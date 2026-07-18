@@ -9,10 +9,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
-import {
-  buildTentSensorChartSeries,
-  buildTentSensorHeaderView,
-} from "@/lib/tentSensorChartRules";
+import { buildTentSensorChartSeries, buildTentSensorHeaderView } from "@/lib/tentSensorChartRules";
 
 const ROOT = resolve(__dirname, "../..");
 const read = (p: string) =>
@@ -23,15 +20,11 @@ const RULES = read("src/lib/tentSensorChartRules.ts");
 
 describe("TentDetail · real sensor readings", () => {
   it("does not import useSensorReadings from useMockData", () => {
-    expect(TENT_DETAIL).not.toMatch(
-      /from\s+["']@\/hooks\/useMockData["']/,
-    );
+    expect(TENT_DETAIL).not.toMatch(/from\s+["']@\/hooks\/useMockData["']/);
   });
 
   it("imports the real sensor_readings hook", () => {
-    expect(TENT_DETAIL).toMatch(
-      /from\s+["']@\/hooks\/use-sensor-readings["']/,
-    );
+    expect(TENT_DETAIL).toMatch(/from\s+["']@\/hooks\/use-sensor-readings["']/);
   });
 
   it("uses the pure chart rules helper", () => {
@@ -95,6 +88,45 @@ describe("buildTentSensorChartSeries", () => {
     ];
     expect(buildTentSensorChartSeries(rows)).toEqual([]);
   });
+
+  it("plots physical gateway evidence but not diagnostics or canonical non-evidence", () => {
+    const rows = [
+      {
+        ts: "2025-01-01T00:00:00Z",
+        metric: "temperature_c",
+        value: 99,
+        source: "live",
+        raw_payload: {
+          vendor: "ecowitt_windows_testbench",
+          metadata: { confidence: "test" },
+        },
+      },
+      {
+        ts: "2025-01-02T00:00:00Z",
+        metric: "temperature_c",
+        value: 24,
+        source: "live",
+        raw_payload: {
+          vendor: "ecowitt_windows_testbench",
+          metadata: {
+            reported_verdant_source: "live",
+            raw_payload: {
+              PASSKEY: "redacted",
+              stationtype: "GW2000A",
+              dateutc: "2025-01-02 00:00:00",
+            },
+          },
+        },
+      },
+      { ts: "2025-01-03T00:00:00Z", metric: "temperature_c", value: 30, source: "demo" },
+      { ts: "2025-01-04T00:00:00Z", metric: "temperature_c", value: 31, source: "stale" },
+      { ts: "2025-01-05T00:00:00Z", metric: "temperature_c", value: 32, source: "invalid" },
+    ];
+
+    expect(buildTentSensorChartSeries(rows)).toEqual([
+      { ts: "2025-01-02T00:00:00Z", temp: 24, rh: null, vpd: null, co2: null, soil: null },
+    ]);
+  });
 });
 
 describe("buildTentSensorHeaderView", () => {
@@ -107,12 +139,51 @@ describe("buildTentSensorHeaderView", () => {
   it("marks readings as stale past the threshold and exposes a source label", () => {
     const now = Date.UTC(2025, 0, 2, 0, 0, 0);
     const oldTs = new Date(now - 2 * 60 * 60 * 1000).toISOString();
-    const rows = [
-      { ts: oldTs, metric: "temperature_c", value: 23, source: "live" },
-    ];
+    const rows = [{ ts: oldTs, metric: "temperature_c", value: 23, source: "live" }];
     const v = buildTentSensorHeaderView(rows, now);
     expect(v.hasReadings).toBe(true);
     expect(v.stale).toBe(true);
+    expect(v.sourceLabel).toBe("Live sensor");
+  });
+
+  it("uses the latest eligible physical row instead of a newer diagnostic row", () => {
+    const now = Date.parse("2025-01-03T00:05:00Z");
+    const v = buildTentSensorHeaderView(
+      [
+        {
+          ts: "2025-01-03T00:04:00Z",
+          metric: "temperature_c",
+          value: 99,
+          source: "live",
+          raw_payload: {
+            vendor: "ecowitt_windows_testbench",
+            metadata: { confidence: "demo" },
+          },
+        },
+        {
+          ts: "2025-01-03T00:03:00Z",
+          metric: "temperature_c",
+          value: 23,
+          source: "live",
+          raw_payload: {
+            vendor: "ecowitt_windows_testbench",
+            metadata: {
+              reported_verdant_source: "live",
+              raw_payload: {
+                PASSKEY: "redacted",
+                stationtype: "GW2000A",
+                dateutc: "2025-01-03 00:03:00",
+              },
+            },
+          },
+        },
+      ],
+      now,
+    );
+
+    expect(v.hasReadings).toBe(true);
+    expect(v.capturedAt).toBe("2025-01-03T00:03:00Z");
+    expect(v.snapshot?.temp).toBe(23);
     expect(v.sourceLabel).toBe("Live sensor");
   });
 });

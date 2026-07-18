@@ -99,7 +99,7 @@ export async function analyzeActionOutcome(
       const toIso = new Date(completedMs + POST_WINDOW_MAX_HOURS * 3_600_000).toISOString();
       const sensorRes = await client
         .from("sensor_readings")
-        .select("tent_id,metric,value,captured_at,source,quality")
+        .select("tent_id,metric,value,captured_at,source,quality,raw_payload")
         .eq("tent_id", action.tent_id)
         .gte("captured_at", fromIso)
         .lte("captured_at", toIso);

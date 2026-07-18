@@ -51,7 +51,7 @@ export function useEnvironmentTrends(
       if (tentIds.length > 0) {
         const { data, error } = await supabase
           .from("sensor_readings")
-          .select("ts,metric,value,source,tent_id")
+          .select("ts,metric,value,source,tent_id,raw_payload")
           .in("tent_id", tentIds)
           .in("metric", ["temperature_c", "humidity_pct", "vpd_kpa"])
           .gte("ts", since)
@@ -65,21 +65,24 @@ export function useEnvironmentTrends(
               value: r.value as number | string | null,
               source: r.source as string | null,
               tent_id: r.tent_id as string | null,
+              raw_payload: r.raw_payload,
             })),
           );
-          const windowed = selectWindow(samples);
-          setState({
-            status: "ok",
-            trends: computeEnvironmentTrends(windowed),
-          });
-          return;
+          if (samples.length > 0) {
+            const windowed = selectWindow(samples);
+            setState({
+              status: "ok",
+              trends: computeEnvironmentTrends(windowed),
+            });
+            return;
+          }
         }
         if (!error && (!data || data.length === 0)) {
           // Try a broader fetch without the time window so we can fall back
           // to "latest 20 readings" if no 24h data exists.
           const { data: any20, error: err20 } = await supabase
             .from("sensor_readings")
-            .select("ts,metric,value,source,tent_id")
+            .select("ts,metric,value,source,tent_id,raw_payload")
             .in("tent_id", tentIds)
             .in("metric", ["temperature_c", "humidity_pct", "vpd_kpa"])
             .order("ts", { ascending: false })
@@ -92,14 +95,17 @@ export function useEnvironmentTrends(
                 value: r.value as number | string | null,
                 source: r.source as string | null,
                 tent_id: r.tent_id as string | null,
+                raw_payload: r.raw_payload,
               })),
             );
-            const windowed = selectWindow(samples);
-            setState({
-              status: "ok",
-              trends: computeEnvironmentTrends(windowed),
-            });
-            return;
+            if (samples.length > 0) {
+              const windowed = selectWindow(samples);
+              setState({
+                status: "ok",
+                trends: computeEnvironmentTrends(windowed),
+              });
+              return;
+            }
           }
         }
       }

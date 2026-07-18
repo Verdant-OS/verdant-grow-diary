@@ -13,10 +13,10 @@ Safety properties (must remain true):
   (`VERDANT_INGEST_URL`) using the bridge token (`VERDANT_BRIDGE_TOKEN`).
 * No fake live data. Synthetic loopback browser/curl/demo payloads are
   labeled ``source = "demo"``. Real LAN EcoWitt gateway uploads
-  (non-loopback caller carrying EcoWitt gateway marker fields such as
-  ``PASSKEY`` / ``stationtype`` / ``model`` / ``dateutc``) are labeled
-  ``source = "live"``. Explicit ``X-Verdant-Forward-Mode: live`` header
-  or ``VERDANT_FORWARD_MODE=live`` env var also opts in to ``live``.
+  (non-loopback caller carrying at least two non-secret EcoWitt gateway
+  marker fields such as ``stationtype`` / ``model`` / ``dateutc``) are
+  labeled ``source = "live"``. Header and environment modes cannot bypass
+  that physical-gateway proof.
   Unknown / spoofed ``source`` values from the payload normalize to
   ``invalid`` and are never silently treated as live or healthy.
 
@@ -32,8 +32,8 @@ Usage:
 
 Endpoints:
     GET  /health
-    GET  /ecowitt              (accepts query params, like EcoWitt customized upload)
-    POST /ecowitt              (accepts form data, JSON, or raw body)
+    GET  /ecowitt or /ECOWITT  (accepts query params, like EcoWitt customized upload)
+    POST /ecowitt or /ECOWITT  (accepts form data, JSON, or raw body)
     GET  /debug/raw-log-tail   (LOCAL-ONLY operator debug; sanitized; read-only)
     GET  /debug/status         (LOCAL-ONLY log status; sanitized; read-only)
     GET  /debug/last-events    (LOCAL-ONLY normalized events; sanitized; read-only)
@@ -153,10 +153,11 @@ def extract_payload() -> Dict[str, Any]:
 # Canonical Verdant source labels. Anything outside this set is "invalid".
 ALLOWED_SOURCES = {"live", "manual", "csv", "demo", "stale", "invalid"}
 
-# Marker fields commonly present in real EcoWitt gateway uploads. We
-# require >=2 to avoid false positives from minimal demo URLs.
+# Non-secret marker fields commonly present in real EcoWitt gateway uploads.
+# We require >=2 to avoid false positives from minimal demo URLs. PASSKEY is
+# intentionally excluded because forwarding strips it before storage; proof
+# must survive that redaction boundary.
 ECOWITT_GATEWAY_MARKERS = {
-    "passkey",
     "stationtype",
     "model",
     "dateutc",
@@ -188,6 +189,25 @@ def looks_like_ecowitt_gateway(payload: Optional[Dict[str, Any]]) -> bool:
     return len(keys_lower & ECOWITT_GATEWAY_MARKERS) >= 2
 
 
+def has_physical_gateway_evidence(
+    payload: Optional[Dict[str, Any]],
+    remote_addr: Optional[str],
+) -> bool:
+    """True only for parse-time, non-loopback EcoWitt gateway evidence.
+
+    This bit is computed by the listener and never trusted from the incoming
+    payload, header mode, or environment mode. A missing caller address fails
+    closed. Requiring at least two gateway markers avoids promoting a minimal
+    browser/curl packet to physical sensor proof.
+    """
+    addr = (remote_addr or "").strip()
+    return (
+        bool(addr)
+        and not _is_loopback_source_addr(addr)
+        and looks_like_ecowitt_gateway(payload)
+    )
+
+
 def resolve_source(
     payload: Optional[Dict[str, Any]] = None,
     remote_addr: Optional[str] = None,
@@ -201,9 +221,8 @@ def resolve_source(
          Unknown labels normalize to ``invalid`` (never silently "live").
       2. Real LAN EcoWitt gateway uploads (non-loopback remote + gateway
          marker fields) normalize to ``live``.
-      3. Explicit ``X-Verdant-Forward-Mode: live`` header or
-         ``VERDANT_FORWARD_MODE=live`` env var keeps the existing opt-in
-         path to ``live``.
+      3. Header/environment ``live`` requests cannot bypass physical gateway
+         evidence; without it they downgrade to ``demo``.
       4. Everything else (loopback browser/curl, demo scripts) is ``demo``.
     """
     if header_mode is None:
@@ -222,23 +241,22 @@ def resolve_source(
                 # Unknown / spoofed label — never accept as live or healthy.
                 return "invalid"
 
-    is_lan = not _is_loopback_source_addr(remote_addr)
-    looks_gateway = looks_like_ecowitt_gateway(payload)
+    physical_gateway_evidence = has_physical_gateway_evidence(payload, remote_addr)
 
     if explicit == "live":
         # Only honor explicit live when it actually looks like a real
         # gateway from a non-loopback caller. Otherwise downgrade.
-        if is_lan and looks_gateway:
+        if physical_gateway_evidence:
             return "live"
         return "demo"
     if explicit in {"manual", "csv", "demo", "stale", "invalid"}:
         return explicit
 
-    if is_lan and looks_gateway:
+    if physical_gateway_evidence:
         return "live"
 
     if header_mode == "live" or env_mode == "live":
-        return "live"
+        return "demo"
 
     return "demo"
 
@@ -366,9 +384,10 @@ FORWARD_STATS: Dict[str, Any] = {
 # under metadata.verdant_source for audit; never sent as `source`.
 WEBHOOK_TRANSPORT_SOURCE = "ecowitt"
 
-# Keys we always strip from raw EcoWitt payloads before forwarding —
-# they are device-auth secrets or noisy fields, never needed by Verdant.
-_FORWARD_PAYLOAD_REDACT_KEYS = {"passkey", "PASSKEY", "Passkey"}
+# Keys we always strip before logging, responding, or forwarding. PASSKEY is
+# device authentication material and MAC is a stable station identifier;
+# neither is needed for telemetry provenance.
+_FORWARD_PAYLOAD_REDACT_KEYS = {"passkey", "mac"}
 
 
 def _redact_raw_payload_for_forward(raw: Any) -> Any:
@@ -378,7 +397,7 @@ def _redact_raw_payload_for_forward(raw: Any) -> Any:
     out: Dict[str, Any] = {}
     for k, v in raw.items():
         ks = str(k)
-        if ks in _FORWARD_PAYLOAD_REDACT_KEYS or ks.lower() == "passkey":
+        if ks.lower() in _FORWARD_PAYLOAD_REDACT_KEYS:
             continue
         out[ks] = v
     return out
@@ -804,21 +823,32 @@ def health() -> Any:
     )
 
 
-@app.route("/ecowitt", methods=["GET", "POST"])
+@app.route("/ecowitt", methods=["GET", "POST"], strict_slashes=False)
+@app.route("/ECOWITT", methods=["GET", "POST"], strict_slashes=False)
 def ecowitt() -> Any:
     raw = extract_payload()
     metrics = normalize_metrics(raw)
     source = resolve_source(payload=raw, remote_addr=request.remote_addr)
+    physical_gateway_evidence = has_physical_gateway_evidence(
+        raw,
+        request.remote_addr,
+    )
     captured_at = datetime.now(timezone.utc).isoformat()
+    safe_raw = _redact_raw_payload_for_forward(raw)
 
 
     reading = {
         "captured_at": captured_at,
         "source": source,
         "vendor": VENDOR,
+        # Listener-computed at parse time. Incoming payload/header/env values
+        # cannot set this bit, so source=live alone is never physical proof.
+        "physical_gateway_evidence": physical_gateway_evidence,
         "metrics": metrics,
         "metadata": {
-            "raw_payload": raw,
+            # Preserve useful gateway markers, never device auth material or
+            # stable station identifiers.
+            "raw_payload": safe_raw,
             "tent_id": os.environ.get("VERDANT_TENT_ID"),
             "remote_addr": request.remote_addr,
         },
@@ -827,7 +857,16 @@ def ecowitt() -> Any:
     append_raw_log(reading)
     forward_result = maybe_forward(reading)
 
-    return jsonify({"ok": True, "reading": reading, "forward": forward_result})
+    # The gateway only needs an acknowledgement. Return the safe telemetry
+    # summary, not local network details or the stored raw envelope.
+    public_reading = {
+        "captured_at": captured_at,
+        "source": source,
+        "vendor": VENDOR,
+        "physical_gateway_evidence": physical_gateway_evidence,
+        "metrics": metrics,
+    }
+    return jsonify({"ok": True, "reading": public_reading, "forward": forward_result})
 
 
 
@@ -1162,6 +1201,7 @@ def debug_forwarding_status() -> Any:
     tent_id = os.environ.get("VERDANT_TENT_ID")
     readiness = evaluate_forwarding_readiness(url, token, tent_id)
     forwarding_enabled = bool(url and token)
+    latest = _latest_metrics_summary()
 
     last_error = FORWARD_STATS.get("last_error")
     if isinstance(last_error, str):
@@ -1219,6 +1259,14 @@ def debug_forwarding_status() -> Any:
             "last_retry_at": FORWARD_STATS.get("last_retry_at"),
             "last_retryable_status": FORWARD_STATS.get("last_retryable_status"),
             "max_retry_attempts": MAX_RETRY_ATTEMPTS,
+            "latest_metrics": {
+                "source": latest["source"],
+                "vendor": latest["vendor"],
+                "metrics": latest["metrics"],
+                "captured_at": latest["captured_at"],
+                "physical_gateway_evidence": latest["physical_gateway_evidence"],
+            },
+            "malformed_line_count": latest["malformed_line_count"],
         }
     )
 
@@ -1369,6 +1417,7 @@ def _latest_metrics_summary() -> Dict[str, Any]:
         "vendor": None,
         "metrics": None,
         "captured_at": None,
+        "physical_gateway_evidence": False,
         "malformed_line_count": 0,
     }
     if not LOG_PATH.exists():
@@ -1387,6 +1436,10 @@ def _latest_metrics_summary() -> Dict[str, Any]:
             summary["vendor"] = safe.get("vendor")
             summary["metrics"] = safe.get("metrics")
             summary["captured_at"] = safe.get("captured_at")
+            # Exact bool only. Legacy/malformed rows fail closed.
+            summary["physical_gateway_evidence"] = (
+                safe.get("physical_gateway_evidence") is True
+            )
     return summary
 
 
@@ -1470,6 +1523,7 @@ def debug_forwarding_error_report() -> Any:
             "vendor": latest["vendor"],
             "metrics": latest["metrics"],
             "captured_at": latest["captured_at"],
+            "physical_gateway_evidence": latest["physical_gateway_evidence"],
         },
         "malformed_line_count": latest["malformed_line_count"],
         "recommended_next_step": next_step,

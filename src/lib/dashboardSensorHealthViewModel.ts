@@ -11,25 +11,13 @@
  * Queue writes. No automation. No device control.
  */
 import type { SnapshotState } from "@/hooks/useLatestSensorSnapshot";
-import {
-  isStale,
-  type SensorSnapshot,
-  type SnapshotSource,
-} from "@/lib/sensorSnapshot";
-import {
-  evaluateSensorQuality,
-  type SensorQualityResult,
-} from "@/lib/sensorQuality";
+import { isStale, type SensorSnapshot, type SnapshotSource } from "@/lib/sensorSnapshot";
+import { type SensorQualityResult } from "@/lib/sensorQuality";
+import { evaluateDashboardSensorQuality } from "@/lib/dashboardSensorEvidenceRules";
 import { resolveSensorSourceLabel } from "@/lib/sensorSourceLabelRules";
 import type { SensorReadingSource } from "@/mock";
 
-export type SensorHealthStatus =
-  | "loading"
-  | "missing"
-  | "invalid"
-  | "stale"
-  | "watch"
-  | "healthy";
+export type SensorHealthStatus = "loading" | "missing" | "invalid" | "stale" | "watch" | "healthy";
 
 export type SensorHealthTone = "ok" | "warn" | "bad" | "muted";
 
@@ -86,6 +74,8 @@ function mapCanonicalSource(snapshot: SensorSnapshot): SensorReadingSource | nul
     case "manual":
     case "diary":
       return "manual";
+    case "csv":
+      return "csv";
     case "sim":
       return "demo";
     case "unavailable":
@@ -121,7 +111,7 @@ export function buildDashboardSensorHealthSummary(
   }
 
   const snapshot = state.snapshot;
-  const quality = evaluateSensorQuality(snapshot, now);
+  const quality = evaluateDashboardSensorQuality(snapshot, now);
 
   // Missing: no snapshot or all metric values are null.
   if (

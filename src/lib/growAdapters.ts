@@ -13,6 +13,7 @@ import {
   classifySensorSnapshotStatus,
   type SensorSnapshotStatus,
 } from "@/lib/sensorSnapshotStatusContract";
+import { isSensorTestbenchRow } from "@/lib/sensorTestbenchIndicatorRules";
 
 const VALID_SOURCES: readonly SensorReadingSource[] = [
   "live",
@@ -25,15 +26,22 @@ const VALID_SOURCES: readonly SensorReadingSource[] = [
 
 /**
  * Coerce a free-text `sensor_readings.source` column to the canonical
- * SensorReadingSource union. Unknown / empty values become "live" — the
- * row came from the DB ingest path, so the *provenance* is live; the
- * status field separately captures whether the value is usable.
+ * SensorReadingSource union. Unknown / empty values fail closed as
+ * "invalid". A database row proves storage, not physical sensor provenance.
  */
 function coerceSource(v: string | null | undefined): SensorReadingSource {
   const s = (v ?? "").toLowerCase();
-  return (VALID_SOURCES as readonly string[]).includes(s)
-    ? (s as SensorReadingSource)
-    : "live";
+  return (VALID_SOURCES as readonly string[]).includes(s) ? (s as SensorReadingSource) : "invalid";
+}
+
+/**
+ * Resolve the presenter-facing source without exposing raw payload details.
+ * Windows listener diagnostics are accepted into the canonical live storage
+ * path, so their preserved lineage must win over the stored `source=live`.
+ */
+export function resolveSensorReadingSource(row: SensorReadingRow): SensorReadingSource {
+  if (isSensorTestbenchRow(row)) return "demo";
+  return coerceSource((row as { source?: string | null }).source);
 }
 
 /**
@@ -47,6 +55,11 @@ function deriveReadingStatus(
   source: SensorReadingSource,
   now: Date = new Date(),
 ): SensorReadingHealthStatus {
+  // Explicit non-live provenance can never become healthy merely because its
+  // timestamp is fresh. This is the legacy adapter's final trust boundary.
+  if (source === "demo") return "needs_review";
+  if (source === "invalid") return "invalid";
+  if (source === "stale") return "stale";
   const result = classifySensorSnapshotStatus({
     rowsReceived: 1,
     rowsAccepted: 1,
@@ -120,10 +133,9 @@ export function mapPlantRow(row: PlantRow): Plant {
  * SensorReading. Missing metrics default to 0. Prefer `groupSensorReadingRows`
  * for fetch results — a single row alone reports only one metric.
  */
-export function mapSensorReadingRow(row: SensorReadingRow): SensorReading {
-  const source = coerceSource((row as { source?: string | null }).source);
-  const capturedAt =
-    (row as { captured_at?: string | null }).captured_at ?? row.ts;
+export function mapSensorReadingRow(row: SensorReadingRow, now: Date = new Date()): SensorReading {
+  const source = resolveSensorReadingSource(row);
+  const capturedAt = (row as { captured_at?: string | null }).captured_at ?? row.ts;
   const reading: SensorReading = {
     ts: row.ts,
     tentId: row.tent_id,
@@ -133,22 +145,36 @@ export function mapSensorReadingRow(row: SensorReadingRow): SensorReading {
     co2: 0,
     soil: 0,
     source,
-    status: deriveReadingStatus(capturedAt, source),
+    status: deriveReadingStatus(capturedAt, source, now),
     capturedAt,
   };
   applyMetric(reading, row.metric, row.value);
   return reading;
 }
 
-function applyMetric(reading: SensorReading, metric: string, rawValue: number | string | null): void {
+function applyMetric(
+  reading: SensorReading,
+  metric: string,
+  rawValue: number | string | null,
+): void {
   const v = Number(rawValue);
   if (!Number.isFinite(v)) return;
   switch (metric) {
-    case "temperature_c": reading.temp = v; break;
-    case "humidity_pct": reading.rh = v; break;
-    case "vpd_kpa": reading.vpd = v; break;
-    case "co2_ppm": reading.co2 = v; break;
-    case "soil_moisture_pct": reading.soil = v; break;
+    case "temperature_c":
+      reading.temp = v;
+      break;
+    case "humidity_pct":
+      reading.rh = v;
+      break;
+    case "vpd_kpa":
+      reading.vpd = v;
+      break;
+    case "co2_ppm":
+      reading.co2 = v;
+      break;
+    case "soil_moisture_pct":
+      reading.soil = v;
+      break;
   }
 }
 
@@ -158,20 +184,23 @@ function applyMetric(reading: SensorReading, metric: string, rawValue: number | 
  * ts descending (newest first); rows with the same ts keep insertion order
  * across distinct tents.
  *
- * Provenance is inherited from the FIRST row encountered per (tent, ts)
- * group; in practice all per-metric rows from one ingest share source/
- * captured_at, so this matches grower expectations. Status is derived
- * once from the contract — never inline-classified.
+ * Provenance starts from the first row encountered per (tent, ts) group; in
+ * practice all per-metric rows from one ingest share source/captured_at. Any
+ * invalid or diagnostic row in a mixed group downgrades the whole snapshot,
+ * so ordering can never promote untrusted evidence. Status is derived from
+ * the contract — never inline-classified.
  */
-export function groupSensorReadingRows(rows: SensorReadingRow[]): SensorReading[] {
+export function groupSensorReadingRows(
+  rows: SensorReadingRow[],
+  now: Date = new Date(),
+): SensorReading[] {
   const byKey = new Map<string, SensorReading>();
   for (const row of rows) {
     const key = `${row.tent_id}|${row.ts}`;
+    const rowSource = resolveSensorReadingSource(row);
     let reading = byKey.get(key);
     if (!reading) {
-      const source = coerceSource((row as { source?: string | null }).source);
-      const capturedAt =
-        (row as { captured_at?: string | null }).captured_at ?? row.ts;
+      const capturedAt = (row as { captured_at?: string | null }).captured_at ?? row.ts;
       reading = {
         ts: row.ts,
         tentId: row.tent_id,
@@ -180,11 +209,17 @@ export function groupSensorReadingRows(rows: SensorReadingRow[]): SensorReading[
         vpd: 0,
         co2: 0,
         soil: 0,
-        source,
-        status: deriveReadingStatus(capturedAt, source),
+        source: rowSource,
+        status: deriveReadingStatus(capturedAt, rowSource, now),
         capturedAt,
       };
       byKey.set(key, reading);
+    } else if (rowSource === "invalid" || (rowSource === "demo" && reading.source !== "invalid")) {
+      // Mixed provenance at one timestamp fails closed. The normal ingest
+      // emits the same lineage for every metric, but a malformed/mixed group
+      // must never let its first physical-looking row promote diagnostics.
+      reading.source = rowSource;
+      reading.status = deriveReadingStatus(reading.capturedAt, rowSource, now);
     }
     applyMetric(reading, row.metric, row.value);
   }

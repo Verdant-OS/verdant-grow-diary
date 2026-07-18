@@ -34,13 +34,19 @@ describe("detectEcowittVendor", () => {
     expect(detectEcowittVendor(row({ source: "ecowitt", raw_payload: null }))).toBe(true);
   });
   it("accepts raw_payload.vendor = ecowitt", () => {
-    expect(detectEcowittVendor(row({ raw_payload: { vendor: "ecowitt_windows_testbench" } }))).toBe(true);
+    expect(detectEcowittVendor(row({ raw_payload: { vendor: "ecowitt_windows_testbench" } }))).toBe(
+      true,
+    );
   });
   it("accepts metadata.transport_source ecowitt", () => {
-    expect(detectEcowittVendor(row({ raw_payload: { metadata: { transport_source: "ecowitt" } } }))).toBe(true);
+    expect(
+      detectEcowittVendor(row({ raw_payload: { metadata: { transport_source: "ecowitt" } } })),
+    ).toBe(true);
   });
   it("rejects when no lineage", () => {
-    expect(detectEcowittVendor(row({ source: "live", raw_payload: { vendor: "spider_farmer" } }))).toBe(false);
+    expect(
+      detectEcowittVendor(row({ source: "live", raw_payload: { vendor: "spider_farmer" } })),
+    ).toBe(false);
   });
 });
 
@@ -79,7 +85,9 @@ describe("detectInvalidMetric", () => {
     expect(detectInvalidMetric(row({ metric: "ph", value: 12 }))).toBe("ph_out_of_range");
   });
   it("flags EC unit mismatch (large raw)", () => {
-    expect(detectInvalidMetric(row({ metric: "soil_ec", value: 1450, unit: "" }))).toBe("ec_unit_mismatch");
+    expect(detectInvalidMetric(row({ metric: "soil_ec", value: 1450, unit: "" }))).toBe(
+      "ec_unit_mismatch",
+    );
   });
   it("flags CO2 out of bounds", () => {
     expect(detectInvalidMetric(row({ metric: "co2", value: 10 }))).toBe("co2_out_of_range");
@@ -142,6 +150,46 @@ describe("classifyEcowittProofRow", () => {
   it("canonical live without ecowitt vendor → not_ecowitt", () => {
     const r = row({ raw_payload: { vendor: "spider_farmer" } });
     expect(classifyEcowittProofRow(r, [r], NOW).status).toBe("not_ecowitt");
+  });
+  it("testbench vendor never satisfies live proof", () => {
+    const r = row({ raw_payload: { vendor: "ecowitt_windows_testbench" } });
+    const c = classifyEcowittProofRow(r, [r], NOW);
+    expect(c.status).toBe("testbench");
+    expect(c.reasonCode).toBe("test_provenance");
+  });
+  it("metadata confidence=test never satisfies live proof", () => {
+    const r = row({
+      raw_payload: {
+        vendor: "ecowitt",
+        metadata: { confidence: "test" },
+      },
+    });
+    expect(classifyEcowittProofRow(r, [r], NOW).status).toBe("testbench");
+  });
+  it("canonical verdant_source=live alone never satisfies physical live proof", () => {
+    const r = row({
+      raw_payload: {
+        vendor: "ecowitt_windows_testbench",
+        metadata: { verdant_source: "live" },
+      },
+    });
+    expect(classifyEcowittProofRow(r, [r], NOW).status).toBe("testbench");
+  });
+  it("physical gateway lineage from the Windows listener can satisfy live proof", () => {
+    const r = row({
+      raw_payload: {
+        vendor: "ecowitt_windows_testbench",
+        metadata: {
+          reported_verdant_source: "live",
+          raw_payload: {
+            stationtype: "GW2000A_V3.2.4",
+            model: "GW2000A",
+            dateutc: "2026-06-19 11:59:00",
+          },
+        },
+      },
+    });
+    expect(classifyEcowittProofRow(r, [r], NOW).status).toBe("live_confirmed");
   });
 });
 

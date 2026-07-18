@@ -22,10 +22,13 @@ import {
   type SensorSnapshotStatus,
   type SensorSnapshotStatusResult,
 } from "@/lib/sensorSnapshotStatusContract";
+import {
+  classifySensorTestbench,
+  type SensorTestbenchRowLike,
+} from "@/lib/sensorTestbenchIndicatorRules";
 
 /** Re-exported for back-compat — prefer the contract module. */
-export const SENSOR_BRIDGE_HEALTH_STALE_MS =
-  resolveSensorSnapshotStaleWindowMs();
+export const SENSOR_BRIDGE_HEALTH_STALE_MS = resolveSensorSnapshotStaleWindowMs();
 
 export const SENSOR_BRIDGE_CONTROL_DISCLOSURE = "No device control.";
 
@@ -67,6 +70,24 @@ export interface SensorBridgeHealthInput {
   bridgeName?: string | null;
   now?: Date;
   staleMs?: number;
+}
+
+/**
+ * Fetch state for the selected tent's row-level sensor evidence. Kept local
+ * to this pure view-model so the card never infers query state in JSX.
+ */
+export type SensorBridgeReadingEvidenceStatus = "loading" | "error" | "success";
+
+export interface SensorBridgeReadingEvidenceRowLike extends SensorTestbenchRowLike {
+  /** `sensor_readings.ts` is the final timestamp fallback. */
+  ts?: string | Date | null;
+}
+
+export interface SensorBridgeReadingEvidenceInput {
+  rows?: ReadonlyArray<SensorBridgeReadingEvidenceRowLike>;
+  status?: SensorBridgeReadingEvidenceStatus;
+  now?: Date;
+  liveWindowMs?: number;
 }
 
 function toDate(v: string | Date | null | undefined): Date | null {
@@ -159,8 +180,7 @@ export function buildSensorBridgeHealthViewModel(
   const evidence = evaluateSensorSnapshotEvidence(classification);
 
   const sourceRaw = latest?.row.source ?? null;
-  const sourceLabel =
-    typeof sourceRaw === "string" && sourceRaw.length > 0 ? sourceRaw : null;
+  const sourceLabel = typeof sourceRaw === "string" && sourceRaw.length > 0 ? sourceRaw : null;
 
   return {
     state: classification.status,
@@ -175,4 +195,111 @@ export function buildSensorBridgeHealthViewModel(
     bridgeName,
     countsAsHealthyEvidence: evidence.countsAsHealthyEvidence,
   };
+}
+
+function withoutHealthyClaim(
+  vm: SensorBridgeHealthViewModel,
+  state: Exclude<SensorBridgeHealthState, "usable">,
+  message: string,
+  reasonCode: SensorBridgeHealthReasonCode | null = null,
+): SensorBridgeHealthViewModel {
+  return {
+    ...vm,
+    state,
+    status: state,
+    message,
+    latestReasonCode: reasonCode,
+    countsAsHealthyEvidence: false,
+  };
+}
+
+/**
+ * Reconcile a transport-level ingest success with provenance-aware readings
+ * from the currently selected tent.
+ *
+ * `sensor_ingest_audit_log` intentionally carries counts/timestamps only, so
+ * a successful audit row cannot distinguish a Windows diagnostic packet from
+ * a physical gateway reading. The bridge card may retain `usable` only when
+ * recent row-level evidence independently classifies as live. Missing,
+ * loading, failed, test/demo, manual, CSV, stale, or invalid evidence fails
+ * closed without rewriting the underlying audit history.
+ */
+export function reconcileSensorBridgeHealthWithReadings(
+  vm: SensorBridgeHealthViewModel,
+  input: SensorBridgeReadingEvidenceInput,
+): SensorBridgeHealthViewModel {
+  // Row evidence can narrow a green audit claim; it must never override an
+  // audit-level rejection, invalid state, stale state, or empty state.
+  if (vm.state !== "usable") return vm;
+
+  if (input.status === "loading") {
+    return withoutHealthyClaim(
+      vm,
+      "needs_review",
+      "Bridge intake accepted; checking this tent for a recent physical sensor reading.",
+    );
+  }
+
+  if (input.status === "error") {
+    return withoutHealthyClaim(
+      vm,
+      "needs_review",
+      "Bridge intake accepted, but this tent's live sensor evidence could not be verified.",
+    );
+  }
+
+  // An omitted status/row set is unverified evidence, never implicit success.
+  const rows = input.rows ?? [];
+  if (input.status !== "success" || rows.length === 0) {
+    return withoutHealthyClaim(
+      vm,
+      "needs_review",
+      "Bridge intake accepted, but no recent physical sensor reading confirms this tent.",
+    );
+  }
+
+  const normalizedRows = rows.map((row) => ({
+    ...row,
+    captured_at: row.captured_at ?? row.ts ?? null,
+  }));
+  const evidence = classifySensorTestbench({
+    rows: normalizedRows,
+    now: input.now,
+    liveWindowMs: input.liveWindowMs,
+  });
+
+  if (evidence.indicator === "live") return vm;
+
+  if (evidence.indicator === "testbench") {
+    return withoutHealthyClaim(
+      vm,
+      "needs_review",
+      "Diagnostic testbench packet received. A recent physical sensor reading is still required.",
+    );
+  }
+
+  const source = evidence.source?.trim().toLowerCase() ?? "";
+  if (source === "invalid") {
+    return withoutHealthyClaim(
+      vm,
+      "invalid",
+      "Latest selected-tent sensor reading is invalid.",
+      "malformed_payload",
+    );
+  }
+
+  if (source === "stale" || source === "live") {
+    return withoutHealthyClaim(
+      vm,
+      "stale",
+      "Latest selected-tent live sensor reading is stale.",
+      "stale_timestamp",
+    );
+  }
+
+  return withoutHealthyClaim(
+    vm,
+    "needs_review",
+    "Bridge intake accepted, but no recent physical sensor reading confirms this tent.",
+  );
 }

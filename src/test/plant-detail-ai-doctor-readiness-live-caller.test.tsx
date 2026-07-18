@@ -1,7 +1,7 @@
 /**
  * PlantDetailAiDoctorReadiness (live caller) — verifies the component
- * passes the REAL intake classification from `useSensorBridgeHealth`
- * into the readiness builder. No presence-to-usable synthesis allowed.
+ * requires provenance-aware current rows before a coarse bridge audit may
+ * count as usable. No presence/audit-to-usable synthesis allowed.
  *
  * Read-only render test. No writes, no AI, no action_queue, no device
  * control.
@@ -16,12 +16,27 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 const useRecentMock = vi.fn();
 const useBridgeMock = vi.fn();
+const currentSensorState = vi.hoisted(() => ({
+  rows: [] as unknown[],
+  status: "success" as "loading" | "error" | "success",
+}));
 
 vi.mock("@/hooks/usePlantRecentActivity", () => ({
   usePlantRecentActivity: (id: string | null | undefined) => useRecentMock(id),
 }));
 vi.mock("@/hooks/useSensorBridgeHealth", () => ({
   useSensorBridgeHealth: () => useBridgeMock(),
+}));
+vi.mock("@/hooks/use-sensor-readings", () => ({
+  useSensorReadingsByTents: (tentIds: string[]) => {
+    const byTent: Record<string, unknown[]> = {};
+    const statusByTent: Record<string, string> = {};
+    for (const id of tentIds) {
+      byTent[id] = currentSensorState.status === "success" ? currentSensorState.rows : [];
+      statusByTent[id] = currentSensorState.status;
+    }
+    return { byTent, statusByTent };
+  },
 }));
 
 import PlantDetailAiDoctorReadiness from "@/components/PlantDetailAiDoctorReadiness";
@@ -35,6 +50,27 @@ const COMPONENT_SRC = readFileSync(
   resolve(ROOT, "src/components/PlantDetailAiDoctorReadiness.tsx"),
   "utf8",
 );
+const TENT_ID = "5a1c6e0f-2b3d-4c5e-8f90-1a2b3c4d5e77";
+
+function physicalLiveRow() {
+  return {
+    metric: "temperature_c",
+    value: 25,
+    captured_at: new Date(Date.now() - 60_000).toISOString(),
+    source: "live",
+    raw_payload: {
+      vendor: "ecowitt_windows_testbench",
+      metadata: {
+        reported_verdant_source: "live",
+        raw_payload: {
+          stationtype: "GW2000A_V3.2.4",
+          model: "GW2000A",
+          dateutc: "2026-07-17 19:30:00",
+        },
+      },
+    },
+  };
+}
 
 function renderCard() {
   const qc = new QueryClient({
@@ -45,6 +81,7 @@ function renderCard() {
       <MemoryRouter>
         <PlantDetailAiDoctorReadiness
           plantId="plant-1"
+          tentId={TENT_ID}
           stage="veg"
           hasPlantPhoto
         />
@@ -98,6 +135,8 @@ const ROWS_WITH_SNAPSHOT = [
 beforeEach(() => {
   useRecentMock.mockReset();
   useBridgeMock.mockReset();
+  currentSensorState.rows = [];
+  currentSensorState.status = "success";
   useRecentMock.mockReturnValue({ data: ROWS_WITH_SNAPSHOT, isLoading: false });
 });
 
@@ -108,14 +147,14 @@ describe("PlantDetailAiDoctorReadiness — live caller × real intake classifica
       expect(COMPONENT_SRC).not.toMatch(
         /signals\.hasSensorSnapshot[\s\S]{0,200}status:\s*["']usable["']/,
       );
-      expect(COMPONENT_SRC).not.toMatch(
-        /hasSensorSnapshot\s*\?\s*\{[\s\S]{0,200}usable/,
-      );
+      expect(COMPONENT_SRC).not.toMatch(/hasSensorSnapshot\s*\?\s*\{[\s\S]{0,200}usable/);
     });
 
-    it("sources sensorSnapshot from useSensorBridgeHealth via classificationFromStatusResult", () => {
+    it("requires provenance-aware current rows before an audit can be usable", () => {
       expect(COMPONENT_SRC).toMatch(/useSensorBridgeHealth/);
-      expect(COMPONENT_SRC).toMatch(/classificationFromStatusResult/);
+      expect(COMPONENT_SRC).toMatch(/useSensorReadingsByTents/);
+      expect(COMPONENT_SRC).toMatch(/classifyAiDoctorCurrentSensorEvidence/);
+      expect(COMPONENT_SRC).toMatch(/selectAiDoctorSensorEvidenceClassification/);
     });
   });
 
@@ -123,9 +162,10 @@ describe("PlantDetailAiDoctorReadiness — live caller × real intake classifica
     setBridge(null, null);
     renderCard();
 
-    expect(
-      screen.getByTestId("plant-detail-ai-doctor-readiness-cta"),
-    ).toHaveAttribute("href", "/plants/plant-1#plant-ai-doctor-review");
+    expect(screen.getByTestId("plant-detail-ai-doctor-readiness-cta")).toHaveAttribute(
+      "href",
+      "/plants/plant-1#plant-ai-doctor-review",
+    );
   });
 
   describe("UI panel reflects real intake classification", () => {
@@ -169,23 +209,20 @@ describe("PlantDetailAiDoctorReadiness — live caller × real intake classifica
 
     for (const c of cases) {
       it(`status="${c.status}" → mode=${c.mode}, exact status+reason rendered`, () => {
+        currentSensorState.rows = c.status === "usable" ? [physicalLiveRow()] : [];
         setBridge(c.status, c.reasonCode);
         renderCard();
-        const panel = screen.getByTestId(
-          "plant-detail-ai-doctor-sensor-evidence-panel",
-        );
+        const panel = screen.getByTestId("plant-detail-ai-doctor-sensor-evidence-panel");
         expect(panel.getAttribute("data-status")).toBe(c.status);
         expect(panel.getAttribute("data-mode")).toBe(c.mode);
         expect(panel.getAttribute("data-counts-as-healthy")).toBe(
           c.status === "usable" ? "true" : "false",
         );
         expect(
-          screen.getByTestId("plant-detail-ai-doctor-sensor-evidence-status")
-            .textContent,
+          screen.getByTestId("plant-detail-ai-doctor-sensor-evidence-status").textContent,
         ).toContain(c.status);
         expect(
-          screen.getByTestId("plant-detail-ai-doctor-sensor-evidence-reason")
-            .textContent,
+          screen.getByTestId("plant-detail-ai-doctor-sensor-evidence-reason").textContent,
         ).toBeTruthy();
 
         if (c.nextActionLabel) {
@@ -195,9 +232,7 @@ describe("PlantDetailAiDoctorReadiness — live caller × real intake classifica
           expect(btn.textContent).toContain(c.nextActionLabel);
         } else {
           expect(
-            screen.queryByTestId(
-              `plant-detail-ai-doctor-sensor-evidence-next-action-${c.status}`,
-            ),
+            screen.queryByTestId(`plant-detail-ai-doctor-sensor-evidence-next-action-${c.status}`),
           ).toBeNull();
         }
       });
@@ -206,31 +241,23 @@ describe("PlantDetailAiDoctorReadiness — live caller × real intake classifica
 
   describe("usable clears the missing 'no_sensor_snapshot' bullet", () => {
     it("does not show no_sensor_snapshot missing bullet when usable", () => {
+      currentSensorState.rows = [physicalLiveRow()];
       setBridge("usable", "fresh_accept");
       renderCard();
       expect(
-        screen.queryByTestId(
-          "plant-detail-ai-doctor-readiness-missing-no_sensor_snapshot",
-        ),
+        screen.queryByTestId("plant-detail-ai-doctor-readiness-missing-no_sensor_snapshot"),
       ).toBeNull();
     });
   });
 
   describe("non-usable statuses do NOT clear the missing bullet", () => {
-    const nonUsable: SensorSnapshotStatus[] = [
-      "stale",
-      "invalid",
-      "needs_review",
-      "no_data",
-    ];
+    const nonUsable: SensorSnapshotStatus[] = ["stale", "invalid", "needs_review", "no_data"];
     for (const status of nonUsable) {
       it(`status="${status}" keeps the no_sensor_snapshot missing bullet`, () => {
         setBridge(status, "none_received");
         renderCard();
         expect(
-          screen.getByTestId(
-            "plant-detail-ai-doctor-readiness-missing-no_sensor_snapshot",
-          ),
+          screen.getByTestId("plant-detail-ai-doctor-readiness-missing-no_sensor_snapshot"),
         ).toBeTruthy();
       });
     }
@@ -240,11 +267,29 @@ describe("PlantDetailAiDoctorReadiness — live caller × real intake classifica
     it("treats missing bridge view-model as no_data", () => {
       setBridge(null, null);
       renderCard();
-      const panel = screen.getByTestId(
-        "plant-detail-ai-doctor-sensor-evidence-panel",
-      );
+      const panel = screen.getByTestId("plant-detail-ai-doctor-sensor-evidence-panel");
       expect(panel.getAttribute("data-status")).toBe("no_data");
       expect(panel.getAttribute("data-mode")).toBe("missing");
     });
+  });
+
+  it("never lets an audit success plus a test packet raise readiness", () => {
+    currentSensorState.rows = [
+      {
+        metric: "temperature_c",
+        value: 29,
+        captured_at: new Date(Date.now() - 60_000).toISOString(),
+        source: "live",
+        raw_payload: {
+          vendor: "ecowitt_windows_testbench",
+          metadata: { confidence: "test" },
+        },
+      },
+    ];
+    setBridge("usable", "fresh_accept");
+    renderCard();
+    const panel = screen.getByTestId("plant-detail-ai-doctor-sensor-evidence-panel");
+    expect(panel.getAttribute("data-status")).toBe("no_data");
+    expect(panel.getAttribute("data-counts-as-healthy")).toBe("false");
   });
 });

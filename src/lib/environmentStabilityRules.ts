@@ -36,7 +36,7 @@ export type StabilityStatus =
 export interface StabilityReadingInput {
   ts: string | number | Date;
   vpd: number | null | undefined;
-  /** Optional source label. Readings marked "demo" are ignored. */
+  /** Optional source label. Explicit demo/invalid/stale sources are ignored. */
   source?: string | null;
   /** Optional explicit stale flag. Stale readings are ignored. */
   stale?: boolean | null;
@@ -103,7 +103,18 @@ function toMillis(ts: string | number | Date): number | null {
 function isUsableSource(source: string | null | undefined): boolean {
   if (source == null) return true;
   const s = String(source).trim().toLowerCase();
-  if (s === "" || s === "demo" || s === "mock") return false;
+  if (
+    s === "" ||
+    s === "demo" ||
+    s === "sim" ||
+    s === "mock" ||
+    s === "testbench" ||
+    s === "invalid" ||
+    s === "stale" ||
+    s === "unavailable"
+  ) {
+    return false;
+  }
   return true;
 }
 
@@ -171,10 +182,7 @@ function computeWindow(
     ) {
       totalConsidered += 1;
       hoursConsidered += gapHours;
-      if (
-        classification === "below_target" ||
-        classification === "above_target"
-      ) {
+      if (classification === "below_target" || classification === "above_target") {
         outsideCount += 1;
         hoursOutside += gapHours;
       }
@@ -288,9 +296,7 @@ export function computeEnvironmentStability(
     status = "stable";
   }
 
-  const message = sparse
-    ? "Limited data — stability estimate may be incomplete."
-    : null;
+  const message = sparse ? "Limited data — stability estimate may be incomplete." : null;
 
   return {
     status,

@@ -23,9 +23,17 @@ import {
   type EpisodeSensorEvidence,
   type PlantMemoryEpisode,
 } from "@/lib/plantMemoryEpisodeRules";
+import { isDiagnosticSensorProvenanceRow } from "@/lib/sensorProvenanceFenceRules";
 
 /** Provenance labels this feature may show (existing project vocabulary). */
-export const EPISODE_SENSOR_SOURCES = ["live", "manual", "csv", "demo", "stale", "invalid"] as const;
+export const EPISODE_SENSOR_SOURCES = [
+  "live",
+  "manual",
+  "csv",
+  "demo",
+  "stale",
+  "invalid",
+] as const;
 
 const KNOWN_REAL_SOURCES = new Set(["live", "manual", "csv"]);
 
@@ -37,6 +45,8 @@ export interface EpisodeSensorRowInput {
   readonly source: string | null;
   readonly quality?: string | null;
   readonly captured_at: string | null;
+  /** Opaque provenance envelope; inspected only by the shared diagnostic fence. */
+  readonly raw_payload?: unknown;
 }
 
 /**
@@ -60,6 +70,12 @@ export function classifyEpisodeSensorRow(
   if (capturedMs > args.nowMs + FUTURE_TIMESTAMP_SKEW_MS) {
     source = "invalid";
     status = "invalid";
+    usable = false;
+  } else if (isDiagnosticSensorProvenanceRow(row)) {
+    // Accepted transport is not the same as physical sensor evidence. Keep
+    // Windows diagnostics visible only as demo-backed, non-usable context.
+    source = "demo";
+    status = "needs_review";
     usable = false;
   } else if (rawSource === "demo") {
     source = "demo";

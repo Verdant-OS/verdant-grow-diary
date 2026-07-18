@@ -12,7 +12,8 @@
  *
  *   - stored source MUST be canonical "live" (never "ecowitt")
  *   - transport lineage preserved in raw_payload.metadata.transport_source
- *   - verdant_source mirror present in raw_payload.metadata
+ *   - canonical source mirror present in raw_payload.metadata.verdant_source
+ *   - listener decision preserved in metadata.reported_verdant_source
  *   - vendor lineage preserved in raw_payload.vendor
  *   - user_id stamped from auth, not from the request body
  *   - tent_id carried through verbatim
@@ -114,6 +115,7 @@ describe("sensor-ingest-webhook E2E insert contract — EcoWitt", () => {
       expect(meta).toBeDefined();
       expect(meta?.transport_source).toBe("ecowitt");
       expect(meta?.verdant_source).toBe("live");
+      expect(meta?.reported_verdant_source).toBe("live");
     }
   });
 
@@ -198,7 +200,8 @@ describe("sensor-ingest-webhook E2E insert contract — EcoWitt", () => {
  * payload must produce a canonical sensor_readings row whose:
  *   - source === "live"
  *   - raw_payload.metadata.transport_source === forwarded payload's `source`
- *   - raw_payload.metadata.verdant_source === "live"
+ *   - raw_payload.metadata.verdant_source === "live" (canonical mirror)
+ *   - raw_payload.metadata.reported_verdant_source === "live" (listener report)
  *
  * This is the TypeScript-side mirror of the Python golden contract in
  * tools/ecowitt-testbench/test_forwarding_contract.py.
@@ -213,5 +216,6 @@ describe("EcoWitt forwarded transport ↔ stored row agreement", () => {
     >;
     expect(meta.transport_source).toBe(ECOWITT_FORWARDED_PAYLOAD.source);
     expect(meta.verdant_source).toBe("live");
+    expect(meta.reported_verdant_source).toBe("live");
   });
 });

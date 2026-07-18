@@ -22,6 +22,7 @@
  */
 
 import { normalizeSensorSource, type SensorSource } from "@/lib/sensor/sensorSourceRules";
+import { isDiagnosticSensorProvenanceRow } from "@/lib/sensorProvenanceFenceRules";
 import { celsiusToFahrenheit } from "@/lib/temperatureUnits";
 import { toCanonicalMscm } from "@/lib/ecUnits";
 import { parseTimestampMs } from "@/lib/actionOutcomeWindowRules";
@@ -60,6 +61,8 @@ export type RawSensorReadingRow = {
   captured_at: string | null;
   source: string | null;
   quality: string | null;
+  /** Opaque provenance envelope used only by the shared testbench fence. */
+  raw_payload?: unknown;
 };
 
 export type SensorEvidenceRejection = {
@@ -199,6 +202,14 @@ export function normalizeSensorEvidence(input: {
     }
     if (row.tent_id !== input.actionTentId) {
       rejections.push({ reason: "wrong_tent", metric: row.metric });
+      continue;
+    }
+
+    // A successful transport can still be a Windows testbench diagnostic.
+    // Provenance wins over the canonical stored source so diagnostic rows
+    // never influence an action outcome as physical sensor evidence.
+    if (isDiagnosticSensorProvenanceRow(row)) {
+      rejections.push({ reason: "unusable_source", metric: row.metric });
       continue;
     }
 

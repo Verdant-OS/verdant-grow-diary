@@ -51,6 +51,7 @@ const MANUAL_SOURCES = new Set(["manual", "user", "entry", "log"]);
 // vendor literals to keep the action-queue safety contract test clean.
 // Callers normalize their own ingest source tags before passing them in.
 const LIVE_SOURCES = new Set([
+  "live",
   "supabase",
   "sensor",
   "hassio",
@@ -118,8 +119,7 @@ export function classifyGrowDataSource(
   const tsProvided = tsRaw !== null && tsRaw !== undefined && tsRaw !== "";
   const tsInvalid = tsProvided && tsMillis === null;
   const ageMs = tsMillis !== null ? now - tsMillis : null;
-  const isStale =
-    ageMs !== null && (ageMs > staleThresholdMs || ageMs < -staleThresholdMs);
+  const isStale = ageMs !== null && (ageMs > staleThresholdMs || ageMs < -staleThresholdMs);
 
   // 1. Demo / mock always wins — never trusted, never Live.
   if (source && DEMO_SOURCES.has(source)) {
@@ -148,7 +148,6 @@ export function classifyGrowDataSource(
       reasons,
     };
   }
-
 
   // 2. Unavailable: no source AND no value.
   if (!source && !valuePresent) {

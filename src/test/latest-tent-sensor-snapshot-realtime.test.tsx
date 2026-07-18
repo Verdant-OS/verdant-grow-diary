@@ -12,7 +12,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { renderHook, act } from "@testing-library/react";
+import { renderHook, act, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 
@@ -50,11 +50,13 @@ function makeChannel(name: string): FakeChannel {
   return ch;
 }
 
+let queryRows: unknown[] = [];
+
 const queryBuilder = {
   select: () => queryBuilder,
   eq: () => queryBuilder,
   order: () => queryBuilder,
-  limit: async () => ({ data: [], error: null }),
+  limit: async () => ({ data: queryRows, error: null }),
 };
 
 vi.mock("@/integrations/supabase/client", () => ({
@@ -87,6 +89,7 @@ function newClient() {
 beforeEach(() => {
   created.length = 0;
   removed.length = 0;
+  queryRows = [];
 });
 
 describe("useLatestTentSensorSnapshot — realtime cache invalidation", () => {
@@ -155,10 +158,9 @@ describe("useLatestTentSensorSnapshot — realtime cache invalidation", () => {
     try {
       const client = newClient();
       const spy = vi.spyOn(client, "invalidateQueries");
-      const { unmount } = renderHook(
-        () => useLatestTentSensorSnapshot("tent-A"),
-        { wrapper: wrapper(client) },
-      );
+      const { unmount } = renderHook(() => useLatestTentSensorSnapshot("tent-A"), {
+        wrapper: wrapper(client),
+      });
       const ch = created[0];
       const before = spy.mock.calls.length;
       act(() => {
@@ -176,10 +178,9 @@ describe("useLatestTentSensorSnapshot — realtime cache invalidation", () => {
 
   it("removes the channel on unmount", () => {
     const client = newClient();
-    const { unmount } = renderHook(
-      () => useLatestTentSensorSnapshot("tent-A"),
-      { wrapper: wrapper(client) },
-    );
+    const { unmount } = renderHook(() => useLatestTentSensorSnapshot("tent-A"), {
+      wrapper: wrapper(client),
+    });
     unmount();
     expect(removed).toHaveLength(1);
     expect(removed[0].name).toContain("tent-A");
@@ -187,10 +188,10 @@ describe("useLatestTentSensorSnapshot — realtime cache invalidation", () => {
 
   it("removes the old channel and subscribes to the new one on tent change", () => {
     const client = newClient();
-    const { rerender } = renderHook(
-      ({ id }: { id: string }) => useLatestTentSensorSnapshot(id),
-      { wrapper: wrapper(client), initialProps: { id: "tent-A" } },
-    );
+    const { rerender } = renderHook(({ id }: { id: string }) => useLatestTentSensorSnapshot(id), {
+      wrapper: wrapper(client),
+      initialProps: { id: "tent-A" },
+    });
     expect(created).toHaveLength(1);
     rerender({ id: "tent-B" });
     expect(removed).toHaveLength(1);
@@ -205,34 +206,110 @@ describe("useLatestTentSensorSnapshot — realtime cache invalidation", () => {
   it("realtime subscribe failure does not break the hook", () => {
     const client = newClient();
     // Patch channel to throw on .on subscription wiring
-    const origChannel = (created.push as unknown) as never;
+    const origChannel = created.push as unknown as never;
     void origChannel;
-    const { result } = renderHook(
-      () => useLatestTentSensorSnapshot("tent-A"),
-      { wrapper: wrapper(client) },
-    );
+    const { result } = renderHook(() => useLatestTentSensorSnapshot("tent-A"), {
+      wrapper: wrapper(client),
+    });
     expect(["loading", "empty", "idle"]).toContain(result.current.status);
   });
 
   it("query key matches the documented shape", () => {
-    expect(latestTentSensorSnapshotQueryKey("tent-A")).toEqual([
-      "sensor",
-      "latest",
-      "tent-A",
-    ]);
-    expect(latestTentSensorSnapshotQueryKey(null)).toEqual([
-      "sensor",
-      "latest",
-      "none",
-    ]);
+    expect(latestTentSensorSnapshotQueryKey("tent-A")).toEqual(["sensor", "latest", "tent-A"]);
+    expect(latestTentSensorSnapshotQueryKey(null)).toEqual(["sensor", "latest", "none"]);
+  });
+
+  it("classifies diagnostics before caching and returns no attachable snapshot", async () => {
+    const capturedAt = new Date().toISOString();
+    queryRows = [
+      {
+        id: "diagnostic-temperature",
+        tent_id: "tent-A",
+        metric: "temperature_c",
+        value: 24,
+        source: "live",
+        quality: "ok",
+        captured_at: capturedAt,
+        ts: capturedAt,
+        created_at: capturedAt,
+        raw_payload: {
+          vendor: "ecowitt_windows_testbench",
+          metadata: {
+            confidence: "test",
+            verdant_source: "live",
+            secret: "classification-only-secret",
+          },
+        },
+      },
+    ];
+    const client = newClient();
+    const { result } = renderHook(() => useLatestTentSensorSnapshot("tent-A"), {
+      wrapper: wrapper(client),
+    });
+
+    await waitFor(() => expect(result.current.status).toBe("empty"));
+    expect(result.current.snapshot.status).toBe("empty");
+    expect(result.current.snapshot.usable).toBe(false);
+    const cached = client.getQueryData(latestTentSensorSnapshotQueryKey("tent-A"));
+    expect(JSON.stringify(cached)).not.toMatch(/raw_payload|classification-only-secret/i);
+  });
+
+  it("keeps physical gateway evidence live while caching only its redacted projection", async () => {
+    const capturedAt = new Date().toISOString();
+    const rawPayload = {
+      vendor: "ecowitt_windows_testbench",
+      metadata: {
+        reported_verdant_source: "live",
+        raw_payload: {
+          stationtype: "GW2000A_V3.2.4",
+          model: "GW2000A",
+          dateutc: "2026-07-17 20:00:00",
+          PASSKEY: "classification-only-secret",
+        },
+      },
+    };
+    queryRows = [
+      {
+        id: "physical-temperature",
+        tent_id: "tent-A",
+        metric: "temperature_c",
+        value: 24,
+        source: "live",
+        quality: "ok",
+        captured_at: capturedAt,
+        ts: capturedAt,
+        created_at: capturedAt,
+        raw_payload: rawPayload,
+      },
+      {
+        id: "physical-humidity",
+        tent_id: "tent-A",
+        metric: "humidity_pct",
+        value: 55,
+        source: "live",
+        quality: "ok",
+        captured_at: capturedAt,
+        ts: capturedAt,
+        created_at: capturedAt,
+        raw_payload: rawPayload,
+      },
+    ];
+    const client = newClient();
+    const { result } = renderHook(() => useLatestTentSensorSnapshot("tent-A"), {
+      wrapper: wrapper(client),
+    });
+
+    await waitFor(() => expect(result.current.status).toBe("ready"));
+    expect(result.current.snapshot.status).toBe("fresh_live");
+    expect(result.current.snapshot.usable).toBe(true);
+    expect(result.current.snapshot.metrics.humidity_pct).toBe(55);
+    const cached = client.getQueryData(latestTentSensorSnapshotQueryKey("tent-A"));
+    expect(JSON.stringify(cached)).not.toMatch(/raw_payload|PASSKEY|classification-only-secret/i);
   });
 });
 
 describe("static safety scan — src/lib/sensor.ts", () => {
-  const src = readFileSync(
-    path.resolve(__dirname, "../lib/sensor.ts"),
-    "utf-8",
-  );
+  const src = readFileSync(path.resolve(__dirname, "../lib/sensor.ts"), "utf-8");
 
   it("contains no write / invoke / automation / device-control / fake-live strings", () => {
     expect(src).not.toMatch(/\.insert\(/);

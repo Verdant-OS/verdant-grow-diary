@@ -35,8 +35,14 @@ describe("ecowittLatestSnapshotFilter", () => {
 
   it("filters by tent_id and never bleeds another tent's newer reading in", () => {
     const rows: EcowittSensorReadingRow[] = [
-      row({ tent_id: TENT_A, captured_at: FRESH_AT }, { temp1f: 70, humidity1: 50, dateutc: FRESH_AT }),
-      row({ tent_id: TENT_B, captured_at: NEWER_AT }, { temp1f: 90, humidity1: 80, dateutc: NEWER_AT }),
+      row(
+        { tent_id: TENT_A, captured_at: FRESH_AT },
+        { temp1f: 70, humidity1: 50, dateutc: FRESH_AT },
+      ),
+      row(
+        { tent_id: TENT_B, captured_at: NEWER_AT },
+        { temp1f: 90, humidity1: 80, dateutc: NEWER_AT },
+      ),
     ];
     const vm = buildEcowittLatestSnapshot(rows, { tentId: TENT_A }, { now: NOW });
     expect(vm.hasReading).toBe(true);
@@ -45,21 +51,21 @@ describe("ecowittLatestSnapshotFilter", () => {
 
   it("filters by plant_id when provided", () => {
     const rows: EcowittSensorReadingRow[] = [
-      row({ plant_id: PLANT_1, captured_at: FRESH_AT }, { temp1f: 77, humidity1: 55, dateutc: FRESH_AT }),
-      row({ plant_id: null, captured_at: NEWER_AT }, { temp1f: 80, humidity1: 60, dateutc: NEWER_AT }),
+      row(
+        { plant_id: PLANT_1, captured_at: FRESH_AT },
+        { temp1f: 77, humidity1: 55, dateutc: FRESH_AT },
+      ),
+      row(
+        { plant_id: null, captured_at: NEWER_AT },
+        { temp1f: 80, humidity1: 60, dateutc: NEWER_AT },
+      ),
     ];
-    const vm = buildEcowittLatestSnapshot(
-      rows,
-      { tentId: TENT_A, plantId: PLANT_1 },
-      { now: NOW },
-    );
+    const vm = buildEcowittLatestSnapshot(rows, { tentId: TENT_A, plantId: PLANT_1 }, { now: NOW });
     expect(vm.metrics.humidity_pct).toBe(55);
   });
 
   it("renders empty-state when no EcoWitt rows match", () => {
-    const rows: EcowittSensorReadingRow[] = [
-      row({ source: "manual", raw_payload: null }),
-    ];
+    const rows: EcowittSensorReadingRow[] = [row({ source: "manual", raw_payload: null })];
     const vm = buildEcowittLatestSnapshot(rows, { tentId: TENT_A }, { now: NOW });
     expect(vm.hasReading).toBe(false);
     expect(vm.emptyStateMessage).toBe(
@@ -173,13 +179,97 @@ describe("ecowittLatestSnapshotFilter", () => {
     });
   });
 
-  it("preserves raw payload on the chosen snapshot", () => {
-    const payload = { temp1f: 77, humidity1: 55, dateutc: FRESH_AT };
+  it("keeps confidence=test Windows-listener packets visible as Demo, never live", () => {
+    const rows: EcowittSensorReadingRow[] = [
+      {
+        tent_id: TENT_A,
+        source: "live",
+        captured_at: FRESH_AT,
+        raw_payload: {
+          vendor: "ecowitt_windows_testbench",
+          captured_at: FRESH_AT,
+          metrics: { temp_f: 78.6, humidity_pct: 56.2 },
+          metadata: {
+            confidence: "test",
+            verdant_source: "live",
+          },
+        },
+      },
+    ];
+
+    const candidates = selectEcowittCandidates(rows, { tentId: TENT_A });
+    const vm = buildEcowittLatestSnapshot(rows, { tentId: TENT_A }, { now: NOW });
+
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0]?.source).toBe("demo");
+    expect(vm.hasReading).toBe(true);
+    expect(vm.source).toBe("demo");
+    expect(vm.sourceLabel?.label).toBe("Demo");
+    expect(vm.sourceLabel?.label).not.toBe("Ecowitt");
+  });
+
+  it("treats the canonical verdant_source=live mirror without physical proof as Demo", () => {
     const vm = buildEcowittLatestSnapshot(
-      [row({}, payload)],
+      [
+        {
+          tent_id: TENT_A,
+          source: "live",
+          captured_at: FRESH_AT,
+          raw_payload: {
+            vendor: "ecowitt_windows_testbench",
+            captured_at: FRESH_AT,
+            metrics: { temp_f: 78.6, humidity_pct: 56.2 },
+            metadata: {
+              transport: "windows_listener",
+              verdant_source: "live",
+            },
+          },
+        },
+      ],
       { tentId: TENT_A },
       { now: NOW },
     );
+
+    expect(vm.hasReading).toBe(true);
+    expect(vm.source).toBe("demo");
+    expect(vm.sourceLabel?.label).toBe("Demo");
+  });
+
+  it("allows physical Windows-listener lineage with preserved live source and gateway markers", () => {
+    const vm = buildEcowittLatestSnapshot(
+      [
+        {
+          tent_id: TENT_A,
+          source: "live",
+          captured_at: FRESH_AT,
+          raw_payload: {
+            vendor: "ecowitt_windows_testbench",
+            captured_at: FRESH_AT,
+            metrics: { temp_f: 78.6, humidity_pct: 56.2 },
+            metadata: {
+              transport: "windows_listener",
+              reported_verdant_source: "live",
+              raw_payload: {
+                stationtype: "GW2000A_V3.2.4",
+                model: "GW2000A",
+                dateutc: "2026-06-04 12:20:00",
+              },
+            },
+          },
+        },
+      ],
+      { tentId: TENT_A },
+      { now: NOW },
+    );
+
+    expect(vm.hasReading).toBe(true);
+    expect(vm.source).toBe("live");
+    expect(vm.sourceLabel?.label).toBe("Ecowitt");
+  });
+
+  it("preserves raw payload on the chosen snapshot", () => {
+    const payload = { temp1f: 77, humidity1: 55, dateutc: FRESH_AT };
+    const vm = buildEcowittLatestSnapshot([row({}, payload)], { tentId: TENT_A }, { now: NOW });
     expect(vm.snapshot?.rawPayload).toBe(payload);
   });
 });

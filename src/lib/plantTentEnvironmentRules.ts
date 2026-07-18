@@ -29,6 +29,8 @@ export interface PlantTentEnvironmentView {
   capturedAt: string | null;
   sourceLabel: string | null;
   stale: boolean;
+  /** Provenance is strong enough for stage-aware health interpretation. */
+  canAssessStage: boolean;
   metrics: PlantTentEnvironmentMetric[];
 }
 
@@ -37,6 +39,7 @@ const EMPTY_VIEW: PlantTentEnvironmentView = {
   capturedAt: null,
   sourceLabel: null,
   stale: false,
+  canAssessStage: false,
   metrics: [],
 };
 
@@ -62,6 +65,7 @@ export function buildPlantTentEnvironmentView(
   if (!rows || rows.length === 0) return EMPTY_VIEW;
   const snap: SensorSnapshot | null = snapshotFromReadings(rows);
   if (!snap) return EMPTY_VIEW;
+  const stale = isStale(snap.ts, now);
   return {
     hasReadings: true,
     capturedAt: snap.ts,
@@ -69,7 +73,9 @@ export function buildPlantTentEnvironmentView(
       source: snap.source,
       deviceId: snap.device_id ?? null,
     }),
-    stale: isStale(snap.ts, now),
+    stale,
+    canAssessStage:
+      !stale && (snap.source === "live" || snap.source === "manual" || snap.source === "csv"),
     metrics: [
       // Stored as Celsius; displayed as Fahrenheit per Verdant convention.
       metric("temp", "Temperature", tempFFromC(snap.temp), "°F"),

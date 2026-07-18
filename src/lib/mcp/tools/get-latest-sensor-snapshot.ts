@@ -18,7 +18,9 @@
  * convention, src/hooks/useLatestSensorSnapshot.ts), then id DESC so
  * equal timestamps can never flip the snapshot between calls.
  *
- * Preserves `source` and `quality` labels verbatim. Trust follows the
+ * Preserves `source` and `quality` labels verbatim. Raw provenance is selected
+ * only long enough to exclude diagnostic-only Windows testbench rows, then is
+ * stripped before tool content is assembled. Trust follows the
  * canonical SENSOR TRUTH contract: only quality `ok` + source `live`
  * (fresh validated connected telemetry) counts as current live data;
  * manual stays manual, csv stays csv, demo stays demo, and
@@ -31,6 +33,7 @@
  */
 import { defineTool } from "@lovable.dev/mcp-js";
 import { z } from "zod";
+import { withoutDiagnosticSensorRows } from "../../sensorProvenanceFenceRules";
 import { supabaseForUser, unauthenticated } from "./_supabase";
 
 /**
@@ -51,7 +54,7 @@ const KNOWN_METRICS = [
   "ppfd",
 ] as const;
 
-interface SensorRow {
+export interface McpSensorQueryRow {
   id: string;
   tent_id: string;
   metric: string;
@@ -60,17 +63,21 @@ interface SensorRow {
   source: string;
   ts: string;
   captured_at: string | null;
+  raw_payload?: unknown;
 }
 
-const SENSOR_COLUMNS = "id,tent_id,metric,value,quality,source,ts,captured_at";
+export type McpSensorReading = Omit<McpSensorQueryRow, "raw_payload">;
+
+const SENSOR_COLUMNS = "id,tent_id,metric,value,quality,source,ts,captured_at,raw_payload";
+const SENSOR_CANDIDATE_LIMIT = 25;
 
 /** Effective capture time: COALESCE(captured_at, ts) as epoch millis. */
-function effectiveCaptureMs(row: SensorRow): number {
+function effectiveCaptureMs(row: McpSensorQueryRow): number {
   return Date.parse(row.captured_at ?? row.ts);
 }
 
 /** Deterministic winner between the captured and legacy candidates. */
-function newerReading(a: SensorRow, b: SensorRow): SensorRow {
+function newerReading(a: McpSensorQueryRow, b: McpSensorQueryRow): McpSensorQueryRow {
   const ea = effectiveCaptureMs(a);
   const eb = effectiveCaptureMs(b);
   if (ea !== eb) return ea > eb ? a : b;
@@ -78,6 +85,37 @@ function newerReading(a: SensorRow, b: SensorRow): SensorRow {
   const tb = Date.parse(b.ts);
   if (ta !== tb) return ta > tb ? a : b;
   return a.id > b.id ? a : b;
+}
+
+/**
+ * Select the newest non-diagnostic row per metric and strip raw provenance.
+ * Stable for identical inputs; never mutates caller rows.
+ */
+export function selectLatestMcpSensorReadings(
+  rows: readonly McpSensorQueryRow[] | null | undefined,
+): Record<string, McpSensorReading> {
+  const selected: Record<string, McpSensorQueryRow> = {};
+  for (const row of withoutDiagnosticSensorRows(rows)) {
+    if (!row || typeof row.metric !== "string" || row.metric.length === 0) continue;
+    const current = selected[row.metric];
+    selected[row.metric] = current ? newerReading(current, row) : row;
+  }
+
+  return Object.fromEntries(
+    Object.entries(selected).map(([metric, row]) => [
+      metric,
+      {
+        id: row.id,
+        tent_id: row.tent_id,
+        metric: row.metric,
+        value: row.value,
+        quality: row.quality,
+        source: row.source,
+        ts: row.ts,
+        captured_at: row.captured_at,
+      } satisfies McpSensorReading,
+    ]),
+  );
 }
 
 export default defineTool({
@@ -122,10 +160,10 @@ export default defineTool({
         isError: true,
       };
     }
-    // Latest row per metric under COALESCE(captured_at, ts) semantics:
-    // two candidates per metric (newest captured row + newest legacy
-    // null-captured row), winner picked by effective capture time. See
-    // the header comment for why a single NULLS LAST order is wrong.
+    // Latest row per metric under COALESCE(captured_at, ts) semantics.
+    // A bounded candidate window is required because the newest stored row
+    // may be diagnostic-only; filtering after LIMIT 1 would hide the newest
+    // eligible physical row for the same metric.
     const results = await Promise.all(
       KNOWN_METRICS.flatMap((metric) => [
         supabase
@@ -138,8 +176,7 @@ export default defineTool({
           .order("ts", { ascending: false })
           .order("created_at", { ascending: false })
           .order("id", { ascending: false })
-          .limit(1)
-          .maybeSingle(),
+          .limit(SENSOR_CANDIDATE_LIMIT),
         supabase
           .from("sensor_readings")
           .select(SENSOR_COLUMNS)
@@ -149,8 +186,7 @@ export default defineTool({
           .order("ts", { ascending: false })
           .order("created_at", { ascending: false })
           .order("id", { ascending: false })
-          .limit(1)
-          .maybeSingle(),
+          .limit(SENSOR_CANDIDATE_LIMIT),
       ]),
     );
     const failed = results.find((r) => r.error);
@@ -160,13 +196,10 @@ export default defineTool({
         isError: true,
       };
     }
-    const readings: Record<string, SensorRow> = {};
-    for (const result of results) {
-      const row = result.data as SensorRow | null;
-      if (!row) continue;
-      const current = readings[row.metric];
-      readings[row.metric] = current ? newerReading(current, row) : row;
-    }
+    const candidates = results.flatMap((result) =>
+      Array.isArray(result.data) ? (result.data as McpSensorQueryRow[]) : [],
+    );
+    const readings = selectLatestMcpSensorReadings(candidates);
     if (Object.keys(readings).length === 0) {
       return {
         content: [{ type: "text", text: "No sensor readings found for that tent." }],

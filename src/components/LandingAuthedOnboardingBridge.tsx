@@ -3,6 +3,7 @@ import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import OnboardingProgressPill from "@/components/OnboardingProgressPill";
 import { buildOnboardingChecklistViewModel } from "@/lib/onboardingChecklistViewModel";
+import { countActivatingSensorReadings } from "@/lib/onboardingSensorActivationRules";
 import { useGrows } from "@/store/grows";
 import { useGrowTents, useGrowPlants } from "@/hooks/useGrowData";
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
@@ -19,7 +20,7 @@ import { useDiaryEntries } from "@/hooks/use-diary-entries";
  *    useDiaryEntries). No new Supabase queries are introduced beyond
  *    what the app would issue once the user opens the Dashboard.
  *  - Never exposes private grow data details (no names, no IDs) — only
- *    counts feed into the shared view model.
+ *    provenance-qualified counts feed into the shared view model.
  *  - No writes, no automation, no device control, no fake-live data.
  */
 export default function LandingAuthedOnboardingBridge() {
@@ -34,12 +35,10 @@ export default function LandingAuthedOnboardingBridge() {
     tentCount: tents.length,
     plantCount: plants.length,
     diaryEntryCount: diary.length,
-    sensorReadingCount: readings.length,
+    sensorReadingCount: countActivatingSensorReadings(readings),
   });
 
-  const ctaLabel = vm.isFullyActivated
-    ? "Open Dashboard"
-    : "Continue setup in Dashboard";
+  const ctaLabel = vm.isFullyActivated ? "Open Dashboard" : "Continue setup in Dashboard";
 
   return (
     <div

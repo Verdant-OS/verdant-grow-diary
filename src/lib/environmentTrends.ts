@@ -7,6 +7,8 @@
 
 import type { SnapshotSource } from "@/lib/sensorSnapshot";
 import { toFiniteNumber } from "@/lib/sensorSnapshot";
+import { normalizeSensorSource } from "@/lib/sensor/sensorSourceRules";
+import { isDiagnosticSensorProvenanceRow } from "@/lib/sensorProvenanceFenceRules";
 import { calculateAirVpdKpa } from "@/lib/vpdRules";
 
 export interface EnvironmentSample {
@@ -57,9 +59,7 @@ export const EMPTY_TRENDS: EnvironmentTrends = {
 };
 
 function aggregate(values: (number | null)[]): TrendStat {
-  const valid = values
-    .map(toFiniteNumber)
-    .filter((v): v is number => v !== null);
+  const valid = values.map(toFiniteNumber).filter((v): v is number => v !== null);
   if (valid.length === 0) return EMPTY_STAT;
   let sum = 0;
   let min = valid[0];
@@ -83,9 +83,7 @@ export function computeEnvironmentTrends(
 ): EnvironmentTrends {
   if (!samples || samples.length === 0) return EMPTY_TRENDS;
 
-  const sorted = [...samples].sort((a, b) =>
-    a.ts < b.ts ? 1 : a.ts > b.ts ? -1 : 0,
-  );
+  const sorted = [...samples].sort((a, b) => (a.ts < b.ts ? 1 : a.ts > b.ts ? -1 : 0));
   const temp = aggregate(sorted.map((s) => s.temp));
   const rh = aggregate(sorted.map((s) => s.rh));
   const vpd = aggregate(sorted.map((s) => s.vpd));
@@ -124,6 +122,8 @@ export interface SensorReadingLike {
   value: number | string | null;
   source?: string | null;
   tent_id?: string | null;
+  /** Opaque provenance envelope used only by the shared testbench fence. */
+  raw_payload?: unknown;
 }
 
 const METRIC_MAP: Record<string, "temp" | "rh" | "vpd"> = {
@@ -132,12 +132,44 @@ const METRIC_MAP: Record<string, "temp" | "rh" | "vpd"> = {
   vpd_kpa: "vpd",
 };
 
+function resolveTrendSource(row: SensorReadingLike): SnapshotSource | null {
+  // Do not aggregate a testbench packet into a physical environment trend.
+  // The row remains stored for audit; this read model simply refuses it as
+  // evidence. Physical gateway packets pass the same shared classifier.
+  if (isDiagnosticSensorProvenanceRow(row)) return null;
+
+  const raw = typeof row.source === "string" ? row.source.trim().toLowerCase() : "";
+  if (raw === "sim") return "sim";
+  switch (normalizeSensorSource(raw)) {
+    case "live":
+      return "live";
+    case "manual":
+      return "manual";
+    case "csv":
+      return "csv";
+    case "demo":
+      return "sim";
+    default:
+      return "unverified";
+  }
+}
+
+/** A mixed group can never inherit a physical-live claim from one row. */
+function mergeTrendSources(current: SnapshotSource, incoming: SnapshotSource): SnapshotSource {
+  if (current === incoming) return current;
+  if (current === "manual" || incoming === "manual") return "manual";
+  if (current === "csv" || incoming === "csv") return "csv";
+  return "unverified";
+}
+
 export function samplesFromReadings(
   rows: SensorReadingLike[] | null | undefined,
 ): EnvironmentSample[] {
   if (!rows || rows.length === 0) return [];
   const byKey = new Map<string, EnvironmentSample>();
   for (const r of rows) {
+    const rowSource = resolveTrendSource(r);
+    if (rowSource === null) continue;
     const key = `${r.tent_id ?? ""}|${r.ts}`;
     let s = byKey.get(key);
     if (!s) {
@@ -146,14 +178,11 @@ export function samplesFromReadings(
         temp: null,
         rh: null,
         vpd: null,
-        source:
-          r.source === "manual"
-            ? "manual"
-            : r.source === "sim"
-              ? "sim"
-              : "live",
+        source: rowSource,
       };
       byKey.set(key, s);
+    } else {
+      s.source = mergeTrendSources(s.source, rowSource);
     }
     const field = METRIC_MAP[r.metric];
     if (field) {
@@ -208,9 +237,7 @@ export function selectWindow(
   now: number = Date.now(),
 ): EnvironmentSample[] {
   if (samples.length === 0) return [];
-  const sorted = [...samples].sort((a, b) =>
-    a.ts < b.ts ? 1 : a.ts > b.ts ? -1 : 0,
-  );
+  const sorted = [...samples].sort((a, b) => (a.ts < b.ts ? 1 : a.ts > b.ts ? -1 : 0));
   const cutoff = now - 24 * 60 * 60 * 1000;
   const inWindow = sorted.filter((s) => {
     const t = new Date(s.ts).getTime();

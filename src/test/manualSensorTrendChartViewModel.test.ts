@@ -11,9 +11,7 @@ import {
   type ManualSensorTrendInputRow,
 } from "@/lib/manualSensorTrendChartViewModel";
 
-function row(
-  overrides: Partial<ManualSensorTrendInputRow>,
-): ManualSensorTrendInputRow {
+function row(overrides: Partial<ManualSensorTrendInputRow>): ManualSensorTrendInputRow {
   return {
     ts: "2026-06-20T10:00:00.000Z",
     metric: "ppfd",
@@ -48,12 +46,7 @@ describe("buildManualSensorTrendChartViewModel", () => {
     expect(vm.series[1].points[0].display).toBe("75.2°F"); // 24C -> 75.2F
     expect(vm.series[2].points[0].display).toBe("55% RH");
     expect(vm.series[3].points[0].display).toBe("1.10 kPa");
-    expect(vm.series.map((s) => s.unit)).toEqual([
-      "µmol/m²/s",
-      "°F",
-      "% RH",
-      "kPa",
-    ]);
+    expect(vm.series.map((s) => s.unit)).toEqual(["µmol/m²/s", "°F", "% RH", "kPa"]);
   });
 
   it("returns no_ppfd state when environment present but PPFD missing", () => {
@@ -86,10 +79,7 @@ describe("buildManualSensorTrendChartViewModel", () => {
     expect(vm.emptyMessage).toMatch(/stale or invalid/i);
     expect(vm.series.every((s) => s.points.length === 0)).toBe(true);
     expect(vm.flagged.length).toBe(2);
-    expect(vm.flagged.map((p) => p.source).sort()).toEqual([
-      "invalid",
-      "stale",
-    ]);
+    expect(vm.flagged.map((p) => p.source).sort()).toEqual(["invalid", "stale"]);
   });
 
   it("flags demo readings as not-healthy and does not include them in series", () => {
@@ -106,6 +96,98 @@ describe("buildManualSensorTrendChartViewModel", () => {
     expect(vm.flagged).toHaveLength(1);
     expect(vm.flagged[0].source).toBe("demo");
     expect(vm.omissions.find((o) => o.reason === "demo")).toBeTruthy();
+  });
+
+  it("omits canonical-live diagnostic rows before building trend points", () => {
+    const vm = buildManualSensorTrendChartViewModel({
+      readings: [
+        row({
+          source: "live",
+          raw_payload: {
+            vendor: "ecowitt_windows_testbench",
+            metadata: {
+              reported_verdant_source: "live",
+              confidence: "test",
+              secret: "classification-only-secret",
+            },
+          },
+        }),
+      ],
+    });
+
+    expect(vm.state).toBe("no_ppfd");
+    expect(vm.series.every((series) => series.points.length === 0)).toBe(true);
+    expect(vm.flagged).toHaveLength(0);
+    expect(vm.omissions).toContainEqual({
+      capturedAt: "2026-06-20T10:00:00.000Z",
+      metric: "ppfd",
+      source: "live",
+      reason: "diagnostic",
+    });
+    expect(JSON.stringify(vm)).not.toContain("classification-only-secret");
+    expect(JSON.stringify(vm)).not.toContain("raw_payload");
+  });
+
+  it("keeps physically proven EcoWitt gateway rows as labeled live context", () => {
+    const physicalGatewayPayload = {
+      vendor: "ecowitt_windows_testbench",
+      metadata: {
+        reported_verdant_source: "live",
+        raw_payload: {
+          stationtype: "GW2000A_V3.2.3",
+          model: "GW2000",
+          dateutc: "2026-06-20 10:00:00",
+        },
+      },
+    };
+    const vm = buildManualSensorTrendChartViewModel({
+      readings: [
+        row({ source: "live", raw_payload: physicalGatewayPayload }),
+        row({
+          metric: "temperature_c",
+          value: 24,
+          source: "live",
+          raw_payload: physicalGatewayPayload,
+        }),
+      ],
+    });
+
+    expect(vm.state).toBe("ready");
+    expect(vm.series[0].points[0].source).toBe("live");
+    expect(vm.series[1].points[0].source).toBe("live");
+    expect(vm.omissions).toHaveLength(0);
+  });
+
+  it("fails unknown non-manual sources and source-less ingest payloads closed", () => {
+    const vm = buildManualSensorTrendChartViewModel({
+      readings: [
+        row({ source: "mystery_bridge" }),
+        row({
+          metric: "temperature_c",
+          source: undefined,
+          raw_payload: { transport: "unknown" },
+        }),
+      ],
+    });
+
+    expect(vm.series.every((series) => series.points.length === 0)).toBe(true);
+    expect(vm.omissions.map((omission) => omission.reason)).toEqual([
+      "unknown_source",
+      "unknown_source",
+    ]);
+  });
+
+  it("preserves source-less legacy manual rows only when no ingest envelope exists", () => {
+    const vm = buildManualSensorTrendChartViewModel({
+      readings: [
+        row({ source: undefined }),
+        row({ metric: "temperature_c", value: 22, source: undefined }),
+      ],
+    });
+
+    expect(vm.state).toBe("ready");
+    expect(vm.series[0].points[0].source).toBe("manual");
+    expect(vm.series[1].points[0].source).toBe("manual");
   });
 
   it("preserves chronological order (oldest -> newest)", () => {
@@ -144,31 +226,21 @@ describe("buildManualSensorTrendChartViewModel", () => {
     expect(vm.series[0].points[0].value).toBe(350);
     expect(vm.omissions.some((o) => o.reason === "non_finite")).toBe(true);
     expect(vm.omissions.some((o) => o.reason === "unknown_metric")).toBe(true);
-    expect(vm.omissions.some((o) => o.reason === "missing_timestamp")).toBe(
-      true,
-    );
+    expect(vm.omissions.some((o) => o.reason === "missing_timestamp")).toBe(true);
   });
 
   it("handles empty/undefined input as no_ppfd without crashing", () => {
-    expect(buildManualSensorTrendChartViewModel({ readings: [] }).state).toBe(
-      "no_ppfd",
-    );
+    expect(buildManualSensorTrendChartViewModel({ readings: [] }).state).toBe("no_ppfd");
     // @ts-expect-error — verifying defensive runtime behavior
     expect(buildManualSensorTrendChartViewModel({}).state).toBe("no_ppfd");
   });
 
   it("formats temperature in °F using the existing app preference unit", () => {
     const vm = buildManualSensorTrendChartViewModel({
-      readings: [
-        row({ metric: "ppfd", value: 400 }),
-        row({ metric: "temperature_c", value: 0 }),
-      ],
+      readings: [row({ metric: "ppfd", value: 400 }), row({ metric: "temperature_c", value: 0 })],
     });
-    const tempPoint = vm.series.find((s) => s.metric === "temperature_c")
-      ?.points[0];
+    const tempPoint = vm.series.find((s) => s.metric === "temperature_c")?.points[0];
     expect(tempPoint?.display).toBe("32.0°F");
-    expect(vm.series.find((s) => s.metric === "temperature_c")?.unit).toBe(
-      "°F",
-    );
+    expect(vm.series.find((s) => s.metric === "temperature_c")?.unit).toBe("°F");
   });
 });

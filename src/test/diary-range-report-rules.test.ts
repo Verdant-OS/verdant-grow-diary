@@ -15,7 +15,9 @@ import {
 const NOW = new Date("2026-07-17T12:00:00.000Z");
 const GROW_UUID = "3b9f2a10-1111-2222-3333-444455556666";
 
-function baseInput(overrides: Partial<BuildDiaryRangeReportInput> = {}): BuildDiaryRangeReportInput {
+function baseInput(
+  overrides: Partial<BuildDiaryRangeReportInput> = {},
+): BuildDiaryRangeReportInput {
   return {
     grow: { name: "Blue Dream #1", stage: "veg" },
     diaryEntries: [],
@@ -59,7 +61,13 @@ describe("range handling", () => {
     const vm = buildDiaryRangeReport(
       baseInput({
         diaryEntries: [
-          { id: "x", note: "", photo_url: null, entry_at: null, details: { event_type: "watering" } },
+          {
+            id: "x",
+            note: "",
+            photo_url: null,
+            entry_at: null,
+            details: { event_type: "watering" },
+          },
           diary("ok", "2026-07-05", { event_type: "watering" }),
         ],
       }),
@@ -140,16 +148,21 @@ describe("environment — provenance honesty", () => {
         sensorReadings: [
           { metric: "temperature_c", value: 20, ts: "2026-07-02T10:00:00Z", source: "live" },
           { metric: "temperature_c", value: 30, ts: "2026-07-03T10:00:00Z", source: "demo" },
-          { metric: "humidity_pct", value: 55, ts: "2026-07-03T11:00:00Z", source: "garbage-source" },
+          {
+            metric: "humidity_pct",
+            value: 55,
+            ts: "2026-07-03T11:00:00Z",
+            source: "garbage-source",
+          },
         ],
       }),
     );
     const temp = vm.environment.metrics.find((m) => m.key === "temperature_c");
-    // 20C→68F, 30C→86F. Displayed in °F per app convention.
+    // Demo stays visible in the source rollup but never feeds the aggregate.
     expect(temp?.min).toBe(68);
-    expect(temp?.max).toBe(86);
-    expect(temp?.avg).toBe(77);
-    expect(temp?.count).toBe(2);
+    expect(temp?.max).toBe(68);
+    expect(temp?.avg).toBe(68);
+    expect(temp?.count).toBe(1);
 
     const labels = vm.environment.sources.map((s) => `${s.kind}:${s.count}`).sort();
     // demo stays demo; unknown strings normalize to invalid — never live.
@@ -158,6 +171,49 @@ describe("environment — provenance honesty", () => {
     expect(labels).toContain("invalid:1");
     const liveCount = vm.environment.sources.find((s) => s.kind === "live")?.count;
     expect(liveCount).toBe(1);
+    expect(vm.environment.readingCount).toBe(3);
+  });
+
+  it("excludes diagnostic lineage while retaining physical gateway evidence", () => {
+    const vm = buildDiaryRangeReport(
+      baseInput({
+        sensorReadings: [
+          {
+            metric: "temperature_c",
+            value: 99,
+            ts: "2026-07-02T10:00:00Z",
+            source: "live",
+            raw_payload: {
+              vendor: "ecowitt_windows_testbench",
+              metadata: { confidence: "test" },
+            },
+          },
+          {
+            metric: "temperature_c",
+            value: 22,
+            ts: "2026-07-03T10:00:00Z",
+            source: "live",
+            raw_payload: {
+              vendor: "ecowitt_windows_testbench",
+              metadata: {
+                reported_verdant_source: "live",
+                raw_payload: {
+                  PASSKEY: "classification-only-secret",
+                  stationtype: "GW2000A",
+                  dateutc: "2026-07-03 10:00:00",
+                },
+              },
+            },
+          },
+        ],
+      }),
+    );
+
+    const temp = vm.environment.metrics.find((m) => m.key === "temperature_c");
+    expect(temp).toMatchObject({ count: 1, min: 71.6, max: 71.6, avg: 71.6 });
+    expect(vm.environment.readingCount).toBe(1);
+    expect(vm.environment.sources).toEqual([{ kind: "live", label: "Live", count: 1 }]);
+    expect(JSON.stringify(vm)).not.toMatch(/raw_payload|classification-only-secret/i);
   });
 });
 

@@ -4,9 +4,11 @@
  *
  * Allowed data operation: SELECT. This module performs no INSERT, no UPDATE,
  * no DELETE, no upsert, no RPC, no storage access, no Edge invocation, and
- * no AI calls. It never selects payload blobs, secrets, tokens, or private
- * environment values, and never accepts a client-provided owner id — owner
- * scoping is the authenticated client's RLS plus explicit grow/plant filters.
+ * no AI calls. It selects the opaque sensor raw_payload only for the shared
+ * provenance classifier; that envelope is never returned by the memory model.
+ * It never selects secrets, tokens, or private environment values, and never
+ * accepts a client-provided owner id — owner scoping is the authenticated
+ * client's RLS plus explicit grow/plant filters.
  *
  * Query shape is CONSTANT (no per-card N+1):
  *   1. one bounded diary_entries read (grow-scoped, optionally plant-scoped);
@@ -91,9 +93,10 @@ export async function loadActionResponseMemories(
     const actions = (actionData ?? []) as unknown as ActionResponseActionRowInput[];
 
     // 3) At most one batched sensor lookup for referenced snapshot ids.
-    //    Selection lists explicit columns only — payload blobs never enter
-    //    this feature. A failed sensor lookup degrades to "unavailable"
-    //    evidence without erasing outcomes or notes.
+    //    Selection lists explicit columns only. raw_payload reaches the pure
+    //    provenance fence but is never copied into the memory output. A failed
+    //    sensor lookup degrades to "unavailable" evidence without erasing
+    //    outcomes or notes.
     const snapshotIds = [
       ...new Set(
         candidates
@@ -105,7 +108,7 @@ export async function loadActionResponseMemories(
     if (snapshotIds.length > 0) {
       const { data: sensorData, error: sensorError } = await client
         .from("sensor_readings")
-        .select("id,tent_id,source,captured_at")
+        .select("id,tent_id,source,captured_at,raw_payload")
         .in("id", snapshotIds);
       sensorRows = sensorError
         ? undefined

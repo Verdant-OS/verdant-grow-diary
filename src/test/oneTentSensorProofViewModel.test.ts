@@ -11,9 +11,7 @@ import type { EcowittIngestAuditProofViewModel } from "@/lib/ecowittIngestAuditP
 
 const TENT = "tent-1";
 
-function live(
-  partial: Partial<EcowittLiveProofViewModel>,
-): EcowittLiveProofViewModel {
+function live(partial: Partial<EcowittLiveProofViewModel>): EcowittLiveProofViewModel {
   return {
     tone: "ok",
     headline: "h",
@@ -95,6 +93,20 @@ describe("buildOneTentSensorProofViewModel", () => {
     expect(vm.limitations.map((l) => l.id)).toContain("live-missing");
   });
 
+  it("labels a diagnostic packet explicitly and still requires physical proof", () => {
+    const vm = buildOneTentSensorProofViewModel({
+      tentId: TENT,
+      liveProof: live({ candidateStatus: "testbench" }),
+      auditProof: audit({ status: "loaded", insertedCount: 3 }),
+    });
+    expect(vm.sensorProofStatus).toBe("testbench");
+    expect(vm.tone).toBe("neutral");
+    expect(vm.headline).toMatch(/physical sensor proof required/i);
+    expect(vm.liveRowProofLabel).toMatch(/diagnostic transport test/i);
+    expect(vm.limitations.map((l) => l.id)).toContain("live-testbench");
+    expect(buildOneTentSensorProofReportSection(vm)).toMatch(/physical EcoWitt reading/i);
+  });
+
   it("stale takes precedence over audit when live is stale", () => {
     const vm = buildOneTentSensorProofViewModel({
       tentId: TENT,
@@ -169,12 +181,9 @@ describe("buildOneTentSensorProofViewModel", () => {
       liveProof: live({ candidateStatus: "live_confirmed" }),
       auditProof: audit({ status: "loaded", insertedCount: 1 }),
     });
-    const text = [
-      vm.headline,
-      vm.liveRowProofLabel,
-      vm.auditProofLabel,
-      ...vm.reportLines,
-    ].join("\n");
+    const text = [vm.headline, vm.liveRowProofLabel, vm.auditProofLabel, ...vm.reportLines].join(
+      "\n",
+    );
     expect(text).toMatch(/current proof window|last 24 hours/);
     expect(text).not.toMatch(/all[- ]time/i);
     expect(text).not.toMatch(/forever/i);

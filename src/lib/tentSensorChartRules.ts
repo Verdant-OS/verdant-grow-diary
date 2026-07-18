@@ -19,9 +19,8 @@ import {
   classifySnapshotTruth,
   type SensorTruthAssessment,
 } from "@/lib/sensorTruthRules";
-
-
-
+import { normalizeSensorSource } from "@/lib/sensor/sensorSourceRules";
+import { isDiagnosticSensorProvenanceRow } from "@/lib/sensorProvenanceFenceRules";
 
 export interface TentSensorChartPoint {
   ts: string;
@@ -40,6 +39,18 @@ const METRIC_KEY: Record<string, keyof Omit<TentSensorChartPoint, "ts">> = {
   soil_moisture_pct: "soil",
 };
 
+function canContributeToTentEnvironment(row: SensorReadingLike): boolean {
+  if (isDiagnosticSensorProvenanceRow(row)) return false;
+  const source = normalizeSensorSource(row.source);
+  return source === "live" || source === "manual" || source === "csv";
+}
+
+function usableTentEnvironmentRows(
+  rows: SensorReadingLike[] | null | undefined,
+): SensorReadingLike[] {
+  return (rows ?? []).filter(canContributeToTentEnvironment);
+}
+
 /**
  * Group rows by timestamp into chart points, sorted ascending by ts.
  *
@@ -55,13 +66,14 @@ const METRIC_KEY: Record<string, keyof Omit<TentSensorChartPoint, "ts">> = {
 export function buildTentSensorChartSeries(
   rows: SensorReadingLike[] | null | undefined,
 ): TentSensorChartPoint[] {
-  if (!rows || rows.length === 0) return [];
+  const usableRows = usableTentEnvironmentRows(rows);
+  if (usableRows.length === 0) return [];
   const byTs = new Map<string, TentSensorChartPoint>();
   // Track per-ts whether temp/rh were *invalid* (not merely missing) so we
   // can null out a derived vpd at the same ts without dropping vpd when the
   // chart simply doesn't carry temp/rh on that timestamp.
   const tempOrRhInvalidAt = new Set<string>();
-  for (const r of rows) {
+  for (const r of usableRows) {
     const key = METRIC_KEY[r.metric];
     if (!key) continue;
     const v = toFiniteNumber(r.value);
@@ -112,12 +124,27 @@ export function buildTentSensorHeaderView(
   rows: SensorReadingLike[] | null | undefined,
   now: number = Date.now(),
 ): TentSensorHeaderView {
-  if (!rows || rows.length === 0) {
-    return { hasReadings: false, capturedAt: null, sourceLabel: null, stale: false, snapshot: null, truth: null };
+  const usableRows = usableTentEnvironmentRows(rows);
+  if (usableRows.length === 0) {
+    return {
+      hasReadings: false,
+      capturedAt: null,
+      sourceLabel: null,
+      stale: false,
+      snapshot: null,
+      truth: null,
+    };
   }
-  const snap = snapshotFromReadings(rows);
+  const snap = snapshotFromReadings(usableRows);
   if (!snap) {
-    return { hasReadings: false, capturedAt: null, sourceLabel: null, stale: false, snapshot: null, truth: null };
+    return {
+      hasReadings: false,
+      capturedAt: null,
+      sourceLabel: null,
+      stale: false,
+      snapshot: null,
+      truth: null,
+    };
   }
   const truth = classifySnapshotTruth(snap, now);
   return {

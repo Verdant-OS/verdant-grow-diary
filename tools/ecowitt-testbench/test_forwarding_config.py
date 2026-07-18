@@ -237,6 +237,7 @@ class ForwardedPayloadContractTests(unittest.TestCase):
                 "raw_payload": {
                     "PASSKEY": "SECRETDEVICEAUTH123",
                     "passkey": "alt-secret",
+                    "MAC": "AA:BB:CC:DD:EE:FF",
                     "tempf": 70.0,
                     "stationtype": "GW1200B_V1.4.7",
                 }
@@ -248,6 +249,7 @@ class ForwardedPayloadContractTests(unittest.TestCase):
         self.assertNotIn("PASSKEY", raw)
         self.assertNotIn("passkey", raw)
         self.assertNotIn("Passkey", raw)
+        self.assertNotIn("MAC", raw)
         self.assertIn("tempf", raw)
         self.assertIn("stationtype", raw)
         # And the literal secret string must not appear anywhere in the body
@@ -255,6 +257,7 @@ class ForwardedPayloadContractTests(unittest.TestCase):
         body_text = _json.dumps(payload)
         self.assertNotIn("SECRETDEVICEAUTH123", body_text)
         self.assertNotIn("alt-secret", body_text)
+        self.assertNotIn("AA:BB:CC:DD:EE:FF", body_text)
 
 
 class ForwardErrorSanitizationTests(unittest.TestCase):

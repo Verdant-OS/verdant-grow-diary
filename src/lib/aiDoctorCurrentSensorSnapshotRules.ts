@@ -25,6 +25,12 @@ import {
   SENSOR_FRESH_WINDOW_MINUTES,
   type SensorMetricKey,
 } from "@/lib/latestSensorSnapshotRules";
+import { isSensorTestbenchRow } from "@/lib/sensorTestbenchIndicatorRules";
+import {
+  classificationFromStatusResult,
+  type Classification,
+  type SensorSnapshotStatusResult,
+} from "@/lib/sensorSnapshotStatusContract";
 
 export const AI_DOCTOR_CURRENT_SENSOR_SOURCES = ["live", "manual"] as const;
 export const AI_DOCTOR_CURRENT_SENSOR_ROW_CAP = 50;
@@ -166,6 +172,10 @@ function projectMetric(metric: string, value: number): MetricProjection | null {
 }
 
 function toCandidate(row: AiDoctorCurrentSensorRowLike): Candidate | null {
+  // Diagnostic packets may be stored with canonical source=live after a
+  // successful transport test. They are never plant evidence and must not
+  // reach a model as current sensor truth.
+  if (isSensorTestbenchRow(row)) return null;
   const source = normalizeSource(row.source);
   const metric = typeof row.metric === "string" ? row.metric.trim().toLowerCase() : "";
   const value = finiteNumber(row.value);
@@ -285,4 +295,45 @@ export function buildAiDoctorCurrentSensorSnapshot(
       missingInformationHints: [...context.missingInformationHints].sort(),
     },
   };
+}
+
+/**
+ * Convert the provenance-filtered current-row projection into the shared
+ * Sensor Snapshot Status Contract used by AI Doctor readiness and audit
+ * persistence. Transport success alone is intentionally insufficient.
+ */
+export function classifyAiDoctorCurrentSensorEvidence(
+  rows: readonly AiDoctorCurrentSensorRowLike[] | null | undefined,
+  options: { now?: Date } = {},
+): Classification {
+  const snapshot = buildAiDoctorCurrentSensorSnapshot(rows, options);
+  let result: SensorSnapshotStatusResult;
+  if (!snapshot) {
+    result = { status: "no_data", reasonCode: "none_received" };
+  } else if (snapshot.severity === "invalid" || snapshot.annotation.source === "invalid") {
+    result = { status: "invalid", reasonCode: "malformed_payload" };
+  } else if (snapshot.annotation.stale) {
+    result = { status: "stale", reasonCode: "stale_timestamp" };
+  } else if (snapshot.annotation.source !== "live") {
+    // Manual evidence stays useful context but never becomes healthy live
+    // bridge evidence for the readiness score.
+    result = { status: "needs_review", reasonCode: "none_accepted" };
+  } else {
+    result = { status: "usable", reasonCode: "fresh_accept" };
+  }
+  return classificationFromStatusResult(result);
+}
+
+/**
+ * Prefer row-level evidence whenever present. A coarse bridge-audit fallback
+ * may explain stale/invalid/no-data states, but it cannot grant `usable`
+ * because audit counts do not carry vendor/test-confidence provenance.
+ */
+export function selectAiDoctorSensorEvidenceClassification(
+  current: Classification,
+  auditFallback: Classification | null | undefined,
+): Classification {
+  if (current.status !== "no_data") return current;
+  if (auditFallback && auditFallback.status !== "usable") return auditFallback;
+  return current;
 }

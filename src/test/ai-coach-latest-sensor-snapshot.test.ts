@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { pickLatestSensorSnapshotByCapturedAt } from "@/lib/aiCoachLatestSensorSnapshot";
+import {
+  pickLatestSensorSnapshotByCapturedAt,
+  pickLatestSensorSnapshotEvidenceByCapturedAt,
+} from "@/lib/aiCoachLatestSensorSnapshot";
 
 const row = (snap: Record<string, unknown> | null, extra: Record<string, unknown> = {}) => ({
   details: snap === null ? null : { sensor_snapshot: snap, ...extra },
@@ -37,11 +40,7 @@ describe("pickLatestSensorSnapshotByCapturedAt", () => {
     const valid = { source: "live", captured_at: "2026-06-01T11:55:00Z", temperature_c: 23 };
     const missing = { source: "manual", temperature_c: 99 };
     const invalid = { source: "manual", captured_at: "not-a-date", temperature_c: 99 };
-    const result = pickLatestSensorSnapshotByCapturedAt([
-      row(missing),
-      row(invalid),
-      row(valid),
-    ]);
+    const result = pickLatestSensorSnapshotByCapturedAt([row(missing), row(invalid), row(valid)]);
     expect(result).toBe(valid);
   });
 
@@ -66,5 +65,31 @@ describe("pickLatestSensorSnapshotByCapturedAt", () => {
     const b = { source: "live", captured_at: 1843473600000 }; // 2028 in ms
     const result = pickLatestSensorSnapshotByCapturedAt([row(a), row(b)]);
     expect(result).toBe(b);
+  });
+
+  it("preserves the selected diary row tent for provenance corroboration", () => {
+    const older = {
+      details: {
+        sensor_snapshot: {
+          source: "live",
+          captured_at: "2026-06-01T08:00:00Z",
+        },
+      },
+      tent_id: "tent-old",
+    };
+    const newer = {
+      details: {
+        sensor_snapshot: {
+          source: "live",
+          captured_at: "2026-06-01T12:00:00Z",
+        },
+      },
+      tent_id: "tent-new",
+    };
+
+    expect(pickLatestSensorSnapshotEvidenceByCapturedAt([older, newer])).toEqual({
+      snapshot: newer.details.sensor_snapshot,
+      tentId: "tent-new",
+    });
   });
 });

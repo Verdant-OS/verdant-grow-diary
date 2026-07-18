@@ -18,8 +18,20 @@ vi.mock("@/hooks/useReportsHubData", () => ({
   useReportsHubData: vi.fn(),
   EMPTY_REPORTS_HUB_DATA: {
     status: "idle",
-    outcomeSummary: { total: 0, improved: 0, unchanged: 0, worsened: 0, more_data_needed: 0, unknown: 0 },
-    outcomeLearning: { totals: { total: 0, improved: 0, unchanged: 0, worsened: 0, more_data_needed: 0, unknown: 0 }, groups: [], examples: [], needs_more_data: true },
+    outcomeSummary: {
+      total: 0,
+      improved: 0,
+      unchanged: 0,
+      worsened: 0,
+      more_data_needed: 0,
+      unknown: 0,
+    },
+    outcomeLearning: {
+      totals: { total: 0, improved: 0, unchanged: 0, worsened: 0, more_data_needed: 0, unknown: 0 },
+      groups: [],
+      examples: [],
+      needs_more_data: true,
+    },
     alertsOpen: 0,
     alertsCritical: 0,
     alertsWarning: 0,
@@ -46,17 +58,27 @@ import { useGrows } from "@/store/grows";
 import { stripSourceComments } from "./utils/stripSourceComments";
 
 const ROOT = resolve(__dirname, "../..");
-const PAGE_SRC = stripSourceComments(
-  readFileSync(resolve(ROOT, "src/pages/Reports.tsx"), "utf8"),
-);
+const PAGE_SRC = stripSourceComments(readFileSync(resolve(ROOT, "src/pages/Reports.tsx"), "utf8"));
 const HOOK_SRC = stripSourceComments(
   readFileSync(resolve(ROOT, "src/hooks/useReportsHubData.ts"), "utf8"),
 );
 
 const emptyData = {
   status: "ready",
-  outcomeSummary: { total: 0, improved: 0, unchanged: 0, worsened: 0, more_data_needed: 0, unknown: 0 },
-  outcomeLearning: { totals: { total: 0, improved: 0, unchanged: 0, worsened: 0, more_data_needed: 0, unknown: 0 }, groups: [], examples: [], needs_more_data: true },
+  outcomeSummary: {
+    total: 0,
+    improved: 0,
+    unchanged: 0,
+    worsened: 0,
+    more_data_needed: 0,
+    unknown: 0,
+  },
+  outcomeLearning: {
+    totals: { total: 0, improved: 0, unchanged: 0, worsened: 0, more_data_needed: 0, unknown: 0 },
+    groups: [],
+    examples: [],
+    needs_more_data: true,
+  },
   alertsOpen: 0,
   alertsCritical: 0,
   alertsWarning: 0,
@@ -68,7 +90,14 @@ const emptyData = {
 
 const populatedData = {
   ...emptyData,
-  outcomeSummary: { total: 7, improved: 3, unchanged: 2, worsened: 1, more_data_needed: 1, unknown: 0 },
+  outcomeSummary: {
+    total: 7,
+    improved: 3,
+    unchanged: 2,
+    worsened: 1,
+    more_data_needed: 1,
+    unknown: 0,
+  },
   alertsOpen: 2,
   alertsCritical: 1,
   alertsWarning: 1,
@@ -198,7 +227,9 @@ describe("Reports page · static safety", () => {
     expect(PAGE_SRC).not.toMatch(/\.insert\(|\.update\(|\.delete\(|\.upsert\(|\.rpc\(/);
     expect(PAGE_SRC).not.toMatch(/service_role/);
     expect(PAGE_SRC).not.toMatch(/ai-coach|ai_coach|functions\.invoke/);
-    expect(PAGE_SRC).not.toMatch(/mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|webhook|\brelay\b|\bactuator\b/i);
+    expect(PAGE_SRC).not.toMatch(
+      /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|webhook|\brelay\b|\bactuator\b/i,
+    );
     const forbidden = /\b(fixed|guaranteed|healthy|caused|best|worst)\b/i;
     expect(forbidden.test(PAGE_SRC)).toBe(false);
   });
@@ -207,5 +238,7 @@ describe("Reports page · static safety", () => {
     expect(HOOK_SRC).not.toMatch(/\.insert\(|\.update\(|\.delete\(|\.upsert\(|\.rpc\(/);
     expect(HOOK_SRC).not.toMatch(/service_role/);
     expect(HOOK_SRC).not.toMatch(/ai-coach|ai_coach|functions\.invoke/);
+    expect(HOOK_SRC).toContain('.select("ts,source,raw_payload")');
+    expect(HOOK_SRC).toContain("isDiagnosticSensorProvenanceRow");
   });
 });

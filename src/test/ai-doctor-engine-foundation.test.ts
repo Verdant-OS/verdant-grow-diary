@@ -25,8 +25,7 @@ import {
 } from "@/lib/aiDoctorEnginePhase1Foundation";
 
 const NOW = new Date("2026-06-04T12:00:00Z");
-const iso = (offsetMs: number) =>
-  new Date(NOW.getTime() - offsetMs).toISOString();
+const iso = (offsetMs: number) => new Date(NOW.getTime() - offsetMs).toISOString();
 
 function baseInput(
   overrides: Partial<CompileAiDoctorContextPayloadFromRowsInput> = {},
@@ -56,9 +55,7 @@ describe("compileAiDoctorContextPayloadFromRows", () => {
   it("produces a high-trust payload when plant + logs + photo + live reading present", () => {
     const ctx = compileAiDoctorContextPayloadFromRows(
       baseInput({
-        logs: [
-          { occurred_at: iso(60_000), event_type: "watering", source: "manual" },
-        ],
+        logs: [{ occurred_at: iso(60_000), event_type: "watering", source: "manual" }],
         photos: [{ captured_at: iso(120_000) }],
         sensorReadings: [
           {
@@ -83,9 +80,7 @@ describe("compileAiDoctorContextPayloadFromRows", () => {
   it("returns medium trust when plant context exists but photo is missing", () => {
     const ctx = compileAiDoctorContextPayloadFromRows(
       baseInput({
-        logs: [
-          { occurred_at: iso(60_000), event_type: "feeding", source: "manual" },
-        ],
+        logs: [{ occurred_at: iso(60_000), event_type: "feeding", source: "manual" }],
         photos: [],
         sensorReadings: [
           {
@@ -145,9 +140,49 @@ describe("compileAiDoctorContextPayloadFromRows", () => {
     expect(rh.is_degraded).toBe(true);
     // Trust must not be high when no trustworthy reading exists.
     expect(ctx.context_trust_level).not.toBe("high");
-    expect(ctx.missing_context).toContain(
-      "recent trustworthy sensor reading (7d)",
+    expect(ctx.missing_context).toContain("recent trustworthy sensor reading (7d)");
+  });
+
+  it("omits diagnostic ECOWITT rows while retaining physical gateway evidence", () => {
+    const ctx = compileAiDoctorContextPayloadFromRows(
+      baseInput({
+        sensorReadings: [
+          {
+            metric: "temperature_c",
+            value: 99,
+            captured_at: iso(30_000),
+            source: "live",
+            raw_payload: {
+              vendor: "ecowitt_windows_testbench",
+              metadata: { confidence: "test", bridge_token: "never-forward" },
+            },
+          },
+          {
+            metric: "humidity_pct",
+            value: 55,
+            captured_at: iso(60_000),
+            source: "live",
+            raw_payload: {
+              vendor: "ecowitt_windows_testbench",
+              metadata: {
+                reported_verdant_source: "live",
+                raw_payload: {
+                  stationtype: "GW2000A_V3.2.4",
+                  model: "GW2000A",
+                  dateutc: "2026-06-04 11:59:00",
+                },
+              },
+            },
+          },
+        ],
+      }),
     );
+
+    expect(ctx.sensor_summary.find((m) => m.metric === "temperature_c")?.latest_value).toBeNull();
+    expect(ctx.sensor_summary.find((m) => m.metric === "humidity_pct")?.latest_value).toBe(55);
+    expect(ctx.source_breakdown.find((row) => row.source === "live")?.reading_count_7d).toBe(1);
+    expect(JSON.stringify(ctx)).not.toContain("raw_payload");
+    expect(JSON.stringify(ctx)).not.toContain("never-forward");
   });
 
   it("limits logs to the last 14 days", () => {
@@ -197,9 +232,7 @@ describe("compileAiDoctorContextPayloadFromRows", () => {
       }),
     );
     const sources = ctx.source_breakdown.map((b) => b.source);
-    const filteredEnum = AI_DOCTOR_SENSOR_SOURCES.filter((s) =>
-      sources.includes(s),
-    );
+    const filteredEnum = AI_DOCTOR_SENSOR_SOURCES.filter((s) => sources.includes(s));
     expect(sources).toEqual(filteredEnum);
   });
 });
@@ -211,9 +244,7 @@ describe("executeAiDoctorEngine", () => {
   function highCtx(): AiDoctorContextPayload {
     return compileAiDoctorContextPayloadFromRows(
       baseInput({
-        logs: [
-          { occurred_at: iso(60_000), event_type: "watering", source: "manual" },
-        ],
+        logs: [{ occurred_at: iso(60_000), event_type: "watering", source: "manual" }],
         photos: [{ captured_at: iso(120_000) }],
         sensorReadings: [
           { metric: "temperature_c", value: 23, captured_at: iso(60_000), source: "live" },
@@ -228,9 +259,7 @@ describe("executeAiDoctorEngine", () => {
     expect(r.likely_issue).toBe("");
     expect(r.summary).toMatch(/insufficient trustworthy context/i);
     expect(r.missing_information).toContain("recent photo (14d)");
-    expect(r.missing_information).toContain(
-      "recent trustworthy sensor reading (7d)",
-    );
+    expect(r.missing_information).toContain("recent trustworthy sensor reading (7d)");
     expect(r.action_queue_suggestion).toBeNull();
   });
 
@@ -247,9 +276,7 @@ describe("executeAiDoctorEngine", () => {
   it("escalates risk to medium when stale/invalid telemetry is present and emits an approval-required suggestion", async () => {
     const ctx = compileAiDoctorContextPayloadFromRows(
       baseInput({
-        logs: [
-          { occurred_at: iso(60_000), event_type: "watering", source: "manual" },
-        ],
+        logs: [{ occurred_at: iso(60_000), event_type: "watering", source: "manual" }],
         photos: [{ captured_at: iso(120_000) }],
         sensorReadings: [
           // trustworthy reading so confidence is not low:
@@ -267,7 +294,9 @@ describe("executeAiDoctorEngine", () => {
     expect(sugg.risk_level).toBe("medium");
     // Must not be an executable device command.
     const text = `${sugg.title} ${sugg.rationale}`.toLowerCase();
-    expect(text).not.toMatch(/\b(turn on|turn off|set humidifier|set fan|execute|run command|api call)\b/);
+    expect(text).not.toMatch(
+      /\b(turn on|turn off|set humidifier|set fan|execute|run command|api call)\b/,
+    );
   });
 
   it("never emits an action_queue_suggestion when confidence is low even if telemetry is invalid", async () => {
@@ -308,9 +337,7 @@ describe("executeAiDoctorEngine", () => {
   it("evidence reflects degraded sensor metrics with explicit non-healthy language", async () => {
     const ctx = compileAiDoctorContextPayloadFromRows(
       baseInput({
-        logs: [
-          { occurred_at: iso(60_000), event_type: "watering", source: "manual" },
-        ],
+        logs: [{ occurred_at: iso(60_000), event_type: "watering", source: "manual" }],
         photos: [{ captured_at: iso(120_000) }],
         sensorReadings: [
           { metric: "temperature_c", value: 23, captured_at: iso(60_000), source: "live" },
@@ -326,15 +353,10 @@ describe("executeAiDoctorEngine", () => {
 });
 
 describe("static safety — aiDoctorEnginePhase1Foundation.ts", () => {
-  const RAW = readFileSync(
-    resolve(__dirname, "../lib/aiDoctorEnginePhase1Foundation.ts"),
-    "utf8",
-  );
+  const RAW = readFileSync(resolve(__dirname, "../lib/aiDoctorEnginePhase1Foundation.ts"), "utf8");
   // Strip block + line comments so that the safety regexes match real code,
   // not the file's own self-describing safety notes.
-  const SOURCE = RAW
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/(^|[^:])\/\/.*$/gm, "$1");
+  const SOURCE = RAW.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
 
   it("does not import Supabase, alerts, action queue writers, or device control", () => {
     expect(SOURCE).not.toMatch(/from\s+["']@\/integrations\/supabase/);

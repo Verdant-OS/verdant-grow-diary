@@ -5,8 +5,8 @@
  * SAFETY:
  *  - Read-only. Never mutates action_queue, alerts, or diary rows.
  *  - RLS-scoped client reads only; no service role.
- *  - sensor_readings select EXCLUDES raw_payload — raw payloads never enter
- *    this feature.
+ *  - sensor_readings selects raw_payload only for the shared provenance
+ *    classifier; the episode contract never returns or renders it.
  *  - Errors are sanitized; provider messages never surface.
  *  - No query per episode: one action query, one diary query, one bounded
  *    sensor query per distinct tent (one-tent grows → one query).
@@ -98,14 +98,17 @@ export async function loadPlantMemoryEpisodes(
         .filter((ms): ms is number => ms !== null);
       const tentIds = [...new Set(actions.map((a) => a.tent_id).filter(Boolean))] as string[];
       if (completedTimes.length > 0 && tentIds.length > 0) {
-        const fromIso = new Date(Math.min(...completedTimes) - EPISODE_BEFORE_WINDOW_MS).toISOString();
+        const fromIso = new Date(
+          Math.min(...completedTimes) - EPISODE_BEFORE_WINDOW_MS,
+        ).toISOString();
         const toIso = new Date(
           Math.max(...completedTimes) + EPISODE_FOLLOW_UP_DUE_MS + EPISODE_AFTER_WINDOW_MS,
         ).toISOString();
-        // Bounded window, bounded limit, NO raw_payload in the select.
+        // Bounded window and limit. raw_payload is classification-only and
+        // never copied into episode evidence.
         const { data: sensorData, error: sensorError } = await supabase
           .from("sensor_readings")
-          .select("id,tent_id,metric,source,quality,captured_at")
+          .select("id,tent_id,metric,source,quality,captured_at,raw_payload")
           .in("tent_id", tentIds)
           .gte("captured_at", fromIso)
           .lte("captured_at", toIso)

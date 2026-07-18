@@ -7,7 +7,7 @@
 
 import { normalizeQuickLogSnapshotMetrics } from "@/lib/quick-log/quickLogSnapshotMetricNormalizer";
 import { summarizeCsvVendor } from "@/lib/sensorReadingVendorLineage";
-
+import { isSensorTestbenchRow } from "@/lib/sensorTestbenchIndicatorRules";
 
 export type SnapshotSource =
   | "live"
@@ -87,9 +87,7 @@ export interface SensorSnapshot {
    * `captured_at`), same raw `source`. Only present when the underlying
    * row carried an `id`. Diary-derived snapshots never populate this.
    */
-  metric_refs?: Partial<
-    Record<SensorSnapshotMetricRefKey, SensorSnapshotMetricRef>
-  >;
+  metric_refs?: Partial<Record<SensorSnapshotMetricRefKey, SensorSnapshotMetricRef>>;
 }
 
 export const EMPTY_SNAPSHOT: SensorSnapshot = {
@@ -164,10 +162,7 @@ export interface SensorReadingLike {
  * `sensor_readings.metric` value. Snapshot fields and reading metrics
  * use different vocabularies; this table is the only mapping site.
  */
-const METRIC_REF_KEY_TO_READING_METRIC: Record<
-  SensorSnapshotMetricRefKey,
-  string
-> = {
+const METRIC_REF_KEY_TO_READING_METRIC: Record<SensorSnapshotMetricRefKey, string> = {
   temp: "temperature_c",
   rh: "humidity_pct",
   vpd: "vpd_kpa",
@@ -182,9 +177,7 @@ const METRIC_REF_KEY_TO_READING_METRIC: Record<
  * `ts` value and folds metric/value pairs at that timestamp into the
  * snapshot fields. Unknown metrics are ignored, not faked.
  */
-export function snapshotFromReadings(
-  rows: SensorReadingLike[],
-): SensorSnapshot | null {
+export function snapshotFromReadings(rows: SensorReadingLike[]): SensorSnapshot | null {
   if (!rows || rows.length === 0) return null;
   // rows are expected ordered desc; take the latest ts then keep all rows at
   // that exact timestamp (multi-metric readings often share ts).
@@ -199,10 +192,8 @@ export function snapshotFromReadings(
   // fold it into the card's existing "sim" bucket so demo rows can never
   // fall through to a live claim.
   const allSim =
-    latest.length > 0 &&
-    latest.every((r) => r.source === "sim" || r.source === "demo");
-  const allCsv =
-    latest.length > 0 && latest.every((r) => r.source === "csv");
+    latest.length > 0 && latest.every((r) => r.source === "sim" || r.source === "demo");
+  const allCsv = latest.length > 0 && latest.every((r) => r.source === "csv");
   const anyCsv = latest.some((r) => r.source === "csv");
   // "Live sensor" is a claim, not a default: it requires EVERY row at the
   // latest timestamp to carry a source in the live reservation. That
@@ -215,7 +206,9 @@ export function snapshotFromReadings(
   // promotion, and this card must not be looser than it.
   const allLive =
     latest.length > 0 &&
-    latest.every((r) => r.source === "live" || r.source === "pi_bridge");
+    latest.every(
+      (r) => (r.source === "live" || r.source === "pi_bridge") && !isSensorTestbenchRow(r),
+    );
   // CSV history must never be promoted to "live". If every row at the
   // latest timestamp is CSV, classify as "csv". If CSV is mixed with
   // non-live sources but no manual, still prefer csv over live so
@@ -235,17 +228,14 @@ export function snapshotFromReadings(
   // device notes (device_id = "manual:...") are surfaced for manual
   // snapshots; otherwise fall back to any device_id at the latest ts.
   const deviceRow =
-    latest.find((r) => r.source === source && !!r.device_id) ??
-    latest.find((r) => !!r.device_id);
+    latest.find((r) => r.source === source && !!r.device_id) ?? latest.find((r) => !!r.device_id);
   // Summarise CSV vendor lineage (presentation hint only — never
   // upgrades the source classification).
   const csvVendor = source === "csv" ? summarizeCsvVendor(latest) : null;
   // Per-metric provenance — use the EXACT row selected by `get(metric)`
   // (first match in `latest`, preserving existing selection semantics).
   // Only emit a ref when the row carries a non-empty id. Never inferred.
-  let metric_refs:
-    | Partial<Record<SensorSnapshotMetricRefKey, SensorSnapshotMetricRef>>
-    | undefined;
+  let metric_refs: Partial<Record<SensorSnapshotMetricRefKey, SensorSnapshotMetricRef>> | undefined;
   for (const key of Object.keys(METRIC_REF_KEY_TO_READING_METRIC) as SensorSnapshotMetricRefKey[]) {
     const readingMetric = METRIC_REF_KEY_TO_READING_METRIC[key];
     const row = latest.find((x) => x.metric === readingMetric);
@@ -347,11 +337,7 @@ export function snapshotFromDiary(
   };
 }
 
-export function formatValue(
-  v: number | null,
-  unit: string,
-  digits = 1,
-): string {
+export function formatValue(v: number | null, unit: string, digits = 1): string {
   if (v === null) return "Unknown";
   return `${v.toFixed(digits)}${unit}`;
 }

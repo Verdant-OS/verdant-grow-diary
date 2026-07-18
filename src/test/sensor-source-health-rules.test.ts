@@ -8,6 +8,17 @@ import {
 
 const NOW = new Date("2026-05-27T12:00:00Z");
 const minutesAgo = (m: number) => new Date(NOW.getTime() - m * 60_000).toISOString();
+const PHYSICAL_WINDOWS_PAYLOAD = {
+  vendor: "ecowitt_windows_testbench",
+  metadata: {
+    reported_verdant_source: "live",
+    raw_payload: {
+      stationtype: "GW2000A_V3.2.4",
+      model: "GW2000A",
+      dateutc: "2026-05-27 11:55:00",
+    },
+  },
+};
 
 describe("sensorSourceHealthRules.buildSensorSourceHealth", () => {
   it("returns empty array when no rows", () => {
@@ -31,14 +42,109 @@ describe("sensorSourceHealthRules.buildSensorSourceHealth", () => {
 
   it("marks source active when newest reading is within 30 minutes", () => {
     const rows: SensorSourceHealthInput[] = [
-      { source: "esp32", metric: "temperature_c", captured_at: minutesAgo(SENSOR_SOURCE_STALE_MINUTES - 1) },
+      {
+        source: "esp32",
+        metric: "temperature_c",
+        captured_at: minutesAgo(SENSOR_SOURCE_STALE_MINUTES - 1),
+      },
     ];
     expect(buildSensorSourceHealth(rows, NOW)[0].status).toBe("active");
   });
 
+  it("never marks a fresh canonical-live Windows diagnostic active", () => {
+    const out = buildSensorSourceHealth(
+      [
+        {
+          source: "live",
+          metric: "temperature_c",
+          captured_at: minutesAgo(1),
+          raw_payload: {
+            vendor: "ecowitt_windows_testbench",
+            metadata: { confidence: "test", verdant_source: "live" },
+          },
+        },
+      ],
+      NOW,
+    );
+    expect(out[0].status).toBe("diagnostic");
+  });
+
+  it("fails closed when a legacy top-level Windows source lacks provenance", () => {
+    const out = buildSensorSourceHealth(
+      [
+        {
+          source: "ecowitt_windows_testbench",
+          metric: "temperature_c",
+          captured_at: minutesAgo(1),
+          raw_payload: null,
+        },
+      ],
+      NOW,
+    );
+    expect(out[0].status).toBe("diagnostic");
+  });
+
+  it("keeps canonical demo rows diagnostic rather than active", () => {
+    const out = buildSensorSourceHealth(
+      [
+        {
+          source: "demo",
+          metric: "temperature_c",
+          captured_at: minutesAgo(1),
+        },
+      ],
+      NOW,
+    );
+    expect(out[0].status).toBe("diagnostic");
+  });
+
+  it("keeps physical Windows gateway rows active", () => {
+    const out = buildSensorSourceHealth(
+      [
+        {
+          source: "live",
+          metric: "temperature_c",
+          captured_at: minutesAgo(5),
+          raw_payload: PHYSICAL_WINDOWS_PAYLOAD,
+        },
+      ],
+      NOW,
+    );
+    expect(out[0].status).toBe("active");
+  });
+
+  it("does not let a newer diagnostic advance a mixed physical source clock", () => {
+    const out = buildSensorSourceHealth(
+      [
+        {
+          source: "live",
+          metric: "temperature_c",
+          captured_at: minutesAgo(40),
+          raw_payload: PHYSICAL_WINDOWS_PAYLOAD,
+        },
+        {
+          source: "live",
+          metric: "humidity_pct",
+          captured_at: minutesAgo(1),
+          raw_payload: {
+            vendor: "ecowitt_windows_testbench",
+            metadata: { confidence: "test", verdant_source: "live" },
+          },
+        },
+      ],
+      NOW,
+    );
+    expect(out[0]).toMatchObject({ status: "stale", readingCount: 1 });
+    expect(out[0].metrics).toEqual(["temperature_c"]);
+  });
+
   it("marks source stale when newest reading is older than 30 minutes", () => {
     const rows: SensorSourceHealthInput[] = [
-      { source: "esp32", metric: "temperature_c", captured_at: minutesAgo(SENSOR_SOURCE_STALE_MINUTES + 5) },
+      {
+        source: "esp32",
+        metric: "temperature_c",
+        captured_at: minutesAgo(SENSOR_SOURCE_STALE_MINUTES + 5),
+      },
     ];
     expect(buildSensorSourceHealth(rows, NOW)[0].status).toBe("stale");
   });

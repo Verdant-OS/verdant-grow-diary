@@ -13,16 +13,16 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import {
-  snapshotFromReadings,
-  SOURCE_LABEL,
-  type SensorReadingLike,
-} from "@/lib/sensorSnapshot";
+import { snapshotFromReadings, SOURCE_LABEL, type SensorReadingLike } from "@/lib/sensorSnapshot";
 
 const TS = "2026-07-15T12:00:00.000Z";
 
 function row(source: string | null, metric = "temp_c", value = 24): SensorReadingLike {
   return { ts: TS, metric, value, source };
+}
+
+function liveRowWithRawPayload(raw_payload: unknown): SensorReadingLike {
+  return { ...row("live"), raw_payload };
 }
 
 describe("live is a claim, not a default", () => {
@@ -51,17 +51,60 @@ describe("live is a claim, not a default", () => {
 
   it("null/missing source → unverified", () => {
     expect(snapshotFromReadings([row(null)])?.source).toBe("unverified");
-    expect(
-      snapshotFromReadings([{ ts: TS, metric: "temp_c", value: 24 }])?.source,
-    ).toBe("unverified");
+    expect(snapshotFromReadings([{ ts: TS, metric: "temp_c", value: 24 }])?.source).toBe(
+      "unverified",
+    );
   });
 
   it("mixed live + vendor rows at the same timestamp → unverified", () => {
+    const snap = snapshotFromReadings([row("live"), row("ecowitt", "rh_pct", 55)]);
+    expect(snap?.source).toBe("unverified");
+  });
+
+  it.each(["test", "demo"])(
+    "source=live with explicit confidence=%s → unverified, never live",
+    (confidence) => {
+      const snap = snapshotFromReadings([liveRowWithRawPayload({ metadata: { confidence } })]);
+      expect(snap?.source).toBe("unverified");
+    },
+  );
+
+  it("source=live with a diagnostic Windows-listener lineage → unverified", () => {
     const snap = snapshotFromReadings([
-      row("live"),
-      row("ecowitt", "rh_pct", 55),
+      liveRowWithRawPayload({
+        vendor: "ecowitt_windows_testbench",
+        metadata: { reported_verdant_source: "demo" },
+      }),
     ]);
     expect(snap?.source).toBe("unverified");
+  });
+
+  it("source=live with only the canonical verdant_source mirror → unverified", () => {
+    const snap = snapshotFromReadings([
+      liveRowWithRawPayload({
+        vendor: "ecowitt_windows_testbench",
+        metadata: { verdant_source: "live" },
+      }),
+    ]);
+    expect(snap?.source).toBe("unverified");
+  });
+
+  it("source=live with explicit physical Windows-listener lineage stays live", () => {
+    const snap = snapshotFromReadings([
+      liveRowWithRawPayload({
+        vendor: "ecowitt_windows_testbench",
+        metadata: {
+          confidence: "high",
+          reported_verdant_source: "live",
+          raw_payload: {
+            stationtype: "GW2000A_V3.2.4",
+            model: "GW2000A",
+            dateutc: "2026-07-15 12:00:00",
+          },
+        },
+      }),
+    ]);
+    expect(snap?.source).toBe("live");
   });
 });
 
@@ -102,16 +145,12 @@ describe("unverified label honesty", () => {
 });
 
 describe("static contract — the classification has no live fallthrough", () => {
-  const SRC = readFileSync(
-    resolve(__dirname, "../lib/sensorSnapshot.ts"),
-    "utf8",
-  );
+  const SRC = readFileSync(resolve(__dirname, "../lib/sensorSnapshot.ts"), "utf8");
 
   it("gates 'live' behind an every(live-reservation) check", () => {
     expect(SRC).toMatch(/allLive\s*=/);
-    expect(SRC).toMatch(
-      /every\(\(r\) => r\.source === "live" \|\| r\.source === "pi_bridge"\)/,
-    );
+    expect(SRC).toContain('r.source === "live" || r.source === "pi_bridge"');
+    expect(SRC).toContain("!isSensorTestbenchRow(r)");
   });
 
   it("terminal classification branch is 'unverified', not 'live'", () => {

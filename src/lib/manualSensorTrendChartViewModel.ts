@@ -17,24 +17,18 @@
  * are never folded into trend context.
  */
 
-export type ManualSensorTrendMetric =
-  | "ppfd"
-  | "temperature_c"
-  | "humidity_pct"
-  | "vpd_kpa";
+import { isDiagnosticSensorProvenanceRow } from "@/lib/sensorProvenanceFenceRules";
 
-export type ManualSensorTrendSource =
-  | "live"
-  | "manual"
-  | "csv"
-  | "demo"
-  | "stale"
-  | "invalid";
+export type ManualSensorTrendMetric = "ppfd" | "temperature_c" | "humidity_pct" | "vpd_kpa";
+
+export type ManualSensorTrendSource = "live" | "manual" | "csv" | "demo" | "stale" | "invalid";
 
 export type ManualSensorTrendOmissionReason =
   | "stale"
   | "invalid"
   | "demo"
+  | "diagnostic"
+  | "unknown_source"
   | "non_finite"
   | "missing_timestamp"
   | "unknown_metric";
@@ -45,6 +39,8 @@ export interface ManualSensorTrendInputRow {
   value?: unknown;
   source?: unknown;
   quality?: unknown;
+  /** Classification-only provenance. Never returned by the view model. */
+  raw_payload?: unknown;
   /** Optional grower-facing source label (e.g. "EcoWitt WH45"). */
   device_label?: unknown;
 }
@@ -103,11 +99,7 @@ const ALLOWED_SOURCES: ReadonlySet<ManualSensorTrendSource> = new Set([
   "invalid",
 ]);
 
-const TRUSTED_SOURCES: ReadonlySet<ManualSensorTrendSource> = new Set([
-  "live",
-  "manual",
-  "csv",
-]);
+const TRUSTED_SOURCES: ReadonlySet<ManualSensorTrendSource> = new Set(["live", "manual", "csv"]);
 
 const METRIC_META: Record<
   ManualSensorTrendMetric,
@@ -146,17 +138,55 @@ const TRACKED_METRICS: ReadonlyArray<ManualSensorTrendMetric> = [
 ];
 
 function normalizeMetric(value: unknown): ManualSensorTrendMetric | null {
-  return typeof value === "string" &&
-    (TRACKED_METRICS as ReadonlyArray<string>).includes(value)
+  return typeof value === "string" && (TRACKED_METRICS as ReadonlyArray<string>).includes(value)
     ? (value as ManualSensorTrendMetric)
     : null;
 }
 
 function normalizeSource(value: unknown): ManualSensorTrendSource | null {
-  return typeof value === "string" &&
-    ALLOWED_SOURCES.has(value as ManualSensorTrendSource)
-    ? (value as ManualSensorTrendSource)
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().toLowerCase();
+  return ALLOWED_SOURCES.has(normalized as ManualSensorTrendSource)
+    ? (normalized as ManualSensorTrendSource)
     : null;
+}
+
+interface ManualSensorTrendSourceResolution {
+  source: ManualSensorTrendSource | null;
+  omissionReason: "diagnostic" | "unknown_source" | null;
+}
+
+/**
+ * Resolve trust before any chart point is built.
+ *
+ * Old manual rows predate the source column and carry no raw ingest envelope;
+ * those are intentionally preserved as manual history. Any non-canonical
+ * source, or a source-less row carrying an ingest payload, fails closed.
+ */
+function resolveTrendSource(row: ManualSensorTrendInputRow): ManualSensorTrendSourceResolution {
+  const sourceValue = typeof row.source === "string" ? row.source.trim().toLowerCase() : null;
+  const canonicalSource = normalizeSource(sourceValue);
+
+  if (
+    isDiagnosticSensorProvenanceRow({
+      source: sourceValue,
+      raw_payload: row.raw_payload,
+    })
+  ) {
+    return { source: canonicalSource, omissionReason: "diagnostic" };
+  }
+
+  if (canonicalSource) {
+    return { source: canonicalSource, omissionReason: null };
+  }
+
+  const sourceIsMissing = sourceValue === null || sourceValue.length === 0;
+  const hasRawProvenance = row.raw_payload !== null && row.raw_payload !== undefined;
+  if (sourceIsMissing && !hasRawProvenance) {
+    return { source: "manual", omissionReason: null };
+  }
+
+  return { source: null, omissionReason: "unknown_source" };
 }
 
 function normalizeTs(value: unknown): string | null {
@@ -212,8 +242,18 @@ export function buildManualSensorTrendChartViewModel(
   for (const row of input?.readings ?? []) {
     const metric = normalizeMetric(row.metric);
     const ts = normalizeTs(row.ts);
-    const source = normalizeSource(row.source);
+    const sourceResolution = resolveTrendSource(row);
+    const source = sourceResolution.source;
     const value = normalizeValue(row.value);
+
+    if (sourceResolution.omissionReason) {
+      omissions.push(makeOmission(ts, metric, source, sourceResolution.omissionReason));
+      continue;
+    }
+    if (!source) {
+      omissions.push(makeOmission(ts, metric, null, "unknown_source"));
+      continue;
+    }
 
     if (!metric) {
       omissions.push(makeOmission(ts, null, source, "unknown_metric"));
@@ -229,7 +269,7 @@ export function buildManualSensorTrendChartViewModel(
     }
 
     const meta = METRIC_META[metric];
-    const resolvedSource = source ?? "manual";
+    const resolvedSource = source;
     const point: ManualSensorTrendPoint = {
       capturedAt: ts,
       metric,
@@ -254,13 +294,15 @@ export function buildManualSensorTrendChartViewModel(
   }
 
   // Chronological order: oldest -> newest for stable trend rendering.
-  acceptedPoints.sort((a, b) =>
-    Date.parse(a.capturedAt) - Date.parse(b.capturedAt) ||
-    (a.metric < b.metric ? -1 : a.metric > b.metric ? 1 : 0),
+  acceptedPoints.sort(
+    (a, b) =>
+      Date.parse(a.capturedAt) - Date.parse(b.capturedAt) ||
+      (a.metric < b.metric ? -1 : a.metric > b.metric ? 1 : 0),
   );
-  flagged.sort((a, b) =>
-    Date.parse(a.capturedAt) - Date.parse(b.capturedAt) ||
-    (a.metric < b.metric ? -1 : a.metric > b.metric ? 1 : 0),
+  flagged.sort(
+    (a, b) =>
+      Date.parse(a.capturedAt) - Date.parse(b.capturedAt) ||
+      (a.metric < b.metric ? -1 : a.metric > b.metric ? 1 : 0),
   );
 
   const series: ManualSensorTrendSeries[] = TRACKED_METRICS.map((metric) => ({
@@ -272,9 +314,7 @@ export function buildManualSensorTrendChartViewModel(
 
   const hasPpfd = series[0]?.points.length > 0;
   const hasEnvironment = series.slice(1).some((s) => s.points.length > 0);
-  const hasAnyTrusted = acceptedPoints.some((p) =>
-    TRUSTED_SOURCES.has(p.source),
-  );
+  const hasAnyTrusted = acceptedPoints.some((p) => TRUSTED_SOURCES.has(p.source));
 
   let state: ManualSensorTrendState;
   let emptyMessage: string | null = null;

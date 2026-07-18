@@ -7,22 +7,15 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import {
-  EMPTY_SNAPSHOT,
-  type SensorSnapshot,
-} from "@/lib/sensorSnapshot";
-import {
-  QUALITY_HEADLINE,
-  evaluateSensorQuality,
-} from "@/lib/sensorQuality";
+import { EMPTY_SNAPSHOT, type SensorSnapshot } from "@/lib/sensorSnapshot";
+import { QUALITY_HEADLINE, evaluateSensorQuality } from "@/lib/sensorQuality";
 
 const ROOT = resolve(__dirname, "../..");
 const DASHBOARD = readFileSync(resolve(ROOT, "src/pages/Dashboard.tsx"), "utf8");
 const HELPER = readFileSync(resolve(ROOT, "src/lib/sensorQuality.ts"), "utf8");
 
 const AI_COACH_CALL = /["'`]ai-coach["'`]|functions\/ai-coach|ai_coach/;
-const EXTERNAL_CONTROL =
-  /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|\brelay\b|\bactuator\b/i;
+const EXTERNAL_CONTROL = /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|\brelay\b|\bactuator\b/i;
 const SERVICE_ROLE = /service_role/;
 const WRITE_PATH = /\.from\(['"][^'"]+['"]\)\s*\.(insert|update|delete|upsert)/;
 
@@ -87,19 +80,13 @@ describe("evaluateSensorQuality", () => {
   });
 
   it("flags humidity = 100 as watch", () => {
-    const r = evaluateSensorQuality(
-      fresh({ temp: 24, rh: 100, vpd: 1.1 }),
-      NOW,
-    );
+    const r = evaluateSensorQuality(fresh({ temp: 24, rh: 100, vpd: 1.1 }), NOW);
     expect(r.quality).toBe("watch");
     expect(r.suspiciousFields).toContain("rh");
   });
 
   it("flags humidity = 0 as watch", () => {
-    const r = evaluateSensorQuality(
-      fresh({ temp: 24, rh: 0, vpd: 1.1 }),
-      NOW,
-    );
+    const r = evaluateSensorQuality(fresh({ temp: 24, rh: 0, vpd: 1.1 }), NOW);
     expect(r.quality).toBe("watch");
     expect(r.suspiciousFields).toContain("rh");
   });
@@ -111,38 +98,26 @@ describe("evaluateSensorQuality", () => {
   });
 
   it("flags implausible temperature", () => {
-    const r = evaluateSensorQuality(
-      fresh({ temp: 120, rh: 55, vpd: 1.1 }),
-      NOW,
-    );
+    const r = evaluateSensorQuality(fresh({ temp: 120, rh: 55, vpd: 1.1 }), NOW);
     expect(r.quality).toBe("watch");
     expect(r.suspiciousFields).toContain("temp");
   });
 
   it("flags soil EC unit mismatch (1450 vs 1.45)", () => {
-    const r = evaluateSensorQuality(
-      fresh({ temp: 24, rh: 55, vpd: 1.1, soil_ec: 1450 }),
-      NOW,
-    );
+    const r = evaluateSensorQuality(fresh({ temp: 24, rh: 55, vpd: 1.1, soil_ec: 1450 }), NOW);
     expect(r.quality).toBe("watch");
     expect(r.suspiciousFields).toContain("soil_ec");
     expect(r.reasons.some((x) => /unit/i.test(x))).toBe(true);
   });
 
   it("flags negative PPFD", () => {
-    const r = evaluateSensorQuality(
-      fresh({ temp: 24, rh: 55, vpd: 1.1, ppfd: -5 }),
-      NOW,
-    );
+    const r = evaluateSensorQuality(fresh({ temp: 24, rh: 55, vpd: 1.1, ppfd: -5 }), NOW);
     expect(r.quality).toBe("watch");
     expect(r.suspiciousFields).toContain("ppfd");
   });
 
   it("flags implausibly high PPFD", () => {
-    const r = evaluateSensorQuality(
-      fresh({ temp: 24, rh: 55, vpd: 1.1, ppfd: 9999 }),
-      NOW,
-    );
+    const r = evaluateSensorQuality(fresh({ temp: 24, rh: 55, vpd: 1.1, ppfd: 9999 }), NOW);
     expect(r.quality).toBe("watch");
     expect(r.suspiciousFields).toContain("ppfd");
   });
@@ -185,8 +160,9 @@ describe("sensorQuality helper safety", () => {
 });
 
 describe("Dashboard Sensor Data Quality wiring", () => {
-  it("imports evaluateSensorQuality", () => {
-    expect(DASHBOARD).toMatch(/evaluateSensorQuality/);
+  it("imports source-aware evaluateDashboardSensorQuality", () => {
+    expect(DASHBOARD).toMatch(/evaluateDashboardSensorQuality/);
+    expect(DASHBOARD).not.toMatch(/evaluateSensorQuality\s*\(/);
   });
   it("renders a Sensor Data Quality section", () => {
     expect(DASHBOARD).toMatch(/Sensor Data Quality/);

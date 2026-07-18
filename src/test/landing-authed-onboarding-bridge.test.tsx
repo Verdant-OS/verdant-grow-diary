@@ -110,10 +110,74 @@ describe("LandingAuthedOnboardingBridge — render", () => {
     growsMock.mockReturnValue({ grows: [{ id: "g1" }] });
     tentsMock.mockReturnValue({ data: [{ id: "t1" }] });
     plantsMock.mockReturnValue({ data: [{ id: "p1" }] });
-    readingsMock.mockReturnValue({ data: [{ id: "r1" }] });
+    readingsMock.mockReturnValue({
+      data: [{ id: "r1", source: "manual", raw_payload: null }],
+    });
     renderBridge();
     const pill = screen.getByTestId("onboarding-progress-pill");
     expect(pill.getAttribute("data-activated")).toBe("true");
+  });
+
+  it("does not let a canonical-live diagnostic row activate grow memory", () => {
+    growsMock.mockReturnValue({ grows: [{ id: "g1" }] });
+    tentsMock.mockReturnValue({ data: [{ id: "t1" }] });
+    plantsMock.mockReturnValue({ data: [{ id: "p1" }] });
+    readingsMock.mockReturnValue({
+      data: [
+        {
+          id: "diagnostic-row",
+          source: "live",
+          raw_payload: {
+            vendor: "ecowitt_windows_testbench",
+            metadata: {
+              reported_verdant_source: "live",
+              confidence: "test",
+              secret: "never-render-this-secret",
+            },
+          },
+        },
+      ],
+    });
+
+    renderBridge();
+
+    const pill = screen.getByTestId("onboarding-progress-pill");
+    expect(pill.getAttribute("data-complete-count")).toBe("3");
+    expect(pill.getAttribute("data-activated")).toBe("false");
+    expect(screen.getByText(/Ready to build your real grow memory\?/i)).toBeTruthy();
+    expect(screen.queryByText(/Your grow memory is active\./i)).toBeNull();
+    expect(screen.queryByText(/never-render-this-secret/i)).toBeNull();
+  });
+
+  it("accepts a physically proven EcoWitt gateway row as activation evidence", () => {
+    growsMock.mockReturnValue({ grows: [{ id: "g1" }] });
+    tentsMock.mockReturnValue({ data: [{ id: "t1" }] });
+    plantsMock.mockReturnValue({ data: [{ id: "p1" }] });
+    readingsMock.mockReturnValue({
+      data: [
+        {
+          id: "physical-gateway-row",
+          source: "live",
+          raw_payload: {
+            vendor: "ecowitt_windows_testbench",
+            metadata: {
+              reported_verdant_source: "live",
+              raw_payload: {
+                stationtype: "GW2000A_V3.2.3",
+                model: "GW2000",
+                dateutc: "2026-06-20 10:00:00",
+              },
+            },
+          },
+        },
+      ],
+    });
+
+    renderBridge();
+
+    const pill = screen.getByTestId("onboarding-progress-pill");
+    expect(pill.getAttribute("data-activated")).toBe("true");
+    expect(screen.getByText(/Your grow memory is active\./i)).toBeTruthy();
   });
 });
 

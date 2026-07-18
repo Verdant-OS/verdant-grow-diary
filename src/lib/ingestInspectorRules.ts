@@ -9,6 +9,7 @@
  *  - Never promotes csv/webhook/mqtt/ecowitt/etc. to a "Live" label.
  *  - Never reveals user_id.
  */
+import { isDiagnosticSensorProvenanceRow } from "@/lib/sensorProvenanceFenceRules";
 
 export const INGEST_INSPECTOR_DISCLOSURE_LINES = [
   "Read-only inspector.",
@@ -71,9 +72,7 @@ const SOURCE_LABEL_OVERRIDES: Record<string, string> = {
 };
 
 /** Display label for a raw DB source value. Never returns "Live". */
-export function inspectorSourceLabel(
-  source: string | null | undefined,
-): string {
+export function inspectorSourceLabel(source: string | null | undefined): string {
   if (typeof source !== "string" || source.trim() === "") return "Unknown";
   const key = source.trim().toLowerCase();
   return SOURCE_LABEL_OVERRIDES[key] ?? key;
@@ -153,9 +152,7 @@ export function redactRawPayload(input: unknown, depth = 0): unknown {
  * Extract a vendor lineage string from raw_payload, if present. Vendor
  * is presentation-only — never trusted for ownership, auth, or routing.
  */
-export function extractVendorLineage(
-  rawPayload: unknown,
-): string | null {
+export function extractVendorLineage(rawPayload: unknown): string | null {
   if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
     return null;
   }
@@ -185,6 +182,36 @@ export interface InspectorReadingLike {
   tent_id: string | null;
   device_id: string | null;
   raw_payload: unknown;
+}
+
+export interface InspectorSourcePresentation {
+  label: string;
+  diagnostic: boolean;
+  live: boolean;
+}
+
+/**
+ * Resolve the source badge from the whole row so a legacy diagnostic row
+ * cannot look live merely because its canonical stored source is `live`.
+ * Raw payload is inspected only by the shared provenance fence and is never
+ * returned from this presenter.
+ */
+export function resolveInspectorSourcePresentation(
+  reading: Pick<InspectorReadingLike, "source" | "raw_payload">,
+): InspectorSourcePresentation {
+  if (isDiagnosticSensorProvenanceRow(reading)) {
+    return {
+      label: "Testbench / demo",
+      diagnostic: true,
+      live: false,
+    };
+  }
+
+  return {
+    label: inspectorSourceLabel(reading.source),
+    diagnostic: false,
+    live: isLiveSource(reading.source),
+  };
 }
 
 export interface InspectorFilters {

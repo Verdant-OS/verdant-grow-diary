@@ -14,14 +14,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Loader2, Sprout } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  listPhenoHuntsForOwner,
-  type PhenoHuntListItem,
-} from "@/lib/phenoHuntCandidatesService";
-import {
-  listKeeperStabilityForOwner,
-  type KeeperStabilityRow,
-} from "@/lib/phenoKeepersService";
+import { listPhenoHuntsForOwner, type PhenoHuntListItem } from "@/lib/phenoHuntCandidatesService";
+import { listKeeperStabilityForOwner, type KeeperStabilityRow } from "@/lib/phenoKeepersService";
 import { buildStabilityDashboard } from "@/lib/phenoStabilityDashboardRules";
 import PhenoStabilityDashboard from "@/components/PhenoStabilityDashboard";
 import { phenoHuntWorkspacePath } from "@/lib/routes";
@@ -45,10 +39,9 @@ export default function PhenoHuntsIndex() {
     let cancelled = false;
     setStatus("loading");
     // Hunts drive the page's load status; the keeper roll-up is best-effort.
-    // The service already returns [] on a query error, and the .catch here also
-    // swallows an unexpected *rejection* (network / auth-refresh throw) so a
-    // keeper-load failure can never fail-fast the whole index — only a hunts
-    // rejection reaches the error state.
+    // Hunt-list and candidate-count query failures reject so this page shows
+    // an honest error state. A keeper-roll-up failure remains isolated because
+    // it is optional context and must not hide an otherwise valid hunts list.
     Promise.all([listPhenoHuntsForOwner(), listKeeperStabilityForOwner().catch(() => [])])
       .then(([huntRows, keeperRows]) => {
         if (cancelled) return;
@@ -84,8 +77,8 @@ export default function PhenoHuntsIndex() {
       <header className="space-y-1">
         <h1 className="text-2xl font-display font-bold">Pheno Hunt</h1>
         <p className="text-sm text-muted-foreground">
-          Track candidates, score phenotypes against your own targets, and preserve keepers —
-          one hunt per grow.
+          Track candidates, score phenotypes against your own targets, and preserve keepers — one
+          hunt per grow.
         </p>
       </header>
 
@@ -105,17 +98,14 @@ export default function PhenoHuntsIndex() {
           </p>
         </div>
       ) : hunts.length === 0 ? (
-        <div
-          className="glass rounded-2xl p-8 text-center"
-          data-testid="pheno-hunts-index-empty"
-        >
+        <div className="glass rounded-2xl p-8 text-center" data-testid="pheno-hunts-index-empty">
           <div className="mx-auto h-14 w-14 rounded-2xl glass flex items-center justify-center mb-3">
             <Sprout className="h-6 w-6 text-primary" />
           </div>
           <h2 className="font-display text-lg font-semibold">No pheno hunts yet</h2>
           <p className="text-sm text-muted-foreground mt-1 mb-4 max-w-sm mx-auto">
-            A pheno hunt starts from a grow. Open a grow and use “Start Pheno Hunt” on its
-            timeline to begin tracking candidates.
+            A pheno hunt starts from a grow. Open a grow and use “Start Pheno Hunt” on its timeline
+            to begin tracking candidates.
           </p>
           <Button asChild className="gradient-leaf text-primary-foreground">
             <Link to="/grows" data-testid="pheno-hunts-index-empty-cta">

@@ -18,6 +18,17 @@ const PRIVATE_TABLES = [
   "action_queue",
 ];
 
+const PROTECTED_TABLES = [...PRIVATE_TABLES, "pheno_hunts", "pheno_keepers"];
+
+const PROTECTED_DESKTOP_ROUTES = [
+  "/sensors",
+  "/actions",
+  "/settings",
+  "/operator/ecowitt",
+  "/pheno-hunts",
+  "/pheno-hunts/new",
+] as const;
+
 async function mockAllSupabase(page: Page, opts: { signedIn?: boolean } = {}) {
   await page.route(/\/auth\/v1\//, async (route, req) => {
     const url = req.url();
@@ -95,8 +106,23 @@ test.describe("Auth route-protection (mocked, 1280x800)", () => {
     await mockAllSupabase(page);
   });
 
-  for (const path of ["/sensors", "/actions", "/settings", "/operator/ecowitt"]) {
-    test(`signed-out → ${path} redirects to /welcome`, async ({ page, baseURL }) => {
+  for (const path of PROTECTED_DESKTOP_ROUTES) {
+    test(`signed-out → ${path} redirects to /welcome and makes no private REST hits`, async ({
+      page,
+      baseURL,
+    }) => {
+      const privateHits: string[] = [];
+      await page.route(/\/rest\/v1\//, (route, req) => {
+        const url = req.url();
+        if (PROTECTED_TABLES.some((table) => url.includes(`/rest/v1/${table}`))) {
+          privateHits.push(url);
+        }
+        return route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify([]),
+        });
+      });
       await page.goto(path);
       await page.waitForURL((u) => u.pathname === "/welcome", { timeout: 8000 });
       const url = new URL(page.url());
@@ -108,6 +134,10 @@ test.describe("Auth route-protection (mocked, 1280x800)", () => {
         expect(redirectTo.startsWith("//")).toBe(false);
         expect(redirectTo).not.toMatch(/^https?:/i);
       }
+      expect(
+        privateHits,
+        `Private-table hits while signed out (${path}): ${privateHits.join(", ")}`,
+      ).toHaveLength(0);
       // No private grow content should be visible pre-auth.
       const body = (await page.locator("body").textContent()) ?? "";
       for (const word of ["Tent 1", "Plant 1", "Diary", "Last reading"]) {

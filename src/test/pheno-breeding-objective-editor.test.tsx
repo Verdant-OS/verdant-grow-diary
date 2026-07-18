@@ -10,7 +10,10 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import PhenoBreedingObjectiveEditor from "@/components/PhenoBreedingObjectiveEditor";
 import { LOUD_TRAIT_AXES } from "@/lib/phenoExpressionRules";
-import { BREEDING_OBJECTIVE_CAVEAT, type BreedingObjectiveTarget } from "@/lib/phenoBreedingObjectiveRules";
+import {
+  BREEDING_OBJECTIVE_CAVEAT,
+  type BreedingObjectiveTarget,
+} from "@/lib/phenoBreedingObjectiveRules";
 
 function renderEditor(
   targets: BreedingObjectiveTarget[],
@@ -50,9 +53,9 @@ describe("adding a target", () => {
     expect(screen.getByTestId("pheno-breeding-objective-target-vigor")).toHaveTextContent(
       "Vigor at least 4",
     );
-    expect((screen.getByTestId("pheno-breeding-objective-save") as HTMLButtonElement).disabled).toBe(
-      false,
-    );
+    expect(
+      (screen.getByTestId("pheno-breeding-objective-save") as HTMLButtonElement).disabled,
+    ).toBe(false);
   });
 
   it("rejects an out-of-range threshold with an inline error and does not add it", () => {
@@ -98,7 +101,9 @@ describe("saving", () => {
     fireEvent.click(screen.getByTestId("pheno-breeding-objective-save"));
 
     await waitFor(() =>
-      expect(onSave).toHaveBeenCalledWith([{ axisKey: "stretch", comparator: "gte", threshold: 2 }]),
+      expect(onSave).toHaveBeenCalledWith([
+        { axisKey: "stretch", comparator: "gte", threshold: 2 },
+      ]),
     );
     await waitFor(() => expect(screen.queryByText("Unsaved changes")).not.toBeInTheDocument());
   });
@@ -115,15 +120,17 @@ describe("saving", () => {
     fireEvent.click(screen.getByTestId("pheno-breeding-objective-add-target"));
     fireEvent.click(screen.getByTestId("pheno-breeding-objective-save"));
 
-    await waitFor(() => expect(screen.getByTestId("pheno-breeding-objective-error")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByTestId("pheno-breeding-objective-error")).toBeInTheDocument(),
+    );
     expect(screen.getByTestId("pheno-breeding-objective-target-stretch")).toBeInTheDocument();
   });
 
   it("disables save while a save is in flight", () => {
     renderEditor([{ axisKey: "vigor", comparator: "gte", threshold: 3 }], vi.fn(), true);
-    expect((screen.getByTestId("pheno-breeding-objective-save") as HTMLButtonElement).disabled).toBe(
-      true,
-    );
+    expect(
+      (screen.getByTestId("pheno-breeding-objective-save") as HTMLButtonElement).disabled,
+    ).toBe(true);
     expect(screen.getByTestId("pheno-breeding-objective-save")).toHaveTextContent("Saving…");
   });
 });
@@ -164,5 +171,54 @@ describe("external target updates", () => {
     );
     expect(screen.getByTestId("pheno-breeding-objective-target-stretch")).toBeInTheDocument();
     expect(screen.queryByTestId("pheno-breeding-objective-target-vigor")).not.toBeInTheDocument();
+  });
+
+  it("moves the pending picker off an axis consumed by a later-loaded target", async () => {
+    const { rerender } = renderEditor([], vi.fn());
+    expect(screen.getByTestId("pheno-breeding-objective-axis-select")).toHaveValue("nose_loudness");
+    fireEvent.change(screen.getByTestId("pheno-breeding-objective-threshold-input"), {
+      target: { value: "4" },
+    });
+
+    rerender(
+      <PhenoBreedingObjectiveEditor
+        targets={[{ axisKey: "nose_loudness", comparator: "gte", threshold: 7 }]}
+        onSave={vi.fn()}
+        saving={false}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("pheno-breeding-objective-axis-select")).toHaveValue("vigor"),
+    );
+    expect(screen.getByTestId("pheno-breeding-objective-threshold-input")).toHaveValue(null);
+    fireEvent.change(screen.getByTestId("pheno-breeding-objective-threshold-input"), {
+      target: { value: "4" },
+    });
+    fireEvent.click(screen.getByTestId("pheno-breeding-objective-add-target"));
+    expect(screen.getByTestId("pheno-breeding-objective-target-vigor")).toBeInTheDocument();
+    expect(screen.getAllByTestId(/pheno-breeding-objective-target-/)).toHaveLength(2);
+  });
+
+  it("selects a newly available axis after removing from an all-axes objective", async () => {
+    const allTargets = LOUD_TRAIT_AXES.map((axis) => ({
+      axisKey: axis.key,
+      comparator: "gte" as const,
+      threshold: axis.min,
+    }));
+    renderEditor(allTargets, vi.fn());
+    expect(screen.queryByTestId("pheno-breeding-objective-axis-select")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("pheno-breeding-objective-remove-nose_loudness"));
+    await waitFor(() =>
+      expect(screen.getByTestId("pheno-breeding-objective-axis-select")).toHaveValue(
+        "nose_loudness",
+      ),
+    );
+    fireEvent.change(screen.getByTestId("pheno-breeding-objective-threshold-input"), {
+      target: { value: "7" },
+    });
+    fireEvent.click(screen.getByTestId("pheno-breeding-objective-add-target"));
+    expect(screen.getByTestId("pheno-breeding-objective-target-nose_loudness")).toBeInTheDocument();
   });
 });

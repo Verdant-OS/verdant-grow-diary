@@ -11,6 +11,7 @@ import path from "node:path";
 import { LOUD_TRAIT_AXES } from "@/lib/phenoExpressionRules";
 import {
   evaluateStability,
+  isValidIsoCalendarDate,
   MAX_STABILITY_RUNS,
   sanitizeStabilityRuns,
   stabilityVerdictCopy,
@@ -21,14 +22,23 @@ import {
 const NOSE = LOUD_TRAIT_AXES.find((a) => a.key === "nose_loudness")!; // 0..10
 const VIGOR = LOUD_TRAIT_AXES.find((a) => a.key === "vigor")!; // 1..5
 
-function run(label: string, traits: Record<string, number>, overrides: Partial<StabilityRun> = {}): StabilityRun {
+function run(
+  label: string,
+  traits: Record<string, number>,
+  overrides: Partial<StabilityRun> = {},
+): StabilityRun {
   return { runLabel: label, observedAt: null, traits, note: null, ...overrides };
 }
 
 describe("sanitizeStabilityRuns", () => {
   it("keeps valid runs and drops unknown axes / out-of-range values", () => {
     const out = sanitizeStabilityRuns([
-      { runLabel: "Run 1", observedAt: "2026-02-01", traits: { nose_loudness: 8, made_up: 3, vigor: 99 }, note: "gassy" },
+      {
+        runLabel: "Run 1",
+        observedAt: "2026-02-01",
+        traits: { nose_loudness: 8, made_up: 3, vigor: 99 },
+        note: "gassy",
+      },
     ]);
     expect(out).toEqual([
       { runLabel: "Run 1", observedAt: "2026-02-01", traits: { nose_loudness: 8 }, note: "gassy" },
@@ -46,6 +56,22 @@ describe("sanitizeStabilityRuns", () => {
     expect(out[0].observedAt).toBeNull();
     expect(out[0].runLabel).toBe("Winter");
     expect(out[0].note).toBe("ok");
+  });
+
+  it("calendar-validates dates, including Gregorian leap-year boundaries", () => {
+    expect(isValidIsoCalendarDate("2024-02-29")).toBe(true);
+    expect(isValidIsoCalendarDate("2000-02-29")).toBe(true);
+    expect(isValidIsoCalendarDate("2025-02-29")).toBe(false);
+    expect(isValidIsoCalendarDate("1900-02-29")).toBe(false);
+    expect(isValidIsoCalendarDate("2026-04-31")).toBe(false);
+    expect(isValidIsoCalendarDate("2026-13-01")).toBe(false);
+    expect(isValidIsoCalendarDate("0000-01-01")).toBe(false);
+
+    const out = sanitizeStabilityRuns([
+      { runLabel: "Leap", observedAt: " 2024-02-29 ", traits: {} },
+      { runLabel: "Impossible", observedAt: "2025-02-29", traits: {} },
+    ]);
+    expect(out.map((r) => r.observedAt)).toEqual(["2024-02-29", null]);
   });
 
   it("caps the number of runs and is null-safe", () => {
@@ -75,6 +101,7 @@ describe("evaluateStability", () => {
     ]);
     expect(e.verdict).toBe("holding");
     expect(e.runCount).toBe(2);
+    expect(e.evidenceRunCount).toBe(2);
     expect(e.driftedAxes).toEqual([]);
     const noseTrend = e.axisTrends.find((t) => t.axisKey === "nose_loudness")!;
     expect(noseTrend.baseline).toBe(8);
@@ -103,12 +130,48 @@ describe("evaluateStability", () => {
   });
 
   it("two runs but no shared re-scored axis → unconfirmed, not a false hold", () => {
+    const e = evaluateStability([run("Run 1", { nose_loudness: 8 }), run("Run 2", { vigor: 4 })]);
+    expect(e.verdict).toBe("unconfirmed");
+    expect(e.evidenceRunCount).toBe(1);
+    expect(e.axisTrends).toEqual([]);
+  });
+
+  it("fails closed when a later run has no baseline-comparable evidence", () => {
     const e = evaluateStability([
       run("Run 1", { nose_loudness: 8 }),
-      run("Run 2", { vigor: 4 }),
+      run("Run 2", { nose_loudness: 9 }),
+      run("Run 3", { vigor: 4 }),
     ]);
+    expect(e.runCount).toBe(3);
+    expect(e.evidenceRunCount).toBe(2);
     expect(e.verdict).toBe("unconfirmed");
-    expect(e.axisTrends).toEqual([]);
+    expect(stabilityVerdictCopy(e)).toMatch(/Only 2 of 3 recorded grow-outs/);
+    expect(stabilityVerdictCopy(e)).not.toMatch(/held across 3/i);
+  });
+
+  it("fails closed when different later runs score disjoint baseline traits", () => {
+    const e = evaluateStability([
+      run("Run 1", { nose_loudness: 8, vigor: 4 }),
+      run("Run 2", { nose_loudness: 9 }),
+      run("Run 3", { vigor: 4 }),
+    ]);
+    expect(e.runCount).toBe(3);
+    expect(e.evidenceRunCount).toBe(3);
+    expect(e.verdict).toBe("unconfirmed");
+    expect(stabilityVerdictCopy(e)).toMatch(
+      /no single baseline trait was re-scored across every run/i,
+    );
+    expect(stabilityVerdictCopy(e)).not.toMatch(/held across 3/i);
+  });
+
+  it("still reports observed drift when another later run is incomplete", () => {
+    const e = evaluateStability([
+      run("Run 1", { nose_loudness: 8 }),
+      run("Run 2", { nose_loudness: 2 }),
+      run("Run 3", {}),
+    ]);
+    expect(e.evidenceRunCount).toBe(2);
+    expect(e.verdict).toBe("drifting");
   });
 
   it("is null-safe against malformed run elements (never throws)", () => {
@@ -148,7 +211,7 @@ describe("stabilityVerdictCopy", () => {
     const holding = stabilityVerdictCopy(
       evaluateStability([run("R1", { vigor: 4 }), run("R2", { vigor: 4 })]),
     );
-    expect(holding).toMatch(/held across 2 recorded grow-outs/);
+    expect(holding).toMatch(/baseline trait held within tolerance across 2 recorded grow-outs/);
     expect(holding).toMatch(/not a promise about future runs/);
     const drift = stabilityVerdictCopy(
       evaluateStability([run("R1", { nose_loudness: 8 }), run("R2", { nose_loudness: 2 })]),
@@ -166,7 +229,9 @@ describe("static safety — module source (premature-stability fence)", () => {
   it("is pure: no I/O, React, Supabase, AI, writes, or clock", () => {
     expect(rawSrc).not.toMatch(/from ["'][^"']*supabase/i);
     expect(rawSrc).not.toMatch(/from ["']react["']/);
-    expect(rawSrc).not.toMatch(/\bfetch\(|\.rpc\(|functions\.invoke|\.insert\(|\.update\(|\.delete\(/);
+    expect(rawSrc).not.toMatch(
+      /\bfetch\(|\.rpc\(|functions\.invoke|\.insert\(|\.update\(|\.delete\(/,
+    );
     expect(rawSrc).not.toMatch(/\bnew Date\(|Date\.now\(|Math\.random\(/);
     expect(rawSrc).not.toMatch(/openai|anthropic|claude|gemini/i);
   });

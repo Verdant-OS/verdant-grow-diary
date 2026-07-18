@@ -50,45 +50,45 @@ export interface PhenoHuntListItem {
   candidateCount: number;
 }
 
+interface PhenoHuntListRow {
+  readonly id: string;
+  readonly name: string | null;
+  readonly created_at: string | null;
+  readonly setup_completed_at: string | null;
+  readonly plants: readonly { readonly count: number | null }[] | null;
+}
+
+function activeCandidateCount(row: PhenoHuntListRow): number {
+  const count = row.plants?.[0]?.count;
+  if (typeof count !== "number" || !Number.isSafeInteger(count) || count < 0) {
+    throw new Error("Could not determine pheno hunt candidate counts.");
+  }
+  return count;
+}
+
 /**
  * List the signed-in grower's pheno hunts, newest first, for the hunts
  * index. RLS scopes to the owner; a bounded read (hunts accumulate over
- * time). Candidate counts come from a single bounded companion query over
- * the same hunts' plants — never a per-hunt N+1. Read-only, best-effort:
- * returns [] on any error rather than throwing.
+ * time). Candidate counts are exact server-side aggregates over each hunt's
+ * non-archived plants, embedded in the same bounded request — no row scan,
+ * 5,000-row truncation, or per-hunt N+1. Resolved query/count errors throw so
+ * the index renders its honest error state instead of a false empty list or
+ * zero candidate count.
  */
 export async function listPhenoHuntsForOwner(): Promise<PhenoHuntListItem[]> {
   const { data, error } = await supabase
     .from("pheno_hunts")
-    .select("id, name, created_at, setup_completed_at")
+    .select("id, name, created_at, setup_completed_at, plants(count)")
+    .eq("plants.is_archived", false)
     .order("created_at", { ascending: false })
     .limit(200);
-  if (error || !data) return [];
-  const hunts = data.map((r) => ({
-    id: r.id as string,
-    name: (r.name as string) ?? "Untitled hunt",
-    createdAt: (r.created_at as string) ?? null,
-    setupCompletedAt: (r.setup_completed_at as string) ?? null,
-  }));
-  const huntIds = hunts.map((h) => h.id).filter(Boolean);
-  const countByHunt = new Map<string, number>();
-  if (huntIds.length > 0) {
-    const { data: plantRows } = await supabase
-      .from("plants")
-      .select("pheno_hunt_id")
-      .in("pheno_hunt_id", huntIds)
-      .limit(5000);
-    for (const row of plantRows ?? []) {
-      const hid = (row as { pheno_hunt_id?: string }).pheno_hunt_id;
-      if (typeof hid === "string") countByHunt.set(hid, (countByHunt.get(hid) ?? 0) + 1);
-    }
-  }
-  return hunts.map((h) => ({
-    id: h.id,
-    name: h.name,
-    createdAt: h.createdAt,
-    setupCompletedAt: h.setupCompletedAt,
-    candidateCount: countByHunt.get(h.id) ?? 0,
+  if (error || !data) throw new Error("Could not load pheno hunts.");
+  return (data as PhenoHuntListRow[]).map((row) => ({
+    id: row.id,
+    name: row.name ?? "Untitled hunt",
+    createdAt: row.created_at ?? null,
+    setupCompletedAt: row.setup_completed_at ?? null,
+    candidateCount: activeCandidateCount(row),
   }));
 }
 

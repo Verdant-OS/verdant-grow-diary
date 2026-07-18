@@ -46,7 +46,12 @@ export default function PhenoBreedingObjectiveEditor({
     if (dirty) return;
     setDraft((prev) =>
       prev.length === targets.length &&
-      prev.every((t, i) => t.axisKey === targets[i]?.axisKey && t.comparator === targets[i]?.comparator && t.threshold === targets[i]?.threshold)
+      prev.every(
+        (t, i) =>
+          t.axisKey === targets[i]?.axisKey &&
+          t.comparator === targets[i]?.comparator &&
+          t.threshold === targets[i]?.threshold,
+      )
         ? prev
         : [...targets],
     );
@@ -57,6 +62,20 @@ export default function PhenoBreedingObjectiveEditor({
   const [pendingAxisKey, setPendingAxisKey] = useState<string>(available[0]?.key ?? "");
   const [pendingComparator, setPendingComparator] = useState<BreedingObjectiveComparator>("gte");
   const [pendingThreshold, setPendingThreshold] = useState<string>("");
+
+  // Async saved targets and local removals both change the available-axis
+  // list. Keep the controlled select on a real option so Add target can never
+  // submit a stale, already-used axis (or an empty key after all axes had
+  // previously been used).
+  const firstAvailableAxisKey = available[0]?.key ?? "";
+  const pendingAxisIsAvailable = available.some((axis) => axis.key === pendingAxisKey);
+  useEffect(() => {
+    if (!pendingAxisIsAvailable) {
+      setPendingAxisKey(firstAvailableAxisKey);
+      setPendingThreshold("");
+      setError(null);
+    }
+  }, [firstAvailableAxisKey, pendingAxisIsAvailable]);
 
   function syncFromSaved(next: readonly BreedingObjectiveTarget[]) {
     setDraft([...next]);
@@ -72,7 +91,10 @@ export default function PhenoBreedingObjectiveEditor({
       return;
     }
     setError(null);
-    setDraft((prev) => [...prev, { axisKey: axis.key, comparator: pendingComparator, threshold: n }]);
+    setDraft((prev) => [
+      ...prev,
+      { axisKey: axis.key, comparator: pendingComparator, threshold: n },
+    ]);
     setDirty(true);
     setPendingThreshold("");
     const stillAvailable = availableObjectiveAxes([

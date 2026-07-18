@@ -122,6 +122,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     description: "Customer Mode cannabis plant care FAQ page (read-only).",
   },
   { path: "/daily-check", access: "auth" },
+  {
+    path: "/dashboard",
+    access: "auth",
+    description: "Authenticated Dashboard alias; preserves optional growId scope.",
+  },
   { path: "/demo", access: "redirect", description: "→ /welcome" },
   {
     path: "/demo/one-tent-live-proof",

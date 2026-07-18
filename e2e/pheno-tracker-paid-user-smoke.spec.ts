@@ -450,10 +450,17 @@ test.describe("I. Core one-tent regression", () => {
   // Anonymous by design (route-resolution check only).
   test.use({ storageState: { cookies: [], origins: [] } });
 
-  test("dashboard route still resolves without a crash", async ({ page }) => {
+  test("dashboard route still resolves without a crash through the signed-out return path, never 404", async ({
+    page,
+  }) => {
     await page.goto("/dashboard");
+    await page.waitForURL(
+      (url) =>
+        url.pathname === "/welcome" && url.searchParams.get("redirectTo") === "/dashboard",
+    );
     const bodyText = await page.locator("body").innerText();
     expect(bodyText.length).toBeGreaterThan(0);
     expect(bodyText).not.toMatch(/something went wrong/i);
+    expect(bodyText).not.toMatch(/Oops! Page not found/i);
   });
 });

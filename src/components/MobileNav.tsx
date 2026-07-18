@@ -1,4 +1,4 @@
-import { NavLink } from "react-router-dom";
+import { Link, NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
   Box,
@@ -27,9 +27,15 @@ import {
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import OperatorModeLink from "@/components/OperatorModeLink";
+import {
+  isNavigationItemActive,
+  type NavigationActiveRule,
+} from "@/lib/navigationActiveRules";
 
-export const primary = [
-  { to: "/", label: "Home", icon: LayoutDashboard, end: true },
+type PrimaryItem = MoreItem & NavigationActiveRule;
+
+export const primary: PrimaryItem[] = [
+  { to: "/", label: "Home", icon: LayoutDashboard, end: true, aliases: ["/dashboard"] },
   { to: "/tents", label: "Tents", icon: Box },
   { to: "/plants", label: "Plants", icon: Sprout },
   { to: "/timeline", label: "Timeline", icon: NotebookText },
@@ -98,25 +104,27 @@ export const more: MoreItem[] = moreGroups.flatMap((g) => g.items);
 
 export default function MobileNav() {
   const [open, setOpen] = useState(false);
+  const { pathname } = useLocation();
   return (
     <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 backdrop-blur-xl bg-background/85 border-t border-border/40 pb-[env(safe-area-inset-bottom)]">
       <div className="grid grid-cols-6 h-16">
-        {primary.map((n) => (
-          <NavLink
-            key={n.to}
-            to={n.to}
-            end={n.end}
-            className={({ isActive }) =>
-              cn(
+        {primary.map((n) => {
+          const active = isNavigationItemActive(pathname, n);
+          return (
+            <Link
+              key={n.to}
+              to={n.to}
+              aria-current={active ? "page" : undefined}
+              className={cn(
                 "flex flex-col items-center justify-center gap-0.5 text-[10px] transition",
-                isActive ? "text-primary" : "text-muted-foreground hover:text-foreground",
-              )
-            }
-          >
-            <n.icon className="h-5 w-5" />
-            {n.label}
-          </NavLink>
-        ))}
+                active ? "text-primary" : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <n.icon className="h-5 w-5" />
+              {n.label}
+            </Link>
+          );
+        })}
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetTrigger className="flex flex-col items-center justify-center gap-0.5 text-[10px] text-muted-foreground hover:text-foreground">
             <MoreHorizontal className="h-5 w-5" />

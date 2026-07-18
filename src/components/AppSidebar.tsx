@@ -1,4 +1,4 @@
-import { NavLink, useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
   Box,
@@ -35,12 +35,14 @@ import { cn } from "@/lib/utils";
 import BrandLogo from "@/components/BrandLogo";
 import OperatorModeLink from "@/components/OperatorModeLink";
 import { useHasRole } from "@/hooks/useHasRole";
+import {
+  isNavigationItemActive,
+  type NavigationActiveRule,
+} from "@/lib/navigationActiveRules";
 
-interface NavItem {
-  to: string;
+interface NavItem extends NavigationActiveRule {
   label: string;
   icon: LucideIcon;
-  end?: boolean;
 }
 
 /**
@@ -52,7 +54,18 @@ interface NavItem {
  * below, which is rendered ONLY when `useHasRole("operator")` is granted.
  */
 const growerGroups: { label: string; items: NavItem[] }[] = [
-  { label: "Today", items: [{ to: "/", label: "Dashboard", icon: LayoutDashboard, end: true }] },
+  {
+    label: "Today",
+    items: [
+      {
+        to: "/",
+        label: "Dashboard",
+        icon: LayoutDashboard,
+        end: true,
+        aliases: ["/dashboard"],
+      },
+    ],
+  },
   {
     label: "Cultivation",
     items: [
@@ -72,7 +85,12 @@ const growerGroups: { label: string; items: NavItem[] }[] = [
   {
     label: "Insight",
     items: [
-      { to: "/sensors", label: "Sensors", icon: Activity },
+      {
+        to: "/sensors",
+        label: "Sensors",
+        icon: Activity,
+        excludedPaths: ["/sensors/ecowitt-audit"],
+      },
       { to: "/doctor", label: "AI Doctor", icon: Stethoscope },
     ],
   },
@@ -111,6 +129,7 @@ const operatorGroups: { label: string; items: NavItem[] }[] = [
     items: [
       { to: "/operator/release-readiness", label: "Release Readiness", icon: ClipboardList },
       { to: "/operator/ai-doctor-phase1", label: "AI Doctor Results", icon: Stethoscope },
+      { to: "/sensors/ecowitt-audit", label: "EcoWitt Audit", icon: Activity },
       { to: "/guides/cannabis-plant-care", label: "Help/Guides", icon: HelpCircle },
     ],
   },
@@ -133,20 +152,18 @@ export default function AppSidebar() {
         <SidebarGroupContent>
           <SidebarMenu>
             {g.items.map((item) => {
-              const active = item.end
-                ? pathname === item.to
-                : pathname === item.to || pathname.startsWith(item.to + "/");
+              const active = isNavigationItemActive(pathname, item);
               return (
                 <SidebarMenuItem key={item.to}>
                   <SidebarMenuButton asChild isActive={active} tooltip={item.label}>
-                    <NavLink
+                    <Link
                       to={item.to}
-                      end={item.end}
+                      aria-current={active ? "page" : undefined}
                       className={cn("flex items-center gap-2.5")}
                     >
                       <item.icon className="h-4 w-4 shrink-0" />
                       <span className="truncate">{item.label}</span>
-                    </NavLink>
+                    </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               );

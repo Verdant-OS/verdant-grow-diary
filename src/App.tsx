@@ -24,6 +24,7 @@ const Auth = lazy(() => import("./pages/Auth"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const OAuthConsent = lazy(() => import("./pages/OAuthConsent"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Tents = lazy(() => import("./pages/Tents"));
 const TentDetail = lazy(() => import("./pages/TentDetail"));
 const Plants = lazy(() => import("./pages/Plants"));
@@ -283,6 +284,11 @@ const App = () => (
 
                   <Route element={<AppShell />}>
                     <Route path="/onboarding" element={<Onboarding />} />
+                    {/* Canonical private Dashboard alias. Several scoped
+                        grow flows intentionally build /dashboard?growId=…;
+                        render Dashboard here so those links do not fall
+                        through to NotFound and the query remains intact. */}
+                    <Route path="/dashboard" element={<Dashboard />} />
                     {/* Legacy Live Dashboard route — consolidated into the
                         main Dashboard. Redirect preserves old bookmarks. */}
                     <Route path="/grow-room" element={<Navigate to="/" replace />} />

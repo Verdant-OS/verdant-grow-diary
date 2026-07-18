@@ -123,8 +123,8 @@ export default function DemoProofWalkthrough(): JSX.Element {
           call AI, create alerts, approve actions, or control devices.
         </p>
         <p>
-          Operator Mode uses <code>?operator=1</code> as a URL surface gate;
-          data access is still enforced by RLS.
+          Operator Mode requires a server-verified operator role; <code>?operator=1</code> only
+          requests the diagnostic surface. Data access remains enforced by RLS.
         </p>
       </section>
       <p

@@ -3,12 +3,22 @@
  * No real Supabase calls; useTimelineMemory + invoke are stubbed.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render as rtlRender, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
+import {
+  act,
+  render as rtlRender,
+  screen,
+  fireEvent,
+  waitFor,
+  cleanup,
+} from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import type { ReactElement } from "react";
 import type { TimelineMemoryItem } from "@/lib/timelineFilterRules";
 import type { ManualSnapshotTimelineCard } from "@/lib/manualSensorSnapshotViewModel";
+
+const trackFunnelEvent = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/funnelAnalytics", () => ({ trackFunnelEvent }));
 
 function render(ui: ReactElement) {
   const client = new QueryClient({
@@ -116,6 +126,7 @@ describe("PlantDetailAiDoctorLiveReview", () => {
   beforeEach(() => {
     cleanup();
     itemsRef.current = [];
+    trackFunnelEvent.mockClear();
   });
 
   it("renders nothing for insufficient readiness", () => {
@@ -150,6 +161,12 @@ describe("PlantDetailAiDoctorLiveReview", () => {
     );
     expect(screen.getByTestId("plant-detail-live-ai-doctor-review-result-preview")).toBeTruthy();
     expect(invoke).toHaveBeenCalledTimes(1);
+    expect(trackFunnelEvent).toHaveBeenCalledWith("ai_doctor_review_started", {
+      surface: "standard",
+    });
+    expect(trackFunnelEvent).toHaveBeenCalledWith("ai_doctor_result_received", {
+      surface: "standard",
+    });
     // No approve/reject buttons rendered.
     expect(screen.queryByText(/approve/i)).toBeNull();
     expect(screen.queryByText(/reject/i)).toBeNull();
@@ -183,11 +200,72 @@ describe("PlantDetailAiDoctorLiveReview", () => {
       "/doctor/sessions/session-42",
     );
     expect(persist).toHaveBeenCalledTimes(1);
+    expect(trackFunnelEvent).toHaveBeenCalledWith("ai_doctor_session_saved", {
+      surface: "standard",
+    });
+    expect(
+      trackFunnelEvent.mock.calls.filter(([name]) =>
+        [
+          "ai_doctor_review_started",
+          "ai_doctor_result_received",
+          "ai_doctor_session_saved",
+        ].includes(name),
+      ),
+    ).toEqual([
+      ["ai_doctor_review_started", { surface: "standard" }],
+      ["ai_doctor_result_received", { surface: "standard" }],
+      ["ai_doctor_session_saved", { surface: "standard" }],
+    ]);
     expect(screen.getByTestId("plant-detail-live-ai-doctor-review-result-preview")).toBeTruthy();
     await waitFor(() => {
       expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["ai_doctor_sessions"] });
       expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["timeline_memory"] });
     });
+  });
+
+  it("does not count a result that becomes ineligible before it can be displayed", async () => {
+    itemsRef.current = strongTimeline();
+    let resolveInvoke: ((value: { data: unknown; error: null }) => void) | null = null;
+    const invoke = vi.fn(
+      () =>
+        new Promise<{ data: unknown; error: null }>((resolve) => {
+          resolveInvoke = resolve;
+        }),
+    );
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    const view = rtlRender(
+      <MemoryRouter>
+        <QueryClientProvider client={client}>
+          <PlantDetailAiDoctorLiveReview plantId="p1" plant={strongPlant} invoke={invoke} />
+        </QueryClientProvider>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(await screen.findByTestId("plant-ai-doctor-live-review-start"));
+    itemsRef.current = [];
+    view.rerender(
+      <MemoryRouter>
+        <QueryClientProvider client={client}>
+          <PlantDetailAiDoctorLiveReview
+            plantId="p1"
+            plant={{ ...strongPlant, photo: null, strain: null, stage: null, medium: null }}
+            invoke={invoke}
+          />
+        </QueryClientProvider>
+      </MemoryRouter>,
+    );
+    await act(async () => {
+      resolveInvoke?.({ data: { ok: true, result: validResult() }, error: null });
+    });
+
+    await waitFor(() => expect(screen.queryByTestId("plant-ai-doctor-live-review")).toBeNull());
+    expect(trackFunnelEvent).not.toHaveBeenCalledWith(
+      "ai_doctor_result_received",
+      expect.anything(),
+    );
+    expect(trackFunnelEvent).not.toHaveBeenCalledWith("ai_doctor_session_saved", expect.anything());
   });
 
   it("keeps the result visible, warns on save failure, and retries without rerunning AI", async () => {
@@ -232,6 +310,9 @@ describe("PlantDetailAiDoctorLiveReview", () => {
     );
     expect(invoke).toHaveBeenCalledTimes(1);
     expect(persist).toHaveBeenCalledTimes(2);
+    expect(
+      trackFunnelEvent.mock.calls.filter(([name]) => name === "ai_doctor_session_saved"),
+    ).toEqual([["ai_doctor_session_saved", { surface: "standard" }]]);
   });
 
   it("shows calm failure copy and offers a single manual retry on error", async () => {
@@ -281,5 +362,10 @@ describe("PlantDetailAiDoctorLiveReview", () => {
     );
     // No raw imperative text leaked.
     expect(screen.queryByText(/Turn on the humidifier/i)).toBeNull();
+    expect(trackFunnelEvent).not.toHaveBeenCalledWith(
+      "ai_doctor_result_received",
+      expect.anything(),
+    );
+    expect(trackFunnelEvent).not.toHaveBeenCalledWith("ai_doctor_session_saved", expect.anything());
   });
 });

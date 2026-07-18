@@ -3,9 +3,13 @@
  */
 import { describe, it, expect } from "vitest";
 import {
+  buildCheckoutReturnNavigationState,
+  classifyCheckoutReturnSurface,
+  readCheckoutReturnNavigationSurface,
   sanitizeCheckoutReturnTo,
   resolveCheckoutReturnTo,
   isPhenoTrackerReturnTo,
+  shouldCreateCheckoutReturnCompletionMarker,
 } from "@/lib/checkoutReturnTo";
 
 describe("sanitizeCheckoutReturnTo", () => {
@@ -21,12 +25,10 @@ describe("sanitizeCheckoutReturnTo", () => {
 
   it("allows other same-origin absolute app paths", () => {
     expect(sanitizeCheckoutReturnTo("/dashboard")).toBe("/dashboard");
-    expect(sanitizeCheckoutReturnTo("/grows/abc?tab=timeline")).toBe(
-      "/grows/abc?tab=timeline",
+    expect(sanitizeCheckoutReturnTo("/grows/abc?tab=timeline")).toBe("/grows/abc?tab=timeline");
+    expect(sanitizeCheckoutReturnTo("/plants/plant-123?tentId=tent-1#plant-ai-doctor-review")).toBe(
+      "/plants/plant-123?tentId=tent-1#plant-ai-doctor-review",
     );
-    expect(
-      sanitizeCheckoutReturnTo("/plants/plant-123?tentId=tent-1#plant-ai-doctor-review"),
-    ).toBe("/plants/plant-123?tentId=tent-1#plant-ai-doctor-review");
   });
 
   it("returns null for missing / empty / non-string values", () => {
@@ -92,8 +94,11 @@ describe("resolveCheckoutReturnTo", () => {
 
 describe("isPhenoTrackerReturnTo", () => {
   it("matches the gated Pheno Tracker workflow routes", () => {
+    expect(isPhenoTrackerReturnTo("/pheno-hunts")).toBe(true);
     expect(isPhenoTrackerReturnTo("/pheno-hunts/new")).toBe(true);
+    expect(isPhenoTrackerReturnTo("/pheno-hunts/new?growId=private-id")).toBe(true);
     expect(isPhenoTrackerReturnTo("/pheno-hunts/abc/workspace")).toBe(true);
+    expect(isPhenoTrackerReturnTo("/pheno-hunts/abc/workspace?tab=overview#top")).toBe(true);
     expect(isPhenoTrackerReturnTo("/pheno-hunts/abc/keepers")).toBe(true);
   });
 
@@ -102,5 +107,59 @@ describe("isPhenoTrackerReturnTo", () => {
     expect(isPhenoTrackerReturnTo("/pheno-hunts/abc/compare")).toBe(false);
     expect(isPhenoTrackerReturnTo("/dashboard")).toBe(false);
     expect(isPhenoTrackerReturnTo(null)).toBe(false);
+  });
+});
+
+describe("classifyCheckoutReturnSurface", () => {
+  it("classifies AI Doctor, Pheno, and other safe destinations without returning identifiers", () => {
+    expect(
+      classifyCheckoutReturnSurface(
+        "/plants/private-plant-id?tentId=private-tent-id#plant-ai-doctor-review",
+      ),
+    ).toBe("ai_doctor");
+    expect(classifyCheckoutReturnSurface("/pheno-hunts")).toBe("pheno");
+    expect(classifyCheckoutReturnSurface("/pheno-hunts/private-id/workspace")).toBe("pheno");
+    expect(classifyCheckoutReturnSurface("/pheno-hunts/new?growId=private-id")).toBe("pheno");
+    expect(classifyCheckoutReturnSurface("/dashboard?grow=private-id")).toBe("other");
+  });
+
+  it("fails closed for missing or unsafe destinations", () => {
+    expect(classifyCheckoutReturnSurface(null)).toBeNull();
+    expect(classifyCheckoutReturnSurface("https://evil.example/steal")).toBeNull();
+    expect(classifyCheckoutReturnSurface("//evil.example/steal")).toBeNull();
+  });
+
+  it("does not mistake a lookalike plant hash for the AI Doctor return", () => {
+    expect(classifyCheckoutReturnSurface("/plants/p1#plant-ai-doctor-review-copy")).toBe("other");
+    expect(classifyCheckoutReturnSurface("/grows/g1#plant-ai-doctor-review")).toBe("other");
+  });
+});
+
+describe("checkout return navigation state", () => {
+  it("defers Pheno completion until its independently-owned gate exposes readiness", () => {
+    expect(shouldCreateCheckoutReturnCompletionMarker("ai_doctor")).toBe(true);
+    expect(shouldCreateCheckoutReturnCompletionMarker("other")).toBe(true);
+    expect(shouldCreateCheckoutReturnCompletionMarker("pheno")).toBe(false);
+    expect(shouldCreateCheckoutReturnCompletionMarker(null)).toBe(false);
+  });
+
+  it("round-trips only the closed destination surface", () => {
+    const state = buildCheckoutReturnNavigationState("ai_doctor");
+    expect(state).toEqual({ verdantCheckoutReturnSurface: "ai_doctor" });
+    expect(readCheckoutReturnNavigationSurface(state)).toBe("ai_doctor");
+    expect(JSON.stringify(state)).not.toMatch(/plant|tent|grow|session|path|query|hash/i);
+  });
+
+  it("rejects missing, malformed, and unrecognized router state", () => {
+    expect(readCheckoutReturnNavigationSurface(null)).toBeNull();
+    expect(readCheckoutReturnNavigationSurface([])).toBeNull();
+    expect(
+      readCheckoutReturnNavigationSurface({ verdantCheckoutReturnSurface: "blocked" }),
+    ).toBeNull();
+    expect(
+      readCheckoutReturnNavigationSurface({
+        verdantCheckoutReturnSurface: "/plants/private-id",
+      }),
+    ).toBeNull();
   });
 });

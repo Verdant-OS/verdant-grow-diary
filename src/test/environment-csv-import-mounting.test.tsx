@@ -3,11 +3,14 @@
  * mounted on Sensors / Timeline surfaces and that it only inserts via the
  * Confirm CTA (never on open/cancel).
  */
-import { describe, it, expect, vi } from "vitest";
+import { beforeEach, describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+const trackFunnelEvent = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/funnelAnalytics", () => ({ trackFunnelEvent }));
 
 import EnvironmentCsvImportLauncher from "@/components/EnvironmentCsvImportLauncher";
 
@@ -34,11 +37,11 @@ function withQuery(ui: React.ReactElement) {
 }
 
 describe("EnvironmentCsvImportLauncher — mounting", () => {
+  beforeEach(() => trackFunnelEvent.mockReset());
+
   it("renders calm message when no grow/tent selected (test 1, 6)", () => {
     render(
-      withQuery(
-        <EnvironmentCsvImportLauncher growId={null} tentId={null} testIdPrefix="x" />,
-      ),
+      withQuery(<EnvironmentCsvImportLauncher growId={null} tentId={null} testIdPrefix="x" />),
     );
     expect(screen.getByTestId("x-needs-context").textContent).toMatch(
       /Select a grow and tent before importing CSV data\./,
@@ -61,22 +64,15 @@ describe("EnvironmentCsvImportLauncher — mounting", () => {
   });
 
   it("clicking the CTA opens the CSV modal (tests 3, 5)", () => {
-    render(
-      withQuery(
-        <EnvironmentCsvImportLauncher growId="g1" tentId="t1" testIdPrefix="x" />,
-      ),
-    );
+    render(withQuery(<EnvironmentCsvImportLauncher growId="g1" tentId="t1" testIdPrefix="x" />));
     fireEvent.click(screen.getByTestId("x-button"));
     expect(screen.getByTestId("csv-import-modal")).toBeTruthy();
+    expect(trackFunnelEvent).toHaveBeenCalledWith("csv_import_started");
   });
 
   it("opening modal does not insert (tests 8, 9)", () => {
     insertSpy.mockClear();
-    render(
-      withQuery(
-        <EnvironmentCsvImportLauncher growId="g1" tentId="t1" testIdPrefix="x" />,
-      ),
-    );
+    render(withQuery(<EnvironmentCsvImportLauncher growId="g1" tentId="t1" testIdPrefix="x" />));
     fireEvent.click(screen.getByTestId("x-button"));
     expect(insertSpy).not.toHaveBeenCalled();
   });
@@ -97,11 +93,7 @@ describe("EnvironmentCsvImportLauncher — mounting", () => {
 
   it("Confirm CTA is the only insert path; payload uses source = csv (tests 10, 11, 12)", async () => {
     insertSpy.mockClear();
-    render(
-      withQuery(
-        <EnvironmentCsvImportLauncher growId="g1" tentId="t1" testIdPrefix="x" />,
-      ),
-    );
+    render(withQuery(<EnvironmentCsvImportLauncher growId="g1" tentId="t1" testIdPrefix="x" />));
     fireEvent.click(screen.getByTestId("x-button"));
     // upload a simple valid CSV with explicit Celsius header
     const input = screen.getByTestId("csv-import-file-input") as HTMLInputElement;
@@ -120,6 +112,11 @@ describe("EnvironmentCsvImportLauncher — mounting", () => {
       source: string;
       raw_payload: { source_tag: string };
     }>;
+    await waitFor(() =>
+      expect(trackFunnelEvent).toHaveBeenCalledWith("csv_import_completed", {
+        rows: rows.length,
+      }),
+    );
     expect(rows.length).toBeGreaterThan(0);
     expect(rows.every((r) => r.source === "csv")).toBe(true);
     expect(rows.every((r) => r.raw_payload.source_tag === "csv")).toBe(true);
@@ -127,11 +124,7 @@ describe("EnvironmentCsvImportLauncher — mounting", () => {
 
   it("Cancel does not insert (test 8)", async () => {
     insertSpy.mockClear();
-    render(
-      withQuery(
-        <EnvironmentCsvImportLauncher growId="g1" tentId="t1" testIdPrefix="x" />,
-      ),
-    );
+    render(withQuery(<EnvironmentCsvImportLauncher growId="g1" tentId="t1" testIdPrefix="x" />));
     fireEvent.click(screen.getByTestId("x-button"));
     const input = screen.getByTestId("csv-import-file-input") as HTMLInputElement;
     const file = new File(
@@ -144,6 +137,8 @@ describe("EnvironmentCsvImportLauncher — mounting", () => {
     await waitFor(() => expect(screen.queryByTestId("csv-import-preview")).toBeTruthy());
     fireEvent.click(screen.getByTestId("csv-import-cancel"));
     expect(insertSpy).not.toHaveBeenCalled();
+    expect(trackFunnelEvent).toHaveBeenCalledWith("csv_import_started");
+    expect(trackFunnelEvent).not.toHaveBeenCalledWith("csv_import_completed", expect.anything());
   });
 });
 

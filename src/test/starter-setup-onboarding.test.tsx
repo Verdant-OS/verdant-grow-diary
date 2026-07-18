@@ -20,12 +20,35 @@ vi.mock("@/store/auth", () => ({
   useAuth: () => ({ user: { id: "user-1" }, loading: false }),
 }));
 
+const refreshGrows = vi.hoisted(() => vi.fn());
+vi.mock("@/store/grows", () => ({
+  useGrows: () => ({ refresh: refreshGrows }),
+}));
+
+const invalidateQueries = vi.hoisted(() => vi.fn());
+vi.mock("@tanstack/react-query", () => ({
+  useQueryClient: () => ({ invalidateQueries }),
+}));
+
+const trackFunnelEvent = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/funnelAnalytics", () => ({ trackFunnelEvent }));
+
 const runStarterSetupMock = vi.fn();
 vi.mock("@/lib/starterSetupService", async (importActual) => {
   const actual = (await importActual()) as typeof import("@/lib/starterSetupService");
   return {
     ...actual,
-    runStarterSetup: (userId: string, db: unknown) => runStarterSetupMock(userId, db),
+    runStarterSetup: async (
+      userId: string,
+      db: unknown,
+      callbacks?: import("@/lib/starterSetupService").StarterSetupCallbacks,
+    ) => {
+      const result = await runStarterSetupMock(userId, db, callbacks);
+      if (!result.reused.grow) callbacks?.onCreated?.("grow");
+      if (!result.reused.tent) callbacks?.onCreated?.("tent");
+      if (!result.reused.plant) callbacks?.onCreated?.("plant");
+      return result;
+    },
   };
 });
 
@@ -52,6 +75,9 @@ function renderPage() {
 describe("Onboarding · guided starter setup", () => {
   beforeEach(() => {
     runStarterSetupMock.mockReset();
+    trackFunnelEvent.mockReset();
+    refreshGrows.mockReset().mockResolvedValue(undefined);
+    invalidateQueries.mockReset().mockResolvedValue(undefined);
   });
   afterEach(() => {
     vi.restoreAllMocks();
@@ -92,9 +118,51 @@ describe("Onboarding · guided starter setup", () => {
       eventType: "observation",
       suggestSnapshot: true,
     });
+    expect(trackFunnelEvent.mock.calls).toEqual([
+      ["grow_created"],
+      ["tent_created"],
+      ["plant_created"],
+    ]);
+    expect(refreshGrows).toHaveBeenCalledTimes(1);
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["tents"] });
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["plants"] });
     // Sanity: canonical grow name never leaks as sensor/demo/live label.
     expect(STARTER_GROW_NAME.toLowerCase()).not.toContain("demo");
     expect(STARTER_GROW_NAME.toLowerCase()).not.toContain("live");
+    window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, listener);
+  });
+
+  it("waits for the starter caches before opening Quick Log", async () => {
+    runStarterSetupMock.mockResolvedValue({
+      growId: "g1",
+      tentId: "t1",
+      plantId: "p1",
+      reused: { grow: false, tent: false, plant: false },
+    });
+    let finishGrowRefresh: () => void = () => {};
+    refreshGrows.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          finishGrowRefresh = resolve;
+        }),
+    );
+    const events: CustomEvent[] = [];
+    const listener = (e: Event) => events.push(e as CustomEvent);
+    window.addEventListener(PLANT_QUICKLOG_PREFILL_EVENT, listener);
+
+    renderPage();
+    await userEvent.click(screen.getByTestId("starter-setup-button"));
+    await waitFor(() => expect(refreshGrows).toHaveBeenCalledTimes(1));
+    expect(events).toHaveLength(0);
+    expect(trackFunnelEvent.mock.calls).toEqual([
+      ["grow_created"],
+      ["tent_created"],
+      ["plant_created"],
+    ]);
+
+    await act(async () => finishGrowRefresh());
+    await waitFor(() => expect(events).toHaveLength(1));
+    expect(trackFunnelEvent).toHaveBeenCalledTimes(3);
     window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, listener);
   });
 
@@ -123,6 +191,7 @@ describe("Onboarding · guided starter setup", () => {
     await waitFor(() => expect(btn).not.toBeDisabled());
     expect(screen.getByTestId("starter-setup-block")).toBeTruthy();
     expect(screen.queryByTestId("dashboard-landing")).toBeNull();
+    expect(trackFunnelEvent).not.toHaveBeenCalled();
   });
 
   it("shows a safe error message and does not redirect on failure", async () => {
@@ -137,5 +206,6 @@ describe("Onboarding · guided starter setup", () => {
     // Onboarding block still present (no redirect).
     expect(screen.getByTestId("starter-setup-block")).toBeTruthy();
     expect(screen.queryByTestId("dashboard-landing")).toBeNull();
+    expect(trackFunnelEvent).not.toHaveBeenCalled();
   });
 });

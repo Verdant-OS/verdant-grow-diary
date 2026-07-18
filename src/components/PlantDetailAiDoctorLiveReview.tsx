@@ -93,14 +93,18 @@ export default function PlantDetailAiDoctorLiveReview({
   sensorClassificationOverride,
 }: PlantDetailAiDoctorLiveReviewProps) {
   const historicalStartTrackedRef = useRef(false);
+  const reviewStartTrackedRef = useRef(false);
+  const acceptedReviewModeRef = useRef<"standard" | "historical_review" | null>(null);
+  const trackedResultRef = useRef<unknown>(null);
+  const trackedSessionIdRef = useRef<string | null>(null);
   const queryClient = useQueryClient();
-  const handlePersisted = useCallback(
-    (_sessionId: string) => {
-      void queryClient.invalidateQueries({ queryKey: ["ai_doctor_sessions"] });
-      void queryClient.invalidateQueries({ queryKey: ["timeline_memory"] });
-    },
-    [queryClient],
-  );
+  useEffect(() => {
+    historicalStartTrackedRef.current = false;
+    reviewStartTrackedRef.current = false;
+    acceptedReviewModeRef.current = null;
+    trackedResultRef.current = null;
+    trackedSessionIdRef.current = null;
+  }, [plantId]);
   const { items } = useTimelineMemory({ kind: "plant", plantId }, TIMELINE_MEMORY_DEFAULT_LIMIT);
   // Dedicated bounded imported-history read. It filters permitted CSV source
   // identities before the cap and orders by historical `captured_at`, so the
@@ -189,6 +193,14 @@ export default function PlantDetailAiDoctorLiveReview({
   const allowed = eligibility.allowed;
   const packet = allowed ? candidatePacket : null;
 
+  const handlePersisted = useCallback(
+    (_sessionId: string) => {
+      void queryClient.invalidateQueries({ queryKey: ["ai_doctor_sessions"] });
+      void queryClient.invalidateQueries({ queryKey: ["timeline_memory"] });
+    },
+    [queryClient],
+  );
+
   const review = useAiDoctorLiveReview({
     // Hold the gate while either sensor context read is in flight.
     enabled: allowed && !sensorContextPending,
@@ -208,8 +220,7 @@ export default function PlantDetailAiDoctorLiveReview({
   // AiCreditLimitNotice validates it again before it reaches the pricing link.
   const returnTo = useMemo(
     () =>
-      buildPlantAiDoctorReviewPath({ plantId, tentId: tentId ?? null }) ??
-      plantDetailPath(plantId),
+      buildPlantAiDoctorReviewPath({ plantId, tentId: tentId ?? null }) ?? plantDetailPath(plantId),
     [plantId, tentId],
   );
 
@@ -235,10 +246,40 @@ export default function PlantDetailAiDoctorLiveReview({
     }
   }, [creditNoticeKind]);
 
+  useEffect(() => {
+    // These events describe value the grower can actually see. If eligibility
+    // disappears while the request is in flight, the component renders
+    // nothing and neither the result nor durable-save milestone is counted.
+    if (!allowed || review.status !== "result" || !review.result) return;
+    const surface = acceptedReviewModeRef.current;
+    if (!surface) return;
+    if (trackedResultRef.current !== review.result) {
+      trackedResultRef.current = review.result;
+      trackFunnelEvent("ai_doctor_result_received", { surface });
+    }
+
+    // Persistence can resolve in the same microtask turn as the model result.
+    // Emit from this post-render effect so saved can never precede result.
+    if (
+      review.persistence.status === "saved" &&
+      trackedSessionIdRef.current !== review.persistence.sessionId
+    ) {
+      trackedSessionIdRef.current = review.persistence.sessionId;
+      trackFunnelEvent("ai_doctor_session_saved", { surface });
+    }
+  }, [allowed, review.persistence, review.result, review.status]);
+
   if (!allowed) return null;
 
   const handleInitialStart = () => {
     if (!review.canStart) return;
+    const acceptedMode =
+      eligibility.mode === "historical_review" ? "historical_review" : "standard";
+    acceptedReviewModeRef.current = acceptedMode;
+    if (!reviewStartTrackedRef.current) {
+      reviewStartTrackedRef.current = true;
+      trackFunnelEvent("ai_doctor_review_started", { surface: acceptedMode });
+    }
     if (eligibility.mode === "historical_review") {
       if (!historicalStartTrackedRef.current) {
         historicalStartTrackedRef.current = true;

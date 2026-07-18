@@ -15,7 +15,9 @@
 //  - "Change later" copy points to Settings.
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, Navigate, Link } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/store/auth";
+import { useGrows } from "@/store/grows";
 import { Button } from "@/components/ui/button";
 import {
   DEFAULT_START_SCREEN,
@@ -33,10 +35,13 @@ import {
 import { runStarterSetup, StarterSetupError } from "@/lib/starterSetupService";
 import { starterSetupSupabaseAdapter } from "@/lib/starterSetupSupabaseAdapter";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
+import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 import PublicQuickLogHandoffCard from "@/components/PublicQuickLogHandoffCard";
 
 export default function Onboarding() {
   const { user, loading } = useAuth();
+  const { refresh: refreshGrows } = useGrows();
+  const queryClient = useQueryClient();
   const nav = useNavigate();
   const [choice, setChoice] = useState<StartScreenChoice>(DEFAULT_START_SCREEN);
   const [starterBusy, setStarterBusy] = useState(false);
@@ -62,7 +67,22 @@ export default function Onboarding() {
     setStarterError(null);
     setStarterBusy(true);
     try {
-      const result = await runStarterSetup(user.id, starterSetupSupabaseAdapter);
+      const result = await runStarterSetup(user.id, starterSetupSupabaseAdapter, {
+        onCreated(entity) {
+          if (entity === "grow") trackFunnelEvent("grow_created");
+          if (entity === "tent") trackFunnelEvent("tent_created");
+          if (entity === "plant") trackFunnelEvent("plant_created");
+        },
+      });
+      // Quick Log is permanently mounted and may still hold the pre-setup
+      // empty lists. Refresh every selector it uses before dispatching the
+      // in-memory handoff so the new grow/tent/plant can be selected and saved
+      // immediately, without waiting for a focus refetch or page reload.
+      await Promise.all([
+        refreshGrows(),
+        queryClient.invalidateQueries({ queryKey: ["tents"] }),
+        queryClient.invalidateQueries({ queryKey: ["plants"] }),
+      ]);
       const prefill = buildStarterQuickLogPrefill(result);
       // AppShell listens for this event globally and opens Quick Log with
       // the plant/tent/grow preselected. No sensor snapshot is inserted;

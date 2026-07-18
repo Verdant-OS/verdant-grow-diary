@@ -7,7 +7,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -16,10 +22,8 @@ import { GROW_TYPES, STAGES, growTypeLabel, stageLabel } from "@/lib/grow";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
-import {
-  evaluateGrowCreationGate,
-  FREE_TIER_UPGRADE_PATH,
-} from "@/lib/entitlements/freeTierGates";
+import { evaluateGrowCreationGate, FREE_TIER_UPGRADE_PATH } from "@/lib/entitlements/freeTierGates";
+import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 
 export default function Grows() {
   const { user } = useAuth();
@@ -46,12 +50,23 @@ export default function Grows() {
       return;
     }
     setBusy(true);
-    const { data, error } = await supabase.from("grows").insert({
-      user_id: user.id, name: form.name.trim(), grow_type: form.grow_type, stage: form.stage,
-      notes: form.notes.trim() || null,
-    }).select().single();
+    const { data, error } = await supabase
+      .from("grows")
+      .insert({
+        user_id: user.id,
+        name: form.name.trim(),
+        grow_type: form.grow_type,
+        stage: form.stage,
+        notes: form.notes.trim() || null,
+      })
+      .select()
+      .single();
     setBusy(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    trackFunnelEvent("grow_created");
     toast.success("Grow created");
     await refresh();
     if (data) setActiveGrowId(data.id);
@@ -77,7 +92,8 @@ export default function Grows() {
           disabled={!growGate.allowed}
           data-testid="grows-new-button"
         >
-          <Plus className="h-4 w-4" />New
+          <Plus className="h-4 w-4" />
+          New
         </Button>
       </div>
 
@@ -98,11 +114,7 @@ export default function Grows() {
           <Loader2 className="h-5 w-5 animate-spin mx-auto" />
         </div>
       ) : error ? (
-        <div
-          className="glass rounded-2xl p-6 text-center"
-          role="alert"
-          data-testid="grows-error"
-        >
+        <div className="glass rounded-2xl p-6 text-center" role="alert" data-testid="grows-error">
           <AlertCircle className="h-5 w-5 text-destructive mx-auto mb-2" />
           <p className="font-semibold">Unable to load grows.</p>
           <p className="text-xs text-muted-foreground mt-1">Please try again later.</p>
@@ -113,8 +125,12 @@ export default function Grows() {
             <Sprout className="h-7 w-7 text-primary" />
           </div>
           <h2 className="font-display text-lg font-semibold">No grows yet.</h2>
-          <p className="text-sm text-muted-foreground mt-1 mb-4">Create your first grow to start logging.</p>
-          <Button onClick={() => setOpen(true)} className="gradient-leaf text-primary-foreground">Create grow</Button>
+          <p className="text-sm text-muted-foreground mt-1 mb-4">
+            Create your first grow to start logging.
+          </p>
+          <Button onClick={() => setOpen(true)} className="gradient-leaf text-primary-foreground">
+            Create grow
+          </Button>
         </div>
       ) : (
         <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3" data-testid="grows-list">
@@ -131,19 +147,25 @@ export default function Grows() {
                 <div className="flex items-center gap-2 flex-wrap mb-1">
                   <span className="font-semibold">{g.name}</span>
                   {g.id === activeGrowId && (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/20 text-primary">active</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/20 text-primary">
+                      active
+                    </span>
                   )}
                   {g.is_archived && (
-                    <Badge variant="outline" className="text-[10px]">archived</Badge>
+                    <Badge variant="outline" className="text-[10px]">
+                      archived
+                    </Badge>
                   )}
-                  <Badge variant="outline" className="uppercase text-[10px]">{stageLabel(g.stage)}</Badge>
-                  <Badge variant="outline" className="text-[10px]">{growTypeLabel(g.grow_type)}</Badge>
+                  <Badge variant="outline" className="uppercase text-[10px]">
+                    {stageLabel(g.stage)}
+                  </Badge>
+                  <Badge variant="outline" className="text-[10px]">
+                    {growTypeLabel(g.grow_type)}
+                  </Badge>
                 </div>
                 <div className="text-xs text-muted-foreground">
                   Started {format(new Date(g.started_at), "MMM d, yyyy")}
-                  {g.updated_at && (
-                    <> · Updated {format(new Date(g.updated_at), "MMM d, yyyy")}</>
-                  )}
+                  {g.updated_at && <> · Updated {format(new Date(g.updated_at), "MMM d, yyyy")}</>}
                 </div>
                 {g.notes && (
                   <p className="text-xs mt-2 text-muted-foreground line-clamp-2">{g.notes}</p>
@@ -178,32 +200,71 @@ export default function Grows() {
         </ul>
       )}
 
-
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="glass max-w-md">
-          <DialogHeader><DialogTitle className="font-display">New grow</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle className="font-display">New grow</DialogTitle>
+          </DialogHeader>
           <form onSubmit={create} className="grid gap-3">
-            <div><Label>Name</Label><Input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Tent #1, Backyard, Mothers…" /></div>
+            <div>
+              <Label>Name</Label>
+              <Input
+                required
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                placeholder="Tent #1, Backyard, Mothers…"
+              />
+            </div>
             <div className="grid grid-cols-2 gap-2">
-              <div><Label>Type</Label>
-                <Select value={form.grow_type} onValueChange={(v) => setForm({ ...form, grow_type: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{GROW_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
+              <div>
+                <Label>Type</Label>
+                <Select
+                  value={form.grow_type}
+                  onValueChange={(v) => setForm({ ...form, grow_type: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {GROW_TYPES.map((t) => (
+                      <SelectItem key={t.value} value={t.value}>
+                        {t.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
                 </Select>
               </div>
-              <div><Label>Stage</Label>
+              <div>
+                <Label>Stage</Label>
                 <Select value={form.stage} onValueChange={(v) => setForm({ ...form, stage: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{STAGES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STAGES.map((s) => (
+                      <SelectItem key={s.value} value={s.value}>
+                        {s.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
                 </Select>
               </div>
             </div>
-            <div><Label>Notes (optional)</Label><Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Strain, lighting, medium…" rows={2} /></div>
-            <Button disabled={busy} className="gradient-leaf text-primary-foreground">Create grow</Button>
+            <div>
+              <Label>Notes (optional)</Label>
+              <Textarea
+                value={form.notes}
+                onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                placeholder="Strain, lighting, medium…"
+                rows={2}
+              />
+            </div>
+            <Button disabled={busy} className="gradient-leaf text-primary-foreground">
+              Create grow
+            </Button>
           </form>
         </DialogContent>
       </Dialog>
-
     </div>
   );
 }

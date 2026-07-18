@@ -13,7 +13,15 @@ vi.mock("@/store/auth", () => ({
   }),
 }));
 
-vi.mock("@/hooks/useRequireAuth", () => ({ useRequireAuth: vi.fn() }));
+vi.mock("@/hooks/useRequireAuth", () => ({
+  useRequireAuth: () => ({ status: "authenticated" }),
+}));
+vi.mock("@/hooks/useMyEntitlements", () => ({
+  useMyEntitlements: () => ({
+    loading: false,
+    entitlement: { isActive: true, effectivePlanId: "pro_monthly" },
+  }),
+}));
 vi.mock("@/hooks/useAlertsList", () => ({ useAlertsList: () => ({ alerts: [] }) }));
 vi.mock("@/components/ui/sidebar", () => ({
   SidebarProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
@@ -50,6 +58,7 @@ function TestContent() {
   return (
     <div>
       <span data-testid="current-path">{location.pathname}</span>
+      <span data-testid="current-search">{location.search}</span>
       <Link to="/settings">Leave tent</Link>
       <Link to={`/tents/${SECOND_TENT_ID}`}>Open second tent</Link>
     </div>
@@ -93,6 +102,20 @@ describe("AppShell mobile Quick Log routing", () => {
 
     expect(screen.getByTestId("legacy-quick-log")).toBeInTheDocument();
     expect(screen.queryByTestId("scoped-quick-log")).not.toBeInTheDocument();
+  });
+
+  it("honors and consumes the saved Quick Log start-screen intent", async () => {
+    renderAt("/dashboard?open=quick-log");
+
+    await waitFor(() => expect(screen.getByTestId("legacy-quick-log")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTestId("current-search").textContent).toBe(""));
+    expect(screen.queryByTestId("scoped-quick-log")).not.toBeInTheDocument();
+  });
+
+  it("does not open Quick Log for an unrecognized query value", () => {
+    renderAt("/dashboard?open=dashboard");
+    expect(screen.queryByTestId("legacy-quick-log")).not.toBeInTheDocument();
+    expect(screen.getByTestId("current-search")).toHaveTextContent("?open=dashboard");
   });
 
   it("closes scoped logging when the grower leaves or changes tents", async () => {

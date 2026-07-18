@@ -5,7 +5,12 @@ import BrandLogo from "@/components/BrandLogo";
 import AccountPlanBadge from "@/components/AccountPlanBadge";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
-import { sanitizeCheckoutReturnTo } from "@/lib/checkoutReturnTo";
+import {
+  buildCheckoutReturnNavigationState,
+  classifyCheckoutReturnSurface,
+  sanitizeCheckoutReturnTo,
+  shouldCreateCheckoutReturnCompletionMarker,
+} from "@/lib/checkoutReturnTo";
 import { buildCheckoutActivationViewModel } from "@/lib/checkoutActivationRules";
 import {
   clearCheckoutStarted,
@@ -61,6 +66,10 @@ export default function CheckoutSuccess() {
     () => buildCheckoutActivationViewModel(searchParams.get("returnTo")),
     [searchParams],
   );
+  const checkoutReturnSurface = useMemo(
+    () => classifyCheckoutReturnSurface(safeReturnTo),
+    [safeReturnTo],
+  );
 
   // Same-device checkout context, read once on mount. Distinguishes a real
   // post-checkout return ("confirming…") from a direct visit ("no checkout
@@ -93,12 +102,13 @@ export default function CheckoutSuccess() {
   // and the analytics event holds itself to the same standard.
   const activationTrackedRef = useRef(false);
   useEffect(() => {
-    if (!confirmed || activationTrackedRef.current) return;
+    if (!confirmed || !hasCheckoutContext || activationTrackedRef.current) return;
     activationTrackedRef.current = true;
     trackFunnelEvent("subscription_activated", {
       plan: entitlement.effectivePlanId,
+      ...(checkoutReturnSurface ? { surface: checkoutReturnSurface } : {}),
     });
-  }, [confirmed, entitlement.effectivePlanId]);
+  }, [checkoutReturnSurface, confirmed, entitlement.effectivePlanId, hasCheckoutContext]);
 
   // Bounded poll — stops when confirmed or after POLL_TIMEOUT_MS. Runs in
   // BOTH unconfirmed states: "confirming" shows it explicitly, while
@@ -133,8 +143,16 @@ export default function CheckoutSuccess() {
     if (!safeReturnTo) return;
     if (redirectedRef.current) return;
     redirectedRef.current = true;
-    navigate(safeReturnTo, { replace: true });
-  }, [confirmed, safeReturnTo, navigate]);
+    // Pheno keeps its activation attribution above, but does not receive a
+    // completion marker until its independently-owned gate can share a
+    // committed-ready signal. This avoids claiming success from route arrival
+    // while that gate is still loading or has resolved denied.
+    const state =
+      hasCheckoutContext && shouldCreateCheckoutReturnCompletionMarker(checkoutReturnSurface)
+        ? buildCheckoutReturnNavigationState(checkoutReturnSurface)
+        : null;
+    navigate(safeReturnTo, { replace: true, state });
+  }, [checkoutReturnSurface, confirmed, hasCheckoutContext, safeReturnTo, navigate]);
 
   return (
     <main

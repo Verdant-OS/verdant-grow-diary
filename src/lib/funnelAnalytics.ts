@@ -1,10 +1,15 @@
 /**
- * Funnel analytics — the ten growth-calendar conversion events:
+ * Funnel analytics — the growth-calendar conversion events:
  *
- *   signup → tent_created → plant_created → quick_log_saved →
- *   csv_import_completed → csv_history_ai_doctor_clicked →
- *   historical_ai_review_started → paywall_viewed → checkout_started →
- *   subscription_activated
+ *   signup → grow_created → tent_created → plant_created → quick_log_saved →
+ *   csv_import_started → csv_import_completed →
+ *   csv_history_ai_doctor_clicked → ai_doctor_review_started →
+ *   ai_doctor_result_received →
+ *   ai_doctor_session_saved → paywall_viewed → checkout_started →
+ *   subscription_activated → checkout_return_completed
+ *
+ * Historical reviews additionally emit historical_ai_review_started as a
+ * companion marker; standard reviews do not pass through that branch.
  *
  * Design constraints (grower-privacy first):
  *  - Fire-and-forget: never throws, never blocks a save/checkout path,
@@ -22,15 +27,21 @@ import { PRICING_ANALYTICS_EVENT } from "@/lib/pricingAnalytics";
 
 export const FUNNEL_EVENTS = [
   "signup",
+  "grow_created",
   "tent_created",
   "plant_created",
   "quick_log_saved",
+  "csv_import_started",
   "csv_import_completed",
   "csv_history_ai_doctor_clicked",
+  "ai_doctor_review_started",
   "historical_ai_review_started",
+  "ai_doctor_result_received",
+  "ai_doctor_session_saved",
   "paywall_viewed",
   "checkout_started",
   "subscription_activated",
+  "checkout_return_completed",
 ] as const;
 
 export type FunnelEventName = (typeof FUNNEL_EVENTS)[number];
@@ -40,7 +51,7 @@ export type FunnelEventName = (typeof FUNNEL_EVENTS)[number];
  * dropped silently — call sites cannot widen this surface by accident.
  */
 export const FUNNEL_PARAM_KEYS = [
-  /** Which paywall rendered: "pricing" | "upgrade" | "ai_doctor_limit". */
+  /** Privacy-safe funnel surface enum; never a route, ID, or grower input. */
   "surface",
   /** Plan slug the grower acted on (enum like "pro-monthly"), never input. */
   "plan",

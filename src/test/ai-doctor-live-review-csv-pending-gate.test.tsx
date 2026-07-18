@@ -245,7 +245,9 @@ describe("CSV history pending/error gating", () => {
     expect(start.disabled).toBe(false);
     fireEvent.click(start);
     await waitFor(() => expect(invoke).toHaveBeenCalledTimes(1));
-    expect(trackFunnelEvent).not.toHaveBeenCalled();
+    expect(trackFunnelEvent).toHaveBeenCalledWith("ai_doctor_review_started", {
+      surface: "standard",
+    });
     const request = invoke.mock.calls[0][1].body;
     expect(request.grow_id).toBe(GROW_ID);
     const packet = request.packet as {
@@ -376,7 +378,10 @@ describe("CSV-first historical review eligibility", () => {
     fireEvent.click(start);
     fireEvent.click(start);
     await waitFor(() => expect(invoke).toHaveBeenCalledTimes(1));
-    expect(trackFunnelEvent).toHaveBeenCalledTimes(1);
+    expect(trackFunnelEvent).toHaveBeenCalledTimes(2);
+    expect(trackFunnelEvent).toHaveBeenCalledWith("ai_doctor_review_started", {
+      surface: "historical_review",
+    });
     expect(trackFunnelEvent).toHaveBeenCalledWith("historical_ai_review_started");
 
     await waitFor(() =>
@@ -384,7 +389,7 @@ describe("CSV-first historical review eligibility", () => {
     );
     fireEvent.click(screen.getByTestId("plant-ai-doctor-live-review-retry"));
     await waitFor(() => expect(invoke).toHaveBeenCalledTimes(2));
-    expect(trackFunnelEvent).toHaveBeenCalledTimes(1);
+    expect(trackFunnelEvent).toHaveBeenCalledTimes(2);
 
     const packet = invoke.mock.calls[0][1].body.packet;
     expect(packet.readiness.state).toBe("insufficient");

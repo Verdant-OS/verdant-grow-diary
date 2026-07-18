@@ -12,14 +12,11 @@
  */
 import { sanitizeAuthRedirect } from "@/lib/authRedirectRules";
 
-export type StartScreenChoice =
-  | "quickLog"
-  | "timeline"
-  | "dashboard"
-  | "onboarding"
-  | "welcome";
+export type StartScreenChoice = "quickLog" | "timeline" | "dashboard" | "onboarding" | "welcome";
 
 export const DEFAULT_START_SCREEN: StartScreenChoice = "quickLog";
+
+export const QUICK_LOG_START_ROUTE = "/dashboard?open=quick-log" as const;
 
 export const START_SCREEN_OPTIONS: ReadonlyArray<{
   key: StartScreenChoice;
@@ -30,7 +27,8 @@ export const START_SCREEN_OPTIONS: ReadonlyArray<{
   {
     key: "quickLog",
     label: "Quick Log",
-    description: "Diary-first. Recommended — Verdant works best when logs come first, then sensors, then AI.",
+    description:
+      "Diary-first. Recommended — Verdant works best when logs come first, then sensors, then AI.",
     recommended: true,
   },
   { key: "timeline", label: "Timeline", description: "Open the diary timeline first." },
@@ -41,7 +39,7 @@ export const START_SCREEN_OPTIONS: ReadonlyArray<{
 
 // Internal routes only. All values must pass sanitizeAuthRedirect.
 const ROUTE_FOR: Record<StartScreenChoice, string> = {
-  quickLog: "/",
+  quickLog: QUICK_LOG_START_ROUTE,
   timeline: "/timeline",
   dashboard: "/",
   onboarding: "/onboarding",
@@ -51,6 +49,19 @@ const ROUTE_FOR: Record<StartScreenChoice, string> = {
 export function routeForStartScreen(choice: StartScreenChoice): string {
   const r = ROUTE_FOR[choice] ?? "/";
   return sanitizeAuthRedirect(r, "/");
+}
+
+/**
+ * Consume Verdant's one-shot Quick Log start intent while preserving unrelated
+ * query parameters. Returns null when no valid intent is present.
+ */
+export function consumeQuickLogStartIntent(search: string): string | null {
+  if (typeof search !== "string") return null;
+  const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
+  if (params.get("open") !== "quick-log") return null;
+  params.delete("open");
+  const remaining = params.toString();
+  return remaining ? `?${remaining}` : "";
 }
 
 function storageKey(userId: string): string | null {

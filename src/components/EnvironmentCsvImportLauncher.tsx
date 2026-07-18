@@ -114,6 +114,11 @@ export function EnvironmentCsvImportLauncher(props: EnvironmentCsvImportLauncher
 
   const ready = !!user?.id && !!growId && !!tentId;
 
+  const handleOpen = useCallback(() => {
+    trackFunnelEvent("csv_import_started");
+    setOpen(true);
+  }, []);
+
   // Imported history is rendered on Tent Detail, so the completion link
   // targets that exact anchored section. Plant context is chosen explicitly
   // after the grower sees the history; Verdant never infers a plant from the
@@ -181,7 +186,7 @@ export function EnvironmentCsvImportLauncher(props: EnvironmentCsvImportLauncher
         <Button
           variant="outline"
           size="sm"
-          onClick={() => setOpen(true)}
+          onClick={handleOpen}
           data-testid={`${testIdPrefix}-button`}
           className="gap-1.5"
         >
@@ -214,7 +219,7 @@ export function EnvironmentCsvImportLauncher(props: EnvironmentCsvImportLauncher
         Data is read-only and source-tagged as CSV.
       </p>
       <div className="mt-3">
-        <Button onClick={() => setOpen(true)} data-testid={`${testIdPrefix}-button`}>
+        <Button onClick={handleOpen} data-testid={`${testIdPrefix}-button`}>
           {label}
         </Button>
       </div>

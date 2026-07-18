@@ -158,7 +158,15 @@ export function checkSitemapCanonicalParity({ distDir, sitemapXml, robotsTxt }) 
   for (const m of malformed) push(m.message, m.detail);
 
   // Rule 2: every sitemap URL must be claimed by exactly one static doc.
+  // Exception: the apex `${CANONICAL_ORIGIN}/` maps to the SPA fallback
+  // dist/index.html, which intentionally ships without a hardcoded
+  // canonical (usePageSeo emits it at runtime — see
+  // validate-canonical-links.mjs). Skip the parity check for that URL
+  // when the SPA fallback exists.
+  const apexUrl = `${CANONICAL_ORIGIN}/`;
+  const spaFallbackExists = existsSync(resolve(distDir, "index.html"));
   for (const url of sitemapSet) {
+    if (url === apexUrl && spaFallbackExists) continue;
     if (!canonicals.has(url)) {
       push(
         `sitemap URL has no matching <link rel="canonical"> in dist/`,

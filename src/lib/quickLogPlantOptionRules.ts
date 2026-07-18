@@ -31,7 +31,20 @@ interface MinimalQuickLogPlant {
   merged_into_plant_id?: string | null;
 }
 
-function isInactive(p: MinimalQuickLogPlant): boolean {
+/**
+ * Canonical Quick Log inactivity predicate: a plant is unavailable as a
+ * logging target when it is archived (hard flag or archived_at timestamp)
+ * or has been merged into another plant. Exported so every Quick Log
+ * surface (v1 picker, v2 target builder) applies the exact same rule
+ * instead of re-deriving a weaker subset of it.
+ *
+ * Schema note: in the deployed schema only `is_archived` exists on
+ * plants — the merge RPC sets it to true on merged sources, so the
+ * archived_at / merged_into_plant_id branches are forward-compatible
+ * defense-in-depth for the planned columns in
+ * docs/plant-merge-execution-plan.md, not a load-bearing guard today.
+ */
+export function isInactiveQuickLogPlant(p: MinimalQuickLogPlant): boolean {
   return !!(p.is_archived || p.archived_at || p.merged_into_plant_id);
 }
 
@@ -39,7 +52,7 @@ export function filterQuickLogPlantOptions<T extends MinimalQuickLogPlant>(
   plants: ReadonlyArray<T>,
   activeGrowId: string | null | undefined,
 ): T[] {
-  const active = plants.filter((p) => !isInactive(p));
+  const active = plants.filter((p) => !isInactiveQuickLogPlant(p));
   if (!activeGrowId) return active;
   return active.filter(
     (p) => p.grow_id === activeGrowId || p.grow_id == null,

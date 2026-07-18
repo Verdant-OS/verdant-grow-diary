@@ -185,8 +185,16 @@ export function validateDocument({ file, html, distDir }) {
       const scope = `jsonld[${blockIdx}].node[${nodeIdx++}]`;
       const idValue = typeof node["@id"] === "string" ? node["@id"] : null;
       const mainId = extractMainEntityOfPageId(node.mainEntityOfPage);
+      const pageTyped = isPageTypedNode(node);
 
-      if (idValue === null && mainId === null) continue;
+      // Only enforce parity when the node claims to describe the page
+      // itself: either a page-typed node with an @id, or any node with
+      // mainEntityOfPage (which by definition asserts a page URL).
+      // Site-level entities (Organization / WebSite / SoftwareApplication)
+      // with origin-level @ids are intentionally exempt.
+      const enforceIdParity = pageTyped && idValue !== null;
+      const enforceMainParity = mainId !== null;
+      if (!enforceIdParity && !enforceMainParity) continue;
 
       if (canonical === null) {
         push(
@@ -196,13 +204,13 @@ export function validateDocument({ file, html, distDir }) {
         continue;
       }
 
-      if (idValue !== null && !matchesCanonical(idValue, canonical)) {
+      if (enforceIdParity && !matchesCanonical(idValue, canonical)) {
         push(
           scope,
           `@id "${idValue}" does not match canonical "${canonical}" (allowed: exact or "${canonical}#<fragment>")`,
         );
       }
-      if (mainId !== null && !matchesCanonical(mainId, canonical)) {
+      if (enforceMainParity && !matchesCanonical(mainId, canonical)) {
         push(
           scope,
           `mainEntityOfPage "${mainId}" does not match canonical "${canonical}" (allowed: exact or "${canonical}#<fragment>")`,
@@ -210,6 +218,7 @@ export function validateDocument({ file, html, distDir }) {
       }
     }
   });
+
 
   return issues;
 }

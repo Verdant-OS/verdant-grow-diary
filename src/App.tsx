@@ -58,7 +58,7 @@ const Reports = lazy(() => import("./pages/Reports"));
 const PostGrowLearningReport = lazy(() => import("./pages/PostGrowLearningReport"));
 const DiaryRangeReportPage = lazy(() => import("./pages/DiaryRangeReportPage"));
 
-const Coach = lazy(() => import("./pages/Coach"));
+const AiDoctorStart = lazy(() => import("./pages/AiDoctorStart"));
 const AiDoctorSessionDetail = lazy(() => import("./pages/AiDoctorSessionDetail"));
 const AiDoctorSessionsIndex = lazy(() => import("./pages/AiDoctorSessionsIndex"));
 const Diagnostics = lazy(() => import("./pages/Diagnostics"));
@@ -317,7 +317,7 @@ const App = () => (
                     {/* /cameras route removed — out of current V0 scope. */}
                     <Route path="/alerts" element={<Alerts />} />
                     <Route path="/alerts/:alertId" element={<AlertDetail />} />
-                    <Route path="/doctor" element={<Coach />} />
+                    <Route path="/doctor" element={<AiDoctorStart />} />
                     {/* Legacy alias — canonical route is /doctor. Growers
                         sometimes type /ai-doctor; redirect rather than 404. */}
                     <Route path="/ai-doctor" element={<Navigate to="/doctor" replace />} />

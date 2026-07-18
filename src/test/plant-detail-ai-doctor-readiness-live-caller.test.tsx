@@ -164,7 +164,7 @@ describe("PlantDetailAiDoctorReadiness — live caller × real intake classifica
 
     expect(screen.getByTestId("plant-detail-ai-doctor-readiness-cta")).toHaveAttribute(
       "href",
-      "/plants/plant-1#plant-ai-doctor-review",
+      `/plants/plant-1?tentId=${TENT_ID}#plant-ai-doctor-review`,
     );
   });
 

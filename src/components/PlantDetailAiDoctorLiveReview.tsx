@@ -41,6 +41,7 @@ import { useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
 import { useImportedSensorHistory } from "@/hooks/useImportedSensorHistory";
 import { isUuid } from "@/lib/isUuid";
 import { plantDetailPath } from "@/lib/routes";
+import { buildPlantAiDoctorReviewPath } from "@/lib/aiDoctorEntryRules";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { buildAiCreditLimitNoticeViewModel } from "@/lib/aiCreditLimitNoticeViewModel";
 import { trackFunnelEvent } from "@/lib/funnelAnalytics";
@@ -205,7 +206,12 @@ export default function PlantDetailAiDoctorLiveReview({
 
   // Keep route construction aligned with the shared route contract.
   // AiCreditLimitNotice validates it again before it reaches the pricing link.
-  const returnTo = useMemo(() => plantDetailPath(plantId), [plantId]);
+  const returnTo = useMemo(
+    () =>
+      buildPlantAiDoctorReviewPath({ plantId, tentId: tentId ?? null }) ??
+      plantDetailPath(plantId),
+    [plantId, tentId],
+  );
 
   // Keep funnel tracking aligned with the notice's server-plan + defensive
   // entitlement rules. Paid, founder, and unknown denials must never register

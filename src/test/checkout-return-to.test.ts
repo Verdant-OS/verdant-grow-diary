@@ -24,6 +24,9 @@ describe("sanitizeCheckoutReturnTo", () => {
     expect(sanitizeCheckoutReturnTo("/grows/abc?tab=timeline")).toBe(
       "/grows/abc?tab=timeline",
     );
+    expect(
+      sanitizeCheckoutReturnTo("/plants/plant-123?tentId=tent-1#plant-ai-doctor-review"),
+    ).toBe("/plants/plant-123?tentId=tent-1#plant-ai-doctor-review");
   });
 
   it("returns null for missing / empty / non-string values", () => {

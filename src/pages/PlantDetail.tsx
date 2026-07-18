@@ -37,6 +37,7 @@ import PlantDetailAiDoctorReadinessGate from "@/components/PlantDetailAiDoctorRe
 import PlantDetailAiDoctorSafeReviewStart from "@/components/PlantDetailAiDoctorSafeReviewStart";
 import AiDoctorReviewResultPreview from "@/components/AiDoctorReviewResultPreview";
 import PlantDetailAiDoctorLiveReview from "@/components/PlantDetailAiDoctorLiveReview";
+import AiDoctorReviewAnchorRestorer from "@/components/AiDoctorReviewAnchorRestorer";
 import PlantDetailAiDoctorContextReadinessMount from "@/components/PlantDetailAiDoctorContextReadinessMount";
 import PlantProfileContextCard from "@/components/PlantProfileContextCard";
 import { updatePlantProfileMetadata } from "@/lib/plantProfileMetadataUpdate";
@@ -529,6 +530,7 @@ export default function PlantDetail() {
         aria-label="Plant AI Doctor review"
         className="scroll-mt-16 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
+        <AiDoctorReviewAnchorRestorer />
         <PlantDetailAiDoctorReadinessGate plantId={plant.id} plant={plant} hasSafeAiDoctorFlow />
         <PlantDetailAiDoctorSafeReviewStart plantId={plant.id} plant={plant} />
         <AiDoctorReviewResultPreview testIdPrefix="plant-detail" />

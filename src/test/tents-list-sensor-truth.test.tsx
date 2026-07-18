@@ -405,6 +405,8 @@ describe("Tents list sensor truth — pi_bridge provenance parity with Tent Deta
     expect(detailHeader.sourceLabel).toBe("Live sensor");
     // List path must agree on the provenance class, not drop to Unknown.
     expect(listView.sourceLabel).toBe("Live");
+    expect(listView.provenanceEligible).toBe(true);
+    expect(listView.canAssessStage).toBe(true);
     expect(listView.sourceLabel).not.toBe("Unknown");
   });
 
@@ -428,6 +430,12 @@ describe("Tents list sensor truth — pi_bridge provenance parity with Tent Deta
     const listView = buildTentSnapshotView(rows, "veg", NOW);
     const detailHeader = buildTentSensorHeaderView(rows, NOW);
     expect(listView.sourceLabel).not.toMatch(/live/i);
+    expect(listView.provenanceEligible).toBe(false);
+    expect(listView.canAssessStage).toBe(false);
+    for (const item of listView.metrics) {
+      expect(item.status).not.toBe("ok");
+      expect(item.chipStatus).not.toBe("ok");
+    }
     expect(detailHeader.sourceLabel).not.toMatch(/^Live/);
   });
 });

@@ -39,8 +39,13 @@ const METRIC_KEY: Record<string, keyof Omit<TentSensorChartPoint, "ts">> = {
   soil_moisture_pct: "soil",
 };
 
-function canContributeToTentEnvironment(row: SensorReadingLike): boolean {
+function canContributeToTentEnvironmentChart(row: SensorReadingLike): boolean {
   if (isDiagnosticSensorProvenanceRow(row)) return false;
+  // `pi_bridge` is the explicit legacy live-source reservation already used
+  // by snapshotFromReadings. Keep that compatibility narrow: unknown vendor
+  // strings still fail closed rather than being normalized to live.
+  const rawSource = typeof row.source === "string" ? row.source.trim().toLowerCase() : "";
+  if (rawSource === "pi_bridge") return true;
   const source = normalizeSensorSource(row.source);
   return source === "live" || source === "manual" || source === "csv";
 }
@@ -48,7 +53,13 @@ function canContributeToTentEnvironment(row: SensorReadingLike): boolean {
 function usableTentEnvironmentRows(
   rows: SensorReadingLike[] | null | undefined,
 ): SensorReadingLike[] {
-  return (rows ?? []).filter(canContributeToTentEnvironment);
+  return (rows ?? []).filter(canContributeToTentEnvironmentChart);
+}
+
+function nonDiagnosticTentEnvironmentRows(
+  rows: SensorReadingLike[] | null | undefined,
+): SensorReadingLike[] {
+  return (rows ?? []).filter((row) => !isDiagnosticSensorProvenanceRow(row));
 }
 
 /**
@@ -124,7 +135,11 @@ export function buildTentSensorHeaderView(
   rows: SensorReadingLike[] | null | undefined,
   now: number = Date.now(),
 ): TentSensorHeaderView {
-  const usableRows = usableTentEnvironmentRows(rows);
+  // Header provenance must see every non-diagnostic row in the latest group.
+  // Filtering unknown sources here could otherwise turn a mixed group into an
+  // apparently all-live group. Chart points remain limited to supported
+  // sources by usableTentEnvironmentRows above.
+  const usableRows = nonDiagnosticTentEnvironmentRows(rows);
   if (usableRows.length === 0) {
     return {
       hasReadings: false,

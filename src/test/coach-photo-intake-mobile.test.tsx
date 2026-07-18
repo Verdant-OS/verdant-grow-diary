@@ -14,10 +14,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const SOURCE = readFileSync(
-  resolve(__dirname, "../pages/Coach.tsx"),
-  "utf8",
-);
+const SOURCE = readFileSync(resolve(__dirname, "../pages/Coach.tsx"), "utf8");
 
 describe("Coach AI Doctor photo intake — mobile take + upload", () => {
   it("exposes a 'Take photo' control", () => {
@@ -31,11 +28,13 @@ describe("Coach AI Doctor photo intake — mobile take + upload", () => {
   });
 
   function findInputBlock(testid: string): string {
-    const blocks = SOURCE.split(/<input\b/).slice(1).map((b) => "<input" + b.split("/>")[0] + "/>");
+    const blocks = SOURCE.split(/<input\b/)
+      .slice(1)
+      .map((b) => "<input" + b.split("/>")[0] + "/>");
     return blocks.find((b) => b.includes(testid)) ?? "";
   }
 
-  it("has a take-photo file input that may use capture=\"environment\"", () => {
+  it('has a take-photo file input that may use capture="environment"', () => {
     const block = findInputBlock("coach-photo-take-input");
     expect(block, "take-photo input not found").toBeTruthy();
     expect(block).toMatch(/type="file"/);
@@ -56,6 +55,14 @@ describe("Coach AI Doctor photo intake — mobile take + upload", () => {
     const uploadBlock = findInputBlock("coach-photo-upload-input");
     expect(takeBlock).toMatch(/handleFile\(/);
     expect(uploadBlock).toMatch(/handleFile\(/);
+  });
+
+  it("allows only local blob URLs into the photo preview sink", () => {
+    expect(SOURCE).toMatch(
+      /const safePreview = preview\?\.startsWith\("blob:"\) \? preview : null/,
+    );
+    expect(SOURCE).toMatch(/src=\{safePreview\}/);
+    expect(SOURCE).not.toMatch(/src=\{preview\}/);
   });
 
   it("keeps cautious diagnosis copy — no 'confirmed diagnosis' wording added", () => {

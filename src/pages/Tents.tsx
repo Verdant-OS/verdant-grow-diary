@@ -212,9 +212,11 @@ export default function Tents() {
                     </p>
                   )}
 
-                  {hasVpdValue && normalizeVpdStage(t.stage) === "unknown" && (
-                    <VpdStageMissingBadge testId="tents-list-vpd-stage-missing-badge" />
-                  )}
+                  {hasVpdValue &&
+                    snapView.canAssessStage &&
+                    normalizeVpdStage(t.stage) === "unknown" && (
+                      <VpdStageMissingBadge testId="tents-list-vpd-stage-missing-badge" />
+                    )}
 
                   {(() => {
                     const health = deriveTentHealthChip({

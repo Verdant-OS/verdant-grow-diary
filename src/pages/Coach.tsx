@@ -346,6 +346,10 @@ export default function Coach() {
   }
 
   const analysis = result?.analysis;
+  // A file picker is DOM-controlled input. Keep its object URL on the local
+  // blob scheme before assigning it to an image URL sink; all other schemes
+  // fail closed to the empty state.
+  const safePreview = preview?.startsWith("blob:") ? preview : null;
 
   return (
     <div>
@@ -403,9 +407,9 @@ export default function Coach() {
           aria-label="Add or replace plant photo"
           className="relative aspect-video w-full rounded-xl border-2 border-dashed border-border/60 overflow-hidden bg-secondary/40 hover:border-primary/60 transition"
         >
-          {preview ? (
+          {safePreview ? (
             <img
-              src={preview}
+              src={safePreview}
               className="h-full w-full object-cover"
               alt="Selected plant photo preview"
             />

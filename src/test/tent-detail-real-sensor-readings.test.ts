@@ -47,7 +47,6 @@ describe("TentDetail · real sensor readings", () => {
       "service_role",
       "mqtt",
       "home_assistant",
-      "pi_bridge",
       "actuator",
       "device_command",
       "autopilot",
@@ -59,6 +58,9 @@ describe("TentDetail · real sensor readings", () => {
       expect(TENT_DETAIL).not.toContain(needle);
       expect(RULES).not.toContain(needle);
     }
+    // `pi_bridge` is a legacy read-side provenance label, not device control.
+    // Its narrow compatibility path must remain presentation-only.
+    expect(RULES).toContain("pi_bridge");
   });
 });
 

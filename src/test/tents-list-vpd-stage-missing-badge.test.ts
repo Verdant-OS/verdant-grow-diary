@@ -18,12 +18,12 @@ describe("Tents list VPD stage-missing info badge", () => {
     );
   });
 
-  it("gates the badge on present VPD and unknown-normalized tent stage", () => {
+  it("gates the badge on trusted VPD evidence and unknown-normalized tent stage", () => {
     // hasVpdValue is derived from the truth-filtered snapshot: the VPD
     // metric exists and is not status "unknown" (i.e. a real value).
     expect(SRC).toMatch(/const hasVpdValue = !!vpdMetric && vpdMetric\.status !== "unknown"/);
     expect(SRC).toMatch(
-      /hasVpdValue\s*&&\s*normalizeVpdStage\(t\.stage\)\s*===\s*"unknown"\s*&&\s*\(\s*<VpdStageMissingBadge[\s\S]*?tents-list-vpd-stage-missing-badge/,
+      /hasVpdValue\s*&&\s*snapView\.canAssessStage\s*&&\s*normalizeVpdStage\(t\.stage\)\s*===\s*"unknown"\s*&&\s*\(\s*<VpdStageMissingBadge[\s\S]*?tents-list-vpd-stage-missing-badge/,
     );
   });
 

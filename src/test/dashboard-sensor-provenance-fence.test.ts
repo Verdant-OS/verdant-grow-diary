@@ -234,7 +234,7 @@ describe("Dashboard sensor provenance fence", () => {
 
   it("filters quality and provenance before the latest snapshot is assembled", () => {
     expect(LATEST_SNAPSHOT_HOOK).toMatch(
-      /select\("id,ts,metric,value,quality,source,tent_id,created_at,raw_payload"\)/,
+      /select\("id,ts,captured_at,metric,value,quality,source,tent_id,created_at,raw_payload"\)/,
     );
     const filterIndex = LATEST_SNAPSHOT_HOOK.indexOf(
       "selectDashboardSensorEvidenceRows(data ?? [])",

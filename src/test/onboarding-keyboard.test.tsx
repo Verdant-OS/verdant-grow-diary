@@ -2,13 +2,15 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { clearLocalStorageForTest, getLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  clearLocalStorageForTest,
+  getLocalStorageItemForTest,
+} from "./helpers/localStorageTestHelper";
 
 const navMock = vi.fn();
 vi.mock("react-router-dom", async () => {
-  const actual = await vi.importActual<typeof import("react-router-dom")>(
-    "react-router-dom",
-  );
+  const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
   return { ...actual, useNavigate: () => navMock };
 });
 
@@ -19,12 +21,17 @@ vi.mock("@/store/auth", () => ({
 import Onboarding from "@/pages/Onboarding";
 
 function renderPage() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   return render(
-    <MemoryRouter initialEntries={["/onboarding"]}>
-      <Routes>
-        <Route path="/onboarding" element={<Onboarding />} />
-      </Routes>
-    </MemoryRouter>,
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={["/onboarding"]}>
+        <Routes>
+          <Route path="/onboarding" element={<Onboarding />} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 
@@ -39,11 +46,11 @@ describe("Onboarding page", () => {
     // Mirrors START_SCREEN_OPTIONS: quickLog, timeline, dashboard, onboarding, welcome.
     expect(radios).toHaveLength(5);
     const values = radios.map((r) => (r as HTMLInputElement).value).sort();
-    expect(values).toEqual(
-      ["dashboard", "onboarding", "quickLog", "timeline", "welcome"].sort(),
-    );
+    expect(values).toEqual(["dashboard", "onboarding", "quickLog", "timeline", "welcome"].sort());
     // Quick Log is default and marked recommended
-    const quickLog = radios.find((r) => (r as HTMLInputElement).value === "quickLog") as HTMLInputElement;
+    const quickLog = radios.find(
+      (r) => (r as HTMLInputElement).value === "quickLog",
+    ) as HTMLInputElement;
     expect(quickLog.checked).toBe(true);
     expect(screen.getAllByText(/recommended/i).length).toBeGreaterThan(0);
   });
@@ -75,8 +82,7 @@ describe("Onboarding page", () => {
     }
     renderPage();
     fireEvent.click(screen.getByRole("button", { name: /skip for now/i }));
-    // Quick Log resolves to "/" (the dashboard host of Quick Log).
-    expect(navMock).toHaveBeenCalledWith("/", { replace: true });
+    expect(navMock).toHaveBeenCalledWith("/dashboard?open=quick-log", { replace: true });
     expect(getLocalStorageItemForTest("verdant:startScreen:user-1")).toBeNull();
   });
 

@@ -171,12 +171,17 @@ describe("launcher → modal handoff", () => {
     for (const table of supabaseSpies.tables) {
       expect(table).toBe("sensor_readings");
     }
-    // Funnel event is the existing privacy-safe completion signal.
+    // Funnel events remain privacy-safe and explicitly cover the import start
+    // and durable completion boundaries—nothing downstream is inferred.
+    expect(trackSpy).toHaveBeenCalledWith("csv_import_started");
     expect(trackSpy).toHaveBeenCalledWith(
       "csv_import_completed",
       expect.objectContaining({ rows: expect.any(Number) }),
     );
-    expect(trackSpy).toHaveBeenCalledTimes(1);
+    expect(trackSpy.mock.calls.map(([eventName]) => eventName)).toEqual([
+      "csv_import_started",
+      "csv_import_completed",
+    ]);
     expect(trackSpy).not.toHaveBeenCalledWith("csv_history_ai_doctor_clicked", expect.anything());
     expect(trackSpy).not.toHaveBeenCalledWith("historical_ai_review_started", expect.anything());
   });

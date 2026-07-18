@@ -16,6 +16,7 @@ import {
   ClipboardList,
   Users,
   HelpCircle,
+  Dna,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -80,6 +81,7 @@ const growerGroups: { label: string; items: NavItem[] }[] = [
     items: [
       { to: "/reports", label: "Reports", icon: LineChart },
       { to: "/grows", label: "My Grows", icon: Sprout },
+      { to: "/pheno-hunts", label: "Pheno Hunt", icon: Dna },
       // /grow-lineage is manifest access "auth" (grower-facing repair tool).
       // Owner-scoped reads/writes only, RLS-protected. MUST stay visible to
       // every authenticated grower — do not gate behind operator role.

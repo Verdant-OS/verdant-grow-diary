@@ -6,7 +6,7 @@
  * only: naming a keeper, adding a clone, or recording a cross starts no grow and
  * drives no device. No AI, no Action Queue, no automation.
  */
-import { memo, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { usePhenoKeepers } from "@/hooks/usePhenoKeepers";
 import { phenoCandidateDisplayLabel } from "@/lib/phenoCandidateIdentity";
@@ -15,6 +15,7 @@ import {
   type PhenoKeeperLineageView,
 } from "@/lib/phenoKeeperLineageViewModel";
 import type { CloneRow } from "@/lib/phenoKeepersService";
+import type { StabilityRun } from "@/lib/phenoStabilityRunRules";
 import {
   buildCrossFormViewModel,
   crossLineageBadge,
@@ -24,6 +25,7 @@ import {
 } from "@/lib/phenoCrossFormViewModel";
 import { buildPhenoHuntActivityEntries } from "@/lib/phenoHuntActivityViewModel";
 import PhenoTimelineEntries from "@/components/PhenoTimelineEntries";
+import PhenoStabilityLedger from "@/components/PhenoStabilityLedger";
 import { buildCloneTreeRows } from "@/lib/phenoCloneTreeViewModel";
 
 /** Depth → indent class (capped) so the clone lineage nests without inline styles. */
@@ -32,14 +34,18 @@ const CLONE_INDENT = ["pl-0", "pl-3", "pl-6", "pl-9", "pl-12"] as const;
 // Stable empty clone list so memoized KeeperCards without clones keep identical
 // props across parent re-renders (a fresh [] per render would defeat memo).
 const EMPTY_CLONES: readonly CloneRow[] = [];
+// Same stable-identity guard for a keeper with no recorded stability runs.
+const EMPTY_STABILITY_RUNS: readonly StabilityRun[] = [];
 
 interface KeeperCardProps {
   view: PhenoKeeperLineageView;
   clones: readonly CloneRow[];
+  stabilityRuns: readonly StabilityRun[];
   reversed: boolean;
   saving: boolean;
   onAddClone: (keeperId: string, label: string) => Promise<boolean>;
   onMarkReversed: (keeperId: string, method: string) => void;
+  onSaveStabilityRuns: (keeperId: string, runs: readonly StabilityRun[]) => Promise<boolean>;
 }
 
 // Memoized with row-LOCAL input state: at commercial scale a hunt can have
@@ -51,14 +57,20 @@ interface KeeperCardProps {
 const KeeperCard = memo(function KeeperCard({
   view,
   clones,
+  stabilityRuns,
   reversed,
   saving,
   onAddClone,
   onMarkReversed,
+  onSaveStabilityRuns,
 }: KeeperCardProps) {
   const [cloneLabel, setCloneLabel] = useState("");
   const [reversalMethod, setReversalMethod] = useState("sts");
   const cloneRows = useMemo(() => buildCloneTreeRows([...clones]), [clones]);
+  const saveStabilityRuns = useCallback(
+    (runs: readonly StabilityRun[]) => onSaveStabilityRuns(view.keeperId, runs),
+    [onSaveStabilityRuns, view.keeperId],
+  );
 
   return (
     <li
@@ -157,6 +169,12 @@ const KeeperCard = memo(function KeeperCard({
           </button>
         </div>
       )}
+      <PhenoStabilityLedger
+        keeperId={view.keeperId}
+        runs={stabilityRuns}
+        onSave={saveStabilityRuns}
+        saving={saving}
+      />
     </li>
   );
 });
@@ -176,6 +194,11 @@ export default function PhenoKeepersPage() {
   const keeperNameById = useMemo(() => {
     const m: Record<string, string> = {};
     for (const k of ks.keepers) m[k.id] = k.keeperName;
+    return m;
+  }, [ks.keepers]);
+  const stabilityRunsByKeeper = useMemo(() => {
+    const m: Record<string, StabilityRun[]> = {};
+    for (const k of ks.keepers) if (k.stabilityRuns && k.stabilityRuns.length > 0) m[k.id] = k.stabilityRuns;
     return m;
   }, [ks.keepers]);
 
@@ -347,10 +370,12 @@ export default function PhenoKeepersPage() {
                   key={view.keeperId}
                   view={view}
                   clones={ks.clonesByKeeper[view.keeperId] ?? EMPTY_CLONES}
+                  stabilityRuns={stabilityRunsByKeeper[view.keeperId] ?? EMPTY_STABILITY_RUNS}
                   reversed={reversedSet.has(view.keeperId)}
                   saving={ks.saving}
                   onAddClone={ks.addKeeperClone}
                   onMarkReversed={ks.markReversed}
+                  onSaveStabilityRuns={ks.saveStabilityRuns}
                 />
               ))}
             </ul>

@@ -35,6 +35,7 @@ function renderAt(state: Partial<UsePhenoKeepersState>) {
   const addKeeperClone = state.addKeeperClone ?? vi.fn().mockResolvedValue(true);
   const markReversed = state.markReversed ?? vi.fn().mockResolvedValue(true);
   const saveCross = state.saveCross ?? vi.fn().mockResolvedValue(true);
+  const saveStabilityRuns = state.saveStabilityRuns ?? vi.fn().mockResolvedValue(true);
   hookMock.mockReturnValue({
     status: "ok",
     hunt: { id: "h1", name: "Loud Hunt", growId: "g1", tentId: "t1" },
@@ -52,6 +53,7 @@ function renderAt(state: Partial<UsePhenoKeepersState>) {
     addKeeperClone,
     markReversed,
     saveCross,
+    saveStabilityRuns,
     ...state,
   });
   const utils = render(
@@ -61,7 +63,7 @@ function renderAt(state: Partial<UsePhenoKeepersState>) {
       </Routes>
     </MemoryRouter>,
   );
-  return { ...utils, promoteToKeeper, addKeeperClone, markReversed, saveCross };
+  return { ...utils, promoteToKeeper, addKeeperClone, markReversed, saveCross, saveStabilityRuns };
 }
 
 beforeEach(() => hookMock.mockReset());
@@ -394,11 +396,91 @@ describe("PhenoKeepersPage — breeding activity timeline (C3)", () => {
   });
 });
 
+describe("PhenoKeepersPage — stability ledger wiring", () => {
+  it("renders a per-keeper stability ledger with its verdict", () => {
+    renderAt({ keepers: [keeper("k1", "Gas")] });
+    const card = screen.getByTestId("pheno-keeper-k1");
+    expect(within(card).getByTestId("pheno-stability-ledger-k1")).toBeInTheDocument();
+    // A brand-new keeper has no runs → the honest "not re-grown" verdict.
+    expect(within(card).getByTestId("pheno-stability-verdict-badge-k1")).toHaveTextContent(
+      /No grow-outs recorded/i,
+    );
+  });
+
+  it("recording a grow-out saves the full run set through the hook (never a direct write)", () => {
+    const saveStabilityRuns = vi.fn().mockResolvedValue(true);
+    renderAt({ keepers: [keeper("k1", "Gas")], saveStabilityRuns });
+    fireEvent.change(screen.getByTestId("pheno-stability-label-k1"), {
+      target: { value: "Winter 2026" },
+    });
+    fireEvent.change(screen.getByTestId("pheno-stability-trait-k1-nose_loudness"), {
+      target: { value: "8" },
+    });
+    fireEvent.click(screen.getByTestId("pheno-stability-add-k1"));
+    expect(saveStabilityRuns).toHaveBeenCalledTimes(1);
+    const [id, runs] = saveStabilityRuns.mock.calls[0];
+    expect(id).toBe("k1");
+    expect(runs).toEqual([
+      { runLabel: "Winter 2026", observedAt: null, traits: { nose_loudness: 8 }, note: null },
+    ]);
+  });
+
+  it("surfaces a keeper's saved runs and the hold/drift read-out", () => {
+    renderAt({
+      keepers: [
+        {
+          ...keeper("k1", "Gas"),
+          stabilityRuns: [
+            { runLabel: "Run 1", observedAt: null, traits: { nose_loudness: 8 }, note: null },
+            { runLabel: "Run 2", observedAt: null, traits: { nose_loudness: 8 }, note: null },
+          ],
+        },
+      ],
+    });
+    const card = screen.getByTestId("pheno-keeper-k1");
+    expect(within(card).getByTestId("pheno-stability-verdict-badge-k1")).toHaveTextContent(
+      /Held on re-grow/i,
+    );
+    expect(
+      within(card).getByTestId("pheno-stability-axis-k1-nose_loudness"),
+    ).toHaveTextContent(/held/);
+  });
+
+  it("removing a grow-out saves the reduced set through the hook", () => {
+    const saveStabilityRuns = vi.fn().mockResolvedValue(true);
+    renderAt({
+      keepers: [
+        {
+          ...keeper("k1", "Gas"),
+          stabilityRuns: [
+            { runLabel: "Run 1", observedAt: null, traits: { vigor: 4 }, note: null },
+            { runLabel: "Run 2", observedAt: null, traits: { vigor: 4 }, note: null },
+          ],
+        },
+      ],
+      saveStabilityRuns,
+    });
+    fireEvent.click(screen.getByTestId("pheno-stability-run-remove-k1-0"));
+    expect(saveStabilityRuns).toHaveBeenCalledWith("k1", [
+      { runLabel: "Run 2", observedAt: null, traits: { vigor: 4 }, note: null },
+    ]);
+  });
+});
+
 describe("PhenoKeepersPage — no direct DB writes from JSX", () => {
   it("the page source contains no direct Supabase writes for crosses/reversals", () => {
     const src = readFileSync(resolve(process.cwd(), "src/pages/PhenoKeepersPage.tsx"), "utf8");
     expect(src).not.toMatch(/supabase/i);
     expect(src).not.toMatch(/\.insert\(|\.update\(|\.delete\(/);
     expect(src).not.toMatch(/pheno_crosses|pheno_reversals/);
+  });
+
+  it("the stability ledger persists ONLY through the hook action (no direct write)", () => {
+    const src = readFileSync(resolve(process.cwd(), "src/components/PhenoStabilityLedger.tsx"), "utf8");
+    expect(src).not.toMatch(/supabase/i);
+    expect(src).not.toMatch(/\.insert\(|\.update\(|\.delete\(|\.rpc\(/);
+    expect(src).not.toMatch(/pheno_keepers/);
+    // The whole-set persistence flows through the injected onSave prop.
+    expect(src).toMatch(/onSave\(/);
   });
 });

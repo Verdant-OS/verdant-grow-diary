@@ -18,6 +18,10 @@ import {
 import { phenoDb } from "@/integrations/supabase/phenoTables";
 import type { PhenoCandidateInput } from "@/lib/phenoComparisonViewModel";
 import { listLatestSexObservationsForHunt } from "@/lib/phenoSexObservationService";
+import {
+  sanitizeBreedingObjectiveTargets,
+  type BreedingObjectiveTarget,
+} from "@/lib/phenoBreedingObjectiveRules";
 
 export interface PhenoHuntSummary {
   id: string;
@@ -29,11 +33,64 @@ export interface PhenoHuntSummary {
   evidenceGoals?: string[];
   notes?: string | null;
   setupCompletedAt?: string | null;
+  /** Grower-authored target trait axes + acceptance thresholds. Re-sanitized
+   * on every read (defense in depth against a stale or manually-edited row). */
+  breedingObjective?: BreedingObjectiveTarget[];
 }
 
 export type LoadPhenoHuntCandidatesResult =
   | { ok: true; hunt: PhenoHuntSummary; candidates: PhenoCandidateInput[] }
   | { ok: false; error: string };
+
+export interface PhenoHuntListItem {
+  id: string;
+  name: string;
+  createdAt: string | null;
+  setupCompletedAt: string | null;
+  candidateCount: number;
+}
+
+/**
+ * List the signed-in grower's pheno hunts, newest first, for the hunts
+ * index. RLS scopes to the owner; a bounded read (hunts accumulate over
+ * time). Candidate counts come from a single bounded companion query over
+ * the same hunts' plants — never a per-hunt N+1. Read-only, best-effort:
+ * returns [] on any error rather than throwing.
+ */
+export async function listPhenoHuntsForOwner(): Promise<PhenoHuntListItem[]> {
+  const { data, error } = await supabase
+    .from("pheno_hunts")
+    .select("id, name, created_at, setup_completed_at")
+    .order("created_at", { ascending: false })
+    .limit(200);
+  if (error || !data) return [];
+  const hunts = data.map((r) => ({
+    id: r.id as string,
+    name: (r.name as string) ?? "Untitled hunt",
+    createdAt: (r.created_at as string) ?? null,
+    setupCompletedAt: (r.setup_completed_at as string) ?? null,
+  }));
+  const huntIds = hunts.map((h) => h.id).filter(Boolean);
+  const countByHunt = new Map<string, number>();
+  if (huntIds.length > 0) {
+    const { data: plantRows } = await supabase
+      .from("plants")
+      .select("pheno_hunt_id")
+      .in("pheno_hunt_id", huntIds)
+      .limit(5000);
+    for (const row of plantRows ?? []) {
+      const hid = (row as { pheno_hunt_id?: string }).pheno_hunt_id;
+      if (typeof hid === "string") countByHunt.set(hid, (countByHunt.get(hid) ?? 0) + 1);
+    }
+  }
+  return hunts.map((h) => ({
+    id: h.id,
+    name: h.name,
+    createdAt: h.createdAt,
+    setupCompletedAt: h.setupCompletedAt,
+    candidateCount: countByHunt.get(h.id) ?? 0,
+  }));
+}
 
 /** Load a hunt and its (non-archived) candidate plants, mapped for comparison. */
 export async function loadPhenoHuntCandidates(
@@ -114,6 +171,9 @@ function mapHuntSummary(huntRow: {
   const notes = typeof huntRow.notes === "string" ? huntRow.notes : null;
   const setupCompletedAt =
     typeof huntRow.setup_completed_at === "string" ? huntRow.setup_completed_at : null;
+  const breedingObjective = sanitizeBreedingObjectiveTargets(
+    Array.isArray(huntRow.breeding_objective) ? (huntRow.breeding_objective as unknown[]) : null,
+  );
   return {
     id: huntRow.id,
     name: huntRow.name,
@@ -122,6 +182,7 @@ function mapHuntSummary(huntRow: {
     evidenceGoals,
     notes,
     setupCompletedAt,
+    breedingObjective,
   };
 }
 

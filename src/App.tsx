@@ -43,6 +43,7 @@ const Timeline = lazy(() => import("./pages/Timeline"));
 const Grows = lazy(() => import("./pages/Grows"));
 const GrowDetail = lazy(() => import("./pages/GrowDetail"));
 const GrowLearning = lazy(() => import("./pages/GrowLearning"));
+const PhenoHuntsIndex = lazy(() => import("./pages/PhenoHuntsIndex"));
 const PhenoHuntNew = lazy(() => import("./pages/PhenoHuntNew"));
 const PhenoHuntCompare = lazy(() => import("./pages/PhenoHuntCompare"));
 const PhenoHuntWorkspace = lazy(() => import("./pages/PhenoHuntWorkspace"));
@@ -321,6 +322,14 @@ const App = () => (
                         viewable — we never hide diary history as a billing
                         punishment. Server-side entitlement enforcement is a
                         follow-up slice; this PR is UI/route gating only. */}
+                    <Route
+                      path="/pheno-hunts"
+                      element={
+                        <PhenoTrackerUpgradeGate>
+                          <PhenoHuntsIndex />
+                        </PhenoTrackerUpgradeGate>
+                      }
+                    />
                     <Route
                       path="/pheno-hunts/new"
                       element={

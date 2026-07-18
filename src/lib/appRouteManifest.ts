@@ -318,6 +318,7 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     access: "public",
     description: "Fixture-only public pheno expression showcase.",
   },
+  { path: "/pheno-hunts", access: "auth", description: "Pheno hunts index (the grower's own hunts)." },
   {
     path: "/pheno-hunts/:id/compare",
     access: "public",

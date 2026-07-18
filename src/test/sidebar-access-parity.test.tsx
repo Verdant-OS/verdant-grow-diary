@@ -84,6 +84,7 @@ describe("AppSidebar — non-operator authenticated grower", () => {
       "/doctor",
       "/reports",
       "/grows",
+      "/pheno-hunts",
       "/grow-lineage",
       "/settings",
       "/invite",

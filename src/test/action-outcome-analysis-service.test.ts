@@ -191,4 +191,9 @@ describe("service static hygiene", () => {
   it("no clock reads — analysisAt must be injected", () => {
     expect(SRC).not.toMatch(/Date\.now\(\)|new Date\(\)\.toISOString/);
   });
+
+  it("selects raw_payload with sensor rows so provenance can fail closed", () => {
+    const sensorQuery = SRC.match(/\.from\("sensor_readings"\)[\s\S]{0,220}/)?.[0] ?? "";
+    expect(sensorQuery).toContain("raw_payload");
+  });
 });

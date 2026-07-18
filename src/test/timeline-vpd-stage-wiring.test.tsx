@@ -8,15 +8,9 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import {
-  classifyVpdAgainstStage,
-  vpdMetricChipStatus,
-} from "@/lib/vpdStageTargetRules";
+import { classifyVpdAgainstStage, vpdMetricChipStatus } from "@/lib/vpdStageTargetRules";
 
-const SRC = readFileSync(
-  resolve(__dirname, "../pages/Timeline.tsx"),
-  "utf8",
-);
+const SRC = readFileSync(resolve(__dirname, "../pages/Timeline.tsx"), "utf8");
 
 describe("Timeline — stage-aware VPD wiring (static)", () => {
   it("imports classifyVpdAgainstStage from the canonical rules module", () => {
@@ -35,6 +29,11 @@ describe("Timeline — stage-aware VPD wiring (static)", () => {
 
   it("renders the stage-aware VPD hint test hook", () => {
     expect(SRC).toMatch(/timeline-vpd-stage-hint/);
+  });
+
+  it("gates stage interpretation on corroborated snapshot provenance", () => {
+    expect(SRC).toMatch(/context:\s*["']persisted_snapshot["']/);
+    expect(SRC).toMatch(/sensor\.vpd\s*!=\s*null\s*&&\s*sourceBadge\.canAssessStage/);
   });
 
   it("does not duplicate hardcoded VPD target ranges in JSX", () => {

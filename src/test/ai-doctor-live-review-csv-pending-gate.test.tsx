@@ -171,7 +171,6 @@ function mount(
       growId={GROW_ID}
       tentId={TENT_ID}
       invoke={invoke}
-      sensorClassificationOverride={null}
     />,
   );
   return invoke;
@@ -272,6 +271,29 @@ describe("CSV history pending/error gating", () => {
     expect(packet.missingLiveSensorReadings).toBe(false);
     expect(JSON.stringify(packet)).not.toContain("raw_payload");
     expect(JSON.stringify(packet)).not.toContain("vbt_do_not_send");
+  });
+
+  it("does not let a successful UI test packet satisfy live AI Doctor context", async () => {
+    const capturedAt = new Date(Date.now() - 60_000).toISOString();
+    sensorQueryState.currentRows = [
+      {
+        metric: "temperature_c",
+        value: 29,
+        captured_at: capturedAt,
+        source: "live",
+        raw_payload: {
+          vendor: "ecowitt_windows_testbench",
+          metadata: { confidence: "test" },
+        },
+      },
+    ];
+    const invoke = mount();
+    fireEvent.click(screen.getByTestId("plant-ai-doctor-live-review-start"));
+    await waitFor(() => expect(invoke).toHaveBeenCalledTimes(1));
+    const packet = invoke.mock.calls[0][1].body.packet;
+    expect(packet.recentSensorSnapshotAnnotation?.source).toBe("manual");
+    expect(packet.missingLiveSensorReadings).toBe(true);
+    expect(JSON.stringify(packet)).not.toContain('"value":29');
   });
 
   it("a failed current read proceeds without inventing a current snapshot", async () => {

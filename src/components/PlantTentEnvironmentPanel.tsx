@@ -20,9 +20,6 @@ import {
   PLANT_QUICKLOG_PREFILL_EVENT,
 } from "@/lib/plantQuickLogPrefillRules";
 
-
-
-
 import { tentDetailPath } from "@/lib/routes";
 
 interface Props {
@@ -35,10 +32,17 @@ interface Props {
   plantStage?: string | null;
 }
 
-export default function PlantTentEnvironmentPanel({ tentId, tentName, plantId, plantName, growId, plantStage }: Props) {
+export default function PlantTentEnvironmentPanel({
+  tentId,
+  tentName,
+  plantId,
+  plantName,
+  growId,
+  plantStage,
+}: Props) {
   const enabled = !!tentId;
   const { data, isLoading } = usePlantTentLatestReadings(tentId ?? null);
-  const rows = enabled ? data ?? [] : [];
+  const rows = enabled ? (data ?? []) : [];
   const view = buildPlantTentEnvironmentView(rows);
   const recent = buildRecentSensorSnapshotHistory(rows, { limit: 5 });
   const prefill = buildPlantQuickLogPrefill({ plantId, plantName, growId, tentId, tentName });
@@ -51,9 +55,7 @@ export default function PlantTentEnvironmentPanel({ tentId, tentName, plantId, p
 
   function openQuickLog() {
     if (!prefill) return;
-    window.dispatchEvent(
-      new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, { detail: prefill }),
-    );
+    window.dispatchEvent(new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, { detail: prefill }));
   }
 
   return (
@@ -63,7 +65,13 @@ export default function PlantTentEnvironmentPanel({ tentId, tentName, plantId, p
           <Gauge className="h-4 w-4" /> Current Environment
         </CardTitle>
         {tentId ? (
-          <Button asChild variant="ghost" size="sm" className="h-7 px-2 gap-1" data-testid="plant-tent-environment-view-tent">
+          <Button
+            asChild
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 gap-1"
+            data-testid="plant-tent-environment-view-tent"
+          >
             <Link to={tentDetailPath(tentId)}>
               <Box className="h-3.5 w-3.5" /> View Tent <ArrowRight className="h-3.5 w-3.5" />
             </Link>
@@ -72,10 +80,7 @@ export default function PlantTentEnvironmentPanel({ tentId, tentName, plantId, p
       </CardHeader>
       <CardContent className="text-sm">
         {!enabled ? (
-          <p
-            className="text-muted-foreground"
-            data-testid="plant-tent-environment-empty-no-tent"
-          >
+          <p className="text-muted-foreground" data-testid="plant-tent-environment-empty-no-tent">
             Assign this plant to a tent to see its latest environment context.
           </p>
         ) : isLoading ? (
@@ -123,7 +128,7 @@ export default function PlantTentEnvironmentPanel({ tentId, tentName, plantId, p
                 </div>
               ))}
             </div>
-            {snap?.vpd !== null && snap?.vpd !== undefined ? (
+            {snap?.vpd !== null && snap?.vpd !== undefined && view.canAssessStage ? (
               <p
                 className="text-[11px] text-muted-foreground"
                 data-testid="plant-tent-environment-vpd-stage-hint"
@@ -131,19 +136,19 @@ export default function PlantTentEnvironmentPanel({ tentId, tentName, plantId, p
                 {vpdClassification.label}. {VPD_STAGE_HELPER_TEXT}
               </p>
             ) : null}
-            {snap?.vpd !== null && snap?.vpd !== undefined && normalizeVpdStage(plantStage) === "unknown" && (
-              <VpdStageMissingBadge
-                testId="plant-tent-vpd-stage-missing-badge"
-                className="mt-2"
-              />
-            )}
+            {snap?.vpd !== null &&
+              snap?.vpd !== undefined &&
+              view.canAssessStage &&
+              normalizeVpdStage(plantStage) === "unknown" && (
+                <VpdStageMissingBadge
+                  testId="plant-tent-vpd-stage-missing-badge"
+                  className="mt-2"
+                />
+              )}
           </div>
         )}
         {enabled && !isLoading ? (
-          <div
-            className="mt-5 border-t pt-3"
-            data-testid="plant-tent-environment-recent-history"
-          >
+          <div className="mt-5 border-t pt-3" data-testid="plant-tent-environment-recent-history">
             <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
               Recent Sensor Readings
             </div>
@@ -152,8 +157,8 @@ export default function PlantTentEnvironmentPanel({ tentId, tentName, plantId, p
                 className="text-xs text-muted-foreground"
                 data-testid="plant-tent-environment-recent-empty"
               >
-                No recent sensor readings yet. Add a manual snapshot to start
-                tracking tent conditions.
+                No recent sensor readings yet. Add a manual snapshot to start tracking tent
+                conditions.
               </p>
             ) : (
               <ul className="space-y-2">
@@ -193,18 +198,10 @@ export default function PlantTentEnvironmentPanel({ tentId, tentName, plantId, p
                           Stale
                         </span>
                       ) : null}
-                      {tempF !== null ? (
-                        <span>{formatValue(tempF, "°F", 1)}</span>
-                      ) : null}
-                      {r.rh !== null ? (
-                        <span>{formatValue(r.rh, "%", 0)}</span>
-                      ) : null}
-                      {r.vpd !== null ? (
-                        <span>{formatValue(r.vpd, " kPa", 2)}</span>
-                      ) : null}
-                      {r.co2 !== null ? (
-                        <span>{formatValue(r.co2, " ppm", 0)}</span>
-                      ) : null}
+                      {tempF !== null ? <span>{formatValue(tempF, "°F", 1)}</span> : null}
+                      {r.rh !== null ? <span>{formatValue(r.rh, "%", 0)}</span> : null}
+                      {r.vpd !== null ? <span>{formatValue(r.vpd, " kPa", 2)}</span> : null}
+                      {r.co2 !== null ? <span>{formatValue(r.co2, " ppm", 0)}</span> : null}
                     </li>
                   );
                 })}
@@ -226,9 +223,6 @@ export default function PlantTentEnvironmentPanel({ tentId, tentName, plantId, p
             </Button>
           </div>
         ) : null}
-
-
-
       </CardContent>
     </Card>
   );

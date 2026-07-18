@@ -19,28 +19,29 @@ import {
 
 const ROOT = resolve(__dirname, "../..");
 const DASHBOARD = readFileSync(resolve(ROOT, "src/pages/Dashboard.tsx"), "utf8");
-const HOOK = readFileSync(
-  resolve(ROOT, "src/hooks/useEnvironmentTrends.ts"),
-  "utf8",
-);
-const HELPER = readFileSync(
-  resolve(ROOT, "src/lib/environmentTrends.ts"),
-  "utf8",
-);
+const HOOK = readFileSync(resolve(ROOT, "src/hooks/useEnvironmentTrends.ts"), "utf8");
+const HELPER = readFileSync(resolve(ROOT, "src/lib/environmentTrends.ts"), "utf8");
 
 const AI_COACH_CALL = /["'`]ai-coach["'`]|functions\/ai-coach|ai_coach/;
-const EXTERNAL_CONTROL =
-  /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|\brelay\b|\bactuator\b/i;
+const EXTERNAL_CONTROL = /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|\brelay\b|\bactuator\b/i;
 const SERVICE_ROLE = /service_role/;
 const WRITE_PATH = /\.from\(['"][^'"]+['"]\)\s*\.(insert|update|delete|upsert|rpc)/;
 const PLANT_HEALTH = /\b(healthy|unhealthy|disease|deficien|plant\s+health|diagnos|recommend)/i;
 
 const NOW = new Date("2026-05-20T12:00:00Z").getTime();
+const PHYSICAL_WINDOWS_PAYLOAD = {
+  vendor: "ecowitt_windows_testbench",
+  metadata: {
+    reported_verdant_source: "live",
+    raw_payload: {
+      stationtype: "GW2000A_V3.2.4",
+      model: "GW2000A",
+      dateutc: "2026-05-20 11:00:00",
+    },
+  },
+};
 
-function s(
-  offsetMs: number,
-  fields: Partial<EnvironmentSample> = {},
-): EnvironmentSample {
+function s(offsetMs: number, fields: Partial<EnvironmentSample> = {}): EnvironmentSample {
   return {
     ts: new Date(NOW - offsetMs).toISOString(),
     temp: null,
@@ -128,6 +129,67 @@ describe("samplesFromReadings", () => {
     expect(samplesFromReadings(null)).toEqual([]);
     expect(samplesFromReadings(undefined)).toEqual([]);
   });
+
+  it("excludes canonical-live Windows diagnostics from trend evidence", () => {
+    const samples = samplesFromReadings([
+      {
+        ts: "2026-05-20T11:00:00Z",
+        metric: "temperature_c",
+        value: 24,
+        source: "live",
+        tent_id: "t1",
+        raw_payload: {
+          vendor: "ecowitt_windows_testbench",
+          metadata: { confidence: "test", verdant_source: "live" },
+        },
+      },
+    ]);
+    expect(samples).toEqual([]);
+  });
+
+  it("fails closed when a legacy top-level Windows source lacks provenance", () => {
+    expect(
+      samplesFromReadings([
+        {
+          ts: "2026-05-20T11:00:00Z",
+          metric: "temperature_c",
+          value: 24,
+          source: "ecowitt_windows_testbench",
+          tent_id: "t1",
+          raw_payload: null,
+        },
+      ]),
+    ).toEqual([]);
+  });
+
+  it("keeps canonical demo data simulated rather than live", () => {
+    const samples = samplesFromReadings([
+      {
+        ts: "2026-05-20T11:00:00Z",
+        metric: "temperature_c",
+        value: 24,
+        source: "demo",
+        tent_id: "t1",
+      },
+    ]);
+    expect(samples).toHaveLength(1);
+    expect(samples[0].source).toBe("sim");
+  });
+
+  it("keeps physical Windows gateway rows live", () => {
+    const samples = samplesFromReadings([
+      {
+        ts: "2026-05-20T11:00:00Z",
+        metric: "temperature_c",
+        value: 24,
+        source: "live",
+        tent_id: "t1",
+        raw_payload: PHYSICAL_WINDOWS_PAYLOAD,
+      },
+    ]);
+    expect(samples).toHaveLength(1);
+    expect(samples[0].source).toBe("live");
+  });
 });
 
 describe("samplesFromDiary", () => {
@@ -154,18 +216,13 @@ describe("samplesFromDiary", () => {
 
 describe("selectWindow", () => {
   it("prefers last 24h when present", () => {
-    const samples = [
-      s(60 * 60 * 1000, { temp: 24 }),
-      s(48 * 60 * 60 * 1000, { temp: 20 }),
-    ];
+    const samples = [s(60 * 60 * 1000, { temp: 24 }), s(48 * 60 * 60 * 1000, { temp: 20 })];
     const out = selectWindow(samples, NOW);
     expect(out).toHaveLength(1);
     expect(out[0].temp).toBe(24);
   });
   it("falls back to latest 20 when nothing in 24h", () => {
-    const samples = Array.from({ length: 30 }, (_, i) =>
-      s((i + 30) * 60 * 60 * 1000, { temp: i }),
-    );
+    const samples = Array.from({ length: 30 }, (_, i) => s((i + 30) * 60 * 60 * 1000, { temp: i }));
     const out = selectWindow(samples, NOW);
     expect(out).toHaveLength(20);
   });
@@ -194,6 +251,7 @@ describe("useEnvironmentTrends hook contract", () => {
     expect(HOOK).toMatch(/temperature_c/);
     expect(HOOK).toMatch(/humidity_pct/);
     expect(HOOK).toMatch(/vpd_kpa/);
+    expect(HOOK).toMatch(/sensor_readings[\s\S]*?raw_payload/);
   });
   it("falls back to diary_entries filtered by grow_id", () => {
     expect(HOOK).toMatch(/\.from\(["']diary_entries["']\)/);

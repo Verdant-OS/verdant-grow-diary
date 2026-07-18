@@ -7,10 +7,13 @@
  * Queue, and never speaks for plant or environment health.
  */
 
+import { normalizeSensorSource } from "@/lib/sensor/sensorSourceRules";
+import { isDiagnosticSensorProvenanceRow } from "@/lib/sensorProvenanceFenceRules";
+
 export const SENSOR_SOURCE_STALE_MINUTES = 30;
 export const SENSOR_SOURCE_NO_DATA_HOURS = 24;
 
-export type SensorSourceStatus = "active" | "stale" | "no_recent_data";
+export type SensorSourceStatus = "active" | "stale" | "diagnostic" | "no_recent_data";
 
 export type SensorSourceHealthInput = {
   source?: string | null;
@@ -19,6 +22,8 @@ export type SensorSourceHealthInput = {
   captured_at?: string | null;
   /** Server-stamped fallback. */
   ts?: string | null;
+  /** Opaque provenance envelope used only by the shared diagnostic fence. */
+  raw_payload?: unknown;
 };
 
 export type SensorSourceHealth = {
@@ -60,7 +65,8 @@ function deriveStatus(ageMinutes: number | null): SensorSourceStatus {
 const STATUS_ORDER: Record<SensorSourceStatus, number> = {
   active: 0,
   stale: 1,
-  no_recent_data: 2,
+  diagnostic: 2,
+  no_recent_data: 3,
 };
 
 /**
@@ -76,42 +82,80 @@ export function buildSensorSourceHealth(
   if (!Array.isArray(rows) || rows.length === 0) return [];
 
   const nowMs = now.getTime();
-  const groups = new Map<string, {
-    source: string;
-    latest: number | null;
-    count: number;
-    metrics: Set<string>;
-  }>();
+  const groups = new Map<
+    string,
+    {
+      source: string;
+      latest: number | null;
+      count: number;
+      metrics: Set<string>;
+      diagnosticLatest: number | null;
+      diagnosticCount: number;
+      diagnosticMetrics: Set<string>;
+      forceStale: boolean;
+      forceNoRecentData: boolean;
+    }
+  >();
 
   for (const row of rows) {
-    const source = (row?.source ?? "").trim() || "unknown";
+    const rawSource = (row?.source ?? "").trim();
+    const source = rawSource || "unknown";
     const ts = newestTimestamp(row);
     const metric = (row?.metric ?? "").trim();
+    const normalizedSource = normalizeSensorSource(rawSource);
+    const diagnostic = isDiagnosticSensorProvenanceRow(row) || normalizedSource === "demo";
 
     const g = groups.get(source) ?? {
       source,
       latest: null,
       count: 0,
       metrics: new Set<string>(),
+      diagnosticLatest: null,
+      diagnosticCount: 0,
+      diagnosticMetrics: new Set<string>(),
+      forceStale: normalizedSource === "stale",
+      forceNoRecentData:
+        rawSource === "" ||
+        rawSource.toLowerCase() === "invalid" ||
+        rawSource.toLowerCase() === "unknown",
     };
-    g.count += 1;
-    if (metric) g.metrics.add(metric);
-    if (ts != null && (g.latest == null || ts > g.latest)) g.latest = ts;
+    if (diagnostic) {
+      g.diagnosticCount += 1;
+      if (metric) g.diagnosticMetrics.add(metric);
+      if (ts != null && (g.diagnosticLatest == null || ts > g.diagnosticLatest)) {
+        g.diagnosticLatest = ts;
+      }
+    } else {
+      // Diagnostic rows never advance the physical source freshness clock or
+      // contribute metrics/counts to an active source group.
+      g.count += 1;
+      if (metric) g.metrics.add(metric);
+      if (ts != null && (g.latest == null || ts > g.latest)) g.latest = ts;
+    }
     groups.set(source, g);
   }
 
   const items: SensorSourceHealth[] = [];
   for (const g of groups.values()) {
-    const ageMinutes = g.latest == null
-      ? null
-      : Math.max(0, Math.round((nowMs - g.latest) / 60_000));
+    const diagnosticOnly = g.count === 0 && g.diagnosticCount > 0;
+    const latest = diagnosticOnly ? g.diagnosticLatest : g.latest;
+    const ageMinutes = latest == null ? null : Math.max(0, Math.round((nowMs - latest) / 60_000));
+    const status: SensorSourceStatus = diagnosticOnly
+      ? "diagnostic"
+      : g.forceNoRecentData
+        ? "no_recent_data"
+        : g.forceStale
+          ? ageMinutes != null && ageMinutes <= SENSOR_SOURCE_NO_DATA_HOURS * 60
+            ? "stale"
+            : "no_recent_data"
+          : deriveStatus(ageMinutes);
     items.push({
       source: g.source,
-      status: deriveStatus(ageMinutes),
-      lastReceivedAt: g.latest == null ? null : new Date(g.latest).toISOString(),
+      status,
+      lastReceivedAt: latest == null ? null : new Date(latest).toISOString(),
       ageMinutes,
-      readingCount: g.count,
-      metrics: Array.from(g.metrics).sort(),
+      readingCount: diagnosticOnly ? g.diagnosticCount : g.count,
+      metrics: Array.from(diagnosticOnly ? g.diagnosticMetrics : g.metrics).sort(),
     });
   }
 

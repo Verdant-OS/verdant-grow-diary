@@ -8,6 +8,9 @@
  *  - Cautious language only: correlations are observational, never causal.
  */
 
+import { normalizeReportSensorSource } from "@/lib/postGrowReportRules";
+import { withoutDiagnosticSensorRows } from "@/lib/sensorProvenanceFenceRules";
+
 export const POST_GROW_LESSON_EVENT_TYPE = "post_grow_learning_lesson";
 
 export interface PostGrowGrowLike {
@@ -38,6 +41,8 @@ export interface PostGrowSensorReadingLike {
   value: number | null;
   ts: string;
   source?: string | null;
+  /** Classification-only provenance; never copied into the report view model. */
+  raw_payload?: unknown;
 }
 
 export interface PostGrowActionLike {
@@ -309,7 +314,13 @@ export function buildPostGrowLearningReportViewModel(input: {
 }): PostGrowLearningReportViewModel {
   const harvests = input.harvests ?? [];
   const diaries = input.diaryEntries ?? [];
-  const sensorReadings = input.sensorReadings ?? [];
+  const sensorReadings = withoutDiagnosticSensorRows(input.sensorReadings ?? []);
+  // Preserve source-labeled context for the provenance badges, while keeping
+  // non-evidence values out of averages, ranges, stability, and sparklines.
+  const aggregateSensorReadings = sensorReadings.filter((reading) => {
+    const source = normalizeReportSensorSource(reading.source);
+    return source === "live" || source === "manual" || source === "csv";
+  });
   const actions = input.actions ?? [];
   const latestHarvest =
     [...harvests].sort(
@@ -329,12 +340,12 @@ export function buildPostGrowLearningReportViewModel(input: {
       alt: `Post-grow photo ${i + 1} from ${input.grow.name}`,
     }));
   const environment = (["temperature_c", "humidity_pct", "vpd_kpa"] as const).map((m) =>
-    buildMetricAggregate(m, sensorReadings),
+    buildMetricAggregate(m, aggregateSensorReadings),
   );
   const completeness = buildDataCompleteness({
     harvests,
     diaries,
-    sensorReadings,
+    sensorReadings: aggregateSensorReadings,
     postHarvestPoints: points,
     photos,
   });

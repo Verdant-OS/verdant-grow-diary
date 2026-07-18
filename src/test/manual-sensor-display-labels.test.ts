@@ -63,10 +63,7 @@ describe("snapshotFromReadings — device_id propagation", () => {
   });
 
   it("preserves the live device_id for live readings", () => {
-    const snap = snapshotFromReadings([
-      liveRow("temperature_c", 24),
-      liveRow("humidity_pct", 55),
-    ])!;
+    const snap = snapshotFromReadings([liveRow("temperature_c", 24), liveRow("humidity_pct", 55)])!;
     expect(snap.source).toBe("live");
     expect(snap.device_id).toBe("shelly-ht-gen4");
   });
@@ -83,9 +80,7 @@ describe("snapshotFromReadings — device_id propagation", () => {
 
 describe("formatSensorDeviceDetail — manual prefix support", () => {
   it("returns the extracted manual note for a manual: device_id", () => {
-    expect(formatSensorDeviceDetail(MANUAL_DEVICE_ID)).toBe(
-      "EcoWitt WH45 CO2/THP Monitor",
-    );
+    expect(formatSensorDeviceDetail(MANUAL_DEVICE_ID)).toBe("EcoWitt WH45 CO2/THP Monitor");
   });
 
   it("returns null for plain manual sources with no note", () => {
@@ -112,15 +107,11 @@ describe("plantTentEnvironmentRules — combined source/device label", () => {
       manualRow("temperature_c", 24),
       manualRow("humidity_pct", 55),
     ]);
-    expect(view.sourceLabel).toBe(
-      `${MANUAL_READING_LABEL} · EcoWitt WH45 CO2/THP Monitor`,
-    );
+    expect(view.sourceLabel).toBe(`${MANUAL_READING_LABEL} · EcoWitt WH45 CO2/THP Monitor`);
   });
 
   it("renders 'Manual reading' alone when no device note exists", () => {
-    const view = buildPlantTentEnvironmentView([
-      manualRow("temperature_c", 24, null),
-    ]);
+    const view = buildPlantTentEnvironmentView([manualRow("temperature_c", 24, null)]);
     expect(view.sourceLabel).toBe(MANUAL_READING_LABEL);
   });
 
@@ -136,17 +127,15 @@ describe("tentSensorChartRules — combined source/device label", () => {
       manualRow("temperature_c", 24),
       manualRow("humidity_pct", 55),
     ]);
-    expect(view.sourceLabel).toBe(
-      `${MANUAL_READING_LABEL} · EcoWitt WH45 CO2/THP Monitor`,
-    );
+    expect(view.sourceLabel).toBe(`${MANUAL_READING_LABEL} · EcoWitt WH45 CO2/THP Monitor`);
   });
 });
 
 describe("formatSensorSourceLabel — manual cannot be relabeled as live/synced/connected", () => {
   it("returns 'Manual reading · …' for manual + device note", () => {
-    expect(
-      formatSensorSourceLabel({ source: "manual", deviceId: MANUAL_DEVICE_ID }),
-    ).toBe(`${MANUAL_READING_LABEL} · EcoWitt WH45 CO2/THP Monitor`);
+    expect(formatSensorSourceLabel({ source: "manual", deviceId: MANUAL_DEVICE_ID })).toBe(
+      `${MANUAL_READING_LABEL} · EcoWitt WH45 CO2/THP Monitor`,
+    );
   });
 
   it("never returns Live / Synced / Connected for manual source", () => {
@@ -160,9 +149,9 @@ describe("formatSensorSourceLabel — manual cannot be relabeled as live/synced/
   });
 
   it("ignores a spoofed deviceNote on a non-manual source", () => {
-    expect(
-      formatSensorSourceLabel({ source: "live", deviceNote: "Totally Live" }),
-    ).toBe("Live sensor");
+    expect(formatSensorSourceLabel({ source: "live", deviceNote: "Totally Live" })).toBe(
+      "Live sensor",
+    );
   });
 });
 
@@ -205,12 +194,15 @@ describe("Display-surface wiring — uses shared helper, stays safe", () => {
       expect(src).not.toMatch(/ai[_-]?coach/i);
       expect(src).not.toMatch(/\bmqtt\b/i);
       expect(src).not.toMatch(/home[_-]?assistant/i);
-      expect(src).not.toMatch(/\bpi[_-]?bridge\b/i);
       expect(src).not.toMatch(/\bwebhook\b/i);
       expect(src).not.toMatch(/\brelay\b/i);
       expect(src).not.toMatch(/\bactuator\b/i);
       expect(src).not.toMatch(/device[_-]?command/i);
     }
+    // `pi_bridge` is an explicit legacy read-side provenance reservation in
+    // the pure Tent rules only; it does not authorize bridge/device control.
+    expect([DASHBOARD, PLANT_RULES, DEVICE_LABELS].join("\n")).not.toMatch(/\bpi[_-]?bridge\b/i);
+    expect(TENT_RULES).toContain("pi_bridge");
   });
 
   it("changed rule files stay pure / read-only (no Supabase writes)", () => {

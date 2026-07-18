@@ -17,11 +17,16 @@
 
 export interface SensorSnapshotCarrier {
   details?: Record<string, unknown> | null;
+  tent_id?: string | null;
+}
+
+export interface SelectedSensorSnapshotEvidence {
+  snapshot: Record<string, unknown>;
+  tentId: string | null;
 }
 
 function parseCapturedAtMs(snap: Record<string, unknown>): number | null {
-  const raw =
-    snap.captured_at ?? snap.capturedAt ?? snap.timestamp ?? snap.ts ?? snap.time;
+  const raw = snap.captured_at ?? snap.capturedAt ?? snap.timestamp ?? snap.ts ?? snap.time;
   if (raw === undefined || raw === null) return null;
   if (typeof raw === "number" && Number.isFinite(raw)) {
     const ms = raw < 1e12 ? raw * 1000 : raw;
@@ -36,24 +41,36 @@ function parseCapturedAtMs(snap: Record<string, unknown>): number | null {
   return null;
 }
 
-export function pickLatestSensorSnapshotByCapturedAt(
+export function pickLatestSensorSnapshotEvidenceByCapturedAt(
   rows: ReadonlyArray<SensorSnapshotCarrier> | null | undefined,
-): Record<string, unknown> | null {
+): SelectedSensorSnapshotEvidence | null {
   if (!Array.isArray(rows) || rows.length === 0) return null;
 
-  let bestWithTs: { snap: Record<string, unknown>; ms: number } | null = null;
-  let firstAny: Record<string, unknown> | null = null;
+  let bestWithTs: (SelectedSensorSnapshotEvidence & { ms: number }) | null = null;
+  let firstAny: SelectedSensorSnapshotEvidence | null = null;
 
   for (const row of rows) {
     const snap = (row?.details ?? null) && (row.details as Record<string, unknown>).sensor_snapshot;
     if (!snap || typeof snap !== "object" || Array.isArray(snap)) continue;
     const s = snap as Record<string, unknown>;
-    if (firstAny === null) firstAny = s;
+    const evidence = {
+      snapshot: s,
+      tentId: typeof row.tent_id === "string" ? row.tent_id : null,
+    };
+    if (firstAny === null) firstAny = evidence;
     const ms = parseCapturedAtMs(s);
     if (ms === null) continue;
-    if (!bestWithTs || ms > bestWithTs.ms) bestWithTs = { snap: s, ms };
+    if (!bestWithTs || ms > bestWithTs.ms) bestWithTs = { ...evidence, ms };
   }
 
-  if (bestWithTs) return bestWithTs.snap;
+  if (bestWithTs) {
+    return { snapshot: bestWithTs.snapshot, tentId: bestWithTs.tentId };
+  }
   return firstAny;
+}
+
+export function pickLatestSensorSnapshotByCapturedAt(
+  rows: ReadonlyArray<SensorSnapshotCarrier> | null | undefined,
+): Record<string, unknown> | null {
+  return pickLatestSensorSnapshotEvidenceByCapturedAt(rows)?.snapshot ?? null;
 }

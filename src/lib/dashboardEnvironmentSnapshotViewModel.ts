@@ -27,6 +27,7 @@ import { classifyVpdAgainstStage, vpdMetricChipStatus } from "@/lib/stageAwareVp
 import { tempFFromC } from "@/lib/temperatureUnits";
 import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 import type { SensorReadingSource } from "@/mock";
+import { isDiagnosticSensorProvenanceRow } from "@/lib/sensorProvenanceFenceRules";
 
 export type MetricStatus = "ok" | "stale" | "invalid" | "degraded" | "unknown";
 
@@ -57,6 +58,10 @@ export interface TentSnapshotView {
   lastUpdatedDisplay: string;
   stale: boolean;
   invalid: boolean;
+  /** True only for one coherent live/manual/CSV latest-source cohort. */
+  provenanceEligible: boolean;
+  /** Fresh, valid, provenance-eligible evidence may receive stage guidance. */
+  canAssessStage: boolean;
   metrics: MetricView[];
 }
 
@@ -103,8 +108,34 @@ const EMPTY: TentSnapshotView = {
   lastUpdatedDisplay: "Unknown",
   stale: false,
   invalid: false,
+  provenanceEligible: false,
+  canAssessStage: false,
   metrics: [],
 };
+
+type TentSnapshotProvenance = "live" | "manual" | "csv" | "demo" | "unverified";
+
+function classifyRowProvenance(row: BuildTentSnapshotInput): TentSnapshotProvenance {
+  if (isDiagnosticSensorProvenanceRow(row)) return "demo";
+  const source = typeof row.source === "string" ? row.source.trim().toLowerCase() : "";
+  if (source === "live" || source === "pi_bridge") return "live";
+  if (source === "manual") return "manual";
+  if (source === "csv" || source === "import") return "csv";
+  if (source === "demo" || source === "sim") return "demo";
+  return "unverified";
+}
+
+/**
+ * Resolve only a source-coherent latest group. Mixing source classes is
+ * unverified even when each individual row looks plausible.
+ */
+function classifyLatestGroupProvenance(
+  rows: readonly BuildTentSnapshotInput[],
+): TentSnapshotProvenance {
+  const classes = new Set(rows.map(classifyRowProvenance));
+  if (classes.size !== 1) return "unverified";
+  return classes.values().next().value ?? "unverified";
+}
 
 function pickVendor(rows: BuildTentSnapshotInput[]): string | null {
   for (const r of rows) {
@@ -167,41 +198,19 @@ export function buildTentSnapshotView(
   if (!snap) return EMPTY;
   const latestRows = rows.filter((r) => r.ts === snap.ts);
 
-  // Source resolution: derive from the actual contributing rows so an
-  // unknown/garbage source can never be silently promoted to "live" by
-  // `snapshotFromReadings`'s heuristic default. "pi_bridge" is a read-side
-  // ingest provenance tag inside the strict live reservation pinned in
-  // `snapshotFromReadings`; a group classifies as live ONLY when every row
-  // at the latest timestamp carries that reservation — recognizing the tag
-  // here routes it through that strict classification (parity with Tent
-  // Detail) without widening trust for any other source string.
-  const RECOGNISED = new Set([
-    "manual",
-    "live",
-    "csv",
-    "import",
-    "sim",
-    "diary",
-    "pi_bridge",
-    "demo",
-    "stale",
-    "invalid",
-  ]);
-  const hasRecognised = latestRows.some(
-    (r) => typeof r.source === "string" && RECOGNISED.has(r.source),
-  );
-  let canonicalSource: SensorReadingSource | null = null;
-  if (!hasRecognised) {
-    canonicalSource = null;
-  } else if (latestRows.some((r) => r.source === "csv" || r.source === "import")) {
-    canonicalSource = "csv";
-  } else if (snap.source === "manual" || snap.source === "diary") {
-    canonicalSource = "manual";
-  } else if (snap.source === "sim") {
-    canonicalSource = "demo";
-  } else if (snap.source === "live") {
-    canonicalSource = "live";
-  }
+  // Source resolution is strict across the whole latest timestamp. A mixed
+  // or unknown cohort stays visible but is never promoted to healthy/live.
+  // `pi_bridge` remains the one explicit legacy alias for physical live
+  // readings; diagnostics carrying that label are classified as demo first.
+  const provenance = classifyLatestGroupProvenance(latestRows);
+  const canonicalSource: SensorReadingSource | null =
+    provenance === "live" || provenance === "manual" || provenance === "csv"
+      ? provenance
+      : provenance === "demo"
+        ? "demo"
+        : null;
+  const provenanceEligible =
+    provenance === "live" || provenance === "manual" || provenance === "csv";
 
   const vendor = pickVendor(latestRows);
   const resolved = resolveSensorSourceLabel({
@@ -217,6 +226,7 @@ export function buildTentSnapshotView(
   // plausible the values look or how recent the timestamp is.
   const flaggedInvalid = latestRows.some((r) => explicitRowFlag(r) === "invalid");
   const flaggedStale = latestRows.some((r) => explicitRowFlag(r) === "stale");
+  const flaggedDegraded = latestRows.some((r) => explicitRowFlag(r) === "degraded");
   const stale = flaggedStale || (!!capturedAt && isStale(capturedAt, now));
   // Beyond explicit flags, "Invalid" is reserved for present-but-implausible
   // values. evaluateSensorQuality also marks an absent VPD as suspicious
@@ -226,6 +236,8 @@ export function buildTentSnapshotView(
   const invalid =
     flaggedInvalid ||
     quality.suspiciousFields.some((f) => typeof snap[f as keyof typeof snap] === "number");
+  const canAssessStage =
+    provenanceEligible && capturedAt !== null && !stale && !invalid && !flaggedDegraded;
 
   // Stale/invalid override the source label per requirement #2/#6.
   let sourceLabel = resolved.label;
@@ -268,6 +280,9 @@ export function buildTentSnapshotView(
     } else if (rowFlag === "degraded") {
       status = "degraded";
       statusLabel = "Degraded";
+    } else if (!provenanceEligible || capturedAt === null) {
+      status = "degraded";
+      statusLabel = "Needs verification";
     }
     // Cap the chip color by status so a flagged metric can never render
     // as a healthy green chip beside an Invalid/Stale/Degraded label.
@@ -325,6 +340,8 @@ export function buildTentSnapshotView(
     lastUpdatedDisplay,
     stale,
     invalid,
+    provenanceEligible,
+    canAssessStage,
     metrics,
   };
 }

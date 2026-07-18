@@ -10,10 +10,7 @@ import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const SRC = readFileSync(
-  resolve(__dirname, "../../supabase/functions/ai-coach/index.ts"),
-  "utf8",
-);
+const SRC = readFileSync(resolve(__dirname, "../../supabase/functions/ai-coach/index.ts"), "utf8");
 
 describe("ai-coach edge function — wiring regression", () => {
   it("imports the shared source-aware annotator", () => {
@@ -22,9 +19,16 @@ describe("ai-coach edge function — wiring regression", () => {
   });
 
   it("selects the latest snapshot via the captured_at picker (not array order)", () => {
-    expect(SRC).toMatch(/pickLatestSensorSnapshotByCapturedAt/);
+    expect(SRC).toMatch(/pickLatestSensorSnapshotEvidenceByCapturedAt/);
     // No legacy "first row with a sensor_snapshot" loop.
     expect(SRC).not.toMatch(/for\s*\(\s*const\s+row\s+of\s+entries\s*\)\s*\{\s*const\s+snap\s*=/);
+  });
+
+  it("corroborates nested live Quick Log snapshots with raw row provenance", () => {
+    expect(SRC).toMatch(/resolveQuickLogSensorSnapshotForAi/);
+    expect(SRC).toMatch(/\.from\("sensor_readings"\)/);
+    expect(SRC).toMatch(/QUICK_LOG_SENSOR_PROVENANCE_COLUMNS[\s\S]*raw_payload/);
+    expect(SRC).toMatch(/selected\.tentId/);
   });
 
   it("pushes annotationLine, safetyNotes, and missingInformationHints into model context", () => {

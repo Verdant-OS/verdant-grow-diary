@@ -116,9 +116,11 @@ describe("ecowitt windows testbench — source labeling rules", () => {
 
   it("declares EcoWitt gateway marker fields used to detect real uploads", () => {
     expect(py).toMatch(/ECOWITT_GATEWAY_MARKERS/);
-    for (const marker of ["passkey", "stationtype", "model", "dateutc"]) {
+    for (const marker of ["stationtype", "model", "dateutc", "freq"]) {
       expect(py).toMatch(new RegExp(`"${marker}"`));
     }
+    const markerBlock = py.split("ECOWITT_GATEWAY_MARKERS = {")[1]?.split("}")[0] ?? "";
+    expect(markerBlock).not.toMatch(/"passkey"/);
   });
 
   it("resolve_source accepts payload + remote_addr (not just headers)", () => {
@@ -129,8 +131,32 @@ describe("ecowitt windows testbench — source labeling rules", () => {
   });
 
   it("non-loopback gateway uploads are normalized to live", () => {
-    expect(py).toMatch(/is_lan[\s\S]{0,120}looks_gateway/);
+    const physicalEvidenceBlock =
+      py.split("def has_physical_gateway_evidence")[1]?.split("\ndef ")[0] ?? "";
+    expect(physicalEvidenceBlock).toMatch(/not\s+_is_loopback_source_addr/);
+    expect(physicalEvidenceBlock).toMatch(/looks_like_ecowitt_gateway/);
+    expect(py).toMatch(/if\s+physical_gateway_evidence:\s*\r?\n\s*return\s+"live"/);
     expect(py).toMatch(/return\s+"live"/);
+  });
+
+  it("physical proof is listener-computed separately from header/env live opt-in", () => {
+    expect(py).toMatch(/"physical_gateway_evidence":\s*physical_gateway_evidence/);
+    expect(py).toMatch(/"physical_gateway_evidence":\s*latest\["physical_gateway_evidence"\]/);
+    expect(py).not.toMatch(
+      /physical_gateway_evidence\s*=\s*(?:request\.headers|os\.environ|raw\.get)/,
+    );
+    expect(py).toMatch(
+      /if\s+header_mode\s*==\s*"live"\s+or\s+env_mode\s*==\s*"live":\s*\r?\n\s*return\s+"demo"/,
+    );
+  });
+
+  it("accepts the configured uppercase and canonical lowercase upload paths", () => {
+    expect(py).toMatch(
+      /@app\.route\("\/ecowitt",\s*methods=\["GET",\s*"POST"\],\s*strict_slashes=False\)/,
+    );
+    expect(py).toMatch(
+      /@app\.route\("\/ECOWITT",\s*methods=\["GET",\s*"POST"\],\s*strict_slashes=False\)/,
+    );
   });
 
   it("unknown payload source labels normalize to invalid, never live", () => {

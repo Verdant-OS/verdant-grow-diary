@@ -19,6 +19,7 @@
  *    even a zero-age snapshot is treated as untrusted because the
  *    caller has explicitly removed the freshness window.
  */
+import { isDiagnosticSensorProvenanceRow } from "../../../src/lib/sensorProvenanceFenceRules.ts";
 
 export type AiSensorSnapshotSource =
   | "live"
@@ -121,8 +122,7 @@ type CapturedAt =
   | { kind: "invalid" };
 
 function parseCapturedAt(snap: Record<string, unknown>): CapturedAt {
-  const raw =
-    snap.captured_at ?? snap.capturedAt ?? snap.timestamp ?? snap.ts ?? snap.time;
+  const raw = snap.captured_at ?? snap.capturedAt ?? snap.timestamp ?? snap.ts ?? snap.time;
   if (raw === undefined || raw === null) return { kind: "missing" };
   if (typeof raw === "string" && raw.trim() === "") return { kind: "missing" };
   if (typeof raw === "number" && Number.isFinite(raw)) {
@@ -190,10 +190,7 @@ function formatReadingsForLine(snap: Record<string, unknown>): string {
   if (typeof snap.ph === "number" && Number.isFinite(snap.ph)) {
     parts.push(`ph=${fmtNum(snap.ph, 2)}`);
   }
-  if (
-    typeof snap.soil_moisture === "number" &&
-    Number.isFinite(snap.soil_moisture)
-  ) {
+  if (typeof snap.soil_moisture === "number" && Number.isFinite(snap.soil_moisture)) {
     parts.push(`soil_moisture=${fmtNum(snap.soil_moisture)}%`);
   }
   if (typeof snap.soil_ec === "number" && Number.isFinite(snap.soil_ec)) {
@@ -255,14 +252,12 @@ export function buildAiSensorSnapshotContext(
   }
 
   const now = options.now ?? new Date();
-  const threshold =
-    options.staleThresholdMs ?? DEFAULT_AI_SENSOR_STALE_THRESHOLD_MS;
-  const rawSourceStr = pickString(snapshot, [
-    "source",
-    "data_source",
-    "sensor_source",
-  ]);
-  const source = normalizeSource(rawSourceStr);
+  const threshold = options.staleThresholdMs ?? DEFAULT_AI_SENSOR_STALE_THRESHOLD_MS;
+  const rawSourceStr = pickString(snapshot, ["source", "data_source", "sensor_source"]);
+  // Raw provenance is classification-only and is never copied into the
+  // returned context. A canonical stored source=live cannot override an
+  // explicit Windows diagnostic lineage marker.
+  const source = isDiagnosticSensorProvenanceRow(snapshot) ? "demo" : normalizeSource(rawSourceStr);
   const captured = parseCapturedAt(snapshot);
 
   // Demo / invalid / unknown / explicit-stale: fixed-message paths.
@@ -275,9 +270,7 @@ export function buildAiSensorSnapshotContext(
         "values omitted; demo data is not trusted for diagnosis.",
       ),
       valuesForModel: null,
-      safetyNotes: [
-        "Demo data is synthetic and MUST NOT be treated as real grow evidence.",
-      ],
+      safetyNotes: ["Demo data is synthetic and MUST NOT be treated as real grow evidence."],
       missingInformationHints: [
         "Real or manual current sensor readings are needed before drawing environmental conclusions.",
       ],
@@ -296,9 +289,7 @@ export function buildAiSensorSnapshotContext(
         "values omitted; invalid sensor data is not trusted for diagnosis.",
       ),
       valuesForModel: null,
-      safetyNotes: [
-        "Sensor telemetry was flagged invalid; do not rely on these values.",
-      ],
+      safetyNotes: ["Sensor telemetry was flagged invalid; do not rely on these values."],
       missingInformationHints: [
         "A valid sensor snapshot (manual or live) is needed before environmental diagnosis.",
       ],
@@ -338,9 +329,7 @@ export function buildAiSensorSnapshotContext(
         "readings may not reflect current tent conditions.",
       ),
       valuesForModel: null,
-      safetyNotes: [
-        "Snapshot is marked stale; readings may not reflect current tent conditions.",
-      ],
+      safetyNotes: ["Snapshot is marked stale; readings may not reflect current tent conditions."],
       missingInformationHints: [
         "A fresh sensor snapshot is needed before drawing environmental conclusions.",
       ],
@@ -364,9 +353,7 @@ export function buildAiSensorSnapshotContext(
     );
   } else if (captured.kind === "invalid") {
     captureProblem = "invalid";
-    safetyNotes.push(
-      "Snapshot captured_at timestamp is invalid; freshness cannot be verified.",
-    );
+    safetyNotes.push("Snapshot captured_at timestamp is invalid; freshness cannot be verified.");
   } else {
     const ageMs = now.getTime() - captured.ms;
     // Exactly on threshold (ageMs === threshold) is NOT stale: strict ">".

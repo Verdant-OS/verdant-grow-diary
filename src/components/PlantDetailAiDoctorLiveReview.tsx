@@ -24,6 +24,7 @@ import { AI_DOCTOR_CSV_HISTORY_SOURCES } from "@/lib/aiDoctorCsvHistoryContextRu
 import {
   AI_DOCTOR_CURRENT_SENSOR_ROW_CAP,
   AI_DOCTOR_CURRENT_SENSOR_SOURCES,
+  classifyAiDoctorCurrentSensorEvidence,
 } from "@/lib/aiDoctorCurrentSensorSnapshotRules";
 import { useAiDoctorLiveReview } from "@/hooks/useAiDoctorLiveReview";
 import AiDoctorReviewResultPreview from "@/components/AiDoctorReviewResultPreview";
@@ -31,17 +32,13 @@ import AiDoctorReviewResultPreview from "@/components/AiDoctorReviewResultPrevie
 import AiCreditRemainingBadge from "@/components/AiCreditRemainingBadge";
 import AiCreditLimitNotice from "@/components/AiCreditLimitNotice";
 import AiCreditServiceDegradedNotice from "@/components/AiCreditServiceDegradedNotice";
-import { useSensorBridgeHealth } from "@/hooks/useSensorBridgeHealth";
 import { useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
 import { isUuid } from "@/lib/growRepo";
 import { plantDetailPath } from "@/lib/routes";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { buildAiCreditLimitNoticeViewModel } from "@/lib/aiCreditLimitNoticeViewModel";
 import { trackFunnelEvent } from "@/lib/funnelAnalytics";
-import {
-  classificationFromStatusResult,
-  type Classification,
-} from "@/lib/sensorSnapshotStatusContract";
+import type { Classification } from "@/lib/sensorSnapshotStatusContract";
 
 /** Stable empty-array identity so the packet memo does not churn. */
 const NO_TENT_SENSOR_ROWS: never[] = [];
@@ -80,7 +77,6 @@ export default function PlantDetailAiDoctorLiveReview({
   sensorClassificationOverride,
 }: PlantDetailAiDoctorLiveReviewProps) {
   const { items } = useTimelineMemory({ kind: "plant", plantId }, TIMELINE_MEMORY_DEFAULT_LIMIT);
-  const { data: bridgeHealth } = useSensorBridgeHealth();
   // Bounded, CSV-source-filtered per-tent sensor window (same shared hook as
   // Dashboard/Tents; non-UUID tent ids are never queried). Filtering happens
   // in the read query before the cap, so high-frequency current telemetry
@@ -126,17 +122,15 @@ export default function PlantDetailAiDoctorLiveReview({
 
   const allowed = context.readiness === "partial" || context.readiness === "strong";
 
-  // Real intake classification — never synthesized from presence.
+  // Row-level, provenance-aware classification. The ingest audit only knows
+  // counts/source transport and cannot distinguish a UI test packet from a
+  // physical sensor, so it must never grant healthy evidence here.
   const sensorClassification = useMemo<Classification | null>(() => {
     if (sensorClassificationOverride !== undefined) {
       return sensorClassificationOverride;
     }
-    if (!bridgeHealth) return null;
-    return classificationFromStatusResult({
-      status: bridgeHealth.status,
-      reasonCode: bridgeHealth.latestReasonCode,
-    });
-  }, [bridgeHealth, sensorClassificationOverride]);
+    return classifyAiDoctorCurrentSensorEvidence(currentSensorRows);
+  }, [currentSensorRows, sensorClassificationOverride]);
 
   const packet = useMemo(
     () =>
@@ -147,9 +141,9 @@ export default function PlantDetailAiDoctorLiveReview({
             context,
             csvHistoryRows: tentSensorRows,
             currentSensorRows,
-            // Real live-ingest signal: "usable" bridge health means fresh
-            // live telemetry exists for this grower right now. Manual
-            // snapshots and CSV history never set this.
+            // This explicit signal is derived from the same filtered rows as
+            // the packet snapshot. Diagnostic/testbench packets, manual
+            // snapshots, and CSV history can never set it.
             hasFreshLiveSensorReadings: sensorClassification?.status === "usable",
           })
         : null,

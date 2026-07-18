@@ -15,8 +15,7 @@
 
 export const LOCAL_FORWARDING_BASE_URL = "http://localhost:8787";
 export const LOCAL_FORWARDING_STATUS_PATH = "/debug/forwarding-status";
-export const LOCAL_FORWARDING_ERROR_REPORT_PATH =
-  "/debug/forwarding-error-report";
+export const LOCAL_FORWARDING_ERROR_REPORT_PATH = "/debug/forwarding-error-report";
 
 export const LOCAL_FORWARDING_STATUS_URL =
   `${LOCAL_FORWARDING_BASE_URL}${LOCAL_FORWARDING_STATUS_PATH}` as const;
@@ -26,6 +25,10 @@ export const LOCAL_FORWARDING_ERROR_REPORT_URL =
 export interface LocalForwardingLatestMetrics {
   source: string | null;
   vendor: string | null;
+  /** Optional on older listeners; `test` never qualifies as live proof. */
+  confidence?: string | null;
+  /** Listener-computed parse-time proof; missing/invalid values normalize false. */
+  physical_gateway_evidence: boolean;
   captured_at: string | null;
   metric_keys: string[];
 }
@@ -141,9 +144,7 @@ function coerceBool(v: unknown): boolean {
 }
 
 /** Tolerant normalization — old/new listener versions both accepted. */
-export function normalizeLocalForwardingStatus(
-  raw: unknown,
-): LocalForwardingStatus {
+export function normalizeLocalForwardingStatus(raw: unknown): LocalForwardingStatus {
   const r = (raw ?? {}) as Record<string, unknown>;
   const safe = sanitizeReportValue(r) as Record<string, unknown>;
   return {
@@ -155,17 +156,11 @@ export function normalizeLocalForwardingStatus(
     tent_id_configured: coerceBool(safe.tent_id_configured),
     tent_id_valid: coerceBool(safe.tent_id_valid),
     last_forward_status:
-      typeof safe.last_forward_status === "number"
-        ? safe.last_forward_status
-        : null,
+      typeof safe.last_forward_status === "number" ? safe.last_forward_status : null,
     last_forward_error: coerceString(safe.last_forward_error),
     last_forward_response_error: coerceString(safe.last_forward_response_error),
-    last_forward_response_classification: coerceString(
-      safe.last_forward_response_classification,
-    ),
-    last_forward_response_message: coerceString(
-      safe.last_forward_response_message,
-    ),
+    last_forward_response_classification: coerceString(safe.last_forward_response_classification),
+    last_forward_response_message: coerceString(safe.last_forward_response_message),
     forward_success_count: coerceNumber(safe.forward_success_count),
     forward_failure_count: coerceNumber(safe.forward_failure_count),
     forward_attempt_count: coerceNumber(safe.forward_attempt_count),
@@ -174,9 +169,7 @@ export function normalizeLocalForwardingStatus(
     last_retry_error: coerceString(safe.last_retry_error),
     last_retry_at: coerceString(safe.last_retry_at),
     last_retryable_status:
-      typeof safe.last_retryable_status === "number"
-        ? safe.last_retryable_status
-        : null,
+      typeof safe.last_retryable_status === "number" ? safe.last_retryable_status : null,
     max_retry_attempts: coerceNumber(safe.max_retry_attempts, 0),
     last_forward_response_reason: coerceString(safe.last_forward_response_reason),
     recommended_next_step: coerceString(safe.recommended_next_step),
@@ -189,11 +182,14 @@ export function normalizeLocalForwardingStatus(
 function normalizeLatestMetrics(raw: unknown): LocalForwardingLatestMetrics | null {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;
-  const metricsObj = r.metrics && typeof r.metrics === "object" ? (r.metrics as Record<string, unknown>) : {};
+  const metricsObj =
+    r.metrics && typeof r.metrics === "object" ? (r.metrics as Record<string, unknown>) : {};
   const keys = Object.keys(metricsObj).filter((k) => typeof k === "string");
   return {
     source: coerceString(r.source),
     vendor: coerceString(r.vendor),
+    confidence: coerceString(r.confidence),
+    physical_gateway_evidence: coerceBool(r.physical_gateway_evidence),
     captured_at: coerceString(r.captured_at),
     metric_keys: keys,
   };
@@ -202,7 +198,12 @@ function normalizeLatestMetrics(raw: unknown): LocalForwardingLatestMetrics | nu
 export type FetchLike = (
   input: string,
   init?: { signal?: AbortSignal },
-) => Promise<{ ok: boolean; status: number; json: () => Promise<unknown>; text: () => Promise<string> }>;
+) => Promise<{
+  ok: boolean;
+  status: number;
+  json: () => Promise<unknown>;
+  text: () => Promise<string>;
+}>;
 
 /** Fetch the local listener's forwarding-status. Classifies offline state. */
 export async function fetchLocalForwardingStatus(

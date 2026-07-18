@@ -47,6 +47,7 @@ import { EcowittLiveProofPanel } from "@/components/EcowittLiveProofPanel";
 import type { EcowittProofRow } from "@/lib/ecowittLiveProofRules";
 import { EcowittIngestAuditProofPanel } from "@/components/EcowittIngestAuditProofPanel";
 import { useEcowittIngestAuditProofRows } from "@/hooks/useEcowittIngestAuditProofRows";
+import { isUsableGrowSensorReading } from "@/lib/growSensorEvidenceRules";
 
 const METRICS = [
   { key: "temp", label: "Temperature" },
@@ -103,6 +104,7 @@ export default function Sensors() {
   const latestSourceRaw = (latest as unknown as { source?: string | null } | null)?.source ?? null;
   const latestSource =
     typeof latestSourceRaw === "string" && latestSourceRaw.length > 0 ? latestSourceRaw : null;
+  const latestCountsAsUsableEvidence = isUsableGrowSensorReading(latest);
   const classification = classifyGrowDataSource(
     latest
       ? { source: latestSource, value: latest.temp, timestamp: latest.ts }
@@ -121,7 +123,13 @@ export default function Sensors() {
   // Uses the existing tent-scoped sensor_readings hook (no new query,
   // no writes). Bound to the same tent the manual reading form targets
   // so PPFD + temperature/humidity/VPD lines up.
-  const { data: trendReadings = [] } = useSensorReadings(defaultManualTentId, 60);
+  const trendReadingsQuery = useSensorReadings(defaultManualTentId, 60);
+  const trendReadings = trendReadingsQuery.data ?? [];
+  const trendReadingsStatus = trendReadingsQuery.isLoading
+    ? "loading"
+    : trendReadingsQuery.isError
+      ? "error"
+      : "success";
 
   const operatorMode = searchParams.get("operator") === "1";
   const ecowittIngestAuditProof = useEcowittIngestAuditProofRows({
@@ -217,13 +225,13 @@ export default function Sensors() {
           // stage never reads as ok. Pure presenter; no writes.
           let envStatus: "ok" | "warn" | "bad" | null = null;
           let envLabel: string | null = null;
-          if (m.key === "temp" && latest) {
+          if (m.key === "temp" && latest && latestCountsAsUsableEvidence) {
             const r = classifyTempAgainstStage(latest.temp ?? null, {
               stage: selectedTentStage,
             });
             envStatus = environmentMetricChipStatus(r);
             envLabel = r.label;
-          } else if (m.key === "rh" && latest) {
+          } else if (m.key === "rh" && latest && latestCountsAsUsableEvidence) {
             const r = classifyRhAgainstStage(latest.rh ?? null, {
               stage: selectedTentStage,
             });
@@ -442,7 +450,10 @@ export default function Sensors() {
         options={{ fallback: "demo" }}
       />
       <div className="mt-4 max-w-xl">
-        <SensorBridgeHealthCard />
+        <SensorBridgeHealthCard
+          sensorReadings={defaultManualTentId ? trendReadings : []}
+          sensorReadingsStatus={defaultManualTentId ? trendReadingsStatus : "success"}
+        />
       </div>
       {manualTents.find((t) => t.id === tentId) && (
         <div className="mt-4 max-w-2xl">

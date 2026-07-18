@@ -27,6 +27,17 @@ function row(overrides: Partial<EpisodeSensorRowInput>): EpisodeSensorRowInput {
 }
 
 const args = { completedAtMs: T0, nowMs: T0 + 2 * HOUR };
+const PHYSICAL_WINDOWS_PAYLOAD = {
+  vendor: "ecowitt_windows_testbench",
+  metadata: {
+    reported_verdant_source: "live",
+    raw_payload: {
+      stationtype: "GW2000A_V3.2.4",
+      model: "GW2000A",
+      dateutc: "2026-07-01 11:00:00",
+    },
+  },
+};
 
 describe("classifyEpisodeSensorRow — provenance labeling", () => {
   it("live evidence is labeled live and usable", () => {
@@ -49,6 +60,39 @@ describe("classifyEpisodeSensorRow — provenance labeling", () => {
     expect(r?.source).toBe("demo");
     expect(r?.usable).toBe(false);
     expect(r?.status).toBe("needs_review");
+  });
+
+  it("canonical-live Windows diagnostics are demo-backed and never usable", () => {
+    const r = classifyEpisodeSensorRow(
+      row({
+        source: "live",
+        raw_payload: {
+          vendor: "ecowitt_windows_testbench",
+          metadata: { confidence: "test", verdant_source: "live" },
+        },
+      }),
+      args,
+    );
+    expect(r).toMatchObject({ source: "demo", status: "needs_review", usable: false });
+  });
+
+  it("legacy top-level Windows source rows missing provenance fail closed", () => {
+    const r = classifyEpisodeSensorRow(
+      row({
+        source: "ecowitt_windows_testbench",
+        raw_payload: null,
+      }),
+      args,
+    );
+    expect(r).toMatchObject({ source: "demo", usable: false });
+  });
+
+  it("physical Windows gateway evidence remains usable live evidence", () => {
+    const r = classifyEpisodeSensorRow(
+      row({ source: "live", raw_payload: PHYSICAL_WINDOWS_PAYLOAD }),
+      args,
+    );
+    expect(r).toMatchObject({ source: "live", status: "usable", usable: true });
   });
 
   it("invalid source is never usable", () => {
@@ -82,9 +126,7 @@ describe("classifyEpisodeSensorRow — provenance labeling", () => {
   });
 
   it("rows outside every evidence window are excluded (null), not guessed", () => {
-    expect(
-      classifyEpisodeSensorRow(row({ captured_at: iso(-48 * HOUR) }), args),
-    ).toBeNull();
+    expect(classifyEpisodeSensorRow(row({ captured_at: iso(-48 * HOUR) }), args)).toBeNull();
     expect(classifyEpisodeSensorRow(row({ captured_at: "not-a-date" }), args)).toBeNull();
   });
 
@@ -100,13 +142,13 @@ describe("classifyEpisodeSensorRow — provenance labeling", () => {
   });
 });
 
-describe("adapter never ingests or exposes raw payloads", () => {
-  it("EpisodeSensorRowInput has no raw_payload field surfaced in evidence", () => {
+describe("adapter uses provenance without exposing raw payloads", () => {
+  it("raw_payload is classification-only and never surfaced in evidence", () => {
     const rowWithPayload = {
       ...row({ source: "live" }),
-      // Even if a caller leaks raw_payload, the classifier ignores it.
+      // The classifier may inspect provenance, but never returns its contents.
       raw_payload: { secret: "should never appear" },
-    } as unknown as EpisodeSensorRowInput;
+    } as EpisodeSensorRowInput;
     const r = classifyEpisodeSensorRow(rowWithPayload, args);
     expect(JSON.stringify(r)).not.toContain("should never appear");
     expect(JSON.stringify(r)).not.toContain("raw_payload");

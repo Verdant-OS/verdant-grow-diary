@@ -6,13 +6,7 @@
  * and supports loading/empty/error states.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import {
-  render,
-  screen,
-  fireEvent,
-  waitFor,
-  cleanup,
-} from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import IngestInspector from "@/pages/IngestInspector";
@@ -78,8 +72,7 @@ vi.mock("@/integrations/supabase/client", () => {
   const makeReadingsChain = () => {
     const promise = new Promise<{ data: unknown; error: unknown }>((res, rej) => {
       if (mode === "loading") return; // never resolve
-      if (mode === "error")
-        return res({ data: null, error: new Error("boom") });
+      if (mode === "error") return res({ data: null, error: new Error("boom") });
       res({ data: mode === "empty" ? [] : rows, error: null });
     });
     const chain: Record<string, unknown> = {
@@ -136,9 +129,7 @@ describe("IngestInspector page", () => {
     renderPage();
     expect(await screen.findByText(/Read-only inspector\./)).toBeInTheDocument();
     expect(screen.getByText(/No device control\./)).toBeInTheDocument();
-    expect(
-      screen.getByText(/No data is modified from this screen\./),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/No data is modified from this screen\./)).toBeInTheDocument();
   });
 
   it("renders captured_at, source badge, and vendor badge for rows", async () => {
@@ -150,9 +141,7 @@ describe("IngestInspector page", () => {
     expect(sourceBadges[1].textContent).toBe("MQTT");
     const vendorBadges = screen.getAllByTestId("ingest-inspector-vendor-badge");
     expect(vendorBadges[0].textContent).toBe("EcoWitt");
-    expect(screen.getAllByTestId("ingest-inspector-captured-at").length).toBe(
-      2,
-    );
+    expect(screen.getAllByTestId("ingest-inspector-captured-at").length).toBe(2);
   });
 
   it("never labels webhook/mqtt rows as Live", async () => {
@@ -162,6 +151,31 @@ describe("IngestInspector page", () => {
     for (const b of badges) {
       expect(b.textContent?.toLowerCase()).not.toBe("live");
     }
+  });
+
+  it("renders diagnostic canonical-live rows as testbench/demo, never Live", async () => {
+    rows = [
+      {
+        ...okRows[0],
+        id: "diagnostic-live",
+        source: "live",
+        raw_payload: {
+          vendor: "ecowitt_windows_testbench",
+          metadata: {
+            reported_verdant_source: "live",
+            raw_payload: { tempf: "77.0" },
+          },
+        },
+      },
+    ];
+
+    renderPage();
+    const row = await screen.findByTestId("ingest-inspector-row");
+    expect(row).toHaveAttribute("data-diagnostic", "true");
+    expect(screen.getByTestId("ingest-inspector-source-badge")).toHaveTextContent(
+      "Testbench / demo",
+    );
+    expect(screen.queryByText(/^live$/i)).toBeNull();
   });
 
   it("raw payload is collapsed by default and redacts secrets/user_id when opened", async () => {
@@ -196,9 +210,7 @@ describe("IngestInspector page", () => {
     await waitFor(() => {
       expect(screen.getAllByTestId("ingest-inspector-row").length).toBe(1);
     });
-    expect(
-      screen.getByTestId("ingest-inspector-source-badge").textContent,
-    ).toBe("MQTT");
+    expect(screen.getByTestId("ingest-inspector-source-badge").textContent).toBe("MQTT");
   });
 
   it("filters by vendor", async () => {
@@ -211,17 +223,13 @@ describe("IngestInspector page", () => {
     await waitFor(() => {
       expect(screen.getAllByTestId("ingest-inspector-row").length).toBe(1);
     });
-    expect(
-      screen.getByTestId("ingest-inspector-vendor-badge").textContent,
-    ).toBe("EcoWitt");
+    expect(screen.getByTestId("ingest-inspector-vendor-badge").textContent).toBe("EcoWitt");
   });
 
   it("renders empty state when there are no rows", async () => {
     mode = "empty";
     renderPage();
-    expect(
-      await screen.findByText(/No recent ingest readings\./),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/No recent ingest readings\./)).toBeInTheDocument();
   });
 
   it("renders loading skeleton while query is pending", () => {
@@ -233,9 +241,7 @@ describe("IngestInspector page", () => {
   it("renders error state with retry button", async () => {
     mode = "error";
     renderPage();
-    expect(
-      await screen.findByTestId("ingest-inspector-error"),
-    ).toBeInTheDocument();
+    expect(await screen.findByTestId("ingest-inspector-error")).toBeInTheDocument();
     expect(screen.getByTestId("ingest-inspector-retry")).toBeInTheDocument();
   });
 

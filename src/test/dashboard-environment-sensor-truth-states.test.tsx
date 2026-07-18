@@ -44,9 +44,10 @@ describe("Environment Snapshot (multi-tent overview) — sensor truth copy", () 
     expect(DASHBOARD).toMatch(/data-testid="dashboard-environment-snapshot-status-banner"/);
   });
 
-  it("uses isStale + evaluateSensorQuality to flag stale and suspicious snapshots", () => {
+  it("uses isStale + source-aware Dashboard quality to flag stale, suspicious, and unverified snapshots", () => {
     expect(DASHBOARD).toMatch(/isStale\(/);
-    expect(DASHBOARD).toMatch(/evaluateSensorQuality\(/);
+    expect(DASHBOARD).toMatch(/evaluateDashboardSensorQuality\(/);
+    expect(DASHBOARD).toMatch(/dashboardHealthSnapshot\s*===\s*null/);
   });
 });
 
@@ -55,7 +56,7 @@ describe("Latest Environment (grow-scoped detail) — sensor truth copy", () => 
     expect(DASHBOARD).toMatch(/aria-label="Latest environment"/);
     expect(DASHBOARD).toContain("Latest Environment");
     expect(DASHBOARD).toMatch(
-      /Grow-scoped detail with per-tent filter and persisted alerts\. Not live device control\./,
+      /Grow-scoped detail with per-tent filter and persisted alerts\. Not live device\s+control\./,
     );
   });
 
@@ -139,7 +140,10 @@ describe("Environment Snapshot strip — pending/failed/empty truth states (Tent
   it("drives strip freshness from the shared ticking clock, not a render-time Date.now()", () => {
     expect(DASHBOARD).toMatch(/useNowTick/);
     expect(DASHBOARD).toMatch(
-      /buildTentSnapshotView\(\s*\(readingsByTent\[tent\.id\][\s\S]*?nowTick/,
+      /const\s+tentRows\s*=\s*selectDashboardSensorEvidenceRows\([\s\S]*?readingsByTent\[t\.id\]/,
+    );
+    expect(DASHBOARD).toMatch(
+      /buildTentSnapshotView\(\s*tentRows\s+as\s+BuildTentSnapshotInput\[\][\s\S]*?nowTick/,
     );
   });
 });

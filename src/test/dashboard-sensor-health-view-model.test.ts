@@ -30,10 +30,7 @@ function ok(snap: Partial<SensorSnapshot>): SnapshotState {
 describe("buildDashboardSensorHealthSummary", () => {
   it("returns loading status for idle/loading state without exposing fake values", () => {
     for (const status of ["idle", "loading"] as const) {
-      const vm = buildDashboardSensorHealthSummary(
-        { status, snapshot: EMPTY_SNAPSHOT },
-        NOW,
-      );
+      const vm = buildDashboardSensorHealthSummary({ status, snapshot: EMPTY_SNAPSHOT }, NOW);
       expect(vm.status).toBe("loading");
       expect(vm.tone).toBe("muted");
       expect(vm.hideValues).toBe(true);
@@ -59,18 +56,12 @@ describe("buildDashboardSensorHealthSummary", () => {
   });
 
   it("returns missing when all metric values are null even if status==ok", () => {
-    const vm = buildDashboardSensorHealthSummary(
-      ok({}),
-      NOW,
-    );
+    const vm = buildDashboardSensorHealthSummary(ok({}), NOW);
     expect(vm.status).toBe("missing");
   });
 
   it("returns healthy for a fresh, complete, plausible live snapshot", () => {
-    const vm = buildDashboardSensorHealthSummary(
-      ok({ temp: 24, rh: 55, vpd: 1.1 }),
-      NOW,
-    );
+    const vm = buildDashboardSensorHealthSummary(ok({ temp: 24, rh: 55, vpd: 1.1 }), NOW);
     expect(vm.status).toBe("healthy");
     expect(vm.tone).toBe("ok");
     expect(vm.sourceLabel).toBe("Live");
@@ -94,10 +85,7 @@ describe("buildDashboardSensorHealthSummary", () => {
   });
 
   it("returns invalid (bad tone) when suspicious fields are present", () => {
-    const vm = buildDashboardSensorHealthSummary(
-      ok({ temp: 24, rh: 100, vpd: 1.1 }),
-      NOW,
-    );
+    const vm = buildDashboardSensorHealthSummary(ok({ temp: 24, rh: 100, vpd: 1.1 }), NOW);
     expect(vm.status).toBe("invalid");
     expect(vm.tone).toBe("bad");
     expect(vm.sourceLabel).toBe("Invalid");
@@ -109,10 +97,7 @@ describe("buildDashboardSensorHealthSummary", () => {
     // so to exercise the pure "watch" branch we synthesize a stale + valid
     // snapshot with no suspicious fields by relying on the stale-only path:
     // here we just confirm watch tone classification is warn.
-    const vm = buildDashboardSensorHealthSummary(
-      ok({ temp: 24, rh: 55, vpd: 1.1 }),
-      NOW,
-    );
+    const vm = buildDashboardSensorHealthSummary(ok({ temp: 24, rh: 55, vpd: 1.1 }), NOW);
     expect(vm.tone).toBe("ok");
   });
 
@@ -151,6 +136,51 @@ describe("buildDashboardSensorHealthSummary", () => {
       NOW,
     );
     expect(vm.sourceLabel).toBe("Demo");
+    expect(vm.status).toBe("watch");
+    expect(vm.tone).toBe("warn");
+    expect(vm.headline).not.toBe("Sensor data looks usable.");
+  });
+
+  it("never gives unverified provenance a healthy/green semantic status", () => {
+    const vm = buildDashboardSensorHealthSummary(
+      {
+        status: "ok",
+        snapshot: {
+          ...EMPTY_SNAPSHOT,
+          source: "unverified",
+          ts: new Date(NOW - 60_000).toISOString(),
+          temp: 24,
+          rh: 55,
+          vpd: 1.1,
+        },
+      },
+      NOW,
+    );
+    expect(vm.status).toBe("watch");
+    expect(vm.tone).toBe("warn");
+    expect(vm.sourceLabel).toBe("Unknown");
+    expect(vm.statusLabel).not.toBe("Healthy");
+    expect(vm.headline).toBe("Sensor data needs review.");
+  });
+
+  it("keeps diary snapshots context-only instead of treating legacy nested provenance as healthy", () => {
+    const vm = buildDashboardSensorHealthSummary(
+      {
+        status: "ok",
+        snapshot: {
+          ...EMPTY_SNAPSHOT,
+          source: "diary",
+          ts: new Date(NOW - 60_000).toISOString(),
+          temp: 24,
+          rh: 55,
+          vpd: 1.1,
+        },
+      },
+      NOW,
+    );
+    expect(vm.status).toBe("watch");
+    expect(vm.tone).toBe("warn");
+    expect(vm.statusLabel).not.toBe("Healthy");
   });
 
   it("always carries the Safe by Design read-only note", () => {
@@ -189,19 +219,14 @@ describe("buildDashboardSensorHealthSummary", () => {
 
 describe("dashboardSensorHealthViewModel safety", () => {
   const ROOT = resolve(__dirname, "../..");
-  const FILE = readFileSync(
-    resolve(ROOT, "src/lib/dashboardSensorHealthViewModel.ts"),
-    "utf8",
-  );
+  const FILE = readFileSync(resolve(ROOT, "src/lib/dashboardSensorHealthViewModel.ts"), "utf8");
 
   it("is pure: no Supabase or fetch imports", () => {
     expect(FILE).not.toMatch(/from\s+["']@\/integrations\/supabase/);
     expect(FILE).not.toMatch(/\bfetch\(/);
   });
   it("introduces no write paths", () => {
-    expect(FILE).not.toMatch(
-      /\.(insert|update|delete|upsert|rpc)\s*\(/,
-    );
+    expect(FILE).not.toMatch(/\.(insert|update|delete|upsert|rpc)\s*\(/);
   });
   it("introduces no device-control or automation strings", () => {
     expect(FILE).not.toMatch(

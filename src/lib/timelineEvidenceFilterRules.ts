@@ -78,6 +78,7 @@ export function deriveTimelineRowSensorSource(
     staleMs: options.staleMs ?? TIMELINE_FILTER_STALE_MS,
     now: options.now,
     fallback: "manual",
+    context: "persisted_snapshot",
   }).kind;
 }
 
@@ -90,9 +91,7 @@ const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
  * URL-provided date-range filter values; anything else is treated as
  * "no constraint" rather than guessed at.
  */
-export function isTimelineDateFilterValue(
-  value: string | null | undefined,
-): value is string {
+export function isTimelineDateFilterValue(value: string | null | undefined): value is string {
   return typeof value === "string" && ISO_DATE_RE.test(value);
 }
 
@@ -188,8 +187,7 @@ export function filterTimelineEvidenceRows<T extends TimelineEvidenceRow>(
   const noType = !input.eventType || input.eventType.trim() === "";
   const noSrc = !Array.isArray(input.sensorSources) || input.sensorSources.length === 0;
   const noDates =
-    !isTimelineDateFilterValue(input.startDate) &&
-    !isTimelineDateFilterValue(input.endDate);
+    !isTimelineDateFilterValue(input.startDate) && !isTimelineDateFilterValue(input.endDate);
   if (noQuery && noPlant && noTent && noType && noSrc && noDates) return [...rows];
   return rows.filter((r) => timelineEvidenceRowMatches(r, input));
 }
@@ -214,9 +212,7 @@ export function deriveTimelinePlantOptions(
     if (id === "") continue;
     const name = (r.details ?? {})["plant_name"];
     const label =
-      typeof name === "string" && name.trim() !== ""
-        ? name.trim()
-        : `Plant ${id.slice(0, 6)}`;
+      typeof name === "string" && name.trim() !== "" ? name.trim() : `Plant ${id.slice(0, 6)}`;
     const cur = m.get(id);
     if (cur) cur.count += 1;
     else m.set(id, { label, count: 1 });
@@ -240,9 +236,7 @@ export function deriveTimelineTentOptions(
     if (id === "") continue;
     const name = nameById?.get(id);
     const label =
-      typeof name === "string" && name.trim() !== ""
-        ? name.trim()
-        : `Tent ${id.slice(0, 6)}`;
+      typeof name === "string" && name.trim() !== "" ? name.trim() : `Tent ${id.slice(0, 6)}`;
     const cur = m.get(id);
     if (cur) cur.count += 1;
     else m.set(id, { label, count: 1 });
@@ -270,9 +264,7 @@ export function deriveTimelineEventTypeOptions(
     .sort((a, b) => a.label.localeCompare(b.label));
 }
 
-export function isTimelineEvidenceFilterActive(
-  input: TimelineEvidenceFilterInput,
-): boolean {
+export function isTimelineEvidenceFilterActive(input: TimelineEvidenceFilterInput): boolean {
   if (normalize(input.query) !== "") return true;
   if (input.plantId && input.plantId.trim() !== "") return true;
   if (input.tentId && input.tentId.trim() !== "") return true;
@@ -285,5 +277,4 @@ export function isTimelineEvidenceFilterActive(
 
 export const TIMELINE_EVIDENCE_SEARCH_PLACEHOLDER = "Search timeline";
 export const TIMELINE_EVIDENCE_EMPTY_TITLE = "No matches";
-export const TIMELINE_EVIDENCE_EMPTY_DESC =
-  "No timeline entries match these filters.";
+export const TIMELINE_EVIDENCE_EMPTY_DESC = "No timeline entries match these filters.";

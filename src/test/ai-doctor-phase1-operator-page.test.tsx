@@ -41,9 +41,7 @@ function baseContext(plantId: string): AiDoctorContextPayload {
   };
 }
 
-function baseResult(
-  overrides: Partial<AiDoctorDiagnosisResult> = {},
-): AiDoctorDiagnosisResult {
+function baseResult(overrides: Partial<AiDoctorDiagnosisResult> = {}): AiDoctorDiagnosisResult {
   return {
     summary: "Cautious summary.",
     likely_issue: "Unclear.",
@@ -63,13 +61,7 @@ function baseResult(
 
 function LocationProbe() {
   const loc = useLocation();
-  return (
-    <div
-      data-testid="probe-location"
-      data-pathname={loc.pathname}
-      data-search={loc.search}
-    />
-  );
+  return <div data-testid="probe-location" data-pathname={loc.pathname} data-search={loc.search} />;
 }
 
 function renderAt(
@@ -118,9 +110,7 @@ describe("OperatorAiDoctorPhase1 — page + routing", () => {
       plants: PLANTS,
     });
     expect(
-      screen
-        .getByTestId("ai-doctor-phase1-plant-option-plant-a")
-        .getAttribute("data-selected"),
+      screen.getByTestId("ai-doctor-phase1-plant-option-plant-a").getAttribute("data-selected"),
     ).toBe("true");
     expect(screen.getByTestId("ai-doctor-phase1-internal-link-href").textContent).toContain(
       "plantId=plant-a",
@@ -181,10 +171,7 @@ describe("OperatorAiDoctorPhase1 — page + routing", () => {
 // ---------------------------------------------------------------------------
 
 describe("Operator Mode navigation — AI Doctor Results", () => {
-  const SIDEBAR_SRC = readFileSync(
-    resolve(__dirname, "../components/AppSidebar.tsx"),
-    "utf8",
-  );
+  const SIDEBAR_SRC = readFileSync(resolve(__dirname, "../components/AppSidebar.tsx"), "utf8");
   const APP_SRC = readFileSync(resolve(__dirname, "../App.tsx"), "utf8");
 
   it("sidebar exposes 'AI Doctor Results' linking to the new route", () => {
@@ -208,10 +195,7 @@ describe("Operator Mode navigation — AI Doctor Results", () => {
 // ---------------------------------------------------------------------------
 
 describe("static safety — OperatorAiDoctorPhase1 page", () => {
-  const SRC = readFileSync(
-    resolve(__dirname, "../pages/OperatorAiDoctorPhase1.tsx"),
-    "utf8",
-  )
+  const SRC = readFileSync(resolve(__dirname, "../pages/OperatorAiDoctorPhase1.tsx"), "utf8")
     .replace(/\/\*[\s\S]*?\*\//g, "")
     .replace(/(^|[^:])\/\/.*$/gm, "$1");
 
@@ -227,6 +211,12 @@ describe("static safety — OperatorAiDoctorPhase1 page", () => {
     expect(SRC).not.toMatch(/alert.*\.(insert|update|upsert|delete)/i);
     expect(SRC).not.toMatch(/executeDeviceCommand|deviceControl|sendDeviceCommand/i);
     expect(SRC).not.toMatch(/service_role/i);
+  });
+
+  it("retains sensor provenance until the pure compiler applies its fence", () => {
+    expect(SRC).toMatch(/captured_at:\s*[\s\S]*?r\.captured_at/);
+    expect(SRC).toMatch(/raw_payload:\s*r\.raw_payload/);
+    expect(SRC).toMatch(/sensorReadings:\s*sensors/);
   });
 });
 
@@ -246,8 +236,7 @@ describe("OperatorAiDoctorPhase1 — deep link enrichment", () => {
     renderAt(`${OPERATOR_AI_DOCTOR_PHASE1_ROUTE}?plantId=plant-a`, {
       plants: ENRICHED,
     });
-    const href =
-      screen.getByTestId("ai-doctor-phase1-internal-link-href").textContent ?? "";
+    const href = screen.getByTestId("ai-doctor-phase1-internal-link-href").textContent ?? "";
     expect(href).toContain("plantId=plant-a");
     expect(href).toContain("growId=grow-1");
     expect(href).toContain("tentId=tent-1");
@@ -342,10 +331,7 @@ describe("mapPlantsToPickerOptions — adapter", () => {
 
   it("skips plants without an id", () => {
     const options = mapPlantsToPickerOptions(
-      [
-        { id: "", name: "broken" } as unknown as { id: string },
-        { id: "p1", name: "ok" },
-      ],
+      [{ id: "", name: "broken" } as unknown as { id: string }, { id: "p1", name: "ok" }],
       [],
     );
     expect(options.map((o) => o.id)).toEqual(["p1"]);

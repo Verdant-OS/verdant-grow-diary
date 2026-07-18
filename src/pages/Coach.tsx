@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,11 +8,7 @@ import { useAuth } from "@/store/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { Sparkles, Camera, Loader2, Wand2, ListChecks, Plus, Upload } from "lucide-react";
 import { toast } from "sonner";
-import {
-  useGrowPlants,
-  useGrowSensorReadings,
-  getGrowDataMeta,
-} from "@/hooks/useGrowData";
+import { useGrowPlants, useGrowSensorReadings, getGrowDataMeta } from "@/hooks/useGrowData";
 import { useDiaryEntries } from "@/hooks/use-diary-entries";
 import { evaluateAiContextSufficiency } from "@/lib/aiContextSufficiencyRules";
 import { adaptDiaryForAiContext } from "@/lib/coachContextAdapter";
@@ -34,8 +30,17 @@ import AiCreditRemainingBadge from "@/components/AiCreditRemainingBadge";
 import AiCreditServiceDegradedNotice from "@/components/AiCreditServiceDegradedNotice";
 import { adaptCreditedAiResponse } from "@/lib/aiCreditedResponseAdapter";
 import type { AiCreditDenial } from "@/lib/aiCreditLimitNoticeViewModel";
+import { buildLegacyAiSensorEvidence } from "@/lib/growSensorEvidenceRules";
+import { validatePlantProfilePhotoFile } from "@/lib/plantProfilePhotoFileRules";
+import {
+  AI_DOCTOR_PHOTO_PREVIEW_HEIGHT,
+  AI_DOCTOR_PHOTO_PREVIEW_WIDTH,
+  calculateRasterPhotoCoverCrop,
+  isRasterPhotoPreviewBitmapWithinBounds,
+} from "@/lib/rasterPhotoPreviewRules";
 
 type Mode = "diagnose" | "next_steps";
+type PhotoPreviewStatus = "empty" | "loading" | "ready" | "unavailable";
 
 interface Analysis {
   summary: string;
@@ -71,13 +76,14 @@ export default function Coach() {
 
   const { activeGrow, activeGrowId } = useGrows();
   const [photoFile, setPhotoFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
+  const [photoPreviewStatus, setPhotoPreviewStatus] = useState<PhotoPreviewStatus>("empty");
   const [question, setQuestion] = useState("");
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<CoachResponse | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const uploadRef = useRef<HTMLInputElement>(null);
+  const photoPreviewCanvasRef = useRef<HTMLCanvasElement>(null);
   const [queuedIdx, setQueuedIdx] = useState<Set<number>>(new Set());
   const [queuingIdx, setQueuingIdx] = useState<number | null>(null);
   // Persisted AI Doctor session id for the *currently rendered* diagnosis.
@@ -95,15 +101,15 @@ export default function Coach() {
   const contextSufficiency = useMemo(() => {
     const plantsMeta = getGrowDataMeta(["grow", "plants", "all", activeGrowId ?? "all"]);
     const sensorsMeta = getGrowDataMeta(["grow", "sensors", "all"]);
+    const sensorEvidence = buildLegacyAiSensorEvidence(ctxSensors, sensorsMeta);
     // Route raw diary rows through the normalization rules so malformed
     // details degrade context safely and valid pH/EC/watering/photo signals
     // can lift sufficiency where appropriate.
     const diaryAdapted = adaptDiaryForAiContext({
       rawDiaryEntries: ctxDiary as readonly unknown[],
     });
-    const liveSensors = ctxSensors.map((r) => ({
-      at: (r as { recordedAt?: string | number | Date; at?: string | number | Date }).recordedAt
-        ?? (r as { at?: string | number | Date }).at,
+    const liveSensors = sensorEvidence.trustedLiveReadings.map((r) => ({
+      at: r.capturedAt ?? r.ts,
       temp: r.temp,
       rh: r.rh,
       vpd: r.vpd,
@@ -124,7 +130,7 @@ export default function Coach() {
       recentWateringOrFeeding: diaryAdapted.recentWateringOrFeeding,
       recentSensorReadings: [...liveSensors, ...diaryAdapted.diaryDerivedSensors],
       hasPhoto: !!photoFile || diaryAdapted.hasDiaryPhoto,
-      sensorMeta: sensorsMeta,
+      sensorMeta: sensorEvidence.sensorMeta,
       contextMeta: plantsMeta,
       questionKind: photoFile ? "visual-diagnosis" : "general",
     });
@@ -154,11 +160,14 @@ export default function Coach() {
     setQueuingIdx(null);
     if (error) {
       const msg = (error.message || "").toLowerCase();
-      if (error.code === "42501" || msg.includes("row-level security") || msg.includes("violates")) {
-        toast.error(
-          "This action cannot be queued until the plant/tent is assigned to this grow.",
-          { description: "Open Lineage Repair to assign tents to this grow." },
-        );
+      if (
+        error.code === "42501" ||
+        msg.includes("row-level security") ||
+        msg.includes("violates")
+      ) {
+        toast.error("This action cannot be queued until the plant/tent is assigned to this grow.", {
+          description: "Open Lineage Repair to assign tents to this grow.",
+        });
         return;
       }
       toast.error(error.message);
@@ -195,9 +204,7 @@ export default function Coach() {
 
   // SECURITY: never send user_id from the client. status pins pending_approval.
   // Source is "ai_doctor"; no device commands. Idempotent per (title|detail).
-  async function addDoctorSuggestionToQueue(
-    action: DiagnosisSuggestedAction,
-  ): Promise<void> {
+  async function addDoctorSuggestionToQueue(action: DiagnosisSuggestedAction): Promise<void> {
     if (!user || !activeGrowId || !diagnosis) return;
     const key = `${action.title}::${action.detail}`;
     if (doctorQueuedKeys.has(key)) return;
@@ -210,10 +217,7 @@ export default function Coach() {
         target_metric: "general",
         suggested_change: `${action.title}: ${action.detail}`,
         reason:
-          action.reason ||
-          diagnosis.likelyIssue ||
-          diagnosis.summary ||
-          "AI Doctor suggestion",
+          action.reason || diagnosis.likelyIssue || diagnosis.summary || "AI Doctor suggestion",
         risk_level: risk,
         source: ACTION_QUEUE_SOURCE_VALUES.AI_DOCTOR,
         status: "pending_approval",
@@ -227,10 +231,9 @@ export default function Coach() {
         msg.includes("row-level security") ||
         msg.includes("violates")
       ) {
-        toast.error(
-          "This action cannot be queued until the plant/tent is assigned to this grow.",
-          { description: "Open Lineage Repair to assign tents to this grow." },
-        );
+        toast.error("This action cannot be queued until the plant/tent is assigned to this grow.", {
+          description: "Open Lineage Repair to assign tents to this grow.",
+        });
         return;
       }
       toast.error(error.message);
@@ -250,21 +253,31 @@ export default function Coach() {
     toast.success("AI Doctor suggestion queued for approval.");
   }
 
-
-
   async function ask(mode: Mode) {
     if (!user) return;
     const seq = ++diagnosisSeqRef.current;
-    setBusy(true); setResult(null); setPersistedSessionId(null);
-    setCreditDenial(null); setUpstreamCreditExhausted(false);
+    setBusy(true);
+    setResult(null);
+    setPersistedSessionId(null);
+    setCreditDenial(null);
+    setUpstreamCreditExhausted(false);
     try {
       let photoUrl: string | undefined;
       if (mode === "diagnose" && photoFile) {
-        const ext = photoFile.name.split(".").pop() || "jpg";
-        const path = `${user.id}/coach/${Date.now()}.${ext}`;
-        const { error } = await supabase.storage.from("diary-photos").upload(path, photoFile, { contentType: photoFile.type });
+        const photoValidation = validatePlantProfilePhotoFile(photoFile);
+        if (photoValidation.ok === false) {
+          setPhotoFile(null);
+          setPhotoPreviewStatus("empty");
+          throw new Error(photoValidation.message);
+        }
+        const path = `${user.id}/coach/${Date.now()}.${photoValidation.extension}`;
+        const { error } = await supabase.storage
+          .from("diary-photos")
+          .upload(path, photoFile, { contentType: photoValidation.mime });
         if (error) throw error;
-        const { data: signed, error: sErr } = await supabase.storage.from("diary-photos").createSignedUrl(path, 600);
+        const { data: signed, error: sErr } = await supabase.storage
+          .from("diary-photos")
+          .createSignedUrl(path, 600);
         if (sErr) throw sErr;
         photoUrl = signed.signedUrl;
       }
@@ -295,25 +308,17 @@ export default function Coach() {
       if (d?.error) throw new Error(d.error);
       setResult(d ?? null);
 
-
       // Persist a read-only snapshot of the completed AI Doctor response.
       // SECURITY: never include user_id (DB default auth.uid()). Only the
       // sanitized diagnosis is persisted. Persistence is non-blocking —
       // failures only emit a soft warning and never affect rendering.
       if (d && (d.analysis || d.diagnosis)) {
-        const sanitized = d.diagnosis
-          ? validateAndSanitizeDiagnosis(d.diagnosis).diagnosis
-          : null;
+        const sanitized = d.diagnosis ? validateAndSanitizeDiagnosis(d.diagnosis).diagnosis : null;
         const rawConf =
-          sanitized && typeof sanitized.confidence === "number"
-            ? sanitized.confidence
-            : null;
+          sanitized && typeof sanitized.confidence === "number" ? sanitized.confidence : null;
         const harmonized =
           rawConf !== null
-            ? harmonizeDiagnosisConfidence(
-                rawConf,
-                contextSufficiency.confidenceCeiling,
-              )
+            ? harmonizeDiagnosisConfidence(rawConf, contextSufficiency.confidenceCeiling)
             : null;
         // Fire-and-forget; we intentionally do not await before clearing busy.
         void persistAiDoctorSession(supabase, {
@@ -344,23 +349,102 @@ export default function Coach() {
       }
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Coach failed");
-    } finally { setBusy(false); }
+    } finally {
+      setBusy(false);
+    }
   }
-
 
   function handleFile(f: File | null) {
+    if (!f) return;
+    const validation = validatePlantProfilePhotoFile(f);
+    if (validation.ok === false) {
+      toast.error(validation.message);
+      return;
+    }
     setPhotoFile(f);
-    setPreview(f ? URL.createObjectURL(f) : null);
+    setPhotoPreviewStatus("loading");
   }
+
+  useEffect(() => {
+    if (!photoFile) {
+      setPhotoPreviewStatus("empty");
+      return;
+    }
+
+    let cancelled = false;
+    setPhotoPreviewStatus("loading");
+
+    if (typeof createImageBitmap !== "function") {
+      setPhotoPreviewStatus("unavailable");
+      return;
+    }
+
+    void createImageBitmap(photoFile, {
+      imageOrientation: "from-image",
+      resizeWidth: AI_DOCTOR_PHOTO_PREVIEW_WIDTH,
+      resizeQuality: "high",
+    })
+      .then((bitmap) => {
+        try {
+          if (cancelled) return;
+          if (!isRasterPhotoPreviewBitmapWithinBounds(bitmap.width, bitmap.height)) {
+            setPhotoPreviewStatus("unavailable");
+            return;
+          }
+          const canvas = photoPreviewCanvasRef.current;
+          const crop = calculateRasterPhotoCoverCrop(bitmap.width, bitmap.height);
+          const context = canvas?.getContext("2d", { alpha: false });
+          if (!canvas || !crop || !context) {
+            setPhotoPreviewStatus("unavailable");
+            return;
+          }
+
+          canvas.width = crop.targetWidth;
+          canvas.height = crop.targetHeight;
+          context.clearRect(0, 0, crop.targetWidth, crop.targetHeight);
+          context.drawImage(
+            bitmap,
+            crop.sourceX,
+            crop.sourceY,
+            crop.sourceWidth,
+            crop.sourceHeight,
+            0,
+            0,
+            crop.targetWidth,
+            crop.targetHeight,
+          );
+          setPhotoPreviewStatus("ready");
+        } finally {
+          bitmap.close();
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setPhotoPreviewStatus("unavailable");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [photoFile]);
 
   const analysis = result?.analysis;
 
   return (
     <div>
       <div className="mb-5">
-        <h1 className="text-2xl font-display font-bold flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary" />AI Doctor</h1>
+        <h1 className="text-2xl font-display font-bold flex items-center gap-2">
+          <Sparkles className="h-5 w-5 text-primary" />
+          AI Doctor
+        </h1>
         <p className="text-sm text-muted-foreground">
-          {activeGrow ? <>Coaching <span className="text-foreground">{activeGrow.name}</span> using your recent diary.</> : "Pick a grow for personalized advice."}
+          {activeGrow ? (
+            <>
+              Coaching <span className="text-foreground">{activeGrow.name}</span> using your recent
+              diary.
+            </>
+          ) : (
+            "Pick a grow for personalized advice."
+          )}
         </p>
       </div>
 
@@ -381,23 +465,59 @@ export default function Coach() {
         // exist. Do not silently use ctxPlants[0].
         selectedPlantId={null}
         growId={activeGrowId ?? null}
-        diaryEntries={ctxDiary as unknown as readonly { entry_type?: string | null; entry_at?: string | null; created_at?: string | null; details?: unknown }[]}
+        diaryEntries={
+          ctxDiary as unknown as readonly {
+            entry_type?: string | null;
+            entry_at?: string | null;
+            created_at?: string | null;
+            details?: unknown;
+          }[]
+        }
         className="mb-4"
       />
 
-
       <CoachAiDoctorHistoryPanel growId={activeGrowId ?? null} />
-
 
       <div className="glass rounded-2xl p-4 space-y-4">
         <button
           type="button"
           onClick={() => fileRef.current?.click()}
           aria-label="Add or replace plant photo"
-          className="relative aspect-video w-full rounded-xl border-2 border-dashed border-border/60 overflow-hidden bg-secondary/40 hover:border-primary/60 transition">
-          {preview ? <img src={preview} className="h-full w-full object-cover" alt="Selected plant photo preview" /> : (
+          className="relative aspect-video w-full rounded-xl border-2 border-dashed border-border/60 overflow-hidden bg-secondary/40 hover:border-primary/60 transition"
+        >
+          {photoFile ? (
+            <>
+              <canvas
+                ref={photoPreviewCanvasRef}
+                width={AI_DOCTOR_PHOTO_PREVIEW_WIDTH}
+                height={AI_DOCTOR_PHOTO_PREVIEW_HEIGHT}
+                role="img"
+                aria-label="Selected plant photo preview"
+                aria-hidden={photoPreviewStatus !== "ready"}
+                data-testid="coach-photo-preview-canvas"
+                className={`h-full w-full transition-opacity ${
+                  photoPreviewStatus === "ready" ? "opacity-100" : "opacity-0"
+                }`}
+              />
+              {photoPreviewStatus !== "ready" ? (
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground gap-2">
+                  {photoPreviewStatus === "loading" ? (
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                  ) : (
+                    <Camera className="h-8 w-8" />
+                  )}
+                  <span className="text-sm">
+                    {photoPreviewStatus === "loading"
+                      ? "Preparing safe preview…"
+                      : "Photo selected · preview unavailable"}
+                  </span>
+                </div>
+              ) : null}
+            </>
+          ) : (
             <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-2">
-              <Camera className="h-8 w-8" /><span className="text-sm">Add photo to diagnose</span>
+              <Camera className="h-8 w-8" />
+              <span className="text-sm">Add photo to diagnose</span>
             </div>
           )}
           {/* Default tap target keeps existing single-tap behavior (no capture, so picker can offer camera or library on mobile). */}
@@ -418,7 +538,8 @@ export default function Coach() {
             onClick={() => cameraRef.current?.click()}
             data-testid="coach-photo-take"
           >
-            <Camera className="h-4 w-4" />Take photo
+            <Camera className="h-4 w-4" />
+            Take photo
           </Button>
           <Button
             type="button"
@@ -426,7 +547,8 @@ export default function Coach() {
             onClick={() => uploadRef.current?.click()}
             data-testid="coach-photo-upload"
           >
-            <Upload className="h-4 w-4" />Upload from device
+            <Upload className="h-4 w-4" />
+            Upload from device
           </Button>
         </div>
         <p className="text-xs text-muted-foreground">
@@ -454,14 +576,33 @@ export default function Coach() {
           onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
         />
 
-
-        <Textarea value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="Optional: ask a question, e.g. 'why are leaves curling?'" rows={2} />
+        <Textarea
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+          placeholder="Optional: ask a question, e.g. 'why are leaves curling?'"
+          rows={2}
+        />
 
         <div className="grid grid-cols-2 gap-2">
-          <Button onClick={() => ask("diagnose")} disabled={busy || !photoFile} className="gradient-leaf text-primary-foreground">
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Wand2 className="h-4 w-4" />Diagnose photo</>}
+          <Button
+            onClick={() => ask("diagnose")}
+            disabled={busy || !photoFile}
+            className="gradient-leaf text-primary-foreground"
+          >
+            {busy ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <>
+                <Wand2 className="h-4 w-4" />
+                Diagnose photo
+              </>
+            )}
           </Button>
-          <Button onClick={() => ask("next_steps")} disabled={busy || !activeGrowId} variant="secondary">
+          <Button
+            onClick={() => ask("next_steps")}
+            disabled={busy || !activeGrowId}
+            variant="secondary"
+          >
             What should I do next?
           </Button>
         </div>
@@ -486,8 +627,6 @@ export default function Coach() {
         </div>
       )}
 
-
-
       {!creditDenial && result?.credit ? (
         <div className="mt-3" data-testid="coach-credit-remaining-wrap">
           <AiCreditRemainingBadge
@@ -497,10 +636,6 @@ export default function Coach() {
           />
         </div>
       ) : null}
-
-
-
-
 
       {diagnosis && (
         <div className="mt-4 animate-fade-in">
@@ -526,7 +661,8 @@ export default function Coach() {
             const capped = cappedConf !== analysis.confidence;
             return (
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Sparkles className="h-3 w-3 text-primary" />Coach
+                <Sparkles className="h-3 w-3 text-primary" />
+                Coach
                 <span
                   className="ml-auto uppercase tracking-wider"
                   data-testid="coach-displayed-confidence"
@@ -541,7 +677,9 @@ export default function Coach() {
           })()}
           <p className="font-medium">{analysis.summary}</p>
           {analysis.likely_issue && (
-            <p className="text-xs"><span className="text-muted-foreground">Likely issue:</span> {analysis.likely_issue}</p>
+            <p className="text-xs">
+              <span className="text-muted-foreground">Likely issue:</span> {analysis.likely_issue}
+            </p>
           )}
           <Section title="Evidence" items={analysis.evidence} />
           <Section title="Possible causes" items={analysis.possible_causes} />
@@ -557,9 +695,7 @@ export default function Coach() {
                     size="sm"
                     variant="outline"
                     className="h-7 px-2 shrink-0"
-                    disabled={
-                      !activeGrowId || queuingIdx === i || queuedIdx.has(i)
-                    }
+                    disabled={!activeGrowId || queuingIdx === i || queuedIdx.has(i)}
                     onClick={() => addToQueue(i, it)}
                   >
                     {queuingIdx === i ? (
@@ -586,8 +722,12 @@ export default function Coach() {
           </div>
           <Section title="Do NOT do" items={analysis.do_not_do} />
           <div className="text-xs space-y-1 pt-2 border-t border-border/40">
-            <p><span className="text-muted-foreground">Next 24h:</span> {analysis.follow_up_24h}</p>
-            <p><span className="text-muted-foreground">Next 3 days:</span> {analysis.follow_up_3_day}</p>
+            <p>
+              <span className="text-muted-foreground">Next 24h:</span> {analysis.follow_up_24h}
+            </p>
+            <p>
+              <span className="text-muted-foreground">Next 3 days:</span> {analysis.follow_up_3_day}
+            </p>
           </div>
         </div>
       )}
@@ -601,7 +741,9 @@ function Section({ title, items }: { title: string; items: string[] }) {
     <div>
       <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">{title}</p>
       <ul className="list-disc list-inside space-y-0.5">
-        {items.map((it, i) => <li key={i}>{it}</li>)}
+        {items.map((it, i) => (
+          <li key={i}>{it}</li>
+        ))}
       </ul>
     </div>
   );

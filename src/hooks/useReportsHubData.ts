@@ -29,6 +29,8 @@ import {
   findPendingOutcomeReviews,
   PENDING_OUTCOME_REVIEW_THRESHOLD_MS,
 } from "@/lib/pendingOutcomeReviewRules";
+import { normalizeSensorSource } from "@/lib/sensor/sensorSourceRules";
+import { isDiagnosticSensorProvenanceRow } from "@/lib/sensorProvenanceFenceRules";
 
 export type ReportsHubDataStatus = "idle" | "loading" | "ready" | "unavailable";
 
@@ -70,6 +72,78 @@ export const EMPTY_REPORTS_HUB_DATA: ReportsHubData = {
   oldestPendingCompletedAt: null,
 };
 
+export interface ReportsHubSensorRow {
+  ts: string;
+  source?: string | null;
+  raw_payload?: unknown;
+}
+
+const REPORTS_HUB_SENSOR_PAGE_SIZE = 1_000;
+const REPORTS_HUB_CONTEXT_SOURCES = ["live", "manual", "csv"] as const;
+
+/** Pure row fence for the Hub's unlabeled sensor count/latest timestamp. */
+export function isReportsHubSensorContextRow(row: ReportsHubSensorRow): boolean {
+  if (isDiagnosticSensorProvenanceRow(row)) return false;
+  const source = normalizeSensorSource(row.source);
+  return source === "live" || source === "manual" || source === "csv";
+}
+
+async function loadReportsHubSensorPage(input: {
+  tentIds: string[];
+  from: number;
+  recentSince?: string;
+  before?: string;
+}): Promise<ReportsHubSensorRow[]> {
+  let query = supabase
+    .from("sensor_readings")
+    .select("ts,source,raw_payload")
+    .in("tent_id", input.tentIds)
+    .in("source", [...REPORTS_HUB_CONTEXT_SOURCES]);
+  if (input.recentSince) query = query.gte("ts", input.recentSince);
+  if (input.before) query = query.lt("ts", input.before);
+  const { data, error } = await query
+    .order("ts", { ascending: false })
+    .range(input.from, input.from + REPORTS_HUB_SENSOR_PAGE_SIZE - 1);
+  if (error) throw error;
+  return (data ?? []) as ReportsHubSensorRow[];
+}
+
+async function findLatestReportsHubSensorAt(
+  tentIds: string[],
+  before: string,
+): Promise<string | null> {
+  let from = 0;
+  while (true) {
+    const page = await loadReportsHubSensorPage({ tentIds, from, before });
+    const eligible = page.find(isReportsHubSensorContextRow);
+    if (eligible) return eligible.ts;
+    if (page.length < REPORTS_HUB_SENSOR_PAGE_SIZE) return null;
+    from += REPORTS_HUB_SENSOR_PAGE_SIZE;
+  }
+}
+
+async function loadReportsHubSensorSummary(
+  tentIds: string[],
+  recentSince: string,
+): Promise<Pick<ReportsHubData, "latestSensorCapturedAt" | "recentSensorReadingCount">> {
+  let from = 0;
+  let recentSensorReadingCount = 0;
+  let latestSensorCapturedAt: string | null = null;
+  while (true) {
+    const page = await loadReportsHubSensorPage({ tentIds, from, recentSince });
+    for (const row of page) {
+      if (!isReportsHubSensorContextRow(row)) continue;
+      recentSensorReadingCount += 1;
+      latestSensorCapturedAt ??= row.ts;
+    }
+    if (page.length < REPORTS_HUB_SENSOR_PAGE_SIZE) break;
+    from += REPORTS_HUB_SENSOR_PAGE_SIZE;
+  }
+  if (!latestSensorCapturedAt) {
+    latestSensorCapturedAt = await findLatestReportsHubSensorAt(tentIds, recentSince);
+  }
+  return { latestSensorCapturedAt, recentSensorReadingCount };
+}
 
 export function useReportsHubData(growId: string | null | undefined): ReportsHubData {
   const { user } = useAuth();
@@ -104,8 +178,7 @@ export function useReportsHubData(growId: string | null | undefined): ReportsHub
         alertsWarnRes,
         diaryTotalRes,
         diary7dRes,
-        sensorLatestRes,
-        sensorRecentRes,
+        sensorSummary,
         firstOpenAlertRes,
         completedActionsRes,
       ] = await Promise.all([
@@ -143,20 +216,11 @@ export function useReportsHubData(growId: string | null | undefined): ReportsHub
           .eq("grow_id", growId)
           .gte("entry_at", sevenDaysAgo),
         tentIds.length > 0
-          ? supabase
-              .from("sensor_readings")
-              .select("ts")
-              .in("tent_id", tentIds)
-              .order("ts", { ascending: false })
-              .limit(1)
-          : Promise.resolve({ data: [], error: null } as { data: { ts: string }[]; error: null }),
-        tentIds.length > 0
-          ? supabase
-              .from("sensor_readings")
-              .select("id", { count: "exact", head: true })
-              .in("tent_id", tentIds)
-              .gte("ts", sevenDaysAgo)
-          : Promise.resolve({ count: 0, error: null } as { count: number; error: null }),
+          ? loadReportsHubSensorSummary(tentIds, sevenDaysAgo)
+          : Promise.resolve({
+              latestSensorCapturedAt: null,
+              recentSensorReadingCount: 0,
+            }),
         supabase
           .from("alerts")
           .select("id,severity,created_at")
@@ -180,9 +244,11 @@ export function useReportsHubData(growId: string | null | undefined): ReportsHub
         outcomes: (outcomeRes.data ?? []) as never,
         now: Date.now(),
       });
-      const firstAlert = (firstOpenAlertRes.data?.[0] ?? null) as
-        | { id?: string; severity?: string; created_at?: string }
-        | null;
+      const firstAlert = (firstOpenAlertRes.data?.[0] ?? null) as {
+        id?: string;
+        severity?: string;
+        created_at?: string;
+      } | null;
 
       setState({
         status: "ready",
@@ -194,17 +260,14 @@ export function useReportsHubData(growId: string | null | undefined): ReportsHub
         firstOpenAlertId: firstAlert?.id ?? null,
         firstOpenAlertSeverity: firstAlert?.severity ?? null,
         firstOpenAlertCreatedAt: firstAlert?.created_at ?? null,
-        latestSensorCapturedAt:
-          (sensorLatestRes.data?.[0]?.ts as string | undefined) ?? null,
-        recentSensorReadingCount: sensorRecentRes.count ?? 0,
+        latestSensorCapturedAt: sensorSummary.latestSensorCapturedAt,
+        recentSensorReadingCount: sensorSummary.recentSensorReadingCount,
         diaryEntriesTotal: diaryTotalRes.count ?? 0,
         diaryEntriesLast7d: diary7dRes.count ?? 0,
         pendingOutcomeReviewCount: pendingReviews.length,
         firstPendingActionId: pendingReviews[0]?.action_queue_id ?? null,
         oldestPendingCompletedAt: pendingReviews[0]?.completed_at ?? null,
       });
-
-
     } catch {
       setState({ ...EMPTY_REPORTS_HUB_DATA, status: "unavailable" });
     }

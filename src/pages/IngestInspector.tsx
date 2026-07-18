@@ -28,6 +28,7 @@ import {
   extractVendorLineage,
   filterInspectorReadings,
   inspectorSourceLabel,
+  resolveInspectorSourcePresentation,
   redactRawPayload,
   type InspectorReadingLike,
 } from "@/lib/ingestInspectorRules";
@@ -50,13 +51,14 @@ function ReadingRow({
   const [open, setOpen] = useState(false);
   const vendor = extractVendorLineage(reading.raw_payload);
   const capturedAt = reading.captured_at ?? reading.ts;
-  const sourceLabel = inspectorSourceLabel(reading.source);
+  const sourcePresentation = resolveInspectorSourcePresentation(reading);
 
   return (
     <li
       data-testid="ingest-inspector-row"
       data-source={reading.source}
       data-vendor={vendor ?? ""}
+      data-diagnostic={sourcePresentation.diagnostic ? "true" : "false"}
       className="rounded-xl border bg-card/40 p-3 text-sm"
     >
       <div className="flex flex-wrap items-center gap-2">
@@ -71,7 +73,7 @@ function ReadingRow({
           variant="secondary"
           className="uppercase tracking-wide"
         >
-          {sourceLabel}
+          {sourcePresentation.label}
         </Badge>
         {vendor && (
           <Badge
@@ -83,25 +85,18 @@ function ReadingRow({
           </Badge>
         )}
         {reading.quality && reading.quality !== "ok" && (
-          <Badge
-            data-testid="ingest-inspector-quality-badge"
-            variant="destructive"
-          >
+          <Badge data-testid="ingest-inspector-quality-badge" variant="destructive">
             {reading.quality}
           </Badge>
         )}
-        {tentName && (
-          <span className="text-xs text-muted-foreground">{tentName}</span>
-        )}
+        {tentName && <span className="text-xs text-muted-foreground">{tentName}</span>}
       </div>
 
       <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <span className="text-xs font-medium uppercase text-muted-foreground">
           {reading.metric}
         </span>
-        <span className="font-display text-base">
-          {formatValue(reading.metric, reading.value)}
-        </span>
+        <span className="font-display text-base">{formatValue(reading.metric, reading.value)}</span>
       </div>
 
       <div className="mt-2">
@@ -241,16 +236,9 @@ export default function IngestInspector() {
         </CardHeader>
         <CardContent>
           {query.isLoading && (
-            <div
-              data-testid="ingest-inspector-loading"
-              className="space-y-2"
-              aria-busy="true"
-            >
+            <div data-testid="ingest-inspector-loading" className="space-y-2" aria-busy="true">
               {[0, 1, 2].map((i) => (
-                <div
-                  key={i}
-                  className="h-16 animate-pulse rounded-xl bg-muted/40"
-                />
+                <div key={i} className="h-16 animate-pulse rounded-xl bg-muted/40" />
               ))}
             </div>
           )}
@@ -278,15 +266,12 @@ export default function IngestInspector() {
             />
           )}
           {!query.isLoading && !query.error && filtered.length > 0 && (
-            <ul
-              data-testid="ingest-inspector-list"
-              className="space-y-2"
-            >
+            <ul data-testid="ingest-inspector-list" className="space-y-2">
               {filtered.map((r) => (
                 <ReadingRow
                   key={r.id}
                   reading={r}
-                  tentName={r.tent_id ? tentNames[r.tent_id] ?? null : null}
+                  tentName={r.tent_id ? (tentNames[r.tent_id] ?? null) : null}
                 />
               ))}
             </ul>

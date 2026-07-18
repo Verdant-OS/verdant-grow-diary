@@ -25,6 +25,7 @@ import {
   snapshotFromDiary,
   snapshotFromReadings,
 } from "@/lib/sensorSnapshot";
+import { selectDashboardSensorEvidenceRows } from "@/lib/dashboardSensorEvidenceRules";
 
 export type SnapshotState =
   | { status: "idle"; snapshot: SensorSnapshot }
@@ -48,14 +49,15 @@ export function useLatestSensorSnapshot(
         if (tentIds.length > 0) {
           const { data, error } = await supabase
             .from("sensor_readings")
-            .select("id,ts,metric,value,source,tent_id,created_at,raw_payload")
+            .select("id,ts,metric,value,quality,source,tent_id,created_at,raw_payload")
             .in("tent_id", tentIds)
             .order("ts", { ascending: false })
             .order("created_at", { ascending: false })
             .limit(50);
-          if (!error && data && data.length > 0) {
+          const evidenceRows = !error ? selectDashboardSensorEvidenceRows(data ?? []) : [];
+          if (evidenceRows.length > 0) {
             const snap = snapshotFromReadings(
-              data.map((r) => ({
+              evidenceRows.map((r) => ({
                 id: (r as { id?: string | null }).id ?? null,
                 ts: r.ts,
                 metric: r.metric,
@@ -97,7 +99,7 @@ export function useLatestSensorSnapshot(
   if (!user || !growId) {
     return { status: "idle", snapshot: EMPTY_SNAPSHOT };
   }
-  if (query.isLoading || query.isFetching && !query.data) {
+  if (query.isLoading || (query.isFetching && !query.data)) {
     return { status: "loading", snapshot: EMPTY_SNAPSHOT };
   }
   if (query.isError) {

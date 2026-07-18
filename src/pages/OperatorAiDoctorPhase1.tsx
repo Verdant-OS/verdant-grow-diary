@@ -46,9 +46,7 @@ import {
   AI_DOCTOR_PHASE1_SKIP_LINK_CLASSES,
 } from "@/lib/aiDoctorPhase1A11yClassNames";
 
-export const AI_DOCTOR_PHASE1_EVIDENCE_SHORTCUTS_ANCHOR_ID =
-  "ai-doctor-phase1-evidence-shortcuts";
-
+export const AI_DOCTOR_PHASE1_EVIDENCE_SHORTCUTS_ANCHOR_ID = "ai-doctor-phase1-evidence-shortcuts";
 
 export const OPERATOR_AI_DOCTOR_PHASE1_ROUTE = "/operator/ai-doctor-phase1";
 export const AI_DOCTOR_PHASE1_SENSOR_ANCHOR_ID = "ai-doctor-phase1-sensor-summary";
@@ -67,9 +65,7 @@ export interface OperatorAiDoctorPhase1Props {
    * Optional pure selector for recent diary/activity rows for a plant.
    * Used by the read-only recent-diary evidence shortcuts.
    */
-  getRecentActivityForPlant?: (
-    plantId: string,
-  ) => ReadonlyArray<AiDoctorPhase1RecentActivityRow>;
+  getRecentActivityForPlant?: (plantId: string) => ReadonlyArray<AiDoctorPhase1RecentActivityRow>;
   /**
    * When true and a plant is selected but no result is available yet,
    * render the loading skeleton instead of the no-result state.
@@ -129,19 +125,14 @@ export default function OperatorAiDoctorPhase1(
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
-  const resultBundle =
-    selectedPlant ? getResultForPlant(selectedPlant.id) : null;
+  const resultBundle = selectedPlant ? getResultForPlant(selectedPlant.id) : null;
 
   const recentActivity: ReadonlyArray<AiDoctorPhase1RecentActivityRow> =
     selectedPlant && props.getRecentActivityForPlant
-      ? props.getRecentActivityForPlant(selectedPlant.id) ?? []
+      ? (props.getRecentActivityForPlant(selectedPlant.id) ?? [])
       : [];
 
-  const isDerivingResult = !!(
-    selectedPlant &&
-    !resultBundle &&
-    props.isDerivingResult
-  );
+  const isDerivingResult = !!(selectedPlant && !resultBundle && props.isDerivingResult);
 
   const ctaContext = {
     plantId: selectedPlant?.id ?? null,
@@ -160,16 +151,13 @@ export default function OperatorAiDoctorPhase1(
     tentId: selectedPlant?.tent_id ?? null,
     hash: "photos",
   });
-  const hasPhotoActivity = recentActivity.some((row) =>
-    typeof row.event_type === "string" && /photo/i.test(row.event_type),
+  const hasPhotoActivity = recentActivity.some(
+    (row) => typeof row.event_type === "string" && /photo/i.test(row.event_type),
   );
 
-  const showMobileStickyBar =
-    !!selectedPlant && !unknownPlantId && !!resultBundle;
+  const showMobileStickyBar = !!selectedPlant && !unknownPlantId && !!resultBundle;
   const plantNameForAria = selectedPlant?.name ?? null;
-  const ariaWho = plantNameForAria
-    ? `for ${plantNameForAria}`
-    : "for selected plant";
+  const ariaWho = plantNameForAria ? `for ${plantNameForAria}` : "for selected plant";
 
   return (
     <main
@@ -177,13 +165,9 @@ export default function OperatorAiDoctorPhase1(
       className={`mx-auto max-w-4xl space-y-4 p-4 ${showMobileStickyBar ? "pb-24 sm:pb-4" : ""}`}
     >
       <header className="space-y-1">
-        <h1 className="text-2xl font-semibold text-foreground">
-          AI Doctor Phase 1
-        </h1>
+        <h1 className="text-2xl font-semibold text-foreground">AI Doctor Phase 1</h1>
         <ul className="space-y-1 text-xs text-muted-foreground">
-          <li data-testid="ai-doctor-phase1-page-safety-1">
-            Cautious context review only.
-          </li>
+          <li data-testid="ai-doctor-phase1-page-safety-1">Cautious context review only.</li>
           <li data-testid="ai-doctor-phase1-page-safety-2">
             No diagnosis is saved from this screen.
           </li>
@@ -198,9 +182,7 @@ export default function OperatorAiDoctorPhase1(
           data-testid="ai-doctor-phase1-no-plants-state"
           className="rounded-md border border-border bg-muted p-4 text-sm"
         >
-          <h2 className="text-base font-semibold text-foreground">
-            No plants available
-          </h2>
+          <h2 className="text-base font-semibold text-foreground">No plants available</h2>
           <p className="text-muted-foreground">
             Create a plant before reviewing AI Doctor context.
           </p>
@@ -227,9 +209,7 @@ export default function OperatorAiDoctorPhase1(
           data-testid="ai-doctor-phase1-unknown-plant-state"
           className="rounded-md border border-border bg-muted p-4 text-sm"
         >
-          <h2 className="text-base font-semibold text-foreground">
-            Plant not found
-          </h2>
+          <h2 className="text-base font-semibold text-foreground">Plant not found</h2>
           <p className="text-muted-foreground">
             Choose a valid plant to review AI Doctor Phase 1 context.
           </p>
@@ -249,9 +229,7 @@ export default function OperatorAiDoctorPhase1(
           data-testid="ai-doctor-phase1-choose-plant-state"
           className="rounded-md border border-border bg-muted p-4 text-sm"
         >
-          <h2 className="text-base font-semibold text-foreground">
-            Choose a plant
-          </h2>
+          <h2 className="text-base font-semibold text-foreground">Choose a plant</h2>
           <p className="text-muted-foreground">
             Select a plant to review its AI Doctor Phase 1 context.
           </p>
@@ -303,9 +281,7 @@ export default function OperatorAiDoctorPhase1(
               Read-only AI Doctor Phase 1
             </span>
           </div>
-          <p className="text-xs text-muted-foreground">
-            No result is saved from this screen.
-          </p>
+          <p className="text-xs text-muted-foreground">No result is saved from this screen.</p>
           <div className="flex flex-wrap gap-2">
             {plantContextHref && (
               <Link
@@ -387,17 +363,13 @@ export default function OperatorAiDoctorPhase1(
               data-testid="ai-doctor-phase1-missing-context-guidance"
               className="rounded-md border border-border bg-muted p-4 text-sm"
             >
-              <h2 className="text-base font-semibold text-foreground">
-                Missing context
-              </h2>
+              <h2 className="text-base font-semibold text-foreground">Missing context</h2>
               <ul className="ml-4 list-disc text-muted-foreground">
                 {resultBundle.result.missing_information.map((m, i) => (
                   <li key={`${i}-${m}`}>{m}</li>
                 ))}
               </ul>
-              <p className="mt-2 text-muted-foreground">
-                Evidence-first next steps:
-              </p>
+              <p className="mt-2 text-muted-foreground">Evidence-first next steps:</p>
               <ul className="ml-4 list-disc text-muted-foreground">
                 <li>Add a recent photo</li>
                 <li>Add watering or feeding log if relevant</li>
@@ -540,7 +512,7 @@ export function mapPlantsToPickerOptions(
       name: p.name ?? p.id,
       strain: p.strain ?? null,
       stage: p.stage ?? null,
-      tent_name: p.tent_id ? tentNameById.get(p.tent_id) ?? null : null,
+      tent_name: p.tent_id ? (tentNameById.get(p.tent_id) ?? null) : null,
       tent_id: p.tent_id ?? null,
       grow_id: p.grow_id ?? null,
     }));
@@ -565,8 +537,7 @@ function useDerivedAiDoctorPhase1Bundle(
     if (!plant) return null;
     const logs = (diaryRows ?? [])
       .map((row: Record<string, unknown>) => {
-        const occurred_at =
-          (row.entry_at as string | null) ?? (row.created_at as string | null);
+        const occurred_at = (row.entry_at as string | null) ?? (row.created_at as string | null);
         if (!occurred_at) return null;
         return {
           id: (row.id as string | null) ?? null,
@@ -577,17 +548,15 @@ function useDerivedAiDoctorPhase1Bundle(
         };
       })
       .filter(Boolean) as Array<{
-        id: string | null;
-        occurred_at: string;
-        event_type: string;
-        source: string;
-        note: string | null;
-      }>;
+      id: string | null;
+      occurred_at: string;
+      event_type: string;
+      source: string;
+      note: string | null;
+    }>;
 
     const sensors = (sensorRows ?? [])
-      .filter((r: Record<string, unknown>) =>
-        plant.tent_id ? r.tent_id === plant.tent_id : true,
-      )
+      .filter((r: Record<string, unknown>) => (plant.tent_id ? r.tent_id === plant.tent_id : true))
       .map((r: Record<string, unknown>) => ({
         id: (r.id as string | null) ?? null,
         metric: String(r.metric ?? ""),
@@ -596,8 +565,14 @@ function useDerivedAiDoctorPhase1Bundle(
             ? (r.value as number)
             : null,
         captured_at:
-          (r.ts as string | null) ?? (r.created_at as string | null) ?? "",
+          (r.captured_at as string | null) ??
+          (r.ts as string | null) ??
+          (r.created_at as string | null) ??
+          "",
         source: String(r.source ?? ""),
+        // Retained only until the pure compiler applies the diagnostic
+        // provenance fence; never included in the compiled AI payload.
+        raw_payload: r.raw_payload,
       }))
       .filter((r) => r.metric && r.captured_at);
 
@@ -653,8 +628,7 @@ function mapDiaryRowsToRecentActivity(
     out.push({
       id,
       occurred_at,
-      event_type:
-        typeof row.entry_type === "string" ? row.entry_type : null,
+      event_type: typeof row.entry_type === "string" ? row.entry_type : null,
       notes: typeof row.notes === "string" ? row.notes : null,
     });
   }
@@ -667,14 +641,12 @@ function OperatorAiDoctorPhase1SmartView(props: {
 }): JSX.Element {
   const [searchParams] = useSearchParams();
   const plantId = searchParams.get("plantId");
-  const selectedRaw =
-    props.rawPlants.find((p) => p.id === plantId) ?? null;
+  const selectedRaw = props.rawPlants.find((p) => p.id === plantId) ?? null;
   const bundle = useDerivedAiDoctorPhase1Bundle(selectedRaw);
   const diary = usePlantRecentActivity(selectedRaw?.id ?? null);
   const recentActivity = React.useMemo(
-    () => mapDiaryRowsToRecentActivity(
-      (diary.data ?? []) as ReadonlyArray<Record<string, unknown>>,
-    ),
+    () =>
+      mapDiaryRowsToRecentActivity((diary.data ?? []) as ReadonlyArray<Record<string, unknown>>),
     [diary.data],
   );
   const getResultForPlant = React.useCallback(

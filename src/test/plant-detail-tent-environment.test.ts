@@ -68,6 +68,7 @@ describe("buildPlantTentEnvironmentView (pure)", () => {
     expect(view.hasReadings).toBe(true);
     expect(view.sourceLabel).toBe("Live sensor");
     expect(view.stale).toBe(false);
+    expect(view.canAssessStage).toBe(true);
     const temp = view.metrics.find((m) => m.key === "temp")!;
     const vpd = view.metrics.find((m) => m.key === "vpd")!;
     expect(temp.hasValue).toBe(true);
@@ -85,6 +86,51 @@ describe("buildPlantTentEnvironmentView (pure)", () => {
     ]);
     expect(view.hasReadings).toBe(true);
     expect(view.sourceLabel).toBe("Unverified source");
+    expect(view.canAssessStage).toBe(false);
+  });
+
+  it("keeps a Windows diagnostic packet non-live when only the canonical mirror says live", () => {
+    const ts = new Date().toISOString();
+    const view = buildPlantTentEnvironmentView([
+      {
+        ts,
+        metric: "temperature_c",
+        value: 24.5,
+        source: "live",
+        raw_payload: {
+          vendor: "ecowitt_windows_testbench",
+          metadata: { verdant_source: "live" },
+        },
+      },
+    ]);
+    expect(view.hasReadings).toBe(true);
+    expect(view.sourceLabel).toBe("Unverified source");
+    expect(view.sourceLabel).not.toBe("Live sensor");
+    expect(view.canAssessStage).toBe(false);
+  });
+
+  it("keeps a physical Windows gateway packet live with preserved source and gateway markers", () => {
+    const ts = new Date().toISOString();
+    const view = buildPlantTentEnvironmentView([
+      {
+        ts,
+        metric: "temperature_c",
+        value: 24.5,
+        source: "live",
+        raw_payload: {
+          vendor: "ecowitt_windows_testbench",
+          metadata: {
+            reported_verdant_source: "live",
+            raw_payload: {
+              stationtype: "GW2000A_V3.2.4",
+              dateutc: "2026-07-17 12:00:00",
+            },
+          },
+        },
+      },
+    ]);
+    expect(view.sourceLabel).toBe("Live sensor");
+    expect(view.canAssessStage).toBe(true);
   });
 
   it("does not invent missing values as zero", () => {
@@ -103,14 +149,14 @@ describe("buildPlantTentEnvironmentView (pure)", () => {
       { ts: old, metric: "temperature_c", value: 21, source: "sensor" },
     ]);
     expect(view.stale).toBe(true);
+    expect(view.canAssessStage).toBe(false);
   });
 
   it("surfaces source label when source metadata is present", () => {
     const ts = new Date().toISOString();
     expect(
-      buildPlantTentEnvironmentView([
-        { ts, metric: "temperature_c", value: 22, source: "manual" },
-      ]).sourceLabel,
+      buildPlantTentEnvironmentView([{ ts, metric: "temperature_c", value: 22, source: "manual" }])
+        .sourceLabel,
     ).toBe("Manual reading");
   });
 });
@@ -132,7 +178,9 @@ describe("usePlantTentLatestReadings (scoping)", () => {
       wrapper: wrapper(),
     });
     await waitFor(() => expect(fromMock).toHaveBeenCalledWith("sensor_readings"));
-    expect(selectMock).toHaveBeenCalledWith("ts,metric,value,source,created_at,device_id");
+    expect(selectMock).toHaveBeenCalledWith(
+      "ts,metric,value,source,created_at,device_id,raw_payload",
+    );
     expect(eqMock).toHaveBeenCalledWith("tent_id", "tent-123");
     expect(orderMock).toHaveBeenCalledWith("ts", { ascending: false });
     expect(orderMock).toHaveBeenCalledWith("created_at", { ascending: false });
@@ -152,15 +200,19 @@ describe("Plant Detail · Assigned Tent Environment static safety", () => {
   });
 
   it("panel renders both empty-state messages", () => {
-    expect(PANEL).toContain(
-      "Assign this plant to a tent to see its latest environment context.",
-    );
+    expect(PANEL).toContain("Assign this plant to a tent to see its latest environment context.");
     expect(PANEL).toContain("No sensor readings found for this tent yet.");
   });
 
   it("panel provides a View Tent link", () => {
     expect(PANEL).toContain("plant-tent-environment-view-tent");
     expect(PANEL).toMatch(/tentDetailPath\(/);
+  });
+
+  it("gates VPD stage cues on provenance-aware assessment eligibility", () => {
+    expect(PANEL).toMatch(/snap\?\.vpd\s*!==\s*undefined\s*&&\s*view\.canAssessStage/);
+    expect(RULES).toMatch(/snap\.source\s*===\s*["']live["']/);
+    expect(RULES).toContain("canAssessStage");
   });
 
   it("hook only reads sensor_readings (no writes)", () => {

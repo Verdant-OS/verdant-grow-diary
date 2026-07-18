@@ -15,6 +15,7 @@
  */
 import {
   isStale,
+  snapshotFromReadings,
   toFiniteNumber,
   type SensorReadingLike,
   type SnapshotSource,
@@ -41,19 +42,18 @@ export interface RecentSensorSnapshot {
 
 function clampLimit(n: number | undefined): number {
   const v =
-    typeof n === "number" && Number.isFinite(n)
-      ? Math.floor(n)
-      : RECENT_HISTORY_DEFAULT_LIMIT;
+    typeof n === "number" && Number.isFinite(n) ? Math.floor(n) : RECENT_HISTORY_DEFAULT_LIMIT;
   if (v < RECENT_HISTORY_MIN_LIMIT) return RECENT_HISTORY_MIN_LIMIT;
   if (v > RECENT_HISTORY_MAX_LIMIT) return RECENT_HISTORY_MAX_LIMIT;
   return v;
 }
 
 function classifySource(rows: SensorReadingLike[]): SnapshotSource {
-  if (rows.length === 0) return "unavailable";
-  if (rows.some((r) => r.source === "manual")) return "manual";
-  if (rows.every((r) => r.source === "sim")) return "sim";
-  return "live";
+  // Source is a trust claim, not a fallback. Reuse the same provenance-aware
+  // classification as the latest environment snapshot so Windows diagnostic
+  // packets cannot become "Live sensor" in history merely because their
+  // canonical stored source is `live`.
+  return snapshotFromReadings(rows)?.source ?? "unavailable";
 }
 
 function pickMetric(rows: SensorReadingLike[], metric: string): number | null {

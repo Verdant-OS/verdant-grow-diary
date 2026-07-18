@@ -18,7 +18,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
-import { resolve } from "node:path";
+import { basename, resolve } from "node:path";
 
 const TOOLS_DIR = resolve(process.cwd(), "src/lib/mcp/tools");
 
@@ -37,7 +37,7 @@ describe("MCP tool source-code safety scan", () => {
 
   for (const file of files) {
     const src = readFileSync(file, "utf8");
-    const relative = file.split("src/lib/mcp/tools/").pop();
+    const relative = basename(file);
 
     describe(relative, () => {
       it("uses the RLS-scoped per-user Supabase client", () => {
@@ -71,13 +71,18 @@ describe("MCP tool source-code safety scan", () => {
         expect(src).not.toMatch(/functions\.invoke/);
       });
 
-      it("never selects or exposes raw_payload as a field", () => {
+      it("uses raw_payload only for the latest-snapshot provenance fence", () => {
         // Strip block/line comments before checking so the safety note
         // (which mentions raw_payload by design) doesn't trigger.
-        const codeOnly = src
-          .replace(/\/\*[\s\S]*?\*\//g, "")
-          .replace(/(^|\s)\/\/.*$/gm, "");
-        expect(codeOnly).not.toMatch(/raw_payload/);
+        const codeOnly = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|\s)\/\/.*$/gm, "");
+        if (relative === "get-latest-sensor-snapshot.ts") {
+          expect(codeOnly).toMatch(/SENSOR_COLUMNS[\s\S]*raw_payload/);
+          expect(codeOnly).toMatch(/withoutDiagnosticSensorRows/);
+          expect(codeOnly).toMatch(/satisfies McpSensorReading/);
+          expect(codeOnly).not.toMatch(/structuredContent[\s\S]*raw_payload/);
+        } else {
+          expect(codeOnly).not.toMatch(/raw_payload/);
+        }
       });
     });
   }

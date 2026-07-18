@@ -8,13 +8,12 @@ import {
   filterInspectorReadings,
   inspectorSourceLabel,
   isLiveSource,
+  resolveInspectorSourcePresentation,
   redactRawPayload,
   type InspectorReadingLike,
 } from "@/lib/ingestInspectorRules";
 
-const makeReading = (
-  over: Partial<InspectorReadingLike> = {},
-): InspectorReadingLike => ({
+const makeReading = (over: Partial<InspectorReadingLike> = {}): InspectorReadingLike => ({
   id: over.id ?? "r1",
   ts: over.ts ?? "2026-06-01T10:00:00Z",
   captured_at: over.captured_at ?? "2026-06-01T10:00:00Z",
@@ -45,6 +44,45 @@ describe("inspectorSourceLabel / isLiveSource", () => {
   });
 });
 
+describe("resolveInspectorSourcePresentation", () => {
+  it("fails a diagnostic canonical-live row closed to testbench/demo", () => {
+    const presentation = resolveInspectorSourcePresentation(
+      makeReading({
+        source: "live",
+        raw_payload: {
+          vendor: "ecowitt_windows_testbench",
+          metadata: { reported_verdant_source: "live", raw_payload: { tempf: "77.0" } },
+        },
+      }),
+    );
+
+    expect(presentation).toEqual({
+      label: "Testbench / demo",
+      diagnostic: true,
+      live: false,
+    });
+  });
+
+  it("keeps a physically proven Windows gateway live without returning raw payload", () => {
+    const presentation = resolveInspectorSourcePresentation(
+      makeReading({
+        source: "live",
+        raw_payload: {
+          vendor: "ecowitt_windows_testbench",
+          metadata: {
+            reported_verdant_source: "live",
+            raw_payload: { stationtype: "GW1200B", model: "GW1200", tempf: "77.0" },
+          },
+        },
+      }),
+    );
+
+    expect(presentation.diagnostic).toBe(false);
+    expect(presentation.live).toBe(true);
+    expect(presentation).not.toHaveProperty("raw_payload");
+  });
+});
+
 describe("redactRawPayload", () => {
   it("redacts secret-like keys at any depth", () => {
     const result = redactRawPayload({
@@ -66,10 +104,7 @@ describe("redactRawPayload", () => {
     expect(arr[1].ok).toBe(true);
   });
   it("strips user_id from output", () => {
-    const out = redactRawPayload({ user_id: "u-1", value: 2 }) as Record<
-      string,
-      unknown
-    >;
+    const out = redactRawPayload({ user_id: "u-1", value: 2 }) as Record<string, unknown>;
     expect(out.user_id).toBe(REDACTED_PLACEHOLDER);
   });
   it("does not mutate input", () => {
@@ -85,9 +120,7 @@ describe("extractVendorLineage", () => {
     expect(extractVendorLineage({ vendor: "EcoWitt" })).toBe("EcoWitt");
   });
   it("reads metadata.vendor", () => {
-    expect(
-      extractVendorLineage({ metadata: { vendor: "Home Assistant" } }),
-    ).toBe("Home Assistant");
+    expect(extractVendorLineage({ metadata: { vendor: "Home Assistant" } })).toBe("Home Assistant");
   });
   it("returns null for missing / blank", () => {
     expect(extractVendorLineage(null)).toBeNull();

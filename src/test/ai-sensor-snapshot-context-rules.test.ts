@@ -116,8 +116,7 @@ describe("buildAiSensorSnapshotContext — locked annotation format", () => {
 // =========================================================
 
 describe("buildAiSensorSnapshotContext — staleThresholdMs edges", () => {
-  const capturedAtMsAgo = (ms: number) =>
-    new Date(NOW.getTime() - ms).toISOString();
+  const capturedAtMsAgo = (ms: number) => new Date(NOW.getTime() - ms).toISOString();
 
   it("exactly on stale threshold → NOT stale (strict greater-than comparison)", () => {
     const r = buildAiSensorSnapshotContext(
@@ -159,10 +158,7 @@ describe("buildAiSensorSnapshotContext — staleThresholdMs edges", () => {
   });
 
   it("missing captured_at → low trust + missing-information hint, values omitted", () => {
-    const r = buildAiSensorSnapshotContext(
-      { source: "manual", ...baseReadings },
-      { now: NOW },
-    );
+    const r = buildAiSensorSnapshotContext({ source: "manual", ...baseReadings }, { now: NOW });
     expect(r.trustLevel).toBe("low");
     expect(r.valuesForModel).toBeNull();
     expect(r.isTrustedForAi).toBe(false);
@@ -251,21 +247,13 @@ describe("buildAiSensorSnapshotsContext — aggregation", () => {
 
   it("dedupes + sorts safety notes and missing-information hints", () => {
     const r = buildAiSensorSnapshotsContext(
-      [
-        make({ source: "demo" }),
-        make({ source: "demo" }),
-        make({ source: "invalid" }),
-      ],
+      [make({ source: "demo" }), make({ source: "demo" }), make({ source: "invalid" })],
       { now: NOW },
     );
     expect(r.safetyNotes).toEqual([...r.safetyNotes].sort());
     expect(new Set(r.safetyNotes).size).toBe(r.safetyNotes.length);
-    expect(r.missingInformationHints).toEqual(
-      [...r.missingInformationHints].sort(),
-    );
-    expect(new Set(r.missingInformationHints).size).toBe(
-      r.missingInformationHints.length,
-    );
+    expect(r.missingInformationHints).toEqual([...r.missingInformationHints].sort());
+    expect(new Set(r.missingInformationHints).size).toBe(r.missingInformationHints.length);
   });
 
   it("reports highest and lowest trust levels across mixed snapshots", () => {
@@ -281,10 +269,9 @@ describe("buildAiSensorSnapshotsContext — aggregation", () => {
   });
 
   it("never hides stale/demo presence in aggregated output", () => {
-    const r = buildAiSensorSnapshotsContext(
-      [make({ source: "live" }), make({ source: "stale" })],
-      { now: NOW },
-    );
+    const r = buildAiSensorSnapshotsContext([make({ source: "live" }), make({ source: "stale" })], {
+      now: NOW,
+    });
     expect(r.hasStaleSnapshots).toBe(true);
     expect(r.annotationLines.some((l) => l.includes("source=stale"))).toBe(true);
   });
@@ -309,6 +296,48 @@ describe("buildAiSensorSnapshotsContext — aggregation", () => {
 // =========================================================
 
 describe("buildAiSensorSnapshotContext — raw blob regression", () => {
+  it("demotes canonical live rows with Windows diagnostic provenance", () => {
+    const r = buildAiSensorSnapshotContext(
+      make({
+        source: "live",
+        raw_payload: {
+          vendor: "ecowitt_windows_testbench",
+          metadata: { confidence: "test" },
+        },
+      }),
+      { now: NOW },
+    );
+    expect(r.sourceLabel).toBe("demo");
+    expect(r.trustLevel).toBe("low");
+    expect(r.isTrustedForAi).toBe(false);
+    expect(r.valuesForModel).toBeNull();
+  });
+
+  it("keeps physical gateway lineage trusted without exposing raw payload", () => {
+    const r = buildAiSensorSnapshotContext(
+      make({
+        source: "live",
+        raw_payload: {
+          vendor: "ecowitt_windows_testbench",
+          metadata: {
+            reported_verdant_source: "live",
+            raw_payload: {
+              stationtype: "GW2000A_V3.2.4",
+              model: "GW2000A",
+              dateutc: "2026-06-06 11:55:00",
+            },
+          },
+        },
+      }),
+      { now: NOW },
+    );
+    expect(r.sourceLabel).toBe("live");
+    expect(r.trustLevel).toBe("high");
+    expect(r.isTrustedForAi).toBe(true);
+    expect(JSON.stringify(r)).not.toContain("raw_payload");
+    expect(JSON.stringify(r)).not.toContain("stationtype");
+  });
+
   it("annotation output never includes raw 'sensor_snapshot' or 'raw_payload' JSON blob", () => {
     const noisy = make({
       source: "live",

@@ -17,9 +17,7 @@ import { resolve } from "node:path";
 const SOURCE_PATH = resolve(__dirname, "../../supabase/functions/ai-coach/index.ts");
 const SOURCE = readFileSync(SOURCE_PATH, "utf8");
 // Strip line comments and block comments so substring checks don't match commented-out code.
-const CODE = SOURCE
-  .replace(/\/\*[\s\S]*?\*\//g, "")
-  .replace(/(^|[^:])\/\/.*$/gm, "$1");
+const CODE = SOURCE.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
 
 describe("ai-coach edge function — security shape", () => {
   it("uses SUPABASE_URL and SUPABASE_ANON_KEY for the Supabase client", () => {
@@ -38,12 +36,16 @@ describe("ai-coach edge function — security shape", () => {
   });
 
   it("returns 401 when the Authorization header is missing", () => {
-    expect(CODE).toMatch(/if\s*\(\s*!auth\s*\)\s*return\s+json\(\s*\{\s*error:\s*["']unauthorized["']\s*\}\s*,\s*401\s*\)/);
+    expect(CODE).toMatch(
+      /if\s*\(\s*!auth\s*\)\s*return\s+json\(\s*\{\s*error:\s*["']unauthorized["']\s*\}\s*,\s*401\s*\)/,
+    );
   });
 
   it("requires supabase.auth.getUser() and returns 401 when no user is present", () => {
     expect(CODE).toMatch(/supabase\.auth\.getUser\(\)/);
-    expect(CODE).toMatch(/if\s*\(\s*!u\?\.user\s*\)\s*return\s+json\(\s*\{\s*error:\s*["']unauthorized["']\s*\}\s*,\s*401\s*\)/);
+    expect(CODE).toMatch(
+      /if\s*\(\s*!u\?\.user\s*\)\s*return\s+json\(\s*\{\s*error:\s*["']unauthorized["']\s*\}\s*,\s*401\s*\)/,
+    );
   });
 
   it("only destructures growId / mode / photoUrl / question from the request body", () => {
@@ -78,24 +80,34 @@ describe("ai-coach edge function — security shape", () => {
       expect(matches.length, `expected at least one .from("${table}") call`).toBeGreaterThan(0);
       // Every .from("<table>") occurrence must be on the `supabase` (anon, auth-forwarded) client.
       // Allow whitespace/newlines between `supabase` and `.from(...)` (chained on next line).
-      const prefixed = CODE.match(new RegExp(`supabase\\s*\\.from\\(\\s*["']${table}["']\\s*\\)`, "g")) ?? [];
-      expect(prefixed.length, `every .from("${table}") must be on the user-scoped supabase client`).toBe(matches.length);
+      const prefixed =
+        CODE.match(new RegExp(`supabase\\s*\\.from\\(\\s*["']${table}["']\\s*\\)`, "g")) ?? [];
+      expect(
+        prefixed.length,
+        `every .from("${table}") must be on the user-scoped supabase client`,
+      ).toBe(matches.length);
     }
   });
 
   it("scopes diary_entries query by grow_id (RLS then restricts to caller's rows)", () => {
-    expect(CODE).toMatch(/\.from\(\s*["']diary_entries["']\s*\)[\s\S]{0,400}\.eq\(\s*["']grow_id["']\s*,\s*body\.growId\s*\)/);
+    expect(CODE).toMatch(
+      /\.from\(\s*["']diary_entries["']\s*\)[\s\S]{0,400}\.eq\(\s*["']grow_id["']\s*,\s*body\.growId\s*\)/,
+    );
   });
 
   it("looks up the grow with .eq('id', body.growId) — RLS makes foreign growIds return null", () => {
-    expect(CODE).toMatch(/\.from\(\s*["']grows["']\s*\)[\s\S]{0,200}\.eq\(\s*["']id["']\s*,\s*body\.growId\s*\)/);
+    expect(CODE).toMatch(
+      /\.from\(\s*["']grows["']\s*\)[\s\S]{0,200}\.eq\(\s*["']id["']\s*,\s*body\.growId\s*\)/,
+    );
   });
 
   it("returns EMPTY_ANALYSIS without invoking the AI provider when grow is foreign / no entries", () => {
     // empty := !grow || entries.length === 0  — when a foreign growId is passed, RLS makes both true.
     expect(CODE).toMatch(/const\s+empty\s*=\s*!grow\s*\|\|\s*entries\.length\s*===\s*0/);
     // The empty branch returns EMPTY_ANALYSIS BEFORE the fetch() to the AI gateway.
-    const emptyIdx = CODE.search(/if\s*\(\s*empty[\s\S]*?return\s+json\(\s*\{\s*analysis:\s*EMPTY_ANALYSIS/);
+    const emptyIdx = CODE.search(
+      /if\s*\(\s*empty[\s\S]*?return\s+json\(\s*\{\s*analysis:\s*EMPTY_ANALYSIS/,
+    );
     const fetchIdx = CODE.search(/fetch\(\s*["']https:\/\/ai\.gateway\.lovable\.dev/);
     expect(emptyIdx).toBeGreaterThan(-1);
     expect(fetchIdx).toBeGreaterThan(-1);
@@ -106,8 +118,8 @@ describe("ai-coach edge function — security shape", () => {
     // The context block is assembled from server-queried variables, not from body fields.
     expect(CODE).toMatch(/const\s+context\s*=\s*ctxLines\.join/);
     expect(CODE).not.toMatch(/ctxLines\.push\([^)]*body\.(plant|tent|user)/i);
-    // latestSnapshot is selected from the already-RLS-filtered diary
-    // entries via the dedicated picker helper.
-    expect(CODE).toMatch(/pickLatestSensorSnapshotByCapturedAt\(\s*entries\s*\)/);
+    // Snapshot evidence is selected from the already-RLS-filtered diary
+    // entries before its provenance is resolved for AI context.
+    expect(CODE).toMatch(/pickLatestSensorSnapshotEvidenceByCapturedAt\(\s*entries\s*\)/);
   });
 });

@@ -4,7 +4,7 @@
  *
  * - Plant Detail: stage-aware VPD copy renders with plant's stage
  * - Unknown stage does NOT render an "In ... range" verdict
- * - Stale readings stay marked stale/historical
+ * - Stale readings stay marked stale and do not receive stage verdicts
  * - Source files contain no automation / device-control / unsafe writes
  */
 import { describe, it, expect, vi } from "vitest";
@@ -27,10 +27,7 @@ const PANEL_SRC = readFileSync(
   resolve(ROOT, "src/components/PlantTentEnvironmentPanel.tsx"),
   "utf8",
 );
-const TENT_DETAIL_SRC = readFileSync(
-  resolve(ROOT, "src/pages/TentDetail.tsx"),
-  "utf8",
-);
+const TENT_DETAIL_SRC = readFileSync(resolve(ROOT, "src/pages/TentDetail.tsx"), "utf8");
 
 function renderPanel(stage: string | null, opts?: { stale?: boolean }) {
   const ts = opts?.stale
@@ -41,8 +38,10 @@ function renderPanel(stage: string | null, opts?: { stale?: boolean }) {
     { ts, metric: "temperature_c", value: 24, source: "manual", device_id: null },
     { ts, metric: "humidity_pct", value: 55, source: "manual", device_id: null },
   ];
-  (usePlantTentLatestReadings as unknown as ReturnType<typeof vi.fn>)
-    .mockReturnValue({ data: rows, isLoading: false });
+  (usePlantTentLatestReadings as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+    data: rows,
+    isLoading: false,
+  });
 
   const qc = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -89,14 +88,11 @@ describe("Plant Detail — stage-aware VPD copy", () => {
     expect(hint.textContent).not.toMatch(/In .* VPD range/);
   });
 
-  it("preserves stale / historical wording for stale readings", () => {
+  it("suppresses stage verdicts for stale readings while keeping the stale marker", () => {
     renderPanel("veg", { stale: true });
-    const hint = screen.getByTestId("plant-tent-environment-vpd-stage-hint");
-    expect(hint.textContent?.toLowerCase()).toMatch(/historical|stale/);
+    expect(screen.queryByTestId("plant-tent-environment-vpd-stage-hint")).toBeNull();
     // Stale marker on the captured-source strip still rendered.
-    expect(
-      screen.getByTestId("plant-tent-environment-stale"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("plant-tent-environment-stale")).toBeInTheDocument();
   });
 });
 

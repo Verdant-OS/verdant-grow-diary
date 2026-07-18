@@ -25,6 +25,7 @@
 import { classifyTimelineEntry } from "@/lib/timelineEntryClassification";
 import { normalizeDiaryEntries } from "@/lib/diaryEntryRules";
 import { normalizeReportSensorSource, redactSecrets } from "@/lib/postGrowReportRules";
+import { withoutDiagnosticSensorRows } from "@/lib/sensorProvenanceFenceRules";
 import { SENSOR_SOURCE_SHORT_LABEL } from "@/constants/sensorSourceLabels";
 import type { TimelineSensorSourceKind } from "@/lib/timelineSensorSourceBadgeRules";
 
@@ -56,6 +57,8 @@ export interface DiaryRangeSensorReadingRow {
   value?: number | null;
   ts?: string | null;
   source?: string | null;
+  /** Classification-only provenance; never copied into the report view model. */
+  raw_payload?: unknown;
 }
 
 export interface BuildDiaryRangeReportInput {
@@ -145,11 +148,9 @@ export const DIARY_RANGE_PREVIEW_CAP = 10;
 export const DIARY_RANGE_WATERING_EMPTY_COPY = "No waterings logged in this range.";
 export const DIARY_RANGE_FEEDING_EMPTY_COPY = "No feedings logged in this range.";
 export const DIARY_RANGE_TRAINING_EMPTY_COPY = "No training logged in this range.";
-export const DIARY_RANGE_ENVIRONMENT_EMPTY_COPY =
-  "No environment evidence logged in this range.";
+export const DIARY_RANGE_ENVIRONMENT_EMPTY_COPY = "No environment evidence logged in this range.";
 export const DIARY_RANGE_PHOTOS_EMPTY_COPY = "No photos logged in this range.";
-export const DIARY_RANGE_HARVEST_EMPTY_COPY =
-  "No harvest outcomes logged in this range.";
+export const DIARY_RANGE_HARVEST_EMPTY_COPY = "No harvest outcomes logged in this range.";
 export const DIARY_RANGE_SOURCE_HONESTY_COPY =
   "Sensor readings keep their original source labels: live, manual, CSV, demo, stale, or invalid.";
 export const DIARY_RANGE_SAFETY_COPY =
@@ -174,18 +175,18 @@ function cToF(c: number): number {
 }
 
 /** Resolve a row's report category. Delegates to the canonical classifier. */
-function categoryOf(eventType: string | null | undefined):
-  | "watering"
-  | "feeding"
-  | "training"
-  | "environment"
-  | "harvest"
-  | "other" {
-  const type =
-    typeof eventType === "string" ? eventType.toLowerCase().trim() : "";
+function categoryOf(
+  eventType: string | null | undefined,
+): "watering" | "feeding" | "training" | "environment" | "harvest" | "other" {
+  const type = typeof eventType === "string" ? eventType.toLowerCase().trim() : "";
   if (type === "environment" || type === "environment_check") return "environment";
   const bucket = classifyTimelineEntry({ eventType: type });
-  if (bucket === "watering" || bucket === "feeding" || bucket === "training" || bucket === "harvest") {
+  if (
+    bucket === "watering" ||
+    bucket === "feeding" ||
+    bucket === "training" ||
+    bucket === "harvest"
+  ) {
     return bucket;
   }
   if (bucket === "measurement") return "environment";
@@ -207,7 +208,10 @@ function harvestDetailGrams(
   details: Record<string, unknown> | null | undefined,
   side: "wet" | "dry",
 ): number | null {
-  const h = details && typeof details["harvest"] === "object" ? (details["harvest"] as Record<string, unknown>) : null;
+  const h =
+    details && typeof details["harvest"] === "object"
+      ? (details["harvest"] as Record<string, unknown>)
+      : null;
   if (!h) return null;
   const canonical = toGrams(h[`${side}_weight_grams`]);
   if (canonical !== null) return canonical;
@@ -357,7 +361,8 @@ export function buildDiaryRangeReport(
         : "training";
     if (item.fromDiary && token === "training") {
       const details = diaryInRange.find((r) => r.id === item.id)?.details;
-      const subtype = details && typeof details["subtype"] === "string" ? (details["subtype"] as string) : null;
+      const subtype =
+        details && typeof details["subtype"] === "string" ? (details["subtype"] as string) : null;
       if (subtype) token = subtype.toLowerCase().trim();
     }
     trainingTypeCounts.set(token, (trainingTypeCounts.get(token) ?? 0) + 1);
@@ -365,9 +370,16 @@ export function buildDiaryRangeReport(
   }
 
   // ---- environment ----------------------------------------------------
-  const readingsInRange = (input.sensorReadings ?? []).filter((r) =>
-    inRange(utcDay(r.ts), startDate, endDate),
+  const sourceLabeledReadingsInRange = withoutDiagnosticSensorRows(
+    (input.sensorReadings ?? []).filter((r) => inRange(utcDay(r.ts), startDate, endDate)),
   );
+  // The source rollup may still show demo/stale/invalid rows with their
+  // honest canonical labels, but those values never feed the unlabeled
+  // environmental aggregates.
+  const aggregateReadingsInRange = sourceLabeledReadingsInRange.filter((r) => {
+    const source = normalizeReportSensorSource(r.source);
+    return source === "live" || source === "manual" || source === "csv";
+  });
   const metricDefs: Array<{
     key: DiaryRangeMetricAggregate["key"];
     label: string;
@@ -379,11 +391,21 @@ export function buildDiaryRangeReport(
     { key: "vpd_kpa", label: "VPD", unit: "kPa", display: (v) => v },
   ];
   const metrics: DiaryRangeMetricAggregate[] = metricDefs.map((def) => {
-    const values = readingsInRange
-      .filter((r) => r.metric === def.key && typeof r.value === "number" && Number.isFinite(r.value))
+    const values = aggregateReadingsInRange
+      .filter(
+        (r) => r.metric === def.key && typeof r.value === "number" && Number.isFinite(r.value),
+      )
       .map((r) => def.display(r.value as number));
     if (values.length === 0) {
-      return { key: def.key, label: def.label, unit: def.unit, count: 0, avg: null, min: null, max: null };
+      return {
+        key: def.key,
+        label: def.label,
+        unit: def.unit,
+        count: 0,
+        avg: null,
+        min: null,
+        max: null,
+      };
     }
     const sum = values.reduce((a, b) => a + b, 0);
     return {
@@ -397,7 +419,7 @@ export function buildDiaryRangeReport(
     };
   });
   const sourceCounts = new Map<TimelineSensorSourceKind, number>();
-  for (const r of readingsInRange) {
+  for (const r of sourceLabeledReadingsInRange) {
     const kind = normalizeReportSensorSource(r.source);
     sourceCounts.set(kind, (sourceCounts.get(kind) ?? 0) + 1);
   }
@@ -502,7 +524,7 @@ export function buildDiaryRangeReport(
     environment: {
       metrics,
       sources,
-      readingCount: readingsInRange.length,
+      readingCount: sourceLabeledReadingsInRange.length,
     },
     photos: {
       items: photoItems,

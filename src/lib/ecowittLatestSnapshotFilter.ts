@@ -17,6 +17,7 @@ import {
   type EcowittCandidate,
   type EcowittSnapshotViewModel,
 } from "@/lib/ecowittReadingViewModel";
+import { isSensorTestbenchRow } from "@/lib/sensorTestbenchIndicatorRules";
 import type { SensorReadingSource } from "@/mock";
 
 /** Minimal shape we need from a `sensor_readings` row. */
@@ -46,15 +47,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function readString(value: unknown): string | null {
-  return typeof value === "string" && value.trim().length > 0
-    ? value.trim()
-    : null;
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 }
 
-function readFiniteMetric(
-  metrics: Record<string, unknown>,
-  key: string,
-): number | null {
+function readFiniteMetric(metrics: Record<string, unknown>, key: string): number | null {
   const raw = metrics[key];
   const value = typeof raw === "number" ? raw : Number(raw);
   return Number.isFinite(value) ? value : null;
@@ -96,9 +92,13 @@ function isEcowittRow(row: EcowittSensorReadingRow): boolean {
   return false;
 }
 
-function resolveCandidateSource(
-  row: EcowittSensorReadingRow,
-): SensorReadingSource {
+function resolveCandidateSource(row: EcowittSensorReadingRow): SensorReadingSource {
+  // Keep diagnostic packets visible for commissioning, but never let their
+  // canonical stored source="live" promote them to physical sensor evidence.
+  // The shared fence allows Windows-listener rows only when storage preserved
+  // the listener's reported live decision and physical gateway markers.
+  if (isSensorTestbenchRow(row)) return "demo";
+
   const src = (row.source ?? "").trim().toLowerCase();
   if (src === "manual") return "manual";
   if (src === "demo") return "demo";
@@ -151,9 +151,7 @@ function buildCandidatePayload(
 
   const metadata = isRecord(raw.metadata) ? raw.metadata : null;
   const capturedAt =
-    readString(raw.captured_at) ??
-    readString(row.captured_at) ??
-    readString(row.ts);
+    readString(raw.captured_at) ?? readString(row.captured_at) ?? readString(row.ts);
   if (capturedAt) next.dateutc = capturedAt;
 
   const transport =

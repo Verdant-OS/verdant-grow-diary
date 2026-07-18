@@ -17,6 +17,7 @@ import type { EcowittIngestAuditProofViewModel } from "@/lib/ecowittIngestAuditP
 
 export type OneTentSensorProofStatus =
   | "present"
+  | "testbench"
   | "live_only"
   | "audit_only"
   | "stale"
@@ -59,9 +60,10 @@ const PROOF_WINDOW_LABEL = "last 24 hours";
 const OPERATOR_SHORTCUT_HREF = "/sensors?operator=1";
 const OPERATOR_SHORTCUT_LABEL = "Open Sensors Operator Proof";
 
-function liveLabel(
-  liveProof: EcowittLiveProofViewModel | null | undefined,
-): { label: string; kind: "ok" | "stale" | "invalid" | "limited" | "missing" } {
+function liveLabel(liveProof: EcowittLiveProofViewModel | null | undefined): {
+  label: string;
+  kind: "ok" | "testbench" | "stale" | "invalid" | "limited" | "missing";
+} {
   if (!liveProof) {
     return {
       label: "EcoWitt row-level proof not found in this view.",
@@ -73,6 +75,11 @@ function liveLabel(
       return {
         label: "EcoWitt live row proof confirmed in current view.",
         kind: "ok",
+      };
+    case "testbench":
+      return {
+        label: "EcoWitt diagnostic transport test received; physical sensor proof still required.",
+        kind: "testbench",
       };
     case "stale":
       return { label: "EcoWitt proof stale.", kind: "stale" };
@@ -94,9 +101,7 @@ function liveLabel(
   }
 }
 
-function auditLabel(
-  auditProof: EcowittIngestAuditProofViewModel | null | undefined,
-): {
+function auditLabel(auditProof: EcowittIngestAuditProofViewModel | null | undefined): {
   label: string;
   kind: "ok" | "rejected" | "empty" | "blocked" | "loading" | "missing";
 } {
@@ -110,27 +115,23 @@ function auditLabel(
     case "loaded":
       if (auditProof.hasRejected) {
         return {
-          label:
-            "EcoWitt ingest audit shows rejected or omitted rows in the current proof window.",
+          label: "EcoWitt ingest audit shows rejected or omitted rows in the current proof window.",
           kind: "rejected",
         };
       }
       if (auditProof.insertedCount > 0) {
         return {
-          label:
-            "EcoWitt ingest audit proof loaded for the current proof window.",
+          label: "EcoWitt ingest audit proof loaded for the current proof window.",
           kind: "ok",
         };
       }
       return {
-        label:
-          "EcoWitt ingest audit rows observed in the current proof window.",
+        label: "EcoWitt ingest audit rows observed in the current proof window.",
         kind: "ok",
       };
     case "no_audit_rows":
       return {
-        label:
-          "No EcoWitt ingest audit rows found in the current proof window.",
+        label: "No EcoWitt ingest audit rows found in the current proof window.",
         kind: "empty",
       };
     case "blocked":
@@ -162,8 +163,7 @@ export function buildOneTentSensorProofViewModel(
       sensorProofStatus: "unavailable",
       tone: "neutral",
       headline: "Sensor proof unavailable",
-      liveRowProofLabel:
-        "EcoWitt row-level proof not found in this view.",
+      liveRowProofLabel: "EcoWitt row-level proof not found in this view.",
       auditProofLabel: "EcoWitt audit proof blocked or unavailable.",
       proofWindowLabel: PROOF_WINDOW_LABEL,
       limitations: Object.freeze([
@@ -172,9 +172,7 @@ export function buildOneTentSensorProofViewModel(
           text: "Select a tent to evaluate sensor proof in the current proof window.",
         },
       ]),
-      reportLines: Object.freeze([
-        "Sensor proof: unavailable (no tent selected).",
-      ]),
+      reportLines: Object.freeze(["Sensor proof: unavailable (no tent selected)."]),
       operatorShortcutHref: OPERATOR_SHORTCUT_HREF,
       operatorShortcutLabel: OPERATOR_SHORTCUT_LABEL,
     };
@@ -191,6 +189,10 @@ export function buildOneTentSensorProofViewModel(
     sensorProofStatus = "loading";
     tone = "neutral";
     headline = "Loading sensor proof…";
+  } else if (live.kind === "testbench") {
+    sensorProofStatus = "testbench";
+    tone = "neutral";
+    headline = "Test packet received; physical sensor proof required";
   } else if (live.kind === "invalid") {
     sensorProofStatus = "invalid";
     tone = "warn";
@@ -252,6 +254,12 @@ export function buildOneTentSensorProofViewModel(
       text: "Row-level proof is limited; not enough recent EcoWitt readings to confirm live ingest.",
     });
   }
+  if (live.kind === "testbench") {
+    limitations.push({
+      id: "live-testbench",
+      text: "A diagnostic packet proved the transport path only; send one physical EcoWitt reading to complete live proof.",
+    });
+  }
   if (live.kind === "stale") {
     limitations.push({
       id: "live-stale",
@@ -277,9 +285,7 @@ export function buildOneTentSensorProofViewModel(
       reportLines.push(`- ${l.text}`);
     }
   }
-  reportLines.push(
-    "This proof reflects sensor evidence visible to the current user.",
-  );
+  reportLines.push("This proof reflects sensor evidence visible to the current user.");
 
   return {
     sensorProofStatus,
@@ -299,9 +305,7 @@ export function buildOneTentSensorProofViewModel(
  * Extra markdown block to splice into the One-Tent Live Proof report.
  * Caller appends to the existing report markdown.
  */
-export function buildOneTentSensorProofReportSection(
-  vm: OneTentSensorProofViewModel,
-): string {
+export function buildOneTentSensorProofReportSection(vm: OneTentSensorProofViewModel): string {
   const md: string[] = [];
   md.push("## Sensor proof");
   for (const line of vm.reportLines) {

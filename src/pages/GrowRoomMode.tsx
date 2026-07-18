@@ -43,11 +43,7 @@ import { useAlertsList } from "@/hooks/useAlertsList";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { actionsPath, alertsPath, tentDetailPath, tentsPath } from "@/lib/routes";
 
-import {
-  EMPTY_SNAPSHOT,
-  snapshotFromReadings,
-  type SensorSnapshot,
-} from "@/lib/sensorSnapshot";
+import { EMPTY_SNAPSHOT, snapshotFromReadings, type SensorSnapshot } from "@/lib/sensorSnapshot";
 import {
   buildGrowRoomTentCards,
   DATA_HEALTH_LABEL,
@@ -65,10 +61,7 @@ import {
   type QuickActionKind,
   type QuickActionPlantLite,
 } from "@/lib/growRoomQuickActionRules";
-import {
-  classifyVpdAgainstStage,
-  normalizeVpdStage,
-} from "@/lib/vpdStageTargetRules";
+import { classifyVpdAgainstStage, normalizeVpdStage } from "@/lib/vpdStageTargetRules";
 
 const QUICK_ACTION_ICON: Record<QuickActionKind, typeof Sprout> = {
   quick_log: NotebookPen,
@@ -78,7 +71,6 @@ const QUICK_ACTION_ICON: Record<QuickActionKind, typeof Sprout> = {
   daily_check: ClipboardCheck,
   view_tent: ArrowRight,
 };
-
 
 const HEALTH_CLASS: Record<DataHealth, string> = {
   healthy: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
@@ -99,9 +91,7 @@ function snapshotSummary(s: SensorSnapshot | null) {
   if (!s) return "No snapshot";
   // Temperature stored in Celsius, displayed in Fahrenheit (Verdant convention).
   const tempF =
-    s.temp === null || !Number.isFinite(s.temp)
-      ? "—"
-      : `${(s.temp * 9 / 5 + 32).toFixed(1)}°F`;
+    s.temp === null || !Number.isFinite(s.temp) ? "—" : `${((s.temp * 9) / 5 + 32).toFixed(1)}°F`;
   return [
     `Temp ${tempF}`,
     `RH ${fmt(s.rh, "%")}`,
@@ -131,11 +121,8 @@ export default function GrowRoomMode() {
     setQuickLogOpen(true);
   }
 
-
   // Latest sensor_readings per tent (read-only). One bounded query.
-  const [snapshotsByTentId, setSnapshotsByTentId] = useState<
-    Record<string, SensorSnapshot>
-  >({});
+  const [snapshotsByTentId, setSnapshotsByTentId] = useState<Record<string, SensorSnapshot>>({});
   // Action Queue items (read-only). One bounded query.
   const [actions, setActions] = useState<GrowRoomActionInput[]>([]);
   const [loading, setLoading] = useState(true);
@@ -159,7 +146,7 @@ export default function GrowRoomMode() {
         // READ-ONLY: latest sensor_readings for these tents.
         const { data: readingRows } = await supabase
           .from("sensor_readings")
-          .select("tent_id,metric,value,ts,source,quality")
+          .select("tent_id,metric,value,ts,source,quality,raw_payload")
           .in("tent_id", tentIds)
           .order("ts", { ascending: false })
           .limit(500);
@@ -277,15 +264,7 @@ export default function GrowRoomMode() {
 
       <GrowRoomQuickActionsCard scopedGrowId={urlGrowId} />
 
-      {!showEmpty && (
-        <DailyGrowCheckStatusCard
-          compact
-          tentIds={tentIds}
-        />
-      )}
-
-
-
+      {!showEmpty && <DailyGrowCheckStatusCard compact tentIds={tentIds} />}
 
       {showEmpty && (
         <EmptyState
@@ -347,9 +326,7 @@ export default function GrowRoomMode() {
                       <Sprout className="h-3.5 w-3.5" />
                       <span className="truncate">Tent</span>
                     </div>
-                    <h2 className="text-lg font-semibold truncate">
-                      {card.tentName}
-                    </h2>
+                    <h2 className="text-lg font-semibold truncate">{card.tentName}</h2>
                   </div>
                   <Badge
                     variant="outline"
@@ -360,9 +337,7 @@ export default function GrowRoomMode() {
                   </Badge>
                 </div>
 
-                <div className="text-sm text-foreground/90">
-                  {snapshotSummary(card.snapshot)}
-                </div>
+                <div className="text-sm text-foreground/90">{snapshotSummary(card.snapshot)}</div>
 
                 {vpdClassification.classification !== "unavailable" && (
                   <p
@@ -375,12 +350,8 @@ export default function GrowRoomMode() {
 
                 {card.snapshot?.vpd != null &&
                   normalizeVpdStage(tentStageById[card.tentId]) === "unknown" && (
-                    <VpdStageMissingBadge
-                      testId="grow-room-vpd-stage-missing-badge"
-                    />
+                    <VpdStageMissingBadge testId="grow-room-vpd-stage-missing-badge" />
                   )}
-
-
 
                 <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                   <span className="inline-flex items-center gap-1">
@@ -410,7 +381,8 @@ export default function GrowRoomMode() {
                   >
                     <AlertTriangle className="h-3.5 w-3.5 mt-0.5" />
                     <span>
-                      Simulated sensor data shown — for testing/demo only. Not real tent data and not used for persisted alerts.
+                      Simulated sensor data shown — for testing/demo only. Not real tent data and
+                      not used for persisted alerts.
                     </span>
                   </div>
                 )}
@@ -432,29 +404,19 @@ export default function GrowRoomMode() {
                 )}
 
                 <div className="flex items-center justify-between text-xs">
-                  <Link
-                    to={alertsPath()}
-                    className="text-muted-foreground hover:text-foreground"
-                  >
+                  <Link to={alertsPath()} className="text-muted-foreground hover:text-foreground">
                     {card.openAlertCount} open alert
                     {card.openAlertCount === 1 ? "" : "s"}
                   </Link>
-                  <Link
-                    to={actionsPath()}
-                    className="text-muted-foreground hover:text-foreground"
-                  >
+                  <Link to={actionsPath()} className="text-muted-foreground hover:text-foreground">
                     {card.pendingActionCount} pending action
                     {card.pendingActionCount === 1 ? "" : "s"}
                   </Link>
                 </div>
 
-                <div
-                  className="text-sm font-medium"
-                  data-testid="grow-room-recommendation"
-                >
+                <div className="text-sm font-medium" data-testid="grow-room-recommendation">
                   {RECOMMENDATION_LABEL[card.primaryRecommendation]}
                 </div>
-
 
                 <div
                   className="border-t border-border/40 pt-3 space-y-2"
@@ -475,9 +437,7 @@ export default function GrowRoomMode() {
                         className="h-9 w-full"
                         data-testid="grow-room-add-plant-cta"
                       >
-                        <Link to={tentDetailPath(card.tentId)}>
-                          Add Plant to This Tent
-                        </Link>
+                        <Link to={tentDetailPath(card.tentId)}>Add Plant to This Tent</Link>
                       </Button>
                     </div>
                   ) : (
@@ -542,13 +502,8 @@ export default function GrowRoomMode() {
       )}
 
       {quickLogOpen && (
-        <QuickLog
-          open={quickLogOpen}
-          onOpenChange={setQuickLogOpen}
-          prefill={quickLogPrefill}
-        />
+        <QuickLog open={quickLogOpen} onOpenChange={setQuickLogOpen} prefill={quickLogPrefill} />
       )}
     </div>
   );
 }
-

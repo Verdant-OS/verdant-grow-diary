@@ -71,22 +71,23 @@ describe("learning-loop causal-language static safety", () => {
     const combined = LEARNING_LOOP_FILES.map((rel) =>
       readFileSync(resolve(ROOT, rel), "utf8"),
     ).join("\n");
-    expect(combined).toMatch(/grower-recorded|other factors may have contributed|evidence is limited/i);
+    expect(combined).toMatch(
+      /grower-recorded|other factors may have contributed|evidence is limited/i,
+    );
   });
 });
 
 describe("episode service — persistence & query safety static contract", () => {
-  const SERVICE = readFileSync(
-    resolve(ROOT, "src/lib/plantMemoryEpisodeService.ts"),
-    "utf8",
-  );
+  const SERVICE = readFileSync(resolve(ROOT, "src/lib/plantMemoryEpisodeService.ts"), "utf8");
 
   it("never uses service_role or bridge/api tokens", () => {
     expect(SERVICE).not.toMatch(/service_role|SUPABASE_SERVICE_ROLE_KEY|bridge_token|api_token/i);
   });
 
   it("never mutates action_queue or alerts (reads only there)", () => {
-    expect(SERVICE).not.toMatch(/from\(["']action_queue["']\)[\s\S]{0,120}\.(insert|update|delete|upsert)\(/);
+    expect(SERVICE).not.toMatch(
+      /from\(["']action_queue["']\)[\s\S]{0,120}\.(insert|update|delete|upsert)\(/,
+    );
     expect(SERVICE).not.toMatch(/from\(["']alerts["']\)/);
   });
 
@@ -100,10 +101,11 @@ describe("episode service — persistence & query safety static contract", () =>
     expect(SERVICE).not.toMatch(/user_id\s*:/);
   });
 
-  it("selects exclude raw_payload from sensor_readings", () => {
-    // The sensor select lists explicit columns and must not include raw_payload.
+  it("selects raw_payload only with sensor rows so provenance can fail closed", () => {
+    // The adapter consumes this opaque envelope for classification and does
+    // not include it in the episode evidence contract.
     const select = SERVICE.match(/from\(["']sensor_readings["']\)[\s\S]{0,200}/)?.[0] ?? "";
-    expect(select).not.toContain("raw_payload");
+    expect(select).toContain("raw_payload");
   });
 
   it("uses bounded limits (no unbounded full-table client fetch)", () => {
@@ -113,6 +115,8 @@ describe("episode service — persistence & query safety static contract", () =>
   });
 
   it("does not contain device-control tokens", () => {
-    expect(SERVICE).not.toMatch(/mqtt|home[\s_-]?assistant|webhook|\brelay\b|\bactuator\b|dispatchCommand/i);
+    expect(SERVICE).not.toMatch(
+      /mqtt|home[\s_-]?assistant|webhook|\brelay\b|\bactuator\b|dispatchCommand/i,
+    );
   });
 });

@@ -39,11 +39,10 @@ import {
   buildEarlyStageAiDoctorContext,
   type EarlyStageAiDoctorContext,
 } from "./earlyStageAiDoctorContextRules";
-
+import { isSensorTestbenchRow } from "./sensorTestbenchIndicatorRules";
 
 /** Section label rendered for imported CSV/XLSX sensor history. */
-export const AI_DOCTOR_IMPORTED_SENSOR_HISTORY_SECTION_LABEL =
-  "Imported sensor history";
+export const AI_DOCTOR_IMPORTED_SENSOR_HISTORY_SECTION_LABEL = "Imported sensor history";
 
 export interface ImportedSensorHistorySection extends AiDoctorCsvHistoryContext {
   sectionLabel: typeof AI_DOCTOR_IMPORTED_SENSOR_HISTORY_SECTION_LABEL;
@@ -74,9 +73,7 @@ export interface ImportedSensorHistorySection extends AiDoctorCsvHistoryContext 
 export function isFreshLiveSnapshotAnnotation(
   annotation: { source: string; stale: boolean } | null | undefined,
 ): boolean {
-  return (
-    !!annotation && annotation.source === "live" && annotation.stale === false
-  );
+  return !!annotation && annotation.source === "live" && annotation.stale === false;
 }
 
 export function buildImportedSensorHistorySection(
@@ -122,20 +119,15 @@ export function compileAiDoctorContext(
   input: CompileAiDoctorContextInput,
 ): CompiledAiDoctorContext {
   const sensor = input.sensorContext ?? null;
-  const selection = selectBestEnvironmentCheckEvent(
-    input.environmentCheckEvents ?? [],
-  );
-  const environmentCheck = buildAiDoctorEnvironmentCheckContext(
-    selection.selected,
-  );
+  const selection = selectBestEnvironmentCheckEvent(input.environmentCheckEvents ?? []);
+  const environmentCheck = buildAiDoctorEnvironmentCheckContext(selection.selected);
 
   const combined: string[] = [];
   const push = (n: string) => {
     if (!combined.includes(n)) combined.push(n);
   };
   if (sensor) for (const n of sensor.safetyNotes) push(n);
-  if (environmentCheck.kind === "present")
-    for (const n of environmentCheck.safetyNotes) push(n);
+  if (environmentCheck.kind === "present") for (const n of environmentCheck.safetyNotes) push(n);
   if (selection.isFallback && environmentCheck.kind === "present") {
     push(
       "Selected Environment Check is a weak fallback — no accepted required metric. Treat as untrusted.",
@@ -143,8 +135,7 @@ export function compileAiDoctorContext(
   }
 
   const hasAnyEvidence =
-    (sensor !== null && sensor.usableMetrics.length > 0) ||
-    environmentCheck.kind === "present";
+    (sensor !== null && sensor.usableMetrics.length > 0) || environmentCheck.kind === "present";
 
   return {
     sensor,
@@ -159,15 +150,7 @@ export function compileAiDoctorContext(
 // Layer 2 — Phase 1 row-based plant context compiler.
 // ---------------------------------------------------------------------------
 
-
-
-export type SensorSourceTag =
-  | "live"
-  | "manual"
-  | "csv"
-  | "demo"
-  | "stale"
-  | "invalid";
+export type SensorSourceTag = "live" | "manual" | "csv" | "demo" | "stale" | "invalid";
 
 export const SENSOR_SOURCE_ORDER: readonly SensorSourceTag[] = Object.freeze([
   "live",
@@ -236,8 +219,6 @@ export interface PlantContextPayload {
   early_stage_memory: EarlyStageAiDoctorContext | null;
 }
 
-
-
 // ---------------------------------------------------------------------------
 // Row shapes (intentionally permissive — caller supplies whatever they have).
 // ---------------------------------------------------------------------------
@@ -271,7 +252,6 @@ export interface GrowEventRowLike {
   details?: unknown;
 }
 
-
 export interface SensorReadingRowLike {
   metric?: string | null;
   value?: number | string | null;
@@ -301,6 +281,11 @@ function classifySource(row: SensorReadingRowLike): SensorSourceTag {
   if (stateLike === "demo") return "demo";
   if (stateLike === "manual") return "manual";
   if (stateLike === "csv") return "csv";
+  // A successful testbench transport is intentionally stored with canonical
+  // source=live, but its preserved provenance is diagnostic—not plant truth.
+  // Keep it visible in the non-trustworthy demo bucket and out of live
+  // averages/readiness.
+  if (isSensorTestbenchRow(row)) return "demo";
   const rawSource = row.source;
   // Missing / blank source must never be trusted as live telemetry.
   if (rawSource === null || rawSource === undefined) return "invalid";
@@ -310,8 +295,7 @@ function classifySource(row: SensorReadingRowLike): SensorSourceTag {
   if (source === "stale") return "stale";
   if (source === "demo" || source === "demo_fixture") return "demo";
   if (source === "manual" || source === "manual_snapshot") return "manual";
-  if (source === "csv" || source === "csv_import" || source === "import")
-    return "csv";
+  if (source === "csv" || source === "csv_import" || source === "import") return "csv";
   // Known live-sensor vendor identifiers. Anything else is untrusted and
   // is bucketed as "invalid" so unrecognized telemetry never folds into
   // the live / healthy view of the plant.
@@ -466,9 +450,7 @@ export function compilePlantContextFromRows(
   }
   if (averages_7d.vpd_kpa !== null) {
     if (averages_7d.vpd_kpa < 0.6 || averages_7d.vpd_kpa > 1.6) {
-      notable_deviations.push(
-        `7d average VPD ${averages_7d.vpd_kpa} kPa outside 0.6–1.6 kPa band`,
-      );
+      notable_deviations.push(`7d average VPD ${averages_7d.vpd_kpa} kPa outside 0.6–1.6 kPa band`);
     }
   }
 
@@ -487,8 +469,9 @@ export function compilePlantContextFromRows(
     diaryRows: input.growEvents ?? [],
     hasRecentSensorSnapshot: hasLiveSensorReadings,
   });
-  const early_stage_memory: EarlyStageAiDoctorContext | null =
-    earlyStage.hasEarlyStageMemory ? earlyStage : null;
+  const early_stage_memory: EarlyStageAiDoctorContext | null = earlyStage.hasEarlyStageMemory
+    ? earlyStage
+    : null;
 
   // Medium / pot size carried directly from the plant row. Whitespace-
   // normalized; blank / non-string inputs collapse to null. Never inferred.
@@ -515,12 +498,10 @@ export function compilePlantContextFromRows(
     missingLiveSensorReadings: !hasLiveSensorReadings,
     early_stage_memory,
   };
-
 }
 
 function bucketAverages(rows: readonly RecentSensorReading[]): SensorRollingAverages {
-  const pick = (metric: string) =>
-    rows.filter((r) => r.metric === metric).map((r) => r.value);
+  const pick = (metric: string) => rows.filter((r) => r.metric === metric).map((r) => r.value);
   return {
     temperature_c: avg(pick("temperature_c")),
     humidity_pct: avg(pick("humidity_pct")),

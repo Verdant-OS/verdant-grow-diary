@@ -8,8 +8,11 @@
 import { describe, expect, it } from "vitest";
 import {
   buildAiDoctorCurrentSensorSnapshot,
+  classifyAiDoctorCurrentSensorEvidence,
+  selectAiDoctorSensorEvidenceClassification,
   type AiDoctorCurrentSensorRowLike,
 } from "@/lib/aiDoctorCurrentSensorSnapshotRules";
+import { classificationFromStatusResult } from "@/lib/sensorSnapshotStatusContract";
 import { buildAiDoctorReviewRequestPacket } from "@/lib/aiDoctorReviewRequestPacket";
 import type { AiDoctorContextResult } from "@/lib/aiDoctorContextRules";
 import type { TimelineMemoryItem } from "@/lib/timelineFilterRules";
@@ -17,6 +20,17 @@ import type { ManualSnapshotTimelineCard } from "@/lib/manualSensorSnapshotViewM
 
 const NOW = new Date("2026-07-17T12:00:00.000Z");
 const FRESH = "2026-07-17T11:58:00.000Z";
+const PHYSICAL_ECOWITT_RAW_PAYLOAD = {
+  vendor: "ecowitt_windows_testbench",
+  metadata: {
+    reported_verdant_source: "live",
+    raw_payload: {
+      stationtype: "GW2000A_V3.2.4",
+      model: "GW2000A",
+      dateutc: "2026-07-17 11:58:00",
+    },
+  },
+};
 
 function row(
   metric: string,
@@ -190,6 +204,63 @@ describe("buildAiDoctorCurrentSensorSnapshot", () => {
     const a = buildAiDoctorCurrentSensorSnapshot(rows, { now: NOW });
     const b = buildAiDoctorCurrentSensorSnapshot([...rows].reverse(), { now: NOW });
     expect(JSON.stringify(b)).toBe(JSON.stringify(a));
+  });
+
+  it("never promotes testbench packets into current AI Doctor sensor truth", () => {
+    const testbench = {
+      ...row("temperature_c", 29, "live", "2026-07-17T11:59:00.000Z"),
+      raw_payload: {
+        vendor: "ecowitt_windows_testbench",
+        metadata: { confidence: "test" },
+      },
+    };
+    const real = {
+      ...row("humidity_pct", 58, "live", "2026-07-17T11:58:00.000Z"),
+      raw_payload: PHYSICAL_ECOWITT_RAW_PAYLOAD,
+    };
+    const snapshot = buildAiDoctorCurrentSensorSnapshot([testbench, real], {
+      now: NOW,
+    });
+    expect(snapshot?.readings).toEqual([{ field: "humidity_pct", value: 58, unit: "%" }]);
+    expect(JSON.stringify(snapshot)).not.toContain("temperature_c");
+    expect(buildAiDoctorCurrentSensorSnapshot([testbench], { now: NOW })).toBeNull();
+  });
+});
+
+describe("AI Doctor current sensor evidence classification", () => {
+  it("grants usable only to fresh provenance-filtered live rows", () => {
+    const physical = {
+      ...row("temperature_c", 25),
+      raw_payload: PHYSICAL_ECOWITT_RAW_PAYLOAD,
+    };
+    expect(classifyAiDoctorCurrentSensorEvidence([physical], { now: NOW }).status).toBe("usable");
+
+    const testbench = {
+      ...physical,
+      raw_payload: {
+        vendor: "ecowitt_windows_testbench",
+        metadata: { confidence: "test" },
+      },
+    };
+    expect(classifyAiDoctorCurrentSensorEvidence([testbench], { now: NOW }).status).toBe("no_data");
+    expect(
+      classifyAiDoctorCurrentSensorEvidence([row("temperature_c", 25, "manual")], { now: NOW })
+        .status,
+    ).toBe("needs_review");
+  });
+
+  it("never lets an audit-only usable fallback override filtered row-level no-data", () => {
+    const noData = classifyAiDoctorCurrentSensorEvidence([], { now: NOW });
+    const auditUsable = classificationFromStatusResult({
+      status: "usable",
+      reasonCode: "fresh_accept",
+    });
+    const auditStale = classificationFromStatusResult({
+      status: "stale",
+      reasonCode: "stale_timestamp",
+    });
+    expect(selectAiDoctorSensorEvidenceClassification(noData, auditUsable).status).toBe("no_data");
+    expect(selectAiDoctorSensorEvidenceClassification(noData, auditStale).status).toBe("stale");
   });
 });
 

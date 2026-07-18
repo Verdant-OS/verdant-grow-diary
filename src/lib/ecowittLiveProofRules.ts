@@ -6,6 +6,7 @@
  *  - Pure, deterministic, no I/O, no React, no Supabase.
  *  - Reuses canonical STALE_THRESHOLD_MS from sensorReadingNormalizationRules.
  *  - Never promotes demo/manual/csv/stale/invalid rows to live.
+ *  - Never promotes Windows testbench packets to commissioning proof.
  *  - Never renders raw payload values; only consumes shape data.
  *  - Sort helper never assumes input order.
  */
@@ -21,6 +22,7 @@ import {
   PPFD_VALID_BOUNDS,
   SOIL_VALID_BOUNDS,
 } from "@/lib/sensorMetricStateRules";
+import { isSensorTestbenchRow } from "@/lib/sensorTestbenchIndicatorRules";
 
 export const ECOWITT_PROOF_WINDOW_MS = 24 * 60 * 60 * 1000;
 /** Future-timestamp tolerance (clock skew). */
@@ -28,17 +30,14 @@ export const ECOWITT_PROOF_FUTURE_SKEW_MS = 60_000;
 
 export type EcowittProofRowStatus =
   | "live_confirmed"
+  | "testbench"
   | "stale"
   | "invalid"
   | "unknown"
   | "limited"
   | "not_ecowitt";
 
-export type EcowittProofSourceKind =
-  | "canonical_live"
-  | "legacy_ecowitt"
-  | "non_live"
-  | "missing";
+export type EcowittProofSourceKind = "canonical_live" | "legacy_ecowitt" | "non_live" | "missing";
 
 /** Minimal shape consumed by the proof helpers. */
 export interface EcowittProofRow {
@@ -98,9 +97,7 @@ export function detectEcowittVendor(row: EcowittProofRow): boolean {
   return candidates.some(lineageHasEcowitt);
 }
 
-export function resolveSourceKind(
-  row: EcowittProofRow,
-): EcowittProofSourceKind {
+export function resolveSourceKind(row: EcowittProofRow): EcowittProofSourceKind {
   const src = (row.source ?? "").trim().toLowerCase();
   if (!src) return "missing";
   if (src === "live") return "canonical_live";
@@ -217,9 +214,7 @@ export function detectStuckSoilMoisture(
   if (!["soil", "soil_moisture", "soil_moisture_pct"].includes(metric)) {
     return null;
   }
-  const sameMetric = recent.filter(
-    (r) => (r.metric ?? "").trim().toLowerCase() === metric,
-  );
+  const sameMetric = recent.filter((r) => (r.metric ?? "").trim().toLowerCase() === metric);
   if (sameMetric.length < 3) return "limited";
   const top3 = sameMetric.slice(0, 3).map((r) => num(r.value));
   const allZero = top3.every((v) => v === 0);
@@ -258,6 +253,19 @@ export function classifyEcowittProofRow(
       capturedAtMs,
       vendorIsEcowitt,
       reasonCode: "no_ecowitt_vendor",
+    };
+  }
+
+  // Testbench provenance wins over freshness and valid-looking values. The
+  // packet proves the transport path only; it is not evidence that a physical
+  // EcoWitt sensor produced the reading.
+  if (isSensorTestbenchRow(row)) {
+    return {
+      status: "testbench",
+      sourceKind,
+      capturedAtMs,
+      vendorIsEcowitt,
+      reasonCode: "test_provenance",
     };
   }
 

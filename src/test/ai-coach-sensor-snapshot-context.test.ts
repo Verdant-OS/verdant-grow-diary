@@ -8,7 +8,9 @@ import {
 
 const NOW = new Date("2026-06-06T12:00:00.000Z");
 const FRESH = "2026-06-06T11:55:00.000Z";
-const STALE = new Date(NOW.getTime() - (DEFAULT_AI_COACH_STALE_THRESHOLD_MS + 60_000)).toISOString();
+const STALE = new Date(
+  NOW.getTime() - (DEFAULT_AI_COACH_STALE_THRESHOLD_MS + 60_000),
+).toISOString();
 
 describe("buildAiCoachSensorSnapshotContext — source-aware annotation", () => {
   it("returns 'none' line when snapshot is null", () => {
@@ -161,9 +163,17 @@ describe("buildAiCoachSensorSnapshotContext — source-aware annotation", () => 
       const r = buildAiCoachSensorSnapshotContext(snap, { now: NOW });
       const blob = JSON.stringify(r).toLowerCase();
       for (const term of [
-        "turn on", "turn off", "switch on", "switch off",
-        "actuate", "publish_command", "setpoint", "set_fan", "set_light",
-        " write_", "command:",
+        "turn on",
+        "turn off",
+        "switch on",
+        "switch off",
+        "actuate",
+        "publish_command",
+        "setpoint",
+        "set_fan",
+        "set_light",
+        " write_",
+        "command:",
       ]) {
         expect(blob, `should not contain "${term}"`).not.toContain(term);
       }
@@ -184,7 +194,9 @@ describe("ai-coach edge function — static safety + wiring scan", () => {
   );
 
   it("plant select includes medium and pot_size", () => {
-    expect(indexSrc).toMatch(/\.from\("plants"\)\.select\([^)]*medium[^)]*pot_size/);
+    expect(indexSrc).toMatch(
+      /\.from\("plants"\)\s*\.select\(\s*"[^"]*medium[^"]*pot_size[^"]*"\s*\)/,
+    );
   });
 
   it("no raw sensor_snapshot JSON.stringify forwarded to model", () => {
@@ -207,8 +219,7 @@ describe("ai-coach edge function — static safety + wiring scan", () => {
       "Authorization:",
       "api_key",
     ]) {
-      expect(helperSrc, `helper should not reference "${term}"`)
-        .not.toContain(term);
+      expect(helperSrc, `helper should not reference "${term}"`).not.toContain(term);
     }
   });
 
@@ -236,4 +247,3 @@ describe("ai-doctor-review packet shape — shared annotation helper", () => {
     expect(packetSrc).toContain("recentSensorSnapshotAnnotation");
   });
 });
-

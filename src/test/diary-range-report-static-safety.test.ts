@@ -11,8 +11,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-const read = (rel: string): string =>
-  readFileSync(path.resolve(__dirname, "..", rel), "utf8");
+const read = (rel: string): string => readFileSync(path.resolve(__dirname, "..", rel), "utf8");
 
 const PAGE = read("pages/DiaryRangeReportPage.tsx");
 const RULES = read("lib/diaryRangeReportRules.ts");
@@ -55,9 +54,7 @@ describe("print wiring", () => {
     expect(PAGE).toContain("document.title = filename");
     expect(PAGE).toContain("verdant-diary-report-");
     expect(PAGE).toMatch(/<img[\s\S]{0,200}src=\{p\.url\}/);
-    expect(PAGE).toContain(
-      "Use your browser print dialog to save this report as PDF.",
-    );
+    expect(PAGE).toContain("Use your browser print dialog to save this report as PDF.");
   });
 });
 
@@ -108,8 +105,13 @@ describe("safety fences over the new sources", () => {
   it("no writes or RPCs anywhere; the data hook is select-only", () => {
     for (const [name, src] of Object.entries(newSources)) {
       expect(src, name).not.toMatch(/\.insert\(|\.update\(|\.upsert\(|\.rpc\(/);
-      expect(src, name).not.toMatch(/service_role|raw_payload|bridge_token/i);
+      expect(src, name).not.toMatch(/service_role|bridge_token/i);
     }
+    // Raw lineage is selected only long enough for the shared diagnostic
+    // classifier. It is not rendered by the page or navigation helper.
+    expect(HOOK).toContain('.select("metric,value,ts,source,raw_payload")');
+    expect(RULES).toContain("withoutDiagnosticSensorRows");
+    expect(PAGE + NAV).not.toMatch(/raw_payload/i);
     // The page's only invoke path is the premium gate helper import.
     expect(PAGE).not.toMatch(/functions\.invoke/);
     expect(HOOK).not.toMatch(/functions\.invoke/);

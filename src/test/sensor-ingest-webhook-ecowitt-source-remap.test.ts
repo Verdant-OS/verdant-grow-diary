@@ -99,6 +99,192 @@ describe("buildStoredRow — EcoWitt transport mapping", () => {
     expect(stored.raw_payload.idempotency_key).toBe("idem-abc-12345678");
   });
 
+  it("preserves the listener's original live decision separately from the canonical mirror", () => {
+    const stored = buildStoredRow({
+      row: {
+        ...baseRow,
+        source: "ecowitt",
+        raw_payload: {
+          ...baseRow.raw_payload,
+          metadata: {
+            device_id: "GW2000A_V1.2.3",
+            verdant_source: " LIVE ",
+          },
+        },
+      },
+      userId: USER,
+      idempotencyKey: null,
+    });
+
+    expect(stored.source).toBe("live");
+    expect(stored.raw_payload.metadata).toMatchObject({
+      transport_source: "ecowitt",
+      verdant_source: "live",
+      reported_verdant_source: "live",
+    });
+  });
+
+  it("stores a listener-reported demo packet as canonical demo", () => {
+    const stored = buildStoredRow({
+      row: {
+        ...baseRow,
+        source: "ecowitt",
+        raw_payload: {
+          ...baseRow.raw_payload,
+          metadata: {
+            device_id: "GW2000A_V1.2.3",
+            verdant_source: "demo",
+          },
+        },
+      },
+      userId: USER,
+      idempotencyKey: null,
+    });
+
+    expect(stored.source).toBe("demo");
+    expect(stored.raw_payload.metadata).toMatchObject({
+      transport_source: "ecowitt",
+      // The storage mirror reflects the narrowed canonical DB source.
+      verdant_source: "demo",
+      // The listener's decision remains available for downstream trust rules.
+      reported_verdant_source: "demo",
+    });
+  });
+
+  it("stores an unproven Windows listener live claim as canonical demo", () => {
+    const stored = buildStoredRow({
+      row: {
+        ...baseRow,
+        source: "ecowitt",
+        raw_payload: {
+          ...baseRow.raw_payload,
+          vendor: "ecowitt_windows_testbench",
+          metadata: {
+            verdant_source: "live",
+            raw_payload: {
+              PASSKEY: "removed-before-real-forwarding",
+              stationtype: "GW1200B",
+            },
+          },
+        },
+      },
+      userId: USER,
+      idempotencyKey: null,
+    });
+
+    expect(stored.source).toBe("demo");
+    expect(stored.raw_payload.metadata).toMatchObject({
+      verdant_source: "demo",
+      reported_verdant_source: "live",
+    });
+  });
+
+  it("keeps a Windows listener packet live with two non-secret forwarded markers", () => {
+    const stored = buildStoredRow({
+      row: {
+        ...baseRow,
+        source: "ecowitt",
+        raw_payload: {
+          ...baseRow.raw_payload,
+          vendor: "ecowitt_windows_testbench",
+          metadata: {
+            verdant_source: "live",
+            raw_payload: {
+              stationtype: "GW1200B",
+              dateutc: "2026-06-04 12:00:00",
+            },
+          },
+        },
+      },
+      userId: USER,
+      idempotencyKey: null,
+    });
+
+    expect(stored.source).toBe("live");
+    expect(stored.raw_payload.metadata).toMatchObject({
+      verdant_source: "live",
+      reported_verdant_source: "live",
+    });
+  });
+
+  it.each(["test", "demo"])(
+    "stores confidence=%s transport diagnostics as canonical demo",
+    (confidence) => {
+      const stored = buildStoredRow({
+        row: {
+          ...baseRow,
+          source: "ecowitt",
+          raw_payload: {
+            ...baseRow.raw_payload,
+            metadata: { confidence },
+          },
+        },
+        userId: USER,
+        idempotencyKey: null,
+      });
+
+      expect(stored.source).toBe("demo");
+      expect(stored.raw_payload.metadata).toMatchObject({
+        transport_source: "ecowitt",
+        verdant_source: "demo",
+        confidence,
+      });
+    },
+  );
+
+  it("ignores a caller-forged reported source when no original listener decision exists", () => {
+    const stored = buildStoredRow({
+      row: {
+        ...baseRow,
+        source: "ecowitt",
+        raw_payload: {
+          ...baseRow.raw_payload,
+          metadata: {
+            device_id: "GW2000A_V1.2.3",
+            reported_verdant_source: "live",
+            raw_payload: {
+              stationtype: "spoofed",
+              model: "spoofed",
+            },
+          },
+        },
+      },
+      userId: USER,
+      idempotencyKey: null,
+    });
+
+    expect(stored.raw_payload.metadata).toMatchObject({
+      transport_source: "ecowitt",
+      verdant_source: "live",
+    });
+    expect(
+      (stored.raw_payload.metadata as Record<string, unknown>).reported_verdant_source,
+    ).toBeUndefined();
+  });
+
+  it("replaces a forged preserved value with the captured listener decision", () => {
+    const stored = buildStoredRow({
+      row: {
+        ...baseRow,
+        source: "ecowitt",
+        raw_payload: {
+          ...baseRow.raw_payload,
+          metadata: {
+            verdant_source: "demo",
+            reported_verdant_source: "live",
+          },
+        },
+      },
+      userId: USER,
+      idempotencyKey: null,
+    });
+
+    expect(stored.raw_payload.metadata).toMatchObject({
+      verdant_source: "demo",
+      reported_verdant_source: "demo",
+    });
+  });
+
   it("never sends source: 'ecowitt' to the DB insert", () => {
     const stored = buildStoredRow({
       row: { ...baseRow, source: "ecowitt" },
@@ -107,9 +293,7 @@ describe("buildStoredRow — EcoWitt transport mapping", () => {
     });
     // The DB-bound source must be canonical.
     expect(stored.source).not.toBe("ecowitt");
-    expect((CANONICAL_STORED_SOURCES as readonly string[])).toContain(
-      stored.source,
-    );
+    expect(CANONICAL_STORED_SOURCES as readonly string[]).toContain(stored.source);
   });
 
   it("preserves canonical manual/csv/demo unchanged", () => {
@@ -128,7 +312,7 @@ describe("buildStoredRow — EcoWitt transport mapping", () => {
       row: {
         ...baseRow,
         source: "ecowitt",
-        raw_payload: { ...(baseRow.raw_payload), vendor: "ecowitt_gw2000a" },
+        raw_payload: { ...baseRow.raw_payload, vendor: "ecowitt_gw2000a" },
       },
       userId: USER,
       idempotencyKey: null,
@@ -156,9 +340,9 @@ describe("buildStoredRow — EcoWitt transport mapping", () => {
 
 describe("classifyInsertError — sanitized reason codes", () => {
   it("23502 -> insert_required_field_missing", () => {
-    expect(
-      classifyInsertError({ code: "23502", message: 'null value in column "tent_id"' }),
-    ).toBe("insert_required_field_missing");
+    expect(classifyInsertError({ code: "23502", message: 'null value in column "tent_id"' })).toBe(
+      "insert_required_field_missing",
+    );
   });
 
   it("23514 with source -> insert_source_constraint_failed", () => {
@@ -177,8 +361,9 @@ describe("classifyInsertError — sanitized reason codes", () => {
   });
 
   it("42703 / 42P10 -> insert_column_mismatch", () => {
-    expect(classifyInsertError({ code: "42703", message: 'column "foo" does not exist' }))
-      .toBe("insert_column_mismatch");
+    expect(classifyInsertError({ code: "42703", message: 'column "foo" does not exist' })).toBe(
+      "insert_column_mismatch",
+    );
     expect(
       classifyInsertError({
         code: "42P10",
@@ -202,9 +387,7 @@ describe("classifyInsertError — sanitized reason codes", () => {
   it("unknown / null -> insert_unknown", () => {
     expect(classifyInsertError(null)).toBe("insert_unknown");
     expect(classifyInsertError({})).toBe("insert_unknown");
-    expect(classifyInsertError({ code: "XXNNN", message: "??" })).toBe(
-      "insert_unknown",
-    );
+    expect(classifyInsertError({ code: "XXNNN", message: "??" })).toBe("insert_unknown");
   });
 
   it("reason values are stable enum strings, never raw PG text", () => {

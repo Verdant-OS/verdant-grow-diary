@@ -478,6 +478,7 @@ export default function PlantDetail() {
       <PlantDetailAiDoctorReadiness
         plantId={plant.id}
         growId={plant.growId ?? null}
+        tentId={plant.tentId ?? null}
         stage={plant.stage ?? null}
         hasPlantPhoto={!!plant.photo}
       />

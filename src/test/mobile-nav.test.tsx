@@ -30,6 +30,37 @@ describe("MobileNav primary tabs", () => {
 });
 
 describe("MobileNav More sheet — Slice 4 grouping", () => {
+  it("keeps destinations scrollable inside a viewport-bounded sheet on short mobile screens", async () => {
+    render(wrap(<MobileNav />));
+
+    await act(async () => {
+      screen.getByText("More").click();
+    });
+
+    const sheet = await screen.findByTestId("mobile-more-sheet");
+    const scrollRegion = screen.getByRole("region", {
+      name: "More navigation destinations",
+    });
+
+    expect(sheet).toHaveClass(
+      "flex",
+      "max-h-[calc(100dvh-0.75rem)]",
+      "flex-col",
+      "overflow-hidden",
+    );
+    expect(scrollRegion).toHaveClass(
+      "mt-4",
+      "min-h-0",
+      "flex-1",
+      "overflow-y-auto",
+      "overscroll-contain",
+      "pb-[calc(1.5rem+env(safe-area-inset-bottom))]",
+    );
+    expect(scrollRegion).toHaveAttribute("tabindex", "0");
+    expect(screen.getByText("Choose a Verdant destination.")).toHaveClass("sr-only");
+    expect(within(scrollRegion).getByText("Invite a Grower")).toBeInTheDocument();
+  });
+
   it("renders groups in order: Daily → Insight → Advanced → Account with canonical labels and routes", async () => {
     render(wrap(<MobileNav />));
 

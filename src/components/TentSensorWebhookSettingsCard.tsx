@@ -119,6 +119,7 @@ export default function TentSensorWebhookSettingsCard({ tentId }: { tentId: stri
             size="sm"
             variant="outline"
             onClick={() => copy(webhookUrl, "Webhook URL")}
+            aria-label="Copy sensor webhook URL"
             data-testid="tent-sensor-webhook-copy-url"
           >
             <Copy className="h-3 w-3" />

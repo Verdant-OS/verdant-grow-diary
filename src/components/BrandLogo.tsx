@@ -65,7 +65,7 @@ export default function BrandLogo({
       />
       {showText && (
         <span
-          className={`font-display font-semibold tracking-tight ${TEXT_CLASS[size]}`}
+          className={`hidden min-[380px]:inline whitespace-nowrap font-display font-semibold tracking-tight ${TEXT_CLASS[size]}`}
         >
           Verdant Grow Diary
         </span>

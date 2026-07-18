@@ -16,7 +16,14 @@ import {
   Dna,
   type LucideIcon,
 } from "lucide-react";
-import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetTrigger,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import OperatorModeLink from "@/components/OperatorModeLink";
@@ -115,11 +122,22 @@ export default function MobileNav() {
             <MoreHorizontal className="h-5 w-5" />
             More
           </SheetTrigger>
-          <SheetContent side="bottom" className="rounded-t-2xl">
-            <SheetHeader>
+          <SheetContent
+            side="bottom"
+            data-testid="mobile-more-sheet"
+            className="flex max-h-[calc(100dvh-0.75rem)] flex-col overflow-hidden rounded-t-2xl"
+          >
+            <SheetHeader className="shrink-0">
               <SheetTitle className="font-display">Navigation</SheetTitle>
+              <SheetDescription className="sr-only">Choose a Verdant destination.</SheetDescription>
             </SheetHeader>
-            <div className="mt-4 space-y-5">
+            <div
+              role="region"
+              aria-label="More navigation destinations"
+              tabIndex={0}
+              data-testid="mobile-more-scroll-region"
+              className="mt-4 min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain pb-[calc(1.5rem+env(safe-area-inset-bottom))] pr-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
               {moreGroups.map((group) => (
                 <section
                   key={group.heading}

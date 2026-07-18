@@ -57,6 +57,12 @@ describe("Coach AI Doctor photo intake — mobile take + upload", () => {
     expect(uploadBlock).toMatch(/handleFile\(/);
   });
 
+  it("stacks the diagnosis actions on narrow screens and restores two columns at sm", () => {
+    expect(SOURCE).toMatch(
+      /className="grid grid-cols-1 gap-2 sm:grid-cols-2"[\s\S]*?Diagnose photo[\s\S]*?What should I do next\?/,
+    );
+  });
+
   it("decodes validated photos to a canvas instead of sending DOM file data to an HTML sink", () => {
     expect(SOURCE).toMatch(/validatePlantProfilePhotoFile\(f\)/);
     expect(SOURCE).toMatch(

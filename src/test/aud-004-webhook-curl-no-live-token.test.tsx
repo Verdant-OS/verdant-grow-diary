@@ -69,6 +69,13 @@ describe("AUD-004 — TentSensorWebhookSettingsCard does not expose live JWT", (
     expect(screen.getByText(/bridge token/i)).toBeInTheDocument();
   });
 
+  it("gives the icon-only endpoint copy control an accessible name", async () => {
+    render(<TentSensorWebhookSettingsCard tentId="tent-uuid-1" />);
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(screen.getByRole("button", { name: "Copy sensor webhook URL" })).toBeInTheDocument();
+  });
+
   it("exposes the reveal-with-token action only as an explicit, gated control", async () => {
     render(<TentSensorWebhookSettingsCard tentId="tent-uuid-1" />);
     await new Promise((r) => setTimeout(r, 0));

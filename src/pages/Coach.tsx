@@ -583,7 +583,7 @@ export default function Coach() {
           rows={2}
         />
 
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <Button
             onClick={() => ask("diagnose")}
             disabled={busy || !photoFile}

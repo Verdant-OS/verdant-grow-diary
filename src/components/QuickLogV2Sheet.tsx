@@ -35,7 +35,7 @@ import {
   type QuickLogV2FormState,
   type QuickLogV2Action,
 } from "@/lib/quickLogV2Rules";
-import { buildQuickLogV2SavePayload } from "@/lib/quickLogV2SavePayload";
+import { buildQuickLogV2SavePayload, QUICK_LOG_NOTE_LIMIT } from "@/lib/quickLogV2SavePayload";
 import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
 import { dispatchQuickLogV2EntryCreated } from "@/lib/quickLogV2EntryCreatedEvent";
 import { buildQuickLogPhotoGateState } from "@/lib/quickLogPhotoGateRules";
@@ -71,7 +71,9 @@ interface Props {
   defaultTargetKey?: string | null;
 }
 
-const NOTE_LIMIT = 500;
+// Mirror of the builder's write-time cap so the counter/maxLength and the
+// persisted validation stay on one source of truth.
+const NOTE_LIMIT = QUICK_LOG_NOTE_LIMIT;
 
 export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }: Props) {
   const { user } = useAuth();

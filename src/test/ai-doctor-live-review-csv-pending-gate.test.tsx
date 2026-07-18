@@ -40,10 +40,12 @@ vi.mock("@/hooks/useTimelineMemory", () => ({
   TIMELINE_MEMORY_DEFAULT_LIMIT: 100,
 }));
 
-// Mutable per-test state for the two separately bounded source reads.
+// Mutable per-test state for the dedicated imported-history read and the
+// separately bounded current-source read.
 const sensorQueryState = vi.hoisted(() => ({
   csvRows: [] as unknown[],
   csvStatus: "success" as "loading" | "error" | "success",
+  csvFetching: false,
   currentRows: [] as unknown[],
   currentStatus: "success" as "loading" | "error" | "success",
 }));
@@ -51,24 +53,36 @@ vi.mock("@/hooks/use-sensor-readings", () => ({
   useSensorReadingsByTents: (
     tentIds: string[],
     _limit: number,
-    sourceFilter?: readonly string[] | null,
   ) => {
-    const current = sourceFilter?.includes("live") === true;
-    const rows = current ? sensorQueryState.currentRows : sensorQueryState.csvRows;
-    const status = current ? sensorQueryState.currentStatus : sensorQueryState.csvStatus;
     const byTent: Record<string, unknown[]> = {};
     const statusByTent: Record<string, string> = {};
     for (const id of tentIds) {
-      byTent[id] = status === "success" ? rows : [];
-      statusByTent[id] = status;
+      byTent[id] =
+        sensorQueryState.currentStatus === "success"
+          ? sensorQueryState.currentRows
+          : [];
+      statusByTent[id] = sensorQueryState.currentStatus;
     }
     return {
       byTent,
       statusByTent,
-      isLoading: status === "loading",
-      isError: status === "error",
+      isLoading: sensorQueryState.currentStatus === "loading",
+      isError: sensorQueryState.currentStatus === "error",
     };
   },
+}));
+
+vi.mock("@/hooks/useImportedSensorHistory", () => ({
+  useImportedSensorHistory: () => ({
+    data:
+      sensorQueryState.csvStatus === "success"
+        ? sensorQueryState.csvRows
+        : undefined,
+    isLoading: sensorQueryState.csvStatus === "loading",
+    isFetching:
+      sensorQueryState.csvStatus === "loading" || sensorQueryState.csvFetching,
+    isError: sensorQueryState.csvStatus === "error",
+  }),
 }));
 
 import PlantDetailAiDoctorLiveReview from "@/components/PlantDetailAiDoctorLiveReview";
@@ -181,6 +195,7 @@ beforeEach(() => {
   itemsRef.current = strongTimeline();
   sensorQueryState.csvRows = [];
   sensorQueryState.csvStatus = "success";
+  sensorQueryState.csvFetching = false;
   sensorQueryState.currentRows = [];
   sensorQueryState.currentStatus = "success";
 });
@@ -188,6 +203,15 @@ beforeEach(() => {
 describe("CSV history pending/error gating", () => {
   it("holds the start button while the CSV-history read is in flight", () => {
     sensorQueryState.csvStatus = "loading";
+    mount();
+    const start = screen.getByTestId("plant-ai-doctor-live-review-start") as HTMLButtonElement;
+    expect(start.disabled).toBe(true);
+  });
+
+  it("holds the start button while cached-empty CSV history is refetching", () => {
+    sensorQueryState.csvRows = [];
+    sensorQueryState.csvStatus = "success";
+    sensorQueryState.csvFetching = true;
     mount();
     const start = screen.getByTestId("plant-ai-doctor-live-review-start") as HTMLButtonElement;
     expect(start.disabled).toBe(true);

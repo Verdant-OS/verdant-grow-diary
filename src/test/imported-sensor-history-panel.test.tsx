@@ -2,7 +2,7 @@
  * imported-sensor-history-panel — render tests for the Tent Detail
  * Imported Sensor History section. Read-only UI only.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
@@ -51,6 +51,42 @@ describe("ImportedSensorHistoryPanel", () => {
     expect(screen.getByTestId("imported-history-empty")).toHaveTextContent(
       "No imported CSV sensor history for this tent yet.",
     );
+  });
+
+  it("keeps a pending read distinct from established empty history", () => {
+    render(
+      wrap(
+        <ImportedSensorHistoryPanel
+          tentId="tent-A"
+          readings={[]}
+          readStatus="loading"
+        />,
+      ),
+    );
+    expect(screen.getByTestId("imported-history-loading")).toHaveTextContent(
+      "Loading imported CSV history",
+    );
+    expect(screen.queryByTestId("imported-history-empty")).not.toBeInTheDocument();
+  });
+
+  it("keeps a failed read distinct from empty history and offers an explicit retry", () => {
+    const onRetry = vi.fn();
+    render(
+      wrap(
+        <ImportedSensorHistoryPanel
+          tentId="tent-A"
+          readings={[]}
+          readStatus="error"
+          onRetry={onRetry}
+        />,
+      ),
+    );
+    expect(screen.getByTestId("imported-history-error")).toHaveTextContent(
+      "Couldn't load imported CSV history",
+    );
+    expect(screen.queryByTestId("imported-history-empty")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
   });
 
   it("renders a safe empty state when no tent context is provided", () => {

@@ -17,6 +17,20 @@ const FAKE_USER = {
   confirmed_at: "2020-01-01T00:00:00.000Z",
   user_metadata: { email_verified: true },
 };
+const FAKE_TENT_ID = "11111111-1111-4111-8111-111111111111";
+const FAKE_TENT = {
+  id: FAKE_TENT_ID,
+  grow_id: "22222222-2222-4222-8222-222222222222",
+  name: "Browser Proof Tent",
+  brand: "",
+  size: "2x2",
+  stage: "veg",
+  light_on: true,
+  light_schedule: "18/6",
+  light_wattage: 100,
+  is_archived: false,
+  created_at: "2020-01-01T00:00:00.000Z",
+};
 
 async function seedFakeSession(page: Page) {
   await page.addInitScript(
@@ -64,6 +78,14 @@ async function mockSignedInSupabase(
       return;
     }
     const selectedColumns = new URL(url).searchParams.get("select") ?? "";
+    if (new URL(url).pathname.endsWith("/rest/v1/tents")) {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([FAKE_TENT]),
+      });
+      return;
+    }
     if (url.includes("sensor_ingest_audit_log") && selectedColumns.includes("tent_id")) {
       options.onOperatorAuditRead?.();
     }
@@ -103,6 +125,10 @@ test.describe("post-Claude route and operator-access closure", () => {
     await expect(page.getByTestId("dashboard-root")).toBeVisible();
     await expect(page).toHaveURL(/\/dashboard\?growId=mock-grow$/);
     await expect(page.getByText("Oops! Page not found")).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Dashboard", exact: true })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
   });
 
   test("?operator=1 cannot reveal diagnostics or trigger audit reads for a grower", async ({
@@ -121,21 +147,40 @@ test.describe("post-Claude route and operator-access closure", () => {
     await acceptReconsentGateIfShown(page);
 
     await expect(page.getByRole("heading", { name: "Sensor Data" })).toBeVisible();
+    await page.getByRole("button", { name: FAKE_TENT.name }).click();
     await expect(page.getByTestId("sensors-operator-diagnostics")).toHaveCount(0);
     expect(auditReads).toBe(0);
   });
 
   test("verified operators retain diagnostics and the dedicated audit link", async ({ page }) => {
+    let auditReads = 0;
     await seedFakeSession(page);
-    await mockSignedInSupabase(page, { operatorGranted: true });
+    await mockSignedInSupabase(page, {
+      operatorGranted: true,
+      onOperatorAuditRead: () => {
+        auditReads += 1;
+      },
+    });
 
     await page.goto("/sensors?operator=1");
     await acceptReconsentGateIfShown(page);
 
+    await page.getByRole("button", { name: FAKE_TENT.name }).click();
     await expect(page.getByTestId("sensors-operator-diagnostics")).toBeVisible();
-    await expect(page.getByRole("link", { name: "EcoWitt Audit" })).toHaveAttribute(
+    const auditLink = page.getByRole("link", { name: "EcoWitt Audit" });
+    await expect(auditLink).toHaveAttribute(
       "href",
       "/sensors/ecowitt-audit",
+    );
+    await expect.poll(() => auditReads).toBeGreaterThan(0);
+
+    await auditLink.click();
+    await expect(page).toHaveURL(/\/sensors\/ecowitt-audit$/);
+    await expect(page.getByTestId("ecowitt-audit-page")).toBeVisible();
+    await expect(auditLink).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("link", { name: "Sensors", exact: true })).not.toHaveAttribute(
+      "aria-current",
+      "page",
     );
   });
 });

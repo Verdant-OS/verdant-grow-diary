@@ -873,7 +873,11 @@ export default function QuickLog({
         built.payload.p_idempotency_key = saveIdempotencyKeyRef.current;
       }
 
-      const result = await saveViaRpc(built.payload);
+      // The shared RPC hook also serves non-Quick-Log adapters. Opt in with
+      // the grower's validated UI selection so observation/environment keep
+      // their semantic activity even though the legacy RPC stores both as
+      // `p_action: "note"`.
+      const result = await saveViaRpc(built.payload, { telemetryIntent: eventType });
       if (!result.ok) {
         lastFailedSaveSigRef.current = attemptSig;
         const reason = result.reason ?? "save_failed";

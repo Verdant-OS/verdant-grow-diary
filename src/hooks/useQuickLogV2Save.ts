@@ -1,13 +1,14 @@
 import { useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { QuickLogV2SavePayload } from "@/lib/quickLogV2SavePayload";
-import { trackFunnelEvent } from "@/lib/funnelAnalytics";
+import { trackQuickLogSuccess, type QuickLogSuccessInput } from "@/lib/quickLogSuccessTelemetry";
 
 export interface QuickLogV2SaveResult {
   ok: boolean;
   reason?: string;
   growEventId?: string | null;
   environmentEventId?: string | null;
+  reused?: boolean;
 }
 
 interface RpcResponse {
@@ -15,6 +16,16 @@ interface RpcResponse {
   reason?: string;
   grow_event_id?: string | null;
   environment_event_id?: string | null;
+  reused?: boolean;
+}
+
+export interface QuickLogV2SaveOptions {
+  /**
+   * Explicit, closed grower Quick Log intent. Omit for adapters and other
+   * workflows that reuse this persistence hook without representing a
+   * grower-authored Quick Log activation.
+   */
+  telemetryIntent?: QuickLogSuccessInput;
 }
 
 export function useQuickLogV2Save() {
@@ -22,7 +33,10 @@ export function useQuickLogV2Save() {
   const [error, setError] = useState<string | null>(null);
 
   const save = useCallback(
-    async (payload: QuickLogV2SavePayload): Promise<QuickLogV2SaveResult> => {
+    async (
+      payload: QuickLogV2SavePayload,
+      options: QuickLogV2SaveOptions = {},
+    ): Promise<QuickLogV2SaveResult> => {
       setSaving(true);
       setError(null);
       try {
@@ -41,13 +55,14 @@ export function useQuickLogV2Save() {
           setError(reason);
           return { ok: false, reason };
         }
-        // Funnel ping only after the RPC confirms the write; p_action is a
-        // closed enum ("water" | "note"), never grower text.
-        trackFunnelEvent("quick_log_saved", { event_type: payload.p_action });
+        if (options.telemetryIntent !== undefined) {
+          trackQuickLogSuccess(options.telemetryIntent, { reused: r.reused === true });
+        }
         return {
           ok: true,
           growEventId: r.grow_event_id ?? null,
           environmentEventId: r.environment_event_id ?? null,
+          reused: r.reused === true,
         };
       } catch {
         setError("save_failed");

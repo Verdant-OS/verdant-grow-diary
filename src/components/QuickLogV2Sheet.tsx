@@ -87,6 +87,7 @@ import {
   shouldBlockQuickLogClose,
   type QuickLogPostSaveSuccess,
 } from "@/lib/quickLogSaveGuardRules";
+import { trackQuickLogSuccess } from "@/lib/quickLogSuccessTelemetry";
 
 interface Props {
   open: boolean;
@@ -530,6 +531,7 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
         setSaveStatus("");
         return;
       }
+      trackQuickLogSuccess("feed");
       setSaveStatus(FEEDING_SAVE_SUCCESS_MESSAGE);
       showTimelineConfirmation(FEEDING_SAVE_SUCCESS_MESSAGE, {
         targetType: resolved.targetType as "plant" | "tent",
@@ -613,7 +615,9 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
     }
 
     setSaveStatus("Saving log…");
-    const res = await save(built.payload);
+    // Explicit opt-in: this mounted grower Quick Log surface owns the intent.
+    // Other users of the shared persistence hook fail closed by default.
+    const res = await save(built.payload, { telemetryIntent: form.action });
     if (!res.ok) {
       if (uploadedPath) {
         await supabase.storage

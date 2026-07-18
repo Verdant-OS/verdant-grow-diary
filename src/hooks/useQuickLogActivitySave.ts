@@ -25,6 +25,7 @@ import {
   QUICK_LOG_V2_ENTRY_CREATED_EVENT,
   dispatchQuickLogV2EntryCreated,
 } from "@/lib/quickLogV2EntryCreatedEvent";
+import { trackQuickLogSuccess } from "@/lib/quickLogSuccessTelemetry";
 
 export interface QuickLogActivitySaveInput {
   activityId: QuickLogActivityId;
@@ -67,6 +68,7 @@ interface ManualRpcResponse {
   reason?: string;
   grow_event_id?: string | null;
   environment_event_id?: string | null;
+  reused?: boolean;
 }
 
 export function useQuickLogActivitySave() {
@@ -129,6 +131,7 @@ export function useQuickLogActivitySave() {
             growEventId: r.grow_event_id ?? null,
             source: "quick_log_v2",
           });
+          trackQuickLogSuccess(input.activityId, { reused: r.reused === true });
           return {
             ok: true,
             reason: "ok",
@@ -188,6 +191,7 @@ export function useQuickLogActivitySave() {
             growEventId: r.grow_event_id,
             source: "quick_log_v2",
           });
+          trackQuickLogSuccess(input.activityId, { reused: r.reused === true });
           return {
             ok: true,
             reason: "ok",

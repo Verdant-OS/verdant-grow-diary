@@ -139,6 +139,9 @@ describe("Quick Log Environment Check — save behavior", () => {
     await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
     const payload = saveMock.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(payload.p_action).toBe("note");
+    expect(saveMock.mock.calls[0]?.[1]).toEqual({
+      telemetryIntent: "environment",
+    });
     // No environment_check envelope when nothing measured.
     expect(payload.p_details).toBeNull();
     expect(toastSuccess).toHaveBeenCalledWith(

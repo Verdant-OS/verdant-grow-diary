@@ -42,6 +42,9 @@ vi.mock("@/store/grows", () => ({
     setActiveGrowId: vi.fn(),
   }),
 }));
+vi.mock("@/hooks/use-tents", () => ({
+  useTents: () => ({ data: [{ id: "t1", name: "Tent 1", grow_id: "g1" }] }),
+}));
 
 let plantsMock: Array<Record<string, unknown>> = [];
 vi.mock("@/hooks/use-plants", () => ({
@@ -61,9 +64,7 @@ function renderQL(ui: ReactElement) {
   return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
 }
 
-const one = [
-  { id: "p1", name: "Blue Dream", strain: "BD", tent_id: "t1", grow_id: "g1" },
-];
+const one = [{ id: "p1", name: "Blue Dream", strain: "BD", tent_id: "t1", grow_id: "g1" }];
 const many = [
   { id: "p1", name: "Blue Dream", strain: "BD", tent_id: "t1", grow_id: "g1" },
   { id: "p2", name: "OG Kush", strain: "OG", tent_id: "t1", grow_id: "g1" },
@@ -89,9 +90,7 @@ describe("QuickLog auto-preselect single eligible plant", () => {
     plantsMock = many;
     renderQL(<QuickLog open onOpenChange={() => {}} />);
     expect(screen.getByTestId("quick-log-plant-error")).toBeInTheDocument();
-    expect(
-      (screen.getByTestId("quick-log-save") as HTMLButtonElement).disabled,
-    ).toBe(true);
+    expect((screen.getByTestId("quick-log-save") as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("prefill plantId wins even when multiple scoped plants exist", () => {
@@ -116,9 +115,7 @@ describe("QuickLog auto-preselect single eligible plant", () => {
   it("re-evaluates when dialog is closed and reopened", async () => {
     plantsMock = many;
     const { rerender } = renderQL(<QuickLog open onOpenChange={() => {}} />);
-    expect(
-      (screen.getByTestId("quick-log-save") as HTMLButtonElement).disabled,
-    ).toBe(true);
+    expect((screen.getByTestId("quick-log-save") as HTMLButtonElement).disabled).toBe(true);
 
     // Close, swap scoped plants down to one, then reopen.
     rerender(

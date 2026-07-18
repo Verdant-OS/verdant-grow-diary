@@ -5,16 +5,10 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import {
-  evaluateQuickLogPreview,
-  type QuickLogDraft,
-} from "@/lib/quickLogPreviewRules";
+import { evaluateQuickLogPreview, type QuickLogDraft } from "@/lib/quickLogPreviewRules";
 
 const ROOT = resolve(__dirname, "../..");
-const QUICKLOG = readFileSync(
-  resolve(ROOT, "src/components/QuickLog.tsx"),
-  "utf8",
-);
+const QUICKLOG = readFileSync(resolve(ROOT, "src/components/QuickLog.tsx"), "utf8");
 
 const base = (over: Partial<QuickLogDraft> = {}): QuickLogDraft => ({
   note: "Watered.",
@@ -26,9 +20,7 @@ const base = (over: Partial<QuickLogDraft> = {}): QuickLogDraft => ({
 
 describe("evaluateQuickLogPreview", () => {
   it("shows no severe warning for valid watering details", () => {
-    const r = evaluateQuickLogPreview(
-      base({ details: { ph: "6.2", ec: "1.4", watering: "500" } }),
-    );
+    const r = evaluateQuickLogPreview(base({ details: { ph: "6.2", ec: "1.4", watering: "500" } }));
     expect(r.hasIssues).toBe(false);
     expect(r.warnings.every((w) => w.severity !== "warning")).toBe(true);
   });
@@ -58,9 +50,7 @@ describe("evaluateQuickLogPreview", () => {
   });
 
   it("warns for invalid watering amount", () => {
-    const r = evaluateQuickLogPreview(
-      base({ details: { watering: "lots" } }),
-    );
+    const r = evaluateQuickLogPreview(base({ details: { watering: "lots" } }));
     expect(r.warnings.some((w) => w.code === "watering:invalid")).toBe(true);
   });
 
@@ -70,9 +60,7 @@ describe("evaluateQuickLogPreview", () => {
   });
 
   it("warns for reminder event without remindAt", () => {
-    const r = evaluateQuickLogPreview(
-      base({ eventType: "reminder", remindAt: "" }),
-    );
+    const r = evaluateQuickLogPreview(base({ eventType: "reminder", remindAt: "" }));
     expect(r.warnings.some((w) => w.code === "remind-at:missing")).toBe(true);
   });
 
@@ -83,9 +71,7 @@ describe("evaluateQuickLogPreview", () => {
   });
 
   it("Timeline normalization remains compatible with QuickLog details", () => {
-    const r = evaluateQuickLogPreview(
-      base({ details: { ph: "6.2", ec: "1.4", watering: "500" } }),
-    );
+    const r = evaluateQuickLogPreview(base({ details: { ph: "6.2", ec: "1.4", watering: "500" } }));
     // Shared normalizer must not flag valid pH/EC/watering coming from QuickLog.
     expect(r.normalizedWarnings).not.toContain("ph:invalid");
     expect(r.normalizedWarnings).not.toContain("ec:invalid");
@@ -94,9 +80,7 @@ describe("evaluateQuickLogPreview", () => {
 
   it("does not echo raw user input in warning messages", () => {
     const secret = "SECRET_PAYLOAD_XYZ";
-    const r = evaluateQuickLogPreview(
-      base({ note: secret, details: { ph: secret, ec: secret } }),
-    );
+    const r = evaluateQuickLogPreview(base({ note: secret, details: { ph: secret, ec: secret } }));
     for (const w of r.warnings) {
       expect(w.message).not.toContain(secret);
       expect(w.message.length).toBeLessThan(120);
@@ -113,9 +97,7 @@ describe("evaluateQuickLogPreview", () => {
 
 describe("QuickLog component wiring", () => {
   it("imports the preview helper", () => {
-    expect(QUICKLOG).toMatch(
-      /from\s+["']@\/lib\/quickLogPreviewRules["']/,
-    );
+    expect(QUICKLOG).toMatch(/from\s+["']@\/lib\/quickLogPreviewRules["']/);
     expect(QUICKLOG).toMatch(/evaluateQuickLogPreview\s*\(/);
   });
 
@@ -123,7 +105,7 @@ describe("QuickLog component wiring", () => {
     // Save is gated on busy and on missing required plant context (Gate 1
     // bug fix: visible picker and save validator must agree). It must NOT
     // be gated on soft preview/validation warnings.
-    expect(QUICKLOG).toMatch(/disabled=\{busy\s*\|\|\s*!selectedPlant\s*\|\|\s*!!savedTarget\}/);
+    expect(QUICKLOG).toMatch(/disabled=\{busy\s*\|\|\s*!resolvedTarget\s*\|\|\s*!!savedTarget\}/);
     expect(QUICKLOG).not.toMatch(/disabled=\{[^}]*preview[^}]*\}/);
     expect(QUICKLOG).not.toMatch(/disabled=\{[^}]*hasIssues[^}]*\}/);
   });
@@ -139,9 +121,7 @@ describe("QuickLog component wiring", () => {
 
   it("does not introduce service_role or device-control surfaces", () => {
     expect(QUICKLOG).not.toMatch(/service_role/);
-    expect(QUICKLOG).not.toMatch(
-      /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|relay|actuator/i,
-    );
+    expect(QUICKLOG).not.toMatch(/mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|relay|actuator/i);
   });
 
   it("syncs the note textarea via onChange, onInput, onCompositionEnd, and onBlur", () => {
@@ -151,9 +131,7 @@ describe("QuickLog component wiring", () => {
     // update React state before the note:missing rule runs.
     expect(QUICKLOG).toMatch(/data-testid="quicklog-note"[\s\S]{0,1200}onChange=/);
     expect(QUICKLOG).toMatch(/data-testid="quicklog-note"[\s\S]{0,1500}onInput=/);
-    expect(QUICKLOG).toMatch(
-      /data-testid="quicklog-note"[\s\S]{0,1800}onCompositionEnd=/,
-    );
+    expect(QUICKLOG).toMatch(/data-testid="quicklog-note"[\s\S]{0,1800}onCompositionEnd=/);
     expect(QUICKLOG).toMatch(/data-testid="quicklog-note"[\s\S]{0,2000}onBlur=/);
   });
 });
@@ -173,10 +151,7 @@ describe("evaluateQuickLogPreview note validation", () => {
   });
 
   it("clears note:missing for pasted multi-line notes", () => {
-    const r = evaluateQuickLogPreview(
-      base({ note: "Line 1\nLine 2 with details" }),
-    );
+    const r = evaluateQuickLogPreview(base({ note: "Line 1\nLine 2 with details" }));
     expect(r.warnings.find((x) => x.code === "note:missing")).toBeUndefined();
   });
 });
-

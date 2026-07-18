@@ -49,7 +49,7 @@ vi.mock("@/store/grows", () => ({
 }));
 vi.mock("@/hooks/use-plants", () => ({ usePlants: () => ({ data: plantsData }) }));
 vi.mock("@/hooks/use-tents", () => ({
-  useTents: () => ({ data: [{ id: "t1", name: "Tent 1" }] }),
+  useTents: () => ({ data: [{ id: "t1", name: "Tent 1", grow_id: "g1" }] }),
 }));
 
 vi.mock("sonner", () => ({
@@ -141,9 +141,7 @@ describe("QuickLog watering required field", () => {
     const form = wateringInput.closest("form") as HTMLFormElement;
     expect(form).not.toBeNull();
     fireEvent.submit(form);
-    await waitFor(() =>
-      expect(screen.queryByTestId("quicklog-watering-error")).not.toBeNull(),
-    );
+    await waitFor(() => expect(screen.queryByTestId("quicklog-watering-error")).not.toBeNull());
     expect(screen.getByTestId("quicklog-watering-error").textContent ?? "").toMatch(
       /watering volume/i,
     );

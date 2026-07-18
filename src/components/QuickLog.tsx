@@ -82,6 +82,11 @@ import {
   isSupportedLegacyEventType,
   UNSUPPORTED_EVENT_TYPE_COPY,
 } from "@/lib/legacyQuickLogUnifiedSave";
+import {
+  QUICK_LOG_TARGET_BLOCKED_COPY,
+  resolveQuickLogPrefillTarget,
+  resolveQuickLogWriteTarget,
+} from "@/lib/quickLogTargetIntegrityRules";
 import { buildSensorSnapshotSavePayload } from "@/lib/latestSensorSnapshotRules";
 import { quickLogReasonToOperatorMessage } from "@/lib/quickLogSaveErrorMessage";
 import { buildStaleSnapshotHelperCopy } from "@/lib/quickLogStaleSnapshotHelperCopy";
@@ -370,9 +375,23 @@ export default function QuickLog({
   // payload, so an edited retry is distinguished from a pure retry.
   const lastFailedSaveSigRef = useRef<string | null>(null);
 
+  const prefillTarget = useMemo(
+    () => resolveQuickLogPrefillTarget({ prefill, plants, tents: activeTents }),
+    [prefill, plants, activeTents],
+  );
+  const prefillPlantId = prefillTarget.status === "ready" ? prefillTarget.target.plantId : null;
+  const prefillGrowId = prefillTarget.status === "ready" ? prefillTarget.target.growId : null;
+
   useEffect(() => {
     if (!open || !prefill) return;
-    if (prefill.growId && prefill.growId !== activeGrowId) {
+    if (prefill.plantId && prefillPlantId && prefillGrowId) {
+      if (prefillGrowId !== activeGrowId) {
+        setActiveGrowId(prefillGrowId);
+      }
+      setPlantId(prefillPlantId);
+    } else if (!prefill.plantId && prefill.growId && prefill.growId !== activeGrowId) {
+      // Grow/tent launchers without a plant remain explicit manual-selection
+      // flows. Preserve their known grow scope, but never invent a plant.
       setActiveGrowId(prefill.growId);
     }
     if (prefill.eventType) setEventType(prefill.eventType);
@@ -404,6 +423,8 @@ export default function QuickLog({
     prefill?.suggestSnapshot,
     prefill?.note,
     prefill?.wateringVolumeMl,
+    prefillPlantId,
+    prefillGrowId,
   ]);
 
   const scopedPlants = useMemo(
@@ -428,6 +449,22 @@ export default function QuickLog({
   const selectedTent = useMemo(
     () => activeTents.find((t) => t.id === selectedPlant?.tent_id) ?? null,
     [activeTents, selectedPlant?.tent_id],
+  );
+
+  const writeTarget = useMemo(
+    () =>
+      resolveQuickLogWriteTarget({
+        activeGrowId,
+        selectedPlant,
+        selectedTent,
+      }),
+    [activeGrowId, selectedPlant, selectedTent],
+  );
+  const resolvedTarget = writeTarget.status === "ready" ? writeTarget.target : null;
+  const resolvedTargetGrow = useMemo(
+    () =>
+      resolvedTarget ? (grows.find((grow) => grow.id === resolvedTarget.growId) ?? null) : null,
+    [grows, resolvedTarget],
   );
 
   // Slice A2: re-enable stage defaulting ONLY when the grower actively switches
@@ -495,9 +532,17 @@ export default function QuickLog({
       plantId || null,
     );
     if (next && next !== plantId) setPlantId(next);
-  }, [open, plantId, scopedPlants, prefill?.plantId, prefill?.suppressPlantDefault]);
+  }, [
+    open,
+    plantId,
+    scopedPlants,
+    activeGrowId,
+    prefill?.plantId,
+    prefill?.growId,
+    prefill?.suppressPlantDefault,
+  ]);
 
-  const sensorTentId = selectedPlant?.tent_id ?? null;
+  const sensorTentId = resolvedTarget?.tentId ?? null;
   const sensorState = useLatestTentSensorSnapshot(sensorTentId);
   const stripView = useMemo(
     () =>
@@ -765,7 +810,7 @@ export default function QuickLog({
   async function runSubmit() {
     setSaveError(null);
 
-    if (!user || !activeGrowId) {
+    if (!user) {
       const message = "Pick a workspace first";
       setSaveError(message);
       toast.error(message);
@@ -775,13 +820,17 @@ export default function QuickLog({
       toast.message(UNSUPPORTED_EVENT_TYPE_COPY);
       return;
     }
-    if (!selectedPlant) {
-      const message = "Pick a plant to save this entry";
+    if (writeTarget.status !== "ready" || !selectedPlant || !selectedTent) {
+      const message =
+        writeTarget.status === "blocked"
+          ? QUICK_LOG_TARGET_BLOCKED_COPY[writeTarget.reason]
+          : "Review the Quick Log target before saving.";
       setSaveError(message);
       toast.error(message);
-      focusPlant();
+      if (!selectedPlant) focusPlant();
       return;
     }
+    const saveTarget = writeTarget.target;
     if (!note.trim() && eventType !== "watering") {
       const message = "Add a quick note";
       setSaveError(message);
@@ -863,7 +912,7 @@ export default function QuickLog({
         selectedPhenoEvidenceGoal &&
         phenoEvidenceContext.status === "ready" &&
         phenoEvidenceContext.context?.huntId === selectedPhenoHuntId &&
-        phenoEvidenceContext.context.plantId === selectedPlant.id &&
+        phenoEvidenceContext.context.plantId === saveTarget.plantId &&
         phenoEvidenceContext.context.coverage.goals.some(
           (goal) => goal.id === selectedPhenoEvidenceGoal,
         )
@@ -872,7 +921,7 @@ export default function QuickLog({
       const phenoEvidenceReceipt = configuredPhenoGoal
         ? buildPhenoEvidenceReceiptDetails({
             huntId: selectedPhenoHuntId,
-            plantId: selectedPlant.id,
+            plantId: saveTarget.plantId,
             evidenceGoal: configuredPhenoGoal,
             stage: normalizeQuickLogStage(stage),
           })
@@ -881,8 +930,8 @@ export default function QuickLog({
         eventType,
         idempotencyKey: saveIdempotencyKeyRef.current,
         noteWithHardware,
-        plantId: selectedPlant.id,
-        plantTentId: selectedPlant.tent_id ?? null,
+        plantId: saveTarget.plantId,
+        plantTentId: saveTarget.tentId,
         details,
         sensorAttachPayload,
         earlyStage: earlyStageRecord,
@@ -939,12 +988,12 @@ export default function QuickLog({
       // the touched ref to avoid silently mutating the grow's stage on an
       // ordinary save. Still never writes an unknown/empty stage.
       if (
-        activeGrow &&
+        resolvedTargetGrow &&
         stageUserTouchedRef.current &&
         normalizeQuickLogStage(stage) &&
-        stage !== activeGrow.stage
+        stage !== resolvedTargetGrow.stage
       ) {
-        await supabase.from("grows").update({ stage }).eq("id", activeGrowId);
+        await supabase.from("grows").update({ stage }).eq("id", saveTarget.growId);
       }
 
       // Submission completed: the next logical submission gets a fresh key.
@@ -961,16 +1010,16 @@ export default function QuickLog({
       toast.success(finalMessage);
 
       rememberLastTarget({
-        plantId: selectedPlant.id,
-        growId: activeGrowId,
-        tentId: selectedPlant.tent_id ?? null,
+        plantId: saveTarget.plantId,
+        growId: saveTarget.growId,
+        tentId: saveTarget.tentId,
         savedAt: new Date().toISOString(),
       });
       setSavedTarget({
         id: selectedPlant.id,
         name: plantLabel,
         tentName: selectedTent?.name ?? null,
-        growName: activeGrow?.name ?? null,
+        growName: resolvedTargetGrow?.name ?? null,
         eventType,
         savedAt: new Date().toISOString(),
       });
@@ -994,8 +1043,8 @@ export default function QuickLog({
       setTimeout(() => viewPlantBtnRef.current?.focus(), 0);
       applyQuickLogV2Refresh(queryClient, {
         targetType: "plant",
-        targetId: selectedPlant.id,
-        tentId: selectedPlant.tent_id ?? null,
+        targetId: saveTarget.plantId,
+        tentId: saveTarget.tentId,
       });
       // Explicit, statically-grep-able invalidations for the two V0-loop
       // memory surfaces (Recent Plant Activity + shared diary_entries
@@ -1019,7 +1068,7 @@ export default function QuickLog({
   }
 
   const snapshotUsable = stripView.status === "usable";
-  const attachDisabled = !selectedPlant || !snapshotUsable;
+  const attachDisabled = !resolvedTarget || !snapshotUsable;
   const showMismatch = !!(
     prefill?.plantId &&
     selectedPlant &&
@@ -1032,7 +1081,7 @@ export default function QuickLog({
     !tentSetupRequired
   );
   const showWateringErr = !!wateringError;
-  const targetGrowName = activeGrow?.name ?? "No setup selected";
+  const targetGrowName = resolvedTargetGrow?.name ?? activeGrow?.name ?? "No setup selected";
   const targetTentName =
     selectedTent?.name ?? (selectedPlant?.tent_id ? "Assigned tent" : "No tent assigned");
   const selectedResponseStatus = readResponseCheckStatus(note);
@@ -1077,9 +1126,9 @@ export default function QuickLog({
             useQuickLogActivitySave and dispatches
             verdant:entry-created only on confirmed success. */}
         <QuickLogAllActivitiesSection
-          growId={activeGrowId ?? null}
-          tentId={selectedPlant?.tent_id ?? null}
-          plantId={selectedPlant?.id ?? null}
+          growId={resolvedTarget?.growId ?? null}
+          tentId={resolvedTarget?.tentId ?? null}
+          plantId={resolvedTarget?.plantId ?? null}
           heading="All activity types"
           testIdPrefix="quick-log-dialog-all-activities"
         />
@@ -1308,6 +1357,9 @@ export default function QuickLog({
 
           <section
             data-testid="quick-log-target-card"
+            data-target-plant-id={resolvedTarget?.plantId}
+            data-target-tent-id={resolvedTarget?.tentId}
+            data-target-grow-id={resolvedTarget?.growId}
             aria-label="Quick Log target"
             className="rounded-xl border border-primary/40 bg-primary/5 p-3 space-y-3"
           >
@@ -1399,6 +1451,15 @@ export default function QuickLog({
                 data-testid="quick-log-plant-error"
               >
                 Choose a plant before saving this entry.
+              </p>
+            ) : writeTarget.status === "blocked" ? (
+              <p
+                id="quick-log-target-error"
+                role="alert"
+                className="text-[11px] text-destructive"
+                data-testid="quick-log-target-error"
+              >
+                {QUICK_LOG_TARGET_BLOCKED_COPY[writeTarget.reason]}
               </p>
             ) : (
               <p className="text-[11px] text-muted-foreground" data-testid="quick-log-plant-helper">
@@ -1541,9 +1602,9 @@ export default function QuickLog({
 
           {!tentSetupRequired && (
             <QuickLogSensorSnapshotStrip
-              growId={activeGrowId}
-              tentId={selectedPlant?.tent_id ?? null}
-              attached={snapshot && !!selectedPlant}
+              growId={resolvedTarget?.growId ?? null}
+              tentId={resolvedTarget?.tentId ?? null}
+              attached={snapshot && !!resolvedTarget}
             />
           )}
 
@@ -2278,7 +2339,7 @@ export default function QuickLog({
 
           <Button
             type="submit"
-            disabled={busy || !selectedPlant || !!savedTarget}
+            disabled={busy || !resolvedTarget || !!savedTarget}
             data-testid="quick-log-save"
             className="gradient-leaf text-primary-foreground"
           >

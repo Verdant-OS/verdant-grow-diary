@@ -58,10 +58,10 @@ describe("Slice 7: user-facing nav never points at the legacy /logs path", () =>
 });
 
 describe("Slice 7: /logs remains a legacy redirect alias in App.tsx", () => {
-  it("App.tsx registers a /logs route that <Navigate>s to /timeline", () => {
+  it("App.tsx registers a scope-preserving /logs alias to /timeline", () => {
     expect(APP).toMatch(/path=["']\/logs["']/);
     expect(APP).toMatch(
-      /<Route[^>]*path=["']\/logs["'][^>]*element=\{\s*<Navigate\s+to=["']\/timeline["']\s+replace\s*\/>\s*\}/,
+      /<Route[^>]*path=["']\/logs["'][^>]*element=\{<RouteAliasRedirect\s+to=["']\/timeline["']\s*\/>\}/,
     );
   });
 

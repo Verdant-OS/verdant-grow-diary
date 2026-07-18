@@ -31,22 +31,13 @@
  *   - Treating a non-founder as founder.
  */
 
-import type {
-  PlanId,
-  ResolvedEntitlement,
-} from "@/lib/entitlements/types";
+import type { PlanId, ResolvedEntitlement } from "@/lib/entitlements/types";
 
-/** Plans whose viewer should NEVER see a "free → upsell" AI Doctor prompt. */
-const PAID_PLAN_IDS: ReadonlySet<PlanId> = new Set<PlanId>([
-  "pro_monthly",
-  "pro_annual",
-  "founder_lifetime",
-]);
+/** Effective recurring plans whose viewer should not see a Free upsell. */
+const RECURRING_PRO_PLAN_IDS: ReadonlySet<PlanId> = new Set<PlanId>(["pro_monthly", "pro_annual"]);
 
 /** Founder/builder/internal plan — full bypass of upsell prompt. */
-const FOUNDER_PLAN_IDS: ReadonlySet<PlanId> = new Set<PlanId>([
-  "founder_lifetime",
-]);
+const FOUNDER_PLAN_IDS: ReadonlySet<PlanId> = new Set<PlanId>(["founder_lifetime"]);
 
 export interface AiDoctorEntitlementInput {
   /** Resolved client entitlement, or null when unknown/loading/signed-out. */
@@ -56,15 +47,12 @@ export interface AiDoctorEntitlementInput {
 export interface AiDoctorEntitlementView {
   /** True for founder_lifetime viewers (any status, active or degraded). */
   isFounder: boolean;
-  /** True for any pro/founder viewer (active OR degraded display plan). */
+  /** True for effective Pro access or any Founder identity. */
   isPaidViewer: boolean;
   /** True when the viewer should bypass premium upsell prompts. */
   bypassesUpsell: boolean;
   /** Human-readable, NON-IDENTIFYING reason for the resolved view. */
-  reason:
-    | "founder_bypass"
-    | "paid_plan_bypass"
-    | "free_or_unknown_viewer";
+  reason: "founder_bypass" | "paid_plan_bypass" | "free_or_unknown_viewer";
 }
 
 /**
@@ -85,18 +73,15 @@ export function resolveAiDoctorEntitlementView(
   }
 
   // displayPlanId retains plan identity even when capabilities have
-  // degraded to free (e.g. paused). For UPSELL SUPPRESSION purposes we
-  // honor the display identity, because a founder whose row briefly
-  // degrades must still never see "upgrade to Pro" copy.
+  // degraded to free (e.g. paused). Only Founder identity is honored from
+  // the display plan: a lapsed recurring Pro viewer has effective Free
+  // access and should be offered a path to reactivate Pro. A Founder whose
+  // row briefly degrades must still never see "upgrade to Pro" copy.
   const display: PlanId = ent.displayPlanId;
   const effective: PlanId = ent.effectivePlanId;
 
-  const isFounder =
-    FOUNDER_PLAN_IDS.has(display) || FOUNDER_PLAN_IDS.has(effective);
-  const isPaidViewer =
-    isFounder ||
-    PAID_PLAN_IDS.has(display) ||
-    PAID_PLAN_IDS.has(effective);
+  const isFounder = FOUNDER_PLAN_IDS.has(display) || FOUNDER_PLAN_IDS.has(effective);
+  const isPaidViewer = isFounder || RECURRING_PRO_PLAN_IDS.has(effective);
 
   if (isFounder) {
     return {

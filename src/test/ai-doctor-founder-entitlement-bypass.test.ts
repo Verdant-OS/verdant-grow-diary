@@ -47,6 +47,13 @@ function rowFor(plan: PlanId): BillingSubscriptionRow {
   };
 }
 
+function entitlementFor(
+  plan: PlanId,
+  overrides: Partial<BillingSubscriptionRow> = {},
+): ResolvedEntitlement {
+  return resolveEntitlements({ ...rowFor(plan), ...overrides }, at);
+}
+
 function denial(planId: string | null): AiCreditDenial {
   return {
     ok: false,
@@ -85,6 +92,70 @@ describe("resolveAiDoctorEntitlementView", () => {
       expect(v.reason).toBe("paid_plan_bypass");
     },
   );
+
+  it.each([
+    ["paused", { status: "paused" }],
+    ["expired", { status: "expired" }],
+    [
+      "canceled after its paid-through period",
+      {
+        status: "canceled",
+        current_period_end: "2026-06-18T23:59:59Z",
+      },
+    ],
+  ] as const)(
+    "lapsed recurring Pro (%s) → does not suppress the reactivation upsell",
+    (_label, overrides) => {
+      const entitlement = entitlementFor("pro_monthly", overrides);
+      expect(entitlement.displayPlanId).toBe("pro_monthly");
+      expect(entitlement.effectivePlanId).toBe("free");
+
+      const v = resolveAiDoctorEntitlementView({ entitlement });
+      expect(v.isFounder).toBe(false);
+      expect(v.isPaidViewer).toBe(false);
+      expect(v.bypassesUpsell).toBe(false);
+      expect(v.reason).toBe("free_or_unknown_viewer");
+    },
+  );
+
+  it.each([
+    [
+      "past_due",
+      {
+        status: "past_due",
+        current_period_end: "2026-06-18T23:59:59Z",
+      },
+    ],
+    [
+      "canceled inside its paid-through period",
+      {
+        status: "canceled",
+        current_period_end: "2026-06-19T00:00:01Z",
+      },
+    ],
+  ] as const)("entitled recurring Pro (%s) → still suppresses upsell", (_label, overrides) => {
+    const entitlement = entitlementFor("pro_monthly", overrides);
+    expect(entitlement.effectivePlanId).toBe("pro_monthly");
+
+    const v = resolveAiDoctorEntitlementView({ entitlement });
+    expect(v.isPaidViewer).toBe(true);
+    expect(v.bypassesUpsell).toBe(true);
+    expect(v.reason).toBe("paid_plan_bypass");
+  });
+
+  it("degraded Founder display identity still bypasses upsell", () => {
+    const entitlement = entitlementFor("founder_lifetime", {
+      status: "paused",
+    });
+    expect(entitlement.effectivePlanId).toBe("free");
+    expect(entitlement.displayPlanId).toBe("founder_lifetime");
+
+    const v = resolveAiDoctorEntitlementView({ entitlement });
+    expect(v.isFounder).toBe(true);
+    expect(v.isPaidViewer).toBe(true);
+    expect(v.bypassesUpsell).toBe(true);
+    expect(v.reason).toBe("founder_bypass");
+  });
 
   it("free → does NOT bypass upsell", () => {
     const v = resolveAiDoctorEntitlementView({ entitlement: freeEnt });
@@ -147,6 +218,66 @@ describe("AiCreditLimitNoticeViewModel — founder bypass integration", () => {
     const vm = buildAiCreditLimitNoticeViewModel({
       credit: denial("free"),
       viewerEntitlement: proEnt,
+    });
+    expect(vm.kind).toBe("wait");
+    expect(vm.paywallVm).toBeUndefined();
+  });
+
+  it.each([
+    ["paused", { status: "paused" }],
+    ["expired", { status: "expired" }],
+    [
+      "canceled after its paid-through period",
+      {
+        status: "canceled",
+        current_period_end: "2026-06-18T23:59:59Z",
+      },
+    ],
+  ] as const)(
+    "lapsed recurring Pro (%s) + server Free denial → 'upsell' reactivation path",
+    (_label, overrides) => {
+      const vm = buildAiCreditLimitNoticeViewModel({
+        credit: denial("free"),
+        viewerEntitlement: entitlementFor("pro_monthly", overrides),
+      });
+      expect(vm.kind).toBe("upsell");
+      expect(vm.paywallVm).toBeDefined();
+    },
+  );
+
+  it.each([
+    [
+      "past_due",
+      {
+        status: "past_due",
+        current_period_end: "2026-06-18T23:59:59Z",
+      },
+    ],
+    [
+      "canceled inside its paid-through period",
+      {
+        status: "canceled",
+        current_period_end: "2026-06-19T00:00:01Z",
+      },
+    ],
+  ] as const)(
+    "entitled recurring Pro (%s) + server Free denial → 'wait', NO paywall",
+    (_label, overrides) => {
+      const vm = buildAiCreditLimitNoticeViewModel({
+        credit: denial("free"),
+        viewerEntitlement: entitlementFor("pro_monthly", overrides),
+      });
+      expect(vm.kind).toBe("wait");
+      expect(vm.paywallVm).toBeUndefined();
+    },
+  );
+
+  it("degraded Founder display identity + server Free denial → 'wait', NO paywall", () => {
+    const vm = buildAiCreditLimitNoticeViewModel({
+      credit: denial("free"),
+      viewerEntitlement: entitlementFor("founder_lifetime", {
+        status: "paused",
+      }),
     });
     expect(vm.kind).toBe("wait");
     expect(vm.paywallVm).toBeUndefined();

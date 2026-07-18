@@ -61,7 +61,7 @@ describe("MobileNav More sheet — Slice 4 grouping", () => {
     expect(within(scrollRegion).getByText("Invite a Grower")).toBeInTheDocument();
   });
 
-  it("renders groups in order: Daily → Insight → Advanced → Account with canonical labels and routes", async () => {
+  it("renders core destinations before a dedicated Labs group with canonical labels and routes", async () => {
     render(wrap(<MobileNav />));
 
     await act(async () => {
@@ -74,7 +74,7 @@ describe("MobileNav More sheet — Slice 4 grouping", () => {
 
     // Group order
     const groupHeadings = screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
-    expect(groupHeadings).toEqual(["Daily", "Insight", "Advanced", "Account"]);
+    expect(groupHeadings).toEqual(["Daily", "Insight", "More", "Labs", "Account"]);
 
     // Each group contains the expected labels + route targets
     const expectations: Record<string, Array<[string, string]>> = {
@@ -86,11 +86,15 @@ describe("MobileNav More sheet — Slice 4 grouping", () => {
       Insight: [
         ["Sensors", "/sensors"],
         ["AI Doctor", "/doctor"],
-      ],
-      Advanced: [
         ["Reports", "/reports"],
-        ["My Grows", "/grows"],
+      ],
+      More: [["My Grows", "/grows"]],
+      Labs: [
         ["Pheno Hunt", "/pheno-hunts"],
+        ["Breeding Programs", "/breeding"],
+        ["Lineage Repair", "/grow-lineage"],
+        ["Agent Integrations", "/settings/agent-integrations"],
+        ["AI Sessions", "/doctor/sessions"],
       ],
       Account: [
         ["Settings", "/settings"],
@@ -105,6 +109,19 @@ describe("MobileNav More sheet — Slice 4 grouping", () => {
         expect(link).toHaveAttribute("href", href);
       }
     }
+  });
+
+  it("does not publicly link Customer publishing before its Phase 4 proof gate", async () => {
+    render(wrap(<MobileNav />));
+    await act(async () => {
+      screen.getByText("More").click();
+    });
+
+    const region = await screen.findByRole("region", {
+      name: "More navigation destinations",
+    });
+    expect(within(region).queryByText(/customer publishing/i)).toBeNull();
+    expect(within(region).queryByRole("link", { name: /customer/i })).toBeNull();
   });
 
   it("does not expose old labels in the More sheet", async () => {

@@ -4,12 +4,10 @@ import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import { APP_ROUTES } from "@/lib/appRouteManifest";
+import { readDesktopGrowerNavigationSource } from "@/test/utils/growerNavigationSource";
 
 const APP = fs.readFileSync(path.resolve(__dirname, "../App.tsx"), "utf8");
-const SIDEBAR = fs.readFileSync(
-  path.resolve(__dirname, "../components/AppSidebar.tsx"),
-  "utf8",
-);
+const SIDEBAR = readDesktopGrowerNavigationSource();
 
 const REMOVED_ROUTES = [
   "/operator/genetics-import",

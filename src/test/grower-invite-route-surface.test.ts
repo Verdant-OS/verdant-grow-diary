@@ -1,6 +1,10 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import {
+  readDesktopGrowerNavigationSource,
+  readMobileGrowerNavigationSource,
+} from "@/test/utils/growerNavigationSource";
 
 function read(path: string): string {
   return readFileSync(resolve(process.cwd(), path), "utf8");
@@ -8,8 +12,8 @@ function read(path: string): string {
 
 const APP = read("src/App.tsx");
 const MANIFEST = read("src/lib/appRouteManifest.ts");
-const SIDEBAR = read("src/components/AppSidebar.tsx");
-const MOBILE = read("src/components/MobileNav.tsx");
+const SIDEBAR = readDesktopGrowerNavigationSource();
+const MOBILE = readMobileGrowerNavigationSource();
 const ONBOARDING = read("src/components/OnboardingChecklistCard.tsx");
 
 describe("authenticated grower invite reachability", () => {

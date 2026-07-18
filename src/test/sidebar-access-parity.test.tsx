@@ -14,7 +14,8 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { ReactNode } from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { APP_ROUTES } from "@/lib/appRouteManifest";
@@ -53,6 +54,12 @@ function hrefSet(): Set<string> {
   );
 }
 
+async function openLabsMenu(): Promise<void> {
+  const user = userEvent.setup();
+  const trigger = screen.getByRole("button", { name: "Open Labs" });
+  await user.click(trigger);
+}
+
 const OPERATOR_OR_INTERNAL_PATHS = new Set(
   APP_ROUTES.filter((r) => r.access === "operator" || r.access === "internal").map((r) => r.path),
 );
@@ -62,16 +69,18 @@ describe("AppSidebar — non-operator authenticated grower", () => {
     roleState.status = "denied";
   });
 
-  it("renders the Lineage Repair link to /grow-lineage", () => {
+  it("renders the Lineage Repair link to /grow-lineage inside Labs", async () => {
     render(wrap(<AppSidebar />));
+    expect(screen.queryByText("Lineage Repair")).toBeNull();
+    await openLabsMenu();
     const links = hrefSet();
     expect(links.has("/grow-lineage")).toBe(true);
     expect(screen.getByText("Lineage Repair")).toBeInTheDocument();
   });
 
-  it("renders core grower-facing nav links", () => {
+  it("renders core grower-facing nav links and reveals advanced links only inside Labs", async () => {
     render(wrap(<AppSidebar />));
-    const links = hrefSet();
+    let links = hrefSet();
     for (const path of [
       "/",
       "/tents",
@@ -84,10 +93,30 @@ describe("AppSidebar — non-operator authenticated grower", () => {
       "/doctor",
       "/reports",
       "/grows",
-      "/pheno-hunts",
-      "/grow-lineage",
       "/settings",
       "/invite",
+    ]) {
+      expect(links.has(path), `missing grower link ${path}`).toBe(true);
+    }
+
+    for (const path of [
+      "/pheno-hunts",
+      "/breeding",
+      "/grow-lineage",
+      "/settings/agent-integrations",
+      "/doctor/sessions",
+    ]) {
+      expect(links.has(path), `Labs link ${path} must be hidden before disclosure`).toBe(false);
+    }
+
+    await openLabsMenu();
+    links = hrefSet();
+    for (const path of [
+      "/pheno-hunts",
+      "/breeding",
+      "/grow-lineage",
+      "/settings/agent-integrations",
+      "/doctor/sessions",
     ]) {
       expect(links.has(path), `missing grower link ${path}`).toBe(true);
     }
@@ -140,8 +169,9 @@ describe("AppSidebar — operator user", () => {
     expect(screen.getByTestId("operator-mode-link-sidebar")).toBeInTheDocument();
   });
 
-  it("still renders /grow-lineage (operator role does not hide grower tools)", () => {
+  it("still renders /grow-lineage inside Labs (operator role does not hide grower tools)", async () => {
     render(wrap(<AppSidebar />));
+    await openLabsMenu();
     expect(hrefSet().has("/grow-lineage")).toBe(true);
   });
 
@@ -171,7 +201,7 @@ describe("UI Simplification Slice 1 — grower-facing group structure", () => {
     roleState.status = "denied";
   });
 
-  for (const label of ["Today", "Cultivation", "Daily", "Insight", "Advanced", "Account"]) {
+  for (const label of ["Today", "Cultivation", "Daily", "Insight", "More", "Account"]) {
     it(`renders the "${label}" group label for non-operators`, () => {
       render(wrap(<AppSidebar />));
       expect(screen.getByText(label)).toBeInTheDocument();
@@ -207,20 +237,40 @@ describe("UI Simplification Slice 1 — grower-facing group structure", () => {
     expect(screen.queryByText("Sensor Data")).toBeNull();
   });
 
-  it("places Lineage Repair inside the Advanced group", () => {
+  it("contains advanced authenticated tools behind a Labs disclosure inside More", async () => {
     render(wrap(<AppSidebar />));
-    // The Advanced group label and the Lineage Repair link must coexist
-    // inside the same SidebarGroup container.
-    const advanced = screen.getByText("Advanced");
-    const group = advanced.closest('[data-sidebar="group"]');
+    const moreHeading = screen.getByText("More");
+    const group = moreHeading.closest('[data-sidebar="group"]');
     expect(group).not.toBeNull();
-    expect(group?.textContent ?? "").toContain("Lineage Repair");
+    const labsTrigger = within(group as HTMLElement).getByRole("button", { name: "Open Labs" });
+    expect(screen.queryByText("Pheno Hunt")).toBeNull();
+    const user = userEvent.setup();
+    await user.click(labsTrigger);
+
+    const menu = await screen.findByRole("menu", { name: /Labs/ });
+    for (const label of [
+      "Pheno Hunt",
+      "Breeding Programs",
+      "Lineage Repair",
+      "Agent Integrations",
+      "AI Sessions",
+    ]) {
+      expect(within(menu).getByRole("menuitem", { name: label })).toBeInTheDocument();
+    }
     expect(group?.textContent ?? "").toContain("My Grows");
+    expect(group?.textContent ?? "").not.toContain("Reports");
+  });
+
+  it("keeps Customer publishing out of normal grower navigation before Phase 4", async () => {
+    render(wrap(<AppSidebar />));
+    await openLabsMenu();
+    expect(screen.queryByText(/customer publishing/i)).toBeNull();
+    expect(screen.queryByRole("link", { name: /customer/i })).toBeNull();
   });
 
   it("does NOT place AI Doctor Results or Release Readiness in any grower group", () => {
     render(wrap(<AppSidebar />));
-    for (const label of ["Today", "Cultivation", "Daily", "Insight", "Advanced", "Account"]) {
+    for (const label of ["Today", "Cultivation", "Daily", "Insight", "More", "Account"]) {
       const heading = screen.getByText(label);
       const group = heading.closest('[data-sidebar="group"]');
       const text = group?.textContent ?? "";

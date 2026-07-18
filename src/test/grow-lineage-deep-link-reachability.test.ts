@@ -13,9 +13,10 @@
  *    targeting", or the all-assigned empty state),
  *  - do not render the operator-denied / "Access restricted" screen.
  *
- * Sidebar reachability: the Archive section exposes a static
- * <NavLink to="/grow-lineage"> labelled "Lineage Repair" that every
- * authenticated grower sees (covered by sidebar-access-parity.test.tsx).
+ * Sidebar reachability: the shared More -> Labs contract exposes a
+ * /grow-lineage destination labelled "Lineage Repair" that every
+ * authenticated grower sees (rendered coverage lives in
+ * sidebar-access-parity.test.tsx).
  */
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
@@ -23,12 +24,10 @@ import path from "node:path";
 import { APP_ROUTES } from "@/lib/appRouteManifest";
 
 const APP = fs.readFileSync(path.resolve(__dirname, "../App.tsx"), "utf8");
-const PAGE = fs.readFileSync(
-  path.resolve(__dirname, "../pages/GrowLineageRepair.tsx"),
-  "utf8",
-);
-const SIDEBAR = fs.readFileSync(
-  path.resolve(__dirname, "../components/AppSidebar.tsx"),
+const PAGE = fs.readFileSync(path.resolve(__dirname, "../pages/GrowLineageRepair.tsx"), "utf8");
+const SIDEBAR = fs.readFileSync(path.resolve(__dirname, "../components/AppSidebar.tsx"), "utf8");
+const NAVIGATION_RULES = fs.readFileSync(
+  path.resolve(__dirname, "../lib/growerNavigationRules.ts"),
   "utf8",
 );
 
@@ -105,11 +104,12 @@ describe("Grow Lineage Repair — deep-link reachability", () => {
     expect(PAGE).not.toMatch(/Access restricted/i);
   });
 
-  it("sidebar Archive section exposes the Lineage Repair deep link", () => {
-    expect(SIDEBAR).toMatch(/to:\s*["']\/grow-lineage["']/);
-    expect(SIDEBAR).toMatch(/Lineage Repair/);
+  it("sidebar More -> Labs exposes the Lineage Repair deep link", () => {
+    expect(SIDEBAR).toMatch(/LABS_NAVIGATION_DESTINATIONS/);
+    expect(NAVIGATION_RULES).toMatch(/to:\s*["']\/grow-lineage["']/);
+    expect(NAVIGATION_RULES).toMatch(/label:\s*["']Lineage Repair["']/);
     // The grow-lineage item must NOT be marked requiresOperator.
-    expect(SIDEBAR).not.toMatch(
+    expect(NAVIGATION_RULES).not.toMatch(
       /\{\s*to:\s*["']\/grow-lineage["'][^}]*requiresOperator\s*:\s*true/,
     );
   });

@@ -14,6 +14,10 @@ import {
   LineChart,
   Users,
   Dna,
+  GitFork,
+  History,
+  PlugZap,
+  Wrench,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -27,10 +31,11 @@ import {
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import OperatorModeLink from "@/components/OperatorModeLink";
+import { isNavigationItemActive, type NavigationActiveRule } from "@/lib/navigationActiveRules";
 import {
-  isNavigationItemActive,
-  type NavigationActiveRule,
-} from "@/lib/navigationActiveRules";
+  LABS_NAVIGATION_DESTINATIONS,
+  type LabsNavigationDestinationId,
+} from "@/lib/growerNavigationRules";
 
 type PrimaryItem = MoreItem & NavigationActiveRule;
 
@@ -53,10 +58,23 @@ export interface MoreGroup {
   items: MoreItem[];
 }
 
+const labsIcons: Record<LabsNavigationDestinationId, LucideIcon> = {
+  phenoHunt: Dna,
+  breedingPrograms: GitFork,
+  lineageRepair: Wrench,
+  agentIntegrations: PlugZap,
+  aiSessions: History,
+};
+
+const labsItems: MoreItem[] = LABS_NAVIGATION_DESTINATIONS.map((item) => ({
+  ...item,
+  icon: labsIcons[item.id],
+}));
+
 /**
  * Mobile More sheet — grouped for grower-first scanning.
  * Order is intentional: Daily (today's actions) → Insight (signals) →
- * Advanced (longer-horizon tools) → Account.
+ * More (lower-frequency core tools) → Labs (advanced tools) → Account.
  *
  * Route targets are unchanged from the prior flat list. Operator-only
  * surfaces are NOT included here — they render separately via the
@@ -76,15 +94,16 @@ export const moreGroups: MoreGroup[] = [
     items: [
       { to: "/sensors", label: "Sensors", icon: Activity },
       { to: "/doctor", label: "AI Doctor", icon: Stethoscope },
+      { to: "/reports", label: "Reports", icon: LineChart },
     ],
   },
   {
-    heading: "Advanced",
-    items: [
-      { to: "/reports", label: "Reports", icon: LineChart },
-      { to: "/grows", label: "My Grows", icon: Sprout },
-      { to: "/pheno-hunts", label: "Pheno Hunt", icon: Dna },
-    ],
+    heading: "More",
+    items: [{ to: "/grows", label: "My Grows", icon: Sprout }],
+  },
+  {
+    heading: "Labs",
+    items: labsItems,
   },
   {
     heading: "Account",

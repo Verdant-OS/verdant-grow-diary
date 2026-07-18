@@ -98,6 +98,66 @@ const CORE_ACQUISITION_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = [
       "See how Verdant AI Doctor uses logs, photos, source-labeled sensor context, evidence, confidence, and missing information to support grower-approved decisions.",
     imageAlt: "How Verdant AI Doctor works",
   }),
+  publicDocument("/ai-doctor-readiness-check", {
+    title: "Free AI Doctor Context Check | Verdant Grow Diary",
+    description:
+      "Check whether you have enough plant stage, medium, pot size, watering, feeding, sensor, photo, target, and history context for a cautious grow review.",
+    imageAlt: "Verdant AI Doctor readiness check",
+  }),
+  publicDocument("/quick-log", {
+    title: "Free 30-Second Quick Log Starter | Verdant Grow Diary",
+    description:
+      "Try the Verdant Quick Log without an account: nickname a plant, jot one note, and keep the draft on your device. Create a free account when you want it in your grow diary.",
+    imageAlt: "Verdant 30-second Quick Log starter",
+  }),
+  publicDocument("/glossary", {
+    title: "Cannabis Cultivation Glossary | Verdant Grow Diary",
+    description:
+      "Alphabetized reference of cannabis breeding, cultivation, and phenotype terms — searchable and category-filterable for serious growers.",
+    imageAlt: "Verdant cultivation glossary",
+  }),
+  publicDocument("/breeder-beta", {
+    title: "Verdant Breeder Beta | Verdant Grow Diary",
+    description:
+      "Controlled beta for breeders and pheno hunters. See how Verdant records lab evidence, pathogen screening, sensory rubrics, and pheno decisions — while the breeder always decides which plants advance.",
+    imageAlt: "Verdant Breeder Beta",
+  }),
+  publicDocument("/creator-beta", {
+    title: "Verdant Creator & Breeder Beta | Verdant Grow Diary",
+    description:
+      "Controlled beta for serious growers, breeders, and grower-educators. See how Verdant turns plant logs, photos, sensor snapshots, phenotype notes, and lab evidence into one clear plant history.",
+    imageAlt: "Verdant Creator & Breeder Beta",
+  }),
+  publicDocument("/pheno-comparison", {
+    title: "Pheno Comparison Preview — Verdant Grow Diary",
+    description:
+      "Read-only preview of Verdant's pheno-hunt comparison view: structure, resin, aroma, vigor, and finish laid side by side. Demo fixtures only.",
+    imageAlt: "Verdant pheno comparison preview (sample data)",
+  }),
+  publicDocument("/pheno-expression-showcase", {
+    title: "Pheno Expression Showcase — Verdant Grow Diary",
+    description:
+      "Ten example phenotypes — loud gas, dessert, fruit, yield-monster, frost bomb, and more — laid side by side. Demo data only; Verdant never picks a keeper for you.",
+    imageAlt: "Verdant pheno expression showcase (sample data)",
+  }),
+  publicDocument("/privacy", {
+    title: "Privacy Policy | Verdant Grow Diary",
+    description:
+      "Privacy Policy for Verdant Grow Diary — what data is collected and why, retention, your rights, and Paddle's role as Merchant of Record payment processor.",
+    imageAlt: "Verdant privacy policy",
+  }),
+  publicDocument("/terms", {
+    title: "Terms of Service | Verdant Grow Diary",
+    description:
+      "Terms of Service for Verdant Grow Diary — seller identity, Paddle Merchant of Record disclosure, acceptable use, and plain-language liability terms.",
+    imageAlt: "Verdant terms of service",
+  }),
+  publicDocument("/refund", {
+    title: "Refund Policy | Verdant Grow Diary",
+    description:
+      "Verdant Grow Diary refund policy — 30-day money-back guarantee on paid plans, with refunds through Paddle (paddle.net) as Merchant of Record.",
+    imageAlt: "Verdant refund policy",
+  }),
 ];
 
 const GUIDE_DOCUMENTS = VERDANT_SEO_GUIDES.map((guide) =>

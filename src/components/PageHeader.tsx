@@ -19,7 +19,7 @@ export default function PageHeader({ title, description, icon, actions, classNam
           {description && <p className="text-sm text-muted-foreground mt-1 break-words">{description}</p>}
         </div>
       </div>
-      {actions && <div className="flex items-center gap-2 flex-wrap shrink-0">{actions}</div>}
+      {actions && <div className="flex items-center gap-2 flex-wrap sm:shrink-0">{actions}</div>}
     </div>
   );
 }

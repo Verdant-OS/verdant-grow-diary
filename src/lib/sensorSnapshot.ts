@@ -53,6 +53,8 @@ export interface SensorSnapshotMetricRef {
 
 export interface SensorSnapshot {
   source: SnapshotSource;
+  /** Aggregated persisted quality for the contributing timestamp cohort. */
+  quality?: string | null;
   ts: string | null;
   temp: number | null;
   rh: number | null;
@@ -92,6 +94,7 @@ export interface SensorSnapshot {
 
 export const EMPTY_SNAPSHOT: SensorSnapshot = {
   source: "unavailable",
+  quality: null,
   ts: null,
   temp: null,
   rh: null,
@@ -113,7 +116,7 @@ export function toFiniteNumber(v: unknown): number | null {
 }
 
 export const SOURCE_LABEL: Record<SnapshotSource, string> = {
-  live: "Live sensor",
+  live: "Connected sensor",
   manual: "Manual",
   sim: "Simulated",
   diary: "Diary snapshot",
@@ -141,6 +144,8 @@ export interface SensorReadingLike {
   metric: string;
   value: number | string | null;
   source?: string | null;
+  /** Persisted intake quality. Missing/unknown can never promote a Live claim. */
+  quality?: string | null;
   device_id?: string | null;
   /**
    * Originating `sensor_readings.id`. Optional: when present and the row
@@ -195,20 +200,28 @@ export function snapshotFromReadings(rows: SensorReadingLike[]): SensorSnapshot 
     latest.length > 0 && latest.every((r) => r.source === "sim" || r.source === "demo");
   const allCsv = latest.length > 0 && latest.every((r) => r.source === "csv");
   const anyCsv = latest.some((r) => r.source === "csv");
+  const normalizedQualities = latest.map((r) =>
+    typeof r.quality === "string" ? r.quality.trim().toLowerCase() : "",
+  );
+  const quality = normalizedQualities.every((value) => value === "ok")
+    ? "ok"
+    : normalizedQualities.includes("invalid")
+      ? "invalid"
+      : normalizedQualities.includes("stale")
+        ? "stale"
+        : normalizedQualities.includes("degraded")
+          ? "degraded"
+          : null;
   // "Live sensor" is a claim, not a default: it requires EVERY row at the
   // latest timestamp to carry a source in the live reservation. That
-  // reservation is exactly {"live", "pi_bridge"} — the Pi bridge is the
-  // first-party live-ingest path and its inclusion is pinned by
-  // manual-sensor-snapshot-v1-audit ("reserved for pi_bridge/live rows
-  // only"). Everything else — raw vendor strings like "ecowitt",
+  // reservation is the canonical `live` value with accepted persisted
+  // quality. Everything else — aliases like "pi_bridge", vendor strings,
   // canonical "stale"/"invalid", or unexpected junk — classifies as
   // "unverified"; the strict trust-badge path refuses the same
   // promotion, and this card must not be looser than it.
   const allLive =
     latest.length > 0 &&
-    latest.every(
-      (r) => (r.source === "live" || r.source === "pi_bridge") && !isSensorTestbenchRow(r),
-    );
+    latest.every((r) => r.source === "live" && r.quality === "ok" && !isSensorTestbenchRow(r));
   // CSV history must never be promoted to "live". If every row at the
   // latest timestamp is CSV, classify as "csv". If CSV is mixed with
   // non-live sources but no manual, still prefer csv over live so
@@ -251,6 +264,7 @@ export function snapshotFromReadings(rows: SensorReadingLike[]): SensorSnapshot 
   }
   return {
     source,
+    quality,
     ts: latestTs,
     temp: get("temperature_c"),
     rh: get("humidity_pct"),
@@ -307,6 +321,7 @@ export function snapshotFromDiary(
     const m = normalizeQuickLogSnapshotMetrics(rawMetrics);
     return {
       source: "diary",
+      quality: null,
       ts: capturedAt,
       temp: toFiniteNumber(m.temperature),
       rh: toFiniteNumber(m.humidity),
@@ -324,6 +339,7 @@ export function snapshotFromDiary(
   if (!ts) return null;
   return {
     source: "diary",
+    quality: null,
     ts,
     temp: toFiniteNumber(snap.temp),
     rh: toFiniteNumber(snap.rh),

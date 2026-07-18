@@ -58,6 +58,7 @@ describe("SensorBridgeHealthCard", () => {
       rows: [
         {
           source: "live",
+          quality: "ok",
           captured_at: minutesAgo(1),
           raw_payload: { vendor: "ecowitt" },
         },
@@ -265,6 +266,7 @@ describe("SensorBridgeHealthCard", () => {
       rows: [
         {
           source: "live",
+          quality: "ok",
           captured_at: minutesAgo(2),
           raw_payload: {
             vendor: "ecowitt_windows_testbench",
@@ -288,6 +290,30 @@ describe("SensorBridgeHealthCard", () => {
     );
     expect(screen.getByTestId("sensor-bridge-health-message")).toHaveTextContent(
       "Latest bridge reading accepted.",
+    );
+  });
+
+  it("keeps physical live-source evidence in review when quality proof is missing", () => {
+    const vm = buildSensorBridgeHealthViewModel({
+      rows: [
+        {
+          source: "ecowitt",
+          rows_received: 1,
+          rows_inserted: 1,
+          created_at: minutesAgo(2),
+        },
+      ],
+      now: NOW,
+    });
+
+    renderCard(vm, {
+      status: "success",
+      rows: [{ source: "live", captured_at: minutesAgo(2) }],
+    });
+
+    expect(screen.getByTestId("sensor-bridge-health-state")).toHaveAttribute(
+      "data-state",
+      "needs_review",
     );
   });
 

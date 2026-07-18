@@ -28,6 +28,8 @@ import { tempFFromC } from "@/lib/temperatureUnits";
 import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 import type { SensorReadingSource } from "@/mock";
 import { isDiagnosticSensorProvenanceRow } from "@/lib/sensorProvenanceFenceRules";
+import { classifyFreshness } from "@/lib/latestSensorSnapshotRules";
+import { evaluateCurrentLiveSensorTruth } from "@/lib/currentLiveSensorTruthRules";
 
 export type MetricStatus = "ok" | "stale" | "invalid" | "degraded" | "unknown";
 
@@ -117,8 +119,8 @@ type TentSnapshotProvenance = "live" | "manual" | "csv" | "demo" | "unverified";
 
 function classifyRowProvenance(row: BuildTentSnapshotInput): TentSnapshotProvenance {
   if (isDiagnosticSensorProvenanceRow(row)) return "demo";
-  const source = typeof row.source === "string" ? row.source.trim().toLowerCase() : "";
-  if (source === "live" || source === "pi_bridge") return "live";
+  const source = row.source;
+  if (source === "live" && row.quality === "ok") return "live";
   if (source === "manual") return "manual";
   if (source === "csv" || source === "import") return "csv";
   if (source === "demo" || source === "sim") return "demo";
@@ -200,8 +202,8 @@ export function buildTentSnapshotView(
 
   // Source resolution is strict across the whole latest timestamp. A mixed
   // or unknown cohort stays visible but is never promoted to healthy/live.
-  // `pi_bridge` remains the one explicit legacy alias for physical live
-  // readings; diagnostics carrying that label are classified as demo first.
+  // Live provenance requires the exact canonical source and accepted intake
+  // quality on every contributing row. Legacy aliases fail closed.
   const provenance = classifyLatestGroupProvenance(latestRows);
   const canonicalSource: SensorReadingSource | null =
     provenance === "live" || provenance === "manual" || provenance === "csv"
@@ -236,13 +238,24 @@ export function buildTentSnapshotView(
   const invalid =
     flaggedInvalid ||
     quality.suspiciousFields.some((f) => typeof snap[f as keyof typeof snap] === "number");
+  const currentLive = evaluateCurrentLiveSensorTruth({
+    source: provenance,
+    quality: latestRows.every((row) => row.quality === "ok") ? "ok" : null,
+    freshness: classifyFreshness(capturedAt, new Date(now)).freshness,
+  }).isCurrentLive;
   const canAssessStage =
-    provenanceEligible && capturedAt !== null && !stale && !invalid && !flaggedDegraded;
+    provenanceEligible &&
+    capturedAt !== null &&
+    !stale &&
+    !invalid &&
+    !flaggedDegraded &&
+    (provenance !== "live" || currentLive);
 
   // Stale/invalid override the source label per requirement #2/#6.
   let sourceLabel = resolved.label;
   if (invalid) sourceLabel = "Invalid";
   else if (stale) sourceLabel = "Stale";
+  else if (provenance === "live" && !currentLive) sourceLabel = "Connected source · needs review";
 
   const lastUpdatedDisplay = capturedAt
     ? format(new Date(capturedAt), "MMM d, yyyy, h:mm a")

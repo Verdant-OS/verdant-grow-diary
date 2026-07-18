@@ -28,16 +28,12 @@ describe("TentDetail · real sensor readings", () => {
   });
 
   it("uses the dedicated imported-history result instead of filtering the mixed sensor window", () => {
-    expect(TENT_DETAIL).toMatch(
-      /from\s+["']@\/hooks\/useImportedSensorHistory["']/,
-    );
+    expect(TENT_DETAIL).toMatch(/from\s+["']@\/hooks\/useImportedSensorHistory["']/);
     expect(TENT_DETAIL).toMatch(/useImportedSensorHistory\(id\)/);
     expect(TENT_DETAIL).toMatch(
       /<ImportedSensorHistoryPanel[\s\S]*?readings=\{importedHistory\.data\s*\?\?\s*\[\]\}/,
     );
-    expect(TENT_DETAIL).not.toMatch(
-      /<ImportedSensorHistoryPanel[^>]*readings=\{readings\}/,
-    );
+    expect(TENT_DETAIL).not.toMatch(/<ImportedSensorHistoryPanel[^>]*readings=\{readings\}/);
   });
 
   it("passes explicit imported-history loading and error truth to the panel", () => {
@@ -78,9 +74,7 @@ describe("TentDetail · real sensor readings", () => {
       expect(TENT_DETAIL).not.toContain(needle);
       expect(RULES).not.toContain(needle);
     }
-    // `pi_bridge` is a legacy read-side provenance label, not device control.
-    // Its narrow compatibility path must remain presentation-only.
-    expect(RULES).toContain("pi_bridge");
+    expect(RULES).not.toContain("pi_bridge");
   });
 });
 
@@ -92,9 +86,27 @@ describe("buildTentSensorChartSeries", () => {
 
   it("groups multi-metric rows by timestamp and sorts ascending", () => {
     const rows = [
-      { ts: "2025-01-02T00:00:00Z", metric: "temperature_c", value: 24, source: "live" },
-      { ts: "2025-01-01T00:00:00Z", metric: "temperature_c", value: 22, source: "live" },
-      { ts: "2025-01-01T00:00:00Z", metric: "humidity_pct", value: 55, source: "live" },
+      {
+        ts: "2025-01-02T00:00:00Z",
+        metric: "temperature_c",
+        value: 24,
+        source: "live",
+        quality: "ok",
+      },
+      {
+        ts: "2025-01-01T00:00:00Z",
+        metric: "temperature_c",
+        value: 22,
+        source: "live",
+        quality: "ok",
+      },
+      {
+        ts: "2025-01-01T00:00:00Z",
+        metric: "humidity_pct",
+        value: 55,
+        source: "live",
+        quality: "ok",
+      },
     ];
     const out = buildTentSensorChartSeries(rows);
     expect(out).toEqual([
@@ -118,6 +130,7 @@ describe("buildTentSensorChartSeries", () => {
         metric: "temperature_c",
         value: 99,
         source: "live",
+        quality: "ok",
         raw_payload: {
           vendor: "ecowitt_windows_testbench",
           metadata: { confidence: "test" },
@@ -128,6 +141,7 @@ describe("buildTentSensorChartSeries", () => {
         metric: "temperature_c",
         value: 24,
         source: "live",
+        quality: "ok",
         raw_payload: {
           vendor: "ecowitt_windows_testbench",
           metadata: {
@@ -161,11 +175,11 @@ describe("buildTentSensorHeaderView", () => {
   it("marks readings as stale past the threshold and exposes a source label", () => {
     const now = Date.UTC(2025, 0, 2, 0, 0, 0);
     const oldTs = new Date(now - 2 * 60 * 60 * 1000).toISOString();
-    const rows = [{ ts: oldTs, metric: "temperature_c", value: 23, source: "live" }];
+    const rows = [{ ts: oldTs, metric: "temperature_c", value: 23, source: "live", quality: "ok" }];
     const v = buildTentSensorHeaderView(rows, now);
     expect(v.hasReadings).toBe(true);
     expect(v.stale).toBe(true);
-    expect(v.sourceLabel).toBe("Live sensor");
+    expect(v.sourceLabel).toBe("Connected sensor · needs review");
   });
 
   it("uses the latest eligible physical row instead of a newer diagnostic row", () => {
@@ -177,6 +191,7 @@ describe("buildTentSensorHeaderView", () => {
           metric: "temperature_c",
           value: 99,
           source: "live",
+          quality: "ok",
           raw_payload: {
             vendor: "ecowitt_windows_testbench",
             metadata: { confidence: "demo" },
@@ -187,6 +202,7 @@ describe("buildTentSensorHeaderView", () => {
           metric: "temperature_c",
           value: 23,
           source: "live",
+          quality: "ok",
           raw_payload: {
             vendor: "ecowitt_windows_testbench",
             metadata: {

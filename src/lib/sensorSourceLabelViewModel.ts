@@ -16,10 +16,7 @@
  *   - Unknown sources resolve to a neutral "Unknown" badge — never
  *     "Live" / "Healthy".
  */
-import {
-  resolveSensorSourceLabel,
-  type SensorVendor,
-} from "./sensorSourceLabelRules";
+import { resolveSensorSourceLabel, type SensorVendor } from "./sensorSourceLabelRules";
 import {
   extractManualDeviceNote,
   normalizeManualSourceNote,
@@ -64,6 +61,10 @@ export interface BuildSensorSourceBadgeInput {
   source: SensorReadingSource | null | undefined;
   /** Canonical snapshot status when the caller has it. Missing stays conservative. */
   status?: SnapshotStatus | null;
+  /** Exact persisted validation state. Only `ok` can support Live copy. */
+  quality?: unknown;
+  /** Caller-proved age state. Only `fresh` can support Live copy. */
+  freshness?: unknown;
   /** Vendor lineage tag if known (e.g. raw_payload.metadata.vendor). */
   vendor?: string | null;
   /** Grower-entered manual device note (preferred). */
@@ -79,9 +80,7 @@ const DEGRADED_TONES: ReadonlySet<SourceBadgeTone> = new Set([
   "unknown",
 ]);
 
-function toneFromSource(
-  source: SensorReadingSource | null | undefined,
-): SourceBadgeTone {
+function toneFromSource(source: SensorReadingSource | null | undefined): SourceBadgeTone {
   switch (source) {
     case "live":
       return "live";
@@ -110,43 +109,52 @@ function toneFromSource(
  *   - Unknown sources collapse to tone "unknown" — never "live".
  *   - Demo / stale / invalid always carry `isDegraded: true`.
  */
-export function buildSensorSourceBadge(
-  input: BuildSensorSourceBadgeInput,
-): SensorSourceBadge {
+export function buildSensorSourceBadge(input: BuildSensorSourceBadgeInput): SensorSourceBadge {
   const source = input.source ?? null;
-  const tone = toneFromSource(source);
+  const sourceTone = toneFromSource(source);
   const truthCopyGuard = buildSensorTruthCopyGuard({
-    sourceTone: tone,
+    sourceTone,
     status: input.status ?? null,
+    quality: input.quality,
+    freshness: input.freshness,
   });
+  const tone: SourceBadgeTone =
+    sourceTone === "live" && !truthCopyGuard.canDescribeAsLive ? "unknown" : sourceTone;
   const resolved = resolveSensorSourceLabel({
     source,
     // Suppress vendor promotion for non-live readings so a "manual"
     // reading with a vendor hint never renders as "EcoWitt" (which
     // could be confused with live).
-    vendor: source === "live" ? input.vendor ?? null : null,
+    vendor: source === "live" ? (input.vendor ?? null) : null,
+    quality: input.quality,
+    freshness: input.freshness,
   });
 
   const manualDeviceNote =
     source === "manual"
-      ? normalizeManualSourceNote(input.manualDeviceNote ?? null) ??
-        extractManualDeviceNote(input.deviceId ?? null)
+      ? (normalizeManualSourceNote(input.manualDeviceNote ?? null) ??
+        extractManualDeviceNote(input.deviceId ?? null))
       : null;
 
   // Presenter-only badge copy. Underlying enum and
   // `resolveSensorSourceLabel` are untouched so other surfaces
   // (dashboard, timeline, ingest) keep their short pill copy.
   let label: string;
-  switch (tone) {
+  switch (sourceTone) {
     case "manual":
       label = manualDeviceNote
         ? `${MANUAL_READING_LABEL} · ${manualDeviceNote}`
         : MANUAL_READING_LABEL;
       break;
     case "live":
-      // Honour vendor promotion (e.g. "Ecowitt") when present;
-      // otherwise render "Live sensor" — never bare "Live".
-      label = resolved.vendorPromoted ? resolved.label : "Live sensor";
+      // A raw source tag has no quality/freshness proof. Only the dedicated
+      // strict snapshot badge may say Live; this generic provenance badge
+      // stays explicit that review is still required.
+      label = truthCopyGuard.canDescribeAsLive
+        ? resolved.vendorPromoted
+          ? resolved.label
+          : "Live sensor"
+        : "Connected source · needs review";
       break;
     case "csv":
       label = "CSV import";
@@ -178,7 +186,7 @@ export function buildSensorSourceBadge(
     label,
     tone,
     isDegraded: DEGRADED_TONES.has(tone),
-    isManual: tone === "manual",
+    isManual: sourceTone === "manual",
     vendor: resolved.vendor,
     manualDeviceNote,
     ariaLabel,

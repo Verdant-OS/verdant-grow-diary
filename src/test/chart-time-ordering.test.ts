@@ -13,8 +13,6 @@ import { sortTimeSeriesAscending } from "@/lib/sortTimeSeriesAscending";
 import { buildTentSensorChartSeries } from "@/lib/tentSensorChartRules";
 
 describe("sortTimeSeriesAscending", () => {
-  
-
   it("returns [] for null/empty input", () => {
     expect(sortTimeSeriesAscending<{ ts: string }>(null, (p) => p.ts)).toEqual([]);
     expect(sortTimeSeriesAscending<{ ts: string }>(undefined, (p) => p.ts)).toEqual([]);
@@ -46,11 +44,7 @@ describe("sortTimeSeriesAscending", () => {
       { ts: "2025-01-01T00:00:00Z", id: "b" },
       { ts: "2025-01-01T00:00:00Z", id: "c" },
     ];
-    expect(sortTimeSeriesAscending(equal, (p) => p.ts).map((p) => p.id)).toEqual([
-      "a",
-      "b",
-      "c",
-    ]);
+    expect(sortTimeSeriesAscending(equal, (p) => p.ts).map((p) => p.id)).toEqual(["a", "b", "c"]);
   });
 
   it("pushes invalid/missing timestamps to the end without crashing", () => {
@@ -71,25 +65,18 @@ describe("sortTimeSeriesAscending", () => {
       { when: 1735689600000 /* 2025-01-01 */, id: "a" },
       { when: new Date("2025-01-02T00:00:00Z"), id: "b" },
     ];
-    expect(
-      sortTimeSeriesAscending(pts, (p) => p.when).map((p) => p.id),
-    ).toEqual(["a", "b", "c"]);
+    expect(sortTimeSeriesAscending(pts, (p) => p.when).map((p) => p.id)).toEqual(["a", "b", "c"]);
   });
 });
 
 describe("SensorChart wires the ascending sort helper", () => {
-  const SRC = readFileSync(
-    resolve(__dirname, "..", "components", "SensorChart.tsx"),
-    "utf8",
-  );
+  const SRC = readFileSync(resolve(__dirname, "..", "components", "SensorChart.tsx"), "utf8");
   it("routes chart data through a shared ascending-sort helper before rendering", () => {
     // SensorChart now wraps sortTimeSeriesAscending inside
     // filterTimeSeriesByRange so the same call site handles both
     // sorting and 7d/30d/90d/All filtering. Either import path
     // satisfies the ordering guardrail.
-    expect(SRC).toMatch(
-      /from\s+["']@\/lib\/(sortTimeSeriesAscending|sensorChartTimeRange)["']/,
-    );
+    expect(SRC).toMatch(/from\s+["']@\/lib\/(sortTimeSeriesAscending|sensorChartTimeRange)["']/);
     expect(SRC).toMatch(/(sortTimeSeriesAscending|filterTimeSeriesByRange)\(/);
   });
 });
@@ -97,9 +84,27 @@ describe("SensorChart wires the ascending sort helper", () => {
 describe("buildTentSensorChartSeries returns ascending order", () => {
   it("re-sorts reversed input into oldest → newest", () => {
     const desc = [
-      { ts: "2025-01-03T00:00:00Z", metric: "temperature_c", value: 24, source: "live" },
-      { ts: "2025-01-02T00:00:00Z", metric: "temperature_c", value: 23, source: "live" },
-      { ts: "2025-01-01T00:00:00Z", metric: "temperature_c", value: 22, source: "live" },
+      {
+        ts: "2025-01-03T00:00:00Z",
+        metric: "temperature_c",
+        value: 24,
+        source: "live",
+        quality: "ok",
+      },
+      {
+        ts: "2025-01-02T00:00:00Z",
+        metric: "temperature_c",
+        value: 23,
+        source: "live",
+        quality: "ok",
+      },
+      {
+        ts: "2025-01-01T00:00:00Z",
+        metric: "temperature_c",
+        value: 22,
+        source: "live",
+        quality: "ok",
+      },
     ];
     const out = buildTentSensorChartSeries(desc);
     expect(out.map((p) => p.ts)).toEqual([

@@ -91,11 +91,11 @@ describe("isHumidityValid", () => {
   it("65 is valid", () => {
     expect(isHumidityValid(65)).toBe(true);
   });
-  it("0 is valid (boundary)", () => {
-    expect(isHumidityValid(0)).toBe(true);
+  it("0 is invalid (stuck/fault endpoint)", () => {
+    expect(isHumidityValid(0)).toBe(false);
   });
-  it("100 is valid (boundary)", () => {
-    expect(isHumidityValid(100)).toBe(true);
+  it("100 is invalid (stuck/fault endpoint)", () => {
+    expect(isHumidityValid(100)).toBe(false);
   });
   it("-1 is invalid", () => {
     expect(isHumidityValid(-1)).toBe(false);
@@ -141,6 +141,9 @@ describe("isSoilMoistureValid", () => {
   });
   it("45 is valid", () => {
     expect(isSoilMoistureValid(45)).toBe(true);
+  });
+  it.each([0, 100])("%s is invalid (stuck/fault endpoint)", (value) => {
+    expect(isSoilMoistureValid(value)).toBe(false);
   });
   it("-1 is invalid", () => {
     expect(isSoilMoistureValid(-1)).toBe(false);
@@ -217,6 +220,7 @@ describe("classifySource", () => {
     expect(
       classifySource({
         declaredSource: "live",
+        quality: "ok",
         capturedAt: FRESH_TS,
         metrics: VALID_METRICS,
         now: NOW,
@@ -228,6 +232,7 @@ describe("classifySource", () => {
     expect(
       classifySource({
         declaredSource: "live",
+        quality: "ok",
         capturedAt: STALE_TS,
         metrics: VALID_METRICS,
         now: NOW,
@@ -273,6 +278,7 @@ describe("classifySource", () => {
     expect(
       classifySource({
         declaredSource: "live",
+        quality: "ok",
         capturedAt: FRESH_TS,
         metrics: invalidMetrics,
         now: NOW,
@@ -298,6 +304,36 @@ describe("classifySource", () => {
       }),
     ).toBe("invalid");
   });
+
+  it.each([undefined, null, "degraded", "OK", " ok "])(
+    "live source with quality %s fails closed",
+    (quality) => {
+      expect(
+        classifySource({
+          declaredSource: "live",
+          quality,
+          capturedAt: FRESH_TS,
+          metrics: VALID_METRICS,
+          now: NOW,
+        }),
+      ).toBe("invalid");
+    },
+  );
+
+  it.each(["LIVE", " live ", "sensor", "pi_bridge"])(
+    "non-canonical source %s fails closed",
+    (declaredSource) => {
+      expect(
+        classifySource({
+          declaredSource,
+          quality: "ok",
+          capturedAt: FRESH_TS,
+          metrics: VALID_METRICS,
+          now: NOW,
+        }),
+      ).toBe("invalid");
+    },
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -310,6 +346,7 @@ describe("normalizeSensorReading", () => {
       {
         captured_at: FRESH_TS,
         source: "live",
+        quality: "ok",
         ...VALID_METRICS,
         raw_payload: { device: "shelly-ht-01", firmware: "1.2.3" },
       },
@@ -334,6 +371,7 @@ describe("normalizeSensorReading", () => {
       {
         captured_at: FRESH_TS,
         source: "live",
+        quality: "ok",
         temperature_c: 22.0,
         humidity_pct: 55,
         raw_payload: { partial: true },
@@ -354,6 +392,7 @@ describe("normalizeSensorReading", () => {
       {
         captured_at: FRESH_TS,
         source: "live",
+        quality: "ok",
         temperature_c: 24.0,
         humidity_pct: 60,
         vpd_kpa: 1.1,
@@ -372,6 +411,7 @@ describe("normalizeSensorReading", () => {
       {
         captured_at: FRESH_TS,
         source: "live",
+        quality: "ok",
         temperature_c: 999, // invalid
         humidity_pct: 65,
         vpd_kpa: 1.2,
@@ -419,6 +459,7 @@ describe("normalizeSensorReading", () => {
       {
         captured_at: STALE_TS,
         source: "live",
+        quality: "ok",
         ...VALID_METRICS,
       },
       NOW,
@@ -459,6 +500,7 @@ describe("normalizeSensorReading", () => {
       {
         captured_at: FRESH_TS,
         source: "live",
+        quality: "ok",
         ...VALID_METRICS,
       },
       NOW,
@@ -467,11 +509,46 @@ describe("normalizeSensorReading", () => {
     // Verify all required fields exist
     expect(result).toHaveProperty("captured_at");
     expect(result).toHaveProperty("source");
+    expect(result).toHaveProperty("quality", "ok");
     expect(result).toHaveProperty("temperature_c");
     expect(result).toHaveProperty("humidity_pct");
     expect(result).toHaveProperty("vpd_kpa");
     expect(result).toHaveProperty("co2_ppm");
     expect(result).toHaveProperty("soil_moisture_pct");
     expect(result).toHaveProperty("raw_payload");
+  });
+
+  it("never promotes a fresh source-only reading to Live", () => {
+    const result = normalizeSensorReading(
+      {
+        captured_at: FRESH_TS,
+        source: "live",
+        ...VALID_METRICS,
+      },
+      NOW,
+    );
+
+    expect(result.source).toBe("invalid");
+    expect(result.quality).toBeNull();
+  });
+
+  it.each([
+    { humidity_pct: 0 },
+    { humidity_pct: 100 },
+    { soil_moisture_pct: 0 },
+    { soil_moisture_pct: 100 },
+  ])("fault endpoint $humidity_pct$soil_moisture_pct is invalid", (metrics) => {
+    const result = normalizeSensorReading(
+      {
+        captured_at: FRESH_TS,
+        source: "live",
+        quality: "ok",
+        ...VALID_METRICS,
+        ...metrics,
+      },
+      NOW,
+    );
+
+    expect(result.source).toBe("invalid");
   });
 });

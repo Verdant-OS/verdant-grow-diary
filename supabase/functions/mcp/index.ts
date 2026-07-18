@@ -225,12 +225,49 @@ function withoutDiagnosticSensorRows(rows) {
   return rows.filter((row) => !isDiagnosticSensorProvenanceRow(row));
 }
 
+// src/constants/sensorIngestProvenance.ts
+var CANONICAL_SENSOR_SOURCES = ["live", "manual", "csv", "demo", "stale", "invalid"];
+var CANONICAL_SET = new Set(CANONICAL_SENSOR_SOURCES);
+function isCanonicalSensorSource(value) {
+  return typeof value === "string" && CANONICAL_SET.has(value);
+}
+function assertCanonicalSensorSource(value) {
+  return isCanonicalSensorSource(value) ? value : null;
+}
+
+// src/lib/currentLiveSensorTruthRules.ts
+function evaluateCurrentLiveSensorTruth(input) {
+  const canonicalSource = assertCanonicalSensorSource(input.source);
+  const normalizedQuality =
+    typeof input.quality === "string" ? input.quality.trim().toLowerCase() || null : null;
+  const sourceIsLive = canonicalSource === "live";
+  const qualityIsOk = input.quality === "ok";
+  const freshnessIsFresh = input.freshness === "fresh";
+  return {
+    canonicalSource,
+    normalizedQuality,
+    sourceIsLive,
+    qualityIsOk,
+    freshnessIsFresh,
+    isCurrentLive: sourceIsLive && qualityIsOk && freshnessIsFresh,
+  };
+}
+
 // src/lib/sensorReadingNormalizationRules.ts
+import { evaluateCurrentLiveSensorTruth as evaluateCurrentLiveSensorTruth2 } from "npm:@/lib/currentLiveSensorTruthRules";
 var STALE_THRESHOLD_MS = 30 * 60 * 1e3;
 function isReadingStale(capturedAt, now = Date.now(), thresholdMs = STALE_THRESHOLD_MS) {
   const t = new Date(capturedAt).getTime();
-  if (!Number.isFinite(t)) return true;
-  return now - t > thresholdMs;
+  if (
+    !Number.isFinite(t) ||
+    !Number.isFinite(now) ||
+    !Number.isFinite(thresholdMs) ||
+    thresholdMs < 0
+  ) {
+    return true;
+  }
+  const ageMs = now - t;
+  return ageMs < 0 || ageMs > thresholdMs;
 }
 
 // src/lib/mcp/tools/get-latest-sensor-snapshot.ts
@@ -292,10 +329,11 @@ function selectLatestMcpSensorReadings(rows, options = {}) {
           ts: row.ts,
           captured_at: row.captured_at,
           freshness,
-          current_live:
-            freshness === "fresh" &&
-            row.source.trim().toLowerCase() === "live" &&
-            row.quality.trim().toLowerCase() === "ok",
+          current_live: evaluateCurrentLiveSensorTruth({
+            source: row.source,
+            quality: row.quality,
+            freshness,
+          }).isCurrentLive,
         },
       ];
     }),

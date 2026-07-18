@@ -164,11 +164,12 @@ describe("Dashboard sensor provenance fence", () => {
       row({ raw_payload: PHYSICAL_GATEWAY_PAYLOAD }),
     ]);
     const snapshot = snapshotFromReadings(
-      selected.map(({ ts, metric, value, source }) => ({
+      selected.map(({ ts, metric, value, source, quality }) => ({
         ts,
         metric,
         value: value as number,
         source,
+        quality,
       })),
     );
 
@@ -179,6 +180,7 @@ describe("Dashboard sensor provenance fence", () => {
   it("caps plausible unverified and simulated snapshots at review, never healthy/green", () => {
     const base: SensorSnapshot = {
       source: "unverified",
+      quality: "ok",
       ts: FRESH,
       temp: 24,
       rh: 55,
@@ -201,6 +203,8 @@ describe("Dashboard sensor provenance fence", () => {
 
     expect(dashboardSnapshotForHealthyCues({ ...base, source: "live" })).not.toBeNull();
     expect(dashboardSnapshotForHealthyCues({ ...base, source: "manual" })).not.toBeNull();
+    expect(dashboardSnapshotForHealthyCues({ ...base, source: "live", quality: null })).toBeNull();
+    expect(dashboardSnapshotForHealthyCues({ ...base, source: "live", quality: "OK" })).toBeNull();
   });
 
   it("gives diary and unverified snapshots no target or alert-persistence source", () => {

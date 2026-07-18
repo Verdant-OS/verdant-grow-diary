@@ -154,4 +154,33 @@ describe("normalizeEcowittFlowerTentPayload", () => {
     expect(stale.source).toBe("degraded");
     expect(stale.degraded_reasons).toContain("stale:captured_at");
   });
+
+  it("never labels missing or future captured_at as live", () => {
+    const missing = normalizeEcowittFlowerTentPayload(validPayload, { now: FRESH_NOW });
+    expect(missing.source).toBe("degraded");
+    expect(missing.degraded_reasons).toContain("missing:captured_at");
+
+    const future = normalizeEcowittFlowerTentPayload(validPayload, {
+      now: FRESH_NOW,
+      captured_at_ms: FRESH_NOW.getTime() + 1,
+    });
+    expect(future.source).toBe("invalid");
+    expect(future.degraded_reasons).toContain("future:captured_at");
+  });
+
+  it.each([0, 100])("rejects humidity and soil moisture rail value %s", (value) => {
+    const humidity = normalizeEcowittFlowerTentPayload(
+      { ...validPayload, humidity1: value },
+      { now: FRESH_NOW, captured_at_ms: FRESH_CAPTURED },
+    );
+    expect(humidity.source).toBe("invalid");
+    expect(humidity.metrics.humidity_pct).toBeNull();
+
+    const soil = normalizeEcowittFlowerTentPayload(
+      { ...validPayload, soilmoisture3: value },
+      { now: FRESH_NOW, captured_at_ms: FRESH_CAPTURED },
+    );
+    expect(soil.source).toBe("invalid");
+    expect(soil.metrics.soil_moisture_pct_primary).toBeNull();
+  });
 });

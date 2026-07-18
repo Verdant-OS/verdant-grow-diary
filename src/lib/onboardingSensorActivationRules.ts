@@ -6,13 +6,14 @@
  * reading value, device detail, or grow detail leaves this helper.
  */
 import {
-  isCanonicalSensorSource,
+  assertCanonicalSensorSource,
   type CanonicalSensorSource,
 } from "@/constants/sensorIngestProvenance";
 import { isDiagnosticSensorProvenanceRow } from "@/lib/sensorProvenanceFenceRules";
 
 export interface OnboardingSensorActivationRow {
   source?: unknown;
+  quality?: unknown;
   raw_payload?: unknown;
 }
 
@@ -32,17 +33,16 @@ export function countActivatingSensorReadings(
 
   let count = 0;
   for (const row of rows) {
-    const normalizedSource =
-      typeof row.source === "string" ? row.source.trim().toLowerCase() : null;
+    const canonicalSource = assertCanonicalSensorSource(row.source);
     if (
       isDiagnosticSensorProvenanceRow({
-        source: normalizedSource,
+        source: canonicalSource,
         raw_payload: row.raw_payload,
       })
     ) {
       continue;
     }
-    if (isCanonicalSensorSource(normalizedSource) && ACTIVATING_SOURCES.has(normalizedSource)) {
+    if (canonicalSource && ACTIVATING_SOURCES.has(canonicalSource) && row.quality === "ok") {
       count += 1;
     }
   }

@@ -27,6 +27,8 @@
  */
 
 import { isDiagnosticSensorProvenanceRow } from "./sensorProvenanceFenceRules";
+import { assertCanonicalSensorSource } from "@/constants/sensorIngestProvenance";
+import { evaluateCurrentLiveSensorTruth } from "@/lib/currentLiveSensorTruthRules";
 
 // ---------------------------------------------------------------------------
 // Source labels
@@ -211,6 +213,8 @@ export interface CompileAiDoctorContextRow_SensorReading {
   value: number | null;
   captured_at: string;
   source: AiDoctorSensorSource | string;
+  /** Exact persisted validation state. Only `ok` supports current Live evidence. */
+  quality?: string | null;
   /** Classification-only lineage; never copied into the compiled payload. */
   raw_payload?: unknown;
 }
@@ -254,22 +258,6 @@ function parseTime(iso: string): number | null {
 
 function isWithin(daysWindow: number, capturedMs: number, nowMs: number): boolean {
   return capturedMs >= nowMs - daysWindow * MS_PER_DAY && capturedMs <= nowMs;
-}
-
-function normalizeSource(raw: string | null | undefined): AiDoctorSensorSource | null {
-  if (!raw) return null;
-  const lower = raw.toLowerCase();
-  if (
-    lower === "live" ||
-    lower === "manual" ||
-    lower === "csv" ||
-    lower === "demo" ||
-    lower === "stale" ||
-    lower === "invalid"
-  ) {
-    return lower;
-  }
-  return null;
 }
 
 function nonEmptyString(value: unknown): string | null {
@@ -359,11 +347,31 @@ export function compileAiDoctorContextPayloadFromRows(
       ? (r.metric as AiDoctorMetricKey)
       : null;
     if (!metric) continue;
-    const source = normalizeSource(r.source as string);
-    if (!source) continue;
+    const canonicalSource = assertCanonicalSensorSource(r.source);
+    if (!canonicalSource) continue;
+    const ageMs = nowMs - t;
+    const faultEndpoint =
+      (r.metric === "humidity_pct" || r.metric === "soil_moisture_pct") &&
+      (r.value === 0 || r.value === 100);
+    const liveTruth = evaluateCurrentLiveSensorTruth({
+      source: canonicalSource,
+      quality: faultEndpoint ? "invalid" : r.quality,
+      freshness: ageMs <= SENSOR_FRESH_MAX_AGE_MS ? "fresh" : "stale",
+    });
+    const source: AiDoctorSensorSource =
+      canonicalSource === "live"
+        ? liveTruth.isCurrentLive
+          ? "live"
+          : liveTruth.qualityIsOk && ageMs > SENSOR_FRESH_MAX_AGE_MS
+            ? "stale"
+            : "invalid"
+        : canonicalSource;
     normalized.push({
       metric,
-      value: typeof r.value === "number" && Number.isFinite(r.value) ? r.value : null,
+      value:
+        source !== "invalid" && typeof r.value === "number" && Number.isFinite(r.value)
+          ? r.value
+          : null,
       captured_at: r.captured_at,
       capturedMs: t,
       source,

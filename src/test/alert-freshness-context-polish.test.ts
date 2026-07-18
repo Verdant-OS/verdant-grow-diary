@@ -19,6 +19,7 @@ function snap(
 ): SensorSnapshot {
   return {
     source: overrides.source,
+    quality: overrides.source === "live" ? "ok" : null,
     ts: overrides.ts,
     temp: null,
     rh: null,
@@ -80,9 +81,7 @@ describe("buildSourceChip", () => {
     }
   });
   it("unavailable / missing → caution, never eligible", () => {
-    expect(
-      buildSourceChip({ status: "ok", snapshot: null, now: NOW }).tone,
-    ).toBe("caution");
+    expect(buildSourceChip({ status: "ok", snapshot: null, now: NOW }).tone).toBe("caution");
     expect(
       buildSourceChip({
         status: "ok",
@@ -90,9 +89,9 @@ describe("buildSourceChip", () => {
         now: NOW,
       }).tone,
     ).toBe("caution");
-    expect(
-      buildSourceChip({ status: "unavailable", snapshot: null, now: NOW }).tone,
-    ).toBe("caution");
+    expect(buildSourceChip({ status: "unavailable", snapshot: null, now: NOW }).tone).toBe(
+      "caution",
+    );
   });
   it("never returns the eligible tone for non-fresh-manual/live", () => {
     const cases = [
@@ -104,9 +103,7 @@ describe("buildSourceChip", () => {
       snap({ source: "unavailable", ts: null }),
     ];
     for (const s of cases) {
-      expect(
-        buildSourceChip({ status: "ok", snapshot: s, now: NOW }).tone,
-      ).not.toBe("eligible");
+      expect(buildSourceChip({ status: "ok", snapshot: s, now: NOW }).tone).not.toBe("eligible");
     }
   });
 });
@@ -178,9 +175,7 @@ describe("emptyStateSnapshotCta", () => {
     expect(cta?.showAddManualSnapshot).toBe(true);
   });
   it("status not ok → null", () => {
-    expect(
-      emptyStateSnapshotCta({ status: "loading", snapshot: null, now: NOW }),
-    ).toBeNull();
+    expect(emptyStateSnapshotCta({ status: "loading", snapshot: null, now: NOW })).toBeNull();
   });
 });
 
@@ -195,18 +190,14 @@ describe("duplicateReassuranceCopy", () => {
     ).toMatch(/no duplicate/i);
   });
   it("open alert + persistable → alternative copy", () => {
-    expect(
-      duplicateReassuranceCopy({ canPersist: true, hasOpenAlerts: true }),
-    ).toMatch(/will not create a duplicate/i);
+    expect(duplicateReassuranceCopy({ canPersist: true, hasOpenAlerts: true })).toMatch(
+      /will not create a duplicate/i,
+    );
   });
   it("persistable but no open alerts → null (no safe inference)", () => {
-    expect(
-      duplicateReassuranceCopy({ canPersist: true, hasOpenAlerts: false }),
-    ).toBeNull();
+    expect(duplicateReassuranceCopy({ canPersist: true, hasOpenAlerts: false })).toBeNull();
   });
   it("not persistable → null even with open alerts", () => {
-    expect(
-      duplicateReassuranceCopy({ canPersist: false, hasOpenAlerts: true }),
-    ).toBeNull();
+    expect(duplicateReassuranceCopy({ canPersist: false, hasOpenAlerts: true })).toBeNull();
   });
 });

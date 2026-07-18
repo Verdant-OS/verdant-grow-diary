@@ -42,6 +42,7 @@ import {
 
 export interface TimelineSensorSnapshotInput {
   source?: string | null;
+  quality?: unknown;
   captured_at?: string | null;
   metrics?: Record<string, number | null | undefined> | null;
 }
@@ -109,6 +110,7 @@ export interface SensorCardViewModel {
 
 export function buildSensorCardViewModel(
   snap: TimelineSensorSnapshotInput | null | undefined,
+  now: number = Date.now(),
 ): SensorCardViewModel | undefined {
   if (!snap) return undefined;
   const source = normalizeSensorSource(snap.source);
@@ -118,11 +120,35 @@ export function buildSensorCardViewModel(
       if (typeof v === "number" && Number.isFinite(v)) metrics[k] = v;
     }
   }
-  const isHealthyLive = isHealthySensorSource(source);
-  const isUnreliable = source === "demo" || source === "stale" || source === "invalid";
+  const capturedAtMs = snap.captured_at ? Date.parse(snap.captured_at) : Number.NaN;
+  const ageMs = Number.isFinite(capturedAtMs) ? now - capturedAtMs : Number.NaN;
+  const freshness =
+    Number.isFinite(ageMs) && ageMs >= 0
+      ? ageMs <= 30 * 60 * 1000
+        ? "fresh"
+        : "stale"
+      : "unknown";
+  const hasFaultEndpoint = Object.entries(metrics).some(
+    ([key, value]) =>
+      (key === "rh" ||
+        key === "humidity_pct" ||
+        key === "soil_moisture" ||
+        key === "soil_moisture_pct") &&
+      (value === 0 || value === 100),
+  );
+  const proof = {
+    quality: hasFaultEndpoint ? "invalid" : snap.quality,
+    freshness,
+  };
+  const isHealthyLive = isHealthySensorSource(source, proof);
+  const isUnreliable =
+    (source === "live" && !isHealthyLive) ||
+    source === "demo" ||
+    source === "stale" ||
+    source === "invalid";
   return {
     source,
-    sourceLabel: sensorSourceLabel(source),
+    sourceLabel: sensorSourceLabel(source, proof),
     isHealthyLive,
     isUnreliable,
     capturedAt: snap.captured_at ?? null,
@@ -149,9 +175,7 @@ export interface HarvestCardInput {
   sensor?: TimelineSensorSnapshotInput | null;
 }
 
-export function buildHarvestCardViewModel(
-  input: HarvestCardInput,
-): HarvestCardViewModel {
+export function buildHarvestCardViewModel(input: HarvestCardInput): HarvestCardViewModel {
   const d = input.details ?? {};
   return {
     kind: "harvest",
@@ -191,9 +215,7 @@ export interface CureCheckCardInput {
   sensor?: TimelineSensorSnapshotInput | null;
 }
 
-export function buildCureCheckCardViewModel(
-  input: CureCheckCardInput,
-): CureCheckCardViewModel {
+export function buildCureCheckCardViewModel(input: CureCheckCardInput): CureCheckCardViewModel {
   const d = input.details ?? {};
   const cautionState = cureCheckCautionState(d.mold_check);
   const hasAirflow =
@@ -216,8 +238,6 @@ export function buildCureCheckCardViewModel(
     sensor: buildSensorCardViewModel(input.sensor),
     cautionState,
     cautionCopy: cureCheckCautionCopy(cautionState),
-    airflow: hasAirflow
-      ? buildGroveBagAirflowViewModel(d.airflow_observation)
-      : undefined,
+    airflow: hasAirflow ? buildGroveBagAirflowViewModel(d.airflow_observation) : undefined,
   };
 }

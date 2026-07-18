@@ -8,6 +8,8 @@
 // - Missing / stale / invalid telemetry is degraded, NEVER reported as healthy.
 // - Seedling / Vegetation channels are intentionally not consumed here.
 
+import { classifyEcowittCaptureTime, inSensorPercentageRangeOrNull } from "./ecowittTentSnapshot";
+
 export const FLOWER_TENT_LABEL = "Flower Tent" as const;
 export const ECOWITT_PROVIDER = "ecowitt" as const;
 
@@ -104,10 +106,10 @@ export function normalizeEcowittFlowerTentPayload(
 
   // Validate plausible ranges. Out-of-range values are dropped, not coerced.
   const air = inRange(airRaw, -40, 200);
-  const hum = inRange(humRaw, 0, 100);
+  const hum = inSensorPercentageRangeOrNull(humRaw);
   const soilTemp = inRange(soilTempRaw, -40, 200);
-  const sm1 = inRange(sm1Raw, 0, 100);
-  const sm2 = inRange(sm2Raw, 0, 100);
+  const sm1 = inSensorPercentageRangeOrNull(sm1Raw);
+  const sm2 = inSensorPercentageRangeOrNull(sm2Raw);
 
   if (airRaw === null) degraded.push("missing:air_temp_f");
   if (humRaw === null) degraded.push("missing:humidity_pct");
@@ -121,8 +123,11 @@ export function normalizeEcowittFlowerTentPayload(
   const capturedAt = options.captured_at_ms ?? null;
   const nowMs = (options.now ?? new Date()).getTime();
   const maxAge = options.max_age_ms ?? DEFAULT_MAX_AGE_MS;
-  if (capturedAt !== null && Number.isFinite(capturedAt)) {
-    if (nowMs - capturedAt > maxAge) degraded.push("stale:captured_at");
+  const captureTimeState = classifyEcowittCaptureTime(capturedAt, nowMs, maxAge);
+  if (captureTimeState === "missing") degraded.push("missing:captured_at");
+  if (captureTimeState === "stale") degraded.push("stale:captured_at");
+  if (captureTimeState === "invalid" || captureTimeState === "future") {
+    degraded.push(`${captureTimeState}:captured_at`);
   }
 
   // Root-zone confidence is independent of air/RH gating.
@@ -133,8 +138,10 @@ export function normalizeEcowittFlowerTentPayload(
   // Source classification: live only when required mapped fields are valid AND fresh.
   const requiredOk = air !== null && hum !== null;
   let source: FlowerTentSnapshotSource;
-  if (!requiredOk) {
-    source = degraded.some((r) => r.startsWith("invalid:")) ? "invalid" : "degraded";
+  if (degraded.some((r) => r.startsWith("invalid:") || r.startsWith("future:"))) {
+    source = "invalid";
+  } else if (!requiredOk) {
+    source = "degraded";
   } else if (degraded.length > 0) {
     source = "degraded";
   } else {

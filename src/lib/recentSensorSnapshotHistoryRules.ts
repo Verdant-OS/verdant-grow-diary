@@ -29,6 +29,7 @@ export const RECENT_HISTORY_MAX_LIMIT = 5;
 export interface RecentSensorSnapshot {
   ts: string;
   source: SnapshotSource;
+  quality: string | null;
   stale: boolean;
   temp: number | null;
   rh: number | null;
@@ -46,14 +47,6 @@ function clampLimit(n: number | undefined): number {
   if (v < RECENT_HISTORY_MIN_LIMIT) return RECENT_HISTORY_MIN_LIMIT;
   if (v > RECENT_HISTORY_MAX_LIMIT) return RECENT_HISTORY_MAX_LIMIT;
   return v;
-}
-
-function classifySource(rows: SensorReadingLike[]): SnapshotSource {
-  // Source is a trust claim, not a fallback. Reuse the same provenance-aware
-  // classification as the latest environment snapshot so Windows diagnostic
-  // packets cannot become "Live sensor" in history merely because their
-  // canonical stored source is `live`.
-  return snapshotFromReadings(rows)?.source ?? "unavailable";
 }
 
 function pickMetric(rows: SensorReadingLike[], metric: string): number | null {
@@ -104,6 +97,7 @@ export function buildRecentSensorSnapshotHistory(
   for (const ts of order) {
     if (out.length >= limit) break;
     const group = byTs.get(ts)!;
+    const snapshot = snapshotFromReadings(group);
     let deviceDetail: string | null = null;
     for (const r of group) {
       const d = formatSensorDeviceDetail(r.device_id);
@@ -114,7 +108,8 @@ export function buildRecentSensorSnapshotHistory(
     }
     out.push({
       ts,
-      source: classifySource(group),
+      source: snapshot?.source ?? "unavailable",
+      quality: snapshot?.quality ?? null,
       stale: isStale(ts, now),
       temp: pickMetric(group, "temperature_c"),
       rh: pickMetric(group, "humidity_pct"),

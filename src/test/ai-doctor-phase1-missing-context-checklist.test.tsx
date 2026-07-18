@@ -85,6 +85,17 @@ describe("buildAiDoctorPhase1Checklist — status derivation", () => {
     expect(items.find((i) => i.id === "fresh_sensor")?.status).toBe("available");
   });
 
+  it("does not mark degraded live-source telemetry as available", () => {
+    const ctx = {
+      ...emptyContext(),
+      sensor_summary: [metric("temperature_c", { is_degraded: true })],
+    };
+    const status = buildAiDoctorPhase1Checklist({ context: ctx, ctaContext: CTA_CTX }).find(
+      (item) => item.id === "fresh_sensor",
+    )?.status;
+    expect(status).toBe("needs_review");
+  });
+
   it("never classifies stale/invalid telemetry as available", () => {
     const stale = {
       ...emptyContext(),
@@ -177,52 +188,33 @@ describe("AiDoctorPhase1MissingContextChecklist — render", () => {
         }),
       ],
     };
-    renderWithRouter(
-      <AiDoctorPhase1MissingContextChecklist
-        context={ctx}
-        ctaContext={CTA_CTX}
-      />,
+    renderWithRouter(<AiDoctorPhase1MissingContextChecklist context={ctx} ctaContext={CTA_CTX} />);
+    expect(screen.getByTestId("ai-doctor-phase1-checklist-status-recent_photo").textContent).toBe(
+      "Missing",
+    );
+    expect(screen.getByTestId("ai-doctor-phase1-checklist-status-recent_diary").textContent).toBe(
+      "Missing",
+    );
+    expect(screen.getByTestId("ai-doctor-phase1-checklist-status-fresh_sensor").textContent).toBe(
+      "Needs review",
     );
     expect(
-      screen.getByTestId("ai-doctor-phase1-checklist-status-recent_photo")
-        .textContent,
-    ).toBe("Missing");
-    expect(
-      screen.getByTestId("ai-doctor-phase1-checklist-status-recent_diary")
-        .textContent,
-    ).toBe("Missing");
-    expect(
-      screen.getByTestId("ai-doctor-phase1-checklist-status-fresh_sensor")
-        .textContent,
-    ).toBe("Needs review");
-    expect(
-      screen.getByTestId(
-        "ai-doctor-phase1-checklist-cta-recent_photo-add-photo",
-      ),
+      screen.getByTestId("ai-doctor-phase1-checklist-cta-recent_photo-add-photo"),
     ).toBeTruthy();
     expect(
-      screen.getByTestId(
-        "ai-doctor-phase1-checklist-cta-recent_diary-add-quick-log",
-      ),
+      screen.getByTestId("ai-doctor-phase1-checklist-cta-recent_diary-add-quick-log"),
     ).toBeTruthy();
     expect(
-      screen.getByTestId(
-        "ai-doctor-phase1-checklist-cta-fresh_sensor-check-environment",
-      ),
+      screen.getByTestId("ai-doctor-phase1-checklist-cta-fresh_sensor-check-environment"),
     ).toBeTruthy();
     expect(
-      screen.getByTestId(
-        "ai-doctor-phase1-checklist-cta-stage-update-plant-context",
-      ),
+      screen.getByTestId("ai-doctor-phase1-checklist-cta-stage-update-plant-context"),
     ).toBeTruthy();
   });
 
   it("renders no aggressive nutrient/equipment/stress advice", () => {
     const { container } = renderWithRouter(
-      <AiDoctorPhase1MissingContextChecklist
-        context={emptyContext()}
-        ctaContext={CTA_CTX}
-      />,
+      <AiDoctorPhase1MissingContextChecklist context={emptyContext()} ctaContext={CTA_CTX} />,
     );
     const text = container.textContent ?? "";
     expect(text).not.toMatch(
@@ -232,10 +224,7 @@ describe("AiDoctorPhase1MissingContextChecklist — render", () => {
 
   it("CTAs preserve plantId/growId/tentId", () => {
     renderWithRouter(
-      <AiDoctorPhase1MissingContextChecklist
-        context={emptyContext()}
-        ctaContext={CTA_CTX}
-      />,
+      <AiDoctorPhase1MissingContextChecklist context={emptyContext()} ctaContext={CTA_CTX} />,
     );
     const photoHref =
       screen
@@ -249,10 +238,7 @@ describe("AiDoctorPhase1MissingContextChecklist — render", () => {
 
 describe("static safety — AiDoctorPhase1MissingContextChecklist", () => {
   const SRC = readFileSync(
-    resolve(
-      __dirname,
-      "../components/AiDoctorPhase1MissingContextChecklist.tsx",
-    ),
+    resolve(__dirname, "../components/AiDoctorPhase1MissingContextChecklist.tsx"),
     "utf8",
   )
     .replace(/\/\*[\s\S]*?\*\//g, "")
@@ -274,9 +260,8 @@ describe("static safety — AiDoctorPhase1MissingContextChecklist", () => {
 
 describe("helperTextForChecklistItem — local-facts-only helper copy", () => {
   it("renders the expected helper for each missing item and stale sensor", async () => {
-    const { helperTextForChecklistItem } = await import(
-      "@/components/AiDoctorPhase1MissingContextChecklist"
-    );
+    const { helperTextForChecklistItem } =
+      await import("@/components/AiDoctorPhase1MissingContextChecklist");
     const cases: Array<[string, "missing" | "needs_review", RegExp]> = [
       ["recent_photo", "missing", /No recent plant photo/i],
       ["recent_diary", "missing", /No recent diary or Quick Log entry/i],
@@ -300,9 +285,8 @@ describe("helperTextForChecklistItem — local-facts-only helper copy", () => {
   });
 
   it("returns null for available items", async () => {
-    const { helperTextForChecklistItem } = await import(
-      "@/components/AiDoctorPhase1MissingContextChecklist"
-    );
+    const { helperTextForChecklistItem } =
+      await import("@/components/AiDoctorPhase1MissingContextChecklist");
     const helper = helperTextForChecklistItem({
       id: "recent_photo",
       label: "x",
@@ -314,9 +298,8 @@ describe("helperTextForChecklistItem — local-facts-only helper copy", () => {
   });
 
   it("contains no nutrient/equipment/stress/action advice", async () => {
-    const { helperTextForChecklistItem } = await import(
-      "@/components/AiDoctorPhase1MissingContextChecklist"
-    );
+    const { helperTextForChecklistItem } =
+      await import("@/components/AiDoctorPhase1MissingContextChecklist");
     const ids = [
       "recent_photo",
       "recent_diary",
@@ -357,9 +340,7 @@ describe("AiDoctorPhase1MissingContextChecklist — helper text rendering + mobi
         }),
       ],
     };
-    renderWithRouter(
-      <AiDoctorPhase1MissingContextChecklist context={ctx} ctaContext={CTA_CTX} />,
-    );
+    renderWithRouter(<AiDoctorPhase1MissingContextChecklist context={ctx} ctaContext={CTA_CTX} />);
     for (const id of [
       "recent_photo",
       "recent_diary",
@@ -369,13 +350,10 @@ describe("AiDoctorPhase1MissingContextChecklist — helper text rendering + mobi
       "medium",
       "pot_size",
     ]) {
-      expect(
-        screen.getByTestId(`ai-doctor-phase1-checklist-helper-${id}`),
-      ).toBeTruthy();
+      expect(screen.getByTestId(`ai-doctor-phase1-checklist-helper-${id}`)).toBeTruthy();
     }
     expect(
-      screen.getByTestId("ai-doctor-phase1-checklist-helper-fresh_sensor")
-        .textContent,
+      screen.getByTestId("ai-doctor-phase1-checklist-helper-fresh_sensor").textContent,
     ).toMatch(/stale, invalid, or degraded/i);
   });
 
@@ -392,9 +370,7 @@ describe("AiDoctorPhase1MissingContextChecklist — helper text rendering + mobi
       recent_watering_events: 1,
       sensor_summary: [metric("temperature_c")],
     };
-    renderWithRouter(
-      <AiDoctorPhase1MissingContextChecklist context={ctx} ctaContext={CTA_CTX} />,
-    );
+    renderWithRouter(<AiDoctorPhase1MissingContextChecklist context={ctx} ctaContext={CTA_CTX} />);
     for (const id of [
       "recent_photo",
       "recent_diary",
@@ -404,28 +380,20 @@ describe("AiDoctorPhase1MissingContextChecklist — helper text rendering + mobi
       "medium",
       "pot_size",
     ]) {
-      expect(
-        screen.queryByTestId(`ai-doctor-phase1-checklist-helper-${id}`),
-      ).toBeNull();
+      expect(screen.queryByTestId(`ai-doctor-phase1-checklist-helper-${id}`)).toBeNull();
     }
   });
 
   it("safely renders helpers under a null context", () => {
-    renderWithRouter(
-      <AiDoctorPhase1MissingContextChecklist context={null} ctaContext={CTA_CTX} />,
-    );
-    expect(
-      screen.getByTestId("ai-doctor-phase1-checklist-helper-recent_photo"),
-    ).toBeTruthy();
+    renderWithRouter(<AiDoctorPhase1MissingContextChecklist context={null} ctaContext={CTA_CTX} />);
+    expect(screen.getByTestId("ai-doctor-phase1-checklist-helper-recent_photo")).toBeTruthy();
   });
 
   it("CTAs use mobile-stacking, full-width, thumb-friendly classes", () => {
     renderWithRouter(
       <AiDoctorPhase1MissingContextChecklist context={emptyContext()} ctaContext={CTA_CTX} />,
     );
-    const cta = screen.getByTestId(
-      "ai-doctor-phase1-checklist-cta-recent_photo-add-photo",
-    );
+    const cta = screen.getByTestId("ai-doctor-phase1-checklist-cta-recent_photo-add-photo");
     const cls = cta.getAttribute("class") ?? "";
     expect(cls).toMatch(/\bw-full\b/);
     expect(cls).toMatch(/\bsm:w-auto\b/);
@@ -442,15 +410,11 @@ describe("AiDoctorPhase1MissingContextChecklist — accessibility polish", () =>
         plantName="Plant A"
       />,
     );
-    const photo = screen.getByTestId(
-      "ai-doctor-phase1-checklist-cta-recent_photo-add-photo",
-    );
+    const photo = screen.getByTestId("ai-doctor-phase1-checklist-cta-recent_photo-add-photo");
     const cls = photo.getAttribute("class") ?? "";
     expect(cls).toMatch(/focus-visible:ring-2/);
     expect(cls).toMatch(/focus-visible:ring-offset-2/);
-    expect(photo.getAttribute("aria-label") ?? "").toBe(
-      "Add photo evidence for Plant A",
-    );
+    expect(photo.getAttribute("aria-label") ?? "").toBe("Add photo evidence for Plant A");
     expect(
       screen
         .getByTestId("ai-doctor-phase1-checklist-cta-recent_diary-add-quick-log")
@@ -458,9 +422,7 @@ describe("AiDoctorPhase1MissingContextChecklist — accessibility polish", () =>
     ).toBe("Add Quick Log evidence for Plant A");
     expect(
       screen
-        .getByTestId(
-          "ai-doctor-phase1-checklist-cta-fresh_sensor-check-environment",
-        )
+        .getByTestId("ai-doctor-phase1-checklist-cta-fresh_sensor-check-environment")
         .getAttribute("aria-label"),
     ).toBe("Check environment readings for Plant A");
     expect(
@@ -472,10 +434,7 @@ describe("AiDoctorPhase1MissingContextChecklist — accessibility polish", () =>
 
   it("falls back to 'for selected plant' when plantName is missing", () => {
     renderWithRouter(
-      <AiDoctorPhase1MissingContextChecklist
-        context={emptyContext()}
-        ctaContext={CTA_CTX}
-      />,
+      <AiDoctorPhase1MissingContextChecklist context={emptyContext()} ctaContext={CTA_CTX} />,
     );
     expect(
       screen
@@ -500,9 +459,7 @@ describe("AiDoctorPhase1MissingContextChecklist — accessibility polish", () =>
     ];
     for (const id of ctas) {
       const aria =
-        screen
-          .getByTestId(`ai-doctor-phase1-checklist-cta-${id}`)
-          .getAttribute("aria-label") ?? "";
+        screen.getByTestId(`ai-doctor-phase1-checklist-cta-${id}`).getAttribute("aria-label") ?? "";
       expect(aria).not.toMatch(/Approve|Send|Execute|Run equipment|Control device/i);
     }
   });
@@ -510,14 +467,10 @@ describe("AiDoctorPhase1MissingContextChecklist — accessibility polish", () =>
 
 describe("AiDoctorPhase1MissingContextChecklist — shared a11y utility", () => {
   it("CTA className contains the shared focus-visible recipe", async () => {
-    const { AI_DOCTOR_PHASE1_FOCUS_VISIBLE_LINK_CLASSES } = await import(
-      "@/lib/aiDoctorPhase1A11yClassNames"
-    );
+    const { AI_DOCTOR_PHASE1_FOCUS_VISIBLE_LINK_CLASSES } =
+      await import("@/lib/aiDoctorPhase1A11yClassNames");
     renderWithRouter(
-      <AiDoctorPhase1MissingContextChecklist
-        context={emptyContext()}
-        ctaContext={CTA_CTX}
-      />,
+      <AiDoctorPhase1MissingContextChecklist context={emptyContext()} ctaContext={CTA_CTX} />,
     );
     const cls =
       screen

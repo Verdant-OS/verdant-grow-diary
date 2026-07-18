@@ -16,6 +16,7 @@ const baseReadings = {
 
 const make = (extra: Record<string, unknown> = {}) => ({
   captured_at: CAPTURED_FRESH,
+  quality: "ok",
   ...baseReadings,
   ...extra,
 });
@@ -120,7 +121,7 @@ describe("buildAiSensorSnapshotContext — staleThresholdMs edges", () => {
 
   it("exactly on stale threshold → NOT stale (strict greater-than comparison)", () => {
     const r = buildAiSensorSnapshotContext(
-      { source: "live", captured_at: capturedAtMsAgo(60_000), ...baseReadings },
+      { source: "live", quality: "ok", captured_at: capturedAtMsAgo(60_000), ...baseReadings },
       { now: NOW, staleThresholdMs: 60_000 },
     );
     expect(r.stale).toBe(false);
@@ -130,7 +131,7 @@ describe("buildAiSensorSnapshotContext — staleThresholdMs edges", () => {
 
   it("just over stale threshold → stale=true, trust=low", () => {
     const r = buildAiSensorSnapshotContext(
-      { source: "live", captured_at: capturedAtMsAgo(60_001), ...baseReadings },
+      { source: "live", quality: "ok", captured_at: capturedAtMsAgo(60_001), ...baseReadings },
       { now: NOW, staleThresholdMs: 60_000 },
     );
     expect(r.stale).toBe(true);
@@ -140,7 +141,7 @@ describe("buildAiSensorSnapshotContext — staleThresholdMs edges", () => {
 
   it("zero threshold → any positive age is stale and untrusted", () => {
     const r = buildAiSensorSnapshotContext(
-      { source: "live", captured_at: capturedAtMsAgo(1), ...baseReadings },
+      { source: "live", quality: "ok", captured_at: capturedAtMsAgo(1), ...baseReadings },
       { now: NOW, staleThresholdMs: 0 },
     );
     expect(r.stale).toBe(true);
@@ -150,7 +151,7 @@ describe("buildAiSensorSnapshotContext — staleThresholdMs edges", () => {
 
   it("negative threshold → still untrusted (never trusts old data)", () => {
     const r = buildAiSensorSnapshotContext(
-      { source: "live", captured_at: capturedAtMsAgo(1000), ...baseReadings },
+      { source: "live", quality: "ok", captured_at: capturedAtMsAgo(1000), ...baseReadings },
       { now: NOW, staleThresholdMs: -1 },
     );
     expect(r.isTrustedForAi).toBe(false);
@@ -205,15 +206,46 @@ describe("buildAiSensorSnapshotContext — determinism & safety", () => {
       make({ source: "invalid" }),
       make({ source: "unknown" }),
       make({ source: "stale" }),
-      { source: "live", captured_at: "2026-06-06T10:00:00Z", ...baseReadings },
+      { source: "live", quality: "ok", captured_at: "2026-06-06T10:00:00Z", ...baseReadings },
       { source: "manual", ...baseReadings },
-      { source: "live", captured_at: "broken", ...baseReadings },
+      { source: "live", quality: "ok", captured_at: "broken", ...baseReadings },
     ];
     for (const c of cases) {
       const r = buildAiSensorSnapshotContext(c, { now: NOW });
       assertNoForbidden(JSON.stringify(r));
     }
   });
+
+  it.each([undefined, null, "degraded", "OK", " ok "])(
+    "live quality %s fails closed",
+    (quality) => {
+      const r = buildAiSensorSnapshotContext(make({ source: "live", quality }), { now: NOW });
+      expect(r.sourceLabel).toBe("invalid");
+      expect(r.trustLevel).toBe("low");
+      expect(r.isTrustedForAi).toBe(false);
+      expect(r.valuesForModel).toBeNull();
+    },
+  );
+
+  it.each(["LIVE", " live ", "sensor", "ecowitt", "pi_bridge"])(
+    "non-canonical source %s never becomes live",
+    (source) => {
+      const r = buildAiSensorSnapshotContext(make({ source, quality: "ok" }), { now: NOW });
+      expect(r.sourceLabel).not.toBe("live");
+      expect(r.trustLevel).toBe("low");
+      expect(r.isTrustedForAi).toBe(false);
+    },
+  );
+
+  it.each([{ humidity: 0 }, { humidity: 100 }, { soil_moisture: 0 }, { soil_moisture: 100 }])(
+    "fault endpoint is invalid and omitted",
+    (metrics) => {
+      const r = buildAiSensorSnapshotContext(make({ source: "live", ...metrics }), { now: NOW });
+      expect(r.sourceLabel).toBe("invalid");
+      expect(r.isTrustedForAi).toBe(false);
+      expect(r.valuesForModel).toBeNull();
+    },
+  );
 
   it("null snapshot produces 'none' line and is untrusted", () => {
     const r = buildAiSensorSnapshotContext(null, { now: NOW });

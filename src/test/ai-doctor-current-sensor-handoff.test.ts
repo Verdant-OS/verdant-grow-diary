@@ -44,6 +44,7 @@ function row(
     metric,
     value,
     source,
+    quality: "ok",
     captured_at: capturedAt,
     ts: capturedAt,
     created_at: capturedAt,
@@ -170,9 +171,9 @@ describe("buildAiDoctorCurrentSensorSnapshot", () => {
       [row("temperature_c", 200), row("humidity_pct", 58)],
       { now: NOW },
     );
-    expect(snapshot?.severity).toBe("warning");
-    expect(snapshot?.annotation.trust).toBe("medium");
-    expect(snapshot?.readings).toEqual([{ field: "humidity_pct", value: 58, unit: "%" }]);
+    expect(snapshot?.severity).toBe("invalid");
+    expect(snapshot?.annotation.trust).toBe("low");
+    expect(snapshot?.readings).toEqual([]);
     expect(snapshot?.annotation.safetyNotes.join(" ")).toContain(
       "omitted because they failed plausibility validation",
     );
@@ -224,6 +225,29 @@ describe("buildAiDoctorCurrentSensorSnapshot", () => {
     expect(snapshot?.readings).toEqual([{ field: "humidity_pct", value: 58, unit: "%" }]);
     expect(JSON.stringify(snapshot)).not.toContain("temperature_c");
     expect(buildAiDoctorCurrentSensorSnapshot([testbench], { now: NOW })).toBeNull();
+  });
+
+  it.each(["degraded", "stale", "invalid", undefined])(
+    "quality=%s never becomes usable live AI evidence",
+    (quality) => {
+      const degraded = {
+        ...row("temperature_c", 25),
+        quality,
+      };
+      const classification = classifyAiDoctorCurrentSensorEvidence([degraded], { now: NOW });
+      expect(classification.status).not.toBe("usable");
+      const snapshot = buildAiDoctorCurrentSensorSnapshot([degraded], { now: NOW });
+      expect(snapshot?.annotation.source).not.toBe("live");
+      expect(snapshot?.annotation.includesValues).toBe(false);
+    },
+  );
+
+  it.each([0, 100])("humidity extreme %s%% never becomes usable live AI evidence", (humidity) => {
+    const classification = classifyAiDoctorCurrentSensorEvidence(
+      [row("temperature_c", 25), row("humidity_pct", humidity)],
+      { now: NOW },
+    );
+    expect(classification.status).not.toBe("usable");
   });
 });
 

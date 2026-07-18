@@ -57,6 +57,7 @@ export interface DiaryRangeSensorReadingRow {
   value?: number | null;
   ts?: string | null;
   source?: string | null;
+  quality?: string | null;
   /** Classification-only provenance; never copied into the report view model. */
   raw_payload?: unknown;
 }
@@ -378,7 +379,7 @@ export function buildDiaryRangeReport(
   // environmental aggregates.
   const aggregateReadingsInRange = sourceLabeledReadingsInRange.filter((r) => {
     const source = normalizeReportSensorSource(r.source);
-    return source === "live" || source === "manual" || source === "csv";
+    return (source === "live" || source === "manual" || source === "csv") && r.quality === "ok";
   });
   const metricDefs: Array<{
     key: DiaryRangeMetricAggregate["key"];
@@ -426,7 +427,7 @@ export function buildDiaryRangeReport(
   const sources: DiaryRangeSourceRollup[] = Array.from(sourceCounts.entries())
     .map(([kind, count]) => ({
       kind,
-      label: SENSOR_SOURCE_SHORT_LABEL[kind],
+      label: kind === "live" ? "Connected sensor" : SENSOR_SOURCE_SHORT_LABEL[kind],
       count,
     }))
     .sort((a, b) => b.count - a.count);

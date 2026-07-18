@@ -25,8 +25,8 @@ const T2 = "2026-05-25T09:00:00Z";
 describe("buildTentSensorChartSeries · truth filtering", () => {
   it("excludes impossible temperature from the chart series (no spike)", () => {
     const out = buildTentSensorChartSeries([
-      { ts: T1, metric: "temperature_c", value: 24, source: "live" }, // ≈ 75°F
-      { ts: T2, metric: "temperature_c", value: 999, source: "live" }, // impossible
+      { ts: T1, metric: "temperature_c", value: 24, source: "live", quality: "ok" }, // ≈ 75°F
+      { ts: T2, metric: "temperature_c", value: 999, source: "live", quality: "ok" }, // impossible
     ]);
     expect(out).toHaveLength(2);
     expect(out[0].temp).toBe(24);
@@ -38,8 +38,8 @@ describe("buildTentSensorChartSeries · truth filtering", () => {
 
   it("excludes impossible VPD from the chart series", () => {
     const out = buildTentSensorChartSeries([
-      { ts: T1, metric: "vpd_kpa", value: 1.1, source: "live" },
-      { ts: T2, metric: "vpd_kpa", value: 7.5, source: "live" },
+      { ts: T1, metric: "vpd_kpa", value: 1.1, source: "live", quality: "ok" },
+      { ts: T2, metric: "vpd_kpa", value: 7.5, source: "live", quality: "ok" },
     ]);
     expect(out[0].vpd).toBe(1.1);
     expect(out[1].vpd).toBeNull();
@@ -47,9 +47,9 @@ describe("buildTentSensorChartSeries · truth filtering", () => {
 
   it("nulls derived VPD when temp at the same ts is invalid", () => {
     const out = buildTentSensorChartSeries([
-      { ts: T1, metric: "temperature_c", value: 999, source: "live" },
-      { ts: T1, metric: "humidity_pct", value: 55, source: "live" },
-      { ts: T1, metric: "vpd_kpa", value: 1.1, source: "live" },
+      { ts: T1, metric: "temperature_c", value: 999, source: "live", quality: "ok" },
+      { ts: T1, metric: "humidity_pct", value: 55, source: "live", quality: "ok" },
+      { ts: T1, metric: "vpd_kpa", value: 1.1, source: "live", quality: "ok" },
     ]);
     expect(out[0].temp).toBeNull();
     expect(out[0].vpd).toBeNull();

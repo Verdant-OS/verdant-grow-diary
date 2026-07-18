@@ -79,6 +79,7 @@ export interface SensorBridgeHealthInput {
 export type SensorBridgeReadingEvidenceStatus = "loading" | "error" | "success";
 
 export interface SensorBridgeReadingEvidenceRowLike extends SensorTestbenchRowLike {
+  quality?: string | null;
   /** `sensor_readings.ts` is the final timestamp fallback. */
   ts?: string | Date | null;
 }
@@ -268,7 +269,9 @@ export function reconcileSensorBridgeHealthWithReadings(
     liveWindowMs: input.liveWindowMs,
   });
 
-  if (evidence.indicator === "live") return vm;
+  const latestEvidenceRow = normalizedRows.find(
+    (row) => toDate(row.captured_at)?.toISOString() === evidence.latestAtIso,
+  );
 
   if (evidence.indicator === "testbench") {
     return withoutHealthyClaim(
@@ -276,6 +279,32 @@ export function reconcileSensorBridgeHealthWithReadings(
       "needs_review",
       "Diagnostic testbench packet received. A recent physical sensor reading is still required.",
     );
+  }
+
+  if (latestEvidenceRow?.source === "live" && latestEvidenceRow.quality !== "ok") {
+    return withoutHealthyClaim(
+      vm,
+      "needs_review",
+      "Bridge intake accepted, but the latest reading lacks exact live-source quality proof.",
+    );
+  }
+
+  if (evidence.indicator === "live") {
+    const confirmed = normalizedRows.some((row) => {
+      const captured = toDate(row.captured_at);
+      return (
+        row.source === "live" &&
+        row.quality === "ok" &&
+        captured?.toISOString() === evidence.latestAtIso
+      );
+    });
+    return confirmed
+      ? vm
+      : withoutHealthyClaim(
+          vm,
+          "needs_review",
+          "Bridge intake accepted, but the latest reading lacks exact live-source quality proof.",
+        );
   }
 
   const source = evidence.source?.trim().toLowerCase() ?? "";

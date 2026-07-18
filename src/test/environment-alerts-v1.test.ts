@@ -27,6 +27,7 @@ function snap(partial: Partial<SensorSnapshot>): SensorSnapshot {
   return {
     ...EMPTY_SNAPSHOT,
     source: "live",
+    quality: "ok",
     ts: new Date(NOW).toISOString(),
     ...partial,
   };
@@ -46,6 +47,11 @@ function runAll(input: {
 }
 
 describe("Environment Alert v1 — default thresholds", () => {
+  it("requires validated snapshot quality before deriving alerts", () => {
+    const unverified = snap({ quality: null, temp: 35, rh: 85, vpd: 2.4 });
+    expect(buildDefaultThresholdAlerts({ snapshot: unverified, now: NOW })).toEqual([]);
+  });
+
   it("1. manual reading with high RH generates a high-humidity alert", () => {
     const s = snap({ source: "manual", temp: 24, rh: 85, vpd: 0.6 });
     const a = runAll({ snapshot: s }).find((x) => x.id === "default_target:rh:high");

@@ -28,6 +28,7 @@ export type ManualSensorTrendOmissionReason =
   | "invalid"
   | "demo"
   | "diagnostic"
+  | "unverified_quality"
   | "unknown_source"
   | "non_finite"
   | "missing_timestamp"
@@ -144,16 +145,14 @@ function normalizeMetric(value: unknown): ManualSensorTrendMetric | null {
 }
 
 function normalizeSource(value: unknown): ManualSensorTrendSource | null {
-  if (typeof value !== "string") return null;
-  const normalized = value.trim().toLowerCase();
-  return ALLOWED_SOURCES.has(normalized as ManualSensorTrendSource)
-    ? (normalized as ManualSensorTrendSource)
+  return typeof value === "string" && ALLOWED_SOURCES.has(value as ManualSensorTrendSource)
+    ? (value as ManualSensorTrendSource)
     : null;
 }
 
 interface ManualSensorTrendSourceResolution {
   source: ManualSensorTrendSource | null;
-  omissionReason: "diagnostic" | "unknown_source" | null;
+  omissionReason: "diagnostic" | "unknown_source" | "unverified_quality" | null;
 }
 
 /**
@@ -164,7 +163,7 @@ interface ManualSensorTrendSourceResolution {
  * source, or a source-less row carrying an ingest payload, fails closed.
  */
 function resolveTrendSource(row: ManualSensorTrendInputRow): ManualSensorTrendSourceResolution {
-  const sourceValue = typeof row.source === "string" ? row.source.trim().toLowerCase() : null;
+  const sourceValue = typeof row.source === "string" ? row.source : null;
   const canonicalSource = normalizeSource(sourceValue);
 
   if (
@@ -177,6 +176,9 @@ function resolveTrendSource(row: ManualSensorTrendInputRow): ManualSensorTrendSo
   }
 
   if (canonicalSource) {
+    if (canonicalSource === "live" && row.quality !== "ok") {
+      return { source: canonicalSource, omissionReason: "unverified_quality" };
+    }
     return { source: canonicalSource, omissionReason: null };
   }
 

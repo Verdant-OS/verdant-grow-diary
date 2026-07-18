@@ -21,9 +21,7 @@ describe("ecowittPayloadRules.normalizeEcowittPayload", () => {
 
     expect(snap.ok).toBe(true);
     expect(snap.vendor).toBe("ecowitt");
-    const byMetric = Object.fromEntries(
-      snap.readings.map((r) => [r.metric, r.value] as const),
-    );
+    const byMetric = Object.fromEntries(snap.readings.map((r) => [r.metric, r.value] as const));
     // 77F -> 25C
     expect(byMetric.temperature_c).toBeCloseTo(25, 1);
     expect(byMetric.humidity_pct).toBe(55);
@@ -46,8 +44,9 @@ describe("ecowittPayloadRules.normalizeEcowittPayload", () => {
     expect(snap.derivedVpdKpa!).toBeGreaterThan(1.0);
     expect(snap.derivedVpdKpa!).toBeLessThan(1.6);
     // Derived VPD is not a reading; never injected into readings as "live".
-    expect(snap.readings.find((r) => (r as { metric: string }).metric === "vpd_kpa"))
-      .toBeUndefined();
+    expect(
+      snap.readings.find((r) => (r as { metric: string }).metric === "vpd_kpa"),
+    ).toBeUndefined();
   });
 
   it("returns null derived VPD when humidity is impossible", () => {
@@ -69,12 +68,19 @@ describe("ecowittPayloadRules.normalizeEcowittPayload", () => {
   });
 
   it("returns freshness=missing when captured_at cannot be parsed", () => {
+    const snap = normalizeEcowittPayload({ temp1f: 70, humidity1: 50 }, { now: NOW });
+    expect(snap.freshness).toBe("missing");
+    expect(snap.capturedAt).toBeNull();
+  });
+
+  it("marks future captured_at invalid and never fresh", () => {
     const snap = normalizeEcowittPayload(
-      { temp1f: 70, humidity1: 50 },
+      { temp1f: 70, humidity1: 50, dateutc: "2026-06-04T12:30:00.001Z" },
       { now: NOW },
     );
     expect(snap.freshness).toBe("missing");
-    expect(snap.capturedAt).toBeNull();
+    expect(snap.invalid).toBe(true);
+    expect(snap.ok).toBe(false);
   });
 
   it("returns ok=false when payload is not an object", () => {
@@ -111,14 +117,7 @@ const baseMapping = {
   },
 };
 
-const UI_FORBIDDEN = [
-  "confirmed",
-  "certain",
-  "synced",
-  "connected",
-  "imported",
-  "guaranteed",
-];
+const UI_FORBIDDEN = ["confirmed", "certain", "synced", "connected", "imported", "guaranteed"];
 
 function assertUiCopySafe(strs: string[]) {
   for (const s of strs) {
@@ -185,6 +184,21 @@ describe("normalizeEcowittCloudReadings", () => {
     expect(res.rows.every((r) => r.reading.source === "stale")).toBe(true);
   });
 
+  it("never promotes future captured_at to live", () => {
+    const res = normalizeEcowittCloudReadings(
+      {
+        MAC: MAC_A,
+        dateutc: "2026-06-04 12:30:01",
+        temp1f: 77,
+        humidity1: 55,
+      },
+      baseMapping,
+      { now: CLOUD_NOW },
+    );
+    expect(res.rows.length).toBe(2);
+    expect(res.rows.every((r) => r.reading.source !== "live")).toBe(true);
+  });
+
   it("marks humidity stuck at 0 or 100 as invalid", () => {
     for (const stuck of [0, 100]) {
       const res = normalizeEcowittCloudReadings(
@@ -229,11 +243,9 @@ describe("normalizeEcowittCloudReadings", () => {
   });
 
   it("flags missing metric (no temp/RH/soil channels) — never returns healthy", () => {
-    const res = normalizeEcowittCloudReadings(
-      { MAC: MAC_A, dateutc: CLOUD_FRESH },
-      baseMapping,
-      { now: CLOUD_NOW },
-    );
+    const res = normalizeEcowittCloudReadings({ MAC: MAC_A, dateutc: CLOUD_FRESH }, baseMapping, {
+      now: CLOUD_NOW,
+    });
     expect(res.rows).toEqual([]);
   });
 
@@ -248,8 +260,6 @@ describe("normalizeEcowittCloudReadings", () => {
       expect(r).not.toHaveProperty("soil_ec");
       expect(r).not.toHaveProperty("reservoir_ec");
       expect(r).not.toHaveProperty("ec_mscm");
-
-
     }
   });
 

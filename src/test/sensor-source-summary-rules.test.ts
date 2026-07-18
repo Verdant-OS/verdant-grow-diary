@@ -18,8 +18,8 @@ describe("summarizeSensorSources", () => {
     const ts = "2025-06-01T11:59:00Z";
     const r = summarizeSensorSources(
       [
-        { source: "live", captured_at: ts },
-        { source: "live", captured_at: ts },
+        { source: "live", quality: "ok", captured_at: ts },
+        { source: "live", quality: "ok", captured_at: ts },
         { source: "manual", captured_at: ts },
         { source: "csv", captured_at: ts },
         { source: "demo", captured_at: ts },
@@ -47,10 +47,9 @@ describe("summarizeSensorSources", () => {
   });
 
   it("uses fallback when provided (e.g. demo mode)", () => {
-    const r = summarizeSensorSources(
-      [{ source: null, ts: "2025-01-01T00:00:00Z" }],
-      { fallback: "demo" },
-    );
+    const r = summarizeSensorSources([{ source: null, ts: "2025-01-01T00:00:00Z" }], {
+      fallback: "demo",
+    });
     expect(r.counts.demo).toBe(1);
     expect(r.counts.invalid).toBe(0);
   });
@@ -59,8 +58,8 @@ describe("summarizeSensorSources", () => {
     const now = Date.parse("2025-01-01T12:00:00Z");
     const r = summarizeSensorSources(
       [
-        { source: "live", captured_at: "2025-01-01T11:59:30Z" },
-        { source: "live", captured_at: "2025-01-01T00:00:00Z" },
+        { source: "live", quality: "ok", captured_at: "2025-01-01T11:59:30Z" },
+        { source: "live", quality: "ok", captured_at: "2025-01-01T00:00:00Z" },
       ],
       { now, staleMs: 60_000 },
     );
@@ -87,9 +86,9 @@ describe("summarizeSensorSources", () => {
 
   it("filters by half-open date range [from, to)", () => {
     const data = [
-      { source: "live", captured_at: "2025-01-01T00:00:00Z" }, // before
-      { source: "live", captured_at: "2025-01-05T00:00:00Z" }, // in
-      { source: "live", captured_at: "2025-01-10T00:00:00Z" }, // at upper -> excluded
+      { source: "live", quality: "ok", captured_at: "2025-01-01T00:00:00Z" }, // before
+      { source: "live", quality: "ok", captured_at: "2025-01-05T00:00:00Z" }, // in
+      { source: "live", quality: "ok", captured_at: "2025-01-10T00:00:00Z" }, // at upper -> excluded
     ];
     const now = Date.parse("2025-01-05T01:00:00Z");
     const r = summarizeSensorSources(data, {
@@ -101,11 +100,20 @@ describe("summarizeSensorSources", () => {
     expect(r.counts.live).toBe(1);
   });
 
+  it("counts a source-only live claim as invalid", () => {
+    const now = Date.parse("2025-06-01T12:00:00Z");
+    const r = summarizeSensorSources([{ source: "live", captured_at: "2025-06-01T11:59:30Z" }], {
+      now,
+      staleMs: 60_000,
+    });
+    expect(r.counts.live).toBe(0);
+    expect(r.counts.invalid).toBe(1);
+  });
+
   it("returns empty when nothing falls inside the range", () => {
-    const r = summarizeSensorSources(
-      [{ source: "live", captured_at: "2025-01-01T00:00:00Z" }],
-      { range: { from: "2025-02-01T00:00:00Z" } },
-    );
+    const r = summarizeSensorSources([{ source: "live", captured_at: "2025-01-01T00:00:00Z" }], {
+      range: { from: "2025-02-01T00:00:00Z" },
+    });
     expect(r.isEmpty).toBe(true);
     expect(r.total).toBe(0);
   });

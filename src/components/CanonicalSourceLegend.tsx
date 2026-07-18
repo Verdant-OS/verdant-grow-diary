@@ -16,7 +16,7 @@ export const CANONICAL_SOURCE_LEGEND_ENTRIES: ReadonlyArray<{
   {
     key: "live",
     label: "Live",
-    description: "Accepted current sensor reading from a connected/live source.",
+    description: "Exact live source with validated quality and a current capture timestamp.",
   },
   {
     key: "manual",
@@ -41,13 +41,11 @@ export const CANONICAL_SOURCE_LEGEND_ENTRIES: ReadonlyArray<{
   {
     key: "invalid",
     label: "Invalid",
-    description:
-      "Bad or suspicious reading that should not be treated as healthy.",
+    description: "Bad or suspicious reading that should not be treated as healthy.",
   },
 ] as const;
 
-export const CANONICAL_SOURCE_LEGEND_TRIGGER_LABEL =
-  "What do source labels mean?" as const;
+export const CANONICAL_SOURCE_LEGEND_TRIGGER_LABEL = "What do source labels mean?" as const;
 
 export interface CanonicalSourceLegendProps {
   className?: string;

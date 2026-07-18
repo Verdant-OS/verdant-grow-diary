@@ -48,6 +48,7 @@ export function isSnapshotPersistable(ctx: PersistenceContext): boolean {
   if (ctx.isDemoData === true) return false;
   if (!snapshot) return false;
   if (snapshot.source !== "live" && snapshot.source !== "manual") return false;
+  if (snapshot.quality !== "ok") return false;
   if (quality === "unavailable") return false;
   const now = ctx.now ?? Date.now();
   if (isStale(snapshot.ts, now)) return false;
@@ -84,10 +85,7 @@ export function alertRuleKey(args: {
 }
 
 /** Build a key from an in-memory derived alert. */
-export function derivedAlertKey(
-  alert: EnvironmentAlert,
-  source = "environment_alerts",
-): string {
+export function derivedAlertKey(alert: EnvironmentAlert, source = "environment_alerts"): string {
   return alertRuleKey({
     metric: typeof alert.metric === "string" ? alert.metric : null,
     source,

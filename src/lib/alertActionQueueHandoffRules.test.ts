@@ -286,6 +286,18 @@ describe("NEX-7: alertActionQueueHandoffRules", () => {
       expect(result.suggestion.sensorContextId).toBeNull();
     });
 
+    it("missing sensor context fails closed instead of inventing Live", () => {
+      const result = createActionSuggestion({ alert: makeAlert(), now: FIXED_NOW });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.suggestion.sourceContext.sourceState).toBe("invalid");
+      expect(result.suggestion.sourceContext.sourceLabel).toBe("Unverified sensor context");
+      expect(result.suggestion.sourceContext.isInvalid).toBe(true);
+      expect(result.suggestion.riskLevel).toBe("low");
+      expect(result.suggestion.rationale).not.toContain("Live sensor");
+    });
+
     it("deterministic output for same input", () => {
       const input: HandoffInput = {
         alert: makeAlert(),

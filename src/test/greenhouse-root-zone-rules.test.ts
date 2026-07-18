@@ -20,6 +20,7 @@ describe("assessRootZoneEc — medium awareness", () => {
       feedEcMscm: 1.6,
       runoffEcMscm: 1.8,
       source: "live",
+      quality: "ok",
     });
     expect(r.deltaUsed).toBe(true);
     expect(r.status).toBe("ok");
@@ -30,6 +31,7 @@ describe("assessRootZoneEc — medium awareness", () => {
       feedEcMscm: 2.0,
       runoffEcMscm: 2.7,
       source: "manual",
+      quality: "ok",
     });
     expect(r.status).toBe("review");
     expect(r.deltaUsed).toBe(true);
@@ -40,6 +42,7 @@ describe("assessRootZoneEc — medium awareness", () => {
       feedEcMscm: 2.0,
       runoffEcMscm: 3.5,
       source: "live",
+      quality: "ok",
     });
     expect(r.status).toBe("risk");
     expect(r.reason).toMatch(/inspect/);
@@ -52,6 +55,7 @@ describe("assessRootZoneEc — medium awareness", () => {
       feedEcMscm: 1.0,
       runoffEcMscm: 3.0,
       source: "live",
+      quality: "ok",
     });
     expect(r.status).toBe("unknown");
     expect(r.deltaUsed).toBe(false);
@@ -64,6 +68,7 @@ describe("assessRootZoneEc — medium awareness", () => {
         feedEcMscm: 1.0,
         runoffEcMscm: 3.0,
         source: "live",
+        quality: "ok",
       });
       expect(r.status).toBe("unknown");
       expect(r.deltaUsed).toBe(false);
@@ -72,12 +77,24 @@ describe("assessRootZoneEc — medium awareness", () => {
 });
 
 describe("assessRootZoneEc — null safety & source handling", () => {
+  it("fails closed for source-only live without accepted quality", () => {
+    const r = assessRootZoneEc({
+      medium: "coco",
+      feedEcMscm: 1.5,
+      runoffEcMscm: 1.7,
+      source: "live",
+    });
+    expect(r.status).toBe("unknown");
+    expect(r.deltaUsed).toBe(false);
+  });
+
   it("returns unknown for unknown medium", () => {
     const r = assessRootZoneEc({
       medium: "wood_chips",
       feedEcMscm: 1.5,
       runoffEcMscm: 1.7,
       source: "live",
+      quality: "ok",
     });
     expect(r.status).toBe("unknown");
     expect(r.medium).toBeNull();
@@ -100,6 +117,7 @@ describe("assessRootZoneEc — null safety & source handling", () => {
         feedEcMscm: null,
         runoffEcMscm: 1.7,
         source: "live",
+        quality: "ok",
       }).status,
     ).toBe("unknown");
     expect(
@@ -108,6 +126,7 @@ describe("assessRootZoneEc — null safety & source handling", () => {
         feedEcMscm: 1.5,
         runoffEcMscm: Number.NaN,
         source: "live",
+        quality: "ok",
       }).status,
     ).toBe("unknown");
   });
@@ -118,6 +137,7 @@ describe("assessRootZoneEc — null safety & source handling", () => {
         feedEcMscm: 1.5,
         runoffEcMscm: 1.6,
         source: s,
+        quality: "ok",
       });
       expect(r.source).toBe(s);
     }
@@ -128,6 +148,7 @@ describe("assessRootZoneEc — null safety & source handling", () => {
       feedEcMscm: 1.5,
       runoffEcMscm: 1.6,
       source: "live",
+      quality: "ok",
     });
     assertNoForbiddenKeys(r);
   });

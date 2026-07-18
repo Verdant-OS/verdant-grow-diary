@@ -12,20 +12,15 @@
  *  - Source label is resolved via `sensorSourceLabelRules`, the single
  *    source of truth for source-label display.
  */
-import type { SensorReadingSource } from "@/mock";
 import {
-  resolveSensorSourceLabel,
-  type ResolvedSourceLabel,
-} from "@/lib/sensorSourceLabelRules";
+  assertCanonicalSensorSource,
+  type CanonicalSensorSource,
+} from "@/constants/sensorIngestProvenance";
+import { evaluateCurrentLiveSensorTruth } from "@/lib/currentLiveSensorTruthRules";
+import { resolveSensorSourceLabel, type ResolvedSourceLabel } from "@/lib/sensorSourceLabelRules";
 import { tempFFromC } from "@/lib/temperatureUnits";
 
-export type TimelineSensorChipMetric =
-  | "temp_f"
-  | "temp_c"
-  | "rh"
-  | "vpd"
-  | "soil_moisture"
-  | "co2";
+export type TimelineSensorChipMetric = "temp_f" | "temp_c" | "rh" | "vpd" | "soil_moisture" | "co2";
 
 export interface TimelineSensorChip {
   metric: TimelineSensorChipMetric;
@@ -71,20 +66,8 @@ function roundTo(n: number, decimals: number): number {
   return Math.round(n * f) / f;
 }
 
-function readSource(raw: unknown): SensorReadingSource | null {
-  if (typeof raw !== "string") return null;
-  const v = raw.trim().toLowerCase();
-  if (
-    v === "live" ||
-    v === "manual" ||
-    v === "csv" ||
-    v === "demo" ||
-    v === "stale" ||
-    v === "invalid"
-  ) {
-    return v;
-  }
-  return null;
+function readSource(raw: unknown): CanonicalSensorSource | null {
+  return assertCanonicalSensorSource(raw);
 }
 
 /**
@@ -104,7 +87,7 @@ function readSource(raw: unknown): SensorReadingSource | null {
  */
 export function buildTimelineSensorSnapshotViewModel(
   input: unknown,
-  options: { preferUnit?: "F" | "C" } = {},
+  options: { preferUnit?: "F" | "C"; now?: number; staleMs?: number } = {},
 ): TimelineSensorSnapshotViewModel {
   if (input === null || input === undefined) return { kind: "none" };
   if (typeof input !== "object") {
@@ -167,8 +150,7 @@ export function buildTimelineSensorSnapshotViewModel(
   } else if (isFiniteNumber(tempGeneric)) {
     const v = roundTo(tempGeneric, 1);
     const unit = options.preferUnit === "C" ? "°C" : "°F";
-    const metric: TimelineSensorChipMetric =
-      options.preferUnit === "C" ? "temp_c" : "temp_f";
+    const metric: TimelineSensorChipMetric = options.preferUnit === "C" ? "temp_c" : "temp_f";
     chips.push({ metric, label: "Temp", value: v, unit, display: `${v}${unit}` });
   }
 
@@ -227,6 +209,33 @@ export function buildTimelineSensorSnapshotViewModel(
       : undefined);
   const source = readSource(sourceRaw);
 
+  const quality = pick(obj, "quality");
+  const capturedAt = pick(obj, "captured_at", "capturedAt", "ts", "timestamp");
+  const now = typeof options.now === "number" ? options.now : Date.now();
+  const staleMs =
+    typeof options.staleMs === "number" && options.staleMs > 0 ? options.staleMs : 30 * 60 * 1000;
+  const capturedMs = typeof capturedAt === "string" ? Date.parse(capturedAt) : Number.NaN;
+  const ageMs = now - capturedMs;
+  const freshness =
+    Number.isFinite(capturedMs) && ageMs >= 0 ? (ageMs <= staleMs ? "fresh" : "stale") : "unknown";
+  const faultEndpoint =
+    (isFiniteNumber(rh) && (rh === 0 || rh === 100)) ||
+    (isFiniteNumber(soil) && (soil === 0 || soil === 100));
+
+  let effectiveSource = source;
+  if (faultEndpoint) {
+    effectiveSource = "invalid";
+  } else if (source === "live") {
+    const truth = evaluateCurrentLiveSensorTruth({ source, quality, freshness });
+    if (truth.isCurrentLive) {
+      effectiveSource = "live";
+    } else if (truth.qualityIsOk && freshness === "stale") {
+      effectiveSource = "stale";
+    } else {
+      effectiveSource = "invalid";
+    }
+  }
+
   const vendorRaw =
     pick(obj, "vendor") ??
     (typeof obj.metadata === "object" && obj.metadata !== null
@@ -234,9 +243,9 @@ export function buildTimelineSensorSnapshotViewModel(
       : undefined);
 
   let resolved: ResolvedSourceLabel | null = null;
-  if (source) {
+  if (effectiveSource) {
     resolved = resolveSensorSourceLabel({
-      source,
+      source: effectiveSource,
       vendor: typeof vendorRaw === "string" ? vendorRaw : null,
     });
   }
@@ -246,6 +255,6 @@ export function buildTimelineSensorSnapshotViewModel(
     chips,
     sourceLabel: resolved ? resolved.label : null,
     source: resolved,
-    isLive: source === "live",
+    isLive: effectiveSource === "live",
   };
 }

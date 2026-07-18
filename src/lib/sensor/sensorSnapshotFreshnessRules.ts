@@ -9,10 +9,8 @@
  *  - manual & csv carry through as their own source; freshness still
  *    informs the age label but they are not promoted to "live".
  */
-import {
-  normalizeSensorSource,
-  type SensorSource,
-} from "./sensorSourceRules";
+import { normalizeSensorSource, type SensorSource } from "./sensorSourceRules";
+import { evaluateCurrentLiveSensorTruth } from "@/lib/currentLiveSensorTruthRules";
 
 export type SensorMetrics = Partial<{
   temp_f: number | null;
@@ -22,10 +20,12 @@ export type SensorMetrics = Partial<{
   soil_moisture: number | null;
   ec: number | null;
   ph: number | null;
-}> & Record<string, number | null | undefined>;
+}> &
+  Record<string, number | null | undefined>;
 
 export interface SensorSnapshot {
   source: SensorSource | string;
+  quality?: unknown;
   captured_at: string | null | undefined;
   tent_id: string | null;
   plant_id?: string | null;
@@ -43,6 +43,8 @@ export interface FreshnessResult {
   ageLabel: string;
   /** True when callers should NOT treat the snapshot as healthy/live. */
   isDegraded: boolean;
+  /** Exact three-factor current-Live result. */
+  isCurrentLive: boolean;
 }
 
 export interface ClassifyOptions {
@@ -84,6 +86,7 @@ export function classifySnapshotFreshness(
       ageMs: null,
       ageLabel: "unknown age",
       isDegraded: true,
+      isCurrentLive: false,
     };
   }
 
@@ -95,6 +98,7 @@ export function classifySnapshotFreshness(
       ageMs: null,
       ageLabel: "no timestamp",
       isDegraded: true,
+      isCurrentLive: false,
     };
   }
   const ts = Date.parse(captured);
@@ -105,6 +109,7 @@ export function classifySnapshotFreshness(
       ageMs: null,
       ageLabel: "bad timestamp",
       isDegraded: true,
+      isCurrentLive: false,
     };
   }
 
@@ -116,6 +121,7 @@ export function classifySnapshotFreshness(
       ageMs,
       ageLabel: "future timestamp",
       isDegraded: true,
+      isCurrentLive: false,
     };
   }
 
@@ -127,6 +133,7 @@ export function classifySnapshotFreshness(
       ageMs: Math.max(ageMs, 0),
       ageLabel: formatAge(Math.max(ageMs, 0)),
       isDegraded: true,
+      isCurrentLive: false,
     };
   }
   if (source === "stale") {
@@ -136,16 +143,24 @@ export function classifySnapshotFreshness(
       ageMs: Math.max(ageMs, 0),
       ageLabel: formatAge(Math.max(ageMs, 0)),
       isDegraded: true,
+      isCurrentLive: false,
     };
   }
 
   const effectiveAge = Math.max(ageMs, 0);
   const isStale = effectiveAge > freshnessMs;
+  const freshness = isStale ? "stale" : "fresh";
+  const isCurrentLive = evaluateCurrentLiveSensorTruth({
+    source,
+    quality: snapshot.quality,
+    freshness,
+  }).isCurrentLive;
   return {
     source,
-    freshness: isStale ? "stale" : "fresh",
+    freshness,
     ageMs: effectiveAge,
     ageLabel: formatAge(effectiveAge),
-    isDegraded: isStale || source !== "live",
+    isDegraded: !isCurrentLive,
+    isCurrentLive,
   };
 }

@@ -17,16 +17,12 @@
  */
 import { EC_PLAUSIBLE_MAX, toCanonicalMscm } from "@/lib/ecUnits";
 import type { EcUnit } from "@/constants/units";
+import { assertCanonicalSensorSource } from "@/constants/sensorIngestProvenance";
 
 export type TempUnit = "C" | "F";
 
-/** Source labels Verdant trusts for current-room decisions. */
-const TRUSTED_SOURCES = new Set([
-  "live",
-  "manual",
-  "csv", // historical, but unit-trustworthy when paired explicitly
-]);
-const UNTRUSTED_SOURCES = new Set(["demo", "stale", "invalid"]);
+/** Source labels Verdant may use for this read-time calculation. */
+const TRUSTED_SOURCES = new Set(["live", "manual", "csv"]);
 
 export type EcCompensationBlockedReason =
   | "missing_ec"
@@ -46,6 +42,8 @@ export interface EcCompensationInput {
   /** Per-°C compensation coefficient. Industry convention is ~0.019–0.02. */
   coefficient?: number;
   sourceLabel: string | null | undefined;
+  /** Persisted validation state. Required before a live row may be trusted. */
+  quality?: unknown;
 }
 
 export interface EcCompensationResult {
@@ -83,13 +81,11 @@ function isKnownTempUnit(u: unknown): u is TempUnit {
   return u === "C" || u === "F";
 }
 
-export function computeEcCompensation(
-  input: EcCompensationInput,
-): EcCompensationResult {
+export function computeEcCompensation(input: EcCompensationInput): EcCompensationResult {
   const warnings: string[] = [];
-  const source = (input.sourceLabel ?? "").toLowerCase();
+  const source = assertCanonicalSensorSource(input.sourceLabel);
 
-  if (!source || UNTRUSTED_SOURCES.has(source) || !TRUSTED_SOURCES.has(source)) {
+  if (!source || !TRUSTED_SOURCES.has(source)) {
     return blocked("unsafe_source", [
       `source "${input.sourceLabel ?? "unknown"}" is not trusted for current-room compensation`,
     ]);

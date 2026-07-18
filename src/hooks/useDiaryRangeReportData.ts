@@ -122,7 +122,7 @@ export function useDiaryRangeReportData(
         tentIds.length > 0
           ? supabase
               .from("sensor_readings")
-              .select("metric,value,ts,source,raw_payload")
+              .select("metric,value,ts,source,quality,raw_payload")
               .in("tent_id", tentIds)
               .in("metric", ["temperature_c", "humidity_pct", "vpd_kpa"])
               .gte("ts", startIso)

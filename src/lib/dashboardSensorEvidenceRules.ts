@@ -17,6 +17,7 @@ import {
   type SensorQualityResult,
 } from "@/lib/sensorQuality";
 import type { SensorSnapshot } from "@/lib/sensorSnapshot";
+import { assertCanonicalSensorSource } from "@/constants/sensorIngestProvenance";
 
 export interface DashboardSensorEvidenceRow extends SensorProvenanceRowLike {
   tent_id: string;
@@ -49,34 +50,19 @@ const METRIC_KEY: Record<string, DashboardNumericMetricKey> = {
   soil_moisture_pct: "soil",
 };
 
-/**
- * Sources that may feed ordinary Dashboard telemetry after provenance has
- * been checked. `pi_bridge` is the established legacy live reservation;
- * physical Windows-listener EcoWitt rows arrive as canonical `live` and are
- * admitted only when the shared diagnostic fence proves they are physical.
- */
-const DASHBOARD_TELEMETRY_SOURCES = new Set(["live", "pi_bridge", "manual", "csv"]);
+/** Sources that may feed ordinary Dashboard telemetry after validation. */
+const DASHBOARD_TELEMETRY_SOURCES = new Set(["live", "manual", "csv"]);
 
-function canonicalDashboardSource(source: string): DashboardChartReading["source"] | null {
-  switch (source.trim().toLowerCase()) {
-    case "live":
-    case "pi_bridge":
-      return "live";
-    case "manual":
-      return "manual";
-    case "csv":
-      return "csv";
-    default:
-      return null;
-  }
+function canonicalDashboardSource(source: unknown): DashboardChartReading["source"] | null {
+  const canonical = assertCanonicalSensorSource(source);
+  return canonical && DASHBOARD_TELEMETRY_SOURCES.has(canonical)
+    ? (canonical as DashboardChartReading["source"])
+    : null;
 }
 
-/** Explicit quality flags other than `ok` cannot feed unlabeled telemetry. */
+/** Missing, aliased, and non-ok quality cannot feed unlabeled telemetry. */
 function hasUsableDashboardQuality(quality: unknown): boolean {
-  if (quality == null) return true; // Preserve legacy rows created before quality was exposed.
-  if (typeof quality !== "string") return false;
-  const normalized = quality.trim().toLowerCase();
-  return normalized === "" || normalized === "ok";
+  return quality === "ok";
 }
 
 /**
@@ -87,8 +73,7 @@ export function isDashboardSensorEvidenceRow<T extends DashboardSensorEvidenceRo
   row: T | null | undefined,
 ): row is T {
   if (!row || typeof row.source !== "string") return false;
-  const source = row.source.trim().toLowerCase();
-  if (!DASHBOARD_TELEMETRY_SOURCES.has(source)) return false;
+  if (!canonicalDashboardSource(row.source)) return false;
   if (!hasUsableDashboardQuality(row.quality)) return false;
   return withoutDiagnosticSensorRows([row]).length === 1;
 }
@@ -114,7 +99,9 @@ export function selectDashboardSensorEvidenceRows<T extends DashboardSensorEvide
 export function isDashboardSnapshotEligibleForHealthyCues(
   snapshot: SensorSnapshot | null | undefined,
 ): boolean {
-  return snapshot?.source === "live" || snapshot?.source === "manual";
+  return (
+    (snapshot?.source === "live" || snapshot?.source === "manual") && snapshot.quality === "ok"
+  );
 }
 
 /** Return null when a snapshot may be displayed but cannot support health cues. */
@@ -210,16 +197,13 @@ export function buildDashboardStabilityReadings(
   return selectDashboardSensorEvidenceRows(rows)
     .filter((row) => row.metric === "vpd_kpa")
     .map((row) => {
-      const source = typeof row.source === "string" ? row.source : null;
-      const quality = typeof row.quality === "string" ? row.quality : null;
-      const sourceFlag = source?.trim().toLowerCase();
-      const qualityFlag = quality?.trim().toLowerCase();
+      const source = canonicalDashboardSource(row.source);
 
       return {
         ts: row.ts,
         vpd: Number(row.value),
         source,
-        stale: sourceFlag === "stale" || qualityFlag === "stale",
+        stale: false,
       };
     });
 }

@@ -10,18 +10,29 @@ const CAPTURED = NOW.getTime() - 60_000;
 
 const allTentsPayload = {
   // Flower
-  temp1f: 82, humidity1: 46, tf_ch1: 70, soilmoisture3: 80, soilmoisture2: 69,
+  temp1f: 82,
+  humidity1: 46,
+  tf_ch1: 70,
+  soilmoisture3: 80,
+  soilmoisture2: 69,
   // Seedling
-  temp2f: 74.5, humidity2: 58,
+  temp2f: 74.5,
+  humidity2: 58,
   // Vegetation
-  temp3f: 78, humidity3: 52, soilmoisture1: 41,
+  temp3f: 78,
+  humidity3: 52,
+  soilmoisture1: 41,
   // Lung Room — must NOT leak
-  tempinf: 72, humidityin: 50,
+  tempinf: 72,
+  humidityin: 50,
 };
 
 describe("normalizeEcowittSeedlingTentPayload", () => {
   it("maps temp2f/humidity2 to Seedling Tent live snapshot", () => {
-    const s = normalizeEcowittSeedlingTentPayload(allTentsPayload, { now: NOW, captured_at_ms: CAPTURED });
+    const s = normalizeEcowittSeedlingTentPayload(allTentsPayload, {
+      now: NOW,
+      captured_at_ms: CAPTURED,
+    });
     expect(s.tent_label).toBe(SEEDLING_TENT_LABEL);
     expect(s.provider).toBe("ecowitt");
     expect(s.source).toBe("live");
@@ -35,29 +46,69 @@ describe("normalizeEcowittSeedlingTentPayload", () => {
   });
 
   it("missing temp2f or humidity2 degrades", () => {
-    const noT = normalizeEcowittSeedlingTentPayload({ humidity2: 50 }, { now: NOW, captured_at_ms: CAPTURED });
+    const noT = normalizeEcowittSeedlingTentPayload(
+      { humidity2: 50 },
+      { now: NOW, captured_at_ms: CAPTURED },
+    );
     expect(noT.source).toBe("degraded");
     expect(noT.degraded_reasons).toContain("missing:air_temp_f");
-    const noH = normalizeEcowittSeedlingTentPayload({ temp2f: 70 }, { now: NOW, captured_at_ms: CAPTURED });
+    const noH = normalizeEcowittSeedlingTentPayload(
+      { temp2f: 70 },
+      { now: NOW, captured_at_ms: CAPTURED },
+    );
     expect(noH.source).toBe("degraded");
     expect(noH.degraded_reasons).toContain("missing:humidity_pct");
   });
 
   it("humidity outside 0–100 → invalid", () => {
-    const s = normalizeEcowittSeedlingTentPayload({ temp2f: 70, humidity2: 150 }, { now: NOW, captured_at_ms: CAPTURED });
+    const s = normalizeEcowittSeedlingTentPayload(
+      { temp2f: 70, humidity2: 150 },
+      { now: NOW, captured_at_ms: CAPTURED },
+    );
     expect(s.source).toBe("invalid");
     expect(s.invalid_reasons).toContain("invalid:humidity_pct");
     expect(s.metrics.humidity_pct).toBeNull();
   });
 
   it("stale captured_at degrades", () => {
-    const s = normalizeEcowittSeedlingTentPayload({ temp2f: 70, humidity2: 50 }, { now: NOW, captured_at_ms: NOW.getTime() - 3600_000 });
+    const s = normalizeEcowittSeedlingTentPayload(
+      { temp2f: 70, humidity2: 50 },
+      { now: NOW, captured_at_ms: NOW.getTime() - 3600_000 },
+    );
     expect(s.source).toBe("degraded");
     expect(s.degraded_reasons).toContain("stale:captured_at");
   });
 
+  it("never labels missing or future captured_at as live", () => {
+    const missing = normalizeEcowittSeedlingTentPayload(
+      { temp2f: 70, humidity2: 50 },
+      { now: NOW },
+    );
+    expect(missing.source).toBe("degraded");
+    expect(missing.degraded_reasons).toContain("missing:captured_at");
+
+    const future = normalizeEcowittSeedlingTentPayload(
+      { temp2f: 70, humidity2: 50 },
+      { now: NOW, captured_at_ms: NOW.getTime() + 1 },
+    );
+    expect(future.source).toBe("invalid");
+    expect(future.invalid_reasons).toContain("future:captured_at");
+  });
+
+  it.each([0, 100])("rejects humidity rail value %s", (humidity2) => {
+    const s = normalizeEcowittSeedlingTentPayload(
+      { temp2f: 70, humidity2 },
+      { now: NOW, captured_at_ms: CAPTURED },
+    );
+    expect(s.source).toBe("invalid");
+    expect(s.metrics.humidity_pct).toBeNull();
+  });
+
   it("raw payload is preserved", () => {
-    const s = normalizeEcowittSeedlingTentPayload(allTentsPayload, { now: NOW, captured_at_ms: CAPTURED });
+    const s = normalizeEcowittSeedlingTentPayload(allTentsPayload, {
+      now: NOW,
+      captured_at_ms: CAPTURED,
+    });
     expect(s.raw_payload_preserved).toBe(true);
     expect(s.raw_payload).toBe(allTentsPayload);
   });
@@ -71,8 +122,14 @@ describe("normalizeEcowittSeedlingTentPayload", () => {
   });
 
   it("deterministic", () => {
-    const a = normalizeEcowittSeedlingTentPayload(allTentsPayload, { now: NOW, captured_at_ms: CAPTURED });
-    const b = normalizeEcowittSeedlingTentPayload(allTentsPayload, { now: NOW, captured_at_ms: CAPTURED });
+    const a = normalizeEcowittSeedlingTentPayload(allTentsPayload, {
+      now: NOW,
+      captured_at_ms: CAPTURED,
+    });
+    const b = normalizeEcowittSeedlingTentPayload(allTentsPayload, {
+      now: NOW,
+      captured_at_ms: CAPTURED,
+    });
     expect(JSON.stringify(a)).toBe(JSON.stringify(b));
   });
 });

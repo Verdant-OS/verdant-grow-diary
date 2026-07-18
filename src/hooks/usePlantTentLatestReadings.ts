@@ -14,6 +14,7 @@ export interface PlantTentReadingRow {
   metric: string;
   value: number | string | null;
   source: string | null;
+  quality: string | null;
   device_id?: string | null;
   raw_payload?: unknown;
 }
@@ -27,7 +28,7 @@ export function usePlantTentLatestReadings(
     queryFn: async () => {
       const { data, error } = await supabase
         .from("sensor_readings")
-        .select("ts,metric,value,source,created_at,device_id,raw_payload")
+        .select("ts,metric,value,source,quality,created_at,device_id,raw_payload")
         // Deterministic ordering: latest ts first, with created_at as a
         // tie-breaker so the ≤5 metrics from a single manual entry (which
         // share `ts`) come back in a stable, repeatable order.

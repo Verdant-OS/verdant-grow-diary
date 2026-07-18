@@ -74,6 +74,20 @@ function hasUnsafeHealthyClaim(raw: string): boolean {
 }
 
 test.describe("/one-tent-loop-proof — never-healthy browser regression", () => {
+  test.beforeAll(async ({ browser, baseURL }, testInfo) => {
+    // Keep cold Vite compilation outside the 60-second safety assertion.
+    // Windows CI can spend more than a minute optimizing the shared React
+    // dependency graph on its first navigation; /welcome warms that graph
+    // without weakening this spec's zero-retry behavior or route checks.
+    testInfo.setTimeout(120_000);
+    const page = await browser.newPage({ baseURL });
+    try {
+      await page.goto("/welcome", { waitUntil: "domcontentloaded", timeout: 110_000 });
+    } finally {
+      await page.close();
+    }
+  });
+
   test("triggers no write-capable network calls and shows no unsafe healthy wording", async ({
     page,
   }) => {

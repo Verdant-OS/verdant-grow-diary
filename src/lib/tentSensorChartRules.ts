@@ -13,14 +13,13 @@ import {
   type SensorReadingLike,
   type SensorSnapshot,
 } from "@/lib/sensorSnapshot";
-import { formatSensorSourceLabel } from "@/lib/manualSensorSourceLabel";
 import {
   classifyManualMetric,
   classifySnapshotTruth,
   type SensorTruthAssessment,
 } from "@/lib/sensorTruthRules";
-import { normalizeSensorSource } from "@/lib/sensor/sensorSourceRules";
 import { isDiagnosticSensorProvenanceRow } from "@/lib/sensorProvenanceFenceRules";
+import { resolvePlantTentSnapshotSourceLabel } from "@/lib/plantTentEnvironmentRules";
 
 export interface TentSensorChartPoint {
   ts: string;
@@ -41,13 +40,8 @@ const METRIC_KEY: Record<string, keyof Omit<TentSensorChartPoint, "ts">> = {
 
 function canContributeToTentEnvironmentChart(row: SensorReadingLike): boolean {
   if (isDiagnosticSensorProvenanceRow(row)) return false;
-  // `pi_bridge` is the explicit legacy live-source reservation already used
-  // by snapshotFromReadings. Keep that compatibility narrow: unknown vendor
-  // strings still fail closed rather than being normalized to live.
-  const rawSource = typeof row.source === "string" ? row.source.trim().toLowerCase() : "";
-  if (rawSource === "pi_bridge") return true;
-  const source = normalizeSensorSource(row.source);
-  return source === "live" || source === "manual" || source === "csv";
+  if (row.source === "live") return row.quality === "ok";
+  return row.source === "manual" || row.source === "csv";
 }
 
 function usableTentEnvironmentRows(
@@ -162,14 +156,12 @@ export function buildTentSensorHeaderView(
     };
   }
   const truth = classifySnapshotTruth(snap, now);
+  const stale = isStale(snap.ts, now);
   return {
     hasReadings: true,
     capturedAt: snap.ts,
-    sourceLabel: formatSensorSourceLabel({
-      source: snap.source,
-      deviceId: snap.device_id ?? null,
-    }),
-    stale: isStale(snap.ts, now),
+    sourceLabel: resolvePlantTentSnapshotSourceLabel(snap, stale),
+    stale,
     snapshot: truth.snapshot,
     truth,
   };

@@ -4,7 +4,8 @@
  * One-Tent Loop's shared source/provenance chip:
  *
  *   - Manual readings render as "Manual reading" (and never as Live).
- *   - Live readings render as "Live" or the promoted vendor label.
+ *   - A live source without a usable trust status renders as neutral and
+ *     review-required; only a validated usable snapshot may render Live.
  *   - Demo / stale / invalid / unknown render with a degraded tone, so
  *     they cannot visually pass as healthy live telemetry.
  *
@@ -18,8 +19,7 @@ import {
   type BuildSensorSourceBadgeInput,
 } from "@/lib/sensorSourceLabelViewModel";
 
-export interface SensorSourceProvenanceBadgeProps
-  extends BuildSensorSourceBadgeInput {
+export interface SensorSourceProvenanceBadgeProps extends BuildSensorSourceBadgeInput {
   className?: string;
   /** Override testid. Default: "sensor-source-provenance-badge". */
   testId?: string;

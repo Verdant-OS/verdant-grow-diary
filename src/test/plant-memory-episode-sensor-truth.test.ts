@@ -107,6 +107,18 @@ describe("classifyEpisodeSensorRow — provenance labeling", () => {
     expect(r?.source).not.toBe("live");
   });
 
+  it("rejects source aliases and missing live quality", () => {
+    expect(classifyEpisodeSensorRow(row({ source: "Live" }), args)).toMatchObject({
+      status: "needs_review",
+      usable: false,
+    });
+    expect(classifyEpisodeSensorRow(row({ source: "live", quality: null }), args)).toMatchObject({
+      source: "live",
+      status: "needs_review",
+      usable: false,
+    });
+  });
+
   it("empty/blank provenance is invalid, not live", () => {
     const r = classifyEpisodeSensorRow(row({ source: "" }), args);
     expect(r?.usable).toBe(false);

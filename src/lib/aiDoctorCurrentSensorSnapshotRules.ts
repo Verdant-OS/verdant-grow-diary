@@ -26,6 +26,7 @@ import {
   type SensorMetricKey,
 } from "@/lib/latestSensorSnapshotRules";
 import { isSensorTestbenchRow } from "@/lib/sensorTestbenchIndicatorRules";
+import { evaluateCurrentLiveSensorTruth } from "@/lib/currentLiveSensorTruthRules";
 import {
   classificationFromStatusResult,
   type Classification,
@@ -84,6 +85,7 @@ interface MetricProjection {
 
 interface Candidate {
   source: AiDoctorCurrentSensorSource;
+  quality: unknown;
   metric: string;
   value: number;
   atMs: number;
@@ -186,6 +188,7 @@ function toCandidate(row: AiDoctorCurrentSensorRowLike): Candidate | null {
   const created = typeof row.created_at === "string" ? row.created_at : "";
   return {
     source,
+    quality: row.quality,
     metric,
     value,
     atMs: at.ms,
@@ -256,7 +259,14 @@ export function buildAiDoctorCurrentSensorSnapshot(
 
   const now = options.now ?? new Date();
   const freshness = classifyFreshness(newest.atIso, now);
-  const invalidSnapshot = freshness.freshness === "invalid" || readings.length === 0;
+  const qualityOk = cohort.every((row) => row.quality === "ok");
+  annotationInput.quality = qualityOk ? "ok" : null;
+  const invalidSnapshot =
+    freshness.freshness === "invalid" ||
+    readings.length === 0 ||
+    !qualityOk ||
+    invalidCount > 0 ||
+    warningCount > 0;
   if (invalidSnapshot) annotationInput.source = "invalid";
 
   const context = buildAiSensorSnapshotContext(annotationInput, {
@@ -271,6 +281,9 @@ export function buildAiDoctorCurrentSensorSnapshot(
     warningCount > 0
       ? "One or more current sensor values are near caution thresholds; interpret them conservatively."
       : null;
+  const qualityNote = !qualityOk
+    ? "Current sensor rows were omitted because every contributing row must be quality=ok."
+    : null;
   const trust = invalidCount > 0 && context.trustLevel === "high" ? "medium" : context.trustLevel;
   const annotationLine =
     trust === context.trustLevel
@@ -291,7 +304,10 @@ export function buildAiDoctorCurrentSensorSnapshot(
       stale: context.stale,
       trust,
       includesValues: context.valuesForModel !== null,
-      safetyNotes: appendUnique(appendUnique(context.safetyNotes, invalidNote), warningNote),
+      safetyNotes: appendUnique(
+        appendUnique(appendUnique(context.safetyNotes, invalidNote), warningNote),
+        qualityNote,
+      ),
       missingInformationHints: [...context.missingInformationHints].sort(),
     },
   };
@@ -318,10 +334,20 @@ export function classifyAiDoctorCurrentSensorEvidence(
     // Manual evidence stays useful context but never becomes healthy live
     // bridge evidence for the readiness score.
     result = { status: "needs_review", reasonCode: "none_accepted" };
-  } else {
+  } else if (currentLiveTruthFromSnapshot(snapshot, options.now ?? new Date()).isCurrentLive) {
     result = { status: "usable", reasonCode: "fresh_accept" };
+  } else {
+    result = { status: "needs_review", reasonCode: "none_accepted" };
   }
   return classificationFromStatusResult(result);
+}
+
+function currentLiveTruthFromSnapshot(snapshot: AiDoctorCurrentSensorSnapshot, now: Date) {
+  return evaluateCurrentLiveSensorTruth({
+    source: snapshot.annotation.source,
+    quality: snapshot.severity === "ok" ? "ok" : null,
+    freshness: classifyFreshness(snapshot.capturedAt, now).freshness,
+  });
 }
 
 /**

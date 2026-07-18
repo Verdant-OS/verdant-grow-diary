@@ -17,7 +17,17 @@ describe("TimelineSensorSourceBadge", () => {
     ["invalid", "invalid", "Source: invalid"],
   ] as const) {
     it(`renders ${expected} kind from source=${raw}`, () => {
-      const badge = classifyTimelineSensorSource({ rawSource: raw });
+      const badge = classifyTimelineSensorSource({
+        rawSource: raw,
+        ...(raw === "live"
+          ? {
+              quality: "ok",
+              capturedAt: "2026-06-17T11:59:30Z",
+              staleMs: 60_000,
+              now: Date.parse("2026-06-17T12:00:00Z"),
+            }
+          : {}),
+      });
       render(<TimelineSensorSourceBadge badge={badge} />);
       const el = screen.getByTestId(`timeline-sensor-source-badge-${expected}`);
       expect(el).toHaveTextContent(label);

@@ -79,8 +79,7 @@ export interface TimelineEvidenceReadinessView {
   readonly hasTrustworthySensorSource: boolean;
 }
 
-export const READINESS_READY_COPY =
-  "AI Doctor has recent plant context to review." as const;
+export const READINESS_READY_COPY = "AI Doctor has recent plant context to review." as const;
 export const READINESS_LIMITED_COPY =
   "AI Doctor can still help, but confidence may be limited." as const;
 export const READINESS_UNTRUSTED_COPY =
@@ -94,13 +93,11 @@ function clampCount(v: number | null | undefined): number {
   return Math.floor(v);
 }
 
-function isTrustworthySource(s: SensorSourceTag): boolean {
-  return s === "live" || s === "manual";
+function isTrustworthySource(s: SensorSourceTag, quality: "ok" | null): boolean {
+  return s === "manual" || (s === "live" && quality === "ok");
 }
 
-function buildSourceBadges(
-  context: AiDoctorContext,
-): ReadinessSourceBadge[] {
+function buildSourceBadges(context: AiDoctorContext): ReadinessSourceBadge[] {
   return context.sensor_groups
     .filter((g) => g.sample_count > 0)
     .map((g) => {
@@ -109,15 +106,12 @@ function buildSourceBadges(
         source: g.source,
         label: resolved.label,
         sampleCount: g.sample_count,
-        trustworthy: isTrustworthySource(g.source),
+        trustworthy: isTrustworthySource(g.source, g.quality),
       };
     });
 }
 
-function countByEventType(
-  context: AiDoctorContext,
-  match: (eventType: string) => boolean,
-): number {
+function countByEventType(context: AiDoctorContext, match: (eventType: string) => boolean): number {
   let n = 0;
   for (const ev of context.recent_grow_events) {
     if (typeof ev.event_type === "string" && match(ev.event_type.toLowerCase())) {
@@ -140,18 +134,11 @@ export function buildTimelineEvidenceReadinessView(
   const recentPhotos = clampCount(extras.recentPhotoCount);
   const openAlerts = clampCount(extras.openAlertsCount);
 
-  const recentWatering = countByEventType(context, (t) =>
-    WATERING_EVENT_TYPES.has(t),
-  );
-  const recentFeeding = countByEventType(context, (t) =>
-    FEEDING_EVENT_TYPES.has(t),
-  );
+  const recentWatering = countByEventType(context, (t) => WATERING_EVENT_TYPES.has(t));
+  const recentFeeding = countByEventType(context, (t) => FEEDING_EVENT_TYPES.has(t));
 
   const sourceBadges = buildSourceBadges(context);
-  const recentSensorSnapshots = sourceBadges.reduce(
-    (sum, b) => sum + b.sampleCount,
-    0,
-  );
+  const recentSensorSnapshots = sourceBadges.reduce((sum, b) => sum + b.sampleCount, 0);
 
   const hasUntrustedSensorSource = sourceBadges.some((b) => !b.trustworthy);
   const hasTrustworthySensorSource = sourceBadges.some((b) => b.trustworthy);

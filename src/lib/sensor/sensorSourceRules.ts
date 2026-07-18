@@ -7,38 +7,14 @@
  * never to "live" or another healthy label.
  */
 
-export const SENSOR_SOURCES = [
-  "live",
-  "manual",
-  "csv",
-  "demo",
-  "stale",
-  "invalid",
-] as const;
+export const SENSOR_SOURCES = ["live", "manual", "csv", "demo", "stale", "invalid"] as const;
 
 export type SensorSource = (typeof SENSOR_SOURCES)[number];
-
-const ALIAS: Record<string, SensorSource> = {
-  live: "live",
-  sensor: "live",
-  realtime: "live",
-  manual: "manual",
-  user: "manual",
-  entry: "manual",
-  log: "manual",
-  csv: "csv",
-  import: "csv",
-  demo: "demo",
-  mock: "demo",
-  sample: "demo",
-  fixture: "demo",
-  stale: "stale",
-  invalid: "invalid",
-  unknown: "invalid",
-};
+import { assertCanonicalSensorSource } from "@/constants/sensorIngestProvenance";
+import { evaluateCurrentLiveSensorTruth } from "@/lib/currentLiveSensorTruthRules";
 
 const SOURCE_LABEL: Record<SensorSource, string> = {
-  live: "Live sensor",
+  live: "Connected source (unverified)",
   manual: "Manual reading",
   csv: "CSV import",
   demo: "Demo data",
@@ -48,18 +24,25 @@ const SOURCE_LABEL: Record<SensorSource, string> = {
 
 /** Normalize any caller-supplied string into a canonical SensorSource. */
 export function normalizeSensorSource(input: unknown): SensorSource {
-  if (typeof input !== "string") return "invalid";
-  const v = input.trim().toLowerCase();
-  if (v.length === 0) return "invalid";
-  return ALIAS[v] ?? "invalid";
+  return assertCanonicalSensorSource(input) ?? "invalid";
 }
 
-export function isHealthySensorSource(source: SensorSource): boolean {
-  // demo / stale / invalid are never healthy. manual and csv are
-  // trusted-as-entered but not "live"; only live is healthy live data.
-  return source === "live";
+export interface SensorSourceTruthProof {
+  quality?: unknown;
+  freshness?: unknown;
 }
 
-export function sensorSourceLabel(source: SensorSource): string {
+export function isHealthySensorSource(
+  source: SensorSource,
+  proof: SensorSourceTruthProof = {},
+): boolean {
+  return evaluateCurrentLiveSensorTruth({ source, ...proof }).isCurrentLive;
+}
+
+export function sensorSourceLabel(
+  source: SensorSource,
+  proof: SensorSourceTruthProof = {},
+): string {
+  if (isHealthySensorSource(source, proof)) return "Live sensor";
   return SOURCE_LABEL[source];
 }

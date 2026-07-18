@@ -41,6 +41,7 @@ export interface PostGrowSensorReadingLike {
   value: number | null;
   ts: string;
   source?: string | null;
+  quality?: string | null;
   /** Classification-only provenance; never copied into the report view model. */
   raw_payload?: unknown;
 }
@@ -319,7 +320,9 @@ export function buildPostGrowLearningReportViewModel(input: {
   // non-evidence values out of averages, ranges, stability, and sparklines.
   const aggregateSensorReadings = sensorReadings.filter((reading) => {
     const source = normalizeReportSensorSource(reading.source);
-    return source === "live" || source === "manual" || source === "csv";
+    return (
+      (source === "live" || source === "manual" || source === "csv") && reading.quality === "ok"
+    );
   });
   const actions = input.actions ?? [];
   const latestHarvest =

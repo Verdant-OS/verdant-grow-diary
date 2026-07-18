@@ -45,6 +45,7 @@ function fresh(): LoopEvidence {
     timeline: { event_count: 5, latest_entry_id: "d1", linked_directly: true },
     latest_sensor_snapshot: {
       source: "live",
+      quality: "ok",
       captured_at: "2026-06-09T11:55:00.000Z",
       confidence: 0.9,
       metric: "temp",
@@ -162,7 +163,7 @@ describe("evaluateSensorSnapshot — never healthy for bad data", () => {
   });
   it("fresh live snapshot is passed", () => {
     const row = evaluateSensorSnapshot(
-      { source: "live", captured_at: "2026-06-09T11:55:00.000Z" },
+      { source: "live", quality: "ok", captured_at: "2026-06-09T11:55:00.000Z" },
       NOW,
     );
     expect(row.status).toBe("passed");
@@ -331,6 +332,30 @@ describe("evaluateSensorSnapshot — stale across all telemetry sources", () => 
     const row = evaluateSensorSnapshot({ source: "stale", captured_at: FRESH_ISO }, NOW_MS);
     expect(row.status).toBe("stale");
     expect(hasUnsafeHealthyClaim(collectRowText(row))).toBe(false);
+  });
+});
+
+describe("evaluateSensorSnapshot — current Live requires quality=ok", () => {
+  it.each(["degraded", "stale", "invalid", null, undefined])(
+    "fresh source=live with quality=%s never passes",
+    (quality) => {
+      const row = evaluateSensorSnapshot(
+        { source: "live", quality, captured_at: FRESH_ISO },
+        NOW_MS,
+      );
+      expect(row.status).not.toBe("passed");
+      expect(row.source).not.toBe("live");
+      expect(hasUnsafeHealthyClaim(collectRowText(row))).toBe(false);
+    },
+  );
+
+  it("fresh source=live with quality=ok passes", () => {
+    const row = evaluateSensorSnapshot(
+      { source: "live", quality: "ok", captured_at: FRESH_ISO },
+      NOW_MS,
+    );
+    expect(row.status).toBe("passed");
+    expect(row.source).toBe("live");
   });
 });
 

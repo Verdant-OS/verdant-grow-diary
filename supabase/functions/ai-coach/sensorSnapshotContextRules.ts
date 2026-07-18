@@ -20,6 +20,8 @@
  *    caller has explicitly removed the freshness window.
  */
 import { isDiagnosticSensorProvenanceRow } from "../../../src/lib/sensorProvenanceFenceRules.ts";
+import { assertCanonicalSensorSource } from "../../../src/constants/sensorIngestProvenance.ts";
+import { evaluateCurrentLiveSensorTruth } from "../../../src/lib/currentLiveSensorTruthRules.ts";
 
 export type AiSensorSnapshotSource =
   | "live"
@@ -64,16 +66,6 @@ export interface AiSensorSnapshotsContext {
 
 export const DEFAULT_AI_SENSOR_STALE_THRESHOLD_MS = 30 * 60 * 1000;
 
-const KNOWN_SOURCES: ReadonlySet<AiSensorSnapshotSource> = new Set([
-  "live",
-  "manual",
-  "csv",
-  "demo",
-  "stale",
-  "invalid",
-  "unknown",
-]);
-
 const READING_KEYS = [
   "temperature_c",
   "temperature_f",
@@ -97,23 +89,14 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
-function pickString(o: Record<string, unknown>, keys: readonly string[]) {
-  for (const k of keys) {
-    const v = o[k];
-    if (typeof v === "string" && v.trim() !== "") return v.trim();
-  }
-  return undefined;
+function normalizeSource(raw: unknown): AiSensorSnapshotSource {
+  return assertCanonicalSensorSource(raw) ?? "unknown";
 }
 
-function normalizeSource(raw: string | undefined): AiSensorSnapshotSource {
-  if (!raw) return "unknown";
-  const lower = raw.toLowerCase();
-  if (lower === "imported" || lower === "import") return "csv";
-  if (lower === "mock" || lower === "fixture") return "demo";
-  if ((KNOWN_SOURCES as ReadonlySet<string>).has(lower)) {
-    return lower as AiSensorSnapshotSource;
-  }
-  return "unknown";
+function hasFaultEndpoint(snapshot: Record<string, unknown>): boolean {
+  const humidity = snapshot.humidity_pct ?? snapshot.humidity ?? snapshot.rh;
+  const soil = snapshot.soil_moisture_pct ?? snapshot.soil_moisture ?? snapshot.soil_water_content;
+  return humidity === 0 || humidity === 100 || soil === 0 || soil === 100;
 }
 
 type CapturedAt =
@@ -253,11 +236,14 @@ export function buildAiSensorSnapshotContext(
 
   const now = options.now ?? new Date();
   const threshold = options.staleThresholdMs ?? DEFAULT_AI_SENSOR_STALE_THRESHOLD_MS;
-  const rawSourceStr = pickString(snapshot, ["source", "data_source", "sensor_source"]);
   // Raw provenance is classification-only and is never copied into the
   // returned context. A canonical stored source=live cannot override an
   // explicit Windows diagnostic lineage marker.
-  const source = isDiagnosticSensorProvenanceRow(snapshot) ? "demo" : normalizeSource(rawSourceStr);
+  const source = isDiagnosticSensorProvenanceRow(snapshot)
+    ? "demo"
+    : hasFaultEndpoint(snapshot)
+      ? "invalid"
+      : normalizeSource(snapshot.source);
   const captured = parseCapturedAt(snapshot);
 
   // Demo / invalid / unknown / explicit-stale: fixed-message paths.
@@ -344,7 +330,7 @@ export function buildAiSensorSnapshotContext(
   const safetyNotes: string[] = [];
   const missingInformationHints: string[] = [];
   let stale = false;
-  let captureProblem: "missing" | "invalid" | null = null;
+  let captureProblem: "missing" | "invalid" | "future" | null = null;
 
   if (captured.kind === "missing") {
     captureProblem = "missing";
@@ -356,12 +342,74 @@ export function buildAiSensorSnapshotContext(
     safetyNotes.push("Snapshot captured_at timestamp is invalid; freshness cannot be verified.");
   } else {
     const ageMs = now.getTime() - captured.ms;
+    if (ageMs < 0) {
+      captureProblem = "future";
+      safetyNotes.push("Snapshot captured_at is future-dated; freshness cannot be verified.");
+    }
     // Exactly on threshold (ageMs === threshold) is NOT stale: strict ">".
-    if (threshold <= 0) {
+    if (!captureProblem && threshold <= 0) {
       // No trustworthy freshness window declared by caller.
       stale = ageMs > 0; // any positive age is stale; exact same instant stays not-stale
-    } else if (ageMs > threshold) {
+    } else if (!captureProblem && ageMs > threshold) {
       stale = true;
+    }
+  }
+
+  if (source === "live") {
+    const freshness = captureProblem || threshold <= 0 ? "unknown" : stale ? "stale" : "fresh";
+    const truth = evaluateCurrentLiveSensorTruth({
+      source,
+      quality: snapshot.quality,
+      freshness,
+    });
+    if (truth.qualityIsOk && freshness === "stale") {
+      return {
+        annotationLine: buildLine(
+          "stale",
+          true,
+          "low",
+          "readings may not reflect current tent conditions.",
+        ),
+        valuesForModel: null,
+        safetyNotes: [
+          "Snapshot is older than the freshness window; readings may not reflect current tent conditions.",
+        ],
+        missingInformationHints: [
+          "A fresh sensor snapshot is needed before drawing environmental conclusions.",
+        ],
+        sourceLabel: "stale",
+        trustLevel: "low",
+        stale: true,
+        isTrustedForAi: false,
+      };
+    }
+    if (!truth.isCurrentLive) {
+      const invalidMessage =
+        captureProblem === "missing"
+          ? "values omitted; captured_at missing, freshness cannot be verified."
+          : captureProblem === "invalid"
+            ? "values omitted; captured_at invalid, freshness cannot be verified."
+            : captureProblem === "future"
+              ? "values omitted; captured_at is future-dated, freshness cannot be verified."
+              : "values omitted; live source quality or freshness could not be verified.";
+      const invalidSafetyNote =
+        captureProblem === "invalid"
+          ? "Snapshot captured_at timestamp is invalid; freshness cannot be verified."
+          : captureProblem === "future"
+            ? "Snapshot captured_at is future-dated; freshness cannot be verified."
+            : "Live telemetry requires exact source, accepted quality, and a fresh captured_at timestamp.";
+      return {
+        annotationLine: buildLine("invalid", stale, "low", invalidMessage),
+        valuesForModel: null,
+        safetyNotes: [invalidSafetyNote],
+        missingInformationHints: [
+          "A fresh quality-accepted sensor snapshot is needed before environmental diagnosis.",
+        ],
+        sourceLabel: "invalid",
+        trustLevel: "low",
+        stale,
+        isTrustedForAi: false,
+      };
     }
   }
 
@@ -377,6 +425,9 @@ export function buildAiSensorSnapshotContext(
       includeValues = false;
     } else if (captureProblem === "invalid") {
       message = "values omitted; captured_at invalid, freshness cannot be verified.";
+      includeValues = false;
+    } else if (captureProblem === "future") {
+      message = "values omitted; captured_at is future-dated, freshness cannot be verified.";
       includeValues = false;
     } else {
       // stale but timestamp valid

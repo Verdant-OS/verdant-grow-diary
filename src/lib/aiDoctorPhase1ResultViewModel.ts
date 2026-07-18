@@ -42,8 +42,7 @@ export const AI_DOCTOR_METRIC_ORDER: readonly AiDoctorMetricKey[] = [
 ] as const;
 
 /** Canonical source order, mirrors the foundation enum order. */
-export const AI_DOCTOR_SOURCE_ORDER: readonly AiDoctorSensorSource[] =
-  AI_DOCTOR_SENSOR_SOURCES;
+export const AI_DOCTOR_SOURCE_ORDER: readonly AiDoctorSensorSource[] = AI_DOCTOR_SENSOR_SOURCES;
 
 const METRIC_LABELS: Record<AiDoctorMetricKey, string> = {
   temperature_c: "Temperature",
@@ -70,7 +69,7 @@ const METRIC_UNITS: Record<AiDoctorMetricKey, string> = {
 };
 
 const SOURCE_LABELS: Record<AiDoctorSensorSource, string> = {
-  live: "Live",
+  live: "Connected sensor history",
   manual: "Manual",
   csv: "CSV history",
   demo: "Demo",
@@ -86,10 +85,7 @@ export function formatSourceLabel(source: AiDoctorSensorSource): string {
   return SOURCE_LABELS[source];
 }
 
-export function formatMetricValue(
-  metric: AiDoctorMetricKey,
-  value: number | null,
-): string {
+export function formatMetricValue(metric: AiDoctorMetricKey, value: number | null): string {
   if (value === null || !Number.isFinite(value)) return NO_TRUSTED_VALUE_LABEL;
   const unit = METRIC_UNITS[metric];
   return `${value} ${unit}`.trim();
@@ -108,9 +104,7 @@ export interface MetricFreshnessState {
   label: string;
 }
 
-export function deriveMetricFreshnessState(
-  snapshot: AiDoctorMetricSnapshot,
-): MetricFreshnessState {
+export function deriveMetricFreshnessState(snapshot: AiDoctorMetricSnapshot): MetricFreshnessState {
   if (snapshot.latest_source === null && snapshot.latest_value === null) {
     return { kind: "missing", label: "No reading" };
   }
@@ -141,23 +135,20 @@ export interface SourceBreakdownRow {
  * metric is emitted even when the snapshot is missing — the row will
  * carry `No trusted value` labels rather than being omitted.
  */
-export function buildSensorSummaryRows(
-  context: AiDoctorContextPayload,
-): MetricDisplayRow[] {
+export function buildSensorSummaryRows(context: AiDoctorContextPayload): MetricDisplayRow[] {
   const byMetric = new Map<AiDoctorMetricKey, AiDoctorMetricSnapshot>();
   for (const s of context.sensor_summary) byMetric.set(s.metric, s);
   return AI_DOCTOR_METRIC_ORDER.map((metric) => {
-    const snapshot: AiDoctorMetricSnapshot =
-      byMetric.get(metric) ?? {
-        metric,
-        latest_value: null,
-        latest_source: null,
-        latest_captured_at: null,
-        is_stale: false,
-        is_invalid: false,
-        is_degraded: false,
-        sample_count_7d: 0,
-      };
+    const snapshot: AiDoctorMetricSnapshot = byMetric.get(metric) ?? {
+      metric,
+      latest_value: null,
+      latest_source: null,
+      latest_captured_at: null,
+      is_stale: false,
+      is_invalid: false,
+      is_degraded: false,
+      sample_count_7d: 0,
+    };
     return {
       metric,
       label: formatMetricLabel(metric),
@@ -165,7 +156,12 @@ export function buildSensorSummaryRows(
       latestSourceDisplay:
         snapshot.latest_source === null
           ? NO_TRUSTED_VALUE_LABEL
-          : formatSourceLabel(snapshot.latest_source),
+          : snapshot.latest_source === "live" &&
+              !snapshot.is_stale &&
+              !snapshot.is_invalid &&
+              !snapshot.is_degraded
+            ? "Live"
+            : formatSourceLabel(snapshot.latest_source),
       latestCapturedAtDisplay: formatNullableText(snapshot.latest_captured_at),
       freshness: deriveMetricFreshnessState(snapshot),
       sampleCount7d: snapshot.sample_count_7d,
@@ -177,9 +173,7 @@ export function buildSensorSummaryRows(
  * Source breakdown rows in canonical source order. Missing sources are
  * preserved with a zero count so the canonical order is always visible.
  */
-export function buildSourceBreakdownRows(
-  context: AiDoctorContextPayload,
-): SourceBreakdownRow[] {
+export function buildSourceBreakdownRows(context: AiDoctorContextPayload): SourceBreakdownRow[] {
   const counts = new Map<AiDoctorSensorSource, number>();
   for (const b of context.source_breakdown as readonly AiDoctorSourceBreakdown[]) {
     counts.set(b.source, b.reading_count_7d);

@@ -9,14 +9,8 @@
  *  - Output is presentation-only; never persists, never calls an external model.
  */
 
-import {
-  generateAiDoctorResult,
-  type AiDoctorContext,
-} from "@/lib/aiDoctorEngine";
-import {
-  assessContextStrength,
-  type AiDoctorResult,
-} from "@/lib/aiDoctorSafetyRules";
+import { generateAiDoctorResult, type AiDoctorContext } from "@/lib/aiDoctorEngine";
+import { assessContextStrength, type AiDoctorResult } from "@/lib/aiDoctorSafetyRules";
 import type { SensorSourceTag } from "@/lib/aiDoctorContextCompiler";
 
 export type AiDoctorReadinessState =
@@ -26,26 +20,23 @@ export type AiDoctorReadinessState =
   | "telemetry_limited"
   | "demo_only";
 
-export const AI_DOCTOR_READINESS_STATE_LABELS: Record<
-  AiDoctorReadinessState,
-  string
-> = Object.freeze({
-  ready: "Ready for cautious check-in",
-  needs_more_context: "Needs more context",
-  sensor_missing: "Sensor data missing",
-  telemetry_limited: "Telemetry limited or stale",
-  demo_only: "Demo data only",
-});
-
-export const AI_DOCTOR_SOURCE_LABELS: Record<SensorSourceTag, string> =
+export const AI_DOCTOR_READINESS_STATE_LABELS: Record<AiDoctorReadinessState, string> =
   Object.freeze({
-    live: "Live",
-    manual: "Manual",
-    csv: "CSV / imported",
-    demo: "Demo",
-    stale: "Stale",
-    invalid: "Invalid",
+    ready: "Ready for cautious check-in",
+    needs_more_context: "Needs more context",
+    sensor_missing: "Sensor data missing",
+    telemetry_limited: "Telemetry limited or stale",
+    demo_only: "Demo data only",
   });
+
+export const AI_DOCTOR_SOURCE_LABELS: Record<SensorSourceTag, string> = Object.freeze({
+  live: "Live",
+  manual: "Manual",
+  csv: "CSV / imported",
+  demo: "Demo",
+  stale: "Stale",
+  invalid: "Invalid",
+});
 
 export interface AiDoctorReadinessSourceBadge {
   source: SensorSourceTag;
@@ -55,12 +46,7 @@ export interface AiDoctorReadinessSourceBadge {
 }
 
 export interface AiDoctorReadinessLimitation {
-  code:
-    | "stale_or_invalid"
-    | "demo_only"
-    | "no_sensors"
-    | "no_recent_events"
-    | "missing_stage";
+  code: "stale_or_invalid" | "demo_only" | "no_sensors" | "no_recent_events" | "missing_stage";
   message: string;
 }
 
@@ -72,22 +58,15 @@ export interface AiDoctorReadinessLimitation {
  *  - "not_trustworthy" — sensor data is stale/invalid/demo-only and
  *                       must not be presented as healthy live data.
  */
-export type AiDoctorReadinessConfidenceClass =
-  | "ready"
-  | "limited"
-  | "not_trustworthy";
+export type AiDoctorReadinessConfidenceClass = "ready" | "limited" | "not_trustworthy";
 
-export const AI_DOCTOR_CONFIDENCE_CLASS_COPY: Record<
-  AiDoctorReadinessConfidenceClass,
-  string
-> = Object.freeze({
-  ready:
-    "Context looks strong enough for a more useful AI Doctor check.",
-  limited:
-    "AI Doctor can run, but the answer may be limited until more evidence is added.",
-  not_trustworthy:
-    "Sensor context is not trustworthy enough to rely on. Add or verify readings before using them for diagnosis.",
-});
+export const AI_DOCTOR_CONFIDENCE_CLASS_COPY: Record<AiDoctorReadinessConfidenceClass, string> =
+  Object.freeze({
+    ready: "Context looks strong enough for a more useful AI Doctor check.",
+    limited: "AI Doctor can run, but the answer may be limited until more evidence is added.",
+    not_trustworthy:
+      "Sensor context is not trustworthy enough to rely on. Add or verify readings before using them for diagnosis.",
+  });
 
 /**
  * Honest provenance copy for fields that are not (yet) available on the
@@ -172,15 +151,12 @@ export function deriveAiDoctorContextEvidenceFlags(
     if (!hasRecentFeeding && FEEDING_EVENT_RE.test(type)) hasRecentFeeding = true;
     if (!hasRecentPhoto && PHOTO_EVENT_RE.test(type)) hasRecentPhoto = true;
   }
-  const stage =
-    typeof context.stage === "string" ? context.stage.trim() : context.stage;
+  const stage = typeof context.stage === "string" ? context.stage.trim() : context.stage;
   // Medium / pot size come from the context payload (carried directly
   // from the plant/profile row). Anything blank / non-string / null is
   // treated as unknown — never inferred from notes or strain.
-  const medium =
-    typeof context.medium === "string" ? context.medium.trim() : null;
-  const potSize =
-    typeof context.pot_size === "string" ? context.pot_size.trim() : null;
+  const medium = typeof context.medium === "string" ? context.medium.trim() : null;
+  const potSize = typeof context.pot_size === "string" ? context.pot_size.trim() : null;
   return {
     hasRecentWatering,
     hasRecentFeeding,
@@ -192,16 +168,13 @@ export function deriveAiDoctorContextEvidenceFlags(
   };
 }
 
-function classifyConfidenceClass(
-  state: AiDoctorReadinessState,
-): AiDoctorReadinessConfidenceClass {
+function classifyConfidenceClass(state: AiDoctorReadinessState): AiDoctorReadinessConfidenceClass {
   if (state === "ready") return "ready";
   if (state === "demo_only" || state === "telemetry_limited") {
     return "not_trustworthy";
   }
   return "limited";
 }
-
 
 export const AI_DOCTOR_PREVIEW_NOTICE = "Preview only — not saved.";
 
@@ -210,9 +183,7 @@ export interface BuildAiDoctorReadinessViewArgs {
   openAlertsCount?: number;
 }
 
-function classifyState(
-  context: AiDoctorContext,
-): AiDoctorReadinessState {
+function classifyState(context: AiDoctorContext): AiDoctorReadinessState {
   const strength = assessContextStrength(context);
   if (strength.hasDemoOnly) return "demo_only";
   if (!strength.hasAnySensors) return "sensor_missing";
@@ -234,14 +205,15 @@ export function buildAiDoctorReadinessView(
   const result = generateAiDoctorResult(context);
   const state = classifyState(context);
 
-  const sourceBadges: AiDoctorReadinessSourceBadge[] = context.sensor_groups.map(
-    (g) => ({
-      source: g.source,
-      label: AI_DOCTOR_SOURCE_LABELS[g.source],
-      sampleCount: g.sample_count,
-      isTrustworthy: g.source === "live" || g.source === "manual",
-    }),
-  );
+  const sourceBadges: AiDoctorReadinessSourceBadge[] = context.sensor_groups.map((g) => ({
+    source: g.source,
+    label:
+      g.source === "live" && g.quality !== "ok"
+        ? "Connected source"
+        : AI_DOCTOR_SOURCE_LABELS[g.source],
+    sampleCount: g.sample_count,
+    isTrustworthy: g.source === "manual" || (g.source === "live" && g.quality === "ok"),
+  }));
 
   const limitations: AiDoctorReadinessLimitation[] = [];
   if (context.sensor_groups.some((g) => g.source === "stale" || g.source === "invalid")) {

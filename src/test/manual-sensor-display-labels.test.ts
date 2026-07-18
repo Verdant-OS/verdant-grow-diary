@@ -25,6 +25,7 @@ import { buildPlantTentEnvironmentView } from "@/lib/plantTentEnvironmentRules";
 import { buildTentSensorHeaderView } from "@/lib/tentSensorChartRules";
 
 const MANUAL_DEVICE_ID = `${MANUAL_DEVICE_ID_PREFIX}EcoWitt WH45 CO2/THP Monitor`;
+const SNAPSHOT_NOW = new Date("2026-05-26T08:05:00Z").getTime();
 
 function manualRow(metric: string, value: number, deviceId: string | null = MANUAL_DEVICE_ID) {
   return {
@@ -42,6 +43,7 @@ function liveRow(metric: string, value: number) {
     metric,
     value,
     source: "live",
+    quality: "ok",
     device_id: "shelly-ht-gen4",
   };
 }
@@ -103,20 +105,23 @@ describe("formatSensorDeviceDetail — manual prefix support", () => {
 
 describe("plantTentEnvironmentRules — combined source/device label", () => {
   it("renders 'Manual reading · EcoWitt WH45 CO2/THP Monitor' for manual + device note", () => {
-    const view = buildPlantTentEnvironmentView([
-      manualRow("temperature_c", 24),
-      manualRow("humidity_pct", 55),
-    ]);
+    const view = buildPlantTentEnvironmentView(
+      [manualRow("temperature_c", 24), manualRow("humidity_pct", 55)],
+      SNAPSHOT_NOW,
+    );
     expect(view.sourceLabel).toBe(`${MANUAL_READING_LABEL} · EcoWitt WH45 CO2/THP Monitor`);
   });
 
   it("renders 'Manual reading' alone when no device note exists", () => {
-    const view = buildPlantTentEnvironmentView([manualRow("temperature_c", 24, null)]);
+    const view = buildPlantTentEnvironmentView(
+      [manualRow("temperature_c", 24, null)],
+      SNAPSHOT_NOW,
+    );
     expect(view.sourceLabel).toBe(MANUAL_READING_LABEL);
   });
 
   it("renders 'Live sensor' unchanged for live rows", () => {
-    const view = buildPlantTentEnvironmentView([liveRow("temperature_c", 24)]);
+    const view = buildPlantTentEnvironmentView([liveRow("temperature_c", 24)], SNAPSHOT_NOW);
     expect(view.sourceLabel).toBe("Live sensor");
   });
 });
@@ -150,7 +155,7 @@ describe("formatSensorSourceLabel — manual cannot be relabeled as live/synced/
 
   it("ignores a spoofed deviceNote on a non-manual source", () => {
     expect(formatSensorSourceLabel({ source: "live", deviceNote: "Totally Live" })).toBe(
-      "Live sensor",
+      "Connected source (unverified)",
     );
   });
 });
@@ -168,18 +173,18 @@ describe("Display-surface wiring — uses shared helper, stays safe", () => {
   const TENT_RULES = read("lib/tentSensorChartRules.ts");
   const DEVICE_LABELS = read("lib/sensorDeviceLabels.ts");
 
-  it("Dashboard latest-env card uses formatSensorSourceLabel with snapshot.device_id", () => {
+  it("Dashboard latest-env card uses the strict shared snapshot resolver", () => {
     expect(DASHBOARD).toContain(
-      'import { formatSensorSourceLabel } from "@/lib/manualSensorSourceLabel"',
+      'import { resolvePlantTentSnapshotSourceLabel } from "@/lib/plantTentEnvironmentRules"',
     );
     expect(DASHBOARD).toMatch(
-      /formatSensorSourceLabel\(\{[\s\S]{0,200}source:\s*sensorState\.snapshot\.source[\s\S]{0,200}deviceId:\s*sensorState\.snapshot\.device_id/,
+      /resolvePlantTentSnapshotSourceLabel\(\s*sensorState\.snapshot,\s*isStale\(sensorState\.snapshot\.ts\)/,
     );
   });
 
-  it("plantTentEnvironmentRules + tentSensorChartRules use formatSensorSourceLabel", () => {
+  it("Plant and Tent rules share the trust-aware source-label resolver", () => {
     expect(PLANT_RULES).toContain("formatSensorSourceLabel");
-    expect(TENT_RULES).toContain("formatSensorSourceLabel");
+    expect(TENT_RULES).toContain("resolvePlantTentSnapshotSourceLabel");
   });
 
   it("sensorDeviceLabels augments — never duplicates — the SOURCE_LABEL map", () => {
@@ -199,10 +204,8 @@ describe("Display-surface wiring — uses shared helper, stays safe", () => {
       expect(src).not.toMatch(/\bactuator\b/i);
       expect(src).not.toMatch(/device[_-]?command/i);
     }
-    // `pi_bridge` is an explicit legacy read-side provenance reservation in
-    // the pure Tent rules only; it does not authorize bridge/device control.
     expect([DASHBOARD, PLANT_RULES, DEVICE_LABELS].join("\n")).not.toMatch(/\bpi[_-]?bridge\b/i);
-    expect(TENT_RULES).toContain("pi_bridge");
+    expect(TENT_RULES).not.toContain("pi_bridge");
   });
 
   it("changed rule files stay pure / read-only (no Supabase writes)", () => {

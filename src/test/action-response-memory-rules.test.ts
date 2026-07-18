@@ -369,7 +369,13 @@ describe("determinism and truth boundary", () => {
       ],
       actions: [action(), action({ id: "act-2" })],
       sensorRows: [
-        { id: "snap-1", tent_id: "tent-1", source: "live", captured_at: "2026-07-02T11:00:00Z" },
+        {
+          id: "snap-1",
+          tent_id: "tent-1",
+          source: "live",
+          quality: "ok",
+          captured_at: "2026-07-02T11:00:00Z",
+        },
       ],
     };
     const a = buildActionResponseMemories(input);
@@ -396,12 +402,18 @@ describe("determinism and truth boundary", () => {
       expect(memories[0].sensor.trustState).toBe(expected);
       expect(memories[0].sensor.trustState).not.toBe("trusted");
     }
-    // Only a literal live source is trusted.
+    // A literal live source also needs persisted quality proof.
     const live = buildActionResponseMemories({
       responseRows: [responseRow({ detailsOver: { sensor_snapshot_id: "snap-1" } })],
       actions: [action()],
       sensorRows: [
-        { id: "snap-1", tent_id: "tent-1", source: "live", captured_at: "2026-07-02T11:00:00Z" },
+        {
+          id: "snap-1",
+          tent_id: "tent-1",
+          source: "live",
+          quality: "ok",
+          captured_at: "2026-07-02T11:00:00Z",
+        },
       ],
     });
     expect(live[0].sensor.trustState).toBe("trusted");
@@ -416,6 +428,7 @@ describe("determinism and truth boundary", () => {
           id: "snap-1",
           tent_id: "tent-1",
           source: "live",
+          quality: "ok",
           captured_at: "2026-07-02T11:00:00Z",
           raw_payload: {
             vendor: "ecowitt_windows_testbench",
@@ -453,12 +466,29 @@ describe("determinism and truth boundary", () => {
           id: "snap-1",
           tent_id: "tent-1",
           source: "live",
+          quality: "ok",
           captured_at: "2026-07-02T11:00:00Z",
           raw_payload: PHYSICAL_WINDOWS_PAYLOAD,
         },
       ],
     });
     expect(memories[0].sensor.trustState).toBe("trusted");
+  });
+
+  it("source-only live action evidence stays unknown", () => {
+    const memories = buildActionResponseMemories({
+      responseRows: [responseRow({ detailsOver: { sensor_snapshot_id: "snap-1" } })],
+      actions: [action()],
+      sensorRows: [
+        {
+          id: "snap-1",
+          tent_id: "tent-1",
+          source: "live",
+          captured_at: "2026-07-02T11:00:00Z",
+        },
+      ],
+    });
+    expect(memories[0].sensor.trustState).toBe("unknown");
   });
 
   it("sensor with unparseable captured_at is invalid regardless of source", () => {

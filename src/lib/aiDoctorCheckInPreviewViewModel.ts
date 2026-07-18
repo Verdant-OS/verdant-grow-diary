@@ -11,10 +11,7 @@
  *  - Weak context emphasizes missing information rather than certainty.
  */
 
-import {
-  generateAiDoctorResult,
-  type AiDoctorContext,
-} from "@/lib/aiDoctorEngine";
+import { generateAiDoctorResult, type AiDoctorContext } from "@/lib/aiDoctorEngine";
 import {
   assessContextStrength,
   type AiDoctorActionQueueSuggestion,
@@ -23,10 +20,8 @@ import {
   type AiDoctorRiskLevel,
 } from "@/lib/aiDoctorSafetyRules";
 
-export const AI_DOCTOR_CHECK_IN_PREVIEW_NOTICE =
-  "Preview only — not saved.";
-export const AI_DOCTOR_CHECK_IN_NO_MODEL_NOTICE =
-  "No live AI model was called.";
+export const AI_DOCTOR_CHECK_IN_PREVIEW_NOTICE = "Preview only — not saved.";
+export const AI_DOCTOR_CHECK_IN_NO_MODEL_NOTICE = "No live AI model was called.";
 
 export type AiDoctorCheckInLimitationCode =
   | "stale_or_invalid"
@@ -62,30 +57,26 @@ export interface AiDoctorCheckInPreviewView {
   actionQueueSuggestion: AiDoctorActionQueueSuggestion | null;
 }
 
-function collectLimitations(
-  context: AiDoctorContext,
-): AiDoctorCheckInLimitation[] {
+function collectLimitations(context: AiDoctorContext): AiDoctorCheckInLimitation[] {
   const limitations: AiDoctorCheckInLimitation[] = [];
   const hasStaleOrInvalid = context.sensor_groups.some(
     (g) => g.source === "stale" || g.source === "invalid",
   );
   const hasDemo = context.sensor_groups.some((g) => g.source === "demo");
   const trustworthy = context.sensor_groups.some(
-    (g) => g.source === "live" || g.source === "manual",
+    (g) => g.source === "manual" || (g.source === "live" && g.quality === "ok"),
   );
 
   if (hasStaleOrInvalid) {
     limitations.push({
       code: "stale_or_invalid",
-      message:
-        "Some recent sensor readings are stale or invalid — treat as untrusted.",
+      message: "Some recent sensor readings are stale or invalid — treat as untrusted.",
     });
   }
   if (hasDemo && !trustworthy) {
     limitations.push({
       code: "demo_only",
-      message:
-        "Only demo sensor data available — not usable for a real diagnosis.",
+      message: "Only demo sensor data available — not usable for a real diagnosis.",
     });
   }
   if (context.sensor_groups.length === 0) {
@@ -114,12 +105,10 @@ export function buildAiDoctorCheckInPreviewView(
 ): AiDoctorCheckInPreviewView {
   const result: AiDoctorResult = generateAiDoctorResult(context);
   const strength = assessContextStrength(context);
-  const contextWeak =
-    !strength.hasTrustworthySensors || strength.evidenceSignals <= 1;
+  const contextWeak = !strength.hasTrustworthySensors || strength.evidenceSignals <= 1;
 
   const summary = contextWeak
-    ? result.summary +
-      " Context is thin — emphasize missing information over certainty."
+    ? result.summary + " Context is thin — emphasize missing information over certainty."
     : result.summary;
 
   return Object.freeze({

@@ -24,6 +24,7 @@ import {
   type PlantMemoryEpisode,
 } from "@/lib/plantMemoryEpisodeRules";
 import { isDiagnosticSensorProvenanceRow } from "@/lib/sensorProvenanceFenceRules";
+import { assertCanonicalSensorSource } from "@/constants/sensorIngestProvenance";
 
 /** Provenance labels this feature may show (existing project vocabulary). */
 export const EPISODE_SENSOR_SOURCES = [
@@ -62,7 +63,8 @@ export function classifyEpisodeSensorRow(
   const window = classifyEvidenceWindow(capturedMs, args.completedAtMs);
   if (window === null) return null;
 
-  const rawSource = (row.source ?? "").trim().toLowerCase();
+  const canonicalSource = assertCanonicalSensorSource(row.source);
+  const rawSource = typeof row.source === "string" ? row.source : "";
   let source: string;
   let status: string;
   let usable: boolean;
@@ -77,12 +79,20 @@ export function classifyEpisodeSensorRow(
     source = "demo";
     status = "needs_review";
     usable = false;
-  } else if (rawSource === "demo") {
+  } else if (canonicalSource === "demo") {
     source = "demo";
     status = "needs_review";
     usable = false;
-  } else if (KNOWN_REAL_SOURCES.has(rawSource)) {
-    source = rawSource;
+  } else if (canonicalSource === "stale" || row.quality === "stale") {
+    source = canonicalSource ?? (rawSource || "invalid");
+    status = "stale";
+    usable = false;
+  } else if (canonicalSource === "invalid" || row.quality === "invalid") {
+    source = "invalid";
+    status = "invalid";
+    usable = false;
+  } else if (canonicalSource && KNOWN_REAL_SOURCES.has(canonicalSource) && row.quality === "ok") {
+    source = canonicalSource;
     status = "usable";
     usable = true;
   } else {

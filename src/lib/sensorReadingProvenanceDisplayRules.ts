@@ -29,7 +29,7 @@ export interface SensorReadingProvenanceDisplayModel {
 }
 
 const SOURCE_LABELS: Record<CanonicalSensorSource, string> = {
-  live: "Live",
+  live: "Connected source",
   manual: "Manual",
   csv: "CSV",
   demo: "Demo",
@@ -37,12 +37,7 @@ const SOURCE_LABELS: Record<CanonicalSensorSource, string> = {
   invalid: "Invalid",
 };
 
-const SAFE_RAW_KEYS = new Set([
-  "source_app",
-  "transport",
-  "vendor",
-  "bridge",
-]);
+const SAFE_RAW_KEYS = new Set(["source_app", "transport", "vendor", "bridge"]);
 
 const BLOCKED_VALUE_PATTERN =
   /service_role|authorization|bearer\s+|passkey|api[_-]?key|secret|token|jwt|eyJ/i;
@@ -61,10 +56,7 @@ function cleanLabel(value: unknown): string | null {
   return trimmed.slice(0, 80);
 }
 
-function readSafeRawLabel(
-  raw: Record<string, unknown> | null,
-  key: string,
-): string | null {
+function readSafeRawLabel(raw: Record<string, unknown> | null, key: string): string | null {
   if (!raw || !SAFE_RAW_KEYS.has(key)) return null;
   return cleanLabel(raw[key]);
 }

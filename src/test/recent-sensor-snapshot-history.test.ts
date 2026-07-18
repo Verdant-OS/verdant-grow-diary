@@ -20,7 +20,10 @@ import {
   buildRecentSensorSnapshotHistory,
   RECENT_HISTORY_MAX_LIMIT,
 } from "@/lib/recentSensorSnapshotHistoryRules";
-import { buildPlantTentEnvironmentView } from "@/lib/plantTentEnvironmentRules";
+import {
+  buildPlantTentEnvironmentView,
+  resolvePlantTentSnapshotSourceLabel,
+} from "@/lib/plantTentEnvironmentRules";
 import { SOURCE_LABEL } from "@/lib/sensorSnapshot";
 
 const NOW = new Date("2026-05-24T12:00:00Z").getTime();
@@ -32,7 +35,7 @@ function row(
   source: string | null,
   raw_payload?: unknown,
 ) {
-  return { ts, metric, value, source, raw_payload };
+  return { ts, metric, value, source, quality: "ok", raw_payload };
 }
 
 describe("buildRecentSensorSnapshotHistory", () => {
@@ -116,7 +119,10 @@ describe("buildRecentSensorSnapshotHistory", () => {
     ];
     const out = buildRecentSensorSnapshotHistory(rows, { now: NOW });
     expect(out[0].source).toBe("live");
-    expect(SOURCE_LABEL[out[0].source]).toBe("Live sensor");
+    expect(SOURCE_LABEL[out[0].source]).toBe("Connected sensor");
+    expect(resolvePlantTentSnapshotSourceLabel(out[0], out[0].stale)).toBe(
+      "Connected sensor · needs review",
+    );
   });
 
   it("flags stale rows", () => {
@@ -212,8 +218,8 @@ describe("Static safety — PlantTentEnvironmentPanel.tsx", () => {
     const defines = src.match(/(const|let|var)\s+SOURCE_LABEL\s*[:=]/g);
     expect(defines).toBeNull();
   });
-  it("imports SOURCE_LABEL from sensorSnapshot", () => {
-    expect(src).toMatch(/SOURCE_LABEL/);
-    expect(src).toMatch(/from\s+["']@\/lib\/sensorSnapshot["']/);
+  it("uses the trust-aware shared source-label resolver", () => {
+    expect(src).toMatch(/resolvePlantTentSnapshotSourceLabel/);
+    expect(src).toMatch(/from\s+["']@\/lib\/plantTentEnvironmentRules["']/);
   });
 });

@@ -27,7 +27,7 @@ describe("normalizeGreenhouseSource", () => {
     }
   });
   it("treats unknown/noncanonical/null/undefined/numeric as invalid", () => {
-    for (const v of [null, undefined, "", "ecowitt", "LIVE_AUTO", 1, {}, []]) {
+    for (const v of [null, undefined, "", "LIVE", " live ", "ecowitt", "LIVE_AUTO", 1, {}, []]) {
       expect(normalizeGreenhouseSource(v)).toBe("invalid");
     }
   });
@@ -53,19 +53,31 @@ describe("aggregateDli", () => {
 
   it("one instantaneous PPFD does NOT become a full DLI", () => {
     const r = aggregateDli({
-      samples: [{ ts: "2026-06-11T12:00:00Z", ppfd: 1500, source: "live" }],
+      samples: [{ ts: "2026-06-11T12:00:00Z", ppfd: 1500, source: "live", quality: "ok" }],
       tzIana: tz,
     });
     expect(r.windowStatus).toBe("insufficient_samples");
     expect(r.dliMolM2Day).toBeNull();
   });
 
+  it("excludes source-only live samples without accepted quality", () => {
+    const r = aggregateDli({
+      samples: [
+        { ts: "2026-06-11T06:00:00Z", ppfd: 1000, source: "live" },
+        { ts: "2026-06-11T18:00:00Z", ppfd: 1000, source: "live" },
+      ],
+      tzIana: tz,
+    });
+    expect(r.windowStatus).toBe("no_healthy_samples");
+    expect(r.usedCount).toBe(0);
+  });
+
   it("aggregates multiple PPFD samples via trapezoidal integration", () => {
     // Constant 1000 µmol/m²/s for 12 hours → DLI = 1000 * 43200 / 1e6 = 43.2
     const samples: PpfdSample[] = [
-      { ts: "2026-06-11T06:00:00Z", ppfd: 1000, source: "live" },
-      { ts: "2026-06-11T12:00:00Z", ppfd: 1000, source: "live" },
-      { ts: "2026-06-11T18:00:00Z", ppfd: 1000, source: "live" },
+      { ts: "2026-06-11T06:00:00Z", ppfd: 1000, source: "live", quality: "ok" },
+      { ts: "2026-06-11T12:00:00Z", ppfd: 1000, source: "live", quality: "ok" },
+      { ts: "2026-06-11T18:00:00Z", ppfd: 1000, source: "live", quality: "ok" },
     ];
     const r = aggregateDli({ samples, tzIana: tz });
     expect(r.windowStatus).toBe("ok");
@@ -76,11 +88,11 @@ describe("aggregateDli", () => {
 
   it("excludes stale/invalid/unknown sources from healthy totals", () => {
     const samples: PpfdSample[] = [
-      { ts: "2026-06-11T06:00:00Z", ppfd: 1000, source: "live" },
+      { ts: "2026-06-11T06:00:00Z", ppfd: 1000, source: "live", quality: "ok" },
       { ts: "2026-06-11T12:00:00Z", ppfd: 9999, source: "stale" },
       { ts: "2026-06-11T13:00:00Z", ppfd: 9999, source: "invalid" },
       { ts: "2026-06-11T14:00:00Z", ppfd: 9999, source: "ecowitt" }, // noncanonical → invalid
-      { ts: "2026-06-11T18:00:00Z", ppfd: 1000, source: "manual" },
+      { ts: "2026-06-11T18:00:00Z", ppfd: 1000, source: "manual", quality: "ok" },
     ];
     const r = aggregateDli({ samples, tzIana: tz });
     expect(r.windowStatus).toBe("ok");
@@ -94,10 +106,10 @@ describe("aggregateDli", () => {
 
   it("separates solar vs LED contribution when channel is provided", () => {
     const samples: PpfdSample[] = [
-      { ts: "2026-06-11T06:00:00Z", ppfd: 500, source: "live", channel: "solar" },
-      { ts: "2026-06-11T12:00:00Z", ppfd: 500, source: "live", channel: "solar" },
-      { ts: "2026-06-11T18:00:00Z", ppfd: 200, source: "live", channel: "led" },
-      { ts: "2026-06-12T00:00:00Z", ppfd: 200, source: "live", channel: "led" },
+      { ts: "2026-06-11T06:00:00Z", ppfd: 500, source: "live", quality: "ok", channel: "solar" },
+      { ts: "2026-06-11T12:00:00Z", ppfd: 500, source: "live", quality: "ok", channel: "solar" },
+      { ts: "2026-06-11T18:00:00Z", ppfd: 200, source: "live", quality: "ok", channel: "led" },
+      { ts: "2026-06-12T00:00:00Z", ppfd: 200, source: "live", quality: "ok", channel: "led" },
     ];
     const r = aggregateDli({ samples, tzIana: tz });
     expect(r.windowStatus).toBe("ok");
@@ -108,10 +120,15 @@ describe("aggregateDli", () => {
 
   it("handles null/NaN/invalid ppfd gracefully", () => {
     const samples: PpfdSample[] = [
-      { ts: "2026-06-11T06:00:00Z", ppfd: null, source: "live" },
-      { ts: "bad-date", ppfd: 500, source: "live" },
-      { ts: "2026-06-11T12:00:00Z", ppfd: Number.NaN as unknown as number, source: "live" },
-      { ts: "2026-06-11T18:00:00Z", ppfd: -10, source: "live" },
+      { ts: "2026-06-11T06:00:00Z", ppfd: null, source: "live", quality: "ok" },
+      { ts: "bad-date", ppfd: 500, source: "live", quality: "ok" },
+      {
+        ts: "2026-06-11T12:00:00Z",
+        ppfd: Number.NaN as unknown as number,
+        source: "live",
+        quality: "ok",
+      },
+      { ts: "2026-06-11T18:00:00Z", ppfd: -10, source: "live", quality: "ok" },
     ];
     const r = aggregateDli({ samples, tzIana: "America/Los_Angeles" });
     expect(r.windowStatus).toBe("no_healthy_samples");
@@ -122,9 +139,9 @@ describe("aggregateDli", () => {
   it("DST spring-forward 24h window returns dst_ambiguous (not silent UTC math)", () => {
     // America/Los_Angeles springs forward on 2026-03-08 02:00 local.
     const samples: PpfdSample[] = [
-      { ts: "2026-03-08T08:00:00Z", ppfd: 1000, source: "live" }, // pre-transition (PST)
-      { ts: "2026-03-08T14:00:00Z", ppfd: 1000, source: "live" }, // post-transition (PDT)
-      { ts: "2026-03-08T20:00:00Z", ppfd: 1000, source: "live" },
+      { ts: "2026-03-08T08:00:00Z", ppfd: 1000, source: "live", quality: "ok" }, // pre-transition (PST)
+      { ts: "2026-03-08T14:00:00Z", ppfd: 1000, source: "live", quality: "ok" }, // post-transition (PDT)
+      { ts: "2026-03-08T20:00:00Z", ppfd: 1000, source: "live", quality: "ok" },
     ];
     const r = aggregateDli({ samples, tzIana: "America/Los_Angeles" });
     expect(r.windowStatus).toBe("dst_ambiguous");
@@ -135,9 +152,9 @@ describe("aggregateDli", () => {
   it("DST fall-back 24h window returns dst_ambiguous (not silent UTC math)", () => {
     // America/Los_Angeles falls back on 2026-11-01 02:00 local.
     const samples: PpfdSample[] = [
-      { ts: "2026-11-01T07:00:00Z", ppfd: 800, source: "live" }, // pre-transition (PDT)
-      { ts: "2026-11-01T13:00:00Z", ppfd: 800, source: "live" },
-      { ts: "2026-11-01T19:00:00Z", ppfd: 800, source: "live" }, // post-transition (PST)
+      { ts: "2026-11-01T07:00:00Z", ppfd: 800, source: "live", quality: "ok" }, // pre-transition (PDT)
+      { ts: "2026-11-01T13:00:00Z", ppfd: 800, source: "live", quality: "ok" },
+      { ts: "2026-11-01T19:00:00Z", ppfd: 800, source: "live", quality: "ok" }, // post-transition (PST)
     ];
     const r = aggregateDli({ samples, tzIana: "America/Los_Angeles" });
     expect(r.windowStatus).toBe("dst_ambiguous");
@@ -146,8 +163,8 @@ describe("aggregateDli", () => {
 
   it("non-DST 24h window still aggregates DLI correctly", () => {
     const samples: PpfdSample[] = [
-      { ts: "2026-06-11T06:00:00Z", ppfd: 1000, source: "live" },
-      { ts: "2026-06-11T18:00:00Z", ppfd: 1000, source: "live" },
+      { ts: "2026-06-11T06:00:00Z", ppfd: 1000, source: "live", quality: "ok" },
+      { ts: "2026-06-11T18:00:00Z", ppfd: 1000, source: "live", quality: "ok" },
     ];
     const r = aggregateDli({ samples, tzIana: "America/Los_Angeles" });
     expect(r.windowStatus).toBe("ok");
@@ -198,9 +215,9 @@ describe("detectDarkCycleLeak", () => {
       tzIana: tz,
       ...dark,
       samples: [
-        { ts: "2026-06-11T04:00:00Z", ppfd: 0, source: "live" },
-        { ts: "2026-06-11T05:00:00Z", ppfd: 12, source: "live" },
-        { ts: "2026-06-11T06:00:00Z", ppfd: 0, source: "manual" },
+        { ts: "2026-06-11T04:00:00Z", ppfd: 0, source: "live", quality: "ok" },
+        { ts: "2026-06-11T05:00:00Z", ppfd: 12, source: "live", quality: "ok" },
+        { ts: "2026-06-11T06:00:00Z", ppfd: 0, source: "manual", quality: "ok" },
       ],
     });
     expect(r.status).toBe("review");
@@ -215,7 +232,7 @@ describe("detectDarkCycleLeak", () => {
       samples: [
         { ts: "2026-06-11T05:00:00Z", ppfd: 500, source: "stale" },
         { ts: "2026-06-11T06:00:00Z", ppfd: 999, source: "invalid" },
-        { ts: "2026-06-11T07:00:00Z", ppfd: 0, source: "live" },
+        { ts: "2026-06-11T07:00:00Z", ppfd: 0, source: "live", quality: "ok" },
       ],
     });
     expect(r.status).toBe("ok");
@@ -226,7 +243,7 @@ describe("detectDarkCycleLeak", () => {
     const r = detectDarkCycleLeak({
       tzIana: tz,
       ...dark,
-      samples: [{ ts: "2026-06-11T05:00:00Z", ppfd: 100, source: "live" }],
+      samples: [{ ts: "2026-06-11T05:00:00Z", ppfd: 100, source: "live", quality: "ok" }],
     });
     assertNoForbiddenKeys(r);
   });
@@ -236,7 +253,7 @@ describe("detectDarkCycleLeak", () => {
       tzIana: "America/Los_Angeles",
       darkStartIso: "2026-03-08T08:00:00Z", // pre-transition (PST)
       darkEndIso: "2026-03-08T15:00:00Z", // post-transition (PDT)
-      samples: [{ ts: "2026-03-08T10:00:00Z", ppfd: 500, source: "live" }],
+      samples: [{ ts: "2026-03-08T10:00:00Z", ppfd: 500, source: "live", quality: "ok" }],
     });
     expect(r.status).toBe("invalid_window");
     expect(r.reason).toMatch(/dst/);
@@ -248,7 +265,7 @@ describe("detectDarkCycleLeak", () => {
       tzIana: "America/Los_Angeles",
       darkStartIso: "2026-11-01T07:00:00Z",
       darkEndIso: "2026-11-01T14:00:00Z",
-      samples: [{ ts: "2026-11-01T09:00:00Z", ppfd: 500, source: "live" }],
+      samples: [{ ts: "2026-11-01T09:00:00Z", ppfd: 500, source: "live", quality: "ok" }],
     });
     expect(r.status).toBe("invalid_window");
     expect(r.reason).toMatch(/dst/);

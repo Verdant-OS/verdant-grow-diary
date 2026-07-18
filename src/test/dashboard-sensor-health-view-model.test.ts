@@ -21,6 +21,7 @@ function ok(snap: Partial<SensorSnapshot>): SnapshotState {
     snapshot: {
       ...EMPTY_SNAPSHOT,
       source: "live",
+      quality: "ok",
       ts: new Date(NOW - 60_000).toISOString(),
       ...snap,
     },
@@ -99,6 +100,18 @@ describe("buildDashboardSensorHealthSummary", () => {
     // here we just confirm watch tone classification is warn.
     const vm = buildDashboardSensorHealthSummary(ok({ temp: 24, rh: 55, vpd: 1.1 }), NOW);
     expect(vm.tone).toBe("ok");
+  });
+
+  it("never marks source-only or degraded live telemetry healthy", () => {
+    for (const quality of [undefined, null, "degraded", "invalid"]) {
+      const vm = buildDashboardSensorHealthSummary(
+        ok({ quality, temp: 24, rh: 55, vpd: 1.1 }),
+        NOW,
+      );
+      expect(vm.status).toBe("watch");
+      expect(vm.tone).toBe("warn");
+      expect(vm.sourceLabel).toBe("Connected source");
+    }
   });
 
   it("preserves source truth: manual snapshot never reads as Live", () => {

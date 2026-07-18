@@ -14,15 +14,12 @@
  * Pure: deterministic, no clock reads (caller passes `now`).
  */
 import type { SensorSnapshot, SnapshotSource } from "@/lib/sensorSnapshot";
+import { evaluateCurrentLiveSensorTruth } from "@/lib/currentLiveSensorTruthRules";
 
 // ---------- Inputs --------------------------------------------------------
 
 export type GrowRoomAlertSeverity = "info" | "watch" | "warning" | "critical";
-export type GrowRoomAlertStatus =
-  | "open"
-  | "acknowledged"
-  | "resolved"
-  | "dismissed";
+export type GrowRoomAlertStatus = "open" | "acknowledged" | "resolved" | "dismissed";
 export type GrowRoomActionStatus =
   | "pending_approval"
   | "approved"
@@ -76,19 +73,14 @@ export interface GrowRoomAggregationInput {
 
 export type SnapshotState =
   | "live"
+  | "needs_review"
   | "manual"
   | "diary"
   | "stale"
   | "missing"
   | "demo";
 
-export type DataHealth =
-  | "healthy"
-  | "attention"
-  | "warning"
-  | "critical"
-  | "stale"
-  | "missing";
+export type DataHealth = "healthy" | "attention" | "warning" | "critical" | "stale" | "missing";
 
 export type PrimaryRecommendation =
   | "review_alert"
@@ -148,8 +140,8 @@ const DEFAULT_RECENT_HOURS = 24;
 function snapshotAgeMinutes(snapshot: SensorSnapshot, now: number): number | null {
   if (!snapshot.ts) return null;
   const ts = Date.parse(snapshot.ts);
-  if (Number.isNaN(ts)) return null;
-  return Math.max(0, Math.floor((now - ts) / 60000));
+  if (!Number.isFinite(ts) || ts > now) return null;
+  return Math.floor((now - ts) / 60000);
 }
 
 function classifySnapshot(
@@ -172,7 +164,20 @@ function classifySnapshot(
     return { state: "stale", ageMinutes: age };
   }
   const src: SnapshotSource = snapshot.source;
-  if (src === "manual" || src === "diary" || src === "live") {
+  if (src === "live") {
+    const faultEndpoint =
+      snapshot.rh === 0 || snapshot.rh === 100 || snapshot.soil === 0 || snapshot.soil === 100;
+    const currentLive = evaluateCurrentLiveSensorTruth({
+      source: src,
+      quality: faultEndpoint ? "invalid" : snapshot.quality,
+      freshness: "fresh",
+    }).isCurrentLive;
+    return {
+      state: currentLive ? "live" : "needs_review",
+      ageMinutes: age,
+    };
+  }
+  if (src === "manual" || src === "diary") {
     return { state: src, ageMinutes: age };
   }
   // Unknown source falls back to missing so we never claim "live" by accident.
@@ -196,7 +201,11 @@ function recommendationFor(
 ): PrimaryRecommendation {
   if (openAlertCount > 0) return "review_alert";
   if (pendingActionCount > 0) return "review_action_queue";
-  if (snapshotState === "stale" || snapshotState === "missing") {
+  if (
+    snapshotState === "stale" ||
+    snapshotState === "missing" ||
+    snapshotState === "needs_review"
+  ) {
     return "check_stale_data";
   }
   return "no_action";
@@ -210,6 +219,7 @@ function dataHealthFor(
   if (snapshotState === "missing") return "missing";
   if (snapshotState === "stale") return "stale";
   if (snapshotState === "demo") return "attention";
+  if (snapshotState === "needs_review" || snapshotState === "diary") return "attention";
   if (openAlertCount === 0) return "healthy";
   return HEALTH_FROM_SEVERITY[severity];
 }
@@ -228,9 +238,7 @@ function dataHealthFor(
  *
  * Read-only and pure. The caller must provide `now`.
  */
-export function buildGrowRoomTentCards(
-  input: GrowRoomAggregationInput,
-): GrowRoomTentCard[] {
+export function buildGrowRoomTentCards(input: GrowRoomAggregationInput): GrowRoomTentCard[] {
   const stale = input.staleMinutes ?? DEFAULT_STALE_MINUTES;
   const recentMs = (input.recentAlertWindowHours ?? DEFAULT_RECENT_HOURS) * 3600_000;
   const demoSet = new Set(input.demoTentIds ?? []);
@@ -286,11 +294,7 @@ export function buildGrowRoomTentCards(
       highestSeverity: severity,
       pendingActionCount: pending.length,
       dataHealth: health,
-      primaryRecommendation: recommendationFor(
-        openAlerts.length,
-        pending.length,
-        snapshotState,
-      ),
+      primaryRecommendation: recommendationFor(openAlerts.length, pending.length, snapshotState),
     };
   });
 
@@ -320,6 +324,7 @@ export const RECOMMENDATION_LABEL: Record<PrimaryRecommendation, string> = {
 
 export const SNAPSHOT_STATE_LABEL: Record<SnapshotState, string> = {
   live: "Live",
+  needs_review: "Connected source needs review",
   manual: "Manual entry",
   diary: "From diary",
   stale: "Stale",

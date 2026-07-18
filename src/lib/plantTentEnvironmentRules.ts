@@ -15,6 +15,7 @@ import {
   type SensorSnapshot,
 } from "@/lib/sensorSnapshot";
 import { formatSensorSourceLabel } from "@/lib/manualSensorSourceLabel";
+import { evaluateCurrentLiveSensorTruth } from "@/lib/currentLiveSensorTruthRules";
 import { tempFFromC } from "@/lib/temperatureUnits";
 
 export interface PlantTentEnvironmentMetric {
@@ -43,6 +44,24 @@ const EMPTY_VIEW: PlantTentEnvironmentView = {
   metrics: [],
 };
 
+export function resolvePlantTentSnapshotSourceLabel(
+  snapshot: Pick<SensorSnapshot, "source" | "quality" | "device_id">,
+  stale: boolean,
+): string {
+  const currentLive = evaluateCurrentLiveSensorTruth({
+    source: snapshot.source,
+    quality: snapshot.quality,
+    freshness: stale ? "stale" : "fresh",
+  }).isCurrentLive;
+
+  if (currentLive) return "Live sensor";
+  if (snapshot.source === "live") return "Connected sensor · needs review";
+  return formatSensorSourceLabel({
+    source: snapshot.source,
+    deviceId: snapshot.device_id ?? null,
+  });
+}
+
 function metric(
   key: string,
   label: string,
@@ -69,13 +88,12 @@ export function buildPlantTentEnvironmentView(
   return {
     hasReadings: true,
     capturedAt: snap.ts,
-    sourceLabel: formatSensorSourceLabel({
-      source: snap.source,
-      deviceId: snap.device_id ?? null,
-    }),
+    sourceLabel: resolvePlantTentSnapshotSourceLabel(snap, stale),
     stale,
     canAssessStage:
-      !stale && (snap.source === "live" || snap.source === "manual" || snap.source === "csv"),
+      !stale &&
+      snap.quality === "ok" &&
+      (snap.source === "live" || snap.source === "manual" || snap.source === "csv"),
     metrics: [
       // Stored as Celsius; displayed as Fahrenheit per Verdant convention.
       metric("temp", "Temperature", tempFFromC(snap.temp), "°F"),

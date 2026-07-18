@@ -148,6 +148,7 @@ export interface ActionResponseSensorRowInput {
   readonly id: string;
   readonly tent_id?: string | null;
   readonly source?: string | null;
+  readonly quality?: string | null;
   readonly captured_at?: string | null;
   /** Opaque provenance envelope used only to prevent diagnostic promotion. */
   readonly raw_payload?: unknown;
@@ -243,7 +244,7 @@ function classifySensorTrust(row: ActionResponseSensorRowInput): ActionResponseS
   const normalized = normalizeSensorSource(raw);
   switch (normalized) {
     case "live":
-      return "trusted";
+      return row.quality === "ok" ? "trusted" : "unknown";
     case "manual":
       return "manual";
     case "csv":

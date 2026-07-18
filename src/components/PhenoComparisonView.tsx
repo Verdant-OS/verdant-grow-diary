@@ -55,7 +55,7 @@ export interface PhenoComparisonViewProps {
 
 function toneClass(view: PhenoSensorSnapshotView): string {
   if (view.source === "live")
-    return "border-emerald-500/40 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300";
+    return "border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-300";
   if (view.source === "manual")
     return "border-sky-500/40 bg-sky-500/10 text-sky-800 dark:text-sky-300";
   if (view.source === "csv")

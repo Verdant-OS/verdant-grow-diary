@@ -75,7 +75,6 @@ export interface NormalizeEcowittOptions extends EcoWittAdapterOptions {
   recentSoilMoisturePct?: ReadonlyArray<number | null | undefined>;
 }
 
-
 const ALLOWED_METRICS = new Set<EcowittNormalizedMetric>([
   "temperature_c",
   "temp_f",
@@ -85,22 +84,17 @@ const ALLOWED_METRICS = new Set<EcowittNormalizedMetric>([
   "vpd_kpa",
 ]);
 
-function freshnessFromAge(
-  ageMinutes: number | null,
-): EcowittFreshness {
+function freshnessFromAge(ageMinutes: number | null): EcowittFreshness {
   if (ageMinutes == null) return "missing";
-  if (ageMinutes < 0) return "fresh"; // future-dated guard
+  if (ageMinutes < 0) return "missing";
   return ageMinutes <= SENSOR_SOURCE_STALE_MINUTES ? "fresh" : "stale";
 }
 
-function ageMinutesBetween(
-  capturedAt: string | null,
-  now: Date,
-): number | null {
+function ageMinutesBetween(capturedAt: string | null, now: Date): number | null {
   if (!capturedAt) return null;
   const t = Date.parse(capturedAt);
   if (!Number.isFinite(t)) return null;
-  return Math.max(0, Math.round((now.getTime() - t) / 60_000));
+  return (now.getTime() - t) / 60_000;
 }
 
 /**
@@ -147,11 +141,10 @@ export function normalizeEcowittPayload(
   }
   const capturedAtRaw = adapter.input.captured_at;
   const capturedAt =
-    typeof capturedAtRaw === "string" && capturedAtRaw.length > 0
-      ? capturedAtRaw
-      : null;
+    typeof capturedAtRaw === "string" && capturedAtRaw.length > 0 ? capturedAtRaw : null;
   const ageMinutes = ageMinutesBetween(capturedAt, now);
   const freshness = capturedAt ? freshnessFromAge(ageMinutes) : "missing";
+  const futureDated = ageMinutes !== null && ageMinutes < 0;
 
   const tempC = readings.find((r) => r.metric === "temperature_c")?.value;
   const rhPct = readings.find((r) => r.metric === "humidity_pct")?.value;
@@ -168,10 +161,8 @@ export function normalizeEcowittPayload(
 
   // Derived VPD must refuse to compute against invalid temp/RH so the UI
   // does not display a confidently-wrong derived value.
-  const rhValidForVpd =
-    typeof rhPct === "number" && rhPct >= 0 && rhPct <= 100;
-  const tempValidForVpd =
-    typeof tempC === "number" && tempC > -20 && tempC < 60;
+  const rhValidForVpd = typeof rhPct === "number" && rhPct >= 0 && rhPct <= 100;
+  const tempValidForVpd = typeof tempC === "number" && tempC > -20 && tempC < 60;
   const derivedVpdKpa =
     rhValidForVpd && tempValidForVpd && !suspicion.hasInvalid
       ? computeVpdKpa(tempC as number, rhPct as number)
@@ -183,7 +174,7 @@ export function normalizeEcowittPayload(
   // as a live reading. Consumers should read `derivedVpdKpa` instead.
 
   return {
-    ok: adapter.ok && readings.length > 0 && !suspicion.hasInvalid,
+    ok: adapter.ok && readings.length > 0 && !suspicion.hasInvalid && !futureDated,
     vendor: "ecowitt",
     capturedAt,
     freshness,
@@ -195,7 +186,7 @@ export function normalizeEcowittPayload(
     rawPayload: payload,
     suspicion: suspicion.flags,
     suspicionSeverity: suspicion.worst,
-    invalid: suspicion.hasInvalid,
+    invalid: suspicion.hasInvalid || futureDated,
   };
 }
 
@@ -244,15 +235,10 @@ export type EcowittCloudUnmappedReason =
   | "no_tent_mapping_for_channel"
   | "unsupported_metric_for_ecowitt";
 
-
 export interface EcowittCloudUnmappedChannel {
   raw_key: string;
   channel: number | null;
-  metric:
-    | "temperature_c"
-    | "humidity_pct"
-    | "soil_moisture_pct"
-    | "pressure_hpa";
+  metric: "temperature_c" | "humidity_pct" | "soil_moisture_pct" | "pressure_hpa";
   value: number | null;
   reason: EcowittCloudUnmappedReason;
   /**
@@ -283,9 +269,7 @@ export interface NormalizeEcowittCloudOptions {
   /** Stale window override (ms). Defaults to canonical STALE_THRESHOLD_MS. */
   staleThresholdMs?: number;
   /** Recent humidity samples per channel for stuck-extreme detection. */
-  recentHumidityPctByChannel?: Readonly<
-    Record<number, ReadonlyArray<number | null | undefined>>
-  >;
+  recentHumidityPctByChannel?: Readonly<Record<number, ReadonlyArray<number | null | undefined>>>;
   /** Recent soil moisture samples per channel for stuck-extreme detection. */
   recentSoilMoisturePctByChannel?: Readonly<
     Record<number, ReadonlyArray<number | null | undefined>>
@@ -321,24 +305,17 @@ export interface EcowittCloudNormalizationResult {
   missing_metric_codes: EcowittMissingMetricCode[];
 }
 
-
 const ECOWITT_TEMP_F_RE = /^temp([1-8])f$/i;
 const ECOWITT_HUMIDITY_CH_RE = /^humidity([1-8])$/i;
 const ECOWITT_SOIL_CH_RE = /^soilmoisture(1[0-6]|[1-9])$/i;
-const ECOWITT_PRESSURE_KEYS = new Set([
-  "baromrelin",
-  "baromabsin",
-  "baromrelhpa",
-  "baromabshpa",
-]);
+const ECOWITT_PRESSURE_KEYS = new Set(["baromrelin", "baromabsin", "baromrelhpa", "baromabshpa"]);
 
 function ecowittFToC(f: number): number {
   return ((f - 32) * 5) / 9;
 }
 
 function readMac(payload: Record<string, unknown>): string | null {
-  const macRaw =
-    payload["MAC"] === undefined ? payload["mac"] : payload["MAC"];
+  const macRaw = payload["MAC"] === undefined ? payload["mac"] : payload["MAC"];
   if (typeof macRaw === "string" && macRaw.trim().length > 0) {
     return macRaw.trim().toUpperCase();
   }
@@ -408,8 +385,7 @@ export function normalizeEcowittCloudReadings(
     const hMatch = ECOWITT_HUMIDITY_CH_RE.exec(k);
     const sMatch = ECOWITT_SOIL_CH_RE.exec(k);
     if (!tMatch && !hMatch && !sMatch) continue;
-    const n =
-      typeof v === "number" ? v : v === "" || v == null ? NaN : Number(v);
+    const n = typeof v === "number" ? v : v === "" || v == null ? NaN : Number(v);
     if (!Number.isFinite(n)) continue;
     if (tMatch) {
       const ch = Number(tMatch[1]);
@@ -437,8 +413,7 @@ export function normalizeEcowittCloudReadings(
       metric: "pressure_hpa",
       value: typeof lower[k] === "number" ? (lower[k] as number) : null,
       reason: "unsupported_metric_for_ecowitt",
-      note:
-        "Pressure channel was received but Verdant has no pressure metric — value was not stored.",
+      note: "Pressure channel was received but Verdant has no pressure metric — value was not stored.",
     });
   }
 
@@ -466,9 +441,7 @@ export function normalizeEcowittCloudReadings(
     }
   }
 
-
   for (const bucket of buckets.values()) {
-
     const airTent = perMac?.air?.[bucket.channel] ?? null;
     const soilTent = perMac?.soil?.[bucket.channel] ?? null;
 
@@ -479,24 +452,14 @@ export function normalizeEcowittCloudReadings(
         temperatureC: tempC,
         humidityPct: rh,
         rawTempF: bucket.tempF ?? null,
-        recentHumidityPct:
-          options.recentHumidityPctByChannel?.[bucket.channel],
+        recentHumidityPct: options.recentHumidityPctByChannel?.[bucket.channel],
       });
       const suspicionCodes = suspicion.flags.map((f) => f.code);
-      const confidence = suspicion.hasInvalid
-        ? 0.0
-        : suspicion.worst === "suspicious"
-          ? 0.3
-          : 0.5;
+      const confidence = suspicion.hasInvalid ? 0.0 : suspicion.worst === "suspicious" ? 0.3 : 0.5;
 
-      const emit = (
-        metric: "temperature_c" | "humidity_pct",
-        value: number,
-      ) => {
+      const emit = (metric: "temperature_c" | "humidity_pct", value: number) => {
         const rawKey =
-          metric === "temperature_c"
-            ? `temp${bucket.channel}f`
-            : `humidity${bucket.channel}`;
+          metric === "temperature_c" ? `temp${bucket.channel}f` : `humidity${bucket.channel}`;
         if (!airTent) {
           unmapped.push({
             raw_key: rawKey,
@@ -509,13 +472,13 @@ export function normalizeEcowittCloudReadings(
           return;
         }
         const stuckRh = suspicionCodes.includes("humidity_stuck_extreme");
-        const declared =
-          suspicion.hasInvalid || stuckRh || !capturedAt ? "invalid" : "live";
+        const declared = suspicion.hasInvalid || stuckRh || !capturedAt ? "invalid" : "live";
 
         const reading = normalizeSensorReading(
           {
             captured_at: capturedAt ?? new Date(0).toISOString(),
             source: declared,
+            quality: declared === "live" ? "ok" : "invalid",
             temperature_c: metric === "temperature_c" ? value : null,
             humidity_pct: metric === "humidity_pct" ? value : null,
             raw_payload: {
@@ -547,8 +510,7 @@ export function normalizeEcowittCloudReadings(
     if (bucket.soilPct !== undefined) {
       const soilSuspicion = evaluateEcowittSuspicion({
         soilMoisturePct: bucket.soilPct,
-        recentSoilMoisturePct:
-          options.recentSoilMoisturePctByChannel?.[bucket.channel],
+        recentSoilMoisturePct: options.recentSoilMoisturePctByChannel?.[bucket.channel],
       });
       const soilCodes = soilSuspicion.flags.map((f) => f.code);
       const soilConfidence = soilSuspicion.hasInvalid
@@ -572,14 +534,12 @@ export function normalizeEcowittCloudReadings(
         // surfaced as `invalid`. Force-invalid when the stuck-extreme flag
         // fires for soil moisture.
         const stuckSoil = soilCodes.includes("soil_moisture_stuck_extreme");
-        const declared =
-          soilSuspicion.hasInvalid || stuckSoil || !capturedAt
-            ? "invalid"
-            : "live";
+        const declared = soilSuspicion.hasInvalid || stuckSoil || !capturedAt ? "invalid" : "live";
         const reading = normalizeSensorReading(
           {
             captured_at: capturedAt ?? new Date(0).toISOString(),
             source: declared,
+            quality: declared === "live" ? "ok" : "invalid",
             soil_moisture_pct: bucket.soilPct,
             raw_payload: {
               vendor: "ecowitt",
@@ -621,5 +581,3 @@ export function normalizeEcowittCloudReadings(
   }
   return { rows, unmapped, warnings, missing_metric_codes };
 }
-
-

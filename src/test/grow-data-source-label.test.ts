@@ -6,13 +6,34 @@ const recent = new Date(NOW - 60 * 1000).toISOString(); // 1 min ago
 const old = new Date(NOW - 60 * 60 * 1000).toISOString(); // 1 hour ago
 
 describe("classifyGrowDataSource", () => {
-  it("classifies recent supabase/sensor reading as Live and trusted", () => {
-    for (const source of ["supabase", "sensor", "hassio", "broker", "api"]) {
-      const r = classifyGrowDataSource({ source, value: 24.5, timestamp: recent }, { now: NOW });
-      expect(r.label).toBe("Live");
-      expect(r.severity).toBe("good");
-      expect(r.isTrustedForAi).toBe(true);
-      expect(r.shouldDisplayBadge).toBe(false);
+  it("classifies only exact live + ok + fresh + usable as Live and trusted", () => {
+    const r = classifyGrowDataSource(
+      {
+        source: "live",
+        value: 24.5,
+        timestamp: recent,
+        quality: "ok",
+        status: "usable",
+      },
+      { now: NOW },
+    );
+    expect(r.label).toBe("Live");
+    expect(r.severity).toBe("good");
+    expect(r.isTrustedForAi).toBe(true);
+    expect(r.shouldDisplayBadge).toBe(false);
+  });
+
+  it("fails closed for live aliases and incomplete proof", () => {
+    const cases: GrowDataSourceInput[] = [
+      { source: "sensor", value: 24.5, timestamp: recent, quality: "ok", status: "usable" },
+      { source: "Live", value: 24.5, timestamp: recent, quality: "ok", status: "usable" },
+      { source: "live", value: 24.5, timestamp: recent, status: "usable" },
+      { source: "live", value: 24.5, timestamp: recent, quality: "ok" },
+    ];
+    for (const input of cases) {
+      const r = classifyGrowDataSource(input, { now: NOW });
+      expect(r.label).not.toBe("Live");
+      expect(r.isTrustedForAi).toBe(false);
     }
   });
 
@@ -46,7 +67,7 @@ describe("classifyGrowDataSource", () => {
 
   it("classifies stale real data as Stale and not trusted", () => {
     const r = classifyGrowDataSource(
-      { source: "sensor", value: 24.5, timestamp: old },
+      { source: "live", value: 24.5, timestamp: old, quality: "ok", status: "stale" },
       { now: NOW },
     );
     expect(r.label).toBe("Stale");
@@ -117,20 +138,26 @@ describe("classifyGrowDataSource", () => {
   it("respects a custom stale threshold", () => {
     const tenMinAgo = new Date(NOW - 10 * 60 * 1000).toISOString();
     const fresh = classifyGrowDataSource(
-      { source: "sensor", value: 1, timestamp: tenMinAgo },
+      { source: "live", value: 1, timestamp: tenMinAgo, quality: "ok", status: "usable" },
       { now: NOW, staleThresholdMs: 30 * 60 * 1000 },
     );
     expect(fresh.label).toBe("Live");
 
     const stale = classifyGrowDataSource(
-      { source: "sensor", value: 1, timestamp: tenMinAgo },
+      { source: "live", value: 1, timestamp: tenMinAgo, quality: "ok", status: "stale" },
       { now: NOW, staleThresholdMs: 5 * 60 * 1000 },
     );
     expect(stale.label).toBe("Stale");
   });
 
   it("is deterministic for repeated identical inputs", () => {
-    const input = { source: "sensor", value: 24.5, timestamp: recent };
+    const input = {
+      source: "live",
+      value: 24.5,
+      timestamp: recent,
+      quality: "ok",
+      status: "usable",
+    };
     const a = classifyGrowDataSource(input, { now: NOW });
     const b = classifyGrowDataSource(input, { now: NOW });
     expect(a).toEqual(b);

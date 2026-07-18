@@ -13,18 +13,13 @@
  * never renders them as visible or accessible text.
  */
 
-import {
-  type ActionFollowUpOutcome,
-} from "@/lib/actionFollowUpEvidenceRules";
+import { type ActionFollowUpOutcome } from "@/lib/actionFollowUpEvidenceRules";
 import {
   actionFollowUpOutcomeMeta,
   type ActionFollowUpOutcomeTone,
 } from "@/lib/actionFollowUpEvidenceViewModel";
 import { formatSnapshotTimestamp } from "@/lib/dateFormat";
-import {
-  sensorSourceLabel,
-  normalizeSensorSource,
-} from "@/lib/sensor/sensorSourceRules";
+import { sensorSourceLabel, normalizeSensorSource } from "@/lib/sensor/sensorSourceRules";
 import {
   ACTION_RESPONSE_MEMORY_HISTORICAL_COPY,
   ACTION_RESPONSE_MEMORY_RECORDED_COPY,
@@ -35,10 +30,8 @@ import {
   type ActionResponseSensorTrustState,
 } from "@/lib/actionResponseMemoryRules";
 
-export const ACTION_RESPONSE_PHOTO_UNAVAILABLE_COPY =
-  "Associated photo evidence is unavailable.";
-export const ACTION_RESPONSE_SENSOR_UNAVAILABLE_COPY =
-  "Associated sensor snapshot is unavailable.";
+export const ACTION_RESPONSE_PHOTO_UNAVAILABLE_COPY = "Associated photo evidence is unavailable.";
+export const ACTION_RESPONSE_SENSOR_UNAVAILABLE_COPY = "Associated sensor snapshot is unavailable.";
 export const ACTION_RESPONSE_VIEW_ACTION_LABEL = "View action";
 
 const NOTE_EXCERPT_MAX = 200;
@@ -80,7 +73,7 @@ function excerptNote(note: string | null): string | null {
 function sensorTrustLabel(trust: ActionResponseSensorTrustState): string {
   switch (trust) {
     case "trusted":
-      return sensorSourceLabel("live");
+      return "Verified sensor evidence";
     case "manual":
       return sensorSourceLabel("manual");
     case "csv":
@@ -96,19 +89,14 @@ function sensorTrustLabel(trust: ActionResponseSensorTrustState): string {
   }
 }
 
-function buildSensorLine(
-  memory: ActionResponseMemory,
-  locale?: string,
-): string | null {
+function buildSensorLine(memory: ActionResponseMemory, locale?: string): string | null {
   const sensor = memory.sensor;
   if (sensor.state === "none") return null;
   if (sensor.state === "unavailable") {
     return ACTION_RESPONSE_SENSOR_UNAVAILABLE_COPY;
   }
   const label = sensorTrustLabel(sensor.trustState);
-  const when = sensor.capturedAt
-    ? formatSnapshotTimestamp(sensor.capturedAt, locale)
-    : null;
+  const when = sensor.capturedAt ? formatSnapshotTimestamp(sensor.capturedAt, locale) : null;
   return when ? `${label} · recorded ${when}` : label;
 }
 
@@ -170,8 +158,7 @@ export function toActionFollowUpEvidenceViewModel(input: {
     typeof input.fallbackActionLabel === "string" && input.fallbackActionLabel.trim().length > 0
       ? input.fallbackActionLabel.trim()
       : "Completed action";
-  const photoReference =
-    memory.photo.state === "available" ? memory.photo.durableReference : null;
+  const photoReference = memory.photo.state === "available" ? memory.photo.durableReference : null;
   return {
     outcome: memory.response.outcome,
     outcomeLabel: meta.label,

@@ -27,14 +27,10 @@ import {
 
 const ROOT = resolve(__dirname, "../..");
 const DASHBOARD = readFileSync(resolve(ROOT, "src/pages/Dashboard.tsx"), "utf8");
-const HOOK = readFileSync(
-  resolve(ROOT, "src/hooks/useLatestSensorSnapshot.ts"),
-  "utf8",
-);
+const HOOK = readFileSync(resolve(ROOT, "src/hooks/useLatestSensorSnapshot.ts"), "utf8");
 
 const AI_COACH_CALL = /["'`]ai-coach["'`]|functions\/ai-coach|ai_coach/;
-const DEVICE_SURFACE =
-  /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|\brelay\b|\bactuator\b/i;
+const DEVICE_SURFACE = /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|\brelay\b|\bactuator\b/i;
 const WRITE_PATH = /\.from\(['"][^'"]+['"]\)\s*\.(insert|update|delete|upsert)/;
 
 describe("sensorSnapshot pure helpers", () => {
@@ -68,11 +64,17 @@ describe("sensorSnapshot pure helpers", () => {
   it("snapshotFromReadings folds latest-ts metrics and labels source", () => {
     const ts = "2026-05-20T11:55:00Z";
     const snap = snapshotFromReadings([
-      { ts, metric: "temperature_c", value: 24.1, source: "pi_bridge" },
-      { ts, metric: "humidity_pct", value: "55.2", source: "pi_bridge" },
-      { ts, metric: "vpd_kpa", value: 1.1, source: "pi_bridge" },
+      { ts, metric: "temperature_c", value: 24.1, source: "live", quality: "ok" },
+      { ts, metric: "humidity_pct", value: "55.2", source: "live", quality: "ok" },
+      { ts, metric: "vpd_kpa", value: 1.1, source: "live", quality: "ok" },
       // earlier ts must be ignored
-      { ts: "2026-05-20T10:00:00Z", metric: "co2_ppm", value: 800, source: "pi_bridge" },
+      {
+        ts: "2026-05-20T10:00:00Z",
+        metric: "co2_ppm",
+        value: 800,
+        source: "live",
+        quality: "ok",
+      },
     ]);
     expect(snap).not.toBeNull();
     expect(snap!.source).toBe("live");
@@ -118,7 +120,7 @@ describe("sensorSnapshot pure helpers", () => {
   it("EMPTY_SNAPSHOT and SOURCE_LABEL cover the unavailable case", () => {
     expect(EMPTY_SNAPSHOT.source).toBe("unavailable");
     expect(SOURCE_LABEL.unavailable).toBe("Unavailable");
-    expect(SOURCE_LABEL.live).toBe("Live sensor");
+    expect(SOURCE_LABEL.live).toBe("Connected sensor");
     expect(SOURCE_LABEL.manual).toBe("Manual");
     expect(SOURCE_LABEL.diary).toBe("Diary snapshot");
   });
@@ -186,15 +188,11 @@ describe("Dashboard — Latest Environment card wiring", () => {
     expect(DASHBOARD).toMatch(/No sensor data yet\./);
     expect(DASHBOARD).toMatch(/Sensor data unavailable\./);
     expect(DASHBOARD).toMatch(/Stale reading/);
-    // Source label is rendered via the shared formatSensorSourceLabel
-    // helper so manual rows with a device_id can read e.g.
-    // "Manual reading · EcoWitt WH45 CO2/THP Monitor" without ever upgrading
-    // the row to live/synced/connected.
+    // Source label is rendered via the shared trust-aware snapshot resolver.
+    // That resolver preserves manual device context while requiring exact
+    // quality and freshness proof before any Live claim.
     expect(DASHBOARD).toMatch(
-      /formatSensorSourceLabel\(\{[\s\S]{0,200}source:\s*sensorState\.snapshot\.source/,
-    );
-    expect(DASHBOARD).toMatch(
-      /deviceId:\s*sensorState\.snapshot\.device_id/,
+      /resolvePlantTentSnapshotSourceLabel\(\s*sensorState\.snapshot,\s*isStale\(sensorState\.snapshot\.ts\)/,
     );
   });
 

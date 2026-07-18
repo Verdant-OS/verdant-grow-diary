@@ -46,7 +46,7 @@ function sensorRow(
 }
 
 function coachContext(rows: QuickLogSensorAcquisitionRow[] | null) {
-  const resolved = resolveQuickLogSensorSnapshotForAi(QUICK_LOG_SNAPSHOT, rows);
+  const resolved = resolveQuickLogSensorSnapshotForAi(QUICK_LOG_SNAPSHOT, rows, { now: NOW });
   return buildAiSensorSnapshotContext(resolved, { now: NOW });
 }
 
@@ -115,47 +115,54 @@ describe("AI Coach — Quick Log ECOWITT provenance consumption", () => {
   });
 
   it("does not relabel an older same-source metric with the fresh anchor time", () => {
-    const acquired = acquireQuickLogSensorSnapshot([
-      sensorRow(
-        "physical-temp",
-        "temperature_c",
-        "2026-06-09T12:00:00Z",
-        24.3,
-        physicalGatewayPayload(),
-      ),
-      sensorRow(
-        "old-humidity",
-        "humidity_pct",
-        "2026-06-09T11:54:59Z",
-        88,
-        physicalGatewayPayload(),
-      ),
-    ]);
+    const acquired = acquireQuickLogSensorSnapshot(
+      [
+        sensorRow(
+          "physical-temp",
+          "temperature_c",
+          "2026-06-09T12:00:00Z",
+          24.3,
+          physicalGatewayPayload(),
+        ),
+        sensorRow(
+          "old-humidity",
+          "humidity_pct",
+          "2026-06-09T11:54:59Z",
+          88,
+          physicalGatewayPayload(),
+        ),
+      ],
+      { now: NOW },
+    );
 
     expect(acquired.snapshot).toEqual({
       source: "live",
+      quality: "ok",
       captured_at: "2026-06-09T12:00:00Z",
       metrics: { temperature: 24.3 },
     });
   });
 
   it("keeps a same-source metric exactly on the five-minute coherence boundary", () => {
-    const acquired = acquireQuickLogSensorSnapshot([
-      sensorRow(
-        "physical-temp",
-        "temperature_c",
-        "2026-06-09T12:00:00Z",
-        24.3,
-        physicalGatewayPayload(),
-      ),
-      sensorRow(
-        "boundary-humidity",
-        "humidity_pct",
-        "2026-06-09T11:55:00Z",
-        55,
-        physicalGatewayPayload(),
-      ),
-    ]);
+    const acquired = acquireQuickLogSensorSnapshot(
+      [
+        sensorRow(
+          "physical-temp",
+          "temperature_c",
+          "2026-06-09T12:00:00Z",
+          24.3,
+          physicalGatewayPayload(),
+        ),
+        sensorRow(
+          "boundary-humidity",
+          "humidity_pct",
+          "2026-06-09T11:55:00Z",
+          55,
+          physicalGatewayPayload(),
+        ),
+      ],
+      { now: NOW },
+    );
 
     expect(acquired.snapshot?.metrics).toEqual({ temperature: 24.3, humidity: 55 });
   });

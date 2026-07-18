@@ -19,10 +19,7 @@ import {
   type EcowittNormalizedSnapshot,
   type NormalizeEcowittOptions,
 } from "@/lib/ecowittPayloadRules";
-import {
-  resolveSensorSourceLabel,
-  type ResolvedSourceLabel,
-} from "@/lib/sensorSourceLabelRules";
+import { resolveSensorSourceLabel, type ResolvedSourceLabel } from "@/lib/sensorSourceLabelRules";
 import type { SensorReadingSource } from "@/mock";
 
 export interface EcowittCandidate {
@@ -59,7 +56,6 @@ export interface EcowittSnapshotViewModel {
   /** Calm copy describing why the snapshot is unavailable, or null. */
   unavailableReason: string | null;
 }
-
 
 const EMPTY_STATE_MESSAGE =
   "No EcoWitt readings yet. Send a local test payload to verify the integration.";
@@ -149,6 +145,8 @@ export function buildEcowittSnapshotViewModel(
   const label = resolveSensorSourceLabel({
     source: effective,
     vendor: "ecowitt",
+    quality: chosen.snap.ok ? "ok" : "invalid",
+    freshness: chosen.snap.freshness,
   });
 
   const metrics: EcowittSnapshotViewModel["metrics"] = {};
@@ -156,10 +154,7 @@ export function buildEcowittSnapshotViewModel(
   // Derived VPD is not a sensor reading — surface it on the metrics map
   // separately so the presenter can read it alongside raw values without
   // having it labeled as a live reading.
-  if (
-    typeof chosen.snap.derivedVpdKpa === "number" &&
-    Number.isFinite(chosen.snap.derivedVpdKpa)
-  ) {
+  if (typeof chosen.snap.derivedVpdKpa === "number" && Number.isFinite(chosen.snap.derivedVpdKpa)) {
     metrics.vpd_kpa = chosen.snap.derivedVpdKpa;
   }
 
@@ -179,7 +174,6 @@ export function buildEcowittSnapshotViewModel(
       : null,
   };
 }
-
 
 export const ECOWITT_EMPTY_STATE_MESSAGE = EMPTY_STATE_MESSAGE;
 export const ECOWITT_DERIVED_VPD_LABEL = "Derived VPD";

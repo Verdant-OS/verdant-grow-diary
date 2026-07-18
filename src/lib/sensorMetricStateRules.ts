@@ -19,13 +19,7 @@
  * No React. No I/O. No side effects.
  */
 
-export type SensorMetricKey =
-  | "temp"
-  | "rh"
-  | "vpd"
-  | "co2"
-  | "soil"
-  | "ppfd";
+export type SensorMetricKey = "temp" | "rh" | "vpd" | "co2" | "soil" | "ppfd";
 
 export type SensorMetricStateKind =
   | "live"
@@ -93,7 +87,9 @@ const STUCK_COPY: Partial<Record<SensorMetricKey, string>> = {
 
 /**
  * Detect impossible/non-finite optional metric values. Missing → false
- * (caller decides calm state); finite-but-out-of-bounds → true.
+ * (caller decides calm state); finite-but-out-of-bounds → true. Soil
+ * moisture endpoints are fault sentinels, so 0% and 100% are invalid even
+ * before enough history exists to call the probe stuck.
  */
 export function isOptionalMetricInvalid(
   metric: SensorMetricKey,
@@ -108,7 +104,7 @@ export function isOptionalMetricInvalid(
     return value < PPFD_VALID_BOUNDS.min || value > PPFD_VALID_BOUNDS.max;
   }
   if (metric === "soil") {
-    return value < SOIL_VALID_BOUNDS.min || value > SOIL_VALID_BOUNDS.max;
+    return value <= SOIL_VALID_BOUNDS.min || value >= SOIL_VALID_BOUNDS.max;
   }
   return false;
 }
@@ -164,18 +160,10 @@ export function describeSoilMoistureStuckWindow(
 }
 
 /** Core metrics that are always expected from a working tent. */
-const CORE_METRICS: ReadonlySet<SensorMetricKey> = new Set([
-  "temp",
-  "rh",
-  "vpd",
-]);
+const CORE_METRICS: ReadonlySet<SensorMetricKey> = new Set(["temp", "rh", "vpd"]);
 
 /** Optional metrics that may simply not be connected — never alarm. */
-const OPTIONAL_METRICS: ReadonlySet<SensorMetricKey> = new Set([
-  "co2",
-  "ppfd",
-  "soil",
-]);
+const OPTIONAL_METRICS: ReadonlySet<SensorMetricKey> = new Set(["co2", "ppfd", "soil"]);
 
 const CALM_EMPTY_COPY: Record<SensorMetricKey, string> = {
   temp: "No temperature reading yet. Add a manual reading or connect a source.",
@@ -192,20 +180,10 @@ function normalizeSource(s: unknown): string | null {
   return t.length > 0 ? t : null;
 }
 
-const LIVE_SOURCES = new Set([
-  "live",
-  "supabase",
-  "sensor",
-  "hassio",
-  "ha",
-  "broker",
-  "api",
-  "device",
-  "gateway",
-]);
-const MANUAL_SOURCES = new Set(["manual", "user", "entry", "log"]);
-const CSV_SOURCES = new Set(["csv", "import"]);
-const DEMO_SOURCES = new Set(["demo", "mock", "fake", "sample", "fixture"]);
+const LIVE_SOURCES = new Set(["live"]);
+const MANUAL_SOURCES = new Set(["manual"]);
+const CSV_SOURCES = new Set(["csv"]);
+const DEMO_SOURCES = new Set(["demo"]);
 
 function sourceKind(source: string | null): SensorMetricStateKind | null {
   if (!source) return null;
@@ -217,7 +195,7 @@ function sourceKind(source: string | null): SensorMetricStateKind | null {
 }
 
 const KIND_LABEL: Record<SensorMetricStateKind, string> = {
-  live: "Live",
+  live: "Connected source (unverified)",
   manual: "Manual",
   csv: "CSV",
   demo: "Demo",
@@ -228,10 +206,7 @@ const KIND_LABEL: Record<SensorMetricStateKind, string> = {
   no_reading_yet: "No reading yet",
 };
 
-const CAUTION_KINDS: ReadonlySet<SensorMetricStateKind> = new Set([
-  "stale",
-  "invalid",
-]);
+const CAUTION_KINDS: ReadonlySet<SensorMetricStateKind> = new Set(["stale", "invalid"]);
 
 export function isOptionalMetric(metric: SensorMetricKey): boolean {
   return OPTIONAL_METRICS.has(metric);
@@ -248,49 +223,37 @@ export function isCoreMetric(metric: SensorMetricKey): boolean {
  * metrics that are simply not connected use a calm tone. Soil moisture
  * uses an optional `recentValues` history to detect stuck-at-bound.
  */
-export function classifySensorMetricState(
-  input: ClassifyMetricInput,
-): SensorMetricState {
+export function classifySensorMetricState(input: ClassifyMetricInput): SensorMetricState {
   const { metric, value, hasAnyReading } = input;
   const hasValue = typeof value === "number" && Number.isFinite(value);
 
   // Auto-detect invalid for optional metrics from value bounds.
-  const autoInvalid =
-    isOptionalMetric(metric) && isOptionalMetricInvalid(metric, value);
+  const autoInvalid = isOptionalMetric(metric) && isOptionalMetricInvalid(metric, value);
   // Soil moisture stuck-at-bound only triggers when caller provides
   // an explicit recent-values window with enough finite history.
   const stuckWindow =
-    metric === "soil"
-      ? describeSoilMoistureStuckWindow(input.recentValues)
-      : null;
+    metric === "soil" ? describeSoilMoistureStuckWindow(input.recentValues) : null;
 
   // Cautionary takes priority over "we have a value".
-  if (input.isInvalid || autoInvalid) {
-    const copy =
-      INVALID_COPY[metric] ?? "Invalid telemetry detected.";
+  if (input.isInvalid) {
+    const copy = INVALID_COPY[metric] ?? "Invalid telemetry detected.";
     return makeState("invalid", metric, copy, false);
   }
   if (stuckWindow) {
     return makeState("invalid", metric, stuckWindow.message, true);
   }
+  if (autoInvalid) {
+    const copy = INVALID_COPY[metric] ?? "Invalid telemetry detected.";
+    return makeState("invalid", metric, copy, false);
+  }
   if (hasValue && input.isStale) {
-    return makeState(
-      "stale",
-      metric,
-      "Reading is older than the freshness window.",
-      true,
-    );
+    return makeState("stale", metric, "Reading is older than the freshness window.", true);
   }
   if (input.isDerived && hasValue) {
-    return makeState(
-      "derived",
-      metric,
-      "Calculated from temperature and humidity.",
-      true,
-    );
+    return makeState("derived", metric, "Calculated from temperature and humidity.", true);
   }
   if (hasValue) {
-    const kind = sourceKind(normalizeSource(input.source)) ?? "demo";
+    const kind = sourceKind(normalizeSource(input.source)) ?? "invalid";
     return makeState(kind, metric, KIND_LABEL[kind], true);
   }
 
@@ -320,8 +283,7 @@ function makeState(
     label: KIND_LABEL[kind],
     tone: CAUTION_KINDS.has(kind) ? "caution" : "calm",
     message,
-    isOptionalEmpty:
-      kind === "not_connected" || kind === "no_reading_yet",
+    isOptionalEmpty: kind === "not_connected" || kind === "no_reading_yet",
     showChart,
   };
 }

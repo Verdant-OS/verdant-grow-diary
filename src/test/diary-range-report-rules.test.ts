@@ -146,7 +146,13 @@ describe("environment — provenance honesty", () => {
     const vm = buildDiaryRangeReport(
       baseInput({
         sensorReadings: [
-          { metric: "temperature_c", value: 20, ts: "2026-07-02T10:00:00Z", source: "live" },
+          {
+            metric: "temperature_c",
+            value: 20,
+            ts: "2026-07-02T10:00:00Z",
+            source: "live",
+            quality: "ok",
+          },
           { metric: "temperature_c", value: 30, ts: "2026-07-03T10:00:00Z", source: "demo" },
           {
             metric: "humidity_pct",
@@ -183,6 +189,7 @@ describe("environment — provenance honesty", () => {
             value: 99,
             ts: "2026-07-02T10:00:00Z",
             source: "live",
+            quality: "ok",
             raw_payload: {
               vendor: "ecowitt_windows_testbench",
               metadata: { confidence: "test" },
@@ -193,6 +200,7 @@ describe("environment — provenance honesty", () => {
             value: 22,
             ts: "2026-07-03T10:00:00Z",
             source: "live",
+            quality: "ok",
             raw_payload: {
               vendor: "ecowitt_windows_testbench",
               metadata: {
@@ -212,8 +220,22 @@ describe("environment — provenance honesty", () => {
     const temp = vm.environment.metrics.find((m) => m.key === "temperature_c");
     expect(temp).toMatchObject({ count: 1, min: 71.6, max: 71.6, avg: 71.6 });
     expect(vm.environment.readingCount).toBe(1);
-    expect(vm.environment.sources).toEqual([{ kind: "live", label: "Live", count: 1 }]);
+    expect(vm.environment.sources).toEqual([{ kind: "live", label: "Connected sensor", count: 1 }]);
     expect(JSON.stringify(vm)).not.toMatch(/raw_payload|classification-only-secret/i);
+  });
+
+  it("keeps missing-quality live rows visible but out of aggregates", () => {
+    const vm = buildDiaryRangeReport(
+      baseInput({
+        sensorReadings: [
+          { metric: "temperature_c", value: 24, ts: "2026-07-02T10:00:00Z", source: "live" },
+        ],
+      }),
+    );
+
+    expect(vm.environment.readingCount).toBe(1);
+    expect(vm.environment.metrics.find((metric) => metric.key === "temperature_c")?.count).toBe(0);
+    expect(vm.environment.sources).toEqual([{ kind: "live", label: "Connected sensor", count: 1 }]);
   });
 });
 

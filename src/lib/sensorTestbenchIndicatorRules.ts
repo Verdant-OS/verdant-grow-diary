@@ -25,6 +25,7 @@ export type SensorTestbenchIndicator = "testbench" | "live" | "stale" | "none";
 
 export interface SensorTestbenchRowLike {
   source?: string | null;
+  quality?: string | null;
   captured_at?: string | Date | null;
   created_at?: string | Date | null;
   raw_payload?: unknown;
@@ -44,22 +45,6 @@ export interface SensorTestbenchClassification {
   ageMs: number | null;
   isTestbench: boolean;
 }
-
-const LIVE_SOURCES = new Set([
-  "live",
-  "ecowitt",
-  "webhook",
-  "webhook_generic",
-  "pi_bridge",
-  "node_red_bridge",
-  "home_assistant_bridge",
-  "ha_forwarded",
-  "esp32_arduino",
-  "esp32_arduino_sht31",
-  "esp32_esphome",
-  "esp32_mqtt_bridge",
-  "mqtt",
-]);
 
 function toDate(v: string | Date | null | undefined): Date | null {
   if (!v) return null;
@@ -227,7 +212,7 @@ export function classifySensorTestbench(input: ClassifyInput): SensorTestbenchCl
   if (testbench) {
     // Testbench tag always wins over freshness — never render as live.
     indicator = "testbench";
-  } else if (ageMs <= windowMs && source && LIVE_SOURCES.has(source)) {
+  } else if (ageMs >= 0 && ageMs <= windowMs && source === "live" && latest.quality === "ok") {
     indicator = "live";
   } else {
     indicator = "stale";

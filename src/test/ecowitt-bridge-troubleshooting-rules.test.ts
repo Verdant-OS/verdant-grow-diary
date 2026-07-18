@@ -19,6 +19,7 @@ describe("ecowittBridgeTroubleshootingRules", () => {
       lastReading: {
         capturedAt: "2026-06-19T11:59:30.000Z",
         source: "live",
+        quality: "ok",
         provider: "ecowitt",
         transport: "mqtt",
         humidityPct: 55,
@@ -30,6 +31,7 @@ describe("ecowittBridgeTroubleshootingRules", () => {
     });
     expect(r.overall).toBe("ok");
     expect(r.checks.find((c) => c.id === "source_live")?.status).toBe("ok");
+    expect(r.checks.find((c) => c.id === "quality_ok")?.status).toBe("ok");
     expect(r.checks.find((c) => c.id === "provider_ecowitt")?.status).toBe("ok");
     expect(r.checks.find((c) => c.id === "transport_mqtt")?.status).toBe("ok");
     expect(r.checks.find((c) => c.id === "vpd")?.status).toBe("ok");
@@ -50,7 +52,12 @@ describe("ecowittBridgeTroubleshootingRules", () => {
   it("never returns token VALUES in any check detail", () => {
     const secret = "supersecret_token_value_ABCDEFGH12345678";
     const r = buildTroubleshootingReport({
-      env: { tentIdConfigured: true, bridgeTokenStatus: "present", sendModeRequested: true, ingestUrlConfigured: true },
+      env: {
+        tentIdConfigured: true,
+        bridgeTokenStatus: "present",
+        sendModeRequested: true,
+        ingestUrlConfigured: true,
+      },
       lastReading: null,
       now: FRESH_NOW,
     });
@@ -65,6 +72,7 @@ describe("ecowittBridgeTroubleshootingRules", () => {
       lastReading: {
         capturedAt: "2026-06-19T11:59:30.000Z",
         source: "live",
+        quality: "ok",
         provider: "ecowitt",
         transport: "mqtt",
         airTempC: 22,
@@ -82,6 +90,7 @@ describe("ecowittBridgeTroubleshootingRules", () => {
       lastReading: {
         capturedAt: "2026-06-19T11:59:30.000Z",
         source: "ecowitt", // wrong — would mean canonical bug
+        quality: "ok",
         provider: "ecowitt",
         transport: "mqtt",
       },
@@ -102,6 +111,7 @@ describe("ecowittBridgeTroubleshootingRules", () => {
       lastReading: {
         capturedAt: "2026-06-19T10:00:00.000Z",
         source: "live",
+        quality: "ok",
         provider: "ecowitt",
         transport: "mqtt",
         airTempC: 22,
@@ -111,5 +121,20 @@ describe("ecowittBridgeTroubleshootingRules", () => {
       now: FRESH_NOW,
     });
     expect(r.checks.find((c) => c.id === "freshness")?.status).toBe("warn");
+  });
+
+  it("fails closed when a live source has no persisted quality proof", () => {
+    const r = buildTroubleshootingReport({
+      env: { tentIdConfigured: true, bridgeTokenStatus: "present" },
+      lastReading: {
+        capturedAt: "2026-06-19T11:59:30.000Z",
+        source: "live",
+        provider: "ecowitt",
+        transport: "mqtt",
+      },
+      now: FRESH_NOW,
+    });
+    expect(r.checks.find((c) => c.id === "quality_ok")?.status).toBe("unknown");
+    expect(r.overall).not.toBe("ok");
   });
 });

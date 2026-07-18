@@ -63,6 +63,7 @@ export function useLatestSensorSnapshot(
                 metric: r.metric,
                 value: r.value as number | string | null,
                 source: r.source as string | null,
+                quality: (r as { quality?: string | null }).quality ?? null,
                 raw_payload: (r as { raw_payload?: unknown }).raw_payload,
               })),
             );

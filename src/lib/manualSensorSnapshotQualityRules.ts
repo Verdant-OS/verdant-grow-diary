@@ -19,17 +19,15 @@ import {
   SUBSTRATE_TEMP_C_RANGE,
   VWC_RANGE,
 } from "@/constants/csvValidationRanges";
+import { assertCanonicalSensorSource } from "@/constants/sensorIngestProvenance";
+import { evaluateCurrentLiveSensorTruth } from "@/lib/currentLiveSensorTruthRules";
 
 /** Default staleness threshold for "current" room confidence. */
 export const MANUAL_SNAPSHOT_CURRENT_STALE_HOURS = 6;
 /** Realistic VPD window for indoor grow rooms (kPa). */
 export const VPD_REALISTIC_RANGE = { min: 0.2, max: 2.5 } as const;
 
-export type ManualSnapshotQuality =
-  | "usable"
-  | "needs_review"
-  | "invalid"
-  | "missing";
+export type ManualSnapshotQuality = "usable" | "needs_review" | "invalid" | "missing";
 
 export type ManualSnapshotSourceLabel =
   | "manual"
@@ -42,6 +40,8 @@ export type ManualSnapshotSourceLabel =
 
 export interface ManualSensorSnapshotInput {
   readonly source?: string | null;
+  /** Exact persisted validation state. Only `ok` can support current Live. */
+  readonly quality?: unknown;
   readonly captured_at?: string | number | Date | null;
   readonly temperature_c?: number | null;
   readonly humidity_pct?: number | null;
@@ -63,22 +63,8 @@ export interface ManualSensorSnapshotQuality {
   readonly canSupportActionSuggestionPreview: boolean;
 }
 
-const KNOWN_SOURCES: ReadonlyArray<ManualSnapshotSourceLabel> = [
-  "manual",
-  "live",
-  "csv",
-  "demo",
-  "stale",
-  "invalid",
-  "unknown",
-];
-
 function normalizeSource(raw: unknown): ManualSnapshotSourceLabel {
-  if (typeof raw !== "string") return "unknown";
-  const s = raw.trim().toLowerCase();
-  return (KNOWN_SOURCES as ReadonlyArray<string>).includes(s)
-    ? (s as ManualSnapshotSourceLabel)
-    : "unknown";
+  return assertCanonicalSensorSource(raw) ?? "unknown";
 }
 
 function toMs(v: ManualSensorSnapshotInput["captured_at"]): number | null {
@@ -155,18 +141,8 @@ export function evaluateManualSensorSnapshotQuality(
     }
   };
 
-  checkNum(
-    "temperature_c",
-    input.temperature_c,
-    AIR_TEMP_C_RANGE,
-    "Air temperature",
-  );
-  checkNum(
-    "soil_temp_c",
-    input.soil_temp_c,
-    SUBSTRATE_TEMP_C_RANGE,
-    "Soil temperature",
-  );
+  checkNum("temperature_c", input.temperature_c, AIR_TEMP_C_RANGE, "Air temperature");
+  checkNum("soil_temp_c", input.soil_temp_c, SUBSTRATE_TEMP_C_RANGE, "Soil temperature");
   checkNum("vpd_kpa", input.vpd_kpa, VPD_REALISTIC_RANGE, "VPD");
   checkNum("ph", input.ph, PH_REALISTIC_RANGE, "pH");
 
@@ -180,17 +156,11 @@ export function evaluateManualSensorSnapshotQuality(
     }
   }
 
-  if (
-    input.soil_moisture_pct != null &&
-    Number.isFinite(input.soil_moisture_pct)
-  ) {
+  if (input.soil_moisture_pct != null && Number.isFinite(input.soil_moisture_pct)) {
     if (!inRange(input.soil_moisture_pct, VWC_RANGE)) {
       invalidFields.push("soil_moisture_pct");
       reasons.push("Soil moisture outside 0–100%.");
-    } else if (
-      input.soil_moisture_pct === 0 ||
-      input.soil_moisture_pct === 100
-    ) {
+    } else if (input.soil_moisture_pct === 0 || input.soil_moisture_pct === 100) {
       invalidFields.push("soil_moisture_pct");
       reasons.push("Soil moisture appears stuck at 0 or 100%.");
     }
@@ -210,22 +180,32 @@ export function evaluateManualSensorSnapshotQuality(
   // surfaces must not mislead growers by marking captured-moment readings
   // as stale just because time has passed.
   let isStaleByTime = false;
+  let isFutureDated = false;
   if (mode === "current" && capturedMs != null) {
     const ageMs = nowMs - capturedMs;
     const staleMs = staleHours * 60 * 60 * 1000;
-    if (ageMs > staleMs) {
+    if (ageMs < 0) {
+      isFutureDated = true;
+      reasons.push("Captured timestamp is in the future.");
+    } else if (ageMs > staleMs) {
       isStaleByTime = true;
       reasons.push(`Reading older than ${staleHours}h.`);
     }
   }
 
   // Source-driven gates
+  const liveTruth = evaluateCurrentLiveSensorTruth({
+    source: sourceLabel,
+    quality: input.quality,
+    freshness: capturedMs == null || isFutureDated ? "unknown" : isStaleByTime ? "stale" : "fresh",
+  });
   const sourceBlocksCurrent =
     sourceLabel === "csv" ||
     sourceLabel === "demo" ||
     sourceLabel === "stale" ||
     sourceLabel === "invalid" ||
-    sourceLabel === "unknown";
+    sourceLabel === "unknown" ||
+    (sourceLabel === "live" && !liveTruth.isCurrentLive);
 
   let quality: ManualSnapshotQuality;
   let summary: string;
@@ -234,14 +214,10 @@ export function evaluateManualSensorSnapshotQuality(
 
   if (sourceLabel === "invalid" || invalidFields.length > 0) {
     quality = "invalid";
-    summary = isHistorical
-      ? "Historical invalid reading — review before use"
-      : "Invalid reading";
+    summary = isHistorical ? "Historical invalid reading — review before use" : "Invalid reading";
   } else if (capturedMs == null) {
     quality = "missing";
-    summary = isHistorical
-      ? "Missing captured timestamp"
-      : "Missing current reading";
+    summary = isHistorical ? "Missing captured timestamp" : "Missing current reading";
   } else if (sourceLabel === "unknown") {
     quality = "needs_review";
     summary = isHistorical ? "Historical reading needs review" : "Needs review";
@@ -260,6 +236,10 @@ export function evaluateManualSensorSnapshotQuality(
     if (sourceLabel === "stale") {
       reasons.unshift("Snapshot labeled stale.");
     }
+  } else if (isFutureDated || (sourceLabel === "live" && !liveTruth.isCurrentLive)) {
+    quality = "needs_review";
+    summary = isHistorical ? "Historical reading needs review" : "Needs review";
+    reasons.unshift("Live source quality or freshness could not be verified.");
   } else {
     quality = "usable";
     summary = isHistorical ? "Historical review reading" : "Usable current reading";
@@ -291,7 +271,7 @@ export const MANUAL_SNAPSHOT_QUALITY_SOURCE_LABELS: Readonly<
   Record<ManualSnapshotSourceLabel, string>
 > = Object.freeze({
   manual: "Source: manual",
-  live: "Source: live",
+  live: "Source: connected sensor",
   csv: "Source: csv — history only",
   demo: "Source: demo",
   stale: "Source: stale",
@@ -313,6 +293,7 @@ interface CurrentSnapshotReadingLike {
 
 interface CurrentSnapshotGroupLike {
   readonly source?: string | null;
+  readonly quality?: unknown;
   readonly readings?: ReadonlyArray<CurrentSnapshotReadingLike> | null;
 }
 
@@ -329,9 +310,7 @@ const SOURCE_PRIORITY: ReadonlyArray<ManualSnapshotSourceLabel> = [
   "invalid",
 ];
 
-const METRIC_MAP: Readonly<
-  Record<string, keyof ManualSensorSnapshotInput>
-> = Object.freeze({
+const METRIC_MAP: Readonly<Record<string, keyof ManualSensorSnapshotInput>> = Object.freeze({
   temperature_c: "temperature_c",
   humidity_pct: "humidity_pct",
   vpd_kpa: "vpd_kpa",
@@ -403,6 +382,7 @@ export function deriveCurrentSnapshotFromAiDoctorContext(
 
   return {
     source: normalizeSource(chosen.source),
+    quality: chosen.quality,
     captured_at: latestCapturedIso,
     ...(fields as ManualSensorSnapshotInput),
   };

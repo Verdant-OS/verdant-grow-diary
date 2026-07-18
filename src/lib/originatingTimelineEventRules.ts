@@ -21,15 +21,10 @@ export const ORIGINATING_TIMELINE_EVENT_SOURCES = [
   "unknown",
 ] as const;
 
-export type OriginatingTimelineEventSource =
-  (typeof ORIGINATING_TIMELINE_EVENT_SOURCES)[number];
+export type OriginatingTimelineEventSource = (typeof ORIGINATING_TIMELINE_EVENT_SOURCES)[number];
 
 /** Trusted-vs-caution split. demo/stale/invalid/unknown are never trusted. */
-const TRUSTED_SOURCES = new Set<OriginatingTimelineEventSource>([
-  "live",
-  "manual",
-  "csv",
-]);
+const TRUSTED_SOURCES = new Set<OriginatingTimelineEventSource>(["manual", "csv"]);
 
 const KNOWN_SOURCES = new Set<string>(ORIGINATING_TIMELINE_EVENT_SOURCES);
 
@@ -47,9 +42,7 @@ export interface OriginatingTimelineEventInput {
   source?: string | null;
 }
 
-function normalizeSource(
-  raw: string | null | undefined,
-): OriginatingTimelineEventSource {
+function normalizeSource(raw: string | null | undefined): OriginatingTimelineEventSource {
   if (typeof raw !== "string") return "unknown";
   const v = raw.trim().toLowerCase();
   if (!v) return "unknown";
@@ -107,19 +100,15 @@ export function normalizeOriginatingTimelineEvents(
   return out;
 }
 
-export function isTrustedTimelineEventSource(
-  src: OriginatingTimelineEventSource,
-): boolean {
+export function isTrustedTimelineEventSource(src: OriginatingTimelineEventSource): boolean {
   return TRUSTED_SOURCES.has(src);
 }
 
 /** Human label used for caution copy. */
-export function originatingTimelineEventLabel(
-  src: OriginatingTimelineEventSource,
-): string {
+export function originatingTimelineEventLabel(src: OriginatingTimelineEventSource): string {
   switch (src) {
     case "live":
-      return "Live";
+      return "Connected sensor event";
     case "manual":
       return "Manual";
     case "csv":
@@ -139,8 +128,7 @@ export function originatingTimelineEventLabel(
 }
 
 /** Safe fallback copy when no timeline event is linked. */
-export const TIMELINE_EVIDENCE_NOT_LINKED_COPY =
-  "Timeline evidence not linked yet." as const;
+export const TIMELINE_EVIDENCE_NOT_LINKED_COPY = "Timeline evidence not linked yet." as const;
 
 /**
  * Provenance-aware fallback copy. Each variant explains which source is not

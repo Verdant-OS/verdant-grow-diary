@@ -40,7 +40,7 @@ export interface SensorSourceLineageLineProps {
 // out of this static label map prevents adjacent-token static scanners from
 // false-flagging this read-only presenter as a device-control surface.
 const SOURCE_LABELS: Record<string, string> = {
-  live: "Live",
+  live: "Connected-source record",
   manual: "Manual",
   csv: "CSV",
   demo: "Demo",
@@ -54,14 +54,7 @@ const SOURCE_LABELS: Record<string, string> = {
 };
 
 /** Sources that are explicitly NOT live and must never be rendered as "Live". */
-const NON_LIVE_SOURCES = new Set([
-  "manual",
-  "csv",
-  "demo",
-  "stale",
-  "invalid",
-  "import",
-]);
+const NON_LIVE_SOURCES = new Set(["manual", "csv", "demo", "stale", "invalid", "import"]);
 
 // Polished vendor labels. Kept in a separate constant so the static scanner
 // cannot pick up `home_assistant` adjacent to other transport tokens.

@@ -11,10 +11,7 @@
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import InfoPopover from "@/components/InfoPopover";
-import {
-  combineGrowDataMeta,
-  type GrowDataSourceMeta,
-} from "@/hooks/useGrowData";
+import { combineGrowDataMeta, type GrowDataSourceMeta } from "@/hooks/useGrowData";
 import type { SnapshotSource } from "@/lib/sensorSnapshot";
 import {
   buildPlantDetailDataSourceView,
@@ -26,6 +23,8 @@ interface Props {
   metas: readonly GrowDataSourceMeta[];
   /** Optional sensor snapshot source for the assigned tent, if known. */
   snapshotSource?: SnapshotSource | null;
+  /** Upstream validation state. Exact `ok` is required for a Live badge. */
+  snapshotQuality?: unknown;
   /** Optional caller-computed stale flag for the latest reading. */
   isStale?: boolean;
   className?: string;
@@ -35,6 +34,7 @@ interface Props {
 export default function PlantDetailDataSourceDisclosure({
   metas,
   snapshotSource = null,
+  snapshotQuality = null,
   isStale = false,
   className,
   testId = "plant-detail-data-source-disclosure",
@@ -43,6 +43,7 @@ export default function PlantDetailDataSourceDisclosure({
   const view = buildPlantDetailDataSourceView({
     recordSource: combined.dataSource,
     snapshotSource,
+    snapshotQuality,
     isStale,
   });
   const label: PlantDetailDataSourceLabel = view.label;
@@ -64,17 +65,10 @@ export default function PlantDetailDataSourceDisclosure({
       >
         {view.badgeText}
       </Badge>
-      <span
-        className="text-xs text-muted-foreground"
-        data-testid={`${testId}-description`}
-      >
+      <span className="text-xs text-muted-foreground" data-testid={`${testId}-description`}>
         {view.description}
       </span>
-      <InfoPopover
-        title={view.helpTitle}
-        body={view.helpBody}
-        testKey={`${testId}-source`}
-      />
+      <InfoPopover title={view.helpTitle} body={view.helpBody} testKey={`${testId}-source`} />
     </div>
   );
 }

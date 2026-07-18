@@ -175,8 +175,8 @@ describe("Dashboard latest-snapshot consumption of manual readings", () => {
     const { snapshotFromReadings, isStale } = await import("@/lib/sensorSnapshot");
     const ts = new Date().toISOString();
     const snap = snapshotFromReadings([
-      { ts, metric: "temperature_c", value: 24, source: "manual" },
-      { ts, metric: "humidity_pct", value: 55, source: "manual" },
+      { ts, metric: "temperature_c", value: 24, source: "manual", quality: "ok" },
+      { ts, metric: "humidity_pct", value: 55, source: "manual", quality: "ok" },
     ]);
     expect(snap).not.toBeNull();
     expect(snap?.source).toBe("manual");
@@ -190,6 +190,7 @@ describe("Dashboard latest-snapshot consumption of manual readings", () => {
     const ts = new Date().toISOString();
     const manualSnap: SensorSnapshot = {
       source: "manual",
+      quality: "ok",
       ts,
       temp: 24,
       rh: 55,

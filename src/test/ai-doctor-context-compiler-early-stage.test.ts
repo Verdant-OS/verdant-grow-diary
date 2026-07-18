@@ -13,8 +13,7 @@ import {
 } from "../lib/earlyStageAiDoctorContextRules";
 
 const NOW = new Date("2026-06-10T12:00:00Z");
-const iso = (offsetMs: number) =>
-  new Date(NOW.getTime() - offsetMs).toISOString();
+const iso = (offsetMs: number) => new Date(NOW.getTime() - offsetMs).toISOString();
 
 const basePlant = {
   id: "p1",
@@ -147,7 +146,8 @@ describe("compilePlantContextFromRows — early_stage_memory", () => {
           metric: "temperature_c",
           value: 23,
           captured_at: iso(60_000),
-          source: "ecowitt",
+          source: "live",
+          quality: "ok",
         },
       ],
       now: NOW,

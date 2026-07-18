@@ -67,9 +67,7 @@ describe("GrowDataSourceDisclosure (presenter)", () => {
       />,
     );
     expect(
-      screen
-        .getByTestId("plants-data-source-disclosure-badge")
-        .getAttribute("data-label"),
+      screen.getByTestId("plants-data-source-disclosure-badge").getAttribute("data-label"),
     ).not.toBe("Live");
   });
 
@@ -83,9 +81,7 @@ describe("GrowDataSourceDisclosure (presenter)", () => {
       />,
     );
     expect(
-      screen
-        .getByTestId("tents-data-source-disclosure-badge")
-        .getAttribute("data-label"),
+      screen.getByTestId("tents-data-source-disclosure-badge").getAttribute("data-label"),
     ).not.toBe("Live");
   });
 
@@ -100,9 +96,9 @@ describe("GrowDataSourceDisclosure (presenter)", () => {
     );
     const b = screen.getByTestId("plants-data-source-disclosure-badge");
     expect(b.getAttribute("data-label")).toBe("Unavailable");
-    expect(
-      screen.getByTestId("plants-data-source-disclosure"),
-    ).toHaveTextContent(/no real plants/i);
+    expect(screen.getByTestId("plants-data-source-disclosure")).toHaveTextContent(
+      /no real plants/i,
+    );
   });
 
   it("shows welcome/empty state for tents when no usable real data exists", () => {
@@ -116,12 +112,10 @@ describe("GrowDataSourceDisclosure (presenter)", () => {
     );
     const b = screen.getByTestId("tents-data-source-disclosure-badge");
     expect(b.getAttribute("data-label")).toBe("Unavailable");
-    expect(
-      screen.getByTestId("tents-data-source-disclosure"),
-    ).toHaveTextContent(/no real tents/i);
+    expect(screen.getByTestId("tents-data-source-disclosure")).toHaveTextContent(/no real tents/i);
   });
 
-  it("shows Live for fully supabase-backed metadata", () => {
+  it("shows Saved for fully supabase-backed metadata", () => {
     render(
       <GrowDataSourceDisclosure
         resource="plants"
@@ -131,18 +125,14 @@ describe("GrowDataSourceDisclosure (presenter)", () => {
       />,
     );
     expect(
-      screen
-        .getByTestId("plants-data-source-disclosure-badge")
-        .getAttribute("data-label"),
-    ).toBe("Live");
+      screen.getByTestId("plants-data-source-disclosure-badge").getAttribute("data-label"),
+    ).toBe("Saved");
   });
 });
 
 describe("Plants page wiring", () => {
   it("imports and renders GrowDataSourceDisclosure", () => {
-    expect(PLANTS).toMatch(
-      /from\s+["']@\/components\/GrowDataSourceDisclosure["']/,
-    );
+    expect(PLANTS).toMatch(/from\s+["']@\/components\/GrowDataSourceDisclosure["']/);
     expect(PLANTS).toMatch(/<GrowDataSourceDisclosure/);
   });
 
@@ -157,17 +147,13 @@ describe("Plants page wiring", () => {
 
   it("does not introduce writes, service_role, or device control", () => {
     expect(PLANTS).not.toMatch(/service_role/);
-    expect(PLANTS).not.toMatch(
-      /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|relay|actuator|webhook/i,
-    );
+    expect(PLANTS).not.toMatch(/mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|relay|actuator|webhook/i);
   });
 });
 
 describe("Tents page wiring", () => {
   it("imports and renders GrowDataSourceDisclosure", () => {
-    expect(TENTS).toMatch(
-      /from\s+["']@\/components\/GrowDataSourceDisclosure["']/,
-    );
+    expect(TENTS).toMatch(/from\s+["']@\/components\/GrowDataSourceDisclosure["']/);
     expect(TENTS).toMatch(/<GrowDataSourceDisclosure/);
   });
 
@@ -177,9 +163,7 @@ describe("Tents page wiring", () => {
 
   it("does not introduce writes, service_role, or device control", () => {
     expect(TENTS).not.toMatch(/service_role/);
-    expect(TENTS).not.toMatch(
-      /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|relay|actuator|webhook/i,
-    );
+    expect(TENTS).not.toMatch(/mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|relay|actuator|webhook/i);
   });
 });
 

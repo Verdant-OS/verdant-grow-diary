@@ -26,14 +26,10 @@ const SENSOR_SOURCE_ORDER: readonly ContextualPhenoSensorSource[] = [
   "unknown",
 ];
 
-const TRUSTED_SOURCES: ReadonlySet<ContextualPhenoSensorSource> = new Set([
-  "live",
-  "manual",
-  "csv",
-]);
+const TRUSTED_SOURCES: ReadonlySet<ContextualPhenoSensorSource> = new Set(["manual", "csv"]);
 
 const SOURCE_LABEL: Record<ContextualPhenoSensorSource, string> = {
-  live: "Live",
+  live: "Connected source",
   manual: "Manual",
   csv: "CSV",
   demo: "Demo",
@@ -43,7 +39,7 @@ const SOURCE_LABEL: Record<ContextualPhenoSensorSource, string> = {
 };
 
 const SOURCE_TONE: Record<ContextualPhenoSensorSource, string> = {
-  live: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+  live: "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300",
   manual: "border-primary/40 bg-primary/10 text-primary",
   csv: "border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-300",
   demo: "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300",
@@ -98,8 +94,7 @@ const EMPTY_STATE_RULES: readonly EmptyStateRule[] = [
     id: "untrusted-only",
     text: "Untrusted sensor evidence only — do not use as live context.",
     applies: (p) =>
-      p.evidenceCounts.sensorReadings > 0 &&
-      !p.environmentSummary.hasTrustedSensorContext,
+      p.evidenceCounts.sensorReadings > 0 && !p.environmentSummary.hasTrustedSensorContext,
   },
   {
     id: "no-trusted-context",
@@ -205,19 +200,12 @@ function buildEvidenceBadges(
 }
 
 function isPlantInsufficient(plant: ContextualPhenoComparisonPlant): boolean {
-  return (
-    plant.missingContext.length > 0 ||
-    plant.environmentSummary.trustWarnings.length > 0 ||
-    !plant.environmentSummary.hasTrustedSensorContext
-  );
+  return plant.missingContext.length > 0 || !plant.environmentSummary.hasTrustedSensorContext;
 }
-
 
 function PlantCard({ plant }: { plant: ContextualPhenoComparisonPlant }) {
   const env = plant.environmentSummary;
-  const sourceEntries = SENSOR_SOURCE_ORDER.filter(
-    (s) => plant.sourceCounts[s] > 0,
-  );
+  const sourceEntries = SENSOR_SOURCE_ORDER.filter((s) => plant.sourceCounts[s] > 0);
 
   return (
     <article
@@ -226,9 +214,7 @@ function PlantCard({ plant }: { plant: ContextualPhenoComparisonPlant }) {
       className="rounded-lg border border-border bg-card text-card-foreground p-4 space-y-3"
     >
       <header className="flex flex-wrap items-baseline justify-between gap-2 min-w-0">
-        <h3 className="text-base font-semibold tracking-tight break-words">
-          {plant.plantLabel}
-        </h3>
+        <h3 className="text-base font-semibold tracking-tight break-words">{plant.plantLabel}</h3>
         <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
           {plant.strain && <span data-testid="plant-strain">{plant.strain}</span>}
           {plant.stage && (
@@ -244,10 +230,7 @@ function PlantCard({ plant }: { plant: ContextualPhenoComparisonPlant }) {
         </div>
       </header>
 
-      <section
-        data-testid="plant-evidence-summary"
-        aria-label="Evidence summary"
-      >
+      <section data-testid="plant-evidence-summary" aria-label="Evidence summary">
         <ul className="flex flex-wrap gap-1.5">
           {buildEvidenceBadges(plant).map((b) => (
             <li
@@ -265,8 +248,6 @@ function PlantCard({ plant }: { plant: ContextualPhenoComparisonPlant }) {
           ))}
         </ul>
       </section>
-
-
 
       <section data-testid="plant-evidence-counts">
         <h4 className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">
@@ -293,10 +274,7 @@ function PlantCard({ plant }: { plant: ContextualPhenoComparisonPlant }) {
           <li>Avg PPFD: {fmtNum(env.avgPpfd, 0)}</li>
         </ul>
         <p className="mt-1 text-[11px] text-muted-foreground">
-          Last sensor:{" "}
-          <span data-testid="plant-last-sensor-at">
-            {env.lastSensorAt ?? "—"}
-          </span>
+          Last sensor: <span data-testid="plant-last-sensor-at">{env.lastSensorAt ?? "—"}</span>
           {" · "}
           Trusted context:{" "}
           <span data-testid="plant-trusted-context">
@@ -334,9 +312,7 @@ function PlantCard({ plant }: { plant: ContextualPhenoComparisonPlant }) {
                     ·
                   </span>
                   <span className="tabular-nums">{plant.sourceCounts[s]}</span>
-                  {untrusted && (
-                    <span className="sr-only"> (caution, untrusted)</span>
-                  )}
+                  {untrusted && <span className="sr-only"> (caution, untrusted)</span>}
                 </li>
               );
             })}
@@ -380,11 +356,7 @@ function PlantCard({ plant }: { plant: ContextualPhenoComparisonPlant }) {
             </h4>
             <ul className="list-disc list-inside text-xs text-muted-foreground space-y-0.5">
               {empties.map((e) => (
-                <li
-                  key={e.id}
-                  data-testid={`plant-empty-state-${e.id}`}
-                  data-empty-state-id={e.id}
-                >
+                <li key={e.id} data-testid={`plant-empty-state-${e.id}`} data-empty-state-id={e.id}>
                   {e.text}
                 </li>
               ))}
@@ -392,8 +364,6 @@ function PlantCard({ plant }: { plant: ContextualPhenoComparisonPlant }) {
           </section>
         );
       })()}
-
-
 
       {plant.comparisonNotes.length > 0 && (
         <section data-testid="plant-comparison-notes">
@@ -427,14 +397,9 @@ export default function ContextualPhenoComparisonPanel({
   className,
 }: ContextualPhenoComparisonPanelProps) {
   const allInsufficient =
-    view.ok &&
-    view.plants.length > 0 &&
-    view.plants.every(isPlantInsufficient);
+    view.ok && view.plants.length > 0 && view.plants.every(isPlantInsufficient);
   return (
-    <div
-      data-testid="contextual-pheno-comparison-panel"
-      className={cn("space-y-4", className)}
-    >
+    <div data-testid="contextual-pheno-comparison-panel" className={cn("space-y-4", className)}>
       {showDemoBanner && (
         <div
           data-testid="contextual-pheno-comparison-demo-banner"
@@ -445,10 +410,7 @@ export default function ContextualPhenoComparisonPanel({
         </div>
       )}
 
-      <p
-        data-testid="contextual-pheno-comparison-caveat"
-        className="text-xs text-muted-foreground"
-      >
+      <p data-testid="contextual-pheno-comparison-caveat" className="text-xs text-muted-foreground">
         {view.caveat}
       </p>
 
@@ -513,9 +475,7 @@ export default function ContextualPhenoComparisonPanel({
             Source quality summary
           </h4>
           <ul className="flex flex-wrap gap-1.5">
-            {SENSOR_SOURCE_ORDER.filter(
-              (s) => view.sourceQualitySummary[s] > 0,
-            ).map((s) => {
+            {SENSOR_SOURCE_ORDER.filter((s) => view.sourceQualitySummary[s] > 0).map((s) => {
               const untrusted = !TRUSTED_SOURCES.has(s);
               return (
                 <li
@@ -532,9 +492,7 @@ export default function ContextualPhenoComparisonPanel({
                   <span aria-hidden="true" className="opacity-50">
                     ·
                   </span>
-                  <span className="tabular-nums">
-                    {view.sourceQualitySummary[s]}
-                  </span>
+                  <span className="tabular-nums">{view.sourceQualitySummary[s]}</span>
                 </li>
               );
             })}

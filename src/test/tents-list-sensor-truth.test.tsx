@@ -319,10 +319,11 @@ describe("Tents list sensor truth — intake quality flags are authoritative", (
     expect(temp.status).toBe("degraded");
     expect(temp.statusLabel).toBe("Degraded");
     expect(temp.chipStatus).not.toBe("ok");
-    // Provenance is a separate axis: source stays truthful, but the
-    // flagged metric itself never presents as healthy.
+    // A mixed-quality live cohort is not verified current-Live evidence;
+    // unflagged metrics stay visible but cannot retain a healthy status.
     const rh = metric(v, "rh");
-    expect(rh.status).toBe("ok");
+    expect(rh.status).toBe("degraded");
+    expect(rh.chipStatus).not.toBe("ok");
   });
 
   it("chip color is capped by status — flagged metrics never render a green chip", () => {
@@ -390,24 +391,21 @@ describe("Tents list sensor truth — canonical source vocabulary", () => {
   });
 });
 
-describe("Tents list sensor truth — pi_bridge provenance parity with Tent Detail", () => {
+describe("Tents list sensor truth — legacy pi_bridge alias fails closed", () => {
   const bridgeRow = (over: Partial<BuildTentSnapshotInput>): BuildTentSnapshotInput =>
     row({ source: "pi_bridge", ...over });
 
-  it("fresh bridge readings classify as live on BOTH presenters — never Unknown", () => {
+  it("fresh bridge readings stay unverified on both presenters", () => {
     const rows = [
       bridgeRow({ ts: FRESH_TS, metric: "temperature_c", value: 21.78 }),
       bridgeRow({ ts: FRESH_TS, metric: "humidity_pct", value: 56 }),
     ];
     const listView = buildTentSnapshotView(rows, "veg", NOW);
     const detailHeader = buildTentSensorHeaderView(rows, NOW);
-    // Detail path: strict reservation in snapshotFromReadings → "Live sensor".
-    expect(detailHeader.sourceLabel).toBe("Live sensor");
-    // List path must agree on the provenance class, not drop to Unknown.
-    expect(listView.sourceLabel).toBe("Live");
-    expect(listView.provenanceEligible).toBe(true);
-    expect(listView.canAssessStage).toBe(true);
-    expect(listView.sourceLabel).not.toBe("Unknown");
+    expect(detailHeader.sourceLabel).toBe("Unverified source");
+    expect(listView.sourceLabel).not.toMatch(/live/i);
+    expect(listView.provenanceEligible).toBe(false);
+    expect(listView.canAssessStage).toBe(false);
   });
 
   it("stale bridge readings label Stale on the list, matching detail's stale flag", () => {

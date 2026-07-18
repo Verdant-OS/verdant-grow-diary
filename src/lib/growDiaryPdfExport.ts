@@ -86,7 +86,9 @@ export interface GrowDiaryPdfModel {
   safetyFooter: string;
 }
 
-const HEALTHY_SOURCES = new Set(["live", "manual", "csv"]);
+// Rollups do not carry per-reading quality/freshness proof. A raw live count
+// therefore stays visible as connected history but cannot earn a healthy cue.
+const HEALTHY_SOURCES = new Set(["manual", "csv"]);
 const FLAGGED_SOURCES = new Set(["demo", "stale", "invalid", "unknown"]);
 
 function normSource(s: string): string {
@@ -169,7 +171,7 @@ export function buildGrowDiaryReportModel(input: BuildGrowDiaryReportInput): Gro
     const healthy = HEALTHY_SOURCES.has(src);
     const flagged = FLAGGED_SOURCES.has(src);
     return {
-      label: src,
+      label: src === "live" ? "connected sensor (unverified)" : src,
       count: Math.max(0, Math.floor(s.count) || 0),
       healthy,
       note: flagged

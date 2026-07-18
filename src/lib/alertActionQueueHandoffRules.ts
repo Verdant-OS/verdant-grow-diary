@@ -279,9 +279,7 @@ function adjustRiskForContext(
  */
 export function createActionSuggestion(input: HandoffInput): HandoffResult {
   const { alert, sensorContext, sensorContextId, now } = input;
-  const timelineEvents = normalizeOriginatingTimelineEvents(
-    input.originatingTimelineEvents,
-  );
+  const timelineEvents = normalizeOriginatingTimelineEvents(input.originatingTimelineEvents);
 
   // Validate alert
   if (!alert) return { ok: false, reason: "missing_alert" };
@@ -302,12 +300,15 @@ export function createActionSuggestion(input: HandoffInput): HandoffResult {
         safetyNotes: [...sensorContext.safetyNotes],
       }
     : {
-        sourceState: "live" as ReadingSource,
-        sourceLabel: "Live sensor",
+        sourceState: "invalid" as ReadingSource,
+        sourceLabel: "Unverified sensor context",
         isStale: false,
-        isInvalid: false,
-        confidenceImpact: "none" as const,
-        safetyNotes: ["Sensor telemetry alone cannot confirm or deny plant health with certainty."],
+        isInvalid: true,
+        confidenceImpact: "untrusted" as const,
+        safetyNotes: [
+          "Sensor context is missing: verify current conditions manually before acting.",
+          "Sensor telemetry alone cannot confirm or deny plant health with certainty.",
+        ],
       };
 
   // Invalid context: block or severely limit

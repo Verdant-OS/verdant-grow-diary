@@ -6,11 +6,14 @@ import { classifyTimelineSensorSource } from "@/lib/timelineSensorSourceBadgeRul
 
 describe("classifyTimelineSensorSource", () => {
   it("returns live for an explicit fresh live source", () => {
+    const now = Date.parse("2026-06-17T12:00:00Z");
     expect(
       classifyTimelineSensorSource({
         rawSource: "live",
-        capturedAt: new Date().toISOString(),
+        quality: "ok",
+        capturedAt: "2026-06-17T11:59:30Z",
         staleMs: 60_000,
+        now,
       }).kind,
     ).toBe("live");
   });
@@ -20,11 +23,52 @@ describe("classifyTimelineSensorSource", () => {
     expect(
       classifyTimelineSensorSource({
         rawSource: "live",
+        quality: "ok",
         capturedAt: "2025-01-01T00:00:00Z",
         staleMs: 60_000,
         now,
       }).kind,
     ).toBe("stale");
+  });
+
+  it.each([undefined, null, "degraded", "OK", " ok "])(
+    "source-only quality %s cannot produce live",
+    (quality) => {
+      expect(
+        classifyTimelineSensorSource({
+          rawSource: "live",
+          quality,
+          capturedAt: "2026-06-17T11:59:30Z",
+          staleMs: 60_000,
+          now: Date.parse("2026-06-17T12:00:00Z"),
+        }).kind,
+      ).toBe("invalid");
+    },
+  );
+
+  it.each(["LIVE", " live ", "sensor", "supabase", "pi_bridge"])(
+    "non-canonical source %s cannot produce live",
+    (rawSource) => {
+      expect(
+        classifyTimelineSensorSource({
+          rawSource,
+          quality: "ok",
+          capturedAt: "2026-06-17T11:59:30Z",
+          staleMs: 60_000,
+          now: Date.parse("2026-06-17T12:00:00Z"),
+        }).kind,
+      ).toBe("invalid");
+    },
+  );
+
+  it("requires an explicit freshness window before rendering live", () => {
+    expect(
+      classifyTimelineSensorSource({
+        rawSource: "live",
+        quality: "ok",
+        capturedAt: "2026-06-17T11:59:30Z",
+      }).kind,
+    ).toBe("invalid");
   });
 
   it("never renders missing source as live; uses fallback", () => {

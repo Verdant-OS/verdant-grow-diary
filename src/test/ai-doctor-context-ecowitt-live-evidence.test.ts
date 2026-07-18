@@ -49,6 +49,7 @@ function liveEcowittRow(metric: string, value: number, capturedAt = FRESH): Sens
     unit: metric === "temperature_c" ? "C" : metric === "humidity_pct" ? "%" : null,
     captured_at: capturedAt,
     source: "live",
+    quality: "ok",
     raw_payload: ECOWITT_RAW,
   };
 }

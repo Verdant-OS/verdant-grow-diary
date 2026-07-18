@@ -55,9 +55,7 @@ function plant(
 describe("buildContextualPhenoComparisonView — guards", () => {
   it("returns too_few_plants for 0 or 1 plants", () => {
     expect(buildContextualPhenoComparisonView([]).error).toBe("too_few_plants");
-    expect(
-      buildContextualPhenoComparisonView([plant("a")]).error,
-    ).toBe("too_few_plants");
+    expect(buildContextualPhenoComparisonView([plant("a")]).error).toBe("too_few_plants");
   });
 
   it("returns too_many_plants for 5+ plants", () => {
@@ -78,12 +76,7 @@ describe("buildContextualPhenoComparisonView — guards", () => {
   });
 
   it("accepts up to 4 plants", () => {
-    const v = buildContextualPhenoComparisonView([
-      plant("a"),
-      plant("b"),
-      plant("c"),
-      plant("d"),
-    ]);
+    const v = buildContextualPhenoComparisonView([plant("a"), plant("b"), plant("c"), plant("d")]);
     expect(v.ok).toBe(true);
     expect(v.plants).toHaveLength(4);
   });
@@ -181,8 +174,8 @@ describe("buildContextualPhenoComparisonView — aggregation", () => {
     const v = buildContextualPhenoComparisonView([
       plant("a", {
         sensorReadings: [
-          { source: "live", tempF: Number.NaN, rh: Number.POSITIVE_INFINITY },
-          { source: "live", tempF: 70, rh: 50 },
+          { source: "manual", tempF: Number.NaN, rh: Number.POSITIVE_INFINITY },
+          { source: "manual", tempF: 70, rh: 50 },
         ],
       }),
       plant("b"),
@@ -225,10 +218,7 @@ describe("buildContextualPhenoComparisonView — aggregation", () => {
 
 describe("buildContextualPhenoComparisonView — determinism", () => {
   it("produces identical output for identical input", () => {
-    const inputs = [
-      plant("a", { plantLabel: "B" }),
-      plant("b", { plantLabel: "A" }),
-    ];
+    const inputs = [plant("a", { plantLabel: "B" }), plant("b", { plantLabel: "A" })];
     const v1 = buildContextualPhenoComparisonView(inputs);
     const v2 = buildContextualPhenoComparisonView(inputs);
     expect(JSON.stringify(v1)).toBe(JSON.stringify(v2));
@@ -262,9 +252,7 @@ describe("buildContextualPhenoComparisonView — determinism", () => {
 
 describe("contextual pheno comparison — static safety scan", () => {
   const REPO_ROOT = resolve(__dirname, "..", "..");
-  const TARGETS = [
-    "src/lib/contextualPhenoComparisonViewModel.ts",
-  ] as const;
+  const TARGETS = ["src/lib/contextualPhenoComparisonViewModel.ts"] as const;
 
   const FORBIDDEN: readonly string[] = [
     "functions.invoke",
@@ -302,9 +290,7 @@ describe("contextual pheno comparison — static safety scan", () => {
       const untrusted = /\b(invalid|stale|demo|unknown|untrusted)\b/i;
       for (const line of lines) {
         if (/\bhealthy\b/i.test(line) && untrusted.test(line)) {
-          throw new Error(
-            `Forbidden "healthy" near untrusted source token in ${rel}: ${line}`,
-          );
+          throw new Error(`Forbidden "healthy" near untrusted source token in ${rel}: ${line}`);
         }
       }
       // "certain" as standalone certainty claim (not "uncertain" etc.).

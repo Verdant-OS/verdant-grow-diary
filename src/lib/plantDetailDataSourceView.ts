@@ -4,16 +4,15 @@
  *
  * Deterministic. No React, no I/O, no fetch, no privileged keys. Takes the
  * already-classified record meta from useGrowData (combineGrowDataMeta)
- * plus an optional sensor `snapshotSource` and optional `isStale` flag
+ * plus optional sensor source, quality, and freshness state
  * (both already produced elsewhere in the app — this helper never queries
  * them) and produces a single honest disclosure label drawn from:
  *
  *   Live | Manual | Demo | Stale | Unavailable
  *
  * Safety contract:
- *   - "Live" is reserved for a sensor snapshot whose source is explicitly
- *     "live" AND whose underlying record store is real (supabase). Demo,
- *     manual, simulated, diary, or unknown snapshots NEVER produce "Live".
+ *   - "Live" requires exact source=`live`, quality=`ok`, fresh state, and a
+ *     real Supabase record store. Source-only claims NEVER produce "Live".
  *   - "Demo" overrides any other label whenever the record store or
  *     snapshot source is mock / simulated — never imply demo is live.
  *   - "Stale" is produced when the caller passes `isStale: true` for an
@@ -28,25 +27,19 @@
 
 import type { GrowDataSource } from "@/hooks/useGrowData";
 import type { SnapshotSource } from "@/lib/sensorSnapshot";
+import { evaluateCurrentLiveSensorTruth } from "@/lib/currentLiveSensorTruthRules";
 
-export type PlantDetailDataSourceLabel =
-  | "Live"
-  | "Manual"
-  | "Demo"
-  | "Stale"
-  | "Unavailable";
+export type PlantDetailDataSourceLabel = "Live" | "Manual" | "Demo" | "Stale" | "Unavailable";
 
-export type PlantDetailDataSourceBadgeVariant =
-  | "default"
-  | "secondary"
-  | "outline"
-  | "destructive";
+export type PlantDetailDataSourceBadgeVariant = "default" | "secondary" | "outline" | "destructive";
 
 export interface PlantDetailDataSourceInput {
   /** Combined record-store source from combineGrowDataMeta. */
   recordSource: GrowDataSource;
   /** Optional sensor snapshot source — when omitted, only records are described. */
   snapshotSource?: SnapshotSource | null;
+  /** Upstream validation state. Exact `ok` is required for Live. */
+  snapshotQuality?: unknown;
   /** Optional caller-computed stale flag for the latest sensor reading. */
   isStale?: boolean;
 }
@@ -68,10 +61,7 @@ const BADGE_TEXT: Record<PlantDetailDataSourceLabel, string> = {
   Unavailable: "Unavailable",
 };
 
-const VARIANT_BY_LABEL: Record<
-  PlantDetailDataSourceLabel,
-  PlantDetailDataSourceBadgeVariant
-> = {
+const VARIANT_BY_LABEL: Record<PlantDetailDataSourceLabel, PlantDetailDataSourceBadgeVariant> = {
   Live: "default",
   Manual: "secondary",
   Demo: "outline",
@@ -102,8 +92,7 @@ const HELP: Record<
       "This is sample or simulated data so you can explore Verdant. It is not live tent data, not a real reading, and never drives persisted alerts or grow decisions.",
   },
   Stale: {
-    description:
-      "Readings may be outdated. Latest reading is older than the freshness window.",
+    description: "Readings may be outdated. Latest reading is older than the freshness window.",
     helpTitle: "Stale data",
     helpBody:
       "The latest sensor or manual reading for this plant is older than Verdant's freshness window, so it may not reflect current tent conditions. Capture a fresh reading before acting on it.",
@@ -132,10 +121,8 @@ export function buildPlantDetailDataSourceView(
   };
 }
 
-function resolveLabel(
-  input: PlantDetailDataSourceInput,
-): PlantDetailDataSourceLabel {
-  const { recordSource, snapshotSource, isStale } = input;
+function resolveLabel(input: PlantDetailDataSourceInput): PlantDetailDataSourceLabel {
+  const { recordSource, snapshotSource, snapshotQuality, isStale } = input;
 
   // 1. Demo / sample always wins — never let demo look live.
   if (recordSource === "mock") return "Demo";
@@ -145,10 +132,7 @@ function resolveLabel(
   if (recordSource === "mixed") return "Demo";
 
   // 2. Unavailable when nothing trustworthy is known.
-  if (
-    recordSource === "unavailable" &&
-    (!snapshotSource || snapshotSource === "unavailable")
-  ) {
+  if (recordSource === "unavailable" && (!snapshotSource || snapshotSource === "unavailable")) {
     return "Unavailable";
   }
 
@@ -156,7 +140,14 @@ function resolveLabel(
   if (snapshotSource === "live") {
     // Never call a snapshot "Live" if the underlying record store isn't real.
     if (recordSource !== "supabase") return "Unavailable";
-    return isStale ? "Stale" : "Live";
+    if (isStale) return "Stale";
+    return evaluateCurrentLiveSensorTruth({
+      source: snapshotSource,
+      quality: snapshotQuality,
+      freshness: "fresh",
+    }).isCurrentLive
+      ? "Live"
+      : "Unavailable";
   }
   if (snapshotSource === "manual" || snapshotSource === "diary") {
     return isStale ? "Stale" : "Manual";

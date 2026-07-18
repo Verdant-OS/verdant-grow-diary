@@ -40,6 +40,9 @@ import {
   type EarlyStageAiDoctorContext,
 } from "./earlyStageAiDoctorContextRules";
 import { isSensorTestbenchRow } from "./sensorTestbenchIndicatorRules";
+import { assertCanonicalSensorSource } from "@/constants/sensorIngestProvenance";
+import { evaluateCurrentLiveSensorTruth } from "@/lib/currentLiveSensorTruthRules";
+import { STALE_THRESHOLD_MS } from "@/lib/sensorSnapshot";
 
 /** Section label rendered for imported CSV/XLSX sensor history. */
 export const AI_DOCTOR_IMPORTED_SENSOR_HISTORY_SECTION_LABEL = "Imported sensor history";
@@ -71,9 +74,14 @@ export interface ImportedSensorHistorySection extends AiDoctorCsvHistoryContext 
  * literals from packet copy.
  */
 export function isFreshLiveSnapshotAnnotation(
-  annotation: { source: string; stale: boolean } | null | undefined,
+  annotation: { source: string; stale: boolean; trust?: string | null } | null | undefined,
 ): boolean {
-  return !!annotation && annotation.source === "live" && annotation.stale === false;
+  return (
+    !!annotation &&
+    annotation.source === "live" &&
+    annotation.stale === false &&
+    annotation.trust === "high"
+  );
 }
 
 export function buildImportedSensorHistorySection(
@@ -185,6 +193,8 @@ export interface SensorRollingAverages {
 
 export interface SensorSourceGroup {
   source: SensorSourceTag;
+  /** Group-level proof retained for downstream current-Live checks. */
+  quality: "ok" | null;
   sample_count: number;
   averages: SensorRollingAverages;
   readings: readonly RecentSensorReading[];
@@ -273,49 +283,38 @@ export interface CompilePlantContextFromRowsInput {
 const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000;
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
-function classifySource(row: SensorReadingRowLike): SensorSourceTag {
-  // Explicit state/quality flags win — invalid/stale must never read as live.
-  const stateLike = (row.state ?? row.quality ?? "").toString().toLowerCase().trim();
-  if (stateLike === "invalid") return "invalid";
-  if (stateLike === "stale") return "stale";
-  if (stateLike === "demo") return "demo";
-  if (stateLike === "manual") return "manual";
-  if (stateLike === "csv") return "csv";
+function classifySource(row: SensorReadingRowLike, nowMs: number): SensorSourceTag {
+  // Explicit exact state flags win. Casing/whitespace variants are
+  // untrusted input and never earn a more favorable bucket.
+  if (row.state === "invalid" || row.quality === "invalid") return "invalid";
+  if (row.state === "stale" || row.quality === "stale") return "stale";
+  if (row.state === "demo") return "demo";
+  if (row.state === "manual") return "manual";
+  if (row.state === "csv") return "csv";
   // A successful testbench transport is intentionally stored with canonical
   // source=live, but its preserved provenance is diagnostic—not plant truth.
   // Keep it visible in the non-trustworthy demo bucket and out of live
   // averages/readiness.
   if (isSensorTestbenchRow(row)) return "demo";
-  const rawSource = row.source;
-  // Missing / blank source must never be trusted as live telemetry.
-  if (rawSource === null || rawSource === undefined) return "invalid";
-  const source = rawSource.toString().toLowerCase().trim();
-  if (source.length === 0) return "invalid";
-  if (source === "invalid" || source === "unknown") return "invalid";
-  if (source === "stale") return "stale";
-  if (source === "demo" || source === "demo_fixture") return "demo";
-  if (source === "manual" || source === "manual_snapshot") return "manual";
-  if (source === "csv" || source === "csv_import" || source === "import") return "csv";
-  // Known live-sensor vendor identifiers. Anything else is untrusted and
-  // is bucketed as "invalid" so unrecognized telemetry never folds into
-  // the live / healthy view of the plant.
-  const LIVE_VENDORS = new Set([
-    "live",
-    "sensor",
-    "realtime",
-    "ecowitt",
-    "ecowitt_cloud",
-    "ecowitt_local",
-    "home_assistant",
-    "homeassistant",
-    "mqtt",
-    "pi",
-    "pi_bridge",
-    "raspberry_pi",
-    "shelly",
-    "shelly_ht",
-  ]);
-  if (LIVE_VENDORS.has(source)) return "live";
+  const source = assertCanonicalSensorSource(row.source);
+  if (!source) return "invalid";
+  if (source !== "live") return source;
+
+  const capturedAt = typeof row.captured_at === "string" ? Date.parse(row.captured_at) : NaN;
+  const age = nowMs - capturedAt;
+  const freshness =
+    Number.isFinite(capturedAt) && age >= 0
+      ? age <= STALE_THRESHOLD_MS
+        ? "fresh"
+        : "stale"
+      : "unknown";
+  const truth = evaluateCurrentLiveSensorTruth({
+    source,
+    quality: row.quality,
+    freshness,
+  });
+  if (truth.isCurrentLive) return "live";
+  if (truth.qualityIsOk && freshness === "stale") return "stale";
   return "invalid";
 }
 
@@ -388,7 +387,7 @@ export function compilePlantContextFromRows(
       metric: String(r.metric),
       value,
       unit: r.unit ?? null,
-      source_tag: classifySource(r),
+      source_tag: classifySource(r, nowMs),
     });
   }
   recentSensorReadings.sort((a, b) =>
@@ -417,6 +416,7 @@ export function compilePlantContextFromRows(
     if (!list || list.length === 0) continue;
     sensor_groups.push({
       source: tag,
+      quality: tag === "live" ? "ok" : null,
       sample_count: list.length,
       averages: bucketAverages(list),
       readings: Object.freeze(list.slice()),

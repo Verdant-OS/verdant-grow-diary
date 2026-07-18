@@ -23,10 +23,7 @@ import type { AiDoctorContextPayload } from "@/lib/aiDoctorEnginePhase1Foundatio
 import { plantDetailPath } from "@/lib/routes";
 import { AI_DOCTOR_PHASE1_FOCUS_VISIBLE_LINK_CLASSES } from "@/lib/aiDoctorPhase1A11yClassNames";
 
-export type AiDoctorPhase1ChecklistStatus =
-  | "available"
-  | "missing"
-  | "needs_review";
+export type AiDoctorPhase1ChecklistStatus = "available" | "missing" | "needs_review";
 
 export interface AiDoctorPhase1ChecklistCtaContext {
   plantId?: string | null;
@@ -81,7 +78,8 @@ function evaluateSensorStatus(
       m.latest_source !== null &&
       TRUSTED_LIVE_SOURCES.has(m.latest_source) &&
       !m.is_stale &&
-      !m.is_invalid,
+      !m.is_invalid &&
+      !m.is_degraded,
   );
   if (hasTrustworthy) return "available";
   const hasDegraded = summary.some(
@@ -95,9 +93,7 @@ export function buildAiDoctorPhase1Checklist(
 ): AiDoctorPhase1ChecklistItem[] {
   const ctx = props.context;
   const q = ctaQuery(props.ctaContext);
-  const plantPath = props.ctaContext.plantId
-    ? plantDetailPath(props.ctaContext.plantId)
-    : null;
+  const plantPath = props.ctaContext.plantId ? plantDetailPath(props.ctaContext.plantId) : null;
   const addPhotoCta = plantPath
     ? { id: "add-photo", label: "Add Photo", to: `${plantPath}${q}` }
     : null;
@@ -119,8 +115,7 @@ export function buildAiDoctorPhase1Checklist(
 
   const photoCount = ctx?.recent_photos_count ?? 0;
   const recentLogs = ctx?.recent_logs ?? [];
-  const wateringFeeding =
-    (ctx?.recent_watering_events ?? 0) + (ctx?.recent_feeding_events ?? 0);
+  const wateringFeeding = (ctx?.recent_watering_events ?? 0) + (ctx?.recent_feeding_events ?? 0);
   const sensorStatus = evaluateSensorStatus(ctx);
 
   const items: AiDoctorPhase1ChecklistItem[] = [
@@ -170,9 +165,7 @@ export function buildAiDoctorPhase1Checklist(
       id: "stage",
       label: "Plant stage",
       status: ctx?.stage ? "available" : "missing",
-      next_step: ctx?.stage
-        ? `Stage: ${ctx.stage}.`
-        : "Set the plant stage in plant context.",
+      next_step: ctx?.stage ? `Stage: ${ctx.stage}.` : "Set the plant stage in plant context.",
       cta: ctx?.stage ? null : updatePlantCta,
     },
     {
@@ -216,9 +209,7 @@ function statusCopy(status: AiDoctorPhase1ChecklistStatus): string {
  * recommends nutrients, irrigation, equipment, stress training, or
  * device actions. Never infers causes from missing data.
  */
-export function helperTextForChecklistItem(
-  item: AiDoctorPhase1ChecklistItem,
-): string | null {
+export function helperTextForChecklistItem(item: AiDoctorPhase1ChecklistItem): string | null {
   if (item.status === "available") return null;
   if (item.id === "fresh_sensor" && item.status === "needs_review") {
     return "Sensor data is stale, invalid, or degraded and should not be treated as healthy.";
@@ -250,10 +241,7 @@ export function helperTextForChecklistItem(
  * "Update plant context"). When the plant name is unavailable, falls
  * back to "for selected plant".
  */
-export function ariaLabelForChecklistCta(
-  ctaId: string,
-  plantName?: string | null,
-): string {
+export function ariaLabelForChecklistCta(ctaId: string, plantName?: string | null): string {
   const who = plantName ? `for ${plantName}` : "for selected plant";
   switch (ctaId) {
     case "add-photo":
@@ -280,9 +268,7 @@ export function AiDoctorPhase1MissingContextChecklist(
       className="space-y-2 rounded-md border border-border bg-card p-4 text-sm"
     >
       <header className="space-y-0.5">
-        <h2 className="text-base font-semibold text-foreground">
-          Context readiness
-        </h2>
+        <h2 className="text-base font-semibold text-foreground">Context readiness</h2>
         <p className="text-xs text-muted-foreground">
           Read-only checklist — no equipment is changed from this view.
         </p>
@@ -298,9 +284,7 @@ export function AiDoctorPhase1MissingContextChecklist(
               className="space-y-1.5 rounded border border-border bg-background p-3"
             >
               <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                <span className="text-sm font-medium text-foreground">
-                  {item.label}
-                </span>
+                <span className="text-sm font-medium text-foreground">{item.label}</span>
                 <span
                   data-testid={`ai-doctor-phase1-checklist-status-${item.id}`}
                   className="self-start rounded border border-border bg-muted px-2 py-0.5 text-xs text-muted-foreground sm:self-auto"

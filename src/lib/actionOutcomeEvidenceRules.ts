@@ -226,6 +226,10 @@ export function normalizeSensorEvidence(input: {
     }
 
     const quality = typeof row.quality === "string" ? row.quality : null;
+    if (source === "live" && quality !== "ok") {
+      rejections.push({ reason: "unusable_quality", metric: row.metric });
+      continue;
+    }
     if (quality && UNUSABLE_QUALITY.has(quality)) {
       rejections.push({ reason: "unusable_quality", metric: row.metric });
       continue;

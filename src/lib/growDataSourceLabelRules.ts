@@ -7,6 +7,8 @@
  * No React, no Supabase, no I/O. Deterministic for any given input + `now`.
  */
 
+import { evaluateCurrentLiveSensorTruth } from "@/lib/currentLiveSensorTruthRules";
+
 export type GrowDataSourceLabel =
   | "Live"
   | "Manual"
@@ -24,6 +26,10 @@ export interface GrowDataSourceInput {
   value?: number | string | null;
   /** ISO timestamp, Date, or millis. */
   timestamp?: string | number | Date | null;
+  /** Persisted ingest quality. Exact `ok` is required for Live. */
+  quality?: string | null;
+  /** Provenance-resolved snapshot status; Live additionally requires `usable`. */
+  status?: string | null;
 }
 
 export interface GrowDataSourceLabelOptions {
@@ -50,17 +56,6 @@ const MANUAL_SOURCES = new Set(["manual", "user", "entry", "log"]);
 // NOTE: source identifiers here intentionally avoid certain reserved
 // vendor literals to keep the action-queue safety contract test clean.
 // Callers normalize their own ingest source tags before passing them in.
-const LIVE_SOURCES = new Set([
-  "live",
-  "supabase",
-  "sensor",
-  "hassio",
-  "ha",
-  "broker",
-  "api",
-  "device",
-  "gateway",
-]);
 
 function normalizeSource(source: unknown): string | null {
   if (typeof source !== "string") return null;
@@ -120,6 +115,12 @@ export function classifyGrowDataSource(
   const tsInvalid = tsProvided && tsMillis === null;
   const ageMs = tsMillis !== null ? now - tsMillis : null;
   const isStale = ageMs !== null && (ageMs > staleThresholdMs || ageMs < -staleThresholdMs);
+  const freshness =
+    tsMillis === null || ageMs === null || ageMs < 0
+      ? "unknown"
+      : ageMs > staleThresholdMs
+        ? "stale"
+        : "fresh";
 
   // 1. Demo / mock always wins — never trusted, never Live.
   if (source && DEMO_SOURCES.has(source)) {
@@ -238,7 +239,7 @@ export function classifyGrowDataSource(
   }
 
   // 7. Live sources.
-  if (LIVE_SOURCES.has(source)) {
+  if (input?.source === "live") {
     if (tsMillis === null) {
       reasons.push("live source without timestamp");
       return {
@@ -261,7 +262,23 @@ export function classifyGrowDataSource(
         reasons,
       };
     }
-    reasons.push("live source within freshness window");
+    const truth = evaluateCurrentLiveSensorTruth({
+      source: input.source,
+      quality: input.quality,
+      freshness,
+    });
+    if (!truth.isCurrentLive || input.status !== "usable") {
+      reasons.push("live source did not pass quality/freshness/status proof");
+      return {
+        label: "Unavailable",
+        severity: "warning",
+        message: "Connected sensor reading is not verified as current and usable.",
+        shouldDisplayBadge: true,
+        isTrustedForAi: false,
+        reasons,
+      };
+    }
+    reasons.push("exact live source with ok quality, fresh capture, and usable status");
     return {
       label: "Live",
       severity: "good",

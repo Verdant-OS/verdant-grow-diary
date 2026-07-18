@@ -17,8 +17,9 @@ const PRESENTER = fs.readFileSync(
   path.resolve(__dirname, "../pages/OneTentLoopLiveProof.tsx"),
   "utf8",
 );
-const RULES = fs.readFileSync(
-  path.resolve(__dirname, "../lib/oneTentLoopProofRules.ts"),
+const RULES = fs.readFileSync(path.resolve(__dirname, "../lib/oneTentLoopProofRules.ts"), "utf8");
+const CURRENT_LIVE_RULES = fs.readFileSync(
+  path.resolve(__dirname, "../lib/currentLiveSensorTruthRules.ts"),
   "utf8",
 );
 const VM = fs.readFileSync(
@@ -80,8 +81,15 @@ describe("OneTentLoopLiveProof — static safety", () => {
 
   it("rules module has no I/O primitives", () => {
     assertNone(RULES, [...WRITE_PATTERNS, ...NETWORK_PATTERNS], "oneTentLoopProofRules.ts");
+    assertNone(
+      CURRENT_LIVE_RULES,
+      [...WRITE_PATTERNS, ...NETWORK_PATTERNS],
+      "currentLiveSensorTruthRules.ts",
+    );
     expect(RULES.includes("supabase")).toBe(false);
+    expect(CURRENT_LIVE_RULES.includes("supabase")).toBe(false);
     expect(RULES.includes("Date.now(")).toBe(false);
+    expect(CURRENT_LIVE_RULES.includes("Date.now(")).toBe(false);
   });
 
   it("view model has no I/O primitives", () => {
@@ -91,6 +99,7 @@ describe("OneTentLoopLiveProof — static safety", () => {
 
   it("rules + view model contain no forbidden device-control / overconfidence copy", () => {
     assertNone(RULES.toLowerCase(), FORBIDDEN_COPY, "oneTentLoopProofRules.ts");
+    assertNone(CURRENT_LIVE_RULES.toLowerCase(), FORBIDDEN_COPY, "currentLiveSensorTruthRules.ts");
     assertNone(VM.toLowerCase(), FORBIDDEN_COPY, "oneTentLoopLiveProofViewModel.ts");
   });
 });

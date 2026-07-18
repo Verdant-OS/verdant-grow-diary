@@ -77,11 +77,12 @@ export default function SensorSnapshotCard({
       )}
     >
       <div className="flex flex-wrap items-center gap-2">
-        <SensorSourceBadge source={freshness.source} />
-        <span
-          data-testid={`${testId}-age`}
-          className="text-[11px] text-muted-foreground"
-        >
+        <SensorSourceBadge
+          source={freshness.source}
+          quality={flags.length > 0 ? "invalid" : snapshot.quality}
+          freshness={freshness.freshness}
+        />
+        <span data-testid={`${testId}-age`} className="text-[11px] text-muted-foreground">
           {freshness.ageLabel}
         </span>
         <span
@@ -164,10 +165,7 @@ export default function SensorSnapshotCard({
               No corrections recorded.
             </p>
           ) : (
-            <ul
-              data-testid={`${testId}-edit-history-list`}
-              className="space-y-1.5"
-            >
+            <ul data-testid={`${testId}-edit-history-list`} className="space-y-1.5">
               {edits.map((e) => (
                 <li
                   key={e.id}

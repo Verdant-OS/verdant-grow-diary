@@ -25,13 +25,15 @@ describe("countActivatingSensorReadings", () => {
   it("counts only non-diagnostic live, manual, and CSV evidence", () => {
     expect(
       countActivatingSensorReadings([
+        { source: "live", quality: "ok" },
+        { source: "manual", quality: "ok" },
+        { source: "csv", quality: "ok" },
+        { source: " MANUAL ", quality: "ok" },
+        { source: "demo", quality: "ok" },
+        { source: "stale", quality: "ok" },
+        { source: "invalid", quality: "ok" },
+        { source: "mystery_bridge", quality: "ok" },
         { source: "live" },
-        { source: " MANUAL " },
-        { source: "csv" },
-        { source: "demo" },
-        { source: "stale" },
-        { source: "invalid" },
-        { source: "mystery_bridge" },
         {},
       ]),
     ).toBe(3);
@@ -39,20 +41,24 @@ describe("countActivatingSensorReadings", () => {
 
   it("does not let a canonical-live diagnostic row activate onboarding", () => {
     expect(
-      countActivatingSensorReadings([{ source: "live", raw_payload: diagnosticPayload }]),
+      countActivatingSensorReadings([
+        { source: "live", quality: "ok", raw_payload: diagnosticPayload },
+      ]),
     ).toBe(0);
   });
 
   it("keeps a physically proven gateway row eligible through the shared exception", () => {
     expect(
-      countActivatingSensorReadings([{ source: "live", raw_payload: physicalGatewayPayload }]),
+      countActivatingSensorReadings([
+        { source: "live", quality: "ok", raw_payload: physicalGatewayPayload },
+      ]),
     ).toBe(1);
   });
 
   it("is null-safe, deterministic, and does not mutate its input", () => {
     const rows = [
-      { source: "manual" },
-      { source: "live", raw_payload: diagnosticPayload },
+      { source: "manual", quality: "ok" },
+      { source: "live", quality: "ok", raw_payload: diagnosticPayload },
     ] as const;
     const before = JSON.stringify(rows);
 

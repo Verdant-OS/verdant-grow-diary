@@ -108,7 +108,7 @@ export async function loadActionResponseMemories(
     if (snapshotIds.length > 0) {
       const { data: sensorData, error: sensorError } = await client
         .from("sensor_readings")
-        .select("id,tent_id,source,captured_at,raw_payload")
+        .select("id,tent_id,source,quality,captured_at,raw_payload")
         .in("id", snapshotIds);
       sensorRows = sensorError
         ? undefined

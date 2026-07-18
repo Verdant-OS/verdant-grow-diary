@@ -1,31 +1,27 @@
 /**
  * DashboardDataSourceDisclosure — presenter-only banner shown near the top of
  * the Dashboard to honestly disclose whether the visible cards/KPIs/charts
- * are backed by Live (Supabase), Demo (mock), Mixed, or Unavailable data.
+ * are backed by Saved (Supabase), Demo (mock), Mixed, or Unavailable data.
  *
  * Pure presenter. Classification stays in `combineGrowDataMeta` /
  * `getGrowDataMeta` from `useGrowData`. No queries, no writes.
  */
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import {
-  combineGrowDataMeta,
-  getGrowDataMeta,
-  type GrowDataSourceMeta,
-} from "@/hooks/useGrowData";
+import { combineGrowDataMeta, getGrowDataMeta, type GrowDataSourceMeta } from "@/hooks/useGrowData";
 import type { SnapshotSource } from "@/lib/sensorSnapshot";
 
-type Label = "Live" | "Demo" | "Mixed" | "Unavailable";
+type Label = "Saved" | "Demo" | "Mixed" | "Unavailable";
 
 const LABEL_BY_SOURCE: Record<GrowDataSourceMeta["dataSource"], Label> = {
-  supabase: "Live",
+  supabase: "Saved",
   mock: "Demo",
   mixed: "Mixed",
   unavailable: "Unavailable",
 };
 
 const VARIANT_BY_LABEL: Record<Label, "default" | "secondary" | "outline" | "destructive"> = {
-  Live: "default",
+  Saved: "default",
   Demo: "outline",
   Mixed: "secondary",
   Unavailable: "destructive",
@@ -35,14 +31,14 @@ const VARIANT_BY_LABEL: Record<Label, "default" | "secondary" | "outline" | "des
 // saved account data — only true real-time sensor telemetry should be
 // labeled "Live". Saved grows/tents/plants are honestly "Saved".
 const BADGE_TEXT: Record<Label, string> = {
-  Live: "Saved data",
+  Saved: "Saved data",
   Demo: "Demo data",
   Mixed: "Mixed data",
   Unavailable: "Unavailable",
 };
 
 const DESCRIPTION: Record<Label, string> = {
-  Live: "Loaded from your Verdant account.",
+  Saved: "Loaded from your Verdant account.",
   Demo: "Showing demo data. Connect real tents, plants, and sensors to replace it.",
   Mixed: "Some data is real, some is demo or manual. Add or connect more to replace the demo data.",
   Unavailable: "No grow data available yet.",

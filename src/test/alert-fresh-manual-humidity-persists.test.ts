@@ -12,10 +12,7 @@
  *  - No automation, no AI, no device control.
  */
 import { describe, it, expect } from "vitest";
-import {
-  buildEnvironmentAlerts,
-  type EnvironmentAlert,
-} from "@/lib/environmentAlerts";
+import { buildEnvironmentAlerts, type EnvironmentAlert } from "@/lib/environmentAlerts";
 import {
   isSnapshotPersistable,
   selectPersistableAlerts,
@@ -32,6 +29,7 @@ const FRESH_TS = new Date(NOW - 8 * 60_000).toISOString(); // 8 min ago
 function freshManualHumiditySnapshot(rh: number): SensorSnapshot {
   return {
     source: "manual",
+    quality: "ok",
     ts: FRESH_TS,
     temp: 24,
     rh,
@@ -56,9 +54,7 @@ function rhHighTargets(rh: number, max = 55): TargetComparisonResult {
     status: "out_of_range",
     headline: "",
     reasons: [],
-    metrics: [
-      { metric: "rh", label: "Humidity", value: rh, min: 40, max, state: "high" },
-    ],
+    metrics: [{ metric: "rh", label: "Humidity", value: rh, min: 40, max, state: "high" }],
   } as unknown as TargetComparisonResult;
 }
 
@@ -67,18 +63,14 @@ function rhInRangeTargets(rh: number): TargetComparisonResult {
     status: "in_range",
     headline: "",
     reasons: [],
-    metrics: [
-      { metric: "rh", label: "Humidity", value: rh, min: 55, max: 70, state: "ok" },
-    ],
+    metrics: [{ metric: "rh", label: "Humidity", value: rh, min: 55, max: 70, state: "ok" }],
   } as unknown as TargetComparisonResult;
 }
 
 describe("fresh manual RH above max → high-humidity alert (regression)", () => {
   it("snapshot is persistable: fresh, manual source, usable quality", () => {
     const snapshot = freshManualHumiditySnapshot(61);
-    expect(
-      isSnapshotPersistable({ snapshot, quality: "good", now: NOW }),
-    ).toBe(true);
+    expect(isSnapshotPersistable({ snapshot, quality: "good", now: NOW })).toBe(true);
   });
 
   it("buildEnvironmentAlerts emits target:rh:high for RH 61 with max 55", () => {
@@ -153,11 +145,13 @@ describe("fresh manual RH above max → high-humidity alert (regression)", () =>
     // And the key shapes match so the dedupe path is exercised, not a
     // happy-coincidence empty list.
     const derivedAlert = kept.find((a) => a.id === "target:rh:high") as EnvironmentAlert;
-    expect(persistedAlertKey({
-      metric: "rh",
-      source: "environment_alerts",
-      title: derivedAlert.title,
-    })).toBeTruthy();
+    expect(
+      persistedAlertKey({
+        metric: "rh",
+        source: "environment_alerts",
+        title: derivedAlert.title,
+      }),
+    ).toBeTruthy();
   });
 
   it("does not introduce an Action Queue write — the alert pipeline returns plain alerts only", () => {

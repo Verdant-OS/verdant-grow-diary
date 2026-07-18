@@ -27,6 +27,7 @@ describe("normalizeSpiderFarmerGgsPayload — happy paths", () => {
     );
     expect(r.provider).toBe(SPIDER_FARMER_GGS_PROVIDER);
     expect(r.source).toBe("live");
+    expect(r.quality).toBe("ok");
     expect(r.transport).toBe("mqtt");
     expect(r.tent_id).toBe("tent-1");
     expect(r.controller_id).toBe("ggs-001");
@@ -102,12 +103,27 @@ describe("normalizeSpiderFarmerGgsPayload — safety / invalid", () => {
     );
     expect(high.readings.humidity).toBeUndefined();
     expect(high.warnings).toContain("humidity_out_of_range");
+    expect(high.source).toBe("invalid");
 
-    const neg = normalizeSpiderFarmerGgsPayload(
-      { captured_at: FRESH, humidity: -5 },
+    const neg = normalizeSpiderFarmerGgsPayload({ captured_at: FRESH, humidity: -5 }, { now: NOW });
+    expect(neg.warnings).toContain("humidity_out_of_range");
+    expect(neg.source).toBe("invalid");
+  });
+
+  it.each([0, 100])("rejects humidity and soil-moisture rail value %s", (value) => {
+    const r = normalizeSpiderFarmerGgsPayload(
+      {
+        captured_at: FRESH,
+        temp_f: 75,
+        humidity: value,
+        soil_water_content: value,
+      },
       { now: NOW },
     );
-    expect(neg.warnings).toContain("humidity_out_of_range");
+    expect(r.source).toBe("invalid");
+    expect(r.quality).toBe("invalid");
+    expect(r.readings.humidity).toBeUndefined();
+    expect(r.readings.soil_water_content).toBeUndefined();
   });
 
   it("flags negative PPFD and CO2", () => {
@@ -148,10 +164,7 @@ describe("normalizeSpiderFarmerGgsPayload — safety / invalid", () => {
 
 describe("normalizeSpiderFarmerGgsPayload — required regression coverage", () => {
   it("missing captured_at degrades to stale (never live) and never fabricates 'now'", () => {
-    const r = normalizeSpiderFarmerGgsPayload(
-      { temp_f: 75, humidity: 50 },
-      { now: NOW },
-    );
+    const r = normalizeSpiderFarmerGgsPayload({ temp_f: 75, humidity: 50 }, { now: NOW });
     expect(r.source).toBe("stale");
     expect(r.captured_at).toBeNull();
     expect(r.warnings).toContain("captured_at_missing");
@@ -175,6 +188,16 @@ describe("normalizeSpiderFarmerGgsPayload — required regression coverage", () 
     expect(r.source).toBe("invalid");
     expect(r.captured_at).toBeNull();
     expect(r.warnings).toContain("captured_at_invalid");
+  });
+
+  it("rejects any future captured_at instead of allowing clock-skew live", () => {
+    const r = normalizeSpiderFarmerGgsPayload(
+      { captured_at: new Date(NOW.getTime() + 1).toISOString(), temp_f: 75 },
+      { now: NOW },
+    );
+    expect(r.source).toBe("invalid");
+    expect(r.quality).toBe("invalid");
+    expect(r.warnings).toContain("captured_at_future");
   });
 
   it("invalid captured_at type (object) is rejected, never falls back to now", () => {

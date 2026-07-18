@@ -62,8 +62,8 @@ describe("buildPlantTentEnvironmentView (pure)", () => {
     // old fixture's "sensor" string relied on the (fixed) default-to-live
     // snapshot classification.
     const view = buildPlantTentEnvironmentView([
-      { ts, metric: "temperature_c", value: 24.5, source: "live" },
-      { ts, metric: "humidity_pct", value: 55, source: "live" },
+      { ts, metric: "temperature_c", value: 24.5, source: "live", quality: "ok" },
+      { ts, metric: "humidity_pct", value: 55, source: "live", quality: "ok" },
     ]);
     expect(view.hasReadings).toBe(true);
     expect(view.sourceLabel).toBe("Live sensor");
@@ -97,6 +97,7 @@ describe("buildPlantTentEnvironmentView (pure)", () => {
         metric: "temperature_c",
         value: 24.5,
         source: "live",
+        quality: "ok",
         raw_payload: {
           vendor: "ecowitt_windows_testbench",
           metadata: { verdant_source: "live" },
@@ -117,6 +118,7 @@ describe("buildPlantTentEnvironmentView (pure)", () => {
         metric: "temperature_c",
         value: 24.5,
         source: "live",
+        quality: "ok",
         raw_payload: {
           vendor: "ecowitt_windows_testbench",
           metadata: {
@@ -179,7 +181,7 @@ describe("usePlantTentLatestReadings (scoping)", () => {
     });
     await waitFor(() => expect(fromMock).toHaveBeenCalledWith("sensor_readings"));
     expect(selectMock).toHaveBeenCalledWith(
-      "ts,metric,value,source,created_at,device_id,raw_payload",
+      "ts,metric,value,source,quality,created_at,device_id,raw_payload",
     );
     expect(eqMock).toHaveBeenCalledWith("tent_id", "tent-123");
     expect(orderMock).toHaveBeenCalledWith("ts", { ascending: false });

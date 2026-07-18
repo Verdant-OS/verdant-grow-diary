@@ -20,20 +20,15 @@
  * any new write/read path — wiring lives in callers.
  */
 
-import {
-  resolveSensorSourceLabel,
-  type ResolvedSourceLabel,
-} from "@/lib/sensorSourceLabelRules";
+import { resolveSensorSourceLabel, type ResolvedSourceLabel } from "@/lib/sensorSourceLabelRules";
 import {
   evaluateManualSensorSnapshotQuality,
   type ManualSensorSnapshotInput,
   type ManualSensorSnapshotQuality,
 } from "@/lib/manualSensorSnapshotQualityRules";
 import type { SensorReadingSource } from "@/mock";
-import {
-  SENSOR_FIELD_LABELS,
-  type SensorFieldKey,
-} from "@/constants/sensorFields";
+import { SENSOR_FIELD_LABELS, type SensorFieldKey } from "@/constants/sensorFields";
+import { STALE_THRESHOLD_MS } from "@/lib/sensorSnapshot";
 
 /** Canonical metric keys allowed in a timeline snapshot summary. */
 export type TimelineSnapshotMetricKey = SensorFieldKey;
@@ -70,9 +65,7 @@ const METRIC_ORDER: ReadonlyArray<TimelineSnapshotMetricKey> = [
 ];
 
 /** Quality-rule field names → timeline metric keys (for warnings/invalid). */
-const QUALITY_FIELD_TO_METRIC: Readonly<
-  Record<string, TimelineSnapshotMetricKey>
-> = {
+const QUALITY_FIELD_TO_METRIC: Readonly<Record<string, TimelineSnapshotMetricKey>> = {
   temperature_c: "air_temp_c",
   humidity_pct: "humidity_pct",
   vpd_kpa: "vpd_kpa",
@@ -97,6 +90,7 @@ const METRIC_TO_QUALITY_FIELD: Partial<
 
 export interface TimelineSnapshotInput {
   readonly source: SensorReadingSource | null | undefined;
+  readonly quality?: unknown;
   readonly capturedAt?: string | number | Date | null;
   /**
    * Optional hardware vendor lineage tag — only used to re-label a
@@ -179,13 +173,25 @@ function normalizeSourceEnum(
  */
 export function buildTimelineSnapshotSummary(
   input: TimelineSnapshotInput | null | undefined,
+  options: { readonly nowMs?: number; readonly staleThresholdMs?: number } = {},
 ): TimelineSnapshotSummary {
   const source = normalizeSourceEnum(input?.source ?? null);
+  const capturedAtIso = normalizeIso(input?.capturedAt ?? null);
+  const capturedAtMs = capturedAtIso ? Date.parse(capturedAtIso) : Number.NaN;
+  const nowMs = options.nowMs ?? Date.now();
+  const staleThresholdMs = options.staleThresholdMs ?? STALE_THRESHOLD_MS;
+  const freshness =
+    !Number.isFinite(capturedAtMs) || capturedAtMs > nowMs || staleThresholdMs <= 0
+      ? "unknown"
+      : nowMs - capturedAtMs > staleThresholdMs
+        ? "stale"
+        : "fresh";
   const sourceResolved = resolveSensorSourceLabel({
     source: source === "unknown" ? null : source,
     vendor: input?.vendor ?? null,
+    quality: input?.quality,
+    freshness,
   });
-  const capturedAtIso = normalizeIso(input?.capturedAt ?? null);
 
   const cells: TimelineSnapshotMetricCell[] = [];
   const qualityFields: Partial<ManualSensorSnapshotInput> = {};
@@ -202,6 +208,7 @@ export function buildTimelineSnapshotSummary(
   const quality = evaluateManualSensorSnapshotQuality(
     {
       source: source === "unknown" ? null : source,
+      quality: input?.quality,
       captured_at: capturedAtIso,
       ...qualityFields,
     },
@@ -235,6 +242,7 @@ export function buildTimelineSnapshotSummary(
   if (quality.quality === "invalid" || source === "invalid") {
     severity = "invalid";
   } else if (
+    (source === "live" && !sourceResolved.isCurrentLive) ||
     source === "stale" ||
     source === "demo" ||
     quality.quality === "needs_review" ||
@@ -249,7 +257,8 @@ export function buildTimelineSnapshotSummary(
   //  - source is live or manual (csv/demo/stale/invalid/unknown are not)
   //  - severity is ok
   const trustworthy =
-    severity === "ok" && (source === "live" || source === "manual");
+    severity === "ok" &&
+    (source === "manual" || (source === "live" && sourceResolved.isCurrentLive));
 
   // Dedup warnings into stable order.
   const seen = new Set<string>();
@@ -279,8 +288,6 @@ export function buildTimelineSnapshotSummary(
  * to decide whether to render the metric grid or fall through to the
  * neutral "No sensor snapshot attached" empty state.
  */
-export function timelineSnapshotHasAnyMetric(
-  summary: TimelineSnapshotSummary,
-): boolean {
+export function timelineSnapshotHasAnyMetric(summary: TimelineSnapshotSummary): boolean {
   return summary.metrics.length > 0;
 }

@@ -10,8 +10,7 @@ import {
 } from "../lib/aiDoctorContextCompiler";
 
 const NOW = new Date("2026-06-04T12:00:00Z");
-const iso = (offsetMs: number) =>
-  new Date(NOW.getTime() - offsetMs).toISOString();
+const iso = (offsetMs: number) => new Date(NOW.getTime() - offsetMs).toISOString();
 
 const basePlant = {
   id: "p1",
@@ -32,13 +31,15 @@ describe("compilePlantContextFromRows — source separation", () => {
           metric: "vpd_kpa",
           value: 1.0,
           captured_at: iso(60_000),
-          source: "ecowitt",
+          source: "live",
+          quality: "ok",
         },
         {
           metric: "vpd_kpa",
           value: 1.4,
           captured_at: iso(120_000),
-          source: "ecowitt",
+          source: "live",
+          quality: "ok",
         },
         {
           metric: "vpd_kpa",
@@ -62,27 +63,22 @@ describe("compilePlantContextFromRows — source separation", () => {
           metric: "vpd_kpa",
           value: 5.0,
           captured_at: iso(60_000),
-          source: "ecowitt",
+          source: "live",
+          quality: "ok",
           state: "stale",
         },
         {
           metric: "vpd_kpa",
           value: 99,
           captured_at: iso(60_000),
-          source: "ecowitt",
+          source: "live",
+          quality: "ok",
           state: "invalid",
         },
       ],
       now: NOW,
     });
-    expect(ctx.source_tags).toEqual([
-      "live",
-      "manual",
-      "csv",
-      "demo",
-      "stale",
-      "invalid",
-    ]);
+    expect(ctx.source_tags).toEqual(["live", "manual", "csv", "demo", "stale", "invalid"]);
     const live = ctx.sensor_groups.find((g) => g.source === "live")!;
     const csv = ctx.sensor_groups.find((g) => g.source === "csv")!;
     const demo = ctx.sensor_groups.find((g) => g.source === "demo")!;
@@ -103,14 +99,16 @@ describe("compilePlantContextFromRows — source separation", () => {
           metric: "temperature_c",
           value: 24,
           captured_at: iso(60_000),
-          source: "ecowitt",
+          source: "live",
+          quality: "ok",
         },
         // wildly bad stale reading must not corrupt the 7d average
         {
           metric: "temperature_c",
           value: 99,
           captured_at: iso(60_000),
-          source: "ecowitt",
+          source: "live",
+          quality: "ok",
           state: "stale",
         },
         // invalid must also be excluded from averages_7d
@@ -118,7 +116,8 @@ describe("compilePlantContextFromRows — source separation", () => {
           metric: "temperature_c",
           value: -50,
           captured_at: iso(60_000),
-          source: "ecowitt",
+          source: "live",
+          quality: "ok",
           state: "invalid",
         },
       ],
@@ -188,9 +187,7 @@ describe("compilePlantContextFromRows — windows + determinism", () => {
       ],
       now: NOW,
     });
-    expect(ctx.recent_grow_events.map((e) => e.event_type)).toEqual([
-      "watering",
-    ]);
+    expect(ctx.recent_grow_events.map((e) => e.event_type)).toEqual(["watering"]);
   });
 
   it("computes 7-day averages deterministically regardless of row order", () => {
@@ -199,13 +196,15 @@ describe("compilePlantContextFromRows — windows + determinism", () => {
         metric: "temperature_c",
         value: 22,
         captured_at: iso(1000),
-        source: "ecowitt",
+        source: "live",
+        quality: "ok",
       },
       {
         metric: "temperature_c",
         value: 24,
         captured_at: iso(2000),
-        source: "ecowitt",
+        source: "live",
+        quality: "ok",
       },
     ];
     const rowsB: SensorReadingRowLike[] = [...rowsA].reverse();
@@ -231,15 +230,22 @@ describe("compilePlantContextFromRows — windows + determinism", () => {
       plant: basePlant,
       growEvents: [],
       sensorReadings: [
-        { metric: "vpd_kpa", value: "not-a-number", captured_at: iso(60_000), source: "ecowitt" },
-        { metric: "vpd_kpa", value: 1.2, captured_at: "not-a-date", source: "ecowitt" },
+        {
+          metric: "vpd_kpa",
+          value: "not-a-number",
+          captured_at: iso(60_000),
+          source: "live",
+          quality: "ok",
+        },
+        { metric: "vpd_kpa", value: 1.2, captured_at: "not-a-date", source: "live", quality: "ok" },
         {
           metric: "vpd_kpa",
           value: 1.2,
           captured_at: new Date(NOW.getTime() + 60_000).toISOString(),
-          source: "ecowitt",
+          source: "live",
+          quality: "ok",
         },
-        { metric: "vpd_kpa", value: 1.2, captured_at: iso(60_000), source: "ecowitt" },
+        { metric: "vpd_kpa", value: 1.2, captured_at: iso(60_000), source: "live", quality: "ok" },
       ],
       now: NOW,
     });
@@ -366,7 +372,7 @@ describe("compilePlantContextFromRows — source variant table (untrusted/never-
   // Every variant below must NOT be classified as `live`, must NOT fold
   // into the trustworthy 7-day averages, and must NOT produce a live
   // sensor group. Manual is intentionally excluded (trusted) and so are
-  // known live vendors.
+  // the exact canonical live + quality=ok contract.
   const UNTRUSTED_VARIANTS: ReadonlyArray<{
     label: string;
     row: Partial<SensorReadingRowLike>;
@@ -419,10 +425,7 @@ describe("compilePlantContextFromRows — source variant table (untrusted/never-
     },
   );
 
-  // Known live-vendor allowlist sanity check — these MUST still classify
-  // as live, otherwise the safety patch regressed the trust list.
-  const LIVE_VENDORS = [
-    "live",
+  const NON_CANONICAL_LIVE_ALIASES = [
     "sensor",
     "ecowitt",
     "ecowitt_cloud",
@@ -434,9 +437,9 @@ describe("compilePlantContextFromRows — source variant table (untrusted/never-
     "pi",
   ] as const;
 
-  it.each(LIVE_VENDORS)(
-    "[live vendor: %s] still classifies as live (allowlist regression guard)",
-    (vendor) => {
+  it.each(NON_CANONICAL_LIVE_ALIASES)(
+    "[non-canonical provenance: %s] never classifies as live",
+    (source) => {
       const ctx = compilePlantContextFromRows({
         plant: basePlant,
         growEvents: [],
@@ -445,14 +448,56 @@ describe("compilePlantContextFromRows — source variant table (untrusted/never-
             metric: "temperature_c",
             value: 24,
             captured_at: iso(60_000),
-            source: vendor,
+            source,
+            quality: "ok",
           },
         ],
         now: NOW,
       });
-      expect(ctx.hasLiveSensorReadings).toBe(true);
-      expect(ctx.averages_7d.temperature_c).toBe(24);
+      expect(ctx.hasLiveSensorReadings).toBe(false);
+      expect(ctx.averages_7d.temperature_c).toBeNull();
     },
   );
-});
 
+  it("requires exact quality=ok for canonical live rows", () => {
+    for (const quality of [undefined, null, "degraded", "OK", " ok "]) {
+      const ctx = compilePlantContextFromRows({
+        plant: basePlant,
+        growEvents: [],
+        sensorReadings: [
+          {
+            metric: "temperature_c",
+            value: 24,
+            captured_at: iso(60_000),
+            source: "live",
+            quality,
+          },
+        ],
+        now: NOW,
+      });
+      expect(ctx.hasLiveSensorReadings).toBe(false);
+      expect(ctx.averages_7d.temperature_c).toBeNull();
+    }
+  });
+
+  it("keeps valid but old canonical live telemetry in the stale bucket", () => {
+    const ctx = compilePlantContextFromRows({
+      plant: basePlant,
+      growEvents: [],
+      sensorReadings: [
+        {
+          metric: "temperature_c",
+          value: 24,
+          captured_at: iso(31 * 60_000),
+          source: "live",
+          quality: "ok",
+        },
+      ],
+      now: NOW,
+    });
+    expect(ctx.hasLiveSensorReadings).toBe(false);
+    expect(ctx.sensor_groups).toEqual([
+      expect.objectContaining({ source: "stale", sample_count: 1 }),
+    ]);
+  });
+});

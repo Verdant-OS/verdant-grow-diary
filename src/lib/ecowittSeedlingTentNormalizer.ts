@@ -5,11 +5,13 @@
 
 import {
   CanonicalEcowittTentSnapshot,
+  classifyEcowittCaptureTime,
   DEFAULT_MAX_AGE_MS,
   ECOWITT_PROVIDER,
   EcowittNormalizeOptions,
   EcowittSnapshotSource,
   inRangeOrNull,
+  inSensorPercentageRangeOrNull,
   RootZoneConfidence,
   toNumberOrNull,
 } from "./ecowittTentSnapshot";
@@ -35,7 +37,7 @@ export function normalizeEcowittSeedlingTentPayload(
   const humRaw = toNumberOrNull(payload[SEEDLING_TENT_CHANNEL_MAP.humidity_pct]);
 
   const air = inRangeOrNull(airRaw, -40, 200);
-  const hum = inRangeOrNull(humRaw, 0, 100);
+  const hum = inSensorPercentageRangeOrNull(humRaw);
 
   if (airRaw === null) degraded.push("missing:air_temp_f");
   if (humRaw === null) degraded.push("missing:humidity_pct");
@@ -45,8 +47,11 @@ export function normalizeEcowittSeedlingTentPayload(
   const capturedAt = options.captured_at_ms ?? null;
   const nowMs = (options.now ?? new Date()).getTime();
   const maxAge = options.max_age_ms ?? DEFAULT_MAX_AGE_MS;
-  if (capturedAt !== null && Number.isFinite(capturedAt)) {
-    if (nowMs - capturedAt > maxAge) degraded.push("stale:captured_at");
+  const captureTimeState = classifyEcowittCaptureTime(capturedAt, nowMs, maxAge);
+  if (captureTimeState === "missing") degraded.push("missing:captured_at");
+  if (captureTimeState === "stale") degraded.push("stale:captured_at");
+  if (captureTimeState === "invalid" || captureTimeState === "future") {
+    invalid.push(`${captureTimeState}:captured_at`);
   }
 
   // No soil channels mapped for Seedling in this slice.
@@ -59,9 +64,7 @@ export function normalizeEcowittSeedlingTentPayload(
   else source = "live";
 
   const captured_at_iso =
-    capturedAt !== null && Number.isFinite(capturedAt)
-      ? new Date(capturedAt).toISOString()
-      : null;
+    capturedAt !== null && Number.isFinite(capturedAt) ? new Date(capturedAt).toISOString() : null;
 
   return {
     source,

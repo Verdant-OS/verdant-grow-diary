@@ -14,15 +14,9 @@ import {
   type SensorSnapshotStatus,
 } from "@/lib/sensorSnapshotStatusContract";
 import { isSensorTestbenchRow } from "@/lib/sensorTestbenchIndicatorRules";
-
-const VALID_SOURCES: readonly SensorReadingSource[] = [
-  "live",
-  "manual",
-  "csv",
-  "demo",
-  "stale",
-  "invalid",
-];
+import { classifyFreshness, type SensorSnapshotFreshness } from "@/lib/latestSensorSnapshotRules";
+import { evaluateCurrentLiveSensorTruth } from "@/lib/currentLiveSensorTruthRules";
+import { assertCanonicalSensorSource } from "@/constants/sensorIngestProvenance";
 
 /**
  * Coerce a free-text `sensor_readings.source` column to the canonical
@@ -30,8 +24,7 @@ const VALID_SOURCES: readonly SensorReadingSource[] = [
  * "invalid". A database row proves storage, not physical sensor provenance.
  */
 function coerceSource(v: string | null | undefined): SensorReadingSource {
-  const s = (v ?? "").toLowerCase();
-  return (VALID_SOURCES as readonly string[]).includes(s) ? (s as SensorReadingSource) : "invalid";
+  return assertCanonicalSensorSource(v) ?? "invalid";
 }
 
 /**
@@ -53,6 +46,7 @@ export function resolveSensorReadingSource(row: SensorReadingRow): SensorReading
 function deriveReadingStatus(
   capturedAt: string | null | undefined,
   source: SensorReadingSource,
+  quality: unknown,
   now: Date = new Date(),
 ): SensorReadingHealthStatus {
   // Explicit non-live provenance can never become healthy merely because its
@@ -60,6 +54,16 @@ function deriveReadingStatus(
   if (source === "demo") return "needs_review";
   if (source === "invalid") return "invalid";
   if (source === "stale") return "stale";
+  if (quality === "invalid") return "invalid";
+  if (quality === "stale") return "stale";
+  if (quality !== "ok") return "needs_review";
+  if (source === "live") {
+    const freshness: SensorSnapshotFreshness = classifyFreshness(capturedAt, now).freshness;
+    const truth = evaluateCurrentLiveSensorTruth({ source, quality, freshness });
+    if (freshness === "invalid") return "invalid";
+    if (freshness === "stale") return "stale";
+    return truth.isCurrentLive ? "usable" : "needs_review";
+  }
   const result = classifySensorSnapshotStatus({
     rowsReceived: 1,
     rowsAccepted: 1,
@@ -145,11 +149,19 @@ export function mapSensorReadingRow(row: SensorReadingRow, now: Date = new Date(
     co2: 0,
     soil: 0,
     source,
-    status: deriveReadingStatus(capturedAt, source, now),
+    quality: row.quality,
+    status: deriveReadingStatus(capturedAt, source, row.quality, now),
     capturedAt,
   };
   applyMetric(reading, row.metric, row.value);
+  if (isSuspiciousExtreme(row.metric, row.value)) reading.status = "invalid";
   return reading;
+}
+
+function isSuspiciousExtreme(metric: string, rawValue: number | string | null): boolean {
+  if (metric !== "humidity_pct" && metric !== "soil_moisture_pct") return false;
+  const value = Number(rawValue);
+  return Number.isFinite(value) && (value === 0 || value === 100);
 }
 
 function applyMetric(
@@ -210,7 +222,8 @@ export function groupSensorReadingRows(
         co2: 0,
         soil: 0,
         source: rowSource,
-        status: deriveReadingStatus(capturedAt, rowSource, now),
+        quality: row.quality,
+        status: deriveReadingStatus(capturedAt, rowSource, row.quality, now),
         capturedAt,
       };
       byKey.set(key, reading);
@@ -219,9 +232,45 @@ export function groupSensorReadingRows(
       // emits the same lineage for every metric, but a malformed/mixed group
       // must never let its first physical-looking row promote diagnostics.
       reading.source = rowSource;
-      reading.status = deriveReadingStatus(reading.capturedAt, rowSource, now);
+      reading.status = mergeReadingStatus(
+        reading.status,
+        deriveReadingStatus(reading.capturedAt, rowSource, row.quality, now),
+      );
     }
     applyMetric(reading, row.metric, row.value);
+    if (row.quality !== "ok" || isSuspiciousExtreme(row.metric, row.value)) {
+      const rowStatus =
+        row.quality === "stale" && !isSuspiciousExtreme(row.metric, row.value)
+          ? "stale"
+          : "invalid";
+      reading.status = mergeReadingStatus(reading.status, rowStatus);
+      reading.quality = mergeReadingQuality(reading.quality, row.quality);
+    }
   }
   return Array.from(byKey.values()).sort((a, b) => (a.ts < b.ts ? 1 : a.ts > b.ts ? -1 : 0));
+}
+
+const READING_STATUS_PRIORITY: Readonly<Record<SensorReadingHealthStatus, number>> = {
+  usable: 0,
+  no_data: 1,
+  stale: 2,
+  needs_review: 3,
+  invalid: 4,
+};
+
+function mergeReadingStatus(
+  current: SensorReadingHealthStatus,
+  candidate: SensorReadingHealthStatus,
+): SensorReadingHealthStatus {
+  return READING_STATUS_PRIORITY[candidate] > READING_STATUS_PRIORITY[current]
+    ? candidate
+    : current;
+}
+
+function mergeReadingQuality(
+  current: string | null | undefined,
+  candidate: unknown,
+): string | null {
+  if (current !== "ok") return current ?? null;
+  return typeof candidate === "string" ? candidate : null;
 }

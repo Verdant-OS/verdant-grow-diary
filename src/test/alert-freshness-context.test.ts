@@ -20,6 +20,7 @@ function snap(
 ): SensorSnapshot {
   return {
     source: overrides.source,
+    quality: overrides.source === "live" ? "ok" : null,
     ts: overrides.ts,
     temp: null,
     rh: null,
@@ -44,14 +45,14 @@ describe("alertFreshnessContext — shared constants", () => {
 
 describe("classifyLatestSnapshotFreshness", () => {
   it("returns unavailable when not loaded", () => {
-    expect(
-      classifyLatestSnapshotFreshness({ status: "loading", snapshot: null, now: NOW }),
-    ).toBe("unavailable");
+    expect(classifyLatestSnapshotFreshness({ status: "loading", snapshot: null, now: NOW })).toBe(
+      "unavailable",
+    );
   });
   it("returns missing when no usable snapshot", () => {
-    expect(
-      classifyLatestSnapshotFreshness({ status: "ok", snapshot: null, now: NOW }),
-    ).toBe("missing");
+    expect(classifyLatestSnapshotFreshness({ status: "ok", snapshot: null, now: NOW })).toBe(
+      "missing",
+    );
     expect(
       classifyLatestSnapshotFreshness({
         status: "ok",
@@ -98,6 +99,16 @@ describe("classifyLatestSnapshotFreshness", () => {
         }),
       ).toBe("stale");
     }
+  });
+  it("never classifies a source-only live snapshot as fresh", () => {
+    const recent = new Date(NOW - 5 * 60_000).toISOString();
+    expect(
+      classifyLatestSnapshotFreshness({
+        status: "ok",
+        snapshot: snap({ source: "live", quality: null, ts: recent }),
+        now: NOW,
+      }),
+    ).toBe("stale");
   });
 });
 
@@ -163,8 +174,17 @@ describe("snapshotAlertsCanPersist", () => {
         }),
       ).toBe(false);
     }
+    expect(snapshotAlertsCanPersist({ status: "loading", snapshot: null, now: NOW })).toBe(false);
+  });
+
+  it("blocks persistence for fresh source-only live telemetry", () => {
+    const recent = new Date(NOW - 60_000).toISOString();
     expect(
-      snapshotAlertsCanPersist({ status: "loading", snapshot: null, now: NOW }),
+      snapshotAlertsCanPersist({
+        status: "ok",
+        snapshot: snap({ source: "live", quality: null, ts: recent }),
+        now: NOW,
+      }),
     ).toBe(false);
   });
 });
@@ -190,6 +210,16 @@ describe("describeLatestSnapshotForAlerts — driven by alertsCanPersist", () =>
       now: NOW,
     });
     expect(msg).toMatch(/live snapshot is fresh/i);
+  });
+
+  it("describes source-only live telemetry as context-only", () => {
+    const msg = describeLatestSnapshotForAlerts({
+      status: "ok",
+      snapshot: snap({ source: "live", quality: null, ts: recent }),
+      now: NOW,
+    });
+    expect(msg).toMatch(/context only/i);
+    expect(msg).not.toMatch(/live snapshot is fresh/i);
   });
 
   it("recent csv snapshot is context-only, never implies persistence", () => {
@@ -443,12 +473,8 @@ describe("buildLatestSnapshotDetail", () => {
   );
 
   it("returns null while loading/unavailable or when no snapshot", () => {
-    expect(
-      buildLatestSnapshotDetail({ status: "loading", snapshot: null, now: NOW }),
-    ).toBeNull();
-    expect(
-      buildLatestSnapshotDetail({ status: "ok", snapshot: null, now: NOW }),
-    ).toBeNull();
+    expect(buildLatestSnapshotDetail({ status: "loading", snapshot: null, now: NOW })).toBeNull();
+    expect(buildLatestSnapshotDetail({ status: "ok", snapshot: null, now: NOW })).toBeNull();
   });
 
   it("buildAlertsHeaderContext attaches latestDetail mirroring alertsCanPersist", () => {

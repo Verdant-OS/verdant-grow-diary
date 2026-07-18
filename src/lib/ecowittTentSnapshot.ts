@@ -50,6 +50,36 @@ export function inRangeOrNull(n: number | null, min: number, max: number): numbe
   return n >= min && n <= max ? n : null;
 }
 
+/** Sensor percentages at either rail are suspicious, never healthy telemetry. */
+export function inSensorPercentageRangeOrNull(n: number | null): number | null {
+  if (n === null) return null;
+  return n > 0 && n < 100 ? n : null;
+}
+
+export type EcowittCaptureTimeState = "fresh" | "missing" | "invalid" | "future" | "stale";
+
+/** Classifies freshness without allowing missing or future timestamps to pass. */
+export function classifyEcowittCaptureTime(
+  capturedAtMs: number | null,
+  nowMs: number,
+  maxAgeMs: number,
+): EcowittCaptureTimeState {
+  if (capturedAtMs === null) return "missing";
+  if (
+    !Number.isFinite(capturedAtMs) ||
+    !Number.isFinite(nowMs) ||
+    !Number.isFinite(maxAgeMs) ||
+    maxAgeMs < 0
+  ) {
+    return "invalid";
+  }
+
+  const ageMs = nowMs - capturedAtMs;
+  if (ageMs < 0) return "future";
+  if (ageMs > maxAgeMs) return "stale";
+  return "fresh";
+}
+
 /** Fields that must NEVER be rendered in UI — secrets, identifiers, network. */
 export const ECOWITT_PRIVATE_FIELDS: readonly string[] = [
   "PASSKEY",

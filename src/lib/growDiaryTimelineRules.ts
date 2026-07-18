@@ -85,7 +85,7 @@ export function sensorSnapshotBadge(state: string | null | undefined): SensorSna
   if (!s || !VALID_SENSOR_STATES.has(s)) return null;
   switch (s) {
     case "live":
-      return { label: "Live", variant: "positive" };
+      return { label: "Connected source", variant: "neutral" };
     case "manual":
       return { label: "Manual", variant: "neutral" };
     case "stale":
@@ -108,7 +108,7 @@ const SOURCE_DISPLAY_LABELS: Record<string, string> = {
   node_red_bridge: "Node-RED",
   ecowitt: "EcoWitt",
   csv: "CSV",
-  live: "Live",
+  live: "Connected source",
   manual: "Manual",
   sim: "Simulated",
   stale: "Stale",
@@ -139,15 +139,16 @@ const VENDOR_DISPLAY_LABELS: Record<string, string> = {
  * dash/underscore/space only, 32-char cap) so a raw enum value never
  * looks like trusted live telemetry.
  */
-export function resolveDiarySensorSourceLabel(
-  source: string | null | undefined,
-): string | null {
+export function resolveDiarySensorSourceLabel(source: string | null | undefined): string | null {
   if (typeof source !== "string") return null;
   const trimmed = source.trim();
   if (!trimmed) return null;
   const key = trimmed.toLowerCase();
   if (SOURCE_DISPLAY_LABELS[key]) return SOURCE_DISPLAY_LABELS[key];
-  const sanitized = key.replace(/[^a-z0-9_\-\s]/g, "").slice(0, 32).trim();
+  const sanitized = key
+    .replace(/[^a-z0-9_\-\s]/g, "")
+    .slice(0, 32)
+    .trim();
   if (!sanitized) return null;
   return sanitized.charAt(0).toUpperCase() + sanitized.slice(1);
 }
@@ -158,9 +159,7 @@ export function resolveDiarySensorSourceLabel(
  * routing. Unknown vendors fall back to a sanitized echo so the badge
  * cannot be styled as authoritative.
  */
-export function resolveDiarySensorVendorLabel(
-  vendor: string | null | undefined,
-): string | null {
+export function resolveDiarySensorVendorLabel(vendor: string | null | undefined): string | null {
   if (typeof vendor !== "string") return null;
   const trimmed = vendor.trim();
   if (!trimmed) return null;
@@ -223,10 +222,7 @@ function isNormalizedEntry(v: unknown): v is NormalizedDiaryEntry {
   );
 }
 
-function titleForEventType(
-  eventType: string,
-  extras?: Record<string, unknown> | null,
-): string {
+function titleForEventType(eventType: string, extras?: Record<string, unknown> | null): string {
   const key = (eventType || "").toLowerCase().trim();
   if (key === "action_followup") {
     return composeActionFollowUpTitle(extras?.outcome);
@@ -334,12 +330,8 @@ export function toTimelineItem(
     hasPhoto: !!entry.photoUrl,
     hasSensorSnapshot: !!entry.details.sensorSnapshot,
     sensorSnapshotState: entry.details.sensorSnapshot?.state ?? null,
-    sensorSourceLabel: resolveDiarySensorSourceLabel(
-      entry.details.sensorSnapshot?.source ?? null,
-    ),
-    sensorVendorLabel: resolveDiarySensorVendorLabel(
-      entry.details.sensorSnapshot?.vendor ?? null,
-    ),
+    sensorSourceLabel: resolveDiarySensorSourceLabel(entry.details.sensorSnapshot?.source ?? null),
+    sensorVendorLabel: resolveDiarySensorVendorLabel(entry.details.sensorSnapshot?.vendor ?? null),
     tags: buildTags(entry),
     warnings: entry.warnings.slice(),
     isUsefulForAiContext: entry.isValidForAiContext,

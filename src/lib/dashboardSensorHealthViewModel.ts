@@ -11,7 +11,12 @@
  * Queue writes. No automation. No device control.
  */
 import type { SnapshotState } from "@/hooks/useLatestSensorSnapshot";
-import { isStale, type SensorSnapshot, type SnapshotSource } from "@/lib/sensorSnapshot";
+import {
+  isStale,
+  STALE_THRESHOLD_MS,
+  type SensorSnapshot,
+  type SnapshotSource,
+} from "@/lib/sensorSnapshot";
 import { type SensorQualityResult } from "@/lib/sensorQuality";
 import { evaluateDashboardSensorQuality } from "@/lib/dashboardSensorEvidenceRules";
 import { resolveSensorSourceLabel } from "@/lib/sensorSourceLabelRules";
@@ -84,6 +89,16 @@ function mapCanonicalSource(snapshot: SensorSnapshot): SensorReadingSource | nul
   }
 }
 
+function snapshotFreshnessProof(
+  snapshot: SensorSnapshot,
+  now: number,
+): "fresh" | "stale" | "unknown" {
+  if (!snapshot.ts) return "unknown";
+  const capturedAt = Date.parse(snapshot.ts);
+  if (!Number.isFinite(capturedAt) || capturedAt > now) return "unknown";
+  return now - capturedAt > STALE_THRESHOLD_MS ? "stale" : "fresh";
+}
+
 /**
  * Build the Sensor Health summary for the Dashboard.
  *
@@ -135,7 +150,12 @@ export function buildDashboardSensorHealthSummary(
   }
 
   const canonical = mapCanonicalSource(snapshot);
-  const resolved = resolveSensorSourceLabel({ source: canonical, vendor: null });
+  const resolved = resolveSensorSourceLabel({
+    source: canonical,
+    vendor: null,
+    quality: snapshot.quality,
+    freshness: snapshotFreshnessProof(snapshot, now),
+  });
   let sourceLabel = resolved.label;
 
   const stale = isStale(snapshot.ts, now);
@@ -189,6 +209,22 @@ export function buildDashboardSensorHealthSummary(
       stale,
       reasons: quality.reasons,
       suspiciousFields: quality.suspiciousFields,
+      safeByDesignNote: SENSOR_HEALTH_SAFE_BY_DESIGN_NOTE,
+      hideValues: false,
+    };
+  }
+
+  if (canonical === "live" && !resolved.isCurrentLive) {
+    return {
+      status: "watch",
+      tone: "warn",
+      statusLabel: STATUS_LABEL.watch,
+      headline: "Sensor data needs review.",
+      body: "The source is connected, but its validation state is not verified as current.",
+      sourceLabel,
+      stale,
+      reasons: [...quality.reasons, "Live quality or freshness proof is missing."],
+      suspiciousFields: [],
       safeByDesignNote: SENSOR_HEALTH_SAFE_BY_DESIGN_NOTE,
       hideValues: false,
     };

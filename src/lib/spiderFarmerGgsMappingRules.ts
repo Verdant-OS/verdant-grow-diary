@@ -16,11 +16,7 @@
  */
 
 export type SpiderFarmerGgsSource = "live" | "stale" | "invalid";
-export type SpiderFarmerGgsTransport =
-  | "mqtt"
-  | "home_assistant"
-  | "bridge"
-  | "unknown";
+export type SpiderFarmerGgsTransport = "mqtt" | "home_assistant" | "bridge" | "unknown";
 
 export const SPIDER_FARMER_GGS_PROVIDER = "spider_farmer_ggs" as const;
 
@@ -46,9 +42,7 @@ export type SpiderFarmerGgsReadingKey =
   | "soil_temp_c"
   | "ph";
 
-export type SpiderFarmerGgsReadings = Partial<
-  Record<SpiderFarmerGgsReadingKey, number>
->;
+export type SpiderFarmerGgsReadings = Partial<Record<SpiderFarmerGgsReadingKey, number>>;
 
 /** Fan/light/schedule state surfaced as CONTEXT ONLY. Never a command. */
 export interface SpiderFarmerGgsContext {
@@ -60,6 +54,7 @@ export interface SpiderFarmerGgsDraft {
   provider: typeof SPIDER_FARMER_GGS_PROVIDER;
   transport: SpiderFarmerGgsTransport;
   source: SpiderFarmerGgsSource;
+  quality: "ok" | "stale" | "invalid";
   captured_at: string | null;
   received_at: string;
   tent_id: string | null;
@@ -219,23 +214,13 @@ export function normalizeSpiderFarmerGgsPayload(
     if (inBounds(tC, SPIDER_FARMER_GGS_TEMP_C_BOUNDS)) readings.temp_c = tC;
     else warningSet.add("temp_c_out_of_range");
   }
-  if (
-    tC !== undefined &&
-    tF === undefined &&
-    unitHint === "c" &&
-    readings.temp_c !== undefined
-  ) {
+  if (tC !== undefined && tF === undefined && unitHint === "c" && readings.temp_c !== undefined) {
     const converted = Math.round(cToF(tC) * 100) / 100;
     if (inBounds(converted, SPIDER_FARMER_GGS_TEMP_F_BOUNDS)) {
       readings.temp_f = converted;
     }
   }
-  if (
-    tF !== undefined &&
-    tC === undefined &&
-    unitHint === "f" &&
-    readings.temp_f !== undefined
-  ) {
+  if (tF !== undefined && tC === undefined && unitHint === "f" && readings.temp_f !== undefined) {
     const converted = Math.round(fToC(tF) * 100) / 100;
     if (inBounds(converted, SPIDER_FARMER_GGS_TEMP_C_BOUNDS)) {
       readings.temp_c = converted;
@@ -245,7 +230,7 @@ export function normalizeSpiderFarmerGgsPayload(
   // Humidity
   const rh = pickNumber(raw, HUMIDITY_KEYS);
   if (rh !== undefined) {
-    if (rh < 0 || rh > 100) warningSet.add("humidity_out_of_range");
+    if (rh <= 0 || rh >= 100) warningSet.add("humidity_out_of_range");
     else readings.humidity = rh;
   }
 
@@ -275,7 +260,7 @@ export function normalizeSpiderFarmerGgsPayload(
   // Soil moisture / water content
   const swc = pickNumber(raw, SWC_KEYS);
   if (swc !== undefined) {
-    if (swc < 0 || swc > 100) warningSet.add("soil_water_content_out_of_range");
+    if (swc <= 0 || swc >= 100) warningSet.add("soil_water_content_out_of_range");
     else readings.soil_water_content = swc;
   }
 
@@ -337,11 +322,30 @@ export function normalizeSpiderFarmerGgsPayload(
   const ts = parseCapturedAt(raw);
   if (ts.invalid) warningSet.add("captured_at_invalid");
 
+  const invalidReadingWarnings = new Set([
+    "temp_f_out_of_range",
+    "temp_c_out_of_range",
+    "humidity_out_of_range",
+    "vpd_implausible",
+    "ppfd_negative",
+    "ppfd_implausible_high",
+    "co2_negative",
+    "co2_implausible_high",
+    "soil_water_content_out_of_range",
+    "soil_ec_implausible",
+    "soil_temp_f_out_of_range",
+    "soil_temp_c_out_of_range",
+    "ph_out_of_realistic_range",
+  ]);
+  const hasInvalidReading = [...warningSet].some((warning) => invalidReadingWarnings.has(warning));
+
   // Source classification
   let source: SpiderFarmerGgsSource;
   if (!isPlainObject(input)) {
     source = "invalid";
   } else if (ts.invalid) {
+    source = "invalid";
+  } else if (hasInvalidReading) {
     source = "invalid";
   } else if (Object.keys(readings).length === 0) {
     source = "invalid";
@@ -352,7 +356,7 @@ export function normalizeSpiderFarmerGgsPayload(
   } else if (now.getTime() - ts.ms > SPIDER_FARMER_GGS_STALE_MS) {
     source = "stale";
     warningSet.add("reading_stale");
-  } else if (ts.ms - now.getTime() > 5 * 60 * 1000) {
+  } else if (ts.ms > now.getTime()) {
     source = "invalid";
     warningSet.add("captured_at_future");
   } else {
@@ -373,6 +377,7 @@ export function normalizeSpiderFarmerGgsPayload(
     provider: SPIDER_FARMER_GGS_PROVIDER,
     transport,
     source,
+    quality: source === "live" ? "ok" : source,
     captured_at: ts.iso,
     received_at: now.toISOString(),
     tent_id,

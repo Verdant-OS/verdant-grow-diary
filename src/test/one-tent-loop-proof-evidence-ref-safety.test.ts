@@ -74,8 +74,6 @@ const HOSTILE_WORDS = [
   /\bno issues detected\b/,
 ] as const;
 
-
-
 const ALLOWED_SOURCE_BADGES = new Set([
   "invalid",
   "missing",
@@ -147,10 +145,7 @@ function assertNoHostileLeak(input: unknown, label: string): void {
   expect(row.status, `${label}: status must not be passed`).not.toBe("passed");
 
   const enriched = enrichLoopStepRow(row, baseEvidence(input));
-  expect(
-    enriched.provenance,
-    `${label}: provenance must not be direct`,
-  ).not.toBe("direct");
+  expect(enriched.provenance, `${label}: provenance must not be direct`).not.toBe("direct");
 
   // Source badge, if present, must be from the safe allow-list.
   if (row.source) {
@@ -181,10 +176,9 @@ function assertNoHostileLeak(input: unknown, label: string): void {
   }
   const scrubbed = stripAllowedNegations(all);
   for (const re of HOSTILE_WORDS) {
-    expect(
-      re.test(scrubbed),
-      `${label}: hostile word ${re} leaked into user-facing text`,
-    ).toBe(false);
+    expect(re.test(scrubbed), `${label}: hostile word ${re} leaked into user-facing text`).toBe(
+      false,
+    );
   }
 }
 
@@ -202,10 +196,7 @@ describe("evidenceRefForStep — hostile source string sanitization", () => {
   ];
   for (const source of HOSTILE_SOURCES) {
     it(`hostile source "${source}" never leaks into any proof surface`, () => {
-      assertNoHostileLeak(
-        { source, captured_at: FRESH_ISO },
-        `source=${source}`,
-      );
+      assertNoHostileLeak({ source, captured_at: FRESH_ISO }, `source=${source}`);
     });
   }
 
@@ -243,12 +234,12 @@ describe("evidenceRefForStep — hostile source string sanitization", () => {
 
   it("legitimate fresh live snapshot still passes (guardrail sanity)", () => {
     const row = evaluateSensorSnapshot(
-      { source: "live", captured_at: FRESH_ISO, confidence: 0.9 },
+      { source: "live", quality: "ok", captured_at: FRESH_ISO, confidence: 0.9 },
       NOW_MS,
     );
     expect(row.status).toBe("passed");
     const rows = evaluateLoop(
-      baseEvidence({ source: "live", captured_at: FRESH_ISO, confidence: 0.9 }),
+      baseEvidence({ source: "live", quality: "ok", captured_at: FRESH_ISO, confidence: 0.9 }),
     );
     const sensor = rows.find((r) => r.id === "sensor-snapshot");
     expect(sensor?.status).toBe("passed");

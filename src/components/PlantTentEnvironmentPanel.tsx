@@ -6,9 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { usePlantTentLatestReadings } from "@/hooks/usePlantTentLatestReadings";
-import { buildPlantTentEnvironmentView } from "@/lib/plantTentEnvironmentRules";
+import {
+  buildPlantTentEnvironmentView,
+  resolvePlantTentSnapshotSourceLabel,
+} from "@/lib/plantTentEnvironmentRules";
 import { buildRecentSensorSnapshotHistory } from "@/lib/recentSensorSnapshotHistoryRules";
-import { SOURCE_LABEL, formatValue, snapshotFromReadings } from "@/lib/sensorSnapshot";
+import { formatValue, snapshotFromReadings } from "@/lib/sensorSnapshot";
 import { tempFFromC } from "@/lib/temperatureUnits";
 import {
   classifyVpdAgainstStage,
@@ -174,7 +177,7 @@ export default function PlantTentEnvironmentPanel({
                         className="rounded-md border px-1.5 py-0.5"
                         data-testid="plant-tent-environment-recent-source"
                       >
-                        {SOURCE_LABEL[r.source]}
+                        {resolvePlantTentSnapshotSourceLabel(r, r.stale)}
                       </span>
                       {r.deviceDetail ? (
                         <span

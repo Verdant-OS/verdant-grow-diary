@@ -19,8 +19,10 @@
  */
 import {
   CANONICAL_SENSOR_SOURCES,
+  assertCanonicalSensorSource,
   type CanonicalSensorSource,
 } from "@/constants/sensorIngestProvenance";
+import { evaluateCurrentLiveSensorTruth } from "@/lib/currentLiveSensorTruthRules";
 
 export type TimelineSensorSourceKind = CanonicalSensorSource;
 
@@ -35,6 +37,8 @@ export interface TimelineSensorSourceBadge {
 
 export interface ClassifyTimelineSensorSourceInput {
   rawSource?: string | null | undefined;
+  /** Exact upstream validation state. Only `ok` can support Live. */
+  quality?: unknown;
   capturedAt?: string | null | undefined;
   now?: number;
   staleMs?: number;
@@ -72,17 +76,7 @@ const DESCRIPTIONS: Record<TimelineSensorSourceKind, string> = {
 };
 
 function normalize(raw: string | null | undefined): TimelineSensorSourceKind | null {
-  if (typeof raw !== "string") return null;
-  const v = raw.trim().toLowerCase();
-  if (v.length === 0) return null;
-  if (v === "live" || v === "sensor" || v === "supabase") return "live";
-  if (v === "manual" || v === "user" || v === "entry" || v === "log") return "manual";
-  if (v === "csv") return "csv";
-  if (v === "demo" || v === "mock" || v === "fake" || v === "sample" || v === "fixture")
-    return "demo";
-  if (v === "stale") return "stale";
-  if (v === "invalid") return "invalid";
-  return null;
+  return assertCanonicalSensorSource(raw);
 }
 
 export function classifyTimelineSensorSource(
@@ -92,15 +86,17 @@ export function classifyTimelineSensorSource(
   const fallback: TimelineSensorSourceKind =
     input.fallback && ALLOWED.has(input.fallback) ? input.fallback : "invalid";
 
-  // Freshness check (only applied when we'd otherwise call it live).
-  const isStale = (() => {
+  // Freshness proof is mandatory for Live. Missing/invalid timing fails
+  // closed as invalid instead of silently assuming current telemetry.
+  const freshness = (() => {
     const staleMs = typeof input.staleMs === "number" && input.staleMs > 0 ? input.staleMs : null;
-    if (staleMs === null) return false;
-    if (!input.capturedAt) return true;
+    if (staleMs === null || !input.capturedAt) return "unknown" as const;
     const ts = Date.parse(input.capturedAt);
-    if (!Number.isFinite(ts)) return true;
+    if (!Number.isFinite(ts)) return "unknown" as const;
     const now = typeof input.now === "number" ? input.now : Date.now();
-    return now - ts > staleMs;
+    const age = now - ts;
+    if (age < 0) return "unknown" as const;
+    return age > staleMs ? ("stale" as const) : ("fresh" as const);
   })();
 
   const hasRawSource = typeof input.rawSource === "string" && input.rawSource.trim().length > 0;
@@ -110,10 +106,19 @@ export function classifyTimelineSensorSource(
     kind = "invalid";
   }
 
-  // Stale freshness rule only downgrades live readings — manual / csv / demo
-  // remain explicitly labeled.
-  if (kind === "live" && isStale) {
-    kind = "stale";
+  if (kind === "live") {
+    const truth = evaluateCurrentLiveSensorTruth({
+      source: kind,
+      quality: input.quality,
+      freshness,
+    });
+    if (!truth.qualityIsOk || freshness === "unknown") {
+      kind = "invalid";
+    } else if (freshness === "stale") {
+      kind = "stale";
+    } else if (!truth.isCurrentLive) {
+      kind = "invalid";
+    }
   }
 
   return {

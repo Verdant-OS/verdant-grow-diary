@@ -17,7 +17,7 @@ export const CANONICAL_BADGE_SOURCES = [
   "stale",
   "invalid",
 ] as const;
-export type CanonicalBadgeSource = typeof CANONICAL_BADGE_SOURCES[number];
+export type CanonicalBadgeSource = (typeof CANONICAL_BADGE_SOURCES)[number];
 
 export type CanonicalBadgeTone =
   | "live"
@@ -44,7 +44,7 @@ export interface CanonicalSourceBadgeViewModel {
 }
 
 const SOURCE_LABEL: Record<CanonicalBadgeSource, string> = {
-  live: "Live",
+  live: "Connected source (unverified)",
   manual: "Manual",
   csv: "CSV",
   demo: "Demo",
@@ -53,7 +53,6 @@ const SOURCE_LABEL: Record<CanonicalBadgeSource, string> = {
 };
 
 import { deriveProviderLabel } from "@/constants/sensorProviderLabels";
-
 
 const UNKNOWN_LABEL = "Unknown source" as const;
 
@@ -73,10 +72,13 @@ export function buildCanonicalSourceBadge(
   const isCanonical = (CANONICAL_BADGE_SOURCES as readonly string[]).includes(normalized);
   if (isCanonical) {
     const src = normalized as CanonicalBadgeSource;
-    const degraded = src === "demo" || src === "stale" || src === "invalid";
+    // This generic badge carries provenance only—no quality or freshness.
+    // It must not render a green Live claim from source text alone.
+    const provenanceOnlyLive = src === "live";
+    const degraded = provenanceOnlyLive || src === "demo" || src === "stale" || src === "invalid";
     return {
       label: SOURCE_LABEL[src],
-      tone: src,
+      tone: provenanceOnlyLive ? "unknown" : src,
       isUnknown: false,
       isDegraded: degraded,
       normalizedSource: src,

@@ -158,6 +158,21 @@ describe("buildManualSensorTrendChartViewModel", () => {
     expect(vm.omissions).toHaveLength(0);
   });
 
+  it("fails aliased or unvalidated live sources closed", () => {
+    const vm = buildManualSensorTrendChartViewModel({
+      readings: [
+        row({ source: "Live", quality: "ok" }),
+        row({ source: "live", quality: null, metric: "temperature_c" }),
+      ],
+    });
+
+    expect(vm.series.every((series) => series.points.length === 0)).toBe(true);
+    expect(vm.omissions.map((omission) => omission.reason)).toEqual([
+      "unknown_source",
+      "unverified_quality",
+    ]);
+  });
+
   it("fails unknown non-manual sources and source-less ingest payloads closed", () => {
     const vm = buildManualSensorTrendChartViewModel({
       readings: [

@@ -46,6 +46,7 @@ const DEMO_DOC = read("docs/v0-operating-loop-demo.md");
 function freshManualSnapshot(): SensorSnapshot {
   return {
     source: "manual",
+    quality: "ok",
     ts: new Date().toISOString(),
     temp: 31, // out-of-range high to trigger a derived alert
     rh: 65,

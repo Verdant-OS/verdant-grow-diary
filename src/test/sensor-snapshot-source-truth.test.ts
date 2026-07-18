@@ -17,8 +17,13 @@ import { snapshotFromReadings, SOURCE_LABEL, type SensorReadingLike } from "@/li
 
 const TS = "2026-07-15T12:00:00.000Z";
 
-function row(source: string | null, metric = "temp_c", value = 24): SensorReadingLike {
-  return { ts: TS, metric, value, source };
+function row(
+  source: string | null,
+  metric = "temp_c",
+  value = 24,
+  quality: string | null = "ok",
+): SensorReadingLike {
+  return { ts: TS, metric, value, source, quality };
 }
 
 function liveRowWithRawPayload(raw_payload: unknown): SensorReadingLike {
@@ -36,12 +41,16 @@ describe("live is a claim, not a default", () => {
     expect(snap?.source).toBe("unverified");
   });
 
-  it("'pi_bridge' stays in the live reservation (pinned first-party path)", () => {
-    // Deliberate prior decision, pinned by manual-sensor-snapshot-v1-audit:
-    // the Pi bridge is the first-party live-ingest path and its rows carry
-    // the live label. The reservation is exactly {live, pi_bridge}.
+  it("legacy alias 'pi_bridge' stays unverified", () => {
     const snap = snapshotFromReadings([row("pi_bridge")]);
-    expect(snap?.source).toBe("live");
+    expect(snap?.source).toBe("unverified");
+  });
+
+  it("source=live without exact quality=ok stays unverified", () => {
+    expect(snapshotFromReadings([row("live", "temp_c", 24, null)])?.source).toBe("unverified");
+    expect(snapshotFromReadings([row("live", "temp_c", 24, "degraded")])?.source).toBe(
+      "unverified",
+    );
   });
 
   it("canonical 'stale' and 'invalid' sources → unverified", () => {
@@ -142,14 +151,19 @@ describe("unverified label honesty", () => {
     expect(SOURCE_LABEL.unverified).toBe("Unverified source");
     expect(SOURCE_LABEL.unverified.toLowerCase()).not.toContain("live");
   });
+
+  it("the provenance-only live bucket is neutral, not a current-Live claim", () => {
+    expect(SOURCE_LABEL.live).toBe("Connected sensor");
+  });
 });
 
 describe("static contract — the classification has no live fallthrough", () => {
   const SRC = readFileSync(resolve(__dirname, "../lib/sensorSnapshot.ts"), "utf8");
 
-  it("gates 'live' behind an every(live-reservation) check", () => {
+  it("gates 'live' behind exact canonical source and accepted quality", () => {
     expect(SRC).toMatch(/allLive\s*=/);
-    expect(SRC).toContain('r.source === "live" || r.source === "pi_bridge"');
+    expect(SRC).toContain('r.source === "live" && r.quality === "ok"');
+    expect(SRC).not.toContain('r.source === "pi_bridge"');
     expect(SRC).toContain("!isSensorTestbenchRow(r)");
   });
 

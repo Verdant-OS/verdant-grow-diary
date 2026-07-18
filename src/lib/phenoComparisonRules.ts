@@ -7,6 +7,7 @@
  * Sensor sources allowed: live | manual | csv | demo | stale | invalid.
  * Anything else normalizes to "invalid" — never to a healthy label.
  */
+import { assertCanonicalSensorSource } from "@/constants/sensorIngestProvenance";
 
 export const PHENO_COMPARISON_SENSOR_SOURCES = [
   "live",
@@ -20,17 +21,16 @@ export const PHENO_COMPARISON_SENSOR_SOURCES = [
 export type PhenoComparisonSensorSource = (typeof PHENO_COMPARISON_SENSOR_SOURCES)[number];
 
 export const PHENO_COMPARISON_TRUSTED_SOURCES: ReadonlySet<PhenoComparisonSensorSource> = new Set([
-  "live",
   "manual",
   "csv",
 ]);
 
 export const PHENO_COMPARISON_UNTRUSTED_SOURCES: ReadonlySet<PhenoComparisonSensorSource> = new Set(
-  ["demo", "stale", "invalid"],
+  ["live", "demo", "stale", "invalid"],
 );
 
 const SOURCE_LABEL: Record<PhenoComparisonSensorSource, string> = {
-  live: "Live",
+  live: "Connected source (unverified)",
   manual: "Manual",
   csv: "CSV",
   demo: "Demo",
@@ -39,12 +39,7 @@ const SOURCE_LABEL: Record<PhenoComparisonSensorSource, string> = {
 };
 
 export function normalizePhenoSensorSource(input: unknown): PhenoComparisonSensorSource {
-  if (typeof input !== "string") return "invalid";
-  const v = input.trim().toLowerCase();
-  if ((PHENO_COMPARISON_SENSOR_SOURCES as readonly string[]).includes(v)) {
-    return v as PhenoComparisonSensorSource;
-  }
-  return "invalid";
+  return assertCanonicalSensorSource(input) ?? "invalid";
 }
 
 export function phenoSensorSourceLabel(source: PhenoComparisonSensorSource): string {
@@ -92,7 +87,12 @@ export const PHENO_SOURCE_LEGEND: ReadonlyArray<{
   description: string;
   trusted: boolean;
 }> = [
-  { source: "live", label: "Live", description: "Live device reading.", trusted: true },
+  {
+    source: "live",
+    label: "Connected source",
+    description: "Connected-source claim; current quality is not proven in this comparison.",
+    trusted: false,
+  },
   { source: "manual", label: "Manual", description: "Grower-entered snapshot.", trusted: true },
   { source: "csv", label: "CSV", description: "Imported history from CSV.", trusted: true },
   {

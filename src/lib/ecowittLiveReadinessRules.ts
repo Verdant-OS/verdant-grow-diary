@@ -29,6 +29,7 @@ export interface EcowittLiveReadinessInput {
   backendEvidencePresent?: boolean;
   realDeviceComparisonPresent?: boolean;
   sourceLabel?: string | null;
+  qualityLabel?: string | null;
   capturedAtRecent?: boolean;
   confidencePresent?: boolean;
   tentIdPresent?: boolean;
@@ -53,9 +54,7 @@ function missing(condition: boolean | undefined, label: string): string | null {
   return condition === true ? null : label;
 }
 
-function comparisonMismatch(
-  comparison: EcowittLiveMetricComparison,
-): string | null {
+function comparisonMismatch(comparison: EcowittLiveMetricComparison): string | null {
   if (comparison.controllerValue == null || comparison.backendValue == null) {
     return `${comparison.metric} missing controller or backend value`;
   }
@@ -83,15 +82,18 @@ export function evaluateEcowittLiveReadiness(
     missing(input.tentIdPresent, "tent_id present"),
   ].filter((item): item is string => item != null);
 
-  const source = `${input.sourceLabel ?? ""}`.trim().toLowerCase();
   const blockers: string[] = [];
   const warnings: string[] = [];
 
-  if (source && source !== "live" && source !== "ecowitt") {
-    blockers.push(`Source label is ${source}, not live/ecowitt.`);
-  }
-  if (!source) {
+  if (input.sourceLabel == null || input.sourceLabel === "") {
     blockers.push("Source label is missing.");
+  } else if (input.sourceLabel !== "live") {
+    blockers.push(`Source label is ${input.sourceLabel}, not exact canonical live.`);
+  }
+  if (input.qualityLabel == null || input.qualityLabel === "") {
+    blockers.push("Quality label is missing.");
+  } else if (input.qualityLabel !== "ok") {
+    blockers.push(`Quality label is ${input.qualityLabel}, not exact ok.`);
   }
 
   for (const flag of input.suspiciousFlags ?? []) {
@@ -133,7 +135,7 @@ export function evaluateEcowittLiveReadiness(
   }
 
   const hasMismatch = blockers.some((b) =>
-    /mismatch|suspicious|stuck|unit|source label is/i.test(b),
+    /mismatch|suspicious|stuck|unit|source label is|quality label is/i.test(b),
   );
   if (hasMismatch && input.realDeviceComparisonPresent) {
     return {
@@ -153,7 +155,9 @@ export function evaluateEcowittLiveReadiness(
   }
 
   if (hasLocalPipeline && !input.realDeviceComparisonPresent) {
-    warnings.push("Local sender and backend path work, but real device comparison is still missing.");
+    warnings.push(
+      "Local sender and backend path work, but real device comparison is still missing.",
+    );
     return {
       verdict: "partial",
       label: "PARTIAL — bring-up in progress",
@@ -178,8 +182,7 @@ export function evaluateEcowittLiveReadiness(
     blockers,
     warnings,
     requiredEvidenceMissing,
-    operatorAction:
-      "Hold. Complete the missing evidence steps and retry the GO/NO-GO check.",
+    operatorAction: "Hold. Complete the missing evidence steps and retry the GO/NO-GO check.",
     canCallLive: false,
     canCreateAlerts: false,
     canCreateActionQueueItems: false,

@@ -5,11 +5,13 @@
 
 import {
   CanonicalEcowittTentSnapshot,
+  classifyEcowittCaptureTime,
   DEFAULT_MAX_AGE_MS,
   ECOWITT_PROVIDER,
   EcowittNormalizeOptions,
   EcowittSnapshotSource,
   inRangeOrNull,
+  inSensorPercentageRangeOrNull,
   RootZoneConfidence,
   toNumberOrNull,
 } from "./ecowittTentSnapshot";
@@ -34,13 +36,11 @@ export function normalizeEcowittVegetationTentPayload(
 
   const airRaw = toNumberOrNull(payload[VEGETATION_TENT_CHANNEL_MAP.air_temp_f]);
   const humRaw = toNumberOrNull(payload[VEGETATION_TENT_CHANNEL_MAP.humidity_pct]);
-  const sm1Raw = toNumberOrNull(
-    payload[VEGETATION_TENT_CHANNEL_MAP.soil_moisture_pct_primary],
-  );
+  const sm1Raw = toNumberOrNull(payload[VEGETATION_TENT_CHANNEL_MAP.soil_moisture_pct_primary]);
 
   const air = inRangeOrNull(airRaw, -40, 200);
-  const hum = inRangeOrNull(humRaw, 0, 100);
-  const sm1 = inRangeOrNull(sm1Raw, 0, 100);
+  const hum = inSensorPercentageRangeOrNull(humRaw);
+  const sm1 = inSensorPercentageRangeOrNull(sm1Raw);
 
   if (airRaw === null) degraded.push("missing:air_temp_f");
   if (humRaw === null) degraded.push("missing:humidity_pct");
@@ -54,8 +54,11 @@ export function normalizeEcowittVegetationTentPayload(
   const capturedAt = options.captured_at_ms ?? null;
   const nowMs = (options.now ?? new Date()).getTime();
   const maxAge = options.max_age_ms ?? DEFAULT_MAX_AGE_MS;
-  if (capturedAt !== null && Number.isFinite(capturedAt)) {
-    if (nowMs - capturedAt > maxAge) degraded.push("stale:captured_at");
+  const captureTimeState = classifyEcowittCaptureTime(capturedAt, nowMs, maxAge);
+  if (captureTimeState === "missing") degraded.push("missing:captured_at");
+  if (captureTimeState === "stale") degraded.push("stale:captured_at");
+  if (captureTimeState === "invalid" || captureTimeState === "future") {
+    invalid.push(`${captureTimeState}:captured_at`);
   }
 
   // No root-zone temperature mapped for Veg in this slice.
@@ -63,16 +66,12 @@ export function normalizeEcowittVegetationTentPayload(
 
   const requiredOk = air !== null && hum !== null;
   let source: EcowittSnapshotSource;
-  if (invalid.length > 0 && !requiredOk) source = "invalid";
-  else if (invalid.some((r) => r.endsWith(":air_temp_f") || r.endsWith(":humidity_pct")))
-    source = "invalid";
+  if (invalid.length > 0) source = "invalid";
   else if (!requiredOk || degraded.length > 0) source = "degraded";
   else source = "live";
 
   const captured_at_iso =
-    capturedAt !== null && Number.isFinite(capturedAt)
-      ? new Date(capturedAt).toISOString()
-      : null;
+    capturedAt !== null && Number.isFinite(capturedAt) ? new Date(capturedAt).toISOString() : null;
 
   return {
     source,

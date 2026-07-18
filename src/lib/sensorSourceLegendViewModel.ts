@@ -27,8 +27,8 @@ export interface SensorLegendEntry {
 export const SENSOR_SOURCE_LEGEND: readonly SensorLegendEntry[] = [
   {
     kind: "live",
-    label: "Live",
-    description: "connected sensor reading",
+    label: "Verified live",
+    description: "connected, validated, and fresh sensor reading",
     tone: "calm",
   },
   {

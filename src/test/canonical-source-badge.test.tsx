@@ -34,14 +34,17 @@ describe("CanonicalSourceBadge view model", () => {
     expect(buildCanonicalSourceBadge({ source: "invalid" }).isDegraded).toBe(true);
   });
 
-  it("live is not degraded", () => {
-    expect(buildCanonicalSourceBadge({ source: "live" }).isDegraded).toBe(false);
+  it("provenance-only live is neutral and review-required", () => {
+    const vm = buildCanonicalSourceBadge({ source: "live" });
+    expect(vm.label).toBe("Connected source (unverified)");
+    expect(vm.tone).toBe("unknown");
+    expect(vm.isDegraded).toBe(true);
   });
 
   it("formats provider label when known", () => {
-    expect(
-      buildCanonicalSourceBadge({ source: "live", provider: "ecowitt" }).providerLabel,
-    ).toBe("EcoWitt");
+    expect(buildCanonicalSourceBadge({ source: "live", provider: "ecowitt" }).providerLabel).toBe(
+      "EcoWitt",
+    );
   });
 
   it("does not let provider become canonical source", () => {
@@ -54,7 +57,9 @@ describe("CanonicalSourceBadge view model", () => {
 describe("CanonicalSourceBadge component", () => {
   it("renders source + provider chips", () => {
     render(<CanonicalSourceBadge source="live" provider="ecowitt" />);
-    expect(screen.getByTestId("canonical-source-badge-source").textContent).toBe("Live");
+    expect(screen.getByTestId("canonical-source-badge-source").textContent).toBe(
+      "Connected source (unverified)",
+    );
     expect(screen.getByTestId("canonical-source-badge-provider").textContent).toBe("EcoWitt");
   });
 

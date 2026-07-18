@@ -107,6 +107,7 @@ export function buildDefaultThresholdAlerts(args: BuildArgs): EnvironmentAlert[]
   const { snapshot } = args;
   if (!snapshot) return [];
   if (snapshot.source !== "live" && snapshot.source !== "manual") return [];
+  if (snapshot.quality !== "ok") return [];
   const now = args.now ?? Date.now();
   if (isStale(snapshot.ts, now)) return [];
 
@@ -128,14 +129,10 @@ export function buildDefaultThresholdAlerts(args: BuildArgs): EnvironmentAlert[]
       // Skip when no actionable target breach for this stage:
       //   - in_target / unavailable     → no alert
       //   - stage_unknown / context_only → no misleading alert
-      if (
-        cls.classification !== "below_target" &&
-        cls.classification !== "above_target"
-      ) {
+      if (cls.classification !== "below_target" && cls.classification !== "above_target") {
         continue;
       }
-      const state: "high" | "low" =
-        cls.classification === "above_target" ? "high" : "low";
+      const state: "high" | "low" = cls.classification === "above_target" ? "high" : "low";
       const recommendation = DEFAULT_RECOMMENDATIONS.vpd[state];
       const stageLabel = cls.band.stage.replace("_", " ");
       const rangeText =
@@ -148,9 +145,7 @@ export function buildDefaultThresholdAlerts(args: BuildArgs): EnvironmentAlert[]
           ? `VPD is above the ${stageLabel} target range.`
           : `VPD is below the ${stageLabel} target range.`,
       );
-      parts.push(
-        `Observed ${fmt(value, " kPa")} (${stageLabel} range ${rangeText}).`,
-      );
+      parts.push(`Observed ${fmt(value, " kPa")} (${stageLabel} range ${rangeText}).`);
       if (snapshot.ts) parts.push(`Reading at ${snapshot.ts}.`);
       if (args.deviceLabel) parts.push(`Source: ${args.deviceLabel}.`);
       parts.push(STAGE_VPD_THRESHOLD_NOTE);
@@ -163,8 +158,7 @@ export function buildDefaultThresholdAlerts(args: BuildArgs): EnvironmentAlert[]
         metric: "vpd",
         // Title intentionally does NOT include observed value, timestamp,
         // or stage — keeps title-based dedupe stable for the same direction.
-        title:
-          state === "high" ? "VPD above stage range" : "VPD below stage range",
+        title: state === "high" ? "VPD above stage range" : "VPD below stage range",
         reason: parts.join(" "),
         source: "default_thresholds",
         createdAt,
@@ -180,14 +174,10 @@ export function buildDefaultThresholdAlerts(args: BuildArgs): EnvironmentAlert[]
           : classifyRhAgainstStage(value, { stage: args.stage ?? null, stale: false });
       // Skip non-actionable classifications:
       //   in_target / unavailable / stage_unknown / context_only
-      if (
-        cls.classification !== "below_target" &&
-        cls.classification !== "above_target"
-      ) {
+      if (cls.classification !== "below_target" && cls.classification !== "above_target") {
         continue;
       }
-      const state: "high" | "low" =
-        cls.classification === "above_target" ? "high" : "low";
+      const state: "high" | "low" = cls.classification === "above_target" ? "high" : "low";
       const recommendation = DEFAULT_RECOMMENDATIONS[metric][state];
       const stageLabel = cls.band.stage.replace("_", " ");
       const unit = metric === "temp" ? "°C" : "%";
@@ -202,9 +192,7 @@ export function buildDefaultThresholdAlerts(args: BuildArgs): EnvironmentAlert[]
           ? `${label} is above the ${stageLabel} target range.`
           : `${label} is below the ${stageLabel} target range.`,
       );
-      parts.push(
-        `Observed ${fmt(value, unit)} (${stageLabel} range ${rangeText}).`,
-      );
+      parts.push(`Observed ${fmt(value, unit)} (${stageLabel} range ${rangeText}).`);
       if (snapshot.ts) parts.push(`Reading at ${snapshot.ts}.`);
       if (args.deviceLabel) parts.push(`Source: ${args.deviceLabel}.`);
       parts.push(STAGE_ENV_THRESHOLD_NOTE);
@@ -216,18 +204,13 @@ export function buildDefaultThresholdAlerts(args: BuildArgs): EnvironmentAlert[]
         severity: "warning",
         metric,
         // Title omits observed value, timestamp, and stage for stable dedupe.
-        title:
-          state === "high"
-            ? `${label} above stage range`
-            : `${label} below stage range`,
+        title: state === "high" ? `${label} above stage range` : `${label} below stage range`,
         reason: parts.join(" "),
         source: "default_thresholds",
         createdAt,
       });
       continue;
     }
-
-
 
     const range = DEFAULT_THRESHOLDS[metric];
     let state: "high" | "low" | null = null;

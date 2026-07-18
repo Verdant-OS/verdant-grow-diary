@@ -24,11 +24,7 @@ export type ActionSuggestionPreviewStatus =
   | "blocked_invalid_data"
   | "blocked_device_command_risk";
 
-export type ActionSuggestionMissingField =
-  | "plant"
-  | "tent"
-  | "stage"
-  | "current_sensor_snapshot";
+export type ActionSuggestionMissingField = "plant" | "tent" | "stage" | "current_sensor_snapshot";
 
 export type ActionSuggestionInvalidField =
   | "temperature"
@@ -103,8 +99,7 @@ const SAFETY_NOTES: readonly string[] = Object.freeze([
 ]);
 
 const SUMMARY_BY_STATUS: Record<ActionSuggestionPreviewStatus, string> = {
-  eligible:
-    "Context is sufficient for a cautious, approval-required suggestion.",
+  eligible: "Context is sufficient for a cautious, approval-required suggestion.",
   needs_current_reading:
     "Imported history is useful background, but a current manual or live reading is needed before a suggestion can be previewed.",
   missing_context:
@@ -136,28 +131,24 @@ const INVALID_FIELD_ORDER: readonly ActionSuggestionInvalidField[] = [
   "unknown",
 ];
 
-export const ACTION_SUGGESTION_MISSING_FIELD_LABELS: Record<
-  ActionSuggestionMissingField,
-  string
-> = Object.freeze({
-  plant: "Plant",
-  tent: "Tent",
-  stage: "Growth stage",
-  current_sensor_snapshot: "Current manual/live sensor snapshot",
-});
+export const ACTION_SUGGESTION_MISSING_FIELD_LABELS: Record<ActionSuggestionMissingField, string> =
+  Object.freeze({
+    plant: "Plant",
+    tent: "Tent",
+    stage: "Growth stage",
+    current_sensor_snapshot: "Current manual/live sensor snapshot",
+  });
 
-export const ACTION_SUGGESTION_INVALID_FIELD_LABELS: Record<
-  ActionSuggestionInvalidField,
-  string
-> = Object.freeze({
-  temperature: "Temperature",
-  humidity: "Humidity",
-  vpd: "VPD",
-  soil_ec: "Soil EC",
-  soil_moisture: "Soil moisture",
-  co2: "CO2",
-  unknown: "Unknown / unverified telemetry",
-});
+export const ACTION_SUGGESTION_INVALID_FIELD_LABELS: Record<ActionSuggestionInvalidField, string> =
+  Object.freeze({
+    temperature: "Temperature",
+    humidity: "Humidity",
+    vpd: "VPD",
+    soil_ec: "Soil EC",
+    soil_moisture: "Soil moisture",
+    co2: "CO2",
+    unknown: "Unknown / unverified telemetry",
+  });
 
 const INVALID_METRIC_ALIASES: Record<string, ActionSuggestionInvalidField> = {
   temperature: "temperature",
@@ -191,22 +182,19 @@ function freeze<T>(value: T): T {
   return Object.freeze(value) as T;
 }
 
-function sortByOrder<T extends string>(
-  values: Iterable<T>,
-  order: readonly T[],
-): T[] {
+function sortByOrder<T extends string>(values: Iterable<T>, order: readonly T[]): T[] {
   const set = new Set(values);
   return order.filter((v) => set.has(v));
 }
 
 function bucketInvalidMetric(raw: string): ActionSuggestionInvalidField {
-  const key = String(raw ?? "").trim().toLowerCase();
+  const key = String(raw ?? "")
+    .trim()
+    .toLowerCase();
   return INVALID_METRIC_ALIASES[key] ?? "unknown";
 }
 
-function deriveMissingFields(
-  input: ActionSuggestionPreviewInput,
-): ActionSuggestionMissingField[] {
+function deriveMissingFields(input: ActionSuggestionPreviewInput): ActionSuggestionMissingField[] {
   const missing = new Set<ActionSuggestionMissingField>();
   const detail = input.plantContextDetail;
   if (detail) {
@@ -224,9 +212,7 @@ function deriveMissingFields(
   return sortByOrder(missing, MISSING_FIELD_ORDER);
 }
 
-function deriveInvalidFields(
-  input: ActionSuggestionPreviewInput,
-): ActionSuggestionInvalidField[] {
+function deriveInvalidFields(input: ActionSuggestionPreviewInput): ActionSuggestionInvalidField[] {
   const metrics = input.invalidTelemetryMetrics;
   if (Array.isArray(metrics) && metrics.length > 0) {
     const bucketed = metrics.map(bucketInvalidMetric);
@@ -262,9 +248,7 @@ export function previewActionSuggestion(
     );
   } else if (invalidFields.length > 0) {
     status = "blocked_invalid_data";
-    reasons.push(
-      "Critical telemetry is flagged invalid, unknown, or unverified.",
-    );
+    reasons.push("Critical telemetry is flagged invalid, unknown, or unverified.");
   } else if (!input.hasPlantContext || missingFields.some((f) => f !== "current_sensor_snapshot")) {
     status = "missing_context";
     reasons.push("Plant, tent, or stage context is not available.");
@@ -275,9 +259,7 @@ export function previewActionSuggestion(
         "Only imported CSV history is available; current manual or live reading is required.",
       );
     } else {
-      reasons.push(
-        "No current manual or live sensor reading is available.",
-      );
+      reasons.push("No current manual or live sensor reading is available.");
     }
   } else {
     status = "eligible";
@@ -391,9 +373,7 @@ export function deriveActionSuggestionPreviewInput(
   const plantPresent = Boolean(view?.plantIdentity?.plantId);
   const stagePresent = Boolean(view?.plantIdentity?.stage);
   const tentPresent =
-    view?.plantIdentity?.tentId === undefined
-      ? plantPresent
-      : Boolean(view?.plantIdentity?.tentId);
+    view?.plantIdentity?.tentId === undefined ? plantPresent : Boolean(view?.plantIdentity?.tentId);
   const hasPlantContext = plantPresent && stagePresent && tentPresent;
   const hasImportedHistory = badges.some(
     (b) => (b.source === "csv" || b.source === "import") && b.sampleCount > 0,
@@ -411,19 +391,18 @@ export function deriveActionSuggestionPreviewInput(
     hasCurrentManualOrLiveReading = q.canSupportActionSuggestionPreview;
     if (q.quality === "invalid") {
       hasInvalidOrUnknownCriticalTelemetry = true;
-      invalidTelemetryMetrics =
-        q.invalidFields.length > 0 ? [...q.invalidFields] : undefined;
+      invalidTelemetryMetrics = q.invalidFields.length > 0 ? [...q.invalidFields] : undefined;
     } else {
       hasInvalidOrUnknownCriticalTelemetry = false;
     }
   } else {
     hasCurrentManualOrLiveReading = badges.some(
       (b) =>
-        (b.source === "live" || b.source === "manual") && b.sampleCount > 0,
+        (b.source === "live" || b.source === "manual") &&
+        b.isTrustworthy === true &&
+        b.sampleCount > 0,
     );
-    hasInvalidOrUnknownCriticalTelemetry = limitations.some(
-      (l) => l.code === "stale_or_invalid",
-    );
+    hasInvalidOrUnknownCriticalTelemetry = limitations.some((l) => l.code === "stale_or_invalid");
   }
 
   return {

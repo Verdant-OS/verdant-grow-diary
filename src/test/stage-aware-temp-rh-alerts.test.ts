@@ -25,6 +25,7 @@ function snap(p: Partial<SensorSnapshot>): SensorSnapshot {
   return {
     ...EMPTY_SNAPSHOT,
     source: "manual",
+    quality: "ok",
     ts: new Date(NOW).toISOString(),
     ...p,
   };

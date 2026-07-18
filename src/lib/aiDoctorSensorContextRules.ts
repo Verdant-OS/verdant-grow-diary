@@ -27,6 +27,7 @@ import {
   isSoilMoistureValid,
   isPpfdReadingValid,
 } from "./sensorReadingNormalizationRules";
+import { evaluateCurrentLiveSensorTruth } from "@/lib/currentLiveSensorTruthRules";
 import {
   buildVpdDriftAiContext,
   type AiDoctorVpdDriftContext,
@@ -130,8 +131,7 @@ function classifyMetrics(reading: NormalizedSensorReading): {
   // context even when its own numeric value happens to fall inside the
   // plausibility band. Demote it from usable → invalid so callers that
   // gate on `invalidMetrics` exclude it from AI Doctor input.
-  const tempOrRhInvalid =
-    invalid.includes("temperature_c") || invalid.includes("humidity_pct");
+  const tempOrRhInvalid = invalid.includes("temperature_c") || invalid.includes("humidity_pct");
   if (tempOrRhInvalid && usable.includes("vpd_kpa")) {
     const i = usable.indexOf("vpd_kpa");
     if (i >= 0) usable.splice(i, 1);
@@ -313,10 +313,22 @@ export function mapSensorReadingToAiDoctorContext(
   reading: NormalizedSensorReading,
   options?: { vpdDrift?: VpdDriftResult | null },
 ): AiDoctorSensorContext {
+  // A typed caller can construct a normalized-looking object directly, so
+  // the AI boundary independently refuses source-only Live claims. Freshness
+  // has already been encoded by the normalizer as `live` versus `stale`.
+  const source: ReadingSource =
+    reading.source === "live" &&
+    !evaluateCurrentLiveSensorTruth({
+      source: reading.source,
+      quality: reading.quality,
+      freshness: "fresh",
+    }).isCurrentLive
+      ? "invalid"
+      : reading.source;
   const { usable, missing, invalid } = classifyMetrics(reading);
-  const confidenceImpact = computeConfidenceImpact(reading.source, invalid);
-  const contextSummary = buildContextSummary(reading.source, usable, missing, invalid);
-  const safetyNotes = buildSafetyNotes(reading.source, usable, missing, invalid);
+  const confidenceImpact = computeConfidenceImpact(source, invalid);
+  const contextSummary = buildContextSummary(source, usable, missing, invalid);
+  const safetyNotes = buildSafetyNotes(source, usable, missing, invalid);
 
   let vpdDrift: AiDoctorVpdDriftContext | undefined;
   if (options?.vpdDrift) {
@@ -329,12 +341,12 @@ export function mapSensorReadingToAiDoctorContext(
   }
 
   return {
-    sourceState: reading.source,
-    sourceLabel: SOURCE_LABELS[reading.source],
+    sourceState: source,
+    sourceLabel: SOURCE_LABELS[source],
     capturedAt: reading.captured_at,
     recordedAt: reading.captured_at,
-    isStale: reading.source === "stale",
-    isInvalid: reading.source === "invalid",
+    isStale: source === "stale",
+    isInvalid: source === "invalid",
     usableMetrics: usable,
     missingMetrics: missing,
     invalidMetrics: invalid,

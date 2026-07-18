@@ -20,6 +20,7 @@ function makeLiveReading(
   return {
     captured_at: "2025-01-15T12:00:00Z",
     source: "live",
+    quality: "ok",
     temperature_c: 24.5,
     humidity_pct: 55,
     vpd_kpa: 1.2,
@@ -113,6 +114,21 @@ describe("mapSensorReadingToAiDoctorContext", () => {
       expect(ctx.contextSummary).not.toMatch(/healthy|normal/i);
       expect(ctx.safetyNotes.some((n) => n.includes("Invalid telemetry"))).toBe(true);
     });
+  });
+
+  describe("unverified live provenance fails closed", () => {
+    it.each([undefined, null, "degraded", "OK"])(
+      "quality %s cannot produce Live AI context",
+      (quality) => {
+        const reading = makeLiveReading({ quality });
+        const ctx = mapSensorReadingToAiDoctorContext(reading);
+
+        expect(ctx.sourceState).toBe("invalid");
+        expect(ctx.sourceLabel).toBe("Invalid telemetry");
+        expect(ctx.contextSummary).not.toContain("Live sensor");
+        expect(ctx.confidenceImpact).toBe("untrusted");
+      },
+    );
   });
 
   describe("missing CO₂ does not create risk by itself", () => {

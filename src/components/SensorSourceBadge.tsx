@@ -31,6 +31,10 @@ export interface SensorSourceBadgeProps {
    * manual / csv / demo readings always keep their canonical label.
    */
   vendor?: string | null;
+  /** Exact persisted validation state. Only `ok` can support current Live copy. */
+  quality?: unknown;
+  /** Caller-proved age state. Only exact `fresh` can support current Live copy. */
+  freshness?: unknown;
   className?: string;
   /** Optional override testid (default: "sensor-source-badge"). */
   testId?: string;
@@ -48,22 +52,16 @@ const STATUS_LABEL: Record<SnapshotStatus, string> = {
  * Visual tone per severity. Only `ok` may render in the green/healthy
  * treatment — every other tone is explicitly non-healthy.
  */
-const TONE_CLASS: Record<
-  ReturnType<typeof mapSensorSnapshotStatusToSeverity>,
-  string
-> = {
+const TONE_CLASS: Record<ReturnType<typeof mapSensorSnapshotStatusToSeverity>, string> = {
   ok: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
-  warning:
-    "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+  warning: "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300",
   danger: "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300",
   empty: "border-muted-foreground/30 bg-muted/40 text-muted-foreground",
   unknown: "border-muted-foreground/30 bg-muted/40 text-muted-foreground",
 };
 
 /** Resolve `status` defensively. Missing → `needs_review`, never `usable`. */
-function resolveStatus(
-  status: SnapshotStatus | null | undefined,
-): SnapshotStatus {
+function resolveStatus(status: SnapshotStatus | null | undefined): SnapshotStatus {
   return status ?? "needs_review";
 }
 
@@ -71,18 +69,22 @@ export default function SensorSourceBadge({
   source,
   status,
   vendor,
+  quality,
+  freshness,
   className,
   testId = "sensor-source-badge",
 }: SensorSourceBadgeProps) {
   const resolvedStatus = resolveStatus(status);
+  const resolved = resolveSensorSourceLabel({ source, vendor, quality, freshness });
+  const unverifiedConnectedSource = source === "live" && !resolved.isCurrentLive;
   // Demo data is *always* visually flagged as non-healthy regardless of
   // any caller-supplied status. This is the core "no fake live data" gate.
   const severity =
-    source === "demo"
+    source === "demo" || unverifiedConnectedSource
       ? "warning"
       : mapSensorSnapshotStatusToSeverity(resolvedStatus);
-  const resolved = resolveSensorSourceLabel({ source, vendor });
-  const sourceLabel = resolved.label;
+  const sourceLabel =
+    source === "live" && !resolved.isCurrentLive ? "Connected source" : resolved.label;
   const statusLabel = STATUS_LABEL[resolvedStatus];
   const demo = source === "demo";
 

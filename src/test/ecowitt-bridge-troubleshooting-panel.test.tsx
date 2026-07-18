@@ -23,8 +23,12 @@ describe("EcowittBridgeTroubleshootingPanel", () => {
     );
     const panel = screen.getByTestId("ecowitt-bridge-troubleshooting-panel");
     expect(panel.getAttribute("data-overall")).toBe("error");
-    expect(screen.getByTestId("troubleshooting-check-tent_id").getAttribute("data-status")).toBe("error");
-    expect(screen.getByTestId("troubleshooting-check-bridge_token").getAttribute("data-status")).toBe("error");
+    expect(screen.getByTestId("troubleshooting-check-tent_id").getAttribute("data-status")).toBe(
+      "error",
+    );
+    expect(
+      screen.getByTestId("troubleshooting-check-bridge_token").getAttribute("data-status"),
+    ).toBe("error");
     expect(panel.textContent ?? "").not.toMatch(/Bearer [A-Za-z0-9]/);
   });
 
@@ -36,6 +40,7 @@ describe("EcowittBridgeTroubleshootingPanel", () => {
           lastReading: {
             capturedAt: "2026-06-19T11:59:30.000Z",
             source: "live",
+            quality: "ok",
             provider: "ecowitt",
             transport: "mqtt",
             humidityPct: 55,
@@ -47,9 +52,15 @@ describe("EcowittBridgeTroubleshootingPanel", () => {
         }}
       />,
     );
-    expect(screen.getByTestId("troubleshooting-check-source_live").getAttribute("data-status")).toBe("ok");
-    expect(screen.getByTestId("troubleshooting-check-provider_ecowitt").getAttribute("data-status")).toBe("ok");
-    expect(screen.getByTestId("troubleshooting-check-transport_mqtt").getAttribute("data-status")).toBe("ok");
+    expect(
+      screen.getByTestId("troubleshooting-check-source_live").getAttribute("data-status"),
+    ).toBe("ok");
+    expect(
+      screen.getByTestId("troubleshooting-check-provider_ecowitt").getAttribute("data-status"),
+    ).toBe("ok");
+    expect(
+      screen.getByTestId("troubleshooting-check-transport_mqtt").getAttribute("data-status"),
+    ).toBe("ok");
   });
 
   it("renders all next-action items", () => {

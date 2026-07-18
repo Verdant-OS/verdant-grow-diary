@@ -22,23 +22,13 @@
  *    `action_queue`, `control`, `relay`, or `execute` keys.
  */
 
-/** Canonical source vocabulary. Mirrors docs/data-labeling-spec.md. */
-export type GreenhouseSource =
-  | "live"
-  | "manual"
-  | "csv"
-  | "demo"
-  | "stale"
-  | "invalid";
+import {
+  assertCanonicalSensorSource,
+  type CanonicalSensorSource,
+} from "@/constants/sensorIngestProvenance";
 
-const CANONICAL_SOURCES: ReadonlySet<string> = new Set([
-  "live",
-  "manual",
-  "csv",
-  "demo",
-  "stale",
-  "invalid",
-]);
+/** Canonical source vocabulary. No parallel greenhouse source enum. */
+export type GreenhouseSource = CanonicalSensorSource;
 
 /**
  * Normalize an arbitrary source-ish value to the canonical vocabulary.
@@ -46,18 +36,16 @@ const CANONICAL_SOURCES: ReadonlySet<string> = new Set([
  * Never promotes anything to "live".
  */
 export function normalizeGreenhouseSource(input: unknown): GreenhouseSource {
-  if (typeof input !== "string") return "invalid";
-  const k = input.trim().toLowerCase();
-  if (!CANONICAL_SOURCES.has(k)) return "invalid";
-  return k as GreenhouseSource;
+  return assertCanonicalSensorSource(input) ?? "invalid";
 }
 
-/** Sources that count toward healthy DLI totals. */
-const HEALTHY_DLI_SOURCES: ReadonlySet<GreenhouseSource> = new Set<GreenhouseSource>([
-  "live",
-  "manual",
-  "csv",
-]);
+/** Only validated physical or grower-supplied samples enter calculations. */
+export function isGreenhouseSampleUsable(source: unknown, quality: unknown): boolean {
+  const canonical = normalizeGreenhouseSource(source);
+  return (
+    quality === "ok" && (canonical === "live" || canonical === "manual" || canonical === "csv")
+  );
+}
 
 export type LightChannel = "solar" | "led" | "unknown";
 
@@ -68,6 +56,8 @@ export interface PpfdSample {
   ppfd: number | null | undefined;
   /** Raw source value — will be normalized. */
   source: unknown;
+  /** Exact persisted validation state. Only `ok` enters calculations. */
+  quality?: unknown;
   /** Optional channel attribution. */
   channel?: LightChannel | string | null;
 }
@@ -193,8 +183,7 @@ export function aggregateDli(input: AggregateDliInput): AggregateDliResult {
   const healthy: Parsed[] = [];
   let excluded = 0;
   for (const s of samples) {
-    const src = normalizeGreenhouseSource(s?.source);
-    if (!HEALTHY_DLI_SOURCES.has(src)) {
+    if (!isGreenhouseSampleUsable(s?.source, s?.quality)) {
       excluded += 1;
       continue;
     }
@@ -323,9 +312,7 @@ export interface DarkCycleLeakResult {
  * command, and never schedules an action. It exists so a human can
  * verify whether the greenhouse went truly dark.
  */
-export function detectDarkCycleLeak(
-  input: DarkCycleLeakInput,
-): DarkCycleLeakResult {
+export function detectDarkCycleLeak(input: DarkCycleLeakInput): DarkCycleLeakResult {
   if (!isValidIanaTz(input?.tzIana)) {
     return {
       status: "invalid_window",
@@ -363,8 +350,7 @@ export function detectDarkCycleLeak(
   let inWindow = 0;
   let suspicious = 0;
   for (const s of samples) {
-    const src = normalizeGreenhouseSource(s?.source);
-    if (!HEALTHY_DLI_SOURCES.has(src)) continue;
+    if (!isGreenhouseSampleUsable(s?.source, s?.quality)) continue;
     const tMs = Date.parse(String(s?.ts ?? ""));
     if (!Number.isFinite(tMs)) continue;
     if (tMs < startMs || tMs >= endMs) continue;

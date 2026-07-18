@@ -164,7 +164,7 @@ function buildSnapshotView(
 
   const missing: PhenoMissingFlag[] = [];
   if (source === "stale") missing.push(flag("stale_reading"));
-  if (source === "invalid") missing.push(flag("invalid_reading"));
+  if (source === "invalid" || source === "live") missing.push(flag("invalid_reading"));
   if (tempF === null) missing.push(flag("missing_temp"));
   if (rh === null) missing.push(flag("missing_rh"));
   if (vpd === null) missing.push(flag("missing_vpd"));

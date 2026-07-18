@@ -119,7 +119,7 @@ describe("computeEcCompensation — safety blocks", () => {
     expect(r.blockedReason).toBe("unknown_temperature_unit");
   });
 
-  it.each(["demo", "stale", "invalid", "", "unknown_bridge"])(
+  it.each(["demo", "stale", "invalid", "", "unknown_bridge", "Live", " live", "pi_bridge"])(
     "rejects untrusted source %s",
     (src) => {
       const r = computeEcCompensation({
@@ -149,10 +149,7 @@ describe("computeEcCompensation — safety blocks", () => {
 
 describe("ecCompensationRules — static safety", () => {
   it("module imports no Supabase / network / cron surfaces", () => {
-    const src = readFileSync(
-      resolve(__dirname, "../lib/ecCompensationRules.ts"),
-      "utf8",
-    );
+    const src = readFileSync(resolve(__dirname, "../lib/ecCompensationRules.ts"), "utf8");
     expect(src).not.toMatch(/from\s+["']@\/integrations\/supabase/);
     expect(src).not.toMatch(/supabase-js/);
     expect(src).not.toMatch(/\bfetch\s*\(/);

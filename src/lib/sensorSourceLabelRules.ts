@@ -15,12 +15,13 @@
  *    "Live."
  */
 import type { SensorReadingSource } from "@/mock";
+import { evaluateCurrentLiveSensorTruth } from "@/lib/currentLiveSensorTruthRules";
 
 /** Recognised hardware vendor lineage tags. */
 export type SensorVendor = "ecowitt";
 
 const CANONICAL_SOURCE_LABELS: Record<SensorReadingSource, string> = {
-  live: "Live",
+  live: "Connected source",
   manual: "Manual",
   csv: "CSV",
   demo: "Demo",
@@ -42,6 +43,10 @@ export interface ResolveSourceLabelInput {
    * stale/invalid/unknown.
    */
   vendor?: string | null;
+  /** Exact persisted validation state. Only `ok` can support Live copy. */
+  quality?: unknown;
+  /** Caller-proved age state. Only exact `fresh` can support Live copy. */
+  freshness?: unknown;
 }
 
 export interface ResolvedSourceLabel {
@@ -51,6 +56,8 @@ export interface ResolvedSourceLabel {
   vendor: SensorVendor | null;
   /** True if the label came from vendor lineage instead of canonical source. */
   vendorPromoted: boolean;
+  /** True only when source, quality, and freshness satisfy the shared rule. */
+  isCurrentLive: boolean;
 }
 
 function normaliseVendor(v: string | null | undefined): SensorVendor | null {
@@ -69,24 +76,38 @@ function normaliseVendor(v: string | null | undefined): SensorVendor | null {
  *    Invalid).
  *  - Missing/unrecognised source → "Unknown" (never "Live").
  */
-export function resolveSensorSourceLabel(
-  input: ResolveSourceLabelInput,
-): ResolvedSourceLabel {
+export function resolveSensorSourceLabel(input: ResolveSourceLabelInput): ResolvedSourceLabel {
   const vendor = normaliseVendor(input.vendor);
   const source = input.source;
 
   if (!source || !(source in CANONICAL_SOURCE_LABELS)) {
-    return { label: "Unknown", vendor, vendorPromoted: false };
+    return { label: "Unknown", vendor, vendorPromoted: false, isCurrentLive: false };
   }
 
-  if (vendor && source === "live") {
-    return { label: VENDOR_LABELS[vendor], vendor, vendorPromoted: true };
+  const truth = evaluateCurrentLiveSensorTruth({
+    source,
+    quality: input.quality,
+    freshness: input.freshness,
+  });
+
+  if (truth.isCurrentLive && vendor) {
+    return {
+      label: VENDOR_LABELS[vendor],
+      vendor,
+      vendorPromoted: true,
+      isCurrentLive: true,
+    };
+  }
+
+  if (truth.isCurrentLive) {
+    return { label: "Live", vendor, vendorPromoted: false, isCurrentLive: true };
   }
 
   return {
     label: CANONICAL_SOURCE_LABELS[source],
     vendor,
     vendorPromoted: false,
+    isCurrentLive: false,
   };
 }
 
@@ -97,6 +118,7 @@ export function resolveSensorSourceLabel(
 export function resolveSensorSourceLabelFromMetadata(
   source: SensorReadingSource | null | undefined,
   metadata: unknown,
+  proof: Pick<ResolveSourceLabelInput, "quality" | "freshness"> = {},
 ): ResolvedSourceLabel {
   const vendor =
     metadata && typeof metadata === "object" && metadata !== null
@@ -105,5 +127,6 @@ export function resolveSensorSourceLabelFromMetadata(
   return resolveSensorSourceLabel({
     source,
     vendor: typeof vendor === "string" ? vendor : null,
+    ...proof,
   });
 }

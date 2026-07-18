@@ -44,6 +44,7 @@ import {
   type AiDoctorDraft,
   type AiDoctorResult,
 } from "./aiDoctorSafetyRules";
+import { assertCanonicalSensorSource } from "../constants/sensorIngestProvenance";
 
 // ---------------------------------------------------------------------------
 // Phase 1 re-exports (new, additive)
@@ -62,8 +63,7 @@ export type {
 /** Phase 1 typed alias used by `generateAiDoctorResult`. */
 export type AiDoctorContext = Phase1PlantContextPayloadImpl;
 export type { AiDoctorResult } from "./aiDoctorSafetyRules";
-export type CompileAiDoctorContextFromRowsInput =
-  CompilePlantContextRowsPhase1InputImpl;
+export type CompileAiDoctorContextFromRowsInput = CompilePlantContextRowsPhase1InputImpl;
 
 /** Phase 1 wrapper — pure pass-through to the typed row compiler. */
 export function compilePlantContextRowsPhase1(
@@ -86,9 +86,7 @@ export function compileAiDoctorContextFromRows(
  * Deterministic, cautious AI Doctor result built from typed context.
  * No external model call. Safety rules are always applied.
  */
-export function generateAiDoctorResult(
-  context: AiDoctorContext,
-): AiDoctorResult {
+export function generateAiDoctorResult(context: AiDoctorContext): AiDoctorResult {
   const strength = assessContextStrength(context);
 
   const evidence: string[] = [];
@@ -100,24 +98,18 @@ export function generateAiDoctorResult(
     );
   }
   for (const group of context.sensor_groups) {
-    evidence.push(
-      `Sensor group ${group.source}: ${group.sample_count} reading(s) in last 7d`,
-    );
+    evidence.push(`Sensor group ${group.source}: ${group.sample_count} reading(s) in last 7d`);
   }
   for (const dev of context.notable_deviations) {
     evidence.push(`Deviation: ${dev}`);
   }
   if (strength.hasRecentEvents) {
-    evidence.push(
-      `Recent grow events (14d): ${context.recent_grow_events.length}`,
-    );
+    evidence.push(`Recent grow events (14d): ${context.recent_grow_events.length}`);
   }
 
   const possible_causes: string[] = [];
   if (context.notable_deviations.length > 0) {
-    possible_causes.push(
-      "Environmental drift consistent with the listed 7-day deviations.",
-    );
+    possible_causes.push("Environmental drift consistent with the listed 7-day deviations.");
   }
   if (strength.hasStaleOrInvalid) {
     possible_causes.push(
@@ -125,9 +117,7 @@ export function generateAiDoctorResult(
     );
   }
   if (possible_causes.length === 0) {
-    possible_causes.push(
-      "Insufficient evidence to enumerate likely causes; observe and re-check.",
-    );
+    possible_causes.push("Insufficient evidence to enumerate likely causes; observe and re-check.");
   }
 
   const summary = strength.hasTrustworthySensors
@@ -137,13 +127,11 @@ export function generateAiDoctorResult(
   const draft: AiDoctorDraft = {
     summary,
     likely_issue: "",
-    confidence:
-      strength.hasTrustworthySensors && strength.hasRecentEvents ? 0.35 : 0.1,
+    confidence: strength.hasTrustworthySensors && strength.hasRecentEvents ? 0.35 : 0.1,
     evidence,
     missing_information: [],
     possible_causes,
-    immediate_action:
-      "Observe and re-check. Do not change inputs based on this output.",
+    immediate_action: "Observe and re-check. Do not change inputs based on this output.",
     what_not_to_do: [],
     follow_up_24h:
       "Re-confirm sensor freshness and source labels; log one fresh manual snapshot if no live readings are present.",
@@ -160,12 +148,7 @@ export function generateAiDoctorResult(
 // Legacy types (unchanged contract)
 // ---------------------------------------------------------------------------
 
-export type SensorSourceTag =
-  | "live"
-  | "csv"
-  | "manual"
-  | "stale"
-  | "invalid";
+export type SensorSourceTag = "live" | "csv" | "manual" | "stale" | "invalid";
 
 export interface VisionAnalysisResult {
   visual_summary: string;
@@ -231,15 +214,12 @@ export interface AiDoctorEngineOptions {
 // Vision step (stubbed)
 // ---------------------------------------------------------------------------
 
-export async function executeVisionAnalysis(
-  imageFile: File,
-): Promise<VisionAnalysisResult> {
+export async function executeVisionAnalysis(imageFile: File): Promise<VisionAnalysisResult> {
   if (!imageFile || typeof (imageFile as File).size !== "number") {
     throw new Error("executeVisionAnalysis: image file is required");
   }
   return Object.freeze({
-    visual_summary:
-      "Stub vision pass — no model invoked. Visual evidence not yet analyzed.",
+    visual_summary: "Stub vision pass — no model invoked. Visual evidence not yet analyzed.",
     leaf_observations: Object.freeze([]) as readonly string[],
     structural_observations: Object.freeze([]) as readonly string[],
     color_and_pigmentation: Object.freeze([]) as readonly string[],
@@ -289,10 +269,10 @@ function classifySource(
 ): SensorSourceTag {
   if (quality === "stale") return "stale";
   if (quality === "invalid") return "invalid";
-  const s = (source ?? "").toLowerCase();
-  if (s === "csv") return "csv";
-  if (s === "manual") return "manual";
-  return "live";
+  const canonical = assertCanonicalSensorSource(source);
+  if (canonical === "csv" || canonical === "manual") return canonical;
+  if (canonical === "live" && quality === "ok") return "live";
+  return "invalid";
 }
 
 function avg(nums: number[]): number | null {
@@ -308,9 +288,7 @@ export interface CompileFromRowsInput {
   now?: Date;
 }
 
-export function compilePlantContextFromRows(
-  input: CompileFromRowsInput,
-): PlantContextPayload {
+export function compilePlantContextFromRows(input: CompileFromRowsInput): PlantContextPayload {
   const now = input.now ?? new Date();
   const nowMs = now.getTime();
   const plant = input.plant ?? null;
@@ -348,8 +326,7 @@ export function compilePlantContextFromRows(
       buckets.set(tag, b);
     }
     b.n += 1;
-    const v =
-      typeof r.value === "number" && Number.isFinite(r.value) ? r.value : null;
+    const v = typeof r.value === "number" && Number.isFinite(r.value) ? r.value : null;
     if (v === null) continue;
     switch (r.metric) {
       case "vpd_kpa":
@@ -367,13 +344,7 @@ export function compilePlantContextFromRows(
     }
   }
 
-  const orderedTags: SensorSourceTag[] = [
-    "live",
-    "csv",
-    "manual",
-    "stale",
-    "invalid",
-  ];
+  const orderedTags: SensorSourceTag[] = ["live", "csv", "manual", "stale", "invalid"];
   const sensor_averages_7d: PlantContextSensorBucket[] = [];
   for (const tag of orderedTags) {
     const b = buckets.get(tag);
@@ -462,8 +433,7 @@ export async function generateMultimodalDiagnosis(
   }
 
   return Object.freeze({
-    summary:
-      "Stub diagnosis pass — reasoning model not yet wired. Observation-only output.",
+    summary: "Stub diagnosis pass — reasoning model not yet wired. Observation-only output.",
     key_observations: Object.freeze(key_observations),
     contributing_factors: Object.freeze(
       context.source_tags.length === 0
@@ -564,10 +534,6 @@ export async function executeVisionAnalysisPhase1(
   });
 }
 
-const TRUSTWORTHY_SOURCES: ReadonlySet<Phase1SensorSourceTag> = new Set<
-  Phase1SensorSourceTag
->(["live", "manual"]);
-
 interface ContextStrength {
   hasTrustworthySensors: boolean;
   hasRecentEvents: boolean;
@@ -575,22 +541,17 @@ interface ContextStrength {
   hasDemoOnly: boolean;
 }
 
-function assessPhase1Context(
-  context: Phase1PlantContextPayload,
-): ContextStrength {
-  const trustworthyGroups = context.sensor_groups.filter((g) =>
-    TRUSTWORTHY_SOURCES.has(g.source),
+function assessPhase1Context(context: Phase1PlantContextPayload): ContextStrength {
+  const trustworthyGroups = context.sensor_groups.filter(
+    (g) => g.source === "manual" || (g.source === "live" && g.quality === "ok"),
   );
-  const hasTrustworthySensors = trustworthyGroups.some(
-    (g) => g.sample_count > 0,
-  );
+  const hasTrustworthySensors = trustworthyGroups.some((g) => g.sample_count > 0);
   const hasRecentEvents = context.recent_grow_events.length > 0;
   const hasStaleOrInvalid = context.sensor_groups.some(
     (g) => g.source === "stale" || g.source === "invalid",
   );
   const hasDemoOnly =
-    !hasTrustworthySensors &&
-    context.sensor_groups.some((g) => g.source === "demo");
+    !hasTrustworthySensors && context.sensor_groups.some((g) => g.source === "demo");
   return {
     hasTrustworthySensors,
     hasRecentEvents,
@@ -618,27 +579,19 @@ export async function generateMultimodalDiagnosisPhase1(
     );
   }
   for (const group of context.sensor_groups) {
-    evidence.push(
-      `Sensor group ${group.source}: ${group.sample_count} reading(s) in last 7d`,
-    );
+    evidence.push(`Sensor group ${group.source}: ${group.sample_count} reading(s) in last 7d`);
   }
   for (const dev of context.notable_deviations) {
     evidence.push(`Deviation: ${dev}`);
   }
   if (strength.hasRecentEvents) {
-    evidence.push(
-      `Recent grow events (14d): ${context.recent_grow_events.length}`,
-    );
+    evidence.push(`Recent grow events (14d): ${context.recent_grow_events.length}`);
   }
-  evidence.push(
-    `Vision pass: stub (image_quality_score=${visionData.image_quality_score})`,
-  );
+  evidence.push(`Vision pass: stub (image_quality_score=${visionData.image_quality_score})`);
 
   const missing_information: string[] = [];
   if (!strength.hasTrustworthySensors) {
-    missing_information.push(
-      "No live or manual sensor readings in the last 7 days.",
-    );
+    missing_information.push("No live or manual sensor readings in the last 7 days.");
   }
   if (strength.hasStaleOrInvalid) {
     missing_information.push(
@@ -646,14 +599,10 @@ export async function generateMultimodalDiagnosisPhase1(
     );
   }
   if (!strength.hasRecentEvents) {
-    missing_information.push(
-      "No grow events logged in the last 14 days for context.",
-    );
+    missing_information.push("No grow events logged in the last 14 days for context.");
   }
   if (strength.hasDemoOnly) {
-    missing_information.push(
-      "Only demo sensor data available — not usable for a real diagnosis.",
-    );
+    missing_information.push("Only demo sensor data available — not usable for a real diagnosis.");
   }
   if (visionData.image_quality_score <= 0) {
     missing_information.push(
@@ -664,12 +613,9 @@ export async function generateMultimodalDiagnosisPhase1(
     missing_information.push("Plant stage is not recorded.");
   }
 
-  const confidence =
-    strength.hasTrustworthySensors && strength.hasRecentEvents ? 0.3 : 0.1;
+  const confidence = strength.hasTrustworthySensors && strength.hasRecentEvents ? 0.3 : 0.1;
 
-  const risk_level: Phase1RiskLevel = strength.hasStaleOrInvalid
-    ? "medium"
-    : "low";
+  const risk_level: Phase1RiskLevel = strength.hasStaleOrInvalid ? "medium" : "low";
 
   const summary = strength.hasTrustworthySensors
     ? "Engine Phase 1 stub: observation-only summary based on supplied context."
@@ -677,9 +623,7 @@ export async function generateMultimodalDiagnosisPhase1(
 
   const possible_causes: string[] = [];
   if (context.notable_deviations.length > 0) {
-    possible_causes.push(
-      "Environmental drift consistent with the listed 7-day deviations.",
-    );
+    possible_causes.push("Environmental drift consistent with the listed 7-day deviations.");
   }
   if (strength.hasStaleOrInvalid) {
     possible_causes.push(
@@ -687,21 +631,18 @@ export async function generateMultimodalDiagnosisPhase1(
     );
   }
   if (possible_causes.length === 0) {
-    possible_causes.push(
-      "Insufficient evidence to enumerate likely causes; observe and re-check.",
-    );
+    possible_causes.push("Insufficient evidence to enumerate likely causes; observe and re-check.");
   }
 
-  const action_queue_suggestion: Phase1ActionQueueSuggestion | null =
-    strength.hasStaleOrInvalid
-      ? {
-          action_type: "advisory",
-          status: "pending_approval",
-          reason:
-            "Some recent sensor readings are stale or invalid. Suggest a manual recheck before any further changes.",
-          risk_level: "medium",
-        }
-      : null;
+  const action_queue_suggestion: Phase1ActionQueueSuggestion | null = strength.hasStaleOrInvalid
+    ? {
+        action_type: "advisory",
+        status: "pending_approval",
+        reason:
+          "Some recent sensor readings are stale or invalid. Suggest a manual recheck before any further changes.",
+        risk_level: "medium",
+      }
+    : null;
 
   return Object.freeze({
     summary,
@@ -710,8 +651,7 @@ export async function generateMultimodalDiagnosisPhase1(
     evidence: Object.freeze(evidence),
     missing_information: Object.freeze(missing_information),
     possible_causes: Object.freeze(possible_causes),
-    immediate_action:
-      "Observe and re-check. Do not change inputs based on this stub pass.",
+    immediate_action: "Observe and re-check. Do not change inputs based on this stub pass.",
     what_not_to_do: Object.freeze([
       "Do not adjust nutrient strength based on this output.",
       "Do not change irrigation schedule based on this output.",

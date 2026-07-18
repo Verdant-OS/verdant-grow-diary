@@ -3,10 +3,7 @@
  * No I/O. No React.
  */
 import { describe, it, expect } from "vitest";
-import {
-  buildSensorSourceBadge,
-  sourceBadgeToneClass,
-} from "@/lib/sensorSourceLabelViewModel";
+import { buildSensorSourceBadge, sourceBadgeToneClass } from "@/lib/sensorSourceLabelViewModel";
 
 describe("sensorSourceLabelViewModel", () => {
   it("labels manual readings prominently and never as Live", () => {
@@ -44,24 +41,35 @@ describe("sensorSourceLabelViewModel", () => {
     expect(b.label).toContain("Manual");
   });
 
-  it("renders live readings as Live sensor and marks them healthy (not degraded)", () => {
+  it("keeps a source-only live tag neutral until status is verified", () => {
     const b = buildSensorSourceBadge({ source: "live" });
-    expect(b.label).toBe("Live sensor");
-    expect(b.tone).toBe("live");
-    expect(b.isDegraded).toBe(false);
+    expect(b.label).toBe("Connected source · needs review");
+    expect(b.tone).toBe("unknown");
+    expect(b.isDegraded).toBe(true);
     expect(b.truthCopyGuard.canDescribeAsHealthyLive).toBe(false);
   });
 
-  it("allows healthy-live copy only when live source also has usable status", () => {
-    const b = buildSensorSourceBadge({ source: "live", status: "usable" });
+  it("allows healthy-live copy only with usable status and exact trust proof", () => {
+    const b = buildSensorSourceBadge({
+      source: "live",
+      status: "usable",
+      quality: "ok",
+      freshness: "fresh",
+    });
     expect(b.truthCopyGuard.verdict).toBe("healthy_live");
     expect(b.truthCopyGuard.canDescribeAsLive).toBe(true);
     expect(b.truthCopyGuard.canDescribeAsCurrent).toBe(true);
     expect(b.truthCopyGuard.canDescribeAsHealthyLive).toBe(true);
   });
 
-  it("promotes recognised vendor only for live readings", () => {
-    const b = buildSensorSourceBadge({ source: "live", vendor: "ecowitt" });
+  it("promotes recognised vendor only for verified usable live readings", () => {
+    const b = buildSensorSourceBadge({
+      source: "live",
+      status: "usable",
+      quality: "ok",
+      freshness: "fresh",
+      vendor: "ecowitt",
+    });
     expect(b.vendor).toBe("ecowitt");
     expect(b.label).toBe("Ecowitt");
     expect(b.tone).toBe("live");
@@ -80,12 +88,8 @@ describe("sensorSourceLabelViewModel", () => {
 
   it("renders demo/stale/invalid with clear degraded copy", () => {
     expect(buildSensorSourceBadge({ source: "demo" }).label).toBe("Demo data");
-    expect(buildSensorSourceBadge({ source: "stale" }).label).toBe(
-      "Stale reading",
-    );
-    expect(buildSensorSourceBadge({ source: "invalid" }).label).toBe(
-      "Invalid reading",
-    );
+    expect(buildSensorSourceBadge({ source: "stale" }).label).toBe("Stale reading");
+    expect(buildSensorSourceBadge({ source: "invalid" }).label).toBe("Invalid reading");
   });
 
   it("collapses unknown/missing source to Unknown source — never Live", () => {

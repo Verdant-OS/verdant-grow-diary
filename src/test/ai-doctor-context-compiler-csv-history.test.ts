@@ -8,8 +8,7 @@ import {
 } from "@/lib/aiDoctorContextCompiler";
 
 const NOW = new Date("2026-06-04T12:00:00Z");
-const iso = (offsetMs: number) =>
-  new Date(NOW.getTime() - offsetMs).toISOString();
+const iso = (offsetMs: number) => new Date(NOW.getTime() - offsetMs).toISOString();
 
 const plant = {
   id: "p1",
@@ -55,12 +54,8 @@ describe("compilePlantContextFromRows — imported CSV/XLSX history", () => {
       now: NOW,
     });
     expect(ctx.imported_sensor_history).not.toBeNull();
-    expect(ctx.imported_sensor_history?.sectionLabel).toBe(
-      "Imported sensor history",
-    );
-    expect(AI_DOCTOR_IMPORTED_SENSOR_HISTORY_SECTION_LABEL).toBe(
-      "Imported sensor history",
-    );
+    expect(ctx.imported_sensor_history?.sectionLabel).toBe("Imported sensor history");
+    expect(AI_DOCTOR_IMPORTED_SENSOR_HISTORY_SECTION_LABEL).toBe("Imported sensor history");
     expect(ctx.imported_sensor_history?.historicalLabel).toBe("CSV history");
     expect(ctx.imported_sensor_history?.notForLiveDiagnosis).toContain(
       "This is imported CSV history, not live telemetry",
@@ -79,7 +74,8 @@ describe("compilePlantContextFromRows — imported CSV/XLSX history", () => {
           metric: "temperature_c",
           value: 23,
           captured_at: iso(60_000),
-          source: "ecowitt",
+          source: "live",
+          quality: "ok",
         },
       ],
       now: NOW,
@@ -101,16 +97,9 @@ describe("compilePlantContextFromRows — imported CSV/XLSX history", () => {
       ],
       now: NOW,
     });
-    const labels = ctx.imported_sensor_history!.vendors.map(
-      (v) => v.vendorLabel,
-    );
+    const labels = ctx.imported_sensor_history!.vendors.map((v) => v.vendorLabel);
     expect(labels).toEqual(
-      expect.arrayContaining([
-        "Spider Farmer",
-        "Vivosun",
-        "AC Infinity",
-        "Verdant Genetics XLSX",
-      ]),
+      expect.arrayContaining(["Spider Farmer", "Vivosun", "AC Infinity", "Verdant Genetics XLSX"]),
     );
   });
 
@@ -182,10 +171,7 @@ describe("compilePlantContextFromRows — imported CSV/XLSX history", () => {
   });
 
   it("static safety: compiler does not write, alert, queue, or change device state", () => {
-    const src = readFileSync(
-      join(process.cwd(), "src/lib/aiDoctorContextCompiler.ts"),
-      "utf8",
-    );
+    const src = readFileSync(join(process.cwd(), "src/lib/aiDoctorContextCompiler.ts"), "utf8");
     expect(src).not.toMatch(/\.(insert|update|delete|upsert|rpc)\s*\(/);
     expect(src).not.toMatch(/\bfrom\s+["']@\/integrations\/supabase/);
     expect(src).not.toMatch(/action_queue/i);

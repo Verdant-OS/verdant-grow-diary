@@ -46,9 +46,7 @@ const ENGINE_CORE_PATHS = [
 // Strip line comments and /* ... */ block comments so doc text describing
 // forbidden patterns (e.g. "no fetch(") cannot trip the scan.
 function stripComments(src: string): string {
-  return src
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/(^|[^:])\/\/.*$/gm, "$1");
+  return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
 }
 
 const sources = ENGINE_CORE_PATHS.map((p) => ({
@@ -62,92 +60,81 @@ describe("ai-doctor engine core — static safety scan", () => {
     expect(src).not.toMatch(/from\s+["']@supabase/);
   });
 
-  it.each(sources)(
-    "[$path] does not call fetch(, axios, or functions.invoke",
-    ({ src }) => {
-      expect(src).not.toMatch(/\bfetch\s*\(/);
-      expect(src).not.toMatch(/\baxios\b/);
-      expect(src).not.toMatch(/functions\.invoke/);
-    },
-  );
+  it.each(sources)("[$path] does not call fetch(, axios, or functions.invoke", ({ src }) => {
+    expect(src).not.toMatch(/\bfetch\s*\(/);
+    expect(src).not.toMatch(/\baxios\b/);
+    expect(src).not.toMatch(/functions\.invoke/);
+  });
 
-  it.each(sources)(
-    "[$path] does not reference DB write helpers",
-    ({ src }) => {
-      expect(src).not.toMatch(/\.insert\(/);
-      expect(src).not.toMatch(/\.upsert\(/);
-      expect(src).not.toMatch(/\.update\(/);
-      expect(src).not.toMatch(/\.delete\(/);
-      expect(src).not.toMatch(/\.rpc\(/);
-    },
-  );
+  it.each(sources)("[$path] does not reference DB write helpers", ({ src }) => {
+    expect(src).not.toMatch(/\.insert\(/);
+    expect(src).not.toMatch(/\.upsert\(/);
+    expect(src).not.toMatch(/\.update\(/);
+    expect(src).not.toMatch(/\.delete\(/);
+    expect(src).not.toMatch(/\.rpc\(/);
+  });
 
-  it.each(sources)(
-    "[$path] does not touch localStorage or sessionStorage",
-    ({ src }) => {
-      expect(src).not.toMatch(/\blocalStorage\b/);
-      expect(src).not.toMatch(/\bsessionStorage\b/);
-    },
-  );
+  it.each(sources)("[$path] does not touch localStorage or sessionStorage", ({ src }) => {
+    expect(src).not.toMatch(/\blocalStorage\b/);
+    expect(src).not.toMatch(/\bsessionStorage\b/);
+  });
 
-  it.each(sources)(
-    "[$path] does not reference service_role or bridge tokens",
-    ({ src }) => {
-      expect(src).not.toMatch(/service_role/);
-      expect(src).not.toMatch(/bridge[_\s-]?token/i);
-    },
-  );
+  it.each(sources)("[$path] does not reference service_role or bridge tokens", ({ src }) => {
+    expect(src).not.toMatch(/service_role/);
+    expect(src).not.toMatch(/bridge[_\s-]?token/i);
+  });
 
-  it.each(sources)(
-    "[$path] does not reference action_queue or alerts write paths",
-    ({ src }) => {
-      expect(src).not.toMatch(/from\(["']action_queue["']\)/);
-      expect(src).not.toMatch(/from\(["']alerts["']\)/);
-    },
-  );
+  it.each(sources)("[$path] does not reference action_queue or alerts write paths", ({ src }) => {
+    expect(src).not.toMatch(/from\(["']action_queue["']\)/);
+    expect(src).not.toMatch(/from\(["']alerts["']\)/);
+  });
 
-  it.each(sources)(
-    "[$path] does not embed device-control command strings",
-    ({ src }) => {
-      // Engine core may *describe* / detect these patterns via regex literals,
-      // but must not emit them as plain command sentences in returned strings.
-      // We allow regex literal usage by checking only for plain-string forms.
-      const stringForms = [
-        /["']\s*turn\s+(on|off)\s+the\s+(fan|light|pump|heater|humidifier|dehumidifier)/i,
-        /["']\s*set\s+(fan|light)\s+/i,
-        /["']\s*dose\s+\d/i,
-        /["']\s*irrigate\s+now/i,
-      ];
-      for (const rx of stringForms) {
-        expect(src).not.toMatch(rx);
-      }
-    },
-  );
+  it.each(sources)("[$path] does not embed device-control command strings", ({ src }) => {
+    // Engine core may *describe* / detect these patterns via regex literals,
+    // but must not emit them as plain command sentences in returned strings.
+    // We allow regex literal usage by checking only for plain-string forms.
+    const stringForms = [
+      /["']\s*turn\s+(on|off)\s+the\s+(fan|light|pump|heater|humidifier|dehumidifier)/i,
+      /["']\s*set\s+(fan|light)\s+/i,
+      /["']\s*dose\s+\d/i,
+      /["']\s*irrigate\s+now/i,
+    ];
+    for (const rx of stringForms) {
+      expect(src).not.toMatch(rx);
+    }
+  });
 });
 
 describe("aiDoctorContextCompiler — Date.now() regression scan", () => {
   it("compiler source does not call Date.now() directly", () => {
-    const compilerSrc = sources.find(
-      (s) => s.path === "src/lib/aiDoctorContextCompiler.ts",
-    )!.src;
+    const compilerSrc = sources.find((s) => s.path === "src/lib/aiDoctorContextCompiler.ts")!.src;
     expect(compilerSrc).not.toMatch(/\bDate\.now\s*\(/);
   });
 });
 
 describe("aiDoctorContextCompiler — reference_time determinism", () => {
   const NOW = new Date("2026-06-04T12:00:00Z");
-  const iso = (msAgo: number) =>
-    new Date(NOW.getTime() - msAgo).toISOString();
+  const iso = (msAgo: number) => new Date(NOW.getTime() - msAgo).toISOString();
 
   it("identical inputs with the same injected now produce identical output", () => {
     const input = {
       plant: { id: "p1", tent_id: "t1", grow_id: "g1", stage: "veg" },
-      growEvents: [
-        { occurred_at: iso(60 * 60 * 1000), event_type: "watering", source: "manual" },
-      ],
+      growEvents: [{ occurred_at: iso(60 * 60 * 1000), event_type: "watering", source: "manual" }],
       sensorReadings: [
-        { metric: "temperature_c", value: 24, captured_at: iso(60 * 60 * 1000), source: "live" },
-        { metric: "humidity_pct", value: 55, captured_at: iso(60 * 60 * 1000), source: "live" },
+        {
+          metric: "temperature_c",
+          value: 24,
+          captured_at: iso(60 * 60 * 1000),
+          source: "live",
+          quality: "ok",
+        },
+        {
+          metric: "humidity_pct",
+          value: 55,
+          captured_at: iso(60 * 60 * 1000),
+          source: "live",
+          quality: "ok",
+        },
       ],
       now: NOW,
     };
@@ -159,15 +146,26 @@ describe("aiDoctorContextCompiler — reference_time determinism", () => {
 
 describe("aiDoctorContextCompiler — vpd uses existing vpd_kpa only", () => {
   const NOW = new Date("2026-06-04T12:00:00Z");
-  const iso = (msAgo: number) =>
-    new Date(NOW.getTime() - msAgo).toISOString();
+  const iso = (msAgo: number) => new Date(NOW.getTime() - msAgo).toISOString();
 
   it("does NOT synthesize vpd_kpa from temperature_c + humidity_pct", () => {
     const readings: SensorReadingRowLike[] = [
       // Pair of T + RH readings that, if VPD were recomputed, would yield
       // a non-null average. The compiler must NOT recompute.
-      { metric: "temperature_c", value: 24, captured_at: iso(60_000), source: "live" },
-      { metric: "humidity_pct", value: 55, captured_at: iso(60_000), source: "live" },
+      {
+        metric: "temperature_c",
+        value: 24,
+        captured_at: iso(60_000),
+        source: "live",
+        quality: "ok",
+      },
+      {
+        metric: "humidity_pct",
+        value: 55,
+        captured_at: iso(60_000),
+        source: "live",
+        quality: "ok",
+      },
     ];
     const ctx = compilePlantContextFromRows({
       plant: { id: "p1", tent_id: "t1", grow_id: "g1", stage: "veg" },
@@ -184,8 +182,8 @@ describe("aiDoctorContextCompiler — vpd uses existing vpd_kpa only", () => {
 
   it("averages only existing vpd_kpa readings within the same source group", () => {
     const readings: SensorReadingRowLike[] = [
-      { metric: "vpd_kpa", value: 1.0, captured_at: iso(60_000), source: "ecowitt" },
-      { metric: "vpd_kpa", value: 1.4, captured_at: iso(120_000), source: "ecowitt" },
+      { metric: "vpd_kpa", value: 1.0, captured_at: iso(60_000), source: "live", quality: "ok" },
+      { metric: "vpd_kpa", value: 1.4, captured_at: iso(120_000), source: "live", quality: "ok" },
       // Different source group — must not blend.
       { metric: "vpd_kpa", value: 0.2, captured_at: iso(60_000), source: "csv" },
     ];
@@ -228,9 +226,18 @@ describe("ai-doctor engine core — banned phrase scan (Phase 1 engine modules)"
     { label: "device command", rx: /\bdevice\s+command\b/i },
     { label: "send command", rx: /\bsend\s+command\b/i },
     { label: "execute command", rx: /\bexecute\s+command\b/i },
-    { label: "turn on/off equipment", rx: /\bturn\s+(on|off)\s+(the\s+)?(fan|light|pump|heater|humidifier|dehumidifier|irrigation)\b/i },
-    { label: "set fan/light/irrigation/humidifier/dehumidifier", rx: /\bset\s+(fan|light|irrigation|humidifier|dehumidifier)\b/i },
-    { label: "diagnosed/diagnose from one photo", rx: /\bdiagnos(ed|e)\s+from\s+(one\s+)?photo\b/i },
+    {
+      label: "turn on/off equipment",
+      rx: /\bturn\s+(on|off)\s+(the\s+)?(fan|light|pump|heater|humidifier|dehumidifier|irrigation)\b/i,
+    },
+    {
+      label: "set fan/light/irrigation/humidifier/dehumidifier",
+      rx: /\bset\s+(fan|light|irrigation|humidifier|dehumidifier)\b/i,
+    },
+    {
+      label: "diagnosed/diagnose from one photo",
+      rx: /\bdiagnos(ed|e)\s+from\s+(one\s+)?photo\b/i,
+    },
   ];
 
   const engineSources = ENGINE_ONLY_PATHS.map((p) => {
@@ -288,6 +295,4 @@ describe("ai-doctor engine core — banned phrase scan (Phase 1 engine modules)"
       expect(violations, violations.join("\n")).toEqual([]);
     },
   );
-
 });
-

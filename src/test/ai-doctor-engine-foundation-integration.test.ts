@@ -52,7 +52,13 @@ describe("integration: compileAiDoctorContextPayloadFromRows → executeAiDoctor
       logs: [{ occurred_at: iso(60_000), event_type: "watering", source: "manual" }],
       photos: [{ captured_at: iso(120_000) }],
       sensorReadings: [
-        { metric: "temperature_c", value: 23, captured_at: iso(60_000), source: "live" },
+        {
+          metric: "temperature_c",
+          value: 23,
+          captured_at: iso(60_000),
+          source: "live",
+          quality: "ok",
+        },
       ],
     });
     const r = await executeAiDoctorEngine({ context: ctx });
@@ -80,7 +86,13 @@ describe("integration: compileAiDoctorContextPayloadFromRows → executeAiDoctor
       logs: [{ occurred_at: iso(60_000), event_type: "watering", source: "manual" }],
       photos: [{ captured_at: iso(120_000) }],
       sensorReadings: [
-        { metric: "temperature_c", value: 23, captured_at: iso(60_000), source: "live" },
+        {
+          metric: "temperature_c",
+          value: 23,
+          captured_at: iso(60_000),
+          source: "live",
+          quality: "ok",
+        },
         { metric: "vpd_kpa", value: 99, captured_at: iso(60_000), source: "invalid" },
       ],
     });
@@ -99,7 +111,13 @@ describe("integration: compileAiDoctorContextPayloadFromRows → executeAiDoctor
       logs: [{ occurred_at: iso(60_000), event_type: "watering", source: "manual" }],
       photos: [{ captured_at: iso(120_000) }],
       sensorReadings: [
-        { metric: "temperature_c", value: 23, captured_at: iso(60_000), source: "live" },
+        {
+          metric: "temperature_c",
+          value: 23,
+          captured_at: iso(60_000),
+          source: "live",
+          quality: "ok",
+        },
         { metric: "humidity_pct", value: 0, captured_at: iso(60_000), source: "stale" },
       ],
     });
@@ -108,7 +126,9 @@ describe("integration: compileAiDoctorContextPayloadFromRows → executeAiDoctor
     expect(s.approval_required).toBe(true);
     expect(["medium", "high"]).toContain(s.risk_level);
     const text = `${s.title} ${s.rationale}`.toLowerCase();
-    expect(text).not.toMatch(/\b(turn on|turn off|execute|run command|set humidifier|set fan|api call)\b/);
+    expect(text).not.toMatch(
+      /\b(turn on|turn off|execute|run command|set humidifier|set fan|api call)\b/,
+    );
   });
 
   it("low confidence never emits an action_queue_suggestion even when telemetry is degraded", async () => {
@@ -147,7 +167,9 @@ describe("sensor_summary: per-metric coverage", () => {
       const capturedAt = iso(60_000);
       const ctx = compileAiDoctorContextPayloadFromRows({
         ...basePlant(),
-        sensorReadings: [{ metric, value: sample, captured_at: capturedAt, source: "live" }],
+        sensorReadings: [
+          { metric, value: sample, captured_at: capturedAt, source: "live", quality: "ok" },
+        ],
       });
       const snap = ctx.sensor_summary.find((m) => m.metric === metric)!;
       expect(snap.latest_value).toBe(sample);
@@ -191,7 +213,14 @@ describe("sensor_summary: per-metric coverage", () => {
   }
 
   it("source separation: live/manual/csv/demo/stale/invalid are never merged for a single metric", () => {
-    const allSources: AiDoctorSensorSource[] = ["live", "manual", "csv", "demo", "stale", "invalid"];
+    const allSources: AiDoctorSensorSource[] = [
+      "live",
+      "manual",
+      "csv",
+      "demo",
+      "stale",
+      "invalid",
+    ];
     const ctx = compileAiDoctorContextPayloadFromRows({
       ...basePlant(),
       sensorReadings: allSources.map((source) => ({
@@ -199,6 +228,7 @@ describe("sensor_summary: per-metric coverage", () => {
         value: 1.0,
         captured_at: iso(60_000),
         source,
+        quality: source === "live" ? "ok" : null,
       })),
     });
     const expected = allSources.map((source) => ({ source, reading_count_7d: 1 }));
@@ -217,7 +247,13 @@ describe("staleness boundary at 6h (deterministic, fixed now)", () => {
     const ctx = compileAiDoctorContextPayloadFromRows({
       ...basePlant(),
       sensorReadings: [
-        { metric: "temperature_c", value: 22, captured_at: iso(SIX_HOURS_MS), source: "live" },
+        {
+          metric: "temperature_c",
+          value: 22,
+          captured_at: iso(SIX_HOURS_MS),
+          source: "live",
+          quality: "ok",
+        },
       ],
     });
     const snap = ctx.sensor_summary.find((m) => m.metric === "temperature_c")!;
@@ -229,7 +265,13 @@ describe("staleness boundary at 6h (deterministic, fixed now)", () => {
     const ctx = compileAiDoctorContextPayloadFromRows({
       ...basePlant(),
       sensorReadings: [
-        { metric: "temperature_c", value: 22, captured_at: iso(SIX_HOURS_MS - 1000), source: "live" },
+        {
+          metric: "temperature_c",
+          value: 22,
+          captured_at: iso(SIX_HOURS_MS - 1000),
+          source: "live",
+          quality: "ok",
+        },
       ],
     });
     const snap = ctx.sensor_summary.find((m) => m.metric === "temperature_c")!;
@@ -241,7 +283,13 @@ describe("staleness boundary at 6h (deterministic, fixed now)", () => {
     const ctx = compileAiDoctorContextPayloadFromRows({
       ...basePlant(),
       sensorReadings: [
-        { metric: "temperature_c", value: 22, captured_at: iso(SIX_HOURS_MS + 1000), source: "live" },
+        {
+          metric: "temperature_c",
+          value: 22,
+          captured_at: iso(SIX_HOURS_MS + 1000),
+          source: "live",
+          quality: "ok",
+        },
       ],
     });
     const snap = ctx.sensor_summary.find((m) => m.metric === "temperature_c")!;
@@ -261,7 +309,13 @@ describe("compileAiDoctorContextFromRows (compatibility wrapper)", () => {
       logs: [{ occurred_at: iso(60_000), event_type: "watering", source: "manual" }],
       photos: [{ captured_at: iso(120_000) }],
       sensorReadings: [
-        { metric: "temperature_c", value: 23, captured_at: iso(60_000), source: "live" },
+        {
+          metric: "temperature_c",
+          value: 23,
+          captured_at: iso(60_000),
+          source: "live",
+          quality: "ok",
+        },
         { metric: "vpd_kpa", value: 99, captured_at: iso(60_000), source: "invalid" },
       ],
     };

@@ -35,6 +35,7 @@
 import { defineTool } from "@lovable.dev/mcp-js";
 import { z } from "zod";
 import { withoutDiagnosticSensorRows } from "../../sensorProvenanceFenceRules";
+import { evaluateCurrentLiveSensorTruth } from "../../currentLiveSensorTruthRules";
 import { isReadingStale, STALE_THRESHOLD_MS } from "../../sensorReadingNormalizationRules";
 import { supabaseForUser, unauthenticated } from "./_supabase";
 
@@ -140,10 +141,11 @@ export function selectLatestMcpSensorReadings(
           ts: row.ts,
           captured_at: row.captured_at,
           freshness,
-          current_live:
-            freshness === "fresh" &&
-            row.source.trim().toLowerCase() === "live" &&
-            row.quality.trim().toLowerCase() === "ok",
+          current_live: evaluateCurrentLiveSensorTruth({
+            source: row.source,
+            quality: row.quality,
+            freshness,
+          }).isCurrentLive,
         } satisfies McpSensorReading,
       ];
     }),

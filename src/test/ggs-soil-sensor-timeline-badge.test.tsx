@@ -10,6 +10,7 @@ import { classifyTimelineSensorSource } from "@/lib/timelineSensorSourceBadgeRul
 import { deriveProviderLabel } from "@/constants/sensorProviderLabels";
 import {
   GGS_SOIL_SENSOR_PROVIDER,
+  GGS_SOIL_STALE_MS,
   normalizeGgsSoilSensorReading,
 } from "@/lib/ggsSoilSensorReadingNormalizer";
 
@@ -22,7 +23,13 @@ describe("GGS soil reading → canonical Timeline badge", () => {
       { captured_at: FRESH, tent_id: "t", soil_moisture: 40, soil_temp_c: 22, soil_ec: 1.5 },
       { now: NOW },
     );
-    const badge = classifyTimelineSensorSource({ rawSource: draft.source });
+    const badge = classifyTimelineSensorSource({
+      rawSource: draft.source,
+      quality: draft.status === "accepted" ? "ok" : draft.status,
+      capturedAt: draft.captured_at,
+      staleMs: GGS_SOIL_STALE_MS,
+      now: NOW.getTime(),
+    });
     render(<TimelineSensorSourceBadge badge={badge} />);
     expect(screen.getByTestId("timeline-sensor-source-badge-live")).toBeInTheDocument();
   });

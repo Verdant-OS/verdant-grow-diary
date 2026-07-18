@@ -61,9 +61,7 @@ export function getManualSensorDeviceOptions(): ManualDeviceOption[] {
  * - Returns `null` for empty / unusable input so callers can omit the
  *   `device_id` field entirely.
  */
-export function normalizeManualSourceNote(
-  input: string | null | undefined,
-): string | null {
+export function normalizeManualSourceNote(input: string | null | undefined): string | null {
   if (input === null || input === undefined) return null;
   if (typeof input !== "string") return null;
   // Keep letters, digits, spaces, and a small set of safe punctuation.
@@ -81,9 +79,7 @@ export function normalizeManualSourceNote(
  * Wrap a normalized device note in the `manual:` device_id prefix for
  * safe storage. Returns `null` when the note is empty.
  */
-export function buildManualDeviceId(
-  note: string | null | undefined,
-): string | null {
+export function buildManualDeviceId(note: string | null | undefined): string | null {
   const safe = normalizeManualSourceNote(note);
   if (!safe) return null;
   return `${MANUAL_DEVICE_ID_PREFIX}${safe}`;
@@ -94,25 +90,17 @@ export function buildManualDeviceId(
  * value previously written via `buildManualDeviceId`. Returns null when
  * the device_id is not a manual note.
  */
-export function extractManualDeviceNote(
-  deviceId: string | null | undefined,
-): string | null {
+export function extractManualDeviceNote(deviceId: string | null | undefined): string | null {
   if (!deviceId || typeof deviceId !== "string") return null;
   if (!deviceId.startsWith(MANUAL_DEVICE_ID_PREFIX)) return null;
   const note = deviceId.slice(MANUAL_DEVICE_ID_PREFIX.length);
   return normalizeManualSourceNote(note);
 }
 
-export type SensorSourceForLabel =
-  | "live"
-  | "manual"
-  | "sim"
-  | "diary"
-  | "unavailable"
-  | string;
+export type SensorSourceForLabel = "live" | "manual" | "sim" | "diary" | "unavailable" | string;
 
 const BASE_SOURCE_LABELS: Record<string, string> = {
-  live: "Live sensor",
+  live: "Connected source (unverified)",
   manual: MANUAL_READING_LABEL,
   sim: "Simulated",
   diary: "Diary snapshot",

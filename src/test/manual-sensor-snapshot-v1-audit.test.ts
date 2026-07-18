@@ -81,12 +81,23 @@ describe("Sensor Context — source labeling", () => {
     expect(SOURCE_LABEL[snap.source]).not.toBe("Live sensor");
   });
 
-  it("Live source label is reserved for pi_bridge/live rows only", () => {
-    const snap = snapshotFromReadings([
+  it("legacy aliases cannot earn the canonical live bucket", () => {
+    const alias = snapshotFromReadings([
       { ts: "2025-01-01T00:00:00Z", metric: "temperature_c", value: 24, source: "pi_bridge" },
     ])!;
-    expect(snap.source).toBe("live");
-    expect(SOURCE_LABEL[snap.source]).toBe("Live sensor");
+    expect(alias.source).toBe("unverified");
+
+    const canonical = snapshotFromReadings([
+      {
+        ts: "2025-01-01T00:00:00Z",
+        metric: "temperature_c",
+        value: 24,
+        source: "live",
+        quality: "ok",
+      },
+    ])!;
+    expect(canonical.source).toBe("live");
+    expect(SOURCE_LABEL[canonical.source]).toBe("Connected sensor");
   });
 
   it("(7) stale readings beyond threshold are flagged stale", () => {

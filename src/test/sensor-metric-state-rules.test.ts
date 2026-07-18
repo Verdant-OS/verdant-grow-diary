@@ -11,16 +11,17 @@ import {
 } from "@/lib/sensorMetricStateRules";
 
 describe("sensorMetricStateRules", () => {
-  it("classifies live reading as live + calm + chart", () => {
+  it("keeps source-only connected reading visible without Live copy", () => {
     const s = classifySensorMetricState({
       metric: "temp",
       value: 24,
-      source: "sensor",
+      source: "live",
       hasAnyReading: true,
     });
     expect(s.kind).toBe("live");
     expect(s.tone).toBe("calm");
     expect(s.showChart).toBe(true);
+    expect(s.label).toBe("Connected source (unverified)");
   });
 
   it("classifies derived metric as derived + calm + chart", () => {
@@ -39,7 +40,7 @@ describe("sensorMetricStateRules", () => {
     const s = classifySensorMetricState({
       metric: "temp",
       value: 22,
-      source: "sensor",
+      source: "live",
       hasAnyReading: true,
       isStale: true,
     });
@@ -155,14 +156,8 @@ describe("sensorMetricStateRules", () => {
 });
 
 describe("sensorMetricStateRules static safety", () => {
-  const SRC = readFileSync(
-    resolve(__dirname, "../lib/sensorMetricStateRules.ts"),
-    "utf8",
-  );
-  const VPD_SRC = readFileSync(
-    resolve(__dirname, "../lib/vpdCalculationRules.ts"),
-    "utf8",
-  );
+  const SRC = readFileSync(resolve(__dirname, "../lib/sensorMetricStateRules.ts"), "utf8");
+  const VPD_SRC = readFileSync(resolve(__dirname, "../lib/vpdCalculationRules.ts"), "utf8");
 
   it("contains no AI / alerts / Action Queue / automation / device control imports", () => {
     for (const src of [SRC, VPD_SRC]) {
@@ -205,18 +200,13 @@ describe("optional metric invalid detection", () => {
     ["soil", Number.NaN, true],
     ["soil", -1, true],
     ["soil", 101, true],
-    ["soil", 0, false],
+    ["soil", 0, true],
     ["soil", 15, false],
     ["soil", 45, false],
     ["soil", 80, false],
-  ] as const)(
-    "isOptionalMetricInvalid(%s, %s) -> %s",
-    (metric, value, expected) => {
-      expect(isOptionalMetricInvalid(metric as SensorMetricKey, value)).toBe(
-        expected,
-      );
-    },
-  );
+  ] as const)("isOptionalMetricInvalid(%s, %s) -> %s", (metric, value, expected) => {
+    expect(isOptionalMetricInvalid(metric as SensorMetricKey, value)).toBe(expected);
+  });
 
   it("classifies CO2 6000 as caution with units copy", () => {
     const s = classifySensorMetricState({
@@ -253,7 +243,7 @@ describe("optional metric invalid detection", () => {
 });
 
 describe("soil moisture stuck detection", () => {
-  it("single 0 reading is not stuck", () => {
+  it("single 0 reading is invalid even though it is not stuck", () => {
     expect(isSoilMoistureStuck([0])).toBe(false);
     const s = classifySensorMetricState({
       metric: "soil",
@@ -261,7 +251,8 @@ describe("soil moisture stuck detection", () => {
       hasAnyReading: true,
       recentValues: [0],
     });
-    expect(s.kind).not.toBe("invalid");
+    expect(s.kind).toBe("invalid");
+    expect(s.message).not.toMatch(/stuck/i);
   });
 
   it("[0,0,0] classifies as caution/stuck", () => {
@@ -365,7 +356,6 @@ describe("stale vs invalid caution-tone coverage", () => {
   );
 });
 
-
 import { describeSoilMoistureStuckWindow } from "@/lib/sensorMetricStateRules";
 
 describe("describeSoilMoistureStuckWindow (window-aware)", () => {
@@ -443,6 +433,7 @@ describe("soil stuck classifier integration (window-aware)", () => {
       const s = classifySensorMetricState({
         metric: "soil",
         value: v,
+        source: "manual",
         hasAnyReading: true,
         recentValues: [v, v - 1, v + 1],
       });

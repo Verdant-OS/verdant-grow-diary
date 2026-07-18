@@ -15,6 +15,8 @@
  */
 
 import { withoutDiagnosticSensorRows } from "@/lib/sensorProvenanceFenceRules";
+import { evaluateCurrentLiveSensorTruth } from "@/lib/currentLiveSensorTruthRules";
+import { assertCanonicalSensorSource } from "@/constants/sensorIngestProvenance";
 
 export const SENSOR_FRESH_WINDOW_MINUTES = 15;
 export const SENSOR_FUTURE_SKEW_LIMIT_MINUTES = 5;
@@ -372,17 +374,6 @@ export function classifyFreshness(
   return { freshness: "stale", ageMinutes, capturedAt, reason: null };
 }
 
-// Per Verdant safety rules, only the canonical "live" source label is treated
-// as live. Bridge/provider identifiers (ecowitt, home assistant, esp32, etc.)
-// are transport metadata, not source-of-truth labels, and must not promote a
-// reading to Live by themselves.
-const LIVE_SOURCES = new Set<string>(["live"]);
-
-function isLiveSource(source: string | null): boolean {
-  if (!source) return false;
-  return LIVE_SOURCES.has(source);
-}
-
 function formatAge(ageMinutes: number | null): string {
   if (ageMinutes === null) return "unknown age";
   const m = Math.max(0, ageMinutes);
@@ -497,29 +488,72 @@ export function buildSensorSnapshot(
   // usability — they never inflate to healthy.
   const requiredPresent = REQUIRED_SNAPSHOT_METRICS.filter((k) => metricValues[k] !== null);
   const requiredInvalid = requiredPresent.some((k) => !metricDetails[k].valid);
+  const anyPresentInvalid = (Object.keys(metricValues) as SensorMetricKey[]).some(
+    (key) => metricValues[key] !== null && !metricDetails[key].valid,
+  );
+  const suspiciousExtreme =
+    metricValues.humidity_pct === 0 ||
+    metricValues.humidity_pct === 100 ||
+    metricValues.soil_moisture_pct === 0 ||
+    metricValues.soil_moisture_pct === 100;
 
   const freshness = classifyFreshness(freshestCapturedAt, now);
   const ageMinutes = freshness.ageMinutes;
+  const canonicalSource = assertCanonicalSensorSource(freshestSource);
+  const qualityValues = cohort.map((row) =>
+    typeof row.quality === "string" ? row.quality.trim().toLowerCase() : "",
+  );
+  const qualityStale = qualityValues.some((quality) => quality === "stale");
+  const qualityOk = qualityValues.length > 0 && qualityValues.every((quality) => quality === "ok");
+  const currentLive = cohort.every(
+    (row) =>
+      evaluateCurrentLiveSensorTruth({
+        source: row.source,
+        quality: row.quality,
+        freshness: freshness.freshness,
+      }).isCurrentLive,
+  );
 
   let status: SensorSnapshotStatus;
   if (requiredPresent.length === 0) {
     status = freshness.freshness === "invalid" ? "invalid" : "empty";
-  } else if (requiredInvalid || freshness.freshness === "invalid") {
-    status = "invalid";
+  } else if (
+    requiredInvalid ||
+    anyPresentInvalid ||
+    suspiciousExtreme ||
+    freshness.freshness === "invalid" ||
+    canonicalSource === null ||
+    canonicalSource === "invalid" ||
+    canonicalSource === "demo" ||
+    !qualityOk
+  ) {
+    status = qualityStale ? "stale" : "invalid";
+  } else if (canonicalSource === "stale") {
+    status = "stale";
   } else if (freshness.freshness === "stale") {
     status = "stale";
-  } else if (isLiveSource(freshestSource)) {
+  } else if (currentLive) {
     status = "fresh_live";
-  } else {
+  } else if (canonicalSource === "manual" || canonicalSource === "csv") {
     status = "fresh_non_live";
+  } else {
+    status = "invalid";
   }
 
   if (freshness.reason) warnings.push(`captured_at: ${freshness.reason}`);
+  if (!qualityOk) warnings.push("quality: Every contributing row must be quality=ok.");
+  if (suspiciousExtreme) {
+    warnings.push("quality: A 0% or 100% sensor extreme cannot be treated as healthy telemetry.");
+  }
 
   const badge_label = buildBadgeLabel(status, freshestSource, ageMinutes);
 
   const usable =
-    status !== "invalid" && status !== "empty" && requiredPresent.length > 0 && !requiredInvalid;
+    (status === "fresh_live" || status === "fresh_non_live") &&
+    requiredPresent.length > 0 &&
+    !requiredInvalid &&
+    !anyPresentInvalid &&
+    !suspiciousExtreme;
 
   return {
     sensor_snapshot_id: freshestId,
@@ -564,7 +598,7 @@ export function buildSensorSnapshotDetails(
 } | null {
   if (!attach) return null;
   if (!snapshot) return null;
-  if (snapshot.status === "empty" || snapshot.status === "invalid") return null;
+  if (snapshot.status !== "fresh_live" && snapshot.status !== "fresh_non_live") return null;
   return {
     sensor_snapshot_id: snapshot.sensor_snapshot_id,
     tent_id: snapshot.tent_id,

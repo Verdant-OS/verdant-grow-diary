@@ -45,6 +45,7 @@ describe("timelineSnapshotSummaryViewModel — source labels", () => {
   it("live snapshot → Live label only when actually live", () => {
     const s = buildTimelineSnapshotSummary({
       source: "live",
+      quality: "ok",
       capturedAt: new Date().toISOString(),
       metrics: { air_temp_c: 24 },
     });
@@ -55,6 +56,7 @@ describe("timelineSnapshotSummaryViewModel — source labels", () => {
   it("live + ecowitt vendor → vendor-promoted label (still live source)", () => {
     const s = buildTimelineSnapshotSummary({
       source: "live",
+      quality: "ok",
       vendor: "ecowitt",
       capturedAt: new Date().toISOString(),
       metrics: { air_temp_c: 24 },
@@ -62,6 +64,25 @@ describe("timelineSnapshotSummaryViewModel — source labels", () => {
     expect(s.source).toBe("live");
     expect(s.sourceLabel).toBe("Ecowitt");
     expect(s.sourceResolved.vendorPromoted).toBe(true);
+  });
+
+  it("source-only or old live snapshots stay neutral and untrusted", () => {
+    const sourceOnly = buildTimelineSnapshotSummary({
+      source: "live",
+      capturedAt: new Date().toISOString(),
+      metrics: { air_temp_c: 24 },
+    });
+    const old = buildTimelineSnapshotSummary({
+      source: "live",
+      quality: "ok",
+      capturedAt: "2020-01-01T00:00:00.000Z",
+      metrics: { air_temp_c: 24 },
+    });
+    for (const summary of [sourceOnly, old]) {
+      expect(summary.sourceLabel).toBe("Connected source");
+      expect(summary.trustworthy).toBe(false);
+      expect(summary.severity).toBe("warning");
+    }
   });
 
   it("csv snapshot → CSV label, never live", () => {

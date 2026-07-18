@@ -29,6 +29,7 @@ function snap(p: Partial<SensorSnapshot>): SensorSnapshot {
   return {
     ...EMPTY_SNAPSHOT,
     source: "manual",
+    quality: "ok",
     ts: new Date(NOW).toISOString(),
     ...p,
   };
@@ -38,10 +39,7 @@ const RULES_SRC = readFileSync(
   resolve(__dirname, "../lib/defaultEnvironmentThresholds.ts"),
   "utf8",
 );
-const ALERTS_SRC = readFileSync(
-  resolve(__dirname, "../lib/environmentAlerts.ts"),
-  "utf8",
-);
+const ALERTS_SRC = readFileSync(resolve(__dirname, "../lib/environmentAlerts.ts"), "utf8");
 const HOOK_SRC = readFileSync(
   resolve(__dirname, "../hooks/usePersistEnvironmentAlerts.ts"),
   "utf8",

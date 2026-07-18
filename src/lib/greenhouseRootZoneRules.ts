@@ -15,15 +15,13 @@
  *  - No `command`, `device_id`, `action_queue`, `control`, `relay`, or
  *    `execute` keys are ever emitted.
  */
-import { normalizeGreenhouseSource, type GreenhouseSource } from "./greenhouseLightRules";
+import {
+  isGreenhouseSampleUsable,
+  normalizeGreenhouseSource,
+  type GreenhouseSource,
+} from "./greenhouseLightRules";
 
-export type RootZoneMedium =
-  | "coco"
-  | "rockwool"
-  | "hydro"
-  | "living_soil"
-  | "peat"
-  | "soil";
+export type RootZoneMedium = "coco" | "rockwool" | "hydro" | "living_soil" | "peat" | "soil";
 
 const RUNOFF_EC_MEDIA: ReadonlySet<RootZoneMedium> = new Set<RootZoneMedium>([
   "coco",
@@ -39,7 +37,10 @@ const SOIL_LIKE_MEDIA: ReadonlySet<RootZoneMedium> = new Set<RootZoneMedium>([
 
 function normalizeMedium(input: unknown): RootZoneMedium | null {
   if (typeof input !== "string") return null;
-  const k = input.trim().toLowerCase().replace(/[-\s]+/g, "_");
+  const k = input
+    .trim()
+    .toLowerCase()
+    .replace(/[-\s]+/g, "_");
   if (
     k === "coco" ||
     k === "rockwool" ||
@@ -65,6 +66,8 @@ export interface RootZoneEcInput {
   runoffEcMscm?: number | null;
   /** Source of the underlying reading — normalized here. */
   source?: unknown;
+  /** Exact validation state. Only `ok` can support an assessment. */
+  quality?: unknown;
 }
 
 export type RootZoneStatus = "unknown" | "ok" | "review" | "risk";
@@ -83,8 +86,7 @@ export interface RootZoneEcResult {
   guidance: string;
 }
 
-const NEVER: string =
-  "no_action_command_emitted_grower_must_inspect_before_changing_feed";
+const NEVER: string = "no_action_command_emitted_grower_must_inspect_before_changing_feed";
 
 /**
  * Assess root-zone EC in a medium-aware way.
@@ -102,10 +104,9 @@ export function assessRootZoneEc(input: RootZoneEcInput): RootZoneEcResult {
   const medium = normalizeMedium(input?.medium);
   const feed = input?.feedEcMscm;
   const runoff = input?.runoffEcMscm;
-  const delta =
-    isFiniteNumber(feed) && isFiniteNumber(runoff) ? runoff - feed : null;
+  const delta = isFiniteNumber(feed) && isFiniteNumber(runoff) ? runoff - feed : null;
 
-  if (source === "stale" || source === "invalid") {
+  if (!isGreenhouseSampleUsable(input?.source, input?.quality)) {
     return {
       status: "unknown",
       medium,
@@ -136,8 +137,7 @@ export function assessRootZoneEc(input: RootZoneEcInput): RootZoneEcResult {
       source,
       deltaUsed: false,
       deltaMscm: delta,
-      reason:
-        "runoff_ec_is_not_a_primary_health_signal_for_living_soil_or_peat",
+      reason: "runoff_ec_is_not_a_primary_health_signal_for_living_soil_or_peat",
       guidance: NEVER,
     };
   }

@@ -15,6 +15,7 @@
 
 import type { SnapshotStatus } from "@/lib/sensorSnapshotStatusContract";
 import type { SourceBadgeTone } from "@/lib/sensorSourceLabelViewModel";
+import { evaluateCurrentLiveSensorTruth } from "@/lib/currentLiveSensorTruthRules";
 
 export type SensorTruthSourceTone = SourceBadgeTone;
 
@@ -32,6 +33,8 @@ export type SensorTruthContextVerdict =
 export interface SensorTruthCopyGuardInput {
   sourceTone: SensorTruthSourceTone | string | null | undefined;
   status?: SnapshotStatus | null;
+  quality?: unknown;
+  freshness?: unknown;
 }
 
 export interface SensorTruthCopyGuard {
@@ -72,7 +75,10 @@ function normalizeStatus(
 }
 
 function build(
-  input: Omit<SensorTruthCopyGuard, "canDescribeAsLive" | "canDescribeAsCurrent" | "canDescribeAsHealthyLive">,
+  input: Omit<
+    SensorTruthCopyGuard,
+    "canDescribeAsLive" | "canDescribeAsCurrent" | "canDescribeAsHealthyLive"
+  >,
 ): SensorTruthCopyGuard {
   const canDescribeAsHealthyLive = input.verdict === "healthy_live";
   return {
@@ -83,14 +89,17 @@ function build(
   };
 }
 
-export function buildSensorTruthCopyGuard(
-  input: SensorTruthCopyGuardInput,
-): SensorTruthCopyGuard {
+export function buildSensorTruthCopyGuard(input: SensorTruthCopyGuardInput): SensorTruthCopyGuard {
   const sourceTone = normalizeSourceTone(input.sourceTone);
   const status = normalizeStatus(input.status);
 
   if (sourceTone === "live") {
-    if (status === "usable") {
+    const currentLive = evaluateCurrentLiveSensorTruth({
+      source: sourceTone,
+      quality: input.quality,
+      freshness: input.freshness,
+    }).isCurrentLive;
+    if (status === "usable" && currentLive) {
       return build({
         sourceTone,
         status,
@@ -104,11 +113,11 @@ export function buildSensorTruthCopyGuard(
       sourceTone,
       status,
       verdict: status === "no_data" ? "no_data" : "review_live",
-      label: status === "no_data" ? "No live data" : "Live source needs review",
+      label: status === "no_data" ? "No current sensor data" : "Connected source needs review",
       helper:
         status === "no_data"
           ? "No live sensor reading is available. Do not describe this as current."
-          : "Live-source telemetry is not validated as usable. Do not describe this as healthy or current.",
+          : "Connected telemetry is missing source, quality, or freshness proof. Do not describe this as healthy or current.",
       canUseAsContext: false,
     });
   }

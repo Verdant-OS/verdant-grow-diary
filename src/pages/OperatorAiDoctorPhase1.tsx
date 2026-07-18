@@ -570,6 +570,7 @@ function useDerivedAiDoctorPhase1Bundle(
           (r.created_at as string | null) ??
           "",
         source: String(r.source ?? ""),
+        quality: typeof r.quality === "string" ? r.quality : null,
         // Retained only until the pure compiler applies the diagnostic
         // provenance fence; never included in the compiled AI payload.
         raw_payload: r.raw_payload,

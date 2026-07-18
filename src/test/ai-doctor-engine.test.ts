@@ -15,7 +15,6 @@ import {
   type VisionAnalysisResult,
 } from "../lib/aiDoctorEngine";
 
-
 function fakeFile(): File {
   // node test env supports File via undici.
   return new File([new Uint8Array([1, 2, 3])], "plant.jpg", {
@@ -41,8 +40,7 @@ describe("executeVisionAnalysis", () => {
 
 describe("compilePlantContextFromRows", () => {
   const NOW = new Date("2026-06-04T12:00:00Z");
-  const iso = (offsetMs: number) =>
-    new Date(NOW.getTime() - offsetMs).toISOString();
+  const iso = (offsetMs: number) => new Date(NOW.getTime() - offsetMs).toISOString();
 
   const baseInput = {
     plant: { id: "p1", tent_id: "t1", grow_id: "g1", stage: "veg" },
@@ -54,12 +52,30 @@ describe("compilePlantContextFromRows", () => {
       ...baseInput,
       growEvents: [],
       sensorReadings: [
-        { metric: "vpd_kpa", value: 1.0, captured_at: iso(60_000), source: "ecowitt", quality: "ok" },
-        { metric: "vpd_kpa", value: 1.4, captured_at: iso(120_000), source: "ecowitt", quality: "ok" },
+        { metric: "vpd_kpa", value: 1.0, captured_at: iso(60_000), source: "live", quality: "ok" },
+        { metric: "vpd_kpa", value: 1.4, captured_at: iso(120_000), source: "live", quality: "ok" },
         { metric: "vpd_kpa", value: 0.8, captured_at: iso(60_000), source: "csv", quality: "ok" },
-        { metric: "vpd_kpa", value: 0.9, captured_at: iso(60_000), source: "manual", quality: "ok" },
-        { metric: "vpd_kpa", value: 5.0, captured_at: iso(60_000), source: "ecowitt", quality: "stale" },
-        { metric: "vpd_kpa", value: 99, captured_at: iso(60_000), source: "ecowitt", quality: "invalid" },
+        {
+          metric: "vpd_kpa",
+          value: 0.9,
+          captured_at: iso(60_000),
+          source: "manual",
+          quality: "ok",
+        },
+        {
+          metric: "vpd_kpa",
+          value: 5.0,
+          captured_at: iso(60_000),
+          source: "live",
+          quality: "stale",
+        },
+        {
+          metric: "vpd_kpa",
+          value: 99,
+          captured_at: iso(60_000),
+          source: "live",
+          quality: "invalid",
+        },
       ],
     });
     const tags = ctx.sensor_averages_7d.map((b) => b.source);
@@ -78,16 +94,40 @@ describe("compilePlantContextFromRows", () => {
       ...baseInput,
       growEvents: [],
       sensorReadings: [
-        { metric: "temperature_c", value: 22, captured_at: iso(1000), source: "ecowitt", quality: "ok" },
-        { metric: "temperature_c", value: 24, captured_at: iso(2000), source: "ecowitt", quality: "ok" },
+        {
+          metric: "temperature_c",
+          value: 22,
+          captured_at: iso(1000),
+          source: "live",
+          quality: "ok",
+        },
+        {
+          metric: "temperature_c",
+          value: 24,
+          captured_at: iso(2000),
+          source: "live",
+          quality: "ok",
+        },
       ],
     });
     const b = compilePlantContextFromRows({
       ...baseInput,
       growEvents: [],
       sensorReadings: [
-        { metric: "temperature_c", value: 24, captured_at: iso(2000), source: "ecowitt", quality: "ok" },
-        { metric: "temperature_c", value: 22, captured_at: iso(1000), source: "ecowitt", quality: "ok" },
+        {
+          metric: "temperature_c",
+          value: 24,
+          captured_at: iso(2000),
+          source: "live",
+          quality: "ok",
+        },
+        {
+          metric: "temperature_c",
+          value: 22,
+          captured_at: iso(1000),
+          source: "live",
+          quality: "ok",
+        },
       ],
     });
     expect(a.sensor_averages_7d).toEqual(b.sensor_averages_7d);
@@ -112,10 +152,30 @@ describe("compilePlantContextFromRows", () => {
       growEvents: [],
       sensorReadings: [
         { metric: "vpd_kpa", value: 1.0, captured_at: iso(60_000), source: "csv", quality: "ok" },
-        { metric: "vpd_kpa", value: 1.0, captured_at: iso(60_000), source: "ecowitt", quality: "ok" },
+        { metric: "vpd_kpa", value: 1.0, captured_at: iso(60_000), source: "live", quality: "ok" },
       ],
     });
     expect(ctx.source_tags).toEqual(["live", "csv"]);
+  });
+
+  it("fails legacy source aliases and missing live quality into the invalid bucket", () => {
+    const ctx = compilePlantContextFromRows({
+      ...baseInput,
+      growEvents: [],
+      sensorReadings: [
+        {
+          metric: "temperature_c",
+          value: 24,
+          captured_at: iso(60_000),
+          source: "ecowitt",
+          quality: "ok",
+        },
+        { metric: "humidity_pct", value: 55, captured_at: iso(60_000), source: "live" },
+      ],
+    });
+
+    expect(ctx.source_tags).toEqual(["invalid"]);
+    expect(ctx.sensor_averages_7d[0]?.sample_count).toBe(2);
   });
 
   it("ignores readings older than 7 days", () => {
@@ -123,7 +183,13 @@ describe("compilePlantContextFromRows", () => {
       ...baseInput,
       growEvents: [],
       sensorReadings: [
-        { metric: "vpd_kpa", value: 1.0, captured_at: iso(10 * 24 * 60 * 60 * 1000), source: "ecowitt", quality: "ok" },
+        {
+          metric: "vpd_kpa",
+          value: 1.0,
+          captured_at: iso(10 * 24 * 60 * 60 * 1000),
+          source: "live",
+          quality: "ok",
+        },
       ],
     });
     expect(ctx.sensor_averages_7d).toEqual([]);
@@ -150,11 +216,12 @@ describe("generateMultimodalDiagnosis", () => {
   });
 
   it("injects automated confidence from edge fn and preserves raw model_confidence_level separately", async () => {
-    const fetchImpl = vi.fn(async () =>
-      new Response(JSON.stringify({ score: 65, level: "Medium", explanation: "ok" }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }),
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ score: 65, level: "Medium", explanation: "ok" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
     );
     const result = await generateMultimodalDiagnosis(vision, context, {
       confidence: {
@@ -193,10 +260,7 @@ describe("generateMultimodalDiagnosis", () => {
 
   it("never recommends nutrient, irrigation, or equipment/device changes", async () => {
     const result = await generateMultimodalDiagnosis(vision, context);
-    const joined = [
-      ...result.recommended_actions,
-      ...result.monitoring_priorities,
-    ]
+    const joined = [...result.recommended_actions, ...result.monitoring_priorities]
       .join(" ")
       .toLowerCase();
     expect(joined).not.toMatch(/increase|decrease|add nutrient|raise ec|lower ec/);
@@ -207,10 +271,7 @@ describe("generateMultimodalDiagnosis", () => {
 
 describe("AI Doctor 2.0 engine — static safety", () => {
   const ENGINE = readFileSync(resolve(__dirname, "../lib/aiDoctorEngine.ts"), "utf8");
-  const CLIENT = readFileSync(
-    resolve(__dirname, "../lib/aiDoctorConfidenceEdgeClient.ts"),
-    "utf8",
-  );
+  const CLIENT = readFileSync(resolve(__dirname, "../lib/aiDoctorConfidenceEdgeClient.ts"), "utf8");
 
   it("contains no service_role", () => {
     expect(ENGINE).not.toMatch(/service_role/i);
@@ -250,8 +311,7 @@ describe("AI Doctor 2.0 engine — static safety", () => {
 
 describe("generateMultimodalDiagnosis — deterministic snapshot", () => {
   const NOW = new Date("2026-06-04T12:00:00Z");
-  const iso = (offsetMs: number) =>
-    new Date(NOW.getTime() - offsetMs).toISOString();
+  const iso = (offsetMs: number) => new Date(NOW.getTime() - offsetMs).toISOString();
 
   const vision: VisionAnalysisResult = {
     visual_summary: "deterministic stub",
@@ -273,9 +333,27 @@ describe("generateMultimodalDiagnosis — deterministic snapshot", () => {
         { occurred_at: iso(24 * 60 * 60 * 1000), event_type: "feeding", source: "manual" },
       ],
       sensorReadings: [
-        { metric: "temperature_c", value: 24, captured_at: iso(60 * 60 * 1000), source: "ecowitt", quality: "ok" },
-        { metric: "humidity_pct", value: 55, captured_at: iso(60 * 60 * 1000), source: "ecowitt", quality: "ok" },
-        { metric: "vpd_kpa", value: 1.1, captured_at: iso(60 * 60 * 1000), source: "ecowitt", quality: "ok" },
+        {
+          metric: "temperature_c",
+          value: 24,
+          captured_at: iso(60 * 60 * 1000),
+          source: "live",
+          quality: "ok",
+        },
+        {
+          metric: "humidity_pct",
+          value: 55,
+          captured_at: iso(60 * 60 * 1000),
+          source: "live",
+          quality: "ok",
+        },
+        {
+          metric: "vpd_kpa",
+          value: 1.1,
+          captured_at: iso(60 * 60 * 1000),
+          source: "live",
+          quality: "ok",
+        },
       ],
       now: NOW,
     });
@@ -319,10 +397,8 @@ describe("Phase 1 engine — deterministic ordering of action/evidence/missing l
   // (evidence, missing_information, possible_causes, what_not_to_do,
   // action_queue_suggestion). No external model calls.
 
-
   const NOW = new Date("2026-06-04T12:00:00Z");
-  const iso = (offsetMs: number) =>
-    new Date(NOW.getTime() - offsetMs).toISOString();
+  const iso = (offsetMs: number) => new Date(NOW.getTime() - offsetMs).toISOString();
 
   // Intentionally unsorted: mixed timestamps, mixed sources, mixed metrics,
   // mixed event types. Compiler + diagnosis must produce identical ordering.
@@ -343,12 +419,42 @@ describe("Phase 1 engine — deterministic ordering of action/evidence/missing l
         { occurred_at: iso(2 * 60 * 60 * 1000), event_type: "observation", source: "manual" },
       ],
       sensorReadings: [
-        { metric: "humidity_pct", value: 55, captured_at: iso(2 * 60 * 60 * 1000), source: "ecowitt" },
-        { metric: "temperature_c", value: 24, captured_at: iso(60 * 60 * 1000), source: "ecowitt" },
-        { metric: "vpd_kpa", value: 1.1, captured_at: iso(3 * 60 * 60 * 1000), source: "ecowitt" },
+        {
+          metric: "humidity_pct",
+          value: 55,
+          captured_at: iso(2 * 60 * 60 * 1000),
+          source: "live",
+          quality: "ok",
+        },
+        {
+          metric: "temperature_c",
+          value: 24,
+          captured_at: iso(60 * 60 * 1000),
+          source: "live",
+          quality: "ok",
+        },
+        {
+          metric: "vpd_kpa",
+          value: 1.1,
+          captured_at: iso(3 * 60 * 60 * 1000),
+          source: "live",
+          quality: "ok",
+        },
         { metric: "vpd_kpa", value: 0.9, captured_at: iso(60 * 60 * 1000), source: "csv" },
-        { metric: "temperature_c", value: 99, captured_at: iso(30 * 60 * 1000), source: "ecowitt", state: "stale" },
-        { metric: "humidity_pct", value: 200, captured_at: iso(45 * 60 * 1000), source: "ecowitt", state: "invalid" },
+        {
+          metric: "temperature_c",
+          value: 99,
+          captured_at: iso(30 * 60 * 1000),
+          source: "live",
+          state: "stale",
+        },
+        {
+          metric: "humidity_pct",
+          value: 200,
+          captured_at: iso(45 * 60 * 1000),
+          source: "live",
+          state: "invalid",
+        },
         { metric: "co2_ppm", value: 800, captured_at: iso(4 * 60 * 60 * 1000), source: "manual" },
       ],
       now: NOW,
@@ -442,4 +548,3 @@ describe("Phase 1 engine — deterministic ordering of action/evidence/missing l
     expect(stableJson(a)).toBe(stableJson(b));
   });
 });
-

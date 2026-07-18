@@ -80,7 +80,9 @@ describe("aiDoctorActionSuggestionPreviewRules", () => {
   it("never recommends nutrient/irrigation/equipment commands in suggested copy", () => {
     const out = previewActionSuggestion(baseInput);
     const copy = out.suggestedActionPreview ?? "";
-    expect(copy).not.toMatch(/increase (feed|nutrient|ec)|water more|irrigation|pump|fan on|light on/i);
+    expect(copy).not.toMatch(
+      /increase (feed|nutrient|ec)|water more|irrigation|pump|fan on|light on/i,
+    );
   });
 
   it("derives input from readiness-view shape", () => {
@@ -98,17 +100,26 @@ describe("aiDoctorActionSuggestionPreviewRules", () => {
     expect(input.hasInvalidOrUnknownCriticalTelemetry).toBe(false);
   });
 
+  it("does not infer a current reading from an untrustworthy live/manual badge", () => {
+    const input = deriveActionSuggestionPreviewInput({
+      plantIdentity: { plantId: "p1", stage: "veg", tentId: "t1" },
+      sourceBadges: [{ source: "live", sampleCount: 1, isTrustworthy: false }],
+      limitations: [],
+    });
+
+    expect(input.hasCurrentManualOrLiveReading).toBe(false);
+    expect(previewActionSuggestion(input).status).toBe("needs_current_reading");
+  });
+
   it("exposes a stable label and status catalog", () => {
     expect(ACTION_SUGGESTION_PREVIEW_LABEL).toBe("Action Queue suggestion preview");
-    expect(Object.keys(ACTION_SUGGESTION_PREVIEW_STATUS_LABELS).sort()).toEqual(
-      [
-        "blocked_device_command_risk",
-        "blocked_invalid_data",
-        "eligible",
-        "missing_context",
-        "needs_current_reading",
-      ],
-    );
+    expect(Object.keys(ACTION_SUGGESTION_PREVIEW_STATUS_LABELS).sort()).toEqual([
+      "blocked_device_command_risk",
+      "blocked_invalid_data",
+      "eligible",
+      "missing_context",
+      "needs_current_reading",
+    ]);
     for (const label of Object.values(ACTION_SUGGESTION_PREVIEW_STATUS_LABELS)) {
       expect(label).not.toMatch(/approved|queued|executed/i);
     }
@@ -176,20 +187,13 @@ describe("aiDoctorActionSuggestionPreviewRules", () => {
       hasPlantContext: false,
       plantContextDetail: { plant: false, tent: false, stage: false },
     });
-    expect(out.missingFields).toEqual([
-      "plant",
-      "tent",
-      "stage",
-      "current_sensor_snapshot",
-    ]);
+    expect(out.missingFields).toEqual(["plant", "tent", "stage", "current_sensor_snapshot"]);
   });
 
   it("conservative suggested copy avoids nutrient/irrigation/equipment language", () => {
     const out = previewActionSuggestion(baseInput);
     const copy = out.suggestedActionPreview ?? "";
-    expect(copy).not.toMatch(
-      /nutrient|irrigation|dose|pump|fan on|light on|setpoint|equipment/i,
-    );
+    expect(copy).not.toMatch(/nutrient|irrigation|dose|pump|fan on|light on|setpoint|equipment/i);
   });
 
   // ---- UI safety filter ----
@@ -232,8 +236,7 @@ describe("aiDoctorActionSuggestionPreviewRules", () => {
 import type { ManualSensorSnapshotQuality } from "@/lib/manualSensorSnapshotQualityRules";
 
 function makeQuality(
-  q: Partial<ManualSensorSnapshotQuality> &
-    Pick<ManualSensorSnapshotQuality, "quality">,
+  q: Partial<ManualSensorSnapshotQuality> & Pick<ManualSensorSnapshotQuality, "quality">,
 ): ManualSensorSnapshotQuality {
   const usable = q.quality === "usable";
   return {
@@ -243,10 +246,8 @@ function makeQuality(
     reasons: q.reasons ?? [],
     invalidFields: q.invalidFields ?? [],
     missingFields: q.missingFields ?? [],
-    canSupportAiDoctorCurrentContext:
-      q.canSupportAiDoctorCurrentContext ?? usable,
-    canSupportActionSuggestionPreview:
-      q.canSupportActionSuggestionPreview ?? usable,
+    canSupportAiDoctorCurrentContext: q.canSupportAiDoctorCurrentContext ?? usable,
+    canSupportActionSuggestionPreview: q.canSupportActionSuggestionPreview ?? usable,
   };
 }
 
@@ -281,9 +282,7 @@ describe("aiDoctorActionSuggestionPreviewRules — snapshot quality integration"
     const input = deriveActionSuggestionPreviewInput(
       {
         ...readinessWithPlant,
-        sourceBadges: [
-          { source: "csv", sampleCount: 10, isTrustworthy: false },
-        ],
+        sourceBadges: [{ source: "csv", sampleCount: 10, isTrustworthy: false }],
       },
       {
         snapshotQuality: makeQuality({

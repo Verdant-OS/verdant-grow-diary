@@ -13,7 +13,11 @@
  *  - No `command`, `device_id`, `action_queue`, `control`, `relay`, or
  *    `execute` keys are ever emitted.
  */
-import { normalizeGreenhouseSource, type GreenhouseSource } from "./greenhouseLightRules";
+import {
+  isGreenhouseSampleUsable,
+  normalizeGreenhouseSource,
+  type GreenhouseSource,
+} from "./greenhouseLightRules";
 
 export const AIR_TEMP_MIN_C = -20;
 export const AIR_TEMP_MAX_C = 60;
@@ -57,6 +61,8 @@ export interface AssessVpdInput {
   vpdKpa: number | null | undefined;
   /** Source for the underlying snapshot — drives unknown classification. */
   source?: unknown;
+  /** Exact validation state. Only `ok` can support an assessment. */
+  quality?: unknown;
   /** Stage band (kPa). Optional; without it, `in_band` is not possible. */
   band?: VpdBand | null;
 }
@@ -79,7 +85,7 @@ export interface AssessVpdResult {
  */
 export function assessVpd(input: AssessVpdInput): AssessVpdResult {
   const source = normalizeGreenhouseSource(input?.source);
-  if (source === "stale" || source === "invalid") {
+  if (!isGreenhouseSampleUsable(input?.source, input?.quality)) {
     return { status: "unknown", severity: null, source, reason: "source_not_healthy" };
   }
   const vpd = input?.vpdKpa;
@@ -116,6 +122,7 @@ export interface ClimateSample {
   tempC: number | null | undefined;
   rhPercent: number | null | undefined;
   source: unknown;
+  quality?: unknown;
 }
 
 export type CondensationStatus = "ok" | "review" | "invalid" | "insufficient_samples";
@@ -145,8 +152,7 @@ export function detectSunsetCondensationRisk(
   type Parsed = { tMs: number; tempC: number; rh: number };
   const healthy: Parsed[] = [];
   for (const s of arr) {
-    const src = normalizeGreenhouseSource(s?.source);
-    if (src === "stale" || src === "invalid" || src === "demo") continue;
+    if (!isGreenhouseSampleUsable(s?.source, s?.quality)) continue;
     const tMs = Date.parse(String(s?.ts ?? ""));
     const tempC = typeof s?.tempC === "number" ? s.tempC : Number(s?.tempC);
     const rh = typeof s?.rhPercent === "number" ? s.rhPercent : Number(s?.rhPercent);

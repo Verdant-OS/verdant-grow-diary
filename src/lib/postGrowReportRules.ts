@@ -27,7 +27,7 @@ export const PDF_EMPTY_SECTION_COPY = "Not enough evidence to summarize this sec
 export const PDF_READ_ONLY_FOOTER =
   "Read-only export. Verdant suggests; the grower decides. No device commands were sent.";
 export const PDF_PROVENANCE_LEGEND_COPY =
-  "Data sources: Live = connected sensor. Manual = grower entry. CSV = imported history. " +
+  "Data sources: Connected sensor = sensor provenance, not a current-health claim. Manual = grower entry. CSV = imported history. " +
   "Demo = sample data. Stale = too old to treat as current. Invalid = missing/malformed.";
 
 export const POST_GROW_SENSOR_PROVENANCE_LEGEND_TITLE = "Sensor provenance legend";
@@ -42,9 +42,10 @@ export interface PostGrowSensorProvenanceLegendRow {
 export const POST_GROW_SENSOR_PROVENANCE_LEGEND: readonly PostGrowSensorProvenanceLegendRow[] = [
   {
     kind: "live",
-    label: "Live",
-    description: "Connected sensor or bridge reading captured from a real source.",
-    healthy: true,
+    label: "Connected sensor",
+    description:
+      "Sensor provenance in grow history; freshness and quality require separate verification.",
+    healthy: false,
   },
   {
     kind: "manual",
@@ -92,9 +93,7 @@ export function provenanceBadgeAriaLabel(
   return `Sensor provenance: ${row.label}. ${row.description}`;
 }
 
-export function findProvenanceLegendRow(
-  kind: string,
-): PostGrowSensorProvenanceLegendRow | null {
+export function findProvenanceLegendRow(kind: string): PostGrowSensorProvenanceLegendRow | null {
   const normalized = normalizeReportSensorSource(kind);
   return POST_GROW_SENSOR_PROVENANCE_LEGEND.find((r) => r.kind === normalized) ?? null;
 }
@@ -165,26 +164,18 @@ export function isoDateOnly(d: Date): string {
  * Deterministic filename for the exported PDF. Uses grow name slug and
  * export date. Never includes ids, tokens, or user identifiers.
  */
-export function buildPdfExportFilename(
-  growName: unknown,
-  now: Date = new Date(),
-): string {
+export function buildPdfExportFilename(growName: unknown, now: Date = new Date()): string {
   return `verdant-post-grow-report-${slugifyGrowName(growName)}-${isoDateOnly(now)}.pdf`;
 }
 
 /** Deterministic document.title used before window.print(). */
-export function buildPdfExportTitle(
-  growName: unknown,
-  now: Date = new Date(),
-): string {
+export function buildPdfExportTitle(growName: unknown, now: Date = new Date()): string {
   const safeName =
-    typeof growName === "string" && growName.trim().length > 0
-      ? growName.trim()
-      : "Grow";
+    typeof growName === "string" && growName.trim().length > 0 ? growName.trim() : "Grow";
   return `Verdant — Post-Grow Report — ${redactSecrets(safeName)} — ${isoDateOnly(now)}`;
 }
 
-const HEALTHY_SOURCE_KINDS: readonly TimelineSensorSourceKind[] = ["live", "manual", "csv"];
+const HEALTHY_SOURCE_KINDS: readonly TimelineSensorSourceKind[] = ["manual", "csv"];
 
 export function normalizeReportSensorSource(input: unknown): TimelineSensorSourceKind {
   if (typeof input !== "string") return "invalid";
@@ -207,5 +198,5 @@ export function isReportSensorSourceHealthy(kind: TimelineSensorSourceKind): boo
 }
 
 export function sensorSourceShortLabel(kind: TimelineSensorSourceKind): string {
-  return SENSOR_SOURCE_SHORT_LABEL[kind];
+  return kind === "live" ? "Connected sensor" : SENSOR_SOURCE_SHORT_LABEL[kind];
 }

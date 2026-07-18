@@ -17,6 +17,7 @@
  *    output — the caller is responsible for stripping them before calling,
  *    and rules never re-emit unknown fields.
  */
+import { evaluateCurrentLiveSensorTruth } from "@/lib/currentLiveSensorTruthRules";
 
 // ---------------------------------------------------------------------------
 // Public status model
@@ -144,6 +145,8 @@ export type SensorSourceLabel = "live" | "manual" | "csv" | "demo" | "stale" | "
 export interface SensorSnapshotEvidence {
   source: SensorSourceLabel | null;
   captured_at: string | null;
+  /** Persisted sensor_readings quality. Required for a current Live claim. */
+  quality?: string | null;
   confidence?: number | null;
   metric?: string | null;
 }
@@ -440,6 +443,7 @@ export const ALLOWED_SENSOR_SOURCES: readonly SensorSourceLabel[] = [
 const ALLOWED_SENSOR_KEYS: ReadonlySet<string> = new Set([
   "source",
   "captured_at",
+  "quality",
   "confidence",
   "metric",
 ]);
@@ -536,7 +540,10 @@ export function evaluateSensorSnapshot(
   const metricInput = (s as { metric?: unknown }).metric;
   const metricInvalid =
     metricInput !== undefined && metricInput !== null && typeof metricInput !== "string";
-  if (confidenceInvalid || metricInvalid) {
+  const qualityInput = (s as { quality?: unknown }).quality;
+  const qualityInvalidShape =
+    qualityInput !== undefined && qualityInput !== null && typeof qualityInput !== "string";
+  if (confidenceInvalid || metricInvalid || qualityInvalidShape) {
     return {
       id: "sensor-snapshot",
       label: "Sensor Snapshot",
@@ -550,7 +557,9 @@ export function evaluateSensorSnapshot(
       missing_info: [
         confidenceInvalid
           ? "Confidence is malformed; excluded from healthy status."
-          : "Metric label is malformed; excluded from healthy status.",
+          : metricInvalid
+            ? "Metric label is malformed; excluded from healthy status."
+            : "Quality is malformed; excluded from healthy status.",
       ],
       safety_note: "Malformed telemetry is never shown as healthy.",
       source: "invalid",
@@ -595,6 +604,7 @@ export function evaluateSensorSnapshot(
     `Source: ${s.source}`,
     s.captured_at ? `Captured: ${s.captured_at}` : "Captured: unknown",
   ];
+  if (typeof s.quality === "string") ev.push(`Quality: ${s.quality}`);
   if (typeof s.confidence === "number") ev.push(`Confidence: ${s.confidence.toFixed(2)}`);
   if (s.metric) ev.push(`Metric: ${s.metric}`);
   if (s.source === "stale" || stale || (isLive && mins === null)) {
@@ -624,14 +634,33 @@ export function evaluateSensorSnapshot(
       source: s.source,
     };
   }
-  // isLive && fresh
+  const liveTruth = evaluateCurrentLiveSensorTruth({
+    source: s.source,
+    quality: s.quality,
+    freshness: "fresh",
+  });
+  if (!liveTruth.isCurrentLive) {
+    const explicitlyStale = liveTruth.normalizedQuality === "stale";
+    return {
+      id: "sensor-snapshot",
+      label: "Sensor Snapshot",
+      status: explicitlyStale ? "stale" : "invalid",
+      evidence: ev,
+      missing_info: [
+        "Live evidence requires canonical live source, accepted sensor quality, and a fresh captured_at.",
+      ],
+      safety_note: "Unknown or degraded sensor quality is never shown as healthy.",
+      source: explicitlyStale ? "stale" : "invalid",
+    };
+  }
+
   return {
     id: "sensor-snapshot",
     label: "Sensor Snapshot",
     status: "passed",
     evidence: ev,
     missing_info: [],
-    safety_note: "Live reading only when source=live and captured_at is fresh.",
+    safety_note: "Live reading only when source=live, quality=ok, and captured_at is fresh.",
     source: "live",
   };
 }

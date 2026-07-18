@@ -55,7 +55,9 @@ export interface AiDoctorResult {
   applied_safety_rules: readonly string[];
 }
 
-const TRUSTWORTHY: ReadonlySet<SensorSourceTag> = new Set<SensorSourceTag>(["live", "manual"]);
+function isTrustworthyGroup(group: AiDoctorContext["sensor_groups"][number]): boolean {
+  return group.source === "manual" || (group.source === "live" && group.quality === "ok");
+}
 
 export const NEVER_DO_BASELINE: readonly string[] = Object.freeze([
   "Do not adjust nutrient strength based on this output.",
@@ -90,7 +92,7 @@ export interface ContextStrength {
 }
 
 export function assessContextStrength(context: AiDoctorContext): ContextStrength {
-  const trustworthyGroups = context.sensor_groups.filter((g) => TRUSTWORTHY.has(g.source));
+  const trustworthyGroups = context.sensor_groups.filter(isTrustworthyGroup);
   const trustworthySensorReadings = trustworthyGroups.reduce((n, g) => n + g.sample_count, 0);
   const hasTrustworthySensors = trustworthySensorReadings > 0;
   const hasRecentEvents = context.recent_grow_events.length > 0;

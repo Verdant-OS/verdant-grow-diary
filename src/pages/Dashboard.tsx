@@ -88,7 +88,7 @@ import { toast } from "sonner";
 
 import { SOURCE_LABEL, formatValue, isStale } from "@/lib/sensorSnapshot";
 import { buildSensorSourceDisplayLabel } from "@/lib/sensorSourceDisplayLabel";
-import { formatSensorSourceLabel } from "@/lib/manualSensorSourceLabel";
+import { resolvePlantTentSnapshotSourceLabel } from "@/lib/plantTentEnvironmentRules";
 import { formatTemperatureDisplay } from "@/lib/temperatureUnitPreference";
 
 import { Button } from "@/components/ui/button";
@@ -835,10 +835,10 @@ export default function Dashboard() {
                           source: "csv",
                           csvVendor: sensorState.snapshot.csvVendor,
                         })
-                      : formatSensorSourceLabel({
-                          source: sensorState.snapshot.source,
-                          deviceId: sensorState.snapshot.device_id ?? null,
-                        })}
+                      : resolvePlantTentSnapshotSourceLabel(
+                          sensorState.snapshot,
+                          isStale(sensorState.snapshot.ts),
+                        )}
                   </Badge>
                   {sensorState.snapshot.ts && (
                     <span className="text-xs text-muted-foreground">

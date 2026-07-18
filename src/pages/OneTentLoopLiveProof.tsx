@@ -590,6 +590,7 @@ export default function OneTentLoopLiveProof(): JSX.Element {
   const latest_sensor_snapshot: SensorSnapshotEvidence | null = snapSourceLabel
     ? {
         source: snapSourceLabel,
+        quality: snapState.snapshot.quality ?? null,
         captured_at: snapState.snapshot.ts ?? null,
         confidence: null,
         metric: null,

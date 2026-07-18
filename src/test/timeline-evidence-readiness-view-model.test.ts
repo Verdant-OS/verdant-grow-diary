@@ -55,8 +55,20 @@ describe("timelineEvidenceReadinessViewModel — counts", () => {
         { occurred_at: ago(5 * HOUR), event_type: "observation", source: "manual" },
       ],
       sensorReadings: [
-        { metric: "temperature_c", value: 24, captured_at: ago(HOUR), source: "live" },
-        { metric: "humidity_pct", value: 55, captured_at: ago(HOUR), source: "live" },
+        {
+          metric: "temperature_c",
+          value: 24,
+          captured_at: ago(10 * 60 * 1000),
+          source: "live",
+          quality: "ok",
+        },
+        {
+          metric: "humidity_pct",
+          value: 55,
+          captured_at: ago(10 * 60 * 1000),
+          source: "live",
+          quality: "ok",
+        },
       ],
     });
     const v = buildTimelineEvidenceReadinessView(ctx, {
@@ -125,7 +137,13 @@ describe("timelineEvidenceReadinessViewModel — source badges & tone", () => {
         { occurred_at: ago(3 * HOUR), event_type: "feeding", source: "manual" },
       ],
       sensorReadings: [
-        { metric: "temperature_c", value: 24, captured_at: ago(HOUR), source: "live" },
+        {
+          metric: "temperature_c",
+          value: 24,
+          captured_at: ago(10 * 60 * 1000),
+          source: "live",
+          quality: "ok",
+        },
       ],
     });
     const v = buildTimelineEvidenceReadinessView(ctx, { recentPhotoCount: 2 });
@@ -136,9 +154,7 @@ describe("timelineEvidenceReadinessViewModel — source badges & tone", () => {
 
   it("limited tone when context is thin but not untrusted", () => {
     const ctx = makeCtx({
-      growEvents: [
-        { occurred_at: ago(2 * HOUR), event_type: "watering", source: "manual" },
-      ],
+      growEvents: [{ occurred_at: ago(2 * HOUR), event_type: "watering", source: "manual" }],
       sensorReadings: [
         { metric: "temperature_c", value: 24, captured_at: ago(HOUR), source: "manual" },
       ],
@@ -178,24 +194,34 @@ describe("timelineEvidenceReadinessViewModel — source badges & tone", () => {
   it("manual + live sources are trustworthy and keep canonical labels", () => {
     const ctx = makeCtx({
       sensorReadings: [
-        { metric: "temperature_c", value: 24, captured_at: ago(HOUR), source: "live" },
+        {
+          metric: "temperature_c",
+          value: 24,
+          captured_at: ago(10 * 60 * 1000),
+          source: "live",
+          quality: "ok",
+        },
         { metric: "humidity_pct", value: 55, captured_at: ago(HOUR), source: "manual" },
       ],
     });
     const v = buildTimelineEvidenceReadinessView(ctx, {});
     expect(v.sourceBadges.find((b) => b.source === "live")?.trustworthy).toBe(true);
-    expect(v.sourceBadges.find((b) => b.source === "live")?.label).toBe("Live");
+    expect(v.sourceBadges.find((b) => b.source === "live")?.label).toBe("Connected source");
     expect(v.sourceBadges.find((b) => b.source === "manual")?.trustworthy).toBe(true);
     expect(v.sourceBadges.find((b) => b.source === "manual")?.label).toBe("Manual");
   });
 
   it("untrusted tone wins when both trustworthy and untrusted sources exist", () => {
     const ctx = makeCtx({
-      growEvents: [
-        { occurred_at: ago(HOUR), event_type: "watering", source: "manual" },
-      ],
+      growEvents: [{ occurred_at: ago(HOUR), event_type: "watering", source: "manual" }],
       sensorReadings: [
-        { metric: "temperature_c", value: 24, captured_at: ago(HOUR), source: "live" },
+        {
+          metric: "temperature_c",
+          value: 24,
+          captured_at: ago(10 * 60 * 1000),
+          source: "live",
+          quality: "ok",
+        },
         { metric: "humidity_pct", value: 55, captured_at: ago(HOUR), source: "demo" },
       ],
     });

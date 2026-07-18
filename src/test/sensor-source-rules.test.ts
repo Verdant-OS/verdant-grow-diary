@@ -6,12 +6,13 @@ import {
 } from "@/lib/sensor/sensorSourceRules";
 
 describe("sensorSourceRules", () => {
-  it("normalizes known aliases", () => {
-    expect(normalizeSensorSource("LIVE")).toBe("live");
-    expect(normalizeSensorSource("sensor")).toBe("live");
-    expect(normalizeSensorSource("user")).toBe("manual");
-    expect(normalizeSensorSource("mock")).toBe("demo");
-    expect(normalizeSensorSource("import")).toBe("csv");
+  it("accepts only exact canonical values", () => {
+    for (const source of ["live", "manual", "csv", "demo", "stale", "invalid"] as const) {
+      expect(normalizeSensorSource(source)).toBe(source);
+    }
+    for (const alias of ["LIVE", "sensor", "user", "mock", "import", " live "]) {
+      expect(normalizeSensorSource(alias)).toBe("invalid");
+    }
   });
 
   it("collapses unknown / missing / non-string to invalid", () => {
@@ -23,8 +24,9 @@ describe("sensorSourceRules", () => {
     expect(normalizeSensorSource("autopilot")).toBe("invalid");
   });
 
-  it("only live is healthy", () => {
-    expect(isHealthySensorSource("live")).toBe(true);
+  it("only exact current Live proof is healthy", () => {
+    expect(isHealthySensorSource("live", { quality: "ok", freshness: "fresh" })).toBe(true);
+    expect(isHealthySensorSource("live")).toBe(false);
     for (const s of ["manual", "csv", "demo", "stale", "invalid"] as const) {
       expect(isHealthySensorSource(s)).toBe(false);
     }
@@ -35,5 +37,7 @@ describe("sensorSourceRules", () => {
     expect(sensorSourceLabel("stale")).toMatch(/stale/i);
     expect(sensorSourceLabel("invalid")).toMatch(/invalid/i);
     expect(sensorSourceLabel("live")).not.toMatch(/demo|stale|invalid/i);
+    expect(sensorSourceLabel("live")).toMatch(/unverified/i);
+    expect(sensorSourceLabel("live", { quality: "ok", freshness: "fresh" })).toBe("Live sensor");
   });
 });

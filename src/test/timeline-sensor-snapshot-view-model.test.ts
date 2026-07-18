@@ -32,9 +32,7 @@ describe("buildTimelineSensorSnapshotViewModel", () => {
 
   it("renders soil moisture and CO2 only when present", () => {
     const a = buildTimelineSensorSnapshotViewModel({ temp_f: 70 });
-    expect(a.kind === "chips" && a.chips.some((c) => c.metric === "soil_moisture")).toBe(
-      false,
-    );
+    expect(a.kind === "chips" && a.chips.some((c) => c.metric === "soil_moisture")).toBe(false);
     expect(a.kind === "chips" && a.chips.some((c) => c.metric === "co2")).toBe(false);
 
     const b = buildTimelineSensorSnapshotViewModel({
@@ -121,12 +119,56 @@ describe("buildTimelineSensorSnapshotViewModel", () => {
   });
 
   it("marks isLive only when source resolves to live", () => {
-    const vm = buildTimelineSensorSnapshotViewModel({
-      temp_f: 70,
-      source: "live",
-    });
+    const vm = buildTimelineSensorSnapshotViewModel(
+      {
+        temp_f: 70,
+        source: "live",
+        quality: "ok",
+        captured_at: "2026-06-17T11:59:30Z",
+      },
+      { now: Date.parse("2026-06-17T12:00:00Z"), staleMs: 60_000 },
+    );
     expect(vm.kind === "chips" && vm.isLive).toBe(true);
   });
+
+  it.each([undefined, null, "degraded", "OK"])(
+    "source-only quality %s never resolves to Live",
+    (quality) => {
+      const vm = buildTimelineSensorSnapshotViewModel(
+        {
+          temp_f: 70,
+          source: "live",
+          quality,
+          captured_at: "2026-06-17T11:59:30Z",
+        },
+        { now: Date.parse("2026-06-17T12:00:00Z"), staleMs: 60_000 },
+      );
+      expect(vm.kind).toBe("chips");
+      if (vm.kind !== "chips") return;
+      expect(vm.isLive).toBe(false);
+      expect(vm.sourceLabel).toBe("Invalid");
+    },
+  );
+
+  it.each([{ humidity: 0 }, { humidity: 100 }, { soil_moisture: 0 }, { soil_moisture: 100 }])(
+    "fault endpoints render as invalid, never Live",
+    (metrics) => {
+      const vm = buildTimelineSensorSnapshotViewModel(
+        {
+          temp_f: 70,
+          source: "live",
+          quality: "ok",
+          captured_at: "2026-06-17T11:59:30Z",
+          ...metrics,
+        },
+        { now: Date.parse("2026-06-17T12:00:00Z"), staleMs: 60_000 },
+      );
+      expect(vm.kind).toBe("chips");
+      if (vm.kind !== "chips") return;
+      expect(vm.isLive).toBe(false);
+      expect(vm.sourceLabel).toBe("Invalid");
+    },
+  );
 
   it("unknown source resolves to null label, never Live", () => {
     const vm = buildTimelineSensorSnapshotViewModel({

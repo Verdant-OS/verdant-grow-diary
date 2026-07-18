@@ -162,6 +162,7 @@ describe("classifySensorTestbench", () => {
       rows: [
         {
           source: "live",
+          quality: "ok",
           captured_at: new Date(NOW.getTime() - 60_000).toISOString(),
           raw_payload: {
             vendor: "ecowitt_windows_testbench",
@@ -184,7 +185,7 @@ describe("classifySensorTestbench", () => {
     expect(r.source).toBe("live");
   });
 
-  it("renders fresh non-testbench ecowitt as live", () => {
+  it("does not promote a fresh noncanonical ecowitt source to live", () => {
     const r = classifySensorTestbench({
       rows: [
         {
@@ -195,8 +196,22 @@ describe("classifySensorTestbench", () => {
       ],
       now: NOW,
     });
-    expect(r.indicator).toBe("live");
+    expect(r.indicator).toBe("stale");
     expect(r.isTestbench).toBe(false);
+  });
+
+  it("does not promote canonical live without exact quality proof", () => {
+    const r = classifySensorTestbench({
+      rows: [
+        {
+          source: "live",
+          captured_at: new Date(NOW.getTime() - 60_000).toISOString(),
+          raw_payload: { vendor: "ecowitt" },
+        },
+      ],
+      now: NOW,
+    });
+    expect(r.indicator).toBe("stale");
   });
 
   it("renders aged ingest as stale", () => {

@@ -66,7 +66,13 @@ describe("legacy sensor adapter provenance fence", () => {
     expect(isHealthyLiveGrowSensorReading(mapped)).toBe(false);
     expect(
       classifyGrowDataSource(
-        { source: mapped.source, value: mapped.temp, timestamp: mapped.ts },
+        {
+          source: mapped.source,
+          value: mapped.temp,
+          timestamp: mapped.capturedAt,
+          quality: mapped.quality,
+          status: mapped.status,
+        },
         { now: NOW },
       ).label,
     ).toBe("Demo");
@@ -82,7 +88,13 @@ describe("legacy sensor adapter provenance fence", () => {
     expect(isHealthyLiveGrowSensorReading(mapped)).toBe(true);
     expect(
       classifyGrowDataSource(
-        { source: mapped.source, value: mapped.temp, timestamp: mapped.ts },
+        {
+          source: mapped.source,
+          value: mapped.temp,
+          timestamp: mapped.capturedAt,
+          quality: mapped.quality,
+          status: mapped.status,
+        },
         { now: NOW },
       ).label,
     ).toBe("Live");

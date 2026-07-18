@@ -51,10 +51,34 @@ describe("buildPostGrowLearningReportViewModel", () => {
         },
       ],
       sensorReadings: [
-        { metric: "temperature_c", value: 24, ts: "2026-03-01T00:00:00.000Z", source: "live" },
-        { metric: "temperature_c", value: 25, ts: "2026-03-02T00:00:00.000Z", source: "live" },
-        { metric: "humidity_pct", value: 55, ts: "2026-03-01T00:00:00.000Z", source: "live" },
-        { metric: "vpd_kpa", value: 1.2, ts: "2026-03-01T00:00:00.000Z", source: "live" },
+        {
+          metric: "temperature_c",
+          value: 24,
+          ts: "2026-03-01T00:00:00.000Z",
+          source: "live",
+          quality: "ok",
+        },
+        {
+          metric: "temperature_c",
+          value: 25,
+          ts: "2026-03-02T00:00:00.000Z",
+          source: "live",
+          quality: "ok",
+        },
+        {
+          metric: "humidity_pct",
+          value: 55,
+          ts: "2026-03-01T00:00:00.000Z",
+          source: "live",
+          quality: "ok",
+        },
+        {
+          metric: "vpd_kpa",
+          value: 1.2,
+          ts: "2026-03-01T00:00:00.000Z",
+          source: "live",
+          quality: "ok",
+        },
       ],
       actions: [
         {
@@ -86,6 +110,7 @@ describe("buildPostGrowLearningReportViewModel", () => {
           value: 99,
           ts: "2026-03-01T00:00:00.000Z",
           source: "live",
+          quality: "ok",
           raw_payload: {
             vendor: "ecowitt_windows_testbench",
             metadata: { confidence: "test" },
@@ -96,6 +121,7 @@ describe("buildPostGrowLearningReportViewModel", () => {
           value: 24,
           ts: "2026-03-02T00:00:00.000Z",
           source: "live",
+          quality: "ok",
           raw_payload: {
             vendor: "ecowitt_windows_testbench",
             metadata: {
@@ -141,6 +167,15 @@ describe("buildPostGrowLearningReportViewModel", () => {
     });
     expect(nonEvidenceOnly.dataCompleteness.missing).toContain("Sensor readings");
     expect(nonEvidenceOnly.sensorReadingSources).toEqual([{ source: "demo" }]);
+
+    const missingQuality = buildPostGrowLearningReportViewModel({
+      grow: archivedGrow,
+      sensorReadings: [
+        { metric: "temperature_c", value: 24, ts: "2026-03-02T00:00:00.000Z", source: "live" },
+      ],
+    });
+    expect(missingQuality.environment[0].count).toBe(0);
+    expect(missingQuality.sensorReadingSources).toEqual([{ source: "live" }]);
   });
 
   it("keeps active veg grows ineligible and reports thin data honestly", () => {

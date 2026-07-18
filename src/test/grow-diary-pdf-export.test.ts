@@ -70,7 +70,7 @@ describe("growDiaryPdfExport — model", () => {
       now: NOW,
     });
     const bySrc = Object.fromEntries(m.sensorSources.map((s) => [s.label, s]));
-    expect(bySrc.live.healthy).toBe(true);
+    expect(bySrc["connected sensor (unverified)"].healthy).toBe(false);
     expect(bySrc.stale.healthy).toBe(false);
     expect(bySrc.invalid.healthy).toBe(false);
     expect(bySrc.demo.healthy).toBe(false);
@@ -97,9 +97,7 @@ describe("growDiaryPdfExport — model", () => {
       chartHints: [{ label: "Log frequency", summary: "12 entries over 7 days" }],
       now: NOW,
     });
-    expect(m.charts).toEqual([
-      { label: "Log frequency", summary: "12 entries over 7 days" },
-    ]);
+    expect(m.charts).toEqual([{ label: "Log frequency", summary: "12 entries over 7 days" }]);
     expect(m.chartsUnavailableNote).toBeNull();
   });
 

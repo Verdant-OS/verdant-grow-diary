@@ -11,6 +11,7 @@ const READY_INPUT = {
   backendEvidencePresent: true,
   realDeviceComparisonPresent: true,
   sourceLabel: "live",
+  qualityLabel: "ok",
   capturedAtRecent: true,
   confidencePresent: true,
   tentIdPresent: true,
@@ -40,7 +41,9 @@ describe("evaluateEcowittLiveReadiness", () => {
     expect(result.canCallLive).toBe(false);
     expect(result.canCreateAlerts).toBe(false);
     expect(result.canCreateActionQueueItems).toBe(false);
-    expect(result.requiredEvidenceMissing).toContain("Real EcoWitt controller/app comparison present");
+    expect(result.requiredEvidenceMissing).toContain(
+      "Real EcoWitt controller/app comparison present",
+    );
   });
 
   it("returns partial when local pipeline works but real device comparison is missing", () => {
@@ -99,8 +102,28 @@ describe("evaluateEcowittLiveReadiness", () => {
 
     const demo = evaluateEcowittLiveReadiness({ ...READY_INPUT, sourceLabel: "demo" });
     expect(demo.verdict).toBe("mismatch");
-    expect(demo.blockers.join(" ")).toMatch(/not live\/ecowitt/i);
+    expect(demo.blockers.join(" ")).toMatch(/not exact canonical live/i);
   });
+
+  it.each(["ecowitt", "Live", " live", "live "])(
+    "rejects the non-canonical live source %j",
+    (sourceLabel) => {
+      const result = evaluateEcowittLiveReadiness({ ...READY_INPUT, sourceLabel });
+      expect(result.verdict).toBe("mismatch");
+      expect(result.canCallLive).toBe(false);
+      expect(result.blockers.join(" ")).toMatch(/not exact canonical live/i);
+    },
+  );
+
+  it.each([undefined, null, "", "OK", "bad", "unknown"])(
+    "rejects missing or non-canonical quality %j",
+    (qualityLabel) => {
+      const result = evaluateEcowittLiveReadiness({ ...READY_INPUT, qualityLabel });
+      expect(result.verdict).toBe("mismatch");
+      expect(result.canCallLive).toBe(false);
+      expect(result.blockers.join(" ")).toMatch(/quality label is/i);
+    },
+  );
 
   it("does not let local sender evidence alone prove live", () => {
     const result = evaluateEcowittLiveReadiness({

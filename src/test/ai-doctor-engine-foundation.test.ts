@@ -63,6 +63,7 @@ describe("compileAiDoctorContextPayloadFromRows", () => {
             value: 23,
             captured_at: iso(60_000),
             source: "live",
+            quality: "ok",
           },
         ],
       }),
@@ -88,6 +89,7 @@ describe("compileAiDoctorContextPayloadFromRows", () => {
             value: 55,
             captured_at: iso(60_000),
             source: "live",
+            quality: "ok",
           },
         ],
       }),
@@ -108,7 +110,13 @@ describe("compileAiDoctorContextPayloadFromRows", () => {
     const ctx = compileAiDoctorContextPayloadFromRows(
       baseInput({
         sensorReadings: [
-          { metric: "vpd_kpa", value: 1.0, captured_at: iso(60_000), source: "live" },
+          {
+            metric: "vpd_kpa",
+            value: 1.0,
+            captured_at: iso(60_000),
+            source: "live",
+            quality: "ok",
+          },
           { metric: "vpd_kpa", value: 0.8, captured_at: iso(60_000), source: "csv" },
           { metric: "vpd_kpa", value: 0.9, captured_at: iso(60_000), source: "manual" },
           { metric: "vpd_kpa", value: 1.1, captured_at: iso(60_000), source: "demo" },
@@ -152,6 +160,7 @@ describe("compileAiDoctorContextPayloadFromRows", () => {
             value: 99,
             captured_at: iso(30_000),
             source: "live",
+            quality: "ok",
             raw_payload: {
               vendor: "ecowitt_windows_testbench",
               metadata: { confidence: "test", bridge_token: "never-forward" },
@@ -162,10 +171,12 @@ describe("compileAiDoctorContextPayloadFromRows", () => {
             value: 55,
             captured_at: iso(60_000),
             source: "live",
+            quality: "ok",
             raw_payload: {
               vendor: "ecowitt_windows_testbench",
               metadata: {
                 reported_verdant_source: "live",
+                quality: "ok",
                 raw_payload: {
                   stationtype: "GW2000A_V3.2.4",
                   model: "GW2000A",
@@ -202,8 +213,20 @@ describe("compileAiDoctorContextPayloadFromRows", () => {
     const r1 = compileAiDoctorContextPayloadFromRows(
       baseInput({
         sensorReadings: [
-          { metric: "temperature_c", value: 22, captured_at: iso(1000), source: "live" },
-          { metric: "temperature_c", value: 24, captured_at: iso(2000), source: "live" },
+          {
+            metric: "temperature_c",
+            value: 22,
+            captured_at: iso(1000),
+            source: "live",
+            quality: "ok",
+          },
+          {
+            metric: "temperature_c",
+            value: 24,
+            captured_at: iso(2000),
+            source: "live",
+            quality: "ok",
+          },
           { metric: "humidity_pct", value: 60, captured_at: iso(1000), source: "manual" },
         ],
       }),
@@ -212,8 +235,20 @@ describe("compileAiDoctorContextPayloadFromRows", () => {
       baseInput({
         sensorReadings: [
           { metric: "humidity_pct", value: 60, captured_at: iso(1000), source: "manual" },
-          { metric: "temperature_c", value: 24, captured_at: iso(2000), source: "live" },
-          { metric: "temperature_c", value: 22, captured_at: iso(1000), source: "live" },
+          {
+            metric: "temperature_c",
+            value: 24,
+            captured_at: iso(2000),
+            source: "live",
+            quality: "ok",
+          },
+          {
+            metric: "temperature_c",
+            value: 22,
+            captured_at: iso(1000),
+            source: "live",
+            quality: "ok",
+          },
         ],
       }),
     );
@@ -225,7 +260,13 @@ describe("compileAiDoctorContextPayloadFromRows", () => {
       baseInput({
         sensorReadings: [
           { metric: "vpd_kpa", value: 1.0, captured_at: iso(60_000), source: "demo" },
-          { metric: "vpd_kpa", value: 1.0, captured_at: iso(60_000), source: "live" },
+          {
+            metric: "vpd_kpa",
+            value: 1.0,
+            captured_at: iso(60_000),
+            source: "live",
+            quality: "ok",
+          },
           { metric: "vpd_kpa", value: 1.0, captured_at: iso(60_000), source: "csv" },
           { metric: "vpd_kpa", value: 1.0, captured_at: iso(60_000), source: "invalid" },
         ],
@@ -247,7 +288,13 @@ describe("executeAiDoctorEngine", () => {
         logs: [{ occurred_at: iso(60_000), event_type: "watering", source: "manual" }],
         photos: [{ captured_at: iso(120_000) }],
         sensorReadings: [
-          { metric: "temperature_c", value: 23, captured_at: iso(60_000), source: "live" },
+          {
+            metric: "temperature_c",
+            value: 23,
+            captured_at: iso(60_000),
+            source: "live",
+            quality: "ok",
+          },
         ],
       }),
     );
@@ -280,7 +327,13 @@ describe("executeAiDoctorEngine", () => {
         photos: [{ captured_at: iso(120_000) }],
         sensorReadings: [
           // trustworthy reading so confidence is not low:
-          { metric: "temperature_c", value: 23, captured_at: iso(60_000), source: "live" },
+          {
+            metric: "temperature_c",
+            value: 23,
+            captured_at: iso(60_000),
+            source: "live",
+            quality: "ok",
+          },
           // invalid reading on another metric:
           { metric: "vpd_kpa", value: 99, captured_at: iso(60_000), source: "invalid" },
         ],
@@ -340,7 +393,13 @@ describe("executeAiDoctorEngine", () => {
         logs: [{ occurred_at: iso(60_000), event_type: "watering", source: "manual" }],
         photos: [{ captured_at: iso(120_000) }],
         sensorReadings: [
-          { metric: "temperature_c", value: 23, captured_at: iso(60_000), source: "live" },
+          {
+            metric: "temperature_c",
+            value: 23,
+            captured_at: iso(60_000),
+            source: "live",
+            quality: "ok",
+          },
           { metric: "vpd_kpa", value: 99, captured_at: iso(60_000), source: "invalid" },
         ],
       }),

@@ -42,6 +42,7 @@ export interface TroubleshootingInput {
   lastReading?: {
     capturedAt?: string | null;
     source?: string | null;
+    quality?: string | null;
     provider?: string | null;
     transport?: string | null;
     humidityPct?: number | null;
@@ -83,9 +84,7 @@ function rollup(checks: TroubleshootingCheck[]): TroubleshootingStatus {
   return "ok";
 }
 
-export function buildTroubleshootingReport(
-  input: TroubleshootingInput,
-): TroubleshootingReport {
+export function buildTroubleshootingReport(input: TroubleshootingInput): TroubleshootingReport {
   const checks: TroubleshootingCheck[] = [];
   const env = input.env ?? {};
   const reading = input.lastReading ?? null;
@@ -96,7 +95,8 @@ export function buildTroubleshootingReport(
   checks.push({
     id: "tent_id",
     label: "VERDANT_TENT_ID",
-    status: env.tentIdConfigured === true ? "ok" : env.tentIdConfigured === false ? "error" : "unknown",
+    status:
+      env.tentIdConfigured === true ? "ok" : env.tentIdConfigured === false ? "error" : "unknown",
     detail:
       env.tentIdConfigured === true
         ? "Tent ID configured."
@@ -130,7 +130,14 @@ export function buildTroubleshootingReport(
   checks.push({
     id: "bridge_token",
     label: "VERDANT_BRIDGE_TOKEN",
-    status: tok === "present" ? "ok" : tok === "missing" ? (env.sendModeRequested ? "error" : "warn") : "unknown",
+    status:
+      tok === "present"
+        ? "ok"
+        : tok === "missing"
+          ? env.sendModeRequested
+            ? "error"
+            : "warn"
+          : "unknown",
     detail:
       tok === "present"
         ? "Bridge token present (value never displayed)."
@@ -222,6 +229,17 @@ export function buildTroubleshootingReport(
             : "Source unknown — needs verification.",
     });
     checks.push({
+      id: "quality_ok",
+      label: "Persisted quality",
+      status: reading.quality === "ok" ? "ok" : reading.quality ? "error" : "unknown",
+      detail:
+        reading.quality === "ok"
+          ? "quality = ok."
+          : reading.quality
+            ? `Expected quality "ok", got "${reading.quality}".`
+            : "Quality unknown — needs verification.",
+    });
+    checks.push({
       id: "provider_ecowitt",
       label: "Provider",
       status: reading.provider === "ecowitt" ? "ok" : reading.provider ? "error" : "unknown",
@@ -284,7 +302,8 @@ export function buildTroubleshootingReport(
 
     // VPD presence — must be null/blank when missing; NEVER 0
     const tempOk = isFiniteNumber(reading.airTempC);
-    const humOk = isFiniteNumber(reading.humidityPct) && reading.humidityPct! > 0 && reading.humidityPct! < 100;
+    const humOk =
+      isFiniteNumber(reading.humidityPct) && reading.humidityPct! > 0 && reading.humidityPct! < 100;
     if (tempOk && humOk) {
       if (isFiniteNumber(reading.vpdKpa) && reading.vpdKpa !== 0) {
         checks.push({

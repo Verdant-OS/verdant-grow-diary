@@ -30,15 +30,25 @@ afterEach(() => cleanup());
 // ---------------------------------------------------------------------------
 
 describe("sensorSourceLabelRules.resolveSensorSourceLabel", () => {
-  it("returns 'Ecowitt' when vendor=ecowitt and source=live", () => {
-    const r = resolveSensorSourceLabel({ source: "live", vendor: "ecowitt" });
+  it("returns 'Ecowitt' only with exact current-Live proof", () => {
+    const r = resolveSensorSourceLabel({
+      source: "live",
+      vendor: "ecowitt",
+      quality: "ok",
+      freshness: "fresh",
+    });
     expect(r.label).toBe("Ecowitt");
     expect(r.vendor).toBe("ecowitt");
     expect(r.vendorPromoted).toBe(true);
   });
 
   it("is case-insensitive on vendor", () => {
-    const r = resolveSensorSourceLabel({ source: "live", vendor: "ECOWITT" });
+    const r = resolveSensorSourceLabel({
+      source: "live",
+      vendor: "ECOWITT",
+      quality: "ok",
+      freshness: "fresh",
+    });
     expect(r.label).toBe("Ecowitt");
   });
 
@@ -87,29 +97,39 @@ describe("sensorSourceLabelRules.resolveSensorSourceLabel", () => {
     expect(r.label).not.toBe("Live");
   });
 
-  it("returns 'Live' for live source with no vendor", () => {
+  it("keeps source-only live provenance neutral", () => {
     const r = resolveSensorSourceLabel({ source: "live" });
-    expect(r.label).toBe("Live");
+    expect(r.label).toBe("Connected source");
+    expect(r.isCurrentLive).toBe(false);
     expect(r.vendorPromoted).toBe(false);
   });
 
   it("ignores unknown vendor strings (falls back to canonical)", () => {
-    const r = resolveSensorSourceLabel({ source: "live", vendor: "acme-x" });
+    const r = resolveSensorSourceLabel({
+      source: "live",
+      vendor: "acme-x",
+      quality: "ok",
+      freshness: "fresh",
+    });
     expect(r.label).toBe("Live");
     expect(r.vendor).toBeNull();
   });
 
   it("extracts vendor from metadata object", () => {
-    const r = resolveSensorSourceLabelFromMetadata("live", {
-      vendor: "ecowitt",
-      device_family: "ecowitt_custom_upload",
-    });
+    const r = resolveSensorSourceLabelFromMetadata(
+      "live",
+      {
+        vendor: "ecowitt",
+        device_family: "ecowitt_custom_upload",
+      },
+      { quality: "ok", freshness: "fresh" },
+    );
     expect(r.label).toBe("Ecowitt");
   });
 
   it("handles missing metadata gracefully", () => {
     const r = resolveSensorSourceLabelFromMetadata("live", null);
-    expect(r.label).toBe("Live");
+    expect(r.label).toBe("Connected source");
   });
 });
 
@@ -119,9 +139,7 @@ describe("sensorSourceLabelRules.resolveSensorSourceLabel", () => {
 
 function badgeOf(props: React.ComponentProps<typeof SensorSourceBadge>) {
   const { container } = render(<SensorSourceBadge {...props} />);
-  const root = container.querySelector(
-    '[data-testid="sensor-source-badge"]',
-  ) as HTMLElement;
+  const root = container.querySelector('[data-testid="sensor-source-badge"]') as HTMLElement;
   return {
     text: root.textContent ?? "",
     severity: root.getAttribute("data-severity"),
@@ -133,8 +151,14 @@ function badgeOf(props: React.ComponentProps<typeof SensorSourceBadge>) {
 }
 
 describe("SensorSourceBadge — vendor (Ecowitt) integration", () => {
-  it("renders 'Ecowitt' label when vendor=ecowitt and source=live", () => {
-    const b = badgeOf({ source: "live", status: "usable", vendor: "ecowitt" });
+  it("renders 'Ecowitt' only for a verified current source", () => {
+    const b = badgeOf({
+      source: "live",
+      status: "usable",
+      vendor: "ecowitt",
+      quality: "ok",
+      freshness: "fresh",
+    });
     expect(b.text).toMatch(/Ecowitt/);
     expect(b.text).not.toMatch(/\bLive\b/);
     expect(b.vendor).toBe("ecowitt");
@@ -149,6 +173,14 @@ describe("SensorSourceBadge — vendor (Ecowitt) integration", () => {
     expect(b.severity).not.toBe("ok");
     expect(b.text).toMatch(/Stale/);
     expect(b.text).not.toMatch(/\bLive\b/);
+    expect(b.vendorPromoted).toBe(false);
+  });
+
+  it("source-only live status cannot force a healthy badge", () => {
+    const b = badgeOf({ source: "live", status: "usable", vendor: "ecowitt" });
+    expect(b.text).toMatch(/Connected source/);
+    expect(b.text).not.toMatch(/Ecowitt|\bLive\b/);
+    expect(b.severity).toBe("warning");
     expect(b.vendorPromoted).toBe(false);
   });
 
@@ -193,9 +225,7 @@ describe("SensorSourceBadge — vendor (Ecowitt) integration", () => {
 describe("SensorTruthHelp", () => {
   it("renders title 'Sensor truth'", () => {
     const { getByTestId } = render(<SensorTruthHelp />);
-    expect(getByTestId("sensor-truth-help-title").textContent).toBe(
-      "Sensor truth",
-    );
+    expect(getByTestId("sensor-truth-help-title").textContent).toBe("Sensor truth");
   });
 
   it("body explains Ecowitt / Manual / CSV / Stale / Unknown", () => {
@@ -220,15 +250,12 @@ describe("SensorTruthHelp", () => {
     const { getByTestId } = render(<SensorTruthHelp />);
     const root = getByTestId("sensor-truth-help");
     expect(root.tagName.toLowerCase()).toBe("section");
-    expect(root.getAttribute("aria-labelledby")).toBe(
-      "sensor-truth-help-title",
-    );
+    expect(root.getAttribute("aria-labelledby")).toBe("sensor-truth-help-title");
   });
 
   it("does not imply device control or automation", () => {
     const { getByTestId } = render(<SensorTruthHelp />);
-    const text = (getByTestId("sensor-truth-help").textContent ?? "")
-      .toLowerCase();
+    const text = (getByTestId("sensor-truth-help").textContent ?? "").toLowerCase();
     for (const banned of [
       "autopilot",
       "automation",
@@ -265,12 +292,7 @@ describe("Ecowitt badge + help — static safety", () => {
     // *_executed event names
     expect(/[a-z0-9]_executed\b/.test(src)).toBe(false);
     // device-control verbs
-    for (const banned of [
-      "turn_on_",
-      "turn_off_",
-      "device_command",
-      "execute_device",
-    ]) {
+    for (const banned of ["turn_on_", "turn_off_", "device_command", "execute_device"]) {
       expect(src.includes(banned)).toBe(false);
     }
   });
@@ -279,9 +301,7 @@ describe("Ecowitt badge + help — static safety", () => {
     const src = readSrc("components/SensorSourceBadge.tsx");
     expect(src).toMatch(/resolveSensorSourceLabel/);
     // No second hard-coded source→label map living in the component.
-    expect(src.match(/Record<SensorReadingSource, string>/g) ?? []).toHaveLength(
-      0,
-    );
+    expect(src.match(/Record<SensorReadingSource, string>/g) ?? []).toHaveLength(0);
   });
 
   it("does not introduce a fake-live fallback (unknown → Live)", () => {

@@ -12,9 +12,12 @@
  *  - No service_role usage.
  *  - Missing CO₂ does NOT create false risk.
  *  - Invalid telemetry NEVER returns healthy/live state.
+ *  - `live` requires exact source + `quality: "ok"` + fresh capture time.
  *  - All source states are explicitly distinguishable.
  *  - Raw payload preserved verbatim; never consulted for downstream logic.
  */
+
+import { evaluateCurrentLiveSensorTruth } from "@/lib/currentLiveSensorTruthRules";
 
 // ---------------------------------------------------------------------------
 // Source Classification
@@ -59,6 +62,8 @@ export interface NormalizedSensorReading {
   captured_at: string;
   /** Classified source tag */
   source: ReadingSource;
+  /** Upstream validation state retained for downstream trust checks. */
+  quality?: string | null;
   /** Temperature in °C (nullable – partial readings allowed) */
   temperature_c: number | null;
   /** Relative humidity 0–100% (nullable) */
@@ -97,10 +102,10 @@ export function isTemperatureValid(v: number | null): boolean {
   return Number.isFinite(v) && v >= -10 && v <= 60;
 }
 
-/** Returns true if humidity is within 0–100% and not a known fault value. */
+/** Returns true if humidity is inside 0–100%; endpoints are sensor fault values. */
 export function isHumidityValid(v: number | null): boolean {
   if (v === null) return true;
-  return Number.isFinite(v) && v >= 0 && v <= 100;
+  return Number.isFinite(v) && v > 0 && v < 100;
 }
 
 /** Returns true if VPD is within plausible range. */
@@ -115,10 +120,10 @@ export function isCo2Valid(v: number | null): boolean {
   return Number.isFinite(v) && v >= 0 && v <= 5000;
 }
 
-/** Returns true if soil moisture is within 0–100%. */
+/** Returns true if soil moisture is inside 0–100%; endpoints are sensor fault values. */
 export function isSoilMoistureValid(v: number | null): boolean {
   if (v === null) return true;
-  return Number.isFinite(v) && v >= 0 && v <= 100;
+  return Number.isFinite(v) && v > 0 && v < 100;
 }
 
 /** Returns true if ALL present metric values pass their respective guards. */
@@ -151,8 +156,16 @@ export function isReadingStale(
   thresholdMs: number = STALE_THRESHOLD_MS,
 ): boolean {
   const t = new Date(capturedAt).getTime();
-  if (!Number.isFinite(t)) return true; // unparseable → treat as stale
-  return now - t > thresholdMs;
+  if (
+    !Number.isFinite(t) ||
+    !Number.isFinite(now) ||
+    !Number.isFinite(thresholdMs) ||
+    thresholdMs < 0
+  ) {
+    return true;
+  }
+  const ageMs = now - t;
+  return ageMs < 0 || ageMs > thresholdMs;
 }
 
 // ---------------------------------------------------------------------------
@@ -162,6 +175,8 @@ export function isReadingStale(
 export interface ClassifySourceInput {
   /** Original source hint from caller (e.g. "live", "manual", "demo", "imported") */
   declaredSource: string;
+  /** Exact upstream validation state. Only the literal `ok` can support Live. */
+  quality?: unknown;
   /** ISO-8601 captured_at timestamp */
   capturedAt: string;
   /** Metric values for validity check */
@@ -184,7 +199,7 @@ export interface ClassifySourceInput {
  *  3. Otherwise → declared source if it's a known ReadingSource, else `"invalid"`
  */
 export function classifySource(input: ClassifySourceInput): ReadingSource {
-  const { declaredSource, capturedAt, metrics, now, staleThresholdMs } = input;
+  const { declaredSource, quality, capturedAt, metrics, now, staleThresholdMs } = input;
 
   // Safety-first: invalid telemetry never returns a healthy source
   if (!isReadingTelemetryValid(metrics)) {
@@ -197,9 +212,18 @@ export function classifySource(input: ClassifySourceInput): ReadingSource {
     return "invalid";
   }
 
-  // Stale detection only applies to live readings
-  if (declaredSource === "live" && isReadingStale(capturedAt, now, staleThresholdMs)) {
-    return "stale";
+  // Live is a three-factor claim, not a provenance synonym. The normalizer
+  // retains stale as a distinct state, while every missing/degraded quality
+  // path fails closed as invalid.
+  if (declaredSource === "live") {
+    const freshness = isReadingStale(capturedAt, now, staleThresholdMs) ? "stale" : "fresh";
+    const truth = evaluateCurrentLiveSensorTruth({
+      source: declaredSource,
+      quality,
+      freshness,
+    });
+    if (!truth.qualityIsOk) return "invalid";
+    return truth.isCurrentLive ? "live" : "stale";
   }
 
   return declaredSource as ReadingSource;
@@ -214,6 +238,8 @@ export interface RawSensorInput {
   captured_at: string;
   /** Declared source from the caller */
   source: string;
+  /** Upstream validation state. Exact `ok` is required for a Live result. */
+  quality?: unknown;
   /** Temperature in °C */
   temperature_c?: number | null;
   /** Humidity 0–100% */
@@ -260,6 +286,7 @@ export function normalizeSensorReading(
 
   const source = classifySource({
     declaredSource: input.source,
+    quality: input.quality,
     capturedAt: input.captured_at,
     metrics,
     now,
@@ -269,6 +296,7 @@ export function normalizeSensorReading(
   return {
     captured_at: input.captured_at,
     source,
+    quality: typeof input.quality === "string" ? input.quality : null,
     ...metrics,
     ppfd_umol_m2s: input.ppfd_umol_m2s ?? null,
     raw_payload: input.raw_payload ?? null,

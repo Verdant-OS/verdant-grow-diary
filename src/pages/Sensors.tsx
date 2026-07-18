@@ -107,7 +107,13 @@ export default function Sensors() {
   const latestCountsAsUsableEvidence = isUsableGrowSensorReading(latest);
   const classification = classifyGrowDataSource(
     latest
-      ? { source: latestSource, value: latest.temp, timestamp: latest.ts }
+      ? {
+          source: latestSource,
+          value: latest.temp,
+          timestamp: latest.capturedAt,
+          quality: latest.quality,
+          status: latest.status,
+        }
       : { source: null, value: null, timestamp: null },
   );
 
@@ -486,6 +492,7 @@ export default function Sensors() {
                       (latest as unknown as { ts?: string | null }).ts ??
                       null,
                     source: latestSource,
+                    quality: latest.quality ?? null,
                     provider: null,
                     transport: null,
                     humidityPct: (latest as unknown as { rh?: number | null }).rh ?? null,

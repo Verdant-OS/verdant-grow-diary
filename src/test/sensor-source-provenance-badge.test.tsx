@@ -26,27 +26,28 @@ describe("SensorSourceProvenanceBadge", () => {
   });
 
   it("appends the manual device note when provided", () => {
-    render(
-      <SensorSourceProvenanceBadge
-        source="manual"
-        manualDeviceNote="EcoWitt WH45"
-      />,
-    );
-    expect(screen.getByTestId(TESTID).textContent).toBe(
-      "Manual reading · EcoWitt WH45",
-    );
+    render(<SensorSourceProvenanceBadge source="manual" manualDeviceNote="EcoWitt WH45" />);
+    expect(screen.getByTestId(TESTID).textContent).toBe("Manual reading · EcoWitt WH45");
   });
 
-  it("renders Live sensor for live readings", () => {
+  it("renders source-only live provenance as neutral and review-required", () => {
     render(<SensorSourceProvenanceBadge source="live" />);
     const el = screen.getByTestId(TESTID);
-    expect(el.textContent).toBe("Live sensor");
-    expect(el.getAttribute("data-tone")).toBe("live");
-    expect(el.getAttribute("data-degraded")).toBe("false");
+    expect(el.textContent).toBe("Connected source · needs review");
+    expect(el.getAttribute("data-tone")).toBe("unknown");
+    expect(el.getAttribute("data-degraded")).toBe("true");
   });
 
-  it("promotes recognised vendor for live readings", () => {
-    render(<SensorSourceProvenanceBadge source="live" vendor="ecowitt" />);
+  it("promotes recognised vendor only for verified usable live readings", () => {
+    render(
+      <SensorSourceProvenanceBadge
+        source="live"
+        status="usable"
+        quality="ok"
+        freshness="fresh"
+        vendor="ecowitt"
+      />,
+    );
     expect(screen.getByTestId(TESTID).textContent).toBe("Ecowitt");
   });
 
@@ -58,16 +59,13 @@ describe("SensorSourceProvenanceBadge", () => {
     expect(txt).not.toMatch(/^Ecowitt$/);
   });
 
-  it.each(["demo", "stale", "invalid"] as const)(
-    "renders %s as degraded, not Live",
-    (src) => {
-      render(<SensorSourceProvenanceBadge source={src} />);
-      const el = screen.getByTestId(TESTID);
-      expect(el.getAttribute("data-tone")).toBe(src);
-      expect(el.getAttribute("data-degraded")).toBe("true");
-      expect(el.textContent?.toLowerCase()).not.toContain("live");
-    },
-  );
+  it.each(["demo", "stale", "invalid"] as const)("renders %s as degraded, not Live", (src) => {
+    render(<SensorSourceProvenanceBadge source={src} />);
+    const el = screen.getByTestId(TESTID);
+    expect(el.getAttribute("data-tone")).toBe(src);
+    expect(el.getAttribute("data-degraded")).toBe("true");
+    expect(el.textContent?.toLowerCase()).not.toContain("live");
+  });
 
   it("renders CSV with its csv tone (not Live, not degraded)", () => {
     render(<SensorSourceProvenanceBadge source="csv" />);

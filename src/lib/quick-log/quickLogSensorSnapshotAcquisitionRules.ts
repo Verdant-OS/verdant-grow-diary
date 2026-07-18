@@ -11,6 +11,8 @@ import {
   isDiagnosticSensorProvenanceRow,
   withoutDiagnosticSensorRows,
 } from "../sensorProvenanceFenceRules";
+import { classifyFreshness } from "../latestSensorSnapshotRules";
+import { evaluateCurrentLiveSensorTruth } from "../currentLiveSensorTruthRules";
 
 export interface QuickLogSensorAcquisitionRow {
   id?: string | null;
@@ -26,6 +28,8 @@ export interface QuickLogSensorAcquisitionRow {
 
 export interface AcquiredQuickLogSensorSnapshot {
   source: string;
+  /** Exact cohort validation state retained for downstream Live checks. */
+  quality: "ok" | null;
   captured_at: string;
   metrics: Record<string, number>;
 }
@@ -114,6 +118,7 @@ function compareNewest(a: QuickLogSensorAcquisitionRow, b: QuickLogSensorAcquisi
  */
 export function acquireQuickLogSensorSnapshot(
   rows: readonly QuickLogSensorAcquisitionRow[] | null | undefined,
+  options: { now?: Date } = {},
 ): QuickLogSensorAcquisitionResult {
   const input = Array.isArray(rows) ? rows : [];
   const diagnosticRowsOmitted = input.filter(isDiagnosticSensorProvenanceRow).length;
@@ -136,13 +141,29 @@ export function acquireQuickLogSensorSnapshot(
     return { snapshot: null, diagnosticRowsOmitted };
   }
 
-  const metrics: Record<string, number> = {};
-  for (const row of safeRows) {
-    if (normalizedSource(row.source) !== anchorSource) continue;
+  const cohort = safeRows.filter((row) => {
+    if (normalizedSource(row.source) !== anchorSource) return false;
     const timestamp = effectiveTimestamp(row);
-    if (!timestamp || anchorTimestamp.ms - timestamp.ms > QUICK_LOG_SENSOR_COHERENCE_MS) {
-      continue;
-    }
+    return !!timestamp && anchorTimestamp.ms - timestamp.ms <= QUICK_LOG_SENSOR_COHERENCE_MS;
+  });
+
+  // A `live` acquisition is a current-truth claim. Fail closed before any
+  // value is persisted or forwarded when source, quality, or age is missing.
+  if (anchorSource === "live") {
+    const freshness = classifyFreshness(anchorTimestamp.raw, options.now ?? new Date()).freshness;
+    const trusted = cohort.every(
+      (row) =>
+        evaluateCurrentLiveSensorTruth({
+          source: row.source,
+          quality: row.quality,
+          freshness,
+        }).isCurrentLive,
+    );
+    if (!trusted) return { snapshot: null, diagnosticRowsOmitted };
+  }
+
+  const metrics: Record<string, number> = {};
+  for (const row of cohort) {
     const rawMetric = typeof row.metric === "string" ? row.metric.trim().toLowerCase() : "";
     const metric = METRIC_MAP[rawMetric];
     if (!metric || Object.prototype.hasOwnProperty.call(metrics, metric)) continue;
@@ -157,6 +178,7 @@ export function acquireQuickLogSensorSnapshot(
   return {
     snapshot: {
       source: typeof anchor.source === "string" ? anchor.source : anchorSource,
+      quality: anchorSource === "live" ? "ok" : null,
       captured_at: anchorTimestamp.raw,
       metrics,
     },
@@ -168,6 +190,7 @@ function flattenSnapshotForAi(snapshot: Record<string, unknown>): Record<string,
   const metrics = asObject(snapshot.metrics) ?? {};
   const out: Record<string, unknown> = {
     source: snapshot.source,
+    quality: snapshot.quality,
     captured_at: snapshot.captured_at,
   };
   for (const [rawKey, rawValue] of Object.entries(metrics)) {
@@ -189,6 +212,7 @@ function flattenSnapshotForAi(snapshot: Record<string, unknown>): Record<string,
 export function resolveQuickLogSensorSnapshotForAi(
   snapshot: unknown,
   provenanceRows?: readonly QuickLogSensorAcquisitionRow[] | null,
+  options: { now?: Date } = {},
 ): unknown {
   const object = asObject(snapshot);
   if (!object) return snapshot;
@@ -203,7 +227,7 @@ export function resolveQuickLogSensorSnapshotForAi(
   const source = normalizedSource(object.source);
   if (source !== "live") return flattenSnapshotForAi(object);
 
-  const acquired = acquireQuickLogSensorSnapshot(provenanceRows ?? []);
+  const acquired = acquireQuickLogSensorSnapshot(provenanceRows ?? [], options);
   if (acquired.snapshot && normalizedSource(acquired.snapshot.source) === "live") {
     return flattenSnapshotForAi({ ...acquired.snapshot });
   }

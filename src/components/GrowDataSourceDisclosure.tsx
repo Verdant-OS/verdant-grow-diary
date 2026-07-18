@@ -1,31 +1,28 @@
 /**
  * GrowDataSourceDisclosure — generic presenter banner for grower-facing pages
  * (Plants, Tents, etc.) that honestly discloses whether the visible records
- * are Live (Supabase), Demo (mock), Mixed, or Unavailable.
+ * are Saved (Supabase), Demo (mock), Mixed, or Unavailable.
  *
  * Pure presenter. Classification stays in `combineGrowDataMeta` from
  * useGrowData. No queries, no writes.
  */
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import {
-  combineGrowDataMeta,
-  type GrowDataSourceMeta,
-} from "@/hooks/useGrowData";
+import { combineGrowDataMeta, type GrowDataSourceMeta } from "@/hooks/useGrowData";
 import InfoPopover from "@/components/InfoPopover";
 import type { SnapshotSource } from "@/lib/sensorSnapshot";
 
-type Label = "Live" | "Demo" | "Mixed" | "Unavailable";
+type Label = "Saved" | "Demo" | "Mixed" | "Unavailable";
 
 const LABEL_BY_SOURCE: Record<GrowDataSourceMeta["dataSource"], Label> = {
-  supabase: "Live",
+  supabase: "Saved",
   mock: "Demo",
   mixed: "Mixed",
   unavailable: "Unavailable",
 };
 
 const VARIANT_BY_LABEL: Record<Label, "default" | "secondary" | "outline" | "destructive"> = {
-  Live: "default",
+  Saved: "default",
   Demo: "outline",
   Mixed: "secondary",
   Unavailable: "destructive",
@@ -65,22 +62,22 @@ export default function GrowDataSourceDisclosure({
   // saved grow records are now disclosed as "Current grow data" so growers
   // don't confuse stored plant/tent records with real-time telemetry.
   const badgeText: Record<Label, string> = {
-    Live: "Current data",
+    Saved: "Saved data",
     Demo: "Demo data",
     Mixed: "Mixed data",
     Unavailable: "Unavailable",
   };
 
   const description: Record<Label, string> = {
-    Live: `Current grow data — ${resource} saved in your Verdant workspace. Sensor readings are labeled in their own sections below.`,
+    Saved: `Saved grow data — ${resource} stored in your Verdant workspace. Sensor readings are labeled in their own sections below.`,
     Demo: `Showing demo ${resource}. Connect real ${resource} to replace it.`,
     Mixed: `Some ${resource} are real, some are demo or manual. Add or connect more to replace the demo data.`,
     Unavailable: `No ${resource} data available yet.`,
   };
 
   const helpCopyByLabel: Record<Label, { title: string; body: string }> = {
-    Live: {
-      title: "Current grow data",
+    Saved: {
+      title: "Saved grow data",
       body: `Plants, tents, and ${resource} saved in your Verdant workspace — not a live sensor reading. Sensor readings are labeled separately in the Environment and sensor sections.`,
     },
     Demo: {
@@ -144,11 +141,7 @@ export default function GrowDataSourceDisclosure({
         {badgeText[label]}
       </Badge>
       <span className="text-xs text-muted-foreground">{description[label]}</span>
-      <InfoPopover
-        title={help.title}
-        body={help.body}
-        testKey={`${testId}-source`}
-      />
+      <InfoPopover title={help.title} body={help.body} testKey={`${testId}-source`} />
       {isSimulated && (
         <>
           <Badge

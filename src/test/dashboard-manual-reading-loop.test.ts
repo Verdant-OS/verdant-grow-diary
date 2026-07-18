@@ -22,10 +22,7 @@ import {
   derivedAlertKey,
   dedupeAgainstOpen,
 } from "@/lib/environmentAlertPersistence";
-import {
-  resolveSelectedTentIds,
-  isSelectionOrphaned,
-} from "@/lib/dashboardLatestEnvironmentRules";
+import { resolveSelectedTentIds, isSelectionOrphaned } from "@/lib/dashboardLatestEnvironmentRules";
 import type { EnvironmentAlert } from "@/lib/environmentAlerts";
 
 const ROOT = resolve(__dirname, "../..");
@@ -34,11 +31,17 @@ const DASHBOARD = readFileSync(resolve(ROOT, "src/pages/Dashboard.tsx"), "utf8")
 const FRESH_TS = new Date().toISOString();
 const STALE_TS = new Date(Date.now() - 60 * 60 * 1000).toISOString();
 
-const goodQuality = { quality: "good" as const, headline: "Sensor data looks usable", reasons: [], suspiciousFields: [] };
+const goodQuality = {
+  quality: "good" as const,
+  headline: "Sensor data looks usable",
+  reasons: [],
+  suspiciousFields: [],
+};
 
 function manualSnap(opts: { ts?: string; temp?: number; rh?: number } = {}) {
   return {
     source: "manual" as const,
+    quality: "ok" as const,
     ts: opts.ts ?? FRESH_TS,
     temp: opts.temp ?? 24,
     rh: opts.rh ?? 55,
@@ -64,10 +67,7 @@ describe("Dashboard tent selector (pure rules)", () => {
     expect(resolveSelectedTentIds(tents, "t-bbb")).toEqual(["t-bbb"]);
   });
   it("falls back to all tents when the selection no longer exists", () => {
-    expect(resolveSelectedTentIds(tents, "t-archived")).toEqual([
-      "t-aaa",
-      "t-bbb",
-    ]);
+    expect(resolveSelectedTentIds(tents, "t-archived")).toEqual(["t-aaa", "t-bbb"]);
     expect(isSelectionOrphaned(tents, "t-archived")).toBe(true);
     expect(isSelectionOrphaned(tents, "t-aaa")).toBe(false);
     expect(isSelectionOrphaned(tents, "all")).toBe(false);
@@ -151,9 +151,7 @@ describe("Alert persistence gating from manual readings", () => {
 describe("Dashboard UI surface — safety contract", () => {
   it("does not directly insert into alerts from Dashboard JSX", () => {
     // Must go through usePersistEnvironmentAlerts (which uses lib/alerts).
-    expect(DASHBOARD).not.toMatch(
-      /\.from\(\s*['"]alerts['"]\s*\)\s*\.(insert|upsert)/,
-    );
+    expect(DASHBOARD).not.toMatch(/\.from\(\s*['"]alerts['"]\s*\)\s*\.(insert|upsert)/);
   });
 
   it("alert persistence is only invoked through usePersistEnvironmentAlerts", () => {
@@ -168,7 +166,9 @@ describe("Dashboard UI surface — safety contract", () => {
       /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|\brelay\b|\bactuator\b/i,
     );
     expect(DASHBOARD).not.toMatch(/from\(\s*['"]leads['"]\s*\)/);
-    expect(DASHBOARD).not.toMatch(/from\(\s*['"]action_queue['"]\s*\)\s*\.(insert|update|delete|upsert)/);
+    expect(DASHBOARD).not.toMatch(
+      /from\(\s*['"]action_queue['"]\s*\)\s*\.(insert|update|delete|upsert)/,
+    );
   });
 
   it("wires the tent selector and persisted-count display", () => {

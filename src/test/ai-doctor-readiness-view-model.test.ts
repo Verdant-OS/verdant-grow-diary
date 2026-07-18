@@ -42,12 +42,22 @@ function makeCtx(opts: {
 describe("aiDoctorReadinessViewModel", () => {
   it("renders 'ready' when trustworthy live sensor + recent logs exist", () => {
     const context = makeCtx({
-      growEvents: [
-        { occurred_at: ago(12 * HOUR), event_type: "watering", source: "manual" },
-      ],
+      growEvents: [{ occurred_at: ago(12 * HOUR), event_type: "watering", source: "manual" }],
       sensorReadings: [
-        { metric: "temperature_c", value: 24, captured_at: ago(2 * HOUR), source: "live" },
-        { metric: "humidity_pct", value: 55, captured_at: ago(2 * HOUR), source: "live" },
+        {
+          metric: "temperature_c",
+          value: 24,
+          captured_at: ago(2 * 60 * 1000),
+          source: "live",
+          quality: "ok",
+        },
+        {
+          metric: "humidity_pct",
+          value: 55,
+          captured_at: ago(2 * 60 * 1000),
+          source: "live",
+          quality: "ok",
+        },
       ],
     });
     const v = buildAiDoctorReadinessView({ context, openAlertsCount: 0 });
@@ -61,16 +71,26 @@ describe("aiDoctorReadinessViewModel", () => {
     const v = buildAiDoctorReadinessView({ context });
     expect(v.state).toBe("sensor_missing");
     expect(v.stateLabel).toBe("Sensor data missing");
-    expect(
-      v.limitations.some((l) => l.code === "no_sensors"),
-    ).toBe(true);
+    expect(v.limitations.some((l) => l.code === "no_sensors")).toBe(true);
   });
 
   it("renders stale/invalid telemetry as a limitation, not as healthy", () => {
     const context = makeCtx({
       sensorReadings: [
-        { metric: "temperature_c", value: 24, captured_at: ago(3 * HOUR), source: "live", quality: "stale" },
-        { metric: "humidity_pct", value: 55, captured_at: ago(3 * HOUR), source: "live", quality: "invalid" },
+        {
+          metric: "temperature_c",
+          value: 24,
+          captured_at: ago(3 * HOUR),
+          source: "live",
+          quality: "stale",
+        },
+        {
+          metric: "humidity_pct",
+          value: 55,
+          captured_at: ago(3 * HOUR),
+          source: "live",
+          quality: "invalid",
+        },
       ],
     });
     const v = buildAiDoctorReadinessView({ context });

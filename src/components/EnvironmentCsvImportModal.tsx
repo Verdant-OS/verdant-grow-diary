@@ -36,6 +36,7 @@ import { parseEnvironmentCSV, type ParsedEnvironmentRow } from "@/lib/csvParser"
 import {
   CSV_IMPORT_DESCRIPTION,
   CSV_IMPORT_ADD_CURRENT_READING_LABEL,
+  CSV_IMPORT_CONFIRM_LABEL,
   CSV_IMPORT_HISTORICAL_CONTEXT_NOTE,
   CSV_IMPORT_READING_COPY,
   CSV_IMPORT_VIEW_HISTORY_LABEL,
@@ -230,7 +231,7 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
                 Cancel
               </Button>
               <Button onClick={handleConfirm} data-testid="csv-import-confirm">
-                Confirm &amp; View on Timeline
+                {CSV_IMPORT_CONFIRM_LABEL}
               </Button>
             </DialogFooter>
           </div>

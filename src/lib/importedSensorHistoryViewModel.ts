@@ -22,9 +22,7 @@ export const IMPORTED_SENSOR_HISTORY_SOURCE = "csv" as const;
 export const IMPORTED_SENSOR_HISTORY_DEFAULT_LIMIT = 25;
 export const IMPORTED_SENSOR_HISTORY_ALL_METRICS = "all" as const;
 
-export type ImportedSensorHistoryMetricFilter =
-  | typeof IMPORTED_SENSOR_HISTORY_ALL_METRICS
-  | string;
+export type ImportedSensorHistoryMetricFilter = typeof IMPORTED_SENSOR_HISTORY_ALL_METRICS | string;
 
 export type ImportedSensorHistoryReadStatus = "loading" | "error" | "success";
 
@@ -52,6 +50,8 @@ export interface ImportedSensorHistoryInputRow {
   captured_at?: string | null;
   created_at?: string | null;
   value?: number | null;
+  /** Optional validity flag used by historical-review eligibility. */
+  quality?: string | null;
   // NOTE: raw_payload is intentionally NOT in this input shape.
 }
 
@@ -112,10 +112,7 @@ export function buildImportedSensorHistoryViewModel(args: {
   limit?: number;
   selectedMetric?: ImportedSensorHistoryMetricFilter | null;
 }): ImportedSensorHistoryViewModel {
-  const limit = Math.max(
-    1,
-    Math.floor(args.limit ?? IMPORTED_SENSOR_HISTORY_DEFAULT_LIMIT),
-  );
+  const limit = Math.max(1, Math.floor(args.limit ?? IMPORTED_SENSOR_HISTORY_DEFAULT_LIMIT));
   const csvRows = (args.readings ?? []).filter((r) => r && isCsvHistoryRow(r));
 
   if (csvRows.length === 0) {

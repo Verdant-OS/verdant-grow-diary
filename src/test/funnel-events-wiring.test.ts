@@ -1,7 +1,7 @@
 /**
  * Funnel event wiring — static source contracts.
  *
- * Pins each of the eight growth-calendar events to its one canonical
+ * Pins each of the ten growth-calendar events to its one canonical
  * emission seam, and fences the module against privacy regressions:
  *
  *   signup                  → Auth.tsx (after supabase.auth.signUp succeeds)
@@ -10,6 +10,10 @@
  *   quick_log_saved         → shared privacy-safe wrapper from every mounted
  *                             Quick Log success seam
  *   csv_import_completed    → EnvironmentCsvImportLauncher.tsx (success block)
+ *   csv_history_ai_doctor_clicked
+ *                           → ImportedSensorHistoryAiDoctorHandoff.tsx (grower CTA click)
+ *   historical_ai_review_started
+ *                           → PlantDetailAiDoctorLiveReview.tsx (accepted initial start)
  *   paywall_viewed          → Pricing.tsx + Upgrade.tsx + AI Doctor limit (mount effects)
  *   checkout_started        → usePaddleCheckout.ts (authenticated openCheckout)
  *   subscription_activated  → CheckoutSuccess.tsx (server-confirmed flip)
@@ -61,6 +65,18 @@ const SEAMS: Array<{ event: string; file: string; extra?: RegExp[] }> = [
     event: "csv_import_completed",
     file: "src/components/EnvironmentCsvImportLauncher.tsx",
     extra: [/rows:\s*res\.insertedCount/],
+  },
+  {
+    event: "csv_history_ai_doctor_clicked",
+    file: "src/components/ImportedSensorHistoryAiDoctorHandoff.tsx",
+    extra: [
+      /trackFunnelEvent\(\s*"csv_history_ai_doctor_clicked",\s*\{\s*surface:\s*"imported_history",?\s*\}\s*\)/,
+    ],
+  },
+  {
+    event: "historical_ai_review_started",
+    file: "src/components/PlantDetailAiDoctorLiveReview.tsx",
+    extra: [/trackFunnelEvent\(\s*"historical_ai_review_started"\s*\)/],
   },
   {
     event: "checkout_started",
@@ -209,6 +225,28 @@ describe("ordering and safety constraints at the seams", () => {
     expect(userGate).toBeGreaterThan(-1);
     expect(track).toBeGreaterThan(userGate);
   });
+
+  it("historical_ai_review_started fires only for an accepted initial historical review", () => {
+    const src = read("src/components/PlantDetailAiDoctorLiveReview.tsx");
+    const handler = src.indexOf("const handleInitialStart");
+    const acceptedGate = src.indexOf("if (!review.canStart) return;", handler);
+    const historicalGate = src.indexOf(
+      'if (eligibility.mode === "historical_review")',
+      acceptedGate,
+    );
+    const track = src.indexOf('trackFunnelEvent("historical_ai_review_started")', historicalGate);
+    const start = src.indexOf("review.start()", track);
+
+    expect(handler).toBeGreaterThan(-1);
+    expect(acceptedGate).toBeGreaterThan(handler);
+    expect(historicalGate).toBeGreaterThan(acceptedGate);
+    expect(track).toBeGreaterThan(historicalGate);
+    expect(start).toBeGreaterThan(track);
+    expect(src).toMatch(
+      /onClick=\{review\.status === "error" \? review\.retry : handleInitialStart\}/,
+    );
+    expect(src.match(/trackFunnelEvent\("historical_ai_review_started"\)/g) ?? []).toHaveLength(1);
+  });
 });
 
 describe("funnelAnalytics module — privacy fences", () => {
@@ -220,6 +258,11 @@ describe("funnelAnalytics module — privacy fences", () => {
   });
 
   it("documents the limited GA4 activation proxy separately from future authority", () => {
+    expect(EVENT_MAP).toMatch(
+      /csv_import_completed → csv_history_ai_doctor_clicked →\s*historical_ai_review_started → paywall_viewed/,
+    );
+    expect(EVENT_MAP).toMatch(/surface: "imported_history"/);
+    expect(EVENT_MAP).toMatch(/accepted initial historical-review start with no properties/);
     expect(EVENT_MAP).toMatch(
       /at least 3 confirmed quick_log_saved events in a trailing 7-day window/,
     );

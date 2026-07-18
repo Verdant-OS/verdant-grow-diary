@@ -8,6 +8,22 @@ from the more detailed internal/PostHog taxonomy that remains aspirational.
 
 ## Shipped GA activation contract
 
+The shipped privacy-safe growth-calendar sequence is:
+
+```text
+signup → tent_created → plant_created → quick_log_saved →
+csv_import_completed → csv_history_ai_doctor_clicked →
+historical_ai_review_started → paywall_viewed → checkout_started →
+subscription_activated
+```
+
+The two CSV-to-AI handoff events preserve the same narrow client analytics
+boundary. `csv_history_ai_doctor_clicked` records the grower's explicit CTA
+click with only `surface: "imported_history"`. `historical_ai_review_started`
+records an accepted initial historical-review start with no properties; blocked
+starts and retries do not emit it. Neither event includes IDs, CSV values,
+filenames, notes, plant details, or other free text.
+
 `quick_log_saved` is emitted after a newly confirmed Quick Log write. The
 only property is `event_type`, selected from this closed, non-content enum:
 
@@ -76,103 +92,112 @@ the shipped `quick_log_saved` GA contract.
 ## Events
 
 ### `quick_log_created`
+
 A grower saved a Quick Log entry against a plant or tent.
 
-| Property | Type | Notes |
-|---|---|---|
-| `tent_id` | string | Internal only. |
-| `plant_id` | string \| null | Internal only. Null for tent-level logs. |
-| `entry_type` | enum | `water` \| `feed` \| `note` \| `photo` \| `training` \| `defoliation` \| `flush` \| `inspect` |
-| `has_photo` | boolean | |
-| `has_sensor_snapshot` | boolean | |
-| `loop_step` | const | `"quick_log"` |
+| Property              | Type           | Notes                                                                                         |
+| --------------------- | -------------- | --------------------------------------------------------------------------------------------- |
+| `tent_id`             | string         | Internal only.                                                                                |
+| `plant_id`            | string \| null | Internal only. Null for tent-level logs.                                                      |
+| `entry_type`          | enum           | `water` \| `feed` \| `note` \| `photo` \| `training` \| `defoliation` \| `flush` \| `inspect` |
+| `has_photo`           | boolean        |                                                                                               |
+| `has_sensor_snapshot` | boolean        |                                                                                               |
+| `loop_step`           | const          | `"quick_log"`                                                                                 |
 
 ### `sensor_snapshot_attached`
+
 A sensor snapshot was attached to a Quick Log entry, a plant timeline,
 or an AI Doctor context.
 
-| Property | Type | Notes |
-|---|---|---|
-| `tent_id` | string | Internal only. |
-| `source` | enum | `live` \| `manual` \| `csv` \| `demo` \| `stale` \| `invalid` |
-| `status` | enum | `usable` \| `stale` \| `invalid` \| `needs_review` \| `no_data` |
-| `attached_to` | enum | `quick_log` \| `timeline` \| `ai_doctor` |
-| `loop_step` | const | `"sensor_snapshot"` |
+| Property      | Type   | Notes                                                           |
+| ------------- | ------ | --------------------------------------------------------------- |
+| `tent_id`     | string | Internal only.                                                  |
+| `source`      | enum   | `live` \| `manual` \| `csv` \| `demo` \| `stale` \| `invalid`   |
+| `status`      | enum   | `usable` \| `stale` \| `invalid` \| `needs_review` \| `no_data` |
+| `attached_to` | enum   | `quick_log` \| `timeline` \| `ai_doctor`                        |
+| `loop_step`   | const  | `"sensor_snapshot"`                                             |
 
 ### `timeline_viewed`
+
 A grower opened a plant or tent timeline view.
 
-| Property | Type | Notes |
-|---|---|---|
-| `tent_id` | string | Internal only. |
-| `plant_id` | string \| null | Internal only. |
-| `range_days` | number | 7 / 30 / 90 / 0=all |
-| `entry_count` | number | Items in current view. |
-| `loop_step` | const | `"timeline"` |
+| Property      | Type           | Notes                  |
+| ------------- | -------------- | ---------------------- |
+| `tent_id`     | string         | Internal only.         |
+| `plant_id`    | string \| null | Internal only.         |
+| `range_days`  | number         | 7 / 30 / 90 / 0=all    |
+| `entry_count` | number         | Items in current view. |
+| `loop_step`   | const          | `"timeline"`           |
 
 ### `ai_doctor_opened`
+
 A grower opened the AI Doctor surface for a plant or tent.
 
-| Property | Type | Notes |
-|---|---|---|
-| `tent_id` | string | Internal only. |
-| `plant_id` | string \| null | Internal only. |
-| `context_completeness` | enum | `complete` \| `partial` \| `insufficient` |
-| `has_recent_photo` | boolean | |
-| `has_recent_sensor_snapshot` | boolean | |
-| `loop_step` | const | `"ai_doctor"` |
+| Property                     | Type           | Notes                                     |
+| ---------------------------- | -------------- | ----------------------------------------- |
+| `tent_id`                    | string         | Internal only.                            |
+| `plant_id`                   | string \| null | Internal only.                            |
+| `context_completeness`       | enum           | `complete` \| `partial` \| `insufficient` |
+| `has_recent_photo`           | boolean        |                                           |
+| `has_recent_sensor_snapshot` | boolean        |                                           |
+| `loop_step`                  | const          | `"ai_doctor"`                             |
 
 ### `alert_viewed`
+
 A grower viewed an alert (sensor, task, or AI).
 
-| Property | Type | Notes |
-|---|---|---|
-| `alert_id` | string | Internal only. |
-| `severity` | enum | `critical` \| `warning` \| `info` |
-| `source` | enum | `sensor` \| `task` \| `ai` |
-| `tent_id` | string \| null | Internal only. |
-| `loop_step` | const | `"alert"` |
+| Property    | Type           | Notes                             |
+| ----------- | -------------- | --------------------------------- |
+| `alert_id`  | string         | Internal only.                    |
+| `severity`  | enum           | `critical` \| `warning` \| `info` |
+| `source`    | enum           | `sensor` \| `task` \| `ai`        |
+| `tent_id`   | string \| null | Internal only.                    |
+| `loop_step` | const          | `"alert"`                         |
 
 ### `action_queue_item_created`
+
 A grower created an Action Queue item (typically from an alert or AI
 Doctor suggestion). The item is **suggested**; nothing executes.
 
-| Property | Type | Notes |
-|---|---|---|
-| `action_queue_item_id` | string | Internal only. |
-| `origin` | enum | `alert` \| `ai_doctor` \| `manual` |
-| `tent_id` | string \| null | Internal only. |
-| `plant_id` | string \| null | Internal only. |
-| `requires_approval` | const | `true` — invariant in V0. |
-| `loop_step` | const | `"action_queue"` |
+| Property               | Type           | Notes                              |
+| ---------------------- | -------------- | ---------------------------------- |
+| `action_queue_item_id` | string         | Internal only.                     |
+| `origin`               | enum           | `alert` \| `ai_doctor` \| `manual` |
+| `tent_id`              | string \| null | Internal only.                     |
+| `plant_id`             | string \| null | Internal only.                     |
+| `requires_approval`    | const          | `true` — invariant in V0.          |
+| `loop_step`            | const          | `"action_queue"`                   |
 
 ### `ai_doctor_result_created`
+
 A grower generated an AI Doctor result (analysis, recommendation, or
 risk assessment) for a plant or tent.
 
-| Property | Type | Notes |
-|---|---|---|
-| `tent_id` | string | Internal only. |
-| `plant_id` | string \| null | Internal only. |
-| `context_completeness` | enum | `complete` \| `partial` \| `insufficient` |
-| `has_recent_photo` | boolean | |
-| `has_recent_sensor_snapshot` | boolean | |
-| `recommendation_count` | number | How many follow-up actions were suggested. |
-| `risk_level` | enum | `low` \| `medium` \| `high` |
-| `loop_step` | const | `"ai_doctor"` |
+| Property                     | Type           | Notes                                      |
+| ---------------------------- | -------------- | ------------------------------------------ |
+| `tent_id`                    | string         | Internal only.                             |
+| `plant_id`                   | string \| null | Internal only.                             |
+| `context_completeness`       | enum           | `complete` \| `partial` \| `insufficient`  |
+| `has_recent_photo`           | boolean        |                                            |
+| `has_recent_sensor_snapshot` | boolean        |                                            |
+| `recommendation_count`       | number         | How many follow-up actions were suggested. |
+| `risk_level`                 | enum           | `low` \| `medium` \| `high`                |
+| `loop_step`                  | const          | `"ai_doctor"`                              |
 
 ### `action_queue_item_completed`
+
 A grower **approved and completed** an Action Queue item. There is no
 implicit execution path; completion is an explicit grower act.
 
-| Property | Type | Notes |
-|---|---|---|
-| `action_queue_item_id` | string | Internal only. |
-| `outcome` | enum | `done` \| `dismissed` \| `superseded` |
-| `time_to_completion_seconds` | number | Created → completed. |
-| `loop_step` | const | `"action_queue"` |
+| Property                     | Type   | Notes                                 |
+| ---------------------------- | ------ | ------------------------------------- |
+| `action_queue_item_id`       | string | Internal only.                        |
+| `outcome`                    | enum   | `done` \| `dismissed` \| `superseded` |
+| `time_to_completion_seconds` | number | Created → completed.                  |
+| `loop_step`                  | const  | `"action_queue"`                      |
 
 ### `action_follow_up_logged`
+
 A grower logged the **plant response** to a completed action.
 This event connects the closed loop:
 
@@ -187,24 +212,24 @@ post-grow learning.
 > Episodes. See [one-tent-learning-loop-v1.md](./one-tent-learning-loop-v1.md).
 >
 > - The **plant response** is the existing `action_outcome` event. Its
->   `outcome_status` enum is `improved | unchanged | worsened |
->   more_data_needed` (the shipped vocabulary; the analytics `response`
+>   `outcome_status` enum is
+>   `improved | unchanged | worsened | more_data_needed` (the shipped vocabulary; the analytics `response`
 >   values `improved | declined | no_change | too_soon` above are the
 >   original V0 analytics contract, not the persisted enum).
 > - The **next-run decision** (`follow_up_type` above) is the separate
->   `run_learning_decision` event: `decision` enum `repeat | avoid | adjust |
->   monitor`, chosen explicitly by the grower after an outcome exists.
+>   `run_learning_decision` event: `decision` enum
+>   `repeat | avoid | adjust | monitor`, chosen explicitly by the grower after an outcome exists.
 >   Verdant never promotes improved→repeat or worsened→avoid automatically.
 
-| Property | Type | Notes |
-|---|---|---|
-| `plant_id` | string | Internal only. |
-| `tent_id` | string | Internal only. |
-| `action_queue_item_id` | string | Links to the original action (`action_queue_id` in the persisted events). |
-| `response` | enum | Analytics contract: `improved` \| `declined` \| `no_change` \| `too_soon`. Persisted `action_outcome.outcome_status`: `improved` \| `unchanged` \| `worsened` \| `more_data_needed`. |
-| `follow_up_type` | enum | `repeat` \| `avoid` \| `adjust` \| `monitor` — persisted as `run_learning_decision.decision`, grower-chosen, never auto-derived. |
-| `has_photo` | boolean | Did the grower attach a visual reference? |
-| `loop_step` | const | `"action_queue"` |
+| Property               | Type    | Notes                                                                                                                                                                                |
+| ---------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `plant_id`             | string  | Internal only.                                                                                                                                                                       |
+| `tent_id`              | string  | Internal only.                                                                                                                                                                       |
+| `action_queue_item_id` | string  | Links to the original action (`action_queue_id` in the persisted events).                                                                                                            |
+| `response`             | enum    | Analytics contract: `improved` \| `declined` \| `no_change` \| `too_soon`. Persisted `action_outcome.outcome_status`: `improved` \| `unchanged` \| `worsened` \| `more_data_needed`. |
+| `follow_up_type`       | enum    | `repeat` \| `avoid` \| `adjust` \| `monitor` — persisted as `run_learning_decision.decision`, grower-chosen, never auto-derived.                                                     |
+| `has_photo`            | boolean | Did the grower attach a visual reference?                                                                                                                                            |
+| `loop_step`            | const   | `"action_queue"`                                                                                                                                                                     |
 
 ## Required context properties on downstream V0 events
 

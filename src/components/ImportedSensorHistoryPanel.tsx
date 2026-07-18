@@ -18,6 +18,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import ImportedSensorHistoryAiDoctorHandoff from "@/components/ImportedSensorHistoryAiDoctorHandoff";
+import {
+  buildImportedSensorHistoryAiDoctorHandoff,
+  type ImportedHistoryAiDoctorHandoffPlant,
+  type ImportedHistoryAiDoctorHandoffReadStatus,
+} from "@/lib/importedSensorHistoryAiDoctorHandoffRules";
 import {
   IMPORTED_SENSOR_HISTORY_ALL_METRICS,
   IMPORTED_SENSOR_HISTORY_ANCHOR_ID,
@@ -34,9 +40,13 @@ interface Props {
   readings: ReadonlyArray<ImportedSensorHistoryInputRow>;
   readStatus?: ImportedSensorHistoryReadStatus;
   onRetry?: () => void;
+  plants?: ReadonlyArray<ImportedHistoryAiDoctorHandoffPlant>;
+  plantReadStatus?: ImportedHistoryAiDoctorHandoffReadStatus;
   /** Optional cap for the recent-rows table. Defaults to view-model default. */
   limit?: number;
 }
+
+const NO_HANDOFF_PLANTS: ReadonlyArray<ImportedHistoryAiDoctorHandoffPlant> = [];
 
 function formatTimestamp(iso: string | null): string {
   if (!iso) return "—";
@@ -52,14 +62,15 @@ export default function ImportedSensorHistoryPanel({
   readings,
   readStatus = "success",
   onRetry,
+  plants = NO_HANDOFF_PLANTS,
+  plantReadStatus = "success",
   limit,
 }: Props) {
   const sectionRef = useRef<HTMLElement | null>(null);
   const location = useLocation();
-  const [selectedMetric, setSelectedMetric] =
-    useState<ImportedSensorHistoryMetricFilter>(
-      IMPORTED_SENSOR_HISTORY_ALL_METRICS,
-    );
+  const [selectedMetric, setSelectedMetric] = useState<ImportedSensorHistoryMetricFilter>(
+    IMPORTED_SENSOR_HISTORY_ALL_METRICS,
+  );
 
   useEffect(() => {
     if (location.hash !== `#${IMPORTED_SENSOR_HISTORY_ANCHOR_ID}`) return;
@@ -80,6 +91,18 @@ export default function ImportedSensorHistoryPanel({
     [readings, limit, selectedMetric],
   );
 
+  const handoffVm = useMemo(
+    () =>
+      buildImportedSensorHistoryAiDoctorHandoff({
+        tentId,
+        historyStatus: readStatus,
+        readings,
+        plantStatus: plantReadStatus,
+        plants,
+      }),
+    [tentId, readStatus, readings, plantReadStatus, plants],
+  );
+
   // Safe empty render when no tent context. Still keeps the anchor target
   // present so the CTA navigation does not 404 the scroll.
   if (!tentId) {
@@ -93,9 +116,7 @@ export default function ImportedSensorHistoryPanel({
         className="border rounded-md p-4 space-y-2"
       >
         <h2 className="text-base font-semibold">Imported sensor history</h2>
-        <p className="text-sm text-muted-foreground">
-          {IMPORTED_SENSOR_HISTORY_EMPTY_COPY}
-        </p>
+        <p className="text-sm text-muted-foreground">{IMPORTED_SENSOR_HISTORY_EMPTY_COPY}</p>
       </section>
     );
   }
@@ -123,9 +144,9 @@ export default function ImportedSensorHistoryPanel({
         data-testid="imported-history-readonly-banner"
         className="rounded-md border border-amber-500/40 bg-amber-500/5 p-3 text-xs text-amber-200"
       >
-        Read-only CSV history. These readings are shown only when explicitly
-        labeled as csv. They are historical context, not live sensor data, and
-        they do not write new readings or control equipment.
+        Read-only CSV history. These readings are shown only when explicitly labeled as csv. They
+        are historical context, not live sensor data, and they do not write new readings or control
+        equipment.
       </div>
 
       {readStatus === "loading" ? (
@@ -138,11 +159,7 @@ export default function ImportedSensorHistoryPanel({
           Loading imported CSV history…
         </p>
       ) : readStatus === "error" ? (
-        <div
-          className="space-y-2"
-          data-testid="imported-history-error"
-          role="alert"
-        >
+        <div className="space-y-2" data-testid="imported-history-error" role="alert">
           <p className="text-sm text-muted-foreground">
             Couldn't load imported CSV history. Check your connection and try again.
           </p>
@@ -153,10 +170,7 @@ export default function ImportedSensorHistoryPanel({
           ) : null}
         </div>
       ) : vm.isEmpty ? (
-        <p
-          className="text-sm text-muted-foreground"
-          data-testid="imported-history-empty"
-        >
+        <p className="text-sm text-muted-foreground" data-testid="imported-history-empty">
           {IMPORTED_SENSOR_HISTORY_EMPTY_COPY}
         </p>
       ) : (
@@ -167,19 +181,13 @@ export default function ImportedSensorHistoryPanel({
           >
             <div>
               <dt className="text-xs text-muted-foreground">Total readings</dt>
-              <dd
-                className="font-medium"
-                data-testid="imported-history-total"
-              >
+              <dd className="font-medium" data-testid="imported-history-total">
                 {vm.totalCount}
               </dd>
             </div>
             <div>
               <dt className="text-xs text-muted-foreground">Visible</dt>
-              <dd
-                className="font-medium"
-                data-testid="imported-history-visible"
-              >
+              <dd className="font-medium" data-testid="imported-history-visible">
                 {vm.visibleCount}
               </dd>
             </div>
@@ -191,9 +199,7 @@ export default function ImportedSensorHistoryPanel({
             </div>
             <div>
               <dt className="text-xs text-muted-foreground">Latest</dt>
-              <dd data-testid="imported-history-latest">
-                {formatTimestamp(vm.latestCapturedAt)}
-              </dd>
+              <dd data-testid="imported-history-latest">{formatTimestamp(vm.latestCapturedAt)}</dd>
             </div>
           </dl>
 
@@ -224,10 +230,7 @@ export default function ImportedSensorHistoryPanel({
             </div>
           ) : null}
 
-          <div
-            className="overflow-x-auto"
-            data-testid="imported-history-recent-rows"
-          >
+          <div className="overflow-x-auto" data-testid="imported-history-recent-rows">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-xs text-muted-foreground">
@@ -254,6 +257,8 @@ export default function ImportedSensorHistoryPanel({
           <p className="text-xs text-muted-foreground">
             Read-only view of CSV-imported sensor history. {IMPORTED_SENSOR_HISTORY_NOT_LIVE_COPY}.
           </p>
+
+          <ImportedSensorHistoryAiDoctorHandoff viewModel={handoffVm} />
         </>
       )}
     </section>

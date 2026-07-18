@@ -35,7 +35,8 @@ import {
   type ExistingKeysQueryScope,
 } from "@/lib/csv-import/sensorReadingsBatchInsert";
 import type { ParsedEnvironmentRow } from "@/lib/csvParser";
-import { plantDetailPath, sensorsPath, tentDetailPath } from "@/lib/routes";
+import { sensorsPath, tentDetailPath } from "@/lib/routes";
+import { IMPORTED_SENSOR_HISTORY_ANCHOR_ID } from "@/lib/importedSensorHistoryViewModel";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 
@@ -113,16 +114,13 @@ export function EnvironmentCsvImportLauncher(props: EnvironmentCsvImportLauncher
 
   const ready = !!user?.id && !!growId && !!tentId;
 
-  // Post-import handoff target. Most specific TRUSTED destination only:
-  // the explicit plant this launcher was mounted with, else the selected
-  // tent's timeline surface. Never inferred from CSV contents. Pure
-  // navigation — never auto-navigates, never runs AI Doctor, never
-  // creates alerts or Action Queue items.
-  const viewHistoryHref = plantId
-    ? plantDetailPath(plantId, { tentId: tentId ?? null })
-    : tentId
-      ? tentDetailPath(tentId)
-      : null;
+  // Imported history is rendered on Tent Detail, so the completion link
+  // targets that exact anchored section. Plant context is chosen explicitly
+  // after the grower sees the history; Verdant never infers a plant from the
+  // file or auto-runs AI Doctor.
+  const viewHistoryHref = tentId
+    ? `${tentDetailPath(tentId)}#${IMPORTED_SENSOR_HISTORY_ANCHOR_ID}`
+    : null;
   // Current-condition handoff stays on the existing manual sensor form.
   // The grower still enters, reviews, and confirms every value; this link
   // performs no write and never invokes AI Doctor by itself.

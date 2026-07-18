@@ -27,6 +27,26 @@ describe("TentDetail · real sensor readings", () => {
     expect(TENT_DETAIL).toMatch(/from\s+["']@\/hooks\/use-sensor-readings["']/);
   });
 
+  it("uses the dedicated imported-history result instead of filtering the mixed sensor window", () => {
+    expect(TENT_DETAIL).toMatch(
+      /from\s+["']@\/hooks\/useImportedSensorHistory["']/,
+    );
+    expect(TENT_DETAIL).toMatch(/useImportedSensorHistory\(id\)/);
+    expect(TENT_DETAIL).toMatch(
+      /<ImportedSensorHistoryPanel[\s\S]*?readings=\{importedHistory\.data\s*\?\?\s*\[\]\}/,
+    );
+    expect(TENT_DETAIL).not.toMatch(
+      /<ImportedSensorHistoryPanel[^>]*readings=\{readings\}/,
+    );
+  });
+
+  it("passes explicit imported-history loading and error truth to the panel", () => {
+    expect(TENT_DETAIL).toMatch(/resolveImportedSensorHistoryReadStatus/);
+    expect(TENT_DETAIL).toMatch(/importedHistory\.isFetching/);
+    expect(TENT_DETAIL).toMatch(/importedHistory\.isError/);
+    expect(TENT_DETAIL).toMatch(/importedHistory\.refetch/);
+  });
+
   it("uses the pure chart rules helper", () => {
     expect(TENT_DETAIL).toContain("buildTentSensorChartSeries");
     expect(TENT_DETAIL).toContain("buildTentSensorHeaderView");

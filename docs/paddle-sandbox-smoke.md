@@ -23,12 +23,12 @@ should stay empty in this flow.
 
 Any future expiry, any 3-digit CVC, any cardholder name.
 
-| Card                    | CVC | Expected                              |
-| ----------------------- | --- | ------------------------------------- |
-| `4242 4242 4242 4242`   | 123 | Successful payment, no 3DS            |
-| `4000 0000 0000 3220`   | 123 | Triggers 3D Secure challenge          |
-| `4000 0000 0000 0002`   | 123 | Always declined                       |
-| `4000 0027 6000 3184`   | 123 | Succeeds initially, declines on renewal |
+| Card                  | CVC | Expected                                |
+| --------------------- | --- | --------------------------------------- |
+| `4242 4242 4242 4242` | 123 | Successful payment, no 3DS              |
+| `4000 0000 0000 3220` | 123 | Triggers 3D Secure challenge            |
+| `4000 0000 0000 0002` | 123 | Always declined                         |
+| `4000 0027 6000 3184` | 123 | Succeeds initially, declines on renewal |
 
 ## Case 1 — Pro Monthly success
 
@@ -114,6 +114,10 @@ For the account from Case 1 or Case 4:
 - [ ] Trigger an AI Doctor review — `ai_credit_spend` returns
       `status='spent'` with the correct `plan_id` and `scope='per_month'`
       (Pro) or the Pro allowance for Founder Lifetime.
+- [ ] Confirm the resulting `ai_credit_spends.meta` records
+      `server_billing_environment='sandbox'` and
+      `entitlement_environment='sandbox'` (unless the account also has a
+      valid live entitlement, which intentionally takes precedence).
 
 For a **free** account (no subscription):
 
@@ -121,6 +125,27 @@ For a **free** account (no subscription):
 - [ ] `ai_credit_spend` for `ai_doctor_review` on a new grow returns
       `status='spent'` up to 3 credits, then
       `status='denied' reason='limit_reached'`.
+
+The environment-aware spend RPC is service-role-only and is normally invoked
+by AI Doctor / AI Coach after JWT verification. Do not call it from a browser
+console. For operator SQL/API verification, provide the verified test user's
+UUID as `p_user_id`, `p_billing_environment='sandbox'`, and the server-pinned
+feature/model tier. An authenticated user client attempting the same RPC must
+receive a permission denial.
+
+- [ ] Repeat one AI Doctor request with the same idempotency key. The second
+      spend response is `status='replayed'`, `result IS NULL`, and the edge
+      returns a calm invalid response without a second provider call.
+- [ ] Force a provider failure in a disposable test request. The service-only
+      refund path appends one negative-weight reversal; replaying the refund is
+      idempotent and leaves the original spend row unchanged.
+- [ ] During expand verification, confirm both AI Doctor and AI Coach spend
+      rows include `meta.server_billing_environment='sandbox'`. This proves the
+      updated edges reached the new overload after the schema reload.
+- [ ] After the separate contract migration only, attempt both legacy
+      `ai_credit_spend` and `ai_credit_refund` RPCs with an authenticated user
+      token. Both receive permission denial; no new spend or reversal row
+      appears.
 
 ## After each run
 

@@ -20,7 +20,6 @@ import {
   AI_DOCTOR_REVIEW_PACKET_CSV_ROW_CAP,
   buildAiDoctorReviewRequestPacket,
 } from "@/lib/aiDoctorReviewRequestPacket";
-import { AI_DOCTOR_CSV_HISTORY_SOURCES } from "@/lib/aiDoctorCsvHistoryContextRules";
 import {
   AI_DOCTOR_CURRENT_SENSOR_ROW_CAP,
   AI_DOCTOR_CURRENT_SENSOR_SOURCES,
@@ -33,6 +32,7 @@ import AiCreditRemainingBadge from "@/components/AiCreditRemainingBadge";
 import AiCreditLimitNotice from "@/components/AiCreditLimitNotice";
 import AiCreditServiceDegradedNotice from "@/components/AiCreditServiceDegradedNotice";
 import { useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
+import { useImportedSensorHistory } from "@/hooks/useImportedSensorHistory";
 import { isUuid } from "@/lib/growRepo";
 import { plantDetailPath } from "@/lib/routes";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
@@ -77,18 +77,14 @@ export default function PlantDetailAiDoctorLiveReview({
   sensorClassificationOverride,
 }: PlantDetailAiDoctorLiveReviewProps) {
   const { items } = useTimelineMemory({ kind: "plant", plantId }, TIMELINE_MEMORY_DEFAULT_LIMIT);
-  // Bounded, CSV-source-filtered per-tent sensor window (same shared hook as
-  // Dashboard/Tents; non-UUID tent ids are never queried). Filtering happens
-  // in the read query before the cap, so high-frequency current telemetry
-  // cannot crowd older imported history out of the packet.
-  const { byTent: readingsByTent, statusByTent: sensorStatusByTent } = useSensorReadingsByTents(
-    isUuid(tentId) ? [tentId] : [],
+  // Dedicated bounded imported-history read. It filters permitted CSV source
+  // identities before the cap and orders by historical `captured_at`, so the
+  // AI packet receives the newest observations rather than newest imports.
+  const importedHistory = useImportedSensorHistory(
+    isUuid(tentId) ? tentId : null,
     AI_DOCTOR_REVIEW_PACKET_CSV_ROW_CAP,
-    AI_DOCTOR_CSV_HISTORY_SOURCES,
   );
-  const tentSensorRows = tentId
-    ? (readingsByTent[tentId] ?? NO_TENT_SENSOR_ROWS)
-    : NO_TENT_SENSOR_ROWS;
+  const tentSensorRows = importedHistory.data ?? NO_TENT_SENSOR_ROWS;
   // Separate bounded current-source read. Keeping it distinct from the CSV
   // query prevents a high-frequency current stream from crowding history
   // out, and prevents historical rows from being mistaken for the latest
@@ -105,8 +101,7 @@ export default function PlantDetailAiDoctorLiveReview({
   // While either bounded sensor read is in flight, hold the start gate so
   // a click cannot send a packet that treats pending evidence as confirmed
   // absent. A FAILED read proceeds by omission — never a fabricated value.
-  const csvHistoryPending =
-    isUuid(tentId) && (sensorStatusByTent[tentId] ?? "loading") === "loading";
+  const csvHistoryPending = isUuid(tentId) && importedHistory.isFetching;
   const currentSensorPending =
     isUuid(tentId) && (currentSensorStatusByTent[tentId] ?? "loading") === "loading";
   const sensorContextPending = csvHistoryPending || currentSensorPending;

@@ -175,12 +175,18 @@ Deno.test(
     const rpcCalls = [...src.matchAll(/\.rpc\(\s*["']([a-z_]+)["']/g)].map((m) => m[1]);
     assertEquals(
       rpcCalls.sort(),
-      ["ai_credit_refund", "ai_credit_spend", "record_ai_doctor_review_completion"].sort(),
+      [
+        "ai_credit_refund",
+        "ai_credit_refund",
+        "ai_credit_spend",
+        "ai_credit_spend",
+        "record_ai_doctor_review_completion",
+      ].sort(),
     );
     assert(/SUPABASE_SERVICE_ROLE_KEY/.test(src), "completion writer must stay server-only");
     const validationIndex = src.indexOf("const v = validateAiDoctorReviewResult(candidate)");
     const completionCallIndex = src.lastIndexOf(
-      "recordFreshAiDoctorReviewCompletion(u.user.id, spendId)",
+      "recordFreshAiDoctorReviewCompletion(userId, spendId)",
     );
     assert(
       validationIndex >= 0 && completionCallIndex > validationIndex,
@@ -196,6 +202,12 @@ Deno.test(
     assert(
       !src.slice(replayStart, replayEnd).includes("recordFreshAiDoctorReviewCompletion"),
       "cached replays must not count as fresh completions",
+    );
+    const providerIndex = src.indexOf("fetch(GATEWAY_URL");
+    assert(providerIndex > replayEnd, "replay handling must complete before provider fetch");
+    assert(
+      src.slice(replayStart, replayEnd).includes('return calmFailure("invalid")'),
+      "resultless/corrupt replay must fail closed before provider fetch",
     );
     // No raw upstream payload logging.
     assert(!/console\.log\([^)]*payload/i.test(src), "must not log raw provider payload");

@@ -16,7 +16,9 @@ export type QuickLogSaveReason =
   | "target_unresolved"
   | "selection_not_found"
   | "invalid_volume"
+  | "temperature_out_of_range"
   | "humidity_out_of_range"
+  | "vpd_out_of_range"
   | "invalid_sensor_value"
   | "photo_saving_not_enabled"
   | "target_not_owned"
@@ -35,8 +37,12 @@ export function quickLogReasonToOperatorMessage(
       return "Choose a plant or tent before saving.";
     case "invalid_volume":
       return "Enter a watering volume greater than zero.";
+    case "temperature_out_of_range":
+      return "Temperature must be between -10 and 60°C.";
     case "humidity_out_of_range":
       return "Humidity must be between 0 and 100.";
+    case "vpd_out_of_range":
+      return "VPD must be between 0 and 10 kPa.";
     case "invalid_sensor_value":
       return "Sensor values must be numbers.";
     case "photo_saving_not_enabled":

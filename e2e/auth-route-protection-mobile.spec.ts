@@ -19,6 +19,8 @@ const PRIVATE_TABLES = [
   "action_queue",
 ];
 
+const PROTECTED_TABLES = [...PRIVATE_TABLES, "pheno_hunts", "pheno_keepers"];
+
 // Representative protected/operator/internal mobile coverage. Kept in sync
 // with src/lib/appRouteManifest.ts via src/test/operator-route-mobile-coverage.test.ts.
 // IMPORTANT: every operator + internal route in APP_ROUTES must be listed here.
@@ -62,6 +64,8 @@ const PROTECTED_MOBILE_ROUTES: string[] = [
   "/sensors",
   "/settings",
   // write-capable pheno hunt surfaces — moved behind the auth gate
+  "/pheno-hunts",
+  "/pheno-hunts/new",
   "/pheno-hunts/:id/workspace",
   "/pheno-hunts/:id/keepers",
 ];
@@ -212,7 +216,7 @@ test.describe("Auth route-protection MOBILE (mocked, 390x844)", () => {
       const privateHits: string[] = [];
       await page.route(/\/rest\/v1\//, (route, req) => {
         const u = req.url();
-        if (PRIVATE_TABLES.some((t) => u.includes(`/rest/v1/${t}`))) {
+        if (PROTECTED_TABLES.some((t) => u.includes(`/rest/v1/${t}`))) {
           privateHits.push(u);
         }
         return route.fulfill({

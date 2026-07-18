@@ -39,7 +39,7 @@ const AXIS_BY_KEY: ReadonlyMap<string, PhenoTraitAxis> = new Map(
   LOUD_TRAIT_AXES.map((a) => [a.key, a]),
 );
 
-const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const ISO_DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 export const MAX_STABILITY_RUNS = 12;
 export const STABILITY_RUN_LABEL_MAX = 80;
@@ -50,6 +50,23 @@ export interface StabilityRun {
   readonly observedAt: string | null;
   readonly traits: Readonly<Record<string, number>>;
   readonly note: string | null;
+}
+
+/**
+ * Validate a plain YYYY-MM-DD Gregorian calendar date without invoking the
+ * host clock or timezone. This rejects impossible dates (including 1900-02-29)
+ * while accepting leap days in years divisible by 400 (including 2000-02-29).
+ */
+export function isValidIsoCalendarDate(value: string): boolean {
+  const match = ISO_DATE_RE.exec(value);
+  if (!match) return false;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (year < 1 || month < 1 || month > 12 || day < 1) return false;
+  const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const daysInMonth = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return day <= daysInMonth[month - 1];
 }
 
 function sanitizeTraits(input: unknown): Record<string, number> {
@@ -83,12 +100,11 @@ export function sanitizeStabilityRuns(
     if (out.length >= MAX_STABILITY_RUNS) break;
     if (!raw || typeof raw !== "object") continue;
     const r = raw as Record<string, unknown>;
-    const runLabel = typeof r.runLabel === "string" ? r.runLabel.trim().slice(0, STABILITY_RUN_LABEL_MAX) : "";
+    const runLabel =
+      typeof r.runLabel === "string" ? r.runLabel.trim().slice(0, STABILITY_RUN_LABEL_MAX) : "";
     if (runLabel === "") continue;
-    const observedAt =
-      typeof r.observedAt === "string" && ISO_DATE_RE.test(r.observedAt.trim())
-        ? r.observedAt.trim()
-        : null;
+    const observedAtRaw = typeof r.observedAt === "string" ? r.observedAt.trim() : "";
+    const observedAt = isValidIsoCalendarDate(observedAtRaw) ? observedAtRaw : null;
     const note =
       typeof r.note === "string" && r.note.trim() !== ""
         ? r.note.trim().slice(0, STABILITY_RUN_NOTE_MAX)
@@ -120,7 +136,10 @@ export interface StabilityAxisTrend {
 
 export interface StabilityEvaluation {
   readonly verdict: StabilityVerdict;
+  /** Every recorded run, including runs without baseline-comparable traits. */
   readonly runCount: number;
+  /** Baseline + later runs that contain at least one valid baseline trait. */
+  readonly evidenceRunCount: number;
   readonly axisTrends: readonly StabilityAxisTrend[];
   /** Axis labels that drifted beyond tolerance — for the verdict copy. */
   readonly driftedAxes: readonly string[];
@@ -131,15 +150,16 @@ export interface StabilityEvaluation {
  * baseline; later runs are compared against it per shared axis. Never reads
  * any other keeper.
  */
-export function evaluateStability(
-  runs: readonly StabilityRun[],
-): StabilityEvaluation {
+export function evaluateStability(runs: readonly StabilityRun[]): StabilityEvaluation {
   const list = Array.isArray(runs) ? runs : [];
   if (list.length === 0) {
-    return { verdict: "no_runs", runCount: 0, axisTrends: [], driftedAxes: [] };
-  }
-  if (list.length === 1) {
-    return { verdict: "unconfirmed", runCount: 1, axisTrends: [], driftedAxes: [] };
+    return {
+      verdict: "no_runs",
+      runCount: 0,
+      evidenceRunCount: 0,
+      axisTrends: [],
+      driftedAxes: [],
+    };
   }
 
   const baseline = list[0];
@@ -154,14 +174,46 @@ export function evaluateStability(
   const traitsOf = (run: StabilityRun | null | undefined): Readonly<Record<string, number>> =>
     run && typeof run.traits === "object" && run.traits !== null ? run.traits : {};
 
+  const validValueFor = (
+    traits: Readonly<Record<string, number>>,
+    axis: PhenoTraitAxis,
+  ): number | null => {
+    const value = traits[axis.key];
+    return typeof value === "number" &&
+      Number.isFinite(value) &&
+      value >= axis.min &&
+      value <= axis.max
+      ? value
+      : null;
+  };
+
   const baseTraits = traitsOf(baseline);
+  const baselineAxes = LOUD_TRAIT_AXES.filter((axis) => validValueFor(baseTraits, axis) !== null);
+  const laterHasComparableEvidence = later.map((run) => {
+    const traits = traitsOf(run);
+    return baselineAxes.some((axis) => validValueFor(traits, axis) !== null);
+  });
+  const evidenceRunCount =
+    baselineAxes.length === 0
+      ? 0
+      : 1 + laterHasComparableEvidence.filter((hasEvidence) => hasEvidence).length;
+
+  if (list.length === 1) {
+    return {
+      verdict: "unconfirmed",
+      runCount: 1,
+      evidenceRunCount,
+      axisTrends: [],
+      driftedAxes: [],
+    };
+  }
+
   for (const axis of LOUD_TRAIT_AXES) {
-    const base = baseTraits[axis.key];
-    if (typeof base !== "number") continue; // no baseline value → nothing to hold to
+    const base = validValueFor(baseTraits, axis);
+    if (base === null) continue; // no valid baseline value → nothing to hold to
     const tolerance = toleranceFor(axis);
     const laterValues = later.map((run) => {
-      const v = traitsOf(run)[axis.key];
-      return typeof v === "number" ? v : null;
+      return validValueFor(traitsOf(run), axis);
     });
     const recorded = laterValues.filter((v): v is number => v !== null);
     if (recorded.length === 0) continue; // never re-scored this axis → can't judge hold
@@ -181,16 +233,30 @@ export function evaluateStability(
 
   // With 2+ runs but no shared re-scored axis, we can't judge hold either way.
   if (axisTrends.length === 0) {
-    return { verdict: "unconfirmed", runCount: list.length, axisTrends: [], driftedAxes: [] };
+    return {
+      verdict: "unconfirmed",
+      runCount: list.length,
+      evidenceRunCount,
+      axisTrends: [],
+      driftedAxes: [],
+    };
   }
 
-  const verdict: StabilityVerdict = driftedAxes.length > 0 ? "drifting" : "holding";
-  return { verdict, runCount: list.length, axisTrends, driftedAxes };
+  // Observed drift remains meaningful even if another run is incomplete. A
+  // broad hold verdict is stricter: one SAME baseline trait must be comparable
+  // in every later run. Run two scoring only trait A and run three scoring only
+  // trait B cannot establish that either trait held across all three grow-outs.
+  const hasFullyComparableAxis = axisTrends.some(
+    (trend) => trend.held && trend.laterValues.every((value) => value !== null),
+  );
+  const verdict: StabilityVerdict =
+    driftedAxes.length > 0 ? "drifting" : hasFullyComparableAxis ? "holding" : "unconfirmed";
+  return { verdict, runCount: list.length, evidenceRunCount, axisTrends, driftedAxes };
 }
 
 export const STABILITY_VERDICT_LABELS: Readonly<Record<StabilityVerdict, string>> = Object.freeze({
   no_runs: "No grow-outs recorded",
-  unconfirmed: "Not yet re-grown",
+  unconfirmed: "Re-grow evidence incomplete",
   holding: "Held on re-grow",
   drifting: "Drifted on re-grow",
 });
@@ -204,9 +270,15 @@ export function stabilityVerdictCopy(evalResult: StabilityEvaluation): string {
     case "no_runs":
       return "No grow-outs recorded yet. Record a run to start tracking whether this phenotype holds.";
     case "unconfirmed":
+      if (evalResult.runCount > 1 && evalResult.evidenceRunCount < evalResult.runCount) {
+        return `Only ${evalResult.evidenceRunCount} of ${evalResult.runCount} recorded grow-outs include trait evidence comparable to the baseline. The incomplete evidence cannot support a held-across-runs claim yet.`;
+      }
+      if (evalResult.runCount > 1) {
+        return `All ${evalResult.runCount} recorded grow-outs include some baseline-comparable evidence, but no single baseline trait was re-scored across every run. That incomplete comparison cannot support a held-across-runs claim yet.`;
+      }
       return "Recorded once. Re-grow the clone in a separate run to see whether the traits hold — a single run can't tell you.";
     case "holding":
-      return `Traits held across ${evalResult.runCount} recorded grow-outs. That is what you observed so far, not a promise about future runs.`;
+      return `At least one baseline trait held within tolerance across ${evalResult.runCount} recorded grow-outs, and no comparable observation drifted. That is what you observed so far, not a promise about future runs.`;
     case "drifting": {
       const which = evalResult.driftedAxes.join(", ");
       return `Traits shifted on re-grow (${which}). What you selected in run one did not repeat within your recorded tolerance.`;

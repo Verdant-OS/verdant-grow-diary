@@ -13,7 +13,11 @@ import { render, screen, fireEvent, within } from "@testing-library/react";
 import PhenoStabilityLedger from "@/components/PhenoStabilityLedger";
 import { MAX_STABILITY_RUNS, type StabilityRun } from "@/lib/phenoStabilityRunRules";
 
-function run(label: string, traits: Record<string, number> = {}, overrides: Partial<StabilityRun> = {}): StabilityRun {
+function run(
+  label: string,
+  traits: Record<string, number> = {},
+  overrides: Partial<StabilityRun> = {},
+): StabilityRun {
   return { runLabel: label, observedAt: null, traits, note: null, ...overrides };
 }
 
@@ -38,7 +42,7 @@ describe("PhenoStabilityLedger — verdict & empty state", () => {
   it("a single run reads as unconfirmed — never a confirmation", () => {
     setup([run("Baseline", { nose_loudness: 8 })]);
     expect(screen.getByTestId("pheno-stability-verdict-badge-k1")).toHaveTextContent(
-      /Not yet re-grown/i,
+      /Re-grow evidence incomplete/i,
     );
     expect(screen.getByTestId("pheno-stability-verdict-k1")).toHaveTextContent(
       /a single run can't tell you/i,
@@ -72,7 +76,9 @@ describe("PhenoStabilityLedger — whole-set save contract", () => {
   it("adding a run calls onSave with the appended set and clears the form", async () => {
     const { onSave } = setup([run("R1", { vigor: 4 })]);
     fireEvent.change(screen.getByTestId("pheno-stability-label-k1"), { target: { value: "R2" } });
-    fireEvent.change(screen.getByTestId("pheno-stability-trait-k1-vigor"), { target: { value: "4" } });
+    fireEvent.change(screen.getByTestId("pheno-stability-trait-k1-vigor"), {
+      target: { value: "4" },
+    });
     fireEvent.change(screen.getByTestId("pheno-stability-date-k1"), {
       target: { value: "2026-03-01" },
     });
@@ -103,7 +109,9 @@ describe("PhenoStabilityLedger — whole-set save contract", () => {
   it("rejects an out-of-range trait with an inline error and no save", () => {
     const { onSave } = setup([]);
     fireEvent.change(screen.getByTestId("pheno-stability-label-k1"), { target: { value: "R1" } });
-    fireEvent.change(screen.getByTestId("pheno-stability-trait-k1-vigor"), { target: { value: "9" } });
+    fireEvent.change(screen.getByTestId("pheno-stability-trait-k1-vigor"), {
+      target: { value: "9" },
+    });
     fireEvent.click(screen.getByTestId("pheno-stability-add-k1"));
     expect(screen.getByTestId("pheno-stability-error-k1")).toHaveTextContent(/between 1 and 5/i);
     expect(onSave).not.toHaveBeenCalled();
@@ -130,9 +138,7 @@ describe("PhenoStabilityLedger — static safety", () => {
   });
 
   it("makes no premature stability / ranking claim in the component copy", () => {
-    const code = src
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+    const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
     expect(code).not.toMatch(/\bguaranteed\b/i);
     expect(code).not.toMatch(/\bproven\b/i);
     expect(code).not.toMatch(/\bwinner\b/i);

@@ -2,8 +2,8 @@
  * phenoStabilityDashboardRules — pure cross-keeper roll-up of the stability
  * ledger. Given every keeper the grower owns (across all their hunts) with its
  * recorded grow-outs, it evaluates EACH keeper against its OWN first run and
- * summarizes the spread — how many are holding, drifting, not-yet-re-grown, or
- * have no grow-outs recorded.
+ * summarizes the spread — how many are holding, drifting, have incomplete
+ * re-grow evidence, or have no grow-outs recorded.
  *
  * NOT A LEADERBOARD: every keeper is judged only against its own baseline
  * (evaluateStability never reads another keeper), the entries are ordered
@@ -20,6 +20,7 @@
 import {
   evaluateStability,
   STABILITY_VERDICT_LABELS,
+  type StabilityEvaluation,
   type StabilityRun,
   type StabilityVerdict,
 } from "@/lib/phenoStabilityRunRules";
@@ -38,6 +39,7 @@ export interface StabilityDashboardEntry {
   readonly huntName: string;
   readonly verdict: StabilityVerdict;
   readonly runCount: number;
+  readonly evidenceRunCount: number;
   readonly driftedAxes: readonly string[];
   /** Neutral status label for the keeper's own verdict (never comparative). */
   readonly statusLabel: string;
@@ -63,23 +65,21 @@ export const STABILITY_DASHBOARD_EMPTY_COPY =
 
 const FALLBACK_HUNT_NAME = "Untitled hunt";
 
-function detailFor(
-  verdict: StabilityVerdict,
-  runCount: number,
-  driftedAxes: readonly string[],
-): string {
-  switch (verdict) {
+function detailFor(evaluation: StabilityEvaluation): string {
+  switch (evaluation.verdict) {
     case "no_runs":
       return "No grow-outs recorded yet.";
     case "unconfirmed":
-      return runCount <= 1
-        ? "Recorded once — not yet re-grown."
-        : "Re-grown, but no shared trait was re-scored yet.";
+      if (evaluation.runCount <= 1) return "Recorded once — re-grow evidence is still incomplete.";
+      if (evaluation.evidenceRunCount < evaluation.runCount) {
+        return `Only ${evaluation.evidenceRunCount} of ${evaluation.runCount} recorded grow-outs include trait evidence comparable to the baseline.`;
+      }
+      return `Every grow-out includes some baseline-comparable evidence, but no single baseline trait was re-scored across all ${evaluation.runCount} runs.`;
     case "holding":
-      return `Held across ${runCount} recorded grow-outs.`;
+      return `At least one baseline trait held within tolerance across ${evaluation.runCount} recorded grow-outs.`;
     case "drifting":
-      return driftedAxes.length > 0
-        ? `Drifted on re-grow (${driftedAxes.join(", ")}).`
+      return evaluation.driftedAxes.length > 0
+        ? `Drifted on re-grow (${evaluation.driftedAxes.join(", ")}).`
         : "Drifted on re-grow.";
     default:
       return "";
@@ -109,18 +109,21 @@ export function buildStabilityDashboard(
     if (!k || typeof k.keeperId !== "string" || k.keeperId === "") continue;
     const evaluation = evaluateStability(k.stabilityRuns ?? []);
     counts[evaluation.verdict] += 1;
-    const huntName =
-      (typeof k.huntId === "string" && huntNameById[k.huntId]) || FALLBACK_HUNT_NAME;
+    const huntName = (typeof k.huntId === "string" && huntNameById[k.huntId]) || FALLBACK_HUNT_NAME;
     entries.push({
       keeperId: k.keeperId,
-      keeperName: typeof k.keeperName === "string" && k.keeperName.trim() !== "" ? k.keeperName : "Unnamed keeper",
+      keeperName:
+        typeof k.keeperName === "string" && k.keeperName.trim() !== ""
+          ? k.keeperName
+          : "Unnamed keeper",
       huntId: typeof k.huntId === "string" ? k.huntId : "",
       huntName,
       verdict: evaluation.verdict,
       runCount: evaluation.runCount,
+      evidenceRunCount: evaluation.evidenceRunCount,
       driftedAxes: evaluation.driftedAxes,
       statusLabel: STABILITY_VERDICT_LABELS[evaluation.verdict],
-      detail: detailFor(evaluation.verdict, evaluation.runCount, evaluation.driftedAxes),
+      detail: detailFor(evaluation),
     });
   }
 

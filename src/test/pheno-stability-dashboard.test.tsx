@@ -17,7 +17,12 @@ import {
 import type { StabilityRun } from "@/lib/phenoStabilityRunRules";
 
 function runs(...pairs: Array<Record<string, number>>): StabilityRun[] {
-  return pairs.map((traits, i) => ({ runLabel: `R${i + 1}`, observedAt: null, traits, note: null }));
+  return pairs.map((traits, i) => ({
+    runLabel: `R${i + 1}`,
+    observedAt: null,
+    traits,
+    note: null,
+  }));
 }
 
 function model(keepers: StabilityDashboardKeeperInput[]) {
@@ -25,8 +30,18 @@ function model(keepers: StabilityDashboardKeeperInput[]) {
 }
 
 const KEEPERS: StabilityDashboardKeeperInput[] = [
-  { keeperId: "k1", keeperName: "Gas #4", huntId: "h1", stabilityRuns: runs({ nose_loudness: 8 }, { nose_loudness: 8 }) },
-  { keeperId: "k2", keeperName: "Cake #1", huntId: "h2", stabilityRuns: runs({ nose_loudness: 8 }, { nose_loudness: 2 }) },
+  {
+    keeperId: "k1",
+    keeperName: "Gas #4",
+    huntId: "h1",
+    stabilityRuns: runs({ nose_loudness: 8 }, { nose_loudness: 8 }),
+  },
+  {
+    keeperId: "k2",
+    keeperName: "Cake #1",
+    huntId: "h2",
+    stabilityRuns: runs({ nose_loudness: 8 }, { nose_loudness: 2 }),
+  },
   { keeperId: "k3", keeperName: "Sherb #2", huntId: "h1", stabilityRuns: [] },
 ];
 
@@ -42,7 +57,9 @@ describe("PhenoStabilityDashboard", () => {
     const k1 = screen.getByTestId("pheno-stability-dashboard-entry-k1");
     expect(k1.textContent).toContain("Gas #4");
     expect(k1.textContent).toContain("Blue Dream F2");
-    expect(k1.textContent).toMatch(/Held across 2 recorded grow-outs/);
+    expect(k1.textContent).toMatch(
+      /baseline trait held within tolerance across 2 recorded grow-outs/,
+    );
     expect(screen.getByTestId("pheno-stability-dashboard-badge-k2")).toHaveTextContent(
       /Drifted on re-grow/i,
     );
@@ -54,13 +71,16 @@ describe("PhenoStabilityDashboard", () => {
   it("shows aggregate counts and disables empty verdict filters", () => {
     render(<PhenoStabilityDashboard model={model(KEEPERS)} />);
     const counts = screen.getByTestId("pheno-stability-dashboard-counts");
-    expect(within(counts).getByTestId("pheno-stability-dashboard-filter-holding")).toHaveTextContent(
-      "1",
-    );
+    expect(
+      within(counts).getByTestId("pheno-stability-dashboard-filter-holding"),
+    ).toHaveTextContent("1");
     // No keeper is "unconfirmed" here → that filter is disabled.
     expect(
-      (within(counts).getByTestId("pheno-stability-dashboard-filter-unconfirmed") as HTMLButtonElement)
-        .disabled,
+      (
+        within(counts).getByTestId(
+          "pheno-stability-dashboard-filter-unconfirmed",
+        ) as HTMLButtonElement
+      ).disabled,
     ).toBe(true);
   });
 
@@ -82,19 +102,24 @@ describe("PhenoStabilityDashboard", () => {
     );
   });
 
-  it("renders the multi-run 'not yet re-grown' verdict for a keeper with no shared axis", () => {
+  it("renders an incomplete-evidence verdict for a multi-run keeper with no shared axis", () => {
     render(
       <PhenoStabilityDashboard
         model={model([
-          { keeperId: "ku", keeperName: "Mystery", huntId: "h1", stabilityRuns: runs({ nose_loudness: 8 }, { vigor: 4 }) },
+          {
+            keeperId: "ku",
+            keeperName: "Mystery",
+            huntId: "h1",
+            stabilityRuns: runs({ nose_loudness: 8 }, { vigor: 4 }),
+          },
         ])}
       />,
     );
     expect(screen.getByTestId("pheno-stability-dashboard-badge-ku")).toHaveTextContent(
-      /Not yet re-grown/i,
+      /Re-grow evidence incomplete/i,
     );
     expect(screen.getByTestId("pheno-stability-dashboard-entry-ku").textContent).toMatch(
-      /no shared trait was re-scored/i,
+      /Only 1 of 2 recorded grow-outs/i,
     );
   });
 

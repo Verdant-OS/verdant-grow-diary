@@ -4,7 +4,7 @@
  * Static guarantees:
  *  - Public demo routes (/pheno-comparison, /pheno-expression-showcase,
  *    /pheno-hunts/:id/compare) are NOT wrapped in PhenoTrackerUpgradeGate.
- *  - Gated workflow routes (/pheno-hunts/new, workspace, keepers) ARE
+ *  - Gated workflow routes (/pheno-hunts, /new, workspace, keepers) ARE
  *    wrapped in PhenoTrackerUpgradeGate.
  *  - Server-side entitlement enforcement files are untouched by this UI
  *    slice (well-known paths still exist and still export the assertion).
@@ -22,7 +22,12 @@ const PUBLIC_DEMO_ROUTES = [
   "/pheno-hunts/:id/compare",
 ];
 
-const GATED_ROUTES = ["/pheno-hunts/new", "/pheno-hunts/:id/workspace", "/pheno-hunts/:id/keepers"];
+const GATED_ROUTES = [
+  "/pheno-hunts",
+  "/pheno-hunts/new",
+  "/pheno-hunts/:id/workspace",
+  "/pheno-hunts/:id/keepers",
+];
 
 function routeBlock(routePath: string): string {
   // Grab a slice around the route so we can check for a nearby Gate wrapper.

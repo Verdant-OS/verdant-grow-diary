@@ -1,0 +1,38 @@
+# Lighthouse CI — protects LCP + SEO on the published surface.
+#
+# Runs against https://verdantgrowdiary.com (published, real network).
+# NOT dispatched automatically until the repo owner enables it — Verdant
+# publishes locally from Windows, so this workflow is opt-in via
+# workflow_dispatch + nightly schedule.
+#
+# Assertions live in lighthouserc.cjs. URLs are loaded from
+# public/sitemap.xml so this stays in lockstep with the canonical routes.
+
+name: lighthouse-ci
+
+on:
+  workflow_dispatch: {}
+  schedule:
+    # Nightly at 08:00 UTC. Comment out if not desired.
+    - cron: "0 8 * * *"
+
+jobs:
+  lighthouse:
+    name: Lighthouse (published sitemap)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Lighthouse CI
+        run: npm install -g @lhci/cli@0.14.x
+
+      - name: Run Lighthouse against published sitemap
+        run: lhci autorun --config=./lighthouserc.cjs
+        env:
+          LHCI_BUILD_CONTEXT__CURRENT_BRANCH: ${{ github.ref_name }}

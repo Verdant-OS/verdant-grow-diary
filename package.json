@@ -9,6 +9,8 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.app.json --noEmit",
+    "lighthouse": "node scripts/run-lighthouse-ci.mjs",
+    "lighthouse:home": "node scripts/run-lighthouse-ci.mjs --home",
     "audit:subscriber-growth-live": "node scripts/audit-subscriber-growth-live-parity.mjs",
     "release:subscriber-growth:gate": "node scripts/releases/run-subscriber-growth-launch-gate.mjs",
     "release:subscriber-growth:gate:local": "node scripts/releases/run-subscriber-growth-launch-gate.mjs --local-only",

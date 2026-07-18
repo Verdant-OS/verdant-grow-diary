@@ -111,7 +111,6 @@ jobs:
             echo "should_run=true" >> "$GITHUB_OUTPUT"
           fi
 
-
       - name: Setup Bun
         if: steps.e2e_config.outputs.should_run == 'true'
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
@@ -150,6 +149,10 @@ jobs:
         if: steps.e2e_config.outputs.should_run == 'true'
         run: bun run e2e:install:ci
 
+      - name: Print disposable E2E fixture checklist
+        if: steps.e2e_config.outputs.should_run == 'true'
+        run: bun run e2e:fixture-checklist
+
       # Optional UI-only disposable E2E fixture bootstrap. OFF by default.
       # Only runs when vars.E2E_ALLOW_FIXTURE_BOOTSTRAP == 'true'.
       # Never deletes, renames, or modifies existing grow data. Refuses to
@@ -169,7 +172,6 @@ jobs:
         id: quicklog_smoke
         if: steps.e2e_config.outputs.should_run == 'true' && steps.verify_fixture.outcome == 'success'
         run: bun run e2e:quicklog-smoke
-
 
       - name: Verify Quick Log smoke artifacts
         if: always() && steps.e2e_config.outputs.should_run == 'true'
@@ -364,9 +366,6 @@ jobs:
           path: e2e/results/quicklog-smoke-report.txt
           retention-days: 30
           if-no-files-found: warn
-
-
-
 
       - name: Write Quick Log smoke run summary
         if: always()

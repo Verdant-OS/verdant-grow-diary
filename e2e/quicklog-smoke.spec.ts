@@ -1,6 +1,7 @@
 import { test, expect } from "./lib/authedTest";
 import fs from "node:fs";
 import path from "node:path";
+import type { Locator, Request } from "@playwright/test";
 import { SmokeChecklistReporter } from "./lib/smokeChecklistReporter";
 
 /**
@@ -33,6 +34,53 @@ const TARGET_NAME = process.env.E2E_GROW_2_PLANT_NAME?.trim() || "505 Headbanger
 const RESULTS_DIR = path.resolve(process.cwd(), "e2e/results");
 const REPORT_JSON = path.join(RESULTS_DIR, "quicklog-smoke-report.json");
 const REPORT_TXT = path.join(RESULTS_DIR, "quicklog-smoke-report.txt");
+const SAFE_TARGET_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
+
+interface QuickLogTargetTuple {
+  plantId: string;
+  tentId: string;
+  growId: string;
+}
+
+function isSafeTargetId(value: unknown): value is string {
+  return typeof value === "string" && SAFE_TARGET_ID_PATTERN.test(value);
+}
+
+function readPlantRouteId(plantUrl: string): string {
+  const baseUrl = process.env.E2E_BASE_URL?.trim() || "http://localhost:5173";
+  const pathname = new URL(plantUrl, baseUrl).pathname;
+  const segments = pathname.split("/").filter(Boolean);
+  const plantsIndex = segments.lastIndexOf("plants");
+  const candidate = plantsIndex >= 0 ? segments[plantsIndex + 1] : null;
+  if (!isSafeTargetId(candidate)) {
+    throw new Error("Plant URL does not contain a safe plant route target.");
+  }
+  return candidate;
+}
+
+function readObservedQuickLogTargetId(request: Request): string | null {
+  try {
+    const body = request.postDataJSON() as { p_target_id?: unknown } | null;
+    if (!body) return null;
+    const candidate = body.p_target_id;
+    return isSafeTargetId(candidate) ? candidate : null;
+  } catch {
+    return null;
+  }
+}
+
+async function readTargetTuple(dialog: Locator): Promise<QuickLogTargetTuple> {
+  const card = dialog.getByTestId("quick-log-target-card");
+  const [plantId, tentId, growId] = await Promise.all([
+    card.getAttribute("data-target-plant-id"),
+    card.getAttribute("data-target-tent-id"),
+    card.getAttribute("data-target-grow-id"),
+  ]);
+  if (![plantId, tentId, growId].every(isSafeTargetId)) {
+    throw new Error("Quick Log target card did not expose a safe complete target tuple.");
+  }
+  return { plantId: plantId!, tentId: tentId!, growId: growId! };
+}
 
 /**
  * Open the Quick Log dialog from any Quick Log button.
@@ -102,18 +150,72 @@ test.describe("Quick Log smoke checklist", () => {
 
   test("authenticated end-to-end checklist", async ({ page }, testInfo) => {
     const report = new SmokeChecklistReporter();
+    let observedRpcTargetId: string | null = null;
+
+    page.on("request", (request) => {
+      let pathname: string;
+      try {
+        pathname = new URL(request.url()).pathname;
+      } catch {
+        return;
+      }
+      if (!pathname.endsWith("/rpc/quicklog_save_manual")) return;
+      const candidate = readObservedQuickLogTargetId(request);
+      if (candidate) observedRpcTargetId = candidate;
+    });
 
     try {
       await page.goto(PLANT_URL!);
+      let routePlantId = "";
+      await report.run(1, "Validate initial plant route target", async () => {
+        routePlantId = readPlantRouteId(PLANT_URL!);
+        return "plant route target validated";
+      });
+
       await acceptReconsentGateIfShown(page);
 
       await openQuickLogDialog(page);
       const dialog = page.getByRole("dialog");
       await expect(dialog).toBeVisible();
 
-      const plantSelect = dialog.getByTestId("quick-log-plant-select");
-      await plantSelect.click();
-      await page.getByRole("option", { name: new RegExp(TARGET_NAME, "i") }).click();
+      let initialTarget: QuickLogTargetTuple | null = null;
+      await report.run(2, "Resolve exact Quick Log target card", async () => {
+        await expect
+          .poll(async () => {
+            try {
+              return (await readTargetTuple(dialog)).plantId;
+            } catch {
+              return null;
+            }
+          })
+          .toBe(routePlantId);
+        initialTarget = await readTargetTuple(dialog);
+        if (initialTarget.plantId !== routePlantId) {
+          throw new Error("Quick Log target does not match the Plant Detail route.");
+        }
+        return "exact route grow/tent/plant target resolved";
+      });
+
+      await report.run(3, "Change the selected target tuple", async () => {
+        const plantSelect = dialog.getByTestId("quick-log-plant-select");
+        await plantSelect.click();
+        await page.getByRole("option", { name: new RegExp(TARGET_NAME, "i") }).click();
+        await expect
+          .poll(() =>
+            dialog.getByTestId("quick-log-target-card").getAttribute("data-target-plant-id"),
+          )
+          .not.toBe(routePlantId);
+        const selectedTarget = await readTargetTuple(dialog);
+        if (
+          initialTarget &&
+          selectedTarget.plantId === initialTarget.plantId &&
+          selectedTarget.tentId === initialTarget.tentId &&
+          selectedTarget.growId === initialTarget.growId
+        ) {
+          throw new Error("Quick Log target tuple did not change after plant selection.");
+        }
+        return "selected grow/tent/plant target changed";
+      });
 
       await report.run(4, "Mismatch banner appears", async () => {
         await expect(dialog.getByTestId("quick-log-plant-mismatch-banner")).toBeVisible();
@@ -256,12 +358,20 @@ test.describe("Quick Log smoke checklist", () => {
         return "note filled (no watering ml field on this build)";
       });
 
-      await report.run(15, "Save succeeds", async () => {
+      await report.run(15, "Save uses displayed target", async () => {
+        const displayedTargetId = await dialog
+          .getByTestId("quick-log-target-card")
+          .getAttribute("data-target-plant-id");
+        if (!isSafeTargetId(displayedTargetId)) {
+          throw new Error("Displayed Quick Log target is missing or invalid before Save.");
+        }
+        observedRpcTargetId = null;
         await dialog.getByTestId("quick-log-save").click();
+        await expect.poll(() => observedRpcTargetId).toBe(displayedTargetId);
         await expect(dialog.getByTestId("quick-log-post-save")).toBeVisible({
           timeout: 15_000,
         });
-        return "post-save shown";
+        return "post-save shown and RPC target matched displayed target";
       });
 
       await report.run(16, "Post-save actions visible (View / Log another / Close)", async () => {
@@ -278,10 +388,6 @@ test.describe("Quick Log smoke checklist", () => {
         return "focused";
       });
 
-      const selectedPlantId = await dialog
-        .getByTestId("quick-log-view-target-plant")
-        .getAttribute("data-target-plant-id");
-
       await report.run(18, "Activate Log another", async () => {
         await dialog.getByTestId("quick-log-post-save-another").click();
         return "activated";
@@ -292,7 +398,7 @@ test.describe("Quick Log smoke checklist", () => {
         await expect(dialog.getByTestId("quick-log-plant-select")).toContainText(
           new RegExp(TARGET_NAME, "i"),
         );
-        return `kept plant ${selectedPlantId ?? "(unknown id)"}`;
+        return "kept selected plant";
       });
 
       await report.run(20, "Form resets, focus lands in note field", async () => {

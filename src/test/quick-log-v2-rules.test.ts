@@ -73,3 +73,61 @@ describe("quickLogV2Rules", () => {
     expect(isPhotoSavingSupported()).toBe(isPhotoSavingSupported());
   });
 });
+
+describe("quickLogV2Rules — archived/merged plant target hardening", () => {
+  // Quick Log v1 hides plants that are archived OR soft-archived OR merged
+  // (the canonical predicate in quickLogPlantOptionRules). The v2 target
+  // builder now applies the same rule as defense-in-depth, NOT as closure
+  // of a live hole: in the deployed schema the merge RPC always sets
+  // is_archived=true on the merged source (see the merge_duplicate_plant
+  // migration) and usePlants() filters archived rows server-side, so no
+  // real row can reach this builder with archived_at or
+  // merged_into_plant_id set today. Those columns are documented,
+  // not-yet-applied schema in docs/plant-merge-execution-plan.md; these
+  // tests pin the predicate so the v2 surface is already correct the day
+  // that migration ships, and so any client path that loads plants
+  // without the server-side filter still fails closed.
+  const hardeningTents = [{ id: "t1", name: "Tent A", grow_id: "g1" }];
+  const hardeningPlants = [
+    { id: "p1", name: "Active", tent_id: "t1", grow_id: "g1" },
+    {
+      id: "p2",
+      name: "Soft archived",
+      tent_id: "t1",
+      grow_id: "g1",
+      archived_at: "2026-07-01T00:00:00Z",
+    },
+    {
+      id: "p3",
+      name: "Merged away",
+      tent_id: "t1",
+      grow_id: "g1",
+      is_archived: false,
+      merged_into_plant_id: "p1",
+    },
+  ];
+
+  it("excludes plants soft-archived via archived_at even when is_archived is unset", () => {
+    const opts = buildQuickLogV2TargetOptions(hardeningTents as any, hardeningPlants as any);
+    expect(opts.find((o) => o.id === "p2")).toBeUndefined();
+  });
+
+  it("excludes merged plants (merged_into_plant_id set, is_archived false)", () => {
+    const opts = buildQuickLogV2TargetOptions(hardeningTents as any, hardeningPlants as any);
+    expect(opts.find((o) => o.id === "p3")).toBeUndefined();
+  });
+
+  it("still offers the active plant and its tent", () => {
+    const opts = buildQuickLogV2TargetOptions(hardeningTents as any, hardeningPlants as any);
+    expect(opts.map((o) => `${o.type}:${o.id}`).sort()).toEqual(["plant:p1", "tent:t1"]);
+  });
+
+  it("resolver cannot resolve a merged plant selection (no stale-key escape)", () => {
+    // Even if a stale UI selection key for a merged plant survives in form
+    // state, resolution must fail closed rather than write against it.
+    const opts = buildQuickLogV2TargetOptions(hardeningTents as any, hardeningPlants as any);
+    const r = resolveQuickLogV2Target(opts, "plant:p3");
+    expect(r.ok).toBe(false);
+    expect(r.reason).toBe("selection_not_found");
+  });
+});

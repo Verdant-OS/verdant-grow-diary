@@ -88,6 +88,8 @@ const QUICKLOG_SURFACE = [
   "src/hooks/useQuickLogV2Save.ts",
   "src/lib/quickLogV2SavePayload.ts",
   "src/lib/quickLogV2Rules.ts",
+  // Part of the v2 import closure (canonical archived/merged predicate).
+  "src/lib/quickLogPlantOptionRules.ts",
   "src/lib/quickLogV2RefreshRules.ts",
   "src/lib/environmentCheckQuickLogRules.ts",
 ];

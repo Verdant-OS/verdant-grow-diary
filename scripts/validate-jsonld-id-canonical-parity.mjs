@@ -105,6 +105,49 @@ function extractMainEntityOfPageId(value) {
 }
 
 /**
+ * schema.org types that describe the page itself. Only these are
+ * required to have `@id` = the page's canonical href. Entity types
+ * like Organization / WebSite / SoftwareApplication legitimately use
+ * site-level identifiers (e.g. "https://site.com/#organization") and
+ * are intentionally exempt.
+ */
+export const PAGE_TYPES = new Set([
+  "WebPage",
+  "AboutPage",
+  "CheckoutPage",
+  "CollectionPage",
+  "ContactPage",
+  "FAQPage",
+  "ItemPage",
+  "MedicalWebPage",
+  "ProfilePage",
+  "QAPage",
+  "RealEstateListing",
+  "SearchResultsPage",
+  "Article",
+  "NewsArticle",
+  "BlogPosting",
+  "TechArticle",
+  "Report",
+  "ScholarlyArticle",
+  "Product",
+  "HowTo",
+  "Recipe",
+  "Event",
+]);
+
+function nodeTypes(node) {
+  const t = node["@type"];
+  if (typeof t === "string") return [t];
+  if (Array.isArray(t)) return t.filter((v) => typeof v === "string");
+  return [];
+}
+
+function isPageTypedNode(node) {
+  return nodeTypes(node).some((t) => PAGE_TYPES.has(t));
+}
+
+/**
  * Validate one HTML document.
  * @param {{ file: string; html: string; distDir?: string }} args
  * @returns {Issue[]}

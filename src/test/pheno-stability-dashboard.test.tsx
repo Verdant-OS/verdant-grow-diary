@@ -58,7 +58,7 @@ describe("PhenoStabilityDashboard", () => {
     expect(k1.textContent).toContain("Gas #4");
     expect(k1.textContent).toContain("Blue Dream F2");
     expect(k1.textContent).toMatch(
-      /baseline trait held within tolerance across 2 recorded grow-outs/,
+      /baseline trait held within tolerance across 2 evidence-bearing grow-outs/,
     );
     expect(screen.getByTestId("pheno-stability-dashboard-badge-k2")).toHaveTextContent(
       /Drifted on re-grow/i,
@@ -120,6 +120,9 @@ describe("PhenoStabilityDashboard", () => {
     );
     expect(screen.getByTestId("pheno-stability-dashboard-entry-ku").textContent).toMatch(
       /Only 1 of 2 recorded grow-outs/i,
+    );
+    expect(screen.getByTestId("pheno-stability-dashboard-entry-ku")).toHaveTextContent(
+      /only those evidence-bearing grow-outs count/i,
     );
   });
 

@@ -39,7 +39,7 @@ export interface StabilityDashboardEntry {
   readonly huntName: string;
   readonly verdict: StabilityVerdict;
   readonly runCount: number;
-  readonly evidenceRunCount: number;
+  readonly recordedRunCount: number;
   readonly driftedAxes: readonly string[];
   /** Neutral status label for the keeper's own verdict (never comparative). */
   readonly statusLabel: string;
@@ -70,13 +70,14 @@ function detailFor(evaluation: StabilityEvaluation): string {
     case "no_runs":
       return "No grow-outs recorded yet.";
     case "unconfirmed":
-      if (evaluation.runCount <= 1) return "Recorded once — re-grow evidence is still incomplete.";
-      if (evaluation.evidenceRunCount < evaluation.runCount) {
-        return `Only ${evaluation.evidenceRunCount} of ${evaluation.runCount} recorded grow-outs include trait evidence comparable to the baseline.`;
+      if (evaluation.recordedRunCount <= 1)
+        return "Recorded once — re-grow evidence is still incomplete.";
+      if (evaluation.runCount < evaluation.recordedRunCount) {
+        return `Only ${evaluation.runCount} of ${evaluation.recordedRunCount} recorded grow-outs include trait evidence comparable to the baseline; only those evidence-bearing grow-outs count toward the stability comparison.`;
       }
-      return `Every grow-out includes some baseline-comparable evidence, but no single baseline trait was re-scored across all ${evaluation.runCount} runs.`;
+      return `Every grow-out includes some baseline-comparable evidence, but no single baseline trait was re-scored across all ${evaluation.runCount} evidence-bearing runs.`;
     case "holding":
-      return `At least one baseline trait held within tolerance across ${evaluation.runCount} recorded grow-outs.`;
+      return `At least one baseline trait held within tolerance across ${evaluation.runCount} evidence-bearing grow-outs.`;
     case "drifting":
       return evaluation.driftedAxes.length > 0
         ? `Drifted on re-grow (${evaluation.driftedAxes.join(", ")}).`
@@ -120,7 +121,7 @@ export function buildStabilityDashboard(
       huntName,
       verdict: evaluation.verdict,
       runCount: evaluation.runCount,
-      evidenceRunCount: evaluation.evidenceRunCount,
+      recordedRunCount: evaluation.recordedRunCount,
       driftedAxes: evaluation.driftedAxes,
       statusLabel: STABILITY_VERDICT_LABELS[evaluation.verdict],
       detail: detailFor(evaluation),

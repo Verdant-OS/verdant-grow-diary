@@ -26,8 +26,7 @@ const read = (p: string) => fs.readFileSync(path.join(ROOT, p), "utf8");
 
 const VALID_ENV = {
   E2E_FIXTURE_MODE: "true",
-  E2E_GROW_1_PLANT_URL:
-    "https://test-account.example.com/plants/e2e-test-plant",
+  E2E_GROW_1_PLANT_URL: "https://test-account.example.com/plants/e2e-test-plant",
   E2E_FIXTURE_EXPECTED_GROW_NAME: "E2E Test Grow",
   E2E_FIXTURE_EXPECTED_TENT_NAME: "E2E Test Tent",
   E2E_FIXTURE_EXPECTED_PLANT_NAME: "E2E Test Plant",
@@ -94,8 +93,7 @@ describe("Disposable E2E fixture safety helpers", () => {
 
     const realProd = validateFixtureEnv({
       ...VALID_ENV,
-      E2E_GROW_1_PLANT_URL:
-        "https://verdantgrowdiary.com/plants/real-plant-id",
+      E2E_GROW_1_PLANT_URL: "https://verdantgrowdiary.com/plants/real-plant-id",
     });
     expect(realProd.ok).toBe(false);
     expect(realProd.errors.join("\n")).toMatch(/real|production/i);
@@ -136,36 +134,27 @@ describe("Disposable E2E fixture safety helpers", () => {
 
     // Grow optional: with no grow expected, a page that only shows
     // tent + plant must pass.
-    const noGrowExpected = pageTextMatchesFixture(
-      "E2E Test Tent — E2E Test Plant detail",
-      { grow: "", tent: "E2E Test Tent", plant: "E2E Test Plant" },
-    );
+    const noGrowExpected = pageTextMatchesFixture("E2E Test Tent — E2E Test Plant detail", {
+      grow: "",
+      tent: "E2E Test Tent",
+      plant: "E2E Test Plant",
+    });
     expect(noGrowExpected.ok).toBe(true);
 
     // Grow optional: when grow IS expected and missing from the page,
     // verification must fail.
-    const missingGrow = pageTextMatchesFixture(
-      "E2E Test Tent — E2E Test Plant detail",
-      expected,
-    );
+    const missingGrow = pageTextMatchesFixture("E2E Test Tent — E2E Test Plant detail", expected);
     expect(missingGrow.ok).toBe(false);
     expect(missingGrow.errors.join("\n")).toContain("E2E Test Grow");
 
     // Fails on generic "Test" / "Test" without expected names visible.
-    const genericTest = pageTextMatchesFixture(
-      "Test / Test",
-      expected,
-    );
+    const genericTest = pageTextMatchesFixture("Test / Test", expected);
     expect(genericTest.ok).toBe(false);
   });
 });
 
 describe("E2E fixture safety: source-level guardrails", () => {
-  const files = [
-    "e2e/lib/fixtureSafety.ts",
-    "e2e/lib/authedTest.ts",
-    "e2e/fixture-safety.spec.ts",
-  ];
+  const files = ["e2e/lib/fixtureSafety.ts", "e2e/lib/authedTest.ts", "e2e/fixture-safety.spec.ts"];
 
   it("fixture helpers and spec exist", () => {
     for (const f of files) {
@@ -183,15 +172,11 @@ describe("E2E fixture safety: source-level guardrails", () => {
         /update\s+plants|update\s+grows|update\s+tents|rename/i,
       );
       expect(body, `${f} must not use service_role`).not.toMatch(/service_role/i);
-      expect(body, `${f} must not bypass auth`).not.toMatch(
-        /skipAuth|bypassAuth|AUTH_BYPASS/,
-      );
+      expect(body, `${f} must not bypass auth`).not.toMatch(/skipAuth|bypassAuth|AUTH_BYPASS/);
       expect(body, `${f} must not hardcode credentials`).not.toMatch(
         /password\s*[:=]\s*["'][^"']+["']/i,
       );
-      expect(body, `${f} must not embed bearer tokens`).not.toMatch(
-        /eyJ[A-Za-z0-9_-]{20,}\./,
-      );
+      expect(body, `${f} must not embed bearer tokens`).not.toMatch(/eyJ[A-Za-z0-9_-]{20,}\./);
     }
   });
 
@@ -219,6 +204,21 @@ describe("E2E fixture safety: source-level guardrails", () => {
 describe("Workflow: fixture verification gates smoke", () => {
   const wf = read(".github/workflows/quicklog-smoke.yml");
 
+  it("runs the non-writing checklist before optional bootstrap, verification, and smoke", () => {
+    const checklist = wf.indexOf("- name: Print disposable E2E fixture checklist");
+    const bootstrap = wf.indexOf("- name: Bootstrap disposable E2E fixture");
+    const verify = wf.indexOf("- name: Verify disposable E2E fixture");
+    const smoke = wf.indexOf("- name: Run Quick Log Playwright smoke");
+
+    expect(checklist).toBeGreaterThan(0);
+    expect(checklist).toBeLessThan(bootstrap);
+    expect(bootstrap).toBeLessThan(verify);
+    expect(verify).toBeLessThan(smoke);
+    expect(wf).toMatch(
+      /- name: Print disposable E2E fixture checklist[\s\S]*?if: steps\.e2e_config\.outputs\.should_run == 'true'[\s\S]*?run: bun run e2e:fixture-checklist/,
+    );
+  });
+
   it("precheck requires the fixture safety vars by sanitized name (grow optional)", () => {
     for (const name of [
       '"vars.E2E_FIXTURE_MODE"',
@@ -229,33 +229,23 @@ describe("Workflow: fixture verification gates smoke", () => {
     }
     // Grow name must NOT be in the missing[] precheck — current UI has
     // no Grow page in the setup flow.
-    expect(wf).not.toMatch(
-      /missing\+=\("vars\.E2E_FIXTURE_EXPECTED_GROW_NAME"\)/,
-    );
+    expect(wf).not.toMatch(/missing\+=\("vars\.E2E_FIXTURE_EXPECTED_GROW_NAME"\)/);
     // No secret VALUES are echoed
     expect(wf).not.toMatch(/echo[^\n]*\$E2E_FIXTURE_/);
   });
 
   it("verify_fixture step runs before smoke and gates it", () => {
-    const verify = wf.match(
-      /-\s*name:\s*Verify disposable E2E fixture[\s\S]*?(?=\n {6}- name:)/,
-    );
+    const verify = wf.match(/-\s*name:\s*Verify disposable E2E fixture[\s\S]*?(?=\n {6}- name:)/);
     expect(verify, "Verify disposable E2E fixture step missing").toBeTruthy();
     const vBlock = verify![0];
     expect(vBlock).toMatch(/id:\s*verify_fixture/);
     expect(vBlock).toContain("bun run e2e:verify-fixture");
-    expect(vBlock).toMatch(
-      /if:\s*steps\.e2e_config\.outputs\.should_run\s*==\s*'true'/,
-    );
+    expect(vBlock).toMatch(/if:\s*steps\.e2e_config\.outputs\.should_run\s*==\s*'true'/);
 
-    const smoke = wf.match(
-      /-\s*name:\s*Run Quick Log Playwright smoke[\s\S]*?(?=\n {6}- name:)/,
-    );
+    const smoke = wf.match(/-\s*name:\s*Run Quick Log Playwright smoke[\s\S]*?(?=\n {6}- name:)/);
     const sBlock = smoke![0];
     // Smoke is gated on fixture success
-    expect(sBlock).toMatch(
-      /steps\.verify_fixture\.outcome\s*==\s*'success'/,
-    );
+    expect(sBlock).toMatch(/steps\.verify_fixture\.outcome\s*==\s*'success'/);
   });
 
   it("summary reports fixture validation status", () => {
@@ -277,9 +267,7 @@ describe("Workflow: fixture verification gates smoke", () => {
     expect(wf).not.toMatch(/pull_request_target/);
     expect(wf).not.toMatch(/service_role/i);
     expect(fs.existsSync(path.join(ROOT, "e2e/.auth/user.json"))).toBe(false);
-    expect(
-      fs.existsSync(path.join(ROOT, "e2e/.auth/session-storage.json")),
-    ).toBe(false);
+    expect(fs.existsSync(path.join(ROOT, "e2e/.auth/session-storage.json"))).toBe(false);
   });
 });
 
@@ -343,9 +331,7 @@ describe("Workflow: deep-link artifact uploads", () => {
       expect(block).toMatch(new RegExp(`\\$\\{${env}:-\\$fallback\\}`));
     }
     expect(block).toContain("[Playwright traces](${pw_traces_url})");
-    expect(block).toContain(
-      "[Playwright media (screenshots/videos)](${pw_media_url})",
-    );
+    expect(block).toContain("[Playwright media (screenshots/videos)](${pw_media_url})");
     expect(block).toContain("[Smoke report JSON](${smoke_json_url})");
     expect(block).toContain("[Smoke report TXT](${smoke_txt_url})");
     // No invented direct file URLs / no hardcoded run or artifact ids
@@ -362,9 +348,7 @@ describe("Package + docs wiring", () => {
       scripts: Record<string, string>;
     };
     expect(pkg.scripts["e2e:verify-fixture"]).toBeTruthy();
-    expect(pkg.scripts["e2e:verify-fixture"]).toContain(
-      "e2e/fixture-safety.spec.ts",
-    );
+    expect(pkg.scripts["e2e:verify-fixture"]).toContain("e2e/fixture-safety.spec.ts");
   });
 
   it("README documents the disposable E2E fixture and new artifacts", () => {

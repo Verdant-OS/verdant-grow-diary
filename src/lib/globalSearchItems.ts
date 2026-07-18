@@ -37,6 +37,7 @@ export const GLOBAL_SEARCH_ITEMS: readonly GlobalSearchItem[] = [
   { label: "AI Doctor", to: "/doctor", group: "Insight", keywords: ["coach", "diagnosis"] },
   { label: "Reports", to: "/reports", group: "Insight", keywords: ["learning", "hub"] },
   // Advanced
+  { label: "Pheno Hunt", to: "/pheno-hunts", group: "Advanced", keywords: ["pheno", "phenotype", "breeding", "keeper", "hunt"] },
   { label: "Lineage Repair", to: "/grow-lineage", group: "Advanced" },
   // Account
   { label: "Settings", to: "/settings", group: "Account" },

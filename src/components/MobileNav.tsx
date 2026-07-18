@@ -13,6 +13,7 @@ import {
   ClipboardCheck,
   LineChart,
   Users,
+  Dna,
   type LucideIcon,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -69,6 +70,7 @@ export const moreGroups: MoreGroup[] = [
     items: [
       { to: "/reports", label: "Reports", icon: LineChart },
       { to: "/grows", label: "My Grows", icon: Sprout },
+      { to: "/pheno-hunts", label: "Pheno Hunt", icon: Dna },
     ],
   },
   {

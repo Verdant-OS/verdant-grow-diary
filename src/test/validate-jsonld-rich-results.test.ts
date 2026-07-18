@@ -92,7 +92,7 @@ describe("validate-jsonld-rich-results", () => {
     expect(res.warnings.some((w) => w.message.includes("offers or aggregateRating"))).toBe(true);
   });
 
-  it("supports @graph arrays", () => {
+  it("supports @graph arrays with inherited @context", () => {
     const html = `<script type="application/ld+json">${JSON.stringify({
       "@context": "https://schema.org",
       "@graph": [
@@ -100,14 +100,19 @@ describe("validate-jsonld-rich-results", () => {
         { "@type": "WebSite", name: "V", url: "https://x.co/" },
       ],
     })}</script>`;
-    // @graph entries inherit context via top-level object; validator falls back to top-level context check
-    const res = validateHtmlDocument(html, "test.html");
-    // Graph child objects don't carry @context; we expect the @context warning per child
-    // The point of this test: extraction + iteration works without crashing and each child is validated.
-    expect(res.blockCount).toBe(1);
-    // Each graph node is validated separately
-    expect(res.issues.filter((i) => i.path.includes("@graph")).length).toBeGreaterThan(0);
+    const clean = validateHtmlDocument(html, "graph.html");
+    expect(clean.blockCount).toBe(1);
+    expect(clean.issues).toEqual([]);
+
+    // A child that violates its @type contract is still caught inside @graph.
+    const bad = `<script type="application/ld+json">${JSON.stringify({
+      "@context": "https://schema.org",
+      "@graph": [{ "@type": "WebSite", name: "V" /* missing url */ }],
+    })}</script>`;
+    const badRes = validateHtmlDocument(bad, "graph-bad.html");
+    expect(badRes.issues.some((i) => i.path.includes("@graph[0].url"))).toBe(true);
   });
+
 
   it("flags a partial </script sequence that would break HTML parsing if closed", () => {
     // Simulates a payload where a string contains "</scriptx" (no closing >).

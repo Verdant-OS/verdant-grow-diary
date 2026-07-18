@@ -22,6 +22,9 @@ import GlobalSearchDialog from "./GlobalSearchDialog";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 import { isEmailVerificationPending } from "@/lib/emailVerificationRules";
 import { resolveMobileQuickLogTarget } from "@/lib/quickLogRouteTargetRules";
+import { consumeQuickLogStartIntent } from "@/lib/startScreenPreferences";
+import { useCheckoutReturnCompletionTracking } from "@/hooks/useCheckoutReturnCompletionTracking";
+import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 
 export default function AppShell({ children }: { children?: ReactNode }) {
   const { user, loading } = useAuth();
@@ -38,7 +41,8 @@ export default function AppShell({ children }: { children?: ReactNode }) {
     location.search,
     location.hash,
   );
-  useRequireAuth(signedOutRedirect);
+  const { status: authStatus } = useRequireAuth(signedOutRedirect);
+  const { loading: entitlementLoading, entitlement } = useMyEntitlements();
   // Real persisted alerts (open only). RLS-scoped to the signed-in user.
   // Replaces the prior mock badge to remove the demo-vs-live mismatch.
   // Gated on a resolved session: an unauthenticated load (about to redirect
@@ -51,6 +55,20 @@ export default function AppShell({ children }: { children?: ReactNode }) {
   const [prefill, setPrefill] = useState<QuickLogPrefill | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const mobileQuickLogTarget = resolveMobileQuickLogTarget(location.pathname);
+
+  // This shell lives inside the route-level Suspense boundary. Tracking here
+  // waits for server-auth revalidation and the paid entitlement read as well
+  // as the authenticated destination subtree (including lazy chunks and route
+  // gates). A cached session, a loading/denied gate, or a free fallback must
+  // never count as proof that the grower reached the paid destination.
+  const paidDestinationReady =
+    !loading &&
+    Boolean(user) &&
+    authStatus === "authenticated" &&
+    !entitlementLoading &&
+    entitlement.isActive &&
+    entitlement.effectivePlanId !== "free";
+  useCheckoutReturnCompletionTracking(paidDestinationReady);
 
   // Global ⌘K / Ctrl+K shortcut to open the search palette.
   useEffect(() => {
@@ -73,6 +91,24 @@ export default function AppShell({ children }: { children?: ReactNode }) {
     window.addEventListener(PLANT_QUICKLOG_PREFILL_EVENT, onOpen as EventListener);
     return () => window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, onOpen as EventListener);
   }, []);
+
+  // The saved "Quick Log" start-screen choice carries a transparent one-shot
+  // query intent. Consume it only after AppShell is mounted, open the existing
+  // Quick Log dialog, then remove the marker so refresh/back does not reopen it.
+  useEffect(() => {
+    const nextSearch = consumeQuickLogStartIntent(location.search);
+    if (nextSearch === null) return;
+    setPrefill(null);
+    setOpenLog(true);
+    nav(
+      {
+        pathname: location.pathname,
+        search: nextSearch,
+        hash: location.hash,
+      },
+      { replace: true },
+    );
+  }, [location.hash, location.pathname, location.search, nav]);
 
   // Redirect from an effect, not during render: router state must not be
   // updated while AppShell is rendering (React update-during-render error,
@@ -164,7 +200,7 @@ export default function AppShell({ children }: { children?: ReactNode }) {
             </div>
           </header>
 
-          <SubscriptionPastDueBanner />
+          <SubscriptionPastDueBanner loading={entitlementLoading} entitlement={entitlement} />
 
           <main className="flex-1 px-4 md:px-6 lg:px-8 py-5 pb-28 md:pb-8 max-w-[1400px] w-full mx-auto">
             {isEmailVerificationPending(user) ? (

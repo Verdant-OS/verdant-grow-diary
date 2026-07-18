@@ -152,7 +152,9 @@ describe("PlantDetailAiDoctorLiveReview — credit_denied branch", () => {
       "href",
       "/pricing?returnTo=%2Fplants%2Fp1%3FtentId%3Dtent-1%23plant-ai-doctor-review",
     );
-    expect(trackFunnelEvent).toHaveBeenCalledTimes(1);
+    expect(trackFunnelEvent.mock.calls.filter(([name]) => name === "paywall_viewed")).toHaveLength(
+      1,
+    );
     expect(trackFunnelEvent).toHaveBeenCalledWith("paywall_viewed", {
       surface: "ai_doctor_limit",
     });
@@ -183,7 +185,9 @@ describe("PlantDetailAiDoctorLiveReview — credit_denied branch", () => {
       "href",
       "/pricing?returnTo=%2Fplants%2Fp1%3FtentId%3Dtent-1%23plant-ai-doctor-review",
     );
-    expect(trackFunnelEvent).toHaveBeenCalledTimes(1);
+    expect(trackFunnelEvent.mock.calls.filter(([name]) => name === "paywall_viewed")).toHaveLength(
+      1,
+    );
     expect(trackFunnelEvent).toHaveBeenCalledWith("paywall_viewed", {
       surface: "ai_doctor_limit",
     });
@@ -200,7 +204,10 @@ describe("PlantDetailAiDoctorLiveReview — credit_denied branch", () => {
       expect(
         screen.queryByTestId("plant-ai-doctor-live-review-credit-denied-paywall-link"),
       ).toBeNull();
-      expect(trackFunnelEvent).not.toHaveBeenCalled();
+      expect(trackFunnelEvent).not.toHaveBeenCalledWith("paywall_viewed", expect.anything());
+      expect(trackFunnelEvent).toHaveBeenCalledWith("ai_doctor_review_started", {
+        surface: "standard",
+      });
     },
   );
 });

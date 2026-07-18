@@ -1,7 +1,7 @@
 /**
  * funnelAnalytics — module unit tests.
  *
- * Covers the ten-event union pin, gtag no-op safety, the structural
+ * Covers the event union pin, gtag no-op safety, the structural
  * param allowlist (free text can never reach the tracker), and the
  * verdant:analytics CustomEvent mirror.
  */
@@ -24,18 +24,24 @@ afterEach(() => {
 });
 
 describe("event name contract", () => {
-  it("pins exactly the ten growth-calendar funnel events, in order", () => {
+  it("pins the complete growth-calendar funnel events, in order", () => {
     expect([...FUNNEL_EVENTS]).toEqual([
       "signup",
+      "grow_created",
       "tent_created",
       "plant_created",
       "quick_log_saved",
+      "csv_import_started",
       "csv_import_completed",
       "csv_history_ai_doctor_clicked",
+      "ai_doctor_review_started",
       "historical_ai_review_started",
+      "ai_doctor_result_received",
+      "ai_doctor_session_saved",
       "paywall_viewed",
       "checkout_started",
       "subscription_activated",
+      "checkout_return_completed",
     ]);
   });
 

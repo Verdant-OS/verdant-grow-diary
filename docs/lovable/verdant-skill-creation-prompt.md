@@ -302,12 +302,25 @@ Primary metrics:
 - 3 active creator integrations
 - 3–5% free-to-paid conversion
 
-The ten privacy-safe funnel events are:
+The privacy-safe funnel events are:
 
-`signup → tent_created → plant_created → quick_log_saved →
-csv_import_completed → csv_history_ai_doctor_clicked →
-historical_ai_review_started → paywall_viewed → checkout_started →
-subscription_activated`
+`signup → grow_created → tent_created → plant_created → quick_log_saved →
+csv_import_started → csv_import_completed → csv_history_ai_doctor_clicked →
+ai_doctor_review_started → ai_doctor_result_received → ai_doctor_session_saved → paywall_viewed →
+checkout_started → subscription_activated → checkout_return_completed`
+
+Historical reviews additionally emit `historical_ai_review_started` as a
+companion branch marker; standard reviews do not.
+
+For activation reporting, count `csv_import_completed` only when `rows > 0`;
+`rows: 0` is a valid duplicate-only completion. The AI events above describe
+the canonical plant-detail `ai-doctor-review` path, not the separate AI Coach
+invocation path.
+
+`subscription_activated` may include only the closed return surface
+`ai_doctor | pheno | other`. `checkout_return_completed` currently covers
+`ai_doctor | other`; defer Pheno route completion until its gate exposes a
+shared committed-ready signal. Do not infer completion from route arrival.
 
 Analytics must be fire-and-forget, never block product behavior, and never
 include emails, notes, nicknames, user IDs, plant IDs, row IDs, or free text.

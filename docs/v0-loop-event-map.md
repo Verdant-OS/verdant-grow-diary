@@ -11,18 +11,61 @@ from the more detailed internal/PostHog taxonomy that remains aspirational.
 The shipped privacy-safe growth-calendar sequence is:
 
 ```text
-signup → tent_created → plant_created → quick_log_saved →
-csv_import_completed → csv_history_ai_doctor_clicked →
-historical_ai_review_started → paywall_viewed → checkout_started →
-subscription_activated
+signup → grow_created → tent_created → plant_created → quick_log_saved →
+csv_import_started → csv_import_completed →
+csv_history_ai_doctor_clicked → ai_doctor_review_started →
+ai_doctor_result_received → ai_doctor_session_saved → paywall_viewed → checkout_started →
+subscription_activated → checkout_return_completed
 ```
 
-The two CSV-to-AI handoff events preserve the same narrow client analytics
-boundary. `csv_history_ai_doctor_clicked` records the grower's explicit CTA
-click with only `surface: "imported_history"`. `historical_ai_review_started`
-records an accepted initial historical-review start with no properties; blocked
-starts and retries do not emit it. Neither event includes IDs, CSV values,
-filenames, notes, plant details, or other free text.
+Historical reviews additionally emit `historical_ai_review_started` beside the
+generic start event. It is a historical-only branch marker, not a step that
+standard reviews pass through.
+
+`grow_created`, `tent_created`, and `plant_created` emit only after their
+respective inserts succeed. They carry no row identifiers or grower-entered
+names. `csv_import_started` records an explicit modal-open action;
+`csv_import_completed` records only a successful persistence result and the
+numeric inserted-row count. The difference measures import abandonment without
+capturing filenames, providers, timestamps, values, or file contents. A
+duplicate-only import can complete with `rows: 0`; count an activated import
+only when `rows > 0`, while retaining zero-row completions as a useful no-op
+completion diagnostic.
+
+The CSV-to-AI handoff preserves the same narrow client analytics boundary.
+`csv_history_ai_doctor_clicked` records the grower's explicit CTA click with
+only `surface: "imported_history"`. `ai_doctor_review_started` records an
+accepted initial start with the closed `standard | historical_review` surface.
+For historical reviews, `historical_ai_review_started` also records the accepted
+initial historical-review start with no properties; blocked starts and retries
+do not emit either start event. The accepted mode is frozen at start so a
+mid-request context refresh cannot relabel the result. `ai_doctor_result_received`
+is emitted only after a contract-valid result is displayed, and
+`ai_doctor_session_saved` only after the durable history insert returns a
+session ID. Both carry only the same frozen review surface and never the session
+ID itself.
+
+These AI Doctor funnel events cover the canonical plant-detail
+`ai-doctor-review` path. AI Coach has a separate invocation path and is not
+claimed as measured by this client sequence; add its server-authoritative usage
+telemetry separately before including Coach in conversion reporting.
+
+`subscription_activated` requires both the server-resolved paid entitlement and
+a fresh same-device checkout-start marker. This intentionally undercounts when
+browser storage is unavailable instead of treating an existing paid grower's
+direct success-page visit as a new conversion. When a sanitized return exists,
+the activation may additionally carry only the closed `ai_doctor | pheno |
+other` surface.
+
+With that same evidence, Checkout Success carries a one-shot router-state
+completion marker for `ai_doctor | other`. The destination-mounted authenticated
+app shell emits `checkout_return_completed` only after server auth revalidation,
+a resolved active paid entitlement, and the lazy destination subtree commit,
+then immediately consumes the marker. Pheno activation is attributed at the
+confirmed checkout, but its route-completion event is deliberately deferred:
+the independently-owned Pheno gate does not yet expose a shared committed-ready
+signal, so route arrival alone would be an unsafe success claim. No event emits
+the path, query, hash, grow ID, tent ID, plant ID, or other route content.
 
 `quick_log_saved` is emitted after a newly confirmed Quick Log write. The
 only property is `event_type`, selected from this closed, non-content enum:
@@ -231,19 +274,24 @@ post-grow learning.
 | `has_photo`            | boolean | Did the grower attach a visual reference?                                                                                                                                            |
 | `loop_step`            | const   | `"action_queue"`                                                                                                                                                                     |
 
-## Required context properties on downstream V0 events
+## Future internal context properties on downstream V0 events
 
-Grow, Tent, and Plant are **required context properties**, not necessarily
-separate V0 events yet. Every downstream V0 event that touches a plant,
-tent, or grow MUST include:
+This section belongs only to the aspirational internal/PostHog taxonomy above.
+It does not describe the shipped GA contract. The shipped privacy-safe create
+and downstream events intentionally carry no grow, tent, plant, session, or
+user IDs.
+
+In a future internal implementation, Grow, Tent, and Plant would be **required
+context properties** on every downstream event that touches a plant, tent, or
+grow:
 
 - `grow_id` (string) — the top-level grow context.
 - `tent_id` (string) — the tent environment context.
 - `plant_id` (string \| null) — the specific plant, or null for tent-level scope.
 
-This ensures funnel analysis can trace: **Grow → Tent → Plant → Loop Step**
-without needing discrete `grow_created`, `tent_created`, or `plant_created`
-events in V0.
+This would let an access-controlled internal funnel trace **Grow → Tent → Plant
+→ Loop Step**. It does not remove or alter the shipped aggregate
+`grow_created`, `tent_created`, and `plant_created` events, which contain no IDs.
 
 ---
 

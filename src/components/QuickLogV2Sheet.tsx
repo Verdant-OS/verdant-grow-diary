@@ -147,6 +147,15 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [feedingDefaultsApplied, setFeedingDefaultsApplied] = useState(false);
+  // Two guards against a duplicate main-log commit, both refs so the checks are
+  // synchronous. `committedMainLogRef` holds the committed result so a
+  // SEQUENTIAL Retry (after a companion-photo failure) re-attempts only the
+  // photo and never re-commits (the save has no idempotency key); it is cleared
+  // on open and whenever the target/action changes. `saveInFlightRef` blocks a
+  // CONCURRENT re-entry (e.g. a double-tap during the photo-upload window,
+  // before `saving` flips true) so two overlapping runs cannot both commit.
+  const committedMainLogRef = useRef<Awaited<ReturnType<typeof save>> | null>(null);
+  const saveInFlightRef = useRef(false);
 
   const options = useMemo(() => buildQuickLogV2TargetOptions(tents, plants), [tents, plants]);
 
@@ -217,8 +226,16 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
       setLocalError(null);
       setSaveStatus("");
       resetPhotoSelection();
+      committedMainLogRef.current = null;
     }
   }, [open, defaultTargetKey]);
+
+  // A change of target or action means any earlier committed main log no
+  // longer matches the current intent, so the next save must commit fresh
+  // rather than reuse the prior commit.
+  useEffect(() => {
+    committedMainLogRef.current = null;
+  }, [form.selectedKey, form.action]);
 
   // One-shot prefill of the feeding form with last-used defaults. Runs only
   // when the Feed action is active, the form is still pristine, defaults
@@ -286,7 +303,7 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
     return { ok: true, path };
   }
 
-  const handleSave = async () => {
+  const runSave = async () => {
     setLocalError(null);
     setSaveStatus("");
     const resolved = resolveQuickLogV2Target(options, form.selectedKey);
@@ -393,18 +410,24 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
       return;
     }
 
-    setSaveStatus("Saving log…");
-    const res = await save(built.payload);
-    if (!res.ok) {
-      if (uploadedPath) {
-        await supabase.storage
-          .from("diary-photos")
-          .remove([uploadedPath])
-          .catch(() => {});
+    // Reuse the already-committed main log if this is a Retry after a
+    // companion-photo failure; otherwise commit it now and remember it.
+    let res = committedMainLogRef.current;
+    if (!res) {
+      setSaveStatus("Saving log…");
+      res = await save(built.payload);
+      if (!res.ok) {
+        if (uploadedPath) {
+          await supabase.storage
+            .from("diary-photos")
+            .remove([uploadedPath])
+            .catch(() => {});
+        }
+        setLocalError(reasonToMessage(res.reason || "save_failed"));
+        setSaveStatus("");
+        return;
       }
-      setLocalError(reasonToMessage(res.reason || "save_failed"));
-      setSaveStatus("");
-      return;
+      committedMainLogRef.current = res;
     }
 
     if (uploadedPath && resolved.growId) {
@@ -456,8 +479,23 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
       growEventId: (res as { growEventId?: string | null }).growEventId ?? null,
       source: "quick_log_v2",
     });
+    committedMainLogRef.current = null;
     resetPhotoSelection();
     onOpenChange(false);
+  };
+
+  // Non-reentrant entry point for both the Save and Retry buttons. A second
+  // click while a save is mid-flight — e.g. a double-tap during the photo
+  // upload, before `saving` flips true — must not start a second commit. The
+  // ref is set synchronously before any await, so an overlapping call bails.
+  const handleSave = async () => {
+    if (saveInFlightRef.current) return;
+    saveInFlightRef.current = true;
+    try {
+      await runSave();
+    } finally {
+      saveInFlightRef.current = false;
+    }
   };
 
   return (

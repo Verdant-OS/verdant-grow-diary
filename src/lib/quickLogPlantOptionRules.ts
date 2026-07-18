@@ -20,7 +20,7 @@
  * Read-only, pure logic. No I/O, no writes, no device control.
  */
 
-interface MinimalQuickLogPlant {
+export interface MinimalQuickLogPlant {
   id: string;
   name?: string | null;
   strain?: string | null;
@@ -54,9 +54,7 @@ export function filterQuickLogPlantOptions<T extends MinimalQuickLogPlant>(
 ): T[] {
   const active = plants.filter((p) => !isInactiveQuickLogPlant(p));
   if (!activeGrowId) return active;
-  return active.filter(
-    (p) => p.grow_id === activeGrowId || p.grow_id == null,
-  );
+  return active.filter((p) => p.grow_id === activeGrowId || p.grow_id == null);
 }
 
 /**

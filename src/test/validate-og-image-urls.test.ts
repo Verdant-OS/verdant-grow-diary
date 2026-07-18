@@ -8,7 +8,7 @@
  * exists in package.json; these tests exercise the pure module.
  */
 import { describe, expect, it, beforeAll, afterAll } from "vitest";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -146,9 +146,13 @@ describe("validate-og-image-urls: validateImageUrl", () => {
 
   it("rejects http and non-canonical origins", () => {
     const httpIssues = validateImageUrl(args("http://verdantgrowdiary.com/og/home.png"));
-    expect(httpIssues.some((i: { message: string }) => /protocol must be https/.test(i.message))).toBe(true);
+    expect(
+      httpIssues.some((i: { message: string }) => /protocol must be https/.test(i.message)),
+    ).toBe(true);
     const originIssues = validateImageUrl(args("https://cdn.example.com/og/home.png"));
-    expect(originIssues.some((i: { message: string }) => /origin must be/.test(i.message))).toBe(true);
+    expect(originIssues.some((i: { message: string }) => /origin must be/.test(i.message))).toBe(
+      true,
+    );
   });
 
   it("rejects URLs with query strings or fragments (cache poisoners)", () => {
@@ -171,7 +175,9 @@ describe("validate-og-image-urls: validateImageUrl", () => {
 
   it("rejects extension/magic-byte mismatch (content-type would be wrong)", () => {
     const issues = validateImageUrl(args(`${ORIGIN}/og/mismatch.jpg`));
-    expect(issues.some((i: { message: string }) => /content-type mismatch/.test(i.message))).toBe(true);
+    expect(issues.some((i: { message: string }) => /content-type mismatch/.test(i.message))).toBe(
+      true,
+    );
   });
 });
 
@@ -188,7 +194,7 @@ describe("validate-og-image-urls: end-to-end", () => {
     // produces it; this asserts the real artifact when it's around.
     const projectDist = join(process.cwd(), "dist");
     try {
-      const stat = require("node:fs").statSync(projectDist);
+      const stat = statSync(projectDist);
       if (!stat.isDirectory()) return;
     } catch {
       return;

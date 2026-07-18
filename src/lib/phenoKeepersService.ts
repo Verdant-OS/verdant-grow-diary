@@ -20,6 +20,10 @@ import {
   type Channel,
 } from "@/lib/genetics/breedingReproductionRules";
 import { hasReversal } from "@/lib/phenoReversalsService";
+import {
+  sanitizeStabilityRuns,
+  type StabilityRun,
+} from "@/lib/phenoStabilityRunRules";
 
 export interface KeeperRow {
   readonly id: string;
@@ -28,6 +32,9 @@ export interface KeeperRow {
   readonly keeperName: string;
   readonly note: string | null;
   readonly createdAt: string | null;
+  /** Grower-recorded grow-outs of this keeper's clone (re-sanitized on read).
+   * Optional so older fixtures / a not-yet-migrated read degrade to []. */
+  readonly stabilityRuns?: StabilityRun[];
 }
 
 export interface CloneRow {
@@ -100,7 +107,7 @@ export async function listKeepersForHunt(huntId: string): Promise<KeeperRow[]> {
   if (!id) return [];
   const { data, error } = await phenoDb
     .from("pheno_keepers")
-    .select("id, hunt_id, source_plant_id, keeper_name, note, created_at")
+    .select("id, hunt_id, source_plant_id, keeper_name, note, created_at, stability_runs")
     .eq("hunt_id", id)
     .order("created_at", { ascending: true });
   if (error || !data) return [];
@@ -111,7 +118,40 @@ export async function listKeepersForHunt(huntId: string): Promise<KeeperRow[]> {
     keeperName: r.keeper_name,
     note: r.note ?? null,
     createdAt: r.created_at ?? null,
+    stabilityRuns: sanitizeStabilityRuns(
+      Array.isArray((r as { stability_runs?: unknown }).stability_runs)
+        ? ((r as { stability_runs?: unknown[] }).stability_runs as unknown[])
+        : null,
+    ),
   }));
+}
+
+/**
+ * Replace a keeper's stability runs (the grower edits the ledger as a
+ * whole set). Sanitized before write; RLS-scoped to the owner via the
+ * keeper's own owner policy. Reads the row back so a silently-blocked
+ * write (lapsed plan, cross-user keeper id) surfaces as an error rather
+ * than a false success.
+ */
+export async function updateKeeperStabilityRuns(input: {
+  keeperId: string;
+  runs: readonly unknown[];
+}): Promise<SaveResult> {
+  const userId = await currentUserId();
+  if (!userId) return { ok: false, error: "Sign in to save stability runs." };
+  const keeperId = typeof input.keeperId === "string" ? input.keeperId.trim() : "";
+  if (!keeperId) return { ok: false, error: "Missing keeper id." };
+  const runs = sanitizeStabilityRuns(input.runs);
+  const { data, error } = await phenoDb
+    .from("pheno_keepers")
+    .update({ stability_runs: runs } as never)
+    .eq("id", keeperId)
+    .eq("user_id", userId)
+    .select("id")
+    .maybeSingle();
+  if (error) return { ok: false, error: error.message };
+  if (!data) return { ok: false, error: "Stability runs were not saved (keeper missing or write rejected)." };
+  return { ok: true, id: data.id as string };
 }
 
 /** Add a clone/accession node under a keeper (optionally under a parent clone). */

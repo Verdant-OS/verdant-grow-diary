@@ -151,6 +151,7 @@ type PhenoKeeperRow = {
   source_plant_id: string;
   keeper_name: string;
   note: string | null;
+  stability_runs: unknown;
   created_at: string;
   updated_at: string;
 };
@@ -322,7 +323,10 @@ export interface PhenoDatabase {
         | "created_at"
         | "updated_at"
       >;
-      pheno_keepers: Tbl<PhenoKeeperRow, "id" | "note" | "created_at" | "updated_at">;
+      pheno_keepers: Tbl<
+        PhenoKeeperRow,
+        "id" | "note" | "stability_runs" | "created_at" | "updated_at"
+      >;
       pheno_keeper_clones: Tbl<
         PhenoKeeperCloneRow,
         | "id"

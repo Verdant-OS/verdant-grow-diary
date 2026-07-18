@@ -68,9 +68,10 @@ review.
 - [ ] Open Graph and Twitter card tags resolve to the brand logo image.
 - [ ] `public/robots.txt` available at `/robots.txt` and contains a
       `Sitemap: https://verdantgrowdiary.com/sitemap.xml` directive.
-- [ ] `public/sitemap.xml` available at `/sitemap.xml` and lists only
-      safe public URLs (`/` and `/welcome`). Private routes are
-      excluded.
+- [ ] `public/sitemap.xml` available at `/sitemap.xml`, matches the shipped
+      canonical public-route inventory (landing, pricing, founder, public
+      explainers/tools, guides, cultivars, and legal pages), and excludes all
+      authenticated/private application routes.
 - [ ] `public/site.webmanifest` resolves and references the brand logo.
 
 ## 5. Documentation review
@@ -84,6 +85,9 @@ review.
 - [ ] [`docs/architecture.md`](./architecture.md) public-route notes remain
       accurate (`/` is session-aware, `/welcome` is always public, and private
       product routes stay auth-gated).
+- [ ] [`docs/growth/verdant-60-day-growth-execution-calendar.md`](./growth/verdant-60-day-growth-execution-calendar.md)
+      has a recorded Day 0 deployment and the current post-publish baseline
+      before acquisition volume increases.
 
 ## 6. Rollback
 

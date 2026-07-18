@@ -6,9 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "postbuild": "node scripts/validate-jsonld-rich-results.mjs dist",
+    "postbuild": "node scripts/validate-jsonld-rich-results.mjs dist && node scripts/validate-og-image-urls.mjs dist",
     "build:dev": "vite build --mode development",
     "check:jsonld": "node scripts/validate-jsonld-rich-results.mjs dist",
+    "check:og-images": "node scripts/validate-og-image-urls.mjs dist",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.app.json --noEmit",
     "lighthouse": "node scripts/run-lighthouse-ci.mjs",

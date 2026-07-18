@@ -1,7 +1,7 @@
 /**
  * funnelAnalytics — module unit tests.
  *
- * Covers the eight-event union pin, gtag no-op safety, the structural
+ * Covers the ten-event union pin, gtag no-op safety, the structural
  * param allowlist (free text can never reach the tracker), and the
  * verdant:analytics CustomEvent mirror.
  */
@@ -24,13 +24,15 @@ afterEach(() => {
 });
 
 describe("event name contract", () => {
-  it("pins exactly the eight growth-calendar funnel events, in order", () => {
+  it("pins exactly the ten growth-calendar funnel events, in order", () => {
     expect([...FUNNEL_EVENTS]).toEqual([
       "signup",
       "tent_created",
       "plant_created",
       "quick_log_saved",
       "csv_import_completed",
+      "csv_history_ai_doctor_clicked",
+      "historical_ai_review_started",
       "paywall_viewed",
       "checkout_started",
       "subscription_activated",
@@ -38,13 +40,7 @@ describe("event name contract", () => {
   });
 
   it("pins the param-key allowlist", () => {
-    expect([...FUNNEL_PARAM_KEYS]).toEqual([
-      "surface",
-      "plan",
-      "method",
-      "event_type",
-      "rows",
-    ]);
+    expect([...FUNNEL_PARAM_KEYS]).toEqual(["surface", "plan", "method", "event_type", "rows"]);
   });
 });
 
@@ -71,24 +67,16 @@ describe("sanitizeFunnelParams — structural privacy allowlist", () => {
   });
 
   it("drops free-text-looking strings even on allowed keys (whitespace)", () => {
-    expect(
-      sanitizeFunnelParams({ plan: "my favorite plan ever" }),
-    ).toEqual({});
+    expect(sanitizeFunnelParams({ plan: "my favorite plan ever" })).toEqual({});
   });
 
   it("drops over-long strings even on allowed keys", () => {
-    expect(
-      sanitizeFunnelParams({ plan: "x".repeat(33) }),
-    ).toEqual({});
-    expect(
-      sanitizeFunnelParams({ plan: "x".repeat(32) }),
-    ).toEqual({ plan: "x".repeat(32) });
+    expect(sanitizeFunnelParams({ plan: "x".repeat(33) })).toEqual({});
+    expect(sanitizeFunnelParams({ plan: "x".repeat(32) })).toEqual({ plan: "x".repeat(32) });
   });
 
   it("drops NaN/Infinity numbers and empty strings", () => {
-    expect(
-      sanitizeFunnelParams({ rows: Number.NaN, plan: "" }),
-    ).toEqual({});
+    expect(sanitizeFunnelParams({ rows: Number.NaN, plan: "" })).toEqual({});
     expect(sanitizeFunnelParams({ rows: Infinity })).toEqual({});
   });
 
@@ -125,12 +113,8 @@ describe("trackFunnelEvent — emission", () => {
     const listener = (e: Event) => seen.push((e as CustomEvent).detail);
     window.addEventListener(PRICING_ANALYTICS_EVENT, listener);
     try {
-      expect(() =>
-        trackFunnelEvent("paywall_viewed", { surface: "pricing" }),
-      ).not.toThrow();
-      expect(seen).toEqual([
-        { name: "paywall_viewed", props: { surface: "pricing" } },
-      ]);
+      expect(() => trackFunnelEvent("paywall_viewed", { surface: "pricing" })).not.toThrow();
+      expect(seen).toEqual([{ name: "paywall_viewed", props: { surface: "pricing" } }]);
     } finally {
       window.removeEventListener(PRICING_ANALYTICS_EVENT, listener);
     }
@@ -142,9 +126,7 @@ describe("trackFunnelEvent — emission", () => {
     window.addEventListener(PRICING_ANALYTICS_EVENT, listener);
     try {
       trackFunnelEvent("subscription_activated", { plan: "pro_annual" });
-      expect(seen).toEqual([
-        { name: "subscription_activated", props: { plan: "pro_annual" } },
-      ]);
+      expect(seen).toEqual([{ name: "subscription_activated", props: { plan: "pro_annual" } }]);
     } finally {
       window.removeEventListener(PRICING_ANALYTICS_EVENT, listener);
     }

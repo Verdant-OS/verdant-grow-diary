@@ -302,10 +302,11 @@ Primary metrics:
 - 3 active creator integrations
 - 3–5% free-to-paid conversion
 
-The eight privacy-safe funnel events are:
+The ten privacy-safe funnel events are:
 
 `signup → tent_created → plant_created → quick_log_saved →
-csv_import_completed → paywall_viewed → checkout_started →
+csv_import_completed → csv_history_ai_doctor_clicked →
+historical_ai_review_started → paywall_viewed → checkout_started →
 subscription_activated`
 
 Analytics must be fire-and-forget, never block product behavior, and never

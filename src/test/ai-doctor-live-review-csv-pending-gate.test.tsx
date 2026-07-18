@@ -34,6 +34,9 @@ vi.mock("@/integrations/supabase/client", () => ({
   },
 }));
 
+const trackFunnelEvent = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/funnelAnalytics", () => ({ trackFunnelEvent }));
+
 const itemsRef: { current: TimelineMemoryItem[] } = { current: [] };
 vi.mock("@/hooks/useTimelineMemory", () => ({
   useTimelineMemory: () => ({ items: itemsRef.current, isLoading: false }),
@@ -213,6 +216,7 @@ beforeEach(() => {
   sensorQueryState.csvFetching = false;
   sensorQueryState.currentRows = [];
   sensorQueryState.currentStatus = "success";
+  trackFunnelEvent.mockClear();
 });
 
 describe("CSV history pending/error gating", () => {
@@ -221,6 +225,8 @@ describe("CSV history pending/error gating", () => {
     mount();
     const start = screen.getByTestId("plant-ai-doctor-live-review-start") as HTMLButtonElement;
     expect(start.disabled).toBe(true);
+    fireEvent.click(start);
+    expect(trackFunnelEvent).not.toHaveBeenCalled();
   });
 
   it("holds the start button while cached-empty CSV history is refetching", () => {
@@ -239,6 +245,7 @@ describe("CSV history pending/error gating", () => {
     expect(start.disabled).toBe(false);
     fireEvent.click(start);
     await waitFor(() => expect(invoke).toHaveBeenCalledTimes(1));
+    expect(trackFunnelEvent).not.toHaveBeenCalled();
     const request = invoke.mock.calls[0][1].body;
     expect(request.grow_id).toBe(GROW_ID);
     const packet = request.packet as {
@@ -364,8 +371,20 @@ describe("CSV-first historical review eligibility", () => {
 
     // Merely rendering imported history never spends a credit or runs AI.
     expect(invoke).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByTestId("plant-ai-doctor-live-review-start"));
+    expect(trackFunnelEvent).not.toHaveBeenCalled();
+    const start = screen.getByTestId("plant-ai-doctor-live-review-start");
+    fireEvent.click(start);
+    fireEvent.click(start);
     await waitFor(() => expect(invoke).toHaveBeenCalledTimes(1));
+    expect(trackFunnelEvent).toHaveBeenCalledTimes(1);
+    expect(trackFunnelEvent).toHaveBeenCalledWith("historical_ai_review_started");
+
+    await waitFor(() =>
+      expect(screen.getByTestId("plant-ai-doctor-live-review-retry")).toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByTestId("plant-ai-doctor-live-review-retry"));
+    await waitFor(() => expect(invoke).toHaveBeenCalledTimes(2));
+    expect(trackFunnelEvent).toHaveBeenCalledTimes(1);
 
     const packet = invoke.mock.calls[0][1].body.packet;
     expect(packet.readiness.state).toBe("insufficient");

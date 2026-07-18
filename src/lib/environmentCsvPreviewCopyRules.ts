@@ -11,6 +11,9 @@ export const CSV_IMPORT_DESCRIPTION =
 
 export const CSV_IMPORT_READING_COPY = "Reading your environment export…";
 
+/** Confirm intent only. The modal stays open until persistence completes. */
+export const CSV_IMPORT_CONFIRM_LABEL = "Import CSV history";
+
 /**
  * Post-import completion note. Rendered verbatim: imported rows are
  * historical background, never live telemetry, and AI Doctor still

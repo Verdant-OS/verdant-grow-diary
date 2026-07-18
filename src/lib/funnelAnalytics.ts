@@ -1,8 +1,9 @@
 /**
- * Funnel analytics — the eight growth-calendar conversion events:
+ * Funnel analytics — the ten growth-calendar conversion events:
  *
  *   signup → tent_created → plant_created → quick_log_saved →
- *   csv_import_completed → paywall_viewed → checkout_started →
+ *   csv_import_completed → csv_history_ai_doctor_clicked →
+ *   historical_ai_review_started → paywall_viewed → checkout_started →
  *   subscription_activated
  *
  * Design constraints (grower-privacy first):
@@ -25,6 +26,8 @@ export const FUNNEL_EVENTS = [
   "plant_created",
   "quick_log_saved",
   "csv_import_completed",
+  "csv_history_ai_doctor_clicked",
+  "historical_ai_review_started",
   "paywall_viewed",
   "checkout_started",
   "subscription_activated",

@@ -31,6 +31,7 @@ import QuickLogGroupedTimelineSection from "@/components/QuickLogGroupedTimeline
 
 import ImportedSensorHistoryPanel from "@/components/ImportedSensorHistoryPanel";
 import { resolveImportedSensorHistoryReadStatus } from "@/lib/importedSensorHistoryViewModel";
+import { resolveImportedHistoryHandoffReadStatus } from "@/lib/importedSensorHistoryAiDoctorHandoffRules";
 import TentSensorWebhookSettingsCard from "@/components/TentSensorWebhookSettingsCard";
 import TentBridgeTokensCard from "@/components/TentBridgeTokensCard";
 import TentSensorSourceHealthCard from "@/components/TentSensorSourceHealthCard";
@@ -39,10 +40,7 @@ import { buildSensorSnapshotReadModel } from "@/lib/sensors/sensorSnapshotReadMo
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
 import { useImportedSensorHistory } from "@/hooks/useImportedSensorHistory";
 import { useGrowTent, useGrowPlants, getGrowDataMeta } from "@/hooks/useGrowData";
-import {
-  buildTentSensorChartSeries,
-  buildTentSensorHeaderView,
-} from "@/lib/tentSensorChartRules";
+import { buildTentSensorChartSeries, buildTentSensorHeaderView } from "@/lib/tentSensorChartRules";
 import {
   convertCelsiusForDisplay,
   getTemperatureUnitSymbol,
@@ -88,7 +86,6 @@ import {
   applyTentPlantTabsUrlPlantId,
 } from "@/lib/tentPlantTabsUrlState";
 
-
 import { plantDetailPath, tentsPath } from "@/lib/routes";
 import StartPhenoHuntButton from "@/components/StartPhenoHuntButton";
 
@@ -108,9 +105,7 @@ export default function TentDetail() {
   };
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedPlantTabId, setSelectedPlantTabIdState] = useState<string | null>(
-    () =>
-      readTentPlantTabsUrlPlantId(searchParams) ??
-      readTentPlantTabsSelectedPlantId(id ?? null),
+    () => readTentPlantTabsUrlPlantId(searchParams) ?? readTentPlantTabsSelectedPlantId(id ?? null),
   );
   // Track which tent we've initialized for so re-renders don't clobber state
   // with the URL value mid-session.
@@ -119,21 +114,21 @@ export default function TentDetail() {
     if (initializedTentIdRef.current === (id ?? null)) return;
     initializedTentIdRef.current = id ?? null;
     setSelectedPlantTabIdState(
-      readTentPlantTabsUrlPlantId(searchParams) ??
-        readTentPlantTabsSelectedPlantId(id ?? null),
+      readTentPlantTabsUrlPlantId(searchParams) ?? readTentPlantTabsSelectedPlantId(id ?? null),
     );
   }, [id, searchParams]);
   const setSelectedPlantTabId = (next: string | null) => {
     setSelectedPlantTabIdState(next);
     writeTentPlantTabsSelectedPlantId(id ?? null, next);
-    setSearchParams(
-      (current) => applyTentPlantTabsUrlPlantId(current, next),
-      { replace: true },
-    );
+    setSearchParams((current) => applyTentPlantTabsUrlPlantId(current, next), { replace: true });
   };
 
   const { data: tent, isLoading, isError, refetch } = useGrowTent(id);
-  const { data: activePlants = [] } = useGrowPlants(id);
+  const {
+    data: activePlants = [],
+    isFetching: activePlantsIsFetching,
+    isError: activePlantsIsError,
+  } = useGrowPlants(id);
   const { data: allPlants = [] } = useGrowPlants(id, undefined, { includeArchived: true });
   const { data: readings = [] } = useSensorReadings(id);
   const importedHistory = useImportedSensorHistory(id);
@@ -153,20 +148,13 @@ export default function TentDetail() {
     if (selectedPlantTabId == null) return;
     if (!Array.isArray(allPlants) || allPlants.length === 0) return;
     const match = allPlants.find((p) => p.id === selectedPlantTabId);
-    const isVisible = match
-      ? rosterIncludeArchived || match.isArchived !== true
-      : false;
+    const isVisible = match ? rosterIncludeArchived || match.isArchived !== true : false;
     if (!isVisible) {
       setSelectedPlantTabIdState(null);
       writeTentPlantTabsSelectedPlantId(id ?? null, null);
-      setSearchParams(
-        (current) => applyTentPlantTabsUrlPlantId(current, null),
-        { replace: true },
-      );
+      setSearchParams((current) => applyTentPlantTabsUrlPlantId(current, null), { replace: true });
     }
   }, [selectedPlantTabId, allPlants, rosterIncludeArchived, id, setSearchParams]);
-
-
 
   if (isLoading) {
     return (
@@ -196,7 +184,9 @@ export default function TentDetail() {
             <div className="flex flex-wrap gap-2">
               <Button
                 variant="outline"
-                onClick={() => { void refetch(); }}
+                onClick={() => {
+                  void refetch();
+                }}
                 data-testid="tent-detail-error-retry"
                 className="min-h-11"
               >
@@ -241,7 +231,11 @@ export default function TentDetail() {
   return (
     <div>
       <QuickLogV2Fab defaultTargetKey={tent?.id ? `tent:${tent.id}` : null} />
-      <Button asChild variant="ghost" size="sm" className="mb-3"><Link to={tentsPath()}><ArrowLeft className="h-4 w-4" /> Tents</Link></Button>
+      <Button asChild variant="ghost" size="sm" className="mb-3">
+        <Link to={tentsPath()}>
+          <ArrowLeft className="h-4 w-4" /> Tents
+        </Link>
+      </Button>
       <PageHeader
         title={tent.name}
         description={`${tent.brand} · ${tent.size}`}
@@ -261,8 +255,7 @@ export default function TentDetail() {
           multiple plants, keep the calm safe disabled state — we do
           not invent a default selection here. */}
       {(() => {
-        const safePlantId =
-          activePlants.length === 1 ? activePlants[0]?.id ?? null : null;
+        const safePlantId = activePlants.length === 1 ? (activePlants[0]?.id ?? null) : null;
         return (
           <OneTentLoopNextStepCard
             current="tent"
@@ -275,7 +268,6 @@ export default function TentDetail() {
           />
         );
       })()}
-
 
       <div className="mb-3 flex items-center gap-2 flex-wrap">
         <TentCardActionsMenu
@@ -291,85 +283,92 @@ export default function TentDetail() {
           variant="row"
           hideView
         />
+        {tent.growId ? <StartPhenoHuntButton growId={tent.growId} tentId={tent.id} /> : null}
         {tent.growId ? (
-          <StartPhenoHuntButton growId={tent.growId} tentId={tent.id} />
-        ) : null}
-        {tent.growId ? (
-          <Button
-            size="sm"
-            variant="outline"
-            asChild
-            data-testid="tent-detail-manage-targets"
-          >
-            <Link to={`/grows/${encodeURIComponent(tent.growId)}`}>
-              Manage Targets
-            </Link>
+          <Button size="sm" variant="outline" asChild data-testid="tent-detail-manage-targets">
+            <Link to={`/grows/${encodeURIComponent(tent.growId)}`}>Manage Targets</Link>
           </Button>
         ) : null}
       </div>
 
       <div className="flex flex-wrap gap-2 mb-5" data-testid="tent-detail-metric-chips">
         {snap?.temp !== null && snap?.temp !== undefined && (
-          <MetricChip label="T" value={(convertCelsiusForDisplay(snap.temp) ?? 0).toFixed(1)} unit={getTemperatureUnitSymbol()} status={environmentMetricChipStatus(classifyTempAgainstStage(snap.temp, { stage: tent.stage, stale: header.stale }))} />
+          <MetricChip
+            label="T"
+            value={(convertCelsiusForDisplay(snap.temp) ?? 0).toFixed(1)}
+            unit={getTemperatureUnitSymbol()}
+            status={environmentMetricChipStatus(
+              classifyTempAgainstStage(snap.temp, { stage: tent.stage, stale: header.stale }),
+            )}
+          />
         )}
         {snap?.rh !== null && snap?.rh !== undefined && (
-          <MetricChip label="RH" value={snap.rh} unit="%" status={environmentMetricChipStatus(classifyRhAgainstStage(snap.rh, { stage: tent.stage, stale: header.stale }))} />
+          <MetricChip
+            label="RH"
+            value={snap.rh}
+            unit="%"
+            status={environmentMetricChipStatus(
+              classifyRhAgainstStage(snap.rh, { stage: tent.stage, stale: header.stale }),
+            )}
+          />
         )}
-        {snap?.vpd !== null && snap?.vpd !== undefined && (() => {
+        {snap?.vpd !== null &&
+          snap?.vpd !== undefined &&
+          (() => {
+            const vpd = classifyVpdAgainstStage({
+              value: snap.vpd,
+              stage: tent.stage,
+              stale: header.stale,
+            });
+            // #21: route VPD chip through the canonical sensor formatter so
+            // header precision matches Recent manual snapshots (2-decimal cap).
+            return (
+              <MetricChip
+                label="VPD"
+                value={formatSensorValue("vpd_kpa", snap.vpd).replace(/\s*kPa$/, "")}
+                unit=" kPa"
+                status={vpdMetricChipStatus(vpd)}
+              />
+            );
+          })()}
+        {snap?.co2 !== null && snap?.co2 !== undefined && (
+          <MetricChip label="CO₂" value={snap.co2} unit=" ppm" />
+        )}
+        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+          <Lightbulb
+            className={`h-3.5 w-3.5 ${tent.light.on ? "text-[hsl(var(--warning))]" : ""}`}
+          />
+          {tent.light.schedule} · {tent.light.wattage}W
+        </span>
+      </div>
+      {snap?.vpd !== null &&
+        snap?.vpd !== undefined &&
+        (() => {
           const vpd = classifyVpdAgainstStage({
             value: snap.vpd,
             stage: tent.stage,
             stale: header.stale,
           });
-          // #21: route VPD chip through the canonical sensor formatter so
-          // header precision matches Recent manual snapshots (2-decimal cap).
           return (
-            <MetricChip
-              label="VPD"
-              value={formatSensorValue("vpd_kpa", snap.vpd).replace(/\s*kPa$/, "")}
-              unit=" kPa"
-              status={vpdMetricChipStatus(vpd)}
-            />
+            <p
+              className="text-[11px] text-muted-foreground -mt-3 mb-4"
+              data-testid="tent-detail-vpd-stage-hint"
+            >
+              {vpd.label}. {VPD_STAGE_HELPER_TEXT}
+            </p>
           );
         })()}
-        {snap?.co2 !== null && snap?.co2 !== undefined && (
-          <MetricChip label="CO₂" value={snap.co2} unit=" ppm" />
+      {snap?.vpd !== null &&
+        snap?.vpd !== undefined &&
+        normalizeVpdStage(tent.stage) === "unknown" && (
+          <VpdStageMissingBadge testId="tent-detail-vpd-stage-missing-badge" className="mb-4" />
         )}
-        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-          <Lightbulb className={`h-3.5 w-3.5 ${tent.light.on ? "text-[hsl(var(--warning))]" : ""}`} />
-          {tent.light.schedule} · {tent.light.wattage}W
-        </span>
-      </div>
-      {snap?.vpd !== null && snap?.vpd !== undefined && (() => {
-        const vpd = classifyVpdAgainstStage({
-          value: snap.vpd,
-          stage: tent.stage,
-          stale: header.stale,
-        });
-        return (
-          <p
-            className="text-[11px] text-muted-foreground -mt-3 mb-4"
-            data-testid="tent-detail-vpd-stage-hint"
-          >
-            {vpd.label}. {VPD_STAGE_HELPER_TEXT}
-          </p>
-        );
-      })()}
-      {snap?.vpd !== null && snap?.vpd !== undefined && normalizeVpdStage(tent.stage) === "unknown" && (
-        <VpdStageMissingBadge
-          testId="tent-detail-vpd-stage-missing-badge"
-          className="mb-4"
-        />
-      )}
 
       <EnvironmentStabilityCard
         testId="tent-detail-environment-stability"
         className="mb-4"
         result={computeEnvironmentStability(series, { stage: tent.stage })}
       />
-
-
-
 
       <div className="glass rounded-2xl p-4 mb-6">
         <div className="flex items-center justify-between gap-2 flex-wrap mb-3">
@@ -417,7 +416,11 @@ export default function TentDetail() {
             No sensor readings yet.
           </p>
         ) : (
-          <SensorChart data={series as unknown as Parameters<typeof SensorChart>[0]["data"]} metric="temp" height={200} />
+          <SensorChart
+            data={series as unknown as Parameters<typeof SensorChart>[0]["data"]}
+            metric="temp"
+            height={200}
+          />
         )}
       </div>
 
@@ -428,9 +431,7 @@ export default function TentDetail() {
       >
         <div className="flex items-start justify-between gap-3 mb-3 flex-wrap">
           <div>
-            <h2 className="font-display font-semibold">
-              Latest EcoWitt Snapshot
-            </h2>
+            <h2 className="font-display font-semibold">Latest EcoWitt Snapshot</h2>
             <p className="text-xs text-muted-foreground">
               Most recent EcoWitt reading for this tent. Not live device control.
             </p>
@@ -451,10 +452,15 @@ export default function TentDetail() {
 
       <TimelineMemorySection scope="tent" tentId={id ?? null} />
 
-
       <ImportedSensorHistoryPanel
         tentId={id ?? null}
         readings={importedHistory.data ?? []}
+        plants={activePlants}
+        plantReadStatus={resolveImportedHistoryHandoffReadStatus({
+          isError: activePlantsIsError,
+          isFetching: activePlantsIsFetching,
+          hasRows: activePlants.length > 0,
+        })}
         readStatus={resolveImportedSensorHistoryReadStatus({
           isError: importedHistory.isError,
           isFetching: importedHistory.isFetching,
@@ -471,20 +477,21 @@ export default function TentDetail() {
 
       <TentAiDoctorSessionsPanel tentId={id ?? null} />
 
-
-
-
-      {activeCount > 0 && id && (() => {
-        const primary = activePlants[0];
-        const prefill = buildPlantQuickLogPrefill({
-          plantId: primary?.id ?? null,
-          plantName: primary?.name ?? null,
-          growId: tent.growId ?? null,
-          tentId: id,
-          tentName: tent.name ?? null,
-        });
-        return <FirstPlantMemoryCta prefill={prefill} testId="tent-detail-first-plant-memory-cta" />;
-      })()}
+      {activeCount > 0 &&
+        id &&
+        (() => {
+          const primary = activePlants[0];
+          const prefill = buildPlantQuickLogPrefill({
+            plantId: primary?.id ?? null,
+            plantName: primary?.name ?? null,
+            growId: tent.growId ?? null,
+            tentId: id,
+            tentName: tent.name ?? null,
+          });
+          return (
+            <FirstPlantMemoryCta prefill={prefill} testId="tent-detail-first-plant-memory-cta" />
+          );
+        })()}
 
       {(() => {
         const tabsVm = buildTentPlantTabsViewModel({
@@ -502,10 +509,7 @@ export default function TentDetail() {
             : allPlants.filter((p) => p.id === tabsVm.selectedPlantId);
         return (
           <div className="space-y-3">
-            <TentPlantTabs
-              viewModel={tabsVm}
-              onSelect={setSelectedPlantTabId}
-            />
+            <TentPlantTabs viewModel={tabsVm} onSelect={setSelectedPlantTabId} />
             <p
               className="text-xs text-muted-foreground"
               data-testid="tent-plant-tabs-current-scope"
@@ -539,8 +543,7 @@ export default function TentDetail() {
                     isArchived: p.isArchived,
                     latestLogAt: a?.latestLogAt ?? null,
                     hasRecentPhoto: a?.hasRecentPhoto ?? false,
-                    harvestWatchPublicState:
-                      a?.harvestWatchPublicState ?? null,
+                    harvestWatchPublicState: a?.harvestWatchPublicState ?? null,
                   };
                 }),
                 tentSensorContextLabel: header.sourceLabel ?? null,
@@ -567,12 +570,9 @@ export default function TentDetail() {
               tentId={id ?? null}
               growId={tent.growId ?? null}
             />
-
           </div>
         );
       })()}
-
-
 
       <div className="glass rounded-2xl p-4">
         <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
@@ -601,10 +601,7 @@ export default function TentDetail() {
                 {showArchived ? "Hide archived plants" : "Show archived plants"}
               </button>
             )}
-            <AddExistingPlantDialog
-              tentId={id ?? ""}
-              growId={tent.growId ?? null}
-            />
+            <AddExistingPlantDialog tentId={id ?? ""} growId={tent.growId ?? null} />
             <CreatePlantDialog
               defaultTentId={id}
               defaultGrowId={tent.growId ?? undefined}
@@ -663,7 +660,10 @@ export default function TentDetail() {
             </div>
           </div>
         ) : (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3" data-testid="tent-detail-plants-grid">
+          <div
+            className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3"
+            data-testid="tent-detail-plants-grid"
+          >
             {visiblePlants.map((p) => {
               const archivedLabel = getArchivedPlantLabel(p);
               const isInactive = archivedLabel.kind !== "active";
@@ -679,13 +679,25 @@ export default function TentDetail() {
                   data-archived-kind={archivedLabel.kind}
                 >
                   <Link to={plantDetailPath(p.id, { tentId: tent.id })} className="block">
-                    <PlantPhoto src={p.photo} alt={p.name} className="aspect-video" caption="No plant photo yet" />
+                    <PlantPhoto
+                      src={p.photo}
+                      alt={p.name}
+                      className="aspect-video"
+                      caption="No plant photo yet"
+                    />
                     <div className="p-3">
                       <div className="flex items-center justify-between gap-2 pr-8">
-                        <span className="font-medium text-sm" data-testid="tent-detail-plant-name">{p.name}</span>
+                        <span className="font-medium text-sm" data-testid="tent-detail-plant-name">
+                          {p.name}
+                        </span>
                         <StageBadge stage={p.stage} />
                       </div>
-                      <p className="text-xs text-muted-foreground mt-0.5" data-testid="tent-detail-plant-strain">{p.strain}</p>
+                      <p
+                        className="text-xs text-muted-foreground mt-0.5"
+                        data-testid="tent-detail-plant-strain"
+                      >
+                        {p.strain}
+                      </p>
                       {isInactive && (
                         <Badge
                           variant="outline"
@@ -701,7 +713,9 @@ export default function TentDetail() {
                           {archivedLabel.kind === "merged" ? "Merged / Archived" : "Archived"}
                         </Badge>
                       )}
-                      <p className="text-[11px] text-muted-foreground mt-1 capitalize">{p.health}</p>
+                      <p className="text-[11px] text-muted-foreground mt-1 capitalize">
+                        {p.health}
+                      </p>
                     </div>
                   </Link>
                   <div className="absolute top-2 right-2">

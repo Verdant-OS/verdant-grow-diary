@@ -13,7 +13,7 @@
  *  - Failure / timeout / invalid / missing-config all render the same
  *    calm failure copy. Fail closed.
  */
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useTimelineMemory, TIMELINE_MEMORY_DEFAULT_LIMIT } from "@/hooks/useTimelineMemory";
 import {
   evaluateAiDoctorContextFromSources,
@@ -82,6 +82,7 @@ export default function PlantDetailAiDoctorLiveReview({
   persist,
   sensorClassificationOverride,
 }: PlantDetailAiDoctorLiveReviewProps) {
+  const historicalStartTrackedRef = useRef(false);
   const { items } = useTimelineMemory({ kind: "plant", plantId }, TIMELINE_MEMORY_DEFAULT_LIMIT);
   // Dedicated bounded imported-history read. It filters permitted CSV source
   // identities before the cap and orders by historical `captured_at`, so the
@@ -212,6 +213,17 @@ export default function PlantDetailAiDoctorLiveReview({
 
   if (!allowed) return null;
 
+  const handleInitialStart = () => {
+    if (!review.canStart) return;
+    if (eligibility.mode === "historical_review") {
+      if (!historicalStartTrackedRef.current) {
+        historicalStartTrackedRef.current = true;
+        trackFunnelEvent("historical_ai_review_started");
+      }
+    }
+    review.start();
+  };
+
   const confidenceCopy =
     eligibility.mode === "historical_review"
       ? AI_DOCTOR_LIVE_REVIEW_HISTORICAL_COPY
@@ -238,7 +250,7 @@ export default function PlantDetailAiDoctorLiveReview({
         {review.status === "idle" || review.status === "error" ? (
           <button
             type="button"
-            onClick={review.status === "error" ? review.retry : review.start}
+            onClick={review.status === "error" ? review.retry : handleInitialStart}
             disabled={!review.canStart}
             data-testid={
               review.status === "error"

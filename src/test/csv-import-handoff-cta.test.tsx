@@ -3,8 +3,8 @@
  *
  * Pins:
  *  - successful import shows the CTA and the historical-context note;
- *  - the CTA targets the launcher's TRUSTED plant, else the tent — and
- *    with no trustworthy context the launcher falls back safely;
+ *  - the CTA targets the tent's visible imported-history section so plant
+ *    choice remains explicit after the grower sees value;
  *  - completion never invokes AI Doctor, never creates alerts, never
  *    creates Action Queue items;
  *  - duplicate-count completion copy stays intact;
@@ -16,9 +16,11 @@ import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import type { ParsedEnvironmentRow } from "@/lib/csvParser";
-import { plantDetailPath, sensorsPath, tentDetailPath } from "@/lib/routes";
+import { sensorsPath, tentDetailPath } from "@/lib/routes";
+import { IMPORTED_SENSOR_HISTORY_ANCHOR_ID } from "@/lib/importedSensorHistoryViewModel";
 import {
   CSV_IMPORT_ADD_CURRENT_READING_LABEL,
+  CSV_IMPORT_CONFIRM_LABEL,
   CSV_IMPORT_HISTORICAL_CONTEXT_NOTE,
   CSV_IMPORT_VIEW_HISTORY_LABEL,
 } from "@/lib/environmentCsvPreviewCopyRules";
@@ -85,6 +87,7 @@ async function uploadAndConfirm() {
   Object.defineProperty(input, "files", { value: [file] });
   fireEvent.change(input);
   await waitFor(() => expect(screen.queryByTestId("csv-import-preview")).toBeTruthy());
+  expect(screen.getByTestId("csv-import-confirm")).toHaveTextContent(CSV_IMPORT_CONFIRM_LABEL);
   fireEvent.click(screen.getByTestId("csv-import-confirm"));
   await waitFor(() => expect(screen.queryByTestId("csv-import-done")).toBeTruthy());
 }
@@ -98,7 +101,7 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe("launcher → modal handoff", () => {
-  it("successful import shows 'View imported history' targeting the trusted plant", async () => {
+  it("successful import shows 'View imported history' targeting the visible tent history", async () => {
     const Wrapper = makeQueryWrapper();
     render(
       <Wrapper>
@@ -113,13 +116,15 @@ describe("launcher → modal handoff", () => {
 
     const cta = screen.getByTestId("csv-import-view-history");
     expect(cta.textContent).toContain(CSV_IMPORT_VIEW_HISTORY_LABEL);
-    expect(cta.getAttribute("href")).toBe(plantDetailPath(PLANT_ID, { tentId: TENT_ID }));
+    expect(cta.getAttribute("href")).toBe(
+      `${tentDetailPath(TENT_ID)}#${IMPORTED_SENSOR_HISTORY_ANCHOR_ID}`,
+    );
     const current = screen.getByTestId("csv-import-add-current-reading");
     expect(current.textContent).toContain(CSV_IMPORT_ADD_CURRENT_READING_LABEL);
     expect(current.getAttribute("href")).toBe(`${sensorsPath(GROW_ID)}#manual-reading`);
   });
 
-  it("without a plant target the CTA falls back to the selected tent", async () => {
+  it("uses the same explicit tent-history target without a plant hint", async () => {
     const Wrapper = makeQueryWrapper();
     render(
       <Wrapper>
@@ -129,7 +134,7 @@ describe("launcher → modal handoff", () => {
     fireEvent.click(screen.getByTestId("csv-launcher-button"));
     await uploadAndConfirm();
     expect(screen.getByTestId("csv-import-view-history").getAttribute("href")).toBe(
-      tentDetailPath(TENT_ID),
+      `${tentDetailPath(TENT_ID)}#${IMPORTED_SENSOR_HISTORY_ANCHOR_ID}`,
     );
     expect(screen.getByTestId("csv-import-add-current-reading").getAttribute("href")).toBe(
       `${sensorsPath(GROW_ID)}#manual-reading`,
@@ -171,6 +176,9 @@ describe("launcher → modal handoff", () => {
       "csv_import_completed",
       expect.objectContaining({ rows: expect.any(Number) }),
     );
+    expect(trackSpy).toHaveBeenCalledTimes(1);
+    expect(trackSpy).not.toHaveBeenCalledWith("csv_history_ai_doctor_clicked", expect.anything());
+    expect(trackSpy).not.toHaveBeenCalledWith("historical_ai_review_started", expect.anything());
   });
 });
 

@@ -28,16 +28,12 @@ describe("TentDetail · real sensor readings", () => {
   });
 
   it("uses the dedicated imported-history result instead of filtering the mixed sensor window", () => {
-    expect(TENT_DETAIL).toMatch(
-      /from\s+["']@\/hooks\/useImportedSensorHistory["']/,
-    );
+    expect(TENT_DETAIL).toMatch(/from\s+["']@\/hooks\/useImportedSensorHistory["']/);
     expect(TENT_DETAIL).toMatch(/useImportedSensorHistory\(id\)/);
     expect(TENT_DETAIL).toMatch(
       /<ImportedSensorHistoryPanel[\s\S]*?readings=\{importedHistory\.data\s*\?\?\s*\[\]\}/,
     );
-    expect(TENT_DETAIL).not.toMatch(
-      /<ImportedSensorHistoryPanel[^>]*readings=\{readings\}/,
-    );
+    expect(TENT_DETAIL).not.toMatch(/<ImportedSensorHistoryPanel[^>]*readings=\{readings\}/);
   });
 
   it("passes explicit imported-history loading and error truth to the panel", () => {
@@ -45,6 +41,20 @@ describe("TentDetail · real sensor readings", () => {
     expect(TENT_DETAIL).toMatch(/importedHistory\.isFetching/);
     expect(TENT_DETAIL).toMatch(/importedHistory\.isError/);
     expect(TENT_DETAIL).toMatch(/importedHistory\.refetch/);
+  });
+
+  it("passes active-plant loading/error truth without inferring the first plant", () => {
+    expect(TENT_DETAIL).toMatch(
+      /const\s+\{[\s\S]*?data:\s*activePlants\s*=\s*\[\],[\s\S]*?isFetching:\s*activePlantsIsFetching,[\s\S]*?isError:\s*activePlantsIsError,[\s\S]*?\}\s*=\s*useGrowPlants\(id\)/,
+    );
+    const panelStart = TENT_DETAIL.indexOf("<ImportedSensorHistoryPanel");
+    const panelEnd = TENT_DETAIL.indexOf("/>", panelStart);
+    const panel = TENT_DETAIL.slice(panelStart, panelEnd);
+    expect(panel).toContain("plants={activePlants}");
+    expect(panel).toContain("resolveImportedHistoryHandoffReadStatus");
+    expect(panel).toContain("isError: activePlantsIsError");
+    expect(panel).toContain("isFetching: activePlantsIsFetching");
+    expect(panel).not.toContain("activePlants[0]");
   });
 
   it("uses the pure chart rules helper", () => {

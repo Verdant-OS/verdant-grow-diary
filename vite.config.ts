@@ -132,6 +132,53 @@ function staticSocialRouteDocuments(): Plugin {
           source: buildStaticSocialRouteHtml(indexAsset.source, metadataWithOg),
         });
       }
+
+
+      // Homepage ("/") — served by index.html itself. Emit a per-route OG PNG
+      // and rewrite the sitewide og:image + twitter:image + og:image:alt so
+      // non-JS crawlers see the same per-route treatment as every other page.
+      const homeTitle = "Verdant Grow Diary — Plant memory. Sensor truth.";
+      const homeDescription =
+        "Grow logs, sensor-aware insights, environment alerts, and cautious AI coaching for serious cultivators.";
+      const homeSvg = buildOgCardSvg({
+        title: homeTitle,
+        description: homeDescription,
+        path: "/",
+      });
+      try {
+        const homePng = new Resvg(homeSvg, {
+          fitTo: { mode: "width", value: OG_IMAGE_WIDTH },
+          font: { loadSystemFonts: true, defaultFontFamily: "sans-serif" },
+        }).render().asPng();
+        this.emitFile({ type: "asset", fileName: "og/home.png", source: homePng });
+      } catch (error) {
+        this.error(
+          `Failed to render home OG image: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+        return;
+      }
+      const homeOgUrl = `${VERDANT_SITE_ORIGIN}/og/home.png`;
+      let patchedIndex = indexAsset.source;
+      const rewriteMeta = (attr: "name" | "property", key: string, value: string) => {
+        const pattern = new RegExp(
+          `<meta\\b(?=[^>]*${attr}=["']${key.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")}["'])[^>]*>`,
+          "i",
+        );
+        if (!pattern.test(patchedIndex)) {
+          this.error(`index.html missing ${attr}="${key}" meta tag`);
+          return;
+        }
+        patchedIndex = patchedIndex.replace(
+          pattern,
+          `<meta ${attr}="${key}" content="${value.replace(/"/g, "&quot;")}" />`,
+        );
+      };
+      rewriteMeta("property", "og:image", homeOgUrl);
+      rewriteMeta("property", "og:image:alt", "Verdant Grow Diary — Plant memory. Sensor truth.");
+      rewriteMeta("name", "twitter:image", homeOgUrl);
+      indexAsset.source = patchedIndex;
     },
   };
 }

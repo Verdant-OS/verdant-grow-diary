@@ -30,8 +30,9 @@ export interface OgCardInput {
  * `/` is not allowed; other routes flatten with `--`.
  */
 export function ogImageSlugForPath(path: string): string {
-  if (!path.startsWith("/") || path === "/") {
-    throw new Error(`ogImageSlugForPath requires a non-root absolute path: ${path}`);
+  if (path === "/") return "home";
+  if (!path.startsWith("/")) {
+    throw new Error(`ogImageSlugForPath requires an absolute path: ${path}`);
   }
   return path
     .slice(1)
@@ -42,6 +43,7 @@ export function ogImageSlugForPath(path: string): string {
 
 /** Returns a stable category label based on the route path. */
 export function categoryForPath(path: string): string {
+  if (path === "/") return "Grow OS";
   if (path === "/founder") return "Founder Lifetime";
   if (path === "/pricing") return "Pricing";
   if (path === "/welcome") return "Grow OS";

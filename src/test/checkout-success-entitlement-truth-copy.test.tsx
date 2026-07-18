@@ -18,7 +18,7 @@ import CheckoutSuccess from "@/pages/CheckoutSuccess";
 import { CHECKOUT_STARTED_STORAGE_KEY, markCheckoutStarted } from "@/lib/checkoutContextRules";
 import type { ResolvedEntitlement } from "@/lib/entitlements";
 
-const mockEnt: { value: ResolvedEntitlement; loading: boolean } = {
+const mockEnt: { value: ResolvedEntitlement; loading: boolean; lookupFailed: boolean } = {
   value: {
     effectivePlanId: "free",
     displayPlanId: "free",
@@ -31,12 +31,14 @@ const mockEnt: { value: ResolvedEntitlement; loading: boolean } = {
     source: "free",
   },
   loading: false,
+  lookupFailed: false,
 };
 
 const refetchSpy = vi.hoisted(() => vi.fn(async () => undefined));
 vi.mock("@/hooks/useMyEntitlements", () => ({
   useMyEntitlements: () => ({
     loading: mockEnt.loading,
+    lookupFailed: mockEnt.lookupFailed,
     entitlement: mockEnt.value,
     refetch: refetchSpy,
   }),
@@ -54,6 +56,9 @@ function renderPage() {
 describe("CheckoutSuccess truth copy", () => {
   beforeEach(() => {
     window.sessionStorage.removeItem(CHECKOUT_STARTED_STORAGE_KEY);
+    mockEnt.loading = false;
+    mockEnt.lookupFailed = false;
+    refetchSpy.mockClear();
   });
 
   it("shows the no-context state on a direct visit — never claims a completed checkout", () => {
@@ -75,6 +80,21 @@ describe("CheckoutSuccess truth copy", () => {
     expect(screen.queryByTestId("checkout-success-pending-heading")).toBeNull();
     expect(screen.queryByTestId("checkout-success-confirmed-heading")).toBeNull();
     expect(screen.queryByTestId("checkout-success-activation-handoff")).toBeNull();
+  });
+
+  it("shows a retryable neutral state when plan verification fails", () => {
+    mockEnt.lookupFailed = true;
+    renderPage();
+
+    expect(screen.getByTestId("checkout-success-page")).toHaveAttribute(
+      "data-view",
+      "verification_failed",
+    );
+    expect(screen.getByTestId("checkout-success-verification-failed-heading")).toHaveTextContent(
+      /couldn't verify your plan/i,
+    );
+    expect(screen.queryByTestId("checkout-success-pricing-link")).toBeNull();
+    expect(screen.queryByTestId("checkout-success-confirmed-heading")).toBeNull();
   });
 
   it("shows confirming copy (not completion) with a fresh same-device checkout marker", () => {

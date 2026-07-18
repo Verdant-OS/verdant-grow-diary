@@ -74,7 +74,7 @@ export default function PhenoTrackerUpgradeGate({
   ...rest
 }: PhenoTrackerUpgradeGateProps) {
   const testId = rest["data-testid"] ?? "pheno-tracker-upgrade-gate";
-  const { entitlement, loading } = useMyEntitlements();
+  const { entitlement, loading, lookupFailed, refetch } = useMyEntitlements();
   const location = useLocation();
   const upgradeHref = useMemo(
     () => buildUpgradeHref(location.pathname, location.search),
@@ -89,6 +89,37 @@ export default function PhenoTrackerUpgradeGate({
       >
         Checking access…
       </div>
+    );
+  }
+
+  if (lookupFailed) {
+    return (
+      <section
+        data-testid={`${testId}-verification-failed`}
+        role="status"
+        aria-labelledby={`${testId}-verification-failed-title`}
+        className="mx-auto mt-8 max-w-2xl rounded-xl border border-border/60 bg-card/40 p-6 text-left"
+      >
+        <h2
+          id={`${testId}-verification-failed-title`}
+          className="font-display text-xl font-semibold tracking-tight"
+        >
+          Plan check unavailable
+        </h2>
+        <p className="mt-3 text-sm text-muted-foreground">
+          We couldn&apos;t verify Pheno Tracker access right now. Your plan has
+          not changed.
+        </p>
+        <Button
+          type="button"
+          variant="outline"
+          className="mt-4"
+          data-testid={`${testId}-retry`}
+          onClick={() => void refetch()}
+        >
+          Retry plan check
+        </Button>
+      </section>
     );
   }
 

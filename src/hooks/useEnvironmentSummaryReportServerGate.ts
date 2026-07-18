@@ -3,21 +3,22 @@
  *
  * Server-side authoritative entitlement gate for the Environment Summary
  * Report page. Calls the `environment-summary-report-entitlement` edge
- * function which re-resolves entitlement from `billing_subscriptions`
+ * function which re-resolves entitlement from canonical `public.subscriptions`
  * server-side (never trusts the client).
  *
  * Status semantics:
  *  - "loading"  — request in flight; render a neutral placeholder.
  *  - "allowed"  — server returned 200 ok=true; report rendering permitted.
- *  - "denied"   — server returned 403 (upgrade required or fail-closed).
- *  - "error"    — unexpected network/runtime error; treat as NOT allowed.
+ *  - "denied"   — server verified that an upgrade is required.
+ *  - "error"    — lookup/network/runtime error; treat as NOT allowed and
+ *                 never present it as a verified plan denial.
  *
  * Hard constraints:
  *  - Never authoritative on the client. The server's response is the gate.
  *  - No service_role, no fetch of secrets, no plan claims sent in the body.
  *  - No DB writes, no sensor ingest, no automation, no device control.
  */
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { supabase } from "@/integrations/supabase/client";
 
@@ -33,17 +34,25 @@ export interface EnvironmentSummaryReportGateState {
   displayPlanId: string | null;
 }
 
-export function useEnvironmentSummaryReportServerGate(): EnvironmentSummaryReportGateState {
+export interface EnvironmentSummaryReportGateResult
+  extends EnvironmentSummaryReportGateState {
+  retry: () => void;
+}
+
+export function useEnvironmentSummaryReportServerGate(): EnvironmentSummaryReportGateResult {
   const [state, setState] = useState<EnvironmentSummaryReportGateState>({
     status: "loading",
     reason: null,
     displayPlanId: null,
   });
-  const ranRef = useRef(false);
+  const [attempt, setAttempt] = useState(0);
+
+  const retry = useCallback(() => {
+    setState({ status: "loading", reason: null, displayPlanId: null });
+    setAttempt((value) => value + 1);
+  }, []);
 
   useEffect(() => {
-    if (ranRef.current) return;
-    ranRef.current = true;
     let cancelled = false;
 
     (async () => {
@@ -84,6 +93,14 @@ export function useEnvironmentSummaryReportServerGate(): EnvironmentSummaryRepor
           denialData && typeof denialData.display_plan_id === "string"
             ? denialData.display_plan_id
             : null;
+        if (denialReason === "entitlement_lookup_failed") {
+          setState({
+            status: "error",
+            reason: denialReason,
+            displayPlanId: null,
+          });
+          return;
+        }
         if (status === 403 || denialReason === "upgrade_required") {
           setState({
             status: "denied",
@@ -110,7 +127,7 @@ export function useEnvironmentSummaryReportServerGate(): EnvironmentSummaryRepor
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [attempt]);
 
-  return state;
+  return { ...state, retry };
 }

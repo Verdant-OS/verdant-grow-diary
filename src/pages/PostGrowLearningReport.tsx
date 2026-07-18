@@ -35,6 +35,7 @@ import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { checkPremiumExportEntitlement } from "@/hooks/usePremiumExportServerGate";
 import PaywallCta from "@/components/PaywallCta";
 import { buildPaywallCtaViewModel } from "@/lib/paywallCtaViewModel";
+import { canUseCapability } from "@/lib/entitlements";
 
 function resultMessage(result: unknown, fallback: string): string {
   if (typeof result !== "object" || result === null || !("message" in result)) return fallback;
@@ -63,11 +64,17 @@ export default function PostGrowLearningReport() {
   // Pro gate. Pricing has always sold this report as Pro-only; the page
   // now enforces it: client hint avoids a content flash, and the
   // fail-closed `post_grow_report` server check is authoritative.
-  const { entitlement, loading: entitlementLoading } = useMyEntitlements();
-  const clientIsPremium = entitlement.capabilities.advancedExports === true;
+  const {
+    entitlement,
+    loading: entitlementLoading,
+    lookupFailed: clientLookupFailed,
+  } = useMyEntitlements();
+  const clientIsPremium =
+    !clientLookupFailed && canUseCapability(entitlement, "advancedExports");
   const [gateStatus, setGateStatus] = useState<"loading" | "allowed" | "denied" | "error">(
     "loading",
   );
+  const [gateAttempt, setGateAttempt] = useState(0);
   useEffect(() => {
     let cancelled = false;
     if (!growId) return;
@@ -75,13 +82,18 @@ export default function PostGrowLearningReport() {
     checkPremiumExportEntitlement("post_grow_report", { growId }).then((res) => {
       if (cancelled) return;
       if (res.ok) setGateStatus("allowed");
-      else if (res.state === "network_error") setGateStatus("error");
+      else if (
+        res.state === "network_error" ||
+        res.state === "verification_failed" ||
+        res.state === "invalid_request"
+      )
+        setGateStatus("error");
       else setGateStatus("denied");
     });
     return () => {
       cancelled = true;
     };
-  }, [growId]);
+  }, [growId, gateAttempt]);
 
   useEffect(() => {
     if (report) setLesson(report.lesson.text);
@@ -108,7 +120,38 @@ export default function PostGrowLearningReport() {
     ? gateStatus !== "allowed"
     : // While the server decides, the non-authoritative client hint
       // prevents a flash of report content for free users.
-      !entitlementLoading && !clientIsPremium;
+      !entitlementLoading && !clientLookupFailed && !clientIsPremium;
+
+  if (gateStatus === "error") {
+    return (
+      <div
+        className="mx-auto max-w-5xl"
+        data-testid="post-grow-report-locked"
+        data-server-gate-status="error"
+      >
+        <PageHeader
+          title="Post-Grow Learning Report"
+          description="Plant memory, sensor truth, and lessons for the next run."
+          icon={<Leaf className="h-5 w-5" />}
+        />
+        <p
+          className="text-sm text-muted-foreground mb-4"
+          data-testid="post-grow-report-gate-message"
+        >
+          The report entitlement check did not complete. Nothing was generated. Try the check
+          again in a moment.
+        </p>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setGateAttempt((value) => value + 1)}
+          data-testid="post-grow-report-entitlement-retry"
+        >
+          Retry plan check
+        </Button>
+      </div>
+    );
+  }
 
   if (showLocked) {
     const paywallVm = buildPaywallCtaViewModel({
@@ -130,9 +173,7 @@ export default function PostGrowLearningReport() {
           className="text-sm text-muted-foreground mb-4"
           data-testid="post-grow-report-gate-message"
         >
-          {gateStatus === "error"
-            ? "The report entitlement check did not complete. Nothing was generated."
-            : "The Post-Grow Learning Report is a Pro feature."}
+          The Post-Grow Learning Report is a Pro feature.
         </p>
         <PaywallCta vm={paywallVm} data-testid="post-grow-report-paywall" />
       </div>

@@ -58,10 +58,21 @@ function proRow(over: Partial<LovableSubscriptionRow> = {}): LovableSubscription
   };
 }
 
-const db: { lovableRows: LovableSubscriptionRow[]; capturedLimit: number | null } = {
+const db: {
+  lovableRows: LovableSubscriptionRow[];
+  lovableError: unknown;
+  lovableErrorsByEnvironment: Partial<Record<"live" | "sandbox", unknown>>;
+  capturedLimit: number | null;
+} = {
   lovableRows: [],
+  lovableError: null,
+  lovableErrorsByEnvironment: {},
   capturedLimit: null,
 };
+
+const paddleEnvironment = vi.hoisted(() => ({
+  current: "live" as "live" | "sandbox",
+}));
 
 // Stable user reference: doLoad's useCallback depends on `user` identity, so
 // a per-call object literal here would refire the load effect on every render
@@ -81,7 +92,7 @@ vi.mock("@/store/auth", () => ({
 // absent under Vitest and would default to sandbox — pin it to live so the
 // fixtures mirror the server test verbatim.
 vi.mock("@/lib/paddle", () => ({
-  getPaddleEnvironment: () => "live" as const,
+  getPaddleEnvironment: () => paddleEnvironment.current,
 }));
 
 vi.mock("@/integrations/supabase/client", () => {
@@ -119,7 +130,15 @@ vi.mock("@/integrations/supabase/client", () => {
       db.capturedLimit = n;
       return chain;
     };
-    chain.then = (resolve: (v: { data: unknown[]; error: null }) => void) => {
+    chain.then = (resolve: (v: { data: unknown[] | null; error: unknown }) => void) => {
+      if (db.lovableError) {
+        resolve({ data: null, error: db.lovableError });
+        return;
+      }
+      if ((env === "live" || env === "sandbox") && db.lovableErrorsByEnvironment[env]) {
+        resolve({ data: null, error: db.lovableErrorsByEnvironment[env] });
+        return;
+      }
       let rows = db.lovableRows.filter((r) => env == null || r.environment === env);
       if (descKeys.length > 0) {
         rows = [...rows].sort((a, b) => {
@@ -150,9 +169,18 @@ async function renderEntitlement() {
   return result.current.entitlement;
 }
 
+async function renderEntitlementResult() {
+  const { result } = renderHook(() => useMyEntitlements());
+  await waitFor(() => expect(result.current.loading).toBe(false));
+  return result.current;
+}
+
 beforeEach(() => {
   db.lovableRows = [];
+  db.lovableError = null;
+  db.lovableErrorsByEnvironment = {};
   db.capturedLimit = null;
+  paddleEnvironment.current = "live";
 });
 
 describe("useMyEntitlements · bounded window, any-entitling-row wins", () => {
@@ -258,6 +286,36 @@ describe("useMyEntitlements · bounded window, any-entitling-row wins", () => {
     const e = await renderEntitlement();
     expect(e.effectivePlanId).toBe("free");
     expect(e.displayPlanId).toBe("free");
+  });
+
+  it("subscription query failure is not presented as verified Free", async () => {
+    db.lovableError = { message: "temporary outage" };
+    const result = await renderEntitlementResult();
+
+    expect(result.lookupFailed).toBe(true);
+    expect(result.entitlement.effectivePlanId).toBe("free");
+  });
+
+  it("a live Founder row remains verified when the client expects sandbox", async () => {
+    paddleEnvironment.current = "sandbox";
+    db.lovableRows = [liveFounderRow()];
+
+    const result = await renderEntitlementResult();
+
+    expect(result.lookupFailed).toBe(false);
+    expect(result.entitlement.displayPlanId).toBe("founder_lifetime");
+    expect(result.entitlement.capabilities.advancedExports).toBe(true);
+  });
+
+  it("a proven live Founder row survives a lower-precedence sandbox read error", async () => {
+    paddleEnvironment.current = "sandbox";
+    db.lovableRows = [liveFounderRow()];
+    db.lovableErrorsByEnvironment.sandbox = { message: "sandbox unavailable" };
+
+    const result = await renderEntitlementResult();
+
+    expect(result.lookupFailed).toBe(false);
+    expect(result.entitlement.displayPlanId).toBe("founder_lifetime");
   });
 
   it("query scans the shared bounded window, not limit(1)", async () => {

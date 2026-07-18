@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { beforeEach, describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { readFileSync } from "node:fs";
@@ -6,6 +6,26 @@ import { resolve } from "node:path";
 import AiCreditLimitNotice from "@/components/AiCreditLimitNotice";
 import type { AiCreditDenial } from "@/lib/aiCreditLimitNoticeViewModel";
 import { paywallCtaFindBannedWords } from "@/lib/paywallCtaViewModel";
+
+const entitlementLookup = vi.hoisted(() => ({ failed: false }));
+
+vi.mock("@/hooks/useMyEntitlements", () => ({
+  useMyEntitlements: () => ({
+    loading: false,
+    lookupFailed: entitlementLookup.failed,
+    entitlement: {
+      displayPlanId: "free",
+      effectivePlanId: "free",
+      status: "active",
+      isActive: true,
+      capabilities: {},
+      degraded: false,
+      degradedReason: "null_row_free",
+      source: "free",
+    },
+    refetch: async () => undefined,
+  }),
+}));
 
 const denial = (plan_id: string | null): AiCreditDenial => ({
   ok: false,
@@ -23,6 +43,10 @@ function renderWithRouter(ui: React.ReactElement) {
 }
 
 describe("AiCreditLimitNotice presenter", () => {
+  beforeEach(() => {
+    entitlementLookup.failed = false;
+  });
+
   it("upsell branch (free) shows paywall CTA link to /pricing", () => {
     renderWithRouter(<AiCreditLimitNotice credit={denial("free")} />);
     expect(screen.getByTestId("ai-credit-limit-notice")).toHaveAttribute("data-kind", "upsell");
@@ -63,6 +87,17 @@ describe("AiCreditLimitNotice presenter", () => {
   it("unknown branch (null plan_id) renders NO CTA link", () => {
     renderWithRouter(<AiCreditLimitNotice credit={denial(null)} />);
     expect(screen.getByTestId("ai-credit-limit-notice")).toHaveAttribute("data-kind", "unknown");
+    expect(screen.queryByRole("link")).toBeNull();
+  });
+
+  it("does not show an upsell when the defensive viewer plan check failed", () => {
+    entitlementLookup.failed = true;
+    renderWithRouter(<AiCreditLimitNotice credit={denial("free")} />);
+
+    expect(screen.getByTestId("ai-credit-limit-notice")).toHaveAttribute(
+      "data-kind",
+      "unknown",
+    );
     expect(screen.queryByRole("link")).toBeNull();
   });
 

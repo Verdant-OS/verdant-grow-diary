@@ -16,8 +16,8 @@
  * SAFETY:
  *  - Reads only. RLS-protected select-own via the caller's JWT client.
  *  - Never uses service_role.
- *  - `expectedBillingEnvironment` is read from a narrow, whitelisted request
- *    input; it is NOT inferred from any provider fields on the row.
+ *  - `expectedBillingEnvironment` is resolved server-side; it is NOT trusted
+ *    from request input or inferred from provider fields on the row.
  *  - Environment rule (matches the DB gates): an entitling environment='live'
  *    row always unlocks; sandbox rows unlock only when the server expects
  *    sandbox.
@@ -155,7 +155,11 @@ export async function loadUnionEntitlement(
   const liveRow = pickEntitlingLovableRow(rowsOrEmpty(lovableLiveRes), "live", now);
   const liveRowEntitles = liveRow != null && lovableRowEntitles(liveRow, "live", now);
 
-  if (!wantsSandbox || liveRowEntitles) {
+  // A successfully resolved paid row is sufficient proof of access even if
+  // the lower-precedence environment read failed. Otherwise any relevant
+  // query error means the plan could not be verified and must not be
+  // misreported as a confirmed Free/upgrade-required result.
+  if (liveRowEntitles) {
     return {
       lookupFailed: false,
       entitlement: resolveUnionEntitlements({
@@ -167,12 +171,35 @@ export async function loadUnionEntitlement(
     };
   }
 
+  const sandboxRow = wantsSandbox
+    ? pickEntitlingLovableRow(rowsOrEmpty(lovableSandboxRes), "sandbox", now)
+    : null;
+  const sandboxRowEntitles =
+    sandboxRow != null && lovableRowEntitles(sandboxRow, "sandbox", now);
+
+  if (wantsSandbox && sandboxRowEntitles) {
+    return {
+      lookupFailed: false,
+      entitlement: resolveUnionEntitlements({
+        byoRow,
+        lovableRow: sandboxRow,
+        expectedBillingEnvironment: "sandbox",
+        now,
+      }),
+    };
+  }
+
+  const lookupFailed =
+    lovableLiveRes.error != null || (wantsSandbox && lovableSandboxRes.error != null);
+  const fallbackEnvironment = wantsSandbox ? "sandbox" : "live";
+  const fallbackRow = wantsSandbox ? sandboxRow : liveRow;
+
   return {
-    lookupFailed: false,
+    lookupFailed,
     entitlement: resolveUnionEntitlements({
       byoRow,
-      lovableRow: pickEntitlingLovableRow(rowsOrEmpty(lovableSandboxRes), "sandbox", now),
-      expectedBillingEnvironment: "sandbox",
+      lovableRow: fallbackRow,
+      expectedBillingEnvironment: fallbackEnvironment,
       now,
     }),
   };

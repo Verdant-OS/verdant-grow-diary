@@ -76,11 +76,17 @@ export function hasFreshCheckoutContext(
   return age >= 0 && age <= CHECKOUT_CONTEXT_MAX_AGE_MS;
 }
 
-export type CheckoutSuccessView = "confirmed" | "confirming" | "no_context";
+export type CheckoutSuccessView =
+  | "confirmed"
+  | "confirming"
+  | "no_context"
+  | "verification_failed";
 
 /**
  * Which state /checkout/success should render:
  *  - "confirmed"  — the server-side resolver confirmed an active paid plan.
+ *  - "verification_failed" — the subscription row could not be read; retry
+ *                             without inferring Free or showing an upsell.
  *  - "confirming" — checkout context exists (fresh same-device marker or a
  *                   sanitized returnTo handoff) but no confirmation yet.
  *  - "no_context" — a direct visit: nothing to confirm, so the page must
@@ -88,9 +94,11 @@ export type CheckoutSuccessView = "confirmed" | "confirming" | "no_context";
  */
 export function resolveCheckoutSuccessView(input: {
   confirmed: boolean;
+  lookupFailed?: boolean;
   hasReturnTo: boolean;
   hasCheckoutContext: boolean;
 }): CheckoutSuccessView {
   if (input.confirmed) return "confirmed";
+  if (input.lookupFailed) return "verification_failed";
   return input.hasReturnTo || input.hasCheckoutContext ? "confirming" : "no_context";
 }

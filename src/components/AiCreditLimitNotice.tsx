@@ -33,13 +33,14 @@ export default function AiCreditLimitNotice({
   // Defensive client-side bypass: founder/paid viewers never see the
   // upsell prompt even if the server denial mis-tagged plan_id="free".
   // Server usage logging is unaffected — this only changes notice copy.
-  const { entitlement } = useMyEntitlements();
+  const { entitlement, lookupFailed } = useMyEntitlements();
   const vm = buildAiCreditLimitNoticeViewModel({
     credit,
     currentPlanLabel,
     surface,
     returnTo,
     viewerEntitlement: entitlement,
+    viewerEntitlementVerified: !lookupFailed,
   });
 
   if (vm.kind === "upsell" && vm.paywallVm) {

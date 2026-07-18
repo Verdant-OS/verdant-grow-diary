@@ -35,9 +35,13 @@ export default function CreateTentDialog({ trigger, defaultGrowId, onCreated }: 
   // Free-tier tent gate (multiTent=false → single tent). useTents already
   // filters archived tents. Fails open while entitlements load.
   const { data: tents } = useTents();
-  const { loading: entLoading, entitlement } = useMyEntitlements();
+  const {
+    loading: entLoading,
+    lookupFailed: entitlementLookupFailed,
+    entitlement,
+  } = useMyEntitlements();
   const tentGate = evaluateTentCreationGate(
-    entLoading ? null : entitlement.capabilities,
+    entLoading || entitlementLookupFailed ? null : entitlement.capabilities,
     (tents ?? []).length,
   );
 

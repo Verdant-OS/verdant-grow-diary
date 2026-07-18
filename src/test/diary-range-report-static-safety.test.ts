@@ -87,7 +87,16 @@ describe("Post-Grow report Pro gate (pricing truth)", () => {
     expect(POST_GROW).toMatch(/checkPremiumExportEntitlement\("post_grow_report"/);
     expect(POST_GROW).toContain('data-testid="post-grow-report-locked"');
     expect(POST_GROW).toContain('data-testid="post-grow-report-paywall"');
-    expect(POST_GROW).toMatch(/advancedExports\s*===\s*true/);
+    expect(POST_GROW).toMatch(/canUseCapability\(entitlement,\s*"advancedExports"\)/);
+  });
+
+  it("keeps verification failures out of the Post-Grow paywall state", () => {
+    expect(POST_GROW).toContain('res.state === "verification_failed"');
+    expect(POST_GROW).toContain('res.state === "invalid_request"');
+    expect(POST_GROW).toContain('data-testid="post-grow-report-entitlement-retry"');
+    expect(POST_GROW.indexOf('gateStatus === "error"')).toBeLessThan(
+      POST_GROW.indexOf('data-testid="post-grow-report-paywall"'),
+    );
   });
 });
 

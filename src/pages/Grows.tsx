@@ -32,9 +32,13 @@ export default function Grows() {
   // rows, so its length IS the active-grow count. Fails open while the
   // entitlement resolver is loading — the gate is UX honesty, and a paying
   // grower must never be blocked by a resolver hiccup.
-  const { loading: entLoading, entitlement } = useMyEntitlements();
+  const {
+    loading: entLoading,
+    lookupFailed: entitlementLookupFailed,
+    entitlement,
+  } = useMyEntitlements();
   const growGate = evaluateGrowCreationGate(
-    entLoading ? null : entitlement.capabilities,
+    entLoading || entitlementLookupFailed ? null : entitlement.capabilities,
     grows.length,
   );
 

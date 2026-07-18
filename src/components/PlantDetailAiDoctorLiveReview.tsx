@@ -183,7 +183,8 @@ export default function PlantDetailAiDoctorLiveReview({
     persist,
   });
 
-  const { entitlement } = useMyEntitlements();
+  const { entitlement, lookupFailed: entitlementLookupFailed } =
+    useMyEntitlements();
 
   // Keep route construction aligned with the shared route contract.
   // AiCreditLimitNotice validates it again before it reaches the pricing link.
@@ -202,8 +203,16 @@ export default function PlantDetailAiDoctorLiveReview({
       surface: "doctor",
       returnTo,
       viewerEntitlement: entitlement,
+      viewerEntitlementVerified: !entitlementLookupFailed,
     }).kind;
-  }, [entitlement, returnTo, review.credit, review.reason, review.status]);
+  }, [
+    entitlement,
+    entitlementLookupFailed,
+    returnTo,
+    review.credit,
+    review.reason,
+    review.status,
+  ]);
 
   useEffect(() => {
     if (creditNoticeKind === "upsell") {

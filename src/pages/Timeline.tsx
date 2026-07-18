@@ -347,8 +347,16 @@ export default function Timeline() {
   // Pro date-range filter (advanced timeline filtering). Client hint via
   // canUseFeature — presentation-only convenience over the grower's own
   // already-authorized diary rows, so no server gate is involved.
-  const { entitlement } = useMyEntitlements();
-  const advancedTimelineUnlocked = canUseFeature(entitlement, "advanced_timeline_filters");
+  const {
+    entitlement,
+    loading: entitlementLoading,
+    lookupFailed,
+    refetch: refetchEntitlement,
+  } = useMyEntitlements();
+  const advancedTimelineUnlocked =
+    !entitlementLoading &&
+    !lookupFailed &&
+    canUseFeature(entitlement, "advanced_timeline_filters");
   const [startDateFilter, setStartDateFilter] = useState<string>(() => {
     const v = searchParams.get(TIMELINE_START_DATE_PARAM);
     return isTimelineDateFilterValue(v) ? v : "";
@@ -984,7 +992,30 @@ export default function Timeline() {
             Start date must be on or before end date. The range is not applied until it is.
           </p>
         )}
-        {!advancedTimelineUnlocked && (
+        {entitlementLoading && (
+          <p className="text-[11px] text-muted-foreground" role="status">
+            Checking Advanced timeline filtering access…
+          </p>
+        )}
+        {lookupFailed && !entitlementLoading && (
+          <div
+            className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground"
+            data-testid="timeline-advanced-filters-verification-failed"
+            role="status"
+          >
+            <span>We couldn't verify Advanced timeline filtering access right now.</span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => void refetchEntitlement()}
+              data-testid="timeline-advanced-filters-retry"
+            >
+              Retry plan check
+            </Button>
+          </div>
+        )}
+        {!advancedTimelineUnlocked && !entitlementLoading && !lookupFailed && (
           <p
             className="text-[11px] text-muted-foreground"
             data-testid="timeline-advanced-filters-locked"

@@ -152,6 +152,14 @@ describe("static wiring — src/pages/Timeline.tsx", () => {
     expect(src).toMatch(/disabled=\{!advancedTimelineUnlocked\}/);
   });
 
+  it("distinguishes entitlement verification failure from a verified Free plan", () => {
+    expect(src).toMatch(/lookupFailed/);
+    expect(src).toMatch(/refetch/);
+    expect(src).toContain('data-testid="timeline-advanced-filters-verification-failed"');
+    expect(src).toContain('data-testid="timeline-advanced-filters-retry"');
+    expect(src).toMatch(/!lookupFailed\s*&&\s*\(/);
+  });
+
   it("mirrors the range to ?start/?end URL params", () => {
     expect(src).toContain('const TIMELINE_START_DATE_PARAM = "start"');
     expect(src).toContain('const TIMELINE_END_DATE_PARAM = "end"');

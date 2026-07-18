@@ -42,8 +42,9 @@ export default function PhenoTrackerPreviewCard({
   ...rest
 }: PhenoTrackerPreviewCardProps) {
   const testId = rest["data-testid"] ?? "pheno-tracker-preview-card";
-  const { entitlement, loading } = useMyEntitlements();
-  const entitled = !loading && canUseFeature(entitlement, "pheno_tracker");
+  const { entitlement, loading, lookupFailed, refetch } = useMyEntitlements();
+  const entitled =
+    !loading && !lookupFailed && canUseFeature(entitlement, "pheno_tracker");
 
   return (
     <Card
@@ -78,7 +79,28 @@ export default function PhenoTrackerPreviewCard({
         </ul>
       </CardContent>
       <CardFooter className="flex flex-wrap items-center gap-3">
-        {entitled ? (
+        {loading ? (
+          <span className="text-sm text-muted-foreground">Checking access…</span>
+        ) : lookupFailed ? (
+          <>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              data-testid={`${testId}-retry`}
+              onClick={() => void refetch()}
+            >
+              Retry plan check
+            </Button>
+            <Link
+              to="/pheno-comparison"
+              data-testid={`${testId}-demo-link`}
+              className="text-sm font-medium text-muted-foreground hover:text-foreground hover:underline"
+            >
+              View Demo
+            </Link>
+          </>
+        ) : entitled ? (
           <Link to="/pheno-hunts/new" data-testid={`${testId}-start-link`}>
             <Button size="sm">Start Pheno Hunt</Button>
           </Link>

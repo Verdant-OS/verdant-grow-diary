@@ -16,6 +16,10 @@ export { FREE_CAPABILITIES } from "./capabilities";
 export { PLAN_CATALOG, KNOWN_PLAN_IDS, isKnownPlanId } from "./planCatalog";
 export { resolveEntitlements } from "./resolveEntitlements";
 export {
+  canUseCapability,
+  type BooleanCapabilityKey,
+} from "./capabilityAccess";
+export {
   mapLovableSubscriptionRow,
   type LovableSubscriptionRow,
   type LovableBillingEnvironment,

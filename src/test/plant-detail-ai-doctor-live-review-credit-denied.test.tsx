@@ -15,6 +15,7 @@ const { trackFunnelEvent } = vi.hoisted(() => ({
 }));
 
 const entitlementState = vi.hoisted(() => ({
+  lookupFailed: false,
   current: {
     displayPlanId: "free",
     effectivePlanId: "free",
@@ -53,7 +54,9 @@ vi.mock("@/hooks/useTimelineMemory", () => ({
 vi.mock("@/hooks/useMyEntitlements", () => ({
   useMyEntitlements: () => ({
     loading: false,
+    lookupFailed: entitlementState.lookupFailed,
     entitlement: entitlementState.current,
+    refetch: async () => undefined,
   }),
 }));
 
@@ -92,6 +95,7 @@ function strongTimeline(): TimelineMemoryItem[] {
 describe("PlantDetailAiDoctorLiveReview — credit_denied branch", () => {
   beforeEach(() => {
     trackFunnelEvent.mockClear();
+    entitlementState.lookupFailed = false;
     entitlementState.current = {
       displayPlanId: "free",
       effectivePlanId: "free",
@@ -148,6 +152,20 @@ describe("PlantDetailAiDoctorLiveReview — credit_denied branch", () => {
     });
     // Generic failure pane must NOT render.
     expect(screen.queryByTestId("plant-ai-doctor-live-review-failure")).toBeNull();
+  });
+
+  it("keeps the denial plan-neutral when the defensive viewer plan check failed", async () => {
+    entitlementState.lookupFailed = true;
+    await mountAndDeny("free");
+
+    expect(screen.getByTestId("plant-ai-doctor-live-review-credit-denied")).toHaveAttribute(
+      "data-kind",
+      "unknown",
+    );
+    expect(
+      screen.queryByTestId("plant-ai-doctor-live-review-credit-denied-paywall-link"),
+    ).toBeNull();
+    expect(trackFunnelEvent).not.toHaveBeenCalled();
   });
 
   it("offers a lapsed Pro grower the same return-safe reactivation path", async () => {

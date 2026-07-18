@@ -6,14 +6,15 @@
  * Forbidden marketing phrases stay absent.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { resolveEntitlements } from "@/lib/entitlements/resolveEntitlements";
 import type { BillingSubscriptionRow } from "@/lib/entitlements/types";
 
 const NOW = new Date("2026-08-01T00:00:00Z");
 const mode = vi.hoisted(() => ({
-  current: "free" as "free" | "pro" | "founder" | "loading",
+  current: "free" as "free" | "pro" | "founder" | "loading" | "error",
+  refetch: vi.fn(async () => undefined),
 }));
 
 vi.mock("@/hooks/useMyEntitlements", () => ({
@@ -21,8 +22,9 @@ vi.mock("@/hooks/useMyEntitlements", () => ({
     if (mode.current === "loading") {
       return {
         loading: true,
+        lookupFailed: false,
         entitlement: resolveEntitlements(null, NOW),
-        refetch: async () => {},
+        refetch: mode.refetch,
       };
     }
     const base: BillingSubscriptionRow = {
@@ -45,8 +47,9 @@ vi.mock("@/hooks/useMyEntitlements", () => ({
       row = { ...base, plan_id: "founder_lifetime", current_period_end: null };
     return {
       loading: false,
+      lookupFailed: mode.current === "error",
       entitlement: resolveEntitlements(row, NOW),
-      refetch: async () => {},
+      refetch: mode.refetch,
     };
   },
 }));
@@ -71,7 +74,10 @@ function renderCard() {
 }
 
 describe("PhenoTrackerPreviewCard", () => {
-  beforeEach(() => cleanup());
+  beforeEach(() => {
+    cleanup();
+    mode.refetch.mockClear();
+  });
 
   it("Free user sees Upgrade + View Demo CTAs", () => {
     mode.current = "free";
@@ -119,5 +125,15 @@ describe("PhenoTrackerPreviewCard", () => {
     expect(screen.getByTestId("pheno-tracker-preview-card-start-link").getAttribute("href")).toBe(
       "/pheno-hunts/new",
     );
+  });
+
+  it("lookup failure offers Retry and Demo without an upgrade CTA", () => {
+    mode.current = "error";
+    renderCard();
+
+    expect(screen.queryByTestId("pheno-tracker-preview-card-upgrade-link")).toBeNull();
+    expect(screen.getByTestId("pheno-tracker-preview-card-demo-link")).toBeDefined();
+    fireEvent.click(screen.getByTestId("pheno-tracker-preview-card-retry"));
+    expect(mode.refetch).toHaveBeenCalledTimes(1);
   });
 });

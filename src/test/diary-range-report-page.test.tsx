@@ -30,7 +30,8 @@ vi.mock("@/store/grows", () => ({
 function proEntitlement() {
   return {
     loading: false,
-    entitlement: { capabilities: { advancedExports: true } },
+    lookupFailed: false,
+    entitlement: { isActive: true, capabilities: { advancedExports: true } },
     refetch: async () => {},
   };
 }
@@ -38,7 +39,8 @@ function proEntitlement() {
 function freeEntitlement() {
   return {
     loading: false,
-    entitlement: { capabilities: { advancedExports: false } },
+    lookupFailed: false,
+    entitlement: { isActive: true, capabilities: { advancedExports: false } },
     refetch: async () => {},
   };
 }
@@ -119,6 +121,42 @@ describe("gating", () => {
       expect(screen.getByTestId("diary-range-report-page-locked")).toBeInTheDocument(),
     );
     expect(screen.getByTestId("diary-range-report-page-locked").getAttribute("data-server-gate-status")).toBe("error");
+    expect(screen.queryByTestId("diary-range-report-paywall")).not.toBeInTheDocument();
+    expect(screen.getByTestId("diary-range-report-entitlement-retry")).toBeInTheDocument();
+  });
+
+  it("treats entitlement lookup failure as retryable verification, not a paywall", async () => {
+    mockCheck.mockResolvedValue({
+      ok: false,
+      state: "verification_failed",
+      reason: "entitlement_lookup_failed",
+      displayPlanId: null,
+    });
+    renderPage();
+    await waitFor(() =>
+      expect(screen.getByTestId("diary-range-report-page-locked")).toBeInTheDocument(),
+    );
+    expect(screen.getByTestId("diary-range-report-page-locked").getAttribute("data-server-gate-status")).toBe("error");
+    expect(screen.queryByTestId("diary-range-report-paywall")).not.toBeInTheDocument();
+    expect(screen.getByTestId("diary-range-report-entitlement-retry")).toBeInTheDocument();
+  });
+
+  it("does not turn an invalid gate request into an upgrade prompt", async () => {
+    mockCheck.mockResolvedValue({
+      ok: false,
+      state: "invalid_request",
+      reason: "invalid_request",
+      displayPlanId: null,
+    });
+    renderPage();
+    await waitFor(() =>
+      expect(screen.getByTestId("diary-range-report-page-locked")).toBeInTheDocument(),
+    );
+    expect(screen.getByTestId("diary-range-report-page-locked")).toHaveAttribute(
+      "data-server-gate-status",
+      "error",
+    );
+    expect(screen.queryByTestId("diary-range-report-paywall")).not.toBeInTheDocument();
   });
 
   it("requests the diary_range_report feature with the page scope", async () => {

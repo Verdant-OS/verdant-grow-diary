@@ -106,6 +106,12 @@ export interface AiCreditLimitNoticeInput {
    * downgrades upsell copy to plan-neutral "wait" copy.
    */
   viewerEntitlement?: ResolvedEntitlement | null;
+  /**
+   * False when the viewer entitlement read failed. In that state the client
+   * cannot safely use fallback Free to reinforce an upsell, so copy remains
+   * plan-neutral even if a denial payload says Free.
+   */
+  viewerEntitlementVerified?: boolean;
 }
 
 function buildPricingHref(returnTo: string | null | undefined): string {
@@ -120,6 +126,15 @@ export function buildAiCreditLimitNoticeViewModel(
 ): AiCreditLimitNoticeViewModel {
   const surface: AiCreditLimitNoticeSurface = input.surface ?? "doctor";
   const copy = copyFor(surface);
+  if (input.viewerEntitlementVerified === false) {
+    return {
+      kind: "unknown",
+      surface,
+      title: copy.unknownTitle,
+      body: copy.unknownBody,
+      charged: false,
+    };
+  }
   const viewerView: AiDoctorEntitlementView = resolveAiDoctorEntitlementView({
     entitlement: input.viewerEntitlement ?? null,
   });

@@ -56,7 +56,11 @@ interface GrowInfo {
  */
 export default function PhenoHuntNew() {
   const { user } = useAuth();
-  const { entitlement } = useMyEntitlements();
+  const {
+    entitlement,
+    loading: entitlementLoading,
+    lookupFailed: entitlementLookupFailed,
+  } = useMyEntitlements();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const growId = params.get("growId");
@@ -159,6 +163,14 @@ export default function PhenoHuntNew() {
 
   const onSave = async () => {
     if (!canSave || !growId) return;
+    if (entitlementLoading) {
+      toast.error("Pheno Tracker access is still being checked. Try again in a moment.");
+      return;
+    }
+    if (entitlementLookupFailed) {
+      toast.error("We couldn't verify Pheno Tracker access. Retry the plan check and try again.");
+      return;
+    }
     // Belt-and-suspenders: server-side RESTRICTIVE RLS +
     // has_pheno_tracker_entitlement already enforce this; re-check here so
     // any future direct handler invocation (deep link race, dev tools,

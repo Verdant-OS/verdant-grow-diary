@@ -21,7 +21,7 @@ import { CheckCircle2, Info, Loader2 } from "lucide-react";
  * SAFETY (Phase 2b truth copy):
  *  - Entitlement is resolved server-side via the union resolver. This page
  *    only reflects that resolution — it does NOT grant entitlements.
- *  - Three distinct states, never claiming completion unverified:
+ *  - Four distinct states, never claiming completion unverified:
  *      "confirming" — real checkout context on this device (fresh marker
  *                     from checkoutContextRules, or a sanitized returnTo);
  *                     polls the resolver up to ~30 s.
@@ -31,6 +31,8 @@ import { CheckCircle2, Info, Loader2 } from "lucide-react";
  *                     returnTo) upgrades to confirmed when the webhook
  *                     lands.
  *      "confirmed"  — resolver confirmed an active paid plan.
+ *      "verification_failed" — resolver read failed; neutral retry state,
+ *                               never inferred as Free or promoted to pricing.
  *  - "Verdant Pro is active." is shown ONLY after `isActive` is true and
  *    `effectivePlanId !== 'free'`.
  */
@@ -45,11 +47,15 @@ const POLL_INTERVAL_MS = 1500;
 const POLL_TIMEOUT_MS = 30_000;
 
 export default function CheckoutSuccess() {
-  const { loading, entitlement, refetch } = useMyEntitlements();
+  const { loading, lookupFailed, entitlement, refetch } = useMyEntitlements();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  const confirmed = !loading && entitlement.isActive && entitlement.effectivePlanId !== "free";
+  const confirmed =
+    !loading &&
+    !lookupFailed &&
+    entitlement.isActive &&
+    entitlement.effectivePlanId !== "free";
 
   // Sanitize the returnTo query param. Never trust the raw value: only
   // same-origin absolute app paths are allowed (see checkoutReturnTo).
@@ -68,6 +74,7 @@ export default function CheckoutSuccess() {
   const [hasCheckoutContext] = useState(() => hasFreshCheckoutContext(Date.now()));
   const view = resolveCheckoutSuccessView({
     confirmed,
+    lookupFailed,
     hasReturnTo: safeReturnTo !== null,
     hasCheckoutContext,
   });
@@ -81,6 +88,8 @@ export default function CheckoutSuccess() {
     title:
       view === "confirmed"
         ? "Verdant Pro is active | Verdant Grow Diary"
+        : view === "verification_failed"
+          ? "Plan check unavailable | Verdant Grow Diary"
         : view === "confirming"
           ? "Confirming your Verdant Pro access | Verdant Grow Diary"
           : "Checkout status | Verdant Grow Diary",
@@ -190,6 +199,19 @@ export default function CheckoutSuccess() {
                 </ol>
               </div>
             )}
+          </>
+        ) : view === "verification_failed" ? (
+          <>
+            <h1
+              className="mt-6 font-display text-3xl md:text-4xl font-bold tracking-tight"
+              data-testid="checkout-success-verification-failed-heading"
+            >
+              We couldn&apos;t verify your plan.
+            </h1>
+            <p className="mt-4 text-muted-foreground">
+              Your plan has not been changed. Retry the check, or open Settings to review your
+              account when the connection is available.
+            </p>
           </>
         ) : view === "confirming" ? (
           <>

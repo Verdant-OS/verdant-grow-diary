@@ -87,6 +87,17 @@ export default function GuidePage() {
     const crumbs = buildBreadcrumbListJsonLd({
       items: [...VERDANT_GUIDES_BREADCRUMB_ITEMS, { name: guide.h1, url: guideUrl }],
     });
+    // Evergreen guides — use the site's stable publish date so Article
+    // schema validates without inventing per-guide edit timestamps.
+    const article = buildArticleJsonLd({
+      headline: guide.h1,
+      description: guide.description,
+      url: guideUrl,
+      datePublished: "2025-01-01",
+      authorName: "Verdant Grow Diary",
+      publisherName: "Verdant Grow Diary",
+      siteUrl: VERDANT_SITE_ORIGIN,
+    });
     const faqScript = document.createElement("script");
     faqScript.type = "application/ld+json";
     faqScript.setAttribute("data-page-ldjson", `guide-${guide.slug}-faq`);
@@ -97,9 +108,15 @@ export default function GuidePage() {
     crumbScript.setAttribute("data-page-ldjson", `guide-${guide.slug}-breadcrumb`);
     crumbScript.text = safeJsonLdStringify(crumbs);
     document.head.appendChild(crumbScript);
+    const articleScript = document.createElement("script");
+    articleScript.type = "application/ld+json";
+    articleScript.setAttribute("data-page-ldjson", `guide-${guide.slug}-article`);
+    articleScript.text = safeJsonLdStringify(article);
+    document.head.appendChild(articleScript);
     return () => {
       faqScript.remove();
       crumbScript.remove();
+      articleScript.remove();
     };
   }, [guide]);
 

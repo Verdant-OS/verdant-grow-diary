@@ -34,6 +34,33 @@ export default function CultivarPage() {
     path: cultivar ? `/cultivars/${cultivar.slug}` : "/cultivars",
   });
 
+  useEffect(() => {
+    if (!cultivar) return;
+    const url = `${VERDANT_SITE_ORIGIN}/cultivars/${cultivar.slug}`;
+    const jsonLd = buildCultivarCollectionJsonLd({
+      name: `${cultivar.name} grow guide`,
+      alternateName: cultivar.searchAlias,
+      description: `${cultivar.name} cultivator profile: lineage ${cultivar.lineage}, ${cultivar.flowerWeeks} flower window, difficulty ${cultivar.difficulty}, plus environment ranges by stage and common issues home growers report.`,
+      url,
+      properties: [
+        { name: "Lineage", value: cultivar.lineage },
+        { name: "Flower window", value: cultivar.flowerWeeks },
+        { name: "Difficulty", value: cultivar.difficulty },
+        { name: "Seedling environment", value: cultivar.environment.seedling },
+        { name: "Vegetative environment", value: cultivar.environment.veg },
+        { name: "Flower environment", value: cultivar.environment.flower },
+      ],
+    });
+    const script = document.createElement("script");
+    script.type = "application/ld+json";
+    script.setAttribute("data-page-ldjson", `cultivar-${cultivar.slug}-collection`);
+    script.text = safeJsonLdStringify(jsonLd);
+    document.head.appendChild(script);
+    return () => {
+      script.remove();
+    };
+  }, [cultivar]);
+
   if (!cultivar) {
     return <Navigate to="/cultivars" replace />;
   }

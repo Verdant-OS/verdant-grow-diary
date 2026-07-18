@@ -2,12 +2,12 @@
 // on Plant Detail's "Ask Doctor" launch dialog.
 //
 // SAFETY:
-// - All Supabase /auth/v1/** and /rest/v1/** traffic is intercepted via
-//   page.route(). No real Supabase calls, no real accounts, no writes.
+// - One route boundary intercepts every Supabase /auth/v1/** and /rest/v1/**
+//   request. Non-local external traffic is blocked before it can leave the
+//   browser, so there are no real Supabase calls, accounts, or writes.
 // - Uses a mocked signed-in user (fake token strings clearly labeled).
-// - Plant "p1" is a NON-UUID id, so growRepo short-circuits to the bundled
-//   mock plant (stage flower, photo present) with zero /rest/v1/plants
-//   traffic; only diary_entries fixtures below drive the freshness gate.
+// - The grow, tent, and plant are explicit UUID-backed REST fixtures. The
+//   authenticated surface never relies on bundled mock/demo fallback data.
 //
 // GATE SEMANTICS UNDER TEST (the load-bearing part):
 // - FRESH  (snapshot <= 48h old + recent activity) → no stale explanation,
@@ -23,7 +23,7 @@
 // to Date.now() at test time with ≥30min margins on both sides of the 48h
 // boundary, and boundary exactness is asserted through the dialog's
 // data-cutoff-at / data-snapshot-at ISO attributes (locale-independent).
-import { test, expect, type Page, type Route } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 
 const MOCKED_PROJECT = "chromium-mocked";
 
@@ -42,16 +42,68 @@ const FAKE_USER = {
   user_metadata: { email_verified: true },
 };
 
-// Bundled mock plant (non-UUID id → served without any plants stub).
-const PLANT_ID = "p1";
-const TENT_ID = "t1";
+const GROW_ID = "11111111-1111-4111-8111-111111111111";
+const TENT_ID = "22222222-2222-4222-8222-222222222222";
+const PLANT_ID = "33333333-3333-4333-8333-333333333333";
 const PLANT_REVIEW_HREF = `/plants/${PLANT_ID}#plant-ai-doctor-review`;
+
+const GROW_ROW = {
+  id: GROW_ID,
+  name: "Freshness Proof Grow",
+  stage: "flower",
+  is_archived: false,
+  created_at: "2026-07-01T00:00:00.000Z",
+};
+
+const TENT_ROW = {
+  id: TENT_ID,
+  grow_id: GROW_ID,
+  name: "Freshness Proof Tent",
+  brand: "",
+  size: "2x2",
+  stage: "flower",
+  light_on: true,
+  light_schedule: "12/12",
+  light_wattage: 150,
+  is_archived: false,
+  created_at: "2026-07-01T00:00:00.000Z",
+};
+
+const PLANT_ROW = {
+  id: PLANT_ID,
+  grow_id: GROW_ID,
+  tent_id: TENT_ID,
+  name: "Freshness Proof Plant",
+  strain: "Browser fixture",
+  stage: "flower",
+  started_at: "2026-07-01T00:00:00.000Z",
+  health: "healthy",
+  photo_url: "/placeholder.svg",
+  last_note: null,
+  is_archived: false,
+  medium: "soil",
+  pot_size: "3 gal",
+  created_at: "2026-07-01T00:00:00.000Z",
+};
+
+// Mirrors src/constants/agreements.ts so the fixture represents a grower who
+// already completed signup consent. This removes the only write the old
+// browser harness performed (accepting the re-consent modal).
+const CURRENT_AGREEMENT_ROWS = [
+  { agreement_type: "terms", version: "2026-07-13" },
+  { agreement_type: "privacy", version: "2026-07-13" },
+];
 
 const HOUR_MS = 3_600_000;
 const FRESH_WINDOW_MS = 48 * HOUR_MS;
 
 // Requests this presentation-only surface must never make.
 const FORBIDDEN_REQUEST_RE = /(openai|anthropic|api\.groq|\/functions\/v1\/)/i;
+const WRITE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+const READ_ONLY_RPC_PATHS = new Set([
+  "/rest/v1/rpc/has_role",
+  "/rest/v1/rpc/get_latest_tent_sensor_snapshot",
+]);
 
 async function seedFakeSession(page: Page) {
   await page.addInitScript(
@@ -74,9 +126,75 @@ async function seedFakeSession(page: Page) {
   );
 }
 
-async function mockSignedInSupabase(page: Page) {
+interface TrafficAudit {
+  forbidden: string[];
+  pageErrors: string[];
+  restReads: string[];
+  restMutations: string[];
+  readOnlyRpcCalls: string[];
+  functionRequests: string[];
+  blockedExternal: string[];
+  realExternalResponses: string[];
+  interceptedRemote: Set<string>;
+}
+
+function isLocalUrl(rawUrl: string): boolean {
+  try {
+    const host = new URL(rawUrl).hostname;
+    return host === "localhost" || host === "127.0.0.1" || host === "::1";
+  } catch {
+    return false;
+  }
+}
+
+function watchTraffic(page: Page): TrafficAudit {
+  const traffic: TrafficAudit = {
+    forbidden: [],
+    pageErrors: [],
+    restReads: [],
+    restMutations: [],
+    readOnlyRpcCalls: [],
+    functionRequests: [],
+    blockedExternal: [],
+    realExternalResponses: [],
+    interceptedRemote: new Set<string>(),
+  };
+  page.on("pageerror", (error) => traffic.pageErrors.push(String(error)));
+  page.on("request", (request) => {
+    if (FORBIDDEN_REQUEST_RE.test(request.url())) {
+      traffic.forbidden.push(`${request.method()} ${request.url()}`);
+    }
+  });
+  page.on("response", (response) => {
+    const url = response.url();
+    if (!isLocalUrl(url) && !traffic.interceptedRemote.has(url)) {
+      traffic.realExternalResponses.push(`${response.status()} ${url}`);
+    }
+  });
+  return traffic;
+}
+
+async function mockSignedInSupabase(
+  page: Page,
+  diaryRows: readonly DiaryFixtureRow[],
+  traffic: TrafficAudit,
+) {
+  // Register the external fence first. The specific mocked Supabase routes
+  // below are registered later and therefore win Playwright's LIFO match.
+  // Everything else non-local is aborted, never continued to the network.
+  await page.route("**/*", async (route) => {
+    const request = route.request();
+    if (isLocalUrl(request.url())) {
+      await route.continue();
+      return;
+    }
+    traffic.blockedExternal.push(`${request.method()} ${request.url()}`);
+    await route.abort("blockedbyclient");
+  });
+
   await page.route(/\/auth\/v1\//, async (route, req) => {
     const url = req.url();
+    traffic.interceptedRemote.add(url);
     if (/\/user/i.test(url)) {
       await route.fulfill({
         status: 200,
@@ -102,11 +220,61 @@ async function mockSignedInSupabase(page: Page) {
     }
     await route.fulfill({ status: 200, contentType: "application/json", body: "{}" });
   });
-  // Catch-all FIRST; the diary_entries fixture route is registered after
-  // it in each test (Playwright checks later-registered routes first).
-  await page.route(/\/rest\/v1\//, (route) =>
-    route.fulfill({ status: 200, contentType: "application/json", body: "[]" }),
-  );
+
+  // This catch-all owns the entire Supabase REST boundary. Every permitted
+  // read receives a deterministic fixture; any write is aborted and fails the
+  // scenario assertion below. No REST request is ever continued.
+  await page.route(/\/rest\/v1\//, async (route) => {
+    const request = route.request();
+    const url = request.url();
+    const pathname = new URL(url).pathname;
+    const label = `${request.method()} ${url}`;
+    traffic.interceptedRemote.add(url);
+
+    if (READ_ONLY_RPC_PATHS.has(pathname)) {
+      traffic.readOnlyRpcCalls.push(label);
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: pathname.endsWith("/has_role") ? "false" : "null",
+      });
+      return;
+    }
+
+    if (WRITE_METHODS.has(request.method())) {
+      traffic.restMutations.push(label);
+      await route.abort("blockedbyclient");
+      return;
+    }
+
+    traffic.restReads.push(label);
+    const table = pathname.match(/\/rest\/v1\/([^/]+)/)?.[1] ?? "";
+    const rows =
+      table === "grows"
+        ? [GROW_ROW]
+        : table === "tents"
+          ? [TENT_ROW]
+          : table === "plants"
+            ? [PLANT_ROW]
+            : table === "diary_entries"
+              ? diaryRows
+              : table === "user_agreement_acceptances"
+                ? CURRENT_AGREEMENT_ROWS
+                : [];
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      headers: { "content-range": `0-${Math.max(rows.length - 1, 0)}/${rows.length}` },
+      body: JSON.stringify(rows),
+    });
+  });
+
+  await page.route(/\/functions\/v1\//, async (route) => {
+    const request = route.request();
+    traffic.interceptedRemote.add(request.url());
+    traffic.functionRequests.push(`${request.method()} ${request.url()}`);
+    await route.fulfill({ status: 404, contentType: "application/json", body: "{}" });
+  });
 }
 
 interface DiaryFixtureRow {
@@ -167,68 +335,48 @@ function buildDiaryFixture(nowMs: number, snapshotAgeMs: number | null): DiaryFi
   return rows.sort((a, b) => (a.entry_at < b.entry_at ? 1 : -1));
 }
 
-async function stubDiaryEntries(page: Page, rows: DiaryFixtureRow[]) {
-  await page.route(/\/rest\/v1\/diary_entries/, (route: Route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify(rows),
-    }),
+function expectIsolatedReadOnlyTraffic(traffic: TrafficAudit) {
+  expect(traffic.restReads).toEqual(
+    expect.arrayContaining([
+      expect.stringContaining("/rest/v1/plants"),
+      expect.stringContaining("/rest/v1/tents"),
+      expect.stringContaining("/rest/v1/diary_entries"),
+    ]),
   );
-}
-
-function watchTraffic(page: Page) {
-  const forbidden: string[] = [];
-  const pageErrors: string[] = [];
-  page.on("pageerror", (e) => pageErrors.push(String(e)));
-  page.on("request", (req) => {
-    if (FORBIDDEN_REQUEST_RE.test(req.url())) {
-      forbidden.push(`${req.method()} ${req.url()}`);
-    }
-  });
-  return { forbidden, pageErrors };
-}
-
-// The signed-in agreement re-consent gate renders as a modal overlay for
-// accounts with no recorded consent rows (our mocked user), swallowing all
-// pointer events. Accept it before interacting (same helper as the Quick
-// Log smoke; the acceptance write is swallowed by the /rest/v1/ catch-all).
-async function acceptReconsentGateIfShown(page: Page) {
-  const gate = page.getByTestId("agreement-reconsent-gate");
-  const shown = await gate
-    .waitFor({ state: "visible", timeout: 5_000 })
-    .then(() => true)
-    .catch(() => false);
-  if (!shown) return;
-  await gate.locator("#reconsent-accept").click();
-  await gate.getByRole("button", { name: /accept and continue/i }).click();
-  await gate.waitFor({ state: "hidden", timeout: 15_000 });
+  expect(traffic.restMutations, "intercepted REST mutations").toEqual([]);
+  expect(traffic.functionRequests, "AI/edge-function requests").toEqual([]);
+  expect(traffic.forbidden, "forbidden AI/function requests").toEqual([]);
+  expect(traffic.realExternalResponses, "real external network responses").toEqual([]);
+  expect(traffic.pageErrors, "uncaught page errors").toEqual([]);
 }
 
 async function openDoctorLaunchDialog(page: Page) {
-  await page.goto(`/plants/${PLANT_ID}`);
-  await acceptReconsentGateIfShown(page);
+  await page.goto(`/plants/${PLANT_ID}`, { waitUntil: "domcontentloaded" });
   const trigger = page.getByTestId("plant-detail-doctor-launch-trigger");
   await expect(trigger).toBeVisible();
+  await expect(page.getByText("No real plants yet")).toHaveCount(0);
+  await expect(page.getByTestId("agreement-reconsent-gate")).toHaveCount(0);
   await trigger.click();
   await expect(page.getByTestId("plant-detail-doctor-launch-dialog")).toBeVisible();
 }
 
+async function installFreshnessHarness(page: Page, diaryRows: readonly DiaryFixtureRow[]) {
+  const traffic = watchTraffic(page);
+  await seedFakeSession(page);
+  await mockSignedInSupabase(page, diaryRows, traffic);
+  return traffic;
+}
+
 test.describe("AI Doctor snapshot freshness gate (mocked, 48h boundary)", () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(() => {
     test.skip(
       test.info().project.name !== MOCKED_PROJECT,
       `freshness boundary proof runs once, under the ${MOCKED_PROJECT} project`,
     );
-    await seedFakeSession(page);
-    await mockSignedInSupabase(page);
   });
 
-  test("FRESH: snapshot 47h30m old → no stale explanation, Continue enabled", async ({
-    page,
-  }) => {
-    const traffic = watchTraffic(page);
-    await stubDiaryEntries(
+  test("FRESH: snapshot 47h30m old → no stale explanation, Continue enabled", async ({ page }) => {
+    const traffic = await installFreshnessHarness(
       page,
       buildDiaryFixture(Date.now(), FRESH_WINDOW_MS - 30 * 60_000),
     );
@@ -237,9 +385,7 @@ test.describe("AI Doctor snapshot freshness gate (mocked, 48h boundary)", () => 
     await expect(
       page.getByTestId("plant-detail-doctor-launch-snapshot-stale-explanation"),
     ).toHaveCount(0);
-    await expect(
-      page.getByTestId("plant-detail-doctor-launch-continue-blocked"),
-    ).toHaveCount(0);
+    await expect(page.getByTestId("plant-detail-doctor-launch-continue-blocked")).toHaveCount(0);
 
     const cont = page.getByTestId("plant-detail-doctor-launch-continue");
     await expect(cont).toBeVisible();
@@ -248,27 +394,21 @@ test.describe("AI Doctor snapshot freshness gate (mocked, 48h boundary)", () => 
       page.getByTestId("plant-detail-doctor-launch-log-readiness-to-diary"),
     ).toHaveAttribute("data-snapshot-freshness", "fresh");
 
-    expect(traffic.forbidden, "forbidden AI/function requests").toEqual([]);
-    expect(traffic.pageErrors, "uncaught page errors").toEqual([]);
+    expectIsolatedReadOnlyTraffic(traffic);
   });
 
   test("STALE: snapshot 48h30m old → stale explanation renders, Continue STAYS enabled", async ({
     page,
   }) => {
-    const traffic = watchTraffic(page);
     const fixtureNowMs = Date.now();
-    const snapshotIso = new Date(
-      fixtureNowMs - (FRESH_WINDOW_MS + 30 * 60_000),
-    ).toISOString();
-    await stubDiaryEntries(
+    const snapshotIso = new Date(fixtureNowMs - (FRESH_WINDOW_MS + 30 * 60_000)).toISOString();
+    const traffic = await installFreshnessHarness(
       page,
       buildDiaryFixture(fixtureNowMs, FRESH_WINDOW_MS + 30 * 60_000),
     );
     await openDoctorLaunchDialog(page);
 
-    const staleBox = page.getByTestId(
-      "plant-detail-doctor-launch-snapshot-stale-explanation",
-    );
+    const staleBox = page.getByTestId("plant-detail-doctor-launch-snapshot-stale-explanation");
     await expect(staleBox).toBeVisible();
     await expect(staleBox).toHaveAttribute("role", "status");
     await expect(staleBox).toHaveAttribute("data-snapshot-at", snapshotIso);
@@ -289,12 +429,8 @@ test.describe("AI Doctor snapshot freshness gate (mocked, 48h boundary)", () => 
 
     // THE gate semantics: stale-but-recent snapshot + activity → partial →
     // Continue remains an enabled link; no blocked button, no blocked box.
-    await expect(
-      page.getByTestId("plant-detail-doctor-launch-continue-blocked"),
-    ).toHaveCount(0);
-    await expect(
-      page.getByTestId("plant-detail-doctor-launch-blocked-explanation"),
-    ).toHaveCount(0);
+    await expect(page.getByTestId("plant-detail-doctor-launch-continue-blocked")).toHaveCount(0);
+    await expect(page.getByTestId("plant-detail-doctor-launch-blocked-explanation")).toHaveCount(0);
     const cont = page.getByTestId("plant-detail-doctor-launch-continue");
     await expect(cont).toBeVisible();
     await expect(cont).toHaveAttribute("href", PLANT_REVIEW_HREF);
@@ -302,15 +438,13 @@ test.describe("AI Doctor snapshot freshness gate (mocked, 48h boundary)", () => 
       page.getByTestId("plant-detail-doctor-launch-log-readiness-to-diary"),
     ).toHaveAttribute("data-snapshot-freshness", "stale");
 
-    expect(traffic.forbidden, "forbidden AI/function requests").toEqual([]);
-    expect(traffic.pageErrors, "uncaught page errors").toEqual([]);
+    expectIsolatedReadOnlyTraffic(traffic);
   });
 
   test("BLOCKED: no activity and no snapshot → disabled Continue + blocked explanation", async ({
     page,
   }) => {
-    const traffic = watchTraffic(page);
-    await stubDiaryEntries(page, []);
+    const traffic = await installFreshnessHarness(page, []);
     await openDoctorLaunchDialog(page);
 
     await expect(page.getByTestId("plant-detail-doctor-launch-continue")).toHaveCount(0);
@@ -328,7 +462,6 @@ test.describe("AI Doctor snapshot freshness gate (mocked, 48h boundary)", () => 
       .evaluateAll((lis) => lis.map((li) => li.getAttribute("data-blocking-code")));
     expect(codes).toEqual(["recent-timeline-activity", "recent-manual-sensor-snapshot"]);
 
-    expect(traffic.forbidden, "forbidden AI/function requests").toEqual([]);
-    expect(traffic.pageErrors, "uncaught page errors").toEqual([]);
+    expectIsolatedReadOnlyTraffic(traffic);
   });
 });

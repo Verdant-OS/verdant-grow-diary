@@ -51,6 +51,12 @@ describe("PhenoHuntDemo page", () => {
     expect(screen.getByTestId("pheno-contenders-caveat").textContent).toMatch(/doesn't decide/i);
   });
 
+  it("renders fight night with the two keepers head to head", () => {
+    renderPage();
+    expect(screen.getByTestId("pheno-fight")).toBeInTheDocument();
+    expect(screen.getByTestId("pheno-fight-caveat").textContent).toMatch(/you make the call/i);
+  });
+
   it("frames the score as a shortlist, not a verdict (ethos)", () => {
     renderPage();
     expect(screen.getByTestId("pheno-hunt-demo-caveat").textContent).toMatch(/not the verdict/i);

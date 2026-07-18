@@ -17,6 +17,8 @@ import { Badge } from "@/components/ui/badge";
 import PhenoFamilyTree from "@/components/PhenoFamilyTree";
 import PhenoContendersBoard from "@/components/PhenoContendersBoard";
 import { buildContenders } from "@/lib/phenoContendersViewModel";
+import PhenoFightNight from "@/components/PhenoFightNight";
+import { buildFight } from "@/lib/phenoFightViewModel";
 import { Sprout } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { buildPhenoPedigree } from "@/lib/phenoPedigreeViewModel";
@@ -195,6 +197,17 @@ export default function PhenoHuntDemo() {
       ),
     [],
   );
+  const fight = useMemo(() => {
+    const keepers = DEMO_CANDIDATES.filter((c) => c.verdict === "keep");
+    const toInput = (c: DemoCandidate) => ({
+      id: c.candidateNumber,
+      name: c.name,
+      verdict: c.verdict,
+      aroma: c.aroma,
+      axes: c.loud,
+    });
+    return keepers.length >= 2 ? buildFight(toInput(keepers[0]), toInput(keepers[1])) : null;
+  }, []);
 
   return (
     <div data-testid="pheno-hunt-demo-page" className="container mx-auto max-w-5xl px-4 py-6">
@@ -239,6 +252,17 @@ export default function PhenoHuntDemo() {
         </div>
         <PhenoContendersBoard board={contenders} />
       </section>
+
+      {/* Fight night — the final two, head to head. */}
+      {fight && (
+        <section aria-label="Fight night" className="mb-8">
+          <div className="mb-3 flex items-center gap-2">
+            <h2 className="text-sm font-semibold text-foreground">Fight night</h2>
+            <span className="h-px flex-1 bg-gradient-to-r from-emerald-500/40 to-transparent" />
+          </div>
+          <PhenoFightNight fight={fight} />
+        </section>
+      )}
 
       {/* Keepers, clones, and the family tree. */}
       <section aria-label="Keepers and family tree">

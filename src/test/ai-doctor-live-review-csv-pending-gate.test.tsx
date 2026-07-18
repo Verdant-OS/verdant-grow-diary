@@ -50,17 +50,11 @@ const sensorQueryState = vi.hoisted(() => ({
   currentStatus: "success" as "loading" | "error" | "success",
 }));
 vi.mock("@/hooks/use-sensor-readings", () => ({
-  useSensorReadingsByTents: (
-    tentIds: string[],
-    _limit: number,
-  ) => {
+  useSensorReadingsByTents: (tentIds: string[], _limit: number) => {
     const byTent: Record<string, unknown[]> = {};
     const statusByTent: Record<string, string> = {};
     for (const id of tentIds) {
-      byTent[id] =
-        sensorQueryState.currentStatus === "success"
-          ? sensorQueryState.currentRows
-          : [];
+      byTent[id] = sensorQueryState.currentStatus === "success" ? sensorQueryState.currentRows : [];
       statusByTent[id] = sensorQueryState.currentStatus;
     }
     return {
@@ -74,18 +68,16 @@ vi.mock("@/hooks/use-sensor-readings", () => ({
 
 vi.mock("@/hooks/useImportedSensorHistory", () => ({
   useImportedSensorHistory: () => ({
-    data:
-      sensorQueryState.csvStatus === "success"
-        ? sensorQueryState.csvRows
-        : undefined,
+    data: sensorQueryState.csvStatus === "success" ? sensorQueryState.csvRows : undefined,
     isLoading: sensorQueryState.csvStatus === "loading",
-    isFetching:
-      sensorQueryState.csvStatus === "loading" || sensorQueryState.csvFetching,
+    isFetching: sensorQueryState.csvStatus === "loading" || sensorQueryState.csvFetching,
     isError: sensorQueryState.csvStatus === "error",
   }),
 }));
 
-import PlantDetailAiDoctorLiveReview from "@/components/PlantDetailAiDoctorLiveReview";
+import PlantDetailAiDoctorLiveReview, {
+  AI_DOCTOR_LIVE_REVIEW_HISTORICAL_COPY,
+} from "@/components/PlantDetailAiDoctorLiveReview";
 
 const TENT_ID = "5a1c6e0f-2b3d-4c5e-8f90-1a2b3c4d5e77";
 const GROW_ID = "11111111-1111-4111-8111-111111111111";
@@ -151,6 +143,7 @@ const csvRows = [
     captured_at: "2026-06-01T10:00:00.000Z",
     ts: "2026-06-01T10:00:00.000Z",
     source: "csv",
+    quality: "ok",
     raw_payload: { csv_import: true },
   },
   {
@@ -159,6 +152,28 @@ const csvRows = [
     captured_at: "2026-06-01T10:00:00.000Z",
     ts: "2026-06-01T10:00:00.000Z",
     source: "csv",
+    quality: "ok",
+    raw_payload: { csv_import: true },
+  },
+];
+
+const historicalCsvRows = [
+  {
+    metric: "temperature_c",
+    value: 23,
+    captured_at: "2026-06-01T10:00:00.000Z",
+    ts: "2026-06-01T10:00:00.000Z",
+    source: "csv",
+    quality: "ok",
+    raw_payload: { csv_import: true },
+  },
+  {
+    metric: "temperature_c",
+    value: 25,
+    captured_at: "2026-06-02T10:00:00.000Z",
+    ts: "2026-06-02T10:00:00.000Z",
+    source: "csv",
+    quality: "ok",
     raw_payload: { csv_import: true },
   },
 ];
@@ -330,5 +345,90 @@ describe("CSV history pending/error gating", () => {
     // was fabricated to replace it.
     expect(packet.recentSensorSnapshotAnnotation?.source).toBe("manual");
     expect(packet.missingLiveSensorReadings).toBe(true);
+  });
+});
+
+describe("CSV-first historical review eligibility", () => {
+  it("renders a manual-only limited review and keeps current readiness insufficient", async () => {
+    itemsRef.current = [];
+    sensorQueryState.csvRows = historicalCsvRows;
+    const invoke = mount();
+
+    const root = screen.getByTestId("plant-ai-doctor-live-review");
+    expect(root).toHaveAttribute("data-readiness", "insufficient");
+    expect(root).toHaveAttribute("data-review-mode", "historical_review");
+    expect(screen.getByTestId("plant-ai-doctor-live-review-confidence-copy")).toHaveTextContent(
+      AI_DOCTOR_LIVE_REVIEW_HISTORICAL_COPY,
+    );
+    expect(AI_DOCTOR_LIVE_REVIEW_HISTORICAL_COPY).toContain("not live telemetry");
+
+    // Merely rendering imported history never spends a credit or runs AI.
+    expect(invoke).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId("plant-ai-doctor-live-review-start"));
+    await waitFor(() => expect(invoke).toHaveBeenCalledTimes(1));
+
+    const packet = invoke.mock.calls[0][1].body.packet;
+    expect(packet.readiness.state).toBe("insufficient");
+    expect(packet.imported_sensor_history?.totalReadings).toBe(2);
+    expect(packet.missingLiveSensorReadings).toBe(true);
+    expect(JSON.stringify(packet)).not.toContain("raw_payload");
+  });
+
+  it("stays blocked when two CSV metrics came from only one timestamp", () => {
+    itemsRef.current = [];
+    sensorQueryState.csvRows = csvRows;
+    const invoke = mount();
+    expect(screen.queryByTestId("plant-ai-doctor-live-review")).toBeNull();
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it("stays blocked when explicit invalid-quality rows span two timestamps", () => {
+    itemsRef.current = [];
+    sensorQueryState.csvRows = historicalCsvRows.map((row) => ({ ...row, quality: "invalid" }));
+    const invoke = mount();
+    expect(screen.queryByTestId("plant-ai-doctor-live-review")).toBeNull();
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it("stays blocked when a later nonnumeric row is the only second timestamp", () => {
+    itemsRef.current = [];
+    sensorQueryState.csvRows = [
+      ...csvRows,
+      {
+        ...historicalCsvRows[1],
+        value: "not-a-number",
+      },
+    ];
+    const invoke = mount();
+    expect(screen.queryByTestId("plant-ai-doctor-live-review")).toBeNull();
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it("stays blocked for non-CSV and malformed rows", () => {
+    itemsRef.current = [];
+    sensorQueryState.csvRows = [
+      { ...historicalCsvRows[0], source: "manual" },
+      { ...historicalCsvRows[1], captured_at: "not-a-date", ts: "not-a-date" },
+    ];
+    const invoke = mount();
+    expect(screen.queryByTestId("plant-ai-doctor-live-review")).toBeNull();
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it("stays blocked without a plant profile even when CSV history is sufficient", () => {
+    itemsRef.current = [];
+    sensorQueryState.csvRows = historicalCsvRows;
+    const invoke = vi.fn<InvokeFn>();
+    render(
+      <PlantDetailAiDoctorLiveReview
+        plantId="p1"
+        plant={null}
+        growId={GROW_ID}
+        tentId={TENT_ID}
+        invoke={invoke}
+      />,
+    );
+    expect(screen.queryByTestId("plant-ai-doctor-live-review")).toBeNull();
+    expect(invoke).not.toHaveBeenCalled();
   });
 });

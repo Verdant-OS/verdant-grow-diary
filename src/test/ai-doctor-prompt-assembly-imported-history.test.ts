@@ -24,6 +24,7 @@ const baseImportedHistory = {
     { sourceApp: "verdant_genetics_xlsx", vendorLabel: "Verdant Genetics XLSX", count: 12 },
   ],
   metrics: [{ metric: "temp", unit: "C", count: 12, min: 20, max: 26, avg: 23.5 }],
+  excludedQualityCount: 0,
   suspiciousFlagCount: 0,
 };
 
@@ -75,6 +76,7 @@ describe("buildAiDoctorPromptMessages — imported-history injection", () => {
     expect(out.user).toContain("[Historical sensor context]");
     expect(out.user).toContain("Verdant Genetics XLSX");
     expect(out.user).toContain("Date range:");
+    expect(out.user).toContain("Excluded quality rows: 0");
     expect(out.system).toContain(IMPORTED_HISTORY_PROMPT_STRINGS.notLiveCaveat);
     expect(out.system).toContain(IMPORTED_HISTORY_PROMPT_STRINGS.notProofOfCurrent);
     expect(out.system).toContain(IMPORTED_HISTORY_PROMPT_STRINGS.notHealthyFromHistoryAlone);

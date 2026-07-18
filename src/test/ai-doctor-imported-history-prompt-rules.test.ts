@@ -76,6 +76,19 @@ describe("aiDoctorImportedHistoryPromptRules", () => {
     expect(frag.guidance.join("\n")).toContain(IMPORTED_HISTORY_PROMPT_STRINGS.notLiveCaveat);
   });
 
+  it("reports excluded non-ok quality rows without exposing their values", () => {
+    const ctx = compilePlantContextFromRows({
+      plant,
+      growEvents: [],
+      sensorReadings: [{ ...csvRow("temperature_c", 99, "spider_farmer"), quality: "invalid" }],
+      now: NOW,
+    });
+    const frag = buildAiDoctorImportedHistoryPromptFragment(ctx);
+    expect(frag.importedHistoryBlock).toContain("Excluded quality rows: 1");
+    expect(frag.importedHistoryBlock).toContain("Metric summaries: no metric summaries");
+    expect(frag.importedHistoryBlock).not.toContain("99");
+  });
+
   it("includes missing-live-readings warning when missingLiveSensorReadings is true", () => {
     const ctx = compilePlantContextFromRows({
       plant,

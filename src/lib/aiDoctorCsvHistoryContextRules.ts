@@ -47,6 +47,7 @@ export interface CsvHistorySensorRowLike {
   captured_at?: string | null;
   ts?: string | null;
   source?: string | null;
+  quality?: string | null;
   raw_payload?: unknown;
 }
 
@@ -78,6 +79,8 @@ export interface AiDoctorCsvHistoryContext {
   dateRange: { earliest: string; latest: string } | null;
   vendors: readonly CsvHistoryVendorSummary[];
   metrics: readonly CsvHistoryMetricSummary[];
+  /** Explicit non-ok/unknown-quality rows excluded from metric evidence. */
+  excludedQualityCount: number;
   suspiciousFlagCount: number;
 }
 
@@ -87,6 +90,8 @@ function asRecord(v: unknown): Record<string, unknown> | null {
 
 function toFiniteNumber(v: unknown): number | null {
   if (v === null || v === undefined) return null;
+  if (typeof v !== "number" && typeof v !== "string") return null;
+  if (typeof v === "string" && v.trim().length === 0) return null;
   const n = typeof v === "number" ? v : Number(v);
   return Number.isFinite(n) ? n : null;
 }
@@ -152,6 +157,16 @@ export function isCsvHistoryRow(row: CsvHistorySensorRowLike): boolean {
   return AI_DOCTOR_CSV_HISTORY_SOURCE_SET.has(source);
 }
 
+/**
+ * Imported rows may predate the quality column, so missing/null quality stays
+ * backward-compatible. Any explicit value must be the canonical `ok`; stale,
+ * degraded, invalid, blank, and unknown values fail closed as evidence.
+ */
+export function isUsableCsvHistoryObservationQuality(row: CsvHistorySensorRowLike): boolean {
+  if (row.quality === null || row.quality === undefined) return true;
+  return typeof row.quality === "string" && row.quality.trim().toLowerCase() === "ok";
+}
+
 const isCsvRow = isCsvHistoryRow;
 
 /**
@@ -189,6 +204,9 @@ export function compareCsvHistoryRowsForBoundedSummary(
   const unitOrder = compareText(nullableTextKey(a.unit), nullableTextKey(b.unit));
   if (unitOrder !== 0) return unitOrder;
 
+  const qualityOrder = compareText(nullableTextKey(a.quality), nullableTextKey(b.quality));
+  if (qualityOrder !== 0) return qualityOrder;
+
   const vendorOrder = compareText(
     vendorLabelFor(a)?.sourceApp ?? "",
     vendorLabelFor(b)?.sourceApp ?? "",
@@ -196,6 +214,48 @@ export function compareCsvHistoryRowsForBoundedSummary(
   if (vendorOrder !== 0) return vendorOrder;
 
   return Number(isSuspicious(a)) - Number(isSuspicious(b));
+}
+
+export interface CsvHistoryEligibilityEvidence {
+  validObservationCount: number;
+  distinctObservationTimestampCount: number;
+}
+
+/**
+ * Count only the exact bounded CSV observations that are safe to use for the
+ * historical-review gate. Date range metadata and rejected rows cannot make a
+ * single valid timestamp look longitudinal.
+ */
+export function summarizeCsvHistoryEligibilityEvidence(
+  rows: ReadonlyArray<CsvHistorySensorRowLike> | null | undefined,
+  limit: number,
+): CsvHistoryEligibilityEvidence {
+  const normalizedLimit = Number.isFinite(limit) ? Math.max(0, Math.floor(limit)) : 0;
+  if (!Array.isArray(rows) || rows.length === 0 || normalizedLimit === 0) {
+    return { validObservationCount: 0, distinctObservationTimestampCount: 0 };
+  }
+
+  const bounded = rows
+    .filter((row) => !!row && isCsvHistoryRow(row))
+    .sort(compareCsvHistoryRowsForBoundedSummary)
+    .slice(0, normalizedLimit);
+  const timestamps = new Set<number>();
+  let validObservationCount = 0;
+
+  for (const row of bounded) {
+    if (!isUsableCsvHistoryObservationQuality(row)) continue;
+    if (typeof row.metric !== "string" || row.metric.trim().length === 0) continue;
+    if (toFiniteNumber(row.value) === null) continue;
+    const timestampMs = Date.parse(capturedAtText(row));
+    if (!Number.isFinite(timestampMs)) continue;
+    validObservationCount += 1;
+    timestamps.add(timestampMs);
+  }
+
+  return {
+    validObservationCount,
+    distinctObservationTimestampCount: timestamps.size,
+  };
 }
 
 function round3(n: number): number {
@@ -221,6 +281,7 @@ export function buildAiDoctorCsvHistoryContext(
     dateRange: null,
     vendors: Object.freeze([]),
     metrics: Object.freeze([]),
+    excludedQualityCount: 0,
     suspiciousFlagCount: 0,
   };
   const rows = Array.isArray(input?.rows) ? input.rows : [];
@@ -228,6 +289,7 @@ export function buildAiDoctorCsvHistoryContext(
 
   let total = 0;
   let suspicious = 0;
+  let excludedQuality = 0;
   let earliestMs = Number.POSITIVE_INFINITY;
   let latestMs = Number.NEGATIVE_INFINITY;
   let earliestIso: string | null = null;
@@ -257,7 +319,8 @@ export function buildAiDoctorCsvHistoryContext(
       latestMs = t;
       latestIso = capturedAt;
     }
-    if (isSuspicious(row)) suspicious += 1;
+    const usableQuality = isUsableCsvHistoryObservationQuality(row);
+    if (isSuspicious(row) || !usableQuality) suspicious += 1;
 
     const vendor = vendorLabelFor(row);
     if (vendor) {
@@ -266,7 +329,12 @@ export function buildAiDoctorCsvHistoryContext(
       else vendorCounts.set(vendor.sourceApp, { ...vendor, count: 1 });
     }
 
-    const metric = typeof row.metric === "string" ? row.metric : null;
+    if (!usableQuality) {
+      excludedQuality += 1;
+      continue;
+    }
+
+    const metric = typeof row.metric === "string" ? row.metric.trim() : null;
     const value = toFiniteNumber(row.value);
     if (metric && value !== null) {
       const bucket = metricAccum.get(metric);
@@ -310,6 +378,7 @@ export function buildAiDoctorCsvHistoryContext(
     dateRange: earliestIso && latestIso ? { earliest: earliestIso, latest: latestIso } : null,
     vendors: Object.freeze(vendors),
     metrics: Object.freeze(metrics),
+    excludedQualityCount: excludedQuality,
     suspiciousFlagCount: suspicious,
   };
 }

@@ -15,6 +15,7 @@ const ROOT = resolve(__dirname, "../..");
 const read = (p: string) => stripSourceComments(readFileSync(resolve(ROOT, p), "utf8"));
 
 const FRONTEND_FILES = [
+  "src/lib/aiDoctorReviewEligibilityRules.ts",
   "src/lib/aiDoctorReviewRequestPacket.ts",
   "src/lib/aiDoctorReviewRequestTransportRules.ts",
   "src/lib/aiCreditedResponseAdapter.ts",

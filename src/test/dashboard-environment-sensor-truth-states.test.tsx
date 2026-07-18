@@ -121,13 +121,15 @@ describe("Dashboard never claims live/healthy state for unknown or bad data", ()
 
 describe("Environment Snapshot strip — pending/failed/empty truth states (Tents-list parity)", () => {
   it("distinguishes pending/failed reads from established absence", () => {
-    // statusByTent (loading/error/success) drives the per-tent branch; a
+    // statusByTent (loading/error/refresh_error/success) drives the per-tent branch; a
     // pending or failed read must never render as "No sensor data yet".
     expect(DASHBOARD).toMatch(/statusByTent/);
     expect(DASHBOARD).toMatch(/dashboard-env-snapshot-loading-/);
     expect(DASHBOARD).toMatch(/Loading sensor data/);
     expect(DASHBOARD).toMatch(/dashboard-env-snapshot-unavailable-/);
     expect(DASHBOARD).toMatch(/Sensor data unavailable/);
+    expect(DASHBOARD).toMatch(/dashboard-env-snapshot-refresh-error-/);
+    expect(DASHBOARD).toMatch(/last loaded readings/);
     expect(DASHBOARD).toMatch(/dashboard-env-snapshot-no-data-/);
     expect(DASHBOARD).toMatch(/No sensor data yet/);
   });

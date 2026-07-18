@@ -5,9 +5,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const H = vi.hoisted(() => ({
   growStatus: "loading" as "loading" | "error" | "success",
   aggregateStatus: "success" as "loading" | "error" | "success",
-  perTentStatus: "success" as "loading" | "error" | "success",
+  perTentStatus: "success" as "loading" | "error" | "refresh_error" | "success",
+  perTentRows: [] as unknown[],
+  secondTentEnabled: false,
+  secondTentStatus: "success" as "loading" | "error" | "refresh_error" | "success",
+  secondTentRows: [] as unknown[],
   refetch: vi.fn(),
   tentId: "5a1c6e0f-2b3d-4c5e-8f90-1a2b3c4d5e6f",
+  secondTentId: "6b2d7f10-3c4e-4d6f-9a01-2b3c4d5e6f70",
 }));
 
 vi.mock("@/hooks/useGrowData", () => ({
@@ -25,6 +30,20 @@ vi.mock("@/hooks/useGrowData", () => ({
               alertCount: 0,
               growId: null,
             },
+            ...(H.secondTentEnabled
+              ? [
+                  {
+                    id: H.secondTentId,
+                    name: "Failed Refresh Tent",
+                    brand: "",
+                    size: "",
+                    stage: "veg",
+                    light: { on: false, schedule: "", wattage: 0 },
+                    alertCount: 0,
+                    growId: null,
+                  },
+                ]
+              : []),
           ]
         : [],
     isLoading: H.growStatus === "loading",
@@ -47,10 +66,16 @@ vi.mock("@/hooks/use-sensor-readings", () => ({
     refetch: H.refetch,
   }),
   useSensorReadingsByTents: () => ({
-    byTent: { [H.tentId]: [] },
-    statusByTent: { [H.tentId]: H.perTentStatus },
+    byTent: {
+      [H.tentId]: H.perTentRows,
+      [H.secondTentId]: H.secondTentRows,
+    },
+    statusByTent: {
+      [H.tentId]: H.perTentStatus,
+      [H.secondTentId]: H.secondTentStatus,
+    },
     isLoading: H.perTentStatus === "loading",
-    isError: H.perTentStatus === "error",
+    isError: H.perTentStatus === "error" || H.perTentStatus === "refresh_error",
   }),
 }));
 
@@ -170,6 +195,10 @@ describe("Dashboard private-read honesty boundary", () => {
     H.growStatus = "loading";
     H.aggregateStatus = "success";
     H.perTentStatus = "success";
+    H.perTentRows = [];
+    H.secondTentEnabled = false;
+    H.secondTentStatus = "success";
+    H.secondTentRows = [];
     H.refetch.mockClear();
   });
 
@@ -193,6 +222,72 @@ describe("Dashboard private-read honesty boundary", () => {
       /can't confirm that sensor history is empty/,
     );
     expect(screen.queryByTestId("dashboard-environment-snapshot-empty")).toBeNull();
+  });
+
+  it("does not turn a cached-empty failed refresh into an established empty snapshot", () => {
+    H.growStatus = "success";
+    H.perTentStatus = "refresh_error";
+    renderDashboard();
+
+    expect(screen.getByTestId("dashboard-environment-snapshot-error")).toHaveTextContent(
+      /can't confirm that sensor history is empty/,
+    );
+    expect(screen.queryByTestId("dashboard-environment-snapshot-empty")).toBeNull();
+  });
+
+  it("labels cached readings as last loaded when their refresh fails", () => {
+    H.growStatus = "success";
+    H.perTentStatus = "refresh_error";
+    H.perTentRows = [
+      {
+        id: "reading-a",
+        tent_id: H.tentId,
+        metric: "temperature_c",
+        value: 24,
+        source: "live",
+        quality: "ok",
+        captured_at: new Date(Date.now() - 60_000).toISOString(),
+        ts: new Date(Date.now() - 60_000).toISOString(),
+        created_at: new Date(Date.now() - 60_000).toISOString(),
+      },
+    ];
+    renderDashboard();
+
+    expect(
+      screen.getByTestId(`dashboard-env-snapshot-refresh-error-${H.tentId}`),
+    ).toHaveTextContent("last loaded readings");
+    expect(screen.getByTestId(`dashboard-env-snapshot-tent-${H.tentId}`)).toHaveAccessibleName(
+      /sensor refresh unavailable, last loaded readings shown/i,
+    );
+    expect(screen.queryByTestId("dashboard-environment-snapshot-error")).toBeNull();
+  });
+
+  it("does not call a failed-refresh tent empty when another tent has current readings", () => {
+    H.growStatus = "success";
+    H.perTentRows = [
+      {
+        id: "reading-a",
+        tent_id: H.tentId,
+        metric: "temperature_c",
+        value: 24,
+        source: "live",
+        quality: "ok",
+        captured_at: new Date(Date.now() - 60_000).toISOString(),
+        ts: new Date(Date.now() - 60_000).toISOString(),
+        created_at: new Date(Date.now() - 60_000).toISOString(),
+      },
+    ];
+    H.secondTentEnabled = true;
+    H.secondTentStatus = "refresh_error";
+    renderDashboard();
+
+    expect(
+      screen.getByTestId(`dashboard-env-snapshot-refresh-unavailable-${H.secondTentId}`),
+    ).toHaveTextContent(/no last loaded readings/i);
+    expect(screen.queryByTestId(`dashboard-env-snapshot-no-data-${H.secondTentId}`)).toBeNull();
+    expect(
+      screen.getByTestId(`dashboard-env-snapshot-tent-${H.secondTentId}`),
+    ).toHaveAccessibleName(/sensor refresh unavailable, no last loaded readings/i);
   });
 
   it("surfaces aggregate sensor-history failures instead of an empty chart state", () => {

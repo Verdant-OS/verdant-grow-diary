@@ -50,21 +50,27 @@ const sensorQueryState = vi.hoisted(() => ({
   csvStatus: "success" as "loading" | "error" | "success",
   csvFetching: false,
   currentRows: [] as unknown[],
-  currentStatus: "success" as "loading" | "error" | "success",
+  currentStatus: "success" as "loading" | "error" | "refresh_error" | "success",
 }));
 vi.mock("@/hooks/use-sensor-readings", () => ({
   useSensorReadingsByTents: (tentIds: string[], _limit: number) => {
     const byTent: Record<string, unknown[]> = {};
     const statusByTent: Record<string, string> = {};
     for (const id of tentIds) {
-      byTent[id] = sensorQueryState.currentStatus === "success" ? sensorQueryState.currentRows : [];
+      byTent[id] =
+        sensorQueryState.currentStatus === "success" ||
+        sensorQueryState.currentStatus === "refresh_error"
+          ? sensorQueryState.currentRows
+          : [];
       statusByTent[id] = sensorQueryState.currentStatus;
     }
     return {
       byTent,
       statusByTent,
       isLoading: sensorQueryState.currentStatus === "loading",
-      isError: sensorQueryState.currentStatus === "error",
+      isError:
+        sensorQueryState.currentStatus === "error" ||
+        sensorQueryState.currentStatus === "refresh_error",
     };
   },
 }));
@@ -352,6 +358,25 @@ describe("CSV history pending/error gating", () => {
     // was fabricated to replace it.
     expect(packet.recentSensorSnapshotAnnotation?.source).toBe("manual");
     expect(packet.missingLiveSensorReadings).toBe(true);
+  });
+
+  it("omits cached current rows after their refresh fails", async () => {
+    sensorQueryState.currentRows = [
+      {
+        metric: "temperature_c",
+        value: 31,
+        captured_at: new Date(Date.now() - 60_000).toISOString(),
+        source: "live",
+      },
+    ];
+    sensorQueryState.currentStatus = "refresh_error";
+    const invoke = mount();
+
+    fireEvent.click(screen.getByTestId("plant-ai-doctor-live-review-start"));
+    await waitFor(() => expect(invoke).toHaveBeenCalledTimes(1));
+    const packet = invoke.mock.calls[0][1].body.packet;
+    expect(packet.missingLiveSensorReadings).toBe(true);
+    expect(JSON.stringify(packet)).not.toContain('"value":31');
   });
 });
 

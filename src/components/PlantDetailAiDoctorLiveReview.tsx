@@ -102,15 +102,21 @@ export default function PlantDetailAiDoctorLiveReview({
       AI_DOCTOR_CURRENT_SENSOR_ROW_CAP,
       AI_DOCTOR_CURRENT_SENSOR_SOURCES,
     );
-  const currentSensorRows = tentId
-    ? (currentReadingsByTent[tentId] ?? NO_TENT_SENSOR_ROWS)
-    : NO_TENT_SENSOR_ROWS;
   // While either bounded sensor read is in flight, hold the start gate so
   // a click cannot send a packet that treats pending evidence as confirmed
-  // absent. A FAILED read proceeds by omission — never a fabricated value.
+  // absent. A failed initial or refresh read proceeds by omission — cached
+  // rows must never be presented to the model as current evidence.
   const csvHistoryPending = isUuid(tentId) && importedHistory.isFetching;
-  const currentSensorPending =
-    isUuid(tentId) && (currentSensorStatusByTent[tentId] ?? "loading") === "loading";
+  const currentSensorStatus = isUuid(tentId)
+    ? (currentSensorStatusByTent[tentId] ?? "loading")
+    : "success";
+  const currentSensorPending = currentSensorStatus === "loading";
+  const currentSensorFailed =
+    currentSensorStatus === "error" || currentSensorStatus === "refresh_error";
+  const currentSensorRows =
+    tentId && !currentSensorFailed
+      ? (currentReadingsByTent[tentId] ?? NO_TENT_SENSOR_ROWS)
+      : NO_TENT_SENSOR_ROWS;
   const sensorContextPending = csvHistoryPending || currentSensorPending;
 
   const context = useMemo(

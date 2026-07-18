@@ -415,7 +415,9 @@ export default function Dashboard() {
                 (tentId) => sensorStatusByTent[tentId] === "loading",
               );
               const hasFailedTentRead = tentIds.some(
-                (tentId) => sensorStatusByTent[tentId] === "error",
+                (tentId) =>
+                  sensorStatusByTent[tentId] === "error" ||
+                  sensorStatusByTent[tentId] === "refresh_error",
               );
               const snapshotQuality = sensorState.status === "ok" ? dashboardSensorQuality : null;
               const isStaleSnap =
@@ -636,8 +638,19 @@ export default function Dashboard() {
                           const sensorReadStatus = isUuid(tent.id)
                             ? (sensorStatusByTent[tent.id] ?? "loading")
                             : "success";
+                          const sensorReadStatusLabel =
+                            sensorReadStatus === "loading"
+                              ? "sensor data loading"
+                              : sensorReadStatus === "error"
+                                ? "sensor data unavailable"
+                                : sensorReadStatus === "refresh_error"
+                                  ? snapView.hasReading
+                                    ? "sensor refresh unavailable, last loaded readings shown"
+                                    : "sensor refresh unavailable, no last loaded readings"
+                                  : null;
                           const ariaParts = [
                             tent.name,
+                            sensorReadStatusLabel,
                             snapView.hasReading ? `source ${snapView.sourceLabel}` : null,
                             snapView.hasReading
                               ? `last updated ${snapView.lastUpdatedDisplay}`
@@ -692,39 +705,57 @@ export default function Dashboard() {
                                 >
                                   Sensor data unavailable — readings couldn't be loaded.
                                 </p>
+                              ) : sensorReadStatus === "refresh_error" && !snapView.hasReading ? (
+                                <p
+                                  className="text-xs text-muted-foreground"
+                                  data-testid={`dashboard-env-snapshot-refresh-unavailable-${tent.id}`}
+                                >
+                                  Sensor refresh unavailable — no last loaded readings are
+                                  available.
+                                </p>
                               ) : snapView.hasReading ? (
-                                <div className="flex flex-wrap gap-1.5">
-                                  {snapView.metrics.map((m) => (
-                                    <div
-                                      key={m.key}
-                                      data-testid={`dashboard-env-snapshot-metric-${tent.id}-${m.key}`}
-                                      data-status={m.status}
-                                      className="inline-flex items-center gap-1"
+                                <div className="space-y-2">
+                                  {sensorReadStatus === "refresh_error" && (
+                                    <p
+                                      className="text-xs text-amber-700 dark:text-amber-300"
+                                      data-testid={`dashboard-env-snapshot-refresh-error-${tent.id}`}
                                     >
-                                      <MetricChip
-                                        label={
-                                          m.key === "temp" ? "T" : m.key === "rh" ? "RH" : "VPD"
-                                        }
-                                        value={m.display}
-                                        unit={m.unit}
-                                        status={m.chipStatus}
-                                      />
-                                      {m.statusLabel && (
-                                        <span
-                                          data-testid={`dashboard-env-snapshot-metric-status-${tent.id}-${m.key}`}
-                                          className={
-                                            m.status === "invalid"
-                                              ? "text-[10px] uppercase tracking-wide text-destructive"
-                                              : m.status === "stale"
-                                                ? "text-[10px] uppercase tracking-wide text-amber-600"
-                                                : "text-[10px] uppercase tracking-wide text-muted-foreground"
+                                      Sensor refresh unavailable — last loaded readings shown.
+                                    </p>
+                                  )}
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {snapView.metrics.map((m) => (
+                                      <div
+                                        key={m.key}
+                                        data-testid={`dashboard-env-snapshot-metric-${tent.id}-${m.key}`}
+                                        data-status={m.status}
+                                        className="inline-flex items-center gap-1"
+                                      >
+                                        <MetricChip
+                                          label={
+                                            m.key === "temp" ? "T" : m.key === "rh" ? "RH" : "VPD"
                                           }
-                                        >
-                                          {m.statusLabel}
-                                        </span>
-                                      )}
-                                    </div>
-                                  ))}
+                                          value={m.display}
+                                          unit={m.unit}
+                                          status={m.chipStatus}
+                                        />
+                                        {m.statusLabel && (
+                                          <span
+                                            data-testid={`dashboard-env-snapshot-metric-status-${tent.id}-${m.key}`}
+                                            className={
+                                              m.status === "invalid"
+                                                ? "text-[10px] uppercase tracking-wide text-destructive"
+                                                : m.status === "stale"
+                                                  ? "text-[10px] uppercase tracking-wide text-amber-600"
+                                                  : "text-[10px] uppercase tracking-wide text-muted-foreground"
+                                            }
+                                          >
+                                            {m.statusLabel}
+                                          </span>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
                                 </div>
                               ) : (
                                 <p

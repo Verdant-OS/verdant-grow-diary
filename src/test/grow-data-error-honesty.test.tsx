@@ -40,7 +40,6 @@ describe("private grow-data error honesty", () => {
   });
 
   it.each([
-    ["src/pages/Tents.tsx", "tents-grow-data-error", "No tents yet"],
     ["src/pages/Plants.tsx", "plants-grow-data-error", "filtered.length === 0"],
     ["src/pages/Dashboard.tsx", "dashboard-grow-data-error", "<KpiCard"],
     ["src/pages/Sensors.tsx", "sensors-grow-data-error", "sensors-first-tent-setup"],
@@ -52,6 +51,18 @@ describe("private grow-data error honesty", () => {
     expect(source).toContain("GrowDataLoadError");
     expect(source).toContain(".isError");
     expect(source).toContain(".refetch()");
+    expect(errorIndex).toBeGreaterThan(-1);
+    expect(emptyIndex).toBeGreaterThan(errorIndex);
+  });
+
+  it("puts the classified Tents primary-query failure before its empty workspace", () => {
+    const source = readSource("src/pages/Tents.tsx");
+    const errorIndex = source.indexOf("tents-grow-data-error");
+    const emptyIndex = source.indexOf("No tents yet");
+
+    expect(source).toContain("classifyTentsPageAsyncState");
+    expect(source).toContain('tentsAsyncState.kind === "error"');
+    expect(source).toContain("tentsQuery.refetch()");
     expect(errorIndex).toBeGreaterThan(-1);
     expect(emptyIndex).toBeGreaterThan(errorIndex);
   });

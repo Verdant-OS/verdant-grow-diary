@@ -195,14 +195,16 @@ export default function PlantDetailAiDoctorReadiness({
     AI_DOCTOR_CURRENT_SENSOR_ROW_CAP,
     AI_DOCTOR_CURRENT_SENSOR_SOURCES,
   );
-  const currentSensorRows = tentId
-    ? (currentReadingsByTent[tentId] ?? NO_CURRENT_SENSOR_ROWS)
-    : NO_CURRENT_SENSOR_ROWS;
   const currentSensorStatus = isUuid(tentId)
     ? (currentSensorStatusByTent[tentId] ?? "loading")
     : "success";
   const currentSensorLoading = currentSensorStatus === "loading";
-  const currentSensorError = currentSensorStatus === "error";
+  const currentSensorError =
+    currentSensorStatus === "error" || currentSensorStatus === "refresh_error";
+  const currentSensorRows =
+    tentId && !currentSensorError
+      ? (currentReadingsByTent[tentId] ?? NO_CURRENT_SENSOR_ROWS)
+      : NO_CURRENT_SENSOR_ROWS;
 
   const signals = useMemo(() => {
     return deriveSignals(plantId, hasPlantPhoto, rawRows ?? []);

@@ -42,13 +42,16 @@ describe("ai-coach edge — 200-envelope credit transport", () => {
     expect(src).toMatch(/ai-coach status=upstream_credit_exhausted http=200/);
   });
 
-  it("does not introduce new RPCs, action_queue writes, device control, or service_role", () => {
+  it("keeps RPCs scoped and uses service role only for server-authoritative credit spending", () => {
     const rpcCalls = [...src.matchAll(/\.rpc\s*\(\s*["'`]([a-zA-Z0-9_]+)["'`]/g)].map((m) => m[1]);
     for (const name of rpcCalls) {
       expect(["ai_credit_spend", "ai_credit_refund"]).toContain(name);
     }
     expect(src).not.toMatch(/\baction_queue\b/);
-    expect(src).not.toMatch(/\bservice_role\b/);
+    expect(src).toContain("resolveRequiredServerBillingEnvironment()");
+    expect(src).toMatch(/creditSupabase\.rpc\(\s*["']ai_credit_spend["']/);
+    expect(src).toMatch(/creditSupabase\.rpc\(\s*["']ai_credit_refund["']/);
+    expect(src).not.toMatch(/creditSupabase\s*\.from\(/);
     expect(src).not.toMatch(/\b(turn on|switch off|toggle the|power the)\b/i);
   });
 });

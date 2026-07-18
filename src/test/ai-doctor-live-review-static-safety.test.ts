@@ -98,7 +98,7 @@ describe("ai doctor live review — edge static safety", () => {
         expect(src).toMatch(/SUPABASE_SERVICE_ROLE_KEY/);
         const validationIndex = src.indexOf("const v = validateAiDoctorReviewResult(candidate)");
         const completionCallIndex = src.lastIndexOf(
-          "recordFreshAiDoctorReviewCompletion(u.user.id, spendId)",
+          "recordFreshAiDoctorReviewCompletion(userId, spendId)",
         );
         expect(completionCallIndex).toBeGreaterThan(validationIndex);
         expect(src).toContain('if (spendObj.status === "spent" && spendId)');

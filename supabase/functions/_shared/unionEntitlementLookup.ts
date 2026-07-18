@@ -62,6 +62,45 @@ export function resolveServerBillingEnvironment(
   return "sandbox";
 }
 
+export type RequiredServerBillingEnvironmentResolution =
+  | { ok: true; environment: LovableBillingEnvironment }
+  | {
+      ok: false;
+      reason:
+        | "payments_environment_missing"
+        | "payments_environment_invalid"
+        | "paddle_key_configuration_ambiguous";
+    };
+
+/**
+ * Strict environment resolver for cost-bearing AI calls.
+ *
+ * Unlike the compatibility resolver above, this helper never infers sandbox
+ * from Paddle-key presence. AI provider spend is allowed only when
+ * PAYMENTS_ENVIRONMENT is explicitly `live` or `sandbox`. If it is absent,
+ * both/neither key configurations are reported as ambiguous instead of
+ * silently becoming sandbox.
+ */
+export function resolveRequiredServerBillingEnvironment(
+  getEnv: (name: string) => string | undefined = (n) =>
+    (globalThis as { Deno?: { env: { get(n: string): string | undefined } } }).Deno?.env.get(n),
+): RequiredServerBillingEnvironmentResolution {
+  const explicit = getEnv("PAYMENTS_ENVIRONMENT");
+  if (explicit === "live" || explicit === "sandbox") {
+    return { ok: true, environment: explicit };
+  }
+  if (explicit !== undefined && explicit !== "") {
+    return { ok: false, reason: "payments_environment_invalid" };
+  }
+
+  const hasLive = (getEnv("PADDLE_LIVE_API_KEY") ?? "").trim() !== "";
+  const hasSandbox = (getEnv("PADDLE_SANDBOX_API_KEY") ?? "").trim() !== "";
+  if (hasLive === hasSandbox) {
+    return { ok: false, reason: "paddle_key_configuration_ambiguous" };
+  }
+  return { ok: false, reason: "payments_environment_missing" };
+}
+
 /**
  * @deprecated Retained only for tests that still exercise the removed
  * client-body path. Server code MUST use `resolveServerBillingEnvironment`.

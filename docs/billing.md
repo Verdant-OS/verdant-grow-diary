@@ -21,7 +21,6 @@ What Verdant sells:
 
 What Verdant does not sell:
 
-
 - Cannabis, flower, or any consumable product
 - Seeds, clones, or live plants
 - Nutrients, fertilizers, or any chemical product
@@ -34,11 +33,11 @@ all laws applicable to cultivation in their own jurisdiction.
 
 ## Plans (sandbox)
 
-| Plan              | Price          | Cadence    | Slug               |
-| ----------------- | -------------- | ---------- | ------------------ |
-| Pro Monthly       | $12            | / month    | `pro-monthly`      |
-| Pro Annual        | $99            | / year     | `pro-annual`       |
-| Founder Lifetime  | $129 (one-time)| one-time   | `founder-lifetime` |
+| Plan             | Price           | Cadence  | Slug               |
+| ---------------- | --------------- | -------- | ------------------ |
+| Pro Monthly      | $12             | / month  | `pro-monthly`      |
+| Pro Annual       | $99             | / year   | `pro-annual`       |
+| Founder Lifetime | $129 (one-time) | one-time | `founder-lifetime` |
 
 Founder Lifetime is limited to the first 75 buyers. Founder Lifetime includes
 100 AI Doctor credits per month; additional credit packs are planned later but
@@ -66,6 +65,10 @@ Server-only secrets (configured via Lovable Cloud → Secrets, never in
 - `PADDLE_SANDBOX_API_KEY` / `PADDLE_LIVE_API_KEY` — gateway connection keys
   for `get-paddle-price` and any server-side Paddle API calls
 - `LOVABLE_API_KEY` — project-level gateway auth
+- `SUPABASE_SERVICE_ROLE_KEY` — used inside AI Doctor / AI Coach only after
+  caller JWT verification to invoke protected credit spend/refund RPCs. The
+  browser never receives this key and cannot provide `user_id`, plan, model
+  tier, weight, or billing environment.
 - (Legacy, still read by the BYO audit sink) `PADDLE_ENVIRONMENT`,
   `PADDLE_WEBHOOK_SECRET`, `PADDLE_PRICE_PRO_MONTHLY`/`_PRO_ANNUAL`/
   `_FOUNDER_LIFETIME`
@@ -93,6 +96,43 @@ never be granted from any client trust surface:
 - A query string on a return URL
 - Local storage, session storage, or any client-trusted flag
 
+## AI credit environment boundary
+
+AI credit metering uses the same server-authoritative environment decision as
+the other Paddle gates:
+
+- `PAYMENTS_ENVIRONMENT=live`: valid live rows may entitle; sandbox-only rows
+  are ignored.
+- `PAYMENTS_ENVIRONMENT=sandbox`: valid sandbox rows may entitle, while a valid
+  live row retains precedence.
+- AI Doctor and AI Coach verify the caller JWT first, derive the user id from
+  that verified session, and resolve the environment from server secrets with
+  `resolveRequiredServerBillingEnvironment()`. Cost-bearing AI fails closed
+  unless `PAYMENTS_ENVIRONMENT` is explicitly `live` or `sandbox`; an invalid
+  selector or any missing-selector key configuration never silently becomes
+  sandbox.
+- The environment-aware `ai_credit_spend` overload is executable only by
+  `service_role`. In the final contract state, the former authenticated
+  five-argument overload is revoked, so ordinary clients cannot manufacture
+  spends, select a model weight, or point the meter at another user's
+  subscription.
+- Refunds use a service-only overload that receives the JWT-verified expected
+  user id and checks ownership of the original spend. The final contract state
+  also revokes authenticated access to the legacy refund function.
+
+The ledger remains append-only. Refunds continue through `ai_credit_refund`,
+and Founder Lifetime remains capped at 100 AI credits per UTC month.
+
+Deployment is an expand/verify/contract sequence across two database releases.
+The expand migration adds service-only overloads but deliberately leaves legacy
+grants until both updated edges produce service-overload receipts after the
+PostgREST schema reload. A separately reviewed contract migration then revokes
+legacy access. Before expand, the new edges fall back only when PostgREST
+specifically reports that the new overload is absent. See
+[`ai-credit-billing-environment-rollout.md`](./ai-credit-billing-environment-rollout.md)
+for the mandatory pause, residual expand-stage exposure, verification evidence,
+and rollback order.
+
 ## What is still required before live payments
 
 Before flipping to live Paddle:
@@ -108,6 +148,5 @@ Before flipping to live Paddle:
 - [ ] Sandbox smoke green per `docs/paddle-sandbox-smoke.md` (Pro Monthly,
       Pro Annual, Founder Lifetime, duplicate-delivery idempotency,
       cancel-and-resubscribe).
-- [ ] Set `PAYMENTS_ENVIRONMENT=live` and install live `VITE_PAYMENTS_CLIENT_TOKEN`
-      + live webhook secret + live API key + live price IDs as one reviewed
+- [ ] Set `PAYMENTS_ENVIRONMENT=live` and install live `VITE_PAYMENTS_CLIENT_TOKEN` + live webhook secret + live API key + live price IDs as one reviewed
       change.

@@ -105,6 +105,7 @@ describe("ai_credit_spend FINAL migration state (regression-proof)", () => {
     // backfilled into public.subscriptions in the narrowing migration.
     expect(FINAL).toMatch(/FROM\s+public\.subscriptions/i);
     expect(FINAL).toContain("s.environment = 'live'");
+    expect(FINAL).toContain("p_billing_environment = 'sandbox' AND s.environment = 'sandbox'");
     // Function body must not read billing_subscriptions.
     const bodyMatch = FINAL.match(
       /CREATE OR REPLACE FUNCTION public\.ai_credit_spend[\s\S]*?LANGUAGE plpgsql[\s\S]*?\$function\$;/,
@@ -142,10 +143,14 @@ describe("ai_credit_spend FINAL migration state (regression-proof)", () => {
     expect(FINAL).not.toMatch(/DELETE\s+FROM\s+public\.ai_credit_spends/i);
   });
 
-  it("keeps staff metering capped and the grant posture tight", () => {
+  it("keeps staff metering capped and the grant posture server-only", () => {
     expect(FINAL).toContain("v_per_month := 10000");
     expect(FINAL).toMatch(/REVOKE ALL ON FUNCTION public\.ai_credit_spend[^;]+FROM PUBLIC/);
     expect(FINAL).toMatch(/REVOKE ALL ON FUNCTION public\.ai_credit_spend[^;]+FROM anon/);
-    expect(FINAL).toMatch(/GRANT EXECUTE ON FUNCTION public\.ai_credit_spend[^;]+TO authenticated/);
+    expect(FINAL).toMatch(/REVOKE ALL ON FUNCTION public\.ai_credit_spend[^;]+FROM authenticated/);
+    expect(FINAL).toMatch(/GRANT EXECUTE ON FUNCTION public\.ai_credit_spend[^;]+TO service_role/);
+    expect(FINAL).not.toMatch(
+      /GRANT EXECUTE ON FUNCTION public\.ai_credit_spend[^;]+TO authenticated/,
+    );
   });
 });

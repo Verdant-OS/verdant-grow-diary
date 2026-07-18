@@ -126,6 +126,41 @@ export async function listKeepersForHunt(huntId: string): Promise<KeeperRow[]> {
   }));
 }
 
+/** Minimal keeper projection for the cross-keeper stability dashboard. */
+export interface KeeperStabilityRow {
+  readonly keeperId: string;
+  readonly huntId: string;
+  readonly keeperName: string;
+  readonly stabilityRuns: StabilityRun[];
+}
+
+/**
+ * Read every keeper the signed-in grower owns (across ALL their hunts) with
+ * just the fields the cross-keeper stability dashboard needs. RLS scopes the
+ * read to the owner (pheno_keepers_select_own: auth.uid() = user_id), so no
+ * client-supplied user filter is trusted or needed; a bounded read (keepers
+ * accumulate across seasons). Runs are re-sanitized on read. Best-effort:
+ * returns [] on any error rather than throwing.
+ */
+export async function listKeeperStabilityForOwner(): Promise<KeeperStabilityRow[]> {
+  const { data, error } = await phenoDb
+    .from("pheno_keepers")
+    .select("id, hunt_id, keeper_name, stability_runs")
+    .order("created_at", { ascending: true })
+    .limit(2000);
+  if (error || !data) return [];
+  return data.map((r) => ({
+    keeperId: r.id,
+    huntId: r.hunt_id,
+    keeperName: r.keeper_name,
+    stabilityRuns: sanitizeStabilityRuns(
+      Array.isArray((r as { stability_runs?: unknown }).stability_runs)
+        ? ((r as { stability_runs?: unknown[] }).stability_runs as unknown[])
+        : null,
+    ),
+  }));
+}
+
 /**
  * Replace a keeper's stability runs (the grower edits the ledger as a
  * whole set). Sanitized before write; RLS-scoped to the owner via the

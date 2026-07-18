@@ -111,6 +111,23 @@ describe("evaluateStability", () => {
     expect(e.axisTrends).toEqual([]);
   });
 
+  it("is null-safe against malformed run elements (never throws)", () => {
+    // Type-contract-violating input a hand-built / unsanitized caller might pass:
+    // null run elements or a null traits map. Must degrade, never throw.
+    expect(() => evaluateStability([null, null] as unknown as StabilityRun[])).not.toThrow();
+    expect(
+      evaluateStability([
+        { runLabel: "R1", observedAt: null, traits: null, note: null },
+        { runLabel: "R2", observedAt: null, traits: { nose_loudness: 8 }, note: null },
+      ] as unknown as StabilityRun[]).verdict,
+    ).toBe("unconfirmed"); // null baseline traits → no axis to hold to
+    const e = evaluateStability([
+      { runLabel: "R1", observedAt: null, traits: { nose_loudness: 8 }, note: null },
+      null,
+    ] as unknown as StabilityRun[]);
+    expect(e.verdict).toBe("unconfirmed"); // later run malformed → nothing re-scored
+  });
+
   it("uses the widest later drift, not the last run's value", () => {
     const e = evaluateStability([
       run("Run 1", { [VIGOR.key]: 4 }),

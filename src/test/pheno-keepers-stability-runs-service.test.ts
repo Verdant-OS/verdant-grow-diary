@@ -8,11 +8,16 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { fromMock, listChain, updateChain } = vi.hoisted(() => {
-  // list*: from().select().eq().order() → resolves
+const { fromMock, listChain, ownerChain, updateChain } = vi.hoisted(() => {
+  // listKeepersForHunt: from().select().eq().order() → resolves
   const orderMock = vi.fn();
   const listEqMock = vi.fn(() => ({ order: orderMock }));
-  const listSelectMock = vi.fn(() => ({ eq: listEqMock }));
+  // listKeeperStabilityForOwner: from().select().order().limit() → resolves
+  // (no .eq — RLS scopes to the owner)
+  const ownerLimitMock = vi.fn();
+  const ownerOrderMock = vi.fn(() => ({ limit: ownerLimitMock }));
+  // select() must serve BOTH shapes; return an object exposing eq AND order.
+  const listSelectMock = vi.fn(() => ({ eq: listEqMock, order: ownerOrderMock }));
   // update: from().update().eq().eq().select().maybeSingle() → resolves
   const maybeSingleMock = vi.fn();
   const updSelectMock = vi.fn(() => ({ maybeSingle: maybeSingleMock }));
@@ -23,6 +28,7 @@ const { fromMock, listChain, updateChain } = vi.hoisted(() => {
   return {
     fromMock,
     listChain: { listSelectMock, listEqMock, orderMock },
+    ownerChain: { ownerOrderMock, ownerLimitMock },
     updateChain: { updateMock, updEq1Mock, updEq2Mock, updSelectMock, maybeSingleMock },
   };
 });
@@ -36,12 +42,17 @@ vi.mock("@/integrations/supabase/client", () => ({
   supabase: { auth: { getUser: () => Promise.resolve({ data: { user: currentUser } }) } },
 }));
 
-import { listKeepersForHunt, updateKeeperStabilityRuns } from "@/lib/phenoKeepersService";
+import {
+  listKeepersForHunt,
+  listKeeperStabilityForOwner,
+  updateKeeperStabilityRuns,
+} from "@/lib/phenoKeepersService";
 
 beforeEach(() => {
   currentUser = { id: "owner-1" };
   for (const fn of [
     ...Object.values(listChain),
+    ...Object.values(ownerChain),
     ...Object.values(updateChain),
     fromMock,
   ]) {
@@ -85,6 +96,47 @@ describe("listKeepersForHunt — stability_runs read", () => {
       { runLabel: "Run 1", observedAt: "2026-02-01", traits: { nose_loudness: 8 }, note: "gassy" },
     ]);
     expect(rows[1].stabilityRuns).toEqual([]);
+  });
+});
+
+describe("listKeeperStabilityForOwner — owner-wide read", () => {
+  it("reads all owner keepers (no hunt filter — RLS scopes to owner) and sanitizes runs", async () => {
+    ownerChain.ownerLimitMock.mockResolvedValue({
+      data: [
+        {
+          id: "k1",
+          hunt_id: "h1",
+          keeper_name: "Gas",
+          stability_runs: [
+            { runLabel: "R1", observedAt: "2026-02-01", traits: { nose_loudness: 8, junk: 3 }, note: "x" },
+          ],
+        },
+        { id: "k2", hunt_id: "h2", keeper_name: "Cake" }, // legacy: column absent
+      ],
+      error: null,
+    });
+    const rows = await listKeeperStabilityForOwner();
+    // Selected the minimal projection, ordered, bounded — and NEVER filtered by
+    // a client-supplied user id (RLS does the owner scoping).
+    expect((listChain.listSelectMock.mock.calls[0] as unknown[])[0]).toContain("stability_runs");
+    expect(listChain.listEqMock).not.toHaveBeenCalled();
+    expect(ownerChain.ownerLimitMock).toHaveBeenCalled();
+    expect(rows).toEqual([
+      {
+        keeperId: "k1",
+        huntId: "h1",
+        keeperName: "Gas",
+        stabilityRuns: [
+          { runLabel: "R1", observedAt: "2026-02-01", traits: { nose_loudness: 8 }, note: "x" },
+        ],
+      },
+      { keeperId: "k2", huntId: "h2", keeperName: "Cake", stabilityRuns: [] },
+    ]);
+  });
+
+  it("returns [] on error without throwing (best-effort read)", async () => {
+    ownerChain.ownerLimitMock.mockResolvedValue({ data: null, error: { message: "boom" } });
+    expect(await listKeeperStabilityForOwner()).toEqual([]);
   });
 });
 

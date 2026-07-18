@@ -10,7 +10,7 @@
  * Read-only presenter. The route is wrapped in PhenoTrackerUpgradeGate at
  * the App.tsx level, so this component never re-checks entitlement.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Loader2, Sprout } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,12 @@ import {
   listPhenoHuntsForOwner,
   type PhenoHuntListItem,
 } from "@/lib/phenoHuntCandidatesService";
+import {
+  listKeeperStabilityForOwner,
+  type KeeperStabilityRow,
+} from "@/lib/phenoKeepersService";
+import { buildStabilityDashboard } from "@/lib/phenoStabilityDashboardRules";
+import PhenoStabilityDashboard from "@/components/PhenoStabilityDashboard";
 import { phenoHuntWorkspacePath } from "@/lib/routes";
 
 type Status = "loading" | "ready" | "error";
@@ -33,14 +39,21 @@ function formatCreated(iso: string | null): string {
 export default function PhenoHuntsIndex() {
   const [status, setStatus] = useState<Status>("loading");
   const [hunts, setHunts] = useState<PhenoHuntListItem[]>([]);
+  const [keepers, setKeepers] = useState<KeeperStabilityRow[]>([]);
 
   useEffect(() => {
     let cancelled = false;
     setStatus("loading");
-    listPhenoHuntsForOwner()
-      .then((rows) => {
+    // Hunts drive the page's load status; the keeper roll-up is best-effort.
+    // The service already returns [] on a query error, and the .catch here also
+    // swallows an unexpected *rejection* (network / auth-refresh throw) so a
+    // keeper-load failure can never fail-fast the whole index — only a hunts
+    // rejection reaches the error state.
+    Promise.all([listPhenoHuntsForOwner(), listKeeperStabilityForOwner().catch(() => [])])
+      .then(([huntRows, keeperRows]) => {
         if (cancelled) return;
-        setHunts(rows);
+        setHunts(huntRows);
+        setKeepers(keeperRows);
         setStatus("ready");
       })
       .catch(() => {
@@ -52,6 +65,20 @@ export default function PhenoHuntsIndex() {
     };
   }, []);
 
+  const stabilityModel = useMemo(() => {
+    const huntNameById: Record<string, string> = {};
+    for (const h of hunts) huntNameById[h.id] = h.name;
+    return buildStabilityDashboard(
+      keepers.map((k) => ({
+        keeperId: k.keeperId,
+        keeperName: k.keeperName,
+        huntId: k.huntId,
+        stabilityRuns: k.stabilityRuns,
+      })),
+      huntNameById,
+    );
+  }, [hunts, keepers]);
+
   return (
     <div className="max-w-3xl mx-auto p-4 space-y-4" data-testid="pheno-hunts-index">
       <header className="space-y-1">
@@ -61,6 +88,8 @@ export default function PhenoHuntsIndex() {
           one hunt per grow.
         </p>
       </header>
+
+      {status === "ready" && <PhenoStabilityDashboard model={stabilityModel} />}
 
       {status === "loading" ? (
         <div

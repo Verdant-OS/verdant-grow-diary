@@ -147,12 +147,20 @@ export function evaluateStability(
   const axisTrends: StabilityAxisTrend[] = [];
   const driftedAxes: string[] = [];
 
+  // Defensive: a caller may (against the StabilityRun[] type, e.g. hand-built
+  // or unsanitized input) pass a null run or a run with a null traits map.
+  // Coerce to an empty trait map so a malformed element contributes no values
+  // rather than throwing — keeping this module's "null-safe" contract true.
+  const traitsOf = (run: StabilityRun | null | undefined): Readonly<Record<string, number>> =>
+    run && typeof run.traits === "object" && run.traits !== null ? run.traits : {};
+
+  const baseTraits = traitsOf(baseline);
   for (const axis of LOUD_TRAIT_AXES) {
-    const base = baseline.traits[axis.key];
+    const base = baseTraits[axis.key];
     if (typeof base !== "number") continue; // no baseline value → nothing to hold to
     const tolerance = toleranceFor(axis);
     const laterValues = later.map((run) => {
-      const v = run.traits[axis.key];
+      const v = traitsOf(run)[axis.key];
       return typeof v === "number" ? v : null;
     });
     const recorded = laterValues.filter((v): v is number => v !== null);

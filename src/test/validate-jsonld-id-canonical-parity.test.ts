@@ -142,6 +142,21 @@ describe("validateDocument", () => {
     expect(issues).toHaveLength(1);
     expect(issues[0].message).toContain("bad.example");
   });
+  it("ignores site-level entity @ids (Organization / WebSite / SoftwareApplication)", () => {
+    const issues = validateDocument({
+      file: "x.html",
+      html: docWith({
+        "@graph": [
+          { "@type": "Organization", "@id": "https://verdantgrowdiary.com/#organization" },
+          { "@type": "WebSite", "@id": "https://verdantgrowdiary.com/#website" },
+          { "@type": "SoftwareApplication", "@id": "https://verdantgrowdiary.com/#app" },
+          { "@type": "WebPage", "@id": CANONICAL },
+        ],
+      }),
+    });
+    expect(issues).toEqual([]);
+  });
+
 
   it("walks top-level array", () => {
     const issues = validateDocument({

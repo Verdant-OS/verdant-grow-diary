@@ -66,16 +66,13 @@ export default function Onboarding() {
       const prefill = buildStarterQuickLogPrefill(result);
       // AppShell listens for this event globally and opens Quick Log with
       // the plant/tent/grow preselected. No sensor snapshot is inserted;
-      // the grower still authors the first log manually.
-      nav("/", { replace: true });
-      window.dispatchEvent(
-        new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, { detail: prefill }),
-      );
+      // the grower still authors the first log manually. Stay inside the
+      // current AppShell so its listener is not replaced before receiving
+      // this in-memory handoff.
+      window.dispatchEvent(new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, { detail: prefill }));
     } catch (err) {
       const message =
-        err instanceof StarterSetupError
-          ? STARTER_SETUP_ERROR_COPY
-          : STARTER_SETUP_ERROR_COPY;
+        err instanceof StarterSetupError ? STARTER_SETUP_ERROR_COPY : STARTER_SETUP_ERROR_COPY;
       setStarterError(message);
     } finally {
       setStarterBusy(false);
@@ -145,10 +142,7 @@ export default function Onboarding() {
         </fieldset>
 
         <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
-          <Button
-            variant="ghost"
-            onClick={() => go(DEFAULT_START_SCREEN, false)}
-          >
+          <Button variant="ghost" onClick={() => go(DEFAULT_START_SCREEN, false)}>
             Skip for now
           </Button>
           <Button
@@ -166,9 +160,7 @@ export default function Onboarding() {
           <p className="text-xs uppercase tracking-wide text-muted-foreground">
             Just want to try Quick Log?
           </p>
-          <p className="mt-2 text-sm text-foreground/90">
-            {STARTER_SETUP_HELPER_COPY}
-          </p>
+          <p className="mt-2 text-sm text-foreground/90">{STARTER_SETUP_HELPER_COPY}</p>
           <Button
             data-testid="starter-setup-button"
             type="button"
@@ -189,8 +181,6 @@ export default function Onboarding() {
             </p>
           ) : null}
         </div>
-
-
 
         <p className="mt-4 text-[11px] text-muted-foreground text-center">
           You can change this later from{" "}

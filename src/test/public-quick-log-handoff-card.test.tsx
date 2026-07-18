@@ -37,9 +37,7 @@ import {
   serializePublicQuickLogStarterDraft,
   type PublicQuickLogStarterDraft,
 } from "@/lib/publicQuickLogStarterRules";
-import {
-  PUBLIC_QUICK_LOG_HANDOFF_DRAFT_STATUS_LINE,
-} from "@/lib/publicQuickLogHandoffViewModel";
+import { PUBLIC_QUICK_LOG_HANDOFF_DRAFT_STATUS_LINE } from "@/lib/publicQuickLogHandoffViewModel";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 
 // The dispatch-time revalidation inside the card reads the REAL clock,
@@ -58,9 +56,7 @@ const NEW_SURFACE_FILES = [
   "src/components/PublicQuickLogHandoffCard.tsx",
 ];
 
-function draft(
-  overrides: Partial<PublicQuickLogStarterDraft> = {},
-): PublicQuickLogStarterDraft {
+function draft(overrides: Partial<PublicQuickLogStarterDraft> = {}): PublicQuickLogStarterDraft {
   return {
     v: 1,
     id: "draft-1",
@@ -89,9 +85,7 @@ function storedDraftRaw(): string | null {
 
 function LocationProbe() {
   const location = useLocation();
-  return (
-    <div data-testid="location-probe">{`${location.pathname}${location.search}`}</div>
-  );
+  return <div data-testid="location-probe">{`${location.pathname}${location.search}`}</div>;
 }
 
 function renderCard(props: { now?: Date } = {}) {
@@ -157,18 +151,16 @@ describe("<PublicQuickLogHandoffCard />", () => {
     expect(screen.getByTestId("public-quick-log-handoff-status-line").textContent).toBe(
       PUBLIC_QUICK_LOG_HANDOFF_DRAFT_STATUS_LINE,
     );
-    expect(
-      screen.getByTestId("public-quick-log-handoff-row-plant").textContent,
-    ).toContain("Blue Dream #1");
-    expect(
-      screen.getByTestId("public-quick-log-handoff-row-type").textContent,
-    ).toContain("Note");
-    expect(
-      screen.getByTestId("public-quick-log-handoff-row-note").textContent,
-    ).toContain("First true leaves look healthy.");
-    expect(
-      screen.getByTestId("public-quick-log-handoff-match-hint").textContent,
-    ).toMatch(/matched your plant/i);
+    expect(screen.getByTestId("public-quick-log-handoff-row-plant").textContent).toContain(
+      "Blue Dream #1",
+    );
+    expect(screen.getByTestId("public-quick-log-handoff-row-type").textContent).toContain("Note");
+    expect(screen.getByTestId("public-quick-log-handoff-row-note").textContent).toContain(
+      "First true leaves look healthy.",
+    );
+    expect(screen.getByTestId("public-quick-log-handoff-match-hint").textContent).toMatch(
+      /matched your plant/i,
+    );
     // Never a fake success: no diary/saved language anywhere on the card.
     expect(card.textContent).not.toMatch(/saved|in your diary now|logged/i);
   });
@@ -176,9 +168,9 @@ describe("<PublicQuickLogHandoffCard />", () => {
   it("watering drafts show the amount row", () => {
     seedDraft(draft({ logType: "watering", note: "", wateringVolumeMl: 500 }));
     renderCard();
-    expect(
-      screen.getByTestId("public-quick-log-handoff-row-volume").textContent,
-    ).toContain("500 ml");
+    expect(screen.getByTestId("public-quick-log-handoff-row-volume").textContent).toContain(
+      "500 ml",
+    );
   });
 
   it("rendering + remounting performs zero writes and leaves the draft byte-identical", () => {
@@ -225,9 +217,9 @@ describe("<PublicQuickLogHandoffCard />", () => {
     });
     // Draft untouched: display/handoff never consumes it.
     expect(storedDraftRaw()).toBe(before);
-    // Routed to the dashboard host with NO query string — nickname/note
-    // never travel through a URL.
-    expect(screen.getByTestId("location-probe").textContent).toBe("/");
+    // Stay inside the current AppShell so its listener receives the event.
+    // The nickname/note never travel through a URL.
+    expect(screen.getByTestId("location-probe").textContent).toBe("/onboarding");
   });
 
   it("'Not now' retains the draft, performs zero writes to it, and hides only this draft", () => {
@@ -252,9 +244,7 @@ describe("<PublicQuickLogHandoffCard />", () => {
     const before = storedDraftRaw();
     renderCard();
     fireEvent.click(screen.getByTestId("public-quick-log-handoff-discard"));
-    expect(
-      screen.getByTestId("public-quick-log-handoff-discard-question"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("public-quick-log-handoff-discard-question")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("public-quick-log-handoff-discard-cancel"));
     expect(storedDraftRaw()).toBe(before);
     expect(screen.getByTestId("public-quick-log-handoff-review-save")).toBeInTheDocument();
@@ -277,9 +267,9 @@ describe("<PublicQuickLogHandoffCard />", () => {
     const setup = screen.getByTestId("public-quick-log-handoff-setup-link");
     expect(setup.getAttribute("href")).toBe("/grows");
     expect(screen.queryByTestId("public-quick-log-handoff-review-save")).toBeNull();
-    expect(
-      screen.getByTestId("public-quick-log-handoff-match-hint").textContent,
-    ).toMatch(/draft stays on this device/i);
+    expect(screen.getByTestId("public-quick-log-handoff-match-hint").textContent).toMatch(
+      /draft stays on this device/i,
+    );
     expect(storedDraftRaw()).not.toBeNull();
   });
 
@@ -292,9 +282,9 @@ describe("<PublicQuickLogHandoffCard />", () => {
     const listener = (e: Event) => events.push(e as CustomEvent);
     window.addEventListener(PLANT_QUICKLOG_PREFILL_EVENT, listener);
     renderCard();
-    expect(
-      screen.getByTestId("public-quick-log-handoff-match-hint").textContent,
-    ).toMatch(/pick which one/i);
+    expect(screen.getByTestId("public-quick-log-handoff-match-hint").textContent).toMatch(
+      /pick which one/i,
+    );
     fireEvent.click(screen.getByTestId("public-quick-log-handoff-review-save"));
     window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, listener);
     expect(events[0].detail.plantId).toBeNull();
@@ -305,9 +295,9 @@ describe("<PublicQuickLogHandoffCard />", () => {
   it("feeding drafts state the 'Coming soon' caveat up front", () => {
     seedDraft(draft({ logType: "feeding", note: "Fed 2ml/L grow nutes" }));
     renderCard();
-    expect(
-      screen.getByTestId("public-quick-log-handoff-type-caveat").textContent,
-    ).toMatch(/not saveable from Quick Log yet/i);
+    expect(screen.getByTestId("public-quick-log-handoff-type-caveat").textContent).toMatch(
+      /not saveable from Quick Log yet/i,
+    );
   });
 
   it("while the plant inventory loads, never claims 'no plants' and never offers setup", () => {
@@ -318,9 +308,9 @@ describe("<PublicQuickLogHandoffCard />", () => {
     expect(checking).toBeDisabled();
     expect(screen.queryByTestId("public-quick-log-handoff-setup-link")).toBeNull();
     expect(screen.queryByTestId("public-quick-log-handoff-review-save")).toBeNull();
-    expect(
-      screen.getByTestId("public-quick-log-handoff-match-hint").textContent,
-    ).toMatch(/checking your plants/i);
+    expect(screen.getByTestId("public-quick-log-handoff-match-hint").textContent).toMatch(
+      /checking your plants/i,
+    );
   });
 
   it("a failed inventory read still allows review (no suggestion, defaults suppressed) — never the setup CTA", () => {
@@ -331,9 +321,9 @@ describe("<PublicQuickLogHandoffCard />", () => {
     window.addEventListener(PLANT_QUICKLOG_PREFILL_EVENT, listener);
     renderCard();
     expect(screen.queryByTestId("public-quick-log-handoff-setup-link")).toBeNull();
-    expect(
-      screen.getByTestId("public-quick-log-handoff-match-hint").textContent,
-    ).toMatch(/couldn't check your plants/i);
+    expect(screen.getByTestId("public-quick-log-handoff-match-hint").textContent).toMatch(
+      /couldn't check your plants/i,
+    );
     fireEvent.click(screen.getByTestId("public-quick-log-handoff-review-save"));
     window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, listener);
     expect(events).toHaveLength(1);
@@ -349,9 +339,7 @@ describe("<PublicQuickLogHandoffCard />", () => {
       screen.getByTestId("public-quick-log-handoff-discard-cancel"),
     );
     fireEvent.click(screen.getByTestId("public-quick-log-handoff-discard-cancel"));
-    expect(document.activeElement).toBe(
-      screen.getByTestId("public-quick-log-handoff-discard"),
-    );
+    expect(document.activeElement).toBe(screen.getByTestId("public-quick-log-handoff-discard"));
   });
 
   it("re-validates at dispatch time: a draft past the 24h cap while mounted is never dispatched", () => {

@@ -39,6 +39,8 @@ export const DIARY_CALENDAR_DRAWER_VIEW_LABEL =
   "View event details" as const;
 export const DIARY_CALENDAR_DRAWER_CLOSE_LABEL =
   "Close event details" as const;
+export const DIARY_CALENDAR_DRAWER_DESCRIPTION =
+  "Read-only details for this diary event, including recorded measurements and attachment status." as const;
 
 export interface DiaryCalendarDrawerField {
   label: string;

@@ -420,6 +420,14 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
         attachedToAction: form.action,
       });
       if (!photoEntry.ok) {
+        // The main log saved but its companion photo entry did not, so the
+        // uploaded object is now orphaned (no row references it). Remove it
+        // so storage does not leak — mirrors the build- and save-failure
+        // cleanup paths above. uploadedPath is non-null in this branch.
+        await supabase.storage
+          .from("diary-photos")
+          .remove([uploadedPath])
+          .catch(() => {});
         setLocalError((photoEntry as { message: string }).message);
         setSaveStatus("");
         return;

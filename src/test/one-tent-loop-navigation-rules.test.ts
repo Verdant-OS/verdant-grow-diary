@@ -75,9 +75,48 @@ describe("oneTentLoopNavigationRules", () => {
     expect(r2.href ?? "").not.toMatch(/^\/grows\//);
   });
 
-  it("enables routes for tent and plant when ids are present", () => {
+  it("enables the tent route when its id is present", () => {
     expect(resolveOneTentLoopNextStep("tent", { tentId: "t1" }).href).toBe("/tents/t1");
-    expect(resolveOneTentLoopNextStep("plant", { plantId: "p1" }).href).toBe("/plants/p1");
+  });
+
+  it("opens an exact Quick Log intent from a fully assigned plant", () => {
+    expect(
+      resolveOneTentLoopNextStep("plant", {
+        plantId: "p1",
+        tentId: "t1",
+        growId: "g1",
+      }),
+    ).toMatchObject({
+      intent: "open_quick_log",
+      href: null,
+      disabled: false,
+      disabledReason: null,
+      quickLogPrefill: {
+        plantId: "p1",
+        plantName: null,
+        tentId: "t1",
+        tentName: null,
+        growId: "g1",
+        eventType: "observation",
+        suggestSnapshot: true,
+      },
+    });
+  });
+
+  it("keeps the plant Quick Log intent disabled when any assignment is missing", () => {
+    for (const ids of [
+      { plantId: "p1", tentId: "t1" },
+      { plantId: "p1", growId: "g1" },
+      { tentId: "t1", growId: "g1" },
+    ]) {
+      expect(resolveOneTentLoopNextStep("plant", ids)).toMatchObject({
+        intent: "open_quick_log",
+        href: null,
+        disabled: true,
+        disabledReason: ONE_TENT_LOOP_DISABLED_COPY,
+        quickLogPrefill: null,
+      });
+    }
   });
 
   it("routes quick-log → timeline and timeline → sensors without ids", () => {
@@ -90,9 +129,7 @@ describe("oneTentLoopNavigationRules", () => {
   });
 
   it("ai-doctor with alertId deep-links; without alertId falls back to /alerts with a clarifying CTA label", () => {
-    expect(
-      resolveOneTentLoopNextStep("ai-doctor", { alertId: "a1" }).href,
-    ).toBe("/alerts/a1");
+    expect(resolveOneTentLoopNextStep("ai-doctor", { alertId: "a1" }).href).toBe("/alerts/a1");
     const fallback = resolveOneTentLoopNextStep("ai-doctor");
     expect(fallback.href).toBe("/alerts");
     // Fallback must NOT imply opening a specific alert.
@@ -105,17 +142,13 @@ describe("oneTentLoopNavigationRules", () => {
     expect(r.ctaLabel).toBe("Add to Action Queue");
     expect(r.href).toBe("/actions");
     expect(resolveOneTentLoopNextStep("alert").href).toBe("/actions");
-    expect(
-      resolveOneTentLoopNextStep("alert", { actionId: "x1" }).href,
-    ).toBe("/actions/x1");
+    expect(resolveOneTentLoopNextStep("alert", { actionId: "x1" }).href).toBe("/actions/x1");
     // Regression guard against the previous /alerts misrouting.
     expect(r.href).not.toMatch(/^\/alerts/);
   });
 
   it("routes action-queue to action detail when actionId is present", () => {
-    expect(
-      resolveOneTentLoopNextStep("action-queue", { actionId: "x1" }).href,
-    ).toBe("/actions/x1");
+    expect(resolveOneTentLoopNextStep("action-queue", { actionId: "x1" }).href).toBe("/actions/x1");
     expect(resolveOneTentLoopNextStep("action-queue").href).toBe("/actions");
   });
 

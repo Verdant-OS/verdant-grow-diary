@@ -8,6 +8,11 @@
  * Approval-required wording is preserved for the Action Queue step.
  */
 
+import {
+  buildPlantQuickLogPrefill,
+  type PlantQuickLogPrefill,
+} from "@/lib/plantQuickLogPrefillRules";
+
 export type OneTentLoopStep =
   | "grow"
   | "tent"
@@ -56,8 +61,7 @@ export const ONE_TENT_LOOP_STEP_LABEL: Record<OneTentLoopStep, string> = {
 };
 
 /** Safe explanation shown when the next step cannot be linked yet. */
-export const ONE_TENT_LOOP_DISABLED_COPY =
-  "Next step unavailable until this record is selected.";
+export const ONE_TENT_LOOP_DISABLED_COPY = "Next step unavailable until this record is selected.";
 
 /**
  * Cautious helper copy describing why the next step matters. Presenter-only.
@@ -69,14 +73,11 @@ export const ONE_TENT_LOOP_HELPER_COPY: Record<OneTentLoopStep, string> = {
   tent: "",
   plant: "",
   "quick-log": "",
-  timeline:
-    "Open Sensor Snapshot from Timeline to cross-check telemetry and proceed.",
+  timeline: "Open Sensor Snapshot from Timeline to cross-check telemetry and proceed.",
   "sensor-snapshot":
     "Open AI Doctor page to review available context and prepare for next actions.",
-  "ai-doctor":
-    "Open Alert page to review and plan approval-required actions.",
-  alert:
-    "Review the approval-required Action Queue before taking action.",
+  "ai-doctor": "Open Alert page to review and plan approval-required actions.",
+  alert: "Review the approval-required Action Queue before taking action.",
   "action-queue": "",
 };
 
@@ -102,8 +103,10 @@ export interface OneTentLoopNextStep {
   current: OneTentLoopStep;
   next: OneTentLoopStep | null;
   ctaLabel: string;
+  intent: "navigate" | "open_quick_log";
   /** Internal route. Never rendered as visible copy. */
   href: string | null;
+  quickLogPrefill: PlantQuickLogPrefill | null;
   disabled: boolean;
   disabledReason: string | null;
 }
@@ -129,7 +132,9 @@ export function resolveOneTentLoopNextStep(
     current,
     next,
     ctaLabel: ONE_TENT_LOOP_CTA_LABEL[current],
+    intent: current === "plant" ? "open_quick_log" : "navigate",
     href: null,
+    quickLogPrefill: null,
     disabled: true,
     disabledReason: ONE_TENT_LOOP_DISABLED_COPY,
   };
@@ -148,7 +153,14 @@ export function resolveOneTentLoopNextStep(
       if (tentId) return enable(base, `/tents/${tentId}`);
       return base;
     case "plant":
-      if (plantId) return enable(base, `/plants/${plantId}`);
+      {
+        const quickLogPrefill = buildPlantQuickLogPrefill({
+          plantId,
+          growId,
+          tentId,
+        });
+        if (quickLogPrefill) return enableQuickLog(base, quickLogPrefill);
+      }
       return base;
     case "quick-log":
       return enable(base, "/timeline");
@@ -178,7 +190,28 @@ export function resolveOneTentLoopNextStep(
 }
 
 function enable(base: OneTentLoopNextStep, href: string): OneTentLoopNextStep {
-  return { ...base, href, disabled: false, disabledReason: null };
+  return {
+    ...base,
+    intent: "navigate",
+    href,
+    quickLogPrefill: null,
+    disabled: false,
+    disabledReason: null,
+  };
+}
+
+function enableQuickLog(
+  base: OneTentLoopNextStep,
+  quickLogPrefill: PlantQuickLogPrefill,
+): OneTentLoopNextStep {
+  return {
+    ...base,
+    intent: "open_quick_log",
+    href: null,
+    quickLogPrefill,
+    disabled: false,
+    disabledReason: null,
+  };
 }
 
 /** Empty-state copy keyed by loop step. */
@@ -193,6 +226,5 @@ export const ONE_TENT_LOOP_EMPTY_STATE: Record<OneTentLoopStep, string> = {
   "ai-doctor":
     "AI Doctor needs context. Add a recent photo, log, or sensor evidence first. Missing context will be shown.",
   alert: "No active alert. Continue monitoring — telemetry status is shown by source.",
-  "action-queue":
-    "No pending approval-required actions. New items always require grower approval.",
+  "action-queue": "No pending approval-required actions. New items always require grower approval.",
 };

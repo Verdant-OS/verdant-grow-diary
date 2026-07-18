@@ -4,9 +4,10 @@
  * fetching, Supabase, AI, or device control.
  */
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
+import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 
 // Spy on fetch to prove the card itself triggers no network calls.
 const fetchSpy = vi.spyOn(globalThis, "fetch" as never).mockImplementation((() => {
@@ -40,25 +41,36 @@ describe("PlantDetail One-Tent Loop next-step card wiring", () => {
         testId="plant-detail-one-tent-loop-next-step-card"
       />,
     );
-    const cta = screen.getByTestId(
-      "plant-detail-one-tent-loop-next-step-card-cta",
-    );
+    const cta = screen.getByTestId("plant-detail-one-tent-loop-next-step-card-cta");
     expect(cta).toHaveTextContent(/Add quick log/i);
   });
 
-  it("CTA href uses the existing /plants/:plantId route pattern (no invented route)", () => {
-    renderCard(
-      <OneTentLoopNextStepCard
-        current="plant"
-        ids={{ plantId: "p1" }}
-        testId="plant-detail-one-tent-loop-next-step-card"
-      />,
-    );
-    const cta = screen.getByTestId(
-      "plant-detail-one-tent-loop-next-step-card-cta",
-    );
-    const anchor = cta.tagName === "A" ? cta : cta.querySelector("a");
-    expect(anchor?.getAttribute("href")).toBe("/plants/p1");
+  it("opens the exact assigned plant in Quick Log without navigating or fetching", () => {
+    const listener = vi.fn();
+    window.addEventListener(PLANT_QUICKLOG_PREFILL_EVENT, listener);
+    try {
+      renderCard(
+        <OneTentLoopNextStepCard
+          current="plant"
+          ids={{ plantId: "p1", tentId: "t1", growId: "g1" }}
+          testId="plant-detail-one-tent-loop-next-step-card"
+        />,
+      );
+      const cta = screen.getByTestId("plant-detail-one-tent-loop-next-step-card-cta");
+      expect(cta.tagName).toBe("BUTTON");
+      expect(cta.querySelector("a")).toBeNull();
+      fireEvent.click(cta);
+
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect((listener.mock.calls[0][0] as CustomEvent).detail).toMatchObject({
+        plantId: "p1",
+        tentId: "t1",
+        growId: "g1",
+      });
+      expect(fetchSpy).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, listener);
+    }
   });
 
   it("falls back to the safe disabled state when ids are missing", () => {
@@ -69,9 +81,7 @@ describe("PlantDetail One-Tent Loop next-step card wiring", () => {
       />,
     );
     expect(
-      screen.getByTestId(
-        "plant-detail-one-tent-loop-next-step-card-disabled",
-      ),
+      screen.getByTestId("plant-detail-one-tent-loop-next-step-card-disabled"),
     ).toHaveTextContent(/Next step unavailable until this record is selected\./);
   });
 
@@ -91,7 +101,7 @@ describe("PlantDetail One-Tent Loop next-step card wiring", () => {
     renderCard(
       <OneTentLoopNextStepCard
         current="plant"
-        ids={{ plantId: "p1" }}
+        ids={{ plantId: "p1", tentId: "t1", growId: "g1" }}
         testId="plant-detail-one-tent-loop-next-step-card"
       />,
     );

@@ -101,7 +101,7 @@ describe("evaluateStability", () => {
     ]);
     expect(e.verdict).toBe("holding");
     expect(e.runCount).toBe(2);
-    expect(e.evidenceRunCount).toBe(2);
+    expect(e.recordedRunCount).toBe(2);
     expect(e.driftedAxes).toEqual([]);
     const noseTrend = e.axisTrends.find((t) => t.axisKey === "nose_loudness")!;
     expect(noseTrend.baseline).toBe(8);
@@ -132,7 +132,8 @@ describe("evaluateStability", () => {
   it("two runs but no shared re-scored axis → unconfirmed, not a false hold", () => {
     const e = evaluateStability([run("Run 1", { nose_loudness: 8 }), run("Run 2", { vigor: 4 })]);
     expect(e.verdict).toBe("unconfirmed");
-    expect(e.evidenceRunCount).toBe(1);
+    expect(e.runCount).toBe(1);
+    expect(e.recordedRunCount).toBe(2);
     expect(e.axisTrends).toEqual([]);
   });
 
@@ -140,12 +141,13 @@ describe("evaluateStability", () => {
     const e = evaluateStability([
       run("Run 1", { nose_loudness: 8 }),
       run("Run 2", { nose_loudness: 9 }),
-      run("Run 3", { vigor: 4 }),
+      run("Run 3", {}),
     ]);
-    expect(e.runCount).toBe(3);
-    expect(e.evidenceRunCount).toBe(2);
+    expect(e.runCount).toBe(2);
+    expect(e.recordedRunCount).toBe(3);
     expect(e.verdict).toBe("unconfirmed");
     expect(stabilityVerdictCopy(e)).toMatch(/Only 2 of 3 recorded grow-outs/);
+    expect(stabilityVerdictCopy(e)).toMatch(/Only those evidence-bearing grow-outs count/);
     expect(stabilityVerdictCopy(e)).not.toMatch(/held across 3/i);
   });
 
@@ -156,7 +158,7 @@ describe("evaluateStability", () => {
       run("Run 3", { vigor: 4 }),
     ]);
     expect(e.runCount).toBe(3);
-    expect(e.evidenceRunCount).toBe(3);
+    expect(e.recordedRunCount).toBe(3);
     expect(e.verdict).toBe("unconfirmed");
     expect(stabilityVerdictCopy(e)).toMatch(
       /no single baseline trait was re-scored across every run/i,
@@ -170,7 +172,8 @@ describe("evaluateStability", () => {
       run("Run 2", { nose_loudness: 2 }),
       run("Run 3", {}),
     ]);
-    expect(e.evidenceRunCount).toBe(2);
+    expect(e.runCount).toBe(2);
+    expect(e.recordedRunCount).toBe(3);
     expect(e.verdict).toBe("drifting");
   });
 
@@ -211,7 +214,9 @@ describe("stabilityVerdictCopy", () => {
     const holding = stabilityVerdictCopy(
       evaluateStability([run("R1", { vigor: 4 }), run("R2", { vigor: 4 })]),
     );
-    expect(holding).toMatch(/baseline trait held within tolerance across 2 recorded grow-outs/);
+    expect(holding).toMatch(
+      /baseline trait held within tolerance across 2 evidence-bearing grow-outs/,
+    );
     expect(holding).toMatch(/not a promise about future runs/);
     const drift = stabilityVerdictCopy(
       evaluateStability([run("R1", { nose_loudness: 8 }), run("R2", { nose_loudness: 2 })]),

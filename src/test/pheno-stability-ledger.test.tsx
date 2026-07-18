@@ -61,6 +61,17 @@ describe("PhenoStabilityLedger — verdict & empty state", () => {
     expect(axis).toHaveTextContent(/held/);
   });
 
+  it("counts only evidence-bearing runs and does not overclaim an unscored third run", () => {
+    setup([run("R1", { nose_loudness: 8 }), run("R2", { nose_loudness: 9 }), run("R3", {})]);
+    expect(screen.getByTestId("pheno-stability-verdict-badge-k1")).toHaveTextContent(
+      /Re-grow evidence incomplete/i,
+    );
+    const copy = screen.getByTestId("pheno-stability-verdict-k1");
+    expect(copy).toHaveTextContent(/Only 2 of 3 recorded grow-outs/i);
+    expect(copy).toHaveTextContent(/Only those evidence-bearing grow-outs count/i);
+    expect(copy).not.toHaveTextContent(/held across 3/i);
+  });
+
   it("a drift beyond tolerance reads as drifted and names the axis move", () => {
     setup([run("R1", { nose_loudness: 8 }), run("R2", { nose_loudness: 2 })]);
     expect(screen.getByTestId("pheno-stability-verdict-badge-k1")).toHaveTextContent(

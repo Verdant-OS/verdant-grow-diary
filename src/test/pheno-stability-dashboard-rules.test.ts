@@ -53,7 +53,9 @@ describe("buildStabilityDashboard", () => {
     expect(model.counts).toEqual({ holding: 1, drifting: 1, unconfirmed: 1, no_runs: 1 });
     const k1 = model.entries.find((e) => e.keeperId === "k1")!;
     expect(k1.verdict).toBe("holding");
-    expect(k1.detail).toMatch(/baseline trait held within tolerance across 2 recorded grow-outs/);
+    expect(k1.detail).toMatch(
+      /baseline trait held within tolerance across 2 evidence-bearing grow-outs/,
+    );
     const k2 = model.entries.find((e) => e.keeperId === "k2")!;
     expect(k2.verdict).toBe("drifting");
     expect(k2.detail).toMatch(/Drifted on re-grow/);
@@ -111,7 +113,8 @@ describe("buildStabilityDashboard", () => {
       HUNT_NAMES,
     );
     expect(model.entries[0].verdict).toBe("unconfirmed");
-    expect(model.entries[0].evidenceRunCount).toBe(1);
+    expect(model.entries[0].runCount).toBe(1);
+    expect(model.entries[0].recordedRunCount).toBe(2);
     expect(model.entries[0].detail).toMatch(/Only 1 of 2 recorded grow-outs/);
     expect(model.counts.unconfirmed).toBe(1);
   });
@@ -132,14 +135,19 @@ describe("buildStabilityDashboard", () => {
 
     const partial = model.entries.find((entry) => entry.keeperId === "partial")!;
     expect(partial.verdict).toBe("unconfirmed");
-    expect(partial.evidenceRunCount).toBe(2);
+    expect(partial.runCount).toBe(2);
+    expect(partial.recordedRunCount).toBe(3);
     expect(partial.detail).toMatch(/Only 2 of 3 recorded grow-outs/);
+    expect(partial.detail).toMatch(/only those evidence-bearing grow-outs count/i);
     expect(partial.detail).not.toMatch(/held across 3/i);
 
     const disjoint = model.entries.find((entry) => entry.keeperId === "disjoint")!;
     expect(disjoint.verdict).toBe("unconfirmed");
-    expect(disjoint.evidenceRunCount).toBe(3);
-    expect(disjoint.detail).toMatch(/no single baseline trait was re-scored across all 3 runs/i);
+    expect(disjoint.runCount).toBe(3);
+    expect(disjoint.recordedRunCount).toBe(3);
+    expect(disjoint.detail).toMatch(
+      /no single baseline trait was re-scored across all 3 evidence-bearing runs/i,
+    );
     expect(disjoint.detail).not.toMatch(/held across 3/i);
   });
 

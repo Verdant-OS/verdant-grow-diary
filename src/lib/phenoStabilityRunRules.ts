@@ -136,10 +136,10 @@ export interface StabilityAxisTrend {
 
 export interface StabilityEvaluation {
   readonly verdict: StabilityVerdict;
-  /** Every recorded run, including runs without baseline-comparable traits. */
+  /** Runs that contain valid evidence comparable to the baseline. */
   readonly runCount: number;
-  /** Baseline + later runs that contain at least one valid baseline trait. */
-  readonly evidenceRunCount: number;
+  /** Every recorded run, including rows without baseline-comparable traits. */
+  readonly recordedRunCount: number;
   readonly axisTrends: readonly StabilityAxisTrend[];
   /** Axis labels that drifted beyond tolerance — for the verdict copy. */
   readonly driftedAxes: readonly string[];
@@ -156,7 +156,7 @@ export function evaluateStability(runs: readonly StabilityRun[]): StabilityEvalu
     return {
       verdict: "no_runs",
       runCount: 0,
-      evidenceRunCount: 0,
+      recordedRunCount: 0,
       axisTrends: [],
       driftedAxes: [],
     };
@@ -193,16 +193,17 @@ export function evaluateStability(runs: readonly StabilityRun[]): StabilityEvalu
     const traits = traitsOf(run);
     return baselineAxes.some((axis) => validValueFor(traits, axis) !== null);
   });
-  const evidenceRunCount =
+  const runCount =
     baselineAxes.length === 0
       ? 0
       : 1 + laterHasComparableEvidence.filter((hasEvidence) => hasEvidence).length;
+  const recordedRunCount = list.length;
 
   if (list.length === 1) {
     return {
       verdict: "unconfirmed",
-      runCount: 1,
-      evidenceRunCount,
+      runCount,
+      recordedRunCount,
       axisTrends: [],
       driftedAxes: [],
     };
@@ -235,8 +236,8 @@ export function evaluateStability(runs: readonly StabilityRun[]): StabilityEvalu
   if (axisTrends.length === 0) {
     return {
       verdict: "unconfirmed",
-      runCount: list.length,
-      evidenceRunCount,
+      runCount,
+      recordedRunCount,
       axisTrends: [],
       driftedAxes: [],
     };
@@ -251,7 +252,7 @@ export function evaluateStability(runs: readonly StabilityRun[]): StabilityEvalu
   );
   const verdict: StabilityVerdict =
     driftedAxes.length > 0 ? "drifting" : hasFullyComparableAxis ? "holding" : "unconfirmed";
-  return { verdict, runCount: list.length, evidenceRunCount, axisTrends, driftedAxes };
+  return { verdict, runCount, recordedRunCount, axisTrends, driftedAxes };
 }
 
 export const STABILITY_VERDICT_LABELS: Readonly<Record<StabilityVerdict, string>> = Object.freeze({
@@ -270,15 +271,15 @@ export function stabilityVerdictCopy(evalResult: StabilityEvaluation): string {
     case "no_runs":
       return "No grow-outs recorded yet. Record a run to start tracking whether this phenotype holds.";
     case "unconfirmed":
-      if (evalResult.runCount > 1 && evalResult.evidenceRunCount < evalResult.runCount) {
-        return `Only ${evalResult.evidenceRunCount} of ${evalResult.runCount} recorded grow-outs include trait evidence comparable to the baseline. The incomplete evidence cannot support a held-across-runs claim yet.`;
+      if (evalResult.recordedRunCount > 1 && evalResult.runCount < evalResult.recordedRunCount) {
+        return `Only ${evalResult.runCount} of ${evalResult.recordedRunCount} recorded grow-outs include trait evidence comparable to the baseline. Only those evidence-bearing grow-outs count toward the stability comparison, and the incomplete evidence cannot support a held-across-runs claim yet.`;
       }
-      if (evalResult.runCount > 1) {
-        return `All ${evalResult.runCount} recorded grow-outs include some baseline-comparable evidence, but no single baseline trait was re-scored across every run. That incomplete comparison cannot support a held-across-runs claim yet.`;
+      if (evalResult.recordedRunCount > 1) {
+        return `All ${evalResult.runCount} evidence-bearing grow-outs include some baseline-comparable evidence, but no single baseline trait was re-scored across every run. That incomplete comparison cannot support a held-across-runs claim yet.`;
       }
       return "Recorded once. Re-grow the clone in a separate run to see whether the traits hold — a single run can't tell you.";
     case "holding":
-      return `At least one baseline trait held within tolerance across ${evalResult.runCount} recorded grow-outs, and no comparable observation drifted. That is what you observed so far, not a promise about future runs.`;
+      return `At least one baseline trait held within tolerance across ${evalResult.runCount} evidence-bearing grow-outs, and no comparable observation drifted. That is what you observed so far, not a promise about future runs.`;
     case "drifting": {
       const which = evalResult.driftedAxes.join(", ");
       return `Traits shifted on re-grow (${which}). What you selected in run one did not repeat within your recorded tolerance.`;

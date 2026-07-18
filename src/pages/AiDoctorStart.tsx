@@ -15,6 +15,7 @@ import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { useGrowPlants } from "@/hooks/useGrowData";
 import { buildAiDoctorEntryOptions } from "@/lib/aiDoctorEntryRules";
+import { plantsPath } from "@/lib/routes";
 
 export default function AiDoctorStart() {
   const plantsQuery = useGrowPlants();
@@ -67,7 +68,7 @@ export default function AiDoctorStart() {
             description="Create or reactivate a plant first. Archived and merged plants stay preserved in history but are not offered for a new review."
             action={
               <Button asChild>
-                <Link to="/plants" data-testid="ai-doctor-start-empty-plants-link">
+                <Link to={plantsPath()} data-testid="ai-doctor-start-empty-plants-link">
                   Go to Plants
                 </Link>
               </Button>

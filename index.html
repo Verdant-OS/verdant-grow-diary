@@ -22,6 +22,17 @@
     <link rel="apple-touch-icon" href="/brand/verdant-logo.png" />
     <link rel="manifest" href="/site.webmanifest" />
 
+    <!-- Preload the landing hero logo (LCP candidate on /welcome) so the
+         browser starts fetching it during HTML parse instead of waiting
+         for React to mount and discover the <img>. -->
+    <link
+      rel="preload"
+      as="image"
+      href="/brand/verdant-logo.png"
+      fetchpriority="high"
+    />
+
+
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-B3QRSZEM9S"></script>
     <script>

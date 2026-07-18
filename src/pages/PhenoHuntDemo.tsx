@@ -15,6 +15,8 @@ import { useMemo } from "react";
 import PageHeader from "@/components/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import PhenoFamilyTree from "@/components/PhenoFamilyTree";
+import PhenoContendersBoard from "@/components/PhenoContendersBoard";
+import { buildContenders } from "@/lib/phenoContendersViewModel";
 import { Sprout } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { buildPhenoPedigree } from "@/lib/phenoPedigreeViewModel";
@@ -180,6 +182,19 @@ export default function PhenoHuntDemo() {
     () => [...DEMO_CANDIDATES].sort((a, b) => a.candidateNumber - b.candidateNumber),
     [],
   );
+  const contenders = useMemo(
+    () =>
+      buildContenders(
+        DEMO_CANDIDATES.map((c) => ({
+          id: c.candidateNumber,
+          name: c.name,
+          verdict: c.verdict,
+          aroma: c.aroma,
+          axes: c.loud,
+        })),
+      ),
+    [],
+  );
 
   return (
     <div data-testid="pheno-hunt-demo-page" className="container mx-auto max-w-5xl px-4 py-6">
@@ -214,6 +229,15 @@ export default function PhenoHuntDemo() {
           The Loud score is a fast shortlist to sort the pack — not the verdict. The keeper
           decision, earned through the cure and re-grow stability, is what counts.
         </p>
+      </section>
+
+      {/* Contenders — the shortlist compared on the merits, before the tree. */}
+      <section aria-label="Contenders" className="mb-8">
+        <div className="mb-3 flex items-center gap-2">
+          <h2 className="text-sm font-semibold text-foreground">Contenders</h2>
+          <span className="h-px flex-1 bg-gradient-to-r from-emerald-500/40 to-transparent" />
+        </div>
+        <PhenoContendersBoard board={contenders} />
       </section>
 
       {/* Keepers, clones, and the family tree. */}

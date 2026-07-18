@@ -32,7 +32,9 @@ describe("PhenoHuntDemo page", () => {
     renderPage();
     const nums = screen
       .getAllByTestId(/pheno-hunt-demo-candidate-\d+/)
-      .map((el) => Number(el.getAttribute("data-testid")!.replace("pheno-hunt-demo-candidate-", "")));
+      .map((el) =>
+        Number(el.getAttribute("data-testid")!.replace("pheno-hunt-demo-candidate-", "")),
+      );
     expect(nums).toEqual([...DEMO_CANDIDATES].map((c) => c.candidateNumber).sort((a, b) => a - b));
   });
 
@@ -43,17 +45,21 @@ describe("PhenoHuntDemo page", () => {
     expect(screen.getByTestId("pheno-family-flag-unknown_pollen_parent")).toBeInTheDocument();
   });
 
+  it("renders the contenders board with its trait comparison", () => {
+    renderPage();
+    expect(screen.getByTestId("pheno-contenders")).toBeInTheDocument();
+    expect(screen.getByTestId("pheno-contenders-caveat").textContent).toMatch(/doesn't decide/i);
+  });
+
   it("frames the score as a shortlist, not a verdict (ethos)", () => {
     renderPage();
     expect(screen.getByTestId("pheno-hunt-demo-caveat").textContent).toMatch(/not the verdict/i);
   });
 
   it("does not call fetch on render", () => {
-    const fetchSpy = vi
-      .spyOn(globalThis, "fetch" as never)
-      .mockImplementation(() => {
-        throw new Error("fetch must not be called");
-      });
+    const fetchSpy = vi.spyOn(globalThis, "fetch" as never).mockImplementation(() => {
+      throw new Error("fetch must not be called");
+    });
     renderPage();
     expect(fetchSpy).not.toHaveBeenCalled();
   });

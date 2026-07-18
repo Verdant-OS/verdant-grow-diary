@@ -23,6 +23,8 @@ import {
   type ContenderInput,
 } from "@/lib/phenoContendersViewModel";
 import PhenoFightNight from "@/components/PhenoFightNight";
+import PhenoCureTimeline from "@/components/PhenoCureTimeline";
+import { buildCureTimeline } from "@/lib/phenoCureTimelineViewModel";
 import { Sprout } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { buildPhenoPedigree } from "@/lib/phenoPedigreeViewModel";
@@ -219,6 +221,21 @@ export default function PhenoHuntDemo() {
     () => DEMO_CANDIDATES.filter((c) => c.verdict === "keep").map((c) => c.candidateNumber),
     [],
   );
+  const cureTimelines = useMemo(
+    () =>
+      DEMO_KEEPERS.map((k) => {
+        const cand = DEMO_CANDIDATES.find((c) => c.name === k.name);
+        return buildCureTimeline({
+          id: k.id,
+          name: k.name,
+          rounds: cand?.rounds,
+          stabilityRunCount: k.stabilityRunCount,
+          reversed: k.reversed,
+          reversalMethods: k.reversalMethods,
+        });
+      }).filter((t): t is NonNullable<typeof t> => t != null),
+    [],
+  );
 
   return (
     <div data-testid="pheno-hunt-demo-page" className="container mx-auto max-w-5xl px-4 py-6">
@@ -283,6 +300,25 @@ export default function PhenoHuntDemo() {
             defaultAId={keeperIds[0] ?? fightPool[0].id}
             defaultBId={keeperIds[1] ?? fightPool[1].id}
           />
+        </section>
+      )}
+
+      {/* Earned at the cure — where keepers are actually decided. */}
+      {cureTimelines.length > 0 && (
+        <section aria-label="Earned at the cure" className="mb-8">
+          <div className="mb-3 flex items-center gap-2">
+            <h2 className="text-sm font-semibold text-foreground">Earned at the cure</h2>
+            <span className="h-px flex-1 bg-gradient-to-r from-emerald-500/40 to-transparent" />
+          </div>
+          <p className="mb-2 text-[11px] text-muted-foreground">
+            A keeper isn't the top score — it's the pheno that held through the cure and re-grew
+            true. Here's where each one earned it.
+          </p>
+          <div className="space-y-2.5">
+            {cureTimelines.map((t) => (
+              <PhenoCureTimeline key={t.id} timeline={t} />
+            ))}
+          </div>
         </section>
       )}
 

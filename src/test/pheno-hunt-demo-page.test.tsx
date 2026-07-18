@@ -57,6 +57,13 @@ describe("PhenoHuntDemo page", () => {
     expect(screen.getByTestId("pheno-fight-caveat").textContent).toMatch(/you make the call/i);
   });
 
+  it("shows where keepers were earned (cure + stability timelines)", () => {
+    renderPage();
+    const timelines = screen.getAllByTestId(/pheno-cure-timeline-/);
+    expect(timelines.length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText(/held through the cure and re-grew true/i)).toBeInTheDocument();
+  });
+
   it("frames the score as a shortlist, not a verdict (ethos)", () => {
     renderPage();
     expect(screen.getByTestId("pheno-hunt-demo-caveat").textContent).toMatch(/not the verdict/i);

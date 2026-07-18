@@ -38,11 +38,11 @@ export default function CultivarPage() {
       data-cultivar-slug={cultivar.slug}
       className="min-h-screen bg-background text-foreground"
     >
-      <header className="px-6 py-5 flex items-center justify-between max-w-6xl mx-auto">
+      <header className="px-6 py-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 max-w-6xl mx-auto">
         <Link to="/welcome" aria-label="Verdant Grow Diary home">
           <BrandLogo size="md" showText />
         </Link>
-        <nav className="flex items-center gap-4 text-sm">
+        <nav className="flex w-full items-center justify-between gap-4 text-sm sm:w-auto sm:justify-start">
           <Link to="/cultivars" className="text-muted-foreground hover:text-foreground">
             All cultivars
           </Link>

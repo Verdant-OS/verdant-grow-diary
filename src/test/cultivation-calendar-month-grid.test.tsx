@@ -88,6 +88,15 @@ describe("<CultivationCalendarMonthGrid />", () => {
     expect(screen.getByTestId("cultivation-calendar-grid-empty")).toHaveTextContent(
       /No logged care or history-derived reviews/i,
     );
+    expect(screen.getByText(/Swipe horizontally to see the full week/i)).toBeInTheDocument();
+    const scrollRegion = screen.getByRole("region", {
+      name: "Scrollable monthly cultivation calendar",
+    });
+    expect(scrollRegion).toHaveAttribute("tabindex", "0");
+    expect(scrollRegion).toHaveAttribute(
+      "aria-describedby",
+      "cultivation-calendar-mobile-scroll-hint",
+    );
   });
 
   it("keeps logged facts clickable while history-derived reviews are non-actionable", () => {

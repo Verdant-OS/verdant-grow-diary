@@ -44,7 +44,11 @@ function FounderPricingLink({
   pricingPath: string;
 }) {
   return (
-    <Button asChild size="lg" className="font-semibold">
+    <Button
+      asChild
+      size="lg"
+      className="min-h-11 max-w-full h-auto whitespace-normal text-center font-semibold leading-tight"
+    >
       <Link
         to={pricingPath}
         data-testid={`founder-pricing-cta-${source}`}
@@ -103,11 +107,14 @@ export default function Founder() {
 
   return (
     <main data-testid="founder-page" className="min-h-screen bg-background text-foreground">
-      <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
+      <header className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-4 gap-y-3 px-6 py-5">
         <Link to="/welcome" aria-label="Verdant Grow Diary home">
           <BrandLogo size="md" showText />
         </Link>
-        <nav aria-label="Founder page" className="flex items-center gap-3 text-sm">
+        <nav
+          aria-label="Founder page"
+          className="flex w-full items-center justify-between gap-3 text-sm sm:w-auto sm:justify-start"
+        >
           <Link to="/guides" className="text-muted-foreground hover:text-foreground">
             Guides
           </Link>

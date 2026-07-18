@@ -213,7 +213,21 @@ export default function CultivationCalendarMonthGrid({
         </p>
       )}
 
-      <div className="mt-4 overflow-x-auto">
+      <p
+        id="cultivation-calendar-mobile-scroll-hint"
+        className="mt-3 text-xs text-muted-foreground md:hidden"
+      >
+        Swipe horizontally to see the full week and any care blocks off-screen.
+      </p>
+
+      <div
+        className="mt-4 overflow-x-auto overscroll-x-contain focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        data-testid="cultivation-calendar-horizontal-scroll"
+        role="region"
+        tabIndex={0}
+        aria-label="Scrollable monthly cultivation calendar"
+        aria-describedby="cultivation-calendar-mobile-scroll-hint"
+      >
         <div className="min-w-[42rem]" role="grid" aria-label="Monthly cultivation calendar">
           <div className="grid grid-cols-7 gap-px text-center" role="row">
             {WEEKDAY_LABELS.map((day) => (

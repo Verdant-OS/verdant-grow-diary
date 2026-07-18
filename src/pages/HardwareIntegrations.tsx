@@ -77,10 +77,19 @@ export default function HardwareIntegrations() {
               })
             }
           >
-            <Button size="lg">Bring in my grow history</Button>
+            <Button
+              size="lg"
+              className="min-h-11 max-w-full h-auto whitespace-normal text-center leading-tight"
+            >
+              Bring in my grow history
+            </Button>
           </Link>
           <a href="#partner">
-            <Button size="lg" variant="outline">
+            <Button
+              size="lg"
+              variant="outline"
+              className="min-h-11 max-w-full h-auto whitespace-normal text-center leading-tight"
+            >
               Hardware partner? Contact Verdant
             </Button>
           </a>
@@ -190,7 +199,11 @@ export default function HardwareIntegrations() {
               <Button size="lg">Create a free account</Button>
             </Link>
             <Link to="/how-ai-doctor-works">
-              <Button size="lg" variant="outline">
+              <Button
+                size="lg"
+                variant="outline"
+                className="min-h-11 max-w-full h-auto whitespace-normal text-center leading-tight"
+              >
                 See how AI Doctor uses context
               </Button>
             </Link>

@@ -11,6 +11,7 @@ import { useAlertsList } from "@/hooks/useAlertsList";
 import AppSidebar from "./AppSidebar";
 import MobileNav from "./MobileNav";
 import QuickLog, { type QuickLogPrefill } from "./QuickLog";
+import QuickLogV2Sheet from "./QuickLogV2Sheet";
 import BrandLogo from "./BrandLogo";
 import GlobalFastAddButton from "./GlobalFastAddButton";
 import AuthStatusIndicator from "./AuthStatusIndicator";
@@ -20,6 +21,7 @@ import { SubscriptionPastDueBanner } from "./SubscriptionPastDueBanner";
 import GlobalSearchDialog from "./GlobalSearchDialog";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 import { isEmailVerificationPending } from "@/lib/emailVerificationRules";
+import { resolveMobileQuickLogTarget } from "@/lib/quickLogRouteTargetRules";
 
 export default function AppShell({ children }: { children?: ReactNode }) {
   const { user, loading } = useAuth();
@@ -45,8 +47,10 @@ export default function AppShell({ children }: { children?: ReactNode }) {
   const { alerts: openAlerts } = useAlertsList({ status: "open" }, { enabled: !loading && !!user });
   const nav = useNavigate();
   const [openLog, setOpenLog] = useState(false);
+  const [openScopedLog, setOpenScopedLog] = useState(false);
   const [prefill, setPrefill] = useState<QuickLogPrefill | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
+  const mobileQuickLogTarget = resolveMobileQuickLogTarget(location.pathname);
 
   // Global ⌘K / Ctrl+K shortcut to open the search palette.
   useEffect(() => {
@@ -76,6 +80,13 @@ export default function AppShell({ children }: { children?: ReactNode }) {
   useEffect(() => {
     if (!loading && !user) nav(signedOutRedirect, { replace: true });
   }, [loading, user, nav, signedOutRedirect]);
+
+  // Never carry an open tent-scoped sheet across routes. Without this reset,
+  // leaving Tent A and later entering Tent B could reopen the sheet with stale
+  // UI state or silently retarget an in-progress log.
+  useEffect(() => {
+    setOpenScopedLog(false);
+  }, [mobileQuickLogTarget]);
 
   if (loading)
     return (
@@ -175,8 +186,12 @@ export default function AppShell({ children }: { children?: ReactNode }) {
         {/* Mobile floating + */}
         <button
           onClick={() => {
-            setPrefill(null);
-            setOpenLog(true);
+            if (mobileQuickLogTarget) {
+              setOpenScopedLog(true);
+            } else {
+              setPrefill(null);
+              setOpenLog(true);
+            }
           }}
           aria-label="Open Quick Log"
           data-testid="mobile-quick-log-fab"
@@ -196,6 +211,14 @@ export default function AppShell({ children }: { children?: ReactNode }) {
           prefill={prefill}
           onCreated={() => window.dispatchEvent(new Event("verdant:entry-created"))}
         />
+
+        {mobileQuickLogTarget ? (
+          <QuickLogV2Sheet
+            open={openScopedLog}
+            onOpenChange={setOpenScopedLog}
+            defaultTargetKey={mobileQuickLogTarget}
+          />
+        ) : null}
 
         <GlobalSearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
       </div>

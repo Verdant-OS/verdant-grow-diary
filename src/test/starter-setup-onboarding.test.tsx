@@ -4,8 +4,8 @@
  * sensor / AI / alert / action-queue / edge-function paths.
  *
  * The Supabase adapter is stubbed so no real network is hit. The
- * PLANT_QUICKLOG_PREFILL_EVENT is asserted so we know Quick Log will
- * open preselected on the starter records after redirect.
+ * PLANT_QUICKLOG_PREFILL_EVENT is asserted so we know the current AppShell
+ * can open Quick Log preselected without being replaced by a redirect.
  */
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { act, render, screen, waitFor } from "@testing-library/react";
@@ -22,12 +22,10 @@ vi.mock("@/store/auth", () => ({
 
 const runStarterSetupMock = vi.fn();
 vi.mock("@/lib/starterSetupService", async (importActual) => {
-  const actual =
-    (await importActual()) as typeof import("@/lib/starterSetupService");
+  const actual = (await importActual()) as typeof import("@/lib/starterSetupService");
   return {
     ...actual,
-    runStarterSetup: (userId: string, db: unknown) =>
-      runStarterSetupMock(userId, db),
+    runStarterSetup: (userId: string, db: unknown) => runStarterSetupMock(userId, db),
   };
 });
 
@@ -82,9 +80,8 @@ describe("Onboarding · guided starter setup", () => {
     await userEvent.click(screen.getByTestId("starter-setup-button"));
 
     await waitFor(() => expect(runStarterSetupMock).toHaveBeenCalledTimes(1));
-    await waitFor(() =>
-      expect(screen.getByTestId("dashboard-landing")).toBeTruthy(),
-    );
+    expect(screen.getByTestId("starter-setup-block")).toBeTruthy();
+    expect(screen.queryByTestId("dashboard-landing")).toBeNull();
     expect(events).toHaveLength(1);
     expect(events[0].detail).toMatchObject({
       plantId: "p1",
@@ -101,7 +98,7 @@ describe("Onboarding · guided starter setup", () => {
     window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, listener);
   });
 
-  it("re-click is safe: awaits the in-flight promise and only fires one navigation", async () => {
+  it("re-click is safe: awaits the in-flight promise and only runs one setup", async () => {
     let resolveIt: (v: unknown) => void = () => {};
     runStarterSetupMock.mockImplementation(
       () =>
@@ -123,9 +120,9 @@ describe("Onboarding · guided starter setup", () => {
         reused: { grow: true, tent: true, plant: true },
       });
     });
-    await waitFor(() =>
-      expect(screen.getByTestId("dashboard-landing")).toBeTruthy(),
-    );
+    await waitFor(() => expect(btn).not.toBeDisabled());
+    expect(screen.getByTestId("starter-setup-block")).toBeTruthy();
+    expect(screen.queryByTestId("dashboard-landing")).toBeNull();
   });
 
   it("shows a safe error message and does not redirect on failure", async () => {

@@ -23,7 +23,7 @@
  *    links to the existing setup flow and says the draft will wait.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { NotebookPen, ArrowRight, Sprout } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePlants } from "@/hooks/use-plants";
@@ -101,9 +101,7 @@ export default function PublicQuickLogHandoffCard({
   className,
 }: PublicQuickLogHandoffCardProps) {
   const storedDraft = usePublicQuickLogStarterDraft();
-  const [notNowDraftId, setNotNowDraftId] = useState<string | null>(() =>
-    readNotNowDraftId(),
-  );
+  const [notNowDraftId, setNotNowDraftId] = useState<string | null>(() => readNotNowDraftId());
 
   const resolution = useMemo(
     () =>
@@ -152,8 +150,6 @@ function HandoffCardInner({
 }) {
   const { data: plants = [], isLoading: plantsLoading, isError: plantsError } = usePlants();
   const { data: tents = [] } = useTents();
-  const location = useLocation();
-  const navigate = useNavigate();
   const [confirmingDiscard, setConfirmingDiscard] = useState(false);
   // Set when a dispatch-time re-check finds the reviewed draft gone, edited
   // elsewhere, or past the freshness cap while the card sat mounted.
@@ -220,11 +216,10 @@ function HandoffCardInner({
       draft: live.draft,
       match: match ?? NO_SUGGESTION_MATCH,
     });
-    // The global Quick Log dialog lives in AppShell; the dashboard route is
-    // the canonical host (mirrors Onboarding's guided starter-setup flow).
-    if (location.pathname !== "/") {
-      navigate("/");
-    }
+    // Both mount sites already live inside AppShell. Dispatch into the
+    // current shell so its Quick Log listener remains mounted long enough
+    // to receive the prefill; routing first would replace that shell and
+    // lose this in-memory event.
     window.dispatchEvent(
       new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, {
         bubbles: true,
@@ -248,10 +243,7 @@ function HandoffCardInner({
       <div className="flex items-start gap-2">
         <NotebookPen className="h-4 w-4 text-primary mt-0.5" aria-hidden="true" />
         <div className="min-w-0">
-          <h2
-            id="public-quick-log-handoff-title"
-            className="text-sm font-semibold text-foreground"
-          >
+          <h2 id="public-quick-log-handoff-title" className="text-sm font-semibold text-foreground">
             {PUBLIC_QUICK_LOG_HANDOFF_TITLE}
           </h2>
           <p
@@ -273,9 +265,7 @@ function HandoffCardInner({
             <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">
               {row.label}
             </dt>
-            <dd className="text-sm text-foreground break-words min-w-0 m-0">
-              {row.value}
-            </dd>
+            <dd className="text-sm text-foreground break-words min-w-0 m-0">{row.value}</dd>
           </div>
         ))}
       </dl>

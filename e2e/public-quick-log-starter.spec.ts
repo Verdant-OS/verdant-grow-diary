@@ -8,7 +8,7 @@ import { test, expect, type Page, type Request } from "@playwright/test";
  *  - renders signed-out with no app chrome and no sign-in wall,
  *  - the whole draft lifecycle (save → reload → persists → delete) happens
  *    with ZERO write requests (POST/PUT/PATCH/DELETE) to any Supabase /
- *    AI / device data-plane host,
+ *    AI / device data-plane host and no unexpected external writes,
  *  - the signup CTA carries the pinned attribution shape,
  *  - no uncaught page errors.
  *
@@ -21,14 +21,37 @@ const FORBIDDEN_REQUEST_RE =
   /(?:supabase\.(?:co|in|net)|\/rest\/v1\/|\/auth\/v1\/|\/functions\/v1\/|openai\.com|anthropic\.com|api\.groq|shelly\.cloud|ecowitt\.net)/i;
 
 const WRITE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+const ALLOWED_ANALYTICS_WRITE_ORIGINS = new Set([
+  "https://www.google-analytics.com",
+  "https://www.google.com",
+]);
 
 function isLocalhost(url: string): boolean {
   return /^https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?\//i.test(url);
 }
 
+function isAllowedAnalyticsCollection(method: string, url: string): boolean {
+  if (method !== "POST") return false;
+  try {
+    const parsed = new URL(url);
+    return ALLOWED_ANALYTICS_WRITE_ORIGINS.has(parsed.origin) && parsed.pathname === "/g/collect";
+  } catch {
+    return false;
+  }
+}
+
+function decodeAnalyticsTranscript(value: string): string {
+  try {
+    return decodeURIComponent(value.replace(/\+/g, " "));
+  } catch {
+    return value;
+  }
+}
+
 function watchTraffic(page: Page) {
   const forbidden: string[] = [];
-  const writes: string[] = [];
+  const unexpectedWrites: string[] = [];
+  const analyticsWrites: string[] = [];
   const pageErrors: string[] = [];
   page.on("pageerror", (e) => pageErrors.push(String(e)));
   page.on("request", (req: Request) => {
@@ -37,10 +60,14 @@ function watchTraffic(page: Page) {
       forbidden.push(`${req.method()} ${url}`);
     }
     if (WRITE_METHODS.has(req.method()) && !isLocalhost(url)) {
-      writes.push(`${req.method()} ${url}`);
+      if (isAllowedAnalyticsCollection(req.method(), url)) {
+        analyticsWrites.push(`${req.method()} ${url} ${req.postData() ?? ""}`);
+      } else {
+        unexpectedWrites.push(`${req.method()} ${url}`);
+      }
     }
   });
-  return { forbidden, writes, pageErrors };
+  return { forbidden, unexpectedWrites, analyticsWrites, pageErrors };
 }
 
 test.describe("Public Quick Log Starter (anonymous, zero writes)", () => {
@@ -82,8 +109,12 @@ test.describe("Public Quick Log Starter (anonymous, zero writes)", () => {
     await page.getByTestId("starter-clear-draft").click();
     await expect(page.getByTestId("starter-saved-draft")).toHaveCount(0);
 
-    // Hard lines: zero external writes, zero forbidden hosts, zero errors.
-    expect(traffic.writes, "external write requests").toEqual([]);
+    // Hard lines: GA may collect generic page events, but grower-entered
+    // content never leaves the browser and no other external write occurs.
+    expect(traffic.unexpectedWrites, "unexpected external write requests").toEqual([]);
+    const analyticsTranscript = decodeAnalyticsTranscript(traffic.analyticsWrites.join("\n"));
+    expect(analyticsTranscript).not.toContain("Blue Dream #1");
+    expect(analyticsTranscript).not.toContain("First true leaves look healthy.");
     expect(traffic.forbidden, "forbidden data-plane requests").toEqual([]);
     expect(traffic.pageErrors, "uncaught page errors").toEqual([]);
   });
@@ -97,12 +128,15 @@ test.describe("Public Quick Log Starter (anonymous, zero writes)", () => {
     await page.getByTestId("starter-save-draft").click();
     // Volume required: inline error, no saved card.
     await expect(page.getByTestId("starter-saved-draft")).toHaveCount(0);
-    await page.getByTestId("starter-watering-volume").fill("500");
+    await page.getByTestId("starter-watering-volume").fill("731.29");
     await page.getByTestId("starter-save-draft").click();
     await expect(page.getByTestId("starter-saved-draft")).toBeVisible();
-    await expect(page.getByTestId("starter-saved-volume")).toContainText("500 ml");
+    await expect(page.getByTestId("starter-saved-volume")).toContainText("731.29 ml");
 
-    expect(traffic.writes, "external write requests").toEqual([]);
+    expect(traffic.unexpectedWrites, "unexpected external write requests").toEqual([]);
+    const analyticsTranscript = decodeAnalyticsTranscript(traffic.analyticsWrites.join("\n"));
+    expect(analyticsTranscript).not.toContain("Blue Dream #1");
+    expect(analyticsTranscript).not.toContain("731.29");
     expect(traffic.forbidden, "forbidden data-plane requests").toEqual([]);
     expect(traffic.pageErrors, "uncaught page errors").toEqual([]);
   });

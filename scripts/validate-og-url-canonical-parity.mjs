@@ -144,9 +144,17 @@ export function validateOgUrlCanonicalParity(distDir) {
   const files = collectHtmlFiles(distDir);
   const issues = [];
   let comparisons = 0;
+  const spaFallback = resolve(distDir, "index.html");
   for (const file of files) {
     const html = readFileSync(file, "utf8");
     comparisons += extractUrlMetaTags(html).length;
+    // The SPA fallback `dist/index.html` intentionally omits a static
+    // canonical — usePageSeo sets a per-route self-canonical at
+    // runtime. Parity for other routes is enforced by the per-route
+    // static documents emitted by staticSocialRouteDocuments.
+    if (resolve(file) === spaFallback && extractCanonicalHrefs(html).length === 0) {
+      continue;
+    }
     issues.push(...validateDocument({ file, html, distDir }));
   }
   return { issues, documents: files.length, comparisons };

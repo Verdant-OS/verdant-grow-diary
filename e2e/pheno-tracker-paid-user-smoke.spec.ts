@@ -450,7 +450,7 @@ test.describe("I. Core one-tent regression", () => {
   // Anonymous by design (route-resolution check only).
   test.use({ storageState: { cookies: [], origins: [] } });
 
-  test("dashboard deep link resolves through the signed-out return path, never 404", async ({
+  test("dashboard route still resolves without a crash through the signed-out return path, never 404", async ({
     page,
   }) => {
     await page.goto("/dashboard");

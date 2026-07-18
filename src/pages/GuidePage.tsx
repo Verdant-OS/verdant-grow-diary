@@ -23,6 +23,7 @@ import {
   VERDANT_SITE_ORIGIN,
 } from "@/constants/verdantSeoContent";
 import {
+  buildArticleJsonLd,
   buildBreadcrumbListJsonLd,
   buildFaqPageJsonLd,
   safeJsonLdStringify,

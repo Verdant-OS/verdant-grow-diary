@@ -10,8 +10,8 @@ import {
 import { STATIC_PUBLIC_SEO_DOCUMENTS } from "@/lib/build/staticPublicSeoDocuments";
 
 describe("ogImageSlugForPath", () => {
-  it("rejects root and non-absolute paths", () => {
-    expect(() => ogImageSlugForPath("/")).toThrow();
+  it("returns 'home' for root and rejects non-absolute paths", () => {
+    expect(ogImageSlugForPath("/")).toBe("home");
     expect(() => ogImageSlugForPath("welcome")).toThrow();
   });
 

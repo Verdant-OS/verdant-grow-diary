@@ -276,14 +276,22 @@ export function validateHtmlDocument(html, file) {
       pushIssue(issues, ctx, `invalid JSON: ${(err && err.message) || String(err)}`);
       return;
     }
-    // Support @graph arrays.
-    const nodes = Array.isArray(parsed?.["@graph"]) ? parsed["@graph"] : [parsed];
+    // Support @graph arrays. @graph children inherit @context from the parent
+    // per JSON-LD 1.1 §4.9, so inject it before validating each child.
+    const isGraph = Array.isArray(parsed?.["@graph"]);
+    const nodes = isGraph ? parsed["@graph"] : [parsed];
+    const inheritedContext = parsed?.["@context"];
     nodes.forEach((node, ni) => {
-      const nctx = { ...ctx, path: nodes.length > 1 ? `$.@graph[${ni}]` : "$" };
-      const res = validateJsonLdObject(node, nctx);
+      const nctx = { ...ctx, path: isGraph ? `$.@graph[${ni}]` : "$" };
+      const nodeForValidation =
+        isGraph && isPlainObject(node) && node["@context"] === undefined && inheritedContext !== undefined
+          ? { "@context": inheritedContext, ...node }
+          : node;
+      const res = validateJsonLdObject(nodeForValidation, nctx);
       issues.push(...res.issues);
       warnings.push(...res.warnings);
     });
+
   });
   return { issues, warnings, blockCount: blocks.length };
 }

@@ -3,7 +3,8 @@
  *
  * Read-only presenter for the Tent Detail "Imported sensor history"
  * section. Renders the CSV-imported subset of the tent's sensor
- * readings with clear CSV/imported/Not-live labels.
+ * readings with clear CSV/imported/Not-live labels. Pending and failed reads
+ * remain explicit and can never render as an established empty history.
  *
  * Local-only metric filtering. No new queries, no query params, no
  * route changes. Logic lives in importedSensorHistoryViewModel.
@@ -25,11 +26,14 @@ import {
   buildImportedSensorHistoryViewModel,
   type ImportedSensorHistoryInputRow,
   type ImportedSensorHistoryMetricFilter,
+  type ImportedSensorHistoryReadStatus,
 } from "@/lib/importedSensorHistoryViewModel";
 
 interface Props {
   tentId: string | null | undefined;
   readings: ReadonlyArray<ImportedSensorHistoryInputRow>;
+  readStatus?: ImportedSensorHistoryReadStatus;
+  onRetry?: () => void;
   /** Optional cap for the recent-rows table. Defaults to view-model default. */
   limit?: number;
 }
@@ -46,6 +50,8 @@ function formatTimestamp(iso: string | null): string {
 export default function ImportedSensorHistoryPanel({
   tentId,
   readings,
+  readStatus = "success",
+  onRetry,
   limit,
 }: Props) {
   const sectionRef = useRef<HTMLElement | null>(null);
@@ -122,7 +128,31 @@ export default function ImportedSensorHistoryPanel({
         they do not write new readings or control equipment.
       </div>
 
-      {vm.isEmpty ? (
+      {readStatus === "loading" ? (
+        <p
+          className="text-sm text-muted-foreground"
+          data-testid="imported-history-loading"
+          role="status"
+          aria-live="polite"
+        >
+          Loading imported CSV history…
+        </p>
+      ) : readStatus === "error" ? (
+        <div
+          className="space-y-2"
+          data-testid="imported-history-error"
+          role="alert"
+        >
+          <p className="text-sm text-muted-foreground">
+            Couldn't load imported CSV history. Check your connection and try again.
+          </p>
+          {onRetry ? (
+            <Button type="button" size="sm" variant="outline" onClick={onRetry}>
+              Try again
+            </Button>
+          ) : null}
+        </div>
+      ) : vm.isEmpty ? (
         <p
           className="text-sm text-muted-foreground"
           data-testid="imported-history-empty"

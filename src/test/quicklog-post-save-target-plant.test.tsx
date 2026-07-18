@@ -18,12 +18,7 @@ const { rpcMock, snapshotState } = vi.hoisted(() => ({
   snapshotState: {
     status: "ready" as "ready" | "loading" | "empty",
     payload: {
-      status: "fresh_live" as
-        | "fresh_live"
-        | "fresh_non_live"
-        | "stale"
-        | "invalid"
-        | "empty",
+      status: "fresh_live" as "fresh_live" | "fresh_non_live" | "stale" | "invalid" | "empty",
       source: "ecowitt" as string | null,
       captured_at: "2026-05-31T13:44:12.000Z" as string | null,
     },
@@ -51,7 +46,7 @@ vi.mock("@/store/grows", () => ({
 }));
 vi.mock("@/hooks/use-plants", () => ({ usePlants: () => ({ data: plantsData }) }));
 vi.mock("@/hooks/use-tents", () => ({
-  useTents: () => ({ data: [{ id: "t1", name: "Tent 1" }] }),
+  useTents: () => ({ data: [{ id: "t1", name: "Tent 1", grow_id: "g1" }] }),
 }));
 vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn(), message: vi.fn() },
@@ -109,9 +104,7 @@ describe("QuickLog post-save target plant action", () => {
     });
     const form = screen.getByTestId("quick-log-save").closest("form") as HTMLFormElement;
     fireEvent.submit(form);
-    const link = (await screen.findByTestId(
-      "quick-log-view-target-plant",
-    )) as HTMLAnchorElement;
+    const link = (await screen.findByTestId("quick-log-view-target-plant")) as HTMLAnchorElement;
     expect(link.tagName).toBe("A");
     expect(link.getAttribute("href")).toBe("/plants/p2");
     expect(link.getAttribute("data-target-plant-id")).toBe("p2");
@@ -129,12 +122,8 @@ describe("QuickLog post-save target plant action", () => {
     fireEvent.change(screen.getByPlaceholderText(/Watered, looking healthy/i), {
       target: { value: "looking good" },
     });
-    fireEvent.submit(
-      screen.getByTestId("quick-log-save").closest("form") as HTMLFormElement,
-    );
-    const link = (await screen.findByTestId(
-      "quick-log-view-target-plant",
-    )) as HTMLAnchorElement;
+    fireEvent.submit(screen.getByTestId("quick-log-save").closest("form") as HTMLFormElement);
+    const link = (await screen.findByTestId("quick-log-view-target-plant")) as HTMLAnchorElement;
     expect(link.tabIndex).not.toBe(-1);
     expect(link.className).toMatch(/focus-visible:ring-2/);
     link.focus();
@@ -150,9 +139,7 @@ describe("QuickLog post-save target plant action", () => {
     fireEvent.change(screen.getByPlaceholderText(/Watered, looking healthy/i), {
       target: { value: "ok" },
     });
-    fireEvent.submit(
-      screen.getByTestId("quick-log-save").closest("form") as HTMLFormElement,
-    );
+    fireEvent.submit(screen.getByTestId("quick-log-save").closest("form") as HTMLFormElement);
     await screen.findByTestId("quick-log-view-target-plant");
     const save = screen.getByTestId("quick-log-save") as HTMLButtonElement;
     expect(save.disabled).toBe(true);
@@ -193,9 +180,7 @@ describe("QuickLog stale helper copy", () => {
     const helper = await screen.findByTestId("quick-log-snapshot-stale-helper");
     expect(helper.textContent ?? "").toMatch(/Captured /);
     expect(helper.textContent ?? "").toMatch(/2026/);
-    expect(helper.textContent ?? "").toMatch(
-      /not saved as current sensor context/i,
-    );
+    expect(helper.textContent ?? "").toMatch(/not saved as current sensor context/i);
     expect(helper.textContent ?? "").not.toMatch(/T\d{2}:\d{2}/);
   });
 
@@ -205,13 +190,9 @@ describe("QuickLog stale helper copy", () => {
       onOpenChange: () => {},
       prefill: { plantId: "p2", growId: "g1" },
     });
-    const sw = (await screen.findByTestId(
-      "quick-log-snapshot-toggle",
-    )) as HTMLButtonElement;
+    const sw = (await screen.findByTestId("quick-log-snapshot-toggle")) as HTMLButtonElement;
     expect(sw.disabled).toBe(true);
-    expect(sw.getAttribute("aria-describedby")).toBe(
-      "quick-log-snapshot-session-helper",
-    );
+    expect(sw.getAttribute("aria-describedby")).toBe("quick-log-snapshot-session-helper");
     const helperRoot = document.getElementById("quick-log-snapshot-session-helper");
     expect(helperRoot).not.toBeNull();
     expect(helperRoot?.textContent ?? "").toMatch(/Captured /);
@@ -225,9 +206,7 @@ describe("QuickLog watering inline validation a11y", () => {
       onOpenChange: () => {},
       prefill: { plantId: "p2", growId: "g1", eventType: "watering" },
     });
-    const input = (await screen.findByTestId(
-      "quicklog-watering-ml",
-    )) as HTMLInputElement;
+    const input = (await screen.findByTestId("quicklog-watering-ml")) as HTMLInputElement;
     fireEvent.submit(input.closest("form") as HTMLFormElement);
     await waitFor(() => {
       expect(input.getAttribute("aria-invalid")).toBe("true");

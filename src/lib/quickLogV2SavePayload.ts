@@ -7,6 +7,13 @@
 import type { QuickLogV2Action, ResolvedQuickLogV2Target } from "./quickLogV2Rules";
 import { isTemperatureValid, isHumidityValid, isVpdValid } from "./sensorReadingNormalizationRules";
 
+/**
+ * Maximum length of a Quick Log v2 note. Single source of truth: the sheet's
+ * textarea maxLength and this builder's write-time guard both reference it so
+ * the UI cap and the persisted cap cannot drift.
+ */
+export const QUICK_LOG_NOTE_LIMIT = 500;
+
 export interface QuickLogV2SavePayload {
   p_target_type: "tent" | "plant";
   p_target_id: string;
@@ -92,6 +99,9 @@ export function buildQuickLogV2SavePayload(
   }
 
   const note = (input.note ?? "").trim();
+  if (note.length > QUICK_LOG_NOTE_LIMIT) {
+    return { ok: false, reason: "note_too_long" };
+  }
   return {
     ok: true,
     payload: {

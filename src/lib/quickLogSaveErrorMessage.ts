@@ -19,6 +19,7 @@ export type QuickLogSaveReason =
   | "temperature_out_of_range"
   | "humidity_out_of_range"
   | "vpd_out_of_range"
+  | "note_too_long"
   | "invalid_sensor_value"
   | "photo_saving_not_enabled"
   | "target_not_owned"
@@ -43,6 +44,8 @@ export function quickLogReasonToOperatorMessage(
       return "Humidity must be between 0 and 100.";
     case "vpd_out_of_range":
       return "VPD must be between 0 and 10 kPa.";
+    case "note_too_long":
+      return "Note is too long. Shorten it and try again.";
     case "invalid_sensor_value":
       return "Sensor values must be numbers.";
     case "photo_saving_not_enabled":

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildQuickLogV2SavePayload } from "@/lib/quickLogV2SavePayload";
+import { buildQuickLogV2SavePayload, QUICK_LOG_NOTE_LIMIT } from "@/lib/quickLogV2SavePayload";
 import { quickLogReasonToOperatorMessage } from "@/lib/quickLogSaveErrorMessage";
 
 const okTarget = {
@@ -222,5 +222,59 @@ describe("quickLogV2SavePayload — canonical sensor plausibility band", () => {
     if (!r.ok) throw new Error("expected ok");
     expect(r.payload.p_temperature_c).toBe(60);
     expect(r.payload.p_humidity_pct).toBe(100);
+  });
+});
+
+describe("quickLogV2SavePayload — note length reconciled with the shared limit", () => {
+  // The Quick Log v2 sheet caps the note field via maxLength={QUICK_LOG_NOTE_LIMIT},
+  // but the pure save-payload builder (the authoritative write seam) never
+  // enforced it, so any path that bypasses the textarea — a programmatic
+  // setField, a paste edge case, or a future caller — could write an
+  // over-limit note. This reconciles the write onto the SAME exported
+  // constant the sheet uses so the UI cap and the persisted cap cannot drift.
+
+  function reason(over: Record<string, unknown>): string {
+    const r = buildQuickLogV2SavePayload(base(over));
+    if (r.ok === true) throw new Error("expected the build to fail");
+    return r.reason;
+  }
+
+  it("rejects a note longer than the shared limit", () => {
+    expect(reason({ note: "x".repeat(QUICK_LOG_NOTE_LIMIT + 1) })).toBe("note_too_long");
+  });
+
+  it("accepts a note exactly at the limit", () => {
+    const r = buildQuickLogV2SavePayload(base({ note: "x".repeat(QUICK_LOG_NOTE_LIMIT) }));
+    expect(r.ok).toBe(true);
+    if (!r.ok) throw new Error("expected ok");
+    expect(r.payload.p_note).toBe("x".repeat(QUICK_LOG_NOTE_LIMIT));
+  });
+
+  it("measures trimmed length (surrounding whitespace does not push a note over)", () => {
+    const padded = `  ${"x".repeat(QUICK_LOG_NOTE_LIMIT)}  `;
+    const r = buildQuickLogV2SavePayload(base({ note: padded }));
+    expect(r.ok).toBe(true);
+  });
+
+  it("enforces the note cap on a watering too (check runs for both actions)", () => {
+    // The note-length guard runs unconditionally after the volume branch, so
+    // a watering carries and must reject an over-limit note. Pins the ordering
+    // so a future refactor cannot scope the cap to note-only saves.
+    expect(
+      reason({ action: "water", volumeMl: "500", note: "x".repeat(QUICK_LOG_NOTE_LIMIT + 1) }),
+    ).toBe("note_too_long");
+    const atLimit = buildQuickLogV2SavePayload(
+      base({ action: "water", volumeMl: "500", note: "x".repeat(QUICK_LOG_NOTE_LIMIT) }),
+    );
+    expect(atLimit.ok).toBe(true);
+    if (!atLimit.ok) throw new Error("expected ok");
+    expect(atLimit.payload.p_note).toBe("x".repeat(QUICK_LOG_NOTE_LIMIT));
+    expect(atLimit.payload.p_volume_ml).toBe(500);
+  });
+
+  it("surfaces specific operator copy for note_too_long (not the generic fallback)", () => {
+    const generic = quickLogReasonToOperatorMessage("some_unknown_code");
+    expect(quickLogReasonToOperatorMessage("note_too_long")).not.toBe(generic);
+    expect(quickLogReasonToOperatorMessage("note_too_long")).toMatch(/note/i);
   });
 });

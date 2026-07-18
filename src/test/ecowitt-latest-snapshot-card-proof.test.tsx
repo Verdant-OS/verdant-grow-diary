@@ -237,6 +237,42 @@ describe("EcowittLatestSnapshotCard — proof card behavior", () => {
     expect(screen.getByTestId("ecowitt-source-badge").textContent).toBe("Stale");
   });
 
+  it.each([
+    ["missing", null],
+    ["unknown", "webhook"],
+    ["invalid", "invalid"],
+  ] as const)(
+    "renders %s provenance as Invalid / Unavailable and withholds Derived VPD",
+    async (_case, source) => {
+      rowsMock = [
+        ecowittRow({
+          source,
+          raw_payload: {
+            vendor: "ecowitt",
+            temp1f: 77,
+            humidity1: 55,
+            dateutc: FRESH_AT,
+          },
+        }),
+      ];
+
+      render(<EcowittLatestSnapshotCard tentId={TENT_A} now={NOW} />, {
+        wrapper: wrap(),
+      });
+
+      await waitFor(() =>
+        expect(screen.getByTestId("ecowitt-snapshot-unavailable")).toHaveTextContent(
+          "Invalid / Unavailable",
+        ),
+      );
+      expect(screen.getByTestId("ecowitt-source-badge")).toHaveTextContent("Invalid");
+      expect(screen.getByTestId("ecowitt-metric-vpd_kpa")).toHaveTextContent(
+        "Unavailable",
+      );
+      expect(screen.queryByText(/^Ecowitt$/)).not.toBeInTheDocument();
+    },
+  );
+
   it("shows tent name when provided", async () => {
     rowsMock = [ecowittRow({})];
     render(<EcowittLatestSnapshotCard tentId={TENT_A} tentName="Tent Alpha" now={NOW} />, {

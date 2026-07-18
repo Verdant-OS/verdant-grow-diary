@@ -50,6 +50,15 @@ import { useEcowittIngestAuditProofRows } from "@/hooks/useEcowittIngestAuditPro
 import { isUsableGrowSensorReading } from "@/lib/growSensorEvidenceRules";
 import { useHasRole } from "@/hooks/useHasRole";
 import { canShowSensorOperatorDiagnostics } from "@/lib/sensorOperatorAccessRules";
+import { resolveGrowTentSelection } from "@/lib/growTentSelectionRules";
+import {
+  classifySensorReadingTrust,
+  readObservedSensorMetric,
+  readTrustedVpdInputs,
+  selectReadingsWithObservedMetric,
+  selectRecentObservedSensorValues,
+  sortSensorReadingsNewestFirst,
+} from "@/lib/sensorReadingSelectionRules";
 
 const METRICS = [
   { key: "temp", label: "Temperature" },
@@ -65,11 +74,18 @@ export default function Sensors() {
   const { data: tents = [] } = useGrowTents();
   const { data: readings = [] } = useGrowSensorReadings();
   // Real DB tents (uuid-backed) for the manual entry form — only these can
-  // be written to via RLS. The display list above may include mock tents.
+  // be written to via RLS.
   const { data: realTents = [] } = useTentRows();
-  const [tentId, setTentId] = useState<string>(tents[0]?.id ?? "t1");
+  const [tentId, setTentId] = useState<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const operatorRole = useHasRole("operator");
+
+  // Reconcile after the authenticated tent query resolves. This removes the
+  // legacy `t1` placeholder, preserves a still-valid grower choice, and moves
+  // deterministically when a selected tent is deleted.
+  useEffect(() => {
+    setTentId((currentTentId) => resolveGrowTentSelection({ currentTentId, tents }));
+  }, [tents]);
 
   // React Router updates hashes without a full browser navigation, so make
   // the existing manual-reading deep link deterministic for same-page CSV
@@ -83,8 +99,19 @@ export default function Sensors() {
   }, [location.hash]);
   const correctionCtx = useMemo(() => decodeManualCorrectionHash(location.hash), [location.hash]);
   const urlSensorSources = parseSensorSourcesParam(searchParams.get(SENSOR_SOURCES_PARAM));
-  const filtered = readings.filter((r) => r.tentId === tentId);
-  const latest = filtered.length > 0 ? filtered[filtered.length - 1] : null;
+  const filtered = useMemo(
+    () => sortSensorReadingsNewestFirst(readings.filter((reading) => reading.tentId === tentId)),
+    [readings, tentId],
+  );
+  const latest = filtered[0] ?? null;
+  const recentSoilValues = useMemo(
+    () => selectRecentObservedSensorValues(filtered, "soil", 3),
+    [filtered],
+  );
+  const vpdStabilityReadings = useMemo(
+    () => selectReadingsWithObservedMetric(filtered, "vpd"),
+    [filtered],
+  );
   const selectedTent = tents.find((t) => t.id === tentId) ?? null;
   const selectedGrowId = selectedTent?.growId ?? null;
   const { data: soilMoistureCalibrations = [] } = useSoilMoistureCalibrations({
@@ -93,7 +120,9 @@ export default function Sensors() {
   });
   const selectedTentStage =
     (selectedTent as unknown as { stage?: string | null } | null)?.stage ?? null;
-  const vpdStageMissing = latest?.vpd != null && normalizeVpdStage(selectedTentStage) === "unknown";
+  const latestObservedVpd = readObservedSensorMetric(vpdStabilityReadings[0] ?? null, "vpd");
+  const vpdStageMissing =
+    latestObservedVpd !== null && normalizeVpdStage(selectedTentStage) === "unknown";
 
   // AUD-003 fix: classify based on the actual latest reading. If a reading
   // exists but is older than the freshness window, label it "Stale" and
@@ -107,7 +136,6 @@ export default function Sensors() {
   const latestSourceRaw = (latest as unknown as { source?: string | null } | null)?.source ?? null;
   const latestSource =
     typeof latestSourceRaw === "string" && latestSourceRaw.length > 0 ? latestSourceRaw : null;
-  const latestCountsAsUsableEvidence = isUsableGrowSensorReading(latest);
   const classification = classifyGrowDataSource(
     latest
       ? { source: latestSource, value: latest.temp, timestamp: latest.ts }
@@ -126,7 +154,7 @@ export default function Sensors() {
   // Uses the existing tent-scoped sensor_readings hook (no new query,
   // no writes). Bound to the same tent the manual reading form targets
   // so PPFD + temperature/humidity/VPD lines up.
-  const trendReadingsQuery = useSensorReadings(defaultManualTentId, 60);
+  const trendReadingsQuery = useSensorReadings(defaultManualTentId ?? null, 60);
   const trendReadings = trendReadingsQuery.data ?? [];
   const trendReadingsStatus = trendReadingsQuery.isLoading
     ? "loading"
@@ -176,23 +204,33 @@ export default function Sensors() {
       <EnvironmentStabilityCard
         testId="sensors-environment-stability"
         className="mb-4"
-        result={computeEnvironmentStability(filtered, {
+        result={computeEnvironmentStability(vpdStabilityReadings, {
           stage: selectedTentStage,
         })}
       />
       <div className="grid lg:grid-cols-2 gap-4">
         {METRICS.map((m) => {
-          // Resolve raw value for this metric from the latest reading.
-          const rawValue: number | null | undefined = latest
-            ? (latest as unknown as Record<string, number | null | undefined>)[m.key]
-            : null;
+          // Resolve each metric from its own latest actual observation. A
+          // newer sparse temperature snapshot must not erase or relabel an
+          // older soil observation, and compatibility zeroes are never read.
+          const metricReadings = selectReadingsWithObservedMetric(filtered, m.key);
+          const latestMetricReading = metricReadings[0] ?? null;
+          const rawValue = readObservedSensorMetric(latestMetricReading, m.key);
+          const metricTrust = classifySensorReadingTrust(latestMetricReading);
+          const metricSource = latestMetricReading?.source ?? null;
+          const metricClassification = classifyGrowDataSource(
+            latestMetricReading
+              ? { source: metricSource, value: rawValue, timestamp: latestMetricReading.ts }
+              : { source: null, value: null, timestamp: null },
+          );
           // Derive VPD from temp + RH when no VPD value is present.
           let value: number | null | undefined = rawValue;
           let isDerived = false;
-          if (m.key === "vpd" && (value == null || !Number.isFinite(value as number)) && latest) {
+          if (m.key === "vpd" && (value == null || !Number.isFinite(value as number))) {
+            const trustedInputs = readTrustedVpdInputs(latest);
             const derived = deriveVpd({
-              temperature: latest.temp ?? null,
-              humidity: latest.rh ?? null,
+              temperature: trustedInputs?.temperatureC ?? null,
+              humidity: trustedInputs?.humidityPct ?? null,
               temperatureUnit: "C",
             });
             if (derived.kind === "derived") {
@@ -200,22 +238,24 @@ export default function Sensors() {
               isDerived = true;
             }
           }
-          // Recent values for soil stuck-at-bound detection (last 3).
+          // Recent values for soil stuck-at-bound detection (newest 3).
           const recentValues =
-            m.key === "soil" ? filtered.slice(-3).map((r) => r.soil ?? null) : undefined;
+            m.key === "soil" ? recentSoilValues : undefined;
           const state = classifySensorMetricState({
             metric: m.key as SensorMetricKey,
             value: value ?? null,
-            source: latestSource,
+            source: metricSource,
             hasAnyReading: hasReadings,
+            isStale: metricTrust.isStale,
+            isInvalid: metricTrust.isInvalid,
             isDerived,
             recentValues,
           });
           const soilMoistureView =
-            m.key === "soil" && latest
+            m.key === "soil" && latestMetricReading && rawValue !== null
               ? buildSoilMoistureReadingViewModel({
-                  rawSoilMoisture: latest.soil ?? null,
-                  rawSource: latestSource,
+                  rawSoilMoisture: rawValue,
+                  rawSource: metricSource,
                   context: {
                     growId: selectedGrowId,
                     tentId,
@@ -231,14 +271,22 @@ export default function Sensors() {
           // stage never reads as ok. Pure presenter; no writes.
           let envStatus: "ok" | "warn" | "bad" | null = null;
           let envLabel: string | null = null;
-          if (m.key === "temp" && latest && latestCountsAsUsableEvidence) {
-            const r = classifyTempAgainstStage(latest.temp ?? null, {
+          if (
+            m.key === "temp" &&
+            latestMetricReading &&
+            isUsableGrowSensorReading(latestMetricReading)
+          ) {
+            const r = classifyTempAgainstStage(rawValue, {
               stage: selectedTentStage,
             });
             envStatus = environmentMetricChipStatus(r);
             envLabel = r.label;
-          } else if (m.key === "rh" && latest && latestCountsAsUsableEvidence) {
-            const r = classifyRhAgainstStage(latest.rh ?? null, {
+          } else if (
+            m.key === "rh" &&
+            latestMetricReading &&
+            isUsableGrowSensorReading(latestMetricReading)
+          ) {
+            const r = classifyRhAgainstStage(rawValue, {
               stage: selectedTentStage,
             });
             envStatus = environmentMetricChipStatus(r);
@@ -302,11 +350,11 @@ export default function Sensors() {
                   )}
                 </div>
                 {state.tone === "caution" && (
-                  <GrowDataSourceBadge classification={classification} />
+                  <GrowDataSourceBadge classification={metricClassification} />
                 )}
               </div>
               {state.showChart ? (
-                <SensorChart data={filtered} metric={m.key} height={200} />
+                <SensorChart data={metricReadings} metric={m.key} height={200} />
               ) : (
                 <p
                   className="text-xs text-muted-foreground py-6 text-center"
@@ -453,7 +501,6 @@ export default function Sensors() {
           captured_at: (r as unknown as { captured_at?: string | null }).captured_at ?? null,
           ts: r.ts,
         }))}
-        options={{ fallback: "demo" }}
       />
       <div className="mt-4 max-w-xl">
         <SensorBridgeHealthCard
@@ -494,10 +541,10 @@ export default function Sensors() {
                     source: latestSource,
                     provider: null,
                     transport: null,
-                    humidityPct: (latest as unknown as { rh?: number | null }).rh ?? null,
-                    soilMoisturePct: (latest as unknown as { soil?: number | null }).soil ?? null,
-                    airTempC: (latest as unknown as { temp?: number | null }).temp ?? null,
-                    vpdKpa: (latest as unknown as { vpd?: number | null }).vpd ?? null,
+                    humidityPct: readObservedSensorMetric(latest, "rh"),
+                    soilMoisturePct: readObservedSensorMetric(latest, "soil"),
+                    airTempC: readObservedSensorMetric(latest, "temp"),
+                    vpdKpa: readObservedSensorMetric(latest, "vpd"),
                   }
                 : null,
             }}

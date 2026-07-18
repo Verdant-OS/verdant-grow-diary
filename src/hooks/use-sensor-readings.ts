@@ -1,14 +1,24 @@
 import { useQueries, useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { SensorReadingRow } from "@/lib/db";
+import { isUuid } from "@/lib/growRepo";
 
 export function useSensorReadings(
-  tentId?: string,
+  tentId?: string | null,
   limit = 200,
 ): UseQueryResult<SensorReadingRow[]> {
+  // `undefined` intentionally preserves the existing all-tents query used by
+  // aggregate dashboards. `null` is an explicit no-scope sentinel, while a
+  // non-UUID legacy/mock id must never be sent to a UUID column.
+  const enabled = tentId === undefined || isUuid(tentId);
+  const scopeKey = tentId === null ? "none" : (tentId ?? "all");
   return useQuery({
-    queryKey: ["sensor_readings", tentId ?? "all", limit],
+    // Keep explicit no-scope separate from the intentional all-tents cache so
+    // a disabled query can never surface aggregate readings from cache.
+    queryKey: ["sensor_readings", scopeKey, limit],
+    enabled,
     queryFn: async () => {
+      if (!enabled) return [];
       let q = supabase
         .from("sensor_readings")
         .select("*")

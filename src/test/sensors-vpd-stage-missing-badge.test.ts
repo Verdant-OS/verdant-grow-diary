@@ -9,9 +9,12 @@ describe("Sensors VPD stage-missing info badge", () => {
     expect(SRC).toMatch(/from\s+["']@\/lib\/vpdStageTargetRules["']/);
   });
 
-  it("derives vpdStageMissing from latest VPD value and unknown-normalized selected-tent stage", () => {
+  it("derives vpdStageMissing from the latest actually observed VPD and selected-tent stage", () => {
     expect(SRC).toMatch(
-      /vpdStageMissing\s*=\s*latest\?\.vpd\s*!=\s*null\s*&&\s*normalizeVpdStage\(selectedTentStage\)\s*===\s*"unknown"/,
+      /latestObservedVpd\s*=\s*readObservedSensorMetric\(vpdStabilityReadings\[0\]\s*\?\?\s*null,\s*["']vpd["']\)/,
+    );
+    expect(SRC).toMatch(
+      /vpdStageMissing\s*=\s*latestObservedVpd\s*!==\s*null\s*&&\s*normalizeVpdStage\(selectedTentStage\)\s*===\s*"unknown"/,
     );
   });
 

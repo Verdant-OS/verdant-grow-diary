@@ -1,16 +1,11 @@
-// React Query hooks for Phase 1 Supabase-backed grow data.
-// Falls back to mock data on Supabase error, null/undefined data, or empty
-// initial result so the UI stays predictable during the live-data transition.
+// React Query hooks for Supabase-backed grow data.
 //
-// The fallback is NOT silent: every query records explicit source metadata
-// (see GrowDataSourceMeta) so consuming pages can label demo/mock data
-// honestly via growDataSourceLabelRules + GrowDataSourceBadge.
-//
-// Naming mirrors useMockData.ts (useTents -> useGrowTents, etc.) to keep a
-// later 1:1 page migration mechanical. Query keys are namespaced under
-// ["grow", ...] to avoid clashing with the existing useMockData cache.
+// These hooks are used by authenticated grower surfaces, so an empty or failed
+// database read must stay honest: empty reads return an empty/null value and
+// failed tent/plant reads remain React Query errors. Mock fixtures live behind
+// the separate, explicit useMockData surface and are never injected here.
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
-import { tents, plants, type Tent, type Plant, type SensorReading } from "@/mock";
+import type { Tent, Plant, SensorReading } from "@/mock";
 import {
   fetchTents,
   fetchTent,
@@ -79,7 +74,10 @@ export function combineGrowDataMeta(
   };
 }
 
-/** Test helper. Not for UI consumption. */
+/**
+ * Legacy test diagnostic. Counts honest empty/error outcomes, never mock
+ * substitution.
+ */
 export const __growDataFallbacks = { count: 0, lastReason: "" as string };
 export function __resetGrowDataMeta(): void {
   metaStore.clear();
@@ -87,57 +85,64 @@ export function __resetGrowDataMeta(): void {
   __growDataFallbacks.lastReason = "";
 }
 
-function fellBack(reason: string) {
+function recordUnavailableOutcome(reason: string) {
   __growDataFallbacks.count += 1;
   __growDataFallbacks.lastReason = reason;
 }
 
 // ---------------------------------------------------------------------------
-// withFallback
+// Source-aware query boundary
 // ---------------------------------------------------------------------------
 
-async function withFallback<T>(
-  scope: string,
-  key: readonly unknown[],
-  run: () => Promise<T>,
-  fallback: () => T,
-  isEmpty: (v: T) => boolean,
-): Promise<T> {
+interface WithSourceMetaOptions<T> {
+  scope: string;
+  key: readonly unknown[];
+  run: () => Promise<T>;
+  emptyValue: () => T;
+  isEmpty: (v: T) => boolean;
+  /** Sensors preserve their existing empty-on-error contract; grow data rethrows. */
+  returnEmptyOnError?: boolean;
+}
+
+async function withSourceMeta<T>({
+  scope,
+  key,
+  run,
+  emptyValue,
+  isEmpty,
+  returnEmptyOnError = false,
+}: WithSourceMetaOptions<T>): Promise<T> {
   try {
     const result = await run();
     if (result == null || isEmpty(result)) {
-      fellBack(`${scope}:empty`);
-      const fb = fallback();
-      const fbEmpty = fb == null || isEmpty(fb);
+      recordUnavailableOutcome(`${scope}:empty`);
       recordMeta(key, {
-        isDemoData: !fbEmpty,
-        dataSource: fbEmpty ? "unavailable" : "mock",
-        sourceReason: fbEmpty ? "no-rows" : "fallback:empty",
+        isDemoData: false,
+        dataSource: "unavailable",
+        sourceReason: "no-rows",
       });
-      return fb;
+      return result == null ? emptyValue() : result;
     }
     recordMeta(key, {
       isDemoData: false,
       dataSource: "supabase",
-      sourceReason: "live:rows",
+      sourceReason: "supabase:rows",
     });
     return result;
   } catch (err) {
-    // Never leak raw error contents into UI-safe metadata.
-    fellBack(`${scope}:error:${(err as Error)?.message ?? "unknown"}`);
-    const fb = fallback();
-    const fbEmpty = fb == null || isEmpty(fb);
+    // Never leak raw error contents into UI-safe metadata or diagnostics.
+    recordUnavailableOutcome(`${scope}:error`);
     recordMeta(key, {
-      isDemoData: !fbEmpty,
-      dataSource: fbEmpty ? "unavailable" : "mock",
-      sourceReason: fbEmpty ? "fallback:error:no-rows" : "fallback:error",
+      isDemoData: false,
+      dataSource: "unavailable",
+      sourceReason: "fetch-error",
     });
-    return fb;
+    if (returnEmptyOnError) return emptyValue();
+    throw err;
   }
 }
 
 const isArrEmpty = <T,>(v: T[]) => v.length === 0;
-const never = <T,>(_v: T) => false;
 const isNullish = <T,>(v: T) => v == null;
 
 // ---------------------------------------------------------------------------
@@ -149,13 +154,13 @@ export function useGrowTents(growId?: string): UseQueryResult<Tent[]> {
   return useQuery({
     queryKey: [...key],
     queryFn: () =>
-      withFallback(
-        "tents",
+      withSourceMeta({
+        scope: "tents",
         key,
-        () => fetchTents(growId),
-        () => (growId ? tents.filter((t) => t.growId === growId) : tents),
-        isArrEmpty,
-      ),
+        run: () => fetchTents(growId),
+        emptyValue: () => [] as Tent[],
+        isEmpty: isArrEmpty,
+      }),
   });
 }
 
@@ -165,13 +170,13 @@ export function useGrowTent(id?: string): UseQueryResult<Tent | null> {
     queryKey: [...key],
     enabled: !!id,
     queryFn: () =>
-      withFallback(
-        "tent",
+      withSourceMeta({
+        scope: "tent",
         key,
-        () => fetchTent(id as string),
-        () => tents.find((t) => t.id === id) ?? null,
-        isNullish,
-      ),
+        run: () => fetchTent(id as string),
+        emptyValue: () => null,
+        isEmpty: isNullish,
+      }),
   });
 }
 
@@ -194,19 +199,13 @@ export function useGrowPlants(
   return useQuery({
     queryKey: [...key],
     queryFn: () =>
-      withFallback(
-        "plants",
+      withSourceMeta({
+        scope: "plants",
         key,
-        () => fetchPlants(tentId, growId, { includeArchived }),
-        () => {
-          let list = plants;
-          if (tentId) list = list.filter((p) => p.tentId === tentId);
-          if (growId) list = list.filter((p) => p.growId === growId);
-          if (!includeArchived) list = list.filter((p) => !p.isArchived);
-          return list;
-        },
-        isArrEmpty,
-      ),
+        run: () => fetchPlants(tentId, growId, { includeArchived }),
+        emptyValue: () => [] as Plant[],
+        isEmpty: isArrEmpty,
+      }),
   });
 }
 
@@ -216,13 +215,13 @@ export function useGrowPlant(id?: string): UseQueryResult<Plant | null> {
     queryKey: [...key],
     enabled: !!id,
     queryFn: () =>
-      withFallback(
-        "plant",
+      withSourceMeta({
+        scope: "plant",
         key,
-        () => fetchPlant(id as string),
-        () => plants.find((p) => p.id === id) ?? null,
-        isNullish,
-      ),
+        run: () => fetchPlant(id as string),
+        emptyValue: () => null,
+        isEmpty: isNullish,
+      }),
   });
 }
 
@@ -237,19 +236,22 @@ export function useGrowPlant(id?: string): UseQueryResult<Plant | null> {
  * their original `source` label — those are real data, not mock, and
  * are unaffected.
  */
-export function useGrowSensorReadings(tentId?: string): UseQueryResult<SensorReading[]> {
+export function useGrowSensorReadings(
+  tentId?: string,
+): UseQueryResult<SensorReading[]> {
   const key = ["grow", "sensors", tentId ?? "all"] as const;
   return useQuery({
     queryKey: [...key],
     queryFn: () =>
-      withFallback(
-        "sensors",
+      withSourceMeta({
+        scope: "sensors",
         key,
-        () => fetchSensorReadings(tentId),
+        run: () => fetchSensorReadings(tentId),
         // Honest empty state — no mock/demo fallback for grower sensor UI.
-        () => [] as SensorReading[],
-        isArrEmpty,
-      ),
+        emptyValue: () => [] as SensorReading[],
+        isEmpty: isArrEmpty,
+        returnEmptyOnError: true,
+      }),
   });
 }
 

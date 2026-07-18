@@ -38,10 +38,6 @@ export interface EcowittLatestSnapshotFilter {
   plantId?: string | null;
 }
 
-/** Sources we trust as EcoWitt-derived. Vendor lineage may also live in
- *  `raw_payload.vendor`. */
-const ECOWITT_SOURCES = new Set<string>(["ecowitt", "live", "manual"]);
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
@@ -93,18 +89,35 @@ function isEcowittRow(row: EcowittSensorReadingRow): boolean {
 }
 
 function resolveCandidateSource(row: EcowittSensorReadingRow): SensorReadingSource {
+  const src = (row.source ?? "").trim().toLowerCase();
+
+  // Persisted canonical provenance is authoritative. In particular, vendor
+  // lineage must never promote CSV, stale, or invalid history to live.
+  if (
+    src === "manual" ||
+    src === "csv" ||
+    src === "demo" ||
+    src === "stale" ||
+    src === "invalid"
+  ) {
+    return src;
+  }
+
   // Keep diagnostic packets visible for commissioning, but never let their
   // canonical stored source="live" promote them to physical sensor evidence.
   // The shared fence allows Windows-listener rows only when storage preserved
   // the listener's reported live decision and physical gateway markers.
   if (isSensorTestbenchRow(row)) return "demo";
 
-  const src = (row.source ?? "").trim().toLowerCase();
-  if (src === "manual") return "manual";
-  if (src === "demo") return "demo";
-  // Treat all listener-tagged EcoWitt rows as "live" candidates; the
-  // view-model will demote stale ones to "stale" via freshness.
-  return "live";
+  // `source="ecowitt"` is the legacy bridge contract still emitted by the
+  // existing EcoWitt adapters and ingest proof paths. It is accepted as live
+  // only because the row already passed the EcoWitt-lineage filter above.
+  if (src === "live" || src === "ecowitt") return "live";
+
+  // Missing and unrecognized provenance fails closed. Raw payload vendor
+  // metadata may establish EcoWitt lineage, but it cannot establish live
+  // trust on its own.
+  return "invalid";
 }
 
 function buildCandidatePayload(

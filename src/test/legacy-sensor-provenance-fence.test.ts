@@ -200,7 +200,9 @@ describe("legacy presenter wiring", () => {
 
   it("gates green stage chips behind usable provenance-resolved evidence", () => {
     expect(sensors).toContain("isUsableGrowSensorReading");
-    expect(sensors).toMatch(/latest\s*&&\s*latestCountsAsUsableEvidence/);
+    expect(sensors).toMatch(
+      /latestMetricReading\s*&&\s*isUsableGrowSensorReading\(latestMetricReading\)/,
+    );
   });
 
   it("feeds only trusted rows with their real captured timestamp into legacy AI context", () => {

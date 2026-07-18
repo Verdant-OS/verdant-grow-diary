@@ -23,6 +23,7 @@ const APP_SHELL = read("src/components/AppShell.tsx");
 const QUICK_LOG_FAB = read("src/components/QuickLogV2Fab.tsx");
 const PAGE_HEADER = read("src/components/PageHeader.tsx");
 const DASHBOARD = read("src/pages/Dashboard.tsx");
+const DAILY_GROW_CHECK_PANEL = read("src/components/DashboardDailyGrowCheckPanel.tsx");
 const DISCLOSURE = read("src/components/DashboardDataSourceDisclosure.tsx");
 
 describe("AppShell mobile layout safety", () => {
@@ -57,6 +58,19 @@ describe("PageHeader wrap safety", () => {
     expect(PAGE_HEADER).toMatch(/flex-wrap/);
     expect(PAGE_HEADER).toMatch(/min-w-0/);
     expect(PAGE_HEADER).toMatch(/break-words/);
+  });
+
+  it("allows the action wrapper to shrink below the small-screen breakpoint", () => {
+    expect(PAGE_HEADER).toMatch(/flex items-center gap-2 flex-wrap sm:shrink-0/);
+    expect(PAGE_HEADER).not.toMatch(/flex items-center gap-2 flex-wrap shrink-0/);
+  });
+});
+
+describe("Dashboard Daily Grow Check narrow-screen safety", () => {
+  it("stacks row content below 390px so the action group can wrap inside the row", () => {
+    expect(DAILY_GROW_CHECK_PANEL).toMatch(
+      /max-\[389px\]:flex-col max-\[389px\]:items-stretch/,
+    );
   });
 });
 

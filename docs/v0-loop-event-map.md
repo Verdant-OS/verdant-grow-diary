@@ -1,12 +1,60 @@
 # V0 Loop Event Map
 
-This is the **contract** for the first PostHog events Verdant will emit
-to measure the One-Tent Loop. PostHog is **not yet wired**; this file
-defines the names, shapes, and rules so implementation can land later
-without re-litigating taxonomy.
+This document separates Verdant's **shipped aggregate activation signal**
+from the more detailed internal/PostHog taxonomy that remains aspirational.
 
 > One-Tent Loop: Grow → Tent → Plant → Quick Log → Timeline → Sensor
 > Snapshot → AI Doctor → Alert → Approval-Required Action Queue.
+
+## Shipped GA activation contract
+
+`quick_log_saved` is emitted after a newly confirmed Quick Log write. The
+only property is `event_type`, selected from this closed, non-content enum:
+
+```text
+note | water | feed | photo | environment | training |
+defoliation | observation | harvest | plant_check
+```
+
+`plant_check` represents the mixed-content Plant Quick Log diary surface; it
+does not inspect or classify the grower's note, photo, or manual readings.
+The event never includes grow/tent/plant identifiers, names, strain, notes,
+sensor values, attachment paths, or raw payloads. Idempotent replay responses
+are not counted again. An attachment upload by itself is not a Quick Log
+success; the primary log/event/diary write must be confirmed first.
+
+The live app routes this event through the privacy allowlisted funnel tracker,
+which sends to `gtag` when Google Analytics is available and mirrors the same
+sanitized shape onto Verdant's existing analytics bridge. Missing or blocked
+analytics never blocks the grower's save.
+
+### Client-observed activation proxy
+
+For current growth reporting, the shipped client-observed activation proxy is:
+
+```text
+at least 3 confirmed quick_log_saved events in a trailing 7-day window
+```
+
+This rolling measure is calculated in GA4 from the privacy-safe client event;
+Verdant does not keep a parallel browser or local-storage counter. It has no
+historical backfill for Quick Logs saved before this event shipped. Browser
+privacy controls, consent state, ad blockers, network loss, or unavailable GA
+can suppress otherwise valid saves, so this proxy can undercount activation.
+
+The GA4 proxy is not authoritative cross-device, server-side, or signup-cohort
+measurement. A future authoritative operator/cohort aggregate must be derived
+separately from confirmed persisted writes with server-side identity and
+deduplication rules. That future aggregate is not implemented or claimed by
+this client telemetry contract.
+
+## Aspirational/internal PostHog taxonomy
+
+The sections below define the first detailed PostHog events Verdant may emit
+to measure the One-Tent Loop. PostHog is **not yet wired**. These names and
+properties are planning contracts, not claims about currently collected data.
+In particular, the internal identifiers described below are **not** part of
+the shipped `quick_log_saved` GA contract.
 
 ## Rules
 

@@ -51,6 +51,7 @@ import {
   type QuickLogActionChip,
   type ResponseCheckStatus,
 } from "@/lib/tenSecondQuickCheckRules";
+import { trackQuickLogSuccess } from "@/lib/quickLogSuccessTelemetry";
 
 interface Props {
   open: boolean;
@@ -289,6 +290,7 @@ export default function PlantQuickLog({
         return;
       }
 
+      trackQuickLogSuccess("plant_quick_log");
       toast.success("Log saved to timeline.");
       applyQuickLogV2Refresh(queryClient, {
         targetType: "plant",

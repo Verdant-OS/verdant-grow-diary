@@ -43,7 +43,7 @@ export const FUNNEL_PARAM_KEYS = [
   "plan",
   /** Signup method (e.g. "email"). */
   "method",
-  /** Quick Log action enum ("water" | "note"). */
+  /** Privacy-safe Quick Log success enum; never grower content. */
   "event_type",
   /** csv_import_completed inserted-row count. */
   "rows",

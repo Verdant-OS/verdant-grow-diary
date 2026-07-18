@@ -147,6 +147,9 @@ describe("QuickLog supported save · routes through quicklog_save_manual RPC", (
       p_target_id: "plant-1",
       p_note: "Topped plant",
     });
+    expect(saveMock.mock.calls[0][1]).toEqual({
+      telemetryIntent: "observation",
+    });
     expect(uploadMock).not.toHaveBeenCalled();
     expect(insertMock).not.toHaveBeenCalled();
 

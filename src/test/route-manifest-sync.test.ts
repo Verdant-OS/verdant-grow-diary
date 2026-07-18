@@ -38,6 +38,14 @@ describe("App route manifest sync", () => {
   it("flags no best-effort access-group mismatches", () => {
     expect(findAccessGroupMismatches()).toEqual([]);
   });
+
+  it("mounts both scoped aliases and classifies them as redirects", () => {
+    const mounted = extractMountedAppRoutePaths();
+    for (const path of ["/dashboard", "/logs"]) {
+      expect(mounted).toContain(path);
+      expect(APP_ROUTES.find((route) => route.path === path)?.access).toBe("redirect");
+    }
+  });
 });
 
 describe("Operator route surface", () => {

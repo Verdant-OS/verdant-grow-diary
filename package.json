@@ -6,11 +6,12 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "postbuild": "node scripts/validate-jsonld-rich-results.mjs dist && node scripts/validate-og-image-urls.mjs dist && node scripts/validate-canonical-links.mjs dist && bunx tsx scripts/validate-static-document-jsonld.mts dist",
+    "postbuild": "node scripts/validate-jsonld-rich-results.mjs dist && node scripts/validate-og-image-urls.mjs dist && node scripts/validate-canonical-links.mjs dist && bunx tsx scripts/validate-static-document-jsonld.mts dist && node scripts/check-sitemap-canonical-parity.mjs dist",
     "build:dev": "vite build --mode development",
     "check:jsonld": "node scripts/validate-jsonld-rich-results.mjs dist",
     "check:og-images": "node scripts/validate-og-image-urls.mjs dist",
     "check:canonical-links": "node scripts/validate-canonical-links.mjs dist",
+    "check:sitemap-canonical-parity": "node scripts/check-sitemap-canonical-parity.mjs dist",
     "check:static-document-jsonld": "bunx tsx scripts/validate-static-document-jsonld.mts dist",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.app.json --noEmit",

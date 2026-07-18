@@ -75,7 +75,10 @@ export type FeedingFormFailureReason =
   | "products:empty"
   | "products:invalid_amount"
   | "products:contains_secret"
-  | "numeric:invalid";
+  | "numeric:invalid"
+  | "ph:out_of_range"
+  | "ec:out_of_range"
+  | "volume:out_of_range";
 
 export interface FeedingFormMapInput {
   growId: string | null | undefined;
@@ -153,32 +156,48 @@ export function buildFeedingFormPayload(
     products.push(entry);
   }
 
-  const numericFields: Array<[keyof QuickLogFeedingFormState,
-    keyof Pick<
+  // Physical plausibility bounds: pH is the 0–14 scale; EC (conductivity)
+  // and runoff volume are non-negative. These match the feeding-history
+  // range warnings (feedingHistoryRules) and the CSV preview validator —
+  // enforced here so a fat-fingered value (e.g. 65 meaning 6.5) is rejected
+  // at the write seam rather than merely flagged after it is stored. Water
+  // temperature is intentionally left unbounded: its band is owned by the
+  // separate sensor-plausibility convergence.
+  const inPhRange = (n: number): boolean => n >= 0 && n <= 14;
+  const nonNegative = (n: number): boolean => n >= 0;
+
+  const numericFields: Array<{
+    formKey: keyof QuickLogFeedingFormState;
+    payloadKey: keyof Pick<
       FeedingTypedEventInput,
-      | "ph"
-      | "ec_in"
-      | "ec_out"
-      | "runoff_ml"
-      | "runoff_ph"
-      | "runoff_ec"
-      | "water_temp_c"
-    >]> = [
-    ["ph", "ph"],
-    ["ecIn", "ec_in"],
-    ["ecOut", "ec_out"],
-    ["runoffMl", "runoff_ml"],
-    ["runoffPh", "runoff_ph"],
-    ["runoffEc", "runoff_ec"],
-    ["waterTempC", "water_temp_c"],
+      "ph" | "ec_in" | "ec_out" | "runoff_ml" | "runoff_ph" | "runoff_ec" | "water_temp_c"
+    >;
+    check?: (n: number) => boolean;
+    reason?: FeedingFormFailureReason;
+  }> = [
+    { formKey: "ph", payloadKey: "ph", check: inPhRange, reason: "ph:out_of_range" },
+    { formKey: "ecIn", payloadKey: "ec_in", check: nonNegative, reason: "ec:out_of_range" },
+    { formKey: "ecOut", payloadKey: "ec_out", check: nonNegative, reason: "ec:out_of_range" },
+    {
+      formKey: "runoffMl",
+      payloadKey: "runoff_ml",
+      check: nonNegative,
+      reason: "volume:out_of_range",
+    },
+    { formKey: "runoffPh", payloadKey: "runoff_ph", check: inPhRange, reason: "ph:out_of_range" },
+    { formKey: "runoffEc", payloadKey: "runoff_ec", check: nonNegative, reason: "ec:out_of_range" },
+    { formKey: "waterTempC", payloadKey: "water_temp_c" },
   ];
 
   const parsedNumerics: Partial<FeedingTypedEventInput> = {};
-  for (const [formKey, payloadKey] of numericFields) {
-    const parsed = parseOptionalFiniteNumber(input.form[formKey] as string);
+  for (const field of numericFields) {
+    const parsed = parseOptionalFiniteNumber(input.form[field.formKey] as string);
     if (!parsed.ok) return { ok: false, reason: "numeric:invalid" };
     if (parsed.value !== null) {
-      (parsedNumerics as Record<string, number>)[payloadKey] = parsed.value;
+      if (field.check && !field.check(parsed.value)) {
+        return { ok: false, reason: field.reason as FeedingFormFailureReason };
+      }
+      (parsedNumerics as Record<string, number>)[field.payloadKey] = parsed.value;
     }
   }
 
@@ -221,6 +240,12 @@ export function feedingFormReasonToHelper(
       return "Product entries must not contain tokens or secrets.";
     case "numeric:invalid":
       return "Optional metrics must be valid numbers or left blank.";
+    case "ph:out_of_range":
+      return "pH must be between 0 and 14.";
+    case "ec:out_of_range":
+      return "EC cannot be negative.";
+    case "volume:out_of_range":
+      return "Runoff volume cannot be negative.";
     default:
       return FEEDING_SAVE_FAILURE_MESSAGE;
   }

@@ -164,12 +164,76 @@ describe("buildFeedingFormPayload — validation", () => {
   });
 });
 
+describe("buildFeedingFormPayload — physical plausibility bounds", () => {
+  // pH is the 0–14 scale; EC (conductivity) and runoff volume are physically
+  // non-negative. These bounds match the feeding-history range warnings
+  // (feedingHistoryRules) and the CSV preview validator — enforced HERE so a
+  // fat-fingered value (e.g. 65 meaning 6.5) is rejected at the write seam,
+  // not merely flagged after the feeding is already stored. Water temperature
+  // is intentionally left unbounded: temperature-band validation is owned by
+  // the separate sensor-plausibility convergence.
+  function reason(patch: Partial<QuickLogFeedingFormState>): string {
+    const r = buildFeedingFormPayload({ growId: "grow-1", form: withForm(patch) });
+    if (r.ok !== false) throw new Error("expected the build to fail");
+    return r.reason;
+  }
+
+  it("rejects a pH above 14 (e.g. 65 fat-fingered from 6.5)", () => {
+    expect(reason({ ph: "65" })).toBe("ph:out_of_range");
+  });
+
+  it("rejects a negative pH", () => {
+    expect(reason({ ph: "-1" })).toBe("ph:out_of_range");
+  });
+
+  it("applies the pH bound to runoff pH as well", () => {
+    expect(reason({ runoffPh: "20" })).toBe("ph:out_of_range");
+  });
+
+  it("rejects negative EC on every EC field", () => {
+    expect(reason({ ecIn: "-0.1" })).toBe("ec:out_of_range");
+    expect(reason({ ecOut: "-2" })).toBe("ec:out_of_range");
+    expect(reason({ runoffEc: "-1" })).toBe("ec:out_of_range");
+  });
+
+  it("rejects a negative runoff volume", () => {
+    expect(reason({ runoffMl: "-5" })).toBe("volume:out_of_range");
+  });
+
+  it("accepts the inclusive pH boundaries and zero EC/volume", () => {
+    const r = buildFeedingFormPayload({
+      growId: "grow-1",
+      form: withForm({ ph: "0", runoffPh: "14", ecIn: "0", runoffMl: "0" }),
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.payload.ph).toBe(0);
+    expect(r.payload.runoff_ph).toBe(14);
+    expect(r.payload.ec_in).toBe(0);
+    expect(r.payload.runoff_ml).toBe(0);
+  });
+
+  it("leaves water temperature unbounded (owned by the sensor-band convergence)", () => {
+    const r = buildFeedingFormPayload({
+      growId: "grow-1",
+      form: withForm({ waterTempC: "999" }),
+    });
+    expect(r.ok).toBe(true);
+  });
+});
+
 describe("feedingFormReasonToHelper", () => {
   it("returns a helpful message for known reasons", () => {
     expect(feedingFormReasonToHelper("line_id:missing")).toMatch(
       /nutrient line/i,
     );
     expect(feedingFormReasonToHelper("products:empty")).toMatch(/product/i);
+  });
+
+  it("explains the physical plausibility rejections", () => {
+    expect(feedingFormReasonToHelper("ph:out_of_range")).toMatch(/ph|14/i);
+    expect(feedingFormReasonToHelper("ec:out_of_range")).toMatch(/ec|negative/i);
+    expect(feedingFormReasonToHelper("volume:out_of_range")).toMatch(/volume|negative/i);
   });
 
   it("falls back to the failure message for unknown reasons", () => {

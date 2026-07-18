@@ -132,6 +132,7 @@ const OperatorAiDoctorPhase1Page = lazy(() =>
 const OneTentLiveProof = lazy(() => import("./pages/OneTentLiveProof"));
 const DemoProofWalkthrough = lazy(() => import("./pages/DemoProofWalkthrough"));
 const ContextualPhenoComparisonDemo = lazy(() => import("./pages/ContextualPhenoComparisonDemo"));
+const PhenoHuntDemo = lazy(() => import("./pages/PhenoHuntDemo"));
 const PhenoComparison = lazy(() => import("./pages/PhenoComparison"));
 const PhenoExpressionShowcase = lazy(() => import("./pages/PhenoExpressionShowcase"));
 const QuickLogStarter = lazy(() => import("./pages/QuickLogStarter"));
@@ -274,6 +275,12 @@ const App = () => (
                     path="/internal/contextual-pheno-comparison-demo"
                     element={<ContextualPhenoComparisonDemo />}
                   />
+
+                  {/* Internal read-only FULL pheno-hunt demo — pack → triage →
+                      keepers → clones → crosses → family tree, from labeled
+                      fixture data only. No fetch/Supabase/AI/writes. Hidden by
+                      URL only. */}
+                  <Route path="/internal/pheno-hunt-demo" element={<PhenoHuntDemo />} />
 
                   {/* Read-only Pheno Comparison PREVIEW surface. Fixture-only,
                       no fetch/Supabase/AI/writes. Mounted outside AppShell so

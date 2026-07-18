@@ -207,6 +207,12 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     description: "One-tent loop internal proof checklist.",
   },
   {
+    path: "/internal/pheno-hunt-demo",
+    access: "public",
+    description:
+      "Read-only full pheno-hunt demo (pack → triage → keepers → clones → crosses → family tree; fixture data only; mounted outside AppShell, unlinked / hidden by URL — no private data).",
+  },
+  {
     path: "/internal/sensor-truth-audit",
     access: "internal",
     description: "Sensor truth internal static audit.",

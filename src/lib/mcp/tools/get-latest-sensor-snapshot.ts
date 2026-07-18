@@ -18,11 +18,12 @@
  * convention, src/hooks/useLatestSensorSnapshot.ts), then id DESC so
  * equal timestamps can never flip the snapshot between calls.
  *
- * Preserves `source` and `quality` labels verbatim. Raw provenance is selected
+ * Preserves `source` and `quality` labels verbatim, then derives response-time
+ * freshness from the effective capture timestamp. Raw provenance is selected
  * only long enough to exclude diagnostic-only Windows testbench rows, then is
  * stripped before tool content is assembled. Trust follows the
- * canonical SENSOR TRUTH contract: only quality `ok` + source `live`
- * (fresh validated connected telemetry) counts as current live data;
+ * canonical SENSOR TRUTH contract: only quality `ok` + source `live` +
+ * response-time freshness `fresh` counts as current live data;
  * manual stays manual, csv stays csv, demo stays demo, and
  * sim/stale/invalid/unknown labels are never live.
  * Never returns `raw_payload`.
@@ -34,6 +35,7 @@
 import { defineTool } from "@lovable.dev/mcp-js";
 import { z } from "zod";
 import { withoutDiagnosticSensorRows } from "../../sensorProvenanceFenceRules";
+import { isReadingStale, STALE_THRESHOLD_MS } from "../../sensorReadingNormalizationRules";
 import { supabaseForUser, unauthenticated } from "./_supabase";
 
 /**
@@ -66,7 +68,12 @@ export interface McpSensorQueryRow {
   raw_payload?: unknown;
 }
 
-export type McpSensorReading = Omit<McpSensorQueryRow, "raw_payload">;
+export type McpSensorFreshness = "fresh" | "stale" | "invalid";
+
+export type McpSensorReading = Omit<McpSensorQueryRow, "raw_payload"> & {
+  freshness: McpSensorFreshness;
+  current_live: boolean;
+};
 
 const SENSOR_COLUMNS = "id,tent_id,metric,value,quality,source,ts,captured_at,raw_payload";
 const SENSOR_CANDIDATE_LIMIT = 25;
@@ -74,6 +81,20 @@ const SENSOR_CANDIDATE_LIMIT = 25;
 /** Effective capture time: COALESCE(captured_at, ts) as epoch millis. */
 function effectiveCaptureMs(row: McpSensorQueryRow): number {
   return Date.parse(row.captured_at ?? row.ts);
+}
+
+function deriveMcpFreshness(
+  row: McpSensorQueryRow,
+  nowMs: number,
+  staleAfterMs: number,
+): McpSensorFreshness {
+  const source = row.source.trim().toLowerCase();
+  const quality = row.quality.trim().toLowerCase();
+  if (source === "invalid" || quality === "invalid") return "invalid";
+  if (source === "stale" || quality === "stale") return "stale";
+  const capturedAt = row.captured_at ?? row.ts;
+  if (!Number.isFinite(Date.parse(capturedAt))) return "invalid";
+  return isReadingStale(capturedAt, nowMs, staleAfterMs) ? "stale" : "fresh";
 }
 
 /** Deterministic winner between the captured and legacy candidates. */
@@ -93,7 +114,10 @@ function newerReading(a: McpSensorQueryRow, b: McpSensorQueryRow): McpSensorQuer
  */
 export function selectLatestMcpSensorReadings(
   rows: readonly McpSensorQueryRow[] | null | undefined,
+  options: { now?: Date; staleAfterMs?: number } = {},
 ): Record<string, McpSensorReading> {
+  const nowMs = (options.now ?? new Date()).getTime();
+  const staleAfterMs = options.staleAfterMs ?? STALE_THRESHOLD_MS;
   const selected: Record<string, McpSensorQueryRow> = {};
   for (const row of withoutDiagnosticSensorRows(rows)) {
     if (!row || typeof row.metric !== "string" || row.metric.length === 0) continue;
@@ -102,19 +126,27 @@ export function selectLatestMcpSensorReadings(
   }
 
   return Object.fromEntries(
-    Object.entries(selected).map(([metric, row]) => [
-      metric,
-      {
-        id: row.id,
-        tent_id: row.tent_id,
-        metric: row.metric,
-        value: row.value,
-        quality: row.quality,
-        source: row.source,
-        ts: row.ts,
-        captured_at: row.captured_at,
-      } satisfies McpSensorReading,
-    ]),
+    Object.entries(selected).map(([metric, row]) => {
+      const freshness = deriveMcpFreshness(row, nowMs, staleAfterMs);
+      return [
+        metric,
+        {
+          id: row.id,
+          tent_id: row.tent_id,
+          metric: row.metric,
+          value: row.value,
+          quality: row.quality,
+          source: row.source,
+          ts: row.ts,
+          captured_at: row.captured_at,
+          freshness,
+          current_live:
+            freshness === "fresh" &&
+            row.source.trim().toLowerCase() === "live" &&
+            row.quality.trim().toLowerCase() === "ok",
+        } satisfies McpSensorReading,
+      ];
+    }),
   );
 }
 
@@ -126,13 +158,16 @@ export default defineTool({
     "humidity_pct, vpd_kpa, co2_ppm, soil_moisture_pct, soil_temp_c, ph, " +
     "ec, ppfd) for one of the signed-in grower's own tents, ordered by " +
     "capture time (captured_at, falling back to ingest time). Every " +
-    "reading keeps its `source` and `quality` labels verbatim. `quality` " +
+    "reading keeps its `source` and `quality` labels verbatim and adds a " +
+    "response-time `freshness` field (`fresh`, `stale`, or `invalid`) plus " +
+    "`current_live`. `quality` " +
     "is one of ok/degraded/stale/invalid. Canonical `source` labels are " +
     "exactly live/manual/csv/demo/stale/invalid, where `live` means " +
     "fresh validated connected telemetry; legacy rows may carry other " +
     "ingest labels such as sim or vendor bridge names. Treat a reading " +
-    "as current live telemetry ONLY when its quality is `ok` AND its " +
-    "source is `live`. Every other source or quality keeps its label " +
+    "as current live telemetry ONLY when `current_live` is true: quality " +
+    "must be `ok`, source must be `live`, and freshness must be `fresh`. " +
+    "Every other source, quality, or freshness state keeps its label " +
     "and is never live: manual stays manual, csv stays csv, demo stays " +
     "demo, and sim, stale, invalid, or unknown labels are never current " +
     "or healthy. Read-only.",
@@ -209,7 +244,7 @@ export default defineTool({
     const summary = Object.values(readings)
       .map(
         (r) =>
-          `${r.metric}=${r.value} (source: ${r.source}, quality: ${r.quality}, at: ${r.captured_at ?? r.ts})`,
+          `${r.metric}=${r.value} (source: ${r.source}, quality: ${r.quality}, freshness: ${r.freshness}, current_live: ${r.current_live}, at: ${r.captured_at ?? r.ts})`,
       )
       .join("\n");
     return {

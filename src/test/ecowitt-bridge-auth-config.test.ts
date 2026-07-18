@@ -33,4 +33,13 @@ describe("ECOWITT bridge authentication configuration", () => {
     expect(source).toMatch(/authenticateBearer\(rawToken,/);
     expect(source).toMatch(/unauthorized/);
   });
+
+  it.each([
+    ["sensor-ingest-webhook", SENSOR_INGEST_WEBHOOK],
+    ["ecowitt-ingest", ECOWITT_INGEST],
+  ])("%s rejects ordinary user JWTs for trusted telemetry", (_name, source) => {
+    expect(source).toMatch(/allowJwt:\s*false/);
+    expect(source).toMatch(/bridge_required/);
+    expect(source).not.toMatch(/anonForJwt/);
+  });
 });

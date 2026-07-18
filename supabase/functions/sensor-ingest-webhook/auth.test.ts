@@ -1,10 +1,7 @@
 // Deno tests for the bearer-token auth resolver used by sensor-ingest-webhook.
 // Covers: valid bridge token, revoked, expired, unknown/malformed, missing
-// service key, valid JWT, invalid JWT, and tent scope enforcement.
-import {
-  assert,
-  assertEquals,
-} from "https://deno.land/std@0.224.0/assert/mod.ts";
+// service key, optional JWT support, bridge-only mode, and tent scope enforcement.
+import { assert, assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import {
   authenticateBearer,
   tentScopeMatches,
@@ -85,7 +82,10 @@ Deno.test("malformed bridge token (too short) is rejected without DB call", asyn
   let called = false;
   const res = await authenticateBearer(BRIDGE_PREFIX + "abc", {
     serviceKeyAvailable: true,
-    lookupBridgeToken: async () => { called = true; return { data: null, error: null }; },
+    lookupBridgeToken: async () => {
+      called = true;
+      return { data: null, error: null };
+    },
     verifyJwtClaims: async () => ({ sub: null }),
   });
   assert(!res.ok);
@@ -93,15 +93,18 @@ Deno.test("malformed bridge token (too short) is rejected without DB call", asyn
   assertEquals(called, false);
 });
 
-Deno.test("missing service key while presenting bridge token returns server_misconfigured", async () => {
-  const res = await authenticateBearer(validToken, {
-    serviceKeyAvailable: false,
-    lookupBridgeToken: async () => ({ data: makeRow(), error: null }),
-    verifyJwtClaims: async () => ({ sub: null }),
-  });
-  assert(!res.ok);
-  if (!res.ok) assertEquals(res.error, "server_misconfigured");
-});
+Deno.test(
+  "missing service key while presenting bridge token returns server_misconfigured",
+  async () => {
+    const res = await authenticateBearer(validToken, {
+      serviceKeyAvailable: false,
+      lookupBridgeToken: async () => ({ data: makeRow(), error: null }),
+      verifyJwtClaims: async () => ({ sub: null }),
+    });
+    assert(!res.ok);
+    if (!res.ok) assertEquals(res.error, "server_misconfigured");
+  },
+);
 
 Deno.test("bridge token DB lookup error returns auth_lookup_failed", async () => {
   const res = await authenticateBearer(validToken, {
@@ -124,6 +127,22 @@ Deno.test("valid JWT (non-bridge) resolves to jwt auth", async () => {
     assertEquals(res.auth.kind, "jwt");
     assertEquals(res.auth.userId, "user-abc");
   }
+});
+
+Deno.test("bridge-only mode rejects JWTs without invoking claims lookup", async () => {
+  let claimsLookupCalled = false;
+  const res = await authenticateBearer("eyJ.some.jwt", {
+    serviceKeyAvailable: true,
+    allowJwt: false,
+    lookupBridgeToken: async () => ({ data: null, error: null }),
+    verifyJwtClaims: async () => {
+      claimsLookupCalled = true;
+      return { sub: "user-abc" };
+    },
+  });
+  assert(!res.ok);
+  if (!res.ok) assertEquals(res.error, "bridge_required");
+  assertEquals(claimsLookupCalled, false);
 });
 
 Deno.test("invalid JWT (no sub) is rejected", async () => {

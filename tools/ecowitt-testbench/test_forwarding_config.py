@@ -228,6 +228,34 @@ class ForwardedPayloadContractTests(unittest.TestCase):
         # Verdant local source label preserved as lineage, never sent as `source`
         self.assertEqual(payload["metadata"]["verdant_source"], "live")
 
+    def test_replay_uses_stable_idempotency_key_from_fingerprint_inputs(self):
+        reading = {
+            "captured_at": "2026-06-17T05:40:30Z",
+            "source": "live",
+            "vendor": "ecowitt_windows_testbench",
+            "metrics": {
+                "temp_f": 80.0,
+                "humidity_percent": 58.0,
+            },
+            "metadata": {
+                "raw_payload": {
+                    "dateutc": "2026-06-17 05:40:30",
+                    "tempf": "80.0",
+                    "humidity": "58",
+                }
+            },
+        }
+
+        first_result, first_request = self._send(reading)
+        second_result, second_request = self._send(reading)
+
+        first_key = first_request["headers"]["Idempotency-Key"]
+        second_key = second_request["headers"]["Idempotency-Key"]
+        self.assertEqual(first_key, second_key)
+        self.assertEqual(first_result["idempotency_key"], first_key)
+        self.assertEqual(second_result["idempotency_key"], second_key)
+        self.assertRegex(first_key, r"^ecowitt-[0-9a-f]{64}$")
+
     def test_passkey_is_stripped_from_forwarded_raw_payload(self):
         reading = {
             "captured_at": "2026-06-17T05:40:30Z",
@@ -352,6 +380,7 @@ class ForwardErrorSanitizationTests(unittest.TestCase):
             ("tent_lookup_failed", "tent_lookup_failed"),
             ("insert_failed", "storage_insert_failed"),
             ("unauthorized", "auth_failed"),
+            ("bridge_required", "bridge_required"),
             ("token_revoked", "token_revoked"),
             ("token_expired", "token_expired"),
             ("auth_lookup_failed", "auth_lookup_failed"),

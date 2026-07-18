@@ -3,7 +3,8 @@
  *
  * Verifies that INSERTs are gated by BOTH:
  *   1. auth.uid() = user_id  (the caller owns the row), AND
- *   2. an EXISTS check against public.tents proving auth.uid() also owns
+ *   2. source is limited to grower-authored manual or CSV history rows, AND
+ *   3. an EXISTS check against public.tents proving auth.uid() also owns
  *      the referenced tent_id (no cross-tenant tent-history pollution).
  *
  * This is a deterministic, dependency-free scan over the current
@@ -69,6 +70,20 @@ describe("sensor_readings INSERT RLS: tent-ownership fence", () => {
     // …AND the tent must be owned by the calling user.
     expect(latest.withCheck).toMatch(/\.user_id\s*=\s*auth\.uid\(\)/i);
   });
+
+  it("allows authenticated clients to insert only manual and CSV sources", () => {
+    const latest = policies[policies.length - 1];
+    expect(latest.withCheck).toMatch(/source\s+IN\s*\(\s*'manual'\s*,\s*'csv'\s*\)/i);
+  });
+
+  it.each(["live", "ecowitt", "mqtt", "webhook", "pi_bridge"])(
+    "does not grant authenticated clients direct %s provenance",
+    (source) => {
+      const latest = policies[policies.length - 1];
+      const sourceFence = latest.withCheck.match(/source\s+IN\s*\(([^)]*)\)/i)?.[1] ?? "";
+      expect(sourceFence.toLowerCase()).not.toContain(`'${source}'`);
+    },
+  );
 
   it("the INSERT policy is scoped to the authenticated role (no anon inserts)", () => {
     const latest = policies[policies.length - 1];

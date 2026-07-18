@@ -40,7 +40,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\Run-EcoWittCanary.ps1
 
 Alternative — double-click in File Explorer:
 
-- `Run-EcoWittCanary.cmd`  (keeps window open after completion)
+- `Run-EcoWittCanary.cmd` (keeps window open after completion)
 
 The root launcher safely prompts for each secret, validates the bridge token shape **before** any network call, and never echoes raw secrets.
 
@@ -90,7 +90,6 @@ The Bash harness is functionally equivalent. Use it on Unix-like shells where th
 
 ---
 
-
 ## 1. Main canary POST (well-formed, mapped channels + one unmapped channel)
 
 ```bash
@@ -132,13 +131,15 @@ curl -i -X POST "$HOST/functions/v1/ecowitt-ingest" \
 
 ### Expected row counts for the mapped tent
 
-Exactly **4 rows** with `source = 'ecowitt'`:
+Exactly **4 rows** with canonical `source = 'live'`. Every row also retains
+direct-gateway lineage as `raw_payload.vendor = 'ecowitt'` and
+`raw_payload.metadata.transport_source = 'ecowitt'`:
 
-| metric              | derivation | provenance                                                  |
-|---------------------|------------|-------------------------------------------------------------|
-| `temperature_c`     | measured   | `raw_payload.raw_key = "temp1f"`                            |
-| `humidity_pct`      | measured   | `raw_payload.raw_key = "humidity1"`                         |
-| `soil_moisture_pct` | measured   | `raw_payload.raw_key = "soilmoisture1"`                     |
+| metric              | derivation | provenance                                                               |
+| ------------------- | ---------- | ------------------------------------------------------------------------ |
+| `temperature_c`     | measured   | `raw_payload.raw_key = "temp1f"`                                         |
+| `humidity_pct`      | measured   | `raw_payload.raw_key = "humidity1"`                                      |
+| `soil_moisture_pct` | measured   | `raw_payload.raw_key = "soilmoisture1"`                                  |
 | `vpd_kpa`           | derived    | `raw_payload.calculated = true`, `derived_from = ["temp1f","humidity1"]` |
 
 Unmapped channels (`temp9f` / `humidity9` / `soilmoisture9`) write **0 rows**.
@@ -194,7 +195,6 @@ The edge function calls `parseEcoWittDateUtc(payload.dateutc)`:
 
 If the first real gateway POST shows `timestamp_source = "server_received_at"`, **pause** the canary — the gateway clock is either missing, malformed, or outside the sane window.
 
-
 ---
 
 ## 4. Verification SQL
@@ -205,14 +205,18 @@ Run via `psql` or the Supabase SQL editor (operator role).
 -- 4a. Inspect the rows the canary just wrote.
 SELECT id, tent_id, source, metric, value, captured_at, raw_payload
 FROM public.sensor_readings
-WHERE source = 'ecowitt'
+WHERE source = 'live'
+  AND raw_payload ->> 'vendor' = 'ecowitt'
+  AND raw_payload -> 'metadata' ->> 'transport_source' = 'ecowitt'
 ORDER BY created_at DESC
 LIMIT 20;
 
 -- 4b. Leak scan — forbidden field-name keywords inside raw_payload.
 SELECT id, raw_payload
 FROM public.sensor_readings
-WHERE source = 'ecowitt'
+WHERE source = 'live'
+  AND raw_payload ->> 'vendor' = 'ecowitt'
+  AND raw_payload -> 'metadata' ->> 'transport_source' = 'ecowitt'
   AND created_at > now() - interval '1 hour'
   AND (
        raw_payload ? 'passkey'
@@ -231,7 +235,9 @@ WHERE source = 'ecowitt'
 -- 4c. Known test-secret VALUE scan (not just field names).
 SELECT id, raw_payload
 FROM public.sensor_readings
-WHERE source = 'ecowitt'
+WHERE source = 'live'
+  AND raw_payload ->> 'vendor' = 'ecowitt'
+  AND raw_payload -> 'metadata' ->> 'transport_source' = 'ecowitt'
   AND created_at > now() - interval '1 hour'
   AND (
        raw_payload::text LIKE '%REDACTED_TEST_PASSKEY%'
@@ -254,7 +260,9 @@ WHERE schemaname = 'public'
 -- 4e. Duplicate-count query — no (user_id, tent_id, source, metric, captured_at) tuple may appear twice.
 SELECT user_id, tent_id, source, metric, captured_at, COUNT(*) AS n
 FROM public.sensor_readings
-WHERE source = 'ecowitt'
+WHERE source = 'live'
+  AND raw_payload ->> 'vendor' = 'ecowitt'
+  AND raw_payload -> 'metadata' ->> 'transport_source' = 'ecowitt'
   AND created_at > now() - interval '1 hour'
 GROUP BY 1,2,3,4,5
 HAVING COUNT(*) > 1;
@@ -264,7 +272,9 @@ HAVING COUNT(*) > 1;
 --     would not apply, so duplicate protection would silently fail).
 SELECT COUNT(*) AS null_captured_at
 FROM public.sensor_readings
-WHERE source = 'ecowitt'
+WHERE source = 'live'
+  AND raw_payload ->> 'vendor' = 'ecowitt'
+  AND raw_payload -> 'metadata' ->> 'transport_source' = 'ecowitt'
   AND captured_at IS NULL;
 -- EXPECT: 0.
 
@@ -274,7 +284,9 @@ SELECT captured_at,
        raw_payload->>'timestamp_source' AS timestamp_source,
        raw_payload->>'calculated'      AS calculated
 FROM public.sensor_readings
-WHERE source = 'ecowitt'
+WHERE source = 'live'
+  AND raw_payload ->> 'vendor' = 'ecowitt'
+  AND raw_payload -> 'metadata' ->> 'transport_source' = 'ecowitt'
 ORDER BY captured_at DESC
 LIMIT 12;
 -- EXPECT: every row from the main canary shows
@@ -288,7 +300,9 @@ LIMIT 12;
 Before promoting from canary → live:
 
 - [ ] Bridge token POSTs land on the **correct tent IDs** (cross-check `per_tent` against the tent's `hardware_config.ecowitt.air_channels` / `soil_channels`).
-- [ ] All rows have `source = 'ecowitt'`. No other source label is emitted.
+- [ ] All accepted fresh rows have canonical `source = 'live'`,
+      `raw_payload.vendor = 'ecowitt'`, and
+      `raw_payload.metadata.transport_source = 'ecowitt'`.
 - [ ] Mapped-tent metrics are exactly: `temperature_c`, `humidity_pct`, `soil_moisture_pct`, `vpd_kpa`.
 - [ ] Main canary produced exactly **4 rows**. Malformed canary produced exactly **2 rows**.
 - [ ] Unmapped channel (`temp9f`/`humidity9`/`soilmoisture9`) produced **0 rows**.
@@ -392,7 +406,6 @@ bash scripts/ecowitt-canary-harness.sh
 ```
 
 The harness prints a pass/fail matrix and redacts every secret it sees before printing response bodies.
-
 
 ---
 

@@ -18,6 +18,7 @@ export type AuthResult =
 
 export type AuthError =
   | "unauthorized"
+  | "bridge_required"
   | "token_revoked"
   | "token_expired"
   | "server_misconfigured"
@@ -32,10 +33,7 @@ export interface JwtClaimsLookup {
 }
 
 export async function sha256Hex(input: string): Promise<string> {
-  const buf = await crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(input),
-  );
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
   return Array.from(new Uint8Array(buf))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
@@ -47,6 +45,7 @@ export async function authenticateBearer(
     lookupBridgeToken: BridgeTokenLookup;
     verifyJwtClaims: JwtClaimsLookup;
     serviceKeyAvailable: boolean;
+    allowJwt?: boolean;
     now?: () => number;
   },
 ): Promise<{ ok: true; auth: AuthResult } | { ok: false; error: AuthError }> {
@@ -67,15 +66,15 @@ export async function authenticateBearer(
       auth: { kind: "bridge", userId: data.user_id, tentScope: data.tent_id, tokenId: data.id },
     };
   }
+  if (deps.allowJwt === false) {
+    return { ok: false, error: "bridge_required" };
+  }
   const { sub } = await deps.verifyJwtClaims(rawToken);
   if (!sub) return { ok: false, error: "unauthorized" };
   return { ok: true, auth: { kind: "jwt", userId: sub } };
 }
 
-export function tentScopeMatches(
-  auth: AuthResult,
-  payloadTentId: string,
-): boolean {
+export function tentScopeMatches(auth: AuthResult, payloadTentId: string): boolean {
   if (auth.kind === "jwt") return true;
   return auth.tentScope === payloadTentId;
 }

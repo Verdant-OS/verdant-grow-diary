@@ -19,13 +19,13 @@ function supabaseForUser(ctx) {
   }
   return createClient(url, anon, {
     global: { headers: { Authorization: `Bearer ${ctx.getToken()}` } },
-    auth: { persistSession: false, autoRefreshToken: false }
+    auth: { persistSession: false, autoRefreshToken: false },
   });
 }
 function unauthenticated() {
   return {
     content: [{ type: "text", text: "Not authenticated." }],
-    isError: true
+    isError: true,
   };
 }
 
@@ -33,22 +33,33 @@ function unauthenticated() {
 var list_grows_default = defineTool({
   name: "list_grows",
   title: "List grows",
-  description: "List the signed-in Verdant grower's own grows (id, name, stage, grow_type, archived flag, timestamps). Read-only.",
+  description:
+    "List the signed-in Verdant grower's own grows (id, name, stage, grow_type, archived flag, timestamps). Read-only.",
   inputSchema: {
     includeArchived: z.boolean().optional().describe("Include archived grows. Defaults to false."),
-    limit: z.number().int().min(1).max(100).optional().describe("Maximum rows to return (1\u2013100). Defaults to 25.")
+    limit: z
+      .number()
+      .int()
+      .min(1)
+      .max(100)
+      .optional()
+      .describe("Maximum rows to return (1\u2013100). Defaults to 25."),
   },
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async ({ includeArchived, limit }, ctx) => {
     if (!ctx.isAuthenticated()) return unauthenticated();
     const supabase = supabaseForUser(ctx);
-    let query = supabase.from("grows").select("id,name,stage,grow_type,is_archived,started_at,created_at,updated_at").order("updated_at", { ascending: false }).limit(limit ?? 25);
+    let query = supabase
+      .from("grows")
+      .select("id,name,stage,grow_type,is_archived,started_at,created_at,updated_at")
+      .order("updated_at", { ascending: false })
+      .limit(limit ?? 25);
     if (!includeArchived) query = query.eq("is_archived", false);
     const { data, error } = await query;
     if (error) {
       return {
         content: [{ type: "text", text: `Error: ${error.message}` }],
-        isError: true
+        isError: true,
       };
     }
     const rows = data ?? [];
@@ -56,13 +67,16 @@ var list_grows_default = defineTool({
       content: [
         {
           type: "text",
-          text: rows.length === 0 ? "No grows found." : `Found ${rows.length} grow(s):
-${JSON.stringify(rows, null, 2)}`
-        }
+          text:
+            rows.length === 0
+              ? "No grows found."
+              : `Found ${rows.length} grow(s):
+${JSON.stringify(rows, null, 2)}`,
+        },
       ],
-      structuredContent: { grows: rows }
+      structuredContent: { grows: rows },
     };
-  }
+  },
 });
 
 // src/lib/mcp/tools/list-recent-diary-entries.ts
@@ -71,33 +85,49 @@ import { z as z2 } from "npm:zod@^4.4.3";
 var list_recent_diary_entries_default = defineTool2({
   name: "list_recent_diary_entries",
   title: "List recent diary entries",
-  description: "List recent diary entries for one of the signed-in grower's own grows. The grow must belong to the caller. Read-only.",
+  description:
+    "List recent diary entries for one of the signed-in grower's own grows. The grow must belong to the caller. Read-only.",
   inputSchema: {
     growId: z2.string().uuid().describe("Grow id to fetch diary entries for."),
-    limit: z2.number().int().min(1).max(50).optional().describe("Maximum entries to return (1\u201350). Defaults to 10.")
+    limit: z2
+      .number()
+      .int()
+      .min(1)
+      .max(50)
+      .optional()
+      .describe("Maximum entries to return (1\u201350). Defaults to 10."),
   },
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async ({ growId, limit }, ctx) => {
     if (!ctx.isAuthenticated()) return unauthenticated();
     const supabase = supabaseForUser(ctx);
-    const { data: grow, error: growError } = await supabase.from("grows").select("id").eq("id", growId).maybeSingle();
+    const { data: grow, error: growError } = await supabase
+      .from("grows")
+      .select("id")
+      .eq("id", growId)
+      .maybeSingle();
     if (growError) {
       return {
         content: [{ type: "text", text: `Error: ${growError.message}` }],
-        isError: true
+        isError: true,
       };
     }
     if (!grow) {
       return {
         content: [{ type: "text", text: "Grow not found for the signed-in grower." }],
-        isError: true
+        isError: true,
       };
     }
-    const { data, error } = await supabase.from("diary_entries").select("id,grow_id,plant_id,tent_id,stage,note,entry_at,created_at").eq("grow_id", growId).order("entry_at", { ascending: false }).limit(limit ?? 10);
+    const { data, error } = await supabase
+      .from("diary_entries")
+      .select("id,grow_id,plant_id,tent_id,stage,note,entry_at,created_at")
+      .eq("grow_id", growId)
+      .order("entry_at", { ascending: false })
+      .limit(limit ?? 10);
     if (error) {
       return {
         content: [{ type: "text", text: `Error: ${error.message}` }],
-        isError: true
+        isError: true,
       };
     }
     const rows = data ?? [];
@@ -105,13 +135,16 @@ var list_recent_diary_entries_default = defineTool2({
       content: [
         {
           type: "text",
-          text: rows.length === 0 ? "No diary entries found for that grow." : `Found ${rows.length} entry(ies):
-${JSON.stringify(rows, null, 2)}`
-        }
+          text:
+            rows.length === 0
+              ? "No diary entries found for that grow."
+              : `Found ${rows.length} entry(ies):
+${JSON.stringify(rows, null, 2)}`,
+        },
       ],
-      structuredContent: { entries: rows }
+      structuredContent: { entries: rows },
     };
-  }
+  },
 });
 
 // src/lib/mcp/tools/get-latest-sensor-snapshot.ts
@@ -139,30 +172,37 @@ function extractTestbenchFields(row) {
     "freq",
     "runtime",
     "wh65batt",
-    "wh25batt"
+    "wh25batt",
   ]);
-  const markerCount = nestedRaw && typeof nestedRaw === "object" ? Object.keys(nestedRaw).filter(
-    (key) => gatewayMarkers.has(key.trim().toLowerCase())
-  ).length : 0;
+  const markerCount =
+    nestedRaw && typeof nestedRaw === "object"
+      ? Object.keys(nestedRaw).filter((key) => gatewayMarkers.has(key.trim().toLowerCase())).length
+      : 0;
   return {
     vendor,
     confidence,
     verdantSource,
-    physicalGatewayEvidence: verdantSource?.trim().toLowerCase() === "live" && markerCount >= 2
+    physicalGatewayEvidence: verdantSource?.trim().toLowerCase() === "live" && markerCount >= 2,
   };
 }
 function isSensorTestbenchProvenance(input) {
   const vendor = typeof input.vendor === "string" ? input.vendor.trim().toLowerCase() : "";
-  const confidence = typeof input.confidence === "string" ? input.confidence.trim().toLowerCase() : "";
-  const verdantSource = typeof input.verdantSource === "string" ? input.verdantSource.trim().toLowerCase() : "";
+  const confidence =
+    typeof input.confidence === "string" ? input.confidence.trim().toLowerCase() : "";
+  const verdantSource =
+    typeof input.verdantSource === "string" ? input.verdantSource.trim().toLowerCase() : "";
   if (confidence === "test" || confidence === "demo") return true;
-  if (vendor === "ecowitt_windows_testbench" && !(verdantSource === "live" && input.physicalGatewayEvidence === true)) {
+  if (
+    vendor === "ecowitt_windows_testbench" &&
+    !(verdantSource === "live" && input.physicalGatewayEvidence === true)
+  ) {
     return true;
   }
   return false;
 }
 function isSensorTestbenchRow(row) {
-  const { vendor, confidence, verdantSource, physicalGatewayEvidence } = extractTestbenchFields(row);
+  const { vendor, confidence, verdantSource, physicalGatewayEvidence } =
+    extractTestbenchFields(row);
   const source = typeof row.source === "string" ? row.source.trim().toLowerCase() : "";
   const normalizedVendor = vendor?.trim().toLowerCase() ?? "";
   if (source === "ecowitt_windows_testbench" && normalizedVendor !== source) {
@@ -172,7 +212,7 @@ function isSensorTestbenchRow(row) {
     vendor,
     confidence,
     verdantSource,
-    physicalGatewayEvidence
+    physicalGatewayEvidence,
   });
 }
 
@@ -185,6 +225,14 @@ function withoutDiagnosticSensorRows(rows) {
   return rows.filter((row) => !isDiagnosticSensorProvenanceRow(row));
 }
 
+// src/lib/sensorReadingNormalizationRules.ts
+var STALE_THRESHOLD_MS = 30 * 60 * 1e3;
+function isReadingStale(capturedAt, now = Date.now(), thresholdMs = STALE_THRESHOLD_MS) {
+  const t = new Date(capturedAt).getTime();
+  if (!Number.isFinite(t)) return true;
+  return now - t > thresholdMs;
+}
+
 // src/lib/mcp/tools/get-latest-sensor-snapshot.ts
 var KNOWN_METRICS = [
   "temperature_c",
@@ -195,12 +243,21 @@ var KNOWN_METRICS = [
   "soil_temp_c",
   "ph",
   "ec",
-  "ppfd"
+  "ppfd",
 ];
 var SENSOR_COLUMNS = "id,tent_id,metric,value,quality,source,ts,captured_at,raw_payload";
 var SENSOR_CANDIDATE_LIMIT = 25;
 function effectiveCaptureMs(row) {
   return Date.parse(row.captured_at ?? row.ts);
+}
+function deriveMcpFreshness(row, nowMs, staleAfterMs) {
+  const source = row.source.trim().toLowerCase();
+  const quality = row.quality.trim().toLowerCase();
+  if (source === "invalid" || quality === "invalid") return "invalid";
+  if (source === "stale" || quality === "stale") return "stale";
+  const capturedAt = row.captured_at ?? row.ts;
+  if (!Number.isFinite(Date.parse(capturedAt))) return "invalid";
+  return isReadingStale(capturedAt, nowMs, staleAfterMs) ? "stale" : "fresh";
 }
 function newerReading(a, b) {
   const ea = effectiveCaptureMs(a);
@@ -211,7 +268,9 @@ function newerReading(a, b) {
   if (ta !== tb) return ta > tb ? a : b;
   return a.id > b.id ? a : b;
 }
-function selectLatestMcpSensorReadings(rows) {
+function selectLatestMcpSensorReadings(rows, options = {}) {
+  const nowMs = (options.now ?? /* @__PURE__ */ new Date()).getTime();
+  const staleAfterMs = options.staleAfterMs ?? STALE_THRESHOLD_MS;
   const selected = {};
   for (const row of withoutDiagnosticSensorRows(rows)) {
     if (!row || typeof row.metric !== "string" || row.metric.length === 0) continue;
@@ -219,82 +278,115 @@ function selectLatestMcpSensorReadings(rows) {
     selected[row.metric] = current ? newerReading(current, row) : row;
   }
   return Object.fromEntries(
-    Object.entries(selected).map(([metric, row]) => [
-      metric,
-      {
-        id: row.id,
-        tent_id: row.tent_id,
-        metric: row.metric,
-        value: row.value,
-        quality: row.quality,
-        source: row.source,
-        ts: row.ts,
-        captured_at: row.captured_at
-      }
-    ])
+    Object.entries(selected).map(([metric, row]) => {
+      const freshness = deriveMcpFreshness(row, nowMs, staleAfterMs);
+      return [
+        metric,
+        {
+          id: row.id,
+          tent_id: row.tent_id,
+          metric: row.metric,
+          value: row.value,
+          quality: row.quality,
+          source: row.source,
+          ts: row.ts,
+          captured_at: row.captured_at,
+          freshness,
+          current_live:
+            freshness === "fresh" &&
+            row.source.trim().toLowerCase() === "live" &&
+            row.quality.trim().toLowerCase() === "ok",
+        },
+      ];
+    }),
   );
 }
 var get_latest_sensor_snapshot_default = defineTool3({
   name: "get_latest_sensor_snapshot",
   title: "Get latest sensor snapshot",
-  description: "Fetch the most recent sensor reading per metric (temperature_c, humidity_pct, vpd_kpa, co2_ppm, soil_moisture_pct, soil_temp_c, ph, ec, ppfd) for one of the signed-in grower's own tents, ordered by capture time (captured_at, falling back to ingest time). Every reading keeps its `source` and `quality` labels verbatim. `quality` is one of ok/degraded/stale/invalid. Canonical `source` labels are exactly live/manual/csv/demo/stale/invalid, where `live` means fresh validated connected telemetry; legacy rows may carry other ingest labels such as sim or vendor bridge names. Treat a reading as current live telemetry ONLY when its quality is `ok` AND its source is `live`. Every other source or quality keeps its label and is never live: manual stays manual, csv stays csv, demo stays demo, and sim, stale, invalid, or unknown labels are never current or healthy. Read-only.",
+  description:
+    "Fetch the most recent sensor reading per metric (temperature_c, humidity_pct, vpd_kpa, co2_ppm, soil_moisture_pct, soil_temp_c, ph, ec, ppfd) for one of the signed-in grower's own tents, ordered by capture time (captured_at, falling back to ingest time). Every reading keeps its `source` and `quality` labels verbatim and adds a response-time `freshness` field (`fresh`, `stale`, or `invalid`) plus `current_live`. `quality` is one of ok/degraded/stale/invalid. Canonical `source` labels are exactly live/manual/csv/demo/stale/invalid, where `live` means fresh validated connected telemetry; legacy rows may carry other ingest labels such as sim or vendor bridge names. Treat a reading as current live telemetry ONLY when `current_live` is true: quality must be `ok`, source must be `live`, and freshness must be `fresh`. Every other source, quality, or freshness state keeps its label and is never live: manual stays manual, csv stays csv, demo stays demo, and sim, stale, invalid, or unknown labels are never current or healthy. Read-only.",
   inputSchema: {
-    tentId: z3.string().uuid().describe("Tent id to fetch the latest readings for.")
+    tentId: z3.string().uuid().describe("Tent id to fetch the latest readings for."),
   },
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async ({ tentId }, ctx) => {
     if (!ctx.isAuthenticated()) return unauthenticated();
     const supabase = supabaseForUser(ctx);
-    const { data: tent, error: tentError } = await supabase.from("tents").select("id,name").eq("id", tentId).maybeSingle();
+    const { data: tent, error: tentError } = await supabase
+      .from("tents")
+      .select("id,name")
+      .eq("id", tentId)
+      .maybeSingle();
     if (tentError) {
       return {
         content: [{ type: "text", text: `Error: ${tentError.message}` }],
-        isError: true
+        isError: true,
       };
     }
     if (!tent) {
       return {
         content: [{ type: "text", text: "Tent not found for the signed-in grower." }],
-        isError: true
+        isError: true,
       };
     }
     const results = await Promise.all(
       KNOWN_METRICS.flatMap((metric) => [
-        supabase.from("sensor_readings").select(SENSOR_COLUMNS).eq("tent_id", tentId).eq("metric", metric).not("captured_at", "is", null).order("captured_at", { ascending: false }).order("ts", { ascending: false }).order("created_at", { ascending: false }).order("id", { ascending: false }).limit(SENSOR_CANDIDATE_LIMIT),
-        supabase.from("sensor_readings").select(SENSOR_COLUMNS).eq("tent_id", tentId).eq("metric", metric).is("captured_at", null).order("ts", { ascending: false }).order("created_at", { ascending: false }).order("id", { ascending: false }).limit(SENSOR_CANDIDATE_LIMIT)
-      ])
+        supabase
+          .from("sensor_readings")
+          .select(SENSOR_COLUMNS)
+          .eq("tent_id", tentId)
+          .eq("metric", metric)
+          .not("captured_at", "is", null)
+          .order("captured_at", { ascending: false })
+          .order("ts", { ascending: false })
+          .order("created_at", { ascending: false })
+          .order("id", { ascending: false })
+          .limit(SENSOR_CANDIDATE_LIMIT),
+        supabase
+          .from("sensor_readings")
+          .select(SENSOR_COLUMNS)
+          .eq("tent_id", tentId)
+          .eq("metric", metric)
+          .is("captured_at", null)
+          .order("ts", { ascending: false })
+          .order("created_at", { ascending: false })
+          .order("id", { ascending: false })
+          .limit(SENSOR_CANDIDATE_LIMIT),
+      ]),
     );
     const failed = results.find((r) => r.error);
     if (failed?.error) {
       return {
         content: [{ type: "text", text: `Error: ${failed.error.message}` }],
-        isError: true
+        isError: true,
       };
     }
-    const candidates = results.flatMap(
-      (result) => Array.isArray(result.data) ? result.data : []
-    );
+    const candidates = results.flatMap((result) => (Array.isArray(result.data) ? result.data : []));
     const readings = selectLatestMcpSensorReadings(candidates);
     if (Object.keys(readings).length === 0) {
       return {
         content: [{ type: "text", text: "No sensor readings found for that tent." }],
-        structuredContent: { snapshot: null }
+        structuredContent: { snapshot: null },
       };
     }
-    const summary = Object.values(readings).map(
-      (r) => `${r.metric}=${r.value} (source: ${r.source}, quality: ${r.quality}, at: ${r.captured_at ?? r.ts})`
-    ).join("\n");
+    const summary = Object.values(readings)
+      .map(
+        (r) =>
+          `${r.metric}=${r.value} (source: ${r.source}, quality: ${r.quality}, freshness: ${r.freshness}, current_live: ${r.current_live}, at: ${r.captured_at ?? r.ts})`,
+      )
+      .join("\n");
     return {
       content: [
         {
           type: "text",
           text: `Latest readings for tent "${tent.name}":
-${summary}`
-        }
+${summary}`,
+        },
       ],
-      structuredContent: { snapshot: { tentId, readings } }
+      structuredContent: { snapshot: { tentId, readings } },
     };
-  }
+  },
 });
 
 // src/lib/mcp/index.ts
@@ -303,12 +395,17 @@ var mcp_default = defineMcp({
   name: "verdant-grow-os-mcp",
   title: "Verdant Grow OS",
   version: "0.1.0",
-  instructions: "Read-only access to the signed-in Verdant grower's own data. Use `list_grows` to enumerate grows, `list_recent_diary_entries` for recent log entries in a grow the caller owns, and `get_latest_sensor_snapshot` for the most recent reading per metric in a tent the caller owns. Sensor readings always include their `source` and `quality` labels verbatim. Trust is deny-by-default: a reading is current live telemetry ONLY when its quality is `ok` AND its source is `live` (fresh validated connected telemetry). Every other source or quality keeps its label and is never live: manual stays manual, csv stays csv, demo stays demo, and sim, stale, invalid, or unknown labels are never current or healthy. This server never writes, never approves Action Queue items, and never controls devices.",
+  instructions:
+    "Read-only access to the signed-in Verdant grower's own data. Use `list_grows` to enumerate grows, `list_recent_diary_entries` for recent log entries in a grow the caller owns, and `get_latest_sensor_snapshot` for the most recent reading per metric in a tent the caller owns. Sensor readings always include their `source` and `quality` labels verbatim. Trust is deny-by-default: a reading is current live telemetry ONLY when its quality is `ok` AND its source is `live` (fresh validated connected telemetry). Every other source or quality keeps its label and is never live: manual stays manual, csv stays csv, demo stays demo, and sim, stale, invalid, or unknown labels are never current or healthy. This server never writes, never approves Action Queue items, and never controls devices.",
   auth: auth.oauth.issuer({
     issuer: `https://${projectRef}.supabase.co/auth/v1`,
-    acceptedAudiences: "authenticated"
+    acceptedAudiences: "authenticated",
   }),
-  tools: [list_grows_default, list_recent_diary_entries_default, get_latest_sensor_snapshot_default]
+  tools: [
+    list_grows_default,
+    list_recent_diary_entries_default,
+    get_latest_sensor_snapshot_default,
+  ],
 });
 
 // lovable-mcp-supabase-entry.ts

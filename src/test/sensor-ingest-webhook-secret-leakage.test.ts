@@ -56,7 +56,7 @@ describe("sensor-ingest-webhook secret leakage — response bodies", () => {
       "invalid_json",
       "invalid_payload",
       "forbidden_tent",
-      "tent_lookup_failed",
+      "bridge_required",
       "insert_failed",
       "method_not_allowed",
       "internal_error",
@@ -69,8 +69,9 @@ describe("sensor-ingest-webhook secret leakage — response bodies", () => {
 describe("sensor-ingest-webhook secret leakage — logging", () => {
   // Capture every console.* argument list and prove no token-bearing
   // identifier or wholesale request-header object is logged.
-  const logCalls = (SRC.match(/console\.(log|info|warn|error|debug)\([^;]*\)/g) ?? [])
-    .map((c) => c.replace(/\/\/[^\n]*/g, ""));
+  const logCalls = (SRC.match(/console\.(log|info|warn|error|debug)\([^;]*\)/g) ?? []).map((c) =>
+    c.replace(/\/\/[^\n]*/g, ""),
+  );
 
   it("never logs raw token / header identifiers", () => {
     for (const call of logCalls) {

@@ -4,7 +4,7 @@
  *
  * The Edge Function delegates to two pure helpers:
  *   - normalizeWebhookIngestPayload (validation, captured_at, metrics)
- *   - authenticateBearer            (JWT / bridge token auth)
+ *   - authenticateBearer            (bridge token auth; optional legacy JWT mode)
  *
  * This matrix exercises both helpers across the contract surface defined in
  * docs/sensor-ingest-payload-contract.md, plus static guards against the
@@ -58,7 +58,7 @@ describe("ingest matrix — happy path", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 2. Auth — missing / invalid JWT, bridge token rejection
+// 2. Auth — missing / invalid credentials, bridge-only trust boundary
 // ---------------------------------------------------------------------------
 describe("ingest matrix — auth", () => {
   const deps = {
@@ -152,6 +152,20 @@ describe("ingest matrix — auth", () => {
     }
   });
 
+  it("rejects an otherwise valid JWT when trusted telemetry requires a bridge", async () => {
+    let claimsLookupCalled = false;
+    const r = await authenticateBearer("ey.fake.jwt", {
+      ...deps,
+      allowJwt: false,
+      verifyJwtClaims: async () => {
+        claimsLookupCalled = true;
+        return { sub: USER };
+      },
+    });
+    expect(r).toEqual({ ok: false, error: "bridge_required" });
+    expect(claimsLookupCalled).toBe(false);
+  });
+
   it("starts with BRIDGE_PREFIX constant `vbt_`", () => {
     expect(BRIDGE_PREFIX).toBe("vbt_");
   });
@@ -191,29 +205,20 @@ describe("ingest matrix — client user_id", () => {
 // ---------------------------------------------------------------------------
 describe("ingest matrix — source allow-list", () => {
   it("rejects unknown source", () => {
-    const res = normalizeWebhookIngestPayload(
-      basePayload({ source: "live" }),
-      { now: NOW },
-    );
+    const res = normalizeWebhookIngestPayload(basePayload({ source: "live" }), { now: NOW });
     expect(res.ok).toBe(false);
     expect(res.errors.some((e) => /invalid source/i.test(e))).toBe(true);
   });
 
   it("rejects missing source", () => {
-    const res = normalizeWebhookIngestPayload(
-      basePayload({ source: undefined }),
-      { now: NOW },
-    );
+    const res = normalizeWebhookIngestPayload(basePayload({ source: undefined }), { now: NOW });
     expect(res.ok).toBe(false);
     expect(res.errors.some((e) => /source required/i.test(e))).toBe(true);
   });
 
   it("does not allow stale/invalid/demo/live as a source", () => {
     for (const bad of ["stale", "invalid", "demo", "live", "unknown"]) {
-      const res = normalizeWebhookIngestPayload(
-        basePayload({ source: bad }),
-        { now: NOW },
-      );
+      const res = normalizeWebhookIngestPayload(basePayload({ source: bad }), { now: NOW });
       expect(res.ok).toBe(false);
     }
   });
@@ -232,39 +237,31 @@ describe("ingest matrix — source allow-list", () => {
 // ---------------------------------------------------------------------------
 describe("ingest matrix — captured_at", () => {
   it("rejects missing captured_at", () => {
-    const res = normalizeWebhookIngestPayload(
-      basePayload({ captured_at: undefined }),
-      { now: NOW },
-    );
+    const res = normalizeWebhookIngestPayload(basePayload({ captured_at: undefined }), {
+      now: NOW,
+    });
     expect(res.ok).toBe(false);
     expect(res.errors.some((e) => /captured_at required/i.test(e))).toBe(true);
   });
 
   it("rejects malformed captured_at", () => {
-    const res = normalizeWebhookIngestPayload(
-      basePayload({ captured_at: "not-a-date" }),
-      { now: NOW },
-    );
+    const res = normalizeWebhookIngestPayload(basePayload({ captured_at: "not-a-date" }), {
+      now: NOW,
+    });
     expect(res.ok).toBe(false);
     expect(res.errors.some((e) => /invalid captured_at/i.test(e))).toBe(true);
   });
 
   it("rejects captured_at more than 5 minutes in the future", () => {
     const future = new Date(NOW.getTime() + 10 * 60 * 1000).toISOString();
-    const res = normalizeWebhookIngestPayload(
-      basePayload({ captured_at: future }),
-      { now: NOW },
-    );
+    const res = normalizeWebhookIngestPayload(basePayload({ captured_at: future }), { now: NOW });
     expect(res.ok).toBe(false);
     expect(res.errors.some((e) => /future/i.test(e))).toBe(true);
   });
 
   it("accepts captured_at inside the 5-minute clock-skew tolerance", () => {
     const near = new Date(NOW.getTime() + 2 * 60 * 1000).toISOString();
-    const res = normalizeWebhookIngestPayload(
-      basePayload({ captured_at: near }),
-      { now: NOW },
-    );
+    const res = normalizeWebhookIngestPayload(basePayload({ captured_at: near }), { now: NOW });
     expect(res.ok).toBe(true);
   });
 
@@ -287,10 +284,9 @@ describe("ingest matrix — captured_at", () => {
 // ---------------------------------------------------------------------------
 describe("ingest matrix — metric validation", () => {
   it("rejects out-of-range humidity", () => {
-    const res = normalizeWebhookIngestPayload(
-      basePayload({ metrics: { humidity_pct: 250 } }),
-      { now: NOW },
-    );
+    const res = normalizeWebhookIngestPayload(basePayload({ metrics: { humidity_pct: 250 } }), {
+      now: NOW,
+    });
     expect(res.ok).toBe(false);
     expect(res.errors.some((e) => /humidity_pct.*out of range/i.test(e))).toBe(true);
   });
@@ -307,10 +303,9 @@ describe("ingest matrix — metric validation", () => {
   });
 
   it("rejects payloads with no valid metrics at all", () => {
-    const res = normalizeWebhookIngestPayload(
-      basePayload({ metrics: { temp_c: 9999 } }),
-      { now: NOW },
-    );
+    const res = normalizeWebhookIngestPayload(basePayload({ metrics: { temp_c: 9999 } }), {
+      now: NOW,
+    });
     expect(res.ok).toBe(false);
   });
 
@@ -332,10 +327,9 @@ describe("ingest matrix — metric validation", () => {
   });
 
   it("rejects out-of-range ppfd", () => {
-    const res = normalizeWebhookIngestPayload(
-      basePayload({ metrics: { ppfd: 99999 } }),
-      { now: NOW },
-    );
+    const res = normalizeWebhookIngestPayload(basePayload({ metrics: { ppfd: 99999 } }), {
+      now: NOW,
+    });
     expect(res.ok).toBe(false);
   });
 });
@@ -345,19 +339,13 @@ describe("ingest matrix — metric validation", () => {
 // ---------------------------------------------------------------------------
 describe("ingest matrix — tent ownership pre-checks", () => {
   it("rejects missing tent_id", () => {
-    const res = normalizeWebhookIngestPayload(
-      basePayload({ tent_id: undefined }),
-      { now: NOW },
-    );
+    const res = normalizeWebhookIngestPayload(basePayload({ tent_id: undefined }), { now: NOW });
     expect(res.ok).toBe(false);
     expect(res.errors.some((e) => /tent_id required/i.test(e))).toBe(true);
   });
 
   it("rejects non-UUID tent_id", () => {
-    const res = normalizeWebhookIngestPayload(
-      basePayload({ tent_id: "not-a-uuid" }),
-      { now: NOW },
-    );
+    const res = normalizeWebhookIngestPayload(basePayload({ tent_id: "not-a-uuid" }), { now: NOW });
     expect(res.ok).toBe(false);
   });
 });
@@ -490,5 +478,6 @@ describe("ingest matrix — static safety guards on edge function source", () =>
     expect(SRC).toMatch(/json\(\s*req\s*,\s*\{\s*error:\s*["']invalid_json["']/);
     expect(SRC).toMatch(/json\(\s*req\s*,\s*\{\s*error:\s*["']invalid_payload["']/);
     expect(SRC).toMatch(/json\(\s*req\s*,\s*\{\s*error:\s*["']forbidden_tent["']/);
+    expect(SRC).toMatch(/json\(\s*req\s*,\s*\{\s*error:\s*["']bridge_required["']/);
   });
 });

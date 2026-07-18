@@ -101,12 +101,13 @@ describe("MCP manifest tool contract (parameter allow-list)", () => {
     const t = toolByName("get_latest_sensor_snapshot");
     expect(t).toBeTruthy();
     const description = t!.description;
-    // Canonical SENSOR TRUTH rule (Lovable knowledge pack): current live
-    // telemetry requires BOTH quality `ok` AND source `live` — manual
-    // stays manual, csv stays csv, demo stays demo; nothing else is live.
-    expect(description).toMatch(/ONLY when its quality is `ok` AND its source is `live`/);
-    // Quality gate: only `ok` readings may count as current.
-    expect(description).toContain("`ok`");
+    // Canonical SENSOR TRUTH rule: current live telemetry is explicit and
+    // requires all three gates — quality `ok`, source `live`, and fresh at
+    // response time. Manual stays manual, csv stays csv, demo stays demo.
+    expect(description).toMatch(/ONLY when `current_live` is true/);
+    expect(description).toMatch(/quality must be `ok`/);
+    expect(description).toMatch(/source must be `live`/);
+    expect(description).toMatch(/freshness must be `fresh`/);
     // Every never-live source label is called out by name…
     for (const source of NEVER_LIVE_SOURCES) {
       expect(description, `description must call out non-live source ${source}`).toMatch(

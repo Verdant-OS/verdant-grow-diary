@@ -123,20 +123,23 @@ describe("ecowitt windows testbench — source labeling rules", () => {
     expect(markerBlock).not.toMatch(/"passkey"/);
   });
 
-  it("resolve_source accepts payload + remote_addr (not just headers)", () => {
+  it("validates gateway time once per request before resolving source", () => {
     expect(py).toMatch(
       /def\s+resolve_source\s*\([\s\S]*?payload[\s\S]*?remote_addr[\s\S]*?\)\s*->\s*str/,
     );
-    expect(py).toMatch(/resolve_source\(payload=raw,\s*remote_addr=request\.remote_addr\)/);
+    expect(py).toMatch(/gateway_captured_at\s*=\s*validate_ecowitt_dateutc/);
+    expect(py).toMatch(
+      /_resolve_source_from_validated\([\s\S]*?payload=raw[\s\S]*?remote_addr=request\.remote_addr[\s\S]*?canonical_gateway_time=gateway_captured_at/,
+    );
   });
 
-  it("non-loopback gateway uploads are normalized to live", () => {
+  it("non-loopback gateway uploads are fresh-live or stale from captured_at age", () => {
     const physicalEvidenceBlock =
-      py.split("def has_physical_gateway_evidence")[1]?.split("\ndef ")[0] ?? "";
+      py.split("def _has_physical_gateway_evidence_from_validated")[1]?.split("\ndef ")[0] ?? "";
     expect(physicalEvidenceBlock).toMatch(/not\s+_is_loopback_source_addr/);
     expect(physicalEvidenceBlock).toMatch(/looks_like_ecowitt_gateway/);
-    expect(py).toMatch(/if\s+physical_gateway_evidence:\s*\r?\n\s*return\s+"live"/);
-    expect(py).toMatch(/return\s+"live"/);
+    expect(py).toMatch(/is_ecowitt_dateutc_stale/);
+    expect(py).toMatch(/return\s+"stale"\s+if\s+stale_gateway_evidence\s+else\s+"live"/);
   });
 
   it("physical proof is listener-computed separately from header/env live opt-in", () => {
@@ -1385,6 +1388,7 @@ describe("ecowitt windows testbench — retry/backoff + error report", () => {
     for (const cls of [
       "invalid_payload",
       "unauthorized",
+      "bridge_required",
       "forbidden_tent",
       "tent_lookup_failed",
       "insert_failed",

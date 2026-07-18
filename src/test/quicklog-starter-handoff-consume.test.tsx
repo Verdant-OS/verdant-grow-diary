@@ -71,6 +71,11 @@ vi.mock("@/hooks/use-plants", () => ({
     data: [{ id: "plant-1", name: "Test Plant", tent_id: "tent-1", grow_id: "grow-1" }],
   }),
 }));
+vi.mock("@/hooks/use-tents", () => ({
+  useTents: () => ({
+    data: [{ id: "tent-1", name: "Test Tent", grow_id: "grow-1" }],
+  }),
+}));
 
 vi.mock("sonner", () => ({
   toast: { error: vi.fn(), success: vi.fn(), message: vi.fn() },
@@ -181,9 +186,7 @@ describe("Quick Log starter-handoff consume-once", () => {
     fireEvent.click(btn);
     await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
     // Post-save state disables further submissions entirely.
-    await waitFor(() =>
-      expect(screen.getByTestId("quick-log-post-save")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByTestId("quick-log-post-save")).toBeInTheDocument());
     expect(saveMock).toHaveBeenCalledTimes(1);
   });
 
@@ -194,9 +197,7 @@ describe("Quick Log starter-handoff consume-once", () => {
     renderWithClient(<QuickLog open onOpenChange={vi.fn()} prefill={handoffPrefill()} />);
     fireEvent.click(saveButton());
     await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
-    await waitFor(() =>
-      expect(screen.getByTestId("quick-log-save-error")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByTestId("quick-log-save-error")).toBeInTheDocument());
     expect(storedDraftRaw()).toBe(before);
     expect(screen.queryByTestId("quick-log-post-save")).toBeNull();
   });
@@ -227,9 +228,7 @@ describe("Quick Log starter-handoff consume-once", () => {
     );
     fireEvent.click(saveButton());
     await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
-    await waitFor(() =>
-      expect(screen.getByTestId("quick-log-post-save")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByTestId("quick-log-post-save")).toBeInTheDocument());
     expect(storedDraftRaw()).toBe(before);
   });
 
@@ -240,9 +239,7 @@ describe("Quick Log starter-handoff consume-once", () => {
     seedDraft();
     renderWithClient(<QuickLog open onOpenChange={vi.fn()} prefill={handoffPrefill()} />);
     fireEvent.click(saveButton());
-    await waitFor(() =>
-      expect(screen.getByTestId("quick-log-save-error")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByTestId("quick-log-save-error")).toBeInTheDocument());
     fireEvent.click(saveButton());
     await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(2));
     const key1 = (saveMock.mock.calls[0][0] as Record<string, unknown>).p_idempotency_key;
@@ -251,9 +248,7 @@ describe("Quick Log starter-handoff consume-once", () => {
     expect(key2, "retry must reuse the same idempotency key").toBe(key1);
 
     // Success happened on the retry; "Log another" starts a new submission.
-    await waitFor(() =>
-      expect(screen.getByTestId("quick-log-post-save")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByTestId("quick-log-post-save")).toBeInTheDocument());
     fireEvent.click(screen.getByTestId("quick-log-post-save-another"));
     fireEvent.change(screen.getByTestId("quicklog-note"), {
       target: { value: "another note" },
@@ -273,9 +268,7 @@ describe("Quick Log starter-handoff consume-once", () => {
     seedDraft();
     renderWithClient(<QuickLog open onOpenChange={vi.fn()} prefill={handoffPrefill()} />);
     fireEvent.click(saveButton());
-    await waitFor(() =>
-      expect(screen.getByTestId("quick-log-save-error")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByTestId("quick-log-save-error")).toBeInTheDocument());
     const key1 = (saveMock.mock.calls[0][0] as Record<string, unknown>).p_idempotency_key;
 
     fireEvent.change(screen.getByTestId("quicklog-note"), {
@@ -296,9 +289,7 @@ describe("Quick Log starter-handoff consume-once", () => {
     seedDraft();
     renderWithClient(<QuickLog open onOpenChange={vi.fn()} prefill={handoffPrefill()} />);
     fireEvent.click(saveButton());
-    await waitFor(() =>
-      expect(screen.getByTestId("quick-log-save-error")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByTestId("quick-log-save-error")).toBeInTheDocument());
     const key1 = (saveMock.mock.calls[0][0] as Record<string, unknown>).p_idempotency_key;
 
     // Close (Escape) — the dialog wrapper runs reset(), abandoning the
@@ -342,9 +333,7 @@ describe("Quick Log starter-handoff consume-once", () => {
       />,
     );
     fireEvent.click(saveButton());
-    await waitFor(() =>
-      expect(screen.getByTestId("quick-log-plant-error")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByTestId("quick-log-plant-error")).toBeInTheDocument());
     expect(saveMock).not.toHaveBeenCalled();
     expect(storedDraftRaw()).toBe(before);
   });
@@ -361,9 +350,7 @@ describe("Quick Log starter-handoff consume-once", () => {
     );
     fireEvent.click(saveButton());
     await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
-    await waitFor(() =>
-      expect(screen.getByTestId("quick-log-post-save")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByTestId("quick-log-post-save")).toBeInTheDocument());
     expect(storedDraftRaw()).toBe(before);
   });
 
@@ -379,9 +366,7 @@ describe("Quick Log starter-handoff consume-once", () => {
     );
     fireEvent.click(saveButton());
     await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
-    await waitFor(() =>
-      expect(screen.getByTestId("quick-log-post-save")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByTestId("quick-log-post-save")).toBeInTheDocument());
     expect(storedDraftRaw()).toBe(before);
   });
 
@@ -415,9 +400,7 @@ describe("Quick Log starter-handoff consume-once", () => {
       />,
     );
     fireEvent.click(saveButton());
-    await waitFor(() =>
-      expect(screen.getByTestId("quick-log-plant-error")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByTestId("quick-log-plant-error")).toBeInTheDocument());
     expect(saveMock).not.toHaveBeenCalled();
     expect(storedDraftRaw()).toBe(before);
   });

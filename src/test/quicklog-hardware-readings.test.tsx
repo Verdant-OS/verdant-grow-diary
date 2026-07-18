@@ -28,14 +28,8 @@ import {
 } from "@/lib/quickLogHardwareReadingsRules";
 
 const ROOT = resolve(__dirname, "../..");
-const QUICKLOG_SRC = readFileSync(
-  resolve(ROOT, "src/components/QuickLog.tsx"),
-  "utf8",
-);
-const RULES_SRC = readFileSync(
-  resolve(ROOT, "src/lib/quickLogHardwareReadingsRules.ts"),
-  "utf8",
-);
+const QUICKLOG_SRC = readFileSync(resolve(ROOT, "src/components/QuickLog.tsx"), "utf8");
+const RULES_SRC = readFileSync(resolve(ROOT, "src/lib/quickLogHardwareReadingsRules.ts"), "utf8");
 
 function renderWithClient(ui: ReactElement) {
   const client = new QueryClient({
@@ -84,6 +78,11 @@ vi.mock("@/hooks/use-plants", () => ({
     data: [{ id: "plant-1", name: "Test Plant", tent_id: "tent-1", grow_id: "grow-1" }],
   }),
 }));
+vi.mock("@/hooks/use-tents", () => ({
+  useTents: () => ({
+    data: [{ id: "tent-1", name: "Test Tent", grow_id: "grow-1" }],
+  }),
+}));
 
 const toastError = vi.fn();
 const toastSuccess = vi.fn();
@@ -109,9 +108,7 @@ describe("formatHardwareReadingsBlock (pure)", () => {
     expect(formatHardwareReadingsBlock({})).toBe("");
     expect(formatHardwareReadingsBlock(null)).toBe("");
     expect(formatHardwareReadingsBlock(undefined)).toBe("");
-    expect(
-      formatHardwareReadingsBlock({ inputPh: "", inputEc: "  " }),
-    ).toBe("");
+    expect(formatHardwareReadingsBlock({ inputPh: "", inputEc: "  " })).toBe("");
   });
 
   it("formats deterministically with fixed field order", () => {

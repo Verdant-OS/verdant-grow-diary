@@ -45,6 +45,11 @@ let plantsMock: Array<Record<string, unknown>> = [];
 vi.mock("@/hooks/use-plants", () => ({
   usePlants: () => ({ data: plantsMock }),
 }));
+vi.mock("@/hooks/use-tents", () => ({
+  // Deliberately returns a new array each render. Quick Log prefill effects
+  // must depend on resolved scalar ids, not query-array identity.
+  useTents: () => ({ data: [{ id: "t1", name: "Tent 1", grow_id: "g1" }] }),
+}));
 vi.mock("sonner", () => ({
   toast: { error: vi.fn(), success: vi.fn(), message: vi.fn() },
 }));
@@ -89,9 +94,7 @@ describe("QuickLog page-context prefill safety", () => {
       />,
     );
     expect(screen.getByTestId("quick-log-plant-error")).toBeInTheDocument();
-    expect(
-      (screen.getByTestId("quick-log-save") as HTMLButtonElement).disabled,
-    ).toBe(true);
+    expect((screen.getByTestId("quick-log-save") as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("ignores an archived plant prefill id", () => {

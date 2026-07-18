@@ -1,9 +1,7 @@
 /**
- * Verifies the EcoWitt latest snapshot filter recognizes rows stored as
- * canonical source="live" with vendor lineage that begins with "ecowitt"
- * (e.g. "ecowitt_windows_testbench" produced by the deployed
- * sensor-ingest-webhook). Prior to this, only exact vendor==="ecowitt"
- * matched, hiding live-forwarded EcoWitt readings from the snapshot card.
+ * Verifies the EcoWitt latest snapshot filter recognizes EcoWitt lineage while
+ * keeping Windows testbench packets visible as demo evidence rather than
+ * promoting their stored source="live" label to physical sensor truth.
  *
  * Pure-helper test. No Supabase, no network, no writes.
  */
@@ -17,9 +15,7 @@ import {
 const TENT = "tent-A";
 const OTHER_TENT = "tent-B";
 
-function makeRow(
-  partial: Partial<EcowittSensorReadingRow>,
-): EcowittSensorReadingRow {
+function makeRow(partial: Partial<EcowittSensorReadingRow>): EcowittSensorReadingRow {
   return {
     id: "row-1",
     tent_id: TENT,
@@ -33,7 +29,7 @@ function makeRow(
 }
 
 describe("EcoWitt latest snapshot — live-source visibility", () => {
-  it("accepts source=live with raw_payload.vendor='ecowitt_windows_testbench'", () => {
+  it("keeps raw_payload.vendor='ecowitt_windows_testbench' visible as demo", () => {
     const rows: EcowittSensorReadingRow[] = [
       makeRow({
         raw_payload: {
@@ -49,7 +45,7 @@ describe("EcoWitt latest snapshot — live-source visibility", () => {
     ];
     const candidates = selectEcowittCandidates(rows, { tentId: TENT });
     expect(candidates).toHaveLength(1);
-    expect(candidates[0].source).toBe("live");
+    expect(candidates[0].source).toBe("demo");
   });
 
   it("accepts source=live when raw_payload.transport_source='ecowitt'", () => {
@@ -99,9 +95,13 @@ describe("EcoWitt latest snapshot — live-source visibility", () => {
         },
       }),
     ];
-    const vm = buildEcowittLatestSnapshot(rows, { tentId: TENT }, {
-      now: new Date("2026-06-17T12:00:00.000Z"),
-    });
+    const vm = buildEcowittLatestSnapshot(
+      rows,
+      { tentId: TENT },
+      {
+        now: new Date("2026-06-17T12:00:00.000Z"),
+      },
+    );
     // The pure filter must surface the row as a candidate; downstream
     // view-model presentation (hasReading vs invalid) is covered by
     // ecowitt-latest-snapshot-filtering / view-model tests.

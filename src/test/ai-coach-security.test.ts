@@ -25,9 +25,34 @@ describe("ai-coach edge function — security shape", () => {
     expect(CODE).toMatch(/Deno\.env\.get\(\s*["']SUPABASE_ANON_KEY["']\s*\)/);
   });
 
-  it("never references SUPABASE_SERVICE_ROLE_KEY (no RLS bypass)", () => {
-    expect(CODE).not.toMatch(/SERVICE_ROLE/i);
-    expect(CODE).not.toMatch(/service_role/);
+  it("uses service role only for protected credit spend/refund after JWT verification", () => {
+    expect(CODE).toMatch(/Deno\.env\.get\(\s*["']SUPABASE_SERVICE_ROLE_KEY["']\s*\)/);
+    expect(CODE).toMatch(/creditSupabase\.rpc\(\s*["']ai_credit_spend["']/);
+    expect(CODE).toMatch(/creditSupabase\.rpc\(\s*["']ai_credit_refund["']/);
+    expect(CODE).not.toMatch(/creditSupabase\s*\.from\(/);
+    const authIndex = CODE.indexOf("await supabase.auth.getUser()");
+    const creditIndex = CODE.indexOf('creditSupabase.rpc("ai_credit_spend"');
+    expect(authIndex).toBeGreaterThan(-1);
+    expect(creditIndex).toBeGreaterThan(authIndex);
+  });
+
+  it("requires explicit billing environment and falls back only for a missing overload", () => {
+    expect(CODE).toContain("resolveRequiredServerBillingEnvironment()");
+    expect(CODE).toContain("isMissingAiCreditRpcOverload(");
+    expect(CODE).toContain('"p_user_id"');
+    expect(CODE).toContain('"p_expected_user_id"');
+  });
+
+  it("rejects scope mismatches and resultless replays before the provider call", () => {
+    const scopeIndex = CODE.indexOf("spendObj.feature !== FEATURE");
+    const replayIndex = CODE.indexOf('spendObj.status === "replayed"');
+    const providerIndex = CODE.indexOf('fetch("https://ai.gateway.lovable.dev');
+    expect(scopeIndex).toBeGreaterThan(-1);
+    expect(replayIndex).toBeGreaterThan(scopeIndex);
+    expect(providerIndex).toBeGreaterThan(replayIndex);
+    expect(CODE.slice(replayIndex, providerIndex)).toContain(
+      'return json({ ok: false, reason: "invalid" }, 200)',
+    );
   });
 
   it("forwards the caller Authorization header into the Supabase client", () => {
@@ -59,12 +84,14 @@ describe("ai-coach edge function — security shape", () => {
     expect(bodyIface).not.toMatch(/plant_id|plantId/);
     expect(bodyIface).not.toMatch(/tent_id|tentId/);
     expect(bodyIface).not.toMatch(/user_id|userId/);
+    expect(bodyIface).not.toMatch(/billing_?environment|billingEnv|plan|modelTier|weight/);
   });
 
   it("never reads plant_id or tent_id off the request body", () => {
     expect(CODE).not.toMatch(/body\.plant_?[Ii]d/);
     expect(CODE).not.toMatch(/body\.tent_?[Ii]d/);
     expect(CODE).not.toMatch(/body\.user_?[Ii]d/);
+    expect(CODE).not.toMatch(/body\.billing_?[Ee]nvironment|body\.billingEnv/);
   });
 
   it("derives plant/tent IDs only from RLS-filtered diary_entries rows", () => {

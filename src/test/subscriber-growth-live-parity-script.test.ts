@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  auditFounderCounterLive,
   auditSubscriberGrowthLiveParity,
   extractJavaScriptAssetPaths,
   extractModuleScriptPath,
   formatSubscriberGrowthLiveParity,
+  SUBSCRIBER_GROWTH_FOUNDER_COUNTER_URL,
 } from "../../scripts/audit-subscriber-growth-live-parity.mjs";
 
 const ORIGIN = "https://example.test";
@@ -47,6 +49,42 @@ function buildFetch(overrides: Partial<Record<string, ReturnType<typeof response
   });
 }
 
+const VALID_FOUNDER_OPTIONS_HEADERS = {
+  "access-control-allow-origin": ORIGIN,
+  "access-control-allow-headers": "authorization, x-client-info, apikey, content-type",
+};
+const VALID_FOUNDER_POST_HEADERS = {
+  "access-control-allow-origin": ORIGIN,
+  "content-type": "application/json; charset=utf-8",
+};
+
+function founderOptions(
+  headers: Record<string, string> = VALID_FOUNDER_OPTIONS_HEADERS,
+  status = 200,
+) {
+  return response("ok", status, headers);
+}
+
+function founderPost(
+  body: string | Record<string, unknown> = { remaining: 42, total: 75 },
+  status = 200,
+  headers: Record<string, string> = VALID_FOUNDER_POST_HEADERS,
+) {
+  return response(typeof body === "string" ? body : JSON.stringify(body), status, headers);
+}
+
+function buildFounderFetch({
+  options = founderOptions(),
+  post = founderPost(),
+}: {
+  options?: ReturnType<typeof response>;
+  post?: ReturnType<typeof response>;
+} = {}) {
+  return vi.fn(async (_input: string | URL, init?: RequestInit) =>
+    init?.method === "OPTIONS" ? options : post,
+  );
+}
+
 describe("subscriber growth live parity script", () => {
   it("extracts a module path and deduplicated JavaScript assets", () => {
     expect(
@@ -74,6 +112,164 @@ describe("subscriber growth live parity script", () => {
     expect(formatSubscriberGrowthLiveParity(result)).toContain(
       "Subscriber growth live parity: PASS",
     );
+  });
+
+  it("proves the public Founder counter with browser-shaped CORS and an exact bounded payload", async () => {
+    const fetchImpl = buildFounderFetch({ post: founderPost({ remaining: 0, total: 75 }) });
+    const result = await auditFounderCounterLive({
+      fetchImpl,
+      browserOrigin: ORIGIN,
+      endpoint: SUBSCRIBER_GROWTH_FOUNDER_COUNTER_URL,
+    });
+
+    expect(result).toEqual({
+      kind: "public_founder_counter_live_check",
+      attempted: true,
+      ok: true,
+      optionsStatus: 200,
+      postStatus: 200,
+      corsVerified: true,
+      payloadVerified: true,
+      remaining: 0,
+      total: 75,
+      error: null,
+      errors: [],
+    });
+    expect(fetchImpl).toHaveBeenNthCalledWith(
+      1,
+      SUBSCRIBER_GROWTH_FOUNDER_COUNTER_URL,
+      expect.objectContaining({
+        method: "OPTIONS",
+        headers: expect.objectContaining({
+          Origin: ORIGIN,
+          "Access-Control-Request-Method": "POST",
+          "Access-Control-Request-Headers": "authorization, x-client-info, apikey, content-type",
+        }),
+      }),
+    );
+    expect(fetchImpl).toHaveBeenNthCalledWith(
+      2,
+      SUBSCRIBER_GROWTH_FOUNDER_COUNTER_URL,
+      expect.objectContaining({ method: "POST", body: "{}" }),
+    );
+  });
+
+  it.each([
+    {
+      name: "404 deployment gap",
+      options: founderOptions({}, 404),
+      post: founderPost("not found", 404, {}),
+      reason: "options_status_404",
+    },
+    {
+      name: "503 runtime failure",
+      options: founderOptions(),
+      post: founderPost({ error: "slots_unavailable" }, 503),
+      reason: "post_status_503",
+    },
+    {
+      name: "missing CORS",
+      options: founderOptions({}, 200),
+      post: founderPost({ remaining: 42, total: 75 }, 200, {
+        "content-type": "application/json",
+      }),
+      reason: "options_origin_not_allowed",
+    },
+    {
+      name: "HTML response",
+      options: founderOptions(),
+      post: founderPost("<html>not json</html>", 200, {
+        "access-control-allow-origin": ORIGIN,
+        "content-type": "text/html",
+      }),
+      reason: "post_content_type_not_json",
+    },
+    {
+      name: "misleading JSON-like content type",
+      options: founderOptions(),
+      post: founderPost('{"remaining":42,"total":75}', 200, {
+        "access-control-allow-origin": ORIGIN,
+        "content-type": "application/jsonp",
+      }),
+      reason: "post_content_type_not_json",
+    },
+    {
+      name: "missing field",
+      options: founderOptions(),
+      post: founderPost({ remaining: 42 }),
+      reason: "post_payload_shape_invalid",
+    },
+    {
+      name: "extra sensitive-shaped field",
+      options: founderOptions(),
+      post: founderPost({ remaining: 42, total: 75, user_id: "must-not-leak" }),
+      reason: "post_payload_shape_invalid",
+    },
+    {
+      name: "fractional remaining",
+      options: founderOptions(),
+      post: founderPost({ remaining: 1.5, total: 75 }),
+      reason: "post_payload_values_invalid",
+    },
+    {
+      name: "null remaining",
+      options: founderOptions(),
+      post: founderPost({ remaining: null, total: 75 }),
+      reason: "post_payload_values_invalid",
+    },
+    {
+      name: "negative remaining",
+      options: founderOptions(),
+      post: founderPost({ remaining: -1, total: 75 }),
+      reason: "post_payload_values_invalid",
+    },
+    {
+      name: "over-cap remaining",
+      options: founderOptions(),
+      post: founderPost({ remaining: 76, total: 75 }),
+      reason: "post_payload_values_invalid",
+    },
+    {
+      name: "wrong total",
+      options: founderOptions(),
+      post: founderPost({ remaining: 42, total: 100 }),
+      reason: "post_payload_values_invalid",
+    },
+  ])("fails closed for a $name", async ({ options, post, reason }) => {
+    const result = await auditFounderCounterLive({
+      fetchImpl: buildFounderFetch({ options, post }),
+      browserOrigin: ORIGIN,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.remaining).toBeNull();
+    expect(result.total).toBeNull();
+    expect(result.errors).toContain(reason);
+    expect(JSON.stringify(result)).not.toContain("must-not-leak");
+  });
+
+  it("makes the aggregate live audit fail when the Founder endpoint is absent", async () => {
+    const publicFetch = buildFetch();
+    const fetchImpl = vi.fn(async (input: string | URL, init?: RequestInit) => {
+      if (String(input) === SUBSCRIBER_GROWTH_FOUNDER_COUNTER_URL) {
+        return init?.method === "OPTIONS"
+          ? founderOptions({}, 404)
+          : founderPost("not found", 404, {});
+      }
+      return publicFetch(input);
+    });
+
+    const result = await auditSubscriberGrowthLiveParity({
+      origin: ORIGIN,
+      fetchImpl,
+      verifyFounderCounter: true,
+    });
+
+    expect(result.routesPassed).toBe(4);
+    expect(result.capabilitiesPassed).toBe(5);
+    expect(result.founderCounter).toMatchObject({ ok: false, optionsStatus: 404, postStatus: 404 });
+    expect(result.ok).toBe(false);
+    expect(formatSubscriberGrowthLiveParity(result)).toContain("FAIL founder counter");
   });
 
   it("accepts a marker-bearing entry asset when Vite emits multiple index chunks", async () => {

@@ -303,6 +303,8 @@ function ToolCard({
   const invalid = fieldErrors.length > 0;
 
   const [showDiff, setShowDiff] = useState(false);
+  const [confirmBeforeRetry, setConfirmBeforeRetry] = useState(true);
+  const [retryPending, setRetryPending] = useState(false);
 
   const run = useCallback(async () => {
     if (invalid) return;

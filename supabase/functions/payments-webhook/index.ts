@@ -194,6 +194,33 @@ function buildDeps(): Deps {
       if (failures.length > 0) return { ok: false, error: failures.join('; ') };
       return { ok: true, canceled };
     },
+    async revokeFounderLifetime({ paddle_transaction_id, environment, now }) {
+      // Turn B refund-retire: single atomic RPC call that flips both the
+      // subscription (revokes Pro) and the founders row (retires the seat).
+      const { data, error } = await sb.rpc(
+        'revoke_lovable_founder_lifetime_by_transaction',
+        {
+          p_paddle_transaction_id: paddle_transaction_id,
+          p_environment: environment,
+          p_now: now.toISOString(),
+        },
+      );
+      if (error) return { ok: false, error: error.message };
+      const payload = (data ?? {}) as {
+        ok?: boolean;
+        reason?: string;
+        subscriptions_updated?: number;
+        founders_updated?: number;
+      };
+      if (payload.ok !== true) {
+        return { ok: false, error: `rpc_rejected:${payload.reason ?? 'unknown'}` };
+      }
+      return {
+        ok: true,
+        subscriptionsUpdated: payload.subscriptions_updated,
+        foundersUpdated: payload.founders_updated,
+      };
+    },
   };
 }
 

@@ -65,7 +65,6 @@ import {
 } from "@/lib/quickLogHardwareReadingsRules";
 import {
   filterQuickLogPlantOptions,
-  pickDefaultQuickLogPlant,
   quickLogPlantHelperText,
 } from "@/lib/quickLogPlantOptionRules";
 import QuickLogSensorSnapshotStrip from "@/components/QuickLogSensorSnapshotStrip";
@@ -84,6 +83,8 @@ import {
 } from "@/lib/legacyQuickLogUnifiedSave";
 import {
   QUICK_LOG_TARGET_BLOCKED_COPY,
+  quickLogPrefillTargetKey,
+  resolveQuickLogEditorTarget,
   resolveQuickLogPrefillTarget,
   resolveQuickLogWriteTarget,
 } from "@/lib/quickLogTargetIntegrityRules";
@@ -225,24 +226,6 @@ type LastQuickLogTarget = {
   savedAt: string;
 };
 
-function readLastTarget(): LastQuickLogTarget | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(LAST_TARGET_STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<LastQuickLogTarget>;
-    if (typeof parsed.plantId !== "string" || !parsed.plantId) return null;
-    return {
-      plantId: parsed.plantId,
-      growId: typeof parsed.growId === "string" ? parsed.growId : null,
-      tentId: typeof parsed.tentId === "string" ? parsed.tentId : null,
-      savedAt: typeof parsed.savedAt === "string" ? parsed.savedAt : new Date().toISOString(),
-    };
-  } catch {
-    return null;
-  }
-}
-
 function rememberLastTarget(target: LastQuickLogTarget) {
   if (typeof window === "undefined") return;
   try {
@@ -288,11 +271,12 @@ export default function QuickLog({
   // we never clobber their explicit choice. Mirrors snapshotUserTouchedRef.
   const stageUserTouchedRef = useRef(false);
   // Tracks the previously selected plant so we can distinguish a real
-  // user-driven plant switch (re-default) from the initial ""→P auto-select
+  // user-driven plant switch (re-default) from the initial ""→P route prefill
   // (keep any stage the grower already picked).
   const prevPlantIdRef = useRef<string>("");
   const [eventType, setEventType] = useState<string>("observation");
   const [plantId, setPlantId] = useState<string>("");
+  const [dismissedBlockedPrefillKey, setDismissedBlockedPrefillKey] = useState<string | null>(null);
   const [snapshot, setSnapshot] = useState(false);
   const [remindAt, setRemindAt] = useState<string>("");
   const [showMore, setShowMore] = useState(false);
@@ -367,30 +351,42 @@ export default function QuickLog({
   );
   const prefillPlantId = prefillTarget.status === "ready" ? prefillTarget.target.plantId : null;
   const prefillGrowId = prefillTarget.status === "ready" ? prefillTarget.target.growId : null;
+  const prefillRequestKey = quickLogPrefillTargetKey(prefill);
+  const prefillHoldActive =
+    prefillRequestKey !== null && dismissedBlockedPrefillKey !== prefillRequestKey;
+  const editorPlantId = prefillHoldActive && prefillPlantId ? prefillPlantId : plantId;
 
   useEffect(() => {
-    if (!open || !prefill) return;
-    if (prefill.plantId && prefillPlantId && prefillGrowId) {
+    if (!open) return;
+    if (prefillHoldActive && prefillPlantId && prefillGrowId) {
       if (prefillGrowId !== activeGrowId) {
         setActiveGrowId(prefillGrowId);
       }
       setPlantId(prefillPlantId);
-    } else if (!prefill.plantId && prefill.growId && prefill.growId !== activeGrowId) {
+    } else if (prefillHoldActive) {
+      // A named target that cannot be proven must hold the editor empty. It
+      // may be released only by an explicit grower selection below.
+      setPlantId("");
+    } else if (!prefillRequestKey) {
+      // Global and grow-only launchers always begin as manual selection.
+      setPlantId("");
+    }
+    if (!prefill?.plantId && prefill?.growId && prefill.growId !== activeGrowId) {
       // Grow/tent launchers without a plant remain explicit manual-selection
       // flows. Preserve their known grow scope, but never invent a plant.
       setActiveGrowId(prefill.growId);
     }
-    if (prefill.eventType) setEventType(prefill.eventType);
-    if (prefill.suggestSnapshot && prefill.tentId) setSnapshot(true);
+    if (prefill?.eventType) setEventType(prefill.eventType);
+    if (prefill?.suggestSnapshot && prefill.tentId) setSnapshot(true);
     // Seed a starter note only when the grower has not yet typed anything,
     // so we never overwrite in-progress text on re-open.
-    if (typeof prefill.note === "string" && prefill.note.length > 0) {
+    if (typeof prefill?.note === "string" && prefill.note.length > 0) {
       setNote((prev) => (prev.trim().length === 0 ? (prefill.note ?? "") : prev));
     }
     // Same only-if-empty rule for a starter watering amount: never clobber
     // a volume the grower already typed.
     if (
-      typeof prefill.wateringVolumeMl === "number" &&
+      typeof prefill?.wateringVolumeMl === "number" &&
       Number.isFinite(prefill.wateringVolumeMl) &&
       prefill.wateringVolumeMl > 0
     ) {
@@ -411,6 +407,8 @@ export default function QuickLog({
     prefill?.wateringVolumeMl,
     prefillPlantId,
     prefillGrowId,
+    prefillRequestKey,
+    dismissedBlockedPrefillKey,
   ]);
 
   const scopedPlants = useMemo(
@@ -419,8 +417,8 @@ export default function QuickLog({
   );
 
   const selectedPlant = useMemo(
-    () => scopedPlants.find((p) => p.id === plantId) ?? null,
-    [plantId, scopedPlants],
+    () => scopedPlants.find((p) => p.id === editorPlantId) ?? null,
+    [editorPlantId, scopedPlants],
   );
 
   const selectedPhenoHuntId = useMemo(() => {
@@ -446,7 +444,17 @@ export default function QuickLog({
       }),
     [activeGrowId, selectedPlant, selectedTent],
   );
-  const resolvedTarget = writeTarget.status === "ready" ? writeTarget.target : null;
+  const editorTarget = useMemo(
+    () =>
+      resolveQuickLogEditorTarget({
+        prefill,
+        prefillResolution: prefillTarget,
+        writeResolution: writeTarget,
+        dismissedBlockedPrefillKey,
+      }),
+    [prefill, prefillTarget, writeTarget, dismissedBlockedPrefillKey],
+  );
+  const resolvedTarget = editorTarget.status === "ready" ? editorTarget.target : null;
   const resolvedTargetGrow = useMemo(
     () =>
       resolvedTarget ? (grows.find((grow) => grow.id === resolvedTarget.growId) ?? null) : null,
@@ -456,7 +464,7 @@ export default function QuickLog({
   // Slice A2: re-enable stage defaulting ONLY when the grower actively switches
   // from one already-selected plant to a different one — the new target's stage
   // should win. It must NOT clear the touched flag on the initial ""→P
-  // auto-select (async plants load / prefill / last-target), because the grower
+  // resolution (async plants load / prefill), because the grower
   // may have already picked a stage before the plant resolved; clobbering that
   // would silently discard their choice. prevPlantIdRef tracks the last
   // NON-EMPTY plant id so a switch that passes through the cleared "Choose a
@@ -464,11 +472,11 @@ export default function QuickLog({
   // defaulting effect so the flag is settled before the default is recomputed.
   useEffect(() => {
     if (!open) return;
-    if (isUserDrivenPlantSwitch(prevPlantIdRef.current, plantId)) {
+    if (isUserDrivenPlantSwitch(prevPlantIdRef.current, editorPlantId)) {
       stageUserTouchedRef.current = false;
     }
-    if (plantId) prevPlantIdRef.current = plantId;
-  }, [open, plantId]);
+    if (editorPlantId) prevPlantIdRef.current = editorPlantId;
+  }, [open, editorPlantId]);
 
   // Slice A2: default the stage from the selected plant, else the active grow.
   // Skipped once the grower has manually chosen a stage (touched ref). The
@@ -484,49 +492,6 @@ export default function QuickLog({
     });
     setStage((prev) => (prev === resolved ? prev : resolved));
   }, [open, selectedPlant, activeGrow?.stage]);
-
-  useEffect(() => {
-    if (!open) return;
-    if (plantId) return;
-    // Ambiguous public-starter handoffs told the grower THEY pick the
-    // plant; last-target / only-plant defaults must not pick one for them.
-    if (prefill?.suppressPlantDefault && !prefill?.plantId) return;
-    // A prefilled plant whose grow switch is STILL PROPAGATING (the
-    // prefill names another grow and setActiveGrowId hasn't re-scoped the
-    // plant list yet) must not be displaced by the OLD grow's
-    // last-target/only-plant fallbacks. Hold until the scope catches up.
-    // Once the grows agree, an unresolvable plantId (archived/foreign)
-    // falls through to the normal default + mismatch banner as before.
-    if (
-      prefill?.plantId &&
-      prefill?.growId &&
-      prefill.growId !== activeGrowId &&
-      !scopedPlants.some((p) => p.id === prefill.plantId)
-    ) {
-      return;
-    }
-
-    const lastTarget = readLastTarget();
-    const lastPlantId = lastTarget?.plantId ?? null;
-    const lastPlantStillValid = lastPlantId
-      ? scopedPlants.some((p) => p.id === lastPlantId)
-      : false;
-
-    const next = pickDefaultQuickLogPlant(
-      scopedPlants,
-      prefill?.plantId ?? (lastPlantStillValid ? lastPlantId : null),
-      plantId || null,
-    );
-    if (next && next !== plantId) setPlantId(next);
-  }, [
-    open,
-    plantId,
-    scopedPlants,
-    activeGrowId,
-    prefill?.plantId,
-    prefill?.growId,
-    prefill?.suppressPlantDefault,
-  ]);
 
   const sensorTentId = resolvedTarget?.tentId ?? null;
   const sensorState = useLatestTentSensorSnapshot(sensorTentId);
@@ -567,7 +532,7 @@ export default function QuickLog({
   // current candidate. Never carry a choice between plants or dialog opens.
   useEffect(() => {
     setSelectedPhenoEvidenceGoal(null);
-  }, [open, plantId, selectedPhenoHuntId]);
+  }, [open, editorPlantId, selectedPhenoHuntId]);
 
   // One-shot guard for the evidence-goal handoff seed. It is consumed the
   // moment the goal is seeded and reset only when the dialog closes, so a
@@ -655,6 +620,7 @@ export default function QuickLog({
     setShowMore(false);
     setEventType("observation");
     setPlantId("");
+    setDismissedBlockedPrefillKey(null);
     setStage("");
     stageUserTouchedRef.current = false;
     prevPlantIdRef.current = "";
@@ -801,17 +767,17 @@ export default function QuickLog({
       toast.message(UNSUPPORTED_EVENT_TYPE_COPY);
       return;
     }
-    if (writeTarget.status !== "ready" || !selectedPlant || !selectedTent) {
+    if (editorTarget.status !== "ready" || !selectedPlant || !selectedTent) {
       const message =
-        writeTarget.status === "blocked"
-          ? QUICK_LOG_TARGET_BLOCKED_COPY[writeTarget.reason]
+        editorTarget.status === "blocked"
+          ? QUICK_LOG_TARGET_BLOCKED_COPY[editorTarget.reason]
           : "Review the Quick Log target before saving.";
       setSaveError(message);
       toast.error(message);
       if (!selectedPlant) focusPlant();
       return;
     }
-    const saveTarget = writeTarget.target;
+    const saveTarget = editorTarget.target;
     if (!note.trim() && eventType !== "watering") {
       const message = "Add a quick note";
       setSaveError(message);
@@ -1376,8 +1342,9 @@ export default function QuickLog({
               <div>
                 <Label className="text-xs">Plant</Label>
                 <Select
-                  value={plantId || "__none"}
+                  value={editorPlantId || "__none"}
                   onValueChange={(v) => {
+                    setDismissedBlockedPrefillKey(prefillRequestKey);
                     setPlantId(v === "__none" ? "" : v);
                     setSaveError(null);
                   }}
@@ -1385,8 +1352,16 @@ export default function QuickLog({
                   <SelectTrigger
                     ref={plantSelectTriggerRef}
                     data-testid="quick-log-plant-select"
-                    aria-invalid={!selectedPlant}
-                    aria-describedby={!selectedPlant ? "quick-log-plant-error" : undefined}
+                    aria-invalid={
+                      prefillHoldActive || !selectedPlant || editorTarget.status === "blocked"
+                    }
+                    aria-describedby={
+                      prefillHoldActive || (selectedPlant && editorTarget.status === "blocked")
+                        ? "quick-log-target-error"
+                        : !selectedPlant
+                          ? "quick-log-plant-error"
+                          : undefined
+                    }
                   >
                     <SelectValue placeholder="Choose a plant" />
                   </SelectTrigger>
@@ -1406,6 +1381,7 @@ export default function QuickLog({
                 <Select
                   value={activeGrowId ?? ""}
                   onValueChange={(v) => {
+                    setDismissedBlockedPrefillKey(prefillRequestKey);
                     setActiveGrowId(v);
                     setSaveError(null);
                   }}
@@ -1423,7 +1399,16 @@ export default function QuickLog({
                 </Select>
               </div>
             </div>
-            {!selectedPlant ? (
+            {prefillHoldActive && editorTarget.status === "blocked" ? (
+              <p
+                id="quick-log-target-error"
+                role="alert"
+                className="text-[11px] text-destructive"
+                data-testid="quick-log-target-error"
+              >
+                {QUICK_LOG_TARGET_BLOCKED_COPY[editorTarget.reason]}
+              </p>
+            ) : !selectedPlant ? (
               <p
                 id="quick-log-plant-error"
                 role="alert"
@@ -1432,14 +1417,14 @@ export default function QuickLog({
               >
                 Choose a plant before saving this entry.
               </p>
-            ) : writeTarget.status === "blocked" ? (
+            ) : editorTarget.status === "blocked" ? (
               <p
                 id="quick-log-target-error"
                 role="alert"
                 className="text-[11px] text-destructive"
                 data-testid="quick-log-target-error"
               >
-                {QUICK_LOG_TARGET_BLOCKED_COPY[writeTarget.reason]}
+                {QUICK_LOG_TARGET_BLOCKED_COPY[editorTarget.reason]}
               </p>
             ) : (
               <p className="text-[11px] text-muted-foreground" data-testid="quick-log-plant-helper">

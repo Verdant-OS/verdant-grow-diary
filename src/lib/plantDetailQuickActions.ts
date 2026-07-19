@@ -16,6 +16,10 @@
  */
 import { sensorsPath } from "@/lib/routes";
 import { QUICK_LOG_ACTIVITY_DEFINITIONS } from "@/constants/quickLogActivityTypes";
+import {
+  buildPlantQuickLogPrefill,
+  type PlantQuickLogPrefill,
+} from "@/lib/plantQuickLogPrefillRules";
 
 export type PlantDetailQuickActionKind =
   | "quicklog"
@@ -26,15 +30,7 @@ export type PlantDetailQuickActionKind =
   | "harvest";
 
 /** Payload dispatched on the `verdant:open-quicklog` event. */
-export interface PlantDetailQuickLogEventPayload {
-  plantId: string;
-  plantName: string | null;
-  growId: string | null;
-  tentId: string | null;
-  tentName: string | null;
-  eventType: "observation";
-  suggestSnapshot: true;
-}
+export type PlantDetailQuickLogEventPayload = PlantQuickLogPrefill;
 
 export interface PlantDetailQuickActionEntry {
   kind: PlantDetailQuickActionKind;
@@ -72,13 +68,9 @@ export interface PlantDetailQuickActionsInput {
 
 export const PLANT_RELATIVE_TIMELINE_ANCHOR_ID = "plant-relative-timeline" as const;
 export const PLANT_PHOTOS_ANCHOR_ID = "plant-photos" as const;
-export const PLANT_AI_DOCTOR_REVIEW_ANCHOR_ID =
-  "plant-ai-doctor-review" as const;
+export const PLANT_AI_DOCTOR_REVIEW_ANCHOR_ID = "plant-ai-doctor-review" as const;
 
-const LABELS: Record<
-  PlantDetailQuickActionKind,
-  { label: string; description: string }
-> = {
+const LABELS: Record<PlantDetailQuickActionKind, { label: string; description: string }> = {
   quicklog: {
     label: "Quick Log",
     description: "Record an observation or grow action.",
@@ -120,17 +112,18 @@ export function buildPlantDetailQuickActions(
   const tentName = input.tentName ?? null;
   const hasTimelineSection = input.hasTimelineSection ?? true;
 
-  const quickLogPayload: PlantDetailQuickLogEventPayload | null = plantId
-    ? {
-        plantId,
-        plantName,
-        growId,
-        tentId,
-        tentName,
-        eventType: "observation",
-        suggestSnapshot: true,
-      }
-    : null;
+  const quickLogPayload = buildPlantQuickLogPrefill({
+    plantId,
+    plantName,
+    growId,
+    tentId,
+    tentName,
+  });
+  const quickLogDisabledReason = !plantId
+    ? "Plant context is not loaded yet."
+    : !quickLogPayload
+      ? "Assign this plant to a grow and tent before opening Quick Log."
+      : undefined;
 
   return [
     {
@@ -139,10 +132,8 @@ export function buildPlantDetailQuickActions(
       event: "open-quicklog",
       eventPayload: quickLogPayload,
       testId: "plant-detail-quick-action-quicklog",
-      disabled: !plantId,
-      disabledReason: plantId
-        ? undefined
-        : "Plant context is not loaded yet.",
+      disabled: !quickLogPayload,
+      disabledReason: quickLogDisabledReason,
     },
     {
       kind: "manual_sensor_snapshot",
@@ -164,35 +155,25 @@ export function buildPlantDetailQuickActions(
       eventPayload: quickLogPayload,
       testId: "plant-detail-quick-action-upload-photo",
       disabled: !plantId,
-      disabledReason: plantId
-        ? undefined
-        : "Plant context is not loaded yet.",
+      disabledReason: plantId ? undefined : "Plant context is not loaded yet.",
     },
     {
       kind: "ask_doctor",
       ...LABELS.ask_doctor,
       // Keep the grower on the existing Plant Detail review surface, where
       // plant/grow/tent context is already scoped. This action never calls AI.
-      scrollTargetId: plantId
-        ? PLANT_AI_DOCTOR_REVIEW_ANCHOR_ID
-        : undefined,
+      scrollTargetId: plantId ? PLANT_AI_DOCTOR_REVIEW_ANCHOR_ID : undefined,
       testId: "plant-detail-quick-action-ask-doctor",
       disabled: !plantId,
-      disabledReason: plantId
-        ? undefined
-        : "Plant context is not loaded yet.",
+      disabledReason: plantId ? undefined : "Plant context is not loaded yet.",
     },
     {
       kind: "view_timeline",
       ...LABELS.view_timeline,
-      scrollTargetId: hasTimelineSection
-        ? PLANT_RELATIVE_TIMELINE_ANCHOR_ID
-        : undefined,
+      scrollTargetId: hasTimelineSection ? PLANT_RELATIVE_TIMELINE_ANCHOR_ID : undefined,
       testId: "plant-detail-quick-action-view-timeline",
       disabled: !hasTimelineSection,
-      disabledReason: hasTimelineSection
-        ? undefined
-        : "Timeline section is not available yet.",
+      disabledReason: hasTimelineSection ? undefined : "Timeline section is not available yet.",
     },
     {
       // Harvest is fully backed by quicklog_save_event now; this entry
@@ -204,9 +185,7 @@ export function buildPlantDetailQuickActions(
       eventPayload: quickLogPayload,
       testId: "plant-detail-quick-action-harvest",
       disabled: !plantId,
-      disabledReason: plantId
-        ? undefined
-        : "Plant context is not loaded yet.",
+      disabledReason: plantId ? undefined : "Plant context is not loaded yet.",
     },
   ];
 }

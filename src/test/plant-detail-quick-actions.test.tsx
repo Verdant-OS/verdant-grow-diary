@@ -20,12 +20,7 @@ vi.mock("react-router-dom", () => ({
     to: string;
     children: React.ReactNode;
     [k: string]: unknown;
-  }) =>
-    React.createElement(
-      "a",
-      { href: typeof to === "string" ? to : "", ...rest },
-      children,
-    ),
+  }) => React.createElement("a", { href: typeof to === "string" ? to : "", ...rest }, children),
 }));
 
 import {
@@ -37,14 +32,8 @@ import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 import PlantDetailQuickActions from "@/components/PlantDetailQuickActions";
 
 const ROOT = resolve(__dirname, "../..");
-const HELPER = readFileSync(
-  resolve(ROOT, "src/lib/plantDetailQuickActions.ts"),
-  "utf8",
-);
-const COMPONENT = readFileSync(
-  resolve(ROOT, "src/components/PlantDetailQuickActions.tsx"),
-  "utf8",
-);
+const HELPER = readFileSync(resolve(ROOT, "src/lib/plantDetailQuickActions.ts"), "utf8");
+const COMPONENT = readFileSync(resolve(ROOT, "src/components/PlantDetailQuickActions.tsx"), "utf8");
 const PAGE = readFileSync(resolve(ROOT, "src/pages/PlantDetail.tsx"), "utf8");
 
 const FORBIDDEN = [
@@ -71,9 +60,7 @@ const FORBIDDEN = [
 
 describe("buildPlantDetailQuickActions · ordering and completeness", () => {
   it("returns the 6 expected kinds in deterministic order", () => {
-    const kinds = buildPlantDetailQuickActions({ plantId: "p1" }).map(
-      (e) => e.kind,
-    );
+    const kinds = buildPlantDetailQuickActions({ plantId: "p1" }).map((e) => e.kind);
     expect(kinds).toEqual([
       "quicklog",
       "manual_sensor_snapshot",
@@ -85,9 +72,7 @@ describe("buildPlantDetailQuickActions · ordering and completeness", () => {
   });
 
   it("labels match the documented copy", () => {
-    const labels = buildPlantDetailQuickActions({ plantId: "p1" }).map(
-      (e) => e.label,
-    );
+    const labels = buildPlantDetailQuickActions({ plantId: "p1" }).map((e) => e.label);
     expect(labels).toEqual([
       "Quick Log",
       "Manual Sensor Snapshot",
@@ -99,9 +84,7 @@ describe("buildPlantDetailQuickActions · ordering and completeness", () => {
   });
 
   it("descriptions match the documented helper copy", () => {
-    const descriptions = buildPlantDetailQuickActions({ plantId: "p1" }).map(
-      (e) => e.description,
-    );
+    const descriptions = buildPlantDetailQuickActions({ plantId: "p1" }).map((e) => e.description);
     expect(descriptions).toEqual([
       "Record an observation or grow action.",
       "Add current tent readings by hand.",
@@ -136,13 +119,24 @@ describe("buildPlantDetailQuickActions · payloads and routes", () => {
   });
 
   it("Quick Log payload is null and entry disabled when plantId is missing", () => {
-    const ql = buildPlantDetailQuickActions({ plantId: null }).find(
-      (e) => e.kind === "quicklog",
-    )!;
+    const ql = buildPlantDetailQuickActions({ plantId: null }).find((e) => e.kind === "quicklog")!;
     expect(ql.eventPayload).toBeNull();
     expect(ql.disabled).toBe(true);
     expect(ql.disabledReason).toMatch(/plant context/i);
   });
+
+  it.each([
+    { label: "grow", input: { plantId: "p1", growId: null, tentId: "t1" } },
+    { label: "tent", input: { plantId: "p1", growId: "g1", tentId: null } },
+  ])(
+    "Quick Log is disabled without a complete plant/grow/tent target ($label missing)",
+    ({ input }) => {
+      const ql = buildPlantDetailQuickActions(input).find((entry) => entry.kind === "quicklog")!;
+      expect(ql.eventPayload).toBeNull();
+      expect(ql.disabled).toBe(true);
+      expect(ql.disabledReason).toMatch(/grow and tent/i);
+    },
+  );
 
   it("Manual Sensor Snapshot links to grow-scoped /sensors when growId is known", () => {
     const e = buildPlantDetailQuickActions({
@@ -160,9 +154,7 @@ describe("buildPlantDetailQuickActions · payloads and routes", () => {
   });
 
   it("Ask Doctor targets the scoped plant review when context is available", () => {
-    const e = buildPlantDetailQuickActions({ plantId: "p1" }).find(
-      (e) => e.kind === "ask_doctor",
-    )!;
+    const e = buildPlantDetailQuickActions({ plantId: "p1" }).find((e) => e.kind === "ask_doctor")!;
     expect(e.scrollTargetId).toBe(PLANT_AI_DOCTOR_REVIEW_ANCHOR_ID);
     expect(e.href).toBeUndefined();
     expect(e.event).toBeUndefined();
@@ -170,9 +162,7 @@ describe("buildPlantDetailQuickActions · payloads and routes", () => {
   });
 
   it("Ask Doctor is disabled with no navigation target when plantId is missing", () => {
-    const e = buildPlantDetailQuickActions({ plantId: null }).find(
-      (e) => e.kind === "ask_doctor",
-    )!;
+    const e = buildPlantDetailQuickActions({ plantId: null }).find((e) => e.kind === "ask_doctor")!;
     expect(e.href).toBeUndefined();
     expect(e.scrollTargetId).toBeUndefined();
     expect(e.disabled).toBe(true);
@@ -211,27 +201,15 @@ describe("PlantDetailQuickActions · render", () => {
         tentName="Tent A"
       />,
     );
-    expect(
-      screen.getByTestId("plant-detail-quick-action-quicklog"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("plant-detail-quick-action-quicklog")).toBeInTheDocument();
     expect(
       screen.getByTestId("plant-detail-quick-action-manual-sensor-snapshot"),
     ).toBeInTheDocument();
-    expect(
-      screen.getByTestId("plant-detail-quick-action-upload-photo"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByTestId("plant-detail-quick-action-ask-doctor"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByTestId("plant-detail-quick-action-view-timeline"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByTestId("plant-detail-quick-action-harvest"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("navigation", { name: /plant quick actions/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("plant-detail-quick-action-upload-photo")).toBeInTheDocument();
+    expect(screen.getByTestId("plant-detail-quick-action-ask-doctor")).toBeInTheDocument();
+    expect(screen.getByTestId("plant-detail-quick-action-view-timeline")).toBeInTheDocument();
+    expect(screen.getByTestId("plant-detail-quick-action-harvest")).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: /plant quick actions/i })).toBeInTheDocument();
   });
 
   it("renders helper description for every quick action", () => {
@@ -271,9 +249,7 @@ describe("PlantDetailQuickActions · render", () => {
         tentName="Tent A"
       />,
     );
-    fireEvent.click(
-      screen.getByTestId("plant-detail-quick-action-upload-photo"),
-    );
+    fireEvent.click(screen.getByTestId("plant-detail-quick-action-upload-photo"));
     expect(handler).toHaveBeenCalledTimes(1);
     const ev = handler.mock.calls[0][0] as CustomEvent;
     expect(ev.detail).toMatchObject({
@@ -289,13 +265,11 @@ describe("PlantDetailQuickActions · render", () => {
     const btn = screen.getByTestId("plant-detail-quick-action-upload-photo");
     expect(btn).toBeDisabled();
     expect(
-      screen.getByTestId("plant-detail-quick-action-upload-photo-description")
-        .textContent,
+      screen.getByTestId("plant-detail-quick-action-upload-photo-description").textContent,
     ).toMatch(/visual history/i);
-    expect(
-      screen.getByTestId("plant-detail-quick-action-upload-photo-reason")
-        .textContent,
-    ).toMatch(/plant context/i);
+    expect(screen.getByTestId("plant-detail-quick-action-upload-photo-reason").textContent).toMatch(
+      /plant context/i,
+    );
   });
 
   it("Quick Log click dispatches verdant:open-quicklog with plant context", () => {
@@ -323,9 +297,7 @@ describe("PlantDetailQuickActions · render", () => {
   });
 
   it("Manual Sensor Snapshot renders as a link to /sensors with growId", () => {
-    const { container } = render(
-      <PlantDetailQuickActions plantId="p1" growId="g1" />,
-    );
+    const { container } = render(<PlantDetailQuickActions plantId="p1" growId="g1" tentId="t1" />);
     const link = container.querySelector(
       'a[data-testid="plant-detail-quick-action-manual-sensor-snapshot"], [data-testid="plant-detail-quick-action-manual-sensor-snapshot"] a',
     ) as HTMLAnchorElement | null;
@@ -358,7 +330,6 @@ describe("PlantDetailQuickActions · render", () => {
     document.body.removeChild(anchor);
   });
 
-
   it("View Timeline click scrolls to and focuses the timeline anchor", () => {
     // Set up a DOM anchor matching the helper's contract.
     const anchor = document.createElement("div");
@@ -368,9 +339,7 @@ describe("PlantDetailQuickActions · render", () => {
     anchor.scrollIntoView = scrollSpy as unknown as Element["scrollIntoView"];
 
     render(<PlantDetailQuickActions plantId="p1" />);
-    fireEvent.click(
-      screen.getByTestId("plant-detail-quick-action-view-timeline"),
-    );
+    fireEvent.click(screen.getByTestId("plant-detail-quick-action-view-timeline"));
     expect(scrollSpy).toHaveBeenCalledTimes(1);
     expect(anchor.getAttribute("tabindex")).toBe("-1");
     expect(document.activeElement).toBe(anchor);
@@ -384,13 +353,11 @@ describe("PlantDetailQuickActions · render", () => {
     expect(ql).toBeDisabled();
     expect(ql.getAttribute("aria-disabled")).toBe("true");
     expect(
-      screen.getByTestId("plant-detail-quick-action-quicklog-description")
-        .textContent,
+      screen.getByTestId("plant-detail-quick-action-quicklog-description").textContent,
     ).toMatch(/observation or grow action/i);
-    expect(
-      screen.getByTestId("plant-detail-quick-action-quicklog-reason")
-        .textContent,
-    ).toMatch(/plant context/i);
+    expect(screen.getByTestId("plant-detail-quick-action-quicklog-reason").textContent).toMatch(
+      /plant context/i,
+    );
   });
 
   it("buttons carry focus-visible ring classes for keyboard users", () => {
@@ -407,6 +374,25 @@ describe("PlantDetailQuickActions · render", () => {
     expect(btn).toBeDisabled();
     fireEvent.click(btn);
     expect(handler).not.toHaveBeenCalled();
+    window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, handler);
+  });
+
+  it.each([
+    { growId: null, tentId: "t1" },
+    { growId: "g1", tentId: null },
+  ])("partial Quick Log target is disabled and dispatches no event", ({ growId, tentId }) => {
+    const handler = vi.fn();
+    window.addEventListener(PLANT_QUICKLOG_PREFILL_EVENT, handler);
+    render(<PlantDetailQuickActions plantId="p1" growId={growId} tentId={tentId} />);
+
+    const button = screen.getByTestId("plant-detail-quick-action-quicklog");
+    expect(button).toBeDisabled();
+    expect(screen.getByTestId("plant-detail-quick-action-quicklog-reason")).toHaveTextContent(
+      /grow and tent/i,
+    );
+    fireEvent.click(button);
+    expect(handler).not.toHaveBeenCalled();
+
     window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, handler);
   });
 
@@ -428,21 +414,16 @@ describe("PlantDetailQuickActions · render", () => {
     expect(btn).toBeDisabled();
     expect(btn.getAttribute("aria-disabled")).toBe("true");
     // No anchor rendered for the disabled entry.
-    const link = container.querySelector(
-      'a[data-testid="plant-detail-quick-action-ask-doctor"]',
-    );
+    const link = container.querySelector('a[data-testid="plant-detail-quick-action-ask-doctor"]');
     expect(link).toBeNull();
-    expect(
-      screen.getByTestId("plant-detail-quick-action-ask-doctor-reason")
-        .textContent,
-    ).toMatch(/plant context/i);
+    expect(screen.getByTestId("plant-detail-quick-action-ask-doctor-reason").textContent).toMatch(
+      /plant context/i,
+    );
   });
 
   it("Manual Sensor Snapshot stays enabled when plant context is missing", () => {
     const { container } = render(<PlantDetailQuickActions plantId={null} />);
-    const btn = screen.getByTestId(
-      "plant-detail-quick-action-manual-sensor-snapshot",
-    );
+    const btn = screen.getByTestId("plant-detail-quick-action-manual-sensor-snapshot");
     expect(btn).not.toBeDisabled();
     const link = container.querySelector(
       'a[data-testid="plant-detail-quick-action-manual-sensor-snapshot"]',
@@ -457,17 +438,14 @@ describe("PlantDetailQuickActions · render", () => {
     const scrollSpy = vi.fn();
     anchor.scrollIntoView = scrollSpy as unknown as Element["scrollIntoView"];
 
-    render(
-      <PlantDetailQuickActions plantId="p1" hasTimelineSection={false} />,
-    );
+    render(<PlantDetailQuickActions plantId="p1" hasTimelineSection={false} />);
     const btn = screen.getByTestId("plant-detail-quick-action-view-timeline");
     expect(btn).toBeDisabled();
     expect(btn.getAttribute("aria-disabled")).toBe("true");
     fireEvent.click(btn);
     expect(scrollSpy).not.toHaveBeenCalled();
     expect(
-      screen.getByTestId("plant-detail-quick-action-view-timeline-reason")
-        .textContent,
+      screen.getByTestId("plant-detail-quick-action-view-timeline-reason").textContent,
     ).toMatch(/timeline section/i);
 
     document.body.removeChild(anchor);
@@ -485,9 +463,7 @@ describe("PlantDetailQuickActions · render", () => {
       plantId: null,
       hasTimelineSection: false,
     });
-    const reasons = entries
-      .map((e) => e.disabledReason)
-      .filter((r): r is string => Boolean(r));
+    const reasons = entries.map((e) => e.disabledReason).filter((r): r is string => Boolean(r));
     expect(reasons.length).toBeGreaterThan(0);
     for (const text of reasons) {
       expect(text).not.toMatch(/live/i);
@@ -518,8 +494,7 @@ describe("PlantDetailQuickActions · render", () => {
     ];
     for (const id of ids) {
       const el = screen.getByTestId(id);
-      const cls =
-        el.className + " " + (el.querySelector("a")?.className ?? "");
+      const cls = el.className + " " + (el.querySelector("a")?.className ?? "");
       expect(cls).toMatch(/w-full/);
       expect(cls).toMatch(/sm:w-auto/);
     }
@@ -527,9 +502,7 @@ describe("PlantDetailQuickActions · render", () => {
 
   it("action wrapper prevents grid blowout with min-w-0", () => {
     const { container } = render(<PlantDetailQuickActions plantId="p1" />);
-    const wrappers = container.querySelectorAll(
-      '[data-testid="plant-detail-quick-actions"] > div',
-    );
+    const wrappers = container.querySelectorAll('[data-testid="plant-detail-quick-actions"] > div');
     expect(wrappers.length).toBe(6);
     for (const w of wrappers) {
       expect(w.className).toMatch(/min-w-0/);
@@ -620,9 +593,7 @@ describe("PlantDetailQuickActions · keyboard and ARIA", () => {
   });
 
   it("route-based actions render as semantic <a> links", () => {
-    const { container } = render(
-      <PlantDetailQuickActions plantId="p1" growId="g1" />,
-    );
+    const { container } = render(<PlantDetailQuickActions plantId="p1" growId="g1" />);
     const sensorLink = container.querySelector(
       'a[data-testid="plant-detail-quick-action-manual-sensor-snapshot"]',
     ) as HTMLAnchorElement | null;
@@ -633,9 +604,7 @@ describe("PlantDetailQuickActions · keyboard and ARIA", () => {
   });
 
   it("disabled actions are skipped by native tab order (disabled attribute set)", () => {
-    render(
-      <PlantDetailQuickActions plantId={null} hasTimelineSection={false} />,
-    );
+    render(<PlantDetailQuickActions plantId={null} hasTimelineSection={false} />);
     const disabledIds = [
       "plant-detail-quick-action-quicklog",
       "plant-detail-quick-action-upload-photo",
@@ -672,13 +641,13 @@ describe("PlantDetailQuickActions · keyboard and ARIA", () => {
 
   it("focus-visible ring classes apply to both enabled and disabled buttons", () => {
     const { rerender } = render(<PlantDetailQuickActions plantId="p1" />);
-    expect(
-      screen.getByTestId("plant-detail-quick-action-quicklog").className,
-    ).toMatch(/focus-visible:ring-2/);
+    expect(screen.getByTestId("plant-detail-quick-action-quicklog").className).toMatch(
+      /focus-visible:ring-2/,
+    );
     rerender(<PlantDetailQuickActions plantId={null} />);
-    expect(
-      screen.getByTestId("plant-detail-quick-action-quicklog").className,
-    ).toMatch(/focus-visible:ring-2/);
+    expect(screen.getByTestId("plant-detail-quick-action-quicklog").className).toMatch(
+      /focus-visible:ring-2/,
+    );
   });
 
   it("each enabled action's aria-describedby points to its description element id", () => {
@@ -758,34 +727,23 @@ describe("PlantDetailQuickActions · hardened a11y coverage", () => {
 
   function accessibleNameOf(el: HTMLElement): string {
     const inner = el.querySelector("a");
-    const label =
-      el.getAttribute("aria-label") ?? inner?.getAttribute("aria-label");
+    const label = el.getAttribute("aria-label") ?? inner?.getAttribute("aria-label");
     return (label ?? el.textContent ?? "").trim();
   }
 
   it("aria-describedby is applied consistently to both Link-asChild and disabled button actions", () => {
-    const { unmount } = render(
-      <PlantDetailQuickActions plantId="p1" growId="g1" />,
-    );
+    const { unmount } = render(<PlantDetailQuickActions plantId="p1" growId="g1" />);
     const askDoctor = screen.getByTestId("plant-detail-quick-action-ask-doctor");
     const quickLog = screen.getByTestId("plant-detail-quick-action-quicklog");
-    expect(describedByOf(askDoctor)).toContain(
-      "plant-detail-quick-action-ask-doctor-description",
-    );
-    expect(describedByOf(quickLog)).toContain(
-      "plant-detail-quick-action-quicklog-description",
-    );
+    expect(describedByOf(askDoctor)).toContain("plant-detail-quick-action-ask-doctor-description");
+    expect(describedByOf(quickLog)).toContain("plant-detail-quick-action-quicklog-description");
     unmount();
 
     render(<PlantDetailQuickActions plantId={null} />);
-    const disabledAskDoctor = screen.getByTestId(
-      "plant-detail-quick-action-ask-doctor",
-    );
+    const disabledAskDoctor = screen.getByTestId("plant-detail-quick-action-ask-doctor");
     expect(disabledAskDoctor.tagName.toLowerCase()).toBe("button");
     const described = describedByOf(disabledAskDoctor);
-    expect(described).toContain(
-      "plant-detail-quick-action-ask-doctor-description",
-    );
+    expect(described).toContain("plant-detail-quick-action-ask-doctor-description");
     expect(described).toContain("plant-detail-quick-action-ask-doctor-reason");
   });
 
@@ -825,20 +783,18 @@ describe("PlantDetailQuickActions · hardened a11y coverage", () => {
   });
 
   it("enabled quick actions appear in expected DOM/tab order", () => {
-    const { container } = render(
-      <PlantDetailQuickActions plantId="p1" growId="g1" />,
+    const { container } = render(<PlantDetailQuickActions plantId="p1" growId="g1" tentId="t1" />);
+    const interactive = Array.from(container.querySelectorAll<HTMLElement>("button, a")).filter(
+      (el) => {
+        const tid = el.getAttribute("data-testid") ?? "";
+        return (
+          tid.startsWith("plant-detail-quick-action-") &&
+          !tid.endsWith("-description") &&
+          !tid.endsWith("-reason") &&
+          !el.hasAttribute("disabled")
+        );
+      },
     );
-    const interactive = Array.from(
-      container.querySelectorAll<HTMLElement>("button, a"),
-    ).filter((el) => {
-      const tid = el.getAttribute("data-testid") ?? "";
-      return (
-        tid.startsWith("plant-detail-quick-action-") &&
-        !tid.endsWith("-description") &&
-        !tid.endsWith("-reason") &&
-        !el.hasAttribute("disabled")
-      );
-    });
     const order = interactive.map((el) => el.getAttribute("data-testid"));
     expect(order).toEqual([...ALL_IDS]);
   });
@@ -870,18 +826,13 @@ describe("PlantDetailQuickActions · hardened a11y coverage", () => {
       const el = screen.getByTestId(id);
       const cls = el.className + " " + (el.querySelector("a")?.className ?? "");
       expect(cls, `${id} missing focus ring`).toMatch(/focus-visible:ring-2/);
-      expect(cls, `${id} missing ring-offset`).toMatch(
-        /focus-visible:ring-offset-2/,
-      );
+      expect(cls, `${id} missing ring-offset`).toMatch(/focus-visible:ring-offset-2/);
       expect(cls, `${id} missing offset-background`).toMatch(
         /focus-visible:ring-offset-background/,
       );
     }
   });
 });
-
-
-
 
 describe("PlantDetailQuickActions · static safety", () => {
   it("helper module contains no React, writes, RPC, fetch, or device control", () => {
@@ -912,9 +863,7 @@ describe("PlantDetailQuickActions · static safety", () => {
   });
 
   it("helper copy does not imply automatic writes", () => {
-    const descriptions = buildPlantDetailQuickActions({ plantId: "p1" }).map(
-      (e) => e.description,
-    );
+    const descriptions = buildPlantDetailQuickActions({ plantId: "p1" }).map((e) => e.description);
     for (const text of descriptions) {
       expect(text).not.toMatch(/auto[-\s]?save/i);
       expect(text).not.toMatch(/auto[-\s]?upload/i);
@@ -923,9 +872,7 @@ describe("PlantDetailQuickActions · static safety", () => {
   });
 
   it("helper copy does not imply live sensor data, AI certainty, automation, or device control", () => {
-    const descriptions = buildPlantDetailQuickActions({ plantId: "p1" }).map(
-      (e) => e.description,
-    );
+    const descriptions = buildPlantDetailQuickActions({ plantId: "p1" }).map((e) => e.description);
     for (const text of descriptions) {
       expect(text).not.toMatch(/live sensor/i);
       expect(text).not.toMatch(/real[-\s]?time/i);

@@ -1,18 +1,17 @@
 /**
- * QuickLog — auto-preselect single eligible plant (Gate 1 speed slice).
+ * QuickLog — explicit target selection for global no-context launchers.
  *
  * Verifies:
- *  - Exactly one scoped plant → auto-selected, inline error gone, Save enabled.
- *  - 2+ scoped plants → no auto-pick; Save remains disabled with inline error.
- *  - Prefill plantId wins over single-candidate fallback (and over no selection).
- *  - User-selected plant is never overwritten by auto-pick logic.
- *  - Closing then reopening re-evaluates against current scoped plants.
+ *  - Exactly one scoped plant is not inferred.
+ *  - A remembered target is not inferred.
+ *  - Explicit grower selection makes a complete target ready.
+ *  - A validated route prefill still selects its exact target.
  *  - No fake live/sensor copy introduced.
  *  - Save path / RPC payload contract untouched: the same plant id we
  *    auto-pick is what would feed the existing save flow (no new RPCs).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, cleanup, act } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 
@@ -57,6 +56,17 @@ vi.mock("@/components/QuickLogSensorSnapshotStrip", () => ({ default: () => null
 
 import QuickLog from "@/components/QuickLog";
 
+const elementPrototype = Element.prototype as Element & {
+  hasPointerCapture?: () => boolean;
+  setPointerCapture?: () => void;
+  releasePointerCapture?: () => void;
+  scrollIntoView?: () => void;
+};
+elementPrototype.hasPointerCapture ??= () => false;
+elementPrototype.setPointerCapture ??= () => {};
+elementPrototype.releasePointerCapture ??= () => {};
+elementPrototype.scrollIntoView ??= () => {};
+
 function renderQL(ui: ReactElement) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
@@ -70,27 +80,36 @@ const many = [
   { id: "p2", name: "OG Kush", strain: "OG", tent_id: "t1", grow_id: "g1" },
 ];
 
-beforeEach(() => rpcMock.mockClear());
+beforeEach(() => {
+  rpcMock.mockClear();
+  window.localStorage.clear();
+});
 afterEach(() => cleanup());
 
-describe("QuickLog auto-preselect single eligible plant", () => {
-  it("auto-selects the only scoped plant and enables Save", async () => {
+describe("QuickLog global manual target selection", () => {
+  it("does not auto-select the only scoped plant", () => {
     plantsMock = one;
     renderQL(<QuickLog open onOpenChange={() => {}} />);
-    // Inline error must be gone.
-    expect(screen.queryByTestId("quick-log-plant-error")).toBeNull();
-    // Save enabled (Plant is satisfied; other required fields default-fine).
-    const btn = screen.getByTestId("quick-log-save") as HTMLButtonElement;
-    expect(btn.disabled).toBe(false);
-    // Picker reflects the auto-pick.
-    expect(screen.getByTestId("quick-log-plant-select").textContent).toMatch(/Blue Dream/);
+    expect(screen.getByTestId("quick-log-plant-error")).toBeInTheDocument();
+    expect(screen.getByTestId("quick-log-save")).toBeDisabled();
+    expect(screen.getByTestId("quick-log-plant-select")).not.toHaveTextContent("Blue Dream");
   });
 
-  it("does NOT auto-select when 2+ scoped plants exist", () => {
+  it("does not auto-select a remembered target", () => {
     plantsMock = many;
+    window.localStorage.setItem(
+      "verdant.quickLog.lastTarget.v1",
+      JSON.stringify({
+        plantId: "p2",
+        growId: "g1",
+        tentId: "t1",
+        savedAt: "2026-07-18T00:00:00.000Z",
+      }),
+    );
     renderQL(<QuickLog open onOpenChange={() => {}} />);
     expect(screen.getByTestId("quick-log-plant-error")).toBeInTheDocument();
-    expect((screen.getByTestId("quick-log-save") as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByTestId("quick-log-save")).toBeDisabled();
+    expect(screen.getByTestId("quick-log-plant-select")).not.toHaveTextContent("OG Kush");
   });
 
   it("prefill plantId wins even when multiple scoped plants exist", () => {
@@ -112,25 +131,22 @@ describe("QuickLog auto-preselect single eligible plant", () => {
     expect(screen.getByTestId("quick-log-plant-select").textContent).toMatch(/OG Kush/);
   });
 
-  it("re-evaluates when dialog is closed and reopened", async () => {
-    plantsMock = many;
-    const { rerender } = renderQL(<QuickLog open onOpenChange={() => {}} />);
-    expect((screen.getByTestId("quick-log-save") as HTMLButtonElement).disabled).toBe(true);
-
-    // Close, swap scoped plants down to one, then reopen.
-    rerender(
-      <QueryClientProvider client={new QueryClient()}>
-        <QuickLog open={false} onOpenChange={() => {}} />
-      </QueryClientProvider>,
-    );
+  it("enables Save only after the grower explicitly selects a valid target", async () => {
     plantsMock = one;
-    rerender(
-      <QueryClientProvider client={new QueryClient()}>
-        <QuickLog open onOpenChange={() => {}} />
-      </QueryClientProvider>,
-    );
-    await act(async () => {});
+    renderQL(<QuickLog open onOpenChange={() => {}} />);
+    expect(screen.getByTestId("quick-log-save")).toBeDisabled();
+
+    const trigger = screen.getByTestId("quick-log-plant-select");
+    fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerType: "mouse" });
+    fireEvent.click(trigger);
+    fireEvent.click(await screen.findByRole("option", { name: /Blue Dream/i }));
+
     expect(screen.queryByTestId("quick-log-plant-error")).toBeNull();
+    expect(screen.getByTestId("quick-log-save")).toBeEnabled();
+    expect(screen.getByTestId("quick-log-target-card")).toHaveAttribute(
+      "data-target-plant-id",
+      "p1",
+    );
   });
 
   it("does not introduce fake live/sensor copy", () => {

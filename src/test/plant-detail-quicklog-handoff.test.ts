@@ -97,10 +97,10 @@ describe("Plant Detail → QuickLog handoff wiring", () => {
     expect(QUICKLOG).toContain("QuickLogPrefill");
     expect(QUICKLOG).toMatch(/prefill\?:\s*QuickLogPrefill\s*\|\s*null/);
     expect(QUICKLOG).toMatch(/setActiveGrowId\(prefill\.growId\)/);
-    // Plant resolution is centralized in pickDefaultQuickLogPlant so that
-    // out-of-scope / archived / merged prefill plantIds are ignored and an
-    // existing grower selection is preserved on reopen.
-    expect(QUICKLOG).toMatch(/pickDefaultQuickLogPlant\(\s*\n?\s*scopedPlants,\s*\n?\s*prefill\?\.plantId/);
+    // Route prefills are resolved against stored relationships and must not
+    // fall through to remembered or single-plant defaults.
+    expect(QUICKLOG).toContain("resolveQuickLogPrefillTarget");
+    expect(QUICKLOG).not.toContain("readLastTarget(");
     expect(QUICKLOG).toMatch(/setEventType\(prefill\.eventType\)/);
     expect(QUICKLOG).toMatch(/suggestSnapshot[\s\S]{0,40}setSnapshot\(true\)/);
   });

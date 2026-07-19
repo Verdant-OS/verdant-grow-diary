@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   QUICK_LOG_TARGET_BLOCKED_COPY,
+  quickLogPrefillTargetKey,
+  resolveQuickLogEditorTarget,
   resolveQuickLogPrefillTarget,
   resolveQuickLogWriteTarget,
 } from "@/lib/quickLogTargetIntegrityRules";
@@ -229,5 +231,60 @@ describe("resolveQuickLogWriteTarget", () => {
 
     expect(serialized).not.toMatch(/temperature|humidity|sensor|automation|device/i);
     expect(serialized).not.toMatch(/rpc|table|writer|persistence/i);
+  });
+});
+
+describe("resolveQuickLogEditorTarget", () => {
+  const readyWrite = {
+    status: "ready" as const,
+    target: { plantId: "p1", growId: "g1", tentId: "t1" },
+  };
+  const blockedPrefill = { status: "blocked" as const, reason: "plant_not_found" as const };
+  const missingWrite = { status: "blocked" as const, reason: "missing_plant" as const };
+
+  it("lets a blocked route prefill override an otherwise ready unrelated write target", () => {
+    expect(
+      resolveQuickLogEditorTarget({
+        prefill: { plantId: "missing", growId: "g1", tentId: "t1" },
+        prefillResolution: blockedPrefill,
+        writeResolution: readyWrite,
+      }),
+    ).toEqual(blockedPrefill);
+  });
+
+  it("releases the prefill hold only for the exact request key dismissed by grower selection", () => {
+    const prefill = { plantId: "missing", growId: "g1", tentId: "t1" };
+    const key = quickLogPrefillTargetKey(prefill);
+    expect(key).not.toBeNull();
+    expect(
+      resolveQuickLogEditorTarget({
+        prefill,
+        prefillResolution: blockedPrefill,
+        writeResolution: readyWrite,
+        dismissedBlockedPrefillKey: key,
+      }),
+    ).toEqual(readyWrite);
+
+    expect(
+      resolveQuickLogEditorTarget({
+        prefill: { ...prefill, plantId: "another-missing" },
+        prefillResolution: blockedPrefill,
+        writeResolution: readyWrite,
+        dismissedBlockedPrefillKey: key,
+      }),
+    ).toEqual(blockedPrefill);
+  });
+
+  it("does not hold global or grow-only launchers that contain no plant target", () => {
+    for (const prefill of [null, {}, { growId: "g1", tentId: "t1" }]) {
+      expect(quickLogPrefillTargetKey(prefill)).toBeNull();
+      expect(
+        resolveQuickLogEditorTarget({
+          prefill,
+          prefillResolution: { status: "blocked", reason: "missing_plant" },
+          writeResolution: missingWrite,
+        }),
+      ).toEqual(missingWrite);
+    }
   });
 });

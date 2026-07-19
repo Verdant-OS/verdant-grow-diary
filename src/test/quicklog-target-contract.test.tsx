@@ -83,6 +83,17 @@ vi.mock("@/components/QuickLogAllActivitiesSection", () => ({
 
 import QuickLog, { type QuickLogPrefill } from "@/components/QuickLog";
 
+const elementPrototype = Element.prototype as Element & {
+  hasPointerCapture?: () => boolean;
+  setPointerCapture?: () => void;
+  releasePointerCapture?: () => void;
+  scrollIntoView?: () => void;
+};
+elementPrototype.hasPointerCapture ??= () => false;
+elementPrototype.setPointerCapture ??= () => {};
+elementPrototype.releasePointerCapture ??= () => {};
+elementPrototype.scrollIntoView ??= () => {};
+
 function quickLogElement(prefill?: QuickLogPrefill): ReactElement {
   return <QuickLog open onOpenChange={() => {}} prefill={prefill} />;
 }
@@ -103,6 +114,7 @@ function renderQuickLog(prefill?: QuickLogPrefill) {
 }
 
 beforeEach(() => {
+  window.localStorage.clear();
   harness.activeGrowId = "g1";
   harness.plants = [
     { id: "p1", name: "Plant One", grow_id: "g1", tent_id: "t1", stage: "veg" },
@@ -197,14 +209,12 @@ describe("Quick Log canonical target contract", () => {
       { id: "legacy-p", name: "Legacy Plant", grow_id: null, tent_id: null, stage: "veg" },
     ];
     harness.tents = [];
-    renderQuickLog();
+    renderQuickLog({ plantId: "legacy-p" });
 
-    await waitFor(() =>
-      expect(screen.getByTestId("quick-log-target-plant")).toHaveTextContent("Legacy Plant"),
-    );
-    expect(screen.getByTestId("quick-log-target-error")).toHaveTextContent(
+    expect(await screen.findByTestId("quick-log-target-error")).toHaveTextContent(
       "Assign this plant to a grow and tent before saving.",
     );
+    expect(screen.getByTestId("quick-log-target-card")).not.toHaveAttribute("data-target-plant-id");
     expect(screen.getByTestId("quick-log-save")).toBeDisabled();
     fireEvent.submit(screen.getByTestId("quick-log-save").closest("form") as HTMLFormElement);
     expect(harness.rpc).not.toHaveBeenCalled();
@@ -214,13 +224,102 @@ describe("Quick Log canonical target contract", () => {
     harness.tents = [{ id: "t1", name: "Tent One", grow_id: "g2" }];
     renderQuickLog({ plantId: "p1", growId: "g1", tentId: "t1" });
 
-    await waitFor(() =>
-      expect(screen.getByTestId("quick-log-target-plant")).toHaveTextContent("Plant One"),
-    );
-    expect(screen.getByTestId("quick-log-target-error")).toHaveTextContent(
+    expect(await screen.findByTestId("quick-log-target-error")).toHaveTextContent(
       /tent belongs to another grow/i,
     );
+    expect(screen.getByTestId("quick-log-target-card")).not.toHaveAttribute("data-target-plant-id");
     expect(screen.getByTestId("quick-log-save")).toBeDisabled();
     expect(harness.rpc).not.toHaveBeenCalled();
+  });
+
+  it("holds an unknown route prefill instead of falling through to a remembered target", async () => {
+    window.localStorage.setItem(
+      "verdant.quickLog.lastTarget.v1",
+      JSON.stringify({
+        plantId: "p1",
+        growId: "g1",
+        tentId: "t1",
+        savedAt: "2026-07-18T00:00:00.000Z",
+      }),
+    );
+
+    renderQuickLog({ plantId: "missing-plant", growId: "g1", tentId: "t1" });
+
+    expect(await screen.findByTestId("quick-log-target-error")).toHaveTextContent(
+      "That plant is no longer available. Choose another plant.",
+    );
+    expect(screen.getByTestId("quick-log-target-card")).not.toHaveAttribute("data-target-plant-id");
+    expect(screen.getByTestId("quick-log-save")).toBeDisabled();
+
+    fireEvent.change(screen.getByPlaceholderText(/Watered, looking healthy/i), {
+      target: { value: "Must not write to the remembered plant" },
+    });
+    fireEvent.submit(screen.getByTestId("quick-log-save").closest("form") as HTMLFormElement);
+    await waitFor(() => expect(harness.rpc).not.toHaveBeenCalled());
+  });
+
+  it("holds an archived route prefill instead of falling through to the sole scoped plant", async () => {
+    harness.plants = [
+      { id: "p1", name: "Plant One", grow_id: "g1", tent_id: "t1", stage: "veg" },
+      {
+        id: "archived-p",
+        name: "Archived Plant",
+        grow_id: "g1",
+        tent_id: "t1",
+        stage: "veg",
+        is_archived: true,
+      },
+    ];
+
+    renderQuickLog({ plantId: "archived-p", growId: "g1", tentId: "t1" });
+
+    expect(await screen.findByTestId("quick-log-target-error")).toHaveTextContent(
+      "That plant is archived or merged. Choose an active plant.",
+    );
+    expect(screen.getByTestId("quick-log-plant-select")).not.toHaveTextContent("Plant One");
+    expect(screen.getByTestId("quick-log-save")).toBeDisabled();
+
+    fireEvent.change(screen.getByPlaceholderText(/Watered, looking healthy/i), {
+      target: { value: "Must not write to the only other plant" },
+    });
+    fireEvent.submit(screen.getByTestId("quick-log-save").closest("form") as HTMLFormElement);
+    await waitFor(() => expect(harness.rpc).not.toHaveBeenCalled());
+  });
+
+  it("releases a blocked prefill hold only after an explicit valid plant selection", async () => {
+    renderQuickLog({ plantId: "missing-plant", growId: "g1", tentId: "t1" });
+    expect(await screen.findByTestId("quick-log-target-error")).toHaveTextContent(
+      "That plant is no longer available. Choose another plant.",
+    );
+
+    const trigger = screen.getByTestId("quick-log-plant-select");
+    fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerType: "mouse" });
+    fireEvent.click(trigger);
+    fireEvent.click(await screen.findByRole("option", { name: /Plant One/i }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("quick-log-target-card")).toHaveAttribute(
+        "data-target-plant-id",
+        "p1",
+      ),
+    );
+    expect(screen.queryByTestId("quick-log-target-error")).not.toBeInTheDocument();
+    expect(screen.getByTestId("quick-log-save")).toBeEnabled();
+  });
+
+  it("replaces a blocked prefill hold when a new valid prefill arrives", async () => {
+    const view = renderQuickLog({ plantId: "missing-plant", growId: "g1", tentId: "t1" });
+    expect(await screen.findByTestId("quick-log-target-error")).toBeInTheDocument();
+
+    act(() => view.rerenderQuickLog({ plantId: "p1", growId: "g1", tentId: "t1" }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("quick-log-target-card")).toHaveAttribute(
+        "data-target-plant-id",
+        "p1",
+      ),
+    );
+    expect(screen.queryByTestId("quick-log-target-error")).not.toBeInTheDocument();
+    expect(screen.getByTestId("quick-log-save")).toBeEnabled();
   });
 });

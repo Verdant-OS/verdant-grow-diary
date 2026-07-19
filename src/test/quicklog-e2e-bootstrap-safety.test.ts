@@ -81,10 +81,7 @@ describe("Bootstrap gate (pure)", () => {
 });
 
 describe("Bootstrap source safety", () => {
-  const files = [
-    "e2e/lib/fixtureBootstrap.ts",
-    "e2e/fixture-bootstrap.spec.ts",
-  ];
+  const files = ["e2e/lib/fixtureBootstrap.ts", "e2e/fixture-bootstrap.spec.ts"];
 
   // Strip JSDoc/comments + string literals so safety wording in docs
   // does not trip code-level scans.
@@ -96,18 +93,13 @@ describe("Bootstrap source safety", () => {
   }
 
   it("files exist", () => {
-    for (const f of files)
-      expect(fs.existsSync(path.join(ROOT, f)), `${f} missing`).toBe(true);
+    for (const f of files) expect(fs.existsSync(path.join(ROOT, f)), `${f} missing`).toBe(true);
   });
   it("bootstrap CODE (comments/strings stripped) has no delete/cleanup/destructive calls", () => {
     for (const f of files) {
       const code = stripCommentsAndStrings(read(f));
-      expect(code, `${f} delete call`).not.toMatch(
-        /\.delete\(|\.remove\(|\.destroy\(/,
-      );
-      expect(code, `${f} sql destructive`).not.toMatch(
-        /\bDROP\s+TABLE\b|\bTRUNCATE\b/i,
-      );
+      expect(code, `${f} delete call`).not.toMatch(/\.delete\(|\.remove\(|\.destroy\(/);
+      expect(code, `${f} sql destructive`).not.toMatch(/\bDROP\s+TABLE\b|\bTRUNCATE\b/i);
       expect(code, `${f} update plants/grows/tents`).not.toMatch(
         /update\s+plants|update\s+grows|update\s+tents/i,
       );
@@ -117,12 +109,8 @@ describe("Bootstrap source safety", () => {
     for (const f of files) {
       const code = stripCommentsAndStrings(read(f));
       expect(code, `${f} service_role`).not.toMatch(/service_role/i);
-      expect(code, `${f} auth bypass`).not.toMatch(
-        /skipAuth|bypassAuth|AUTH_BYPASS/,
-      );
-      expect(code, `${f} hardcoded password`).not.toMatch(
-        /password\s*[:=]\s*["'][^"']+["']/i,
-      );
+      expect(code, `${f} auth bypass`).not.toMatch(/skipAuth|bypassAuth|AUTH_BYPASS/);
+      expect(code, `${f} hardcoded password`).not.toMatch(/password\s*[:=]\s*["'][^"']+["']/i);
       expect(code, `${f} bearer token`).not.toMatch(/eyJ[A-Za-z0-9_-]{20,}\./);
     }
   });
@@ -143,9 +131,7 @@ describe("Workflow: bootstrap step + media expansion + summary", () => {
   const wf = read(".github/workflows/quicklog-smoke.yml");
 
   it("has a Bootstrap step gated by vars.E2E_ALLOW_FIXTURE_BOOTSTRAP == 'true'", () => {
-    const m = wf.match(
-      /-\s*name:\s*Bootstrap disposable E2E fixture[\s\S]*?(?=\n {6}- name:)/,
-    );
+    const m = wf.match(/-\s*name:\s*Bootstrap disposable E2E fixture[\s\S]*?(?=\n {6}- name:)/);
     expect(m, "Bootstrap step missing").toBeTruthy();
     const block = m![0];
     expect(block).toMatch(/id:\s*bootstrap_fixture/);
@@ -156,20 +142,14 @@ describe("Workflow: bootstrap step + media expansion + summary", () => {
   });
 
   it("bootstrap is not required for fixture verification — verify step runs without bootstrap gating", () => {
-    const m = wf.match(
-      /-\s*name:\s*Verify disposable E2E fixture[\s\S]*?(?=\n {6}- name:)/,
-    );
+    const m = wf.match(/-\s*name:\s*Verify disposable E2E fixture[\s\S]*?(?=\n {6}- name:)/);
     const block = m![0];
     expect(block).not.toMatch(/E2E_ALLOW_FIXTURE_BOOTSTRAP/);
-    expect(block).toMatch(
-      /if:\s*steps\.e2e_config\.outputs\.should_run\s*==\s*'true'/,
-    );
+    expect(block).toMatch(/if:\s*steps\.e2e_config\.outputs\.should_run\s*==\s*'true'/);
   });
 
   it("smoke still gated by fixture verification success (not by bootstrap)", () => {
-    const m = wf.match(
-      /-\s*name:\s*Run Quick Log Playwright smoke[\s\S]*?(?=\n {6}- name:)/,
-    );
+    const m = wf.match(/-\s*name:\s*Run Quick Log Playwright smoke[\s\S]*?(?=\n {6}- name:)/);
     const block = m![0];
     expect(block).toMatch(/steps\.verify_fixture\.outcome\s*==\s*'success'/);
     expect(block).not.toMatch(/steps\.bootstrap_fixture/);
@@ -182,25 +162,19 @@ describe("Workflow: bootstrap step + media expansion + summary", () => {
     expect(m, "media path block missing").toBeTruthy();
     const block = m![1];
     for (const ext of [".png", ".jpg", ".jpeg", ".gif", ".webm", ".mp4"]) {
-      expect(block, `media missing ${ext}`).toMatch(
-        new RegExp(`test-results/\\*\\*/\\*\\${ext}`),
-      );
+      expect(block, `media missing ${ext}`).toMatch(new RegExp(`test-results/\\*\\*/\\*\\${ext}`));
     }
     expect(block).toContain("playwright-report/data/**");
   });
 
   it("Playwright HTML report artifact includes playwright-report/", () => {
-    const m = wf.match(
-      /name:\s*quicklog-playwright-report[\s\S]*?(?=\n {6}- name:)/,
-    );
+    const m = wf.match(/name:\s*quicklog-playwright-report[\s\S]*?(?=\n {6}- name:)/);
     expect(m).toBeTruthy();
     expect(m![0]).toMatch(/path:\s*playwright-report\//);
   });
 
   it("traces artifact keeps test-results/**/*.zip", () => {
-    const m = wf.match(
-      /name:\s*quicklog-playwright-traces[\s\S]*?(?=\n {6}- name:)/,
-    );
+    const m = wf.match(/name:\s*quicklog-playwright-traces[\s\S]*?(?=\n {6}- name:)/);
     expect(m).toBeTruthy();
     expect(m![0]).toMatch(/test-results\/\*\*\/\*\.zip/);
   });
@@ -214,9 +188,7 @@ describe("Workflow: bootstrap step + media expansion + summary", () => {
       "upload_smoke_report_txt",
     ];
     for (const id of ids) {
-      const m = wf.match(
-        new RegExp(`id:\\s*${id}[\\s\\S]*?(?=\\n {6}- name:|\\n*$)`),
-      );
+      const m = wf.match(new RegExp(`id:\\s*${id}[\\s\\S]*?(?=\\n {6}- name:|\\n*$)`));
       expect(m, `${id} missing`).toBeTruthy();
       const block = m![0];
       expect(block, `${id} uses pinned upload-artifact v4`).toMatch(
@@ -255,9 +227,7 @@ describe("Workflow: bootstrap step + media expansion + summary", () => {
     expect(wf).not.toMatch(/service_role/i);
     expect(wf).not.toMatch(/password\s*:\s*["'][^"'$]+["']/i);
     expect(fs.existsSync(path.join(ROOT, "e2e/.auth/user.json"))).toBe(false);
-    expect(
-      fs.existsSync(path.join(ROOT, "e2e/.auth/session-storage.json")),
-    ).toBe(false);
+    expect(fs.existsSync(path.join(ROOT, "e2e/.auth/session-storage.json"))).toBe(false);
   });
 });
 
@@ -287,7 +257,7 @@ describe("Docs: rotation + fixture setup + screenshots", () => {
       "E2E Test Grow",
       "E2E Test Tent",
       "E2E Test Plant",
-      "505 Headbanger",
+      "E2E Test Plant 2",
       "E2E_TEST_EMAIL",
       "E2E_TEST_PASSWORD",
       "E2E_FIXTURE_MODE",
@@ -297,9 +267,7 @@ describe("Docs: rotation + fixture setup + screenshots", () => {
       "screenshot",
       "redact",
     ]) {
-      expect(doc, `FIXTURE_SETUP.md missing: ${tok}`).toMatch(
-        new RegExp(tok, "i"),
-      );
+      expect(doc, `FIXTURE_SETUP.md missing: ${tok}`).toMatch(new RegExp(tok, "i"));
     }
     expect(doc.toLowerCase()).toContain("never");
     expect(doc).toMatch(/no hardcoded credentials/i);
@@ -320,7 +288,9 @@ describe("Docs: rotation + fixture setup + screenshots", () => {
     const body = read(p);
     expect(body).not.toMatch(/process\.env\.E2E_TEST_PASSWORD/);
     expect(body).not.toMatch(/process\.env\.E2E_TEST_EMAIL/);
-    expect(body).not.toMatch(/\bfetch\s*\(|require\(["']https?["']\)|from\s+["']https?["']|supabase\.from\(/i);
+    expect(body).not.toMatch(
+      /\bfetch\s*\(|require\(["']https?["']\)|from\s+["']https?["']|supabase\.from\(/i,
+    );
     expect(body).not.toMatch(/service_role/i);
     expect(body).not.toMatch(/\.delete\(/);
   });
@@ -345,12 +315,8 @@ describe("Docs: rotation + fixture setup + screenshots", () => {
     expect(readme).not.toMatch(/Grow\s+named\s+exactly/i);
 
     // Checklist marks grow as optional, not required.
-    const requiredBlock = checklist.match(
-      /const REQUIRED_VARS = \[([\s\S]*?)\] as const/,
-    );
-    const optionalBlock = checklist.match(
-      /const OPTIONAL_VARS = \[([\s\S]*?)\] as const/,
-    );
+    const requiredBlock = checklist.match(/const REQUIRED_VARS = \[([\s\S]*?)\] as const/);
+    const optionalBlock = checklist.match(/const OPTIONAL_VARS = \[([\s\S]*?)\] as const/);
     expect(requiredBlock).toBeTruthy();
     expect(optionalBlock).toBeTruthy();
     expect(requiredBlock![1]).not.toMatch(/E2E_FIXTURE_EXPECTED_GROW_NAME/);
@@ -362,11 +328,7 @@ describe("Docs: rotation + fixture setup + screenshots", () => {
     const pkg = JSON.parse(read("package.json")) as {
       scripts: Record<string, string>;
     };
-    expect(pkg.scripts["e2e:bootstrap-fixture"]).toContain(
-      "e2e/fixture-bootstrap.spec.ts",
-    );
-    expect(pkg.scripts["e2e:fixture-checklist"]).toContain(
-      "print-fixture-config-checklist.ts",
-    );
+    expect(pkg.scripts["e2e:bootstrap-fixture"]).toContain("e2e/fixture-bootstrap.spec.ts");
+    expect(pkg.scripts["e2e:fixture-checklist"]).toContain("print-fixture-config-checklist.ts");
   });
 });

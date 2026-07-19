@@ -42,17 +42,17 @@ Because of this:
 
 ## Required env
 
-| Name                    | Purpose                                              |
-| ----------------------- | ---------------------------------------------------- |
-| `E2E_BASE_URL`          | Base URL of the running app (e.g. http://localhost:5173) |
-| `E2E_GROW_1_PLANT_URL`  | Full URL of a Grow #1 plant page to open first       |
-| `E2E_TEST_EMAIL`        | Login email for the smoke account                    |
-| `E2E_TEST_PASSWORD`     | Login password for the smoke account                 |
-| `E2E_GROW_2_PLANT_NAME` | Optional. Defaults to `505 Headbanger`               |
-| `E2E_FIXTURE_MODE` | Must be exactly `"true"` for any write-producing smoke run |
-| `E2E_FIXTURE_EXPECTED_TENT_NAME` | Expected disposable E2E tent name (e.g. `E2E Test Tent`) |
-| `E2E_FIXTURE_EXPECTED_PLANT_NAME` | Expected disposable E2E plant name (e.g. `E2E Test Plant`) |
-| `E2E_FIXTURE_EXPECTED_GROW_NAME` | **Optional.** Only used if the UI visibly exposes a grow name (e.g. `E2E Test Grow`). The current setup flow has no Grow page, so this is not required. |
+| Name                              | Purpose                                                                                                                                                 |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `E2E_BASE_URL`                    | Base URL of the running app (e.g. http://localhost:5173)                                                                                                |
+| `E2E_GROW_1_PLANT_URL`            | Full URL of a Grow #1 plant page to open first                                                                                                          |
+| `E2E_TEST_EMAIL`                  | Login email for the smoke account                                                                                                                       |
+| `E2E_TEST_PASSWORD`               | Login password for the smoke account                                                                                                                    |
+| `E2E_GROW_1_SECOND_PLANT_NAME`    | Optional. Same-grow/tent target; defaults to `E2E Test Plant 2`                                                                                         |
+| `E2E_FIXTURE_MODE`                | Must be exactly `"true"` for any write-producing smoke run                                                                                              |
+| `E2E_FIXTURE_EXPECTED_TENT_NAME`  | Expected disposable E2E tent name (e.g. `E2E Test Tent`)                                                                                                |
+| `E2E_FIXTURE_EXPECTED_PLANT_NAME` | Expected disposable E2E plant name (e.g. `E2E Test Plant`)                                                                                              |
+| `E2E_FIXTURE_EXPECTED_GROW_NAME`  | **Optional.** Only used if the UI visibly exposes a grow name (e.g. `E2E Test Grow`). The current setup flow has no Grow page, so this is not required. |
 
 `E2E_TEST_EMAIL` / `E2E_TEST_PASSWORD` are only required to (re)generate
 `e2e/.auth/user.json`. Once that file exists, the smoke run reuses it.
@@ -74,8 +74,8 @@ Required setup before enabling CI smoke (current UI flow — no Grow page):
    3. Open that tent and **Add Plant**.
    4. Name the plant exactly **`E2E Test Plant`**.
    5. Copy the plant detail URL — this becomes `E2E_GROW_1_PLANT_URL`.
-   6. Optional second plant **`505 Headbanger`** if the smoke step that
-      references it is in scope.
+   6. Optional second plant **`E2E Test Plant 2`** in the same tent/grow if
+      the smoke target-transition step is in scope.
    7. Optional grow named **`E2E Test Grow`** only if/when the UI
       visibly exposes a grow name or selector.
 3. Set the GitHub Actions variables:
@@ -204,10 +204,6 @@ dedicated artifact via the upload action's `artifact-url` output
 (with a fallback to the run's `#artifacts` section); no invented
 direct raw URLs are produced.
 
-
-
-
-
 ## Local setup
 
 Install Playwright once (it is declared in `devDependencies`, so
@@ -273,7 +269,7 @@ bun run e2e:install
 
 $env:E2E_BASE_URL="https://verdantgrowdiary-com.lovable.app"
 $env:E2E_GROW_1_PLANT_URL="https://verdantgrowdiary-com.lovable.app/plants/YOUR_TEST_PLANT_ID"
-$env:E2E_GROW_2_PLANT_NAME="505 Headbanger"
+$env:E2E_GROW_1_SECOND_PLANT_NAME="E2E Test Plant 2"
 $env:E2E_TEST_EMAIL="your-test-email"
 $env:E2E_TEST_PASSWORD="your-test-password"
 
@@ -289,7 +285,7 @@ bun run e2e:install
 
 export E2E_BASE_URL="https://verdantgrowdiary-com.lovable.app"
 export E2E_GROW_1_PLANT_URL="https://verdantgrowdiary-com.lovable.app/plants/YOUR_TEST_PLANT_ID"
-export E2E_GROW_2_PLANT_NAME="505 Headbanger"
+export E2E_GROW_1_SECOND_PLANT_NAME="E2E Test Plant 2"
 export E2E_TEST_EMAIL="your-test-email"
 export E2E_TEST_PASSWORD="your-test-password"
 
@@ -386,7 +382,7 @@ Triggers:
   - `E2E_BASE_URL`
   - `E2E_GROW_1_PLANT_URL`
 - Optional variable:
-  - `E2E_GROW_2_PLANT_NAME` (defaults to `"505 Headbanger"`)
+  - `E2E_GROW_1_SECOND_PLANT_NAME` (defaults to `"E2E Test Plant 2"`; same grow/tent)
 
 Artifacts (uploaded with `if: always()` under the name
 `quicklog-smoke-artifacts`, retained for 30 days):
@@ -546,16 +542,10 @@ artifact and open `index.html` (HTML report) or the report files
 locally. For JSON/TXT report artifacts, download and open the file
 directly.
 
-
-
 There is no scheduled or nightly Quick Log smoke. Write-producing smoke
 must only run against a disposable test account/test plant, so the
 workflow stays manual-dispatch / PR / push only until such a fixture
 exists. See the real-write warning at the top of this file.
-
-
-
-
 
 ## Run from GitHub Actions manually
 
@@ -576,7 +566,7 @@ Required repository configuration before dispatching:
 - Variables (Settings → Secrets and variables → Actions → Variables):
   - `E2E_BASE_URL`
   - `E2E_GROW_1_PLANT_URL`
-  - `E2E_GROW_2_PLANT_NAME` (optional; defaults to `"505 Headbanger"`)
+  - `E2E_GROW_1_SECOND_PLANT_NAME` (optional; defaults to `"E2E Test Plant 2"`)
 - Secrets (Settings → Secrets and variables → Actions → Secrets):
   - `E2E_TEST_EMAIL`
   - `E2E_TEST_PASSWORD`
@@ -609,8 +599,6 @@ Where outputs appear:
 **First file to inspect on any failure:**
 `e2e/results/quicklog-smoke-report.txt`.
 
-
-
 ## Troubleshooting Quick Log smoke failures
 
 Start with `quicklog-smoke-report.txt` (or the JSON sibling). Find the first
@@ -637,9 +625,9 @@ Common failure cases:
     plant route changed.
   - Fix: open the URL as the test user in a browser and update the var.
 
-- **Cannot find Grow #2 / target plant**
-  - Likely: `E2E_GROW_2_PLANT_NAME` does not match an existing plant, or
-    the test fixture is missing.
+- **Cannot find same-grow second target plant**
+  - Likely: `E2E_GROW_1_SECOND_PLANT_NAME` does not match a second plant in
+    the route plant's current grow/tent, or the test fixture is missing.
   - Fix: update the var or create/rename the test plant for the test
     account.
 

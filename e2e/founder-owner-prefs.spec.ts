@@ -74,6 +74,24 @@ function mockFoundersReadOnce(
 
 test.describe("Founder owner preferences (mocked)", () => {
   test.beforeEach(async ({ page }) => {
+    // The AgreementReconsentGate reads user_agreement_acceptances on every
+    // signed-in page. If it sees no accepted rows it mounts a modal Dialog
+    // that intercepts pointer events across the whole viewport and blocks
+    // the form beneath. Fulfil it with rows at the current versions so the
+    // gate stays closed. Registered BEFORE the /rest/v1 catch-all so this
+    // specific match wins.
+    await page.route(
+      /\/rest\/v1\/user_agreement_acceptances/,
+      (route) =>
+        route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify([
+            { agreement_type: "terms", version: "2026-07-13" },
+            { agreement_type: "privacy", version: "2026-07-13" },
+          ]),
+        }),
+    );
     // Default safety net — no /rest/v1/** or /functions/v1/** call can
     // escape the mocks and hit real Supabase.
     await page.route(/\/rest\/v1\//, (route) =>

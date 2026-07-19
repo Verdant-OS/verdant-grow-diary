@@ -168,17 +168,23 @@ test.describe("Founder owner preferences (mocked)", () => {
     await page.locator("#founder-optional-link").fill("https://example.com/jane");
     await clearOverlays();
 
+    // Programmatic form.requestSubmit() so the real submit event fires even
+    // if a portalled overlay would otherwise steal the click.
+    async function submitForm() {
+      await page.locator("form:has(#founder-show-on-wall)").evaluate((f) => {
+        (f as HTMLFormElement).requestSubmit();
+      });
+    }
+
     // https-only client validation: an http:// value must NOT invoke.
     await page.locator("#founder-optional-link").fill("http://insecure.example");
-    await clearOverlays();
-    await page.getByRole("button", { name: /Save Founder settings/i }).click({ force: true });
+    await submitForm();
     await expect(page.getByRole("alert")).toBeVisible();
     expect(invokeCount).toBe(0);
 
     // Fix and re-submit.
     await page.locator("#founder-optional-link").fill("https://example.com/jane");
-    await clearOverlays();
-    await page.getByRole("button", { name: /Save Founder settings/i }).click({ force: true });
+    await submitForm();
 
     await expect
       .poll(() => invokeCount, { timeout: 5_000 })

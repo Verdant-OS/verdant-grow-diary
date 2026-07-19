@@ -1046,6 +1046,10 @@ export default function McpToolExplorer() {
           persistOnOk("get_latest_sensor_snapshot", outcome, category, { tentId })
         }
         fieldErrors={tentIdTouched ? sensorErrors : []}
+        onApplyArgs={(args) => {
+          setTentId(typeof args.tentId === "string" ? args.tentId : "");
+          setTentIdTouched(true);
+        }}
         buildArgs={() => ({ tentId: tentId.trim() })}
       >
         <div className="space-y-1">

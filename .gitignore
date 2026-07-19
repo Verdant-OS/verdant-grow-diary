@@ -38,3 +38,6 @@ test-results/
 playwright-report/
 e2e/screenshots/
 e2e/.auth/
+
+# Windows / OneDrive per-folder settings artifact
+desktop.ini

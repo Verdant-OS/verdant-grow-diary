@@ -522,14 +522,67 @@ function ToolCard({
               <Button
                 type="button"
                 size="sm"
-                onClick={run}
-                disabled={state.loading || invalid || !connected}
+                onClick={requestRetry}
+                disabled={state.loading || invalid || !connected || retryPending}
+                aria-haspopup={confirmBeforeRetry ? "dialog" : undefined}
+                aria-expanded={retryPending || undefined}
                 data-testid={`tool-explorer-retry-${toolName}`}
               >
                 <RotateCcw className="mr-2 h-4 w-4" aria-hidden />
                 {guidance.primaryAction === "fix_params" ? "Retry with corrections" : "Retry"}
               </Button>
             </div>
+            <label className="flex items-center gap-2 pt-1 text-xs font-normal">
+              <Switch
+                checked={confirmBeforeRetry}
+                onCheckedChange={(v) => {
+                  setConfirmBeforeRetry(v);
+                  if (v === false) setRetryPending(false);
+                }}
+                aria-label="Confirm before retry"
+                data-testid={`tool-explorer-confirm-toggle-${toolName}`}
+              />
+              <span>
+                Confirm before retry
+                <span className="ml-1 text-muted-foreground">
+                  (recommended if a tool might have side effects)
+                </span>
+              </span>
+            </label>
+            {retryPending ? (
+              <div
+                role="alertdialog"
+                aria-label="Confirm retry"
+                data-testid={`tool-explorer-confirm-panel-${toolName}`}
+                className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-900 dark:text-amber-200 space-y-2"
+              >
+                <p className="font-medium">Re-run this tool?</p>
+                <p>
+                  The three built-in tools are read-only, but confirming avoids
+                  repeating side effects if a future tool ever isn't. The retry
+                  will send the current arguments as-is.
+                </p>
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={confirmRetry}
+                    data-testid={`tool-explorer-confirm-retry-${toolName}`}
+                  >
+                    Confirm retry
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setRetryPending(false)}
+                    data-testid={`tool-explorer-cancel-retry-${toolName}`}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : null}
           </div>
         );
       })()}

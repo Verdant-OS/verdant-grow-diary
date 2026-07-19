@@ -217,15 +217,15 @@ export default function ManualSensorReadingCard({
     });
   }, [form, tentId]);
 
-  // Entered vs derived VPD comparison. Uses only sanitized numeric metrics —
+  // Entered VPD vs air-VPD estimate. Uses only sanitized numeric metrics —
   // never relabels source. If the grower entered a VPD that disagrees with
-  // temp/RH-derived VPD by more than `VPD_CONFLICT_THRESHOLD_KPA`, the
+  // the temp/RH air estimate by more than `VPD_CONFLICT_THRESHOLD_KPA`, the
   // validator returns a warn hint on `vpdKpa`; we surface it inline.
   //
   // We only treat VPD as "entered" when the grower literally typed one in
-  // the VPD field (form.vpdKpa is a non-empty string). Auto-derived VPD
-  // that appears in validation.metrics from temp+RH must NOT be treated as
-  // entered — that would suppress the derived display and mask conflicts.
+  // the VPD field (form.vpdKpa is a non-empty string). A temp/RH air estimate
+  // must NOT be treated as entered or persisted — that would suppress the
+  // comparison and falsely upgrade its measurement basis.
   const fieldValidation = useMemo(() => {
     const fields: {
       temperatureC?: number;
@@ -250,7 +250,7 @@ export default function ManualSensorReadingCard({
   const enteredVpd =
     fieldValidation.derivedVpd.kind === "entered" ? fieldValidation.derivedVpd.vpdKpa : null;
   const derivedVpdFromTempRh = useMemo(() => {
-    // Compute derived VPD independently so we can render entered vs derived
+    // Compute the air estimate independently so we can render entered vs estimate
     // side-by-side even when the grower typed a VPD.
     const t = validation.metrics.find((m) => m.metric === "temperature_c");
     const h = validation.metrics.find((m) => m.metric === "humidity_pct");
@@ -643,7 +643,8 @@ export default function ManualSensorReadingCard({
                 className="text-[11px] text-muted-foreground"
                 data-testid="manual-reading-derived-vpd-hint"
               >
-                Saved as the VPD value unless you enter one.
+                Air estimate only — not saved as verified VPD. Enter a measured VPD only when its
+                basis is known.
               </p>
             )}
 
@@ -667,7 +668,7 @@ export default function ManualSensorReadingCard({
                     data-testid="manual-reading-vpd-derived"
                     data-value={derivedVpdFromTempRh ?? ""}
                   >
-                    <span className="text-muted-foreground">Derived VPD (temp + RH):</span>{" "}
+                    <span className="text-muted-foreground">Air VPD estimate (temp + RH):</span>{" "}
                     {derivedVpdFromTempRh !== null ? `${derivedVpdFromTempRh.toFixed(2)} kPa` : "—"}
                   </span>
                 </div>
@@ -681,8 +682,9 @@ export default function ManualSensorReadingCard({
                   </p>
                 )}
                 <p className="mt-1 text-[10px] text-muted-foreground">
-                  Manual entry — derived VPD never relabels this reading as live. Conflict
-                  threshold: {VPD_CONFLICT_THRESHOLD_KPA.toFixed(2)} kPa.
+                  Manual entry — the air estimate is preview-only, is not saved as verified VPD, and
+                  never relabels this reading as live. Conflict threshold:{" "}
+                  {VPD_CONFLICT_THRESHOLD_KPA.toFixed(2)} kPa.
                 </p>
               </div>
             )}

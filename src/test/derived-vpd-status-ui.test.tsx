@@ -23,7 +23,7 @@ import {
 } from "@/lib/derivedVpdStatusViewModel";
 
 describe("buildDerivedVpdStatusViewModel", () => {
-  it("returns available + numeric VPD for valid °F + RH", () => {
+  it("keeps valid °F + RH as an air estimate with no target claim", () => {
     const vm = buildDerivedVpdStatusViewModel({
       airTempF: 72, // ~22.2°C
       humidityPct: 60,
@@ -31,10 +31,36 @@ describe("buildDerivedVpdStatusViewModel", () => {
     });
     expect(vm.available).toBe(true);
     expect(vm.vpdKpa).not.toBeNull();
+    expect(vm.classification).toBe("unverified");
+    expect(vm.statusLabel).toBe("Calibration required — no target claim");
+    expect(vm.vpdLabel).toBe("Air VPD estimate");
+    expect(vm.canCompareToStageTarget).toBe(false);
+    expect(vm.vpdLabel).not.toMatch(/live/i);
+  });
+
+  it("uses verified leaf VPD before making a stage comparison", () => {
+    const vm = buildDerivedVpdStatusViewModel({
+      airTempC: 25,
+      leafTempC: 24,
+      humidityPct: 60,
+      stage: "veg",
+      nowMs: Date.parse("2026-07-18T18:00:00.000Z"),
+      measurementEvidence: {
+        observedAt: "2026-07-18T17:55:00.000Z",
+        temperatureVerifiedAt: "2026-06-01T12:00:00.000Z",
+        temperatureReference: "Traceable reference",
+        temperatureVerifiedAtOperatingConditions: true,
+        humidityVerifiedAt: "2026-06-01T12:00:00.000Z",
+        humidityReferenceRhPercent: 75,
+        leafTemperatureMeasuredAt: "2026-07-18T17:56:00.000Z",
+        placement: "canopy",
+      },
+    });
+
+    expect(vm.vpdLabel).toBe("Verified leaf VPD");
+    expect(vm.canCompareToStageTarget).toBe(true);
     expect(vm.classification).toBe("in_band");
     expect(vm.statusLabel).toBe("In target");
-    expect(vm.vpdLabel).toBe("Derived VPD");
-    expect(vm.vpdLabel).not.toMatch(/live/i);
   });
 
   it("returns unavailable when temp missing", () => {
@@ -76,8 +102,8 @@ describe("buildDerivedVpdStatusViewModel", () => {
       humidityPct: 30,
       stage: "seedling",
     });
-    expect(vm.classification).toBe("high");
-    expect(vm.statusLabel).toBe("Above target");
+    expect(vm.classification).toBe("unverified");
+    expect(vm.statusLabel).toBe("Calibration required — no target claim");
   });
 
   it("classifies low VPD against stage band", () => {
@@ -86,31 +112,34 @@ describe("buildDerivedVpdStatusViewModel", () => {
       humidityPct: 90,
       stage: "flower",
     });
-    expect(vm.classification).toBe("low");
-    expect(vm.statusLabel).toBe("Below target");
+    expect(vm.classification).toBe("unverified");
+    expect(vm.statusLabel).toBe("Calibration required — no target claim");
   });
 
   it("help copy explains temp + RH", () => {
     expect(DERIVED_VPD_HELP_COPY).toMatch(/temperature/i);
     expect(DERIVED_VPD_HELP_COPY).toMatch(/humidity/i);
+    expect(DERIVED_VPD_HELP_COPY).toMatch(/leaf/i);
+    expect(DERIVED_VPD_HELP_COPY).toMatch(/calibrat/i);
   });
 });
 
 describe("<DerivedVpdStatus />", () => {
-  it("renders Derived VPD value when temp + RH valid", () => {
+  it("renders an air VPD estimate when temp + RH are valid", () => {
     render(<DerivedVpdStatus airTempF={77} humidityPct={60} stage="veg" />);
     expect(screen.getByTestId("derived-vpd-status")).toBeInTheDocument();
     expect(screen.getByTestId("derived-vpd-status-value")).toBeInTheDocument();
-    expect(screen.getByTestId("derived-vpd-status")).toHaveTextContent(/Derived VPD/);
+    expect(screen.getByTestId("derived-vpd-status")).toHaveTextContent(/Air VPD estimate/);
+    expect(screen.getByTestId("derived-vpd-status-status")).toHaveTextContent(
+      /Calibration required — no target claim/,
+    );
     expect(screen.getByTestId("derived-vpd-status")).not.toHaveTextContent(/Live/);
   });
 
   it("renders VPD unavailable when inputs missing", () => {
     render(<DerivedVpdStatus airTempF="" humidityPct="" stage="veg" />);
     expect(screen.getByTestId("derived-vpd-status-unavailable")).toBeInTheDocument();
-    expect(screen.getByTestId("derived-vpd-status-status")).toHaveTextContent(
-      /VPD unavailable/,
-    );
+    expect(screen.getByTestId("derived-vpd-status-status")).toHaveTextContent(/VPD unavailable/);
   });
 
   it("stage unknown never renders healthy/in-target language", () => {

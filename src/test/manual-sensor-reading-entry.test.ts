@@ -21,12 +21,12 @@ describe("sensorReadingManualEntryRules — pure validation", () => {
     });
     expect(v.ok).toBe(true);
     expect(v.errors).toEqual([]);
-    expect(v.warnings).toEqual([]);
-    // temp_c, humidity, co2, soil, vpd(derived) = 5 metrics
+    expect(v.warnings.join(" ")).toMatch(/air vpd estimate.*not saved/i);
+    // Air VPD remains preview-only until leaf/calibration evidence can travel with the row.
     expect(v.metrics.map((m) => m.metric).sort()).toEqual(
-      ["co2_ppm", "humidity_pct", "soil_moisture_pct", "temperature_c", "vpd_kpa"].sort(),
+      ["co2_ppm", "humidity_pct", "soil_moisture_pct", "temperature_c"].sort(),
     );
-    expect(v.metrics.find((m) => m.metric === "vpd_kpa")?.derived).toBe(true);
+    expect(v.metrics.find((m) => m.metric === "vpd_kpa")).toBeUndefined();
   });
 
   it("rejects an empty reading", () => {
@@ -63,11 +63,19 @@ describe("sensorReadingManualEntryRules — pure validation", () => {
     expect(v.ok).toBe(true);
   });
 
-  it("converts °F to °C and auto-derives VPD when not supplied", () => {
+  it("converts °F to °C and keeps air VPD available for preview", () => {
     expect(fahrenheitToCelsius(77)).toBeCloseTo(25, 1);
     const vpd = computeVpdKpa(25, 50);
     expect(vpd).toBeGreaterThan(1.0);
     expect(vpd).toBeLessThan(2.0);
+  });
+
+  it("persists a grower-entered manual VPD but never invents one", () => {
+    const entered = validateManualEntry({ vpdKpa: 1.2 });
+    expect(entered.metrics.find((m) => m.metric === "vpd_kpa")).toMatchObject({
+      value: 1.2,
+    });
+    expect(entered.metrics.find((m) => m.metric === "vpd_kpa")?.derived).toBeUndefined();
   });
 });
 

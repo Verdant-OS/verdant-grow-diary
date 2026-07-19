@@ -11,6 +11,7 @@
 import { Link } from "react-router-dom";
 import BrandLogo from "@/components/BrandLogo";
 import { usePageSeo } from "@/hooks/usePageSeo";
+import McpToolExplorer from "@/components/mcp/McpToolExplorer";
 
 const ENDPOINT = "https://knkwiiywfkbqznbxwqfh.supabase.co/functions/v1/mcp";
 

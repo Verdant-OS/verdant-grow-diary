@@ -216,4 +216,64 @@ test.describe("Founder owner preferences (mocked)", () => {
     await save.click({ force: true }).catch(() => {});
     expect(invokeCount).toBe(0);
   });
+
+  test("status live region announces saving once and clears on completion", async ({ page }) => {
+    await seedSession(page);
+    await mockFoundersReadOnce(page, {
+      founder_number: 21,
+      display_name: null,
+      display_style: "hidden",
+      show_on_wall: false,
+      optional_link: null,
+      status: "confirmed",
+    });
+
+    // Gate the edge function so we can inspect the in-flight state.
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route(
+      /\/functions\/v1\/save-founder-prefs/,
+      async (route) => {
+        await gate;
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ ok: true }),
+        });
+      },
+    );
+
+    await page.goto("/founder");
+    await expect(
+      page.getByRole("heading", { name: /Your Founder settings/i }),
+    ).toBeVisible({ timeout: 15_000 });
+
+    const status = page.getByTestId("founder-prefs-status");
+
+    // Idle: element exists, is a status live region, and holds no stale text.
+    await expect(status).toHaveCount(1);
+    await expect(status).toHaveAttribute("role", "status");
+    await expect(status).toHaveAttribute("aria-live", "polite");
+    await expect(status).toHaveAttribute("aria-atomic", "true");
+    await expect(status).toHaveText("");
+
+    // Trigger the save.
+    await page.getByRole("button", { name: /Save Founder settings/i }).click();
+
+    // In-flight: message announced exactly once (single node, single text).
+    await expect(status).toHaveText("Saving Founder settings…");
+    expect(await page.getByText("Saving Founder settings…").count()).toBe(1);
+
+    // Complete the request and assert the live region clears — no stale
+    // announcement lingers for assistive tech after success.
+    release();
+    await expect(status).toHaveText("", { timeout: 5_000 });
+    await expect(
+      page.getByRole("button", { name: /Save Founder settings/i }),
+    ).toBeEnabled();
+    expect(await page.getByText("Saving Founder settings…").count()).toBe(0);
+  });
 });
+

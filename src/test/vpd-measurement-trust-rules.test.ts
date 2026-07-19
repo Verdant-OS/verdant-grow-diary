@@ -4,6 +4,7 @@ import {
   evaluateVpdMeasurementTrust,
   VPD_CALIBRATION_MAX_AGE_DAYS,
   VPD_HUMIDITY_REFERENCE_MIN_PERCENT,
+  VPD_MEASUREMENT_FUTURE_TOLERANCE_MINUTES,
 } from "@/lib/vpdMeasurementTrustStatusRules";
 import { calculateLeafVpdKpa } from "@/lib/vpdRules";
 
@@ -199,6 +200,27 @@ describe("evaluateVpdMeasurementTrust", () => {
     expect(result.canCompareToStageTarget).toBe(false);
     expect(result.issues).toContain("leaf_measurement_time_in_future");
     expect(result.issues).not.toContain("leaf_measurement_not_contemporaneous");
+  });
+
+  it("keeps the documented five-minute future tolerance inclusive", () => {
+    const toleranceMs = VPD_MEASUREMENT_FUTURE_TOLERANCE_MINUTES * 60_000;
+    const exactBoundary = new Date(NOW_MS + toleranceMs).toISOString();
+    const result = evaluateVpdMeasurementTrust({
+      airTempC: 25,
+      leafTempC: 23,
+      humidityPct: 60,
+      evidence: {
+        ...VERIFIED_EVIDENCE,
+        observedAt: exactBoundary,
+        leafTemperatureMeasuredAt: exactBoundary,
+      },
+      nowMs: NOW_MS,
+    });
+
+    expect(result.confidence).toBe("verified");
+    expect(result.canCompareToStageTarget).toBe(true);
+    expect(result.issues).not.toContain("observation_time_in_future");
+    expect(result.issues).not.toContain("leaf_measurement_time_in_future");
   });
 
   it("never converts whitespace-only measurement strings into numeric zero", () => {

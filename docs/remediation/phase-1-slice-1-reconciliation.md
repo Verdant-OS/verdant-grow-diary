@@ -9,8 +9,8 @@
 ## Scope and current ground truth
 
 - Charter outcome: **T1 — Quick Log target integrity**.
-- Deploy-trunk base: `ed3790cb8e6534d161968b6769a7fafe24aaefd1` (`origin/verdant-grow-diary`).
-- Specification-repair base: `fcb3c7b2837db0b6e86ad437070569234e10409f`.
+- Deploy-trunk base: `47cb5bd077e02ca17daa32b40191283e1cb9bf32` (`origin/verdant-grow-diary`).
+- Specification-repair base: `7e5739f5a`.
 - Branch: `codex/verdant-trust-core-target-integrity`.
 - Deployment source of truth: `verdant-grow-diary`, not undeployed `main`.
 - `/dashboard` intentionally remains an authenticated Dashboard alias rendered inside `AppShell`; it is not a redirect and its optional `growId` scope is preserved.
@@ -58,22 +58,25 @@ Deterministic result: **3/3 enumerated route-scoped entry-point classes pass, an
 
 ## Replayed commit sequence
 
-- `e8bb1f1cd` — Trust Core redesign specification
-- `e40b83b97` — T1 implementation plan
-- `602e28c9d` — pure target-integrity rules
-- `aaf3c2cdd` — Quick Log canonical display/write target
-- `4ece7e162` — exact One-Tent Loop Quick Log handoff
-- `834c929b6` — scope-preserving `/logs` route alias
-- `16e5e2b23` — authenticated route-target gate
-- `530a4e7b2` — legacy Quick Log target-fixture alignment
-- `0f08a90d5` — legacy save and alias-contract alignment
-- `ef4200bd1` — exact refresh-target contract alignment
-- `e1e41b99d` — initial reconciliation packet replay
-- `fcb3c7b28` — target-integrity port evidence refresh
-- `d5de062cc` — blocked-target integrity repair
-- `1ebba5b26` — canonical target display repair
-- `4bdbd1263` — in-flight target, query-state, handoff, and exact-name repair
-- `909fa9d78` — legacy target-contract tests aligned with explicit grower selection
+- `278a55586` — Trust Core redesign specification
+- `e13e2cec0` — T1 implementation plan
+- `d595905eb` — pure target-integrity rules
+- `f8eb93745` — Quick Log canonical display/write target
+- `60dd7aadc` — exact One-Tent Loop Quick Log handoff
+- `c5509626e` — scope-preserving `/logs` route alias
+- `e279103f4` — authenticated route-target gate
+- `6bc58b7e6` — legacy Quick Log target-fixture alignment
+- `f2e05addf` — legacy save and alias-contract alignment
+- `b22ca3772` — exact refresh-target contract alignment
+- `eb8a4aa61` — initial reconciliation packet replay
+- `7e5739f5a` — target-integrity port evidence refresh
+- `37c444fbe` — blocked-target integrity repair
+- `d158e28cc` — canonical target display repair
+- `1ebfc4e6c` — in-flight target, query-state, handoff, and exact-name repair
+- `4101f49e1` — specification-repair reconciliation
+- `09c29a0d5` — legacy target-contract tests aligned with explicit grower selection
+- `b10c4f2f2` — final validation evidence
+- `5d390f989` — cross-platform workflow-fixture parsing
 
 ## Validation rerun on this port
 
@@ -82,6 +85,7 @@ Deterministic result: **3/3 enumerated route-scoped entry-point classes pass, an
 | Requested targeted slice              | **Pass — 16 files, 203/203 tests, 0 failures**                                                                        |
 | Repair-focused changed-test batch     | **Pass — 8 files, 151/151 tests, 0 failures**                                                                         |
 | Final regression repair batch         | **Pass — 5 files, 42/42 tests, 0 failures**                                                                           |
+| Cross-platform E2E static contracts   | **Pass — 4 files, 93/93 tests, 0 failures**                                                                           |
 | All branch-changed test files         | **Pass — 35 files, 447/447 tests, 0 failures**                                                                        |
 | Type-check                            | **Pass — 0 diagnostics** (`tsc -p tsconfig.app.json --noEmit`)                                                        |
 | Changed-file lint                     | **Pass — 0 errors, 0 warnings**                                                                                       |
@@ -106,9 +110,11 @@ The requested targeted slice emitted only known non-failing React Router v7 futu
 
 The exact all-branch-changed-test-file batch is currently green at 447/447. The first aggregate rerun exposed nine legacy assertions that still expected silent sole-plant fallback or invalid-prefill fallback. Those tests now use a valid route target followed by an explicit grower selection, preserving mismatch, accessibility, stage-alias, post-save, and draft-safety coverage without restoring the unsafe behavior.
 
+After the branch was rebased without conflict onto the latest deploy trunk, the workflow-fixture parsers exposed four CRLF-only failures on Windows. The two shared test readers now normalize line endings before applying the exact workflow assertions; the same assertions pass 93/93 without changing workflow content.
+
 The security scanner initially identified only generated `dist/` bundle strings in the local working directory. The generated directory was temporarily isolated, the scanner fixtures and source-tree scan passed, and the directory was restored unchanged. The scanner timing wrapper remains red only because two passing rows exceeded its unchanged 5000 ms performance threshold on this Windows runner. No workflow safety parser, timing threshold, allow-list, suppression, or scope fence was weakened to obtain any result.
 
-The old branch's full-suite totals, scanner timings, Playwright discovery, E2E compilation, fixture-checklist result, and deployment-base classifications are intentionally not carried forward as current evidence because they were not rerun against `ed3790cb8`.
+The old branch's full-suite totals, scanner timings, Playwright discovery, E2E compilation, fixture-checklist result, and deployment-base classifications are intentionally not carried forward as current evidence because they were not rerun against `47cb5bd07`.
 
 ## Current pending gates
 

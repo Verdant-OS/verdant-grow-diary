@@ -254,4 +254,88 @@ test.describe("Founder owner preferences (mocked)", () => {
     await save.click({ force: true }).catch(() => {});
     expect(invokeCount).toBe(0);
   });
+
+  test("edge function 500 surfaces inline error and does NOT refetch", async ({ page }) => {
+    await seedSession(page);
+
+    // Count founders reads so we can assert no refetch after a failed save.
+    let foundersReadCount = 0;
+    await page.route(/\/rest\/v1\/founders(\?|$)/, async (route: Route) => {
+      foundersReadCount += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          founder_number: 9,
+          display_name: null,
+          display_style: "hidden",
+          show_on_wall: false,
+          optional_link: null,
+          status: "confirmed",
+        }),
+      });
+    });
+
+    // save-founder-prefs returns a 500 edge failure.
+    let invokeCount = 0;
+    await page.route(
+      /\/functions\/v1\/save-founder-prefs/,
+      async (route) => {
+        invokeCount += 1;
+        await route.fulfill({
+          status: 500,
+          contentType: "application/json",
+          body: JSON.stringify({ error: "internal edge failure" }),
+        });
+      },
+    );
+
+    await page.goto("/founder");
+
+    const heading = page.getByRole("heading", { name: /Your Founder settings/i });
+    await expect(heading).toBeVisible({ timeout: 15_000 });
+
+    // Snapshot the mount-time read count before the failing submit.
+    const readsBeforeSubmit = foundersReadCount;
+    expect(readsBeforeSubmit).toBeGreaterThan(0);
+
+    await page.keyboard.press("Escape");
+    await page.evaluate(() => {
+      document
+        .querySelectorAll<HTMLElement>('div.fixed.inset-0.z-50')
+        .forEach((el) => el.remove());
+    });
+    await heading.scrollIntoViewIfNeeded();
+
+    // Valid client-side payload so the edge function is actually invoked.
+    await page.locator("#founder-show-on-wall").click({ force: true });
+    await page.locator("#founder-display-name").fill("Jane Cultivator");
+
+    await page.locator("form:has(#founder-show-on-wall)").evaluate((f) => {
+      (f as HTMLFormElement).requestSubmit();
+    });
+
+    // Edge function was called exactly once and returned 500.
+    await expect.poll(() => invokeCount, { timeout: 5_000 }).toBe(1);
+
+    // Inline error alert is visible with a message from the failure path.
+    const alert = page.getByRole("alert");
+    await expect(alert).toBeVisible();
+    await expect(alert).toContainText(/internal edge failure|Could not save|Edge Function/i);
+
+    // Destructive toast surfaced (title appears in both toast body and
+    // the aria-live announcer, so scope to the first match).
+    await expect(
+      page.getByText(/Could not save Founder settings/i).first(),
+    ).toBeVisible();
+
+    // Give any stray refetch a chance to fire, then assert none did.
+    await page.waitForTimeout(500);
+    expect(foundersReadCount).toBe(readsBeforeSubmit);
+
+    // Save button is re-enabled (saving flag cleared) so the user can retry.
+    await expect(
+      page.getByRole("button", { name: /Save Founder settings/i }),
+    ).toBeEnabled();
+  });
 });

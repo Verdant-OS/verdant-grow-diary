@@ -85,6 +85,14 @@ describe("subscriber growth publication handoff", () => {
     expect(HANDOFF).toMatch(/public (?:Founder )?check sends no key/i);
   });
 
+  it("keeps the public Founder-counter release contract aligned with the 100-seat offer", () => {
+    for (const document of [HANDOFF, LAUNCH_RUNBOOK]) {
+      expect(document).toContain("total === 100");
+      expect(document).toContain("0..100");
+      expect(document).not.toMatch(/total === 75|0\.\.75/);
+    }
+  });
+
   it("keeps subscriber truth and rollback fail-closed", () => {
     expect(HANDOFF).toMatch(/only active, in-period rows from the server-written billing/i);
     expect(HANDOFF).toContain("incumbent `billing_subscriptions`");

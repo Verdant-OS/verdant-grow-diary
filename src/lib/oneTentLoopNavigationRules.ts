@@ -8,6 +8,8 @@
  * Approval-required wording is preserved for the Action Queue step.
  */
 
+import { buildSensorsTentRouteHref } from "@/lib/sensorRouteTentIntentRules";
+
 export type OneTentLoopStep =
   | "grow"
   | "tent"
@@ -156,7 +158,11 @@ export function resolveOneTentLoopNextStep(
     case "quick-log":
       return enable(base, "/timeline");
     case "timeline":
-      return enable(base, "/sensors");
+      // Carry an explicitly selected timeline tent into Sensors as a
+      // UUID-only intent. Sensors still validates it against authenticated
+      // tent rows before selecting it, so this never grants access or turns
+      // an arbitrary query value into a sensor query.
+      return enable(base, buildSensorsTentRouteHref(tentId));
     case "sensor-snapshot":
       return enable(base, "/doctor");
     case "ai-doctor":

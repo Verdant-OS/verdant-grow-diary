@@ -88,9 +88,16 @@ describe("oneTentLoopNavigationRules", () => {
     expect(plant.href ?? "").not.toMatch(/^\/plants\//);
   });
 
-  it("routes quick-log → timeline and timeline → sensors without ids", () => {
+  it("routes quick-log → timeline and preserves a valid Timeline tent as a Sensors intent", () => {
     expect(resolveOneTentLoopNextStep("quick-log").href).toBe("/timeline");
     expect(resolveOneTentLoopNextStep("timeline").href).toBe("/sensors");
+    expect(
+      resolveOneTentLoopNextStep("timeline", {
+        tentId: "00000000-0000-4000-8000-00000000000a",
+      }).href,
+    ).toBe("/sensors?tentId=00000000-0000-4000-8000-00000000000a");
+    // A malformed local filter must not become an untrusted route query.
+    expect(resolveOneTentLoopNextStep("timeline", { tentId: "tent-a" }).href).toBe("/sensors");
   });
 
   it("routes sensor-snapshot → ai doctor entry", () => {

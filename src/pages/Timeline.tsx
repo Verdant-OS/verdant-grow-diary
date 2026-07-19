@@ -806,7 +806,7 @@ export default function Timeline() {
 
       <OneTentLoopNextStepCard
         current="timeline"
-        ids={{ growId: activeGrowId ?? null }}
+        ids={{ growId: activeGrowId ?? null, tentId: tentFilter || null }}
         testId="timeline-one-tent-loop-next-step-card"
         className="mb-3"
       />

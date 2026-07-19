@@ -18,6 +18,7 @@
  *   ai_doctor_result_received / ai_doctor_session_saved
  *                           → PlantDetailAiDoctorLiveReview.tsx
  *   paywall_viewed          → Pricing.tsx + Upgrade.tsx + AI Doctor limit (mount effects)
+ *   paywall_cta_clicked     → explicit Free AI Doctor limit pricing CTA click
  *   checkout_started        → usePaddleCheckout.ts (authenticated openCheckout)
  *   subscription_activated  → CheckoutSuccess.tsx (server-confirmed flip)
  *   checkout_return_completed
@@ -169,6 +170,25 @@ describe("each funnel event fires from its canonical seam", () => {
     );
   });
 
+  it("paywall_cta_clicked is only wired to the explicit Free AI Doctor limit CTA", () => {
+    const aiDoctor = read("src/components/PlantDetailAiDoctorLiveReview.tsx");
+    const notice = read("src/components/AiCreditLimitNotice.tsx");
+    const coach = read("src/pages/Coach.tsx");
+    const callbackStart = aiDoctor.indexOf("const handleCreditLimitPlansClick");
+    const callbackEnd = aiDoctor.indexOf("useEffect(() =>", callbackStart);
+    const callback = aiDoctor.slice(callbackStart, callbackEnd);
+
+    expect(callbackStart).toBeGreaterThan(-1);
+    expect(callbackEnd).toBeGreaterThan(callbackStart);
+    expect(callback).toMatch(
+      /trackFunnelEvent\("paywall_cta_clicked",\s*\{\s*surface:\s*"ai_doctor_limit"\s*\}\)/,
+    );
+    expect(callback).not.toMatch(/user_id|plant_id|grow_id|tent_id|returnTo|email|plan/);
+    expect(aiDoctor).toMatch(/onUpsellCtaClick=\{handleCreditLimitPlansClick\}/);
+    expect(notice).toMatch(/onPrimaryCtaClick=\{onUpsellCtaClick\}/);
+    expect(coach).not.toContain("onUpsellCtaClick");
+  });
+
   it("quick_log_saved routes through the shared wrapper at every mounted success seam", () => {
     expect(QUICK_LOG_MODULE).toMatch(
       /trackFunnelEvent\("quick_log_saved",\s*\{\s*event_type:\s*eventType\s*\}\)/,
@@ -182,6 +202,8 @@ describe("each funnel event fires from its canonical seam", () => {
     }
   });
 
+  // This inventory recursively reads every source file. Permit normal parallel
+  // Vitest contention as the app grows without weakening the assertion.
   it("inventories every production useQuickLogV2Save caller and requires explicit opt-in", () => {
     const actualCallers = listSourceFiles(resolve(ROOT, "src"))
       .map((file) => ({ absolute: file, relative: relative(ROOT, file).replace(/\\/g, "/") }))
@@ -200,7 +222,7 @@ describe("each funnel event fires from its canonical seam", () => {
         expect(src).not.toMatch(/telemetryIntent|trackQuickLogSuccess/);
       }
     }
-  });
+  }, 15_000);
 });
 
 describe("ordering and safety constraints at the seams", () => {
@@ -439,7 +461,7 @@ describe("funnelAnalytics module — privacy fences", () => {
 
   it("documents the limited GA4 activation proxy separately from future authority", () => {
     expect(EVENT_MAP).toMatch(
-      /csv_import_started → csv_import_completed →\s*csv_history_ai_doctor_clicked → ai_doctor_review_started →\s*ai_doctor_result_received → ai_doctor_session_saved → paywall_viewed/,
+      /csv_import_started → csv_import_completed →\s*csv_history_ai_doctor_clicked → ai_doctor_review_started →\s*ai_doctor_result_received → ai_doctor_session_saved → paywall_viewed →\s*paywall_cta_clicked → checkout_started/,
     );
     expect(EVENT_MAP).toMatch(/historical-only branch marker/);
     expect(EVENT_MAP).toMatch(/surface: "imported_history"/);
@@ -453,6 +475,10 @@ describe("funnelAnalytics module — privacy fences", () => {
     expect(EVENT_MAP).toMatch(/not authoritative cross-device, server-side, or signup-cohort/);
     expect(EVENT_MAP).toMatch(/future authoritative operator\/cohort aggregate/);
     expect(EVENT_MAP).toMatch(/not implemented or claimed/);
+    expect(EVENT_MAP).toMatch(/client-only, non-authoritative intent signal/);
+    expect(EVENT_MAP).toMatch(
+      /not\s+a checkout start, subscription, entitlement grant, or revenue event/,
+    );
   });
 
   it("has no network client, storage writes, or identifiers", () => {

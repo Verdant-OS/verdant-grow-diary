@@ -14,7 +14,8 @@ The shipped privacy-safe growth-calendar sequence is:
 signup → grow_created → tent_created → plant_created → quick_log_saved →
 csv_import_started → csv_import_completed →
 csv_history_ai_doctor_clicked → ai_doctor_review_started →
-ai_doctor_result_received → ai_doctor_session_saved → paywall_viewed → checkout_started →
+ai_doctor_result_received → ai_doctor_session_saved → paywall_viewed →
+paywall_cta_clicked → checkout_started →
 subscription_activated → checkout_return_completed
 ```
 
@@ -49,6 +50,16 @@ These AI Doctor funnel events cover the canonical plant-detail
 `ai-doctor-review` path. AI Coach has a separate invocation path and is not
 claimed as measured by this client sequence; add its server-authoritative usage
 telemetry separately before including Coach in conversion reporting.
+
+When a Free grower is server-denied for the per-grow AI Doctor limit,
+`paywall_viewed` records that the rendered limit notice exposed an upgrade
+option. `paywall_cta_clicked` then records only an explicit click on that
+notice's pricing CTA with the closed `surface: "ai_doctor_limit"` enum. It
+does not record a route, return target, grower identity, plant/tent/grow ID,
+or plan choice. It is a client-only, non-authoritative intent signal: it is not
+a checkout start, subscription, entitlement grant, or revenue event. Paid,
+Founder, and unknown-plan denials expose no pricing CTA and emit neither
+paywall event.
 
 `subscription_activated` requires both the server-resolved paid entitlement and
 a fresh same-device checkout-start marker. This intentionally undercounts when

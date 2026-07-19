@@ -450,6 +450,13 @@ function PlantDetailAiDoctorLiveReviewScope({
     }
   }, [creditNoticeKind]);
 
+  // This is intentionally an explicit CTA-intent marker, not a checkout or
+  // entitlement signal. AiCreditLimitNotice attaches it only to the Free
+  // denial's rendered pricing CTA; paid/founder/unknown notices have no CTA.
+  const handleCreditLimitPlansClick = useCallback(() => {
+    trackFunnelEvent("paywall_cta_clicked", { surface: "ai_doctor_limit" });
+  }, []);
+
   useEffect(() => {
     // These events describe value the grower can actually see. If eligibility
     // disappears while the request is in flight, the component renders
@@ -715,6 +722,7 @@ function PlantDetailAiDoctorLiveReviewScope({
             credit={review.credit}
             surface="doctor"
             returnTo={returnTo}
+            onUpsellCtaClick={handleCreditLimitPlansClick}
             data-testid="plant-ai-doctor-live-review-credit-denied"
           />
         ) : review.reason === "upstream_credit_exhausted" ? (

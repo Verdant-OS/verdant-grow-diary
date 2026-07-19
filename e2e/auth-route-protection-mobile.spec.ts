@@ -94,6 +94,12 @@ const PUBLIC_MOBILE_ROUTES: string[] = [
   // zero private-table fetches.
   "/pheno-comparison",
   "/pheno-hunts/:id/compare",
+  // Read-only per-hunt showcase (pack → contenders → fight → cure → family
+  // tree): public + RLS-scoped, gated so it fetches nothing signed-out and
+  // renders the demo fallback. Plus the fixture-only /internal walkthrough
+  // (no Supabase at all).
+  "/pheno-hunts/:id/showcase",
+  "/internal/pheno-hunt-demo",
   "/.lovable/oauth/consent",
   "/breeder-beta",
   "/creator-beta",

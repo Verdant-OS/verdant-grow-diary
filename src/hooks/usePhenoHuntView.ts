@@ -20,6 +20,7 @@
  *    (needs the on-demand round load + flavor coercion) — omitted, never faked.
  */
 import { useEffect, useMemo } from "react";
+import { useAuth } from "@/store/auth";
 import { usePhenoHuntWorkspace } from "@/hooks/usePhenoHuntWorkspace";
 import { usePhenoKeepers } from "@/hooks/usePhenoKeepers";
 import { PHENO_SCORE_ROUNDS } from "@/lib/phenoScoreRoundsService";
@@ -123,10 +124,15 @@ function coerceDescriptors(value: unknown): string[] {
 }
 
 export function usePhenoHuntView(huntId: string | null | undefined): UsePhenoHuntViewResult {
-  const ws = usePhenoHuntWorkspace(huntId);
-  const kp = usePhenoKeepers(huntId);
+  const { user } = useAuth();
+  // Read the hunt ONLY for a signed-in grower (their own hunt, via RLS). Signed
+  // out → pass null so the reads never fire → the public showcase renders the
+  // demo with zero private-table hits (the mobile auth-route guardrail).
+  const liveHuntId = user ? huntId : null;
+  const ws = usePhenoHuntWorkspace(liveHuntId);
+  const kp = usePhenoKeepers(liveHuntId);
 
-  const hasLive = (huntId?.trim().length ?? 0) > 0 && ws.candidates.length > 0;
+  const hasLive = !!user && (huntId?.trim().length ?? 0) > 0 && ws.candidates.length > 0;
 
   // Load each scoring round on demand so the cure timeline can draw the grow
   // nodes (veg→flower→cure), not just the cure marker. Idempotent per round;

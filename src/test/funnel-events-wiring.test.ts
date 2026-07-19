@@ -400,7 +400,7 @@ describe("ordering and safety constraints at the seams", () => {
     );
     expect(src).toMatch(/activeReviewRequest\s*\?\s*review\.status === "error" && canRetryReview/);
     expect(src).toMatch(
-      /allowed && historyRecovery\.state !== "decision_required" && review\.status === "idle"/,
+      /allowed\s*&&\s*historyRecovery\.state !== "decision_required"\s*&&\s*rootZoneRecovery\.state !== "decision_required"\s*&&\s*review\.status === "idle"/,
     );
     expect(src.match(/trackFunnelEvent\("historical_ai_review_started"\)/g) ?? []).toHaveLength(1);
   });

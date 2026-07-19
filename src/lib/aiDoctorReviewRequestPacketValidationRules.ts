@@ -11,9 +11,16 @@
 import type {
   AiDoctorReviewRequestEvent,
   AiDoctorReviewRequestPacket,
+  AiDoctorReviewRequestRootZoneObservation,
+  AiDoctorReviewRequestRootZoneProduct,
   AiDoctorReviewRequestSnapshot,
   AiDoctorReviewRequestSnapshotAnnotation,
 } from "./aiDoctorReviewRequestPacket";
+import {
+  hasRootZoneSecretHint,
+  ROOT_ZONE_INVALID_FIELDS,
+  type RootZoneInvalidField,
+} from "./rootZoneObservationRules";
 import {
   AI_DOCTOR_CSV_HISTORY_LABEL,
   AI_DOCTOR_CSV_HISTORY_NOT_LIVE_NOTE,
@@ -27,6 +34,8 @@ export const AI_DOCTOR_REVIEW_PACKET_MAX_LIST_ITEMS = 32;
 export const AI_DOCTOR_REVIEW_PACKET_MAX_SNAPSHOT_READINGS = 32;
 export const AI_DOCTOR_REVIEW_PACKET_MAX_HISTORY_DIMENSIONS = 64;
 export const AI_DOCTOR_REVIEW_PACKET_MAX_HISTORY_READINGS = 200;
+export const AI_DOCTOR_REVIEW_PACKET_MAX_ROOT_ZONE_OBSERVATIONS = 20;
+export const AI_DOCTOR_REVIEW_PACKET_MAX_ROOT_ZONE_PRODUCTS = 12;
 export const AI_DOCTOR_REVIEW_PACKET_MAX_ABSOLUTE_NUMBER = 1_000_000_000;
 
 const SCHEMA_VERSION = 1 as const;
@@ -51,6 +60,8 @@ const EVENT_CATEGORIES = [
 const SNAPSHOT_SEVERITIES = ["ok", "warning", "invalid"] as const;
 const SNAPSHOT_SOURCES = ["live", "manual", "csv", "demo", "stale", "invalid", "unknown"] as const;
 const SNAPSHOT_TRUST_LEVELS = ["low", "medium", "high"] as const;
+const ROOT_ZONE_EVENT_TYPES = ["watering", "feeding"] as const;
+const ROOT_ZONE_SOURCES = ["manual", "csv", "demo", "stale", "invalid", "unknown"] as const;
 
 type Normalization<T> = { ok: true; value: T } | { ok: false };
 
@@ -122,6 +133,24 @@ function normalizeFiniteNumber(value: unknown): Normalization<number> {
   return valid(value === 0 ? 0 : value);
 }
 
+function normalizeNullableBoundedNumber(
+  value: unknown,
+  min: number,
+  max: number,
+  strictlyPositive = false,
+): Normalization<number | null> {
+  if (value === null) return valid(null);
+  const normalized = normalizeFiniteNumber(value);
+  if (!normalized.ok) return INVALID;
+  if (
+    (strictlyPositive ? normalized.value <= min : normalized.value < min) ||
+    normalized.value > max
+  ) {
+    return INVALID;
+  }
+  return valid(normalized.value);
+}
+
 function normalizeCount(value: unknown, max: number, min = 0): Normalization<number> {
   if (!Number.isSafeInteger(value) || (value as number) < min || (value as number) > max) {
     return INVALID;
@@ -140,6 +169,128 @@ function normalizeEvents(value: unknown): Normalization<AiDoctorReviewRequestEve
     events.push({ at: at.value, category: record.category });
   }
   return valid(events);
+}
+
+function normalizeRootZoneProducts(
+  value: unknown,
+): Normalization<AiDoctorReviewRequestRootZoneProduct[]> {
+  if (!Array.isArray(value) || value.length > AI_DOCTOR_REVIEW_PACKET_MAX_ROOT_ZONE_PRODUCTS) {
+    return INVALID;
+  }
+  const products: AiDoctorReviewRequestRootZoneProduct[] = [];
+  for (const item of value) {
+    const record = isPlainRecord(item) ? item : null;
+    if (!record || !hasOwnKeys(record, ["name", "amount", "unit"])) return INVALID;
+    const name = normalizeString(record.name, 120);
+    const amount = normalizeNullableBoundedNumber(record.amount, 0, 1_000_000);
+    const unit = normalizeNullableString(record.unit, 40);
+    if (
+      !name.ok ||
+      !amount.ok ||
+      !unit.ok ||
+      hasRootZoneSecretHint(name.value) ||
+      (unit.value !== null && hasRootZoneSecretHint(unit.value))
+    ) {
+      return INVALID;
+    }
+    products.push({ name: name.value, amount: amount.value, unit: unit.value });
+  }
+  return valid(products);
+}
+
+function normalizeRootZoneInvalidFields(value: unknown): Normalization<RootZoneInvalidField[]> {
+  if (!Array.isArray(value) || value.length > ROOT_ZONE_INVALID_FIELDS.length) return INVALID;
+  const allowed = new Set<string>(ROOT_ZONE_INVALID_FIELDS);
+  const fields: RootZoneInvalidField[] = [];
+  const seen = new Set<string>();
+  for (const item of value) {
+    if (typeof item !== "string" || !allowed.has(item) || seen.has(item)) return INVALID;
+    seen.add(item);
+    fields.push(item as RootZoneInvalidField);
+  }
+  return valid(fields);
+}
+
+function normalizeRootZoneObservations(
+  value: unknown,
+): Normalization<AiDoctorReviewRequestRootZoneObservation[]> {
+  if (!Array.isArray(value) || value.length > AI_DOCTOR_REVIEW_PACKET_MAX_ROOT_ZONE_OBSERVATIONS) {
+    return INVALID;
+  }
+  const observations: AiDoctorReviewRequestRootZoneObservation[] = [];
+  for (const item of value) {
+    const record = isPlainRecord(item) ? item : null;
+    if (
+      !record ||
+      !hasOwnKeys(record, [
+        "at",
+        "eventType",
+        "source",
+        "volumeMl",
+        "inputPh",
+        "inputEcMsCm",
+        "outputEcMsCm",
+        "runoffMl",
+        "runoffPh",
+        "runoffEcMsCm",
+        "waterTempC",
+        "nutrientLine",
+        "products",
+      ])
+    ) {
+      return INVALID;
+    }
+    const at = normalizeTimestamp(record.at);
+    const volumeMl = normalizeNullableBoundedNumber(record.volumeMl, 0, 1_000_000, true);
+    const inputPh = normalizeNullableBoundedNumber(record.inputPh, 0, 14);
+    const inputEcMsCm = normalizeNullableBoundedNumber(record.inputEcMsCm, 0, 10);
+    const outputEcMsCm = normalizeNullableBoundedNumber(record.outputEcMsCm, 0, 10);
+    const runoffMl = normalizeNullableBoundedNumber(record.runoffMl, 0, 1_000_000);
+    const runoffPh = normalizeNullableBoundedNumber(record.runoffPh, 0, 14);
+    const runoffEcMsCm = normalizeNullableBoundedNumber(record.runoffEcMsCm, 0, 10);
+    const waterTempC = normalizeNullableBoundedNumber(record.waterTempC, -10, 60);
+    const nutrientLine = normalizeNullableString(record.nutrientLine, 120);
+    const products = normalizeRootZoneProducts(record.products);
+    const invalidFields = hasOwn(record, "invalidFields")
+      ? normalizeRootZoneInvalidFields(record.invalidFields)
+      : valid<RootZoneInvalidField[]>([]);
+    if (
+      !at.ok ||
+      !isOneOf(record.eventType, ROOT_ZONE_EVENT_TYPES) ||
+      !isOneOf(record.source, ROOT_ZONE_SOURCES) ||
+      !volumeMl.ok ||
+      !inputPh.ok ||
+      !inputEcMsCm.ok ||
+      !outputEcMsCm.ok ||
+      !runoffMl.ok ||
+      !runoffPh.ok ||
+      !runoffEcMsCm.ok ||
+      !waterTempC.ok ||
+      !nutrientLine.ok ||
+      !products.ok ||
+      !invalidFields.ok ||
+      (nutrientLine.value !== null && hasRootZoneSecretHint(nutrientLine.value))
+    ) {
+      return INVALID;
+    }
+    observations.push({
+      at: at.value,
+      eventType: record.eventType,
+      source: record.source,
+      volumeMl: volumeMl.value,
+      inputPh: inputPh.value,
+      inputEcMsCm: inputEcMsCm.value,
+      outputEcMsCm: outputEcMsCm.value,
+      runoffMl: runoffMl.value,
+      runoffPh: runoffPh.value,
+      runoffEcMsCm: runoffEcMsCm.value,
+      waterTempC: waterTempC.value,
+      nutrientLine: nutrientLine.value,
+      products: products.value,
+      ...(hasOwn(record, "invalidFields") ? { invalidFields: invalidFields.value } : {}),
+    });
+  }
+  return valid(observations);
 }
 
 function normalizeSnapshot(value: unknown): Normalization<AiDoctorReviewRequestSnapshot | null> {
@@ -419,6 +570,12 @@ export function validateAndNormalizeAiDoctorReviewRequestPacket(
     recentEvents: recentEvents.value,
     recentSensorSnapshot: recentSensorSnapshot.value,
   };
+
+  if (hasOwn(record, "recentRootZoneObservations")) {
+    const rootZone = normalizeRootZoneObservations(record.recentRootZoneObservations);
+    if (!rootZone.ok) return null;
+    packet.recentRootZoneObservations = rootZone.value;
+  }
 
   if (hasOwn(record, "recentSensorSnapshotAnnotation")) {
     const annotation = normalizeSnapshotAnnotation(record.recentSensorSnapshotAnnotation);

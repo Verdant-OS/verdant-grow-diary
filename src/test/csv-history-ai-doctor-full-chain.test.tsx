@@ -145,10 +145,22 @@ vi.mock("@/integrations/supabase/client", () => {
     return builder;
   }
 
+  function createEmptyRootZoneBuilder() {
+    const builder: Record<string, unknown> = {};
+    builder.select = (_columns: string) => builder;
+    builder.eq = (_column: string, _value: unknown) => builder;
+    builder.in = (_column: string, _values: unknown[]) => builder;
+    builder.or = (_filter: string) => builder;
+    builder.order = (_column: string, _options: unknown) => builder;
+    builder.limit = (_limit: number) => Promise.resolve({ data: [], error: null });
+    return builder;
+  }
+
   return {
     supabase: {
       from(table: string) {
         database.tables.push(table);
+        if (table === "grow_events") return createEmptyRootZoneBuilder();
         if (table !== "sensor_readings") {
           throw new Error(`Unexpected table access in CSV full-chain test: ${table}`);
         }
@@ -599,7 +611,10 @@ describe("CSV history -> AI Doctor full-chain regression", () => {
     ];
     expect(milestoneIndexes.every((index) => index >= 0)).toBe(true);
     expect(milestoneIndexes).toEqual([...milestoneIndexes].sort((a, b) => a - b));
-    expect(database.tables.every((table) => table === "sensor_readings")).toBe(true);
+    expect(database.tables).toContain("grow_events");
+    expect(
+      database.tables.every((table) => ["sensor_readings", "grow_events"].includes(table)),
+    ).toBe(true);
     expect(supabaseFunctionsInvoke).not.toHaveBeenCalled();
   });
 });

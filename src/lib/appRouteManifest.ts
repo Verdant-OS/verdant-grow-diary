@@ -139,6 +139,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     access: "auth",
     description: "Environment summary report (diary).",
   },
+  {
+    path: "/docs/mcp-api",
+    access: "public",
+    description: "Public MCP API reference documentation.",
+  },
   { path: "/doctor", access: "auth" },
   { path: "/doctor/sessions", access: "auth" },
   { path: "/doctor/sessions/:sessionId", access: "auth" },

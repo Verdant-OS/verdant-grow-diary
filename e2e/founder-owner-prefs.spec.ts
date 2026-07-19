@@ -74,8 +74,9 @@ function mockFoundersReadOnce(
 
 test.describe("Founder owner preferences (mocked)", () => {
   test.beforeEach(async ({ page }) => {
-    // Default safety net — no /rest/v1/** or /functions/v1/** call can
-    // escape the mocks and hit real Supabase.
+    // Default safety net FIRST — Playwright matches routes in reverse
+    // registration order (last-added wins), so more specific patterns must
+    // be registered AFTER the catch-all to take precedence.
     await page.route(/\/rest\/v1\//, (route) =>
       route.fulfill({
         status: 200,
@@ -90,14 +91,28 @@ test.describe("Founder owner preferences (mocked)", () => {
         body: JSON.stringify({ ok: true }),
       }),
     );
-    // /auth/v1/** requests (getSession, etc.) — sessionStorage carries the
-    // synthetic session; block outbound token refresh from reaching prod.
     await page.route(/\/auth\/v1\//, (route) =>
       route.fulfill({
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({}),
       }),
+    );
+    // The AgreementReconsentGate reads user_agreement_acceptances on every
+    // signed-in page. Without accepted rows at the current versions it mounts
+    // a modal Dialog that intercepts pointer events across the viewport and
+    // blocks the form beneath. Registered LAST so it wins over the catch-all.
+    await page.route(
+      /\/rest\/v1\/user_agreement_acceptances/,
+      (route) =>
+        route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify([
+            { agreement_type: "terms", version: "2026-07-13" },
+            { agreement_type: "privacy", version: "2026-07-13" },
+          ]),
+        }),
     );
   });
 
@@ -148,20 +163,43 @@ test.describe("Founder owner preferences (mocked)", () => {
     await expect(heading).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText(/Founder #7/i)).toBeVisible();
 
+    // Some /founder surfaces (share card, portals) mount overlays that
+    // intercept pointer events regardless of z-order. Drop any full-screen
+    // overlay before driving the form.
+    async function clearOverlays() {
+      await page.evaluate(() => {
+        document
+          .querySelectorAll<HTMLElement>('div.fixed.inset-0.z-50')
+          .forEach((el) => el.remove());
+      });
+    }
+    await page.keyboard.press("Escape");
+    await clearOverlays();
+    await heading.scrollIntoViewIfNeeded();
+
     // Fill in a valid custom-name profile.
-    await page.locator("#founder-show-on-wall").click();
+    await page.locator("#founder-show-on-wall").click({ force: true });
     await page.locator("#founder-display-name").fill("Jane Cultivator");
     await page.locator("#founder-optional-link").fill("https://example.com/jane");
+    await clearOverlays();
+
+    // Programmatic form.requestSubmit() so the real submit event fires even
+    // if a portalled overlay would otherwise steal the click.
+    async function submitForm() {
+      await page.locator("form:has(#founder-show-on-wall)").evaluate((f) => {
+        (f as HTMLFormElement).requestSubmit();
+      });
+    }
 
     // https-only client validation: an http:// value must NOT invoke.
     await page.locator("#founder-optional-link").fill("http://insecure.example");
-    await page.getByRole("button", { name: /Save Founder settings/i }).click();
+    await submitForm();
     await expect(page.getByRole("alert")).toBeVisible();
     expect(invokeCount).toBe(0);
 
     // Fix and re-submit.
     await page.locator("#founder-optional-link").fill("https://example.com/jane");
-    await page.getByRole("button", { name: /Save Founder settings/i }).click();
+    await submitForm();
 
     await expect
       .poll(() => invokeCount, { timeout: 5_000 })

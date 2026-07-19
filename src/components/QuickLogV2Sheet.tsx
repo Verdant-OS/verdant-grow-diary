@@ -140,8 +140,8 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
   function showTimelineConfirmation(
     message: string,
     scope: {
-      targetType: "plant" | "tent";
-      targetId: string;
+      targetType: "plant" | "tent" | null;
+      targetId: string | null;
       tentId: string | null;
       growEventId?: string | null;
     },
@@ -531,13 +531,16 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
         setSaveStatus("");
         return;
       }
+      const growEventId = result.eventId;
       trackQuickLogSuccess("feed");
       setSaveStatus(FEEDING_SAVE_SUCCESS_MESSAGE);
       showTimelineConfirmation(FEEDING_SAVE_SUCCESS_MESSAGE, {
-        targetType: resolved.targetType as "plant" | "tent",
-        targetId: resolved.targetId as string,
+        // Feed events are currently surfaced in the global typed root-zone
+        // lane, not the scoped grouped timeline. Route to the real anchor.
+        targetType: null,
+        targetId: null,
         tentId: resolved.tentId ?? null,
-        growEventId: null,
+        growEventId,
       });
       applyQuickLogV2Refresh(queryClient, {
         targetType: resolved.targetType as "plant" | "tent",
@@ -549,11 +552,11 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
       // succeeded (no early/duplicate dispatch on the failure paths above).
       dispatchQuickLogV2EntryCreated({
         createdAt: new Date().toISOString(),
-        growEventId: (result as { growEventId?: string | null }).growEventId ?? null,
+        growEventId,
         source: "quick_log_v2_feed",
       });
       setPostSave({
-        growEventId: (result as { growEventId?: string | null }).growEventId ?? null,
+        growEventId,
         targetType: resolved.targetType as "plant" | "tent",
         targetId: resolved.targetId as string,
         tentId: resolved.tentId ?? null,
@@ -763,8 +766,8 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
   function handleViewTimeline() {
     if (!postSave) return;
     const nav = buildQuickLogTimelineNavTarget({
-      targetType: postSave.targetType,
-      targetId: postSave.targetId,
+      targetType: postSave.action === "feed" ? null : postSave.targetType,
+      targetId: postSave.action === "feed" ? null : postSave.targetId,
       growEventId: postSave.growEventId,
     });
     onOpenChange(false);

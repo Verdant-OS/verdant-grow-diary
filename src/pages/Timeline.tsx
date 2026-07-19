@@ -91,6 +91,7 @@ import {
   mapGrowEventsToRecentRawEntries,
   type GrowEventRowForRecent,
 } from "@/lib/growEventToDiaryRawEntry";
+import { ROOT_ZONE_GROW_EVENT_SELECT } from "@/lib/rootZoneObservationRules";
 import { mergeTimelineSources } from "@/lib/timelineMergeRules";
 import {
   deriveTimelineEventTypeOptions,
@@ -164,6 +165,7 @@ import {
 import { buildCopyableTraceLinkFromDiaryDetails } from "@/lib/actionQueueTraceLinkCopyRules";
 import CopyTraceLinkButton from "@/components/CopyTraceLinkButton";
 import { useTimelineHighlightAutoScroll } from "@/lib/useTimelineHighlightAutoScroll";
+import { useTimelineHashAnchorHandoff } from "@/hooks/useTimelineHashAnchorHandoff";
 
 const TIMELINE_SNAPSHOT_STALE_MS = 30 * 60 * 1000;
 
@@ -264,7 +266,7 @@ export default function Timeline() {
     setActiveGrowId,
   } = useGrows();
 
-  const { pathname } = useLocation();
+  const { pathname, hash } = useLocation();
   // Shared URL `?growId=` resolution. urlGrowId is preserved as the source of truth
   // for filter precedence; scopedGrowName/backHref come from the same hook.
   const { urlGrowId, scopedGrowName, backHref } = useScopedGrow();
@@ -443,13 +445,18 @@ export default function Timeline() {
     // Fetch them in parallel for the Recent Quick Logs panel so newly
     // saved entries appear at the top instead of being invisible until
     // the legacy diary writer is exercised. RLS scopes to owner.
-    const { data: geData } = await supabase
+    let growEventsQuery = supabase
       .from("grow_events")
-      .select("id,grow_id,plant_id,tent_id,event_type,occurred_at,note,source,is_deleted")
+      .select(ROOT_ZONE_GROW_EVENT_SELECT)
       .eq("grow_id", activeGrowId)
       .eq("is_deleted", false)
       .order("occurred_at", { ascending: false })
       .limit(100);
+    if (effectiveStartDate)
+      growEventsQuery = growEventsQuery.gte("occurred_at", `${effectiveStartDate}T00:00:00.000Z`);
+    if (effectiveEndDate)
+      growEventsQuery = growEventsQuery.lte("occurred_at", `${effectiveEndDate}T23:59:59.999Z`);
+    const { data: geData } = await growEventsQuery;
     setGrowEvents((geData as unknown as GrowEventRowForRecent[]) || []);
 
     // Action Queue events for this grow (read-only audit trail).
@@ -528,7 +535,6 @@ export default function Timeline() {
     }
   }
 
-   
   useEffect(() => {
     load();
   }, [activeGrowId, user, effectiveStartDate, effectiveEndDate]);
@@ -669,6 +675,11 @@ export default function Timeline() {
   // never steal focus.
   useTimelineHighlightAutoScroll(highlight, filtered);
 
+  // Browser fragment scrolling can run before async diary / grow-event rows
+  // mount. Complete that handoff once the load settles; the hook is one-shot
+  // per entry fragment and leaves no timers or observers behind.
+  useTimelineHashAnchorHandoff(hash, !loading);
+
   // Merge `grow_events` (Quick Log v2 manual saves) and `diary_entries`
   // through the tested `mergeTimelineSources` helper so the Recent Quick
   // Logs panel receives a deterministic, deduplicated, newest-first
@@ -688,6 +699,10 @@ export default function Timeline() {
         details && typeof details["grow_event_id"] === "string"
           ? (details["grow_event_id"] as string)
           : null;
+      const linked_grow_event_id =
+        details && typeof details["linked_grow_event_id"] === "string"
+          ? (details["linked_grow_event_id"] as string)
+          : null;
       return {
         id: e.id,
         entry_at: e.entry_at,
@@ -698,6 +713,7 @@ export default function Timeline() {
         photo_url: e.photo_url,
         details,
         grow_event_id,
+        linked_grow_event_id,
       };
     });
     const merged = mergeTimelineSources({
@@ -1279,11 +1295,11 @@ export default function Timeline() {
       </div>
 
       <div className="mt-4">
-        <WateringHistoryPanel rawEntries={entries} limit={20} />
+        <WateringHistoryPanel rawEntries={recentLaneRawEntries} limit={20} />
       </div>
 
       <div className="mt-4">
-        <FeedingHistoryPanel rawEntries={entries} limit={20} />
+        <FeedingHistoryPanel rawEntries={recentLaneRawEntries} limit={20} />
       </div>
 
       <div className="mt-4">

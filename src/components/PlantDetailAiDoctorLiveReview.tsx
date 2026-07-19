@@ -24,6 +24,7 @@ import {
 } from "@/lib/aiDoctorContextViewModel";
 import {
   AI_DOCTOR_REVIEW_PACKET_CSV_ROW_CAP,
+  AI_DOCTOR_REVIEW_PACKET_ROOT_ZONE_CAP,
   buildAiDoctorReviewRequestPacket,
   type AiDoctorReviewRequestPacket,
 } from "@/lib/aiDoctorReviewRequestPacket";
@@ -40,6 +41,7 @@ import AiCreditLimitNotice from "@/components/AiCreditLimitNotice";
 import AiCreditServiceDegradedNotice from "@/components/AiCreditServiceDegradedNotice";
 import { useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
 import { useImportedSensorHistory } from "@/hooks/useImportedSensorHistory";
+import { useRootZoneObservations } from "@/hooks/useRootZoneObservations";
 import { isUuid } from "@/lib/isUuid";
 import { plantDetailPath } from "@/lib/routes";
 import { buildPlantAiDoctorReviewPath } from "@/lib/aiDoctorEntryRules";
@@ -56,6 +58,7 @@ import { resolveAiDoctorImportedHistoryRecovery } from "@/lib/aiDoctorImportedHi
 
 /** Stable empty-array identity so the packet memo does not churn. */
 const NO_TENT_SENSOR_ROWS: never[] = [];
+const NO_ROOT_ZONE_OBSERVATIONS: never[] = [];
 
 export const AI_DOCTOR_LIVE_REVIEW_LOADING_COPY = "Preparing cautious AI Doctor review…";
 export const AI_DOCTOR_LIVE_REVIEW_FAILURE_COPY =
@@ -76,6 +79,12 @@ export const AI_DOCTOR_IMPORTED_HISTORY_INSUFFICIENT_COPY =
   "The remaining context is not enough to run AI Doctor while imported sensor history is unavailable.";
 export const AI_DOCTOR_IMPORTED_HISTORY_RETRY_LABEL = "Retry imported history";
 export const AI_DOCTOR_IMPORTED_HISTORY_CONTINUE_LABEL = "Continue without history";
+export const AI_DOCTOR_ROOT_ZONE_HISTORY_LOAD_FAILED_COPY =
+  "Verdant couldn’t load this plant’s recent watering and feeding measurements. Retry, or continue without them. Continuing means AI Doctor will not use that root-zone history.";
+export const AI_DOCTOR_ROOT_ZONE_HISTORY_OMITTED_COPY =
+  "This AI Doctor review is proceeding without recent root-zone history and may have less context.";
+export const AI_DOCTOR_ROOT_ZONE_HISTORY_RETRY_LABEL = "Retry root-zone history";
+export const AI_DOCTOR_ROOT_ZONE_HISTORY_CONTINUE_LABEL = "Continue without root-zone history";
 export const AI_DOCTOR_HISTORY_SAVING_COPY = "Saving this review to AI Doctor history…";
 export const AI_DOCTOR_HISTORY_SAVED_COPY = "Saved to AI Doctor history.";
 export const AI_DOCTOR_HISTORY_SAVE_FAILED_COPY =
@@ -111,6 +120,7 @@ interface AcceptedAiDoctorReviewRequest {
   mode: "standard" | "historical_review";
   confidenceCopy: string;
   omittedImportedHistory: boolean;
+  omittedRootZoneHistory: boolean;
 }
 
 function PlantDetailAiDoctorLiveReviewScope({
@@ -129,9 +139,11 @@ function PlantDetailAiDoctorLiveReviewScope({
   const trackedSessionIdRef = useRef<string | null>(null);
   const historyScopeKey = buildAiDoctorLiveReviewScopeKey(plantId, tentId, growId);
   const [historyOmissionScope, setHistoryOmissionScope] = useState<string | null>(null);
+  const [rootZoneOmissionScope, setRootZoneOmissionScope] = useState<string | null>(null);
   const [acceptedReviewRequest, setAcceptedReviewRequest] =
     useState<AcceptedAiDoctorReviewRequest | null>(null);
   const historyOmissionAcknowledged = historyOmissionScope === historyScopeKey;
+  const rootZoneOmissionAcknowledged = rootZoneOmissionScope === historyScopeKey;
   const queryClient = useQueryClient();
   useEffect(() => {
     historicalStartTrackedRef.current = false;
@@ -141,6 +153,26 @@ function PlantDetailAiDoctorLiveReviewScope({
     trackedSessionIdRef.current = null;
   }, [growId, plantId, tentId]);
   const { items } = useTimelineMemory({ kind: "plant", plantId }, TIMELINE_MEMORY_DEFAULT_LIMIT);
+  const rootZoneScope =
+    isUuid(plantId) && isUuid(tentId) && isUuid(growId)
+      ? ({ kind: "plant_context", plantId, tentId, growId } as const)
+      : isUuid(plantId)
+        ? ({ kind: "plant", plantId } as const)
+        : null;
+  const rootZoneHistory = useRootZoneObservations(
+    rootZoneScope,
+    AI_DOCTOR_REVIEW_PACKET_ROOT_ZONE_CAP,
+  );
+  const queryRootZoneRecovery = resolveAiDoctorImportedHistoryRecovery({
+    hasTentScope: rootZoneScope !== null,
+    isFetching: rootZoneHistory.isFetching,
+    isError: rootZoneHistory.isError,
+    omissionAcknowledged: rootZoneOmissionAcknowledged,
+  });
+  const queryRootZoneObservations =
+    queryRootZoneRecovery.state === "ready"
+      ? rootZoneHistory.observations
+      : NO_ROOT_ZONE_OBSERVATIONS;
   // Dedicated bounded imported-history read. It filters permitted CSV source
   // identities before the cap and orders by historical `captured_at`, so the
   // AI packet receives the newest observations rather than newest imports.
@@ -179,7 +211,8 @@ function PlantDetailAiDoctorLiveReviewScope({
   // grower choice before omission can reach a paid AI request.
   const currentSensorPending =
     isUuid(tentId) && (currentSensorStatusByTent[tentId] ?? "loading") === "loading";
-  const sensorContextBlocked = currentSensorPending || queryHistoryRecovery.blocksReview;
+  const sensorContextBlocked =
+    currentSensorPending || queryHistoryRecovery.blocksReview || queryRootZoneRecovery.blocksReview;
 
   const context = useMemo(
     () =>
@@ -211,12 +244,21 @@ function PlantDetailAiDoctorLiveReviewScope({
         context,
         csvHistoryRows: queryTentSensorRows,
         currentSensorRows,
+        rootZoneObservations: queryRootZoneObservations,
         // This explicit signal is derived from the same filtered rows as
         // the packet snapshot. Diagnostic/testbench packets, manual
         // snapshots, and CSV history can never set it.
         hasFreshLiveSensorReadings: sensorClassification?.status === "usable",
       }),
-    [plant, items, context, queryTentSensorRows, currentSensorRows, sensorClassification],
+    [
+      plant,
+      items,
+      context,
+      queryTentSensorRows,
+      currentSensorRows,
+      queryRootZoneObservations,
+      sensorClassification,
+    ],
   );
 
   const eligibility = useMemo(
@@ -260,6 +302,15 @@ function PlantDetailAiDoctorLiveReviewScope({
         showsRecovery: activeReviewRequest.omittedImportedHistory,
       }
     : queryHistoryRecovery;
+  const rootZoneRecovery = activeReviewRequest
+    ? {
+        state: activeReviewRequest.omittedRootZoneHistory
+          ? ("omitted_by_choice" as const)
+          : ("ready" as const),
+        blocksReview: false,
+        showsRecovery: activeReviewRequest.omittedRootZoneHistory,
+      }
+    : queryRootZoneRecovery;
 
   const handlePersisted = useCallback(
     (_sessionId: string) => {
@@ -293,7 +344,8 @@ function PlantDetailAiDoctorLiveReviewScope({
     activeReviewRequest !== null &&
     (allowed ||
       activeReviewRequest.mode === "historical_review" ||
-      activeReviewRequest.omittedImportedHistory);
+      activeReviewRequest.omittedImportedHistory ||
+      activeReviewRequest.omittedRootZoneHistory);
 
   // If a background/refocus refetch succeeds before the grower starts, the
   // earlier omission choice is no longer relevant. Once a review has begun,
@@ -307,6 +359,16 @@ function PlantDetailAiDoctorLiveReviewScope({
       setHistoryOmissionScope(null);
     }
   }, [historyOmissionScope, historyScopeKey, importedHistory.isError, review.status]);
+
+  useEffect(() => {
+    if (
+      !rootZoneHistory.isError &&
+      review.status === "idle" &&
+      rootZoneOmissionScope === historyScopeKey
+    ) {
+      setRootZoneOmissionScope(null);
+    }
+  }, [historyScopeKey, review.status, rootZoneHistory.isError, rootZoneOmissionScope]);
 
   // Keep route construction aligned with the shared route contract.
   // AiCreditLimitNotice validates it again before it reaches the pricing link.
@@ -363,11 +425,18 @@ function PlantDetailAiDoctorLiveReviewScope({
 
   const showHistoryOmission = historyRecovery.state === "omitted_by_choice";
   const showHistoryRecovery = historyRecovery.state === "decision_required" || showHistoryOmission;
+  const showRootZoneOmission = rootZoneRecovery.state === "omitted_by_choice";
+  const showRootZoneRecovery =
+    rootZoneRecovery.state === "decision_required" || showRootZoneOmission;
   const showReviewAction = activeReviewRequest
     ? review.status === "error" && canRetryReview
-    : allowed && historyRecovery.state !== "decision_required" && review.status === "idle";
+    : allowed &&
+      historyRecovery.state !== "decision_required" &&
+      rootZoneRecovery.state !== "decision_required" &&
+      review.status === "idle";
 
-  if (!allowed && !showHistoryRecovery && !activeReviewVisible) return null;
+  if (!allowed && !showHistoryRecovery && !showRootZoneRecovery && !activeReviewVisible)
+    return null;
 
   const handleRetryImportedHistory = () => {
     setHistoryOmissionScope(null);
@@ -376,6 +445,15 @@ function PlantDetailAiDoctorLiveReviewScope({
 
   const handleContinueWithoutImportedHistory = () => {
     setHistoryOmissionScope(historyScopeKey);
+  };
+
+  const handleRetryRootZoneHistory = () => {
+    setRootZoneOmissionScope(null);
+    void rootZoneHistory.refetch();
+  };
+
+  const handleContinueWithoutRootZoneHistory = () => {
+    setRootZoneOmissionScope(historyScopeKey);
   };
 
   const handleInitialStart = () => {
@@ -391,6 +469,7 @@ function PlantDetailAiDoctorLiveReviewScope({
       mode: acceptedMode,
       confidenceCopy: candidateConfidenceCopy,
       omittedImportedHistory: historyRecovery.state === "omitted_by_choice",
+      omittedRootZoneHistory: rootZoneRecovery.state === "omitted_by_choice",
     });
     if (!reviewStartTrackedRef.current) {
       reviewStartTrackedRef.current = true;
@@ -415,6 +494,7 @@ function PlantDetailAiDoctorLiveReviewScope({
       data-review-mode={activeReviewRequest?.mode ?? eligibility.mode}
       data-status={review.status}
       data-history-recovery-state={historyRecovery.state}
+      data-root-zone-recovery-state={rootZoneRecovery.state}
       className="glass rounded-2xl p-4 my-3 space-y-3"
     >
       <header className="flex items-start justify-between gap-2 flex-wrap">
@@ -495,6 +575,56 @@ function PlantDetailAiDoctorLiveReviewScope({
               data-testid="plant-ai-doctor-imported-history-retry"
             >
               {AI_DOCTOR_IMPORTED_HISTORY_RETRY_LABEL}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {rootZoneRecovery.state === "decision_required" ? (
+        <div
+          className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-100"
+          role="alert"
+          data-testid="plant-ai-doctor-root-zone-history-recovery"
+        >
+          <p>{AI_DOCTOR_ROOT_ZONE_HISTORY_LOAD_FAILED_COPY}</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={handleRetryRootZoneHistory}
+              disabled={rootZoneHistory.isFetching}
+              className="rounded-md border border-amber-300/40 px-2 py-1 font-medium hover:bg-amber-500/10 disabled:opacity-50"
+              data-testid="plant-ai-doctor-root-zone-history-retry"
+            >
+              {AI_DOCTOR_ROOT_ZONE_HISTORY_RETRY_LABEL}
+            </button>
+            <button
+              type="button"
+              onClick={handleContinueWithoutRootZoneHistory}
+              disabled={rootZoneHistory.isFetching}
+              className="rounded-md border border-amber-300/40 px-2 py-1 font-medium hover:bg-amber-500/10 disabled:opacity-50"
+              data-testid="plant-ai-doctor-root-zone-history-continue"
+            >
+              {AI_DOCTOR_ROOT_ZONE_HISTORY_CONTINUE_LABEL}
+            </button>
+          </div>
+        </div>
+      ) : showRootZoneOmission ? (
+        <div
+          className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-100"
+          role="status"
+          aria-live="polite"
+          data-testid="plant-ai-doctor-root-zone-history-omitted"
+        >
+          <p>{AI_DOCTOR_ROOT_ZONE_HISTORY_OMITTED_COPY}</p>
+          {review.status === "idle" ? (
+            <button
+              type="button"
+              onClick={handleRetryRootZoneHistory}
+              disabled={rootZoneHistory.isFetching}
+              className="mt-2 rounded-md border border-amber-300/40 px-2 py-1 font-medium hover:bg-amber-500/10 disabled:opacity-50"
+              data-testid="plant-ai-doctor-root-zone-history-retry"
+            >
+              {AI_DOCTOR_ROOT_ZONE_HISTORY_RETRY_LABEL}
             </button>
           ) : null}
         </div>

@@ -7,7 +7,7 @@
  * Presentation-only: never trusts client-derived visibility. Public wall
  * always reads `founders_wall_public` where the server is authoritative.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";

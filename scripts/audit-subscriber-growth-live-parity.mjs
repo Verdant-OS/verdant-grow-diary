@@ -5,7 +5,7 @@ import { pathToFileURL } from "node:url";
 export const DEFAULT_SUBSCRIBER_GROWTH_ORIGIN = "https://verdantgrowdiary.com";
 export const SUBSCRIBER_GROWTH_FOUNDER_COUNTER_URL =
   "https://knkwiiywfkbqznbxwqfh.supabase.co/functions/v1/founder-slots-remaining";
-export const SUBSCRIBER_GROWTH_FOUNDER_TOTAL = 75;
+export const SUBSCRIBER_GROWTH_FOUNDER_TOTAL = 100;
 
 const FOUNDER_COUNTER_REQUIRED_CORS_HEADERS = Object.freeze([
   "authorization",

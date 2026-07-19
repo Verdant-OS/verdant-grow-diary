@@ -66,7 +66,7 @@ function founderOptions(
 }
 
 function founderPost(
-  body: string | Record<string, unknown> = { remaining: 42, total: 75 },
+  body: string | Record<string, unknown> = { remaining: 42, total: 100 },
   status = 200,
   headers: Record<string, string> = VALID_FOUNDER_POST_HEADERS,
 ) {
@@ -115,7 +115,7 @@ describe("subscriber growth live parity script", () => {
   });
 
   it("proves the public Founder counter with browser-shaped CORS and an exact bounded payload", async () => {
-    const fetchImpl = buildFounderFetch({ post: founderPost({ remaining: 0, total: 75 }) });
+    const fetchImpl = buildFounderFetch({ post: founderPost({ remaining: 0, total: 100 }) });
     const result = await auditFounderCounterLive({
       fetchImpl,
       browserOrigin: ORIGIN,
@@ -131,7 +131,7 @@ describe("subscriber growth live parity script", () => {
       corsVerified: true,
       payloadVerified: true,
       remaining: 0,
-      total: 75,
+      total: 100,
       error: null,
       errors: [],
     });
@@ -170,7 +170,7 @@ describe("subscriber growth live parity script", () => {
     {
       name: "missing CORS",
       options: founderOptions({}, 200),
-      post: founderPost({ remaining: 42, total: 75 }, 200, {
+      post: founderPost({ remaining: 42, total: 100 }, 200, {
         "content-type": "application/json",
       }),
       reason: "options_origin_not_allowed",
@@ -187,7 +187,7 @@ describe("subscriber growth live parity script", () => {
     {
       name: "misleading JSON-like content type",
       options: founderOptions(),
-      post: founderPost('{"remaining":42,"total":75}', 200, {
+      post: founderPost('{"remaining":42,"total":100}', 200, {
         "access-control-allow-origin": ORIGIN,
         "content-type": "application/jsonp",
       }),
@@ -202,31 +202,31 @@ describe("subscriber growth live parity script", () => {
     {
       name: "extra sensitive-shaped field",
       options: founderOptions(),
-      post: founderPost({ remaining: 42, total: 75, user_id: "must-not-leak" }),
+      post: founderPost({ remaining: 42, total: 100, user_id: "must-not-leak" }),
       reason: "post_payload_shape_invalid",
     },
     {
       name: "fractional remaining",
       options: founderOptions(),
-      post: founderPost({ remaining: 1.5, total: 75 }),
+      post: founderPost({ remaining: 1.5, total: 100 }),
       reason: "post_payload_values_invalid",
     },
     {
       name: "null remaining",
       options: founderOptions(),
-      post: founderPost({ remaining: null, total: 75 }),
+      post: founderPost({ remaining: null, total: 100 }),
       reason: "post_payload_values_invalid",
     },
     {
       name: "negative remaining",
       options: founderOptions(),
-      post: founderPost({ remaining: -1, total: 75 }),
+      post: founderPost({ remaining: -1, total: 100 }),
       reason: "post_payload_values_invalid",
     },
     {
       name: "over-cap remaining",
       options: founderOptions(),
-      post: founderPost({ remaining: 76, total: 75 }),
+      post: founderPost({ remaining: 101, total: 100 }),
       reason: "post_payload_values_invalid",
     },
     {

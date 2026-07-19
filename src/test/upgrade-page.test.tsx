@@ -117,7 +117,7 @@ beforeEach(() => {
     if (t.id === "pro_annual") t.paddlePriceId = "pri_pro_annual";
     if (t.id === "founder_lifetime") {
       t.paddlePriceId = "pri_founder";
-      t.cap = { total: 75, claimed: tierOverride.founderClaimed };
+      t.cap = { total: 100, claimed: tierOverride.founderClaimed };
     }
   }
   installFakePaddle();
@@ -185,7 +185,7 @@ describe("Upgrade page", () => {
 
   it("founder sold-out state disables CTA", () => {
     const founder = PRICING_TIERS.find((t) => t.id === "founder_lifetime")!;
-    founder.cap = { total: 75, claimed: 75 };
+    founder.cap = { total: 100, claimed: 75 };
     renderPage();
     const cta = screen.getByTestId("tier-founder_lifetime-cta") as HTMLButtonElement;
     expect(cta).toBeDisabled();

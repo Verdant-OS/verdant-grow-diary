@@ -16,14 +16,14 @@ const INDEX_CODE = INDEX_SOURCE.replace(/\/\*[\s\S]*?\*\//g, "").replace(
 );
 
 describe("founder slots remaining — public payload contract", () => {
-  it.each([0, 42, 75])("accepts the bounded integer %s with exactly two public fields", (value) => {
+  it.each([0, 42, 100])("accepts the bounded integer %s with exactly two public fields", (value) => {
     const payload = buildFounderSlotsPayload(value);
 
-    expect(payload).toEqual({ remaining: value, total: 75 });
+    expect(payload).toEqual({ remaining: value, total: 100 });
     expect(Object.keys(payload ?? {}).sort()).toEqual(["remaining", "total"]);
   });
 
-  it.each([-1, 76])("rejects the out-of-range integer %s", (value) => {
+  it.each([-1, 101])("rejects the out-of-range integer %s", (value) => {
     expect(buildFounderSlotsPayload(value)).toBeNull();
   });
 
@@ -50,7 +50,7 @@ describe("founder slots remaining — public payload contract", () => {
 
     expect(first).toEqual(second);
     expect(first).not.toBe(second);
-    expect(FOUNDER_SLOTS_TOTAL).toBe(75);
+    expect(FOUNDER_SLOTS_TOTAL).toBe(100);
   });
 });
 

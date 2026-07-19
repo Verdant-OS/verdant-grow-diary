@@ -232,7 +232,7 @@ describe("subscriber growth live parity script", () => {
     {
       name: "wrong total",
       options: founderOptions(),
-      post: founderPost({ remaining: 42, total: 100 }),
+      post: founderPost({ remaining: 42, total: 75 }),
       reason: "post_payload_values_invalid",
     },
   ])("fails closed for a $name", async ({ options, post, reason }) => {

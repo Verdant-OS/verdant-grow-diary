@@ -185,6 +185,7 @@ jobs:
               echo "- customer mode isolation (\`test:customer-mode-db-security\`)"
               echo "- subscriber interest RLS (\`test:subscriber-interest-db-security\`)"
               echo "- AI Doctor sessions RLS (\`test:ai-doctor-sessions-rls\`)"
+              echo "- VPD calibration provenance RLS (via aggregate lane)"
               echo "- aggregate lane (\`test:security-db-local\`)"
               echo ""
               echo "**Artifact:** \`security-db-local-artifacts\` (uploaded on failure only, 14-day retention)"

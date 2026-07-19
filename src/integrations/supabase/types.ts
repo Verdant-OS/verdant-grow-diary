@@ -3244,6 +3244,7 @@ export type Database = {
         }[]
       }
       founder_lifetime_slots_remaining: { Args: never; Returns: number }
+      founders_seats_consumed: { Args: never; Returns: number }
       founders_wall_count: { Args: never; Returns: number }
       get_latest_tent_sensor_snapshot: {
         Args: { _tent_id: string }

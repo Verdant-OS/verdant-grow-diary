@@ -241,17 +241,32 @@ export default function FounderOwnerPrefsForm() {
         ) : null}
 
         <div>
-          <Button type="submit" disabled={isRefunded || saving}>
+          <Button
+            type="submit"
+            disabled={isRefunded || saving}
+            aria-busy={saving}
+          >
             {saving ? (
               <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+                <Loader2
+                  className="mr-2 h-4 w-4 animate-spin"
+                  aria-hidden="true"
+                  focusable="false"
+                />
                 Saving…
               </>
             ) : (
               "Save Founder settings"
             )}
           </Button>
+          {/* Polite live region announces the save transition to AT without
+              nesting a status role inside the <button>. */}
+          <span role="status" aria-live="polite" className="sr-only">
+            {saving ? "Saving Founder settings…" : ""}
+          </span>
         </div>
+
+
       </form>
     </section>
   );

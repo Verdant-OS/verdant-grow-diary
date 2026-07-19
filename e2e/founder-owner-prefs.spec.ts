@@ -391,25 +391,43 @@ test.describe("Founder owner preferences (mocked)", () => {
 
     const saveButton = page.getByRole("button", { name: /Saving…|Save Founder settings/i });
 
-    // In-flight state: button disabled, label switched to "Saving…",
-    // spinner rendered (aria-hidden Loader2 icon), and every editable
-    // input/switch/select disabled.
+    // In-flight state: the button is disabled, exposes aria-busy="true", and
+    // its accessible name switches to "Saving…" so screen readers announce
+    // the mid-flight state.
     await expect(saveButton).toBeDisabled();
-    await expect(saveButton).toHaveText(/Saving…/);
-    await expect(saveButton.locator("svg.animate-spin")).toBeVisible();
+    await expect(saveButton).toHaveAttribute("aria-busy", "true");
+    await expect(saveButton).toHaveAccessibleName(/Saving…/);
+
+    // Spinner icon is decorative and must be hidden from assistive tech.
+    const spinner = saveButton.locator("svg.animate-spin");
+    await expect(spinner).toBeVisible();
+    await expect(spinner).toHaveAttribute("aria-hidden", "true");
+
+    // A polite live region (rendered as a sibling so it is not nested inside
+    // the button) announces the transition. Scope to the form so we don't
+    // collide with unrelated status regions on the page.
+    const form = page.locator("form:has(#founder-show-on-wall)");
+    const savingStatus = form.getByRole("status");
+    await expect(savingStatus).toHaveAttribute("aria-live", "polite");
+    await expect(savingStatus).toHaveText(/Saving Founder settings…/);
 
     await expect(page.locator("#founder-show-on-wall")).toBeDisabled();
     await expect(page.locator("#founder-display-name")).toBeDisabled();
     await expect(page.locator("#founder-optional-link")).toBeDisabled();
     await expect(page.locator("#founder-display-style")).toBeDisabled();
 
-    // Release the edge function; UI should recover to the idle state.
+    // Release the edge function; the UI recovers to idle and the busy
+    // signal / status announcement must clear.
     releaseInvoke?.();
 
-    await expect(
-      page.getByRole("button", { name: /Save Founder settings/i }),
-    ).toBeEnabled({ timeout: 5_000 });
+    const idleButton = page.getByRole("button", { name: /Save Founder settings/i });
+    await expect(idleButton).toBeEnabled({ timeout: 5_000 });
+    await expect(idleButton).not.toHaveAttribute("aria-busy", "true");
     await expect(page.locator("#founder-display-name")).toBeEnabled();
+    // Live region cleared (empty text) so AT doesn't keep announcing "Saving…".
+    await expect(savingStatus).toHaveText("");
+
+
   });
 
   test("successful save updates displayed prefs and keeps inputs enabled", async ({ page }) => {

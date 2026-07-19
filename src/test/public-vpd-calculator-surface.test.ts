@@ -33,12 +33,14 @@ describe("public VPD acquisition surface", () => {
     expect(SEO_SMOKE).toContain('path: "/tools/vpd-calculator"');
   });
 
-  it("stays client-local, manual, derived, and read-only", () => {
+  it("stays client-local, manual, evidence-gated, and read-only", () => {
     const combined = `${PAGE}\n${RULES}`;
     expect(combined).not.toMatch(/integrations\/supabase|supabase\.(from|rpc)|fetch\(|invoke\(/i);
     expect(combined).not.toMatch(/\.insert\(|\.update\(|mqtt\.publish|webhook\s*\(/i);
-    expect(combined).not.toMatch(/calculateLeaf|leafTemperature|leaf_vpd/i);
-    expect(combined).toContain("Manual inputs · derived air VPD · not live telemetry");
+    expect(combined).toMatch(/evaluateVpdMeasurementTrust|leafTemperature/i);
+    expect(combined).toContain("Manual inputs · calculated locally · not live telemetry");
+    expect(combined).toMatch(/humidityReferenceRhPercent/);
+    expect(combined).toMatch(/placement/);
     expect(combined).toMatch(/not a plant-health diagnosis/i);
     expect(combined).toMatch(/does not issue device commands/i);
   });

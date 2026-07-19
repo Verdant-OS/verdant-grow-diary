@@ -78,8 +78,9 @@ describe("webhook decide() — adjustment.created refund path", () => {
       {
         eventId: "evt_upd",
         eventType: "adjustment.updated" as const,
-        data: { action: "refund", status: "approved", transactionId: "txn_abc" },
-      },
+        // Cast: decide() reads `data` as unknown for adjustment events.
+        data: { action: "refund", status: "approved", transactionId: "txn_abc" } as unknown as Record<string, unknown>,
+      } as Parameters<typeof decide>[0],
       "live",
       NOW,
     );

@@ -87,12 +87,16 @@ afterEach(() => cleanup());
 
 describe("QuickLog stage defaulting — plant stage reaches the Select", () => {
   it("a flowering plant opens the form showing Flowering (not Vegetative)", () => {
-    // Single scoped plant → auto-selected; its stage must win over the veg grow.
+    // The route-prefilled plant's stage must win over the veg grow.
     growState.stage = "veg";
     plantsData = [
       { id: "p1", name: "Zkittlez", strain: "ZK", tent_id: "t1", grow_id: "g1", stage: "flower" },
     ];
-    renderQL({ open: true, onOpenChange: () => {} });
+    renderQL({
+      open: true,
+      onOpenChange: () => {},
+      prefill: { plantId: "p1", growId: "g1", tentId: "t1" },
+    });
     expect(stageText()).toMatch(/Flowering/);
     expect(stageText()).not.toMatch(/Vegetative/);
   });
@@ -102,7 +106,11 @@ describe("QuickLog stage defaulting — plant stage reaches the Select", () => {
     plantsData = [
       { id: "p1", name: "Zkittlez", strain: "ZK", tent_id: "t1", grow_id: "g1" }, // no stage
     ];
-    renderQL({ open: true, onOpenChange: () => {} });
+    renderQL({
+      open: true,
+      onOpenChange: () => {},
+      prefill: { plantId: "p1", growId: "g1", tentId: "t1" },
+    });
     expect(stageText()).toMatch(/Flowering/);
   });
 
@@ -112,7 +120,11 @@ describe("QuickLog stage defaulting — plant stage reaches the Select", () => {
     plantsData = [
       { id: "p1", name: "Runtz", strain: "RZ", tent_id: "t1", grow_id: "g1", stage: "cure" },
     ];
-    renderQL({ open: true, onOpenChange: () => {} });
+    renderQL({
+      open: true,
+      onOpenChange: () => {},
+      prefill: { plantId: "p1", growId: "g1", tentId: "t1" },
+    });
     expect(stageText()).toMatch(/Drying \/ Curing/);
     expect(stageText()).not.toMatch(/Vegetative/);
   });

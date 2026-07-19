@@ -13,6 +13,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
+const elementPrototype = Element.prototype as unknown as Record<string, unknown>;
+if (!elementPrototype.scrollIntoView) elementPrototype.scrollIntoView = () => {};
+if (!elementPrototype.hasPointerCapture) elementPrototype.hasPointerCapture = () => false;
+if (!elementPrototype.setPointerCapture) elementPrototype.setPointerCapture = () => {};
+if (!elementPrototype.releasePointerCapture) elementPrototype.releasePointerCapture = () => {};
+
 const { rpcMock, snapshotState } = vi.hoisted(() => ({
   rpcMock: vi.fn().mockResolvedValue({ data: { ok: true }, error: null }),
   snapshotState: {
@@ -34,6 +40,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 vi.mock("@/store/auth", () => ({ useAuth: () => ({ user: { id: "u1" } }) }));
 const grows = [{ id: "g1", name: "Grow #1", stage: "veg" }];
 const plantsData = [
+  { id: "p-other", name: "Blue Dream", strain: "BD", tent_id: "t1", grow_id: "g1" },
   { id: "p2", name: "505 Headbanger", strain: "HB", tent_id: "t1", grow_id: "g1" },
 ];
 vi.mock("@/store/grows", () => ({
@@ -76,6 +83,13 @@ function renderQL(props: Parameters<typeof QuickLog>[0]) {
   );
 }
 
+async function selectPlant(name: RegExp) {
+  const trigger = screen.getByTestId("quick-log-plant-select");
+  fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerType: "mouse" });
+  fireEvent.click(trigger);
+  fireEvent.click(await screen.findByRole("option", { name }));
+}
+
 beforeEach(() => {
   rpcMock.mockClear();
   rpcMock.mockResolvedValue({ data: { ok: true }, error: null });
@@ -93,10 +107,10 @@ describe("QuickLog post-save target plant action", () => {
     renderQL({
       open: true,
       onOpenChange: () => {},
-      // Prefill plant differs from the auto-picked scoped plant (p2).
       prefill: { plantId: "p-other", plantName: "Blue Dream", growId: "g1" },
     });
-    // Make sure mismatch banner shows (sanity: differs from prefill).
+    await selectPlant(/505 Headbanger/i);
+    // Make sure mismatch banner shows after the grower changes the route target.
     await screen.findByTestId("quick-log-plant-mismatch-banner");
     // Add a note so save passes.
     fireEvent.change(screen.getByPlaceholderText(/Watered, looking healthy/i), {
@@ -153,6 +167,7 @@ describe("QuickLog mismatch banner accessibility", () => {
       onOpenChange: () => {},
       prefill: { plantId: "p-other", plantName: "Blue Dream", growId: "g1" },
     });
+    await selectPlant(/505 Headbanger/i);
     const banner = await screen.findByTestId("quick-log-plant-mismatch-banner");
     expect(banner.getAttribute("role")).toBe("status");
     expect(banner.getAttribute("aria-live")).toBe("polite");

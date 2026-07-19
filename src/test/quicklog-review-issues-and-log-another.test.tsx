@@ -13,6 +13,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
+const elementPrototype = Element.prototype as unknown as Record<string, unknown>;
+if (!elementPrototype.scrollIntoView) elementPrototype.scrollIntoView = () => {};
+if (!elementPrototype.hasPointerCapture) elementPrototype.hasPointerCapture = () => false;
+if (!elementPrototype.setPointerCapture) elementPrototype.setPointerCapture = () => {};
+if (!elementPrototype.releasePointerCapture) elementPrototype.releasePointerCapture = () => {};
+
 const { rpcMock, snapshotState } = vi.hoisted(() => ({
   rpcMock: vi.fn().mockResolvedValue({ data: { ok: true }, error: null }),
   snapshotState: {
@@ -34,6 +40,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 vi.mock("@/store/auth", () => ({ useAuth: () => ({ user: { id: "u1" } }) }));
 const grows = [{ id: "g1", name: "Grow #1", stage: "veg" }];
 const plantsData = [
+  { id: "p-other", name: "Old Plant", strain: "OLD", tent_id: "t1", grow_id: "g1" },
   { id: "p2", name: "505 Headbanger", strain: "HB", tent_id: "t1", grow_id: "g1" },
 ];
 vi.mock("@/store/grows", () => ({
@@ -76,6 +83,13 @@ function renderQL(props: Parameters<typeof QuickLog>[0]) {
   );
 }
 
+async function selectPlant(name: RegExp) {
+  const trigger = screen.getByTestId("quick-log-plant-select");
+  fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerType: "mouse" });
+  fireEvent.click(trigger);
+  fireEvent.click(await screen.findByRole("option", { name }));
+}
+
 beforeEach(() => {
   rpcMock.mockClear();
   rpcMock.mockResolvedValue({ data: { ok: true }, error: null });
@@ -104,6 +118,7 @@ describe("QuickLog — Review issues region", () => {
       onOpenChange: () => {},
       prefill: { plantId: "p-other", plantName: "Old Plant", growId: "g1" },
     });
+    await selectPlant(/505 Headbanger/i);
     await screen.findByTestId("quick-log-plant-mismatch-banner");
     const region = screen.getByTestId("quick-log-review-issues");
     expect(region.getAttribute("aria-label")).toMatch(/review quick log issues/i);
@@ -157,6 +172,7 @@ describe("QuickLog — Review issues region", () => {
       onOpenChange: () => {},
       prefill: { plantId: "p-other", plantName: "Old Plant", growId: "g1" },
     });
+    await selectPlant(/505 Headbanger/i);
     const banner = await screen.findByTestId("quick-log-plant-mismatch-banner");
     expect(banner.tabIndex).toBe(-1);
     expect(banner.querySelector("a,button,input,select,textarea")).toBeNull();
@@ -194,6 +210,7 @@ describe("QuickLog — Review issues region", () => {
         eventType: "watering",
       },
     });
+    await selectPlant(/505 Headbanger/i);
     const input = (await screen.findByTestId("quicklog-watering-ml")) as HTMLInputElement;
     fireEvent.submit(input.closest("form") as HTMLFormElement);
     await screen.findByTestId("quick-log-review-jump-watering");

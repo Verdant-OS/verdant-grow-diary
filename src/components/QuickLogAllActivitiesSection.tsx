@@ -60,6 +60,8 @@ export interface QuickLogAllActivitiesSectionProps {
   onSaveEnd?: () => void;
   /** Presenter lock while either the parent or this section owns the guard. */
   saveBlocked?: boolean;
+  /** Reads the same parent-owned synchronous guard used to acquire a save. */
+  isSaveBlocked?: () => boolean;
 }
 
 export interface QuickLogAllActivitiesSaveTarget {
@@ -120,6 +122,7 @@ export default function QuickLogAllActivitiesSection({
   onSaveStart,
   onSaveEnd,
   saveBlocked = false,
+  isSaveBlocked,
 }: QuickLogAllActivitiesSectionProps) {
   const [selected, setSelected] = useState<QuickLogActivityDefinition | null>(null);
   const [note, setNote] = useState("");
@@ -150,17 +153,29 @@ export default function QuickLogAllActivitiesSection({
     );
   }, [selected]);
 
-  const handleSelect = useCallback((a: QuickLogActivityDefinition) => {
-    setErrorReason(null);
-    setErrorForActivity(null);
-    setSelected(a);
-    setNote("");
-    setHarvestWet("");
-    setHarvestDry("");
-    setHarvestUnit("g");
-  }, []);
+  const mutationBlocked = saving || saveBlocked;
+  const isMutationBlocked = useCallback(
+    () =>
+      mutationBlocked || (onSaveStart ? isSaveBlocked?.() === true : localSaveInFlightRef.current),
+    [isSaveBlocked, mutationBlocked, onSaveStart],
+  );
+
+  const handleSelect = useCallback(
+    (a: QuickLogActivityDefinition) => {
+      if (isMutationBlocked()) return;
+      setErrorReason(null);
+      setErrorForActivity(null);
+      setSelected(a);
+      setNote("");
+      setHarvestWet("");
+      setHarvestDry("");
+      setHarvestUnit("g");
+    },
+    [isMutationBlocked],
+  );
 
   const handleSave = useCallback(async () => {
+    if (isMutationBlocked()) return;
     if (!selected) return;
     if (!growId) {
       setErrorReason("Missing grow context. Nothing saved.");
@@ -302,6 +317,7 @@ export default function QuickLogAllActivitiesSection({
     harvestDryValidation,
     onSaveStart,
     onSaveEnd,
+    isMutationBlocked,
   ]);
 
   const noContext = !growId;
@@ -334,6 +350,7 @@ export default function QuickLogAllActivitiesSection({
 
       <QuickLogActivityPicker
         onSelect={handleSelect}
+        disabled={mutationBlocked}
         selectedId={selected?.id ?? null}
         testIdPrefix={`${testIdPrefix}-picker`}
       />
@@ -371,7 +388,11 @@ export default function QuickLogAllActivitiesSection({
                     id={`${testIdPrefix}-harvest-wet`}
                     data-testid={`${testIdPrefix}-harvest-wet`}
                     value={harvestWet}
-                    onChange={(e) => setHarvestWet(e.target.value)}
+                    onChange={(e) => {
+                      if (isMutationBlocked()) return;
+                      setHarvestWet(e.target.value);
+                    }}
+                    disabled={mutationBlocked}
                     inputMode="decimal"
                     placeholder="e.g. 120"
                     min={0}
@@ -399,7 +420,11 @@ export default function QuickLogAllActivitiesSection({
                     id={`${testIdPrefix}-harvest-dry`}
                     data-testid={`${testIdPrefix}-harvest-dry`}
                     value={harvestDry}
-                    onChange={(e) => setHarvestDry(e.target.value)}
+                    onChange={(e) => {
+                      if (isMutationBlocked()) return;
+                      setHarvestDry(e.target.value);
+                    }}
+                    disabled={mutationBlocked}
                     inputMode="decimal"
                     placeholder="e.g. 22"
                     min={0}
@@ -427,7 +452,11 @@ export default function QuickLogAllActivitiesSection({
                     id={`${testIdPrefix}-harvest-unit`}
                     data-testid={`${testIdPrefix}-harvest-unit`}
                     value={harvestUnit}
-                    onChange={(e) => setHarvestUnit(e.target.value as QuickLogWeightUnit)}
+                    onChange={(e) => {
+                      if (isMutationBlocked()) return;
+                      setHarvestUnit(e.target.value as QuickLogWeightUnit);
+                    }}
+                    disabled={mutationBlocked}
                     className="w-full text-sm h-9 rounded-md border border-input bg-background px-2"
                   >
                     {QUICK_LOG_WEIGHT_UNITS.map((u) => (
@@ -449,7 +478,11 @@ export default function QuickLogAllActivitiesSection({
                   id={`${testIdPrefix}-note`}
                   data-testid={`${testIdPrefix}-note`}
                   value={note}
-                  onChange={(e) => setNote(e.target.value)}
+                  onChange={(e) => {
+                    if (isMutationBlocked()) return;
+                    setNote(e.target.value);
+                  }}
+                  disabled={mutationBlocked}
                   placeholder="Removed main cola, lower branches…"
                   className="min-h-[64px] text-sm"
                 />
@@ -464,7 +497,11 @@ export default function QuickLogAllActivitiesSection({
                 id={`${testIdPrefix}-note`}
                 data-testid={`${testIdPrefix}-note`}
                 value={note}
-                onChange={(e) => setNote(e.target.value)}
+                onChange={(e) => {
+                  if (isMutationBlocked()) return;
+                  setNote(e.target.value);
+                }}
+                disabled={mutationBlocked}
                 placeholder="Short observation…"
                 className="min-h-[64px] text-sm"
               />
@@ -481,8 +518,7 @@ export default function QuickLogAllActivitiesSection({
               size="sm"
               onClick={handleSave}
               disabled={
-                saving ||
-                saveBlocked ||
+                mutationBlocked ||
                 noContext ||
                 selected.id === "manual_sensor_snapshot" ||
                 (requiresNote && note.trim().length === 0) ||
@@ -497,12 +533,13 @@ export default function QuickLogAllActivitiesSection({
               size="sm"
               variant="ghost"
               onClick={() => {
+                if (isMutationBlocked()) return;
                 setSelected(null);
                 setNote("");
                 setErrorReason(null);
                 setErrorForActivity(null);
               }}
-              disabled={saving || saveBlocked}
+              disabled={mutationBlocked}
               data-testid={`${testIdPrefix}-cancel`}
             >
               Cancel

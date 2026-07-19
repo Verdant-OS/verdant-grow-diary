@@ -3,7 +3,6 @@ import fs from "node:fs";
 import path from "node:path";
 import type { Locator, Request } from "@playwright/test";
 import { SmokeChecklistReporter } from "./lib/smokeChecklistReporter";
-import { exactAccessibleNameOptions } from "./lib/fixtureSafety";
 
 /**
  * Authenticated Quick Log smoke checklist.
@@ -200,7 +199,10 @@ test.describe("Quick Log smoke checklist", () => {
       await report.run(3, "Change the selected target tuple", async () => {
         const plantSelect = dialog.getByTestId("quick-log-plant-select");
         await plantSelect.click();
-        await page.getByRole("option", exactAccessibleNameOptions(TARGET_NAME)).click();
+        const exactPlantName = page.getByText(TARGET_NAME, { exact: true });
+        const targetOption = page.getByRole("option").filter({ has: exactPlantName });
+        await expect(targetOption).toHaveCount(1);
+        await targetOption.click();
         await expect
           .poll(() =>
             dialog.getByTestId("quick-log-target-card").getAttribute("data-target-plant-id"),

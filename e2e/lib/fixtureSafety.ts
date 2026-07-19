@@ -40,16 +40,6 @@ export interface FixtureEnvValidation {
   };
 }
 
-function escapeRegExpLiteral(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-/** Match the literal plant name, with only the UI's exact optional strain suffix. */
-export function exactAccessibleNameOptions(name: string): { name: RegExp } {
-  const literalName = escapeRegExpLiteral(name);
-  return { name: new RegExp(`^${literalName}(?: · .+)?$`) };
-}
-
 /**
  * Known patterns that indicate the URL points at a real / production grow.
  * Extend this list when new known-real plants are identified.

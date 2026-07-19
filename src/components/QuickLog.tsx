@@ -564,6 +564,7 @@ export default function QuickLog({
     setChildSaveBusy(false);
     setInFlightSaveContext(null);
   }, []);
+  const isSaveInFlight = useCallback(() => saveInFlightRef.current, []);
 
   // Slice A2: re-enable stage defaulting ONLY when the grower actively switches
   // from one already-selected plant to a different one — the new target's stage
@@ -1244,6 +1245,7 @@ export default function QuickLog({
           onSaveStart={beginAllActivitiesSave}
           onSaveEnd={endAllActivitiesSave}
           saveBlocked={saveLocked}
+          isSaveBlocked={isSaveInFlight}
         />
 
         <form onSubmit={submit} className="grid gap-4">
@@ -1536,7 +1538,7 @@ export default function QuickLog({
                     <SelectItem value="__none">Choose a plant…</SelectItem>
                     {scopedPlants.map((p) => (
                       <SelectItem key={p.id} value={p.id}>
-                        {p.name}
+                        <span data-testid="quick-log-plant-option-name">{p.name}</span>
                         {p.strain ? ` · ${p.strain}` : ""}
                       </SelectItem>
                     ))}
@@ -2504,7 +2506,14 @@ export default function QuickLog({
             data-testid="quick-log-save"
             className="gradient-leaf text-primary-foreground"
           >
-            {saveLocked ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save log"}
+            {saveLocked ? (
+              <>
+                <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
+                <span>Saving…</span>
+              </>
+            ) : (
+              "Save log"
+            )}
           </Button>
           <p
             data-testid="quick-log-save-helper"

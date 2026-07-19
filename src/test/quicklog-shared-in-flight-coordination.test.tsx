@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -151,6 +151,26 @@ async function prepareChildNote() {
   return screen.getByTestId("quick-log-dialog-all-activities-save") as HTMLButtonElement;
 }
 
+async function prepareChildHarvest() {
+  fireEvent.click(screen.getByTestId("quick-log-dialog-all-activities-picker-harvest"));
+  const wet = await screen.findByTestId("quick-log-dialog-all-activities-harvest-wet");
+  const dry = screen.getByTestId("quick-log-dialog-all-activities-harvest-dry");
+  const unit = screen.getByTestId("quick-log-dialog-all-activities-harvest-unit");
+  const note = screen.getByTestId("quick-log-dialog-all-activities-note");
+  fireEvent.change(wet, { target: { value: "120" } });
+  fireEvent.change(dry, { target: { value: "22" } });
+  fireEvent.change(unit, { target: { value: "oz" } });
+  fireEvent.change(note, { target: { value: "Harvest activity A" } });
+  return {
+    wet: wet as HTMLInputElement,
+    dry: dry as HTMLInputElement,
+    unit: unit as HTMLSelectElement,
+    note: note as HTMLTextAreaElement,
+    save: screen.getByTestId("quick-log-dialog-all-activities-save") as HTMLButtonElement,
+    cancel: screen.getByTestId("quick-log-dialog-all-activities-cancel") as HTMLButtonElement,
+  };
+}
+
 function prepareMainNote() {
   fireEvent.change(screen.getByTestId("quicklog-note"), {
     target: { value: "Main form observation" },
@@ -178,6 +198,26 @@ function expectParentSelectorsLocked(locked: boolean) {
   }
 }
 
+function childActivityButton(id: string): HTMLButtonElement {
+  return screen.getByTestId(`quick-log-dialog-all-activities-picker-${id}`) as HTMLButtonElement;
+}
+
+function expectEveryChildMutationControlLocked() {
+  const section = screen.getByTestId("quick-log-dialog-all-activities");
+  const controls = Array.from(
+    section.querySelectorAll<
+      HTMLButtonElement | HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >("button, input, textarea, select"),
+  );
+  expect(controls.length).toBeGreaterThan(0);
+  controls.forEach((control) => expect(control).toBeDisabled());
+
+  const picker = within(section).getByRole("group", { name: "Quick Log activity" });
+  within(picker)
+    .getAllByRole("button")
+    .forEach((button) => expect(button).toHaveAttribute("aria-disabled", "true"));
+}
+
 beforeEach(() => {
   window.localStorage.clear();
   harness.activeGrowId = "g1";
@@ -195,6 +235,157 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe("Quick Log shared in-flight coordination", () => {
+  it("names the disabled main Save as Saving while the shared lock is active", async () => {
+    const pending = deferredRpc();
+    harness.rpc.mockReturnValue(pending.promise);
+    renderQuickLog();
+    const childSave = await prepareChildNote();
+
+    fireEvent.click(childSave);
+    await waitFor(() => expect(harness.rpc).toHaveBeenCalledTimes(1));
+
+    const mainSave = screen.getByTestId("quick-log-save");
+    expect(mainSave).toBeDisabled();
+    expect(mainSave).toHaveAccessibleName(/^saving(?:…|\.\.\.)$/i);
+    expect(mainSave.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+
+    await act(async () => {
+      pending.resolve({ data: { ok: true, grow_event_id: "child-event" }, error: null });
+      await pending.promise;
+    });
+  });
+
+  it("locks every child draft mutation while child activity A saves, then re-enables after success", async () => {
+    const pending = deferredRpc();
+    harness.rpc.mockReturnValue(pending.promise);
+    renderQuickLog();
+    const harvest = await prepareChildHarvest();
+
+    act(() => {
+      harvest.save.click();
+      childActivityButton("feeding").click();
+      fireEvent.change(harvest.wet, { target: { value: "999" } });
+      fireEvent.change(harvest.dry, { target: { value: "999" } });
+      fireEvent.change(harvest.unit, { target: { value: "kg" } });
+      fireEvent.change(harvest.note, { target: { value: "Newer draft B" } });
+      harvest.cancel.click();
+    });
+
+    await waitFor(() => expect(harness.rpc).toHaveBeenCalledTimes(1));
+    expectEveryChildMutationControlLocked();
+    expect(screen.getByTestId("quick-log-dialog-all-activities-form")).toHaveAttribute(
+      "data-activity-id",
+      "harvest",
+    );
+    expect(harvest.wet).toHaveValue("120");
+    expect(harvest.dry).toHaveValue("22");
+    expect(harvest.unit).toHaveValue("oz");
+    expect(harvest.note).toHaveValue("Harvest activity A");
+
+    const mainSave = screen.getByTestId("quick-log-save");
+    expect(mainSave).toBeDisabled();
+    expect(mainSave).toHaveAccessibleName(/^saving(?:…|\.\.\.)$/i);
+    expect(mainSave.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+
+    await act(async () => {
+      pending.resolve({ data: { ok: true, grow_event_id: "child-event" }, error: null });
+      await pending.promise;
+    });
+
+    expect(await screen.findByTestId("quick-log-dialog-all-activities-saved-item")).toHaveAttribute(
+      "data-saved-activity-id",
+      "harvest",
+    );
+    expect(screen.queryByTestId("quick-log-dialog-all-activities-form")).not.toBeInTheDocument();
+    expect(childActivityButton("feeding")).toBeEnabled();
+    expect(childActivityButton("feeding")).not.toHaveAttribute("aria-disabled");
+    fireEvent.click(childActivityButton("feeding"));
+    expect(await screen.findByTestId("quick-log-dialog-all-activities-form")).toHaveAttribute(
+      "data-activity-id",
+      "feeding",
+    );
+  });
+
+  it("retains child activity A and re-enables every draft mutation after failure", async () => {
+    const pending = deferredRpc();
+    harness.rpc.mockReturnValue(pending.promise);
+    renderQuickLog();
+    const childSave = await prepareChildNote();
+    const note = screen.getByTestId("quick-log-dialog-all-activities-note") as HTMLTextAreaElement;
+    const cancel = screen.getByTestId(
+      "quick-log-dialog-all-activities-cancel",
+    ) as HTMLButtonElement;
+
+    act(() => {
+      childSave.click();
+      childActivityButton("feeding").click();
+      fireEvent.change(note, { target: { value: "Newer draft B" } });
+      cancel.click();
+    });
+
+    await waitFor(() => expect(harness.rpc).toHaveBeenCalledTimes(1));
+    expectEveryChildMutationControlLocked();
+    await act(async () => {
+      pending.resolve({ data: null, error: { message: "offline" } });
+      await pending.promise;
+    });
+
+    expect(await screen.findByTestId("quick-log-dialog-all-activities-error")).toHaveTextContent(
+      /save failed/i,
+    );
+    expect(screen.getByTestId("quick-log-dialog-all-activities-form")).toHaveAttribute(
+      "data-activity-id",
+      "note",
+    );
+    expect(note).toHaveValue("Child activity observation");
+    expect(note).toBeEnabled();
+    expect(cancel).toBeEnabled();
+    expect(childSave).toBeEnabled();
+    expect(childActivityButton("feeding")).toBeEnabled();
+  });
+
+  it("locks every existing child draft mutation while the main save owns the shared guard", async () => {
+    const pending = deferredRpc();
+    harness.rpc.mockReturnValue(pending.promise);
+    renderQuickLog();
+    const harvest = await prepareChildHarvest();
+    prepareMainNote();
+
+    act(() => {
+      submitForm(mainForm());
+      childActivityButton("feeding").click();
+      fireEvent.change(harvest.wet, { target: { value: "999" } });
+      fireEvent.change(harvest.dry, { target: { value: "999" } });
+      fireEvent.change(harvest.unit, { target: { value: "kg" } });
+      fireEvent.change(harvest.note, { target: { value: "Newer draft B" } });
+      harvest.cancel.click();
+    });
+
+    await waitFor(() => expect(harness.rpc).toHaveBeenCalledTimes(1));
+    expectEveryChildMutationControlLocked();
+    expect(screen.getByTestId("quick-log-dialog-all-activities-form")).toHaveAttribute(
+      "data-activity-id",
+      "harvest",
+    );
+    expect(harvest.wet).toHaveValue("120");
+    expect(harvest.dry).toHaveValue("22");
+    expect(harvest.unit).toHaveValue("oz");
+    expect(harvest.note).toHaveValue("Harvest activity A");
+
+    await act(async () => {
+      pending.resolve({ data: { ok: true, grow_event_id: "main-event" }, error: null });
+      await pending.promise;
+    });
+
+    await waitFor(() => expect(childActivityButton("feeding")).toBeEnabled());
+    expect(harvest.wet).toBeEnabled();
+    expect(harvest.dry).toBeEnabled();
+    expect(harvest.unit).toBeEnabled();
+    expect(harvest.note).toBeEnabled();
+    expect(harvest.cancel).toBeEnabled();
+    expect(harvest.save).toBeEnabled();
+  });
+
   it("locks the parent and close path while a child save holds its captured target", async () => {
     const pending = deferredRpc();
     harness.rpc.mockReturnValue(pending.promise);

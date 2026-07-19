@@ -19,7 +19,6 @@ import {
   validateFixtureEnv,
   pageTextMatchesFixture,
   isLikelyRealPlantUrl,
-  exactAccessibleNameOptions,
 } from "../../e2e/lib/fixtureSafety";
 
 const ROOT = path.resolve(__dirname, "../..");
@@ -286,7 +285,10 @@ describe("Workflow: fixture verification gates smoke", () => {
     const checklist = read("e2e/scripts/print-fixture-config-checklist.ts");
     expect(smoke).toContain("E2E_GROW_1_SECOND_PLANT_NAME");
     expect(smoke).not.toContain("E2E_GROW_2_PLANT_NAME");
-    expect(smoke).toMatch(/getByRole\("option",\s*exactAccessibleNameOptions\(TARGET_NAME\)\)/);
+    expect(smoke).toContain("getByText(TARGET_NAME, { exact: true })");
+    expect(smoke).toMatch(/getByRole\("option"\)\.filter\(\{\s*has:\s*exactPlantName/);
+    expect(smoke).toContain("await expect(targetOption).toHaveCount(1)");
+    expect(smoke).not.toContain("exactAccessibleNameOptions");
     expect(smoke).not.toContain("new RegExp(TARGET_NAME");
     expect(smoke).toMatch(/selectedTarget\.growId\s*!==\s*initialTarget\.growId/);
     expect(smoke).toContain("One-Tent Loop card's CTA dispatches the canonical global prefill");
@@ -295,16 +297,14 @@ describe("Workflow: fixture verification gates smoke", () => {
     expect(checklist).toContain("E2E Test Plant 2");
   });
 
-  it("keeps regex metacharacters literal and rejects prefix-only accessible names", () => {
-    const fixtureName = "E2E Plant [A]+ (2).";
-    const options = exactAccessibleNameOptions(fixtureName);
-    expect(options.name).toBeInstanceOf(RegExp);
-    expect(options.name).toMatchObject({ source: expect.stringMatching(/^\^/) });
-    expect(options.name.test(fixtureName)).toBe(true);
-    expect(options.name.test(`${fixtureName} · Lemon.*`)).toBe(true);
-    expect(options.name.test(`${fixtureName} clone`)).toBe(false);
-    expect(options.name.test(`Prefix ${fixtureName} · Lemon.*`)).toBe(false);
-    expect(options.name.test("E2E Plant A 22")).toBe(false);
+  it("uses an exact nested name locator instead of inferring a strain suffix", () => {
+    const smoke = read("e2e/quicklog-smoke.spec.ts");
+    const quickLog = read("src/components/QuickLog.tsx");
+    expect(quickLog).toContain('data-testid="quick-log-plant-option-name"');
+    expect(smoke).toContain("const exactPlantName = page.getByText(TARGET_NAME, { exact: true });");
+    expect(smoke).toContain('const targetOption = page.getByRole("option").filter({');
+    expect(smoke).toContain("has: exactPlantName");
+    expect(smoke).not.toMatch(/TARGET_NAME.*(?:RegExp| · )/);
   });
 
   it("no schedule, no cron, no pull_request_target, no service_role, no checked-in storageState", () => {

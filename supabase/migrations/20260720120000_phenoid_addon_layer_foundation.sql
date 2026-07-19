@@ -57,7 +57,7 @@ AS $$
       SELECT 1 FROM public.subscriptions s
       WHERE s.user_id = _user_id
         AND s.environment = 'live'
-        AND s.plan_id IN ('phenoid_monthly','phenoid_annual')
+        AND s.price_id IN ('phenoid_monthly','phenoid_annual')
         AND (
           (s.status IN ('active','trialing')
              AND (s.current_period_end IS NULL OR s.current_period_end > now()))

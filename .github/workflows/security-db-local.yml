@@ -64,7 +64,7 @@ jobs:
         if: env.ENABLED == 'true'
         id: supabase-start
         run: |
-          set -e
+          set -eo pipefail
           supabase start --workdir . 2>&1 | tee supabase-start.log
           echo "started=true" >> "$GITHUB_OUTPUT"
 
@@ -96,27 +96,46 @@ jobs:
         # inserts) fails with 42501 before any assertion runs. The seed is
         # local-only and never touches the hosted project. See
         # docs/security-regression-tests.md.
-        run: supabase db reset 2>&1 | tee supabase-db-reset.log
+        run: |
+          set -o pipefail
+          supabase db reset 2>&1 | tee supabase-db-reset.log
 
       - name: Profiles DB security
         if: env.ENABLED == 'true'
         id: profiles-db
-        run: bun run test:profiles-db-security 2>&1 | tee profiles-db.log
+        run: |
+          set -o pipefail
+          bun run test:profiles-db-security 2>&1 | tee profiles-db.log
 
       - name: Customer Mode isolation
         if: env.ENABLED == 'true'
         id: customer-mode-db
-        run: bun run test:customer-mode-db-security 2>&1 | tee customer-mode-db.log
+        run: |
+          set -o pipefail
+          bun run test:customer-mode-db-security 2>&1 | tee customer-mode-db.log
 
       - name: Subscriber interest RLS
         if: env.ENABLED == 'true'
         id: subscriber-interest-db
-        run: bun run test:subscriber-interest-db-security 2>&1 | tee subscriber-interest-db.log
+        run: |
+          set -o pipefail
+          bun run test:subscriber-interest-db-security 2>&1 | tee subscriber-interest-db.log
+
+      - name: AI Doctor sessions RLS
+        if: env.ENABLED == 'true'
+        id: ai-doctor-sessions-rls
+        env:
+          AI_DOCTOR_SESSIONS_RLS_HARNESS: "1"
+        run: |
+          set -o pipefail
+          bun run test:ai-doctor-sessions-rls 2>&1 | tee ai-doctor-sessions-rls.log
 
       - name: Aggregate DB security lane
         if: env.ENABLED == 'true'
         id: aggregate
-        run: bun run test:security-db-local 2>&1 | tee security-db-local.log
+        run: |
+          set -o pipefail
+          bun run test:security-db-local 2>&1 | tee security-db-local.log
 
       - name: Upload failure artifacts
         if: failure() && env.ENABLED == 'true'
@@ -130,6 +149,7 @@ jobs:
             profiles-db.log
             customer-mode-db.log
             subscriber-interest-db.log
+            ai-doctor-sessions-rls.log
             security-db-local.log
             test-results/**
             artifacts/security-db/**
@@ -164,12 +184,13 @@ jobs:
               echo "- profiles DB security (\`test:profiles-db-security\`)"
               echo "- customer mode isolation (\`test:customer-mode-db-security\`)"
               echo "- subscriber interest RLS (\`test:subscriber-interest-db-security\`)"
+              echo "- AI Doctor sessions RLS (\`test:ai-doctor-sessions-rls\`)"
               echo "- aggregate lane (\`test:security-db-local\`)"
               echo ""
               echo "**Artifact:** \`security-db-local-artifacts\` (uploaded on failure only, 14-day retention)"
               echo ""
               echo "Artifact paths (when uploaded):"
-              echo "- \`profiles-db.log\`, \`customer-mode-db.log\`, \`subscriber-interest-db.log\`, \`security-db-local.log\`"
+              echo "- \`profiles-db.log\`, \`customer-mode-db.log\`, \`subscriber-interest-db.log\`, \`ai-doctor-sessions-rls.log\`, \`security-db-local.log\`"
               echo "- \`supabase-start.log\`, \`supabase-db-reset.log\` (sanitized)"
               echo "- \`test-results/\`, \`artifacts/security-db/\` (if produced)"
               echo ""

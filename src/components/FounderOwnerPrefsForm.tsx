@@ -7,7 +7,7 @@
  * Presentation-only: never trusts client-derived visibility. Public wall
  * always reads `founders_wall_public` where the server is authoritative.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -48,6 +48,8 @@ export default function FounderOwnerPrefsForm() {
   const [optionalLink, setOptionalLink] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const saveButtonRef = useRef<HTMLButtonElement | null>(null);
+  const wasSavingRef = useRef(false);
 
   useEffect(() => {
     if (!row) return;
@@ -56,6 +58,18 @@ export default function FounderOwnerPrefsForm() {
     setShowOnWall(row.show_on_wall);
     setOptionalLink(row.optional_link ?? "");
   }, [row]);
+
+  // After a save completes (saving true → false), return focus to the Save
+  // button so keyboard users are not stranded and no focus trap develops
+  // around the transient disabled state. Fires before any refetch-triggered
+  // remount removes the button from the DOM.
+  useEffect(() => {
+    if (wasSavingRef.current && !saving) {
+      const btn = saveButtonRef.current;
+      if (btn && !btn.disabled) btn.focus();
+    }
+    wasSavingRef.current = saving;
+  }, [saving]);
 
   const previewName = useMemo(() => {
     if (!row) return null;
@@ -126,6 +140,12 @@ export default function FounderOwnerPrefsForm() {
       description: "Your Founders Wall preferences are updated.",
     });
     await refetch();
+    // Return focus to the Save button after the row remounts, so keyboard
+    // users are not stranded on document.body during / after refetch.
+    requestAnimationFrame(() => {
+      const btn = saveButtonRef.current;
+      if (btn && !btn.disabled) btn.focus();
+    });
   }
 
   return (
@@ -242,6 +262,7 @@ export default function FounderOwnerPrefsForm() {
 
         <div>
           <Button
+            ref={saveButtonRef}
             type="submit"
             disabled={isRefunded || saving}
             aria-busy={saving ? "true" : "false"}

@@ -113,6 +113,16 @@ test.describe("Founder owner preferences (mocked)", () => {
 
   test("signed-in confirmed founder can save valid prefs", async ({ page }) => {
     await seedSession(page);
+    await page.route(/\/rest\/v1\/user_agreement_acceptances/, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([
+          { agreement_type: "terms", version: "2026-07-13" },
+          { agreement_type: "privacy", version: "2026-07-13" },
+        ]),
+      }),
+    );
     await mockFoundersReadOnce(page, {
       founder_number: 7,
       display_name: null,
@@ -292,6 +302,94 @@ test.describe("Founder owner preferences (mocked)", () => {
       page.getByRole("button", { name: /Save Founder settings/i }),
     ).toBeEnabled();
     expect(await page.getByText("Saving Founder settings…").count()).toBe(0);
+  });
+
+  test("focus returns to Save button after save completes without a focus trap", async ({ page }) => {
+    await seedSession(page);
+    await page.route(/\/rest\/v1\/user_agreement_acceptances/, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([
+          { agreement_type: "terms", version: "2026-07-13" },
+          { agreement_type: "privacy", version: "2026-07-13" },
+        ]),
+      }),
+    );
+    // Persistent read mock — refetch after save must still return the row,
+    // otherwise the form unmounts and focus can never return to Save.
+    await page.route(/\/rest\/v1\/founders(\?|$)/, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          founder_number: 33,
+          display_name: null,
+          display_style: "hidden",
+          show_on_wall: false,
+          optional_link: null,
+          status: "confirmed",
+        }),
+      }),
+    );
+
+    // Gate save so we can inspect in-flight focus, then release for completion.
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route(/\/functions\/v1\/save-founder-prefs/, async (route) => {
+      await gate;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true }),
+      });
+    });
+
+    await page.goto("/founder");
+    await expect(
+      page.getByRole("heading", { name: /Your Founder settings/i }),
+    ).toBeVisible({ timeout: 15_000 });
+    await page.keyboard.press("Escape").catch(() => {});
+
+    // Submit via the form so we don't depend on click actionability while
+    // any tail-end overlay is still animating out.
+    await page.evaluate(() => {
+      const form = document.querySelector<HTMLFormElement>(
+        "form:has(#founder-show-on-wall)",
+      );
+      form?.requestSubmit();
+    });
+
+    // In-flight: Save is disabled and no longer the active element, but
+    // focus must remain somewhere in the document (not null / <body> only
+    // if that indicates the page has lost focus entirely).
+    await expect(page.getByRole("button", { name: /Saving…/i })).toBeDisabled();
+    const inFlightTag = await page.evaluate(
+      () => document.activeElement?.tagName ?? null,
+    );
+    expect(inFlightTag).not.toBeNull();
+
+    // Complete the request — focus should return to the (now re-enabled)
+    // Save button, proving no dialog/overlay trapped focus and keyboard
+    // users are not stranded on a hidden disabled control.
+    release();
+    const restored = page.getByRole("button", { name: /Save Founder settings/i });
+    await expect(restored).toBeEnabled();
+    await expect(restored).toBeFocused({ timeout: 5_000 });
+
+    // No focus trap: pressing Tab / Shift+Tab from the Save button must
+    // move focus to another element (a real trap would keep focus pinned
+    // to the same node).
+    const beforeId = await page.evaluate(
+      () => (document.activeElement as HTMLElement | null)?.id ?? "",
+    );
+    await page.keyboard.press("Shift+Tab");
+    const afterId = await page.evaluate(
+      () => (document.activeElement as HTMLElement | null)?.id ?? "",
+    );
+    expect(afterId).not.toBe(beforeId);
   });
 });
 

@@ -241,17 +241,26 @@ export default function FounderOwnerPrefsForm() {
         ) : null}
 
         <div>
-          <Button type="submit" disabled={isRefunded || saving}>
+          <Button
+            type="submit"
+            disabled={isRefunded || saving}
+            aria-busy={saving}
+          >
             {saving ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
-                Saving…
-              </>
+              <span role="status" aria-live="polite" className="inline-flex items-center">
+                <Loader2
+                  className="mr-2 h-4 w-4 animate-spin"
+                  aria-hidden="true"
+                  focusable="false"
+                />
+                <span>Saving…</span>
+              </span>
             ) : (
               "Save Founder settings"
             )}
           </Button>
         </div>
+
       </form>
     </section>
   );

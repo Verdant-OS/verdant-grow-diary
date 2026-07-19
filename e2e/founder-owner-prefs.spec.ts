@@ -367,13 +367,6 @@ test.describe("Founder owner preferences (mocked)", () => {
     release();
     const restored = page.getByRole("button", { name: /Save Founder settings/i });
     await expect(restored).toBeEnabled();
-    await page.waitForTimeout(300);
-    const dbg = await page.evaluate(() => ({
-      active: document.activeElement?.outerHTML?.slice(0, 200) ?? null,
-      tag: document.activeElement?.tagName ?? null,
-      openDialogs: document.querySelectorAll('[role="dialog"]').length,
-    }));
-    console.log("DBG focus state:", JSON.stringify(dbg));
     await expect(restored).toBeFocused({ timeout: 5_000 });
 
     // No focus trap: pressing Tab / Shift+Tab from the Save button must

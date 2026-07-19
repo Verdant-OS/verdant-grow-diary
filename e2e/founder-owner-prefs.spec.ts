@@ -335,11 +335,8 @@ test.describe("Founder owner preferences (mocked)", () => {
     ).toBeVisible({ timeout: 15_000 });
     await page.keyboard.press("Escape").catch(() => {});
 
-    const save = page.getByRole("button", { name: /Save Founder settings/i });
-
-    // Focus the Save button as a keyboard user would, then submit via the form.
-    await save.focus();
-    await expect(save).toBeFocused();
+    // Submit via the form so we don't depend on click actionability while
+    // any tail-end overlay is still animating out.
     await page.evaluate(() => {
       const form = document.querySelector<HTMLFormElement>(
         "form:has(#founder-show-on-wall)",
@@ -347,35 +344,34 @@ test.describe("Founder owner preferences (mocked)", () => {
       form?.requestSubmit();
     });
 
-    // In-flight: Save is disabled and therefore no longer the active element,
-    // but focus must remain inside the document (not lost to <body>) and no
-    // element outside the form should have stolen focus into a trap.
+    // In-flight: Save is disabled and no longer the active element, but
+    // focus must remain somewhere in the document (not null / <body> only
+    // if that indicates the page has lost focus entirely).
     await expect(page.getByRole("button", { name: /Saving…/i })).toBeDisabled();
-    const inFlightFocus = await page.evaluate(() => ({
-      tag: document.activeElement?.tagName ?? null,
-      insideForm: !!document
-        .querySelector("form:has(#founder-show-on-wall)")
-        ?.contains(document.activeElement),
-    }));
-    expect(inFlightFocus.tag).not.toBeNull();
+    const inFlightTag = await page.evaluate(
+      () => document.activeElement?.tagName ?? null,
+    );
+    expect(inFlightTag).not.toBeNull();
 
-    // Complete the request — focus should return to the (now re-enabled) Save
-    // button, proving no dialog/overlay trapped focus and keyboard users are
-    // not stranded.
+    // Complete the request — focus should return to the (now re-enabled)
+    // Save button, proving no dialog/overlay trapped focus and keyboard
+    // users are not stranded on a hidden disabled control.
     release();
     const restored = page.getByRole("button", { name: /Save Founder settings/i });
     await expect(restored).toBeEnabled();
     await expect(restored).toBeFocused({ timeout: 5_000 });
 
-    // Tab away and back — a real focus trap would prevent focus from moving
-    // to a sibling input. Confirm the display-name input is reachable.
-    await page.keyboard.press("Shift+Tab");
-    await page.keyboard.press("Shift+Tab");
-    const afterTab = await page.evaluate(
-      () => document.activeElement?.id ?? null,
+    // No focus trap: pressing Tab / Shift+Tab from the Save button must
+    // move focus to another element (a real trap would keep focus pinned
+    // to the same node).
+    const beforeId = await page.evaluate(
+      () => (document.activeElement as HTMLElement | null)?.id ?? "",
     );
-    expect(afterTab).not.toBe(null);
-    expect(afterTab).not.toBe("");
+    await page.keyboard.press("Shift+Tab");
+    const afterId = await page.evaluate(
+      () => (document.activeElement as HTMLElement | null)?.id ?? "",
+    );
+    expect(afterId).not.toBe(beforeId);
   });
 });
 

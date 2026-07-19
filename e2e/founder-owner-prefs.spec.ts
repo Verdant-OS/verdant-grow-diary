@@ -219,6 +219,17 @@ test.describe("Founder owner preferences (mocked)", () => {
 
   test("status live region announces saving once and clears on completion", async ({ page }) => {
     await seedSession(page);
+    // Pre-empt the AgreementReconsentGate modal so it can't intercept clicks.
+    await page.route(/\/rest\/v1\/user_agreement_acceptances/, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([
+          { document_key: "terms", accepted_at: new Date().toISOString() },
+          { document_key: "privacy", accepted_at: new Date().toISOString() },
+        ]),
+      }),
+    );
     await mockFoundersReadOnce(page, {
       founder_number: 21,
       display_name: null,

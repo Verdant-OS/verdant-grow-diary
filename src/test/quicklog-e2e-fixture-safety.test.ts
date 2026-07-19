@@ -199,6 +199,32 @@ describe("E2E fixture safety: source-level guardrails", () => {
     expect(base).toContain("session-storage.json");
     expect(base).not.toMatch(/eyJ[A-Za-z0-9_-]{20,}\./);
   });
+
+  it("the standalone smoke validates the visible fixture immediately after navigation and before any write", () => {
+    const smoke = read("e2e/quicklog-smoke.spec.ts");
+    const helper = read("e2e/lib/fixtureSafety.ts");
+    const goto = smoke.indexOf("await page.goto(PLANT_URL!)");
+    const validate = smoke.indexOf("await validateQuickLogFixturePage(page");
+    const reconsent = smoke.indexOf("await acceptReconsentGateIfShown(page)");
+    const openQuickLog = smoke.indexOf("await openQuickLogDialog(page)");
+    const firstSave = smoke.indexOf('getByTestId("quick-log-save").click()');
+
+    expect(smoke).toMatch(
+      /import\s*\{[^}]*validateQuickLogFixturePage[^}]*\}\s*from\s*["']\.\/lib\/fixtureSafety["']/s,
+    );
+    expect(goto).toBeGreaterThan(0);
+    expect(validate).toBeGreaterThan(goto);
+    expect(smoke.slice(goto, validate)).toMatch(/await page\.goto\(PLANT_URL!\);\s*$/);
+    expect(validate).toBeLessThan(reconsent);
+    expect(validate).toBeLessThan(openQuickLog);
+    expect(validate).toBeLessThan(firstSave);
+
+    expect(helper).toContain("export async function validateQuickLogFixturePage");
+    expect(helper).toContain("validateFixtureEnv");
+    expect(helper).toContain("pageTextMatchesFixture");
+    expect(helper).toMatch(/expected\.plant[\s\S]*toBeVisible|expected\.plant[\s\S]*waitFor/);
+    expect(helper).toMatch(/expected\.tent[\s\S]*toBeVisible|expected\.tent[\s\S]*waitFor/);
+  });
 });
 
 describe("Workflow: fixture verification gates smoke", () => {
@@ -420,5 +446,13 @@ describe("Package + docs wiring", () => {
     expect(readme.toLowerCase()).toContain("deferred");
     // Reaffirm no scheduled smoke
     expect(readme).toMatch(/no scheduled or nightly/i);
+  });
+
+  it("README says direct smoke invocation performs the same internal fixture validation", () => {
+    const readme = read("e2e/README.md");
+    expect(readme).toMatch(
+      /bun run e2e:quicklog-smoke[\s\S]{0,500}(?:internally|itself)[\s\S]{0,200}(?:fixture validation|validates the fixture)/i,
+    );
+    expect(readme).toMatch(/Tent \+ Plant[^\n]*required[^\n]*Grow[^\n]*optional/i);
   });
 });

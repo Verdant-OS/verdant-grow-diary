@@ -20,6 +20,7 @@
  *   - never bypasses auth
  *   - never reads or logs secret values
  */
+import type { Page } from "@playwright/test";
 
 export type FixtureSafetyEnv = Readonly<{
   E2E_FIXTURE_MODE?: string;
@@ -27,6 +28,7 @@ export type FixtureSafetyEnv = Readonly<{
   E2E_FIXTURE_EXPECTED_GROW_NAME?: string;
   E2E_FIXTURE_EXPECTED_TENT_NAME?: string;
   E2E_FIXTURE_EXPECTED_PLANT_NAME?: string;
+  E2E_FIXTURE_EXPECTED_ACCOUNT_HINT?: string;
 }>;
 
 export interface FixtureEnvValidation {
@@ -166,4 +168,62 @@ export function pageTextMatchesFixture(
   }
 
   return { ok: errors.length === 0, errors };
+}
+
+/**
+ * Validate the already-open Plant Detail page before the Quick Log smoke
+ * performs any write-producing UI action. This deliberately composes the
+ * same pure env and visible-page checks used by fixture-safety.spec.ts so a
+ * direct `e2e:quicklog-smoke` invocation cannot bypass them.
+ */
+export async function validateQuickLogFixturePage(
+  page: Page,
+  env: FixtureSafetyEnv = {
+    E2E_FIXTURE_MODE: process.env.E2E_FIXTURE_MODE,
+    E2E_GROW_1_PLANT_URL: process.env.E2E_GROW_1_PLANT_URL,
+    E2E_FIXTURE_EXPECTED_GROW_NAME: process.env.E2E_FIXTURE_EXPECTED_GROW_NAME,
+    E2E_FIXTURE_EXPECTED_TENT_NAME: process.env.E2E_FIXTURE_EXPECTED_TENT_NAME,
+    E2E_FIXTURE_EXPECTED_PLANT_NAME: process.env.E2E_FIXTURE_EXPECTED_PLANT_NAME,
+    E2E_FIXTURE_EXPECTED_ACCOUNT_HINT: process.env.E2E_FIXTURE_EXPECTED_ACCOUNT_HINT,
+  },
+): Promise<FixtureEnvValidation> {
+  const envCheck = validateFixtureEnv(env);
+  if (!envCheck.ok) {
+    throw new Error(`Fixture env validation failed:\n - ${envCheck.errors.join("\n - ")}`);
+  }
+
+  if (page.url().includes("/auth")) {
+    throw new Error(
+      "Fixture validation reached /auth instead of the configured Plant Detail page.",
+    );
+  }
+
+  // Plant and Tent are the required visible relationship. Grow remains
+  // optional until the product exposes it in the setup flow.
+  await page
+    .getByText(envCheck.expected.plant, { exact: false })
+    .first()
+    .waitFor({ state: "visible", timeout: 20_000 });
+  await page
+    .getByText(envCheck.expected.tent, { exact: false })
+    .first()
+    .waitFor({ state: "visible", timeout: 20_000 });
+  if (envCheck.expected.grow) {
+    await page
+      .getByText(envCheck.expected.grow, { exact: false })
+      .first()
+      .waitFor({ state: "visible", timeout: 20_000 });
+  }
+
+  const bodyText = (await page.locator("body").innerText()).slice(0, 50_000);
+  const pageCheck = pageTextMatchesFixture(bodyText, envCheck.expected, {
+    accountHint: env.E2E_FIXTURE_EXPECTED_ACCOUNT_HINT,
+  });
+  if (!pageCheck.ok) {
+    throw new Error(
+      `Target page does not look like a disposable E2E fixture:\n - ${pageCheck.errors.join("\n - ")}`,
+    );
+  }
+
+  return envCheck;
 }

@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { Locator, Request } from "@playwright/test";
 import { SmokeChecklistReporter } from "./lib/smokeChecklistReporter";
+import { validateQuickLogFixturePage } from "./lib/fixtureSafety";
 
 /**
  * Authenticated Quick Log smoke checklist.
@@ -166,6 +167,7 @@ test.describe("Quick Log smoke checklist", () => {
 
     try {
       await page.goto(PLANT_URL!);
+      await validateQuickLogFixturePage(page);
       let routePlantId = "";
       await report.run(1, "Validate initial plant route target", async () => {
         routePlantId = readPlantRouteId(PLANT_URL!);

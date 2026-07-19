@@ -75,6 +75,18 @@ export default function McpApiReference() {
           </p>
         </div>
 
+        <Section id="explorer" title="Interactive tool explorer">
+          <p className="text-sm text-muted-foreground">
+            Call each tool live as your signed-in account. Connect this browser
+            once from{" "}
+            <Link to="/settings/agent-integrations" className="underline">
+              Settings → Agent integrations
+            </Link>{" "}
+            and the explorer will reuse that OAuth session.
+          </p>
+          <McpToolExplorer />
+        </Section>
+
         <Section id="endpoint" title="Endpoint & auth">
           <p className="text-sm text-muted-foreground">
             Streamable HTTP transport (MCP spec 2025-06-18). Callers authenticate

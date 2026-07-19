@@ -48,6 +48,7 @@ const GrowLearning = lazy(() => import("./pages/GrowLearning"));
 const PhenoHuntsIndex = lazy(() => import("./pages/PhenoHuntsIndex"));
 const PhenoHuntNew = lazy(() => import("./pages/PhenoHuntNew"));
 const PhenoHuntCompare = lazy(() => import("./pages/PhenoHuntCompare"));
+const PhenoHuntShowcase = lazy(() => import("./pages/PhenoHuntShowcase"));
 const PhenoHuntWorkspace = lazy(() => import("./pages/PhenoHuntWorkspace"));
 const PhenoKeepersPage = lazy(() => import("./pages/PhenoKeepersPage"));
 const BreedingLogNew = lazy(() => import("./pages/BreedingLogNew"));
@@ -132,6 +133,7 @@ const OperatorAiDoctorPhase1Page = lazy(() =>
 const OneTentLiveProof = lazy(() => import("./pages/OneTentLiveProof"));
 const DemoProofWalkthrough = lazy(() => import("./pages/DemoProofWalkthrough"));
 const ContextualPhenoComparisonDemo = lazy(() => import("./pages/ContextualPhenoComparisonDemo"));
+const PhenoHuntDemo = lazy(() => import("./pages/PhenoHuntDemo"));
 const PhenoComparison = lazy(() => import("./pages/PhenoComparison"));
 const PhenoExpressionShowcase = lazy(() => import("./pages/PhenoExpressionShowcase"));
 const QuickLogStarter = lazy(() => import("./pages/QuickLogStarter"));
@@ -275,6 +277,12 @@ const App = () => (
                     element={<ContextualPhenoComparisonDemo />}
                   />
 
+                  {/* Internal read-only FULL pheno-hunt demo — pack → triage →
+                      keepers → clones → crosses → family tree, from labeled
+                      fixture data only. No fetch/Supabase/AI/writes. Hidden by
+                      URL only. */}
+                  <Route path="/internal/pheno-hunt-demo" element={<PhenoHuntDemo />} />
+
                   {/* Read-only Pheno Comparison PREVIEW surface. Fixture-only,
                       no fetch/Supabase/AI/writes. Mounted outside AppShell so
                       the read-only surface renders without operator chrome. */}
@@ -286,6 +294,11 @@ const App = () => (
                       RLS-scoped SELECT (empty/graceful without a session);
                       still read-only — no writes/AI/automation. */}
                   <Route path="/pheno-hunts/:id/compare" element={<PhenoHuntCompare />} />
+                  {/* LIVE per-hunt showcase — the grower's own hunt walked
+                      through the pack → contenders → fight → cure → family tree
+                      surfaces. RLS-scoped read; graceful demo fallback without a
+                      session/hunt. Read-only — no writes/AI/automation. */}
+                  <Route path="/pheno-hunts/:id/showcase" element={<PhenoHuntShowcase />} />
 
                   {/* Public 30-second Quick Log starter. Local draft on this
                       device only — no Supabase/AI/device calls, no fake-live

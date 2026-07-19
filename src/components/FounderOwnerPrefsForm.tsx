@@ -140,6 +140,12 @@ export default function FounderOwnerPrefsForm() {
       description: "Your Founders Wall preferences are updated.",
     });
     await refetch();
+    // Return focus to the Save button after the row remounts, so keyboard
+    // users are not stranded on document.body during / after refetch.
+    requestAnimationFrame(() => {
+      const btn = saveButtonRef.current;
+      if (btn && !btn.disabled) btn.focus();
+    });
   }
 
   return (

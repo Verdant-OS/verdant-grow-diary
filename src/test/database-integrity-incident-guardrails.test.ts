@@ -95,10 +95,13 @@ describe("Database integrity incident guardrails", () => {
     }
   });
 
+  // `\barchived\b` matches "archived" only as a standalone repair word, not
+  // the legitimate `is_archived` column used by normal find-or-create queries.
+  // `placeholder`/`orphan`/`one-shot` still catch the fabrication anti-pattern.
   it("no raw INSERT INTO public.tents repair with placeholder/archived language", () => {
     const hits = files.filter((f) => {
       if (!/insert\s+into\s+(public\.)?tents\b/i.test(f.text)) return false;
-      return /placeholder|archived|one[-_ ]?shot|orphan/i.test(f.text);
+      return /placeholder|\barchived\b|one[-_ ]?shot|orphan/i.test(f.text);
     });
     expect(hits.map((h) => h.path.split(sep).join("/"))).toEqual([]);
   });
@@ -106,7 +109,7 @@ describe("Database integrity incident guardrails", () => {
   it("no raw INSERT INTO public.grows repair with placeholder/archived language", () => {
     const hits = files.filter((f) => {
       if (!/insert\s+into\s+(public\.)?grows\b/i.test(f.text)) return false;
-      return /placeholder|archived|one[-_ ]?shot|orphan/i.test(f.text);
+      return /placeholder|\barchived\b|one[-_ ]?shot|orphan/i.test(f.text);
     });
     expect(hits.map((h) => h.path.split(sep).join("/"))).toEqual([]);
   });

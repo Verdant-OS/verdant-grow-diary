@@ -101,8 +101,10 @@ if (!localHost) {
 const runId = crypto.randomUUID().slice(0, 8);
 const emailA = `ai-doctor-sessions-a-${runId}@verdant.test`;
 const emailB = `ai-doctor-sessions-b-${runId}@verdant.test`;
+const emailCascade = `ai-doctor-sessions-cascade-${runId}@verdant.test`;
 const passwordA = crypto.randomUUID();
 const passwordB = crypto.randomUUID();
+const passwordCascade = crypto.randomUUID();
 
 const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false },
@@ -260,14 +262,19 @@ async function cleanupStep(
 async function run(): Promise<void> {
   let uidA: string | null = null;
   let uidB: string | null = null;
+  let uidCascade: string | null = null;
+  let cascadeFixtureUserId: string | null = null;
   const cleanupFailures: string[] = [];
 
   try {
     console.log("[ai-doctor-sessions] creating disposable users and owned scopes");
     uidA = await createUser(emailA, passwordA);
     uidB = await createUser(emailB, passwordB);
+    uidCascade = await createUser(emailCascade, passwordCascade);
+    cascadeFixtureUserId = uidCascade;
     const ownerA = await signedInClient(emailA, passwordA);
     const ownerB = await signedInClient(emailB, passwordB);
+    const cascadeOwner = await signedInClient(emailCascade, passwordCascade);
     const anonymous = createClient(SUPABASE_URL, ANON_KEY, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
@@ -550,9 +557,76 @@ async function run(): Promise<void> {
         error?.code ?? readError?.code,
       );
     }
+
+    console.log("[ai-doctor-sessions] proving auth-user cascade and user-id integrity");
+    const cascadeUserId = uidCascade;
+    const cascadeSessionId = crypto.randomUUID();
+    {
+      const { data, error } = await cascadeOwner
+        .from("ai_doctor_sessions")
+        .insert({
+          id: cascadeSessionId,
+          question: `RLS account-deletion cascade ${runId}`,
+        })
+        .select("id,user_id,grow_id,tent_id,plant_id")
+        .single();
+      check(
+        "dedicated owner inserts a scope-null session for cascade proof",
+        !error &&
+          data?.id === cascadeSessionId &&
+          data.user_id === cascadeUserId &&
+          data.grow_id === null &&
+          data.tent_id === null &&
+          data.plant_id === null,
+        error?.code,
+      );
+    }
+    {
+      const { error } = await admin.auth.admin.deleteUser(cascadeUserId);
+      check("deleting the dedicated auth user succeeds", !error, error?.code);
+      if (!error) uidCascade = null;
+    }
+    {
+      const { data: deletedSession, error: deletedReadError } = await readSession(cascadeSessionId);
+      check(
+        "deleting an auth user cascades only that user's AI Doctor session",
+        !deletedReadError && !deletedSession,
+        deletedReadError?.code,
+      );
+    }
+    {
+      const { data: controlSession, error: controlReadError } = await readSession(sessionAId);
+      check(
+        "auth-user cascade leaves another owner's session intact",
+        !controlReadError &&
+          isIntactSession(controlSession, {
+            id: sessionAId,
+            userId: uidA,
+            scope: scopeA,
+            question: questionA,
+          }),
+        controlReadError?.code,
+      );
+    }
+    {
+      const nonexistentUserId = crypto.randomUUID();
+      const rejectedSessionId = crypto.randomUUID();
+      const { error } = await admin.from("ai_doctor_sessions").insert({
+        id: rejectedSessionId,
+        user_id: nonexistentUserId,
+        question: `RLS nonexistent owner ${runId}`,
+      });
+      const { data: rejectedSession, error: readError } = await readSession(rejectedSessionId);
+      check(
+        "auth-user constraint rejects a nonexistent AI Doctor session owner",
+        error?.code === "23503" && !readError && !rejectedSession,
+        error?.code ?? readError?.code,
+      );
+    }
   } finally {
     console.log("[ai-doctor-sessions] tearing down disposable rows");
-    const userIds = [uidA, uidB].filter((id): id is string => Boolean(id));
+    const userIds = [uidA, uidB, cascadeFixtureUserId].filter((id): id is string => Boolean(id));
+    const authUserIds = [uidA, uidB, uidCascade].filter((id): id is string => Boolean(id));
     if (userIds.length > 0) {
       await cleanupStep(
         "session rows",
@@ -579,7 +653,7 @@ async function run(): Promise<void> {
         () => admin.from("profiles").delete().in("user_id", userIds),
         cleanupFailures,
       );
-      for (const userId of userIds) {
+      for (const userId of authUserIds) {
         await cleanupStep("auth user", () => admin.auth.admin.deleteUser(userId), cleanupFailures);
       }
     }

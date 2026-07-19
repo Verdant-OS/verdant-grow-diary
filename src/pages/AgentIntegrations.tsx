@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import ManifestSummaryModal from "@/components/mcp/ManifestSummaryModal";
+import BrowserConnectPanel from "@/components/mcp/BrowserConnectPanel";
 import {
   MCP_MANIFEST,
   buildConnectionDetailsText,

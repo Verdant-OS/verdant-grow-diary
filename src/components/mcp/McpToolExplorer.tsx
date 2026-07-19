@@ -905,6 +905,9 @@ export default function McpToolExplorer() {
         endpoint={endpoint}
         connected={connected}
         onAuthLost={refreshAuth}
+        onRunOutcome={(outcome, category) =>
+          persistOnOk("get_latest_sensor_snapshot", outcome, category, { tentId })
+        }
         fieldErrors={tentIdTouched ? sensorErrors : []}
         buildArgs={() => ({ tentId: tentId.trim() })}
       >

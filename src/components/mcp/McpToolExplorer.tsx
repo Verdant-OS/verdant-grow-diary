@@ -485,16 +485,31 @@ function ToolCard({
             data-testid={`tool-explorer-diff-${toolName}`}
             className="rounded-md border bg-muted/40 p-3 text-xs space-y-3"
           >
-            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <p className="font-medium text-sm">Changes since previous request</p>
-              {changed.length === 0 ? (
-                <span className="text-muted-foreground">(no fields changed)</span>
-              ) : (
-                <span className="text-muted-foreground" aria-label="change summary">
-                  {counts.added} added · {counts.changed} changed · {counts.removed} removed
-                </span>
-              )}
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <p className="font-medium text-sm">Changes since previous request</p>
+                {changed.length === 0 ? (
+                  <span className="text-muted-foreground">(no fields changed)</span>
+                ) : (
+                  <span className="text-muted-foreground" aria-label="change summary">
+                    {counts.added} added · {counts.changed} changed · {counts.removed} removed
+                  </span>
+                )}
+              </div>
+              {onApplyArgs && changed.length > 0 && state.args ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onApplyArgs(state.args!)}
+                  data-testid={`tool-explorer-apply-changes-${toolName}`}
+                  aria-label="Apply changed values to the form for retry"
+                >
+                  Apply changes to form
+                </Button>
+              ) : null}
             </div>
+
             {entries.length > 0 ? (
               <div className="flex items-center gap-2">
                 <Switch

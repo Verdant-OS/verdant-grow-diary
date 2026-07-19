@@ -968,12 +968,21 @@ export default function McpToolExplorer() {
             ? [{ id: "list-diary-limit", label: "Limit", message: diaryLimitError }]
             : []),
         ]}
+        onApplyArgs={(args) => {
+          setGrowId(typeof args.growId === "string" ? args.growId : "");
+          setDiaryLimit(
+            args.limit === undefined || args.limit === null ? "" : String(args.limit),
+          );
+          setGrowIdTouched(true);
+          setDiaryLimitTouched(true);
+        }}
         buildArgs={() => {
           const args: Record<string, unknown> = { growId: growId.trim() };
           const n = coerceOptionalInt(diaryLimit);
           if (n !== undefined) args.limit = n;
           return args;
         }}
+
       >
         <div className="space-y-1">
           <Label htmlFor="list-diary-grow">

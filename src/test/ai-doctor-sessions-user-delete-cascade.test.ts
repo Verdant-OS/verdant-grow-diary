@@ -48,7 +48,7 @@ describe("AI Doctor session account-deletion integrity", () => {
     expect(HARNESS).toContain("admin.auth.admin.deleteUser(cascadeUserId)");
     expect(HARNESS).toContain("deleting an auth user cascades only that user's AI Doctor session");
     expect(HARNESS).toContain("auth-user cascade leaves another owner's session intact");
-    expect(HARNESS).toContain("foreign key rejects a nonexistent AI Doctor session owner");
+    expect(HARNESS).toContain("auth-user constraint rejects a nonexistent AI Doctor session owner");
     expect(HARNESS).toContain('error?.code === "23503"');
     expect(HARNESS).toContain("!readError && !rejectedSession");
 

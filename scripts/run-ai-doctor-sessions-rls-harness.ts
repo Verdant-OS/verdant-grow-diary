@@ -618,7 +618,7 @@ async function run(): Promise<void> {
       });
       const { data: rejectedSession, error: readError } = await readSession(rejectedSessionId);
       check(
-        "foreign key rejects a nonexistent AI Doctor session owner",
+        "auth-user constraint rejects a nonexistent AI Doctor session owner",
         error?.code === "23503" && !readError && !rejectedSession,
         error?.code ?? readError?.code,
       );

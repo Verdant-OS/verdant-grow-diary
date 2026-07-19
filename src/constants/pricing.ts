@@ -59,8 +59,8 @@ export const PRICING = {
     price: 129,
     cadence: "one-time",
     highlighted: false,
-    limit: 75,
-    badge: "First 75 only",
+    limit: 100,
+    badge: "First 100 only",
     description:
       "A limited early-supporter offer. Pay once and get full Pro access for the life of the product.",
     features: [

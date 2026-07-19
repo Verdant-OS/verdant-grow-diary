@@ -151,7 +151,9 @@ export function resolveOneTentLoopNextStep(
     case "plant":
       // Plant Detail already owns the selected plant. The next step is the
       // existing Quick Log sheet, not a self-link back to the same route.
-      if (plantId) return enableLocalAction(base, "open-quick-log");
+      // Require the complete ownership tuple so the visible target and the
+      // eventual write target cannot diverge while context is still loading.
+      if (plantId && tentId && growId) return enableLocalAction(base, "open-quick-log");
       return base;
     case "quick-log":
       return enable(base, "/timeline");

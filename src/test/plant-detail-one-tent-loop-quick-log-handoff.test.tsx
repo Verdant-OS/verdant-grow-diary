@@ -38,8 +38,24 @@ vi.mock("@/hooks/useGrowData", async (importOriginal) => {
 
 vi.mock("@/components/QuickLogV2Fab", () => ({ default: () => null }));
 vi.mock("@/components/PlantQuickLog", () => ({
-  default: ({ open }: { open: boolean }) => (
-    <div data-testid="plant-quick-log-sheet" data-open={String(open)} />
+  default: ({
+    open,
+    plantId,
+    growId,
+    tentId,
+  }: {
+    open: boolean;
+    plantId: string;
+    growId: string | null;
+    tentId: string | null;
+  }) => (
+    <div
+      data-testid="plant-quick-log-sheet"
+      data-open={String(open)}
+      data-plant-id={plantId}
+      data-grow-id={growId ?? ""}
+      data-tent-id={tentId ?? ""}
+    />
   ),
 }));
 vi.mock("@/components/PlantDetailAiDoctorReadiness", () => ({ default: () => null }));
@@ -83,6 +99,9 @@ describe("Plant Detail One-Tent Loop Quick Log handoff", () => {
     await user.click(screen.getByTestId("plant-detail-one-tent-loop-next-step-card-cta"));
 
     expect(sheet).toHaveAttribute("data-open", "true");
+    expect(sheet).toHaveAttribute("data-plant-id", "plant-1");
+    expect(sheet).toHaveAttribute("data-grow-id", "grow-1");
+    expect(sheet).toHaveAttribute("data-tent-id", "tent-1");
     expect(screen.getByTestId("location-pathname")).toHaveTextContent("/plants/plant-1");
     expect(screen.getByTestId("plant-detail-one-tent-loop-next-step-card")).toBeInTheDocument();
   });

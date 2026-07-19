@@ -77,14 +77,37 @@ describe("oneTentLoopNavigationRules", () => {
 
   it("routes tent navigation and resolves Plant -> Quick Log as a local action", () => {
     expect(resolveOneTentLoopNextStep("tent", { tentId: "t1" }).href).toBe("/tents/t1");
-    const plant = resolveOneTentLoopNextStep("plant", { plantId: "p1" });
+    const plant = resolveOneTentLoopNextStep("plant", {
+      plantId: "p1",
+      tentId: "t1",
+      growId: "g1",
+    });
     expect(plant.disabled).toBe(false);
     expect(plant.href).toBeNull();
     expect(plant.localAction).toBe("open-quick-log");
   });
 
+  it("keeps Plant -> Quick Log disabled until plant, tent, and grow are all known", () => {
+    for (const ids of [
+      { plantId: "p1", tentId: "t1" },
+      { plantId: "p1", growId: "g1" },
+      { tentId: "t1", growId: "g1" },
+    ]) {
+      expect(resolveOneTentLoopNextStep("plant", ids)).toMatchObject({
+        href: null,
+        localAction: null,
+        disabled: true,
+        disabledReason: ONE_TENT_LOOP_DISABLED_COPY,
+      });
+    }
+  });
+
   it("never self-links Plant -> Quick Log back to Plant Detail", () => {
-    const plant = resolveOneTentLoopNextStep("plant", { plantId: "p1" });
+    const plant = resolveOneTentLoopNextStep("plant", {
+      plantId: "p1",
+      tentId: "t1",
+      growId: "g1",
+    });
     expect(plant.href ?? "").not.toMatch(/^\/plants\//);
   });
 

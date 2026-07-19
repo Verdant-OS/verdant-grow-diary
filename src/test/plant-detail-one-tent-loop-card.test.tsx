@@ -34,7 +34,7 @@ describe("PlantDetail One-Tent Loop next-step card wiring", () => {
     expect(card.textContent ?? "").toMatch(/Plant/);
   });
 
-  it("shows the safe Add quick log CTA when plantId is available", () => {
+  it("shows the safe Add quick log CTA when the full target tuple is available", () => {
     renderCard(
       <OneTentLoopNextStepCard
         current="plant"
@@ -53,7 +53,7 @@ describe("PlantDetail One-Tent Loop next-step card wiring", () => {
     renderCard(
       <OneTentLoopNextStepCard
         current="plant"
-        ids={{ plantId: "p1" }}
+        ids={{ plantId: "p1", tentId: "t1", growId: "g1" }}
         testId="plant-detail-one-tent-loop-next-step-card"
         onLocalAction={onLocalAction}
       />,
@@ -70,7 +70,7 @@ describe("PlantDetail One-Tent Loop next-step card wiring", () => {
     renderCard(
       <OneTentLoopNextStepCard
         current="plant"
-        ids={{ plantId: "p1" }}
+        ids={{ plantId: "p1", tentId: "t1", growId: "g1" }}
         testId="plant-detail-one-tent-loop-next-step-card"
       />,
     );
@@ -89,6 +89,21 @@ describe("PlantDetail One-Tent Loop next-step card wiring", () => {
     expect(
       screen.getByTestId("plant-detail-one-tent-loop-next-step-card-disabled"),
     ).toHaveTextContent(/Next step unavailable until this record is selected\./);
+  });
+
+  it("stays disabled when plant ownership context is incomplete", () => {
+    renderCard(
+      <OneTentLoopNextStepCard
+        current="plant"
+        ids={{ plantId: "p1", growId: "g1" }}
+        testId="plant-detail-one-tent-loop-next-step-card"
+        onLocalAction={() => {}}
+      />,
+    );
+    expect(
+      screen.getByTestId("plant-detail-one-tent-loop-next-step-card-disabled"),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId("plant-detail-one-tent-loop-next-step-card-cta")).toBeNull();
   });
 
   it("does not render UUID-looking internal IDs in visible text", () => {

@@ -96,6 +96,9 @@ function fillFeedForm() {
   fireEvent.change(screen.getByLabelText("Product 1 amount"), {
     target: { value: "2" },
   });
+  fireEvent.change(screen.getByLabelText("Applied volume (ml)"), {
+    target: { value: "750" },
+  });
 }
 
 function renderPlantQuickLog() {
@@ -151,7 +154,7 @@ afterEach(() => {
 
 describe("structured-feed Quick Log success telemetry", () => {
   it("emits exactly once and only after the feeding write confirms success", async () => {
-    const write = deferred<{ ok: true; eventId: string }>();
+    const write = deferred<{ ok: true; eventId: string; reused: false }>();
     writeFeedingMock.mockReturnValueOnce(write.promise);
     renderFeedSheet();
     fillFeedForm();
@@ -164,7 +167,7 @@ describe("structured-feed Quick Log success telemetry", () => {
     expect(gtagMock()).not.toHaveBeenCalled();
 
     await act(async () => {
-      write.resolve({ ok: true, eventId: "feeding-1" });
+      write.resolve({ ok: true, eventId: "feeding-1", reused: false });
       await write.promise;
     });
 
@@ -182,6 +185,21 @@ describe("structured-feed Quick Log success telemetry", () => {
 
     await waitFor(() => expect(writeFeedingMock).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(screen.getByTestId("qlv2-error")).toBeInTheDocument());
+    expect(gtagMock()).not.toHaveBeenCalled();
+  });
+
+  it("does not count an idempotent replay as a second feeding save", async () => {
+    writeFeedingMock.mockResolvedValueOnce({
+      ok: true,
+      eventId: "feeding-1",
+      reused: true,
+    });
+    renderFeedSheet();
+    fillFeedForm();
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(writeFeedingMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByTestId("qlv2-post-save")).toBeInTheDocument());
     expect(gtagMock()).not.toHaveBeenCalled();
   });
 });

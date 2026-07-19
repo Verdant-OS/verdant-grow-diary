@@ -14,7 +14,7 @@ function row(p: Partial<PlantRecentActivityRow>): PlantRecentActivityRow {
     eventType: "quick_log",
     occurredAt: new Date(NOW - 2 * HOUR).toISOString(),
     occurredAtLabel: "2h ago",
-    notePreview: "Quick check: Same.",
+    notePreview: "Response check: Same.",
     plantId: "p1",
     tentId: "t1",
     hasPhoto: false,
@@ -33,13 +33,79 @@ function row(p: Partial<PlantRecentActivityRow>): PlantRecentActivityRow {
 describe("plantStabilizeModeViewModel", () => {
   it("stays hidden for calm recent activity", () => {
     const vm = buildPlantStabilizeModeViewModel({
-      rows: [row({ notePreview: "Quick check: Same." })],
+      rows: [row({ notePreview: "Response check: Same." })],
       now: NOW,
       plantStage: "veg",
       plantStatus: "healthy",
     });
     expect(vm.level).toBe("off");
     expect(shouldShowPlantStabilizeMode(vm)).toBe(false);
+  });
+
+  it("does not count response-only check-ins as repeated interventions", () => {
+    const vm = buildPlantStabilizeModeViewModel({
+      rows: [
+        row({ id: "a", notePreview: "Response check: Better." }),
+        row({ id: "b", notePreview: "Response check: Same." }),
+        row({ id: "c", notePreview: "Quick check: Worse." }),
+      ],
+      now: NOW,
+    });
+    expect(vm.level).toBe("off");
+    expect(shouldShowPlantStabilizeMode(vm)).toBe(false);
+  });
+
+  it("does not count explanatory response prose as a new intervention", () => {
+    const vm = buildPlantStabilizeModeViewModel({
+      rows: [
+        row({ id: "a", notePreview: "Response check: Better. Watering less helped." }),
+        row({ id: "b", notePreview: "Response check: Same. Feed strength held steady." }),
+        row({ id: "c", notePreview: "Response check: Worse. Training may have stressed it." }),
+      ],
+      now: NOW,
+    });
+    expect(vm.level).toBe("off");
+    expect(shouldShowPlantStabilizeMode(vm)).toBe(false);
+  });
+
+  it("does not count major-change words inside response-only prose", () => {
+    const vm = buildPlantStabilizeModeViewModel({
+      rows: [
+        row({ id: "a", notePreview: "Response check: Better. Training may have stressed it." }),
+        row({ id: "b", notePreview: "Response check: Same. Raised light may have helped." }),
+      ],
+      now: NOW,
+    });
+    expect(vm.level).toBe("off");
+    expect(shouldShowPlantStabilizeMode(vm)).toBe(false);
+  });
+
+  it("does not count nested Response wrapper prose as interventions", () => {
+    const vm = buildPlantStabilizeModeViewModel({
+      rows: [
+        row({
+          id: "a",
+          notePreview: "Response: Response check: Better. Watering less helped.",
+        }),
+        row({ id: "b", notePreview: "Response: Quick check: Same. Feeding held steady." }),
+        row({ id: "c", notePreview: "Response: Response check: Worse. Training may recover." }),
+      ],
+      now: NOW,
+    });
+    expect(vm.level).toBe("off");
+    expect(shouldShowPlantStabilizeMode(vm)).toBe(false);
+  });
+
+  it("still counts explicit major actions on lines after response context", () => {
+    const vm = buildPlantStabilizeModeViewModel({
+      rows: [
+        row({ id: "a", notePreview: "Response check: Better.\nTraining / pruning." }),
+        row({ id: "b", notePreview: "Response check: Same.\nRaised light." }),
+      ],
+      now: NOW,
+    });
+    expect(vm.level).toBe("stabilize");
+    expect(shouldShowPlantStabilizeMode(vm)).toBe(true);
   });
 
   it("shows stabilize mode for 3+ recent actions", () => {
@@ -54,6 +120,19 @@ describe("plantStabilizeModeViewModel", () => {
     expect(vm.level).toBe("stabilize");
     expect(shouldShowPlantStabilizeMode(vm)).toBe(true);
     expect(vm.what_not_to_do.join(" ")).toContain("stacking");
+  });
+
+  it("still counts an action when a response check and action share the note", () => {
+    const vm = buildPlantStabilizeModeViewModel({
+      rows: [
+        row({ id: "a", notePreview: "Response check: Better.\nWatered." }),
+        row({ id: "b", notePreview: "Response check: Same.\nFed." }),
+        row({ id: "c", notePreview: "Response check: Worse.\nEnvironment changed." }),
+      ],
+      now: NOW,
+    });
+    expect(vm.level).toBe("stabilize");
+    expect(shouldShowPlantStabilizeMode(vm)).toBe(true);
   });
 
   it("shows stabilize mode for 2+ major recent changes", () => {

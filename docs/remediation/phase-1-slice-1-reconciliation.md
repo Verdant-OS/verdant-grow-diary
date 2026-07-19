@@ -2,9 +2,9 @@
 
 ## Promotion status
 
-**Implementation status:** specification-review findings repaired and ready for re-review on the current deploy-trunk port.
+**Implementation status:** specification and code-quality re-review passed on the current deploy-trunk port. The final aggregate test reconciliation is green.
 
-**Merge status:** not ready. Specification re-review, authenticated Chrome execution against the dedicated disposable fixture, fixture verification/smoke, and the scanner timing gate remain pending. No exception, threshold change, workflow broadening, or scanner suppression has been added for those gates.
+**Merge status:** not ready. Claude review, authenticated Chrome execution against the dedicated disposable fixture, fixture verification/smoke, and the scanner timing gate remain pending. No exception, threshold change, workflow broadening, or scanner suppression has been added for those gates.
 
 ## Scope and current ground truth
 
@@ -73,6 +73,7 @@ Deterministic result: **3/3 enumerated route-scoped entry-point classes pass, an
 - `d5de062cc` — blocked-target integrity repair
 - `1ebba5b26` — canonical target display repair
 - `4bdbd1263` — in-flight target, query-state, handoff, and exact-name repair
+- `909fa9d78` — legacy target-contract tests aligned with explicit grower selection
 
 ## Validation rerun on this port
 
@@ -80,13 +81,20 @@ Deterministic result: **3/3 enumerated route-scoped entry-point classes pass, an
 | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | Requested targeted slice              | **Pass — 16 files, 203/203 tests, 0 failures**                                                                        |
 | Repair-focused changed-test batch     | **Pass — 8 files, 151/151 tests, 0 failures**                                                                         |
-| All changed test files                | **Pass — 10 files, 215/215 tests, 0 failures**                                                                        |
+| Final regression repair batch         | **Pass — 5 files, 42/42 tests, 0 failures**                                                                           |
+| All branch-changed test files         | **Pass — 35 files, 447/447 tests, 0 failures**                                                                        |
 | Type-check                            | **Pass — 0 diagnostics** (`tsc -p tsconfig.app.json --noEmit`)                                                        |
+| Changed-file lint                     | **Pass — 0 errors, 0 warnings**                                                                                       |
+| Pre-commit matrix                     | **Pass — formatter, ESLint fix, TypeScript, docs safety, and 22/22 tests**                                            |
 | Working diff whitespace/error check   | **Pass** (`git diff --check`)                                                                                         |
 | Full suite                            | **Not rerun on this port**                                                                                            |
-| Separate static-safety matrix         | **Not rerun on this port**                                                                                            |
-| Scanner assertion matrix              | **Not rerun on this port**                                                                                            |
-| Scanner CI timing wrapper             | **Not rerun; remains a promotion gate**                                                                               |
+| Separate static-safety matrix         | **Pass — 8 files, 180/180 tests, 0 failures**                                                                         |
+| Scanner assertion matrix              | **Pass — 20 files, 326/326 tests, 0 failures**                                                                        |
+| Scanner CI timing wrapper             | **Fail — assertions pass, but 2 rows exceeded the unchanged 5-second local timing threshold (6436 ms and 5349 ms)**   |
+| Source security scan                  | **Pass — all scanner fixtures and the source-tree scan passed; no allow-list or suppression was added**               |
+| Quick Log RPC static boundary         | **Pass — 6 files, 137/137 tests, 0 failures**                                                                         |
+| Quick Log typed-payload runtime       | **Skipped — required disposable Supabase URL/service-role/anon test credentials are not present locally**             |
+| One-Tent Loop audit                   | **Pass — 21 files, 365/365 tests, 0 failures, 0 skips**                                                               |
 | Playwright discovery / E2E TypeScript | **Pass — 3 tests listed across setup, authenticated, and mocked projects; no browser execution**                      |
 | Fixture checklist                     | **Pass — required Tent + Plant names and optional Grow/second-plant vars printed without values**                     |
 | Fixture verification                  | **Not run; remains pending against the dedicated disposable fixture**                                                 |
@@ -96,7 +104,9 @@ Deterministic result: **3/3 enumerated route-scoped entry-point classes pass, an
 
 The requested targeted slice emitted only known non-failing React Router v7 future-flag notices and Radix Dialog `Description`/`aria-describedby` warnings. No targeted test failed and type-check emitted no warning or diagnostic.
 
-The exact all-changed-test-file batch is currently green at 215/215. No workflow safety parser, threshold, or scope fence was weakened to obtain this result.
+The exact all-branch-changed-test-file batch is currently green at 447/447. The first aggregate rerun exposed nine legacy assertions that still expected silent sole-plant fallback or invalid-prefill fallback. Those tests now use a valid route target followed by an explicit grower selection, preserving mismatch, accessibility, stage-alias, post-save, and draft-safety coverage without restoring the unsafe behavior.
+
+The security scanner initially identified only generated `dist/` bundle strings in the local working directory. The generated directory was temporarily isolated, the scanner fixtures and source-tree scan passed, and the directory was restored unchanged. The scanner timing wrapper remains red only because two passing rows exceeded its unchanged 5000 ms performance threshold on this Windows runner. No workflow safety parser, timing threshold, allow-list, suppression, or scope fence was weakened to obtain any result.
 
 The old branch's full-suite totals, scanner timings, Playwright discovery, E2E compilation, fixture-checklist result, and deployment-base classifications are intentionally not carried forward as current evidence because they were not rerun against `ed3790cb8`.
 
@@ -104,8 +114,8 @@ The old branch's full-suite totals, scanner timings, Playwright discovery, E2E c
 
 1. Run fixture verification against the dedicated disposable fixture without weakening Tent + Plant requirements or making Grow mandatory. The non-writing checklist has passed locally.
 2. Run the authenticated Quick Log Chrome smoke and confirm the displayed target equals the observed `quicklog_save_manual.p_target_id`.
-3. Run the scanner assertion/timing gates without changing thresholds, allow-lists, ignores, or suppressions.
-4. Complete specification re-review and reconcile every finding or obtain explicit user acceptance.
+3. Obtain a green scanner CI timing run without changing thresholds, allow-lists, ignores, or suppressions. The assertion matrix is already green.
+4. Obtain Claude review of the published slice and reconcile every finding before merge.
 5. Reconcile the goal charter and P0/P1 companion map when supplied as repository files with a commit SHA.
 
 ## Safety verdict
@@ -123,7 +133,7 @@ The old branch's full-suite totals, scanner timings, Playwright discovery, E2E c
 - Workflow permissions and triggers are unchanged; Grow remains optional while Tent + Plant remain required.
 - No automatic Action Queue write, AI mutation, diary write outside explicit Quick Log save, or device-control seam was added.
 
-**Safety verdict: safe for draft re-review; not yet safe to merge because authenticated Chrome/fixture proof, scanner timing, and specification re-review are incomplete.**
+**Safety verdict: safe to publish as a draft PR; not yet safe to merge because authenticated Chrome/fixture proof, scanner timing, and Claude review are incomplete.**
 
 ## Deferred outcomes and work
 
@@ -150,8 +160,10 @@ Rollback uses `git revert` on the smallest relevant commit. Do not reset shared 
 - [x] Plant Detail named Quick Log, Upload Photo, and Harvest require complete plant/grow/tent context.
 - [x] Smoke second-target fixture is same-grow and Grow fixture naming remains optional.
 - [x] Non-writing disposable fixture checklist output confirmed.
+- [x] Specification and code-quality re-review passed.
+- [x] Scanner assertion matrix green with no suppression.
 - [ ] Disposable fixture verification green.
 - [ ] Authenticated Chrome smoke green.
-- [ ] Scanner assertions and CI timing wrapper green on this port.
-- [ ] Specification re-review attached and reconciled.
+- [ ] Scanner CI timing wrapper green on this port.
+- [ ] Claude review attached and reconciled.
 - [ ] Goal charter and P0/P1 map reconciled by supplied commit SHA.

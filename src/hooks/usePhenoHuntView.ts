@@ -12,9 +12,9 @@
  * hook is presentation only.
  *
  * SLICE 1 seams (honest, not fabricated):
- *  - Loud axes read exactly nose/resin/structure/yield/breeding from the score
- *    card (see phenoHuntViewAdapter). Confirming the scorecard is those five is a
- *    James Loud decision.
+ *  - Loud axes read exactly nose/resin/structure/yield/breeding — the CONFIRMED
+ *    (James Loud) standing-plant shortlist. Flavor/potency are cure-decided at
+ *    the smoke test and belong on that surface, never scored into the shortlist.
  *  - `cured` is inferred from the PRESENCE of a post-cure smoke test row; the
  *    per-round grow nodes (veg→flower) and aroma chips are follow-up enrichment
  *    (needs the on-demand round load + flavor coercion) — omitted, never faked.

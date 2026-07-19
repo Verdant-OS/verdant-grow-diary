@@ -12,10 +12,13 @@
  * only fallback.
  *
  * Ethos + honesty:
- *  - The Loud scorecard is exactly nose/resin/structure/yield/breeding (the
- *    demo's canonical weights). The live trait card may ALSO hold flavor /
- *    potency / vigor; those are deliberately NOT folded into the shortlist here
- *    — mapping them is a Loud-scorecard product decision, not a silent guess.
+ *  - The Loud shortlist scores the STANDING PLANT: nose / resin / structure /
+ *    yield / breeding. CONFIRMED (James Loud): flavor and potency are
+ *    CURE-DECIDED — earned at the smoke test, not on the shortlist — and vigor
+ *    shows through structure/breeding, so it's not its own axis. The live card's
+ *    flavor / potency / vigor are therefore recorded but NEVER folded into the
+ *    composite. Scoring the smoke before the cure is the hype shortcut the
+ *    scorecard exists to refuse.
  *  - A missing trait is 0, never invented. `hold` / `undecided` decisions map to
  *    "maybe" (still in triage), never to "keep".
  *
@@ -27,7 +30,8 @@ import type { CloneInput } from "@/lib/phenoCloneTreeViewModel";
 import type { CureTimelineInput, RoundKey } from "@/lib/phenoCureTimelineViewModel";
 import { normalizeKeeperDecision } from "@/lib/phenoKeeperDecisionModel";
 
-/** The five trait keys that ARE the Loud shortlist. Live cards may hold more. */
+/** The five trait keys that ARE the Loud shortlist (the standing plant). Confirmed
+ * scorecard: flavor/potency are cure-decided and vigor folds in — not shortlist axes. */
 export const LOUD_AXIS_KEYS: readonly AxisKey[] = [
   "nose",
   "resin",

@@ -56,9 +56,7 @@ function asRecord(v: unknown): Record<string, unknown> | null {
  */
 export function buildAiDoctorPromptMessages(packet: unknown): AiDoctorPromptMessages {
   const rec = asRecord(packet);
-  const imported_sensor_history = (rec?.imported_sensor_history ?? null) as
-    | Parameters<typeof buildAiDoctorImportedHistoryPromptFragment>[0]["imported_sensor_history"]
-    | null;
+  const imported_sensor_history = rec?.imported_sensor_history ?? null;
   const missingLiveSensorReadings = rec?.missingLiveSensorReadings === true;
 
   const fragment = buildAiDoctorImportedHistoryPromptFragment({

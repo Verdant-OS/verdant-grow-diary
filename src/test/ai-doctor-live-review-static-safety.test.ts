@@ -111,7 +111,18 @@ describe("ai doctor live review — edge static safety", () => {
           "recordFreshAiDoctorReviewCompletion",
         );
         expect(src).toContain("parseAiDoctorReviewRequestEnvelope");
-        expect(src).toContain("buildAiDoctorPromptMessages(request.packet)");
+        expect(src).toContain("validateAndNormalizeAiDoctorReviewRequestPacket");
+        const packetValidationIndex = src.indexOf(
+          "const validatedPacket = validateAndNormalizeAiDoctorReviewRequestPacket(request.packet)",
+        );
+        const firstCreditSpendIndex = src.indexOf('.rpc("ai_credit_spend"');
+        expect(packetValidationIndex).toBeGreaterThanOrEqual(0);
+        expect(firstCreditSpendIndex).toBeGreaterThan(packetValidationIndex);
+        expect(src.slice(packetValidationIndex, firstCreditSpendIndex)).toContain(
+          'return calmFailure("shape")',
+        );
+        expect(src).toContain("buildAiDoctorPromptMessages(validatedPacket)");
+        expect(src).not.toContain("buildAiDoctorPromptMessages(request.packet)");
         expect(src).not.toContain("buildAiDoctorPromptMessages(requestBody)");
       }
       for (const re of [

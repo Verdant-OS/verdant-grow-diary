@@ -18,6 +18,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { validateAiDoctorReviewResult } from "./contract.ts";
 import { buildAiDoctorPromptMessages } from "../../../src/lib/aiDoctorPromptAssembly.ts";
 import { parseAiDoctorReviewRequestEnvelope } from "../../../src/lib/aiDoctorReviewRequestTransportRules.ts";
+import { validateAndNormalizeAiDoctorReviewRequestPacket } from "../../../src/lib/aiDoctorReviewRequestPacketValidationRules.ts";
 import { resolveRequiredServerBillingEnvironment } from "../_shared/unionEntitlementLookup.ts";
 import { isMissingAiCreditRpcOverload } from "../_shared/aiCreditRpcCompatibility.ts";
 // Measurement-only cost wiring. Pure helpers; no persistence, no I/O.
@@ -197,10 +198,17 @@ Deno.serve(async (req) => {
     if (!request) {
       return calmFailure("shape");
     }
+    // Validate the complete model-context schema before the first credit RPC.
+    // Reconstruction drops unknown/prototype keys and bounds every promptable
+    // string, array, and number; malformed packets fail without a spend.
+    const validatedPacket = validateAndNormalizeAiDoctorReviewRequestPacket(request.packet);
+    if (!validatedPacket) {
+      return calmFailure("shape");
+    }
 
     // Server resolves grow scope from an untrusted transport envelope; the
     // atomic credit RPC re-checks ownership. `request.packet` is deliberately
-    // separate and is the only data allowed into model prompt assembly.
+    // separate; only its validated reconstruction may enter prompt assembly.
     const growId = isUuid(request.growId) ? request.growId : null;
     const rawKey = request.idempotencyKey;
     const idempotencyKey =
@@ -309,7 +317,7 @@ Deno.serve(async (req) => {
     // Build the prompt once so the assembled text can feed both the upstream
     // call AND an in-memory cost measurement. Measurement is local-only;
     // never persisted, logged, or returned to the client.
-    const promptMessages = buildAiDoctorPromptMessages(request.packet);
+    const promptMessages = buildAiDoctorPromptMessages(validatedPacket);
     const promptMeasurement = buildAiDoctorPromptMeasurement({
       promptName: FEATURE,
       recordedAt: new Date().toISOString(),

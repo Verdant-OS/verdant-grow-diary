@@ -40,9 +40,13 @@ import {
   type EarlyStageAiDoctorContext,
 } from "./earlyStageAiDoctorContextRules";
 import { isSensorTestbenchRow } from "./sensorTestbenchIndicatorRules";
+import {
+  AI_DOCTOR_IMPORTED_SENSOR_HISTORY_GUIDANCE,
+  AI_DOCTOR_IMPORTED_SENSOR_HISTORY_SECTION_LABEL,
+} from "@/constants/aiDoctorImportedHistory";
 
 /** Section label rendered for imported CSV/XLSX sensor history. */
-export const AI_DOCTOR_IMPORTED_SENSOR_HISTORY_SECTION_LABEL = "Imported sensor history";
+export { AI_DOCTOR_IMPORTED_SENSOR_HISTORY_SECTION_LABEL };
 
 export interface ImportedSensorHistorySection extends AiDoctorCsvHistoryContext {
   sectionLabel: typeof AI_DOCTOR_IMPORTED_SENSOR_HISTORY_SECTION_LABEL;
@@ -84,10 +88,7 @@ export function buildImportedSensorHistorySection(
   return {
     ...csvHistory,
     sectionLabel: AI_DOCTOR_IMPORTED_SENSOR_HISTORY_SECTION_LABEL,
-    guidance: Object.freeze([
-      csvHistory.notForLiveDiagnosis,
-      "Imported history may show trends but is not proof of current conditions.",
-    ]),
+    guidance: AI_DOCTOR_IMPORTED_SENSOR_HISTORY_GUIDANCE,
   };
 }
 

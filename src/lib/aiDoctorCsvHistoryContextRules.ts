@@ -17,10 +17,12 @@
  */
 
 import { getCsvVendorLineage } from "@/lib/sensorReadingVendorLineage";
+import {
+  AI_DOCTOR_CSV_HISTORY_LABEL,
+  AI_DOCTOR_CSV_HISTORY_NOT_LIVE_NOTE,
+} from "@/constants/aiDoctorImportedHistory";
 
-export const AI_DOCTOR_CSV_HISTORY_LABEL = "CSV history";
-export const AI_DOCTOR_CSV_HISTORY_NOT_LIVE_NOTE =
-  "This is imported CSV history, not live telemetry. Do not diagnose from CSV history alone.";
+export { AI_DOCTOR_CSV_HISTORY_LABEL, AI_DOCTOR_CSV_HISTORY_NOT_LIVE_NOTE };
 
 /**
  * Explicit database source labels that may enter AI Doctor's imported-history

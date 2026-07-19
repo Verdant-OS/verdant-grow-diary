@@ -8,6 +8,7 @@ import { useAiDoctorLiveReview } from "@/hooks/useAiDoctorLiveReview";
 import type { AiDoctorReviewRequestPacket } from "@/lib/aiDoctorReviewRequestPacket";
 import { buildAiDoctorSessionPersistenceFailureDiagnostic } from "@/lib/aiDoctorSessionPersistenceFailureRules";
 import type { Classification } from "@/lib/sensorSnapshotStatusContract";
+import type { AiDoctorReviewEvidenceAcceptance } from "@/lib/aiDoctorReviewEvidenceReceiptRules";
 
 const packet: AiDoctorReviewRequestPacket = {
   schemaVersion: 1,
@@ -23,6 +24,16 @@ const SESSION_ID = "22222222-2222-4222-8222-222222222222";
 const FIRST_REQUEST_ID = "33333333-3333-4333-8333-333333333333";
 const SECOND_REQUEST_ID = "44444444-4444-4444-8444-444444444444";
 const EVALUATED_AT = "2026-07-18T18:30:00.000Z";
+const INITIAL_EVIDENCE_ACCEPTANCE: AiDoctorReviewEvidenceAcceptance = {
+  reviewMode: "standard",
+  importedHistory: { state: "none_available", scope: "tent_scoped" },
+  rootZoneHistory: { state: "included", scope: "plant_only" },
+};
+const OTHER_EVIDENCE_ACCEPTANCE: AiDoctorReviewEvidenceAcceptance = {
+  reviewMode: "historical_review",
+  importedHistory: { state: "omitted_by_choice", scope: "tent_scoped" },
+  rootZoneHistory: { state: "not_scoped", scope: "not_scoped" },
+};
 
 const validResult = () => ({
   summary: "Plant shows mild leaf curl on lower fan leaves.",
@@ -71,6 +82,7 @@ describe("useAiDoctorLiveReview", () => {
         growId: GROW_ID,
         invoke,
         persist,
+        createSessionId: () => SESSION_ID,
         createRequestIdempotencyKey: () => FIRST_REQUEST_ID,
       }),
     );
@@ -82,11 +94,15 @@ describe("useAiDoctorLiveReview", () => {
         packet,
         grow_id: GROW_ID,
         idempotency_key: FIRST_REQUEST_ID,
+        session_id: FIRST_REQUEST_ID,
       },
     });
     expect(packet).not.toHaveProperty("grow_id");
     expect(packet).not.toHaveProperty("idempotency_key");
     await waitFor(() => expect(result.current.persistence.status).toBe("saved"));
+    await waitFor(() =>
+      expect(persist).toHaveBeenCalledWith(expect.objectContaining({ sessionId: SESSION_ID })),
+    );
   });
 
   it("persists a history-readable diagnosis and exposes the saved session id", async () => {
@@ -592,6 +608,7 @@ describe("useAiDoctorLiveReview", () => {
       activeTentId: string;
       activePlantId: string;
       activeSensor: Classification;
+      activeEvidenceAcceptance: AiDoctorReviewEvidenceAcceptance;
     }
     const otherPacket: AiDoctorReviewRequestPacket = {
       ...packet,
@@ -617,7 +634,14 @@ describe("useAiDoctorLiveReview", () => {
     const persist = vi.fn().mockResolvedValue({ ok: true, id: SESSION_ID });
     const createRequestIdempotencyKey = vi.fn(() => FIRST_REQUEST_ID);
     const { result, rerender } = renderHook(
-      ({ activePacket, activeGrowId, activeTentId, activePlantId, activeSensor }: HookProps) =>
+      ({
+        activePacket,
+        activeGrowId,
+        activeTentId,
+        activePlantId,
+        activeSensor,
+        activeEvidenceAcceptance,
+      }: HookProps) =>
         useAiDoctorLiveReview({
           enabled: true,
           packet: activePacket,
@@ -625,6 +649,7 @@ describe("useAiDoctorLiveReview", () => {
           tentId: activeTentId,
           plantId: activePlantId,
           sensorClassification: activeSensor,
+          evidenceAcceptance: activeEvidenceAcceptance,
           invoke,
           persist,
           createRequestIdempotencyKey,
@@ -638,6 +663,7 @@ describe("useAiDoctorLiveReview", () => {
           activeTentId: "tent-a",
           activePlantId: "plant-a",
           activeSensor: initialSensorClassification,
+          activeEvidenceAcceptance: INITIAL_EVIDENCE_ACCEPTANCE,
         },
       },
     );
@@ -650,6 +676,7 @@ describe("useAiDoctorLiveReview", () => {
       activeTentId: "tent-b",
       activePlantId: "plant-b",
       activeSensor: otherSensorClassification,
+      activeEvidenceAcceptance: OTHER_EVIDENCE_ACCEPTANCE,
     });
     act(() => result.current.retry());
     await waitFor(() => expect(result.current.persistence.status).toBe("saved"));
@@ -657,14 +684,27 @@ describe("useAiDoctorLiveReview", () => {
     expect(createRequestIdempotencyKey).toHaveBeenCalledTimes(1);
     expect(now).toHaveBeenCalledTimes(1);
     expect(invoke.mock.calls.map((call) => call[1].body)).toEqual([
-      { packet, grow_id: GROW_ID, idempotency_key: FIRST_REQUEST_ID },
-      { packet, grow_id: GROW_ID, idempotency_key: FIRST_REQUEST_ID },
+      {
+        packet,
+        grow_id: GROW_ID,
+        idempotency_key: FIRST_REQUEST_ID,
+        session_id: FIRST_REQUEST_ID,
+        evidence_acceptance: INITIAL_EVIDENCE_ACCEPTANCE,
+      },
+      {
+        packet,
+        grow_id: GROW_ID,
+        idempotency_key: FIRST_REQUEST_ID,
+        session_id: FIRST_REQUEST_ID,
+        evidence_acceptance: INITIAL_EVIDENCE_ACCEPTANCE,
+      },
     ]);
     expect(persist).toHaveBeenCalledWith(
       expect.objectContaining({
         growId: GROW_ID,
         tentId: "tent-a",
         plantId: "plant-a",
+        sessionId: SESSION_ID,
         sensorEvidence: initialSensorClassification,
         sensorEvidenceEvaluatedAt: EVALUATED_AT,
       }),

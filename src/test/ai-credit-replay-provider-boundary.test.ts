@@ -44,12 +44,20 @@ describe("AI credit replay provider boundary", () => {
     expect(DOCTOR).not.toContain("crypto.randomUUID()");
   });
 
-  it("AI Doctor requires the result-cache migration before Edge deployment", () => {
+  it("AI Doctor requires result-cache and atomic evidence receipt migrations before Edge deployment", () => {
     expect(DOCTOR_RAW).toContain("20260719043000_ai_credit_result_cache.sql");
-    expect(DOCTOR_RAW).toMatch(/apply[\s\S]{0,100}before deploying this function/i);
-    expect(DOCTOR_RAW).toMatch(/deploy this function[\s\S]{0,100}publish the UUID-sending client/i);
-    expect(DOCTOR.match(/\.rpc\(\s*["']ai_credit_attach_result["']/g) ?? []).toHaveLength(1);
-    expect(DOCTOR).not.toMatch(/supabase\.rpc\(\s*["']ai_credit_attach_result["']/);
+    expect(DOCTOR_RAW).toContain("20260719180000_ai_doctor_review_evidence_receipts.sql");
+    expect(DOCTOR_RAW.indexOf("20260719043000_ai_credit_result_cache.sql")).toBeLessThan(
+      DOCTOR_RAW.indexOf("20260719180000_ai_doctor_review_evidence_receipts.sql"),
+    );
+    expect(
+      DOCTOR_RAW.indexOf("20260719180000_ai_doctor_review_evidence_receipts.sql"),
+    ).toBeLessThan(DOCTOR_RAW.indexOf("Deploy this function"));
+    expect(DOCTOR_RAW).toMatch(
+      /deploy this function[\s\S]{0,100}publish the client with optional session\/collection metadata/i,
+    );
+    expect(DOCTOR.match(/\.rpc\(\s*["']ai_doctor_finalize_review["']/g) ?? []).toHaveLength(1);
+    expect(DOCTOR).not.toMatch(/\.rpc\(\s*["']ai_credit_attach_result["']/);
   });
 
   it("AI Doctor keeps unexpected spend-or-later failures on the same logical request key", () => {
@@ -94,28 +102,31 @@ describe("AI credit replay provider boundary", () => {
     );
   });
 
-  it("AI Doctor returns fresh provider output only after result attachment confirms", () => {
+  it("AI Doctor returns fresh provider output only after atomic result/evidence finalization", () => {
     const validationIndex = DOCTOR.indexOf("const v = validateAiDoctorReviewResult(candidate)");
-    const attachIndex = DOCTOR.indexOf('creditSupabase.rpc("ai_credit_attach_result"');
+    const finalizationIndex = DOCTOR.indexOf('creditSupabase.rpc("ai_doctor_finalize_review"');
     const successIndex = DOCTOR.lastIndexOf("return safeOk(v.result");
     expect(validationIndex).toBeGreaterThan(-1);
-    expect(attachIndex).toBeGreaterThan(validationIndex);
-    expect(successIndex).toBeGreaterThan(attachIndex);
-    const attachmentBoundary = DOCTOR.slice(attachIndex, successIndex);
-    expect(attachmentBoundary).toContain("parseAiDoctorResultAttachment");
-    const ambiguousIndex = attachmentBoundary.indexOf('attachment === "ambiguous"');
-    const rejectedIndex = attachmentBoundary.indexOf('attachment === "rejected"');
+    expect(finalizationIndex).toBeGreaterThan(validationIndex);
+    expect(successIndex).toBeGreaterThan(finalizationIndex);
+    const finalizationBoundary = DOCTOR.slice(finalizationIndex, successIndex);
+    expect(finalizationBoundary).toContain("parseAiDoctorResultAttachment");
+    expect(finalizationBoundary).toContain("p_evidence: evidenceReceipt");
+    const ambiguousIndex = finalizationBoundary.indexOf('finalization === "ambiguous"');
+    const rejectedIndex = finalizationBoundary.indexOf('finalization === "rejected"');
     expect(ambiguousIndex).toBeGreaterThan(-1);
     expect(rejectedIndex).toBeGreaterThan(ambiguousIndex);
-    const ambiguousBlock = attachmentBoundary.slice(ambiguousIndex, rejectedIndex);
+    const ambiguousBlock = finalizationBoundary.slice(ambiguousIndex, rejectedIndex);
     expect(ambiguousBlock).toContain('return calmFailure("result_pending")');
     expect(ambiguousBlock).not.toContain("failureAfterRefund");
-    expect(attachmentBoundary).toContain('attachment === "rejected"');
-    expect(attachmentBoundary.slice(rejectedIndex)).toContain("failureAfterRefund");
-    expect(attachmentBoundary.slice(rejectedIndex)).toContain('"result_recording_failed"');
-    expect(attachmentBoundary).toContain('attachment === "recorded"');
+    const rejectedBlock = finalizationBoundary.slice(rejectedIndex);
+    expect(rejectedBlock).toContain("failureAfterRefund");
+    expect(rejectedBlock).toContain('"result_finalization_rejected"');
+    expect(rejectedBlock).not.toContain('return calmFailure("result_pending")');
+    expect(finalizationBoundary).toContain('finalization === "recorded"');
+    expect(DOCTOR).toContain("AI_DOCTOR_RECEIPT_HMAC_KEY_ID");
+    expect(DOCTOR).toContain("p_prompt_hmac_key_id: receiptHmacKeyId");
   });
-
   it("AI Doctor maps ambiguous refunds to result_pending across upstream failures", () => {
     const helperStart = DOCTOR.indexOf("async function failureAfterRefund");
     const providerIndex = DOCTOR.indexOf("fetch(GATEWAY_URL");

@@ -49,6 +49,10 @@ import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { buildAiCreditLimitNoticeViewModel } from "@/lib/aiCreditLimitNoticeViewModel";
 import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 import type { Classification } from "@/lib/sensorSnapshotStatusContract";
+import {
+  buildAiDoctorReviewEvidenceAcceptance,
+  type AiDoctorReviewEvidenceAcceptance,
+} from "@/lib/aiDoctorReviewEvidenceReceiptRules";
 import { evaluateAiDoctorReviewEligibility } from "@/lib/aiDoctorReviewEligibilityRules";
 import {
   buildAiDoctorLiveReviewScopeKey,
@@ -117,6 +121,7 @@ interface AcceptedAiDoctorReviewRequest {
   scopeKey: string;
   packet: AiDoctorReviewRequestPacket;
   sensorClassification: Classification | null;
+  evidenceAcceptance: AiDoctorReviewEvidenceAcceptance;
   mode: "standard" | "historical_review";
   confidenceCopy: string;
   omittedImportedHistory: boolean;
@@ -137,6 +142,7 @@ function PlantDetailAiDoctorLiveReviewScope({
   const acceptedReviewModeRef = useRef<"standard" | "historical_review" | null>(null);
   const trackedResultRef = useRef<unknown>(null);
   const trackedSessionIdRef = useRef<string | null>(null);
+  const pendingAcceptedReviewStartRef = useRef<string | null>(null);
   const historyScopeKey = buildAiDoctorLiveReviewScopeKey(plantId, tentId, growId);
   const [historyOmissionScope, setHistoryOmissionScope] = useState<string | null>(null);
   const [rootZoneOmissionScope, setRootZoneOmissionScope] = useState<string | null>(null);
@@ -151,6 +157,7 @@ function PlantDetailAiDoctorLiveReviewScope({
     acceptedReviewModeRef.current = null;
     trackedResultRef.current = null;
     trackedSessionIdRef.current = null;
+    pendingAcceptedReviewStartRef.current = null;
   }, [growId, plantId, tentId]);
   const { items } = useTimelineMemory({ kind: "plant", plantId }, TIMELINE_MEMORY_DEFAULT_LIMIT);
   const rootZoneScope =
@@ -235,9 +242,10 @@ function PlantDetailAiDoctorLiveReviewScope({
 
   // Build the bounded, sanitized candidate before eligibility is resolved so
   // the gate inspects the exact imported-history summary that would reach the
-  // server. This is pure and cannot trigger a model call or persistence.
-  const candidatePacket = useMemo(
-    () =>
+  // server. The start handler builds it once more with click-time freshness,
+  // so a tab left open cannot silently preserve an out-of-date sensor state.
+  const buildReviewPacket = useCallback(
+    (classification: Classification | null, now?: Date) =>
       buildAiDoctorReviewRequestPacket({
         plant,
         timelineItems: items,
@@ -245,22 +253,15 @@ function PlantDetailAiDoctorLiveReviewScope({
         csvHistoryRows: queryTentSensorRows,
         currentSensorRows,
         rootZoneObservations: queryRootZoneObservations,
-        // This explicit signal is derived from the same filtered rows as
-        // the packet snapshot. Diagnostic/testbench packets, manual
-        // snapshots, and CSV history can never set it.
-        hasFreshLiveSensorReadings: sensorClassification?.status === "usable",
+        now,
+        hasFreshLiveSensorReadings: classification?.status === "usable",
       }),
-    [
-      plant,
-      items,
-      context,
-      queryTentSensorRows,
-      currentSensorRows,
-      queryRootZoneObservations,
-      sensorClassification,
-    ],
+    [plant, items, context, queryTentSensorRows, currentSensorRows, queryRootZoneObservations],
   );
-
+  const candidatePacket = useMemo(
+    () => buildReviewPacket(sensorClassification),
+    [buildReviewPacket, sensorClassification],
+  );
   const eligibility = useMemo(
     () =>
       evaluateAiDoctorReviewEligibility({
@@ -293,6 +294,37 @@ function PlantDetailAiDoctorLiveReviewScope({
   // context from a manual retry.
   const activeReviewRequest =
     acceptedReviewRequest?.scopeKey === historyScopeKey ? acceptedReviewRequest : null;
+  const buildEvidenceAcceptanceForPacket = useCallback(
+    (reviewPacket: AiDoctorReviewRequestPacket, reviewMode: "standard" | "historical_review") =>
+      buildAiDoctorReviewEvidenceAcceptance({
+        reviewMode,
+        importedHistory: {
+          hasTentScope: isUuid(tentId),
+          included: reviewPacket.imported_sensor_history !== null,
+          omittedByChoice: queryHistoryRecovery.state === "omitted_by_choice",
+        },
+        rootZoneHistory: {
+          scope:
+            rootZoneScope?.kind === "plant_context"
+              ? "plant_and_shared_tent"
+              : rootZoneScope?.kind === "plant"
+                ? "plant_only"
+                : "not_scoped",
+          included: (reviewPacket.recentRootZoneObservations?.length ?? 0) > 0,
+          omittedByChoice: queryRootZoneRecovery.state === "omitted_by_choice",
+        },
+      }),
+    [queryHistoryRecovery.state, queryRootZoneRecovery.state, rootZoneScope?.kind, tentId],
+  );
+  const candidateEvidenceAcceptance = useMemo(
+    () =>
+      buildEvidenceAcceptanceForPacket(
+        candidatePacket,
+        eligibility.mode === "historical_review" ? "historical_review" : "standard",
+      ),
+    [buildEvidenceAcceptanceForPacket, candidatePacket, eligibility.mode],
+  );
+
   const historyRecovery = activeReviewRequest
     ? {
         state: activeReviewRequest.omittedImportedHistory
@@ -330,9 +362,27 @@ function PlantDetailAiDoctorLiveReviewScope({
     sensorClassification: activeReviewRequest
       ? activeReviewRequest.sensorClassification
       : sensorClassification,
+    evidenceAcceptance: activeReviewRequest
+      ? activeReviewRequest.evidenceAcceptance
+      : candidateEvidenceAcceptance,
     persist,
     onPersisted: handlePersisted,
   });
+  const { start: startReview, status: reviewStatus } = review;
+  // Start only after React has committed the accepted request. This makes the
+  // initial provider call use the exact frozen packet rather than the previous
+  // render’s candidate, and remains idempotent under StrictMode effects.
+  useEffect(() => {
+    if (
+      pendingAcceptedReviewStartRef.current !== historyScopeKey ||
+      activeReviewRequest === null ||
+      reviewStatus !== "idle"
+    ) {
+      return;
+    }
+    pendingAcceptedReviewStartRef.current = null;
+    startReview();
+  }, [activeReviewRequest, historyScopeKey, reviewStatus, startReview]);
 
   const { entitlement } = useMyEntitlements();
   const canRetryReview = canRetryAiDoctorLiveReviewFailure(review.reason);
@@ -458,14 +508,36 @@ function PlantDetailAiDoctorLiveReviewScope({
 
   const handleInitialStart = () => {
     if (!review.canStart) return;
-    if (!packet) return;
+    if (!packet || pendingAcceptedReviewStartRef.current === historyScopeKey) return;
+
+    const acceptedAt = new Date();
+    const acceptedSensorClassification =
+      sensorClassificationOverride !== undefined
+        ? sensorClassificationOverride
+        : classifyAiDoctorCurrentSensorEvidence(currentSensorRows, { now: acceptedAt });
+    const acceptedPacket = buildReviewPacket(acceptedSensorClassification, acceptedAt);
+    const acceptedEligibility = evaluateAiDoctorReviewEligibility({
+      context,
+      hasPlantProfile: plant !== null,
+      importedHistory: acceptedPacket.imported_sensor_history,
+      historicalRows: queryTentSensorRows,
+      missingLiveSensorReadings: acceptedPacket.missingLiveSensorReadings === true,
+    });
+    if (!acceptedEligibility.allowed) return;
     const acceptedMode =
-      eligibility.mode === "historical_review" ? "historical_review" : "standard";
+      acceptedEligibility.mode === "historical_review" ? "historical_review" : "standard";
+    const acceptedEvidenceAcceptance = buildEvidenceAcceptanceForPacket(
+      acceptedPacket,
+      acceptedMode,
+    );
+
     acceptedReviewModeRef.current = acceptedMode;
+    pendingAcceptedReviewStartRef.current = historyScopeKey;
     setAcceptedReviewRequest({
       scopeKey: historyScopeKey,
-      packet,
-      sensorClassification,
+      packet: acceptedPacket,
+      sensorClassification: acceptedSensorClassification,
+      evidenceAcceptance: acceptedEvidenceAcceptance,
       mode: acceptedMode,
       confidenceCopy: candidateConfidenceCopy,
       omittedImportedHistory: historyRecovery.state === "omitted_by_choice",
@@ -475,15 +547,11 @@ function PlantDetailAiDoctorLiveReviewScope({
       reviewStartTrackedRef.current = true;
       trackFunnelEvent("ai_doctor_review_started", { surface: acceptedMode });
     }
-    if (eligibility.mode === "historical_review") {
-      if (!historicalStartTrackedRef.current) {
-        historicalStartTrackedRef.current = true;
-        trackFunnelEvent("historical_ai_review_started");
-      }
+    if (acceptedEligibility.mode === "historical_review" && !historicalStartTrackedRef.current) {
+      historicalStartTrackedRef.current = true;
+      trackFunnelEvent("historical_ai_review_started");
     }
-    review.start();
   };
-
   const confidenceCopy = activeReviewRequest?.confidenceCopy ?? candidateConfidenceCopy;
 
   return (

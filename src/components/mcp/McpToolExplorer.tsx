@@ -776,6 +776,9 @@ export default function McpToolExplorer() {
         endpoint={endpoint}
         connected={connected}
         onAuthLost={refreshAuth}
+        onRunOutcome={(outcome, category) =>
+          persistOnOk("list_grows", outcome, category, { includeArchived, growsLimit })
+        }
         fieldErrors={growsLimitTouched ? listGrowsErrors : []}
         buildArgs={() => {
           const args: Record<string, unknown> = {};

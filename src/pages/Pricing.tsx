@@ -108,6 +108,7 @@ export default function Pricing() {
     blocked: Boolean(checkoutRecoveryReason),
   });
   const founderSlots = useFounderSlotsRemaining();
+  const founderSoldOut = founderSlots.status === "ready" && founderSlots.soldOut;
 
   function handlePaidIntent(
     planId: SubscriberInterestPlanId,
@@ -442,7 +443,7 @@ export default function Pricing() {
               : PRICING.founder.badge
           }
           footnote={
-            founderSlots.status === "ready" && founderSlots.soldOut
+            founderSoldOut
               ? "Founder Lifetime is currently sold out. Additional slots may open if a purchase is refunded."
               : `Founder Lifetime is limited; availability may close manually when the first ${PRICING.founder.limit} are claimed.`
           }
@@ -450,9 +451,7 @@ export default function Pricing() {
             <Button
               size="lg"
               className="w-full h-auto min-h-11 whitespace-normal"
-              disabled={
-                checkoutLoading || (founderSlots.status === "ready" && founderSlots.soldOut)
-              }
+              disabled={checkoutLoading || founderSoldOut}
               data-testid="pricing-cta-founder-lifetime"
               data-founder-remaining={founderSlots.remaining ?? ""}
               onClick={() => {
@@ -463,7 +462,7 @@ export default function Pricing() {
                 );
               }}
             >
-              {founderSlots.status === "ready" && founderSlots.soldOut
+              {founderSoldOut
                 ? "Founder Lifetime sold out"
                 : checkoutRecoveryReason
                   ? "Join the Founder launch list"
@@ -600,7 +599,8 @@ export default function Pricing() {
           <Button
             size="lg"
             className="shrink-0"
-            disabled={checkoutLoading}
+            disabled={checkoutLoading || founderSoldOut}
+            data-testid="pricing-cta-founder-highlight"
             onClick={() => {
               handlePaidIntent(
                 "founder_lifetime",
@@ -609,7 +609,11 @@ export default function Pricing() {
               );
             }}
           >
-            {checkoutRecoveryReason ? "Join the Founder launch list" : "Claim Founder Lifetime"}
+            {founderSoldOut
+              ? "Founder Lifetime sold out"
+              : checkoutRecoveryReason
+                ? "Join the Founder launch list"
+                : "Claim Founder Lifetime"}
           </Button>
         </div>
       </section>

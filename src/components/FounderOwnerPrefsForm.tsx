@@ -247,19 +247,25 @@ export default function FounderOwnerPrefsForm() {
             aria-busy={saving}
           >
             {saving ? (
-              <span role="status" aria-live="polite" className="inline-flex items-center">
+              <>
                 <Loader2
                   className="mr-2 h-4 w-4 animate-spin"
                   aria-hidden="true"
                   focusable="false"
                 />
-                <span>Saving…</span>
-              </span>
+                Saving…
+              </>
             ) : (
               "Save Founder settings"
             )}
           </Button>
+          {/* Polite live region announces the save transition to AT without
+              nesting a status role inside the <button>. */}
+          <span role="status" aria-live="polite" className="sr-only">
+            {saving ? "Saving Founder settings…" : ""}
+          </span>
         </div>
+
 
       </form>
     </section>

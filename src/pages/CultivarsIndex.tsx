@@ -16,6 +16,7 @@ import {
   VERDANT_CULTIVARS,
   type VerdantCultivarProfile,
 } from "@/constants/verdantCultivars";
+import { buildCultivarsIndexSeo } from "@/lib/cultivarIndexSeoRules";
 
 type DifficultyFilter = "all" | VerdantCultivarProfile["difficulty"];
 
@@ -42,14 +43,11 @@ function matchesQuery(c: VerdantCultivarProfile, q: string): boolean {
 }
 
 export default function CultivarsIndex() {
-  usePageSeo({
-    title: "Cannabis Cultivar Guides — Oreoz, Do-Si-Dos, Blue Cookies Strain Info | Verdant",
-    description:
-      "Evergreen cultivar profiles for serious home growers: environment ranges, flower windows, common issues, and what to compare when pheno-hunting.",
-    path: "/cultivars",
-  });
-
   const [searchParams, setSearchParams] = useSearchParams();
+  // Faceted filter URLs stay deep-linkable in the UI but must not create
+  // indexable thin documents. Canonical + og:url always stay the clean hub.
+  usePageSeo(buildCultivarsIndexSeo(searchParams));
+
   const rawQuery = searchParams.get("q") ?? "";
   const rawDifficulty = (searchParams.get("difficulty") ?? "all") as DifficultyFilter;
   const difficulty: DifficultyFilter = DIFFICULTY_OPTIONS.some((o) => o.value === rawDifficulty)
@@ -101,65 +99,34 @@ export default function CultivarsIndex() {
         </nav>
       </header>
 
-      <section className="px-6 pt-8 pb-6 max-w-3xl mx-auto">
-        <p className="text-sm uppercase tracking-[0.2em] text-primary/80 font-medium">
-          Cultivar guides
-        </p>
-        <h1 className="mt-3 font-display text-3xl md:text-5xl font-bold tracking-tight">
-          Cannabis cultivar guides for serious home growers
-        </h1>
-        <p className="mt-4 text-lg text-muted-foreground">
-          Practical, evergreen profiles for popular cannabis cultivars — often
-          called strains. Each page covers lineage, flower window, environment
-          ranges by stage, common issues home growers report, and the
-          evidence points that matter when running a Pheno Hunt. No cherry-picked
-          diary photos, no guaranteed-yield claims, no AI picking winners for you.
-        </p>
-        <p className="mt-4 text-sm text-muted-foreground">
-          Verdant is a grow diary and Pheno Hunt tool. It records what you did
-          and what changed; it does not control your equipment.
-        </p>
-      </section>
+      <div className="max-w-6xl mx-auto px-6 pb-16">
+        <div className="mb-8">
+          <h1 className="text-3xl font-semibold tracking-tight mb-2">Cultivar Guides</h1>
+          <p className="text-muted-foreground max-w-2xl">
+            Evergreen profiles for serious home growers: environment ranges, flower windows,
+            common issues, and what to compare when pheno-hunting. No live diaries, no rankings.
+          </p>
+        </div>
 
-      <section className="px-6 pb-16 max-w-3xl mx-auto">
-        <h2 className="font-display text-2xl font-semibold mb-4">Featured cultivars</h2>
-
-        <form
-          role="search"
-          aria-label="Filter cultivar guides"
-          className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end"
-          onSubmit={(e) => e.preventDefault()}
-        >
-          <div className="flex-1">
-            <label
-              htmlFor="cultivar-search"
-              className="block text-xs uppercase tracking-wide text-muted-foreground mb-1"
-            >
-              Search
-            </label>
+        <div className="flex flex-col sm:flex-row gap-3 mb-6">
+          <label className="flex-1">
+            <span className="sr-only">Search cultivars</span>
             <input
-              id="cultivar-search"
               type="search"
-              inputMode="search"
-              autoComplete="off"
-              placeholder="Try “Oreoz”, “cookies”, “blueberry”…"
               value={rawQuery}
               onChange={(e) => updateParam("q", e.target.value)}
-              className="w-full min-h-[44px] rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+              placeholder="Search by name, alias, lineage…"
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              data-testid="cultivar-search-input"
             />
-          </div>
-          <div className="sm:w-56">
-            <label
-              htmlFor="cultivar-difficulty"
-              className="block text-xs uppercase tracking-wide text-muted-foreground mb-1"
-            >
-              Difficulty
-            </label>
+          </label>
+          <label>
+            <span className="sr-only">Difficulty</span>
             <select
-              id="cultivar-difficulty"
               value={difficulty}
               onChange={(e) => updateParam("difficulty", e.target.value)}
-              className="w-full min-h-[44px] rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+              className="w-full sm:w-auto rounded-md border border-input bg-background px-3 py-2 text-sm"
+              data-testid="cultivar-difficulty-select"
             >
               {DIFFICULTY_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>
@@ -167,71 +134,44 @@ export default function CultivarsIndex() {
                 </option>
               ))}
             </select>
-          </div>
-          {hasFilters ? (
+          </label>
+          {hasFilters && (
             <button
               type="button"
               onClick={clearAll}
-              className="min-h-[44px] rounded-md border border-border px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:border-primary/40"
+              className="text-sm text-muted-foreground hover:text-foreground underline-offset-4 hover:underline"
+              data-testid="cultivar-clear-filters"
             >
-              Clear
+              Clear filters
             </button>
-          ) : null}
-        </form>
-
-        <p
-          className="mb-3 text-xs text-muted-foreground"
-          aria-live="polite"
-          data-testid="cultivars-index-result-count"
-        >
-          {filtered.length === VERDANT_CULTIVARS.length
-            ? `Showing all ${VERDANT_CULTIVARS.length} cultivars`
-            : `Showing ${filtered.length} of ${VERDANT_CULTIVARS.length} cultivars`}
-        </p>
+          )}
+        </div>
 
         {filtered.length === 0 ? (
-          <div
-            data-testid="cultivars-index-empty"
-            className="rounded-lg border border-dashed border-border/60 p-6 text-sm text-muted-foreground"
-          >
-            No cultivar guides match those filters yet. Try clearing the search
-            or picking a different difficulty — the library is small and
-            curated on purpose.
-          </div>
+          <p className="text-muted-foreground" data-testid="cultivar-empty-state">
+            No cultivars match those filters.
+          </p>
         ) : (
-          <ul className="space-y-4">
+          <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" data-testid="cultivar-grid">
             {filtered.map((c) => (
-              <li
-                key={c.slug}
-                className="rounded-lg border border-border/60 p-4 hover:border-primary/40 transition-colors"
-              >
-                <Link to={`/cultivars/${c.slug}`} className="block">
-                  <div className="flex items-baseline justify-between gap-4">
-                    <h3 className="font-semibold text-lg">{c.name}</h3>
-                    <span className="text-xs text-muted-foreground">{c.flowerWeeks}</span>
-                  </div>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Lineage: {c.lineage} · {c.difficulty}
+              <li key={c.slug}>
+                <Link
+                  to={`/cultivars/${c.slug}`}
+                  className="block rounded-lg border border-border bg-card p-4 hover:border-primary/40 transition-colors h-full"
+                >
+                  <h2 className="font-medium text-lg mb-1">{c.name}</h2>
+                  <p className="text-sm text-muted-foreground mb-2">{c.searchAlias}</p>
+                  <p className="text-xs text-muted-foreground">{c.lineage}</p>
+                  <p className="text-xs mt-2">
+                    <span className="inline-block rounded bg-muted px-1.5 py-0.5">{c.difficulty}</span>
+                    <span className="ml-2 text-muted-foreground">{c.flowerWeeks} flower</span>
                   </p>
-                  <p className="mt-2 text-sm text-muted-foreground">{c.intro}</p>
                 </Link>
               </li>
             ))}
           </ul>
         )}
-
-        <p className="mt-8 text-sm text-muted-foreground">
-          Looking for stage-by-stage checklists? See the{" "}
-          <Link to="/guides/grow-stage-care-guide" className="underline hover:text-foreground">
-            grow-stage care guide
-          </Link>
-          . Comparing keepers across a run? See{" "}
-          <Link to="/pheno-comparison" className="underline hover:text-foreground">
-            Pheno comparison
-          </Link>
-          .
-        </p>
-      </section>
+      </div>
     </main>
   );
 }

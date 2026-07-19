@@ -255,6 +255,7 @@ export default function FounderOwnerPrefsForm() {
 
         <div>
           <Button
+            ref={saveButtonRef}
             type="submit"
             disabled={isRefunded || saving}
             aria-busy={saving ? "true" : "false"}

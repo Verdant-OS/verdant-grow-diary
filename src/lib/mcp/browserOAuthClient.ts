@@ -355,7 +355,7 @@ export async function probeTools(endpoint: string): Promise<ProbeResult> {
 export type ToolCallOutcome =
   | { status: "not_connected"; message: string }
   | { status: "unauthorized"; message: string }
-  | { status: "error"; message: string }
+  | { status: "error"; message: string; code?: number }
   | {
       status: "ok";
       result: {
@@ -394,7 +394,9 @@ export async function callMcpTool(
       structuredContent?: unknown;
       isError?: boolean;
     }>(endpoint, token, "tools/call", { name, arguments: args }, 2);
-    if (resp.error) return { status: "error", message: resp.error.message };
+    if (resp.error) {
+      return { status: "error", message: resp.error.message, code: resp.error.code };
+    }
     return { status: "ok", result: resp.result ?? {} };
   } catch (e) {
     const unauth = (e as { unauthorized?: boolean }).unauthorized === true;
@@ -407,3 +409,4 @@ export async function callMcpTool(
     return { status: "error", message: "Tool call failed. Try again or reconnect." };
   }
 }
+

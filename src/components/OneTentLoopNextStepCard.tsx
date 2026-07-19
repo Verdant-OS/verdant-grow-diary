@@ -16,6 +16,7 @@ import {
   ONE_TENT_LOOP_HELPER_COPY,
   resolveOneTentLoopNextStep,
   type OneTentLoopIds,
+  type OneTentLoopLocalAction,
   type OneTentLoopStep,
 } from "@/lib/oneTentLoopNavigationRules";
 
@@ -24,6 +25,7 @@ interface Props {
   ids?: OneTentLoopIds;
   className?: string;
   testId?: string;
+  onLocalAction?: (action: OneTentLoopLocalAction) => void;
 }
 
 export default function OneTentLoopNextStepCard({
@@ -31,11 +33,13 @@ export default function OneTentLoopNextStepCard({
   ids,
   className,
   testId,
+  onLocalAction,
 }: Props) {
   const step = resolveOneTentLoopNextStep(current, ids);
   const resolvedTestId = testId ?? "one-tent-loop-next-step-card";
   const currentLabel = ONE_TENT_LOOP_STEP_LABEL[current];
   const nextLabel = step.next ? ONE_TENT_LOOP_STEP_LABEL[step.next] : null;
+  const localAction = step.localAction;
 
   return (
     <div
@@ -43,8 +47,7 @@ export default function OneTentLoopNextStepCard({
       data-current-step={current}
       data-next-step={step.next ?? ""}
       className={
-        "rounded-2xl border border-border/60 bg-secondary/30 p-4 space-y-2 " +
-        (className ?? "")
+        "rounded-2xl border border-border/60 bg-secondary/30 p-4 space-y-2 " + (className ?? "")
       }
     >
       <div className="text-xs uppercase tracking-wide text-muted-foreground">
@@ -56,18 +59,12 @@ export default function OneTentLoopNextStepCard({
         </div>
       )}
       {ONE_TENT_LOOP_HELPER_COPY[current] && (
-        <p
-          className="text-xs text-muted-foreground"
-          data-testid={`${resolvedTestId}-helper`}
-        >
+        <p className="text-xs text-muted-foreground" data-testid={`${resolvedTestId}-helper`}>
           {ONE_TENT_LOOP_HELPER_COPY[current]}
         </p>
       )}
       {step.disabled ? (
-        <p
-          className="text-xs text-muted-foreground"
-          data-testid={`${resolvedTestId}-disabled`}
-        >
+        <p className="text-xs text-muted-foreground" data-testid={`${resolvedTestId}-disabled`}>
           {step.disabledReason}
         </p>
       ) : step.href ? (
@@ -76,6 +73,16 @@ export default function OneTentLoopNextStepCard({
             {step.ctaLabel}
             <ArrowRight className="ml-1 h-4 w-4" aria-hidden />
           </Link>
+        </Button>
+      ) : localAction && onLocalAction ? (
+        <Button
+          type="button"
+          size="sm"
+          data-testid={`${resolvedTestId}-cta`}
+          onClick={() => onLocalAction(localAction)}
+        >
+          {step.ctaLabel}
+          <ArrowRight className="ml-1 h-4 w-4" aria-hidden />
         </Button>
       ) : (
         <Button size="sm" disabled data-testid={`${resolvedTestId}-cta-inert`}>

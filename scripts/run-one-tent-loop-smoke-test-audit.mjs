@@ -3,7 +3,7 @@
  * One-Tent Loop smoke test audit.
  *
  * Runs the targeted Vitest suites that protect Verdant's core operating
- * loop (Grow → Tent → Plant → Manual Reading → Snapshot → Alert →
+ * loop (Grow → Tent → Plant → Quick Log → Manual Reading → Snapshot → Alert →
  * Action Queue → Completion → Follow-up Diary → Timeline) and prints a
  * pass/fail table to CI logs.
  *
@@ -22,6 +22,9 @@ const ROOT = process.cwd();
 
 /** Real, on-disk targeted suites for the One-Tent Loop smoke audit. */
 const SUITES = [
+  "src/test/one-tent-loop-navigation-rules.test.ts",
+  "src/test/plant-detail-one-tent-loop-card.test.tsx",
+  "src/test/plant-detail-one-tent-loop-quick-log-handoff.test.tsx",
   "src/test/manual-sensor-reading-entry.test.ts",
   "src/test/manual-sensor-source-label.test.ts",
   "src/test/manual-sensor-display-labels.test.ts",

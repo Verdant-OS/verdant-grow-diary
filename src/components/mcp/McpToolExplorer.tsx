@@ -44,9 +44,53 @@ interface RunState {
   loading: boolean;
   outcome: ToolCallOutcome | null;
   ranAt: string | null;
+  args: Record<string, unknown> | null;
+  previousArgs: Record<string, unknown> | null;
 }
 
-const EMPTY: RunState = { loading: false, outcome: null, ranAt: null };
+const EMPTY: RunState = {
+  loading: false,
+  outcome: null,
+  ranAt: null,
+  args: null,
+  previousArgs: null,
+};
+
+// ---------- pure diff helper ----------
+
+export type ArgDiffKind = "added" | "removed" | "changed" | "unchanged";
+export interface ArgDiffEntry {
+  key: string;
+  kind: ArgDiffKind;
+  from: unknown;
+  to: unknown;
+}
+
+export function diffArgs(
+  prev: Record<string, unknown> | null,
+  curr: Record<string, unknown> | null,
+): ArgDiffEntry[] {
+  const a = prev ?? {};
+  const b = curr ?? {};
+  const keys = Array.from(new Set([...Object.keys(a), ...Object.keys(b)])).sort();
+  return keys.map((key) => {
+    const inA = Object.prototype.hasOwnProperty.call(a, key);
+    const inB = Object.prototype.hasOwnProperty.call(b, key);
+    const from = a[key];
+    const to = b[key];
+    let kind: ArgDiffKind;
+    if (inA && !inB) kind = "removed";
+    else if (!inA && inB) kind = "added";
+    else if (JSON.stringify(from) !== JSON.stringify(to)) kind = "changed";
+    else kind = "unchanged";
+    return { key, kind, from, to };
+  });
+}
+
+function formatArgValue(v: unknown): string {
+  if (v === undefined) return "—";
+  return JSON.stringify(v);
+}
 
 const UUID_RE =
   /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;

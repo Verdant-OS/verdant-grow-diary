@@ -185,7 +185,7 @@ describe("Upgrade page", () => {
 
   it("founder sold-out state disables CTA", () => {
     const founder = PRICING_TIERS.find((t) => t.id === "founder_lifetime")!;
-    founder.cap = { total: 100, claimed: 75 };
+    founder.cap = { total: 100, claimed: 100 };
     renderPage();
     const cta = screen.getByTestId("tier-founder_lifetime-cta") as HTMLButtonElement;
     expect(cta).toBeDisabled();

@@ -31,11 +31,11 @@ T1 requires every enumerated route-scoped entry point to open the exact grow/ten
 | Plant Detail `plant-detail-quick-action-quicklog` opens its exact routed plant                                         | Pass in deterministic contract; authenticated Chrome execution pending    | `quicklog-route-contract-static.test.ts`, `quicklog-target-contract.test.tsx`                                                 |
 | Plant Detail One-Tent Loop `Add quick log` opens its exact grow/tent/plant                                             | Pass                                                                      | `one-tent-loop-navigation-rules.test.ts`, `one-tent-loop-next-step-card.test.tsx`, `plant-detail-one-tent-loop-card.test.tsx` |
 | Existing complete `PlantQuickLogPrefill` dispatchers retain the exact tuple                                            | Pass                                                                      | `quicklog-target-contract.test.tsx`, `quicklog-prefill-safety.test.tsx`                                                       |
-| The target card and `quicklog_save_manual.p_target_id` use one captured target                                         | Pass in deterministic contract; authenticated request observation pending | `quicklog-target-contract.test.tsx`                                                                                           |
+| The target card and `quicklog_save_manual.p_target_id` use one captured target, including across an in-flight await    | Pass in deterministic contract; authenticated request observation pending | `quicklog-target-contract.test.tsx`                                                                                           |
 | Missing, unknown, inactive, merged, unassigned, or contradictory targets hold with exact calm guidance and zero writes | Pass                                                                      | `quick-log-target-integrity-rules.test.ts`, `quicklog-target-contract.test.tsx`, `quicklog-prefill-safety.test.tsx`           |
 | Global launchers without route context invent no remembered or sole plant                                              | Pass                                                                      | `quicklog-plant-default.test.tsx`, `quickLogPlantDefault.test.ts`, `quicklog-prefill-safety.test.tsx`                         |
-| Plant Detail named Quick Log requires a complete plant/grow/tent prefill                                               | Pass                                                                      | `plant-detail-quick-actions.test.tsx`, `plant-detail-quicklog-handoff.test.ts`                                                |
-| Smoke target transition stays inside the routed plant's grow                                                           | Pass in deterministic/static contract; authenticated execution pending    | `quicklog-e2e-fixture-safety.test.ts`, `quicklog-smoke.spec.ts`                                                               |
+| Plant Detail named Quick Log, Upload Photo, and Harvest require a complete plant/grow/tent prefill                     | Pass                                                                      | `plant-detail-quick-actions.test.tsx`, `plant-detail-quicklog-handoff.test.ts`                                                |
+| Smoke target transition stays inside the routed plant's grow and matches the exact accessible name                     | Pass in deterministic/static contract; authenticated execution pending    | `quicklog-e2e-fixture-safety.test.ts`, `quicklog-smoke.spec.ts`                                                               |
 | `/logs` preserves raw query/hash while redirecting to `/timeline`                                                      | Pass                                                                      | `route-alias-preservation.test.tsx`, route-manifest tests                                                                     |
 | `/dashboard` remains an authenticated Dashboard alias                                                                  | Pass                                                                      | `app-route-manifest.test.ts`, `route-manifest-sync.test.ts`, `dashboard-grow-scope.test.ts`                                   |
 
@@ -46,14 +46,15 @@ Deterministic result: **3/3 enumerated route-scoped entry-point classes pass, an
 1. `quickLogTargetIntegrityRules.ts` owns pure, typed, null-safe prefill, editor-hold, and write resolution.
 2. A named invalid prefill overrides any unrelated selected target until the grower explicitly chooses a valid target; a new valid prefill replaces the hold exactly.
 3. Global and grow-only launchers start in manual-selection mode. Last-target history may still be recorded after a successful save, but it is never read to auto-select a plant, and a sole plant is never inferred.
-4. `QuickLog.tsx` derives one immutable canonical target and uses it for the target card, sensor context, RPC payload, stage writeback, receipt, last-target memory, and refresh.
-5. Plant Detail named Quick Log reuses `buildPlantQuickLogPrefill` and remains disabled when plant, grow, or tent context is incomplete; disabled clicks dispatch no event.
-6. The smoke's second target uses `E2E_GROW_1_SECOND_PLANT_NAME` (safe default `E2E Test Plant 2`) and asserts that its grow remains the routed plant's grow. No Grow fixture name became required.
-7. Workflow summary copy now puts Tent + Plant in the required section and Grow in the optional section. Workflow triggers and permissions are unchanged.
-8. The One-Tent Loop plant step dispatches exactly one existing Quick Log prefill event and performs no navigation or write itself.
-9. The `/logs` alias uses a presenter-only redirect backed by a pure raw search/hash preservation rule.
-10. The authenticated smoke installs its request observer before navigation and retains only `p_target_id`; it does not retain request bodies, headers, credentials, or raw grower content.
-11. `quicklog_save_manual` remains the only Quick Log persistence seam. No Action Queue or device-control write was added.
+4. `QuickLog.tsx` captures one immutable canonical target, grow, event, and stage before the first await and freezes target and stage controls while the save is in flight. The captured context drives the target card, sensor context, RPC payload, stage writeback, receipt, last-target memory, and refresh.
+5. Named-prefill plant/tent queries fail closed while loading or errored. Loading copy never claims not-found, query errors expose a calm retry, and retry invokes only the failed query.
+6. Plant Detail named Quick Log, Upload Photo, and Harvest reuse `buildPlantQuickLogPrefill` and remain disabled when plant, grow, or tent context is incomplete; disabled clicks dispatch no event.
+7. The smoke's second target uses `E2E_GROW_1_SECOND_PLANT_NAME` (safe default `E2E Test Plant 2`), selects by exact accessible name without regex interpretation, and asserts that its grow remains the routed plant's grow. No Grow fixture name became required.
+8. Workflow summary copy now puts Tent + Plant in the required section and Grow in the optional section. Workflow triggers and permissions are unchanged.
+9. The One-Tent Loop plant step dispatches exactly one existing Quick Log prefill event and performs no navigation or write itself.
+10. The `/logs` alias uses a presenter-only redirect backed by a pure raw search/hash preservation rule.
+11. The authenticated smoke installs its request observer before navigation and retains only `p_target_id`; it does not retain request bodies, headers, credentials, or raw grower content.
+12. `quicklog_save_manual` remains the only Quick Log persistence seam. No Action Queue or device-control write was added.
 
 ## Replayed commit sequence
 
@@ -69,14 +70,17 @@ Deterministic result: **3/3 enumerated route-scoped entry-point classes pass, an
 - `ef4200bd1` — exact refresh-target contract alignment
 - `e1e41b99d` — initial reconciliation packet replay
 - `fcb3c7b28` — target-integrity port evidence refresh
+- `d5de062cc` — blocked-target integrity repair
+- `1ebba5b26` — canonical target display repair
+- `4bdbd1263` — in-flight target, query-state, handoff, and exact-name repair
 
 ## Validation rerun on this port
 
 | Gate                                  | Current result                                                                                                        |
 | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| Requested targeted slice              | **Pass — 16 files, 198/198 tests, 0 failures**                                                                        |
-| Repair-focused changed-test batch     | **Pass — 8 files, 146/146 tests, 0 failures**                                                                         |
-| All changed test files                | **Pass — 10 files, 210/210 tests, 0 failures**                                                                        |
+| Requested targeted slice              | **Pass — 16 files, 203/203 tests, 0 failures**                                                                        |
+| Repair-focused changed-test batch     | **Pass — 8 files, 151/151 tests, 0 failures**                                                                         |
+| All changed test files                | **Pass — 10 files, 215/215 tests, 0 failures**                                                                        |
 | Type-check                            | **Pass — 0 diagnostics** (`tsc -p tsconfig.app.json --noEmit`)                                                        |
 | Working diff whitespace/error check   | **Pass** (`git diff --check`)                                                                                         |
 | Full suite                            | **Not rerun on this port**                                                                                            |
@@ -92,7 +96,7 @@ Deterministic result: **3/3 enumerated route-scoped entry-point classes pass, an
 
 The requested targeted slice emitted only known non-failing React Router v7 future-flag notices and Radix Dialog `Description`/`aria-describedby` warnings. No targeted test failed and type-check emitted no warning or diagnostic.
 
-The exact all-changed-test-file batch is currently green at 210/210. No workflow safety parser, threshold, or scope fence was weakened to obtain this result.
+The exact all-changed-test-file batch is currently green at 215/215. No workflow safety parser, threshold, or scope fence was weakened to obtain this result.
 
 The old branch's full-suite totals, scanner timings, Playwright discovery, E2E compilation, fixture-checklist result, and deployment-base classifications are intentionally not carried forward as current evidence because they were not rerun against `ed3790cb8`.
 
@@ -107,6 +111,9 @@ The old branch's full-suite totals, scanner timings, Playwright discovery, E2E c
 ## Safety verdict
 
 - A resolved target is immutable for the duration of a save and is reused after the await boundary.
+- Named prefill query loading and errors remain unresolved rather than being misreported as not-found, and retries are limited to failed queries.
+- All three Plant Detail named handoffs fail closed unless the full grow/tent/plant tuple exists.
+- Fixture names containing regular-expression metacharacters are matched as exact accessible names.
 - No unknown or contradictory target is shown as ready.
 - No schema, RLS, service-role, bridge-token, device-control, relay, Action Queue, Edge Function, billing, entitlement, or Founder backfill seam was added.
 - No fake live or sensor state was introduced.
@@ -140,7 +147,7 @@ Rollback uses `git revert` on the smallest relevant commit. Do not reset shared 
 - [x] Authenticated `/dashboard` alias and scope-preserving `/logs` redirect preserved.
 - [x] Named blocked prefills hold with zero writes until explicit grower action or a new valid prefill.
 - [x] Global launchers require manual plant selection; remembered and sole-plant fallbacks are removed.
-- [x] Plant Detail named Quick Log requires complete plant/grow/tent context.
+- [x] Plant Detail named Quick Log, Upload Photo, and Harvest require complete plant/grow/tent context.
 - [x] Smoke second-target fixture is same-grow and Grow fixture naming remains optional.
 - [x] Non-writing disposable fixture checklist output confirmed.
 - [ ] Disposable fixture verification green.

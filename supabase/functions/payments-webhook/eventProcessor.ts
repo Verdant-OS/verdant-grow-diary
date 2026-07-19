@@ -295,14 +295,40 @@ export function decide(event: EventLike, env: PaddleEnv, now: Date): Decision {
     };
   }
 
-  // Adjustment events (refunds / credits / chargebacks). RECORD-ONLY:
-  // insertEventReceived() has already persisted the raw payload to
-  // lovable_paddle_events for operator visibility. We deliberately do NOT
-  // mutate subscriptions, entitlements, or access rules here — refunds
-  // are handled operationally (see the runbook), not by silently flipping
-  // a user's plan. Distinct skip_reason so the audit surface can filter
-  // "recorded on purpose" from "unknown event type" noise.
-  if (type === 'adjustment.created' || type === 'adjustment.updated') {
+  // Adjustment events (refunds / credits / chargebacks).
+  //
+  // Turn B refund-retire: for founder_lifetime purchases, an approved
+  // refund or chargeback MUST revoke the Pro-level subscription row AND
+  // retire the founders row atomically. Non-refund/chargeback adjustments
+  // (credits, non-approved states) stay audit-only — the raw payload is
+  // already durably persisted to lovable_paddle_events for operator
+  // visibility upstream in the orchestrator.
+  //
+  // We route the refund to a dedicated 'revoke_lifetime' decision keyed
+  // by paddle_transaction_id. The orchestrator dep resolves that to the
+  // right subscription + founder row via the service-role RPC. If the
+  // referenced transaction was NOT a founder_lifetime purchase, the RPC
+  // no-ops (updates zero rows) — safe for recurring-plan refunds too.
+  if (type === 'adjustment.created') {
+    const data = (event.data ?? {}) as {
+      action?: string;
+      status?: string;
+      transactionId?: string;
+    };
+    const action = data.action ?? '';
+    const status = data.status ?? '';
+    if (action !== 'refund' && action !== 'chargeback') {
+      return { kind: 'skip', reason: 'adjustment_not_refund_or_chargeback' };
+    }
+    if (status !== 'approved') {
+      return { kind: 'skip', reason: 'adjustment_not_approved' };
+    }
+    if (!data.transactionId) {
+      return { kind: 'skip', reason: 'adjustment_missing_transaction_id' };
+    }
+    return { kind: 'revoke_lifetime', paddleTransactionId: data.transactionId, env };
+  }
+  if (type === 'adjustment.updated') {
     return { kind: 'skip', reason: 'adjustment_audit_only' };
   }
 

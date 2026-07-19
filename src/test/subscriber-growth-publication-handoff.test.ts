@@ -49,16 +49,18 @@ describe("subscriber growth publication handoff", () => {
     expect(HANDOFF).toContain("LIVE_VERIFIED");
     expect(HANDOFF).toMatch(/authorizes nothing/i);
     expect(HANDOFF).toMatch(/evidence only.*not deployment authorization/i);
-    expect(LAUNCH_RUNBOOK).toContain("launch-gate.v2.json");
-    expect(LAUNCH_RUNBOOK).toMatch(/v1 receipt[\s\S]*cannot support a `LIVE_VERIFIED`/i);
+    expect(LAUNCH_RUNBOOK).toContain("launch-gate.v3.json");
+    expect(LAUNCH_RUNBOOK).toMatch(/v2 receipt[\s\S]*cannot\s+support a `LIVE_VERIFIED`/i);
   });
 
   it("documents the exact reviewed-function deployment boundary and manual outreach fence", () => {
     expect(HANDOFF).toContain("`ai-doctor-review`");
+    expect(HANDOFF).toContain("`founder-slots-remaining`");
     expect(HANDOFF).toMatch(/do not\s+redeploy unrelated functions/i);
-    expect(HANDOFF).toMatch(/source parity alone does not prove[\s\S]*deployed/i);
+    expect(HANDOFF).toMatch(/source presence alone does\s+not prove[\s\S]*deployed/i);
     expect(HANDOFF).toContain("SUPABASE_SERVICE_ROLE_KEY");
     expect(LAUNCH_RUNBOOK).toContain("`ai-doctor-review`");
+    expect(LAUNCH_RUNBOOK).toContain("`founder-slots-remaining`");
     expect(LAUNCH_RUNBOOK).toMatch(/Do not deploy unrelated Edge Functions/i);
     expect(HANDOFF).not.toMatch(/no changed Supabase Edge Function sources/i);
     expect(HANDOFF).not.toMatch(/Do \*\*not\*\* deploy an Edge Function/i);
@@ -72,11 +74,15 @@ describe("subscriber growth publication handoff", () => {
       expect(document).toContain("SUPABASE_SERVICE_ROLE_KEY");
     }
     expect(LAUNCH_RUNBOOK).toMatch(/It never prints or stores secret values/i);
-    expect(HANDOFF).toMatch(/It never logs secret\s+values/i);
+    expect(HANDOFF).toMatch(/(?:It|The gate) never logs secret\s+values/i);
     expect(LAUNCH_RUNBOOK).toMatch(/downloaded remote `ai-doctor-review` source/i);
     expect(LAUNCH_RUNBOOK).toMatch(/Downloaded source exists only in a temporary directory/i);
-    expect(HANDOFF).toMatch(/downloaded function source parity plus recorder markers/i);
+    expect(HANDOFF).toMatch(
+      /downloaded\s+(?:function|AI Doctor)\s+source parity plus\s+recorder markers/i,
+    );
     expect(HANDOFF).toMatch(/does not\s+validate or expose the secret value/i);
+    expect(LAUNCH_RUNBOOK).toMatch(/browser-shaped unauthenticated `OPTIONS` preflight/i);
+    expect(HANDOFF).toMatch(/public (?:Founder )?check sends no key/i);
   });
 
   it("keeps subscriber truth and rollback fail-closed", () => {

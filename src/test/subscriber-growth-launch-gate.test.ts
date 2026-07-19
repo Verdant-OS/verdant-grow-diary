@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildSubscriberGrowthReleaseReceipt,
   evaluateSubscriberGrowthLaunchGate,
+  founderCounterPassed,
   formatSubscriberGrowthLaunchGate,
   migrationContractPassed,
   SUBSCRIBER_GROWTH_EXPECTED_MIGRATION_COUNT,
@@ -82,9 +83,24 @@ const localParity = {
   capabilitiesTotal: 5,
 };
 
+const founderCounter = {
+  kind: "public_founder_counter_live_check",
+  attempted: true,
+  ok: true,
+  optionsStatus: 200,
+  postStatus: 200,
+  corsVerified: true,
+  payloadVerified: true,
+  remaining: 42,
+  total: 75,
+  error: null,
+  errors: [],
+};
+
 const liveParity = {
   ...localParity,
   deploymentId: "deployment-123",
+  founderCounter,
 };
 
 const backendRemoteVerification = {
@@ -104,8 +120,8 @@ describe("subscriber growth launch gate", () => {
     );
   });
 
-  it("uses receipt schema v2 so legacy evidence cannot stand in for remote backend verification", () => {
-    expect(SUBSCRIBER_GROWTH_RECEIPT_VERSION).toBe(2);
+  it("uses receipt schema v3 so v2 evidence cannot stand in for the Founder live guard", () => {
+    expect(SUBSCRIBER_GROWTH_RECEIPT_VERSION).toBe(3);
   });
 
   it("fails closed instead of accepting an empty migration contract as 0/0", () => {
@@ -342,6 +358,43 @@ describe("subscriber growth launch gate", () => {
     });
   });
 
+  it("requires complete bounded Founder counter evidence before LIVE_VERIFIED", () => {
+    expect(founderCounterPassed(founderCounter)).toBe(true);
+
+    const missing = evaluateSubscriberGrowthLaunchGate({
+      source,
+      commands,
+      localParity,
+      liveParity: { ...localParity, deploymentId: "deployment-123" },
+      backendRemoteVerification,
+      liveRequired: true,
+    });
+    expect(missing.status).toBe("HOLD");
+    expect(missing.problems).toContain("public Founder counter is not verified in production");
+
+    for (const invalidEvidence of [
+      { ...founderCounter, ok: false },
+      { ...founderCounter, corsVerified: false },
+      { ...founderCounter, payloadVerified: false },
+      { ...founderCounter, remaining: -1 },
+      { ...founderCounter, remaining: 76 },
+      { ...founderCounter, total: 100 },
+      { ...founderCounter, errors: ["unexpected"] },
+    ]) {
+      expect(founderCounterPassed(invalidEvidence)).toBe(false);
+      expect(
+        evaluateSubscriberGrowthLaunchGate({
+          source,
+          commands,
+          localParity,
+          liveParity: { ...liveParity, founderCounter: invalidEvidence },
+          backendRemoteVerification,
+          liveRequired: true,
+        }).status,
+      ).toBe("HOLD");
+    }
+  });
+
   it("requires the full gate base to be the canonical release commit's first parent", () => {
     const result = evaluateSubscriberGrowthLaunchGate({
       source: { ...source, baseIsHeadParent: false },
@@ -418,6 +471,7 @@ describe("subscriber growth launch gate", () => {
     expect(receipt.decision.note).toContain("never authorizes");
     expect(formatSubscriberGrowthLaunchGate(receipt)).toContain("Authorization: NONE");
     expect(formatSubscriberGrowthLaunchGate(receipt)).toContain("Subscriber goal verified: NO");
+    expect(formatSubscriberGrowthLaunchGate(receipt)).toContain("Founder counter: verified");
   });
 
   it("parses CLI boundaries and exact Vitest totals deterministically", () => {

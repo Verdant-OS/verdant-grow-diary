@@ -22,9 +22,7 @@ const read = (p: string) => fs.readFileSync(path.join(ROOT, p), "utf8");
 describe("Quick Log Playwright CI surface", () => {
   it("does not commit storageState", () => {
     expect(fs.existsSync(path.join(ROOT, "e2e/.auth/user.json"))).toBe(false);
-    expect(
-      fs.existsSync(path.join(ROOT, "e2e/.auth/session-storage.json")),
-    ).toBe(false);
+    expect(fs.existsSync(path.join(ROOT, "e2e/.auth/session-storage.json"))).toBe(false);
   });
 
   it("CI workflow has NO schedule/cron trigger (no automated writes to a real grow)", () => {
@@ -84,7 +82,7 @@ describe("Quick Log Playwright CI surface", () => {
     for (const v of [
       "E2E_BASE_URL",
       "E2E_GROW_1_PLANT_URL",
-      "E2E_GROW_2_PLANT_NAME",
+      "E2E_GROW_1_SECOND_PLANT_NAME",
       "E2E_TEST_EMAIL",
       "E2E_TEST_PASSWORD",
     ]) {
@@ -223,7 +221,7 @@ describe("Quick Log Playwright CI surface", () => {
     for (const token of [
       "E2E_BASE_URL",
       "E2E_GROW_1_PLANT_URL",
-      "E2E_GROW_2_PLANT_NAME",
+      "E2E_GROW_1_SECOND_PLANT_NAME",
       "E2E_TEST_EMAIL",
       "E2E_TEST_PASSWORD",
       "quicklog-smoke-artifacts",
@@ -241,7 +239,7 @@ describe("Quick Log Playwright CI surface", () => {
       "Missing GitHub variable or secret",
       "Redirected to `/auth`",
       "Cannot find Grow #1 plant page",
-      "Cannot find Grow #2 / target plant",
+      "Cannot find same-grow second target plant",
       "Stale snapshot helper missing",
       "Watering validation focus failed",
       "Report says a later step failed after save",

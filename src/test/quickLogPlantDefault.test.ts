@@ -1,9 +1,8 @@
 /**
  * Pure tests for pickDefaultQuickLogPlant.
  *
- * Gate 1 speed slice: reduce tap count by auto-selecting a plant only when
- * the resolution is unambiguous. Must never override an existing grower
- * choice and must never invent a selection out of thin air.
+ * Target-integrity slice: preserve explicit or validated prefill choices,
+ * but never infer the only available plant for a global launcher.
  */
 import { describe, it, expect } from "vitest";
 import { pickDefaultQuickLogPlant } from "@/lib/quickLogPlantOptionRules";
@@ -20,8 +19,8 @@ describe("pickDefaultQuickLogPlant", () => {
     expect(pickDefaultQuickLogPlant(one, "p1", "p1")).toBe("p1");
   });
 
-  it("ignores a stale currentPlantId not present in scope", () => {
-    expect(pickDefaultQuickLogPlant(one, null, "ghost")).toBe("p1");
+  it("clears a stale currentPlantId not present in scope", () => {
+    expect(pickDefaultQuickLogPlant(one, null, "ghost")).toBe("");
   });
 
   it("uses a valid prefillPlantId over single-candidate fallback", () => {
@@ -30,12 +29,12 @@ describe("pickDefaultQuickLogPlant", () => {
 
   it("ignores an invalid prefillPlantId", () => {
     expect(pickDefaultQuickLogPlant(many, "ghost", null)).toBe("");
-    expect(pickDefaultQuickLogPlant(one, "ghost", null)).toBe("p1");
+    expect(pickDefaultQuickLogPlant(one, "ghost", null)).toBe("");
   });
 
-  it("auto-selects the only scoped plant", () => {
-    expect(pickDefaultQuickLogPlant(one, null, null)).toBe("p1");
-    expect(pickDefaultQuickLogPlant(one, undefined, undefined)).toBe("p1");
+  it("never infers the only scoped plant", () => {
+    expect(pickDefaultQuickLogPlant(one, null, null)).toBe("");
+    expect(pickDefaultQuickLogPlant(one, undefined, undefined)).toBe("");
   });
 
   it("returns empty for multiple scoped plants without prefill", () => {
@@ -47,8 +46,8 @@ describe("pickDefaultQuickLogPlant", () => {
   });
 
   it("is deterministic across repeat calls", () => {
-    const a = pickDefaultQuickLogPlant(one, null, null);
-    const b = pickDefaultQuickLogPlant(one, null, null);
+    const a = pickDefaultQuickLogPlant(one, "p1", null);
+    const b = pickDefaultQuickLogPlant(one, "p1", null);
     expect(a).toBe(b);
   });
 });

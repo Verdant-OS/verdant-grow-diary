@@ -78,7 +78,7 @@ beforeEach(() => rpcMock.mockClear());
 afterEach(() => cleanup());
 
 describe("QuickLog page-context prefill safety", () => {
-  it("ignores an out-of-scope prefill plantId (not in scopedPlants)", () => {
+  it("holds an out-of-scope prefill plantId with exact repair guidance", () => {
     plantsMock = many;
     renderQL(
       <QuickLog
@@ -93,11 +93,13 @@ describe("QuickLog page-context prefill safety", () => {
         }}
       />,
     );
-    expect(screen.getByTestId("quick-log-plant-error")).toBeInTheDocument();
+    expect(screen.getByTestId("quick-log-target-error")).toHaveTextContent(
+      "That plant is no longer available. Choose another plant.",
+    );
     expect((screen.getByTestId("quick-log-save") as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("ignores an archived plant prefill id", () => {
+  it("holds an archived plant prefill id with exact repair guidance", () => {
     plantsMock = withArchived;
     renderQL(
       <QuickLog
@@ -112,7 +114,9 @@ describe("QuickLog page-context prefill safety", () => {
         }}
       />,
     );
-    expect(screen.getByTestId("quick-log-plant-error")).toBeInTheDocument();
+    expect(screen.getByTestId("quick-log-target-error")).toHaveTextContent(
+      "That plant is archived or merged. Choose an active plant.",
+    );
     expect(screen.getByTestId("quick-log-plant-select").textContent).not.toMatch(/Old/);
   });
 

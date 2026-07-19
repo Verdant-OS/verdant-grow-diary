@@ -20,6 +20,7 @@ export type QuickLogTargetBlockReason =
   | "plant_tent_unassigned"
   | "prefill_grow_mismatch"
   | "prefill_tent_mismatch"
+  | "prefill_target_pending"
   | "active_grow_mismatch"
   | "tent_not_found"
   | "tent_inactive"
@@ -40,6 +41,7 @@ export const QUICK_LOG_TARGET_BLOCKED_COPY: Readonly<Record<QuickLogTargetBlockR
   plant_tent_unassigned: "Assign this plant to a grow and tent before saving.",
   prefill_grow_mismatch: "The Quick Log grow context changed. Reopen it from the plant.",
   prefill_tent_mismatch: "The Quick Log tent context changed. Reopen it from the plant.",
+  prefill_target_pending: "Confirming this Quick Log target. Please wait.",
   active_grow_mismatch: "This plant belongs to another grow. Review the target before saving.",
   tent_not_found: "The assigned tent is unavailable. Review the plant assignment before saving.",
   tent_inactive: "The assigned tent is archived. Choose an active tent before saving.",
@@ -78,6 +80,13 @@ export interface ResolveQuickLogWriteTargetInput {
   selectedTent?: QuickLogTargetTent | null;
 }
 
+export interface ResolveQuickLogEditorTargetInput {
+  prefill?: QuickLogPrefillTargetRequest | null;
+  prefillResolution: QuickLogTargetResolution;
+  writeResolution: QuickLogTargetResolution;
+  dismissedBlockedPrefillKey?: string | null;
+}
+
 const blocked = (reason: QuickLogTargetBlockReason): QuickLogTargetResolution => ({
   status: "blocked",
   reason,
@@ -98,6 +107,51 @@ function ready(plantId: string, growId: string, tentId: string): QuickLogTargetR
 
 function tentIsInactive(tent: QuickLogTargetTent): boolean {
   return tent.is_archived === true || normalizeId(tent.archived_at) !== null;
+}
+
+/**
+ * Stable identity for a route/event request that names a plant. Launchers
+ * without a plant are manual-selection flows and intentionally have no key.
+ */
+export function quickLogPrefillTargetKey(
+  prefill?: QuickLogPrefillTargetRequest | null,
+): string | null {
+  const plantId = normalizeId(prefill?.plantId);
+  if (!plantId) return null;
+  return JSON.stringify([
+    plantId,
+    normalizeId(prefill?.growId) ?? "",
+    normalizeId(prefill?.tentId) ?? "",
+  ]);
+}
+
+/**
+ * Keep a named route/event target authoritative until it resolves exactly or
+ * the grower explicitly chooses another target. This gate sits in front of
+ * both presenter readiness and persistence so a stale, remembered, or
+ * otherwise unrelated selection can never receive the write.
+ */
+export function resolveQuickLogEditorTarget(
+  input: ResolveQuickLogEditorTargetInput,
+): QuickLogTargetResolution {
+  const requestKey = quickLogPrefillTargetKey(input.prefill);
+  if (!requestKey || input.dismissedBlockedPrefillKey === requestKey) {
+    return input.writeResolution;
+  }
+  if (input.prefillResolution.status === "blocked") {
+    return input.prefillResolution;
+  }
+  if (input.writeResolution.status === "blocked") {
+    return blocked("prefill_target_pending");
+  }
+
+  const expected = input.prefillResolution.target;
+  const actual = input.writeResolution.target;
+  return expected.plantId === actual.plantId &&
+    expected.growId === actual.growId &&
+    expected.tentId === actual.tentId
+    ? input.writeResolution
+    : blocked("prefill_target_pending");
 }
 
 /**

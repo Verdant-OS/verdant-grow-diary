@@ -261,6 +261,35 @@ describe("Workflow: fixture verification gates smoke", () => {
     expect(block).toContain("skipped due missing config");
   });
 
+  it("summary names Tent + Plant as required and Grow as optional", () => {
+    const summary = wf.match(
+      /-\s*name:\s*Write Quick Log smoke run summary[\s\S]*?(?=\n {6}- name:|\n*$)/,
+    );
+    const block = summary![0];
+    expect(block).toContain("Tent + Plant fixture names are required; Grow name is optional.");
+
+    const requiredStart = block.indexOf("Required configuration (names only");
+    const optionalStart = block.indexOf("Optional configuration (names only");
+    expect(requiredStart).toBeGreaterThanOrEqual(0);
+    expect(optionalStart).toBeGreaterThan(requiredStart);
+    const required = block.slice(requiredStart, optionalStart);
+    const optional = block.slice(optionalStart);
+    expect(required).toContain("E2E_FIXTURE_EXPECTED_TENT_NAME");
+    expect(required).toContain("E2E_FIXTURE_EXPECTED_PLANT_NAME");
+    expect(required).not.toContain("E2E_FIXTURE_EXPECTED_GROW_NAME");
+    expect(optional).toContain("E2E_FIXTURE_EXPECTED_GROW_NAME");
+  });
+
+  it("smoke transitions to a named second plant in the routed plant's current grow", () => {
+    const smoke = read("e2e/quicklog-smoke.spec.ts");
+    const checklist = read("e2e/scripts/print-fixture-config-checklist.ts");
+    expect(smoke).toContain("E2E_GROW_1_SECOND_PLANT_NAME");
+    expect(smoke).not.toContain("E2E_GROW_2_PLANT_NAME");
+    expect(smoke).toMatch(/selectedTarget\.growId\s*!==\s*initialTarget\.growId/);
+    expect(checklist).toContain("second plant in the same tent/grow");
+    expect(checklist).toContain("E2E Test Plant 2");
+  });
+
   it("no schedule, no cron, no pull_request_target, no service_role, no checked-in storageState", () => {
     expect(wf).not.toMatch(/^\s*schedule\s*:/m);
     expect(wf).not.toMatch(/-\s*cron\s*:/);

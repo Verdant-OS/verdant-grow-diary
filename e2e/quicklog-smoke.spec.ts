@@ -17,8 +17,8 @@ import { SmokeChecklistReporter } from "./lib/smokeChecklistReporter";
  * Optional env:
  *   E2E_BASE_URL                (default http://localhost:5173)
  *   E2E_GROW_1_PLANT_URL        URL of the Grow #1 plant page to open first
- *   E2E_GROW_2_PLANT_NAME       Display name of the target plant in Grow #2
- *                               (default "505 Headbanger")
+ *   E2E_GROW_1_SECOND_PLANT_NAME Display name of a second plant in the same
+ *                                grow/tent (default "E2E Test Plant 2")
  *
  * SAFETY:
  *   - No auth bypass. No hardcoded credentials. No elevated DB role.
@@ -29,7 +29,7 @@ const PLANT_URL = process.env.E2E_GROW_1_PLANT_URL;
 // `??` alone is not enough: an unset GitHub Actions var referenced via
 // `env:` arrives as an EMPTY STRING (not undefined), which would produce an
 // empty regex that strict-mode-matches every option in the plant select.
-const TARGET_NAME = process.env.E2E_GROW_2_PLANT_NAME?.trim() || "505 Headbanger";
+const TARGET_NAME = process.env.E2E_GROW_1_SECOND_PLANT_NAME?.trim() || "E2E Test Plant 2";
 
 const RESULTS_DIR = path.resolve(process.cwd(), "e2e/results");
 const REPORT_JSON = path.join(RESULTS_DIR, "quicklog-smoke-report.json");
@@ -206,6 +206,9 @@ test.describe("Quick Log smoke checklist", () => {
           )
           .not.toBe(routePlantId);
         const selectedTarget = await readTargetTuple(dialog);
+        if (initialTarget && selectedTarget.growId !== initialTarget.growId) {
+          throw new Error("Selected target plant is not in the routed plant's grow.");
+        }
         if (
           initialTarget &&
           selectedTarget.plantId === initialTarget.plantId &&

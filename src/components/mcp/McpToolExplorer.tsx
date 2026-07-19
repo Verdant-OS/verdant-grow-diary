@@ -107,7 +107,7 @@ function ToolCard({
   const run = useCallback(async () => {
     setValidationError(null);
     const built = buildArgs();
-    if (!built.ok) {
+    if (built.ok === false) {
       setValidationError(built.error);
       return;
     }

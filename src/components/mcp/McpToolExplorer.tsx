@@ -435,43 +435,95 @@ function ToolCard({
       {state.previousArgs && state.args && showDiff ? (() => {
         const entries = diffArgs(state.previousArgs, state.args);
         const changed = entries.filter((e) => e.kind !== "unchanged");
+        const counts = {
+          added: changed.filter((e) => e.kind === "added").length,
+          removed: changed.filter((e) => e.kind === "removed").length,
+          changed: changed.filter((e) => e.kind === "changed").length,
+        };
+        const tagStyles = {
+          added: {
+            label: "added",
+            badge:
+              "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
+            newChip:
+              "bg-emerald-500/10 text-emerald-800 dark:text-emerald-200 border-emerald-500/30",
+            oldChip: "",
+          },
+          removed: {
+            label: "removed",
+            badge: "bg-destructive/15 text-destructive border-destructive/30",
+            newChip: "",
+            oldChip:
+              "bg-destructive/10 text-destructive border-destructive/30 line-through",
+          },
+          changed: {
+            label: "changed",
+            badge:
+              "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30",
+            newChip:
+              "bg-emerald-500/10 text-emerald-800 dark:text-emerald-200 border-emerald-500/30",
+            oldChip:
+              "bg-destructive/10 text-destructive border-destructive/30 line-through",
+          },
+        } as const;
         return (
           <div
             id={`tool-explorer-diff-${toolName}`}
             data-testid={`tool-explorer-diff-${toolName}`}
-            className="rounded-md border bg-muted/40 p-3 text-xs space-y-2"
+            className="rounded-md border bg-muted/40 p-3 text-xs space-y-3"
           >
-            <p className="font-medium text-sm">
-              Changes since previous request
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <p className="font-medium text-sm">Changes since previous request</p>
               {changed.length === 0 ? (
-                <span className="ml-2 font-normal text-muted-foreground">
-                  (no fields changed)
+                <span className="text-muted-foreground">(no fields changed)</span>
+              ) : (
+                <span className="text-muted-foreground" aria-label="change summary">
+                  {counts.added} added · {counts.changed} changed · {counts.removed} removed
                 </span>
-              ) : null}
-            </p>
+              )}
+            </div>
             {changed.length > 0 ? (
-              <ul className="space-y-1 font-mono">
+              <ul className="space-y-2">
                 {changed.map((e) => {
-                  const tag =
-                    e.kind === "added"
-                      ? { label: "added", cls: "text-emerald-600 dark:text-emerald-400" }
-                      : e.kind === "removed"
-                        ? { label: "removed", cls: "text-destructive" }
-                        : { label: "changed", cls: "text-amber-600 dark:text-amber-400" };
+                  const t = tagStyles[e.kind as "added" | "removed" | "changed"];
                   return (
-                    <li key={e.key} className="flex flex-wrap items-baseline gap-2">
-                      <span className={`uppercase tracking-wide ${tag.cls}`}>
-                        {tag.label}
-                      </span>
-                      <span className="font-semibold">{e.key}</span>
-                      {e.kind !== "added" ? (
-                        <span className="text-muted-foreground line-through">
-                          {formatArgValue(e.from)}
+                    <li
+                      key={e.key}
+                      className="grid gap-1 rounded border bg-background/60 p-2 sm:grid-cols-[auto_1fr] sm:gap-x-3"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${t.badge}`}
+                        >
+                          {t.label}
                         </span>
-                      ) : null}
-                      {e.kind !== "removed" ? (
-                        <span>→ {formatArgValue(e.to)}</span>
-                      ) : null}
+                        <span className="font-mono text-xs font-semibold">{e.key}</span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 font-mono">
+                        {e.kind !== "added" ? (
+                          <span
+                            className={`inline-block max-w-full truncate rounded border px-1.5 py-0.5 ${t.oldChip}`}
+                            title={formatArgValue(e.from)}
+                            aria-label={`previous value ${formatArgValue(e.from)}`}
+                          >
+                            {formatArgValue(e.from)}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground italic">(not set)</span>
+                        )}
+                        <span aria-hidden="true" className="text-muted-foreground">→</span>
+                        {e.kind !== "removed" ? (
+                          <span
+                            className={`inline-block max-w-full truncate rounded border px-1.5 py-0.5 ${t.newChip}`}
+                            title={formatArgValue(e.to)}
+                            aria-label={`new value ${formatArgValue(e.to)}`}
+                          >
+                            {formatArgValue(e.to)}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground italic">(removed)</span>
+                        )}
+                      </div>
                     </li>
                   );
                 })}
@@ -480,6 +532,7 @@ function ToolCard({
           </div>
         );
       })() : null}
+
 
       {(() => {
         const category = classifyOutcome(state.outcome);

@@ -7,6 +7,7 @@ import {
   formatSubscriberGrowthLaunchGate,
   migrationContractPassed,
   SUBSCRIBER_GROWTH_EXPECTED_MIGRATION_COUNT,
+  SUBSCRIBER_GROWTH_FOUNDER_TOTAL,
   SUBSCRIBER_GROWTH_RECEIPT_VERSION,
 } from "../../scripts/releases/subscriber-growth-launch-gate-rules.mjs";
 import { SUBSCRIBER_GROWTH_MIGRATION_CONTRACT } from "../../scripts/releases/subscriber-growth-migration-contract.mjs";
@@ -92,7 +93,7 @@ const founderCounter = {
   corsVerified: true,
   payloadVerified: true,
   remaining: 42,
-  total: 75,
+  total: SUBSCRIBER_GROWTH_FOUNDER_TOTAL,
   error: null,
   errors: [],
 };
@@ -377,8 +378,9 @@ describe("subscriber growth launch gate", () => {
       { ...founderCounter, corsVerified: false },
       { ...founderCounter, payloadVerified: false },
       { ...founderCounter, remaining: -1 },
-      { ...founderCounter, remaining: 76 },
-      { ...founderCounter, total: 100 },
+      { ...founderCounter, remaining: SUBSCRIBER_GROWTH_FOUNDER_TOTAL + 1 },
+      { ...founderCounter, total: SUBSCRIBER_GROWTH_FOUNDER_TOTAL - 1 },
+      { ...founderCounter, total: 75 },
       { ...founderCounter, errors: ["unexpected"] },
     ]) {
       expect(founderCounterPassed(invalidEvidence)).toBe(false);

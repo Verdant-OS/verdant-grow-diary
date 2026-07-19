@@ -65,9 +65,9 @@ describe("Pricing tiers in constants", () => {
     expect(CONSTANTS).toMatch(/annualPrice:\s*99/);
   });
 
-  it("renders Founder Lifetime at $129 one-time with first-75 limit", () => {
+  it("renders Founder Lifetime at $129 one-time with first-100 limit", () => {
     expect(CONSTANTS).toMatch(/price:\s*129/);
-    expect(CONSTANTS).toMatch(/limit:\s*75/);
+    expect(CONSTANTS).toMatch(/limit:\s*100/);
     expect(CONSTANTS).toMatch(/one-time/);
   });
 

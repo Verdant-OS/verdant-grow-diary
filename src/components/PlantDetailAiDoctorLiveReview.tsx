@@ -507,9 +507,8 @@ function PlantDetailAiDoctorLiveReviewScope({
   };
 
   const handleInitialStart = () => {
-    if (!review.canStart || !packet || pendingAcceptedReviewStartRef.current === historyScopeKey) {
-      return;
-    }
+    if (!review.canStart) return;
+    if (!packet || pendingAcceptedReviewStartRef.current === historyScopeKey) return;
 
     const acceptedAt = new Date();
     const acceptedSensorClassification =
@@ -548,7 +547,7 @@ function PlantDetailAiDoctorLiveReviewScope({
       reviewStartTrackedRef.current = true;
       trackFunnelEvent("ai_doctor_review_started", { surface: acceptedMode });
     }
-    if (eligibility.mode === "historical_review" && !historicalStartTrackedRef.current) {
+    if (acceptedEligibility.mode === "historical_review" && !historicalStartTrackedRef.current) {
       historicalStartTrackedRef.current = true;
       trackFunnelEvent("historical_ai_review_started");
     }

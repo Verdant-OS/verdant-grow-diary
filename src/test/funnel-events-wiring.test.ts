@@ -380,22 +380,44 @@ describe("ordering and safety constraints at the seams", () => {
     expect(app).toMatch(/<Suspense[\s\S]*<Route element=\{<AppShell \/>\}>/);
   });
 
-  it("historical_ai_review_started fires only for an accepted initial historical review", () => {
+  it("historical_ai_review_started uses click-time accepted eligibility and defers start", () => {
     const src = read("src/components/PlantDetailAiDoctorLiveReview.tsx");
+    const startBinding = src.indexOf(
+      "const { start: startReview, status: reviewStatus } = review;",
+    );
+    const deferredStartEffect = src.indexOf("useEffect(() => {", startBinding);
+    const deferredStartGuard = src.indexOf(
+      "pendingAcceptedReviewStartRef.current !== historyScopeKey",
+      deferredStartEffect,
+    );
+    const deferredStart = src.indexOf("startReview();", deferredStartGuard);
     const handler = src.indexOf("const handleInitialStart");
-    const acceptedGate = src.indexOf("if (!review.canStart) return;", handler);
+    const canStartGate = src.indexOf("if (!review.canStart) return;", handler);
+    const requestGate = src.indexOf(
+      "if (!packet || pendingAcceptedReviewStartRef.current === historyScopeKey) return;",
+      canStartGate,
+    );
+    const acceptedGate = src.indexOf("if (!acceptedEligibility.allowed) return;", requestGate);
+    const acceptedRequest = src.indexOf("setAcceptedReviewRequest({", acceptedGate);
     const historicalGate = src.indexOf(
-      'if (eligibility.mode === "historical_review")',
-      acceptedGate,
+      'if (acceptedEligibility.mode === "historical_review"',
+      acceptedRequest,
     );
     const track = src.indexOf('trackFunnelEvent("historical_ai_review_started")', historicalGate);
-    const start = src.indexOf("review.start()", track);
+    const handlerEnd = src.indexOf("const confidenceCopy", handler);
 
+    expect(startBinding).toBeGreaterThan(-1);
+    expect(deferredStartEffect).toBeGreaterThan(startBinding);
+    expect(deferredStartGuard).toBeGreaterThan(deferredStartEffect);
+    expect(deferredStart).toBeGreaterThan(deferredStartGuard);
     expect(handler).toBeGreaterThan(-1);
-    expect(acceptedGate).toBeGreaterThan(handler);
-    expect(historicalGate).toBeGreaterThan(acceptedGate);
+    expect(canStartGate).toBeGreaterThan(handler);
+    expect(requestGate).toBeGreaterThan(canStartGate);
+    expect(acceptedGate).toBeGreaterThan(requestGate);
+    expect(acceptedRequest).toBeGreaterThan(acceptedGate);
+    expect(historicalGate).toBeGreaterThan(acceptedRequest);
     expect(track).toBeGreaterThan(historicalGate);
-    expect(start).toBeGreaterThan(track);
+    expect(src.slice(handler, handlerEnd)).not.toContain("startReview()");
     expect(src).toMatch(
       /onClick=\{review\.status === "error" \? review\.retry : handleInitialStart\}/,
     );

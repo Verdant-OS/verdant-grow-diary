@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   AlertTriangle,
@@ -137,6 +137,24 @@ export default function ManualSensorReadingCard({
   const [lastSaved, setLastSaved] = useState<LastSavedConfirmation | null>(null);
   const insert = useInsertSensorReading();
   const isCorrection = !!correction;
+  const tentIdRef = useRef(tentId);
+
+  const changeTentTarget = useCallback((nextTentId: string, nextForm: ManualEntryInput) => {
+    if (tentIdRef.current === nextTentId) return;
+    tentIdRef.current = nextTentId;
+    setTentId(nextTentId);
+    setForm(nextForm);
+    setDevicePreset("none");
+    setDeviceCustom("");
+    setReviewOpen(false);
+    setLastSaved(null);
+  }, []);
+
+  useEffect(() => {
+    const nextTentId = correction?.tentId ?? defaultTentId;
+    if (!nextTentId) return;
+    changeTentTarget(nextTentId, correctionToPrefill(correction));
+  }, [changeTentTarget, correction, defaultTentId]);
 
   const devicePresets = useMemo(() => getManualSensorDeviceOptions(), []);
   const deviceNote = useMemo(() => {
@@ -427,7 +445,10 @@ export default function ManualSensorReadingCard({
                 <Label htmlFor="manual-reading-tent" className="text-xs">
                   Tent
                 </Label>
-                <Select value={tentId} onValueChange={setTentId}>
+                <Select
+                  value={tentId}
+                  onValueChange={(nextTentId) => changeTentTarget(nextTentId, EMPTY)}
+                >
                   <SelectTrigger id="manual-reading-tent" data-testid="manual-reading-tent-select">
                     <SelectValue placeholder="Select tent" />
                   </SelectTrigger>

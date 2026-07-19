@@ -595,7 +595,7 @@ export default function ManualSensorReadingCard({
                 unit="kPa"
                 value={form.vpdKpa as string}
                 onChange={(v) => update("vpdKpa", v)}
-                placeholder="auto from temp + RH"
+                placeholder="enter measured VPD (optional)"
               />
             </Section>
 

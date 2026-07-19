@@ -85,6 +85,23 @@ describe("buildDerivedVpdStatusViewModel", () => {
     expect(vm.statusLabel).toBe("VPD unavailable");
   });
 
+  it("treats whitespace-only temperature and humidity as missing", () => {
+    expect(
+      buildDerivedVpdStatusViewModel({ airTempC: " \t ", humidityPct: 60, stage: "veg" }),
+    ).toMatchObject({ available: false, canCompareToStageTarget: false });
+    expect(
+      buildDerivedVpdStatusViewModel({ airTempC: 25, humidityPct: " \t ", stage: "veg" }),
+    ).toMatchObject({ available: false, canCompareToStageTarget: false });
+    expect(
+      buildDerivedVpdStatusViewModel({
+        airTempC: 25,
+        leafTempC: " \t ",
+        humidityPct: 60,
+        stage: "veg",
+      }),
+    ).toMatchObject({ vpdLabel: "Air VPD estimate", canCompareToStageTarget: false });
+  });
+
   it("never marks stage-unknown as healthy/in-target", () => {
     const vm = buildDerivedVpdStatusViewModel({
       airTempF: 77,

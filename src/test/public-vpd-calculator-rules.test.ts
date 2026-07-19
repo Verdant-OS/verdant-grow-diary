@@ -100,6 +100,33 @@ describe("public VPD calculator rules", () => {
     expect(result.trustIssues).toContain("humidity_reference_below_minimum");
   });
 
+  it("withholds a target claim for mutually contemporaneous future measurements", () => {
+    const result = evaluatePublicVpdCalculator({
+      temperature: 25,
+      leafTemperature: 25,
+      temperatureUnit: "C",
+      humidity: 60,
+      stage: "flower",
+      nowMs: Date.parse("2026-07-18T18:00:00.000Z"),
+      measurementEvidence: {
+        observedAt: "2026-07-19T18:00:00.000Z",
+        temperatureVerifiedAt: "2026-06-01T12:00:00.000Z",
+        temperatureReference: "Traceable reference thermometer",
+        temperatureVerifiedAtOperatingConditions: true,
+        humidityVerifiedAt: "2026-06-01T12:00:00.000Z",
+        humidityReferenceRhPercent: 75,
+        leafTemperatureMeasuredAt: "2026-07-19T18:01:00.000Z",
+        placement: "canopy",
+      },
+    });
+
+    expect(result.classification).toBeNull();
+    expect(result.canCompareToStageTarget).toBe(false);
+    expect(result.classificationLabel).not.toMatch(/in .*vpd range/i);
+    expect(result.trustIssues).toContain("observation_time_in_future");
+    expect(result.trustIssues).toContain("leaf_measurement_time_in_future");
+  });
+
   it("keeps unknown and harvest stages contextual rather than inventing a target", () => {
     expect(
       evaluatePublicVpdCalculator({

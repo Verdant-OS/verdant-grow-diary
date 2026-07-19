@@ -54,6 +54,7 @@ export interface DerivedVpdStatusViewModel {
 
 function toFinite(v: unknown): number | null {
   if (v === null || v === undefined || v === "") return null;
+  if (typeof v === "string" && v.trim() === "") return null;
   const n = typeof v === "number" ? v : Number(v);
   return Number.isFinite(n) ? n : null;
 }

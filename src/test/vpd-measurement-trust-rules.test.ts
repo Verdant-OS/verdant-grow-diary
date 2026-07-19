@@ -164,6 +164,80 @@ describe("evaluateVpdMeasurementTrust", () => {
     expect(result.issues).toContain("leaf_measurement_not_contemporaneous");
   });
 
+  it("blocks mutually contemporaneous observation and leaf timestamps in the future", () => {
+    const result = evaluateVpdMeasurementTrust({
+      airTempC: 25,
+      leafTempC: 23,
+      humidityPct: 60,
+      evidence: {
+        ...VERIFIED_EVIDENCE,
+        observedAt: "2026-07-19T18:00:00.000Z",
+        leafTemperatureMeasuredAt: "2026-07-19T18:01:00.000Z",
+      },
+      nowMs: NOW_MS,
+    });
+
+    expect(result.confidence).toBe("reduced");
+    expect(result.canCompareToStageTarget).toBe(false);
+    expect(result.issues).toContain("observation_time_in_future");
+    expect(result.issues).toContain("leaf_measurement_time_in_future");
+  });
+
+  it("blocks a future leaf timestamp even when it is inside the pairing window", () => {
+    const result = evaluateVpdMeasurementTrust({
+      airTempC: 25,
+      leafTempC: 23,
+      humidityPct: 60,
+      evidence: {
+        ...VERIFIED_EVIDENCE,
+        observedAt: "2026-07-18T18:00:00.000Z",
+        leafTemperatureMeasuredAt: "2026-07-18T18:06:00.000Z",
+      },
+      nowMs: NOW_MS,
+    });
+
+    expect(result.canCompareToStageTarget).toBe(false);
+    expect(result.issues).toContain("leaf_measurement_time_in_future");
+    expect(result.issues).not.toContain("leaf_measurement_not_contemporaneous");
+  });
+
+  it("never converts whitespace-only measurement strings into numeric zero", () => {
+    const airWhitespace = evaluateVpdMeasurementTrust({
+      airTempC: " \t ",
+      leafTempC: 23,
+      humidityPct: 60,
+      evidence: VERIFIED_EVIDENCE,
+      nowMs: NOW_MS,
+    });
+    const leafWhitespace = evaluateVpdMeasurementTrust({
+      airTempC: 25,
+      leafTempC: " \t ",
+      humidityPct: 60,
+      evidence: VERIFIED_EVIDENCE,
+      nowMs: NOW_MS,
+    });
+    const humidityWhitespace = evaluateVpdMeasurementTrust({
+      airTempC: 25,
+      leafTempC: 23,
+      humidityPct: " \t ",
+      evidence: VERIFIED_EVIDENCE,
+      nowMs: NOW_MS,
+    });
+
+    expect(airWhitespace).toMatchObject({
+      airTempC: null,
+      confidence: "invalid",
+      canCompareToStageTarget: false,
+    });
+    expect(leafWhitespace.issues).toContain("leaf_temperature_missing");
+    expect(leafWhitespace.canCompareToStageTarget).toBe(false);
+    expect(humidityWhitespace).toMatchObject({
+      humidityPct: null,
+      confidence: "invalid",
+      canCompareToStageTarget: false,
+    });
+  });
+
   it("never verifies exact 0% or 100% humidity", () => {
     for (const humidityPct of [0, 100]) {
       const result = evaluateVpdMeasurementTrust({

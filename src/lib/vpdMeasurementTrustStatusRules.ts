@@ -18,6 +18,7 @@ import {
 export const VPD_HUMIDITY_REFERENCE_MIN_PERCENT = 75;
 export const VPD_CALIBRATION_MAX_AGE_DAYS = 365;
 export const VPD_LEAF_MEASUREMENT_MAX_SKEW_MINUTES = 15;
+export const VPD_MEASUREMENT_FUTURE_TOLERANCE_MINUTES = 5;
 
 export type VpdSensorPlacement = "canopy" | "above_canopy" | "below_canopy" | "unknown";
 
@@ -31,7 +32,9 @@ export type VpdMeasurementTrustIssue =
   | "leaf_temperature_missing"
   | "leaf_temperature_invalid"
   | "observation_time_missing"
+  | "observation_time_in_future"
   | "leaf_measurement_time_missing"
+  | "leaf_measurement_time_in_future"
   | "leaf_measurement_not_contemporaneous"
   | "temperature_verification_missing"
   | "temperature_verification_stale"
@@ -72,6 +75,7 @@ export interface VpdMeasurementTrustInput {
   nowMs?: number;
   calibrationMaxAgeDays?: number;
   leafMeasurementMaxSkewMinutes?: number;
+  measurementFutureToleranceMinutes?: number;
 }
 
 export interface VpdMeasurementTrustResult {
@@ -105,8 +109,14 @@ const UNVERIFIED_ISSUES = new Set<VpdMeasurementTrustIssue>([
 
 function toFinite(value: unknown): number | null {
   if (value === null || value === undefined || value === "") return null;
+  if (typeof value === "string" && value.trim() === "") return null;
   const parsed = typeof value === "number" ? value : Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function wasProvided(value: unknown): boolean {
+  if (value === null || value === undefined) return false;
+  return typeof value !== "string" || value.trim() !== "";
 }
 
 function resolveTempC(celsius: unknown, fahrenheit: unknown): number | null {
@@ -166,8 +176,11 @@ export function evaluateVpdMeasurementTrust(
     toFinite(input.calibrationMaxAgeDays) ?? VPD_CALIBRATION_MAX_AGE_DAYS;
   const leafMeasurementMaxSkewMinutes =
     toFinite(input.leafMeasurementMaxSkewMinutes) ?? VPD_LEAF_MEASUREMENT_MAX_SKEW_MINUTES;
+  const measurementFutureToleranceMinutes =
+    toFinite(input.measurementFutureToleranceMinutes) ?? VPD_MEASUREMENT_FUTURE_TOLERANCE_MINUTES;
   const maxAgeMs = Math.max(0, calibrationMaxAgeDays) * DAY_MS;
   const maxLeafSkewMs = Math.max(0, leafMeasurementMaxSkewMinutes) * MINUTE_MS;
+  const maxFutureToleranceMs = Math.max(0, measurementFutureToleranceMinutes) * MINUTE_MS;
 
   const airTempC = resolveTempC(input.airTempC, input.airTempF);
   const leafTempC = resolveTempC(input.leafTempC, input.leafTempF);
@@ -175,9 +188,7 @@ export function evaluateVpdMeasurementTrust(
   const airTempValid =
     airTempC !== null && airTempC >= AIR_TEMP_MIN_C && airTempC <= AIR_TEMP_MAX_C;
   const humidityValid = humidityPct !== null && humidityPct >= 0 && humidityPct <= 100;
-  const leafWasProvided =
-    (input.leafTempC !== null && input.leafTempC !== undefined && input.leafTempC !== "") ||
-    (input.leafTempF !== null && input.leafTempF !== undefined && input.leafTempF !== "");
+  const leafWasProvided = wasProvided(input.leafTempC) || wasProvided(input.leafTempF);
   const leafTempValid =
     leafTempC !== null && leafTempC >= AIR_TEMP_MIN_C && leafTempC <= AIR_TEMP_MAX_C;
 
@@ -256,11 +267,20 @@ export function evaluateVpdMeasurementTrust(
   if (leafTempValid) {
     const observedMs = toMs(evidence.observedAt);
     const leafMeasuredMs = toMs(evidence.leafTemperatureMeasuredAt);
-    if (observedMs === null) pushUnique(issues, "observation_time_missing");
+    if (observedMs === null) {
+      pushUnique(issues, "observation_time_missing");
+    } else if (observedMs > nowMs + maxFutureToleranceMs) {
+      pushUnique(issues, "observation_time_in_future");
+    }
     if (leafMeasuredMs === null) {
       pushUnique(issues, "leaf_measurement_time_missing");
-    } else if (observedMs !== null && Math.abs(leafMeasuredMs - observedMs) > maxLeafSkewMs) {
-      pushUnique(issues, "leaf_measurement_not_contemporaneous");
+    } else {
+      if (leafMeasuredMs > nowMs + maxFutureToleranceMs) {
+        pushUnique(issues, "leaf_measurement_time_in_future");
+      }
+      if (observedMs !== null && Math.abs(leafMeasuredMs - observedMs) > maxLeafSkewMs) {
+        pushUnique(issues, "leaf_measurement_not_contemporaneous");
+      }
     }
   }
 

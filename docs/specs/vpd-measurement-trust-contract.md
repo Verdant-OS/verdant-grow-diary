@@ -47,6 +47,8 @@ A stage-target comparison is allowed only when all of the following hold:
 - A real canopy-leaf temperature is supplied.
 - The leaf temperature and air/RH observation are no more than 15 minutes
   apart.
+- Neither the air/RH observation nor the leaf measurement is more than five
+  minutes in the future relative to the evaluation clock.
 - The sensor placement is recorded as canopy level.
 
 The 75% value is a **verification reference point**, not a recommended grow
@@ -54,7 +56,8 @@ room humidity setpoint. The 365-day interval is Verdant's conservative default
 for this phase and may later become device-specific. The 15-minute coherence
 window is a Verdant product rule for keeping a leaf measurement paired with
 the same room state; it is not presented as a universal horticultural
-standard.
+standard. The five-minute future tolerance accommodates small device-clock
+differences; it does not make future-dated evidence current.
 
 An older sensor is not automatically rejected. If it has current verification
 evidence, it can still be trusted. An older sensor without current verification
@@ -86,18 +89,18 @@ inside a stage band.
 
 ## Acceptance criteria
 
-| ID     | Required state                                                                                  |
-| ------ | ----------------------------------------------------------------------------------------------- |
-| VPD-01 | The canonical helper calculates leaf-to-air VPD from leaf temperature, air temperature, and RH. |
-| VPD-02 | Air-only VPD is labeled as an estimate and cannot produce a target claim.                       |
-| VPD-03 | Complete, current evidence unlocks a stage-target comparison.                                   |
-| VPD-04 | An RH reference below 75% or above 100% blocks verification.                                    |
-| VPD-05 | Exact 0% or 100% RH blocks verification.                                                        |
-| VPD-06 | Missing, stale, or future-dated calibration evidence blocks verification.                       |
-| VPD-07 | Missing canopy placement or non-contemporaneous leaf temperature blocks verification.           |
-| VPD-08 | Older, unverified sensors are lower confidence.                                                 |
-| VPD-09 | Temperature + RH entry never silently persists an air estimate as verified VPD.                 |
-| VPD-10 | Negative leaf VPD is preserved and flagged as condensation-risk evidence.                       |
+| ID     | Required state                                                                                                   |
+| ------ | ---------------------------------------------------------------------------------------------------------------- |
+| VPD-01 | The canonical helper calculates leaf-to-air VPD from leaf temperature, air temperature, and RH.                  |
+| VPD-02 | Air-only VPD is labeled as an estimate and cannot produce a target claim.                                        |
+| VPD-03 | Complete, current evidence unlocks a stage-target comparison.                                                    |
+| VPD-04 | An RH reference below 75% or above 100% blocks verification.                                                     |
+| VPD-05 | Exact 0% or 100% RH blocks verification.                                                                         |
+| VPD-06 | Missing, stale, or future-dated calibration evidence blocks verification.                                        |
+| VPD-07 | Missing canopy placement, future-dated measurement, or non-contemporaneous leaf temperature blocks verification. |
+| VPD-08 | Older, unverified sensors are lower confidence.                                                                  |
+| VPD-09 | Temperature + RH entry never silently persists an air estimate as verified VPD.                                  |
+| VPD-10 | Negative leaf VPD is preserved and flagged as condensation-risk evidence.                                        |
 
 ## Technical basis
 

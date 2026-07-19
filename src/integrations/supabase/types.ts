@@ -977,6 +977,51 @@ export type Database = {
           },
         ]
       }
+      founders: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          display_style: Database["public"]["Enums"]["founder_display_style"]
+          founder_number: number
+          id: string
+          milestone_status: Database["public"]["Enums"]["founder_milestone_status"]
+          optional_link: string | null
+          paddle_subscription_ref: string | null
+          show_on_wall: boolean
+          status: Database["public"]["Enums"]["founder_status"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          display_style?: Database["public"]["Enums"]["founder_display_style"]
+          founder_number: number
+          id?: string
+          milestone_status?: Database["public"]["Enums"]["founder_milestone_status"]
+          optional_link?: string | null
+          paddle_subscription_ref?: string | null
+          show_on_wall?: boolean
+          status?: Database["public"]["Enums"]["founder_status"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          display_style?: Database["public"]["Enums"]["founder_display_style"]
+          founder_number?: number
+          id?: string
+          milestone_status?: Database["public"]["Enums"]["founder_milestone_status"]
+          optional_link?: string | null
+          paddle_subscription_ref?: string | null
+          show_on_wall?: boolean
+          status?: Database["public"]["Enums"]["founder_status"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       grow_events: {
         Row: {
           created_at: string
@@ -3022,6 +3067,24 @@ export type Database = {
       }
     }
     Views: {
+      founders_wall_public: {
+        Row: {
+          founder_number: number | null
+          optional_link: string | null
+          public_display_name: string | null
+        }
+        Insert: {
+          founder_number?: number | null
+          optional_link?: never
+          public_display_name?: never
+        }
+        Update: {
+          founder_number?: number | null
+          optional_link?: never
+          public_display_name?: never
+        }
+        Relationships: []
+      }
       pheno_sex_observations_latest: {
         Row: {
           herm_observed: boolean | null
@@ -3181,6 +3244,7 @@ export type Database = {
         }[]
       }
       founder_lifetime_slots_remaining: { Args: never; Returns: number }
+      founders_wall_count: { Args: never; Returns: number }
       get_latest_tent_sensor_snapshot: {
         Args: { _tent_id: string }
         Returns: Json
@@ -3271,6 +3335,13 @@ export type Database = {
     Enums: {
       agreement_type: "terms" | "privacy"
       app_role: "operator" | "customer" | "staff"
+      founder_display_style:
+        | "custom_name"
+        | "first_initial"
+        | "number_only"
+        | "hidden"
+      founder_milestone_status: "pending" | "met" | "missed"
+      founder_status: "confirmed" | "refunded" | "revoked"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -3400,6 +3471,14 @@ export const Constants = {
     Enums: {
       agreement_type: ["terms", "privacy"],
       app_role: ["operator", "customer", "staff"],
+      founder_display_style: [
+        "custom_name",
+        "first_initial",
+        "number_only",
+        "hidden",
+      ],
+      founder_milestone_status: ["pending", "met", "missed"],
+      founder_status: ["confirmed", "refunded", "revoked"],
     },
   },
 } as const

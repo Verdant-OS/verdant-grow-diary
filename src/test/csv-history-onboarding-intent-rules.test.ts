@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildCsvHistoryImportHandoffHref,
   buildCsvHistoryOnboardingPath,
+  buildCsvHistorySignupPath,
   CSV_HISTORY_ONBOARDING_INTENT,
   ONBOARDING_INTENT_QUERY_PARAM,
   readCsvHistoryOnboardingIntent,
@@ -14,6 +15,22 @@ describe("csvHistoryOnboardingIntentRules", () => {
     expect(buildCsvHistoryOnboardingPath()).toBe(
       `/onboarding?${ONBOARDING_INTENT_QUERY_PARAM}=${CSV_HISTORY_ONBOARDING_INTENT}`,
     );
+  });
+
+  it("builds an attributed signup handoff without file or grower state", () => {
+    const href = buildCsvHistorySignupPath();
+    expect(href).toBe(
+      "/auth?mode=signup&redirectTo=%2Fonboarding%3Fintent%3Dcsv_history&utm_source=csv_history&utm_medium=owned&utm_campaign=csv_history",
+    );
+    const params = new URLSearchParams(href.split("?")[1]);
+    expect([...params.keys()]).toEqual([
+      "mode",
+      "redirectTo",
+      "utm_source",
+      "utm_medium",
+      "utm_campaign",
+    ]);
+    expect(params.get("redirectTo")).toBe(buildCsvHistoryOnboardingPath());
   });
 
   it("accepts only the fixed CSV-history intent", () => {

@@ -168,6 +168,7 @@ test.describe("Auth route-protection (mocked, 1280x800)", () => {
     "/pricing",
     "/hardware-integrations",
     "/partners/csv-preview",
+    "/sensors/csv-preview",
   ]) {
     test(`public route ${path} renders signed-out without private fetches`, async ({
       page,
@@ -197,8 +198,17 @@ test.describe("Auth route-protection (mocked, 1280x800)", () => {
       ).toHaveLength(0);
       // No fake-live wording allowed on public pages.
       const body = ((await page.locator("body").textContent()) ?? "").toLowerCase();
+      expect(body).not.toContain("page not found");
       expect(body).not.toContain("live reading");
       expect(body).not.toContain("latest sensor:");
+      if (path === "/partners/csv-preview") {
+        await expect(
+          page.getByRole("heading", { name: /turn hardware exports into plant memory/i }),
+        ).toBeVisible();
+      }
+      if (path === "/sensors/csv-preview") {
+        await expect(page.getByRole("heading", { name: /csv sensor preview/i })).toBeVisible();
+      }
     });
   }
 });

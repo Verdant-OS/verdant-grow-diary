@@ -6,17 +6,9 @@ import path from "node:path";
 import { APP_ROUTES } from "@/lib/appRouteManifest";
 
 const APP = fs.readFileSync(path.resolve(__dirname, "../App.tsx"), "utf8");
-const SIDEBAR = fs.readFileSync(
-  path.resolve(__dirname, "../components/AppSidebar.tsx"),
-  "utf8",
-);
+const SIDEBAR = fs.readFileSync(path.resolve(__dirname, "../components/AppSidebar.tsx"), "utf8");
 
-const REMOVED_ROUTES = [
-  "/operator/genetics-import",
-  "/imports/representative-csv",
-  "/sensors/csv-preview",
-  "/partners/csv-preview",
-];
+const REMOVED_ROUTES = ["/operator/genetics-import", "/imports/representative-csv"];
 
 describe("Operator XLSX / spreadsheet import routes are gone", () => {
   for (const p of REMOVED_ROUTES) {

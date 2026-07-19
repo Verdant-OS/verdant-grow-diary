@@ -12,12 +12,13 @@ function adjustmentEvent(action: string, status: string, transactionId?: string 
   return {
     eventId: `evt_${Math.random().toString(36).slice(2)}`,
     eventType: "adjustment.created" as const,
+    // decide() only inspects action/status/transactionId on adjustment events.
     data: {
       action,
       status,
       transactionId: transactionId ?? undefined,
-    },
-  };
+    } as unknown as Record<string, unknown>,
+  } as Parameters<typeof decide>[0];
 }
 
 describe("webhook decide() — adjustment.created refund path", () => {

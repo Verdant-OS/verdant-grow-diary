@@ -20,15 +20,15 @@ const ALL_MIGRATIONS = readdirSync(MIGRATIONS_DIR)
 const CONCAT_SQL = ALL_MIGRATIONS.map((m) => m.sql).join("\n\n");
 
 function findViewDefinition(): string {
-  // The view definition lives in the Turn A base migration; A.1 adds a
-  // COMMENT. We assert the effective (last) CREATE OR REPLACE VIEW body.
-  const matches = CONCAT_SQL.match(
-    /CREATE\s+OR\s+REPLACE\s+VIEW\s+public\.founders_wall_public[\s\S]*?;/gi,
+  // The view is created once via `CREATE VIEW` in the Turn A migration;
+  // A.1 adds a COMMENT ON VIEW. We assert against the CREATE VIEW body.
+  const match = CONCAT_SQL.match(
+    /CREATE\s+(?:OR\s+REPLACE\s+)?VIEW\s+public\.founders_wall_public[\s\S]*?;/i,
   );
-  if (!matches || matches.length === 0) {
+  if (!match) {
     throw new Error("founders_wall_public view definition not found in migrations");
   }
-  return matches[matches.length - 1];
+  return match[0];
 }
 
 describe("founders_wall_public — view exposure invariant", () => {

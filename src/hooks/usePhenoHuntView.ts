@@ -19,9 +19,10 @@
  *    per-round grow nodes (veg→flower) and aroma chips are follow-up enrichment
  *    (needs the on-demand round load + flavor coercion) — omitted, never faked.
  */
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { usePhenoHuntWorkspace } from "@/hooks/usePhenoHuntWorkspace";
 import { usePhenoKeepers } from "@/hooks/usePhenoKeepers";
+import { PHENO_SCORE_ROUNDS } from "@/lib/phenoScoreRoundsService";
 import {
   buildPhenoHuntView,
   type PhenoHuntViewData,
@@ -115,9 +116,28 @@ function candidateDisplayName(c: {
   );
 }
 
+/** Coerce a jsonb descriptor column (e.g. flavor_descriptors) to clean strings. */
+function coerceDescriptors(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((x): x is string => typeof x === "string" && x.trim().length > 0);
+}
+
 export function usePhenoHuntView(huntId: string | null | undefined): UsePhenoHuntViewResult {
   const ws = usePhenoHuntWorkspace(huntId);
   const kp = usePhenoKeepers(huntId);
+
+  const hasLive = (huntId?.trim().length ?? 0) > 0 && ws.candidates.length > 0;
+
+  // Load each scoring round on demand so the cure timeline can draw the grow
+  // nodes (veg→flower→cure), not just the cure marker. Idempotent per round;
+  // loadRound is a stable useCallback, so this fires once the hunt is live.
+  const { loadRound } = ws;
+  useEffect(() => {
+    if (!hasLive) return;
+    PHENO_SCORE_ROUNDS.forEach((round) => {
+      void loadRound(round);
+    });
+  }, [hasLive, loadRound]);
 
   const live = useMemo(() => {
     const candidates: HuntCandidateSource[] = ws.candidates.map((c) => ({
@@ -125,8 +145,9 @@ export function usePhenoHuntView(huntId: string | null | undefined): UsePhenoHun
       name: candidateDisplayName(c),
       decision: ws.decisionsByPlant[c.candidateId]?.decision ?? null,
       traits: (ws.scoresByPlant[c.candidateId]?.traits ?? null) as Record<string, number> | null,
-      // Aroma (flavor descriptors) is follow-up enrichment — omit, never fake.
-      aroma: [],
+      // Aroma = the smoke test's flavor descriptors (post-cure — where flavor
+      // is earned, per the Loud ruling). Descriptive only, never scored.
+      aroma: coerceDescriptors(ws.smokeByPlant[c.candidateId]?.flavor_descriptors),
     }));
 
     const labelBySourcePlant = new Map<string, string>();
@@ -144,9 +165,12 @@ export function usePhenoHuntView(huntId: string | null | undefined): UsePhenoHun
       reversalMethods: kp.reversals.filter((r) => r.keeperId === k.id).map((r) => r.method),
       cloneCount: kp.clonesByKeeper[k.id]?.length ?? 0,
       stabilityRunCount: k.stabilityRuns?.length ?? 0,
-      // A post-cure smoke test means it reached the cure. Grow-round nodes are
-      // follow-up enrichment (on-demand round load) — omitted, not invented.
-      rounds: ws.smokeByPlant[k.sourcePlantId] ? ["post_cure"] : [],
+      // Grow rounds actually scored (pheno_score_rounds) + the cure when a
+      // post-cure smoke test exists. Only what's recorded — nothing invented.
+      rounds: [
+        ...PHENO_SCORE_ROUNDS.filter((r) => ws.roundsByKey[`${k.sourcePlantId}:${r}`] != null),
+        ...(ws.smokeByPlant[k.sourcePlantId] ? ["post_cure"] : []),
+      ],
     }));
 
     const crosses: PedigreeCrossInput[] = kp.crosses.map((x) => ({
@@ -188,6 +212,7 @@ export function usePhenoHuntView(huntId: string | null | undefined): UsePhenoHun
     ws.decisionsByPlant,
     ws.scoresByPlant,
     ws.smokeByPlant,
+    ws.roundsByKey,
     kp.keepers,
     kp.reversedKeeperIds,
     kp.reversals,
@@ -195,7 +220,6 @@ export function usePhenoHuntView(huntId: string | null | undefined): UsePhenoHun
     kp.crosses,
   ]);
 
-  const hasLive = (huntId?.trim().length ?? 0) > 0 && ws.candidates.length > 0;
   const loading = ws.status === "loading" || kp.status === "loading";
 
   if (hasLive) {

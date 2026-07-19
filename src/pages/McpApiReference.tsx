@@ -8,20 +8,45 @@
  * the tool source of truth in src/lib/mcp/tools/* — keep in sync when
  * tool contracts change.
  */
+import { useState } from "react";
 import { Link } from "react-router-dom";
+import { Check, Copy } from "lucide-react";
 import BrandLogo from "@/components/BrandLogo";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import McpToolExplorer from "@/components/mcp/McpToolExplorer";
 
 const ENDPOINT = "https://knkwiiywfkbqznbxwqfh.supabase.co/functions/v1/mcp";
 
-function Code({ children }: { children: React.ReactNode }) {
+function Code({ children, copyLabel }: { children: string; copyLabel?: string }) {
+  const [copied, setCopied] = useState(false);
+  const onCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(children);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    } catch {
+      // Clipboard unavailable (e.g. insecure context) — silently no-op.
+    }
+  };
   return (
-    <pre className="bg-muted text-foreground text-xs rounded-md p-4 overflow-x-auto border border-border">
-      <code>{children}</code>
-    </pre>
+    <div className="relative group">
+      <pre className="bg-muted text-foreground text-xs rounded-md p-4 pr-12 overflow-x-auto border border-border">
+        <code>{children}</code>
+      </pre>
+      <button
+        type="button"
+        onClick={onCopy}
+        aria-label={copied ? "Copied" : (copyLabel ?? "Copy to clipboard")}
+        data-testid="mcp-api-copy-button"
+        className="absolute top-2 right-2 inline-flex items-center gap-1 rounded-md border border-border bg-background/80 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+      >
+        {copied ? <Check className="h-3.5 w-3.5" aria-hidden /> : <Copy className="h-3.5 w-3.5" aria-hidden />}
+        <span>{copied ? "Copied" : "Copy"}</span>
+      </button>
+    </div>
   );
 }
+
 
 function Section({
   id,

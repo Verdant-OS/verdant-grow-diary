@@ -51,7 +51,7 @@ Deno.serve(async (req) => {
       return json(400, { error: 'invalid_json' });
     }
 
-    const parsed = validate(bodyJson);
+    const parsed = validatePrefs(bodyJson);
     if (!parsed.ok) return json(400, { error: parsed.error });
 
     const admin = createClient(supabaseUrl, serviceRoleKey, {

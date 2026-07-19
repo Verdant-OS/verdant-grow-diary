@@ -60,8 +60,9 @@ export default function FounderOwnerPrefsForm() {
   }, [row]);
 
   // After a save completes (saving true → false), return focus to the Save
-  // button so keyboard users are not stranded on a now-hidden control and
-  // no focus trap develops around the disabled state.
+  // button so keyboard users are not stranded and no focus trap develops
+  // around the transient disabled state. Fires before any refetch-triggered
+  // remount removes the button from the DOM.
   useEffect(() => {
     if (wasSavingRef.current && !saving) {
       const btn = saveButtonRef.current;

@@ -21,10 +21,9 @@ import {
 import { buildCsvPreviewReportPdfBytes } from "@/lib/csvSensorPreviewPdf";
 import {
   CSV_PREVIEW_WARNING_COPY,
-  FUTURE_DIARY_CONVERSION_COPY,
+  CSV_PREVIEW_SIGNUP_HANDOFF_COPY,
   type FlagCode,
 } from "@/lib/csvSensorPreviewWarningCopy";
-import { CsvPreviewReviewGate } from "@/components/CsvPreviewReviewGate";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -53,7 +52,15 @@ import {
  *  - User mapping overrides + window/sampling settings live in local state only.
  *  - Report download uses a local Blob/object URL — never the network.
  */
-export default function CsvSensorPreviewPanel() {
+interface CsvSensorPreviewPanelProps {
+  conversionHref: string;
+  onConversionClick?: () => void;
+}
+
+export default function CsvSensorPreviewPanel({
+  conversionHref,
+  onConversionClick,
+}: CsvSensorPreviewPanelProps) {
   const [result, setResult] = useState<CsvPreviewParseResult | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [overrides, setOverrides] = useState<MappingOverrides>({});
@@ -70,11 +77,11 @@ export default function CsvSensorPreviewPanel() {
     const isTsv = /\.tsv$/i.test(name);
     const isTxt = /\.txt$/i.test(name);
     if (!isCsv && !isTsv && !isTxt) {
-      setResult(
-        parseDelimitedSensorPreview("", { fileName: name, delimiter: "," }),
-      );
+      setResult(parseDelimitedSensorPreview("", { fileName: name, delimiter: "," }));
       setResult((prev) =>
-        prev ? { ...prev, error: "Only .csv, .tsv, or .txt files are supported in preview." } : prev,
+        prev
+          ? { ...prev, error: "Only .csv, .tsv, or .txt files are supported in preview." }
+          : prev,
       );
       return;
     }
@@ -160,10 +167,7 @@ export default function CsvSensorPreviewPanel() {
       timeWindow: window,
       sampling,
     });
-    downloadLocalBlob(
-      new Blob([csv], { type: "text/csv" }),
-      "verdant-sensor-preview-summary.csv",
-    );
+    downloadLocalBlob(new Blob([csv], { type: "text/csv" }), "verdant-sensor-preview-summary.csv");
   }, [result, overrides, window, sampling]);
 
   const handleDownloadPdf = useCallback(() => {
@@ -207,9 +211,8 @@ export default function CsvSensorPreviewPanel() {
       >
         <p className="font-semibold text-foreground">Preview only — not saved</p>
         <p className="text-muted-foreground">
-          Not live data · Nothing has been saved. Verdant performs no device
-          control, no automation, no alerts, and no Action Queue writes from
-          this screen.
+          Not live data · Nothing has been saved. Verdant performs no device control, no automation,
+          no alerts, and no Action Queue writes from this screen.
         </p>
       </div>
 
@@ -227,8 +230,8 @@ export default function CsvSensorPreviewPanel() {
         }`}
       >
         <p className="text-sm text-muted-foreground mb-3">
-          Drag a sensor <code>.csv</code> or <code>.tsv</code> here, or pick a
-          file. Nothing leaves your browser.
+          Drag a sensor <code>.csv</code> or <code>.tsv</code> here, or pick a file. Nothing leaves
+          your browser.
         </p>
         <input
           ref={inputRef}
@@ -241,11 +244,7 @@ export default function CsvSensorPreviewPanel() {
             void handleFile(f);
           }}
         />
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => inputRef.current?.click()}
-        >
+        <Button type="button" variant="outline" onClick={() => inputRef.current?.click()}>
           Choose CSV or TSV file
         </Button>
       </div>
@@ -315,34 +314,22 @@ export default function CsvSensorPreviewPanel() {
             </span>
           </div>
 
-          {/* Disabled future-flow CTA (no writes) */}
+          {/* Explicit signup handoff. The local file/result never crosses this link. */}
           <div
             data-testid="csv-preview-diary-cta-wrapper"
             className="rounded-md border border-dashed border-border bg-muted/30 p-3 text-xs flex flex-wrap items-center gap-3"
           >
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled
-              aria-disabled="true"
-              data-testid="csv-preview-diary-cta"
-              title="Coming later — approval-required flow"
-            >
-              Convert to diary entries — coming later
+            <Button asChild size="sm">
+              <a
+                href={conversionHref}
+                onClick={onConversionClick}
+                data-testid="csv-preview-diary-cta"
+              >
+                Create free account to import
+              </a>
             </Button>
-            <span className="text-muted-foreground">
-              {FUTURE_DIARY_CONVERSION_COPY}
-            </span>
+            <span className="text-muted-foreground">{CSV_PREVIEW_SIGNUP_HANDOFF_COPY}</span>
           </div>
-
-          {/* Disabled review gate + import plan summary — presentational only. */}
-          <CsvPreviewReviewGate
-            previewResult={result}
-            hasHardBlockedRows={(result.flags ?? []).some((f) => f.severity === "error")}
-            hasAcceptedRows={(result.rows ?? []).length > 0}
-          />
-
 
           {/* Editable mapping table */}
           <div>
@@ -358,10 +345,7 @@ export default function CsvSensorPreviewPanel() {
               </TableHeader>
               <TableBody>
                 {effective.mappings.map((m) => {
-                  const overrideKey = Object.prototype.hasOwnProperty.call(
-                    overrides,
-                    m.header,
-                  )
+                  const overrideKey = Object.prototype.hasOwnProperty.call(overrides, m.header)
                     ? overrides[m.header] === null
                       ? "__unmapped__"
                       : (overrides[m.header] as string)
@@ -379,10 +363,7 @@ export default function CsvSensorPreviewPanel() {
                         )}
                       </TableCell>
                       <TableCell>
-                        <Select
-                          value={overrideKey}
-                          onValueChange={(v) => setOverride(m.header, v)}
-                        >
+                        <Select value={overrideKey} onValueChange={(v) => setOverride(m.header, v)}>
                           <SelectTrigger
                             className="h-8 w-[12rem]"
                             data-testid={`csv-preview-override-trigger-${m.header}`}
@@ -401,9 +382,7 @@ export default function CsvSensorPreviewPanel() {
                           </SelectContent>
                         </Select>
                       </TableCell>
-                      <TableCell className="text-muted-foreground text-xs">
-                        {m.reason}
-                      </TableCell>
+                      <TableCell className="text-muted-foreground text-xs">{m.reason}</TableCell>
                     </TableRow>
                   );
                 })}
@@ -432,9 +411,7 @@ export default function CsvSensorPreviewPanel() {
                           {f.severity}
                         </Badge>
                         <span className="font-mono text-xs">{f.header}</span>
-                        <span className="font-medium">
-                          {copy?.title ?? f.message}
-                        </span>
+                        <span className="font-medium">{copy?.title ?? f.message}</span>
                       </div>
                       {copy && (
                         <>
@@ -467,13 +444,8 @@ export default function CsvSensorPreviewPanel() {
             className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 items-end"
           >
             <div>
-              <label className="text-xs text-muted-foreground block mb-1">
-                Time window
-              </label>
-              <Select
-                value={windowKind}
-                onValueChange={(v) => setWindowKind(v as TimeWindowKind)}
-              >
+              <label className="text-xs text-muted-foreground block mb-1">Time window</label>
+              <Select value={windowKind} onValueChange={(v) => setWindowKind(v as TimeWindowKind)}>
                 <SelectTrigger
                   className="h-9"
                   data-testid="csv-preview-window-trigger"
@@ -491,13 +463,8 @@ export default function CsvSensorPreviewPanel() {
               </Select>
             </div>
             <div>
-              <label className="text-xs text-muted-foreground block mb-1">
-                Sampling
-              </label>
-              <Select
-                value={sampling}
-                onValueChange={(v) => setSampling(v as SamplingKind)}
-              >
+              <label className="text-xs text-muted-foreground block mb-1">Sampling</label>
+              <Select value={sampling} onValueChange={(v) => setSampling(v as SamplingKind)}>
                 <SelectTrigger
                   className="h-9"
                   data-testid="csv-preview-sampling-trigger"
@@ -517,9 +484,7 @@ export default function CsvSensorPreviewPanel() {
             {windowKind === "custom" && (
               <>
                 <div>
-                  <label className="text-xs text-muted-foreground block mb-1">
-                    Start
-                  </label>
+                  <label className="text-xs text-muted-foreground block mb-1">Start</label>
                   <input
                     type="datetime-local"
                     value={customStart}
@@ -529,9 +494,7 @@ export default function CsvSensorPreviewPanel() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-muted-foreground block mb-1">
-                    End
-                  </label>
+                  <label className="text-xs text-muted-foreground block mb-1">End</label>
                   <input
                     type="datetime-local"
                     value={customEnd}
@@ -544,8 +507,8 @@ export default function CsvSensorPreviewPanel() {
             )}
           </div>
           <p className="text-xs text-muted-foreground -mt-3">
-            Timeline preview is sampled for readability. Original file is not
-            modified. {CSV_PREVIEW_STATUS_LABEL}.
+            Timeline preview is sampled for readability. Original file is not modified.{" "}
+            {CSV_PREVIEW_STATUS_LABEL}.
           </p>
 
           {/* Timeline preview */}

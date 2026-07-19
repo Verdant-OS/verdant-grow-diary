@@ -37,6 +37,10 @@ describe("CSV-history public acquisition path", () => {
       "href",
       EXPECTED_SIGNUP_PATH,
     );
+    expect(screen.getByTestId("csv-history-preview-cta-hero")).toHaveAttribute(
+      "href",
+      "/sensors/csv-preview",
+    );
     expect(screen.getByText(/CSV import and basic logging are free/i)).toBeInTheDocument();
     expect(screen.getByTestId("csv-history-signup-cta-hero").getAttribute("href")).toContain(
       "redirectTo=%2Fonboarding%3Fintent%3Dcsv_history",

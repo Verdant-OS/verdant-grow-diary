@@ -93,9 +93,11 @@ describe("Hardware Integrations page copy", () => {
   });
 
   it("includes a grower-first CSV-history signup path with honest trust copy", () => {
-    expect(PAGE).toMatch(/buildAttributedSignupPath\(\{[\s\S]*source:\s*["']csv_history["']/);
-    expect(PAGE).toMatch(/redirectTo:\s*buildCsvHistoryOnboardingPath\(\)/);
+    expect(PAGE).toMatch(/buildCsvHistorySignupPath/);
+    expect(PAGE).toMatch(/CSV_HISTORY_SIGNUP_PATH\s*=\s*buildCsvHistorySignupPath\(\)/);
     expect(PAGE).toMatch(/Bring in my grow history/);
+    expect(PAGE).toMatch(/to=["']\/sensors\/csv-preview["']/);
+    expect(PAGE).toMatch(/Preview a CSV in my browser/);
     expect(PAGE).toMatch(/CSV import and basic logging are free/);
     expect(PAGE).toMatch(/never live\s*telemetry/);
     expect(PAGE).toMatch(/read-only background context/);

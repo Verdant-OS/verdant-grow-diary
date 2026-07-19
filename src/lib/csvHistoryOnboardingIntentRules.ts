@@ -4,6 +4,7 @@
  * carries a grower id, file, provider, or import payload.
  */
 import { buildSensorsTentRouteHref, SENSORS_TENT_ROUTE } from "@/lib/sensorRouteTentIntentRules";
+import { buildAttributedSignupPath } from "@/lib/signupAcquisitionRules";
 
 export const ONBOARDING_INTENT_QUERY_PARAM = "intent" as const;
 export const CSV_HISTORY_ONBOARDING_INTENT = "csv_history" as const;
@@ -38,6 +39,18 @@ export function buildCsvHistoryOnboardingPath(): string {
   const params = new URLSearchParams();
   params.set(ONBOARDING_INTENT_QUERY_PARAM, CSV_HISTORY_ONBOARDING_INTENT);
   return `/onboarding?${params.toString()}`;
+}
+
+/**
+ * Build the fixed public-preview handoff into signup and CSV onboarding.
+ * The URL carries attribution and a same-origin intent only. It never carries
+ * the selected file, parsed rows, grower identifiers, or sensor payloads.
+ */
+export function buildCsvHistorySignupPath(): string {
+  return buildAttributedSignupPath({
+    source: CSV_HISTORY_ONBOARDING_INTENT,
+    redirectTo: buildCsvHistoryOnboardingPath(),
+  });
 }
 
 /**

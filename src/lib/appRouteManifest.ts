@@ -324,6 +324,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
       "Operator subscriber-growth goal snapshot from authoritative billing counts (read-only).",
   },
   {
+    path: "/partners/csv-preview",
+    access: "public",
+    description: "Read-only partner explainer for the browser-local CSV sensor preview.",
+  },
+  {
     path: "/pheno-comparison",
     access: "public",
     description:
@@ -378,6 +383,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/reports/post-grow/:growId", access: "auth", description: "Post-grow learning report." },
   { path: "/reset-password", access: "public", description: "Password reset landing page." },
   { path: "/sensors", access: "auth" },
+  {
+    path: "/sensors/csv-preview",
+    access: "public",
+    description: "Browser-local CSV/TSV sensor preview with no upload or persistence.",
+  },
   { path: "/sensors/ecowitt-audit", access: "operator" },
   { path: "/sensors/ingest-normalizer", access: "operator" },
   { path: "/settings", access: "auth" },

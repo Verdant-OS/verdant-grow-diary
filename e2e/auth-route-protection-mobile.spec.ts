@@ -87,6 +87,7 @@ const PUBLIC_MOBILE_ROUTES: string[] = [
   "/founder",
   "/how-ai-doctor-works",
   "/partners/csv-preview",
+  "/sensors/csv-preview",
   "/customer/:shareId",
   "/customer/:shareId/cannabis-care",
   // Read-only Pheno Comparison preview: public, fixture-only, mounted outside
@@ -253,8 +254,17 @@ test.describe("Auth route-protection MOBILE (mocked, 390x844)", () => {
         `Private-table hits while signed out (mobile, ${path}): ${privateHits.join(", ")}`,
       ).toHaveLength(0);
       const body = ((await page.locator("body").textContent()) ?? "").toLowerCase();
+      expect(body).not.toContain("page not found");
       expect(body).not.toContain("live reading");
       expect(body).not.toContain("latest sensor:");
+      if (path === "/partners/csv-preview") {
+        await expect(
+          page.getByRole("heading", { name: /turn hardware exports into plant memory/i }),
+        ).toBeVisible();
+      }
+      if (path === "/sensors/csv-preview") {
+        await expect(page.getByRole("heading", { name: /csv sensor preview/i })).toBeVisible();
+      }
       for (const word of ["Tent 1", "Plant 1", "Diary"]) {
         expect(body).not.toContain(`${word.toLowerCase()} for owner`);
       }

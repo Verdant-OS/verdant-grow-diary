@@ -87,6 +87,8 @@ const DailyCheck = lazy(() => import("./pages/DailyCheck"));
 const Landing = lazy(() => import("./pages/Landing"));
 // Demo page removed — Verdant is positioned around real grow data only.
 const HardwareIntegrations = lazy(() => import("./pages/HardwareIntegrations"));
+const PartnerCsvPreviewLanding = lazy(() => import("./pages/PartnerCsvPreviewLanding"));
+const SensorCsvPreview = lazy(() => import("./pages/SensorCsvPreview"));
 const CreatorBeta = lazy(() => import("./pages/CreatorBeta"));
 const BreederBeta = lazy(() => import("./pages/BreederBeta"));
 const Pricing = lazy(() => import("./pages/Pricing"));
@@ -220,6 +222,10 @@ const App = () => (
                       Old bookmarks redirect to the landing page. */}
                   <Route path="/demo" element={<Navigate to="/welcome" replace />} />
                   <Route path="/hardware-integrations" element={<HardwareIntegrations />} />
+                  {/* Public, browser-local CSV proof. Both routes stay outside
+                      AppShell and perform no private reads or writes. */}
+                  <Route path="/partners/csv-preview" element={<PartnerCsvPreviewLanding />} />
+                  <Route path="/sensors/csv-preview" element={<SensorCsvPreview />} />
                   <Route path="/creator-beta" element={<CreatorBeta />} />
                   <Route path="/breeder-beta" element={<BreederBeta />} />
                   <Route path="/pricing" element={<Pricing />} />

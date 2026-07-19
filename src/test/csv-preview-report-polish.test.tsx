@@ -7,17 +7,15 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import SensorCsvPreview from "@/pages/SensorCsvPreview";
+import { buildCsvPreviewReportPdfBytes } from "@/lib/csvSensorPreviewPdf";
+import { buildCsvPreview, parseDelimitedSensorPreview } from "@/lib/csvSensorPreviewRules";
 import {
-  buildCsvPreviewReportPdfBytes,
-} from "@/lib/csvSensorPreviewPdf";
-import {
-  buildCsvPreview,
-  parseDelimitedSensorPreview,
-} from "@/lib/csvSensorPreviewRules";
-import {
+  CSV_PREVIEW_SIGNUP_HANDOFF_COPY,
   CSV_PREVIEW_WARNING_COPY,
-  FUTURE_DIARY_CONVERSION_COPY,
 } from "@/lib/csvSensorPreviewWarningCopy";
+
+const EXPECTED_SIGNUP_PATH =
+  "/auth?mode=signup&redirectTo=%2Fonboarding%3Fintent%3Dcsv_history&utm_source=csv_history&utm_medium=owned&utm_campaign=csv_history";
 
 const FIXED_NOW = "2026-06-04T12:00:00.000Z";
 const ECOWITT_CSV = readFileSync(
@@ -57,9 +55,7 @@ describe("CSV preview warning copy", () => {
     );
   });
   it("ph_out_of_range suggested fix mentions units/calibration", () => {
-    expect(CSV_PREVIEW_WARNING_COPY.ph_out_of_range.suggestedFix).toMatch(
-      /units?|calibration/i,
-    );
+    expect(CSV_PREVIEW_WARNING_COPY.ph_out_of_range.suggestedFix).toMatch(/units?|calibration/i);
   });
   it("ec_unit_ambiguous suggested fix mentions mS/cm", () => {
     expect(CSV_PREVIEW_WARNING_COPY.ec_unit_ambiguous.suggestedFix).toMatch(/mS\/cm/i);
@@ -151,25 +147,25 @@ function dropFile(file: File) {
 }
 
 function stubBlobUrl() {
-  (URL as unknown as { createObjectURL?: (b: Blob) => string }).createObjectURL =
-    (() => "blob:mock") as (b: Blob) => string;
-  (URL as unknown as { revokeObjectURL?: (s: string) => void }).revokeObjectURL =
-    (() => {}) as (s: string) => void;
-  const createSpy = vi
-    .spyOn(URL, "createObjectURL")
-    .mockReturnValue("blob:mock");
+  (URL as unknown as { createObjectURL?: (b: Blob) => string }).createObjectURL = (() =>
+    "blob:mock") as (b: Blob) => string;
+  (URL as unknown as { revokeObjectURL?: (s: string) => void }).revokeObjectURL = (() => {}) as (
+    s: string,
+  ) => void;
+  const createSpy = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:mock");
   const revokeSpy = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
-  const clickSpy = vi
-    .spyOn(HTMLAnchorElement.prototype, "click")
-    .mockImplementation(() => {});
+  const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
   return { createSpy, revokeSpy, clickSpy };
 }
 
 describe("SensorCsvPreview — three download buttons + warnings + diary CTA", () => {
   beforeEach(() => {
-    vi.stubGlobal("fetch", vi.fn(() => {
-      throw new Error("fetch must not be called from CSV preview");
-    }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => {
+        throw new Error("fetch must not be called from CSV preview");
+      }),
+    );
   });
 
   it("renders the three download buttons after dropping a CSV", async () => {
@@ -217,9 +213,7 @@ describe("SensorCsvPreview — three download buttons + warnings + diary CTA", (
   it("PDF download produces an application/pdf Blob", async () => {
     render(<SensorCsvPreview />);
     dropFile(makeFile(ECOWITT_CSV));
-    await waitFor(() =>
-      expect(screen.getByTestId("csv-preview-download-pdf")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByTestId("csv-preview-download-pdf")).toBeInTheDocument());
     const { createSpy, clickSpy, revokeSpy } = stubBlobUrl();
     fireEvent.click(screen.getByTestId("csv-preview-download-pdf"));
     expect(createSpy).toHaveBeenCalledTimes(1);
@@ -259,24 +253,22 @@ describe("SensorCsvPreview — three download buttons + warnings + diary CTA", (
     expect(screen.getByTestId("csv-preview-flag-fix-ec_unit_ambiguous")).toHaveTextContent(
       /mS\/cm/i,
     );
-    expect(screen.getByTestId("csv-preview-flag-fix-lux_not_ppfd")).toHaveTextContent(
-      /ppfd|par/i,
-    );
+    expect(screen.getByTestId("csv-preview-flag-fix-lux_not_ppfd")).toHaveTextContent(/ppfd|par/i);
   });
 
-  it("renders the disabled diary-conversion CTA (no writes)", async () => {
+  it("hands a valid local preview to attributed signup without carrying file state", async () => {
     render(<SensorCsvPreview />);
     dropFile(makeFile(ECOWITT_CSV));
-    await waitFor(() =>
-      expect(screen.getByTestId("csv-preview-diary-cta")).toBeInTheDocument(),
-    );
-    const btn = screen.getByTestId("csv-preview-diary-cta") as HTMLButtonElement;
-    expect(btn).toBeDisabled();
-    expect(btn).toHaveAttribute("aria-disabled", "true");
+    await waitFor(() => expect(screen.getByTestId("csv-preview-diary-cta")).toBeInTheDocument());
+    const cta = screen.getByTestId("csv-preview-diary-cta");
+    expect(cta).toHaveAttribute("href", EXPECTED_SIGNUP_PATH);
+    expect(cta).not.toHaveAttribute("aria-disabled");
     const wrapper = screen.getByTestId("csv-preview-diary-cta-wrapper");
-    expect(wrapper).toHaveTextContent(FUTURE_DIARY_CONVERSION_COPY);
-    // Clicking a disabled button must not do anything observable.
-    fireEvent.click(btn);
+    expect(wrapper).toHaveTextContent(CSV_PREVIEW_SIGNUP_HANDOFF_COPY);
+    expect(wrapper).toHaveTextContent(/choose and confirm the CSV again/i);
+    expect(screen.queryByText(/convert to diary entries — coming later/i)).not.toBeInTheDocument();
+    expect(screen.queryByTestId("csv-preview-review-gate")).not.toBeInTheDocument();
+    expect(cta.getAttribute("href")).not.toMatch(/file|payload|row|user|growId|tentId|plantId/i);
   });
 });
 

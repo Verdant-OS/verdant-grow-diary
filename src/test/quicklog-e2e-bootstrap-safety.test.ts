@@ -14,7 +14,7 @@ import path from "node:path";
 import { evaluateBootstrapGate } from "../../e2e/lib/fixtureBootstrap";
 
 const ROOT = path.resolve(__dirname, "../..");
-const read = (p: string) => fs.readFileSync(path.join(ROOT, p), "utf8");
+const read = (p: string) => fs.readFileSync(path.join(ROOT, p), "utf8").replace(/\r\n?/g, "\n");
 
 const VALID_GATE_ENV = {
   E2E_FIXTURE_MODE: "true",

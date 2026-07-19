@@ -391,5 +391,118 @@ test.describe("Founder owner preferences (mocked)", () => {
     );
     expect(afterId).not.toBe(beforeId);
   });
+
+  test("status live region clears after save and does not replay on rerenders or second save", async ({ page }) => {
+    await seedSession(page);
+    await page.route(/\/rest\/v1\/user_agreement_acceptances/, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([
+          { agreement_type: "terms", version: "2026-07-13" },
+          { agreement_type: "privacy", version: "2026-07-13" },
+        ]),
+      }),
+    );
+    // Persistent read mock so post-save refetch keeps the form mounted and
+    // the status node identity is preserved across renders.
+    await page.route(/\/rest\/v1\/founders(\?|$)/, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          founder_number: 44,
+          display_name: null,
+          display_style: "hidden",
+          show_on_wall: false,
+          optional_link: null,
+          status: "confirmed",
+        }),
+      }),
+    );
+
+    // Gate each save independently so we can inspect in-flight / cleared
+    // transitions per invocation without cross-contamination.
+    let currentRelease: (() => void) | null = null;
+    const releasers: Array<() => void> = [];
+    await page.route(/\/functions\/v1\/save-founder-prefs/, async (route) => {
+      const gate = new Promise<void>((resolve) => {
+        currentRelease = resolve;
+        releasers.push(resolve);
+      });
+      await gate;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true }),
+      });
+    });
+
+    await page.goto("/founder");
+    await expect(
+      page.getByRole("heading", { name: /Your Founder settings/i }),
+    ).toBeVisible({ timeout: 15_000 });
+    await page.keyboard.press("Escape").catch(() => {});
+
+    const status = page.getByTestId("founder-prefs-status");
+    await expect(status).toHaveText("");
+
+    // --- First save -------------------------------------------------------
+    await page.evaluate(() => {
+      const form = document.querySelector<HTMLFormElement>(
+        "form:has(#founder-show-on-wall)",
+      );
+      form?.requestSubmit();
+    });
+    await expect(status).toHaveText("Saving Founder settings…");
+
+    // Release and assert the region clears immediately after completion.
+    // Whether React keeps the same node or remounts one after refetch, the
+    // accessibility invariant is that no "Saving…" text remains in DOM for
+    // assistive tech to re-read.
+    releasers[0]?.();
+    await expect(status).toHaveText("", { timeout: 5_000 });
+    await expect(
+      page.getByRole("button", { name: /Save Founder settings/i }),
+    ).toBeEnabled();
+    expect(await page.getByText("Saving Founder settings…").count()).toBe(0);
+
+    // Exactly one status live region exists — a stale duplicate would cause
+    // screen readers to announce twice on the next mutation.
+    await expect(status).toHaveCount(1);
+
+    // --- Unrelated re-renders after completion ---------------------------
+    // Typing must not cause the live region to re-emit the old "Saving…"
+    // string (which would happen if state were reset back through the
+    // saving branch or if a stale message were retained in DOM).
+    await page.locator("#founder-display-name").fill("A");
+    await page.locator("#founder-display-name").fill("Ab");
+    await page.locator("#founder-display-name").fill("Abc");
+    await expect(status).toHaveText("");
+    expect(await page.getByText("Saving Founder settings…").count()).toBe(0);
+    await expect(status).toHaveCount(1);
+
+    // --- Second save -----------------------------------------------------
+    await page.evaluate(() => {
+      const form = document.querySelector<HTMLFormElement>(
+        "form:has(#founder-show-on-wall)",
+      );
+      form?.requestSubmit();
+    });
+    await expect(status).toHaveText("Saving Founder settings…");
+    // Exactly one active announcement — no duplicate stale copy left over
+    // from the first cycle.
+    expect(await page.getByText("Saving Founder settings…").count()).toBe(1);
+
+    releasers[1]?.();
+    await expect(status).toHaveText("", { timeout: 5_000 });
+    expect(await page.getByText("Saving Founder settings…").count()).toBe(0);
+    await expect(status).toHaveCount(1);
+
+    // Silence the unused-var lint on the placeholder release capture.
+    void currentRelease;
+  });
+
 });
+
 

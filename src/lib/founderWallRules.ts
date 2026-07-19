@@ -90,7 +90,7 @@ function isSafeHttpsUrl(value: string): boolean {
 }
 
 export const founderPrefsSchema = z.object({
-  display_style: z.enum(["custom", "first_initial", "number_only", "hidden"]),
+  display_style: z.enum(["custom_name", "first_initial", "number_only", "hidden"]),
   show_on_wall: z.boolean(),
   display_name: z
     .string()

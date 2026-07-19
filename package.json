@@ -79,6 +79,7 @@
     "test:security-regression": "bun run test:security-static && bun run test:payments-security && bun run test:storage-security && bun run test:pi-ingest-security",
     "test:sensor-readings-tent-ownership": "vitest run src/test/sensor-readings-insert-tent-ownership-rls.test.ts",
     "test:sensor-readings-source-rls": "bun run scripts/run-sensor-readings-source-rls-harness.ts",
+    "test:vpd-calibration-provenance-rls": "bun run scripts/run-vpd-calibration-provenance-rls-harness.ts",
     "test:pi-ingest-db-security": "node scripts/security/run-pi-ingest-db-security.mjs",
     "test:storage-db-security": "node scripts/security/run-storage-db-security.mjs",
     "test:profiles-db-security": "node scripts/security/run-profiles-db-security.mjs",

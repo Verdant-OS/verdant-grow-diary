@@ -306,6 +306,7 @@ function ToolCard({
   const invalid = fieldErrors.length > 0;
 
   const [showDiff, setShowDiff] = useState(false);
+  const [onlyChanged, setOnlyChanged] = useState(true);
   const [confirmBeforeRetry, setConfirmBeforeRetry] = useState(true);
   const [retryPending, setRetryPending] = useState(false);
 

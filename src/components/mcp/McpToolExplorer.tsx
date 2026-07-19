@@ -34,6 +34,7 @@ import {
   type ToolCallOutcome,
 } from "@/lib/mcp/browserOAuthClient";
 import { MCP_MANIFEST, getSupabaseOrigin } from "@/lib/mcp/manifestView";
+import { loadLastValidInputs, saveLastValidInputs } from "@/lib/mcp/lastValidInputs";
 
 type ToolName =
   | "list_grows"

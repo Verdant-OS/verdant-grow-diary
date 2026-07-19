@@ -12,10 +12,8 @@ import { useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import BrandLogo from "@/components/BrandLogo";
 import { usePageSeo } from "@/hooks/usePageSeo";
-import {
-  VERDANT_CULTIVARS,
-  type VerdantCultivarProfile,
-} from "@/constants/verdantCultivars";
+import { VERDANT_CULTIVARS, type VerdantCultivarProfile } from "@/constants/verdantCultivars";
+import { buildCultivarsIndexSeo } from "@/lib/cultivarIndexSeoRules";
 
 type DifficultyFilter = "all" | VerdantCultivarProfile["difficulty"];
 
@@ -42,14 +40,8 @@ function matchesQuery(c: VerdantCultivarProfile, q: string): boolean {
 }
 
 export default function CultivarsIndex() {
-  usePageSeo({
-    title: "Cannabis Cultivar Guides — Oreoz, Do-Si-Dos, Blue Cookies Strain Info | Verdant",
-    description:
-      "Evergreen cultivar profiles for serious home growers: environment ranges, flower windows, common issues, and what to compare when pheno-hunting.",
-    path: "/cultivars",
-  });
-
   const [searchParams, setSearchParams] = useSearchParams();
+  usePageSeo(buildCultivarsIndexSeo(searchParams));
   const rawQuery = searchParams.get("q") ?? "";
   const rawDifficulty = (searchParams.get("difficulty") ?? "all") as DifficultyFilter;
   const difficulty: DifficultyFilter = DIFFICULTY_OPTIONS.some((o) => o.value === rawDifficulty)
@@ -70,8 +62,7 @@ export default function CultivarsIndex() {
     () =>
       VERDANT_CULTIVARS.filter(
         (c) =>
-          matchesQuery(c, rawQuery) &&
-          (difficulty === "all" ? true : c.difficulty === difficulty),
+          matchesQuery(c, rawQuery) && (difficulty === "all" ? true : c.difficulty === difficulty),
       ),
     [rawQuery, difficulty],
   );
@@ -80,10 +71,7 @@ export default function CultivarsIndex() {
   const hasFilters = rawQuery.trim().length > 0 || difficulty !== "all";
 
   return (
-    <main
-      data-testid="cultivars-index-page"
-      className="min-h-screen bg-background text-foreground"
-    >
+    <main data-testid="cultivars-index-page" className="min-h-screen bg-background text-foreground">
       <header className="px-6 py-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 max-w-6xl mx-auto">
         <Link to="/welcome" aria-label="Verdant Grow Diary home">
           <BrandLogo size="md" showText />
@@ -109,15 +97,14 @@ export default function CultivarsIndex() {
           Cannabis cultivar guides for serious home growers
         </h1>
         <p className="mt-4 text-lg text-muted-foreground">
-          Practical, evergreen profiles for popular cannabis cultivars — often
-          called strains. Each page covers lineage, flower window, environment
-          ranges by stage, common issues home growers report, and the
-          evidence points that matter when running a Pheno Hunt. No cherry-picked
-          diary photos, no guaranteed-yield claims, no AI picking winners for you.
+          Practical, evergreen profiles for popular cannabis cultivars — often called strains. Each
+          page covers lineage, flower window, environment ranges by stage, common issues home
+          growers report, and the evidence points that matter when running a Pheno Hunt. No
+          cherry-picked diary photos, no guaranteed-yield claims, no AI picking winners for you.
         </p>
         <p className="mt-4 text-sm text-muted-foreground">
-          Verdant is a grow diary and Pheno Hunt tool. It records what you did
-          and what changed; it does not control your equipment.
+          Verdant is a grow diary and Pheno Hunt tool. It records what you did and what changed; it
+          does not control your equipment.
         </p>
       </section>
 
@@ -194,9 +181,8 @@ export default function CultivarsIndex() {
             data-testid="cultivars-index-empty"
             className="rounded-lg border border-dashed border-border/60 p-6 text-sm text-muted-foreground"
           >
-            No cultivar guides match those filters yet. Try clearing the search
-            or picking a different difficulty — the library is small and
-            curated on purpose.
+            No cultivar guides match those filters yet. Try clearing the search or picking a
+            different difficulty — the library is small and curated on purpose.
           </div>
         ) : (
           <ul className="space-y-4">

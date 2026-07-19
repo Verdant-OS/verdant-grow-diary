@@ -1,11 +1,12 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import Sensors from "@/pages/Sensors";
 
 const TENT_A = "11111111-1111-4111-8111-111111111111";
 const TENT_B = "22222222-2222-4222-8222-222222222222";
+const insertReading = vi.hoisted(() => vi.fn());
 
 vi.mock("@/hooks/useGrowData", () => ({
   useGrowTents: () => ({
@@ -47,7 +48,7 @@ vi.mock("@/hooks/useEcowittIngestAuditProofRows", () => ({
 }));
 
 vi.mock("@/hooks/useInsertSensorReading", () => ({
-  useInsertSensorReading: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useInsertSensorReading: () => ({ mutateAsync: insertReading, isPending: false }),
 }));
 
 vi.mock("@/components/EnvironmentCsvImportLauncher", () => ({ default: () => null }));
@@ -69,6 +70,10 @@ function renderSensors() {
     </QueryClientProvider>,
   );
 }
+
+beforeEach(() => {
+  insertReading.mockReset().mockResolvedValue(undefined);
+});
 
 describe("Sensors manual reading target handoff", () => {
   it("moves the manual save target when the active tent chip changes", async () => {
@@ -96,5 +101,35 @@ describe("Sensors manual reading target handoff", () => {
 
     await waitFor(() => expect(target).toHaveTextContent("Saving to: Tent B"));
     expect(temperature.value).toBe("");
+  });
+
+  it("does not let an earlier tent save clear the newly selected tent draft", async () => {
+    let releaseSave: (() => void) | undefined;
+    const pendingSave = new Promise<void>((resolve) => {
+      releaseSave = resolve;
+    });
+    insertReading.mockReturnValueOnce(pendingSave);
+    renderSensors();
+
+    const target = screen.getByTestId("manual-reading-tent-row");
+    await waitFor(() => expect(target).toHaveTextContent("Saving to: Tent A"));
+
+    const temperature = screen.getByLabelText(/Air temp/i) as HTMLInputElement;
+    fireEvent.change(temperature, { target: { value: "75" } });
+    fireEvent.click(screen.getByTestId("manual-reading-save"));
+    fireEvent.click(screen.getByTestId("manual-sensor-review-confirm"));
+    await waitFor(() => expect(insertReading).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByRole("button", { name: "Tent B" }));
+    await waitFor(() => expect(target).toHaveTextContent("Saving to: Tent B"));
+    fireEvent.change(temperature, { target: { value: "80" } });
+
+    await act(async () => {
+      releaseSave?.();
+      await pendingSave;
+    });
+
+    expect(temperature.value).toBe("80");
+    expect(screen.queryByTestId("manual-reading-saved-confirmation")).not.toBeInTheDocument();
   });
 });

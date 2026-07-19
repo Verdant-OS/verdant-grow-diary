@@ -15,7 +15,6 @@
  *  - Preserves the canonical AI Doctor required output structure.
  */
 
-import type { PlantContextPayload } from "./aiDoctorContextCompiler";
 import { sanitizeAiDoctorPromptText } from "./aiDoctorPromptVocabularyRules";
 
 /** Canonical AI Doctor required-output sections (rendered verbatim). */
@@ -85,35 +84,66 @@ export interface ImportedHistoryPromptFragment {
   missingLiveReadingsBlock: string | null;
 }
 
-function formatVendors(
-  vendors: PlantContextPayload["imported_sensor_history"] extends infer T
-    ? T extends { vendors: infer V }
-      ? V
-      : never
-    : never,
-): string {
-  const list = (vendors as ReadonlyArray<{ vendorLabel: string; count: number }>) ?? [];
-  if (list.length === 0) return "unknown vendor";
-  return list.map((v) => `${sanitizeAiDoctorPromptText(v.vendorLabel)} (${v.count})`).join(", ");
+export interface AiDoctorImportedHistoryPromptContext {
+  imported_sensor_history?: unknown;
+  missingLiveSensorReadings?: unknown;
 }
 
-function formatMetrics(
-  metrics: ReadonlyArray<{
-    metric: string;
-    unit: string | null;
-    count: number;
-    min: number;
-    max: number;
-    avg: number;
-  }>,
-): string {
-  if (metrics.length === 0) return "no metric summaries";
-  return metrics
-    .map(
-      (m) =>
-        `${sanitizeAiDoctorPromptText(m.metric)}${m.unit ? ` (${sanitizeAiDoctorPromptText(m.unit)})` : ""}: min=${m.min}, max=${m.max}, avg=${m.avg}, n=${m.count}`,
-    )
-    .join("; ");
+function asPlainRecord(value: unknown): Record<string, unknown> | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function promptString(value: unknown, fallback: string): string {
+  return typeof value === "string" ? sanitizeAiDoctorPromptText(value) : fallback;
+}
+
+function promptCount(value: unknown): number | "unknown" {
+  return Number.isSafeInteger(value) && (value as number) >= 0 ? (value as number) : "unknown";
+}
+
+function formatVendors(vendors: unknown): string {
+  if (!Array.isArray(vendors)) return "unknown vendor";
+  const formatted: string[] = [];
+  for (const item of vendors) {
+    const vendor = asPlainRecord(item);
+    if (!vendor || typeof vendor.vendorLabel !== "string") continue;
+    const count = promptCount(vendor.count);
+    if (count === "unknown") continue;
+    formatted.push(`${sanitizeAiDoctorPromptText(vendor.vendorLabel)} (${count})`);
+  }
+  return formatted.length > 0 ? formatted.join(", ") : "unknown vendor";
+}
+
+function formatMetrics(metrics: unknown): string {
+  if (!Array.isArray(metrics)) return "no metric summaries";
+  const formatted: string[] = [];
+  for (const item of metrics) {
+    const metric = asPlainRecord(item);
+    if (!metric || typeof metric.metric !== "string") continue;
+    const unit =
+      metric.unit === null ? null : typeof metric.unit === "string" ? metric.unit : undefined;
+    const count = promptCount(metric.count);
+    if (
+      unit === undefined ||
+      count === "unknown" ||
+      typeof metric.min !== "number" ||
+      !Number.isFinite(metric.min) ||
+      typeof metric.max !== "number" ||
+      !Number.isFinite(metric.max) ||
+      typeof metric.avg !== "number" ||
+      !Number.isFinite(metric.avg)
+    ) {
+      continue;
+    }
+    formatted.push(
+      `${sanitizeAiDoctorPromptText(metric.metric)}${unit ? ` (${sanitizeAiDoctorPromptText(unit)})` : ""}: min=${metric.min}, max=${metric.max}, avg=${metric.avg}, n=${count}`,
+    );
+  }
+  return formatted.length > 0 ? formatted.join("; ") : "no metric summaries";
 }
 
 /**
@@ -122,14 +152,15 @@ function formatMetrics(
  * Returns empty/null blocks when neither condition applies.
  */
 export function buildAiDoctorImportedHistoryPromptFragment(
-  ctx: Pick<PlantContextPayload, "imported_sensor_history" | "missingLiveSensorReadings">,
+  ctx: AiDoctorImportedHistoryPromptContext,
 ): ImportedHistoryPromptFragment {
   const guidance: string[] = [];
   const s = IMPORTED_HISTORY_PROMPT_STRINGS;
+  const importedHistory = asPlainRecord(ctx?.imported_sensor_history);
 
   let importedHistoryBlock: string | null = null;
-  if (ctx.imported_sensor_history) {
-    const h = ctx.imported_sensor_history;
+  if (importedHistory) {
+    const h = importedHistory;
     guidance.push(
       s.notLiveCaveat,
       s.notProofOfCurrent,
@@ -138,28 +169,28 @@ export function buildAiDoctorImportedHistoryPromptFragment(
       s.noAlertsFromHistoryAlone,
       s.noActionQueueFromHistoryAlone,
     );
-    const dateRange = h.dateRange ? `${h.dateRange.earliest} → ${h.dateRange.latest}` : "unknown";
-    const excludedQualityCount =
-      Number.isInteger(h.excludedQualityCount) && h.excludedQualityCount >= 0
-        ? h.excludedQualityCount
+    const range = asPlainRecord(h.dateRange);
+    const dateRange =
+      range && typeof range.earliest === "string" && typeof range.latest === "string"
+        ? `${sanitizeAiDoctorPromptText(range.earliest)} → ${sanitizeAiDoctorPromptText(range.latest)}`
         : "unknown";
     importedHistoryBlock = [
       `[${s.sectionLabel}]`,
-      `Source label: ${sanitizeAiDoctorPromptText(h.historicalLabel)}`,
-      `Caveat: ${sanitizeAiDoctorPromptText(h.notForLiveDiagnosis)}`,
-      `Vendors: ${formatVendors(h.vendors as never)}`,
+      `Source label: ${promptString(h.historicalLabel, "unknown history")}`,
+      `Caveat: ${promptString(h.notForLiveDiagnosis, "Historical context is not current telemetry.")}`,
+      `Vendors: ${formatVendors(h.vendors)}`,
       `Date range: ${dateRange}`,
-      `Total readings: ${h.totalReadings}`,
-      `Excluded quality rows: ${excludedQualityCount}`,
-      `Suspicious flags: ${h.suspiciousFlagCount}`,
+      `Total readings: ${promptCount(h.totalReadings)}`,
+      `Excluded quality rows: ${promptCount(h.excludedQualityCount)}`,
+      `Suspicious flags: ${promptCount(h.suspiciousFlagCount)}`,
       `Metric summaries: ${formatMetrics(h.metrics)}`,
     ].join("\n");
   }
 
   let missingLiveReadingsBlock: string | null = null;
-  if (ctx.missingLiveSensorReadings) {
+  if (ctx?.missingLiveSensorReadings === true) {
     guidance.push(s.missingLiveReadings, s.missingInfoIncludeLive);
-    if (ctx.imported_sensor_history) {
+    if (importedHistory) {
       guidance.push(s.confidenceCap);
     }
     missingLiveReadingsBlock = "[Missing current sensor readings] " + s.missingLiveReadings;

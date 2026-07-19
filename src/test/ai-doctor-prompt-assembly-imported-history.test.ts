@@ -149,6 +149,21 @@ describe("buildAiDoctorPromptMessages — imported-history injection", () => {
     expect(out.missingLiveReadingsBlock).toBeNull();
   });
 
+  it("fails safely inside prompt formatting when history arrays are malformed", () => {
+    const malformedHistory = {
+      ...baseImportedHistory,
+      vendors: {},
+      metrics: {},
+    };
+
+    expect(() =>
+      buildAiDoctorPromptMessages({ imported_sensor_history: malformedHistory }),
+    ).not.toThrow();
+    const out = buildAiDoctorPromptMessages({ imported_sensor_history: malformedHistory });
+    expect(out.importedHistoryBlock).toContain("Vendors: unknown vendor");
+    expect(out.importedHistoryBlock).toContain("Metric summaries: no metric summaries");
+  });
+
   it("static guard: edge function uses helper and contains no new Supabase write / schema / device-control calls", () => {
     const path = resolve(process.cwd(), "supabase/functions/ai-doctor-review/index.ts");
     const src = readFileSync(path, "utf8");

@@ -76,8 +76,7 @@ Deterministic result: **3/3 enumerated route-scoped entry-point classes pass, an
 | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | Requested targeted slice              | **Pass — 16 files, 198/198 tests, 0 failures**                                                                        |
 | Repair-focused changed-test batch     | **Pass — 8 files, 146/146 tests, 0 failures**                                                                         |
-| Tests changed in broad E2E CI files   | **Pass — 5/5 filtered tests**                                                                                         |
-| All changed test files                | **206/210 pass; 4 pre-existing Windows static-parser failures reproduced in two broad E2E CI files**                  |
+| All changed test files                | **Pass — 10 files, 210/210 tests, 0 failures**                                                                        |
 | Type-check                            | **Pass — 0 diagnostics** (`tsc -p tsconfig.app.json --noEmit`)                                                        |
 | Working diff whitespace/error check   | **Pass** (`git diff --check`)                                                                                         |
 | Full suite                            | **Not rerun on this port**                                                                                            |
@@ -93,7 +92,7 @@ Deterministic result: **3/3 enumerated route-scoped entry-point classes pass, an
 
 The requested targeted slice emitted only known non-failing React Router v7 future-flag notices and Radix Dialog `Description`/`aria-describedby` warnings. No targeted test failed and type-check emitted no warning or diagnostic.
 
-The all-changed-test-file batch reproduced four failures already present in the RED baseline: three artifact/path-filter extraction assertions in `quicklog-e2e-ci-surface.test.ts` and one media-path extraction assertion in `quicklog-e2e-bootstrap-safety.test.ts`. All four use line-ending-sensitive static parsers and fail before evaluating the repaired fixture contract. They are unrelated to the product repair and were not weakened or opportunistically rewritten. The five tests modified in those broad files pass when filtered directly.
+The exact all-changed-test-file batch is currently green at 210/210. No workflow safety parser, threshold, or scope fence was weakened to obtain this result.
 
 The old branch's full-suite totals, scanner timings, Playwright discovery, E2E compilation, fixture-checklist result, and deployment-base classifications are intentionally not carried forward as current evidence because they were not rerun against `ed3790cb8`.
 

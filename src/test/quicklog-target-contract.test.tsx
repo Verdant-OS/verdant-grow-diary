@@ -170,6 +170,9 @@ describe("Quick Log canonical target contract", () => {
 
     const card = await screen.findByTestId("quick-log-target-card");
     await waitFor(() => expect(card).toHaveAttribute("data-target-plant-id", "p1"));
+    expect(screen.getByTestId("quick-log-plant-select")).toHaveAttribute("aria-invalid", "false");
+    expect(screen.getByTestId("quick-log-plant-select")).not.toHaveAttribute("aria-describedby");
+    expect(screen.queryByTestId("quick-log-target-error")).not.toBeInTheDocument();
     fireEvent.change(screen.getByPlaceholderText(/Watered, looking healthy/i), {
       target: { value: "Target contract observation" },
     });
@@ -185,7 +188,7 @@ describe("Quick Log canonical target contract", () => {
     );
   });
 
-  it("replaces an open dialog target when a new exact route prefill arrives", async () => {
+  it("isolates a blocked replacement before accepting a new exact route prefill", async () => {
     const view = renderQuickLog({ plantId: "p1", growId: "g1", tentId: "t1" });
     await waitFor(() =>
       expect(screen.getByTestId("quick-log-target-card")).toHaveAttribute(
@@ -193,6 +196,26 @@ describe("Quick Log canonical target contract", () => {
         "p1",
       ),
     );
+
+    act(() => view.rerenderQuickLog({ plantId: "missing-plant", growId: "g1", tentId: "t1" }));
+
+    expect(await screen.findByTestId("quick-log-target-error")).toHaveTextContent(
+      "That plant is no longer available. Choose another plant.",
+    );
+    const blockedCard = screen.getByTestId("quick-log-target-card");
+    expect(blockedCard).not.toHaveAttribute("data-target-plant-id");
+    expect(blockedCard).not.toHaveAttribute("data-target-grow-id");
+    expect(blockedCard).not.toHaveAttribute("data-target-tent-id");
+    expect(screen.getByTestId("quick-log-target-plant")).not.toHaveTextContent("Plant One");
+    expect(screen.getByTestId("quick-log-target-tent")).not.toHaveTextContent("Tent One");
+    expect(screen.getByTestId("quick-log-target-grow")).not.toHaveTextContent("Grow One");
+    expect(screen.getByTestId("quick-log-plant-select")).not.toHaveTextContent("Plant One");
+    expect(screen.getByTestId("quick-log-save")).toBeDisabled();
+    fireEvent.change(screen.getByPlaceholderText(/Watered, looking healthy/i), {
+      target: { value: "Must not write to the previous target" },
+    });
+    fireEvent.submit(screen.getByTestId("quick-log-save").closest("form") as HTMLFormElement);
+    expect(harness.rpc).not.toHaveBeenCalled();
 
     act(() => view.rerenderQuickLog({ plantId: "p2", growId: "g2", tentId: "t2" }));
 
@@ -245,9 +268,14 @@ describe("Quick Log canonical target contract", () => {
 
     renderQuickLog({ plantId: "missing-plant", growId: "g1", tentId: "t1" });
 
-    expect(await screen.findByTestId("quick-log-target-error")).toHaveTextContent(
+    const targetError = await screen.findByTestId("quick-log-target-error");
+    expect(targetError).toHaveTextContent(
       "That plant is no longer available. Choose another plant.",
     );
+    const plantSelect = screen.getByTestId("quick-log-plant-select");
+    expect(plantSelect).toHaveAttribute("aria-invalid", "true");
+    expect(plantSelect).toHaveAttribute("aria-describedby", "quick-log-target-error");
+    expect(document.getElementById("quick-log-target-error")).toBe(targetError);
     expect(screen.getByTestId("quick-log-target-card")).not.toHaveAttribute("data-target-plant-id");
     expect(screen.getByTestId("quick-log-save")).toBeDisabled();
 

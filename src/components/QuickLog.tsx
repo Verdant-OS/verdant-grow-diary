@@ -368,7 +368,7 @@ export default function QuickLog({
   const prefillRequestKey = quickLogPrefillTargetKey(prefill);
   const prefillHoldActive =
     prefillRequestKey !== null && dismissedBlockedPrefillKey !== prefillRequestKey;
-  const editorPlantId = prefillHoldActive && prefillPlantId ? prefillPlantId : plantId;
+  const editorPlantId = prefillHoldActive ? (prefillPlantId ?? "") : plantId;
 
   useEffect(() => {
     if (!open) return;
@@ -473,6 +473,18 @@ export default function QuickLog({
     () =>
       resolvedTarget ? (grows.find((grow) => grow.id === resolvedTarget.growId) ?? null) : null,
     [grows, resolvedTarget],
+  );
+  const resolvedTargetPlant = useMemo(
+    () =>
+      resolvedTarget ? (plants.find((plant) => plant.id === resolvedTarget.plantId) ?? null) : null,
+    [plants, resolvedTarget],
+  );
+  const resolvedTargetTent = useMemo(
+    () =>
+      resolvedTarget
+        ? (activeTents.find((tent) => tent.id === resolvedTarget.tentId) ?? null)
+        : null,
+    [activeTents, resolvedTarget],
   );
 
   // Slice A2: re-enable stage defaulting ONLY when the grower actively switches
@@ -1047,9 +1059,22 @@ export default function QuickLog({
     !tentSetupRequired
   );
   const showWateringErr = !!wateringError;
-  const targetGrowName = resolvedTargetGrow?.name ?? activeGrow?.name ?? "No setup selected";
-  const targetTentName =
-    selectedTent?.name ?? (selectedPlant?.tent_id ? "Assigned tent" : "No tent assigned");
+  const targetPlantName = resolvedTarget
+    ? (resolvedTargetPlant?.name ?? "Assigned plant")
+    : "Choose a plant";
+  const targetTentName = resolvedTarget
+    ? (resolvedTargetTent?.name ?? "Assigned tent")
+    : "Plant required before save";
+  const targetGrowName = resolvedTarget
+    ? (resolvedTargetGrow?.name ?? "Assigned grow")
+    : "No setup selected";
+  const editorTargetBlocked = editorTarget.status === "blocked";
+  const showTargetError = editorTargetBlocked && (prefillHoldActive || selectedPlant !== null);
+  const plantSelectErrorId = editorTargetBlocked
+    ? showTargetError
+      ? "quick-log-target-error"
+      : "quick-log-plant-error"
+    : undefined;
   const selectedResponseStatus = readResponseCheckStatus(note);
 
   return (
@@ -1338,13 +1363,13 @@ export default function QuickLog({
                   data-testid="quick-log-target-plant"
                   className="text-base font-semibold text-foreground"
                 >
-                  {selectedPlant?.name ?? "Choose a plant"}
+                  {targetPlantName}
                 </p>
                 <p
                   data-testid="quick-log-target-tent"
                   className="text-[12px] text-muted-foreground"
                 >
-                  {selectedPlant ? targetTentName : "Plant required before save"}
+                  {targetTentName}
                 </p>
                 <p
                   data-testid="quick-log-target-grow"
@@ -1372,16 +1397,8 @@ export default function QuickLog({
                   <SelectTrigger
                     ref={plantSelectTriggerRef}
                     data-testid="quick-log-plant-select"
-                    aria-invalid={
-                      prefillHoldActive || !selectedPlant || editorTarget.status === "blocked"
-                    }
-                    aria-describedby={
-                      prefillHoldActive || (selectedPlant && editorTarget.status === "blocked")
-                        ? "quick-log-target-error"
-                        : !selectedPlant
-                          ? "quick-log-plant-error"
-                          : undefined
-                    }
+                    aria-invalid={editorTargetBlocked}
+                    aria-describedby={plantSelectErrorId}
                   >
                     <SelectValue placeholder="Choose a plant" />
                   </SelectTrigger>
@@ -1419,7 +1436,7 @@ export default function QuickLog({
                 </Select>
               </div>
             </div>
-            {prefillHoldActive && editorTarget.status === "blocked" ? (
+            {showTargetError && editorTarget.status === "blocked" ? (
               <p
                 id="quick-log-target-error"
                 role="alert"
@@ -1436,15 +1453,6 @@ export default function QuickLog({
                 data-testid="quick-log-plant-error"
               >
                 Choose a plant before saving this entry.
-              </p>
-            ) : editorTarget.status === "blocked" ? (
-              <p
-                id="quick-log-target-error"
-                role="alert"
-                className="text-[11px] text-destructive"
-                data-testid="quick-log-target-error"
-              >
-                {QUICK_LOG_TARGET_BLOCKED_COPY[editorTarget.reason]}
               </p>
             ) : (
               <p className="text-[11px] text-muted-foreground" data-testid="quick-log-plant-helper">

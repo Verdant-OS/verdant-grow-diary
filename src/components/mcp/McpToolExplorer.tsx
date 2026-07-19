@@ -329,7 +329,9 @@ function ToolCard({
     if (outcome.status === "unauthorized" || outcome.status === "not_connected") {
       onAuthLost();
     }
-  }, [invalid, buildArgs, endpoint, toolName, onAuthLost]);
+    const category = classifyOutcome(outcome);
+    if (category && onRunOutcome) onRunOutcome(outcome, category);
+  }, [invalid, buildArgs, endpoint, toolName, onAuthLost, onRunOutcome]);
 
   const requestRetry = useCallback(() => {
     if (confirmBeforeRetry) {

@@ -1,4 +1,4 @@
-export const FOUNDER_SLOTS_TOTAL = 75 as const;
+export const FOUNDER_SLOTS_TOTAL = 100 as const;
 
 export interface FounderSlotsPayload {
   remaining: number;

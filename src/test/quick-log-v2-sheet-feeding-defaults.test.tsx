@@ -22,7 +22,9 @@ vi.mock("@/integrations/supabase/client", () => ({
 
 vi.mock("@/hooks/use-plants", () => ({
   usePlants: () => ({
-    data: [{ id: "plant-1", name: "Plant 1", tent_id: "tent-1", grow_id: "grow-1" }],
+    data: [
+      { id: "plant-1", name: "Plant 1", tent_id: "tent-1", grow_id: "grow-1" },
+    ],
   }),
 }));
 vi.mock("@/hooks/use-tents", () => ({
@@ -49,20 +51,15 @@ function renderSheet() {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
-  const renderResult = render(
+  render(
     <QueryClientProvider client={client}>
-      <QuickLogV2Sheet open={true} onOpenChange={vi.fn()} defaultTargetKey="plant:plant-1" />
+      <QuickLogV2Sheet
+        open={true}
+        onOpenChange={vi.fn()}
+        defaultTargetKey="plant:plant-1"
+      />
     </QueryClientProvider>,
   );
-  return {
-    ...renderResult,
-    rerenderSheet: () =>
-      renderResult.rerender(
-        <QueryClientProvider client={client}>
-          <QuickLogV2Sheet open={true} onOpenChange={vi.fn()} defaultTargetKey="plant:plant-1" />
-        </QueryClientProvider>,
-      ),
-  };
 }
 
 beforeEach(() => {
@@ -108,17 +105,22 @@ describe("QuickLogV2Sheet — Last Feeding Defaults", () => {
     expect((screen.getByLabelText("Product 1 name") as HTMLInputElement).value).toBe("Base A");
     expect((screen.getByLabelText("Product 1 amount") as HTMLInputElement).value).toBe("2.5");
 
-    // Defaults never guess the measured applied volume, so review stays in
-    // needs-input mode until the grower records it.
-    expect(screen.getByTestId("qlv2-feeding-review-defaults-flag")).toBeInTheDocument();
+    // Review section should show the defaults-applied flag and the populated preview.
+    expect(
+      screen.getByTestId("qlv2-feeding-review-defaults-flag"),
+    ).toBeInTheDocument();
     expect(screen.getByTestId("qlv2-feeding-review-defaults-flag").textContent).toMatch(
       /Includes prefilled feeding defaults/,
     );
-    expect(screen.getByTestId("qlv2-feeding-review-needs-input")).toBeInTheDocument();
-    expect((screen.getByLabelText("Applied volume (ml)") as HTMLInputElement).value).toBe("");
+    expect(
+      screen.queryByTestId("qlv2-feeding-review-needs-input"),
+    ).toBeNull();
+    const review = screen.getByTestId("qlv2-feeding-review");
+    expect(review.textContent).toMatch(/veg-week-3/);
+    expect(review.textContent).toMatch(/Base A/);
   });
 
-  it("does NOT prefill measured fields (volume/pH/EC/runoff/water temp)", async () => {
+  it("does NOT prefill measured outcome fields (pH/EC/runoff/water temp)", async () => {
     mockedRows = [
       {
         id: "feed-1",
@@ -143,7 +145,7 @@ describe("QuickLogV2Sheet — Last Feeding Defaults", () => {
     await waitFor(() =>
       expect(screen.getByTestId("qlv2-feeding-defaults-label")).toBeInTheDocument(),
     );
-    expect((screen.getByLabelText("Applied volume (ml)") as HTMLInputElement).value).toBe("");
+    // Expand the optional metrics group so the inputs are mounted/visible.
     expect((screen.getByLabelText("pH") as HTMLInputElement).value).toBe("");
     expect((screen.getByLabelText("EC in") as HTMLInputElement).value).toBe("");
     expect((screen.getByLabelText("EC out") as HTMLInputElement).value).toBe("");
@@ -151,42 +153,6 @@ describe("QuickLogV2Sheet — Last Feeding Defaults", () => {
     expect((screen.getByLabelText("Runoff pH") as HTMLInputElement).value).toBe("");
     expect((screen.getByLabelText("Runoff EC") as HTMLInputElement).value).toBe("");
     expect((screen.getByLabelText("Water (°C)") as HTMLInputElement).value).toBe("");
-  });
-
-  it("does not erase a draft when feeding defaults arrive late", async () => {
-    const { rerenderSheet } = renderSheet();
-    fireEvent.click(screen.getByRole("button", { name: "Feed" }));
-    fireEvent.change(screen.getByLabelText("Applied volume (ml)"), {
-      target: { value: "900" },
-    });
-    fireEvent.change(screen.getByLabelText("Feeding note (optional)"), {
-      target: { value: "slight tip response" },
-    });
-
-    mockedRows = [
-      {
-        id: "feed-late",
-        grow_id: "grow-1",
-        tent_id: "tent-1",
-        plant_id: "plant-1",
-        event_type: "feeding",
-        entry_at: "2026-06-10T12:00:00.000Z",
-        details: {
-          nutrients: [{ name: "Base A", amount: 2.5, unit: "ml_per_l" }],
-          nutrient_line_id: "veg-week-3",
-        },
-      },
-    ];
-    rerenderSheet();
-
-    await waitFor(() =>
-      expect((screen.getByLabelText("Applied volume (ml)") as HTMLInputElement).value).toBe("900"),
-    );
-    expect((screen.getByLabelText("Feeding note (optional)") as HTMLTextAreaElement).value).toBe(
-      "slight tip response",
-    );
-    expect((screen.getByLabelText("Nutrient line") as HTMLInputElement).value).toBe("");
-    expect(screen.queryByTestId("qlv2-feeding-defaults-label")).toBeNull();
   });
 
   it("save payload uses current form values, not stale hidden defaults", async () => {
@@ -204,11 +170,13 @@ describe("QuickLogV2Sheet — Last Feeding Defaults", () => {
         },
       },
     ];
-    writeFeedingMock.mockResolvedValue({ ok: true, eventId: "evt-1", reused: false });
+    writeFeedingMock.mockResolvedValue({ ok: true, eventId: "evt-1" });
     renderSheet();
     fireEvent.click(screen.getByRole("button", { name: "Feed" }));
     await waitFor(() =>
-      expect((screen.getByLabelText("Nutrient line") as HTMLInputElement).value).toBe("veg-week-3"),
+      expect((screen.getByLabelText("Nutrient line") as HTMLInputElement).value).toBe(
+        "veg-week-3",
+      ),
     );
     // User edits the prefilled values before saving.
     fireEvent.change(screen.getByLabelText("Nutrient line"), {
@@ -217,14 +185,12 @@ describe("QuickLogV2Sheet — Last Feeding Defaults", () => {
     fireEvent.change(screen.getByLabelText("Product 1 amount"), {
       target: { value: "3" },
     });
-    fireEvent.change(screen.getByLabelText("Applied volume (ml)"), {
-      target: { value: "900" },
-    });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(writeFeedingMock).toHaveBeenCalledTimes(1));
     const payload = writeFeedingMock.mock.calls[0][0];
     expect(payload.nutrient_line_id).toBe("flower-week-1");
-    expect(payload.products).toEqual([{ name: "Base A", amount: 3, unit: "ml_per_l" }]);
-    expect(payload.volume_ml).toBe(900);
+    expect(payload.products).toEqual([
+      { name: "Base A", amount: 3, unit: "ml_per_l" },
+    ]);
   });
 });

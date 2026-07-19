@@ -51,22 +51,12 @@ describe("buildFeedingDefaults", () => {
   it("selects the latest valid same-plant feeding", () => {
     const r = buildFeedingDefaults({
       rawEntries: [
-        row({
-          id: "older",
-          entry_at: "2026-06-01T00:00:00.000Z",
-          details: {
-            nutrients: [{ name: "Old", amount: 1, unit: "ml_per_l" }],
-            nutrient_line_id: "old-line",
-          },
-        }),
-        row({
-          id: "newer",
-          entry_at: "2026-06-09T00:00:00.000Z",
-          details: {
-            nutrients: [{ name: "New", amount: 3, unit: "ml_per_l" }],
-            nutrient_line_id: "veg-week-3",
-          },
-        }),
+        row({ id: "older", entry_at: "2026-06-01T00:00:00.000Z",
+          details: { nutrients: [{ name: "Old", amount: 1, unit: "ml_per_l" }],
+            nutrient_line_id: "old-line" } }),
+        row({ id: "newer", entry_at: "2026-06-09T00:00:00.000Z",
+          details: { nutrients: [{ name: "New", amount: 3, unit: "ml_per_l" }],
+            nutrient_line_id: "veg-week-3" } }),
       ],
       plantId: "plant-1",
       tentId: "tent-1",
@@ -75,20 +65,17 @@ describe("buildFeedingDefaults", () => {
     expect(r.scope).toBe("plant");
     expect(r.sourceEntryId).toBe("newer");
     expect(r.defaults?.lineId).toBe("veg-week-3");
-    expect(r.defaults?.products).toEqual([{ name: "New", amount: "3", unit: "ml_per_l" }]);
+    expect(r.defaults?.products).toEqual([
+      { name: "New", amount: "3", unit: "ml_per_l" },
+    ]);
     expect(r.label).toBe(FEEDING_DEFAULTS_LABEL);
   });
 
   it("is deterministic regardless of input order", () => {
     const a = row({ id: "a", entry_at: "2026-06-01T00:00:00.000Z" });
-    const b = row({
-      id: "b",
-      entry_at: "2026-06-09T00:00:00.000Z",
-      details: {
-        nutrients: [{ name: "B", amount: 1, unit: "ml_per_l" }],
-        nutrient_line_id: "line-b",
-      },
-    });
+    const b = row({ id: "b", entry_at: "2026-06-09T00:00:00.000Z",
+      details: { nutrients: [{ name: "B", amount: 1, unit: "ml_per_l" }],
+        nutrient_line_id: "line-b" } });
     const c = row({ id: "c", entry_at: "2026-06-05T00:00:00.000Z" });
     const r1 = buildFeedingDefaults({ rawEntries: [a, b, c], plantId: "plant-1" });
     const r2 = buildFeedingDefaults({ rawEntries: [c, b, a], plantId: "plant-1" });
@@ -99,7 +86,8 @@ describe("buildFeedingDefaults", () => {
   it("ignores non-feeding rows", () => {
     const r = buildFeedingDefaults({
       rawEntries: [
-        row({ id: "water", event_type: "watering", details: { watering_amount_ml: 500 } }),
+        row({ id: "water", event_type: "watering",
+          details: { watering_amount_ml: 500 } }),
         row({ id: "note", event_type: "note", details: {} }),
       ],
       plantId: "plant-1",
@@ -119,7 +107,8 @@ describe("buildFeedingDefaults", () => {
     const r = buildFeedingDefaults({
       rawEntries: [
         row({ details: { nutrients: "oops", nutrient_line_id: "x" } }),
-        row({ id: "no-name", details: { nutrients: [{ amount: 1 }], nutrient_line_id: "x" } }),
+        row({ id: "no-name",
+          details: { nutrients: [{ amount: 1 }], nutrient_line_id: "x" } }),
       ],
       plantId: "plant-1",
     });
@@ -129,22 +118,18 @@ describe("buildFeedingDefaults", () => {
   it("ignores demo/stale/invalid provenance", () => {
     const r = buildFeedingDefaults({
       rawEntries: [
-        row({
-          id: "demo",
+        row({ id: "demo",
           details: {
             nutrients: [{ name: "Demo", amount: 1, unit: "ml_per_l" }],
             nutrient_line_id: "demo-line",
             source: "demo",
-          },
-        }),
-        row({
-          id: "stale",
+          } }),
+        row({ id: "stale",
           details: {
             nutrients: [{ name: "Stale", amount: 1, unit: "ml_per_l" }],
             nutrient_line_id: "stale-line",
             provenance: "stale",
-          },
-        }),
+          } }),
       ],
       plantId: "plant-1",
     });
@@ -154,15 +139,13 @@ describe("buildFeedingDefaults", () => {
   it("prefills nutrient line + product rows", () => {
     const r = buildFeedingDefaults({
       rawEntries: [
-        row({
-          details: {
-            nutrients: [
-              { name: "Base A", amount: 2, unit: "ml_per_l" },
-              { name: "Cal-Mag", amount: 1.5, unit: "ml_per_l" },
-            ],
-            nutrient_line_id: "veg-week-3",
-          },
-        }),
+        row({ details: {
+          nutrients: [
+            { name: "Base A", amount: 2, unit: "ml_per_l" },
+            { name: "Cal-Mag", amount: 1.5, unit: "ml_per_l" },
+          ],
+          nutrient_line_id: "veg-week-3",
+        } }),
       ],
       plantId: "plant-1",
     });
@@ -176,18 +159,16 @@ describe("buildFeedingDefaults", () => {
   it("does not include measured outcome fields in defaults", () => {
     const r = buildFeedingDefaults({
       rawEntries: [
-        row({
-          details: {
-            nutrients: [{ name: "Base", amount: 2, unit: "ml_per_l" }],
-            nutrient_line_id: "veg-week-3",
-            ph: 6.1,
-            ec: 1.6,
-            runoff_ph: 6.4,
-            runoff_ec: 2.1,
-            runoff_ml: 250,
-            extras: { water_temp_c: 21 },
-          },
-        }),
+        row({ details: {
+          nutrients: [{ name: "Base", amount: 2, unit: "ml_per_l" }],
+          nutrient_line_id: "veg-week-3",
+          ph: 6.1,
+          ec: 1.6,
+          runoff_ph: 6.4,
+          runoff_ec: 2.1,
+          runoff_ml: 250,
+          extras: { water_temp_c: 21 },
+        } }),
       ],
       plantId: "plant-1",
     });
@@ -199,15 +180,9 @@ describe("buildFeedingDefaults", () => {
   it("falls back to same tent when no plant feeding exists", () => {
     const r = buildFeedingDefaults({
       rawEntries: [
-        row({
-          id: "tent-only",
-          plant_id: "other-plant",
-          tent_id: "tent-1",
-          details: {
-            nutrients: [{ name: "T", amount: 1, unit: "ml_per_l" }],
-            nutrient_line_id: "tent-line",
-          },
-        }),
+        row({ id: "tent-only", plant_id: "other-plant", tent_id: "tent-1",
+          details: { nutrients: [{ name: "T", amount: 1, unit: "ml_per_l" }],
+            nutrient_line_id: "tent-line" } }),
       ],
       plantId: "plant-1",
       tentId: "tent-1",
@@ -219,16 +194,9 @@ describe("buildFeedingDefaults", () => {
   it("falls back to same grow when no plant/tent feeding exists", () => {
     const r = buildFeedingDefaults({
       rawEntries: [
-        row({
-          id: "grow-only",
-          plant_id: "p2",
-          tent_id: "t2",
-          grow_id: "grow-1",
-          details: {
-            nutrients: [{ name: "G", amount: 1, unit: "ml_per_l" }],
-            nutrient_line_id: "grow-line",
-          },
-        }),
+        row({ id: "grow-only", plant_id: "p2", tent_id: "t2", grow_id: "grow-1",
+          details: { nutrients: [{ name: "G", amount: 1, unit: "ml_per_l" }],
+            nutrient_line_id: "grow-line" } }),
       ],
       plantId: "plant-1",
       tentId: "tent-1",
@@ -241,11 +209,9 @@ describe("buildFeedingDefaults", () => {
   it("skips entries missing a nutrient line id", () => {
     const r = buildFeedingDefaults({
       rawEntries: [
-        row({
-          details: {
-            nutrients: [{ name: "Base", amount: 1, unit: "ml_per_l" }],
-          },
-        }),
+        row({ details: {
+          nutrients: [{ name: "Base", amount: 1, unit: "ml_per_l" }],
+        } }),
       ],
       plantId: "plant-1",
     });
@@ -277,8 +243,9 @@ describe("applyFeedingDefaultsToForm", () => {
       label: FEEDING_DEFAULTS_LABEL,
     });
     expect(f.lineId).toBe("veg-week-3");
-    expect(f.products).toEqual([{ name: "Base", amount: "2", unit: FEEDING_FORM_DEFAULT_UNIT }]);
-    expect(f.volumeMl).toBe("");
+    expect(f.products).toEqual([
+      { name: "Base", amount: "2", unit: FEEDING_FORM_DEFAULT_UNIT },
+    ]);
     expect(f.ph).toBe("");
     expect(f.ecIn).toBe("");
     expect(f.ecOut).toBe("");

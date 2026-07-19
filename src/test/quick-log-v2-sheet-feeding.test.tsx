@@ -89,9 +89,6 @@ function fillRequiredFeedingFields() {
   fireEvent.change(screen.getByLabelText("Product 1 amount"), {
     target: { value: "2" },
   });
-  fireEvent.change(screen.getByLabelText("Applied volume (ml)"), {
-    target: { value: "750" },
-  });
 }
 
 function clickSave() {
@@ -143,7 +140,7 @@ describe("QuickLogV2Sheet — structured feeding", () => {
     expect(screen.getByTestId("qlv2-feeding-review")).toBeInTheDocument();
     expect(screen.getByTestId("qlv2-feeding-review-needs-input")).toBeInTheDocument();
     expect(screen.getByTestId("qlv2-feeding-review-needs-input").textContent).toMatch(
-      /nutrient line, applied volume, and product/i,
+      /nutrient line and product/i,
     );
     expect(screen.queryByTestId("qlv2-feeding-review-defaults-flag")).toBeNull();
   });
@@ -156,11 +153,10 @@ describe("QuickLogV2Sheet — structured feeding", () => {
     const review = screen.getByTestId("qlv2-feeding-review");
     expect(review.textContent).toMatch(/veg-week-3/);
     expect(review.textContent).toMatch(/Base A/);
-    expect(review.textContent).toMatch(/Applied volume \(ml\).*750/);
   });
 
   it("calls writeFeedingTypedEvent exactly once on a valid save", async () => {
-    writeFeedingMock.mockResolvedValue({ ok: true, eventId: "evt-1", reused: false });
+    writeFeedingMock.mockResolvedValue({ ok: true, eventId: "evt-1" });
     const createdEvents: Array<Record<string, unknown>> = [];
     const onEntryCreated = (event: Event) => {
       createdEvents.push((event as CustomEvent<Record<string, unknown>>).detail);
@@ -179,8 +175,6 @@ describe("QuickLogV2Sheet — structured feeding", () => {
     expect(payload.tent_id).toBe("tent-1");
     expect(payload.plant_id).toBe("plant-1");
     expect(payload.nutrient_line_id).toBe("veg-week-3");
-    expect(payload.volume_ml).toBe(750);
-    expect(payload.idempotency_key).toMatch(/^quicklog-/);
     expect(payload.products).toEqual([{ name: "Base A", amount: 2, unit: "ml_per_l" }]);
     // Post-save hardening: sheet stays open on success so the grower can
     // review, log another, or close explicitly.
@@ -198,7 +192,7 @@ describe("QuickLogV2Sheet — structured feeding", () => {
   });
 
   it("maps optional pH/EC/runoff/water-temp fields into the writer payload", async () => {
-    writeFeedingMock.mockResolvedValue({ ok: true, eventId: "evt-2", reused: false });
+    writeFeedingMock.mockResolvedValue({ ok: true, eventId: "evt-2" });
     renderSheet("plant:plant-1");
     clickFeed();
     fillRequiredFeedingFields();
@@ -233,56 +227,12 @@ describe("QuickLogV2Sheet — structured feeding", () => {
     expect(payload.water_temp_c).toBe(21);
   });
 
-  it("captures multiple products and the feeding observation note", async () => {
-    writeFeedingMock.mockResolvedValue({ ok: true, eventId: "evt-3", reused: false });
-    renderSheet("plant:plant-1");
-    clickFeed();
-    fillRequiredFeedingFields();
-    fireEvent.click(screen.getByRole("button", { name: "Add product" }));
-    fireEvent.change(screen.getByLabelText("Product 2 name"), {
-      target: { value: "CRONK CalMag" },
-    });
-    fireEvent.change(screen.getByLabelText("Product 2 amount"), {
-      target: { value: "1" },
-    });
-    fireEvent.change(screen.getByLabelText("Feeding note (optional)"), {
-      target: { value: "Runoff was clear; leaf posture held." },
-    });
-
-    clickSave();
-    await waitFor(() => expect(writeFeedingMock).toHaveBeenCalledTimes(1));
-    const payload = writeFeedingMock.mock.calls[0][0];
-    expect(payload.products).toEqual([
-      { name: "Base A", amount: 2, unit: "ml_per_l" },
-      { name: "CRONK CalMag", amount: 1, unit: "ml_per_l" },
-    ]);
-    expect(payload.note).toBe("Runoff was clear; leaf posture held.");
-  });
-
-  it("requires an honest applied volume and never guesses one", async () => {
-    renderSheet("plant:plant-1");
-    clickFeed();
-    fireEvent.change(screen.getByLabelText("Nutrient line"), {
-      target: { value: "veg-week-3" },
-    });
-    fireEvent.change(screen.getByLabelText("Product 1 name"), {
-      target: { value: "Base A" },
-    });
-    clickSave();
-    await waitFor(() => expect(screen.getByTestId("qlv2-error")).toBeInTheDocument());
-    expect(screen.getByTestId("qlv2-error").textContent).toMatch(/total nutrient solution/i);
-    expect(writeFeedingMock).not.toHaveBeenCalled();
-  });
-
   it("blocks save when nutrient line is missing", async () => {
     renderSheet("plant:plant-1");
     clickFeed();
     // Skip nutrient line, just fill product.
     fireEvent.change(screen.getByLabelText("Product 1 name"), {
       target: { value: "Base A" },
-    });
-    fireEvent.change(screen.getByLabelText("Applied volume (ml)"), {
-      target: { value: "750" },
     });
     clickSave();
     await waitFor(() => expect(screen.getByTestId("qlv2-error")).toBeInTheDocument());
@@ -295,9 +245,6 @@ describe("QuickLogV2Sheet — structured feeding", () => {
     clickFeed();
     fireEvent.change(screen.getByLabelText("Nutrient line"), {
       target: { value: "veg-week-3" },
-    });
-    fireEvent.change(screen.getByLabelText("Applied volume (ml)"), {
-      target: { value: "750" },
     });
     clickSave();
     await waitFor(() => expect(screen.getByTestId("qlv2-error")).toBeInTheDocument());
@@ -327,9 +274,6 @@ describe("QuickLogV2Sheet — structured feeding", () => {
     });
     fireEvent.change(screen.getByLabelText("Product 1 amount"), {
       target: { value: "1" },
-    });
-    fireEvent.change(screen.getByLabelText("Applied volume (ml)"), {
-      target: { value: "750" },
     });
     clickSave();
     await waitFor(() => expect(screen.getByTestId("qlv2-error")).toBeInTheDocument());

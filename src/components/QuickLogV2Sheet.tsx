@@ -55,7 +55,6 @@ import {
   FEEDING_SAVE_SUCCESS_MESSAGE,
   buildFeedingFormPayload,
   feedingFormReasonToHelper,
-  isFeedingFormPristine,
   type QuickLogFeedingFormState,
 } from "@/lib/quickLogFeedingFormViewModel";
 import { writeFeedingTypedEvent } from "@/lib/writeFeedingTypedEvent";
@@ -309,10 +308,22 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
     if (feedingDefaultsApplied) return;
     if (!feedingDefaults.defaults) return;
     // Only prefill if the user has not started typing — preserves manual input.
-    if (!isFeedingFormPristine(feedingForm)) return;
+    if (
+      feedingForm.lineId.trim() !== "" ||
+      feedingForm.products.some((p) => p.name.trim() !== "")
+    ) {
+      return;
+    }
     setFeedingForm(applyFeedingDefaultsToForm(feedingDefaults));
     setFeedingDefaultsApplied(true);
-  }, [open, form.action, feedingDefaults, feedingDefaultsApplied, feedingForm]);
+  }, [
+    open,
+    form.action,
+    feedingDefaults,
+    feedingDefaultsApplied,
+    feedingForm.lineId,
+    feedingForm.products,
+  ]);
 
   // Idempotent: the note field receives value updates from multiple event
   // paths (onChange + onInput + onCompositionEnd + onBlur), which often
@@ -504,7 +515,6 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
         growId: resolved.growId,
         tentId: resolved.tentId ?? null,
         plantId: resolved.plantId ?? null,
-        idempotencyKey: saveIdempotencyKeyRef.current,
         form: feedingForm,
       });
       if (mapped.ok !== true) {
@@ -522,10 +532,7 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
         return;
       }
       const growEventId = result.eventId;
-      trackQuickLogSuccess("feed", { reused: result.reused });
-      // The logical feeding save is complete. Rotate only now so a retry
-      // after a failed/unknown response reuses the original server key.
-      saveIdempotencyKeyRef.current = newQuickLogSaveKey();
+      trackQuickLogSuccess("feed");
       setSaveStatus(FEEDING_SAVE_SUCCESS_MESSAGE);
       showTimelineConfirmation(FEEDING_SAVE_SUCCESS_MESSAGE, {
         // Feed events are currently surfaced in the global typed root-zone

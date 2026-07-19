@@ -87,14 +87,10 @@ describe("quicklog_save_manual idempotency contract (client threading)", () => {
     expect(SHEET).toMatch(/idempotencyKey: saveIdempotencyKeyRef\.current/);
   });
 
-  it("sheet rotates the shared key only on completed logical submissions", () => {
-    // Three intentional sites: structured-feed success, manual-log success,
-    // and the grower's explicit "Log another" reset.
+  it("sheet rotates the key only on submission completion, never mid-retry", () => {
+    // Two rotation sites: full success block + "Log another".
     const rotations = SHEET.match(/saveIdempotencyKeyRef\.current = newQuickLogSaveKey\(\)/g) ?? [];
-    expect(rotations).toHaveLength(3);
-    expect(SHEET).toMatch(
-      /trackQuickLogSuccess\("feed", \{ reused: result\.reused \}\);[\s\S]{0,300}saveIdempotencyKeyRef\.current = newQuickLogSaveKey\(\)/,
-    );
+    expect(rotations).toHaveLength(2);
   });
 
   it("companion-media failure is partial success — the save flow no longer aborts", () => {

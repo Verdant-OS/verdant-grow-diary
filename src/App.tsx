@@ -48,6 +48,7 @@ const GrowLearning = lazy(() => import("./pages/GrowLearning"));
 const PhenoHuntsIndex = lazy(() => import("./pages/PhenoHuntsIndex"));
 const PhenoHuntNew = lazy(() => import("./pages/PhenoHuntNew"));
 const PhenoHuntCompare = lazy(() => import("./pages/PhenoHuntCompare"));
+const PhenoHuntShowcase = lazy(() => import("./pages/PhenoHuntShowcase"));
 const PhenoHuntWorkspace = lazy(() => import("./pages/PhenoHuntWorkspace"));
 const PhenoKeepersPage = lazy(() => import("./pages/PhenoKeepersPage"));
 const BreedingLogNew = lazy(() => import("./pages/BreedingLogNew"));
@@ -293,6 +294,11 @@ const App = () => (
                       RLS-scoped SELECT (empty/graceful without a session);
                       still read-only — no writes/AI/automation. */}
                   <Route path="/pheno-hunts/:id/compare" element={<PhenoHuntCompare />} />
+                  {/* LIVE per-hunt showcase — the grower's own hunt walked
+                      through the pack → contenders → fight → cure → family tree
+                      surfaces. RLS-scoped read; graceful demo fallback without a
+                      session/hunt. Read-only — no writes/AI/automation. */}
+                  <Route path="/pheno-hunts/:id/showcase" element={<PhenoHuntShowcase />} />
 
                   {/* Public 30-second Quick Log starter. Local draft on this
                       device only — no Supabase/AI/device calls, no fake-live

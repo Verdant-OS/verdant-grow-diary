@@ -75,9 +75,17 @@ describe("oneTentLoopNavigationRules", () => {
     expect(r2.href ?? "").not.toMatch(/^\/grows\//);
   });
 
-  it("enables routes for tent and plant when ids are present", () => {
+  it("routes tent navigation and resolves Plant -> Quick Log as a local action", () => {
     expect(resolveOneTentLoopNextStep("tent", { tentId: "t1" }).href).toBe("/tents/t1");
-    expect(resolveOneTentLoopNextStep("plant", { plantId: "p1" }).href).toBe("/plants/p1");
+    const plant = resolveOneTentLoopNextStep("plant", { plantId: "p1" });
+    expect(plant.disabled).toBe(false);
+    expect(plant.href).toBeNull();
+    expect(plant.localAction).toBe("open-quick-log");
+  });
+
+  it("never self-links Plant -> Quick Log back to Plant Detail", () => {
+    const plant = resolveOneTentLoopNextStep("plant", { plantId: "p1" });
+    expect(plant.href ?? "").not.toMatch(/^\/plants\//);
   });
 
   it("routes quick-log → timeline and timeline → sensors without ids", () => {
@@ -90,9 +98,7 @@ describe("oneTentLoopNavigationRules", () => {
   });
 
   it("ai-doctor with alertId deep-links; without alertId falls back to /alerts with a clarifying CTA label", () => {
-    expect(
-      resolveOneTentLoopNextStep("ai-doctor", { alertId: "a1" }).href,
-    ).toBe("/alerts/a1");
+    expect(resolveOneTentLoopNextStep("ai-doctor", { alertId: "a1" }).href).toBe("/alerts/a1");
     const fallback = resolveOneTentLoopNextStep("ai-doctor");
     expect(fallback.href).toBe("/alerts");
     // Fallback must NOT imply opening a specific alert.
@@ -105,17 +111,13 @@ describe("oneTentLoopNavigationRules", () => {
     expect(r.ctaLabel).toBe("Add to Action Queue");
     expect(r.href).toBe("/actions");
     expect(resolveOneTentLoopNextStep("alert").href).toBe("/actions");
-    expect(
-      resolveOneTentLoopNextStep("alert", { actionId: "x1" }).href,
-    ).toBe("/actions/x1");
+    expect(resolveOneTentLoopNextStep("alert", { actionId: "x1" }).href).toBe("/actions/x1");
     // Regression guard against the previous /alerts misrouting.
     expect(r.href).not.toMatch(/^\/alerts/);
   });
 
   it("routes action-queue to action detail when actionId is present", () => {
-    expect(
-      resolveOneTentLoopNextStep("action-queue", { actionId: "x1" }).href,
-    ).toBe("/actions/x1");
+    expect(resolveOneTentLoopNextStep("action-queue", { actionId: "x1" }).href).toBe("/actions/x1");
     expect(resolveOneTentLoopNextStep("action-queue").href).toBe("/actions");
   });
 

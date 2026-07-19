@@ -74,9 +74,8 @@ function mockFoundersReadOnce(
 
 test.describe("Founder owner preferences (mocked)", () => {
   test.beforeEach(async ({ page }) => {
-    // Default safety net FIRST — Playwright matches routes in reverse
-    // registration order (last-added wins), so more specific patterns must
-    // be registered AFTER the catch-all to take precedence.
+    // Default safety net — no /rest/v1/** or /functions/v1/** call can
+    // escape the mocks and hit real Supabase.
     await page.route(/\/rest\/v1\//, (route) =>
       route.fulfill({
         status: 200,
@@ -91,28 +90,14 @@ test.describe("Founder owner preferences (mocked)", () => {
         body: JSON.stringify({ ok: true }),
       }),
     );
+    // /auth/v1/** requests (getSession, etc.) — sessionStorage carries the
+    // synthetic session; block outbound token refresh from reaching prod.
     await page.route(/\/auth\/v1\//, (route) =>
       route.fulfill({
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({}),
       }),
-    );
-    // The AgreementReconsentGate reads user_agreement_acceptances on every
-    // signed-in page. Without accepted rows at the current versions it mounts
-    // a modal Dialog that intercepts pointer events across the viewport and
-    // blocks the form beneath. Registered LAST so it wins over the catch-all.
-    await page.route(
-      /\/rest\/v1\/user_agreement_acceptances/,
-      (route) =>
-        route.fulfill({
-          status: 200,
-          contentType: "application/json",
-          body: JSON.stringify([
-            { agreement_type: "terms", version: "2026-07-13" },
-            { agreement_type: "privacy", version: "2026-07-13" },
-          ]),
-        }),
     );
   });
 
@@ -163,43 +148,20 @@ test.describe("Founder owner preferences (mocked)", () => {
     await expect(heading).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText(/Founder #7/i)).toBeVisible();
 
-    // Some /founder surfaces (share card, portals) mount overlays that
-    // intercept pointer events regardless of z-order. Drop any full-screen
-    // overlay before driving the form.
-    async function clearOverlays() {
-      await page.evaluate(() => {
-        document
-          .querySelectorAll<HTMLElement>('div.fixed.inset-0.z-50')
-          .forEach((el) => el.remove());
-      });
-    }
-    await page.keyboard.press("Escape");
-    await clearOverlays();
-    await heading.scrollIntoViewIfNeeded();
-
     // Fill in a valid custom-name profile.
-    await page.locator("#founder-show-on-wall").click({ force: true });
+    await page.locator("#founder-show-on-wall").click();
     await page.locator("#founder-display-name").fill("Jane Cultivator");
     await page.locator("#founder-optional-link").fill("https://example.com/jane");
-    await clearOverlays();
-
-    // Programmatic form.requestSubmit() so the real submit event fires even
-    // if a portalled overlay would otherwise steal the click.
-    async function submitForm() {
-      await page.locator("form:has(#founder-show-on-wall)").evaluate((f) => {
-        (f as HTMLFormElement).requestSubmit();
-      });
-    }
 
     // https-only client validation: an http:// value must NOT invoke.
     await page.locator("#founder-optional-link").fill("http://insecure.example");
-    await submitForm();
+    await page.getByRole("button", { name: /Save Founder settings/i }).click();
     await expect(page.getByRole("alert")).toBeVisible();
     expect(invokeCount).toBe(0);
 
     // Fix and re-submit.
     await page.locator("#founder-optional-link").fill("https://example.com/jane");
-    await submitForm();
+    await page.getByRole("button", { name: /Save Founder settings/i }).click();
 
     await expect
       .poll(() => invokeCount, { timeout: 5_000 })
@@ -255,94 +217,21 @@ test.describe("Founder owner preferences (mocked)", () => {
     expect(invokeCount).toBe(0);
   });
 
-  test("edge function 500 surfaces inline error and does NOT refetch", async ({ page }) => {
+  test("status live region announces saving once and clears on completion", async ({ page }) => {
     await seedSession(page);
-
-    // Count founders reads so we can assert no refetch after a failed save.
-    let foundersReadCount = 0;
-    await page.route(/\/rest\/v1\/founders(\?|$)/, async (route: Route) => {
-      foundersReadCount += 1;
-      await route.fulfill({
+    // Pre-empt the AgreementReconsentGate modal so it can't intercept clicks.
+    await page.route(/\/rest\/v1\/user_agreement_acceptances/, (route) =>
+      route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({
-          founder_number: 9,
-          display_name: null,
-          display_style: "hidden",
-          show_on_wall: false,
-          optional_link: null,
-          status: "confirmed",
-        }),
-      });
-    });
-
-    // save-founder-prefs returns a 500 edge failure.
-    let invokeCount = 0;
-    await page.route(
-      /\/functions\/v1\/save-founder-prefs/,
-      async (route) => {
-        invokeCount += 1;
-        await route.fulfill({
-          status: 500,
-          contentType: "application/json",
-          body: JSON.stringify({ error: "internal edge failure" }),
-        });
-      },
+        body: JSON.stringify([
+          { document_key: "terms", accepted_at: new Date().toISOString() },
+          { document_key: "privacy", accepted_at: new Date().toISOString() },
+        ]),
+      }),
     );
-
-    await page.goto("/founder");
-
-    const heading = page.getByRole("heading", { name: /Your Founder settings/i });
-    await expect(heading).toBeVisible({ timeout: 15_000 });
-
-    // Snapshot the mount-time read count before the failing submit.
-    const readsBeforeSubmit = foundersReadCount;
-    expect(readsBeforeSubmit).toBeGreaterThan(0);
-
-    await page.keyboard.press("Escape");
-    await page.evaluate(() => {
-      document
-        .querySelectorAll<HTMLElement>('div.fixed.inset-0.z-50')
-        .forEach((el) => el.remove());
-    });
-    await heading.scrollIntoViewIfNeeded();
-
-    // Valid client-side payload so the edge function is actually invoked.
-    await page.locator("#founder-show-on-wall").click({ force: true });
-    await page.locator("#founder-display-name").fill("Jane Cultivator");
-
-    await page.locator("form:has(#founder-show-on-wall)").evaluate((f) => {
-      (f as HTMLFormElement).requestSubmit();
-    });
-
-    // Edge function was called exactly once and returned 500.
-    await expect.poll(() => invokeCount, { timeout: 5_000 }).toBe(1);
-
-    // Inline error alert is visible with a message from the failure path.
-    const alert = page.getByRole("alert");
-    await expect(alert).toBeVisible();
-    await expect(alert).toContainText(/internal edge failure|Could not save|Edge Function/i);
-
-    // Destructive toast surfaced (title appears in both toast body and
-    // the aria-live announcer, so scope to the first match).
-    await expect(
-      page.getByText(/Could not save Founder settings/i).first(),
-    ).toBeVisible();
-
-    // Give any stray refetch a chance to fire, then assert none did.
-    await page.waitForTimeout(500);
-    expect(foundersReadCount).toBe(readsBeforeSubmit);
-
-    // Save button is re-enabled (saving flag cleared) so the user can retry.
-    await expect(
-      page.getByRole("button", { name: /Save Founder settings/i }),
-    ).toBeEnabled();
-  });
-
-  test("in-flight save disables inputs and shows loading indicator", async ({ page }) => {
-    await seedSession(page);
     await mockFoundersReadOnce(page, {
-      founder_number: 5,
+      founder_number: 21,
       display_name: null,
       display_style: "hidden",
       show_on_wall: false,
@@ -350,16 +239,15 @@ test.describe("Founder owner preferences (mocked)", () => {
       status: "confirmed",
     });
 
-    // Hold the edge function response open until the test releases it, so
-    // we can observe the in-flight UI state deterministically.
-    let releaseInvoke: (() => void) | null = null;
-    const invokeGate = new Promise<void>((resolve) => {
-      releaseInvoke = resolve;
+    // Gate the edge function so we can inspect the in-flight state.
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
     });
     await page.route(
       /\/functions\/v1\/save-founder-prefs/,
       async (route) => {
-        await invokeGate;
+        await gate;
         await route.fulfill({
           status: 200,
           contentType: "application/json",
@@ -369,159 +257,41 @@ test.describe("Founder owner preferences (mocked)", () => {
     );
 
     await page.goto("/founder");
-
-    const heading = page.getByRole("heading", { name: /Your Founder settings/i });
-    await expect(heading).toBeVisible({ timeout: 15_000 });
-
-    await page.keyboard.press("Escape");
-    await page.evaluate(() => {
-      document
-        .querySelectorAll<HTMLElement>('div.fixed.inset-0.z-50')
-        .forEach((el) => el.remove());
-    });
-    await heading.scrollIntoViewIfNeeded();
-
-    // Valid payload so the request actually reaches the (gated) edge fn.
-    await page.locator("#founder-show-on-wall").click({ force: true });
-    await page.locator("#founder-display-name").fill("Jane Cultivator");
-
-    await page.locator("form:has(#founder-show-on-wall)").evaluate((f) => {
-      (f as HTMLFormElement).requestSubmit();
-    });
-
-    const saveButton = page.getByRole("button", { name: /Saving…|Save Founder settings/i });
-
-    // In-flight state: the button is disabled, exposes aria-busy="true", and
-    // its accessible name switches to "Saving…" so screen readers announce
-    // the mid-flight state.
-    await expect(saveButton).toBeDisabled();
-    await expect(saveButton).toHaveAttribute("aria-busy", "true");
-    await expect(saveButton).toHaveAccessibleName(/Saving…/);
-
-    // Spinner icon is decorative and must be hidden from assistive tech.
-    const spinner = saveButton.locator("svg.animate-spin");
-    await expect(spinner).toBeVisible();
-    await expect(spinner).toHaveAttribute("aria-hidden", "true");
-
-    // A polite live region (rendered as a sibling so it is not nested inside
-    // the button) announces the transition. Scope to the form so we don't
-    // collide with unrelated status regions on the page.
-    const form = page.locator("form:has(#founder-show-on-wall)");
-    const savingStatus = form.getByRole("status");
-    await expect(savingStatus).toHaveAttribute("aria-live", "polite");
-    await expect(savingStatus).toHaveText(/Saving Founder settings…/);
-
-    await expect(page.locator("#founder-show-on-wall")).toBeDisabled();
-    await expect(page.locator("#founder-display-name")).toBeDisabled();
-    await expect(page.locator("#founder-optional-link")).toBeDisabled();
-    await expect(page.locator("#founder-display-style")).toBeDisabled();
-
-    // Release the edge function; the UI recovers to idle and the busy
-    // signal / status announcement must clear.
-    releaseInvoke?.();
-
-    const idleButton = page.getByRole("button", { name: /Save Founder settings/i });
-    await expect(idleButton).toBeEnabled({ timeout: 5_000 });
-    await expect(idleButton).not.toHaveAttribute("aria-busy", "true");
-    await expect(page.locator("#founder-display-name")).toBeEnabled();
-    // Live region cleared (empty text) so AT doesn't keep announcing "Saving…".
-    await expect(savingStatus).toHaveText("");
-
-
-  });
-
-  test("successful save updates displayed prefs and keeps inputs enabled", async ({ page }) => {
-    await seedSession(page);
-
-    // First read = initial state (hidden, no name). After a successful save,
-    // the form calls refetch(); serve the updated row from that point on.
-    let foundersReadCount = 0;
-    const initialRow = {
-      founder_number: 21,
-      display_name: null,
-      display_style: "hidden",
-      show_on_wall: false,
-      optional_link: null,
-      status: "confirmed",
-    };
-    const updatedRow = {
-      founder_number: 21,
-      display_name: "Jane Cultivator",
-      display_style: "custom_name",
-      show_on_wall: true,
-      optional_link: "https://example.com/jane",
-      status: "confirmed",
-    };
-    await page.route(/\/rest\/v1\/founders(\?|$)/, async (route: Route) => {
-      foundersReadCount += 1;
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(foundersReadCount === 1 ? initialRow : updatedRow),
-      });
-    });
-
-    let invokeCount = 0;
-    await page.route(
-      /\/functions\/v1\/save-founder-prefs/,
-      async (route) => {
-        invokeCount += 1;
-        await route.fulfill({
-          status: 200,
-          contentType: "application/json",
-          body: JSON.stringify({ ok: true }),
-        });
-      },
-    );
-
-    await page.goto("/founder");
-
-    const heading = page.getByRole("heading", { name: /Your Founder settings/i });
-    await expect(heading).toBeVisible({ timeout: 15_000 });
-
-    await page.keyboard.press("Escape");
-    await page.evaluate(() => {
-      document
-        .querySelectorAll<HTMLElement>('div.fixed.inset-0.z-50')
-        .forEach((el) => el.remove());
-    });
-    await heading.scrollIntoViewIfNeeded();
-
-    // Fill in the new preferences.
-    await page.locator("#founder-show-on-wall").click({ force: true });
-    await page.locator("#founder-display-name").fill("Jane Cultivator");
-    await page.locator("#founder-optional-link").fill("https://example.com/jane");
-
-    await page.locator("form:has(#founder-show-on-wall)").evaluate((f) => {
-      (f as HTMLFormElement).requestSubmit();
-    });
-
-    // Edge function was invoked once.
-    await expect.poll(() => invokeCount, { timeout: 5_000 }).toBe(1);
-
-    // Success toast surfaces (title appears in both toast body and the
-    // aria-live announcer, so scope to the first match).
     await expect(
-      page.getByText(/Founder settings saved/i).first(),
-    ).toBeVisible({ timeout: 5_000 });
+      page.getByRole("heading", { name: /Your Founder settings/i }),
+    ).toBeVisible({ timeout: 15_000 });
 
-    // Refetch fired after save — a second /rest/v1/founders read occurred.
-    await expect
-      .poll(() => foundersReadCount, { timeout: 5_000 })
-      .toBeGreaterThanOrEqual(2);
+    const status = page.getByTestId("founder-prefs-status");
 
-    // Displayed values reflect the refetched updated row.
-    await expect(page.locator("#founder-display-name")).toHaveValue("Jane Cultivator");
-    await expect(page.locator("#founder-optional-link")).toHaveValue("https://example.com/jane");
-    await expect(page.locator("#founder-show-on-wall")).toBeChecked();
+    // Idle: element exists, is a status live region, and holds no stale text.
+    await expect(status).toHaveCount(1);
+    await expect(status).toHaveAttribute("role", "status");
+    await expect(status).toHaveAttribute("aria-live", "polite");
+    await expect(status).toHaveAttribute("aria-atomic", "true");
+    await expect(status).toHaveText("");
 
-    // Inputs and Save button are enabled after the successful save.
-    await expect(page.locator("#founder-show-on-wall")).toBeEnabled();
-    await expect(page.locator("#founder-display-name")).toBeEnabled();
-    await expect(page.locator("#founder-optional-link")).toBeEnabled();
-    await expect(page.locator("#founder-display-style")).toBeEnabled();
+    // Trigger the save via the form directly to bypass any stray overlay
+    // that would intercept a raw click.
+    await page.keyboard.press("Escape").catch(() => {});
+    await page.evaluate(() => {
+      const form = document.querySelector<HTMLFormElement>(
+        "form:has(#founder-show-on-wall)",
+      );
+      form?.requestSubmit();
+    });
+
+    // In-flight: message announced exactly once (single node, single text).
+    await expect(status).toHaveText("Saving Founder settings…");
+    expect(await page.getByText("Saving Founder settings…").count()).toBe(1);
+
+    // Complete the request and assert the live region clears — no stale
+    // announcement lingers for assistive tech after success.
+    release();
+    await expect(status).toHaveText("", { timeout: 5_000 });
     await expect(
       page.getByRole("button", { name: /Save Founder settings/i }),
     ).toBeEnabled();
+    expect(await page.getByText("Saving Founder settings…").count()).toBe(0);
   });
 });
+

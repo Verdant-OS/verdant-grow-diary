@@ -9,7 +9,14 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import type { QuickLogFeedingFormState } from "@/lib/quickLogFeedingFormViewModel";
+import { Button } from "@/components/ui/button";
+import { Plus, Trash2 } from "lucide-react";
+import {
+  FEEDING_FORM_PRODUCT_CAP,
+  addFeedingProductRow,
+  removeFeedingProductRow,
+  type QuickLogFeedingFormState,
+} from "@/lib/quickLogFeedingFormViewModel";
 import {
   buildFeedingReview,
   FEEDING_REVIEW_TITLE,
@@ -20,10 +27,7 @@ import {
   buildEcCompensationPreview,
   EC_COMPENSATION_PREVIEW_DISCLAIMER,
 } from "@/lib/ecCompensationPreviewViewModel";
-import {
-  updateEcPpm500Pair,
-  type EcPpm500EditSource,
-} from "@/lib/ecPpm500PairRules";
+import { updateEcPpm500Pair, type EcPpm500EditSource } from "@/lib/ecPpm500PairRules";
 
 interface Props {
   value: QuickLogFeedingFormState;
@@ -47,9 +51,7 @@ export default function QuickLogFeedingForm({
     idx: number,
     patch: Partial<QuickLogFeedingFormState["products"][number]>,
   ) => {
-    const next = value.products.map((row, i) =>
-      i === idx ? { ...row, ...patch } : row,
-    );
+    const next = value.products.map((row, i) => (i === idx ? { ...row, ...patch } : row));
     onChange({ ...value, products: next });
   };
 
@@ -65,7 +67,6 @@ export default function QuickLogFeedingForm({
 
   const review = buildFeedingReview(value, defaultsApplied);
 
-
   return (
     <div className="space-y-4" data-testid="qlv2-feeding-form">
       <div>
@@ -78,20 +79,38 @@ export default function QuickLogFeedingForm({
           onChange={(e) => setField("lineId", e.target.value)}
           placeholder="e.g. veg-week-3"
         />
-        <p
-          id="qlv2-feed-line-help"
-          className="mt-1 text-sm text-muted-foreground"
-        >
+        <p id="qlv2-feed-line-help" className="mt-1 text-sm text-muted-foreground">
           Required. Use a short label you can recognize later.
         </p>
       </div>
 
+      <div>
+        <Label htmlFor="qlv2-feed-volume">Applied volume (ml)</Label>
+        <Input
+          id="qlv2-feed-volume"
+          inputMode="decimal"
+          value={value.volumeMl}
+          disabled={disabled}
+          aria-describedby="qlv2-feed-volume-help"
+          onChange={(e) => setField("volumeMl", e.target.value)}
+          placeholder="e.g. 750"
+        />
+        <p id="qlv2-feed-volume-help" className="mt-1 text-sm text-muted-foreground">
+          Required. Record the total nutrient solution delivered to this target.
+        </p>
+      </div>
+
       <div className="space-y-2">
-        <Label>Products</Label>
+        <div className="flex items-center justify-between gap-2">
+          <Label>Products</Label>
+          <span className="text-xs text-muted-foreground">
+            {value.products.length}/{FEEDING_FORM_PRODUCT_CAP}
+          </span>
+        </div>
         {value.products.map((row, idx) => (
           <div
             key={idx}
-            className="grid grid-cols-[1fr_80px_80px] gap-2"
+            className="grid grid-cols-[minmax(0,1fr)_72px_78px_auto] gap-2"
             data-testid={`qlv2-feed-product-row-${idx}`}
           >
             <Input
@@ -116,20 +135,40 @@ export default function QuickLogFeedingForm({
               onChange={(e) => setProductField(idx, { unit: e.target.value })}
               placeholder="Unit"
             />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              disabled={disabled || value.products.length <= 1}
+              aria-label={`Remove product ${idx + 1}`}
+              onClick={() => setField("products", removeFeedingProductRow(value.products, idx))}
+            >
+              <Trash2 className="h-4 w-4" aria-hidden="true" />
+            </Button>
           </div>
         ))}
-        <p className="text-sm text-muted-foreground">
-          At least one product is required.
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm text-muted-foreground">
+            At least one product is required. Add each part of the mix separately.
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={disabled || value.products.length >= FEEDING_FORM_PRODUCT_CAP}
+            onClick={() => setField("products", addFeedingProductRow(value.products))}
+          >
+            <Plus className="mr-1 h-4 w-4" aria-hidden="true" />
+            Add product
+          </Button>
+        </div>
       </div>
 
       <details className="rounded-md border border-border p-3">
-        <summary className="cursor-pointer text-sm font-medium">
-          Optional metrics
-        </summary>
+        <summary className="cursor-pointer text-sm font-medium">Optional metrics</summary>
         <p id="qlv2-feed-ec-ppm-help" className="mt-2 text-xs text-muted-foreground">
-          PPM uses the 500 scale. Enter either value and Verdant fills the other:
-          PPM ÷ 500 = EC; EC × 500 = PPM. Canonical EC is saved in mS/cm.
+          PPM uses the 500 scale. Enter either value and Verdant fills the other: PPM ÷ 500 = EC; EC
+          × 500 = PPM. Canonical EC is saved in mS/cm.
         </p>
         <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
           <div>
@@ -214,9 +253,7 @@ export default function QuickLogFeedingForm({
               value={value.runoffEc}
               disabled={disabled}
               aria-describedby="qlv2-feed-ec-ppm-help"
-              onChange={(e) =>
-                setEcPpmPair("runoffEc", "runoffPpm", "ec", e.target.value)
-              }
+              onChange={(e) => setEcPpmPair("runoffEc", "runoffPpm", "ec", e.target.value)}
             />
           </div>
           <div>
@@ -227,9 +264,7 @@ export default function QuickLogFeedingForm({
               value={value.runoffPpm}
               disabled={disabled}
               aria-describedby="qlv2-feed-ec-ppm-help"
-              onChange={(e) =>
-                setEcPpmPair("runoffEc", "runoffPpm", "ppm", e.target.value)
-              }
+              onChange={(e) => setEcPpmPair("runoffEc", "runoffPpm", "ppm", e.target.value)}
             />
           </div>
           <div>
@@ -243,12 +278,32 @@ export default function QuickLogFeedingForm({
             />
           </div>
         </div>
+        <div className="mt-3">
+          <Label htmlFor="qlv2-feed-note">Feeding note (optional)</Label>
+          <Textarea
+            id="qlv2-feed-note"
+            value={value.note}
+            maxLength={500}
+            disabled={disabled}
+            aria-describedby="qlv2-feed-note-help qlv2-feed-note-count"
+            onChange={(e) => setField("note", e.target.value)}
+            onInput={(e) => setField("note", (e.currentTarget as HTMLTextAreaElement).value)}
+            onCompositionEnd={(e) =>
+              setField("note", (e.currentTarget as HTMLTextAreaElement).value)
+            }
+            onBlur={(e) => setField("note", e.currentTarget.value)}
+            placeholder="Plant response, runoff observation, or anything unusual"
+          />
+          <div className="mt-1 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+            <p id="qlv2-feed-note-help">Keep observations factual and concise.</p>
+            <p id="qlv2-feed-note-count" aria-live="polite">
+              {value.note.length}/500
+            </p>
+          </div>
+        </div>
       </details>
 
-      <div
-        className="rounded-md border border-border p-3"
-        data-testid="qlv2-feeding-review"
-      >
+      <div className="rounded-md border border-border p-3" data-testid="qlv2-feeding-review">
         <h4 className="text-sm font-medium">{FEEDING_REVIEW_TITLE}</h4>
         {review.defaultsApplied && (
           <p
@@ -293,10 +348,7 @@ export default function QuickLogFeedingForm({
                 <dd className="font-medium">{review.note}</dd>
               </div>
             )}
-            <EcCompensationPreviewLine
-              ec={value.ecIn}
-              waterTempC={value.waterTempC}
-            />
+            <EcCompensationPreviewLine ec={value.ecIn} waterTempC={value.waterTempC} />
           </dl>
         )}
       </div>
@@ -304,13 +356,7 @@ export default function QuickLogFeedingForm({
   );
 }
 
-function EcCompensationPreviewLine({
-  ec,
-  waterTempC,
-}: {
-  ec: string;
-  waterTempC: string;
-}) {
+function EcCompensationPreviewLine({ ec, waterTempC }: { ec: string; waterTempC: string }) {
   const preview = buildEcCompensationPreview({
     ec,
     waterTempC,

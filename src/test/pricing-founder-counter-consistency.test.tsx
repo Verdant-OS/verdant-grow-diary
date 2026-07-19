@@ -8,8 +8,8 @@ const mocks = vi.hoisted(() => ({
   founderSlots: {
     status: "ready",
     remaining: 42,
-    total: 75,
-    claimed: 33,
+    total: 100,
+    claimed: 58,
     soldOut: false,
   },
 }));
@@ -47,8 +47,8 @@ beforeEach(() => {
   Object.assign(mocks.founderSlots, {
     status: "ready",
     remaining: 42,
-    total: 75,
-    claimed: 33,
+    total: 100,
+    claimed: 58,
     soldOut: false,
   });
 });
@@ -58,7 +58,7 @@ describe("Pricing Founder counter consistency", () => {
     const user = userEvent.setup();
     renderPricing();
 
-    expect(screen.getByTestId("pricing-card-founder")).toHaveTextContent("33 of 75 claimed");
+    expect(screen.getByTestId("pricing-card-founder")).toHaveTextContent("58 of 100 claimed");
     expect(screen.getByTestId("pricing-cta-founder-lifetime")).toBeEnabled();
     expect(screen.getByTestId("pricing-cta-founder-highlight")).toBeEnabled();
 
@@ -70,8 +70,8 @@ describe("Pricing Founder counter consistency", () => {
     Object.assign(mocks.founderSlots, {
       status: "ready",
       remaining: 0,
-      total: 75,
-      claimed: 75,
+      total: 100,
+      claimed: 100,
       soldOut: true,
     });
     const user = userEvent.setup();
@@ -83,7 +83,7 @@ describe("Pricing Founder counter consistency", () => {
     expect(highlightCta).toBeDisabled();
     expect(planCta).toHaveTextContent("Founder Lifetime sold out");
     expect(highlightCta).toHaveTextContent("Founder Lifetime sold out");
-    expect(screen.getByTestId("pricing-card-founder")).toHaveTextContent("75 of 75 claimed");
+    expect(screen.getByTestId("pricing-card-founder")).toHaveTextContent("100 of 100 claimed");
 
     await user.click(highlightCta);
     expect(mocks.openCheckout).not.toHaveBeenCalled();
@@ -93,15 +93,15 @@ describe("Pricing Founder counter consistency", () => {
     Object.assign(mocks.founderSlots, {
       status: "unknown",
       remaining: null,
-      total: 75,
+      total: 100,
       claimed: null,
       soldOut: false,
     });
     renderPricing();
 
     const founderCard = screen.getByTestId("pricing-card-founder");
-    expect(founderCard).toHaveTextContent("First 75 only");
-    expect(founderCard).not.toHaveTextContent(/NaN|of 75 claimed|sold out/i);
+    expect(founderCard).toHaveTextContent("First 100 only");
+    expect(founderCard).not.toHaveTextContent(/NaN|of 100 claimed|sold out/i);
     expect(screen.getByTestId("pricing-cta-founder-lifetime")).toBeEnabled();
     expect(screen.getByTestId("pricing-cta-founder-highlight")).toBeEnabled();
   });

@@ -27,7 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Loader2, Play, PlugZap, ShieldAlert } from "lucide-react";
+import { Loader2, Play, PlugZap, RotateCcw, ShieldAlert } from "lucide-react";
 import {
   callMcpTool,
   hasStoredToken,

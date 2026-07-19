@@ -133,6 +133,105 @@ interface FieldError {
   message: string;
 }
 
+/**
+ * Outcome categories the explorer renders guidance for. These are derived
+ * from the low-level ToolCallOutcome plus JSON-RPC/tool text conventions
+ * documented in /docs/mcp-api.
+ */
+export type OutcomeCategory =
+  | "ok"
+  | "unauthorized"
+  | "not_connected"
+  | "invalid_params"
+  | "not_found"
+  | "tool_error"
+  | "transport_error";
+
+export function classifyOutcome(outcome: ToolCallOutcome | null): OutcomeCategory | null {
+  if (!outcome) return null;
+  if (outcome.status === "not_connected") return "not_connected";
+  if (outcome.status === "unauthorized") return "unauthorized";
+  if (outcome.status === "error") {
+    // JSON-RPC: -32602 = invalid params, -32601 = method/tool not found,
+    // -32000..-32099 = server-defined. Fall back to message text for
+    // servers that only stringify the failure.
+    if (outcome.code === -32602) return "invalid_params";
+    if (outcome.code === -32601) return "not_found";
+    const m = outcome.message.toLowerCase();
+    if (/invalid[_ ]?params|validation|schema|bad request/.test(m)) return "invalid_params";
+    if (/not[_ ]?found|no such|unknown/.test(m)) return "not_found";
+    if (/unauthorized|401|token/.test(m)) return "unauthorized";
+    return "transport_error";
+  }
+  // status === "ok"
+  if (outcome.result.isError) {
+    const text = outcome.result.content?.find((c) => c.type === "text")?.text ?? "";
+    const m = text.toLowerCase();
+    if (/invalid[_ ]?params|validation|schema|must be|required/.test(m)) return "invalid_params";
+    if (/not[_ ]?found|does not (?:exist|belong)|no rows|unknown/.test(m)) return "not_found";
+    return "tool_error";
+  }
+  return "ok";
+}
+
+interface GuidanceCopy {
+  tone: "destructive" | "warning";
+  title: string;
+  body: string;
+  primaryAction: "reconnect" | "retry" | "fix_params" | null;
+}
+
+function guidanceFor(category: OutcomeCategory): GuidanceCopy | null {
+  switch (category) {
+    case "unauthorized":
+      return {
+        tone: "destructive",
+        title: "Unauthorized (401)",
+        body: "Your access token was rejected or expired. Reconnect this browser from Settings → Agent integrations, then retry.",
+        primaryAction: "reconnect",
+      };
+    case "not_connected":
+      return {
+        tone: "warning",
+        title: "Not connected",
+        body: "This browser has no MCP session. Connect once from Settings → Agent integrations, then retry.",
+        primaryAction: "reconnect",
+      };
+    case "invalid_params":
+      return {
+        tone: "destructive",
+        title: "Invalid parameters",
+        body: "The server rejected the arguments. Fix the highlighted fields above (UUID format, integer range) and run again.",
+        primaryAction: "fix_params",
+      };
+    case "not_found":
+      return {
+        tone: "warning",
+        title: "Not found for the signed-in grower",
+        body: "The id was well-formed but doesn't match any of your own rows. Run list_grows to copy a real id, then retry.",
+        primaryAction: "retry",
+      };
+    case "tool_error":
+      return {
+        tone: "destructive",
+        title: "Tool returned isError",
+        body: "The server accepted the call but the tool reported a failure. Read the payload below for details, then retry.",
+        primaryAction: "retry",
+      };
+    case "transport_error":
+      return {
+        tone: "destructive",
+        title: "Transport error",
+        body: "The call couldn't complete. Check your connection and retry — repeated failures usually mean the endpoint is unreachable.",
+        primaryAction: "retry",
+      };
+    case "ok":
+      return null;
+  }
+}
+
+
+
 function ToolCard({
   toolName,
   endpoint,

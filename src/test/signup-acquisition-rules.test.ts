@@ -7,6 +7,7 @@ import {
   buildSignupUserMetadata,
   resolveSignupAcquisitionSource,
 } from "@/lib/signupAcquisitionRules";
+import { buildCsvHistoryOnboardingPath } from "@/lib/csvHistoryOnboardingIntentRules";
 
 describe("signup acquisition rules", () => {
   it("builds a deterministic signup-first handoff from a fixed source", () => {
@@ -21,10 +22,14 @@ describe("signup acquisition rules", () => {
   });
 
   it("builds and resolves the fixed CSV-history acquisition handoff", () => {
-    const path = buildAttributedSignupPath({ source: "csv_history" });
+    const csvOnboarding = buildCsvHistoryOnboardingPath();
+    const path = buildAttributedSignupPath({ source: "csv_history", redirectTo: csvOnboarding });
 
     expect(path).toBe(
-      "/auth?mode=signup&utm_source=csv_history&utm_medium=owned&utm_campaign=csv_history",
+      "/auth?mode=signup&redirectTo=%2Fonboarding%3Fintent%3Dcsv_history&utm_source=csv_history&utm_medium=owned&utm_campaign=csv_history",
+    );
+    expect(new URL(path, "https://verdantgrowdiary.com").searchParams.get("redirectTo")).toBe(
+      csvOnboarding,
     );
     expect(resolveSignupAcquisitionSource(path.split("?")[1])).toBe("csv_history");
     expect(buildSignupUserMetadata(path.split("?")[1])).toEqual({

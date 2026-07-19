@@ -11,6 +11,7 @@ import { clearGrowDataMeta } from "@/hooks/useGrowData";
 import RootErrorBoundary from "@/components/RootErrorBoundary";
 import PhenoTrackerUpgradeGate from "@/components/PhenoTrackerUpgradeGate";
 import RequireOperatorRole from "./components/RequireOperatorRole";
+import OAuthPostAuthRedirect from "@/components/OAuthPostAuthRedirect";
 import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
 import { AgreementReconsentGate } from "@/components/AgreementReconsentGate";
 import RootEntry from "@/components/RootEntry";
@@ -190,6 +191,7 @@ const App = () => (
         <BrowserRouter>
           <AnalyticsShell />
           <AuthProvider onBeforeAuthIdentityChange={clearQueryCacheBeforeAuthIdentityChange}>
+            <OAuthPostAuthRedirect />
             <GrowsProvider>
               <PaymentTestModeBanner />
               <AgreementReconsentGate />

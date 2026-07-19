@@ -11,9 +11,13 @@ import {
   SENSOR_SOURCE_SHORT_LABEL,
 } from "@/constants/sensorSourceLabels";
 import { buildAttributedSignupPath } from "@/lib/signupAcquisitionRules";
+import { buildCsvHistoryOnboardingPath } from "@/lib/csvHistoryOnboardingIntentRules";
 import { trackPricingEvent } from "@/lib/pricingAnalytics";
 
-const CSV_HISTORY_SIGNUP_PATH = buildAttributedSignupPath({ source: "csv_history" });
+const CSV_HISTORY_SIGNUP_PATH = buildAttributedSignupPath({
+  source: "csv_history",
+  redirectTo: buildCsvHistoryOnboardingPath(),
+});
 
 /**
  * Public hardware-neutral integration page.

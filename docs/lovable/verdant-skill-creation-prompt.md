@@ -302,12 +302,15 @@ Primary metrics:
 - 3 active creator integrations
 - 3–5% free-to-paid conversion
 
-The privacy-safe funnel events are:
+The privacy-safe funnel events have shared setup and two activation branches;
+they are not one required linear journey:
 
-`signup → grow_created → tent_created → plant_created → quick_log_saved →
-csv_import_started → csv_import_completed → csv_history_ai_doctor_clicked →
-ai_doctor_review_started → ai_doctor_result_received → ai_doctor_session_saved → paywall_viewed →
-checkout_started → subscription_activated → checkout_return_completed`
+`signup → grow_created → tent_created → plant_created`
+
+- Diary activation: `quick_log_saved → ai_doctor_review_started → ai_doctor_result_received → ai_doctor_session_saved`
+- CSV acquisition: `csv_history_onboarding_ready → csv_import_started → csv_import_completed → csv_history_ai_doctor_clicked → ai_doctor_review_started → ai_doctor_result_received → ai_doctor_session_saved`
+
+Either branch may later lead to `paywall_viewed → checkout_started → subscription_activated → checkout_return_completed` when its independent conditions are met.
 
 Historical reviews additionally emit `historical_ai_review_started` as a
 companion branch marker; standard reviews do not.

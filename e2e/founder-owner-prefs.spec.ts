@@ -411,4 +411,99 @@ test.describe("Founder owner preferences (mocked)", () => {
     ).toBeEnabled({ timeout: 5_000 });
     await expect(page.locator("#founder-display-name")).toBeEnabled();
   });
+
+  test("successful save updates displayed prefs and keeps inputs enabled", async ({ page }) => {
+    await seedSession(page);
+
+    // First read = initial state (hidden, no name). After a successful save,
+    // the form calls refetch(); serve the updated row from that point on.
+    let foundersReadCount = 0;
+    const initialRow = {
+      founder_number: 21,
+      display_name: null,
+      display_style: "hidden",
+      show_on_wall: false,
+      optional_link: null,
+      status: "confirmed",
+    };
+    const updatedRow = {
+      founder_number: 21,
+      display_name: "Jane Cultivator",
+      display_style: "custom_name",
+      show_on_wall: true,
+      optional_link: "https://example.com/jane",
+      status: "confirmed",
+    };
+    await page.route(/\/rest\/v1\/founders(\?|$)/, async (route: Route) => {
+      foundersReadCount += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(foundersReadCount === 1 ? initialRow : updatedRow),
+      });
+    });
+
+    let invokeCount = 0;
+    await page.route(
+      /\/functions\/v1\/save-founder-prefs/,
+      async (route) => {
+        invokeCount += 1;
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ ok: true }),
+        });
+      },
+    );
+
+    await page.goto("/founder");
+
+    const heading = page.getByRole("heading", { name: /Your Founder settings/i });
+    await expect(heading).toBeVisible({ timeout: 15_000 });
+
+    await page.keyboard.press("Escape");
+    await page.evaluate(() => {
+      document
+        .querySelectorAll<HTMLElement>('div.fixed.inset-0.z-50')
+        .forEach((el) => el.remove());
+    });
+    await heading.scrollIntoViewIfNeeded();
+
+    // Fill in the new preferences.
+    await page.locator("#founder-show-on-wall").click({ force: true });
+    await page.locator("#founder-display-name").fill("Jane Cultivator");
+    await page.locator("#founder-optional-link").fill("https://example.com/jane");
+
+    await page.locator("form:has(#founder-show-on-wall)").evaluate((f) => {
+      (f as HTMLFormElement).requestSubmit();
+    });
+
+    // Edge function was invoked once.
+    await expect.poll(() => invokeCount, { timeout: 5_000 }).toBe(1);
+
+    // Success toast surfaces (title appears in both toast body and the
+    // aria-live announcer, so scope to the first match).
+    await expect(
+      page.getByText(/Founder settings saved/i).first(),
+    ).toBeVisible({ timeout: 5_000 });
+
+    // Refetch fired after save — a second /rest/v1/founders read occurred.
+    await expect
+      .poll(() => foundersReadCount, { timeout: 5_000 })
+      .toBeGreaterThanOrEqual(2);
+
+    // Displayed values reflect the refetched updated row.
+    await expect(page.locator("#founder-display-name")).toHaveValue("Jane Cultivator");
+    await expect(page.locator("#founder-optional-link")).toHaveValue("https://example.com/jane");
+    await expect(page.locator("#founder-show-on-wall")).toBeChecked();
+
+    // Inputs and Save button are enabled after the successful save.
+    await expect(page.locator("#founder-show-on-wall")).toBeEnabled();
+    await expect(page.locator("#founder-display-name")).toBeEnabled();
+    await expect(page.locator("#founder-optional-link")).toBeEnabled();
+    await expect(page.locator("#founder-display-style")).toBeEnabled();
+    await expect(
+      page.getByRole("button", { name: /Save Founder settings/i }),
+    ).toBeEnabled();
+  });
 });

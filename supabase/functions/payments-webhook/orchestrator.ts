@@ -152,6 +152,21 @@ export interface Deps {
     environment: PaddleEnv;
     exceptPaddleSubscriptionId: string;
   }): Promise<{ ok: true; canceled: number } | { ok: false; error: string }>;
+  /**
+   * Turn B refund-retire: called for adjustment.created events with
+   * action IN ('refund','chargeback') and status='approved'. Atomically
+   * cancels the founder_lifetime subscription row AND marks the founders
+   * row 'refunded' via the service-role SECURITY DEFINER RPC
+   * revoke_lovable_founder_lifetime_by_transaction. No-op (0 rows) when
+   * the tx isn't a founder purchase — safe for recurring refunds.
+   *
+   * Optional so pure unit tests for subscription paths don't need it.
+   */
+  revokeFounderLifetime?(input: {
+    paddle_transaction_id: string;
+    environment: PaddleEnv;
+    now: Date;
+  }): Promise<IoResult & { subscriptionsUpdated?: number; foundersUpdated?: number }>;
 }
 
 

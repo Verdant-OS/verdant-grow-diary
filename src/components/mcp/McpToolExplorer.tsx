@@ -286,6 +286,7 @@ function ToolCard({
   fieldErrors,
   onAuthLost,
   onRunOutcome,
+  onApplyArgs,
 }: {
   toolName: ToolName;
   endpoint: string;
@@ -295,6 +296,7 @@ function ToolCard({
   fieldErrors: FieldError[];
   onAuthLost: () => void;
   onRunOutcome?: (outcome: ToolCallOutcome, category: OutcomeCategory) => void;
+  onApplyArgs?: (args: Record<string, unknown>) => void;
 }) {
   const [state, setState] = useState<RunState>(EMPTY);
 

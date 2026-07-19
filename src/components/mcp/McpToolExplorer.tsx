@@ -436,6 +436,8 @@ function ToolCard({
       {state.previousArgs && state.args && showDiff ? (() => {
         const entries = diffArgs(state.previousArgs, state.args);
         const changed = entries.filter((e) => e.kind !== "unchanged");
+        const visible = onlyChanged ? changed : entries;
+        const unchangedCount = entries.length - changed.length;
         const counts = {
           added: changed.filter((e) => e.kind === "added").length,
           removed: changed.filter((e) => e.kind === "removed").length,
@@ -466,7 +468,15 @@ function ToolCard({
             oldChip:
               "bg-destructive/10 text-destructive border-destructive/30 line-through",
           },
+          unchanged: {
+            label: "unchanged",
+            badge:
+              "bg-muted text-muted-foreground border-border",
+            newChip: "bg-muted/60 text-muted-foreground border-border",
+            oldChip: "bg-muted/60 text-muted-foreground border-border",
+          },
         } as const;
+        const onlyChangedId = `tool-explorer-only-changed-${toolName}`;
         return (
           <div
             id={`tool-explorer-diff-${toolName}`}
@@ -483,14 +493,41 @@ function ToolCard({
                 </span>
               )}
             </div>
-            {changed.length > 0 ? (
+            {entries.length > 0 ? (
+              <div className="flex items-center gap-2">
+                <Switch
+                  id={onlyChangedId}
+                  checked={onlyChanged}
+                  onCheckedChange={(v) => setOnlyChanged(Boolean(v))}
+                  data-testid={`tool-explorer-only-changed-${toolName}`}
+                  aria-describedby={`${onlyChangedId}-desc`}
+                />
+                <Label htmlFor={onlyChangedId} className="text-xs font-normal">
+                  Show only changed args
+                </Label>
+                <span
+                  id={`${onlyChangedId}-desc`}
+                  className="text-muted-foreground"
+                >
+                  {onlyChanged
+                    ? unchangedCount > 0
+                      ? `(${unchangedCount} unchanged hidden)`
+                      : "(nothing hidden)"
+                    : `(showing all ${entries.length})`}
+                </span>
+              </div>
+            ) : null}
+            {visible.length > 0 ? (
               <ul className="space-y-2">
-                {changed.map((e) => {
-                  const t = tagStyles[e.kind as "added" | "removed" | "changed"];
+                {visible.map((e) => {
+                  const t = tagStyles[e.kind];
+                  const isUnchanged = e.kind === "unchanged";
                   return (
                     <li
                       key={e.key}
-                      className="grid gap-1 rounded border bg-background/60 p-2 sm:grid-cols-[auto_1fr] sm:gap-x-3"
+                      className={`grid gap-1 rounded border p-2 sm:grid-cols-[auto_1fr] sm:gap-x-3 ${
+                        isUnchanged ? "bg-background/30 opacity-70" : "bg-background/60"
+                      }`}
                     >
                       <div className="flex items-center gap-2">
                         <span
@@ -501,28 +538,39 @@ function ToolCard({
                         <span className="font-mono text-xs font-semibold">{e.key}</span>
                       </div>
                       <div className="flex flex-wrap items-center gap-2 font-mono">
-                        {e.kind !== "added" ? (
-                          <span
-                            className={`inline-block max-w-full truncate rounded border px-1.5 py-0.5 ${t.oldChip}`}
-                            title={formatArgValue(e.from)}
-                            aria-label={`previous value ${formatArgValue(e.from)}`}
-                          >
-                            {formatArgValue(e.from)}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground italic">(not set)</span>
-                        )}
-                        <span aria-hidden="true" className="text-muted-foreground">→</span>
-                        {e.kind !== "removed" ? (
+                        {isUnchanged ? (
                           <span
                             className={`inline-block max-w-full truncate rounded border px-1.5 py-0.5 ${t.newChip}`}
                             title={formatArgValue(e.to)}
-                            aria-label={`new value ${formatArgValue(e.to)}`}
                           >
                             {formatArgValue(e.to)}
                           </span>
                         ) : (
-                          <span className="text-muted-foreground italic">(removed)</span>
+                          <>
+                            {e.kind !== "added" ? (
+                              <span
+                                className={`inline-block max-w-full truncate rounded border px-1.5 py-0.5 ${t.oldChip}`}
+                                title={formatArgValue(e.from)}
+                                aria-label={`previous value ${formatArgValue(e.from)}`}
+                              >
+                                {formatArgValue(e.from)}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground italic">(not set)</span>
+                            )}
+                            <span aria-hidden="true" className="text-muted-foreground">→</span>
+                            {e.kind !== "removed" ? (
+                              <span
+                                className={`inline-block max-w-full truncate rounded border px-1.5 py-0.5 ${t.newChip}`}
+                                title={formatArgValue(e.to)}
+                                aria-label={`new value ${formatArgValue(e.to)}`}
+                              >
+                                {formatArgValue(e.to)}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground italic">(removed)</span>
+                            )}
+                          </>
                         )}
                       </div>
                     </li>
@@ -533,6 +581,7 @@ function ToolCard({
           </div>
         );
       })() : null}
+
 
 
       {(() => {

@@ -241,16 +241,36 @@ export default function FounderOwnerPrefsForm() {
         ) : null}
 
         <div>
-          <Button type="submit" disabled={isRefunded || saving}>
+          <Button
+            type="submit"
+            disabled={isRefunded || saving}
+            aria-busy={saving ? "true" : "false"}
+            aria-label={saving ? "Saving…" : undefined}
+          >
             {saving ? (
               <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
                 Saving…
               </>
             ) : (
               "Save Founder settings"
             )}
           </Button>
+        </div>
+
+        {/*
+         * Polite live region for screen readers. Rendered persistently and
+         * mutated in place so assistive tech announces the current message
+         * once and does not replay stale text after completion.
+         */}
+        <div
+          data-testid="founder-prefs-status"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          className="sr-only"
+        >
+          {saving ? "Saving Founder settings…" : ""}
         </div>
       </form>
     </section>

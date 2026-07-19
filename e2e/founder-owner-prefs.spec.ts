@@ -338,4 +338,77 @@ test.describe("Founder owner preferences (mocked)", () => {
       page.getByRole("button", { name: /Save Founder settings/i }),
     ).toBeEnabled();
   });
+
+  test("in-flight save disables inputs and shows loading indicator", async ({ page }) => {
+    await seedSession(page);
+    await mockFoundersReadOnce(page, {
+      founder_number: 5,
+      display_name: null,
+      display_style: "hidden",
+      show_on_wall: false,
+      optional_link: null,
+      status: "confirmed",
+    });
+
+    // Hold the edge function response open until the test releases it, so
+    // we can observe the in-flight UI state deterministically.
+    let releaseInvoke: (() => void) | null = null;
+    const invokeGate = new Promise<void>((resolve) => {
+      releaseInvoke = resolve;
+    });
+    await page.route(
+      /\/functions\/v1\/save-founder-prefs/,
+      async (route) => {
+        await invokeGate;
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ ok: true }),
+        });
+      },
+    );
+
+    await page.goto("/founder");
+
+    const heading = page.getByRole("heading", { name: /Your Founder settings/i });
+    await expect(heading).toBeVisible({ timeout: 15_000 });
+
+    await page.keyboard.press("Escape");
+    await page.evaluate(() => {
+      document
+        .querySelectorAll<HTMLElement>('div.fixed.inset-0.z-50')
+        .forEach((el) => el.remove());
+    });
+    await heading.scrollIntoViewIfNeeded();
+
+    // Valid payload so the request actually reaches the (gated) edge fn.
+    await page.locator("#founder-show-on-wall").click({ force: true });
+    await page.locator("#founder-display-name").fill("Jane Cultivator");
+
+    await page.locator("form:has(#founder-show-on-wall)").evaluate((f) => {
+      (f as HTMLFormElement).requestSubmit();
+    });
+
+    const saveButton = page.getByRole("button", { name: /Saving…|Save Founder settings/i });
+
+    // In-flight state: button disabled, label switched to "Saving…",
+    // spinner rendered (aria-hidden Loader2 icon), and every editable
+    // input/switch/select disabled.
+    await expect(saveButton).toBeDisabled();
+    await expect(saveButton).toHaveText(/Saving…/);
+    await expect(saveButton.locator("svg.animate-spin")).toBeVisible();
+
+    await expect(page.locator("#founder-show-on-wall")).toBeDisabled();
+    await expect(page.locator("#founder-display-name")).toBeDisabled();
+    await expect(page.locator("#founder-optional-link")).toBeDisabled();
+    await expect(page.locator("#founder-display-style")).toBeDisabled();
+
+    // Release the edge function; UI should recover to the idle state.
+    releaseInvoke?.();
+
+    await expect(
+      page.getByRole("button", { name: /Save Founder settings/i }),
+    ).toBeEnabled({ timeout: 5_000 });
+    await expect(page.locator("#founder-display-name")).toBeEnabled();
+  });
 });

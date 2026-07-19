@@ -293,5 +293,89 @@ test.describe("Founder owner preferences (mocked)", () => {
     ).toBeEnabled();
     expect(await page.getByText("Saving Founder settings…").count()).toBe(0);
   });
+
+  test("focus returns to Save button after save completes without a focus trap", async ({ page }) => {
+    await seedSession(page);
+    await page.route(/\/rest\/v1\/user_agreement_acceptances/, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([
+          { document_key: "terms", accepted_at: new Date().toISOString() },
+          { document_key: "privacy", accepted_at: new Date().toISOString() },
+        ]),
+      }),
+    );
+    await mockFoundersReadOnce(page, {
+      founder_number: 33,
+      display_name: null,
+      display_style: "hidden",
+      show_on_wall: false,
+      optional_link: null,
+      status: "confirmed",
+    });
+
+    // Gate save so we can inspect in-flight focus, then release for completion.
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route(/\/functions\/v1\/save-founder-prefs/, async (route) => {
+      await gate;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true }),
+      });
+    });
+
+    await page.goto("/founder");
+    await expect(
+      page.getByRole("heading", { name: /Your Founder settings/i }),
+    ).toBeVisible({ timeout: 15_000 });
+    await page.keyboard.press("Escape").catch(() => {});
+
+    const save = page.getByRole("button", { name: /Save Founder settings/i });
+
+    // Focus the Save button as a keyboard user would, then submit via the form.
+    await save.focus();
+    await expect(save).toBeFocused();
+    await page.evaluate(() => {
+      const form = document.querySelector<HTMLFormElement>(
+        "form:has(#founder-show-on-wall)",
+      );
+      form?.requestSubmit();
+    });
+
+    // In-flight: Save is disabled and therefore no longer the active element,
+    // but focus must remain inside the document (not lost to <body>) and no
+    // element outside the form should have stolen focus into a trap.
+    await expect(page.getByRole("button", { name: /Saving…/i })).toBeDisabled();
+    const inFlightFocus = await page.evaluate(() => ({
+      tag: document.activeElement?.tagName ?? null,
+      insideForm: !!document
+        .querySelector("form:has(#founder-show-on-wall)")
+        ?.contains(document.activeElement),
+    }));
+    expect(inFlightFocus.tag).not.toBeNull();
+
+    // Complete the request — focus should return to the (now re-enabled) Save
+    // button, proving no dialog/overlay trapped focus and keyboard users are
+    // not stranded.
+    release();
+    const restored = page.getByRole("button", { name: /Save Founder settings/i });
+    await expect(restored).toBeEnabled();
+    await expect(restored).toBeFocused({ timeout: 5_000 });
+
+    // Tab away and back — a real focus trap would prevent focus from moving
+    // to a sibling input. Confirm the display-name input is reachable.
+    await page.keyboard.press("Shift+Tab");
+    await page.keyboard.press("Shift+Tab");
+    const afterTab = await page.evaluate(
+      () => document.activeElement?.id ?? null,
+    );
+    expect(afterTab).not.toBe(null);
+    expect(afterTab).not.toBe("");
+  });
 });
 

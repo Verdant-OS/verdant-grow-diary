@@ -323,9 +323,10 @@ test.describe("Founder owner preferences (mocked)", () => {
     await expect(alert).toBeVisible();
     await expect(alert).toContainText(/internal edge failure|Could not save|Edge Function/i);
 
-    // Destructive toast surfaced.
+    // Destructive toast surfaced (title appears in both toast body and
+    // the aria-live announcer, so scope to the first match).
     await expect(
-      page.getByText(/Could not save Founder settings/i),
+      page.getByText(/Could not save Founder settings/i).first(),
     ).toBeVisible();
 
     // Give any stray refetch a chance to fire, then assert none did.

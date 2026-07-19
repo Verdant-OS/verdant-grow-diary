@@ -17,7 +17,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 const ROOT = path.resolve(__dirname, "../..");
-const read = (p: string) => fs.readFileSync(path.join(ROOT, p), "utf8");
+const read = (p: string) => fs.readFileSync(path.join(ROOT, p), "utf8").replace(/\r\n?/g, "\n");
 
 describe("Quick Log Playwright CI surface", () => {
   it("does not commit storageState", () => {

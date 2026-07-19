@@ -1,12 +1,14 @@
 /**
  * Plant Detail continuity regression: the One-Tent Loop Plant -> Quick Log
- * CTA opens the existing plant-scoped Quick Log sheet on the current route.
+ * CTA dispatches the canonical exact-target Quick Log handoff on the current
+ * route. The legacy plant-scoped sheet must not open from this entry point.
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
+import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 
 const activePlant = {
   id: "plant-1",
@@ -72,18 +74,34 @@ function renderPlantDetail() {
 }
 
 describe("Plant Detail One-Tent Loop Quick Log handoff", () => {
-  it("opens the existing plant-scoped Quick Log sheet without navigating away", async () => {
+  it("dispatches the exact canonical target without navigating or opening the legacy sheet", async () => {
     const user = userEvent.setup();
+    const listener = vi.fn();
+    window.addEventListener(PLANT_QUICKLOG_PREFILL_EVENT, listener);
     renderPlantDetail();
 
-    const sheet = screen.getByTestId("plant-quick-log-sheet");
-    expect(sheet).toHaveAttribute("data-open", "false");
-    expect(screen.getByTestId("location-pathname")).toHaveTextContent("/plants/plant-1");
+    try {
+      const sheet = screen.getByTestId("plant-quick-log-sheet");
+      expect(sheet).toHaveAttribute("data-open", "false");
+      expect(screen.getByTestId("location-pathname")).toHaveTextContent("/plants/plant-1");
 
-    await user.click(screen.getByTestId("plant-detail-one-tent-loop-next-step-card-cta"));
+      await user.click(screen.getByTestId("plant-detail-one-tent-loop-next-step-card-cta"));
 
-    expect(sheet).toHaveAttribute("data-open", "true");
-    expect(screen.getByTestId("location-pathname")).toHaveTextContent("/plants/plant-1");
-    expect(screen.getByTestId("plant-detail-one-tent-loop-next-step-card")).toBeInTheDocument();
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect((listener.mock.calls[0][0] as CustomEvent).detail).toEqual({
+        plantId: "plant-1",
+        plantName: null,
+        growId: "grow-1",
+        tentId: "tent-1",
+        tentName: null,
+        eventType: "observation",
+        suggestSnapshot: true,
+      });
+      expect(sheet).toHaveAttribute("data-open", "false");
+      expect(screen.getByTestId("location-pathname")).toHaveTextContent("/plants/plant-1");
+      expect(screen.getByTestId("plant-detail-one-tent-loop-next-step-card")).toBeInTheDocument();
+    } finally {
+      window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, listener);
+    }
   });
 });

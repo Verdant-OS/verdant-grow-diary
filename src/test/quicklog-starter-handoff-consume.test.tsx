@@ -333,7 +333,7 @@ describe("Quick Log starter-handoff consume-once", () => {
       />,
     );
     fireEvent.click(saveButton());
-    await waitFor(() => expect(screen.getByTestId("quick-log-plant-error")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTestId("quick-log-target-error")).toBeInTheDocument());
     expect(saveMock).not.toHaveBeenCalled();
     expect(storedDraftRaw()).toBe(before);
   });

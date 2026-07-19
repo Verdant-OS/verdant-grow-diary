@@ -1,9 +1,9 @@
 /**
  * QuickLog post-save target-plant navigation + keyboard/a11y polish:
  *  - After save the dialog stays open and reveals a "View {plant}" action
- *    pointing at the saved target plant id (not the prefill plant id).
+ *    pointing at the exact saved target plant id.
  *  - The action is a keyboard-reachable anchor with focus styling.
- *  - The mismatch banner is screen-reader discoverable but not tabbable.
+ *  - A blocked named target is screen-reader discoverable but not tabbable.
  *  - The stale helper copy includes the formatted captured timestamp and
  *    is associated with the disabled Switch via aria-describedby.
  *  - The watering-missing error path sets aria-invalid + aria-describedby
@@ -93,11 +93,8 @@ describe("QuickLog post-save target plant action", () => {
     renderQL({
       open: true,
       onOpenChange: () => {},
-      // Prefill plant differs from the auto-picked scoped plant (p2).
-      prefill: { plantId: "p-other", plantName: "Blue Dream", growId: "g1" },
+      prefill: { plantId: "p2", growId: "g1", tentId: "t1" },
     });
-    // Make sure mismatch banner shows (sanity: differs from prefill).
-    await screen.findByTestId("quick-log-plant-mismatch-banner");
     // Add a note so save passes.
     fireEvent.change(screen.getByPlaceholderText(/Watered, looking healthy/i), {
       target: { value: "looking good" },
@@ -108,8 +105,6 @@ describe("QuickLog post-save target plant action", () => {
     expect(link.tagName).toBe("A");
     expect(link.getAttribute("href")).toBe("/plants/p2");
     expect(link.getAttribute("data-target-plant-id")).toBe("p2");
-    // Does NOT point at the original prefill page plant.
-    expect(link.getAttribute("href")).not.toContain("p-other");
     expect(link.textContent ?? "").toMatch(/View timeline/);
   });
 
@@ -146,19 +141,17 @@ describe("QuickLog post-save target plant action", () => {
   });
 });
 
-describe("QuickLog mismatch banner accessibility", () => {
-  it("is screen-reader discoverable (role=status, aria-live=polite) and not tabbable", async () => {
+describe("QuickLog blocked-target accessibility", () => {
+  it("is screen-reader discoverable as an alert and has no interactive children", async () => {
     renderQL({
       open: true,
       onOpenChange: () => {},
       prefill: { plantId: "p-other", plantName: "Blue Dream", growId: "g1" },
     });
-    const banner = await screen.findByTestId("quick-log-plant-mismatch-banner");
-    expect(banner.getAttribute("role")).toBe("status");
-    expect(banner.getAttribute("aria-live")).toBe("polite");
-    // No focusable children, banner itself not tab-stop.
-    expect(banner.tabIndex).toBe(-1);
-    expect(banner.querySelector("a,button,input,select,textarea")).toBeNull();
+    const error = await screen.findByTestId("quick-log-target-error");
+    expect(error.getAttribute("role")).toBe("alert");
+    expect(error.tabIndex).toBe(-1);
+    expect(error.querySelector("a,button,input,select,textarea")).toBeNull();
   });
 });
 

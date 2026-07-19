@@ -503,6 +503,104 @@ test.describe("Founder owner preferences (mocked)", () => {
     void currentRelease;
   });
 
+  test("failed save announces a single error, clears the status region, and re-enables inputs", async ({ page }) => {
+    await seedSession(page);
+    await page.route(/\/rest\/v1\/user_agreement_acceptances/, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([
+          { agreement_type: "terms", version: "2026-07-13" },
+          { agreement_type: "privacy", version: "2026-07-13" },
+        ]),
+      }),
+    );
+    await page.route(/\/rest\/v1\/founders(\?|$)/, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          founder_number: 55,
+          display_name: null,
+          display_style: "hidden",
+          show_on_wall: false,
+          optional_link: null,
+          status: "confirmed",
+        }),
+      }),
+    );
+
+    // Gate the save so we can inspect the in-flight state, then reject.
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let invokeCount = 0;
+    const errorMessage = "Server rejected the save. Please try again.";
+    await page.route(/\/functions\/v1\/save-founder-prefs/, async (route) => {
+      invokeCount += 1;
+      await gate;
+      // supabase-js treats `ok: false` as a functional error and surfaces
+      // the payload's `error` string via the inline alert.
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: false, error: errorMessage }),
+      });
+    });
+
+    await page.goto("/founder");
+    await expect(
+      page.getByRole("heading", { name: /Your Founder settings/i }),
+    ).toBeVisible({ timeout: 15_000 });
+    await page.keyboard.press("Escape").catch(() => {});
+
+    const status = page.getByTestId("founder-prefs-status");
+    await expect(status).toHaveText("");
+    await expect(page.getByRole("alert")).toHaveCount(0);
+
+    // Trigger save.
+    await page.evaluate(() => {
+      const form = document.querySelector<HTMLFormElement>(
+        "form:has(#founder-show-on-wall)",
+      );
+      form?.requestSubmit();
+    });
+
+    // In-flight: status announces once, inputs disabled.
+    await expect(status).toHaveText("Saving Founder settings…");
+    await expect(page.locator("#founder-show-on-wall")).toBeDisabled();
+    await expect(page.locator("#founder-display-name")).toBeDisabled();
+    await expect(page.locator("#founder-optional-link")).toBeDisabled();
+    await expect(
+      page.getByRole("button", { name: /Saving…/i }),
+    ).toBeDisabled();
+
+    // Complete with failure.
+    release();
+
+    // Live status region clears — no stale "Saving…" left for SRs to
+    // replay alongside the new error announcement.
+    await expect(status).toHaveText("", { timeout: 5_000 });
+    expect(await page.getByText("Saving Founder settings…").count()).toBe(0);
+
+    // Exactly one clear inline error appears with the server-supplied
+    // message, and it is a proper alert live region so SRs announce it.
+    const alert = page.getByRole("alert");
+    await expect(alert).toHaveCount(1);
+    await expect(alert).toHaveText(errorMessage);
+
+    // Inputs and Save re-enabled so the user can retry without reload.
+    await expect(page.locator("#founder-show-on-wall")).toBeEnabled();
+    await expect(page.locator("#founder-display-name")).toBeEnabled();
+    await expect(page.locator("#founder-optional-link")).toBeEnabled();
+    await expect(
+      page.getByRole("button", { name: /Save Founder settings/i }),
+    ).toBeEnabled();
+
+    expect(invokeCount).toBe(1);
+  });
 });
+
 
 

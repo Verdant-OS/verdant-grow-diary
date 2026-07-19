@@ -20,6 +20,9 @@ describe("VPD calibration provenance runtime RLS harness contract", () => {
     );
     expect(harness).toContain("VPD_CALIBRATION_PROVENANCE_RLS_HARNESS_ALLOW_REMOTE");
     expect(harness).toMatch(/refusing remote database/i);
+    expect(packageJson.scripts?.["test:security-db-local"]).toContain(
+      "bun run test:vpd-calibration-provenance-rls",
+    );
   });
 
   it("uses authenticated clients for allow and deny proofs", () => {
@@ -31,8 +34,10 @@ describe("VPD calibration provenance runtime RLS harness contract", () => {
   });
 
   it("proves formula parity with non-zero measured corrections", () => {
-    expect(harness).toMatch(/temperature_reference_value_c:\s*26/);
-    expect(harness).toMatch(/temperature_sensor_value_c:\s*25/);
+    expect(harness).toMatch(
+      /temperature_reference_value_c:\s*args\.temperatureReferenceValue \?\? 26/,
+    );
+    expect(harness).toMatch(/temperature_sensor_value_c:\s*args\.temperatureSensorValue \?\? 25/);
     expect(harness).toMatch(/humidity_sensor_rh_pct:\s*\(args\.humidityReference \?\? 75\) - 2/);
     expect(harness).toMatch(/vpdValue \?\? 0\.73/);
   });
@@ -46,12 +51,58 @@ describe("VPD calibration provenance runtime RLS harness contract", () => {
       "stale calibration is denied",
       "leaf reading outside 15 minutes is denied",
       "formula mismatch is denied",
-      "UPDATE is denied",
-      "DELETE is denied",
+      "null temperature device_id is denied",
+      "blank humidity device_id is denied",
+      "mismatched temperature device_id is denied",
+      "mismatched humidity device_id is denied",
+      "demo VPD source is denied",
+      "future legacy measurement timestamps are denied",
+      "future leaf measurement timestamp is denied",
+      "future calibration verification is denied",
+      "backdated calibration recorded_at is denied",
+      "future calibration recorded_at is denied",
+      "backdated provenance recorded_at is denied",
+      "future provenance recorded_at is denied",
+      "calibration below minus 20 C is denied",
+      "calibration above 60 C is denied",
+      "leaf temperature below minus 20 C is denied",
+      "leaf temperature above 60 C is denied",
+      "air temperature below minus 20 C is denied",
+      "air temperature above 60 C is denied",
+      "calibration UPDATE is denied",
+      "calibration DELETE is denied",
+      "provenance UPDATE is denied",
+      "provenance DELETE is denied",
       "anonymous INSERT is denied",
     ]) {
       expect(harness).toContain(proof);
     }
+  });
+
+  it("proves visibility, canonical boundaries, negative VPD, and deletion cascades", () => {
+    for (const proof of [
+      "cross-user calibration SELECT returns no rows",
+      "cross-user provenance SELECT returns no rows",
+      "minus 20 C calibration boundary is accepted",
+      "60 C calibration boundary is accepted",
+      "100 percent RH reference boundary is accepted",
+      "minus 20 C measurement boundary is accepted",
+      "60 C measurement boundary is accepted",
+      "formula-matched negative leaf VPD is preserved",
+      "tent deletion cascades calibration and provenance safely",
+      "auth user deletion cascades calibration and provenance safely",
+    ]) {
+      expect(harness).toContain(proof);
+    }
+  });
+
+  it("backs deny assertions with authoritative service-role readback", () => {
+    expect(harness).toMatch(/const id = crypto\.randomUUID\(\)/);
+    expect(harness).toMatch(/expectedDatabaseErrorCodes\.has\(error\.code\)/);
+    expect(harness).toMatch(/\.select\("id", \{ count: "exact", head: true \}\)/);
+    expect(harness).toMatch(/!readbackError && count === 0/);
+    expect(harness).toContain("unauthorized-row cleanup");
+    expect(harness).not.toMatch(/!!error \|\| \(data \?\? \[\]\)\.length === 0/);
   });
 
   it("uses the service role only for fixtures, authoritative readback, and cleanup", () => {

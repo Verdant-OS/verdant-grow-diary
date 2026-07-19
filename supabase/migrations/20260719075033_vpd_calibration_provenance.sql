@@ -6,7 +6,7 @@
 
 CREATE TABLE public.vpd_calibration_records (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid NOT NULL DEFAULT auth.uid(),
+  user_id uuid NOT NULL DEFAULT auth.uid() REFERENCES auth.users(id) ON DELETE CASCADE,
   tent_id uuid NOT NULL REFERENCES public.tents(id) ON DELETE CASCADE,
   device_id text NOT NULL,
   sensor_label text,
@@ -37,10 +37,10 @@ CREATE TABLE public.vpd_calibration_records (
     CHECK (humidity_reference_rh_pct >= 75 AND humidity_reference_rh_pct <= 100),
   CONSTRAINT vpd_calibration_records_temperature_values_check
     CHECK (
-      temperature_reference_value_c >= -50
-      AND temperature_reference_value_c <= 100
-      AND temperature_sensor_value_c >= -50
-      AND temperature_sensor_value_c <= 100
+      temperature_reference_value_c >= -20
+      AND temperature_reference_value_c <= 60
+      AND temperature_sensor_value_c >= -20
+      AND temperature_sensor_value_c <= 60
     ),
   CONSTRAINT vpd_calibration_records_humidity_sensor_value_check
     CHECK (humidity_sensor_rh_pct >= 0 AND humidity_sensor_rh_pct <= 100),
@@ -73,12 +73,12 @@ CREATE INDEX vpd_calibration_records_user_tent_device_idx
 
 CREATE TABLE public.vpd_measurement_provenance (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid NOT NULL DEFAULT auth.uid(),
+  user_id uuid NOT NULL DEFAULT auth.uid() REFERENCES auth.users(id) ON DELETE CASCADE,
   tent_id uuid NOT NULL REFERENCES public.tents(id) ON DELETE CASCADE,
   vpd_reading_id uuid NOT NULL UNIQUE REFERENCES public.sensor_readings(id) ON DELETE RESTRICT,
   air_temperature_reading_id uuid NOT NULL REFERENCES public.sensor_readings(id) ON DELETE RESTRICT,
   humidity_reading_id uuid NOT NULL REFERENCES public.sensor_readings(id) ON DELETE RESTRICT,
-  calibration_record_id uuid REFERENCES public.vpd_calibration_records(id) ON DELETE RESTRICT,
+  calibration_record_id uuid REFERENCES public.vpd_calibration_records(id) ON DELETE CASCADE,
   measurement_basis text NOT NULL,
   leaf_temperature_c numeric(6,2),
   leaf_temperature_measured_at timestamptz,
@@ -88,7 +88,7 @@ CREATE TABLE public.vpd_measurement_provenance (
   CONSTRAINT vpd_measurement_provenance_basis_check
     CHECK (measurement_basis IN ('leaf', 'air_estimate', 'grower_entered')),
   CONSTRAINT vpd_measurement_provenance_leaf_temperature_check
-    CHECK (leaf_temperature_c IS NULL OR (leaf_temperature_c >= -50 AND leaf_temperature_c <= 100)),
+    CHECK (leaf_temperature_c IS NULL OR (leaf_temperature_c >= -20 AND leaf_temperature_c <= 60)),
   CONSTRAINT vpd_measurement_provenance_leaf_method_check
     CHECK (
       leaf_temperature_method IS NULL
@@ -131,6 +131,36 @@ COMMENT ON COLUMN public.vpd_measurement_provenance.measurement_basis IS
 CREATE INDEX vpd_measurement_provenance_user_tent_recorded_idx
   ON public.vpd_measurement_provenance (user_id, tent_id, recorded_at DESC);
 
+CREATE OR REPLACE FUNCTION public.validate_vpd_calibration_record()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_evaluated_at timestamptz := clock_timestamp();
+BEGIN
+  IF NEW.recorded_at < v_evaluated_at - interval '5 minutes'
+     OR NEW.recorded_at > v_evaluated_at + interval '5 minutes' THEN
+    RAISE EXCEPTION 'recorded_at must be within 5 minutes of insertion time';
+  END IF;
+
+  IF NEW.temperature_verified_at > v_evaluated_at
+     OR NEW.humidity_verified_at > v_evaluated_at THEN
+    RAISE EXCEPTION 'calibration verification timestamps cannot be in the future';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.validate_vpd_calibration_record() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.validate_vpd_calibration_record() TO service_role;
+
+CREATE TRIGGER vpd_calibration_records_validate
+  BEFORE INSERT ON public.vpd_calibration_records
+  FOR EACH ROW EXECUTE FUNCTION public.validate_vpd_calibration_record();
+
 CREATE OR REPLACE FUNCTION public.validate_vpd_measurement_provenance()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -150,7 +180,13 @@ DECLARE
   v_air_saturation_kpa numeric;
   v_leaf_saturation_kpa numeric;
   v_expected_vpd numeric;
+  v_evaluated_at timestamptz := clock_timestamp();
 BEGIN
+  IF NEW.recorded_at < v_evaluated_at - interval '5 minutes'
+     OR NEW.recorded_at > v_evaluated_at + interval '5 minutes' THEN
+    RAISE EXCEPTION 'recorded_at must be within 5 minutes of insertion time';
+  END IF;
+
   SELECT *
     INTO v_vpd
     FROM public.sensor_readings
@@ -184,7 +220,7 @@ BEGIN
     RAISE EXCEPTION 'humidity_reading_id must reference the caller-owned tent humidity row';
   END IF;
 
-  IF v_air.value < -50 OR v_air.value > 100 THEN
+  IF v_air.value < -20 OR v_air.value > 60 THEN
     RAISE EXCEPTION 'air temperature is outside the accepted VPD range';
   END IF;
   IF v_humidity.value < 0 OR v_humidity.value > 100 THEN
@@ -194,6 +230,12 @@ BEGIN
   v_vpd_observed_at := COALESCE(v_vpd.captured_at, v_vpd.ts);
   v_air_observed_at := COALESCE(v_air.captured_at, v_air.ts);
   v_humidity_observed_at := COALESCE(v_humidity.captured_at, v_humidity.ts);
+
+  IF v_vpd_observed_at > v_evaluated_at + interval '5 minutes'
+     OR v_air_observed_at > v_evaluated_at + interval '5 minutes'
+     OR v_humidity_observed_at > v_evaluated_at + interval '5 minutes' THEN
+    RAISE EXCEPTION 'measurement timestamps cannot be more than 5 minutes in the future';
+  END IF;
 
   IF abs(extract(epoch FROM (v_air_observed_at - v_humidity_observed_at)))
        > extract(epoch FROM interval '15 minutes')
@@ -221,6 +263,10 @@ BEGIN
     IF v_calibration.temperature_verified_at_operating_conditions IS NOT TRUE THEN
       RAISE EXCEPTION 'temperature must be verified at operating conditions';
     END IF;
+    IF v_calibration.temperature_verified_at > v_evaluated_at
+       OR v_calibration.humidity_verified_at > v_evaluated_at THEN
+      RAISE EXCEPTION 'calibration verification timestamps cannot be in the future';
+    END IF;
     IF v_calibration.humidity_reference_rh_pct < 75
        OR v_calibration.humidity_reference_rh_pct > 100 THEN
       RAISE EXCEPTION 'humidity reference must be between 75 and 100 percent';
@@ -235,20 +281,33 @@ BEGIN
        AND v_calibration.sensor_commissioned_at > v_vpd_observed_at THEN
       RAISE EXCEPTION 'sensor commissioned date cannot be after the observation';
     END IF;
-    IF v_air.device_id IS NOT NULL
-       AND v_air.device_id <> v_calibration.device_id THEN
+    IF NULLIF(btrim(v_air.device_id), '') IS NULL
+       OR v_air.device_id <> v_calibration.device_id THEN
       RAISE EXCEPTION 'temperature reading device does not match calibration evidence';
     END IF;
-    IF v_humidity.device_id IS NOT NULL
-       AND v_humidity.device_id <> v_calibration.device_id THEN
+    IF NULLIF(btrim(v_humidity.device_id), '') IS NULL
+       OR v_humidity.device_id <> v_calibration.device_id THEN
       RAISE EXCEPTION 'humidity reading device does not match calibration evidence';
     END IF;
     IF v_air.quality <> 'ok' OR v_humidity.quality <> 'ok' OR v_vpd.quality <> 'ok' THEN
       RAISE EXCEPTION 'decision-grade leaf VPD requires ok-quality source rows';
     END IF;
-    IF v_air.source IN ('demo', 'sim', 'stale', 'invalid')
-       OR v_humidity.source IN ('demo', 'sim', 'stale', 'invalid') THEN
-      RAISE EXCEPTION 'decision-grade leaf VPD cannot use demo, stale, or invalid sources';
+    IF v_vpd.source NOT IN (
+         'live', 'manual', 'csv', 'pi_bridge', 'webhook_generic', 'node_red_bridge',
+         'esp32_arduino', 'esp32_arduino_sht31', 'esp32_esphome', 'esp32_mqtt_bridge',
+         'home_assistant_bridge', 'ha_forwarded', 'ecowitt', 'mqtt', 'webhook'
+       )
+       OR v_air.source NOT IN (
+         'live', 'manual', 'csv', 'pi_bridge', 'webhook_generic', 'node_red_bridge',
+         'esp32_arduino', 'esp32_arduino_sht31', 'esp32_esphome', 'esp32_mqtt_bridge',
+         'home_assistant_bridge', 'ha_forwarded', 'ecowitt', 'mqtt', 'webhook'
+       )
+       OR v_humidity.source NOT IN (
+         'live', 'manual', 'csv', 'pi_bridge', 'webhook_generic', 'node_red_bridge',
+         'esp32_arduino', 'esp32_arduino_sht31', 'esp32_esphome', 'esp32_mqtt_bridge',
+         'home_assistant_bridge', 'ha_forwarded', 'ecowitt', 'mqtt', 'webhook'
+       ) THEN
+      RAISE EXCEPTION 'decision-grade leaf VPD requires an explicitly trusted source';
     END IF;
     IF v_humidity.value = 0 OR v_humidity.value = 100 THEN
       RAISE EXCEPTION 'exact humidity extremes cannot support decision-grade VPD';
@@ -259,12 +318,15 @@ BEGIN
          > extract(epoch FROM interval '15 minutes') THEN
       RAISE EXCEPTION 'leaf temperature and room readings must be within 15 minutes';
     END IF;
+    IF NEW.leaf_temperature_measured_at > v_evaluated_at + interval '5 minutes' THEN
+      RAISE EXCEPTION 'leaf temperature timestamp cannot be more than 5 minutes in the future';
+    END IF;
 
     v_corrected_air_temp_c :=
       v_air.value + v_calibration.temperature_correction_offset_c;
     v_corrected_humidity_pct :=
       v_humidity.value + v_calibration.humidity_correction_offset_pct;
-    IF v_corrected_air_temp_c < -50 OR v_corrected_air_temp_c > 100 THEN
+    IF v_corrected_air_temp_c < -20 OR v_corrected_air_temp_c > 60 THEN
       RAISE EXCEPTION 'corrected air temperature is outside the accepted VPD range';
     END IF;
     IF v_corrected_humidity_pct <= 0 OR v_corrected_humidity_pct >= 100 THEN
@@ -324,7 +386,10 @@ CREATE POLICY "Users insert own VPD calibration records"
   TO authenticated
   WITH CHECK (
     auth.uid() = user_id
+    AND recorded_at >= now() - interval '5 minutes'
     AND recorded_at <= now() + interval '5 minutes'
+    AND temperature_verified_at <= now()
+    AND humidity_verified_at <= now()
     AND EXISTS (
       SELECT 1
         FROM public.tents
@@ -345,6 +410,7 @@ CREATE POLICY "Users insert own VPD measurement provenance"
   TO authenticated
   WITH CHECK (
     auth.uid() = user_id
+    AND recorded_at >= now() - interval '5 minutes'
     AND recorded_at <= now() + interval '5 minutes'
     AND EXISTS (
       SELECT 1

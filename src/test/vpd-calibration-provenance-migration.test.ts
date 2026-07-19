@@ -55,6 +55,19 @@ describe("VPD calibration provenance migration", () => {
     expect(sql).not.toMatch(/\b(is_verified|can_compare_to_stage_target)\b/i);
   });
 
+  it("pins canonical temperature evidence to minus 20 through 60 C", () => {
+    expect(sql).toMatch(/temperature_reference_value_c\s*>=\s*-20/i);
+    expect(sql).toMatch(/temperature_reference_value_c\s*<=\s*60/i);
+    expect(sql).toMatch(/temperature_sensor_value_c\s*>=\s*-20/i);
+    expect(sql).toMatch(/temperature_sensor_value_c\s*<=\s*60/i);
+    expect(sql).toMatch(
+      /leaf_temperature_c\s+IS NULL\s+OR\s*\(leaf_temperature_c\s*>=\s*-20\s+AND\s+leaf_temperature_c\s*<=\s*60\)/i,
+    );
+    expect(sql).toMatch(/v_air\.value\s*<\s*-20\s+OR\s+v_air\.value\s*>\s*60/i);
+    expect(sql).toMatch(/v_corrected_air_temp_c\s*<\s*-20\s+OR\s+v_corrected_air_temp_c\s*>\s*60/i);
+    expect(sql).not.toMatch(/temperature_(?:reference_value|sensor_value)_c\s*(?:>=|<)\s*-50/i);
+  });
+
   it("derives and applies measured temperature and RH corrections", () => {
     expect(sql).toMatch(/temperature_reference_value_c\s+numeric/i);
     expect(sql).toMatch(/temperature_sensor_value_c\s+numeric/i);
@@ -106,6 +119,51 @@ describe("VPD calibration provenance migration", () => {
     expect(sql).not.toMatch(/GREATEST\s*\(\s*0\s*,/i);
   });
 
+  it("uses one evaluation clock and rejects future or forged insertion timestamps", () => {
+    expect(sql.match(/v_evaluated_at\s+timestamptz\s*:=\s*clock_timestamp\(\)/gi)).toHaveLength(2);
+    expect(sql).toMatch(/v_vpd_observed_at\s*>\s*v_evaluated_at\s*\+\s*interval\s+'5 minutes'/i);
+    expect(sql).toMatch(
+      /NEW\.leaf_temperature_measured_at\s*>\s*v_evaluated_at\s*\+\s*interval\s+'5 minutes'/i,
+    );
+    expect(sql).toMatch(
+      /v_calibration\.temperature_verified_at\s*>\s*v_evaluated_at[\s\S]*?v_calibration\.humidity_verified_at\s*>\s*v_evaluated_at/i,
+    );
+    expect(
+      sql.match(/NEW\.recorded_at\s*<\s*v_evaluated_at\s*-\s*interval\s+'5 minutes'/gi),
+    ).toHaveLength(2);
+    expect(
+      sql.match(/NEW\.recorded_at\s*>\s*v_evaluated_at\s*\+\s*interval\s+'5 minutes'/gi),
+    ).toHaveLength(2);
+  });
+
+  it("requires exact nonblank device lineage and trusted VPD source evidence", () => {
+    expect(sql).toMatch(/NULLIF\s*\(\s*btrim\(v_air\.device_id\)\s*,\s*''\s*\)\s+IS NULL/i);
+    expect(sql).toMatch(/v_air\.device_id\s*<>\s*v_calibration\.device_id/i);
+    expect(sql).toMatch(/NULLIF\s*\(\s*btrim\(v_humidity\.device_id\)\s*,\s*''\s*\)\s+IS NULL/i);
+    expect(sql).toMatch(/v_humidity\.device_id\s*<>\s*v_calibration\.device_id/i);
+    expect(sql.match(/v_vpd\.source\s+NOT IN\s*\(/gi)).toHaveLength(2);
+    expect(sql.match(/v_air\.source\s+NOT IN\s*\(/gi)).toHaveLength(1);
+    expect(sql.match(/v_humidity\.source\s+NOT IN\s*\(/gi)).toHaveLength(1);
+    for (const trustedSource of ["live", "manual", "csv", "ecowitt", "mqtt", "webhook"]) {
+      expect(sql).toContain(`'${trustedSource}'`);
+    }
+    expect(sql).not.toMatch(/v_vpd\.source\s+IN\s*\(\s*'demo'/i);
+  });
+
+  it("owns rows through auth users and keeps tent deletion cascade-safe", () => {
+    expect(
+      sql.match(
+        /user_id\s+uuid\s+NOT NULL\s+DEFAULT auth\.uid\(\)\s+REFERENCES auth\.users\(id\)\s+ON DELETE CASCADE/gi,
+      ),
+    ).toHaveLength(2);
+    expect(
+      sql.match(/tent_id\s+uuid\s+NOT NULL\s+REFERENCES public\.tents\(id\)\s+ON DELETE CASCADE/gi),
+    ).toHaveLength(2);
+    expect(sql).toMatch(
+      /calibration_record_id\s+uuid\s+REFERENCES public\.vpd_calibration_records\(id\)\s+ON DELETE CASCADE/i,
+    );
+  });
+
   it("enforces grower and tent ownership for both inserts", () => {
     const calibrationInsert = policyBlock("Users insert own VPD calibration records");
     const provenanceInsert = policyBlock("Users insert own VPD measurement provenance");
@@ -114,6 +172,8 @@ describe("VPD calibration provenance migration", () => {
       expect(policy).toMatch(/FOR INSERT/i);
       expect(policy).toMatch(/TO authenticated/i);
       expect(policy).toMatch(/auth\.uid\(\)\s*=\s*user_id/i);
+      expect(policy).toMatch(/recorded_at\s*>=\s*now\(\)\s*-\s*interval\s+'5 minutes'/i);
+      expect(policy).toMatch(/recorded_at\s*<=\s*now\(\)\s*\+\s*interval\s+'5 minutes'/i);
       expect(policy).toMatch(
         /EXISTS\s*\([\s\S]*?FROM\s+public\.tents[\s\S]*?user_id\s*=\s*auth\.uid\(\)/i,
       );

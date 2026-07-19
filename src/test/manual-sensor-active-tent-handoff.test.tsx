@@ -6,18 +6,19 @@ import Sensors from "@/pages/Sensors";
 
 const TENT_A = "11111111-1111-4111-8111-111111111111";
 const TENT_B = "22222222-2222-4222-8222-222222222222";
+const TENT_NOT_OWNED = "33333333-3333-4333-8333-333333333333";
 const insertReading = vi.hoisted(() => vi.fn());
+const growTentsQuery = vi.hoisted(() => ({
+  // `vi.hoisted` runs before module constants; each test supplies its rows.
+  data: [],
+  isLoading: false,
+  isError: false,
+  isSuccess: true,
+  refetch: vi.fn(),
+}));
 
 vi.mock("@/hooks/useGrowData", () => ({
-  useGrowTents: () => ({
-    data: [
-      { id: TENT_A, name: "Tent A", growId: "grow-1" },
-      { id: TENT_B, name: "Tent B", growId: "grow-1" },
-    ],
-    isLoading: false,
-    isError: false,
-    refetch: vi.fn(),
-  }),
+  useGrowTents: () => growTentsQuery,
   useGrowSensorReadings: () => ({
     data: [],
     isLoading: false,
@@ -57,25 +58,82 @@ vi.mock("@/components/SensorChart", () => ({ default: () => null }));
 vi.mock("@/components/SensorsTestbenchPanel", () => ({ default: () => null }));
 vi.mock("@/components/ManualSensorTrendChart", () => ({ default: () => null }));
 
-function renderSensors() {
+function renderSensors(initialEntry = "/sensors") {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-
-  return render(
+  const tree = () => (
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={["/sensors"]}>
+      <MemoryRouter initialEntries={[initialEntry]}>
         <Sensors />
       </MemoryRouter>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
+  const rendered = render(tree());
+
+  return {
+    ...rendered,
+    rerenderSensors: () => rendered.rerender(tree()),
+  };
 }
 
 beforeEach(() => {
   insertReading.mockReset().mockResolvedValue(undefined);
+  Object.assign(growTentsQuery, {
+    data: [
+      { id: TENT_A, name: "Tent A", growId: "grow-1" },
+      { id: TENT_B, name: "Tent B", growId: "grow-1" },
+    ],
+    isLoading: false,
+    isError: false,
+    isSuccess: true,
+  });
 });
 
 describe("Sensors manual reading target handoff", () => {
+  it("selects an authenticated tent requested by the Timeline route intent", async () => {
+    renderSensors(`/sensors?tentId=${TENT_B}`);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("manual-reading-tent-row")).toHaveTextContent("Saving to: Tent B"),
+    );
+  });
+
+  it("preserves a requested tent through a failed tent query and applies it after retry success", async () => {
+    Object.assign(growTentsQuery, {
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      isSuccess: false,
+    });
+    const { rerenderSensors } = renderSensors(`/sensors?tentId=${TENT_B}`);
+
+    expect(screen.queryByTestId("manual-reading-tent-row")).not.toBeInTheDocument();
+
+    Object.assign(growTentsQuery, {
+      data: [
+        { id: TENT_A, name: "Tent A", growId: "grow-1" },
+        { id: TENT_B, name: "Tent B", growId: "grow-1" },
+      ],
+      isLoading: false,
+      isError: false,
+      isSuccess: true,
+    });
+    rerenderSensors();
+
+    await waitFor(() =>
+      expect(screen.getByTestId("manual-reading-tent-row")).toHaveTextContent("Saving to: Tent B"),
+    );
+  });
+
+  it("falls back to the default authenticated tent when the route intent is not owned", async () => {
+    renderSensors(`/sensors?tentId=${TENT_NOT_OWNED}`);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("manual-reading-tent-row")).toHaveTextContent("Saving to: Tent A"),
+    );
+  });
+
   it("moves the manual save target when the active tent chip changes", async () => {
     renderSensors();
 

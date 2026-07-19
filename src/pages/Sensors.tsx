@@ -2,7 +2,7 @@ import VpdStageMissingBadge from "@/components/VpdStageMissingBadge";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import EnvironmentStabilityCard from "@/components/EnvironmentStabilityCard";
 import { computeEnvironmentStability } from "@/lib/environmentStabilityRules";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { decodeManualCorrectionHash } from "@/lib/manualSensorCorrectionContext";
 import { Activity } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
@@ -50,7 +50,10 @@ import { useEcowittIngestAuditProofRows } from "@/hooks/useEcowittIngestAuditPro
 import { isUsableGrowSensorReading } from "@/lib/growSensorEvidenceRules";
 import { useHasRole } from "@/hooks/useHasRole";
 import { canShowSensorOperatorDiagnostics } from "@/lib/sensorOperatorAccessRules";
-import { resolveGrowTentSelection } from "@/lib/growTentSelectionRules";
+import {
+  readSensorsTentRouteIntent,
+  resolveSensorsTentRouteSelection,
+} from "@/lib/sensorRouteTentIntentRules";
 import {
   classifySensorReadingTrust,
   indexSensorReadingsByObservedMetric,
@@ -72,20 +75,37 @@ export default function Sensors() {
   const location = useLocation();
   const tentsQuery = useGrowTents();
   const { data: tents = [] } = tentsQuery;
+  const [searchParams, setSearchParams] = useSearchParams();
+  const sensorsTentRouteIntent = useMemo(
+    () => readSensorsTentRouteIntent(searchParams),
+    [searchParams],
+  );
   const [tentId, setTentId] = useState<string | null>(null);
+  const appliedTentRouteIntentRef = useRef<string | null | undefined>(undefined);
   // Do not fetch the all-tents aggregate into the Sensors browser cache.
   // `null` is an explicit no-scope sentinel until a persisted tent is chosen.
   const readingsQuery = useGrowSensorReadings(tentId);
   const { data: readings = [] } = readingsQuery;
-  const [searchParams, setSearchParams] = useSearchParams();
   const operatorRole = useHasRole("operator");
 
-  // Reconcile after the authenticated tent query resolves. This removes the
-  // legacy `t1` placeholder, preserves a still-valid grower choice, and moves
-  // deterministically when a selected tent is deleted.
+  // Reconcile only after the authenticated tent query succeeds. A failed
+  // first attempt must not consume the URL intent: its retry can still prove
+  // whether the requested tent belongs to this grower. A new valid intent may
+  // select a matching owned tent once; all later chip choices remain
+  // grower-owned. Missing/invalid intent preserves the prior safe fallback.
   useEffect(() => {
-    setTentId((currentTentId) => resolveGrowTentSelection({ currentTentId, tents }));
-  }, [tents]);
+    if (!tentsQuery.isSuccess) return;
+
+    const intentChanged = appliedTentRouteIntentRef.current !== sensorsTentRouteIntent.tentId;
+    setTentId((currentTentId) =>
+      resolveSensorsTentRouteSelection({
+        intent: intentChanged ? sensorsTentRouteIntent : null,
+        currentTentId,
+        tents,
+      }),
+    );
+    appliedTentRouteIntentRef.current = sensorsTentRouteIntent.tentId;
+  }, [sensorsTentRouteIntent, tents, tentsQuery.isSuccess]);
 
   // React Router updates hashes without a full browser navigation, so make
   // the existing manual-reading deep link deterministic for same-page CSV

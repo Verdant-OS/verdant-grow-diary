@@ -169,8 +169,8 @@ The separate public check requires an unauthenticated browser-shaped `OPTIONS`
 and `POST {}` to the production `founder-slots-remaining` endpoint. It fails
 closed unless CORS permits Verdant's production origin and the Supabase client
 headers, the POST returns HTTP 200 JSON, the payload contains exactly
-`remaining` and `total`, both values are integers, `total === 75`, and
-`remaining` is within `0..75`. A 404, 503, malformed response, extra field, or
+`remaining` and `total`, both values are integers, `total === 100`, and
+`remaining` is within `0..100`. A 404, 503, malformed response, extra field, or
 missing CORS evidence prevents `LIVE_VERIFIED`. This is a production-backend
 proof, not a sixth frontend capability marker; local preview stays
 network-free.

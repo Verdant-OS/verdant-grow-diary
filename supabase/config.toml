@@ -21,7 +21,7 @@ project_id = "knkwiiywfkbqznbxwqfh"
   [functions.payments-webhook]
     verify_jwt = false
   # founder-slots-remaining is a public, read-only counter used by the
-  # /pricing card. Bounded 0..75 integer only; no user data.
+  # /pricing card. Bounded 0..100 integer only; no user data.
   [functions.founder-slots-remaining]
     verify_jwt = false
   # checkout-status re-verifies the caller JWT inside the function via

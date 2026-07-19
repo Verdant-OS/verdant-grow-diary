@@ -5,7 +5,8 @@
  *   csv_import_started → csv_import_completed →
  *   csv_history_ai_doctor_clicked → ai_doctor_review_started →
  *   ai_doctor_result_received →
- *   ai_doctor_session_saved → paywall_viewed → checkout_started →
+ *   ai_doctor_session_saved → paywall_viewed → paywall_cta_clicked →
+ *   checkout_started →
  *   subscription_activated → checkout_return_completed
  *
  * Historical reviews additionally emit historical_ai_review_started as a
@@ -39,6 +40,7 @@ export const FUNNEL_EVENTS = [
   "ai_doctor_result_received",
   "ai_doctor_session_saved",
   "paywall_viewed",
+  "paywall_cta_clicked",
   "checkout_started",
   "subscription_activated",
   "checkout_return_completed",

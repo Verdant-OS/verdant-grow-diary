@@ -19,13 +19,23 @@ describe("ai-coach edge — 200-envelope credit transport", () => {
   const src = read("supabase/functions/ai-coach/index.ts");
 
   it("ai_credit_spend denial returns 200 with { ok:false, reason:'credit_denied', credit }", () => {
-    // The denial branch must not return a non-200 status.
+    // Only an authoritative denied status reaches the paywall branch, and the
+    // denial branch must not return a non-200 status.
     expect(src).toMatch(
-      /spendObj\.ok\s*!==\s*true[\s\S]{0,300}return\s+json\(\s*\{\s*ok:\s*false,\s*reason:\s*"credit_denied",\s*credit:\s*spendObj\s*\}\s*,\s*200\s*\)/,
+      /spendObj\.ok\s*!==\s*true\s*&&\s*spendObj\.status\s*!==\s*"denied"[\s\S]{0,500}spendObj\.ok\s*!==\s*true[\s\S]{0,300}return\s+json\(\s*\{\s*ok:\s*false,\s*reason:\s*"credit_denied",\s*credit:\s*spendObj\s*\}\s*,\s*200\s*\)/,
     );
     // Legacy shapes removed.
     expect(src).not.toMatch(
       /return\s+json\(\s*\{\s*error:\s*"credit_denied"[\s\S]{0,80}\}\s*,\s*402/,
+    );
+  });
+
+  it("keeps refunded and context-conflicting replays out of the credit-denied paywall", () => {
+    expect(src).toMatch(
+      /spendObj\.ok\s*!==\s*true\s*&&\s*spendObj\.status\s*!==\s*"denied"[\s\S]{0,500}return\s+json\(\s*\{\s*ok:\s*false,\s*reason:\s*"invalid"\s*\}\s*,\s*200\s*\)/,
+    );
+    expect(src.indexOf('spendObj.status !== "denied"')).toBeLessThan(
+      src.indexOf('reason: "credit_denied"'),
     );
   });
 
@@ -39,6 +49,7 @@ describe("ai-coach edge — 200-envelope credit transport", () => {
 
   it("logs the new HTTP=200 business envelopes", () => {
     expect(src).toMatch(/ai-coach status=credit_denied http=200/);
+    expect(src).toMatch(/ai-coach status=credit_invalid http=200/);
     expect(src).toMatch(/ai-coach status=upstream_credit_exhausted http=200/);
   });
 
@@ -60,8 +71,11 @@ describe("ai-doctor-review edge — credit_denied envelope unchanged", () => {
   const src = read("supabase/functions/ai-doctor-review/index.ts");
 
   it("still returns HTTP 200 { ok:false, reason:'credit_denied', credit } via calmFailure", () => {
+    // A previously refunded replay is terminal and must be separated before
+    // the ordinary denied-spend path. Every remaining denial still preserves
+    // the established calm credit payload instead of becoming a generic error.
     expect(src).toMatch(
-      /spendObj\.ok\s*!==\s*true[\s\S]{0,300}return\s+calmFailure\(\s*"credit_denied"\s*,\s*\{\s*credit:\s*spendObj\s*\}\s*\)/,
+      /spendDecision\.kind\s*===\s*"refunded"[\s\S]{0,300}return\s+calmFailure\(\s*"result_recording_failed"\s*\)[\s\S]{0,300}spendDecision\.kind\s*===\s*"denied"[\s\S]{0,300}return\s+calmFailure\(\s*"credit_denied"\s*,\s*\{\s*credit:\s*spendObj\s*\}\s*\)/,
     );
     // calmFailure returns 200.
     expect(src).toMatch(/function\s+calmFailure[\s\S]{0,200}status:\s*200/);
@@ -135,6 +149,13 @@ describe("shared adapter — adaptCreditedAiResponse", () => {
     if (out.ok === false) expect(out.reason).toBe("invalid");
   });
 
+  it.each(["result_pending", "result_recording_failed"] as const)(
+    "passes the AI Doctor replay outcome %s through without credit/paywall coercion",
+    (reason) => {
+      expect(adaptCreditedAiResponse({ ok: false, reason })).toEqual({ ok: false, reason });
+    },
+  );
+
   it("preserves credit on upstream_credit_exhausted when server included one", () => {
     const credit = { ok: false, status: "denied", scope: "per_month" };
     const out = adaptCreditedAiResponse({
@@ -159,9 +180,11 @@ describe("shared adapter — adaptCreditedAiResponse", () => {
       "shape",
       "credit_denied",
       "upstream_credit_exhausted",
+      "result_pending",
+      "result_recording_failed",
     ];
     // Compile-time assertion; runtime sanity:
-    expect(accepted.length).toBe(9);
+    expect(accepted.length).toBe(11);
   });
 });
 

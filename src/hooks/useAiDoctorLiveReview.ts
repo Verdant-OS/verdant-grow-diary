@@ -25,6 +25,8 @@ import { supabase } from "@/integrations/supabase/client";
 import type { AiDoctorReviewRequestPacket } from "@/lib/aiDoctorReviewRequestPacket";
 import {
   buildAiDoctorReviewRequestEnvelope,
+  createAiDoctorReviewIdempotencyKey,
+  newAiDoctorReviewIdempotencyKey,
   type AiDoctorReviewRequestEnvelope,
 } from "@/lib/aiDoctorReviewRequestTransportRules";
 import {
@@ -48,6 +50,7 @@ import {
   adaptAiDoctorReviewResultToDiagnosis,
   AI_DOCTOR_REVIEW_CONFIDENCE_SCORE,
 } from "@/lib/aiDoctorReviewHistoryRules";
+import { shouldReuseAiDoctorReviewIdempotencyKeyAfterResponse } from "@/lib/aiDoctorLiveReviewRecoveryRules";
 
 export type AiDoctorLiveReviewStatus = "idle" | "loading" | "result" | "error";
 
@@ -97,6 +100,8 @@ export interface UseAiDoctorLiveReviewOptions {
   onPersisted?: (sessionId: string) => void;
   /** Deterministic test seam for the stable logical-session UUID. */
   createSessionId?: () => string;
+  /** Deterministic test seam for the per-logical-request replay UUID. */
+  createRequestIdempotencyKey?: () => string;
   /** Deterministic test seam for the frozen evidence-evaluation timestamp. */
   now?: () => Date;
 }
@@ -116,6 +121,17 @@ const INITIAL: AiDoctorLiveReviewState = {
   reason: null,
   persistence: { status: "idle" },
 };
+
+interface FrozenAiDoctorLiveReviewRequest {
+  idempotencyKey: string;
+  packet: AiDoctorReviewRequestPacket;
+  growId: string | null;
+  tentId: string | null;
+  plantId: string | null;
+  sensorClassification: Classification | null;
+  sensorEvidenceEvaluatedAt: string | null;
+  sensorEvidenceTimestampError: unknown;
+}
 
 function scopeFromInput(input: AiDoctorSessionInput) {
   return {
@@ -139,10 +155,12 @@ export function useAiDoctorLiveReview(
     persist: persistOverride,
     onPersisted,
     createSessionId,
+    createRequestIdempotencyKey,
     now,
   } = opts;
   const [state, setState] = useState<AiDoctorLiveReviewState>(INITIAL);
   const inflight = useRef(false);
+  const logicalRequest = useRef<FrozenAiDoctorLiveReviewRequest | null>(null);
   const persistenceInflight = useRef(false);
   const retryPersistenceInput = useRef<AiDoctorSessionInput | null>(null);
 
@@ -213,145 +231,219 @@ export function useAiDoctorLiveReview(
     [onPersisted, persistOverride],
   );
 
-  const run = useCallback(async () => {
-    if (!enabled || packet == null) return;
-    if (inflight.current) return;
-    inflight.current = true;
-    retryPersistenceInput.current = null;
-    setState({ status: "loading", result: null, reason: null, persistence: { status: "idle" } });
+  const run = useCallback(
+    async (requestKind: "start" | "retry") => {
+      if (!enabled) return;
+      if (inflight.current) return;
+      inflight.current = true;
+      retryPersistenceInput.current = null;
 
-    // The evidence classification belongs to the click-time request packet,
-    // not the later moment when a model response happens to return. Capture
-    // one timestamp now and reuse it for the durable snapshot and any retry.
-    let sensorEvidenceEvaluatedAt: string | null = null;
-    let sensorEvidenceTimestampError: unknown = null;
-    if (sensorClassification) {
-      try {
-        sensorEvidenceEvaluatedAt = (now?.() ?? new Date()).toISOString();
-      } catch (error) {
-        sensorEvidenceTimestampError = error;
+      // `start` always begins a new logical request. A retained retry reuses
+      // the entire click-time request, not merely its UUID, so background
+      // rerenders can never pair an old spend identity with a new packet,
+      // scope, evidence classification, or evaluation time.
+      if (requestKind === "start") logicalRequest.current = null;
+      if (logicalRequest.current === null) {
+        if (packet == null) {
+          inflight.current = false;
+          return;
+        }
+        const created = createAiDoctorReviewIdempotencyKey(
+          createRequestIdempotencyKey ?? newAiDoctorReviewIdempotencyKey,
+        );
+        if (created.ok === false) {
+          setState({
+            status: "error",
+            result: null,
+            reason: "invalid",
+            persistence: { status: "idle" },
+          });
+          inflight.current = false;
+          return;
+        }
+
+        let sensorEvidenceEvaluatedAt: string | null = null;
+        let sensorEvidenceTimestampError: unknown = null;
+        if (sensorClassification) {
+          try {
+            sensorEvidenceEvaluatedAt = (now?.() ?? new Date()).toISOString();
+          } catch (error) {
+            sensorEvidenceTimestampError = error;
+          }
+        }
+
+        logicalRequest.current = {
+          idempotencyKey: created.key,
+          packet,
+          growId: growId ?? null,
+          tentId: tentId ?? null,
+          plantId: plantId ?? null,
+          sensorClassification: sensorClassification ?? null,
+          sensorEvidenceEvaluatedAt,
+          sensorEvidenceTimestampError,
+        };
       }
-    }
 
-    const invoke =
-      invokeOverride ??
-      ((name, init) =>
-        supabase.functions.invoke(name, init) as Promise<{
-          data: unknown;
-          error: unknown;
-        }>);
+      const request = logicalRequest.current;
+      if (request === null) {
+        inflight.current = false;
+        return;
+      }
 
-    try {
-      const { data, error } = await invoke("ai-doctor-review", {
-        // Grow scope stays outside the model context packet. The Edge Function
-        // validates ownership before spending a Free per-grow credit.
-        body: buildAiDoctorReviewRequestEnvelope(packet, growId),
-      });
-      if (error) {
+      const builtRequest = buildAiDoctorReviewRequestEnvelope(
+        request.packet,
+        request.growId,
+        request.idempotencyKey,
+      );
+      if (builtRequest.ok === false) {
+        logicalRequest.current = null;
+        setState({
+          status: "error",
+          result: null,
+          reason: "invalid",
+          persistence: { status: "idle" },
+        });
+        inflight.current = false;
+        return;
+      }
+
+      setState({ status: "loading", result: null, reason: null, persistence: { status: "idle" } });
+
+      const invoke =
+        invokeOverride ??
+        ((name, init) =>
+          supabase.functions.invoke(name, init) as Promise<{
+            data: unknown;
+            error: unknown;
+          }>);
+
+      try {
+        const { data, error } = await invoke("ai-doctor-review", {
+          // Grow scope stays outside the model context packet. The Edge Function
+          // validates ownership before spending a Free per-grow credit.
+          body: builtRequest.envelope,
+        });
+        if (error) {
+          // The request may have reached the Edge Function. Preserve the UUID so
+          // a grower retry asks the server for the same spend/result.
+          setState({
+            status: "error",
+            result: null,
+            reason: "http",
+            persistence: { status: "idle" },
+          });
+          return;
+        }
+        const outcome = adaptCreditedAiResponse(data, validateAiDoctorReviewResult);
+        if (outcome.ok === false) {
+          if (!shouldReuseAiDoctorReviewIdempotencyKeyAfterResponse(data, outcome.reason)) {
+            logicalRequest.current = null;
+          }
+          setState({
+            status: "error",
+            result: null,
+            reason: outcome.reason,
+            credit:
+              outcome.reason === "credit_denied" || outcome.reason === "upstream_credit_exhausted"
+                ? outcome.credit
+                : undefined,
+            persistence: { status: "idle" },
+          });
+          return;
+        }
+
+        // A validated response is complete. Retire its replay identity before
+        // any independent history persistence work begins.
+        logicalRequest.current = null;
+
+        setState({
+          status: "result",
+          result: outcome.result,
+          reason: null,
+          creditRemaining: outcome.credit,
+          persistence: request.growId
+            ? { status: "saving" }
+            : { status: "skipped", reason: "missing_grow_scope" },
+        });
+
+        // Audit-trail: explicit successful run only. The displayed review does
+        // not depend on this insert, and a failed insert can be retried alone.
+        // Skipped when there is no scope (growId is required for an
+        // ownership-checked insert under existing RLS).
+        if (request.growId) {
+          try {
+            if (request.sensorEvidenceTimestampError) {
+              throw request.sensorEvidenceTimestampError;
+            }
+            const diagnosisReport = adaptAiDoctorReviewResultToDiagnosis(outcome.result);
+            const confidenceScore = AI_DOCTOR_REVIEW_CONFIDENCE_SCORE[outcome.result.confidence];
+            const persistenceInput: AiDoctorSessionInput = {
+              sessionId: createSessionId?.() ?? newAiDoctorSessionId(),
+              growId: request.growId,
+              tentId: request.tentId,
+              plantId: request.plantId,
+              analysis: outcome.result,
+              diagnosis: diagnosisReport.diagnosis,
+              rawConfidence: confidenceScore,
+              displayedConfidence: confidenceScore,
+              sensorEvidence: request.sensorClassification,
+              // Freeze this once per logical review. Manual save retries reuse
+              // the same input object, so history cannot drift to retry time.
+              sensorEvidenceEvaluatedAt: request.sensorEvidenceEvaluatedAt,
+            };
+            await saveToHistory(persistenceInput);
+          } catch (error) {
+            const diagnostic = buildAiDoctorSessionPersistenceFailureDiagnostic({
+              stage: "unexpected",
+              error: error instanceof Error ? error : { message: "unknown" },
+              authResolution: "unavailable",
+              scope: {
+                hasGrowScope: true,
+                hasTentScope: Boolean(request.tentId),
+                hasPlantScope: Boolean(request.plantId),
+              },
+              fallbackMessage: "history_save_preparation_failed",
+            });
+            setState((current) =>
+              current.status === "result"
+                ? { ...current, persistence: { status: "failed", diagnostic } }
+                : current,
+            );
+          }
+        }
+      } catch {
+        // A thrown invoke is transport-ambiguous for the same reason as an
+        // invoke `{ error }`: replay must retain the current UUID.
         setState({
           status: "error",
           result: null,
           reason: "http",
           persistence: { status: "idle" },
         });
-        return;
+      } finally {
+        inflight.current = false;
       }
-      const outcome = adaptCreditedAiResponse(data, validateAiDoctorReviewResult);
-      if (outcome.ok === false) {
-        setState({
-          status: "error",
-          result: null,
-          reason: outcome.reason,
-          credit:
-            outcome.reason === "credit_denied" || outcome.reason === "upstream_credit_exhausted"
-              ? outcome.credit
-              : undefined,
-          persistence: { status: "idle" },
-        });
-        return;
-      }
-
-      setState({
-        status: "result",
-        result: outcome.result,
-        reason: null,
-        creditRemaining: outcome.credit,
-        persistence: growId
-          ? { status: "saving" }
-          : { status: "skipped", reason: "missing_grow_scope" },
-      });
-
-      // Audit-trail: explicit successful run only. The displayed review does
-      // not depend on this insert, and a failed insert can be retried alone.
-      // Skipped when there is no scope (growId is required for an
-      // ownership-checked insert under existing RLS).
-      if (growId) {
-        try {
-          if (sensorEvidenceTimestampError) throw sensorEvidenceTimestampError;
-          const diagnosisReport = adaptAiDoctorReviewResultToDiagnosis(outcome.result);
-          const confidenceScore = AI_DOCTOR_REVIEW_CONFIDENCE_SCORE[outcome.result.confidence];
-          const persistenceInput: AiDoctorSessionInput = {
-            sessionId: createSessionId?.() ?? newAiDoctorSessionId(),
-            growId,
-            tentId: tentId ?? null,
-            plantId: plantId ?? null,
-            analysis: outcome.result,
-            diagnosis: diagnosisReport.diagnosis,
-            rawConfidence: confidenceScore,
-            displayedConfidence: confidenceScore,
-            sensorEvidence: sensorClassification ?? null,
-            // Freeze this once per logical review. Manual save retries reuse
-            // the same input object, so history cannot drift to retry time.
-            sensorEvidenceEvaluatedAt,
-          };
-          await saveToHistory(persistenceInput);
-        } catch (error) {
-          const diagnostic = buildAiDoctorSessionPersistenceFailureDiagnostic({
-            stage: "unexpected",
-            error: error instanceof Error ? error : { message: "unknown" },
-            authResolution: "unavailable",
-            scope: {
-              hasGrowScope: true,
-              hasTentScope: Boolean(tentId),
-              hasPlantScope: Boolean(plantId),
-            },
-            fallbackMessage: "history_save_preparation_failed",
-          });
-          setState((current) =>
-            current.status === "result"
-              ? { ...current, persistence: { status: "failed", diagnostic } }
-              : current,
-          );
-        }
-      }
-    } catch {
-      setState({
-        status: "error",
-        result: null,
-        reason: "http",
-        persistence: { status: "idle" },
-      });
-    } finally {
-      inflight.current = false;
-    }
-  }, [
-    enabled,
-    packet,
-    invokeOverride,
-    growId,
-    tentId,
-    plantId,
-    sensorClassification,
-    createSessionId,
-    now,
-    saveToHistory,
-  ]);
+    },
+    [
+      enabled,
+      packet,
+      invokeOverride,
+      growId,
+      tentId,
+      plantId,
+      sensorClassification,
+      createSessionId,
+      createRequestIdempotencyKey,
+      now,
+      saveToHistory,
+    ],
+  );
 
   const start = useCallback(() => {
-    void run();
+    void run("start");
   }, [run]);
   const retry = useCallback(() => {
-    void run();
+    void run("retry");
   }, [run]);
 
   const retrySave = useCallback(() => {

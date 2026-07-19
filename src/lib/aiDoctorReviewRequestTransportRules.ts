@@ -17,7 +17,20 @@ export interface AiDoctorReviewRequestEnvelope<TPacket> {
   packet: TPacket;
   /** Server-only credit/ownership scope. Never prompt context. */
   grow_id?: string;
+  /** Server-only replay identity. Never prompt context or persisted diagnosis data. */
+  idempotency_key: string;
 }
+
+export type AiDoctorReviewRequestEnvelopeBuildResult<TPacket> =
+  | { ok: true; envelope: AiDoctorReviewRequestEnvelope<TPacket> }
+  | { ok: false; reason: "invalid_idempotency_key" };
+
+export type AiDoctorReviewIdempotencyKeyCreationResult =
+  | { ok: true; key: string }
+  | {
+      ok: false;
+      reason: "idempotency_key_generation_failed" | "invalid_idempotency_key";
+    };
 
 export interface ParsedAiDoctorReviewRequestEnvelope {
   /** Sanitized model-context packet; never contains top-level transport fields. */
@@ -44,15 +57,51 @@ interface TransportFieldStripResult {
 }
 
 /**
+ * Turns an injected UUID generator into a validated request identity. Keeping
+ * generation behind this seam makes request-lifecycle tests deterministic and
+ * converts unavailable/invalid randomness into a typed, fail-closed result.
+ */
+export function createAiDoctorReviewIdempotencyKey(
+  generate: () => unknown,
+): AiDoctorReviewIdempotencyKeyCreationResult {
+  let candidate: unknown;
+  try {
+    candidate = generate();
+  } catch {
+    return { ok: false, reason: "idempotency_key_generation_failed" };
+  }
+
+  return isUuid(candidate)
+    ? { ok: true, key: candidate }
+    : { ok: false, reason: "invalid_idempotency_key" };
+}
+
+/** Browser default for one UUID per grower-initiated logical request. */
+export function newAiDoctorReviewIdempotencyKey(): string {
+  return globalThis.crypto.randomUUID();
+}
+
+/**
  * Builds the current request envelope. Invalid/demo scope IDs are omitted so
- * they cannot produce a malformed UUID request; the server still fails closed
- * when a Free request has no valid, owned grow scope.
+ * they cannot produce a malformed grow UUID request; the server still fails
+ * closed when a Free request has no valid, owned grow scope. An invalid replay
+ * identity fails closed as a typed result and never reaches the network.
  */
 export function buildAiDoctorReviewRequestEnvelope<TPacket>(
   packet: TPacket,
   growId?: unknown,
-): AiDoctorReviewRequestEnvelope<TPacket> {
-  return isUuid(growId) ? { packet, grow_id: growId } : { packet };
+  idempotencyKey?: unknown,
+): AiDoctorReviewRequestEnvelopeBuildResult<TPacket> {
+  if (!isUuid(idempotencyKey)) {
+    return { ok: false, reason: "invalid_idempotency_key" };
+  }
+
+  return {
+    ok: true,
+    envelope: isUuid(growId)
+      ? { packet, grow_id: growId, idempotency_key: idempotencyKey }
+      : { packet, idempotency_key: idempotencyKey },
+  };
 }
 
 /**

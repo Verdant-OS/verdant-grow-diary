@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   buildAiDoctorReviewRequestEnvelope,
+  createAiDoctorReviewIdempotencyKey,
   parseAiDoctorReviewRequestEnvelope,
   stripAiDoctorReviewRequestTransportFields,
 } from "@/lib/aiDoctorReviewRequestTransportRules";
 
 const GROW_ID = "11111111-1111-4111-8111-111111111111";
+const IDEMPOTENCY_KEY = "33333333-3333-4333-8333-333333333333";
 const PACKET = {
   schemaVersion: 1,
   plant: { strain: "Northern Lights" },
@@ -28,16 +30,57 @@ function createWidePacket(width: number): Record<string, unknown> {
 
 describe("AI Doctor review request transport", () => {
   it("puts a valid grow scope beside, not inside, the model-context packet", () => {
-    const envelope = buildAiDoctorReviewRequestEnvelope(PACKET, GROW_ID);
+    const built = buildAiDoctorReviewRequestEnvelope(PACKET, GROW_ID, IDEMPOTENCY_KEY);
 
-    expect(envelope).toEqual({ packet: PACKET, grow_id: GROW_ID });
-    expect(envelope.packet).toBe(PACKET);
+    expect(built).toEqual({
+      ok: true,
+      envelope: {
+        packet: PACKET,
+        grow_id: GROW_ID,
+        idempotency_key: IDEMPOTENCY_KEY,
+      },
+    });
+    if (built.ok === false) throw new Error("expected a valid request envelope");
+    expect(built.envelope.packet).toBe(PACKET);
     expect(PACKET).not.toHaveProperty("grow_id");
+    expect(PACKET).not.toHaveProperty("idempotency_key");
   });
 
   it("omits malformed/demo scope IDs and leaves credit validation server-side", () => {
-    expect(buildAiDoctorReviewRequestEnvelope(PACKET, "demo-grow")).toEqual({ packet: PACKET });
-    expect(buildAiDoctorReviewRequestEnvelope(PACKET, null)).toEqual({ packet: PACKET });
+    expect(buildAiDoctorReviewRequestEnvelope(PACKET, "demo-grow", IDEMPOTENCY_KEY)).toEqual({
+      ok: true,
+      envelope: { packet: PACKET, idempotency_key: IDEMPOTENCY_KEY },
+    });
+    expect(buildAiDoctorReviewRequestEnvelope(PACKET, null, IDEMPOTENCY_KEY)).toEqual({
+      ok: true,
+      envelope: { packet: PACKET, idempotency_key: IDEMPOTENCY_KEY },
+    });
+  });
+
+  it("fails closed with a typed result when the replay identity is absent or malformed", () => {
+    for (const value of [undefined, null, "not-a-uuid", 42]) {
+      expect(() => buildAiDoctorReviewRequestEnvelope(PACKET, GROW_ID, value)).not.toThrow();
+      expect(buildAiDoctorReviewRequestEnvelope(PACKET, GROW_ID, value)).toEqual({
+        ok: false,
+        reason: "invalid_idempotency_key",
+      });
+    }
+  });
+
+  it("validates an injected UUID generator and contains generator failures", () => {
+    expect(createAiDoctorReviewIdempotencyKey(() => IDEMPOTENCY_KEY)).toEqual({
+      ok: true,
+      key: IDEMPOTENCY_KEY,
+    });
+    expect(createAiDoctorReviewIdempotencyKey(() => "invalid")).toEqual({
+      ok: false,
+      reason: "invalid_idempotency_key",
+    });
+    expect(
+      createAiDoctorReviewIdempotencyKey(() => {
+        throw new Error("random unavailable");
+      }),
+    ).toEqual({ ok: false, reason: "idempotency_key_generation_failed" });
   });
 
   it("parses the envelope and strips scope/idempotency fields before prompt assembly", () => {

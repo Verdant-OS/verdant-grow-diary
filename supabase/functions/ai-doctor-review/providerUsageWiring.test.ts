@@ -11,8 +11,8 @@
 //   - never recursively searches into nested fields (no throwing-getter trip)
 //   - the runtime wiring does NOT introduce direct persistence, capture,
 //     budget, back-pressure, alerts, or action_queue writes. Its only
-//     additional server persistence is a protected service-role completion RPC
-//     after a fresh validated review succeeds.
+//     additional server persistence is protected service-role result attachment
+//     followed by the completion RPC after a fresh validated review succeeds.
 //
 // Runtime safety: this is a LOCAL/UNIT test file only.
 //   * No provider API call is made.
@@ -162,6 +162,15 @@ Deno.test(
   "structural safety: edge function wiring keeps completion persistence protected",
   async () => {
     const raw = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
+    assert(
+      raw.includes("20260719043000_ai_credit_result_cache.sql") &&
+        /apply[\s\S]{0,100}before deploying this function/i.test(raw),
+      "result-cache migration must be documented as an Edge prerequisite",
+    );
+    assert(
+      /deploy this function[\s\S]{0,100}publish the UUID-sending client/i.test(raw),
+      "the safe mixed-version rollout must deploy Edge before the UUID-sending client",
+    );
     // Strip line + block comments so safety assertions only see executable code.
     const src = raw.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
     // No direct persistence / writes introduced by the wiring slice.
@@ -176,6 +185,7 @@ Deno.test(
     assertEquals(
       rpcCalls.sort(),
       [
+        "ai_credit_attach_result",
         "ai_credit_refund",
         "ai_credit_refund",
         "ai_credit_spend",
@@ -188,16 +198,17 @@ Deno.test(
     const completionCallIndex = src.lastIndexOf(
       "recordFreshAiDoctorReviewCompletion(userId, spendId)",
     );
+    const attachmentCallIndex = src.indexOf('creditSupabase.rpc("ai_credit_attach_result"');
     assert(
-      validationIndex >= 0 && completionCallIndex > validationIndex,
-      "completion must be recorded only after fresh result validation",
+      validationIndex >= 0 && attachmentCallIndex > validationIndex,
+      "validated results must be attached before success",
     );
     assert(
-      src.includes('if (spendObj.status === "spent" && spendId)'),
-      "only a newly spent credit row may count as a fresh completion",
+      completionCallIndex > attachmentCallIndex && src.includes('if (attachment === "recorded")'),
+      "only a newly recorded cache attachment may count as a fresh completion",
     );
-    const replayStart = src.indexOf('if (spendObj.status === "replayed"');
-    const replayEnd = src.indexOf("const spendId", replayStart);
+    const replayStart = src.indexOf("const spendDecision = classifyAiDoctorCreditSpend");
+    const replayEnd = src.indexOf("const spendId = spendDecision.spendId", replayStart);
     assert(replayStart >= 0 && replayEnd > replayStart, "replay boundary must remain explicit");
     assert(
       !src.slice(replayStart, replayEnd).includes("recordFreshAiDoctorReviewCompletion"),
@@ -205,9 +216,50 @@ Deno.test(
     );
     const providerIndex = src.indexOf("fetch(GATEWAY_URL");
     assert(providerIndex > replayEnd, "replay handling must complete before provider fetch");
+    const ambiguityFlag = src.indexOf("let creditSpendMayExist = false");
+    const spendAttempt = src.indexOf("creditSpendMayExist = true", ambiguityFlag);
+    const spendRpc = src.indexOf('creditSupabase.rpc("ai_credit_spend"', spendAttempt);
+    const outerFallback = src.lastIndexOf(
+      'return calmFailure(creditSpendMayExist ? "result_pending" : "http")',
+    );
     assert(
-      src.slice(replayStart, replayEnd).includes('return calmFailure("invalid")'),
-      "resultless/corrupt replay must fail closed before provider fetch",
+      ambiguityFlag >= 0 &&
+        spendAttempt > ambiguityFlag &&
+        spendRpc > spendAttempt &&
+        outerFallback > spendRpc,
+      "unexpected spend-or-later failures must remain same-key replayable",
+    );
+    const scopeStart = src.indexOf("spendObj.feature !== FEATURE", replayStart);
+    const pendingStart = src.indexOf('if (spendDecision.kind === "pending")', scopeStart);
+    assert(
+      scopeStart > replayStart &&
+        pendingStart > scopeStart &&
+        src.slice(scopeStart, pendingStart).includes("spendObj.grow_id !== growId"),
+      "feature, model, and grow scope must match before replay/provider",
+    );
+    assert(
+      src.slice(replayStart, replayEnd).includes('return calmFailure("result_pending")') &&
+        src.slice(replayStart, replayEnd).includes('"result_recording_failed"'),
+      "resultless replays must resolve to pending or a confirmed recording failure",
+    );
+    const successIndex = src.lastIndexOf("return safeOk(v.result");
+    assert(successIndex > attachmentCallIndex, "fresh output must not return before attachment");
+    const ambiguousAttachment = src.indexOf('if (attachment === "ambiguous")');
+    const rejectedAttachment = src.indexOf('if (attachment === "rejected")');
+    assert(
+      ambiguousAttachment > attachmentCallIndex && rejectedAttachment > ambiguousAttachment,
+      "attachment ambiguity and explicit rejection must remain separate",
+    );
+    assert(
+      src
+        .slice(ambiguousAttachment, rejectedAttachment)
+        .includes('return calmFailure("result_pending")') &&
+        !src.slice(ambiguousAttachment, rejectedAttachment).includes("failureAfterRefund"),
+      "ambiguous attachment outcomes must retain the spend for same-key replay",
+    );
+    assert(
+      src.slice(rejectedAttachment, completionCallIndex).includes("failureAfterRefund"),
+      "only explicit attachment rejection may enter the refund path",
     );
     // No raw upstream payload logging.
     assert(!/console\.log\([^)]*payload/i.test(src), "must not log raw provider payload");

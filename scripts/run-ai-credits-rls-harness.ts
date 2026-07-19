@@ -13,8 +13,11 @@
  *   - active, trialing, past_due dunning, and cancellation grace agree across
  *     AI credits and the Pheno entitlement gate; elapsed/paused/expired deny
  *   - authenticated users cannot mutate canonical public.subscriptions rows
- *   - resultless/cross-feature idempotent replays do NOT double-charge and
- *     preserve the original feature for edge fail-closed handling
+ *   - valid same-context idempotent replays do NOT double-charge, while
+ *     cross-feature/grow/model/environment key reuse fails closed
+ *   - validated results are attached once through a service-only RPC, remain
+ *     private/immutable, and are returned on same-key replay
+ *   - refunds suppress cached results so a reversed spend cannot replay output
  *   - server-authoritative ai_credit_refund creates an append-only reversal
  *     that restores room
  *   - refund cannot mutate or replace the original spend row
@@ -59,6 +62,7 @@ for (const [k, v] of [
 
 const EMAIL_FREE = "ai-credits-free@verdant.test";
 const EMAIL_PRO = "ai-credits-pro@verdant.test";
+const EMAIL_RESULT_CASCADE = "ai-credit-result-cascade@verdant.test";
 const PASS = crypto.randomUUID();
 const PRO_SUBSCRIPTION_ID = `harness_sub_${crypto.randomUUID()}`;
 const LIVE_PRECEDENCE_SUBSCRIPTION_ID = `harness_live_${crypto.randomUUID()}`;
@@ -151,6 +155,20 @@ function serverRefund(
   });
 }
 
+function serverAttachResult(
+  expectedUserId: string,
+  spendId: string,
+  expectedFeature: "ai_doctor_review" | "ai_coach" | null,
+  result: unknown,
+) {
+  return admin.rpc("ai_credit_attach_result", {
+    p_expected_user_id: expectedUserId,
+    p_spend_id: spendId,
+    p_expected_feature: expectedFeature,
+    p_result: result,
+  });
+}
+
 async function main() {
   console.log(`AI credit rollout phase: ${rolloutPhase}`);
   console.log("→ seeding users + plans via service_role");
@@ -180,7 +198,7 @@ async function main() {
   // reads the canonical Lovable Paddle table rather than billing_subscriptions.
   await admin.from("billing_subscriptions").delete().in("user_id", [uidFree, uidPro]);
 
-  // One grow each.
+  // Primary grows plus a second owned Free grow for replay-binding proof.
   const { data: growsFree } = await admin
     .from("grows")
     .insert({
@@ -199,7 +217,17 @@ async function main() {
     })
     .select("id")
     .single();
+  const { data: growsFreeOther } = await admin
+    .from("grows")
+    .insert({
+      user_id: uidFree,
+      name: "Free replay conflict grow",
+      grow_type: "indoor",
+    })
+    .select("id")
+    .single();
   const growIdFree = growsFree!.id as string;
+  const growIdFreeOther = growsFreeOther!.id as string;
   const growIdPro = growsPro!.id as string;
 
   const free = await signedInClient(EMAIL_FREE);
@@ -219,6 +247,30 @@ async function main() {
     "authenticated client cannot spoof user or billing environment",
     !!spoofedSpendError || (spoofedSpend as any)?.reason === "not_authorized",
     spoofedSpendError?.message ?? JSON.stringify(spoofedSpend),
+  );
+  const deniedAttachArgs = {
+    p_expected_user_id: uidFree,
+    p_spend_id: crypto.randomUUID(),
+    p_expected_feature: "ai_doctor_review",
+    p_result: { summary: "must stay server-only" },
+  };
+  const { data: ownerAttach, error: ownerAttachError } = await free.rpc(
+    "ai_credit_attach_result",
+    deniedAttachArgs,
+  );
+  check(
+    "authenticated client cannot invoke result recorder",
+    !!ownerAttachError || (ownerAttach as any)?.reason === "not_authorized",
+    ownerAttachError?.message ?? JSON.stringify(ownerAttach),
+  );
+  const { data: anonAttach, error: anonAttachError } = await anon.rpc(
+    "ai_credit_attach_result",
+    deniedAttachArgs,
+  );
+  check(
+    "anon cannot invoke result recorder",
+    !!anonAttachError || (anonAttach as any)?.reason === "not_authorized",
+    anonAttachError?.message ?? JSON.stringify(anonAttach),
   );
   if (isContractPhase) {
     const { data: legacySpend, error: legacySpendError } = await free.rpc("ai_credit_spend", {
@@ -507,6 +559,84 @@ async function main() {
     seedAfter?.weight === 1 && seedAfter?.status === "spent",
   );
 
+  console.log("\n→ RLS: ai_credit_spend_results stays private and insert-once");
+  const { data: ownerResultInsert, error: ownerResultInsertError } = await free
+    .from("ai_credit_spend_results")
+    .insert({
+      spend_id: seedFree!.id,
+      feature: "ai_doctor_review",
+      result: { summary: "client must not persist this" },
+    })
+    .select();
+  check(
+    "authenticated result-cache INSERT denied",
+    !!ownerResultInsertError || (ownerResultInsert ?? []).length === 0,
+    ownerResultInsertError?.message,
+  );
+  const { data: serviceResultInsert, error: serviceResultInsertError } = await admin
+    .from("ai_credit_spend_results")
+    .insert({
+      spend_id: seedPro!.id,
+      feature: "ai_doctor_review",
+      result: { summary: "direct service insert must be denied" },
+    })
+    .select();
+  check(
+    "service role cannot INSERT a result directly",
+    !!serviceResultInsertError || (serviceResultInsert ?? []).length === 0,
+    serviceResultInsertError?.message,
+  );
+  const inlineResultRpcKey = `inline-rpc-${crypto.randomUUID()}`;
+  const { data: inlineResultRpc, error: inlineResultRpcError } = await serverSpend(
+    uidFree,
+    "live",
+    {
+      p_feature: "ai_doctor_review",
+      p_grow_id: growIdFree,
+      p_model_tier: "standard",
+      p_idempotency_key: inlineResultRpcKey,
+      p_result: { summary: "inline cache must be rejected" },
+    },
+  );
+  const inlineResultRpcObj = inlineResultRpc as { ok?: boolean; reason?: string } | null;
+  check(
+    "spend RPC rejects inline cached result",
+    !inlineResultRpcError &&
+      inlineResultRpcObj?.ok === false &&
+      inlineResultRpcObj.reason === "inline_result_not_allowed",
+    inlineResultRpcError?.message ?? JSON.stringify(inlineResultRpc),
+  );
+  const { count: inlineResultRpcRows } = await admin
+    .from("ai_credit_spends")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", uidFree)
+    .eq("idempotency_key", inlineResultRpcKey);
+  check("rejected inline RPC result appends no spend", inlineResultRpcRows === 0);
+
+  const directInlineKey = `inline-direct-${crypto.randomUUID()}`;
+  const { error: directInlineError } = await admin.from("ai_credit_spends").insert({
+    user_id: uidFree,
+    grow_id: growIdFree,
+    period_key: "1970-01",
+    weight: 1,
+    model_tier: "standard",
+    feature: "ai_doctor_review",
+    status: "spent",
+    idempotency_key: directInlineKey,
+    result: { summary: "constraint must reject this" },
+  });
+  check(
+    "ledger constraint rejects direct inline cached result",
+    !!directInlineError,
+    directInlineError?.message,
+  );
+  const { count: directInlineRows } = await admin
+    .from("ai_credit_spends")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", uidFree)
+    .eq("idempotency_key", directInlineKey);
+  check("rejected direct inline result appends no spend", directInlineRows === 0);
+
   console.log("\n→ ai_credit_spend RPC: Free per-grow cap (3)");
   // Clean test ledger (keep seed in 1970-01 so it doesn't bias per_grow sum)
   await admin
@@ -605,7 +735,9 @@ async function main() {
       reversalRow?.refund_of === spends[0],
     JSON.stringify(reversalRow),
   );
-  // Now spend one more with a production-shaped result=null key.
+  // Now spend one more with a production-shaped result=null key, attach the
+  // validated output, and prove a same-key retry returns that output without
+  // changing the financial row.
   const { data: s1 } = await serverSpend(uidFree, "live", {
     p_feature: "ai_doctor_review",
     p_grow_id: growIdFree,
@@ -614,8 +746,263 @@ async function main() {
     p_result: null,
   });
   check("post-refund spend allowed", (s1 as any)?.ok === true && (s1 as any)?.status === "spent");
-  // Replay same key — no second row and no cached result that could justify a
-  // second provider call.
+  check(
+    "fresh spend returns a parseable spend_created_at",
+    typeof (s1 as any)?.spend_created_at === "string" &&
+      !Number.isNaN(Date.parse((s1 as any).spend_created_at)),
+    JSON.stringify(s1),
+  );
+  check(
+    "fresh spend returns bound grow_id and zero database age",
+    (s1 as any)?.grow_id === growIdFree && (s1 as any)?.spend_age_ms === 0,
+    JSON.stringify(s1),
+  );
+  const replaySpendId = (s1 as any)?.spend_id as string;
+  const { data: otherUserSameKey, error: otherUserSameKeyError } = await serverSpend(
+    uidPro,
+    "live",
+    {
+      p_feature: "ai_doctor_review",
+      p_grow_id: growIdPro,
+      p_model_tier: "standard",
+      p_idempotency_key: replayKey,
+      p_result: null,
+    },
+  );
+  const otherUserSameKeyObj = otherUserSameKey as {
+    ok?: boolean;
+    status?: string;
+    spend_id?: string;
+  } | null;
+  check(
+    "same idempotency key remains isolated between users",
+    !otherUserSameKeyError &&
+      otherUserSameKeyObj?.ok === true &&
+      otherUserSameKeyObj.status === "spent" &&
+      otherUserSameKeyObj.spend_id !== replaySpendId,
+    otherUserSameKeyError?.message ?? JSON.stringify(otherUserSameKey),
+  );
+  const { data: sameKeyOwners } = await admin
+    .from("ai_credit_spends")
+    .select("user_id")
+    .eq("idempotency_key", replayKey);
+  check(
+    "same-key isolation stores one spend per owning user",
+    (sameKeyOwners ?? []).length === 2 &&
+      new Set((sameKeyOwners ?? []).map((row) => row.user_id)).size === 2,
+    JSON.stringify(sameKeyOwners),
+  );
+  const cachedResult = {
+    summary: "History and sensors support a cautious review.",
+    confidence: "moderate",
+  };
+  const { data: spendBeforeAttach } = await admin
+    .from("ai_credit_spends")
+    .select("id,user_id,weight,status,feature,result,created_at")
+    .eq("id", replaySpendId)
+    .single();
+
+  const invalidAttachCases = [
+    {
+      label: "wrong user",
+      userId: uidPro,
+      feature: "ai_doctor_review" as const,
+      result: cachedResult,
+      reason: "spend_not_recordable",
+    },
+    {
+      label: "wrong feature",
+      userId: uidFree,
+      feature: "ai_coach" as const,
+      result: cachedResult,
+      reason: "feature_mismatch",
+    },
+    {
+      label: "null feature",
+      userId: uidFree,
+      feature: null,
+      result: cachedResult,
+      reason: "invalid_feature",
+    },
+    {
+      label: "scalar result",
+      userId: uidFree,
+      feature: "ai_doctor_review" as const,
+      result: "not-an-object",
+      reason: "invalid_result_shape",
+    },
+    {
+      label: "null result",
+      userId: uidFree,
+      feature: "ai_doctor_review" as const,
+      result: null,
+      reason: "result_required",
+    },
+    {
+      label: "empty result",
+      userId: uidFree,
+      feature: "ai_doctor_review" as const,
+      result: {},
+      reason: "invalid_result_shape",
+    },
+    {
+      label: "oversized result",
+      userId: uidFree,
+      feature: "ai_doctor_review" as const,
+      result: { summary: "x".repeat(131073) },
+      reason: "result_too_large",
+    },
+  ];
+  for (const attachCase of invalidAttachCases) {
+    const { data, error } = await serverAttachResult(
+      attachCase.userId,
+      replaySpendId,
+      attachCase.feature,
+      attachCase.result,
+    );
+    check(
+      `result recorder rejects ${attachCase.label}`,
+      !error && (data as any)?.ok === false && (data as any)?.reason === attachCase.reason,
+      error?.message ?? JSON.stringify(data),
+    );
+  }
+
+  const { data: recordedResult, error: recordedResultError } = await serverAttachResult(
+    uidFree,
+    replaySpendId,
+    "ai_doctor_review",
+    cachedResult,
+  );
+  check(
+    "service recorder attaches validated result once",
+    !recordedResultError &&
+      (recordedResult as any)?.ok === true &&
+      (recordedResult as any)?.status === "recorded",
+    recordedResultError?.message ?? JSON.stringify(recordedResult),
+  );
+  const { data: sidecarAfterAttach } = await admin
+    .from("ai_credit_spend_results")
+    .select("spend_id,feature,result,recorded_at")
+    .eq("spend_id", replaySpendId)
+    .single();
+  const persistedSidecarResult = sidecarAfterAttach?.result as Record<string, unknown> | null;
+  check(
+    "result sidecar stores the expected feature and object",
+    sidecarAfterAttach?.feature === "ai_doctor_review" &&
+      persistedSidecarResult?.summary === cachedResult.summary &&
+      persistedSidecarResult?.confidence === cachedResult.confidence &&
+      typeof sidecarAfterAttach?.recorded_at === "string",
+    JSON.stringify(sidecarAfterAttach),
+  );
+  const { data: ownerResultRows, error: ownerResultSelectError } = await free
+    .from("ai_credit_spend_results")
+    .select("spend_id")
+    .eq("spend_id", replaySpendId);
+  check(
+    "authenticated result-cache SELECT of an owned attached result is denied / empty",
+    !!ownerResultSelectError || (ownerResultRows ?? []).length === 0,
+    ownerResultSelectError?.message,
+  );
+  const { data: anonResultRows, error: anonResultSelectError } = await anon
+    .from("ai_credit_spend_results")
+    .select("spend_id")
+    .eq("spend_id", replaySpendId);
+  check(
+    "anon result-cache SELECT of a known attached result is denied / empty",
+    !!anonResultSelectError || (anonResultRows ?? []).length === 0,
+    anonResultSelectError?.message,
+  );
+  const { data: ownerResultUpdate, error: ownerResultUpdateError } = await free
+    .from("ai_credit_spend_results")
+    .update({ result: { summary: "client mutation" } })
+    .eq("spend_id", replaySpendId)
+    .select();
+  check(
+    "authenticated result-cache UPDATE denied / no-op",
+    !!ownerResultUpdateError || (ownerResultUpdate ?? []).length === 0,
+    ownerResultUpdateError?.message,
+  );
+  const { data: ownerResultDelete, error: ownerResultDeleteError } = await free
+    .from("ai_credit_spend_results")
+    .delete()
+    .eq("spend_id", replaySpendId)
+    .select();
+  check(
+    "authenticated result-cache DELETE denied / no-op",
+    !!ownerResultDeleteError || (ownerResultDelete ?? []).length === 0,
+    ownerResultDeleteError?.message,
+  );
+  const { data: sidecarAfterOwnerMutations } = await admin
+    .from("ai_credit_spend_results")
+    .select("feature,result,recorded_at")
+    .eq("spend_id", replaySpendId)
+    .single();
+  check(
+    "authenticated mutation attempts leave attached result unchanged",
+    JSON.stringify(sidecarAfterOwnerMutations) ===
+      JSON.stringify({
+        feature: sidecarAfterAttach?.feature,
+        result: sidecarAfterAttach?.result,
+        recorded_at: sidecarAfterAttach?.recorded_at,
+      }),
+    JSON.stringify(sidecarAfterOwnerMutations),
+  );
+  const { data: spendAfterAttach } = await admin
+    .from("ai_credit_spends")
+    .select("id,user_id,weight,status,feature,result,created_at")
+    .eq("id", replaySpendId)
+    .single();
+  check(
+    "attaching output leaves the spend row immutable",
+    JSON.stringify(spendAfterAttach) === JSON.stringify(spendBeforeAttach),
+    JSON.stringify({ before: spendBeforeAttach, after: spendAfterAttach }),
+  );
+
+  const { data: serviceUpdateData, error: serviceUpdateError } = await admin
+    .from("ai_credit_spend_results")
+    .update({ result: { summary: "service mutation attempt" } })
+    .eq("spend_id", replaySpendId)
+    .select();
+  check(
+    "service role cannot UPDATE an attached result",
+    !!serviceUpdateError || (serviceUpdateData ?? []).length === 0,
+    serviceUpdateError?.message,
+  );
+  const { data: serviceDeleteData, error: serviceDeleteError } = await admin
+    .from("ai_credit_spend_results")
+    .delete()
+    .eq("spend_id", replaySpendId)
+    .select();
+  check(
+    "service role cannot DELETE an attached result directly",
+    !!serviceDeleteError || (serviceDeleteData ?? []).length === 0,
+    serviceDeleteError?.message,
+  );
+
+  const { data: equalAttach } = await serverAttachResult(
+    uidFree,
+    replaySpendId,
+    "ai_doctor_review",
+    cachedResult,
+  );
+  check(
+    "equal result attachment replays successfully",
+    (equalAttach as any)?.ok === true && (equalAttach as any)?.status === "replayed",
+    JSON.stringify(equalAttach),
+  );
+  const { data: conflictingAttach } = await serverAttachResult(
+    uidFree,
+    replaySpendId,
+    "ai_doctor_review",
+    { ...cachedResult, confidence: "high" },
+  );
+  check(
+    "different result attachment is rejected as a conflict",
+    (conflictingAttach as any)?.ok === false &&
+      (conflictingAttach as any)?.reason === "result_conflict",
+    JSON.stringify(conflictingAttach),
+  );
+
   const { data: s2 } = await serverSpend(uidFree, "live", {
     p_feature: "ai_doctor_review",
     p_grow_id: growIdFree,
@@ -624,26 +1011,129 @@ async function main() {
     p_result: null,
   });
   check("replay returns status='replayed'", (s2 as any)?.status === "replayed");
-  check("production-shaped replay remains resultless", (s2 as any)?.result == null);
-  const { data: crossFeatureReplay } = await serverSpend(uidFree, "live", {
-    p_feature: "ai_coach",
-    p_grow_id: growIdFree,
-    p_model_tier: "standard",
-    p_idempotency_key: replayKey,
-    p_result: null,
-  });
+  const replayedResult = (s2 as any)?.result as Record<string, unknown> | null;
   check(
-    "cross-feature replay preserves original feature for edge rejection",
-    (crossFeatureReplay as any)?.status === "replayed" &&
-      (crossFeatureReplay as any)?.feature === "ai_doctor_review",
-    JSON.stringify(crossFeatureReplay),
+    "same-key replay returns the cached validated result",
+    replayedResult?.summary === cachedResult.summary &&
+      replayedResult?.confidence === cachedResult.confidence,
+    JSON.stringify(s2),
   );
+  check(
+    "same-key replay returns the original spend_created_at",
+    (s2 as any)?.spend_created_at === (s1 as any)?.spend_created_at,
+    JSON.stringify(s2),
+  );
+  check(
+    "same-key replay returns bound grow_id and nonnegative database age",
+    (s2 as any)?.grow_id === growIdFree &&
+      Number.isInteger((s2 as any)?.spend_age_ms) &&
+      (s2 as any)?.spend_age_ms >= 0,
+    JSON.stringify(s2),
+  );
+  const replayConflictCases = [
+    {
+      label: "cross-feature",
+      environment: "live" as const,
+      feature: "ai_coach" as const,
+      growId: growIdFree,
+      modelTier: "standard" as const,
+    },
+    {
+      label: "cross-grow",
+      environment: "live" as const,
+      feature: "ai_doctor_review" as const,
+      growId: growIdFreeOther,
+      modelTier: "standard" as const,
+    },
+    {
+      label: "cross-model",
+      environment: "live" as const,
+      feature: "ai_doctor_review" as const,
+      growId: growIdFree,
+      modelTier: "escalated" as const,
+    },
+    {
+      label: "cross-environment",
+      environment: "sandbox" as const,
+      feature: "ai_doctor_review" as const,
+      growId: growIdFree,
+      modelTier: "standard" as const,
+    },
+  ];
+  for (const conflictCase of replayConflictCases) {
+    const { data, error } = await serverSpend(uidFree, conflictCase.environment, {
+      p_feature: conflictCase.feature,
+      p_grow_id: conflictCase.growId,
+      p_model_tier: conflictCase.modelTier,
+      p_idempotency_key: replayKey,
+      p_result: null,
+    });
+    check(
+      `${conflictCase.label} same-key replay is rejected without cached output`,
+      !error &&
+        (data as any)?.ok === false &&
+        (data as any)?.status === "invalid" &&
+        (data as any)?.reason === "idempotency_key_conflict" &&
+        !Object.prototype.hasOwnProperty.call(data ?? {}, "result"),
+      error?.message ?? JSON.stringify(data),
+    );
+  }
   const { count: rowCount } = await admin
     .from("ai_credit_spends")
     .select("id", { count: "exact", head: true })
     .eq("user_id", uidFree)
     .eq("idempotency_key", replayKey);
   check("replay did not insert a 2nd row", rowCount === 1);
+  const { data: replaySpendRows } = await admin
+    .from("ai_credit_spends")
+    .select("weight")
+    .eq("user_id", uidFree)
+    .eq("idempotency_key", replayKey);
+  check(
+    "cached same-key replay adds no credit weight",
+    (replaySpendRows ?? []).length === 1 && replaySpendRows?.[0]?.weight === 1,
+    JSON.stringify(replaySpendRows),
+  );
+
+  const cachedRefundKey = `cached-refund-${crypto.randomUUID()}`;
+  const { data: cachedRefund } = await serverRefund(
+    uidFree,
+    replaySpendId,
+    cachedRefundKey,
+    "cached_result_refund_harness",
+  );
+  check(
+    "cached spend can still be reversed append-only",
+    (cachedRefund as any)?.ok === true && (cachedRefund as any)?.status === "refunded",
+    JSON.stringify(cachedRefund),
+  );
+  const { data: refundedReplay } = await serverSpend(uidFree, "live", {
+    p_feature: "ai_doctor_review",
+    p_grow_id: growIdFree,
+    p_model_tier: "standard",
+    p_idempotency_key: replayKey,
+    p_result: null,
+  });
+  check(
+    "refund suppresses cached output on same-key replay",
+    (refundedReplay as any)?.ok === false &&
+      (refundedReplay as any)?.status === "invalid" &&
+      (refundedReplay as any)?.reason === "spend_refunded" &&
+      !Object.prototype.hasOwnProperty.call(refundedReplay ?? {}, "result"),
+    JSON.stringify(refundedReplay),
+  );
+  const { data: attachAfterRefund } = await serverAttachResult(
+    uidFree,
+    replaySpendId,
+    "ai_doctor_review",
+    cachedResult,
+  );
+  check(
+    "result recorder rejects a reversed spend",
+    (attachAfterRefund as any)?.ok === false &&
+      (attachAfterRefund as any)?.reason === "spend_refunded",
+    JSON.stringify(attachAfterRefund),
+  );
 
   console.log("\n→ refund is append-only (no UPDATE of original)");
   const { data: origRow } = await admin
@@ -922,6 +1412,68 @@ async function main() {
     p_result: null,
   });
   check("escalated tier records weight=5", (tierSpend as any)?.weight === 5);
+
+  console.log("\n→ account deletion cascades through spend result sidecars");
+  const uidResultCascade = await adminCreateUser(EMAIL_RESULT_CASCADE);
+  const { data: resultCascadeGrow, error: resultCascadeGrowError } = await admin
+    .from("grows")
+    .insert({
+      user_id: uidResultCascade,
+      name: "Result cascade harness grow",
+      grow_type: "indoor",
+    })
+    .select("id")
+    .single();
+  if (resultCascadeGrowError || !resultCascadeGrow) {
+    throw new Error(`create result cascade grow: ${resultCascadeGrowError?.message}`);
+  }
+  const { data: resultCascadeSpend, error: resultCascadeSpendError } = await serverSpend(
+    uidResultCascade,
+    "live",
+    {
+      p_feature: "ai_doctor_review",
+      p_grow_id: resultCascadeGrow.id,
+      p_model_tier: "standard",
+      p_idempotency_key: `result-cascade-${crypto.randomUUID()}`,
+      p_result: null,
+    },
+  );
+  const resultCascadeSpendId = (resultCascadeSpend as any)?.spend_id as string;
+  const { data: resultCascadeAttach, error: resultCascadeAttachError } = await serverAttachResult(
+    uidResultCascade,
+    resultCascadeSpendId,
+    "ai_doctor_review",
+    { summary: "delete this with the account" },
+  );
+  check(
+    "cascade fixture has an attached result",
+    !resultCascadeSpendError &&
+      !resultCascadeAttachError &&
+      (resultCascadeAttach as any)?.status === "recorded",
+    resultCascadeSpendError?.message ??
+      resultCascadeAttachError?.message ??
+      JSON.stringify(resultCascadeAttach),
+  );
+  const { error: resultCascadeDeleteError } = await admin.auth.admin.deleteUser(uidResultCascade);
+  check(
+    "cascade fixture account deletion succeeds",
+    !resultCascadeDeleteError,
+    resultCascadeDeleteError?.message,
+  );
+  const { count: deletedSpendCount } = await admin
+    .from("ai_credit_spends")
+    .select("id", { count: "exact", head: true })
+    .eq("id", resultCascadeSpendId);
+  const { count: deletedResultCount } = await admin
+    .from("ai_credit_spend_results")
+    .select("spend_id", { count: "exact", head: true })
+    .eq("spend_id", resultCascadeSpendId);
+  check(
+    "account deletion removes both spend and result sidecar",
+    deletedSpendCount === 0 && deletedResultCount === 0,
+    JSON.stringify({ deletedSpendCount, deletedResultCount }),
+  );
+  if (resultCascadeDeleteError) await cleanupUser(uidResultCascade);
 
   console.log("\n→ teardown");
   await cleanupUser(uidFree);

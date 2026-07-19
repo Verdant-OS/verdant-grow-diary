@@ -48,15 +48,14 @@ import { buildAiCreditLimitNoticeViewModel } from "@/lib/aiCreditLimitNoticeView
 import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 import type { Classification } from "@/lib/sensorSnapshotStatusContract";
 import { evaluateAiDoctorReviewEligibility } from "@/lib/aiDoctorReviewEligibilityRules";
-import { canRetryAiDoctorLiveReviewFailure } from "@/lib/aiDoctorLiveReviewRecoveryRules";
+import {
+  buildAiDoctorLiveReviewScopeKey,
+  canRetryAiDoctorLiveReviewFailure,
+} from "@/lib/aiDoctorLiveReviewRecoveryRules";
 import { resolveAiDoctorImportedHistoryRecovery } from "@/lib/aiDoctorImportedHistoryRecoveryRules";
 
 /** Stable empty-array identity so the packet memo does not churn. */
 const NO_TENT_SENSOR_ROWS: never[] = [];
-
-function aiDoctorReviewScopeKey(plantId: string, tentId: string | null | undefined): string {
-  return `${plantId}:${tentId || "no-tent"}`;
-}
 
 export const AI_DOCTOR_LIVE_REVIEW_LOADING_COPY = "Preparing cautious AI Doctor review…";
 export const AI_DOCTOR_LIVE_REVIEW_FAILURE_COPY =
@@ -101,7 +100,7 @@ export interface PlantDetailAiDoctorLiveReviewProps {
 export default function PlantDetailAiDoctorLiveReview({
   ...props
 }: PlantDetailAiDoctorLiveReviewProps) {
-  const scopeKey = aiDoctorReviewScopeKey(props.plantId, props.tentId);
+  const scopeKey = buildAiDoctorLiveReviewScopeKey(props.plantId, props.tentId, props.growId);
   return <PlantDetailAiDoctorLiveReviewScope key={scopeKey} {...props} />;
 }
 
@@ -128,7 +127,7 @@ function PlantDetailAiDoctorLiveReviewScope({
   const acceptedReviewModeRef = useRef<"standard" | "historical_review" | null>(null);
   const trackedResultRef = useRef<unknown>(null);
   const trackedSessionIdRef = useRef<string | null>(null);
-  const historyScopeKey = aiDoctorReviewScopeKey(plantId, tentId);
+  const historyScopeKey = buildAiDoctorLiveReviewScopeKey(plantId, tentId, growId);
   const [historyOmissionScope, setHistoryOmissionScope] = useState<string | null>(null);
   const [acceptedReviewRequest, setAcceptedReviewRequest] =
     useState<AcceptedAiDoctorReviewRequest | null>(null);
@@ -140,7 +139,7 @@ function PlantDetailAiDoctorLiveReviewScope({
     acceptedReviewModeRef.current = null;
     trackedResultRef.current = null;
     trackedSessionIdRef.current = null;
-  }, [plantId]);
+  }, [growId, plantId, tentId]);
   const { items } = useTimelineMemory({ kind: "plant", plantId }, TIMELINE_MEMORY_DEFAULT_LIMIT);
   // Dedicated bounded imported-history read. It filters permitted CSV source
   // identities before the cap and orders by historical `captured_at`, so the

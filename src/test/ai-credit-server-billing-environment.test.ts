@@ -80,6 +80,7 @@ describe("AI credit server billing-environment boundary", () => {
     for (const signature of [
       "public.ai_credit_spend(uuid,text,text,uuid,text,text,jsonb)",
       "public.ai_credit_refund(uuid,uuid,text,text)",
+      "public.ai_credit_attach_result(uuid,uuid,text,jsonb)",
       "public.ai_credit_spend(text,uuid,text,text,jsonb)",
       "public.ai_credit_refund(uuid,text,text)",
     ]) {
@@ -88,6 +89,8 @@ describe("AI credit server billing-environment boundary", () => {
     expect(CONTRACT).toContain("has_function_privilege('service_role'");
     expect(CONTRACT).toContain("has_function_privilege('authenticated'");
     expect(CONTRACT).toContain("has_function_privilege('anon'");
+    expect(CONTRACT).toContain("has_table_privilege('service_role'");
+    expect(CONTRACT).toContain("public.ai_credit_spend_results");
     expect(CONTRACT).toContain("RAISE EXCEPTION 'ai-credit contract blocked:");
   });
 

@@ -147,7 +147,7 @@ export function usePhenoHuntView(huntId: string | null | undefined): UsePhenoHun
       traits: (ws.scoresByPlant[c.candidateId]?.traits ?? null) as Record<string, number> | null,
       // Aroma = the smoke test's flavor descriptors (post-cure — where flavor
       // is earned, per the Loud ruling). Descriptive only, never scored.
-      aroma: coerceDescriptors(ws.smokeByPlant[c.candidateId]?.flavor_descriptors),
+      aroma: coerceDescriptors(ws.smokeByPlant[c.candidateId]?.flavorDescriptors),
     }));
 
     const labelBySourcePlant = new Map<string, string>();

@@ -29,7 +29,7 @@ describe("phenoFightViewModel", () => {
     expect(fight.ties).toBe(2); // structure, breeding
     // Ethos: the model never declares a winner.
     expect("winner" in fight).toBe(false);
-    expect((fight as Record<string, unknown>).winner).toBeUndefined();
+    expect((fight as unknown as Record<string, unknown>).winner).toBeUndefined();
   });
 
   it("carries each side's canonical composite and margins", () => {

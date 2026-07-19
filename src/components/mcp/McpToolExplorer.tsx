@@ -638,20 +638,57 @@ export default function McpToolExplorer() {
 
   const endpoint = `${getSupabaseOrigin()}${MCP_MANIFEST.path}`;
 
+  // Hydrate from "last valid inputs" cache once on mount so a grower who
+  // already corrected an invalid_params error doesn't retype the fix.
+  const listGrowsCache = useMemo(
+    () => loadLastValidInputs<{ includeArchived: boolean; growsLimit: string }>("list_grows") ?? {},
+    [],
+  );
+  const listDiaryCache = useMemo(
+    () => loadLastValidInputs<{ growId: string; diaryLimit: string }>("list_recent_diary_entries") ?? {},
+    [],
+  );
+  const sensorCache = useMemo(
+    () => loadLastValidInputs<{ tentId: string }>("get_latest_sensor_snapshot") ?? {},
+    [],
+  );
+
   // list_grows state
-  const [includeArchived, setIncludeArchived] = useState(false);
-  const [growsLimit, setGrowsLimit] = useState("25");
+  const [includeArchived, setIncludeArchived] = useState<boolean>(
+    typeof listGrowsCache.includeArchived === "boolean" ? listGrowsCache.includeArchived : false,
+  );
+  const [growsLimit, setGrowsLimit] = useState<string>(
+    typeof listGrowsCache.growsLimit === "string" ? listGrowsCache.growsLimit : "25",
+  );
   const [growsLimitTouched, setGrowsLimitTouched] = useState(false);
 
   // list_recent_diary_entries state
-  const [growId, setGrowId] = useState("");
+  const [growId, setGrowId] = useState<string>(
+    typeof listDiaryCache.growId === "string" ? listDiaryCache.growId : "",
+  );
   const [growIdTouched, setGrowIdTouched] = useState(false);
-  const [diaryLimit, setDiaryLimit] = useState("10");
+  const [diaryLimit, setDiaryLimit] = useState<string>(
+    typeof listDiaryCache.diaryLimit === "string" ? listDiaryCache.diaryLimit : "10",
+  );
   const [diaryLimitTouched, setDiaryLimitTouched] = useState(false);
 
   // get_latest_sensor_snapshot state
-  const [tentId, setTentId] = useState("");
+  const [tentId, setTentId] = useState<string>(
+    typeof sensorCache.tentId === "string" ? sensorCache.tentId : "",
+  );
   const [tentIdTouched, setTentIdTouched] = useState(false);
+
+  // Persist current form values as "last valid inputs" whenever a tool
+  // returns an ok, non-error outcome — the exact fields the grower just
+  // corrected, ready to pre-fill on the next visit.
+  const persistOnOk = useCallback(
+    (tool: ToolName, outcome: ToolCallOutcome, category: OutcomeCategory, snapshot: Record<string, unknown>) => {
+      if (category !== "ok") return;
+      if (outcome.status !== "ok" || outcome.result.isError) return;
+      saveLastValidInputs(tool, snapshot);
+    },
+    [],
+  );
 
   // Live per-field validation (always computed; shown once touched).
   const growsLimitError = validateOptionalIntInRange(growsLimit, 1, 100, "limit");

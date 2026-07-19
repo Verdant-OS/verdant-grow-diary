@@ -14,8 +14,7 @@ export const PRICING = {
     cadence: "forever",
     highlighted: false,
     badge: undefined as string | undefined,
-    description:
-      "Start free. Build your grow diary and see if Verdant fits your workflow.",
+    description: "Start free. Build your grow diary and see if Verdant fits your workflow.",
     features: [
       "1 active grow",
       "Historical logs kept forever",
@@ -38,8 +37,7 @@ export const PRICING = {
     highlighted: true,
     badge: "Most Popular",
     annualSavingsPercent: 31,
-    description:
-      "Upgrade when Verdant becomes your real grow memory system.",
+    description: "Upgrade when Verdant becomes your real grow memory system.",
     features: [
       "Unlimited grows",
       "100 AI Doctor credits / month",
@@ -82,17 +80,12 @@ export const AI_CREDIT_EXPLAINER = {
     "Free users can upgrade when credits are used",
     "Pro and Lifetime users can buy credit packs later if needed",
   ],
-  note: "Credit purchase logic is not yet implemented.",
+  note: "Included AI Doctor credits work today: Free includes 3 per grow; Pro and Founder include 100 per month. Buying extra credit packs is planned — that purchase flow isn't built yet.",
 } as const;
 
 export const TRUST_STRIP = {
   label: "Safe by Design",
-  items: [
-    "Read-only",
-    "Honest data labels",
-    "Your history is always yours",
-    "No blind automation",
-  ],
+  items: ["Read-only", "Honest data labels", "Your history is always yours", "No blind automation"],
 } as const;
 
 export const FOUNDER_LIFETIME_LIMIT = PRICING.founder.limit;

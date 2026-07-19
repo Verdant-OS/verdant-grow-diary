@@ -7,8 +7,16 @@
  */
 import { buildOperatorDemoPreviewViewModel } from "@/lib/operatorDemoPreviewViewModel";
 import OperatorDemoEvidenceChainPreview from "@/components/OperatorDemoEvidenceChainPreview";
+import OperatorAccountReadModelsPanel from "@/components/OperatorAccountReadModelsPanel";
+import { useOperatorAccountReadModels } from "@/hooks/useOperatorAccountReadModels";
 
 export default function OperatorDemoPreview() {
   const vm = buildOperatorDemoPreviewViewModel();
-  return <OperatorDemoEvidenceChainPreview vm={vm} />;
+  const accountModel = useOperatorAccountReadModels();
+  return (
+    <>
+      <OperatorAccountReadModelsPanel model={accountModel} />
+      <OperatorDemoEvidenceChainPreview vm={vm} />
+    </>
+  );
 }

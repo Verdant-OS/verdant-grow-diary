@@ -34,121 +34,16 @@
  */
 import { defineTool } from "@lovable.dev/mcp-js";
 import { z } from "zod";
-import { withoutDiagnosticSensorRows } from "../../sensorProvenanceFenceRules";
-import { isReadingStale, STALE_THRESHOLD_MS } from "../../sensorReadingNormalizationRules";
+import {
+  getLatestSensorSnapshotForOwnedTent,
+  selectLatestMcpSensorReadings,
+  type McpSensorQueryRow,
+  type McpSensorReading,
+} from "../../operatorAccountReadModels";
 import { supabaseForUser, unauthenticated } from "./_supabase";
 
-/**
- * Long-format metrics accepted by the live schema. Mirrors the
- * validate_sensor_reading() allow-list (supabase/migrations/
- * 20260617164759_*.sql) — a metric missing here would silently vanish
- * from snapshots, so keep this in sync when the trigger gains metrics.
- */
-const KNOWN_METRICS = [
-  "temperature_c",
-  "humidity_pct",
-  "vpd_kpa",
-  "co2_ppm",
-  "soil_moisture_pct",
-  "soil_temp_c",
-  "ph",
-  "ec",
-  "ppfd",
-] as const;
-
-export interface McpSensorQueryRow {
-  id: string;
-  tent_id: string;
-  metric: string;
-  value: number;
-  quality: string;
-  source: string;
-  ts: string;
-  captured_at: string | null;
-  raw_payload?: unknown;
-}
-
-export type McpSensorFreshness = "fresh" | "stale" | "invalid";
-
-export type McpSensorReading = Omit<McpSensorQueryRow, "raw_payload"> & {
-  freshness: McpSensorFreshness;
-  current_live: boolean;
-};
-
-const SENSOR_COLUMNS = "id,tent_id,metric,value,quality,source,ts,captured_at,raw_payload";
-const SENSOR_CANDIDATE_LIMIT = 25;
-
-/** Effective capture time: COALESCE(captured_at, ts) as epoch millis. */
-function effectiveCaptureMs(row: McpSensorQueryRow): number {
-  return Date.parse(row.captured_at ?? row.ts);
-}
-
-function deriveMcpFreshness(
-  row: McpSensorQueryRow,
-  nowMs: number,
-  staleAfterMs: number,
-): McpSensorFreshness {
-  const source = row.source.trim().toLowerCase();
-  const quality = row.quality.trim().toLowerCase();
-  if (source === "invalid" || quality === "invalid") return "invalid";
-  if (source === "stale" || quality === "stale") return "stale";
-  const capturedAt = row.captured_at ?? row.ts;
-  if (!Number.isFinite(Date.parse(capturedAt))) return "invalid";
-  return isReadingStale(capturedAt, nowMs, staleAfterMs) ? "stale" : "fresh";
-}
-
-/** Deterministic winner between the captured and legacy candidates. */
-function newerReading(a: McpSensorQueryRow, b: McpSensorQueryRow): McpSensorQueryRow {
-  const ea = effectiveCaptureMs(a);
-  const eb = effectiveCaptureMs(b);
-  if (ea !== eb) return ea > eb ? a : b;
-  const ta = Date.parse(a.ts);
-  const tb = Date.parse(b.ts);
-  if (ta !== tb) return ta > tb ? a : b;
-  return a.id > b.id ? a : b;
-}
-
-/**
- * Select the newest non-diagnostic row per metric and strip raw provenance.
- * Stable for identical inputs; never mutates caller rows.
- */
-export function selectLatestMcpSensorReadings(
-  rows: readonly McpSensorQueryRow[] | null | undefined,
-  options: { now?: Date; staleAfterMs?: number } = {},
-): Record<string, McpSensorReading> {
-  const nowMs = (options.now ?? new Date()).getTime();
-  const staleAfterMs = options.staleAfterMs ?? STALE_THRESHOLD_MS;
-  const selected: Record<string, McpSensorQueryRow> = {};
-  for (const row of withoutDiagnosticSensorRows(rows)) {
-    if (!row || typeof row.metric !== "string" || row.metric.length === 0) continue;
-    const current = selected[row.metric];
-    selected[row.metric] = current ? newerReading(current, row) : row;
-  }
-
-  return Object.fromEntries(
-    Object.entries(selected).map(([metric, row]) => {
-      const freshness = deriveMcpFreshness(row, nowMs, staleAfterMs);
-      return [
-        metric,
-        {
-          id: row.id,
-          tent_id: row.tent_id,
-          metric: row.metric,
-          value: row.value,
-          quality: row.quality,
-          source: row.source,
-          ts: row.ts,
-          captured_at: row.captured_at,
-          freshness,
-          current_live:
-            freshness === "fresh" &&
-            row.source.trim().toLowerCase() === "live" &&
-            row.quality.trim().toLowerCase() === "ok",
-        } satisfies McpSensorReading,
-      ];
-    }),
-  );
-}
+export { selectLatestMcpSensorReadings };
+export type { McpSensorQueryRow, McpSensorReading };
 
 export default defineTool({
   name: "get_latest_sensor_snapshot",
@@ -178,69 +73,25 @@ export default defineTool({
   handler: async ({ tentId }, ctx) => {
     if (!ctx.isAuthenticated()) return unauthenticated();
     const supabase = supabaseForUser(ctx);
-    const { data: tent, error: tentError } = await supabase
-      .from("tents")
-      .select("id,name")
-      .eq("id", tentId)
-      .maybeSingle();
-    if (tentError) {
+    const result = await getLatestSensorSnapshotForOwnedTent(supabase, tentId);
+    if (result.ok === false) {
       return {
-        content: [{ type: "text", text: `Error: ${tentError.message}` }],
+        content: [
+          {
+            type: "text",
+            text: result.reason === "unavailable" ? `Error: ${result.message}` : result.message,
+          },
+        ],
         isError: true,
       };
     }
-    if (!tent) {
-      return {
-        content: [{ type: "text", text: "Tent not found for the signed-in grower." }],
-        isError: true,
-      };
-    }
-    // Latest row per metric under COALESCE(captured_at, ts) semantics.
-    // A bounded candidate window is required because the newest stored row
-    // may be diagnostic-only; filtering after LIMIT 1 would hide the newest
-    // eligible physical row for the same metric.
-    const results = await Promise.all(
-      KNOWN_METRICS.flatMap((metric) => [
-        supabase
-          .from("sensor_readings")
-          .select(SENSOR_COLUMNS)
-          .eq("tent_id", tentId)
-          .eq("metric", metric)
-          .not("captured_at", "is", null)
-          .order("captured_at", { ascending: false })
-          .order("ts", { ascending: false })
-          .order("created_at", { ascending: false })
-          .order("id", { ascending: false })
-          .limit(SENSOR_CANDIDATE_LIMIT),
-        supabase
-          .from("sensor_readings")
-          .select(SENSOR_COLUMNS)
-          .eq("tent_id", tentId)
-          .eq("metric", metric)
-          .is("captured_at", null)
-          .order("ts", { ascending: false })
-          .order("created_at", { ascending: false })
-          .order("id", { ascending: false })
-          .limit(SENSOR_CANDIDATE_LIMIT),
-      ]),
-    );
-    const failed = results.find((r) => r.error);
-    if (failed?.error) {
-      return {
-        content: [{ type: "text", text: `Error: ${failed.error.message}` }],
-        isError: true,
-      };
-    }
-    const candidates = results.flatMap((result) =>
-      Array.isArray(result.data) ? (result.data as McpSensorQueryRow[]) : [],
-    );
-    const readings = selectLatestMcpSensorReadings(candidates);
-    if (Object.keys(readings).length === 0) {
+    if (!result.data.snapshot) {
       return {
         content: [{ type: "text", text: "No sensor readings found for that tent." }],
         structuredContent: { snapshot: null },
       };
     }
+    const { readings } = result.data.snapshot;
     const summary = Object.values(readings)
       .map(
         (r) =>
@@ -251,10 +102,10 @@ export default defineTool({
       content: [
         {
           type: "text",
-          text: `Latest readings for tent "${tent.name}":\n${summary}`,
+          text: `Latest readings for tent "${result.data.tent.name}":\n${summary}`,
         },
       ],
-      structuredContent: { snapshot: { tentId, readings } },
+      structuredContent: { snapshot: result.data.snapshot },
     };
   },
 });

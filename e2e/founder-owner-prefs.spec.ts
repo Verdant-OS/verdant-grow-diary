@@ -148,15 +148,25 @@ test.describe("Founder owner preferences (mocked)", () => {
     await expect(heading).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText(/Founder #7/i)).toBeVisible();
 
-    // Dismiss any auto-opened dialog (e.g. share-card modal) that may cover
-    // the form on /founder. Escape is a no-op if nothing is open.
+    // Some /founder surfaces (share card, portals) mount overlays that
+    // intercept pointer events regardless of z-order. Drop any full-screen
+    // overlay before driving the form.
+    async function clearOverlays() {
+      await page.evaluate(() => {
+        document
+          .querySelectorAll<HTMLElement>('div.fixed.inset-0.z-50')
+          .forEach((el) => el.remove());
+      });
+    }
     await page.keyboard.press("Escape");
+    await clearOverlays();
     await heading.scrollIntoViewIfNeeded();
 
     // Fill in a valid custom-name profile.
     await page.locator("#founder-show-on-wall").click({ force: true });
     await page.locator("#founder-display-name").fill("Jane Cultivator");
     await page.locator("#founder-optional-link").fill("https://example.com/jane");
+    await clearOverlays();
 
     // https-only client validation: an http:// value must NOT invoke.
     await page.locator("#founder-optional-link").fill("http://insecure.example");

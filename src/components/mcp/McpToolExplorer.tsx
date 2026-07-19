@@ -329,6 +329,19 @@ function ToolCard({
     }
   }, [invalid, buildArgs, endpoint, toolName, onAuthLost]);
 
+  const requestRetry = useCallback(() => {
+    if (confirmBeforeRetry) {
+      setRetryPending(true);
+    } else {
+      void run();
+    }
+  }, [confirmBeforeRetry, run]);
+
+  const confirmRetry = useCallback(() => {
+    setRetryPending(false);
+    void run();
+  }, [run]);
+
   const summaryId = `tool-explorer-${toolName}-validation-summary`;
 
   return (

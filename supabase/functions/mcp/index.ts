@@ -68,55 +68,118 @@ ${JSON.stringify(rows, null, 2)}`
 // src/lib/mcp/tools/list-recent-diary-entries.ts
 import { defineTool as defineTool2 } from "npm:@lovable.dev/mcp-js@0.20.0";
 import { z as z2 } from "npm:zod@^4.4.3";
-var list_recent_diary_entries_default = defineTool2({
-  name: "list_recent_diary_entries",
-  title: "List recent diary entries",
-  description: "List recent diary entries for one of the signed-in grower's own grows. The grow must belong to the caller. Read-only.",
-  inputSchema: {
-    growId: z2.string().uuid().describe("Grow id to fetch diary entries for."),
-    limit: z2.number().int().min(1).max(50).optional().describe("Maximum entries to return (1\u201350). Defaults to 10.")
-  },
-  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
-  handler: async ({ growId, limit }, ctx) => {
-    if (!ctx.isAuthenticated()) return unauthenticated();
-    const supabase = supabaseForUser(ctx);
-    const { data: grow, error: growError } = await supabase.from("grows").select("id").eq("id", growId).maybeSingle();
-    if (growError) {
-      return {
-        content: [{ type: "text", text: `Error: ${growError.message}` }],
-        isError: true
-      };
-    }
-    if (!grow) {
-      return {
-        content: [{ type: "text", text: "Grow not found for the signed-in grower." }],
-        isError: true
-      };
-    }
-    const { data, error } = await supabase.from("diary_entries").select("id,grow_id,plant_id,tent_id,stage,note,entry_at,created_at").eq("grow_id", growId).order("entry_at", { ascending: false }).limit(limit ?? 10);
-    if (error) {
-      return {
-        content: [{ type: "text", text: `Error: ${error.message}` }],
-        isError: true
-      };
-    }
-    const rows = data ?? [];
+
+// src/lib/sensor/sensorSourceRules.ts
+var ALIAS = {
+  live: "live",
+  sensor: "live",
+  realtime: "live",
+  manual: "manual",
+  user: "manual",
+  entry: "manual",
+  log: "manual",
+  csv: "csv",
+  import: "csv",
+  demo: "demo",
+  mock: "demo",
+  sample: "demo",
+  fixture: "demo",
+  stale: "stale",
+  invalid: "invalid",
+  unknown: "invalid"
+};
+function normalizeSensorSource(input) {
+  if (typeof input !== "string") return "invalid";
+  const v = input.trim().toLowerCase();
+  if (v.length === 0) return "invalid";
+  return ALIAS[v] ?? "invalid";
+}
+
+// src/lib/sensor/sensorSnapshotFreshnessRules.ts
+var DEFAULT_FRESH_MS = 30 * 60 * 1e3;
+var DEFAULT_FUTURE_TOL = 2 * 60 * 1e3;
+function formatAge(ms) {
+  if (ms < 6e4) return "just now";
+  const mins = Math.floor(ms / 6e4);
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+function classifySnapshotFreshness(snapshot, options = {}) {
+  const source = normalizeSensorSource(snapshot.source);
+  const freshnessMs = options.freshnessMs ?? DEFAULT_FRESH_MS;
+  const futureTol = options.futureToleranceMs ?? DEFAULT_FUTURE_TOL;
+  const now = options.now ?? Date.now();
+  if (source === "invalid") {
     return {
-      content: [
-        {
-          type: "text",
-          text: rows.length === 0 ? "No diary entries found for that grow." : `Found ${rows.length} entry(ies):
-${JSON.stringify(rows, null, 2)}`
-        }
-      ],
-      structuredContent: { entries: rows }
+      source,
+      freshness: "invalid",
+      ageMs: null,
+      ageLabel: "unknown age",
+      isDegraded: true
     };
   }
-});
-
-// src/lib/mcp/tools/get-latest-sensor-snapshot.ts
-import { defineTool as defineTool3 } from "npm:@lovable.dev/mcp-js@0.20.0";
-import { z as z3 } from "npm:zod@^4.4.3";
+  const captured = snapshot.captured_at;
+  if (typeof captured !== "string" || captured.length === 0) {
+    return {
+      source,
+      freshness: "invalid",
+      ageMs: null,
+      ageLabel: "no timestamp",
+      isDegraded: true
+    };
+  }
+  const ts = Date.parse(captured);
+  if (!Number.isFinite(ts)) {
+    return {
+      source,
+      freshness: "invalid",
+      ageMs: null,
+      ageLabel: "bad timestamp",
+      isDegraded: true
+    };
+  }
+  const ageMs = now - ts;
+  if (ageMs < -futureTol) {
+    return {
+      source,
+      freshness: "invalid",
+      ageMs,
+      ageLabel: "future timestamp",
+      isDegraded: true
+    };
+  }
+  if (source === "demo") {
+    return {
+      source,
+      freshness: "fresh",
+      // demo can be "current" in the demo set, but is degraded
+      ageMs: Math.max(ageMs, 0),
+      ageLabel: formatAge(Math.max(ageMs, 0)),
+      isDegraded: true
+    };
+  }
+  if (source === "stale") {
+    return {
+      source,
+      freshness: "stale",
+      ageMs: Math.max(ageMs, 0),
+      ageLabel: formatAge(Math.max(ageMs, 0)),
+      isDegraded: true
+    };
+  }
+  const effectiveAge = Math.max(ageMs, 0);
+  const isStale = effectiveAge > freshnessMs;
+  return {
+    source,
+    freshness: isStale ? "stale" : "fresh",
+    ageMs: effectiveAge,
+    ageLabel: formatAge(effectiveAge),
+    isDegraded: isStale || source !== "live"
+  };
+}
 
 // src/lib/sensorTestbenchIndicatorRules.ts
 var SENSOR_TESTBENCH_LIVE_WINDOW_MS = 15 * 60 * 1e3;
@@ -187,14 +250,69 @@ function withoutDiagnosticSensorRows(rows) {
 
 // src/lib/sensorReadingNormalizationRules.ts
 var STALE_THRESHOLD_MS = 30 * 60 * 1e3;
-function isReadingStale(capturedAt, now = Date.now(), thresholdMs = STALE_THRESHOLD_MS) {
-  const t = new Date(capturedAt).getTime();
-  if (!Number.isFinite(t)) return true;
-  return now - t > thresholdMs;
+
+// src/lib/sensorValidation.ts
+import { EC_PLAUSIBLE_MAX } from "npm:@/lib/ecUnits";
+function num(v) {
+  if (v === null || v === void 0 || v === "") return null;
+  const n = typeof v === "number" ? v : Number(String(v).trim());
+  return Number.isFinite(n) ? n : null;
+}
+function validatePh(value) {
+  const n = num(value);
+  if (n === null) return null;
+  if (n < 3 || n > 9) {
+    return {
+      code: "ph:implausible",
+      message: "Check pH: outside realistic 3.0\u20139.0 range.",
+      severity: "warning"
+    };
+  }
+  return null;
+}
+function validateEcWithUnit(value, unit) {
+  const n = num(value);
+  if (n === null) return null;
+  if (n < 0) {
+    return { code: "ec:negative", message: "EC must be positive.", severity: "warning" };
+  }
+  const cap = EC_PLAUSIBLE_MAX[unit];
+  if (Number.isFinite(cap) && n > cap) {
+    return {
+      code: "ec:implausible",
+      message: "Check EC unit/value \u2014 looks too high for the selected unit.",
+      severity: "warning"
+    };
+  }
+  return null;
+}
+function validateTempC(value) {
+  const n = num(value);
+  if (n === null) return null;
+  if (n < -10 || n > 60) {
+    return {
+      code: "temp:implausible",
+      message: "Check temperature: outside realistic grow range.",
+      severity: "warning"
+    };
+  }
+  return null;
+}
+function validateHumidity(value) {
+  const n = num(value);
+  if (n === null) return null;
+  if (n < 1 || n > 99) {
+    return {
+      code: "rh:stuck",
+      message: "Humidity looks stuck at 0% or 100% \u2014 check sensor.",
+      severity: "warning"
+    };
+  }
+  return null;
 }
 
-// src/lib/mcp/tools/get-latest-sensor-snapshot.ts
-var KNOWN_METRICS = [
+// src/lib/operatorAccountReadModels.ts
+var OPERATOR_SENSOR_METRICS = [
   "temperature_c",
   "humidity_pct",
   "vpd_kpa",
@@ -205,35 +323,110 @@ var KNOWN_METRICS = [
   "ec",
   "ppfd"
 ];
-var SENSOR_COLUMNS = "id,tent_id,metric,value,quality,source,ts,captured_at,raw_payload";
+var DIARY_COLUMNS = "id,grow_id,plant_id,tent_id,stage,note,entry_at,created_at";
+var SENSOR_COLUMNS = "id,tent_id,metric,value,quality,source,ts,captured_at,created_at,raw_payload";
 var SENSOR_CANDIDATE_LIMIT = 25;
+var KNOWN_METRIC_SET = new Set(OPERATOR_SENSOR_METRICS);
+function normalizeDiaryLimit(limit) {
+  if (!Number.isFinite(limit)) return 10;
+  return Math.min(50, Math.max(1, Math.trunc(limit)));
+}
+async function listRecentDiaryEntriesForOwnedGrow(client, growId, limit) {
+  const { data: grow, error: growError } = await client.from("grows").select("id").eq("id", growId).maybeSingle();
+  if (growError) {
+    return { ok: false, reason: "unavailable", message: growError.message };
+  }
+  if (!grow) {
+    return {
+      ok: false,
+      reason: "not_found",
+      message: "Grow not found for the signed-in grower."
+    };
+  }
+  const { data, error } = await client.from("diary_entries").select(DIARY_COLUMNS).eq("grow_id", growId).order("entry_at", { ascending: false }).limit(normalizeDiaryLimit(limit));
+  if (error) {
+    return { ok: false, reason: "unavailable", message: error.message };
+  }
+  return {
+    ok: true,
+    data: { entries: data ?? [] }
+  };
+}
+function parseTimestamp(value) {
+  if (typeof value !== "string") return Number.NEGATIVE_INFINITY;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : Number.NEGATIVE_INFINITY;
+}
 function effectiveCaptureMs(row) {
-  return Date.parse(row.captured_at ?? row.ts);
+  return parseTimestamp(row.captured_at ?? row.ts);
+}
+function normalizedLabel(value) {
+  return typeof value === "string" ? value.trim().toLowerCase() : "invalid";
+}
+function isPlausibleMcpSensorValue(row) {
+  if (!Number.isFinite(row.value)) return false;
+  switch (row.metric) {
+    case "temperature_c":
+    case "soil_temp_c":
+      return validateTempC(row.value) === null;
+    case "humidity_pct":
+      return validateHumidity(row.value) === null;
+    case "vpd_kpa":
+      return row.value >= 0 && row.value <= 10;
+    case "co2_ppm":
+      return row.value >= 0 && row.value <= 5e3;
+    case "soil_moisture_pct":
+      return row.value > 0 && row.value < 100;
+    case "ph":
+      return validatePh(row.value) === null;
+    case "ec":
+      return validateEcWithUnit(row.value, "mS/cm") === null;
+    case "ppfd":
+      return row.value >= 0;
+    default:
+      return false;
+  }
 }
 function deriveMcpFreshness(row, nowMs, staleAfterMs) {
-  const source = row.source.trim().toLowerCase();
-  const quality = row.quality.trim().toLowerCase();
+  const source = normalizedLabel(row.source);
+  const quality = normalizedLabel(row.quality);
   if (source === "invalid" || quality === "invalid") return "invalid";
   if (source === "stale" || quality === "stale") return "stale";
+  if (!isPlausibleMcpSensorValue(row)) return "invalid";
   const capturedAt = row.captured_at ?? row.ts;
-  if (!Number.isFinite(Date.parse(capturedAt))) return "invalid";
-  return isReadingStale(capturedAt, nowMs, staleAfterMs) ? "stale" : "fresh";
+  if (!Number.isFinite(nowMs)) return "invalid";
+  return classifySnapshotFreshness(
+    {
+      // Freshness is timestamp truth, not a relabeling of legacy provider
+      // sources. Source/quality trust is handled above and `current_live`
+      // remains strict below, so use a non-live canonical source only to
+      // reuse the shared malformed/future/stale time classifier.
+      source: "manual",
+      captured_at: capturedAt,
+      tent_id: row.tent_id,
+      metrics: {}
+    },
+    { now: nowMs, freshnessMs: staleAfterMs }
+  ).freshness;
 }
 function newerReading(a, b) {
-  const ea = effectiveCaptureMs(a);
-  const eb = effectiveCaptureMs(b);
-  if (ea !== eb) return ea > eb ? a : b;
-  const ta = Date.parse(a.ts);
-  const tb = Date.parse(b.ts);
-  if (ta !== tb) return ta > tb ? a : b;
-  return a.id > b.id ? a : b;
+  const comparisons = [
+    [effectiveCaptureMs(a), effectiveCaptureMs(b)],
+    [parseTimestamp(a.ts), parseTimestamp(b.ts)],
+    [parseTimestamp(a.created_at), parseTimestamp(b.created_at)]
+  ];
+  for (const [left, right] of comparisons) {
+    if (left !== right) return left > right ? a : b;
+  }
+  return a.id >= b.id ? a : b;
 }
 function selectLatestMcpSensorReadings(rows, options = {}) {
   const nowMs = (options.now ?? /* @__PURE__ */ new Date()).getTime();
-  const staleAfterMs = options.staleAfterMs ?? STALE_THRESHOLD_MS;
+  const requestedStaleAfterMs = options.staleAfterMs ?? STALE_THRESHOLD_MS;
+  const staleAfterMs = Number.isFinite(requestedStaleAfterMs) && requestedStaleAfterMs >= 0 ? requestedStaleAfterMs : STALE_THRESHOLD_MS;
   const selected = {};
   for (const row of withoutDiagnosticSensorRows(rows)) {
-    if (!row || typeof row.metric !== "string" || row.metric.length === 0) continue;
+    if (!row || !KNOWN_METRIC_SET.has(row.metric)) continue;
     const current = selected[row.metric];
     selected[row.metric] = current ? newerReading(current, row) : row;
   }
@@ -252,12 +445,97 @@ function selectLatestMcpSensorReadings(rows, options = {}) {
           ts: row.ts,
           captured_at: row.captured_at,
           freshness,
-          current_live: freshness === "fresh" && row.source.trim().toLowerCase() === "live" && row.quality.trim().toLowerCase() === "ok"
+          current_live: freshness === "fresh" && normalizedLabel(row.source) === "live" && normalizedLabel(row.quality) === "ok"
         }
       ];
     })
   );
 }
+async function getLatestSensorSnapshotForOwnedTent(client, tentId, options = {}) {
+  const { data: tent, error: tentError } = await client.from("tents").select("id,name,grow_id").eq("id", tentId).maybeSingle();
+  if (tentError) {
+    return { ok: false, reason: "unavailable", message: tentError.message };
+  }
+  if (!tent) {
+    return {
+      ok: false,
+      reason: "not_found",
+      message: "Tent not found for the signed-in grower."
+    };
+  }
+  const results = await Promise.all(
+    OPERATOR_SENSOR_METRICS.flatMap((metric) => [
+      client.from("sensor_readings").select(SENSOR_COLUMNS).eq("tent_id", tentId).eq("metric", metric).not("captured_at", "is", null).order("captured_at", { ascending: false }).order("ts", { ascending: false }).order("created_at", { ascending: false }).order("id", { ascending: false }).limit(SENSOR_CANDIDATE_LIMIT),
+      client.from("sensor_readings").select(SENSOR_COLUMNS).eq("tent_id", tentId).eq("metric", metric).is("captured_at", null).order("ts", { ascending: false }).order("created_at", { ascending: false }).order("id", { ascending: false }).limit(SENSOR_CANDIDATE_LIMIT)
+    ])
+  );
+  const failed = results.find((result) => result.error);
+  if (failed?.error) {
+    return { ok: false, reason: "unavailable", message: failed.error.message };
+  }
+  const candidates = results.flatMap(
+    (result) => Array.isArray(result.data) ? result.data : []
+  );
+  const readings = selectLatestMcpSensorReadings(candidates, options);
+  const ownedTent = {
+    id: tent.id,
+    name: tent.name,
+    grow_id: tent.grow_id
+  };
+  return {
+    ok: true,
+    data: {
+      tent: ownedTent,
+      snapshot: Object.keys(readings).length === 0 ? null : {
+        tentId,
+        readings
+      }
+    }
+  };
+}
+
+// src/lib/mcp/tools/list-recent-diary-entries.ts
+var list_recent_diary_entries_default = defineTool2({
+  name: "list_recent_diary_entries",
+  title: "List recent diary entries",
+  description: "List recent diary entries for one of the signed-in grower's own grows. The grow must belong to the caller. Read-only.",
+  inputSchema: {
+    growId: z2.string().uuid().describe("Grow id to fetch diary entries for."),
+    limit: z2.number().int().min(1).max(50).optional().describe("Maximum entries to return (1\u201350). Defaults to 10.")
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async ({ growId, limit }, ctx) => {
+    if (!ctx.isAuthenticated()) return unauthenticated();
+    const supabase = supabaseForUser(ctx);
+    const result = await listRecentDiaryEntriesForOwnedGrow(supabase, growId, limit);
+    if (result.ok === false) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: result.reason === "unavailable" ? `Error: ${result.message}` : result.message
+          }
+        ],
+        isError: true
+      };
+    }
+    const rows = result.data.entries;
+    return {
+      content: [
+        {
+          type: "text",
+          text: rows.length === 0 ? "No diary entries found for that grow." : `Found ${rows.length} entry(ies):
+${JSON.stringify(rows, null, 2)}`
+        }
+      ],
+      structuredContent: { entries: rows }
+    };
+  }
+});
+
+// src/lib/mcp/tools/get-latest-sensor-snapshot.ts
+import { defineTool as defineTool3 } from "npm:@lovable.dev/mcp-js@0.20.0";
+import { z as z3 } from "npm:zod@^4.4.3";
 var get_latest_sensor_snapshot_default = defineTool3({
   name: "get_latest_sensor_snapshot",
   title: "Get latest sensor snapshot",
@@ -269,42 +547,25 @@ var get_latest_sensor_snapshot_default = defineTool3({
   handler: async ({ tentId }, ctx) => {
     if (!ctx.isAuthenticated()) return unauthenticated();
     const supabase = supabaseForUser(ctx);
-    const { data: tent, error: tentError } = await supabase.from("tents").select("id,name").eq("id", tentId).maybeSingle();
-    if (tentError) {
+    const result = await getLatestSensorSnapshotForOwnedTent(supabase, tentId);
+    if (result.ok === false) {
       return {
-        content: [{ type: "text", text: `Error: ${tentError.message}` }],
+        content: [
+          {
+            type: "text",
+            text: result.reason === "unavailable" ? `Error: ${result.message}` : result.message
+          }
+        ],
         isError: true
       };
     }
-    if (!tent) {
-      return {
-        content: [{ type: "text", text: "Tent not found for the signed-in grower." }],
-        isError: true
-      };
-    }
-    const results = await Promise.all(
-      KNOWN_METRICS.flatMap((metric) => [
-        supabase.from("sensor_readings").select(SENSOR_COLUMNS).eq("tent_id", tentId).eq("metric", metric).not("captured_at", "is", null).order("captured_at", { ascending: false }).order("ts", { ascending: false }).order("created_at", { ascending: false }).order("id", { ascending: false }).limit(SENSOR_CANDIDATE_LIMIT),
-        supabase.from("sensor_readings").select(SENSOR_COLUMNS).eq("tent_id", tentId).eq("metric", metric).is("captured_at", null).order("ts", { ascending: false }).order("created_at", { ascending: false }).order("id", { ascending: false }).limit(SENSOR_CANDIDATE_LIMIT)
-      ])
-    );
-    const failed = results.find((r) => r.error);
-    if (failed?.error) {
-      return {
-        content: [{ type: "text", text: `Error: ${failed.error.message}` }],
-        isError: true
-      };
-    }
-    const candidates = results.flatMap(
-      (result) => Array.isArray(result.data) ? result.data : []
-    );
-    const readings = selectLatestMcpSensorReadings(candidates);
-    if (Object.keys(readings).length === 0) {
+    if (!result.data.snapshot) {
       return {
         content: [{ type: "text", text: "No sensor readings found for that tent." }],
         structuredContent: { snapshot: null }
       };
     }
+    const { readings } = result.data.snapshot;
     const summary = Object.values(readings).map(
       (r) => `${r.metric}=${r.value} (source: ${r.source}, quality: ${r.quality}, freshness: ${r.freshness}, current_live: ${r.current_live}, at: ${r.captured_at ?? r.ts})`
     ).join("\n");
@@ -312,11 +573,11 @@ var get_latest_sensor_snapshot_default = defineTool3({
       content: [
         {
           type: "text",
-          text: `Latest readings for tent "${tent.name}":
+          text: `Latest readings for tent "${result.data.tent.name}":
 ${summary}`
         }
       ],
-      structuredContent: { snapshot: { tentId, readings } }
+      structuredContent: { snapshot: result.data.snapshot }
     };
   }
 });

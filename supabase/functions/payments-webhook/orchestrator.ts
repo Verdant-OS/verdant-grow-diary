@@ -342,6 +342,16 @@ export async function handleVerifiedEvent(
     writeRes = deps.upsertCustomer
       ? await deps.upsertCustomer(decision.row)
       : { ok: true };
+  } else if (decision.kind === 'revoke_lifetime') {
+    // Turn B refund-retire. If the dep isn't wired (unit tests), treat as
+    // ok — those tests never exercise the refund path end-to-end.
+    writeRes = deps.revokeFounderLifetime
+      ? await deps.revokeFounderLifetime({
+          paddle_transaction_id: decision.paddleTransactionId,
+          environment: decision.env,
+          now,
+        })
+      : { ok: true };
   } else {
     writeRes = await deps.updateSubscription(decision.paddleSubscriptionId, decision.patch, env);
   }

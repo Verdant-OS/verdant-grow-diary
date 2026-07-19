@@ -31,6 +31,7 @@ describe("event name contract", () => {
       "tent_created",
       "plant_created",
       "quick_log_saved",
+      "csv_history_onboarding_ready",
       "csv_import_started",
       "csv_import_completed",
       "csv_history_ai_doctor_clicked",

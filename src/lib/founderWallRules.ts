@@ -21,7 +21,7 @@
  */
 import { z } from "zod";
 
-export type FounderDisplayStyle = "custom" | "first_initial" | "number_only" | "hidden";
+export type FounderDisplayStyle = "custom_name" | "first_initial" | "number_only" | "hidden";
 
 export interface FounderPrefsInput {
   display_name: string | null;
@@ -54,11 +54,11 @@ export function deriveWallDisplayName(row: FounderRowLike): string | null {
     case "first_initial": {
       const raw = (row.display_name ?? "").trim();
       if (raw.length === 0) return null;
-      // Server truncates to one character before emitting. Keep the same
-      // rule client-side so preview matches the wall.
-      return `${raw.charAt(0)}.`;
+      // Server: `upper(left(btrim(display_name), 1))`. Match that exactly
+      // so owner preview and public wall never disagree.
+      return raw.charAt(0).toUpperCase();
     }
-    case "custom": {
+    case "custom_name": {
       const raw = (row.display_name ?? "").trim();
       return raw.length === 0 ? null : raw;
     }

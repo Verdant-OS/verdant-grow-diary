@@ -10,7 +10,8 @@
  *    history exists);
  *  - once rows arrive, the packet sent to the edge invoke carries the
  *    sanitized imported_sensor_history built from those rows;
- *  - a FAILED read proceeds by omission, never a fabricated summary/value;
+ *  - a FAILED read requires an explicit retry-or-continue decision before
+ *    omission can reach a paid AI request;
  *  - fresh live temp/RH/soil rows reach the packet with no raw payload.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -24,7 +25,13 @@ function render(ui: ReactElement) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
-  return rtlRender(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+  const view = rtlRender(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+  return {
+    ...view,
+    rerenderWithProviders(nextUi: ReactElement) {
+      view.rerender(<QueryClientProvider client={client}>{nextUi}</QueryClientProvider>);
+    },
+  };
 }
 
 vi.mock("@/integrations/supabase/client", () => ({
@@ -49,6 +56,7 @@ const sensorQueryState = vi.hoisted(() => ({
   csvRows: [] as unknown[],
   csvStatus: "success" as "loading" | "error" | "success",
   csvFetching: false,
+  csvRefetch: vi.fn(async () => undefined),
   currentRows: [] as unknown[],
   currentStatus: "success" as "loading" | "error" | "success",
 }));
@@ -71,10 +79,13 @@ vi.mock("@/hooks/use-sensor-readings", () => ({
 
 vi.mock("@/hooks/useImportedSensorHistory", () => ({
   useImportedSensorHistory: () => ({
-    data: sensorQueryState.csvStatus === "success" ? sensorQueryState.csvRows : undefined,
+    // TanStack Query intentionally retains successful data when a later
+    // refetch fails. Keep that behavior visible to the regressions below.
+    data: sensorQueryState.csvRows,
     isLoading: sensorQueryState.csvStatus === "loading",
     isFetching: sensorQueryState.csvStatus === "loading" || sensorQueryState.csvFetching,
     isError: sensorQueryState.csvStatus === "error",
+    refetch: sensorQueryState.csvRefetch,
   }),
 }));
 
@@ -181,6 +192,20 @@ const historicalCsvRows = [
   },
 ];
 
+const validResult = () => ({
+  summary: "Plant shows mild leaf curl on lower fan leaves.",
+  likely_issue: "Possible early heat stress.",
+  confidence: "medium",
+  evidence: ["Tent temperature was elevated."],
+  missing_information: ["No recent VPD snapshot."],
+  possible_causes: ["High tent temperature."],
+  immediate_action: "Stabilize temperature and observe.",
+  what_not_to_do: "Avoid increasing nutrient strength right now.",
+  twenty_four_hour_follow_up: "Recheck leaf posture after 24 hours.",
+  three_day_recovery_plan: "Hold the current feed schedule and monitor daily.",
+  risk_level: "watch",
+});
+
 type InvokeFn = (
   name: string,
   init: {
@@ -190,21 +215,25 @@ type InvokeFn = (
   },
 ) => Promise<{ data: unknown; error: unknown }>;
 
+function reviewElement(invoke: ReturnType<typeof vi.fn<InvokeFn>>, tentId = TENT_ID) {
+  return (
+    <PlantDetailAiDoctorLiveReview
+      plantId="p1"
+      plant={strongPlant}
+      growId={GROW_ID}
+      tentId={tentId}
+      invoke={invoke}
+    />
+  );
+}
+
 function mount(
   invoke = vi.fn<InvokeFn>(async () => ({
     data: { ok: false, reason: "http" },
     error: null,
   })),
 ) {
-  render(
-    <PlantDetailAiDoctorLiveReview
-      plantId="p1"
-      plant={strongPlant}
-      growId={GROW_ID}
-      tentId={TENT_ID}
-      invoke={invoke}
-    />,
-  );
+  render(reviewElement(invoke));
   return invoke;
 }
 
@@ -214,6 +243,8 @@ beforeEach(() => {
   sensorQueryState.csvRows = [];
   sensorQueryState.csvStatus = "success";
   sensorQueryState.csvFetching = false;
+  sensorQueryState.csvRefetch.mockReset();
+  sensorQueryState.csvRefetch.mockResolvedValue(undefined);
   sensorQueryState.currentRows = [];
   sensorQueryState.currentStatus = "success";
   trackFunnelEvent.mockClear();
@@ -261,17 +292,172 @@ describe("CSV history pending/error gating", () => {
     expect(JSON.stringify(packet)).not.toContain("raw_payload");
   });
 
-  it("a failed read proceeds WITHOUT history — omission, not fabrication", async () => {
+  it("requires an explicit decision before a failed read can be omitted", async () => {
+    sensorQueryState.csvRows = historicalCsvRows;
     sensorQueryState.csvStatus = "error";
     const invoke = mount();
-    const start = screen.getByTestId("plant-ai-doctor-live-review-start") as HTMLButtonElement;
-    expect(start.disabled).toBe(false);
+
+    expect(screen.getByTestId("plant-ai-doctor-imported-history-recovery")).toHaveTextContent(
+      /couldn’t load this tent’s imported sensor history/i,
+    );
+    expect(screen.queryByTestId("plant-ai-doctor-live-review-start")).toBeNull();
+    expect(invoke).not.toHaveBeenCalled();
+    expect(trackFunnelEvent).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByTestId("plant-ai-doctor-imported-history-continue"));
+    expect(screen.getByTestId("plant-ai-doctor-imported-history-omitted")).toHaveTextContent(
+      /without imported sensor history/i,
+    );
+
+    const start = screen.getByTestId("plant-ai-doctor-live-review-start");
     fireEvent.click(start);
     await waitFor(() => expect(invoke).toHaveBeenCalledTimes(1));
     const packet = invoke.mock.calls[0][1].body.packet as {
       imported_sensor_history: unknown;
     };
     expect(packet.imported_sensor_history).toBeNull();
+    expect(screen.getByTestId("plant-ai-doctor-imported-history-omitted")).toBeInTheDocument();
+  });
+
+  it("retries only the imported-history query and never invokes AI Doctor", () => {
+    sensorQueryState.csvStatus = "error";
+    const invoke = mount();
+
+    fireEvent.click(screen.getByTestId("plant-ai-doctor-imported-history-retry"));
+
+    expect(sensorQueryState.csvRefetch).toHaveBeenCalledTimes(1);
+    expect(invoke).not.toHaveBeenCalled();
+    expect(trackFunnelEvent).not.toHaveBeenCalled();
+  });
+
+  it("restores imported context after a successful query retry", async () => {
+    sensorQueryState.csvRows = historicalCsvRows;
+    sensorQueryState.csvStatus = "error";
+    const invoke = vi.fn<InvokeFn>(async () => ({
+      data: { ok: false, reason: "http" },
+      error: null,
+    }));
+    const view = render(reviewElement(invoke));
+
+    fireEvent.click(screen.getByTestId("plant-ai-doctor-imported-history-retry"));
+    expect(sensorQueryState.csvRefetch).toHaveBeenCalledTimes(1);
+    expect(invoke).not.toHaveBeenCalled();
+
+    sensorQueryState.csvStatus = "success";
+    sensorQueryState.csvRows = csvRows;
+    view.rerenderWithProviders(reviewElement(invoke));
+
+    expect(screen.queryByTestId("plant-ai-doctor-imported-history-recovery")).toBeNull();
+    fireEvent.click(screen.getByTestId("plant-ai-doctor-live-review-start"));
+    await waitFor(() => expect(invoke).toHaveBeenCalledTimes(1));
+    expect(invoke.mock.calls[0][1].body.packet.imported_sensor_history?.totalReadings).toBe(2);
+  });
+
+  it("keeps an omitted packet frozen when history later succeeds before a model retry", async () => {
+    sensorQueryState.csvRows = historicalCsvRows;
+    sensorQueryState.csvStatus = "error";
+    const invoke = vi.fn<InvokeFn>(async () => ({
+      data: { ok: false, reason: "http" },
+      error: null,
+    }));
+    const view = render(reviewElement(invoke));
+
+    fireEvent.click(screen.getByTestId("plant-ai-doctor-imported-history-continue"));
+    fireEvent.click(screen.getByTestId("plant-ai-doctor-live-review-start"));
+    await waitFor(() => expect(invoke).toHaveBeenCalledTimes(1));
+    expect(invoke.mock.calls[0][1].body.packet.imported_sensor_history).toBeNull();
+
+    sensorQueryState.csvStatus = "success";
+    view.rerenderWithProviders(reviewElement(invoke));
+
+    expect(screen.getByTestId("plant-ai-doctor-imported-history-omitted")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("plant-ai-doctor-live-review-retry"));
+    await waitFor(() => expect(invoke).toHaveBeenCalledTimes(2));
+    expect(invoke.mock.calls[1][1].body.packet.imported_sensor_history).toBeNull();
+  });
+
+  it("keeps an included packet frozen when a later history refetch fails", async () => {
+    sensorQueryState.csvRows = historicalCsvRows;
+    const invoke = vi.fn<InvokeFn>(async () => ({
+      data: { ok: false, reason: "http" },
+      error: null,
+    }));
+    const view = render(reviewElement(invoke));
+
+    fireEvent.click(screen.getByTestId("plant-ai-doctor-live-review-start"));
+    await waitFor(() => expect(invoke).toHaveBeenCalledTimes(1));
+    expect(invoke.mock.calls[0][1].body.packet.imported_sensor_history?.totalReadings).toBe(2);
+
+    sensorQueryState.csvStatus = "error";
+    view.rerenderWithProviders(reviewElement(invoke));
+
+    expect(screen.queryByTestId("plant-ai-doctor-imported-history-recovery")).toBeNull();
+    expect(screen.queryByTestId("plant-ai-doctor-imported-history-omitted")).toBeNull();
+    fireEvent.click(screen.getByTestId("plant-ai-doctor-live-review-retry"));
+    await waitFor(() => expect(invoke).toHaveBeenCalledTimes(2));
+    expect(invoke.mock.calls[1][1].body.packet.imported_sensor_history?.totalReadings).toBe(2);
+  });
+
+  it("does not carry an omission choice into a different tent", () => {
+    sensorQueryState.csvStatus = "error";
+    const invoke = vi.fn<InvokeFn>(async () => ({
+      data: { ok: false, reason: "http" },
+      error: null,
+    }));
+    const view = render(reviewElement(invoke));
+
+    fireEvent.click(screen.getByTestId("plant-ai-doctor-imported-history-continue"));
+    expect(screen.getByTestId("plant-ai-doctor-imported-history-omitted")).toBeInTheDocument();
+
+    const otherTentId = "6b2d7f10-3c4e-4d5f-8a01-2b3c4d5e6f88";
+    view.rerenderWithProviders(reviewElement(invoke, otherTentId));
+
+    expect(screen.getByTestId("plant-ai-doctor-imported-history-recovery")).toBeInTheDocument();
+    expect(screen.queryByTestId("plant-ai-doctor-imported-history-omitted")).toBeNull();
+    expect(screen.queryByTestId("plant-ai-doctor-live-review-start")).toBeNull();
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it("clears a completed omitted review when the plant/tent scope changes", async () => {
+    sensorQueryState.csvStatus = "error";
+    const invoke = vi.fn<InvokeFn>(async () => ({
+      data: { ok: true, result: validResult() },
+      error: null,
+    }));
+    const view = render(reviewElement(invoke));
+
+    fireEvent.click(screen.getByTestId("plant-ai-doctor-imported-history-continue"));
+    fireEvent.click(screen.getByTestId("plant-ai-doctor-live-review-start"));
+    await screen.findByTestId("plant-ai-doctor-live-review-result-wrap");
+    expect(screen.getByTestId("plant-ai-doctor-imported-history-omitted")).toBeInTheDocument();
+
+    sensorQueryState.csvStatus = "success";
+    sensorQueryState.csvRows = [];
+    const otherTentId = "6b2d7f10-3c4e-4d5f-8a01-2b3c4d5e6f88";
+    view.rerenderWithProviders(reviewElement(invoke, otherTentId));
+
+    expect(screen.queryByTestId("plant-ai-doctor-live-review-result-wrap")).toBeNull();
+    expect(screen.queryByTestId("plant-ai-doctor-imported-history-omitted")).toBeNull();
+    expect(screen.getByTestId("plant-ai-doctor-live-review-start")).toBeInTheDocument();
+  });
+
+  it("keeps recovery reachable when failed history was the only qualifying context", () => {
+    itemsRef.current = [];
+    sensorQueryState.csvRows = historicalCsvRows;
+    sensorQueryState.csvStatus = "error";
+    const invoke = mount();
+
+    expect(screen.getByTestId("plant-ai-doctor-imported-history-recovery")).toBeInTheDocument();
+    expect(screen.getByTestId("plant-ai-doctor-live-review-confidence-copy")).toHaveTextContent(
+      /remaining context is not enough/i,
+    );
+    expect(screen.queryByTestId("plant-ai-doctor-live-review-start")).toBeNull();
+
+    fireEvent.click(screen.getByTestId("plant-ai-doctor-imported-history-continue"));
+
+    expect(screen.getByTestId("plant-ai-doctor-imported-history-omitted")).toBeInTheDocument();
+    expect(screen.queryByTestId("plant-ai-doctor-live-review-start")).toBeNull();
+    expect(invoke).not.toHaveBeenCalled();
   });
 
   it("also holds the start button while current sensor truth is still loading", () => {

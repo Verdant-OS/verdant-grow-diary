@@ -14,7 +14,7 @@
  *  - Failure / timeout / invalid / missing-config all render the same
  *    calm failure copy. Fail closed.
  */
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTimelineMemory, TIMELINE_MEMORY_DEFAULT_LIMIT } from "@/hooks/useTimelineMemory";
@@ -25,6 +25,7 @@ import {
 import {
   AI_DOCTOR_REVIEW_PACKET_CSV_ROW_CAP,
   buildAiDoctorReviewRequestPacket,
+  type AiDoctorReviewRequestPacket,
 } from "@/lib/aiDoctorReviewRequestPacket";
 import {
   AI_DOCTOR_CURRENT_SENSOR_ROW_CAP,
@@ -48,9 +49,14 @@ import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 import type { Classification } from "@/lib/sensorSnapshotStatusContract";
 import { evaluateAiDoctorReviewEligibility } from "@/lib/aiDoctorReviewEligibilityRules";
 import { canRetryAiDoctorLiveReviewFailure } from "@/lib/aiDoctorLiveReviewRecoveryRules";
+import { resolveAiDoctorImportedHistoryRecovery } from "@/lib/aiDoctorImportedHistoryRecoveryRules";
 
 /** Stable empty-array identity so the packet memo does not churn. */
 const NO_TENT_SENSOR_ROWS: never[] = [];
+
+function aiDoctorReviewScopeKey(plantId: string, tentId: string | null | undefined): string {
+  return `${plantId}:${tentId || "no-tent"}`;
+}
 
 export const AI_DOCTOR_LIVE_REVIEW_LOADING_COPY = "Preparing cautious AI Doctor review…";
 export const AI_DOCTOR_LIVE_REVIEW_FAILURE_COPY =
@@ -63,6 +69,14 @@ export const AI_DOCTOR_LIVE_REVIEW_HISTORICAL_COPY =
 export const AI_DOCTOR_LIVE_REVIEW_VALIDATED_LABEL = "Validated AI Doctor review.";
 export const AI_DOCTOR_LIVE_REVIEW_START_LABEL = "Run cautious AI Doctor review";
 export const AI_DOCTOR_LIVE_REVIEW_RETRY_LABEL = "Try once more";
+export const AI_DOCTOR_IMPORTED_HISTORY_LOAD_FAILED_COPY =
+  "Verdant couldn’t load this tent’s imported sensor history. Retry, or continue without it. Continuing means AI Doctor will not use that historical sensor evidence.";
+export const AI_DOCTOR_IMPORTED_HISTORY_OMITTED_COPY =
+  "This AI Doctor review is proceeding without imported sensor history and may have less context.";
+export const AI_DOCTOR_IMPORTED_HISTORY_INSUFFICIENT_COPY =
+  "The remaining context is not enough to run AI Doctor while imported sensor history is unavailable.";
+export const AI_DOCTOR_IMPORTED_HISTORY_RETRY_LABEL = "Retry imported history";
+export const AI_DOCTOR_IMPORTED_HISTORY_CONTINUE_LABEL = "Continue without history";
 export const AI_DOCTOR_HISTORY_SAVING_COPY = "Saving this review to AI Doctor history…";
 export const AI_DOCTOR_HISTORY_SAVED_COPY = "Saved to AI Doctor history.";
 export const AI_DOCTOR_HISTORY_SAVE_FAILED_COPY =
@@ -85,6 +99,22 @@ export interface PlantDetailAiDoctorLiveReviewProps {
 }
 
 export default function PlantDetailAiDoctorLiveReview({
+  ...props
+}: PlantDetailAiDoctorLiveReviewProps) {
+  const scopeKey = aiDoctorReviewScopeKey(props.plantId, props.tentId);
+  return <PlantDetailAiDoctorLiveReviewScope key={scopeKey} {...props} />;
+}
+
+interface AcceptedAiDoctorReviewRequest {
+  scopeKey: string;
+  packet: AiDoctorReviewRequestPacket;
+  sensorClassification: Classification | null;
+  mode: "standard" | "historical_review";
+  confidenceCopy: string;
+  omittedImportedHistory: boolean;
+}
+
+function PlantDetailAiDoctorLiveReviewScope({
   plantId,
   plant,
   growId,
@@ -98,6 +128,11 @@ export default function PlantDetailAiDoctorLiveReview({
   const acceptedReviewModeRef = useRef<"standard" | "historical_review" | null>(null);
   const trackedResultRef = useRef<unknown>(null);
   const trackedSessionIdRef = useRef<string | null>(null);
+  const historyScopeKey = aiDoctorReviewScopeKey(plantId, tentId);
+  const [historyOmissionScope, setHistoryOmissionScope] = useState<string | null>(null);
+  const [acceptedReviewRequest, setAcceptedReviewRequest] =
+    useState<AcceptedAiDoctorReviewRequest | null>(null);
+  const historyOmissionAcknowledged = historyOmissionScope === historyScopeKey;
   const queryClient = useQueryClient();
   useEffect(() => {
     historicalStartTrackedRef.current = false;
@@ -114,7 +149,19 @@ export default function PlantDetailAiDoctorLiveReview({
     isUuid(tentId) ? tentId : null,
     AI_DOCTOR_REVIEW_PACKET_CSV_ROW_CAP,
   );
-  const tentSensorRows = importedHistory.data ?? NO_TENT_SENSOR_ROWS;
+  const queryHistoryRecovery = resolveAiDoctorImportedHistoryRecovery({
+    hasTentScope: isUuid(tentId),
+    isFetching: importedHistory.isFetching,
+    isError: importedHistory.isError,
+    omissionAcknowledged: historyOmissionAcknowledged,
+  });
+  // TanStack Query may retain cached data after a failed refetch. Only a
+  // settled, successful read is authoritative for a new request; loading,
+  // failed, and explicitly omitted history all contribute zero rows.
+  const queryTentSensorRows =
+    isUuid(tentId) && queryHistoryRecovery.state === "ready" && !queryHistoryRecovery.blocksReview
+      ? (importedHistory.data ?? NO_TENT_SENSOR_ROWS)
+      : NO_TENT_SENSOR_ROWS;
   // Separate bounded current-source read. Keeping it distinct from the CSV
   // query prevents a high-frequency current stream from crowding history
   // out, and prevents historical rows from being mistaken for the latest
@@ -128,13 +175,12 @@ export default function PlantDetailAiDoctorLiveReview({
   const currentSensorRows = tentId
     ? (currentReadingsByTent[tentId] ?? NO_TENT_SENSOR_ROWS)
     : NO_TENT_SENSOR_ROWS;
-  // While either bounded sensor read is in flight, hold the start gate so
-  // a click cannot send a packet that treats pending evidence as confirmed
-  // absent. A FAILED read proceeds by omission — never a fabricated value.
-  const csvHistoryPending = isUuid(tentId) && importedHistory.isFetching;
+  // Hold the start gate while current truth is loading or imported-history
+  // evidence is unresolved. A failed history read now requires an explicit
+  // grower choice before omission can reach a paid AI request.
   const currentSensorPending =
     isUuid(tentId) && (currentSensorStatusByTent[tentId] ?? "loading") === "loading";
-  const sensorContextPending = csvHistoryPending || currentSensorPending;
+  const sensorContextBlocked = currentSensorPending || queryHistoryRecovery.blocksReview;
 
   const context = useMemo(
     () =>
@@ -164,14 +210,14 @@ export default function PlantDetailAiDoctorLiveReview({
         plant,
         timelineItems: items,
         context,
-        csvHistoryRows: tentSensorRows,
+        csvHistoryRows: queryTentSensorRows,
         currentSensorRows,
         // This explicit signal is derived from the same filtered rows as
         // the packet snapshot. Diagnostic/testbench packets, manual
         // snapshots, and CSV history can never set it.
         hasFreshLiveSensorReadings: sensorClassification?.status === "usable",
       }),
-    [plant, items, context, tentSensorRows, currentSensorRows, sensorClassification],
+    [plant, items, context, queryTentSensorRows, currentSensorRows, sensorClassification],
   );
 
   const eligibility = useMemo(
@@ -180,7 +226,7 @@ export default function PlantDetailAiDoctorLiveReview({
         context,
         hasPlantProfile: plant !== null,
         importedHistory: candidatePacket.imported_sensor_history,
-        historicalRows: tentSensorRows,
+        historicalRows: queryTentSensorRows,
         missingLiveSensorReadings: candidatePacket.missingLiveSensorReadings === true,
       }),
     [
@@ -188,11 +234,33 @@ export default function PlantDetailAiDoctorLiveReview({
       candidatePacket.missingLiveSensorReadings,
       context,
       plant,
-      tentSensorRows,
+      queryTentSensorRows,
     ],
   );
   const allowed = eligibility.allowed;
   const packet = allowed ? candidatePacket : null;
+  const candidateConfidenceCopy = !allowed
+    ? AI_DOCTOR_IMPORTED_HISTORY_INSUFFICIENT_COPY
+    : eligibility.mode === "historical_review"
+      ? AI_DOCTOR_LIVE_REVIEW_HISTORICAL_COPY
+      : context.readiness === "partial"
+        ? AI_DOCTOR_LIVE_REVIEW_PARTIAL_COPY
+        : AI_DOCTOR_LIVE_REVIEW_STRONG_COPY;
+
+  // Once the grower starts a logical review, its packet and evidence decision
+  // are immutable. Background query changes cannot silently add/remove CSV
+  // context from a manual retry.
+  const activeReviewRequest =
+    acceptedReviewRequest?.scopeKey === historyScopeKey ? acceptedReviewRequest : null;
+  const historyRecovery = activeReviewRequest
+    ? {
+        state: activeReviewRequest.omittedImportedHistory
+          ? ("omitted_by_choice" as const)
+          : ("ready" as const),
+        blocksReview: false,
+        showsRecovery: activeReviewRequest.omittedImportedHistory,
+      }
+    : queryHistoryRecovery;
 
   const handlePersisted = useCallback(
     (_sessionId: string) => {
@@ -203,20 +271,43 @@ export default function PlantDetailAiDoctorLiveReview({
   );
 
   const review = useAiDoctorLiveReview({
-    // Hold the gate while either sensor context read is in flight.
-    enabled: allowed && !sensorContextPending,
-    packet,
+    enabled: activeReviewRequest !== null || (allowed && !sensorContextBlocked),
+    packet: activeReviewRequest?.packet ?? packet,
     invoke,
     growId: growId ?? null,
     tentId: tentId ?? null,
     plantId,
-    sensorClassification,
+    sensorClassification: activeReviewRequest
+      ? activeReviewRequest.sensorClassification
+      : sensorClassification,
     persist,
     onPersisted: handlePersisted,
   });
 
   const { entitlement } = useMyEntitlements();
   const canRetryReview = canRetryAiDoctorLiveReviewFailure(review.reason);
+  // Preserve the pre-existing same-scope safety gate for ordinary reviews:
+  // if their current context disappears before display, the result stays
+  // hidden. A frozen historical or explicitly omitted request remains
+  // explainable because its accepted evidence decision is still visible.
+  const activeReviewVisible =
+    activeReviewRequest !== null &&
+    (allowed ||
+      activeReviewRequest.mode === "historical_review" ||
+      activeReviewRequest.omittedImportedHistory);
+
+  // If a background/refocus refetch succeeds before the grower starts, the
+  // earlier omission choice is no longer relevant. Once a review has begun,
+  // retain the disclosure because that request packet was already frozen.
+  useEffect(() => {
+    if (
+      !importedHistory.isError &&
+      review.status === "idle" &&
+      historyOmissionScope === historyScopeKey
+    ) {
+      setHistoryOmissionScope(null);
+    }
+  }, [historyOmissionScope, historyScopeKey, importedHistory.isError, review.status]);
 
   // Keep route construction aligned with the shared route contract.
   // AiCreditLimitNotice validates it again before it reaches the pricing link.
@@ -252,7 +343,7 @@ export default function PlantDetailAiDoctorLiveReview({
     // These events describe value the grower can actually see. If eligibility
     // disappears while the request is in flight, the component renders
     // nothing and neither the result nor durable-save milestone is counted.
-    if (!allowed || review.status !== "result" || !review.result) return;
+    if (!activeReviewVisible || review.status !== "result" || !review.result) return;
     const surface = acceptedReviewModeRef.current;
     if (!surface) return;
     if (trackedResultRef.current !== review.result) {
@@ -269,15 +360,39 @@ export default function PlantDetailAiDoctorLiveReview({
       trackedSessionIdRef.current = review.persistence.sessionId;
       trackFunnelEvent("ai_doctor_session_saved", { surface });
     }
-  }, [allowed, review.persistence, review.result, review.status]);
+  }, [activeReviewVisible, review.persistence, review.result, review.status]);
 
-  if (!allowed) return null;
+  const showHistoryOmission = historyRecovery.state === "omitted_by_choice";
+  const showHistoryRecovery = historyRecovery.state === "decision_required" || showHistoryOmission;
+  const showReviewAction = activeReviewRequest
+    ? review.status === "error" && canRetryReview
+    : allowed && historyRecovery.state !== "decision_required" && review.status === "idle";
+
+  if (!allowed && !showHistoryRecovery && !activeReviewVisible) return null;
+
+  const handleRetryImportedHistory = () => {
+    setHistoryOmissionScope(null);
+    void importedHistory.refetch();
+  };
+
+  const handleContinueWithoutImportedHistory = () => {
+    setHistoryOmissionScope(historyScopeKey);
+  };
 
   const handleInitialStart = () => {
     if (!review.canStart) return;
+    if (!packet) return;
     const acceptedMode =
       eligibility.mode === "historical_review" ? "historical_review" : "standard";
     acceptedReviewModeRef.current = acceptedMode;
+    setAcceptedReviewRequest({
+      scopeKey: historyScopeKey,
+      packet,
+      sensorClassification,
+      mode: acceptedMode,
+      confidenceCopy: candidateConfidenceCopy,
+      omittedImportedHistory: historyRecovery.state === "omitted_by_choice",
+    });
     if (!reviewStartTrackedRef.current) {
       reviewStartTrackedRef.current = true;
       trackFunnelEvent("ai_doctor_review_started", { surface: acceptedMode });
@@ -291,20 +406,16 @@ export default function PlantDetailAiDoctorLiveReview({
     review.start();
   };
 
-  const confidenceCopy =
-    eligibility.mode === "historical_review"
-      ? AI_DOCTOR_LIVE_REVIEW_HISTORICAL_COPY
-      : context.readiness === "partial"
-        ? AI_DOCTOR_LIVE_REVIEW_PARTIAL_COPY
-        : AI_DOCTOR_LIVE_REVIEW_STRONG_COPY;
+  const confidenceCopy = activeReviewRequest?.confidenceCopy ?? candidateConfidenceCopy;
 
   return (
     <section
       aria-labelledby="plant-ai-doctor-live-review-heading"
       data-testid="plant-ai-doctor-live-review"
       data-readiness={context.readiness}
-      data-review-mode={eligibility.mode}
+      data-review-mode={activeReviewRequest?.mode ?? eligibility.mode}
       data-status={review.status}
+      data-history-recovery-state={historyRecovery.state}
       className="glass rounded-2xl p-4 my-3 space-y-3"
     >
       <header className="flex items-start justify-between gap-2 flex-wrap">
@@ -314,7 +425,7 @@ export default function PlantDetailAiDoctorLiveReview({
         >
           Cautious AI Doctor review
         </h2>
-        {review.status === "idle" || (review.status === "error" && canRetryReview) ? (
+        {showReviewAction ? (
           <button
             type="button"
             onClick={review.status === "error" ? review.retry : handleInitialStart}
@@ -339,6 +450,56 @@ export default function PlantDetailAiDoctorLiveReview({
       >
         {confidenceCopy}
       </p>
+
+      {historyRecovery.state === "decision_required" ? (
+        <div
+          className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-100"
+          role="alert"
+          data-testid="plant-ai-doctor-imported-history-recovery"
+        >
+          <p>{AI_DOCTOR_IMPORTED_HISTORY_LOAD_FAILED_COPY}</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={handleRetryImportedHistory}
+              disabled={importedHistory.isFetching}
+              className="rounded-md border border-amber-300/40 px-2 py-1 font-medium hover:bg-amber-500/10 disabled:opacity-50"
+              data-testid="plant-ai-doctor-imported-history-retry"
+            >
+              {AI_DOCTOR_IMPORTED_HISTORY_RETRY_LABEL}
+            </button>
+            <button
+              type="button"
+              onClick={handleContinueWithoutImportedHistory}
+              disabled={importedHistory.isFetching}
+              className="rounded-md border border-amber-300/40 px-2 py-1 font-medium hover:bg-amber-500/10 disabled:opacity-50"
+              data-testid="plant-ai-doctor-imported-history-continue"
+            >
+              {AI_DOCTOR_IMPORTED_HISTORY_CONTINUE_LABEL}
+            </button>
+          </div>
+        </div>
+      ) : showHistoryOmission ? (
+        <div
+          className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-100"
+          role="status"
+          aria-live="polite"
+          data-testid="plant-ai-doctor-imported-history-omitted"
+        >
+          <p>{AI_DOCTOR_IMPORTED_HISTORY_OMITTED_COPY}</p>
+          {review.status === "idle" ? (
+            <button
+              type="button"
+              onClick={handleRetryImportedHistory}
+              disabled={importedHistory.isFetching}
+              className="mt-2 rounded-md border border-amber-300/40 px-2 py-1 font-medium hover:bg-amber-500/10 disabled:opacity-50"
+              data-testid="plant-ai-doctor-imported-history-retry"
+            >
+              {AI_DOCTOR_IMPORTED_HISTORY_RETRY_LABEL}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
 
       {review.status === "loading" ? (
         <p

@@ -324,16 +324,109 @@ Content-Type: application/json`}</Code>
 
         <Section id="errors" title="Errors">
           <p className="text-sm text-muted-foreground">
-            Tool-level failures return a normal MCP tool response with{" "}
-            <code>isError: true</code> and a human-readable text message.
-            Common cases:
+            The server distinguishes two error surfaces. <strong>Transport-level</strong>{" "}
+            failures (missing or invalid OAuth token) come back as a JSON-RPC{" "}
+            <code>error</code> object with an HTTP <code>401</code>.{" "}
+            <strong>Tool-level</strong> failures (bad parameters, unknown grow,
+            unknown tent) come back as a normal <code>tools/call</code>{" "}
+            <code>result</code> with <code>isError: true</code> and a
+            human-readable text message — the JSON-RPC envelope itself is a
+            success.
           </p>
-          <ul className="text-sm list-disc pl-6 space-y-1">
-            <li><em>Unauthenticated</em> — no valid OAuth token was presented.</li>
-            <li><em>Grow not found for the signed-in grower</em> — grow id is unknown or not visible to the caller.</li>
-            <li><em>Tent not found for the signed-in grower</em> — tent id is unknown or not visible to the caller.</li>
-          </ul>
+
+          <h3 className="text-sm font-semibold" id="error-unauthorized">
+            401 Unauthorized
+          </h3>
+          <p className="text-sm text-muted-foreground">
+            The bearer token is missing, expired, revoked, or was not issued by
+            this app's OAuth server (for example, a copied Supabase session
+            JWT). The response includes a{" "}
+            <code>WWW-Authenticate</code> header pointing at the OAuth
+            protected-resource metadata.
+          </p>
+          <Code copyLabel="Copy unauthorized response">{`HTTP/1.1 401 Unauthorized
+WWW-Authenticate: Bearer resource_metadata="https://knkwiiywfkbqznbxwqfh.supabase.co/functions/v1/mcp/.well-known/oauth-protected-resource"
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "error": {
+    "code": -32001,
+    "message": "Unauthorized"
+  }
+}`}</Code>
+          <p className="text-sm text-muted-foreground">
+            <strong>How to recover:</strong> do not retry with the same token.
+            Run the OAuth 2.1 authorization-code + PKCE flow again against the
+            issuer above, or — in this browser — click{" "}
+            <em>Disconnect</em> then <em>Connect this browser</em> from{" "}
+            <Link to="/settings/agent-integrations" className="underline">
+              Settings → Agent integrations
+            </Link>
+            . Never paste an app session token as a workaround; the server
+            requires an <code>oauth_client</code> claim and will keep rejecting
+            it.
+          </p>
+
+          <h3 className="text-sm font-semibold" id="error-invalid-params">
+            Invalid parameters
+          </h3>
+          <p className="text-sm text-muted-foreground">
+            The bearer token was accepted, but the tool's Zod input schema
+            rejected the arguments — for example a missing{" "}
+            <code>growId</code>, a malformed UUID, or a <code>limit</code> out
+            of range. The JSON-RPC call succeeds; the tool result carries the
+            failure.
+          </p>
+          <Code copyLabel="Copy invalid-parameters response">{`{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "result": {
+    "isError": true,
+    "content": [
+      {
+        "type": "text",
+        "text": "Invalid parameters for tool \\"list_recent_diary_entries\\": growId: Required; limit: Number must be less than or equal to 50"
+      }
+    ]
+  }
+}`}</Code>
+          <p className="text-sm text-muted-foreground">
+            <strong>How to recover:</strong> read the field list in the message,
+            correct the arguments against the parameter tables above, and retry
+            the same JSON-RPC call. Do not fall back to a wider tool or invent
+            an id — an unknown <code>growId</code>/<code>tentId</code> that
+            parses as a UUID surfaces as the ownership errors below, not this
+            one.
+          </p>
+
+          <h3 className="text-sm font-semibold" id="error-not-found">
+            Not found for the signed-in grower
+          </h3>
+          <p className="text-sm text-muted-foreground">
+            The id parses correctly but is either unknown or belongs to another
+            grower. RLS returns the same "not found" either way so ownership is
+            never leaked through the error.
+          </p>
+          <Code copyLabel="Copy not-found response">{`{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "result": {
+    "isError": true,
+    "content": [
+      { "type": "text", "text": "Grow not found for the signed-in grower." }
+    ]
+  }
+}`}</Code>
+          <p className="text-sm text-muted-foreground">
+            <strong>How to recover:</strong> call <code>list_grows</code> (or,
+            for tents, look them up inside a known grow in the app) to
+            re-discover a valid id owned by the current user, then retry.
+            Retrying the same id will keep returning this error.
+          </p>
         </Section>
+
 
         <Section id="connect" title="Connect a client">
           <p className="text-sm text-muted-foreground">

@@ -351,3 +351,59 @@ export async function probeTools(endpoint: string): Promise<ProbeResult> {
     };
   }
 }
+
+export type ToolCallOutcome =
+  | { status: "not_connected"; message: string }
+  | { status: "unauthorized"; message: string }
+  | { status: "error"; message: string }
+  | {
+      status: "ok";
+      result: {
+        content?: Array<{ type: string; text?: string }>;
+        structuredContent?: unknown;
+        isError?: boolean;
+      };
+    };
+
+/**
+ * Invoke an MCP tool by name with arbitrary arguments using the browser's
+ * stored OAuth token. Returns a coarse outcome — never throws raw error
+ * bodies (which could echo tokens) to the caller.
+ */
+export async function callMcpTool(
+  endpoint: string,
+  name: string,
+  args: Record<string, unknown>,
+): Promise<ToolCallOutcome> {
+  const token = readToken();
+  if (!token) {
+    return {
+      status: "not_connected",
+      message: "Not connected. Connect this browser from Settings → Agent integrations first.",
+    };
+  }
+  try {
+    // Ensure the session is initialized before the first call in a fresh tab.
+    await mcpCall(endpoint, token, "initialize", {
+      protocolVersion: "2025-06-18",
+      capabilities: {},
+      clientInfo: { name: "verdant-tool-explorer", version: "0.1.0" },
+    }, 1);
+    const resp = await mcpCall<{
+      content?: Array<{ type: string; text?: string }>;
+      structuredContent?: unknown;
+      isError?: boolean;
+    }>(endpoint, token, "tools/call", { name, arguments: args }, 2);
+    if (resp.error) return { status: "error", message: resp.error.message };
+    return { status: "ok", result: resp.result ?? {} };
+  } catch (e) {
+    const unauth = (e as { unauthorized?: boolean }).unauthorized === true;
+    if (unauth) {
+      return {
+        status: "unauthorized",
+        message: "Token was rejected. Reconnect from Settings → Agent integrations.",
+      };
+    }
+    return { status: "error", message: "Tool call failed. Try again or reconnect." };
+  }
+}

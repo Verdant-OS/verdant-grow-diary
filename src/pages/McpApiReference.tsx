@@ -11,6 +11,7 @@
 import { Link } from "react-router-dom";
 import BrandLogo from "@/components/BrandLogo";
 import { usePageSeo } from "@/hooks/usePageSeo";
+import McpToolExplorer from "@/components/mcp/McpToolExplorer";
 
 const ENDPOINT = "https://knkwiiywfkbqznbxwqfh.supabase.co/functions/v1/mcp";
 
@@ -73,6 +74,18 @@ export default function McpApiReference() {
             sensor snapshot. No writes. No AI. No device control.
           </p>
         </div>
+
+        <Section id="explorer" title="Interactive tool explorer">
+          <p className="text-sm text-muted-foreground">
+            Call each tool live as your signed-in account. Connect this browser
+            once from{" "}
+            <Link to="/settings/agent-integrations" className="underline">
+              Settings → Agent integrations
+            </Link>{" "}
+            and the explorer will reuse that OAuth session.
+          </p>
+          <McpToolExplorer />
+        </Section>
 
         <Section id="endpoint" title="Endpoint & auth">
           <p className="text-sm text-muted-foreground">

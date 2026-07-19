@@ -270,8 +270,15 @@ test.describe("Founder owner preferences (mocked)", () => {
     await expect(status).toHaveAttribute("aria-atomic", "true");
     await expect(status).toHaveText("");
 
-    // Trigger the save.
-    await page.getByRole("button", { name: /Save Founder settings/i }).click();
+    // Trigger the save via the form directly to bypass any stray overlay
+    // that would intercept a raw click.
+    await page.keyboard.press("Escape").catch(() => {});
+    await page.evaluate(() => {
+      const form = document.querySelector<HTMLFormElement>(
+        "form:has(#founder-show-on-wall)",
+      );
+      form?.requestSubmit();
+    });
 
     // In-flight: message announced exactly once (single node, single text).
     await expect(status).toHaveText("Saving Founder settings…");

@@ -301,8 +301,8 @@ test.describe("Founder owner preferences (mocked)", () => {
         status: 200,
         contentType: "application/json",
         body: JSON.stringify([
-          { document_key: "terms", accepted_at: new Date().toISOString() },
-          { document_key: "privacy", accepted_at: new Date().toISOString() },
+          { agreement_type: "terms", version: "2026-07-13" },
+          { agreement_type: "privacy", version: "2026-07-13" },
         ]),
       }),
     );

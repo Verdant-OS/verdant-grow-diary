@@ -170,13 +170,15 @@ test.describe("Founder owner preferences (mocked)", () => {
 
     // https-only client validation: an http:// value must NOT invoke.
     await page.locator("#founder-optional-link").fill("http://insecure.example");
-    await page.getByRole("button", { name: /Save Founder settings/i }).click();
+    await clearOverlays();
+    await page.getByRole("button", { name: /Save Founder settings/i }).click({ force: true });
     await expect(page.getByRole("alert")).toBeVisible();
     expect(invokeCount).toBe(0);
 
     // Fix and re-submit.
     await page.locator("#founder-optional-link").fill("https://example.com/jane");
-    await page.getByRole("button", { name: /Save Founder settings/i }).click();
+    await clearOverlays();
+    await page.getByRole("button", { name: /Save Founder settings/i }).click({ force: true });
 
     await expect
       .poll(() => invokeCount, { timeout: 5_000 })

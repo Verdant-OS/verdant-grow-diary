@@ -91,6 +91,23 @@ beforeEach(() => {
 });
 
 describe("Sensors manual reading target handoff", () => {
+  it("selects the authenticated CSV-import tent and focuses the import card without opening it", async () => {
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: scrollIntoView,
+    });
+
+    renderSensors(`/sensors?tentId=${TENT_B}#csv-import`);
+
+    const importAnchor = screen.getByTestId("sensors-csv-import-anchor");
+    await waitFor(() =>
+      expect(screen.getByTestId("manual-reading-tent-row")).toHaveTextContent("Saving to: Tent B"),
+    );
+    expect(importAnchor).toHaveFocus();
+    expect(scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });
+  });
+
   it("selects an authenticated tent requested by the Timeline route intent", async () => {
     renderSensors(`/sensors?tentId=${TENT_B}`);
 

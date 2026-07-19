@@ -62,11 +62,16 @@ import {
 } from "@/lib/starterSetupRules";
 
 function renderPage() {
+  return renderPageAt("/onboarding");
+}
+
+function renderPageAt(initialEntry: string) {
   return render(
-    <MemoryRouter initialEntries={["/onboarding"]}>
+    <MemoryRouter initialEntries={[initialEntry]}>
       <Routes>
         <Route path="/onboarding" element={<Onboarding />} />
         <Route path="/" element={<div data-testid="dashboard-landing" />} />
+        <Route path="/sensors" element={<div data-testid="csv-import-target" />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -207,5 +212,43 @@ describe("Onboarding · guided starter setup", () => {
     expect(screen.getByTestId("starter-setup-block")).toBeTruthy();
     expect(screen.queryByTestId("dashboard-landing")).toBeNull();
     expect(trackFunnelEvent).not.toHaveBeenCalled();
+  });
+
+  it("preserves a CSV-history acquisition intent through explicit starter setup", async () => {
+    const tentId = "00000000-0000-4000-8000-00000000000a";
+    runStarterSetupMock.mockResolvedValue({
+      growId: "00000000-0000-4000-8000-00000000000b",
+      tentId,
+      plantId: "00000000-0000-4000-8000-00000000000c",
+      reused: { grow: false, tent: false, plant: false },
+    });
+    const events: CustomEvent[] = [];
+    const listener = (e: Event) => events.push(e as CustomEvent);
+    window.addEventListener(PLANT_QUICKLOG_PREFILL_EVENT, listener);
+
+    renderPageAt("/onboarding?intent=csv_history");
+    expect(screen.getByTestId("csv-history-onboarding-handoff")).toBeInTheDocument();
+    expect(screen.queryByTestId("starter-setup-block")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByTestId("csv-history-onboarding-setup-button"));
+
+    await waitFor(() => expect(runStarterSetupMock).toHaveBeenCalledTimes(1));
+    const importLink = await screen.findByTestId("csv-history-onboarding-import-cta");
+    expect(importLink).toHaveAttribute("href", `/sensors?tentId=${tentId}#csv-import`);
+    expect(screen.getByTestId("csv-history-onboarding-ready")).toHaveTextContent(/ready/i);
+    expect(events).toHaveLength(0);
+    expect(trackFunnelEvent.mock.calls).toEqual([
+      ["grow_created"],
+      ["tent_created"],
+      ["plant_created"],
+      ["csv_history_onboarding_ready", { surface: "onboarding" }],
+    ]);
+    window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, listener);
+  });
+
+  it("ignores an unknown onboarding intent and leaves the default starter path intact", () => {
+    renderPageAt("/onboarding?intent=not-csv-history");
+    expect(screen.queryByTestId("csv-history-onboarding-handoff")).not.toBeInTheDocument();
+    expect(screen.getByTestId("starter-setup-block")).toBeInTheDocument();
   });
 });

@@ -8,6 +8,8 @@
  *   grow_created            → Grows.tsx (after insert succeeds)
  *   tent_created            → CreateTentDialog.tsx (after insert succeeds)
  *   plant_created           → CreatePlantDialog.tsx (after insert succeeds)
+ *   csv_history_onboarding_ready
+ *                           → Onboarding.tsx (after explicit starter setup + safe handoff)
  *   quick_log_saved         → shared privacy-safe wrapper from every mounted
  *                             Quick Log success seam
  *   csv_import_started      → EnvironmentCsvImportLauncher.tsx (modal open intent)
@@ -68,6 +70,11 @@ const SEAMS: Array<{ event: string; file: string; extra?: RegExp[] }> = [
   { event: "grow_created", file: "src/pages/Grows.tsx" },
   { event: "tent_created", file: "src/components/CreateTentDialog.tsx" },
   { event: "plant_created", file: "src/components/CreatePlantDialog.tsx" },
+  {
+    event: "csv_history_onboarding_ready",
+    file: "src/pages/Onboarding.tsx",
+    extra: [/surface:\s*"onboarding"/],
+  },
   { event: "csv_import_started", file: "src/components/EnvironmentCsvImportLauncher.tsx" },
   {
     event: "csv_import_completed",
@@ -463,6 +470,12 @@ describe("funnelAnalytics module — privacy fences", () => {
     expect(EVENT_MAP).toMatch(
       /csv_import_started → csv_import_completed →\s*csv_history_ai_doctor_clicked → ai_doctor_review_started →\s*ai_doctor_result_received → ai_doctor_session_saved → paywall_viewed →\s*paywall_cta_clicked → checkout_started/,
     );
+    expect(EVENT_MAP).toMatch(/two\s+independent activation branches/);
+    expect(EVENT_MAP).toMatch(
+      /\*\*not\*\*\s+a requirement that every grower\s+complete Quick Log before importing CSV history/,
+    );
+    expect(EVENT_MAP).toMatch(/Diary activation branch:\s*quick_log_saved/);
+    expect(EVENT_MAP).toMatch(/CSV-history acquisition branch:\s*csv_history_onboarding_ready/);
     expect(EVENT_MAP).toMatch(/historical-only branch marker/);
     expect(EVENT_MAP).toMatch(/surface: "imported_history"/);
     expect(EVENT_MAP).toMatch(/accepted\s+initial historical-review start with no properties/);

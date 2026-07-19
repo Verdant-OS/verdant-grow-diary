@@ -112,6 +112,9 @@ const PUBLIC_MOBILE_ROUTES: string[] = [
   "/privacy",
   "/refund",
   "/tools/vpd-calculator",
+  // Public MCP API reference docs page: static content only, no Supabase
+  // fetch — must render signed-out with zero private-table fetches.
+  "/docs/mcp-api",
   // Public 30-second Quick Log starter: local draft only, mounted outside
   // AppShell — must render signed-out with zero private-table fetches.
   "/quick-log",

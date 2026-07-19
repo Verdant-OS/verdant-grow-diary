@@ -82,6 +82,7 @@ export default function Sensors() {
   );
   const [tentId, setTentId] = useState<string | null>(null);
   const appliedTentRouteIntentRef = useRef<string | null | undefined>(undefined);
+  const focusedSensorAnchorHashRef = useRef<string | null>(null);
   // Do not fetch the all-tents aggregate into the Sensors browser cache.
   // `null` is an explicit no-scope sentinel until a persisted tent is chosen.
   const readingsQuery = useGrowSensorReadings(tentId);
@@ -108,15 +109,29 @@ export default function Sensors() {
   }, [sensorsTentRouteIntent, tents, tentsQuery.isSuccess]);
 
   // React Router updates hashes without a full browser navigation, so make
-  // the existing manual-reading deep link deterministic for same-page CSV
-  // handoffs as well as cross-page links.
+  // the supported manual-reading and CSV-import deep links deterministic.
+  // This only moves viewport/focus; it never opens a picker or starts import.
   useEffect(() => {
-    if (!location.hash.startsWith("#manual-reading")) return;
-    const target = document.getElementById("manual-reading");
+    const anchorId = location.hash.startsWith("#manual-reading")
+      ? "manual-reading"
+      : location.hash === "#csv-import"
+        ? "csv-import"
+        : null;
+    if (!anchorId) {
+      focusedSensorAnchorHashRef.current = null;
+      return;
+    }
+    if (focusedSensorAnchorHashRef.current === location.hash) return;
+    // CSV import is tent-scoped. Wait for the existing owner-validated tent
+    // route selection before moving focus, so the grower lands on a usable
+    // importer rather than a transient empty shell.
+    if (anchorId === "csv-import" && (!tentsQuery.isSuccess || !tentId)) return;
+    const target = document.getElementById(anchorId);
     if (!target) return;
     target.scrollIntoView?.({ behavior: "smooth", block: "start" });
     target.focus?.({ preventScroll: true });
-  }, [location.hash]);
+    focusedSensorAnchorHashRef.current = location.hash;
+  }, [location.hash, tentId, tentsQuery.isSuccess]);
   const correctionCtx = useMemo(() => decodeManualCorrectionHash(location.hash), [location.hash]);
   const urlSensorSources = parseSensorSourcesParam(searchParams.get(SENSOR_SOURCES_PARAM));
   const filtered = useMemo(
@@ -578,6 +593,7 @@ export default function Sensors() {
       )}
       <div
         id="csv-import"
+        tabIndex={-1}
         className="mt-4 max-w-xl scroll-mt-24"
         data-testid="sensors-csv-import-anchor"
       >

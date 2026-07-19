@@ -306,14 +306,22 @@ test.describe("Founder owner preferences (mocked)", () => {
         ]),
       }),
     );
-    await mockFoundersReadOnce(page, {
-      founder_number: 33,
-      display_name: null,
-      display_style: "hidden",
-      show_on_wall: false,
-      optional_link: null,
-      status: "confirmed",
-    });
+    // Persistent read mock — refetch after save must still return the row,
+    // otherwise the form unmounts and focus can never return to Save.
+    await page.route(/\/rest\/v1\/founders(\?|$)/, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          founder_number: 33,
+          display_name: null,
+          display_style: "hidden",
+          show_on_wall: false,
+          optional_link: null,
+          status: "confirmed",
+        }),
+      }),
+    );
 
     // Gate save so we can inspect in-flight focus, then release for completion.
     let release!: () => void;

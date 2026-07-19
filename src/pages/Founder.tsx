@@ -143,6 +143,9 @@ export default function Founder() {
         <p className="mx-auto mt-3 max-w-2xl text-sm text-muted-foreground">
           {FOUNDER_LAUNCH_COPY.availability}
         </p>
+        <div className="mx-auto mt-6 max-w-2xl">
+          <FoundersHeroCounter />
+        </div>
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <FounderPricingLink
             source="hero"

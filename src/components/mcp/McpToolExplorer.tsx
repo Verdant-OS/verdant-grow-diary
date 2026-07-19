@@ -302,11 +302,26 @@ function ToolCard({
 
   const invalid = fieldErrors.length > 0;
 
+  const [showDiff, setShowDiff] = useState(false);
+
   const run = useCallback(async () => {
     if (invalid) return;
-    setState({ loading: true, outcome: null, ranAt: null });
-    const outcome = await callMcpTool(endpoint, toolName, buildArgs());
-    setState({ loading: false, outcome, ranAt: new Date().toISOString() });
+    const args = buildArgs();
+    setState((prev) => ({
+      loading: true,
+      outcome: null,
+      ranAt: null,
+      args: prev.args,
+      previousArgs: prev.args,
+    }));
+    const outcome = await callMcpTool(endpoint, toolName, args);
+    setState((prev) => ({
+      loading: false,
+      outcome,
+      ranAt: new Date().toISOString(),
+      args,
+      previousArgs: prev.previousArgs,
+    }));
     if (outcome.status === "unauthorized" || outcome.status === "not_connected") {
       onAuthLost();
     }

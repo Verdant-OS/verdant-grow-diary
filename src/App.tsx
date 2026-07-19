@@ -42,6 +42,7 @@ const Settings = lazy(() => import("./pages/Settings"));
 const AccountPreferences = lazy(() => import("./pages/AccountPreferences"));
 const GrowerInvite = lazy(() => import("./pages/GrowerInvite"));
 const AgentIntegrations = lazy(() => import("./pages/AgentIntegrations"));
+const McpApiReference = lazy(() => import("./pages/McpApiReference"));
 const Timeline = lazy(() => import("./pages/Timeline"));
 const Grows = lazy(() => import("./pages/Grows"));
 const GrowDetail = lazy(() => import("./pages/GrowDetail"));
@@ -240,6 +241,7 @@ const App = () => (
                   <Route path="/how-ai-doctor-works" element={<HowAiDoctorWorks />} />
                   <Route path="/ai-doctor-readiness-check" element={<AiDoctorContextCheck />} />
                   <Route path="/tools/vpd-calculator" element={<PublicVpdCalculator />} />
+                  <Route path="/docs/mcp-api" element={<McpApiReference />} />
                   {/* Legacy `/billing/:plan` entry — redirect to canonical
                       `/pricing` with plan preselect + safe returnTo. */}
                   <Route path="/billing/:plan" element={<LegacyBillingRedirect />} />

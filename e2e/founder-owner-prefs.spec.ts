@@ -113,6 +113,16 @@ test.describe("Founder owner preferences (mocked)", () => {
 
   test("signed-in confirmed founder can save valid prefs", async ({ page }) => {
     await seedSession(page);
+    await page.route(/\/rest\/v1\/user_agreement_acceptances/, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([
+          { agreement_type: "terms", version: "2026-07-13" },
+          { agreement_type: "privacy", version: "2026-07-13" },
+        ]),
+      }),
+    );
     await mockFoundersReadOnce(page, {
       founder_number: 7,
       display_name: null,

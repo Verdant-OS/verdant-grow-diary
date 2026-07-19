@@ -148,8 +148,13 @@ test.describe("Founder owner preferences (mocked)", () => {
     await expect(heading).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText(/Founder #7/i)).toBeVisible();
 
+    // Dismiss any auto-opened dialog (e.g. share-card modal) that may cover
+    // the form on /founder. Escape is a no-op if nothing is open.
+    await page.keyboard.press("Escape");
+    await heading.scrollIntoViewIfNeeded();
+
     // Fill in a valid custom-name profile.
-    await page.locator("#founder-show-on-wall").click();
+    await page.locator("#founder-show-on-wall").click({ force: true });
     await page.locator("#founder-display-name").fill("Jane Cultivator");
     await page.locator("#founder-optional-link").fill("https://example.com/jane");
 

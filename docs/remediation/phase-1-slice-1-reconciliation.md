@@ -2,22 +2,23 @@
 
 ## Summary
 
-The reviewed T1 Quick Log target-integrity chain is rebased onto the current verified deploy source of truth, `2c2b2f1414a72a34258d14add1f24f42e1324142` (`feat(diary): converge Daily Walk response semantics (#352)`). The one production overlap in `QuickLog.tsx` preserves both sets of behavior:
+The complete reviewed 24-commit T1 Quick Log target-integrity topic is rebased onto the current verified deploy source of truth, `ceb99a6729592af70bab1bba7972bc413700021a`. The deploy advanced 135 commits beyond #352; its intersection with T1 is limited to `src/App.tsx`, `src/lib/oneTentLoopNavigationRules.ts`, and `src/test/one-tent-loop-navigation-rules.test.ts`.
 
 - T1 keeps the canonical grow/tent/plant target, fail-closed query states, immutable in-flight save context, shared synchronous parent/child save lock, exact nested plant target, and accessible `Saving…` state.
 - #352 keeps canonical Better/Same/Worse response semantics, observation chips, response replacement, and downstream response/follow-up rules.
+- Current deploy keeps OAuth post-auth restoration, the public MCP API route, and the authenticated validated Timeline-to-Sensors tent intent.
 
-Deterministic validation is green. The branch remains unpushed and is not merge-ready until the already-deferred authenticated disposable-fixture proof and independent specification review are complete.
+All targeted functional and safety assertions are green. The unchanged scanner timing wrapper failed because seven scanner rows exceeded 5000 ms; no threshold, suppression, or scanner implementation changed. The branch remains unpushed and is not merge-ready until that timing signal, the authenticated disposable-fixture proof, and independent specification review are resolved.
 
 ## Requirements and assumptions
 
 - Charter outcome: **T1 — Quick Log target integrity**.
 - Deployment source of truth: `verdant-grow-diary`, not undeployed `main`.
-- Current verified deploy base: `2c2b2f1414a72a34258d14add1f24f42e1324142` (#352).
+- Current verified deploy base: `ceb99a6729592af70bab1bba7972bc413700021a`.
 - Current branch: `codex/verdant-trust-core-target-integrity-current`.
-- Current validated code/test head before this evidence update: `0b579bbfdf1dee9083f5e09f4d3a9f8c906297bc`.
-- The original 22 T1 commits were replayed in order from `6ddc01f1859c4877ab42e2eeb78f9ac52a5e43a6..c123795c2e953e3a2d66a01e6e9c892bfe31ab39`.
-- `origin/verdant-grow-diary` was fetched again before documentation and still resolved to #352.
+- Current validated code/test head before this evidence update: `6fcf2f69f3f07328af4bfeaafe94be1fdd819310`.
+- The complete 24-commit topic was replayed in order from `2c2b2f1414a72a34258d14add1f24f42e1324142..e903d133d50a9926aafef857a969302721efa82d`.
+- `origin/verdant-grow-diary` was fetched immediately before this documentation update and remained `ceb99a6729592af70bab1bba7972bc413700021a`.
 - No push, merge, schema migration, backfill, row mutation, RLS change, identity model, explicit Unassigned product behavior, room model, or reserved interface was authorized.
 - Existing legacy/unassigned Quick Log targets remain fail-closed. Assignment and migration UX are deferred product work.
 - This port does not change a user-facing calendar/day, phase, age, schedule-source, or sensor-truth label and adds no direct clock read. Authoritative schedule ownership and conflict presentation therefore remain outside this slice.
@@ -27,10 +28,20 @@ Deterministic validation is green. The branch remains unpushed and is not merge-
 
 ### Rebase integrity
 
-- All 22 original commits are present in order on #352.
-- `git range-diff` maps 19 commits exactly and marks three Quick Log commits as expected context-aware integrations. In each marked commit, the only upstream addition retained beside the T1 target block is #352's `selectedResponseStatus` derivation.
+- All 24 reviewed commits are present in order on `ceb99a672`.
+- `git range-diff` maps 22 commits exactly, marks two commits as expected context-aware integrations, and reports no unmatched commit.
 - No rebase conflict marker remains in any changed TypeScript, TSX, Markdown, or workflow file.
-- A separate post-rebase test commit (`0b579bbfd`) aligns #352's canonical-response RPC test with T1's existing exact target contract; it does not change runtime behavior.
+- The two contextual integrations are the One-Tent rule/test combination and the `App.tsx` import context described below. The sole content conflict was the One-Tent rules import block.
+
+### Current deploy intersection decisions
+
+The deploy history from `2c2b2f141..ceb99a672` was audited for every intersecting path before replay:
+
+1. `src/App.tsx`: deploy commits `634b3cf36`, `93b459690`, and `48c96a988` add `OAuthPostAuthRedirect`, mount it under `AuthProvider`, lazy-load `McpApiReference`, and expose `/docs/mcp-api`. All remain intact. T1 adds only `RouteAliasRedirect` and changes `/logs` to preserve its raw query/hash while redirecting to `/timeline`.
+2. `src/lib/oneTentLoopNavigationRules.ts`: deploy commit `61573649f` changes Timeline → Sensors to use `buildSensorsTentRouteHref(tentId)`, which accepts only a valid UUID intent for later authenticated tent validation. T1 changes Plant → Quick Log to require a complete exact grow/tent/plant prefill. The conflict resolution retains both imports and both independent switch branches.
+3. `src/test/one-tent-loop-navigation-rules.test.ts`: the final test file retains #358's valid-UUID Sensors intent and malformed-value fallback assertions alongside T1's exact Quick Log intent and missing-assignment fail-closed assertions.
+
+No deploy route, MCP, OAuth, operator, sensor-intent, or #352 response behavior was selected away wholesale.
 
 ### #352 overlap
 
@@ -64,29 +75,30 @@ This reconciliation changes no schema, RLS, Edge Function, billing, entitlement,
 
 ## Current commit sequence
 
-- `b49e6acde` — Trust Core redesign specification
-- `d2b294016` — T1 implementation plan
-- `aefb586ba` — pure target-integrity rules
-- `274203651` — canonical Quick Log display/write target
-- `01a60817a` — exact One-Tent Loop Quick Log handoff
-- `d1cb8efd2` — scope-preserving route alias
-- `cf176a90d` — authenticated route-target gate
-- `11905d419` — target-fixture alignment
-- `8644bc004` — save and alias-contract alignment
-- `3b21ce9fa` — refresh-target contract alignment
-- `e40cd1364` — initial reconciliation packet
-- `333f816d7` — initial port evidence refresh
-- `34d42e06e` — blocked-target integrity repair
-- `a9902354c` — canonical target display repair
-- `88b149a7e` — in-flight target/query-state repair
-- `08fd94f43` — Quick Log integrity reconciliation
-- `3dcbeae5c` — deploy-drift test alignment
-- `8a323e97c` — current-port evidence
-- `2cb337d88` — shared parent/child save coordination
-- `65eed1e6b` — quality-repair reconciliation
-- `e0fbb0b5d` — immutable child draft and accessible save repair
-- `33a32762c` — final replayed T1 evidence
-- `0b579bbfd` — #352 canonical-response target fixture integration
+- `4f1d57744` — Trust Core redesign specification
+- `3bba9130e` — T1 implementation plan
+- `5397acf61` — pure target-integrity rules
+- `a006bc2b7` — canonical Quick Log display/write target
+- `10d8317ad` — exact One-Tent Loop Quick Log handoff plus #358 Sensors-intent compatibility
+- `6f498eab8` — scope-preserving route alias plus current App context
+- `d1c37e568` — authenticated route-target gate
+- `699e3dab7` — target-fixture alignment
+- `cdcef00b3` — save and alias-contract alignment
+- `d06610425` — refresh-target contract alignment
+- `e9baf9f16` — initial reconciliation packet
+- `62bf733f5` — initial port evidence refresh
+- `8408a84f0` — blocked-target integrity repair
+- `f6fb04825` — canonical target display repair
+- `dd00e7a24` — in-flight target/query-state repair
+- `b8f45ff0a` — Quick Log integrity reconciliation
+- `303871242` — deploy-drift test alignment
+- `8d79554b3` — current-port evidence
+- `7252e20b0` — shared parent/child save coordination
+- `8d1488268` — quality-repair reconciliation
+- `7fc72dc5e` — immutable child draft and accessible save repair
+- `9dbdb41a4` — final replayed T1 evidence
+- `8743a6640` — #352 canonical-response target fixture integration
+- `6fcf2f69f` — #352 reconciliation evidence
 
 ## Tests added
 
@@ -94,33 +106,36 @@ No new test file was added for #352. The existing `quicklog-habit-polish.test.ts
 
 ## Validation results
 
-| Gate                        | Current result                                                                                                                                       |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| #352 integration RED        | **Expected fail — 9 files, 126 passed / 1 failed**; only the incomplete target fixture blocked the RPC                                               |
-| #352 focused fixture GREEN  | **Pass — 1 file, 16/16 tests**                                                                                                                       |
-| Focused T1 quality matrix   | **Pass — 3 files, 47/47 tests**                                                                                                                      |
-| Requested T1 targeted slice | **Pass — 16 files, 204/204 tests**                                                                                                                   |
-| #352 nine-file matrix       | **Pass — 9 files, 127/127 tests**                                                                                                                    |
-| One-Tent Loop smoke         | **Pass — 24 files, 394/394 tests**                                                                                                                   |
-| Scanner assertion matrix    | **Pass — 20 files, 330/330 tests**                                                                                                                   |
-| Scanner CI timing wrapper   | **Pass — 20 files, 330/330 tests; no row above 5000 ms and no report emitted**                                                                       |
-| Type-check                  | **Pass — 0 diagnostics** (`bun run typecheck`)                                                                                                       |
-| Scoped lint                 | **Pass — 54 changed TypeScript/TSX files, 0 errors and 1 pre-existing Fast Refresh warning**                                                         |
-| Playwright discovery        | **Pass — exactly 3 tests listed across setup, authenticated, and mocked projects; no browser execution**                                             |
-| Fixture checklist           | **Pass — Tent + Plant required; Grow and second plant optional; no secret values printed**                                                           |
-| Docs safety                 | **Pass — automated-phenotyping, release, and sensor checks**                                                                                         |
-| Diff/scope checks           | **Pass — 60 files relative to #352, clean index/worktree before this evidence edit, no conflict markers, and both working/staged diff checks clean** |
-| Full repository suite       | **Not run — intentionally excluded by the approved scoped-validation instruction**                                                                   |
-| Fixture verification        | **Not run — requires the dedicated disposable fixture**                                                                                              |
-| Authenticated Chrome smoke  | **Not run — requires the dedicated disposable fixture**                                                                                              |
-| Runtime DB/RLS harness      | **Not applicable — no schema, RLS, or server mutation**                                                                                              |
-| `test:security-db-local`    | **No action — documented opt-in infrastructure lane, unrelated to this diff, and non-gating under the baseline standard**                            |
+| Gate                        | Current result                                                                                                                             |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| #352 integration RED        | **Expected fail — 9 files, 126 passed / 1 failed**; only the incomplete target fixture blocked the RPC                                     |
+| #352 focused fixture GREEN  | **Pass — 1 file, 16/16 tests**                                                                                                             |
+| Focused T1 quality matrix   | **Pass — 3 files, 47/47 tests**                                                                                                            |
+| Requested T1 targeted slice | **Pass — 16 files, 204/204 tests**                                                                                                         |
+| #352 nine-file matrix       | **Pass — 9 files, 127/127 tests**                                                                                                          |
+| Current deploy overlap      | **Pass — 9 files, 63/63 tests**; OAuth/App and Timeline/Sensors/One-Tent behavior                                                          |
+| One-Tent Loop smoke         | **Pass — 24 files, 394/394 tests**                                                                                                         |
+| Static safety               | **Pass — 8 files, 180/180 tests**                                                                                                          |
+| Scanner assertion matrix    | **Pass — 20 files, 330/330 tests**                                                                                                         |
+| Scanner CI timing wrapper   | **Fail — 7 rows exceeded the unchanged 5000 ms threshold; report emitted; no threshold or suppression change**                             |
+| Type-check                  | **Pass — 0 diagnostics** (`bun run typecheck`)                                                                                             |
+| Scoped lint                 | **Not run — current instruction required repository scripts rather than an ad hoc lint invocation**                                        |
+| Playwright discovery        | **Pass — 153 tests listed for Quick Log and auth-route protection across setup, authenticated, and mocked projects; no browser execution** |
+| Fixture checklist           | **Pass — Tent + Plant required; Grow and second plant optional; no secret values printed**                                                 |
+| Docs safety                 | **Pass — automated-phenotyping, release, and sensor checks**                                                                               |
+| Diff/scope checks           | **Pass — 60 files relative to `ceb99a672`, clean index/worktree before this evidence edit, no conflict markers, and topic diff clean**     |
+| Full repository suite       | **Not run — intentionally excluded by the approved scoped-validation instruction**                                                         |
+| Fixture verification        | **Not run — requires the dedicated disposable fixture**                                                                                    |
+| Authenticated Chrome smoke  | **Not run — requires the dedicated disposable fixture**                                                                                    |
+| Runtime DB/RLS harness      | **Not applicable — no schema, RLS, or server mutation**                                                                                    |
+| `test:security-db-local`    | **No action — documented opt-in infrastructure lane, unrelated to this diff, and non-gating under the baseline standard**                  |
 
-Known non-failing output remains limited to Radix Dialog description warnings, React Router future-flag notices, multiple-GoTrueClient test warnings, the existing Fast Refresh lint warning, and the unrelated non-fatal `sensor-rls-wt` metadata cleanup permission warning after Git operations.
+Scanner timing rows were 5235, 10274, 13454, 15248, 5539, 6367, and 6154 ms. All 330 assertions still passed. The timing wrapper was not rerun, and `test-results/scanner-guardrail-slow-tests.jsonl` was left as its emitted diagnostic artifact. Known non-failing output remains limited to Radix Dialog description warnings, React Router future-flag notices, multiple-GoTrueClient test warnings, and the unrelated non-fatal `sensor-rls-wt` metadata cleanup permission warning after Git operations.
 
 ## Safety verdict
 
 - #352's response UI and follow-up semantics are preserved without bypassing T1 target integrity.
+- Deploy OAuth restoration, the public MCP route, operator/auth boundaries, and authenticated Sensors tent-intent validation are preserved.
 - A resolved target remains immutable for the duration of save and is reused after await boundaries.
 - Parent and child saves remain mutually exclusive under one synchronous guard.
 - Bad, missing, or contradictory target ownership remains fail-closed with zero writes.
@@ -128,14 +143,15 @@ Known non-failing output remains limited to Radix Dialog description warnings, R
 - No schedule/calendar ownership, phase label, age label, sensor-truth label, or clock behavior was changed.
 - No fake live state, automation, Action Queue write, AI mutation, device command, schema change, backfill, or secret-bearing output was introduced.
 
-**Safety verdict: safe for draft re-review; not yet safe to merge because authenticated disposable-fixture proof and independent specification review remain incomplete.**
+**Safety verdict: safe for draft re-review; not yet safe to merge because the scanner timing gate, authenticated disposable-fixture proof, and independent specification review remain incomplete.**
 
 ## Deferred items
 
 1. Run fixture verification against the dedicated disposable account.
 2. Run the authenticated Quick Log smoke and observe that the displayed plant equals `quicklog_save_manual.p_target_id`.
-3. Complete independent specification review and reconcile findings.
-4. Treat explicit Unassigned assignment, migration/backfill, authoritative schedule ownership, schedule-source conflict UI, and other non-T1 product work as separate future slices.
+3. Investigate the emitted scanner timing report without changing thresholds or suppressing tests.
+4. Complete independent specification review and reconcile findings.
+5. Treat explicit Unassigned assignment, migration/backfill, authoritative schedule ownership, schedule-source conflict UI, and other non-T1 product work as separate future slices.
 
 ## Risk and rollback
 

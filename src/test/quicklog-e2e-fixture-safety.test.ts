@@ -19,6 +19,7 @@ import {
   validateFixtureEnv,
   pageTextMatchesFixture,
   isLikelyRealPlantUrl,
+  exactAccessibleNameOptions,
 } from "../../e2e/lib/fixtureSafety";
 
 const ROOT = path.resolve(__dirname, "../..");
@@ -285,9 +286,19 @@ describe("Workflow: fixture verification gates smoke", () => {
     const checklist = read("e2e/scripts/print-fixture-config-checklist.ts");
     expect(smoke).toContain("E2E_GROW_1_SECOND_PLANT_NAME");
     expect(smoke).not.toContain("E2E_GROW_2_PLANT_NAME");
+    expect(smoke).toMatch(/getByRole\("option",\s*exactAccessibleNameOptions\(TARGET_NAME\)\)/);
+    expect(smoke).not.toContain("new RegExp(TARGET_NAME");
     expect(smoke).toMatch(/selectedTarget\.growId\s*!==\s*initialTarget\.growId/);
     expect(checklist).toContain("second plant in the same tent/grow");
     expect(checklist).toContain("E2E Test Plant 2");
+  });
+
+  it("keeps regex metacharacters literal and rejects prefix-only accessible names", () => {
+    const fixtureName = "E2E Plant [A]+ (2).";
+    const options = exactAccessibleNameOptions(fixtureName);
+    expect(options).toEqual({ name: fixtureName, exact: true });
+    expect(options.name).not.toBe(`${fixtureName} clone`);
+    expect(options.name).not.toBe("E2E Plant A 22");
   });
 
   it("no schedule, no cron, no pull_request_target, no service_role, no checked-in storageState", () => {

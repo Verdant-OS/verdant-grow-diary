@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { Locator, Request } from "@playwright/test";
 import { SmokeChecklistReporter } from "./lib/smokeChecklistReporter";
+import { exactAccessibleNameOptions } from "./lib/fixtureSafety";
 
 /**
  * Authenticated Quick Log smoke checklist.
@@ -28,7 +29,7 @@ import { SmokeChecklistReporter } from "./lib/smokeChecklistReporter";
 const PLANT_URL = process.env.E2E_GROW_1_PLANT_URL;
 // `??` alone is not enough: an unset GitHub Actions var referenced via
 // `env:` arrives as an EMPTY STRING (not undefined), which would produce an
-// empty regex that strict-mode-matches every option in the plant select.
+// empty exact name that cannot identify a plant option.
 const TARGET_NAME = process.env.E2E_GROW_1_SECOND_PLANT_NAME?.trim() || "E2E Test Plant 2";
 
 const RESULTS_DIR = path.resolve(process.cwd(), "e2e/results");
@@ -199,7 +200,7 @@ test.describe("Quick Log smoke checklist", () => {
       await report.run(3, "Change the selected target tuple", async () => {
         const plantSelect = dialog.getByTestId("quick-log-plant-select");
         await plantSelect.click();
-        await page.getByRole("option", { name: new RegExp(TARGET_NAME, "i") }).click();
+        await page.getByRole("option", exactAccessibleNameOptions(TARGET_NAME)).click();
         await expect
           .poll(() =>
             dialog.getByTestId("quick-log-target-card").getAttribute("data-target-plant-id"),
@@ -398,9 +399,7 @@ test.describe("Quick Log smoke checklist", () => {
 
       await report.run(19, "Same target plant remains selected", async () => {
         await expect(dialog.getByTestId("quick-log-post-save")).toHaveCount(0);
-        await expect(dialog.getByTestId("quick-log-plant-select")).toContainText(
-          new RegExp(TARGET_NAME, "i"),
-        );
+        await expect(dialog.getByTestId("quick-log-plant-select")).toHaveText(TARGET_NAME);
         return "kept selected plant";
       });
 

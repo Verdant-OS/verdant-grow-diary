@@ -11,7 +11,14 @@ const harness = vi.hoisted(() => ({
   ],
   plants: [] as Array<Record<string, unknown>>,
   tents: [] as Array<Record<string, unknown>>,
+  plantsLoading: false,
+  plantsError: false,
+  tentsLoading: false,
+  tentsError: false,
+  plantsRefetch: vi.fn(),
+  tentsRefetch: vi.fn(),
   rpc: vi.fn(),
+  growUpdate: vi.fn(),
   growUpdateEq: vi.fn(),
   setActiveGrowId: vi.fn(),
 }));
@@ -20,7 +27,10 @@ vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     rpc: (...args: unknown[]) => harness.rpc(...args),
     from: () => ({
-      update: () => ({ eq: (...args: unknown[]) => harness.growUpdateEq(...args) }),
+      update: (...args: unknown[]) => {
+        harness.growUpdate(...args);
+        return { eq: (...eqArgs: unknown[]) => harness.growUpdateEq(...eqArgs) };
+      },
     }),
   },
 }));
@@ -39,11 +49,25 @@ vi.mock("@/store/grows", () => ({
 }));
 
 vi.mock("@/hooks/use-plants", () => ({
-  usePlants: () => ({ data: harness.plants, isLoading: false }),
+  usePlants: () => ({
+    data: harness.plantsLoading || harness.plantsError ? undefined : harness.plants,
+    isLoading: harness.plantsLoading,
+    isPending: harness.plantsLoading,
+    isError: harness.plantsError,
+    error: harness.plantsError ? new Error("plants unavailable") : null,
+    refetch: harness.plantsRefetch,
+  }),
 }));
 
 vi.mock("@/hooks/use-tents", () => ({
-  useTents: () => ({ data: harness.tents, isLoading: false }),
+  useTents: () => ({
+    data: harness.tentsLoading || harness.tentsError ? undefined : harness.tents,
+    isLoading: harness.tentsLoading,
+    isPending: harness.tentsLoading,
+    isError: harness.tentsError,
+    error: harness.tentsError ? new Error("tents unavailable") : null,
+    refetch: harness.tentsRefetch,
+  }),
 }));
 
 vi.mock("@/lib/sensor", () => ({
@@ -108,6 +132,7 @@ function renderQuickLog(prefill?: QuickLogPrefill) {
   const view = render(element(quickLogElement(prefill)));
   return {
     ...view,
+    client,
     rerenderQuickLog: (nextPrefill = prefill) =>
       view.rerender(element(quickLogElement(nextPrefill))),
   };
@@ -124,8 +149,17 @@ beforeEach(() => {
     { id: "t1", name: "Tent One", grow_id: "g1" },
     { id: "t2", name: "Tent Two", grow_id: "g2" },
   ];
+  harness.plantsLoading = false;
+  harness.plantsError = false;
+  harness.tentsLoading = false;
+  harness.tentsError = false;
+  harness.plantsRefetch.mockReset();
+  harness.plantsRefetch.mockResolvedValue({ data: harness.plants });
+  harness.tentsRefetch.mockReset();
+  harness.tentsRefetch.mockResolvedValue({ data: harness.tents });
   harness.rpc.mockReset();
   harness.rpc.mockResolvedValue({ data: { ok: true, grow_event_id: "event-1" }, error: null });
+  harness.growUpdate.mockReset();
   harness.growUpdateEq.mockReset();
   harness.growUpdateEq.mockResolvedValue({ error: null });
   harness.setActiveGrowId.mockReset();
@@ -349,5 +383,190 @@ describe("Quick Log canonical target contract", () => {
     );
     expect(screen.queryByTestId("quick-log-target-error")).not.toBeInTheDocument();
     expect(screen.getByTestId("quick-log-save")).toBeEnabled();
+  });
+
+  it("holds a named prefill as pending until plant and tent queries resolve", async () => {
+    harness.plantsLoading = true;
+    harness.tentsLoading = true;
+    const prefill = { plantId: "p1", growId: "g1", tentId: "t1" };
+    const view = renderQuickLog(prefill);
+
+    expect(await screen.findByTestId("quick-log-target-loading")).toHaveTextContent(
+      "Confirming this Quick Log target. Please wait.",
+    );
+    expect(screen.queryByTestId("quick-log-target-error")).not.toBeInTheDocument();
+    expect(screen.queryByText("That plant is no longer available.", { exact: false })).toBeNull();
+    expect(screen.queryByText("The assigned tent is unavailable.", { exact: false })).toBeNull();
+    expect(screen.getByTestId("quick-log-plant-select")).toBeDisabled();
+    expect(screen.getByTestId("quick-log-save")).toBeDisabled();
+
+    harness.plantsLoading = false;
+    harness.tentsLoading = false;
+    act(() => view.rerenderQuickLog(prefill));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("quick-log-target-card")).toHaveAttribute(
+        "data-target-plant-id",
+        "p1",
+      ),
+    );
+    expect(screen.queryByTestId("quick-log-target-loading")).not.toBeInTheDocument();
+    expect(screen.getByTestId("quick-log-save")).toBeEnabled();
+  });
+
+  it("transitions a loading named prefill to an error and retries only the failed query", async () => {
+    harness.plantsLoading = true;
+    harness.tentsLoading = true;
+    const prefill = { plantId: "p1", growId: "g1", tentId: "t1" };
+    const view = renderQuickLog(prefill);
+
+    expect(await screen.findByTestId("quick-log-target-loading")).toBeInTheDocument();
+
+    harness.plantsLoading = false;
+    harness.tentsLoading = false;
+    harness.tentsError = true;
+    act(() => view.rerenderQuickLog(prefill));
+
+    expect(await screen.findByTestId("quick-log-target-query-error")).toHaveTextContent(
+      "We couldn't load the tent details needed to confirm this Quick Log target.",
+    );
+    expect(screen.queryByTestId("quick-log-target-error")).not.toBeInTheDocument();
+    expect(screen.queryByText("That plant is no longer available.", { exact: false })).toBeNull();
+    expect(screen.getByTestId("quick-log-plant-select")).toBeDisabled();
+    expect(screen.getByTestId("quick-log-save")).toBeDisabled();
+
+    fireEvent.click(screen.getByTestId("quick-log-target-retry"));
+    expect(harness.plantsRefetch).not.toHaveBeenCalled();
+    expect(harness.tentsRefetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not reveal the previous target when a replacement prefill arrives while loading", async () => {
+    const initialPrefill = { plantId: "p1", growId: "g1", tentId: "t1" };
+    const replacementPrefill = { plantId: "p2", growId: "g2", tentId: "t2" };
+    const view = renderQuickLog(initialPrefill);
+    await waitFor(() =>
+      expect(screen.getByTestId("quick-log-target-card")).toHaveAttribute(
+        "data-target-plant-id",
+        "p1",
+      ),
+    );
+
+    harness.plantsLoading = true;
+    harness.tentsLoading = true;
+    act(() => view.rerenderQuickLog(replacementPrefill));
+
+    expect(await screen.findByTestId("quick-log-target-loading")).toBeInTheDocument();
+    const pendingCard = screen.getByTestId("quick-log-target-card");
+    expect(pendingCard).not.toHaveAttribute("data-target-plant-id");
+    expect(pendingCard).not.toHaveAttribute("data-target-grow-id");
+    expect(pendingCard).not.toHaveAttribute("data-target-tent-id");
+    expect(screen.getByTestId("quick-log-target-plant")).not.toHaveTextContent("Plant One");
+    expect(screen.getByTestId("quick-log-target-tent")).not.toHaveTextContent("Tent One");
+    expect(screen.getByTestId("quick-log-target-grow")).not.toHaveTextContent("Grow One");
+    expect(screen.getByTestId("quick-log-save")).toBeDisabled();
+
+    harness.plantsLoading = false;
+    harness.tentsLoading = false;
+    act(() => view.rerenderQuickLog(replacementPrefill));
+    act(() => view.rerenderQuickLog(replacementPrefill));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("quick-log-target-card")).toHaveAttribute(
+        "data-target-plant-id",
+        "p2",
+      ),
+    );
+  });
+
+  it("freezes the captured target and stage for the full in-flight save", async () => {
+    let resolveRpc!: (value: { data: { ok: boolean; grow_event_id: string }; error: null }) => void;
+    const pendingRpc = new Promise<{
+      data: { ok: boolean; grow_event_id: string };
+      error: null;
+    }>((resolve) => {
+      resolveRpc = resolve;
+    });
+    harness.rpc.mockReturnValue(pendingRpc);
+
+    const initialPrefill = { plantId: "p1", growId: "g1", tentId: "t1" };
+    const replacementPrefill = {
+      plantId: "p2",
+      growId: "g2",
+      tentId: "t2",
+      eventType: "watering",
+    };
+    const view = renderQuickLog(initialPrefill);
+    const invalidateSpy = vi.spyOn(view.client, "invalidateQueries");
+    await waitFor(() =>
+      expect(screen.getByTestId("quick-log-target-card")).toHaveAttribute(
+        "data-target-plant-id",
+        "p1",
+      ),
+    );
+
+    const stageSelect = screen.getByTestId("quick-log-stage-select");
+    fireEvent.pointerDown(stageSelect, { button: 0, ctrlKey: false, pointerType: "mouse" });
+    fireEvent.click(stageSelect);
+    fireEvent.click(await screen.findByRole("option", { name: "Seedling" }));
+    await waitFor(() => expect(stageSelect).toHaveTextContent("Seedling"));
+    fireEvent.change(screen.getByPlaceholderText(/Watered, looking healthy/i), {
+      target: { value: "Captured target save" },
+    });
+    fireEvent.submit(screen.getByTestId("quick-log-save").closest("form") as HTMLFormElement);
+    await waitFor(() => expect(harness.rpc).toHaveBeenCalledTimes(1));
+
+    const plantSelect = screen.getByTestId("quick-log-plant-select");
+    const growSelect = screen.getByTestId("quick-log-grow-select");
+    const eventSelect = screen.getByRole("combobox", { name: "Event" });
+    expect(plantSelect).toBeDisabled();
+    expect(growSelect).toBeDisabled();
+    expect(eventSelect).toBeDisabled();
+    expect(stageSelect).toBeDisabled();
+
+    fireEvent.click(plantSelect);
+    fireEvent.click(growSelect);
+    fireEvent.click(eventSelect);
+    fireEvent.click(stageSelect);
+    act(() => view.rerenderQuickLog(replacementPrefill));
+
+    const inFlightCard = screen.getByTestId("quick-log-target-card");
+    expect(inFlightCard).toHaveAttribute("data-target-plant-id", "p1");
+    expect(inFlightCard).toHaveAttribute("data-target-grow-id", "g1");
+    expect(inFlightCard).toHaveAttribute("data-target-tent-id", "t1");
+    expect(screen.getByTestId("quick-log-target-plant")).toHaveTextContent("Plant One");
+    expect(screen.getByTestId("quick-log-target-tent")).toHaveTextContent("Tent One");
+    expect(screen.getByTestId("quick-log-target-grow")).toHaveTextContent("Grow One");
+    expect(stageSelect).toHaveTextContent("Seedling");
+    expect(eventSelect).toHaveTextContent("Observation");
+
+    await act(async () => {
+      resolveRpc({ data: { ok: true, grow_event_id: "event-1" }, error: null });
+      await pendingRpc;
+    });
+    await waitFor(() => expect(screen.getByTestId("quick-log-post-save")).toBeInTheDocument());
+
+    expect(harness.rpc).toHaveBeenCalledWith(
+      "quicklog_save_manual",
+      expect.objectContaining({ p_target_type: "plant", p_target_id: "p1" }),
+    );
+    expect(harness.growUpdate).toHaveBeenCalledWith({ stage: "seedling" });
+    expect(harness.growUpdateEq).toHaveBeenCalledWith("id", "g1");
+    expect(screen.getByTestId("quick-log-post-save-description")).toHaveTextContent("Plant One");
+    expect(screen.getByTestId("quick-log-post-save-description")).toHaveTextContent("Tent One");
+    expect(screen.getByTestId("quick-log-post-save-description")).toHaveTextContent("Grow One");
+    expect(screen.getByTestId("quick-log-view-target-plant")).toHaveAttribute(
+      "data-target-plant-id",
+      "p1",
+    );
+    expect(
+      JSON.parse(window.localStorage.getItem("verdant.quickLog.lastTarget.v1") ?? "{}"),
+    ).toEqual(expect.objectContaining({ plantId: "p1", growId: "g1", tentId: "t1" }));
+    const invalidatedKeys = invalidateSpy.mock.calls.map(([options]) =>
+      JSON.stringify(options.queryKey),
+    );
+    expect(invalidatedKeys).toContain(JSON.stringify(["plant_recent_activity", "p1"]));
+    expect(invalidatedKeys).toContain(JSON.stringify(["tent_recent_activity", "t1"]));
+    expect(invalidatedKeys).not.toContain(JSON.stringify(["plant_recent_activity", "p2"]));
+    expect(invalidatedKeys).not.toContain(JSON.stringify(["tent_recent_activity", "t2"]));
   });
 });

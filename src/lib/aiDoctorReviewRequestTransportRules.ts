@@ -9,6 +9,11 @@
  * Pure: no React, Supabase, network, or model calls.
  */
 
+import {
+  normalizeAiDoctorReviewEvidenceAcceptance,
+  type AiDoctorReviewEvidenceAcceptance,
+} from "./aiDoctorReviewEvidenceReceiptRules";
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_TRANSPORT_NESTING_DEPTH = 16;
 const MAX_TRANSPORT_VALUE_NODES = 2_000;
@@ -19,11 +24,25 @@ export interface AiDoctorReviewRequestEnvelope<TPacket> {
   grow_id?: string;
   /** Server-only replay identity. Never prompt context or persisted diagnosis data. */
   idempotency_key: string;
+  /** Optional opaque receipt correlation. Never a durable session link or prompt context. */
+  session_id?: string;
+  /** Explicit collection decision for the protected evidence receipt. Never prompt context. */
+  evidence_acceptance?: AiDoctorReviewEvidenceAcceptance;
 }
 
 export type AiDoctorReviewRequestEnvelopeBuildResult<TPacket> =
   | { ok: true; envelope: AiDoctorReviewRequestEnvelope<TPacket> }
-  | { ok: false; reason: "invalid_idempotency_key" };
+  | {
+      ok: false;
+      reason: "invalid_idempotency_key" | "invalid_session_id" | "invalid_evidence_acceptance";
+    };
+
+export interface AiDoctorReviewRequestEnvelopeOptions {
+  /** Optional opaque receipt correlation. Invalid supplied values fail closed. */
+  sessionId?: unknown;
+  /** Optional strict collection declaration used only by the receipt boundary. */
+  evidenceAcceptance?: unknown;
+}
 
 export type AiDoctorReviewIdempotencyKeyCreationResult =
   | { ok: true; key: string }
@@ -39,6 +58,10 @@ export interface ParsedAiDoctorReviewRequestEnvelope {
   growId: unknown;
   /** Untrusted idempotency value for the Edge Function to validate. */
   idempotencyKey: unknown;
+  /** Untrusted opaque receipt correlation for the Edge Function to validate. */
+  sessionId?: unknown;
+  /** Untrusted optional collection declaration for the Edge Function to validate. */
+  evidenceAcceptance?: unknown;
   format: "envelope" | "legacy";
 }
 
@@ -91,17 +114,29 @@ export function buildAiDoctorReviewRequestEnvelope<TPacket>(
   packet: TPacket,
   growId?: unknown,
   idempotencyKey?: unknown,
+  options: AiDoctorReviewRequestEnvelopeOptions = {},
 ): AiDoctorReviewRequestEnvelopeBuildResult<TPacket> {
   if (!isUuid(idempotencyKey)) {
     return { ok: false, reason: "invalid_idempotency_key" };
   }
 
-  return {
-    ok: true,
-    envelope: isUuid(growId)
-      ? { packet, grow_id: growId, idempotency_key: idempotencyKey }
-      : { packet, idempotency_key: idempotencyKey },
-  };
+  if (options.sessionId != null && !isUuid(options.sessionId)) {
+    return { ok: false, reason: "invalid_session_id" };
+  }
+  const evidenceAcceptance =
+    options.evidenceAcceptance === undefined || options.evidenceAcceptance === null
+      ? undefined
+      : normalizeAiDoctorReviewEvidenceAcceptance(options.evidenceAcceptance);
+  if (options.evidenceAcceptance != null && !evidenceAcceptance) {
+    return { ok: false, reason: "invalid_evidence_acceptance" };
+  }
+  const envelope: AiDoctorReviewRequestEnvelope<TPacket> = isUuid(growId)
+    ? { packet, grow_id: growId, idempotency_key: idempotencyKey }
+    : { packet, idempotency_key: idempotencyKey };
+  if (isUuid(options.sessionId)) envelope.session_id = options.sessionId;
+  if (evidenceAcceptance) envelope.evidence_acceptance = evidenceAcceptance;
+
+  return { ok: true, envelope };
 }
 
 /**
@@ -153,7 +188,11 @@ function stripAiDoctorReviewRequestTransportFieldsBounded(
       key === "grow_id" ||
       key === "growId" ||
       key === "idempotency_key" ||
-      key === "idempotencyKey"
+      key === "idempotencyKey" ||
+      key === "session_id" ||
+      key === "sessionId" ||
+      key === "evidence_acceptance" ||
+      key === "evidenceAcceptance"
     ) {
       continue;
     }
@@ -181,6 +220,25 @@ export function stripAiDoctorReviewRequestTransportFields(value: unknown): unkno
  * the legacy branch lets a deployed client fail safely during rollout while
  * ensuring both shapes remove operational fields before prompting.
  */
+interface AliasedTransportValue {
+  present: boolean;
+  value: unknown;
+}
+
+/** Reject duplicate aliases rather than letting one untrusted value shadow another. */
+function readAliasedTransportValue(
+  value: Record<string, unknown>,
+  snakeCase: string,
+  camelCase: string,
+): AliasedTransportValue | null {
+  const hasSnakeCase = Object.prototype.hasOwnProperty.call(value, snakeCase);
+  const hasCamelCase = Object.prototype.hasOwnProperty.call(value, camelCase);
+  if (hasSnakeCase && hasCamelCase) return null;
+  if (hasSnakeCase) return { present: true, value: value[snakeCase] };
+  if (hasCamelCase) return { present: true, value: value[camelCase] };
+  return { present: false, value: undefined };
+}
+
 export function parseAiDoctorReviewRequestEnvelope(
   value: unknown,
 ): ParsedAiDoctorReviewRequestEnvelope | null {
@@ -189,6 +247,16 @@ export function parseAiDoctorReviewRequestEnvelope(
   const hasEnvelope = Object.prototype.hasOwnProperty.call(value, "packet");
   const rawPacket = hasEnvelope ? value.packet : value;
   if (!isPlainRecord(rawPacket)) return null;
+
+  const growScope = readAliasedTransportValue(value, "grow_id", "growId");
+  const idempotency = readAliasedTransportValue(value, "idempotency_key", "idempotencyKey");
+  const sessionLink = readAliasedTransportValue(value, "session_id", "sessionId");
+  const evidenceAcceptance = readAliasedTransportValue(
+    value,
+    "evidence_acceptance",
+    "evidenceAcceptance",
+  );
+  if (!growScope || !idempotency || !sessionLink || !evidenceAcceptance) return null;
 
   const stripped = stripAiDoctorReviewRequestTransportFieldsBounded(rawPacket, {
     value: MAX_TRANSPORT_VALUE_NODES,
@@ -199,8 +267,10 @@ export function parseAiDoctorReviewRequestEnvelope(
 
   return {
     packet: stripped.value,
-    growId: value.grow_id ?? value.growId,
-    idempotencyKey: value.idempotency_key ?? value.idempotencyKey,
+    growId: growScope.value,
+    idempotencyKey: idempotency.value,
+    ...(sessionLink.present ? { sessionId: sessionLink.value } : {}),
+    ...(evidenceAcceptance.present ? { evidenceAcceptance: evidenceAcceptance.value } : {}),
     format: hasEnvelope ? "envelope" : "legacy",
   };
 }

@@ -163,13 +163,18 @@ Deno.test(
   async () => {
     const raw = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
     assert(
-      raw.includes("20260719043000_ai_credit_result_cache.sql") &&
-        /apply[\s\S]{0,100}before deploying this function/i.test(raw),
-      "result-cache migration must be documented as an Edge prerequisite",
+      raw.indexOf("20260719043000_ai_credit_result_cache.sql") >= 0 &&
+        raw.indexOf("20260719180000_ai_doctor_review_evidence_receipts.sql") >
+          raw.indexOf("20260719043000_ai_credit_result_cache.sql") &&
+        raw.indexOf("Deploy this function") >
+          raw.indexOf("20260719180000_ai_doctor_review_evidence_receipts.sql"),
+      "result-cache and evidence receipt migrations must precede Edge deployment",
     );
     assert(
-      /deploy this function[\s\S]{0,100}publish the UUID-sending client/i.test(raw),
-      "the safe mixed-version rollout must deploy Edge before the UUID-sending client",
+      /deploy this function[\s\S]{0,100}publish the client with optional session\/collection metadata/i.test(
+        raw,
+      ),
+      "the safe mixed-version rollout must deploy Edge before the metadata-sending client",
     );
     // Strip line + block comments so safety assertions only see executable code.
     const src = raw.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
@@ -185,7 +190,7 @@ Deno.test(
     assertEquals(
       rpcCalls.sort(),
       [
-        "ai_credit_attach_result",
+        "ai_doctor_finalize_review",
         "ai_credit_refund",
         "ai_credit_refund",
         "ai_credit_spend",
@@ -198,13 +203,14 @@ Deno.test(
     const completionCallIndex = src.lastIndexOf(
       "recordFreshAiDoctorReviewCompletion(userId, spendId)",
     );
-    const attachmentCallIndex = src.indexOf('creditSupabase.rpc("ai_credit_attach_result"');
+    const finalizationCallIndex = src.indexOf('creditSupabase.rpc("ai_doctor_finalize_review"');
     assert(
-      validationIndex >= 0 && attachmentCallIndex > validationIndex,
+      validationIndex >= 0 && finalizationCallIndex > validationIndex,
       "validated results must be attached before success",
     );
     assert(
-      completionCallIndex > attachmentCallIndex && src.includes('if (attachment === "recorded")'),
+      completionCallIndex > finalizationCallIndex &&
+        src.includes('if (finalization === "recorded")'),
       "only a newly recorded cache attachment may count as a fresh completion",
     );
     const replayStart = src.indexOf("const spendDecision = classifyAiDoctorCreditSpend");
@@ -243,23 +249,44 @@ Deno.test(
       "resultless replays must resolve to pending or a confirmed recording failure",
     );
     const successIndex = src.lastIndexOf("return safeOk(v.result");
-    assert(successIndex > attachmentCallIndex, "fresh output must not return before attachment");
-    const ambiguousAttachment = src.indexOf('if (attachment === "ambiguous")');
-    const rejectedAttachment = src.indexOf('if (attachment === "rejected")');
     assert(
-      ambiguousAttachment > attachmentCallIndex && rejectedAttachment > ambiguousAttachment,
-      "attachment ambiguity and explicit rejection must remain separate",
+      successIndex > finalizationCallIndex,
+      "fresh output must not return before finalization",
+    );
+    assert(src.includes("p_evidence: evidenceReceipt"), "finalizer must receive the safe receipt");
+    assert(
+      src.includes("p_prompt_hmac_sha256") && src.includes("p_prompt_hmac_key_id"),
+      "finalizer must receive a server-keyed prompt HMAC and key identifier",
+    );
+    assert(!/\bp_prompt_sha256\b/.test(src), "finalizer must not receive a raw prompt hash");
+    assert(!/ai_credit_attach_result/.test(src), "new Edge wiring must not call legacy attachment");
+    const ambiguousFinalization = src.indexOf('if (finalization === "ambiguous")');
+    const rejectedFinalization = src.indexOf('if (finalization === "rejected")');
+    assert(
+      ambiguousFinalization > finalizationCallIndex && rejectedFinalization > ambiguousFinalization,
+      "finalization ambiguity and explicit rejection must remain separate",
     );
     assert(
       src
-        .slice(ambiguousAttachment, rejectedAttachment)
+        .slice(ambiguousFinalization, rejectedFinalization)
         .includes('return calmFailure("result_pending")') &&
-        !src.slice(ambiguousAttachment, rejectedAttachment).includes("failureAfterRefund"),
-      "ambiguous attachment outcomes must retain the spend for same-key replay",
+        !src.slice(ambiguousFinalization, rejectedFinalization).includes("failureAfterRefund"),
+      "ambiguous finalization outcomes must retain the spend for same-key replay",
     );
     assert(
-      src.slice(rejectedAttachment, completionCallIndex).includes("failureAfterRefund"),
-      "only explicit attachment rejection may enter the refund path",
+      src.slice(rejectedFinalization, completionCallIndex).includes("failureAfterRefund") &&
+        src
+          .slice(rejectedFinalization, completionCallIndex)
+          .includes('"result_finalization_rejected"') &&
+        !src
+          .slice(rejectedFinalization, completionCallIndex)
+          .includes('return calmFailure("result_pending")'),
+      "explicit finalization rejection must attempt the idempotent refund",
+    );
+    assert(
+      src.includes("AI_DOCTOR_RECEIPT_HMAC_KEY_ID") &&
+        src.includes("p_prompt_hmac_key_id: receiptHmacKeyId"),
+      "prompt HMAC key identity must be configured and stored with each receipt",
     );
     // No raw upstream payload logging.
     assert(!/console\.log\([^)]*payload/i.test(src), "must not log raw provider payload");

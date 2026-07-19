@@ -3,7 +3,7 @@
 // after a fresh response passes the contract. Fails closed.
 //
 // Hard constraints:
-//  - No direct DB writes. Credit spending/refunds, immutable result attachment,
+//  - No direct DB writes. Credit spending/refunds, atomic result/receipt finalization,
 //    and one protected fresh-review completion RPC are the only persistence.
 //    No ai_doctor_sessions / alerts / action_queue / sensor_readings writes.
 //    No equipment / device control.
@@ -15,17 +15,31 @@
 //    full packets, secrets, tokens, or unvalidated AI output.
 //
 // Deployment order is mandatory:
-// 1. Apply 20260719043000_ai_credit_result_cache.sql before deploying this function.
-// 2. Deploy this function.
-// 3. Publish the UUID-sending client.
-// The result-attachment RPC has no compatibility fallback by design. Older
-// clients reaching step 2 fail request-shape validation before any spend.
+// 0. Drain old ai-doctor-review Edge traffic before the receipt migration; a
+//    stale build can otherwise create a cache-only result with no receipt.
+// 1. Provision server-only AI_DOCTOR_RECEIPT_HMAC_KEY (32+ UTF-8 bytes) and
+//    set AI_DOCTOR_RECEIPT_HMAC_KEY_ID configuration; rotate them together.
+// 2. Apply 20260719043000_ai_credit_result_cache.sql, then
+//    20260719180000_ai_doctor_review_evidence_receipts.sql.
+// Apply both migrations before deploying this function.
+// 3. Deploy this function, then publish the client with optional session/collection metadata.
+// Reopen traffic only after the new finalizer smoke passes; do not roll back to
+// a pre-receipt Edge build without a deliberate compatibility procedure.
+// Legacy cache-only replays remain valid, but this function never backfills
+// them with new context because idempotency does not bind the old packet.
+
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { validateAiDoctorReviewResult } from "./contract.ts";
 import { buildAiDoctorPromptMessages } from "../../../src/lib/aiDoctorPromptAssembly.ts";
 import { parseAiDoctorReviewRequestEnvelope } from "../../../src/lib/aiDoctorReviewRequestTransportRules.ts";
 import { validateAndNormalizeAiDoctorReviewRequestPacket } from "../../../src/lib/aiDoctorReviewRequestPacketValidationRules.ts";
+import {
+  buildAiDoctorReviewEvidenceReceiptSnapshot,
+  isAiDoctorReviewEvidenceAcceptanceCoherentWithPacket,
+  isAiDoctorReviewEvidenceReceiptSnapshot,
+  normalizeAiDoctorReviewEvidenceAcceptance,
+} from "../../../src/lib/aiDoctorReviewEvidenceReceiptRules.ts";
 import {
   classifyAiDoctorCreditSpend,
   isConfirmedAiDoctorCreditRefund,
@@ -47,6 +61,10 @@ const FEATURE = "ai_doctor_review";
 const MODEL_TIER = "standard";
 const COMPLETION_WRITE_TIMEOUT_MS = 1_500;
 const RESULT_PERSISTENCE_TIMEOUT_MS = 3_000;
+const TOOL_SCHEMA_VERSION = "ai-doctor-review-tool-v1";
+const PROMPT_CONTRACT_VERSION = "ai-doctor-review-prompt-v1";
+const RECEIPT_HMAC_SECRET_ENV = "AI_DOCTOR_RECEIPT_HMAC_KEY";
+const RECEIPT_HMAC_KEY_ID_ENV = "AI_DOCTOR_RECEIPT_HMAC_KEY_ID";
 
 // Base system prompt is composed inside buildAiDoctorPromptMessages so
 // imported CSV/XLSX history guidance and missing-live-readings notes can
@@ -114,6 +132,43 @@ function isUuid(s: unknown): s is string {
   );
 }
 
+function isReceiptHmacKeyId(value: unknown): value is string {
+  return typeof value === "string" && /^[A-Za-z0-9._:-]{1,80}$/.test(value);
+}
+
+/**
+ * Computes a server-keyed integrity HMAC over the exact outbound request frame.
+ * Neither the prompt text nor the HMAC secret is returned, stored in browser
+ * rows, or logged. The HMAC is not used to authorize, price, or select a model.
+ */
+async function signAiDoctorPrompt(
+  prompt: ReturnType<typeof buildAiDoctorPromptMessages>,
+  secret: string,
+): Promise<string> {
+  const frame = JSON.stringify({
+    version: PROMPT_CONTRACT_VERSION,
+    model: MODEL,
+    messages: [
+      { role: "system", content: prompt.system },
+      { role: "user", content: prompt.user },
+    ],
+    tools: [TOOL_SCHEMA],
+    tool_choice: { type: "function", function: { name: "submit_ai_doctor_review" } },
+  });
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(frame));
+  const hex = Array.from(new Uint8Array(signature), (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("");
+  return `hmac-sha256:${hex}`;
+}
 async function settleResultPersistence<T>(operation: PromiseLike<T>): Promise<T> {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   try {
@@ -204,10 +259,19 @@ Deno.serve(async (req) => {
     if (!u?.user) return calmFailure("http");
     const userId = u.user.id;
 
+    const receiptHmacSecret = Deno.env.get(RECEIPT_HMAC_SECRET_ENV);
+    const receiptHmacKeyId = Deno.env.get(RECEIPT_HMAC_KEY_ID_ENV);
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const billingEnvironmentResolution = resolveRequiredServerBillingEnvironment();
-    if (!serviceRoleKey || !supabaseUrl || !billingEnvironmentResolution.ok) {
+    if (
+      !serviceRoleKey ||
+      !supabaseUrl ||
+      !billingEnvironmentResolution.ok ||
+      !receiptHmacSecret ||
+      new TextEncoder().encode(receiptHmacSecret).byteLength < 32 ||
+      !isReceiptHmacKeyId(receiptHmacKeyId)
+    ) {
       console.log("ai-doctor-review status=config_missing");
       return calmFailure("config");
     }
@@ -249,6 +313,46 @@ Deno.serve(async (req) => {
     }
     const idempotencyKey = request.idempotencyKey;
 
+    const rawSessionId = request.sessionId;
+    const sessionId =
+      rawSessionId === undefined || rawSessionId === null
+        ? null
+        : isUuid(rawSessionId)
+          ? rawSessionId.toLowerCase()
+          : null;
+    if (rawSessionId !== undefined && rawSessionId !== null && sessionId === null) {
+      return calmFailure("shape");
+    }
+
+    const rawEvidenceAcceptance = request.evidenceAcceptance;
+    const evidenceAcceptance =
+      rawEvidenceAcceptance === undefined
+        ? null
+        : normalizeAiDoctorReviewEvidenceAcceptance(rawEvidenceAcceptance);
+    if (
+      rawEvidenceAcceptance !== undefined &&
+      (!evidenceAcceptance ||
+        !isAiDoctorReviewEvidenceAcceptanceCoherentWithPacket(validatedPacket, evidenceAcceptance))
+    ) {
+      return calmFailure("shape");
+    }
+
+    const evidenceReceipt = buildAiDoctorReviewEvidenceReceiptSnapshot({
+      packet: validatedPacket,
+      clientCollectionDecision: evidenceAcceptance,
+    });
+    if (!evidenceReceipt || !isAiDoctorReviewEvidenceReceiptSnapshot(evidenceReceipt)) {
+      return calmFailure("shape");
+    }
+
+    const promptMessages = buildAiDoctorPromptMessages(validatedPacket);
+    let promptHmac: string;
+    try {
+      promptHmac = await signAiDoctorPrompt(promptMessages, receiptHmacSecret);
+    } catch {
+      console.log("ai-doctor-review status=prompt_hmac_unavailable");
+      return calmFailure("config");
+    }
     // ---- ai_credit_spend (atomic check-and-spend) ---------------------------
     creditSpendMayExist = true;
     let spendResponse = await creditSupabase.rpc("ai_credit_spend", {
@@ -263,7 +367,7 @@ Deno.serve(async (req) => {
     // Spend-overload compatibility only: if an older database lacks the
     // service-only spend signature, and only for that exact missing-overload
     // error, use the still-authorized legacy user-scoped spend RPC. The result
-    // attachment migration remains a hard deployment prerequisite. Permission,
+    // result-cache/receipt migrations remain hard deployment prerequisites. Permission,
     // timeout, validation, and other database errors always fail closed.
     if (isMissingAiCreditRpcOverload(spendResponse.error, "ai_credit_spend", "p_user_id")) {
       spendResponse = await supabase.rpc("ai_credit_spend", {
@@ -393,7 +497,7 @@ Deno.serve(async (req) => {
     // Build the prompt once so the assembled text can feed both the upstream
     // call AND an in-memory cost measurement. Measurement is local-only;
     // never persisted, logged, or returned to the client.
-    const promptMessages = buildAiDoctorPromptMessages(validatedPacket);
+
     const promptMeasurement = buildAiDoctorPromptMeasurement({
       promptName: FEATURE,
       recordedAt: new Date().toISOString(),
@@ -476,38 +580,45 @@ Deno.serve(async (req) => {
       return failureAfterRefund(spendId, `invalid_${v.reason}`, "invalid");
     }
 
-    let attachment: ReturnType<typeof parseAiDoctorResultAttachment> = "ambiguous";
+    let finalization: ReturnType<typeof parseAiDoctorResultAttachment> = "ambiguous";
     try {
-      const attachmentResponse = await settleResultPersistence(
-        creditSupabase.rpc("ai_credit_attach_result", {
+      const finalizationResponse = await settleResultPersistence(
+        creditSupabase.rpc("ai_doctor_finalize_review", {
           p_expected_user_id: userId,
           p_spend_id: spendId,
-          p_expected_feature: FEATURE,
           p_result: v.result,
+          p_evidence: evidenceReceipt,
+          p_prompt_hmac_sha256: promptHmac,
+          p_prompt_hmac_key_id: receiptHmacKeyId,
+          p_model_id: MODEL,
+          p_tool_schema_version: TOOL_SCHEMA_VERSION,
+          p_prompt_contract_version: PROMPT_CONTRACT_VERSION,
+          p_session_id: sessionId,
         }),
       );
-      if (!attachmentResponse.error) {
-        attachment = parseAiDoctorResultAttachment(attachmentResponse.data);
+      if (!finalizationResponse.error) {
+        finalization = parseAiDoctorResultAttachment(finalizationResponse.data);
       }
     } catch {
       // Timeout/transport ambiguity must preserve the spend and request key.
-      // A same-key retry can then recover a cache write whose response was lost.
+      // A same-key retry can then recover a fully committed atomic pair.
     }
-    if (attachment === "ambiguous") {
-      console.log("ai-doctor-review status=result_attachment_pending");
+    if (finalization === "ambiguous") {
+      console.log("ai-doctor-review status=result_finalization_pending");
       return calmFailure("result_pending");
     }
-    if (attachment === "rejected") {
-      console.log("ai-doctor-review status=result_attachment_rejected");
-      return failureAfterRefund(spendId, "result_attachment_failed", "result_recording_failed");
+    if (finalization === "rejected") {
+      // An explicit RPC rejection completed without accepting the atomic pair.
+      // Unlike a timeout, it can safely receive the normal idempotent refund.
+      console.log("ai-doctor-review status=result_finalization_rejected");
+      return failureAfterRefund(spendId, "result_finalization_rejected", "result_recording_failed");
     }
 
-    if (attachment === "recorded") {
-      // Fresh cache attachment only: cached spend replays and idempotent
-      // attachment replays must not increment completion measurement.
+    if (finalization === "recorded") {
+      // Fresh atomic finalization only: cached spend replays and idempotent
+      // finalizer replays must not increment completion measurement.
       await recordFreshAiDoctorReviewCompletion(userId, spendId);
     }
-
     console.log("ai-doctor-review status=ok");
     return safeOk(v.result, {
       remaining: spendObj.remaining,

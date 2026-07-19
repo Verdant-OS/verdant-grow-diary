@@ -8,11 +8,17 @@ import {
 
 const GROW_ID = "11111111-1111-4111-8111-111111111111";
 const IDEMPOTENCY_KEY = "33333333-3333-4333-8333-333333333333";
+const SESSION_ID = "44444444-4444-4444-8444-444444444444";
 const PACKET = {
   schemaVersion: 1,
   plant: { strain: "Northern Lights" },
 };
 
+const EVIDENCE_ACCEPTANCE = {
+  reviewMode: "standard",
+  importedHistory: { state: "none_available", scope: "tent_scoped" },
+  rootZoneHistory: { state: "included", scope: "plant_only" },
+};
 function createDeepPacket(depth: number): Record<string, unknown> {
   let nested: Record<string, unknown> = { leaf: true };
   for (let index = 0; index < depth; index += 1) {
@@ -46,6 +52,36 @@ describe("AI Doctor review request transport", () => {
     expect(PACKET).not.toHaveProperty("idempotency_key");
   });
 
+  it("adds receipt metadata beside the packet and fails closed on malformed metadata", () => {
+    expect(
+      buildAiDoctorReviewRequestEnvelope(PACKET, GROW_ID, IDEMPOTENCY_KEY, {
+        sessionId: SESSION_ID,
+        evidenceAcceptance: EVIDENCE_ACCEPTANCE,
+      }),
+    ).toEqual({
+      ok: true,
+      envelope: {
+        packet: PACKET,
+        grow_id: GROW_ID,
+        idempotency_key: IDEMPOTENCY_KEY,
+        session_id: SESSION_ID,
+        evidence_acceptance: EVIDENCE_ACCEPTANCE,
+      },
+    });
+    expect(PACKET).not.toHaveProperty("session_id");
+    expect(PACKET).not.toHaveProperty("evidence_acceptance");
+
+    expect(
+      buildAiDoctorReviewRequestEnvelope(PACKET, GROW_ID, IDEMPOTENCY_KEY, {
+        sessionId: "not-a-uuid",
+      }),
+    ).toEqual({ ok: false, reason: "invalid_session_id" });
+    expect(
+      buildAiDoctorReviewRequestEnvelope(PACKET, GROW_ID, IDEMPOTENCY_KEY, {
+        evidenceAcceptance: { reviewMode: "standard" },
+      }),
+    ).toEqual({ ok: false, reason: "invalid_evidence_acceptance" });
+  });
   it("omits malformed/demo scope IDs and leaves credit validation server-side", () => {
     expect(buildAiDoctorReviewRequestEnvelope(PACKET, "demo-grow", IDEMPOTENCY_KEY)).toEqual({
       ok: true,
@@ -108,6 +144,52 @@ describe("AI Doctor review request transport", () => {
     });
   });
 
+  it("parses receipt metadata only at the envelope boundary and strips nested aliases", () => {
+    const parsed = parseAiDoctorReviewRequestEnvelope({
+      packet: {
+        ...PACKET,
+        context: {
+          session_id: "malicious-nested-session",
+          evidenceAcceptance: { reviewMode: "malicious" },
+          readings: [
+            {
+              sessionId: "another-nested-session",
+              evidence_acceptance: { injected: true },
+            },
+          ],
+        },
+      },
+      grow_id: GROW_ID,
+      idempotency_key: IDEMPOTENCY_KEY,
+      session_id: SESSION_ID,
+      evidence_acceptance: EVIDENCE_ACCEPTANCE,
+    });
+
+    expect(parsed).toEqual({
+      packet: { ...PACKET, context: { readings: [{}] } },
+      growId: GROW_ID,
+      idempotencyKey: IDEMPOTENCY_KEY,
+      sessionId: SESSION_ID,
+      evidenceAcceptance: EVIDENCE_ACCEPTANCE,
+      format: "envelope",
+    });
+  });
+
+  it("rejects duplicate snake/camel aliases instead of letting untrusted metadata shadow itself", () => {
+    const conflicts = [
+      { grow_id: GROW_ID, growId: GROW_ID },
+      { idempotency_key: IDEMPOTENCY_KEY, idempotencyKey: IDEMPOTENCY_KEY },
+      { session_id: SESSION_ID, sessionId: SESSION_ID },
+      {
+        evidence_acceptance: EVIDENCE_ACCEPTANCE,
+        evidenceAcceptance: EVIDENCE_ACCEPTANCE,
+      },
+    ];
+
+    for (const conflict of conflicts) {
+      expect(parseAiDoctorReviewRequestEnvelope({ packet: PACKET, ...conflict })).toBeNull();
+    }
+  });
   it("accepts the prior flat request shape while stripping its transport fields", () => {
     const parsed = parseAiDoctorReviewRequestEnvelope({
       ...PACKET,

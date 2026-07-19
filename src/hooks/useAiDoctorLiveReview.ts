@@ -23,6 +23,7 @@
 import { useCallback, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { AiDoctorReviewRequestPacket } from "@/lib/aiDoctorReviewRequestPacket";
+import type { AiDoctorReviewEvidenceAcceptance } from "@/lib/aiDoctorReviewEvidenceReceiptRules";
 import {
   buildAiDoctorReviewRequestEnvelope,
   createAiDoctorReviewIdempotencyKey,
@@ -94,6 +95,8 @@ export interface UseAiDoctorLiveReviewOptions {
    * `growId` (the audit row has no useful scope without it).
    */
   sensorClassification?: Classification | null;
+  /** Frozen client collection disclosure for the server-owned evidence receipt. */
+  evidenceAcceptance?: AiDoctorReviewEvidenceAcceptance | null;
   /** Override for tests — defaults to `persistAiDoctorSession(supabase, ...)`. */
   persist?: (input: AiDoctorSessionInput) => Promise<PersistAiDoctorSessionResult>;
   /** Called after durable persistence, even if the initiating component unmounts. */
@@ -115,6 +118,13 @@ export interface UseAiDoctorLiveReviewApi extends AiDoctorLiveReviewState {
   canRetrySave: boolean;
 }
 
+const NO_SENSOR_EVIDENCE_CLASSIFICATION: Classification = Object.freeze({
+  status: "no_data",
+  reason: "no_rows",
+  isHealthyEvidence: false,
+  label: "No sensor evidence was available at review time.",
+});
+
 const INITIAL: AiDoctorLiveReviewState = {
   status: "idle",
   result: null,
@@ -124,11 +134,16 @@ const INITIAL: AiDoctorLiveReviewState = {
 
 interface FrozenAiDoctorLiveReviewRequest {
   idempotencyKey: string;
+  /** Opaque receipt correlation only; never reused as an ai_doctor_sessions primary key. */
+  receiptCorrelationId: string;
   packet: AiDoctorReviewRequestPacket;
   growId: string | null;
   tentId: string | null;
   plantId: string | null;
-  sensorClassification: Classification | null;
+  sensorClassification: Classification;
+  evidenceAcceptance: AiDoctorReviewEvidenceAcceptance | null;
+  sessionId: string | null;
+  sessionIdError: unknown;
   sensorEvidenceEvaluatedAt: string | null;
   sensorEvidenceTimestampError: unknown;
 }
@@ -152,6 +167,7 @@ export function useAiDoctorLiveReview(
     tentId,
     plantId,
     sensorClassification,
+    evidenceAcceptance,
     persist: persistOverride,
     onPersisted,
     createSessionId,
@@ -262,23 +278,36 @@ export function useAiDoctorLiveReview(
           return;
         }
 
+        const frozenSensorClassification =
+          sensorClassification ?? NO_SENSOR_EVIDENCE_CLASSIFICATION;
         let sensorEvidenceEvaluatedAt: string | null = null;
         let sensorEvidenceTimestampError: unknown = null;
-        if (sensorClassification) {
+        try {
+          sensorEvidenceEvaluatedAt = (now?.() ?? new Date()).toISOString();
+        } catch (error) {
+          sensorEvidenceTimestampError = error;
+        }
+        let sessionId: string | null = null;
+        let sessionIdError: unknown = null;
+        if (growId) {
           try {
-            sensorEvidenceEvaluatedAt = (now?.() ?? new Date()).toISOString();
+            sessionId = createSessionId?.() ?? newAiDoctorSessionId();
           } catch (error) {
-            sensorEvidenceTimestampError = error;
+            sessionIdError = error;
           }
         }
 
         logicalRequest.current = {
           idempotencyKey: created.key,
+          receiptCorrelationId: created.key,
           packet,
           growId: growId ?? null,
           tentId: tentId ?? null,
           plantId: plantId ?? null,
-          sensorClassification: sensorClassification ?? null,
+          sensorClassification: frozenSensorClassification,
+          evidenceAcceptance: evidenceAcceptance ?? null,
+          sessionId,
+          sessionIdError,
           sensorEvidenceEvaluatedAt,
           sensorEvidenceTimestampError,
         };
@@ -294,6 +323,10 @@ export function useAiDoctorLiveReview(
         request.packet,
         request.growId,
         request.idempotencyKey,
+        {
+          sessionId: request.receiptCorrelationId,
+          evidenceAcceptance: request.evidenceAcceptance,
+        },
       );
       if (builtRequest.ok === false) {
         logicalRequest.current = null;
@@ -375,10 +408,13 @@ export function useAiDoctorLiveReview(
             if (request.sensorEvidenceTimestampError) {
               throw request.sensorEvidenceTimestampError;
             }
+            if (request.sessionIdError) {
+              throw request.sessionIdError;
+            }
             const diagnosisReport = adaptAiDoctorReviewResultToDiagnosis(outcome.result);
             const confidenceScore = AI_DOCTOR_REVIEW_CONFIDENCE_SCORE[outcome.result.confidence];
             const persistenceInput: AiDoctorSessionInput = {
-              sessionId: createSessionId?.() ?? newAiDoctorSessionId(),
+              sessionId: request.sessionId,
               growId: request.growId,
               tentId: request.tentId,
               plantId: request.plantId,
@@ -432,6 +468,7 @@ export function useAiDoctorLiveReview(
       tentId,
       plantId,
       sensorClassification,
+      evidenceAcceptance,
       createSessionId,
       createRequestIdempotencyKey,
       now,

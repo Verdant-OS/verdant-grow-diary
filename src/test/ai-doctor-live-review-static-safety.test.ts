@@ -84,7 +84,7 @@ describe("ai doctor live review — edge static safety", () => {
       const APPROVED_RPCS = new Set([
         "ai_credit_spend",
         "ai_credit_refund",
-        "ai_credit_attach_result",
+        "ai_doctor_finalize_review",
         "record_ai_doctor_review_completion",
       ]);
       const rpcCalls = [...src.matchAll(/\.rpc\s*\(\s*["'`]([a-zA-Z0-9_]+)["'`]/g)].map(
@@ -103,10 +103,10 @@ describe("ai doctor live review — edge static safety", () => {
         const completionCallIndex = src.lastIndexOf(
           "recordFreshAiDoctorReviewCompletion(userId, spendId)",
         );
-        const attachmentIndex = src.indexOf('.rpc("ai_credit_attach_result"');
-        expect(attachmentIndex).toBeGreaterThan(validationIndex);
-        expect(completionCallIndex).toBeGreaterThan(attachmentIndex);
-        expect(src).toContain('if (attachment === "recorded")');
+        const finalizationIndex = src.indexOf('.rpc("ai_doctor_finalize_review"');
+        expect(finalizationIndex).toBeGreaterThan(validationIndex);
+        expect(completionCallIndex).toBeGreaterThan(finalizationIndex);
+        expect(src).toContain('if (finalization === "recorded")');
         const replayStart = src.indexOf("const spendDecision = classifyAiDoctorCreditSpend");
         const replayEnd = src.indexOf("const spendId = spendDecision.spendId", replayStart);
         expect(replayStart).toBeGreaterThanOrEqual(0);
@@ -137,17 +137,25 @@ describe("ai doctor live review — edge static safety", () => {
         expect(src).toContain("buildAiDoctorPromptMessages(validatedPacket)");
         expect(src).not.toContain("buildAiDoctorPromptMessages(request.packet)");
         expect(src).not.toContain("buildAiDoctorPromptMessages(requestBody)");
-        const ambiguousAttachment = src.indexOf('if (attachment === "ambiguous")');
-        const rejectedAttachment = src.indexOf('if (attachment === "rejected")');
-        expect(ambiguousAttachment).toBeGreaterThan(attachmentIndex);
-        expect(rejectedAttachment).toBeGreaterThan(ambiguousAttachment);
-        expect(src.slice(ambiguousAttachment, rejectedAttachment)).toContain(
+        const ambiguousFinalization = src.indexOf('if (finalization === "ambiguous")');
+        const rejectedFinalization = src.indexOf('if (finalization === "rejected")');
+        expect(ambiguousFinalization).toBeGreaterThan(finalizationIndex);
+        expect(rejectedFinalization).toBeGreaterThan(ambiguousFinalization);
+        expect(src.slice(ambiguousFinalization, rejectedFinalization)).toContain(
           'return calmFailure("result_pending")',
         );
-        expect(src.slice(ambiguousAttachment, rejectedAttachment)).not.toContain(
+        expect(src.slice(ambiguousFinalization, rejectedFinalization)).not.toContain(
           "failureAfterRefund",
         );
-        expect(src.slice(rejectedAttachment, completionCallIndex)).toContain("failureAfterRefund");
+        expect(src.slice(rejectedFinalization, completionCallIndex)).toContain(
+          "failureAfterRefund",
+        );
+        expect(src.slice(rejectedFinalization, completionCallIndex)).toContain(
+          '"result_finalization_rejected"',
+        );
+        expect(src.slice(rejectedFinalization, completionCallIndex)).not.toContain(
+          'return calmFailure("result_pending")',
+        );
       }
       for (const re of [
         /action_queue/i,
@@ -189,8 +197,14 @@ describe("ai doctor live review — edge static safety", () => {
     const raw = readRaw("supabase/functions/ai-doctor-review/index.ts");
     const src = stripSourceComments(raw);
     expect(raw).toContain("20260719043000_ai_credit_result_cache.sql");
-    expect(raw).toMatch(/apply[\s\S]{0,100}before deploying this function/i);
-    expect(src.match(/\.rpc\s*\(\s*["']ai_credit_attach_result["']/g) ?? []).toHaveLength(1);
-    expect(src).not.toMatch(/\bsupabase\.rpc\s*\(\s*["']ai_credit_attach_result["']/);
+    expect(raw).toContain("20260719180000_ai_doctor_review_evidence_receipts.sql");
+    expect(raw.indexOf("20260719043000_ai_credit_result_cache.sql")).toBeLessThan(
+      raw.indexOf("20260719180000_ai_doctor_review_evidence_receipts.sql"),
+    );
+    expect(raw.indexOf("20260719180000_ai_doctor_review_evidence_receipts.sql")).toBeLessThan(
+      raw.indexOf("Deploy this function"),
+    );
+    expect(src.match(/\.rpc\s*\(\s*["']ai_doctor_finalize_review["']/g) ?? []).toHaveLength(1);
+    expect(src).not.toMatch(/\.rpc\s*\(\s*["']ai_credit_attach_result["']/);
   });
 });

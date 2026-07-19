@@ -4,6 +4,8 @@ import { Link, useSearchParams } from "react-router-dom";
 
 import BrandLogo from "@/components/BrandLogo";
 import FounderShareCard from "@/components/FounderShareCard";
+import FoundersHeroCounter from "@/components/FoundersHeroCounter";
+import FoundersWall from "@/components/FoundersWall";
 import {
   Accordion,
   AccordionContent,
@@ -143,6 +145,9 @@ export default function Founder() {
         <p className="mx-auto mt-3 max-w-2xl text-sm text-muted-foreground">
           {FOUNDER_LAUNCH_COPY.availability}
         </p>
+        <div className="mx-auto mt-6 max-w-2xl">
+          <FoundersHeroCounter />
+        </div>
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <FounderPricingLink
             source="hero"
@@ -236,6 +241,23 @@ export default function Founder() {
       <div className="mx-auto max-w-3xl px-6 pb-16">
         <FounderShareCard />
       </div>
+
+      <section aria-labelledby="founders-wall-heading" className="mx-auto max-w-4xl px-6 pb-16">
+        <h2
+          id="founders-wall-heading"
+          className="font-display text-2xl font-semibold text-center"
+        >
+          The Founders Wall
+        </h2>
+        <p className="mx-auto mt-3 max-w-2xl text-center text-sm text-muted-foreground">
+          Verified Founders who chose to appear publicly. Founders may stay hidden
+          or show only a number; nothing here is auto-populated.
+        </p>
+        <div className="mt-6">
+          <FoundersWall />
+        </div>
+      </section>
+
 
       <section className="border-t border-border/50 px-6 py-16 text-center">
         <div className="mx-auto max-w-3xl">

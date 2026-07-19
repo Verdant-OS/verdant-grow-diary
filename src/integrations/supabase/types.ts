@@ -3332,6 +3332,14 @@ export type Database = {
           read_ct: number
         }[]
       }
+      revoke_lovable_founder_lifetime_by_transaction: {
+        Args: {
+          p_environment: string
+          p_now: string
+          p_paddle_transaction_id: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       agreement_type: "terms" | "privacy"

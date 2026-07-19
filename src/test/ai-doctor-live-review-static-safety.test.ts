@@ -12,6 +12,7 @@ import { resolve } from "node:path";
 import { stripSourceComments } from "@/test/utils/stripSourceComments";
 
 const ROOT = resolve(__dirname, "../..");
+const readRaw = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
 const read = (p: string) => stripSourceComments(readFileSync(resolve(ROOT, p), "utf8"));
 
 const FRONTEND_FILES = [
@@ -78,11 +79,12 @@ describe("ai doctor live review — edge static safety", () => {
       expect(src).not.toMatch(/\.update\(/);
       expect(src).not.toMatch(/\.delete\(/);
       // RPC allow-list: live-review edge may only call atomic credit spend,
-      // matching refund, and the service-only completion recorder after a
-      // fresh validated result. It must never persist model data directly.
+      // matching refund, immutable result attachment, and the service-only
+      // completion recorder after a fresh validated result.
       const APPROVED_RPCS = new Set([
         "ai_credit_spend",
         "ai_credit_refund",
+        "ai_credit_attach_result",
         "record_ai_doctor_review_completion",
       ]);
       const rpcCalls = [...src.matchAll(/\.rpc\s*\(\s*["'`]([a-zA-Z0-9_]+)["'`]/g)].map(
@@ -101,15 +103,22 @@ describe("ai doctor live review — edge static safety", () => {
         const completionCallIndex = src.lastIndexOf(
           "recordFreshAiDoctorReviewCompletion(userId, spendId)",
         );
-        expect(completionCallIndex).toBeGreaterThan(validationIndex);
-        expect(src).toContain('if (spendObj.status === "spent" && spendId)');
-        const replayStart = src.indexOf('if (spendObj.status === "replayed"');
-        const replayEnd = src.indexOf("const spendId", replayStart);
+        const attachmentIndex = src.indexOf('.rpc("ai_credit_attach_result"');
+        expect(attachmentIndex).toBeGreaterThan(validationIndex);
+        expect(completionCallIndex).toBeGreaterThan(attachmentIndex);
+        expect(src).toContain('if (attachment === "recorded")');
+        const replayStart = src.indexOf("const spendDecision = classifyAiDoctorCreditSpend");
+        const replayEnd = src.indexOf("const spendId = spendDecision.spendId", replayStart);
         expect(replayStart).toBeGreaterThanOrEqual(0);
         expect(replayEnd).toBeGreaterThan(replayStart);
         expect(src.slice(replayStart, replayEnd)).not.toContain(
           "recordFreshAiDoctorReviewCompletion",
         );
+        expect(src.slice(replayStart, replayEnd)).toContain('return calmFailure("result_pending")');
+        const scopeStart = src.indexOf("spendObj.feature !== FEATURE");
+        const pendingStart = src.indexOf('if (spendDecision.kind === "pending")');
+        expect(scopeStart).toBeGreaterThan(replayStart);
+        expect(src.slice(scopeStart, pendingStart)).toContain("spendObj.grow_id !== growId");
         expect(src).toContain("parseAiDoctorReviewRequestEnvelope");
         expect(src).toContain("validateAndNormalizeAiDoctorReviewRequestPacket");
         const packetValidationIndex = src.indexOf(
@@ -121,9 +130,24 @@ describe("ai doctor live review — edge static safety", () => {
         expect(src.slice(packetValidationIndex, firstCreditSpendIndex)).toContain(
           'return calmFailure("shape")',
         );
+        const keyValidationIndex = src.indexOf("if (!isUuid(request.idempotencyKey))");
+        expect(keyValidationIndex).toBeGreaterThan(packetValidationIndex);
+        expect(keyValidationIndex).toBeLessThan(firstCreditSpendIndex);
+        expect(src).not.toContain("crypto.randomUUID()");
         expect(src).toContain("buildAiDoctorPromptMessages(validatedPacket)");
         expect(src).not.toContain("buildAiDoctorPromptMessages(request.packet)");
         expect(src).not.toContain("buildAiDoctorPromptMessages(requestBody)");
+        const ambiguousAttachment = src.indexOf('if (attachment === "ambiguous")');
+        const rejectedAttachment = src.indexOf('if (attachment === "rejected")');
+        expect(ambiguousAttachment).toBeGreaterThan(attachmentIndex);
+        expect(rejectedAttachment).toBeGreaterThan(ambiguousAttachment);
+        expect(src.slice(ambiguousAttachment, rejectedAttachment)).toContain(
+          'return calmFailure("result_pending")',
+        );
+        expect(src.slice(ambiguousAttachment, rejectedAttachment)).not.toContain(
+          "failureAfterRefund",
+        );
+        expect(src.slice(rejectedAttachment, completionCallIndex)).toContain("failureAfterRefund");
       }
       for (const re of [
         /action_queue/i,
@@ -160,4 +184,13 @@ describe("ai doctor live review — edge static safety", () => {
       }
     });
   }
+
+  it("requires the result-cache migration before deploying the AI Doctor Edge", () => {
+    const raw = readRaw("supabase/functions/ai-doctor-review/index.ts");
+    const src = stripSourceComments(raw);
+    expect(raw).toContain("20260719043000_ai_credit_result_cache.sql");
+    expect(raw).toMatch(/apply[\s\S]{0,100}before deploying this function/i);
+    expect(src.match(/\.rpc\s*\(\s*["']ai_credit_attach_result["']/g) ?? []).toHaveLength(1);
+    expect(src).not.toMatch(/\bsupabase\.rpc\s*\(\s*["']ai_credit_attach_result["']/);
+  });
 });

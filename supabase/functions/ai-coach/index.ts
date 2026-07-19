@@ -147,6 +147,14 @@ Deno.serve(async (req) => {
       return json({ error: "credit_rpc" }, 500);
     }
     const spendObj = spend as Record<string, unknown>;
+    if (spendObj.ok !== true && spendObj.status !== "denied") {
+      // A refunded or context-conflicting idempotency replay is terminal, but
+      // it is not a quota denial. Keep it out of the paywall path.
+      console.log(
+        `ai-coach status=credit_invalid http=200 reason=${String(spendObj.reason ?? "")}`,
+      );
+      return json({ ok: false, reason: "invalid" }, 200);
+    }
     if (spendObj.ok !== true) {
       console.log(`ai-coach status=credit_denied http=200 reason=${String(spendObj.reason ?? "")}`);
       return json({ ok: false, reason: "credit_denied", credit: spendObj }, 200);

@@ -44,9 +44,53 @@ interface RunState {
   loading: boolean;
   outcome: ToolCallOutcome | null;
   ranAt: string | null;
+  args: Record<string, unknown> | null;
+  previousArgs: Record<string, unknown> | null;
 }
 
-const EMPTY: RunState = { loading: false, outcome: null, ranAt: null };
+const EMPTY: RunState = {
+  loading: false,
+  outcome: null,
+  ranAt: null,
+  args: null,
+  previousArgs: null,
+};
+
+// ---------- pure diff helper ----------
+
+export type ArgDiffKind = "added" | "removed" | "changed" | "unchanged";
+export interface ArgDiffEntry {
+  key: string;
+  kind: ArgDiffKind;
+  from: unknown;
+  to: unknown;
+}
+
+export function diffArgs(
+  prev: Record<string, unknown> | null,
+  curr: Record<string, unknown> | null,
+): ArgDiffEntry[] {
+  const a = prev ?? {};
+  const b = curr ?? {};
+  const keys = Array.from(new Set([...Object.keys(a), ...Object.keys(b)])).sort();
+  return keys.map((key) => {
+    const inA = Object.prototype.hasOwnProperty.call(a, key);
+    const inB = Object.prototype.hasOwnProperty.call(b, key);
+    const from = a[key];
+    const to = b[key];
+    let kind: ArgDiffKind;
+    if (inA && !inB) kind = "removed";
+    else if (!inA && inB) kind = "added";
+    else if (JSON.stringify(from) !== JSON.stringify(to)) kind = "changed";
+    else kind = "unchanged";
+    return { key, kind, from, to };
+  });
+}
+
+function formatArgValue(v: unknown): string {
+  if (v === undefined) return "—";
+  return JSON.stringify(v);
+}
 
 const UUID_RE =
   /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -258,11 +302,26 @@ function ToolCard({
 
   const invalid = fieldErrors.length > 0;
 
+  const [showDiff, setShowDiff] = useState(false);
+
   const run = useCallback(async () => {
     if (invalid) return;
-    setState({ loading: true, outcome: null, ranAt: null });
-    const outcome = await callMcpTool(endpoint, toolName, buildArgs());
-    setState({ loading: false, outcome, ranAt: new Date().toISOString() });
+    const args = buildArgs();
+    setState((prev) => ({
+      loading: true,
+      outcome: null,
+      ranAt: null,
+      args: prev.args,
+      previousArgs: prev.args,
+    }));
+    const outcome = await callMcpTool(endpoint, toolName, args);
+    setState((prev) => ({
+      loading: false,
+      outcome,
+      ranAt: new Date().toISOString(),
+      args,
+      previousArgs: prev.previousArgs,
+    }));
     if (outcome.status === "unauthorized" || outcome.status === "not_connected") {
       onAuthLost();
     }
@@ -338,7 +397,69 @@ function ToolCard({
         {state.ranAt ? (
           <span className="text-xs text-muted-foreground">Ran at {state.ranAt}</span>
         ) : null}
+        {state.previousArgs && state.args ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={() => setShowDiff((s) => !s)}
+            aria-expanded={showDiff}
+            aria-controls={`tool-explorer-diff-${toolName}`}
+            data-testid={`tool-explorer-view-changes-${toolName}`}
+          >
+            {showDiff ? "Hide changes" : "View changes"}
+          </Button>
+        ) : null}
       </div>
+
+      {state.previousArgs && state.args && showDiff ? (() => {
+        const entries = diffArgs(state.previousArgs, state.args);
+        const changed = entries.filter((e) => e.kind !== "unchanged");
+        return (
+          <div
+            id={`tool-explorer-diff-${toolName}`}
+            data-testid={`tool-explorer-diff-${toolName}`}
+            className="rounded-md border bg-muted/40 p-3 text-xs space-y-2"
+          >
+            <p className="font-medium text-sm">
+              Changes since previous request
+              {changed.length === 0 ? (
+                <span className="ml-2 font-normal text-muted-foreground">
+                  (no fields changed)
+                </span>
+              ) : null}
+            </p>
+            {changed.length > 0 ? (
+              <ul className="space-y-1 font-mono">
+                {changed.map((e) => {
+                  const tag =
+                    e.kind === "added"
+                      ? { label: "added", cls: "text-emerald-600 dark:text-emerald-400" }
+                      : e.kind === "removed"
+                        ? { label: "removed", cls: "text-destructive" }
+                        : { label: "changed", cls: "text-amber-600 dark:text-amber-400" };
+                  return (
+                    <li key={e.key} className="flex flex-wrap items-baseline gap-2">
+                      <span className={`uppercase tracking-wide ${tag.cls}`}>
+                        {tag.label}
+                      </span>
+                      <span className="font-semibold">{e.key}</span>
+                      {e.kind !== "added" ? (
+                        <span className="text-muted-foreground line-through">
+                          {formatArgValue(e.from)}
+                        </span>
+                      ) : null}
+                      {e.kind !== "removed" ? (
+                        <span>→ {formatArgValue(e.to)}</span>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : null}
+          </div>
+        );
+      })() : null}
 
       {(() => {
         const category = classifyOutcome(state.outcome);

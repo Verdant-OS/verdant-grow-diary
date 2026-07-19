@@ -154,8 +154,8 @@ export function buildPlantDetailQuickActions(
       event: "open-quicklog",
       eventPayload: quickLogPayload,
       testId: "plant-detail-quick-action-upload-photo",
-      disabled: !plantId,
-      disabledReason: plantId ? undefined : "Plant context is not loaded yet.",
+      disabled: !quickLogPayload,
+      disabledReason: quickLogDisabledReason,
     },
     {
       kind: "ask_doctor",
@@ -184,8 +184,8 @@ export function buildPlantDetailQuickActions(
       event: "open-quicklog",
       eventPayload: quickLogPayload,
       testId: "plant-detail-quick-action-harvest",
-      disabled: !plantId,
-      disabledReason: plantId ? undefined : "Plant context is not loaded yet.",
+      disabled: !quickLogPayload,
+      disabledReason: quickLogDisabledReason,
     },
   ];
 }

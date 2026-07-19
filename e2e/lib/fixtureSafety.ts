@@ -40,6 +40,11 @@ export interface FixtureEnvValidation {
   };
 }
 
+/** Preserve fixture names literally and require a full accessible-name match. */
+export function exactAccessibleNameOptions(name: string): { name: string; exact: true } {
+  return { name, exact: true };
+}
+
 /**
  * Known patterns that indicate the URL points at a real / production grow.
  * Extend this list when new known-real plants are identified.
@@ -65,9 +70,7 @@ export function validateFixtureEnv(env: FixtureSafetyEnv): FixtureEnvValidation 
   const errors: string[] = [];
 
   if (env.E2E_FIXTURE_MODE !== "true") {
-    errors.push(
-      "E2E_FIXTURE_MODE must be exactly 'true' before write-producing smoke can run.",
-    );
+    errors.push("E2E_FIXTURE_MODE must be exactly 'true' before write-producing smoke can run.");
   }
 
   const plantUrl = env.E2E_GROW_1_PLANT_URL ?? "";
@@ -144,9 +147,7 @@ export function pageTextMatchesFixture(
   ];
   for (const [label, value] of required) {
     if (value && !text.includes(value)) {
-      errors.push(
-        `Expected ${label} name '${value}' not visible on the target page.`,
-      );
+      errors.push(`Expected ${label} name '${value}' not visible on the target page.`);
     }
   }
 
@@ -154,17 +155,14 @@ export function pageTextMatchesFixture(
   // supplied. The current UI does not expose a Grow page in the setup
   // flow, so a missing grow name must not fail fixture verification.
   if (expected.grow && !text.includes(expected.grow)) {
-    errors.push(
-      `Expected grow name '${expected.grow}' not visible on the target page.`,
-    );
+    errors.push(`Expected grow name '${expected.grow}' not visible on the target page.`);
   }
 
   const hint = (options.accountHint ?? "").trim();
   if (hint) {
     // If the visible UI exposes any account-identity surface (email-like
     // string or "Signed in as" label), require the hint to be present.
-    const exposesAccount =
-      /signed in as|account:|@/i.test(text);
+    const exposesAccount = /signed in as|account:|@/i.test(text);
     if (exposesAccount && !text.toLowerCase().includes(hint.toLowerCase())) {
       errors.push(
         `Account hint '${hint}' not visible on a page that exposes account identity — refusing to assume the dedicated test account is signed in.`,

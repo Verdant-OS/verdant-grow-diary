@@ -87,6 +87,7 @@ import {
   resolveQuickLogEditorTarget,
   resolveQuickLogPrefillTarget,
   resolveQuickLogWriteTarget,
+  type QuickLogResolvedTarget,
 } from "@/lib/quickLogTargetIntegrityRules";
 import { buildSensorSnapshotSavePayload } from "@/lib/latestSensorSnapshotRules";
 import { quickLogReasonToOperatorMessage } from "@/lib/quickLogSaveErrorMessage";
@@ -226,6 +227,16 @@ type LastQuickLogTarget = {
   savedAt: string;
 };
 
+type InFlightSaveContext = Readonly<{
+  target: QuickLogResolvedTarget;
+  plantName: string;
+  tentName: string | null;
+  growName: string | null;
+  eventType: string;
+  stage: string;
+  stageWasUserTouched: boolean;
+}>;
+
 function rememberLastTarget(target: LastQuickLogTarget) {
   if (typeof window === "undefined") return;
   try {
@@ -253,8 +264,10 @@ export default function QuickLog({
 }: Props) {
   const { user } = useAuth();
   const { grows, activeGrow, activeGrowId, setActiveGrowId } = useGrows();
-  const { data: plants = [] } = usePlants();
-  const { data: activeTents = [] } = useTents();
+  const plantsQuery = usePlants();
+  const tentsQuery = useTents();
+  const plants = useMemo(() => plantsQuery.data ?? [], [plantsQuery.data]);
+  const activeTents = useMemo(() => tentsQuery.data ?? [], [tentsQuery.data]);
   const queryClient = useQueryClient();
   const { save: saveViaRpc } = useQuickLogV2Save();
 
@@ -302,6 +315,7 @@ export default function QuickLog({
     lightDistance: "",
   });
   const [busy, setBusy] = useState(false);
+  const [inFlightSaveContext, setInFlightSaveContext] = useState<InFlightSaveContext | null>(null);
   const [hardwareOpen, setHardwareOpen] = useState(false);
   const [wateringError, setWateringError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -345,19 +359,31 @@ export default function QuickLog({
   // payload, so an edited retry is distinguished from a pure retry.
   const lastFailedSaveSigRef = useRef<string | null>(null);
 
+  const prefillRequestKey = quickLogPrefillTargetKey(prefill);
+  const namedPrefillQueryError =
+    prefillRequestKey !== null && (plantsQuery.isError || tentsQuery.isError);
+  const namedPrefillQueryPending =
+    prefillRequestKey !== null &&
+    !namedPrefillQueryError &&
+    (plantsQuery.isPending ||
+      plantsQuery.isLoading ||
+      tentsQuery.isPending ||
+      tentsQuery.isLoading);
   const prefillTarget = useMemo(
-    () => resolveQuickLogPrefillTarget({ prefill, plants, tents: activeTents }),
-    [prefill, plants, activeTents],
+    () =>
+      namedPrefillQueryPending || namedPrefillQueryError
+        ? ({ status: "blocked", reason: "prefill_target_pending" } as const)
+        : resolveQuickLogPrefillTarget({ prefill, plants, tents: activeTents }),
+    [prefill, plants, activeTents, namedPrefillQueryPending, namedPrefillQueryError],
   );
   const prefillPlantId = prefillTarget.status === "ready" ? prefillTarget.target.plantId : null;
   const prefillGrowId = prefillTarget.status === "ready" ? prefillTarget.target.growId : null;
-  const prefillRequestKey = quickLogPrefillTargetKey(prefill);
   const prefillHoldActive =
     prefillRequestKey !== null && dismissedBlockedPrefillKey !== prefillRequestKey;
   const editorPlantId = prefillHoldActive ? (prefillPlantId ?? "") : plantId;
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || busy) return;
     if (prefillHoldActive && prefillPlantId && prefillGrowId) {
       if (prefillGrowId !== activeGrowId) {
         setActiveGrowId(prefillGrowId);
@@ -409,6 +435,7 @@ export default function QuickLog({
     prefillGrowId,
     prefillRequestKey,
     dismissedBlockedPrefillKey,
+    busy,
   ]);
 
   const scopedPlants = useMemo(
@@ -454,7 +481,8 @@ export default function QuickLog({
       }),
     [prefill, prefillTarget, writeTarget, dismissedBlockedPrefillKey],
   );
-  const resolvedTarget = editorTarget.status === "ready" ? editorTarget.target : null;
+  const editorResolvedTarget = editorTarget.status === "ready" ? editorTarget.target : null;
+  const resolvedTarget = inFlightSaveContext?.target ?? editorResolvedTarget;
   const resolvedTargetGrow = useMemo(
     () =>
       resolvedTarget ? (grows.find((grow) => grow.id === resolvedTarget.growId) ?? null) : null,
@@ -483,12 +511,12 @@ export default function QuickLog({
   // plant…" state (A → "" → B) is still seen as A→B. Ordered BEFORE the
   // defaulting effect so the flag is settled before the default is recomputed.
   useEffect(() => {
-    if (!open) return;
+    if (!open || busy) return;
     if (isUserDrivenPlantSwitch(prevPlantIdRef.current, editorPlantId)) {
       stageUserTouchedRef.current = false;
     }
     if (editorPlantId) prevPlantIdRef.current = editorPlantId;
-  }, [open, editorPlantId]);
+  }, [open, editorPlantId, busy]);
 
   // Slice A2: default the stage from the selected plant, else the active grow.
   // Skipped once the grower has manually chosen a stage (touched ref). The
@@ -496,14 +524,14 @@ export default function QuickLog({
   // read that does not depend on the generated types exposing it, and never
   // widens the value to `any`.
   useEffect(() => {
-    if (!open) return;
+    if (!open || busy) return;
     if (stageUserTouchedRef.current) return;
     const resolved = resolveQuickLogStageDefault({
       plantStage: (selectedPlant as { stage?: unknown } | null)?.stage ?? null,
       growStage: activeGrow?.stage ?? null,
     });
     setStage((prev) => (prev === resolved ? prev : resolved));
-  }, [open, selectedPlant, activeGrow?.stage]);
+  }, [open, selectedPlant, activeGrow?.stage, busy]);
 
   const sensorTentId = resolvedTarget?.tentId ?? null;
   const sensorState = useLatestTentSensorSnapshot(sensorTentId);
@@ -659,6 +687,7 @@ export default function QuickLog({
     setHarvestPhotoAngle("");
     setHarvestPhotoLighting("");
     setSelectedPhenoEvidenceGoal(null);
+    setInFlightSaveContext(null);
   }
 
   /**
@@ -669,6 +698,7 @@ export default function QuickLog({
    * stage, snapshot, remindAt) are preserved.
    */
   function handleEventTypeChange(next: string) {
+    if (busy) return;
     const plan = planQuickLogActionSwitchReset(eventType, next);
     setEventType(next);
     if (!plan.changed) return;
@@ -789,15 +819,21 @@ export default function QuickLog({
       if (!selectedPlant) focusPlant();
       return;
     }
-    const saveTarget = editorTarget.target;
-    if (!note.trim() && eventType !== "watering") {
+    const saveTarget = Object.freeze({ ...editorTarget.target });
+    const saveStage = stage;
+    const saveStageWasUserTouched = stageUserTouchedRef.current;
+    const saveEventType = eventType;
+    const savePlant = selectedPlant;
+    const saveTent = selectedTent;
+    const saveGrow = resolvedTargetGrow;
+    if (!note.trim() && saveEventType !== "watering") {
       const message = "Add a quick note";
       setSaveError(message);
       toast.error(message);
       noteRef.current?.focus();
       return;
     }
-    if (eventType === "watering") {
+    if (saveEventType === "watering") {
       const raw = details.watering.trim();
       const vol = Number(raw);
       if (!raw || !Number.isFinite(vol) || vol <= 0) {
@@ -811,6 +847,17 @@ export default function QuickLog({
       }
     }
 
+    setInFlightSaveContext(
+      Object.freeze({
+        target: saveTarget,
+        plantName: savePlant.name,
+        tentName: saveTent.name ?? null,
+        growName: saveGrow?.name ?? null,
+        eventType: saveEventType,
+        stage: saveStage,
+        stageWasUserTouched: saveStageWasUserTouched,
+      }),
+    );
     setBusy(true);
     try {
       const noteWithHardware = appendHardwareReadingsToNote(note, hardware);
@@ -822,7 +869,7 @@ export default function QuickLog({
         milestone: earlyMilestone,
         vigor: earlyVigor,
         notes: earlyNotes,
-        stage,
+        stage: saveStage,
       });
       const earlyStageRecord: Record<string, unknown> | null = earlyStageEnvelope
         ? { ...earlyStageEnvelope }
@@ -831,13 +878,13 @@ export default function QuickLog({
         milestone: earlyMilestone,
         vigor: earlyVigor,
         notes: earlyNotes,
-        stage,
+        stage: saveStage,
       });
       // Block out-of-band air-sensor values before building the envelope so an
       // implausible reading surfaces the same per-metric copy Quick Log v2
       // shows — instead of the old silent clamp-to-null that discarded the
       // grower's number. Reuses the single canonical band via the shared guard.
-      if (eventType === "environment") {
+      if (saveEventType === "environment") {
         const bandCheck = validateEnvironmentCheckSensorBand({
           roomTempF: envRoomTempF,
           humidityPct: envHumidityPct,
@@ -852,7 +899,7 @@ export default function QuickLog({
         }
       }
       const environmentCheckEnvelope =
-        eventType === "environment"
+        saveEventType === "environment"
           ? buildEnvironmentCheckDetails({
               roomTempF: envRoomTempF,
               humidityPct: envHumidityPct,
@@ -867,7 +914,7 @@ export default function QuickLog({
         ? { ...environmentCheckEnvelope }
         : null;
       const configuredPhenoGoal =
-        eventType === "observation" &&
+        saveEventType === "observation" &&
         selectedPhenoEvidenceGoal &&
         phenoEvidenceContext.status === "ready" &&
         phenoEvidenceContext.context?.huntId === selectedPhenoHuntId &&
@@ -882,11 +929,11 @@ export default function QuickLog({
             huntId: selectedPhenoHuntId,
             plantId: saveTarget.plantId,
             evidenceGoal: configuredPhenoGoal,
-            stage: normalizeQuickLogStage(stage),
+            stage: normalizeQuickLogStage(saveStage),
           })
         : null;
       const built = buildLegacyQuickLogUnifiedPayload({
-        eventType,
+        eventType: saveEventType,
         idempotencyKey: saveIdempotencyKeyRef.current,
         noteWithHardware,
         plantId: saveTarget.plantId,
@@ -923,7 +970,7 @@ export default function QuickLog({
       // the grower's validated UI selection so observation/environment keep
       // their semantic activity even though the legacy RPC stores both as
       // `p_action: "note"`.
-      const result = await saveViaRpc(built.payload, { telemetryIntent: eventType });
+      const result = await saveViaRpc(built.payload, { telemetryIntent: saveEventType });
       if (!result.ok) {
         lastFailedSaveSigRef.current = attemptSig;
         const reason = result.reason ?? "save_failed";
@@ -947,12 +994,12 @@ export default function QuickLog({
       // the touched ref to avoid silently mutating the grow's stage on an
       // ordinary save. Still never writes an unknown/empty stage.
       if (
-        resolvedTargetGrow &&
-        stageUserTouchedRef.current &&
-        normalizeQuickLogStage(stage) &&
-        stage !== resolvedTargetGrow.stage
+        saveGrow &&
+        saveStageWasUserTouched &&
+        normalizeQuickLogStage(saveStage) &&
+        saveStage !== saveGrow.stage
       ) {
-        await supabase.from("grows").update({ stage }).eq("id", saveTarget.growId);
+        await supabase.from("grows").update({ stage: saveStage }).eq("id", saveTarget.growId);
       }
 
       // Submission completed: the next logical submission gets a fresh key.
@@ -961,11 +1008,11 @@ export default function QuickLog({
       saveIdempotencyKeyRef.current = newQuickLogSaveKey();
       lastFailedSaveSigRef.current = null;
 
-      const plantLabel = selectedPlant.name;
+      const plantLabel = savePlant.name;
       const finalMessage =
         successMessage && successMessage !== "Logged 🌱"
           ? successMessage
-          : `Saved ${savedVerb(eventType)} for ${plantLabel}`;
+          : `Saved ${savedVerb(saveEventType)} for ${plantLabel}`;
       toast.success(finalMessage);
 
       rememberLastTarget({
@@ -975,11 +1022,11 @@ export default function QuickLog({
         savedAt: new Date().toISOString(),
       });
       setSavedTarget({
-        id: selectedPlant.id,
+        id: savePlant.id,
         name: plantLabel,
-        tentName: selectedTent?.name ?? null,
-        growName: resolvedTargetGrow?.name ?? null,
-        eventType,
+        tentName: saveTent.name ?? null,
+        growName: saveGrow?.name ?? null,
+        eventType: saveEventType,
         savedAt: new Date().toISOString(),
       });
       onCreated?.();
@@ -1023,6 +1070,7 @@ export default function QuickLog({
       console.error("[QuickLog] unexpected error", err);
     } finally {
       setBusy(false);
+      setInFlightSaveContext(null);
     }
   }
 
@@ -1040,22 +1088,43 @@ export default function QuickLog({
     !tentSetupRequired
   );
   const showWateringErr = !!wateringError;
-  const targetPlantName = resolvedTarget
-    ? (resolvedTargetPlant?.name ?? "Assigned plant")
-    : "Choose a plant";
-  const targetTentName = resolvedTarget
-    ? (resolvedTargetTent?.name ?? "Assigned tent")
-    : "Plant required before save";
-  const targetGrowName = resolvedTarget
-    ? (resolvedTargetGrow?.name ?? "Assigned grow")
-    : "No setup selected";
-  const editorTargetBlocked = editorTarget.status === "blocked";
+  const targetQueryPending = inFlightSaveContext === null && namedPrefillQueryPending;
+  const targetQueryError = inFlightSaveContext === null && namedPrefillQueryError;
+  const targetSelectionLocked = busy || targetQueryPending || targetQueryError;
+  const displayedPlantId = inFlightSaveContext?.target.plantId ?? editorPlantId;
+  const displayedGrowId = inFlightSaveContext?.target.growId ?? activeGrowId ?? "";
+  const displayedEventType = inFlightSaveContext?.eventType ?? eventType;
+  const displayedStage = inFlightSaveContext?.stage ?? stage;
+  const targetPlantName =
+    inFlightSaveContext?.plantName ??
+    (resolvedTarget ? (resolvedTargetPlant?.name ?? "Assigned plant") : "Choose a plant");
+  const targetTentName =
+    inFlightSaveContext?.tentName ??
+    (resolvedTarget ? (resolvedTargetTent?.name ?? "Assigned tent") : "Plant required before save");
+  const targetGrowName =
+    inFlightSaveContext?.growName ??
+    (resolvedTarget ? (resolvedTargetGrow?.name ?? "Assigned grow") : "No setup selected");
+  const editorTargetBlocked =
+    inFlightSaveContext === null &&
+    !targetQueryPending &&
+    !targetQueryError &&
+    editorTarget.status === "blocked";
   const showTargetError = editorTargetBlocked && (prefillHoldActive || selectedPlant !== null);
-  const plantSelectErrorId = editorTargetBlocked
-    ? showTargetError
-      ? "quick-log-target-error"
-      : "quick-log-plant-error"
-    : undefined;
+  const plantSelectErrorId = targetQueryPending
+    ? "quick-log-target-loading"
+    : targetQueryError
+      ? "quick-log-target-query-error"
+      : editorTargetBlocked
+        ? showTargetError
+          ? "quick-log-target-error"
+          : "quick-log-plant-error"
+        : undefined;
+  const targetQueryErrorSubject =
+    plantsQuery.isError && tentsQuery.isError
+      ? "plant and tent details"
+      : plantsQuery.isError
+        ? "plant details"
+        : "tent details";
 
   return (
     <Dialog
@@ -1358,7 +1427,13 @@ export default function QuickLog({
                   {targetGrowName}
                 </p>
               </div>
-              <Button type="button" variant="outline" size="sm" onClick={focusPlant}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={focusPlant}
+                disabled={targetSelectionLocked}
+              >
                 Change
               </Button>
             </div>
@@ -1367,8 +1442,10 @@ export default function QuickLog({
               <div>
                 <Label className="text-xs">Plant</Label>
                 <Select
-                  value={editorPlantId || "__none"}
+                  value={displayedPlantId || "__none"}
+                  disabled={targetSelectionLocked}
                   onValueChange={(v) => {
+                    if (targetSelectionLocked) return;
                     setDismissedBlockedPrefillKey(prefillRequestKey);
                     setPlantId(v === "__none" ? "" : v);
                     setSaveError(null);
@@ -1396,8 +1473,10 @@ export default function QuickLog({
               <div>
                 <Label className="text-xs">Current Setup</Label>
                 <Select
-                  value={activeGrowId ?? ""}
+                  value={displayedGrowId}
+                  disabled={targetSelectionLocked}
                   onValueChange={(v) => {
+                    if (targetSelectionLocked) return;
                     setDismissedBlockedPrefillKey(prefillRequestKey);
                     setActiveGrowId(v);
                     setSaveError(null);
@@ -1416,7 +1495,40 @@ export default function QuickLog({
                 </Select>
               </div>
             </div>
-            {showTargetError && editorTarget.status === "blocked" ? (
+            {targetQueryPending ? (
+              <p
+                id="quick-log-target-loading"
+                role="status"
+                className="text-[11px] text-muted-foreground"
+                data-testid="quick-log-target-loading"
+              >
+                {QUICK_LOG_TARGET_BLOCKED_COPY.prefill_target_pending}
+              </p>
+            ) : targetQueryError ? (
+              <div className="flex items-center justify-between gap-3">
+                <p
+                  id="quick-log-target-query-error"
+                  role="alert"
+                  className="text-[11px] text-destructive"
+                  data-testid="quick-log-target-query-error"
+                >
+                  We couldn't load the {targetQueryErrorSubject} needed to confirm this Quick Log
+                  target.
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  data-testid="quick-log-target-retry"
+                  onClick={() => {
+                    if (plantsQuery.isError) void plantsQuery.refetch();
+                    if (tentsQuery.isError) void tentsQuery.refetch();
+                  }}
+                >
+                  Retry
+                </Button>
+              </div>
+            ) : showTargetError && editorTarget.status === "blocked" ? (
               <p
                 id="quick-log-target-error"
                 role="alert"
@@ -1585,14 +1697,17 @@ export default function QuickLog({
             <div className="grid grid-cols-2 gap-2">
               <EventTypeSelector
                 id="quick-log-event-type"
-                value={eventType}
+                value={displayedEventType}
                 onValueChange={handleEventTypeChange}
+                disabled={busy}
               />
               <div>
                 <Label className="text-xs">Stage</Label>
                 <Select
-                  value={stage}
+                  value={displayedStage}
+                  disabled={busy}
                   onValueChange={(v) => {
+                    if (busy) return;
                     stageUserTouchedRef.current = true;
                     setStage(v);
                   }}

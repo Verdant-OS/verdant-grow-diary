@@ -129,12 +129,15 @@ describe("buildPlantDetailQuickActions · payloads and routes", () => {
     { label: "grow", input: { plantId: "p1", growId: null, tentId: "t1" } },
     { label: "tent", input: { plantId: "p1", growId: "g1", tentId: null } },
   ])(
-    "Quick Log is disabled without a complete plant/grow/tent target ($label missing)",
+    "all Quick Log handoffs are disabled without a complete plant/grow/tent target ($label missing)",
     ({ input }) => {
-      const ql = buildPlantDetailQuickActions(input).find((entry) => entry.kind === "quicklog")!;
-      expect(ql.eventPayload).toBeNull();
-      expect(ql.disabled).toBe(true);
-      expect(ql.disabledReason).toMatch(/grow and tent/i);
+      const entries = buildPlantDetailQuickActions(input);
+      for (const kind of ["quicklog", "upload_photo", "harvest"] as const) {
+        const entry = entries.find((candidate) => candidate.kind === kind)!;
+        expect(entry.eventPayload).toBeNull();
+        expect(entry.disabled).toBe(true);
+        expect(entry.disabledReason).toMatch(/grow and tent/i);
+      }
     },
   );
 
@@ -380,17 +383,21 @@ describe("PlantDetailQuickActions · render", () => {
   it.each([
     { growId: null, tentId: "t1" },
     { growId: "g1", tentId: null },
-  ])("partial Quick Log target is disabled and dispatches no event", ({ growId, tentId }) => {
+  ])("partial Quick Log handoffs are disabled and dispatch no event", ({ growId, tentId }) => {
     const handler = vi.fn();
     window.addEventListener(PLANT_QUICKLOG_PREFILL_EVENT, handler);
     render(<PlantDetailQuickActions plantId="p1" growId={growId} tentId={tentId} />);
 
-    const button = screen.getByTestId("plant-detail-quick-action-quicklog");
-    expect(button).toBeDisabled();
-    expect(screen.getByTestId("plant-detail-quick-action-quicklog-reason")).toHaveTextContent(
-      /grow and tent/i,
-    );
-    fireEvent.click(button);
+    for (const testId of [
+      "plant-detail-quick-action-quicklog",
+      "plant-detail-quick-action-upload-photo",
+      "plant-detail-quick-action-harvest",
+    ]) {
+      const button = screen.getByTestId(testId);
+      expect(button).toBeDisabled();
+      expect(screen.getByTestId(`${testId}-reason`)).toHaveTextContent(/grow and tent/i);
+      fireEvent.click(button);
+    }
     expect(handler).not.toHaveBeenCalled();
 
     window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, handler);

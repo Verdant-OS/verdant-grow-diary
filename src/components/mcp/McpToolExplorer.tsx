@@ -12,6 +12,13 @@
  * - When there is no stored token the UI shows a Connect CTA that
  *   deep-links to Settings → Agent integrations; it does not attempt
  *   to start a second OAuth flow from the docs page.
+ *
+ * VALIDATION:
+ * - Every input has an inline validator that runs on change AND blur.
+ * - Errors appear beneath the specific field with `aria-invalid` +
+ *   `aria-describedby` wired to a stable id, so the fix is obvious.
+ * - Run is disabled while any field is invalid; a summary line names
+ *   the fields that still need attention.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
@@ -40,6 +47,45 @@ interface RunState {
 }
 
 const EMPTY: RunState = { loading: false, outcome: null, ranAt: null };
+
+const UUID_RE =
+  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
+// ---------- pure validators ----------
+
+export function validateOptionalIntInRange(
+  raw: string,
+  min: number,
+  max: number,
+  fieldLabel: string,
+): string | null {
+  const t = raw.trim();
+  if (t === "") return null;
+  if (!/^-?\d+$/.test(t)) return `${fieldLabel} must be a whole number.`;
+  const n = Number(t);
+  if (!Number.isInteger(n) || n < min || n > max) {
+    return `${fieldLabel} must be between ${min} and ${max}.`;
+  }
+  return null;
+}
+
+export function validateRequiredUuid(raw: string, fieldLabel: string): string | null {
+  const t = raw.trim();
+  if (t === "") return `${fieldLabel} is required.`;
+  if (!UUID_RE.test(t)) {
+    return `${fieldLabel} must be a UUID (8-4-4-4-12 hex, e.g. 3f2e1a4b-…-9d2f).`;
+  }
+  return null;
+}
+
+function coerceOptionalInt(raw: string): number | undefined {
+  const t = raw.trim();
+  if (t === "") return undefined;
+  const n = Number(t);
+  return Number.isInteger(n) ? n : undefined;
+}
+
+// ---------- presentational helpers ----------
 
 function formatResult(outcome: ToolCallOutcome): string {
   if (outcome.status !== "ok") return outcome.message;
@@ -81,43 +127,49 @@ function OutcomeBadge({ outcome }: { outcome: ToolCallOutcome | null }) {
   return <Badge variant={variant}>{label}</Badge>;
 }
 
+interface FieldError {
+  id: string;
+  label: string;
+  message: string;
+}
+
 function ToolCard({
   toolName,
   endpoint,
   connected,
   children,
   buildArgs,
+  fieldErrors,
   onAuthLost,
 }: {
   toolName: ToolName;
   endpoint: string;
   connected: boolean;
   children: React.ReactNode;
-  buildArgs: () => { ok: true; args: Record<string, unknown> } | { ok: false; error: string };
+  buildArgs: () => Record<string, unknown>;
+  fieldErrors: FieldError[];
   onAuthLost: () => void;
 }) {
   const [state, setState] = useState<RunState>(EMPTY);
-  const [validationError, setValidationError] = useState<string | null>(null);
 
   const tool = useMemo(
     () => MCP_MANIFEST.tools.find((t) => t.name === toolName)!,
     [toolName],
   );
 
+  const invalid = fieldErrors.length > 0;
+
   const run = useCallback(async () => {
-    setValidationError(null);
-    const built = buildArgs();
-    if (built.ok === false) {
-      setValidationError(built.error);
-      return;
-    }
+    if (invalid) return;
     setState({ loading: true, outcome: null, ranAt: null });
-    const outcome = await callMcpTool(endpoint, toolName, built.args);
+    const outcome = await callMcpTool(endpoint, toolName, buildArgs());
     setState({ loading: false, outcome, ranAt: new Date().toISOString() });
     if (outcome.status === "unauthorized" || outcome.status === "not_connected") {
       onAuthLost();
     }
-  }, [buildArgs, endpoint, toolName, onAuthLost]);
+  }, [invalid, buildArgs, endpoint, toolName, onAuthLost]);
+
+  const summaryId = `tool-explorer-${toolName}-validation-summary`;
 
   return (
     <section
@@ -137,16 +189,43 @@ function ToolCard({
 
       <div className="space-y-3">{children}</div>
 
-      {validationError ? (
-        <div className="text-sm text-destructive" role="alert">
-          {validationError}
+      {invalid ? (
+        <div
+          id={summaryId}
+          role="alert"
+          aria-live="polite"
+          data-testid={`tool-explorer-validation-${toolName}`}
+          className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive space-y-1"
+        >
+          <p className="font-medium">Fix {fieldErrors.length === 1 ? "1 field" : `${fieldErrors.length} fields`} before running:</p>
+          <ul className="list-disc pl-5">
+            {fieldErrors.map((e) => (
+              <li key={e.id}>
+                <button
+                  type="button"
+                  className="underline underline-offset-2 hover:no-underline"
+                  onClick={() => {
+                    const el = document.getElementById(e.id);
+                    if (el) {
+                      el.focus();
+                      el.scrollIntoView({ block: "center", behavior: "smooth" });
+                    }
+                  }}
+                >
+                  {e.label}
+                </button>
+                : {e.message}
+              </li>
+            ))}
+          </ul>
         </div>
       ) : null}
 
       <div className="flex flex-wrap items-center gap-3">
         <Button
           onClick={run}
-          disabled={!connected || state.loading}
+          disabled={!connected || state.loading || invalid}
+          aria-describedby={invalid ? summaryId : undefined}
           data-testid={`tool-explorer-run-${toolName}`}
         >
           {state.loading ? (
@@ -183,8 +262,16 @@ function ToolCard({
   );
 }
 
-const UUID_RE =
-  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+// ---------- field row with inline validation ----------
+
+function FieldError({ id, message }: { id: string; message: string | null }) {
+  if (!message) return null;
+  return (
+    <p id={id} role="alert" className="text-xs text-destructive">
+      {message}
+    </p>
+  );
+}
 
 export default function McpToolExplorer() {
   const [connected, setConnected] = useState<boolean>(false);
@@ -202,13 +289,49 @@ export default function McpToolExplorer() {
   // list_grows state
   const [includeArchived, setIncludeArchived] = useState(false);
   const [growsLimit, setGrowsLimit] = useState("25");
+  const [growsLimitTouched, setGrowsLimitTouched] = useState(false);
 
   // list_recent_diary_entries state
   const [growId, setGrowId] = useState("");
+  const [growIdTouched, setGrowIdTouched] = useState(false);
   const [diaryLimit, setDiaryLimit] = useState("10");
+  const [diaryLimitTouched, setDiaryLimitTouched] = useState(false);
 
   // get_latest_sensor_snapshot state
   const [tentId, setTentId] = useState("");
+  const [tentIdTouched, setTentIdTouched] = useState(false);
+
+  // Live per-field validation (always computed; shown once touched).
+  const growsLimitError = validateOptionalIntInRange(growsLimit, 1, 100, "limit");
+  const growIdError = validateRequiredUuid(growId, "growId");
+  const diaryLimitError = validateOptionalIntInRange(diaryLimit, 1, 50, "limit");
+  const tentIdError = validateRequiredUuid(tentId, "tentId");
+
+  const listGrowsErrors: FieldError[] = [];
+  if (growsLimitError) {
+    listGrowsErrors.push({
+      id: "list-grows-limit",
+      label: "Limit",
+      message: growsLimitError,
+    });
+  }
+
+  const listDiaryErrors: FieldError[] = [];
+  if (growIdError) {
+    listDiaryErrors.push({ id: "list-diary-grow", label: "Grow id", message: growIdError });
+  }
+  if (diaryLimitError) {
+    listDiaryErrors.push({
+      id: "list-diary-limit",
+      label: "Limit",
+      message: diaryLimitError,
+    });
+  }
+
+  const sensorErrors: FieldError[] = [];
+  if (tentIdError) {
+    sensorErrors.push({ id: "sensor-tent", label: "Tent id", message: tentIdError });
+  }
 
   return (
     <section
@@ -263,18 +386,13 @@ export default function McpToolExplorer() {
         endpoint={endpoint}
         connected={connected}
         onAuthLost={refreshAuth}
+        fieldErrors={growsLimitTouched ? listGrowsErrors : []}
         buildArgs={() => {
           const args: Record<string, unknown> = {};
           if (includeArchived) args.includeArchived = true;
-          const trimmed = growsLimit.trim();
-          if (trimmed) {
-            const n = Number(trimmed);
-            if (!Number.isInteger(n) || n < 1 || n > 100) {
-              return { ok: false, error: "limit must be an integer between 1 and 100." };
-            }
-            args.limit = n;
-          }
-          return { ok: true, args };
+          const n = coerceOptionalInt(growsLimit);
+          if (n !== undefined) args.limit = n;
+          return args;
         }}
       >
         <div className="flex items-center justify-between gap-3">
@@ -289,14 +407,27 @@ export default function McpToolExplorer() {
           />
         </div>
         <div className="space-y-1">
-          <Label htmlFor="list-grows-limit">Limit (1–100)</Label>
+          <Label htmlFor="list-grows-limit">
+            Limit <span className="text-muted-foreground">(optional, 1–100)</span>
+          </Label>
           <Input
             id="list-grows-limit"
             inputMode="numeric"
             value={growsLimit}
-            onChange={(e) => setGrowsLimit(e.target.value)}
+            onChange={(e) => {
+              setGrowsLimit(e.target.value);
+              setGrowsLimitTouched(true);
+            }}
+            onBlur={() => setGrowsLimitTouched(true)}
+            aria-invalid={growsLimitTouched && !!growsLimitError}
+            aria-describedby={
+              growsLimitTouched && growsLimitError ? "list-grows-limit-error" : undefined
+            }
             placeholder="25"
           />
+          {growsLimitTouched ? (
+            <FieldError id="list-grows-limit-error" message={growsLimitError} />
+          ) : null}
         </div>
       </ToolCard>
 
@@ -305,46 +436,71 @@ export default function McpToolExplorer() {
         endpoint={endpoint}
         connected={connected}
         onAuthLost={refreshAuth}
+        fieldErrors={[
+          ...(growIdTouched && growIdError
+            ? [{ id: "list-diary-grow", label: "Grow id", message: growIdError }]
+            : []),
+          ...(diaryLimitTouched && diaryLimitError
+            ? [{ id: "list-diary-limit", label: "Limit", message: diaryLimitError }]
+            : []),
+        ]}
         buildArgs={() => {
-          const trimmedGrow = growId.trim();
-          if (!trimmedGrow || !UUID_RE.test(trimmedGrow)) {
-            return { ok: false, error: "growId must be a UUID from one of your grows." };
-          }
-          const args: Record<string, unknown> = { growId: trimmedGrow };
-          const trimmedLimit = diaryLimit.trim();
-          if (trimmedLimit) {
-            const n = Number(trimmedLimit);
-            if (!Number.isInteger(n) || n < 1 || n > 50) {
-              return { ok: false, error: "limit must be an integer between 1 and 50." };
-            }
-            args.limit = n;
-          }
-          return { ok: true, args };
+          const args: Record<string, unknown> = { growId: growId.trim() };
+          const n = coerceOptionalInt(diaryLimit);
+          if (n !== undefined) args.limit = n;
+          return args;
         }}
       >
         <div className="space-y-1">
-          <Label htmlFor="list-diary-grow">Grow id (UUID)</Label>
+          <Label htmlFor="list-diary-grow">
+            Grow id <span className="text-muted-foreground">(required UUID)</span>
+          </Label>
           <Input
             id="list-diary-grow"
             value={growId}
-            onChange={(e) => setGrowId(e.target.value)}
-            placeholder="e.g. 3f2e…-b1c0"
+            onChange={(e) => {
+              setGrowId(e.target.value);
+              setGrowIdTouched(true);
+            }}
+            onBlur={() => setGrowIdTouched(true)}
+            aria-invalid={growIdTouched && !!growIdError}
+            aria-describedby={
+              growIdTouched && growIdError ? "list-diary-grow-error" : undefined
+            }
+            placeholder="e.g. 3f2e1a4b-…-9d2f"
             spellCheck={false}
           />
-          <p className="text-xs text-muted-foreground">
-            Tip: run <code className="font-mono">list_grows</code> above to copy an id
-            from your own grows.
-          </p>
+          {growIdTouched ? (
+            <FieldError id="list-diary-grow-error" message={growIdError} />
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Tip: run <code className="font-mono">list_grows</code> above to copy an
+              id from your own grows.
+            </p>
+          )}
         </div>
         <div className="space-y-1">
-          <Label htmlFor="list-diary-limit">Limit (1–50)</Label>
+          <Label htmlFor="list-diary-limit">
+            Limit <span className="text-muted-foreground">(optional, 1–50)</span>
+          </Label>
           <Input
             id="list-diary-limit"
             inputMode="numeric"
             value={diaryLimit}
-            onChange={(e) => setDiaryLimit(e.target.value)}
+            onChange={(e) => {
+              setDiaryLimit(e.target.value);
+              setDiaryLimitTouched(true);
+            }}
+            onBlur={() => setDiaryLimitTouched(true)}
+            aria-invalid={diaryLimitTouched && !!diaryLimitError}
+            aria-describedby={
+              diaryLimitTouched && diaryLimitError ? "list-diary-limit-error" : undefined
+            }
             placeholder="10"
           />
+          {diaryLimitTouched ? (
+            <FieldError id="list-diary-limit-error" message={diaryLimitError} />
+          ) : null}
         </div>
       </ToolCard>
 
@@ -353,27 +509,36 @@ export default function McpToolExplorer() {
         endpoint={endpoint}
         connected={connected}
         onAuthLost={refreshAuth}
-        buildArgs={() => {
-          const trimmed = tentId.trim();
-          if (!trimmed || !UUID_RE.test(trimmed)) {
-            return { ok: false, error: "tentId must be a UUID from one of your tents." };
-          }
-          return { ok: true, args: { tentId: trimmed } };
-        }}
+        fieldErrors={tentIdTouched ? sensorErrors : []}
+        buildArgs={() => ({ tentId: tentId.trim() })}
       >
         <div className="space-y-1">
-          <Label htmlFor="sensor-tent">Tent id (UUID)</Label>
+          <Label htmlFor="sensor-tent">
+            Tent id <span className="text-muted-foreground">(required UUID)</span>
+          </Label>
           <Input
             id="sensor-tent"
             value={tentId}
-            onChange={(e) => setTentId(e.target.value)}
-            placeholder="e.g. 8a13…-9d2f"
+            onChange={(e) => {
+              setTentId(e.target.value);
+              setTentIdTouched(true);
+            }}
+            onBlur={() => setTentIdTouched(true)}
+            aria-invalid={tentIdTouched && !!tentIdError}
+            aria-describedby={
+              tentIdTouched && tentIdError ? "sensor-tent-error" : "sensor-tent-hint"
+            }
+            placeholder="e.g. 8a13c9f0-…-9d2f"
             spellCheck={false}
           />
-          <p className="text-xs text-muted-foreground">
-            Only <code className="font-mono">current_live=true</code> readings are
-            current live telemetry — every other label stays as-is.
-          </p>
+          {tentIdTouched && tentIdError ? (
+            <FieldError id="sensor-tent-error" message={tentIdError} />
+          ) : (
+            <p id="sensor-tent-hint" className="text-xs text-muted-foreground">
+              Only <code className="font-mono">current_live=true</code> readings are
+              current live telemetry — every other label stays as-is.
+            </p>
+          )}
         </div>
       </ToolCard>
     </section>

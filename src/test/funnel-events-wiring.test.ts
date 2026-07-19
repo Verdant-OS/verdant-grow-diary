@@ -311,7 +311,7 @@ describe("ordering and safety constraints at the seams", () => {
     expect(startDedupe).toBeGreaterThan(frozenMode);
 
     const resultGate = src.indexOf(
-      'if (!allowed || review.status !== "result" || !review.result) return;',
+      'if (!activeReviewVisible || review.status !== "result" || !review.result) return;',
     );
     const resultSurface = src.indexOf("const surface = acceptedReviewModeRef.current", resultGate);
     const resultDedupe = src.indexOf(
@@ -398,8 +398,9 @@ describe("ordering and safety constraints at the seams", () => {
     expect(src).toMatch(
       /onClick=\{review\.status === "error" \? review\.retry : handleInitialStart\}/,
     );
+    expect(src).toMatch(/activeReviewRequest\s*\?\s*review\.status === "error" && canRetryReview/);
     expect(src).toMatch(
-      /review\.status === "idle" \|\| \(review\.status === "error" && canRetryReview\)/,
+      /allowed && historyRecovery\.state !== "decision_required" && review\.status === "idle"/,
     );
     expect(src.match(/trackFunnelEvent\("historical_ai_review_started"\)/g) ?? []).toHaveLength(1);
   });

@@ -6,11 +6,12 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "postbuild": "node scripts/validate-jsonld-rich-results.mjs dist && node scripts/validate-og-image-urls.mjs dist && node scripts/validate-og-url-canonical-parity.mjs dist && node scripts/validate-canonical-shape.mjs dist && node scripts/validate-title-description.mjs dist && node scripts/validate-jsonld-id-canonical-parity.mjs dist",
+    "postbuild": "node scripts/validate-jsonld-rich-results.mjs dist && node scripts/validate-og-image-urls.mjs dist && node scripts/validate-og-url-canonical-parity.mjs dist && node scripts/validate-canonical-singleton.mjs dist && node scripts/validate-canonical-shape.mjs dist && node scripts/validate-title-description.mjs dist && node scripts/validate-jsonld-id-canonical-parity.mjs dist",
     "build:dev": "vite build --mode development",
     "check:jsonld": "node scripts/validate-jsonld-rich-results.mjs dist",
     "check:og-images": "node scripts/validate-og-image-urls.mjs dist",
     "check:og-url-canonical-parity": "node scripts/validate-og-url-canonical-parity.mjs dist",
+    "check:canonical-singleton": "node scripts/validate-canonical-singleton.mjs dist",
     "check:canonical-shape": "node scripts/validate-canonical-shape.mjs dist",
     "check:title-description": "node scripts/validate-title-description.mjs dist",
     "lint": "eslint .",

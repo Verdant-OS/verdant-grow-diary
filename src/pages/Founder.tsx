@@ -6,6 +6,7 @@ import BrandLogo from "@/components/BrandLogo";
 import FounderShareCard from "@/components/FounderShareCard";
 import FoundersHeroCounter from "@/components/FoundersHeroCounter";
 import FoundersWall from "@/components/FoundersWall";
+import FounderOwnerPrefsForm from "@/components/FounderOwnerPrefsForm";
 import {
   Accordion,
   AccordionContent,
@@ -255,6 +256,9 @@ export default function Founder() {
         </p>
         <div className="mt-6">
           <FoundersWall />
+        </div>
+        <div className="mt-8">
+          <FounderOwnerPrefsForm />
         </div>
       </section>
 

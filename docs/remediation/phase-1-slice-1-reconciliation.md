@@ -9,8 +9,8 @@
 ## Scope and current ground truth
 
 - Charter outcome: **T1 — Quick Log target integrity**.
-- Deploy-trunk base: `47cb5bd077e02ca17daa32b40191283e1cb9bf32` (`origin/verdant-grow-diary`).
-- Specification-repair base: `7e5739f5a`.
+- Deploy-trunk base: `55cece5a6b2a724fa9aa4fd54a1d4d11988ef2ec` (`origin/verdant-grow-diary`).
+- Specification-repair base: `9c96a13ba`.
 - Branch: `codex/verdant-trust-core-target-integrity`.
 - Deployment source of truth: `verdant-grow-diary`, not undeployed `main`.
 - `/dashboard` intentionally remains an authenticated Dashboard alias rendered inside `AppShell`; it is not a redirect and its optional `growId` scope is preserved.
@@ -58,25 +58,26 @@ Deterministic result: **3/3 enumerated route-scoped entry-point classes pass, an
 
 ## Replayed commit sequence
 
-- `278a55586` — Trust Core redesign specification
-- `e13e2cec0` — T1 implementation plan
-- `d595905eb` — pure target-integrity rules
-- `f8eb93745` — Quick Log canonical display/write target
-- `60dd7aadc` — exact One-Tent Loop Quick Log handoff
-- `c5509626e` — scope-preserving `/logs` route alias
-- `e279103f4` — authenticated route-target gate
-- `6bc58b7e6` — legacy Quick Log target-fixture alignment
-- `f2e05addf` — legacy save and alias-contract alignment
-- `b22ca3772` — exact refresh-target contract alignment
-- `eb8a4aa61` — initial reconciliation packet replay
-- `7e5739f5a` — target-integrity port evidence refresh
-- `37c444fbe` — blocked-target integrity repair
-- `d158e28cc` — canonical target display repair
-- `1ebfc4e6c` — in-flight target, query-state, handoff, and exact-name repair
-- `4101f49e1` — specification-repair reconciliation
-- `09c29a0d5` — legacy target-contract tests aligned with explicit grower selection
-- `b10c4f2f2` — final validation evidence
-- `5d390f989` — cross-platform workflow-fixture parsing
+- `8a721e4be` — Trust Core redesign specification
+- `219274b1f` — T1 implementation plan
+- `799e9955e` — pure target-integrity rules
+- `78742706f` — Quick Log canonical display/write target
+- `b523bde4a` — scope-preserving `/logs` route alias
+- `b235d82d3` — authenticated route-target gate
+- `0b16aa9c4` — legacy Quick Log target-fixture alignment
+- `124377e81` — legacy save and alias-contract alignment
+- `0c190c037` — exact refresh-target contract alignment
+- `7b24cf3f9` — initial reconciliation packet replay
+- `9c96a13ba` — target-integrity port evidence refresh
+- `795a700a1` — blocked-target integrity repair
+- `2f82e0e9f` — canonical target display repair
+- `1eafb1f2d` — in-flight target, query-state, handoff, and exact-name repair
+- `322607033` — specification-repair reconciliation
+- `8bae8a430` — legacy target-contract tests aligned with explicit grower selection
+- `c00bfd39d` — final validation evidence
+- `b9d770d69` — cross-platform workflow-fixture parsing
+- `51d7f2765` — latest deploy-base reconciliation
+- `4da7229e8` — exact target strengthening on the upstream Plant Detail handoff
 
 ## Validation rerun on this port
 
@@ -85,8 +86,9 @@ Deterministic result: **3/3 enumerated route-scoped entry-point classes pass, an
 | Requested targeted slice              | **Pass — 16 files, 203/203 tests, 0 failures**                                                                        |
 | Repair-focused changed-test batch     | **Pass — 8 files, 151/151 tests, 0 failures**                                                                         |
 | Final regression repair batch         | **Pass — 5 files, 42/42 tests, 0 failures**                                                                           |
+| Plant Detail continuity closure       | **Pass — 5 files, 52/52 tests, 0 failures**                                                                           |
 | Cross-platform E2E static contracts   | **Pass — 4 files, 93/93 tests, 0 failures**                                                                           |
-| All branch-changed test files         | **Pass — 35 files, 447/447 tests, 0 failures**                                                                        |
+| All branch-changed test files         | **Pass — 35 files, 442/442 tests, 0 failures**                                                                        |
 | Type-check                            | **Pass — 0 diagnostics** (`tsc -p tsconfig.app.json --noEmit`)                                                        |
 | Changed-file lint                     | **Pass — 0 errors, 0 warnings**                                                                                       |
 | Pre-commit matrix                     | **Pass — formatter, ESLint fix, TypeScript, docs safety, and 22/22 tests**                                            |
@@ -98,7 +100,7 @@ Deterministic result: **3/3 enumerated route-scoped entry-point classes pass, an
 | Source security scan                  | **Pass — all scanner fixtures and the source-tree scan passed; no allow-list or suppression was added**               |
 | Quick Log RPC static boundary         | **Pass — 6 files, 137/137 tests, 0 failures**                                                                         |
 | Quick Log typed-payload runtime       | **Skipped — required disposable Supabase URL/service-role/anon test credentials are not present locally**             |
-| One-Tent Loop audit                   | **Pass — 21 files, 365/365 tests, 0 failures, 0 skips**                                                               |
+| One-Tent Loop audit                   | **Pass — 24 files, 395/395 tests, 0 failures, 0 skips**                                                               |
 | Playwright discovery / E2E TypeScript | **Pass — 3 tests listed across setup, authenticated, and mocked projects; no browser execution**                      |
 | Fixture checklist                     | **Pass — required Tent + Plant names and optional Grow/second-plant vars printed without values**                     |
 | Fixture verification                  | **Not run; remains pending against the dedicated disposable fixture**                                                 |
@@ -108,13 +110,15 @@ Deterministic result: **3/3 enumerated route-scoped entry-point classes pass, an
 
 The requested targeted slice emitted only known non-failing React Router v7 future-flag notices and Radix Dialog `Description`/`aria-describedby` warnings. No targeted test failed and type-check emitted no warning or diagnostic.
 
-The exact all-branch-changed-test-file batch is currently green at 447/447. The first aggregate rerun exposed nine legacy assertions that still expected silent sole-plant fallback or invalid-prefill fallback. Those tests now use a valid route target followed by an explicit grower selection, preserving mismatch, accessibility, stage-alias, post-save, and draft-safety coverage without restoring the unsafe behavior.
+The exact all-branch-changed-test-file batch is currently green at 442/442. The first aggregate rerun exposed nine legacy assertions that still expected silent sole-plant fallback or invalid-prefill fallback. Those tests now use a valid route target followed by an explicit grower selection, preserving mismatch, accessibility, stage-alias, post-save, and draft-safety coverage without restoring the unsafe behavior.
 
-After the branch was rebased without conflict onto the latest deploy trunk, the workflow-fixture parsers exposed four CRLF-only failures on Windows. The two shared test readers now normalize line endings before applying the exact workflow assertions; the same assertions pass 93/93 without changing workflow content.
+After the branch was rebased onto deploy trunk, the workflow-fixture parsers exposed four CRLF-only failures on Windows. The two shared test readers now normalize line endings before applying the exact workflow assertions; the same assertions pass 93/93 without changing workflow content.
+
+Deploy PR #343 then landed a presenter-owned Plant Detail local-action handoff over the same older card-dispatch implementation. The port keeps that newer deploy architecture, drops the superseded self-contained event dispatch, and adds only the stricter T1 fence: Plant Detail does not enable the handoff until plant, tent, and grow are all known. The integration test proves the local sheet receives that exact tuple without navigation.
 
 The security scanner initially identified only generated `dist/` bundle strings in the local working directory. The generated directory was temporarily isolated, the scanner fixtures and source-tree scan passed, and the directory was restored unchanged. The scanner timing wrapper remains red only because two passing rows exceeded its unchanged 5000 ms performance threshold on this Windows runner. No workflow safety parser, timing threshold, allow-list, suppression, or scope fence was weakened to obtain any result.
 
-The old branch's full-suite totals, scanner timings, Playwright discovery, E2E compilation, fixture-checklist result, and deployment-base classifications are intentionally not carried forward as current evidence because they were not rerun against `47cb5bd07`.
+The old branch's full-suite totals, scanner timings, Playwright discovery, E2E compilation, fixture-checklist result, and deployment-base classifications are intentionally not carried forward as current evidence because they were not rerun against `55cece5a6`.
 
 ## Current pending gates
 

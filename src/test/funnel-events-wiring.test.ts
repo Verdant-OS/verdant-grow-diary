@@ -135,7 +135,7 @@ const QUICK_LOG_SUCCESS_SEAMS: Array<{
   {
     file: "src/components/QuickLogV2Sheet.tsx",
     calls: 1,
-    extra: /trackQuickLogSuccess\("feed"\)/,
+    extra: /trackQuickLogSuccess\("feed",\s*\{\s*reused:\s*result\.reused\s*\}\)/,
   },
   {
     file: "src/components/PlantQuickLog.tsx",
@@ -229,9 +229,10 @@ describe("ordering and safety constraints at the seams", () => {
 
   it("structured feed and Plant Quick Log emit only after their write rejection gates", () => {
     const sheet = read("src/components/QuickLogV2Sheet.tsx");
-    expect(sheet.indexOf('trackQuickLogSuccess("feed")')).toBeGreaterThan(
+    expect(sheet.indexOf('trackQuickLogSuccess("feed"')).toBeGreaterThan(
       sheet.indexOf("if (result.ok !== true)"),
     );
+    expect(sheet).toMatch(/trackQuickLogSuccess\("feed",\s*\{\s*reused:\s*result\.reused/);
 
     const plant = read("src/components/PlantQuickLog.tsx");
     expect(plant.indexOf('trackQuickLogSuccess("plant_quick_log")')).toBeGreaterThan(

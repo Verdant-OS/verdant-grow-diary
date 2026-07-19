@@ -340,6 +340,66 @@ function ToolCard({
         ) : null}
       </div>
 
+      {(() => {
+        const category = classifyOutcome(state.outcome);
+        const guidance = category ? guidanceFor(category) : null;
+        if (!guidance) return null;
+        const toneClass =
+          guidance.tone === "destructive"
+            ? "border-destructive/40 bg-destructive/10 text-destructive"
+            : "border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-200";
+        return (
+          <div
+            role="alert"
+            aria-live="polite"
+            data-testid={`tool-explorer-guidance-${toolName}`}
+            data-category={category}
+            className={`rounded-md border p-3 text-sm space-y-2 ${toneClass}`}
+          >
+            <p className="font-medium">{guidance.title}</p>
+            <p>{guidance.body}</p>
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              {guidance.primaryAction === "reconnect" ? (
+                <Button asChild size="sm" variant="outline">
+                  <Link to="/settings/agent-integrations">
+                    <PlugZap className="mr-2 h-4 w-4" aria-hidden />
+                    Reconnect this browser
+                  </Link>
+                </Button>
+              ) : null}
+              {guidance.primaryAction === "fix_params" && fieldErrors[0] ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    const el = document.getElementById(fieldErrors[0].id);
+                    if (el) {
+                      el.focus();
+                      el.scrollIntoView({ block: "center", behavior: "smooth" });
+                    }
+                  }}
+                >
+                  Jump to {fieldErrors[0].label}
+                </Button>
+              ) : null}
+              <Button
+                type="button"
+                size="sm"
+                onClick={run}
+                disabled={state.loading || invalid || !connected}
+                data-testid={`tool-explorer-retry-${toolName}`}
+              >
+                <RotateCcw className="mr-2 h-4 w-4" aria-hidden />
+                {guidance.primaryAction === "fix_params" ? "Retry with corrections" : "Retry"}
+              </Button>
+            </div>
+          </div>
+        );
+      })()}
+
+
+
       <div
         role="status"
         aria-live="polite"

@@ -2,11 +2,11 @@
  * QuickLogActivityPicker — presenter-only activity grid driven by the
  * shared QUICK_LOG_ACTIVITY_DEFINITIONS. Every entry-point (DailyCheck,
  * Plant fast-actions, QuickLog dialog) can consume this component so the
- * v1a activity taxonomy is not duplicated in JSX.
+ * activity taxonomy is not duplicated in JSX.
  *
  * Never persists. Never fires save events. Never claims plant health.
- * Harvest renders visible-but-disabled with the shared backend-update
- * copy. Missing sensor/context stays unknown, never "healthy".
+ * Harvest is selectable and uses the shared cautious activity copy.
+ * Missing sensor/context stays unknown, never "healthy".
  */
 import { Button } from "@/components/ui/button";
 import {

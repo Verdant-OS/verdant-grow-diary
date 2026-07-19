@@ -226,6 +226,12 @@ bun run e2e:setup       # writes e2e/.auth/user.json
 bun run e2e:quicklog-smoke
 ```
 
+The smoke command itself internally runs the same read-only fixture validation
+immediately after navigation and before re-consent or any Quick Log
+write-producing action. Tent + Plant fixture names are required; Grow is optional.
+The validation checks that the configured fixture names
+and relationship are visible, and fails before writes on any mismatch.
+
 ### Windows PowerShell
 
 ```powershell

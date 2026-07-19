@@ -12,9 +12,8 @@
  * src/constants/*.
  *
  * Safety fences:
- *   - Harvest is visible-but-disabled; click never opens a form, never
- *     calls an RPC, never dispatches verdant:entry-created, never adds
- *     a saved item.
+ *   - Harvest is enabled and persists through the canonical event route;
+ *     its copy does not claim readiness or final yield.
  *   - Manual sensor snapshot is intentionally deferred to the existing
  *     ManualSensorReadingCard path — this section shows the shared
  *     safety copy and links out; it does NOT persist a reading itself.

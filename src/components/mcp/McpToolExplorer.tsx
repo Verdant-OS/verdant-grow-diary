@@ -829,6 +829,9 @@ export default function McpToolExplorer() {
         endpoint={endpoint}
         connected={connected}
         onAuthLost={refreshAuth}
+        onRunOutcome={(outcome, category) =>
+          persistOnOk("list_recent_diary_entries", outcome, category, { growId, diaryLimit })
+        }
         fieldErrors={[
           ...(growIdTouched && growIdError
             ? [{ id: "list-diary-grow", label: "Grow id", message: growIdError }]

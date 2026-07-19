@@ -56,7 +56,7 @@ describe("founders_wall_public — view exposure invariant", () => {
 
   it("anon has NO SELECT on public.founders base table", () => {
     // Base grants live in the Turn A migration.
-    const base = ALL_MIGRATIONS.find((m) => m.sql.includes("CREATE TABLE public.founders"));
+    const base = ALL_MIGRATIONS.find((m) => /CREATE\s+TABLE(\s+IF\s+NOT\s+EXISTS)?\s+public\.founders\s*\(/i.test(m.sql));
     expect(base).toBeTruthy();
     const sql = base!.sql;
     // Explicit revoke or simply no grant to anon. We assert an explicit

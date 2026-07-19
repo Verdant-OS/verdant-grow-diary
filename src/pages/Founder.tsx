@@ -4,6 +4,8 @@ import { Link, useSearchParams } from "react-router-dom";
 
 import BrandLogo from "@/components/BrandLogo";
 import FounderShareCard from "@/components/FounderShareCard";
+import FoundersHeroCounter from "@/components/FoundersHeroCounter";
+import FoundersWall from "@/components/FoundersWall";
 import {
   Accordion,
   AccordionContent,

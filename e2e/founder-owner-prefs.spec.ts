@@ -391,25 +391,41 @@ test.describe("Founder owner preferences (mocked)", () => {
 
     const saveButton = page.getByRole("button", { name: /Saving…|Save Founder settings/i });
 
-    // In-flight state: button disabled, label switched to "Saving…",
-    // spinner rendered (aria-hidden Loader2 icon), and every editable
+    // In-flight state: button disabled + aria-busy="true", label switched
+    // to "Saving…" inside a polite live region so AT announces the change,
+    // spinner rendered as decorative (aria-hidden), and every editable
     // input/switch/select disabled.
     await expect(saveButton).toBeDisabled();
-    await expect(saveButton).toHaveText(/Saving…/);
-    await expect(saveButton.locator("svg.animate-spin")).toBeVisible();
+    await expect(saveButton).toHaveAttribute("aria-busy", "true");
+    await expect(saveButton).toHaveAccessibleName(/Saving…/);
+
+    // Polite status region announces the loading label to assistive tech.
+    const savingStatus = saveButton.getByRole("status");
+    await expect(savingStatus).toBeVisible();
+    await expect(savingStatus).toHaveAttribute("aria-live", "polite");
+    await expect(savingStatus).toHaveText(/Saving…/);
+
+    // Spinner icon is decorative and must be hidden from AT.
+    const spinner = savingStatus.locator("svg.animate-spin");
+    await expect(spinner).toBeVisible();
+    await expect(spinner).toHaveAttribute("aria-hidden", "true");
 
     await expect(page.locator("#founder-show-on-wall")).toBeDisabled();
     await expect(page.locator("#founder-display-name")).toBeDisabled();
     await expect(page.locator("#founder-optional-link")).toBeDisabled();
     await expect(page.locator("#founder-display-style")).toBeDisabled();
 
-    // Release the edge function; UI should recover to the idle state.
+    // Release the edge function; UI should recover to the idle state and
+    // the busy signal must clear so AT no longer reports the button as busy.
     releaseInvoke?.();
 
-    await expect(
-      page.getByRole("button", { name: /Save Founder settings/i }),
-    ).toBeEnabled({ timeout: 5_000 });
+    const idleButton = page.getByRole("button", { name: /Save Founder settings/i });
+    await expect(idleButton).toBeEnabled({ timeout: 5_000 });
+    await expect(idleButton).not.toHaveAttribute("aria-busy", "true");
     await expect(page.locator("#founder-display-name")).toBeEnabled();
+    // Status live region is unmounted after the save resolves.
+    await expect(idleButton.getByRole("status")).toHaveCount(0);
+
   });
 
   test("successful save updates displayed prefs and keeps inputs enabled", async ({ page }) => {

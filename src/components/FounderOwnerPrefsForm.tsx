@@ -48,6 +48,8 @@ export default function FounderOwnerPrefsForm() {
   const [optionalLink, setOptionalLink] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const saveButtonRef = useRef<HTMLButtonElement | null>(null);
+  const wasSavingRef = useRef(false);
 
   useEffect(() => {
     if (!row) return;
@@ -56,6 +58,17 @@ export default function FounderOwnerPrefsForm() {
     setShowOnWall(row.show_on_wall);
     setOptionalLink(row.optional_link ?? "");
   }, [row]);
+
+  // After a save completes (saving true → false), return focus to the Save
+  // button so keyboard users are not stranded on a now-hidden control and
+  // no focus trap develops around the disabled state.
+  useEffect(() => {
+    if (wasSavingRef.current && !saving) {
+      const btn = saveButtonRef.current;
+      if (btn && !btn.disabled) btn.focus();
+    }
+    wasSavingRef.current = saving;
+  }, [saving]);
 
   const previewName = useMemo(() => {
     if (!row) return null;

@@ -138,6 +138,7 @@ describe("PlantDetailAiDoctorLiveReview — credit_denied branch", () => {
     await waitFor(() =>
       expect(screen.getByTestId("plant-ai-doctor-live-review-credit-denied")).toBeTruthy(),
     );
+    expect(screen.queryByTestId("plant-ai-doctor-live-review-retry")).toBeNull();
   }
 
   it("offers Free growers a return-safe pricing CTA and records the funnel view", async () => {

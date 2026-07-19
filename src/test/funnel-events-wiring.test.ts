@@ -398,6 +398,9 @@ describe("ordering and safety constraints at the seams", () => {
     expect(src).toMatch(
       /onClick=\{review\.status === "error" \? review\.retry : handleInitialStart\}/,
     );
+    expect(src).toMatch(
+      /review\.status === "idle" \|\| \(review\.status === "error" && canRetryReview\)/,
+    );
     expect(src.match(/trackFunnelEvent\("historical_ai_review_started"\)/g) ?? []).toHaveLength(1);
   });
 });

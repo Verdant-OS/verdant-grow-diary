@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { exactAccessibleNameOptions } from "../../e2e/lib/fixtureSafety";
 
 const harness = vi.hoisted(() => ({
   activeGrowId: "g1" as string | null,
@@ -568,5 +569,48 @@ describe("Quick Log canonical target contract", () => {
     expect(invalidatedKeys).toContain(JSON.stringify(["tent_recent_activity", "t1"]));
     expect(invalidatedKeys).not.toContain(JSON.stringify(["plant_recent_activity", "p2"]));
     expect(invalidatedKeys).not.toContain(JSON.stringify(["tent_recent_activity", "t2"]));
+  });
+
+  it("selects a literal plant name with a rendered strain suffix without prefix collision", async () => {
+    const targetName = "E2E Plant [A]+ (2).";
+    harness.plants = [
+      {
+        id: "p1",
+        name: targetName,
+        strain: "Lemon.*",
+        grow_id: "g1",
+        tent_id: "t1",
+        stage: "veg",
+      },
+      {
+        id: "p-prefix",
+        name: `${targetName} Clone`,
+        strain: "Prefix collision",
+        grow_id: "g1",
+        tent_id: "t1",
+        stage: "veg",
+      },
+    ];
+    renderQuickLog({ plantId: "p-prefix", growId: "g1", tentId: "t1" });
+    await waitFor(() =>
+      expect(screen.getByTestId("quick-log-target-card")).toHaveAttribute(
+        "data-target-plant-id",
+        "p-prefix",
+      ),
+    );
+
+    const plantSelect = screen.getByTestId("quick-log-plant-select");
+    fireEvent.pointerDown(plantSelect, { button: 0, ctrlKey: false, pointerType: "mouse" });
+    fireEvent.click(plantSelect);
+    const targetOption = await screen.findByRole("option", exactAccessibleNameOptions(targetName));
+    expect(targetOption).toHaveTextContent(`${targetName} · Lemon.*`);
+    fireEvent.click(targetOption);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("quick-log-target-card")).toHaveAttribute(
+        "data-target-plant-id",
+        "p1",
+      ),
+    );
   });
 });

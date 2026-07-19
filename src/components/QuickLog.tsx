@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { newQuickLogSaveKey } from "@/lib/quickLogIdempotencyKey";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -40,7 +40,9 @@ import {
   buildQuickLogPostSaveDescription,
   shouldBlockQuickLogClose,
 } from "@/lib/quickLogSaveGuardRules";
-import QuickLogAllActivitiesSection from "@/components/QuickLogAllActivitiesSection";
+import QuickLogAllActivitiesSection, {
+  type QuickLogAllActivitiesSaveTarget,
+} from "@/components/QuickLogAllActivitiesSection";
 import { STAGES } from "@/lib/grow";
 import {
   resolveQuickLogStageDefault,
@@ -329,6 +331,7 @@ export default function QuickLog({
     lightDistance: "",
   });
   const [busy, setBusy] = useState(false);
+  const [childSaveBusy, setChildSaveBusy] = useState(false);
   const [inFlightSaveContext, setInFlightSaveContext] = useState<InFlightSaveContext | null>(null);
   const [hardwareOpen, setHardwareOpen] = useState(false);
   const [wateringError, setWateringError] = useState<string | null>(null);
@@ -356,10 +359,10 @@ export default function QuickLog({
   const viewPlantBtnRef = useRef<HTMLAnchorElement | null>(null);
   const hardwareUserTouchedRef = useRef(false);
   const snapshotUserTouchedRef = useRef(false);
-  // Synchronous in-flight guard so a rapid double-click cannot fire a
-  // second submit before `busy` state has propagated. Complements the
-  // existing `busy || !!savedTarget` button-disabled logic.
-  const submitInFlightRef = useRef(false);
+  // One synchronous guard shared by the parent form and the all-activities
+  // child. Presenter state complements this ref but never replaces it.
+  const saveInFlightRef = useRef(false);
+  const saveLocked = busy || childSaveBusy;
   // One idempotency key per LOGICAL submission (quickLogIdempotencyKey
   // contract, same pattern as the V2 sheet): retries after a failure or a
   // lost response REUSE the key so the RPC dedupes instead of writing a
@@ -397,7 +400,7 @@ export default function QuickLog({
   const editorPlantId = prefillHoldActive ? (prefillPlantId ?? "") : plantId;
 
   useEffect(() => {
-    if (!open || busy) return;
+    if (!open || saveLocked) return;
     if (prefillHoldActive && prefillPlantId && prefillGrowId) {
       if (prefillGrowId !== activeGrowId) {
         setActiveGrowId(prefillGrowId);
@@ -449,7 +452,7 @@ export default function QuickLog({
     prefillGrowId,
     prefillRequestKey,
     dismissedBlockedPrefillKey,
-    busy,
+    saveLocked,
   ]);
 
   const scopedPlants = useMemo(
@@ -515,6 +518,53 @@ export default function QuickLog({
     [activeTents, resolvedTarget],
   );
 
+  const beginAllActivitiesSave = useCallback(
+    (target: QuickLogAllActivitiesSaveTarget): boolean => {
+      if (saveInFlightRef.current || !target.plantId || !target.tentId || !target.growId) {
+        return false;
+      }
+      const targetPlant = plants.find((plant) => plant.id === target.plantId) ?? null;
+      const targetTent = activeTents.find((tent) => tent.id === target.tentId) ?? null;
+      const targetGrow = grows.find((grow) => grow.id === target.growId) ?? null;
+      if (
+        !targetPlant ||
+        !targetTent ||
+        !targetGrow ||
+        targetPlant.grow_id !== target.growId ||
+        targetPlant.tent_id !== target.tentId ||
+        targetTent.grow_id !== target.growId
+      ) {
+        return false;
+      }
+
+      saveInFlightRef.current = true;
+      setChildSaveBusy(true);
+      setInFlightSaveContext(
+        Object.freeze({
+          target: Object.freeze({
+            plantId: target.plantId,
+            tentId: target.tentId,
+            growId: target.growId,
+          }),
+          plantName: targetPlant.name,
+          tentName: targetTent.name ?? null,
+          growName: targetGrow.name ?? null,
+          eventType,
+          stage,
+          stageWasUserTouched: stageUserTouchedRef.current,
+        }),
+      );
+      return true;
+    },
+    [activeTents, eventType, grows, plants, stage],
+  );
+
+  const endAllActivitiesSave = useCallback(() => {
+    saveInFlightRef.current = false;
+    setChildSaveBusy(false);
+    setInFlightSaveContext(null);
+  }, []);
+
   // Slice A2: re-enable stage defaulting ONLY when the grower actively switches
   // from one already-selected plant to a different one — the new target's stage
   // should win. It must NOT clear the touched flag on the initial ""→P
@@ -525,12 +575,12 @@ export default function QuickLog({
   // plant…" state (A → "" → B) is still seen as A→B. Ordered BEFORE the
   // defaulting effect so the flag is settled before the default is recomputed.
   useEffect(() => {
-    if (!open || busy) return;
+    if (!open || saveLocked) return;
     if (isUserDrivenPlantSwitch(prevPlantIdRef.current, editorPlantId)) {
       stageUserTouchedRef.current = false;
     }
     if (editorPlantId) prevPlantIdRef.current = editorPlantId;
-  }, [open, editorPlantId, busy]);
+  }, [open, editorPlantId, saveLocked]);
 
   // Slice A2: default the stage from the selected plant, else the active grow.
   // Skipped once the grower has manually chosen a stage (touched ref). The
@@ -538,14 +588,14 @@ export default function QuickLog({
   // read that does not depend on the generated types exposing it, and never
   // widens the value to `any`.
   useEffect(() => {
-    if (!open || busy) return;
+    if (!open || saveLocked) return;
     if (stageUserTouchedRef.current) return;
     const resolved = resolveQuickLogStageDefault({
       plantStage: (selectedPlant as { stage?: unknown } | null)?.stage ?? null,
       growStage: activeGrow?.stage ?? null,
     });
     setStage((prev) => (prev === resolved ? prev : resolved));
-  }, [open, selectedPlant, activeGrow?.stage, busy]);
+  }, [open, selectedPlant, activeGrow?.stage, saveLocked]);
 
   const sensorTentId = resolvedTarget?.tentId ?? null;
   const sensorState = useLatestTentSensorSnapshot(sensorTentId);
@@ -712,7 +762,7 @@ export default function QuickLog({
    * stage, snapshot, remindAt) are preserved.
    */
   function handleEventTypeChange(next: string) {
-    if (busy) return;
+    if (saveLocked) return;
     const plan = planQuickLogActionSwitchReset(eventType, next);
     setEventType(next);
     if (!plan.changed) return;
@@ -806,12 +856,12 @@ export default function QuickLog({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (submitInFlightRef.current || busy || savedTarget) return;
-    submitInFlightRef.current = true;
+    if (saveInFlightRef.current || saveLocked || savedTarget) return;
+    saveInFlightRef.current = true;
     try {
       await runSubmit();
     } finally {
-      submitInFlightRef.current = false;
+      saveInFlightRef.current = false;
     }
   }
 
@@ -1109,7 +1159,7 @@ export default function QuickLog({
   const showWateringErr = !!wateringError;
   const targetQueryPending = inFlightSaveContext === null && namedPrefillQueryPending;
   const targetQueryError = inFlightSaveContext === null && namedPrefillQueryError;
-  const targetSelectionLocked = busy || targetQueryPending || targetQueryError;
+  const targetSelectionLocked = saveLocked || targetQueryPending || targetQueryError;
   const displayedPlantId = inFlightSaveContext?.target.plantId ?? editorPlantId;
   const displayedGrowId = inFlightSaveContext?.target.growId ?? activeGrowId ?? "";
   const displayedEventType = inFlightSaveContext?.eventType ?? eventType;
@@ -1152,8 +1202,8 @@ export default function QuickLog({
       onOpenChange={(o) => {
         if (!o) {
           const blocked = shouldBlockQuickLogClose({
-            saving: busy,
-            inFlight: submitInFlightRef.current,
+            saving: saveLocked,
+            inFlight: saveInFlightRef.current,
           });
           if (blocked) {
             toast.message(QUICK_LOG_CLOSE_BLOCKED_HINT);
@@ -1191,6 +1241,9 @@ export default function QuickLog({
           plantId={resolvedTarget?.plantId ?? null}
           heading="All activity types"
           testIdPrefix="quick-log-dialog-all-activities"
+          onSaveStart={beginAllActivitiesSave}
+          onSaveEnd={endAllActivitiesSave}
+          saveBlocked={saveLocked}
         />
 
         <form onSubmit={submit} className="grid gap-4">
@@ -1719,15 +1772,15 @@ export default function QuickLog({
                 id="quick-log-event-type"
                 value={displayedEventType}
                 onValueChange={handleEventTypeChange}
-                disabled={busy}
+                disabled={saveLocked}
               />
               <div>
                 <Label className="text-xs">Stage</Label>
                 <Select
                   value={displayedStage}
-                  disabled={busy}
+                  disabled={saveLocked}
                   onValueChange={(v) => {
-                    if (busy) return;
+                    if (saveLocked) return;
                     stageUserTouchedRef.current = true;
                     setStage(v);
                   }}
@@ -2447,11 +2500,11 @@ export default function QuickLog({
 
           <Button
             type="submit"
-            disabled={busy || !resolvedTarget || !!savedTarget}
+            disabled={saveLocked || !resolvedTarget || !!savedTarget}
             data-testid="quick-log-save"
             className="gradient-leaf text-primary-foreground"
           >
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save log"}
+            {saveLocked ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save log"}
           </Button>
           <p
             data-testid="quick-log-save-helper"

@@ -40,9 +40,14 @@ export interface FixtureEnvValidation {
   };
 }
 
-/** Preserve fixture names literally and require a full accessible-name match. */
-export function exactAccessibleNameOptions(name: string): { name: string; exact: true } {
-  return { name, exact: true };
+function escapeRegExpLiteral(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Match the literal plant name, with only the UI's exact optional strain suffix. */
+export function exactAccessibleNameOptions(name: string): { name: RegExp } {
+  const literalName = escapeRegExpLiteral(name);
+  return { name: new RegExp(`^${literalName}(?: · .+)?$`) };
 }
 
 /**

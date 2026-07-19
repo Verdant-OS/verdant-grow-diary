@@ -24,7 +24,7 @@
  *   - No recommendation, no health inference, no "safe to feed / train
  *     / defoliate", no harvest readiness, no diagnosis language.
  */
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -39,10 +39,7 @@ import {
   type QuickLogActivityId,
   type QuickLogWeightUnit,
 } from "@/constants/quickLogActivityTypes";
-import {
-  buildHarvestDetailsPayload,
-  validateHarvestWeightInput,
-} from "@/lib/harvestDetailsRules";
+import { buildHarvestDetailsPayload, validateHarvestWeightInput } from "@/lib/harvestDetailsRules";
 import {
   buildDailyCheckSavedItems,
   type DailyCheckSavedItem,
@@ -57,12 +54,22 @@ export interface QuickLogAllActivitiesSectionProps {
   heading?: string;
   /** Optional testid prefix. Defaults to "quick-log-all-activities". */
   testIdPrefix?: string;
+  /** Parent-owned synchronous guard shared with the canonical Quick Log form. */
+  onSaveStart?: (target: QuickLogAllActivitiesSaveTarget) => boolean;
+  /** Releases the parent-owned guard after either success or failure. */
+  onSaveEnd?: () => void;
+  /** Presenter lock while either the parent or this section owns the guard. */
+  saveBlocked?: boolean;
+}
+
+export interface QuickLogAllActivitiesSaveTarget {
+  readonly growId: string;
+  readonly tentId: string | null;
+  readonly plantId: string | null;
 }
 
 /** Map a QuickLogActivityId to the "What was saved" DailyCheck source. */
-function toSavedSource(
-  id: QuickLogActivityId,
-): DailyCheckSavedSource | null {
+function toSavedSource(id: QuickLogActivityId): DailyCheckSavedSource | null {
   switch (id) {
     case "note":
       return "note";
@@ -101,6 +108,7 @@ interface SavedRecord {
   id: string;
   activityId: QuickLogActivityId;
   item: DailyCheckSavedItem;
+  target: QuickLogAllActivitiesSaveTarget;
 }
 
 export default function QuickLogAllActivitiesSection({
@@ -109,33 +117,26 @@ export default function QuickLogAllActivitiesSection({
   plantId = null,
   heading = "All quick actions",
   testIdPrefix = "quick-log-all-activities",
+  onSaveStart,
+  onSaveEnd,
+  saveBlocked = false,
 }: QuickLogAllActivitiesSectionProps) {
-  const [selected, setSelected] = useState<QuickLogActivityDefinition | null>(
-    null,
-  );
+  const [selected, setSelected] = useState<QuickLogActivityDefinition | null>(null);
   const [note, setNote] = useState("");
   const [harvestWet, setHarvestWet] = useState("");
   const [harvestDry, setHarvestDry] = useState("");
   const [harvestUnit, setHarvestUnit] = useState<QuickLogWeightUnit>("g");
   const [saved, setSaved] = useState<SavedRecord[]>([]);
   const [errorReason, setErrorReason] = useState<string | null>(null);
-  const [errorForActivity, setErrorForActivity] =
-    useState<QuickLogActivityId | null>(null);
+  const [errorForActivity, setErrorForActivity] = useState<QuickLogActivityId | null>(null);
   const { save, saving } = useQuickLogActivitySave();
+  const localSaveInFlightRef = useRef(false);
 
   const canPersistManualSensor = false; // Deferred to ManualSensorReadingCard.
 
-  const harvestWetValidation = useMemo(
-    () => validateHarvestWeightInput(harvestWet),
-    [harvestWet],
-  );
-  const harvestDryValidation = useMemo(
-    () => validateHarvestWeightInput(harvestDry),
-    [harvestDry],
-  );
-  const harvestWeightsInvalid =
-    !harvestWetValidation.ok || !harvestDryValidation.ok;
-
+  const harvestWetValidation = useMemo(() => validateHarvestWeightInput(harvestWet), [harvestWet]);
+  const harvestDryValidation = useMemo(() => validateHarvestWeightInput(harvestDry), [harvestDry]);
+  const harvestWeightsInvalid = !harvestWetValidation.ok || !harvestDryValidation.ok;
 
   const requiresNote = useMemo(() => {
     if (!selected) return false;
@@ -168,9 +169,7 @@ export default function QuickLogAllActivitiesSection({
     }
     // Disabled activities must never reach RPC.
     if (!selected.enabled) {
-      setErrorReason(
-        selected.disabledReason ?? QUICK_LOG_HARVEST_DISABLED_REASON,
-      );
+      setErrorReason(selected.disabledReason ?? QUICK_LOG_HARVEST_DISABLED_REASON);
       setErrorForActivity(selected.id);
       return;
     }
@@ -223,56 +222,69 @@ export default function QuickLogAllActivitiesSection({
       }
     }
 
-    const idempotencyKey = newIdempotencyKey(selected.id);
-    const result = await save({
-      activityId: selected.id,
+    const capturedTarget = Object.freeze({
       growId,
       tentId: tentId ?? null,
       plantId: plantId ?? null,
-      note: note.trim().length > 0 ? note.trim() : null,
-      idempotencyKey,
-      extraDetails:
-        Object.keys(extraDetails).length > 0 ? extraDetails : null,
     });
+    const acquired = onSaveStart ? onSaveStart(capturedTarget) : !localSaveInFlightRef.current;
+    if (!acquired) return;
+    if (!onSaveStart) localSaveInFlightRef.current = true;
 
-    if (!result.ok) {
-      setErrorReason(
-        result.reason === "save_failed"
-          ? "Save failed. Nothing was saved."
-          : result.disabledReason ?? "Save was refused.",
-      );
-      setErrorForActivity(selected.id);
-      return;
-    }
-
-    // Success path — build saved-item using the SHARED helper so no
-    // local label array can drift out of sync.
-    const source = toSavedSource(selected.id);
-    if (source) {
-      const items = buildDailyCheckSavedItems({
-        source,
-        submittedAt: Date.now(),
-        harvestDetails:
-          source === "harvest" ? harvestDetailsForBreakdown : null,
+    try {
+      const idempotencyKey = newIdempotencyKey(selected.id);
+      const result = await save({
+        activityId: selected.id,
+        growId: capturedTarget.growId,
+        tentId: capturedTarget.tentId,
+        plantId: capturedTarget.plantId,
+        note: note.trim().length > 0 ? note.trim() : null,
+        idempotencyKey,
+        extraDetails: Object.keys(extraDetails).length > 0 ? extraDetails : null,
       });
-      if (items.length > 0) {
-        setSaved((prev) => [
-          ...prev,
-          {
-            id: `${idempotencyKey}-saved`,
-            activityId: selected.id,
-            item: items[0],
-          },
-        ]);
+
+      if (!result.ok) {
+        setErrorReason(
+          result.reason === "save_failed"
+            ? "Save failed. Nothing was saved."
+            : (result.disabledReason ?? "Save was refused."),
+        );
+        setErrorForActivity(selected.id);
+        return;
       }
+
+      // Success path — build saved-item using the SHARED helper so no
+      // local label array can drift out of sync.
+      const source = toSavedSource(selected.id);
+      if (source) {
+        const items = buildDailyCheckSavedItems({
+          source,
+          submittedAt: Date.now(),
+          harvestDetails: source === "harvest" ? harvestDetailsForBreakdown : null,
+        });
+        if (items.length > 0) {
+          setSaved((prev) => [
+            ...prev,
+            {
+              id: `${idempotencyKey}-saved`,
+              activityId: selected.id,
+              item: items[0],
+              target: capturedTarget,
+            },
+          ]);
+        }
+      }
+      setNote("");
+      setHarvestWet("");
+      setHarvestDry("");
+      setHarvestUnit("g");
+      setSelected(null);
+      setErrorReason(null);
+      setErrorForActivity(null);
+    } finally {
+      if (onSaveStart) onSaveEnd?.();
+      else localSaveInFlightRef.current = false;
     }
-    setNote("");
-    setHarvestWet("");
-    setHarvestDry("");
-    setHarvestUnit("g");
-    setSelected(null);
-    setErrorReason(null);
-    setErrorForActivity(null);
   }, [
     selected,
     growId,
@@ -288,6 +300,8 @@ export default function QuickLogAllActivitiesSection({
     harvestWeightsInvalid,
     harvestWetValidation,
     harvestDryValidation,
+    onSaveStart,
+    onSaveEnd,
   ]);
 
   const noContext = !growId;
@@ -332,9 +346,7 @@ export default function QuickLogAllActivitiesSection({
         >
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <p className="text-xs font-medium">{selected.label}</p>
-            <p className="text-[11px] text-muted-foreground">
-              {selected.safetyNote}
-            </p>
+            <p className="text-[11px] text-muted-foreground">{selected.safetyNote}</p>
           </div>
 
           {selected.id === "manual_sensor_snapshot" ? (
@@ -342,14 +354,11 @@ export default function QuickLogAllActivitiesSection({
               className="text-xs text-muted-foreground"
               data-testid={`${testIdPrefix}-manual-sensor-hint`}
             >
-              Use the Manual Sensor Snapshot card on this page to record a
-              reading. Manual snapshots stay labeled manual, not live.
+              Use the Manual Sensor Snapshot card on this page to record a reading. Manual snapshots
+              stay labeled manual, not live.
             </p>
           ) : selected.id === "harvest" ? (
-            <div
-              className="space-y-2"
-              data-testid={`${testIdPrefix}-harvest-fields`}
-            >
+            <div className="space-y-2" data-testid={`${testIdPrefix}-harvest-fields`}>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <div className="space-y-1">
                   <Label
@@ -418,9 +427,7 @@ export default function QuickLogAllActivitiesSection({
                     id={`${testIdPrefix}-harvest-unit`}
                     data-testid={`${testIdPrefix}-harvest-unit`}
                     value={harvestUnit}
-                    onChange={(e) =>
-                      setHarvestUnit(e.target.value as QuickLogWeightUnit)
-                    }
+                    onChange={(e) => setHarvestUnit(e.target.value as QuickLogWeightUnit)}
                     className="w-full text-sm h-9 rounded-md border border-input bg-background px-2"
                   >
                     {QUICK_LOG_WEIGHT_UNITS.map((u) => (
@@ -450,10 +457,7 @@ export default function QuickLogAllActivitiesSection({
             </div>
           ) : requiresNote ? (
             <div className="space-y-1">
-              <Label
-                htmlFor={`${testIdPrefix}-note`}
-                className="text-[11px] text-muted-foreground"
-              >
+              <Label htmlFor={`${testIdPrefix}-note`} className="text-[11px] text-muted-foreground">
                 Note
               </Label>
               <Textarea
@@ -478,6 +482,7 @@ export default function QuickLogAllActivitiesSection({
               onClick={handleSave}
               disabled={
                 saving ||
+                saveBlocked ||
                 noContext ||
                 selected.id === "manual_sensor_snapshot" ||
                 (requiresNote && note.trim().length === 0) ||
@@ -497,6 +502,7 @@ export default function QuickLogAllActivitiesSection({
                 setErrorReason(null);
                 setErrorForActivity(null);
               }}
+              disabled={saving || saveBlocked}
               data-testid={`${testIdPrefix}-cancel`}
             >
               Cancel
@@ -521,9 +527,7 @@ export default function QuickLogAllActivitiesSection({
           data-testid={`${testIdPrefix}-saved`}
           aria-live="polite"
         >
-          <p className="text-[11px] uppercase tracking-wide text-primary/80">
-            What was saved
-          </p>
+          <p className="text-[11px] uppercase tracking-wide text-primary/80">What was saved</p>
           <ul className="text-xs space-y-0.5">
             {saved.map((s) => (
               <li
@@ -531,6 +535,9 @@ export default function QuickLogAllActivitiesSection({
                 data-testid={`${testIdPrefix}-saved-item`}
                 data-saved-activity-id={s.activityId}
                 data-saved-key={s.item.key}
+                data-target-grow-id={s.target.growId}
+                data-target-tent-id={s.target.tentId ?? undefined}
+                data-target-plant-id={s.target.plantId ?? undefined}
               >
                 {s.item.label}
               </li>

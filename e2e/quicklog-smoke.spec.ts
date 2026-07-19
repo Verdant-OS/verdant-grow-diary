@@ -99,8 +99,8 @@ async function openQuickLogDialog(page: import("@playwright/test").Page) {
   //    opens the FULL dialog  <-- what we want
   //  - the AppShell header's global fast-add opens a compact summary dialog
   //    with no form body
-  //  - the One-Tent Loop card's CTA opens a simplified Target/Action/Photo
-  //    dialog with no quick-log-plant-select
+  //  - the One-Tent Loop card's CTA dispatches the canonical global prefill
+  //    event that opens this same full dialog
   // Prefer the precise testid; fall back to name matching for other pages.
   const preciseButton = page.getByTestId("plant-detail-quick-action-quicklog");
   const anyButton = page.getByRole("button", { name: /quick log|log entry|\+ log/i }).first();

@@ -47,6 +47,7 @@ import { buildAiCreditLimitNoticeViewModel } from "@/lib/aiCreditLimitNoticeView
 import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 import type { Classification } from "@/lib/sensorSnapshotStatusContract";
 import { evaluateAiDoctorReviewEligibility } from "@/lib/aiDoctorReviewEligibilityRules";
+import { canRetryAiDoctorLiveReviewFailure } from "@/lib/aiDoctorLiveReviewRecoveryRules";
 
 /** Stable empty-array identity so the packet memo does not churn. */
 const NO_TENT_SENSOR_ROWS: never[] = [];
@@ -215,6 +216,7 @@ export default function PlantDetailAiDoctorLiveReview({
   });
 
   const { entitlement } = useMyEntitlements();
+  const canRetryReview = canRetryAiDoctorLiveReviewFailure(review.reason);
 
   // Keep route construction aligned with the shared route contract.
   // AiCreditLimitNotice validates it again before it reaches the pricing link.
@@ -312,7 +314,7 @@ export default function PlantDetailAiDoctorLiveReview({
         >
           Cautious AI Doctor review
         </h2>
-        {review.status === "idle" || review.status === "error" ? (
+        {review.status === "idle" || (review.status === "error" && canRetryReview) ? (
           <button
             type="button"
             onClick={review.status === "error" ? review.retry : handleInitialStart}

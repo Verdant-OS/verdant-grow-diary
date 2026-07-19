@@ -900,9 +900,17 @@ export default function McpToolExplorer() {
           persistOnOk("list_grows", outcome, category, { includeArchived, growsLimit })
         }
         fieldErrors={growsLimitTouched ? listGrowsErrors : []}
+        onApplyArgs={(args) => {
+          setIncludeArchived(Boolean(args.includeArchived));
+          setGrowsLimit(
+            args.limit === undefined || args.limit === null ? "" : String(args.limit),
+          );
+          setGrowsLimitTouched(true);
+        }}
         buildArgs={() => {
           const args: Record<string, unknown> = {};
           if (includeArchived) args.includeArchived = true;
+
           const n = coerceOptionalInt(growsLimit);
           if (n !== undefined) args.limit = n;
           return args;

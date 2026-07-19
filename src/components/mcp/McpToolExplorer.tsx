@@ -286,6 +286,7 @@ function ToolCard({
   fieldErrors,
   onAuthLost,
   onRunOutcome,
+  onApplyArgs,
 }: {
   toolName: ToolName;
   endpoint: string;
@@ -295,6 +296,7 @@ function ToolCard({
   fieldErrors: FieldError[];
   onAuthLost: () => void;
   onRunOutcome?: (outcome: ToolCallOutcome, category: OutcomeCategory) => void;
+  onApplyArgs?: (args: Record<string, unknown>) => void;
 }) {
   const [state, setState] = useState<RunState>(EMPTY);
 
@@ -483,16 +485,31 @@ function ToolCard({
             data-testid={`tool-explorer-diff-${toolName}`}
             className="rounded-md border bg-muted/40 p-3 text-xs space-y-3"
           >
-            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <p className="font-medium text-sm">Changes since previous request</p>
-              {changed.length === 0 ? (
-                <span className="text-muted-foreground">(no fields changed)</span>
-              ) : (
-                <span className="text-muted-foreground" aria-label="change summary">
-                  {counts.added} added · {counts.changed} changed · {counts.removed} removed
-                </span>
-              )}
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <p className="font-medium text-sm">Changes since previous request</p>
+                {changed.length === 0 ? (
+                  <span className="text-muted-foreground">(no fields changed)</span>
+                ) : (
+                  <span className="text-muted-foreground" aria-label="change summary">
+                    {counts.added} added · {counts.changed} changed · {counts.removed} removed
+                  </span>
+                )}
+              </div>
+              {onApplyArgs && changed.length > 0 && state.args ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onApplyArgs(state.args!)}
+                  data-testid={`tool-explorer-apply-changes-${toolName}`}
+                  aria-label="Apply changed values to the form for retry"
+                >
+                  Apply changes to form
+                </Button>
+              ) : null}
             </div>
+
             {entries.length > 0 ? (
               <div className="flex items-center gap-2">
                 <Switch
@@ -883,9 +900,17 @@ export default function McpToolExplorer() {
           persistOnOk("list_grows", outcome, category, { includeArchived, growsLimit })
         }
         fieldErrors={growsLimitTouched ? listGrowsErrors : []}
+        onApplyArgs={(args) => {
+          setIncludeArchived(Boolean(args.includeArchived));
+          setGrowsLimit(
+            args.limit === undefined || args.limit === null ? "" : String(args.limit),
+          );
+          setGrowsLimitTouched(true);
+        }}
         buildArgs={() => {
           const args: Record<string, unknown> = {};
           if (includeArchived) args.includeArchived = true;
+
           const n = coerceOptionalInt(growsLimit);
           if (n !== undefined) args.limit = n;
           return args;
@@ -943,12 +968,21 @@ export default function McpToolExplorer() {
             ? [{ id: "list-diary-limit", label: "Limit", message: diaryLimitError }]
             : []),
         ]}
+        onApplyArgs={(args) => {
+          setGrowId(typeof args.growId === "string" ? args.growId : "");
+          setDiaryLimit(
+            args.limit === undefined || args.limit === null ? "" : String(args.limit),
+          );
+          setGrowIdTouched(true);
+          setDiaryLimitTouched(true);
+        }}
         buildArgs={() => {
           const args: Record<string, unknown> = { growId: growId.trim() };
           const n = coerceOptionalInt(diaryLimit);
           if (n !== undefined) args.limit = n;
           return args;
         }}
+
       >
         <div className="space-y-1">
           <Label htmlFor="list-diary-grow">
@@ -1012,6 +1046,10 @@ export default function McpToolExplorer() {
           persistOnOk("get_latest_sensor_snapshot", outcome, category, { tentId })
         }
         fieldErrors={tentIdTouched ? sensorErrors : []}
+        onApplyArgs={(args) => {
+          setTentId(typeof args.tentId === "string" ? args.tentId : "");
+          setTentIdTouched(true);
+        }}
         buildArgs={() => ({ tentId: tentId.trim() })}
       >
         <div className="space-y-1">

@@ -305,6 +305,8 @@ export default function AgentIntegrations({
           </div>
         </section>
 
+        <BrowserConnectPanel />
+
         <section
           aria-label="Verify tool access"
           className="glass rounded-2xl border p-5 space-y-3"

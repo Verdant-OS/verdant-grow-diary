@@ -73,17 +73,19 @@ describe("founders_wall_public — view exposure invariant", () => {
 
   it("first_initial style is truncated server-side inside the CASE", () => {
     const viewSql = findViewDefinition();
-    // Look for a substring/left/substr call in the CASE branch — the
-    // exact SQL varies but a server-side truncation must exist so the
-    // raw display_name cannot leave the DB for first_initial rows.
+    // Look for a `left(...)` or `substr(...)` call — the raw display_name
+    // must be truncated server-side so it cannot leave the DB whole.
     expect(viewSql.toLowerCase()).toMatch(/first_initial/);
-    expect(viewSql.toLowerCase()).toMatch(/(substr|substring|left)\s*\(/);
+    expect(viewSql.toLowerCase()).toMatch(/(substr|substring|\bleft)\s*\(/);
   });
 
-  it("number_only and hidden styles resolve to NULL in the CASE", () => {
+  it("number_only style resolves to NULL in the display-name CASE", () => {
     const viewSql = findViewDefinition().toLowerCase();
-    // Both styles must map to NULL in the CASE.
     expect(viewSql).toMatch(/when\s+'number_only'\s+then\s+null/);
+  });
+
+  it("hidden style resolves to NULL for optional_link (link never emitted for hidden rows)", () => {
+    const viewSql = findViewDefinition().toLowerCase();
     expect(viewSql).toMatch(/when\s+'hidden'\s+then\s+null/);
   });
 });

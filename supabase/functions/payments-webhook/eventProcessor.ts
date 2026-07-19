@@ -31,7 +31,8 @@ export type Decision =
   | { kind: 'upsert_subscription'; row: SubscriptionUpsertRow }
   | { kind: 'update_subscription'; paddleSubscriptionId: string; patch: SubscriptionPatch }
   | { kind: 'record_lifetime'; row: SubscriptionUpsertRow }
-  | { kind: 'upsert_customer'; row: CustomerUpsertRow };
+  | { kind: 'upsert_customer'; row: CustomerUpsertRow }
+  | { kind: 'revoke_lifetime'; paddleTransactionId: string; env: PaddleEnv };
 
 export type SkipReason =
   | 'missing_user_id'
@@ -45,7 +46,10 @@ export type SkipReason =
   | 'lifetime_price_only_for_transactions'
   | 'non_lifetime_transaction'
   | 'unknown_lifetime_price_id'
-  | 'adjustment_audit_only';
+  | 'adjustment_audit_only'
+  | 'adjustment_not_refund_or_chargeback'
+  | 'adjustment_not_approved'
+  | 'adjustment_missing_transaction_id';
 
 
 export interface SubscriptionUpsertRow {

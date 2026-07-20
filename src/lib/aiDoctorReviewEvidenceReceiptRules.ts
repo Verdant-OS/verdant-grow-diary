@@ -7,6 +7,7 @@
  * is recorded separately by the server finalizer.
  */
 import type { AiDoctorReviewRequestPacket } from "./aiDoctorReviewRequestPacket";
+import { ROOT_ZONE_INVALID_FIELDS } from "./rootZoneObservationRules";
 
 export const AI_DOCTOR_REVIEW_EVIDENCE_RECEIPT_SCHEMA_VERSION = 1 as const;
 export const AI_DOCTOR_REVIEW_EVIDENCE_RECEIPT_MAX_BYTES = 65_536;
@@ -35,18 +36,6 @@ const SNAPSHOT_SOURCES = ["live", "manual", "csv", "demo", "stale", "invalid", "
 const SNAPSHOT_TRUST_LEVELS = ["low", "medium", "high"] as const;
 const ROOT_ZONE_EVENT_TYPES = ["watering", "feeding"] as const;
 const ROOT_ZONE_SOURCES = ["manual", "csv", "demo", "stale", "invalid", "unknown"] as const;
-const ROOT_ZONE_INVALID_FIELDS = [
-  "volumeMl",
-  "inputPh",
-  "inputEcMsCm",
-  "outputEcMsCm",
-  "runoffMl",
-  "runoffPh",
-  "runoffEcMsCm",
-  "waterTempC",
-  "nutrientLine",
-  "products",
-] as const;
 const ROOT_ZONE_MEASURED_FIELDS = [
   "volumeMl",
   "inputPh",
@@ -57,6 +46,7 @@ const ROOT_ZONE_MEASURED_FIELDS = [
   "runoffEcMsCm",
   "waterTempC",
 ] as const;
+const ROOT_ZONE_MANUAL_OBSERVATION_FIELDS = ["potWeightFeel", "mediumSurface", "drainage"] as const;
 
 export type AiDoctorReviewEvidenceCollectionState = (typeof COLLECTION_STATES)[number];
 export type AiDoctorReviewEvidenceReviewMode = (typeof REVIEW_MODES)[number];
@@ -64,6 +54,7 @@ export type AiDoctorReviewImportedHistoryScope = (typeof IMPORTED_HISTORY_SCOPES
 export type AiDoctorReviewRootZoneHistoryScope = (typeof ROOT_ZONE_HISTORY_SCOPES)[number];
 
 type RootZoneMeasuredField = (typeof ROOT_ZONE_MEASURED_FIELDS)[number];
+type RootZoneManualObservationField = (typeof ROOT_ZONE_MANUAL_OBSERVATION_FIELDS)[number];
 
 /**
  * Client-declared collection metadata. The server validates its exact shape,
@@ -103,6 +94,8 @@ interface ReceiptRootZoneObservation {
   hasNutrientLine: boolean;
   productCount: number;
   invalidFields: Array<(typeof ROOT_ZONE_INVALID_FIELDS)[number]>;
+  /** Additive receipt metadata; absent on rollout-compatible older receipts. */
+  manualObservationFields?: RootZoneManualObservationField[];
 }
 
 export interface AiDoctorReviewEvidenceReceiptSnapshot {
@@ -314,6 +307,19 @@ function buildRootZoneObservationReceipt(
   const invalidFields = (observation.invalidFields ?? []).filter((field) =>
     (ROOT_ZONE_INVALID_FIELDS as readonly string[]).includes(field),
   );
+  const manualObservation = observation.manualObservation;
+  const manualObservationIsCoherent =
+    manualObservation !== undefined &&
+    observation.eventType === "watering" &&
+    observation.source === "manual" &&
+    manualObservation.source === "manual" &&
+    manualObservation.advisoryOnly === true &&
+    isSafeTimestamp(manualObservation.observedAt) &&
+    Date.parse(manualObservation.observedAt) === Date.parse(observation.at) &&
+    !invalidFields.includes("manualObservation");
+  const manualObservationFields = manualObservationIsCoherent
+    ? ROOT_ZONE_MANUAL_OBSERVATION_FIELDS.filter((field) => manualObservation[field] != null)
+    : [];
   return {
     at: observation.at,
     eventType: observation.eventType,
@@ -322,6 +328,7 @@ function buildRootZoneObservationReceipt(
     hasNutrientLine: profileFieldPresent(observation.nutrientLine),
     productCount: Array.isArray(observation.products) ? observation.products.length : 0,
     invalidFields,
+    ...(manualObservationFields.length > 0 ? { manualObservationFields } : {}),
   };
 }
 
@@ -417,17 +424,22 @@ export function buildAiDoctorReviewEvidenceReceiptSnapshot(input: {
 }
 
 function isReceiptRootZoneObservation(value: unknown): value is ReceiptRootZoneObservation {
+  const legacyKeys = [
+    "at",
+    "eventType",
+    "source",
+    "measuredFields",
+    "hasNutrientLine",
+    "productCount",
+    "invalidFields",
+  ] as const;
+  const hasCompatibleKeys =
+    isPlainRecord(value) &&
+    (hasExactKeys(value, legacyKeys) ||
+      hasExactKeys(value, [...legacyKeys, "manualObservationFields"]));
   if (
     !isPlainRecord(value) ||
-    !hasExactKeys(value, [
-      "at",
-      "eventType",
-      "source",
-      "measuredFields",
-      "hasNutrientLine",
-      "productCount",
-      "invalidFields",
-    ]) ||
+    !hasCompatibleKeys ||
     !isSafeTimestamp(value.at) ||
     !isOneOf(value.eventType, ROOT_ZONE_EVENT_TYPES) ||
     !isOneOf(value.source, ROOT_ZONE_SOURCES) ||
@@ -436,7 +448,11 @@ function isReceiptRootZoneObservation(value: unknown): value is ReceiptRootZoneO
     !Array.isArray(value.measuredFields) ||
     value.measuredFields.length > ROOT_ZONE_MEASURED_FIELDS.length ||
     !Array.isArray(value.invalidFields) ||
-    value.invalidFields.length > ROOT_ZONE_INVALID_FIELDS.length
+    value.invalidFields.length > ROOT_ZONE_INVALID_FIELDS.length ||
+    (Object.prototype.hasOwnProperty.call(value, "manualObservationFields") &&
+      (!Array.isArray(value.manualObservationFields) ||
+        value.manualObservationFields.length === 0 ||
+        value.manualObservationFields.length > ROOT_ZONE_MANUAL_OBSERVATION_FIELDS.length))
   ) {
     return false;
   }
@@ -444,7 +460,18 @@ function isReceiptRootZoneObservation(value: unknown): value is ReceiptRootZoneO
     value.measuredFields.every((field) => isOneOf(field, ROOT_ZONE_MEASURED_FIELDS)) &&
     new Set(value.measuredFields).size === value.measuredFields.length &&
     value.invalidFields.every((field) => isOneOf(field, ROOT_ZONE_INVALID_FIELDS)) &&
-    new Set(value.invalidFields).size === value.invalidFields.length
+    new Set(value.invalidFields).size === value.invalidFields.length &&
+    (!Object.prototype.hasOwnProperty.call(value, "manualObservationFields") ||
+      (value.eventType === "watering" &&
+        value.source === "manual" &&
+        !value.invalidFields.includes("manualObservation"))) &&
+    (!Object.prototype.hasOwnProperty.call(value, "manualObservationFields") ||
+      (value.manualObservationFields as unknown[]).every((field) =>
+        isOneOf(field, ROOT_ZONE_MANUAL_OBSERVATION_FIELDS),
+      )) &&
+    (!Object.prototype.hasOwnProperty.call(value, "manualObservationFields") ||
+      new Set(value.manualObservationFields as unknown[]).size ===
+        (value.manualObservationFields as unknown[]).length)
   );
 }
 

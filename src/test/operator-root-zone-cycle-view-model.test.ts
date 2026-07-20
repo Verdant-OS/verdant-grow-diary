@@ -5,6 +5,8 @@ import {
   OPERATOR_ROOT_ZONE_CYCLE_ARITHMETIC_CAVEAT,
   OPERATOR_ROOT_ZONE_CYCLE_CAP,
   OPERATOR_ROOT_ZONE_FUTURE_TOLERANCE_MS,
+  OPERATOR_ROOT_ZONE_MANUAL_OBSERVATION_CAVEAT,
+  OPERATOR_ROOT_ZONE_MANUAL_OBSERVATION_ROW_CAP,
   OPERATOR_ROOT_ZONE_CYCLE_NUTRIENT_CAVEAT,
   OPERATOR_ROOT_ZONE_CYCLE_SCOPE_CAVEAT,
   type OperatorRootZoneCycleInput,
@@ -53,7 +55,173 @@ function observation(
   };
 }
 
+function observationWithUntrustedManual(manualObservation: unknown): OperatorRootZoneCycleInput {
+  return {
+    ...observation("2026-07-19T10:00:00.000Z", "watering"),
+    manualObservation,
+  } as unknown as OperatorRootZoneCycleInput;
+}
+
 describe("operator root-zone cycle view model", () => {
+  it("projects bounded grower-recorded manual observations without presenting sensor or dryback evidence", () => {
+    const [row] = buildOperatorRootZoneCycleRows([
+      observation("2026-07-19T10:00:00.000Z", "watering", {
+        manualObservation: {
+          observedAt: "2026-07-19T10:00:00.000Z",
+          source: "manual",
+          advisoryOnly: true,
+          potWeightFeel: "light",
+          mediumSurface: "dry",
+          drainage: "slow",
+        },
+      }),
+    ]);
+
+    expect(OPERATOR_ROOT_ZONE_MANUAL_OBSERVATION_ROW_CAP).toBe(3);
+    expect(row.manualObservation).toEqual({
+      observedAt: "2026-07-19T10:00:00.000Z",
+      sourceLabel: "Manual observation",
+      advisoryOnly: true,
+      rows: [
+        {
+          key: "pot_weight_feel",
+          label: "Pot/container weight feel",
+          valueLabel: "Light",
+        },
+        { key: "medium_surface", label: "Medium surface", valueLabel: "Dry" },
+        { key: "drainage", label: "Drainage", valueLabel: "Slow" },
+      ],
+      caveat: OPERATOR_ROOT_ZONE_MANUAL_OBSERVATION_CAVEAT,
+    });
+    expect(row.manualObservation?.rows).toHaveLength(OPERATOR_ROOT_ZONE_MANUAL_OBSERVATION_ROW_CAP);
+    expect(OPERATOR_ROOT_ZONE_MANUAL_OBSERVATION_CAVEAT).toMatch(
+      /manual observation.*not sensor.*not measured dryback/i,
+    );
+  });
+
+  it("keeps valid partial categorical evidence and its fixed row order", () => {
+    const [row] = buildOperatorRootZoneCycleRows([
+      observation("2026-07-19T10:00:00.000Z", "watering", {
+        manualObservation: {
+          observedAt: "2026-07-19T10:00:00.000Z",
+          source: "manual",
+          advisoryOnly: true,
+          mediumSurface: "moist",
+        },
+      }),
+    ]);
+
+    expect(row.manualObservation?.rows).toEqual([
+      { key: "medium_surface", label: "Medium surface", valueLabel: "Moist" },
+    ]);
+  });
+
+  it("fails closed on missing or malformed manual-observation envelopes", () => {
+    const valid = {
+      observedAt: "2026-07-19T10:00:00.000Z",
+      source: "manual",
+      advisoryOnly: true,
+      potWeightFeel: "moderate",
+    };
+    const malformed: unknown[] = [
+      null,
+      [],
+      {},
+      { ...valid, source: "live" },
+      { ...valid, advisoryOnly: false },
+      { ...valid, observedAt: "not-a-date" },
+      { ...valid, observedAt: "2026-07-19T05:00:00-05:00" },
+      { ...valid, potWeightFeel: "guess" },
+      { ...valid, drainage: "fast" },
+      { ...valid, potWeightFeel: null },
+      {
+        observedAt: "2026-07-19T10:00:00.000Z",
+        source: "manual",
+        advisoryOnly: true,
+      },
+    ];
+
+    for (const manualObservation of malformed) {
+      const [row] = buildOperatorRootZoneCycleRows([
+        observationWithUntrustedManual(manualObservation),
+      ]);
+      expect(row).toBeDefined();
+      expect(row.manualObservation).toBeNull();
+    }
+  });
+
+  it("keeps event-id conflict resolution deterministic when manual evidence differs", () => {
+    const eventId = "abababab-abab-4bab-8bab-abababababab";
+    const manualObservation = (potWeightFeel: "light" | "heavy") => ({
+      observedAt: "2026-07-19T10:00:00.000Z",
+      source: "manual" as const,
+      advisoryOnly: true as const,
+      potWeightFeel,
+    });
+    const light = observation("2026-07-19T10:00:00.000Z", "watering", {
+      eventId,
+      manualObservation: manualObservation("light"),
+    });
+    const heavy = observation("2026-07-19T10:00:00.000Z", "watering", {
+      eventId,
+      manualObservation: manualObservation("heavy"),
+    });
+
+    const forward = buildOperatorRootZoneCycleRows([light, heavy]);
+    const reversed = buildOperatorRootZoneCycleRows([heavy, light]);
+
+    expect(forward).toEqual(reversed);
+    expect(forward).toHaveLength(1);
+    expect(forward[0].manualObservation).not.toBeNull();
+  });
+
+  it("rejects manual-observation evidence attached to a feeding cycle", () => {
+    const [row] = buildOperatorRootZoneCycleRows([
+      observation("2026-07-19T10:00:00.000Z", "feeding", {
+        manualObservation: {
+          observedAt: "2026-07-19T10:00:00.000Z",
+          source: "manual",
+          advisoryOnly: true,
+          potWeightFeel: "light",
+        },
+      }),
+    ]);
+
+    expect(row.manualObservation).toBeNull();
+  });
+
+  it("rejects manual-observation evidence on a non-manual parent cycle", () => {
+    const [row] = buildOperatorRootZoneCycleRows([
+      observation("2026-07-19T10:00:00.000Z", "watering", {
+        source: "csv",
+        manualObservation: {
+          observedAt: "2026-07-19T10:00:00.000Z",
+          source: "manual",
+          advisoryOnly: true,
+          mediumSurface: "dry",
+        },
+      }),
+    ]);
+
+    expect(row.sourceLabel).toBe("CSV log");
+    expect(row.manualObservation).toBeNull();
+  });
+
+  it("rejects a manual observation timestamp that differs from its cycle by one millisecond", () => {
+    const [row] = buildOperatorRootZoneCycleRows([
+      observation("2026-07-19T10:00:00.000Z", "watering", {
+        manualObservation: {
+          observedAt: "2026-07-19T10:00:00.001Z",
+          source: "manual",
+          advisoryOnly: true,
+          drainage: "normal",
+        },
+      }),
+    ]);
+
+    expect(row.manualObservation).toBeNull();
+  });
+
   it("shows CRONK feeding evidence, EC/PPM companions, and recorded arithmetic comparisons", () => {
     const previous = observation("2026-07-18T10:00:00.000Z");
     const feeding = observation("2026-07-19T10:00:00.000Z", "feeding", {
@@ -296,6 +464,17 @@ describe("operator root-zone cycle view model", () => {
     });
   });
 
+  it("distinguishes a rejected manual observation from rejected measurements", () => {
+    const [row] = buildOperatorRootZoneCycleRows([
+      observation("2026-07-19T10:00:00.000Z", "watering", {
+        invalidFields: ["manualObservation"],
+      }),
+    ]);
+
+    expect(row.warnings).toContain("A grower-recorded manual observation was rejected.");
+    expect(row.warnings).not.toContain("Some supplied measurements were rejected.");
+  });
+
   it("keeps manual, CSV, demo, stale, invalid, and unknown provenance explicit", () => {
     const sources = ["manual", "csv", "demo", "stale", "invalid", "unknown"] as const;
     const rows = buildOperatorRootZoneCycleRows(
@@ -363,13 +542,17 @@ describe("operator root-zone cycle view model", () => {
       OPERATOR_ROOT_ZONE_CYCLE_ARITHMETIC_CAVEAT,
       OPERATOR_ROOT_ZONE_CYCLE_NUTRIENT_CAVEAT,
       OPERATOR_ROOT_ZONE_CYCLE_SCOPE_CAVEAT,
+      OPERATOR_ROOT_ZONE_MANUAL_OBSERVATION_CAVEAT,
     ].join(" ");
 
     expect(copy).not.toMatch(
-      /water now|skip watering|ready to water|watering schedule|target volume|increase (?:the )?volume|decrease (?:the )?volume|change nutrients|action queue|device command|automatic watering/i,
+      /water now|skip watering|ready to water|watering schedule|target volume|increase (?:the )?volume|decrease (?:the )?volume|change nutrients|diagnos|chart adherence|action queue|automat|device command|automatic watering/i,
     );
     expect(OPERATOR_ROOT_ZONE_CYCLE_ARITHMETIC_CAVEAT).toContain("not watering targets");
     expect(OPERATOR_ROOT_ZONE_CYCLE_NUTRIENT_CAVEAT).toContain("not verification");
     expect(OPERATOR_ROOT_ZONE_CYCLE_SCOPE_CAVEAT).toContain("same plant reference");
+    expect(OPERATOR_ROOT_ZONE_MANUAL_OBSERVATION_CAVEAT).toMatch(
+      /manual observation.*not sensor.*not measured dryback/i,
+    );
   });
 });

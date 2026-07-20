@@ -14,6 +14,12 @@ import {
   rootZoneSourceLabel,
   type RootZoneMetricsV1,
 } from "@/lib/rootZoneObservationRules";
+import type {
+  RootZoneDrainageObservation,
+  RootZoneManualObservationV1,
+  RootZoneMediumSurface,
+  RootZonePotWeightFeel,
+} from "@/lib/rootZoneManualObservationRules";
 import { formatSensorValue } from "@/lib/sensorFormat";
 
 export const OPERATOR_ROOT_ZONE_CYCLE_CAP = 5;
@@ -24,6 +30,9 @@ export const OPERATOR_ROOT_ZONE_CYCLE_NUTRIENT_CAVEAT =
   "Recorded nutrient lines and products are evidence, not verification of a manufacturer feeding chart." as const;
 export const OPERATOR_ROOT_ZONE_CYCLE_SCOPE_CAVEAT =
   "Intervals compare records for the same plant reference, or tent-level records when no plant was assigned." as const;
+export const OPERATOR_ROOT_ZONE_MANUAL_OBSERVATION_ROW_CAP = 3;
+export const OPERATOR_ROOT_ZONE_MANUAL_OBSERVATION_CAVEAT =
+  "Manual observation only — not sensor data and not measured dryback." as const;
 
 export type OperatorRootZoneCycleInput = OperatorRootZoneRecordV1;
 
@@ -67,6 +76,25 @@ export interface OperatorRootZoneCycleProductRow {
   valueLabel: string | null;
 }
 
+export type OperatorRootZoneCycleManualObservationKey =
+  | "pot_weight_feel"
+  | "medium_surface"
+  | "drainage";
+
+export interface OperatorRootZoneCycleManualObservationRow {
+  key: OperatorRootZoneCycleManualObservationKey;
+  label: string;
+  valueLabel: string;
+}
+
+export interface OperatorRootZoneCycleManualObservation {
+  observedAt: string;
+  sourceLabel: "Manual observation";
+  advisoryOnly: true;
+  rows: readonly OperatorRootZoneCycleManualObservationRow[];
+  caveat: typeof OPERATOR_ROOT_ZONE_MANUAL_OBSERVATION_CAVEAT;
+}
+
 export interface OperatorRootZoneCycleRow {
   key: string;
   occurredAt: string;
@@ -78,6 +106,7 @@ export interface OperatorRootZoneCycleRow {
   comparisons: readonly OperatorRootZoneCycleComparisonRow[];
   nutrientLine: string | null;
   products: readonly OperatorRootZoneCycleProductRow[];
+  manualObservation: OperatorRootZoneCycleManualObservation | null;
   warnings: readonly string[];
 }
 
@@ -91,7 +120,102 @@ interface NormalizedCycle {
   futureDated: boolean;
   sourceLabel: string;
   metrics: RootZoneMetricsV1;
+  manualObservation: OperatorRootZoneCycleManualObservation | null;
   hasRejectedMetrics: boolean;
+  hasRejectedManualObservation: boolean;
+}
+
+const POT_WEIGHT_LABELS: Readonly<Record<RootZonePotWeightFeel, string>> = {
+  light: "Light",
+  moderate: "Moderate",
+  heavy: "Heavy",
+};
+const MEDIUM_SURFACE_LABELS: Readonly<Record<RootZoneMediumSurface, string>> = {
+  dry: "Dry",
+  moist: "Moist",
+  wet: "Wet",
+};
+const DRAINAGE_LABELS: Readonly<Record<RootZoneDrainageObservation, string>> = {
+  normal: "Normal",
+  slow: "Slow",
+  none: "None observed",
+};
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+function optionalDisplayLabel<T extends string>(
+  value: unknown,
+  labels: Readonly<Record<T, string>>,
+): { status: "absent" } | { status: "invalid" } | { status: "valid"; valueLabel: string } {
+  if (value === undefined) return { status: "absent" };
+  if (typeof value !== "string" || !Object.prototype.hasOwnProperty.call(labels, value)) {
+    return { status: "invalid" };
+  }
+  return { status: "valid", valueLabel: labels[value as T] };
+}
+
+function buildManualObservation(
+  value: RootZoneManualObservationV1 | null | undefined,
+  parent: {
+    eventType: "watering" | "feeding";
+    source: ReturnType<typeof normalizeRootZoneSource>;
+    occurredAt: string;
+  },
+): OperatorRootZoneCycleManualObservation | null {
+  if (parent.eventType !== "watering" || parent.source !== "manual") return null;
+  const row = asRecord(value);
+  if (!row || row.source !== "manual" || row.advisoryOnly !== true) return null;
+  if (typeof row.observedAt !== "string") return null;
+  const observedAtMs = Date.parse(row.observedAt);
+  if (!Number.isFinite(observedAtMs)) return null;
+  const observedAt = new Date(observedAtMs).toISOString();
+  if (observedAt !== row.observedAt || observedAt !== parent.occurredAt) return null;
+
+  const potWeightFeel = optionalDisplayLabel(row.potWeightFeel, POT_WEIGHT_LABELS);
+  const mediumSurface = optionalDisplayLabel(row.mediumSurface, MEDIUM_SURFACE_LABELS);
+  const drainage = optionalDisplayLabel(row.drainage, DRAINAGE_LABELS);
+  if (
+    potWeightFeel.status === "invalid" ||
+    mediumSurface.status === "invalid" ||
+    drainage.status === "invalid"
+  ) {
+    return null;
+  }
+
+  const rows: OperatorRootZoneCycleManualObservationRow[] = [];
+  if (potWeightFeel.status === "valid") {
+    rows.push({
+      key: "pot_weight_feel",
+      label: "Pot/container weight feel",
+      valueLabel: potWeightFeel.valueLabel,
+    });
+  }
+  if (mediumSurface.status === "valid") {
+    rows.push({
+      key: "medium_surface",
+      label: "Medium surface",
+      valueLabel: mediumSurface.valueLabel,
+    });
+  }
+  if (drainage.status === "valid") {
+    rows.push({
+      key: "drainage",
+      label: "Drainage",
+      valueLabel: drainage.valueLabel,
+    });
+  }
+  if (rows.length === 0) return null;
+
+  return {
+    observedAt,
+    sourceLabel: "Manual observation",
+    advisoryOnly: true,
+    rows: rows.slice(0, OPERATOR_ROOT_ZONE_MANUAL_OBSERVATION_ROW_CAP),
+    caveat: OPERATOR_ROOT_ZONE_MANUAL_OBSERVATION_CAVEAT,
+  };
 }
 
 function finiteMetric(value: number | null): value is number {
@@ -272,6 +396,11 @@ function normalizeCycles(
     const targetKey = plantId ? `plant:${plantId}` : `tent:${tentId}`;
     const targetLabel = plantId ? `Plant ref …${plantId.slice(-8)}` : "Tent-level record";
     const futureDated = timestamp > now + futureToleranceMs;
+    const manualObservation = buildManualObservation(observation.manualObservation, {
+      eventType: observation.eventType,
+      source,
+      occurredAt,
+    });
     const invalidFields = Array.isArray(observation.invalidFields)
       ? [...observation.invalidFields].map(String).sort()
       : [];
@@ -286,7 +415,9 @@ function normalizeCycles(
       futureDated,
       sourceLabel: rootZoneSourceLabel(source),
       metrics,
-      hasRejectedMetrics: invalidFields.length > 0,
+      manualObservation,
+      hasRejectedMetrics: invalidFields.some((field) => field !== "manualObservation"),
+      hasRejectedManualObservation: invalidFields.includes("manualObservation"),
     });
   }
 
@@ -328,6 +459,9 @@ function buildWarnings(cycle: NormalizedCycle): string[] {
     );
   }
   if (cycle.hasRejectedMetrics) warnings.push("Some supplied measurements were rejected.");
+  if (cycle.hasRejectedManualObservation) {
+    warnings.push("A grower-recorded manual observation was rejected.");
+  }
   if (
     finiteMetric(cycle.metrics.volumeMl) &&
     finiteMetric(cycle.metrics.runoffMl) &&
@@ -373,6 +507,7 @@ export function buildOperatorRootZoneCycleRows(
       comparisons: buildComparisons(cycle, previous),
       nutrientLine: cycle.eventType === "feeding" ? cycle.metrics.nutrientLine : null,
       products: cycle.eventType === "feeding" ? buildProducts(cycle.metrics) : [],
+      manualObservation: cycle.manualObservation,
       warnings: buildWarnings(cycle),
     };
   });

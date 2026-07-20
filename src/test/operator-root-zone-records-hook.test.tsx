@@ -7,7 +7,10 @@ import { resolve } from "node:path";
 
 import { buildPrivateGrowQueryKey } from "@/lib/growDataQueryKeyRules";
 import { QUICK_LOG_V2_ENTRY_CREATED_EVENT } from "@/lib/quickLogV2EntryCreatedEvent";
-import { ROOT_ZONE_OBSERVATION_CAP } from "@/lib/rootZoneObservationRules";
+import {
+  ROOT_ZONE_MANUAL_OBSERVATION_COMPANION_QUERY_CAP,
+  ROOT_ZONE_OBSERVATION_CAP,
+} from "@/lib/rootZoneObservationRules";
 
 const USER_ID = "11111111-1111-4111-8111-111111111111";
 const TENT_ID = "22222222-2222-4222-8222-222222222222";
@@ -17,12 +20,16 @@ const GROW_ID = "55555555-5555-4555-8555-555555555555";
 
 const mocks = vi.hoisted(() => ({
   authUserId: "11111111-1111-4111-8111-111111111111" as string | null,
-  rows: [] as unknown[],
-  error: null as unknown,
+  currentTable: "" as string,
+  growRows: [] as unknown[],
+  companionRows: [] as unknown[],
+  growError: null as unknown,
+  companionError: null as unknown,
   from: vi.fn(),
   select: vi.fn(),
   eq: vi.fn(),
   in: vi.fn(),
+  not: vi.fn(),
   order: vi.fn(),
   limit: vi.fn(),
 }));
@@ -36,13 +43,18 @@ vi.mock("@/integrations/supabase/client", () => {
     select: mocks.select,
     eq: mocks.eq,
     in: mocks.in,
+    not: mocks.not,
     order: mocks.order,
     limit: mocks.limit,
   };
-  mocks.from.mockImplementation(() => builder);
+  mocks.from.mockImplementation((table: string) => {
+    mocks.currentTable = table;
+    return builder;
+  });
   mocks.select.mockImplementation(() => builder);
   mocks.eq.mockImplementation(() => builder);
   mocks.in.mockImplementation(() => builder);
+  mocks.not.mockImplementation(() => builder);
   mocks.order.mockImplementation(() => builder);
   return { supabase: { from: mocks.from } };
 });
@@ -96,23 +108,35 @@ beforeEach(() => {
     select: mocks.select,
     eq: mocks.eq,
     in: mocks.in,
+    not: mocks.not,
     order: mocks.order,
     limit: mocks.limit,
   };
-  mocks.from.mockImplementation(() => builder);
+  mocks.from.mockImplementation((table: string) => {
+    mocks.currentTable = table;
+    return builder;
+  });
   mocks.select.mockImplementation(() => builder);
   mocks.eq.mockImplementation(() => builder);
   mocks.in.mockImplementation(() => builder);
+  mocks.not.mockImplementation(() => builder);
   mocks.order.mockImplementation(() => builder);
   mocks.authUserId = USER_ID;
-  mocks.rows = [];
-  mocks.error = null;
-  mocks.limit.mockImplementation(async () => ({ data: mocks.rows, error: mocks.error }));
+  mocks.currentTable = "";
+  mocks.growRows = [];
+  mocks.companionRows = [];
+  mocks.growError = null;
+  mocks.companionError = null;
+  mocks.limit.mockImplementation(async () =>
+    mocks.currentTable === "diary_entries"
+      ? { data: mocks.companionRows, error: mocks.companionError }
+      : { data: mocks.growRows, error: mocks.growError },
+  );
 });
 
 describe("useOperatorRootZoneRecords", () => {
   it("reads one owner-scoped tent and preserves safe event/plant identity", async () => {
-    mocks.rows = [wateringRow(750)];
+    mocks.growRows = [wateringRow(750)];
     const { wrapper } = makeHarness();
     const { result } = renderHook(
       () => useOperatorRootZoneRecords({ growId: GROW_ID, tentId: TENT_ID }),
@@ -126,12 +150,14 @@ describe("useOperatorRootZoneRecords", () => {
       tentId: TENT_ID,
       metrics: { volumeMl: 750 },
     });
+    expect(result.current.manualObservationStatus).toBe("ready");
     expect(mocks.from).toHaveBeenCalledWith("grow_events");
     expect(mocks.eq).toHaveBeenCalledWith("grow_id", GROW_ID);
     expect(mocks.eq).toHaveBeenCalledWith("tent_id", TENT_ID);
     expect(mocks.order).toHaveBeenNthCalledWith(1, "occurred_at", { ascending: false });
     expect(mocks.order).toHaveBeenNthCalledWith(2, "id", { ascending: true });
     expect(mocks.limit).toHaveBeenCalledWith(ROOT_ZONE_OBSERVATION_CAP);
+    expect(mocks.limit).toHaveBeenCalledWith(ROOT_ZONE_MANUAL_OBSERVATION_COMPANION_QUERY_CAP);
   });
 
   it("refreshes only its exact private query after a confirmed Quick Log save", async () => {
@@ -144,7 +170,7 @@ describe("useOperatorRootZoneRecords", () => {
     const unrelatedKey = queryKey("66666666-6666-4666-8666-666666666666");
     client.setQueryData(unrelatedKey, ["unrelated"]);
     const invalidate = vi.spyOn(client, "invalidateQueries");
-    mocks.rows = [wateringRow(900)];
+    mocks.growRows = [wateringRow(900)];
 
     act(() => {
       window.dispatchEvent(new CustomEvent(QUICK_LOG_V2_ENTRY_CREATED_EVENT));
@@ -196,7 +222,7 @@ describe("useOperatorRootZoneRecords", () => {
   });
 
   it("does not reuse one authenticated owner's records after an owner swap", async () => {
-    mocks.rows = [wateringRow(750)];
+    mocks.growRows = [wateringRow(750)];
     const { client, wrapper } = makeHarness();
     const { result, rerender } = renderHook(
       () => useOperatorRootZoneRecords({ growId: GROW_ID, tentId: TENT_ID }),
@@ -206,16 +232,54 @@ describe("useOperatorRootZoneRecords", () => {
 
     const nextOwner = "77777777-7777-4777-8777-777777777777";
     mocks.authUserId = nextOwner;
-    mocks.rows = [];
+    mocks.growRows = [];
     rerender();
 
     await waitFor(() => {
-      expect(mocks.limit).toHaveBeenCalledTimes(2);
+      expect(mocks.limit).toHaveBeenCalledTimes(3);
       expect(result.current.isFetching).toBe(false);
       expect(result.current.records).toEqual([]);
     });
-    expect(client.getQueryData(queryKey(USER_ID))).toHaveLength(1);
-    expect(client.getQueryData(queryKey(nextOwner))).toEqual([]);
+    expect(client.getQueryData(queryKey(USER_ID))).toMatchObject({
+      records: [expect.objectContaining({ eventId: EVENT_ID })],
+      manualObservationStatus: "ready",
+    });
+    expect(client.getQueryData(queryKey(nextOwner))).toEqual({
+      records: [],
+      manualObservationStatus: "ready",
+    });
+  });
+
+  it("keeps core records while surfacing unavailable manual observation enrichment", async () => {
+    mocks.growRows = [wateringRow(750)];
+    mocks.companionError = { message: "companion unavailable" };
+    const { wrapper } = makeHarness();
+    const { result } = renderHook(
+      () => useOperatorRootZoneRecords({ growId: GROW_ID, tentId: TENT_ID }),
+      { wrapper },
+    );
+
+    await waitFor(() => expect(result.current.records).toHaveLength(1));
+    expect(result.current.isError).toBe(false);
+    expect(result.current.manualObservationStatus).toBe("unavailable");
+    expect(result.current.records[0]?.metrics.volumeMl).toBe(750);
+  });
+
+  it("marks overflowed manual observation enrichment unavailable without discarding events", async () => {
+    mocks.growRows = [wateringRow(750)];
+    mocks.companionRows = Array.from(
+      { length: ROOT_ZONE_MANUAL_OBSERVATION_COMPANION_QUERY_CAP },
+      (_, index) => ({ id: `companion-${index}` }),
+    );
+    const { wrapper } = makeHarness();
+    const { result } = renderHook(
+      () => useOperatorRootZoneRecords({ growId: GROW_ID, tentId: TENT_ID }),
+      { wrapper },
+    );
+
+    await waitFor(() => expect(result.current.records).toHaveLength(1));
+    expect(result.current.isError).toBe(false);
+    expect(result.current.manualObservationStatus).toBe("unavailable");
   });
 });
 

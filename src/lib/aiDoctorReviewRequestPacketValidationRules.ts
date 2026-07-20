@@ -11,6 +11,7 @@
 import type {
   AiDoctorReviewRequestEvent,
   AiDoctorReviewRequestPacket,
+  AiDoctorReviewRequestRootZoneManualObservation,
   AiDoctorReviewRequestRootZoneObservation,
   AiDoctorReviewRequestRootZoneProduct,
   AiDoctorReviewRequestSnapshot,
@@ -21,6 +22,11 @@ import {
   ROOT_ZONE_INVALID_FIELDS,
   type RootZoneInvalidField,
 } from "./rootZoneObservationRules";
+import {
+  ROOT_ZONE_DRAINAGE_OBSERVATIONS,
+  ROOT_ZONE_MEDIUM_SURFACES,
+  ROOT_ZONE_POT_WEIGHT_FEELS,
+} from "./rootZoneManualObservationRules";
 import {
   AI_DOCTOR_CSV_HISTORY_LABEL,
   AI_DOCTOR_CSV_HISTORY_NOT_LIVE_NOTE,
@@ -103,8 +109,12 @@ function normalizeNullableString(value: unknown, maxLength: number): Normalizati
 
 function normalizeTimestamp(value: unknown): Normalization<string> {
   const normalized = normalizeString(value, TIMESTAMP_MAX_LENGTH);
-  if (!normalized.ok || !Number.isFinite(Date.parse(normalized.value))) return INVALID;
-  return normalized;
+  if (!normalized.ok) return INVALID;
+  const timestamp = Date.parse(normalized.value);
+  if (!Number.isFinite(timestamp)) return INVALID;
+  // Date.parse accepts legacy/RFC strings with arbitrary parenthesized
+  // comments. Never preserve those untrusted bytes into prompt assembly.
+  return valid(new Date(timestamp).toISOString());
 }
 
 function normalizeStringArray(
@@ -211,6 +221,64 @@ function normalizeRootZoneInvalidFields(value: unknown): Normalization<RootZoneI
   return valid(fields);
 }
 
+function normalizeNullableRootZoneLabel<const T extends string>(
+  value: unknown,
+  allowed: readonly T[],
+): Normalization<T | null> {
+  if (value === null) return valid(null);
+  return isOneOf(value, allowed) ? valid(value) : INVALID;
+}
+
+function normalizeRootZoneManualObservation(
+  value: unknown,
+): Normalization<AiDoctorReviewRequestRootZoneManualObservation> {
+  const record = isPlainRecord(value) ? value : null;
+  if (
+    !record ||
+    !hasOwnKeys(record, [
+      "observedAt",
+      "source",
+      "advisoryOnly",
+      "potWeightFeel",
+      "mediumSurface",
+      "drainage",
+    ])
+  ) {
+    return INVALID;
+  }
+
+  const observedAt = normalizeTimestamp(record.observedAt);
+  const potWeightFeel = normalizeNullableRootZoneLabel(
+    record.potWeightFeel,
+    ROOT_ZONE_POT_WEIGHT_FEELS,
+  );
+  const mediumSurface = normalizeNullableRootZoneLabel(
+    record.mediumSurface,
+    ROOT_ZONE_MEDIUM_SURFACES,
+  );
+  const drainage = normalizeNullableRootZoneLabel(record.drainage, ROOT_ZONE_DRAINAGE_OBSERVATIONS);
+  if (
+    !observedAt.ok ||
+    record.source !== "manual" ||
+    record.advisoryOnly !== true ||
+    !potWeightFeel.ok ||
+    !mediumSurface.ok ||
+    !drainage.ok ||
+    (potWeightFeel.value === null && mediumSurface.value === null && drainage.value === null)
+  ) {
+    return INVALID;
+  }
+
+  return valid({
+    observedAt: observedAt.value,
+    source: "manual",
+    advisoryOnly: true,
+    potWeightFeel: potWeightFeel.value,
+    mediumSurface: mediumSurface.value,
+    drainage: drainage.value,
+  });
+}
+
 function normalizeRootZoneObservations(
   value: unknown,
 ): Normalization<AiDoctorReviewRequestRootZoneObservation[]> {
@@ -251,6 +319,16 @@ function normalizeRootZoneObservations(
     const waterTempC = normalizeNullableBoundedNumber(record.waterTempC, -10, 60);
     const nutrientLine = normalizeNullableString(record.nutrientLine, 120);
     const products = normalizeRootZoneProducts(record.products);
+    const manualObservation = hasOwn(record, "manualObservation")
+      ? normalizeRootZoneManualObservation(record.manualObservation)
+      : null;
+    const manualObservationAligned =
+      manualObservation === null ||
+      (manualObservation.ok &&
+        at.ok &&
+        Date.parse(manualObservation.value.observedAt) === Date.parse(at.value));
+    const manualObservationScopeValid =
+      manualObservation === null || (record.eventType === "watering" && record.source === "manual");
     const invalidFields = hasOwn(record, "invalidFields")
       ? normalizeRootZoneInvalidFields(record.invalidFields)
       : valid<RootZoneInvalidField[]>([]);
@@ -268,7 +346,13 @@ function normalizeRootZoneObservations(
       !waterTempC.ok ||
       !nutrientLine.ok ||
       !products.ok ||
+      (manualObservation !== null && !manualObservation.ok) ||
+      !manualObservationAligned ||
+      !manualObservationScopeValid ||
       !invalidFields.ok ||
+      (manualObservation?.ok &&
+        invalidFields.ok &&
+        invalidFields.value.includes("manualObservation")) ||
       (nutrientLine.value !== null && hasRootZoneSecretHint(nutrientLine.value))
     ) {
       return INVALID;
@@ -287,6 +371,7 @@ function normalizeRootZoneObservations(
       waterTempC: waterTempC.value,
       nutrientLine: nutrientLine.value,
       products: products.value,
+      ...(manualObservation?.ok ? { manualObservation: manualObservation.value } : {}),
       ...(hasOwn(record, "invalidFields") ? { invalidFields: invalidFields.value } : {}),
     });
   }

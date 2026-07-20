@@ -158,7 +158,11 @@ export function useOperatorAccountReadModels(): OperatorAccountReadModelsPanelMo
         : tentStatus === "unavailable"
           ? { status: "unavailable" as const }
           : tentStatus === "empty"
-            ? { status: "ready" as const, observations: [] }
+            ? {
+                status: "ready" as const,
+                observations: [],
+                manualObservationStatus: "ready" as const,
+              }
             : rootZoneQuery.isLoading || (rootZoneQuery.isFetching && !rootZoneQuery.records)
               ? { status: "loading" as const }
               : rootZoneQuery.isError
@@ -166,6 +170,7 @@ export function useOperatorAccountReadModels(): OperatorAccountReadModelsPanelMo
                 : {
                     status: "ready" as const,
                     observations: rootZoneQuery.records,
+                    manualObservationStatus: rootZoneQuery.manualObservationStatus,
                   };
 
     return {
@@ -189,6 +194,7 @@ export function useOperatorAccountReadModels(): OperatorAccountReadModelsPanelMo
     rootZoneQuery.isError,
     rootZoneQuery.isFetching,
     rootZoneQuery.isLoading,
+    rootZoneQuery.manualObservationStatus,
     rootZoneQuery.records,
     selectedTent,
     sensorQuery,

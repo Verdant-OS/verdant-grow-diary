@@ -6,15 +6,29 @@
  * No writes, no Supabase client, no inferred targets, and no advice.
  */
 
+import {
+  ROOT_ZONE_MANUAL_OBSERVATION_DETAILS_KEY,
+  projectRootZoneManualObservationFromDetails,
+  type RootZoneManualObservationProjection,
+  type RootZoneManualObservationV1,
+} from "./rootZoneManualObservationRules";
+
 export const ROOT_ZONE_OBSERVATION_SCHEMA_VERSION = 1 as const;
 export const ROOT_ZONE_OBSERVATION_CAP = 20;
 export const ROOT_ZONE_PRODUCT_CAP = 12;
+export const ROOT_ZONE_MANUAL_OBSERVATION_COMPANION_QUERY_CAP = ROOT_ZONE_OBSERVATION_CAP * 2 + 1;
 
 /** Shared PostgREST projection for the existing typed event spine. */
 export const ROOT_ZONE_GROW_EVENT_SELECT =
   "id,grow_id,plant_id,tent_id,event_type,occurred_at,note,source,is_deleted," +
   "watering_events(volume_ml,ph,ec_ms_cm,runoff_ml,runoff_ph,runoff_ec,water_temp_c)," +
   "feeding_events(volume_ml,ph,ec_ms_cm,ec_in,ec_out,runoff_ml,runoff_ph,runoff_ec,water_temp_c,line_id,products,nutrient_brand)";
+
+/** Separate RLS-scoped companion read; `grow_events` has no details column. */
+export const ROOT_ZONE_MANUAL_OBSERVATION_DIARY_SELECT =
+  "id,grow_id,plant_id,tent_id,entry_at," +
+  "linked_grow_event_id:details->>linked_grow_event_id," +
+  "root_zone_manual_observation_v1:details->root_zone_manual_observation_v1";
 
 export type RootZoneEventType = "watering" | "feeding";
 export type RootZoneSource = "manual" | "csv" | "demo" | "stale" | "invalid" | "unknown";
@@ -29,6 +43,7 @@ export const ROOT_ZONE_INVALID_FIELDS = [
   "waterTempC",
   "nutrientLine",
   "products",
+  "manualObservation",
 ] as const;
 export type RootZoneInvalidField = (typeof ROOT_ZONE_INVALID_FIELDS)[number];
 
@@ -57,6 +72,8 @@ export interface RootZoneObservationV1 {
   eventType: RootZoneEventType;
   source: RootZoneSource;
   metrics: RootZoneMetricsV1;
+  /** Optional grower-authored context from this exact manual watering event. */
+  manualObservation?: RootZoneManualObservationV1;
   /** Supplied fields rejected by the plausibility/safety projection. */
   invalidFields?: readonly RootZoneInvalidField[];
 }
@@ -75,6 +92,23 @@ export interface RootZoneGrowEventRowLike {
   feeding_events?: unknown;
 }
 
+export interface RootZoneManualObservationDiaryRowLike {
+  id?: unknown;
+  grow_id?: unknown;
+  plant_id?: unknown;
+  tent_id?: unknown;
+  entry_at?: unknown;
+  linked_grow_event_id?: unknown;
+  root_zone_manual_observation_v1?: unknown;
+}
+
+export interface RootZoneManualObservationCompanionIndex {
+  readonly matchesByGrowEventId: ReadonlyMap<
+    string,
+    readonly RootZoneManualObservationDiaryRowLike[]
+  >;
+}
+
 const SECRET_HINT_RE =
   /(secret|token|api[_-]?key|password|service[_-]?role|bearer\s|^eyJ[A-Za-z0-9_-]{8,}\.|^sk_(live|test)_|^sb_|^pk_(live|test)_)/i;
 const DECIMAL_NUMBER_RE = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/;
@@ -87,6 +121,10 @@ export function hasRootZoneSecretHint(value: string): boolean {
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   return value as Record<string, unknown>;
+}
+
+function hasOwn(record: Record<string, unknown>, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(record, key);
 }
 
 function relationRecord(value: unknown): Record<string, unknown> | null {
@@ -306,9 +344,95 @@ export function normalizeRootZoneMetricsV1(value: unknown): RootZoneMetricsV1 | 
   return hasEvidence(metrics) ? metrics : null;
 }
 
+function exactNonBlankIdentifier(value: unknown): string | null {
+  if (typeof value !== "string" || value.length === 0 || value.length > 200) return null;
+  return value.trim() === value ? value : null;
+}
+
+/** Build one exact-link index without projecting or exposing diary details. */
+export function buildRootZoneManualObservationCompanionIndex(
+  rows: readonly RootZoneManualObservationDiaryRowLike[] | null | undefined,
+): RootZoneManualObservationCompanionIndex {
+  const mutable = new Map<string, RootZoneManualObservationDiaryRowLike[]>();
+  for (const row of rows ?? []) {
+    try {
+      if (
+        row?.root_zone_manual_observation_v1 === null ||
+        row?.root_zone_manual_observation_v1 === undefined
+      ) {
+        continue;
+      }
+      const linkedGrowEventId = exactNonBlankIdentifier(row.linked_grow_event_id);
+      if (!linkedGrowEventId) continue;
+      const matches = mutable.get(linkedGrowEventId) ?? [];
+      matches.push(row);
+      mutable.set(linkedGrowEventId, matches);
+    } catch {
+      // An untrusted row that cannot expose a verified link cannot be attached.
+    }
+  }
+
+  const matchesByGrowEventId = new Map<string, readonly RootZoneManualObservationDiaryRowLike[]>();
+  for (const [eventId, matches] of mutable) {
+    matchesByGrowEventId.set(eventId, Object.freeze([...matches]));
+  }
+  return Object.freeze({ matchesByGrowEventId });
+}
+
+function nullableIdentifierMatches(parent: unknown, companion: unknown): boolean {
+  if (parent === null || companion === null) return parent === null && companion === null;
+  const parentId = exactNonBlankIdentifier(parent);
+  const companionId = exactNonBlankIdentifier(companion);
+  return parentId !== null && parentId === companionId;
+}
+
+function companionScopeMatchesGrowEvent(
+  event: RootZoneGrowEventRowLike,
+  companion: RootZoneManualObservationDiaryRowLike,
+): boolean {
+  const eventGrowId = exactNonBlankIdentifier(event.grow_id);
+  const companionGrowId = exactNonBlankIdentifier(companion.grow_id);
+  return (
+    eventGrowId !== null &&
+    eventGrowId === companionGrowId &&
+    nullableIdentifierMatches(event.tent_id, companion.tent_id) &&
+    nullableIdentifierMatches(event.plant_id, companion.plant_id)
+  );
+}
+
+function projectManualObservationForGrowEvent(
+  row: RootZoneGrowEventRowLike,
+  eventType: RootZoneEventType,
+  source: RootZoneSource,
+  occurredAt: string,
+  companionIndex: RootZoneManualObservationCompanionIndex | null | undefined,
+): RootZoneManualObservationProjection {
+  const eventId = exactNonBlankIdentifier(row.id);
+  if (!eventId || !companionIndex) return { status: "absent" };
+  const matches = companionIndex.matchesByGrowEventId.get(eventId) ?? [];
+  if (matches.length === 0) return { status: "absent" };
+  if (matches.length !== 1) return { status: "invalid" };
+
+  const companion = matches[0];
+  if (
+    eventType !== "watering" ||
+    source !== "manual" ||
+    !companionScopeMatchesGrowEvent(row, companion)
+  ) {
+    return { status: "invalid" };
+  }
+  return projectRootZoneManualObservationFromDetails(
+    {
+      [ROOT_ZONE_MANUAL_OBSERVATION_DETAILS_KEY]: companion.root_zone_manual_observation_v1,
+    },
+    occurredAt,
+  );
+}
+
 /** Project one existing typed grow event into a root-zone observation. */
 export function buildRootZoneObservationFromGrowEvent(
   row: RootZoneGrowEventRowLike,
+  companionIndex: RootZoneManualObservationCompanionIndex | null = null,
 ): RootZoneObservationV1 | null {
   if (!row || row.is_deleted === true) return null;
   const eventType = row.event_type;
@@ -320,12 +444,27 @@ export function buildRootZoneObservationFromGrowEvent(
   if (!child) return null;
   const metrics = buildMetrics(eventType, child);
   if (!metrics) return null;
-  const invalidFields = collectInvalidFields(eventType, child);
-  return {
-    occurredAt: new Date(occurredMs).toISOString(),
+  const occurredAt = new Date(occurredMs).toISOString();
+  const source = normalizeRootZoneSource(row.source);
+  const manualObservationProjection = projectManualObservationForGrowEvent(
+    row,
     eventType,
-    source: normalizeRootZoneSource(row.source),
+    source,
+    occurredAt,
+    companionIndex,
+  );
+  const invalidFields = [...collectInvalidFields(eventType, child)];
+  if (manualObservationProjection.status === "invalid") {
+    invalidFields.push("manualObservation");
+  }
+  return {
+    occurredAt,
+    eventType,
+    source,
     metrics,
+    ...(manualObservationProjection.status === "valid"
+      ? { manualObservation: manualObservationProjection.manualObservation }
+      : {}),
     ...(invalidFields.length > 0 ? { invalidFields } : {}),
   };
 }
@@ -394,10 +533,15 @@ export function sortAndBoundRootZoneObservations(
 export function buildRootZoneObservationsFromRows(
   rows: readonly RootZoneGrowEventRowLike[] | null | undefined,
   cap: number = ROOT_ZONE_OBSERVATION_CAP,
+  manualObservationDiaryRows:
+    | readonly RootZoneManualObservationDiaryRowLike[]
+    | null
+    | undefined = [],
 ): RootZoneObservationV1[] {
+  const companionIndex = buildRootZoneManualObservationCompanionIndex(manualObservationDiaryRows);
   const observations: RootZoneObservationV1[] = [];
   for (const row of rows ?? []) {
-    const observation = buildRootZoneObservationFromGrowEvent(row);
+    const observation = buildRootZoneObservationFromGrowEvent(row, companionIndex);
     if (observation) observations.push(observation);
   }
   return sortAndBoundRootZoneObservations(observations, cap);

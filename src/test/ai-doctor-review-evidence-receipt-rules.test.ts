@@ -47,7 +47,7 @@ function packet(): AiDoctorReviewRequestPacket {
     recentRootZoneObservations: [
       {
         at: AT,
-        eventType: "feeding",
+        eventType: "watering",
         source: "manual",
         volumeMl: 1432.75,
         inputPh: 5.83,
@@ -57,6 +57,29 @@ function packet(): AiDoctorReviewRequestPacket {
         runoffPh: null,
         runoffEcMsCm: null,
         waterTempC: null,
+        nutrientLine: null,
+        products: [],
+        manualObservation: {
+          observedAt: AT,
+          source: "manual",
+          advisoryOnly: true,
+          potWeightFeel: "light",
+          mediumSurface: "dry",
+          drainage: "normal",
+        },
+      },
+      {
+        at: AT,
+        eventType: "feeding",
+        source: "manual",
+        volumeMl: 900,
+        inputPh: 5.9,
+        inputEcMsCm: 1.8,
+        outputEcMsCm: 2.1,
+        runoffMl: 120,
+        runoffPh: 6.1,
+        runoffEcMsCm: 2.3,
+        waterTempC: 20,
         nutrientLine: "Private nutrient line",
         products: [{ name: "Private product", amount: 7.125, unit: "ml" }],
       },
@@ -141,9 +164,28 @@ describe("AI Doctor review evidence receipt rules", () => {
       rootZoneObservations: [
         {
           at: AT,
-          eventType: "feeding",
+          eventType: "watering",
           source: "manual",
           measuredFields: ["volumeMl", "inputPh", "inputEcMsCm"],
+          hasNutrientLine: false,
+          productCount: 0,
+          invalidFields: [],
+          manualObservationFields: ["potWeightFeel", "mediumSurface", "drainage"],
+        },
+        {
+          at: AT,
+          eventType: "feeding",
+          source: "manual",
+          measuredFields: [
+            "volumeMl",
+            "inputPh",
+            "inputEcMsCm",
+            "outputEcMsCm",
+            "runoffMl",
+            "runoffPh",
+            "runoffEcMsCm",
+            "waterTempC",
+          ],
           hasNutrientLine: true,
           productCount: 1,
           invalidFields: [],
@@ -166,6 +208,9 @@ describe("AI Doctor review evidence receipt rules", () => {
       "1432.75",
       "5.83",
       "2.17",
+      '"light"',
+      '"dry"',
+      '"normal"',
     ]) {
       expect(serialized).not.toContain(forbidden);
     }
@@ -200,8 +245,29 @@ describe("AI Doctor review evidence receipt rules", () => {
         hasNutrientLine: false,
         productCount: 0,
         invalidFields: [],
+        manualObservationFields: ["potWeightFeel", "mediumSurface", "drainage"],
       },
     ]);
+  });
+
+  it("never records manual-observation fields for a contradictory parent receipt", () => {
+    for (const mutate of [
+      (input: AiDoctorReviewRequestPacket) => {
+        input.recentRootZoneObservations![0].eventType = "feeding";
+      },
+      (input: AiDoctorReviewRequestPacket) => {
+        input.recentRootZoneObservations![0].source = "csv";
+      },
+      (input: AiDoctorReviewRequestPacket) => {
+        input.recentRootZoneObservations![0].invalidFields = ["manualObservation"];
+      },
+    ]) {
+      const input = packet();
+      input.recentRootZoneObservations = [input.recentRootZoneObservations![0]];
+      mutate(input);
+      const receipt = buildAiDoctorReviewEvidenceReceiptSnapshot({ packet: input });
+      expect(receipt?.rootZoneObservations[0]).not.toHaveProperty("manualObservationFields");
+    }
   });
 
   it("keeps rollout-compatible null client metadata distinct from malformed metadata", () => {
@@ -258,5 +324,38 @@ describe("AI Doctor review evidence receipt rules", () => {
         ],
       }),
     ).toBe(false);
+    expect(
+      isAiDoctorReviewEvidenceReceiptSnapshot({
+        ...receipt,
+        rootZoneObservations: [
+          {
+            ...receipt.rootZoneObservations[0],
+            manualObservationFields: ["potWeightFeel", "potWeightFeel"],
+          },
+        ],
+      }),
+    ).toBe(false);
+    for (const contradictory of [
+      { eventType: "feeding" as const },
+      { source: "csv" as const },
+      { invalidFields: ["manualObservation"] as const },
+      { manualObservationFields: [] as const },
+    ]) {
+      expect(
+        isAiDoctorReviewEvidenceReceiptSnapshot({
+          ...receipt,
+          rootZoneObservations: [
+            {
+              ...receipt.rootZoneObservations[0],
+              ...contradictory,
+            },
+          ],
+        }),
+      ).toBe(false);
+    }
+
+    const legacyReceipt = structuredClone(receipt);
+    delete legacyReceipt.rootZoneObservations[0].manualObservationFields;
+    expect(isAiDoctorReviewEvidenceReceiptSnapshot(legacyReceipt)).toBe(true);
   });
 });

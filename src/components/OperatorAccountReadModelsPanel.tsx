@@ -235,6 +235,14 @@ function WateringContextPanel({
           <>
             <div className="space-y-2" data-testid="operator-watering-context-summary">
               <p className="text-sm">{model.summary}</p>
+              {model.manualObservationAvailabilityNote ? (
+                <p
+                  className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-amber-700 dark:text-amber-300"
+                  data-testid="operator-manual-root-zone-observations-unavailable"
+                >
+                  {model.manualObservationAvailabilityNote}
+                </p>
+              ) : null}
               {model.missingContext.length > 0 ? (
                 <div className="flex flex-wrap gap-1.5 text-xs text-muted-foreground">
                   {model.missingContext.includes("typed_root_zone_history") ? (
@@ -356,6 +364,35 @@ function WateringContextPanel({
                             </div>
                           ))}
                         </dl>
+                      ) : null}
+
+                      {cycle.manualObservation ? (
+                        <div
+                          className="mt-3 space-y-2 rounded-md border border-border/50 p-2 text-xs"
+                          data-testid="operator-root-zone-cycle-manual-observation"
+                        >
+                          <div className="flex flex-wrap items-center gap-2 text-muted-foreground">
+                            <Badge variant="outline">{cycle.manualObservation.sourceLabel}</Badge>
+                            <time dateTime={cycle.manualObservation.observedAt}>
+                              {readableTimestamp(cycle.manualObservation.observedAt)}
+                            </time>
+                          </div>
+                          <p className="text-muted-foreground">{cycle.manualObservation.caveat}</p>
+                          <dl
+                            className="grid gap-2 sm:grid-cols-3"
+                            aria-label="Grower-recorded manual root-zone observations"
+                          >
+                            {cycle.manualObservation.rows.map((observation) => (
+                              <div
+                                key={observation.key}
+                                className="rounded-md border border-border/50 px-2 py-1"
+                              >
+                                <dt className="text-muted-foreground">{observation.label}</dt>
+                                <dd className="font-medium">{observation.valueLabel}</dd>
+                              </div>
+                            ))}
+                          </dl>
+                        </div>
                       ) : null}
 
                       {cycle.nutrientLine || cycle.products.length > 0 ? (

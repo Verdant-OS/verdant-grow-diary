@@ -90,6 +90,27 @@ describe("buildWateringFormPayload — mapping", () => {
     });
   });
 
+  it("does not preserve a caller-supplied reserved manual-observation envelope", () => {
+    const result = buildPayload({
+      growId: "grow-1",
+      baseDetails: {
+        retained: true,
+        root_zone_manual_observation_v1: {
+          source: "live",
+          advisory_only: false,
+          pot_weight_feel: "api_key=leak-marker",
+        },
+      },
+      form: withForm(),
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      payload: expect.objectContaining({ details: { retained: true } }),
+    });
+    expect(JSON.stringify(result)).not.toMatch(/api_key|leak-marker|root_zone_manual_observation/i);
+  });
+
   it("maps all optional measurements and trims the note", () => {
     const result = buildPayload({
       growId: "grow-1",

@@ -37,6 +37,8 @@ export const AI_DOCTOR_BASE_SYSTEM_PROMPT =
 export const AI_DOCTOR_ROOT_ZONE_SAFETY_GUIDANCE = Object.freeze([
   "Treat root-zone entries as grower-recorded historical observations, not prescribed targets.",
   "Use repeated measurements and plant response as context; state when runoff or follow-up evidence is missing.",
+  "Treat manualObservation labels as grower-recorded categorical context, not sensor readings or measured dryback.",
+  "A single light-pot, dry-surface, or drainage label does not establish a watering target or schedule.",
   "Treat invalidFields as omitted measurements and name them under Missing information.",
   "Do not recommend aggressive irrigation or nutrient changes from a single root-zone entry.",
 ]);

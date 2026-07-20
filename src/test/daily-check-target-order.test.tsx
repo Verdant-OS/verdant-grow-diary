@@ -602,6 +602,54 @@ describe("DailyCheck target selector order and exact-target truth", () => {
     expect(useSensorReadingsMock).not.toHaveBeenCalledWith("t-g2", 50);
   });
 
+  it("rejects a routed cross-grow plant-to-tent edge without a URL grow scope", async () => {
+    renderRoute("/daily-check?plantId=p-cross-tent&method=sensor");
+
+    await waitFor(() =>
+      expect(screen.getByTestId("daily-check-all-activities")).toHaveAttribute(
+        "data-plant-id",
+        "p-cross-tent",
+      ),
+    );
+    expect(screen.getByTestId("daily-check-all-activities")).toHaveAttribute("data-tent-id", "");
+    expect(screen.getByTestId("mock-quicklog")).toHaveAttribute(
+      "data-prefill-plant-id",
+      "p-cross-tent",
+    );
+    expect(screen.getByTestId("mock-quicklog")).toHaveAttribute("data-prefill-tent-id", "");
+    expect(screen.getByTestId("daily-grow-check-choose-snapshot")).toBeDisabled();
+    expect(screen.queryByTestId("mock-manual-card")).not.toBeInTheDocument();
+    expect(useSensorReadingsMock).not.toHaveBeenCalledWith("t-g2", 50);
+
+    const note = screen.getByTestId("daily-grow-check-choose-quicklog");
+    expect(note).not.toBeDisabled();
+    fireEvent.click(note);
+    expect(screen.getByTestId("mock-quicklog")).toHaveAttribute("data-open", "1");
+    expect(screen.getByTestId("mock-quicklog")).toHaveAttribute("data-prefill-tent-id", "");
+  });
+
+  it("rejects a locally selected cross-grow plant-to-tent edge", async () => {
+    renderRoute("/daily-check");
+    await choosePlant(/Scoped plant assigned to another grow tent/i);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("daily-check-all-activities")).toHaveAttribute(
+        "data-plant-id",
+        "p-cross-tent",
+      ),
+    );
+    expect(screen.getByTestId("daily-check-all-activities")).toHaveAttribute("data-tent-id", "");
+    expect(screen.getByTestId("mock-quicklog")).toHaveAttribute(
+      "data-prefill-plant-id",
+      "p-cross-tent",
+    );
+    expect(screen.getByTestId("mock-quicklog")).toHaveAttribute("data-prefill-tent-id", "");
+    expect(screen.getByTestId("daily-grow-check-choose-snapshot")).toBeDisabled();
+    expect(screen.queryByTestId("mock-manual-card")).not.toBeInTheDocument();
+    expect(useSensorReadingsMock).not.toHaveBeenCalledWith("t-g2", 50);
+    expect(screen.getByTestId("daily-grow-check-choose-quicklog")).not.toBeDisabled();
+  });
+
   it.each([
     ["untented", null],
     ["unavailable", "remove"],

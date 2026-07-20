@@ -120,6 +120,23 @@ function useQueryParam(name: string): string | null {
   return useMemo(() => new URLSearchParams(loc.search).get(name), [loc.search, name]);
 }
 
+function resolveCompatibleAssignedTentId(
+  plant: { tent_id?: string | null; grow_id?: string | null } | null | undefined,
+  availableTents: ReadonlyArray<{ id: string; grow_id?: string | null }>,
+): string {
+  if (!plant?.tent_id) return "";
+  const assignedTent = availableTents.find((tent) => tent.id === plant.tent_id);
+  if (!assignedTent) return "";
+
+  // Preserve legacy unscoped rows only when the graph does not prove a
+  // mismatch. Known grow ownership on both sides must agree.
+  if (plant.grow_id && assignedTent.grow_id && plant.grow_id !== assignedTent.grow_id) {
+    return "";
+  }
+
+  return assignedTent.id;
+}
+
 export default function DailyCheck() {
   const navigate = useNavigate();
   const { data: tents = [], isLoading: tentsLoading } = useTents();
@@ -176,9 +193,7 @@ export default function DailyCheck() {
   const routePlant = plantResolution.status === "valid" ? plantResolution.plant : null;
   const routePlantId = routePlant?.id ?? "";
   const routeAssignedTentId = routePlant?.tent_id ?? "";
-  const routeTentId = selectableTents.some((tent) => tent.id === routeAssignedTentId)
-    ? routeAssignedTentId
-    : "";
+  const routeTentId = resolveCompatibleAssignedTentId(routePlant, selectableTents);
   const routeIdentity = useMemo(
     () =>
       JSON.stringify([
@@ -213,10 +228,7 @@ export default function DailyCheck() {
     () => selectablePlants.find((plant) => plant.id === renderedPlantId) ?? null,
     [renderedPlantId, selectablePlants],
   );
-  const selectedPlantTentId =
-    selectedPlant?.tent_id && selectableTents.some((tent) => tent.id === selectedPlant.tent_id)
-      ? selectedPlant.tent_id
-      : "";
+  const selectedPlantTentId = resolveCompatibleAssignedTentId(selectedPlant, selectableTents);
   const selectedStandaloneTentId = selectableTents.some((tent) => tent.id === tentId) ? tentId : "";
   // A selected plant owns the tent context. Derive this synchronously so an
   // untented plant can never render one frame against a previously selected or
@@ -259,8 +271,7 @@ export default function DailyCheck() {
     if (routeIdentityPending) return;
     if (!plantId) return;
     const match = selectablePlants.find((p) => p.id === plantId);
-    const assignedTentId = match?.tent_id ?? "";
-    setTentId(selectableTents.some((tent) => tent.id === assignedTentId) ? assignedTentId : "");
+    setTentId(resolveCompatibleAssignedTentId(match, selectableTents));
   }, [plantId, routeIdentityPending, selectablePlants, selectableTents]);
 
   // Default tent to first if none selected and no plant chosen

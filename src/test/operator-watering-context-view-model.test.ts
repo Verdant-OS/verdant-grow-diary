@@ -7,16 +7,28 @@ import type {
   OperatorDiaryEntryInput,
   OperatorSensorReadingInput,
 } from "@/lib/operatorAccountReadModelsViewModel";
-import type { RootZoneObservationV1 } from "@/lib/rootZoneObservationRules";
+import type { OperatorRootZoneCycleInput } from "@/lib/operatorRootZoneCycleViewModel";
+
+const PLANT_ID = "11111111-1111-4111-8111-111111111111";
+const TENT_ID = "22222222-2222-4222-8222-222222222222";
+
+function eventIdFor(value: string): string {
+  let hash = 0;
+  for (const character of value) hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
+  return `33333333-3333-4333-8333-${hash.toString(16).padStart(12, "0")}`;
+}
 
 function rootZoneObservation(
   occurredAt: string,
   eventType: "watering" | "feeding",
-  overrides: Partial<RootZoneObservationV1["metrics"]> = {},
-): RootZoneObservationV1 {
+  overrides: Partial<OperatorRootZoneCycleInput["metrics"]> = {},
+): OperatorRootZoneCycleInput {
   return {
     occurredAt,
     eventType,
+    eventId: eventIdFor(`${occurredAt}:${eventType}`),
+    plantId: PLANT_ID,
+    tentId: TENT_ID,
     source: "manual",
     metrics: {
       schemaVersion: 1,
@@ -97,7 +109,9 @@ describe("operator watering context view model", () => {
         observations: [
           rootZoneObservation("2026-07-19T18:30:00.000Z", "feeding", {
             volumeMl: 500,
-            nutrientLine: "flower line",
+            outputEcMsCm: 1.5,
+            nutrientLine: "CRONK Bonnie & Clyde",
+            products: [{ name: "Bonnie", amount: 4, unit: "ml_per_l" }],
           }),
           rootZoneObservation("2026-07-19T18:00:00.000Z", "watering"),
           rootZoneObservation("2026-07-18T18:00:00.000Z", "watering", { volumeMl: 700 }),
@@ -119,6 +133,20 @@ describe("operator watering context view model", () => {
     expect(model.status).toBe("context");
     expect(model.typedWateringCount).toBe(2);
     expect(model.typedFeedingCount).toBe(1);
+    expect(model.recentRootZoneCycles.map((row) => row.eventLabel)).toEqual([
+      "Feeding",
+      "Watering",
+      "Watering",
+    ]);
+    expect(model.recentRootZoneCycles[0]).toMatchObject({
+      nutrientLine: "CRONK Bonnie & Clyde",
+      products: [{ name: "Bonnie", valueLabel: "4 mL/L" }],
+    });
+    expect(model.recentRootZoneCycles[0].metrics).toContainEqual({
+      key: "output_ec",
+      label: "Output EC",
+      valueLabel: "1.50 mS/cm · 750 ppm (500 scale)",
+    });
     expect(model.lastConfirmedWatering).toMatchObject({
       occurredAt: "2026-07-19T18:00:00.000Z",
       sourceLabel: "Manual log",
@@ -183,6 +211,29 @@ describe("operator watering context view model", () => {
     expect(model.typedWateringCount).toBe(0);
     expect(model.lastConfirmedWatering).toBeNull();
     expect(model.status).toBe("insufficient");
+  });
+
+  it("does not let a future-only watering satisfy confirmed history", () => {
+    const model = buildOperatorWateringContextViewModel(
+      readyState({
+        rootZone: {
+          status: "ready",
+          observations: [
+            rootZoneObservation("2026-07-19T10:06:00.001Z", "watering", {
+              volumeMl: 800,
+            }),
+          ],
+        },
+      }),
+      { now: Date.parse("2026-07-19T10:00:00.000Z") },
+    );
+
+    expect(model.typedWateringCount).toBe(1);
+    expect(model.lastConfirmedWatering).toBeNull();
+    expect(model.missingContext).toContain("typed_watering_history");
+    expect(model.recentRootZoneCycles[0].warnings).toContain(
+      "Timestamp is in the future; verify the recorded time before interpreting this record.",
+    );
   });
 
   it("reports insufficient context when typed watering history is absent or soil moisture is absent", () => {
@@ -345,8 +396,14 @@ describe("operator watering context view model", () => {
 
   it("uses complete tie-breakers so shuffled equal-time evidence is deterministic", () => {
     const at = "2026-07-19T18:00:00.000Z";
-    const firstWatering = rootZoneObservation(at, "watering", { volumeMl: 500 });
-    const secondWatering = rootZoneObservation(at, "watering", { volumeMl: 750 });
+    const firstWatering = {
+      ...rootZoneObservation(at, "watering", { volumeMl: 500 }),
+      eventId: "44444444-4444-4444-8444-444444444444",
+    };
+    const secondWatering = {
+      ...rootZoneObservation(at, "watering", { volumeMl: 750 }),
+      eventId: "55555555-5555-4555-8555-555555555555",
+    };
     const diaries = [diaryEntry("a", at, "Observation A"), diaryEntry("b", at, "Observation B")];
     const readings = {
       z: sensorReading("z", "temperature_c", { value: 24 }),
@@ -402,6 +459,9 @@ describe("operator watering context view model", () => {
       model.decisionReminder,
       model.snapshotCaveat,
       model.airContextCaveat,
+      model.cycleArithmeticCaveat,
+      model.nutrientEvidenceCaveat,
+      model.cycleScopeCaveat,
       model.growerControlNote,
     ].join(" ");
 

@@ -19,8 +19,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/store/auth", () => ({ useAuth: () => mocks.auth() }));
 vi.mock("@/store/grows", () => ({ useGrows: () => mocks.grows() }));
 vi.mock("@/hooks/useGrowData", () => ({ useGrowTents: (id: string) => mocks.tents(id) }));
-vi.mock("@/hooks/useRootZoneObservations", () => ({
-  useRootZoneObservations: (scope: unknown) => mocks.rootZone(scope),
+vi.mock("@/hooks/useOperatorRootZoneRecords", () => ({
+  useOperatorRootZoneRecords: (tentId: unknown) => mocks.rootZone(tentId),
 }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: {} }));
 vi.mock("@/lib/operatorAccountReadModels", () => ({
@@ -53,7 +53,7 @@ function readyDefaults() {
     isError: false,
   });
   mocks.rootZone.mockReturnValue({
-    observations: [],
+    records: [],
     isLoading: false,
     isFetching: false,
     isError: false,
@@ -119,7 +119,7 @@ describe("useOperatorAccountReadModels", () => {
 
     expect(mocks.listDiary).toHaveBeenCalledWith(expect.anything(), GROW_ID, 10);
     expect(mocks.getSnapshot).toHaveBeenCalledWith(expect.anything(), TENT_ID);
-    expect(mocks.rootZone).toHaveBeenCalledWith({ kind: "tent", tentId: TENT_ID });
+    expect(mocks.rootZone).toHaveBeenCalledWith({ growId: GROW_ID, tentId: TENT_ID });
     expect(result.current.status === "ready" && result.current.watering.status).toBe(
       "insufficient",
     );

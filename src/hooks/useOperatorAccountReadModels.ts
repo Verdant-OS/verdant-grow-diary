@@ -11,7 +11,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useGrowTents } from "@/hooks/useGrowData";
-import { useRootZoneObservations } from "@/hooks/useRootZoneObservations";
+import { useOperatorRootZoneRecords } from "@/hooks/useOperatorRootZoneRecords";
 import { isUuid } from "@/lib/isUuid";
 import {
   getLatestSensorSnapshotForOwnedTent,
@@ -103,8 +103,8 @@ export function useOperatorAccountReadModels(): OperatorAccountReadModelsPanelMo
 
   const diaryQuery = useDiaryReadModelQuery(user?.id ?? null, validGrowId);
   const sensorQuery = useSensorReadModelQuery(user?.id ?? null, validTentId);
-  const rootZoneQuery = useRootZoneObservations(
-    validTentId ? { kind: "tent", tentId: validTentId } : null,
+  const rootZoneQuery = useOperatorRootZoneRecords(
+    validGrowId && validTentId ? { growId: validGrowId, tentId: validTentId } : null,
   );
 
   return useMemo(() => {
@@ -159,13 +159,13 @@ export function useOperatorAccountReadModels(): OperatorAccountReadModelsPanelMo
           ? { status: "unavailable" as const }
           : tentStatus === "empty"
             ? { status: "ready" as const, observations: [] }
-            : rootZoneQuery.isLoading || (rootZoneQuery.isFetching && !rootZoneQuery.observations)
+            : rootZoneQuery.isLoading || (rootZoneQuery.isFetching && !rootZoneQuery.records)
               ? { status: "loading" as const }
               : rootZoneQuery.isError
                 ? { status: "unavailable" as const }
                 : {
                     status: "ready" as const,
-                    observations: rootZoneQuery.observations,
+                    observations: rootZoneQuery.records,
                   };
 
     return {
@@ -189,7 +189,7 @@ export function useOperatorAccountReadModels(): OperatorAccountReadModelsPanelMo
     rootZoneQuery.isError,
     rootZoneQuery.isFetching,
     rootZoneQuery.isLoading,
-    rootZoneQuery.observations,
+    rootZoneQuery.records,
     selectedTent,
     sensorQuery,
     tentsQuery.isError,

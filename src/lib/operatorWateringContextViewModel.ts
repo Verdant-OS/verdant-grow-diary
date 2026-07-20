@@ -20,6 +20,15 @@ import {
   type RootZoneMetricsV1,
   type RootZoneObservationV1,
 } from "@/lib/rootZoneObservationRules";
+import {
+  buildOperatorRootZoneCycleRows,
+  OPERATOR_ROOT_ZONE_CYCLE_ARITHMETIC_CAVEAT,
+  OPERATOR_ROOT_ZONE_FUTURE_TOLERANCE_MS,
+  OPERATOR_ROOT_ZONE_CYCLE_NUTRIENT_CAVEAT,
+  OPERATOR_ROOT_ZONE_CYCLE_SCOPE_CAVEAT,
+  type OperatorRootZoneCycleInput,
+  type OperatorRootZoneCycleRow,
+} from "@/lib/operatorRootZoneCycleViewModel";
 import { formatSensorValue } from "@/lib/sensorFormat";
 
 export type OperatorWateringContextStatus = "loading" | "unavailable" | "insufficient" | "context";
@@ -29,7 +38,7 @@ type OperatorWateringCollectionStatus = "loading" | "unavailable" | "ready";
 export interface OperatorWateringReadState {
   rootZone: {
     status: OperatorWateringCollectionStatus;
-    observations?: readonly RootZoneObservationV1[] | null;
+    observations?: readonly OperatorRootZoneCycleInput[] | null;
   };
   diary: {
     status: OperatorWateringCollectionStatus;
@@ -39,6 +48,11 @@ export interface OperatorWateringReadState {
     status: OperatorWateringCollectionStatus | "no_tent";
     readings?: Readonly<Record<string, OperatorSensorReadingInput>> | null;
   };
+}
+
+export interface OperatorWateringContextOptions {
+  now?: number;
+  futureToleranceMs?: number;
 }
 
 export interface OperatorWateringMetricRow {
@@ -81,6 +95,7 @@ export interface OperatorWateringContextViewModel {
   lastConfirmedWatering: OperatorConfirmedWateringRow | null;
   typedWateringCount: number;
   typedFeedingCount: number;
+  recentRootZoneCycles: readonly OperatorRootZoneCycleRow[];
   diaryObservationCount: number;
   diaryObservations: readonly OperatorWateringDiaryObservationRow[];
   sensorRows: readonly OperatorWateringSensorContextRow[];
@@ -88,6 +103,9 @@ export interface OperatorWateringContextViewModel {
   decisionReminder: "Review the plant, pot weight or medium, drainage, and recent watering before deciding.";
   snapshotCaveat: "One sensor snapshot is not a dryback trend.";
   airContextCaveat: "Air readings alone do not determine watering.";
+  cycleArithmeticCaveat: typeof OPERATOR_ROOT_ZONE_CYCLE_ARITHMETIC_CAVEAT;
+  nutrientEvidenceCaveat: typeof OPERATOR_ROOT_ZONE_CYCLE_NUTRIENT_CAVEAT;
+  cycleScopeCaveat: typeof OPERATOR_ROOT_ZONE_CYCLE_SCOPE_CAVEAT;
   growerControlNote: "Verdant presents read-only evidence here; the grower makes the decision.";
 }
 
@@ -122,6 +140,7 @@ interface NormalizedRootZoneObservation {
   sourceLabel: string;
   metrics: RootZoneMetricsV1;
   hasRejectedMetrics: boolean;
+  futureDated: boolean;
 }
 
 function validTimestamp(value: unknown): string | null {
@@ -207,7 +226,9 @@ function buildWateringMetricRows(metrics: RootZoneMetricsV1): OperatorWateringMe
 }
 
 function normalizeRootZoneObservations(
-  observations: readonly RootZoneObservationV1[] | null | undefined,
+  observations: readonly OperatorRootZoneCycleInput[] | null | undefined,
+  now: number,
+  futureToleranceMs: number,
 ): NormalizedRootZoneObservation[] {
   if (!Array.isArray(observations)) return [];
 
@@ -226,6 +247,7 @@ function normalizeRootZoneObservations(
       sourceLabel: rootZoneSourceLabel(source),
       metrics,
       hasRejectedMetrics: Array.isArray(row.invalidFields) && row.invalidFields.length > 0,
+      futureDated: Date.parse(occurredAt) > now + futureToleranceMs,
     });
   }
 
@@ -234,7 +256,7 @@ function normalizeRootZoneObservations(
     if (byTime !== 0) return byTime;
     const aKey = JSON.stringify(a);
     const bKey = JSON.stringify(b);
-    return aKey.localeCompare(bKey);
+    return aKey < bKey ? -1 : aKey > bKey ? 1 : 0;
   });
 }
 
@@ -310,10 +332,15 @@ function summaryFor(status: OperatorWateringContextStatus): string {
 
 export function buildOperatorWateringContextViewModel(
   input: OperatorWateringReadState | null | undefined,
+  options: OperatorWateringContextOptions = {},
 ): OperatorWateringContextViewModel {
+  const now = Number.isFinite(options.now) ? (options.now as number) : Date.now();
+  const futureToleranceMs = Number.isFinite(options.futureToleranceMs)
+    ? Math.max(0, options.futureToleranceMs as number)
+    : OPERATOR_ROOT_ZONE_FUTURE_TOLERANCE_MS;
   const rootZoneObservations =
     input?.rootZone?.status === "ready"
-      ? normalizeRootZoneObservations(input.rootZone.observations)
+      ? normalizeRootZoneObservations(input.rootZone.observations, now, futureToleranceMs)
       : [];
   const wateringObservations = rootZoneObservations.filter(
     (observation) => observation.eventType === "watering",
@@ -321,7 +348,7 @@ export function buildOperatorWateringContextViewModel(
   const feedingCount = rootZoneObservations.filter(
     (observation) => observation.eventType === "feeding",
   ).length;
-  const lastWatering = wateringObservations[0] ?? null;
+  const lastWatering = wateringObservations.find((observation) => !observation.futureDated) ?? null;
   const lastConfirmedWatering: OperatorConfirmedWateringRow | null = lastWatering
     ? {
         occurredAt: lastWatering.occurredAt,
@@ -330,6 +357,13 @@ export function buildOperatorWateringContextViewModel(
         hasRejectedMetrics: lastWatering.hasRejectedMetrics,
       }
     : null;
+  const recentRootZoneCycles =
+    input?.rootZone?.status === "ready"
+      ? buildOperatorRootZoneCycleRows(input.rootZone.observations, {
+          now,
+          futureToleranceMs,
+        })
+      : [];
 
   const diary =
     input?.diary?.status === "ready"
@@ -363,6 +397,7 @@ export function buildOperatorWateringContextViewModel(
     lastConfirmedWatering,
     typedWateringCount: wateringObservations.length,
     typedFeedingCount: feedingCount,
+    recentRootZoneCycles,
     diaryObservationCount: diary.count,
     diaryObservations: diary.rows,
     sensorRows,
@@ -370,6 +405,9 @@ export function buildOperatorWateringContextViewModel(
     decisionReminder: DECISION_REMINDER,
     snapshotCaveat: SNAPSHOT_CAVEAT,
     airContextCaveat: AIR_CONTEXT_CAVEAT,
+    cycleArithmeticCaveat: OPERATOR_ROOT_ZONE_CYCLE_ARITHMETIC_CAVEAT,
+    nutrientEvidenceCaveat: OPERATOR_ROOT_ZONE_CYCLE_NUTRIENT_CAVEAT,
+    cycleScopeCaveat: OPERATOR_ROOT_ZONE_CYCLE_SCOPE_CAVEAT,
     growerControlNote: GROWER_CONTROL_NOTE,
   };
 }

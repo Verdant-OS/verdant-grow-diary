@@ -6,6 +6,9 @@ import OperatorAccountReadModelsPanel from "@/components/OperatorAccountReadMode
 import type { OperatorAccountReadModelsPanelModel } from "@/lib/operatorAccountReadModelsViewModel";
 import { buildOperatorWateringContextViewModel } from "@/lib/operatorWateringContextViewModel";
 
+const PLANT_ID = "11111111-1111-4111-8111-111111111111";
+const TENT_ID = "22222222-2222-4222-8222-222222222222";
+
 const EMPTY_WATERING = buildOperatorWateringContextViewModel({
   rootZone: { status: "ready", observations: [] },
   diary: { status: "ready", entries: [] },
@@ -106,6 +109,30 @@ describe("OperatorAccountReadModelsPanel", () => {
         status: "ready",
         observations: [
           {
+            eventId: "33333333-3333-4333-8333-333333333333",
+            plantId: PLANT_ID,
+            tentId: TENT_ID,
+            occurredAt: "2026-07-19T11:00:00.000Z",
+            eventType: "feeding",
+            source: "manual",
+            metrics: {
+              schemaVersion: 1,
+              volumeMl: 1_000,
+              inputPh: 6.2,
+              inputEcMsCm: 2,
+              outputEcMsCm: 2.2,
+              runoffMl: 150,
+              runoffPh: 6.3,
+              runoffEcMsCm: 2.3,
+              waterTempC: 20,
+              nutrientLine: "CRONK Bonnie & Clyde",
+              products: [{ name: "Bonnie", amount: 4, unit: "ml_per_l" }],
+            },
+          },
+          {
+            eventId: "44444444-4444-4444-8444-444444444444",
+            plantId: PLANT_ID,
+            tentId: TENT_ID,
             occurredAt: "2026-07-19T10:00:00.000Z",
             eventType: "watering",
             source: "manual",
@@ -166,10 +193,31 @@ describe("OperatorAccountReadModelsPanel", () => {
 
     const card = screen.getByTestId("operator-watering-context-card");
     expect(within(card).getByText(/last confirmed typed watering/i)).toBeInTheDocument();
-    expect(within(card).getByText(/900 ml/i)).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("operator-last-confirmed-watering")).getByText(/900 ml/i),
+    ).toBeInTheDocument();
     expect(within(card).getByText(/root-zone context/i)).toBeInTheDocument();
+    const cycles = screen.getByTestId("operator-root-zone-cycle-list");
+    expect(within(cycles).getAllByTestId("operator-root-zone-cycle")).toHaveLength(2);
+    expect(within(cycles).getByText("CRONK Bonnie & Clyde")).toBeInTheDocument();
+    expect(within(cycles).getAllByText("Plant ref …11111111")).toHaveLength(2);
+    expect(within(cycles).getByText(/Bonnie · 4 mL\/L/i)).toBeInTheDocument();
+    expect(within(cycles).getByText(/2\.00 mS\/cm · 1000 ppm \(500 scale\)/i)).toBeInTheDocument();
+    expect(
+      within(cycles).getByText(/interval from prior record for this plant reference/i),
+    ).toBeInTheDocument();
+    expect(within(cycles).getAllByText(/recorded runoff ÷ applied volume/i)).toHaveLength(2);
     expect(screen.getByTestId("operator-watering-safety-fence")).toHaveTextContent(
       /pot weight or medium, drainage/i,
+    );
+    expect(screen.getByTestId("operator-watering-safety-fence")).toHaveTextContent(
+      /not watering targets or health verdicts/i,
+    );
+    expect(screen.getByTestId("operator-watering-safety-fence")).toHaveTextContent(
+      /not verification of a manufacturer feeding chart/i,
+    );
+    expect(screen.getByTestId("operator-watering-safety-fence")).toHaveTextContent(
+      /same plant reference/i,
     );
     const text = card.textContent?.toLowerCase() ?? "";
     expect(text).not.toMatch(/water now|skip watering|start pump|open valve|set a schedule/);

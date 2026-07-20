@@ -91,6 +91,8 @@
     "test:ai-doctor-review-completion-rls": "bun run scripts/run-ai-doctor-review-completion-rls-harness.ts",
     "test:ai-doctor-sessions-rls": "bun run scripts/run-ai-doctor-sessions-rls-harness.ts",
     "test:ai-doctor-sessions-rls:local-lane": "bun run scripts/run-ai-doctor-sessions-rls-harness.ts --confirm-local-security-lane",
+    "test:genetics-propagation-rls": "bun run scripts/run-genetics-propagation-rls-harness.ts",
+    "test:genetics-propagation-rls:local-lane": "bun run scripts/run-genetics-propagation-rls-harness.ts --confirm-local-security-lane",
     "test:irrigation-evidence-rls": "bun run scripts/run-irrigation-evidence-rls-harness.ts",
     "test:irrigation-evidence-rls:local-lane": "bun run scripts/run-irrigation-evidence-rls-harness.ts --confirm-local-security-lane",
     "test:summarize-timeouts": "node scripts/summarize-vitest-timeouts.mjs",

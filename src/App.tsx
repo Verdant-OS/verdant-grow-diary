@@ -115,6 +115,9 @@ const CheckoutCancel = lazy(() => import("./pages/CheckoutCancel"));
 const Terms = lazy(() => import("./pages/TermsOfService"));
 const Privacy = lazy(() => import("./pages/PrivacyPolicy"));
 const Refund = lazy(() => import("./pages/RefundPolicy"));
+const Feedback = lazy(() => import("./pages/support/Feedback"));
+const Contact = lazy(() => import("./pages/support/Contact"));
+const OperatorSupportInbox = lazy(() => import("./pages/OperatorSupportInbox"));
 
 const Leads = lazy(() => import("./pages/Leads"));
 const PiIngestStatus = lazy(() => import("./pages/PiIngestStatus"));
@@ -262,6 +265,8 @@ const App = () => (
                   <Route path="/terms" element={<Terms />} />
                   <Route path="/privacy" element={<Privacy />} />
                   <Route path="/refund" element={<Refund />} />
+                  <Route path="/feedback" element={<Feedback />} />
+                  <Route path="/contact" element={<Contact />} />
                   <Route path="/refunds" element={<Navigate to="/refund" replace />} />
                   <Route path="/refund-policy" element={<Navigate to="/refund" replace />} />
                   <Route path="/terms-of-service" element={<Navigate to="/terms" replace />} />
@@ -485,6 +490,7 @@ const App = () => (
                         element={<OperatorGgsRealPayloadIngest />}
                       />
                       <Route path="/operator/demo-preview" element={<OperatorDemoPreview />} />
+                      <Route path="/operator/support-inbox" element={<OperatorSupportInbox />} />
                       <Route path="/operator/release-readiness" element={<ReleaseReadiness />} />
                       {/* Diagnostics Audience Split v1 — /diagnostics is an
                           operator-only RLS / round-trip / DevOps surface; manifest

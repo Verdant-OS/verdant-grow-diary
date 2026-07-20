@@ -66,6 +66,41 @@ type GeneticsMutationIdempotencyRow = {
   created_at: string;
 };
 
+type PropagationBatchRow = {
+  id: string;
+  user_id: string;
+  batch_code: string;
+  name: string | null;
+  propagation_method: string;
+  source_accession_id: string | null;
+  mother_plant_id: string | null;
+  origin_unknown: boolean;
+  cut_date: string | null;
+  received_date: string | null;
+  started_date: string | null;
+  rooted_date: string | null;
+  initial_quantity: number | null;
+  viable_quantity: number | null;
+  counts_unknown: boolean;
+  status: string;
+  grow_id: string | null;
+  tent_id: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type PropagationBatchStatusEventRow = {
+  id: string;
+  user_id: string;
+  batch_id: string;
+  from_status: string | null;
+  to_status: string;
+  reason: string | null;
+  changed_at: string;
+  created_at: string;
+};
+
 // ---------------------------------------------------------------------------
 // Function (RPC) argument + return types. Returns are the jsonb envelope (Json).
 // ---------------------------------------------------------------------------
@@ -104,6 +139,34 @@ export interface GeneticsTraceabilityDatabase {
         "created_at",
         never
       >;
+      propagation_batches: Tbl<
+        PropagationBatchRow,
+        | "id"
+        | "name"
+        | "propagation_method"
+        | "source_accession_id"
+        | "mother_plant_id"
+        | "origin_unknown"
+        | "cut_date"
+        | "received_date"
+        | "started_date"
+        | "rooted_date"
+        | "initial_quantity"
+        | "viable_quantity"
+        | "counts_unknown"
+        | "status"
+        | "grow_id"
+        | "tent_id"
+        | "notes"
+        | "created_at"
+        | "updated_at"
+      >;
+      // Append-only status history — Update = never.
+      propagation_batch_status_events: Tbl<
+        PropagationBatchStatusEventRow,
+        "id" | "from_status" | "reason" | "changed_at" | "created_at",
+        never
+      >;
     };
     Views: Record<string, never>;
     Functions: {
@@ -115,6 +178,10 @@ export interface GeneticsTraceabilityDatabase {
         p_idempotency_key: string;
         p_accession_id: string;
         p_archived: boolean;
+      }>;
+      genetics_batch_upsert: GeneticsFn<{
+        p_idempotency_key: string;
+        p_payload: Json;
       }>;
     };
     Enums: Record<string, never>;

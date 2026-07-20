@@ -217,6 +217,88 @@ function policyChecks(head) {
 }
 
 /**
+ * Structured-data invariants. Every pre-rendered route must publish
+ * the sitewide Schema.org JSON-LD (baked into index.html by the
+ * `softwareApplicationJsonLd` vite plugin) — same @context, same
+ * @type-keyed nodes, same required fields, same Offer catalog. Any
+ * drift (missing block, parse error, mutated @id, dropped offer)
+ * fails the postbuild fence just like a drifted title.
+ * @param {ReturnType<typeof extractHead>} head
+ */
+export function jsonLdChecks(head) {
+  const results = [];
+  const blocks = head.jsonLd ?? [];
+  results.push({
+    label: "JSON-LD: <script type=application/ld+json> present",
+    expected: "at least 1 block",
+    actual: `${blocks.length} block(s)`,
+    ok: blocks.length > 0,
+  });
+  for (let i = 0; i < blocks.length; i += 1) {
+    const b = blocks[i];
+    results.push({
+      label: `JSON-LD[${i}]: parses as JSON`,
+      expected: "valid JSON",
+      actual: b.parseError ?? "valid JSON",
+      ok: b.parseError === null,
+    });
+  }
+  const nodes = flattenJsonLdNodes(blocks);
+  for (let i = 0; i < blocks.length; i += 1) {
+    const b = blocks[i];
+    if (!b.parsed || typeof b.parsed !== "object") continue;
+    const ctx = b.parsed["@context"];
+    const ctxOk =
+      typeof ctx === "string"
+        ? ctx.includes("schema.org")
+        : Array.isArray(ctx)
+          ? ctx.some((c) => typeof c === "string" && c.includes("schema.org"))
+          : false;
+    results.push({
+      label: `JSON-LD[${i}]: @context includes schema.org`,
+      expected: "https://schema.org",
+      actual: ctx === undefined ? null : ctx,
+      ok: ctxOk,
+    });
+  }
+  for (const spec of EXPECTED_JSONLD_NODES) {
+    const node = nodes.find((n) => n && n["@type"] === spec.type);
+    if (!node) {
+      results.push({
+        label: `JSON-LD: node @type="${spec.type}" present`,
+        expected: `@type=${spec.type}`,
+        actual: nodes.map((n) => n?.["@type"] ?? null),
+        ok: false,
+      });
+      continue;
+    }
+    for (const [field, expected] of Object.entries(spec.required)) {
+      results.push({
+        label: `JSON-LD ${spec.type}.${field}`,
+        expected,
+        actual: node[field] ?? null,
+        ok: node[field] === expected,
+      });
+    }
+    if (spec.offerNames) {
+      const offers = Array.isArray(node.offers) ? node.offers : [];
+      const actualNames = offers
+        .filter((o) => o && o["@type"] === "Offer")
+        .map((o) => o.name);
+      const missing = spec.offerNames.filter((n) => !actualNames.includes(n));
+      results.push({
+        label: `JSON-LD ${spec.type}.offers[] names`,
+        expected: [...spec.offerNames],
+        actual: actualNames,
+        ok: missing.length === 0,
+      });
+    }
+  }
+  return results;
+}
+
+
+/**
  * Build a structured diff for one route — every checked field, plus a
  * boolean `ok` flag. Consumed by the JSON report writer and by
  * `checkRouteHead` (which flattens to legacy string issues).

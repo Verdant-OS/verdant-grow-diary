@@ -16,10 +16,19 @@
 import type { FaqEntry } from "./verdantSeoCopy";
 import { CANNABIS_PLANT_CARE_FAQ } from "./cannabisPlantCareFaq";
 
+export interface GuideSectionLink {
+  readonly label: string;
+  /** Absolute in-app path (e.g. "/quick-log", "/guides/sensor-truth-grow-room"). */
+  readonly to: string;
+}
+
 export interface GuideSection {
   readonly heading: string;
   readonly body: string;
+  /** Optional in-app internal links surfaced under the section body. */
+  readonly links?: ReadonlyArray<GuideSectionLink>;
 }
+
 
 export interface SeoGuidePage {
   readonly slug: string;

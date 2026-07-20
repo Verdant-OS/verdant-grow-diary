@@ -273,6 +273,7 @@ interface TierCardProps {
   tier: PricingTier;
   currentPlanId: string | null;
   currentPlanKnown: boolean;
+  planVerificationFailed: boolean;
   paddleReady: boolean;
   paddleUnavailableReason: string | null;
   onCheckout: (tier: PricingTier) => void;
@@ -283,6 +284,7 @@ function TierCard({
   tier,
   currentPlanId,
   currentPlanKnown,
+  planVerificationFailed,
   paddleReady,
   paddleUnavailableReason,
   onCheckout,
@@ -297,7 +299,11 @@ function TierCard({
   let ctaHint: string | null = null;
   let onClick: () => void = () => onFreeStart();
 
-  if (tier.billingPeriod === "free") {
+  if (planVerificationFailed) {
+    ctaLabel = "Plan check unavailable";
+    ctaDisabled = true;
+    ctaHint = "Retry your plan check before choosing a tier.";
+  } else if (tier.billingPeriod === "free") {
     ctaLabel = isCurrent ? "Current plan" : "Get started";
     ctaDisabled = isCurrent;
   } else if (isCurrent) {
@@ -632,9 +638,15 @@ export default function Upgrade() {
     paddle,
     retry: retryPaddle,
   } = usePaddle(paddleConfig);
-  const { loading: entLoading, entitlement } = useMyEntitlements();
+  const {
+    loading: entLoading,
+    lookupFailed: entitlementLookupFailed,
+    entitlement,
+    refetch: refetchEntitlement,
+  } = useMyEntitlements();
 
-  const currentPlanKnown = !entLoading && !!entitlement?.displayPlanId;
+  const currentPlanKnown =
+    !entLoading && !entitlementLookupFailed && !!entitlement?.displayPlanId;
   const currentPlanId = currentPlanKnown ? (entitlement.displayPlanId as string) : null;
 
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
@@ -696,6 +708,25 @@ export default function Upgrade() {
             <Loader2 className="h-3 w-3 animate-spin" /> Loading your current plan…
           </p>
         )}
+        {!entLoading && entitlementLookupFailed && (
+          <div
+            className="mt-3 text-sm text-muted-foreground"
+            data-testid="upgrade-plan-verification-failed"
+            role="status"
+          >
+            <p>We couldn&apos;t verify your current plan. No tier is marked as current.</p>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="mt-1"
+              data-testid="upgrade-plan-verification-retry"
+              onClick={() => void refetchEntitlement()}
+            >
+              Retry plan check
+            </Button>
+          </div>
+        )}
       </header>
 
       <UpgradeSuccessPanel
@@ -726,6 +757,7 @@ export default function Upgrade() {
             tier={tier}
             currentPlanId={currentPlanId}
             currentPlanKnown={currentPlanKnown}
+            planVerificationFailed={entitlementLookupFailed}
             paddleReady={paddleReady}
             paddleUnavailableReason={paddleUnavailableReason}
             onCheckout={openConfirm}

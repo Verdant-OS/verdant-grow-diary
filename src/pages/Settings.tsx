@@ -278,22 +278,24 @@ function TemperatureUnitTile() {
  * dialog only.
  */
 function SubscriptionTile() {
-  const { loading, entitlement } = useMyEntitlements();
+  const { loading, lookupFailed, entitlement, refetch } = useMyEntitlements();
   const { opening, error: portalError, open: openPortal, clearError } = useOpenCustomerPortalState();
   const cancelNotice = usePaddleCancelNotice();
 
-  const planId = entitlement?.displayPlanId ?? null;
+  const planId = lookupFailed ? null : (entitlement?.displayPlanId ?? null);
 
   const tier = planId ? PRICING_TIERS.find((t) => t.id === planId) ?? null : null;
 
   const label = loading
     ? "Loading…"
+    : lookupFailed
+      ? "Plan status unavailable"
     : tier
       ? tier.name
       : "Plan status unavailable";
 
-  const isFree = !loading && (planId === "free" || (!tier && !planId));
-  const isPaid = !loading && !!tier && planId !== "free";
+  const isFree = !loading && !lookupFailed && (planId === "free" || (!tier && !planId));
+  const isPaid = !loading && !lookupFailed && !!tier && planId !== "free";
   const isLifetime = planId === "founder_lifetime";
   const isStaff = !!entitlement?.isStaff;
 
@@ -314,7 +316,7 @@ function SubscriptionTile() {
             >
               {label}
             </span>
-            <AccountPlanBadge entitlement={entitlement} loading={loading} />
+            {!lookupFailed && <AccountPlanBadge entitlement={entitlement} loading={loading} />}
           </p>
           {isStaff && (
             <p
@@ -353,6 +355,18 @@ function SubscriptionTile() {
               We couldn't determine your plan right now. Your grow data is safe
               — try refreshing in a moment.
             </p>
+          )}
+          {!loading && lookupFailed && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="mt-2"
+              onClick={() => void refetch()}
+              data-testid="settings-subscription-entitlement-retry"
+            >
+              Retry plan check
+            </Button>
           )}
         </div>
       </div>

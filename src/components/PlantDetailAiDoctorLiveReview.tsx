@@ -406,7 +406,11 @@ function PlantDetailAiDoctorLiveReviewScope({
     startReview();
   }, [activeReviewRequest, historyScopeKey, reviewStatus, startReview]);
 
-  const { entitlement, loading: entitlementLoading } = useMyEntitlements();
+  const {
+    entitlement,
+    loading: entitlementLoading,
+    lookupFailed: entitlementLookupFailed,
+  } = useMyEntitlements();
   const canRetryReview = canRetryAiDoctorLiveReviewFailure(review.reason);
   // Preserve the existing same-scope guard when unrelated plant/timeline
   // context disappears. The narrow exception is a request that was accepted
@@ -487,8 +491,16 @@ function PlantDetailAiDoctorLiveReviewScope({
       surface: "doctor",
       returnTo: reviewReturnTo,
       viewerEntitlement: entitlement,
+      viewerEntitlementVerified: !entitlementLookupFailed,
     }).kind;
-  }, [entitlement, review.credit, review.reason, review.status, reviewReturnTo]);
+  }, [
+    entitlement,
+    entitlementLookupFailed,
+    review.credit,
+    review.reason,
+    review.status,
+    reviewReturnTo,
+  ]);
 
   useEffect(() => {
     if (creditNoticeKind === "upsell") {

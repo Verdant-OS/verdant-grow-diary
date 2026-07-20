@@ -15,7 +15,8 @@
  *   - an ENTITLING live row unlocks regardless of the expected environment;
  *   - sandbox rows unlock ONLY when the server expects sandbox (unchanged);
  *   - a degraded/unknown live row changes nothing (fail-closed preserved);
- *   - the BYO read failing still fails closed (lookupFailed=true).
+ *   - a relevant canonical-lane read failure is reported as unverifiable
+ *     unless another relevant read already proved a paid entitlement.
  */
 import { describe, it, expect } from "vitest";
 import { loadUnionEntitlement } from "../../supabase/functions/_shared/unionEntitlementLookup.ts";
@@ -81,6 +82,7 @@ interface FakeDbState {
   byo?: { data: unknown[] | null; error: unknown };
   subsByEnv?: Partial<Record<"live" | "sandbox", LovableSubscriptionRow[]>>;
   subsError?: unknown;
+  subsErrorByEnv?: Partial<Record<"live" | "sandbox", unknown>>;
 }
 
 /**
@@ -121,6 +123,10 @@ function fakeClient(state: FakeDbState) {
           }
           if (state.subsError) {
             resolve({ data: null, error: state.subsError });
+            return;
+          }
+          if (env && state.subsErrorByEnv?.[env]) {
+            resolve({ data: null, error: state.subsErrorByEnv[env] });
             return;
           }
           let rows = [...((env && state.subsByEnv?.[env]) || [])];
@@ -423,13 +429,43 @@ describe("loadUnionEntitlement — live-row environment rule", () => {
     expect(entitlement.capabilities.advancedExports).toBe(true);
   });
 
-  it("subscriptions read failure degrades to null rows (no throw, no unlock)", async () => {
+  it("subscriptions read failure is reported as an unverifiable entitlement", async () => {
     const { entitlement, lookupFailed } = await loadUnionEntitlement(
       fakeClient({ subsError: { message: "boom" } }),
       "sandbox",
       NOW,
     );
-    expect(lookupFailed).toBe(false);
+    expect(lookupFailed).toBe(true);
     expect(entitlement.effectivePlanId).toBe("free");
+  });
+
+  it("a valid live Founder row remains verified when the sandbox read fails", async () => {
+    const { entitlement, lookupFailed } = await loadUnionEntitlement(
+      fakeClient({
+        subsByEnv: { live: [liveFounderRow()] },
+        subsErrorByEnv: { sandbox: { message: "sandbox unavailable" } },
+      }),
+      "sandbox",
+      NOW,
+    );
+
+    expect(lookupFailed).toBe(false);
+    expect(entitlement.displayPlanId).toBe("founder_lifetime");
+    expect(entitlement.capabilities.advancedExports).toBe(true);
+  });
+
+  it("a valid sandbox Pro row remains verified when the live read fails", async () => {
+    const { entitlement, lookupFailed } = await loadUnionEntitlement(
+      fakeClient({
+        subsByEnv: { sandbox: [proRow({ environment: "sandbox" })] },
+        subsErrorByEnv: { live: { message: "live unavailable" } },
+      }),
+      "sandbox",
+      NOW,
+    );
+
+    expect(lookupFailed).toBe(false);
+    expect(entitlement.displayPlanId).toBe("pro_monthly");
+    expect(entitlement.capabilities.advancedExports).toBe(true);
   });
 });

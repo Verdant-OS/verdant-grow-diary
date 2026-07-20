@@ -134,9 +134,13 @@ describe("static wiring — the gates are actually read at the creation seams", 
     expect(TENT_DIALOG).toMatch(/tent-create-gate-notice/);
   });
 
-  it("both seams fail open on loading entitlements", () => {
-    expect(GROWS).toMatch(/entLoading \? null : entitlement\.capabilities/);
-    expect(TENT_DIALOG).toMatch(/entLoading \? null : entitlement\.capabilities/);
+  it("both seams fail open while loading or when entitlement lookup fails", () => {
+    expect(GROWS).toMatch(
+      /entLoading \|\| entitlementLookupFailed\s*\? null\s*: entitlement\.capabilities/,
+    );
+    expect(TENT_DIALOG).toMatch(
+      /entLoading \|\| entitlementLookupFailed\s*\? null\s*: entitlement\.capabilities/,
+    );
   });
 
   it("the gate module itself stays pure — no React, Supabase, or clock reads", () => {

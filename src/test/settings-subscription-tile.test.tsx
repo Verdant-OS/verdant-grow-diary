@@ -15,7 +15,9 @@ import { MemoryRouter } from "react-router-dom";
 
 const entitlementMock = vi.hoisted(() => ({
   loading: false as boolean,
+  lookupFailed: false as boolean,
   displayPlanId: "free" as string | null,
+  refetch: vi.fn(async () => undefined),
 }));
 
 const portalMock = vi.hoisted(() => ({
@@ -25,7 +27,9 @@ const portalMock = vi.hoisted(() => ({
 vi.mock("@/hooks/useMyEntitlements", () => ({
   useMyEntitlements: () => ({
     loading: entitlementMock.loading,
+    lookupFailed: entitlementMock.lookupFailed,
     entitlement: { displayPlanId: entitlementMock.displayPlanId },
+    refetch: entitlementMock.refetch,
   }),
 }));
 
@@ -56,7 +60,9 @@ vi.mock("@/integrations/supabase/client", () => ({
 beforeEach(() => {
   delete (window as any).Paddle;
   entitlementMock.loading = false;
+  entitlementMock.lookupFailed = false;
   entitlementMock.displayPlanId = "free";
+  entitlementMock.refetch.mockClear();
   cancelNoticeMock.visible = false;
   cancelNoticeMock.accessUntilIso = null;
   cancelNoticeMock.accessUntilLabel = "";
@@ -159,6 +165,18 @@ describe("Settings — Subscription tile", () => {
     entitlementMock.displayPlanId = "some_unknown_plan";
     renderPage();
     expect(screen.getByTestId("settings-subscription-plan").textContent).toMatch(/unavailable/i);
+  });
+
+  it("lookup failure shows a retry state without treating the account as Free", async () => {
+    entitlementMock.lookupFailed = true;
+    entitlementMock.displayPlanId = "free";
+    renderPage();
+
+    expect(screen.getByTestId("settings-subscription-plan").textContent).toMatch(/unavailable/i);
+    expect(screen.queryByTestId("settings-subscription-upgrade")).toBeNull();
+    expect(screen.queryByTestId("settings-subscription-manage")).toBeNull();
+    fireEvent.click(screen.getByTestId("settings-subscription-entitlement-retry"));
+    await waitFor(() => expect(entitlementMock.refetch).toHaveBeenCalledTimes(1));
   });
 
   it("does not include autopilot / device-control claims", () => {

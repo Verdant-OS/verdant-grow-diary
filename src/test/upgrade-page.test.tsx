@@ -38,6 +38,11 @@ const tierOverride = vi.hoisted(() => ({
   proMonthlyPriceId: "pri_pro_month" as string | null,
 }));
 
+const entitlementMock = vi.hoisted(() => ({
+  lookupFailed: false,
+  refetch: vi.fn(async () => undefined),
+}));
+
 // Live-mutable pricing tiers: we mutate the ACTUAL imported array in
 // beforeEach so component reads see current test overrides.
 import { PRICING_TIERS, resolveTierFeatures } from "@/config/pricing";
@@ -66,7 +71,9 @@ vi.mock("@/lib/paddleConfig", async () => {
 vi.mock("@/hooks/useMyEntitlements", () => ({
   useMyEntitlements: () => ({
     loading: false,
-    entitlement: { displayPlanId: null },
+    lookupFailed: entitlementMock.lookupFailed,
+    entitlement: { displayPlanId: entitlementMock.lookupFailed ? "free" : null },
+    refetch: entitlementMock.refetch,
   }),
 }));
 
@@ -108,6 +115,8 @@ beforeEach(() => {
   paddleMock.error = null;
   paddleMock.checkoutOpen.mockReset();
   canonicalCheckout.openCheckout.mockReset();
+  entitlementMock.lookupFailed = false;
+  entitlementMock.refetch.mockClear();
   tierOverride.founderClaimed = 0;
   tierOverride.proMonthlyPriceId = "pri_pro_month";
   // Mutate live pricing tiers so all paid CTAs are active by default; individual
@@ -136,6 +145,22 @@ describe("Upgrade page", () => {
     expect(screen.getByTestId("tier-pro_monthly")).toBeInTheDocument();
     expect(screen.getByTestId("tier-pro_annual")).toBeInTheDocument();
     expect(screen.getByTestId("tier-founder_lifetime")).toBeInTheDocument();
+  });
+
+  it("does not label fallback Free or allow checkout when verification fails", () => {
+    entitlementMock.lookupFailed = true;
+    renderPage();
+
+    expect(screen.getByTestId("upgrade-plan-verification-failed")).toBeInTheDocument();
+    expect(screen.getByTestId("tier-free-cta")).not.toHaveTextContent("Current plan");
+    expect(screen.getByTestId("tier-pro_monthly-cta")).toBeDisabled();
+    expect(screen.getByTestId("tier-pro_monthly-cta")).toHaveTextContent(
+      "Plan check unavailable",
+    );
+    fireEvent.click(screen.getByTestId("tier-pro_monthly-cta"));
+    expect(canonicalCheckout.openCheckout).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId("upgrade-plan-verification-retry"));
+    expect(entitlementMock.refetch).toHaveBeenCalledTimes(1);
   });
 
   it("keeps paid CTA disabled and shows 'Available soon' when paddlePriceId is null", () => {

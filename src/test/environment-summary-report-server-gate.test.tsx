@@ -20,7 +20,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-type GateOutcome = "allowed" | "denied" | "error";
+type GateOutcome = "allowed" | "denied" | "verification_failed" | "error";
 
 const gateMock = vi.hoisted(() => ({
   outcome: "denied" as GateOutcome,
@@ -87,6 +87,16 @@ vi.mock("@/integrations/supabase/client", () => {
             error: { context: { status: 403 } } as any,
           };
         }
+        if (gateMock.outcome === "verification_failed") {
+          return {
+            data: {
+              ok: false,
+              reason: "entitlement_lookup_failed",
+              feature: "environment_summary_report",
+            },
+            error: { context: { status: 403 } } as any,
+          };
+        }
         // error
         return {
           data: null,
@@ -143,7 +153,7 @@ describe("EnvironmentSummaryReportPage — server-authoritative entitlement gate
     expect(screen.queryByTestId("env-report-paywall")).toBeNull();
   });
 
-  it("server error fails CLOSED (locked state, no crash)", async () => {
+  it("server error fails closed without presenting a paywall", async () => {
     gateMock.outcome = "error";
     gateMock.clientPremium = true;
     renderPage();
@@ -153,6 +163,20 @@ describe("EnvironmentSummaryReportPage — server-authoritative entitlement gate
     expect(locked).toBeTruthy();
     expect(locked.getAttribute("data-server-gate-status")).toBe("error");
     expect(screen.queryByTestId("environment-summary-report-page")).toBeNull();
+    expect(screen.queryByTestId("env-report-paywall")).toBeNull();
+    expect(screen.getByTestId("env-report-entitlement-retry")).toBeTruthy();
+  });
+
+  it("entitlement lookup failure is a retryable verification state, not an upgrade denial", async () => {
+    gateMock.outcome = "verification_failed";
+    gateMock.clientPremium = false;
+    renderPage();
+    const locked = await screen.findByTestId(
+      "environment-summary-report-page-locked",
+    );
+    expect(locked.getAttribute("data-server-gate-status")).toBe("error");
+    expect(screen.queryByTestId("env-report-paywall")).toBeNull();
+    expect(screen.getByTestId("env-report-entitlement-retry")).toBeTruthy();
   });
 });
 

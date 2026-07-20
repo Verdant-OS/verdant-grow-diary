@@ -43,7 +43,7 @@ import {
 } from "@/lib/environmentSummaryExportAuditRules";
 import EnvironmentSummaryPrePrintModal from "@/components/EnvironmentSummaryPrePrintModal";
 import EnvironmentSummaryExportHistoryPanel from "@/components/EnvironmentSummaryExportHistoryPanel";
-
+import { canUseCapability } from "@/lib/entitlements";
 
 type PrintMode = "full_report" | "drilldown";
 
@@ -78,8 +78,13 @@ export default function EnvironmentSummaryReportPage() {
     if (endParam) setEndDate(endParam);
   }, [startParam, endParam]);
 
-  const { entitlement, loading: entitlementLoading } = useMyEntitlements();
-  const clientIsPremium = entitlement.capabilities.advancedExports === true;
+  const {
+    entitlement,
+    loading: entitlementLoading,
+    lookupFailed: clientLookupFailed,
+  } = useMyEntitlements();
+  const clientIsPremium =
+    !clientLookupFailed && canUseCapability(entitlement, "advancedExports");
   // Authoritative gate. The client hint above is presentation-only.
   const serverGate = useEnvironmentSummaryReportServerGate();
 
@@ -255,7 +260,7 @@ export default function EnvironmentSummaryReportPage() {
 
   // ----- Server-authoritative gate -----
   // The server-side edge function `environment-summary-report-entitlement`
-  // re-resolves entitlement from `billing_subscriptions` and returns 403
+  // re-resolves entitlement from canonical `public.subscriptions` and returns 403
   // for non-premium plans. Client `useMyEntitlements` is only a hint.
   const serverDecided =
     serverGate.status === "allowed" ||
@@ -266,7 +271,38 @@ export default function EnvironmentSummaryReportPage() {
       ? serverGate.status !== "allowed"
       // While the server is still deciding, fall back to the (non-authoritative)
       // client hint to avoid a flash of report content for free users.
-      : !entitlementLoading && !clientIsPremium;
+      : !entitlementLoading && !clientLookupFailed && !clientIsPremium;
+
+  if (serverGate.status === "error") {
+    return (
+      <div
+        className="container max-w-3xl py-6 space-y-4"
+        data-testid="environment-summary-report-page-locked"
+        data-server-gate-status="error"
+      >
+        <PageHeader
+          title="Environment Summary"
+          description="Premium report — aggregated greenhouse rule results over a date range."
+          icon={<FileBarChart className="h-5 w-5" />}
+        />
+        <p
+          className="text-sm text-muted-foreground"
+          data-testid="env-report-server-gate-message"
+        >
+          We couldn't verify your plan right now. Nothing was generated. Try the check again in a
+          moment.
+        </p>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={serverGate.retry}
+          data-testid="env-report-entitlement-retry"
+        >
+          Retry plan check
+        </Button>
+      </div>
+    );
+  }
 
   if (showLocked) {
     const vm = buildPaywallCtaViewModel({
@@ -283,9 +319,7 @@ export default function EnvironmentSummaryReportPage() {
         "Reports are read-only. Verdant does not control equipment or automate changes.",
     });
     const lockedMessage =
-      serverGate.status === "error"
-        ? "We couldn't verify your plan right now. Environment Summary Report is a Pro feature — please try again in a moment."
-        : "Environment Summary Report is a Pro feature. Upgrade required to generate this report.";
+      "Environment Summary Report is a Pro feature. Upgrade required to generate this report.";
     return (
       <div
         className="container max-w-3xl py-6 space-y-4"

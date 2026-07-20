@@ -6,7 +6,7 @@
  * children. Forbidden marketing phrases stay absent.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { resolveEntitlements } from "@/lib/entitlements/resolveEntitlements";
 import type { BillingSubscriptionRow } from "@/lib/entitlements/types";
@@ -14,7 +14,8 @@ import type { BillingSubscriptionRow } from "@/lib/entitlements/types";
 const NOW = new Date("2026-08-01T00:00:00Z");
 const PAST = new Date(NOW.getTime() - 60_000).toISOString();
 const mode = vi.hoisted(() => ({
-  current: "free" as "free" | "pro" | "founder" | "canceled" | "loading",
+  current: "free" as "free" | "pro" | "founder" | "canceled" | "loading" | "error",
+  refetch: vi.fn(async () => undefined),
 }));
 
 vi.mock("@/hooks/useMyEntitlements", () => ({
@@ -22,8 +23,9 @@ vi.mock("@/hooks/useMyEntitlements", () => ({
     if (mode.current === "loading") {
       return {
         loading: true,
+        lookupFailed: false,
         entitlement: resolveEntitlements(null, NOW),
-        refetch: async () => {},
+        refetch: mode.refetch,
       };
     }
     const base: BillingSubscriptionRow = {
@@ -48,8 +50,9 @@ vi.mock("@/hooks/useMyEntitlements", () => ({
       row = { ...base, status: "canceled", current_period_end: PAST };
     return {
       loading: false,
+      lookupFailed: mode.current === "error",
       entitlement: resolveEntitlements(row, NOW),
-      refetch: async () => {},
+      refetch: mode.refetch,
     };
   },
 }));
@@ -79,7 +82,10 @@ function renderGate(
 }
 
 describe("PhenoTrackerUpgradeGate", () => {
-  beforeEach(() => cleanup());
+  beforeEach(() => {
+    cleanup();
+    mode.refetch.mockClear();
+  });
 
   it("renders loading state while entitlement resolves", () => {
     mode.current = "loading";
@@ -117,6 +123,16 @@ describe("PhenoTrackerUpgradeGate", () => {
     expect(screen.queryByTestId("gated-child")).toBeNull();
     const body = document.body.textContent ?? "";
     for (const rx of FORBIDDEN) expect(body).not.toMatch(rx);
+  });
+
+  it("lookup failure shows Retry without presenting an upgrade CTA", () => {
+    mode.current = "error";
+    renderGate();
+
+    expect(screen.getByTestId("pheno-tracker-upgrade-gate-verification-failed")).toBeDefined();
+    expect(screen.queryByRole("link", { name: /upgrade to pro/i })).toBeNull();
+    fireEvent.click(screen.getByTestId("pheno-tracker-upgrade-gate-retry"));
+    expect(mode.refetch).toHaveBeenCalledTimes(1);
   });
 
   it("returnTo param is scoped to gated Pheno pathnames", () => {

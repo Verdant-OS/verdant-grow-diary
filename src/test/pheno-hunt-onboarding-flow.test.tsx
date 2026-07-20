@@ -19,7 +19,12 @@ import type { BillingSubscriptionRow } from "@/lib/entitlements/types";
 
 const NOW = new Date("2026-08-01T00:00:00Z");
 const entMode = vi.hoisted(() => ({
-  current: "pro" as "pro" | "founder" | "free" | "canceled",
+  current: "pro" as "pro" | "founder" | "free" | "canceled" | "error",
+}));
+
+const toastMock = vi.hoisted(() => ({
+  success: vi.fn(),
+  error: vi.fn(),
 }));
 
 const createPhenoHuntMock = vi.hoisted(() =>
@@ -98,6 +103,7 @@ vi.mock("@/hooks/useMyEntitlements", () => ({
     }
     return {
       loading: false,
+      lookupFailed: entMode.current === "error",
       entitlement: resolveEntitlements(row, NOW),
       refetch: async () => {},
     };
@@ -114,7 +120,7 @@ vi.mock("@/lib/phenoHuntService", async () => {
 });
 
 vi.mock("sonner", () => ({
-  toast: { success: vi.fn(), error: vi.fn() },
+  toast: toastMock,
 }));
 
 import PhenoHuntNew from "@/pages/PhenoHuntNew";
@@ -142,6 +148,8 @@ describe("PhenoHuntNew onboarding flow", () => {
   beforeEach(() => {
     cleanup();
     createPhenoHuntMock.mockClear();
+    toastMock.success.mockClear();
+    toastMock.error.mockClear();
   });
 
   it("Pro user sees the stepper starting on the basics step", async () => {
@@ -264,6 +272,24 @@ describe("PhenoHuntNew onboarding flow", () => {
     fireEvent.click(screen.getByTestId("ph-save-btn"));
     // Even if the button were clickable, canWriteFeatureData blocks the call.
     await new Promise((r) => setTimeout(r, 0));
+    expect(createPhenoHuntMock).not.toHaveBeenCalled();
+  });
+
+  it("does not call a failed plan check an upgrade requirement", async () => {
+    entMode.current = "pro";
+    renderPage();
+    await waitFor(() => screen.getByTestId("pheno-onboarding-stepper"));
+    fireEvent.click(screen.getByTestId("pheno-onboarding-stepper-step-candidates"));
+    fireEvent.click(screen.getByTestId("ph-toggle-p1"));
+    fireEvent.click(screen.getByTestId("ph-toggle-p2"));
+
+    entMode.current = "error";
+    fireEvent.click(screen.getByTestId("pheno-onboarding-stepper-step-checklist"));
+    fireEvent.click(screen.getByTestId("ph-save-btn"));
+
+    await waitFor(() => expect(toastMock.error).toHaveBeenCalledTimes(1));
+    expect(toastMock.error.mock.calls[0]?.[0]).toMatch(/couldn't verify pheno tracker access/i);
+    expect(toastMock.error.mock.calls[0]?.[0]).not.toMatch(/upgrade/i);
     expect(createPhenoHuntMock).not.toHaveBeenCalled();
   });
 });

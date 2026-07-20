@@ -4,7 +4,7 @@
  * Server-side authoritative entitlement preflight for premium CSV / report
  * exporters (AI Doctor PDF / Evidence CSV / Report Package, and any future
  * premium export surface). Calls the `premium-export-entitlement` edge
- * function which re-resolves entitlement from `billing_subscriptions`
+ * function which re-resolves entitlement from canonical `public.subscriptions`
  * server-side (never trusts the client).
  *
  * Reusable API:
@@ -24,7 +24,6 @@
 import { useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
-
 export type PremiumExportFeature =
   | "ai_doctor_report"
   | "ai_doctor_evidence_csv"
@@ -35,6 +34,7 @@ export type PremiumExportFeature =
 export type PremiumExportGateState =
   | "allowed"
   | "denied"
+  | "verification_failed"
   | "invalid_request"
   | "network_error";
 
@@ -60,6 +60,9 @@ export const PAYWALL_UPGRADE_COPY =
 export const PREMIUM_EXPORT_PAYWALL_COPY = `${PAYWALL_HEADLINE} ${PAYWALL_UPGRADE_COPY}`;
 
 function classifyDenial(reason: string | null): PremiumExportGateState {
+  if (reason === "entitlement_lookup_failed") {
+    return "verification_failed";
+  }
   if (reason === "invalid_request" || reason === "invalid_json") {
     return "invalid_request";
   }
@@ -78,9 +81,8 @@ export async function checkPremiumExportEntitlement(
     if (scope.plantId) body.plant_id = scope.plantId;
     if (scope.startDate) body.start_date = scope.startDate;
     if (scope.endDate) body.end_date = scope.endDate;
-    // Phase 2b: pass the client-derived billing environment so the server
-    // union resolver ignores mismatched Lovable Paddle rows.
-    // billing_env is derived server-side; never sent from the client.
+    // Billing environment is resolved server-side; no client plan or
+    // environment claims are sent.
 
     const { data, error } = await supabase.functions.invoke(
       "premium-export-entitlement",
@@ -102,10 +104,17 @@ export async function checkPremiumExportEntitlement(
       };
     }
     const denial = (data ?? null) as Record<string, unknown> | null;
-    const reason =
-      (denial && typeof denial.reason === "string"
-        ? denial.reason
-        : null) ?? "upgrade_required";
+    const structuredReason =
+      denial && typeof denial.reason === "string" ? denial.reason : null;
+    if (structuredReason === null) {
+      return {
+        ok: false,
+        state: "network_error",
+        reason: "network_error",
+        displayPlanId: null,
+      };
+    }
+    const reason = structuredReason ?? "upgrade_required";
     const displayPlanId =
       denial && typeof denial.display_plan_id === "string"
         ? denial.display_plan_id

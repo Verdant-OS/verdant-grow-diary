@@ -40,6 +40,7 @@ import {
   isValidDiaryRangeReportRange,
 } from "@/lib/diaryRangeReportNavigationRules";
 import { timelinePath } from "@/lib/routes";
+import { canUseCapability } from "@/lib/entitlements";
 
 type ServerGateStatus = "loading" | "allowed" | "denied" | "error";
 
@@ -81,14 +82,20 @@ export default function DiaryRangeReportPage() {
   }
 
   // Client hint — presentation-only; the server decision is the gate.
-  const { entitlement, loading: entitlementLoading } = useMyEntitlements();
-  const clientIsPremium = entitlement.capabilities.advancedExports === true;
+  const {
+    entitlement,
+    loading: entitlementLoading,
+    lookupFailed: clientLookupFailed,
+  } = useMyEntitlements();
+  const clientIsPremium =
+    !clientLookupFailed && canUseCapability(entitlement, "advancedExports");
 
   // Authoritative server gate. Fail-closed.
   const [serverGate, setServerGate] = useState<{
     status: ServerGateStatus;
     reason: string | null;
   }>({ status: "loading", reason: null });
+  const [serverGateAttempt, setServerGateAttempt] = useState(0);
   useEffect(() => {
     let cancelled = false;
     if (!growId) {
@@ -103,13 +110,18 @@ export default function DiaryRangeReportPage() {
     }).then((res) => {
       if (cancelled) return;
       if (res.ok) setServerGate({ status: "allowed", reason: null });
-      else if (res.state === "network_error") setServerGate({ status: "error", reason: res.reason });
+      else if (
+        res.state === "network_error" ||
+        res.state === "verification_failed" ||
+        res.state === "invalid_request"
+      )
+        setServerGate({ status: "error", reason: res.reason });
       else setServerGate({ status: "denied", reason: res.reason });
     });
     return () => {
       cancelled = true;
     };
-  }, [growId, startDate, endDate]);
+  }, [growId, startDate, endDate, serverGateAttempt]);
 
   const gateAllowed = serverGate.status === "allowed";
   const { status: dataStatus, data, error } = useDiaryRangeReportData(
@@ -169,7 +181,34 @@ export default function DiaryRangeReportPage() {
     ? serverGate.status !== "allowed"
     : // While the server is deciding, use the non-authoritative client
       // hint to avoid a flash of report content for free users.
-      !entitlementLoading && !clientIsPremium;
+      !entitlementLoading && !clientLookupFailed && !clientIsPremium;
+
+  if (serverGate.status === "error") {
+    return (
+      <div
+        className="max-w-2xl mx-auto py-8"
+        data-testid="diary-range-report-page-locked"
+        data-server-gate-status="error"
+      >
+        <h1 className="font-display text-xl font-semibold mb-2">Date-range diary report</h1>
+        <p
+          className="text-sm text-muted-foreground mb-4"
+          data-testid="diary-range-report-server-gate-message"
+        >
+          The report entitlement check did not complete. Nothing was generated. Try the check
+          again in a moment.
+        </p>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setServerGateAttempt((value) => value + 1)}
+          data-testid="diary-range-report-entitlement-retry"
+        >
+          Retry plan check
+        </Button>
+      </div>
+    );
+  }
 
   if (showLocked) {
     const paywallVm = buildPaywallCtaViewModel({
@@ -187,9 +226,7 @@ export default function DiaryRangeReportPage() {
           className="text-sm text-muted-foreground mb-4"
           data-testid="diary-range-report-server-gate-message"
         >
-          {serverGate.status === "error"
-            ? "The report entitlement check did not complete. Nothing was generated."
-            : "Date-range diary reports are a Pro feature."}
+          Date-range diary reports are a Pro feature.
         </p>
         <PaywallCta vm={paywallVm} data-testid="diary-range-report-paywall" />
       </div>

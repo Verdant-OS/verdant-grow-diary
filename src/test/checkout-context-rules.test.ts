@@ -102,4 +102,15 @@ describe("resolveCheckoutSuccessView", () => {
       }),
     ).toBe("no_context");
   });
+
+  it("a failed entitlement read resolves to verification_failed", () => {
+    expect(
+      resolveCheckoutSuccessView({
+        confirmed: false,
+        lookupFailed: true,
+        hasReturnTo: false,
+        hasCheckoutContext: false,
+      }),
+    ).toBe("verification_failed");
+  });
 });

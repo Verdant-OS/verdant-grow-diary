@@ -3,6 +3,10 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { getRoutesByAccess } from "@/lib/appRouteManifest";
+import {
+  readDesktopGrowerNavigationSource,
+  readMobileGrowerNavigationSource,
+} from "@/test/utils/growerNavigationSource";
 
 const read = (path: string) => readFileSync(resolve(process.cwd(), path), "utf8");
 
@@ -11,8 +15,8 @@ const RULES = read("src/lib/ai/postGrowReflectionCandidatePasteValidator.ts");
 const COMPONENT = read("src/components/PostGrowReflectionCandidatePasteValidator.tsx");
 const PAGE = read("src/pages/OperatorPostGrowReflectionDryRun.tsx");
 const DOCS = read("docs/post-grow-reflection-phase2g.md");
-const SIDEBAR = read("src/components/AppSidebar.tsx");
-const MOBILE_NAV = read("src/components/MobileNav.tsx");
+const SIDEBAR = readDesktopGrowerNavigationSource();
+const MOBILE_NAV = readMobileGrowerNavigationSource();
 
 describe("Post-Grow Reflection candidate paste validator static safety", () => {
   it("does not introduce provider, DB, schema, network, or device-control surfaces", () => {

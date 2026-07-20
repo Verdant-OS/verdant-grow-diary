@@ -10,6 +10,10 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import {
+  readDesktopGrowerNavigationSource,
+  readMobileGrowerNavigationSource,
+} from "@/test/utils/growerNavigationSource";
 
 const read = (p: string) => readFileSync(resolve(process.cwd(), p), "utf8");
 
@@ -31,13 +35,13 @@ describe("Leads admin boundary — routing", () => {
 
 describe("Leads admin boundary — navigation", () => {
   it("AppSidebar does not expose Leads", () => {
-    const SIDEBAR = read("src/components/AppSidebar.tsx");
+    const SIDEBAR = readDesktopGrowerNavigationSource();
     expect(SIDEBAR).not.toMatch(/\/leads/);
     expect(SIDEBAR).not.toMatch(/\bLeads\b/);
   });
 
   it("MobileNav does not expose Leads", () => {
-    const NAV = read("src/components/MobileNav.tsx");
+    const NAV = readMobileGrowerNavigationSource();
     expect(NAV).not.toMatch(/\/leads/);
     expect(NAV).not.toMatch(/\bLeads\b/);
   });

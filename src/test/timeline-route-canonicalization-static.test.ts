@@ -13,13 +13,17 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import {
+  readDesktopGrowerNavigationSource,
+  readMobileGrowerNavigationSource,
+} from "@/test/utils/growerNavigationSource";
 
 const ROOT = resolve(__dirname, "../..");
 const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
 
 const DASHBOARD = read("src/pages/Dashboard.tsx");
-const MOBILE = read("src/components/MobileNav.tsx");
-const SIDEBAR = read("src/components/AppSidebar.tsx");
+const MOBILE = readMobileGrowerNavigationSource();
+const SIDEBAR = readDesktopGrowerNavigationSource();
 const APP = read("src/App.tsx");
 
 const USER_FACING = [
@@ -29,11 +33,11 @@ const USER_FACING = [
 ];
 
 describe("Slice 7: user-facing nav never points at the legacy /logs path", () => {
-  it.each(USER_FACING)("%s contains no to=\"/logs\" link", (_name, source) => {
+  it.each(USER_FACING)('%s contains no to="/logs" link', (_name, source) => {
     expect(source).not.toMatch(/to=\{?\s*["'`]\/logs(?:["'`?])/);
   });
 
-  it.each(USER_FACING)("%s contains no href=\"/logs\" link", (_name, source) => {
+  it.each(USER_FACING)('%s contains no href="/logs" link', (_name, source) => {
     expect(source).not.toMatch(/href=\{?\s*["'`]\/logs(?:["'`?])/);
   });
 

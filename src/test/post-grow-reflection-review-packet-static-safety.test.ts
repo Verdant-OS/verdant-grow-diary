@@ -3,6 +3,10 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { getRoutesByAccess } from "@/lib/appRouteManifest";
+import {
+  readDesktopGrowerNavigationSource,
+  readMobileGrowerNavigationSource,
+} from "@/test/utils/growerNavigationSource";
 
 const read = (path: string) => readFileSync(resolve(process.cwd(), path), "utf8");
 
@@ -12,8 +16,8 @@ const EXPORT_HELPERS = read("src/lib/ai/postGrowReflectionReviewPacketExport.ts"
 const CARD = read("src/components/PostGrowReflectionReviewPacketCard.tsx");
 const VALIDATOR = read("src/components/PostGrowReflectionCandidatePasteValidator.tsx");
 const DOCS = read("docs/post-grow-reflection-phase2l.md");
-const SIDEBAR = read("src/components/AppSidebar.tsx");
-const MOBILE_NAV = read("src/components/MobileNav.tsx");
+const SIDEBAR = readDesktopGrowerNavigationSource();
+const MOBILE_NAV = readMobileGrowerNavigationSource();
 
 describe("Post-Grow Reflection Phase 2L static safety", () => {
   it("keeps all new files free of runtime and persistence surfaces", () => {

@@ -149,7 +149,7 @@ describe("static route head fidelity helpers", () => {
     expect(md).toContain("`/gone`");
     expect(md).toContain("### `/pricing`");
     expect(md).toContain("Wrong title");
-    expect(md).toContain(FIXTURE_META.title);
+    expect(md).toContain("Pricing — Free, Pro & Founder Lifetime");
     // Clean route must not appear as a drifted section.
     expect(md).not.toContain("### `/clean`");
   });

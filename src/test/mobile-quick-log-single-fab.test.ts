@@ -47,8 +47,9 @@ describe("mobile Quick Log — single FAB", () => {
     expect(APP_SHELL).toMatch(/resolveMobileQuickLogTarget\(location\.pathname\)/);
     expect(APP_SHELL).toMatch(/mobileQuickLogTarget[\s\S]{0,300}setOpenScopedLog\(true\)/);
     expect(APP_SHELL).toMatch(
-      /mobileQuickLogTarget\s*\?[\s\S]{0,250}<QuickLogV2Sheet[\s\S]{0,250}defaultTargetKey=\{mobileQuickLogTarget\}/,
+      /<QuickLogV2Sheet[\s\S]{0,350}defaultTargetKey=\{structuredOpenIntent\?\.targetKey \?\? mobileQuickLogTarget\}/,
     );
+    expect(APP_SHELL.match(/<QuickLogV2Sheet\b/g) ?? []).toHaveLength(1);
   });
 });
 

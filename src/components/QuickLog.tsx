@@ -81,6 +81,8 @@ import { useQuickLogV2Save } from "@/hooks/useQuickLogV2Save";
 import {
   buildLegacyQuickLogUnifiedPayload,
   isSupportedLegacyEventType,
+  isVerifiedPublicStarterWateringHandoff,
+  ORDINARY_LEGACY_WATERING_BLOCKED_COPY,
   UNSUPPORTED_EVENT_TYPE_COPY,
 } from "@/lib/legacyQuickLogUnifiedSave";
 import {
@@ -286,6 +288,10 @@ export default function QuickLog({
   const activeTents = useMemo(() => tentsQuery.data ?? [], [tentsQuery.data]);
   const queryClient = useQueryClient();
   const { save: saveViaRpc } = useQuickLogV2Save();
+  const verifiedPublicStarterWatering = isVerifiedPublicStarterWateringHandoff(
+    prefill,
+    readPublicQuickLogStarterDraft(),
+  );
 
   const tentSetupRequired =
     shouldRequireFirstTentSetup(activeTents) &&
@@ -889,6 +895,15 @@ export default function QuickLog({
   async function runSubmit() {
     setSaveError(null);
 
+    if (
+      (eventType === "watering" || prefill?.eventType === "watering") &&
+      !isVerifiedPublicStarterWateringHandoff(prefill, readPublicQuickLogStarterDraft())
+    ) {
+      setSaveError(ORDINARY_LEGACY_WATERING_BLOCKED_COPY);
+      toast.message(ORDINARY_LEGACY_WATERING_BLOCKED_COPY);
+      return;
+    }
+
     if (!user) {
       const message = "Pick a workspace first";
       setSaveError(message);
@@ -1269,6 +1284,10 @@ export default function QuickLog({
           onSaveEnd={endAllActivitiesSave}
           saveBlocked={saveLocked}
           isSaveBlocked={isSaveInFlight}
+          onBeforeStructuredWaterOpen={() => {
+            onOpenChange(false);
+            reset();
+          }}
         />
 
         <form onSubmit={submit} className="grid gap-4">
@@ -1814,6 +1833,7 @@ export default function QuickLog({
                   value={displayedEventType}
                   onValueChange={handleEventTypeChange}
                   disabled={saveLocked}
+                  allowLegacyWatering={verifiedPublicStarterWatering}
                 />
                 <div>
                   <Label className="text-xs">Stage</Label>

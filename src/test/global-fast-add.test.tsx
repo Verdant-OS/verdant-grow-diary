@@ -49,14 +49,13 @@ describe("fastAddActionRules", () => {
     }
   });
 
-  it("routes non-diagnosis actions to open the existing Quick Log via event", () => {
+  it("routes Watering only to the exact typed V2 Water event", () => {
     const ctx = { plantId: "p1", tentId: null, growId: "g1" };
     const intent = resolveFastAddIntent("watering", ctx);
-    expect(intent.kind).toBe("open-quicklog");
-    if (intent.kind === "open-quicklog") {
-      expect(intent.prefill.eventType).toBe("watering");
-      expect(intent.prefill.plantId).toBe("p1");
-      expect(intent.eventName).toBe("verdant:open-quicklog");
+    expect(intent.kind).toBe("open-quicklog-v2");
+    if (intent.kind === "open-quicklog-v2") {
+      expect(intent.detail).toEqual({ targetKey: "plant:p1", action: "water" });
+      expect(intent.eventName).toBe("verdant:open-quicklog-v2");
     }
   });
 
@@ -120,6 +119,17 @@ describe("GlobalFastAddButton", () => {
     const [eventName, detail] = onDispatchEvent.mock.calls[0];
     expect(eventName).toBe("verdant:open-quicklog");
     expect((detail as { eventType: string }).eventType).toBe("feeding");
+  });
+
+  it("dispatches only the typed V2 event for Watering", () => {
+    const onDispatchEvent = vi.fn();
+    renderAt("/plants/p1", { onDispatchEvent });
+    fireEvent.click(screen.getByTestId("global-fast-add-trigger"));
+    fireEvent.click(screen.getByTestId("global-fast-add-action-watering"));
+    expect(onDispatchEvent).toHaveBeenCalledWith("verdant:open-quicklog-v2", {
+      targetKey: "plant:p1",
+      action: "water",
+    });
   });
 
   it("navigates for Diagnosis (no event, no model call)", () => {

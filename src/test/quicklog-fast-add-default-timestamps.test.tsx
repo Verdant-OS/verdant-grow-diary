@@ -43,11 +43,12 @@ describe("buildFastAddTimestampDefaults", () => {
 describe("resolveFastAddIntent — defaults flow into Quick Log prefill", () => {
   const ctx = { plantId: "p1", tentId: null, growId: "g1" };
 
-  it("includes occurred_at in prefill for watering", () => {
+  it("routes watering through the closed V2 intent without legacy timestamps", () => {
     const intent = resolveFastAddIntent("watering", ctx, { now });
-    expect(intent.kind).toBe("open-quicklog");
-    if (intent.kind === "open-quicklog") {
-      expect(intent.prefill.occurred_at).toBe(FIXED.toISOString());
+    expect(intent.kind).toBe("open-quicklog-v2");
+    if (intent.kind === "open-quicklog-v2") {
+      expect(intent.detail).toEqual({ targetKey: "plant:p1", action: "water" });
+      expect(intent.detail).not.toHaveProperty("occurred_at");
     }
   });
 

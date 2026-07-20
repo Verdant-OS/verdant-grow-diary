@@ -71,7 +71,7 @@ export interface QuickLogHarvestDetails {
  */
 export type QuickLogSaveRouteKind =
   | "manual_note"
-  | "manual_water"
+  | "structured_water"
   | "event"
   | "manual_sensor_reading"
   | "none";
@@ -149,7 +149,7 @@ export const QUICK_LOG_ACTIVITY_DEFINITIONS: Readonly<
     label: "Watering",
     description: "Record a watering event.",
     safetyNote: "Record what you watered. This log is not an irrigation recommendation.",
-    saveRoute: "manual_water",
+    saveRoute: "structured_water",
     timelineLabel: "Watering",
     savedBreakdownLabel: "Watering",
     enabled: true,

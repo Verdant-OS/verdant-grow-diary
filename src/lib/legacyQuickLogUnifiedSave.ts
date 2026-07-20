@@ -48,6 +48,54 @@ export function isSupportedLegacyEventType(value: string): value is SupportedLeg
 export const UNSUPPORTED_EVENT_TYPE_COPY =
   "Coming soon in the new Quick Log path. Use Water or Observation for now.";
 
+export const ORDINARY_LEGACY_WATERING_BLOCKED_COPY =
+  "Watering now uses the structured Water form. Choose Watering under All activity types to continue.";
+
+interface PublicStarterWateringPrefillLike {
+  eventType?: unknown;
+  source?: unknown;
+  wateringVolumeMl?: unknown;
+  publicStarterDraftId?: unknown;
+  publicStarterDraftUpdatedAt?: unknown;
+}
+
+interface PublicStarterWateringDraftLike {
+  v?: unknown;
+  id?: unknown;
+  updatedAt?: unknown;
+  logType?: unknown;
+  wateringVolumeMl?: unknown;
+}
+
+/**
+ * Narrow compatibility fence for the public starter's richer legacy handoff.
+ * Both opaque marker and exact revision must match the currently stored v1
+ * watering draft; ordinary/crafted Water state is rejected.
+ */
+export function isVerifiedPublicStarterWateringHandoff(
+  prefill: PublicStarterWateringPrefillLike | null | undefined,
+  storedDraft: PublicStarterWateringDraftLike | null | undefined,
+): boolean {
+  return !!(
+    prefill &&
+    storedDraft &&
+    prefill.eventType === "watering" &&
+    prefill.source === "public-starter" &&
+    typeof prefill.publicStarterDraftId === "string" &&
+    prefill.publicStarterDraftId.length > 0 &&
+    prefill.publicStarterDraftId === storedDraft.id &&
+    typeof prefill.publicStarterDraftUpdatedAt === "string" &&
+    prefill.publicStarterDraftUpdatedAt.length > 0 &&
+    prefill.publicStarterDraftUpdatedAt === storedDraft.updatedAt &&
+    storedDraft.v === 1 &&
+    storedDraft.logType === "watering" &&
+    typeof storedDraft.wateringVolumeMl === "number" &&
+    Number.isFinite(storedDraft.wateringVolumeMl) &&
+    storedDraft.wateringVolumeMl > 0 &&
+    prefill.wateringVolumeMl === storedDraft.wateringVolumeMl
+  );
+}
+
 import { type EcUnit } from "@/constants/units";
 
 export interface LegacyQuickLogDetails {

@@ -52,6 +52,10 @@ import {
   QUICK_LOG_HARVEST_STAGE_DISABLED_REASON,
   type QuickLogActivityDraftBinding,
 } from "@/lib/quickLogActivityRules";
+import {
+  QUICK_LOG_V2_OPEN_EVENT,
+  buildQuickLogV2OpenIntent,
+} from "@/lib/quickLogV2OpenIntent";
 
 export interface QuickLogAllActivitiesSectionProps {
   growId: string | null | undefined;
@@ -71,6 +75,8 @@ export interface QuickLogAllActivitiesSectionProps {
   saveBlocked?: boolean;
   /** Reads the same parent-owned synchronous guard used to acquire a save. */
   isSaveBlocked?: () => boolean;
+  /** Parent-owned close/reset seam used before handing Water to Quick Log v2. */
+  onBeforeStructuredWaterOpen?: () => void;
 }
 
 export interface QuickLogAllActivitiesSaveTarget {
@@ -133,6 +139,7 @@ export default function QuickLogAllActivitiesSection({
   onSaveEnd,
   saveBlocked = false,
   isSaveBlocked,
+  onBeforeStructuredWaterOpen,
 }: QuickLogAllActivitiesSectionProps) {
   const currentTarget = useMemo(
     () => buildQuickLogTargetIdentity({ growId, tentId, plantId }),
@@ -155,6 +162,7 @@ export default function QuickLogAllActivitiesSection({
   const [saved, setSaved] = useState<SavedRecord[]>([]);
   const [errorReason, setErrorReason] = useState<string | null>(null);
   const [errorForActivity, setErrorForActivity] = useState<QuickLogActivityId | null>(null);
+  const [structuredWaterError, setStructuredWaterError] = useState<string | null>(null);
   const { save, saving } = useQuickLogActivitySave();
   const localSaveInFlightRef = useRef(false);
 
@@ -171,6 +179,7 @@ export default function QuickLogAllActivitiesSection({
     setHarvestUnit("g");
     setErrorReason(null);
     setErrorForActivity(null);
+    setStructuredWaterError(null);
     setSaved([]);
   }, [currentTargetKey]);
 
@@ -218,13 +227,35 @@ export default function QuickLogAllActivitiesSection({
       if (isMutationBlocked()) return;
       setErrorReason(null);
       setErrorForActivity(null);
+      setStructuredWaterError(null);
+      if (a.id === "watering") {
+        if (!growId) {
+          setStructuredWaterError("Missing grow context. Nothing opened.");
+          return;
+        }
+        const intent = buildQuickLogV2OpenIntent({ plantId, tentId, action: "water" });
+        if (!intent || typeof window === "undefined") {
+          setStructuredWaterError("Choose a plant or tent before logging Water.");
+          return;
+        }
+        onBeforeStructuredWaterOpen?.();
+        window.dispatchEvent(new CustomEvent(QUICK_LOG_V2_OPEN_EVENT, { detail: intent }));
+        return;
+      }
       setSelectedDraft(bindQuickLogActivityDraft(a.id, currentTarget));
       setNote("");
       setHarvestWet("");
       setHarvestDry("");
       setHarvestUnit("g");
     },
-    [currentTarget, isMutationBlocked],
+    [
+      currentTarget,
+      growId,
+      isMutationBlocked,
+      onBeforeStructuredWaterOpen,
+      plantId,
+      tentId,
+    ],
   );
 
   const handleSave = useCallback(async () => {
@@ -423,6 +454,16 @@ export default function QuickLogAllActivitiesSection({
         plantStage={plantStage}
         testIdPrefix={`${testIdPrefix}-picker`}
       />
+
+      {structuredWaterError && (
+        <p
+          role="alert"
+          className="text-xs text-destructive"
+          data-testid={`${testIdPrefix}-structured-water-error`}
+        >
+          {structuredWaterError}
+        </p>
+      )}
 
       {selected && selected.enabled && (
         <div

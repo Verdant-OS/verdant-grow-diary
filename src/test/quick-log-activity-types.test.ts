@@ -164,13 +164,13 @@ describe("planQuickLogPersistence", () => {
     });
   });
 
-  it("Watering routes to quicklog_save_manual with p_action=water", () => {
+  it("Watering is a structured handoff and has no legacy manual persistence plan", () => {
     const plan = planQuickLogPersistence("watering");
     expect(plan).toEqual({
       activityId: "watering",
-      saveRoute: "manual_water",
-      manualAction: "water",
+      saveRoute: "structured_water",
     });
+    expect(JSON.stringify(QUICK_LOG_ACTIVITY_DEFINITIONS)).not.toContain("manual_water");
   });
 
   it.each([

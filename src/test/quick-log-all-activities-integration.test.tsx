@@ -17,6 +17,7 @@ import React from "react";
 import QuickLogAllActivitiesSection from "@/components/QuickLogAllActivitiesSection";
 import { QUICK_LOG_ACTIVITY_DEFINITIONS } from "@/constants/quickLogActivityTypes";
 import { QUICK_LOG_V2_ENTRY_CREATED_EVENT } from "@/lib/quickLogV2EntryCreatedEvent";
+import { QUICK_LOG_V2_OPEN_EVENT } from "@/lib/quickLogV2OpenIntent";
 
 const rpcMock = vi.fn();
 
@@ -134,17 +135,55 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     l.dispose();
   });
 
-  it("Watering → quicklog_save_manual with p_action=water", async () => {
-    rpcMock.mockResolvedValueOnce({
-      data: { ok: true, grow_event_id: "e-w" },
-      error: null,
-    });
-    mountSection();
-    await saveWithoutNote("watering");
-    await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(1));
-    const [rpcName, args] = rpcMock.mock.calls[0];
-    expect(rpcName).toBe("quicklog_save_manual");
-    expect(args.p_action).toBe("water");
+  it("Watering emits the exact structured V2 intent after the parent-close seam, with no inline Save or RPC", () => {
+    const order: string[] = [];
+    const events: CustomEvent[] = [];
+    const listener = (event: Event) => {
+      order.push("dispatch");
+      events.push(event as CustomEvent);
+    };
+    window.addEventListener(QUICK_LOG_V2_OPEN_EVENT, listener);
+    mountSection({ onBeforeStructuredWaterOpen: () => order.push("close") });
+
+    selectActivity("watering");
+
+    window.removeEventListener(QUICK_LOG_V2_OPEN_EVENT, listener);
+    expect(order).toEqual(["close", "dispatch"]);
+    expect(events).toHaveLength(1);
+    expect(events[0].detail).toEqual({ targetKey: "plant:plant-1", action: "water" });
+    expect(screen.queryByTestId("quick-log-all-activities-form")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("quick-log-all-activities-save")).not.toBeInTheDocument();
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+
+  it("Watering fails closed for an external block, missing grow, or missing plant/tent target", () => {
+    const events: CustomEvent[] = [];
+    const listener = (event: Event) => events.push(event as CustomEvent);
+    window.addEventListener(QUICK_LOG_V2_OPEN_EVENT, listener);
+
+    const blocked = mountSection({ externalPersistenceBlockReason: "Target unavailable." });
+    selectActivity("watering");
+    expect(screen.getByTestId("quick-log-all-activities-structured-water-error")).toHaveTextContent(
+      "Target unavailable.",
+    );
+    blocked.unmount();
+
+    const noGrow = mountSection({ growId: null });
+    selectActivity("watering");
+    expect(screen.getByTestId("quick-log-all-activities-structured-water-error")).toHaveTextContent(
+      /missing grow context/i,
+    );
+    noGrow.unmount();
+
+    mountSection({ plantId: null, tentId: null });
+    selectActivity("watering");
+    expect(screen.getByTestId("quick-log-all-activities-structured-water-error")).toHaveTextContent(
+      /choose a plant or tent/i,
+    );
+
+    window.removeEventListener(QUICK_LOG_V2_OPEN_EVENT, listener);
+    expect(events).toHaveLength(0);
+    expect(rpcMock).not.toHaveBeenCalled();
   });
 
   it("Feeding → quicklog_save_event event_type=feeding", async () => {

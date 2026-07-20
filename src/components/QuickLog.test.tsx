@@ -15,6 +15,11 @@ import { render, screen, fireEvent, within, waitFor } from "@testing-library/rea
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import QuickLog from "./QuickLog";
+import {
+  PUBLIC_QUICK_LOG_STARTER_DRAFT_KEY,
+  serializePublicQuickLogStarterDraft,
+  type PublicQuickLogStarterDraft,
+} from "@/lib/publicQuickLogStarterRules";
 
 function renderWithClient(ui: ReactElement) {
   const client = new QueryClient({
@@ -90,6 +95,7 @@ beforeEach(() => {
   toastError.mockReset();
   toastSuccess.mockReset();
   toastMessage.mockReset();
+  window.localStorage.clear();
 });
 
 describe("QuickLog photo attach — disabled (no upload path)", () => {
@@ -124,6 +130,80 @@ describe("QuickLog photo attach — disabled (no upload path)", () => {
 });
 
 describe("QuickLog supported save · routes through quicklog_save_manual RPC", () => {
+  it("refuses an ordinary crafted Water prefill before any RPC", async () => {
+    renderWithClient(
+      <QuickLog
+        open={true}
+        onOpenChange={vi.fn()}
+        prefill={{
+          plantId: "plant-1",
+          growId: "grow-1",
+          tentId: "tent-1",
+          eventType: "watering",
+          wateringVolumeMl: 500,
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("quick-log-save"));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("quick-log-save-error")).toHaveTextContent(
+        /structured Water form/i,
+      ),
+    );
+    expect(saveMock).not.toHaveBeenCalled();
+    expect(insertMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps the narrow matching public-starter Water consume-on-success path", async () => {
+    const updatedAt = new Date().toISOString();
+    const draft: PublicQuickLogStarterDraft = {
+      v: 1,
+      id: "starter-water-1",
+      createdAt: updatedAt,
+      updatedAt,
+      plantNickname: "Test Plant",
+      stage: "veg",
+      logType: "watering",
+      note: "",
+      wateringVolumeMl: 500,
+      attribution: {},
+    };
+    window.localStorage.setItem(
+      PUBLIC_QUICK_LOG_STARTER_DRAFT_KEY,
+      serializePublicQuickLogStarterDraft(draft),
+    );
+    renderWithClient(
+      <QuickLog
+        open={true}
+        onOpenChange={vi.fn()}
+        prefill={{
+          plantId: "plant-1",
+          growId: "grow-1",
+          tentId: "tent-1",
+          eventType: "watering",
+          wateringVolumeMl: 500,
+          source: "public-starter",
+          publicStarterDraftId: draft.id,
+          publicStarterDraftUpdatedAt: draft.updatedAt,
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("quick-log-save"));
+
+    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
+    expect(saveMock.mock.calls[0][0]).toMatchObject({
+      p_action: "water",
+      p_volume_ml: 500,
+      p_target_id: "plant-1",
+    });
+    await waitFor(() =>
+      expect(window.localStorage.getItem(PUBLIC_QUICK_LOG_STARTER_DRAFT_KEY)).toBeNull(),
+    );
+  });
+
   it("submits an observation with a note as p_action='note' and closes the dialog", async () => {
     const onOpenChange = vi.fn();
     const onCreated = vi.fn();

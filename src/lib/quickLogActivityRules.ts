@@ -232,8 +232,8 @@ export function getQuickLogDisabledReason(
 export interface QuickLogPersistencePlan {
   activityId: QuickLogActivityId;
   saveRoute: QuickLogSaveRouteKind;
-  /** p_action passed to quicklog_save_manual, when saveRoute is manual_*. */
-  manualAction?: "note" | "water";
+  /** p_action passed to quicklog_save_manual for the note route. */
+  manualAction?: "note";
   /** event_type passed to quicklog_save_event, when saveRoute === "event". */
   eventType?: QuickLogEventTypeValue;
   /** Metadata subtype fence to include in event details, when applicable. */
@@ -258,11 +258,10 @@ export function planQuickLogPersistence(
         saveRoute: "manual_note",
         manualAction: "note",
       };
-    case "manual_water":
+    case "structured_water":
       return {
         activityId: id,
-        saveRoute: "manual_water",
-        manualAction: "water",
+        saveRoute: "structured_water",
       };
     case "event":
       if (!def.eventType) return null;

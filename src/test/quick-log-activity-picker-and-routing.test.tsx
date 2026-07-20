@@ -115,23 +115,19 @@ describe("useQuickLogActivitySave — routing", () => {
     expect(payload).not.toHaveProperty("p_grow_id");
   });
 
-  it("routes Watering through quicklog_save_manual with p_action=water", async () => {
-    rpcMock.mockResolvedValueOnce({ data: { ok: true, grow_event_id: "w1" }, error: null });
+  it("refuses direct Watering saves so callers must use the structured form", async () => {
     const { result } = renderHook(() => useQuickLogActivitySave());
+    let res!: Awaited<ReturnType<typeof result.current.save>>;
     await act(async () => {
-      await result.current.save({
+      res = await result.current.save({
         activityId: "watering",
         growId: "g1",
         tentId: "t1",
         volumeMl: 350,
       });
     });
-    const [name, payload] = rpcMock.mock.calls[0];
-    expect(name).toBe("quicklog_save_manual");
-    expect(payload.p_action).toBe("water");
-    expect(payload.p_target_type).toBe("tent");
-    expect(payload.p_target_id).toBe("t1");
-    expect(payload.p_volume_ml).toBe(350);
+    expect(res).toEqual({ ok: false, reason: "unsupported_activity" });
+    expect(rpcMock).not.toHaveBeenCalled();
   });
 
   it("refuses the manual route without a tent or plant target (no RPC call)", async () => {

@@ -13,6 +13,11 @@
  *  - Never produces an executable device command surface.
  */
 
+import {
+  buildQuickLogV2OpenIntent,
+  type QuickLogV2OpenIntent,
+} from "@/lib/quickLogV2OpenIntent";
+
 export type QuickActionKind =
   | "quick_log"
   | "watering"
@@ -48,6 +53,8 @@ export interface QuickActionLink {
   label: string;
   /** When defined → open QuickLog with this prefill. */
   quickLogPrefill?: QuickLogPrefillPayload;
+  /** Structured Water handoff. Never coexists with legacy prefill. */
+  quickLogV2Intent?: QuickLogV2OpenIntent;
   /** When defined → navigate to this route instead of opening QuickLog. */
   href?: string;
 }
@@ -104,6 +111,11 @@ export function buildGrowRoomQuickActionLinks(
     growId: tent.grow_id ?? null,
     plantId: safePlantId,
   };
+  const wateringIntent = buildQuickLogV2OpenIntent({
+    plantId: safePlantId,
+    tentId: tent.id,
+    action: "water",
+  });
 
   return [
     {
@@ -114,7 +126,7 @@ export function buildGrowRoomQuickActionLinks(
     {
       kind: "watering",
       label: "Log Watering",
-      quickLogPrefill: { ...base, eventType: "watering" },
+      ...(wateringIntent ? { quickLogV2Intent: wateringIntent } : {}),
     },
     {
       kind: "feeding",

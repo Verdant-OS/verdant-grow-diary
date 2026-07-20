@@ -25,6 +25,11 @@ import { resolveMobileQuickLogTarget } from "@/lib/quickLogRouteTargetRules";
 import { consumeQuickLogStartIntent } from "@/lib/startScreenPreferences";
 import { useCheckoutReturnCompletionTracking } from "@/hooks/useCheckoutReturnCompletionTracking";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
+import {
+  QUICK_LOG_V2_OPEN_EVENT,
+  isQuickLogV2OpenIntent,
+  type QuickLogV2OpenIntent,
+} from "@/lib/quickLogV2OpenIntent";
 
 export default function AppShell({ children }: { children?: ReactNode }) {
   const { user, loading } = useAuth();
@@ -52,6 +57,9 @@ export default function AppShell({ children }: { children?: ReactNode }) {
   const nav = useNavigate();
   const [openLog, setOpenLog] = useState(false);
   const [openScopedLog, setOpenScopedLog] = useState(false);
+  const [structuredOpenIntent, setStructuredOpenIntent] =
+    useState<QuickLogV2OpenIntent | null>(null);
+  const [legacyQuickLogSession, setLegacyQuickLogSession] = useState(0);
   const [prefill, setPrefill] = useState<QuickLogPrefill | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const mobileQuickLogTarget = resolveMobileQuickLogTarget(location.pathname);
@@ -80,6 +88,24 @@ export default function AppShell({ children }: { children?: ReactNode }) {
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  useEffect(() => {
+    function onOpenV2(event: Event) {
+      const detail = (event as CustomEvent<unknown>).detail;
+      if (!isQuickLogV2OpenIntent(detail)) return;
+
+      // Close and remount-reset legacy Quick Log in the same state transition
+      // before opening V2, so two modal focus locks can never remain active.
+      setOpenLog(false);
+      setPrefill(null);
+      setLegacyQuickLogSession((session) => session + 1);
+      setStructuredOpenIntent(detail);
+      setOpenScopedLog(true);
+    }
+    window.addEventListener(QUICK_LOG_V2_OPEN_EVENT, onOpenV2 as EventListener);
+    return () =>
+      window.removeEventListener(QUICK_LOG_V2_OPEN_EVENT, onOpenV2 as EventListener);
   }, []);
 
   useEffect(() => {
@@ -122,6 +148,7 @@ export default function AppShell({ children }: { children?: ReactNode }) {
   // UI state or silently retarget an in-progress log.
   useEffect(() => {
     setOpenScopedLog(false);
+    setStructuredOpenIntent(null);
   }, [mobileQuickLogTarget]);
 
   if (loading)
@@ -237,6 +264,7 @@ export default function AppShell({ children }: { children?: ReactNode }) {
         <button
           onClick={() => {
             if (mobileQuickLogTarget) {
+              setStructuredOpenIntent(null);
               setOpenScopedLog(true);
             } else {
               setPrefill(null);
@@ -253,6 +281,7 @@ export default function AppShell({ children }: { children?: ReactNode }) {
         <MobileNav />
 
         <QuickLog
+          key={legacyQuickLogSession}
           open={openLog}
           onOpenChange={(o) => {
             setOpenLog(o);
@@ -262,13 +291,15 @@ export default function AppShell({ children }: { children?: ReactNode }) {
           onCreated={() => window.dispatchEvent(new Event("verdant:entry-created"))}
         />
 
-        {mobileQuickLogTarget ? (
-          <QuickLogV2Sheet
-            open={openScopedLog}
-            onOpenChange={setOpenScopedLog}
-            defaultTargetKey={mobileQuickLogTarget}
-          />
-        ) : null}
+        <QuickLogV2Sheet
+          open={openScopedLog}
+          onOpenChange={(nextOpen) => {
+            setOpenScopedLog(nextOpen);
+            if (!nextOpen) setStructuredOpenIntent(null);
+          }}
+          defaultTargetKey={structuredOpenIntent?.targetKey ?? mobileQuickLogTarget}
+          defaultAction={structuredOpenIntent?.action ?? "note"}
+        />
 
         <GlobalSearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
       </div>

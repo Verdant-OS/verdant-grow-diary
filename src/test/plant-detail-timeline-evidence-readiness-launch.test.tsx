@@ -29,6 +29,7 @@ vi.mock("@/hooks/usePlantManualSensorHistory", () => ({
 
 import PlantDetailTimelineEvidenceReadinessLaunch from "@/components/PlantDetailTimelineEvidenceReadinessLaunch";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
+import { QUICK_LOG_V2_OPEN_EVENT } from "@/lib/quickLogV2OpenIntent";
 
 const fetchSpy = vi.spyOn(globalThis, "fetch" as never);
 
@@ -137,11 +138,14 @@ describe("PlantDetailTimelineEvidenceReadinessLaunch — operator actions", () =
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it("Add Watering / Add Feeding dispatch events only — no fetch, no record writes", () => {
+  it("Add Watering dispatches exact typed V2 target while Feeding keeps the legacy event", () => {
     renderLaunch();
-    const events: CustomEvent[] = [];
-    const handler = (e: Event) => events.push(e as CustomEvent);
-    window.addEventListener(PLANT_QUICKLOG_PREFILL_EVENT, handler);
+    const waterEvents: CustomEvent[] = [];
+    const legacyEvents: CustomEvent[] = [];
+    const waterHandler = (e: Event) => waterEvents.push(e as CustomEvent);
+    const legacyHandler = (e: Event) => legacyEvents.push(e as CustomEvent);
+    window.addEventListener(QUICK_LOG_V2_OPEN_EVENT, waterHandler);
+    window.addEventListener(PLANT_QUICKLOG_PREFILL_EVENT, legacyHandler);
 
     fireEvent.click(
       screen.getByTestId("plant-detail-timeline-evidence-readiness-launch-action-add-watering"),
@@ -149,11 +153,13 @@ describe("PlantDetailTimelineEvidenceReadinessLaunch — operator actions", () =
     fireEvent.click(
       screen.getByTestId("plant-detail-timeline-evidence-readiness-launch-action-add-feeding"),
     );
-    window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, handler);
+    window.removeEventListener(QUICK_LOG_V2_OPEN_EVENT, waterHandler);
+    window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, legacyHandler);
 
-    expect(events).toHaveLength(2);
-    expect(events[0].detail).toMatchObject({ eventType: "watering" });
-    expect(events[1].detail).toMatchObject({ eventType: "feeding" });
+    expect(waterEvents).toHaveLength(1);
+    expect(waterEvents[0].detail).toEqual({ targetKey: "plant:p1", action: "water" });
+    expect(legacyEvents).toHaveLength(1);
+    expect(legacyEvents[0].detail).toMatchObject({ eventType: "feeding" });
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 

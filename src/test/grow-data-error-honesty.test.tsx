@@ -41,7 +41,10 @@ describe("private grow-data error honesty", () => {
 
   it.each([
     ["src/pages/Tents.tsx", "tents-grow-data-error", "No tents yet"],
-    ["src/pages/Plants.tsx", "plants-grow-data-error", "filtered.length === 0"],
+    // Plants was rewritten to the honest-async model: a failed primary plant
+    // read returns the explicit "Plants unavailable" error branch (retry:
+    // plants-retry-primary) before any empty/zero grid is reachable.
+    ["src/pages/Plants.tsx", "plants-retry-primary", "filtered.length === 0"],
     ["src/pages/Dashboard.tsx", "dashboard-grow-data-error", "<KpiCard"],
     ["src/pages/Sensors.tsx", "sensors-grow-data-error", "sensors-first-tent-setup"],
   ])("puts a retryable failure branch before empty or zero UI in %s", (path, testId, emptyCue) => {

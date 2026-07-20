@@ -12,6 +12,8 @@ import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { SensorReadingRow } from "@/lib/db";
 import { AI_DOCTOR_CSV_HISTORY_SOURCES } from "@/lib/aiDoctorCsvHistoryContextRules";
+import { buildPrivateSensorQueryKey } from "@/lib/growDataQueryKeyRules";
+import { useAuth } from "@/store/auth";
 
 export const IMPORTED_SENSOR_HISTORY_QUERY_LIMIT = 200;
 
@@ -64,18 +66,19 @@ export function useImportedSensorHistory(
   tentId: string | null | undefined,
   limit = IMPORTED_SENSOR_HISTORY_QUERY_LIMIT,
 ): UseQueryResult<ImportedSensorHistoryRow[]> {
+  const { user } = useAuth();
   const normalizedLimit = normalizeLimit(limit);
   const normalizedTentId = typeof tentId === "string" ? tentId.trim() : "";
 
   return useQuery({
-    queryKey: [
-      "sensor_readings",
+    queryKey: buildPrivateSensorQueryKey(user?.id, [
       "imported_history",
       normalizedTentId || "missing-tent",
       normalizedLimit,
       AI_DOCTOR_CSV_HISTORY_SOURCES.join("|"),
-    ],
+    ]),
     enabled: normalizedTentId.length > 0,
+    retry: false,
     queryFn: () => fetchImportedSensorHistory(normalizedTentId, normalizedLimit),
   });
 }

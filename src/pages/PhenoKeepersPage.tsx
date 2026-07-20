@@ -7,7 +7,7 @@
  * drives no device. No AI, no Action Queue, no automation.
  */
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { usePhenoKeepers } from "@/hooks/usePhenoKeepers";
 import { phenoCandidateDisplayLabel } from "@/lib/phenoCandidateIdentity";
 import {
@@ -198,7 +198,8 @@ export default function PhenoKeepersPage() {
   }, [ks.keepers]);
   const stabilityRunsByKeeper = useMemo(() => {
     const m: Record<string, StabilityRun[]> = {};
-    for (const k of ks.keepers) if (k.stabilityRuns && k.stabilityRuns.length > 0) m[k.id] = k.stabilityRuns;
+    for (const k of ks.keepers)
+      if (k.stabilityRuns && k.stabilityRuns.length > 0) m[k.id] = k.stabilityRuns;
     return m;
   }, [ks.keepers]);
 
@@ -301,6 +302,13 @@ export default function PhenoKeepersPage() {
           Preserve a keeper as clones and record breeding crosses. Recording anything here changes
           nothing on its own — Verdant never starts a grow or acts for you.
         </p>
+        <Link
+          to={`/pheno-hunts/${id}/showcase`}
+          data-testid="pheno-keepers-walk-link"
+          className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 hover:underline dark:text-emerald-400"
+        >
+          Walk this hunt — pack, contenders, fight night &amp; family tree →
+        </Link>
       </header>
 
       {/* Promote a candidate to keeper */}

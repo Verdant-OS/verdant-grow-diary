@@ -78,6 +78,7 @@ vi.mock("@/integrations/supabase/client", () => {
     const chain: Record<string, unknown> = {
       select: () => chain,
       gte: () => chain,
+      or: () => chain,
       order: () => chain,
       limit: () => promise,
     };
@@ -229,7 +230,7 @@ describe("IngestInspector page", () => {
   it("renders empty state when there are no rows", async () => {
     mode = "empty";
     renderPage();
-    expect(await screen.findByText(/No recent ingest readings\./)).toBeInTheDocument();
+    expect(await screen.findByText(/No recent sensor observations\./)).toBeInTheDocument();
   });
 
   it("renders loading skeleton while query is pending", () => {

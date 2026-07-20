@@ -38,6 +38,14 @@ describe("App route manifest sync", () => {
   it("flags no best-effort access-group mismatches", () => {
     expect(findAccessGroupMismatches()).toEqual([]);
   });
+
+  it("mounts both scoped aliases with their intentional access contracts", () => {
+    const mounted = extractMountedAppRoutePaths();
+    expect(mounted).toContain("/dashboard");
+    expect(mounted).toContain("/logs");
+    expect(APP_ROUTES.find((route) => route.path === "/dashboard")?.access).toBe("auth");
+    expect(APP_ROUTES.find((route) => route.path === "/logs")?.access).toBe("redirect");
+  });
 });
 
 describe("Operator route surface", () => {
@@ -85,6 +93,8 @@ describe("Public SEO route surface", () => {
     /^\/welcome$/,
     /^\/pricing$/,
     /^\/hardware-integrations$/,
+    /^\/partners\/csv-preview$/,
+    /^\/sensors\/csv-preview$/,
     /^\/how-ai-doctor-works$/,
     /^\/tools(\/.*)?$/,
     /^\/customer\/.+$/,
@@ -121,5 +131,13 @@ describe("Public SEO route surface", () => {
     const entry = APP_ROUTES.find((r) => r.path === "/quick-log");
     expect(entry, "manifest entry for /quick-log").toBeDefined();
     expect(entry?.access).toBe("public");
+  });
+
+  it("explicitly covers both browser-local CSV preview routes as public", () => {
+    for (const path of ["/partners/csv-preview", "/sensors/csv-preview"]) {
+      const entry = APP_ROUTES.find((route) => route.path === path);
+      expect(entry, `manifest entry for ${path}`).toBeDefined();
+      expect(entry?.access).toBe("public");
+    }
   });
 });

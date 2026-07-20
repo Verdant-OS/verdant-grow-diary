@@ -20,7 +20,7 @@
  * Read-only, pure logic. No I/O, no writes, no device control.
  */
 
-interface MinimalQuickLogPlant {
+export interface MinimalQuickLogPlant {
   id: string;
   name?: string | null;
   strain?: string | null;
@@ -54,9 +54,7 @@ export function filterQuickLogPlantOptions<T extends MinimalQuickLogPlant>(
 ): T[] {
   const active = plants.filter((p) => !isInactiveQuickLogPlant(p));
   if (!activeGrowId) return active;
-  return active.filter(
-    (p) => p.grow_id === activeGrowId || p.grow_id == null,
-  );
+  return active.filter((p) => p.grow_id === activeGrowId || p.grow_id == null);
 }
 
 /**
@@ -79,8 +77,7 @@ export function quickLogPlantHelperText(
  *   1. If the grower has already chosen a plant in this session
  *      (`currentPlantId` is set AND matches a scoped plant), keep it.
  *   2. If `prefillPlantId` is set AND matches a scoped plant, use it.
- *   3. If exactly one scoped plant exists, auto-select it.
- *   4. Otherwise return "" (no auto-pick — grower must choose).
+ *   3. Otherwise return "" (no auto-pick — grower must choose).
  *
  * Notes:
  *   - `scopedPlants` is already filtered by `filterQuickLogPlantOptions`,
@@ -101,6 +98,5 @@ export function pickDefaultQuickLogPlant<T extends MinimalQuickLogPlant>(
   if (prefillPlantId && scopedPlants.some((p) => p.id === prefillPlantId)) {
     return prefillPlantId;
   }
-  if (scopedPlants.length === 1) return scopedPlants[0].id;
   return "";
 }

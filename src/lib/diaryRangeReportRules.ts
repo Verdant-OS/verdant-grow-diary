@@ -28,6 +28,7 @@ import { normalizeReportSensorSource, redactSecrets } from "@/lib/postGrowReport
 import { withoutDiagnosticSensorRows } from "@/lib/sensorProvenanceFenceRules";
 import { SENSOR_SOURCE_SHORT_LABEL } from "@/constants/sensorSourceLabels";
 import type { TimelineSensorSourceKind } from "@/lib/timelineSensorSourceBadgeRules";
+import { resolveSensorObservationTime } from "@/lib/sensorObservationTimeRules";
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -56,6 +57,8 @@ export interface DiaryRangeSensorReadingRow {
   metric?: string | null;
   value?: number | null;
   ts?: string | null;
+  /** Actual observation time when an imported row preserves it. */
+  captured_at?: string | null;
   source?: string | null;
   /** Classification-only provenance; never copied into the report view model. */
   raw_payload?: unknown;
@@ -371,7 +374,9 @@ export function buildDiaryRangeReport(
 
   // ---- environment ----------------------------------------------------
   const sourceLabeledReadingsInRange = withoutDiagnosticSensorRows(
-    (input.sensorReadings ?? []).filter((r) => inRange(utcDay(r.ts), startDate, endDate)),
+    (input.sensorReadings ?? []).filter((r) =>
+      inRange(utcDay(resolveSensorObservationTime(r)), startDate, endDate),
+    ),
   );
   // The source rollup may still show demo/stale/invalid rows with their
   // honest canonical labels, but those values never feed the unlabeled

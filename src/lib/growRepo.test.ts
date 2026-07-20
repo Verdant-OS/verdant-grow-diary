@@ -3,13 +3,20 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // Chainable fake Supabase query builder.
 type Result = { data: unknown; error: unknown };
 let nextResult: Result = { data: [], error: null };
-const calls: { table?: string; filters: Array<[string, unknown]>; ordered?: string; limited?: number; inserted?: unknown; single?: boolean } = { filters: [] };
+const calls: {
+  table?: string;
+  filters: Array<[string, unknown]>;
+  ordered?: string[];
+  limited?: number;
+  inserted?: unknown;
+  single?: boolean;
+} = { filters: [] };
 
 function reset() {
   nextResult = { data: [], error: null };
   calls.table = undefined;
   calls.filters = [];
-  calls.ordered = undefined;
+  calls.ordered = [];
   calls.limited = undefined;
   calls.inserted = undefined;
   calls.single = false;
@@ -20,21 +27,48 @@ function builder(): any {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const b: any = {
     select: () => b,
-    eq: (col: string, val: unknown) => { calls.filters.push([col, val]); return b; },
-    order: (col: string) => { calls.ordered = col; return b; },
-    limit: (n: number) => { calls.limited = n; return b; },
-    maybeSingle: () => { calls.single = true; return Promise.resolve(nextResult); },
-    insert: (row: unknown) => { calls.inserted = row; return Promise.resolve(nextResult); },
+    eq: (col: string, val: unknown) => {
+      calls.filters.push([col, val]);
+      return b;
+    },
+    order: (col: string) => {
+      calls.ordered ??= [];
+      calls.ordered.push(col);
+      return b;
+    },
+    limit: (n: number) => {
+      calls.limited = n;
+      return b;
+    },
+    maybeSingle: () => {
+      calls.single = true;
+      return Promise.resolve(nextResult);
+    },
+    insert: (row: unknown) => {
+      calls.inserted = row;
+      return Promise.resolve(nextResult);
+    },
     then: (resolve: (r: Result) => unknown) => Promise.resolve(nextResult).then(resolve),
   };
   return b;
 }
 
 vi.mock("@/integrations/supabase/client", () => ({
-  supabase: { from: (table: string) => { calls.table = table; return builder(); } },
+  supabase: {
+    from: (table: string) => {
+      calls.table = table;
+      return builder();
+    },
+  },
 }));
 
-import { fetchTents, fetchTent, fetchPlants, fetchSensorReadings, insertSensorReading } from "./growRepo";
+import {
+  fetchTents,
+  fetchTent,
+  fetchPlants,
+  fetchSensorReadings,
+  insertSensorReading,
+} from "./growRepo";
 
 beforeEach(reset);
 
@@ -42,10 +76,19 @@ const TENT_UUID = "11111111-1111-4111-8111-111111111111";
 const TENT_UUID_2 = "22222222-2222-4222-8222-222222222222";
 
 const tentRow = {
-  id: TENT_UUID, user_id: "u", name: "A", brand: null, size: null,
-  stage: "veg", light_on: true, light_schedule: null, light_wattage: null,
-  is_archived: false, schema_version: 1,
-  created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z",
+  id: TENT_UUID,
+  user_id: "u",
+  name: "A",
+  brand: null,
+  size: null,
+  stage: "veg",
+  light_on: true,
+  light_schedule: null,
+  light_wattage: null,
+  is_archived: false,
+  schema_version: 1,
+  created_at: "2026-01-01T00:00:00Z",
+  updated_at: "2026-01-01T00:00:00Z",
 };
 
 describe("fetchTents", () => {
@@ -101,28 +144,43 @@ describe("fetchPlants", () => {
 });
 
 describe("fetchSensorReadings", () => {
-  it("applies limit and order", async () => {
+  it("orders by physical capture time before the legacy ts fallback", async () => {
     nextResult = { data: [], error: null };
     await fetchSensorReadings(TENT_UUID);
-    expect(calls.ordered).toBe("ts");
+    expect(calls.ordered).toEqual(["captured_at", "ts"]);
     expect(calls.limited).toBe(2000);
   });
   it("returns empty array on no data", async () => {
     nextResult = { data: null, error: null };
     expect(await fetchSensorReadings()).toEqual([]);
   });
+  it("treats null as explicit no-scope without querying Supabase", async () => {
+    expect(await fetchSensorReadings(null)).toEqual([]);
+    expect(calls.table).toBeUndefined();
+  });
 });
 
 describe("insertSensorReading", () => {
   it("forwards the row payload", async () => {
     nextResult = { data: null, error: null };
-    await insertSensorReading({ user_id: "u", tent_id: TENT_UUID, metric: "temperature_c", value: 22 } as never);
+    await insertSensorReading({
+      user_id: "u",
+      tent_id: TENT_UUID,
+      metric: "temperature_c",
+      value: 22,
+    } as never);
     expect(calls.table).toBe("sensor_readings");
     expect(calls.inserted).toMatchObject({ metric: "temperature_c", value: 22 });
   });
   it("throws on error", async () => {
     nextResult = { data: null, error: { message: "denied" } };
-    await expect(insertSensorReading({ user_id: "u", tent_id: TENT_UUID, metric: "temperature_c", value: 1 } as never))
-      .rejects.toThrow(/insertSensorReading.*denied/);
+    await expect(
+      insertSensorReading({
+        user_id: "u",
+        tent_id: TENT_UUID,
+        metric: "temperature_c",
+        value: 1,
+      } as never),
+    ).rejects.toThrow(/insertSensorReading.*denied/);
   });
 });

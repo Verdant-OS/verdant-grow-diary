@@ -125,6 +125,54 @@ describe("samplesFromReadings", () => {
     const bad = samples.find((s) => s.ts === "2026-05-20T10:00:00Z")!;
     expect(bad.temp).toBeNull();
   });
+  it("uses captured_at to keep historical CSV observations distinct from their shared import ts", () => {
+    const importedAt = "2026-05-20T12:00:00Z";
+    const olderCapturedAt = "2025-01-01T10:00:00Z";
+    const newerCapturedAt = "2025-01-01T11:00:00Z";
+    const samples = samplesFromReadings([
+      {
+        ts: importedAt,
+        captured_at: olderCapturedAt,
+        metric: "temperature_c",
+        value: 20,
+        source: "csv",
+        tent_id: "t1",
+      },
+      {
+        ts: importedAt,
+        captured_at: olderCapturedAt,
+        metric: "humidity_pct",
+        value: 55,
+        source: "csv",
+        tent_id: "t1",
+      },
+      {
+        ts: importedAt,
+        captured_at: newerCapturedAt,
+        metric: "temperature_c",
+        value: 24,
+        source: "csv",
+        tent_id: "t1",
+      },
+      {
+        ts: importedAt,
+        captured_at: newerCapturedAt,
+        metric: "humidity_pct",
+        value: 52,
+        source: "csv",
+        tent_id: "t1",
+      },
+    ]);
+
+    expect(samples).toHaveLength(2);
+    expect(samples.map((sample) => sample.ts).sort()).toEqual([olderCapturedAt, newerCapturedAt]);
+    expect(samples.find((sample) => sample.ts === newerCapturedAt)).toMatchObject({
+      temp: 24,
+      rh: 52,
+      source: "csv",
+    });
+  });
+
   it("returns [] for null/undefined", () => {
     expect(samplesFromReadings(null)).toEqual([]);
     expect(samplesFromReadings(undefined)).toEqual([]);
@@ -251,7 +299,9 @@ describe("useEnvironmentTrends hook contract", () => {
     expect(HOOK).toMatch(/temperature_c/);
     expect(HOOK).toMatch(/humidity_pct/);
     expect(HOOK).toMatch(/vpd_kpa/);
-    expect(HOOK).toMatch(/sensor_readings[\s\S]*?raw_payload/);
+    expect(HOOK).toMatch(/sensor_readings[\s\S]*?captured_at[\s\S]*?raw_payload/);
+    expect(HOOK).toContain("captured_at.gte.${since}");
+    expect(HOOK).toContain('.order("captured_at", { ascending: false, nullsFirst: false })');
   });
   it("falls back to diary_entries filtered by grow_id", () => {
     expect(HOOK).toMatch(/\.from\(["']diary_entries["']\)/);

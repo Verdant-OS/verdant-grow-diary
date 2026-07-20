@@ -59,6 +59,37 @@ describe("classifyGrowDataSource", () => {
     expect(r.isTrustedForAi).toBe(false);
   });
 
+  it("keeps CSV provenance separate from freshness", () => {
+    const freshCsv = classifyGrowDataSource(
+      { source: "csv", value: 24.5, timestamp: recent },
+      { now: NOW },
+    );
+    const oldCsv = classifyGrowDataSource(
+      { source: "csv", value: 24.5, timestamp: old },
+      { now: NOW },
+    );
+
+    expect(freshCsv.label).toBe("CSV history");
+    expect(freshCsv.severity).toBe("info");
+    expect(oldCsv.label).toBe("CSV history");
+    expect(oldCsv.severity).toBe("watch");
+    expect(oldCsv.message).toMatch(/outside the current freshness window/i);
+    expect(oldCsv.isTrustedForAi).toBe(false);
+  });
+
+  it("keeps invalid or missing CSV timestamps labeled as CSV history", () => {
+    for (const timestamp of ["not-a-date", null]) {
+      const result = classifyGrowDataSource(
+        { source: "import", value: 24.5, timestamp },
+        { now: NOW },
+      );
+      expect(result.label).toBe("CSV history");
+      expect(result.label).not.toBe("Unavailable");
+      expect(result.severity).toBe("watch");
+      expect(result.isTrustedForAi).toBe(false);
+    }
+  });
+
   it("classifies missing source as Unavailable", () => {
     const r = classifyGrowDataSource({ value: 24.5, timestamp: recent }, { now: NOW });
     expect(r.label).toBe("Unavailable");

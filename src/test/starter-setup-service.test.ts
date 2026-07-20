@@ -59,9 +59,7 @@ describe("starterSetupRules", () => {
     expect(STARTER_GROW_NAME).toBe("Starter Grow");
     expect(STARTER_TENT_NAME).toBe("Starter Tent");
     expect(STARTER_PLANT_NAME).toBe("Sample Plant");
-    expect(STARTER_SETUP_BUTTON_LABEL).toBe(
-      "Skip setup — try Quick Log on a sample plant",
-    );
+    expect(STARTER_SETUP_BUTTON_LABEL).toBe("Skip setup — try Quick Log on a sample plant");
     // Helper copy must say no fake logs/sensor readings are added.
     expect(STARTER_SETUP_HELPER_COPY.toLowerCase()).toContain("no fake logs");
     expect(STARTER_SETUP_HELPER_COPY.toLowerCase()).toContain("sensor reading");
@@ -80,9 +78,7 @@ describe("starterSetupRules", () => {
     ];
     expect(findStarterRowByName(rows, STARTER_GROW_NAME)?.id).toBe("b");
     expect(findStarterRowByName([], STARTER_GROW_NAME)).toBeNull();
-    expect(
-      findStarterRowByName([{ id: "x", name: null }], STARTER_GROW_NAME),
-    ).toBeNull();
+    expect(findStarterRowByName([{ id: "x", name: null }], STARTER_GROW_NAME)).toBeNull();
   });
 
   it("builds a Quick Log prefill that references only the starter records", () => {
@@ -112,7 +108,8 @@ describe("runStarterSetup", () => {
 
   it("creates all three records when nothing exists", async () => {
     const { db, spies } = makeAdapter();
-    const result = await runStarterSetup("user-1", db);
+    const onCreated = vi.fn();
+    const result = await runStarterSetup("user-1", db, { onCreated });
     expect(result).toEqual({
       growId: "grow-1",
       tentId: "tent-1",
@@ -122,6 +119,7 @@ describe("runStarterSetup", () => {
     expect(spies.createStarterGrow).toHaveBeenCalledTimes(1);
     expect(spies.createStarterTent).toHaveBeenCalledTimes(1);
     expect(spies.createStarterPlant).toHaveBeenCalledTimes(1);
+    expect(onCreated.mock.calls).toEqual([["grow"], ["tent"], ["plant"]]);
   });
 
   it("is idempotent: reuses existing starter rows and creates none", async () => {
@@ -148,11 +146,7 @@ describe("runStarterSetup", () => {
     expect(result.reused).toEqual({ grow: true, tent: false, plant: false });
     expect(spies.createStarterGrow).not.toHaveBeenCalled();
     expect(spies.createStarterTent).toHaveBeenCalledWith("user-1", "grow-77");
-    expect(spies.createStarterPlant).toHaveBeenCalledWith(
-      "user-1",
-      "grow-77",
-      "tent-1",
-    );
+    expect(spies.createStarterPlant).toHaveBeenCalledWith("user-1", "grow-77", "tent-1");
   });
 
   it("surfaces creation failure as StarterSetupError with step label", async () => {
@@ -165,6 +159,31 @@ describe("runStarterSetup", () => {
       name: "StarterSetupError",
       step: "tent",
     });
+  });
+
+  it("reports each durable creation even when a later starter step fails", async () => {
+    const { db } = makeAdapter({
+      createStarterTent: vi.fn(async () => {
+        throw new Error("tent unavailable");
+      }),
+    });
+    const onCreated = vi.fn();
+
+    await expect(runStarterSetup("user-1", db, { onCreated })).rejects.toMatchObject({
+      step: "tent",
+    });
+    expect(onCreated.mock.calls).toEqual([["grow"]]);
+  });
+
+  it("never lets an observability callback break a durable starter setup", async () => {
+    const { db } = makeAdapter();
+    const result = await runStarterSetup("user-1", db, {
+      onCreated() {
+        throw new Error("analytics unavailable");
+      },
+    });
+
+    expect(result).toMatchObject({ growId: "grow-1", tentId: "tent-1", plantId: "plant-1" });
   });
 
   it("never references sensor/AI/action/alert paths on the adapter interface", () => {

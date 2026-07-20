@@ -61,6 +61,10 @@ import {
   clearPendingOAuthSignupAcquisition,
   savePendingOAuthSignupAcquisition,
 } from "@/lib/oauthSignupAcquisitionRules";
+import {
+  clearPendingOAuthPostAuthRedirect,
+  savePendingOAuthPostAuthRedirect,
+} from "@/lib/oauthPostAuthRedirectRules";
 
 export default function Auth() {
   usePageSeo({
@@ -117,25 +121,36 @@ export default function Auth() {
     } else {
       clearPendingOAuthSignupAcquisition();
     }
+    // Google returns to the configured public origin. The helper preserves
+    // only Verdant's fixed CSV onboarding target for the post-OAuth root
+    // handoff; all other destinations are intentionally not persisted.
+    if (explicitRedirect) {
+      savePendingOAuthPostAuthRedirect(explicitRedirect);
+    } else {
+      clearPendingOAuthPostAuthRedirect();
+    }
     setGoogleBusy(true);
     setGoogleError(null);
     try {
       // redirect_uri MUST be a same-origin public URL, not a protected route.
-      // The intended post-auth destination lives in `redirectTo` (already
-      // manifest-validated) and is applied after Supabase reports a session.
+      // The fixed CSV onboarding intent is applied after Supabase reports a
+      // session; other return paths keep their existing non-OAuth behavior.
       const result = await lovable.auth.signInWithOAuth("google", {
         redirect_uri: window.location.origin,
       });
       if (result.error) {
         if (shouldRecordSignupSource) clearPendingOAuthSignupAcquisition();
+        clearPendingOAuthPostAuthRedirect();
         setGoogleError("Google sign-in didn't complete. Please try again.");
         return;
       }
       if (result.redirected) return; // browser redirects to Google
       // Tokens returned and session set — route to intended destination.
+      clearPendingOAuthPostAuthRedirect();
       nav(postSignInTarget(), { replace: true });
     } catch {
       if (shouldRecordSignupSource) clearPendingOAuthSignupAcquisition();
+      clearPendingOAuthPostAuthRedirect();
       setGoogleError("Google sign-in didn't complete. Please try again.");
     } finally {
       setGoogleBusy(false);

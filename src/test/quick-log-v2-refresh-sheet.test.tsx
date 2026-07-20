@@ -21,9 +21,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 
 vi.mock("@/hooks/use-plants", () => ({
   usePlants: () => ({
-    data: [
-      { id: "plant-1", name: "Plant 1", tent_id: "tent-1", grow_id: "grow-1" },
-    ],
+    data: [{ id: "plant-1", name: "Plant 1", tent_id: "tent-1", grow_id: "grow-1" }],
   }),
 }));
 vi.mock("@/hooks/use-tents", () => ({
@@ -65,9 +63,7 @@ function renderSheet(defaultTargetKey: string) {
 }
 
 function invalidatedKeys(): unknown[] {
-  return invalidateSpy.mock.calls.map(
-    (c) => (c[0] as { queryKey: unknown }).queryKey,
-  );
+  return invalidateSpy.mock.calls.map((c) => (c[0] as { queryKey: unknown }).queryKey);
 }
 
 function clickWater() {
@@ -101,7 +97,9 @@ describe("QuickLogV2Sheet — post-save refresh", () => {
     const { onOpenChange } = renderSheet("plant:plant-1");
     clickWater();
     clickSave();
-    await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith("Log saved", expect.anything()));
+    await waitFor(() =>
+      expect(toastSuccess).toHaveBeenCalledWith("Watering logged.", expect.anything()),
+    );
     const keys = invalidatedKeys().map((k) => JSON.stringify(k));
     expect(keys).toContain(JSON.stringify(["quick_log_grouped_timeline"]));
     expect(keys).toContain(JSON.stringify(["timeline_memory"]));

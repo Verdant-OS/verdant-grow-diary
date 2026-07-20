@@ -13,8 +13,15 @@
 import { useMemo, useState } from "react";
 import PhenoComparisonView from "@/components/PhenoComparisonView";
 import { PHENO_EXAMPLE_STRAINS, PHENO_SHOWCASE_DEFAULT_SELECTION } from "@/lib/phenoExampleStrains";
+import { usePageSeo } from "@/hooks/usePageSeo";
 
 export default function PhenoExpressionShowcase() {
+  usePageSeo({
+    title: "Pheno Expression Showcase — Verdant Grow Diary",
+    description:
+      "Ten example phenotypes — loud gas, dessert, fruit, yield-monster, frost bomb, and more — laid side by side. Demo data only; Verdant never picks a keeper for you.",
+    path: "/pheno-expression-showcase",
+  });
   const [selected, setSelected] = useState<ReadonlySet<string>>(
     () => new Set(PHENO_SHOWCASE_DEFAULT_SELECTION),
   );

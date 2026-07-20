@@ -12,12 +12,14 @@ export const LEGAL_FOOTER_LINKS = [
   { to: "/terms", label: "Terms" },
   { to: "/privacy", label: "Privacy" },
   { to: "/refund", label: "Refunds" },
+  { to: "/feedback", label: "Feedback" },
+  { to: "/contact", label: "Contact" },
 ] as const;
 
 export default function LegalFooterLinks({ className }: { className?: string }) {
   return (
     <nav
-      aria-label="Legal"
+      aria-label="Legal and support"
       data-testid="legal-footer-links"
       className={className ?? "flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground"}
     >

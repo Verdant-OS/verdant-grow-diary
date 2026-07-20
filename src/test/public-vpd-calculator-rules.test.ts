@@ -7,7 +7,7 @@ import {
 } from "@/lib/publicVpdCalculatorRules";
 
 describe("public VPD calculator rules", () => {
-  it("derives the same stage-aware air VPD from Celsius and Fahrenheit", () => {
+  it("derives the same air estimate from Celsius and Fahrenheit without a target claim", () => {
     const celsius = evaluatePublicVpdCalculator({
       temperature: 25,
       temperatureUnit: "C",
@@ -26,7 +26,10 @@ describe("public VPD calculator rules", () => {
       vpdKpa: 1.27,
       temperatureC: 25,
       humidity: 60,
-      classification: "in_target",
+      classification: null,
+      basis: "air_estimate",
+      confidence: "unverified",
+      canCompareToStageTarget: false,
       sourceNote: PUBLIC_VPD_SOURCE_NOTE,
     });
     expect(fahrenheit).toEqual(celsius);
@@ -40,6 +43,90 @@ describe("public VPD calculator rules", () => {
     ).toEqual(celsius);
   });
 
+  it("unlocks stage comparison only for verified leaf VPD evidence", () => {
+    const verified = evaluatePublicVpdCalculator({
+      temperature: 25,
+      leafTemperature: 25,
+      temperatureUnit: "C",
+      humidity: 60,
+      stage: "flower",
+      nowMs: Date.parse("2026-07-18T18:00:00.000Z"),
+      measurementEvidence: {
+        observedAt: "2026-07-18T17:55:00.000Z",
+        temperatureVerifiedAt: "2026-06-01T12:00:00.000Z",
+        temperatureReference: "Traceable reference thermometer",
+        temperatureVerifiedAtOperatingConditions: true,
+        humidityVerifiedAt: "2026-06-01T12:00:00.000Z",
+        humidityReferenceRhPercent: 75,
+        leafTemperatureMeasuredAt: "2026-07-18T17:56:00.000Z",
+        placement: "canopy",
+      },
+    });
+
+    expect(verified).toMatchObject({
+      state: "derived",
+      vpdKpa: 1.27,
+      leafVpdKpa: 1.27,
+      basis: "leaf",
+      confidence: "verified",
+      canCompareToStageTarget: true,
+      classification: "in_target",
+    });
+    expect(verified.classificationLabel).toMatch(/in flower vpd range/i);
+  });
+
+  it("withholds a target claim when the RH reference is below 75%", () => {
+    const result = evaluatePublicVpdCalculator({
+      temperature: 25,
+      leafTemperature: 25,
+      temperatureUnit: "C",
+      humidity: 60,
+      stage: "flower",
+      nowMs: Date.parse("2026-07-18T18:00:00.000Z"),
+      measurementEvidence: {
+        observedAt: "2026-07-18T17:55:00.000Z",
+        temperatureVerifiedAt: "2026-06-01T12:00:00.000Z",
+        temperatureReference: "Traceable reference thermometer",
+        temperatureVerifiedAtOperatingConditions: true,
+        humidityVerifiedAt: "2026-06-01T12:00:00.000Z",
+        humidityReferenceRhPercent: 74.9,
+        leafTemperatureMeasuredAt: "2026-07-18T17:56:00.000Z",
+        placement: "canopy",
+      },
+    });
+
+    expect(result.classification).toBeNull();
+    expect(result.canCompareToStageTarget).toBe(false);
+    expect(result.trustIssues).toContain("humidity_reference_below_minimum");
+  });
+
+  it("withholds a target claim for mutually contemporaneous future measurements", () => {
+    const result = evaluatePublicVpdCalculator({
+      temperature: 25,
+      leafTemperature: 25,
+      temperatureUnit: "C",
+      humidity: 60,
+      stage: "flower",
+      nowMs: Date.parse("2026-07-18T18:00:00.000Z"),
+      measurementEvidence: {
+        observedAt: "2026-07-19T18:00:00.000Z",
+        temperatureVerifiedAt: "2026-06-01T12:00:00.000Z",
+        temperatureReference: "Traceable reference thermometer",
+        temperatureVerifiedAtOperatingConditions: true,
+        humidityVerifiedAt: "2026-06-01T12:00:00.000Z",
+        humidityReferenceRhPercent: 75,
+        leafTemperatureMeasuredAt: "2026-07-19T18:01:00.000Z",
+        placement: "canopy",
+      },
+    });
+
+    expect(result.classification).toBeNull();
+    expect(result.canCompareToStageTarget).toBe(false);
+    expect(result.classificationLabel).not.toMatch(/in .*vpd range/i);
+    expect(result.trustIssues).toContain("observation_time_in_future");
+    expect(result.trustIssues).toContain("leaf_measurement_time_in_future");
+  });
+
   it("keeps unknown and harvest stages contextual rather than inventing a target", () => {
     expect(
       evaluatePublicVpdCalculator({
@@ -50,8 +137,8 @@ describe("public VPD calculator rules", () => {
       }),
     ).toMatchObject({
       state: "derived",
-      classification: "stage_unknown",
-      targetLabel: "Select a stage for a stage-aware range.",
+      classification: null,
+      targetLabel: "Verify the measurement before selecting a stage target.",
     });
     expect(
       evaluatePublicVpdCalculator({
@@ -62,7 +149,7 @@ describe("public VPD calculator rules", () => {
       }),
     ).toMatchObject({
       state: "derived",
-      classification: "context_only",
+      classification: null,
     });
   });
 

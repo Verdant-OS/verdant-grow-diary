@@ -1,5 +1,6 @@
-import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
-import { createClient } from 'npm:@supabase/supabase-js@2';
+import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { createClient } from "npm:@supabase/supabase-js@2";
+import { buildFounderSlotsPayload } from "./contract.ts";
 
 /**
  * founder-slots-remaining — public read-only endpoint that exposes ONLY
@@ -14,51 +15,53 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
  *  - No user data, no billing rows, no Paddle IDs — just an integer.
  *  - Executed with the service-role client purely so it can invoke the
  *    SECURITY DEFINER RPC without requiring the /pricing viewer to be
- *    signed in. The RPC itself computes a bounded (0..75) integer, so
- *    even if it were called anonymously it would not leak anything else.
+ *    signed in. The endpoint revalidates the RPC result as a bounded
+ *    integer before returning the aggregate-only public payload.
  *  - Errors are sanitized. Fail-closed by returning 503; the pricing card
  *    then falls back to its static cap copy.
  */
 
 const CACHE_SECONDS = 30;
 
-function json(status: number, body: Record<string, unknown>, headers: Record<string, string> = {}): Response {
+function json(status: number, body: object, headers: Record<string, string> = {}): Response {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
       ...corsHeaders,
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
       ...headers,
     },
   });
 }
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
   }
-  if (req.method !== 'GET' && req.method !== 'POST') {
-    return json(405, { error: 'method_not_allowed' });
+  if (req.method !== "GET" && req.method !== "POST") {
+    return json(405, { error: "method_not_allowed" });
   }
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     if (!supabaseUrl || !serviceRoleKey) {
-      return json(503, { error: 'slots_unavailable' });
+      return json(503, { error: "slots_unavailable" });
     }
     const sb = createClient(supabaseUrl, serviceRoleKey, {
       auth: { persistSession: false },
     });
-    const { data, error } = await sb.rpc('founder_lifetime_slots_remaining');
+    const { data, error } = await sb.rpc("founder_lifetime_slots_remaining");
     if (error) {
-      return json(503, { error: 'slots_unavailable' });
+      return json(503, { error: "slots_unavailable" });
     }
-    const remaining = typeof data === 'number' ? data : 0;
-    // total is a fixed contract; keep in one place client-side too.
-    return json(200, { remaining, total: 75 }, {
-      'Cache-Control': `public, max-age=${CACHE_SECONDS}`,
+    const payload = buildFounderSlotsPayload(data);
+    if (!payload) {
+      return json(503, { error: "slots_unavailable" });
+    }
+    return json(200, payload, {
+      "Cache-Control": `public, max-age=${CACHE_SECONDS}`,
     });
   } catch {
-    return json(503, { error: 'slots_unavailable' });
+    return json(503, { error: "slots_unavailable" });
   }
 });

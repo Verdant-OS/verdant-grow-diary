@@ -39,7 +39,7 @@ all laws applicable to cultivation in their own jurisdiction.
 | Pro Annual       | $99             | / year   | `pro-annual`       |
 | Founder Lifetime | $129 (one-time) | one-time | `founder-lifetime` |
 
-Founder Lifetime is limited to the first 75 buyers. Founder Lifetime includes
+Founder Lifetime is limited to the first 100 buyers. Founder Lifetime includes
 100 AI Doctor credits per month; additional credit packs are planned later but
 are not live yet.
 

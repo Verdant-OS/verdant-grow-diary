@@ -48,6 +48,11 @@ function readString(value: unknown): string | null {
 
 function readFiniteMetric(metrics: Record<string, unknown>, key: string): number | null {
   const raw = metrics[key];
+  // Number(null), Number(undefined-like blanks), and Number("   ") can look
+  // like real zeroes. Preserve missingness before numeric coercion so absent
+  // EcoWitt values never become sensor evidence.
+  if (raw === null || raw === undefined) return null;
+  if (typeof raw === "string" && raw.trim().length === 0) return null;
   const value = typeof raw === "number" ? raw : Number(raw);
   return Number.isFinite(value) ? value : null;
 }
@@ -91,23 +96,17 @@ function isEcowittRow(row: EcowittSensorReadingRow): boolean {
 function resolveCandidateSource(row: EcowittSensorReadingRow): SensorReadingSource {
   const src = (row.source ?? "").trim().toLowerCase();
 
+  // Diagnostic lineage is a provenance fence, not a fallback label. It must
+  // run before every canonical source return so a testbench packet persisted
+  // as manual/csv/stale cannot bypass the shared detector. The detector keeps
+  // its explicit physical-gateway exception for legitimate listener traffic.
+  if (isSensorTestbenchRow(row)) return "demo";
+
   // Persisted canonical provenance is authoritative. In particular, vendor
   // lineage must never promote CSV, stale, or invalid history to live.
-  if (
-    src === "manual" ||
-    src === "csv" ||
-    src === "demo" ||
-    src === "stale" ||
-    src === "invalid"
-  ) {
+  if (src === "manual" || src === "csv" || src === "demo" || src === "stale" || src === "invalid") {
     return src;
   }
-
-  // Keep diagnostic packets visible for commissioning, but never let their
-  // canonical stored source="live" promote them to physical sensor evidence.
-  // The shared fence allows Windows-listener rows only when storage preserved
-  // the listener's reported live decision and physical gateway markers.
-  if (isSensorTestbenchRow(row)) return "demo";
 
   // `source="ecowitt"` is the legacy bridge contract still emitted by the
   // existing EcoWitt adapters and ingest proof paths. It is accepted as live

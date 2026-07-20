@@ -14,9 +14,10 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { readDesktopGrowerNavigationSource } from "@/test/utils/growerNavigationSource";
 
 const ROOT = resolve(__dirname, "../..");
-const SIDEBAR = readFileSync(resolve(ROOT, "src/components/AppSidebar.tsx"), "utf8");
+const SIDEBAR = readDesktopGrowerNavigationSource();
 const APP = readFileSync(resolve(ROOT, "src/App.tsx"), "utf8");
 const DASH = readFileSync(resolve(ROOT, "src/pages/Dashboard.tsx"), "utf8");
 
@@ -32,10 +33,11 @@ describe("Dashboard + Live Dashboard consolidation · navigation", () => {
   });
 
   it("Legacy /grow-room route redirects to the main Dashboard", () => {
-    expect(APP).toMatch(/path=["']\/grow-room["']\s+element=\{<Navigate\s+to=["']\/["']\s+replace\s*\/>\}/);
+    expect(APP).toMatch(
+      /path=["']\/grow-room["']\s+element=\{<Navigate\s+to=["']\/["']\s+replace\s*\/>\}/,
+    );
     expect(APP).not.toMatch(/<GrowRoomMode\s*\/?>/);
   });
-
 
   it("Existing Alerts / Tasks / Sensors nav links remain", () => {
     expect(SIDEBAR).toMatch(/\/alerts/);

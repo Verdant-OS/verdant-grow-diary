@@ -1,5 +1,5 @@
 import VpdStageMissingBadge from "@/components/VpdStageMissingBadge";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Box, Lightbulb } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import StageBadge from "@/components/StageBadge";
@@ -11,14 +11,16 @@ import TentCardActionsMenu from "@/components/TentCardActionsMenu";
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import GrowDataSourceDisclosure from "@/components/GrowDataSourceDisclosure";
+import GrowDataLoadError, { GrowDataLoadingState } from "@/components/GrowDataLoadError";
 import { useGrowPlants } from "@/hooks/useGrowData";
 import { useGrowTents, getGrowDataMeta } from "@/hooks/useGrowData";
 import { useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
 import { useNowTick } from "@/hooks/useNowTick";
+import { useAuth } from "@/store/auth";
 
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { tentDetailPath, tentsPath } from "@/lib/routes";
-import { isUuid } from "@/lib/growRepo";
+import { isUuid } from "@/lib/isUuid";
 import { loadTemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 import { formatTentLightStatus } from "@/lib/lightScheduleFormat";
 import { deriveTentHealthChip } from "@/lib/tentHealthChip";
@@ -27,16 +29,25 @@ import {
   buildTentSnapshotView,
   type BuildTentSnapshotInput,
 } from "@/lib/dashboardEnvironmentSnapshotViewModel";
+import {
+  buildConnectedActivationRoutes,
+  isOneTentActivationIntent,
+} from "@/lib/connectedOneTentActivationRules";
 
 function formatTentPlantHealthCopy(copy: string): string {
   return copy.replace(/^●\s*/, "");
 }
 
 export default function Tents() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { user } = useAuth();
   // Shared URL `?growId=` resolution against RLS-loaded grows.
   const { urlGrowId, scopedGrowName, isValidScopedGrow, backHref } = useScopedGrow();
   const validGrowId = isValidScopedGrow ? (urlGrowId ?? undefined) : undefined;
-  const { data: tents = [], isLoading } = useGrowTents(urlGrowId ?? undefined);
+  const activationIntent = !!validGrowId && isOneTentActivationIntent(searchParams.get("intent"));
+  const tentsQuery = useGrowTents(urlGrowId ?? undefined);
+  const { data: tents = [] } = tentsQuery;
   // SENSOR TRUTH: per-tent raw reading windows (same hook as the Dashboard
   // Environment Snapshot strip) instead of the legacy grouped shape, which
   // fabricated 0 for missing metrics and could not carry per-metric truth.
@@ -55,8 +66,40 @@ export default function Tents() {
   // AUD-001 fix: use real plants (Supabase, RLS-scoped) instead of mock
   // so plant counts match the assigned-tent reality. Mock plants reference
   // mock tent ids ("t1"..) which never match real tent UUIDs.
-  const { data: plants = [] } = useGrowPlants(undefined, urlGrowId ?? undefined);
-  const tentsMeta = getGrowDataMeta(["grow", "tents", urlGrowId ?? "all"]);
+  const plantsQuery = useGrowPlants(undefined, urlGrowId ?? undefined);
+  const { data: plants = [] } = plantsQuery;
+  const growDataError = tentsQuery.isError || plantsQuery.isError;
+  const growDataLoading = tentsQuery.isLoading || plantsQuery.isLoading;
+  const tentsMeta = getGrowDataMeta(["grow", "tents", urlGrowId ?? "all"], user?.id);
+
+  if (growDataError || growDataLoading) {
+    return (
+      <div>
+        <GrowBreadcrumbs
+          growId={urlGrowId}
+          growName={scopedGrowName}
+          current="Tents"
+          section="tents"
+        />
+        <PageHeader
+          title="Tents"
+          description="Your grow tents — environment, lighting, and assigned plants."
+          icon={<Box className="h-5 w-5" />}
+        />
+        {growDataError ? (
+          <GrowDataLoadError
+            resource="Tent data"
+            testId="tents-grow-data-error"
+            onRetry={() => {
+              void Promise.all([tentsQuery.refetch(), plantsQuery.refetch()]);
+            }}
+          />
+        ) : (
+          <GrowDataLoadingState resource="Tent data" testId="tents-grow-data-loading" />
+        )}
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -70,7 +113,26 @@ export default function Tents() {
         title="Tents"
         description="Your grow tents — environment, lighting, and assigned plants."
         icon={<Box className="h-5 w-5" />}
-        actions={<CreateTentDialog defaultGrowId={validGrowId} />}
+        actions={
+          <CreateTentDialog
+            key={activationIntent ? "one-tent-activation" : "standard-create"}
+            defaultGrowId={validGrowId}
+            initiallyOpen={activationIntent}
+            onCreated={
+              activationIntent && validGrowId
+                ? (tent) => {
+                    navigate(
+                      buildConnectedActivationRoutes({
+                        growId: validGrowId,
+                        tentId: tent.id,
+                        plantId: null,
+                      }).addPlant,
+                    );
+                  }
+                : undefined
+            }
+          />
+        }
       />
 
       {urlGrowId && (
@@ -90,13 +152,7 @@ export default function Tents() {
         testId="tents-data-source-disclosure"
       />
 
-      {isLoading ? (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="glass rounded-2xl h-48 animate-pulse" />
-          ))}
-        </div>
-      ) : tents.length === 0 ? (
+      {tents.length === 0 ? (
         <EmptyState
           icon={<Box className="h-6 w-6" />}
           title="No tents yet"

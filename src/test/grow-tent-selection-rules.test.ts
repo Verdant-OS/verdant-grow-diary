@@ -25,7 +25,7 @@ describe("growTentSelectionRules", () => {
     });
 
     expect(beforeRows).toBeNull();
-    expect(afterRows).toBe(TENT_A);
+    expect(afterRows).toBe(TENT_B);
   });
 
   it("preserves the current persisted tent when it remains available", () => {
@@ -43,7 +43,7 @@ describe("growTentSelectionRules", () => {
         currentTentId: TENT_C,
         tents: [{ id: TENT_B }, { id: TENT_A }],
       }),
-    ).toBe(TENT_A);
+    ).toBe(TENT_B);
   });
 
   it("rejects non-UUID placeholders instead of turning them into queries", () => {
@@ -71,7 +71,7 @@ describe("growTentSelectionRules", () => {
     ).toBe(TENT_A);
   });
 
-  it("uses an explicit UUID tie-breaker independent of row order", () => {
+  it("uses repository input order for the default selection", () => {
     const ascending = resolveGrowTentSelection({
       tents: [{ id: TENT_A }, { id: TENT_B }, { id: TENT_C }],
     });
@@ -80,7 +80,15 @@ describe("growTentSelectionRules", () => {
     });
 
     expect(ascending).toBe(TENT_A);
-    expect(shuffled).toBe(TENT_A);
+    expect(shuffled).toBe(TENT_C);
+  });
+
+  it("keeps the first valid occurrence when repository rows contain duplicates", () => {
+    expect(
+      resolveGrowTentSelection({
+        tents: [{ id: "t1" }, { id: TENT_B }, { id: TENT_A }, { id: TENT_B }],
+      }),
+    ).toBe(TENT_B);
   });
 
   it("normalizes valid UUID casing and whitespace deterministically", () => {

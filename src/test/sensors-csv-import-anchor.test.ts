@@ -21,9 +21,11 @@ describe("Sensors page — CSV import regression guard", () => {
     expect(SENSORS_SRC).toMatch(/testIdPrefix="sensors-csv-import"/);
   });
 
-  it("passes the selected grow and tent through to the launcher", () => {
+  it("passes only the synchronously validated grow and tent through to the launcher", () => {
     expect(SENSORS_SRC).toMatch(/growId=\{selectedGrowId\}/);
-    expect(SENSORS_SRC).toMatch(/tentId=\{tentId\}/);
+    expect(SENSORS_SRC).toMatch(/tentId=\{activeTentId\}/);
+    expect(SENSORS_SRC).toMatch(/requiredTentGate\.reselectionRequired/);
+    expect(SENSORS_SRC).toMatch(/data-testid="sensors-csv-import-target-unavailable"/);
   });
 
   it("preserves the existing manual reading anchor and bridge health card", () => {

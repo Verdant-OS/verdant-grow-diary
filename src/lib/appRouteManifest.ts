@@ -139,6 +139,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     access: "auth",
     description: "Environment summary report (diary).",
   },
+  {
+    path: "/docs/mcp-api",
+    access: "public",
+    description: "Public MCP API reference documentation.",
+  },
   { path: "/doctor", access: "auth" },
   { path: "/doctor/sessions", access: "auth" },
   { path: "/doctor/sessions/:sessionId", access: "auth" },
@@ -205,6 +210,12 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     path: "/internal/one-tent-loop-proof",
     access: "internal",
     description: "One-tent loop internal proof checklist.",
+  },
+  {
+    path: "/internal/pheno-hunt-demo",
+    access: "public",
+    description:
+      "Read-only full pheno-hunt demo (pack → triage → keepers → clones → crosses → family tree; fixture data only; mounted outside AppShell, unlinked / hidden by URL — no private data).",
   },
   {
     path: "/internal/sensor-truth-audit",
@@ -313,6 +324,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
       "Operator subscriber-growth goal snapshot from authoritative billing counts (read-only).",
   },
   {
+    path: "/partners/csv-preview",
+    access: "public",
+    description: "Read-only partner explainer for the browser-local CSV sensor preview.",
+  },
+  {
     path: "/pheno-comparison",
     access: "public",
     description:
@@ -323,13 +339,23 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     access: "public",
     description: "Fixture-only public pheno expression showcase.",
   },
-  { path: "/pheno-hunts", access: "auth", description: "Pheno hunts index (the grower's own hunts)." },
+  {
+    path: "/pheno-hunts",
+    access: "auth",
+    description: "Pheno hunts index (the grower's own hunts).",
+  },
   {
     path: "/pheno-hunts/:id/compare",
     access: "public",
     description: "Read-only per-hunt comparison with graceful unauthenticated state.",
   },
   { path: "/pheno-hunts/:id/keepers", access: "auth", description: "Pheno keeper selection." },
+  {
+    path: "/pheno-hunts/:id/showcase",
+    access: "public",
+    description:
+      "Read-only per-hunt showcase (pack, contenders, fight, cure, family tree) with graceful demo fallback.",
+  },
   { path: "/pheno-hunts/:id/workspace", access: "auth", description: "Pheno hunt workspace." },
   { path: "/pheno-hunts/new", access: "auth", description: "New pheno hunt entry." },
   { path: "/pi-ingest-status", access: "operator" },
@@ -349,10 +375,19 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/refunds", access: "redirect", description: "→ /refund" },
   { path: "/register", access: "redirect", description: "→ /auth" },
   { path: "/reports", access: "auth" },
-  { path: "/reports/diary-range", access: "auth", description: "Date-range diary report (Print / Save PDF)." },
+  {
+    path: "/reports/diary-range",
+    access: "auth",
+    description: "Date-range diary report (Print / Save PDF).",
+  },
   { path: "/reports/post-grow/:growId", access: "auth", description: "Post-grow learning report." },
   { path: "/reset-password", access: "public", description: "Password reset landing page." },
   { path: "/sensors", access: "auth" },
+  {
+    path: "/sensors/csv-preview",
+    access: "public",
+    description: "Browser-local CSV/TSV sensor preview with no upload or persistence.",
+  },
   { path: "/sensors/ecowitt-audit", access: "operator" },
   { path: "/sensors/ingest-normalizer", access: "operator" },
   { path: "/settings", access: "auth" },

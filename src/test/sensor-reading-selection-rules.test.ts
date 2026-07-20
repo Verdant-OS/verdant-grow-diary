@@ -4,7 +4,9 @@ import { resolve } from "node:path";
 import type { SensorReading } from "@/mock";
 import {
   classifySensorReadingTrust,
+  indexSensorReadingsByObservedMetric,
   selectLatestSensorReading,
+  selectLatestTrustedVpdInputs,
   selectRecentSensorReadings,
   readObservedSensorMetric,
   readTrustedVpdInputs,
@@ -13,11 +15,7 @@ import {
   sortSensorReadingsNewestFirst,
 } from "@/lib/sensorReadingSelectionRules";
 
-function reading(
-  ts: string,
-  soil: number,
-  overrides: Partial<SensorReading> = {},
-): SensorReading {
+function reading(ts: string, soil: number, overrides: Partial<SensorReading> = {}): SensorReading {
   return {
     ts,
     capturedAt: ts,
@@ -68,12 +66,52 @@ describe("sensor reading selection rules", () => {
     ]);
   });
 
+  it("uses physical capture time before a later CSV import timestamp", () => {
+    const importedOldHistory = reading("2026-07-18T12:00:00.000Z", 30, {
+      capturedAt: "2026-07-17T10:00:00.000Z",
+      source: "csv",
+    });
+    const currentLiveReading = reading("2026-07-18T10:00:00.000Z", 40, {
+      capturedAt: "2026-07-18T10:00:00.000Z",
+      source: "live",
+    });
+
+    expect(sortSensorReadingsNewestFirst([importedOldHistory, currentLiveReading])).toEqual([
+      currentLiveReading,
+      importedOldHistory,
+    ]);
+  });
+
   it("is repeatable when equal timestamps and capture times arrive in different orders", () => {
     const live = reading("2026-07-18T10:00:00.000Z", 40, { source: "live" });
     const manual = reading("2026-07-18T10:00:00.000Z", 40, { source: "manual" });
 
     const forward = sortSensorReadingsNewestFirst([live, manual]).map((row) => row.source);
     const reverse = sortSensorReadingsNewestFirst([manual, live]).map((row) => row.source);
+    expect(forward).toEqual(reverse);
+  });
+
+  it("includes observed metrics and confidence in deterministic exact-time ties", () => {
+    const sparseLowerConfidence = reading("2026-07-18T10:00:00.000Z", 40, {
+      observedMetrics: ["temp"],
+      confidence: 0.5,
+    });
+    const completeHigherConfidence = reading("2026-07-18T10:00:00.000Z", 40, {
+      observedMetrics: ["rh", "temp"],
+      confidence: 0.9,
+    });
+
+    const signature = (row: SensorReading) =>
+      `${row.observedMetrics?.join(",") ?? "legacy"}|${row.confidence ?? ""}`;
+    const forward = sortSensorReadingsNewestFirst([
+      sparseLowerConfidence,
+      completeHigherConfidence,
+    ]).map(signature);
+    const reverse = sortSensorReadingsNewestFirst([
+      completeHigherConfidence,
+      sparseLowerConfidence,
+    ]).map(signature);
+
     expect(forward).toEqual(reverse);
   });
 
@@ -180,6 +218,47 @@ describe("sensor reading selection rules", () => {
     expect(readTrustedVpdInputs(manual)).toEqual({ temperatureC: 24, humidityPct: 55 });
   });
 
+  it("finds the newest usable complete VPD inputs past newer sparse and stale rows", () => {
+    const newestSparseSoil = reading("2026-07-18T13:00:00.000Z", 48, {
+      observedMetrics: ["soil"],
+    });
+    const newerStaleComplete = reading("2026-07-18T12:00:00.000Z", 45, {
+      observedMetrics: ["temp", "rh"],
+      source: "stale",
+      status: "stale",
+      temp: 30,
+      rh: 80,
+    });
+    const expectedManual = reading("2026-07-18T11:00:00.000Z", 44, {
+      observedMetrics: ["temp", "rh"],
+      source: "manual",
+      temp: 25,
+      rh: 60,
+    });
+
+    expect(
+      selectLatestTrustedVpdInputs([expectedManual, newestSparseSoil, newerStaleComplete]),
+    ).toEqual({ temperatureC: 25, humidityPct: 60, reading: expectedManual });
+  });
+
+  it("sorts once into deterministic per-metric reading indexes", () => {
+    const newestTempOnly = reading("2026-07-18T12:00:00.000Z", 0, {
+      observedMetrics: ["temp"],
+    });
+    const olderTempAndRh = reading("2026-07-18T11:00:00.000Z", 0, {
+      observedMetrics: ["temp", "rh"],
+    });
+    const soilOnly = reading("2026-07-18T10:00:00.000Z", 47, {
+      observedMetrics: ["soil"],
+    });
+
+    const index = indexSensorReadingsByObservedMetric([soilOnly, olderTempAndRh, newestTempOnly]);
+    expect(index.temp).toEqual([newestTempOnly, olderTempAndRh]);
+    expect(index.rh).toEqual([olderTempAndRh]);
+    expect(index.soil).toEqual([soilOnly]);
+    expect(index.vpd).toEqual([]);
+  });
+
   it("maps canonical snapshot status and source into fail-closed presenter flags", () => {
     expect(classifySensorReadingTrust(reading("2026-07-18T12:00:00.000Z", 52))).toEqual({
       isUsable: true,
@@ -212,7 +291,8 @@ describe("Sensors page reading-selection wiring", () => {
   });
 
   it("uses the newest three readings for soil boundary detection", () => {
-    expect(source).toMatch(/selectRecentObservedSensorValues\(filtered, "soil", 3\)/);
+    expect(source).toMatch(/indexSensorReadingsByObservedMetric\(filtered\)/);
+    expect(source).toMatch(/readingsByMetric\.soil/);
     expect(source).toMatch(/m\.key === "soil" \? recentSoilValues/);
     expect(source).not.toMatch(/filtered\.slice\(-3\)/);
   });
@@ -222,7 +302,9 @@ describe("Sensors page reading-selection wiring", () => {
   });
 
   it("gates derived VPD and forwards stale/invalid trust flags", () => {
-    expect(source).toMatch(/readTrustedVpdInputs\(latest\)/);
+    expect(source).toMatch(/selectLatestTrustedVpdInputs\(filtered\)/);
+    expect(source).toMatch(/const displayedVpdKpa = latestObservedVpd \?\? derivedVpdKpa/);
+    expect(source).toMatch(/displayedVpdKpa !== null/);
     expect(source).toMatch(/isStale:\s*metricTrust\.isStale/);
     expect(source).toMatch(/isInvalid:\s*metricTrust\.isInvalid/);
   });

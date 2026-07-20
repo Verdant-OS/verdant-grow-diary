@@ -15,7 +15,7 @@ vi.mock("@/lib/pricingAnalytics", () => ({
 import HardwareIntegrations from "@/pages/HardwareIntegrations";
 
 const EXPECTED_SIGNUP_PATH =
-  "/auth?mode=signup&utm_source=csv_history&utm_medium=owned&utm_campaign=csv_history";
+  "/auth?mode=signup&redirectTo=%2Fonboarding%3Fintent%3Dcsv_history&utm_source=csv_history&utm_medium=owned&utm_campaign=csv_history";
 
 beforeEach(() => {
   mocks.track.mockReset();
@@ -37,7 +37,14 @@ describe("CSV-history public acquisition path", () => {
       "href",
       EXPECTED_SIGNUP_PATH,
     );
+    expect(screen.getByTestId("csv-history-preview-cta-hero")).toHaveAttribute(
+      "href",
+      "/sensors/csv-preview",
+    );
     expect(screen.getByText(/CSV import and basic logging are free/i)).toBeInTheDocument();
+    expect(screen.getByTestId("csv-history-signup-cta-hero").getAttribute("href")).toContain(
+      "redirectTo=%2Fonboarding%3Fintent%3Dcsv_history",
+    );
     expect(screen.getByText(/never live telemetry/i)).toBeInTheDocument();
     expect(screen.getByText(/read-only background context/i)).toBeInTheDocument();
     expect(screen.getByText(/never creates an action automatically/i)).toBeInTheDocument();

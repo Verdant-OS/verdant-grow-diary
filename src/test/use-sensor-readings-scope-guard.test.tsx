@@ -52,6 +52,18 @@ describe("useSensorReadings scope guard", () => {
     expect(fromSpy).not.toHaveBeenCalled();
   });
 
+  it("isolates an invalid string scope from any cache entry under that string", () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(["sensor_readings", "t1", 60], [{ id: "legacy-row" }]);
+
+    const { result } = renderHook(() => useSensorReadings("t1", 60), {
+      wrapper: createWrapper(client),
+    });
+
+    expect(result.current.data).toBeUndefined();
+    expect(fromSpy).not.toHaveBeenCalled();
+  });
+
   it("preserves the intentional aggregate query when scope is undefined", async () => {
     renderHook(() => useSensorReadings(undefined, 60), { wrapper: createWrapper() });
     await waitFor(() => expect(fromSpy).toHaveBeenCalledTimes(1));

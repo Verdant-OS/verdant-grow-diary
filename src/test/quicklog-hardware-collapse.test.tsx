@@ -62,6 +62,9 @@ vi.mock("@/hooks/use-plants", () => ({
     data: [{ id: "p1", name: "P", tent_id: "t1", grow_id: "g1" }],
   }),
 }));
+vi.mock("@/hooks/use-tents", () => ({
+  useTents: () => ({ data: [{ id: "t1", name: "Tent 1", grow_id: "g1" }] }),
+}));
 vi.mock("sonner", () => ({
   toast: { error: vi.fn(), success: vi.fn(), message: vi.fn() },
 }));
@@ -88,12 +91,7 @@ describe("computeQuickLogHardwareDefaultOpen (pure helper)", () => {
     expect(computeQuickLogHardwareDefaultOpen({ ppfdCanopy: "650" })).toBe(true);
   });
   it("matches hasAnyHardwareReading for the same input", () => {
-    const samples = [
-      {},
-      { inputPh: "6.2" },
-      { runoffEc: "1.5" },
-      { lightDistance: "" },
-    ];
+    const samples = [{}, { inputPh: "6.2" }, { runoffEc: "1.5" }, { lightDistance: "" }];
     for (const s of samples) {
       expect(computeQuickLogHardwareDefaultOpen(s)).toBe(hasAnyHardwareReading(s));
     }
@@ -114,9 +112,7 @@ describe("QuickLog Hardware readings collapse-by-default", () => {
     renderWithClient(<QuickLog open onOpenChange={vi.fn()} />);
     const toggle = screen.getByTestId("quicklog-hardware-toggle");
     fireEvent.click(toggle);
-    expect(screen.getByTestId("quicklog-hardware-readings").getAttribute("data-open")).toBe(
-      "true",
-    );
+    expect(screen.getByTestId("quicklog-hardware-readings").getAttribute("data-open")).toBe("true");
     expect(screen.getByTestId("quicklog-hardware-helper")).toBeInTheDocument();
     // Re-renders that flow through hardware state (e.g. typing) must NOT
     // collapse it again.
@@ -127,14 +123,10 @@ describe("QuickLog Hardware readings collapse-by-default", () => {
   });
 
   it("recomputes the default on reopen", () => {
-    const { rerender } = renderWithClient(
-      <QuickLog open onOpenChange={vi.fn()} />,
-    );
+    const { rerender } = renderWithClient(<QuickLog open onOpenChange={vi.fn()} />);
     // expand, then close
     fireEvent.click(screen.getByTestId("quicklog-hardware-toggle"));
-    expect(
-      screen.getByTestId("quicklog-hardware-readings").getAttribute("data-open"),
-    ).toBe("true");
+    expect(screen.getByTestId("quicklog-hardware-readings").getAttribute("data-open")).toBe("true");
     rerender(
       <QueryClientProvider client={new QueryClient()}>
         <QuickLog open={false} onOpenChange={vi.fn()} />
@@ -146,9 +138,9 @@ describe("QuickLog Hardware readings collapse-by-default", () => {
       </QueryClientProvider>,
     );
     // Empty values → collapsed default restored on reopen.
-    expect(
-      screen.getByTestId("quicklog-hardware-readings").getAttribute("data-open"),
-    ).toBe("false");
+    expect(screen.getByTestId("quicklog-hardware-readings").getAttribute("data-open")).toBe(
+      "false",
+    );
   });
 
   it("does not introduce fake live/sensor copy in the section header", () => {
@@ -160,11 +152,7 @@ describe("QuickLog Hardware readings collapse-by-default", () => {
 
   it("save payload is unchanged when the section is left collapsed", async () => {
     renderWithClient(
-      <QuickLog
-        open
-        onOpenChange={vi.fn()}
-        prefill={{ plantId: "p1", growId: "g1" }}
-      />,
+      <QuickLog open onOpenChange={vi.fn()} prefill={{ plantId: "p1", growId: "g1" }} />,
     );
     const dialog = screen.getByRole("dialog");
     fireEvent.change(dialog.querySelector("textarea") as HTMLTextAreaElement, {

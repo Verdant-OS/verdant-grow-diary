@@ -89,6 +89,7 @@ describe("buildAiDoctorCurrentSensorSnapshot", () => {
       buildAiDoctorCurrentSensorSnapshot(
         [
           { source: "live", metric: "temperature_c", value: "", captured_at: FRESH },
+          { source: "live", metric: "temperature_c", value: "   ", captured_at: FRESH },
           { source: "manual", metric: "humidity_pct", value: null, captured_at: FRESH },
           { source: "live", metric: "soil_ec", value: 1.4, captured_at: FRESH },
           { source: "live", metric: "temperature_c", value: 25, captured_at: "not-a-date" },
@@ -96,6 +97,31 @@ describe("buildAiDoctorCurrentSensorSnapshot", () => {
         { now: NOW },
       ),
     ).toBeNull();
+  });
+
+  it("accepts absent legacy or ok quality and rejects every explicit non-ok quality", () => {
+    const legacy = row("temperature_c", 25);
+    const legacyNull = { ...row("humidity_pct", 58), quality: null };
+    const ok = { ...row("soil_moisture_pct", 41), quality: " OK " };
+    const accepted = buildAiDoctorCurrentSensorSnapshot([legacy, legacyNull, ok], { now: NOW });
+    expect(accepted?.readings.map((reading) => reading.field)).toEqual([
+      "humidity_pct",
+      "soil_moisture_pct",
+      "temperature_c",
+    ]);
+
+    for (const quality of ["degraded", "stale", "invalid", "", "   ", "unknown"]) {
+      const rejected = { ...row("temperature_c", 25), quality };
+      expect(buildAiDoctorCurrentSensorSnapshot([rejected], { now: NOW })).toBeNull();
+      expect(classifyAiDoctorCurrentSensorEvidence([rejected], { now: NOW }).status).toBe(
+        "no_data",
+      );
+      expect(packet([rejected])).toMatchObject({
+        recentSensorSnapshot: null,
+        recentSensorSnapshotAnnotation: null,
+        missingLiveSensorReadings: true,
+      });
+    }
   });
 
   it("projects a fresh live temp/RH/soil cohort with source and values preserved", () => {

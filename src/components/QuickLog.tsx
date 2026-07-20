@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { newQuickLogSaveKey } from "@/lib/quickLogIdempotencyKey";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -40,7 +40,9 @@ import {
   buildQuickLogPostSaveDescription,
   shouldBlockQuickLogClose,
 } from "@/lib/quickLogSaveGuardRules";
-import QuickLogAllActivitiesSection from "@/components/QuickLogAllActivitiesSection";
+import QuickLogAllActivitiesSection, {
+  type QuickLogAllActivitiesSaveTarget,
+} from "@/components/QuickLogAllActivitiesSection";
 import { STAGES } from "@/lib/grow";
 import {
   resolveQuickLogStageDefault,
@@ -65,7 +67,6 @@ import {
 } from "@/lib/quickLogHardwareReadingsRules";
 import {
   filterQuickLogPlantOptions,
-  pickDefaultQuickLogPlant,
   quickLogPlantHelperText,
 } from "@/lib/quickLogPlantOptionRules";
 import QuickLogSensorSnapshotStrip from "@/components/QuickLogSensorSnapshotStrip";
@@ -82,10 +83,25 @@ import {
   isSupportedLegacyEventType,
   UNSUPPORTED_EVENT_TYPE_COPY,
 } from "@/lib/legacyQuickLogUnifiedSave";
+import {
+  QUICK_LOG_TARGET_BLOCKED_COPY,
+  quickLogPrefillTargetKey,
+  resolveQuickLogEditorTarget,
+  resolveQuickLogPrefillTarget,
+  resolveQuickLogWriteTarget,
+  type QuickLogResolvedTarget,
+} from "@/lib/quickLogTargetIntegrityRules";
 import { buildSensorSnapshotSavePayload } from "@/lib/latestSensorSnapshotRules";
 import { quickLogReasonToOperatorMessage } from "@/lib/quickLogSaveErrorMessage";
 import { buildStaleSnapshotHelperCopy } from "@/lib/quickLogStaleSnapshotHelperCopy";
 import { buildQuickLogDraftPreview } from "@/lib/quickLogDraftPreviewViewModel";
+import {
+  RESPONSE_CHECK_STATUSES,
+  applyResponseCheck,
+  appendQuickLogObservation,
+  readResponseCheckStatus,
+  type ResponseCheckStatus,
+} from "@/lib/tenSecondQuickCheckRules";
 import { plantDetailPath } from "@/lib/routes";
 import {
   EARLY_STAGE_MILESTONES,
@@ -104,6 +120,7 @@ import {
   buildEnvironmentCheckDetails,
   hasAnyEnvironmentCheckMeasurement,
   resolvePreviewWaterTempC,
+  validateEnvironmentCheckSensorBand,
   type EnvironmentCheckWaterTempUnit,
 } from "@/lib/environmentCheckQuickLogRules";
 import {
@@ -203,6 +220,13 @@ interface Props {
 
 const LAST_TARGET_STORAGE_KEY = "verdant.quickLog.lastTarget.v1";
 
+const QUICK_OBSERVATION_CHIPS = [
+  { label: "Watered", text: "Watered today." },
+  { label: "Fed", text: "Fed today." },
+  { label: "Spotted issue", text: "Spotted an issue — see photo or notes." },
+  { label: "Photo only", text: "Photo only — no other changes today." },
+] as const;
+
 type SavedTarget = {
   id: string;
   name: string;
@@ -219,23 +243,15 @@ type LastQuickLogTarget = {
   savedAt: string;
 };
 
-function readLastTarget(): LastQuickLogTarget | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(LAST_TARGET_STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<LastQuickLogTarget>;
-    if (typeof parsed.plantId !== "string" || !parsed.plantId) return null;
-    return {
-      plantId: parsed.plantId,
-      growId: typeof parsed.growId === "string" ? parsed.growId : null,
-      tentId: typeof parsed.tentId === "string" ? parsed.tentId : null,
-      savedAt: typeof parsed.savedAt === "string" ? parsed.savedAt : new Date().toISOString(),
-    };
-  } catch {
-    return null;
-  }
-}
+type InFlightSaveContext = Readonly<{
+  target: QuickLogResolvedTarget;
+  plantName: string;
+  tentName: string | null;
+  growName: string | null;
+  eventType: string;
+  stage: string;
+  stageWasUserTouched: boolean;
+}>;
 
 function rememberLastTarget(target: LastQuickLogTarget) {
   if (typeof window === "undefined") return;
@@ -264,8 +280,10 @@ export default function QuickLog({
 }: Props) {
   const { user } = useAuth();
   const { grows, activeGrow, activeGrowId, setActiveGrowId } = useGrows();
-  const { data: plants = [] } = usePlants();
-  const { data: activeTents = [] } = useTents();
+  const plantsQuery = usePlants();
+  const tentsQuery = useTents();
+  const plants = useMemo(() => plantsQuery.data ?? [], [plantsQuery.data]);
+  const activeTents = useMemo(() => tentsQuery.data ?? [], [tentsQuery.data]);
   const queryClient = useQueryClient();
   const { save: saveViaRpc } = useQuickLogV2Save();
 
@@ -282,11 +300,12 @@ export default function QuickLog({
   // we never clobber their explicit choice. Mirrors snapshotUserTouchedRef.
   const stageUserTouchedRef = useRef(false);
   // Tracks the previously selected plant so we can distinguish a real
-  // user-driven plant switch (re-default) from the initial ""→P auto-select
+  // user-driven plant switch (re-default) from the initial ""→P route prefill
   // (keep any stage the grower already picked).
   const prevPlantIdRef = useRef<string>("");
   const [eventType, setEventType] = useState<string>("observation");
   const [plantId, setPlantId] = useState<string>("");
+  const [dismissedBlockedPrefillKey, setDismissedBlockedPrefillKey] = useState<string | null>(null);
   const [snapshot, setSnapshot] = useState(false);
   const [remindAt, setRemindAt] = useState<string>("");
   const [showMore, setShowMore] = useState(false);
@@ -312,6 +331,8 @@ export default function QuickLog({
     lightDistance: "",
   });
   const [busy, setBusy] = useState(false);
+  const [childSaveBusy, setChildSaveBusy] = useState(false);
+  const [inFlightSaveContext, setInFlightSaveContext] = useState<InFlightSaveContext | null>(null);
   const [hardwareOpen, setHardwareOpen] = useState(false);
   const [wateringError, setWateringError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -338,10 +359,14 @@ export default function QuickLog({
   const viewPlantBtnRef = useRef<HTMLAnchorElement | null>(null);
   const hardwareUserTouchedRef = useRef(false);
   const snapshotUserTouchedRef = useRef(false);
-  // Synchronous in-flight guard so a rapid double-click cannot fire a
-  // second submit before `busy` state has propagated. Complements the
-  // existing `busy || !!savedTarget` button-disabled logic.
-  const submitInFlightRef = useRef(false);
+  // One synchronous guard shared by the parent form and the all-activities
+  // child. Presenter state complements this ref but never replaces it.
+  const saveInFlightRef = useRef(false);
+  const saveLocked = busy || childSaveBusy;
+  const isMainDraftMutationLocked = useCallback(
+    () => saveInFlightRef.current || saveLocked,
+    [saveLocked],
+  );
   // One idempotency key per LOGICAL submission (quickLogIdempotencyKey
   // contract, same pattern as the V2 sheet): retries after a failure or a
   // lost response REUSE the key so the RPC dedupes instead of writing a
@@ -355,22 +380,60 @@ export default function QuickLog({
   // payload, so an edited retry is distinguished from a pure retry.
   const lastFailedSaveSigRef = useRef<string | null>(null);
 
+  const prefillRequestKey = quickLogPrefillTargetKey(prefill);
+  const namedPrefillQueryError =
+    prefillRequestKey !== null && (plantsQuery.isError || tentsQuery.isError);
+  const namedPrefillQueryPending =
+    prefillRequestKey !== null &&
+    !namedPrefillQueryError &&
+    (plantsQuery.isPending ||
+      plantsQuery.isLoading ||
+      tentsQuery.isPending ||
+      tentsQuery.isLoading);
+  const prefillTarget = useMemo(
+    () =>
+      namedPrefillQueryPending || namedPrefillQueryError
+        ? ({ status: "blocked", reason: "prefill_target_pending" } as const)
+        : resolveQuickLogPrefillTarget({ prefill, plants, tents: activeTents }),
+    [prefill, plants, activeTents, namedPrefillQueryPending, namedPrefillQueryError],
+  );
+  const prefillPlantId = prefillTarget.status === "ready" ? prefillTarget.target.plantId : null;
+  const prefillGrowId = prefillTarget.status === "ready" ? prefillTarget.target.growId : null;
+  const prefillHoldActive =
+    prefillRequestKey !== null && dismissedBlockedPrefillKey !== prefillRequestKey;
+  const editorPlantId = prefillHoldActive ? (prefillPlantId ?? "") : plantId;
+
   useEffect(() => {
-    if (!open || !prefill) return;
-    if (prefill.growId && prefill.growId !== activeGrowId) {
+    if (!open || saveLocked) return;
+    if (prefillHoldActive && prefillPlantId && prefillGrowId) {
+      if (prefillGrowId !== activeGrowId) {
+        setActiveGrowId(prefillGrowId);
+      }
+      setPlantId(prefillPlantId);
+    } else if (prefillHoldActive) {
+      // A named target that cannot be proven must hold the editor empty. It
+      // may be released only by an explicit grower selection below.
+      setPlantId("");
+    } else if (!prefillRequestKey) {
+      // Global and grow-only launchers always begin as manual selection.
+      setPlantId("");
+    }
+    if (!prefill?.plantId && prefill?.growId && prefill.growId !== activeGrowId) {
+      // Grow/tent launchers without a plant remain explicit manual-selection
+      // flows. Preserve their known grow scope, but never invent a plant.
       setActiveGrowId(prefill.growId);
     }
-    if (prefill.eventType) setEventType(prefill.eventType);
-    if (prefill.suggestSnapshot && prefill.tentId) setSnapshot(true);
+    if (prefill?.eventType) setEventType(prefill.eventType);
+    if (prefill?.suggestSnapshot && prefill.tentId) setSnapshot(true);
     // Seed a starter note only when the grower has not yet typed anything,
     // so we never overwrite in-progress text on re-open.
-    if (typeof prefill.note === "string" && prefill.note.length > 0) {
+    if (typeof prefill?.note === "string" && prefill.note.length > 0) {
       setNote((prev) => (prev.trim().length === 0 ? (prefill.note ?? "") : prev));
     }
     // Same only-if-empty rule for a starter watering amount: never clobber
     // a volume the grower already typed.
     if (
-      typeof prefill.wateringVolumeMl === "number" &&
+      typeof prefill?.wateringVolumeMl === "number" &&
       Number.isFinite(prefill.wateringVolumeMl) &&
       prefill.wateringVolumeMl > 0
     ) {
@@ -389,6 +452,11 @@ export default function QuickLog({
     prefill?.suggestSnapshot,
     prefill?.note,
     prefill?.wateringVolumeMl,
+    prefillPlantId,
+    prefillGrowId,
+    prefillRequestKey,
+    dismissedBlockedPrefillKey,
+    saveLocked,
   ]);
 
   const scopedPlants = useMemo(
@@ -397,8 +465,8 @@ export default function QuickLog({
   );
 
   const selectedPlant = useMemo(
-    () => scopedPlants.find((p) => p.id === plantId) ?? null,
-    [plantId, scopedPlants],
+    () => scopedPlants.find((p) => p.id === editorPlantId) ?? null,
+    [editorPlantId, scopedPlants],
   );
 
   const selectedPhenoHuntId = useMemo(() => {
@@ -415,22 +483,109 @@ export default function QuickLog({
     [activeTents, selectedPlant?.tent_id],
   );
 
+  const writeTarget = useMemo(
+    () =>
+      resolveQuickLogWriteTarget({
+        activeGrowId,
+        selectedPlant,
+        selectedTent,
+      }),
+    [activeGrowId, selectedPlant, selectedTent],
+  );
+  const editorTarget = useMemo(
+    () =>
+      resolveQuickLogEditorTarget({
+        prefill,
+        prefillResolution: prefillTarget,
+        writeResolution: writeTarget,
+        dismissedBlockedPrefillKey,
+      }),
+    [prefill, prefillTarget, writeTarget, dismissedBlockedPrefillKey],
+  );
+  const editorResolvedTarget = editorTarget.status === "ready" ? editorTarget.target : null;
+  const resolvedTarget = inFlightSaveContext?.target ?? editorResolvedTarget;
+  const resolvedTargetGrow = useMemo(
+    () =>
+      resolvedTarget ? (grows.find((grow) => grow.id === resolvedTarget.growId) ?? null) : null,
+    [grows, resolvedTarget],
+  );
+  const resolvedTargetPlant = useMemo(
+    () =>
+      resolvedTarget ? (plants.find((plant) => plant.id === resolvedTarget.plantId) ?? null) : null,
+    [plants, resolvedTarget],
+  );
+  const resolvedTargetTent = useMemo(
+    () =>
+      resolvedTarget
+        ? (activeTents.find((tent) => tent.id === resolvedTarget.tentId) ?? null)
+        : null,
+    [activeTents, resolvedTarget],
+  );
+
+  const beginAllActivitiesSave = useCallback(
+    (target: QuickLogAllActivitiesSaveTarget): boolean => {
+      if (saveInFlightRef.current || !target.plantId || !target.tentId || !target.growId) {
+        return false;
+      }
+      const targetPlant = plants.find((plant) => plant.id === target.plantId) ?? null;
+      const targetTent = activeTents.find((tent) => tent.id === target.tentId) ?? null;
+      const targetGrow = grows.find((grow) => grow.id === target.growId) ?? null;
+      if (
+        !targetPlant ||
+        !targetTent ||
+        !targetGrow ||
+        targetPlant.grow_id !== target.growId ||
+        targetPlant.tent_id !== target.tentId ||
+        targetTent.grow_id !== target.growId
+      ) {
+        return false;
+      }
+
+      saveInFlightRef.current = true;
+      setChildSaveBusy(true);
+      setInFlightSaveContext(
+        Object.freeze({
+          target: Object.freeze({
+            plantId: target.plantId,
+            tentId: target.tentId,
+            growId: target.growId,
+          }),
+          plantName: targetPlant.name,
+          tentName: targetTent.name ?? null,
+          growName: targetGrow.name ?? null,
+          eventType,
+          stage,
+          stageWasUserTouched: stageUserTouchedRef.current,
+        }),
+      );
+      return true;
+    },
+    [activeTents, eventType, grows, plants, stage],
+  );
+
+  const endAllActivitiesSave = useCallback(() => {
+    saveInFlightRef.current = false;
+    setChildSaveBusy(false);
+    setInFlightSaveContext(null);
+  }, []);
+  const isSaveInFlight = useCallback(() => saveInFlightRef.current, []);
+
   // Slice A2: re-enable stage defaulting ONLY when the grower actively switches
   // from one already-selected plant to a different one — the new target's stage
   // should win. It must NOT clear the touched flag on the initial ""→P
-  // auto-select (async plants load / prefill / last-target), because the grower
+  // resolution (async plants load / prefill), because the grower
   // may have already picked a stage before the plant resolved; clobbering that
   // would silently discard their choice. prevPlantIdRef tracks the last
   // NON-EMPTY plant id so a switch that passes through the cleared "Choose a
   // plant…" state (A → "" → B) is still seen as A→B. Ordered BEFORE the
   // defaulting effect so the flag is settled before the default is recomputed.
   useEffect(() => {
-    if (!open) return;
-    if (isUserDrivenPlantSwitch(prevPlantIdRef.current, plantId)) {
+    if (!open || saveLocked) return;
+    if (isUserDrivenPlantSwitch(prevPlantIdRef.current, editorPlantId)) {
       stageUserTouchedRef.current = false;
     }
-    if (plantId) prevPlantIdRef.current = plantId;
-  }, [open, plantId]);
+    if (editorPlantId) prevPlantIdRef.current = editorPlantId;
+  }, [open, editorPlantId, saveLocked]);
 
   // Slice A2: default the stage from the selected plant, else the active grow.
   // Skipped once the grower has manually chosen a stage (touched ref). The
@@ -438,51 +593,16 @@ export default function QuickLog({
   // read that does not depend on the generated types exposing it, and never
   // widens the value to `any`.
   useEffect(() => {
-    if (!open) return;
+    if (!open || saveLocked) return;
     if (stageUserTouchedRef.current) return;
     const resolved = resolveQuickLogStageDefault({
       plantStage: (selectedPlant as { stage?: unknown } | null)?.stage ?? null,
       growStage: activeGrow?.stage ?? null,
     });
     setStage((prev) => (prev === resolved ? prev : resolved));
-  }, [open, selectedPlant, activeGrow?.stage]);
+  }, [open, selectedPlant, activeGrow?.stage, saveLocked]);
 
-  useEffect(() => {
-    if (!open) return;
-    if (plantId) return;
-    // Ambiguous public-starter handoffs told the grower THEY pick the
-    // plant; last-target / only-plant defaults must not pick one for them.
-    if (prefill?.suppressPlantDefault && !prefill?.plantId) return;
-    // A prefilled plant whose grow switch is STILL PROPAGATING (the
-    // prefill names another grow and setActiveGrowId hasn't re-scoped the
-    // plant list yet) must not be displaced by the OLD grow's
-    // last-target/only-plant fallbacks. Hold until the scope catches up.
-    // Once the grows agree, an unresolvable plantId (archived/foreign)
-    // falls through to the normal default + mismatch banner as before.
-    if (
-      prefill?.plantId &&
-      prefill?.growId &&
-      prefill.growId !== activeGrowId &&
-      !scopedPlants.some((p) => p.id === prefill.plantId)
-    ) {
-      return;
-    }
-
-    const lastTarget = readLastTarget();
-    const lastPlantId = lastTarget?.plantId ?? null;
-    const lastPlantStillValid = lastPlantId
-      ? scopedPlants.some((p) => p.id === lastPlantId)
-      : false;
-
-    const next = pickDefaultQuickLogPlant(
-      scopedPlants,
-      prefill?.plantId ?? (lastPlantStillValid ? lastPlantId : null),
-      plantId || null,
-    );
-    if (next && next !== plantId) setPlantId(next);
-  }, [open, plantId, scopedPlants, prefill?.plantId, prefill?.suppressPlantDefault]);
-
-  const sensorTentId = selectedPlant?.tent_id ?? null;
+  const sensorTentId = resolvedTarget?.tentId ?? null;
   const sensorState = useLatestTentSensorSnapshot(sensorTentId);
   const stripView = useMemo(
     () =>
@@ -496,32 +616,33 @@ export default function QuickLog({
   );
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || saveInFlightRef.current) return;
     if (snapshotUserTouchedRef.current) return;
     if (!selectedPlant?.tent_id) return;
     if (stripView.status === "usable" && !snapshot) setSnapshot(true);
   }, [open, stripView.status, selectedPlant?.tent_id, snapshot]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || saveInFlightRef.current) return;
     if (stripView.status !== "usable" && snapshot) setSnapshot(false);
   }, [open, stripView.status, snapshot]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || saveInFlightRef.current) return;
     snapshotUserTouchedRef.current = false;
   }, [open, selectedPlant?.tent_id]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || saveInFlightRef.current) return;
     if (eventType === "watering") setShowMore(true);
   }, [open, eventType]);
 
   // A receipt always requires a fresh, explicit goal selection for the
   // current candidate. Never carry a choice between plants or dialog opens.
   useEffect(() => {
+    if (saveInFlightRef.current) return;
     setSelectedPhenoEvidenceGoal(null);
-  }, [open, plantId, selectedPhenoHuntId]);
+  }, [open, editorPlantId, selectedPhenoHuntId]);
 
   // One-shot guard for the evidence-goal handoff seed. It is consumed the
   // moment the goal is seeded and reset only when the dialog closes, so a
@@ -544,7 +665,7 @@ export default function QuickLog({
   // leaves the selection empty — never auto-picks a different goal. Runs at
   // most ONCE per dialog handoff via phenoSeedConsumedRef.
   useEffect(() => {
-    if (!open) return;
+    if (!open || saveInFlightRef.current) return;
     if (phenoSeedConsumedRef.current) return;
     const goal = prefill?.phenoEvidenceGoal;
     if (typeof goal !== "string" || goal.length === 0) return;
@@ -578,6 +699,7 @@ export default function QuickLog({
       hardwareUserTouchedRef.current = false;
       return;
     }
+    if (saveInFlightRef.current) return;
     if (hardwareUserTouchedRef.current) return;
     setHardwareOpen(computeQuickLogHardwareDefaultOpen(hardware));
   }, [open, hardware]);
@@ -609,6 +731,7 @@ export default function QuickLog({
     setShowMore(false);
     setEventType("observation");
     setPlantId("");
+    setDismissedBlockedPrefillKey(null);
     setStage("");
     stageUserTouchedRef.current = false;
     prevPlantIdRef.current = "";
@@ -635,6 +758,7 @@ export default function QuickLog({
     setHarvestPhotoAngle("");
     setHarvestPhotoLighting("");
     setSelectedPhenoEvidenceGoal(null);
+    setInFlightSaveContext(null);
   }
 
   /**
@@ -645,6 +769,7 @@ export default function QuickLog({
    * stage, snapshot, remindAt) are preserved.
    */
   function handleEventTypeChange(next: string) {
+    if (isMainDraftMutationLocked()) return;
     const plan = planQuickLogActionSwitchReset(eventType, next);
     setEventType(next);
     if (!plan.changed) return;
@@ -677,6 +802,24 @@ export default function QuickLog({
       setSaveError(null);
       setWateringError(null);
     }
+  }
+
+  function handleResponseCheck(status: ResponseCheckStatus) {
+    if (isMainDraftMutationLocked()) return;
+    setNote((previous) => applyResponseCheck(previous, status));
+    setSaveError(null);
+  }
+
+  function restoreLockedDraftValue(
+    control: HTMLInputElement | HTMLTextAreaElement,
+    currentValue: string,
+  ): boolean {
+    if (!isMainDraftMutationLocked()) return false;
+    // A native input event updates the DOM before React invokes its handler.
+    // During the submit-to-rerender gap, immediately restore the controlled
+    // value as well as rejecting the state mutation.
+    control.value = currentValue;
+    return true;
   }
 
   function resetForAnother() {
@@ -724,6 +867,7 @@ export default function QuickLog({
   }
 
   function focusWatering() {
+    if (isMainDraftMutationLocked()) return;
     setShowMore(true);
     setTimeout(() => {
       wateringInputRef.current?.focus();
@@ -733,19 +877,19 @@ export default function QuickLog({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (submitInFlightRef.current || busy || savedTarget) return;
-    submitInFlightRef.current = true;
+    if (saveInFlightRef.current || saveLocked || savedTarget) return;
+    saveInFlightRef.current = true;
     try {
       await runSubmit();
     } finally {
-      submitInFlightRef.current = false;
+      saveInFlightRef.current = false;
     }
   }
 
   async function runSubmit() {
     setSaveError(null);
 
-    if (!user || !activeGrowId) {
+    if (!user) {
       const message = "Pick a workspace first";
       setSaveError(message);
       toast.error(message);
@@ -755,21 +899,31 @@ export default function QuickLog({
       toast.message(UNSUPPORTED_EVENT_TYPE_COPY);
       return;
     }
-    if (!selectedPlant) {
-      const message = "Pick a plant to save this entry";
+    if (editorTarget.status !== "ready" || !selectedPlant || !selectedTent) {
+      const message =
+        editorTarget.status === "blocked"
+          ? QUICK_LOG_TARGET_BLOCKED_COPY[editorTarget.reason]
+          : "Review the Quick Log target before saving.";
       setSaveError(message);
       toast.error(message);
-      focusPlant();
+      if (!selectedPlant) focusPlant();
       return;
     }
-    if (!note.trim() && eventType !== "watering") {
+    const saveTarget = Object.freeze({ ...editorTarget.target });
+    const saveStage = stage;
+    const saveStageWasUserTouched = stageUserTouchedRef.current;
+    const saveEventType = eventType;
+    const savePlant = selectedPlant;
+    const saveTent = selectedTent;
+    const saveGrow = resolvedTargetGrow;
+    if (!note.trim() && saveEventType !== "watering") {
       const message = "Add a quick note";
       setSaveError(message);
       toast.error(message);
       noteRef.current?.focus();
       return;
     }
-    if (eventType === "watering") {
+    if (saveEventType === "watering") {
       const raw = details.watering.trim();
       const vol = Number(raw);
       if (!raw || !Number.isFinite(vol) || vol <= 0) {
@@ -783,6 +937,17 @@ export default function QuickLog({
       }
     }
 
+    setInFlightSaveContext(
+      Object.freeze({
+        target: saveTarget,
+        plantName: savePlant.name,
+        tentName: saveTent.name ?? null,
+        growName: saveGrow?.name ?? null,
+        eventType: saveEventType,
+        stage: saveStage,
+        stageWasUserTouched: saveStageWasUserTouched,
+      }),
+    );
     setBusy(true);
     try {
       const noteWithHardware = appendHardwareReadingsToNote(note, hardware);
@@ -794,7 +959,7 @@ export default function QuickLog({
         milestone: earlyMilestone,
         vigor: earlyVigor,
         notes: earlyNotes,
-        stage,
+        stage: saveStage,
       });
       const earlyStageRecord: Record<string, unknown> | null = earlyStageEnvelope
         ? { ...earlyStageEnvelope }
@@ -803,10 +968,28 @@ export default function QuickLog({
         milestone: earlyMilestone,
         vigor: earlyVigor,
         notes: earlyNotes,
-        stage,
+        stage: saveStage,
       });
+      // Block out-of-band air-sensor values before building the envelope so an
+      // implausible reading surfaces the same per-metric copy Quick Log v2
+      // shows — instead of the old silent clamp-to-null that discarded the
+      // grower's number. Reuses the single canonical band via the shared guard.
+      if (saveEventType === "environment") {
+        const bandCheck = validateEnvironmentCheckSensorBand({
+          roomTempF: envRoomTempF,
+          humidityPct: envHumidityPct,
+          vpdKpa: envVpdKpa,
+        });
+        if (bandCheck.ok !== true) {
+          const message = quickLogReasonToOperatorMessage(bandCheck.reason);
+          setSaveError(message);
+          // Allow-listed reason code only — never tokens, endpoints, or payload.
+          toast.error(`${message} [${bandCheck.reason}]`);
+          return;
+        }
+      }
       const environmentCheckEnvelope =
-        eventType === "environment"
+        saveEventType === "environment"
           ? buildEnvironmentCheckDetails({
               roomTempF: envRoomTempF,
               humidityPct: envHumidityPct,
@@ -821,11 +1004,11 @@ export default function QuickLog({
         ? { ...environmentCheckEnvelope }
         : null;
       const configuredPhenoGoal =
-        eventType === "observation" &&
+        saveEventType === "observation" &&
         selectedPhenoEvidenceGoal &&
         phenoEvidenceContext.status === "ready" &&
         phenoEvidenceContext.context?.huntId === selectedPhenoHuntId &&
-        phenoEvidenceContext.context.plantId === selectedPlant.id &&
+        phenoEvidenceContext.context.plantId === saveTarget.plantId &&
         phenoEvidenceContext.context.coverage.goals.some(
           (goal) => goal.id === selectedPhenoEvidenceGoal,
         )
@@ -834,17 +1017,17 @@ export default function QuickLog({
       const phenoEvidenceReceipt = configuredPhenoGoal
         ? buildPhenoEvidenceReceiptDetails({
             huntId: selectedPhenoHuntId,
-            plantId: selectedPlant.id,
+            plantId: saveTarget.plantId,
             evidenceGoal: configuredPhenoGoal,
-            stage: normalizeQuickLogStage(stage),
+            stage: normalizeQuickLogStage(saveStage),
           })
         : null;
       const built = buildLegacyQuickLogUnifiedPayload({
-        eventType,
+        eventType: saveEventType,
         idempotencyKey: saveIdempotencyKeyRef.current,
         noteWithHardware,
-        plantId: selectedPlant.id,
-        plantTentId: selectedPlant.tent_id ?? null,
+        plantId: saveTarget.plantId,
+        plantTentId: saveTarget.tentId,
         details,
         sensorAttachPayload,
         earlyStage: earlyStageRecord,
@@ -877,7 +1060,7 @@ export default function QuickLog({
       // the grower's validated UI selection so observation/environment keep
       // their semantic activity even though the legacy RPC stores both as
       // `p_action: "note"`.
-      const result = await saveViaRpc(built.payload, { telemetryIntent: eventType });
+      const result = await saveViaRpc(built.payload, { telemetryIntent: saveEventType });
       if (!result.ok) {
         lastFailedSaveSigRef.current = attemptSig;
         const reason = result.reason ?? "save_failed";
@@ -901,12 +1084,12 @@ export default function QuickLog({
       // the touched ref to avoid silently mutating the grow's stage on an
       // ordinary save. Still never writes an unknown/empty stage.
       if (
-        activeGrow &&
-        stageUserTouchedRef.current &&
-        normalizeQuickLogStage(stage) &&
-        stage !== activeGrow.stage
+        saveGrow &&
+        saveStageWasUserTouched &&
+        normalizeQuickLogStage(saveStage) &&
+        saveStage !== saveGrow.stage
       ) {
-        await supabase.from("grows").update({ stage }).eq("id", activeGrowId);
+        await supabase.from("grows").update({ stage: saveStage }).eq("id", saveTarget.growId);
       }
 
       // Submission completed: the next logical submission gets a fresh key.
@@ -915,25 +1098,25 @@ export default function QuickLog({
       saveIdempotencyKeyRef.current = newQuickLogSaveKey();
       lastFailedSaveSigRef.current = null;
 
-      const plantLabel = selectedPlant.name;
+      const plantLabel = savePlant.name;
       const finalMessage =
         successMessage && successMessage !== "Logged 🌱"
           ? successMessage
-          : `Saved ${savedVerb(eventType)} for ${plantLabel}`;
+          : `Saved ${savedVerb(saveEventType)} for ${plantLabel}`;
       toast.success(finalMessage);
 
       rememberLastTarget({
-        plantId: selectedPlant.id,
-        growId: activeGrowId,
-        tentId: selectedPlant.tent_id ?? null,
+        plantId: saveTarget.plantId,
+        growId: saveTarget.growId,
+        tentId: saveTarget.tentId,
         savedAt: new Date().toISOString(),
       });
       setSavedTarget({
-        id: selectedPlant.id,
+        id: savePlant.id,
         name: plantLabel,
-        tentName: selectedTent?.name ?? null,
-        growName: activeGrow?.name ?? null,
-        eventType,
+        tentName: saveTent.name ?? null,
+        growName: saveGrow?.name ?? null,
+        eventType: saveEventType,
         savedAt: new Date().toISOString(),
       });
       onCreated?.();
@@ -956,8 +1139,8 @@ export default function QuickLog({
       setTimeout(() => viewPlantBtnRef.current?.focus(), 0);
       applyQuickLogV2Refresh(queryClient, {
         targetType: "plant",
-        targetId: selectedPlant.id,
-        tentId: selectedPlant.tent_id ?? null,
+        targetId: saveTarget.plantId,
+        tentId: saveTarget.tentId,
       });
       // Explicit, statically-grep-able invalidations for the two V0-loop
       // memory surfaces (Recent Plant Activity + shared diary_entries
@@ -977,11 +1160,12 @@ export default function QuickLog({
       console.error("[QuickLog] unexpected error", err);
     } finally {
       setBusy(false);
+      setInFlightSaveContext(null);
     }
   }
 
   const snapshotUsable = stripView.status === "usable";
-  const attachDisabled = !selectedPlant || !snapshotUsable;
+  const attachDisabled = saveLocked || !resolvedTarget || !snapshotUsable;
   const showMismatch = !!(
     prefill?.plantId &&
     selectedPlant &&
@@ -994,9 +1178,44 @@ export default function QuickLog({
     !tentSetupRequired
   );
   const showWateringErr = !!wateringError;
-  const targetGrowName = activeGrow?.name ?? "No setup selected";
+  const targetQueryPending = inFlightSaveContext === null && namedPrefillQueryPending;
+  const targetQueryError = inFlightSaveContext === null && namedPrefillQueryError;
+  const targetSelectionLocked = saveLocked || targetQueryPending || targetQueryError;
+  const displayedPlantId = inFlightSaveContext?.target.plantId ?? editorPlantId;
+  const displayedGrowId = inFlightSaveContext?.target.growId ?? activeGrowId ?? "";
+  const displayedEventType = inFlightSaveContext?.eventType ?? eventType;
+  const displayedStage = inFlightSaveContext?.stage ?? stage;
+  const targetPlantName =
+    inFlightSaveContext?.plantName ??
+    (resolvedTarget ? (resolvedTargetPlant?.name ?? "Assigned plant") : "Choose a plant");
   const targetTentName =
-    selectedTent?.name ?? (selectedPlant?.tent_id ? "Assigned tent" : "No tent assigned");
+    inFlightSaveContext?.tentName ??
+    (resolvedTarget ? (resolvedTargetTent?.name ?? "Assigned tent") : "Plant required before save");
+  const targetGrowName =
+    inFlightSaveContext?.growName ??
+    (resolvedTarget ? (resolvedTargetGrow?.name ?? "Assigned grow") : "No setup selected");
+  const editorTargetBlocked =
+    inFlightSaveContext === null &&
+    !targetQueryPending &&
+    !targetQueryError &&
+    editorTarget.status === "blocked";
+  const showTargetError = editorTargetBlocked && (prefillHoldActive || selectedPlant !== null);
+  const plantSelectErrorId = targetQueryPending
+    ? "quick-log-target-loading"
+    : targetQueryError
+      ? "quick-log-target-query-error"
+      : editorTargetBlocked
+        ? showTargetError
+          ? "quick-log-target-error"
+          : "quick-log-plant-error"
+        : undefined;
+  const targetQueryErrorSubject =
+    plantsQuery.isError && tentsQuery.isError
+      ? "plant and tent details"
+      : plantsQuery.isError
+        ? "plant details"
+        : "tent details";
+  const selectedResponseStatus = readResponseCheckStatus(note);
 
   return (
     <Dialog
@@ -1004,8 +1223,8 @@ export default function QuickLog({
       onOpenChange={(o) => {
         if (!o) {
           const blocked = shouldBlockQuickLogClose({
-            saving: busy,
-            inFlight: submitInFlightRef.current,
+            saving: saveLocked,
+            inFlight: saveInFlightRef.current,
           });
           if (blocked) {
             toast.message(QUICK_LOG_CLOSE_BLOCKED_HINT);
@@ -1038,1268 +1257,1478 @@ export default function QuickLog({
             useQuickLogActivitySave and dispatches
             verdant:entry-created only on confirmed success. */}
         <QuickLogAllActivitiesSection
-          growId={activeGrowId ?? null}
-          tentId={selectedPlant?.tent_id ?? null}
-          plantId={selectedPlant?.id ?? null}
+          growId={resolvedTarget?.growId ?? null}
+          tentId={resolvedTarget?.tentId ?? null}
+          plantId={resolvedTarget?.plantId ?? null}
           heading="All activity types"
           testIdPrefix="quick-log-dialog-all-activities"
+          onSaveStart={beginAllActivitiesSave}
+          onSaveEnd={endAllActivitiesSave}
+          saveBlocked={saveLocked}
+          isSaveBlocked={isSaveInFlight}
         />
 
         <form onSubmit={submit} className="grid gap-4">
-          {(() => {
-            const draftPreview = buildQuickLogDraftPreview({ prefill });
-            if (!draftPreview.show) return null;
-            return (
-              <div
-                data-testid="quick-log-draft-preview"
-                data-source={prefill?.source ?? "unknown"}
-                className="rounded-lg border border-primary/30 bg-primary/[0.04] p-2.5 space-y-1"
-              >
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <p className="text-[11px] uppercase tracking-wide text-primary/80">
-                    {draftPreview.eventTypeLabel ?? "Draft"} prefilled
-                  </p>
-                  {draftPreview.sourceLabel ? (
-                    <span
-                      data-testid="quick-log-draft-preview-source"
-                      className="text-[10px] uppercase tracking-wide text-amber-200/80 rounded-sm border border-amber-200/30 px-1.5 py-0.5"
+          <fieldset
+            data-testid="quick-log-main-draft-fields"
+            disabled={saveLocked}
+            aria-disabled={saveLocked}
+            className="contents"
+          >
+            {(() => {
+              const draftPreview = buildQuickLogDraftPreview({ prefill });
+              if (!draftPreview.show) return null;
+              return (
+                <div
+                  data-testid="quick-log-draft-preview"
+                  data-source={prefill?.source ?? "unknown"}
+                  className="rounded-lg border border-primary/30 bg-primary/[0.04] p-2.5 space-y-1"
+                >
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <p className="text-[11px] uppercase tracking-wide text-primary/80">
+                      {draftPreview.eventTypeLabel ?? "Draft"} prefilled
+                    </p>
+                    {draftPreview.sourceLabel ? (
+                      <span
+                        data-testid="quick-log-draft-preview-source"
+                        className="text-[10px] uppercase tracking-wide text-amber-200/80 rounded-sm border border-amber-200/30 px-1.5 py-0.5"
+                      >
+                        {draftPreview.sourceLabel}
+                      </span>
+                    ) : null}
+                  </div>
+                  {draftPreview.noteSummary ? (
+                    <p
+                      data-testid="quick-log-draft-preview-note"
+                      className="text-[12px] text-foreground/90 leading-snug"
                     >
-                      {draftPreview.sourceLabel}
-                    </span>
+                      {draftPreview.noteSummary}
+                    </p>
+                  ) : null}
+                  {draftPreview.snapshotLabel ? (
+                    <p
+                      data-testid="quick-log-draft-preview-snapshot"
+                      className="text-[11px] text-muted-foreground italic"
+                    >
+                      {draftPreview.snapshotLabel}
+                    </p>
+                  ) : null}
+                  {draftPreview.photoLabel ? (
+                    <p
+                      data-testid="quick-log-draft-preview-photo"
+                      className="text-[11px] text-muted-foreground italic"
+                    >
+                      {draftPreview.photoLabel}
+                    </p>
                   ) : null}
                 </div>
-                {draftPreview.noteSummary ? (
-                  <p
-                    data-testid="quick-log-draft-preview-note"
-                    className="text-[12px] text-foreground/90 leading-snug"
-                  >
-                    {draftPreview.noteSummary}
-                  </p>
-                ) : null}
-                {draftPreview.snapshotLabel ? (
-                  <p
-                    data-testid="quick-log-draft-preview-snapshot"
-                    className="text-[11px] text-muted-foreground italic"
-                  >
-                    {draftPreview.snapshotLabel}
-                  </p>
-                ) : null}
-                {draftPreview.photoLabel ? (
-                  <p
-                    data-testid="quick-log-draft-preview-photo"
-                    className="text-[11px] text-muted-foreground italic"
-                  >
-                    {draftPreview.photoLabel}
-                  </p>
-                ) : null}
-              </div>
-            );
-          })()}
-          {(() => {
-            const hv = buildHarvestInspectionPreviewViewModel(prefill ?? null);
-            if (!hv.show) return null;
-            return (
-              <div
-                data-testid="quick-log-harvest-inspection-preview"
-                data-preset={hv.preset ?? ""}
-                className="rounded-lg border border-amber-400/30 bg-amber-400/[0.04] p-2.5 space-y-1.5"
-              >
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <p
-                    className="text-[11px] uppercase tracking-wide text-amber-200/90"
-                    data-testid="quick-log-harvest-inspection-preview-label"
-                  >
-                    Harvest Watch · {hv.presetLabel}
-                  </p>
-                  <span
-                    className="text-[10px] uppercase tracking-wide text-muted-foreground rounded-sm border border-border/60 px-1.5 py-0.5"
-                    data-testid="quick-log-harvest-inspection-preview-event-type"
-                  >
-                    {hv.eventTypeLabel}
-                  </span>
-                </div>
-                <p
-                  className="text-[11px] text-amber-200/80"
-                  data-testid="quick-log-harvest-inspection-preview-caution"
+              );
+            })()}
+            {(() => {
+              const hv = buildHarvestInspectionPreviewViewModel(prefill ?? null);
+              if (!hv.show) return null;
+              return (
+                <div
+                  data-testid="quick-log-harvest-inspection-preview"
+                  data-preset={hv.preset ?? ""}
+                  className="rounded-lg border border-amber-400/30 bg-amber-400/[0.04] p-2.5 space-y-1.5"
                 >
-                  {hv.caution}
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <p
+                      className="text-[11px] uppercase tracking-wide text-amber-200/90"
+                      data-testid="quick-log-harvest-inspection-preview-label"
+                    >
+                      Harvest Watch · {hv.presetLabel}
+                    </p>
+                    <span
+                      className="text-[10px] uppercase tracking-wide text-muted-foreground rounded-sm border border-border/60 px-1.5 py-0.5"
+                      data-testid="quick-log-harvest-inspection-preview-event-type"
+                    >
+                      {hv.eventTypeLabel}
+                    </span>
+                  </div>
+                  <p
+                    className="text-[11px] text-amber-200/80"
+                    data-testid="quick-log-harvest-inspection-preview-caution"
+                  >
+                    {hv.caution}
+                  </p>
+                  <p
+                    className="text-[11px] text-muted-foreground"
+                    data-testid="quick-log-harvest-inspection-preview-review"
+                  >
+                    {hv.reviewCopy}
+                  </p>
+                  {hv.note ? (
+                    <pre
+                      data-testid="quick-log-harvest-inspection-preview-note"
+                      className="text-[12px] text-foreground/90 leading-snug whitespace-pre-wrap font-sans"
+                    >
+                      {hv.note}
+                    </pre>
+                  ) : null}
+                  <p
+                    className="text-[11px] text-muted-foreground italic"
+                    data-testid="quick-log-harvest-inspection-preview-grower"
+                  >
+                    Grower reviews before saving.
+                  </p>
+                  {hv.showPhotoComparison ? (
+                    <div
+                      data-testid="quick-log-harvest-photo-comparison"
+                      className="grid gap-2 sm:grid-cols-2 pt-1"
+                    >
+                      <div className="grid gap-1">
+                        <Label
+                          htmlFor="ql-harvest-angle"
+                          className="text-[11px] text-muted-foreground"
+                        >
+                          Angle (optional)
+                        </Label>
+                        <Select
+                          value={harvestPhotoAngle}
+                          onValueChange={(v) => {
+                            if (isMainDraftMutationLocked()) return;
+                            setHarvestPhotoAngle(v as HarvestPhotoAngle);
+                          }}
+                        >
+                          <SelectTrigger
+                            id="ql-harvest-angle"
+                            data-testid="quick-log-harvest-photo-angle"
+                            className="h-8 text-xs"
+                          >
+                            <SelectValue placeholder="Select angle" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {HARVEST_PHOTO_COMPARISON_ANGLES.map((opt) => (
+                              <SelectItem
+                                key={opt.value}
+                                value={opt.value}
+                                data-testid={`quick-log-harvest-photo-angle-${opt.value}`}
+                              >
+                                {opt.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="grid gap-1">
+                        <Label
+                          htmlFor="ql-harvest-lighting"
+                          className="text-[11px] text-muted-foreground"
+                        >
+                          Lighting (optional)
+                        </Label>
+                        <Select
+                          value={harvestPhotoLighting}
+                          onValueChange={(v) => {
+                            if (isMainDraftMutationLocked()) return;
+                            setHarvestPhotoLighting(v as HarvestPhotoLighting);
+                          }}
+                        >
+                          <SelectTrigger
+                            id="ql-harvest-lighting"
+                            data-testid="quick-log-harvest-photo-lighting"
+                            className="h-8 text-xs"
+                          >
+                            <SelectValue placeholder="Select lighting" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {HARVEST_PHOTO_COMPARISON_LIGHTINGS.map((opt) => (
+                              <SelectItem
+                                key={opt.value}
+                                value={opt.value}
+                                data-testid={`quick-log-harvest-photo-lighting-${opt.value}`}
+                              >
+                                {opt.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })()}
+            {(showMismatch || showStaleHelper || showWateringErr) && (
+              <div
+                data-testid="quick-log-review-issues"
+                role="group"
+                aria-label="Review Quick Log issues"
+                className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-2.5 space-y-1"
+              >
+                <p className="text-[11px] uppercase tracking-wide text-amber-200/80">
+                  Review before saving
                 </p>
+                <ul className="flex flex-wrap gap-x-3 gap-y-1">
+                  {showMismatch && (
+                    <li>
+                      <button
+                        type="button"
+                        data-testid="quick-log-review-jump-mismatch"
+                        onClick={focusPlant}
+                        className="text-[12px] underline text-amber-200 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        Check target
+                      </button>
+                    </li>
+                  )}
+                  {showStaleHelper && (
+                    <li>
+                      <button
+                        type="button"
+                        data-testid="quick-log-review-jump-snapshot"
+                        onClick={focusAttach}
+                        className="text-[12px] underline text-amber-200 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        Check sensor truth
+                      </button>
+                    </li>
+                  )}
+                  {showWateringErr && (
+                    <li>
+                      <button
+                        type="button"
+                        data-testid="quick-log-review-jump-watering"
+                        onClick={focusWatering}
+                        className="text-[12px] underline text-amber-200 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        Add Watering (ml)
+                      </button>
+                    </li>
+                  )}
+                </ul>
+              </div>
+            )}
+
+            <section
+              data-testid="quick-log-target-card"
+              data-target-plant-id={resolvedTarget?.plantId}
+              data-target-tent-id={resolvedTarget?.tentId}
+              data-target-grow-id={resolvedTarget?.growId}
+              aria-label="Quick Log target"
+              className="rounded-xl border border-primary/40 bg-primary/5 p-3 space-y-3"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                    Logging to
+                  </p>
+                  <p
+                    data-testid="quick-log-target-plant"
+                    className="text-base font-semibold text-foreground"
+                  >
+                    {targetPlantName}
+                  </p>
+                  <p
+                    data-testid="quick-log-target-tent"
+                    className="text-[12px] text-muted-foreground"
+                  >
+                    {targetTentName}
+                  </p>
+                  <p
+                    data-testid="quick-log-target-grow"
+                    className="text-[12px] text-muted-foreground"
+                  >
+                    {targetGrowName}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={focusPlant}
+                  disabled={targetSelectionLocked}
+                >
+                  Change
+                </Button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-xs">Plant</Label>
+                  <Select
+                    value={displayedPlantId || "__none"}
+                    disabled={targetSelectionLocked}
+                    onValueChange={(v) => {
+                      if (targetSelectionLocked || isMainDraftMutationLocked()) return;
+                      setDismissedBlockedPrefillKey(prefillRequestKey);
+                      setPlantId(v === "__none" ? "" : v);
+                      setSaveError(null);
+                    }}
+                  >
+                    <SelectTrigger
+                      ref={plantSelectTriggerRef}
+                      data-testid="quick-log-plant-select"
+                      aria-invalid={editorTargetBlocked}
+                      aria-describedby={plantSelectErrorId}
+                    >
+                      <SelectValue placeholder="Choose a plant" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none">Choose a plant…</SelectItem>
+                      {scopedPlants.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          <span data-testid="quick-log-plant-option-name">{p.name}</span>
+                          {p.strain ? ` · ${p.strain}` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs">Current Setup</Label>
+                  <Select
+                    value={displayedGrowId}
+                    disabled={targetSelectionLocked}
+                    onValueChange={(v) => {
+                      if (targetSelectionLocked || isMainDraftMutationLocked()) return;
+                      setDismissedBlockedPrefillKey(prefillRequestKey);
+                      setActiveGrowId(v);
+                      setSaveError(null);
+                    }}
+                  >
+                    <SelectTrigger data-testid="quick-log-grow-select">
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {grows.map((g) => (
+                        <SelectItem key={g.id} value={g.id}>
+                          {g.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              {targetQueryPending ? (
+                <p
+                  id="quick-log-target-loading"
+                  role="status"
+                  className="text-[11px] text-muted-foreground"
+                  data-testid="quick-log-target-loading"
+                >
+                  {QUICK_LOG_TARGET_BLOCKED_COPY.prefill_target_pending}
+                </p>
+              ) : targetQueryError ? (
+                <div className="flex items-center justify-between gap-3">
+                  <p
+                    id="quick-log-target-query-error"
+                    role="alert"
+                    className="text-[11px] text-destructive"
+                    data-testid="quick-log-target-query-error"
+                  >
+                    We couldn't load the {targetQueryErrorSubject} needed to confirm this Quick Log
+                    target.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    data-testid="quick-log-target-retry"
+                    onClick={() => {
+                      if (plantsQuery.isError) void plantsQuery.refetch();
+                      if (tentsQuery.isError) void tentsQuery.refetch();
+                    }}
+                  >
+                    Retry
+                  </Button>
+                </div>
+              ) : showTargetError && editorTarget.status === "blocked" ? (
+                <p
+                  id="quick-log-target-error"
+                  role="alert"
+                  className="text-[11px] text-destructive"
+                  data-testid="quick-log-target-error"
+                >
+                  {QUICK_LOG_TARGET_BLOCKED_COPY[editorTarget.reason]}
+                </p>
+              ) : !selectedPlant ? (
+                <p
+                  id="quick-log-plant-error"
+                  role="alert"
+                  className="text-[11px] text-destructive"
+                  data-testid="quick-log-plant-error"
+                >
+                  Choose a plant before saving this entry.
+                </p>
+              ) : (
                 <p
                   className="text-[11px] text-muted-foreground"
-                  data-testid="quick-log-harvest-inspection-preview-review"
+                  data-testid="quick-log-plant-helper"
                 >
-                  {hv.reviewCopy}
+                  {quickLogPlantHelperText(activeGrow?.name ?? null, !!activeGrowId)}
                 </p>
-                {hv.note ? (
-                  <pre
-                    data-testid="quick-log-harvest-inspection-preview-note"
-                    className="text-[12px] text-foreground/90 leading-snug whitespace-pre-wrap font-sans"
-                  >
-                    {hv.note}
-                  </pre>
-                ) : null}
-                <p
-                  className="text-[11px] text-muted-foreground italic"
-                  data-testid="quick-log-harvest-inspection-preview-grower"
-                >
-                  Grower reviews before saving.
-                </p>
-                {hv.showPhotoComparison ? (
-                  <div
-                    data-testid="quick-log-harvest-photo-comparison"
-                    className="grid gap-2 sm:grid-cols-2 pt-1"
-                  >
-                    <div className="grid gap-1">
-                      <Label
-                        htmlFor="ql-harvest-angle"
-                        className="text-[11px] text-muted-foreground"
-                      >
-                        Angle (optional)
-                      </Label>
-                      <Select
-                        value={harvestPhotoAngle}
-                        onValueChange={(v) => setHarvestPhotoAngle(v as HarvestPhotoAngle)}
-                      >
-                        <SelectTrigger
-                          id="ql-harvest-angle"
-                          data-testid="quick-log-harvest-photo-angle"
-                          className="h-8 text-xs"
-                        >
-                          <SelectValue placeholder="Select angle" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {HARVEST_PHOTO_COMPARISON_ANGLES.map((opt) => (
-                            <SelectItem
-                              key={opt.value}
-                              value={opt.value}
-                              data-testid={`quick-log-harvest-photo-angle-${opt.value}`}
-                            >
-                              {opt.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="grid gap-1">
-                      <Label
-                        htmlFor="ql-harvest-lighting"
-                        className="text-[11px] text-muted-foreground"
-                      >
-                        Lighting (optional)
-                      </Label>
-                      <Select
-                        value={harvestPhotoLighting}
-                        onValueChange={(v) => setHarvestPhotoLighting(v as HarvestPhotoLighting)}
-                      >
-                        <SelectTrigger
-                          id="ql-harvest-lighting"
-                          data-testid="quick-log-harvest-photo-lighting"
-                          className="h-8 text-xs"
-                        >
-                          <SelectValue placeholder="Select lighting" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {HARVEST_PHOTO_COMPARISON_LIGHTINGS.map((opt) => (
-                            <SelectItem
-                              key={opt.value}
-                              value={opt.value}
-                              data-testid={`quick-log-harvest-photo-lighting-${opt.value}`}
-                            >
-                              {opt.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            );
-          })()}
-          {(showMismatch || showStaleHelper || showWateringErr) && (
-            <div
-              data-testid="quick-log-review-issues"
-              role="group"
-              aria-label="Review Quick Log issues"
-              className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-2.5 space-y-1"
-            >
-              <p className="text-[11px] uppercase tracking-wide text-amber-200/80">
-                Review before saving
-              </p>
-              <ul className="flex flex-wrap gap-x-3 gap-y-1">
-                {showMismatch && (
-                  <li>
-                    <button
-                      type="button"
-                      data-testid="quick-log-review-jump-mismatch"
-                      onClick={focusPlant}
-                      className="text-[12px] underline text-amber-200 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      Check target
-                    </button>
-                  </li>
-                )}
-                {showStaleHelper && (
-                  <li>
-                    <button
-                      type="button"
-                      data-testid="quick-log-review-jump-snapshot"
-                      onClick={focusAttach}
-                      className="text-[12px] underline text-amber-200 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      Check sensor truth
-                    </button>
-                  </li>
-                )}
-                {showWateringErr && (
-                  <li>
-                    <button
-                      type="button"
-                      data-testid="quick-log-review-jump-watering"
-                      onClick={focusWatering}
-                      className="text-[12px] underline text-amber-200 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      Add Watering (ml)
-                    </button>
-                  </li>
-                )}
-              </ul>
-            </div>
-          )}
+              )}
+            </section>
 
-          <section
-            data-testid="quick-log-target-card"
-            aria-label="Quick Log target"
-            className="rounded-xl border border-primary/40 bg-primary/5 p-3 space-y-3"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                  Logging to
-                </p>
-                <p
-                  data-testid="quick-log-target-plant"
-                  className="text-base font-semibold text-foreground"
-                >
-                  {selectedPlant?.name ?? "Choose a plant"}
-                </p>
-                <p
-                  data-testid="quick-log-target-tent"
-                  className="text-[12px] text-muted-foreground"
-                >
-                  {selectedPlant ? targetTentName : "Plant required before save"}
-                </p>
-                <p
-                  data-testid="quick-log-target-grow"
-                  className="text-[12px] text-muted-foreground"
-                >
-                  {targetGrowName}
-                </p>
-              </div>
-              <Button type="button" variant="outline" size="sm" onClick={focusPlant}>
-                Change
-              </Button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <Label className="text-xs">Plant</Label>
-                <Select
-                  value={plantId || "__none"}
-                  onValueChange={(v) => {
-                    setPlantId(v === "__none" ? "" : v);
-                    setSaveError(null);
-                  }}
-                >
-                  <SelectTrigger
-                    ref={plantSelectTriggerRef}
-                    data-testid="quick-log-plant-select"
-                    aria-invalid={!selectedPlant}
-                    aria-describedby={!selectedPlant ? "quick-log-plant-error" : undefined}
-                  >
-                    <SelectValue placeholder="Choose a plant" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none">Choose a plant…</SelectItem>
-                    {scopedPlants.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name}
-                        {p.strain ? ` · ${p.strain}` : ""}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-xs">Current Setup</Label>
-                <Select
-                  value={activeGrowId ?? ""}
-                  onValueChange={(v) => {
-                    setActiveGrowId(v);
-                    setSaveError(null);
-                  }}
-                >
-                  <SelectTrigger data-testid="quick-log-grow-select">
-                    <SelectValue placeholder="Select" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {grows.map((g) => (
-                      <SelectItem key={g.id} value={g.id}>
-                        {g.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            {!selectedPlant ? (
-              <p
-                id="quick-log-plant-error"
-                role="alert"
-                className="text-[11px] text-destructive"
-                data-testid="quick-log-plant-error"
+            {prefill?.plantId && selectedPlant && selectedPlant.id !== prefill.plantId && (
+              <div
+                data-testid="quick-log-plant-mismatch-banner"
+                role="status"
+                aria-live="polite"
+                tabIndex={-1}
+                className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-2.5 text-[12px] text-amber-200 flex items-start gap-2"
               >
-                Choose a plant before saving this entry.
-              </p>
-            ) : (
-              <p className="text-[11px] text-muted-foreground" data-testid="quick-log-plant-helper">
-                {quickLogPlantHelperText(activeGrow?.name ?? null, !!activeGrowId)}
-              </p>
+                <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" aria-hidden="true" />
+                <span>
+                  Logging to <strong className="font-semibold">{selectedPlant.name}</strong>
+                  {prefill.plantName ? (
+                    <>
+                      , not <strong className="font-semibold">{prefill.plantName}</strong>
+                    </>
+                  ) : (
+                    ", not the plant currently open"
+                  )}
+                  .
+                </span>
+              </div>
             )}
-          </section>
 
-          {prefill?.plantId && selectedPlant && selectedPlant.id !== prefill.plantId && (
-            <div
-              data-testid="quick-log-plant-mismatch-banner"
-              role="status"
-              aria-live="polite"
-              tabIndex={-1}
-              className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-2.5 text-[12px] text-amber-200 flex items-start gap-2"
+            <section
+              data-testid="quick-log-truth-section"
+              className="rounded-xl border border-border/60 bg-secondary/20 p-3 space-y-2"
+              aria-label="Quick Log sensor truth"
             >
-              <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" aria-hidden="true" />
-              <span>
-                Logging to <strong className="font-semibold">{selectedPlant.name}</strong>
-                {prefill.plantName ? (
-                  <>
-                    , not <strong className="font-semibold">{prefill.plantName}</strong>
-                  </>
-                ) : (
-                  ", not the plant currently open"
-                )}
-                .
-              </span>
-            </div>
-          )}
-
-          <section
-            data-testid="quick-log-truth-section"
-            className="rounded-xl border border-border/60 bg-secondary/20 p-3 space-y-2"
-            aria-label="Quick Log sensor truth"
-          >
-            <div className="flex items-center justify-between gap-2">
-              <span className="inline-flex items-center gap-1.5 text-sm font-medium">
-                <Gauge className="h-4 w-4 text-primary" aria-hidden="true" />
-                Sensor truth
-              </span>
-              <span
-                data-testid="quick-log-truth-pill"
-                data-status={stripView.status}
-                className="rounded px-1.5 py-0.5 bg-muted/60 text-[10px] uppercase tracking-wide text-muted-foreground"
+              <div className="flex items-center justify-between gap-2">
+                <span className="inline-flex items-center gap-1.5 text-sm font-medium">
+                  <Gauge className="h-4 w-4 text-primary" aria-hidden="true" />
+                  Sensor truth
+                </span>
+                <span
+                  data-testid="quick-log-truth-pill"
+                  data-status={stripView.status}
+                  className="rounded px-1.5 py-0.5 bg-muted/60 text-[10px] uppercase tracking-wide text-muted-foreground"
+                >
+                  {stripView.status === "usable"
+                    ? "Usable"
+                    : stripView.status === "stale"
+                      ? "Stale"
+                      : stripView.status === "invalid"
+                        ? "Invalid"
+                        : "No data"}
+                </span>
+              </div>
+              <p
+                data-testid="quick-log-truth-copy"
+                className="text-[12px] text-muted-foreground leading-snug"
               >
                 {stripView.status === "usable"
-                  ? "Usable"
-                  : stripView.status === "stale"
-                    ? "Stale"
-                    : stripView.status === "invalid"
-                      ? "Invalid"
-                      : "No data"}
-              </span>
-            </div>
-            <p
-              data-testid="quick-log-truth-copy"
-              className="text-[12px] text-muted-foreground leading-snug"
-            >
-              {stripView.status === "usable"
-                ? snapshot
-                  ? "Sensor context is usable and will attach to this log."
-                  : "Sensor context is usable but not attached."
-                : stripView.status === "no_data"
-                  ? "No usable sensor context. This will save as a manual log only."
-                  : "Sensor context is not usable enough to attach. This will save as a manual log only."}
-            </p>
-
-            <div
-              data-testid="quick-log-snapshot-manual-truth"
-              className="rounded-lg border border-border/50 bg-background/40 p-2 text-[11px] leading-snug space-y-0.5"
-            >
-              <p className="font-medium text-foreground">{MANUAL_SENSOR_TRUTH_TITLE}</p>
-              <ul className="text-muted-foreground space-y-0.5">
-                {MANUAL_SENSOR_TRUTH_LINES.map((line) => (
-                  <li key={line} data-testid="quick-log-snapshot-manual-truth-line">
-                    {line}
-                  </li>
-                ))}
-                {(!snapshot || !snapshotUsable) && (
-                  <li
-                    data-testid="quick-log-snapshot-manual-truth-missing"
-                    className="text-muted-foreground"
-                  >
-                    {MANUAL_SENSOR_TRUTH_MISSING_READINGS_LINE}
-                  </li>
-                )}
-              </ul>
-            </div>
-
-            {tentSetupRequired ? (
-              <p
-                data-testid="quick-log-snapshot-tent-required"
-                className="rounded-lg border border-border/60 bg-secondary/30 p-3 text-[12px] text-muted-foreground"
-              >
-                Sensor snapshots need a tent first.{" "}
-                <a href="/tents" className="underline text-primary">
-                  Create your first tent
-                </a>{" "}
-                to attach environment context to logs.
+                  ? snapshot
+                    ? "Sensor context is usable and will attach to this log."
+                    : "Sensor context is usable but not attached."
+                  : stripView.status === "no_data"
+                    ? "No usable sensor context. This will save as a manual log only."
+                    : "Sensor context is not usable enough to attach. This will save as a manual log only."}
               </p>
-            ) : (
-              <>
-                <label
-                  ref={attachWrapperRef}
-                  tabIndex={-1}
-                  data-testid="quick-log-snapshot-attach-section"
-                  className={`flex items-center justify-between gap-2 rounded-lg border p-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${attachDisabled ? "border-border/40 opacity-60" : "border-border/60"}`}
-                >
-                  <span className="text-sm">Attach sensor snapshot</span>
-                  <Switch
-                    data-testid="quick-log-snapshot-toggle"
-                    data-snapshot-status={stripView.status}
-                    checked={snapshot && !!selectedPlant && snapshotUsable}
-                    onCheckedChange={(v) => {
-                      snapshotUserTouchedRef.current = true;
-                      setSnapshot(v);
-                    }}
-                    disabled={attachDisabled}
-                    aria-label="Attach sensor snapshot to this log"
-                    aria-describedby="quick-log-snapshot-session-helper"
-                  />
-                </label>
-                <p
-                  id="quick-log-snapshot-session-helper"
-                  data-testid="quick-log-snapshot-session-helper"
-                  className="text-[11px] text-muted-foreground"
-                >
-                  {selectedPlant && !snapshotUsable && stripView.status !== "no_data" ? (
-                    <span data-testid="quick-log-snapshot-stale-helper">
-                      {buildStaleSnapshotHelperCopy(stripView.capturedAt)}
-                    </span>
-                  ) : (
-                    "Applies to this log only. Closing Quick Log resets this choice."
-                  )}
-                </p>
-              </>
-            )}
-          </section>
 
-          {!tentSetupRequired && (
-            <QuickLogSensorSnapshotStrip
-              growId={activeGrowId}
-              tentId={selectedPlant?.tent_id ?? null}
-              attached={snapshot && !!selectedPlant}
-            />
-          )}
-
-          <section className="space-y-2">
-            <div className="grid grid-cols-2 gap-2">
-              <EventTypeSelector
-                id="quick-log-event-type"
-                value={eventType}
-                onValueChange={handleEventTypeChange}
-              />
-              <div>
-                <Label className="text-xs">Stage</Label>
-                <Select
-                  value={stage}
-                  onValueChange={(v) => {
-                    stageUserTouchedRef.current = true;
-                    setStage(v);
-                  }}
-                >
-                  <SelectTrigger data-testid="quick-log-stage-select">
-                    <SelectValue placeholder="Select stage" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {STAGES.map((s) => (
-                      <SelectItem key={s.value} value={s.value}>
-                        {s.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <h3
-              data-testid="quick-log-section-observation"
-              className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
-            >
-              What happened?
-            </h3>
-            <div
-              data-testid="quick-log-prompt-chips"
-              role="group"
-              aria-label="Quick observation prompts"
-              className="flex flex-wrap gap-1.5"
-            >
-              {[
-                { label: "Watered", text: "Watered today." },
-                { label: "Fed", text: "Fed today." },
-                { label: "Better", text: "Better than yesterday." },
-                { label: "Same", text: "About the same as yesterday." },
-                { label: "Worse", text: "Looking worse than yesterday." },
-                { label: "Spotted issue", text: "Spotted an issue — see photo or notes." },
-                { label: "Photo only", text: "Photo only — no other changes today." },
-              ].map((chip) => (
-                <button
-                  key={chip.label}
-                  type="button"
-                  data-testid={`quick-log-chip-${chip.label.toLowerCase().replace(/\s+/g, "-")}`}
-                  aria-label={`Insert observation: ${chip.label}`}
-                  onClick={() => {
-                    setNote((prev) => (prev.trim() ? `${prev.trim()} ${chip.text}` : chip.text));
-                    setSaveError(null);
-                  }}
-                  className="rounded-full border border-border/60 bg-secondary/30 px-2.5 py-1 text-[11px] text-foreground hover:bg-secondary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  {chip.label}
-                </button>
-              ))}
-            </div>
-            <Label htmlFor="quicklog-note-textarea">Short note</Label>
-            <Textarea
-              id="quicklog-note-textarea"
-              ref={noteRef}
-              data-testid="quicklog-note"
-              value={note}
-              onChange={(e) => {
-                setNote(e.target.value);
-                setSaveError(null);
-              }}
-              onInput={(e) => {
-                // Native input events (paste, dictation, programmatic
-                // dispatchEvent) may bypass React's synthetic onChange in
-                // some environments. Mirror the DOM value into state so
-                // preview validation and save always see what the grower
-                // visibly typed.
-                const v = (e.currentTarget as HTMLTextAreaElement).value;
-                setNote((prev) => (prev === v ? prev : v));
-              }}
-              onCompositionEnd={(e) => {
-                // IME / dictation finalization: commit the final composed
-                // value into React state so validation clears immediately.
-                const v = (e.currentTarget as HTMLTextAreaElement).value;
-                setNote((prev) => (prev === v ? prev : v));
-              }}
-              onBlur={(e) => {
-                // Last-chance sync before the grower taps Save.
-                const v = e.currentTarget.value;
-                setNote((prev) => (prev === v ? prev : v));
-              }}
-              placeholder="Watered, looking healthy, slight yellowing on a fan leaf…"
-              rows={3}
-              aria-label="Quick log observation note"
-              autoComplete="off"
-              autoCorrect="off"
-              autoCapitalize="sentences"
-              spellCheck={true}
-            />
-          </section>
-
-          {selectedPhenoHuntId && eventType === "observation" && (
-            <PhenoEvidenceQuickLogPanel
-              status={
-                phenoEvidenceContext.status === "ready"
-                  ? "ready"
-                  : phenoEvidenceContext.status === "error"
-                    ? "error"
-                    : "loading"
-              }
-              context={phenoEvidenceContext.context}
-              candidateLabel={
-                typeof (selectedPlant as { candidate_label?: unknown } | null)?.candidate_label ===
-                "string"
-                  ? (selectedPlant as { candidate_label: string }).candidate_label || null
-                  : null
-              }
-              selectedGoal={selectedPhenoEvidenceGoal}
-              onSelectedGoalChange={setSelectedPhenoEvidenceGoal}
-            />
-          )}
-
-          {(() => {
-            const visibility = evaluateEarlyStageVisibility({
-              stage,
-              plantCreatedAt:
-                (selectedPlant as { created_at?: string | null } | null)?.created_at ?? null,
-            });
-            if (visibility === "hidden" && !earlyManuallyOpen) return null;
-            const isCollapsed = visibility === "suggested" && !earlyManuallyOpen;
-            return (
-              <section
-                data-testid="quick-log-early-stage-section"
-                data-visibility={visibility}
-                aria-label="Early-stage milestone (germination/seedling)"
-                className="rounded-xl border border-border/60 bg-secondary/20 p-3 space-y-2"
+              <div
+                data-testid="quick-log-snapshot-manual-truth"
+                className="rounded-lg border border-border/50 bg-background/40 p-2 text-[11px] leading-snug space-y-0.5"
               >
-                <div className="flex items-center justify-between gap-2">
-                  <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                    Early stage · germination / seedling
-                  </h3>
-                  {visibility !== "visible" && (
-                    <button
-                      type="button"
-                      data-testid="quick-log-early-stage-toggle"
-                      onClick={() => setEarlyManuallyOpen((v) => !v)}
-                      className="text-[11px] underline text-muted-foreground"
+                <p className="font-medium text-foreground">{MANUAL_SENSOR_TRUTH_TITLE}</p>
+                <ul className="text-muted-foreground space-y-0.5">
+                  {MANUAL_SENSOR_TRUTH_LINES.map((line) => (
+                    <li key={line} data-testid="quick-log-snapshot-manual-truth-line">
+                      {line}
+                    </li>
+                  ))}
+                  {(!snapshot || !snapshotUsable) && (
+                    <li
+                      data-testid="quick-log-snapshot-manual-truth-missing"
+                      className="text-muted-foreground"
                     >
-                      {isCollapsed ? "Open" : "Hide"}
-                    </button>
+                      {MANUAL_SENSOR_TRUTH_MISSING_READINGS_LINE}
+                    </li>
                   )}
-                </div>
-                {!isCollapsed && (
-                  <>
-                    <div
-                      data-testid="quick-log-early-stage-milestone-chips"
-                      role="radiogroup"
-                      aria-label="Early-stage milestone"
-                      className="flex flex-wrap gap-1.5"
-                    >
-                      {EARLY_STAGE_MILESTONES.map((m) => {
-                        const selected = earlyMilestone === m.value;
-                        return (
-                          <button
-                            key={m.value}
-                            type="button"
-                            role="radio"
-                            aria-checked={selected}
-                            data-testid={`quick-log-early-stage-milestone-${m.value}`}
-                            onClick={() => setEarlyMilestone(selected ? null : m.value)}
-                            className={`rounded-full border px-2.5 py-1 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                              selected
-                                ? "border-primary bg-primary/15 text-foreground"
-                                : "border-border/60 bg-secondary/30 text-foreground hover:bg-secondary/60"
-                            }`}
-                          >
-                            {m.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    <div
-                      data-testid="quick-log-early-stage-vigor-chips"
-                      role="radiogroup"
-                      aria-label="Plant vigor"
-                      className="flex flex-wrap gap-1.5"
-                    >
-                      {EARLY_STAGE_VIGOR_OPTIONS.map((v) => {
-                        const selected = earlyVigor === v.value;
-                        return (
-                          <button
-                            key={v.value}
-                            type="button"
-                            role="radio"
-                            aria-checked={selected}
-                            data-testid={`quick-log-early-stage-vigor-${v.value}`}
-                            onClick={() => setEarlyVigor(selected ? null : v.value)}
-                            className={`rounded-full border px-2.5 py-1 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                              selected
-                                ? "border-primary bg-primary/15 text-foreground"
-                                : "border-border/60 bg-secondary/30 text-foreground hover:bg-secondary/60"
-                            }`}
-                          >
-                            Vigor: {v.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    <div>
-                      <Label htmlFor="quick-log-early-stage-notes" className="text-xs">
-                        {EARLY_STAGE_NOTE_PLACEHOLDER}
-                      </Label>
-                      <Input
-                        id="quick-log-early-stage-notes"
-                        data-testid="quick-log-early-stage-notes"
-                        value={earlyNotes}
-                        onChange={(e) => setEarlyNotes(e.target.value)}
-                        placeholder="Optional — short observation"
-                        autoComplete="off"
-                      />
-                    </div>
-                    <p
-                      data-testid="quick-log-early-stage-photo-hint"
-                      className="text-[11px] text-muted-foreground"
-                    >
-                      {EARLY_STAGE_PHOTO_HINT}
-                    </p>
-                  </>
-                )}
-              </section>
-            );
-          })()}
+                </ul>
+              </div>
 
-          {eventType === "environment" &&
-            (() => {
-              const hasMeasurement = hasAnyEnvironmentCheckMeasurement({
-                roomTempF: envRoomTempF,
-                humidityPct: envHumidityPct,
-                vpdKpa: envVpdKpa,
-                waterTempValue: envWaterTempValue,
-                waterTempUnit: envWaterTempUnit,
-                ecMscm: envEcMscm,
+              {tentSetupRequired ? (
+                <p
+                  data-testid="quick-log-snapshot-tent-required"
+                  className="rounded-lg border border-border/60 bg-secondary/30 p-3 text-[12px] text-muted-foreground"
+                >
+                  Sensor snapshots need a tent first.{" "}
+                  <a href="/tents" className="underline text-primary">
+                    Create your first tent
+                  </a>{" "}
+                  to attach environment context to logs.
+                </p>
+              ) : (
+                <>
+                  <label
+                    ref={attachWrapperRef}
+                    tabIndex={-1}
+                    data-testid="quick-log-snapshot-attach-section"
+                    className={`flex items-center justify-between gap-2 rounded-lg border p-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${attachDisabled ? "border-border/40 opacity-60" : "border-border/60"}`}
+                  >
+                    <span className="text-sm">Attach sensor snapshot</span>
+                    <Switch
+                      data-testid="quick-log-snapshot-toggle"
+                      data-snapshot-status={stripView.status}
+                      checked={snapshot && !!selectedPlant && snapshotUsable}
+                      onCheckedChange={(v) => {
+                        if (isMainDraftMutationLocked()) return;
+                        snapshotUserTouchedRef.current = true;
+                        setSnapshot(v);
+                      }}
+                      disabled={attachDisabled}
+                      aria-label="Attach sensor snapshot to this log"
+                      aria-describedby="quick-log-snapshot-session-helper"
+                    />
+                  </label>
+                  <p
+                    id="quick-log-snapshot-session-helper"
+                    data-testid="quick-log-snapshot-session-helper"
+                    className="text-[11px] text-muted-foreground"
+                  >
+                    {selectedPlant && !snapshotUsable && stripView.status !== "no_data" ? (
+                      <span data-testid="quick-log-snapshot-stale-helper">
+                        {buildStaleSnapshotHelperCopy(stripView.capturedAt)}
+                      </span>
+                    ) : (
+                      "Applies to this log only. Closing Quick Log resets this choice."
+                    )}
+                  </p>
+                </>
+              )}
+            </section>
+
+            {!tentSetupRequired && (
+              <QuickLogSensorSnapshotStrip
+                growId={resolvedTarget?.growId ?? null}
+                tentId={resolvedTarget?.tentId ?? null}
+                attached={snapshot && !!resolvedTarget}
+              />
+            )}
+
+            <section className="space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <EventTypeSelector
+                  id="quick-log-event-type"
+                  value={displayedEventType}
+                  onValueChange={handleEventTypeChange}
+                  disabled={saveLocked}
+                />
+                <div>
+                  <Label className="text-xs">Stage</Label>
+                  <Select
+                    value={displayedStage}
+                    disabled={saveLocked}
+                    onValueChange={(v) => {
+                      if (isMainDraftMutationLocked()) return;
+                      stageUserTouchedRef.current = true;
+                      setStage(v);
+                    }}
+                  >
+                    <SelectTrigger data-testid="quick-log-stage-select">
+                      <SelectValue placeholder="Select stage" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {STAGES.map((s) => (
+                        <SelectItem key={s.value} value={s.value}>
+                          {s.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <h3
+                data-testid="quick-log-section-observation"
+                className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
+              >
+                What happened?
+              </h3>
+              <div
+                data-testid="quick-log-prompt-chips"
+                role="group"
+                aria-label="Quick observation prompts"
+                className="flex flex-wrap gap-1.5"
+              >
+                {QUICK_OBSERVATION_CHIPS.map((chip) => (
+                  <button
+                    key={chip.label}
+                    type="button"
+                    data-testid={`quick-log-chip-${chip.label.toLowerCase().replace(/\s+/g, "-")}`}
+                    aria-label={`Insert observation: ${chip.label}`}
+                    onClick={() => {
+                      if (isMainDraftMutationLocked()) return;
+                      setNote((previous) => appendQuickLogObservation(previous, chip.text));
+                      setSaveError(null);
+                    }}
+                    className="rounded-full border border-border/60 bg-secondary/30 px-2.5 py-1 text-[11px] text-foreground hover:bg-secondary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    {chip.label}
+                  </button>
+                ))}
+              </div>
+              <div className="space-y-1.5">
+                <div>
+                  <p className="text-xs font-medium text-foreground">How did the plant respond?</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Use this after a previous change has had time to show up.
+                  </p>
+                </div>
+                <div
+                  data-testid="quick-log-response-chips"
+                  role="group"
+                  aria-label="Plant response check"
+                  className="flex flex-wrap gap-1.5"
+                >
+                  {RESPONSE_CHECK_STATUSES.map((status) => (
+                    <button
+                      key={status}
+                      type="button"
+                      data-testid={`quick-log-chip-${status.toLowerCase()}`}
+                      aria-label={`Response check: ${status}`}
+                      aria-pressed={selectedResponseStatus === status}
+                      onClick={() => handleResponseCheck(status)}
+                      className={`rounded-full border px-2.5 py-1 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                        selectedResponseStatus === status
+                          ? "border-primary/70 bg-primary/10 text-primary"
+                          : "border-border/60 bg-secondary/30 text-foreground hover:bg-secondary/60"
+                      }`}
+                    >
+                      {status}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Better, Same, or Worse records the plant response—not the grow action.
+                </p>
+              </div>
+              <Label htmlFor="quicklog-note-textarea">Short note</Label>
+              <Textarea
+                id="quicklog-note-textarea"
+                ref={noteRef}
+                data-testid="quicklog-note"
+                value={note}
+                onChange={(e) => {
+                  if (restoreLockedDraftValue(e.currentTarget, note)) return;
+                  setNote(e.target.value);
+                  setSaveError(null);
+                }}
+                onInput={(e) => {
+                  if (restoreLockedDraftValue(e.currentTarget, note)) return;
+                  // Native input events (paste, dictation, programmatic
+                  // dispatchEvent) may bypass React's synthetic onChange in
+                  // some environments. Mirror the DOM value into state so
+                  // preview validation and save always see what the grower
+                  // visibly typed.
+                  const v = (e.currentTarget as HTMLTextAreaElement).value;
+                  setNote((prev) => (prev === v ? prev : v));
+                }}
+                onCompositionEnd={(e) => {
+                  if (restoreLockedDraftValue(e.currentTarget, note)) return;
+                  // IME / dictation finalization: commit the final composed
+                  // value into React state so validation clears immediately.
+                  const v = (e.currentTarget as HTMLTextAreaElement).value;
+                  setNote((prev) => (prev === v ? prev : v));
+                }}
+                onBlur={(e) => {
+                  if (restoreLockedDraftValue(e.currentTarget, note)) return;
+                  // Last-chance sync before the grower taps Save.
+                  const v = e.currentTarget.value;
+                  setNote((prev) => (prev === v ? prev : v));
+                }}
+                placeholder="Watered, looking healthy, slight yellowing on a fan leaf…"
+                rows={3}
+                aria-label="Quick log observation note"
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="sentences"
+                spellCheck={true}
+              />
+            </section>
+
+            {selectedPhenoHuntId && eventType === "observation" && (
+              <PhenoEvidenceQuickLogPanel
+                status={
+                  phenoEvidenceContext.status === "ready"
+                    ? "ready"
+                    : phenoEvidenceContext.status === "error"
+                      ? "error"
+                      : "loading"
+                }
+                context={phenoEvidenceContext.context}
+                candidateLabel={
+                  typeof (selectedPlant as { candidate_label?: unknown } | null)
+                    ?.candidate_label === "string"
+                    ? (selectedPlant as { candidate_label: string }).candidate_label || null
+                    : null
+                }
+                selectedGoal={selectedPhenoEvidenceGoal}
+                onSelectedGoalChange={(goal) => {
+                  if (isMainDraftMutationLocked()) return;
+                  setSelectedPhenoEvidenceGoal(goal);
+                }}
+              />
+            )}
+
+            {(() => {
+              const visibility = evaluateEarlyStageVisibility({
+                stage,
+                plantCreatedAt:
+                  (selectedPlant as { created_at?: string | null } | null)?.created_at ?? null,
               });
-              const previewTempC = resolvePreviewWaterTempC({
-                waterTempValue: envWaterTempValue,
-                waterTempUnit: envWaterTempUnit,
-              });
-              const ecPreview = buildEcCompensationPreview({
-                ec: envEcMscm,
-                ecUnit: "mS/cm",
-                waterTempC: previewTempC,
-                sourceLabel: "manual",
-              });
-              const sensorContext = buildEnvironmentCheckSensorContext({
-                tentId: sensorTentId,
-                plantId: selectedPlant?.id ?? null,
-                sourceLabel: "manual",
-                hasMeasurements: hasMeasurement,
-              });
-              const ctxTone =
-                sensorContext.status === "valid"
-                  ? "border-emerald-500/40 bg-emerald-500/10"
-                  : sensorContext.status === "blocked"
-                    ? "border-destructive/40 bg-destructive/10"
-                    : sensorContext.status === "warning"
-                      ? "border-amber-500/40 bg-amber-500/10"
-                      : "border-border/60 bg-secondary/30";
+              if (visibility === "hidden" && !earlyManuallyOpen) return null;
+              const isCollapsed = visibility === "suggested" && !earlyManuallyOpen;
               return (
                 <section
-                  data-testid="quick-log-environment-check-section"
-                  aria-label={ENVIRONMENT_CHECK_SECTION_TITLE}
+                  data-testid="quick-log-early-stage-section"
+                  data-visibility={visibility}
+                  aria-label="Early-stage milestone (germination/seedling)"
                   className="rounded-xl border border-border/60 bg-secondary/20 p-3 space-y-2"
                 >
-                  <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                    {ENVIRONMENT_CHECK_SECTION_TITLE}
-                  </h3>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <Label className="text-xs" htmlFor="quick-log-env-room-temp-f">
-                        Room temperature (°F)
-                      </Label>
-                      <Input
-                        id="quick-log-env-room-temp-f"
-                        data-testid="quick-log-env-room-temp-f"
-                        inputMode="decimal"
-                        value={envRoomTempF}
-                        onChange={(e) => setEnvRoomTempF(e.target.value)}
-                        placeholder="76"
-                        autoComplete="off"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-xs" htmlFor="quick-log-env-humidity">
-                        Humidity (%)
-                      </Label>
-                      <Input
-                        id="quick-log-env-humidity"
-                        data-testid="quick-log-env-humidity"
-                        inputMode="decimal"
-                        value={envHumidityPct}
-                        onChange={(e) => setEnvHumidityPct(e.target.value)}
-                        placeholder="55"
-                        autoComplete="off"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-xs" htmlFor="quick-log-env-vpd">
-                        VPD (kPa)
-                      </Label>
-                      <Input
-                        id="quick-log-env-vpd"
-                        data-testid="quick-log-env-vpd"
-                        inputMode="decimal"
-                        value={envVpdKpa}
-                        onChange={(e) => setEnvVpdKpa(e.target.value)}
-                        placeholder="1.1"
-                        autoComplete="off"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-xs" htmlFor="quick-log-env-ec">
-                        EC (mS/cm)
-                      </Label>
-                      <Input
-                        id="quick-log-env-ec"
-                        data-testid="quick-log-env-ec"
-                        inputMode="decimal"
-                        value={envEcMscm}
-                        onChange={(e) => setEnvEcMscm(e.target.value)}
-                        placeholder="1.4"
-                        autoComplete="off"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-xs" htmlFor="quick-log-env-water-temp">
-                        Water/root-zone temperature
-                      </Label>
-                      <Input
-                        id="quick-log-env-water-temp"
-                        data-testid="quick-log-env-water-temp"
-                        inputMode="decimal"
-                        value={envWaterTempValue}
-                        onChange={(e) => setEnvWaterTempValue(e.target.value)}
-                        placeholder={envWaterTempUnit === "F" ? "68" : "20"}
-                        autoComplete="off"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-xs">Water temp unit</Label>
-                      <Select
-                        value={envWaterTempUnit}
-                        onValueChange={(v) =>
-                          setEnvWaterTempUnit(v as EnvironmentCheckWaterTempUnit)
-                        }
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Early stage · germination / seedling
+                    </h3>
+                    {visibility !== "visible" && (
+                      <button
+                        type="button"
+                        data-testid="quick-log-early-stage-toggle"
+                        onClick={() => {
+                          if (isMainDraftMutationLocked()) return;
+                          setEarlyManuallyOpen((v) => !v);
+                        }}
+                        className="text-[11px] underline text-muted-foreground"
                       >
-                        <SelectTrigger data-testid="quick-log-env-water-temp-unit">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="F">°F</SelectItem>
-                          <SelectItem value="C">°C</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                        {isCollapsed ? "Open" : "Hide"}
+                      </button>
+                    )}
                   </div>
-                  {!hasMeasurement && (
-                    <p
-                      data-testid="quick-log-env-helper"
-                      className="text-[11px] text-muted-foreground"
-                    >
-                      {ENVIRONMENT_CHECK_HELPER_COPY}
-                    </p>
-                  )}
-                  {sensorContext.status !== "not_applicable" && (
-                    <div
-                      data-testid="quick-log-env-sensor-context"
-                      data-status={sensorContext.status}
-                      data-reason={sensorContext.reasonCode}
-                      className={`rounded-lg border p-2.5 space-y-0.5 ${ctxTone}`}
-                    >
-                      <p className="text-[11px] font-semibold uppercase tracking-wide text-foreground">
-                        {sensorContext.title}
-                      </p>
-                      <p className="text-[11px] text-muted-foreground">{sensorContext.message}</p>
+                  {!isCollapsed && (
+                    <>
+                      <div
+                        data-testid="quick-log-early-stage-milestone-chips"
+                        role="radiogroup"
+                        aria-label="Early-stage milestone"
+                        className="flex flex-wrap gap-1.5"
+                      >
+                        {EARLY_STAGE_MILESTONES.map((m) => {
+                          const selected = earlyMilestone === m.value;
+                          return (
+                            <button
+                              key={m.value}
+                              type="button"
+                              role="radio"
+                              aria-checked={selected}
+                              data-testid={`quick-log-early-stage-milestone-${m.value}`}
+                              onClick={() => {
+                                if (isMainDraftMutationLocked()) return;
+                                setEarlyMilestone(selected ? null : m.value);
+                              }}
+                              className={`rounded-full border px-2.5 py-1 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                                selected
+                                  ? "border-primary bg-primary/15 text-foreground"
+                                  : "border-border/60 bg-secondary/30 text-foreground hover:bg-secondary/60"
+                              }`}
+                            >
+                              {m.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div
+                        data-testid="quick-log-early-stage-vigor-chips"
+                        role="radiogroup"
+                        aria-label="Plant vigor"
+                        className="flex flex-wrap gap-1.5"
+                      >
+                        {EARLY_STAGE_VIGOR_OPTIONS.map((v) => {
+                          const selected = earlyVigor === v.value;
+                          return (
+                            <button
+                              key={v.value}
+                              type="button"
+                              role="radio"
+                              aria-checked={selected}
+                              data-testid={`quick-log-early-stage-vigor-${v.value}`}
+                              onClick={() => {
+                                if (isMainDraftMutationLocked()) return;
+                                setEarlyVigor(selected ? null : v.value);
+                              }}
+                              className={`rounded-full border px-2.5 py-1 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                                selected
+                                  ? "border-primary bg-primary/15 text-foreground"
+                                  : "border-border/60 bg-secondary/30 text-foreground hover:bg-secondary/60"
+                              }`}
+                            >
+                              Vigor: {v.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div>
+                        <Label htmlFor="quick-log-early-stage-notes" className="text-xs">
+                          {EARLY_STAGE_NOTE_PLACEHOLDER}
+                        </Label>
+                        <Input
+                          id="quick-log-early-stage-notes"
+                          data-testid="quick-log-early-stage-notes"
+                          value={earlyNotes}
+                          onChange={(e) => {
+                            if (restoreLockedDraftValue(e.currentTarget, earlyNotes)) return;
+                            setEarlyNotes(e.target.value);
+                          }}
+                          placeholder="Optional — short observation"
+                          autoComplete="off"
+                        />
+                      </div>
                       <p
-                        data-testid="quick-log-env-sensor-context-source"
+                        data-testid="quick-log-early-stage-photo-hint"
                         className="text-[11px] text-muted-foreground"
                       >
-                        Source: {sensorContext.sourceLabel}
+                        {EARLY_STAGE_PHOTO_HINT}
                       </p>
-                    </div>
+                    </>
                   )}
-                  {ecPreview.visible && (
-                    <div
-                      data-testid="quick-log-env-ec-preview"
-                      data-tone={ecPreview.tone}
-                      className="rounded-lg border border-border/60 bg-secondary/30 p-2.5 space-y-0.5"
-                    >
-                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                        {ecPreview.label}
-                      </p>
-                      <p className="text-sm font-medium text-foreground">
-                        {ecPreview.valueDisplay}
-                      </p>
-                      <p className="text-[11px] text-muted-foreground">
-                        {EC_COMPENSATION_PREVIEW_DISCLAIMER}
-                      </p>
-                    </div>
-                  )}
-                  {hasMeasurement &&
-                    (() => {
-                      const normPreviewVm = buildSensorNormalizationPreviewViewModel({
-                        payload: {
-                          temperature_f: envRoomTempF || undefined,
-                          humidity_pct: envHumidityPct || undefined,
-                          vpd_kpa: envVpdKpa || undefined,
-                          soil_ec_ms_cm: envEcMscm || undefined,
-                          [envWaterTempUnit === "C" ? "soil_temperature_c" : "soil_temperature_f"]:
-                            envWaterTempValue || undefined,
-                        },
-                        options: {
-                          source: "manual",
-                          sourceIdentity: "manual_entry",
-                          transport: "manual",
-                          tentId: sensorTentId,
-                          plantId: selectedPlant?.id ?? null,
-                          capturedAt: new Date().toISOString(),
-                        },
-                      });
-                      return (
-                        <div data-testid="quick-log-env-normalization-preview-slot">
-                          <SensorNormalizationPreviewPanel
-                            viewModel={normPreviewVm}
-                            variant="compact"
-                            title="Sensor normalization preview"
-                          />
-                        </div>
-                      );
-                    })()}
                 </section>
               );
             })()}
 
-          {eventType === "reminder" && (
-            <div>
-              <Label className="text-xs">Remind me at</Label>
-              <Input
-                type="datetime-local"
-                value={remindAt}
-                onChange={(e) => setRemindAt(e.target.value)}
-              />
-            </div>
-          )}
-
-          <h3
-            data-testid="quick-log-section-optional"
-            className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
-          >
-            Optional details
-          </h3>
-          <label className="flex items-center justify-between gap-2 rounded-lg border border-border/60 p-3">
-            <span className="text-sm">Add more details</span>
-            <Switch checked={showMore} onCheckedChange={setShowMore} />
-          </label>
-
-          {showMore && (
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <Label className="text-xs">EC value</Label>
-                <Input
-                  inputMode="decimal"
-                  value={details.ec}
-                  onChange={(e) => setDetails({ ...details, ec: e.target.value })}
-                  placeholder="1.4"
-                  data-testid="quicklog-details-ec-value"
-                />
-              </div>
-              <div>
-                <Label className="text-xs">EC unit</Label>
-                <Select
-                  value={details.ecUnit}
-                  onValueChange={(v) => setDetails({ ...details, ecUnit: v as EcUnit })}
-                >
-                  <SelectTrigger data-testid="quicklog-details-ec-unit">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {EC_UNITS.map((u) => (
-                      <SelectItem key={u} value={u}>
-                        {EC_UNIT_LABEL[u]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-xs" htmlFor="quicklog-watering-ml">
-                  Watering (ml)
-                  {eventType === "watering" ? (
-                    <span aria-hidden="true" className="text-destructive">
-                      {" "}
-                      *
-                    </span>
-                  ) : null}
-                </Label>
-                <Input
-                  id="quicklog-watering-ml"
-                  ref={wateringInputRef}
-                  data-testid="quicklog-watering-ml"
-                  inputMode="decimal"
-                  value={details.watering}
-                  onChange={(e) => setDetails({ ...details, watering: e.target.value })}
-                  required={eventType === "watering"}
-                  aria-required={eventType === "watering"}
-                  aria-invalid={!!wateringError}
-                  aria-describedby={wateringError ? "quicklog-watering-error" : undefined}
-                />
-                {wateringError && (
-                  <p
-                    id="quicklog-watering-error"
-                    role="alert"
-                    data-testid="quicklog-watering-error"
-                    className="text-[11px] text-destructive mt-1"
+            {eventType === "environment" &&
+              (() => {
+                const hasMeasurement = hasAnyEnvironmentCheckMeasurement({
+                  roomTempF: envRoomTempF,
+                  humidityPct: envHumidityPct,
+                  vpdKpa: envVpdKpa,
+                  waterTempValue: envWaterTempValue,
+                  waterTempUnit: envWaterTempUnit,
+                  ecMscm: envEcMscm,
+                });
+                const previewTempC = resolvePreviewWaterTempC({
+                  waterTempValue: envWaterTempValue,
+                  waterTempUnit: envWaterTempUnit,
+                });
+                const ecPreview = buildEcCompensationPreview({
+                  ec: envEcMscm,
+                  ecUnit: "mS/cm",
+                  waterTempC: previewTempC,
+                  sourceLabel: "manual",
+                });
+                const sensorContext = buildEnvironmentCheckSensorContext({
+                  tentId: sensorTentId,
+                  plantId: selectedPlant?.id ?? null,
+                  sourceLabel: "manual",
+                  hasMeasurements: hasMeasurement,
+                });
+                const ctxTone =
+                  sensorContext.status === "valid"
+                    ? "border-emerald-500/40 bg-emerald-500/10"
+                    : sensorContext.status === "blocked"
+                      ? "border-destructive/40 bg-destructive/10"
+                      : sensorContext.status === "warning"
+                        ? "border-amber-500/40 bg-amber-500/10"
+                        : "border-border/60 bg-secondary/30";
+                return (
+                  <section
+                    data-testid="quick-log-environment-check-section"
+                    aria-label={ENVIRONMENT_CHECK_SECTION_TITLE}
+                    className="rounded-xl border border-border/60 bg-secondary/20 p-3 space-y-2"
                   >
-                    {wateringError}
-                  </p>
-                )}
-              </div>
-              <div className="col-span-2">
-                <Label className="text-xs">Nutrients</Label>
-                <Input
-                  value={details.nutrients}
-                  onChange={(e) => setDetails({ ...details, nutrients: e.target.value })}
-                  autoComplete="off"
-                  autoCorrect="off"
-                  autoCapitalize="off"
-                  spellCheck={false}
-                />
-              </div>
-              <div className="col-span-2">
-                <Label className="text-xs">Training / actions</Label>
-                <Input
-                  value={details.training}
-                  onChange={(e) => setDetails({ ...details, training: e.target.value })}
-                  placeholder="LST, defoliation…"
-                  autoComplete="off"
-                  autoCorrect="off"
-                  autoCapitalize="off"
-                  spellCheck={false}
-                />
-              </div>
-            </div>
-          )}
+                    <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      {ENVIRONMENT_CHECK_SECTION_TITLE}
+                    </h3>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label className="text-xs" htmlFor="quick-log-env-room-temp-f">
+                          Room temperature (°F)
+                        </Label>
+                        <Input
+                          id="quick-log-env-room-temp-f"
+                          data-testid="quick-log-env-room-temp-f"
+                          inputMode="decimal"
+                          value={envRoomTempF}
+                          onChange={(e) => {
+                            if (restoreLockedDraftValue(e.currentTarget, envRoomTempF)) return;
+                            setEnvRoomTempF(e.target.value);
+                          }}
+                          placeholder="76"
+                          autoComplete="off"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs" htmlFor="quick-log-env-humidity">
+                          Humidity (%)
+                        </Label>
+                        <Input
+                          id="quick-log-env-humidity"
+                          data-testid="quick-log-env-humidity"
+                          inputMode="decimal"
+                          value={envHumidityPct}
+                          onChange={(e) => {
+                            if (restoreLockedDraftValue(e.currentTarget, envHumidityPct)) return;
+                            setEnvHumidityPct(e.target.value);
+                          }}
+                          placeholder="55"
+                          autoComplete="off"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs" htmlFor="quick-log-env-vpd">
+                          VPD (kPa)
+                        </Label>
+                        <Input
+                          id="quick-log-env-vpd"
+                          data-testid="quick-log-env-vpd"
+                          inputMode="decimal"
+                          value={envVpdKpa}
+                          onChange={(e) => {
+                            if (restoreLockedDraftValue(e.currentTarget, envVpdKpa)) return;
+                            setEnvVpdKpa(e.target.value);
+                          }}
+                          placeholder="1.1"
+                          autoComplete="off"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs" htmlFor="quick-log-env-ec">
+                          EC (mS/cm)
+                        </Label>
+                        <Input
+                          id="quick-log-env-ec"
+                          data-testid="quick-log-env-ec"
+                          inputMode="decimal"
+                          value={envEcMscm}
+                          onChange={(e) => {
+                            if (restoreLockedDraftValue(e.currentTarget, envEcMscm)) return;
+                            setEnvEcMscm(e.target.value);
+                          }}
+                          placeholder="1.4"
+                          autoComplete="off"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs" htmlFor="quick-log-env-water-temp">
+                          Water/root-zone temperature
+                        </Label>
+                        <Input
+                          id="quick-log-env-water-temp"
+                          data-testid="quick-log-env-water-temp"
+                          inputMode="decimal"
+                          value={envWaterTempValue}
+                          onChange={(e) => {
+                            if (restoreLockedDraftValue(e.currentTarget, envWaterTempValue)) return;
+                            setEnvWaterTempValue(e.target.value);
+                          }}
+                          placeholder={envWaterTempUnit === "F" ? "68" : "20"}
+                          autoComplete="off"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Water temp unit</Label>
+                        <Select
+                          value={envWaterTempUnit}
+                          onValueChange={(v) => {
+                            if (isMainDraftMutationLocked()) return;
+                            setEnvWaterTempUnit(v as EnvironmentCheckWaterTempUnit);
+                          }}
+                        >
+                          <SelectTrigger data-testid="quick-log-env-water-temp-unit">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="F">°F</SelectItem>
+                            <SelectItem value="C">°C</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    {!hasMeasurement && (
+                      <p
+                        data-testid="quick-log-env-helper"
+                        className="text-[11px] text-muted-foreground"
+                      >
+                        {ENVIRONMENT_CHECK_HELPER_COPY}
+                      </p>
+                    )}
+                    {sensorContext.status !== "not_applicable" && (
+                      <div
+                        data-testid="quick-log-env-sensor-context"
+                        data-status={sensorContext.status}
+                        data-reason={sensorContext.reasonCode}
+                        className={`rounded-lg border p-2.5 space-y-0.5 ${ctxTone}`}
+                      >
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-foreground">
+                          {sensorContext.title}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">{sensorContext.message}</p>
+                        <p
+                          data-testid="quick-log-env-sensor-context-source"
+                          className="text-[11px] text-muted-foreground"
+                        >
+                          Source: {sensorContext.sourceLabel}
+                        </p>
+                      </div>
+                    )}
+                    {ecPreview.visible && (
+                      <div
+                        data-testid="quick-log-env-ec-preview"
+                        data-tone={ecPreview.tone}
+                        className="rounded-lg border border-border/60 bg-secondary/30 p-2.5 space-y-0.5"
+                      >
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                          {ecPreview.label}
+                        </p>
+                        <p className="text-sm font-medium text-foreground">
+                          {ecPreview.valueDisplay}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {EC_COMPENSATION_PREVIEW_DISCLAIMER}
+                        </p>
+                      </div>
+                    )}
+                    {hasMeasurement &&
+                      (() => {
+                        const normPreviewVm = buildSensorNormalizationPreviewViewModel({
+                          payload: {
+                            temperature_f: envRoomTempF || undefined,
+                            humidity_pct: envHumidityPct || undefined,
+                            vpd_kpa: envVpdKpa || undefined,
+                            soil_ec_ms_cm: envEcMscm || undefined,
+                            [envWaterTempUnit === "C"
+                              ? "soil_temperature_c"
+                              : "soil_temperature_f"]: envWaterTempValue || undefined,
+                          },
+                          options: {
+                            source: "manual",
+                            sourceIdentity: "manual_entry",
+                            transport: "manual",
+                            tentId: sensorTentId,
+                            plantId: selectedPlant?.id ?? null,
+                            capturedAt: new Date().toISOString(),
+                          },
+                        });
+                        return (
+                          <div data-testid="quick-log-env-normalization-preview-slot">
+                            <SensorNormalizationPreviewPanel
+                              viewModel={normPreviewVm}
+                              variant="compact"
+                              title="Sensor normalization preview"
+                            />
+                          </div>
+                        );
+                      })()}
+                  </section>
+                );
+              })()}
 
-          <section
-            data-testid="quicklog-hardware-readings"
-            data-has-readings={String(hasAnyHardwareReading(hardware))}
-            data-open={String(hardwareOpen)}
-            className="rounded-lg border border-border/60 p-3 space-y-2"
-          >
-            <button
-              type="button"
-              data-testid="quicklog-hardware-toggle"
-              aria-expanded={hardwareOpen}
-              aria-controls="quicklog-hardware-body"
-              onClick={() => {
-                hardwareUserTouchedRef.current = true;
-                setHardwareOpen((v) => !v);
-              }}
-              className="flex w-full items-center justify-between gap-2 text-left"
+            {eventType === "reminder" && (
+              <div>
+                <Label className="text-xs">Remind me at</Label>
+                <Input
+                  type="datetime-local"
+                  value={remindAt}
+                  onChange={(e) => {
+                    if (restoreLockedDraftValue(e.currentTarget, remindAt)) return;
+                    setRemindAt(e.target.value);
+                  }}
+                />
+              </div>
+            )}
+
+            <h3
+              data-testid="quick-log-section-optional"
+              className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
             >
-              <span className="text-sm font-medium">
-                Hardware readings
-                <span
-                  data-testid="quicklog-hardware-manual-subtitle"
-                  className="ml-2 text-[10px] font-normal uppercase tracking-wide text-muted-foreground"
-                >
-                  Manual readings · handheld only, not telemetry
-                </span>
-              </span>
-              <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                {hardwareOpen ? "Optional" : "Tap to add"}
-              </span>
-            </button>
-            {hardwareOpen && (
-              <div id="quicklog-hardware-body" className="space-y-2">
-                <p
-                  data-testid="quicklog-hardware-helper"
-                  className="text-[11px] text-muted-foreground leading-snug"
-                >
-                  Manual handheld readings — not live sensor data. EC fields are EC mS/cm only. Use
-                  the optional EC value above to record other scales.
-                </p>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <Label className="text-xs">Feed/Input pH</Label>
-                    <Input
-                      inputMode="decimal"
-                      value={hardware.inputPh ?? ""}
-                      onChange={(e) => setHardware({ ...hardware, inputPh: e.target.value })}
-                      placeholder="6.2"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Feed/Input EC mS/cm</Label>
-                    <Input
-                      inputMode="decimal"
-                      value={hardware.inputEc ?? ""}
-                      onChange={(e) => setHardware({ ...hardware, inputEc: e.target.value })}
-                      placeholder="1.4"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Runoff pH</Label>
-                    <Input
-                      inputMode="decimal"
-                      value={hardware.runoffPh ?? ""}
-                      onChange={(e) => setHardware({ ...hardware, runoffPh: e.target.value })}
-                      placeholder="6.0"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Runoff EC mS/cm</Label>
-                    <Input
-                      inputMode="decimal"
-                      value={hardware.runoffEc ?? ""}
-                      onChange={(e) => setHardware({ ...hardware, runoffEc: e.target.value })}
-                      placeholder="1.6"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs">PPFD canopy (µmol)</Label>
-                    <Input
-                      inputMode="decimal"
-                      value={hardware.ppfdCanopy ?? ""}
-                      onChange={(e) => setHardware({ ...hardware, ppfdCanopy: e.target.value })}
-                      placeholder="650"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Light distance (cm)</Label>
-                    <Input
-                      inputMode="decimal"
-                      value={hardware.lightDistance ?? ""}
-                      onChange={(e) => setHardware({ ...hardware, lightDistance: e.target.value })}
-                      placeholder="45"
-                    />
-                  </div>
+              Optional details
+            </h3>
+            <label className="flex items-center justify-between gap-2 rounded-lg border border-border/60 p-3">
+              <span className="text-sm">Add more details</span>
+              <Switch
+                checked={showMore}
+                onCheckedChange={(checked) => {
+                  if (isMainDraftMutationLocked()) return;
+                  setShowMore(checked);
+                }}
+              />
+            </label>
+
+            {showMore && (
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-xs">EC value</Label>
+                  <Input
+                    inputMode="decimal"
+                    value={details.ec}
+                    onChange={(e) => {
+                      if (restoreLockedDraftValue(e.currentTarget, details.ec)) return;
+                      setDetails({ ...details, ec: e.target.value });
+                    }}
+                    placeholder="1.4"
+                    data-testid="quicklog-details-ec-value"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">EC unit</Label>
+                  <Select
+                    value={details.ecUnit}
+                    onValueChange={(v) => {
+                      if (isMainDraftMutationLocked()) return;
+                      setDetails({ ...details, ecUnit: v as EcUnit });
+                    }}
+                  >
+                    <SelectTrigger data-testid="quicklog-details-ec-unit">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {EC_UNITS.map((u) => (
+                        <SelectItem key={u} value={u}>
+                          {EC_UNIT_LABEL[u]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs" htmlFor="quicklog-watering-ml">
+                    Watering (ml)
+                    {eventType === "watering" ? (
+                      <span aria-hidden="true" className="text-destructive">
+                        {" "}
+                        *
+                      </span>
+                    ) : null}
+                  </Label>
+                  <Input
+                    id="quicklog-watering-ml"
+                    ref={wateringInputRef}
+                    data-testid="quicklog-watering-ml"
+                    inputMode="decimal"
+                    value={details.watering}
+                    onChange={(e) => {
+                      if (restoreLockedDraftValue(e.currentTarget, details.watering)) return;
+                      setDetails({ ...details, watering: e.target.value });
+                    }}
+                    required={eventType === "watering"}
+                    aria-required={eventType === "watering"}
+                    aria-invalid={!!wateringError}
+                    aria-describedby={wateringError ? "quicklog-watering-error" : undefined}
+                  />
+                  {wateringError && (
+                    <p
+                      id="quicklog-watering-error"
+                      role="alert"
+                      data-testid="quicklog-watering-error"
+                      className="text-[11px] text-destructive mt-1"
+                    >
+                      {wateringError}
+                    </p>
+                  )}
+                </div>
+                <div className="col-span-2">
+                  <Label className="text-xs">Nutrients</Label>
+                  <Input
+                    value={details.nutrients}
+                    onChange={(e) => {
+                      if (restoreLockedDraftValue(e.currentTarget, details.nutrients)) return;
+                      setDetails({ ...details, nutrients: e.target.value });
+                    }}
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck={false}
+                  />
+                </div>
+                <div className="col-span-2">
+                  <Label className="text-xs">Training / actions</Label>
+                  <Input
+                    value={details.training}
+                    onChange={(e) => {
+                      if (restoreLockedDraftValue(e.currentTarget, details.training)) return;
+                      setDetails({ ...details, training: e.target.value });
+                    }}
+                    placeholder="LST, defoliation…"
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck={false}
+                  />
                 </div>
               </div>
             )}
-          </section>
 
-          {(() => {
-            const preview = evaluateQuickLogPreview({ note, eventType, stage, remindAt, details });
-            if (preview.warnings.length === 0) return null;
-            return (
-              <div
-                data-testid="quicklog-preview"
-                data-has-issues={String(preview.hasIssues)}
-                className="rounded-lg border border-border/60 bg-secondary/30 p-3 space-y-1.5"
+            <section
+              data-testid="quicklog-hardware-readings"
+              data-has-readings={String(hasAnyHardwareReading(hardware))}
+              data-open={String(hardwareOpen)}
+              className="rounded-lg border border-border/60 p-3 space-y-2"
+            >
+              <button
+                type="button"
+                data-testid="quicklog-hardware-toggle"
+                aria-expanded={hardwareOpen}
+                aria-controls="quicklog-hardware-body"
+                onClick={() => {
+                  if (isMainDraftMutationLocked()) return;
+                  hardwareUserTouchedRef.current = true;
+                  setHardwareOpen((v) => !v);
+                }}
+                className="flex w-full items-center justify-between gap-2 text-left"
               >
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                  Validation preview
-                </p>
-                <ul className="space-y-1">
-                  {preview.warnings.map((w) => {
-                    const Icon = w.severity === "warning" ? AlertTriangle : Info;
-                    const tone =
-                      w.severity === "warning" ? "text-amber-300" : "text-muted-foreground";
-                    return (
-                      <li
-                        key={w.code}
-                        data-testid={`quicklog-preview-${w.code}`}
-                        className={`flex items-start gap-1.5 text-[12px] ${tone}`}
-                      >
-                        <Icon className="h-3 w-3 mt-0.5 shrink-0" />
-                        <span>{w.message}</span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            );
-          })()}
-
-          {saveError && (
-            <p
-              data-testid="quick-log-save-error"
-              role="alert"
-              aria-live="assertive"
-              className="rounded-lg border border-destructive/40 bg-destructive/10 p-2.5 text-[12px] text-destructive"
-            >
-              {saveError}
-            </p>
-          )}
-
-          <Button
-            type="submit"
-            disabled={busy || !selectedPlant || !!savedTarget}
-            data-testid="quick-log-save"
-            className="gradient-leaf text-primary-foreground"
-          >
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save log"}
-          </Button>
-          <p
-            data-testid="quick-log-save-helper"
-            className="text-[11px] text-muted-foreground -mt-2"
-          >
-            Failed saves keep your input in place. You can add more detail later from the timeline.
-          </p>
-
-          {savedTarget && (
-            <div
-              data-testid="quick-log-post-save"
-              role="status"
-              aria-live="polite"
-              className="rounded-lg border border-primary/40 bg-primary/5 p-3 flex flex-col gap-2"
-            >
-              <div className="flex items-start gap-2">
-                <CheckCircle2 className="h-4 w-4 text-primary mt-0.5" aria-hidden="true" />
-                <div>
-                  <p
-                    className="text-sm font-semibold text-foreground"
-                    data-testid="quick-log-post-save-title"
+                <span className="text-sm font-medium">
+                  Hardware readings
+                  <span
+                    data-testid="quicklog-hardware-manual-subtitle"
+                    className="ml-2 text-[10px] font-normal uppercase tracking-wide text-muted-foreground"
                   >
-                    {QUICK_LOG_POST_SAVE_TITLE}
+                    Manual readings · handheld only, not telemetry
+                  </span>
+                </span>
+                <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  {hardwareOpen ? "Optional" : "Tap to add"}
+                </span>
+              </button>
+              {hardwareOpen && (
+                <div id="quicklog-hardware-body" className="space-y-2">
+                  <p
+                    data-testid="quicklog-hardware-helper"
+                    className="text-[11px] text-muted-foreground leading-snug"
+                  >
+                    Manual handheld readings — not live sensor data. EC fields are EC mS/cm only.
+                    Use the optional EC value above to record other scales.
                   </p>
-                  <p
-                    className="text-[12px] text-muted-foreground"
-                    data-testid="quick-log-post-save-description"
-                  >
-                    {buildQuickLogPostSaveDescription({
-                      targetName: savedTarget.name,
-                      tentName: savedTarget.tentName ?? null,
-                      growName: savedTarget.growName ?? null,
-                      action: savedVerb(savedTarget.eventType),
-                      photoAttached: false,
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-xs">Feed/Input pH</Label>
+                      <Input
+                        inputMode="decimal"
+                        value={hardware.inputPh ?? ""}
+                        onChange={(e) => {
+                          if (restoreLockedDraftValue(e.currentTarget, hardware.inputPh ?? ""))
+                            return;
+                          setHardware({ ...hardware, inputPh: e.target.value });
+                        }}
+                        placeholder="6.2"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Feed/Input EC mS/cm</Label>
+                      <Input
+                        inputMode="decimal"
+                        value={hardware.inputEc ?? ""}
+                        onChange={(e) => {
+                          if (restoreLockedDraftValue(e.currentTarget, hardware.inputEc ?? ""))
+                            return;
+                          setHardware({ ...hardware, inputEc: e.target.value });
+                        }}
+                        placeholder="1.4"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Runoff pH</Label>
+                      <Input
+                        inputMode="decimal"
+                        value={hardware.runoffPh ?? ""}
+                        onChange={(e) => {
+                          if (restoreLockedDraftValue(e.currentTarget, hardware.runoffPh ?? ""))
+                            return;
+                          setHardware({ ...hardware, runoffPh: e.target.value });
+                        }}
+                        placeholder="6.0"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Runoff EC mS/cm</Label>
+                      <Input
+                        inputMode="decimal"
+                        value={hardware.runoffEc ?? ""}
+                        onChange={(e) => {
+                          if (restoreLockedDraftValue(e.currentTarget, hardware.runoffEc ?? ""))
+                            return;
+                          setHardware({ ...hardware, runoffEc: e.target.value });
+                        }}
+                        placeholder="1.6"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">PPFD canopy (µmol)</Label>
+                      <Input
+                        inputMode="decimal"
+                        value={hardware.ppfdCanopy ?? ""}
+                        onChange={(e) => {
+                          if (restoreLockedDraftValue(e.currentTarget, hardware.ppfdCanopy ?? ""))
+                            return;
+                          setHardware({ ...hardware, ppfdCanopy: e.target.value });
+                        }}
+                        placeholder="650"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Light distance (cm)</Label>
+                      <Input
+                        inputMode="decimal"
+                        value={hardware.lightDistance ?? ""}
+                        onChange={(e) => {
+                          if (
+                            restoreLockedDraftValue(e.currentTarget, hardware.lightDistance ?? "")
+                          )
+                            return;
+                          setHardware({ ...hardware, lightDistance: e.target.value });
+                        }}
+                        placeholder="45"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </section>
+
+            {(() => {
+              const preview = evaluateQuickLogPreview({
+                note,
+                eventType,
+                stage,
+                remindAt,
+                details,
+              });
+              if (preview.warnings.length === 0) return null;
+              return (
+                <div
+                  data-testid="quicklog-preview"
+                  data-has-issues={String(preview.hasIssues)}
+                  className="rounded-lg border border-border/60 bg-secondary/30 p-3 space-y-1.5"
+                >
+                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                    Validation preview
+                  </p>
+                  <ul className="space-y-1">
+                    {preview.warnings.map((w) => {
+                      const Icon = w.severity === "warning" ? AlertTriangle : Info;
+                      const tone =
+                        w.severity === "warning" ? "text-amber-300" : "text-muted-foreground";
+                      return (
+                        <li
+                          key={w.code}
+                          data-testid={`quicklog-preview-${w.code}`}
+                          className={`flex items-start gap-1.5 text-[12px] ${tone}`}
+                        >
+                          <Icon className="h-3 w-3 mt-0.5 shrink-0" />
+                          <span>{w.message}</span>
+                        </li>
+                      );
                     })}
-                  </p>
+                  </ul>
+                </div>
+              );
+            })()}
+
+            {saveError && (
+              <p
+                data-testid="quick-log-save-error"
+                role="alert"
+                aria-live="assertive"
+                className="rounded-lg border border-destructive/40 bg-destructive/10 p-2.5 text-[12px] text-destructive"
+              >
+                {saveError}
+              </p>
+            )}
+
+            <Button
+              type="submit"
+              disabled={saveLocked || !resolvedTarget || !!savedTarget}
+              data-testid="quick-log-save"
+              className="gradient-leaf text-primary-foreground"
+            >
+              {saveLocked ? (
+                <>
+                  <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
+                  <span>Saving…</span>
+                </>
+              ) : (
+                "Save log"
+              )}
+            </Button>
+            <p
+              data-testid="quick-log-save-helper"
+              className="text-[11px] text-muted-foreground -mt-2"
+            >
+              Failed saves keep your input in place. You can add more detail later from the
+              timeline.
+            </p>
+
+            {savedTarget && (
+              <div
+                data-testid="quick-log-post-save"
+                role="status"
+                aria-live="polite"
+                className="rounded-lg border border-primary/40 bg-primary/5 p-3 flex flex-col gap-2"
+              >
+                <div className="flex items-start gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-primary mt-0.5" aria-hidden="true" />
+                  <div>
+                    <p
+                      className="text-sm font-semibold text-foreground"
+                      data-testid="quick-log-post-save-title"
+                    >
+                      {QUICK_LOG_POST_SAVE_TITLE}
+                    </p>
+                    <p
+                      className="text-[12px] text-muted-foreground"
+                      data-testid="quick-log-post-save-description"
+                    >
+                      {buildQuickLogPostSaveDescription({
+                        targetName: savedTarget.name,
+                        tentName: savedTarget.tentName ?? null,
+                        growName: savedTarget.growName ?? null,
+                        action: savedVerb(savedTarget.eventType),
+                        photoAttached: false,
+                      })}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <a
+                    ref={viewPlantBtnRef}
+                    href={plantDetailPath(savedTarget.id)}
+                    data-testid="quick-log-view-target-plant"
+                    data-target-plant-id={savedTarget.id}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-md bg-primary px-3 py-2 text-[13px] font-medium text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    onClick={() => {
+                      if (typeof document !== "undefined") {
+                        (document.activeElement as HTMLElement | null)?.blur?.();
+                      }
+                      // Match the Dialog wrapper's close path: without reset()
+                      // the component (kept mounted in AppShell) reopens showing
+                      // the stale post-save panel instead of a fresh form.
+                      onOpenChange(false);
+                      reset();
+                    }}
+                  >
+                    {QUICK_LOG_POST_SAVE_VIEW_LABEL}
+                    <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                  </a>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    data-testid="quick-log-post-save-another"
+                    onClick={resetForAnother}
+                  >
+                    {QUICK_LOG_POST_SAVE_ANOTHER_LABEL}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    data-testid="quick-log-post-save-close"
+                    onClick={() => {
+                      // Same reset-on-close as the Dialog wrapper path — see
+                      // the View-plant handler above.
+                      onOpenChange(false);
+                      reset();
+                    }}
+                  >
+                    {QUICK_LOG_POST_SAVE_CLOSE_LABEL}
+                  </Button>
                 </div>
               </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <a
-                  ref={viewPlantBtnRef}
-                  href={plantDetailPath(savedTarget.id)}
-                  data-testid="quick-log-view-target-plant"
-                  data-target-plant-id={savedTarget.id}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-md bg-primary px-3 py-2 text-[13px] font-medium text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  onClick={() => {
-                    if (typeof document !== "undefined") {
-                      (document.activeElement as HTMLElement | null)?.blur?.();
-                    }
-                    // Match the Dialog wrapper's close path: without reset()
-                    // the component (kept mounted in AppShell) reopens showing
-                    // the stale post-save panel instead of a fresh form.
-                    onOpenChange(false);
-                    reset();
-                  }}
-                >
-                  {QUICK_LOG_POST_SAVE_VIEW_LABEL}
-                  <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-                </a>
-                <Button
-                  type="button"
-                  variant="outline"
-                  data-testid="quick-log-post-save-another"
-                  onClick={resetForAnother}
-                >
-                  {QUICK_LOG_POST_SAVE_ANOTHER_LABEL}
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  data-testid="quick-log-post-save-close"
-                  onClick={() => {
-                    // Same reset-on-close as the Dialog wrapper path — see
-                    // the View-plant handler above.
-                    onOpenChange(false);
-                    reset();
-                  }}
-                >
-                  {QUICK_LOG_POST_SAVE_CLOSE_LABEL}
-                </Button>
-              </div>
-            </div>
-          )}
+            )}
+          </fieldset>
         </form>
       </DialogContent>
     </Dialog>

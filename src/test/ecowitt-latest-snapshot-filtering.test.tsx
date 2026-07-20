@@ -136,9 +136,7 @@ describe("ecowittLatestSnapshotFilter", () => {
       expect(vm.source).toBe("invalid");
       expect(vm.sourceLabel?.label).toBe("Invalid");
       expect(vm.invalid).toBe(true);
-      expect(vm.unavailableReason).toBe(
-        "Reading provenance is missing or unrecognized.",
-      );
+      expect(vm.unavailableReason).toBe("Reading provenance is missing or unrecognized.");
       expect(vm.derivedVpdKpa).toBeNull();
       expect(vm.metrics.vpd_kpa).toBeUndefined();
     },
@@ -291,6 +289,34 @@ describe("ecowittLatestSnapshotFilter", () => {
     });
   });
 
+  it("does not coerce absent or blank metric-bag values into zero evidence", () => {
+    const candidates = selectEcowittCandidates(
+      [
+        row(
+          { source: "live" },
+          {
+            vendor: "ecowitt",
+            captured_at: FRESH_AT,
+            metrics: {
+              temp_f: null,
+              temperature_c: undefined,
+              humidity_pct: "",
+              soil_moisture_pct: "   ",
+              co2_ppm: "950",
+            },
+          },
+        ),
+      ],
+      { tentId: TENT_A },
+    );
+
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0]?.payload).toMatchObject({ co2: 950, dateutc: FRESH_AT });
+    expect(candidates[0]?.payload).not.toHaveProperty("temp1f");
+    expect(candidates[0]?.payload).not.toHaveProperty("humidity1");
+    expect(candidates[0]?.payload).not.toHaveProperty("soilmoisture1");
+  });
+
   it("keeps confidence=test Windows-listener packets visible as Demo, never live", () => {
     const rows: EcowittSensorReadingRow[] = [
       {
@@ -319,6 +345,26 @@ describe("ecowittLatestSnapshotFilter", () => {
     expect(vm.sourceLabel?.label).toBe("Demo");
     expect(vm.sourceLabel?.label).not.toBe("Ecowitt");
   });
+
+  it.each(["manual", "csv", "demo", "stale", "invalid"] as const)(
+    "applies the testbench provenance fence before canonical source=%s",
+    (source) => {
+      const rows: EcowittSensorReadingRow[] = [
+        row(
+          { source },
+          {
+            vendor: "ecowitt_windows_testbench",
+            temp1f: 77,
+            humidity1: 55,
+            dateutc: FRESH_AT,
+            metadata: { confidence: "test" },
+          },
+        ),
+      ];
+
+      expect(selectEcowittCandidates(rows, { tentId: TENT_A })[0]?.source).toBe("demo");
+    },
+  );
 
   it("treats the canonical verdant_source=live mirror without physical proof as Demo", () => {
     const vm = buildEcowittLatestSnapshot(

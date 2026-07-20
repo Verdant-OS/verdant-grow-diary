@@ -113,6 +113,31 @@ describe("buildTentSensorChartSeries", () => {
     ]);
   });
 
+  it("keeps CSV observations distinct when their import ts is shared", () => {
+    const importedAt = "2026-07-18T12:00:00Z";
+    const out = buildTentSensorChartSeries([
+      {
+        ts: importedAt,
+        captured_at: "2025-01-01T10:00:00Z",
+        metric: "temperature_c",
+        value: 20,
+        source: "csv",
+      },
+      {
+        ts: importedAt,
+        captured_at: "2025-01-01T11:00:00Z",
+        metric: "temperature_c",
+        value: 24,
+        source: "csv",
+      },
+    ]);
+
+    expect(out).toEqual([
+      { ts: "2025-01-01T10:00:00Z", temp: 20, rh: null, vpd: null, co2: null, soil: null },
+      { ts: "2025-01-01T11:00:00Z", temp: 24, rh: null, vpd: null, co2: null, soil: null },
+    ]);
+  });
+
   it("ignores unknown metrics and non-finite values, does not invent data", () => {
     const rows = [
       { ts: "2025-01-01T00:00:00Z", metric: "weird_metric", value: 1, source: "live" },

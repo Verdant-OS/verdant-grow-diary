@@ -6,7 +6,16 @@ import { mcpPlugin } from "@lovable.dev/mcp-js/stacks/supabase/vite";
 import { PRICING } from "./src/constants/pricing";
 import { viteManualChunks } from "./src/lib/build/manualChunks";
 import { buildStaticSocialRouteHtml } from "./src/lib/build/staticSocialRouteHtml";
-import { STATIC_PUBLIC_SEO_DOCUMENTS } from "./src/lib/build/staticPublicSeoDocuments";
+import {
+  STATIC_PUBLIC_SEO_DOCUMENTS,
+  VERDANT_SITE_ORIGIN,
+} from "./src/lib/build/staticPublicSeoDocuments";
+import {
+  buildOgCardSvg,
+  ogImageSlugForPath,
+  OG_IMAGE_WIDTH,
+} from "./src/lib/build/ogImageCard";
+import { Resvg } from "@resvg/resvg-js";
 
 const SITE_ORIGIN = "https://verdantgrowdiary.com";
 
@@ -77,21 +86,126 @@ function staticSocialRouteDocuments(): Plugin {
         return;
       }
       const fileNames = new Set<string>();
+      const ogEmitted = new Set<string>();
       for (const document of STATIC_PUBLIC_SEO_DOCUMENTS) {
         if (fileNames.has(document.fileName)) {
           this.error(`Duplicate static SEO output path: ${document.fileName}`);
           return;
         }
         fileNames.add(document.fileName);
+
+        // Per-route OG PNG. Deterministic filename derived from the URL path.
+        const slug = ogImageSlugForPath(document.path);
+        const ogFileName = `og/${slug}.png`;
+        if (!ogEmitted.has(ogFileName)) {
+          ogEmitted.add(ogFileName);
+          const svg = buildOgCardSvg({
+            title: document.metadata.title,
+            description: document.metadata.description,
+            path: document.path,
+          });
+          try {
+            const png = new Resvg(svg, {
+              fitTo: { mode: "width", value: OG_IMAGE_WIDTH },
+              font: { loadSystemFonts: true, defaultFontFamily: "sans-serif" },
+            }).render().asPng();
+            this.emitFile({
+              type: "asset",
+              fileName: ogFileName,
+              source: png,
+            });
+          } catch (error) {
+            this.error(
+              `Failed to render OG image for ${document.path}: ${
+                error instanceof Error ? error.message : String(error)
+              }`,
+            );
+            return;
+          }
+        }
+        const ogImageUrl = `${VERDANT_SITE_ORIGIN}/${ogFileName}`;
+
+        const metadataWithOg = { ...document.metadata, image: ogImageUrl };
         this.emitFile({
           type: "asset",
           fileName: document.fileName,
-          source: buildStaticSocialRouteHtml(indexAsset.source, document.metadata),
+          source: buildStaticSocialRouteHtml(indexAsset.source, metadataWithOg),
         });
       }
+
+
+      // Homepage ("/") — served by index.html itself. Emit a per-route OG PNG
+      // and rewrite the sitewide og:image + twitter:image + og:image:alt so
+      // non-JS crawlers see the same per-route treatment as every other page.
+      const homeTitle = "Verdant Grow Diary — Plant memory. Sensor truth.";
+      const homeDescription =
+        "Grow logs, sensor-aware insights, environment alerts, and cautious AI coaching for serious cultivators.";
+      const homeSvg = buildOgCardSvg({
+        title: homeTitle,
+        description: homeDescription,
+        path: "/",
+      });
+      try {
+        const homePng = new Resvg(homeSvg, {
+          fitTo: { mode: "width", value: OG_IMAGE_WIDTH },
+          font: { loadSystemFonts: true, defaultFontFamily: "sans-serif" },
+        }).render().asPng();
+        this.emitFile({ type: "asset", fileName: "og/home.png", source: homePng });
+      } catch (error) {
+        this.error(
+          `Failed to render home OG image: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+        return;
+      }
+      const homeOgUrl = `${VERDANT_SITE_ORIGIN}/og/home.png`;
+      let patchedIndex = indexAsset.source;
+      const rewriteMeta = (attr: "name" | "property", key: string, value: string) => {
+        const pattern = new RegExp(
+          `<meta\\b(?=[^>]*${attr}=["']${key.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")}["'])[^>]*>`,
+          "i",
+        );
+        if (!pattern.test(patchedIndex)) {
+          this.error(`index.html missing ${attr}="${key}" meta tag`);
+          return;
+        }
+        patchedIndex = patchedIndex.replace(
+          pattern,
+          `<meta ${attr}="${key}" content="${value.replace(/"/g, "&quot;")}" />`,
+        );
+      };
+      rewriteMeta("property", "og:image", homeOgUrl);
+      rewriteMeta("property", "og:image:alt", "Verdant Grow Diary — Plant memory. Sensor truth.");
+      rewriteMeta("name", "twitter:image", homeOgUrl);
+      indexAsset.source = patchedIndex;
+
+      // Emit a machine-readable manifest of every pre-rendered public route
+      // and the exact metadata the plugin baked into its <head>. Postbuild
+      // validators (validate-static-route-head-fidelity.mjs) and the sitemap
+      // parity vitest use this as the single source of truth, so head
+      // fidelity and sitemap membership never drift silently.
+      const manifest = STATIC_PUBLIC_SEO_DOCUMENTS.map((document) => {
+        const slug = ogImageSlugForPath(document.path);
+        const ogFileName = `og/${slug}.png`;
+        return {
+          path: document.path,
+          fileName: document.fileName,
+          metadata: {
+            ...document.metadata,
+            image: `${VERDANT_SITE_ORIGIN}/${ogFileName}`,
+          },
+        };
+      });
+      this.emitFile({
+        type: "asset",
+        fileName: "seo-manifest.json",
+        source: JSON.stringify({ origin: VERDANT_SITE_ORIGIN, documents: manifest }, null, 2),
+      });
     },
   };
 }
+
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({

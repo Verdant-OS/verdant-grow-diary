@@ -21,6 +21,7 @@ import {
 } from "@/lib/sensorTruthRules";
 import { normalizeSensorSource } from "@/lib/sensor/sensorSourceRules";
 import { isDiagnosticSensorProvenanceRow } from "@/lib/sensorProvenanceFenceRules";
+import { resolveSensorObservationTime } from "@/lib/sensorObservationTimeRules";
 
 export interface TentSensorChartPoint {
   ts: string;
@@ -87,17 +88,19 @@ export function buildTentSensorChartSeries(
   for (const r of usableRows) {
     const key = METRIC_KEY[r.metric];
     if (!key) continue;
+    const observedAt = resolveSensorObservationTime(r);
+    if (!observedAt) continue;
     const v = toFiniteNumber(r.value);
     if (v === null) continue;
-    let pt = byTs.get(r.ts);
+    let pt = byTs.get(observedAt);
     if (!pt) {
-      pt = { ts: r.ts, temp: null, rh: null, vpd: null, co2: null, soil: null };
-      byTs.set(r.ts, pt);
+      pt = { ts: observedAt, temp: null, rh: null, vpd: null, co2: null, soil: null };
+      byTs.set(observedAt, pt);
     }
     const truth = classifyManualMetric(r.metric, v);
     if (!truth.valid) {
       if (r.metric === "temperature_c" || r.metric === "humidity_pct") {
-        tempOrRhInvalidAt.add(r.ts);
+        tempOrRhInvalidAt.add(observedAt);
       }
       continue;
     }

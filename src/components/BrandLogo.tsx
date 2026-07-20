@@ -43,26 +43,26 @@ export interface BrandLogoProps {
   className?: string;
 }
 
-export default function BrandLogo({
-  size = "md",
-  showText = false,
-  className,
-}: BrandLogoProps) {
+export default function BrandLogo({ size = "md", showText = false, className }: BrandLogoProps) {
   const px = SIZE_PX[size];
+  // Hero variant is the landing LCP candidate — eager-load and hint the
+  // browser to fetch it at high priority so it isn't deprioritized behind
+  // late-discovered resources. Smaller variants keep lazy behavior.
+  const isHero = size === "hero";
   return (
-    <span
-      className={`inline-flex items-center gap-2 ${className ?? ""}`.trim()}
-    >
+    <span className={`inline-flex items-center gap-2 ${className ?? ""}`.trim()}>
       <img
         src={LOGO_SRC}
         alt={ALT}
         width={px}
         height={px}
-        loading="lazy"
+        loading={isHero ? "eager" : "lazy"}
+        {...(isHero ? ({ fetchpriority: "high" } as Record<string, string>) : {})}
         decoding="async"
         className="rounded-full shrink-0 select-none"
         style={{ width: px, height: px }}
       />
+
       {showText && (
         <span
           className={`hidden min-[380px]:inline whitespace-nowrap font-display font-semibold tracking-tight ${TEXT_CLASS[size]}`}

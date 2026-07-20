@@ -1,6 +1,6 @@
 import { SUBSCRIBER_GROWTH_MIGRATION_CONTRACT } from "./subscriber-growth-migration-contract.mjs";
 
-export const SUBSCRIBER_GROWTH_RECEIPT_VERSION = 2;
+export const SUBSCRIBER_GROWTH_RECEIPT_VERSION = 3;
 export const SUBSCRIBER_GROWTH_SUPABASE_PROJECT_REF = "knkwiiywfkbqznbxwqfh";
 export const SUBSCRIBER_GROWTH_RECORDED_FUNCTION_NAME = "ai-doctor-review";
 
@@ -24,6 +24,7 @@ export const SUBSCRIBER_GROWTH_REQUIRED_COMMAND_IDS = Object.freeze([
 
 const EXPECTED_ROUTE_COUNT = 4;
 const EXPECTED_CAPABILITY_COUNT = 5;
+export const SUBSCRIBER_GROWTH_FOUNDER_TOTAL = 100;
 export const SUBSCRIBER_GROWTH_EXPECTED_MIGRATION_COUNT =
   SUBSCRIBER_GROWTH_MIGRATION_CONTRACT.length;
 
@@ -113,6 +114,28 @@ function parityPassed(parity, requireDeploymentId) {
   );
 }
 
+export function founderCounterPassed(founderCounter) {
+  return (
+    isRecord(founderCounter) &&
+    founderCounter.kind === "public_founder_counter_live_check" &&
+    founderCounter.attempted === true &&
+    founderCounter.ok === true &&
+    Number.isInteger(founderCounter.optionsStatus) &&
+    founderCounter.optionsStatus >= 200 &&
+    founderCounter.optionsStatus < 300 &&
+    founderCounter.postStatus === 200 &&
+    founderCounter.corsVerified === true &&
+    founderCounter.payloadVerified === true &&
+    Number.isInteger(founderCounter.remaining) &&
+    founderCounter.remaining >= 0 &&
+    founderCounter.remaining <= SUBSCRIBER_GROWTH_FOUNDER_TOTAL &&
+    founderCounter.total === SUBSCRIBER_GROWTH_FOUNDER_TOTAL &&
+    founderCounter.error === null &&
+    Array.isArray(founderCounter.errors) &&
+    founderCounter.errors.length === 0
+  );
+}
+
 export function evaluateSubscriberGrowthLaunchGate(input) {
   const liveRequired = input?.liveRequired !== false;
   const sourceProblems = [];
@@ -160,6 +183,9 @@ export function evaluateSubscriberGrowthLaunchGate(input) {
   const localReady = sourceProblems.length === 0 && commandProblems.length === 0 && localParityPass;
 
   const liveParityPass = liveRequired ? parityPassed(input?.liveParity, true) : false;
+  const founderCounterPass = liveRequired
+    ? founderCounterPassed(input?.liveParity?.founderCounter)
+    : false;
   const backendRemoteVerification = summarizeSubscriberGrowthBackendRemoteVerification(
     input?.backendRemoteVerification,
   );
@@ -167,6 +193,9 @@ export function evaluateSubscriberGrowthLaunchGate(input) {
   const liveProblems = [];
   if (liveRequired && !liveParityPass) {
     liveProblems.push("live growth parity is not verified on an identified deployment");
+  }
+  if (liveRequired && !founderCounterPass) {
+    liveProblems.push("public Founder counter is not verified in production");
   }
   if (liveRequired && !backendRemoteVerificationPass) {
     liveProblems.push(
@@ -176,7 +205,7 @@ export function evaluateSubscriberGrowthLaunchGate(input) {
 
   let status = SUBSCRIBER_GROWTH_RELEASE_STATUSES.hold;
   if (localReady && !liveRequired) status = SUBSCRIBER_GROWTH_RELEASE_STATUSES.localReady;
-  if (localReady && liveParityPass && backendRemoteVerificationPass) {
+  if (localReady && liveParityPass && founderCounterPass && backendRemoteVerificationPass) {
     status = SUBSCRIBER_GROWTH_RELEASE_STATUSES.liveVerified;
   }
 
@@ -238,6 +267,7 @@ export function formatSubscriberGrowthLaunchGate(receipt) {
     lines.push(
       `Live deployment: ${receipt.liveParity.deploymentId ?? "unavailable"}`,
       `Live parity: ${receipt.liveParity.capabilitiesPassed}/${receipt.liveParity.capabilitiesTotal}`,
+      `Founder counter: ${founderCounterPassed(receipt.liveParity.founderCounter) ? "verified" : "unverified"}`,
     );
   } else {
     lines.push("Live parity: skipped by local-only mode");

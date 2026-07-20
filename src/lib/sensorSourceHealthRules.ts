@@ -9,6 +9,7 @@
 
 import { normalizeSensorSource } from "@/lib/sensor/sensorSourceRules";
 import { isDiagnosticSensorProvenanceRow } from "@/lib/sensorProvenanceFenceRules";
+import { resolveSensorObservationTime } from "@/lib/sensorObservationTimeRules";
 
 export const SENSOR_SOURCE_STALE_MINUTES = 30;
 export const SENSOR_SOURCE_NO_DATA_HOURS = 24;
@@ -46,13 +47,13 @@ function parseTimestamp(input: string | null | undefined): number | null {
   return Number.isFinite(t) ? t : null;
 }
 
-/** Pick the newest valid timestamp from (captured_at, ts), preferring captured_at. */
+/**
+ * Resolve the actual observation timestamp. A present `captured_at` is the
+ * grower's measurement time; `ts` is only the fallback for legacy rows that
+ * never stored one. Never use a later import timestamp to freshen CSV data.
+ */
 function newestTimestamp(row: SensorSourceHealthInput): number | null {
-  const c = parseTimestamp(row.captured_at);
-  const s = parseTimestamp(row.ts);
-  if (c == null) return s;
-  if (s == null) return c;
-  return Math.max(c, s);
+  return parseTimestamp(resolveSensorObservationTime(row));
 }
 
 function deriveStatus(ageMinutes: number | null): SensorSourceStatus {

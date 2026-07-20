@@ -27,7 +27,7 @@ describe("outcomeFollowUpRules", () => {
   it("does not show when there is no meaningful action", () => {
     const vm = buildOutcomeFollowUp({
       now: NOW,
-      rows: [{ eventType: "note", notePreview: "Quick check: Same.", occurredAt: iso(24) }],
+      rows: [{ eventType: "note", notePreview: "Response check: Same.", occurredAt: iso(24) }],
     });
     expect(vm.showPrompt).toBe(false);
     expect(vm.reason).toBe("no_action");
@@ -51,7 +51,37 @@ describe("outcomeFollowUpRules", () => {
     expect(vm.reason).toBe("expired");
   });
 
-  it("does not show when a later Better/Same/Worse check exists", () => {
+  it("does not show when a later canonical response check exists", () => {
+    const vm = buildOutcomeFollowUp({
+      now: NOW,
+      rows: [
+        { eventType: "quick_log", notePreview: "Response check: Better.", occurredAt: iso(12) },
+        { eventType: "watering", notePreview: "Watered 1L", occurredAt: iso(24) },
+      ],
+    });
+    expect(vm.showPrompt).toBe(false);
+    expect(vm.reason).toBe("already_checked");
+  });
+
+  it("uses the same action-before-response policy at equal timestamps", () => {
+    const sameTime = iso(24);
+    const vm = buildOutcomeFollowUp({
+      now: NOW,
+      rows: [
+        {
+          id: "response",
+          eventType: "quick_log",
+          notePreview: "Response check: Better.",
+          occurredAt: sameTime,
+        },
+        { id: "action", eventType: "watering", notePreview: "Watered 1L", occurredAt: sameTime },
+      ],
+    });
+    expect(vm.showPrompt).toBe(false);
+    expect(vm.reason).toBe("already_checked");
+  });
+
+  it("keeps legacy Quick check history compatible", () => {
     const vm = buildOutcomeFollowUp({
       now: NOW,
       rows: [
@@ -61,6 +91,84 @@ describe("outcomeFollowUpRules", () => {
     });
     expect(vm.showPrompt).toBe(false);
     expect(vm.reason).toBe("already_checked");
+  });
+
+  it("does not treat a longer word as a valid response status", () => {
+    const vm = buildOutcomeFollowUp({
+      now: NOW,
+      rows: [
+        {
+          eventType: "note",
+          notePreview: "Response check: Betterment plan.",
+          occurredAt: iso(12),
+        },
+        { eventType: "watering", notePreview: "Watered 1L", occurredAt: iso(24) },
+      ],
+    });
+    expect(vm.showPrompt).toBe(true);
+    expect(vm.reason).toBe("needs_follow_up");
+  });
+
+  it("does not classify explanatory response prose as another grow action", () => {
+    const vm = buildOutcomeFollowUp({
+      now: NOW,
+      rows: [
+        {
+          eventType: "note",
+          notePreview: "Response check: Better. Watering less helped.",
+          occurredAt: iso(24),
+        },
+      ],
+    });
+    expect(vm.showPrompt).toBe(false);
+    expect(vm.reason).toBe("no_action");
+  });
+
+  it("recognizes an explicit action line after response context", () => {
+    const vm = buildOutcomeFollowUp({
+      now: NOW,
+      rows: [
+        {
+          eventType: "quick_log",
+          notePreview: "Response check: Better.\nWatered today.",
+          occurredAt: iso(24),
+        },
+      ],
+    });
+    expect(vm.showPrompt).toBe(true);
+    expect(vm.reason).toBe("needs_follow_up");
+    expect(vm.actionSummary).toBe("Watered today.");
+  });
+
+  it("summarizes only the new action from a mixed response/action row", () => {
+    const vm = buildOutcomeFollowUp({
+      now: NOW,
+      rows: [
+        {
+          eventType: "quick_log",
+          notePreview: "Response check: Better.\nFed.",
+          occurredAt: iso(24),
+        },
+      ],
+    });
+    expect(vm.showPrompt).toBe(true);
+    expect(vm.reason).toBe("needs_follow_up");
+    expect(vm.actionSummary).toBe("Fed.");
+  });
+
+  it("does not classify nested Response wrapper prose as an action", () => {
+    const vm = buildOutcomeFollowUp({
+      now: NOW,
+      rows: [
+        {
+          eventType: "quick_log",
+          notePreview: "Response: Response check: Better. Watering less helped.",
+          occurredAt: iso(24),
+        },
+      ],
+    });
+    expect(vm.showPrompt).toBe(false);
+    expect(vm.reason).toBe("no_action");
   });
 
   it("detects actions from note keywords", () => {

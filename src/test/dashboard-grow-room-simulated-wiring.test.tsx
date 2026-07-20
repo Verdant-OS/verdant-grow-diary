@@ -31,18 +31,18 @@ describe("DashboardDataSourceDisclosure snapshotSource prop", () => {
         snapshotSource="sim"
       />,
     );
-    expect(
-      screen.getByTestId("dashboard-data-source-simulated-badge"),
-    ).toHaveTextContent(/simulated/i);
-    expect(
-      screen.getByTestId("dashboard-data-source-simulated-notice"),
-    ).toHaveTextContent(/testing\/demo only/i);
-    expect(
-      screen.getByTestId("dashboard-data-source-simulated-notice"),
-    ).toHaveTextContent(/not real tent data/i);
-    expect(
-      screen.getByTestId("dashboard-data-source-simulated-notice"),
-    ).toHaveTextContent(/not used for persisted alerts/i);
+    expect(screen.getByTestId("dashboard-data-source-simulated-badge")).toHaveTextContent(
+      /simulated/i,
+    );
+    expect(screen.getByTestId("dashboard-data-source-simulated-notice")).toHaveTextContent(
+      /testing\/demo only/i,
+    );
+    expect(screen.getByTestId("dashboard-data-source-simulated-notice")).toHaveTextContent(
+      /not real tent data/i,
+    );
+    expect(screen.getByTestId("dashboard-data-source-simulated-notice")).toHaveTextContent(
+      /not used for persisted alerts/i,
+    );
   });
 
   it("does not render simulated notice when snapshotSource is live", () => {
@@ -53,12 +53,8 @@ describe("DashboardDataSourceDisclosure snapshotSource prop", () => {
         snapshotSource="live"
       />,
     );
-    expect(
-      screen.queryByTestId("dashboard-data-source-simulated-badge"),
-    ).toBeNull();
-    expect(
-      screen.queryByTestId("dashboard-data-source-simulated-notice"),
-    ).toBeNull();
+    expect(screen.queryByTestId("dashboard-data-source-simulated-badge")).toBeNull();
+    expect(screen.queryByTestId("dashboard-data-source-simulated-notice")).toBeNull();
   });
 
   it("does not render simulated notice when snapshotSource is manual", () => {
@@ -69,9 +65,7 @@ describe("DashboardDataSourceDisclosure snapshotSource prop", () => {
         snapshotSource="manual"
       />,
     );
-    expect(
-      screen.queryByTestId("dashboard-data-source-simulated-badge"),
-    ).toBeNull();
+    expect(screen.queryByTestId("dashboard-data-source-simulated-badge")).toBeNull();
   });
 });
 
@@ -85,8 +79,22 @@ describe("Dashboard.tsx wiring", () => {
 // --- Grow-Room Mode wiring (page render) ---
 
 const SIM_READINGS = [
-  { tent_id: "t1", metric: "temp", value: 24, ts: new Date().toISOString(), source: "sim", quality: "ok" },
-  { tent_id: "t1", metric: "rh", value: 55, ts: new Date().toISOString(), source: "sim", quality: "ok" },
+  {
+    tent_id: "t1",
+    metric: "temp",
+    value: 24,
+    ts: new Date().toISOString(),
+    source: "sim",
+    quality: "ok",
+  },
+  {
+    tent_id: "t1",
+    metric: "rh",
+    value: 55,
+    ts: new Date().toISOString(),
+    source: "sim",
+    quality: "ok",
+  },
 ];
 
 vi.mock("@/hooks/use-tents", () => ({
@@ -116,18 +124,20 @@ vi.mock("@/hooks/use-plants", () => ({
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: (table: string) => ({
-      select: () => ({
-        in: () => ({
-          order: () => ({
-            limit: () =>
-              Promise.resolve({
-                data: table === "sensor_readings" ? SIM_READINGS : [],
-                error: null,
-              }),
-          }),
+      select: () => {
+        const ordered = {
+          order: () => ordered,
+          limit: () =>
+            Promise.resolve({
+              data: table === "sensor_readings" ? SIM_READINGS : [],
+              error: null,
+            }),
+        };
+        return {
+          in: () => ordered,
           limit: () => Promise.resolve({ data: [], error: null }),
-        }),
-      }),
+        };
+      },
     }),
   },
 }));
@@ -155,8 +165,7 @@ describe("GrowRoomMode sim-source card disclosure", () => {
 
 describe("Static safety: Dashboard + GrowRoomMode wiring", () => {
   const FORBIDDEN_WRITES = /\.(insert|update|delete|upsert|rpc)\s*\(/;
-  const FORBIDDEN_INTEGRATIONS =
-    /service_role|\bmqtt\b|home[\s_-]?assistant|pi[\s_-]?bridge/i;
+  const FORBIDDEN_INTEGRATIONS = /service_role|\bmqtt\b|home[\s_-]?assistant|pi[\s_-]?bridge/i;
 
   it("Dashboard wiring adds no writes or forbidden integrations", () => {
     expect(DASHBOARD).not.toMatch(FORBIDDEN_WRITES);

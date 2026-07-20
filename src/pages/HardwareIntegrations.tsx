@@ -10,10 +10,10 @@ import {
   SENSOR_SOURCE_LEGEND,
   SENSOR_SOURCE_SHORT_LABEL,
 } from "@/constants/sensorSourceLabels";
-import { buildAttributedSignupPath } from "@/lib/signupAcquisitionRules";
+import { buildCsvHistorySignupPath } from "@/lib/csvHistoryOnboardingIntentRules";
 import { trackPricingEvent } from "@/lib/pricingAnalytics";
 
-const CSV_HISTORY_SIGNUP_PATH = buildAttributedSignupPath({ source: "csv_history" });
+const CSV_HISTORY_SIGNUP_PATH = buildCsvHistorySignupPath();
 
 /**
  * Public hardware-neutral integration page.
@@ -82,6 +82,15 @@ export default function HardwareIntegrations() {
               className="min-h-11 max-w-full h-auto whitespace-normal text-center leading-tight"
             >
               Bring in my grow history
+            </Button>
+          </Link>
+          <Link to="/sensors/csv-preview" data-testid="csv-history-preview-cta-hero">
+            <Button
+              size="lg"
+              variant="outline"
+              className="min-h-11 max-w-full h-auto whitespace-normal text-center leading-tight"
+            >
+              Preview a CSV in my browser
             </Button>
           </Link>
           <a href="#partner">

@@ -145,6 +145,12 @@
     <priority>0.7</priority>
   </url>
   <url>
+    <loc>https://verdantgrowdiary.com/guides/bud-rot-prevention-identification</loc>
+    <lastmod>2026-07-20</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
     <loc>https://verdantgrowdiary.com/guides/grow-stage-care-guide</loc>
     <lastmod>2026-07-15</lastmod>
     <changefreq>monthly</changefreq>
@@ -177,6 +183,18 @@
   <url>
     <loc>https://verdantgrowdiary.com/refund</loc>
     <lastmod>2026-07-09</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://verdantgrowdiary.com/feedback</loc>
+    <lastmod>2026-07-20</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://verdantgrowdiary.com/contact</loc>
+    <lastmod>2026-07-20</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>

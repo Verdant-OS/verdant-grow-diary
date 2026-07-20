@@ -109,7 +109,8 @@ describe("safety fences over the new sources", () => {
     }
     // Raw lineage is selected only long enough for the shared diagnostic
     // classifier. It is not rendered by the page or navigation helper.
-    expect(HOOK).toContain('.select("metric,value,ts,source,raw_payload")');
+    expect(HOOK).toContain('.select("metric,value,ts,captured_at,source,raw_payload")');
+    expect(HOOK).toContain("captured_at.gte.${startIso}");
     expect(RULES).toContain("withoutDiagnosticSensorRows");
     expect(PAGE + NAV).not.toMatch(/raw_payload/i);
     // The page's only invoke path is the premium gate helper import.

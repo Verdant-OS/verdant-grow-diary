@@ -23,7 +23,7 @@ name: Quick Log Playwright smoke
 #   secrets.E2E_TEST_PASSWORD
 #   vars.E2E_BASE_URL              (e.g. https://<preview-or-staging>.example)
 #   vars.E2E_GROW_1_PLANT_URL      (full URL of a Grow #1 plant page)
-#   vars.E2E_GROW_2_PLANT_NAME     (optional; defaults to "505 Headbanger")
+#   vars.E2E_GROW_1_SECOND_PLANT_NAME (optional; defaults to "E2E Test Plant 2")
 
 on:
   workflow_dispatch:
@@ -49,7 +49,7 @@ jobs:
     env:
       E2E_BASE_URL: ${{ vars.E2E_BASE_URL }}
       E2E_GROW_1_PLANT_URL: ${{ vars.E2E_GROW_1_PLANT_URL }}
-      E2E_GROW_2_PLANT_NAME: ${{ vars.E2E_GROW_2_PLANT_NAME }}
+      E2E_GROW_1_SECOND_PLANT_NAME: ${{ vars.E2E_GROW_1_SECOND_PLANT_NAME }}
       E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
       E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
       E2E_FIXTURE_MODE: ${{ vars.E2E_FIXTURE_MODE }}
@@ -111,7 +111,6 @@ jobs:
             echo "should_run=true" >> "$GITHUB_OUTPUT"
           fi
 
-
       - name: Setup Bun
         if: steps.e2e_config.outputs.should_run == 'true'
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
@@ -150,6 +149,10 @@ jobs:
         if: steps.e2e_config.outputs.should_run == 'true'
         run: bun run e2e:install:ci
 
+      - name: Print disposable E2E fixture checklist
+        if: steps.e2e_config.outputs.should_run == 'true'
+        run: bun run e2e:fixture-checklist
+
       # Optional UI-only disposable E2E fixture bootstrap. OFF by default.
       # Only runs when vars.E2E_ALLOW_FIXTURE_BOOTSTRAP == 'true'.
       # Never deletes, renames, or modifies existing grow data. Refuses to
@@ -169,7 +172,6 @@ jobs:
         id: quicklog_smoke
         if: steps.e2e_config.outputs.should_run == 'true' && steps.verify_fixture.outcome == 'success'
         run: bun run e2e:quicklog-smoke
-
 
       - name: Verify Quick Log smoke artifacts
         if: always() && steps.e2e_config.outputs.should_run == 'true'
@@ -365,9 +367,6 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
 
-
-
-
       - name: Write Quick Log smoke run summary
         if: always()
         shell: bash
@@ -536,6 +535,7 @@ jobs:
               echo ""
               echo "Missing required Quick Log smoke configuration prevented execution."
               echo ""
+              echo "Tent + Plant fixture names are required; Grow name is optional."
               echo "Required configuration (names only — values are never printed):"
               echo ""
               echo "- \`vars.E2E_BASE_URL\`"
@@ -543,9 +543,12 @@ jobs:
               echo "- \`secrets.E2E_TEST_EMAIL\`"
               echo "- \`secrets.E2E_TEST_PASSWORD\`"
               echo "- \`vars.E2E_FIXTURE_MODE\`"
-              echo "- \`vars.E2E_FIXTURE_EXPECTED_GROW_NAME\`"
               echo "- \`vars.E2E_FIXTURE_EXPECTED_TENT_NAME\`"
               echo "- \`vars.E2E_FIXTURE_EXPECTED_PLANT_NAME\`"
+              echo ""
+              echo "Optional configuration (names only — values are never printed):"
+              echo ""
+              echo "- \`vars.E2E_FIXTURE_EXPECTED_GROW_NAME\`"
               echo ""
 
               if [ -n "${MISSING_CONFIG}" ]; then

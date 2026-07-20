@@ -8,6 +8,7 @@
 import { normalizeQuickLogSnapshotMetrics } from "@/lib/quick-log/quickLogSnapshotMetricNormalizer";
 import { summarizeCsvVendor } from "@/lib/sensorReadingVendorLineage";
 import { isSensorTestbenchRow } from "@/lib/sensorTestbenchIndicatorRules";
+import { resolveSensorObservationTime } from "@/lib/sensorObservationTimeRules";
 
 export type SnapshotSource =
   | "live"
@@ -155,6 +156,8 @@ export interface SensorReadingLike {
    * `summarizeCsvVendor`, which is the only sanctioned reader.
    */
   raw_payload?: unknown;
+  /** Original capture time for imported/history rows; preferred over ts. */
+  captured_at?: string | null;
 }
 
 /**
@@ -174,15 +177,25 @@ const METRIC_REF_KEY_TO_READING_METRIC: Record<SensorSnapshotMetricRefKey, strin
 
 /**
  * Build a snapshot from a batch of sensor_readings rows. Picks the latest
- * `ts` value and folds metric/value pairs at that timestamp into the
- * snapshot fields. Unknown metrics are ignored, not faked.
+ * actual observation time (`captured_at` when present, otherwise `ts`) and
+ * folds metric/value pairs at that time into the snapshot fields. Unknown
+ * metrics are ignored, not faked.
  */
 export function snapshotFromReadings(rows: SensorReadingLike[]): SensorSnapshot | null {
   if (!rows || rows.length === 0) return null;
-  // rows are expected ordered desc; take the latest ts then keep all rows at
-  // that exact timestamp (multi-metric readings often share ts).
-  const latestTs = rows[0].ts;
-  const latest = rows.filter((r) => r.ts === latestTs);
+  const observedRows = rows
+    .map((row) => ({ row, observedAt: resolveSensorObservationTime(row) }))
+    .filter(
+      (item): item is { row: SensorReadingLike; observedAt: string } => item.observedAt !== null,
+    );
+  if (observedRows.length === 0) return null;
+  const latestTs = observedRows.reduce(
+    (latest, item) => (item.observedAt > latest ? item.observedAt : latest),
+    observedRows[0].observedAt,
+  );
+  const latest = observedRows
+    .filter((item) => item.observedAt === latestTs)
+    .map((item) => item.row);
   const get = (metric: string): number | null => {
     const r = latest.find((x) => x.metric === metric);
     return r ? toFiniteNumber(r.value) : null;
@@ -245,7 +258,7 @@ export function snapshotFromReadings(rows: SensorReadingLike[]): SensorSnapshot 
     if (!metric_refs) metric_refs = {};
     metric_refs[key] = {
       id,
-      captured_at: row.ts,
+      captured_at: resolveSensorObservationTime(row) ?? latestTs,
       source: typeof row.source === "string" ? row.source : "",
     };
   }

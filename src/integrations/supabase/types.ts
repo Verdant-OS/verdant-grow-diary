@@ -728,6 +728,117 @@ export type Database = {
         }
         Relationships: []
       }
+      contact_messages: {
+        Row: {
+          admin_notes: string | null
+          attachment_path: string | null
+          category: string
+          created_at: string
+          email: string
+          grow_context: string | null
+          id: string
+          message: string
+          name: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          admin_notes?: string | null
+          attachment_path?: string | null
+          category: string
+          created_at?: string
+          email: string
+          grow_context?: string | null
+          id?: string
+          message: string
+          name: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          admin_notes?: string | null
+          attachment_path?: string | null
+          category?: string
+          created_at?: string
+          email?: string
+          grow_context?: string | null
+          id?: string
+          message?: string
+          name?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      customer_feedback: {
+        Row: {
+          admin_notes: string | null
+          ai_doctor_rating: number | null
+          contact_email: string | null
+          created_at: string
+          follow_up_ok: boolean
+          grow_context: string | null
+          id: string
+          one_improvement: string | null
+          overall_rating: number
+          quicklog_rating: number | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          sensors_rating: number | null
+          trust_rating: number | null
+          user_agent: string | null
+          user_id: string | null
+          whats_friction: string | null
+          whats_working: string | null
+        }
+        Insert: {
+          admin_notes?: string | null
+          ai_doctor_rating?: number | null
+          contact_email?: string | null
+          created_at?: string
+          follow_up_ok?: boolean
+          grow_context?: string | null
+          id?: string
+          one_improvement?: string | null
+          overall_rating: number
+          quicklog_rating?: number | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          sensors_rating?: number | null
+          trust_rating?: number | null
+          user_agent?: string | null
+          user_id?: string | null
+          whats_friction?: string | null
+          whats_working?: string | null
+        }
+        Update: {
+          admin_notes?: string | null
+          ai_doctor_rating?: number | null
+          contact_email?: string | null
+          created_at?: string
+          follow_up_ok?: boolean
+          grow_context?: string | null
+          id?: string
+          one_improvement?: string | null
+          overall_rating?: number
+          quicklog_rating?: number | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          sensors_rating?: number | null
+          trust_rating?: number | null
+          user_agent?: string | null
+          user_id?: string | null
+          whats_friction?: string | null
+          whats_working?: string | null
+        }
+        Relationships: []
+      }
       diary_entries: {
         Row: {
           created_at: string
@@ -976,6 +1087,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      founders: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          display_style: Database["public"]["Enums"]["founder_display_style"]
+          founder_number: number
+          id: string
+          milestone_status: Database["public"]["Enums"]["founder_milestone_status"]
+          optional_link: string | null
+          paddle_subscription_ref: string | null
+          show_on_wall: boolean
+          status: Database["public"]["Enums"]["founder_status"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          display_style?: Database["public"]["Enums"]["founder_display_style"]
+          founder_number: number
+          id?: string
+          milestone_status?: Database["public"]["Enums"]["founder_milestone_status"]
+          optional_link?: string | null
+          paddle_subscription_ref?: string | null
+          show_on_wall?: boolean
+          status?: Database["public"]["Enums"]["founder_status"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          display_style?: Database["public"]["Enums"]["founder_display_style"]
+          founder_number?: number
+          id?: string
+          milestone_status?: Database["public"]["Enums"]["founder_milestone_status"]
+          optional_link?: string | null
+          paddle_subscription_ref?: string | null
+          show_on_wall?: boolean
+          status?: Database["public"]["Enums"]["founder_status"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       grow_events: {
         Row: {
@@ -3022,6 +3178,24 @@ export type Database = {
       }
     }
     Views: {
+      founders_wall_public: {
+        Row: {
+          founder_number: number | null
+          optional_link: string | null
+          public_display_name: string | null
+        }
+        Insert: {
+          founder_number?: number | null
+          optional_link?: never
+          public_display_name?: never
+        }
+        Update: {
+          founder_number?: number | null
+          optional_link?: never
+          public_display_name?: never
+        }
+        Relationships: []
+      }
       pheno_sex_observations_latest: {
         Row: {
           herm_observed: boolean | null
@@ -3181,6 +3355,8 @@ export type Database = {
         }[]
       }
       founder_lifetime_slots_remaining: { Args: never; Returns: number }
+      founders_seats_consumed: { Args: never; Returns: number }
+      founders_wall_count: { Args: never; Returns: number }
       get_latest_tent_sensor_snapshot: {
         Args: { _tent_id: string }
         Returns: Json
@@ -3267,10 +3443,25 @@ export type Database = {
           read_ct: number
         }[]
       }
+      revoke_lovable_founder_lifetime_by_transaction: {
+        Args: {
+          p_environment: string
+          p_now: string
+          p_paddle_transaction_id: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       agreement_type: "terms" | "privacy"
       app_role: "operator" | "customer" | "staff"
+      founder_display_style:
+        | "custom_name"
+        | "first_initial"
+        | "number_only"
+        | "hidden"
+      founder_milestone_status: "pending" | "met" | "missed"
+      founder_status: "confirmed" | "refunded" | "revoked"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -3400,6 +3591,14 @@ export const Constants = {
     Enums: {
       agreement_type: ["terms", "privacy"],
       app_role: ["operator", "customer", "staff"],
+      founder_display_style: [
+        "custom_name",
+        "first_initial",
+        "number_only",
+        "hidden",
+      ],
+      founder_milestone_status: ["pending", "met", "missed"],
+      founder_status: ["confirmed", "refunded", "revoked"],
     },
   },
 } as const

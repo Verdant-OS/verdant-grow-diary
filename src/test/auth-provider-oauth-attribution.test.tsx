@@ -1,10 +1,14 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { QueryClient } from "@tanstack/react-query";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   getSession: vi.fn(),
   onAuthStateChange: vi.fn(),
   rpc: vi.fn(),
+  authListener: undefined as
+    | undefined
+    | ((event: string, session: { user: { id: string } } | null) => void),
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({
@@ -34,8 +38,10 @@ beforeEach(() => {
   mocks.getSession.mockReset();
   mocks.onAuthStateChange.mockReset();
   mocks.rpc.mockReset();
-  mocks.onAuthStateChange.mockReturnValue({
-    data: { subscription: { unsubscribe: vi.fn() } },
+  mocks.authListener = undefined;
+  mocks.onAuthStateChange.mockImplementation((listener) => {
+    mocks.authListener = listener;
+    return { data: { subscription: { unsubscribe: vi.fn() } } };
   });
   mocks.rpc.mockResolvedValue({ data: true, error: null });
 });
@@ -80,5 +86,44 @@ describe("AuthProvider OAuth signup attribution handoff", () => {
 
     expect(await screen.findByText("existing-user")).toBeInTheDocument();
     await waitFor(() => expect(mocks.rpc).not.toHaveBeenCalled());
+  });
+
+  it("clears cached private rows synchronously before exposing a new auth identity", async () => {
+    mocks.getSession.mockResolvedValue({
+      data: { session: { user: { id: "owner-a" } } },
+    });
+    const client = new QueryClient();
+    const transitions: Array<[string | null, string | null]> = [];
+
+    render(
+      <AuthProvider
+        onBeforeAuthIdentityChange={(previousUserId, nextUserId) => {
+          transitions.push([previousUserId, nextUserId]);
+          client.clear();
+        }}
+      >
+        <Probe />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByText("owner-a")).toBeInTheDocument();
+    client.setQueryData(
+      ["sensor_readings", "all", 60, "owner", "owner-a"],
+      [{ id: "owner-a-private-row" }],
+    );
+    expect(client.getQueryCache().getAll()).toHaveLength(1);
+
+    act(() => {
+      mocks.authListener?.("SIGNED_IN", { user: { id: "owner-b" } });
+      // React has not committed owner B yet; the synchronous transition fence
+      // has already destroyed owner A's cache entry.
+      expect(client.getQueryCache().getAll()).toHaveLength(0);
+    });
+
+    expect(await screen.findByText("owner-b")).toBeInTheDocument();
+    expect(transitions).toEqual([
+      [null, "owner-a"],
+      ["owner-a", "owner-b"],
+    ]);
   });
 });

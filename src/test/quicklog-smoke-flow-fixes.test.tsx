@@ -1,8 +1,8 @@
 /**
  * QuickLog smoke-flow bug-fix coverage (screen-recording findings):
- *  - Plant mismatch banner appears when selected plant differs from
- *    the prefill (page-context) plant; toast includes plant name.
- *  - Matching plant: no banner.
+ *  - Invalid page-context targets fail closed instead of falling through to
+ *    an unrelated selected plant.
+ *  - Matching plant: no legacy mismatch banner.
  *  - Watering event auto-expands details and exposes Watering (ml) as
  *    required; saving empty surfaces inline error.
  *  - Attach toggle is disabled and OFF when snapshot status is stale,
@@ -49,7 +49,7 @@ vi.mock("@/store/grows", () => ({
 }));
 vi.mock("@/hooks/use-plants", () => ({ usePlants: () => ({ data: plantsData }) }));
 vi.mock("@/hooks/use-tents", () => ({
-  useTents: () => ({ data: [{ id: "t1", name: "Tent 1" }] }),
+  useTents: () => ({ data: [{ id: "t1", name: "Tent 1", grow_id: "g1" }] }),
 }));
 
 vi.mock("sonner", () => ({
@@ -93,17 +93,19 @@ beforeEach(() => {
 });
 afterEach(() => cleanup());
 
-describe("QuickLog plant mismatch banner", () => {
-  it("shows banner when selected plant differs from prefill plant", async () => {
+describe("QuickLog named target integrity", () => {
+  it("holds an unknown prefill instead of revealing the unrelated scoped plant", async () => {
     renderQL({
       open: true,
       onOpenChange: () => {},
       prefill: { plantId: "p-route-plant", plantName: "Blue Dream", growId: "g1" },
     });
-    // Single scoped plant (p2) auto-picks → differs from prefill.plantId.
-    const banner = await screen.findByTestId("quick-log-plant-mismatch-banner");
-    expect(banner.textContent ?? "").toMatch(/505 Headbanger/);
-    expect(banner.textContent ?? "").toMatch(/Blue Dream/);
+    const error = await screen.findByTestId("quick-log-target-error");
+    expect(error).toHaveTextContent(/no longer available/i);
+    expect(screen.getByTestId("quick-log-target-plant")).toHaveTextContent("Choose a plant");
+    expect(screen.getByTestId("quick-log-target-plant")).not.toHaveTextContent("505 Headbanger");
+    expect(screen.queryByTestId("quick-log-plant-mismatch-banner")).toBeNull();
+    expect(screen.getByTestId("quick-log-save")).toBeDisabled();
   });
 
   it("does not show banner when selected plant matches prefill", async () => {
@@ -141,9 +143,7 @@ describe("QuickLog watering required field", () => {
     const form = wateringInput.closest("form") as HTMLFormElement;
     expect(form).not.toBeNull();
     fireEvent.submit(form);
-    await waitFor(() =>
-      expect(screen.queryByTestId("quicklog-watering-error")).not.toBeNull(),
-    );
+    await waitFor(() => expect(screen.queryByTestId("quicklog-watering-error")).not.toBeNull());
     expect(screen.getByTestId("quicklog-watering-error").textContent ?? "").toMatch(
       /watering volume/i,
     );

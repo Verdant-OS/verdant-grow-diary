@@ -11,32 +11,30 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
+import { readDesktopGrowerNavigationSource } from "@/test/utils/growerNavigationSource";
 
 const ROOT = resolve(__dirname, "../..");
 const PAGE = resolve(ROOT, "src/pages/GrowRoomMode.tsx");
 const RULES = resolve(ROOT, "src/lib/growRoomModeRules.ts");
 const APP = resolve(ROOT, "src/App.tsx");
-const SIDEBAR = resolve(ROOT, "src/components/AppSidebar.tsx");
+const SIDEBAR_PATH = resolve(ROOT, "src/components/AppSidebar.tsx");
 
 const page = readFileSync(PAGE, "utf8");
 const rules = readFileSync(RULES, "utf8");
 
 describe("Grow-Room Mode · file presence", () => {
-  it.each([PAGE, RULES, APP, SIDEBAR])("exists: %s", (p) => {
+  it.each([PAGE, RULES, APP, SIDEBAR_PATH])("exists: %s", (p) => {
     expect(existsSync(p)).toBe(true);
   });
 });
 
 describe("Grow-Room Mode · page is read-only", () => {
-  it.each([
-    /\.insert\(/,
-    /\.update\(/,
-    /\.delete\(/,
-    /\.upsert\(/,
-    /\.rpc\(/,
-  ])("page does not call %s", (re) => {
-    expect(page).not.toMatch(re);
-  });
+  it.each([/\.insert\(/, /\.update\(/, /\.delete\(/, /\.upsert\(/, /\.rpc\(/])(
+    "page does not call %s",
+    (re) => {
+      expect(page).not.toMatch(re);
+    },
+  );
 
   it("page does not write to action_queue", () => {
     expect(page).not.toMatch(
@@ -45,9 +43,7 @@ describe("Grow-Room Mode · page is read-only", () => {
   });
 
   it("page does not write to alerts or alert_events", () => {
-    expect(page).not.toMatch(
-      /\.from\(\s*["']alerts["']\s*\)\s*\.(insert|update|delete|upsert)\(/,
-    );
+    expect(page).not.toMatch(/\.from\(\s*["']alerts["']\s*\)\s*\.(insert|update|delete|upsert)\(/);
     expect(page).not.toMatch(
       /\.from\(\s*["']alert_events["']\s*\)\s*\.(insert|update|delete|upsert)\(/,
     );
@@ -104,21 +100,21 @@ describe("Grow-Room Mode · business logic lives outside JSX", () => {
 
 describe("Grow-Room Mode · route + nav wiring", () => {
   const app = readFileSync(APP, "utf8");
-  const sidebar = readFileSync(SIDEBAR, "utf8");
+  const sidebar = readDesktopGrowerNavigationSource();
 
   it("App redirects the legacy /grow-room route to the main Dashboard", () => {
     expect(app).toMatch(/path=["']\/grow-room["']/);
-    expect(app).toMatch(/path=["']\/grow-room["']\s+element=\{<Navigate\s+to=["']\/["']\s+replace\s*\/>\}/);
+    expect(app).toMatch(
+      /path=["']\/grow-room["']\s+element=\{<Navigate\s+to=["']\/["']\s+replace\s*\/>\}/,
+    );
     expect(app).not.toMatch(/<GrowRoomMode\s*\/?>/);
   });
-
 
   it("Sidebar no longer surfaces the Live Dashboard entry (consolidated into Dashboard)", () => {
     expect(sidebar).not.toMatch(/\/grow-room/);
     expect(sidebar).not.toMatch(/Live Dashboard/);
     expect(sidebar).not.toMatch(/"Grow-Room Mode"/);
   });
-
 });
 
 describe("Grow-Room Mode · rules module is I/O-free", () => {

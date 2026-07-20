@@ -27,11 +27,7 @@ import {
   fahrenheitToCelsius,
   validateManualEntry,
 } from "@/lib/sensorReadingManualEntryRules";
-import {
-  celsiusToFahrenheit,
-  formatTempFFromC,
-  tempFFromC,
-} from "@/lib/temperatureUnits";
+import { celsiusToFahrenheit, formatTempFFromC, tempFFromC } from "@/lib/temperatureUnits";
 
 const ROOT = resolve(__dirname, "../..");
 const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
@@ -183,8 +179,13 @@ describe("ManualSensorReadingCard always exposes the tent selection", () => {
 describe("Sensors page never silently re-routes a manual write to another tent", () => {
   it("only auto-defaults the manual tent when the chip selection is a real DB tent", () => {
     // Old (buggy) behavior: `?? manualTents[0]?.id`. New behavior: undefined.
-    expect(SENSORS_PAGE).not.toMatch(/find\(\(t\) => t\.id === tentId\)\?\.id\s*\?\?\s*manualTents\[0\]/);
-    expect(SENSORS_PAGE).toMatch(/manualTents\.find\(\(t\) => t\.id === tentId\)\?\.id\s*;/);
+    expect(SENSORS_PAGE).not.toMatch(
+      /find\(\(t\) => t\.id === activeTentId\)\?\.id\s*\?\?\s*manualTents\[0\]/,
+    );
+    expect(SENSORS_PAGE).toMatch(/manualTents\.find\(\(t\) => t\.id === activeTentId\)\?\.id\s*;/);
+    expect(SENSORS_PAGE).toMatch(
+      /requiredTentGate\.resolutionPending \|\| requiredTentGate\.reselectionRequired \? null : tentId/,
+    );
   });
 });
 
@@ -195,17 +196,23 @@ describe("Sensors page never silently re-routes a manual write to another tent",
 describe("Latest-reading hooks sort deterministically (ts desc, created_at desc)", () => {
   it("usePlantTentLatestReadings adds a created_at tie-breaker", () => {
     expect(PLANT_LATEST).toMatch(/\.order\(\s*["']ts["']\s*,\s*\{\s*ascending:\s*false\s*\}\s*\)/);
-    expect(PLANT_LATEST).toMatch(/\.order\(\s*["']created_at["']\s*,\s*\{\s*ascending:\s*false\s*\}\s*\)/);
+    expect(PLANT_LATEST).toMatch(
+      /\.order\(\s*["']created_at["']\s*,\s*\{\s*ascending:\s*false\s*\}\s*\)/,
+    );
   });
 
   it("use-sensor-readings adds a created_at tie-breaker", () => {
     expect(USE_SR).toMatch(/\.order\(\s*["']ts["']\s*,\s*\{\s*ascending:\s*false\s*\}\s*\)/);
-    expect(USE_SR).toMatch(/\.order\(\s*["']created_at["']\s*,\s*\{\s*ascending:\s*false\s*\}\s*\)/);
+    expect(USE_SR).toMatch(
+      /\.order\(\s*["']created_at["']\s*,\s*\{\s*ascending:\s*false\s*\}\s*\)/,
+    );
   });
 
   it("useLatestSensorSnapshot already orders by ts then created_at", () => {
     expect(LATEST_SNAP).toMatch(/\.order\(\s*["']ts["']\s*,\s*\{\s*ascending:\s*false\s*\}\s*\)/);
-    expect(LATEST_SNAP).toMatch(/\.order\(\s*["']created_at["']\s*,\s*\{\s*ascending:\s*false\s*\}\s*\)/);
+    expect(LATEST_SNAP).toMatch(
+      /\.order\(\s*["']created_at["']\s*,\s*\{\s*ascending:\s*false\s*\}\s*\)/,
+    );
   });
 });
 

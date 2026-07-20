@@ -28,8 +28,9 @@ describe("manual CO2 entry (EcoWitt-ready)", () => {
     const v = validateManualEntry({ airTempF: 75, humidityPct: 55 });
     expect(v.ok).toBe(true);
     expect(v.metrics.some((m) => m.metric === "co2_ppm")).toBe(false);
-    // temp + RH still derive VPD
-    expect(v.metrics.find((m) => m.metric === "vpd_kpa")?.derived).toBe(true);
+    // temp + RH produce a preview, never an indistinguishable persisted VPD row.
+    expect(v.metrics.find((m) => m.metric === "vpd_kpa")).toBeUndefined();
+    expect(v.warnings.join(" ")).toMatch(/air vpd estimate.*not saved/i);
   });
 
   it("rejects negative CO2 as invalid", () => {
@@ -43,11 +44,12 @@ describe("manual CO2 entry (EcoWitt-ready)", () => {
     expect(v.metrics.some((m) => m.metric === "co2_ppm")).toBe(false);
   });
 
-  it("preserves temp/RH → VPD derivation when CO2 is also present", () => {
+  it("keeps temp/RH → air VPD preview-only when CO2 is also present", () => {
     const v = validateManualEntry({ airTempF: 78, humidityPct: 50, co2Ppm: 900 });
     expect(v.ok).toBe(true);
     const vpd = v.metrics.find((m) => m.metric === "vpd_kpa");
-    expect(vpd?.derived).toBe(true);
+    expect(vpd).toBeUndefined();
+    expect(v.warnings.join(" ")).toMatch(/air vpd estimate.*not saved/i);
     expect(v.metrics.some((m) => m.metric === "co2_ppm")).toBe(true);
   });
 

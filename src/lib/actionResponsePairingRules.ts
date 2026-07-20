@@ -9,8 +9,14 @@
  */
 
 import { normalizeDiaryNoteText } from "./diaryNoteFormatting";
+import {
+  actionTextWithoutResponseContext,
+  readResponseCheckStatus,
+  responseActionChronologyRank,
+} from "./tenSecondQuickCheckRules";
 
 export interface ActionResponsePairingRow {
+  id?: string | null;
   eventType: string;
   notePreview: string;
   occurredAt: string | null;
@@ -43,7 +49,6 @@ const ACTION_EVENT_TYPES = [
   "flush",
   "environment_change",
   "light_change",
-  "quick_log",
 ] as const;
 
 const ACTION_NOTE_KEYWORDS = [
@@ -76,7 +81,6 @@ const ACTION_NOTE_KEYWORDS = [
   "training / pruning",
 ] as const;
 
-const RESPONSE_RE = /(?:response check|quick check):\s*(better|same|worse)\.?/i;
 const MAX_LABEL = 88;
 
 function parseTime(iso: string | null): number | null {
@@ -91,13 +95,7 @@ function includesAny(value: string, needles: readonly string[]): boolean {
 }
 
 function extractResponseStatus(note: string): ActionResponsePairingResult["responseStatus"] {
-  const match = RESPONSE_RE.exec(note ?? "");
-  if (!match) return null;
-  const status = match[1].toLowerCase();
-  if (status === "better") return "Better";
-  if (status === "same") return "Same";
-  if (status === "worse") return "Worse";
-  return null;
+  return readResponseCheckStatus(note ?? "");
 }
 
 function isResponse(row: ActionResponsePairingRow): boolean {
@@ -105,12 +103,11 @@ function isResponse(row: ActionResponsePairingRow): boolean {
 }
 
 function isAction(row: ActionResponsePairingRow): boolean {
-  if (isResponse(row)) return false;
   const eventType = (row.eventType ?? "").toLowerCase();
-  const note = row.notePreview ?? "";
+  const actionText = actionTextWithoutResponseContext(row.notePreview ?? "");
   return (
     ACTION_EVENT_TYPES.some((type) => eventType.includes(type)) ||
-    includesAny(note, ACTION_NOTE_KEYWORDS)
+    includesAny(actionText, ACTION_NOTE_KEYWORDS)
   );
 }
 
@@ -122,6 +119,18 @@ function label(row: ActionResponsePairingRow): string {
   const fallback = (row.eventType ?? "log").replace(/_/g, " ").trim() || "log";
   const source = note || fallback;
   return source.length <= MAX_LABEL ? source : `${source.slice(0, MAX_LABEL - 1).trimEnd()}…`;
+}
+
+function actionLabel(row: ActionResponsePairingRow): string {
+  const actionText = actionTextWithoutResponseContext(row.notePreview ?? "");
+  return label({ ...row, notePreview: actionText });
+}
+
+function chronologicalRank(row: ActionResponsePairingRow): number {
+  return responseActionChronologyRank({
+    hasAction: isAction(row),
+    hasResponse: isResponse(row),
+  });
 }
 
 function empty(reason: ActionResponsePairingResult["reason"]): ActionResponsePairingResult {
@@ -140,9 +149,18 @@ export function buildActionResponsePairing(
   input: ActionResponsePairingInput,
 ): ActionResponsePairingResult {
   const parsed = (input.rows ?? [])
-    .map((row) => ({ row, at: parseTime(row.occurredAt) }))
-    .filter((item): item is { row: ActionResponsePairingRow; at: number } => item.at !== null)
-    .sort((a, b) => a.at - b.at);
+    .map((row, sourceIndex) => ({ row, at: parseTime(row.occurredAt), sourceIndex }))
+    .filter(
+      (item): item is { row: ActionResponsePairingRow; at: number; sourceIndex: number } =>
+        item.at !== null,
+    )
+    .sort((a, b) => {
+      if (a.at !== b.at) return a.at - b.at;
+      const rankDelta = chronologicalRank(a.row) - chronologicalRank(b.row);
+      if (rankDelta !== 0) return rankDelta;
+      const idDelta = (a.row.id ?? "").localeCompare(b.row.id ?? "");
+      return idDelta !== 0 ? idDelta : a.sourceIndex - b.sourceIndex;
+    });
 
   if (parsed.length === 0) return empty("no_action");
 
@@ -167,7 +185,7 @@ export function buildActionResponsePairing(
       show: true,
       reason: "awaiting_response",
       title: "Waiting on plant response",
-      actionLabel: label(action.row),
+      actionLabel: actionLabel(action.row),
       responseLabel: "No response check yet",
       responseStatus: null,
       helper: "Next useful log: Better, Same, or Worse after this change has had time to show up.",
@@ -179,7 +197,7 @@ export function buildActionResponsePairing(
     show: true,
     reason: "paired",
     title: "Action → response captured",
-    actionLabel: label(action.row),
+    actionLabel: actionLabel(action.row),
     responseLabel: label(response.row),
     responseStatus: status,
     helper: status

@@ -105,6 +105,11 @@ import {
   type AiDoctorSessionReviewState,
   type AiDoctorSessionReviewStatusFilter,
 } from "@/lib/aiDoctorSessionReviewStatusRules";
+import AiDoctorSessionIntegrityLedger from "@/components/AiDoctorSessionIntegrityLedger";
+
+/** Only "ledger" opts into the alternate view. Any other/absent value is history. */
+const LEDGER_VIEW_PARAM = "view";
+const LEDGER_VIEW_VALUE = "ledger";
 
 function fmtDate(ts: string | null): string {
   if (!ts) return "";
@@ -299,6 +304,26 @@ function IndexRow({
 
 export default function AiDoctorSessionsIndex() {
   const [searchParams, setSearchParams] = useSearchParams();
+
+  // Optional `?view=ledger` mode. Any other/absent value keeps the default
+  // history view. Independent of the filter/page params below — entering or
+  // leaving ledger mode must never reset or discard them.
+  const isLedgerView = searchParams.get(LEDGER_VIEW_PARAM) === LEDGER_VIEW_VALUE;
+  const enterLedgerView = () => {
+    const next = new URLSearchParams(searchParams);
+    next.set(LEDGER_VIEW_PARAM, LEDGER_VIEW_VALUE);
+    setSearchParams(next, { replace: true });
+  };
+  const exitLedgerView = () => {
+    // Remove ONLY the view param — every other current param (filters,
+    // saved-view selection, page, or anything unrelated) is preserved as-is,
+    // including any repeated same-name params.
+    const next = new URLSearchParams();
+    searchParams.forEach((value, key) => {
+      if (key !== LEDGER_VIEW_PARAM) next.append(key, value);
+    });
+    setSearchParams(next, { replace: true });
+  };
 
   // Derive filters + page from URL (single source of truth).
   const filters = useMemo<SessionsIndexFilters>(
@@ -565,30 +590,55 @@ export default function AiDoctorSessionsIndex() {
             >
               <Stethoscope className="h-4 w-4" /> AI Doctor Sessions
             </h1>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleCopyLink}
-              data-testid="ai-doctor-sessions-index-copy-link"
-              aria-live="polite"
-            >
-              {copyStatus === "success" ? (
-                <>
-                  <Check className="h-3.5 w-3.5" />
-                  <span data-testid="ai-doctor-sessions-index-copy-link-success">Copied</span>
-                </>
-              ) : copyStatus === "error" ? (
-                <>
-                  <AlertCircle className="h-3.5 w-3.5" />
-                  <span data-testid="ai-doctor-sessions-index-copy-link-error">Copy failed</span>
-                </>
-              ) : (
-                <>
-                  <Link2 className="h-3.5 w-3.5" />
-                  <span>Copy link</span>
-                </>
-              )}
-            </Button>
+            <div className="flex items-center gap-2">
+              <div
+                className="flex items-center gap-1"
+                data-testid="ai-doctor-sessions-index-view-switch"
+              >
+                <Button
+                  variant={isLedgerView ? "outline" : "secondary"}
+                  size="sm"
+                  onClick={exitLedgerView}
+                  data-testid="ai-doctor-sessions-index-view-switch-history"
+                  aria-pressed={!isLedgerView}
+                >
+                  History
+                </Button>
+                <Button
+                  variant={isLedgerView ? "secondary" : "outline"}
+                  size="sm"
+                  onClick={enterLedgerView}
+                  data-testid="ai-doctor-sessions-index-view-switch-ledger"
+                  aria-pressed={isLedgerView}
+                >
+                  Ledger
+                </Button>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCopyLink}
+                data-testid="ai-doctor-sessions-index-copy-link"
+                aria-live="polite"
+              >
+                {copyStatus === "success" ? (
+                  <>
+                    <Check className="h-3.5 w-3.5" />
+                    <span data-testid="ai-doctor-sessions-index-copy-link-success">Copied</span>
+                  </>
+                ) : copyStatus === "error" ? (
+                  <>
+                    <AlertCircle className="h-3.5 w-3.5" />
+                    <span data-testid="ai-doctor-sessions-index-copy-link-error">Copy failed</span>
+                  </>
+                ) : (
+                  <>
+                    <Link2 className="h-3.5 w-3.5" />
+                    <span>Copy link</span>
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
           <p
             className="text-xs text-muted-foreground"
@@ -598,6 +648,10 @@ export default function AiDoctorSessionsIndex() {
           </p>
         </CardHeader>
         <CardContent className="text-sm space-y-4">
+          {isLedgerView ? (
+            <AiDoctorSessionIntegrityLedger />
+          ) : (
+            <>
           <div
             className="flex flex-wrap items-end gap-3"
             data-testid="ai-doctor-sessions-index-filters"
@@ -1146,6 +1200,8 @@ export default function AiDoctorSessionsIndex() {
                   Next
                 </Button>
               </div>
+            </>
+          )}
             </>
           )}
         </CardContent>

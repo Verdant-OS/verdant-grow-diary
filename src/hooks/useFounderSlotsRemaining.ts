@@ -18,8 +18,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { FOUNDER_LIFETIME_LIMIT } from "@/constants/pricing";
+import { parseFounderSlotsResponse } from "@/lib/founderSlotsResponseRules";
 
-const TOTAL_SLOTS = 75;
+const TOTAL_SLOTS = FOUNDER_LIFETIME_LIMIT;
 
 export interface FounderSlotsState {
   status: "loading" | "ready" | "unknown";
@@ -46,12 +48,12 @@ export function useFounderSlotsRemaining(): FounderSlotsState {
     let cancelled = false;
     void (async () => {
       try {
-        const { data, error } = await supabase.functions.invoke(
-          "founder-slots-remaining",
-          { body: {} },
-        );
+        const { data, error } = await supabase.functions.invoke("founder-slots-remaining", {
+          body: {},
+        });
         if (cancelled || !mountedRef.current) return;
-        if (error || typeof (data as { remaining?: unknown })?.remaining !== "number") {
+        const parsed = parseFounderSlotsResponse(data);
+        if (error || !parsed) {
           setState({
             status: "unknown",
             remaining: null,
@@ -61,16 +63,9 @@ export function useFounderSlotsRemaining(): FounderSlotsState {
           });
           return;
         }
-        const remaining = Math.max(
-          0,
-          Math.min(TOTAL_SLOTS, Math.floor((data as { remaining: number }).remaining)),
-        );
         setState({
           status: "ready",
-          remaining,
-          total: TOTAL_SLOTS,
-          claimed: TOTAL_SLOTS - remaining,
-          soldOut: remaining <= 0,
+          ...parsed,
         });
       } catch {
         if (cancelled || !mountedRef.current) return;

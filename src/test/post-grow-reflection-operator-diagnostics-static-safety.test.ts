@@ -3,6 +3,10 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { getRoutesByAccess } from "@/lib/appRouteManifest";
+import {
+  readDesktopGrowerNavigationSource,
+  readMobileGrowerNavigationSource,
+} from "@/test/utils/growerNavigationSource";
 
 const read = (path: string) => readFileSync(resolve(process.cwd(), path), "utf8");
 
@@ -26,8 +30,8 @@ describe("Post-Grow Reflection operator diagnostics static safety", () => {
   });
 
   it("does not expose the diagnostics route in grower-facing navigation", () => {
-    const sidebar = read("src/components/AppSidebar.tsx");
-    const mobileNav = read("src/components/MobileNav.tsx");
+    const sidebar = readDesktopGrowerNavigationSource();
+    const mobileNav = readMobileGrowerNavigationSource();
 
     expect(sidebar).not.toContain(ROUTE);
     expect(mobileNav).not.toContain(ROUTE);

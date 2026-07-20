@@ -164,3 +164,122 @@ export function buildBreadcrumbListJsonLd({
 export function safeJsonLdStringify(data: unknown): string {
   return JSON.stringify(data).replace(/<\/(script)/gi, "<\\/$1");
 }
+
+export interface ArticleJsonLd {
+  readonly "@context": "https://schema.org";
+  readonly "@type": "Article";
+  readonly headline: string;
+  readonly description: string;
+  readonly url: string;
+  readonly datePublished: string;
+  readonly dateModified?: string;
+  readonly author: { readonly "@type": "Organization"; readonly name: string; readonly url?: string };
+  readonly publisher: { readonly "@type": "Organization"; readonly name: string; readonly url?: string };
+  readonly mainEntityOfPage: { readonly "@type": "WebPage"; readonly "@id": string };
+}
+
+/**
+ * Build a schema.org Article JSON-LD document for editorial pages
+ * (grower guides). Author/publisher default to the Verdant organization
+ * since these are house-authored evergreen guides.
+ */
+export function buildArticleJsonLd({
+  headline,
+  description,
+  url,
+  datePublished,
+  dateModified,
+  authorName = "Verdant Grow Diary",
+  publisherName = "Verdant Grow Diary",
+  siteUrl,
+}: {
+  headline: string;
+  description: string;
+  url: string;
+  datePublished: string;
+  dateModified?: string;
+  authorName?: string;
+  publisherName?: string;
+  siteUrl?: string;
+}): ArticleJsonLd {
+  if (!headline.trim()) throw new Error("buildArticleJsonLd: headline required");
+  if (!description.trim()) throw new Error("buildArticleJsonLd: description required");
+  if (!/^https?:\/\//i.test(url)) {
+    throw new Error(`buildArticleJsonLd: url must be absolute (got "${url}")`);
+  }
+  if (!/^\d{4}-\d{2}-\d{2}/.test(datePublished)) {
+    throw new Error(`buildArticleJsonLd: datePublished must be ISO-8601 (got "${datePublished}")`);
+  }
+  return {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline,
+    description,
+    url,
+    datePublished,
+    ...(dateModified ? { dateModified } : {}),
+    author: { "@type": "Organization", name: authorName, ...(siteUrl ? { url: siteUrl } : {}) },
+    publisher: { "@type": "Organization", name: publisherName, ...(siteUrl ? { url: siteUrl } : {}) },
+    mainEntityOfPage: { "@type": "WebPage", "@id": url },
+  };
+}
+
+export interface CultivarCollectionJsonLd {
+  readonly "@context": "https://schema.org";
+  readonly "@type": "CollectionPage";
+  readonly name: string;
+  readonly description: string;
+  readonly url: string;
+  readonly about: {
+    readonly "@type": "Thing";
+    readonly name: string;
+    readonly alternateName?: string;
+    readonly additionalProperty: ReadonlyArray<{
+      readonly "@type": "PropertyValue";
+      readonly name: string;
+      readonly value: string;
+    }>;
+  };
+}
+
+/**
+ * Build a schema.org CollectionPage JSON-LD document for a cultivar profile.
+ * CollectionPage rather than Product because cultivars are not sold here —
+ * the page collects horticultural evidence about the strain. Strain traits
+ * are encoded as PropertyValue entries under `about`.
+ */
+export function buildCultivarCollectionJsonLd({
+  name,
+  alternateName,
+  description,
+  url,
+  properties,
+}: {
+  name: string;
+  alternateName?: string;
+  description: string;
+  url: string;
+  properties: ReadonlyArray<{ name: string; value: string }>;
+}): CultivarCollectionJsonLd {
+  if (!name.trim()) throw new Error("buildCultivarCollectionJsonLd: name required");
+  if (!description.trim()) throw new Error("buildCultivarCollectionJsonLd: description required");
+  if (!/^https?:\/\//i.test(url)) {
+    throw new Error(`buildCultivarCollectionJsonLd: url must be absolute (got "${url}")`);
+  }
+  const additionalProperty = properties
+    .filter((p) => p.name.trim() && p.value.trim())
+    .map((p) => ({ "@type": "PropertyValue" as const, name: p.name, value: p.value }));
+  return {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    name,
+    description,
+    url,
+    about: {
+      "@type": "Thing",
+      name,
+      ...(alternateName ? { alternateName } : {}),
+      additionalProperty,
+    },
+  };
+}

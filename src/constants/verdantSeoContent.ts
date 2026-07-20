@@ -16,9 +16,28 @@
 import type { FaqEntry } from "./verdantSeoCopy";
 import { CANNABIS_PLANT_CARE_FAQ } from "./cannabisPlantCareFaq";
 
+export interface GuideSectionLink {
+  readonly label: string;
+  /** Absolute in-app path (e.g. "/quick-log", "/guides/sensor-truth-grow-room"). */
+  readonly to: string;
+}
+
 export interface GuideSection {
   readonly heading: string;
   readonly body: string;
+  /** Optional in-app internal links surfaced under the section body. */
+  readonly links?: ReadonlyArray<GuideSectionLink>;
+}
+
+
+export interface GuideCallToAction {
+  readonly label: string;
+  /** Absolute in-app path. */
+  readonly to: string;
+  readonly heading: string;
+  readonly description: string;
+  /** Optional bullet prompts shown next to the CTA button. */
+  readonly prompts?: ReadonlyArray<string>;
 }
 
 export interface SeoGuidePage {
@@ -32,7 +51,10 @@ export interface SeoGuidePage {
   readonly faq: ReadonlyArray<FaqEntry>;
   /** Related guide slugs surfaced as internal links. */
   readonly related: ReadonlyArray<string>;
+  /** Optional prominent CTA rendered near the top of the guide. */
+  readonly cta?: GuideCallToAction;
 }
+
 
 /* ------------------------------------------------------------------ */
 /* Grower guide FAQ (visible on /guides + FAQPage JSON-LD on /guides) */
@@ -661,6 +683,110 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       "plant-watering-log",
       "grow-room-vpd-tracker",
       "ai-grow-doctor",
+    ],
+  },
+  {
+    slug: "bud-rot-prevention-identification",
+    title: "Bud rot (Botrytis) identification | Verdant Grow Diary",
+    h1: "Bud rot (Botrytis) identification and prevention with sensor history",
+    description:
+      "Catch bud rot (Botrytis) early using photos, humidity logs, and VPD history — source-labeled sensor context, not guesswork, so you spot high-risk periods before the canopy is lost.",
+    targetKeyword: "bud rot identification",
+    intro:
+      "Bud rot identification is a race against a fungus that hides inside the flower before it shows on the outside. Botrytis cinerea thrives when humidity climbs, temperatures drop overnight, and airflow through the canopy stalls. Verdant does not diagnose bud rot for you — but the same plant memory and sensor truth that power the rest of the app make early signs visible, and let you review the humidity and VPD history around the moment things went wrong.",
+    cta: {
+      heading: "Start an Environment Check for bud rot risk",
+      description:
+        "Open a source-labeled humidity and VPD review for your tent — see how long conditions sat in the Botrytis risk band and log any suspicious buds while the context is fresh.",
+      label: "Start Environment Check",
+      to: "/diary/environment-summary",
+      prompts: [
+        "Is late-flower humidity holding above ~60% for long stretches?",
+        "Does humidity spike overnight after lights-off?",
+        "Is VPD sliding below your late-flower target for hours at a time?",
+        "Any suspicious buds to log with a Quick Log photo right now?",
+      ],
+    },
+    sections: [
+
+      {
+        heading: "Early visual signs to log with a photo",
+        body: "Bud rot identification usually starts with one wilted or discolored sugar leaf poking out of an otherwise healthy cola, a single dry-looking pistil cluster, or a bud that feels slightly soft when you gently touch it. Inside, cores turn grey, brown, or dusty. Log every suspicious bud in Quick Log with a close photo against the specific plant so the timeline holds the moment you first saw it. One photo is not a confident diagnosis — but a photo plus the surrounding humidity, VPD, and watering context is the evidence AI Doctor and future-you actually need.",
+        links: [
+          { label: "Start a Quick Log", to: "/quick-log" },
+          { label: "What to log in a grow journal", to: "/guides/what-to-log-in-a-grow-journal" },
+          { label: "How AI Doctor uses your photos", to: "/how-ai-doctor-works" },
+        ],
+      },
+      {
+        heading: "Environmental triggers Botrytis loves",
+        body: "The classic triggers are sustained high humidity above roughly 60% in late flower, cool overnight temperatures that push relative humidity even higher, dense canopies with poor airflow, wet foliage from foliar sprays or condensation, and dense colas that trap moisture inside. Verdant does not adjust your fans, dehumidifier, or lights. It surfaces the pattern — a source-labeled humidity reading holding above your target, or a VPD number sliding out of range overnight — so the grower can decide whether to defoliate lightly, improve airflow, or pull affected buds.",
+        links: [
+          { label: "Grow-room VPD tracker guide", to: "/guides/grow-room-vpd-tracker" },
+          { label: "Open Environment Check", to: "/diary/environment-summary" },
+        ],
+      },
+      {
+        heading: "Use humidity and VPD history to identify high-risk periods",
+        body: "Open the plant timeline and scan the days before the first symptom. Look for humidity readings that stayed high for hours, temperature drops after lights-off that pushed humidity even higher, and VPD values that spent long stretches below your late-flower target. Every reading in Verdant carries a source label — live, manual, csv, demo, stale, or invalid — so a week-old or invalid number is flagged, not treated as current truth. CSV history imported from AC Infinity or Spider Farmer exports works the same way: read-only, source-labeled, and reviewable next to the photo you took.",
+        links: [
+          { label: "Sensor truth in the grow room", to: "/guides/sensor-truth-grow-room" },
+          { label: "Review humidity & VPD history (Environment Check)", to: "/diary/environment-summary" },
+        ],
+      },
+      {
+        heading: "A cautious response, not a panic response",
+        body: "If you confirm bud rot, remove affected buds with clean scissors, cutting well below the visible damage, and dispose of them away from the tent. Reduce humidity, improve airflow, and inspect neighboring colas the next day. Verdant's cautious AI Doctor can review your photos and sensor history and suggest a step — improve airflow, adjust dehumidifier setpoint, or increase inspection cadence — but any equipment change is grower-approved through the Action Queue. Verdant suggests; the grower decides. Verdant will never touch your dehumidifier, fans, or lights.",
+        links: [
+          { label: "AI Doctor readiness check", to: "/ai-doctor-readiness-check" },
+          { label: "How AI Doctor works", to: "/how-ai-doctor-works" },
+        ],
+      },
+
+    ],
+    faq: [
+      {
+        question: "What does bud rot look like in the early stages?",
+        answer:
+          "Early bud rot often shows as a single wilted sugar leaf on an otherwise healthy cola, dry or discolored pistils in one spot, or a bud that feels softer than the ones next to it. Inside, the core turns grey, brown, or dusty. Log any suspicious bud with a close photo against the specific plant so the timeline holds the exact moment and context.",
+      },
+      {
+        question: "What humidity level puts flower at risk of Botrytis?",
+        answer:
+          "Risk climbs when relative humidity sits above roughly 60% for long stretches in late flower, especially overnight when temperatures drop and humidity rises further. There is no single safe number — dense colas, poor airflow, and wet foliage all raise risk at the same humidity. Use your source-labeled humidity and VPD history to see how long conditions stayed in the risk band, not just the current reading.",
+      },
+      {
+        question: "Can Verdant automatically prevent bud rot?",
+        answer:
+          "No. Verdant does not control your dehumidifier, fans, or lights. It gives you plant memory, source-labeled sensor history, and cautious AI Doctor context so bud rot risk is visible earlier. Any equipment change or pruning decision stays with the grower through the approval-required Action Queue.",
+      },
+      {
+        question: "How do I use sensor history to spot bud rot risk?",
+        answer:
+          "Open the affected plant's timeline and review the humidity, temperature, and VPD readings for the days leading up to the first symptom. Look for humidity above target for long stretches, overnight spikes after lights-off, and VPD values that stayed below your late-flower target. Every reading carries a source label so stale, demo, or invalid values are flagged rather than mistaken for current truth.",
+      },
+      {
+        question: "How is bud rot different from powdery mildew?",
+        answer:
+          "Powdery mildew shows as a white, dusty coating on the outside of leaves and buds and is usually visible before you touch anything. Bud rot (Botrytis) hides inside the cola — the outside can look normal while the core is grey, brown, or dusty. Both are humidity-driven, but bud rot is discovered by gently probing suspicious buds and cross-checking the plant's humidity and VPD history, not by surface inspection alone.",
+      },
+      {
+        question: "Are dense-cola or indica-leaning cultivars more at risk?",
+        answer:
+          "Yes. Tight, chunky colas trap moisture and slow drying after any humidity spike, so dense indica-leaning cultivars and heavy hybrids tend to carry more bud rot risk than airy sativa-leaning structures. Log cultivar and structure notes in the plant record so your timeline shows which genetics needed tighter late-flower humidity and airflow the last time around.",
+      },
+      {
+        question: "Can I smoke or salvage buds that had bud rot?",
+        answer:
+          "No. Any bud showing Botrytis should be cut well below the visible damage and discarded away from the tent — do not smoke, extract, or dry-trim affected material, and do not attempt to salvage it. Inspect neighboring colas the next day, since spores spread easily. Log the removal in Quick Log with a photo so the timeline records what was pulled and when.",
+      },
+
+    ],
+    related: [
+      "grow-room-vpd-tracker",
+      "sensor-truth-grow-room",
+      "ai-grow-doctor",
+      "what-to-log-in-a-grow-journal",
     ],
   },
 ];

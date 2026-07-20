@@ -72,6 +72,8 @@ const H = vi.hoisted(() => {
     statusByTent: { [TENT_ID]: "success" } as Record<string, string>,
     isLoading: false,
     isError: false,
+    growIsLoading: false,
+    growIsError: false,
     /** Tent ids the sensor hook was last called with (for UUID-guard pins). */
     lastRequestedIds: [] as string[],
   };
@@ -81,6 +83,8 @@ const H = vi.hoisted(() => {
     hookState.statusByTent = { [TENT_ID]: "success" };
     hookState.isLoading = false;
     hookState.isError = false;
+    hookState.growIsLoading = false;
+    hookState.growIsError = false;
     hookState.lastRequestedIds = [];
   };
   return { TENT_ID, newestTs, oldestTs, ROWS, raw, makeTent, hookState, resetHookState };
@@ -92,9 +96,16 @@ vi.mock("@/hooks/useGrowData", async (importOriginal) => {
     ...actual,
     useGrowTents: () => ({
       data: H.hookState.tents,
-      isLoading: false,
+      isLoading: H.hookState.growIsLoading,
+      isError: H.hookState.growIsError,
+      refetch: vi.fn(),
     }),
-    useGrowPlants: () => ({ data: [] }),
+    useGrowPlants: () => ({
+      data: [],
+      isLoading: H.hookState.growIsLoading,
+      isError: H.hookState.growIsError,
+      refetch: vi.fn(),
+    }),
     getGrowDataMeta: () => ({
       isDemoData: false,
       dataSource: "supabase",
@@ -474,6 +485,37 @@ describe("Tents list sensor truth — rendered page (walkthrough regression)", (
     vi.useRealTimers();
   });
 
+  it("a failed tent/plant read owns the page and suppresses setup, disclosure, and counts", () => {
+    H.hookState.growIsError = true;
+    H.hookState.tents = [];
+    render(
+      <MemoryRouter>
+        <Tents />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId("tents-grow-data-error")).toHaveTextContent(
+      /This is not an empty grow/,
+    );
+    expect(screen.queryByTestId("tents-data-source-disclosure")).toBeNull();
+    expect(screen.queryByText("No tents yet")).toBeNull();
+    expect(screen.queryByText(/0 plants/)).toBeNull();
+  });
+
+  it("an unresolved tent/plant read renders only a loading boundary, never empty-grow UI", () => {
+    H.hookState.growIsLoading = true;
+    H.hookState.tents = [];
+    render(
+      <MemoryRouter>
+        <Tents />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId("tents-grow-data-loading")).toHaveTextContent(/Loading tent data/);
+    expect(screen.queryByTestId("tents-data-source-disclosure")).toBeNull();
+    expect(screen.queryByText("No tents yet")).toBeNull();
+  });
+
   it("pending reads render a loading state, never 'No sensor data yet'", () => {
     H.hookState.byTent = { [H.TENT_ID]: [] };
     H.hookState.statusByTent = { [H.TENT_ID]: "loading" };
@@ -636,7 +678,7 @@ describe("Tents list sensor truth — static wiring", () => {
   });
 
   it("only queries real UUID tent ids (mock-fallback ids short-circuit)", () => {
-    expect(TENTS_SRC).toMatch(/from\s+["']@\/lib\/growRepo["']/);
+    expect(TENTS_SRC).toMatch(/from\s+["']@\/lib\/isUuid["']/);
     expect(TENTS_SRC).toMatch(/\.filter\(\(id\) => isUuid\(id\)\)/);
     expect(TENTS_SRC).toMatch(/isUuid\(t\.id\)/);
   });

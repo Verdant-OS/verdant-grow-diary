@@ -5,7 +5,7 @@
  * re-test that calculation. Also pins the `from=plants` entry-source
  * contract and the success-card CTAs for that source.
  */
-import { describe, it, expect, vi } from "vitest";
+import { beforeEach, describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen, within } from "@testing-library/react";
@@ -22,6 +22,10 @@ import { buildDashboardDailyGrowCheckPanel } from "@/lib/dashboardDailyGrowCheck
 // Hook mocks — feed deterministic data into Plants.tsx
 // ---------------------------------------------------------------------------
 const TODAY_ISO = new Date().toISOString();
+const growReadState = {
+  isLoading: false,
+  isError: false,
+};
 
 const PLANTS = [
   {
@@ -56,17 +60,25 @@ vi.mock("@/hooks/useGrowData", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/hooks/useGrowData")>();
   return {
     ...actual,
-    useGrowPlants: () => ({ data: PLANTS }),
-    useGrowTents: () => ({ data: [{ id: "t1", name: "Tent A" }] }),
+    useGrowPlants: () => ({
+      data: growReadState.isLoading || growReadState.isError ? [] : PLANTS,
+      isLoading: growReadState.isLoading,
+      isError: growReadState.isError,
+      refetch: vi.fn(),
+    }),
+    useGrowTents: () => ({
+      data: growReadState.isLoading || growReadState.isError ? [] : [{ id: "t1", name: "Tent A" }],
+      isLoading: growReadState.isLoading,
+      isError: growReadState.isError,
+      refetch: vi.fn(),
+    }),
     getGrowDataMeta: () => undefined,
   };
 });
 
 vi.mock("@/hooks/use-diary-entries", () => ({
   useDiaryEntries: () => ({
-    data: [
-      { id: "d1", entry_at: TODAY_ISO, plant_id: "p-checked", tent_id: "t1" },
-    ],
+    data: [{ id: "d1", entry_at: TODAY_ISO, plant_id: "p-checked", tent_id: "t1" }],
   }),
 }));
 
@@ -117,6 +129,32 @@ function renderPlants() {
 }
 
 describe("Plants page · Daily Grow Check badge", () => {
+  beforeEach(() => {
+    growReadState.isLoading = false;
+    growReadState.isError = false;
+  });
+
+  it("lets a failed private read own the page instead of rendering filters, counts, or setup", () => {
+    growReadState.isError = true;
+    renderPlants();
+
+    expect(screen.getByTestId("plants-grow-data-error")).toHaveTextContent(
+      /This is not an empty grow/,
+    );
+    expect(screen.queryByTestId("plants-filter-controls")).toBeNull();
+    expect(screen.queryByTestId("plants-current-grow-strip")).toBeNull();
+    expect(screen.queryByText("No plants yet")).toBeNull();
+  });
+
+  it("does not flash zero-count filters or an empty grow while private reads are pending", () => {
+    growReadState.isLoading = true;
+    renderPlants();
+
+    expect(screen.getByTestId("plants-grow-data-loading")).toHaveTextContent(/Loading plant data/);
+    expect(screen.queryByTestId("plants-filter-controls")).toBeNull();
+    expect(screen.queryByText("No plants yet")).toBeNull();
+  });
+
   it("renders 'Checked today' badge for plants with today's check", () => {
     renderPlants();
     const rows = screen.getAllByTestId("plant-card-daily-check-row");
@@ -141,9 +179,7 @@ describe("Plants page · Daily Grow Check badge", () => {
     renderPlants();
     const ctas = screen.getAllByTestId("plant-card-daily-check-cta");
     expect(ctas).toHaveLength(1);
-    expect(ctas[0].getAttribute("href")).toBe(
-      "/daily-check?plantId=p-needs&from=plants",
-    );
+    expect(ctas[0].getAttribute("href")).toBe("/daily-check?plantId=p-needs&from=plants");
     expect(ctas[0].getAttribute("data-plant-id")).toBe("p-needs");
     expect(ctas[0].textContent).toMatch(/start check/i);
   });
@@ -227,13 +263,9 @@ describe("Manual current-tent sensor snapshot still counts", () => {
     const panel = buildDashboardDailyGrowCheckPanel({
       now,
       scopedGrowId: null,
-      plants: [
-        { id: "p1", name: "P1", tentId: "t1", growId: null, isArchived: false },
-      ],
+      plants: [{ id: "p1", name: "P1", tentId: "t1", growId: null, isArchived: false }],
       tents: [{ id: "t1", name: "Tent A" }],
-      manualReadings: [
-        { ts: now.toISOString(), id: "m1", tent_id: "t1" },
-      ],
+      manualReadings: [{ ts: now.toISOString(), id: "m1", tent_id: "t1" }],
       diaryEntries: [],
     });
     expect(panel.rows[0].checkedToday).toBe(true);
@@ -241,15 +273,10 @@ describe("Manual current-tent sensor snapshot still counts", () => {
 });
 
 describe("Static safety · Plants daily-check badge wiring", () => {
-  const PLANTS_SRC = readFileSync(
-    resolve(__dirname, "../../src/pages/Plants.tsx"),
-    "utf8",
-  );
+  const PLANTS_SRC = readFileSync(resolve(__dirname, "../../src/pages/Plants.tsx"), "utf8");
 
   function stripComments(src: string): string {
-    return src
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+    return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
   }
   const CODE = stripComments(PLANTS_SRC);
 

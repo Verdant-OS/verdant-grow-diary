@@ -5,11 +5,17 @@
  * If the slug is unknown, redirects to the index rather than 404-ing —
  * keeps the SEO surface predictable without shipping a thin page.
  */
+import { useEffect } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import BrandLogo from "@/components/BrandLogo";
 import CultivarPhenoSampleModule from "@/components/CultivarPhenoSampleModule";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import { findCultivarBySlug } from "@/constants/verdantCultivars";
+import { VERDANT_SITE_ORIGIN } from "@/constants/verdantSeoContent";
+import {
+  buildCultivarCollectionJsonLd,
+  safeJsonLdStringify,
+} from "@/lib/seoStructuredData";
 
 export default function CultivarPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -27,6 +33,33 @@ export default function CultivarPage() {
       : "Cultivator-focused grow guides for popular cultivars.",
     path: cultivar ? `/cultivars/${cultivar.slug}` : "/cultivars",
   });
+
+  useEffect(() => {
+    if (!cultivar) return;
+    const url = `${VERDANT_SITE_ORIGIN}/cultivars/${cultivar.slug}`;
+    const jsonLd = buildCultivarCollectionJsonLd({
+      name: `${cultivar.name} grow guide`,
+      alternateName: cultivar.searchAlias,
+      description: `${cultivar.name} cultivator profile: lineage ${cultivar.lineage}, ${cultivar.flowerWeeks} flower window, difficulty ${cultivar.difficulty}, plus environment ranges by stage and common issues home growers report.`,
+      url,
+      properties: [
+        { name: "Lineage", value: cultivar.lineage },
+        { name: "Flower window", value: cultivar.flowerWeeks },
+        { name: "Difficulty", value: cultivar.difficulty },
+        { name: "Seedling environment", value: cultivar.environment.seedling },
+        { name: "Vegetative environment", value: cultivar.environment.veg },
+        { name: "Flower environment", value: cultivar.environment.flower },
+      ],
+    });
+    const script = document.createElement("script");
+    script.type = "application/ld+json";
+    script.setAttribute("data-page-ldjson", `cultivar-${cultivar.slug}-collection`);
+    script.text = safeJsonLdStringify(jsonLd);
+    document.head.appendChild(script);
+    return () => {
+      script.remove();
+    };
+  }, [cultivar]);
 
   if (!cultivar) {
     return <Navigate to="/cultivars" replace />;

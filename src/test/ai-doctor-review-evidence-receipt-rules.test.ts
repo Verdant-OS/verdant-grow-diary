@@ -171,6 +171,39 @@ describe("AI Doctor review evidence receipt rules", () => {
     }
   });
 
+  it("drops malformed root-zone observations without discarding valid watering evidence", () => {
+    const input = packet();
+    input.recentRootZoneObservations = [
+      {
+        ...input.recentRootZoneObservations![0],
+        at: "not-a-timestamp",
+      },
+      {
+        ...input.recentRootZoneObservations![0],
+        eventType: "watering",
+        nutrientLine: null,
+        products: [],
+      },
+    ];
+
+    const receipt = buildAiDoctorReviewEvidenceReceiptSnapshot({
+      packet: input,
+      clientCollectionDecision: decision(),
+    });
+
+    expect(receipt?.rootZoneObservations).toEqual([
+      {
+        at: AT,
+        eventType: "watering",
+        source: "manual",
+        measuredFields: ["volumeMl", "inputPh", "inputEcMsCm"],
+        hasNutrientLine: false,
+        productCount: 0,
+        invalidFields: [],
+      },
+    ]);
+  });
+
   it("keeps rollout-compatible null client metadata distinct from malformed metadata", () => {
     const receipt = buildAiDoctorReviewEvidenceReceiptSnapshot({ packet: packet() });
     expect(receipt?.clientCollectionDecision).toBeNull();

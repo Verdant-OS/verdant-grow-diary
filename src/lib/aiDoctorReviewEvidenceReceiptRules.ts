@@ -407,9 +407,9 @@ export function buildAiDoctorReviewEvidenceReceiptSnapshot(input: {
     recentSensorSnapshot,
     recentSensorSnapshotAnnotation,
     importedSensorHistory,
-    rootZoneObservations: (packet.recentRootZoneObservations ?? []).flatMap(
-      buildRootZoneObservationReceipt,
-    ),
+    rootZoneObservations: (packet.recentRootZoneObservations ?? [])
+      .map(buildRootZoneObservationReceipt)
+      .filter((observation): observation is ReceiptRootZoneObservation => observation !== null),
     missingLiveSensorReadings: packet.missingLiveSensorReadings === true,
   };
 

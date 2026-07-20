@@ -287,6 +287,38 @@ export default function GuidePage() {
           </section>
         )}
 
+        {guide.slug === "bud-rot-prevention-identification" && (
+          <section
+            className="mt-12 rounded-xl border border-primary/30 bg-primary/5 p-5"
+            data-testid="guide-bud-rot-checklist-download"
+          >
+            <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">
+              Printable resource
+            </p>
+            <h2 className="mt-2 font-display text-xl font-semibold">
+              Download the Bud Rot prevention checklist (PDF)
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              A one-page, grower-approved checklist for late flower: environment
+              targets, a daily walk-through, a weekly Environment Check audit,
+              and what to do if you find rot. Print it and pin it next to the
+              tent, or keep it on your phone.
+            </p>
+            <a
+              href="/verdant-bud-rot-prevention-checklist.pdf"
+              download
+              className="mt-4 inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+              data-testid="guide-bud-rot-checklist-download-link"
+            >
+              Download checklist (PDF)
+            </a>
+            <p className="mt-3 text-xs text-muted-foreground">
+              Verdant suggests; the grower decides. Nothing on this checklist
+              triggers automation.
+            </p>
+          </section>
+        )}
+
         <section className="mt-12 rounded-lg border border-border/60 p-5">
           <h2 className="font-display text-lg font-semibold">Keep reading</h2>
           <ul className="mt-3 space-y-2 text-sm">

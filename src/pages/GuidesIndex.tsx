@@ -32,7 +32,7 @@ const PAGE_URL = "https://verdantgrowdiary.com/guides";
 
 export default function GuidesIndex() {
   usePageSeo({
-    title: "Verdant Grower Guides | Grow Diary, VPD Tracking, and Sensor Truth",
+    title: "Grower Guides: Grow Diary, VPD & Sensor Truth | Verdant",
     description:
       "Practical grower guides for using plant timelines, source-labeled sensor data, VPD context, and cautious AI to make better cultivation decisions.",
     path: "/guides",

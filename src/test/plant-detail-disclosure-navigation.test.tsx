@@ -5,6 +5,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { usePlantDetailDisclosureNavigation } from "@/hooks/usePlantDetailDisclosureNavigation";
 
+const disclosureRenderLog: Array<{
+  plantId: string | undefined;
+  openGroups: { history: boolean; harvest: boolean; ai: boolean };
+}> = [];
+
 function wrapper(initialEntry: string) {
   return function RouterWrapper({ children }: PropsWithChildren) {
     return <MemoryRouter initialEntries={[initialEntry]}>{children}</MemoryRouter>;
@@ -15,6 +20,7 @@ function NavigableDisclosureHarness() {
   const { plantId } = useParams<{ plantId: string }>();
   const navigate = useNavigate();
   const { openGroups, setGroupOpen } = usePlantDetailDisclosureNavigation({ plantId });
+  disclosureRenderLog.push({ plantId, openGroups: { ...openGroups } });
 
   return (
     <>
@@ -50,6 +56,7 @@ describe("usePlantDetailDisclosureNavigation", () => {
   let cancelAnimationFrame: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
+    disclosureRenderLog.length = 0;
     frames = [];
     nextFrameId = 0;
     vi.stubGlobal(
@@ -227,6 +234,21 @@ describe("usePlantDetailDisclosureNavigation", () => {
     expect(document.activeElement).toBe(navigateButton);
   });
 
+  it("never renders cached plant A disclosure state while plant B has no hash", () => {
+    renderNavigableHarness("/plants/plant-a#plant-ai-doctor-review");
+    fireEvent.click(screen.getByRole("button", { name: "Open history" }));
+    disclosureRenderLog.length = 0;
+
+    fireEvent.click(screen.getByRole("button", { name: "Open plant B without hash" }));
+
+    const firstPlantBRender = disclosureRenderLog.find(({ plantId }) => plantId === "plant-b");
+    expect(firstPlantBRender?.openGroups).toEqual({
+      history: false,
+      harvest: false,
+      ai: false,
+    });
+  });
+
   it("opens only the current hash group when route, hash, and plant identity change together", () => {
     renderNavigableHarness("/plants/plant-a#plant-ai-doctor-review");
     flushLatestFrame();
@@ -242,6 +264,31 @@ describe("usePlantDetailDisclosureNavigation", () => {
     );
     flushLatestFrame();
     expect(document.activeElement).toBe(document.getElementById("plant-harvest-evidence"));
+  });
+
+  it("renders only plant B's hash-derived group on the first cached transition paint", () => {
+    renderNavigableHarness("/plants/plant-a#plant-ai-doctor-review");
+    fireEvent.click(screen.getByRole("button", { name: "Open history" }));
+    disclosureRenderLog.length = 0;
+
+    fireEvent.click(screen.getByRole("button", { name: "Open plant B harvest evidence" }));
+
+    const firstPlantBRender = disclosureRenderLog.find(({ plantId }) => plantId === "plant-b");
+    expect(firstPlantBRender?.openGroups).toEqual({
+      history: false,
+      harvest: true,
+      ai: false,
+    });
+  });
+
+  it("cancels plant A's pending focus frame before the first plant B render settles", () => {
+    renderNavigableHarness("/plants/plant-a#plant-ai-doctor-review");
+    expect(frames.map(({ id }) => id)).toEqual([1]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Open plant B without hash" }));
+
+    expect(cancelAnimationFrame).toHaveBeenCalledWith(1);
+    expect(frames).toHaveLength(0);
   });
 
   it("cancels a pending animation frame on replacement and cleanup", () => {

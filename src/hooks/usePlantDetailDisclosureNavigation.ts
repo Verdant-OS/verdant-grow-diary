@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import {
   resolvePlantDetailDisclosureTarget,
@@ -15,6 +15,7 @@ export interface PlantDetailDisclosureOpenState {
 export type PlantDetailRevealAndNavigate = (
   anchorId: string,
   preferredTarget?: HTMLElement | null,
+  options?: { updateHash?: boolean; replace?: boolean },
 ) => void;
 
 interface UsePlantDetailDisclosureNavigationInput {
@@ -26,6 +27,12 @@ const ALL_CLOSED: PlantDetailDisclosureOpenState = {
   harvest: false,
   ai: false,
 };
+
+interface PlantDetailDisclosureState {
+  plantId: string | null | undefined;
+  routeHash: string;
+  openGroups: PlantDetailDisclosureOpenState;
+}
 
 function openStateFor(group: PlantDetailDisclosureGroup | null): PlantDetailDisclosureOpenState {
   return group ? { ...ALL_CLOSED, [group]: true } : { ...ALL_CLOSED };
@@ -57,13 +64,20 @@ export function usePlantDetailDisclosureNavigation({
   plantId,
 }: UsePlantDetailDisclosureNavigationInput) {
   const location = useLocation();
-  const [observedHash, setObservedHash] = useState(location.hash);
+  const navigate = useNavigate();
   const initialTarget = resolvePlantDetailDisclosureTarget(location.hash);
-  const [openGroups, setOpenGroups] = useState<PlantDetailDisclosureOpenState>(() =>
-    openStateFor(initialTarget?.group ?? null),
-  );
-  const previousPlantIdRef = useRef<string | null | undefined>(plantId);
+  const [disclosureState, setDisclosureState] = useState<PlantDetailDisclosureState>(() => ({
+    plantId,
+    routeHash: location.hash,
+    openGroups: openStateFor(initialTarget?.group ?? null),
+  }));
   const pendingFrameRef = useRef<number | null>(null);
+
+  const routeScopeChanged =
+    disclosureState.plantId !== plantId || disclosureState.routeHash !== location.hash;
+  const openGroups = routeScopeChanged
+    ? openStateFor(resolvePlantDetailDisclosureTarget(location.hash)?.group ?? null)
+    : disclosureState.openGroups;
 
   const cancelPendingFrame = useCallback(() => {
     if (pendingFrameRef.current === null) return;
@@ -95,51 +109,95 @@ export function usePlantDetailDisclosureNavigation({
     [cancelPendingFrame],
   );
 
-  const setGroupOpen = useCallback((group: PlantDetailDisclosureGroup, open: boolean) => {
-    setOpenGroups((current) => (current[group] === open ? current : { ...current, [group]: open }));
-  }, []);
+  const setGroupOpen = useCallback(
+    (group: PlantDetailDisclosureGroup, open: boolean) => {
+      setDisclosureState((current) => {
+        const scopeMatches = current.plantId === plantId && current.routeHash === location.hash;
+        const currentGroups = scopeMatches
+          ? current.openGroups
+          : openStateFor(resolvePlantDetailDisclosureTarget(location.hash)?.group ?? null);
+        if (scopeMatches && currentGroups[group] === open) return current;
+        return {
+          plantId,
+          routeHash: location.hash,
+          openGroups: { ...currentGroups, [group]: open },
+        };
+      });
+    },
+    [location.hash, plantId],
+  );
 
   const revealAndNavigate = useCallback<PlantDetailRevealAndNavigate>(
-    (targetValue, preferredTarget) => {
+    (targetValue, preferredTarget, options) => {
       const target = resolvePlantDetailDisclosureTarget(targetValue);
       if (!target) return;
       if (target.group) {
-        setOpenGroups((current) =>
-          current[target.group] ? current : { ...current, [target.group]: true },
-        );
+        setDisclosureState((current) => {
+          const scopeMatches = current.plantId === plantId && current.routeHash === location.hash;
+          const currentGroups = scopeMatches
+            ? current.openGroups
+            : openStateFor(resolvePlantDetailDisclosureTarget(location.hash)?.group ?? null);
+          if (scopeMatches && currentGroups[target.group]) return current;
+          return {
+            plantId,
+            routeHash: location.hash,
+            openGroups: { ...currentGroups, [target.group]: true },
+          };
+        });
       }
       scheduleNavigation(target.anchorId, preferredTarget);
+
+      const nextHash = `#${target.anchorId}`;
+      if (options?.updateHash && location.hash !== nextHash) {
+        navigate(
+          {
+            pathname: location.pathname,
+            search: location.search,
+            hash: nextHash,
+          },
+          { replace: options.replace ?? false },
+        );
+      }
     },
-    [scheduleNavigation],
+    [location.hash, location.pathname, location.search, navigate, plantId, scheduleNavigation],
   );
 
   useEffect(() => {
-    setObservedHash(location.hash);
-  }, [location.hash]);
+    const target = resolvePlantDetailDisclosureTarget(location.hash);
+    cancelPendingFrame();
+    setDisclosureState((current) => {
+      if (current.plantId === plantId && current.routeHash === location.hash) return current;
+      return {
+        plantId,
+        routeHash: location.hash,
+        openGroups: openStateFor(target?.group ?? null),
+      };
+    });
+    if (target) scheduleNavigation(target.anchorId);
+  }, [cancelPendingFrame, location.hash, plantId, scheduleNavigation]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const handleHashChange = () => setObservedHash(window.location.hash);
+    const handleHashChange = () => {
+      const target = resolvePlantDetailDisclosureTarget(window.location.hash);
+      if (!target) return;
+      if (target.group) {
+        setDisclosureState((current) => {
+          const currentGroups =
+            current.plantId === plantId ? current.openGroups : openStateFor(null);
+          if (current.plantId === plantId && currentGroups[target.group]) return current;
+          return {
+            plantId,
+            routeHash: location.hash,
+            openGroups: { ...currentGroups, [target.group]: true },
+          };
+        });
+      }
+      scheduleNavigation(target.anchorId);
+    };
     window.addEventListener("hashchange", handleHashChange);
     return () => window.removeEventListener("hashchange", handleHashChange);
-  }, []);
-
-  useEffect(() => {
-    const plantChanged = previousPlantIdRef.current !== plantId;
-    const target = resolvePlantDetailDisclosureTarget(plantChanged ? location.hash : observedHash);
-    previousPlantIdRef.current = plantId;
-
-    if (plantChanged) {
-      cancelPendingFrame();
-      setOpenGroups(openStateFor(target?.group ?? null));
-    } else if (target?.group) {
-      setOpenGroups((current) =>
-        current[target.group] ? current : { ...current, [target.group]: true },
-      );
-    }
-
-    if (target) scheduleNavigation(target.anchorId);
-  }, [cancelPendingFrame, location.hash, observedHash, plantId, scheduleNavigation]);
+  }, [location.hash, plantId, scheduleNavigation]);
 
   useEffect(() => cancelPendingFrame, [cancelPendingFrame]);
 

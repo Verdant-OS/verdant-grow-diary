@@ -221,14 +221,7 @@ export default function PlantDetailHarvestWatchCard({
       );
       if (!target || !onRevealAndNavigate) return;
       event.preventDefault();
-      if (typeof window !== "undefined") {
-        try {
-          window.history.pushState(window.history.state, "", `#${target.anchorId}`);
-        } catch {
-          // The reveal coordinator still provides accessible in-page navigation.
-        }
-      }
-      onRevealAndNavigate(target.anchorId);
+      onRevealAndNavigate(target.anchorId, undefined, { updateHash: true });
     },
     [onRevealAndNavigate, vm?.photoEvidenceDisplay.supportingRecordsHref],
   );

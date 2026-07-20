@@ -9,10 +9,15 @@
  *
  * No network. No AI. No Action Queue writes.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { BrowserRouter, useLocation } from "react-router-dom";
 
 import PlantDetailHarvestWatchCard from "@/components/PlantDetailHarvestWatchCard";
+import { usePlantDetailDisclosureNavigation } from "@/hooks/usePlantDetailDisclosureNavigation";
 import { buildPhotoEvidenceDisplay } from "@/lib/plantPhotoEvidenceReconciliation";
 
 const mocks = vi.hoisted(() => ({
@@ -32,6 +37,33 @@ vi.mock("@/lib/plantDetailHarvestWatchCardViewModel", () => ({
 }));
 
 const plant = { id: "p1", name: "P", strain: null, stage: "flower", startedAt: null, photo: null };
+const CARD_SOURCE = readFileSync(
+  join(process.cwd(), "src/components/PlantDetailHarvestWatchCard.tsx"),
+  "utf8",
+);
+
+function RouterEvidenceHarness() {
+  const location = useLocation();
+  const { openGroups, revealAndNavigate } = usePlantDetailDisclosureNavigation({ plantId: "p1" });
+
+  return (
+    <>
+      <output data-testid="router-location">
+        {location.pathname}
+        {location.search}
+        {location.hash}
+      </output>
+      <output data-testid="router-disclosures">{JSON.stringify(openGroups)}</output>
+      <section id="plant-recent-activity">Recent Activity</section>
+      <PlantDetailHarvestWatchCard
+        plantId="p1"
+        galleryPhotoCount={0}
+        dataSource="live"
+        onRevealAndNavigate={revealAndNavigate}
+      />
+    </>
+  );
+}
 
 function makeVm(overrides: {
   evidenceCount: number;
@@ -79,6 +111,10 @@ beforeEach(() => {
   mocks.usePlantRecentActivity.mockReturnValue({ data: [], isLoading: false });
 });
 
+afterEach(() => {
+  window.history.replaceState(null, "", "/");
+});
+
 describe("Evidence tile trust + traceability (render)", () => {
   it("exposes stable test IDs for tile, count, explanation and source label", () => {
     mocks.buildVm.mockReturnValue(
@@ -114,7 +150,7 @@ describe("Evidence tile trust + traceability (render)", () => {
     expect(cta).toHaveAccessibleName(/Recent Activity/i);
   });
 
-  it("reveals hidden Recent Activity before following the same-page evidence link", () => {
+  it("delegates a primary supporting-records click without directly mutating browser history", () => {
     mocks.buildVm.mockReturnValue(
       makeVm({ evidenceCount: 3, galleryPhotoCount: 0, dataSource: "live" }),
     );
@@ -135,9 +171,59 @@ describe("Evidence tile trust + traceability (render)", () => {
     });
     screen.getByTestId("evidence-tile-supporting-records-link").dispatchEvent(click);
     expect(click.defaultPrevented).toBe(true);
-    expect(pushState).toHaveBeenCalledTimes(1);
-    expect(reveal).toHaveBeenCalledWith("plant-recent-activity");
+    expect(pushState).not.toHaveBeenCalled();
+    expect(reveal).toHaveBeenCalledWith("plant-recent-activity", undefined, {
+      updateHash: true,
+    });
     pushState.mockRestore();
+  });
+
+  it("contains no direct pushState call in the Harvest Watch presenter", () => {
+    expect(CARD_SOURCE).not.toContain("window.history.pushState");
+  });
+
+  it("uses BrowserRouter history so Back and Forward restore URL and disclosure state", async () => {
+    mocks.buildVm.mockReturnValue(
+      makeVm({ evidenceCount: 3, galleryPhotoCount: 0, dataSource: "live" }),
+    );
+    window.history.replaceState(null, "", "/plants/p1?tentId=tent-7");
+    render(
+      <BrowserRouter>
+        <RouterEvidenceHarness />
+      </BrowserRouter>,
+    );
+    const initialIndex = window.history.state?.idx;
+
+    fireEvent.click(screen.getByTestId("evidence-tile-supporting-records-link"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("router-location")).toHaveTextContent(
+        "/plants/p1?tentId=tent-7#plant-recent-activity",
+      );
+      expect(screen.getByTestId("router-disclosures")).toHaveTextContent(
+        JSON.stringify({ history: true, harvest: false, ai: false }),
+      );
+    });
+    expect(window.history.state?.idx).toBe(initialIndex + 1);
+    expect(window.history.state?.key).toEqual(expect.any(String));
+
+    act(() => window.history.back());
+    await waitFor(() => {
+      expect(screen.getByTestId("router-location")).toHaveTextContent("/plants/p1?tentId=tent-7");
+      expect(screen.getByTestId("router-disclosures")).toHaveTextContent(
+        JSON.stringify({ history: false, harvest: false, ai: false }),
+      );
+    });
+
+    act(() => window.history.forward());
+    await waitFor(() => {
+      expect(screen.getByTestId("router-location")).toHaveTextContent(
+        "/plants/p1?tentId=tent-7#plant-recent-activity",
+      );
+      expect(screen.getByTestId("router-disclosures")).toHaveTextContent(
+        JSON.stringify({ history: true, harvest: false, ai: false }),
+      );
+    });
   });
 
   it.each([

@@ -243,6 +243,10 @@ export default function DailyCheck() {
     [effectiveTentId, tents],
   );
   const growId = (selectedPlant as { grow_id?: string | null } | null)?.grow_id ?? null;
+  const quickLogTargetIdentity = JSON.stringify([
+    selectedPlant?.id ?? null,
+    effectiveTentId || null,
+  ]);
 
   const manualSensorTents = useMemo(() => {
     if (!selectedPlant) return tents;
@@ -1185,6 +1189,7 @@ export default function DailyCheck() {
 
           {/* Shared QuickLog dialog with prefill */}
           <QuickLog
+            key={quickLogTargetIdentity}
             open={renderedQuickLogOpen}
             onOpenChange={setQuickLogOpen}
             onCreated={() => handleSubmitSuccess("note")}

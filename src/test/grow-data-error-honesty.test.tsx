@@ -56,9 +56,12 @@ describe("private grow-data error honesty", () => {
     expect(emptyIndex).toBeGreaterThan(errorIndex);
   });
 
-  it("keeps the Sensors grow read tent-scoped and null-disabled", () => {
+  it("keeps the Sensors grow read scoped to the synchronously validated tent", () => {
     const source = readSource("src/pages/Sensors.tsx");
-    expect(source).toMatch(/useGrowSensorReadings\(tentId\)/);
+    expect(source).toMatch(/useGrowSensorReadings\(activeTentId\)/);
+    expect(source).toMatch(
+      /requiredTentGate\.resolutionPending \|\| requiredTentGate\.reselectionRequired \? null : tentId/,
+    );
     expect(source).not.toMatch(/useGrowSensorReadings\(\s*\)/);
   });
 });

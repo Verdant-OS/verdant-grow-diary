@@ -6,6 +6,7 @@
  * constrained by the signed-in grower's RLS-scoped reads.
  */
 import { QUICK_LOG_ACTIVITY_LIST } from "@/constants/quickLogActivityTypes";
+import { buildSensorsTentRouteHref, SENSORS_TENT_ROUTE } from "@/lib/sensorRouteTentIntentRules";
 
 export interface ConnectedActivationGrowRow {
   id?: string | null;
@@ -264,7 +265,11 @@ export function buildConnectedActivationRoutes(
   const quickLog = growId
     ? `/dashboard?growId=${encodeURIComponent(growId)}&open=quick-log`
     : createGrow;
-  const sensors = growId ? `/sensors?growId=${encodeURIComponent(growId)}` : "/sensors";
+  const sensorTentRoute = buildSensorsTentRouteHref(tentId, { requireExactMatch: true });
+  const sensors =
+    growId && tentId && sensorTentRoute !== SENSORS_TENT_ROUTE
+      ? `${sensorTentRoute}#manual-reading`
+      : addTent;
 
   return { createGrow, addTent, addPlant, quickLog, sensors };
 }

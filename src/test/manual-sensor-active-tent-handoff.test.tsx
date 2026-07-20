@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useNavigate } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Sensors from "@/pages/Sensors";
 
@@ -52,19 +52,45 @@ vi.mock("@/hooks/useInsertSensorReading", () => ({
   useInsertSensorReading: () => ({ mutateAsync: insertReading, isPending: false }),
 }));
 
-vi.mock("@/components/EnvironmentCsvImportLauncher", () => ({ default: () => null }));
+vi.mock("@/components/EnvironmentCsvImportLauncher", () => ({
+  default: ({ growId, tentId }: { growId?: string | null; tentId?: string | null }) => (
+    <div data-testid="csv-import-writer" data-grow-id={growId ?? ""} data-tent-id={tentId ?? ""} />
+  ),
+}));
 vi.mock("@/components/SensorBridgeHealthCard", () => ({ default: () => null }));
 vi.mock("@/components/SensorChart", () => ({ default: () => null }));
 vi.mock("@/components/SensorsTestbenchPanel", () => ({ default: () => null }));
 vi.mock("@/components/ManualSensorTrendChart", () => ({ default: () => null }));
 
-function renderSensors(initialEntry = "/sensors") {
+function SensorRouteChangeButton({
+  to,
+  testId = "sensor-route-change",
+}: {
+  to?: string;
+  testId?: string;
+}) {
+  const navigate = useNavigate();
+  if (!to) return null;
+  return (
+    <button type="button" data-testid={testId} onClick={() => navigate(to)}>
+      Change sensor route
+    </button>
+  );
+}
+
+function renderSensors(
+  initialEntry = "/sensors",
+  routeChangeTarget?: string,
+  routeReturnTarget?: string,
+) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
   const tree = () => (
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[initialEntry]}>
+        <SensorRouteChangeButton to={routeChangeTarget} />
+        <SensorRouteChangeButton to={routeReturnTarget} testId="sensor-route-return" />
         <Sensors />
       </MemoryRouter>
     </QueryClientProvider>
@@ -106,6 +132,114 @@ describe("Sensors manual reading target handoff", () => {
     );
     expect(importAnchor).toHaveFocus();
     expect(scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });
+  });
+
+  it("keeps the connected activation tent selected when focusing the manual snapshot form", async () => {
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: scrollIntoView,
+    });
+
+    renderSensors(`/sensors?tentId=${TENT_B}&tentIntent=required#manual-reading`);
+
+    const manualReadingAnchor = screen.getByTestId("sensors-manual-reading-anchor");
+    await waitFor(() =>
+      expect(screen.getByTestId("manual-reading-tent-row")).toHaveTextContent("Saving to: Tent B"),
+    );
+    expect(manualReadingAnchor).toHaveFocus();
+    expect(scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });
+  });
+
+  it("does not retarget a required snapshot handoff when that tent is unavailable", async () => {
+    renderSensors(`/sensors?tentId=${TENT_NOT_OWNED}&tentIntent=required#manual-reading`);
+
+    const unavailable = await screen.findByTestId("sensors-required-tent-unavailable");
+    expect(unavailable).toHaveTextContent("Verdant did not switch tents");
+    expect(screen.queryByTestId("manual-reading-tent-row")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Choose Tent B" }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("manual-reading-tent-row")).toHaveTextContent("Saving to: Tent B"),
+    );
+  });
+
+  it("hides the previous writer when the mounted page receives a new required intent", async () => {
+    renderSensors(
+      `/sensors?tentId=${TENT_A}`,
+      `/sensors?tentId=${TENT_NOT_OWNED}&tentIntent=required#manual-reading`,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("manual-reading-tent-row")).toHaveTextContent("Saving to: Tent A"),
+    );
+
+    fireEvent.click(screen.getByTestId("sensor-route-change"));
+
+    await screen.findByTestId("sensors-required-tent-unavailable");
+    expect(screen.queryByTestId("manual-reading-tent-row")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("csv-import-writer")).not.toBeInTheDocument();
+  });
+
+  it("does not reuse a prior replacement when the exact-target route is opened again", async () => {
+    renderSensors(
+      `/sensors?tentId=${TENT_A}&tentIntent=required#manual-reading`,
+      "/sensors",
+      `/sensors?tentId=${TENT_A}&tentIntent=required#manual-reading`,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("manual-reading-tent-row")).toHaveTextContent("Saving to: Tent A"),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Tent B" }));
+    await waitFor(() =>
+      expect(screen.getByTestId("manual-reading-tent-row")).toHaveTextContent("Saving to: Tent B"),
+    );
+
+    fireEvent.click(screen.getByTestId("sensor-route-change"));
+    await waitFor(() =>
+      expect(screen.getByTestId("manual-reading-tent-row")).toHaveTextContent("Saving to: Tent B"),
+    );
+
+    fireEvent.click(screen.getByTestId("sensor-route-return"));
+    await waitFor(() =>
+      expect(screen.getByTestId("manual-reading-tent-row")).toHaveTextContent("Saving to: Tent A"),
+    );
+  });
+
+  it("returns to conscious selection when a required tent disappears on refetch", async () => {
+    Object.assign(growTentsQuery, {
+      data: [
+        { id: TENT_A, name: "Tent A", growId: "grow-1" },
+        { id: TENT_NOT_OWNED, name: "Tent C", growId: "grow-1" },
+      ],
+    });
+    const { rerenderSensors } = renderSensors(
+      `/sensors?tentId=${TENT_NOT_OWNED}&tentIntent=required#manual-reading`,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("manual-reading-tent-row")).toHaveTextContent("Saving to: Tent C"),
+    );
+
+    Object.assign(growTentsQuery, {
+      data: [
+        { id: TENT_A, name: "Tent A", growId: "grow-1" },
+        { id: TENT_B, name: "Tent B", growId: "grow-1" },
+      ],
+    });
+    rerenderSensors();
+
+    const unavailable = await screen.findByTestId("sensors-required-tent-unavailable");
+    expect(unavailable).toHaveTextContent("Verdant did not switch tents");
+    expect(screen.queryByTestId("manual-reading-tent-row")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("csv-import-writer")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Choose Tent B" }));
+    await waitFor(() =>
+      expect(screen.getByTestId("manual-reading-tent-row")).toHaveTextContent("Saving to: Tent B"),
+    );
+    expect(screen.getByTestId("csv-import-writer")).toHaveAttribute("data-tent-id", TENT_B);
   });
 
   it("selects an authenticated tent requested by the Timeline route intent", async () => {

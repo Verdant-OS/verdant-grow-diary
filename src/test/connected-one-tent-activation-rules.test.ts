@@ -20,6 +20,7 @@ const plants = [
   { id: "plant-a2", growId: "grow-a", tentId: "tent-a2" },
   { id: "plant-a1", growId: "grow-a", tentId: "tent-a2" },
 ];
+const PERSISTED_TENT_ID = "00000000-0000-4000-8000-00000000000a";
 
 describe("selectConnectedOneTentGraph", () => {
   it("selects the deepest graph with lexical tie-breakers", () => {
@@ -123,8 +124,28 @@ describe("buildConnectedActivationRoutes", () => {
       addTent: "/tents?growId=grow%20one&intent=one_tent_activation",
       addPlant: "/plants?growId=grow%20one&tentId=tent%26one&intent=one_tent_activation",
       quickLog: "/dashboard?growId=grow%20one&open=quick-log",
-      sensors: "/sensors?growId=grow%20one",
+      sensors: "/tents?growId=grow%20one&intent=one_tent_activation",
     });
+  });
+
+  it("hands the exact persisted tent to the manual sensor snapshot form", () => {
+    expect(
+      buildConnectedActivationRoutes({
+        growId: "grow-a",
+        tentId: ` ${PERSISTED_TENT_ID.toUpperCase()} `,
+      }).sensors,
+    ).toBe(`/sensors?tentId=${PERSISTED_TENT_ID}&tentIntent=required#manual-reading`);
+  });
+
+  it("fails closed to tent setup instead of selecting another tent", () => {
+    const route = buildConnectedActivationRoutes({
+      growId: "grow-a",
+      tentId: "not-a-persisted-tent",
+    }).sensors;
+
+    expect(route).toBe("/tents?growId=grow-a&intent=one_tent_activation");
+    expect(route).not.toContain("/sensors");
+    expect(route).not.toMatch(/^\/sensors\?.*growId=/);
   });
 
   it("falls back to the preceding safe route when scope is missing", () => {
@@ -133,7 +154,7 @@ describe("buildConnectedActivationRoutes", () => {
       addTent: "/grows?intent=one_tent_activation",
       addPlant: "/grows?intent=one_tent_activation",
       quickLog: "/grows?intent=one_tent_activation",
-      sensors: "/sensors",
+      sensors: "/grows?intent=one_tent_activation",
     });
   });
 });

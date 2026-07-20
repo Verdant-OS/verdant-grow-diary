@@ -978,11 +978,18 @@ export default function McpToolExplorer() {
         }
         fieldErrors={growsLimitTouched ? listGrowsErrors : []}
         onApplyArgs={(args) => {
-          setIncludeArchived(Boolean(args.includeArchived));
-          setGrowsLimit(
-            args.limit === undefined || args.limit === null ? "" : String(args.limit),
-          );
+          const nextIncludeArchived = Boolean(args.includeArchived);
+          const nextGrowsLimit =
+            args.limit === undefined || args.limit === null ? "" : String(args.limit);
+          setIncludeArchived(nextIncludeArchived);
+          setGrowsLimit(nextGrowsLimit);
           setGrowsLimitTouched(true);
+          // Persist applied form values immediately so reopening the explorer
+          // restores them even before a successful retry.
+          saveLastValidInputs("list_grows", {
+            includeArchived: nextIncludeArchived,
+            growsLimit: nextGrowsLimit,
+          });
         }}
         buildArgs={() => {
           const args: Record<string, unknown> = {};

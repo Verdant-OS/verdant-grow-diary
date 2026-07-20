@@ -254,8 +254,11 @@ describe("Dashboard sensor provenance fence", () => {
     expect(DASHBOARD).toContain("const tentRows = selectDashboardSensorEvidenceRows(");
     expect(DASHBOARD).toContain("const rs = buildDashboardStabilityReadings(tentRows)");
     expect(DASHBOARD).toContain("tentRows as BuildTentSnapshotInput[]");
-    expect(DASHBOARD).toContain("sensorReadingCount: dashboardSensorRows.length");
-    expect(DASHBOARD).toContain("sensorSnapshotCount={dashboardSensorRows.length}");
+    expect(DASHBOARD).toContain("const connectedSensorReadingCount = activationGraph.tentId");
+    expect(DASHBOARD).toContain(
+      "countActivatingSensorReadings(readingsByTent[activationGraph.tentId] ?? [])",
+    );
+    expect(DASHBOARD).toContain("sensorReadingCount: connectedSensorReadingCount");
     expect(DASHBOARD).toContain("dashboardSnapshotForHealthyCues(");
     expect(DASHBOARD).toContain("evaluateDashboardSensorQuality(");
     expect(DASHBOARD).toMatch(

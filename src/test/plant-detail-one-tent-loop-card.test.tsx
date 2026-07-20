@@ -5,6 +5,7 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 
@@ -24,6 +25,7 @@ describe("PlantDetail One-Tent Loop next-step card wiring", () => {
         current="plant"
         ids={{ plantId: "p1", tentId: "t1", growId: "g1" }}
         testId="plant-detail-one-tent-loop-next-step-card"
+        onLocalAction={() => {}}
       />,
     );
     const card = screen.getByTestId("plant-detail-one-tent-loop-next-step-card");
@@ -38,15 +40,33 @@ describe("PlantDetail One-Tent Loop next-step card wiring", () => {
         current="plant"
         ids={{ plantId: "p1", tentId: "t1", growId: "g1" }}
         testId="plant-detail-one-tent-loop-next-step-card"
+        onLocalAction={() => {}}
       />,
     );
-    const cta = screen.getByTestId(
-      "plant-detail-one-tent-loop-next-step-card-cta",
-    );
+    const cta = screen.getByTestId("plant-detail-one-tent-loop-next-step-card-cta");
     expect(cta).toHaveTextContent(/Add quick log/i);
   });
 
-  it("CTA href uses the existing /plants/:plantId route pattern (no invented route)", () => {
+  it("invokes the typed Quick Log action instead of self-linking to Plant Detail", async () => {
+    const user = userEvent.setup();
+    const onLocalAction = vi.fn();
+    renderCard(
+      <OneTentLoopNextStepCard
+        current="plant"
+        ids={{ plantId: "p1" }}
+        testId="plant-detail-one-tent-loop-next-step-card"
+        onLocalAction={onLocalAction}
+      />,
+    );
+    const cta = screen.getByTestId("plant-detail-one-tent-loop-next-step-card-cta");
+    expect(cta.tagName).toBe("BUTTON");
+    expect(cta.querySelector("a")).toBeNull();
+    await user.click(cta);
+    expect(onLocalAction).toHaveBeenCalledOnce();
+    expect(onLocalAction).toHaveBeenCalledWith("open-quick-log");
+  });
+
+  it("fails closed when the presenter does not provide a local-action handler", () => {
     renderCard(
       <OneTentLoopNextStepCard
         current="plant"
@@ -54,11 +74,9 @@ describe("PlantDetail One-Tent Loop next-step card wiring", () => {
         testId="plant-detail-one-tent-loop-next-step-card"
       />,
     );
-    const cta = screen.getByTestId(
-      "plant-detail-one-tent-loop-next-step-card-cta",
-    );
-    const anchor = cta.tagName === "A" ? cta : cta.querySelector("a");
-    expect(anchor?.getAttribute("href")).toBe("/plants/p1");
+    const cta = screen.getByTestId("plant-detail-one-tent-loop-next-step-card-cta-inert");
+    expect(cta).toBeDisabled();
+    expect(cta).toHaveTextContent("Add quick log");
   });
 
   it("falls back to the safe disabled state when ids are missing", () => {
@@ -69,9 +87,7 @@ describe("PlantDetail One-Tent Loop next-step card wiring", () => {
       />,
     );
     expect(
-      screen.getByTestId(
-        "plant-detail-one-tent-loop-next-step-card-disabled",
-      ),
+      screen.getByTestId("plant-detail-one-tent-loop-next-step-card-disabled"),
     ).toHaveTextContent(/Next step unavailable until this record is selected\./);
   });
 

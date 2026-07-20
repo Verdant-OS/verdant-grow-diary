@@ -179,9 +179,33 @@ function staticSocialRouteDocuments(): Plugin {
       rewriteMeta("property", "og:image:alt", "Verdant Grow Diary — Plant memory. Sensor truth.");
       rewriteMeta("name", "twitter:image", homeOgUrl);
       indexAsset.source = patchedIndex;
+
+      // Emit a machine-readable manifest of every pre-rendered public route
+      // and the exact metadata the plugin baked into its <head>. Postbuild
+      // validators (validate-static-route-head-fidelity.mjs) and the sitemap
+      // parity vitest use this as the single source of truth, so head
+      // fidelity and sitemap membership never drift silently.
+      const manifest = STATIC_PUBLIC_SEO_DOCUMENTS.map((document) => {
+        const slug = ogImageSlugForPath(document.path);
+        const ogFileName = `og/${slug}.png`;
+        return {
+          path: document.path,
+          fileName: document.fileName,
+          metadata: {
+            ...document.metadata,
+            image: `${VERDANT_SITE_ORIGIN}/${ogFileName}`,
+          },
+        };
+      });
+      this.emitFile({
+        type: "asset",
+        fileName: "seo-manifest.json",
+        source: JSON.stringify({ origin: VERDANT_SITE_ORIGIN, documents: manifest }, null, 2),
+      });
     },
   };
 }
+
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({

@@ -1,10 +1,11 @@
+import { AIR_TEMP_MAX_C, AIR_TEMP_MIN_C, fahrenheitToCelsius, type TempUnit } from "@/lib/vpdRules";
 import {
-  AIR_TEMP_MAX_C,
-  AIR_TEMP_MIN_C,
-  calculateAirVpdKpa,
-  fahrenheitToCelsius,
-  type TempUnit,
-} from "@/lib/vpdRules";
+  evaluateVpdMeasurementTrust,
+  type VpdMeasurementBasis,
+  type VpdMeasurementConfidence,
+  type VpdMeasurementEvidence,
+  type VpdMeasurementTrustIssue,
+} from "@/lib/vpdMeasurementTrustStatusRules";
 import {
   classifyVpdAgainstStage,
   getVpdTargetBand,
@@ -18,28 +19,37 @@ export const PUBLIC_VPD_CALCULATOR_URL =
   "https://verdantgrowdiary.com/tools/vpd-calculator" as const;
 
 export const PUBLIC_VPD_SOURCE_NOTE =
-  "Manual inputs · derived air VPD · not live telemetry. Nothing is uploaded or saved.";
+  "Manual inputs · calculated locally · not live telemetry. Nothing is uploaded or saved.";
 export const PUBLIC_VPD_SAFETY_NOTE =
-  "VPD is environmental context, not a plant-health diagnosis. Verify the reading, timestamp, sensor placement, stage, medium, and plant response before changing equipment or irrigation.";
+  "Air VPD is an estimate. Verdant unlocks a stage-target claim only for calibrated temperature and RH evidence plus a contemporaneous canopy-level leaf-temperature measurement. VPD is context, not a plant-health diagnosis or device command.";
 
 export type PublicVpdCalculatorState = "needs_inputs" | "invalid" | "derived";
 export type PublicVpdCalculatorInvalidReason = "invalid_temperature" | "invalid_humidity";
 
 export interface PublicVpdCalculatorInput {
   temperature: number | null | undefined;
+  leafTemperature?: number | null | undefined;
   temperatureUnit: TempUnit;
   humidity: number | null | undefined;
   stage: VpdStage;
+  measurementEvidence?: VpdMeasurementEvidence | null;
+  nowMs?: number;
 }
 
 export interface PublicVpdCalculatorResult {
   state: PublicVpdCalculatorState;
   invalidReason: PublicVpdCalculatorInvalidReason | null;
   vpdKpa: number | null;
+  airVpdKpa: number | null;
+  leafVpdKpa: number | null;
   temperatureC: number | null;
   humidity: number | null;
   stage: VpdStage;
   classification: VpdClassification | null;
+  basis: VpdMeasurementBasis;
+  confidence: VpdMeasurementConfidence;
+  canCompareToStageTarget: boolean;
+  trustIssues: ReadonlyArray<VpdMeasurementTrustIssue>;
   classificationLabel: string;
   targetLabel: string;
   interpretation: string;
@@ -66,7 +76,7 @@ export const PUBLIC_VPD_CALCULATOR_FAQ = Object.freeze([
   Object.freeze({
     question: "What does this VPD calculator calculate?",
     answer:
-      "It calculates air vapor pressure deficit from manually entered air temperature and relative humidity. It does not calculate leaf VPD and does not read a live sensor.",
+      "It always shows an air VPD estimate from manual temperature and RH. Add measured leaf temperature and verification evidence to calculate leaf-to-air VPD and unlock a stage comparison. It does not read a live sensor.",
   }),
   Object.freeze({
     question: "Does an in-range VPD mean my plant is healthy?",
@@ -84,7 +94,7 @@ function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
-function targetLabel(stage: VpdStage): string {
+function verifiedTargetLabel(stage: VpdStage): string {
   const band = getVpdTargetBand(stage);
   if (stage === "unknown") return "Select a stage for a stage-aware range.";
   if (band.contextOnly || band.min === null || band.max === null) {
@@ -126,9 +136,15 @@ function baseResult(
 > {
   return {
     stage: input.stage,
-    targetLabel: targetLabel(input.stage),
+    targetLabel: "Verify the measurement before selecting a stage target.",
     sourceNote: PUBLIC_VPD_SOURCE_NOTE,
     safetyNote: PUBLIC_VPD_SAFETY_NOTE,
+    basis: "unavailable",
+    confidence: "unverified",
+    canCompareToStageTarget: false,
+    airVpdKpa: null,
+    leafVpdKpa: null,
+    trustIssues: Object.freeze([]),
   };
 }
 
@@ -210,11 +226,16 @@ export function evaluatePublicVpdCalculator(
     };
   }
 
-  const vpdKpa = calculateAirVpdKpa({
-    tempC: input.temperatureUnit === "C" ? input.temperature : undefined,
-    tempF: input.temperatureUnit === "F" ? input.temperature : undefined,
-    rhPercent: input.humidity,
+  const trust = evaluateVpdMeasurementTrust({
+    airTempC: input.temperatureUnit === "C" ? input.temperature : undefined,
+    airTempF: input.temperatureUnit === "F" ? input.temperature : undefined,
+    leafTempC: input.temperatureUnit === "C" ? input.leafTemperature : undefined,
+    leafTempF: input.temperatureUnit === "F" ? input.leafTemperature : undefined,
+    humidityPct: input.humidity,
+    evidence: input.measurementEvidence,
+    nowMs: input.nowMs,
   });
+  const vpdKpa = trust.valueKpa;
   if (vpdKpa === null) {
     return {
       ...base,
@@ -229,7 +250,19 @@ export function evaluatePublicVpdCalculator(
     };
   }
 
-  const classified = classifyVpdAgainstStage({ value: vpdKpa, stage: input.stage });
+  const classified = trust.canCompareToStageTarget
+    ? classifyVpdAgainstStage({ value: vpdKpa, stage: input.stage })
+    : null;
+  const classificationLabel = classified
+    ? classified.label
+    : trust.basis === "leaf"
+      ? "Leaf VPD estimate — verification required"
+      : "Air VPD estimate — no target claim";
+  const interpretation = classified
+    ? interpretationFor(classified.classification)
+    : trust.basis === "leaf"
+      ? "Leaf temperature is included, but calibration or placement evidence is incomplete or out of date. Review the evidence checklist before comparing this value with a stage target."
+      : "This is air VPD only. Measure leaf temperature at the canopy and complete the calibration evidence before treating the number as a stage-target result.";
   return {
     ...base,
     state: "derived",
@@ -237,9 +270,18 @@ export function evaluatePublicVpdCalculator(
     vpdKpa,
     temperatureC: Math.round(temperatureC * 100) / 100,
     humidity: input.humidity,
-    classification: classified.classification,
-    classificationLabel: classified.label,
-    interpretation: interpretationFor(classified.classification),
+    classification: classified?.classification ?? null,
+    classificationLabel,
+    interpretation,
+    targetLabel: trust.canCompareToStageTarget
+      ? verifiedTargetLabel(input.stage)
+      : "Verify the measurement before selecting a stage target.",
+    basis: trust.basis,
+    confidence: trust.confidence,
+    canCompareToStageTarget: trust.canCompareToStageTarget,
+    airVpdKpa: trust.airVpdKpa,
+    leafVpdKpa: trust.leafVpdKpa,
+    trustIssues: trust.issues,
   };
 }
 
@@ -251,7 +293,7 @@ export function buildPublicVpdShareData(): ShareData {
   });
   return {
     title: "Free stage-aware VPD calculator — Verdant",
-    text: "Calculate air VPD from manual temperature and humidity inputs, with honest source labeling and no device control.",
+    text: "Calculate an air VPD estimate or evidence-verified leaf VPD, with honest confidence labeling and no device control.",
     url: `${PUBLIC_VPD_CALCULATOR_URL}?${params.toString()}`,
   };
 }

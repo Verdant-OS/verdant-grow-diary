@@ -7,7 +7,14 @@
  * No I/O, no React, no Supabase, no AI, no alerts, no Action Queue, no device control.
  */
 
+import {
+  actionTextWithoutResponseContext,
+  readResponseCheckStatus,
+  responseActionChronologyRank,
+} from "@/lib/tenSecondQuickCheckRules";
+
 export interface OutcomeFollowUpRow {
+  id?: string | null;
   eventType: string;
   notePreview: string;
   occurredAt: string | null;
@@ -83,8 +90,6 @@ const ACTION_NOTE_KEYWORDS = [
   "changed temp",
 ] as const;
 
-const QUICK_CHECK_PATTERN = /quick check:\s*(better|same|worse)\.?/i;
-
 const PROMPT_COPY = {
   headline: "Follow up on the last change.",
   body: "How did the plant respond: Better, Same, or Worse?",
@@ -105,19 +110,19 @@ function includesAny(value: string, needles: readonly string[]): boolean {
 
 function isAction(row: OutcomeFollowUpRow): boolean {
   const eventType = (row.eventType ?? "").toLowerCase();
-  const note = row.notePreview ?? "";
+  const actionText = actionTextWithoutResponseContext(row.notePreview ?? "");
   return (
     ACTION_EVENT_TYPES.some((type) => eventType.includes(type)) ||
-    includesAny(note, ACTION_NOTE_KEYWORDS)
+    includesAny(actionText, ACTION_NOTE_KEYWORDS)
   );
 }
 
-function isQuickCheck(row: OutcomeFollowUpRow): boolean {
-  return QUICK_CHECK_PATTERN.test(row.notePreview ?? "");
+function isResponseCheck(row: OutcomeFollowUpRow): boolean {
+  return readResponseCheckStatus(row.notePreview ?? "") !== null;
 }
 
 function summarize(row: OutcomeFollowUpRow): string {
-  const note = (row.notePreview ?? "").trim();
+  const note = actionTextWithoutResponseContext(row.notePreview ?? "").trim();
   if (note) {
     return note.length <= SUMMARY_MAX ? note : `${note.slice(0, SUMMARY_MAX - 1).trimEnd()}…`;
   }
@@ -151,21 +156,45 @@ export function buildOutcomeFollowUp(input: OutcomeFollowUpInput): OutcomeFollow
       : DEFAULT_MAX_AGE_HOURS;
 
   const parsed = (input.rows ?? [])
-    .map((row) => ({ row, at: parseTime(row.occurredAt) }))
-    .filter((item): item is { row: OutcomeFollowUpRow; at: number } => item.at !== null)
-    .sort((a, b) => b.at - a.at);
+    .map((row, sourceIndex) => ({ row, at: parseTime(row.occurredAt), sourceIndex }))
+    .filter(
+      (item): item is { row: OutcomeFollowUpRow; at: number; sourceIndex: number } =>
+        item.at !== null,
+    )
+    .sort((a, b) => {
+      if (a.at !== b.at) return a.at - b.at;
+      const rankDelta =
+        responseActionChronologyRank({
+          hasAction: isAction(a.row),
+          hasResponse: isResponseCheck(a.row),
+        }) -
+        responseActionChronologyRank({
+          hasAction: isAction(b.row),
+          hasResponse: isResponseCheck(b.row),
+        });
+      if (rankDelta !== 0) return rankDelta;
+      const idDelta = (a.row.id ?? "").localeCompare(b.row.id ?? "");
+      return idDelta !== 0 ? idDelta : a.sourceIndex - b.sourceIndex;
+    });
 
-  const action = parsed.find((item) => isAction(item.row));
-  if (!action) return empty("no_action");
+  let actionIndex = -1;
+  for (let index = parsed.length - 1; index >= 0; index -= 1) {
+    if (isAction(parsed[index].row)) {
+      actionIndex = index;
+      break;
+    }
+  }
+  if (actionIndex === -1) return empty("no_action");
+  const action = parsed[actionIndex];
 
   const ageHours = (input.now - action.at) / HOUR_MS;
   if (ageHours < minAgeHours) return empty("too_soon");
   if (ageHours > maxAgeHours) return empty("expired");
 
-  const hasLaterQuickCheck = parsed.some(
-    (item) => item.at > action.at && isQuickCheck(item.row),
-  );
-  if (hasLaterQuickCheck) return empty("already_checked");
+  const hasLaterResponseCheck = parsed
+    .slice(actionIndex + 1)
+    .some((item) => isResponseCheck(item.row));
+  if (hasLaterResponseCheck) return empty("already_checked");
 
   return {
     showPrompt: true,

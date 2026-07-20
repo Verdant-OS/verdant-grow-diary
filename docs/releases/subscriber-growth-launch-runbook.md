@@ -125,8 +125,8 @@ The separate Founder check uses no API key or service-role value. It sends a
 browser-shaped unauthenticated `OPTIONS` preflight and `POST {}` to the fixed
 production `founder-slots-remaining` endpoint. The check requires successful
 CORS for Verdant's production origin and the Supabase client headers, HTTP 200
-JSON, exactly the keys `remaining` and `total`, integer values, `total === 75`,
-and `remaining` within `0..75`. Its receipt records only response statuses,
+JSON, exactly the keys `remaining` and `total`, integer values, `total === 100`,
+and `remaining` within `0..100`. Its receipt records only response statuses,
 stable reason codes, and the bounded public aggregate after the complete
 contract passes. A 404, 503, HTML response, extra field, malformed value, or
 missing CORS evidence returns `HOLD`.

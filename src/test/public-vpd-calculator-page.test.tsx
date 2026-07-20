@@ -37,19 +37,24 @@ afterEach(() => {
 });
 
 describe("public VPD calculator page", () => {
-  it("derives a manual air VPD and exposes attributed next steps", async () => {
+  it("shows a manual air estimate without claiming the stage target", async () => {
     const user = userEvent.setup();
     renderPage();
 
     expect(screen.getAllByText(/Nothing is uploaded or saved/)).toHaveLength(2);
-    expect(screen.getByText(/Air VPD only—not leaf VPD/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Air estimate first · verified leaf VPD for target status/),
+    ).toBeInTheDocument();
     await user.type(screen.getByLabelText("Air temperature"), "77");
     await user.type(screen.getByLabelText("Relative humidity"), "65");
     await user.selectOptions(screen.getByLabelText("Plant stage"), "veg");
-    await user.click(screen.getByRole("button", { name: /Calculate air VPD/ }));
+    await user.click(screen.getByRole("button", { name: /Calculate VPD/ }));
 
     expect(screen.getByTestId("public-vpd-calculator-result")).toHaveTextContent("1.11 kPa");
-    expect(screen.getByTestId("public-vpd-classification")).toHaveTextContent("In Veg VPD range");
+    expect(screen.getByTestId("public-vpd-classification")).toHaveTextContent(
+      "Air VPD estimate — no target claim",
+    );
+    expect(screen.getByTestId("public-vpd-confidence")).toHaveTextContent("unverified");
     expect(screen.getByRole("link", { name: "Start a free grow memory" })).toHaveAttribute(
       "href",
       "/auth?mode=signup&utm_source=vpd_calculator&utm_medium=owned&utm_campaign=vpd_calculator",
@@ -59,15 +64,46 @@ describe("public VPD calculator page", () => {
       "/pricing?utm_source=vpd_calculator&utm_medium=owned&utm_campaign=vpd_calculator",
     );
     expect(mocks.track).toHaveBeenCalledWith("vpd_calculator_completed", {
-      item: "in_target",
+      item: "air_estimate",
       source: "veg",
+    });
+  });
+
+  it("unlocks target status after the full VPD evidence checklist", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.type(screen.getByLabelText("Air temperature"), "77");
+    await user.type(screen.getByLabelText("Relative humidity"), "60");
+    await user.type(screen.getByLabelText("Measured leaf temperature"), "77");
+    await user.selectOptions(screen.getByLabelText("Temperature/RH sensor placement"), "canopy");
+    await user.type(screen.getByLabelText("Temperature reference"), "Traceable reference");
+    await user.type(screen.getByLabelText("Temperature verified date"), "2026-06-01");
+    await user.type(screen.getByLabelText("RH reference point"), "75");
+    await user.type(screen.getByLabelText("Humidity verified date"), "2026-06-01");
+    await user.click(
+      screen.getByLabelText(/Temperature was checked against that reference at normal room/i),
+    );
+    await user.click(
+      screen.getByLabelText(/Leaf temperature was measured now in the same canopy/i),
+    );
+    await user.selectOptions(screen.getByLabelText("Plant stage"), "flower");
+    await user.click(screen.getByRole("button", { name: /Calculate VPD/ }));
+
+    expect(screen.getByTestId("public-vpd-confidence")).toHaveTextContent("verified");
+    expect(screen.getByTestId("public-vpd-classification")).toHaveTextContent(
+      "In Flower VPD range",
+    );
+    expect(mocks.track).toHaveBeenCalledWith("vpd_calculator_completed", {
+      item: "in_target",
+      source: "flower",
     });
   });
 
   it("fails closed for missing inputs and does not expose conversion actions", async () => {
     const user = userEvent.setup();
     renderPage();
-    await user.click(screen.getByRole("button", { name: /Calculate air VPD/ }));
+    await user.click(screen.getByRole("button", { name: /Calculate VPD/ }));
 
     expect(screen.getByTestId("public-vpd-calculator-result")).toHaveTextContent(
       "Temperature and humidity required",
@@ -89,7 +125,7 @@ describe("public VPD calculator page", () => {
     await user.type(screen.getByLabelText("Air temperature"), "77");
     await user.type(screen.getByLabelText("Relative humidity"), "65");
     await user.selectOptions(screen.getByLabelText("Plant stage"), "veg");
-    await user.click(screen.getByRole("button", { name: /Calculate air VPD/ }));
+    await user.click(screen.getByRole("button", { name: /Calculate VPD/ }));
     await user.click(screen.getByRole("button", { name: /Share calculator/ }));
 
     expect(writeText).toHaveBeenCalledWith(buildPublicVpdShareData().url);

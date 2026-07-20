@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import type { OnboardingChecklistViewModel } from "@/lib/onboardingChecklistViewModel";
 import { useOnboardingChecklistDismissed } from "@/lib/localOnboardingPreferences";
+import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 
 /**
  * First-run onboarding checklist card.
@@ -94,7 +95,18 @@ export default function OnboardingChecklistCard({ vm }: { vm: OnboardingChecklis
                 <div className="text-xs text-muted-foreground mt-0.5">{s.description}</div>
               </div>
               {!s.complete && (
-                <Link to={s.href} className="shrink-0">
+                <Link
+                  to={s.href}
+                  className="shrink-0"
+                  onClick={() => {
+                    if (!s.quickLogPrefill || typeof window === "undefined") return;
+                    window.dispatchEvent(
+                      new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, {
+                        detail: s.quickLogPrefill,
+                      }),
+                    );
+                  }}
+                >
                   <Button size="sm" variant="outline">
                     {s.ctaLabel}
                   </Button>

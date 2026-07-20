@@ -86,6 +86,13 @@ import { buildSensorSnapshotSavePayload } from "@/lib/latestSensorSnapshotRules"
 import { quickLogReasonToOperatorMessage } from "@/lib/quickLogSaveErrorMessage";
 import { buildStaleSnapshotHelperCopy } from "@/lib/quickLogStaleSnapshotHelperCopy";
 import { buildQuickLogDraftPreview } from "@/lib/quickLogDraftPreviewViewModel";
+import {
+  RESPONSE_CHECK_STATUSES,
+  applyResponseCheck,
+  appendQuickLogObservation,
+  readResponseCheckStatus,
+  type ResponseCheckStatus,
+} from "@/lib/tenSecondQuickCheckRules";
 import { plantDetailPath } from "@/lib/routes";
 import {
   EARLY_STAGE_MILESTONES,
@@ -203,6 +210,13 @@ interface Props {
 }
 
 const LAST_TARGET_STORAGE_KEY = "verdant.quickLog.lastTarget.v1";
+
+const QUICK_OBSERVATION_CHIPS = [
+  { label: "Watered", text: "Watered today." },
+  { label: "Fed", text: "Fed today." },
+  { label: "Spotted issue", text: "Spotted an issue — see photo or notes." },
+  { label: "Photo only", text: "Photo only — no other changes today." },
+] as const;
 
 type SavedTarget = {
   id: string;
@@ -680,6 +694,11 @@ export default function QuickLog({
     }
   }
 
+  function handleResponseCheck(status: ResponseCheckStatus) {
+    setNote((previous) => applyResponseCheck(previous, status));
+    setSaveError(null);
+  }
+
   function resetForAnother() {
     // "Log another" starts a genuinely new logical submission.
     saveIdempotencyKeyRef.current = newQuickLogSaveKey();
@@ -1016,6 +1035,7 @@ export default function QuickLog({
   const targetGrowName = activeGrow?.name ?? "No setup selected";
   const targetTentName =
     selectedTent?.name ?? (selectedPlant?.tent_id ? "Assigned tent" : "No tent assigned");
+  const selectedResponseStatus = readResponseCheckStatus(note);
 
   return (
     <Dialog
@@ -1569,22 +1589,14 @@ export default function QuickLog({
               aria-label="Quick observation prompts"
               className="flex flex-wrap gap-1.5"
             >
-              {[
-                { label: "Watered", text: "Watered today." },
-                { label: "Fed", text: "Fed today." },
-                { label: "Better", text: "Better than yesterday." },
-                { label: "Same", text: "About the same as yesterday." },
-                { label: "Worse", text: "Looking worse than yesterday." },
-                { label: "Spotted issue", text: "Spotted an issue — see photo or notes." },
-                { label: "Photo only", text: "Photo only — no other changes today." },
-              ].map((chip) => (
+              {QUICK_OBSERVATION_CHIPS.map((chip) => (
                 <button
                   key={chip.label}
                   type="button"
                   data-testid={`quick-log-chip-${chip.label.toLowerCase().replace(/\s+/g, "-")}`}
                   aria-label={`Insert observation: ${chip.label}`}
                   onClick={() => {
-                    setNote((prev) => (prev.trim() ? `${prev.trim()} ${chip.text}` : chip.text));
+                    setNote((previous) => appendQuickLogObservation(previous, chip.text));
                     setSaveError(null);
                   }}
                   className="rounded-full border border-border/60 bg-secondary/30 px-2.5 py-1 text-[11px] text-foreground hover:bg-secondary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -1592,6 +1604,41 @@ export default function QuickLog({
                   {chip.label}
                 </button>
               ))}
+            </div>
+            <div className="space-y-1.5">
+              <div>
+                <p className="text-xs font-medium text-foreground">How did the plant respond?</p>
+                <p className="text-[11px] text-muted-foreground">
+                  Use this after a previous change has had time to show up.
+                </p>
+              </div>
+              <div
+                data-testid="quick-log-response-chips"
+                role="group"
+                aria-label="Plant response check"
+                className="flex flex-wrap gap-1.5"
+              >
+                {RESPONSE_CHECK_STATUSES.map((status) => (
+                  <button
+                    key={status}
+                    type="button"
+                    data-testid={`quick-log-chip-${status.toLowerCase()}`}
+                    aria-label={`Response check: ${status}`}
+                    aria-pressed={selectedResponseStatus === status}
+                    onClick={() => handleResponseCheck(status)}
+                    className={`rounded-full border px-2.5 py-1 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                      selectedResponseStatus === status
+                        ? "border-primary/70 bg-primary/10 text-primary"
+                        : "border-border/60 bg-secondary/30 text-foreground hover:bg-secondary/60"
+                    }`}
+                  >
+                    {status}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Better, Same, or Worse records the plant response—not the grow action.
+              </p>
             </div>
             <Label htmlFor="quicklog-note-textarea">Short note</Label>
             <Textarea

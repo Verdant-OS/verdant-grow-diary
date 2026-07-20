@@ -85,6 +85,8 @@ describe("Public SEO route surface", () => {
     /^\/welcome$/,
     /^\/pricing$/,
     /^\/hardware-integrations$/,
+    /^\/partners\/csv-preview$/,
+    /^\/sensors\/csv-preview$/,
     /^\/how-ai-doctor-works$/,
     /^\/tools(\/.*)?$/,
     /^\/customer\/.+$/,
@@ -121,5 +123,13 @@ describe("Public SEO route surface", () => {
     const entry = APP_ROUTES.find((r) => r.path === "/quick-log");
     expect(entry, "manifest entry for /quick-log").toBeDefined();
     expect(entry?.access).toBe("public");
+  });
+
+  it("explicitly covers both browser-local CSV preview routes as public", () => {
+    for (const path of ["/partners/csv-preview", "/sensors/csv-preview"]) {
+      const entry = APP_ROUTES.find((route) => route.path === path);
+      expect(entry, `manifest entry for ${path}`).toBeDefined();
+      expect(entry?.access).toBe("public");
+    }
   });
 });

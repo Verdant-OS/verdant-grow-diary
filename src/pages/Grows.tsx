@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useGrows } from "@/store/grows";
 import { useAuth } from "@/store/auth";
 
@@ -24,11 +24,18 @@ import { toast } from "sonner";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { evaluateGrowCreationGate, FREE_TIER_UPGRADE_PATH } from "@/lib/entitlements/freeTierGates";
 import { trackFunnelEvent } from "@/lib/funnelAnalytics";
+import {
+  buildConnectedActivationRoutes,
+  isOneTentActivationIntent,
+} from "@/lib/connectedOneTentActivationRules";
 
 export default function Grows() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const activationIntent = isOneTentActivationIntent(searchParams.get("intent"));
   const { user } = useAuth();
   const { grows, activeGrowId, setActiveGrowId, refresh, loading, error } = useGrows();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(activationIntent);
   const [form, setForm] = useState({ name: "", grow_type: "tent", stage: "seedling", notes: "" });
   const [busy, setBusy] = useState(false);
 
@@ -72,6 +79,15 @@ export default function Grows() {
     if (data) setActiveGrowId(data.id);
     setOpen(false);
     setForm({ name: "", grow_type: "tent", stage: "seedling", notes: "" });
+    if (data && activationIntent) {
+      navigate(
+        buildConnectedActivationRoutes({
+          growId: data.id,
+          tentId: null,
+          plantId: null,
+        }).addTent,
+      );
+    }
   }
 
   async function archive(id: string) {

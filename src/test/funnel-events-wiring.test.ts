@@ -8,6 +8,8 @@
  *   grow_created            → Grows.tsx (after insert succeeds)
  *   tent_created            → CreateTentDialog.tsx (after insert succeeds)
  *   plant_created           → CreatePlantDialog.tsx (after insert succeeds)
+ *   csv_history_onboarding_ready
+ *                           → Onboarding.tsx (after explicit starter setup + safe handoff)
  *   quick_log_saved         → shared privacy-safe wrapper from every mounted
  *                             Quick Log success seam
  *   csv_import_started      → EnvironmentCsvImportLauncher.tsx (modal open intent)
@@ -18,6 +20,7 @@
  *   ai_doctor_result_received / ai_doctor_session_saved
  *                           → PlantDetailAiDoctorLiveReview.tsx
  *   paywall_viewed          → Pricing.tsx + Upgrade.tsx + AI Doctor limit (mount effects)
+ *   paywall_cta_clicked     → explicit Free AI Doctor limit pricing CTA click
  *   checkout_started        → usePaddleCheckout.ts (authenticated openCheckout)
  *   subscription_activated  → CheckoutSuccess.tsx (server-confirmed flip)
  *   checkout_return_completed
@@ -67,6 +70,11 @@ const SEAMS: Array<{ event: string; file: string; extra?: RegExp[] }> = [
   { event: "grow_created", file: "src/pages/Grows.tsx" },
   { event: "tent_created", file: "src/components/CreateTentDialog.tsx" },
   { event: "plant_created", file: "src/components/CreatePlantDialog.tsx" },
+  {
+    event: "csv_history_onboarding_ready",
+    file: "src/pages/Onboarding.tsx",
+    extra: [/surface:\s*"onboarding"/],
+  },
   { event: "csv_import_started", file: "src/components/EnvironmentCsvImportLauncher.tsx" },
   {
     event: "csv_import_completed",
@@ -134,8 +142,9 @@ const QUICK_LOG_SUCCESS_SEAMS: Array<{
   },
   {
     file: "src/components/QuickLogV2Sheet.tsx",
-    calls: 1,
-    extra: /trackQuickLogSuccess\("feed"\)/,
+    calls: 2,
+    extra:
+      /trackQuickLogSuccess\("feed",\s*\{\s*reused:\s*result\.reused\s*\}\)[\s\S]*trackQuickLogSuccess\("water",\s*\{\s*reused:\s*wateringResult\.reused\s*\}\)/,
   },
   {
     file: "src/components/PlantQuickLog.tsx",
@@ -167,6 +176,30 @@ describe("each funnel event fires from its canonical seam", () => {
     expect(aiDoctor).toMatch(
       /trackFunnelEvent\("paywall_viewed",\s*\{\s*surface:\s*"ai_doctor_limit"\s*\}\)/,
     );
+    expect(aiDoctor).toContain("surface: AI_DOCTOR_POST_VALUE_UPGRADE_SURFACE");
+  });
+
+  it("paywall_cta_clicked is wired only to explicit AI Doctor pricing actions", () => {
+    const aiDoctor = read("src/components/PlantDetailAiDoctorLiveReview.tsx");
+    const notice = read("src/components/AiCreditLimitNotice.tsx");
+    const coach = read("src/pages/Coach.tsx");
+    const callbackStart = aiDoctor.indexOf("const handleCreditLimitPlansClick");
+    const callbackEnd = aiDoctor.indexOf("useEffect(() =>", callbackStart);
+    const callback = aiDoctor.slice(callbackStart, callbackEnd);
+
+    expect(callbackStart).toBeGreaterThan(-1);
+    expect(callbackEnd).toBeGreaterThan(callbackStart);
+    expect(callback).toMatch(
+      /trackFunnelEvent\("paywall_cta_clicked",\s*\{\s*surface:\s*"ai_doctor_limit"\s*\}\)/,
+    );
+    expect(callback).not.toMatch(/user_id|plant_id|grow_id|tent_id|returnTo|email|plan/);
+    expect(aiDoctor).toMatch(/onUpsellCtaClick=\{handleCreditLimitPlansClick\}/);
+    expect(notice).toMatch(/onPrimaryCtaClick=\{onUpsellCtaClick\}/);
+    expect(aiDoctor).toMatch(
+      /const handlePostValuePlansClick[\s\S]{0,250}surface:\s*AI_DOCTOR_POST_VALUE_UPGRADE_SURFACE/,
+    );
+    expect(aiDoctor).toMatch(/onPrimaryCtaClick=\{handlePostValuePlansClick\}/);
+    expect(coach).not.toContain("onUpsellCtaClick");
   });
 
   it("quick_log_saved routes through the shared wrapper at every mounted success seam", () => {
@@ -182,6 +215,8 @@ describe("each funnel event fires from its canonical seam", () => {
     }
   });
 
+  // This inventory recursively reads every source file. Permit normal parallel
+  // Vitest contention as the app grows without weakening the assertion.
   it("inventories every production useQuickLogV2Save caller and requires explicit opt-in", () => {
     const actualCallers = listSourceFiles(resolve(ROOT, "src"))
       .map((file) => ({ absolute: file, relative: relative(ROOT, file).replace(/\\/g, "/") }))
@@ -200,7 +235,7 @@ describe("each funnel event fires from its canonical seam", () => {
         expect(src).not.toMatch(/telemetryIntent|trackQuickLogSuccess/);
       }
     }
-  });
+  }, 15_000);
 });
 
 describe("ordering and safety constraints at the seams", () => {
@@ -227,11 +262,16 @@ describe("ordering and safety constraints at the seams", () => {
     expect(src).not.toMatch(/telemetryIntent:\s*built\.payload\.p_action/);
   });
 
-  it("structured feed and Plant Quick Log emit only after their write rejection gates", () => {
+  it("structured feed, Water, and Plant Quick Log emit only after their write rejection gates", () => {
     const sheet = read("src/components/QuickLogV2Sheet.tsx");
-    expect(sheet.indexOf('trackQuickLogSuccess("feed")')).toBeGreaterThan(
+    expect(sheet.indexOf('trackQuickLogSuccess("feed"')).toBeGreaterThan(
       sheet.indexOf("if (result.ok !== true)"),
     );
+    expect(sheet).toMatch(/trackQuickLogSuccess\("feed",\s*\{\s*reused:\s*result\.reused/);
+    expect(sheet.indexOf('trackQuickLogSuccess("water"')).toBeGreaterThan(
+      sheet.indexOf("if (wateringResult.ok !== true)"),
+    );
+    expect(sheet).toMatch(/trackQuickLogSuccess\("water",\s*\{\s*reused:\s*wateringResult\.reused/);
 
     const plant = read("src/components/PlantQuickLog.tsx");
     expect(plant.indexOf('trackQuickLogSuccess("plant_quick_log")')).toBeGreaterThan(
@@ -331,6 +371,16 @@ describe("ordering and safety constraints at the seams", () => {
     expect(savedGate).toBeGreaterThan(resultTrack);
     expect(savedDedupe).toBeGreaterThan(savedGate);
     expect(savedTrack).toBeGreaterThan(savedDedupe);
+
+    const postValueGate = src.indexOf("!postValueUpgrade.visible", savedTrack);
+    const postValueDedupe = src.indexOf(
+      "trackedPostValuePaywallResultRef.current === review.result",
+      postValueGate,
+    );
+    const postValueTrack = src.indexOf('trackFunnelEvent("paywall_viewed"', postValueDedupe);
+    expect(postValueGate).toBeGreaterThan(savedTrack);
+    expect(postValueDedupe).toBeGreaterThan(postValueGate);
+    expect(postValueTrack).toBeGreaterThan(postValueDedupe);
   });
 
   it("checkout_return_completed fires only after confirmation and a sanitized return exists", () => {
@@ -379,28 +429,50 @@ describe("ordering and safety constraints at the seams", () => {
     expect(app).toMatch(/<Suspense[\s\S]*<Route element=\{<AppShell \/>\}>/);
   });
 
-  it("historical_ai_review_started fires only for an accepted initial historical review", () => {
+  it("historical_ai_review_started uses click-time accepted eligibility and defers start", () => {
     const src = read("src/components/PlantDetailAiDoctorLiveReview.tsx");
+    const startBinding = src.indexOf(
+      "const { start: startReview, status: reviewStatus } = review;",
+    );
+    const deferredStartEffect = src.indexOf("useEffect(() => {", startBinding);
+    const deferredStartGuard = src.indexOf(
+      "pendingAcceptedReviewStartRef.current !== historyScopeKey",
+      deferredStartEffect,
+    );
+    const deferredStart = src.indexOf("startReview();", deferredStartGuard);
     const handler = src.indexOf("const handleInitialStart");
-    const acceptedGate = src.indexOf("if (!review.canStart) return;", handler);
+    const canStartGate = src.indexOf("if (!review.canStart) return;", handler);
+    const requestGate = src.indexOf(
+      "if (!packet || pendingAcceptedReviewStartRef.current === historyScopeKey) return;",
+      canStartGate,
+    );
+    const acceptedGate = src.indexOf("if (!acceptedEligibility.allowed) return;", requestGate);
+    const acceptedRequest = src.indexOf("setAcceptedReviewRequest({", acceptedGate);
     const historicalGate = src.indexOf(
-      'if (eligibility.mode === "historical_review")',
-      acceptedGate,
+      'if (acceptedEligibility.mode === "historical_review"',
+      acceptedRequest,
     );
     const track = src.indexOf('trackFunnelEvent("historical_ai_review_started")', historicalGate);
-    const start = src.indexOf("review.start()", track);
+    const handlerEnd = src.indexOf("const confidenceCopy", handler);
 
+    expect(startBinding).toBeGreaterThan(-1);
+    expect(deferredStartEffect).toBeGreaterThan(startBinding);
+    expect(deferredStartGuard).toBeGreaterThan(deferredStartEffect);
+    expect(deferredStart).toBeGreaterThan(deferredStartGuard);
     expect(handler).toBeGreaterThan(-1);
-    expect(acceptedGate).toBeGreaterThan(handler);
-    expect(historicalGate).toBeGreaterThan(acceptedGate);
+    expect(canStartGate).toBeGreaterThan(handler);
+    expect(requestGate).toBeGreaterThan(canStartGate);
+    expect(acceptedGate).toBeGreaterThan(requestGate);
+    expect(acceptedRequest).toBeGreaterThan(acceptedGate);
+    expect(historicalGate).toBeGreaterThan(acceptedRequest);
     expect(track).toBeGreaterThan(historicalGate);
-    expect(start).toBeGreaterThan(track);
+    expect(src.slice(handler, handlerEnd)).not.toContain("startReview()");
     expect(src).toMatch(
       /onClick=\{review\.status === "error" \? review\.retry : handleInitialStart\}/,
     );
     expect(src).toMatch(/activeReviewRequest\s*\?\s*review\.status === "error" && canRetryReview/);
     expect(src).toMatch(
-      /allowed && historyRecovery\.state !== "decision_required" && review\.status === "idle"/,
+      /allowed\s*&&\s*historyRecovery\.state !== "decision_required"\s*&&\s*rootZoneRecovery\.state !== "decision_required"\s*&&\s*review\.status === "idle"/,
     );
     expect(src.match(/trackFunnelEvent\("historical_ai_review_started"\)/g) ?? []).toHaveLength(1);
   });
@@ -416,8 +488,14 @@ describe("funnelAnalytics module — privacy fences", () => {
 
   it("documents the limited GA4 activation proxy separately from future authority", () => {
     expect(EVENT_MAP).toMatch(
-      /csv_import_started → csv_import_completed →\s*csv_history_ai_doctor_clicked → ai_doctor_review_started →\s*ai_doctor_result_received → ai_doctor_session_saved → paywall_viewed/,
+      /csv_import_started → csv_import_completed →\s*csv_history_ai_doctor_clicked → ai_doctor_review_started →\s*ai_doctor_result_received → ai_doctor_session_saved → paywall_viewed →\s*paywall_cta_clicked → checkout_started/,
     );
+    expect(EVENT_MAP).toMatch(/two\s+independent activation branches/);
+    expect(EVENT_MAP).toMatch(
+      /\*\*not\*\*\s+a requirement that every grower\s+complete Quick Log before importing CSV history/,
+    );
+    expect(EVENT_MAP).toMatch(/Diary activation branch:\s*quick_log_saved/);
+    expect(EVENT_MAP).toMatch(/CSV-history acquisition branch:\s*csv_history_onboarding_ready/);
     expect(EVENT_MAP).toMatch(/historical-only branch marker/);
     expect(EVENT_MAP).toMatch(/surface: "imported_history"/);
     expect(EVENT_MAP).toMatch(/accepted\s+initial historical-review start with no properties/);
@@ -430,6 +508,10 @@ describe("funnelAnalytics module — privacy fences", () => {
     expect(EVENT_MAP).toMatch(/not authoritative cross-device, server-side, or signup-cohort/);
     expect(EVENT_MAP).toMatch(/future authoritative operator\/cohort aggregate/);
     expect(EVENT_MAP).toMatch(/not implemented or claimed/);
+    expect(EVENT_MAP).toMatch(/client-only, non-authoritative intent signal/);
+    expect(EVENT_MAP).toMatch(
+      /not\s+a checkout start, subscription, entitlement grant, or revenue event/,
+    );
   });
 
   it("has no network client, storage writes, or identifiers", () => {

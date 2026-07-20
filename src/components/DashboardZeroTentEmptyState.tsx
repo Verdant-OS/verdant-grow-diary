@@ -13,7 +13,7 @@ import { tentsPath } from "@/lib/routes";
  *
  * Pure presenter: no Supabase, no hooks, no writes.
  */
-export default function DashboardZeroTentEmptyState() {
+export default function DashboardZeroTentEmptyState({ growId }: { growId?: string | null }) {
   return (
     <section
       data-testid="dashboard-zero-tent-empty-state"
@@ -23,13 +23,10 @@ export default function DashboardZeroTentEmptyState() {
       <div className="mx-auto h-12 w-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-4">
         <Box className="h-6 w-6" />
       </div>
-      <h2 className="font-display text-xl md:text-2xl font-semibold">
-        Set up your first tent
-      </h2>
+      <h2 className="font-display text-xl md:text-2xl font-semibold">Set up your first tent</h2>
       <p className="mt-3 text-sm md:text-base text-muted-foreground max-w-xl mx-auto leading-relaxed">
-        Your dashboard starts with a real grow space. Add a tent first,
-        then Verdant can organize plants, logs, manual readings, alerts,
-        and your grow timeline.
+        Your dashboard starts with a real grow space. Add a tent first, then Verdant can organize
+        plants, logs, manual readings, alerts, and your grow timeline.
       </p>
       <p
         className="mt-3 text-xs text-muted-foreground"
@@ -38,7 +35,7 @@ export default function DashboardZeroTentEmptyState() {
         This is your real workspace — demo data stays in <code>/demo</code>.
       </p>
       <div className="mt-5 flex justify-center">
-        <Link to={tentsPath()}>
+        <Link to={tentsPath(growId)}>
           <Button
             size="lg"
             data-testid="dashboard-zero-tent-create-cta"

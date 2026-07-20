@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   Sprout,
   Filter,
@@ -31,7 +31,7 @@ import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { useGrows } from "@/store/grows";
 import { useDiaryEntries } from "@/hooks/use-diary-entries";
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
-import { plantDetailPath, plantsPath } from "@/lib/routes";
+import { dashboardPath, plantDetailPath, plantsPath } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import {
   filterVisiblePlants,
@@ -50,7 +50,11 @@ import {
 import { buildPlantsTentFilterChips } from "@/lib/plantsTentFilterChipsRules";
 import { buildDashboardDailyGrowCheckPanel } from "@/lib/dashboardDailyGrowCheckPanelRules";
 import { buildDailyCheckEntryHref } from "@/lib/dailyCheckPostSubmitRules";
-import { useNavigate } from "react-router-dom";
+import { isOneTentActivationIntent } from "@/lib/connectedOneTentActivationRules";
+import {
+  buildPlantQuickLogPrefill,
+  PLANT_QUICKLOG_PREFILL_EVENT,
+} from "@/lib/plantQuickLogPrefillRules";
 
 function formatPlantHealthLabel(health: string | null | undefined): string {
   return `Plant health: ${health ?? "unknown"}`;
@@ -61,6 +65,7 @@ function formatPlantHealthAriaLabel(health: string | null | undefined): string {
 }
 
 export default function Plants() {
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const { urlGrowId, scopedGrowName, isValidScopedGrow, backHref } = useScopedGrow();
   const navigate = useNavigate();
@@ -81,6 +86,14 @@ export default function Plants() {
   const { data: allGrowsActivePlants = [] } = allGrowsActivePlantsQuery;
   const tentsQuery = useGrowTents(urlGrowId ?? undefined);
   const { data: tents = [] } = tentsQuery;
+  const requestedActivationTentId = searchParams.get("tentId");
+  const activationTent =
+    validGrowId && isOneTentActivationIntent(searchParams.get("intent"))
+      ? (tents.find(
+          (tent) => tent.id === requestedActivationTentId && tent.growId === validGrowId,
+        ) ?? null)
+      : null;
+  const activationIntent = !!activationTent;
   const growDataQueries = [
     activePlantsQuery,
     allPlantsQuery,
@@ -227,7 +240,36 @@ export default function Plants() {
         title="Plants"
         description="Every plant you're tracking, across every tent."
         icon={<Sprout className="h-5 w-5" />}
-        actions={<CreatePlantDialog defaultGrowId={validGrowId} />}
+        actions={
+          <CreatePlantDialog
+            key={activationIntent ? "one-tent-activation" : "standard-create"}
+            defaultGrowId={validGrowId}
+            defaultTentId={activationTent?.id}
+            requireTent={activationIntent}
+            initiallyOpen={activationIntent}
+            onCreated={
+              activationIntent && validGrowId && activationTent
+                ? (plant) => {
+                    const prefill = buildPlantQuickLogPrefill({
+                      plantId: plant.id,
+                      plantName: plant.name,
+                      growId: validGrowId,
+                      tentId: activationTent.id,
+                      tentName: activationTent.name,
+                    });
+                    navigate(dashboardPath(validGrowId));
+                    if (prefill && typeof window !== "undefined") {
+                      window.dispatchEvent(
+                        new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, {
+                          detail: prefill,
+                        }),
+                      );
+                    }
+                  }
+                : undefined
+            }
+          />
+        }
       />
 
       {/* Grow filter + plant search row — the two controls are deliberately

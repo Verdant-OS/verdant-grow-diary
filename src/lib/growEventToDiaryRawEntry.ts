@@ -16,7 +16,13 @@
  *   - Pure / deterministic.
  */
 
-export interface GrowEventRowForRecent {
+import {
+  buildRootZoneDiaryDetails,
+  buildRootZoneObservationFromGrowEvent,
+  type RootZoneGrowEventRowLike,
+} from "./rootZoneObservationRules";
+
+export interface GrowEventRowForRecent extends RootZoneGrowEventRowLike {
   id: string;
   grow_id?: string | null;
   plant_id?: string | null;
@@ -26,6 +32,8 @@ export interface GrowEventRowForRecent {
   note?: string | null;
   source?: string | null;
   is_deleted?: boolean | null;
+  watering_events?: unknown;
+  feeding_events?: unknown;
 }
 
 export interface RecentLaneRawEntry {
@@ -36,12 +44,15 @@ export interface RecentLaneRawEntry {
   entry_type: string;
   entry_at: string;
   note: string;
-  details: { event_type: string; source: string | null };
+  details: Record<string, unknown> & {
+    event_type: string;
+    source: string | null;
+  };
 }
 
-export function mapGrowEventToRecentRawEntry(
-  row: GrowEventRowForRecent,
-): RecentLaneRawEntry {
+export function mapGrowEventToRecentRawEntry(row: GrowEventRowForRecent): RecentLaneRawEntry {
+  const rootZone = buildRootZoneObservationFromGrowEvent(row);
+  const expectsRootZone = row.event_type === "watering" || row.event_type === "feeding";
   return {
     id: row.id,
     grow_id: row.grow_id ?? null,
@@ -53,6 +64,16 @@ export function mapGrowEventToRecentRawEntry(
     details: {
       event_type: row.event_type,
       source: row.source ?? null,
+      ...(expectsRootZone
+        ? {
+            root_zone_status: !rootZone
+              ? "unavailable"
+              : rootZone.invalidFields && rootZone.invalidFields.length > 0
+                ? "partial"
+                : "available",
+          }
+        : {}),
+      ...buildRootZoneDiaryDetails(rootZone),
     },
   };
 }

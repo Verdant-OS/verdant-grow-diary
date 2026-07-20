@@ -34,6 +34,15 @@ export const AI_DOCTOR_BASE_SYSTEM_PROMPT =
   "advisory phrasing such as 'Avoid…' or 'Do not…' for cautions. Keep all " +
   "arrays to at most 12 items and at most one short sentence per item.";
 
+export const AI_DOCTOR_ROOT_ZONE_SAFETY_GUIDANCE = Object.freeze([
+  "Treat root-zone entries as grower-recorded historical observations, not prescribed targets.",
+  "Use repeated measurements and plant response as context; state when runoff or follow-up evidence is missing.",
+  "Treat manualObservation labels as grower-recorded categorical context, not sensor readings or measured dryback.",
+  "A single light-pot, dry-surface, or drainage label does not establish a watering target or schedule.",
+  "Treat invalidFields as omitted measurements and name them under Missing information.",
+  "Do not recommend aggressive irrigation or nutrient changes from a single root-zone entry.",
+]);
+
 export interface AiDoctorPromptMessages {
   system: string;
   user: string;
@@ -58,6 +67,8 @@ export function buildAiDoctorPromptMessages(packet: unknown): AiDoctorPromptMess
   const rec = asRecord(packet);
   const imported_sensor_history = rec?.imported_sensor_history ?? null;
   const missingLiveSensorReadings = rec?.missingLiveSensorReadings === true;
+  const hasRootZoneObservations =
+    Array.isArray(rec?.recentRootZoneObservations) && rec.recentRootZoneObservations.length > 0;
 
   const fragment = buildAiDoctorImportedHistoryPromptFragment({
     imported_sensor_history,
@@ -76,6 +87,12 @@ export function buildAiDoctorPromptMessages(packet: unknown): AiDoctorPromptMess
     systemSections.push(
       "Historical sensor context safety rules:",
       ...guidance.map((g) => `- ${g}`),
+    );
+  }
+  if (hasRootZoneObservations) {
+    systemSections.push(
+      "Root-zone context safety rules:",
+      ...AI_DOCTOR_ROOT_ZONE_SAFETY_GUIDANCE.map((rule) => `- ${rule}`),
     );
   }
   systemSections.push(

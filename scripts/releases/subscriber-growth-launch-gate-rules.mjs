@@ -24,6 +24,7 @@ export const SUBSCRIBER_GROWTH_REQUIRED_COMMAND_IDS = Object.freeze([
 
 const EXPECTED_ROUTE_COUNT = 4;
 const EXPECTED_CAPABILITY_COUNT = 5;
+export const SUBSCRIBER_GROWTH_FOUNDER_TOTAL = 100;
 export const SUBSCRIBER_GROWTH_EXPECTED_MIGRATION_COUNT =
   SUBSCRIBER_GROWTH_MIGRATION_CONTRACT.length;
 
@@ -127,8 +128,8 @@ export function founderCounterPassed(founderCounter) {
     founderCounter.payloadVerified === true &&
     Number.isInteger(founderCounter.remaining) &&
     founderCounter.remaining >= 0 &&
-    founderCounter.remaining <= 75 &&
-    founderCounter.total === 75 &&
+    founderCounter.remaining <= SUBSCRIBER_GROWTH_FOUNDER_TOTAL &&
+    founderCounter.total === SUBSCRIBER_GROWTH_FOUNDER_TOTAL &&
     founderCounter.error === null &&
     Array.isArray(founderCounter.errors) &&
     founderCounter.errors.length === 0

@@ -11,6 +11,7 @@ import { clearGrowDataMeta } from "@/hooks/useGrowData";
 import RootErrorBoundary from "@/components/RootErrorBoundary";
 import PhenoTrackerUpgradeGate from "@/components/PhenoTrackerUpgradeGate";
 import RequireOperatorRole from "./components/RequireOperatorRole";
+import OAuthPostAuthRedirect from "@/components/OAuthPostAuthRedirect";
 import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
 import { AgreementReconsentGate } from "@/components/AgreementReconsentGate";
 import RootEntry from "@/components/RootEntry";
@@ -41,6 +42,7 @@ const Settings = lazy(() => import("./pages/Settings"));
 const AccountPreferences = lazy(() => import("./pages/AccountPreferences"));
 const GrowerInvite = lazy(() => import("./pages/GrowerInvite"));
 const AgentIntegrations = lazy(() => import("./pages/AgentIntegrations"));
+const McpApiReference = lazy(() => import("./pages/McpApiReference"));
 const Timeline = lazy(() => import("./pages/Timeline"));
 const Grows = lazy(() => import("./pages/Grows"));
 const GrowDetail = lazy(() => import("./pages/GrowDetail"));
@@ -85,6 +87,8 @@ const DailyCheck = lazy(() => import("./pages/DailyCheck"));
 const Landing = lazy(() => import("./pages/Landing"));
 // Demo page removed — Verdant is positioned around real grow data only.
 const HardwareIntegrations = lazy(() => import("./pages/HardwareIntegrations"));
+const PartnerCsvPreviewLanding = lazy(() => import("./pages/PartnerCsvPreviewLanding"));
+const SensorCsvPreview = lazy(() => import("./pages/SensorCsvPreview"));
 const CreatorBeta = lazy(() => import("./pages/CreatorBeta"));
 const BreederBeta = lazy(() => import("./pages/BreederBeta"));
 const Pricing = lazy(() => import("./pages/Pricing"));
@@ -105,6 +109,9 @@ const CheckoutCancel = lazy(() => import("./pages/CheckoutCancel"));
 const Terms = lazy(() => import("./pages/TermsOfService"));
 const Privacy = lazy(() => import("./pages/PrivacyPolicy"));
 const Refund = lazy(() => import("./pages/RefundPolicy"));
+const Feedback = lazy(() => import("./pages/support/Feedback"));
+const Contact = lazy(() => import("./pages/support/Contact"));
+const OperatorSupportInbox = lazy(() => import("./pages/OperatorSupportInbox"));
 
 const Leads = lazy(() => import("./pages/Leads"));
 const PiIngestStatus = lazy(() => import("./pages/PiIngestStatus"));
@@ -190,6 +197,7 @@ const App = () => (
         <BrowserRouter>
           <AnalyticsShell />
           <AuthProvider onBeforeAuthIdentityChange={clearQueryCacheBeforeAuthIdentityChange}>
+            <OAuthPostAuthRedirect />
             <GrowsProvider>
               <PaymentTestModeBanner />
               <AgreementReconsentGate />
@@ -217,6 +225,10 @@ const App = () => (
                       Old bookmarks redirect to the landing page. */}
                   <Route path="/demo" element={<Navigate to="/welcome" replace />} />
                   <Route path="/hardware-integrations" element={<HardwareIntegrations />} />
+                  {/* Public, browser-local CSV proof. Both routes stay outside
+                      AppShell and perform no private reads or writes. */}
+                  <Route path="/partners/csv-preview" element={<PartnerCsvPreviewLanding />} />
+                  <Route path="/sensors/csv-preview" element={<SensorCsvPreview />} />
                   <Route path="/creator-beta" element={<CreatorBeta />} />
                   <Route path="/breeder-beta" element={<BreederBeta />} />
                   <Route path="/pricing" element={<Pricing />} />
@@ -238,6 +250,7 @@ const App = () => (
                   <Route path="/how-ai-doctor-works" element={<HowAiDoctorWorks />} />
                   <Route path="/ai-doctor-readiness-check" element={<AiDoctorContextCheck />} />
                   <Route path="/tools/vpd-calculator" element={<PublicVpdCalculator />} />
+                  <Route path="/docs/mcp-api" element={<McpApiReference />} />
                   {/* Legacy `/billing/:plan` entry — redirect to canonical
                       `/pricing` with plan preselect + safe returnTo. */}
                   <Route path="/billing/:plan" element={<LegacyBillingRedirect />} />
@@ -246,6 +259,8 @@ const App = () => (
                   <Route path="/terms" element={<Terms />} />
                   <Route path="/privacy" element={<Privacy />} />
                   <Route path="/refund" element={<Refund />} />
+                  <Route path="/feedback" element={<Feedback />} />
+                  <Route path="/contact" element={<Contact />} />
                   <Route path="/refunds" element={<Navigate to="/refund" replace />} />
                   <Route path="/refund-policy" element={<Navigate to="/refund" replace />} />
                   <Route path="/terms-of-service" element={<Navigate to="/terms" replace />} />
@@ -464,6 +479,7 @@ const App = () => (
                         element={<OperatorGgsRealPayloadIngest />}
                       />
                       <Route path="/operator/demo-preview" element={<OperatorDemoPreview />} />
+                      <Route path="/operator/support-inbox" element={<OperatorSupportInbox />} />
                       <Route path="/operator/release-readiness" element={<ReleaseReadiness />} />
                       {/* Diagnostics Audience Split v1 — /diagnostics is an
                           operator-only RLS / round-trip / DevOps surface; manifest

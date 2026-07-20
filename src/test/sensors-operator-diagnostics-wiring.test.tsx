@@ -39,6 +39,7 @@ vi.mock("@/hooks/useGrowData", () => ({
       : [{ id: sensorPageState.tentId, name: "Tent 1", growId: "g1" }],
     isLoading: sensorPageState.tentsLoading,
     isError: sensorPageState.tentsError,
+    isSuccess: !sensorPageState.tentsLoading && !sensorPageState.tentsError,
     refetch: vi.fn(),
   }),
   useGrowSensorReadings: () => ({

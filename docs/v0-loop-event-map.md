@@ -8,13 +8,25 @@ from the more detailed internal/PostHog taxonomy that remains aspirational.
 
 ## Shipped GA activation contract
 
-The shipped privacy-safe growth-calendar sequence is:
+The shipped privacy-safe growth-calendar contract has shared setup, then two
+independent activation branches. It is **not** a requirement that every grower
+complete Quick Log before importing CSV history, or import CSV history before
+using the diary.
 
 ```text
-signup → grow_created → tent_created → plant_created → quick_log_saved →
-csv_import_started → csv_import_completed →
+Shared setup:
+signup → grow_created → tent_created → plant_created
+
+Diary activation branch:
+quick_log_saved → ai_doctor_review_started → ai_doctor_result_received →
+ai_doctor_session_saved → paywall_viewed → paywall_cta_clicked →
+checkout_started → subscription_activated → checkout_return_completed
+
+CSV-history acquisition branch:
+csv_history_onboarding_ready → csv_import_started → csv_import_completed →
 csv_history_ai_doctor_clicked → ai_doctor_review_started →
-ai_doctor_result_received → ai_doctor_session_saved → paywall_viewed → checkout_started →
+ai_doctor_result_received → ai_doctor_session_saved → paywall_viewed →
+paywall_cta_clicked → checkout_started →
 subscription_activated → checkout_return_completed
 ```
 
@@ -24,7 +36,13 @@ standard reviews pass through.
 
 `grow_created`, `tent_created`, and `plant_created` emit only after their
 respective inserts succeed. They carry no row identifiers or grower-entered
-names. `csv_import_started` records an explicit modal-open action;
+names. `csv_history_onboarding_ready` records a CSV-acquisition grower who
+explicitly finished the editable starter Grow, Tent, and Plant setup and now
+sees the tent-scoped importer handoff. It carries only `surface: "onboarding"`;
+it does not open a file picker, import data, or imply that any history is live.
+It is a CSV-branch milestone, not a replacement for `quick_log_saved` and not
+evidence that a diary user has imported anything.
+`csv_import_started` records an explicit modal-open action;
 `csv_import_completed` records only a successful persistence result and the
 numeric inserted-row count. The difference measures import abandonment without
 capturing filenames, providers, timestamps, values, or file contents. A
@@ -49,6 +67,27 @@ These AI Doctor funnel events cover the canonical plant-detail
 `ai-doctor-review` path. AI Coach has a separate invocation path and is not
 claimed as measured by this client sequence; add its server-authoritative usage
 telemetry separately before including Coach in conversion reporting.
+
+After a Free grower's third review returns a contract-valid result and the
+history insert is durably confirmed, the saved result may expose a calm upgrade
+handoff. `paywall_viewed` then carries only
+`surface: "ai_doctor_post_value"`; `paywall_cta_clicked` uses that same closed
+surface only after an explicit pricing-link click. The handoff requires the
+server-resolved Free plan, the exact exhausted `3 per grow` allowance, and a
+settled client entitlement that is not paid or Founder. It stays hidden while
+history is saving or failed, for malformed or missing credit context, and for
+paid, Founder, or unknown viewers. The review remains visible and saved whether
+or not the grower opens pricing.
+
+When a Free grower is server-denied for the per-grow AI Doctor limit,
+`paywall_viewed` records that the rendered limit notice exposed an upgrade
+option. `paywall_cta_clicked` then records only an explicit click on that
+notice's pricing CTA with the closed `surface: "ai_doctor_limit"` enum. It
+does not record a route, return target, grower identity, plant/tent/grow ID,
+or plan choice. It is a client-only, non-authoritative intent signal: it is not
+a checkout start, subscription, entitlement grant, or revenue event. Paid,
+Founder, and unknown-plan denials expose no pricing CTA and emit neither
+paywall event.
 
 `subscription_activated` requires both the server-resolved paid entitlement and
 a fresh same-device checkout-start marker. This intentionally undercounts when

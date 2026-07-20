@@ -14,13 +14,13 @@ function renderCard(input: Parameters<typeof buildOnboardingChecklistViewModel>[
 }
 
 describe("post-value grower invite entry", () => {
-  it("appears only after the existing activation contract is complete", () => {
+  it("appears only after plant memory and sensor truth are both complete", () => {
     renderCard({
       growCount: 1,
       tentCount: 1,
       plantCount: 1,
       diaryEntryCount: 1,
-      sensorReadingCount: 0,
+      sensorReadingCount: 1,
     });
     expect(screen.getByRole("link", { name: "Invite a grower" })).toHaveAttribute(
       "href",

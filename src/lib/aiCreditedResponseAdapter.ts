@@ -25,7 +25,9 @@ export type AiCreditedFailureReason =
   | "invalid"
   | "shape"
   | "credit_denied"
-  | "upstream_credit_exhausted";
+  | "upstream_credit_exhausted"
+  | "result_pending"
+  | "result_recording_failed";
 
 const ALLOWED_REASONS: readonly AiCreditedFailureReason[] = [
   "config",
@@ -37,6 +39,8 @@ const ALLOWED_REASONS: readonly AiCreditedFailureReason[] = [
   "shape",
   "credit_denied",
   "upstream_credit_exhausted",
+  "result_pending",
+  "result_recording_failed",
 ] as const;
 
 export type AiCreditedOutcome<T> =

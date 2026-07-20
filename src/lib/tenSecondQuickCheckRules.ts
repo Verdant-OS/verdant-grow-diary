@@ -33,10 +33,18 @@ export const QUICK_CHECK_DETAIL_CHIPS = QUICK_LOG_ACTION_CHIPS;
 export type QuickCheckDetailChip = QuickLogActionChip;
 
 const RESPONSE_CHECK_PREFIX = "Response check:";
-const LEGACY_QUICK_CHECK_PREFIX = "Quick check:";
+const RESPONSE_CHECK_TOKEN =
+  /(?:response:\s*)?(?:response check|quick check):\s*(better|same|worse)(?=$|[.!]|\s)(?:[.!]+)?/i;
+const RESPONSE_CHECK_TOKEN_GLOBAL =
+  /(?:response:\s*)?(?:response check|quick check):\s*(?:better|same|worse)(?=$|[.!]|\s)(?:[.!]+)?/gi;
+const RESPONSE_CHECK_AT_LINE_START =
+  /^(?:response:\s*)?(?:response check|quick check):\s*(?:better|same|worse)(?=$|[.!]|\s)(?:[.!]+)?\s*/i;
 
 function normalizeLine(value: string): string {
-  return value.trim().replace(/[.!]+$/, "").toLowerCase();
+  return value
+    .trim()
+    .replace(/[.!]+$/, "")
+    .toLowerCase();
 }
 
 function splitLines(note: string): string[] {
@@ -47,15 +55,14 @@ function splitLines(note: string): string[] {
 }
 
 function isResponseCheckLine(line: string): boolean {
-  const lower = line.trim().toLowerCase();
-  return (
-    lower.startsWith(RESPONSE_CHECK_PREFIX.toLowerCase()) ||
-    lower.startsWith(LEGACY_QUICK_CHECK_PREFIX.toLowerCase())
-  );
+  return RESPONSE_CHECK_TOKEN.test(line);
 }
 
-function stripExistingResponseCheckLines(note: string): string[] {
-  return splitLines(note).filter((line) => !isResponseCheckLine(line));
+function stripResponseCheckTokens(line: string): string {
+  return line
+    .replace(RESPONSE_CHECK_TOKEN_GLOBAL, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 }
 
 function actionChipLine(chip: QuickLogActionChip): string {
@@ -85,12 +92,28 @@ export function buildQuickCheckLine(status: TenSecondQuickCheckStatus): string {
   return buildResponseCheckLine(status);
 }
 
-export function applyResponseCheck(
-  existingNote: string,
-  status: ResponseCheckStatus,
-): string {
-  const rest = stripExistingResponseCheckLines(existingNote);
-  return [buildResponseCheckLine(status), ...rest].join("\n");
+export function applyResponseCheck(existingNote: string, status: ResponseCheckStatus): string {
+  const responseContext: string[] = [];
+  const remainingLines: string[] = [];
+
+  for (const line of splitLines(existingNote)) {
+    if (!isResponseCheckLine(line)) {
+      remainingLines.push(line);
+      continue;
+    }
+
+    const stripped = stripResponseCheckTokens(line);
+    if (!stripped) continue;
+
+    if (RESPONSE_CHECK_AT_LINE_START.test(line)) {
+      responseContext.push(stripped);
+    } else {
+      remainingLines.push(stripped);
+    }
+  }
+
+  const responseLine = [buildResponseCheckLine(status), ...responseContext].join(" ");
+  return [responseLine, ...remainingLines].join("\n");
 }
 
 // Backward-compatible wrapper. Better/Same/Worse are response checks now.
@@ -101,16 +124,21 @@ export function applyTenSecondQuickCheck(
   return applyResponseCheck(existingNote, status);
 }
 
-export function applyQuickLogActionChip(
-  existingNote: string,
-  chip: QuickLogActionChip,
-): string {
+export function applyQuickLogActionChip(existingNote: string, chip: QuickLogActionChip): string {
   const line = actionChipLine(chip);
   const normalizedChip = normalizeLine(line);
   const lines = splitLines(existingNote);
   const hasChip = lines.some((item) => normalizeLine(item) === normalizedChip);
   if (hasChip) return existingNote;
   return [...lines, line].join("\n");
+}
+
+export function appendQuickLogObservation(existingNote: string, observation: string): string {
+  const note = existingNote.trim();
+  const detail = observation.trim();
+  if (!detail) return note;
+  if (!note) return detail;
+  return `${note}${hasResponseCheck(note) ? "\n" : " "}${detail}`;
 }
 
 // Backward-compatible wrapper for old imports.
@@ -123,6 +151,41 @@ export function applyQuickCheckDetailChip(
 
 export function hasResponseCheck(existingNote: string): boolean {
   return splitLines(existingNote).some(isResponseCheckLine);
+}
+
+export function readResponseCheckStatus(existingNote: string): ResponseCheckStatus | null {
+  const match = RESPONSE_CHECK_TOKEN.exec(existingNote);
+  if (!match) return null;
+  const normalized = match[1].toLowerCase();
+  if (normalized === "better") return "Better";
+  if (normalized === "same") return "Same";
+  if (normalized === "worse") return "Worse";
+  return null;
+}
+
+/**
+ * Removes response-only context before classifying grow actions. A line that
+ * starts with a response marker is entirely response context; a marker later
+ * in a line is removed while the preceding action prose is preserved.
+ */
+export function actionTextWithoutResponseContext(existingNote: string): string {
+  return splitLines(existingNote)
+    .map((line) => {
+      if (RESPONSE_CHECK_AT_LINE_START.test(line)) return "";
+      return stripResponseCheckTokens(line);
+    })
+    .filter(Boolean)
+    .join("\n");
+}
+
+export function responseActionChronologyRank(input: {
+  hasAction: boolean;
+  hasResponse: boolean;
+}): number {
+  if (input.hasAction && !input.hasResponse) return 0;
+  if (input.hasAction && input.hasResponse) return 1;
+  if (input.hasResponse) return 2;
+  return 3;
 }
 
 // Backward-compatible wrapper for old imports.

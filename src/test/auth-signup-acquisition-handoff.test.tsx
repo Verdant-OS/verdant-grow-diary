@@ -35,9 +35,14 @@ vi.mock("@/integrations/lovable/index", () => ({
 
 import Auth from "@/pages/Auth";
 import { OAUTH_SIGNUP_ACQUISITION_STORAGE_KEY } from "@/lib/oauthSignupAcquisitionRules";
+import {
+  consumePendingOAuthPostAuthRedirect,
+  OAUTH_POST_AUTH_REDIRECT_STORAGE_KEY,
+} from "@/lib/oauthPostAuthRedirectRules";
 
-const redirectTo =
+const founderRedirectTo =
   "/pricing?plan=pro_annual&utm_source=founder_share&utm_medium=referral&utm_campaign=founder_launch";
+const csvRedirectTo = "/onboarding?intent=csv_history";
 
 beforeEach(() => {
   mocks.signUp.mockReset();
@@ -51,7 +56,7 @@ beforeEach(() => {
   });
 });
 
-function renderSignup() {
+function renderSignup(redirectTo = founderRedirectTo) {
   return render(
     <MemoryRouter
       initialEntries={[`/auth?mode=signup&redirectTo=${encodeURIComponent(redirectTo)}`]}
@@ -59,6 +64,7 @@ function renderSignup() {
       <Routes>
         <Route path="/auth" element={<Auth />} />
         <Route path="/pricing" element={<div data-testid="pricing-return" />} />
+        <Route path="/onboarding" element={<div data-testid="onboarding-return" />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -93,7 +99,7 @@ describe("Auth signup acquisition handoff", () => {
       email: "grower@example.com",
       password: "correct-horse-battery-staple",
       options: {
-        emailRedirectTo: `${window.location.origin}${redirectTo}`,
+        emailRedirectTo: `${window.location.origin}${founderRedirectTo}`,
         data: { verdant_signup_source: "founder_share", marketing_opt_in: false },
       },
     });
@@ -149,6 +155,26 @@ describe("Auth signup acquisition handoff", () => {
     expect(pending).not.toBeNull();
     expect(JSON.parse(pending ?? "{}")).toMatchObject({ source: "founder_share" });
     expect(pending).not.toMatch(/email|token|user_?id|grower@example/i);
+    expect(consumePendingOAuthPostAuthRedirect()).toBeNull();
+  });
+
+  it("preserves only the fixed CSV onboarding intent across a Google OAuth redirect", async () => {
+    renderSignup(csvRedirectTo);
+
+    fireEvent.click(screen.getByTestId("auth-google-signup"));
+
+    await waitFor(() => expect(mocks.oauth).toHaveBeenCalledTimes(1));
+    expect(consumePendingOAuthPostAuthRedirect()).toBe(csvRedirectTo);
+  });
+
+  it("clears the one-shot OAuth target when Google returns a session without redirecting", async () => {
+    mocks.oauth.mockResolvedValue({ error: null, redirected: false });
+    renderSignup(csvRedirectTo);
+
+    fireEvent.click(screen.getByTestId("auth-google-signup"));
+
+    expect(await screen.findByTestId("onboarding-return")).toBeInTheDocument();
+    expect(window.sessionStorage.getItem(OAUTH_POST_AUTH_REDIRECT_STORAGE_KEY)).toBeNull();
   });
 
   it("continues to the safe return path when signup immediately creates a session", async () => {

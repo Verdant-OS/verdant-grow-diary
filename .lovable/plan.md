@@ -1,49 +1,51 @@
-# Manage-subscription 404 trace (read-only audit)
+# Turn B — Founding 100
 
-## 1. How `no_subscription` is caught today vs `lifetime_only`
+Ships the refund-retire webhook path, the public Wall + hero counter on `/founder`, the owner prefs form, the four required invariant tests, and the FE cap ripple (75 → 100) triggered by Turn A's DB migration.
 
-Both cases are handled in `openPaddleCustomerPortal()` at `src/lib/customerPortal.ts` lines 48–91, inside a single `try { … } catch { unavailable }` wrapper. Two symmetric branches:
+## Backend
 
-**Non-2xx path (what a 404 from the edge function actually hits).** `supabase.functions.invoke` returns `{ error }` as a `FunctionsHttpError` on non-2xx. The handler unwraps `error.context.body` (string or object), parses it, and reads the discriminating `error` field:
+**Migration** `founding_100_turn_b_refund_and_prefs.sql`:
+- `public.revoke_lovable_founder_lifetime_by_transaction(p_paddle_transaction_id text, p_environment text, p_now timestamptz)` RPC:
+  - `SECURITY DEFINER`, service_role only.
+  - Atomically: `UPDATE public.subscriptions SET status='canceled', current_period_end=p_now, updated_at=p_now WHERE paddle_subscription_id='lifetime_'||p_paddle_transaction_id AND environment=p_environment` AND `UPDATE public.founders SET status='refunded', updated_at=p_now WHERE paddle_transaction_id=p_paddle_transaction_id AND environment=p_environment`.
+  - Returns `{ ok: true, revoked: boolean }`. Seat stays consumed (row + number preserved), user's Pro is revoked, wall view naturally drops the row (status<>'confirmed').
+- `GRANT EXECUTE ... TO service_role` only; `REVOKE ... FROM anon, authenticated`.
 
-```ts
-// lines 58–75 (paraphrased)
-const ctx = (error as { context?: { status?: number; body?: unknown } })?.context;
-const bodyCode = /* JSON.parse(ctx.body) or ctx.body.error */;
-if (bodyCode === "lifetime_only")   return { ok:false, code:"lifetime_only",   error: PORTAL_LIFETIME_ONLY_MESSAGE };
-if (bodyCode === "no_subscription" || ctx?.status === 404)
-                                    return { ok:false, code:"no_subscription", error: PORTAL_NO_SUBSCRIPTION_MESSAGE };
-return { ok:false, code:"unavailable", error: PORTAL_UNAVAILABLE_MESSAGE };
-```
+**Webhook** (`eventProcessor.ts` + `orchestrator.ts` + `index.ts`):
+- Extend `decide()` for `adjustment.created` where `action IN ('refund','chargeback')` and `status='approved'` and `transactionId` is present → new decision `{ kind: 'revoke_lifetime', paddleTransactionId, env }`.
+- Non-approved / non-refund adjustments → skip (existing behavior).
+- New `Deps.revokeFounderLifetime(txId, env, now)` calls the RPC. Wired in `index.ts`.
 
-Note the belt-and-suspenders on line 73: **any** 404 (even one whose body fails to parse) is already mapped to `no_subscription`, not thrown.
+## Cap ripple (Turn A raised DB cap to 100)
 
-**2xx-with-error-body path.** Lines 78–83 also handle a hypothetical `200 { error: "lifetime_only" | "no_subscription" }` shape symmetrically.
+- `src/constants/pricing.ts`: `limit: 75 → 100`, `badge: "First 75 only" → "First 100 only"`.
+- `supabase/functions/founder-slots-remaining/contract.ts`: `FOUNDER_SLOTS_TOTAL = 75 → 100`.
+- Update the 3 test files that hardcode 75 in ways that must track the cap:
+  - `src/test/founder-slots-remaining-contract.test.ts` (expects 75)
+  - `src/test/subscriber-growth-live-parity-script.test.ts` (total:75 fixtures)
+  - `src/test/upgrade-page.test.tsx` (cap fixtures)
+- Leave the two static-SQL tests that assert against the **old BYO `billing_subscriptions` migration** (`entitlements-rls.test.ts`, `paddle-paid-launch-gate-static.test.ts`) as-is — they check historical migration text, not the current `founders` cap.
 
-**Outer safety net.** Lines 88–90 swallow any thrown exception and return `{ ok:false, code:"unavailable" }`. There is no code path in this helper that can propagate an exception to the caller.
+## UI + rules
 
-## 2. Where the "uncaught runtime error / blank screen" would originate
+- **`src/lib/founderWallRules.ts`** (pure):
+  - `deriveWallDisplayName(row)` mirroring the DB CASE for the owner's own preview only (public wall reads the view; server is authoritative).
+  - `founderPrefsSchema` zod: `display_name` ≤60, no control chars; `optional_link` https-only, reject `javascript:`/`data:`/`http:`/relative/whitespace; `display_style` enum; `show_on_wall` boolean.
+- **`src/hooks/useFoundersWall.ts`**: `select('founder_number, public_display_name, optional_link').order('founder_number', { ascending: true })` from `founders_wall_public`.
+- **`src/components/FoundersWall.tsx`**: renders list; every `optional_link` gets `target="_blank" rel="noopener noreferrer nofollow"`.
+- **`src/components/FoundersHeroCounter.tsx`**: uses `useFounderSlotsRemaining` — shows `{claimed} of 100 claimed` (seats-consumed via existing RPC, already pointed at `founders_seats_consumed()` in A.1).
+- **`src/components/FounderOwnerPrefsForm.tsx`**: fetches own `founders` row; edits `display_name`, `display_style`, `show_on_wall`, `optional_link`; validates with zod; writes via a new tiny `save-founder-prefs` edge fn (service_role, verifies `auth.uid()===user_id`, re-validates server-side).
+- **`supabase/functions/save-founder-prefs/index.ts`**: JWT-verified; zod-parse; UPDATE own row only.
+- **`src/pages/Founder.tsx`**: mount `<FoundersHeroCounter />` in hero; mount `<FoundersWall />` in a new section; mount `<FounderOwnerPrefsForm />` when signed-in user has a founder row.
 
-Given the above, **the current client cannot throw on a 404 `{"error":"no_subscription"}` response** from `paddle-portal-session`. The Settings caller (`src/pages/Settings.tsx` lines 282, 386–411) consumes the result via `useOpenCustomerPortalState`, sets `portalError` from `result.error`, and renders it in a `role="alert"` `<p>` — no `throw`, no unwrapped promise, no navigation.
+## Tests (four load-bearing invariants)
 
-Two things to check before concluding this is a real regression:
+1. `src/test/founders-view-exposure-static.test.ts` — reads Turn A migration text; asserts view exposes exactly `founder_number, public_display_name, optional_link`; `security_barrier=true`; `REVOKE ... FROM anon` on `public.founders`.
+2. `src/test/founders-refund-retire-static.test.ts` — reads Turn B migration text; asserts RPC updates BOTH `public.subscriptions` status='canceled' AND `public.founders` status='refunded'; grants only to `service_role`.
+3. `src/test/founder-wall-rules.test.ts` — pure rules: name derivation per style (custom / first_initial / number_only / hidden) incl. null/empty; prefs zod rejects all listed dangerous URL schemes + control chars + >60 chars; accepts valid.
+4. `src/test/founders-webhook-refund-decision.test.ts` — orchestrator decision for `adjustment.created` refund → `revoke_lifetime`; non-approved skipped; happy-path dep invoked with correct tx id.
 
-- **Is the deployed bundle actually current?** The `no_subscription` mapping (line 73) and `lifetime_only` distinction are recent additions (Code #6). A stale published bundle would still crash on 404 while the source in the repo looks fine. Confirm the live `verdantgrowdiary.com` bundle contains `PORTAL_NO_SUBSCRIPTION_MESSAGE` (grep the deployed JS) before shipping any "fix".
-- **Is the button even rendered for comp/internal staff?** The Manage button is gated by `isPaid && !isLifetime` (line 381). If a comp account's entitlement resolves to `isPaid=true` with no Paddle row, clicking will hit the 404 path — and the current code will show the friendly message, not crash. If the account resolves to `isFree`, they only see the Upgrade CTA.
-- **Other callsite:** `src/components/SubscriptionPastDueBanner.tsx` line 41 calls `openPaddleCustomerPortal()` fire-and-forget without consuming the result. It also cannot throw (outer catch), but the user gets no visible error message from that entry point — silent no-op on 404. Not a crash, but a UX gap.
+## Deferred
 
-If a real blank-screen repro exists, the most likely non-portal culprits are: (a) an error thrown by the entitlement hook that renders the tile (unrelated to portal click), (b) a React error boundary tripping on a sibling component, or (c) a stale deployed bundle predating Code #6. None of these are fixed by editing `customerPortal.ts`.
-
-## 3. Minimal frontend-only change (proposed, not applied)
-
-**If** repro confirms the deployed bundle is current and a crash still happens, the surface is already correct — no change to `customerPortal.ts` or `Settings.tsx` would materially improve it. The one small, defensible additive change is at the **silent** callsite:
-
-- `src/components/SubscriptionPastDueBanner.tsx` line 41: switch from bare `void openPaddleCustomerPortal()` to using the hook's `open()` (already destructured on line 19) so `no_subscription` / `lifetime_only` render in the banner's existing `error` slot instead of vanishing.
-
-**If** the repro is actually a stale deployed bundle, the correct action is a republish, not a code change.
-
-Otherwise: no edit recommended. `customerPortal.ts` already returns `{ ok:false, code:"no_subscription", error: PORTAL_NO_SUBSCRIPTION_MESSAGE }` for the exact response you described, and Settings already renders that message in `data-testid="settings-subscription-portal-error"`.
-
-## Recommendation
-
-Do not edit. First verify (a) the deployed bundle contains the Code #6 mapping and (b) an actual stack trace from a real repro. If both point to a genuine crash post-Code #6, come back with the stack trace and we can target the true origin — the current portal helper is not it.
+- Automated Playwright screenshot of `/founder` — sandbox environment gate (session replay only shows real signed-in state on verdant-testbench). I'll ship the code and provide instructions for the user to capture.
+- No changes to the existing double-bill cancellation, allocator, or AI Doctor paths.

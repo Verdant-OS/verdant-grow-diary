@@ -9,33 +9,33 @@
  * are covered by the raw-body clone + verifyWebhook behavior; we do not
  * re-test the Paddle SDK here.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from "vitest";
 import {
   attachResolvedPriceExternalId,
   auditFields,
   decide,
   transactionPriceIdNeedingLookup,
-} from '../../supabase/functions/payments-webhook/eventProcessor';
+} from "../../supabase/functions/payments-webhook/eventProcessor";
 
-const NOW = new Date('2026-07-09T12:00:00.000Z');
+const NOW = new Date("2026-07-09T12:00:00.000Z");
 
 function subEvent(overrides: Record<string, unknown> = {}) {
   return {
-    eventId: 'evt_test_1',
-    eventType: 'subscription.created',
+    eventId: "evt_test_1",
+    eventType: "subscription.created",
     data: {
-      id: 'sub_abc',
-      customerId: 'ctm_abc',
-      status: 'active',
+      id: "sub_abc",
+      customerId: "ctm_abc",
+      status: "active",
       currentBillingPeriod: {
-        startsAt: '2026-07-01T00:00:00Z',
-        endsAt: '2026-08-01T00:00:00Z',
+        startsAt: "2026-07-01T00:00:00Z",
+        endsAt: "2026-08-01T00:00:00Z",
       },
-      customData: { userId: 'user-uuid-1' },
+      customData: { userId: "user-uuid-1" },
       items: [
         {
-          price: { id: 'pri_x', importMeta: { externalId: 'pro_monthly' } },
-          product: { id: 'pro_x', importMeta: { externalId: 'verdant_pro' } },
+          price: { id: "pri_x", importMeta: { externalId: "pro_monthly" } },
+          product: { id: "pro_x", importMeta: { externalId: "verdant_pro" } },
         },
       ],
       ...overrides,
@@ -45,19 +45,19 @@ function subEvent(overrides: Record<string, unknown> = {}) {
 
 function txEvent(overrides: Record<string, unknown> = {}) {
   return {
-    eventId: 'evt_tx_1',
-    eventType: 'transaction.completed',
+    eventId: "evt_tx_1",
+    eventType: "transaction.completed",
     data: {
-      id: 'txn_abc',
-      customerId: 'ctm_abc',
-      status: 'completed',
-      customData: { userId: 'user-uuid-1' },
+      id: "txn_abc",
+      customerId: "ctm_abc",
+      status: "completed",
+      customData: { userId: "user-uuid-1" },
       items: [
         {
           price: {
-            id: 'pri_lifetime',
-            productId: 'pro_lifetime',
-            importMeta: { externalId: 'founder_lifetime' },
+            id: "pri_lifetime",
+            productId: "pro_lifetime",
+            importMeta: { externalId: "founder_lifetime" },
           },
         },
       ],
@@ -66,225 +66,217 @@ function txEvent(overrides: Record<string, unknown> = {}) {
   };
 }
 
-describe('decide: subscription.created', () => {
-  it('produces an upsert row with env, period, and external ids', () => {
-    const d = decide(subEvent(), 'sandbox', NOW);
-    expect(d.kind).toBe('upsert_subscription');
-    if (d.kind !== 'upsert_subscription') throw new Error('narrow');
+describe("decide: subscription.created", () => {
+  it("produces an upsert row with env, period, and external ids", () => {
+    const d = decide(subEvent(), "sandbox", NOW);
+    expect(d.kind).toBe("upsert_subscription");
+    if (d.kind !== "upsert_subscription") throw new Error("narrow");
     expect(d.row).toMatchObject({
-      user_id: 'user-uuid-1',
-      paddle_subscription_id: 'sub_abc',
-      price_id: 'pro_monthly',
-      product_id: 'verdant_pro',
-      status: 'active',
-      environment: 'sandbox',
-      current_period_end: '2026-08-01T00:00:00Z',
+      user_id: "user-uuid-1",
+      paddle_subscription_id: "sub_abc",
+      price_id: "pro_monthly",
+      product_id: "verdant_pro",
+      status: "active",
+      environment: "sandbox",
+      current_period_end: "2026-08-01T00:00:00Z",
       cancel_at_period_end: false,
     });
   });
 
-  it('persists live environment when env=live', () => {
-    const d = decide(subEvent(), 'live', NOW);
-    if (d.kind !== 'upsert_subscription') throw new Error('narrow');
-    expect(d.row.environment).toBe('live');
+  it("persists live environment when env=live", () => {
+    const d = decide(subEvent(), "live", NOW);
+    if (d.kind !== "upsert_subscription") throw new Error("narrow");
+    expect(d.row.environment).toBe("live");
   });
 
-  it('skips when customData.userId is missing (never overgrants)', () => {
-    const d = decide(subEvent({ customData: null }), 'sandbox', NOW);
-    expect(d).toEqual({ kind: 'skip', reason: 'missing_user_id' });
+  it("skips when customData.userId is missing (never overgrants)", () => {
+    const d = decide(subEvent({ customData: null }), "sandbox", NOW);
+    expect(d).toEqual({ kind: "skip", reason: "missing_user_id" });
   });
 
-  it('skips when price external id is missing', () => {
+  it("skips when price external id is missing", () => {
     const d = decide(
-      subEvent({ items: [{ price: { id: 'pri_x' }, product: { importMeta: { externalId: 'x' } } }] }),
-      'sandbox',
+      subEvent({
+        items: [{ price: { id: "pri_x" }, product: { importMeta: { externalId: "x" } } }],
+      }),
+      "sandbox",
       NOW,
     );
-    expect(d).toEqual({ kind: 'skip', reason: 'missing_price_external_id' });
+    expect(d).toEqual({ kind: "skip", reason: "missing_price_external_id" });
   });
 
-  it('skips when price external id is unknown', () => {
+  it("skips when price external id is unknown", () => {
     const d = decide(
       subEvent({
         items: [
           {
-            price: { importMeta: { externalId: 'mystery_price' } },
-            product: { importMeta: { externalId: 'verdant_pro' } },
+            price: { importMeta: { externalId: "mystery_price" } },
+            product: { importMeta: { externalId: "verdant_pro" } },
           },
         ],
       }),
-      'sandbox',
+      "sandbox",
       NOW,
     );
-    expect(d).toEqual({ kind: 'skip', reason: 'unknown_price_id' });
+    expect(d).toEqual({ kind: "skip", reason: "unknown_price_id" });
   });
 
-  it('skips when product external id is missing (never writes raw pro_ id)', () => {
+  it("skips when product external id is missing (never writes raw pro_ id)", () => {
     const d = decide(
       subEvent({
-        items: [{ price: { importMeta: { externalId: 'pro_annual' } }, product: { id: 'pro_x' } }],
+        items: [{ price: { importMeta: { externalId: "pro_annual" } }, product: { id: "pro_x" } }],
       }),
-      'sandbox',
+      "sandbox",
       NOW,
     );
-    expect(d).toEqual({ kind: 'skip', reason: 'missing_product_external_id' });
+    expect(d).toEqual({ kind: "skip", reason: "missing_product_external_id" });
   });
 });
 
-describe('decide: subscription.canceled', () => {
-  it('produces a canceled update patch keyed by subscription id', () => {
+describe("decide: subscription.canceled", () => {
+  it("produces a canceled update patch keyed by subscription id", () => {
     const d = decide(
-      { eventType: 'subscription.canceled', data: { id: 'sub_abc' } },
-      'sandbox',
+      { eventType: "subscription.canceled", data: { id: "sub_abc" } },
+      "sandbox",
       NOW,
     );
-    expect(d.kind).toBe('update_subscription');
-    if (d.kind !== 'update_subscription') throw new Error('narrow');
-    expect(d.paddleSubscriptionId).toBe('sub_abc');
-    expect(d.patch.status).toBe('canceled');
+    expect(d.kind).toBe("update_subscription");
+    if (d.kind !== "update_subscription") throw new Error("narrow");
+    expect(d.paddleSubscriptionId).toBe("sub_abc");
+    expect(d.patch.status).toBe("canceled");
     expect(d.patch.cancel_at_period_end).toBe(true);
-    expect(d.patch.environment).toBe('sandbox');
+    expect(d.patch.environment).toBe("sandbox");
   });
 });
 
-describe('decide: transaction.completed → founder_lifetime', () => {
-  it('records a lifetime row with null current_period_end (no expiry)', () => {
-    const d = decide(txEvent(), 'sandbox', NOW);
-    expect(d.kind).toBe('record_lifetime');
-    if (d.kind !== 'record_lifetime') throw new Error('narrow');
-    expect(d.row.price_id).toBe('founder_lifetime');
-    expect(d.row.product_id).toBe('founder_lifetime');
+describe("decide: transaction.completed → founder_lifetime", () => {
+  it("records a lifetime row with null current_period_end (no expiry)", () => {
+    const d = decide(txEvent(), "sandbox", NOW);
+    expect(d.kind).toBe("record_lifetime");
+    if (d.kind !== "record_lifetime") throw new Error("narrow");
+    expect(d.row.price_id).toBe("founder_lifetime");
+    expect(d.row.product_id).toBe("founder_lifetime");
     expect(d.row.current_period_end).toBeNull();
-    expect(d.row.status).toBe('active');
-    expect(d.row.paddle_subscription_id).toBe('lifetime_txn_abc');
-    expect(d.row.environment).toBe('sandbox');
+    expect(d.row.status).toBe("active");
+    expect(d.row.paddle_subscription_id).toBe("lifetime_txn_abc");
+    expect(d.row.environment).toBe("sandbox");
   });
 
-  it('skips recurring transactions (subscriptionId set) as non_lifetime', () => {
-    const d = decide(
-      txEvent({ subscriptionId: 'sub_abc' }),
-      'sandbox',
-      NOW,
-    );
-    expect(d).toEqual({ kind: 'skip', reason: 'non_lifetime_transaction' });
+  it("skips recurring transactions (subscriptionId set) as non_lifetime", () => {
+    const d = decide(txEvent({ subscriptionId: "sub_abc" }), "sandbox", NOW);
+    expect(d).toEqual({ kind: "skip", reason: "non_lifetime_transaction" });
   });
 
-  it('skips pro_monthly/pro_annual transactions as unknown_lifetime_price_id (double-write guard)', () => {
+  it("skips pro_monthly/pro_annual transactions as unknown_lifetime_price_id (double-write guard)", () => {
     // Recurring plans arrive with subscriptionId → covered above.
     // The remaining pro_* transaction shape (no subscriptionId) is a
     // config bug; we still refuse to double-write.
     const d = decide(
       txEvent({
-        items: [{ price: { id: 'pri_x', importMeta: { externalId: 'pro_monthly' } } }],
+        items: [{ price: { id: "pri_x", importMeta: { externalId: "pro_monthly" } } }],
       }),
-      'sandbox',
+      "sandbox",
       NOW,
     );
-    expect(d).toEqual({ kind: 'skip', reason: 'unknown_lifetime_price_id' });
+    expect(d).toEqual({ kind: "skip", reason: "unknown_lifetime_price_id" });
   });
 
-  it('skips a lifetime transaction with no userId (never overgrants)', () => {
-    const d = decide(txEvent({ customData: null }), 'sandbox', NOW);
-    expect(d).toEqual({ kind: 'skip', reason: 'missing_user_id' });
+  it("skips a lifetime transaction with no userId (never overgrants)", () => {
+    const d = decide(txEvent({ customData: null }), "sandbox", NOW);
+    expect(d).toEqual({ kind: "skip", reason: "missing_user_id" });
   });
 
-  it('skips a transaction in a non-completed status', () => {
-    const d = decide(txEvent({ status: 'past_due' }), 'sandbox', NOW);
-    expect(d).toEqual({ kind: 'skip', reason: 'non_lifetime_transaction' });
+  it("skips a transaction in a non-completed status", () => {
+    const d = decide(txEvent({ status: "past_due" }), "sandbox", NOW);
+    expect(d).toEqual({ kind: "skip", reason: "non_lifetime_transaction" });
   });
 
-  it('skips when price external id is missing entirely (unresolvable)', () => {
-    const d = decide(
-      txEvent({ items: [{ price: { id: 'pri_unknown' } }] }),
-      'sandbox',
-      NOW,
-    );
-    expect(d).toEqual({ kind: 'skip', reason: 'unknown_lifetime_price_id' });
+  it("skips when price external id is missing entirely (unresolvable)", () => {
+    const d = decide(txEvent({ items: [{ price: { id: "pri_unknown" } }] }), "sandbox", NOW);
+    expect(d).toEqual({ kind: "skip", reason: "unknown_lifetime_price_id" });
   });
 
-  it('skips lifetime transaction with no transaction id', () => {
-    const d = decide(txEvent({ id: undefined }), 'sandbox', NOW);
-    expect(d).toEqual({ kind: 'skip', reason: 'missing_transaction_id' });
+  it("skips lifetime transaction with no transaction id", () => {
+    const d = decide(txEvent({ id: undefined }), "sandbox", NOW);
+    expect(d).toEqual({ kind: "skip", reason: "missing_transaction_id" });
   });
 
-  it('persists live environment when env=live', () => {
-    const d = decide(txEvent(), 'live', NOW);
-    if (d.kind !== 'record_lifetime') throw new Error('narrow');
-    expect(d.row.environment).toBe('live');
-    expect(d.row.paddle_subscription_id).toBe('lifetime_txn_abc');
+  it("persists live environment when env=live", () => {
+    const d = decide(txEvent(), "live", NOW);
+    if (d.kind !== "record_lifetime") throw new Error("narrow");
+    expect(d.row.environment).toBe("live");
+    expect(d.row.paddle_subscription_id).toBe("lifetime_txn_abc");
   });
 });
 
-describe('decide: unhandled types', () => {
-  it('skips subscription.trialing / transaction.payment_failed / random types', () => {
-    for (const t of ['transaction.payment_failed', 'random.thing', undefined]) {
-      const d = decide({ eventType: t as string | undefined, data: {} }, 'sandbox', NOW);
-      expect(d).toEqual({ kind: 'skip', reason: 'unhandled_event_type' });
+describe("decide: unhandled types", () => {
+  it("skips subscription.trialing / transaction.payment_failed / random types", () => {
+    for (const t of ["transaction.payment_failed", "random.thing", undefined]) {
+      const d = decide({ eventType: t as string | undefined, data: {} }, "sandbox", NOW);
+      expect(d).toEqual({ kind: "skip", reason: "unhandled_event_type" });
     }
   });
 });
 
-describe('auditFields', () => {
-  it('extracts audit metadata for subscription events', () => {
-    const a = auditFields(subEvent(), 'sandbox');
+describe("auditFields", () => {
+  it("extracts audit metadata for subscription events", () => {
+    const a = auditFields(subEvent(), "sandbox");
     expect(a).toMatchObject({
-      event_type: 'subscription.created',
-      environment: 'sandbox',
-      user_id: 'user-uuid-1',
-      paddle_subscription_id: 'sub_abc',
-      price_external_id: 'pro_monthly',
-      product_external_id: 'verdant_pro',
+      event_type: "subscription.created",
+      environment: "sandbox",
+      user_id: "user-uuid-1",
+      paddle_subscription_id: "sub_abc",
+      price_external_id: "pro_monthly",
+      product_external_id: "verdant_pro",
       paddle_transaction_id: null,
     });
   });
 
-  it('sets paddle_transaction_id only for transaction.* events', () => {
-    const a = auditFields(txEvent(), 'sandbox');
-    expect(a.paddle_transaction_id).toBe('txn_abc');
-    expect(a.paddle_subscription_id).toBe('txn_abc'); // TransactionData.id
+  it("sets paddle_transaction_id only for transaction.* events", () => {
+    const a = auditFields(txEvent(), "sandbox");
+    expect(a.paddle_transaction_id).toBe("txn_abc");
+    expect(a.paddle_subscription_id).toBe("txn_abc"); // TransactionData.id
   });
 });
 
-describe('transactionPriceIdNeedingLookup', () => {
-  it('returns null for subscription events', () => {
+describe("transactionPriceIdNeedingLookup", () => {
+  it("returns null for subscription events", () => {
     expect(transactionPriceIdNeedingLookup(subEvent())).toBeNull();
   });
 
-  it('returns null when importMeta.externalId is already resolved', () => {
+  it("returns null when importMeta.externalId is already resolved", () => {
     expect(transactionPriceIdNeedingLookup(txEvent())).toBeNull();
   });
 
-  it('returns null when the transaction has a subscriptionId (recurring)', () => {
-    expect(
-      transactionPriceIdNeedingLookup(txEvent({ subscriptionId: 'sub_x' })),
-    ).toBeNull();
+  it("returns null when the transaction has a subscriptionId (recurring)", () => {
+    expect(transactionPriceIdNeedingLookup(txEvent({ subscriptionId: "sub_x" }))).toBeNull();
   });
 
-  it('returns the paddle price id when external id is missing and no subscriptionId', () => {
-    const ev = txEvent({ items: [{ price: { id: 'pri_needs_lookup' } }] });
-    expect(transactionPriceIdNeedingLookup(ev)).toBe('pri_needs_lookup');
+  it("returns the paddle price id when external id is missing and no subscriptionId", () => {
+    const ev = txEvent({ items: [{ price: { id: "pri_needs_lookup" } }] });
+    expect(transactionPriceIdNeedingLookup(ev)).toBe("pri_needs_lookup");
   });
 
-  it('returns null when there is no price id at all', () => {
+  it("returns null when there is no price id at all", () => {
     const ev = txEvent({ items: [{ price: {} }] });
     expect(transactionPriceIdNeedingLookup(ev)).toBeNull();
   });
 });
 
-describe('attachResolvedPriceExternalId', () => {
-  it('fills in a resolved external id on the first item', () => {
-    const ev = txEvent({ items: [{ price: { id: 'pri_x' } }] });
-    attachResolvedPriceExternalId(ev, 'founder_lifetime');
+describe("attachResolvedPriceExternalId", () => {
+  it("fills in a resolved external id on the first item", () => {
+    const ev = txEvent({ items: [{ price: { id: "pri_x" } }] });
+    attachResolvedPriceExternalId(ev, "founder_lifetime");
     // After attach, decide() should now record lifetime.
-    const d = decide(ev, 'sandbox', NOW);
-    expect(d.kind).toBe('record_lifetime');
+    const d = decide(ev, "sandbox", NOW);
+    expect(d.kind).toBe("record_lifetime");
   });
 
-  it('is a no-op when the external id is null (unknown)', () => {
-    const ev = txEvent({ items: [{ price: { id: 'pri_x' } }] });
+  it("is a no-op when the external id is null (unknown)", () => {
+    const ev = txEvent({ items: [{ price: { id: "pri_x" } }] });
     attachResolvedPriceExternalId(ev, null);
-    const d = decide(ev, 'sandbox', NOW);
-    expect(d).toEqual({ kind: 'skip', reason: 'unknown_lifetime_price_id' });
+    const d = decide(ev, "sandbox", NOW);
+    expect(d).toEqual({ kind: "skip", reason: "unknown_lifetime_price_id" });
   });
 });
 
@@ -298,26 +290,26 @@ describe('attachResolvedPriceExternalId', () => {
  * src/lib/paddleSubscriptionAccessRules.ts (active/trialing/past_due
  * grant; paused revokes) see the correct value.
  */
-describe('decide — dedicated subscription lifecycle events', () => {
+describe("decide — dedicated subscription lifecycle events", () => {
   const CASES: Array<{ eventType: string; status: string }> = [
-    { eventType: 'subscription.past_due', status: 'past_due' },
-    { eventType: 'subscription.paused', status: 'paused' },
-    { eventType: 'subscription.resumed', status: 'active' },
-    { eventType: 'subscription.trialing', status: 'trialing' },
+    { eventType: "subscription.past_due", status: "past_due" },
+    { eventType: "subscription.paused", status: "paused" },
+    { eventType: "subscription.resumed", status: "active" },
+    { eventType: "subscription.trialing", status: "trialing" },
   ];
 
   for (const { eventType, status } of CASES) {
     it(`maps ${eventType} to an upsert_subscription with status='${status}'`, () => {
       const ev = subEvent({ status });
       ev.eventType = eventType;
-      const d = decide(ev, 'sandbox', NOW);
-      expect(d.kind).toBe('upsert_subscription');
-      if (d.kind !== 'upsert_subscription') return;
+      const d = decide(ev, "sandbox", NOW);
+      expect(d.kind).toBe("upsert_subscription");
+      if (d.kind !== "upsert_subscription") return;
       expect(d.row.status).toBe(status);
-      expect(d.row.paddle_subscription_id).toBe('sub_abc');
-      expect(d.row.user_id).toBe('user-uuid-1');
-      expect(d.row.price_id).toBe('pro_monthly');
-      expect(d.row.environment).toBe('sandbox');
+      expect(d.row.paddle_subscription_id).toBe("sub_abc");
+      expect(d.row.user_id).toBe("user-uuid-1");
+      expect(d.row.price_id).toBe("pro_monthly");
+      expect(d.row.environment).toBe("sandbox");
       // Not a cancel — cancel_at_period_end must stay false unless a
       // scheduledChange.action='cancel' is explicitly present.
       expect(d.row.cancel_at_period_end).toBe(false);
@@ -326,8 +318,8 @@ describe('decide — dedicated subscription lifecycle events', () => {
     it(`${eventType} still respects missing_user_id skip`, () => {
       const ev = subEvent({ status, customData: {} });
       ev.eventType = eventType;
-      const d = decide(ev, 'sandbox', NOW);
-      expect(d).toEqual({ kind: 'skip', reason: 'missing_user_id' });
+      const d = decide(ev, "sandbox", NOW);
+      expect(d).toEqual({ kind: "skip", reason: "missing_user_id" });
     });
 
     it(`${eventType} still respects unknown_price_id skip`, () => {
@@ -335,14 +327,14 @@ describe('decide — dedicated subscription lifecycle events', () => {
         status,
         items: [
           {
-            price: { id: 'pri_x', importMeta: { externalId: 'mystery_plan' } },
-            product: { id: 'pro_x', importMeta: { externalId: 'verdant_pro' } },
+            price: { id: "pri_x", importMeta: { externalId: "mystery_plan" } },
+            product: { id: "pro_x", importMeta: { externalId: "verdant_pro" } },
           },
         ],
       });
       ev.eventType = eventType;
-      const d = decide(ev, 'sandbox', NOW);
-      expect(d).toEqual({ kind: 'skip', reason: 'unknown_price_id' });
+      const d = decide(ev, "sandbox", NOW);
+      expect(d).toEqual({ kind: "skip", reason: "unknown_price_id" });
     });
 
     it(`${eventType} is idempotent — same event decides identically twice`, () => {
@@ -350,94 +342,101 @@ describe('decide — dedicated subscription lifecycle events', () => {
       ev1.eventType = eventType;
       const ev2 = subEvent({ status });
       ev2.eventType = eventType;
-      expect(decide(ev1, 'sandbox', NOW)).toEqual(decide(ev2, 'sandbox', NOW));
+      expect(decide(ev1, "sandbox", NOW)).toEqual(decide(ev2, "sandbox", NOW));
     });
   }
 
-  it('subscription.paused carries paused status through — access rules will revoke', () => {
-    const ev = subEvent({ status: 'paused' });
-    ev.eventType = 'subscription.paused';
-    const d = decide(ev, 'live', NOW);
-    expect(d.kind).toBe('upsert_subscription');
-    if (d.kind !== 'upsert_subscription') return;
-    expect(d.row.status).toBe('paused');
-    expect(d.row.environment).toBe('live');
+  it("subscription.paused carries paused status through — access rules will revoke", () => {
+    const ev = subEvent({ status: "paused" });
+    ev.eventType = "subscription.paused";
+    const d = decide(ev, "live", NOW);
+    expect(d.kind).toBe("upsert_subscription");
+    if (d.kind !== "upsert_subscription") return;
+    expect(d.row.status).toBe("paused");
+    expect(d.row.environment).toBe("live");
   });
 
-  it('regression: subscription.updated still routes through the same branch', () => {
-    const ev = subEvent({ status: 'active' });
-    ev.eventType = 'subscription.updated';
-    const d = decide(ev, 'sandbox', NOW);
-    expect(d.kind).toBe('upsert_subscription');
+  it("regression: subscription.updated still routes through the same branch", () => {
+    const ev = subEvent({ status: "active" });
+    ev.eventType = "subscription.updated";
+    const d = decide(ev, "sandbox", NOW);
+    expect(d.kind).toBe("upsert_subscription");
   });
 
-  it('regression: subscription.canceled still maps to update_subscription, not upsert', () => {
-    const ev = subEvent({ status: 'canceled' });
-    ev.eventType = 'subscription.canceled';
-    const d = decide(ev, 'sandbox', NOW);
-    expect(d.kind).toBe('update_subscription');
+  it("regression: subscription.canceled still maps to update_subscription, not upsert", () => {
+    const ev = subEvent({ status: "canceled" });
+    ev.eventType = "subscription.canceled";
+    const d = decide(ev, "sandbox", NOW);
+    expect(d.kind).toBe("update_subscription");
   });
 
-  it('regression: unknown subscription.* event still falls through to unhandled_event_type', () => {
-    const ev = subEvent({ status: 'active' });
-    ev.eventType = 'subscription.mystery_new_event';
-    const d = decide(ev, 'sandbox', NOW);
-    expect(d).toEqual({ kind: 'skip', reason: 'unhandled_event_type' });
+  it("regression: unknown subscription.* event still falls through to unhandled_event_type", () => {
+    const ev = subEvent({ status: "active" });
+    ev.eventType = "subscription.mystery_new_event";
+    const d = decide(ev, "sandbox", NOW);
+    expect(d).toEqual({ kind: "skip", reason: "unhandled_event_type" });
   });
 
-  describe('adjustment.* (Code #7) — record-only, no entitlement mutation', () => {
-    function adjustmentEvent(type: 'adjustment.created' | 'adjustment.updated') {
+  describe("adjustment.* (Code #7) — approved refund revocation, updated audit-only", () => {
+    function adjustmentEvent(type: "adjustment.created" | "adjustment.updated") {
       return {
         eventId: `evt_adj_${type}`,
         eventType: type,
         data: {
-          id: 'adj_01abcd',
-          action: 'refund',
-          status: 'approved',
-          transactionId: 'txn_01abcd',
-          subscriptionId: 'sub_01abcd',
-          customerId: 'ctm_01abcd',
-          items: [{ amount: '1000', type: 'partial' }],
+          id: "adj_01abcd",
+          action: "refund",
+          status: "approved",
+          transactionId: "txn_01abcd",
+          subscriptionId: "sub_01abcd",
+          customerId: "ctm_01abcd",
+          items: [{ amount: "1000", type: "partial" }],
         },
       };
     }
 
-    it('adjustment.created → skip with reason adjustment_audit_only (no upsert/update)', () => {
-      const d = decide(adjustmentEvent('adjustment.created'), 'sandbox', NOW);
-      expect(d).toEqual({ kind: 'skip', reason: 'adjustment_audit_only' });
+    it("adjustment.created → revoke_lifetime for an approved refund with a transaction id", () => {
+      const d = decide(adjustmentEvent("adjustment.created"), "sandbox", NOW);
+      expect(d).toEqual({
+        kind: "revoke_lifetime",
+        paddleTransactionId: "txn_01abcd",
+        env: "sandbox",
+      });
     });
 
-    it('adjustment.updated → skip with reason adjustment_audit_only', () => {
-      const d = decide(adjustmentEvent('adjustment.updated'), 'live', NOW);
-      expect(d).toEqual({ kind: 'skip', reason: 'adjustment_audit_only' });
+    it("adjustment.updated → skip with reason adjustment_audit_only", () => {
+      const d = decide(adjustmentEvent("adjustment.updated"), "live", NOW);
+      expect(d).toEqual({ kind: "skip", reason: "adjustment_audit_only" });
     });
 
-    it('regression: adjustment.* never returns upsert/update/record_lifetime', () => {
-      for (const t of ['adjustment.created', 'adjustment.updated'] as const) {
-        const d = decide(adjustmentEvent(t), 'sandbox', NOW);
-        expect(d.kind).toBe('skip');
-        // Belt-and-braces: guarantee no entitlement mutation escape hatch.
-        expect(['upsert_subscription', 'update_subscription', 'record_lifetime'])
-          .not.toContain((d as { kind: string }).kind);
+    it("regression: only approved adjustment.created may revoke; neither adjustment path grants", () => {
+      const created = decide(adjustmentEvent("adjustment.created"), "sandbox", NOW);
+      const updated = decide(adjustmentEvent("adjustment.updated"), "sandbox", NOW);
+
+      expect(created.kind).toBe("revoke_lifetime");
+      expect(updated).toEqual({ kind: "skip", reason: "adjustment_audit_only" });
+      for (const decision of [created, updated]) {
+        expect(["upsert_subscription", "update_subscription", "record_lifetime"]).not.toContain(
+          decision.kind,
+        );
       }
+      expect(updated.kind).not.toBe("revoke_lifetime");
     });
 
-    it('audit fields extract cleanly for adjustment events (no crash on missing sub fields)', () => {
-      const ev = adjustmentEvent('adjustment.created');
-      const audit = auditFields(ev, 'live');
-      expect(audit.event_type).toBe('adjustment.created');
-      expect(audit.environment).toBe('live');
+    it("audit fields extract cleanly for adjustment events (no crash on missing sub fields)", () => {
+      const ev = adjustmentEvent("adjustment.created");
+      const audit = auditFields(ev, "live");
+      expect(audit.event_type).toBe("adjustment.created");
+      expect(audit.environment).toBe("live");
       // Adjustment payload has no customData.userId — must not throw.
       expect(audit.user_id).toBeNull();
     });
 
-    it('unknown adjustment.* subtype still falls through to unhandled_event_type', () => {
-      const ev = adjustmentEvent('adjustment.created');
+    it("unknown adjustment.* subtype still falls through to unhandled_event_type", () => {
+      const ev = adjustmentEvent("adjustment.created");
       // deliberately unknown subtype
-      (ev as { eventType: string }).eventType = 'adjustment.mystery';
-      const d = decide(ev, 'sandbox', NOW);
-      expect(d).toEqual({ kind: 'skip', reason: 'unhandled_event_type' });
+      (ev as { eventType: string }).eventType = "adjustment.mystery";
+      const d = decide(ev, "sandbox", NOW);
+      expect(d).toEqual({ kind: "skip", reason: "unhandled_event_type" });
     });
   });
 });
-

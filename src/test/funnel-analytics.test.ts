@@ -31,6 +31,7 @@ describe("event name contract", () => {
       "tent_created",
       "plant_created",
       "quick_log_saved",
+      "csv_history_onboarding_ready",
       "csv_import_started",
       "csv_import_completed",
       "csv_history_ai_doctor_clicked",
@@ -39,6 +40,7 @@ describe("event name contract", () => {
       "ai_doctor_result_received",
       "ai_doctor_session_saved",
       "paywall_viewed",
+      "paywall_cta_clicked",
       "checkout_started",
       "subscription_activated",
       "checkout_return_completed",
@@ -108,6 +110,21 @@ describe("trackFunnelEvent — emission", () => {
     expect(spy).toHaveBeenCalledTimes(1);
     expect(spy).toHaveBeenCalledWith("event", "quick_log_saved", {
       event_type: "water",
+    });
+  });
+
+  it("strips identifiers and return-path content from a paywall CTA intent", () => {
+    const spy = vi.fn();
+    win.gtag = spy;
+    trackFunnelEvent("paywall_cta_clicked", {
+      surface: "ai_doctor_limit",
+      returnTo: "/plants/private-plant?tentId=private-tent",
+      user_id: "private-user",
+      plant_id: "private-plant",
+      email: "grower@example.com",
+    } as unknown as FunnelEventParams);
+    expect(spy).toHaveBeenCalledWith("event", "paywall_cta_clicked", {
+      surface: "ai_doctor_limit",
     });
   });
 

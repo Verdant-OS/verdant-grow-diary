@@ -220,7 +220,7 @@ function ArchivedTimelineReadOnlyView({
           />
           <ManualSnapshotTimelineSection scope="plant" plantId={plant.id} />
           <QuickLogGroupedTimelineSection scope="plant" plantId={plant.id} tentId={plant.tentId} />
-          <TimelineMemorySection scope="plant" plantId={plant.id} />
+          <TimelineMemorySection scope="plant" plantId={plant.id} tentId={plant.tentId} />
           <PlantMemoryEpisodesSection growId={plant.growId} plantId={plant.id} />
         </div>
       </div>
@@ -423,6 +423,9 @@ export default function PlantDetail() {
           growId: plant.growId ?? null,
         }}
         testId="plant-detail-one-tent-loop-next-step-card"
+        onLocalAction={(action) => {
+          if (action === "open-quick-log") setQuickLogOpen(true);
+        }}
       />
       <div
         id={PLANT_PHOTOS_ANCHOR_ID}
@@ -731,7 +734,7 @@ export default function PlantDetail() {
             plantId={plant.id}
             tentId={plant.tentId ?? null}
           />
-          <TimelineMemorySection scope="plant" plantId={plant.id} />
+          <TimelineMemorySection scope="plant" plantId={plant.id} tentId={plant.tentId ?? null} />
 
           <section
             aria-labelledby="plant-daily-grow-check-section-heading"

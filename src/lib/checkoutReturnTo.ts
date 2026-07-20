@@ -124,6 +124,12 @@ export function classifyCheckoutReturnSurface(
     ) {
       return "ai_doctor";
     }
+    // A post-value upgrade returns to the exact, owner-scoped saved review
+    // that earned the purchase intent. Classify only the route shape; never
+    // expose the session identifier to analytics.
+    if (/^\/doctor\/sessions\/[^/]+$/.test(parsed.pathname)) {
+      return "ai_doctor";
+    }
   } catch {
     return null;
   }

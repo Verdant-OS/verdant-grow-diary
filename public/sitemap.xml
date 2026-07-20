@@ -181,6 +181,18 @@
     <priority>0.5</priority>
   </url>
   <url>
+    <loc>https://verdantgrowdiary.com/feedback</loc>
+    <lastmod>2026-07-20</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://verdantgrowdiary.com/contact</loc>
+    <lastmod>2026-07-20</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
     <loc>https://verdantgrowdiary.com/cultivars</loc>
     <lastmod>2026-07-16</lastmod>
     <changefreq>monthly</changefreq>

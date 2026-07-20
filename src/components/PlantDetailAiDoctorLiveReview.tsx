@@ -22,8 +22,10 @@ import {
   evaluateAiDoctorContextFromSources,
   type AiDoctorContextPlantSource,
 } from "@/lib/aiDoctorContextViewModel";
+import type { AiDoctorContextReadiness } from "@/lib/aiDoctorContextRules";
 import {
   AI_DOCTOR_REVIEW_PACKET_CSV_ROW_CAP,
+  AI_DOCTOR_REVIEW_PACKET_ROOT_ZONE_CAP,
   buildAiDoctorReviewRequestPacket,
   type AiDoctorReviewRequestPacket,
 } from "@/lib/aiDoctorReviewRequestPacket";
@@ -34,29 +36,40 @@ import {
 } from "@/lib/aiDoctorCurrentSensorSnapshotRules";
 import { useAiDoctorLiveReview } from "@/hooks/useAiDoctorLiveReview";
 import AiDoctorReviewResultPreview from "@/components/AiDoctorReviewResultPreview";
+import AiDoctorImportedHistoryDisclosurePanel from "@/components/AiDoctorImportedHistoryDisclosurePanel";
 
 import AiCreditRemainingBadge from "@/components/AiCreditRemainingBadge";
 import AiCreditLimitNotice from "@/components/AiCreditLimitNotice";
 import AiCreditServiceDegradedNotice from "@/components/AiCreditServiceDegradedNotice";
+import PaywallCta from "@/components/PaywallCta";
 import { useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
 import { useImportedSensorHistory } from "@/hooks/useImportedSensorHistory";
+import { useRootZoneObservations } from "@/hooks/useRootZoneObservations";
 import { isUuid } from "@/lib/isUuid";
-import { plantDetailPath } from "@/lib/routes";
+import { aiDoctorSessionDetailPath, plantDetailPath } from "@/lib/routes";
 import { buildPlantAiDoctorReviewPath } from "@/lib/aiDoctorEntryRules";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { buildAiCreditLimitNoticeViewModel } from "@/lib/aiCreditLimitNoticeViewModel";
 import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 import type { Classification } from "@/lib/sensorSnapshotStatusContract";
+import {
+  buildAiDoctorReviewEvidenceAcceptance,
+  type AiDoctorReviewEvidenceAcceptance,
+} from "@/lib/aiDoctorReviewEvidenceReceiptRules";
 import { evaluateAiDoctorReviewEligibility } from "@/lib/aiDoctorReviewEligibilityRules";
-import { canRetryAiDoctorLiveReviewFailure } from "@/lib/aiDoctorLiveReviewRecoveryRules";
+import {
+  buildAiDoctorLiveReviewScopeKey,
+  canRetryAiDoctorLiveReviewFailure,
+} from "@/lib/aiDoctorLiveReviewRecoveryRules";
 import { resolveAiDoctorImportedHistoryRecovery } from "@/lib/aiDoctorImportedHistoryRecoveryRules";
+import {
+  AI_DOCTOR_POST_VALUE_UPGRADE_SURFACE,
+  buildAiDoctorPostValueUpgradeViewModel,
+} from "@/lib/aiDoctorPostValueUpgradeViewModel";
 
 /** Stable empty-array identity so the packet memo does not churn. */
 const NO_TENT_SENSOR_ROWS: never[] = [];
-
-function aiDoctorReviewScopeKey(plantId: string, tentId: string | null | undefined): string {
-  return `${plantId}:${tentId || "no-tent"}`;
-}
+const NO_ROOT_ZONE_OBSERVATIONS: never[] = [];
 
 export const AI_DOCTOR_LIVE_REVIEW_LOADING_COPY = "Preparing cautious AI Doctor review…";
 export const AI_DOCTOR_LIVE_REVIEW_FAILURE_COPY =
@@ -77,6 +90,12 @@ export const AI_DOCTOR_IMPORTED_HISTORY_INSUFFICIENT_COPY =
   "The remaining context is not enough to run AI Doctor while imported sensor history is unavailable.";
 export const AI_DOCTOR_IMPORTED_HISTORY_RETRY_LABEL = "Retry imported history";
 export const AI_DOCTOR_IMPORTED_HISTORY_CONTINUE_LABEL = "Continue without history";
+export const AI_DOCTOR_ROOT_ZONE_HISTORY_LOAD_FAILED_COPY =
+  "Verdant couldn’t load this plant’s recent watering and feeding measurements. Retry, or continue without them. Continuing means AI Doctor will not use that root-zone history.";
+export const AI_DOCTOR_ROOT_ZONE_HISTORY_OMITTED_COPY =
+  "This AI Doctor review is proceeding without recent root-zone history and may have less context.";
+export const AI_DOCTOR_ROOT_ZONE_HISTORY_RETRY_LABEL = "Retry root-zone history";
+export const AI_DOCTOR_ROOT_ZONE_HISTORY_CONTINUE_LABEL = "Continue without root-zone history";
 export const AI_DOCTOR_HISTORY_SAVING_COPY = "Saving this review to AI Doctor history…";
 export const AI_DOCTOR_HISTORY_SAVED_COPY = "Saved to AI Doctor history.";
 export const AI_DOCTOR_HISTORY_SAVE_FAILED_COPY =
@@ -101,7 +120,7 @@ export interface PlantDetailAiDoctorLiveReviewProps {
 export default function PlantDetailAiDoctorLiveReview({
   ...props
 }: PlantDetailAiDoctorLiveReviewProps) {
-  const scopeKey = aiDoctorReviewScopeKey(props.plantId, props.tentId);
+  const scopeKey = buildAiDoctorLiveReviewScopeKey(props.plantId, props.tentId, props.growId);
   return <PlantDetailAiDoctorLiveReviewScope key={scopeKey} {...props} />;
 }
 
@@ -109,9 +128,13 @@ interface AcceptedAiDoctorReviewRequest {
   scopeKey: string;
   packet: AiDoctorReviewRequestPacket;
   sensorClassification: Classification | null;
+  evidenceAcceptance: AiDoctorReviewEvidenceAcceptance;
   mode: "standard" | "historical_review";
+  readiness: AiDoctorContextReadiness;
+  includedRootZoneHistory: boolean;
   confidenceCopy: string;
   omittedImportedHistory: boolean;
+  omittedRootZoneHistory: boolean;
 }
 
 function PlantDetailAiDoctorLiveReviewScope({
@@ -128,11 +151,15 @@ function PlantDetailAiDoctorLiveReviewScope({
   const acceptedReviewModeRef = useRef<"standard" | "historical_review" | null>(null);
   const trackedResultRef = useRef<unknown>(null);
   const trackedSessionIdRef = useRef<string | null>(null);
-  const historyScopeKey = aiDoctorReviewScopeKey(plantId, tentId);
+  const trackedPostValuePaywallResultRef = useRef<unknown>(null);
+  const pendingAcceptedReviewStartRef = useRef<string | null>(null);
+  const historyScopeKey = buildAiDoctorLiveReviewScopeKey(plantId, tentId, growId);
   const [historyOmissionScope, setHistoryOmissionScope] = useState<string | null>(null);
+  const [rootZoneOmissionScope, setRootZoneOmissionScope] = useState<string | null>(null);
   const [acceptedReviewRequest, setAcceptedReviewRequest] =
     useState<AcceptedAiDoctorReviewRequest | null>(null);
   const historyOmissionAcknowledged = historyOmissionScope === historyScopeKey;
+  const rootZoneOmissionAcknowledged = rootZoneOmissionScope === historyScopeKey;
   const queryClient = useQueryClient();
   useEffect(() => {
     historicalStartTrackedRef.current = false;
@@ -140,8 +167,33 @@ function PlantDetailAiDoctorLiveReviewScope({
     acceptedReviewModeRef.current = null;
     trackedResultRef.current = null;
     trackedSessionIdRef.current = null;
-  }, [plantId]);
-  const { items } = useTimelineMemory({ kind: "plant", plantId }, TIMELINE_MEMORY_DEFAULT_LIMIT);
+    trackedPostValuePaywallResultRef.current = null;
+    pendingAcceptedReviewStartRef.current = null;
+  }, [growId, plantId, tentId]);
+  const { items: evidenceItems } = useTimelineMemory(
+    { kind: "plant", plantId, tentId },
+    TIMELINE_MEMORY_DEFAULT_LIMIT,
+  );
+  const rootZoneScope =
+    isUuid(plantId) && isUuid(tentId) && isUuid(growId)
+      ? ({ kind: "plant_context", plantId, tentId, growId } as const)
+      : isUuid(plantId)
+        ? ({ kind: "plant", plantId } as const)
+        : null;
+  const rootZoneHistory = useRootZoneObservations(
+    rootZoneScope,
+    AI_DOCTOR_REVIEW_PACKET_ROOT_ZONE_CAP,
+  );
+  const queryRootZoneRecovery = resolveAiDoctorImportedHistoryRecovery({
+    hasTentScope: rootZoneScope !== null,
+    isFetching: rootZoneHistory.isFetching,
+    isError: rootZoneHistory.isError,
+    omissionAcknowledged: rootZoneOmissionAcknowledged,
+  });
+  const queryRootZoneObservations =
+    queryRootZoneRecovery.state === "ready"
+      ? rootZoneHistory.observations
+      : NO_ROOT_ZONE_OBSERVATIONS;
   // Dedicated bounded imported-history read. It filters permitted CSV source
   // identities before the cap and orders by historical `captured_at`, so the
   // AI packet receives the newest observations rather than newest imports.
@@ -180,15 +232,17 @@ function PlantDetailAiDoctorLiveReviewScope({
   // grower choice before omission can reach a paid AI request.
   const currentSensorPending =
     isUuid(tentId) && (currentSensorStatusByTent[tentId] ?? "loading") === "loading";
-  const sensorContextBlocked = currentSensorPending || queryHistoryRecovery.blocksReview;
+  const sensorContextBlocked =
+    currentSensorPending || queryHistoryRecovery.blocksReview || queryRootZoneRecovery.blocksReview;
 
   const context = useMemo(
     () =>
       evaluateAiDoctorContextFromSources({
         plant,
-        timelineItems: items,
+        timelineItems: evidenceItems,
+        rootZoneObservations: queryRootZoneObservations,
       }),
-    [plant, items],
+    [plant, evidenceItems, queryRootZoneObservations],
   );
 
   // Row-level, provenance-aware classification. The ingest audit only knows
@@ -203,23 +257,33 @@ function PlantDetailAiDoctorLiveReviewScope({
 
   // Build the bounded, sanitized candidate before eligibility is resolved so
   // the gate inspects the exact imported-history summary that would reach the
-  // server. This is pure and cannot trigger a model call or persistence.
-  const candidatePacket = useMemo(
-    () =>
+  // server. The start handler builds it once more with click-time freshness,
+  // so a tab left open cannot silently preserve an out-of-date sensor state.
+  const buildReviewPacket = useCallback(
+    (classification: Classification | null, now?: Date) =>
       buildAiDoctorReviewRequestPacket({
         plant,
-        timelineItems: items,
+        timelineItems: evidenceItems,
         context,
         csvHistoryRows: queryTentSensorRows,
         currentSensorRows,
-        // This explicit signal is derived from the same filtered rows as
-        // the packet snapshot. Diagnostic/testbench packets, manual
-        // snapshots, and CSV history can never set it.
-        hasFreshLiveSensorReadings: sensorClassification?.status === "usable",
+        rootZoneObservations: queryRootZoneObservations,
+        now,
+        hasFreshLiveSensorReadings: classification?.status === "usable",
       }),
-    [plant, items, context, queryTentSensorRows, currentSensorRows, sensorClassification],
+    [
+      plant,
+      evidenceItems,
+      context,
+      queryTentSensorRows,
+      currentSensorRows,
+      queryRootZoneObservations,
+    ],
   );
-
+  const candidatePacket = useMemo(
+    () => buildReviewPacket(sensorClassification),
+    [buildReviewPacket, sensorClassification],
+  );
   const eligibility = useMemo(
     () =>
       evaluateAiDoctorReviewEligibility({
@@ -252,6 +316,37 @@ function PlantDetailAiDoctorLiveReviewScope({
   // context from a manual retry.
   const activeReviewRequest =
     acceptedReviewRequest?.scopeKey === historyScopeKey ? acceptedReviewRequest : null;
+  const buildEvidenceAcceptanceForPacket = useCallback(
+    (reviewPacket: AiDoctorReviewRequestPacket, reviewMode: "standard" | "historical_review") =>
+      buildAiDoctorReviewEvidenceAcceptance({
+        reviewMode,
+        importedHistory: {
+          hasTentScope: isUuid(tentId),
+          included: reviewPacket.imported_sensor_history !== null,
+          omittedByChoice: queryHistoryRecovery.state === "omitted_by_choice",
+        },
+        rootZoneHistory: {
+          scope:
+            rootZoneScope?.kind === "plant_context"
+              ? "plant_and_shared_tent"
+              : rootZoneScope?.kind === "plant"
+                ? "plant_only"
+                : "not_scoped",
+          included: (reviewPacket.recentRootZoneObservations?.length ?? 0) > 0,
+          omittedByChoice: queryRootZoneRecovery.state === "omitted_by_choice",
+        },
+      }),
+    [queryHistoryRecovery.state, queryRootZoneRecovery.state, rootZoneScope?.kind, tentId],
+  );
+  const candidateEvidenceAcceptance = useMemo(
+    () =>
+      buildEvidenceAcceptanceForPacket(
+        candidatePacket,
+        eligibility.mode === "historical_review" ? "historical_review" : "standard",
+      ),
+    [buildEvidenceAcceptanceForPacket, candidatePacket, eligibility.mode],
+  );
+
   const historyRecovery = activeReviewRequest
     ? {
         state: activeReviewRequest.omittedImportedHistory
@@ -261,6 +356,15 @@ function PlantDetailAiDoctorLiveReviewScope({
         showsRecovery: activeReviewRequest.omittedImportedHistory,
       }
     : queryHistoryRecovery;
+  const rootZoneRecovery = activeReviewRequest
+    ? {
+        state: activeReviewRequest.omittedRootZoneHistory
+          ? ("omitted_by_choice" as const)
+          : ("ready" as const),
+        blocksReview: false,
+        showsRecovery: activeReviewRequest.omittedRootZoneHistory,
+      }
+    : queryRootZoneRecovery;
 
   const handlePersisted = useCallback(
     (_sessionId: string) => {
@@ -280,21 +384,41 @@ function PlantDetailAiDoctorLiveReviewScope({
     sensorClassification: activeReviewRequest
       ? activeReviewRequest.sensorClassification
       : sensorClassification,
+    evidenceAcceptance: activeReviewRequest
+      ? activeReviewRequest.evidenceAcceptance
+      : candidateEvidenceAcceptance,
     persist,
     onPersisted: handlePersisted,
   });
+  const { start: startReview, status: reviewStatus } = review;
+  // Start only after React has committed the accepted request. This makes the
+  // initial provider call use the exact frozen packet rather than the previous
+  // render’s candidate, and remains idempotent under StrictMode effects.
+  useEffect(() => {
+    if (
+      pendingAcceptedReviewStartRef.current !== historyScopeKey ||
+      activeReviewRequest === null ||
+      reviewStatus !== "idle"
+    ) {
+      return;
+    }
+    pendingAcceptedReviewStartRef.current = null;
+    startReview();
+  }, [activeReviewRequest, historyScopeKey, reviewStatus, startReview]);
 
-  const { entitlement } = useMyEntitlements();
+  const { entitlement, loading: entitlementLoading } = useMyEntitlements();
   const canRetryReview = canRetryAiDoctorLiveReviewFailure(review.reason);
-  // Preserve the pre-existing same-scope safety gate for ordinary reviews:
-  // if their current context disappears before display, the result stays
-  // hidden. A frozen historical or explicitly omitted request remains
-  // explainable because its accepted evidence decision is still visible.
+  // Preserve the existing same-scope guard when unrelated plant/timeline
+  // context disappears. The narrow exception is a request that was accepted
+  // with root-zone history: a later background refresh cannot hide that
+  // already-started paid request while its frozen packet is still in flight.
   const activeReviewVisible =
     activeReviewRequest !== null &&
     (allowed ||
       activeReviewRequest.mode === "historical_review" ||
-      activeReviewRequest.omittedImportedHistory);
+      activeReviewRequest.omittedImportedHistory ||
+      activeReviewRequest.omittedRootZoneHistory ||
+      (activeReviewRequest.includedRootZoneHistory && queryRootZoneRecovery.blocksReview));
 
   // If a background/refocus refetch succeeds before the grower starts, the
   // earlier omission choice is no longer relevant. Once a review has begun,
@@ -309,12 +433,45 @@ function PlantDetailAiDoctorLiveReviewScope({
     }
   }, [historyOmissionScope, historyScopeKey, importedHistory.isError, review.status]);
 
-  // Keep route construction aligned with the shared route contract.
-  // AiCreditLimitNotice validates it again before it reaches the pricing link.
-  const returnTo = useMemo(
+  useEffect(() => {
+    if (
+      !rootZoneHistory.isError &&
+      review.status === "idle" &&
+      rootZoneOmissionScope === historyScopeKey
+    ) {
+      setRootZoneOmissionScope(null);
+    }
+  }, [historyScopeKey, review.status, rootZoneHistory.isError, rootZoneOmissionScope]);
+
+  // Credit denials have no newly saved result, so they return to the same
+  // plant-scoped reviewer. The post-value handoff below uses the durable
+  // session route instead, preserving the exact result that earned the click.
+  const reviewReturnTo = useMemo(
     () =>
       buildPlantAiDoctorReviewPath({ plantId, tentId: tentId ?? null }) ?? plantDetailPath(plantId),
     [plantId, tentId],
+  );
+  const savedSessionReturnTo =
+    review.persistence.status === "saved"
+      ? aiDoctorSessionDetailPath(review.persistence.sessionId)
+      : null;
+
+  const postValueUpgrade = useMemo(
+    () =>
+      buildAiDoctorPostValueUpgradeViewModel({
+        credit: review.creditRemaining,
+        viewerEntitlement: entitlement,
+        entitlementLoading,
+        durableSessionSaved: review.persistence.status === "saved",
+        returnTo: savedSessionReturnTo,
+      }),
+    [
+      entitlement,
+      entitlementLoading,
+      review.creditRemaining,
+      review.persistence.status,
+      savedSessionReturnTo,
+    ],
   );
 
   // Keep funnel tracking aligned with the notice's server-plan + defensive
@@ -328,16 +485,29 @@ function PlantDetailAiDoctorLiveReviewScope({
     return buildAiCreditLimitNoticeViewModel({
       credit: review.credit,
       surface: "doctor",
-      returnTo,
+      returnTo: reviewReturnTo,
       viewerEntitlement: entitlement,
     }).kind;
-  }, [entitlement, returnTo, review.credit, review.reason, review.status]);
+  }, [entitlement, review.credit, review.reason, review.status, reviewReturnTo]);
 
   useEffect(() => {
     if (creditNoticeKind === "upsell") {
       trackFunnelEvent("paywall_viewed", { surface: "ai_doctor_limit" });
     }
   }, [creditNoticeKind]);
+
+  // This is intentionally an explicit CTA-intent marker, not a checkout or
+  // entitlement signal. AiCreditLimitNotice attaches it only to the Free
+  // denial's rendered pricing CTA; paid/founder/unknown notices have no CTA.
+  const handleCreditLimitPlansClick = useCallback(() => {
+    trackFunnelEvent("paywall_cta_clicked", { surface: "ai_doctor_limit" });
+  }, []);
+
+  const handlePostValuePlansClick = useCallback(() => {
+    trackFunnelEvent("paywall_cta_clicked", {
+      surface: AI_DOCTOR_POST_VALUE_UPGRADE_SURFACE,
+    });
+  }, []);
 
   useEffect(() => {
     // These events describe value the grower can actually see. If eligibility
@@ -362,13 +532,40 @@ function PlantDetailAiDoctorLiveReviewScope({
     }
   }, [activeReviewVisible, review.persistence, review.result, review.status]);
 
+  useEffect(() => {
+    // Value must be visible and durably saved before a conversion impression.
+    // This effect is declared after the result/session milestone effect above,
+    // preserving result -> saved -> paywall ordering even when persistence and
+    // the provider result settle in the same render turn.
+    if (
+      !activeReviewVisible ||
+      review.status !== "result" ||
+      !review.result ||
+      !postValueUpgrade.visible
+    ) {
+      return;
+    }
+    if (trackedPostValuePaywallResultRef.current === review.result) return;
+    trackedPostValuePaywallResultRef.current = review.result;
+    trackFunnelEvent("paywall_viewed", {
+      surface: AI_DOCTOR_POST_VALUE_UPGRADE_SURFACE,
+    });
+  }, [activeReviewVisible, postValueUpgrade.visible, review.result, review.status]);
+
   const showHistoryOmission = historyRecovery.state === "omitted_by_choice";
   const showHistoryRecovery = historyRecovery.state === "decision_required" || showHistoryOmission;
+  const showRootZoneOmission = rootZoneRecovery.state === "omitted_by_choice";
+  const showRootZoneRecovery =
+    rootZoneRecovery.state === "decision_required" || showRootZoneOmission;
   const showReviewAction = activeReviewRequest
     ? review.status === "error" && canRetryReview
-    : allowed && historyRecovery.state !== "decision_required" && review.status === "idle";
+    : allowed &&
+      historyRecovery.state !== "decision_required" &&
+      rootZoneRecovery.state !== "decision_required" &&
+      review.status === "idle";
 
-  if (!allowed && !showHistoryRecovery && !activeReviewVisible) return null;
+  if (!allowed && !showHistoryRecovery && !showRootZoneRecovery && !activeReviewVisible)
+    return null;
 
   const handleRetryImportedHistory = () => {
     setHistoryOmissionScope(null);
@@ -379,43 +576,86 @@ function PlantDetailAiDoctorLiveReviewScope({
     setHistoryOmissionScope(historyScopeKey);
   };
 
+  const handleRetryRootZoneHistory = () => {
+    setRootZoneOmissionScope(null);
+    void rootZoneHistory.refetch();
+  };
+
+  const handleContinueWithoutRootZoneHistory = () => {
+    setRootZoneOmissionScope(historyScopeKey);
+  };
+
   const handleInitialStart = () => {
     if (!review.canStart) return;
-    if (!packet) return;
+    if (!packet || pendingAcceptedReviewStartRef.current === historyScopeKey) return;
+
+    const acceptedAt = new Date();
+    const acceptedSensorClassification =
+      sensorClassificationOverride !== undefined
+        ? sensorClassificationOverride
+        : classifyAiDoctorCurrentSensorEvidence(currentSensorRows, { now: acceptedAt });
+    const acceptedPacket = buildReviewPacket(acceptedSensorClassification, acceptedAt);
+    const acceptedEligibility = evaluateAiDoctorReviewEligibility({
+      context,
+      hasPlantProfile: plant !== null,
+      importedHistory: acceptedPacket.imported_sensor_history,
+      historicalRows: queryTentSensorRows,
+      missingLiveSensorReadings: acceptedPacket.missingLiveSensorReadings === true,
+    });
+    if (!acceptedEligibility.allowed) return;
     const acceptedMode =
-      eligibility.mode === "historical_review" ? "historical_review" : "standard";
+      acceptedEligibility.mode === "historical_review" ? "historical_review" : "standard";
+    const acceptedEvidenceAcceptance = buildEvidenceAcceptanceForPacket(
+      acceptedPacket,
+      acceptedMode,
+    );
+
     acceptedReviewModeRef.current = acceptedMode;
+    pendingAcceptedReviewStartRef.current = historyScopeKey;
     setAcceptedReviewRequest({
       scopeKey: historyScopeKey,
-      packet,
-      sensorClassification,
+      packet: acceptedPacket,
+      sensorClassification: acceptedSensorClassification,
+      evidenceAcceptance: acceptedEvidenceAcceptance,
       mode: acceptedMode,
+      readiness: context.readiness,
+      includedRootZoneHistory: queryRootZoneObservations.length > 0,
       confidenceCopy: candidateConfidenceCopy,
       omittedImportedHistory: historyRecovery.state === "omitted_by_choice",
+      omittedRootZoneHistory: rootZoneRecovery.state === "omitted_by_choice",
     });
     if (!reviewStartTrackedRef.current) {
       reviewStartTrackedRef.current = true;
       trackFunnelEvent("ai_doctor_review_started", { surface: acceptedMode });
     }
-    if (eligibility.mode === "historical_review") {
-      if (!historicalStartTrackedRef.current) {
-        historicalStartTrackedRef.current = true;
-        trackFunnelEvent("historical_ai_review_started");
-      }
+    if (acceptedEligibility.mode === "historical_review" && !historicalStartTrackedRef.current) {
+      historicalStartTrackedRef.current = true;
+      trackFunnelEvent("historical_ai_review_started");
     }
-    review.start();
   };
-
   const confidenceCopy = activeReviewRequest?.confidenceCopy ?? candidateConfidenceCopy;
+  // Before start, disclose the exact sanitized history from the allowed packet
+  // that could reach AI Doctor. Once a review begins, stay pinned to its
+  // accepted packet so background CSV refetches cannot rewrite the evidence
+  // beside the result. Normalize optional transport fields for the presenter.
+  const importedHistoryDisclosurePacket = activeReviewRequest?.packet ?? packet;
+  const importedHistoryDisclosureContext = importedHistoryDisclosurePacket
+    ? {
+        imported_sensor_history: importedHistoryDisclosurePacket.imported_sensor_history ?? null,
+        missingLiveSensorReadings:
+          importedHistoryDisclosurePacket.missingLiveSensorReadings === true,
+      }
+    : null;
 
   return (
     <section
       aria-labelledby="plant-ai-doctor-live-review-heading"
       data-testid="plant-ai-doctor-live-review"
-      data-readiness={context.readiness}
+      data-readiness={activeReviewRequest?.readiness ?? context.readiness}
       data-review-mode={activeReviewRequest?.mode ?? eligibility.mode}
       data-status={review.status}
       data-history-recovery-state={historyRecovery.state}
+      data-root-zone-recovery-state={rootZoneRecovery.state}
       className="glass rounded-2xl p-4 my-3 space-y-3"
     >
       <header className="flex items-start justify-between gap-2 flex-wrap">
@@ -450,6 +690,8 @@ function PlantDetailAiDoctorLiveReviewScope({
       >
         {confidenceCopy}
       </p>
+
+      <AiDoctorImportedHistoryDisclosurePanel context={importedHistoryDisclosureContext} />
 
       {historyRecovery.state === "decision_required" ? (
         <div
@@ -501,6 +743,56 @@ function PlantDetailAiDoctorLiveReviewScope({
         </div>
       ) : null}
 
+      {rootZoneRecovery.state === "decision_required" ? (
+        <div
+          className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-100"
+          role="alert"
+          data-testid="plant-ai-doctor-root-zone-history-recovery"
+        >
+          <p>{AI_DOCTOR_ROOT_ZONE_HISTORY_LOAD_FAILED_COPY}</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={handleRetryRootZoneHistory}
+              disabled={rootZoneHistory.isFetching}
+              className="rounded-md border border-amber-300/40 px-2 py-1 font-medium hover:bg-amber-500/10 disabled:opacity-50"
+              data-testid="plant-ai-doctor-root-zone-history-retry"
+            >
+              {AI_DOCTOR_ROOT_ZONE_HISTORY_RETRY_LABEL}
+            </button>
+            <button
+              type="button"
+              onClick={handleContinueWithoutRootZoneHistory}
+              disabled={rootZoneHistory.isFetching}
+              className="rounded-md border border-amber-300/40 px-2 py-1 font-medium hover:bg-amber-500/10 disabled:opacity-50"
+              data-testid="plant-ai-doctor-root-zone-history-continue"
+            >
+              {AI_DOCTOR_ROOT_ZONE_HISTORY_CONTINUE_LABEL}
+            </button>
+          </div>
+        </div>
+      ) : showRootZoneOmission ? (
+        <div
+          className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-100"
+          role="status"
+          aria-live="polite"
+          data-testid="plant-ai-doctor-root-zone-history-omitted"
+        >
+          <p>{AI_DOCTOR_ROOT_ZONE_HISTORY_OMITTED_COPY}</p>
+          {review.status === "idle" ? (
+            <button
+              type="button"
+              onClick={handleRetryRootZoneHistory}
+              disabled={rootZoneHistory.isFetching}
+              className="mt-2 rounded-md border border-amber-300/40 px-2 py-1 font-medium hover:bg-amber-500/10 disabled:opacity-50"
+              data-testid="plant-ai-doctor-root-zone-history-retry"
+            >
+              {AI_DOCTOR_ROOT_ZONE_HISTORY_RETRY_LABEL}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
       {review.status === "loading" ? (
         <p
           className="text-xs text-amber-200"
@@ -517,7 +809,8 @@ function PlantDetailAiDoctorLiveReviewScope({
           <AiCreditLimitNotice
             credit={review.credit}
             surface="doctor"
-            returnTo={returnTo}
+            returnTo={reviewReturnTo}
+            onUpsellCtaClick={handleCreditLimitPlansClick}
             data-testid="plant-ai-doctor-live-review-credit-denied"
           />
         ) : review.reason === "upstream_credit_exhausted" ? (
@@ -563,7 +856,7 @@ function PlantDetailAiDoctorLiveReviewScope({
             >
               <span>{AI_DOCTOR_HISTORY_SAVED_COPY}</span>
               <Link
-                to={`/doctor/sessions/${review.persistence.sessionId}`}
+                to={aiDoctorSessionDetailPath(review.persistence.sessionId)}
                 className="font-medium underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 data-testid="plant-ai-doctor-history-saved-link"
               >
@@ -605,6 +898,14 @@ function PlantDetailAiDoctorLiveReviewScope({
             />
           ) : null}
           <AiDoctorReviewResultPreview result={review.result} testIdPrefix="plant-detail-live" />
+          {postValueUpgrade.visible ? (
+            <PaywallCta
+              vm={postValueUpgrade.paywallVm}
+              onPrimaryCtaClick={handlePostValuePlansClick}
+              className="mt-4"
+              data-testid="plant-ai-doctor-post-value-upgrade"
+            />
+          ) : null}
         </div>
       ) : null}
     </section>

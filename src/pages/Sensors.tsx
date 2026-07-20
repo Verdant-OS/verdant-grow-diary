@@ -51,6 +51,8 @@ import { isUsableGrowSensorReading } from "@/lib/growSensorEvidenceRules";
 import { useHasRole } from "@/hooks/useHasRole";
 import { canShowSensorOperatorDiagnostics } from "@/lib/sensorOperatorAccessRules";
 import {
+  buildSensorsRequiredTentGate,
+  buildSensorsTentRouteIntentKey,
   readSensorsTentRouteIntent,
   resolveSensorsTentRouteSelection,
 } from "@/lib/sensorRouteTentIntentRules";
@@ -80,33 +82,73 @@ export default function Sensors() {
     () => readSensorsTentRouteIntent(searchParams),
     [searchParams],
   );
+  const sensorsTentRouteIntentKey = useMemo(
+    () => buildSensorsTentRouteIntentKey(sensorsTentRouteIntent, location.key),
+    [location.key, sensorsTentRouteIntent],
+  );
   const [tentId, setTentId] = useState<string | null>(null);
-  const appliedTentRouteIntentRef = useRef<string | null | undefined>(undefined);
+  const [appliedTentRouteIntentKey, setAppliedTentRouteIntentKey] = useState<string | null>(null);
+  const [growerTentSelection, setGrowerTentSelection] = useState<{
+    intentKey: string;
+    tentId: string;
+  } | null>(null);
   const focusedSensorAnchorHashRef = useRef<string | null>(null);
+  const explicitTentId =
+    growerTentSelection?.intentKey === sensorsTentRouteIntentKey
+      ? growerTentSelection.tentId
+      : null;
+  const requiredTentGate = buildSensorsRequiredTentGate({
+    intent: sensorsTentRouteIntent,
+    intentKey: sensorsTentRouteIntentKey,
+    appliedIntentKey: appliedTentRouteIntentKey,
+    currentTentId: tentId,
+    explicitTentId,
+    tents,
+    tentsLoaded: tentsQuery.isSuccess,
+  });
+  // An exact-target handoff fails closed across every tent-scoped reader and
+  // writer until the route is resolved or the grower consciously reselects.
+  const activeTentId =
+    requiredTentGate.resolutionPending || requiredTentGate.reselectionRequired ? null : tentId;
   // Do not fetch the all-tents aggregate into the Sensors browser cache.
   // `null` is an explicit no-scope sentinel until a persisted tent is chosen.
-  const readingsQuery = useGrowSensorReadings(tentId);
+  const readingsQuery = useGrowSensorReadings(activeTentId);
   const { data: readings = [] } = readingsQuery;
   const operatorRole = useHasRole("operator");
 
   // Reconcile only after the authenticated tent query succeeds. A failed
   // first attempt must not consume the URL intent: its retry can still prove
-  // whether the requested tent belongs to this grower. A new valid intent may
-  // select a matching owned tent once; all later chip choices remain
-  // grower-owned. Missing/invalid intent preserves the prior safe fallback.
+  // whether the requested tent belongs to this grower. Exact-match intents
+  // remain active across tent-list refreshes until a grower explicitly picks
+  // another owned tent. Ordinary intents preserve the prior safe fallback.
   useEffect(() => {
     if (!tentsQuery.isSuccess) return;
 
-    const intentChanged = appliedTentRouteIntentRef.current !== sensorsTentRouteIntent.tentId;
+    const intentChanged = appliedTentRouteIntentKey !== sensorsTentRouteIntentKey;
     setTentId((currentTentId) =>
       resolveSensorsTentRouteSelection({
-        intent: intentChanged ? sensorsTentRouteIntent : null,
+        intent:
+          sensorsTentRouteIntent.requireExactMatch === true
+            ? {
+                tentId: explicitTentId ?? sensorsTentRouteIntent.tentId,
+                requireExactMatch: true,
+              }
+            : intentChanged
+              ? sensorsTentRouteIntent
+              : null,
         currentTentId,
         tents,
       }),
     );
-    appliedTentRouteIntentRef.current = sensorsTentRouteIntent.tentId;
-  }, [sensorsTentRouteIntent, tents, tentsQuery.isSuccess]);
+    setAppliedTentRouteIntentKey(sensorsTentRouteIntentKey);
+  }, [
+    appliedTentRouteIntentKey,
+    explicitTentId,
+    sensorsTentRouteIntent,
+    sensorsTentRouteIntentKey,
+    tents,
+    tentsQuery.isSuccess,
+  ]);
 
   // React Router updates hashes without a full browser navigation, so make
   // the supported manual-reading and CSV-import deep links deterministic.
@@ -125,18 +167,19 @@ export default function Sensors() {
     // CSV import is tent-scoped. Wait for the existing owner-validated tent
     // route selection before moving focus, so the grower lands on a usable
     // importer rather than a transient empty shell.
-    if (anchorId === "csv-import" && (!tentsQuery.isSuccess || !tentId)) return;
+    if (anchorId === "csv-import" && (!tentsQuery.isSuccess || !activeTentId)) return;
     const target = document.getElementById(anchorId);
     if (!target) return;
     target.scrollIntoView?.({ behavior: "smooth", block: "start" });
     target.focus?.({ preventScroll: true });
     focusedSensorAnchorHashRef.current = location.hash;
-  }, [location.hash, tentId, tentsQuery.isSuccess]);
+  }, [activeTentId, appliedTentRouteIntentKey, location.hash, tentsQuery.isSuccess]);
   const correctionCtx = useMemo(() => decodeManualCorrectionHash(location.hash), [location.hash]);
   const urlSensorSources = parseSensorSourcesParam(searchParams.get(SENSOR_SOURCES_PARAM));
   const filtered = useMemo(
-    () => sortSensorReadingsNewestFirst(readings.filter((reading) => reading.tentId === tentId)),
-    [readings, tentId],
+    () =>
+      sortSensorReadingsNewestFirst(readings.filter((reading) => reading.tentId === activeTentId)),
+    [activeTentId, readings],
   );
   const latest = filtered[0] ?? null;
   const readingsByMetric = useMemo(() => indexSensorReadingsByObservedMetric(filtered), [filtered]);
@@ -149,11 +192,11 @@ export default function Sensors() {
     [readingsByMetric],
   );
   const vpdStabilityReadings = readingsByMetric.vpd;
-  const selectedTent = tents.find((t) => t.id === tentId) ?? null;
+  const selectedTent = tents.find((t) => t.id === activeTentId) ?? null;
   const selectedGrowId = selectedTent?.growId ?? null;
   const soilMoistureCalibrationsQuery = useSoilMoistureCalibrations({
     growId: selectedGrowId,
-    tentId,
+    tentId: activeTentId,
   });
   const { data: soilMoistureCalibrations = [] } = soilMoistureCalibrationsQuery;
   const selectedTentStage =
@@ -194,10 +237,14 @@ export default function Sensors() {
   const hasReadings = filtered.length > 0;
 
   const manualTents = tents.map((t) => ({ id: t.id as string, name: t.name as string }));
+  const selectTentByGrower = (nextTentId: string) => {
+    setGrowerTentSelection({ intentKey: sensorsTentRouteIntentKey, tentId: nextTentId });
+    setTentId(nextTentId);
+  };
   // Only auto-default when the chip-selected tent exists as a real DB tent;
   // otherwise leave it undefined so the user must consciously pick from the
   // tent dropdown rather than silently writing to manualTents[0].
-  const defaultManualTentId = manualTents.find((t) => t.id === tentId)?.id;
+  const defaultManualTentId = manualTents.find((t) => t.id === activeTentId)?.id;
 
   // Read-only recent readings for the PPFD-vs-environment trend chart.
   // Uses the existing tent-scoped sensor_readings hook (no new query,
@@ -241,7 +288,10 @@ export default function Sensors() {
 
   const sensorPageLoading =
     tentsQuery.isLoading ||
-    (tents.length > 0 && (selectedTent === null || readingsQuery.isLoading));
+    requiredTentGate.resolutionPending ||
+    (tents.length > 0 &&
+      !requiredTentGate.reselectionRequired &&
+      (selectedTent === null || readingsQuery.isLoading));
 
   if (sensorPageLoading) {
     return (
@@ -265,7 +315,7 @@ export default function Sensors() {
       />
       <OneTentLoopNextStepCard
         current="sensor-snapshot"
-        ids={{ growId: selectedGrowId ?? null, tentId }}
+        ids={{ growId: selectedGrowId ?? null, tentId: activeTentId }}
         testId="sensors-one-tent-loop-next-step-card"
         className="mb-3"
       />
@@ -273,10 +323,10 @@ export default function Sensors() {
         {tents.map((t) => (
           <button
             key={t.id}
-            onClick={() => setTentId(t.id)}
+            onClick={() => selectTentByGrower(t.id)}
             className={cn(
               "text-xs px-2.5 py-1 rounded-full border transition",
-              tentId === t.id
+              activeTentId === t.id
                 ? "bg-primary text-primary-foreground border-primary"
                 : "bg-secondary/50 border-border/50 hover:bg-secondary",
             )}
@@ -342,7 +392,7 @@ export default function Sensors() {
                   rawSource: metricSource,
                   context: {
                     growId: selectedGrowId,
-                    tentId,
+                    tentId: activeTentId,
                     plantId: null,
                     deviceId: null,
                   },
@@ -578,6 +628,32 @@ export default function Sensors() {
       >
         {manualTents.length === 0 ? (
           <FirstTentSetupEmptyState surface="sensor_pairing" testId="sensors-first-tent-setup" />
+        ) : requiredTentGate.reselectionRequired ? (
+          <div
+            className="glass rounded-xl border border-amber-500/30 p-4 space-y-3"
+            data-testid="sensors-required-tent-unavailable"
+            role="status"
+          >
+            <div className="space-y-1">
+              <p className="text-sm font-medium">That snapshot target is no longer available.</p>
+              <p className="text-xs text-muted-foreground">
+                Verdant did not switch tents. Choose the tent you want before entering or saving a
+                manual snapshot.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {manualTents.map((tent) => (
+                <button
+                  key={tent.id}
+                  type="button"
+                  className="rounded-md border border-border bg-secondary/50 px-3 py-1.5 text-xs hover:bg-secondary"
+                  onClick={() => selectTentByGrower(tent.id)}
+                >
+                  Choose {tent.name}
+                </button>
+              ))}
+            </div>
+          </div>
         ) : (
           <ManualSensorReadingCard
             tents={manualTents}
@@ -597,11 +673,20 @@ export default function Sensors() {
         className="mt-4 max-w-xl scroll-mt-24"
         data-testid="sensors-csv-import-anchor"
       >
-        <EnvironmentCsvImportLauncher
-          growId={selectedGrowId}
-          tentId={tentId}
-          testIdPrefix="sensors-csv-import"
-        />
+        {requiredTentGate.reselectionRequired ? (
+          <div
+            className="rounded-md border border-dashed border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground"
+            data-testid="sensors-csv-import-target-unavailable"
+          >
+            Choose a tent above before importing historical sensor data.
+          </div>
+        ) : (
+          <EnvironmentCsvImportLauncher
+            growId={selectedGrowId}
+            tentId={activeTentId}
+            testIdPrefix="sensors-csv-import"
+          />
+        )}
       </div>
       <div
         className="mt-4 max-w-xl rounded-lg border border-border/60 bg-muted/30 p-3 text-xs text-muted-foreground"
@@ -638,9 +723,9 @@ export default function Sensors() {
           sensorReadingsStatus={defaultManualTentId ? trendReadingsStatus : "success"}
         />
       </div>
-      {manualTents.find((t) => t.id === tentId) && (
+      {selectedTent && activeTentId && (
         <div className="mt-4 max-w-2xl">
-          <SensorsTestbenchPanel tentId={tentId} tentName={selectedTent?.name ?? null} />
+          <SensorsTestbenchPanel tentId={activeTentId} tentName={selectedTent.name ?? null} />
         </div>
       )}
       {operatorMode && (
@@ -694,7 +779,7 @@ export default function Sensors() {
                     (r as unknown as { captured_at?: string | null }).captured_at ?? null,
                   source: (r as unknown as { source?: string | null }).source ?? null,
                 })),
-                tentId,
+                activeTentId,
               ),
             }}
           />

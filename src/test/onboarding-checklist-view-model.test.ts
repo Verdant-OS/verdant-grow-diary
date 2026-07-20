@@ -21,6 +21,7 @@ const base = {
   diaryEntryCount: 0,
   sensorReadingCount: 0,
 };
+const CONNECTED_TENT_ID = "00000000-0000-4000-8000-00000000000b";
 
 describe("buildOnboardingChecklistViewModel — activation states", () => {
   it("new user with no grow → all 5 steps incomplete, checklist shown", () => {
@@ -124,6 +125,28 @@ describe("buildOnboardingChecklistViewModel — activation states", () => {
     expect(vm.steps.find((s) => s.key === "first_log")?.href).toBe(
       "/dashboard?growId=grow%20with%20spaces&open=quick-log",
     );
+    expect(vm.steps.find((s) => s.key === "first_sensor_snapshot")?.href).toBe(
+      "/tents?growId=grow%20with%20spaces&intent=one_tent_activation",
+    );
+  });
+
+  it("preserves the exact connected tent through the Add snapshot handoff", () => {
+    const vm = buildOnboardingChecklistViewModel({
+      ...base,
+      connectedScope: {
+        growId: "grow-a",
+        tentId: CONNECTED_TENT_ID,
+        plantId: "plant-a",
+      },
+      firstLogEvidenceCount: 1,
+      firstLogEvidenceStatus: "ok",
+    });
+
+    const snapshotStep = vm.steps.find((step) => step.key === "first_sensor_snapshot");
+    expect(snapshotStep?.href).toBe(
+      `/sensors?tentId=${CONNECTED_TENT_ID}&tentIntent=required#manual-reading`,
+    );
+    expect(snapshotStep?.href).not.toContain("growId=");
   });
 });
 

@@ -317,6 +317,7 @@ function ToolCard({
   const run = useCallback(async () => {
     if (invalid) return;
     const args = buildArgs();
+    setJustApplied(false);
     setState((prev) => ({
       loading: true,
       outcome: null,
@@ -338,6 +339,7 @@ function ToolCard({
     const category = classifyOutcome(outcome);
     if (category && onRunOutcome) onRunOutcome(outcome, category);
   }, [invalid, buildArgs, endpoint, toolName, onAuthLost, onRunOutcome]);
+
 
   const requestRetry = useCallback(() => {
     if (confirmBeforeRetry) {

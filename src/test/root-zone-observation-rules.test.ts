@@ -1,16 +1,68 @@
 import { describe, expect, it } from "vitest";
 import {
+  ROOT_ZONE_GROW_EVENT_SELECT,
+  ROOT_ZONE_MANUAL_OBSERVATION_DIARY_SELECT,
   ROOT_ZONE_OBSERVATION_CAP,
   ROOT_ZONE_PRODUCT_CAP,
+  buildRootZoneManualObservationCompanionIndex,
   buildRootZoneDiaryDetails,
   buildRootZoneObservationFromGrowEvent,
   buildRootZoneObservationsFromRows,
   normalizeRootZoneMetricsV1,
   sortAndBoundRootZoneObservations,
   type RootZoneGrowEventRowLike,
+  type RootZoneManualObservationDiaryRowLike,
   type RootZoneObservationV1,
   type RootZoneSource,
 } from "@/lib/rootZoneObservationRules";
+
+const MANUAL_OBSERVED_AT = "2026-07-20T10:30:00.000Z";
+
+function manualObservationEnvelope(observedAt: string = MANUAL_OBSERVED_AT) {
+  return {
+    schema_version: 1,
+    source: "manual",
+    evidence_type: "root_zone_manual_observation",
+    advisory_only: true,
+    observed_at: observedAt,
+    pot_weight_feel: "light",
+    medium_surface: "dry",
+    drainage: "normal",
+  };
+}
+
+function manualWateringRow(
+  id: string,
+  patch: Partial<RootZoneGrowEventRowLike> = {},
+): RootZoneGrowEventRowLike {
+  return {
+    id,
+    grow_id: "grow-1",
+    tent_id: "tent-1",
+    plant_id: "plant-1",
+    event_type: "watering",
+    occurred_at: MANUAL_OBSERVED_AT,
+    source: "manual",
+    watering_events: { volume_ml: 750 },
+    ...patch,
+  };
+}
+
+function manualObservationCompanion(
+  linkedGrowEventId: string,
+  patch: Partial<RootZoneManualObservationDiaryRowLike> = {},
+): RootZoneManualObservationDiaryRowLike {
+  return {
+    id: `diary-${linkedGrowEventId}`,
+    grow_id: "grow-1",
+    tent_id: "tent-1",
+    plant_id: "plant-1",
+    entry_at: MANUAL_OBSERVED_AT,
+    linked_grow_event_id: linkedGrowEventId,
+    root_zone_manual_observation_v1: manualObservationEnvelope(),
+    ...patch,
+  };
+}
 
 const metrics = (
   volumeMl: number,
@@ -310,6 +362,118 @@ describe("root-zone grow-event normalization", () => {
       nutrientLine: null,
       products: [],
     });
+  });
+});
+
+describe("manual root-zone companion preservation", () => {
+  it("keeps grow-event and companion selects honest about the physical storage path", () => {
+    expect(ROOT_ZONE_GROW_EVENT_SELECT).not.toMatch(/(?:^|,)details(?:,|$)/);
+    expect(ROOT_ZONE_MANUAL_OBSERVATION_DIARY_SELECT).toBe(
+      "id,grow_id,plant_id,tent_id,entry_at," +
+        "linked_grow_event_id:details->>linked_grow_event_id," +
+        "root_zone_manual_observation_v1:details->root_zone_manual_observation_v1",
+    );
+  });
+
+  it("projects one exact-linked, exact-time manual watering observation", () => {
+    const row = manualWateringRow("event-1");
+    const companion = manualObservationCompanion("event-1");
+    const normalized = buildRootZoneObservationsFromRows([row], 20, [companion]);
+
+    expect(normalized).toEqual([
+      {
+        occurredAt: MANUAL_OBSERVED_AT,
+        eventType: "watering",
+        source: "manual",
+        metrics: metrics(750),
+        manualObservation: {
+          observedAt: MANUAL_OBSERVED_AT,
+          source: "manual",
+          advisoryOnly: true,
+          potWeightFeel: "light",
+          mediumSurface: "dry",
+          drainage: "normal",
+        },
+      },
+    ]);
+    expect(JSON.stringify(normalized)).not.toMatch(
+      /event-1|diary-event-1|linked_grow_event_id|root_zone_manual_observation_v1|grow-1|tent-1|plant-1/i,
+    );
+  });
+
+  it("preserves legacy rows and ignores unrelated or envelope-free companions", () => {
+    const row = manualWateringRow("event-legacy");
+    const unrelated = manualObservationCompanion("another-event");
+    const envelopeFree = manualObservationCompanion("event-legacy", {
+      root_zone_manual_observation_v1: null,
+    });
+    const normalized = buildRootZoneObservationsFromRows([row], 20, [unrelated, envelopeFree]);
+
+    expect(normalized).toEqual([
+      {
+        occurredAt: MANUAL_OBSERVED_AT,
+        eventType: "watering",
+        source: "manual",
+        metrics: metrics(750),
+      },
+    ]);
+  });
+
+  it("keeps metrics but flags malformed, misaligned, non-watering, non-manual, mismatched, and duplicate evidence", () => {
+    const rows: RootZoneGrowEventRowLike[] = [
+      manualWateringRow("bad-envelope"),
+      manualWateringRow("bad-time"),
+      manualWateringRow("bad-source", { source: "csv_import" }),
+      manualWateringRow("bad-event", {
+        event_type: "feeding",
+        watering_events: undefined,
+        feeding_events: { volume_ml: 750 },
+      }),
+      manualWateringRow("bad-scope"),
+      manualWateringRow("duplicate"),
+    ];
+    const companions: RootZoneManualObservationDiaryRowLike[] = [
+      manualObservationCompanion("bad-envelope", {
+        root_zone_manual_observation_v1: {
+          ...manualObservationEnvelope(),
+          advisory_only: false,
+        },
+      }),
+      manualObservationCompanion("bad-time", {
+        root_zone_manual_observation_v1: manualObservationEnvelope("2026-07-20T10:30:00.001Z"),
+      }),
+      manualObservationCompanion("bad-source"),
+      manualObservationCompanion("bad-event"),
+      manualObservationCompanion("bad-scope", { plant_id: "other-plant" }),
+      manualObservationCompanion("duplicate", { id: "diary-duplicate-a" }),
+      manualObservationCompanion("duplicate", { id: "diary-duplicate-b" }),
+    ];
+
+    const index = buildRootZoneManualObservationCompanionIndex(companions);
+    const normalized = rows.map((row) => buildRootZoneObservationFromGrowEvent(row, index));
+
+    expect(normalized).toHaveLength(rows.length);
+    for (const item of normalized) {
+      expect(item?.metrics.volumeMl).toBe(750);
+      expect(item).not.toHaveProperty("manualObservation");
+      expect(item?.invalidFields).toEqual(["manualObservation"]);
+    }
+  });
+
+  it("shares one deterministic index without mutating either input collection", () => {
+    const row = manualWateringRow("event-1");
+    const companion = manualObservationCompanion("event-1");
+    const rowsBefore = structuredClone([row]);
+    const companionsBefore = structuredClone([companion]);
+    const index = buildRootZoneManualObservationCompanionIndex([companion]);
+
+    const first = buildRootZoneObservationFromGrowEvent(row, index);
+    const second = buildRootZoneObservationFromGrowEvent(row, index);
+
+    expect(first).toEqual(second);
+    expect(first?.manualObservation?.observedAt).toBe(MANUAL_OBSERVED_AT);
+    expect([row]).toEqual(rowsBefore);
+    expect([companion]).toEqual(companionsBefore);
   });
 });
 

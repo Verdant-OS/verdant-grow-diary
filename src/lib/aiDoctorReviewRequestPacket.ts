@@ -40,6 +40,11 @@ import {
   type RootZoneObservationV1,
   type RootZoneSource,
 } from "@/lib/rootZoneObservationRules";
+import type {
+  RootZoneDrainageObservation,
+  RootZoneMediumSurface,
+  RootZonePotWeightFeel,
+} from "@/lib/rootZoneManualObservationRules";
 
 export const AI_DOCTOR_REVIEW_PACKET_EVENT_CAP = 20;
 /**
@@ -91,6 +96,20 @@ export interface AiDoctorReviewRequestRootZoneProduct {
   unit: string | null;
 }
 
+/**
+ * Bounded grower-authored root-zone context captured with a typed watering
+ * event. These categorical labels are observations only: they are never
+ * sensor readings, measured dryback, or a watering instruction.
+ */
+export interface AiDoctorReviewRequestRootZoneManualObservation {
+  observedAt: string;
+  source: "manual";
+  advisoryOnly: true;
+  potWeightFeel: RootZonePotWeightFeel | null;
+  mediumSurface: RootZoneMediumSurface | null;
+  drainage: RootZoneDrainageObservation | null;
+}
+
 export interface AiDoctorReviewRequestRootZoneObservation {
   at: string;
   eventType: "watering" | "feeding";
@@ -105,6 +124,8 @@ export interface AiDoctorReviewRequestRootZoneObservation {
   waterTempC: number | null;
   nutrientLine: string | null;
   products: AiDoctorReviewRequestRootZoneProduct[];
+  /** Optional for packet compatibility with older saved root-zone rows. */
+  manualObservation?: AiDoctorReviewRequestRootZoneManualObservation;
   invalidFields?: RootZoneInvalidField[];
 }
 
@@ -294,6 +315,18 @@ export function buildAiDoctorReviewRequestPacket(
         amount: product.amount,
         unit: product.unit,
       })),
+      ...(observation.manualObservation
+        ? {
+            manualObservation: {
+              observedAt: observation.manualObservation.observedAt,
+              source: "manual" as const,
+              advisoryOnly: true as const,
+              potWeightFeel: observation.manualObservation.potWeightFeel ?? null,
+              mediumSurface: observation.manualObservation.mediumSurface ?? null,
+              drainage: observation.manualObservation.drainage ?? null,
+            },
+          }
+        : {}),
       ...(observation.invalidFields && observation.invalidFields.length > 0
         ? { invalidFields: [...observation.invalidFields] }
         : {}),

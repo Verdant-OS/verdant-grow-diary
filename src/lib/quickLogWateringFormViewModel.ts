@@ -7,15 +7,26 @@
  */
 
 import { resolveEcPpm500Pair } from "./ecPpm500PairRules";
+import {
+  ROOT_ZONE_DRAINAGE_OBSERVATIONS,
+  ROOT_ZONE_MANUAL_OBSERVATION_DETAILS_KEY,
+  ROOT_ZONE_MANUAL_OBSERVATION_SCHEMA_VERSION,
+  ROOT_ZONE_MEDIUM_SURFACES,
+  ROOT_ZONE_POT_WEIGHT_FEELS,
+  buildRootZoneManualObservationEnvelopeV1,
+  type RootZoneDrainageObservation,
+  type RootZoneMediumSurface,
+  type RootZonePotWeightFeel,
+} from "./rootZoneManualObservationRules";
 import { isHumidityValid, isTemperatureValid, isVpdValid } from "./sensorReadingNormalizationRules";
 import type {
   QuickLogWateringManualSnapshot,
   WateringTypedEventInput,
 } from "./writeQuickLogWateringTypedEvent";
 
-export type PotWeightFeel = "" | "light" | "moderate" | "heavy";
-export type MediumSurface = "" | "dry" | "moist" | "wet";
-export type DrainageObservation = "" | "normal" | "slow" | "none";
+export type PotWeightFeel = "" | RootZonePotWeightFeel;
+export type MediumSurface = "" | RootZoneMediumSurface;
+export type DrainageObservation = "" | RootZoneDrainageObservation;
 
 export interface QuickLogWateringFormState {
   volumeMl: string;
@@ -47,18 +58,8 @@ export const EMPTY_QUICKLOG_WATERING_FORM: QuickLogWateringFormState = {
   drainage: "",
 };
 
-export const ROOT_ZONE_MANUAL_OBSERVATION_VERSION = 1 as const;
-
-export interface RootZoneManualObservationV1 {
-  schema_version: typeof ROOT_ZONE_MANUAL_OBSERVATION_VERSION;
-  source: "manual";
-  evidence_type: "root_zone_manual_observation";
-  advisory_only: true;
-  observed_at: string;
-  pot_weight_feel?: Exclude<PotWeightFeel, "">;
-  medium_surface?: Exclude<MediumSurface, "">;
-  drainage?: Exclude<DrainageObservation, "">;
-}
+/** Backward-compatible alias; the shared contract owns the actual version. */
+export { ROOT_ZONE_MANUAL_OBSERVATION_SCHEMA_VERSION as ROOT_ZONE_MANUAL_OBSERVATION_VERSION };
 
 export interface BuildWateringFormPayloadInput {
   growId: string | null | undefined;
@@ -93,9 +94,9 @@ export type BuildWateringFormPayloadResult =
   | { ok: false; reason: WateringFormFailureReason };
 
 const PLAIN_NUMBER = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/;
-const POT_WEIGHT_VALUES = new Set<PotWeightFeel>(["", "light", "moderate", "heavy"]);
-const MEDIUM_SURFACE_VALUES = new Set<MediumSurface>(["", "dry", "moist", "wet"]);
-const DRAINAGE_VALUES = new Set<DrainageObservation>(["", "normal", "slow", "none"]);
+const POT_WEIGHT_VALUES = new Set<PotWeightFeel>(["", ...ROOT_ZONE_POT_WEIGHT_FEELS]);
+const MEDIUM_SURFACE_VALUES = new Set<MediumSurface>(["", ...ROOT_ZONE_MEDIUM_SURFACES]);
+const DRAINAGE_VALUES = new Set<DrainageObservation>(["", ...ROOT_ZONE_DRAINAGE_OBSERVATIONS]);
 
 function trim(value: string | null | undefined): string {
   return (value ?? "").trim();
@@ -128,22 +129,6 @@ function normalizeOccurredAt(raw: BuildWateringFormPayloadInput["occurredAt"]): 
 
 function hasManualObservation(form: QuickLogWateringFormState): boolean {
   return form.potWeightFeel !== "" || form.mediumSurface !== "" || form.drainage !== "";
-}
-
-function buildManualObservation(
-  form: QuickLogWateringFormState,
-  observedAt: string,
-): RootZoneManualObservationV1 {
-  return {
-    schema_version: ROOT_ZONE_MANUAL_OBSERVATION_VERSION,
-    source: "manual",
-    evidence_type: "root_zone_manual_observation",
-    advisory_only: true,
-    observed_at: observedAt,
-    ...(form.potWeightFeel ? { pot_weight_feel: form.potWeightFeel } : {}),
-    ...(form.mediumSurface ? { medium_surface: form.mediumSurface } : {}),
-    ...(form.drainage ? { drainage: form.drainage } : {}),
-  };
 }
 
 function metricInRange(value: number | null, min: number, max: number): boolean {
@@ -244,8 +229,18 @@ export function buildWateringFormPayload(
   }
 
   const details: Record<string, unknown> = { ...(input.baseDetails ?? {}) };
+  // This reserved envelope is owned exclusively by the validated form fields.
+  // A stale or caller-supplied copy must never masquerade as this save's evidence.
+  delete details[ROOT_ZONE_MANUAL_OBSERVATION_DETAILS_KEY];
   if (hasObservation && occurredAt) {
-    details.root_zone_manual_observation_v1 = buildManualObservation(input.form, occurredAt);
+    const manualObservation = buildRootZoneManualObservationEnvelopeV1({
+      observedAt: occurredAt,
+      potWeightFeel: input.form.potWeightFeel || null,
+      mediumSurface: input.form.mediumSurface || null,
+      drainage: input.form.drainage || null,
+    });
+    if (!manualObservation) return { ok: false, reason: "manual_observation:invalid" };
+    details[ROOT_ZONE_MANUAL_OBSERVATION_DETAILS_KEY] = manualObservation;
   }
 
   const note = trim(input.note);

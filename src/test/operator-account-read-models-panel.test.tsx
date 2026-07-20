@@ -103,6 +103,31 @@ describe("OperatorAccountReadModelsPanel", () => {
     expect(screen.getByTestId("operator-account-tent-name")).toHaveTextContent("Flower tent");
   });
 
+  it("visibly warns when manual root-zone observation enrichment is unavailable", () => {
+    const watering = buildOperatorWateringContextViewModel({
+      rootZone: {
+        status: "ready",
+        observations: [],
+        manualObservationStatus: "unavailable",
+      },
+      diary: { status: "ready", entries: [] },
+      sensor: { status: "ready", readings: {} },
+    });
+
+    renderPanel({
+      status: "ready",
+      growName: "Home run",
+      tentName: "Flower tent",
+      diary: { status: "empty", items: [] },
+      sensor: { status: "empty", items: [] },
+      watering,
+    });
+
+    expect(
+      screen.getByTestId("operator-manual-root-zone-observations-unavailable"),
+    ).toHaveTextContent(/manual root-zone observations are unavailable.*source log/i);
+  });
+
   it("renders watering evidence with grower-control fences and no decision command", () => {
     const watering = buildOperatorWateringContextViewModel({
       rootZone: {
@@ -136,6 +161,14 @@ describe("OperatorAccountReadModelsPanel", () => {
             occurredAt: "2026-07-19T10:00:00.000Z",
             eventType: "watering",
             source: "manual",
+            manualObservation: {
+              observedAt: "2026-07-19T10:00:00.000Z",
+              source: "manual",
+              advisoryOnly: true,
+              potWeightFeel: "light",
+              mediumSurface: "dry",
+              drainage: "slow",
+            },
             metrics: {
               schemaVersion: 1,
               volumeMl: 900,
@@ -222,6 +255,22 @@ describe("OperatorAccountReadModelsPanel", () => {
       within(cycles).getByText(/interval from prior record for this plant reference/i),
     ).toBeInTheDocument();
     expect(within(cycles).getAllByText(/recorded runoff ÷ applied volume/i)).toHaveLength(2);
+    const manualObservation = within(cycles).getByTestId(
+      "operator-root-zone-cycle-manual-observation",
+    );
+    expect(within(manualObservation).getByText("Manual observation")).toBeInTheDocument();
+    expect(within(manualObservation).getByText("Pot/container weight feel")).toBeInTheDocument();
+    expect(within(manualObservation).getByText("Light")).toBeInTheDocument();
+    expect(within(manualObservation).getByText("Medium surface")).toBeInTheDocument();
+    expect(within(manualObservation).getByText("Dry")).toBeInTheDocument();
+    expect(within(manualObservation).getByText("Drainage")).toBeInTheDocument();
+    expect(within(manualObservation).getByText("Slow")).toBeInTheDocument();
+    expect(manualObservation).toHaveTextContent(
+      /manual observation only.*not sensor data.*not measured dryback/i,
+    );
+    expect(
+      manualObservation.querySelector('time[datetime="2026-07-19T10:00:00.000Z"]'),
+    ).not.toBeNull();
     expect(screen.getByTestId("operator-watering-safety-fence")).toHaveTextContent(
       /pot weight or medium, drainage/i,
     );
@@ -238,6 +287,8 @@ describe("OperatorAccountReadModelsPanel", () => {
       /elapsed review starts after the latest root-zone application/i,
     );
     const text = card.textContent?.toLowerCase() ?? "";
-    expect(text).not.toMatch(/water now|skip watering|start pump|open valve|set a schedule/);
+    expect(text).not.toMatch(
+      /water now|skip watering|diagnosis:|chart adherence|action queue item|automatic(?:ally)? (?:water|irrigat)|start pump|open valve|device command|set a schedule/,
+    );
   });
 });

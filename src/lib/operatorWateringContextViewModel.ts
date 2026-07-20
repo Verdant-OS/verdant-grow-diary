@@ -34,11 +34,13 @@ import { formatSensorValue } from "@/lib/sensorFormat";
 export type OperatorWateringContextStatus = "loading" | "unavailable" | "insufficient" | "context";
 
 type OperatorWateringCollectionStatus = "loading" | "unavailable" | "ready";
+export type OperatorManualObservationStatus = "loading" | "ready" | "unavailable";
 
 export interface OperatorWateringReadState {
   rootZone: {
     status: OperatorWateringCollectionStatus;
     observations?: readonly OperatorRootZoneCycleInput[] | null;
+    manualObservationStatus?: OperatorManualObservationStatus;
   };
   diary: {
     status: OperatorWateringCollectionStatus;
@@ -106,6 +108,10 @@ export interface OperatorWateringContextViewModel {
   diaryObservations: readonly OperatorWateringDiaryObservationRow[];
   sensorRows: readonly OperatorWateringSensorContextRow[];
   missingContext: readonly ("typed_root_zone_history" | "soil_moisture_snapshot")[];
+  manualObservationStatus: OperatorManualObservationStatus;
+  manualObservationAvailabilityNote:
+    | "Grower-recorded manual root-zone observations are unavailable; review the source log before deciding."
+    | null;
   decisionReminder: "Review the plant, pot weight or medium, drainage, and recent water or feed applications before deciding.";
   snapshotCaveat: "One sensor snapshot is not a dryback trend; elapsed review starts after the latest root-zone application.";
   airContextCaveat: "Air readings alone do not determine watering.";
@@ -125,6 +131,8 @@ const SNAPSHOT_CAVEAT =
 const AIR_CONTEXT_CAVEAT = "Air readings alone do not determine watering." as const;
 const GROWER_CONTROL_NOTE =
   "Verdant presents read-only evidence here; the grower makes the decision." as const;
+const MANUAL_OBSERVATION_UNAVAILABLE_NOTE =
+  "Grower-recorded manual root-zone observations are unavailable; review the source log before deciding." as const;
 
 const SECRET_LIKE_TEXT =
   /service[_-]?role|authorization|bearer\s+|api[_-]?key|secret|token|jwt|eyJ|sk_(?:live|test)_|sb_/i;
@@ -267,7 +275,9 @@ function normalizeRootZoneObservations(
       eventType: row.eventType,
       sourceLabel: rootZoneSourceLabel(source),
       metrics,
-      hasRejectedMetrics: Array.isArray(row.invalidFields) && row.invalidFields.length > 0,
+      hasRejectedMetrics:
+        Array.isArray(row.invalidFields) &&
+        row.invalidFields.some((field) => field !== "manualObservation"),
       futureDated: Date.parse(occurredAt) > now + futureToleranceMs,
     });
   }
@@ -402,6 +412,16 @@ export function buildOperatorWateringContextViewModel(
   if (!usableSoilMoisture) missingContext.push("soil_moisture_snapshot");
 
   const sources = sourceStatus(input);
+  const manualObservationStatus: OperatorManualObservationStatus =
+    input?.rootZone?.status === "loading"
+      ? "loading"
+      : input?.rootZone?.status === "ready"
+        ? (input.rootZone.manualObservationStatus ?? "ready")
+        : "unavailable";
+  const manualObservationAvailabilityNote =
+    input?.rootZone?.status === "ready" && manualObservationStatus === "unavailable"
+      ? MANUAL_OBSERVATION_UNAVAILABLE_NOTE
+      : null;
   const status: OperatorWateringContextStatus = sources.loading
     ? "loading"
     : !sources.anyReady
@@ -423,6 +443,8 @@ export function buildOperatorWateringContextViewModel(
     diaryObservations: diary.rows,
     sensorRows,
     missingContext,
+    manualObservationStatus,
+    manualObservationAvailabilityNote,
     decisionReminder: DECISION_REMINDER,
     snapshotCaveat: SNAPSHOT_CAVEAT,
     airContextCaveat: AIR_CONTEXT_CAVEAT,

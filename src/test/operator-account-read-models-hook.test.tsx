@@ -54,6 +54,7 @@ function readyDefaults() {
   });
   mocks.rootZone.mockReturnValue({
     records: [],
+    manualObservationStatus: "ready",
     isLoading: false,
     isFetching: false,
     isError: false,
@@ -145,6 +146,30 @@ describe("useOperatorAccountReadModels", () => {
         expect(result.current.sensor.status).toBe("unavailable");
       }
     });
+  });
+
+  it("propagates unavailable manual observation enrichment without discarding core context", async () => {
+    mocks.rootZone.mockReturnValue({
+      records: [],
+      manualObservationStatus: "unavailable",
+      isLoading: false,
+      isFetching: false,
+      isError: false,
+    });
+
+    const { result } = renderHook(() => useOperatorAccountReadModels(), { wrapper: wrapper() });
+    await waitFor(() => expect(result.current.status).toBe("ready"));
+
+    expect(
+      result.current.status === "ready" &&
+        result.current.watering.manualObservationAvailabilityNote,
+    ).toMatch(/manual root-zone observations are unavailable/i);
+    expect(
+      result.current.status === "ready" && result.current.watering.manualObservationStatus,
+    ).toBe("unavailable");
+    expect(result.current.status === "ready" && result.current.watering.status).toBe(
+      "insufficient",
+    );
   });
 
   it("does not reuse the prior account's diary or sensor cache after an identity swap", async () => {

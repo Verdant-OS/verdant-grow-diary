@@ -80,6 +80,10 @@ describe("ai-doctor-review edge — credit_denied envelope unchanged", () => {
     // calmFailure returns 200.
     expect(src).toMatch(/function\s+calmFailure[\s\S]{0,200}status:\s*200/);
   });
+
+  it("returns the server-resolved plan identity with successful credit context", () => {
+    expect(src).toContain("plan_id: spendObj.plan_id");
+  });
 });
 
 describe("shared adapter — adaptCreditedAiResponse", () => {

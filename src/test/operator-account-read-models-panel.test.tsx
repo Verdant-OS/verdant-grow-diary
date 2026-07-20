@@ -1,13 +1,33 @@
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import OperatorAccountReadModelsPanel from "@/components/OperatorAccountReadModelsPanel";
 import type { OperatorAccountReadModelsPanelModel } from "@/lib/operatorAccountReadModelsViewModel";
 import { buildOperatorWateringContextViewModel } from "@/lib/operatorWateringContextViewModel";
 
+interface ElementPrototypeWithPointerCapture {
+  hasPointerCapture?: () => boolean;
+  setPointerCapture?: () => void;
+  releasePointerCapture?: () => void;
+  scrollIntoView?: () => void;
+}
+
+const elementPrototype = Element.prototype as unknown as ElementPrototypeWithPointerCapture;
+if (!elementPrototype.hasPointerCapture) elementPrototype.hasPointerCapture = () => false;
+if (!elementPrototype.setPointerCapture) elementPrototype.setPointerCapture = () => {};
+if (!elementPrototype.releasePointerCapture) elementPrototype.releasePointerCapture = () => {};
+if (!elementPrototype.scrollIntoView) elementPrototype.scrollIntoView = () => {};
+
 const PLANT_ID = "11111111-1111-4111-8111-111111111111";
 const TENT_ID = "22222222-2222-4222-8222-222222222222";
+
+const READY_TENT_SCOPE = {
+  tentOptions: [{ id: TENT_ID, name: "Flower tent" }],
+  tentScopeStatus: "ready" as const,
+  selectedTentId: TENT_ID,
+};
 
 const EMPTY_WATERING = buildOperatorWateringContextViewModel({
   rootZone: { status: "ready", observations: [] },
@@ -15,10 +35,19 @@ const EMPTY_WATERING = buildOperatorWateringContextViewModel({
   sensor: { status: "ready", readings: {} },
 });
 
-function renderPanel(model: OperatorAccountReadModelsPanelModel) {
+const UNAVAILABLE_TENT_DIARY_WATERING = buildOperatorWateringContextViewModel({
+  rootZone: { status: "ready", observations: [] },
+  diary: { status: "unavailable" },
+  sensor: { status: "ready", readings: {} },
+});
+
+function renderPanel(
+  model: OperatorAccountReadModelsPanelModel,
+  onTentSelectionChange?: (tentId: string) => void,
+) {
   return render(
     <MemoryRouter>
-      <OperatorAccountReadModelsPanel model={model} />
+      <OperatorAccountReadModelsPanel model={model} onTentSelectionChange={onTentSelectionChange} />
     </MemoryRouter>,
   );
 }
@@ -50,6 +79,7 @@ describe("OperatorAccountReadModelsPanel", () => {
     renderPanel({
       status: "ready",
       growName: "Home run",
+      ...READY_TENT_SCOPE,
       tentName: "Flower tent",
       diary: {
         status: "ok",
@@ -103,6 +133,32 @@ describe("OperatorAccountReadModelsPanel", () => {
     expect(screen.getByTestId("operator-account-tent-name")).toHaveTextContent("Flower tent");
   });
 
+  it("visibly warns when manual root-zone observation enrichment is unavailable", () => {
+    const watering = buildOperatorWateringContextViewModel({
+      rootZone: {
+        status: "ready",
+        observations: [],
+        manualObservationStatus: "unavailable",
+      },
+      diary: { status: "ready", entries: [] },
+      sensor: { status: "ready", readings: {} },
+    });
+
+    renderPanel({
+      status: "ready",
+      growName: "Home run",
+      ...READY_TENT_SCOPE,
+      tentName: "Flower tent",
+      diary: { status: "empty", items: [] },
+      sensor: { status: "empty", items: [] },
+      watering,
+    });
+
+    expect(
+      screen.getByTestId("operator-manual-root-zone-observations-unavailable"),
+    ).toHaveTextContent(/manual root-zone observations are unavailable.*source log/i);
+  });
+
   it("renders watering evidence with grower-control fences and no decision command", () => {
     const watering = buildOperatorWateringContextViewModel({
       rootZone: {
@@ -136,6 +192,14 @@ describe("OperatorAccountReadModelsPanel", () => {
             occurredAt: "2026-07-19T10:00:00.000Z",
             eventType: "watering",
             source: "manual",
+            manualObservation: {
+              observedAt: "2026-07-19T10:00:00.000Z",
+              source: "manual",
+              advisoryOnly: true,
+              potWeightFeel: "light",
+              mediumSurface: "dry",
+              drainage: "slow",
+            },
             metrics: {
               schemaVersion: 1,
               volumeMl: 900,
@@ -185,6 +249,7 @@ describe("OperatorAccountReadModelsPanel", () => {
     renderPanel({
       status: "ready",
       growName: "Home run",
+      ...READY_TENT_SCOPE,
       tentName: "Flower tent",
       diary: { status: "empty", items: [] },
       sensor: { status: "empty", items: [] },
@@ -222,6 +287,22 @@ describe("OperatorAccountReadModelsPanel", () => {
       within(cycles).getByText(/interval from prior record for this plant reference/i),
     ).toBeInTheDocument();
     expect(within(cycles).getAllByText(/recorded runoff ÷ applied volume/i)).toHaveLength(2);
+    const manualObservation = within(cycles).getByTestId(
+      "operator-root-zone-cycle-manual-observation",
+    );
+    expect(within(manualObservation).getByText("Manual observation")).toBeInTheDocument();
+    expect(within(manualObservation).getByText("Pot/container weight feel")).toBeInTheDocument();
+    expect(within(manualObservation).getByText("Light")).toBeInTheDocument();
+    expect(within(manualObservation).getByText("Medium surface")).toBeInTheDocument();
+    expect(within(manualObservation).getByText("Dry")).toBeInTheDocument();
+    expect(within(manualObservation).getByText("Drainage")).toBeInTheDocument();
+    expect(within(manualObservation).getByText("Slow")).toBeInTheDocument();
+    expect(manualObservation).toHaveTextContent(
+      /manual observation only.*not sensor data.*not measured dryback/i,
+    );
+    expect(
+      manualObservation.querySelector('time[datetime="2026-07-19T10:00:00.000Z"]'),
+    ).not.toBeNull();
     expect(screen.getByTestId("operator-watering-safety-fence")).toHaveTextContent(
       /pot weight or medium, drainage/i,
     );
@@ -238,6 +319,83 @@ describe("OperatorAccountReadModelsPanel", () => {
       /elapsed review starts after the latest root-zone application/i,
     );
     const text = card.textContent?.toLowerCase() ?? "";
-    expect(text).not.toMatch(/water now|skip watering|start pump|open valve|set a schedule/);
+    expect(text).not.toMatch(
+      /water now|skip watering|diagnosis:|chart adherence|action queue item|automatic(?:ally)? (?:water|irrigat)|start pump|open valve|device command|set a schedule/,
+    );
+  });
+
+  it("fails closed until a multi-tent grow has an explicit watering scope", () => {
+    renderPanel({
+      status: "ready",
+      growName: "Home run",
+      tentOptions: [
+        { id: TENT_ID, name: "Flower tent" },
+        { id: "33333333-3333-4333-8333-333333333333", name: "Veg tent" },
+      ],
+      tentScopeStatus: "selection_required",
+      selectedTentId: null,
+      tentName: null,
+      diary: { status: "empty", items: [] },
+      sensor: { status: "select_tent", items: [] },
+      watering: EMPTY_WATERING,
+    });
+
+    expect(screen.getByTestId("operator-watering-tent-selector")).toHaveTextContent(
+      /watering context tent/i,
+    );
+    expect(screen.getByTestId("operator-account-sensor-select-tent")).toHaveTextContent(
+      /no room is selected implicitly/i,
+    );
+    expect(screen.getByTestId("operator-watering-scope-gate")).toHaveTextContent(
+      /no diary note or sensor reading is treated as belonging to this context/i,
+    );
+    expect(screen.queryByTestId("operator-watering-diary-list")).not.toBeInTheDocument();
+  });
+
+  it("passes the grower's explicit tent choice back to the scoped read adapter", async () => {
+    const onTentSelectionChange = vi.fn();
+    const user = userEvent.setup();
+    renderPanel(
+      {
+        status: "ready",
+        growName: "Home run",
+        tentOptions: [
+          { id: TENT_ID, name: "Flower tent" },
+          { id: "33333333-3333-4333-8333-333333333333", name: "Veg tent" },
+        ],
+        tentScopeStatus: "selection_required",
+        selectedTentId: null,
+        tentName: null,
+        diary: { status: "empty", items: [] },
+        sensor: { status: "select_tent", items: [] },
+        watering: EMPTY_WATERING,
+      },
+      onTentSelectionChange,
+    );
+
+    await user.click(screen.getByRole("combobox", { name: /watering context tent/i }));
+    await user.click(await screen.findByRole("option", { name: "Veg tent" }));
+
+    expect(onTentSelectionChange).toHaveBeenCalledTimes(1);
+    expect(onTentSelectionChange).toHaveBeenCalledWith("33333333-3333-4333-8333-333333333333");
+  });
+
+  it("warns when tent-linked observations are unavailable instead of claiming the history is empty", () => {
+    renderPanel({
+      status: "ready",
+      growName: "Home run",
+      ...READY_TENT_SCOPE,
+      tentName: "Flower tent",
+      diary: { status: "empty", items: [] },
+      sensor: { status: "empty", items: [] },
+      watering: UNAVAILABLE_TENT_DIARY_WATERING,
+    });
+
+    expect(screen.getByTestId("operator-tent-diary-unavailable")).toHaveTextContent(
+      /cannot confirm this tent has no recent entries/i,
+    );
+    expect(
+      screen.queryByText(/no recent tent-linked grower observations are available/i),
+    ).not.toBeInTheDocument();
   });
 });

@@ -36,6 +36,7 @@ import {
 } from "@/lib/aiDoctorCurrentSensorSnapshotRules";
 import { useAiDoctorLiveReview } from "@/hooks/useAiDoctorLiveReview";
 import AiDoctorReviewResultPreview from "@/components/AiDoctorReviewResultPreview";
+import AiDoctorImportedHistoryDisclosurePanel from "@/components/AiDoctorImportedHistoryDisclosurePanel";
 
 import AiCreditRemainingBadge from "@/components/AiCreditRemainingBadge";
 import AiCreditLimitNotice from "@/components/AiCreditLimitNotice";
@@ -45,7 +46,7 @@ import { useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
 import { useImportedSensorHistory } from "@/hooks/useImportedSensorHistory";
 import { useRootZoneObservations } from "@/hooks/useRootZoneObservations";
 import { isUuid } from "@/lib/isUuid";
-import { plantDetailPath } from "@/lib/routes";
+import { aiDoctorSessionDetailPath, plantDetailPath } from "@/lib/routes";
 import { buildPlantAiDoctorReviewPath } from "@/lib/aiDoctorEntryRules";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { buildAiCreditLimitNoticeViewModel } from "@/lib/aiCreditLimitNoticeViewModel";
@@ -442,13 +443,18 @@ function PlantDetailAiDoctorLiveReviewScope({
     }
   }, [historyScopeKey, review.status, rootZoneHistory.isError, rootZoneOmissionScope]);
 
-  // Keep route construction aligned with the shared route contract.
-  // AiCreditLimitNotice validates it again before it reaches the pricing link.
-  const returnTo = useMemo(
+  // Credit denials have no newly saved result, so they return to the same
+  // plant-scoped reviewer. The post-value handoff below uses the durable
+  // session route instead, preserving the exact result that earned the click.
+  const reviewReturnTo = useMemo(
     () =>
       buildPlantAiDoctorReviewPath({ plantId, tentId: tentId ?? null }) ?? plantDetailPath(plantId),
     [plantId, tentId],
   );
+  const savedSessionReturnTo =
+    review.persistence.status === "saved"
+      ? aiDoctorSessionDetailPath(review.persistence.sessionId)
+      : null;
 
   const postValueUpgrade = useMemo(
     () =>
@@ -457,9 +463,15 @@ function PlantDetailAiDoctorLiveReviewScope({
         viewerEntitlement: entitlement,
         entitlementLoading,
         durableSessionSaved: review.persistence.status === "saved",
-        returnTo,
+        returnTo: savedSessionReturnTo,
       }),
-    [entitlement, entitlementLoading, returnTo, review.creditRemaining, review.persistence.status],
+    [
+      entitlement,
+      entitlementLoading,
+      review.creditRemaining,
+      review.persistence.status,
+      savedSessionReturnTo,
+    ],
   );
 
   // Keep funnel tracking aligned with the notice's server-plan + defensive
@@ -473,10 +485,10 @@ function PlantDetailAiDoctorLiveReviewScope({
     return buildAiCreditLimitNoticeViewModel({
       credit: review.credit,
       surface: "doctor",
-      returnTo,
+      returnTo: reviewReturnTo,
       viewerEntitlement: entitlement,
     }).kind;
-  }, [entitlement, returnTo, review.credit, review.reason, review.status]);
+  }, [entitlement, review.credit, review.reason, review.status, reviewReturnTo]);
 
   useEffect(() => {
     if (creditNoticeKind === "upsell") {
@@ -622,6 +634,18 @@ function PlantDetailAiDoctorLiveReviewScope({
     }
   };
   const confidenceCopy = activeReviewRequest?.confidenceCopy ?? candidateConfidenceCopy;
+  // Before start, disclose the exact sanitized history from the allowed packet
+  // that could reach AI Doctor. Once a review begins, stay pinned to its
+  // accepted packet so background CSV refetches cannot rewrite the evidence
+  // beside the result. Normalize optional transport fields for the presenter.
+  const importedHistoryDisclosurePacket = activeReviewRequest?.packet ?? packet;
+  const importedHistoryDisclosureContext = importedHistoryDisclosurePacket
+    ? {
+        imported_sensor_history: importedHistoryDisclosurePacket.imported_sensor_history ?? null,
+        missingLiveSensorReadings:
+          importedHistoryDisclosurePacket.missingLiveSensorReadings === true,
+      }
+    : null;
 
   return (
     <section
@@ -666,6 +690,8 @@ function PlantDetailAiDoctorLiveReviewScope({
       >
         {confidenceCopy}
       </p>
+
+      <AiDoctorImportedHistoryDisclosurePanel context={importedHistoryDisclosureContext} />
 
       {historyRecovery.state === "decision_required" ? (
         <div
@@ -783,7 +809,7 @@ function PlantDetailAiDoctorLiveReviewScope({
           <AiCreditLimitNotice
             credit={review.credit}
             surface="doctor"
-            returnTo={returnTo}
+            returnTo={reviewReturnTo}
             onUpsellCtaClick={handleCreditLimitPlansClick}
             data-testid="plant-ai-doctor-live-review-credit-denied"
           />
@@ -830,7 +856,7 @@ function PlantDetailAiDoctorLiveReviewScope({
             >
               <span>{AI_DOCTOR_HISTORY_SAVED_COPY}</span>
               <Link
-                to={`/doctor/sessions/${review.persistence.sessionId}`}
+                to={aiDoctorSessionDetailPath(review.persistence.sessionId)}
                 className="font-medium underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 data-testid="plant-ai-doctor-history-saved-link"
               >

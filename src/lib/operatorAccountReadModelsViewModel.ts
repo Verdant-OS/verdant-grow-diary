@@ -11,11 +11,25 @@ import type { OperatorWateringContextViewModel } from "@/lib/operatorWateringCon
 
 export interface OperatorDiaryEntryInput {
   id: string;
+  /** Preserved for tent-scoped watering context; omitted by older fixtures. */
+  tent_id?: string | null;
   stage: string | null;
   note: string | null;
   entry_at: string;
   created_at: string;
 }
+
+export interface OperatorAccountTentOption {
+  id: string;
+  name: string;
+}
+
+export type OperatorAccountTentScopeStatus =
+  | "loading"
+  | "unavailable"
+  | "no_tents"
+  | "selection_required"
+  | "ready";
 
 export interface OperatorSensorReadingInput {
   id: string;
@@ -60,7 +74,7 @@ export type OperatorPanelCollectionState<T> =
 
 export type OperatorPanelSensorState =
   | OperatorPanelCollectionState<OperatorSensorReadingRow>
-  | { status: "no_tent"; items: readonly OperatorSensorReadingRow[] };
+  | { status: "no_tent" | "select_tent"; items: readonly OperatorSensorReadingRow[] };
 
 export type OperatorAccountReadModelsPanelModel =
   | { status: "loading" }
@@ -69,6 +83,9 @@ export type OperatorAccountReadModelsPanelModel =
   | {
       status: "ready";
       growName: string;
+      tentOptions: readonly OperatorAccountTentOption[];
+      tentScopeStatus: OperatorAccountTentScopeStatus;
+      selectedTentId: string | null;
       tentName: string | null;
       diary: OperatorPanelCollectionState<OperatorDiaryEntryRow>;
       sensor: OperatorPanelSensorState;

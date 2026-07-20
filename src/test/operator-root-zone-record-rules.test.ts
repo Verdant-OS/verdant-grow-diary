@@ -7,6 +7,7 @@ import {
 import {
   buildRootZoneObservationFromGrowEvent,
   type RootZoneGrowEventRowLike,
+  type RootZoneManualObservationDiaryRowLike,
 } from "@/lib/rootZoneObservationRules";
 
 const EVENT_A = "11111111-1111-4111-8111-111111111111";
@@ -71,6 +72,37 @@ describe("operator root-zone record rules", () => {
 
     expect(records).toHaveLength(1);
     expect(records[0]).toMatchObject({ eventId: EVENT_A, plantId: null, tentId: TENT_ID });
+  });
+
+  it("preserves exact-linked manual observation context through the operator identity adapter", () => {
+    const companion: RootZoneManualObservationDiaryRowLike = {
+      id: "77777777-7777-4777-8777-777777777777",
+      grow_id: "66666666-6666-4666-8666-666666666666",
+      plant_id: PLANT_A,
+      tent_id: TENT_ID,
+      entry_at: "2026-07-19T12:00:00.000Z",
+      linked_grow_event_id: EVENT_A,
+      root_zone_manual_observation_v1: {
+        schema_version: 1,
+        source: "manual",
+        evidence_type: "root_zone_manual_observation",
+        advisory_only: true,
+        observed_at: "2026-07-19T12:00:00.000Z",
+        medium_surface: "moist",
+      },
+    };
+
+    expect(buildOperatorRootZoneRecordsFromRows([wateringRow()], 20, [companion])).toEqual([
+      expect.objectContaining({
+        eventId: EVENT_A,
+        manualObservation: {
+          observedAt: "2026-07-19T12:00:00.000Z",
+          source: "manual",
+          advisoryOnly: true,
+          mediumSurface: "moist",
+        },
+      }),
+    ]);
   });
 
   it("fails closed on malformed identifiers and invalid shared observations", () => {

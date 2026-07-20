@@ -131,6 +131,7 @@ describe("operator watering context view model", () => {
     const model = buildOperatorWateringContextViewModel(state);
 
     expect(model.status).toBe("context");
+    expect(model.manualObservationStatus).toBe("ready");
     expect(model.typedWateringCount).toBe(2);
     expect(model.typedFeedingCount).toBe(1);
     expect(model.recentRootZoneCycles.map((row) => row.eventLabel)).toEqual([
@@ -318,11 +319,64 @@ describe("operator watering context view model", () => {
     });
 
     expect(loading.status).toBe("loading");
+    expect(loading.manualObservationStatus).toBe("loading");
     expect(loading.lastRootZoneApplication).toBeNull();
     expect(loading.lastConfirmedWatering).toBeNull();
     expect(unavailable.status).toBe("unavailable");
+    expect(unavailable.manualObservationStatus).toBe("unavailable");
     expect(unavailable.summary).toContain("unavailable");
     expect(buildOperatorWateringContextViewModel(null).status).toBe("unavailable");
+  });
+
+  it("keeps core root-zone evidence usable while flagging unavailable manual observations", () => {
+    const model = buildOperatorWateringContextViewModel(
+      readyState({
+        rootZone: {
+          status: "ready",
+          observations: [rootZoneObservation("2026-07-19T17:00:00.000Z", "watering")],
+          manualObservationStatus: "unavailable",
+        },
+      }),
+    );
+
+    expect(model.status).toBe("context");
+    expect(model.lastConfirmedWatering).not.toBeNull();
+    expect(model.recentRootZoneCycles).toHaveLength(1);
+    expect(model.manualObservationStatus).toBe("unavailable");
+    expect(model.manualObservationAvailabilityNote).toMatch(
+      /manual root-zone observations are unavailable.*review the source log/i,
+    );
+  });
+
+  it("keeps other evidence usable while distinguishing an unavailable tent diary from no entries", () => {
+    const model = buildOperatorWateringContextViewModel(
+      readyState({ diary: { status: "unavailable" } }),
+    );
+
+    expect(model.status).toBe("context");
+    expect(model.lastRootZoneApplication).not.toBeNull();
+    expect(model.sensorRows).toHaveLength(1);
+    expect(model.diaryObservationStatus).toBe("unavailable");
+    expect(model.diaryObservationCount).toBe(0);
+    expect(model.diaryObservations).toEqual([]);
+    expect(model.diaryObservationAvailabilityNote).toBe(
+      "Tent-linked observations are unavailable. Verdant cannot confirm this tent has no recent entries.",
+    );
+  });
+
+  it("does not label a rejected manual observation as a rejected measurement", () => {
+    const observation = {
+      ...rootZoneObservation("2026-07-19T17:00:00.000Z", "watering"),
+      invalidFields: ["manualObservation"] as const,
+    };
+    const model = buildOperatorWateringContextViewModel(
+      readyState({ rootZone: { status: "ready", observations: [observation] } }),
+    );
+
+    expect(model.lastRootZoneApplication?.hasRejectedMetrics).toBe(false);
+    expect(model.recentRootZoneCycles[0]?.warnings).not.toContain(
+      "Some supplied measurements were rejected.",
+    );
   });
 
   it("labels root-zone and air context while only strict fresh live readings remain current", () => {

@@ -5,6 +5,13 @@
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import type {
   OperatorAccountReadModelsPanelModel,
@@ -21,6 +28,7 @@ import type {
 
 export interface OperatorAccountReadModelsPanelProps {
   model: OperatorAccountReadModelsPanelModel;
+  onTentSelectionChange?: (tentId: string) => void;
 }
 
 function readableTimestamp(value: string | null): string {
@@ -56,9 +64,9 @@ function DiaryPanel({ state }: { state: OperatorPanelCollectionState<OperatorDia
   return (
     <Card data-testid="operator-account-diary-card">
       <CardHeader>
-        <CardTitle className="text-base">Recent diary entries</CardTitle>
+        <CardTitle className="text-base">Recent grow diary entries</CardTitle>
         <CardDescription>
-          <code>list_recent_diary_entries</code> · newest first · owner-scoped
+          <code>list_recent_diary_entries</code> · active grow · newest first · owner-scoped
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -114,7 +122,14 @@ function SensorPanel({
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {state.status === "no_tent" ? (
+        {state.status === "select_tent" ? (
+          <p
+            className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-muted-foreground"
+            data-testid="operator-account-sensor-select-tent"
+          >
+            Choose a tent before Verdant loads a sensor snapshot. No room is selected implicitly.
+          </p>
+        ) : state.status === "no_tent" ? (
           <p
             className="text-sm text-muted-foreground"
             data-testid="operator-account-sensor-no-tent"
@@ -218,7 +233,7 @@ function WateringContextPanel({
         </div>
         <CardDescription>
           Confirmed typed water and feed applications with source-labeled sensor context for{" "}
-          {tentName ?? "the active grow"}, plus recent active-grow observations.
+          {tentName ?? "the selected tent"}, plus recent observations linked to this tent.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -235,6 +250,14 @@ function WateringContextPanel({
           <>
             <div className="space-y-2" data-testid="operator-watering-context-summary">
               <p className="text-sm">{model.summary}</p>
+              {model.manualObservationAvailabilityNote ? (
+                <p
+                  className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-amber-700 dark:text-amber-300"
+                  data-testid="operator-manual-root-zone-observations-unavailable"
+                >
+                  {model.manualObservationAvailabilityNote}
+                </p>
+              ) : null}
               {model.missingContext.length > 0 ? (
                 <div className="flex flex-wrap gap-1.5 text-xs text-muted-foreground">
                   {model.missingContext.includes("typed_root_zone_history") ? (
@@ -358,6 +381,35 @@ function WateringContextPanel({
                         </dl>
                       ) : null}
 
+                      {cycle.manualObservation ? (
+                        <div
+                          className="mt-3 space-y-2 rounded-md border border-border/50 p-2 text-xs"
+                          data-testid="operator-root-zone-cycle-manual-observation"
+                        >
+                          <div className="flex flex-wrap items-center gap-2 text-muted-foreground">
+                            <Badge variant="outline">{cycle.manualObservation.sourceLabel}</Badge>
+                            <time dateTime={cycle.manualObservation.observedAt}>
+                              {readableTimestamp(cycle.manualObservation.observedAt)}
+                            </time>
+                          </div>
+                          <p className="text-muted-foreground">{cycle.manualObservation.caveat}</p>
+                          <dl
+                            className="grid gap-2 sm:grid-cols-3"
+                            aria-label="Grower-recorded manual root-zone observations"
+                          >
+                            {cycle.manualObservation.rows.map((observation) => (
+                              <div
+                                key={observation.key}
+                                className="rounded-md border border-border/50 px-2 py-1"
+                              >
+                                <dt className="text-muted-foreground">{observation.label}</dt>
+                                <dd className="font-medium">{observation.valueLabel}</dd>
+                              </div>
+                            ))}
+                          </dl>
+                        </div>
+                      ) : null}
+
                       {cycle.nutrientLine || cycle.products.length > 0 ? (
                         <div
                           className="mt-3 space-y-2 rounded-md border border-border/50 p-2 text-xs"
@@ -472,9 +524,17 @@ function WateringContextPanel({
                 id="operator-watering-observations-title"
                 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
               >
-                Recent active-grow observations ({model.diaryObservationCount})
+                Recent observations for this tent ({model.diaryObservationCount})
               </h3>
-              {model.diaryObservations.length > 0 ? (
+              {model.diaryObservationAvailabilityNote ? (
+                <p
+                  className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-amber-700 dark:text-amber-300"
+                  data-testid="operator-tent-diary-unavailable"
+                  role="status"
+                >
+                  {model.diaryObservationAvailabilityNote}
+                </p>
+              ) : model.diaryObservations.length > 0 ? (
                 <ol className="space-y-2" data-testid="operator-watering-diary-list">
                   {model.diaryObservations.map((entry) => (
                     <li
@@ -496,7 +556,7 @@ function WateringContextPanel({
                 </ol>
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  No recent grower observations are available.
+                  No recent tent-linked grower observations are available.
                 </p>
               )}
             </section>
@@ -520,8 +580,114 @@ function WateringContextPanel({
   );
 }
 
+function TentScopeControl({
+  model,
+  onTentSelectionChange,
+}: {
+  model: Extract<OperatorAccountReadModelsPanelModel, { status: "ready" }>;
+  onTentSelectionChange?: (tentId: string) => void;
+}) {
+  if (model.tentScopeStatus === "loading") {
+    return (
+      <p
+        className="mt-3 text-sm text-muted-foreground"
+        data-testid="operator-watering-tents-loading"
+      >
+        Loading tent scope…
+      </p>
+    );
+  }
+
+  if (model.tentScopeStatus === "unavailable") {
+    return (
+      <p
+        className="mt-3 text-sm text-muted-foreground"
+        data-testid="operator-watering-tents-unavailable"
+      >
+        Tent scope is unavailable. Verdant will not assemble watering context from an unknown room.
+      </p>
+    );
+  }
+
+  if (model.tentScopeStatus === "no_tents") {
+    return (
+      <p className="mt-3 text-sm text-muted-foreground" data-testid="operator-watering-no-tents">
+        No tent is available in this grow. Add a tent before building watering context.
+      </p>
+    );
+  }
+
+  if (model.tentOptions.length === 1 && model.selectedTentId) {
+    return (
+      <p className="mt-3 text-sm" data-testid="operator-watering-single-tent-scope">
+        Watering scope: <span className="font-medium">{model.tentOptions[0].name}</span>
+      </p>
+    );
+  }
+
+  return (
+    <div className="mt-3 max-w-sm space-y-1.5" data-testid="operator-watering-tent-selector">
+      <label className="text-sm font-medium" htmlFor="operator-watering-tent-select">
+        Watering context tent
+      </label>
+      <Select
+        value={model.selectedTentId ?? ""}
+        onValueChange={onTentSelectionChange}
+        disabled={!onTentSelectionChange}
+      >
+        <SelectTrigger
+          id="operator-watering-tent-select"
+          aria-describedby="operator-watering-tent-help"
+        >
+          <SelectValue placeholder="Choose a tent" />
+        </SelectTrigger>
+        <SelectContent>
+          {model.tentOptions.map((tent) => (
+            <SelectItem key={tent.id} value={tent.id}>
+              {tent.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <p id="operator-watering-tent-help" className="text-xs text-muted-foreground">
+        Verdant combines diary, sensor, water, and feed evidence only after you choose the room.
+      </p>
+    </div>
+  );
+}
+
+function WateringScopeGate({
+  status,
+}: {
+  status: Extract<OperatorAccountReadModelsPanelModel, { status: "ready" }>["tentScopeStatus"];
+}) {
+  const message =
+    status === "selection_required"
+      ? "Choose a tent before Verdant combines watering evidence. Until then, no diary note or sensor reading is treated as belonging to this context."
+      : status === "no_tents"
+        ? "Add a tent before Verdant can assemble tent-scoped watering evidence."
+        : status === "loading"
+          ? "Tent scope is still loading. Verdant has not combined any watering evidence yet."
+          : "Tent scope is unavailable. Verdant will not combine evidence from an unknown room.";
+
+  return (
+    <Card data-testid="operator-watering-scope-gate">
+      <CardHeader>
+        <CardTitle className="text-base">Watering decision context</CardTitle>
+        <CardDescription>Read-only evidence · grower decides</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <p className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-muted-foreground">
+          {message}
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function OperatorAccountReadModelsPanel({
   model,
+  onTentSelectionChange,
 }: OperatorAccountReadModelsPanelProps) {
   return (
     <section
@@ -560,9 +726,12 @@ export default function OperatorAccountReadModelsPanel({
               </Link>
             </div>
           ) : (
-            <p className="text-sm" data-testid="operator-account-grow-name">
-              Active grow: <span className="font-medium">{model.growName}</span>
-            </p>
+            <div>
+              <p className="text-sm" data-testid="operator-account-grow-name">
+                Active grow: <span className="font-medium">{model.growName}</span>
+              </p>
+              <TentScopeControl model={model} onTentSelectionChange={onTentSelectionChange} />
+            </div>
           )}
         </CardContent>
       </Card>
@@ -573,7 +742,11 @@ export default function OperatorAccountReadModelsPanel({
             <DiaryPanel state={model.diary} />
             <SensorPanel state={model.sensor} tentName={model.tentName} />
           </div>
-          <WateringContextPanel model={model.watering} tentName={model.tentName} />
+          {model.tentScopeStatus === "ready" ? (
+            <WateringContextPanel model={model.watering} tentName={model.tentName} />
+          ) : (
+            <WateringScopeGate status={model.tentScopeStatus} />
+          )}
         </div>
       ) : null}
 

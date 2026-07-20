@@ -144,6 +144,70 @@ export async function listRecentDiaryEntriesForOwnedGrow(
   };
 }
 
+/**
+ * Return recent diary rows that are explicitly linked to one tent in an owned
+ * grow. The tent relation is checked before child rows are queried so a stale
+ * or forged client selection cannot broaden the read.
+ */
+export async function listRecentDiaryEntriesForOwnedTent(
+  client: OwnerScopedSupabaseClient,
+  growId: string,
+  tentId: string,
+  limit?: number,
+): Promise<OwnerScopedReadModelResult<{ entries: OperatorRecentDiaryEntry[] }>> {
+  const { data: grow, error: growError } = await client
+    .from("grows")
+    .select("id")
+    .eq("id", growId)
+    .maybeSingle();
+
+  if (growError) {
+    return { ok: false, reason: "unavailable", message: growError.message };
+  }
+  if (!grow) {
+    return {
+      ok: false,
+      reason: "not_found",
+      message: "Grow not found for the signed-in grower.",
+    };
+  }
+
+  const { data: tent, error: tentError } = await client
+    .from("tents")
+    .select("id")
+    .eq("id", tentId)
+    .eq("grow_id", growId)
+    .maybeSingle();
+
+  if (tentError) {
+    return { ok: false, reason: "unavailable", message: tentError.message };
+  }
+  if (!tent) {
+    return {
+      ok: false,
+      reason: "not_found",
+      message: "Tent not found in this grow for the signed-in grower.",
+    };
+  }
+
+  const { data, error } = await client
+    .from("diary_entries")
+    .select(DIARY_COLUMNS)
+    .eq("grow_id", growId)
+    .eq("tent_id", tentId)
+    .order("entry_at", { ascending: false })
+    .limit(normalizeDiaryLimit(limit));
+
+  if (error) {
+    return { ok: false, reason: "unavailable", message: error.message };
+  }
+
+  return {
+    ok: true,
+    data: { entries: (data ?? []) satisfies OperatorRecentDiaryEntry[] },
+  };
+}
+
 function parseTimestamp(value: string | null | undefined): number {
   if (typeof value !== "string") return Number.NEGATIVE_INFINITY;
   const parsed = Date.parse(value);

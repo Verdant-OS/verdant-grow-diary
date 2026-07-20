@@ -117,6 +117,10 @@ describe("classifyCheckoutReturnSurface", () => {
         "/plants/private-plant-id?tentId=private-tent-id#plant-ai-doctor-review",
       ),
     ).toBe("ai_doctor");
+    expect(classifyCheckoutReturnSurface("/doctor/sessions/private-session-id")).toBe("ai_doctor");
+    expect(
+      classifyCheckoutReturnSurface("/doctor/sessions/private-session-id?from=pricing#summary"),
+    ).toBe("ai_doctor");
     expect(classifyCheckoutReturnSurface("/pheno-hunts")).toBe("pheno");
     expect(classifyCheckoutReturnSurface("/pheno-hunts/private-id/workspace")).toBe("pheno");
     expect(classifyCheckoutReturnSurface("/pheno-hunts/new?growId=private-id")).toBe("pheno");
@@ -132,6 +136,8 @@ describe("classifyCheckoutReturnSurface", () => {
   it("does not mistake a lookalike plant hash for the AI Doctor return", () => {
     expect(classifyCheckoutReturnSurface("/plants/p1#plant-ai-doctor-review-copy")).toBe("other");
     expect(classifyCheckoutReturnSurface("/grows/g1#plant-ai-doctor-review")).toBe("other");
+    expect(classifyCheckoutReturnSurface("/doctor/sessions")).toBe("other");
+    expect(classifyCheckoutReturnSurface("/doctor/sessions/s1/extra")).toBe("other");
   });
 });
 

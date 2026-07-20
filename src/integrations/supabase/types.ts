@@ -728,6 +728,117 @@ export type Database = {
         }
         Relationships: []
       }
+      contact_messages: {
+        Row: {
+          admin_notes: string | null
+          attachment_path: string | null
+          category: string
+          created_at: string
+          email: string
+          grow_context: string | null
+          id: string
+          message: string
+          name: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          admin_notes?: string | null
+          attachment_path?: string | null
+          category: string
+          created_at?: string
+          email: string
+          grow_context?: string | null
+          id?: string
+          message: string
+          name: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          admin_notes?: string | null
+          attachment_path?: string | null
+          category?: string
+          created_at?: string
+          email?: string
+          grow_context?: string | null
+          id?: string
+          message?: string
+          name?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      customer_feedback: {
+        Row: {
+          admin_notes: string | null
+          ai_doctor_rating: number | null
+          contact_email: string | null
+          created_at: string
+          follow_up_ok: boolean
+          grow_context: string | null
+          id: string
+          one_improvement: string | null
+          overall_rating: number
+          quicklog_rating: number | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          sensors_rating: number | null
+          trust_rating: number | null
+          user_agent: string | null
+          user_id: string | null
+          whats_friction: string | null
+          whats_working: string | null
+        }
+        Insert: {
+          admin_notes?: string | null
+          ai_doctor_rating?: number | null
+          contact_email?: string | null
+          created_at?: string
+          follow_up_ok?: boolean
+          grow_context?: string | null
+          id?: string
+          one_improvement?: string | null
+          overall_rating: number
+          quicklog_rating?: number | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          sensors_rating?: number | null
+          trust_rating?: number | null
+          user_agent?: string | null
+          user_id?: string | null
+          whats_friction?: string | null
+          whats_working?: string | null
+        }
+        Update: {
+          admin_notes?: string | null
+          ai_doctor_rating?: number | null
+          contact_email?: string | null
+          created_at?: string
+          follow_up_ok?: boolean
+          grow_context?: string | null
+          id?: string
+          one_improvement?: string | null
+          overall_rating?: number
+          quicklog_rating?: number | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          sensors_rating?: number | null
+          trust_rating?: number | null
+          user_agent?: string | null
+          user_id?: string | null
+          whats_friction?: string | null
+          whats_working?: string | null
+        }
+        Relationships: []
+      }
       diary_entries: {
         Row: {
           created_at: string

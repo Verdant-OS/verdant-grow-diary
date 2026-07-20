@@ -9,9 +9,12 @@
  */
 import { isUuid } from "@/lib/isUuid";
 import {
+  buildRootZoneManualObservationCompanionIndex,
   buildRootZoneObservationFromGrowEvent,
   ROOT_ZONE_OBSERVATION_CAP,
   type RootZoneGrowEventRowLike,
+  type RootZoneManualObservationCompanionIndex,
+  type RootZoneManualObservationDiaryRowLike,
   type RootZoneObservationV1,
 } from "@/lib/rootZoneObservationRules";
 
@@ -38,8 +41,9 @@ function compareOperatorRootZoneRecords(
  */
 export function buildOperatorRootZoneRecordFromGrowEvent(
   row: RootZoneGrowEventRowLike,
+  companionIndex: RootZoneManualObservationCompanionIndex | null = null,
 ): OperatorRootZoneRecordV1 | null {
-  const observation = buildRootZoneObservationFromGrowEvent(row);
+  const observation = buildRootZoneObservationFromGrowEvent(row, companionIndex);
   if (!observation || !isUuid(row.id) || !isUuid(row.tent_id)) return null;
 
   const rawPlantId = row.plant_id;
@@ -63,14 +67,19 @@ export function buildOperatorRootZoneRecordFromGrowEvent(
 export function buildOperatorRootZoneRecordsFromRows(
   rows: readonly RootZoneGrowEventRowLike[] | null | undefined,
   cap: number = ROOT_ZONE_OBSERVATION_CAP,
+  manualObservationDiaryRows:
+    | readonly RootZoneManualObservationDiaryRowLike[]
+    | null
+    | undefined = [],
 ): OperatorRootZoneRecordV1[] {
   const boundedCap = Number.isFinite(cap)
     ? Math.max(0, Math.min(ROOT_ZONE_OBSERVATION_CAP, Math.floor(cap)))
     : ROOT_ZONE_OBSERVATION_CAP;
   if (boundedCap === 0) return [];
 
+  const companionIndex = buildRootZoneManualObservationCompanionIndex(manualObservationDiaryRows);
   const records = (rows ?? [])
-    .map(buildOperatorRootZoneRecordFromGrowEvent)
+    .map((row) => buildOperatorRootZoneRecordFromGrowEvent(row, companionIndex))
     .filter((record): record is OperatorRootZoneRecordV1 => record !== null)
     .sort(compareOperatorRootZoneRecords);
   const output: OperatorRootZoneRecordV1[] = [];

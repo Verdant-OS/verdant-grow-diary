@@ -29,6 +29,7 @@ import PlantDetailRecentActionResponse from "@/components/PlantDetailRecentActio
 import PlantDetailHarvestWatchCard from "@/components/PlantDetailHarvestWatchCard";
 import { usePlantGalleryPhotoCount } from "@/hooks/usePlantGalleryPhotoCount";
 import PlantDetailHarvestEvidenceReportMount from "@/components/PlantDetailHarvestEvidenceReportMount";
+import { isHarvestWatchEligible } from "@/lib/harvestWatchEligibilityRules";
 import PlantDetailWhatsMissing from "@/components/PlantDetailWhatsMissing";
 import PlantDetailAiDoctorReadiness from "@/components/PlantDetailAiDoctorReadiness";
 import PlantDetailDoctorContextPreview from "@/components/PlantDetailDoctorContextPreview";
@@ -352,6 +353,10 @@ export default function PlantDetail() {
   }
 
   const ageDays = Math.floor((Date.now() - new Date(plant.startedAt).getTime()) / 86400000);
+  const harvestWatchEligible = isHarvestWatchEligible({
+    stage: plant.stage,
+    isArchived: plant.isArchived,
+  });
   return (
     <div>
       <QuickLogV2Fab defaultTargetKey={`plant:${plant.id}`} />
@@ -423,9 +428,6 @@ export default function PlantDetail() {
           growId: plant.growId ?? null,
         }}
         testId="plant-detail-one-tent-loop-next-step-card"
-        onLocalAction={(action) => {
-          if (action === "open-quick-log") setQuickLogOpen(true);
-        }}
       />
       <div
         id={PLANT_PHOTOS_ANCHOR_ID}
@@ -475,12 +477,16 @@ export default function PlantDetail() {
         }}
       />
       <PlantDetailRecentActionResponse growId={plant.growId ?? null} plantId={plant.id} />
-      <PlantDetailHarvestWatchCard
-        plantId={plant.id}
-        hasPlantPhoto={!!plant.photo}
-        galleryPhotoCount={plantGalleryPhotoCount}
-      />
-      <PlantDetailHarvestEvidenceReportMount plantId={plant.id} />
+      {harvestWatchEligible && (
+        <>
+          <PlantDetailHarvestWatchCard
+            plantId={plant.id}
+            hasPlantPhoto={!!plant.photo}
+            galleryPhotoCount={plantGalleryPhotoCount}
+          />
+          <PlantDetailHarvestEvidenceReportMount plantId={plant.id} />
+        </>
+      )}
       <PlantDetailAiDoctorReadiness
         plantId={plant.id}
         growId={plant.growId ?? null}

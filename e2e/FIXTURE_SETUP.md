@@ -34,12 +34,12 @@ Follow the current in-app setup flow (no Grow page is surfaced):
 5. Name the plant exactly `E2E Test Plant`.
 6. Copy the plant detail URL — this becomes `E2E_GROW_1_PLANT_URL`.
 
-| Type  | Exact name        | Required |
-|-------|-------------------|----------|
-| Tent  | `E2E Test Tent`   | ✅ |
-| Plant | `E2E Test Plant`  | ✅ |
-| Plant | `505 Headbanger`  | optional (second plant smoke step) |
-| Grow  | `E2E Test Grow`   | optional / future — only if the UI ever visibly exposes a grow name or selector |
+| Type  | Exact name         | Required                                                                        |
+| ----- | ------------------ | ------------------------------------------------------------------------------- |
+| Tent  | `E2E Test Tent`    | ✅                                                                              |
+| Plant | `E2E Test Plant`   | ✅                                                                              |
+| Plant | `E2E Test Plant 2` | optional (second plant smoke step; same tent/grow)                              |
+| Grow  | `E2E Test Grow`    | optional / future — only if the UI ever visibly exposes a grow name or selector |
 
 Required names must match exactly. The fixture validator refuses to
 run smoke if the tent or plant names are missing or do not contain
@@ -70,7 +70,7 @@ Configure in `Settings → Secrets and variables → Actions`:
   UI visibly exposes a grow name or selector. The current setup flow
   has no Grow page, so this is **not** required and fixture
   verification will not fail when it is omitted.
-- `E2E_GROW_2_PLANT_NAME` (default `505 Headbanger`)
+- `E2E_GROW_1_SECOND_PLANT_NAME` (default `E2E Test Plant 2`; must be in the same grow/tent as the route plant)
 - `E2E_FIXTURE_EXPECTED_ACCOUNT_HINT` — a short safe label (e.g. `E2E`)
   used only if the app visibly exposes the signed-in account identity.
   **Must not** be a password or token.
@@ -102,13 +102,13 @@ Capture and store these reference screenshots locally for hand-off.
 **Redact** any email, account id, plant id, or other personally
 identifying value before sharing or committing.
 
-| Screenshot | Purpose |
-|------------|---------|
-| Account after login | confirm dedicated test account is signed in |
-| `E2E Test Tent` page | confirm tent name visible |
-| `E2E Test Plant` detail page | confirm plant name + E2E/Test markers |
-| `E2E Test Grow` page (optional) | only when the UI exposes a grow name |
-| GitHub Actions Variables page (values redacted) | confirm variables set |
+| Screenshot                                      | Purpose                                     |
+| ----------------------------------------------- | ------------------------------------------- |
+| Account after login                             | confirm dedicated test account is signed in |
+| `E2E Test Tent` page                            | confirm tent name visible                   |
+| `E2E Test Plant` detail page                    | confirm plant name + E2E/Test markers       |
+| `E2E Test Grow` page (optional)                 | only when the UI exposes a grow name        |
+| GitHub Actions Variables page (values redacted) | confirm variables set                       |
 
 Rules for committed screenshots:
 

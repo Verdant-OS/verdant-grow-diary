@@ -9,6 +9,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { resolve, join } from "node:path";
+import { readDesktopGrowerNavigationSource } from "@/test/utils/growerNavigationSource";
 
 const ROOT = resolve(__dirname, "../..");
 const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
@@ -17,7 +18,7 @@ const QUICKLOG = read("src/components/QuickLog.tsx");
 const ENV_PANEL = read("src/components/PlantTentEnvironmentPanel.tsx");
 const ALERTS_PANEL = read("src/components/PlantAssignedTentAlertsPanel.tsx");
 const ACTIONS_PANEL = read("src/components/PlantAssignedTentActionsPanel.tsx");
-const SIDEBAR = read("src/components/AppSidebar.tsx");
+const SIDEBAR = readDesktopGrowerNavigationSource();
 const GRM_PAGE = read("src/pages/GrowRoomMode.tsx");
 const STRIP = read("src/components/PlantStatusStrip.tsx");
 const PLANT_DETAIL = read("src/pages/PlantDetail.tsx");
@@ -60,8 +61,6 @@ describe("Copy renames are applied", () => {
     expect(GRM_PAGE).not.toMatch(/title=["']Live Dashboard["']/);
     expect(GRM_PAGE).not.toMatch(/title=["']Grow-Room Mode["']/);
   });
-
-
 });
 
 describe("Plant Detail status strip surfaces the four key signals", () => {
@@ -145,9 +144,7 @@ describe("Safety: copy pass introduces no risky surfaces", () => {
     const entries = existsSync(dir) ? readdirSync(dir) : [];
     expect(
       entries.every(
-        (f) =>
-          !f.includes("plant-detail-copy-pass") &&
-          !f.includes("mobile-copy-pass"),
+        (f) => !f.includes("plant-detail-copy-pass") && !f.includes("mobile-copy-pass"),
       ),
     ).toBe(true);
     // Reference `join` to satisfy lint without polluting assertions.

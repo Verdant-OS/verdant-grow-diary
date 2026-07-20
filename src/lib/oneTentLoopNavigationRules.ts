@@ -9,6 +9,10 @@
  */
 
 import { buildSensorsTentRouteHref } from "@/lib/sensorRouteTentIntentRules";
+import {
+  buildPlantQuickLogPrefill,
+  type PlantQuickLogPrefill,
+} from "@/lib/plantQuickLogPrefillRules";
 
 export type OneTentLoopStep =
   | "grow"
@@ -96,16 +100,14 @@ export interface OneTentLoopIds {
   actionId?: string | null;
 }
 
-export type OneTentLoopLocalAction = "open-quick-log";
-
 export interface OneTentLoopNextStep {
   current: OneTentLoopStep;
   next: OneTentLoopStep | null;
   ctaLabel: string;
-  /** Internal route. Never rendered as visible copy. Null for local actions. */
+  intent: "navigate" | "open_quick_log";
+  /** Internal route. Never rendered as visible copy. */
   href: string | null;
-  /** Presenter-owned action that stays on the current route. */
-  localAction: OneTentLoopLocalAction | null;
+  quickLogPrefill: PlantQuickLogPrefill | null;
   disabled: boolean;
   disabledReason: string | null;
 }
@@ -119,8 +121,8 @@ export function getNextLoopStep(current: OneTentLoopStep): OneTentLoopStep | nul
 /**
  * Resolve the next safe CTA for a given loop step + available ids.
  * Returns a disabled state with calm copy when required ids are absent.
- * Navigation steps return internal href strings; local steps return a typed
- * action for the presenter. Callers must not surface internal IDs as copy.
+ * Routes are returned as internal href strings only; callers must not
+ * surface internal IDs as visible copy.
  */
 export function resolveOneTentLoopNextStep(
   current: OneTentLoopStep,
@@ -131,8 +133,9 @@ export function resolveOneTentLoopNextStep(
     current,
     next,
     ctaLabel: ONE_TENT_LOOP_CTA_LABEL[current],
+    intent: current === "plant" ? "open_quick_log" : "navigate",
     href: null,
-    localAction: null,
+    quickLogPrefill: null,
     disabled: true,
     disabledReason: ONE_TENT_LOOP_DISABLED_COPY,
   };
@@ -151,9 +154,14 @@ export function resolveOneTentLoopNextStep(
       if (tentId) return enable(base, `/tents/${tentId}`);
       return base;
     case "plant":
-      // Plant Detail already owns the selected plant. The next step is the
-      // existing Quick Log sheet, not a self-link back to the same route.
-      if (plantId) return enableLocalAction(base, "open-quick-log");
+      {
+        const quickLogPrefill = buildPlantQuickLogPrefill({
+          plantId,
+          growId,
+          tentId,
+        });
+        if (quickLogPrefill) return enableQuickLog(base, quickLogPrefill);
+      }
       return base;
     case "quick-log":
       return enable(base, "/timeline");
@@ -187,14 +195,28 @@ export function resolveOneTentLoopNextStep(
 }
 
 function enable(base: OneTentLoopNextStep, href: string): OneTentLoopNextStep {
-  return { ...base, href, localAction: null, disabled: false, disabledReason: null };
+  return {
+    ...base,
+    intent: "navigate",
+    href,
+    quickLogPrefill: null,
+    disabled: false,
+    disabledReason: null,
+  };
 }
 
-function enableLocalAction(
+function enableQuickLog(
   base: OneTentLoopNextStep,
-  localAction: OneTentLoopLocalAction,
+  quickLogPrefill: PlantQuickLogPrefill,
 ): OneTentLoopNextStep {
-  return { ...base, href: null, localAction, disabled: false, disabledReason: null };
+  return {
+    ...base,
+    intent: "open_quick_log",
+    href: null,
+    quickLogPrefill,
+    disabled: false,
+    disabledReason: null,
+  };
 }
 
 /** Empty-state copy keyed by loop step. */

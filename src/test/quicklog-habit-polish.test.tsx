@@ -70,6 +70,12 @@ vi.mock("@/hooks/use-plants", () => ({
   }),
 }));
 
+vi.mock("@/hooks/use-tents", () => ({
+  useTents: () => ({
+    data: [{ id: "tent-1", name: "Test Tent", grow_id: "grow-1" }],
+  }),
+}));
+
 vi.mock("sonner", () => ({
   toast: { error: vi.fn(), success: vi.fn(), message: vi.fn() },
 }));
@@ -154,7 +160,13 @@ describe("QuickLog habit-capture polish — presentation", () => {
   });
 
   it("saves the canonical response line through the existing RPC payload", async () => {
-    renderWithClient(<QuickLog open={true} onOpenChange={vi.fn()} />);
+    renderWithClient(
+      <QuickLog
+        open={true}
+        onOpenChange={vi.fn()}
+        prefill={{ plantId: "plant-1", tentId: "tent-1", growId: "grow-1" }}
+      />,
+    );
 
     fireEvent.click(screen.getByTestId("quick-log-chip-better"));
     fireEvent.click(screen.getByTestId("quick-log-chip-watered"));
@@ -162,6 +174,8 @@ describe("QuickLog habit-capture polish — presentation", () => {
 
     await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
     expect(saveMock.mock.calls[0][0]).toMatchObject({
+      p_target_type: "plant",
+      p_target_id: "plant-1",
       p_note: "Response check: Better.\nWatered today.",
     });
   });

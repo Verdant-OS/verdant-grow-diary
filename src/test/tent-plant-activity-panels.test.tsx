@@ -9,8 +9,8 @@ function wrap(ui: React.ReactElement) {
 }
 
 const PLANTS = [
-  { id: "p1", name: "Blue Dream", strain: "Hybrid", stage: "veg", isArchived: false },
-  { id: "p2", name: "Plant B", isArchived: false },
+  { id: "p1", name: "Blue Dream", strain: "Hybrid", stage: "flower", isArchived: false },
+  { id: "p2", name: "Plant B", stage: "flower", isArchived: false },
 ];
 const ACTIVITY = {
   p1: {
@@ -44,7 +44,7 @@ describe("TentPlantActivityPanels", () => {
     wrap(<TentPlantActivityPanels viewModel={vm()} />);
     expect(screen.getByTestId("tent-plant-activity-panel-p1-name")).toHaveTextContent("Blue Dream");
     expect(screen.getByTestId("tent-plant-activity-panel-p1-strain")).toHaveTextContent("Hybrid");
-    expect(screen.getByTestId("tent-plant-activity-panel-p1-stage")).toHaveTextContent("veg");
+    expect(screen.getByTestId("tent-plant-activity-panel-p1-stage")).toHaveTextContent("flower");
     expect(screen.getByTestId("tent-plant-activity-panel-p2-name")).toHaveTextContent("Plant B");
   });
 
@@ -75,6 +75,31 @@ describe("TentPlantActivityPanels", () => {
     expect(screen.getByTestId("tent-plant-activity-panel-p2-harvest-watch")).toHaveTextContent(
       "Harvest Watch available on Plant Detail.",
     );
+  });
+
+  it("hides Harvest Watch and harvest evidence notes for an ineligible stage", () => {
+    wrap(
+      <TentPlantActivityPanels
+        viewModel={vm({
+          plants: [
+            {
+              id: "p1",
+              name: "Blue Dream",
+              strain: "Hybrid",
+              stage: "veg",
+              isArchived: false,
+            },
+          ],
+        })}
+      />,
+    );
+
+    expect(
+      screen.queryByTestId("tent-plant-activity-panel-p1-harvest-watch"),
+    ).toBeNull();
+    expect(
+      screen.queryByTestId("tent-plant-activity-panel-p1-evidence-notes"),
+    ).toBeNull();
   });
 
   it("Add Quick Log CTA dispatches verdant:open-quicklog with the prefill", () => {

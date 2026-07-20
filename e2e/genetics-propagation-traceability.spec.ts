@@ -115,6 +115,17 @@ async function mockSupabase(page: Page) {
   );
   await page.route(/\/rest\/v1\//, async (route, request) => {
     const pathname = new URL(request.url()).pathname;
+    // Playwright runs matching routes in REVERSE registration order, so this
+    // broad /rest/v1/ route is consulted before the more specific
+    // genetics_trace_resolve mock registered above it. Table reads are answered
+    // here; RPC calls must fall back to their dedicated handler. Without this
+    // guard the RPC gets this route's empty table read ([]), buildTraceView
+    // collapses to its empty view, and the semantic role="tree" this proof
+    // asserts never renders.
+    if (pathname.includes("/rpc/")) {
+      await route.fallback();
+      return;
+    }
     const rows = pathname.endsWith("/rest/v1/genetics_accessions")
       ? [ACCESSION]
       : pathname.endsWith("/rest/v1/propagation_batches")

@@ -501,17 +501,38 @@ function ToolCard({
                 )}
               </div>
               {onApplyArgs && changed.length > 0 && state.args ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => onApplyArgs(state.args!)}
-                  data-testid={`tool-explorer-apply-changes-${toolName}`}
-                  aria-label="Apply changed values to the form for retry"
-                >
-                  Apply changes to form
-                </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      onApplyArgs(state.args!);
+                      setJustApplied(true);
+                    }}
+                    data-testid={`tool-explorer-apply-changes-${toolName}`}
+                    aria-label="Apply changed values to the form for retry"
+                  >
+                    Apply changes to form
+                  </Button>
+                  {justApplied ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={requestRetry}
+                      disabled={state.loading || invalid || !connected || retryPending}
+                      aria-haspopup={confirmBeforeRetry ? "dialog" : undefined}
+                      aria-expanded={retryPending || undefined}
+                      data-testid={`tool-explorer-retry-now-${toolName}`}
+                      aria-label="Retry now with the applied values"
+                    >
+                      <RotateCcw className="mr-2 h-4 w-4" aria-hidden />
+                      Retry now
+                    </Button>
+                  ) : null}
+                </div>
               ) : null}
+
             </div>
 
             {entries.length > 0 ? (

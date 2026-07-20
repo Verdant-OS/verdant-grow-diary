@@ -14,6 +14,7 @@ import {
   isTentUpdatePayloadValid,
   evaluateTentDeleteGuard,
   buildArchiveTentPayload,
+  resolveVerifiedAssignedPlantCount,
 } from "@/lib/tentManagementRules";
 import {
   buildPlantMergePreview,
@@ -105,6 +106,40 @@ describe("tentManagementRules · evaluateTentDeleteGuard", () => {
     expect(g.canArchive).toBe(true);
     expect(g.recommendedAction).toBe("archive");
   });
+  it("fails delete and archive closed when plant assignments are unknown", () => {
+    const g = evaluateTentDeleteGuard({ tentId: "t1", assignedPlantCount: null });
+    expect(g.canDelete).toBe(false);
+    expect(g.canArchive).toBe(false);
+    expect(g.reason).toMatch(/plant assignments unavailable/i);
+    expect(g.recommendedAction).toBe("retry_plant_count");
+  });
+});
+
+describe("tentManagementRules · resolveVerifiedAssignedPlantCount", () => {
+  const archivedPlant = { id: "archived", tentId: "t1", isArchived: true };
+
+  it.each([
+    ["pending", { data: undefined, isPending: true }],
+    ["loading", { data: undefined, isLoading: true }],
+    ["error", { data: undefined, isError: true }],
+    ["placeholder", { data: [archivedPlant], isPlaceholderData: true }],
+    ["background refresh", { data: [archivedPlant], isFetching: true }],
+  ])("fails closed while the include-archived query is %s", (_label, query) => {
+    expect(resolveVerifiedAssignedPlantCount(query)).toBeNull();
+  });
+
+  it("counts archived assignments when the guard query is fully current", () => {
+    expect(resolveVerifiedAssignedPlantCount({ data: [archivedPlant] })).toBe(1);
+  });
+
+  it("filters a grow-wide verified assignment query by tent", () => {
+    expect(
+      resolveVerifiedAssignedPlantCount(
+        { data: [archivedPlant, { id: "other", tentId: "t2", isArchived: false }] },
+        (plant) => plant.tentId === "t1",
+      ),
+    ).toBe(1);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -138,10 +173,7 @@ describe("plantMergeRules · detectPotentialDuplicatePlants", () => {
     expect(groups[0].map((p) => p.id).sort()).toEqual(["a", "b"]);
   });
   it("ignores archived plants", () => {
-    const groups = detectPotentialDuplicatePlants([
-      A,
-      { ...B, is_archived: true },
-    ]);
+    const groups = detectPotentialDuplicatePlants([A, { ...B, is_archived: true }]);
     expect(groups.length).toBe(0);
   });
 });
@@ -188,20 +220,15 @@ describe("plantMergeRules · buildPlantMergeUpdatePlan", () => {
     expect(plan.executable).toBe(true);
     expect(plan.rpcName).toBe("merge_duplicate_plant");
     expect(plan.steps.every((s) => s.enabled && s.via === "rpc")).toBe(true);
-    expect(plan.steps.map((s) => s.table).sort()).toEqual([
-      "action_queue",
-      "diary_entries",
-      "grow_events",
-      "alerts",
-    ].sort());
+    expect(plan.steps.map((s) => s.table).sort()).toEqual(
+      ["action_queue", "diary_entries", "grow_events", "alerts"].sort(),
+    );
   });
 });
 
 describe("plantMergeRules · summarizePlantMergePlan", () => {
   it("reports server-side transaction summary when source has history", () => {
-    const out = summarizePlantMergePlan(
-      buildPlantMergePreview(A, B, { diaryEntries: 5 }),
-    );
+    const out = summarizePlantMergePlan(buildPlantMergePreview(A, B, { diaryEntries: 5 }));
     expect(out).toMatch(/single server-side transaction/i);
     expect(out).toMatch(/Sensor readings/i);
   });
@@ -222,6 +249,9 @@ describe("Edit Tent UI wiring", () => {
   it("Tent Detail exposes Edit Tent action row", () => {
     expect(TENT_DETAIL).toContain("TentCardActionsMenu");
     expect(TENT_DETAIL).toContain('variant="row"');
+    expect(TENT_DETAIL).toMatch(/includeArchived:\s*true/);
+    expect(TENT_DETAIL).toContain("resolveVerifiedAssignedPlantCount");
+    expect(TENT_DETAIL).toContain("assignedPlantCount={assignedPlantCount}");
   });
   it("EditTentDialog edits supported fields only", () => {
     expect(EDIT_TENT).toContain("edit-tent-name");
@@ -231,6 +261,10 @@ describe("Edit Tent UI wiring", () => {
   });
   it("Tent actions menu disables delete when guard blocks", () => {
     expect(TENT_ACTIONS).toMatch(/disabled=\{!guard\.canDelete\}/);
+  });
+  it("Tent actions menu disables archive and checks the guard before writing", () => {
+    expect(TENT_ACTIONS).toMatch(/disabled=\{!guard\.canArchive\}/);
+    expect(TENT_ACTIONS).toMatch(/async function archiveTent\(\)[\s\S]*?if \(!guard\.canArchive\)/);
   });
   it("Tent actions only update is_archived for archive (no hard delete of plants/logs)", () => {
     expect(TENT_RULES).toContain("is_archived: true");
@@ -301,20 +335,15 @@ describe("Mixed data label copy", () => {
 // ---------------------------------------------------------------------------
 
 describe("Global safety (static)", () => {
-  const FILES = [
-    EDIT_TENT,
-    TENT_ACTIONS,
-    MERGE_DIALOG,
-    MERGE_RULES,
-    TENT_RULES,
-    PLANT_PHOTO,
-  ];
+  const FILES = [EDIT_TENT, TENT_ACTIONS, MERGE_DIALOG, MERGE_RULES, TENT_RULES, PLANT_PHOTO];
   it("no service_role usage", () => {
     for (const f of FILES) expect(f).not.toMatch(/service_role/);
   });
   it("no pi-ingest / edge-function / alert / action_queue / sensor_readings writes", () => {
     for (const f of FILES) {
-      expect(f).not.toMatch(/from\(["']pi_ingest|supabase\/functions\/pi-ingest|functions\.invoke\(["']pi-ingest/);
+      expect(f).not.toMatch(
+        /from\(["']pi_ingest|supabase\/functions\/pi-ingest|functions\.invoke\(["']pi-ingest/,
+      );
       expect(f).not.toMatch(/from\("alerts"\)\.(insert|update|delete)/);
       expect(f).not.toMatch(/from\("action_queue"\)\.(insert|update|delete)/);
       expect(f).not.toMatch(/from\("sensor_readings"\)\.(insert|update|delete)/);

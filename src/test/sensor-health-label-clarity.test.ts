@@ -23,11 +23,10 @@ const FORBIDDEN_SIDE_EFFECT_TOKENS = [
 ];
 
 describe("sensor health label clarity", () => {
-  it("tents page scopes the card health chip to plant health", () => {
-    expect(TENTS).toMatch(/Plant health:/);
-    expect(TENTS).toMatch(/Plant health status:/);
-    expect(TENTS).toMatch(/Sensor status is shown separately/);
-    expect(TENTS).toMatch(/Plant health only — sensor status is shown separately/);
+  it("tents page does not claim plant health from a fabricated zero-alert adapter value", () => {
+    expect(TENTS).toMatch(/Plant health not assessed/);
+    expect(TENTS).not.toMatch(/deriveTentHealthChip/);
+    expect(TENTS).not.toMatch(/Plant health: \{plantHealthCopy\}/);
   });
 
   it("plants page scopes the card health chip to plant health", () => {
@@ -43,10 +42,9 @@ describe("sensor health label clarity", () => {
     expect(PLANTS).toMatch(/formatPlantHealthAriaLabel\(p\.health\)/);
   });
 
-  it("tents page strips the legacy decorative dot before rendering scoped copy", () => {
-    expect(TENTS).toMatch(/formatTentPlantHealthCopy/);
-    expect(TENTS).toMatch(/replace\(\/\^●\\s\*\//);
-    expect(TENTS).toMatch(/Plant health: \{plantHealthCopy\}/);
+  it("tents page keeps sensor and plant assessment truth separate", () => {
+    expect(TENTS).toMatch(/Sensor status is shown separately/);
+    expect(TENTS).toMatch(/No alert assessment is loaded for this card/);
   });
 
   it("does not weaken sensor truth labels or introduce unsafe side effects", () => {

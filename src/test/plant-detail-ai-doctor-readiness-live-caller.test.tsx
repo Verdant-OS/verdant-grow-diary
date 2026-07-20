@@ -18,7 +18,7 @@ const useRecentMock = vi.fn();
 const useBridgeMock = vi.fn();
 const currentSensorState = vi.hoisted(() => ({
   rows: [] as unknown[],
-  status: "success" as "loading" | "error" | "success",
+  status: "success" as "loading" | "error" | "refresh_error" | "success",
 }));
 
 vi.mock("@/hooks/usePlantRecentActivity", () => ({
@@ -32,10 +32,13 @@ vi.mock("@/hooks/use-sensor-readings", () => ({
     const byTent: Record<string, unknown[]> = {};
     const statusByTent: Record<string, string> = {};
     for (const id of tentIds) {
-      byTent[id] = currentSensorState.status === "success" ? currentSensorState.rows : [];
+      byTent[id] =
+        currentSensorState.status === "success" || currentSensorState.status === "refresh_error"
+          ? currentSensorState.rows
+          : [];
       statusByTent[id] = currentSensorState.status;
     }
-    return { byTent, statusByTent };
+    return { byTent, statusByTent, refetch: vi.fn() };
   },
 }));
 
@@ -248,6 +251,19 @@ describe("PlantDetailAiDoctorReadiness — live caller × real intake classifica
         screen.queryByTestId("plant-detail-ai-doctor-readiness-missing-no_sensor_snapshot"),
       ).toBeNull();
     });
+  });
+
+  it("never treats cached rows as current evidence after their refresh fails", () => {
+    currentSensorState.rows = [physicalLiveRow()];
+    currentSensorState.status = "refresh_error";
+    setBridge("usable", "fresh_accept");
+    renderCard();
+
+    expect(screen.getByTestId("plant-detail-ai-doctor-readiness-sensor-error")).toHaveTextContent(
+      "Current sensor evidence unavailable",
+    );
+    expect(screen.queryByTestId("plant-detail-ai-doctor-readiness-badge")).toBeNull();
+    expect(screen.queryByTestId("plant-detail-ai-doctor-sensor-evidence-panel")).toBeNull();
   });
 
   describe("non-usable statuses do NOT clear the missing bullet", () => {

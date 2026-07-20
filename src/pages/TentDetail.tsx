@@ -41,6 +41,7 @@ import { useSensorReadings } from "@/hooks/use-sensor-readings";
 import { useImportedSensorHistory } from "@/hooks/useImportedSensorHistory";
 import { useGrowTent, useGrowPlants, getGrowDataMeta } from "@/hooks/useGrowData";
 import { buildTentSensorChartSeries, buildTentSensorHeaderView } from "@/lib/tentSensorChartRules";
+import { resolveVerifiedAssignedPlantCount } from "@/lib/tentManagementRules";
 import {
   convertCelsiusForDisplay,
   getTemperatureUnitSymbol,
@@ -89,6 +90,8 @@ import {
 import { plantDetailPath, tentsPath } from "@/lib/routes";
 import StartPhenoHuntButton from "@/components/StartPhenoHuntButton";
 
+const EMPTY_TENT_PLANTS: never[] = [];
+
 export default function TentDetail() {
   const { id } = useParams();
   const { user } = useAuth();
@@ -129,7 +132,8 @@ export default function TentDetail() {
     isFetching: activePlantsIsFetching,
     isError: activePlantsIsError,
   } = useGrowPlants(id);
-  const { data: allPlants = [] } = useGrowPlants(id, undefined, { includeArchived: true });
+  const allPlantsQuery = useGrowPlants(id, undefined, { includeArchived: true });
+  const allPlants = allPlantsQuery.data ?? EMPTY_TENT_PLANTS;
   const { data: readings = [] } = useSensorReadings(id);
   const importedHistory = useImportedSensorHistory(id);
   const series = buildTentSensorChartSeries(readings);
@@ -137,6 +141,9 @@ export default function TentDetail() {
   const snap = header.snapshot;
   const tentMeta = getGrowDataMeta(["grow", "tent", id ?? null], user?.id);
   const activeCount = getActivePlantCount(activePlants);
+  // Archive/delete authorization counts all soft-linked plants, including
+  // archived/merged history, and fails closed during every non-current state.
+  const assignedPlantCount = resolveVerifiedAssignedPlantCount(allPlantsQuery);
   const hasArchived = shouldShowArchivedToggle(allPlants);
   const visiblePlants = filterVisiblePlants(allPlants, { showArchived });
   const rosterActivity = useTentPlantRosterActivity(allPlants);
@@ -279,7 +286,8 @@ export default function TentDetail() {
             stage: tent.stage,
             light: tent.light,
           }}
-          assignedPlantCount={activeCount}
+          assignedPlantCount={assignedPlantCount}
+          onRetryAssignments={() => void allPlantsQuery.refetch()}
           variant="row"
           hideView
         />

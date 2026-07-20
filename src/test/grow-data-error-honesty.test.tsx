@@ -59,6 +59,18 @@ describe("private grow-data error honesty", () => {
     expect(emptyIndex).toBeGreaterThan(errorIndex);
   });
 
+  it("puts the classified Tents primary-query failure before its empty workspace", () => {
+    const source = readSource("src/pages/Tents.tsx");
+    const errorIndex = source.indexOf("tents-grow-data-error");
+    const emptyIndex = source.indexOf("No tents yet");
+
+    expect(source).toContain("classifyTentsPageAsyncState");
+    expect(source).toContain('tentsAsyncState.kind === "error"');
+    expect(source).toContain("tentsQuery.refetch()");
+    expect(errorIndex).toBeGreaterThan(-1);
+    expect(emptyIndex).toBeGreaterThan(errorIndex);
+  });
+
   it("keeps the Sensors grow read scoped to the synchronously validated tent", () => {
     const source = readSource("src/pages/Sensors.tsx");
     expect(source).toMatch(/useGrowSensorReadings\(activeTentId\)/);

@@ -66,15 +66,48 @@ export function isTentUpdatePayloadValid(p: TentUpdatePayload): boolean {
 
 export interface TentDeleteGuardInput {
   tentId: string;
-  assignedPlantCount: number;
+  /** Null means the assignment query has not produced trustworthy current data. */
+  assignedPlantCount: number | null;
   archiveSupported?: boolean;
+}
+
+export interface PlantAssignmentQueryLike<T> {
+  data?: readonly T[] | null;
+  isLoading?: boolean;
+  isPending?: boolean;
+  isFetching?: boolean;
+  isError?: boolean;
+  isPlaceholderData?: boolean;
+}
+
+/**
+ * Resolve the count used by destructive Tent guards only from fully current,
+ * include-archived assignment data. A cached value being refreshed is useful
+ * for display but cannot authorize archive/delete.
+ */
+export function resolveVerifiedAssignedPlantCount<T>(
+  query: PlantAssignmentQueryLike<T>,
+  isAssigned: (row: T) => boolean = () => true,
+): number | null {
+  if (
+    !Array.isArray(query.data) ||
+    query.isLoading === true ||
+    query.isPending === true ||
+    query.isFetching === true ||
+    query.isError === true ||
+    query.isPlaceholderData === true
+  ) {
+    return null;
+  }
+
+  return query.data.filter(isAssigned).length;
 }
 
 export interface TentDeleteGuard {
   canDelete: boolean;
   canArchive: boolean;
   reason: string | null;
-  recommendedAction: "delete" | "archive" | "move_plants_first";
+  recommendedAction: "delete" | "archive" | "move_plants_first" | "retry_plant_count";
 }
 
 /**
@@ -83,6 +116,18 @@ export interface TentDeleteGuard {
  */
 export function evaluateTentDeleteGuard(input: TentDeleteGuardInput): TentDeleteGuard {
   const archiveSupported = input.archiveSupported !== false;
+  if (
+    input.assignedPlantCount === null ||
+    !Number.isInteger(input.assignedPlantCount) ||
+    input.assignedPlantCount < 0
+  ) {
+    return {
+      canDelete: false,
+      canArchive: false,
+      reason: "Plant assignments unavailable. Retry before deleting or archiving this tent.",
+      recommendedAction: "retry_plant_count",
+    };
+  }
   if (input.assignedPlantCount > 0) {
     return {
       canDelete: false,

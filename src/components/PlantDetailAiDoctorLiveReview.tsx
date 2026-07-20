@@ -224,14 +224,24 @@ function PlantDetailAiDoctorLiveReviewScope({
       AI_DOCTOR_CURRENT_SENSOR_ROW_CAP,
       AI_DOCTOR_CURRENT_SENSOR_SOURCES,
     );
-  const currentSensorRows = tentId
-    ? (currentReadingsByTent[tentId] ?? NO_TENT_SENSOR_ROWS)
-    : NO_TENT_SENSOR_ROWS;
+  // Current-sensor status drives both the start-gate hold and the fail-closed
+  // guard below, derived once so "pending" and "failed" share one source of
+  // truth. Non-UUID tents can't have live rows, so their read is "success".
+  const currentSensorStatus = isUuid(tentId)
+    ? (currentSensorStatusByTent[tentId] ?? "loading")
+    : "success";
+  // Fail closed: a failed initial or refresh current-sensor read must not
+  // present TanStack's retained cached rows to the model as current evidence.
+  const currentSensorFailed =
+    currentSensorStatus === "error" || currentSensorStatus === "refresh_error";
+  const currentSensorRows =
+    tentId && !currentSensorFailed
+      ? (currentReadingsByTent[tentId] ?? NO_TENT_SENSOR_ROWS)
+      : NO_TENT_SENSOR_ROWS;
   // Hold the start gate while current truth is loading or imported-history
   // evidence is unresolved. A failed history read now requires an explicit
   // grower choice before omission can reach a paid AI request.
-  const currentSensorPending =
-    isUuid(tentId) && (currentSensorStatusByTent[tentId] ?? "loading") === "loading";
+  const currentSensorPending = currentSensorStatus === "loading";
   const sensorContextBlocked =
     currentSensorPending || queryHistoryRecovery.blocksReview || queryRootZoneRecovery.blocksReview;
 

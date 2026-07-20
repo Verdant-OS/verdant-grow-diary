@@ -41,7 +41,7 @@ export function useSensorReadings(
 }
 
 /** Per-tent fetch outcome so consumers can tell "no rows" from "not loaded". */
-export type TentSensorReadStatus = "loading" | "error" | "success";
+export type TentSensorReadStatus = "loading" | "error" | "refresh_error" | "success";
 
 /**
  * Per-tent sensor reading fetch. Each tent gets its own `limit`-bounded
@@ -68,6 +68,8 @@ export function useSensorReadingsByTents(
   isLoading: boolean;
   isError: boolean;
   refetch: () => Promise<void>;
+  /** Re-fetch exactly one tent window; unknown ids are a safe no-op. */
+  retryTent: (tentId: string) => Promise<void>;
 } {
   const { user } = useAuth();
   // Stable, de-duplicated id list so query order is deterministic and the
@@ -105,11 +107,14 @@ export function useSensorReadingsByTents(
   const byTent: Record<string, SensorReadingRow[]> = {};
   const statusByTent: Record<string, TentSensorReadStatus> = {};
   ids.forEach((id, i) => {
-    byTent[id] = (results[i]?.data as SensorReadingRow[] | undefined) ?? [];
-    statusByTent[id] = results[i]?.isLoading
+    const result = results[i];
+    byTent[id] = (result?.data as SensorReadingRow[] | undefined) ?? [];
+    statusByTent[id] = result?.isLoading
       ? "loading"
-      : results[i]?.isError
-        ? "error"
+      : result?.isError
+        ? result.data !== undefined
+          ? "refresh_error"
+          : "error"
         : "success";
   });
   return {
@@ -119,6 +124,12 @@ export function useSensorReadingsByTents(
     isError: results.some((r) => r.isError),
     refetch: async () => {
       await Promise.all(results.map((result) => result.refetch()));
+    },
+    retryTent: async (tentId: string) => {
+      const index = ids.indexOf(tentId);
+      const result = index >= 0 ? results[index] : undefined;
+      if (!result) return;
+      await result.refetch();
     },
   };
 }

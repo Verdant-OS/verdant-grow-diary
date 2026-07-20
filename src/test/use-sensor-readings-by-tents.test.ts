@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createElement, type ReactNode } from "react";
 
@@ -67,12 +67,19 @@ const FIXTURES: Record<string, Array<Record<string, unknown>>> = {
   ],
 };
 
+const REQUESTED_TENT_IDS = vi.hoisted(() => [] as string[]);
+const FAILED_TENT_IDS = vi.hoisted(() => new Set<string>());
+
 vi.mock("@/integrations/supabase/client", () => {
   const builder = (tentId: string | null, sourceFilter: ReadonlySet<string> | null = null) => {
     const b: Record<string, unknown> = {};
     b.select = () => b;
     b.order = () => b;
     b.limit = (limit: number) => {
+      if (tentId) REQUESTED_TENT_IDS.push(tentId);
+      if (tentId && FAILED_TENT_IDS.has(tentId)) {
+        return Promise.resolve({ data: null, error: new Error("fixture refresh failure") });
+      }
       const tentRows = tentId ? (FIXTURES[tentId] ?? []) : [];
       const scopedRows = sourceFilter
         ? tentRows.filter((row) => sourceFilter.has(String(row.source ?? "")))
@@ -101,6 +108,8 @@ function wrapper({ children }: { children: ReactNode }) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  REQUESTED_TENT_IDS.length = 0;
+  FAILED_TENT_IDS.clear();
 });
 
 describe("useSensorReadingsByTents", () => {
@@ -141,6 +150,37 @@ describe("useSensorReadingsByTents", () => {
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.statusByTent["tent-c"]).toBe("success");
     expect(result.current.byTent["tent-c"]).toEqual([]);
+  });
+
+  it("retries exactly the requested tent window and ignores unknown ids", async () => {
+    const { result } = renderHook(() => useSensorReadingsByTents(["tent-a", "tent-b"]), {
+      wrapper,
+    });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(REQUESTED_TENT_IDS.filter((id) => id === "tent-a")).toHaveLength(1);
+    expect(REQUESTED_TENT_IDS.filter((id) => id === "tent-b")).toHaveLength(1);
+
+    await act(async () => {
+      await result.current.retryTent("tent-b");
+      await result.current.retryTent("not-requested");
+    });
+
+    expect(REQUESTED_TENT_IDS.filter((id) => id === "tent-a")).toHaveLength(1);
+    expect(REQUESTED_TENT_IDS.filter((id) => id === "tent-b")).toHaveLength(2);
+  });
+
+  it("retains cached rows and distinguishes a failed refresh from an uncached error", async () => {
+    const { result } = renderHook(() => useSensorReadingsByTents(["tent-a"]), { wrapper });
+    await waitFor(() => expect(result.current.statusByTent["tent-a"]).toBe("success"));
+    expect(result.current.byTent["tent-a"].map((row) => row.id)).toEqual(["ra1", "ra2"]);
+
+    FAILED_TENT_IDS.add("tent-a");
+    await act(async () => {
+      await result.current.retryTent("tent-a");
+    });
+
+    await waitFor(() => expect(result.current.statusByTent["tent-a"]).toBe("refresh_error"));
+    expect(result.current.byTent["tent-a"].map((row) => row.id)).toEqual(["ra1", "ra2"]);
   });
 
   it("filters CSV sources before the cap so newer live rows cannot starve imported history", async () => {

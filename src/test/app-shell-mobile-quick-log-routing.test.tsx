@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Link, MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 
@@ -47,10 +47,12 @@ vi.mock("@/components/QuickLogV2Sheet", () => ({
     open,
     defaultTargetKey,
     defaultAction,
+    onOpenChange,
   }: {
     open: boolean;
     defaultTargetKey: string | null;
     defaultAction?: string;
+    onOpenChange: (open: boolean) => void;
   }) =>
     open ? (
       <div
@@ -59,6 +61,13 @@ vi.mock("@/components/QuickLogV2Sheet", () => ({
         data-action={defaultAction ?? "note"}
       >
         Scoped Quick Log
+        <button
+          type="button"
+          data-testid="close-scoped-quick-log"
+          onClick={() => onOpenChange(false)}
+        >
+          Close scoped Quick Log
+        </button>
       </div>
     ) : null,
 }));
@@ -96,17 +105,23 @@ function renderAt(pathname: string) {
   );
 }
 
+function dispatchRuntimeEvent(event: Event) {
+  act(() => {
+    window.dispatchEvent(event);
+  });
+}
+
 describe("AppShell mobile Quick Log routing", () => {
   it("closes legacy Quick Log before opening one global V2 sheet for a valid typed Water intent", async () => {
     renderAt("/settings");
-    window.dispatchEvent(
+    dispatchRuntimeEvent(
       new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, {
         detail: { plantId: "legacy-plant", eventType: "observation" },
       }),
     );
     expect(await screen.findByTestId("legacy-quick-log")).toBeInTheDocument();
 
-    window.dispatchEvent(
+    dispatchRuntimeEvent(
       new CustomEvent(QUICK_LOG_V2_OPEN_EVENT, {
         detail: { targetKey: "plant:plant-1", action: "water" },
       }),
@@ -122,12 +137,36 @@ describe("AppShell mobile Quick Log routing", () => {
 
   it("ignores invalid typed detail and does not open V2", () => {
     renderAt("/settings");
-    window.dispatchEvent(
+    dispatchRuntimeEvent(
       new CustomEvent(QUICK_LOG_V2_OPEN_EVENT, {
         detail: { targetKey: "plant:", action: "water" },
       }),
     );
     expect(screen.queryByTestId("scoped-quick-log")).not.toBeInTheDocument();
+  });
+
+  it("clears a closed typed target before reopening from the route-scoped mobile FAB", () => {
+    renderAt(`/tents/${TENT_ID}`);
+    dispatchRuntimeEvent(
+      new CustomEvent(QUICK_LOG_V2_OPEN_EVENT, {
+        detail: { targetKey: "plant:typed-plant", action: "water" },
+      }),
+    );
+    expect(screen.getByTestId("scoped-quick-log")).toHaveAttribute(
+      "data-target-key",
+      "plant:typed-plant",
+    );
+    expect(screen.getByTestId("scoped-quick-log")).toHaveAttribute("data-action", "water");
+
+    fireEvent.click(screen.getByTestId("close-scoped-quick-log"));
+    expect(screen.queryByTestId("scoped-quick-log")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("mobile-quick-log-fab"));
+
+    expect(screen.getByTestId("scoped-quick-log")).toHaveAttribute(
+      "data-target-key",
+      `tent:${TENT_ID}`,
+    );
+    expect(screen.getByTestId("scoped-quick-log")).toHaveAttribute("data-action", "note");
   });
 
   it("opens tent-scoped V2 logging from a zero-plant Tent Detail route", () => {

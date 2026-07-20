@@ -1,3 +1,4 @@
+// CI: executed by .github/workflows/genetics-traceability-smoke.yml (chromium-mocked).
 // Browser regression proof for the Genetics traceability surfaces.
 //
 // SAFETY:

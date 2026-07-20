@@ -40,10 +40,10 @@ const META_TAG_REGEX = /<meta\b[^>]*>/gi;
 const TITLE_REGEX = /<title\b[^>]*>([\s\S]*?)<\/title>/i;
 const CANONICAL_REGEX =
   /<link\b[^>]*rel=["']canonical["'][^>]*>/i;
-const HREF_REGEX = /href=["']([^"']*)["']/i;
-const CONTENT_REGEX = /content=["']([^"']*)["']/i;
-const NAME_REGEX = /name=["']([^"']+)["']/i;
-const PROPERTY_REGEX = /property=["']([^"']+)["']/i;
+const HREF_REGEX = /href=(["'])((?:(?!\1).)*)\1/i;
+const CONTENT_REGEX = /content=(["'])((?:(?!\1).)*)\1/i;
+const NAME_REGEX = /name=(["'])((?:(?!\1).)+)\1/i;
+const PROPERTY_REGEX = /property=(["'])((?:(?!\1).)+)\1/i;
 const JSONLD_REGEX =
   /<script\b[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
 

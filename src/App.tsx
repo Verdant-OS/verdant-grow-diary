@@ -109,6 +109,8 @@ const CheckoutCancel = lazy(() => import("./pages/CheckoutCancel"));
 const Terms = lazy(() => import("./pages/TermsOfService"));
 const Privacy = lazy(() => import("./pages/PrivacyPolicy"));
 const Refund = lazy(() => import("./pages/RefundPolicy"));
+const Feedback = lazy(() => import("./pages/support/Feedback"));
+const Contact = lazy(() => import("./pages/support/Contact"));
 
 const Leads = lazy(() => import("./pages/Leads"));
 const PiIngestStatus = lazy(() => import("./pages/PiIngestStatus"));
@@ -256,6 +258,8 @@ const App = () => (
                   <Route path="/terms" element={<Terms />} />
                   <Route path="/privacy" element={<Privacy />} />
                   <Route path="/refund" element={<Refund />} />
+                  <Route path="/feedback" element={<Feedback />} />
+                  <Route path="/contact" element={<Contact />} />
                   <Route path="/refunds" element={<Navigate to="/refund" replace />} />
                   <Route path="/refund-policy" element={<Navigate to="/refund" replace />} />
                   <Route path="/terms-of-service" element={<Navigate to="/terms" replace />} />

@@ -201,13 +201,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "ai_credit_spends_grow_id_fkey"
-            columns: ["grow_id"]
-            isOneToOne: false
-            referencedRelation: "grows"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "ai_credit_spends_refund_of_fkey"
             columns: ["refund_of"]
             isOneToOne: false

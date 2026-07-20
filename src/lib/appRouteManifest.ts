@@ -104,6 +104,7 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/breeding/new", access: "auth", description: "New breeding event entry." },
   { path: "/checkout/cancel", access: "public", description: "Checkout cancellation return." },
   { path: "/checkout/success", access: "public", description: "Checkout success return." },
+  { path: "/contact", access: "public", description: "Public support contact page." },
   { path: "/creator-beta", access: "public", description: "Creator beta landing page." },
   { path: "/cultivars", access: "public", description: "Public cultivar guides index." },
   {
@@ -148,6 +149,7 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/doctor/sessions", access: "auth" },
   { path: "/doctor/sessions/:sessionId", access: "auth" },
   { path: "/features", access: "redirect", description: "→ /welcome" },
+  { path: "/feedback", access: "public", description: "Public support feedback page." },
   {
     path: "/founder",
     access: "public",
@@ -334,6 +336,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     access: "operator",
     description:
       "Operator subscriber-growth goal snapshot from authoritative billing counts (read-only).",
+  },
+  {
+    path: "/operator/support-inbox",
+    access: "operator",
+    description: "Operator support inbox (read-only).",
   },
   {
     path: "/partners/csv-preview",

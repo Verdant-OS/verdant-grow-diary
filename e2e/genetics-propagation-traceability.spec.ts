@@ -153,7 +153,7 @@ function expectNoOverflow(m: Awaited<ReturnType<typeof readOverflow>>, label: st
   expect(m.bodyScroll, `body overflow @ ${label}`).toBeLessThanOrEqual(m.bodyClient);
 }
 
-test.beforeEach(({}, testInfo) => {
+test.beforeEach(({ browserName: _browserName }, testInfo) => {
   test.skip(
     testInfo.project.name !== MOCKED_PROJECT,
     `genetics traceability overflow proof runs once, under the ${MOCKED_PROJECT} project`,

@@ -31,7 +31,6 @@ import { useGrowPlants, useGrowTents } from "@/hooks/useGrowData";
 import { useGrows } from "@/store/grows";
 import OnboardingChecklistCard from "@/components/OnboardingChecklistCard";
 import PublicQuickLogHandoffCard from "@/components/PublicQuickLogHandoffCard";
-import FirstRunChecklist from "@/components/FirstRunChecklist";
 import OnboardingProgressPill from "@/components/OnboardingProgressPill";
 import DashboardZeroTentEmptyState from "@/components/DashboardZeroTentEmptyState";
 import OperatorModeCallout from "@/components/OperatorModeCallout";
@@ -46,6 +45,9 @@ import { buildDashboardSensorHealthSummary } from "@/lib/dashboardSensorHealthVi
 import { sanitizeActionCopy } from "@/lib/actionQueueRowView";
 import { APPROVAL_QUEUE_EMPTY_COPY, mapRiskToSeverity } from "@/lib/dashboardActionQueueViewModel";
 import { buildOnboardingChecklistViewModel } from "@/lib/onboardingChecklistViewModel";
+import { selectConnectedOneTentGraph } from "@/lib/connectedOneTentActivationRules";
+import { countActivatingSensorReadings } from "@/lib/onboardingSensorActivationRules";
+import { useOneTentActivationEvidence } from "@/hooks/useOneTentActivationEvidence";
 import { useSensorReadings, useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
 import { useNowTick } from "@/hooks/useNowTick";
 import { isUuid } from "@/lib/isUuid";
@@ -180,17 +182,29 @@ export default function Dashboard() {
   const dashboardHealthSnapshot = dashboardSnapshotForHealthyCues(currentSensorSnapshot);
   const dashboardSensorQuality = evaluateDashboardSensorQuality(currentSensorSnapshot, nowTick);
 
-  // First-run onboarding checklist — derived from data the Dashboard
-  // already loads. No extra Supabase queries, no writes.
-  const { grows } = useGrows();
-  const diaryRecentCount =
-    recent.status === "ok" ? recent.items.filter((i) => i.kind === "diary").length : 0;
+  // First-run activation is relationship-aware. Independent grow/tent/plant
+  // counts cannot prove that a usable One-Tent chain exists.
+  const { grows, activeGrowId } = useGrows();
+  const activationGraph = selectConnectedOneTentGraph({
+    grows,
+    tents,
+    plants,
+    preferredGrowId: scopedGrowId ?? activeGrowId,
+  });
+  const activationEvidence = useOneTentActivationEvidence(activationGraph);
+  const connectedSensorReadingCount = activationGraph.tentId
+    ? countActivatingSensorReadings(readingsByTent[activationGraph.tentId] ?? [])
+    : 0;
   const onboardingVm = buildOnboardingChecklistViewModel({
     growCount: grows.length,
     tentCount: tents.length,
     plantCount: plants.length,
-    diaryEntryCount: diaryRecentCount,
-    sensorReadingCount: dashboardSensorRows.length,
+    diaryEntryCount: 0,
+    sensorReadingCount: connectedSensorReadingCount,
+    connectedScope: activationGraph,
+    firstLogEvidenceCount:
+      activationEvidence.status === "ok" ? activationEvidence.summary.count : null,
+    firstLogEvidenceStatus: activationEvidence.status,
   });
   // Real persisted alerts for this grow (open only). Read-only display so
   // growers can see the loop close: manual reading → derived alert → persisted.
@@ -332,9 +346,9 @@ export default function Dashboard() {
         <ReleaseReadinessOperatorCard />
       </div>
 
-      {/* Lineage Repair + First-Run Checklist intentionally moved below the
-          core Quick Log + Environment loop so they don't compete visually on
-          mobile. See Today Trust + Route Polish v1. */}
+      {/* Lineage Repair stays below the core Quick Log + Environment loop.
+          First-run guidance now has one canonical relationship-aware card
+          above, so two checklists cannot disagree or compete on mobile. */}
 
       {/* Dashboard intentionally has a single Quick Log entry point (QuickLogV2Fab).
           The "Log your first plant memory" CTA was a duplicate entry point and was removed.
@@ -377,7 +391,7 @@ export default function Dashboard() {
       </div>
 
       {tents.length === 0 ? (
-        <DashboardZeroTentEmptyState />
+        <DashboardZeroTentEmptyState growId={activationGraph.growId} />
       ) : (
         <>
           <h2
@@ -1053,15 +1067,6 @@ export default function Dashboard() {
           )}
           <div className="my-3">
             <LineageRepairCta />
-          </div>
-          <div className="my-3">
-            <FirstRunChecklist
-              growCount={grows.length}
-              tentCount={tents.length}
-              plantCount={plants.length}
-              quickLogCount={diaryRecentCount}
-              sensorSnapshotCount={dashboardSensorRows.length}
-            />
           </div>
           <h2
             data-testid="dashboard-section-heading-advanced"

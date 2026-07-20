@@ -23,26 +23,27 @@ const base = {
 };
 
 describe("buildOnboardingChecklistViewModel — activation states", () => {
-  it("new user with no grow → all 4 steps incomplete, checklist shown", () => {
+  it("new user with no grow → all 5 steps incomplete, checklist shown", () => {
     const vm = buildOnboardingChecklistViewModel(base);
-    expect(vm.totalCount).toBe(4);
+    expect(vm.totalCount).toBe(5);
     expect(vm.completeCount).toBe(0);
     expect(vm.isFullyActivated).toBe(false);
     expect(vm.shouldShowChecklist).toBe(true);
     expect(vm.steps.every((s) => !s.complete)).toBe(true);
   });
 
-  it("user with grow only → grow complete, tent/plant/log incomplete", () => {
+  it("user with grow only → grow complete, tent/plant/log/snapshot incomplete", () => {
     const vm = buildOnboardingChecklistViewModel({ ...base, growCount: 1 });
     expect(vm.completeCount).toBe(1);
     expect(vm.steps.find((s) => s.key === "create_grow")?.complete).toBe(true);
     expect(vm.steps.find((s) => s.key === "add_tent")?.complete).toBe(false);
     expect(vm.steps.find((s) => s.key === "add_plant")?.complete).toBe(false);
     expect(vm.steps.find((s) => s.key === "first_log")?.complete).toBe(false);
+    expect(vm.steps.find((s) => s.key === "first_sensor_snapshot")?.complete).toBe(false);
     expect(vm.shouldShowChecklist).toBe(true);
   });
 
-  it("grow + tent + plant but no log/sensor → only final step incomplete", () => {
+  it("grow + tent + plant but no log or snapshot → both evidence steps incomplete", () => {
     const vm = buildOnboardingChecklistViewModel({
       ...base,
       growCount: 1,
@@ -51,10 +52,11 @@ describe("buildOnboardingChecklistViewModel — activation states", () => {
     });
     expect(vm.completeCount).toBe(3);
     expect(vm.steps.find((s) => s.key === "first_log")?.complete).toBe(false);
+    expect(vm.steps.find((s) => s.key === "first_sensor_snapshot")?.complete).toBe(false);
     expect(vm.shouldShowChecklist).toBe(true);
   });
 
-  it("first_log completes via diary entry alone", () => {
+  it("a diary entry establishes plant memory but does not replace sensor truth", () => {
     const vm = buildOnboardingChecklistViewModel({
       ...base,
       growCount: 1,
@@ -63,11 +65,13 @@ describe("buildOnboardingChecklistViewModel — activation states", () => {
       diaryEntryCount: 1,
     });
     expect(vm.steps.find((s) => s.key === "first_log")?.complete).toBe(true);
-    expect(vm.isFullyActivated).toBe(true);
-    expect(vm.shouldShowChecklist).toBe(false);
+    expect(vm.steps.find((s) => s.key === "first_sensor_snapshot")?.complete).toBe(false);
+    expect(vm.completeCount).toBe(4);
+    expect(vm.isFullyActivated).toBe(false);
+    expect(vm.shouldShowChecklist).toBe(true);
   });
 
-  it("first_log completes via sensor reading alone", () => {
+  it("a sensor reading establishes sensor truth but does not replace plant memory", () => {
     const vm = buildOnboardingChecklistViewModel({
       ...base,
       growCount: 1,
@@ -75,8 +79,10 @@ describe("buildOnboardingChecklistViewModel — activation states", () => {
       plantCount: 1,
       sensorReadingCount: 1,
     });
-    expect(vm.steps.find((s) => s.key === "first_log")?.complete).toBe(true);
-    expect(vm.isFullyActivated).toBe(true);
+    expect(vm.steps.find((s) => s.key === "first_log")?.complete).toBe(false);
+    expect(vm.steps.find((s) => s.key === "first_sensor_snapshot")?.complete).toBe(true);
+    expect(vm.completeCount).toBe(4);
+    expect(vm.isFullyActivated).toBe(false);
   });
 
   it("fully activated user → checklist hidden but completed headline available", () => {
@@ -91,17 +97,46 @@ describe("buildOnboardingChecklistViewModel — activation states", () => {
     expect(vm.shouldShowChecklist).toBe(false);
     expect(vm.completedHeadline).toBe(ONBOARDING_COMPLETED_HEADLINE);
   });
+
+  it("relationship-aware scope ignores unrelated counts and keeps the handoff grow-scoped", () => {
+    const vm = buildOnboardingChecklistViewModel({
+      growCount: 9,
+      tentCount: 9,
+      plantCount: 9,
+      diaryEntryCount: 9,
+      sensorReadingCount: 0,
+      connectedScope: {
+        growId: "grow with spaces",
+        tentId: null,
+        plantId: null,
+      },
+      firstLogEvidenceCount: 0,
+      firstLogEvidenceStatus: "ok",
+    });
+
+    expect(vm.steps.find((s) => s.key === "create_grow")?.complete).toBe(true);
+    expect(vm.steps.find((s) => s.key === "add_tent")?.complete).toBe(false);
+    expect(vm.steps.find((s) => s.key === "add_plant")?.complete).toBe(false);
+    expect(vm.steps.find((s) => s.key === "first_log")?.complete).toBe(false);
+    expect(vm.steps.find((s) => s.key === "add_tent")?.href).toBe(
+      "/tents?growId=grow%20with%20spaces&intent=one_tent_activation",
+    );
+    expect(vm.steps.find((s) => s.key === "first_log")?.href).toBe(
+      "/dashboard?growId=grow%20with%20spaces&open=quick-log",
+    );
+  });
 });
 
 describe("checklist links point to safe existing routes", () => {
   const vm = buildOnboardingChecklistViewModel(base);
 
-  it("keeps the one-tent setup order: Grow → Tent → Plant → Quick Log", () => {
+  it("keeps the one-tent setup order: Grow → Tent → Plant → Quick Log → Sensor Snapshot", () => {
     expect(vm.steps.map((s) => s.key)).toEqual([
       "create_grow",
       "add_tent",
       "add_plant",
       "first_log",
+      "first_sensor_snapshot",
     ]);
   });
 
@@ -109,7 +144,8 @@ describe("checklist links point to safe existing routes", () => {
     ["create_grow", "/grows"],
     ["add_tent", "/tents"],
     ["add_plant", "/plants"],
-    ["first_log", "/"],
+    ["first_log", "/dashboard?open=quick-log"],
+    ["first_sensor_snapshot", "/sensors"],
   ] as const)("%s → %s", (key, expected) => {
     expect(vm.steps.find((s) => s.key === key)?.href).toBe(expected);
     expect(ONBOARDING_ROUTES[key]).toBe(expected);
@@ -118,7 +154,7 @@ describe("checklist links point to safe existing routes", () => {
   it("first log step routes to Dashboard where QuickLogV2Fab opens the sheet", () => {
     const firstLog = vm.steps.find((s) => s.key === "first_log");
 
-    expect(firstLog?.href).toBe("/");
+    expect(firstLog?.href).toBe("/dashboard?open=quick-log");
     expect(firstLog?.title).toMatch(/log/i);
   });
 
@@ -135,7 +171,7 @@ describe("checklist links point to safe existing routes", () => {
 describe("checklist copy is safe", () => {
   it("intro and honesty note match the approved strings", () => {
     expect(ONBOARDING_INTRO).toBe(
-      "Start with one real grow. Verdant gets smarter as your plant history builds.",
+      "Connect one real grow, tent, and plant. Then preserve what you did and what the room measured.",
     );
     expect(ONBOARDING_HONESTY_NOTE).toBe(
       "No fake-live data. Manual readings are welcome when clearly labeled.",

@@ -1,5 +1,5 @@
 import VpdStageMissingBadge from "@/components/VpdStageMissingBadge";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Box, Lightbulb } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import StageBadge from "@/components/StageBadge";
@@ -29,16 +29,23 @@ import {
   buildTentSnapshotView,
   type BuildTentSnapshotInput,
 } from "@/lib/dashboardEnvironmentSnapshotViewModel";
+import {
+  buildConnectedActivationRoutes,
+  isOneTentActivationIntent,
+} from "@/lib/connectedOneTentActivationRules";
 
 function formatTentPlantHealthCopy(copy: string): string {
   return copy.replace(/^●\s*/, "");
 }
 
 export default function Tents() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
   // Shared URL `?growId=` resolution against RLS-loaded grows.
   const { urlGrowId, scopedGrowName, isValidScopedGrow, backHref } = useScopedGrow();
   const validGrowId = isValidScopedGrow ? (urlGrowId ?? undefined) : undefined;
+  const activationIntent = !!validGrowId && isOneTentActivationIntent(searchParams.get("intent"));
   const tentsQuery = useGrowTents(urlGrowId ?? undefined);
   const { data: tents = [] } = tentsQuery;
   // SENSOR TRUTH: per-tent raw reading windows (same hook as the Dashboard
@@ -106,7 +113,26 @@ export default function Tents() {
         title="Tents"
         description="Your grow tents — environment, lighting, and assigned plants."
         icon={<Box className="h-5 w-5" />}
-        actions={<CreateTentDialog defaultGrowId={validGrowId} />}
+        actions={
+          <CreateTentDialog
+            key={activationIntent ? "one-tent-activation" : "standard-create"}
+            defaultGrowId={validGrowId}
+            initiallyOpen={activationIntent}
+            onCreated={
+              activationIntent && validGrowId
+                ? (tent) => {
+                    navigate(
+                      buildConnectedActivationRoutes({
+                        growId: validGrowId,
+                        tentId: tent.id,
+                        plantId: null,
+                      }).addPlant,
+                    );
+                  }
+                : undefined
+            }
+          />
+        }
       />
 
       {urlGrowId && (

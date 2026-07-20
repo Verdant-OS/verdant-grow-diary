@@ -5,17 +5,19 @@
  *
  * Pure: no React, no Supabase, no side effects. The caller passes counts
  * derived from data the Dashboard already loads (grows / tents / plants /
- * diary entries / sensor readings). The view model returns:
+ * diary entries / sensor readings). New callers may pass a relationship-
+ * checked One-Tent scope so unrelated rows cannot fake activation.
  *
  *   - the ordered list of checklist items + complete/incomplete state
  *   - whether the checklist should be shown at all
  *   - whether the user is fully activated
  *
- * Activation rule (intentionally lenient — Verdant is grow-room friendly):
- *   - has at least one grow
- *   - has at least one tent
- *   - has at least one plant
- *   - has at least one diary/log entry OR sensor reading
+ * Canonical activation rule:
+ *   - one grow
+ *   - one tent linked to that grow
+ *   - one plant linked to that tent and grow
+ *   - one connected manual log (including watering or feeding)
+ *   - one trustworthy sensor snapshot (manual is first-class)
  *
  * Links point to the safest existing routes — no automation, no device
  * control, no fake-live data. The copy is intentionally cautious: no
@@ -23,11 +25,22 @@
  * The test suite enforces this.
  */
 
+import {
+  buildConnectedActivationRoutes,
+  type ConnectedActivationScope,
+} from "@/lib/connectedOneTentActivationRules";
+import {
+  buildPlantQuickLogPrefill,
+  type PlantQuickLogPrefill,
+} from "@/lib/plantQuickLogPrefillRules";
+import { dashboardPath } from "@/lib/routes";
+
 export type OnboardingStepKey =
   | "create_grow"
   | "add_tent"
   | "add_plant"
-  | "first_log";
+  | "first_log"
+  | "first_sensor_snapshot";
 
 export interface OnboardingStep {
   key: OnboardingStepKey;
@@ -36,6 +49,8 @@ export interface OnboardingStep {
   href: string;
   ctaLabel: string;
   complete: boolean;
+  /** Exact validated context for the presenter to hand to the existing sheet. */
+  quickLogPrefill?: PlantQuickLogPrefill | null;
 }
 
 export interface OnboardingChecklistInput {
@@ -44,6 +59,14 @@ export interface OnboardingChecklistInput {
   plantCount: number;
   diaryEntryCount: number;
   sensorReadingCount: number;
+  /**
+   * Relationship-checked scope. When supplied, grow/tent/plant completion is
+   * derived from these IDs rather than independent counts.
+   */
+  connectedScope?: ConnectedActivationScope | null;
+  /** Canonical diary + grow_events evidence for the connected scope. */
+  firstLogEvidenceCount?: number | null;
+  firstLogEvidenceStatus?: "idle" | "loading" | "ok" | "unavailable";
 }
 
 export interface OnboardingChecklistViewModel {
@@ -60,7 +83,7 @@ export interface OnboardingChecklistViewModel {
 }
 
 export const ONBOARDING_INTRO =
-  "Start with one real grow. Verdant gets smarter as your plant history builds.";
+  "Connect one real grow, tent, and plant. Then preserve what you did and what the room measured.";
 
 export const ONBOARDING_HONESTY_NOTE =
   "No fake-live data. Manual readings are welcome when clearly labeled.";
@@ -72,28 +95,56 @@ export const ONBOARDING_ROUTES = {
   create_grow: "/grows",
   add_tent: "/tents",
   add_plant: "/plants",
-  // Routes to the Dashboard, which surfaces the QuickLog CTA once a
-  // plant exists. /sensors remains fully functional for direct manual
-  // sensor reading entry — it is just not the primary first-log path
-  // for note-style logging.
-  first_log: "/",
+  first_log: "/dashboard?open=quick-log",
+  first_sensor_snapshot: "/sensors",
 } as const;
 
 export function buildOnboardingChecklistViewModel(
   input: OnboardingChecklistInput,
 ): OnboardingChecklistViewModel {
-  const hasGrow = (input.growCount ?? 0) > 0;
-  const hasTent = (input.tentCount ?? 0) > 0;
-  const hasPlant = (input.plantCount ?? 0) > 0;
-  const hasFirstSignal =
-    (input.diaryEntryCount ?? 0) > 0 || (input.sensorReadingCount ?? 0) > 0;
+  const hasConnectedScope = input.connectedScope !== undefined;
+  const scope = input.connectedScope ?? null;
+  const hasGrow = hasConnectedScope ? !!scope?.growId : (input.growCount ?? 0) > 0;
+  const hasTent = hasConnectedScope ? !!scope?.tentId : (input.tentCount ?? 0) > 0;
+  const hasPlant = hasConnectedScope ? !!scope?.plantId : (input.plantCount ?? 0) > 0;
+  const firstLogStatus = input.firstLogEvidenceStatus ?? "ok";
+  const hasFirstLog = hasConnectedScope
+    ? firstLogStatus === "ok" && (input.firstLogEvidenceCount ?? 0) > 0
+    : (input.diaryEntryCount ?? 0) > 0;
+  const hasSensorSnapshot = (input.sensorReadingCount ?? 0) > 0;
+  const connectedRoutes = buildConnectedActivationRoutes(scope ?? {});
+  const quickLogPrefill = hasConnectedScope
+    ? buildPlantQuickLogPrefill({
+        growId: scope?.growId,
+        tentId: scope?.tentId,
+        plantId: scope?.plantId,
+      })
+    : null;
+  const routes = hasConnectedScope
+    ? {
+        create_grow: connectedRoutes.createGrow,
+        add_tent: connectedRoutes.addTent,
+        add_plant: connectedRoutes.addPlant,
+        first_log: connectedRoutes.quickLog,
+        first_sensor_snapshot: connectedRoutes.sensors,
+      }
+    : ONBOARDING_ROUTES;
+
+  const firstLogDescription =
+    firstLogStatus === "loading"
+      ? "Checking saved plant memory for this connected tent."
+      : firstLogStatus === "unavailable"
+        ? "Saved history could not be verified right now. Try again shortly."
+        : hasPlant
+          ? "A watering, feeding, photo, or short observation starts the timeline."
+          : "Add this after your first plant is connected.";
 
   const steps: OnboardingStep[] = [
     {
       key: "create_grow",
       title: "Create your first grow",
       description: "Name your run and set basic targets.",
-      href: ONBOARDING_ROUTES.create_grow,
+      href: routes.create_grow,
       ctaLabel: "Create grow",
       complete: hasGrow,
     },
@@ -101,7 +152,7 @@ export function buildOnboardingChecklistViewModel(
       key: "add_tent",
       title: "Add your tent",
       description: "Verdant tracks environment per tent.",
-      href: ONBOARDING_ROUTES.add_tent,
+      href: routes.add_tent,
       ctaLabel: "Add tent",
       complete: hasTent,
     },
@@ -109,17 +160,28 @@ export function buildOnboardingChecklistViewModel(
       key: "add_plant",
       title: "Add your first plant",
       description: "Plant memory starts the moment you add it.",
-      href: ONBOARDING_ROUTES.add_plant,
+      href: routes.add_plant,
       ctaLabel: "Add plant",
       complete: hasPlant,
     },
     {
       key: "first_log",
-      title: "Log your first note or sensor reading",
-      description: "A diary entry or a manual sensor reading — your call.",
-      href: ONBOARDING_ROUTES.first_log,
-      ctaLabel: "Log first reading",
-      complete: hasFirstSignal,
+      title: "Log your first plant memory",
+      description: firstLogDescription,
+      href: quickLogPrefill ? dashboardPath(quickLogPrefill.growId) : routes.first_log,
+      ctaLabel: "Open Quick Log",
+      complete: hasFirstLog,
+      quickLogPrefill,
+    },
+    {
+      key: "first_sensor_snapshot",
+      title: "Add your first sensor snapshot",
+      description: hasTent
+        ? "A manual snapshot is enough to establish sensor truth; hardware is optional."
+        : "Add this after your first tent is connected.",
+      href: routes.first_sensor_snapshot,
+      ctaLabel: "Add snapshot",
+      complete: hasSensorSnapshot,
     },
   ];
 

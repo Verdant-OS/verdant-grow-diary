@@ -157,6 +157,15 @@ const AGREEMENT_ACCEPTANCES = [
   { agreement_type: "privacy", version: "2026-07-13" },
 ];
 
+const CORE_CHANGED_PAGES = {
+  dashboard: "src/pages/Dashboard.tsx",
+  dailyCheck: "src/pages/DailyCheck.tsx",
+  plantDetail: "src/pages/PlantDetail.tsx",
+  quickLogStarter: "src/pages/QuickLogStarter.tsx",
+  tents: "src/pages/Tents.tsx",
+  tentDetail: "src/pages/TentDetail.tsx",
+} as const;
+
 const REDESIGNED_PRODUCTION_PAGES = {
   actionDetail: "src/pages/ActionDetail.tsx",
   actionQueue: "src/pages/ActionQueue.tsx",
@@ -200,7 +209,7 @@ type BrowserRoute = {
 
 const BROWSER_ROUTES: readonly BrowserRoute[] = [
   {
-    sourcePage: "src/pages/Dashboard.tsx",
+    sourcePage: CORE_CHANGED_PAGES.dashboard,
     routePattern: "/dashboard",
     path: dashboardPath(),
     heading: "Dashboard",
@@ -208,7 +217,7 @@ const BROWSER_ROUTES: readonly BrowserRoute[] = [
     criticalOperatingLoop: true,
   },
   {
-    sourcePage: "src/pages/DailyCheck.tsx",
+    sourcePage: CORE_CHANGED_PAGES.dailyCheck,
     routePattern: "/daily-check",
     path: `/daily-check?plantId=${PLANT_ID}&growId=${GROW_ID}`,
     heading: "Quick Log",
@@ -216,7 +225,7 @@ const BROWSER_ROUTES: readonly BrowserRoute[] = [
     criticalOperatingLoop: true,
   },
   {
-    sourcePage: "src/pages/PlantDetail.tsx",
+    sourcePage: CORE_CHANGED_PAGES.plantDetail,
     routePattern: "/plants/:id",
     path: plantDetailPath(PLANT_ID),
     heading: LONG_PLANT_NAME,
@@ -224,7 +233,7 @@ const BROWSER_ROUTES: readonly BrowserRoute[] = [
     criticalOperatingLoop: true,
   },
   {
-    sourcePage: "src/pages/QuickLogStarter.tsx",
+    sourcePage: CORE_CHANGED_PAGES.quickLogStarter,
     routePattern: "/quick-log",
     path: "/quick-log",
     heading: "Log your first grow note in 30 seconds",
@@ -233,7 +242,7 @@ const BROWSER_ROUTES: readonly BrowserRoute[] = [
     mainSelector: 'main[data-testid="public-quick-log-starter"]',
   },
   {
-    sourcePage: "src/pages/Tents.tsx",
+    sourcePage: CORE_CHANGED_PAGES.tents,
     routePattern: "/tents",
     path: tentsPath(),
     heading: "Tents",
@@ -241,7 +250,7 @@ const BROWSER_ROUTES: readonly BrowserRoute[] = [
     criticalOperatingLoop: true,
   },
   {
-    sourcePage: "src/pages/TentDetail.tsx",
+    sourcePage: CORE_CHANGED_PAGES.tentDetail,
     routePattern: "/tents/:id",
     path: tentDetailPath(TENT_ID),
     heading: "Responsive Proof Tent",
@@ -644,16 +653,80 @@ async function assertViewportFit(
 
       const viewportWidth = document.documentElement.clientWidth;
       const mainBounds = main.getBoundingClientRect();
-      const isHidden = (element: HTMLElement, bounds = element.getBoundingClientRect()) => {
+      const semanticOrInteractiveSelector = [
+        "button",
+        "a[href]",
+        "input",
+        "select",
+        "textarea",
+        "summary",
+        "iframe",
+        "object",
+        "embed",
+        "video",
+        "audio",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "h5",
+        "h6",
+        "p",
+        "ul",
+        "ol",
+        "li",
+        "table",
+        'img:not([alt=""])',
+        '[contenteditable="true"]',
+        '[tabindex]:not([tabindex="-1"])',
+        '[role]:not([role="none"]):not([role="presentation"])',
+      ].join(",");
+      const isComputedAssistiveText = (element: HTMLElement) => {
         const style = getComputedStyle(element);
+        const bounds = element.getBoundingClientRect();
+        const normalizedClip = style.clip.replace(/\s/g, "");
+        const normalizedClipPath = style.clipPath.replace(/\s/g, "");
+        const clippedToNothing =
+          normalizedClip === "rect(0px,0px,0px,0px)" || normalizedClipPath === "inset(50%)";
         return (
-          bounds.width === 0 ||
-          bounds.height === 0 ||
-          style.display === "none" ||
-          style.visibility === "hidden" ||
-          element.closest(".sr-only") !== null ||
-          element.closest('[hidden], [aria-hidden="true"]') !== null
+          style.position === "absolute" &&
+          bounds.width > 0 &&
+          bounds.width <= 1.5 &&
+          bounds.height > 0 &&
+          bounds.height <= 1.5 &&
+          ["hidden", "clip"].includes(style.overflowX) &&
+          ["hidden", "clip"].includes(style.overflowY) &&
+          style.whiteSpace === "nowrap" &&
+          clippedToNothing
         );
+      };
+      const isTrulyNonvisual = (element: HTMLElement) => {
+        let current: HTMLElement | null = element;
+        while (current && main.contains(current)) {
+          const style = getComputedStyle(current);
+          if (
+            style.display === "none" ||
+            style.visibility === "hidden" ||
+            isComputedAssistiveText(current)
+          ) {
+            return true;
+          }
+          if (current === main) break;
+          current = current.parentElement;
+        }
+        return false;
+      };
+      const isExplicitAriaHiddenDecoration = (element: HTMLElement) => {
+        const hiddenRoot = element.closest<HTMLElement>('[aria-hidden="true"]');
+        if (!hiddenRoot || !main.contains(hiddenRoot)) return false;
+        const hasMeaningfulText = Boolean(hiddenRoot.textContent?.trim());
+        const hasSemanticOrInteractiveContent =
+          hiddenRoot.matches(semanticOrInteractiveSelector) ||
+          hiddenRoot.querySelector(semanticOrInteractiveSelector) !== null;
+        return !hasMeaningfulText && !hasSemanticOrInteractiveContent;
+      };
+      const isIgnoredForWidthChecks = (element: HTMLElement) => {
+        return isTrulyNonvisual(element) || isExplicitAriaHiddenDecoration(element);
       };
       const scrollerValidationViolations: Array<{
         testId: string;
@@ -682,7 +755,7 @@ async function assertViewportFit(
           bounds.left >= Math.max(0, mainBounds.left) - 0.5 &&
           bounds.right <= Math.min(viewportWidth, mainBounds.right) + 0.5;
         if (
-          isHidden(scroller, bounds) ||
+          isIgnoredForWidthChecks(scroller) ||
           !["auto", "scroll"].includes(overflowX) ||
           !boundedInsideMainAndViewport
         ) {
@@ -702,16 +775,15 @@ async function assertViewportFit(
         validatedScrollerElements.some(
           (scroller) => scroller !== element && scroller.contains(element),
         );
-      const isInsideContainedProgressbar = (element: HTMLElement) => {
-        const progressbar = element.closest<HTMLElement>('[role="progressbar"]');
-        if (!progressbar || progressbar === element) return false;
-
-        const progressBounds = progressbar.getBoundingClientRect();
-        const progressStyle = getComputedStyle(progressbar);
+      const isExplicitSingleLineEllipsis = (
+        element: HTMLElement,
+        style = getComputedStyle(element),
+      ) => {
         return (
-          ["hidden", "clip"].includes(progressStyle.overflowX) &&
-          progressBounds.left >= Math.max(0, mainBounds.left) - 0.5 &&
-          progressBounds.right <= Math.min(viewportWidth, mainBounds.right) + 0.5
+          Boolean(element.textContent?.trim()) &&
+          ["hidden", "clip"].includes(style.overflowX) &&
+          style.textOverflow === "ellipsis" &&
+          style.whiteSpace === "nowrap"
         );
       };
       const visibleBoundsViolations = Array.from(
@@ -739,9 +811,8 @@ async function assertViewportFit(
       ).flatMap((element) => {
         const bounds = element.getBoundingClientRect();
         if (
-          isHidden(element, bounds) ||
-          isInsideValidatedScroller(element) ||
-          isInsideContainedProgressbar(element)
+          isIgnoredForWidthChecks(element) ||
+          isInsideValidatedScroller(element)
         ) {
           return [];
         }
@@ -764,9 +835,8 @@ async function assertViewportFit(
       ).flatMap((element) => {
         const bounds = element.getBoundingClientRect();
         if (
-          isHidden(element, bounds) ||
-          isInsideValidatedScroller(element) ||
-          isInsideContainedProgressbar(element)
+          isIgnoredForWidthChecks(element) ||
+          isInsideValidatedScroller(element)
         ) {
           return [];
         }
@@ -786,17 +856,12 @@ async function assertViewportFit(
         (element) => {
           const style = getComputedStyle(element);
           const concealedOverflow = element.scrollWidth - element.clientWidth;
-          const intentionallyEllipsized =
-            ["hidden", "clip"].includes(style.overflowX) &&
-            style.textOverflow === "ellipsis" &&
-            style.whiteSpace === "nowrap";
           if (
-            isHidden(element) ||
+            isIgnoredForWidthChecks(element) ||
             isValidatedScroller(element) ||
             isInsideValidatedScroller(element) ||
             concealedOverflow <= 1 ||
-            ["auto", "scroll"].includes(style.overflowX) ||
-            intentionallyEllipsized
+            isExplicitSingleLineEllipsis(element, style)
           ) {
             return [];
           }
@@ -814,27 +879,21 @@ async function assertViewportFit(
             element.querySelectorAll<HTMLElement>("*"),
           ).some((descendant) => {
             if (
-              isHidden(descendant) ||
+              isIgnoredForWidthChecks(descendant) ||
               isValidatedScroller(descendant) ||
-              isInsideValidatedScroller(descendant) ||
-              isInsideContainedProgressbar(descendant)
+              isInsideValidatedScroller(descendant)
             ) {
               return false;
             }
             const descendantBounds = descendant.getBoundingClientRect();
             const descendantStyle = getComputedStyle(descendant);
-            const descendantIsIntentionallyEllipsized =
-              ["hidden", "clip"].includes(descendantStyle.overflowX) &&
-              descendantStyle.textOverflow === "ellipsis" &&
-              descendantStyle.whiteSpace === "nowrap";
-            if (descendantIsIntentionallyEllipsized) return false;
+            if (isExplicitSingleLineEllipsis(descendant, descendantStyle)) return false;
 
             const escapesContainer =
               descendantBounds.left < bounds.left - 0.5 ||
               descendantBounds.right > bounds.right + 0.5;
             const concealsOwnContent =
-              descendant.scrollWidth - descendant.clientWidth > 1 &&
-              !["auto", "scroll"].includes(descendantStyle.overflowX);
+              descendant.scrollWidth - descendant.clientWidth > 1;
             return escapesContainer || concealsOwnContent;
           });
           if (!hasMeaningfulDirectText && !hasProblematicDescendant) return [];
@@ -962,17 +1021,16 @@ test.describe("Verdant UI-overhaul responsive routes", () => {
   });
 
   test("accounts for every redesigned production page in browser or documented exclusions", () => {
-    const redesignedPages = Object.values(REDESIGNED_PRODUCTION_PAGES).sort();
-    const redesignedPageSet = new Set(redesignedPages);
+    const changedPages = [
+      ...Object.values(CORE_CHANGED_PAGES),
+      ...Object.values(REDESIGNED_PRODUCTION_PAGES),
+    ].sort();
     const canonicalRoutePatterns = new Set(APP_ROUTES.map((route) => route.path));
     const accountedRoutes = [...BROWSER_ROUTES, ...DOCUMENTED_EXCLUDED_ROUTES];
-    const accountedPages = [
-      ...BROWSER_ROUTES.map((route) => route.sourcePage),
-      ...DOCUMENTED_EXCLUDED_ROUTES.map((route) => route.sourcePage),
-    ].filter((sourcePage) => redesignedPageSet.has(sourcePage as (typeof redesignedPages)[number]));
+    const accountedPages = accountedRoutes.map((route) => route.sourcePage);
 
-    expect([...accountedPages].sort()).toEqual(redesignedPages);
-    expect(new Set(accountedPages).size, "redesigned pages must not be double-counted").toBe(
+    expect([...accountedPages].sort()).toEqual(changedPages);
+    expect(new Set(accountedPages).size, "changed pages must not be double-counted").toBe(
       accountedPages.length,
     );
     expect(
@@ -996,9 +1054,7 @@ test.describe("Verdant UI-overhaul responsive routes", () => {
     }
   });
 
-  test("rejects a clipped oversized descendant that document scrollWidth alone misses", async ({
-    page,
-  }) => {
+  test("rejects clipped content and unvalidated overflow exemptions", async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 568 });
     await page.setContent(`
       <style>html, body { margin: 0; width: 100%; } </style>
@@ -1021,6 +1077,80 @@ test.describe("Verdant UI-overhaul responsive routes", () => {
     expect(concealedWidths.mainScroll).toBe(concealedWidths.mainClient);
     await expect(assertViewportFit(page, { path: "clipped-oversized-proof" })).rejects.toThrow(
       /structural content|intrinsic horizontal overflow/i,
+    );
+
+    const adversarialExemptionFixtures = [
+      {
+        name: "progressbar-descendant",
+        markup: `
+          <main id="main-content" style="width: 100%;">
+            <div role="progressbar" style="width: 100%; height: 24px; overflow-x: clip;">
+              <canvas style="display: block; width: 640px; height: 20px;"></canvas>
+            </div>
+          </main>
+        `,
+      },
+      {
+        name: "unnamed-auto-scroller",
+        markup: `
+          <main id="main-content" style="width: 100%;">
+            <div style="width: 100%; overflow-x: auto;">
+              <canvas style="display: block; width: 640px; height: 20px;"></canvas>
+            </div>
+          </main>
+        `,
+      },
+      {
+        name: "visible-fake-sr-only",
+        markup: `
+          <main id="main-content" style="width: 100%;">
+            <div style="width: 100%; overflow-x: clip;">
+              <p class="sr-only" style="position: static; display: block; width: 640px; height: 20px; clip: auto; overflow: visible; margin: 0;">
+                This visible oversized text must still be measured.
+              </p>
+            </div>
+          </main>
+        `,
+      },
+    ] as const;
+    const adversarialResults: Array<{ name: string; rejectedForWidth: boolean }> = [];
+    for (const fixture of adversarialExemptionFixtures) {
+      await page.setContent(`
+        <style>html, body { margin: 0; width: 100%; } </style>
+        ${fixture.markup}
+      `);
+      const widths = await page.evaluate(() => ({
+        documentClient: document.documentElement.clientWidth,
+        documentScroll: document.documentElement.scrollWidth,
+        mainClient: document.querySelector<HTMLElement>("#main-content")?.clientWidth,
+        mainScroll: document.querySelector<HTMLElement>("#main-content")?.scrollWidth,
+      }));
+      expect(widths.documentScroll, `${fixture.name} document width must remain concealed`).toBe(
+        widths.documentClient,
+      );
+      expect(widths.mainScroll, `${fixture.name} main width must remain concealed`).toBe(
+        widths.mainClient,
+      );
+
+      let rejectionMessage = "";
+      try {
+        await assertViewportFit(page, { path: fixture.name });
+      } catch (error) {
+        rejectionMessage = error instanceof Error ? error.message : String(error);
+      }
+      adversarialResults.push({
+        name: fixture.name,
+        rejectedForWidth:
+          /visible content|structural content|intrinsic horizontal overflow/i.test(
+            rejectionMessage,
+          ),
+      });
+    }
+    expect(adversarialResults).toEqual(
+      adversarialExemptionFixtures.map((fixture) => ({
+        name: fixture.name,
+        rejectedForWidth: true,
+      })),
     );
 
     const invalidScrollerFixtures = [

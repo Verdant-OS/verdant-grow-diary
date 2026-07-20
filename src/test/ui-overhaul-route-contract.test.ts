@@ -19,6 +19,8 @@ const UI_OVERHAUL_CHANGED_PAGES = [
   "src/pages/BreedingProgramDetail.tsx",
   "src/pages/BreedingProgramNew.tsx",
   "src/pages/BreedingProgramsIndex.tsx",
+  "src/pages/DailyCheck.tsx",
+  "src/pages/Dashboard.tsx",
   "src/pages/EcowittIngestAudit.tsx",
   "src/pages/EcowittLiveBringup.tsx",
   "src/pages/GrowDetail.tsx",
@@ -31,10 +33,14 @@ const UI_OVERHAUL_CHANGED_PAGES = [
   "src/pages/OperatorEcowittTentPreview.tsx",
   "src/pages/OperatorPaddleProcessingAudit.tsx",
   "src/pages/OperatorSubscriberGrowth.tsx",
+  "src/pages/PlantDetail.tsx",
   "src/pages/PhenoHuntNew.tsx",
   "src/pages/PhenoHuntsIndex.tsx",
   "src/pages/PhenoHuntWorkspace.tsx",
   "src/pages/PhenoKeepersPage.tsx",
+  "src/pages/QuickLogStarter.tsx",
+  "src/pages/TentDetail.tsx",
+  "src/pages/Tents.tsx",
   "src/pages/Timeline.tsx",
 ] as const;
 
@@ -57,8 +63,24 @@ const APP_SHELL_ROUTE_FILES = [
 
 describe("Verdant UI overhaul route contract", () => {
   it("accounts for every redesigned production page exactly once in the browser manifest", () => {
+    expect(RESPONSIVE_SPEC).toContain("const CORE_CHANGED_PAGES");
     expect(RESPONSIVE_SPEC).toContain("BROWSER_ROUTES");
     expect(RESPONSIVE_SPEC).toContain("DOCUMENTED_EXCLUDED_ROUTES");
+
+    const browserRoutesBlock = RESPONSIVE_SPEC.slice(
+      RESPONSIVE_SPEC.indexOf("const BROWSER_ROUTES"),
+      RESPONSIVE_SPEC.indexOf("const DOCUMENTED_EXCLUDED_ROUTES"),
+    );
+    expect(browserRoutesBlock.match(/sourcePage:\s*CORE_CHANGED_PAGES\./g)).toHaveLength(6);
+
+    const coverageOracle = RESPONSIVE_SPEC.slice(
+      RESPONSIVE_SPEC.indexOf(
+        'test("accounts for every redesigned production page in browser or documented exclusions"',
+      ),
+      RESPONSIVE_SPEC.indexOf('test("rejects clipped content'),
+    );
+    expect(coverageOracle).toContain("Object.values(CORE_CHANGED_PAGES)");
+    expect(coverageOracle).toContain("Object.values(REDESIGNED_PRODUCTION_PAGES)");
 
     for (const page of UI_OVERHAUL_CHANGED_PAGES) {
       const occurrences = RESPONSIVE_SPEC.split(`"${page}"`).length - 1;
@@ -67,12 +89,15 @@ describe("Verdant UI overhaul route contract", () => {
   });
 
   it("checks document, main-region, and visible control bounds", () => {
+    const progress = readSource("src/components/ui/progress.tsx");
+
     expect(RESPONSIVE_SPEC).toContain("documentScrollWidth");
     expect(RESPONSIVE_SPEC).toContain("mainScrollWidth");
     expect(RESPONSIVE_SPEC).toContain("getBoundingClientRect");
     expect(RESPONSIVE_SPEC).toContain("visibleBoundsViolations");
     expect(RESPONSIVE_SPEC).toMatch(/expect\(\s*snapshot\.layoutBoundsViolations/);
     expect(RESPONSIVE_SPEC).toMatch(/expect\(\s*snapshot\.intrinsicWidthViolations/);
+    expect(progress).toMatch(/<ProgressPrimitive\.Indicator[\s\S]*?aria-hidden="true"/);
   });
 
   it("proves the viewport assertion rejects clipped non-semantic nested content", () => {

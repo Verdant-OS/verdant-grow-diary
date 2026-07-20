@@ -47,7 +47,7 @@ describe("public VPD acquisition surface", () => {
 
   it("uses one unit-change transaction for both fields and one visible-result invalidation", () => {
     const handler = PAGE.match(
-      /function changeTemperatureUnit[\s\S]*?\n\s{2}}\n\n\s{2}function reset/,
+      /function changeTemperatureUnit[\s\S]*?\r?\n\s{2}}\r?\n\r?\n\s{2}function reset/,
     )?.[0];
     expect(handler).toBeTruthy();
     expect(handler).toContain("setTemperature(");

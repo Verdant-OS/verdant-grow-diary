@@ -27,6 +27,15 @@ const DAILY_GROW_CHECK_PANEL = read("src/components/DashboardDailyGrowCheckPanel
 const DISCLOSURE = read("src/components/DashboardDataSourceDisclosure.tsx");
 
 describe("AppShell mobile layout safety", () => {
+  it("does not conceal oversized route content at the application root", () => {
+    const shellRoot = APP_SHELL.match(
+      /<div className="relative isolate flex min-h-screen w-full[^"]*"/,
+    )?.[0];
+
+    expect(shellRoot).toBeTruthy();
+    expect(shellRoot).not.toMatch(/overflow-x-(?:clip|hidden)/);
+  });
+
   it("main content reserves bottom padding for fixed nav/FAB on mobile", () => {
     expect(APP_SHELL).toMatch(/pb-(2[0-9]|28|24|32)/);
   });

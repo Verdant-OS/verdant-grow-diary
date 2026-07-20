@@ -106,7 +106,7 @@ export default function TentPlantRosterPanel({
     <section
       data-testid={testId}
       aria-label="Tent Plant Roster"
-      className={`glass rounded-2xl p-4 mb-6 ${className ?? ""}`}
+      className={`glass min-w-0 rounded-2xl p-4 mb-6 ${className ?? ""}`}
     >
       <div className="mb-3">
         <h2 className="font-display font-semibold">Plant Roster</h2>
@@ -194,7 +194,7 @@ export default function TentPlantRosterPanel({
 
       {viewModel.state === "loaded" && (
         <ul
-          className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3"
+          className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3"
           data-testid="tent-plant-roster-list"
         >
           {viewModel.rows.map((row) => {
@@ -202,7 +202,7 @@ export default function TentPlantRosterPanel({
             return (
               <li
                 key={row.id}
-                className="rounded-xl border border-border/50 p-3"
+                className="min-w-0 rounded-xl border border-border/50 p-3"
                 data-testid={`tent-plant-roster-row-${row.id}`}
               >
                 <div className="flex items-center justify-between gap-2">

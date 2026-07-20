@@ -157,7 +157,7 @@ export default function TentPlantActivityPanels({
     <section
       data-testid={testId}
       aria-label="Tent plant activity panels"
-      className={`space-y-2 ${className ?? ""}`}
+      className={`min-w-0 space-y-2 ${className ?? ""}`}
     >
       <p
         className="text-[11px] text-muted-foreground"
@@ -175,7 +175,7 @@ export default function TentPlantActivityPanels({
         >
           <p className="sr-only">{TENT_PLANT_ACTIVITY_LOADING_COPY}</p>
           <ul
-            className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3"
+            className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3"
             data-testid="tent-plant-activity-panels-skeleton-list"
             data-skeleton-count={skeletonCount}
             data-has-visible-plants={hasVisiblePlants ? "true" : "false"}
@@ -222,13 +222,13 @@ export default function TentPlantActivityPanels({
       )}
       {viewModel.panels.length > 0 && (
         <ul
-          className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3"
+          className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3"
           data-testid="tent-plant-activity-panels-list"
         >
           {viewModel.panels.map((panel) => (
             <li
               key={panel.id}
-              className="rounded-xl border border-border/50 p-3 bg-card min-h-[10.5rem] flex flex-col"
+              className="flex min-h-[10.5rem] min-w-0 flex-col rounded-xl border border-border/50 bg-card p-3"
               data-testid={panel.testId}
             >
               <header className="flex items-start justify-between gap-2">

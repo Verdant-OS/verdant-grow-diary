@@ -802,7 +802,7 @@ export default function ActionDetail() {
                                     asChild
                                     size="sm"
                                     variant="outline"
-                                    className="w-full sm:w-auto min-h-[2.25rem] justify-center"
+                                    className="min-h-11 min-w-0 w-full sm:w-auto justify-center whitespace-normal"
                                   >
                                     <Link
                                       to={link.to}
@@ -902,7 +902,7 @@ export default function ActionDetail() {
                                     asChild
                                     size="sm"
                                     variant="outline"
-                                    className="w-full sm:w-auto min-h-[2.25rem] justify-center"
+                                    className="min-h-11 min-w-0 w-full sm:w-auto justify-center whitespace-normal"
                                   >
                                     <Link
                                       to={link.to}

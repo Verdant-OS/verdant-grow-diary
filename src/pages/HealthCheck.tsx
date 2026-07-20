@@ -178,7 +178,7 @@ export default function HealthCheck() {
         </p>
       </header>
 
-      <div className="flex items-center gap-3">
+      <div className="flex min-w-0 flex-wrap items-center gap-3">
         <span
           role="status"
           aria-live="polite"
@@ -208,7 +208,7 @@ export default function HealthCheck() {
           {running ? "Running…" : "Re-run checks"}
         </Button>
         {ranAt && (
-          <span className="text-xs text-muted-foreground">
+          <span className="min-w-0 break-words text-xs text-muted-foreground">
             Last run {new Date(ranAt).toLocaleTimeString()}
           </span>
         )}

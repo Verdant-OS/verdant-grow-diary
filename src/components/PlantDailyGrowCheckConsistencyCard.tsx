@@ -117,7 +117,7 @@ export default function PlantDailyGrowCheckConsistencyCard({
       data-guidance-state={guidance.state}
       className="p-4 space-y-3"
     >
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex min-w-0 flex-col items-stretch gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Activity className="h-4 w-4" />
@@ -127,7 +127,7 @@ export default function PlantDailyGrowCheckConsistencyCard({
         </div>
         {showQuickActions ? (
           <div
-            className="flex flex-wrap gap-2 shrink-0"
+            className="flex min-w-0 w-full flex-wrap gap-2 sm:w-auto sm:shrink-0"
             data-testid="plant-daily-grow-check-quick-actions"
             data-plant-id={plantId}
           >

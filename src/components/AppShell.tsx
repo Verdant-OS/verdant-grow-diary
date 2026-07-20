@@ -168,7 +168,7 @@ export default function AppShell({ children }: { children?: ReactNode }) {
 
   return (
     <SidebarProvider defaultOpen className="bg-background">
-      <div className="relative isolate flex min-h-screen w-full overflow-x-clip">
+      <div className="relative isolate flex min-h-screen w-full">
         <div
           aria-hidden="true"
           className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(circle_at_82%_0%,hsl(var(--primary)/0.09),transparent_30%),radial-gradient(circle_at_5%_85%,hsl(var(--accent)/0.12),transparent_32%)]"

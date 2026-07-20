@@ -1079,11 +1079,14 @@ export default function ActionQueue() {
       )}
 
       <div
-        className="glass mb-4 grid grid-cols-1 gap-2 rounded-2xl p-3 sm:flex sm:flex-wrap"
+        className="glass mb-4 min-w-0 grid grid-cols-1 gap-2 rounded-2xl p-3 sm:flex sm:flex-wrap"
         aria-label="Action queue filters"
       >
         <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
-          <SelectTrigger className="h-9 w-full sm:w-[150px]" aria-label="Status filter">
+          <SelectTrigger
+            className="min-h-11 min-w-0 w-full sm:w-[150px] sm:h-9 sm:min-h-9"
+            aria-label="Status filter"
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -1098,7 +1101,10 @@ export default function ActionQueue() {
         </Select>
 
         <Select value={riskFilter} onValueChange={(v) => setRiskFilter(v as RiskFilter)}>
-          <SelectTrigger className="h-9 w-full sm:w-[140px]" aria-label="Risk filter">
+          <SelectTrigger
+            className="min-h-11 min-w-0 w-full sm:w-[140px] sm:h-9 sm:min-h-9"
+            aria-label="Risk filter"
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -1111,7 +1117,10 @@ export default function ActionQueue() {
         </Select>
 
         <Select value={sourceFilter} onValueChange={(v) => setSourceFilter(v as SourceFilter)}>
-          <SelectTrigger className="h-9 w-full sm:w-[170px]" aria-label="Source filter">
+          <SelectTrigger
+            className="min-h-11 min-w-0 w-full sm:w-[170px] sm:h-9 sm:min-h-9"
+            aria-label="Source filter"
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -1130,7 +1139,7 @@ export default function ActionQueue() {
           onValueChange={(v) => setTraceExtraFilter(v as ActionListExtraFilter)}
         >
           <SelectTrigger
-            className="h-9 w-full sm:w-[170px]"
+            className="min-h-11 min-w-0 w-full sm:w-[170px] sm:h-9 sm:min-h-9"
             aria-label="Trace filter"
             data-testid="action-queue-trace-filter"
           >
@@ -1143,7 +1152,10 @@ export default function ActionQueue() {
         </Select>
 
         <Select value={sortOrder} onValueChange={(v) => setSortOrder(v as SortOrder)}>
-          <SelectTrigger className="h-9 w-full sm:w-[170px]" aria-label="Sort order">
+          <SelectTrigger
+            className="min-h-11 min-w-0 w-full sm:w-[170px] sm:h-9 sm:min-h-9"
+            aria-label="Sort order"
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -1160,13 +1172,13 @@ export default function ActionQueue() {
           placeholder="Search actions…"
           aria-label="Search actions"
           data-testid="action-queue-search-input"
-          className="h-9 w-full sm:w-[220px]"
+          className="min-h-11 min-w-0 w-full sm:w-[220px] sm:h-9 sm:min-h-9"
         />
       </div>
 
       {/* Pagination controls. Pure presenter; no writes, no AI calls. */}
       <div
-        className="glass rounded-2xl p-3 mb-4 flex flex-wrap items-center gap-3 text-xs"
+        className="glass rounded-2xl p-3 mb-4 flex min-w-0 flex-wrap items-center gap-3 text-xs"
         data-testid="action-queue-pagination"
         role="navigation"
         aria-label="Action queue pagination"
@@ -1176,8 +1188,8 @@ export default function ActionQueue() {
             ? "0 of 0"
             : `Showing ${paginated.rangeStart}–${paginated.rangeEnd} of ${paginated.totalItems}`}
         </span>
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          <label className="flex items-center gap-1 text-muted-foreground">
+        <div className="ml-auto flex min-w-0 w-full flex-wrap items-center gap-2 sm:w-auto">
+          <label className="flex min-w-0 items-center gap-1 text-muted-foreground">
             <span>Per page</span>
             <Select
               value={String(pageSize)}
@@ -1189,7 +1201,7 @@ export default function ActionQueue() {
               }}
             >
               <SelectTrigger
-                className="h-8 w-[80px]"
+                className="min-h-11 min-w-0 w-[80px] sm:h-8 sm:min-h-8"
                 aria-label="Page size"
                 data-testid="action-queue-page-size"
               >
@@ -1207,6 +1219,7 @@ export default function ActionQueue() {
           <Button
             size="sm"
             variant="ghost"
+            className="min-h-11 sm:min-h-9"
             disabled={!paginated.hasPrev}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             aria-label="Previous page"
@@ -1223,6 +1236,7 @@ export default function ActionQueue() {
           <Button
             size="sm"
             variant="ghost"
+            className="min-h-11 sm:min-h-9"
             disabled={!paginated.hasNext}
             onClick={() => setPage((p) => Math.min(paginated.totalPages, p + 1))}
             aria-label="Next page"

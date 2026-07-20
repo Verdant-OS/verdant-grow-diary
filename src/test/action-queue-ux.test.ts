@@ -38,6 +38,40 @@ describe("ActionQueue — filter UI", () => {
     expect(PAGE).toMatch(/grid grid-cols-1 gap-2 rounded-2xl p-3 sm:flex sm:flex-wrap/);
   });
 
+  it("keeps every mobile filter, search, and pagination control at least 44px tall", () => {
+    for (const label of [
+      "Status filter",
+      "Risk filter",
+      "Source filter",
+      "Trace filter",
+      "Sort order",
+      "Search actions",
+      "Page size",
+      "Previous page",
+      "Next page",
+    ]) {
+      const labelIndex = PAGE.indexOf(`aria-label="${label}"`);
+      expect(labelIndex, `${label} must exist`).toBeGreaterThan(-1);
+      const control = PAGE.slice(Math.max(0, labelIndex - 240), labelIndex + 120);
+      expect(control, `${label} must expose a 44px mobile touch target`).toContain("min-h-11");
+    }
+  });
+
+  it("allows narrow filter and pagination groups to shrink and wrap", () => {
+    const filters = PAGE.slice(
+      PAGE.lastIndexOf("<div", PAGE.indexOf('aria-label="Action queue filters"')),
+      PAGE.indexOf('aria-label="Action queue filters"') + 80,
+    );
+    const pagination = PAGE.slice(
+      PAGE.indexOf('data-testid="action-queue-pagination"'),
+      PAGE.indexOf('data-testid="action-queue-no-results"'),
+    );
+
+    expect(filters).toContain("min-w-0");
+    expect(pagination).toContain("min-w-0");
+    expect(pagination).toContain("flex-wrap");
+  });
+
   it("exposes a status filter with Pending/Simulated/Approved/Rejected/All", () => {
     expect(PAGE).toMatch(/aria-label=\s*["']Status filter["']/);
     for (const label of ["All statuses", "Pending", "Simulated", "Approved", "Rejected"]) {

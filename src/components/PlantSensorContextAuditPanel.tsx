@@ -78,7 +78,7 @@ export default function PlantSensorContextAuditPanel({
   return (
     <section
       data-testid="plant-sensor-context-audit-panel"
-      className="glass rounded-2xl p-4 my-3 space-y-3"
+      className="glass my-3 min-w-0 space-y-3 rounded-2xl p-4"
       aria-label="Sensor context for AI Doctor"
     >
       <header className="flex items-center justify-between gap-2">
@@ -158,12 +158,13 @@ export default function PlantSensorContextAuditPanel({
         </div>
       )}
       {cta.kind === "add" || cta.kind === "refresh" ? (
-        <div data-testid="plant-sensor-context-audit-cta">
+        <div className="min-w-0" data-testid="plant-sensor-context-audit-cta">
           <Button
             type="button"
             size="sm"
             variant="outline"
             data-testid="plant-sensor-context-audit-cta-button"
+            className="h-auto min-h-11 min-w-0 w-full whitespace-normal sm:h-9 sm:min-h-9 sm:w-auto"
             onClick={() => {
               if (cta.prefill && onOpenManualSensorEntry) {
                 onOpenManualSensorEntry(cta.prefill);

@@ -255,7 +255,16 @@ describe("ActionDetail missing-evidence guidance wiring", () => {
   });
 
   it("review link uses a thumb-friendly minimum touch target on mobile", () => {
-    expect(ACTION_DETAIL_SRC).toContain("min-h-[2.25rem]");
+    const reviewLinkButtons = ACTION_DETAIL_SRC.match(
+      /<Button[\s\S]{0,500}?aria-label=\{ACTION_EVIDENCE_REVIEW_LINK_ARIA_LABEL\}/g,
+    );
+
+    expect(reviewLinkButtons).toHaveLength(2);
+    for (const button of reviewLinkButtons ?? []) {
+      expect(button).toContain("min-h-11");
+      expect(button).toContain("min-w-0");
+      expect(button).toContain("whitespace-normal");
+    }
   });
 
   it("review link spans full width on mobile and auto on desktop", () => {

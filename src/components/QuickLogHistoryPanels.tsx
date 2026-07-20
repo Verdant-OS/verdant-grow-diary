@@ -255,12 +255,12 @@ function QuickLogHistorySection({
       aria-label={title}
       data-testid={`quicklog-history-section-${laneKey}`}
     >
-      <header className="flex items-start justify-between gap-3 mb-3">
-        <h2 className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+      <header className="mb-3 flex min-w-0 flex-col items-stretch gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <h2 className="inline-flex min-w-0 items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           {icon}
           {title}
         </h2>
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
           {headerAction}
           <span className="text-xs text-muted-foreground">
             {rows.length === 0

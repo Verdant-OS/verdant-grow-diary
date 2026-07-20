@@ -8,6 +8,8 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { StructuredWateringEntry } from "@/components/irrigation/StructuredWateringEntry";
 import { TentIrrigationHistoryPanel } from "@/components/irrigation/TentIrrigationHistoryPanel";
 import { useTentIrrigationLedger } from "@/hooks/useTentIrrigationLedger";
@@ -18,7 +20,17 @@ vi.mock("@/hooks/useTentIrrigationLedger", async (orig) => {
   return { ...actual, useTentIrrigationLedger: vi.fn() };
 });
 
-const LONG = "Absurdly-long-product-and-note-designation-that-must-never-force-horizontal-overflow-on-a-narrow-glove-friendly-phone-screen";
+const LONG =
+  "Absurdly-long-product-and-note-designation-that-must-never-force-horizontal-overflow-on-a-narrow-glove-friendly-phone-screen";
+const ROOT = resolve(__dirname, "../..");
+const overflowFixtureSource = readFileSync(
+  resolve(ROOT, "e2e/fixtures/irrigation-overflow-entry.tsx"),
+  "utf8",
+);
+const overflowBrowserSpecSource = readFileSync(
+  resolve(ROOT, "e2e/irrigation-overflow.spec.ts"),
+  "utf8",
+);
 
 const longRow: IrrigationLedgerRow = {
   id: "w-1",
@@ -69,6 +81,15 @@ function assertOverflowSafe(container: HTMLElement) {
 }
 
 describe("irrigation surfaces are overflow-safe (structural)", () => {
+  it("browser proof loads Verdant CSS and asserts computed responsive styles", () => {
+    expect(overflowFixtureSource).toMatch(/import\s+["']@\/index\.css["']/);
+    expect(overflowBrowserSpecSource).toMatch(/getComputedStyle\(/);
+    expect(overflowBrowserSpecSource).toContain('toBe("0px")');
+    expect(overflowBrowserSpecSource).toContain('toBe("grid")');
+    expect(overflowBrowserSpecSource).toContain('toBe("44px")');
+    expect(overflowBrowserSpecSource).toMatch(/320[\s\S]*375[\s\S]*390[\s\S]*768[\s\S]*1440/);
+  });
+
   it("StructuredWateringEntry: min-w-0 root, 44px controls, no fixed inline widths", () => {
     const { container, getByTestId } = render(
       <StructuredWateringEntry growId="g" tentId="t" writer={vi.fn() as never} />,

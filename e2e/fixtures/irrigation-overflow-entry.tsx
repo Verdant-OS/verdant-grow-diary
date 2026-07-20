@@ -4,8 +4,13 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { StructuredWateringEntry } from "@/components/irrigation/StructuredWateringEntry";
+import "@/index.css";
 
-const noopWriter = (async () => ({ ok: true as const, eventId: "fixture", reused: false })) as never;
+const noopWriter = (async () => ({
+  ok: true as const,
+  eventId: "fixture",
+  reused: false,
+})) as never;
 
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

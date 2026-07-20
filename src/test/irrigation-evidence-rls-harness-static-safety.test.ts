@@ -15,8 +15,12 @@ import { resolve } from "node:path";
 
 const ROOT = resolve(__dirname, "../..");
 const HARNESS = "scripts/run-irrigation-evidence-rls-harness.ts";
+const WORKFLOW = ".github/workflows/irrigation-evidence-gate.yml";
 const harnessPath = resolve(ROOT, HARNESS);
 const src = existsSync(harnessPath) ? readFileSync(harnessPath, "utf8") : "";
+const workflowPath = resolve(ROOT, WORKFLOW);
+const workflowSrc = existsSync(workflowPath) ? readFileSync(workflowPath, "utf8") : "";
+const workflowCode = workflowSrc.replace(/^\s*#.*$/gm, "");
 const PRODUCTION_PROJECT_REF = "knkwiiywfkbqznbxwqfh";
 
 const pkg = JSON.parse(readFileSync(resolve(ROOT, "package.json"), "utf8")) as {
@@ -41,7 +45,7 @@ describe("irrigation evidence RLS harness — production is always refused", () 
   it("only reaches a remote database with an explicit, ref-matched acknowledgement", () => {
     expect(src).toMatch(/ALLOW_REMOTE/);
     expect(src).toMatch(/EXPECTED_PROJECT_REF/);
-    expect(src).toMatch(/refusing unverified remote database/i);
+    expect(src).toMatch(/refusing unverified remote (API\/database pair|database)/i);
     // A remote ref that equals production can never be confirmed.
     expect(src).toMatch(/expectedRemoteRef !== PRODUCTION_PROJECT_REF/);
   });
@@ -49,7 +53,7 @@ describe("irrigation evidence RLS harness — production is always refused", () 
   it("guards the local security lane to loopback only", () => {
     expect(src).toMatch(/localHost/);
     expect(src).toMatch(/127\.0\.0\.1/);
-    expect(src).toMatch(/local security lane requires a loopback database/i);
+    expect(src).toMatch(/local security lane requires loopback API and database URLs/i);
   });
 });
 
@@ -62,6 +66,7 @@ describe("irrigation evidence RLS harness — opt-in, no-op by default", () => {
 
   it("requires the full disposable-database env before running", () => {
     expect(src).toMatch(/SUPABASE_URL/);
+    expect(src).toMatch(/SUPABASE_DB_URL/);
     expect(src).toMatch(/SUPABASE_SERVICE_ROLE_KEY/);
     expect(src).toMatch(/SUPABASE_ANON_KEY|SUPABASE_PUBLISHABLE_KEY|VITE_SUPABASE_ANON_KEY/);
   });
@@ -139,6 +144,12 @@ describe("irrigation evidence RLS harness — disposable + self-cleaning", () =>
   });
   it("verifies zero leftovers after teardown", () => {
     expect(src).toMatch(/zero leftovers/i);
+    expect(src).toMatch(/error === null && count === 0/);
+    expect(src).toMatch(/auth\.admin\.getUserById/);
+    expect(src).not.toMatch(/\(count \?\? 0\) === 0/);
+    expect(src).not.toMatch(/deleteUser\(id\)\.catch/);
+    expect(src).toMatch(/removeRaceBarrier/);
+    expect(src).toMatch(/DROP SCHEMA IF EXISTS/);
   });
 });
 
@@ -163,6 +174,37 @@ describe("irrigation evidence RLS harness — proves the trust boundary matrix",
     expect(src).toMatch(/reused/);
     expect(src).toMatch(/exactly one/i);
   });
+  it("proves concurrent identical and conflicting requests instead of sequential-only replay", () => {
+    expect(src).toMatch(/Promise\.all/);
+    expect(src).toMatch(/parallel identical requests/i);
+    expect(src).toMatch(/parallel different requests/i);
+    expect(src).toMatch(/idempotency_key_conflict/);
+    expect(src).toMatch(/pg_advisory_xact_lock/);
+    expect(src).toMatch(/pg_catalog\.pg_locks/);
+    expect(src).toMatch(/granted_count/);
+    expect(src).toMatch(/waiting_count/);
+    expect(src).toMatch(/overlapped at the idempotency insert/i);
+  });
+  it("checks atomicity across the full committed event set", () => {
+    for (const table of [
+      "grow_events",
+      "watering_events",
+      "feeding_events",
+      "diary_entries",
+      "quicklog_idempotency",
+    ]) {
+      expect(src).toContain(`"${table}"`);
+    }
+    expect(src).toMatch(/snapshotUserRows/);
+    expect(src).toMatch(/wrote no grow\/watering\/feeding\/diary\/idempotency rows/);
+  });
+  it("checks cross-owner read isolation for every related history table", () => {
+    expect(src).toMatch(/OWNER_READ_TABLES/);
+    expect(src).toMatch(/stranger cannot read owner \$\{table\}/);
+    expect(src).toContain('"quicklog_audit_events"');
+    expect(src).toMatch(/recognizedReadDenial/);
+    expect(src).not.toMatch(/error !== null \|\| \(Array\.isArray\(data\)/);
+  });
 });
 
 describe("irrigation evidence RLS harness — package wiring", () => {
@@ -179,5 +221,66 @@ describe("irrigation evidence RLS harness — package wiring", () => {
     // The mission keeps this a dedicated opt-in command, not a baseline blocker.
     const baseline = pkg.scripts?.["test:security-db-local"] ?? "";
     expect(baseline).not.toContain("irrigation-evidence-rls");
+  });
+});
+
+describe("irrigation evidence CI gate — authoritative and non-production", () => {
+  it(`${WORKFLOW} exists`, () => {
+    expect(existsSync(workflowPath)).toBe(true);
+  });
+
+  it("uses safe PR permissions without secrets or elevated PR execution", () => {
+    expect(workflowCode).toMatch(/permissions:\s*\n\s*contents:\s*read/);
+    expect(workflowCode).toMatch(/pull_request:/);
+    expect(workflowCode).not.toMatch(/pull_request_target/);
+    expect(workflowCode).not.toMatch(/\bsecrets\s*\./);
+    expect(workflowCode).not.toMatch(/continue-on-error/);
+  });
+
+  it("runs the disposable RLS harness against a masked local Supabase stack", () => {
+    expect(workflowCode).toMatch(/supabase start/);
+    expect(workflowCode).toMatch(/supabase db reset --local/);
+    expect(workflowCode).toMatch(/::add-mask::\$\{ANON_KEY\}/);
+    expect(workflowCode).toMatch(/::add-mask::\$\{SERVICE_ROLE_KEY\}/);
+    expect(workflowCode).toMatch(/::add-mask::\$\{DB_URL\}/);
+    expect(workflowCode).toMatch(/SUPABASE_DB_URL=\$\{DB_URL\}/);
+    expect(workflowCode).toContain("bun run test:irrigation-evidence-rls:local-lane");
+    expect(workflowCode).toMatch(/if:\s*always\(\)[\s\S]{0,120}supabase stop --no-backup/);
+    expect(workflowCode).not.toMatch(/supabase\s+(link|db push)/);
+  });
+
+  it("suppresses startup credentials before masking and never uploads the raw startup log", () => {
+    const startIndex = workflowCode.indexOf("supabase start");
+    const maskIndex = workflowCode.indexOf("::add-mask::${ANON_KEY}");
+    expect(startIndex).toBeGreaterThan(-1);
+    expect(maskIndex).toBeGreaterThan(startIndex);
+    expect(workflowCode.slice(startIndex, maskIndex)).toMatch(
+      />"\$\{RUNNER_TEMP\}\/irrigation-supabase-start\.log" 2>&1/,
+    );
+    expect(workflowCode).not.toMatch(/path:[\s\S]{0,120}irrigation-supabase-start\.log/);
+    expect(workflowCode).not.toMatch(/path:[\s\S]{0,120}irrigation-supabase-reset\.log/);
+  });
+
+  it("runs the exact styled Chromium overflow proof as an independent blocking job", () => {
+    expect(workflowCode).toContain("e2e/irrigation-overflow.spec.ts");
+    expect(workflowCode).toContain("--project=chromium-mocked");
+    expect(workflowCode).toContain("playwright install chromium --with-deps");
+    expect(workflowCode).toMatch(/Irrigation overflow \(real Verdant CSS\)/);
+    expect(workflowCode).toMatch(/name:\s*Write proof summary\s*\n\s*if:\s*success\(\)/);
+  });
+
+  it("reruns for all database, irrigation UI, style, and browser-proof dependencies", () => {
+    for (const path of [
+      '"supabase/migrations/**"',
+      '"src/components/irrigation/**"',
+      '"src/components/ui/**"',
+      '"src/lib/irrigation/**"',
+      '"src/index.css"',
+      '"e2e/fixtures/irrigation-overflow*"',
+      '"tailwind.config.ts"',
+      '"vite.config.ts"',
+    ]) {
+      expect(workflowCode).toContain(path);
+    }
   });
 });

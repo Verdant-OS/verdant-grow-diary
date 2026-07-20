@@ -60,14 +60,21 @@ vi.mock("@/hooks/useGrowData", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/hooks/useGrowData")>();
   return {
     ...actual,
+    // A pending or failed private read has NO established data — real React
+    // Query leaves `data` undefined (not []). The honest-async Plants page
+    // relies on that distinction to fail closed (loading/error owns the page)
+    // instead of rendering an established-but-empty grow.
     useGrowPlants: () => ({
-      data: growReadState.isLoading || growReadState.isError ? [] : PLANTS,
+      data: growReadState.isLoading || growReadState.isError ? undefined : PLANTS,
       isLoading: growReadState.isLoading,
       isError: growReadState.isError,
       refetch: vi.fn(),
     }),
     useGrowTents: () => ({
-      data: growReadState.isLoading || growReadState.isError ? [] : [{ id: "t1", name: "Tent A" }],
+      data:
+        growReadState.isLoading || growReadState.isError
+          ? undefined
+          : [{ id: "t1", name: "Tent A" }],
       isLoading: growReadState.isLoading,
       isError: growReadState.isError,
       refetch: vi.fn(),
@@ -138,9 +145,12 @@ describe("Plants page · Daily Grow Check badge", () => {
     growReadState.isError = true;
     renderPlants();
 
-    expect(screen.getByTestId("plants-grow-data-error")).toHaveTextContent(
-      /This is not an empty grow/,
-    );
+    // Honest-async surface: a failed plant read renders the explicit
+    // "Plants unavailable" error (with a retry) and owns the page — it never
+    // degrades to a misleadingly-empty grow with filters and counts.
+    expect(screen.getByText("Plants unavailable")).toBeInTheDocument();
+    expect(screen.getByText(/Nothing has been changed/i)).toBeInTheDocument();
+    expect(screen.getByTestId("plants-retry-primary")).toBeInTheDocument();
     expect(screen.queryByTestId("plants-filter-controls")).toBeNull();
     expect(screen.queryByTestId("plants-current-grow-strip")).toBeNull();
     expect(screen.queryByText("No plants yet")).toBeNull();
@@ -150,7 +160,12 @@ describe("Plants page · Daily Grow Check badge", () => {
     growReadState.isLoading = true;
     renderPlants();
 
-    expect(screen.getByTestId("plants-grow-data-loading")).toHaveTextContent(/Loading plant data/);
+    // Honest-async surface: a pending plant read shows the dedicated loading
+    // boundary (reason=plants) and owns the page — no zero-count filters, no
+    // empty-grow copy flashes underneath it.
+    const loading = screen.getByTestId("plants-loading");
+    expect(loading).toHaveTextContent(/Loading plants/);
+    expect(loading).toHaveAttribute("data-loading-reason", "plants");
     expect(screen.queryByTestId("plants-filter-controls")).toBeNull();
     expect(screen.queryByText("No plants yet")).toBeNull();
   });

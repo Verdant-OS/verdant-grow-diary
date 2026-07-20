@@ -75,6 +75,7 @@ export default function GuidePage() {
       guide?.description ??
       "Verdant grower guides on grow diary logging, sensor truth, VPD, and AI Doctor.",
     path: guide ? `/guides/${guide.slug}` : "/guides",
+    ogType: guide ? "article" : "website",
   });
 
   useEffect(() => {

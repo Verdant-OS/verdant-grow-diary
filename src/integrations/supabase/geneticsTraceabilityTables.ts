@@ -317,6 +317,18 @@ export interface GeneticsTraceabilityDatabase {
         p_reason?: string | null;
         p_screening_result_id?: string | null;
       }>;
+      genetics_trace_resolve: GeneticsFn<{
+        p_subject_type: string;
+        p_subject_id: string;
+        p_direction?: string;
+        p_max_depth?: number;
+        p_max_nodes?: number;
+      }>;
+      genetics_subject_evidence: GeneticsFn<{
+        p_owner: string;
+        p_subject_type: string;
+        p_subject_id: string;
+      }>;
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

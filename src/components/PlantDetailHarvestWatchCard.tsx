@@ -111,6 +111,22 @@ function v0StateTone(state: HarvestWatchV0ReadinessState): string {
   }
 }
 
+function HarvestWatchLoadingCard({ className }: { className?: string }) {
+  return (
+    <Card
+      data-testid="plant-detail-harvest-watch-card-loading"
+      className={cn("my-3", className)}
+    >
+      <CardHeader className="space-y-1">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Leaf className="h-4 w-4 text-primary" /> Harvest Watch
+        </CardTitle>
+        <p className="text-xs text-muted-foreground">Loading harvest evidence…</p>
+      </CardHeader>
+    </Card>
+  );
+}
+
 function dispatchNextInspection(
   prefill: HarvestInspectionQuickLogPrefill,
 ) {
@@ -194,23 +210,15 @@ export default function PlantDetailHarvestWatchCard({
 
   if (!plantId) return null;
 
-  if (plant && !harvestWatchEligible) return null;
+  if (plantLoading) return <HarvestWatchLoadingCard className={className} />;
 
-  if (plantLoading || activityLoading || !vm) {
-    return (
-      <Card
-        data-testid="plant-detail-harvest-watch-card-loading"
-        className={cn("my-3", className)}
-      >
-        <CardHeader className="space-y-1">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Leaf className="h-4 w-4 text-primary" /> Harvest Watch
-          </CardTitle>
-          <p className="text-xs text-muted-foreground">Loading harvest evidence…</p>
-        </CardHeader>
-      </Card>
-    );
-  }
+  if (!plant) return null;
+
+  if (!harvestWatchEligible) return null;
+
+  if (activityLoading) return <HarvestWatchLoadingCard className={className} />;
+
+  if (!vm) return null;
 
   const row = vm.row;
 

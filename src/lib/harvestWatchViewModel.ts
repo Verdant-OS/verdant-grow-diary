@@ -105,7 +105,17 @@ export function buildHarvestWatchRowViewModel(
 ): HarvestWatchRowViewModel {
   const readiness = calculateReadinessScore(input);
   const dryback = deriveDrybackVisibility(input);
-  const harvestWindow = predictHarvestWindow(input);
+  const predictedHarvestWindow = predictHarvestWindow(input);
+  const hasFlowerTimingContext =
+    typeof input.daysInFlower === "number" &&
+    Number.isFinite(input.daysInFlower) &&
+    input.daysInFlower >= 0;
+  const harvestWindow = hasFlowerTimingContext
+    ? predictedHarvestWindow
+    : {
+        ...predictedHarvestWindow,
+        caption: "Log a flower start or flip date before using a calendar window.",
+      };
   const photoPrompt = evaluatePhotoPrompt(input.lastPhotoAt, input.now);
   const trichome = deriveTrichomePlaceholder(input.trichome ?? null);
   const daysVsHistory = computeDaysVsHistory(
@@ -148,7 +158,9 @@ export function buildHarvestWatchRowViewModel(
     daysVsHistory,
     dryback,
     harvestWindow,
-    harvestWindowLabel: `Day ${harvestWindow.startDay}–${harvestWindow.endDay}`,
+    harvestWindowLabel: hasFlowerTimingContext
+      ? `Day ${harvestWindow.startDay}–${harvestWindow.endDay}`
+      : "Flower start date needed",
     confidenceLabel: HARVEST_WATCH_CONFIDENCE_LABEL[downgraded],
     lastPhotoAgeDays: ageDays,
     lastPhotoLabel:

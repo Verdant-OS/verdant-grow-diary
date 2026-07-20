@@ -67,6 +67,43 @@ export function isKnownQuickLogStage(raw: unknown): boolean {
   return normalizeQuickLogStage(raw) !== null;
 }
 
+export type HarvestStageEligibilityReason =
+  | "eligible"
+  | "early_stage"
+  | "post_harvest"
+  | "unknown_stage";
+
+export interface HarvestStageEligibility {
+  eligible: boolean;
+  normalizedStage: string | null;
+  reason: HarvestStageEligibilityReason;
+}
+
+/**
+ * Resolve whether pre-harvest evidence tooling applies to a plant stage.
+ *
+ * This is intentionally fail-closed: missing and unrecognized stages never
+ * receive harvest-window UI. Plant-side `cure` is normalized through the
+ * canonical alias above to `drying`, then treated as post-harvest.
+ */
+export function evaluateHarvestStageEligibility(raw: unknown): HarvestStageEligibility {
+  const normalizedStage = normalizeQuickLogStage(raw);
+
+  if (normalizedStage === "flower" || normalizedStage === "flush" || normalizedStage === "harvest") {
+    return { eligible: true, normalizedStage, reason: "eligible" };
+  }
+
+  if (normalizedStage === "seedling" || normalizedStage === "veg") {
+    return { eligible: false, normalizedStage, reason: "early_stage" };
+  }
+
+  if (normalizedStage === "drying") {
+    return { eligible: false, normalizedStage, reason: "post_harvest" };
+  }
+
+  return { eligible: false, normalizedStage: null, reason: "unknown_stage" };
+}
+
 /**
  * Should stage defaulting be re-armed for a plant-selection change?
  *

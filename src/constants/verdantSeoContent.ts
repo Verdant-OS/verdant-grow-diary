@@ -644,6 +644,10 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       {
         heading: "Log what went into the feed, not what the chart intended",
         body: "For each feeding, capture the date, product names, actual amounts used, total mixed volume, water source, input pH, and input EC or PPM. If a field was not measured, leave it unknown instead of inventing a value. The goal is an honest record of the feed the plant received, not a perfect-looking checklist.",
+        links: [
+          { label: "Start a Quick Log", to: "/quick-log" },
+          { label: "AI Doctor readiness check", to: "/ai-doctor-readiness-check" },
+        ],
       },
       {
         heading: "Pair the input with root-zone and room context",
@@ -652,6 +656,10 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       {
         heading: "Compare chart adherence with the plant's response",
         body: "Check the plant again over the next day and the next few days: leaf posture, tip color, new growth, water use, and any visible change. Compare that response with the feed and environment already on the timeline. AI Doctor can review this history cautiously and identify missing context, but it should not turn one symptom into an aggressive nutrient change or an automatic action.",
+        links: [
+          { label: "AI Doctor readiness check", to: "/ai-doctor-readiness-check" },
+          { label: "How AI Doctor works", to: "/how-ai-doctor-works" },
+        ],
       },
     ],
     faq: [

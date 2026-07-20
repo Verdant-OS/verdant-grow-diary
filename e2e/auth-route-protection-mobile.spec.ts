@@ -45,6 +45,7 @@ const PROTECTED_MOBILE_ROUTES: string[] = [
   "/operator/post-grow-reflection-dry-run",
   "/operator/release-readiness",
   "/operator/subscriber-growth",
+  "/operator/support-inbox",
   "/operator/demo-preview",
 
   "/pi-ingest-status",
@@ -112,6 +113,10 @@ const PUBLIC_MOBILE_ROUTES: string[] = [
   "/terms",
   "/privacy",
   "/refund",
+  // Public support pages (feedback + contact): static forms mounted outside
+  // AppShell — must render signed-out with zero private-table fetches.
+  "/contact",
+  "/feedback",
   "/tools/vpd-calculator",
   // Public MCP API reference docs page: static content only, no Supabase
   // fetch — must render signed-out with zero private-table fetches.

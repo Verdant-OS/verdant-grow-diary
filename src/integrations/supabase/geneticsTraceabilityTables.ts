@@ -142,6 +142,35 @@ type GeneticsScreeningResultRow = {
   created_at: string;
 };
 
+type QuarantineEpisodeRow = {
+  id: string;
+  user_id: string;
+  subject_type: string;
+  subject_id: string;
+  target: string;
+  status: string;
+  opened_at: string;
+  opened_reason: string | null;
+  reopened_at: string | null;
+  closed_at: string | null;
+  closure_kind: string | null;
+  closure_screening_result_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type QuarantineTransitionEventRow = {
+  id: string;
+  user_id: string;
+  episode_id: string;
+  action: string;
+  reason: string | null;
+  screening_result_id: string | null;
+  is_override: boolean;
+  changed_at: string;
+  created_at: string;
+};
+
 // ---------------------------------------------------------------------------
 // Function (RPC) argument + return types. Returns are the jsonb envelope (Json).
 // ---------------------------------------------------------------------------
@@ -232,6 +261,25 @@ export interface GeneticsTraceabilityDatabase {
         | "created_at",
         never
       >;
+      quarantine_episodes: Tbl<
+        QuarantineEpisodeRow,
+        | "id"
+        | "status"
+        | "opened_at"
+        | "opened_reason"
+        | "reopened_at"
+        | "closed_at"
+        | "closure_kind"
+        | "closure_screening_result_id"
+        | "created_at"
+        | "updated_at"
+      >;
+      // Append-only transition history — Update = never.
+      quarantine_transition_events: Tbl<
+        QuarantineTransitionEventRow,
+        "id" | "reason" | "screening_result_id" | "is_override" | "changed_at" | "created_at",
+        never
+      >;
     };
     Views: Record<string, never>;
     Functions: {
@@ -257,6 +305,17 @@ export interface GeneticsTraceabilityDatabase {
       genetics_screening_record: GeneticsFn<{
         p_idempotency_key: string;
         p_payload: Json;
+      }>;
+      genetics_quarantine_open: GeneticsFn<{
+        p_idempotency_key: string;
+        p_payload: Json;
+      }>;
+      genetics_quarantine_transition: GeneticsFn<{
+        p_idempotency_key: string;
+        p_episode_id: string;
+        p_action: string;
+        p_reason?: string | null;
+        p_screening_result_id?: string | null;
       }>;
     };
     Enums: Record<string, never>;

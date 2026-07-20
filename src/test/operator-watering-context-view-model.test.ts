@@ -348,6 +348,22 @@ describe("operator watering context view model", () => {
     );
   });
 
+  it("keeps other evidence usable while distinguishing an unavailable tent diary from no entries", () => {
+    const model = buildOperatorWateringContextViewModel(
+      readyState({ diary: { status: "unavailable" } }),
+    );
+
+    expect(model.status).toBe("context");
+    expect(model.lastRootZoneApplication).not.toBeNull();
+    expect(model.sensorRows).toHaveLength(1);
+    expect(model.diaryObservationStatus).toBe("unavailable");
+    expect(model.diaryObservationCount).toBe(0);
+    expect(model.diaryObservations).toEqual([]);
+    expect(model.diaryObservationAvailabilityNote).toBe(
+      "Tent-linked observations are unavailable. Verdant cannot confirm this tent has no recent entries.",
+    );
+  });
+
   it("does not label a rejected manual observation as a rejected measurement", () => {
     const observation = {
       ...rootZoneObservation("2026-07-19T17:00:00.000Z", "watering"),

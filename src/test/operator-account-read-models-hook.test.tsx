@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const GROW_ID = "11111111-1111-4111-8111-111111111111";
 const TENT_ID = "22222222-2222-4222-8222-222222222222";
+const SECOND_TENT_ID = "44444444-4444-4444-8444-444444444444";
 const USER_ID = "33333333-3333-4333-8333-333333333333";
 
 const mocks = vi.hoisted(() => ({
@@ -13,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   tents: vi.fn(),
   rootZone: vi.fn(),
   listDiary: vi.fn(),
+  listTentDiary: vi.fn(),
   getSnapshot: vi.fn(),
 }));
 
@@ -25,6 +27,7 @@ vi.mock("@/hooks/useOperatorRootZoneRecords", () => ({
 vi.mock("@/integrations/supabase/client", () => ({ supabase: {} }));
 vi.mock("@/lib/operatorAccountReadModels", () => ({
   listRecentDiaryEntriesForOwnedGrow: (...args: unknown[]) => mocks.listDiary(...args),
+  listRecentDiaryEntriesForOwnedTent: (...args: unknown[]) => mocks.listTentDiary(...args),
   getLatestSensorSnapshotForOwnedTent: (...args: unknown[]) => mocks.getSnapshot(...args),
 }));
 
@@ -60,6 +63,23 @@ function readyDefaults() {
     isError: false,
   });
   mocks.listDiary.mockResolvedValue({
+    ok: true,
+    data: {
+      entries: [
+        {
+          id: "entry-1",
+          grow_id: GROW_ID,
+          plant_id: null,
+          tent_id: TENT_ID,
+          stage: "flower",
+          note: "Observed upright leaves.",
+          entry_at: "2026-07-19T10:00:00.000Z",
+          created_at: "2026-07-19T10:00:00.000Z",
+        },
+      ],
+    },
+  });
+  mocks.listTentDiary.mockResolvedValue({
     ok: true,
     data: {
       entries: [
@@ -119,11 +139,197 @@ describe("useOperatorAccountReadModels", () => {
     });
 
     expect(mocks.listDiary).toHaveBeenCalledWith(expect.anything(), GROW_ID, 10);
+    expect(mocks.listTentDiary).toHaveBeenCalledWith(expect.anything(), GROW_ID, TENT_ID, 10);
     expect(mocks.getSnapshot).toHaveBeenCalledWith(expect.anything(), TENT_ID);
     expect(mocks.rootZone).toHaveBeenCalledWith({ growId: GROW_ID, tentId: TENT_ID });
     expect(result.current.status === "ready" && result.current.watering.status).toBe(
       "insufficient",
     );
+    expect(result.current.status === "ready" && result.current.tentScopeStatus).toBe("ready");
+    expect(result.current.status === "ready" && result.current.selectedTentId).toBe(TENT_ID);
+  });
+
+  it("requires a tent choice and never mixes another tent's diary note into watering context", async () => {
+    const tentA = { id: TENT_ID, growId: GROW_ID, name: "Flower tent" };
+    const tentB = { id: SECOND_TENT_ID, growId: GROW_ID, name: "Veg tent" };
+    mocks.tents.mockReturnValue({
+      data: [tentB, tentA],
+      isLoading: false,
+      isError: false,
+    });
+    mocks.listDiary.mockResolvedValue({
+      ok: true,
+      data: {
+        entries: [
+          {
+            id: "entry-b",
+            grow_id: GROW_ID,
+            plant_id: null,
+            tent_id: SECOND_TENT_ID,
+            stage: "veg",
+            note: "Tent B is still wet.",
+            entry_at: "2026-07-19T11:00:00.000Z",
+            created_at: "2026-07-19T11:00:00.000Z",
+          },
+          {
+            id: "entry-a",
+            grow_id: GROW_ID,
+            plant_id: null,
+            tent_id: TENT_ID,
+            stage: "flower",
+            note: "Tent A pot feels light.",
+            entry_at: "2026-07-19T10:00:00.000Z",
+            created_at: "2026-07-19T10:00:00.000Z",
+          },
+        ],
+      },
+    });
+    mocks.listTentDiary.mockResolvedValue({
+      ok: true,
+      data: {
+        entries: [
+          {
+            id: "entry-a",
+            grow_id: GROW_ID,
+            plant_id: null,
+            tent_id: TENT_ID,
+            stage: "flower",
+            note: "Tent A pot feels light.",
+            entry_at: "2026-07-19T10:00:00.000Z",
+            created_at: "2026-07-19T10:00:00.000Z",
+          },
+        ],
+      },
+    });
+
+    const { result, rerender } = renderHook(
+      ({ selectedTentId }: { selectedTentId: string | null }) =>
+        useOperatorAccountReadModels({ selectedTentId }),
+      { wrapper: wrapper(), initialProps: { selectedTentId: null } },
+    );
+
+    await waitFor(() => {
+      expect(result.current.status).toBe("ready");
+      expect(result.current.status === "ready" && result.current.tentScopeStatus).toBe(
+        "selection_required",
+      );
+    });
+    expect(mocks.getSnapshot).not.toHaveBeenCalled();
+    expect(mocks.listTentDiary).not.toHaveBeenCalled();
+    expect(mocks.rootZone).toHaveBeenLastCalledWith(null);
+    expect(result.current.status === "ready" && result.current.watering.diaryObservationCount).toBe(
+      0,
+    );
+
+    rerender({ selectedTentId: TENT_ID });
+    await waitFor(() => {
+      expect(result.current.status === "ready" && result.current.sensor.status).toBe("ok");
+      expect(result.current.status === "ready" && result.current.selectedTentId).toBe(TENT_ID);
+    });
+
+    expect(mocks.getSnapshot).toHaveBeenCalledWith(expect.anything(), TENT_ID);
+    expect(mocks.listTentDiary).toHaveBeenCalledWith(expect.anything(), GROW_ID, TENT_ID, 10);
+    expect(mocks.rootZone).toHaveBeenLastCalledWith({ growId: GROW_ID, tentId: TENT_ID });
+    expect(
+      result.current.status === "ready" &&
+        result.current.watering.diaryObservations.map((entry) => entry.note),
+    ).toEqual(["Tent A pot feels light."]);
+
+    // Query ordering is not a selection contract. Reordering tents must not
+    // silently switch the selected room or admit Tent B's conflicting note.
+    mocks.tents.mockReturnValue({ data: [tentA, tentB], isLoading: false, isError: false });
+    rerender({ selectedTentId: TENT_ID });
+    await waitFor(() => {
+      expect(result.current.status === "ready" && result.current.selectedTentId).toBe(TENT_ID);
+    });
+    expect(
+      result.current.status === "ready" &&
+        result.current.watering.diaryObservations.map((entry) => entry.note),
+    ).toEqual(["Tent A pot feels light."]);
+  });
+
+  it("keeps the selected tent's observation when newer sibling-tent rows fill the grow preview", async () => {
+    mocks.tents.mockReturnValue({
+      data: [
+        { id: TENT_ID, growId: GROW_ID, name: "Flower tent" },
+        { id: SECOND_TENT_ID, growId: GROW_ID, name: "Veg tent" },
+      ],
+      isLoading: false,
+      isError: false,
+    });
+    mocks.listDiary.mockResolvedValue({
+      ok: true,
+      data: {
+        entries: Array.from({ length: 10 }, (_, index) => ({
+          id: `veg-entry-${index}`,
+          grow_id: GROW_ID,
+          plant_id: null,
+          tent_id: SECOND_TENT_ID,
+          stage: "veg",
+          note: `Veg observation ${index}`,
+          entry_at: `2026-07-20T${String(10 + index).padStart(2, "0")}:00:00.000Z`,
+          created_at: `2026-07-20T${String(10 + index).padStart(2, "0")}:00:00.000Z`,
+        })),
+      },
+    });
+    mocks.listTentDiary.mockResolvedValue({
+      ok: true,
+      data: {
+        entries: [
+          {
+            id: "flower-entry",
+            grow_id: GROW_ID,
+            plant_id: null,
+            tent_id: TENT_ID,
+            stage: "flower",
+            note: "Flower pot feels light.",
+            entry_at: "2026-07-20T09:00:00.000Z",
+            created_at: "2026-07-20T09:00:00.000Z",
+          },
+        ],
+      },
+    });
+
+    const { result } = renderHook(() => useOperatorAccountReadModels({ selectedTentId: TENT_ID }), {
+      wrapper: wrapper(),
+    });
+
+    await waitFor(() => {
+      expect(
+        result.current.status === "ready" && result.current.watering.diaryObservationCount,
+      ).toBe(1);
+    });
+    expect(
+      result.current.status === "ready" &&
+        result.current.watering.diaryObservations.map((entry) => entry.note),
+    ).toEqual(["Flower pot feels light."]);
+    expect(mocks.listDiary).toHaveBeenCalledWith(expect.anything(), GROW_ID, 10);
+    expect(mocks.listTentDiary).toHaveBeenCalledWith(expect.anything(), GROW_ID, TENT_ID, 10);
+  });
+
+  it("does not convert an unavailable tent diary read into an empty watering history", async () => {
+    mocks.listTentDiary.mockResolvedValue({
+      ok: false,
+      reason: "unavailable",
+      message: "tent diary read failed",
+    });
+
+    const { result } = renderHook(() => useOperatorAccountReadModels(), { wrapper: wrapper() });
+
+    await waitFor(() => {
+      expect(
+        result.current.status === "ready" &&
+          result.current.watering.diaryObservationAvailabilityNote,
+      ).toMatch(/cannot confirm this tent has no recent entries/i);
+    });
+    expect(
+      result.current.status === "ready" && result.current.watering.diaryObservationStatus,
+    ).toBe("unavailable");
+    expect(result.current.status === "ready" && result.current.watering.diaryObservationCount).toBe(
+      0,
+    );
+    expect(result.current.status === "ready" && result.current.sensor.status).toBe("ok");
+    expect(result.current.status === "ready" && result.current.diary.status).toBe("ok");
   });
 
   it("fails the sensor section closed when the loader returns a tent from another grow", async () => {
@@ -146,6 +352,18 @@ describe("useOperatorAccountReadModels", () => {
         expect(result.current.sensor.status).toBe("unavailable");
       }
     });
+  });
+
+  it("does not mislabel an unavailable tent read as an empty grow", async () => {
+    mocks.tents.mockReturnValue({ data: undefined, isLoading: false, isError: true });
+
+    const { result } = renderHook(() => useOperatorAccountReadModels(), { wrapper: wrapper() });
+    await waitFor(() => expect(result.current.status).toBe("ready"));
+
+    expect(result.current.status === "ready" && result.current.tentScopeStatus).toBe("unavailable");
+    expect(result.current.status === "ready" && result.current.sensor.status).toBe("unavailable");
+    expect(mocks.getSnapshot).not.toHaveBeenCalled();
+    expect(mocks.rootZone).toHaveBeenLastCalledWith(null);
   });
 
   it("propagates unavailable manual observation enrichment without discarding core context", async () => {
@@ -257,6 +475,7 @@ describe("useOperatorAccountReadModels", () => {
     await waitFor(() => expect(result.current.status).toBe("no_grow"));
     expect(mocks.tents).toHaveBeenCalledWith("operator-no-grow");
     expect(mocks.listDiary).not.toHaveBeenCalled();
+    expect(mocks.listTentDiary).not.toHaveBeenCalled();
     expect(mocks.getSnapshot).not.toHaveBeenCalled();
     expect(mocks.rootZone).toHaveBeenCalledWith(null);
   });

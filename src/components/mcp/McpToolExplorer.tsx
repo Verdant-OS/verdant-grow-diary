@@ -322,6 +322,8 @@ function ToolCard({
     if (invalid) return;
     const args = buildArgs();
     setJustApplied(false);
+    setPreApplySnapshot(null);
+
     setState((prev) => ({
       loading: true,
       outcome: null,

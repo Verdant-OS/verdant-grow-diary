@@ -685,19 +685,37 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       {
         heading: "Early visual signs to log with a photo",
         body: "Bud rot identification usually starts with one wilted or discolored sugar leaf poking out of an otherwise healthy cola, a single dry-looking pistil cluster, or a bud that feels slightly soft when you gently touch it. Inside, cores turn grey, brown, or dusty. Log every suspicious bud in Quick Log with a close photo against the specific plant so the timeline holds the moment you first saw it. One photo is not a confident diagnosis — but a photo plus the surrounding humidity, VPD, and watering context is the evidence AI Doctor and future-you actually need.",
+        links: [
+          { label: "Start a Quick Log", to: "/quick-log" },
+          { label: "What to log in a grow journal", to: "/guides/what-to-log-in-a-grow-journal" },
+          { label: "How AI Doctor uses your photos", to: "/how-ai-doctor-works" },
+        ],
       },
       {
         heading: "Environmental triggers Botrytis loves",
         body: "The classic triggers are sustained high humidity above roughly 60% in late flower, cool overnight temperatures that push relative humidity even higher, dense canopies with poor airflow, wet foliage from foliar sprays or condensation, and dense colas that trap moisture inside. Verdant does not adjust your fans, dehumidifier, or lights. It surfaces the pattern — a source-labeled humidity reading holding above your target, or a VPD number sliding out of range overnight — so the grower can decide whether to defoliate lightly, improve airflow, or pull affected buds.",
+        links: [
+          { label: "Grow-room VPD tracker guide", to: "/guides/grow-room-vpd-tracker" },
+          { label: "Open Environment Check", to: "/diary/environment-summary" },
+        ],
       },
       {
         heading: "Use humidity and VPD history to identify high-risk periods",
         body: "Open the plant timeline and scan the days before the first symptom. Look for humidity readings that stayed high for hours, temperature drops after lights-off that pushed humidity even higher, and VPD values that spent long stretches below your late-flower target. Every reading in Verdant carries a source label — live, manual, csv, demo, stale, or invalid — so a week-old or invalid number is flagged, not treated as current truth. CSV history imported from AC Infinity or Spider Farmer exports works the same way: read-only, source-labeled, and reviewable next to the photo you took.",
+        links: [
+          { label: "Sensor truth in the grow room", to: "/guides/sensor-truth-grow-room" },
+          { label: "Review humidity & VPD history (Environment Check)", to: "/diary/environment-summary" },
+        ],
       },
       {
         heading: "A cautious response, not a panic response",
         body: "If you confirm bud rot, remove affected buds with clean scissors, cutting well below the visible damage, and dispose of them away from the tent. Reduce humidity, improve airflow, and inspect neighboring colas the next day. Verdant's cautious AI Doctor can review your photos and sensor history and suggest a step — improve airflow, adjust dehumidifier setpoint, or increase inspection cadence — but any equipment change is grower-approved through the Action Queue. Verdant suggests; the grower decides. Verdant will never touch your dehumidifier, fans, or lights.",
+        links: [
+          { label: "AI Doctor readiness check", to: "/ai-doctor-readiness-check" },
+          { label: "How AI Doctor works", to: "/how-ai-doctor-works" },
+        ],
       },
+
     ],
     faq: [
       {

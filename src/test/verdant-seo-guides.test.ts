@@ -290,7 +290,7 @@ describe("Guide internal links to Customer Guide route", () => {
 describe("Guides hub metadata (/guides)", () => {
   it("GuidesIndex title/description carry the target keyword phrases", () => {
     expect(GUIDES_INDEX).toContain(
-      "Verdant Grower Guides | Grow Diary, VPD Tracking, and Sensor Truth",
+      "Grower Guides: Grow Diary, VPD & Sensor Truth | Verdant",
     );
     expect(GUIDES_INDEX).toMatch(/source-labeled sensor data/i);
     expect(GUIDES_INDEX).toMatch(/path:\s*"\/guides"/);

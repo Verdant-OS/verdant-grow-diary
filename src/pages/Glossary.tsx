@@ -67,7 +67,7 @@ export default function Glossary() {
       className="container mx-auto max-w-4xl px-4 py-6"
     >
       <header className="space-y-2">
-        <h1 className="text-2xl font-semibold">Cannabis glossary</h1>
+        <h1 className="text-2xl font-semibold">Cannabis Cultivation &amp; Breeding Glossary</h1>
         <p className="text-sm text-muted-foreground">{GLOSSARY_DISCLAIMER}</p>
       </header>
 

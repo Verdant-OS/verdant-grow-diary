@@ -728,6 +728,99 @@ export type Database = {
         }
         Relationships: []
       }
+      contact_messages: {
+        Row: {
+          attachment_path: string | null
+          category: string
+          created_at: string
+          email: string
+          grow_context: string | null
+          id: string
+          message: string
+          name: string
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          attachment_path?: string | null
+          category: string
+          created_at?: string
+          email: string
+          grow_context?: string | null
+          id?: string
+          message: string
+          name: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          attachment_path?: string | null
+          category?: string
+          created_at?: string
+          email?: string
+          grow_context?: string | null
+          id?: string
+          message?: string
+          name?: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      customer_feedback: {
+        Row: {
+          ai_doctor_rating: number | null
+          contact_email: string | null
+          created_at: string
+          follow_up_ok: boolean
+          grow_context: string | null
+          id: string
+          one_improvement: string | null
+          overall_rating: number
+          quicklog_rating: number | null
+          sensors_rating: number | null
+          trust_rating: number | null
+          user_agent: string | null
+          user_id: string | null
+          whats_friction: string | null
+          whats_working: string | null
+        }
+        Insert: {
+          ai_doctor_rating?: number | null
+          contact_email?: string | null
+          created_at?: string
+          follow_up_ok?: boolean
+          grow_context?: string | null
+          id?: string
+          one_improvement?: string | null
+          overall_rating: number
+          quicklog_rating?: number | null
+          sensors_rating?: number | null
+          trust_rating?: number | null
+          user_agent?: string | null
+          user_id?: string | null
+          whats_friction?: string | null
+          whats_working?: string | null
+        }
+        Update: {
+          ai_doctor_rating?: number | null
+          contact_email?: string | null
+          created_at?: string
+          follow_up_ok?: boolean
+          grow_context?: string | null
+          id?: string
+          one_improvement?: string | null
+          overall_rating?: number
+          quicklog_rating?: number | null
+          sensors_rating?: number | null
+          trust_rating?: number | null
+          user_agent?: string | null
+          user_id?: string | null
+          whats_friction?: string | null
+          whats_working?: string | null
+        }
+        Relationships: []
+      }
       diary_entries: {
         Row: {
           created_at: string

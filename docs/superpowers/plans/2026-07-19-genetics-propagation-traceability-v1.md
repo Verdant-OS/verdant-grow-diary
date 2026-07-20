@@ -223,6 +223,44 @@ All tables: `user_id NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE`, RLS 
 10. Zero horizontal overflow at 320/375/768/1440. 11. No AI/automation/device/entitlement/sensor/Action-Queue boundary changed.
 12. Old/partial rows remain readable.
 
+## 8a. Design revisions from adversarial review (2026-07-20)
+
+A 5-dimension adversarial design review ran before implementation. Confirmed defects and the fixes now baked into the design:
+
+**Idempotency (Slice 1 + all RPCs)**
+- R1. Ledger PK is `(user_id, operation, idempotency_key)` (operation namespaced) + a `request_hash text NOT NULL` column. Pre-check returns the stored envelope only when `request_hash` matches; a same-key/same-op/**different-payload** reuse returns `{ok:false, reason:'idempotency_key_conflict'}` instead of a foreign envelope. Cross-operation key reuse is harmless (separate rows).
+- R2. The `EXCEPTION WHEN unique_violation` handler uses `GET STACKED DIAGNOSTICS … = PG_EXCEPTION_CONSTRAINT` and only runs the replay path for the **named** idempotency PK (`genetics_mutation_idempotency_pkey`); a domain unique violation (batch_code / plant assignment) is handled on its own merits, never misreported as a replay.
+- R3. Key guard is the explicit `IF p_idempotency_key IS NULL OR length < 8 OR length > 200` form (NULL-safe; three-valued `NOT BETWEEN` alone would let NULL through).
+
+**Cycle rejection (Slice 3)**
+- R4. Trigger walk carries `path uuid[]` seeded with the child, guards `NOT (parent_key = ANY(path))` **and** a hard `depth < 64` cap → self-terminating even over pre-existing cyclic data; cycle-found and depth-cap both RAISE.
+- R5. **No `service_role` bypass** on the cycle guard — acyclicity is a structural invariant for *all* writers. An intentional admin override is gated only on an explicit auditable GUC `current_setting('genetics.allow_cycle_override', true) = 'on'`, never ambient role.
+- R6. The walk seeds from the **NEW** tuple's own values (NEW.mother_plant_id / NEW.batch_id+NEW.plant_id), never a table lookup of NEW.id (BEFORE-UPDATE OLD/NEW self-read bug).
+- R7. One shared `genetics_lock_lineage(uid)` helper taking `pg_advisory_xact_lock(hashtext('genetics_lineage:'||uid::text))` is the mandatory first statement of **both** `genetics_assign_plants` and `genetics_batch_upsert`; a source-scan test pins it. The lock (not the trigger) closes the concurrent window.
+- R8. One canonical ancestry CTE that **alternates both edge types** (plant→assignment→batch and batch→mother→plant); tested with a 6-node both-edge cycle, not just the 2-node case.
+
+**Trace resolver (Slice 6)**
+- R9. Node identity is the composite `node_key = node_type || ':' || node_id` (a plant may be both a mother and a production plant). DISTINCT ON / node-cap / path-guard all key on `node_key`.
+- R10. Inner `SELECT DISTINCT ON (node_key) … ORDER BY node_key, depth ASC, node_type ASC, path ASC` (satisfies the DISTINCT-ON prefix rule and picks a deterministic min-depth/lowest-path representative); outer `ORDER BY depth, node_type, node_id` for presentation.
+- R11. `truncated` is set when **either** the node-cap **or** the depth-cap elides reachable nodes (a frontier node at `max_depth` with further edges ⇒ truncated). Never report a depth-clipped trace as complete.
+- R12. Recursion is depth-capped (`p_max_depth`), path-guarded, and wrapped in `SET LOCAL statement_timeout` as a backstop; the `plant_origin_assignments.UNIQUE(plant_id)` invariant keeps the production side a tree (no diamond blow-up), and the cross/keeper sub-graph is bounded by depth+timeout with truthful `truncated`.
+- R13. `evidence_state` is a **per-target vector**, worst-wins: any target `positive` ⇒ positive; else any `inconclusive`/`untested`/`pending` ⇒ that; a target is `negative_scoped` only for its own target+date; rows referenced by another row's `supersedes_id` are excluded from "current" but kept in history. **No path maps `not_tested`/`inconclusive`/superseded to negative or clean.**
+
+**Quarantine clearance (Slice 5)**
+- R14. Release rejects a **superseded** chosen negative (`EXISTS supersedes_id = chosen`) and any **newer/equal contradicting** result (`positive`/`inconclusive`/`not_tested`, same subject+target, `collected_date >= chosen`). Clearance is proven against the latest evidence.
+- R15. Release binds the screening to the episode's **subject** (`subject_type` + `subject_id`) *and* target — not target+owner alone (another plant's certificate must not clear).
+- R16. Screening carries `collected_date` with `CHECK (collected_date <= current_date)` and (when both present) `collected_date <= result_date`; clearance compares against the effective-open **date** in UTC and **allows same-day** (`>=`), blocking future-dated fabrication.
+- R17. `reopen` sets a fresh effective-open (`reopened_at`); post-reopen clearance requires evidence collected after the last open/reopen (no dispose→reopen→release laundering on a stale negative).
+- R18. Transition RPC does `SELECT … FOR UPDATE` on the episode + an explicit legal-transition table (release/dispose require `open`; reopen requires `released`/`disposed`) → no double-release / disposed→released flip / concurrent race.
+- R19. Override forces `closure_kind='override'`, `closure_screening_result_id=NULL` (never `cleared`); table `CHECK ((closure_kind='cleared') = (closure_screening_result_id IS NOT NULL))`. Dispose/override require `length(btrim(reason)) >= 8`.
+- R20. `target` normalized (`lower(btrim(target))`, `CHECK (target = btrim(target) AND target <> '')`), compared normalized.
+
+**RLS / tenant isolation (all slices)**
+- R21. `genetics_trace_resolve`'s first statement is a seed-ownership gate (`EXISTS … AND user_id = uid` → generic `not_found`); every node hydrated only from rows carrying `user_id = uid`; every edge union filters `user_id = uid` on **both** endpoints.
+- R22. Every referenced-id check is a single `EXISTS(… AND user_id = uid)` returning **one generic reason** regardless of absent-vs-foreign (no existence oracle). Harness asserts a foreign id and a random uuid yield byte-identical envelopes.
+- R23. Ownership columns (`user_id`, `recorded_by`) are always set literally `= uid`, never read from `p_payload`; source-scan test forbids `p_payload->>'user_id'` / `'recorded_by'` and unqualified `jsonb_populate_record`.
+- R24. `quarantine_transition_events.screening_result_id` gets a real FK and ownership validation for **any** action carrying it (not just release).
+
 ## 9. Known risks / rollback
 
 - Runtime RLS harness unexecuted here (no local stack) → **must** run on a stacked machine or CI before production trust. Rollback: migrations are additive; drop-new-objects migration reverses cleanly (no existing table altered).

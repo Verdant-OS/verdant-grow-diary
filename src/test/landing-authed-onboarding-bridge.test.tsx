@@ -19,11 +19,37 @@ import { resolve } from "node:path";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
-const growsMock = vi.fn(() => ({ grows: [] as unknown[] }));
+type ActivationEvidenceState = {
+  status: "idle" | "loading" | "ok" | "unavailable";
+  summary: {
+    count: number;
+    hasEvidence: boolean;
+    latestAt: string | null;
+    latestSource: "grow_events" | "diary_entries" | null;
+  };
+};
+
+const emptyActivationEvidence = (): ActivationEvidenceState => ({
+  status: "idle",
+  summary: {
+    count: 0,
+    hasEvidence: false,
+    latestAt: null,
+    latestSource: null,
+  },
+});
+
+const growsMock = vi.fn(() => ({
+  grows: [] as unknown[],
+  activeGrowId: null as string | null,
+}));
 const tentsMock = vi.fn(() => ({ data: [] as unknown[] }));
 const plantsMock = vi.fn(() => ({ data: [] as unknown[] }));
 const readingsMock = vi.fn(() => ({ data: [] as unknown[] }));
 const diaryMock = vi.fn(() => ({ data: [] as unknown[] }));
+const activationEvidenceMock = vi.fn<(scope?: unknown) => ActivationEvidenceState>(() =>
+  emptyActivationEvidence(),
+);
 
 vi.mock("@/store/grows", () => ({
   useGrows: () => growsMock(),
@@ -37,6 +63,9 @@ vi.mock("@/hooks/use-sensor-readings", () => ({
 }));
 vi.mock("@/hooks/use-diary-entries", () => ({
   useDiaryEntries: () => diaryMock(),
+}));
+vi.mock("@/hooks/useOneTentActivationEvidence", () => ({
+  useOneTentActivationEvidence: (scope: unknown) => activationEvidenceMock(scope),
 }));
 
 import LandingAuthedOnboardingBridge from "@/components/LandingAuthedOnboardingBridge";
@@ -58,11 +87,12 @@ function renderBridge() {
 }
 
 beforeEach(() => {
-  growsMock.mockReturnValue({ grows: [] });
+  growsMock.mockReturnValue({ grows: [], activeGrowId: null });
   tentsMock.mockReturnValue({ data: [] });
   plantsMock.mockReturnValue({ data: [] });
   readingsMock.mockReturnValue({ data: [] });
   diaryMock.mockReturnValue({ data: [] });
+  activationEvidenceMock.mockReturnValue(emptyActivationEvidence());
 });
 
 describe("LandingAuthedOnboardingBridge — render", () => {
@@ -71,33 +101,50 @@ describe("LandingAuthedOnboardingBridge — render", () => {
     expect(screen.getByTestId("landing-authed-onboarding-bridge")).toBeTruthy();
     const pill = screen.getByTestId("onboarding-progress-pill");
     expect(pill.getAttribute("data-complete-count")).toBe("0");
-    expect(pill.getAttribute("data-total-count")).toBe("4");
+    expect(pill.getAttribute("data-total-count")).toBe("5");
     expect(screen.getByText(/Ready to build your real grow memory\?/i)).toBeTruthy();
     const cta = screen.getByTestId("landing-authed-onboarding-bridge-cta");
     expect(cta).toHaveTextContent(/Continue setup in Dashboard/i);
     expect(cta.closest("a")?.getAttribute("href")).toBe("/");
   });
 
-  it("reflects partial progress from real hook counts", () => {
-    growsMock.mockReturnValue({ grows: [{ id: "g1" }] });
-    tentsMock.mockReturnValue({ data: [{ id: "t1" }] });
-    plantsMock.mockReturnValue({ data: [{ id: "p1" }] });
+  it("reflects partial progress from one relationship-connected graph", () => {
+    growsMock.mockReturnValue({ grows: [{ id: "g1" }], activeGrowId: "g1" });
+    tentsMock.mockReturnValue({ data: [{ id: "t1", growId: "g1" }] });
+    plantsMock.mockReturnValue({
+      data: [{ id: "p1", growId: "g1", tentId: "t1" }],
+    });
     renderBridge();
     const pill = screen.getByTestId("onboarding-progress-pill");
     expect(pill.getAttribute("data-complete-count")).toBe("3");
+    expect(pill.getAttribute("data-total-count")).toBe("5");
     expect(pill.getAttribute("data-activated")).toBe("false");
     expect(screen.getByTestId("landing-authed-onboarding-bridge-cta")).toHaveTextContent(
       /Continue setup in Dashboard/i,
     );
   });
 
-  it("shows Grow memory active + Open Dashboard when fully activated", () => {
-    growsMock.mockReturnValue({ grows: [{ id: "g1" }] });
-    tentsMock.mockReturnValue({ data: [{ id: "t1" }] });
-    plantsMock.mockReturnValue({ data: [{ id: "p1" }] });
-    diaryMock.mockReturnValue({ data: [{ id: "d1" }] });
+  it("shows Grow memory active only after both Quick Log evidence and a sensor snapshot", () => {
+    growsMock.mockReturnValue({ grows: [{ id: "g1" }], activeGrowId: "g1" });
+    tentsMock.mockReturnValue({ data: [{ id: "t1", growId: "g1" }] });
+    plantsMock.mockReturnValue({
+      data: [{ id: "p1", growId: "g1", tentId: "t1" }],
+    });
+    activationEvidenceMock.mockReturnValue({
+      status: "ok",
+      summary: {
+        count: 1,
+        hasEvidence: true,
+        latestAt: "2026-07-19T12:00:00.000Z",
+        latestSource: "grow_events",
+      },
+    });
+    readingsMock.mockReturnValue({
+      data: [{ id: "r1", tent_id: "t1", source: "manual", raw_payload: null }],
+    });
     renderBridge();
     const pill = screen.getByTestId("onboarding-progress-pill");
+    expect(pill.getAttribute("data-complete-count")).toBe("5");
     expect(pill.getAttribute("data-activated")).toBe("true");
     expect(pill).toHaveTextContent(/Grow memory active/i);
     expect(screen.getByText(/Your grow memory is active\./i)).toBeTruthy();
@@ -106,26 +153,73 @@ describe("LandingAuthedOnboardingBridge — render", () => {
     expect(cta.closest("a")?.getAttribute("href")).toBe("/");
   });
 
-  it("counts a sensor reading alone as the first-log signal", () => {
-    growsMock.mockReturnValue({ grows: [{ id: "g1" }] });
-    tentsMock.mockReturnValue({ data: [{ id: "t1" }] });
-    plantsMock.mockReturnValue({ data: [{ id: "p1" }] });
+  it("keeps a trustworthy sensor snapshot separate from missing Quick Log evidence", () => {
+    growsMock.mockReturnValue({ grows: [{ id: "g1" }], activeGrowId: "g1" });
+    tentsMock.mockReturnValue({ data: [{ id: "t1", growId: "g1" }] });
+    plantsMock.mockReturnValue({
+      data: [{ id: "p1", growId: "g1", tentId: "t1" }],
+    });
     readingsMock.mockReturnValue({
-      data: [{ id: "r1", source: "manual", raw_payload: null }],
+      data: [{ id: "r1", tent_id: "t1", source: "manual", raw_payload: null }],
     });
     renderBridge();
     const pill = screen.getByTestId("onboarding-progress-pill");
-    expect(pill.getAttribute("data-activated")).toBe("true");
+    expect(pill.getAttribute("data-complete-count")).toBe("4");
+    expect(pill.getAttribute("data-activated")).toBe("false");
+    expect(screen.queryByText(/Your grow memory is active\./i)).toBeNull();
+  });
+
+  it("counts grow_events-only hook evidence as Quick Log without fabricating sensor truth", () => {
+    growsMock.mockReturnValue({ grows: [{ id: "g1" }], activeGrowId: "g1" });
+    tentsMock.mockReturnValue({ data: [{ id: "t1", growId: "g1" }] });
+    plantsMock.mockReturnValue({
+      data: [{ id: "p1", growId: "g1", tentId: "t1" }],
+    });
+    activationEvidenceMock.mockReturnValue({
+      status: "ok",
+      summary: {
+        count: 1,
+        hasEvidence: true,
+        latestAt: "2026-07-19T12:00:00.000Z",
+        latestSource: "grow_events",
+      },
+    });
+
+    renderBridge();
+
+    expect(activationEvidenceMock).toHaveBeenCalledWith({
+      growId: "g1",
+      tentId: "t1",
+      plantId: "p1",
+      hasGrow: true,
+      hasTent: true,
+      hasPlant: true,
+    });
+    const pill = screen.getByTestId("onboarding-progress-pill");
+    expect(pill.getAttribute("data-complete-count")).toBe("4");
+    expect(pill.getAttribute("data-activated")).toBe("false");
   });
 
   it("does not let a canonical-live diagnostic row activate grow memory", () => {
-    growsMock.mockReturnValue({ grows: [{ id: "g1" }] });
-    tentsMock.mockReturnValue({ data: [{ id: "t1" }] });
-    plantsMock.mockReturnValue({ data: [{ id: "p1" }] });
+    growsMock.mockReturnValue({ grows: [{ id: "g1" }], activeGrowId: "g1" });
+    tentsMock.mockReturnValue({ data: [{ id: "t1", growId: "g1" }] });
+    plantsMock.mockReturnValue({
+      data: [{ id: "p1", growId: "g1", tentId: "t1" }],
+    });
+    activationEvidenceMock.mockReturnValue({
+      status: "ok",
+      summary: {
+        count: 1,
+        hasEvidence: true,
+        latestAt: "2026-07-19T12:00:00.000Z",
+        latestSource: "grow_events",
+      },
+    });
     readingsMock.mockReturnValue({
       data: [
         {
           id: "diagnostic-row",
+          tent_id: "t1",
           source: "live",
           raw_payload: {
             vendor: "ecowitt_windows_testbench",
@@ -142,7 +236,7 @@ describe("LandingAuthedOnboardingBridge — render", () => {
     renderBridge();
 
     const pill = screen.getByTestId("onboarding-progress-pill");
-    expect(pill.getAttribute("data-complete-count")).toBe("3");
+    expect(pill.getAttribute("data-complete-count")).toBe("4");
     expect(pill.getAttribute("data-activated")).toBe("false");
     expect(screen.getByText(/Ready to build your real grow memory\?/i)).toBeTruthy();
     expect(screen.queryByText(/Your grow memory is active\./i)).toBeNull();
@@ -150,13 +244,25 @@ describe("LandingAuthedOnboardingBridge — render", () => {
   });
 
   it("accepts a physically proven EcoWitt gateway row as activation evidence", () => {
-    growsMock.mockReturnValue({ grows: [{ id: "g1" }] });
-    tentsMock.mockReturnValue({ data: [{ id: "t1" }] });
-    plantsMock.mockReturnValue({ data: [{ id: "p1" }] });
+    growsMock.mockReturnValue({ grows: [{ id: "g1" }], activeGrowId: "g1" });
+    tentsMock.mockReturnValue({ data: [{ id: "t1", growId: "g1" }] });
+    plantsMock.mockReturnValue({
+      data: [{ id: "p1", growId: "g1", tentId: "t1" }],
+    });
+    activationEvidenceMock.mockReturnValue({
+      status: "ok",
+      summary: {
+        count: 1,
+        hasEvidence: true,
+        latestAt: "2026-07-19T12:00:00.000Z",
+        latestSource: "grow_events",
+      },
+    });
     readingsMock.mockReturnValue({
       data: [
         {
           id: "physical-gateway-row",
+          tent_id: "t1",
           source: "live",
           raw_payload: {
             vendor: "ecowitt_windows_testbench",
@@ -176,6 +282,7 @@ describe("LandingAuthedOnboardingBridge — render", () => {
     renderBridge();
 
     const pill = screen.getByTestId("onboarding-progress-pill");
+    expect(pill.getAttribute("data-complete-count")).toBe("5");
     expect(pill.getAttribute("data-activated")).toBe("true");
     expect(screen.getByText(/Your grow memory is active\./i)).toBeTruthy();
   });

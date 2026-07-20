@@ -5,8 +5,20 @@ import { useAuth } from "@/store/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { STAGES } from "@/lib/grow";
 import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 import { Plus } from "lucide-react";
@@ -14,21 +26,25 @@ import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { useTents } from "@/hooks/use-tents";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
-import {
-  evaluateTentCreationGate,
-  FREE_TIER_UPGRADE_PATH,
-} from "@/lib/entitlements/freeTierGates";
+import { evaluateTentCreationGate, FREE_TIER_UPGRADE_PATH } from "@/lib/entitlements/freeTierGates";
 
 interface Props {
   trigger?: React.ReactNode;
   defaultGrowId?: string;
   onCreated?: (tent: { id: string; name: string }) => void;
+  /** Opens the existing dialog on guided activation routes only. */
+  initiallyOpen?: boolean;
 }
 
-export default function CreateTentDialog({ trigger, defaultGrowId, onCreated }: Props) {
+export default function CreateTentDialog({
+  trigger,
+  defaultGrowId,
+  onCreated,
+  initiallyOpen = false,
+}: Props) {
   const { user } = useAuth();
   const qc = useQueryClient();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initiallyOpen);
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({ name: "", size: "", brand: "", stage: "seedling" });
 
@@ -94,7 +110,8 @@ export default function CreateTentDialog({ trigger, defaultGrowId, onCreated }: 
           <DialogTitle className="font-display">New tent</DialogTitle>
         </DialogHeader>
         <p className="text-xs text-muted-foreground -mt-1">
-          Start simple. You can add size, brand, and stage later. Verdant works best once your first plant memory exists.
+          Start simple. You can add size, brand, and stage later. Verdant works best once your first
+          plant memory exists.
         </p>
         {!tentGate.allowed && (
           <p
@@ -110,29 +127,52 @@ export default function CreateTentDialog({ trigger, defaultGrowId, onCreated }: 
         <form onSubmit={submit} className="grid gap-3">
           <div>
             <Label>Name</Label>
-            <Input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Tent #1" />
-            <p className="text-[11px] text-muted-foreground mt-1">Only a name is required to get started.</p>
+            <Input
+              required
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="Tent #1"
+            />
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Only a name is required to get started.
+            </p>
           </div>
           <details className="rounded-md border border-border/40 px-3 py-2">
-            <summary className="cursor-pointer text-xs text-muted-foreground select-none">Optional details (enrich later)</summary>
+            <summary className="cursor-pointer text-xs text-muted-foreground select-none">
+              Optional details (enrich later)
+            </summary>
             <div className="grid gap-3 pt-3">
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <Label>Size (optional)</Label>
-                  <Input value={form.size} onChange={(e) => setForm({ ...form, size: e.target.value })} placeholder="4x4" />
+                  <Input
+                    value={form.size}
+                    onChange={(e) => setForm({ ...form, size: e.target.value })}
+                    placeholder="4x4"
+                  />
                 </div>
                 <div>
                   <Label>Brand (optional)</Label>
-                  <Input value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} placeholder="Gorilla" />
+                  <Input
+                    value={form.brand}
+                    onChange={(e) => setForm({ ...form, brand: e.target.value })}
+                    placeholder="Gorilla"
+                  />
                 </div>
               </div>
               <div>
                 <Label>Stage (optional)</Label>
                 <Select value={form.stage} onValueChange={(v) => setForm({ ...form, stage: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
-                    {STAGES.filter((s) => ["seedling", "veg", "flower", "flush", "harvest"].includes(s.value)).map((s) => (
-                      <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                    {STAGES.filter((s) =>
+                      ["seedling", "veg", "flower", "flush", "harvest"].includes(s.value),
+                    ).map((s) => (
+                      <SelectItem key={s.value} value={s.value}>
+                        {s.label}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

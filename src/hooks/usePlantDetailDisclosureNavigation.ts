@@ -125,8 +125,8 @@ export function usePlantDetailDisclosureNavigation({
   }, []);
 
   useEffect(() => {
-    const target = resolvePlantDetailDisclosureTarget(observedHash);
     const plantChanged = previousPlantIdRef.current !== plantId;
+    const target = resolvePlantDetailDisclosureTarget(plantChanged ? location.hash : observedHash);
     previousPlantIdRef.current = plantId;
 
     if (plantChanged) {
@@ -139,7 +139,7 @@ export function usePlantDetailDisclosureNavigation({
     }
 
     if (target) scheduleNavigation(target.anchorId);
-  }, [cancelPendingFrame, observedHash, plantId, scheduleNavigation]);
+  }, [cancelPendingFrame, location.hash, observedHash, plantId, scheduleNavigation]);
 
   useEffect(() => cancelPendingFrame, [cancelPendingFrame]);
 

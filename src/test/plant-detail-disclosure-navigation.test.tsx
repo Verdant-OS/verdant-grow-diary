@@ -1,6 +1,6 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, fireEvent, render, renderHook, screen } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { usePlantDetailDisclosureNavigation } from "@/hooks/usePlantDetailDisclosureNavigation";
@@ -11,20 +11,58 @@ function wrapper(initialEntry: string) {
   };
 }
 
+function NavigableDisclosureHarness() {
+  const { plantId } = useParams<{ plantId: string }>();
+  const navigate = useNavigate();
+  const { openGroups, setGroupOpen } = usePlantDetailDisclosureNavigation({ plantId });
+
+  return (
+    <>
+      <output data-testid="disclosure-open-groups">{JSON.stringify(openGroups)}</output>
+      <button type="button" onClick={() => setGroupOpen("history", true)}>
+        Open history
+      </button>
+      <button type="button" onClick={() => navigate("/plants/plant-b")}>
+        Open plant B without hash
+      </button>
+      <button type="button" onClick={() => navigate("/plants/plant-b#plant-harvest-evidence")}>
+        Open plant B harvest evidence
+      </button>
+      <section id="plant-ai-doctor-review">AI review</section>
+      <section id="plant-harvest-evidence">Harvest evidence</section>
+    </>
+  );
+}
+
+function renderNavigableHarness(initialEntry: string) {
+  return render(
+    <MemoryRouter initialEntries={[initialEntry]}>
+      <Routes>
+        <Route path="/plants/:plantId" element={<NavigableDisclosureHarness />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
+
 describe("usePlantDetailDisclosureNavigation", () => {
-  let frames: FrameRequestCallback[];
+  let frames: Array<{ id: number; callback: FrameRequestCallback }>;
+  let nextFrameId: number;
   let cancelAnimationFrame: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     frames = [];
+    nextFrameId = 0;
     vi.stubGlobal(
       "requestAnimationFrame",
       vi.fn((callback: FrameRequestCallback) => {
-        frames.push(callback);
-        return frames.length;
+        const id = ++nextFrameId;
+        frames.push({ id, callback });
+        return id;
       }),
     );
-    cancelAnimationFrame = vi.fn();
+    cancelAnimationFrame = vi.fn((frameId: number) => {
+      frames = frames.filter(({ id }) => id !== frameId);
+    });
     vi.stubGlobal("cancelAnimationFrame", cancelAnimationFrame);
   });
 
@@ -36,7 +74,7 @@ describe("usePlantDetailDisclosureNavigation", () => {
 
   function flushLatestFrame() {
     const frame = frames.shift();
-    if (frame) act(() => frame(0));
+    if (frame) act(() => frame.callback(0));
   }
 
   it("opens a direct-hash group before focusing and scrolling its target", () => {
@@ -168,6 +206,42 @@ describe("usePlantDetailDisclosureNavigation", () => {
       harvest: false,
       ai: true,
     });
+  });
+
+  it("closes every group when route, hash, and plant identity change together to no hash", () => {
+    renderNavigableHarness("/plants/plant-a#plant-ai-doctor-review");
+    flushLatestFrame();
+    fireEvent.click(screen.getByRole("button", { name: "Open history" }));
+    expect(screen.getByTestId("disclosure-open-groups")).toHaveTextContent(
+      JSON.stringify({ history: true, harvest: false, ai: true }),
+    );
+
+    const navigateButton = screen.getByRole("button", { name: "Open plant B without hash" });
+    navigateButton.focus();
+    fireEvent.click(navigateButton);
+
+    expect(screen.getByTestId("disclosure-open-groups")).toHaveTextContent(
+      JSON.stringify({ history: false, harvest: false, ai: false }),
+    );
+    flushLatestFrame();
+    expect(document.activeElement).toBe(navigateButton);
+  });
+
+  it("opens only the current hash group when route, hash, and plant identity change together", () => {
+    renderNavigableHarness("/plants/plant-a#plant-ai-doctor-review");
+    flushLatestFrame();
+    fireEvent.click(screen.getByRole("button", { name: "Open history" }));
+    expect(screen.getByTestId("disclosure-open-groups")).toHaveTextContent(
+      JSON.stringify({ history: true, harvest: false, ai: true }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Open plant B harvest evidence" }));
+
+    expect(screen.getByTestId("disclosure-open-groups")).toHaveTextContent(
+      JSON.stringify({ history: false, harvest: true, ai: false }),
+    );
+    flushLatestFrame();
+    expect(document.activeElement).toBe(document.getElementById("plant-harvest-evidence"));
   });
 
   it("cancels a pending animation frame on replacement and cleanup", () => {

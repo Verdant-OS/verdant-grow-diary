@@ -711,6 +711,22 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
         answer:
           "Open the affected plant's timeline and review the humidity, temperature, and VPD readings for the days leading up to the first symptom. Look for humidity above target for long stretches, overnight spikes after lights-off, and VPD values that stayed below your late-flower target. Every reading carries a source label so stale, demo, or invalid values are flagged rather than mistaken for current truth.",
       },
+      {
+        question: "How is bud rot different from powdery mildew?",
+        answer:
+          "Powdery mildew shows as a white, dusty coating on the outside of leaves and buds and is usually visible before you touch anything. Bud rot (Botrytis) hides inside the cola — the outside can look normal while the core is grey, brown, or dusty. Both are humidity-driven, but bud rot is discovered by gently probing suspicious buds and cross-checking the plant's humidity and VPD history, not by surface inspection alone.",
+      },
+      {
+        question: "Are dense-cola or indica-leaning cultivars more at risk?",
+        answer:
+          "Yes. Tight, chunky colas trap moisture and slow drying after any humidity spike, so dense indica-leaning cultivars and heavy hybrids tend to carry more bud rot risk than airy sativa-leaning structures. Log cultivar and structure notes in the plant record so your timeline shows which genetics needed tighter late-flower humidity and airflow the last time around.",
+      },
+      {
+        question: "Can I smoke or salvage buds that had bud rot?",
+        answer:
+          "No. Any bud showing Botrytis should be cut well below the visible damage and discarded away from the tent — do not smoke, extract, or dry-trim affected material, and do not attempt to salvage it. Inspect neighboring colas the next day, since spores spread easily. Log the removal in Quick Log with a photo so the timeline records what was pulled and when.",
+      },
+
     ],
     related: [
       "grow-room-vpd-tracker",

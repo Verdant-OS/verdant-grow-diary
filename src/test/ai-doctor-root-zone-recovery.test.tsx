@@ -133,8 +133,21 @@ function strongTimeline(): TimelineMemoryItem[] {
   ] as TimelineMemoryItem[];
 }
 
+function oneRecentNoteTimeline(): TimelineMemoryItem[] {
+  return [
+    {
+      kind: "diary",
+      key: "note-1",
+      occurredAt: new Date(Date.now() - 60 * 60_000).toISOString(),
+      eventType: "note",
+      hasPhoto: false,
+      note: "Leaves checked",
+    },
+  ] as TimelineMemoryItem[];
+}
+
 const rootZoneObservation: RootZoneObservationV1 = {
-  occurredAt: "2026-07-19T12:00:00.000Z",
+  occurredAt: new Date(Date.now() - 2 * 60 * 60_000).toISOString(),
   eventType: "feeding",
   source: "manual",
   metrics: {
@@ -203,6 +216,113 @@ beforeEach(() => {
 });
 
 describe("AI Doctor root-zone history recovery", () => {
+  it("uses only successfully recovered root-zone history for readiness", () => {
+    timelineItems.current = [];
+    rootZoneQuery.observations = [
+      rootZoneObservation,
+      {
+        ...rootZoneObservation,
+        occurredAt: new Date(Date.now() - 3 * 60 * 60_000).toISOString(),
+        eventType: "watering",
+        metrics: {
+          ...rootZoneObservation.metrics,
+          outputEcMsCm: null,
+          nutrientLine: null,
+          products: [],
+        },
+      },
+    ];
+
+    mount();
+
+    expect(screen.getByTestId("plant-ai-doctor-live-review")).toHaveAttribute(
+      "data-readiness",
+      "partial",
+    );
+    expect(screen.getByTestId("plant-ai-doctor-live-review-start")).toBeEnabled();
+  });
+
+  it("keeps an accepted standard review visible if a background root-zone refetch fails", async () => {
+    timelineItems.current = [];
+    rootZoneQuery.observations = [
+      rootZoneObservation,
+      {
+        ...rootZoneObservation,
+        occurredAt: new Date(Date.now() - 3 * 60 * 60_000).toISOString(),
+        eventType: "watering",
+        metrics: {
+          ...rootZoneObservation.metrics,
+          outputEcMsCm: null,
+          nutrientLine: null,
+          products: [],
+        },
+      },
+    ];
+    const invoke = vi.fn<InvokeFn>(
+      () => new Promise<{ data: unknown; error: unknown }>(() => undefined),
+    );
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    const review = () => (
+      <QueryClientProvider client={client}>
+        <PlantDetailAiDoctorLiveReview
+          plantId={PLANT_ID}
+          plant={plant}
+          growId={GROW_ID}
+          tentId={TENT_ID}
+          invoke={invoke}
+        />
+      </QueryClientProvider>
+    );
+    const rendered = render(review());
+
+    fireEvent.click(screen.getByTestId("plant-ai-doctor-live-review-start"));
+    await waitFor(() => expect(invoke).toHaveBeenCalledTimes(1));
+    expect(screen.getByTestId("plant-ai-doctor-live-review-loading")).toBeInTheDocument();
+
+    rootZoneQuery.isError = true;
+    rootZoneQuery.error = new Error("background root-zone refetch failed");
+    rendered.rerender(review());
+
+    expect(screen.getByTestId("plant-ai-doctor-live-review")).toHaveAttribute(
+      "data-readiness",
+      "partial",
+    );
+    expect(screen.getByTestId("plant-ai-doctor-live-review-loading")).toBeInTheDocument();
+    expect(screen.queryByTestId("plant-ai-doctor-root-zone-history-recovery")).toBeNull();
+  });
+
+  it("does not use retained root-zone rows for readiness after a query error", () => {
+    timelineItems.current = oneRecentNoteTimeline();
+    rootZoneQuery.observations = [rootZoneObservation];
+    rootZoneQuery.isError = true;
+
+    mount();
+
+    expect(screen.getByTestId("plant-ai-doctor-live-review")).toHaveAttribute(
+      "data-readiness",
+      "insufficient",
+    );
+    expect(screen.queryByTestId("plant-ai-doctor-live-review-start")).toBeNull();
+  });
+
+  it("keeps errored root-zone rows out of readiness after explicit omission", () => {
+    timelineItems.current = oneRecentNoteTimeline();
+    rootZoneQuery.observations = [rootZoneObservation];
+    rootZoneQuery.isError = true;
+
+    mount();
+    fireEvent.click(screen.getByTestId("plant-ai-doctor-root-zone-history-continue"));
+
+    expect(screen.getByTestId("plant-ai-doctor-live-review")).toHaveAttribute(
+      "data-readiness",
+      "insufficient",
+    );
+    expect(screen.getByTestId("plant-ai-doctor-root-zone-history-omitted")).toBeInTheDocument();
+    expect(screen.queryByTestId("plant-ai-doctor-live-review-start")).toBeNull();
+  });
+
   it("blocks review start while root-zone history is loading", () => {
     rootZoneQuery.isLoading = true;
     rootZoneQuery.isFetching = true;
@@ -298,5 +418,6 @@ describe("AI Doctor root-zone history recovery", () => {
         products: [{ name: "Base", amount: 2, unit: "mL/L" }],
       },
     ]);
+    expect(invoke.mock.calls[0][1].body.packet.missingLiveSensorReadings).toBe(true);
   });
 });

@@ -1260,6 +1260,9 @@ export default function QuickLog({
           growId={resolvedTarget?.growId ?? null}
           tentId={resolvedTarget?.tentId ?? null}
           plantId={resolvedTarget?.plantId ?? null}
+          plantStage={
+            (resolvedTargetPlant as { stage?: unknown } | null)?.stage ?? null
+          }
           heading="All activity types"
           testIdPrefix="quick-log-dialog-all-activities"
           onSaveStart={beginAllActivitiesSave}

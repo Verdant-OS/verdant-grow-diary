@@ -358,13 +358,16 @@ export default function DailyCheck() {
 
       {/* Shared Quick Log activity surface — consumes the canonical
           QUICK_LOG_ACTIVITY_DEFINITIONS via QuickLogActivityPicker and
-          routes saves through useQuickLogActivitySave. Harvest renders
-          disabled with backend-update copy and never persists. */}
+          routes saves through useQuickLogActivitySave. Harvest is available
+          only for eligible selected-plant stages and fails closed otherwise. */}
       <div className="mb-4">
         <QuickLogAllActivitiesSection
           growId={growId}
           tentId={tentId}
           plantId={selectedPlant?.id ?? null}
+          plantStage={
+            (selectedPlant as { stage?: unknown } | null)?.stage ?? null
+          }
           testIdPrefix="daily-check-all-activities"
         />
       </div>

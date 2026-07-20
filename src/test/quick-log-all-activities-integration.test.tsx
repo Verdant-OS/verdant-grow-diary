@@ -7,8 +7,7 @@
  *  - routes saves through the shared useQuickLogActivitySave hook
  *  - dispatches verdant:entry-created only on confirmed success
  *  - appears in the local "What was saved" breakdown only on success
- *  - Harvest never opens a form, never RPCs, never dispatches, never
- *    appears in the saved breakdown
+ *  - Harvest saves only when the selected plant stage is eligible
  *  - failed saves do not dispatch and do not add saved items
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -16,10 +15,7 @@ import { render, screen, fireEvent, waitFor, act } from "@testing-library/react"
 import React from "react";
 
 import QuickLogAllActivitiesSection from "@/components/QuickLogAllActivitiesSection";
-import {
-  QUICK_LOG_ACTIVITY_DEFINITIONS,
-  QUICK_LOG_HARVEST_DISABLED_REASON,
-} from "@/constants/quickLogActivityTypes";
+import { QUICK_LOG_ACTIVITY_DEFINITIONS } from "@/constants/quickLogActivityTypes";
 import { QUICK_LOG_V2_ENTRY_CREATED_EVENT } from "@/lib/quickLogV2EntryCreatedEvent";
 
 const rpcMock = vi.fn();
@@ -38,9 +34,25 @@ function mountSection(props?: Partial<React.ComponentProps<typeof QuickLogAllAct
       growId={GROW}
       tentId={TENT}
       plantId={PLANT}
+      plantStage="flower"
       {...props}
     />,
   );
+}
+
+function revealAdditionalActivities() {
+  const disclosure = screen.getByRole("button", {
+    name: "More activity types",
+  });
+  if (disclosure.getAttribute("aria-expanded") === "false") {
+    fireEvent.click(disclosure);
+  }
+}
+
+function selectActivity(activityId: string) {
+  const testId = `quick-log-all-activities-picker-${activityId}`;
+  if (!screen.queryByTestId(testId)) revealAdditionalActivities();
+  fireEvent.click(screen.getByTestId(testId));
 }
 
 function listenForEntryCreated() {
@@ -55,7 +67,7 @@ function listenForEntryCreated() {
 }
 
 async function saveWithNote(activityId: string, note = "  short observation  ") {
-  fireEvent.click(screen.getByTestId(`quick-log-all-activities-picker-${activityId}`));
+  selectActivity(activityId);
   await screen.findByTestId("quick-log-all-activities-form");
   const textarea = screen.queryByTestId("quick-log-all-activities-note");
   if (textarea) fireEvent.change(textarea, { target: { value: note } });
@@ -63,7 +75,7 @@ async function saveWithNote(activityId: string, note = "  short observation  ") 
 }
 
 async function saveWithoutNote(activityId: string) {
-  fireEvent.click(screen.getByTestId(`quick-log-all-activities-picker-${activityId}`));
+  selectActivity(activityId);
   await screen.findByTestId("quick-log-all-activities-form");
   fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
 }
@@ -73,8 +85,9 @@ beforeEach(() => {
 });
 
 describe("QuickLogAllActivitiesSection — shared taxonomy", () => {
-  it("renders every supported v1a activity from shared definitions", () => {
+  it("renders every supported activity from shared definitions after disclosure", () => {
     mountSection();
+    revealAdditionalActivities();
     for (const def of Object.values(QUICK_LOG_ACTIVITY_DEFINITIONS)) {
       expect(
         screen.getByTestId(`quick-log-all-activities-picker-${def.id}`),
@@ -82,8 +95,9 @@ describe("QuickLogAllActivitiesSection — shared taxonomy", () => {
     }
   });
 
-  it("renders Harvest as enabled (v1b) with no disabled-reason element", () => {
+  it("renders Harvest as enabled for an eligible plant stage", () => {
     mountSection();
+    revealAdditionalActivities();
     const btn = screen.getByTestId("quick-log-all-activities-picker-harvest");
     expect(btn).not.toBeDisabled();
     expect(
@@ -91,9 +105,6 @@ describe("QuickLogAllActivitiesSection — shared taxonomy", () => {
         "quick-log-all-activities-picker-harvest-disabled-reason",
       ),
     ).toBeNull();
-    // Legacy disabled reason constant is still exported and remains distinct
-    // from the live Harvest safety copy.
-    expect(QUICK_LOG_HARVEST_DISABLED_REASON).toMatch(/backend update/i);
   });
 });
 
@@ -249,9 +260,7 @@ describe("QuickLogAllActivitiesSection — Harvest v1b", () => {
 
   it("unsaved Harvest draft does not appear in saved breakdown", () => {
     mountSection();
-    fireEvent.click(
-      screen.getByTestId("quick-log-all-activities-picker-harvest"),
-    );
+    selectActivity("harvest");
     // Cancel without saving.
     const cancel = screen.queryByTestId("quick-log-all-activities-cancel");
     if (cancel) fireEvent.click(cancel);
@@ -295,7 +304,7 @@ describe("QuickLogAllActivitiesSection — failure paths", () => {
 
   it("unsaved draft selection never appears in saved breakdown", async () => {
     mountSection();
-    fireEvent.click(screen.getByTestId("quick-log-all-activities-picker-training"));
+    selectActivity("training");
     await screen.findByTestId("quick-log-all-activities-form");
     // User cancels without saving.
     fireEvent.click(screen.getByTestId("quick-log-all-activities-cancel"));
@@ -305,9 +314,7 @@ describe("QuickLogAllActivitiesSection — failure paths", () => {
 
   it("Manual sensor snapshot is deferred to the existing card path (no RPC)", async () => {
     mountSection();
-    fireEvent.click(
-      screen.getByTestId("quick-log-all-activities-picker-manual_sensor_snapshot"),
-    );
+    selectActivity("manual_sensor_snapshot");
     await screen.findByTestId("quick-log-all-activities-manual-sensor-hint");
     expect(screen.getByTestId("quick-log-all-activities-save")).toBeDisabled();
     expect(rpcMock).not.toHaveBeenCalled();
@@ -336,9 +343,7 @@ describe("QuickLogAllActivitiesSection — Harvest v1b.next hardening", () => {
     });
     const l = listenForEntryCreated();
     mountSection();
-    fireEvent.click(
-      screen.getByTestId("quick-log-all-activities-picker-harvest"),
-    );
+    selectActivity("harvest");
     await screen.findByTestId("quick-log-all-activities-harvest-fields");
     fireEvent.change(
       screen.getByTestId("quick-log-all-activities-harvest-wet"),
@@ -371,9 +376,7 @@ describe("QuickLogAllActivitiesSection — Harvest v1b.next hardening", () => {
       error: null,
     });
     mountSection();
-    fireEvent.click(
-      screen.getByTestId("quick-log-all-activities-picker-harvest"),
-    );
+    selectActivity("harvest");
     await screen.findByTestId("quick-log-all-activities-harvest-fields");
     fireEvent.change(
       screen.getByTestId("quick-log-all-activities-harvest-wet"),
@@ -401,9 +404,7 @@ describe("QuickLogAllActivitiesSection — Harvest v1b.next hardening", () => {
       error: null,
     });
     mountSection();
-    fireEvent.click(
-      screen.getByTestId("quick-log-all-activities-picker-harvest"),
-    );
+    selectActivity("harvest");
     await screen.findByTestId("quick-log-all-activities-harvest-fields");
     fireEvent.change(
       screen.getByTestId("quick-log-all-activities-harvest-wet"),
@@ -422,9 +423,7 @@ describe("QuickLogAllActivitiesSection — Harvest v1b.next hardening", () => {
 
   it("negative wet weight shows inline validation and blocks the save", async () => {
     mountSection();
-    fireEvent.click(
-      screen.getByTestId("quick-log-all-activities-picker-harvest"),
-    );
+    selectActivity("harvest");
     await screen.findByTestId("quick-log-all-activities-harvest-fields");
     fireEvent.change(
       screen.getByTestId("quick-log-all-activities-harvest-wet"),
@@ -440,9 +439,7 @@ describe("QuickLogAllActivitiesSection — Harvest v1b.next hardening", () => {
 
   it("negative dry weight shows inline validation and blocks the save", async () => {
     mountSection();
-    fireEvent.click(
-      screen.getByTestId("quick-log-all-activities-picker-harvest"),
-    );
+    selectActivity("harvest");
     await screen.findByTestId("quick-log-all-activities-harvest-fields");
     fireEvent.change(
       screen.getByTestId("quick-log-all-activities-harvest-dry"),
@@ -462,9 +459,7 @@ describe("QuickLogAllActivitiesSection — Harvest v1b.next hardening", () => {
       error: null,
     });
     mountSection();
-    fireEvent.click(
-      screen.getByTestId("quick-log-all-activities-picker-harvest"),
-    );
+    selectActivity("harvest");
     await screen.findByTestId("quick-log-all-activities-harvest-fields");
     fireEvent.change(
       screen.getByTestId("quick-log-all-activities-harvest-wet"),

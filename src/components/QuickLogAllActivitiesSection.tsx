@@ -12,8 +12,8 @@
  * src/constants/*.
  *
  * Safety fences:
- *   - Harvest is enabled and persists through the canonical event route;
- *     its copy does not claim readiness or final yield.
+ *   - Harvest is stage-gated in the picker and re-checked immediately
+ *     before save. Missing, stale, or ineligible context never reaches RPC.
  *   - Manual sensor snapshot is intentionally deferred to the existing
  *     ManualSensorReadingCard path — this section shows the shared
  *     safety copy and links out; it does NOT persist a reading itself.
@@ -32,7 +32,6 @@ import QuickLogActivityPicker from "@/components/QuickLogActivityPicker";
 import { useQuickLogActivitySave } from "@/hooks/useQuickLogActivitySave";
 import {
   QUICK_LOG_ACTIVITY_DEFINITIONS,
-  QUICK_LOG_HARVEST_DISABLED_REASON,
   QUICK_LOG_WEIGHT_UNITS,
   type QuickLogActivityDefinition,
   type QuickLogActivityId,
@@ -44,11 +43,17 @@ import {
   type DailyCheckSavedItem,
   type DailyCheckSavedSource,
 } from "@/lib/dailyCheckPostSubmitRules";
+import {
+  evaluateQuickLogActivityAvailability,
+  QUICK_LOG_HARVEST_STAGE_DISABLED_REASON,
+} from "@/lib/quickLogActivityRules";
 
 export interface QuickLogAllActivitiesSectionProps {
   growId: string | null | undefined;
   tentId?: string | null;
   plantId?: string | null;
+  /** Current selected-plant stage. Harvest fails closed when this is missing. */
+  plantStage?: unknown;
   /** Optional heading override for the section. */
   heading?: string;
   /** Optional testid prefix. Defaults to "quick-log-all-activities". */
@@ -116,6 +121,7 @@ export default function QuickLogAllActivitiesSection({
   growId,
   tentId = null,
   plantId = null,
+  plantStage = null,
   heading = "All quick actions",
   testIdPrefix = "quick-log-all-activities",
   onSaveStart,
@@ -136,9 +142,23 @@ export default function QuickLogAllActivitiesSection({
 
   const canPersistManualSensor = false; // Deferred to ManualSensorReadingCard.
 
-  const harvestWetValidation = useMemo(() => validateHarvestWeightInput(harvestWet), [harvestWet]);
-  const harvestDryValidation = useMemo(() => validateHarvestWeightInput(harvestDry), [harvestDry]);
-  const harvestWeightsInvalid = !harvestWetValidation.ok || !harvestDryValidation.ok;
+  const harvestWetValidation = useMemo(
+    () => validateHarvestWeightInput(harvestWet),
+    [harvestWet],
+  );
+  const harvestDryValidation = useMemo(
+    () => validateHarvestWeightInput(harvestDry),
+    [harvestDry],
+  );
+  const harvestWeightsInvalid =
+    !harvestWetValidation.ok || !harvestDryValidation.ok;
+  const selectedAvailability = useMemo(
+    () =>
+      selected
+        ? evaluateQuickLogActivityAvailability(selected.id, plantStage)
+        : null,
+    [plantStage, selected],
+  );
 
   const requiresNote = useMemo(() => {
     if (!selected) return false;
@@ -181,9 +201,19 @@ export default function QuickLogAllActivitiesSection({
       setErrorForActivity(selected.id);
       return;
     }
-    // Disabled activities must never reach RPC.
-    if (!selected.enabled) {
-      setErrorReason(selected.disabledReason ?? QUICK_LOG_HARVEST_DISABLED_REASON);
+    // Re-evaluate against CURRENT context immediately before persistence.
+    // This is independent of the picker so a stale Harvest selection cannot
+    // write after the selected plant/stage changes.
+    const currentAvailability = evaluateQuickLogActivityAvailability(
+      selected.id,
+      plantStage,
+    );
+    if (currentAvailability.disabled) {
+      setErrorReason(
+        currentAvailability.disabledReason ??
+          selected.disabledReason ??
+          "This activity is not available.",
+      );
       setErrorForActivity(selected.id);
       return;
     }
@@ -304,6 +334,7 @@ export default function QuickLogAllActivitiesSection({
     growId,
     tentId,
     plantId,
+    plantStage,
     note,
     requiresNote,
     save,
@@ -351,6 +382,7 @@ export default function QuickLogAllActivitiesSection({
         onSelect={handleSelect}
         disabled={mutationBlocked}
         selectedId={selected?.id ?? null}
+        plantStage={plantStage}
         testIdPrefix={`${testIdPrefix}-picker`}
       />
 
@@ -364,6 +396,17 @@ export default function QuickLogAllActivitiesSection({
             <p className="text-xs font-medium">{selected.label}</p>
             <p className="text-[11px] text-muted-foreground">{selected.safetyNote}</p>
           </div>
+
+          {selected.id === "harvest" && selectedAvailability?.disabled && (
+            <p
+              role="note"
+              className="text-xs text-muted-foreground"
+              data-testid={`${testIdPrefix}-harvest-stage-blocked`}
+            >
+              {selectedAvailability.disabledReason ??
+                QUICK_LOG_HARVEST_STAGE_DISABLED_REASON}
+            </p>
+          )}
 
           {selected.id === "manual_sensor_snapshot" ? (
             <p
@@ -519,6 +562,7 @@ export default function QuickLogAllActivitiesSection({
               disabled={
                 mutationBlocked ||
                 noContext ||
+                selectedAvailability?.disabled ||
                 selected.id === "manual_sensor_snapshot" ||
                 (requiresNote && note.trim().length === 0) ||
                 (selected.id === "harvest" && harvestWeightsInvalid)

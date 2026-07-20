@@ -2,9 +2,8 @@
  * Verdant Quick Log Activity Types — pure constant/rule tests.
  *
  * Covers:
- *  - all canonical activity labels present
- *  - Harvest enabled with cautious safety copy
- *  - Harvest persists through the canonical event route
+ *  - all supported activity labels present
+ *  - Harvest has the real event persistence plan (never fake-remapped)
  *  - Defoliation persists as event_type=training with subtype fence
  *  - Generic training does not render as Defoliation
  *  - Only DB-validator-allowed event_type values are emitted
@@ -15,7 +14,6 @@ import { describe, it, expect } from "vitest";
 import {
   QUICK_LOG_ACTIVITY_DEFINITIONS,
   QUICK_LOG_ACTIVITY_IDS,
-  QUICK_LOG_HARVEST_DISABLED_REASON,
   type QuickLogActivityId,
   type QuickLogEventTypeValue,
 } from "@/constants/quickLogActivityTypes";
@@ -26,7 +24,7 @@ import {
   resolveQuickLogEventTimelineLabel,
 } from "@/lib/quickLogActivityRules";
 
-const V1A_ENABLED: QuickLogActivityId[] = [
+const SUPPORTED_ACTIVITY_IDS: QuickLogActivityId[] = [
   "note",
   "photo",
   "watering",
@@ -68,22 +66,23 @@ function assertSafe(s: string) {
 
 describe("quickLogActivityTypes constants", () => {
   it("registers exactly the v1b activity ids (harvest now enabled)", () => {
-    expect(new Set(QUICK_LOG_ACTIVITY_IDS)).toEqual(new Set(V1A_ENABLED));
+    expect(new Set(QUICK_LOG_ACTIVITY_IDS)).toEqual(
+      new Set(SUPPORTED_ACTIVITY_IDS),
+    );
   });
 
-  it.each(V1A_ENABLED)("%s is enabled and has no disabled reason", (id) => {
-    expect(isQuickLogActivityEnabled(id)).toBe(true);
-    expect(getQuickLogDisabledReason(id)).toBeNull();
-  });
+  it.each(SUPPORTED_ACTIVITY_IDS)(
+    "%s is enabled and has no taxonomy-level disabled reason",
+    (id) => {
+      expect(isQuickLogActivityEnabled(id)).toBe(true);
+      expect(getQuickLogDisabledReason(id)).toBeNull();
+    },
+  );
 
   it("Harvest safety copy denies readiness/yield claims", () => {
     const note = QUICK_LOG_ACTIVITY_DEFINITIONS.harvest.safetyNote.toLowerCase();
     expect(note).toMatch(/does not claim/);
     expect(note).toMatch(/readiness|yield/);
-    // Legacy disabled-reason constant is still exported for out-of-date
-    // callers, but must NOT be used as Harvest's live safety copy.
-    expect(note).not.toBe(QUICK_LOG_HARVEST_DISABLED_REASON.toLowerCase());
-    expect(QUICK_LOG_HARVEST_DISABLED_REASON).toMatch(/backend update/i);
   });
 
   it("safety copy across every activity avoids recommendation/diagnosis/readiness language", () => {
@@ -123,29 +122,32 @@ describe("quickLogActivityTypes constants", () => {
           `${id} safetyNote asserts healthy without a denial`,
         ).toBe(true);
       }
+
+
     }
   });
 
   it("feeding safety copy explicitly denies nutrient recommendation", () => {
-    expect(QUICK_LOG_ACTIVITY_DEFINITIONS.feeding.safetyNote.toLowerCase()).toContain(
-      "not a nutrient recommendation",
-    );
+    expect(
+      QUICK_LOG_ACTIVITY_DEFINITIONS.feeding.safetyNote.toLowerCase(),
+    ).toContain("not a nutrient recommendation");
   });
 
   it("training safety copy explicitly denies safe-to-train inference", () => {
-    expect(QUICK_LOG_ACTIVITY_DEFINITIONS.training.safetyNote.toLowerCase()).toContain(
-      "does not mean the plant was safe to train",
-    );
+    expect(
+      QUICK_LOG_ACTIVITY_DEFINITIONS.training.safetyNote.toLowerCase(),
+    ).toContain("does not mean the plant was safe to train");
   });
 
   it("defoliation safety copy explicitly denies recovery/stress diagnosis", () => {
-    expect(QUICK_LOG_ACTIVITY_DEFINITIONS.defoliation.safetyNote.toLowerCase()).toContain(
-      "does not diagnose recovery or plant stress",
-    );
+    expect(
+      QUICK_LOG_ACTIVITY_DEFINITIONS.defoliation.safetyNote.toLowerCase(),
+    ).toContain("does not diagnose recovery or plant stress");
   });
 
   it("manual sensor snapshot copy preserves manual/not-live truth", () => {
-    const n = QUICK_LOG_ACTIVITY_DEFINITIONS.manual_sensor_snapshot.safetyNote.toLowerCase();
+    const n =
+      QUICK_LOG_ACTIVITY_DEFINITIONS.manual_sensor_snapshot.safetyNote.toLowerCase();
     expect(n).toContain("manual");
     expect(n).toContain("not live");
     expect(n).toContain("unknown");
@@ -177,14 +179,17 @@ describe("planQuickLogPersistence", () => {
     ["photo", "photo", undefined],
     ["environment_check", "environment", undefined],
     ["issue_observation", "observation", "issue"],
-  ] as const)("%s routes to quicklog_save_event with event_type=%s", (id, eventType, subtype) => {
-    const plan = planQuickLogPersistence(id);
-    expect(plan?.saveRoute).toBe("event");
-    expect(plan?.eventType).toBe(eventType);
-    expect(plan?.detailsSubtype ?? undefined).toBe(subtype);
-    // Only DB-validator-allowed event_types may be emitted.
-    expect(ALLOWED_EVENT_TYPES.has(plan!.eventType!)).toBe(true);
-  });
+  ] as const)(
+    "%s routes to quicklog_save_event with event_type=%s",
+    (id, eventType, subtype) => {
+      const plan = planQuickLogPersistence(id);
+      expect(plan?.saveRoute).toBe("event");
+      expect(plan?.eventType).toBe(eventType);
+      expect(plan?.detailsSubtype ?? undefined).toBe(subtype);
+      // Only DB-validator-allowed event_types may be emitted.
+      expect(ALLOWED_EVENT_TYPES.has(plan!.eventType!)).toBe(true);
+    },
+  );
 
   it("Defoliation persists as event_type=training with subtype fence", () => {
     const plan = planQuickLogPersistence("defoliation");
@@ -229,7 +234,9 @@ describe("resolveQuickLogEventTimelineLabel", () => {
   });
 
   it("generic training is not mislabeled as Defoliation", () => {
-    expect(resolveQuickLogEventTimelineLabel({ eventType: "training" })).toBe("Training");
+    expect(
+      resolveQuickLogEventTimelineLabel({ eventType: "training" }),
+    ).toBe("Training");
     expect(
       resolveQuickLogEventTimelineLabel({
         eventType: "training",
@@ -245,21 +252,33 @@ describe("resolveQuickLogEventTimelineLabel", () => {
   });
 
   it("labels supported event_types correctly", () => {
-    expect(resolveQuickLogEventTimelineLabel({ eventType: "feeding" })).toBe("Feeding");
-    expect(resolveQuickLogEventTimelineLabel({ eventType: "watering" })).toBe("Watering");
-    expect(resolveQuickLogEventTimelineLabel({ eventType: "photo" })).toBe("Photo");
-    expect(resolveQuickLogEventTimelineLabel({ eventType: "environment" })).toBe(
-      "Environment check",
+    expect(resolveQuickLogEventTimelineLabel({ eventType: "feeding" })).toBe(
+      "Feeding",
     );
-    expect(resolveQuickLogEventTimelineLabel({ eventType: "observation" })).toBe("Observation");
+    expect(resolveQuickLogEventTimelineLabel({ eventType: "watering" })).toBe(
+      "Watering",
+    );
+    expect(resolveQuickLogEventTimelineLabel({ eventType: "photo" })).toBe(
+      "Photo",
+    );
+    expect(
+      resolveQuickLogEventTimelineLabel({ eventType: "environment" }),
+    ).toBe("Environment check");
+    expect(
+      resolveQuickLogEventTimelineLabel({ eventType: "observation" }),
+    ).toBe("Observation");
   });
 
   it("labels harvest event_type as Harvest", () => {
-    expect(resolveQuickLogEventTimelineLabel({ eventType: "harvest" })).toBe("Harvest");
+    expect(resolveQuickLogEventTimelineLabel({ eventType: "harvest" })).toBe(
+      "Harvest",
+    );
   });
 
   it("returns empty string for unknown/absent event_type", () => {
     expect(resolveQuickLogEventTimelineLabel({ eventType: null })).toBe("");
-    expect(resolveQuickLogEventTimelineLabel({ eventType: undefined })).toBe("");
+    expect(resolveQuickLogEventTimelineLabel({ eventType: undefined })).toBe(
+      "",
+    );
   });
 });

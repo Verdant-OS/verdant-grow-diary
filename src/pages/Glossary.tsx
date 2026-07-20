@@ -77,6 +77,7 @@ export default function Glossary() {
           <input
             type="search"
             data-testid="glossary-search"
+            aria-label="Search glossary terms"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search terms and definitions…"

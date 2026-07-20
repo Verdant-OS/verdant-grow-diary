@@ -35,7 +35,6 @@ import {
 import { buildStaticSocialRouteHtml } from "@/lib/build/staticSocialRouteHtml";
 import {
   extractHead,
-  diffRouteHead,
 } from "../../scripts/validate-static-route-head-fidelity.mjs";
 import {
   ALLOWED_ROBOTS_DIRECTIVES,

@@ -56,6 +56,10 @@ const EXPECTED_SLUGS: ReadonlyArray<string> = [
   "grow-journal-app-without-account",
   "daily-grow-log-checklist",
   "cronk-nutrients-grow-diary",
+  "athena-nutrients-grow-diary",
+  "jacks-nutrients-grow-diary",
+  "house-and-garden-nutrients-grow-diary",
+  "canna-nutrients-grow-diary",
   "bud-rot-prevention-identification",
 ];
 
@@ -108,8 +112,8 @@ describe("Verdant grower guide FAQ (/guides)", () => {
   });
 });
 
-describe("Verdant SEO guide pages (16)", () => {
-  it("defines exactly the sixteen expected slugs, in order", () => {
+describe("Verdant SEO guide pages (20)", () => {
+  it("defines exactly the twenty expected slugs, in order", () => {
     expect(VERDANT_GUIDE_SLUGS).toEqual(EXPECTED_SLUGS);
   });
 
@@ -290,9 +294,7 @@ describe("Guide internal links to Customer Guide route", () => {
 
 describe("Guides hub metadata (/guides)", () => {
   it("GuidesIndex title/description carry the target keyword phrases", () => {
-    expect(GUIDES_INDEX).toContain(
-      "Grower Guides: Grow Diary, VPD & Sensor Truth | Verdant",
-    );
+    expect(GUIDES_INDEX).toContain("Grower Guides: Grow Diary, VPD & Sensor Truth | Verdant");
     expect(GUIDES_INDEX).toMatch(/source-labeled sensor data/i);
     expect(GUIDES_INDEX).toMatch(/path:\s*"\/guides"/);
   });

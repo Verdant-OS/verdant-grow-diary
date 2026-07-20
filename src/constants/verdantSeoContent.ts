@@ -684,6 +684,230 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
     ],
   },
   {
+    slug: "athena-nutrients-grow-diary",
+    title: "Using Athena Nutrients with a grow diary | Verdant Grow Diary",
+    h1: "Using Athena Nutrients with a grow diary: what to log so you can tell if the chart is working",
+    description:
+      "Use an Athena Nutrients grow diary to track the official chart step, product line, medium, stage, input pH/EC, runoff trends, photos, and plant response.",
+    targetKeyword: "Athena Nutrients grow diary",
+    intro:
+      "An Athena Nutrients grow diary should answer a practical question: did you follow the current manufacturer chart, and how did this plant respond in this medium and environment? Verdant treats Athena as a brand-specific case study because it is used consistently in real grows — useful for repeatable plant memory, not a universal recommendation. Verdant is not affiliated with Athena and does not sell or recommend its products.",
+    sections: [
+      {
+        heading: "Start with the exact chart you actually followed",
+        body: "Record the Athena product line (for example Pro Line or the Blended Line), the current official chart or revision you referenced, the plant stage, and the medium. Verdant does not reproduce or rewrite a manufacturer feeding chart. Keeping the source and version beside the log prevents a later chart update—or a different product line—from quietly changing what your history means.",
+      },
+      {
+        heading: "Log what went into the feed, not what the chart intended",
+        body: "For each feeding, capture the date, product names, actual amounts used, total mixed volume, water source, input pH, and input EC or PPM. If a field was not measured, leave it unknown instead of inventing a value. The goal is an honest record of the feed the plant received, not a perfect-looking checklist.",
+      },
+      {
+        heading: "Pair the input with root-zone and room context",
+        body: "Where the medium and routine make it useful, add runoff or drain pH and EC, pot weight or soil-moisture context, temperature, humidity, VPD, and a photo. Keep every sensor reading source-labeled and time-stamped. One runoff number or leaf photo does not prove nutrient burn; trends and surrounding conditions are what make the reading interpretable.",
+      },
+      {
+        heading: "Compare chart adherence with the plant's response",
+        body: "Check the plant again over the next day and the next few days: leaf posture, tip color, new growth, water use, and any visible change. Compare that response with the feed and environment already on the timeline. AI Doctor can review this history cautiously and identify missing context, but it should not turn one symptom into an aggressive nutrient change or an automatic action.",
+      },
+    ],
+    faq: [
+      {
+        question: "Does Verdant provide an Athena Nutrients feeding chart?",
+        answer:
+          "No. Verdant is not affiliated with Athena and does not sell or recommend its products. Use Athena's current official chart for the product line and medium you run. Verdant records which chart step you followed, what you actually mixed, and how the plant responded; it does not copy, reconstruct, or replace the manufacturer's chart.",
+      },
+      {
+        question: "What should I log when using Athena Nutrients?",
+        answer:
+          "Log the product line, chart or revision, plant stage, medium, product names and actual amounts, total feed volume, water source, input pH, input EC or PPM, and—when useful—runoff or drain pH and EC. Add a consistent photo and room conditions so the plant response has context.",
+      },
+      {
+        question: "Can one runoff reading prove Athena Nutrients is burning or starving my plant?",
+        answer:
+          "No. A single runoff value can be affected by medium, sampling method, irrigation history, and measurement quality. Look for a repeatable trend alongside leaf-tip changes, plant posture, water use, input readings, and environment before drawing a conclusion.",
+      },
+      {
+        question: "Should I change the feeding chart after one symptom?",
+        answer:
+          "Not from one weak signal. Confirm the chart and mix, check meter quality and environment, add a fresh photo, and compare the plant over time. Make nutrient changes cautiously and keep the grower—not software—in control of the decision.",
+      },
+    ],
+    related: [
+      "what-to-log-in-a-grow-journal",
+      "plant-watering-log",
+      "grow-room-vpd-tracker",
+      "ai-grow-doctor",
+    ],
+  },
+  {
+    slug: "jacks-nutrients-grow-diary",
+    title: "Using Jack's Nutrients with a grow diary | Verdant Grow Diary",
+    h1: "Using Jack's Nutrients with a grow diary: what to log so you can tell if the chart is working",
+    description:
+      "Use a Jack's Nutrients grow diary to log the chart or revision, product line, medium, stage, input pH/EC, runoff trends, photos, and how the plant responded.",
+    targetKeyword: "Jack's Nutrients grow diary",
+    intro:
+      "A Jack's Nutrients grow diary should answer a practical question: did you follow the current manufacturer chart, and how did this plant respond in this medium and environment? Verdant treats Jack's as a brand-specific case study because it is used consistently in real grows — useful for repeatable plant memory, not a universal recommendation. Verdant is not affiliated with Jack's and does not sell or recommend its products.",
+    sections: [
+      {
+        heading: "Start with the exact chart you actually followed",
+        body: "Record the Jack's product line (for example the Jack's 3-2-1 program, or Part A and Part B), the current official chart or revision you referenced, the plant stage, and the medium. Verdant does not reproduce or rewrite a manufacturer feeding chart. Keeping the source and version beside the log prevents a later chart update—or a different product line—from quietly changing what your history means.",
+      },
+      {
+        heading: "Log what went into the feed, not what the chart intended",
+        body: "For each feeding, capture the date, product names, actual amounts used, total mixed volume, water source, input pH, and input EC or PPM. If a field was not measured, leave it unknown instead of inventing a value. The goal is an honest record of the feed the plant received, not a perfect-looking checklist.",
+      },
+      {
+        heading: "Pair the input with root-zone and room context",
+        body: "Where the medium and routine make it useful, add runoff or drain pH and EC, pot weight or soil-moisture context, temperature, humidity, VPD, and a photo. Keep every sensor reading source-labeled and time-stamped. One runoff number or leaf photo does not prove nutrient burn; trends and surrounding conditions are what make the reading interpretable.",
+      },
+      {
+        heading: "Compare chart adherence with the plant's response",
+        body: "Check the plant again over the next day and the next few days: leaf posture, tip color, new growth, water use, and any visible change. Compare that response with the feed and environment already on the timeline. AI Doctor can review this history cautiously and identify missing context, but it should not turn one symptom into an aggressive nutrient change or an automatic action.",
+      },
+    ],
+    faq: [
+      {
+        question: "Does Verdant provide a Jack's Nutrients feeding chart?",
+        answer:
+          "No. Verdant is not affiliated with Jack's and does not sell or recommend its products. Use Jack's current official chart for the product line and medium you run. Verdant records which chart step you followed, what you actually mixed, and how the plant responded; it does not copy, reconstruct, or replace the manufacturer's chart.",
+      },
+      {
+        question: "What should I log when using Jack's Nutrients?",
+        answer:
+          "Log the product line, chart or revision, plant stage, medium, product names and actual amounts, total feed volume, water source, input pH, input EC or PPM, and—when useful—runoff or drain pH and EC. Add a consistent photo and room conditions so the plant response has context.",
+      },
+      {
+        question: "Can one runoff reading prove Jack's Nutrients is burning or starving my plant?",
+        answer:
+          "No. A single runoff value can be affected by medium, sampling method, irrigation history, and measurement quality. Look for a repeatable trend alongside leaf-tip changes, plant posture, water use, input readings, and environment before drawing a conclusion.",
+      },
+      {
+        question: "Should I change the feeding chart after one symptom?",
+        answer:
+          "Not from one weak signal. Confirm the chart and mix, check meter quality and environment, add a fresh photo, and compare the plant over time. Make nutrient changes cautiously and keep the grower—not software—in control of the decision.",
+      },
+    ],
+    related: [
+      "what-to-log-in-a-grow-journal",
+      "plant-watering-log",
+      "grow-room-vpd-tracker",
+      "ai-grow-doctor",
+    ],
+  },
+  {
+    slug: "house-and-garden-nutrients-grow-diary",
+    title: "Using House & Garden Nutrients with a grow diary | Verdant Grow Diary",
+    h1: "Using House & Garden Nutrients with a grow diary: what to log so you can tell if the chart is working",
+    description:
+      "Use a House & Garden grow diary to record the feed chart, product line, medium, stage, input pH/EC, runoff trends, photos, and measured plant response.",
+    targetKeyword: "House & Garden Nutrients grow diary",
+    intro:
+      "A House & Garden Nutrients grow diary should answer a practical question: did you follow the current manufacturer chart, and how did this plant respond in this medium and environment? Verdant treats House & Garden as a brand-specific case study because it is used consistently in real grows — useful for repeatable plant memory, not a universal recommendation. Verdant is not affiliated with House & Garden and does not sell or recommend its products.",
+    sections: [
+      {
+        heading: "Start with the exact chart you actually followed",
+        body: "Record the House & Garden product line (for example Cocos, Aqua Flakes, or Soil A&B), the current official chart or revision you referenced, the plant stage, and the medium. Verdant does not reproduce or rewrite a manufacturer feeding chart. Keeping the source and version beside the log prevents a later chart update—or a different product line—from quietly changing what your history means.",
+      },
+      {
+        heading: "Log what went into the feed, not what the chart intended",
+        body: "For each feeding, capture the date, product names, actual amounts used, total mixed volume, water source, input pH, and input EC or PPM. If a field was not measured, leave it unknown instead of inventing a value. The goal is an honest record of the feed the plant received, not a perfect-looking checklist.",
+      },
+      {
+        heading: "Pair the input with root-zone and room context",
+        body: "Where the medium and routine make it useful, add runoff or drain pH and EC, pot weight or soil-moisture context, temperature, humidity, VPD, and a photo. Keep every sensor reading source-labeled and time-stamped. One runoff number or leaf photo does not prove nutrient burn; trends and surrounding conditions are what make the reading interpretable.",
+      },
+      {
+        heading: "Compare chart adherence with the plant's response",
+        body: "Check the plant again over the next day and the next few days: leaf posture, tip color, new growth, water use, and any visible change. Compare that response with the feed and environment already on the timeline. AI Doctor can review this history cautiously and identify missing context, but it should not turn one symptom into an aggressive nutrient change or an automatic action.",
+      },
+    ],
+    faq: [
+      {
+        question: "Does Verdant provide a House & Garden feeding chart?",
+        answer:
+          "No. Verdant is not affiliated with House & Garden and does not sell or recommend its products. Use House & Garden's current official chart for the product line and medium you run. Verdant records which chart step you followed, what you actually mixed, and how the plant responded; it does not copy, reconstruct, or replace the manufacturer's chart.",
+      },
+      {
+        question: "What should I log when using House & Garden Nutrients?",
+        answer:
+          "Log the product line, chart or revision, plant stage, medium, product names and actual amounts, total feed volume, water source, input pH, input EC or PPM, and—when useful—runoff or drain pH and EC. Add a consistent photo and room conditions so the plant response has context.",
+      },
+      {
+        question: "Can one runoff reading prove House & Garden is burning or starving my plant?",
+        answer:
+          "No. A single runoff value can be affected by medium, sampling method, irrigation history, and measurement quality. Look for a repeatable trend alongside leaf-tip changes, plant posture, water use, input readings, and environment before drawing a conclusion.",
+      },
+      {
+        question: "Should I change the feeding chart after one symptom?",
+        answer:
+          "Not from one weak signal. Confirm the chart and mix, check meter quality and environment, add a fresh photo, and compare the plant over time. Make nutrient changes cautiously and keep the grower—not software—in control of the decision.",
+      },
+    ],
+    related: [
+      "what-to-log-in-a-grow-journal",
+      "plant-watering-log",
+      "grow-room-vpd-tracker",
+      "ai-grow-doctor",
+    ],
+  },
+  {
+    slug: "canna-nutrients-grow-diary",
+    title: "Using Canna Nutrients with a grow diary | Verdant Grow Diary",
+    h1: "Using Canna Nutrients with a grow diary: what to log so you can tell if the chart is working",
+    description:
+      "Use a Canna Nutrients grow diary to capture the official chart, product line, medium, stage, input pH/EC, runoff trends, photos, and the plant's response.",
+    targetKeyword: "Canna Nutrients grow diary",
+    intro:
+      "A Canna Nutrients grow diary should answer a practical question: did you follow the current manufacturer chart, and how did this plant respond in this medium and environment? Verdant treats Canna as a brand-specific case study because it is used consistently in real grows — useful for repeatable plant memory, not a universal recommendation. Verdant is not affiliated with Canna and does not sell or recommend its products.",
+    sections: [
+      {
+        heading: "Start with the exact chart you actually followed",
+        body: "Record the Canna product line (for example Coco A&B, Terra, Aqua, or Bio), the current official chart or revision you referenced, the plant stage, and the medium. Verdant does not reproduce or rewrite a manufacturer feeding chart. Keeping the source and version beside the log prevents a later chart update—or a different product line—from quietly changing what your history means.",
+      },
+      {
+        heading: "Log what went into the feed, not what the chart intended",
+        body: "For each feeding, capture the date, product names, actual amounts used, total mixed volume, water source, input pH, and input EC or PPM. If a field was not measured, leave it unknown instead of inventing a value. The goal is an honest record of the feed the plant received, not a perfect-looking checklist.",
+      },
+      {
+        heading: "Pair the input with root-zone and room context",
+        body: "Where the medium and routine make it useful, add runoff or drain pH and EC, pot weight or soil-moisture context, temperature, humidity, VPD, and a photo. Keep every sensor reading source-labeled and time-stamped. One runoff number or leaf photo does not prove nutrient burn; trends and surrounding conditions are what make the reading interpretable.",
+      },
+      {
+        heading: "Compare chart adherence with the plant's response",
+        body: "Check the plant again over the next day and the next few days: leaf posture, tip color, new growth, water use, and any visible change. Compare that response with the feed and environment already on the timeline. AI Doctor can review this history cautiously and identify missing context, but it should not turn one symptom into an aggressive nutrient change or an automatic action.",
+      },
+    ],
+    faq: [
+      {
+        question: "Does Verdant provide a Canna Nutrients feeding chart?",
+        answer:
+          "No. Verdant is not affiliated with Canna and does not sell or recommend its products. Use Canna's current official chart for the product line and medium you run. Verdant records which chart step you followed, what you actually mixed, and how the plant responded; it does not copy, reconstruct, or replace the manufacturer's chart.",
+      },
+      {
+        question: "What should I log when using Canna Nutrients?",
+        answer:
+          "Log the product line, chart or revision, plant stage, medium, product names and actual amounts, total feed volume, water source, input pH, input EC or PPM, and—when useful—runoff or drain pH and EC. Add a consistent photo and room conditions so the plant response has context.",
+      },
+      {
+        question: "Can one runoff reading prove Canna Nutrients is burning or starving my plant?",
+        answer:
+          "No. A single runoff value can be affected by medium, sampling method, irrigation history, and measurement quality. Look for a repeatable trend alongside leaf-tip changes, plant posture, water use, input readings, and environment before drawing a conclusion.",
+      },
+      {
+        question: "Should I change the feeding chart after one symptom?",
+        answer:
+          "Not from one weak signal. Confirm the chart and mix, check meter quality and environment, add a fresh photo, and compare the plant over time. Make nutrient changes cautiously and keep the grower—not software—in control of the decision.",
+      },
+    ],
+    related: [
+      "what-to-log-in-a-grow-journal",
+      "plant-watering-log",
+      "grow-room-vpd-tracker",
+      "ai-grow-doctor",
+    ],
+  },
+  {
     slug: "bud-rot-prevention-identification",
     title: "Bud rot (Botrytis) identification | Verdant Grow Diary",
     h1: "Bud rot (Botrytis) identification and prevention with sensor history",

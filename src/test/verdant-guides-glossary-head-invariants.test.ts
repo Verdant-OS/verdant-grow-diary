@@ -147,24 +147,11 @@ describe("Guides + glossary head-tag content contract", () => {
 });
 
 describe("Guides + glossary pre-rendered head matches global invariants", () => {
-  it.each(TARGET_PATHS)(
-    "%s emitted HTML passes the same head-fidelity fence used in postbuild",
-    (path) => {
-      const doc = REGISTRY_BY_PATH.get(path)!;
-      const html = buildStaticSocialRouteHtml(INDEX_HTML, doc.metadata);
-      const diff = diffRouteHead(extractHead(html), {
-        path: doc.path,
-        fileName: doc.fileName,
-        metadata: doc.metadata,
-      });
-      // Surface the exact mismatched fields when this fails.
-      const mismatches = diff.mismatched.map((f: { label: string; expected: unknown; actual: unknown }) =>
-        `${f.label}: expected=${JSON.stringify(f.expected)} actual=${JSON.stringify(f.actual)}`,
-      );
-      expect(mismatches, mismatches.join("\n")).toEqual([]);
-      expect(diff.ok).toBe(true);
-    },
-  );
+  // Note: JSON-LD injection happens in a later vite plugin against the
+  // dist bundle, so this suite intentionally checks head META tags only.
+  // The postbuild validator (scripts/validate-static-route-head-fidelity.mjs)
+  // owns end-to-end JSON-LD fidelity across every emitted dist/*.html.
+
 
   const headFor = (path: string) => {
     const doc = REGISTRY_BY_PATH.get(path)!;

@@ -937,13 +937,14 @@ export default function ActionDetail() {
           (() => {
             const disabledReason = busy ? "Saving — please wait" : null;
             return (
-              <div className="flex flex-wrap gap-2 mt-4">
+              <div className="mt-4 flex min-w-0 flex-wrap gap-2">
                 {canApprove(row.status) && (
                   <Button
                     size="sm"
                     disabled={busy}
                     onClick={() => openDialog("approve")}
-                    className="gradient-leaf text-primary-foreground"
+                    className="gradient-leaf min-h-11 min-w-0 whitespace-normal text-primary-foreground sm:min-h-9"
+                    data-testid="action-detail-approve"
                     aria-label={buildActionButtonAriaLabel("approve", row, { disabledReason })}
                     title={disabledReason ?? undefined}
                   >
@@ -956,6 +957,8 @@ export default function ActionDetail() {
                     variant="secondary"
                     disabled={busy}
                     onClick={() => openDialog("simulate")}
+                    className="min-h-11 min-w-0 whitespace-normal sm:min-h-9"
+                    data-testid="action-detail-simulate"
                     aria-label={buildActionButtonAriaLabel("simulate", row, { disabledReason })}
                     title={disabledReason ?? undefined}
                   >
@@ -980,6 +983,8 @@ export default function ActionDetail() {
                     variant="ghost"
                     disabled={busy}
                     onClick={() => openDialog("reject")}
+                    className="min-h-11 min-w-0 whitespace-normal sm:min-h-9"
+                    data-testid="action-detail-reject"
                     aria-label={buildActionButtonAriaLabel("reject", row, { disabledReason })}
                     title={disabledReason ?? undefined}
                   >

@@ -15,6 +15,19 @@ import { resolve } from "node:path";
 
 const PAGE = readFileSync(resolve(__dirname, "../..", "src/pages/ActionQueue.tsx"), "utf8");
 
+function buttonOpeningTag(testId: string): string | undefined {
+  const marker = `data-testid="${testId}"`;
+  const markerIndex = PAGE.indexOf(marker);
+  if (markerIndex < 0) return undefined;
+
+  const buttonStart = PAGE.lastIndexOf("<Button", markerIndex);
+  const previousButtonEnd = PAGE.lastIndexOf("</Button>", markerIndex);
+  const buttonEnd = PAGE.indexOf("</Button>", markerIndex);
+  if (buttonStart < 0 || buttonStart < previousButtonEnd || buttonEnd < 0) return undefined;
+
+  return PAGE.slice(buttonStart, buttonEnd + "</Button>".length);
+}
+
 describe("ActionQueue — filter UI", () => {
   it("uses the shared page header and keeps refresh as a header action", () => {
     expect(PAGE).toMatch(/import PageHeader from ["']@\/components\/PageHeader["']/);
@@ -54,6 +67,20 @@ describe("ActionQueue — filter UI", () => {
       expect(labelIndex, `${label} must exist`).toBeGreaterThan(-1);
       const control = PAGE.slice(Math.max(0, labelIndex - 240), labelIndex + 120);
       expect(control, `${label} must expose a 44px mobile touch target`).toContain("min-h-11");
+    }
+  });
+
+  it("keeps refresh and pending decision controls at least 44px tall on mobile", () => {
+    for (const testId of [
+      "action-queue-refresh-button",
+      "action-queue-row-approve",
+      "action-queue-row-simulate",
+      "action-queue-row-reject",
+    ]) {
+      const control = buttonOpeningTag(testId);
+      expect(control, `${testId} must be a directly selectable Button`).toBeTruthy();
+      expect(control, `${testId} must expose a 44px mobile touch target`).toContain("min-h-11");
+      expect(control, `${testId} may return to the compact desktop height`).toContain("sm:min-h-9");
     }
   });
 

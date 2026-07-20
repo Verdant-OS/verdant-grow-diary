@@ -961,6 +961,7 @@ export default function ActionQueue() {
               disabled={loading || isRefreshing}
               aria-label="Refresh Action Queue"
               data-testid="action-queue-refresh-button"
+              className="min-h-11 min-w-0 whitespace-normal sm:min-h-9"
             >
               <RefreshCw
                 className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
@@ -1537,7 +1538,7 @@ export default function ActionQueue() {
                           </p>
                         </div>
                       </div>
-                      <div className="flex flex-wrap gap-2 mt-3">
+                      <div className="mt-3 flex min-w-0 flex-wrap gap-2">
                         {(() => {
                           const disabled = busyId === row.id;
                           const disabledReason = disabled ? "Saving — please wait" : null;
@@ -1547,7 +1548,8 @@ export default function ActionQueue() {
                                 size="sm"
                                 disabled={disabled}
                                 onClick={() => approve(row)}
-                                className="gradient-leaf text-primary-foreground"
+                                className="gradient-leaf min-h-11 min-w-0 whitespace-normal text-primary-foreground sm:min-h-9"
+                                data-testid="action-queue-row-approve"
                                 aria-label={buildActionButtonAriaLabel("approve", row, {
                                   disabledReason,
                                 })}
@@ -1560,6 +1562,8 @@ export default function ActionQueue() {
                                 variant="secondary"
                                 disabled={disabled}
                                 onClick={() => simulate(row)}
+                                className="min-h-11 min-w-0 whitespace-normal sm:min-h-9"
+                                data-testid="action-queue-row-simulate"
                                 aria-label={buildActionButtonAriaLabel("simulate", row, {
                                   disabledReason,
                                 })}
@@ -1572,6 +1576,8 @@ export default function ActionQueue() {
                                 variant="ghost"
                                 disabled={disabled}
                                 onClick={() => reject(row)}
+                                className="min-h-11 min-w-0 whitespace-normal sm:min-h-9"
+                                data-testid="action-queue-row-reject"
                                 aria-label={buildActionButtonAriaLabel("reject", row, {
                                   disabledReason,
                                 })}

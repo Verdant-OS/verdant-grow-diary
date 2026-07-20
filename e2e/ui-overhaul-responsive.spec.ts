@@ -6,6 +6,21 @@
 // - Makes no real writes, AI calls, sensor-ingest calls, Action Queue changes,
 //   or device-control requests.
 import { expect, test, type Page } from "@playwright/test";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { APP_ROUTES } from "../src/lib/appRouteManifest";
+import {
+  actionDetailPath,
+  actionsPath,
+  aiDoctorSessionDetailPath,
+  dashboardPath,
+  growDetailPath,
+  phenoHuntsPath,
+  plantDetailPath,
+  tentDetailPath,
+  tentsPath,
+  timelinePath,
+} from "../src/lib/routes";
 
 const PROJECT_REF = "knkwiiywfkbqznbxwqfh";
 const SESSION_KEY = `sb-${PROJECT_REF}-auth-token`;
@@ -101,7 +116,7 @@ const ACTION = {
   suggested_change: "Recheck canopy conditions before making any adjustment",
   reason: `[session:${SESSION_ID}] Mocked AI Doctor follow-up with no sensor snapshot.`,
   risk_level: "low",
-  status: "pending",
+  status: "pending_approval",
   approved_at: null,
   rejected_at: null,
   completed_at: null,
@@ -160,8 +175,7 @@ const REDESIGNED_PRODUCTION_PAGES = {
   operatorAiDoctorPhase1: "src/pages/OperatorAiDoctorPhase1.tsx",
   operatorBillingEntitlementResolutionAudit:
     "src/pages/OperatorBillingEntitlementResolutionAudit.tsx",
-  operatorBillingSubscriptionUpdateAudit:
-    "src/pages/OperatorBillingSubscriptionUpdateAudit.tsx",
+  operatorBillingSubscriptionUpdateAudit: "src/pages/OperatorBillingSubscriptionUpdateAudit.tsx",
   operatorEcowittTentPreview: "src/pages/OperatorEcowittTentPreview.tsx",
   operatorPaddleProcessingAudit: "src/pages/OperatorPaddleProcessingAudit.tsx",
   operatorSubscriberGrowth: "src/pages/OperatorSubscriberGrowth.tsx",
@@ -174,8 +188,10 @@ const REDESIGNED_PRODUCTION_PAGES = {
 
 type BrowserRoute = {
   sourcePage: string;
+  routePattern: string;
   path: string;
   heading: string;
+  readySelector: string;
   criticalOperatingLoop?: boolean;
   mainSelector?: string;
   allowedHorizontalScrollTestIds?: readonly string[];
@@ -185,64 +201,84 @@ type BrowserRoute = {
 const BROWSER_ROUTES: readonly BrowserRoute[] = [
   {
     sourcePage: "src/pages/Dashboard.tsx",
-    path: "/dashboard",
+    routePattern: "/dashboard",
+    path: dashboardPath(),
     heading: "Dashboard",
+    readySelector: '[data-testid="dashboard-daily-grow-check-entry"]',
     criticalOperatingLoop: true,
   },
   {
     sourcePage: "src/pages/DailyCheck.tsx",
+    routePattern: "/daily-check",
     path: `/daily-check?plantId=${PLANT_ID}&growId=${GROW_ID}`,
     heading: "Quick Log",
+    readySelector: '[data-testid="daily-grow-check-choose"]',
     criticalOperatingLoop: true,
   },
   {
     sourcePage: "src/pages/PlantDetail.tsx",
-    path: `/plants/${PLANT_ID}`,
+    routePattern: "/plants/:id",
+    path: plantDetailPath(PLANT_ID),
     heading: LONG_PLANT_NAME,
+    readySelector: '[data-testid="plant-detail-secondary-disclosures"]',
     criticalOperatingLoop: true,
   },
   {
     sourcePage: "src/pages/QuickLogStarter.tsx",
+    routePattern: "/quick-log",
     path: "/quick-log",
     heading: "Log your first grow note in 30 seconds",
+    readySelector: '[data-testid="starter-truth-line"]',
     criticalOperatingLoop: true,
     mainSelector: 'main[data-testid="public-quick-log-starter"]',
   },
   {
     sourcePage: "src/pages/Tents.tsx",
-    path: "/tents",
+    routePattern: "/tents",
+    path: tentsPath(),
     heading: "Tents",
+    readySelector: '[data-testid="tent-card-health-chip"]',
     criticalOperatingLoop: true,
   },
   {
     sourcePage: "src/pages/TentDetail.tsx",
-    path: `/tents/${TENT_ID}`,
+    routePattern: "/tents/:id",
+    path: tentDetailPath(TENT_ID),
     heading: "Responsive Proof Tent",
+    readySelector: '[data-testid="tent-detail-plants-grid"]',
     criticalOperatingLoop: true,
   },
   {
     sourcePage: REDESIGNED_PRODUCTION_PAGES.grows,
+    routePattern: "/grows",
     path: "/grows",
     heading: "My Grows",
+    readySelector: '[data-testid="grows-list"]',
     criticalOperatingLoop: true,
   },
   {
     sourcePage: REDESIGNED_PRODUCTION_PAGES.growDetail,
-    path: `/grows/${GROW_ID}`,
+    routePattern: "/grows/:growId",
+    path: growDetailPath(GROW_ID),
     heading: "Responsive Proof Grow",
+    readySelector: '[data-testid="grow-status-card"]',
     criticalOperatingLoop: true,
   },
   {
     sourcePage: REDESIGNED_PRODUCTION_PAGES.timeline,
-    path: `/timeline?growId=${GROW_ID}`,
+    routePattern: "/timeline",
+    path: timelinePath(GROW_ID),
     heading: "Responsive Proof Grow",
+    readySelector: '[data-testid="timeline-results-count"]',
     criticalOperatingLoop: true,
     allowedHorizontalScrollTestIds: ["timeline-stage-progression-scroll"],
   },
   {
     sourcePage: REDESIGNED_PRODUCTION_PAGES.actionQueue,
-    path: "/actions",
+    routePattern: "/actions",
+    path: actionsPath(),
     heading: "Action Queue",
+    readySelector: '[data-testid="action-queue-row"]',
     criticalOperatingLoop: true,
     mobileTouchTargetSelectors: [
       '[aria-label="Status filter"]',
@@ -254,54 +290,81 @@ const BROWSER_ROUTES: readonly BrowserRoute[] = [
       '[aria-label="Page size"]',
       '[aria-label="Previous page"]',
       '[aria-label="Next page"]',
+      '[data-testid="action-queue-refresh-button"]',
+      '[data-testid="action-queue-row-approve"]',
+      '[data-testid="action-queue-row-simulate"]',
+      '[data-testid="action-queue-row-reject"]',
     ],
   },
   {
     sourcePage: REDESIGNED_PRODUCTION_PAGES.actionDetail,
-    path: `/actions/${ACTION_ID}`,
+    routePattern: "/actions/:actionId",
+    path: actionDetailPath(ACTION_ID),
     heading: "Recheck canopy conditions before making any adjustment",
+    readySelector: '[data-testid="action-detail-grow-label"]',
     criticalOperatingLoop: true,
-    mobileTouchTargetSelectors: ['[data-testid="action-detail-evidence-review-link"]'],
+    mobileTouchTargetSelectors: [
+      '[data-testid="action-detail-evidence-review-link"]',
+      '[data-testid="action-detail-approve"]',
+      '[data-testid="action-detail-simulate"]',
+      '[data-testid="action-detail-reject"]',
+    ],
   },
   {
     sourcePage: REDESIGNED_PRODUCTION_PAGES.aiDoctorSessionsIndex,
+    routePattern: "/doctor/sessions",
     path: "/doctor/sessions",
     heading: "AI Doctor Sessions",
+    readySelector: '[data-testid="ai-doctor-sessions-index-list"]',
   },
   {
     sourcePage: REDESIGNED_PRODUCTION_PAGES.aiDoctorSessionDetail,
-    path: `/doctor/sessions/${SESSION_ID}`,
+    routePattern: "/doctor/sessions/:sessionId",
+    path: aiDoctorSessionDetailPath(SESSION_ID),
     heading: "Historical AI Doctor Session",
+    readySelector: '[data-testid="ai-doctor-session-detail-session-summary"]',
   },
   {
     sourcePage: REDESIGNED_PRODUCTION_PAGES.phenoHuntsIndex,
-    path: "/pheno-hunts",
+    routePattern: "/pheno-hunts",
+    path: phenoHuntsPath(),
     heading: "Pheno Hunts",
+    readySelector: '[data-testid="pheno-hunts-index-empty"]',
   },
   {
     sourcePage: REDESIGNED_PRODUCTION_PAGES.phenoHuntNew,
+    routePattern: "/pheno-hunts/new",
     path: `/pheno-hunts/new?growId=${GROW_ID}`,
     heading: "Start Pheno Hunt",
+    readySelector: '[data-testid="pheno-step-basics"]',
   },
   {
     sourcePage: REDESIGNED_PRODUCTION_PAGES.breedingProgramsIndex,
+    routePattern: "/breeding",
     path: "/breeding",
     heading: "Breeding programs",
+    readySelector: '[data-testid="breeding-programs-empty"]',
   },
   {
     sourcePage: REDESIGNED_PRODUCTION_PAGES.breedingProgramNew,
+    routePattern: "/breeding/new",
     path: "/breeding/new",
     heading: "New breeding program",
+    readySelector: "#name",
   },
   {
     sourcePage: REDESIGNED_PRODUCTION_PAGES.growerInvite,
+    routePattern: "/invite",
     path: "/invite",
     heading: "Invite a grower",
+    readySelector: '[data-testid="grower-invite-page"]',
   },
   {
     sourcePage: REDESIGNED_PRODUCTION_PAGES.healthCheck,
+    routePattern: "/health",
     path: "/health",
     heading: "Health check",
+    readySelector: '[data-testid="health-overall-status"]:not([data-status="pending"])',
   },
 ];
 
@@ -309,74 +372,115 @@ const DOCUMENTED_EXCLUDED_ROUTES = [
   {
     sourcePage: REDESIGNED_PRODUCTION_PAGES.aiDoctorConfidenceAudit,
     routePattern: "/internal/ai-doctor-confidence-audit",
-    reason: "Operator-only route; the authenticated browser fixture intentionally has no operator role.",
-    staticProof: "ui-overhaul-route-contract: AppShell landmark coverage",
+    reason:
+      "Internal, operator-gated route; the authenticated browser fixture intentionally has no operator role.",
+    staticProof: {
+      file: "src/test/ai-doctor-confidence-audit-route.test.tsx",
+      contains: "ai-doctor-confidence-audit-page",
+    },
   },
   {
     sourcePage: REDESIGNED_PRODUCTION_PAGES.breedingProgramDetail,
     routePattern: "/breeding/:programId",
-    reason: "Dynamic detail requires a breeding-program record that is absent from the read-only fixture.",
-    staticProof: "ui-overhaul-route-contract: AppShell landmark coverage",
+    reason:
+      "Dynamic detail requires a breeding-program record that is absent from the read-only fixture.",
+    staticProof: {
+      file: REDESIGNED_PRODUCTION_PAGES.breedingProgramDetail,
+      contains: 'aria-label="Breeding program steps"',
+    },
   },
   {
     sourcePage: REDESIGNED_PRODUCTION_PAGES.ecowittIngestAudit,
     routePattern: "/sensors/ecowitt-audit",
     reason: "Operator-only sensor audit; the fixture must not self-grant operator access.",
-    staticProof: "ui-overhaul-route-contract: AppShell landmark coverage",
+    staticProof: {
+      file: "src/test/ecowitt-ingest-audit-page.test.tsx",
+      contains: "ecowitt-audit-row-row-1",
+    },
   },
   {
     sourcePage: REDESIGNED_PRODUCTION_PAGES.ecowittLiveBringup,
     routePattern: "/operator/ecowitt-live-bringup",
-    reason: "Operator-only live bring-up surface is intentionally inaccessible to the standard fixture.",
-    staticProof: "ui-overhaul-route-contract: AppShell landmark coverage",
+    reason:
+      "Operator-only live bring-up surface is intentionally inaccessible to the standard fixture.",
+    staticProof: {
+      file: "src/test/ecowitt-live-bringup-route.test.tsx",
+      contains: "ecowitt-bringup-page",
+    },
   },
   {
     sourcePage: REDESIGNED_PRODUCTION_PAGES.operatorAiDoctorPhase1,
     routePattern: "/operator/ai-doctor-phase1",
     reason: "Operator-only AI audit; browser proof remains read-only and non-operator.",
-    staticProof: "ui-overhaul-route-contract: AppShell landmark coverage",
+    staticProof: {
+      file: "src/test/ai-doctor-phase1-operator-page.test.tsx",
+      contains: "ai-doctor-phase1-page-safety-1",
+    },
   },
   {
     sourcePage: REDESIGNED_PRODUCTION_PAGES.operatorBillingEntitlementResolutionAudit,
     routePattern: "/operator/billing-entitlement-resolution",
     reason: "Operator-only billing audit is outside the standard authenticated fixture.",
-    staticProof: "ui-overhaul-route-contract: AppShell landmark coverage",
+    staticProof: {
+      file: "src/test/operator-billing-entitlement-resolution-audit-page.test.tsx",
+      contains: "Billing Entitlement Resolution",
+    },
   },
   {
     sourcePage: REDESIGNED_PRODUCTION_PAGES.operatorBillingSubscriptionUpdateAudit,
     routePattern: "/operator/billing-subscription-updates",
     reason: "Operator-only billing audit is outside the standard authenticated fixture.",
-    staticProof: "ui-overhaul-route-contract: AppShell landmark coverage",
+    staticProof: {
+      file: "src/test/operator-billing-subscription-update-audit-page.test.tsx",
+      contains: "new_subscription",
+    },
   },
   {
     sourcePage: REDESIGNED_PRODUCTION_PAGES.operatorEcowittTentPreview,
     routePattern: "/operator/ecowitt-tent-preview",
     reason: "Operator-only sensor preview is intentionally inaccessible to the standard fixture.",
-    staticProof: "ui-overhaul-route-contract: AppShell landmark coverage",
+    staticProof: {
+      file: "src/test/ecowitt-tent-preview.test.tsx",
+      contains: "tent-label",
+    },
   },
   {
     sourcePage: REDESIGNED_PRODUCTION_PAGES.operatorPaddleProcessingAudit,
     routePattern: "/operator/paddle-processing-audit",
     reason: "Operator-only billing processing audit is outside the standard authenticated fixture.",
-    staticProof: "ui-overhaul-route-contract: AppShell landmark coverage",
+    staticProof: {
+      file: "src/test/paddle-processing-audit-static.test.ts",
+      contains: "/operator/paddle-processing-audit",
+    },
   },
   {
     sourcePage: REDESIGNED_PRODUCTION_PAGES.operatorSubscriberGrowth,
     routePattern: "/operator/subscriber-growth",
     reason: "Operator-only growth audit is outside the standard authenticated fixture.",
-    staticProof: "ui-overhaul-route-contract: AppShell landmark coverage",
+    staticProof: {
+      file: "src/test/operator-subscriber-growth-page.test.tsx",
+      contains: "Subscriber Growth",
+    },
   },
   {
     sourcePage: REDESIGNED_PRODUCTION_PAGES.phenoHuntWorkspace,
     routePattern: "/pheno-hunts/:id/workspace",
-    reason: "Dynamic workspace requires a pheno-hunt record that is absent from the read-only fixture.",
-    staticProof: "ui-overhaul-route-contract: named-section coverage",
+    reason:
+      "Dynamic workspace requires a pheno-hunt record that is absent from the read-only fixture.",
+    staticProof: {
+      file: "src/test/pheno-hunt-workspace.test.tsx",
+      contains: "pheno-workspace",
+    },
   },
   {
     sourcePage: REDESIGNED_PRODUCTION_PAGES.phenoKeepers,
     routePattern: "/pheno-hunts/:id/keepers",
-    reason: "Dynamic keepers view requires a pheno-hunt record that is absent from the read-only fixture.",
-    staticProof: "ui-overhaul-route-contract: named-section coverage",
+    reason:
+      "Dynamic keepers view requires a pheno-hunt record that is absent from the read-only fixture.",
+    staticProof: {
+      file: "src/test/pheno-keepers-page.test.tsx",
+      contains: "pheno-keeper-k1",
+    },
   },
 ] as const;
 
@@ -495,7 +599,43 @@ async function mockSignedInSupabase(page: Page) {
   );
 }
 
-async function assertViewportFit(page: Page, route: Pick<BrowserRoute, "path" | "mainSelector" | "allowedHorizontalScrollTestIds">) {
+async function waitForStableLayout(page: Page, mainSelector: string, routePath: string) {
+  let previousSignature: string | null = null;
+  let stableSamples = 0;
+
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolveFrame) => {
+          requestAnimationFrame(() => requestAnimationFrame(() => resolveFrame()));
+        }),
+    );
+    const signature = await page.locator(mainSelector).evaluate((main) => {
+      const bounds = main.getBoundingClientRect();
+      return JSON.stringify({
+        documentScrollWidth: document.documentElement.scrollWidth,
+        documentScrollHeight: document.documentElement.scrollHeight,
+        mainClientWidth: main.clientWidth,
+        mainScrollWidth: main.scrollWidth,
+        mainScrollHeight: main.scrollHeight,
+        left: Math.round(bounds.left * 100) / 100,
+        right: Math.round(bounds.right * 100) / 100,
+        height: Math.round(bounds.height * 100) / 100,
+      });
+    });
+
+    stableSamples = signature === previousSignature ? stableSamples + 1 : 0;
+    if (stableSamples >= 2) return;
+    previousSignature = signature;
+  }
+
+  throw new Error(`${routePath} layout did not stabilize before responsive measurement`);
+}
+
+async function assertViewportFit(
+  page: Page,
+  route: Pick<BrowserRoute, "path" | "mainSelector" | "allowedHorizontalScrollTestIds">,
+) {
   const mainSelector = route.mainSelector ?? "main#main-content";
   const snapshot = await page.evaluate(
     ({ selector, allowedHorizontalScrollTestIds }) => {
@@ -504,6 +644,76 @@ async function assertViewportFit(page: Page, route: Pick<BrowserRoute, "path" | 
 
       const viewportWidth = document.documentElement.clientWidth;
       const mainBounds = main.getBoundingClientRect();
+      const isHidden = (element: HTMLElement, bounds = element.getBoundingClientRect()) => {
+        const style = getComputedStyle(element);
+        return (
+          bounds.width === 0 ||
+          bounds.height === 0 ||
+          style.display === "none" ||
+          style.visibility === "hidden" ||
+          element.closest(".sr-only") !== null ||
+          element.closest('[hidden], [aria-hidden="true"]') !== null
+        );
+      };
+      const scrollerValidationViolations: Array<{
+        testId: string;
+        reason: string;
+        count: number;
+      }> = [];
+      const validatedScrollerElements: HTMLElement[] = [];
+
+      for (const testId of allowedHorizontalScrollTestIds) {
+        const matches = Array.from(main.querySelectorAll<HTMLElement>("[data-testid]")).filter(
+          (element) => element.dataset.testid === testId,
+        );
+        if (matches.length !== 1) {
+          scrollerValidationViolations.push({
+            testId,
+            reason: "expected exactly one allowlisted scroller",
+            count: matches.length,
+          });
+          continue;
+        }
+
+        const scroller = matches[0];
+        const bounds = scroller.getBoundingClientRect();
+        const overflowX = getComputedStyle(scroller).overflowX;
+        const boundedInsideMainAndViewport =
+          bounds.left >= Math.max(0, mainBounds.left) - 0.5 &&
+          bounds.right <= Math.min(viewportWidth, mainBounds.right) + 0.5;
+        if (
+          isHidden(scroller, bounds) ||
+          !["auto", "scroll"].includes(overflowX) ||
+          !boundedInsideMainAndViewport
+        ) {
+          scrollerValidationViolations.push({
+            testId,
+            reason: `invalid scroller: overflow-x=${overflowX}, bounds=${bounds.left}-${bounds.right}`,
+            count: 1,
+          });
+          continue;
+        }
+        validatedScrollerElements.push(scroller);
+      }
+
+      const isValidatedScroller = (element: HTMLElement) =>
+        validatedScrollerElements.includes(element);
+      const isInsideValidatedScroller = (element: HTMLElement) =>
+        validatedScrollerElements.some(
+          (scroller) => scroller !== element && scroller.contains(element),
+        );
+      const isInsideContainedProgressbar = (element: HTMLElement) => {
+        const progressbar = element.closest<HTMLElement>('[role="progressbar"]');
+        if (!progressbar || progressbar === element) return false;
+
+        const progressBounds = progressbar.getBoundingClientRect();
+        const progressStyle = getComputedStyle(progressbar);
+        return (
+          ["hidden", "clip"].includes(progressStyle.overflowX) &&
+          progressBounds.left >= Math.max(0, mainBounds.left) - 0.5 &&
+          progressBounds.right <= Math.min(viewportWidth, mainBounds.right) + 0.5
+        );
+      };
       const visibleBoundsViolations = Array.from(
         main.querySelectorAll<HTMLElement>(
           [
@@ -528,19 +738,13 @@ async function assertViewportFit(page: Page, route: Pick<BrowserRoute, "path" | 
         ),
       ).flatMap((element) => {
         const bounds = element.getBoundingClientRect();
-        const style = getComputedStyle(element);
-        const isHidden =
-          bounds.width === 0 ||
-          bounds.height === 0 ||
-          style.display === "none" ||
-          style.visibility === "hidden" ||
-          element.closest('[hidden], [aria-hidden="true"]') !== null;
-        const isInsideAllowedScroller = allowedHorizontalScrollTestIds.some((testId) => {
-          const scroller = element.closest<HTMLElement>(`[data-testid="${testId}"]`);
-          return scroller !== null && scroller !== element;
-        });
-
-        if (isHidden || isInsideAllowedScroller) return [];
+        if (
+          isHidden(element, bounds) ||
+          isInsideValidatedScroller(element) ||
+          isInsideContainedProgressbar(element)
+        ) {
+          return [];
+        }
         if (bounds.left >= -0.5 && bounds.right <= viewportWidth + 0.5) return [];
 
         return [
@@ -554,21 +758,18 @@ async function assertViewportFit(page: Page, route: Pick<BrowserRoute, "path" | 
         ];
       });
       const layoutBoundsViolations = Array.from(
-        main.querySelectorAll<HTMLElement>("div, section, article, header, footer, ul, ol, li, form"),
+        main.querySelectorAll<HTMLElement>(
+          "div, section, article, header, footer, ul, ol, li, form, p, pre, dl, dt, dd, span",
+        ),
       ).flatMap((element) => {
         const bounds = element.getBoundingClientRect();
-        const style = getComputedStyle(element);
-        const isHidden =
-          bounds.width === 0 ||
-          bounds.height === 0 ||
-          style.display === "none" ||
-          style.visibility === "hidden" ||
-          element.closest('[hidden], [aria-hidden="true"]') !== null;
-        const isInsideAllowedScroller = allowedHorizontalScrollTestIds.some((testId) => {
-          const scroller = element.closest<HTMLElement>(`[data-testid="${testId}"]`);
-          return scroller !== null && scroller !== element;
-        });
-        if (isHidden || isInsideAllowedScroller) return [];
+        if (
+          isHidden(element, bounds) ||
+          isInsideValidatedScroller(element) ||
+          isInsideContainedProgressbar(element)
+        ) {
+          return [];
+        }
         if (bounds.left >= -0.5 && bounds.right <= viewportWidth + 0.5) return [];
         return [
           {
@@ -584,18 +785,60 @@ async function assertViewportFit(page: Page, route: Pick<BrowserRoute, "path" | 
       const intrinsicWidthViolations = Array.from(main.querySelectorAll<HTMLElement>("*")).flatMap(
         (element) => {
           const style = getComputedStyle(element);
-          const allowedScroller = allowedHorizontalScrollTestIds.some((testId) =>
-            element.closest(`[data-testid="${testId}"]`),
-          );
           const concealedOverflow = element.scrollWidth - element.clientWidth;
+          const intentionallyEllipsized =
+            ["hidden", "clip"].includes(style.overflowX) &&
+            style.textOverflow === "ellipsis" &&
+            style.whiteSpace === "nowrap";
           if (
-            allowedScroller ||
+            isHidden(element) ||
+            isValidatedScroller(element) ||
+            isInsideValidatedScroller(element) ||
             concealedOverflow <= 1 ||
-            ["auto", "scroll", "hidden", "clip"].includes(style.overflowX)
+            ["auto", "scroll"].includes(style.overflowX) ||
+            intentionallyEllipsized
           ) {
             return [];
           }
           const bounds = element.getBoundingClientRect();
+          const clipsOverflow = ["hidden", "clip"].includes(style.overflowX);
+          const contentRight = bounds.left + element.scrollWidth;
+          const escapesMainOrViewport =
+            contentRight > Math.min(mainBounds.right, viewportWidth) + 0.5;
+          if (!clipsOverflow && !escapesMainOrViewport) return [];
+
+          const hasMeaningfulDirectText = Array.from(element.childNodes).some(
+            (node) => node.nodeType === Node.TEXT_NODE && Boolean(node.textContent?.trim()),
+          );
+          const hasProblematicDescendant = Array.from(
+            element.querySelectorAll<HTMLElement>("*"),
+          ).some((descendant) => {
+            if (
+              isHidden(descendant) ||
+              isValidatedScroller(descendant) ||
+              isInsideValidatedScroller(descendant) ||
+              isInsideContainedProgressbar(descendant)
+            ) {
+              return false;
+            }
+            const descendantBounds = descendant.getBoundingClientRect();
+            const descendantStyle = getComputedStyle(descendant);
+            const descendantIsIntentionallyEllipsized =
+              ["hidden", "clip"].includes(descendantStyle.overflowX) &&
+              descendantStyle.textOverflow === "ellipsis" &&
+              descendantStyle.whiteSpace === "nowrap";
+            if (descendantIsIntentionallyEllipsized) return false;
+
+            const escapesContainer =
+              descendantBounds.left < bounds.left - 0.5 ||
+              descendantBounds.right > bounds.right + 0.5;
+            const concealsOwnContent =
+              descendant.scrollWidth - descendant.clientWidth > 1 &&
+              !["auto", "scroll"].includes(descendantStyle.overflowX);
+            return escapesContainer || concealsOwnContent;
+          });
+          if (!hasMeaningfulDirectText && !hasProblematicDescendant) return [];
+
           return [
             {
               tag: element.tagName.toLowerCase(),
@@ -621,6 +864,7 @@ async function assertViewportFit(page: Page, route: Pick<BrowserRoute, "path" | 
         visibleBoundsViolations,
         layoutBoundsViolations,
         intrinsicWidthViolations,
+        scrollerValidationViolations,
       };
     },
     {
@@ -633,6 +877,11 @@ async function assertViewportFit(page: Page, route: Pick<BrowserRoute, "path" | 
   if (!snapshot) return;
 
   expect(
+    snapshot.scrollerValidationViolations,
+    `${route.path} horizontal scroller allowlist must resolve exactly once to bounded auto/scroll containers`,
+  ).toEqual([]);
+
+  expect(
     snapshot.documentScrollWidth - snapshot.documentClientWidth,
     `${route.path} must not create document-level horizontal overflow; main=${snapshot.mainScrollWidth}/${snapshot.mainClientWidth}; visible offenders: ${JSON.stringify(snapshot.visibleBoundsViolations)}; layout offenders: ${JSON.stringify(snapshot.layoutBoundsViolations)}; intrinsic offenders: ${JSON.stringify(snapshot.intrinsicWidthViolations)}`,
   ).toBe(0);
@@ -640,15 +889,25 @@ async function assertViewportFit(page: Page, route: Pick<BrowserRoute, "path" | 
     snapshot.mainScrollWidth - snapshot.mainClientWidth,
     `${route.path} main content must not have concealed horizontal overflow`,
   ).toBe(0);
-  expect(snapshot.mainLeft, `${route.path} main content must stay inside the left edge`).toBeGreaterThanOrEqual(
-    -0.5,
-  );
-  expect(snapshot.mainRight, `${route.path} main content must stay inside the right edge`).toBeLessThanOrEqual(
-    snapshot.viewportWidth + 0.5,
-  );
+  expect(
+    snapshot.mainLeft,
+    `${route.path} main content must stay inside the left edge`,
+  ).toBeGreaterThanOrEqual(-0.5);
+  expect(
+    snapshot.mainRight,
+    `${route.path} main content must stay inside the right edge`,
+  ).toBeLessThanOrEqual(snapshot.viewportWidth + 0.5);
   expect(
     snapshot.visibleBoundsViolations,
     `${route.path} visible content and controls must stay inside the viewport`,
+  ).toEqual([]);
+  expect(
+    snapshot.layoutBoundsViolations,
+    `${route.path} structural content must stay inside the viewport`,
+  ).toEqual([]);
+  expect(
+    snapshot.intrinsicWidthViolations,
+    `${route.path} must not conceal intrinsic horizontal overflow`,
   ).toEqual([]);
 }
 
@@ -662,12 +921,25 @@ async function assertRouteFitsViewport(page: Page, route: BrowserRoute) {
     await expect(page.locator("main main")).toHaveCount(0);
   }
 
+  const ready = page.locator(route.readySelector);
+  await expect(
+    ready,
+    `${route.path} must reach ${route.readySelector} before measurement`,
+  ).toHaveCount(1);
+  await expect(ready).toBeVisible();
+  await waitForStableLayout(page, mainSelector, route.path);
+
   await assertViewportFit(page, route);
 
   const viewport = page.viewportSize();
   if (viewport && viewport.width < 640) {
     for (const selector of route.mobileTouchTargetSelectors ?? []) {
-      const control = page.locator(selector).first();
+      const controls = page.locator(selector);
+      await expect(
+        controls,
+        `${route.path} must render exactly one critical mobile control for ${selector}`,
+      ).toHaveCount(1);
+      const control = controls.first();
       await expect(control, `${route.path} must render ${selector}`).toBeVisible();
       const bounds = await control.boundingBox();
       expect(bounds, `${route.path} ${selector} must have a box`).not.toBeNull();
@@ -692,6 +964,8 @@ test.describe("Verdant UI-overhaul responsive routes", () => {
   test("accounts for every redesigned production page in browser or documented exclusions", () => {
     const redesignedPages = Object.values(REDESIGNED_PRODUCTION_PAGES).sort();
     const redesignedPageSet = new Set(redesignedPages);
+    const canonicalRoutePatterns = new Set(APP_ROUTES.map((route) => route.path));
+    const accountedRoutes = [...BROWSER_ROUTES, ...DOCUMENTED_EXCLUDED_ROUTES];
     const accountedPages = [
       ...BROWSER_ROUTES.map((route) => route.sourcePage),
       ...DOCUMENTED_EXCLUDED_ROUTES.map((route) => route.sourcePage),
@@ -701,10 +975,24 @@ test.describe("Verdant UI-overhaul responsive routes", () => {
     expect(new Set(accountedPages).size, "redesigned pages must not be double-counted").toBe(
       accountedPages.length,
     );
+    expect(
+      new Set(accountedRoutes.map((route) => route.routePattern)).size,
+      "runnable and excluded routes must each be accounted for exactly once",
+    ).toBe(accountedRoutes.length);
+    for (const route of accountedRoutes) {
+      expect(
+        canonicalRoutePatterns.has(route.routePattern),
+        `${route.routePattern} must exist in APP_ROUTES`,
+      ).toBe(true);
+    }
     for (const exclusion of DOCUMENTED_EXCLUDED_ROUTES) {
-      expect(exclusion.routePattern).toBeTruthy();
       expect(exclusion.reason.length).toBeGreaterThan(24);
-      expect(exclusion.staticProof).toBeTruthy();
+      const proofPath = resolve(process.cwd(), exclusion.staticProof.file);
+      const proofSource = readFileSync(proofPath, "utf8");
+      expect(
+        proofSource,
+        `${exclusion.routePattern} static proof must contain ${exclusion.staticProof.contains}`,
+      ).toContain(exclusion.staticProof.contains);
     }
   });
 
@@ -714,21 +1002,52 @@ test.describe("Verdant UI-overhaul responsive routes", () => {
     await page.setViewportSize({ width: 320, height: 568 });
     await page.setContent(`
       <style>html, body { margin: 0; width: 100%; } </style>
-      <div id="clipped-oversized-proof" style="width: 100vw; overflow-x: clip;">
-        <main id="main-content" style="width: 100%;">
-          <button style="width: 640px; max-width: none;">Oversized control</button>
-        </main>
-      </div>
+      <main id="main-content" style="width: 100%;">
+        <div id="clipped-oversized-proof" style="width: 100%; overflow-x: clip;">
+          <div style="width: 100%;">
+            <p style="width: 640px; max-width: none; margin: 0;">Oversized non-semantic content</p>
+          </div>
+        </div>
+      </main>
     `);
 
-    const documentWidths = await page.evaluate(() => ({
-      client: document.documentElement.clientWidth,
-      scroll: document.documentElement.scrollWidth,
+    const concealedWidths = await page.evaluate(() => ({
+      documentClient: document.documentElement.clientWidth,
+      documentScroll: document.documentElement.scrollWidth,
+      mainClient: document.querySelector<HTMLElement>("#main-content")?.clientWidth,
+      mainScroll: document.querySelector<HTMLElement>("#main-content")?.scrollWidth,
     }));
-    expect(documentWidths.scroll).toBe(documentWidths.client);
-    await expect(
-      assertViewportFit(page, { path: "clipped-oversized-proof" }),
-    ).rejects.toThrow(/main content must not have concealed horizontal overflow/i);
+    expect(concealedWidths.documentScroll).toBe(concealedWidths.documentClient);
+    expect(concealedWidths.mainScroll).toBe(concealedWidths.mainClient);
+    await expect(assertViewportFit(page, { path: "clipped-oversized-proof" })).rejects.toThrow(
+      /structural content|intrinsic horizontal overflow/i,
+    );
+
+    const invalidScrollerFixtures = [
+      {
+        name: "missing",
+        markup: '<main id="main-content"></main>',
+      },
+      {
+        name: "duplicate",
+        markup:
+          '<main id="main-content"><div data-testid="proof-scroller" style="overflow-x: auto"></div><div data-testid="proof-scroller" style="overflow-x: auto"></div></main>',
+      },
+      {
+        name: "non-scrolling",
+        markup:
+          '<main id="main-content"><div data-testid="proof-scroller" style="width: 100%; overflow-x: hidden"><p style="width: 640px">Wide content</p></div></main>',
+      },
+    ] as const;
+    for (const fixture of invalidScrollerFixtures) {
+      await page.setContent(fixture.markup);
+      await expect(
+        assertViewportFit(page, {
+          path: `${fixture.name}-scroller-proof`,
+          allowedHorizontalScrollTestIds: ["proof-scroller"],
+        }),
+      ).rejects.toThrow(/horizontal scroller allowlist/i);
+    }
   });
 
   for (const viewport of [
@@ -849,10 +1168,7 @@ test.describe("Verdant UI-overhaul responsive routes", () => {
       }));
       await assertViewportFit(page, {
         path: `/plants/${PLANT_ID} (expanded disclosures at ${width}px)`,
-        allowedHorizontalScrollTestIds: [
-          "timeline-stage-progression-scroll",
-          "relative-timeline-filters",
-        ],
+        allowedHorizontalScrollTestIds: width < 640 ? ["relative-timeline-filters"] : [],
       });
       expect(expandedLayout.scrollWidth - expandedLayout.clientWidth).toBe(0);
       expect(expandedLayout.duplicateIds).toEqual([]);

@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { APP_ROUTES } from "@/lib/appRouteManifest";
 
 const readSource = (relativePath: string) =>
   readFileSync(resolve(__dirname, "../..", relativePath), "utf8");
@@ -70,11 +71,60 @@ describe("Verdant UI overhaul route contract", () => {
     expect(RESPONSIVE_SPEC).toContain("mainScrollWidth");
     expect(RESPONSIVE_SPEC).toContain("getBoundingClientRect");
     expect(RESPONSIVE_SPEC).toContain("visibleBoundsViolations");
+    expect(RESPONSIVE_SPEC).toMatch(/expect\(\s*snapshot\.layoutBoundsViolations/);
+    expect(RESPONSIVE_SPEC).toMatch(/expect\(\s*snapshot\.intrinsicWidthViolations/);
   });
 
-  it("proves the viewport assertion rejects a clipped oversized descendant", () => {
+  it("proves the viewport assertion rejects clipped non-semantic nested content", () => {
     expect(RESPONSIVE_SPEC).toContain("clipped-oversized-proof");
+    expect(RESPONSIVE_SPEC).toMatch(/overflow-x:\s*(?:clip|hidden)/);
+    expect(RESPONSIVE_SPEC).toMatch(/<p[^>]*style="[^"]*width:\s*640px/);
     expect(RESPONSIVE_SPEC).toMatch(/rejects\.toThrow/);
+  });
+
+  it("validates every horizontal-scroller exemption before using it", () => {
+    expect(RESPONSIVE_SPEC).toContain("scrollerValidationViolations");
+    expect(RESPONSIVE_SPEC).toContain("validatedScrollerElements");
+    expect(RESPONSIVE_SPEC).toMatch(/\["auto",\s*"scroll"\]/);
+    expect(RESPONSIVE_SPEC).toMatch(/snapshot\.scrollerValidationViolations/);
+    expect(
+      RESPONSIVE_SPEC.split('"timeline-stage-progression-scroll"').length - 1,
+      "the Timeline-only scroller must not be allowlisted on Plant Detail",
+    ).toBe(1);
+  });
+
+  it("ties runnable and excluded route patterns to the canonical manifest", () => {
+    const declaredPatterns = [...RESPONSIVE_SPEC.matchAll(/routePattern:\s*"([^"]+)"/g)].map(
+      (match) => match[1],
+    );
+    const canonicalPatterns = new Set(APP_ROUTES.map((route) => route.path));
+
+    expect(declaredPatterns).toHaveLength(31);
+    for (const routePattern of declaredPatterns) {
+      expect(canonicalPatterns.has(routePattern), `${routePattern} must exist in APP_ROUTES`).toBe(
+        true,
+      );
+    }
+    expect(RESPONSIVE_SPEC).toMatch(/import\s*\{\s*APP_ROUTES\s*\}/);
+  });
+
+  it("requires concrete static-proof files and route-specific readiness before measurement", () => {
+    const browserRoutesBlock = RESPONSIVE_SPEC.slice(
+      RESPONSIVE_SPEC.indexOf("const BROWSER_ROUTES"),
+      RESPONSIVE_SPEC.indexOf("const DOCUMENTED_EXCLUDED_ROUTES"),
+    );
+    const exclusionsBlock = RESPONSIVE_SPEC.slice(
+      RESPONSIVE_SPEC.indexOf("const DOCUMENTED_EXCLUDED_ROUTES"),
+      RESPONSIVE_SPEC.indexOf("const CRITICAL_OPERATING_LOOP_ROUTES"),
+    );
+
+    expect(browserRoutesBlock.match(/readySelector:/g)).toHaveLength(19);
+    expect(browserRoutesBlock.match(/routePattern:/g)).toHaveLength(19);
+    expect(exclusionsBlock.match(/staticProof:\s*\{/g)).toHaveLength(12);
+    expect(exclusionsBlock.match(/file:/g)).toHaveLength(12);
+    expect(exclusionsBlock.match(/contains:/g)).toHaveLength(12);
+    expect(RESPONSIVE_SPEC).toContain("waitForStableLayout");
+    expect(RESPONSIVE_SPEC).toMatch(/route\.readySelector/);
   });
 
   it("connects the skip link to the single application main region", () => {

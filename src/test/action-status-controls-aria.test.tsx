@@ -48,6 +48,19 @@ const ID_LIKE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 
 const SAMPLE_ROW = { action_type: "raise_light" };
 
+function buttonOpeningTag(source: string, testId: string): string | undefined {
+  const marker = `data-testid="${testId}"`;
+  const markerIndex = source.indexOf(marker);
+  if (markerIndex < 0) return undefined;
+
+  const buttonStart = source.lastIndexOf("<Button", markerIndex);
+  const previousButtonEnd = source.lastIndexOf("</Button>", markerIndex);
+  const buttonEnd = source.indexOf("</Button>", markerIndex);
+  if (buttonStart < 0 || buttonStart < previousButtonEnd || buttonEnd < 0) return undefined;
+
+  return source.slice(buttonStart, buttonEnd + "</Button>".length);
+}
+
 describe("buildActionButtonAriaLabel — pure helper", () => {
   it("composes a descriptive label per transition kind", () => {
     expect(buildActionButtonAriaLabel("approve", SAMPLE_ROW)).toBe(
@@ -168,6 +181,19 @@ describe("ActionDetail — status-control aria wiring", () => {
 
   it("exposes the current status on the header status badge", () => {
     expect(DETAIL).toMatch(/aria-label=\{buildStatusBadgeAriaLabel\(row\.status\)\}/);
+  });
+
+  it("keeps pending decision controls directly selectable and touch-safe on mobile", () => {
+    for (const testId of [
+      "action-detail-approve",
+      "action-detail-simulate",
+      "action-detail-reject",
+    ]) {
+      const control = buttonOpeningTag(DETAIL, testId);
+      expect(control, `${testId} must be a directly selectable Button`).toBeTruthy();
+      expect(control, `${testId} must expose a 44px mobile touch target`).toContain("min-h-11");
+      expect(control, `${testId} may return to the compact desktop height`).toContain("sm:min-h-9");
+    }
   });
 });
 

@@ -18,6 +18,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Sprout, Check, Trash2, Loader2, AlertCircle } from "lucide-react";
+import PageHeader from "@/components/PageHeader";
 import { GROW_TYPES, STAGES, growTypeLabel, stageLabel } from "@/lib/grow";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -98,20 +99,25 @@ export default function Grows() {
   }
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-5">
-        <h1 className="text-2xl font-display font-bold">My Grows</h1>
-        <Button
-          onClick={() => setOpen(true)}
-          size="sm"
-          className="gradient-leaf text-primary-foreground gap-1"
-          disabled={!growGate.allowed}
-          data-testid="grows-new-button"
-        >
-          <Plus className="h-4 w-4" />
-          New
-        </Button>
-      </div>
+    <div className="min-w-0">
+      <PageHeader
+        title="My Grows"
+        eyebrow="Cultivation"
+        description="Follow each grow from seed or clone through harvest without losing the why."
+        icon={<Sprout className="size-5" />}
+        actions={
+          <Button
+            onClick={() => setOpen(true)}
+            size="sm"
+            className="w-full gradient-leaf text-primary-foreground sm:w-auto"
+            disabled={!growGate.allowed}
+            data-testid="grows-new-button"
+          >
+            <Plus data-icon="inline-start" />
+            New grow
+          </Button>
+        }
+      />
 
       {!growGate.allowed && (
         <p
@@ -149,15 +155,18 @@ export default function Grows() {
           </Button>
         </div>
       ) : (
-        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3" data-testid="grows-list">
+        <ul
+          className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
+          data-testid="grows-list"
+        >
           {grows.map((g) => (
             <li
               key={g.id}
-              className={`glass rounded-2xl p-0 overflow-hidden ${g.id === activeGrowId ? "border-primary/60" : ""}`}
+              className={`group overflow-hidden rounded-3xl border bg-card/65 shadow-card backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-elevated ${g.id === activeGrowId ? "border-primary/60" : "border-border/60"}`}
             >
               <Link
                 to={`/grows/${g.id}`}
-                className="block p-4 hover:bg-secondary/20 transition-colors"
+                className="block p-5 transition-colors hover:bg-secondary/20"
                 data-testid="grow-card-link"
               >
                 <div className="flex items-center gap-2 flex-wrap mb-1">

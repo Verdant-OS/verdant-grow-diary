@@ -27,10 +27,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import OperatorModeLink from "@/components/OperatorModeLink";
-import {
-  isNavigationItemActive,
-  type NavigationActiveRule,
-} from "@/lib/navigationActiveRules";
+import { isNavigationItemActive, type NavigationActiveRule } from "@/lib/navigationActiveRules";
 
 type PrimaryItem = MoreItem & NavigationActiveRule;
 
@@ -106,7 +103,10 @@ export default function MobileNav() {
   const [open, setOpen] = useState(false);
   const { pathname } = useLocation();
   return (
-    <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 backdrop-blur-xl bg-background/85 border-t border-border/40 pb-[env(safe-area-inset-bottom)]">
+    <nav
+      aria-label="Primary navigation"
+      className="fixed inset-x-2 bottom-2 z-30 rounded-2xl border border-border/60 bg-card/90 shadow-elevated backdrop-blur-2xl pb-[env(safe-area-inset-bottom)] md:hidden"
+    >
       <div className="grid grid-cols-6 h-16">
         {primary.map((n) => {
           const active = isNavigationItemActive(pathname, n);
@@ -116,8 +116,10 @@ export default function MobileNav() {
               to={n.to}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "flex flex-col items-center justify-center gap-0.5 text-[10px] transition",
-                active ? "text-primary" : "text-muted-foreground hover:text-foreground",
+                "relative flex flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] transition-colors",
+                active
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
               )}
             >
               <n.icon className="h-5 w-5" />
@@ -126,7 +128,7 @@ export default function MobileNav() {
           );
         })}
         <Sheet open={open} onOpenChange={setOpen}>
-          <SheetTrigger className="flex flex-col items-center justify-center gap-0.5 text-[10px] text-muted-foreground hover:text-foreground">
+          <SheetTrigger className="flex flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] text-muted-foreground hover:bg-muted/50 hover:text-foreground">
             <MoreHorizontal className="h-5 w-5" />
             More
           </SheetTrigger>

@@ -13,12 +13,31 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const PAGE = readFileSync(
-  resolve(__dirname, "../..", "src/pages/ActionQueue.tsx"),
-  "utf8",
-);
+const PAGE = readFileSync(resolve(__dirname, "../..", "src/pages/ActionQueue.tsx"), "utf8");
 
 describe("ActionQueue — filter UI", () => {
+  it("uses the shared page header and keeps refresh as a header action", () => {
+    expect(PAGE).toMatch(/import PageHeader from ["']@\/components\/PageHeader["']/);
+    expect(PAGE).toMatch(/<PageHeader[\s\S]*?actions=\{[\s\S]*?action-queue-refresh-button/);
+    expect(PAGE).not.toMatch(/<h1[^>]*>[\s\S]*?action-queue-refresh-button/);
+  });
+
+  it("stacks every filter control full-width before the small breakpoint", () => {
+    for (const label of [
+      "Status filter",
+      "Risk filter",
+      "Source filter",
+      "Trace filter",
+      "Sort order",
+    ]) {
+      const controlStart = PAGE.indexOf(`aria-label="${label}"`);
+      expect(controlStart).toBeGreaterThan(-1);
+      const control = PAGE.slice(Math.max(0, controlStart - 160), controlStart + 80);
+      expect(control).toMatch(/w-full sm:w-\[/);
+    }
+    expect(PAGE).toMatch(/grid grid-cols-1 gap-2 rounded-2xl p-3 sm:flex sm:flex-wrap/);
+  });
+
   it("exposes a status filter with Pending/Simulated/Approved/Rejected/All", () => {
     expect(PAGE).toMatch(/aria-label=\s*["']Status filter["']/);
     for (const label of ["All statuses", "Pending", "Simulated", "Approved", "Rejected"]) {
@@ -73,9 +92,7 @@ describe("ActionQueue — transition/audit flow preserved", () => {
   });
 
   it("transition() writes to action_queue_events", () => {
-    expect(PAGE).toMatch(
-      /\.from\(\s*["']action_queue_events["']\s*\)[\s\S]{0,200}\.insert\(/,
-    );
+    expect(PAGE).toMatch(/\.from\(\s*["']action_queue_events["']\s*\)[\s\S]{0,200}\.insert\(/);
   });
 
   it("approve never sends user_id from the client", () => {

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import PageHeader from "@/components/PageHeader";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import { supabase } from "@/integrations/supabase/client";
 import { useGrows } from "@/store/grows";
@@ -812,16 +813,21 @@ export default function Timeline() {
       />
 
       {activeGrow && (
-        <div className="mb-5">
-          <h1 className="text-2xl font-display font-bold">{activeGrow.name}</h1>
-          <p className="text-sm text-muted-foreground">
-            {stageLabel(activeGrow.stage)} · day{" "}
-            {Math.max(
-              1,
-              Math.floor((Date.now() - new Date(activeGrow.started_at).getTime()) / 86400000),
-            )}
-          </p>
-        </div>
+        <PageHeader
+          eyebrow={isLogsRoute ? "Grow log" : "Grow timeline"}
+          title={activeGrow.name}
+          description="Trace observations, evidence, and decisions across this grow."
+          icon={<Sprout className="size-5" aria-hidden="true" />}
+          meta={
+            <span className="text-sm text-muted-foreground">
+              {stageLabel(activeGrow.stage)} · day{" "}
+              {Math.max(
+                1,
+                Math.floor((Date.now() - new Date(activeGrow.started_at).getTime()) / 86400000),
+              )}
+            </span>
+          }
+        />
       )}
 
       {/* Stage progression */}
@@ -835,39 +841,50 @@ export default function Timeline() {
               {entries.length} {entries.length === 1 ? "entry" : "entries"}
             </span>
           </div>
-          <ol className="grid grid-cols-6 gap-1.5">
-            {STAGES.map((s, i) => {
-              const count = stageCounts[s.value] || 0;
-              const isCurrent = i === currentStageIdx;
-              const isPast = currentStageIdx >= 0 && i < currentStageIdx;
-              return (
-                <li key={s.value} className="flex flex-col items-center gap-1.5">
-                  <div
-                    className={cn(
-                      "h-7 w-7 rounded-full flex items-center justify-center text-[11px] font-semibold border transition",
-                      isCurrent &&
-                        "bg-primary text-primary-foreground border-primary shadow-sm shadow-primary/30",
-                      isPast && "bg-primary/20 text-primary border-primary/40",
-                      !isCurrent &&
-                        !isPast &&
-                        "bg-secondary/50 text-muted-foreground border-border/50",
-                    )}
+          <div
+            aria-label="Grow stage progression"
+            className="-mx-1 overflow-x-auto px-1 pb-1 scrollbar-thin"
+            data-testid="timeline-stage-progression-scroll"
+            tabIndex={0}
+          >
+            <ol className="grid min-w-[34rem] grid-cols-6 gap-2">
+              {STAGES.map((s, i) => {
+                const count = stageCounts[s.value] || 0;
+                const isCurrent = i === currentStageIdx;
+                const isPast = currentStageIdx >= 0 && i < currentStageIdx;
+                return (
+                  <li
+                    key={s.value}
+                    aria-current={isCurrent ? "step" : undefined}
+                    className="flex flex-col items-center gap-1.5"
                   >
-                    {isPast ? <Check className="h-3.5 w-3.5" /> : i + 1}
-                  </div>
-                  <span
-                    className={cn(
-                      "text-[10px] leading-tight text-center",
-                      isCurrent ? "text-foreground font-medium" : "text-muted-foreground",
-                    )}
-                  >
-                    {s.label}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground">{count}</span>
-                </li>
-              );
-            })}
-          </ol>
+                    <div
+                      className={cn(
+                        "h-7 w-7 rounded-full flex items-center justify-center text-[11px] font-semibold border transition",
+                        isCurrent &&
+                          "bg-primary text-primary-foreground border-primary shadow-sm shadow-primary/30",
+                        isPast && "bg-primary/20 text-primary border-primary/40",
+                        !isCurrent &&
+                          !isPast &&
+                          "bg-secondary/50 text-muted-foreground border-border/50",
+                      )}
+                    >
+                      {isPast ? <Check className="h-3.5 w-3.5" /> : i + 1}
+                    </div>
+                    <span
+                      className={cn(
+                        "text-[10px] leading-tight text-center",
+                        isCurrent ? "text-foreground font-medium" : "text-muted-foreground",
+                      )}
+                    >
+                      {s.label}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">{count}</span>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
         </div>
       )}
 

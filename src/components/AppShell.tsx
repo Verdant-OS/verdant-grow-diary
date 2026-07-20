@@ -136,8 +136,18 @@ export default function AppShell({ children }: { children?: ReactNode }) {
   const pageContent = children ?? <Outlet />;
 
   return (
-    <SidebarProvider defaultOpen>
-      <div className="min-h-screen flex w-full">
+    <SidebarProvider defaultOpen className="bg-background">
+      <div className="relative isolate flex min-h-screen w-full overflow-x-clip">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(circle_at_82%_0%,hsl(var(--primary)/0.09),transparent_30%),radial-gradient(circle_at_5%_85%,hsl(var(--accent)/0.12),transparent_32%)]"
+        />
+        <a
+          href="#main-content"
+          className="fixed left-3 top-3 z-[100] -translate-y-24 rounded-xl border border-primary/30 bg-background px-4 py-2 text-sm font-semibold text-foreground shadow-elevated transition-transform focus:translate-y-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
+          Skip to main content
+        </a>
         {/* Desktop sidebar */}
         <div className="hidden md:block">
           <AppSidebar />
@@ -145,8 +155,8 @@ export default function AppShell({ children }: { children?: ReactNode }) {
 
         <div className="flex-1 flex flex-col min-w-0">
           {/* Top bar */}
-          <header className="sticky top-0 z-30 backdrop-blur-xl bg-background/70 border-b border-border/40">
-            <div className="h-14 px-3 md:px-5 flex items-center gap-3">
+          <header className="sticky top-0 z-40 border-b border-border/50 bg-background/80 backdrop-blur-2xl">
+            <div className="flex h-16 items-center gap-3 px-3 md:px-5">
               <div className="hidden md:block">
                 <SidebarTrigger />
               </div>
@@ -202,7 +212,11 @@ export default function AppShell({ children }: { children?: ReactNode }) {
 
           <SubscriptionPastDueBanner loading={entitlementLoading} entitlement={entitlement} />
 
-          <main className="flex-1 px-4 md:px-6 lg:px-8 py-5 pb-28 md:pb-8 max-w-[1400px] w-full mx-auto">
+          <main
+            id="main-content"
+            tabIndex={-1}
+            className="mx-auto w-full min-w-0 max-w-[1440px] flex-1 px-3 pb-28 pt-5 sm:px-5 md:px-7 md:pb-9 md:pt-7 lg:px-10"
+          >
             {isEmailVerificationPending(user) ? (
               <VerificationPendingBanner email={user.email ?? ""} />
             ) : (
@@ -231,7 +245,7 @@ export default function AppShell({ children }: { children?: ReactNode }) {
           }}
           aria-label="Open Quick Log"
           data-testid="mobile-quick-log-fab"
-          className="md:hidden fixed z-40 bottom-20 right-4 h-14 w-14 rounded-full gradient-leaf shadow-elevated flex items-center justify-center text-primary-foreground hover:scale-105 transition active:scale-95 glow-accent"
+          className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full gradient-leaf text-primary-foreground shadow-elevated transition hover:scale-105 active:scale-95 glow-accent md:hidden"
         >
           <Plus className="h-6 w-6" />
         </button>

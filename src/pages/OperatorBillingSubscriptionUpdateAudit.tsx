@@ -19,9 +19,15 @@ type SubUpdateAuditRpcClient = {
 };
 
 const LIMIT_OPTIONS = [25, 50, 100] as const;
-type LimitOption = typeof LIMIT_OPTIONS[number];
+type LimitOption = (typeof LIMIT_OPTIONS)[number];
 
-function StatusPill({ status, label }: { status: BillingSubscriptionUpdateAuditStatus; label: string }) {
+function StatusPill({
+  status,
+  label,
+}: {
+  status: BillingSubscriptionUpdateAuditStatus;
+  label: string;
+}) {
   const cls: Record<BillingSubscriptionUpdateAuditStatus, string> = {
     created: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
     updated: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
@@ -31,7 +37,9 @@ function StatusPill({ status, label }: { status: BillingSubscriptionUpdateAuditS
     skipped: "border-slate-500/40 bg-slate-500/10 text-slate-700 dark:text-slate-300",
   };
   return (
-    <span className={`inline-flex rounded-md border px-2 py-0.5 text-xs font-semibold ${cls[status]}`}>
+    <span
+      className={`inline-flex rounded-md border px-2 py-0.5 text-xs font-semibold ${cls[status]}`}
+    >
       {label}
     </span>
   );
@@ -48,7 +56,9 @@ function CountCard({ label, value }: { label: string; value: number }) {
   );
 }
 
-async function fetchSubUpdateAudit(limit: number): Promise<BillingSubscriptionUpdateAuditViewModel> {
+async function fetchSubUpdateAudit(
+  limit: number,
+): Promise<BillingSubscriptionUpdateAuditViewModel> {
   const { data, error } = await (supabase as unknown as SubUpdateAuditRpcClient).rpc(
     "billing_subscription_update_operator_audit",
     { p_limit: limit },
@@ -71,7 +81,7 @@ export default function OperatorBillingSubscriptionUpdateAudit() {
   const audit = auditQuery.data;
 
   return (
-    <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-4 md:p-6">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-4 md:p-6">
       <section className="space-y-2">
         <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           Operator Mode
@@ -83,15 +93,13 @@ export default function OperatorBillingSubscriptionUpdateAudit() {
             </h1>
             <p className="max-w-3xl text-sm text-muted-foreground">
               Sanitized, read-only view of subscription updater outcomes. Rows show status, reason,
-              candidate plan, and subscription status only. Raw provider identifiers, webhook bodies,
-              and internal extra fields are intentionally hidden.
+              candidate plan, and subscription status only. Raw provider identifiers, webhook
+              bodies, and internal extra fields are intentionally hidden.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Button asChild type="button" variant="outline">
-              <Link to="/operator/billing-entitlement-resolution">
-                View entitlement resolution
-              </Link>
+              <Link to="/operator/billing-entitlement-resolution">View entitlement resolution</Link>
             </Button>
             <label className="text-xs text-muted-foreground" htmlFor="sub-update-audit-limit">
               Rows
@@ -123,7 +131,9 @@ export default function OperatorBillingSubscriptionUpdateAudit() {
 
       {role.status === "loading" && (
         <Card>
-          <CardContent className="p-6 text-sm text-muted-foreground">Checking operator access…</CardContent>
+          <CardContent className="p-6 text-sm text-muted-foreground">
+            Checking operator access…
+          </CardContent>
         </Card>
       )}
 
@@ -131,7 +141,9 @@ export default function OperatorBillingSubscriptionUpdateAudit() {
         <Card>
           <CardHeader>
             <CardTitle>Sign in required</CardTitle>
-            <CardDescription>Operator audit views require an authenticated operator session.</CardDescription>
+            <CardDescription>
+              Operator audit views require an authenticated operator session.
+            </CardDescription>
           </CardHeader>
         </Card>
       )}
@@ -141,7 +153,8 @@ export default function OperatorBillingSubscriptionUpdateAudit() {
           <CardHeader>
             <CardTitle>Operator access required</CardTitle>
             <CardDescription>
-              This audit surface is hidden from non-operator accounts. No subscription data was requested.
+              This audit surface is hidden from non-operator accounts. No subscription data was
+              requested.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -162,7 +175,9 @@ export default function OperatorBillingSubscriptionUpdateAudit() {
         <Card>
           <CardHeader>
             <CardTitle>Subscription updater audit unavailable.</CardTitle>
-            <CardDescription>{audit.reasonLabel ?? "Operator audit is not available."}</CardDescription>
+            <CardDescription>
+              {audit.reasonLabel ?? "Operator audit is not available."}
+            </CardDescription>
           </CardHeader>
         </Card>
       )}
@@ -212,7 +227,10 @@ export default function OperatorBillingSubscriptionUpdateAudit() {
                     </thead>
                     <tbody>
                       {audit.latest.map((row, index) => (
-                        <tr key={`${row.createdAt ?? "row"}-${index}`} className="border-b last:border-0">
+                        <tr
+                          key={`${row.createdAt ?? "row"}-${index}`}
+                          className="border-b last:border-0"
+                        >
                           <td className="py-3 pr-3 font-mono text-xs text-muted-foreground">
                             {row.createdAt ?? "—"}
                           </td>
@@ -235,6 +253,6 @@ export default function OperatorBillingSubscriptionUpdateAudit() {
           </Card>
         </section>
       )}
-    </main>
+    </div>
   );
 }

@@ -30,21 +30,11 @@ import {
   ACTION_EVIDENCE_REVIEW_LINK_HELPER,
   ACTION_EVIDENCE_REVIEW_SCOPE_LABELS,
 } from "@/lib/actionQueueMissingEvidenceLink";
-import {
-  plantDetailPath,
-  tentDetailPath,
-  timelinePath,
-} from "@/lib/routes";
+import { plantDetailPath, tentDetailPath, timelinePath } from "@/lib/routes";
 
 const ROOT = resolve(__dirname, "../..");
-const ACTION_DETAIL_SRC = readFileSync(
-  resolve(ROOT, "src/pages/ActionDetail.tsx"),
-  "utf8",
-);
-const HELPER_SRC = readFileSync(
-  resolve(ROOT, "src/lib/actionQueueMissingEvidenceLink.ts"),
-  "utf8",
-);
+const ACTION_DETAIL_SRC = readFileSync(resolve(ROOT, "src/pages/ActionDetail.tsx"), "utf8");
+const HELPER_SRC = readFileSync(resolve(ROOT, "src/lib/actionQueueMissingEvidenceLink.ts"), "utf8");
 
 describe("buildMissingEvidenceReviewLink — route preference", () => {
   it("prefers the plant detail page when plant_id is present (audit: plant detail renders plant-scoped diary + sensor sections)", () => {
@@ -135,7 +125,9 @@ describe("buildMissingEvidenceReviewLink — null safety", () => {
     // @ts-expect-error invalid input shape
     expect(buildMissingEvidenceReviewLink({ plant_id: 42 })).toBeNull();
     expect(
-      buildMissingEvidenceReviewLink(null as unknown as Parameters<typeof buildMissingEvidenceReviewLink>[0]),
+      buildMissingEvidenceReviewLink(
+        null as unknown as Parameters<typeof buildMissingEvidenceReviewLink>[0],
+      ),
     ).toBeNull();
   });
 });
@@ -168,11 +160,7 @@ describe("buildMissingEvidenceReviewLink — visible copy + a11y", () => {
 
   it("visible copy (label/helper/scopeLabel) does not embed raw/internal IDs", () => {
     const id = "00000000-0000-0000-0000-000000000abc";
-    for (const ctx of [
-      { plant_id: id },
-      { tent_id: id },
-      { grow_id: id },
-    ]) {
+    for (const ctx of [{ plant_id: id }, { tent_id: id }, { grow_id: id }]) {
       const link = buildMissingEvidenceReviewLink(ctx)!;
       expect(link.label).not.toContain(id);
       expect(link.helper).not.toContain(id);
@@ -191,7 +179,7 @@ describe("ActionDetail missing-evidence guidance wiring", () => {
   it("renders the review-timeline link inside missing-evidence panels", () => {
     expect(ACTION_DETAIL_SRC).toContain("data-testid={link.testId}");
     const occurrences = ACTION_DETAIL_SRC.match(
-      /!ev\.hasSnapshotQuality && \(\(\) => \{[\s\S]*?buildMissingEvidenceReviewLink/g,
+      /!ev\.hasSnapshotQuality\s*&&\s*\(\(\)\s*=>\s*\{[\s\S]*?buildMissingEvidenceReviewLink/g,
     );
     expect(occurrences?.length ?? 0).toBeGreaterThanOrEqual(2);
   });
@@ -209,9 +197,7 @@ describe("ActionDetail missing-evidence guidance wiring", () => {
   });
 
   it("link has explicit aria-label with review/before-approving language", () => {
-    expect(ACTION_DETAIL_SRC).toContain(
-      "aria-label={ACTION_EVIDENCE_REVIEW_LINK_ARIA_LABEL}",
-    );
+    expect(ACTION_DETAIL_SRC).toContain("aria-label={ACTION_EVIDENCE_REVIEW_LINK_ARIA_LABEL}");
     expect(ACTION_EVIDENCE_REVIEW_LINK_ARIA_LABEL).toMatch(/review.*diary.*timeline/i);
     expect(ACTION_EVIDENCE_REVIEW_LINK_ARIA_LABEL).toMatch(/before approving/i);
   });
@@ -259,13 +245,13 @@ describe("ActionDetail missing-evidence guidance wiring", () => {
 
   it("groups missing-evidence chip, help, and link in a responsive vertical stack", () => {
     expect(ACTION_DETAIL_SRC).toContain('data-testid="action-detail-missing-evidence-group"');
-    expect(ACTION_DETAIL_SRC).toMatch(/flex flex-col gap-2[\s\S]{0,400}action-detail-missing-evidence-group/);
+    expect(ACTION_DETAIL_SRC).toMatch(
+      /flex flex-col gap-2[\s\S]{0,400}action-detail-missing-evidence-group/,
+    );
   });
 
   it("stacks review link and helper text on mobile and keeps them inline on desktop", () => {
-    expect(ACTION_DETAIL_SRC).toMatch(
-      /flex-col gap-1\.5 sm:flex-row sm:items-center sm:gap-2/,
-    );
+    expect(ACTION_DETAIL_SRC).toMatch(/flex-col gap-1\.5 sm:flex-row sm:items-center sm:gap-2/);
   });
 
   it("review link uses a thumb-friendly minimum touch target on mobile", () => {

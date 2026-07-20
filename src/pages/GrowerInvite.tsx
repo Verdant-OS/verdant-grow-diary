@@ -19,7 +19,7 @@ export default function GrowerInvite() {
   }, []);
 
   return (
-    <main className="mx-auto w-full max-w-4xl space-y-6" data-testid="grower-invite-page">
+    <div className="mx-auto w-full max-w-4xl space-y-6" data-testid="grower-invite-page">
       <PageHeader
         title="Invite a grower"
         description="Recommend Verdant to someone who values plant memory, sensor truth, and grower-controlled decisions."
@@ -44,6 +44,6 @@ export default function GrowerInvite() {
           <p>It does not promise a reward, discount, entitlement, or reserved Founder position.</p>
         </CardContent>
       </Card>
-    </main>
+    </div>
   );
 }

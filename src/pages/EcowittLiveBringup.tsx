@@ -46,9 +46,6 @@ import {
   type EcowittTonightModeViewModel,
 } from "@/lib/ecowittTonightModeViewModel";
 
-
-
-
 function Section({
   id,
   title,
@@ -86,33 +83,23 @@ function StepCard({ step }: { step: EcowittBringupStep }) {
       </header>
       <dl className="space-y-1">
         <div>
-          <dt className="text-xs uppercase text-muted-foreground">
-            Operator action
-          </dt>
+          <dt className="text-xs uppercase text-muted-foreground">Operator action</dt>
           <dd>{step.operator_action}</dd>
         </div>
         <div>
-          <dt className="text-xs uppercase text-muted-foreground">
-            Expected evidence
-          </dt>
+          <dt className="text-xs uppercase text-muted-foreground">Expected evidence</dt>
           <dd>{step.expected_evidence}</dd>
         </div>
         <div>
-          <dt className="text-xs uppercase text-muted-foreground">
-            Success criteria
-          </dt>
+          <dt className="text-xs uppercase text-muted-foreground">Success criteria</dt>
           <dd>{step.success_criteria}</dd>
         </div>
         <div>
-          <dt className="text-xs uppercase text-muted-foreground">
-            Blocked if
-          </dt>
+          <dt className="text-xs uppercase text-muted-foreground">Blocked if</dt>
           <dd>{step.blocked_if}</dd>
         </div>
         <div>
-          <dt className="text-xs uppercase text-muted-foreground">
-            Safety notes
-          </dt>
+          <dt className="text-xs uppercase text-muted-foreground">Safety notes</dt>
           <dd>{step.safety_notes}</dd>
         </div>
       </dl>
@@ -190,9 +177,7 @@ function GoNoGoCard({ rule }: { rule: EcowittGoNoGoRule }) {
           <li key={`${rule.id}-c-${i}`}>{c}</li>
         ))}
       </ul>
-      <p className="text-xs text-muted-foreground">
-        Operator decision: {rule.operator_decision}
-      </p>
+      <p className="text-xs text-muted-foreground">Operator decision: {rule.operator_decision}</p>
     </article>
   );
 }
@@ -233,9 +218,7 @@ function MetricRowEditor({
           inputMode="decimal"
           data-testid={`${tid}-backend`}
           value={row.backend_value}
-          onChange={(e) =>
-            onChange({ ...row, backend_value: e.target.value })
-          }
+          onChange={(e) => onChange({ ...row, backend_value: e.target.value })}
           className="rounded border border-border bg-background px-1 py-0.5"
         />
       </label>
@@ -245,9 +228,7 @@ function MetricRowEditor({
           type="text"
           data-testid={`${tid}-backend-unit`}
           value={row.backend_unit ?? ""}
-          onChange={(e) =>
-            onChange({ ...row, backend_unit: e.target.value })
-          }
+          onChange={(e) => onChange({ ...row, backend_unit: e.target.value })}
           className="rounded border border-border bg-background px-1 py-0.5"
         />
       </label>
@@ -258,9 +239,7 @@ function MetricRowEditor({
           inputMode="decimal"
           data-testid={`${tid}-controller`}
           value={row.controller_value}
-          onChange={(e) =>
-            onChange({ ...row, controller_value: e.target.value })
-          }
+          onChange={(e) => onChange({ ...row, controller_value: e.target.value })}
           className="rounded border border-border bg-background px-1 py-0.5"
         />
       </label>
@@ -270,9 +249,7 @@ function MetricRowEditor({
           type="text"
           data-testid={`${tid}-controller-unit`}
           value={row.controller_unit ?? ""}
-          onChange={(e) =>
-            onChange({ ...row, controller_unit: e.target.value })
-          }
+          onChange={(e) => onChange({ ...row, controller_unit: e.target.value })}
           className="rounded border border-border bg-background px-1 py-0.5"
         />
       </label>
@@ -287,9 +264,7 @@ function MetricRowEditor({
         />
       </label>
       <label className="flex flex-col sm:col-span-2">
-        <span className="text-muted-foreground">
-          tolerance override (blank = default)
-        </span>
+        <span className="text-muted-foreground">tolerance override (blank = default)</span>
         <input
           type="text"
           inputMode="decimal"
@@ -315,7 +290,6 @@ function MetricRowEditor({
   );
 }
 
-
 function VerdictCard({
   result,
   formWarnings,
@@ -326,9 +300,7 @@ function VerdictCard({
   const nextSteps =
     result.required_next_steps.length > 0
       ? result.required_next_steps
-      : [
-          "No next steps returned by the evaluator. Recheck evidence before treating data as live.",
-        ];
+      : ["No next steps returned by the evaluator. Recheck evidence before treating data as live."];
   return (
     <div
       data-testid="ecowitt-evaluator-verdict-card"
@@ -357,13 +329,8 @@ function VerdictCard({
       <p data-testid="ecowitt-evaluator-summary">{result.summary}</p>
 
       <div>
-        <h4 className="text-xs uppercase text-muted-foreground">
-          Required next steps
-        </h4>
-        <ul
-          data-testid="ecowitt-evaluator-next-steps"
-          className="list-disc space-y-1 pl-5"
-        >
+        <h4 className="text-xs uppercase text-muted-foreground">Required next steps</h4>
+        <ul data-testid="ecowitt-evaluator-next-steps" className="list-disc space-y-1 pl-5">
           {nextSteps.map((s, i) => (
             <li key={`next-${i}`}>{s}</li>
           ))}
@@ -372,10 +339,7 @@ function VerdictCard({
 
       <div>
         <h4 className="text-xs uppercase text-muted-foreground">Limitations</h4>
-        <ul
-          data-testid="ecowitt-evaluator-limitations"
-          className="list-disc space-y-1 pl-5"
-        >
+        <ul data-testid="ecowitt-evaluator-limitations" className="list-disc space-y-1 pl-5">
           {result.limitations.length === 0 ? (
             <li>No limitations reported.</li>
           ) : (
@@ -386,10 +350,7 @@ function VerdictCard({
 
       <div>
         <h4 className="text-xs uppercase text-muted-foreground">Warnings</h4>
-        <ul
-          data-testid="ecowitt-evaluator-warnings"
-          className="list-disc space-y-1 pl-5"
-        >
+        <ul data-testid="ecowitt-evaluator-warnings" className="list-disc space-y-1 pl-5">
           {result.warnings.length === 0 && formWarnings.length === 0 ? (
             <li>No warnings reported.</li>
           ) : (
@@ -435,22 +396,14 @@ function TonightModePanel({ vm }: { vm: EcowittTonightModeViewModel }) {
           can_claim_live_proof: {String(vm.can_claim_live_proof)}
         </span>
       </header>
-      <p
-        data-testid="ecowitt-tonight-mode-headline"
-        className="text-sm font-medium"
-      >
+      <p data-testid="ecowitt-tonight-mode-headline" className="text-sm font-medium">
         {vm.headline}
       </p>
-      <p
-        data-testid="ecowitt-tonight-mode-summary"
-        className="text-xs text-muted-foreground"
-      >
+      <p data-testid="ecowitt-tonight-mode-summary" className="text-xs text-muted-foreground">
         {vm.summary}
       </p>
       <div>
-        <h4 className="text-xs uppercase text-muted-foreground">
-          Top blockers
-        </h4>
+        <h4 className="text-xs uppercase text-muted-foreground">Top blockers</h4>
         <ul
           data-testid="ecowitt-tonight-mode-top-blockers"
           className="list-disc space-y-1 pl-5 text-xs"
@@ -458,9 +411,7 @@ function TonightModePanel({ vm }: { vm: EcowittTonightModeViewModel }) {
           {vm.top_blockers.length === 0 ? (
             <li>No blockers detected.</li>
           ) : (
-            vm.top_blockers.map((b, i) => (
-              <li key={`tm-b-${i}`}>{b}</li>
-            ))
+            vm.top_blockers.map((b, i) => <li key={`tm-b-${i}`}>{b}</li>)
           )}
         </ul>
       </div>
@@ -472,10 +423,7 @@ function TonightModePanel({ vm }: { vm: EcowittTonightModeViewModel }) {
       </p>
       <div>
         <h4 className="text-xs uppercase text-muted-foreground">Checklist</h4>
-        <ul
-          data-testid="ecowitt-tonight-mode-checklist"
-          className="space-y-1 text-xs"
-        >
+        <ul data-testid="ecowitt-tonight-mode-checklist" className="space-y-1 text-xs">
           {vm.checklist_items.map((item) => (
             <li
               key={item.id}
@@ -489,17 +437,12 @@ function TonightModePanel({ vm }: { vm: EcowittTonightModeViewModel }) {
               >
                 {item.status}
               </span>
-              <span className="basis-full text-muted-foreground">
-                {item.helper}
-              </span>
+              <span className="basis-full text-muted-foreground">{item.helper}</span>
             </li>
           ))}
         </ul>
       </div>
-      <p
-        data-testid="ecowitt-tonight-mode-safety-note"
-        className="text-xs text-muted-foreground"
-      >
+      <p data-testid="ecowitt-tonight-mode-safety-note" className="text-xs text-muted-foreground">
         {vm.safety_note}
       </p>
     </section>
@@ -507,21 +450,14 @@ function TonightModePanel({ vm }: { vm: EcowittTonightModeViewModel }) {
 }
 
 function LiveEvidenceEvaluator() {
-
   const [form, setForm] = React.useState<EcowittLiveEvidenceFormState>(() =>
     createInitialEcowittLiveEvidenceFormState(),
   );
   const [plantIdsInput, setPlantIdsInput] = React.useState<string>("");
   const [evaluated, setEvaluated] = React.useState<boolean>(false);
 
-  const built = React.useMemo(
-    () => buildLiveSourceTruthEvidenceFromForm(form),
-    [form],
-  );
-  const result = React.useMemo(
-    () => evaluateLiveSourceTruth(built.evidence),
-    [built.evidence],
-  );
+  const built = React.useMemo(() => buildLiveSourceTruthEvidenceFromForm(form), [form]);
+  const result = React.useMemo(() => evaluateLiveSourceTruth(built.evidence), [built.evidence]);
   const unitWarnings = React.useMemo(
     () => detectEcowittEvidenceUnitWarnings(form.metric_rows),
     [form.metric_rows],
@@ -546,13 +482,11 @@ function LiveEvidenceEvaluator() {
     [evaluated, result, multi, unitWarnings, built.form_warnings],
   );
 
-
-  const updateMetric = (key: LiveSourceTruthMetricKey) =>
-    (next: EcowittLiveEvidenceMetricRow) =>
-      setForm((prev) => ({
-        ...prev,
-        metric_rows: prev.metric_rows.map((r) => (r.key === key ? next : r)),
-      }));
+  const updateMetric = (key: LiveSourceTruthMetricKey) => (next: EcowittLiveEvidenceMetricRow) =>
+    setForm((prev) => ({
+      ...prev,
+      metric_rows: prev.metric_rows.map((r) => (r.key === key ? next : r)),
+    }));
 
   const applyTemplate = (id: EcowittLiveEvidenceTemplateId) => {
     const t = ECOWITT_LIVE_EVIDENCE_TEMPLATES.find((x) => x.id === id);
@@ -563,15 +497,10 @@ function LiveEvidenceEvaluator() {
   return (
     <Section id="live-evidence-evaluator" title="Live Evidence Evaluator">
       <TonightModePanel vm={tonight} />
-      <p
-        data-testid="ecowitt-evaluator-helper"
-        className="text-xs text-muted-foreground"
-      >
-        Enter evidence from the EcoWitt app/controller, MQTT payload, and
-        backend response. This evaluator runs locally in the browser and does
-        not query sensors or write data.
+      <p data-testid="ecowitt-evaluator-helper" className="text-xs text-muted-foreground">
+        Enter evidence from the EcoWitt app/controller, MQTT payload, and backend response. This
+        evaluator runs locally in the browser and does not query sensors or write data.
       </p>
-
 
       <div
         data-testid="ecowitt-evaluator-templates"
@@ -582,9 +511,8 @@ function LiveEvidenceEvaluator() {
           data-testid="ecowitt-evaluator-templates-helper"
           className="text-xs text-muted-foreground"
         >
-          Templates are local examples for faster testing. Replace example
-          values with tonight's real EcoWitt/MQTT/backend evidence before
-          treating any result as useful.
+          Templates are local examples for faster testing. Replace example values with tonight's
+          real EcoWitt/MQTT/backend evidence before treating any result as useful.
         </p>
         <div className="flex flex-wrap gap-2">
           {ECOWITT_LIVE_EVIDENCE_TEMPLATES.map((t) => (
@@ -608,9 +536,7 @@ function LiveEvidenceEvaluator() {
           <select
             data-testid="ecowitt-evaluator-source"
             value={form.source}
-            onChange={(e) =>
-              setForm((prev) => ({ ...prev, source: e.target.value }))
-            }
+            onChange={(e) => setForm((prev) => ({ ...prev, source: e.target.value }))}
             className="rounded border border-border bg-background px-1 py-0.5"
           >
             {ECOWITT_FORM_SOURCE_OPTIONS.map((s) => (
@@ -626,9 +552,7 @@ function LiveEvidenceEvaluator() {
             type="text"
             data-testid="ecowitt-evaluator-tent-id"
             value={form.tent_id}
-            onChange={(e) =>
-              setForm((prev) => ({ ...prev, tent_id: e.target.value }))
-            }
+            onChange={(e) => setForm((prev) => ({ ...prev, tent_id: e.target.value }))}
             className="rounded border border-border bg-background px-1 py-0.5"
           />
         </label>
@@ -638,9 +562,7 @@ function LiveEvidenceEvaluator() {
             type="text"
             data-testid="ecowitt-evaluator-plant-id"
             value={form.plant_id}
-            onChange={(e) =>
-              setForm((prev) => ({ ...prev, plant_id: e.target.value }))
-            }
+            onChange={(e) => setForm((prev) => ({ ...prev, plant_id: e.target.value }))}
             className="rounded border border-border bg-background px-1 py-0.5"
           />
         </label>
@@ -650,9 +572,7 @@ function LiveEvidenceEvaluator() {
             type="text"
             data-testid="ecowitt-evaluator-captured-at"
             value={form.captured_at}
-            onChange={(e) =>
-              setForm((prev) => ({ ...prev, captured_at: e.target.value }))
-            }
+            onChange={(e) => setForm((prev) => ({ ...prev, captured_at: e.target.value }))}
             className="rounded border border-border bg-background px-1 py-0.5"
           />
         </label>
@@ -662,9 +582,7 @@ function LiveEvidenceEvaluator() {
             type="text"
             data-testid="ecowitt-evaluator-now"
             value={form.now}
-            onChange={(e) =>
-              setForm((prev) => ({ ...prev, now: e.target.value }))
-            }
+            onChange={(e) => setForm((prev) => ({ ...prev, now: e.target.value }))}
             className="rounded border border-border bg-background px-1 py-0.5"
           />
         </label>
@@ -716,9 +634,7 @@ function LiveEvidenceEvaluator() {
       </div>
 
       <label className="flex flex-col text-xs">
-        <span className="text-muted-foreground">
-          plant_id entries (comma or newline-separated)
-        </span>
+        <span className="text-muted-foreground">plant_id entries (comma or newline-separated)</span>
         <textarea
           data-testid="ecowitt-evaluator-plant-ids"
           value={plantIdsInput}
@@ -726,13 +642,9 @@ function LiveEvidenceEvaluator() {
           rows={3}
           className="rounded border border-border bg-background px-1 py-0.5 font-mono"
         />
-        <span
-          data-testid="ecowitt-evaluator-plant-ids-helper"
-          className="text-muted-foreground"
-        >
-          EcoWitt evidence is usually tent-level. Per-plant verdicts reuse the
-          same tent evidence and should not be treated as plant-specific
-          sensor proof.
+        <span data-testid="ecowitt-evaluator-plant-ids-helper" className="text-muted-foreground">
+          EcoWitt evidence is usually tent-level. Per-plant verdicts reuse the same tent evidence
+          and should not be treated as plant-specific sensor proof.
         </span>
       </label>
 
@@ -781,15 +693,12 @@ function LiveEvidenceEvaluator() {
           data-testid="ecowitt-evaluator-empty-state"
           className="rounded border border-border bg-muted/40 p-3 text-xs text-muted-foreground"
         >
-          No evaluation yet. Enter evidence above and choose Evaluate evidence
-          to see a local verdict. Default state must not be treated as live.
+          No evaluation yet. Enter evidence above and choose Evaluate evidence to see a local
+          verdict. Default state must not be treated as live.
         </p>
       ) : (
         <>
-          <VerdictCard
-            result={result}
-            formWarnings={built.form_warnings}
-          />
+          <VerdictCard result={result} formWarnings={built.form_warnings} />
 
           <div
             data-testid="ecowitt-evaluator-overall-summary"
@@ -820,9 +729,7 @@ function LiveEvidenceEvaluator() {
             data-testid="ecowitt-evaluator-per-plant"
             className="rounded-md border border-border bg-background p-3 text-sm"
           >
-            <h4 className="text-xs uppercase text-muted-foreground">
-              Per-plant verdicts
-            </h4>
+            <h4 className="text-xs uppercase text-muted-foreground">Per-plant verdicts</h4>
             <ul className="space-y-1">
               {multi.per_plant.map((p, i) => (
                 <li
@@ -830,9 +737,7 @@ function LiveEvidenceEvaluator() {
                   data-testid={`ecowitt-evaluator-per-plant-row-${i}`}
                   className="flex flex-wrap gap-2 text-xs"
                 >
-                  <span className="font-mono">
-                    {p.plant_id ?? "Tent-level evidence"}
-                  </span>
+                  <span className="font-mono">{p.plant_id ?? "Tent-level evidence"}</span>
                   <span>verdict: {p.result.verdict}</span>
                   <span>confidence: {p.result.confidence_label}</span>
                   <span>is_live_proof: {String(p.result.is_live_proof)}</span>
@@ -857,9 +762,7 @@ function LiveEvidenceEvaluator() {
               {multi.combined_next_steps.length === 0 ? (
                 <li>No next steps. Recheck evidence before treating as live.</li>
               ) : (
-                multi.combined_next_steps.map((s, i) => (
-                  <li key={`cns-${i}`}>{s}</li>
-                ))
+                multi.combined_next_steps.map((s, i) => <li key={`cns-${i}`}>{s}</li>)
               )}
             </ul>
           </div>
@@ -868,13 +771,8 @@ function LiveEvidenceEvaluator() {
             data-testid="ecowitt-evaluator-status-card"
             className="rounded-md border border-border bg-background p-3 text-sm"
           >
-            <h4 className="text-xs uppercase text-muted-foreground">
-              Evaluator verdict
-            </h4>
-            <p
-              data-testid="ecowitt-evaluator-status-message"
-              className="text-sm"
-            >
+            <h4 className="text-xs uppercase text-muted-foreground">Evaluator verdict</h4>
+            <p data-testid="ecowitt-evaluator-status-message" className="text-sm">
               {result.verdict === "verified_live"
                 ? "Local evaluator says the submitted evidence can support live proof. Confirm screenshots/notes before marking the bring-up ready."
                 : "Submitted evidence does not prove live sensor truth yet."}
@@ -885,26 +783,17 @@ function LiveEvidenceEvaluator() {
             data-testid="ecowitt-evaluator-live-evidence-details"
             className="rounded-md border border-border bg-background p-3 text-xs"
           >
-            <summary className="cursor-pointer text-sm font-semibold">
-              Live Evidence
-            </summary>
+            <summary className="cursor-pointer text-sm font-semibold">Live Evidence</summary>
             <div className="mt-2 space-y-2">
               {result.metric_results.length === 0 ? (
-                <p className="text-muted-foreground">
-                  No metric rows submitted.
-                </p>
+                <p className="text-muted-foreground">No metric rows submitted.</p>
               ) : (
                 result.metric_results.map((m) => {
                   const row = form.metric_rows.find((r) => r.key === m.key);
-                  const backendUnit =
-                    (row?.backend_unit ?? "").trim() || (row?.unit ?? "");
-                  const controllerUnit =
-                    (row?.controller_unit ?? "").trim() || (row?.unit ?? "");
-                  const overridden =
-                    row != null && row.tolerance.trim().length > 0;
-                  const rowWarnings = unitWarnings.filter(
-                    (w) => w.metric_key === m.key,
-                  );
+                  const backendUnit = (row?.backend_unit ?? "").trim() || (row?.unit ?? "");
+                  const controllerUnit = (row?.controller_unit ?? "").trim() || (row?.unit ?? "");
+                  const overridden = row != null && row.tolerance.trim().length > 0;
+                  const rowWarnings = unitWarnings.filter((w) => w.metric_key === m.key);
                   return (
                     <div
                       key={`mr-${m.key}`}
@@ -973,9 +862,7 @@ interface SnapshotExportPanelProps {
   readonly form: EcowittLiveEvidenceFormState;
   readonly tonight: EcowittTonightModeViewModel;
   readonly overall: LiveSourceTruthGateResult;
-  readonly plantResults: ReturnType<
-    typeof evaluateLiveEvidenceForPlants
-  >["per_plant"];
+  readonly plantResults: ReturnType<typeof evaluateLiveEvidenceForPlants>["per_plant"];
   readonly unitWarnings: readonly EcowittEvidenceUnitWarning[];
   readonly formWarnings: readonly string[];
   readonly requiredNextSteps: readonly string[];
@@ -992,10 +879,7 @@ function SnapshotExportPanel({
   requiredNextSteps,
 }: SnapshotExportPanelProps) {
   const handleDownload = React.useCallback(() => {
-    const generatedAt =
-      (form.now ?? "").trim() ||
-      (form.captured_at ?? "").trim() ||
-      "";
+    const generatedAt = (form.now ?? "").trim() || (form.captured_at ?? "").trim() || "";
     const snapshot = buildEcowittLiveEvidenceSnapshotExport({
       generated_at: generatedAt,
       form_state: form,
@@ -1019,15 +903,7 @@ function SnapshotExportPanel({
     } finally {
       URL.revokeObjectURL(url);
     }
-  }, [
-    form,
-    tonight,
-    overall,
-    plantResults,
-    unitWarnings,
-    formWarnings,
-    requiredNextSteps,
-  ]);
+  }, [form, tonight, overall, plantResults, unitWarnings, formWarnings, requiredNextSteps]);
 
   return (
     <div
@@ -1035,13 +911,9 @@ function SnapshotExportPanel({
       className="space-y-2 rounded-md border border-border bg-background p-3 text-sm"
     >
       <h3 className="text-sm font-semibold">Evidence Snapshot Export</h3>
-      <p
-        data-testid="ecowitt-evaluator-export-helper"
-        className="text-xs text-muted-foreground"
-      >
-        Download a local JSON snapshot of the evidence currently entered on
-        this page. This does not write to the database, query sensors, or
-        prove live data by itself.
+      <p data-testid="ecowitt-evaluator-export-helper" className="text-xs text-muted-foreground">
+        Download a local JSON snapshot of the evidence currently entered on this page. This does not
+        write to the database, query sensors, or prove live data by itself.
       </p>
       {evaluated ? (
         <button
@@ -1064,15 +936,11 @@ function SnapshotExportPanel({
   );
 }
 
-
 export default function EcowittLiveBringup(): JSX.Element {
   const vm = React.useMemo(() => buildEcowittLiveBringupViewModel(), []);
 
   return (
-    <main
-      data-testid="ecowitt-bringup-page"
-      className="mx-auto max-w-4xl space-y-4 p-4"
-    >
+    <div data-testid="ecowitt-bringup-page" className="mx-auto max-w-4xl space-y-4 p-4">
       <header className="space-y-2">
         <h1 className="text-xl font-bold">{vm.title}</h1>
         <p className="text-sm text-muted-foreground">{vm.subtitle}</p>
@@ -1103,8 +971,8 @@ export default function EcowittLiveBringup(): JSX.Element {
           {vm.overall_status}
         </p>
         <p className="text-xs text-muted-foreground">
-          Live proof stays blocked until the grower has compared real
-          EcoWitt/controller readings against backend evidence.
+          Live proof stays blocked until the grower has compared real EcoWitt/controller readings
+          against backend evidence.
         </p>
       </Section>
 
@@ -1164,12 +1032,9 @@ export default function EcowittLiveBringup(): JSX.Element {
         </ul>
       </Section>
 
-      <footer
-        data-testid="ecowitt-bringup-generated-at"
-        className="text-xs text-muted-foreground"
-      >
+      <footer data-testid="ecowitt-bringup-generated-at" className="text-xs text-muted-foreground">
         Generated at: {vm.generated_at}
       </footer>
-    </main>
+    </div>
   );
 }

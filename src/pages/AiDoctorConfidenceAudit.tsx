@@ -35,18 +35,9 @@ function Section({
   );
 }
 
-function BulletList({
-  items,
-  testId,
-}: {
-  items: readonly string[];
-  testId: string;
-}) {
+function BulletList({ items, testId }: { items: readonly string[]; testId: string }) {
   return (
-    <ul
-      data-testid={testId}
-      className="list-disc space-y-1 pl-5 text-sm text-foreground"
-    >
+    <ul data-testid={testId} className="list-disc space-y-1 pl-5 text-sm text-foreground">
       {items.map((item, i) => (
         <li key={`${testId}-${i}`}>{item}</li>
       ))}
@@ -73,35 +64,25 @@ function RuleCard({ rule }: { rule: AiDoctorConfidenceAuditRule }) {
       </header>
       <dl className="space-y-1 text-sm text-foreground">
         <div>
-          <dt className="text-xs uppercase text-muted-foreground">
-            Data condition
-          </dt>
+          <dt className="text-xs uppercase text-muted-foreground">Data condition</dt>
           <dd>{rule.data_condition}</dd>
         </div>
         <div>
-          <dt className="text-xs uppercase text-muted-foreground">
-            Confidence effect
-          </dt>
+          <dt className="text-xs uppercase text-muted-foreground">Confidence effect</dt>
           <dd>{rule.confidence_effect}</dd>
         </div>
         {rule.required_warning ? (
           <div>
-            <dt className="text-xs uppercase text-muted-foreground">
-              Required warning
-            </dt>
+            <dt className="text-xs uppercase text-muted-foreground">Required warning</dt>
             <dd>{rule.required_warning}</dd>
           </div>
         ) : null}
         <div>
-          <dt className="text-xs uppercase text-muted-foreground">
-            Why it matters
-          </dt>
+          <dt className="text-xs uppercase text-muted-foreground">Why it matters</dt>
           <dd>{rule.why_it_matters}</dd>
         </div>
         <div>
-          <dt className="text-xs uppercase text-muted-foreground">
-            Expected UI behavior
-          </dt>
+          <dt className="text-xs uppercase text-muted-foreground">Expected UI behavior</dt>
           <dd>{rule.expected_ui_behavior}</dd>
         </div>
       </dl>
@@ -139,49 +120,30 @@ function ScenarioPanel({ scenario }: { scenario: AiDoctorConfidenceAuditScenario
       className="space-y-3 rounded-md border border-border bg-background p-3 text-sm"
     >
       <header className="space-y-1">
-        <h3
-          data-testid="ai-doctor-confidence-scenario-label"
-          className="text-sm font-semibold"
-        >
+        <h3 data-testid="ai-doctor-confidence-scenario-label" className="text-sm font-semibold">
           {scenario.label}
         </h3>
-        <p
-          data-testid="ai-doctor-confidence-scenario-description"
-          className="text-foreground"
-        >
+        <p data-testid="ai-doctor-confidence-scenario-description" className="text-foreground">
           {scenario.description}
         </p>
       </header>
 
       <dl className="space-y-2">
         <div>
-          <dt className="text-xs uppercase text-muted-foreground">
-            Context type
-          </dt>
-          <dd data-testid="ai-doctor-confidence-scenario-context-type">
-            {scenario.context_type}
-          </dd>
+          <dt className="text-xs uppercase text-muted-foreground">Context type</dt>
+          <dd data-testid="ai-doctor-confidence-scenario-context-type">{scenario.context_type}</dd>
         </div>
 
         <div>
-          <dt className="text-xs uppercase text-muted-foreground">
-            Confidence ceiling
-          </dt>
-          <dd data-testid="ai-doctor-confidence-scenario-ceiling">
-            {ceilingText}
-          </dd>
+          <dt className="text-xs uppercase text-muted-foreground">Confidence ceiling</dt>
+          <dd data-testid="ai-doctor-confidence-scenario-ceiling">{ceilingText}</dd>
         </div>
 
         {scenario.applies_hard_caps.length > 0 ? (
           <div>
-            <dt className="text-xs uppercase text-muted-foreground">
-              Applicable hard caps
-            </dt>
+            <dt className="text-xs uppercase text-muted-foreground">Applicable hard caps</dt>
             <dd>
-              <ul
-                data-testid="ai-doctor-confidence-scenario-hard-caps"
-                className="list-disc pl-5"
-              >
+              <ul data-testid="ai-doctor-confidence-scenario-hard-caps" className="list-disc pl-5">
                 {scenario.applies_hard_caps.map((cap) => (
                   <li key={cap}>{cap}</li>
                 ))}
@@ -190,17 +152,13 @@ function ScenarioPanel({ scenario }: { scenario: AiDoctorConfidenceAuditScenario
           </div>
         ) : (
           <div>
-            <dt className="text-xs uppercase text-muted-foreground">
-              Applicable hard caps
-            </dt>
+            <dt className="text-xs uppercase text-muted-foreground">Applicable hard caps</dt>
             <dd data-testid="ai-doctor-confidence-scenario-hard-caps">None</dd>
           </div>
         )}
 
         <div>
-          <dt className="text-xs uppercase text-muted-foreground">
-            Applicable safety flags
-          </dt>
+          <dt className="text-xs uppercase text-muted-foreground">Applicable safety flags</dt>
           <dd>
             <ul
               data-testid="ai-doctor-confidence-scenario-safety-flags"
@@ -219,12 +177,8 @@ function ScenarioPanel({ scenario }: { scenario: AiDoctorConfidenceAuditScenario
         </div>
 
         <div>
-          <dt className="text-xs uppercase text-muted-foreground">
-            Operator takeaway
-          </dt>
-          <dd data-testid="ai-doctor-confidence-scenario-takeaway">
-            {scenario.operator_takeaway}
-          </dd>
+          <dt className="text-xs uppercase text-muted-foreground">Operator takeaway</dt>
+          <dd data-testid="ai-doctor-confidence-scenario-takeaway">{scenario.operator_takeaway}</dd>
         </div>
       </dl>
     </article>
@@ -232,10 +186,7 @@ function ScenarioPanel({ scenario }: { scenario: AiDoctorConfidenceAuditScenario
 }
 
 export default function AiDoctorConfidenceAudit(): JSX.Element {
-  const vm = React.useMemo(
-    () => buildAiDoctorConfidenceAuditViewModel(),
-    [],
-  );
+  const vm = React.useMemo(() => buildAiDoctorConfidenceAuditViewModel(), []);
   const [searchParams, setSearchParams] = useSearchParams();
 
   const validScenarioIds = React.useMemo(
@@ -252,8 +203,7 @@ export default function AiDoctorConfidenceAudit(): JSX.Element {
   }, [searchParams, validScenarioIds]);
 
   const selectedScenario = React.useMemo(
-    () =>
-      vm.scenarios.find((s) => s.id === selectedScenarioId) ?? vm.scenarios[0],
+    () => vm.scenarios.find((s) => s.id === selectedScenarioId) ?? vm.scenarios[0],
     [vm.scenarios, selectedScenarioId],
   );
 
@@ -273,10 +223,7 @@ export default function AiDoctorConfidenceAudit(): JSX.Element {
   );
 
   return (
-    <main
-      data-testid="ai-doctor-confidence-audit-page"
-      className="mx-auto max-w-4xl space-y-4 p-4"
-    >
+    <div data-testid="ai-doctor-confidence-audit-page" className="mx-auto max-w-4xl space-y-4 p-4">
       <header className="space-y-2">
         <h1 className="text-xl font-bold">{vm.title}</h1>
         <p className="text-sm text-muted-foreground">{vm.subtitle}</p>
@@ -295,9 +242,9 @@ export default function AiDoctorConfidenceAudit(): JSX.Element {
           data-testid="ai-doctor-confidence-audit-top-note"
           className="rounded border border-border bg-muted/40 p-3 text-xs text-muted-foreground"
         >
-          This page documents AI Doctor confidence safety rules. It does not run
-          diagnosis, score live confidence, query sensors, create alerts, create
-          Action Queue items, or perform device control.
+          This page documents AI Doctor confidence safety rules. It does not run diagnosis, score
+          live confidence, query sensors, create alerts, create Action Queue items, or perform
+          device control.
         </p>
       </header>
 
@@ -306,13 +253,10 @@ export default function AiDoctorConfidenceAudit(): JSX.Element {
           data-testid="ai-doctor-confidence-scenario-deep-links-helper"
           className="text-xs text-muted-foreground"
         >
-          Use these internal links to jump directly to a static confidence
-          scenario. They do not run scoring or write data.
+          Use these internal links to jump directly to a static confidence scenario. They do not run
+          scoring or write data.
         </p>
-        <ul
-          data-testid="ai-doctor-confidence-scenario-deep-links"
-          className="grid gap-2"
-        >
+        <ul data-testid="ai-doctor-confidence-scenario-deep-links" className="grid gap-2">
           {vm.scenarios.map((s) => (
             <li
               key={s.id}
@@ -337,10 +281,7 @@ export default function AiDoctorConfidenceAudit(): JSX.Element {
                   data-testid={`ai-doctor-confidence-scenario-deep-link-ceiling-${s.id}`}
                   className="rounded border border-border px-2 py-0.5"
                 >
-                  Ceiling:{" "}
-                  {s.confidence_ceiling >= 0
-                    ? s.confidence_ceiling
-                    : "Conservative / low"}
+                  Ceiling: {s.confidence_ceiling >= 0 ? s.confidence_ceiling : "Conservative / low"}
                 </span>
                 <span
                   data-testid={`ai-doctor-confidence-scenario-deep-link-flags-${s.id}`}
@@ -367,8 +308,7 @@ export default function AiDoctorConfidenceAudit(): JSX.Element {
           data-testid="ai-doctor-confidence-scenario-helper-text"
           className="text-xs text-muted-foreground"
         >
-          Choose a static confidence scenario. This does not run scoring or write
-          data.
+          Choose a static confidence scenario. This does not run scoring or write data.
         </p>
         <select
           id="ai-doctor-confidence-scenario-select"
@@ -426,10 +366,7 @@ export default function AiDoctorConfidenceAudit(): JSX.Element {
       </Section>
 
       <Section id="safety-flags" title="Safety flags">
-        <ul
-          data-testid="ai-doctor-confidence-safety-flags-list"
-          className="flex flex-wrap gap-2"
-        >
+        <ul data-testid="ai-doctor-confidence-safety-flags-list" className="flex flex-wrap gap-2">
           {vm.safety_flags.map((flag) => (
             <li
               key={flag}
@@ -455,6 +392,6 @@ export default function AiDoctorConfidenceAudit(): JSX.Element {
       >
         Generated at: {vm.generated_at}
       </footer>
-    </main>
+    </div>
   );
 }

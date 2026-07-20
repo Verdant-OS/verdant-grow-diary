@@ -7,12 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import PageHeader from "@/components/PageHeader";
 import { toast } from "sonner";
 import { useAuth } from "@/store/auth";
-import {
-  createPhenoHunt,
-  defaultHuntName,
-} from "@/lib/phenoHuntService";
+import { createPhenoHunt, defaultHuntName } from "@/lib/phenoHuntService";
 
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { canWriteFeatureData } from "@/lib/featureEntitlements";
@@ -68,8 +66,8 @@ export default function PhenoHuntNew() {
   const [name, setName] = useState("");
   const [notes, setNotes] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [evidenceGoals, setEvidenceGoals] = useState<PhenoEvidenceGoalId[]>(
-    () => defaultEvidenceGoalSelection(),
+  const [evidenceGoals, setEvidenceGoals] = useState<PhenoEvidenceGoalId[]>(() =>
+    defaultEvidenceGoalSelection(),
   );
   const [currentStep, setCurrentStep] = useState<PhenoOnboardingStepId>("basics");
   const [saving, setSaving] = useState(false);
@@ -141,9 +139,7 @@ export default function PhenoHuntNew() {
   };
 
   const toggleGoal = (id: PhenoEvidenceGoalId) => {
-    setEvidenceGoals((prev) =>
-      prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id],
-    );
+    setEvidenceGoals((prev) => (prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id]));
   };
 
   const stepIndex = PHENO_ONBOARDING_STEP_ORDER.indexOf(currentStep);
@@ -190,19 +186,36 @@ export default function PhenoHuntNew() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20 text-muted-foreground">
-        <Loader2 className="h-5 w-5 animate-spin" />
+      <div
+        className="mx-auto flex max-w-4xl items-center justify-center rounded-3xl border border-border/60 bg-card/50 py-20 text-muted-foreground"
+        role="status"
+        aria-label="Loading pheno hunt setup"
+      >
+        <Loader2 className="size-5 animate-spin" />
       </div>
     );
   }
 
   if (!growId || !grow) {
     return (
-      <div className="max-w-xl mx-auto p-4">
-        <BackLink to="/grows" />
-        <div className="glass rounded-2xl p-6 text-center">
-          <h1 className="text-lg font-semibold mb-2">Grow not found</h1>
-          <p className="text-sm text-muted-foreground">
+      <div className="mx-auto min-w-0 max-w-4xl">
+        <PageHeader
+          title="Start Pheno Hunt"
+          eyebrow="Cultivar selection"
+          description="Create a traceable candidate set and preserve the evidence you record."
+          icon={<Sprout className="size-5" />}
+          actions={
+            <Button asChild variant="outline" size="sm" className="w-full sm:w-auto">
+              <Link to="/grows">
+                <ArrowLeft data-icon="inline-start" />
+                Back to My Grows
+              </Link>
+            </Button>
+          }
+        />
+        <div className="rounded-3xl border border-border/60 bg-card/65 p-6 text-center shadow-card backdrop-blur-xl sm:p-8">
+          <h2 className="font-display text-lg font-semibold">Grow not found</h2>
+          <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
             Start a pheno hunt from a grow or tent detail page.
           </p>
         </div>
@@ -211,20 +224,21 @@ export default function PhenoHuntNew() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto p-4 space-y-4" data-testid="pheno-hunt-onboarding">
-      <BackLink to={`/grows/${growId}`} />
-
-      <header className="glass rounded-2xl p-4">
-        <div className="flex items-center gap-2 mb-1">
-          <Sprout className="h-5 w-5 text-primary" />
-          <h1 className="text-xl font-display font-bold">Start Pheno Hunt</h1>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          Guided setup for <span className="font-medium">{grow.name}</span>
-          {tentId ? " (this tent)" : ""}. You choose the candidates and evidence goals —
-          Verdant preserves what you record.
-        </p>
-      </header>
+    <div className="mx-auto min-w-0 max-w-4xl space-y-4" data-testid="pheno-hunt-onboarding">
+      <PageHeader
+        title="Start Pheno Hunt"
+        eyebrow="Cultivar selection"
+        description={`Guided setup for ${grow.name}${tentId ? " (this tent)" : ""}. You choose the candidates and evidence goals — Verdant preserves what you record.`}
+        icon={<Sprout className="size-5" />}
+        actions={
+          <Button asChild variant="outline" size="sm" className="w-full sm:w-auto">
+            <Link to={`/grows/${growId}`}>
+              <ArrowLeft data-icon="inline-start" />
+              Back to grow
+            </Link>
+          </Button>
+        }
+      />
 
       <PhenoHuntOnboardingStepper
         steps={vm.steps}
@@ -234,7 +248,7 @@ export default function PhenoHuntNew() {
 
       {currentStep === "basics" && (
         <section
-          className="glass rounded-2xl p-4 space-y-3"
+          className="space-y-4 rounded-3xl border border-border/60 bg-card/65 p-4 shadow-card backdrop-blur-xl sm:p-5"
           data-testid="pheno-step-basics"
         >
           <h2 className="text-sm font-semibold">Hunt basics</h2>
@@ -270,42 +284,37 @@ export default function PhenoHuntNew() {
 
       {currentStep === "candidates" && (
         <section
-          className="glass rounded-2xl p-4 space-y-3"
+          className="space-y-4 rounded-3xl border border-border/60 bg-card/65 p-4 shadow-card backdrop-blur-xl sm:p-5"
           data-testid="pheno-step-candidates"
         >
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
             <h2 className="text-sm font-semibold">Candidate plants</h2>
-            <span
-              className="text-xs text-muted-foreground"
-              data-testid="pheno-candidate-status"
-            >
+            <span className="text-xs text-muted-foreground" data-testid="pheno-candidate-status">
               {vm.candidateStatusLabel}
             </span>
           </div>
           {plants.length === 0 ? (
             <div
-              className="rounded-lg border border-dashed p-6 text-center space-y-3"
+              className="space-y-3 rounded-2xl border border-dashed border-border/80 bg-muted/20 p-6 text-center"
               data-testid="ph-empty"
             >
-              <h3 className="text-sm font-semibold">
-                No plants in this grow yet
-              </h3>
+              <h3 className="text-sm font-semibold">No plants in this grow yet</h3>
               <p className="text-xs text-muted-foreground">
-                Add a plant before starting a Pheno Hunt. Candidates are
-                tagged plants, not separate records.
+                Add a plant before starting a Pheno Hunt. Candidates are tagged plants, not separate
+                records.
               </p>
               <Button asChild size="sm" data-testid="ph-empty-cta">
                 <Link to={`/grows/${growId}`}>Go to grow to add a plant</Link>
               </Button>
             </div>
           ) : (
-            <ul className="space-y-1.5" data-testid="ph-plant-list">
+            <ul className="space-y-2" data-testid="ph-plant-list">
               {plants.map((p) => {
                 const checked = selected.has(p.id);
                 return (
                   <li
                     key={p.id}
-                    className="flex items-center gap-3 rounded-md border p-2"
+                    className="flex items-center gap-3 rounded-xl border border-border/60 bg-background/35 p-3 transition-colors hover:bg-secondary/30"
                   >
                     <Checkbox
                       id={`ph-${p.id}`}
@@ -329,42 +338,35 @@ export default function PhenoHuntNew() {
 
       {currentStep === "goals" && (
         <section
-          className="glass rounded-2xl p-4 space-y-3"
+          className="space-y-4 rounded-3xl border border-border/60 bg-card/65 p-4 shadow-card backdrop-blur-xl sm:p-5"
           data-testid="pheno-step-goals"
         >
           <h2 className="text-sm font-semibold">Evidence goals</h2>
           <p className="text-xs text-muted-foreground">
-            Choose what you plan to track. You decide what matters — Verdant
-            preserves the evidence you record.
+            Choose what you plan to track. You decide what matters — Verdant preserves the evidence
+            you record.
           </p>
-          <PhenoEvidenceGoalsSelector
-            selected={evidenceGoals}
-            onToggle={toggleGoal}
-          />
+          <PhenoEvidenceGoalsSelector selected={evidenceGoals} onToggle={toggleGoal} />
         </section>
       )}
 
       {currentStep === "packet_preview" && (
         <section
-          className="glass rounded-2xl p-4 space-y-3"
+          className="space-y-4 rounded-3xl border border-border/60 bg-card/65 p-4 shadow-card backdrop-blur-xl sm:p-5"
           data-testid="pheno-step-packet-preview"
         >
           <h2 className="text-sm font-semibold">First Evidence Packet Map</h2>
           <p className="text-xs text-muted-foreground">
-            Preview of the packet shape for your candidates. Every cell starts
-            at <span className="font-medium">Not recorded</span> — you fill them
-            in from the workspace.
+            Preview of the packet shape for your candidates. Every cell starts at{" "}
+            <span className="font-medium">Not recorded</span> — you fill them in from the workspace.
           </p>
-          <PhenoFirstEvidencePacketMapPreview
-            vm={vm}
-            candidates={selectedCandidates}
-          />
+          <PhenoFirstEvidencePacketMapPreview vm={vm} candidates={selectedCandidates} />
         </section>
       )}
 
       {currentStep === "checklist" && (
         <section
-          className="glass rounded-2xl p-4 space-y-3"
+          className="space-y-4 rounded-3xl border border-border/60 bg-card/65 p-4 shadow-card backdrop-blur-xl sm:p-5"
           data-testid="pheno-step-checklist"
         >
           <h2 className="text-sm font-semibold">Comparison-ready checklist</h2>
@@ -384,16 +386,19 @@ export default function PhenoHuntNew() {
 
       {currentStep === "confirmation" && (
         <section
-          className="glass rounded-2xl p-4 space-y-3"
+          className="space-y-4 rounded-3xl border border-border/60 bg-card/65 p-4 shadow-card backdrop-blur-xl sm:p-5"
           data-testid="pheno-step-confirmation"
         >
           <h2 className="text-sm font-semibold">Setup complete</h2>
           <p className="text-sm text-muted-foreground">
-            You choose the candidates and evidence goals — Verdant preserves
-            what you record. Confirm to enter your hunt workspace. You can
-            update evidence goals from the workspace at any time.
+            You choose the candidates and evidence goals — Verdant preserves what you record.
+            Confirm to enter your hunt workspace. You can update evidence goals from the workspace
+            at any time.
           </p>
-          <ul className="text-xs text-muted-foreground space-y-1" data-testid="pheno-confirmation-summary">
+          <ul
+            className="text-xs text-muted-foreground space-y-1"
+            data-testid="pheno-confirmation-summary"
+          >
             <li>• Candidates selected: {candidateIds.length}</li>
             <li>• Evidence goals selected: {evidenceGoals.length}</li>
             <li>• Readiness: {vm.readinessLabel}</li>
@@ -405,9 +410,7 @@ export default function PhenoHuntNew() {
               onCheckedChange={(v) => setSetupConfirmed(v === true)}
               data-testid="pheno-setup-confirm-toggle"
             />
-            <span>
-              I've reviewed setup and I'm ready to start the hunt.
-            </span>
+            <span>I've reviewed setup and I'm ready to start the hunt.</span>
           </label>
           {vm.blockingReasons.length > 0 ? (
             <ul
@@ -422,11 +425,12 @@ export default function PhenoHuntNew() {
         </section>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col gap-3 rounded-3xl border border-border/60 bg-card/65 p-3 shadow-card backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-1 gap-2 sm:flex-none">
           <Button
             variant="ghost"
             size="sm"
+            className="flex-1 sm:flex-none"
             onClick={() => goStep(-1)}
             disabled={stepIndex === 0}
             data-testid="pheno-step-prev"
@@ -436,6 +440,7 @@ export default function PhenoHuntNew() {
           <Button
             variant="ghost"
             size="sm"
+            className="flex-1 sm:flex-none"
             onClick={() => goStep(1)}
             disabled={stepIndex === PHENO_ONBOARDING_STEP_ORDER.length - 1}
             data-testid="pheno-step-next"
@@ -443,13 +448,14 @@ export default function PhenoHuntNew() {
             Next <ArrowRight className="h-4 w-4 ml-1" />
           </Button>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" asChild>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <Button variant="ghost" asChild className="w-full sm:w-auto">
             <Link to={`/grows/${growId}`}>Cancel</Link>
           </Button>
           <Button
             onClick={onSave}
             disabled={!canSave}
+            className="w-full gradient-leaf text-primary-foreground sm:w-auto"
             data-testid="ph-save-btn"
           >
             {saving ? (
@@ -464,17 +470,5 @@ export default function PhenoHuntNew() {
         </div>
       </div>
     </div>
-  );
-}
-
-function BackLink({ to }: { to: string }) {
-  return (
-    <Link
-      to={to}
-      className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-2"
-    >
-      <ArrowLeft className="h-4 w-4" />
-      Back
-    </Link>
   );
 }

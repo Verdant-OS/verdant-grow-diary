@@ -35,10 +35,7 @@ import { cn } from "@/lib/utils";
 import BrandLogo from "@/components/BrandLogo";
 import OperatorModeLink from "@/components/OperatorModeLink";
 import { useHasRole } from "@/hooks/useHasRole";
-import {
-  isNavigationItemActive,
-  type NavigationActiveRule,
-} from "@/lib/navigationActiveRules";
+import { isNavigationItemActive, type NavigationActiveRule } from "@/lib/navigationActiveRules";
 
 interface NavItem extends NavigationActiveRule {
   label: string;
@@ -175,8 +172,11 @@ export default function AppSidebar() {
   };
 
   return (
-    <Sidebar collapsible="icon">
-      <SidebarHeader className="border-b border-sidebar-border px-3 py-3">
+    <Sidebar
+      collapsible="icon"
+      className="border-r border-sidebar-border/70 bg-sidebar/95 backdrop-blur-xl"
+    >
+      <SidebarHeader className="border-b border-sidebar-border/70 px-3 py-4">
         <div className="flex items-center gap-2.5">
           <BrandLogo size="md" />
           {!collapsed && (

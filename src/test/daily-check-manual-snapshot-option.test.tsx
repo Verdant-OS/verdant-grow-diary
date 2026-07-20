@@ -91,7 +91,7 @@ describe("DailyCheck · Choose today's check section", () => {
     expect(PAGE).toMatch(/data-testid="daily-grow-check-choose-no-tent"/);
     // The button must be disabled when a plant is selected without a tent —
     // never silently routes to an arbitrary tent.
-    expect(PAGE).toMatch(/disabled=\{!!selectedPlant && !selectedPlant\.tent_id\}/);
+    expect(PAGE).toMatch(/disabled=\{!effectiveTentId\}/);
   });
 
   it("listens for the sensor success event to drive the success card", () => {

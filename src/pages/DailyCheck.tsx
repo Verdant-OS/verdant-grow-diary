@@ -148,26 +148,36 @@ export default function DailyCheck() {
     [initialPlantId, plants, urlGrowId],
   );
 
+  const selectedPlant = useMemo(
+    () => plants.find((plant) => plant.id === plantId) ?? null,
+    [plantId, plants],
+  );
+  // A selected plant owns the tent context. Derive this synchronously so an
+  // untented plant can never render one frame against a previously selected or
+  // default tent while the state-synchronizing effect catches up.
+  const effectiveTentId = plantId ? (selectedPlant?.tent_id ?? "") : tentId;
+
   // Seed plant from query param ONLY when the resolution is valid. Invalid
   // / out-of-scope / unknown cases fall through to the picker + banner.
   useEffect(() => {
     if (plantId) return;
     if (plantResolution.status !== "valid" || !plantResolution.plant) return;
     setPlantId(plantResolution.plant.id);
-    if (plantResolution.plant.tent_id) setTentId(plantResolution.plant.tent_id);
+    setTentId(plantResolution.plant.tent_id ?? "");
   }, [plantResolution, plantId]);
 
   // When a plant is chosen, sync its assigned tent
   useEffect(() => {
     if (!plantId) return;
     const match = plants.find((p) => p.id === plantId);
-    if (match?.tent_id) setTentId(match.tent_id);
+    setTentId(match?.tent_id ?? "");
   }, [plantId, plants]);
 
   // Default tent to first if none selected and no plant chosen
   useEffect(() => {
+    if (plantResolution.status !== "missing") return;
     if (!tentId && !plantId && tents[0]?.id) setTentId(tents[0].id);
-  }, [tentId, plantId, tents]);
+  }, [plantResolution.status, tentId, plantId, tents]);
 
   // Apply ?method= hint exactly once: when the plant resolution is valid
   // and the grower is still on the default "select" step. Sensor focus is
@@ -194,11 +204,10 @@ export default function DailyCheck() {
     }
   }, [methodHint, methodHintApplied, plantResolution, step]);
 
-  const selectedPlant = useMemo(
-    () => plants.find((p) => p.id === plantId) ?? null,
-    [plantId, plants],
+  const selectedTent = useMemo(
+    () => tents.find((tent) => tent.id === effectiveTentId) ?? null,
+    [effectiveTentId, tents],
   );
-  const selectedTent = useMemo(() => tents.find((t) => t.id === tentId) ?? null, [tentId, tents]);
   const growId = (selectedPlant as { grow_id?: string | null } | null)?.grow_id ?? null;
 
   const guard = evaluateDailyGrowCheckGuard({
@@ -288,9 +297,9 @@ export default function DailyCheck() {
       buildDailyCheckTimelineHref({
         growId: growId ?? urlGrowId ?? null,
         plantId: selectedPlant?.id ?? null,
-        tentId: selectedPlant?.tent_id ?? tentId ?? null,
+        tentId: effectiveTentId || null,
       }),
-    [growId, urlGrowId, selectedPlant?.id, selectedPlant?.tent_id, tentId],
+    [effectiveTentId, growId, urlGrowId, selectedPlant?.id],
   );
 
   function handleSubmitSuccess(method: "note" | "sensor") {
@@ -303,10 +312,10 @@ export default function DailyCheck() {
   // Pull the latest manual readings for the current tent so we can show a
   // compact "Changed since last snapshot" panel after a sensor save.
   // Read-only — no writes, no ingestion changes.
-  const { data: tentReadings = [] } = useSensorReadings(tentId || undefined, 50);
+  const { data: tentReadings = [] } = useSensorReadings(effectiveTentId || undefined, 50);
   const changeContext = useMemo(
-    () => deriveChangeContextFromReadings(tentReadings, { tentId }),
-    [tentReadings, tentId],
+    () => deriveChangeContextFromReadings(tentReadings, { tentId: effectiveTentId }),
+    [effectiveTentId, tentReadings],
   );
 
   const progress = stepProgress(step);
@@ -316,13 +325,19 @@ export default function DailyCheck() {
     setStep((s) => nextStep(s));
   }
 
+  function openSelectedPlantQuickLog() {
+    if (!selectedPlant) return;
+    setStep("quicklog");
+    setQuickLogOpen(true);
+  }
+
   if (tentsLoading || plantsLoading) {
     return <div className="glass rounded-2xl h-64 animate-pulse" />;
   }
 
   return (
-    <div className="max-w-2xl mx-auto pb-24" data-testid="daily-grow-check-page">
-      <Button asChild variant="ghost" size="sm" className="mb-3">
+    <div className="mx-auto w-full min-w-0 max-w-2xl pb-24" data-testid="daily-grow-check-page">
+      <Button asChild variant="ghost" size="sm" className="mb-3 min-h-11 whitespace-normal">
         <Link to="/">
           <ArrowLeft className="h-4 w-4" /> Dashboard
         </Link>
@@ -335,11 +350,11 @@ export default function DailyCheck() {
 
       {/* Plain-language explanation of what a check actually is. */}
       <p
-        className="text-xs text-muted-foreground flex items-start gap-1 mb-3"
+        className="mb-3 flex min-w-0 items-start gap-1 break-words text-xs text-muted-foreground"
         data-testid="daily-grow-check-what-counts"
       >
         <Info className="h-3 w-3 mt-0.5 shrink-0" aria-hidden="true" />
-        <span>{DAILY_CHECK_WHAT_COUNTS_HINT}</span>
+        <span className="min-w-0 break-words">{DAILY_CHECK_WHAT_COUNTS_HINT}</span>
       </p>
 
       {/* Visible rejection banner when ?plantId= cannot be honored. */}
@@ -356,23 +371,100 @@ export default function DailyCheck() {
         </div>
       )}
 
+      {(guard.ok || guard.reason === "plant-needs-tent") && step === "select" && (
+        <div className="w-full min-w-0" data-testid="daily-grow-check-target-selector">
+          <StepCard
+            title="Step 1 · Select Current Tent / Plant"
+            icon={<Sprout className="h-4 w-4" />}
+          >
+            <div className="grid w-full min-w-0 gap-3">
+              <div className="min-w-0">
+                <Label className="text-xs">Current Plant</Label>
+                <Select
+                  value={plantId || "__none"}
+                  onValueChange={(value) => setPlantId(value === "__none" ? "" : value)}
+                >
+                  <SelectTrigger
+                    className="min-h-11 w-full min-w-0"
+                    data-testid="daily-grow-check-plant-select"
+                  >
+                    <SelectValue placeholder="Select a plant" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none">No specific plant</SelectItem>
+                    {plants.map((plant) => (
+                      <SelectItem key={plant.id} value={plant.id}>
+                        {plant.name}
+                        {plant.strain ? ` · ${plant.strain}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="min-w-0">
+                <Label className="text-xs">Current Tent</Label>
+                <Select
+                  value={effectiveTentId}
+                  onValueChange={setTentId}
+                  disabled={!!selectedPlant}
+                >
+                  <SelectTrigger
+                    className="min-h-11 w-full min-w-0"
+                    data-testid="daily-grow-check-tent-select"
+                  >
+                    <SelectValue placeholder="Select a tent" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {tents.map((tent) => (
+                      <SelectItem key={tent.id} value={tent.id}>
+                        {tent.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedPlant?.tent_id && (
+                  <p className="mt-1 min-w-0 break-words text-[11px] text-muted-foreground">
+                    Tent follows the selected plant's assignment.
+                  </p>
+                )}
+              </div>
+
+              {guard.reason === "plant-needs-tent" && (
+                <div
+                  className="min-w-0 break-words rounded-lg border border-[hsl(var(--warning))]/40 bg-[hsl(var(--warning))]/10 p-3 text-sm"
+                  data-testid="daily-grow-check-needs-tent"
+                >
+                  Assign this plant to a tent before running Daily Grow Check.
+                  <div className="mt-2">
+                    <Button
+                      asChild
+                      size="sm"
+                      variant="outline"
+                      className="min-h-11 whitespace-normal"
+                    >
+                      <Link to={plantDetailPath(selectedPlant?.id ?? "")}>Assign Tent</Link>
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </StepCard>
+        </div>
+      )}
+
       {/* Shared Quick Log activity surface — consumes the canonical
           QUICK_LOG_ACTIVITY_DEFINITIONS via QuickLogActivityPicker and
           routes saves through useQuickLogActivitySave. Harvest is available
           only for eligible selected-plant stages and fails closed otherwise. */}
-      <div className="mb-4">
+      <div className="mb-4 w-full min-w-0">
         <QuickLogAllActivitiesSection
           growId={growId}
-          tentId={tentId}
+          tentId={effectiveTentId || null}
           plantId={selectedPlant?.id ?? null}
-          plantStage={
-            (selectedPlant as { stage?: unknown } | null)?.stage ?? null
-          }
+          plantStage={(selectedPlant as { stage?: unknown } | null)?.stage ?? null}
           testIdPrefix="daily-check-all-activities"
         />
       </div>
-
-
 
       {/* Post-submit confirmation. Only renders after QuickLog dispatches
           `verdant:entry-created`, which only fires after a successful insert. */}
@@ -438,7 +530,7 @@ export default function DailyCheck() {
                   asChild
                   size="sm"
                   variant="default"
-                  className="h-9"
+                  className="min-h-11 whitespace-normal"
                   data-testid="daily-grow-check-post-submit-timeline"
                 >
                   <Link to={timelineHref} data-href={timelineHref}>
@@ -497,7 +589,7 @@ export default function DailyCheck() {
                 asChild
                 size="sm"
                 variant={a.primary ? "default" : "outline"}
-                className="h-10 justify-between"
+                className="min-h-11 min-w-0 justify-between whitespace-normal"
                 data-testid={`daily-grow-check-post-submit-${a.key}`}
               >
                 <Link to={a.href}>
@@ -527,20 +619,17 @@ export default function DailyCheck() {
               className="flex flex-wrap items-center gap-2 justify-center"
               data-testid="daily-grow-check-empty-no-tents-actions"
             >
-              <Button asChild>
+              <Button asChild className="min-h-11 whitespace-normal">
                 <Link to={tentsPath()} data-testid="daily-grow-check-add-tent">
                   Add Tent <ArrowRight className="h-4 w-4" />
                 </Link>
               </Button>
-              <Button asChild variant="outline" size="sm">
-                <Link
-                  to={plantsPath()}
-                  data-testid="daily-grow-check-empty-no-tents-go-plants"
-                >
+              <Button asChild variant="outline" size="sm" className="min-h-11 whitespace-normal">
+                <Link to={plantsPath()} data-testid="daily-grow-check-empty-no-tents-go-plants">
                   {DAILY_CHECK_EMPTY_GO_TO_PLANTS_LABEL}
                 </Link>
               </Button>
-              <Button asChild variant="ghost" size="sm">
+              <Button asChild variant="ghost" size="sm" className="min-h-11 whitespace-normal">
                 <Link
                   to={timelinePath()}
                   data-testid="daily-grow-check-empty-no-tents-open-timeline"
@@ -562,20 +651,17 @@ export default function DailyCheck() {
               className="flex flex-wrap items-center gap-2 justify-center"
               data-testid="daily-grow-check-empty-no-plants-actions"
             >
-              <Button asChild>
+              <Button asChild className="min-h-11 whitespace-normal">
                 <Link to={plantsPath()} data-testid="daily-grow-check-add-plant">
                   Add Plant <ArrowRight className="h-4 w-4" />
                 </Link>
               </Button>
-              <Button asChild variant="outline" size="sm">
-                <Link
-                  to={tentsPath()}
-                  data-testid="daily-grow-check-empty-no-plants-go-tents"
-                >
+              <Button asChild variant="outline" size="sm" className="min-h-11 whitespace-normal">
+                <Link to={tentsPath()} data-testid="daily-grow-check-empty-no-plants-go-tents">
                   {DAILY_CHECK_EMPTY_GO_TO_TENTS_LABEL}
                 </Link>
               </Button>
-              <Button asChild variant="ghost" size="sm">
+              <Button asChild variant="ghost" size="sm" className="min-h-11 whitespace-normal">
                 <Link
                   to={sensorsPath()}
                   data-testid="daily-grow-check-empty-no-plants-open-sensors"
@@ -595,80 +681,83 @@ export default function DailyCheck() {
                 - plant QuickLog note
                 - current-tent manual sensor snapshot
               No new persistence. No new sensor ingestion. Sensor snapshot
-              option is gated on the selected plant having an assigned tent;
-              we never silently pick a tent on the grower's behalf. */}
+              option is gated on the effective current tent; a selected plant
+              can use only its assigned tent and never falls back to another. */}
           {step !== "done" && (
             <section
-              className="glass rounded-2xl p-4 mb-4 space-y-3"
+              className="glass mb-4 w-full min-w-0 space-y-3 rounded-2xl p-4"
               data-testid="daily-grow-check-choose"
               data-plant-id={selectedPlant?.id ?? ""}
               data-plant-tent-id={selectedPlant?.tent_id ?? ""}
               data-method-hint={methodHint ?? ""}
             >
-              <div>
-                <h2 className="font-display font-semibold text-base flex items-center gap-2">
+              <div className="min-w-0">
+                <h2 className="flex min-w-0 items-center gap-2 break-words font-display text-base font-semibold">
                   <ClipboardCheck className="h-4 w-4" />
                   Choose today's check
                 </h2>
-                <p className="text-xs text-muted-foreground mt-0.5">
+                <p className="mt-0.5 min-w-0 break-words text-xs text-muted-foreground">
                   Either path counts. Logging a check does not mean the plant is healthy — it just
                   records what you observed today.
                 </p>
               </div>
-              <div className="grid gap-2 sm:grid-cols-2">
+              <div className="grid w-full min-w-0 gap-2 sm:grid-cols-2">
                 <Button
                   variant="outline"
-                  className={`h-auto py-3 flex-col items-start gap-1 ${
+                  className={`h-auto min-h-11 w-full min-w-0 flex-col items-start gap-1 whitespace-normal py-3 text-left ${
                     methodHint === "note" ? "ring-2 ring-primary" : ""
                   }`}
                   data-testid="daily-grow-check-choose-quicklog"
                   data-method-focused={methodHint === "note" ? "1" : "0"}
                   aria-pressed={methodHint === "note"}
-                  onClick={() => {
-                    setStep("quicklog");
-                    setQuickLogOpen(true);
-                  }}
+                  disabled={!selectedPlant}
+                  onClick={openSelectedPlantQuickLog}
                 >
-                  <span className="flex items-center gap-2 font-medium">
+                  <span className="flex min-w-0 items-center gap-2 break-words font-medium">
                     <Sparkles className="h-4 w-4" /> Add plant note
                   </span>
-                  <span className="text-[11px] text-muted-foreground text-left">
+                  <span className="min-w-0 break-words text-left text-[11px] text-muted-foreground">
                     Quick Log a short observation or photo for this plant.
                   </span>
                 </Button>
                 <Button
                   variant="outline"
-                  className={`h-auto py-3 flex-col items-start gap-1 ${
-                    methodHint === "sensor" && !!selectedPlant?.tent_id ? "ring-2 ring-primary" : ""
+                  className={`h-auto min-h-11 w-full min-w-0 flex-col items-start gap-1 whitespace-normal py-3 text-left ${
+                    methodHint === "sensor" && !!effectiveTentId ? "ring-2 ring-primary" : ""
                   }`}
                   data-testid="daily-grow-check-choose-snapshot"
-                  data-method-focused={
-                    methodHint === "sensor" && !!selectedPlant?.tent_id ? "1" : "0"
-                  }
-                  aria-pressed={methodHint === "sensor" && !!selectedPlant?.tent_id}
-                  disabled={!!selectedPlant && !selectedPlant.tent_id}
+                  data-method-focused={methodHint === "sensor" && !!effectiveTentId ? "1" : "0"}
+                  aria-pressed={methodHint === "sensor" && !!effectiveTentId}
+                  disabled={!effectiveTentId}
                   onClick={() => setStep("manual")}
                 >
-                  <span className="flex items-center gap-2 font-medium">
+                  <span className="flex min-w-0 items-center gap-2 break-words font-medium">
                     <Gauge className="h-4 w-4" /> Add sensor snapshot
                   </span>
-                  <span className="text-[11px] text-muted-foreground text-left">
-                    Save a manual reading for this plant's current tent.
+                  <span className="min-w-0 break-words text-left text-[11px] text-muted-foreground">
+                    Save a manual reading for the current tent.
                   </span>
                 </Button>
               </div>
 
               {!selectedPlant && plants.length > 0 && (
                 <div
-                  className="rounded-md border border-border/50 bg-muted/30 p-2 text-xs space-y-1"
+                  className="min-w-0 space-y-1 break-words rounded-md border border-border/50 bg-muted/30 p-2 text-xs"
                   data-testid="daily-grow-check-choose-no-plant"
                 >
-                  <p className="font-medium">{DAILY_CHECK_EMPTY_NO_SELECTED_PLANT_TITLE}</p>
-                  <p className="text-muted-foreground">
+                  <p className="min-w-0 break-words font-medium">
+                    {DAILY_CHECK_EMPTY_NO_SELECTED_PLANT_TITLE}
+                  </p>
+                  <p className="min-w-0 break-words text-muted-foreground">
                     {DAILY_CHECK_EMPTY_NO_SELECTED_PLANT_BODY}
                   </p>
                   <div className="flex flex-wrap gap-2 pt-1">
-                    <Button asChild size="sm" variant="outline">
+                    <Button
+                      asChild
+                      size="sm"
+                      variant="outline"
+                      className="min-h-11 whitespace-normal"
+                    >
                       <Link
                         to={plantsPath()}
                         data-testid="daily-grow-check-choose-no-plant-go-plants"
@@ -676,7 +765,12 @@ export default function DailyCheck() {
                         {DAILY_CHECK_EMPTY_GO_TO_PLANTS_LABEL}
                       </Link>
                     </Button>
-                    <Button asChild size="sm" variant="ghost">
+                    <Button
+                      asChild
+                      size="sm"
+                      variant="ghost"
+                      className="min-h-11 whitespace-normal"
+                    >
                       <Link
                         to={timelinePath()}
                         data-testid="daily-grow-check-choose-no-plant-open-timeline"
@@ -690,18 +784,25 @@ export default function DailyCheck() {
 
               {selectedPlant && !selectedPlant.tent_id && (
                 <div
-                  className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs space-y-1"
+                  className="min-w-0 space-y-1 break-words rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs"
                   data-testid="daily-grow-check-choose-no-tent"
                 >
-                  <p className="flex items-start gap-1 font-medium text-amber-300">
+                  <p className="flex min-w-0 items-start gap-1 break-words font-medium text-amber-300">
                     <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" aria-hidden="true" />
-                    <span>{DAILY_CHECK_EMPTY_PLANT_NEEDS_TENT_TITLE}</span>
+                    <span className="min-w-0 break-words">
+                      {DAILY_CHECK_EMPTY_PLANT_NEEDS_TENT_TITLE}
+                    </span>
                   </p>
-                  <p className="text-muted-foreground">
+                  <p className="min-w-0 break-words text-muted-foreground">
                     {DAILY_CHECK_EMPTY_PLANT_NEEDS_TENT_BODY}
                   </p>
                   <div className="flex flex-wrap gap-2 pt-1">
-                    <Button asChild size="sm" variant="outline">
+                    <Button
+                      asChild
+                      size="sm"
+                      variant="outline"
+                      className="min-h-11 whitespace-normal"
+                    >
                       <Link
                         to={plantDetailPath(selectedPlant.id)}
                         data-testid="daily-grow-check-choose-no-tent-assign"
@@ -709,11 +810,13 @@ export default function DailyCheck() {
                         Assign tent
                       </Link>
                     </Button>
-                    <Button asChild size="sm" variant="ghost">
-                      <Link
-                        to={tentsPath()}
-                        data-testid="daily-grow-check-choose-no-tent-go-tents"
-                      >
+                    <Button
+                      asChild
+                      size="sm"
+                      variant="ghost"
+                      className="min-h-11 whitespace-normal"
+                    >
+                      <Link to={tentsPath()} data-testid="daily-grow-check-choose-no-tent-go-tents">
                         {DAILY_CHECK_EMPTY_GO_TO_TENTS_LABEL}
                       </Link>
                     </Button>
@@ -727,13 +830,16 @@ export default function DailyCheck() {
           {step !== "done" && (
             <>
               <h2
-                className="font-display font-semibold text-sm text-muted-foreground mt-2 mb-2"
+                className="mb-2 mt-2 min-w-0 break-words font-display text-sm font-semibold text-muted-foreground"
                 data-testid="daily-grow-check-guided-heading"
               >
                 Or run the guided check
               </h2>
-              <div className="glass rounded-2xl p-3 mb-4" data-testid="daily-grow-check-progress">
-                <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
+              <div
+                className="glass mb-4 w-full min-w-0 rounded-2xl p-3"
+                data-testid="daily-grow-check-progress"
+              >
+                <div className="mb-1.5 flex min-w-0 items-center justify-between gap-2 text-xs text-muted-foreground">
                   <span>
                     Step {progress.index + 1} of {progress.total}
                   </span>
@@ -745,85 +851,17 @@ export default function DailyCheck() {
           )}
 
           {/* Step content */}
-          {step === "select" && (
-            <StepCard
-              title="Step 1 · Select Current Tent / Plant"
-              icon={<Sprout className="h-4 w-4" />}
-            >
-              <div className="grid gap-3">
-                <div>
-                  <Label className="text-xs">Current Plant</Label>
-                  <Select
-                    value={plantId || "__none"}
-                    onValueChange={(v) => setPlantId(v === "__none" ? "" : v)}
-                  >
-                    <SelectTrigger data-testid="daily-grow-check-plant-select">
-                      <SelectValue placeholder="Select a plant" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none">No specific plant</SelectItem>
-                      {plants.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.name}
-                          {p.strain ? ` · ${p.strain}` : ""}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label className="text-xs">Current Tent</Label>
-                  <Select
-                    value={tentId}
-                    onValueChange={setTentId}
-                    disabled={!!selectedPlant?.tent_id}
-                  >
-                    <SelectTrigger data-testid="daily-grow-check-tent-select">
-                      <SelectValue placeholder="Select a tent" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {tents.map((t) => (
-                        <SelectItem key={t.id} value={t.id}>
-                          {t.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {selectedPlant?.tent_id && (
-                    <p className="text-[11px] text-muted-foreground mt-1">
-                      Tent follows the selected plant's assignment.
-                    </p>
-                  )}
-                </div>
-
-                {guard.reason === "plant-needs-tent" && (
-                  <div
-                    className="rounded-lg border border-[hsl(var(--warning))]/40 bg-[hsl(var(--warning))]/10 p-3 text-sm"
-                    data-testid="daily-grow-check-needs-tent"
-                  >
-                    Assign this plant to a tent before running Daily Grow Check.
-                    <div className="mt-2">
-                      <Button asChild size="sm" variant="outline">
-                        <Link to={plantDetailPath(selectedPlant?.id ?? "")}>Assign Tent</Link>
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </StepCard>
-          )}
-
           {step === "environment" && (
             <StepCard
               title="Step 2 · Review Current Environment"
               icon={<Gauge className="h-4 w-4" />}
             >
               <PlantStatusStrip
-                tentId={tentId || null}
+                tentId={effectiveTentId || null}
                 tentName={selectedTent?.name ?? null}
                 growId={growId}
               />
-              <p className="text-[11px] text-muted-foreground">
+              <p className="min-w-0 break-words text-[11px] text-muted-foreground">
                 Read-only. Source and freshness shown above. Manual snapshot, not live sensor data,
                 unless your source label says otherwise.
               </p>
@@ -837,18 +875,18 @@ export default function DailyCheck() {
             >
               <ManualSensorReadingCard
                 tents={tents.map((t) => ({ id: t.id, name: t.name }))}
-                defaultTentId={tentId || undefined}
+                defaultTentId={effectiveTentId || undefined}
                 successMessage={DAILY_CHECK_SENSOR_SAVED_TOAST}
                 onSaved={() => handleSubmitSuccess("sensor")}
               />
-              <p className="text-[11px] text-muted-foreground mt-2">
+              <p className="mt-2 min-w-0 break-words text-[11px] text-muted-foreground">
                 Saved as <strong>manual</strong>, not live sensor data. Temperature uses °F.
               </p>
-              <div className="flex gap-2 mt-3">
+              <div className="mt-3 flex min-w-0 gap-2">
                 <Button
                   size="sm"
                   variant="outline"
-                  className="flex-1"
+                  className="min-h-11 min-w-0 flex-1 whitespace-normal"
                   data-testid="daily-grow-check-mark-manual-added"
                   onClick={() => markAndAdvance("manual", "visited")}
                 >
@@ -857,7 +895,7 @@ export default function DailyCheck() {
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="flex-1"
+                  className="min-h-11 min-w-0 flex-1 whitespace-normal"
                   data-testid="daily-grow-check-skip-manual"
                   onClick={() => markAndAdvance("manual", "skipped")}
                 >
@@ -869,26 +907,27 @@ export default function DailyCheck() {
 
           {step === "quicklog" && (
             <StepCard title="Step 4 · Quick Log" icon={<Sparkles className="h-4 w-4" />}>
-              <p className="text-sm text-muted-foreground mb-3">
+              <p className="mb-3 min-w-0 break-words text-sm text-muted-foreground">
                 Add a quick note (and optional photo) about what you observed today.
               </p>
               <div className="flex flex-col gap-2">
                 <Button
+                  className="min-h-11 w-full min-w-0 whitespace-normal"
                   data-testid="daily-grow-check-open-quicklog"
                   onClick={() => setQuickLogOpen(true)}
                 >
                   <Sparkles className="h-4 w-4" /> Open Quick Log
                 </Button>
                 {state.quicklog === "added" && (
-                  <p className="text-xs text-[hsl(var(--success))] flex items-center gap-1">
+                  <p className="flex min-w-0 items-center gap-1 break-words text-xs text-[hsl(var(--success))]">
                     <CheckCircle2 className="h-3.5 w-3.5" /> Quick Log entry saved.
                   </p>
                 )}
-                <div className="flex gap-2">
+                <div className="flex min-w-0 gap-2">
                   <Button
                     size="sm"
                     variant="outline"
-                    className="flex-1"
+                    className="min-h-11 min-w-0 flex-1 whitespace-normal"
                     onClick={() =>
                       markAndAdvance("quicklog", state.quicklog === "added" ? "added" : "added")
                     }
@@ -900,7 +939,7 @@ export default function DailyCheck() {
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="flex-1"
+                    className="min-h-11 min-w-0 flex-1 whitespace-normal"
                     onClick={() => markAndAdvance("quicklog", "skipped")}
                     data-testid="daily-grow-check-skip-quicklog"
                   >
@@ -913,28 +952,29 @@ export default function DailyCheck() {
 
           {step === "handheld" && (
             <StepCard title="Step 5 · Handheld Readings" icon={<Wrench className="h-4 w-4" />}>
-              <p className="text-sm text-muted-foreground mb-3">
+              <p className="mb-3 min-w-0 break-words text-sm text-muted-foreground">
                 Optional. Use the Hardware readings block inside Quick Log (Spider Farmer pH/EC pen,
                 PAR/PPFD meter). Saved as note text only — never as live sensor data.
               </p>
               <div className="flex flex-col gap-2">
                 <Button
                   variant="outline"
+                  className="min-h-11 w-full min-w-0 whitespace-normal"
                   data-testid="daily-grow-check-open-quicklog-handheld"
                   onClick={() => setQuickLogOpen(true)}
                 >
                   <Wrench className="h-4 w-4" /> Open Quick Log for handheld readings
                 </Button>
                 {state.handheld === "added" && (
-                  <p className="text-xs text-[hsl(var(--success))] flex items-center gap-1">
+                  <p className="flex min-w-0 items-center gap-1 break-words text-xs text-[hsl(var(--success))]">
                     <CheckCircle2 className="h-3.5 w-3.5" /> Handheld readings logged.
                   </p>
                 )}
-                <div className="flex gap-2">
+                <div className="flex min-w-0 gap-2">
                   <Button
                     size="sm"
                     variant="outline"
-                    className="flex-1"
+                    className="min-h-11 min-w-0 flex-1 whitespace-normal"
                     onClick={() =>
                       markAndAdvance("handheld", state.handheld === "added" ? "added" : "added")
                     }
@@ -946,7 +986,7 @@ export default function DailyCheck() {
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="flex-1"
+                    className="min-h-11 min-w-0 flex-1 whitespace-normal"
                     onClick={() => markAndAdvance("handheld", "skipped")}
                     data-testid="daily-grow-check-skip-handheld"
                   >
@@ -962,22 +1002,23 @@ export default function DailyCheck() {
               title="Step 6 · Review Alerts & Pending Tasks"
               icon={<Bell className="h-4 w-4" />}
             >
-              <p className="text-xs text-muted-foreground mb-2">
+              <p className="mb-2 min-w-0 break-words text-xs text-muted-foreground">
                 Read-only review. Nothing is approved, dismissed, or executed here.
               </p>
               <PlantAssignedTentAlertsPanel
-                tentId={tentId || null}
+                tentId={effectiveTentId || null}
                 tentName={selectedTent?.name ?? null}
                 growId={growId}
               />
               <PlantAssignedTentActionsPanel
-                tentId={tentId || null}
+                tentId={effectiveTentId || null}
                 tentName={selectedTent?.name ?? null}
                 growId={growId}
               />
-              <div className="grid grid-cols-2 gap-2 mt-3">
+              <div className="mt-3 grid min-w-0 grid-cols-2 gap-2">
                 <Button
                   variant="outline"
+                  className="min-h-11 min-w-0 whitespace-normal"
                   onClick={() =>
                     setState((s) => ({ ...s, alertsReviewed: true, tasksReviewed: true }))
                   }
@@ -985,7 +1026,11 @@ export default function DailyCheck() {
                 >
                   <Check className="h-4 w-4" /> Mark reviewed
                 </Button>
-                <Button onClick={() => setStep("done")} data-testid="daily-grow-check-finish">
+                <Button
+                  className="min-h-11 min-w-0 whitespace-normal"
+                  onClick={() => setStep("done")}
+                  data-testid="daily-grow-check-finish"
+                >
                   Finish <ArrowRight className="h-4 w-4" />
                 </Button>
               </div>
@@ -1035,7 +1080,7 @@ export default function DailyCheck() {
               <div className="grid gap-2 mt-4" data-testid="daily-grow-check-review-links">
                 {buildDailyGrowCheckReviewLinks({
                   plantId: selectedPlant?.id ?? null,
-                  tentId: tentId || null,
+                  tentId: effectiveTentId || null,
                 }).map((link) => (
                   <Button
                     key={link.key}
@@ -1068,20 +1113,20 @@ export default function DailyCheck() {
           {/* Sticky footer for Back/Next on mid-flow steps */}
           {step !== "done" && step !== "select" && step !== "review" && (
             <div
-              className="sticky bottom-2 mt-4 flex gap-2 bg-background/80 backdrop-blur rounded-xl border p-2"
+              className="sticky bottom-2 mt-4 flex w-full min-w-0 gap-2 rounded-xl border bg-background/80 p-2 backdrop-blur"
               data-testid="daily-grow-check-footer"
             >
               <Button
                 variant="ghost"
                 onClick={() => setStep(previousStep(step))}
-                className="flex-1"
+                className="min-h-11 min-w-0 flex-1 whitespace-normal"
               >
                 <ArrowLeft className="h-4 w-4" /> Back
               </Button>
               <Button
                 variant="default"
                 onClick={() => setStep(nextStep(step))}
-                className="flex-1"
+                className="min-h-11 min-w-0 flex-1 whitespace-normal"
                 data-testid="daily-grow-check-next"
               >
                 Next <ArrowRight className="h-4 w-4" />
@@ -1089,12 +1134,12 @@ export default function DailyCheck() {
             </div>
           )}
           {step === "select" && guard.ok && (
-            <div className="sticky bottom-2 mt-4 flex gap-2 bg-background/80 backdrop-blur rounded-xl border p-2">
+            <div className="sticky bottom-2 mt-4 flex w-full min-w-0 gap-2 rounded-xl border bg-background/80 p-2 backdrop-blur">
               <Button
-                className="flex-1"
+                className="min-h-11 min-w-0 flex-1 whitespace-normal"
                 onClick={() => setStep("environment")}
                 data-testid="daily-grow-check-start"
-                disabled={!tentId}
+                disabled={!effectiveTentId}
               >
                 Start <ArrowRight className="h-4 w-4" />
               </Button>
@@ -1110,7 +1155,7 @@ export default function DailyCheck() {
             prefill={{
               plantId: selectedPlant?.id ?? null,
               growId,
-              tentId: tentId || null,
+              tentId: effectiveTentId || null,
             }}
           />
         </>
@@ -1134,8 +1179,11 @@ function StepCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className="glass rounded-2xl p-4 mb-4" data-testid="daily-grow-check-step">
-      <h2 className="font-display font-semibold text-base flex items-center gap-2 mb-3">
+    <section
+      className="glass mb-4 w-full min-w-0 rounded-2xl p-4"
+      data-testid="daily-grow-check-step"
+    >
+      <h2 className="mb-3 flex min-w-0 items-center gap-2 break-words font-display text-base font-semibold">
         {icon}
         {title}
       </h2>

@@ -16,6 +16,7 @@ const TENT_ID = "22222222-2222-4222-8222-222222222222";
 const PLANT_ID = "33333333-3333-4333-8333-333333333333";
 const ACTION_ID = "44444444-4444-4444-8444-444444444444";
 const SESSION_ID = "55555555-5555-4555-8555-555555555555";
+const LONG_PLANT_NAME = "Responsive Proof Plant With A Deliberately Long Cultivar Selection Name";
 
 const FAKE_USER = {
   id: USER_ID,
@@ -61,7 +62,7 @@ const PLANT = {
   user_id: USER_ID,
   grow_id: GROW_ID,
   tent_id: TENT_ID,
-  name: "Responsive Proof Plant",
+  name: LONG_PLANT_NAME,
   strain: "Browser fixture",
   stage: "flower",
   started_at: "2026-07-01T00:00:00.000Z",
@@ -343,9 +344,7 @@ test.describe("Verdant UI-overhaul responsive routes", () => {
         height: width < 768 ? 844 : 900,
       });
       await page.goto(`/plants/${PLANT_ID}`, { waitUntil: "domcontentloaded" });
-      await expect(
-        page.getByRole("heading", { level: 1, name: "Responsive Proof Plant" }),
-      ).toBeVisible();
+      await expect(page.getByRole("heading", { level: 1, name: LONG_PLANT_NAME })).toBeVisible();
 
       const triggers = ["history", "harvest", "ai"].map((group) =>
         page.getByTestId(`plant-detail-disclosure-${group}-trigger`),
@@ -433,5 +432,90 @@ test.describe("Verdant UI-overhaul responsive routes", () => {
         "force-mounted disclosure content must not invoke AI, edge functions, or writes",
       ).toEqual([]);
     }
+  });
+
+  test("keeps Daily Check target-first, touch-safe, and overflow-free", async ({ page }) => {
+    test.setTimeout(120_000);
+    const unexpectedMutations: string[] = [];
+    page.on("request", (request) => {
+      const url = request.url();
+      const isRestMutation =
+        /\/rest\/v1\//i.test(url) &&
+        !/\/rest\/v1\/rpc\/has_role(?:\?|$)/i.test(url) &&
+        !["GET", "HEAD"].includes(request.method());
+      if (isRestMutation || /\/functions\/v1\//i.test(url)) {
+        unexpectedMutations.push(`${request.method()} ${url}`);
+      }
+    });
+
+    for (const width of [320, 375, 390, 768, 1440] as const) {
+      await page.setViewportSize({ width, height: width < 768 ? 844 : 900 });
+      await page.goto(`/daily-check?plantId=${PLANT_ID}`, {
+        waitUntil: "domcontentloaded",
+      });
+      await expect(page.getByRole("heading", { level: 1, name: "Quick Log" })).toBeVisible();
+
+      const selector = page.getByTestId("daily-grow-check-target-selector");
+      const activities = page.getByTestId("daily-check-all-activities");
+      const choose = page.getByTestId("daily-grow-check-choose");
+      const guided = page.getByTestId("daily-grow-check-guided-heading");
+      await expect(selector).toBeVisible();
+      await expect(page.getByTestId("daily-grow-check-plant-select")).toContainText(
+        LONG_PLANT_NAME,
+      );
+
+      const order = await page.evaluate(() => {
+        const ids = [
+          "daily-grow-check-target-selector",
+          "daily-check-all-activities",
+          "daily-grow-check-choose",
+          "daily-grow-check-guided-heading",
+        ];
+        const elements = ids.map((id) =>
+          document.querySelector<HTMLElement>(`[data-testid="${id}"]`),
+        );
+        return elements.every(Boolean)
+          ? elements
+              .slice(0, -1)
+              .every((element, index) =>
+                Boolean(
+                  element!.compareDocumentPosition(elements[index + 1]!) &
+                  Node.DOCUMENT_POSITION_FOLLOWING,
+                ),
+              )
+          : false;
+      });
+      expect(order, `${width}px Daily Check must keep the target-first order`).toBe(true);
+      await expect(activities).toBeVisible();
+      await expect(choose).toBeVisible();
+      await expect(guided).toBeVisible();
+
+      for (const testId of [
+        "daily-grow-check-plant-select",
+        "daily-grow-check-tent-select",
+        "daily-grow-check-choose-quicklog",
+        "daily-grow-check-choose-snapshot",
+        "daily-grow-check-start",
+      ]) {
+        const control = page.getByTestId(testId);
+        await expect(control).toBeVisible();
+        const box = await control.boundingBox();
+        expect(box, `${width}px ${testId} must have a box`).not.toBeNull();
+        expect(box!.height, `${width}px ${testId} must be at least 44px`).toBeGreaterThanOrEqual(
+          44,
+        );
+      }
+
+      const layout = await page.evaluate(() => ({
+        clientWidth: document.documentElement.clientWidth,
+        scrollWidth: document.documentElement.scrollWidth,
+      }));
+      expect(
+        layout.scrollWidth - layout.clientWidth,
+        `${width}px Daily Check must not create document-level horizontal overflow`,
+      ).toBe(0);
+    }
+
+    expect(unexpectedMutations, "responsive proof must remain read-only").toEqual([]);
   });
 });

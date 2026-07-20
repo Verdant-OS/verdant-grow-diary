@@ -124,7 +124,9 @@ describe("static route head fidelity helpers", () => {
     expect(titleField.ok).toBe(false);
     expect(titleField.expected).toBe(FIXTURE_META.title);
     expect(titleField.actual).toBe("Wrong title");
-    expect(diff.mismatched).toHaveLength(1);
+    // title, og:title, and twitter:title all derive from metadata.title.
+    expect(diff.mismatched).toHaveLength(3);
+    expect(diff.mismatched.every((f: any) => f.actual === "Wrong title")).toBe(true);
   });
 
   it("renderMarkdownReport summarizes drifted routes with expected vs actual", () => {

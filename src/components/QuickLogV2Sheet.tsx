@@ -29,6 +29,7 @@ import { useQuickLogV2Save } from "@/hooks/useQuickLogV2Save";
 
 import {
   buildQuickLogV2TargetOptions,
+  isStaleQuickLogV2TargetSelection,
   resolveQuickLogV2Target,
   EMPTY_QUICKLOG_V2_FORM,
   type QuickLogV2FormState,
@@ -323,6 +324,7 @@ export default function QuickLogV2Sheet({
   const contextBlocked = isLoadingContext || hasFetchError || hasNoTargets;
 
   const selectedTargetMissing = !contextBlocked && !form.selectedKey;
+  const selectedTargetStale = isStaleQuickLogV2TargetSelection(resolvedTarget);
   const noteLength = form.note.length;
   const volumeMissing = form.action === "water" && wateringForm.volumeMl.trim() === "";
   const showMaturityEvidence =
@@ -1665,7 +1667,8 @@ export default function QuickLogV2Sheet({
                       feedingSaving ||
                       wateringSaving ||
                       videoChecking ||
-                      (contextBlocked && !wateringRetryPending)
+                      (contextBlocked && !wateringRetryPending) ||
+                      (selectedTargetStale && !wateringRetryPending)
                     }
                     aria-describedby="qlv2-save-helper"
                     data-testid="qlv2-save"

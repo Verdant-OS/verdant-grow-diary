@@ -10,7 +10,7 @@
  * No network. No AI. No Action Queue writes.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 
 import PlantDetailHarvestWatchCard from "@/components/PlantDetailHarvestWatchCard";
 import { buildPhotoEvidenceDisplay } from "@/lib/plantPhotoEvidenceReconciliation";
@@ -81,7 +81,9 @@ beforeEach(() => {
 
 describe("Evidence tile trust + traceability (render)", () => {
   it("exposes stable test IDs for tile, count, explanation and source label", () => {
-    mocks.buildVm.mockReturnValue(makeVm({ evidenceCount: 3, galleryPhotoCount: 0, dataSource: "live" }));
+    mocks.buildVm.mockReturnValue(
+      makeVm({ evidenceCount: 3, galleryPhotoCount: 0, dataSource: "live" }),
+    );
     render(<PlantDetailHarvestWatchCard plantId="p1" galleryPhotoCount={0} dataSource="live" />);
     expect(screen.getByTestId("evidence-tile")).toBeInTheDocument();
     expect(screen.getByTestId("evidence-tile-count")).toBeInTheDocument();
@@ -92,7 +94,9 @@ describe("Evidence tile trust + traceability (render)", () => {
   });
 
   it("ties the explanation to the tile via aria-describedby", () => {
-    mocks.buildVm.mockReturnValue(makeVm({ evidenceCount: 3, galleryPhotoCount: 0, dataSource: "live" }));
+    mocks.buildVm.mockReturnValue(
+      makeVm({ evidenceCount: 3, galleryPhotoCount: 0, dataSource: "live" }),
+    );
     render(<PlantDetailHarvestWatchCard plantId="p1" galleryPhotoCount={0} dataSource="live" />);
     const tile = screen.getByTestId("evidence-tile");
     const expl = screen.getByTestId("evidence-tile-explanation");
@@ -101,15 +105,36 @@ describe("Evidence tile trust + traceability (render)", () => {
   });
 
   it("supporting-records link has an accessible name and points at Recent Activity", () => {
-    mocks.buildVm.mockReturnValue(makeVm({ evidenceCount: 3, galleryPhotoCount: 0, dataSource: "live" }));
+    mocks.buildVm.mockReturnValue(
+      makeVm({ evidenceCount: 3, galleryPhotoCount: 0, dataSource: "live" }),
+    );
     render(<PlantDetailHarvestWatchCard plantId="p1" galleryPhotoCount={0} dataSource="live" />);
     const cta = screen.getByTestId("evidence-tile-supporting-records-link");
     expect(cta).toHaveAttribute("href", "#plant-recent-activity");
     expect(cta).toHaveAccessibleName(/Recent Activity/i);
   });
 
+  it("reveals hidden Recent Activity before following the same-page evidence link", () => {
+    mocks.buildVm.mockReturnValue(
+      makeVm({ evidenceCount: 3, galleryPhotoCount: 0, dataSource: "live" }),
+    );
+    const reveal = vi.fn();
+    render(
+      <PlantDetailHarvestWatchCard
+        plantId="p1"
+        galleryPhotoCount={0}
+        dataSource="live"
+        onRevealAndNavigate={reveal}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("evidence-tile-supporting-records-link"));
+    expect(reveal).toHaveBeenCalledWith("plant-recent-activity");
+  });
+
   it("labels demo evidence explicitly and never uses the bare word 'live'", () => {
-    mocks.buildVm.mockReturnValue(makeVm({ evidenceCount: 3, galleryPhotoCount: 0, dataSource: "demo" }));
+    mocks.buildVm.mockReturnValue(
+      makeVm({ evidenceCount: 3, galleryPhotoCount: 0, dataSource: "demo" }),
+    );
     render(<PlantDetailHarvestWatchCard plantId="p1" galleryPhotoCount={0} dataSource="demo" />);
     const source = screen.getByTestId("evidence-tile-source-label");
     const expl = screen.getByTestId("evidence-tile-explanation");
@@ -122,7 +147,9 @@ describe("Evidence tile trust + traceability (render)", () => {
   });
 
   it("mismatch note is announced politely via role=note + aria-live", () => {
-    mocks.buildVm.mockReturnValue(makeVm({ evidenceCount: 3, galleryPhotoCount: 0, dataSource: "live" }));
+    mocks.buildVm.mockReturnValue(
+      makeVm({ evidenceCount: 3, galleryPhotoCount: 0, dataSource: "live" }),
+    );
     render(<PlantDetailHarvestWatchCard plantId="p1" galleryPhotoCount={0} dataSource="live" />);
     const mismatch = screen.getByTestId("evidence-tile-mismatch-note");
     expect(mismatch).toHaveAttribute("role", "note");
@@ -130,13 +157,17 @@ describe("Evidence tile trust + traceability (render)", () => {
   });
 
   it("hides the CTA when there is no evidence to inspect", () => {
-    mocks.buildVm.mockReturnValue(makeVm({ evidenceCount: 0, galleryPhotoCount: 0, dataSource: "live" }));
+    mocks.buildVm.mockReturnValue(
+      makeVm({ evidenceCount: 0, galleryPhotoCount: 0, dataSource: "live" }),
+    );
     render(<PlantDetailHarvestWatchCard plantId="p1" galleryPhotoCount={0} dataSource="live" />);
     expect(screen.queryByTestId("evidence-tile-supporting-records-link")).not.toBeInTheDocument();
   });
 
   it("does not render the mismatch note when counts align", () => {
-    mocks.buildVm.mockReturnValue(makeVm({ evidenceCount: 3, galleryPhotoCount: 3, dataSource: "live" }));
+    mocks.buildVm.mockReturnValue(
+      makeVm({ evidenceCount: 3, galleryPhotoCount: 3, dataSource: "live" }),
+    );
     render(<PlantDetailHarvestWatchCard plantId="p1" galleryPhotoCount={3} dataSource="live" />);
     expect(screen.queryByTestId("evidence-tile-mismatch-note")).not.toBeInTheDocument();
   });

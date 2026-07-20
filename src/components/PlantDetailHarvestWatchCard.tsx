@@ -13,7 +13,7 @@
  * context. No writes. No AI calls. No alerts. No Action Queue writes. No
  * automation. No device control. No trichome image analysis.
  */
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, type MouseEvent } from "react";
 import {
   Camera,
   Check,
@@ -34,9 +34,7 @@ import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
 import { buildPlantRecentActivity } from "@/lib/plantRecentActivityRules";
 import { buildPlantDetailHarvestWatchCardViewModel } from "@/lib/plantDetailHarvestWatchCardViewModel";
 import { isHarvestWatchEligible } from "@/lib/harvestWatchEligibilityRules";
-import type {
-  HarvestWatchV0ReadinessState,
-} from "@/lib/harvestWatchCardEvidenceRules";
+import type { HarvestWatchV0ReadinessState } from "@/lib/harvestWatchCardEvidenceRules";
 import {
   buildHarvestInspectionQuickLogPrefill,
   pickHarvestInspectionPreset,
@@ -44,6 +42,8 @@ import {
 } from "@/lib/harvestInspectionQuickLogRules";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 import { cn } from "@/lib/utils";
+import type { PlantDetailRevealAndNavigate } from "@/hooks/usePlantDetailDisclosureNavigation";
+import { resolvePlantDetailDisclosureTarget } from "@/lib/plantDetailDisclosureRules";
 
 interface PlantDetailHarvestWatchCardProps {
   plantId: string | null | undefined;
@@ -65,9 +65,9 @@ interface PlantDetailHarvestWatchCardProps {
    * "#plant-recent-activity", matching the Recent Activity panel anchor.
    */
   supportingRecordsHref?: string | null;
+  onRevealAndNavigate?: PlantDetailRevealAndNavigate;
   className?: string;
 }
-
 
 function trendLabel(trend: string): string {
   switch (trend) {
@@ -113,10 +113,7 @@ function v0StateTone(state: HarvestWatchV0ReadinessState): string {
 
 function HarvestWatchLoadingCard({ className }: { className?: string }) {
   return (
-    <Card
-      data-testid="plant-detail-harvest-watch-card-loading"
-      className={cn("my-3", className)}
-    >
+    <Card data-testid="plant-detail-harvest-watch-card-loading" className={cn("my-3", className)}>
       <CardHeader className="space-y-1">
         <CardTitle className="flex items-center gap-2 text-base">
           <Leaf className="h-4 w-4 text-primary" /> Harvest Watch
@@ -127,9 +124,7 @@ function HarvestWatchLoadingCard({ className }: { className?: string }) {
   );
 }
 
-function dispatchNextInspection(
-  prefill: HarvestInspectionQuickLogPrefill,
-) {
+function dispatchNextInspection(prefill: HarvestInspectionQuickLogPrefill) {
   if (typeof window === "undefined") return;
   window.dispatchEvent(
     new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, {
@@ -157,6 +152,7 @@ export default function PlantDetailHarvestWatchCard({
   galleryPhotoCount,
   dataSource,
   supportingRecordsHref,
+  onRevealAndNavigate,
   className,
 }: PlantDetailHarvestWatchCardProps) {
   const { data: plant, isLoading: plantLoading } = useGrowPlant(plantId ?? undefined);
@@ -192,7 +188,6 @@ export default function PlantDetailHarvestWatchCard({
     harvestWatchEligible,
   ]);
 
-
   const onNextInspection = useCallback(() => {
     if (!vm || !plant) return;
     const preset = pickHarvestInspectionPreset(vm.evidenceChecklist);
@@ -207,6 +202,25 @@ export default function PlantDetailHarvestWatchCard({
     });
     dispatchNextInspection(prefill);
   }, [vm, plant]);
+
+  const onSupportingRecordsClick = useCallback(
+    (event: MouseEvent<HTMLAnchorElement>) => {
+      const target = resolvePlantDetailDisclosureTarget(
+        vm?.photoEvidenceDisplay.supportingRecordsHref,
+      );
+      if (!target || !onRevealAndNavigate) return;
+      event.preventDefault();
+      if (typeof window !== "undefined") {
+        try {
+          window.history.pushState(window.history.state, "", `#${target.anchorId}`);
+        } catch {
+          // The reveal coordinator still provides accessible in-page navigation.
+        }
+      }
+      onRevealAndNavigate(target.anchorId);
+    },
+    [onRevealAndNavigate, vm?.photoEvidenceDisplay.supportingRecordsHref],
+  );
 
   if (!plantId) return null;
 
@@ -286,9 +300,7 @@ export default function PlantDetailHarvestWatchCard({
             <div className="font-medium" data-testid="plant-detail-harvest-watch-window">
               {row.harvestWindowLabel}
             </div>
-            <p className="mt-1 text-[11px] text-muted-foreground">
-              {row.harvestWindow.caption}
-            </p>
+            <p className="mt-1 text-[11px] text-muted-foreground">{row.harvestWindow.caption}</p>
           </div>
           <div
             className="rounded-lg border border-border/50 bg-background/40 p-3"
@@ -340,6 +352,7 @@ export default function PlantDetailHarvestWatchCard({
             {vm.photoEvidenceDisplay.showSupportingRecordsCta && (
               <a
                 href={vm.photoEvidenceDisplay.supportingRecordsHref}
+                onClick={onSupportingRecordsClick}
                 data-testid="evidence-tile-supporting-records-link"
                 aria-label={vm.photoEvidenceDisplay.supportingRecordsCtaAriaLabel}
                 className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-primary underline-offset-2 hover:underline focus-visible:underline"
@@ -350,7 +363,6 @@ export default function PlantDetailHarvestWatchCard({
             )}
           </div>
         </div>
-
 
         <div
           className="rounded-lg border border-border/50 bg-background/40 p-3"
@@ -385,9 +397,15 @@ export default function PlantDetailHarvestWatchCard({
                   data-status={item.status}
                 >
                   {item.status === "present" ? (
-                    <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400" aria-hidden="true" />
+                    <Check
+                      className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400"
+                      aria-hidden="true"
+                    />
                   ) : (
-                    <X className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                    <X
+                      className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground"
+                      aria-hidden="true"
+                    />
                   )}
                   <div className="flex-1">
                     <div
@@ -427,10 +445,7 @@ export default function PlantDetailHarvestWatchCard({
           </div>
           <div className="mt-2 space-y-3">
             {vm.groupedRecent.map((group) => (
-              <div
-                key={group.key}
-                data-testid={`harvest-watch-recent-group-${group.key}`}
-              >
+              <div key={group.key} data-testid={`harvest-watch-recent-group-${group.key}`}>
                 <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   {group.label}
                 </div>
@@ -479,10 +494,7 @@ export default function PlantDetailHarvestWatchCard({
           </p>
           <div className="mt-2 space-y-3">
             {vm.evidenceHistory.groups.map((group) => (
-              <div
-                key={group.key}
-                data-testid={`harvest-evidence-history-group-${group.key}`}
-              >
+              <div key={group.key} data-testid={`harvest-evidence-history-group-${group.key}`}>
                 <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   {group.label}
                 </div>
@@ -516,7 +528,6 @@ export default function PlantDetailHarvestWatchCard({
             ))}
           </div>
         </div>
-
 
         <div className="rounded-lg border border-dashed border-border/60 bg-secondary/20 p-3">
           <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -558,7 +569,8 @@ export default function PlantDetailHarvestWatchCard({
           className="text-[11px] text-muted-foreground"
           data-testid="plant-detail-harvest-watch-evidence-only-caution"
         >
-          Harvest Watch is evidence-only. Confirm with direct plant inspection before making harvest decisions.
+          Harvest Watch is evidence-only. Confirm with direct plant inspection before making harvest
+          decisions.
         </p>
       </CardContent>
     </Card>

@@ -26,12 +26,14 @@ import {
 import { PLANT_RELATIVE_TIMELINE_ANCHOR_ID } from "@/lib/plantDetailQuickActions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import type { PlantDetailRevealAndNavigate } from "@/hooks/usePlantDetailDisclosureNavigation";
 
 interface PlantDetailRecentActivityRecapProps {
   plantId: string | null | undefined;
   plantStage?: string | null;
   plantStatus?: string | null;
   onAddQuickCheck?: () => void;
+  onRevealAndNavigate?: PlantDetailRevealAndNavigate;
 }
 
 const HEADING_ID = "plant-detail-recent-activity-recap-heading";
@@ -57,6 +59,7 @@ export default function PlantDetailRecentActivityRecap({
   plantStage,
   plantStatus,
   onAddQuickCheck,
+  onRevealAndNavigate,
 }: PlantDetailRecentActivityRecapProps) {
   const { data: rawRows, isLoading } = usePlantRecentActivity(plantId ?? null);
 
@@ -86,10 +89,7 @@ export default function PlantDetailRecentActivityRecap({
     [rows],
   );
 
-  const actionResponsePair = useMemo(
-    () => buildActionResponsePairing({ rows }),
-    [rows],
-  );
+  const actionResponsePair = useMemo(() => buildActionResponsePairing({ rows }), [rows]);
 
   const followUp = useMemo(
     () =>
@@ -130,9 +130,13 @@ export default function PlantDetailRecentActivityRecap({
           type="button"
           size="sm"
           variant="ghost"
-          onClick={scrollToTimeline}
+          onClick={() =>
+            onRevealAndNavigate
+              ? onRevealAndNavigate(PLANT_RELATIVE_TIMELINE_ANCHOR_ID)
+              : scrollToTimeline()
+          }
           data-testid="plant-detail-recent-activity-recap-view-timeline"
-          className="h-7 gap-1 focus-visible:ring-2 focus-visible:ring-ring"
+          className="min-h-11 max-w-full whitespace-normal gap-1 focus-visible:ring-2 focus-visible:ring-ring"
         >
           View full timeline <ArrowDown className="h-3.5 w-3.5" />
         </Button>
@@ -146,11 +150,7 @@ export default function PlantDetailRecentActivityRecap({
           className="space-y-2"
         >
           {Array.from({ length: 3 }).map((_, i) => (
-            <li
-              key={i}
-              className="h-10 rounded-lg bg-secondary/40 animate-pulse"
-              aria-hidden
-            />
+            <li key={i} className="h-10 rounded-lg bg-secondary/40 animate-pulse" aria-hidden />
           ))}
           <span className="sr-only">Loading recent activity…</span>
         </ul>
@@ -284,10 +284,7 @@ export default function PlantDetailRecentActivityRecap({
               </p>
             </div>
           ) : (
-            <ul
-              data-testid="plant-detail-recent-activity-recap-list"
-              className="space-y-2"
-            >
+            <ul data-testid="plant-detail-recent-activity-recap-list" className="space-y-2">
               {items.map((item) => (
                 <li
                   key={item.key}
@@ -295,10 +292,7 @@ export default function PlantDetailRecentActivityRecap({
                   data-category={item.category}
                   className="flex items-start gap-2 rounded-lg border border-border/40 bg-card/30 p-2"
                 >
-                  <Badge
-                    variant="outline"
-                    className="shrink-0 text-[10px] uppercase tracking-wide"
-                  >
+                  <Badge variant="outline" className="shrink-0 text-[10px] uppercase tracking-wide">
                     {item.categoryLabel}
                   </Badge>
                   <div className="min-w-0 flex-1">

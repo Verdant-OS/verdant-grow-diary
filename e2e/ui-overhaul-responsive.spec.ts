@@ -63,7 +63,7 @@ const PLANT = {
   tent_id: TENT_ID,
   name: "Responsive Proof Plant",
   strain: "Browser fixture",
-  stage: "veg",
+  stage: "flower",
   started_at: "2026-07-01T00:00:00.000Z",
   health: "healthy",
   photo_url: null,
@@ -71,6 +71,20 @@ const PLANT = {
   is_archived: false,
   medium: "soil",
   pot_size: "3 gal",
+};
+
+const PLANT_PHOTO_ENTRY = {
+  id: "66666666-6666-4666-8666-666666666666",
+  user_id: USER_ID,
+  grow_id: GROW_ID,
+  tent_id: TENT_ID,
+  plant_id: PLANT_ID,
+  entry_type: "photo",
+  entry_at: "2026-07-18T13:00:00.000Z",
+  notes: "Mocked visual observation for responsive disclosure proof.",
+  photo_url: "/placeholder.svg",
+  details: { event_type: "photo" },
+  created_at: "2026-07-18T13:00:00.000Z",
 };
 
 const ACTION = {
@@ -172,6 +186,8 @@ function rowsForTable(table: string): unknown[] {
       return [TENT];
     case "plants":
       return [PLANT];
+    case "diary_entries":
+      return [PLANT_PHOTO_ENTRY];
     case "action_queue":
       return [ACTION];
     case "ai_doctor_sessions":
@@ -304,4 +320,118 @@ test.describe("Verdant UI-overhaul responsive routes", () => {
       await assertRouteFitsViewport(page, { path: "/dashboard", heading: "Dashboard" });
     });
   }
+
+  test("keeps Plant Detail disclosures compact, reachable, and overflow-free", async ({ page }) => {
+    test.setTimeout(120_000);
+    const closedContentSideEffects: string[] = [];
+    page.on("request", (request) => {
+      const url = request.url();
+      const isRestMutation =
+        /\/rest\/v1\//i.test(url) &&
+        !/\/rest\/v1\/rpc\/has_role(?:\?|$)/i.test(url) &&
+        !["GET", "HEAD"].includes(request.method());
+      const isAiOrEdgeInvocation =
+        /\/functions\/v1\/|openai|anthropic|generativelanguage|api\.gemini/i.test(url);
+      if (isRestMutation || isAiOrEdgeInvocation) {
+        closedContentSideEffects.push(`${request.method()} ${url}`);
+      }
+    });
+
+    for (const width of [320, 375, 390, 768, 1440] as const) {
+      await page.setViewportSize({
+        width,
+        height: width < 768 ? 844 : 900,
+      });
+      await page.goto(`/plants/${PLANT_ID}`, { waitUntil: "domcontentloaded" });
+      await expect(
+        page.getByRole("heading", { level: 1, name: "Responsive Proof Plant" }),
+      ).toBeVisible();
+
+      const triggers = ["history", "harvest", "ai"].map((group) =>
+        page.getByTestId(`plant-detail-disclosure-${group}-trigger`),
+      );
+      const contents = ["history", "harvest", "ai"].map((group) =>
+        page.getByTestId(`plant-detail-disclosure-${group}-content`),
+      );
+
+      for (const trigger of triggers) {
+        await expect(trigger).toBeVisible();
+        await expect(trigger).toHaveAttribute("aria-expanded", "false");
+        const box = await trigger.boundingBox();
+        expect(box, `${width}px disclosure trigger must have a box`).not.toBeNull();
+        expect(
+          box!.height,
+          `${width}px disclosure trigger must be at least 44px`,
+        ).toBeGreaterThanOrEqual(44);
+        expect(
+          box!.x,
+          `${width}px disclosure trigger must stay inside the left edge`,
+        ).toBeGreaterThanOrEqual(0);
+        expect(
+          box!.x + box!.width,
+          `${width}px disclosure trigger must stay inside the right edge`,
+        ).toBeLessThanOrEqual(width);
+      }
+
+      for (const content of contents) {
+        await expect(content).toHaveAttribute("hidden", "");
+        expect(await content.evaluate((element) => element.offsetHeight)).toBe(0);
+      }
+
+      const closedLayout = await page.evaluate(() => ({
+        clientWidth: document.documentElement.clientWidth,
+        scrollWidth: document.documentElement.scrollWidth,
+        scrollHeight: document.documentElement.scrollHeight,
+      }));
+      expect(closedLayout.scrollWidth - closedLayout.clientWidth).toBe(0);
+
+      await triggers[1].click();
+      await expect(contents[1]).toBeVisible();
+      const relatedActivity = page.getByTestId("evidence-tile-supporting-records-link");
+      await expect(relatedActivity).toBeVisible();
+      await relatedActivity.click();
+      await expect(triggers[0]).toHaveAttribute("aria-expanded", "true");
+      await expect(page.locator("#plant-recent-activity")).toBeVisible();
+
+      await triggers[2].click();
+      await expect(contents[2]).toBeVisible();
+
+      const expandedLayout = await page.evaluate(() => ({
+        clientWidth: document.documentElement.clientWidth,
+        scrollWidth: document.documentElement.scrollWidth,
+        scrollHeight: document.documentElement.scrollHeight,
+        duplicateIds: Array.from(document.querySelectorAll<HTMLElement>("[id]"))
+          .map((element) => element.id)
+          .filter((id, index, ids) => id && ids.indexOf(id) !== index),
+      }));
+      expect(expandedLayout.scrollWidth - expandedLayout.clientWidth).toBe(0);
+      expect(expandedLayout.duplicateIds).toEqual([]);
+      expect(
+        closedLayout.scrollHeight,
+        `${width}px closed page should be at least 25% shorter than all-expanded`,
+      ).toBeLessThanOrEqual(expandedLayout.scrollHeight * 0.75);
+
+      const desktopFab = page.locator('button.fixed[aria-label="Quick Log"]');
+      if (width < 768) {
+        await expect(desktopFab).toBeHidden();
+        await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+        const bottomClearance = await page.evaluate(() => {
+          const content = document.querySelector<HTMLElement>(
+            '[data-testid="plant-detail-disclosure-ai-content"]',
+          );
+          const nav = document.querySelector<HTMLElement>('nav[aria-label="Primary navigation"]');
+          if (!content || !nav) return null;
+          return nav.getBoundingClientRect().top - content.getBoundingClientRect().bottom;
+        });
+        expect(bottomClearance).not.toBeNull();
+        expect(bottomClearance!).toBeGreaterThanOrEqual(0);
+      } else {
+        await expect(desktopFab).toBeVisible();
+      }
+      expect(
+        closedContentSideEffects,
+        "force-mounted disclosure content must not invoke AI, edge functions, or writes",
+      ).toEqual([]);
+    }
+  });
 });

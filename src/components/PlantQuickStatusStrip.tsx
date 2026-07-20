@@ -10,14 +10,7 @@
  */
 import { useCallback } from "react";
 import { Link } from "react-router-dom";
-import {
-  AlertTriangle,
-  ArrowDownToLine,
-  Bell,
-  Clock,
-  ListTodo,
-  Sprout,
-} from "lucide-react";
+import { AlertTriangle, ArrowDownToLine, Bell, Clock, ListTodo, Sprout } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
@@ -25,6 +18,8 @@ import { usePlantAssignedTentAlerts } from "@/hooks/usePlantAssignedTentAlerts";
 import { usePlantAssignedTentActions } from "@/hooks/usePlantAssignedTentActions";
 import { buildRelativeTimelineProjection } from "@/lib/relativeTimelineProjectionRules";
 import { buildPlantQuickStatusView } from "@/lib/plantQuickStatusRules";
+import { PLANT_RELATIVE_TIMELINE_ANCHOR_ID } from "@/lib/plantDetailQuickActions";
+import type { PlantDetailRevealAndNavigate } from "@/hooks/usePlantDetailDisclosureNavigation";
 
 interface Props {
   plantId: string | null | undefined;
@@ -32,10 +27,13 @@ interface Props {
   stage?: string | null;
   tentId?: string | null;
   growId?: string | null;
+  onRevealAndNavigate?: PlantDetailRevealAndNavigate;
 }
 
 function escapeAttr(id: string): string {
-  if (typeof (globalThis as { CSS?: { escape?: (s: string) => string } }).CSS?.escape === "function") {
+  if (
+    typeof (globalThis as { CSS?: { escape?: (s: string) => string } }).CSS?.escape === "function"
+  ) {
     return (globalThis as { CSS: { escape: (s: string) => string } }).CSS.escape(id);
   }
   return id.replace(/["\\]/g, "\\$&");
@@ -47,9 +45,9 @@ export default function PlantQuickStatusStrip({
   stage,
   tentId,
   growId,
+  onRevealAndNavigate,
 }: Props) {
-  const { data: rawEntries, isLoading: entriesLoading } =
-    usePlantRecentActivity(plantId ?? null);
+  const { data: rawEntries, isLoading: entriesLoading } = usePlantRecentActivity(plantId ?? null);
   const timelineItems = buildRelativeTimelineProjection({
     rawEntries: rawEntries ?? [],
     plantId: plantId ?? null,
@@ -58,19 +56,17 @@ export default function PlantQuickStatusStrip({
 
   const hasTent = !!tentId;
   const { rows: alertRows, status: alertStatus } = usePlantAssignedTentAlerts(
-    hasTent ? tentId ?? null : null,
+    hasTent ? (tentId ?? null) : null,
     growId ?? null,
   );
-  const { rows: actionRows, isLoading: actionsLoading } =
-    usePlantAssignedTentActions(
-      hasTent ? tentId ?? null : null,
-      growId ?? null,
-    );
+  const { rows: actionRows, isLoading: actionsLoading } = usePlantAssignedTentActions(
+    hasTent ? (tentId ?? null) : null,
+    growId ?? null,
+  );
 
   const alertsLoading = hasTent && alertStatus !== "ok";
   const alertCount = hasTent && alertStatus === "ok" ? alertRows.length : null;
-  const actionCount =
-    hasTent && !actionsLoading ? actionRows.length : null;
+  const actionCount = hasTent && !actionsLoading ? actionRows.length : null;
 
   const view = buildPlantQuickStatusView({
     stage,
@@ -87,10 +83,12 @@ export default function PlantQuickStatusStrip({
   const handleViewLatest = useCallback(() => {
     const id = view.viewLatestEntry.targetItemId;
     if (!id || typeof document === "undefined") return;
-    const el = document.querySelector<HTMLElement>(
-      `[data-item-id="${escapeAttr(id)}"]`,
-    );
+    const el = document.querySelector<HTMLElement>(`[data-item-id="${escapeAttr(id)}"]`);
     if (!el) return;
+    if (onRevealAndNavigate) {
+      onRevealAndNavigate(PLANT_RELATIVE_TIMELINE_ANCHOR_ID, el);
+      return;
+    }
     try {
       el.scrollIntoView({ behavior: "smooth", block: "center" });
     } catch {
@@ -107,8 +105,7 @@ export default function PlantQuickStatusStrip({
         /* noop */
       }
     }
-  }, [view.viewLatestEntry.targetItemId]);
-
+  }, [onRevealAndNavigate, view.viewLatestEntry.targetItemId]);
 
   return (
     <div
@@ -128,33 +125,28 @@ export default function PlantQuickStatusStrip({
         data-testid="plant-quick-status-stage"
         className={cn(
           "inline-flex items-center gap-1.5",
-          view.stageIsFallback
-            ? "italic text-muted-foreground"
-            : "font-medium text-foreground",
+          view.stageIsFallback ? "italic text-muted-foreground" : "font-medium text-foreground",
         )}
       >
         <Sprout className="h-3.5 w-3.5" aria-hidden /> {view.stageLabel}
       </span>
-      <span aria-hidden className="text-muted-foreground/40">·</span>
+      <span aria-hidden className="text-muted-foreground/40">
+        ·
+      </span>
       {view.timelineLoading ? (
         <span
           data-testid="plant-quick-status-last-update-loading"
           className="inline-flex items-center gap-1.5 text-muted-foreground/70"
         >
           <Clock className="h-3.5 w-3.5" aria-hidden />
-          <Skeleton
-            className="h-3 w-28"
-            aria-label="Checking recent activity…"
-          />
+          <Skeleton className="h-3 w-28" aria-label="Checking recent activity…" />
         </span>
       ) : (
         <span
           data-testid="plant-quick-status-last-update"
           className={cn(
             "inline-flex items-center gap-1.5",
-            view.lastUpdateIsFallback
-              ? "italic text-muted-foreground/80"
-              : "text-muted-foreground",
+            view.lastUpdateIsFallback ? "italic text-muted-foreground/80" : "text-muted-foreground",
           )}
         >
           <Clock className="h-3.5 w-3.5" aria-hidden /> {view.lastUpdateLabel}
@@ -163,26 +155,27 @@ export default function PlantQuickStatusStrip({
 
       {view.alertsState === "loading" ? (
         <>
-          <span aria-hidden className="text-muted-foreground/40">·</span>
+          <span aria-hidden className="text-muted-foreground/40">
+            ·
+          </span>
           <span
             data-testid="plant-quick-status-alerts-loading"
             className="inline-flex items-center gap-1.5 italic text-muted-foreground/70"
           >
-            <Bell className="h-3.5 w-3.5" aria-hidden />{" "}
-            {view.alertsStatusLabel}
+            <Bell className="h-3.5 w-3.5" aria-hidden /> {view.alertsStatusLabel}
           </span>
         </>
       ) : view.hasAlertCount && view.alertLabel ? (
         <>
-          <span aria-hidden className="text-muted-foreground/40">·</span>
+          <span aria-hidden className="text-muted-foreground/40">
+            ·
+          </span>
           <span
             data-testid="plant-quick-status-alerts"
             data-count={view.alertCount ?? 0}
             className={cn(
               "inline-flex items-center gap-1.5",
-              (view.alertCount ?? 0) > 0
-                ? "text-[hsl(var(--warning))]"
-                : "text-muted-foreground",
+              (view.alertCount ?? 0) > 0 ? "text-[hsl(var(--warning))]" : "text-muted-foreground",
             )}
           >
             {(view.alertCount ?? 0) > 0 ? (
@@ -195,31 +188,35 @@ export default function PlantQuickStatusStrip({
         </>
       ) : view.alertsStatusLabel ? (
         <>
-          <span aria-hidden className="text-muted-foreground/40">·</span>
+          <span aria-hidden className="text-muted-foreground/40">
+            ·
+          </span>
           <span
             data-testid="plant-quick-status-alerts-unavailable"
             className="inline-flex items-center gap-1.5 italic text-muted-foreground/70"
           >
-            <Bell className="h-3.5 w-3.5" aria-hidden />{" "}
-            {view.alertsStatusLabel}
+            <Bell className="h-3.5 w-3.5" aria-hidden /> {view.alertsStatusLabel}
           </span>
         </>
       ) : null}
 
       {view.actionsState === "loading" ? (
         <>
-          <span aria-hidden className="text-muted-foreground/40">·</span>
+          <span aria-hidden className="text-muted-foreground/40">
+            ·
+          </span>
           <span
             data-testid="plant-quick-status-actions-loading"
             className="inline-flex items-center gap-1.5 italic text-muted-foreground/70"
           >
-            <ListTodo className="h-3.5 w-3.5" aria-hidden />{" "}
-            {view.actionsStatusLabel}
+            <ListTodo className="h-3.5 w-3.5" aria-hidden /> {view.actionsStatusLabel}
           </span>
         </>
       ) : view.hasActionCount && view.actionLabel ? (
         <>
-          <span aria-hidden className="text-muted-foreground/40">·</span>
+          <span aria-hidden className="text-muted-foreground/40">
+            ·
+          </span>
           <span
             data-testid="plant-quick-status-actions"
             data-count={view.actionCount ?? 0}
@@ -230,21 +227,19 @@ export default function PlantQuickStatusStrip({
         </>
       ) : view.actionsStatusLabel ? (
         <>
-          <span aria-hidden className="text-muted-foreground/40">·</span>
+          <span aria-hidden className="text-muted-foreground/40">
+            ·
+          </span>
           <span
             data-testid="plant-quick-status-actions-unavailable"
             className="inline-flex items-center gap-1.5 italic text-muted-foreground/70"
           >
-            <ListTodo className="h-3.5 w-3.5" aria-hidden />{" "}
-            {view.actionsStatusLabel}
+            <ListTodo className="h-3.5 w-3.5" aria-hidden /> {view.actionsStatusLabel}
           </span>
         </>
       ) : null}
 
-      <span
-        aria-hidden
-        className="hidden sm:inline text-muted-foreground/40"
-      >
+      <span aria-hidden className="hidden sm:inline text-muted-foreground/40">
         ·
       </span>
 
@@ -278,7 +273,9 @@ export default function PlantQuickStatusStrip({
             {view.alertsLink.label}
           </Link>
         )}
-        <span aria-hidden className="text-muted-foreground/40">·</span>
+        <span aria-hidden className="text-muted-foreground/40">
+          ·
+        </span>
         {view.actionsLink.disabled ? (
           <span
             data-testid="plant-quick-status-actions-link"
@@ -307,7 +304,9 @@ export default function PlantQuickStatusStrip({
             {view.actionsLink.label}
           </Link>
         )}
-        <span aria-hidden className="text-muted-foreground/40">·</span>
+        <span aria-hidden className="text-muted-foreground/40">
+          ·
+        </span>
         {view.viewLatestEntry.disabled ? (
           <span
             data-testid="plant-quick-status-view-latest"
@@ -340,7 +339,6 @@ export default function PlantQuickStatusStrip({
           </button>
         )}
       </span>
-
     </div>
   );
 }

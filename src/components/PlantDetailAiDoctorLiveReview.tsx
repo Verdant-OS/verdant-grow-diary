@@ -36,6 +36,7 @@ import {
 } from "@/lib/aiDoctorCurrentSensorSnapshotRules";
 import { useAiDoctorLiveReview } from "@/hooks/useAiDoctorLiveReview";
 import AiDoctorReviewResultPreview from "@/components/AiDoctorReviewResultPreview";
+import AiDoctorImportedHistoryDisclosurePanel from "@/components/AiDoctorImportedHistoryDisclosurePanel";
 
 import AiCreditRemainingBadge from "@/components/AiCreditRemainingBadge";
 import AiCreditLimitNotice from "@/components/AiCreditLimitNotice";
@@ -633,6 +634,18 @@ function PlantDetailAiDoctorLiveReviewScope({
     }
   };
   const confidenceCopy = activeReviewRequest?.confidenceCopy ?? candidateConfidenceCopy;
+  // Before start, disclose the exact sanitized history from the allowed packet
+  // that could reach AI Doctor. Once a review begins, stay pinned to its
+  // accepted packet so background CSV refetches cannot rewrite the evidence
+  // beside the result. Normalize optional transport fields for the presenter.
+  const importedHistoryDisclosurePacket = activeReviewRequest?.packet ?? packet;
+  const importedHistoryDisclosureContext = importedHistoryDisclosurePacket
+    ? {
+        imported_sensor_history: importedHistoryDisclosurePacket.imported_sensor_history ?? null,
+        missingLiveSensorReadings:
+          importedHistoryDisclosurePacket.missingLiveSensorReadings === true,
+      }
+    : null;
 
   return (
     <section
@@ -677,6 +690,8 @@ function PlantDetailAiDoctorLiveReviewScope({
       >
         {confidenceCopy}
       </p>
+
+      <AiDoctorImportedHistoryDisclosurePanel context={importedHistoryDisclosureContext} />
 
       {historyRecovery.state === "decision_required" ? (
         <div

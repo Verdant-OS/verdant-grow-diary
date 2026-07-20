@@ -163,8 +163,31 @@ export default function GuidePage() {
             <section key={section.heading}>
               <h2 className="font-display text-xl md:text-2xl font-semibold">{section.heading}</h2>
               <p className="mt-3 text-base text-foreground/90">{section.body}</p>
+              {section.links && section.links.length > 0 && (
+                <nav
+                  aria-label={`In Verdant: ${section.heading}`}
+                  className="mt-4 rounded-md border border-border/60 bg-muted/30 px-4 py-3"
+                >
+                  <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground font-medium">
+                    In Verdant
+                  </p>
+                  <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-sm">
+                    {section.links.map((link) => (
+                      <li key={link.to}>
+                        <Link
+                          to={link.to}
+                          className="text-primary underline underline-offset-4 hover:text-primary/80"
+                        >
+                          {link.label}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </nav>
+              )}
             </section>
           ))}
+
         </div>
 
         {guide.faq.length > 0 && (

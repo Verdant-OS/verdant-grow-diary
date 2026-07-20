@@ -39,13 +39,32 @@ import {
 const META_TAG_REGEX = /<meta\b[^>]*>/gi;
 const TITLE_REGEX = /<title\b[^>]*>([\s\S]*?)<\/title>/i;
 const CANONICAL_REGEX =
-  /<link\b[^>]*rel=["']canonical["'][^>]*>/i;
-const HREF_REGEX = /href=(["'])((?:(?!\1).)*)\1/i;
-const CONTENT_REGEX = /content=(["'])((?:(?!\1).)*)\1/i;
-const NAME_REGEX = /name=(["'])((?:(?!\1).)+)\1/i;
-const PROPERTY_REGEX = /property=(["'])((?:(?!\1).)+)\1/i;
+  /<link\b[^>]*\brel\s*=\s*(?:"canonical"|'canonical'|canonical)[^>]*>/i;
+
+// Attribute-value matchers that robustly handle:
+//   - mixed single / double quoted values ( key="v"  key='v' )
+//   - unquoted values                     ( key=value )
+//   - values containing the opposite quote or HTML entities
+// Groups: 1 = double-quoted, 2 = single-quoted, 3 = unquoted.
+// Entities like &quot; / &#39; / &#x27; stay inside the value and are
+// decoded downstream by `decode()`.
+const ATTR_VALUE = `(?:"([^"]*)"|'([^']*)'|([^\\s"'>=\`]+))`;
+function attrRegex(name) {
+  return new RegExp(`\\b${name}\\s*=\\s*${ATTR_VALUE}`, "i");
+}
+const HREF_REGEX = attrRegex("href");
+const CONTENT_REGEX = attrRegex("content");
+const NAME_REGEX = attrRegex("name");
+const PROPERTY_REGEX = attrRegex("property");
+
 const JSONLD_REGEX =
-  /<script\b[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  /<script\b[^>]*\btype\s*=\s*(?:"application\/ld\+json"|'application\/ld\+json'|application\/ld\+json)[^>]*>([\s\S]*?)<\/script>/gi;
+
+/** Pick the populated capture group produced by ATTR_VALUE. */
+function pickAttrValue(m) {
+  if (!m) return null;
+  return m[1] ?? m[2] ?? m[3] ?? null;
+}
 
 /**
  * Extract every JSON-LD script block on the page and parse it. Blocks
@@ -101,13 +120,38 @@ export function flattenJsonLdNodes(blocks) {
 }
 
 
+// Decode the HTML-entity forms that legitimately appear in meta/OG
+// attribute values authored via document.createElement/setAttribute
+// or via server-side HTML serialization: named entities, decimal
+// numeric refs (&#39;), and hex numeric refs (&#x27;). Unknown named
+// entities are left intact so drift stays visible instead of being
+// silently masked.
+const NAMED_ENTITIES = {
+  quot: '"',
+  apos: "'",
+  lt: "<",
+  gt: ">",
+  amp: "&",
+  nbsp: "\u00a0",
+};
 function decode(value) {
+  // Decode numeric refs first, then named. Handle &amp; last-ish by
+  // running the named pass once — an author-written literal "&amp;quot;"
+  // decodes to "&quot;" which is the intended behavior.
   return value
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&amp;/g, "&");
+    .replace(/&#[xX]([0-9a-fA-F]+);/g, (m, hex) => {
+      const cp = Number.parseInt(hex, 16);
+      return Number.isFinite(cp) ? String.fromCodePoint(cp) : m;
+    })
+    .replace(/&#([0-9]+);/g, (m, dec) => {
+      const cp = Number.parseInt(dec, 10);
+      return Number.isFinite(cp) ? String.fromCodePoint(cp) : m;
+    })
+    .replace(/&([a-zA-Z][a-zA-Z0-9]*);/g, (m, name) =>
+      Object.prototype.hasOwnProperty.call(NAMED_ENTITIES, name.toLowerCase())
+        ? NAMED_ENTITIES[name.toLowerCase()]
+        : m,
+    );
 }
 
 /**

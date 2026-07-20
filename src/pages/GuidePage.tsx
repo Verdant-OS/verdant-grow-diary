@@ -158,6 +158,37 @@ export default function GuidePage() {
         </h1>
         <p className="mt-5 text-lg text-muted-foreground">{guide.intro}</p>
 
+        {guide.cta && (
+          <aside
+            aria-label={guide.cta.heading}
+            className="mt-8 rounded-lg border border-primary/40 bg-primary/5 p-5 md:p-6 shadow-sm"
+          >
+            <h2 className="font-display text-xl md:text-2xl font-semibold text-foreground">
+              {guide.cta.heading}
+            </h2>
+            <p className="mt-2 text-sm md:text-base text-foreground/85">
+              {guide.cta.description}
+            </p>
+            {guide.cta.prompts && guide.cta.prompts.length > 0 && (
+              <ul className="mt-3 space-y-1 text-sm text-foreground/80 list-disc pl-5">
+                {guide.cta.prompts.map((prompt) => (
+                  <li key={prompt}>{prompt}</li>
+                ))}
+              </ul>
+            )}
+            <div className="mt-5">
+              <Link
+                to={guide.cta.to}
+                className="inline-flex items-center justify-center rounded-md bg-primary px-5 py-3 text-sm md:text-base font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary min-h-[44px]"
+              >
+                {guide.cta.label}
+              </Link>
+            </div>
+          </aside>
+        )}
+
+
+
         <div className="mt-10 space-y-8">
           {guide.sections.map((section) => (
             <section key={section.heading}>

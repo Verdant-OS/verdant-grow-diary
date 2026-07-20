@@ -29,6 +29,21 @@ function Harness() {
   );
 }
 
+function KeyedHarness({ plantId }: { plantId: string }) {
+  return (
+    <PlantDetailDisclosureSection
+      key={`${plantId}:history`}
+      group="history"
+      title="History"
+      summary="Full plant activity and timeline history."
+      open
+      onOpenChange={() => undefined}
+    >
+      <StatefulChild />
+    </PlantDetailDisclosureSection>
+  );
+}
+
 describe("PlantDetailDisclosureSection", () => {
   it("is controlled, closed by default, and exposes stable ARIA wiring", () => {
     render(<Harness />);
@@ -72,5 +87,17 @@ describe("PlantDetailDisclosureSection", () => {
     expect(trigger).toHaveAttribute("aria-expanded", "false");
     await user.keyboard(" ");
     expect(trigger).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("preserves same-plant state but resets descendants for a new plant key", () => {
+    const { rerender } = render(<KeyedHarness plantId="plant-a" />);
+    fireEvent.click(screen.getByRole("button", { name: "Child count 0" }));
+    expect(screen.getByRole("button", { name: "Child count 1" })).toBeInTheDocument();
+
+    rerender(<KeyedHarness plantId="plant-a" />);
+    expect(screen.getByRole("button", { name: "Child count 1" })).toBeInTheDocument();
+
+    rerender(<KeyedHarness plantId="plant-b" />);
+    expect(screen.getByRole("button", { name: "Child count 0" })).toBeInTheDocument();
   });
 });

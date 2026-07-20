@@ -84,11 +84,11 @@ export default function PlantQuickStatusStrip({
     const id = view.viewLatestEntry.targetItemId;
     if (!id || typeof document === "undefined") return;
     const el = document.querySelector<HTMLElement>(`[data-item-id="${escapeAttr(id)}"]`);
-    if (!el) return;
     if (onRevealAndNavigate) {
       onRevealAndNavigate(PLANT_RELATIVE_TIMELINE_ANCHOR_ID, el);
       return;
     }
+    if (!el) return;
     try {
       el.scrollIntoView({ behavior: "smooth", block: "center" });
     } catch {

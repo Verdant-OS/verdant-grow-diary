@@ -29,9 +29,20 @@ function countComponent(source: string, component: string) {
 
 describe("Plant Detail information architecture", () => {
   it("mounts the three controlled disclosure groups exactly once", () => {
-    expect(count(ACTIVE_PAGE, '<PlantDetailDisclosureSection\n          group="history"')).toBe(1);
-    expect(count(ACTIVE_PAGE, '<PlantDetailDisclosureSection\n          group="harvest"')).toBe(1);
-    expect(count(ACTIVE_PAGE, '<PlantDetailDisclosureSection\n          group="ai"')).toBe(1);
+    expect(count(ACTIVE_PAGE, "<PlantDetailDisclosureSection")).toBe(3);
+    expect(count(ACTIVE_PAGE, 'group="history"')).toBe(1);
+    expect(count(ACTIVE_PAGE, 'group="harvest"')).toBe(1);
+    expect(count(ACTIVE_PAGE, 'group="ai"')).toBe(1);
+  });
+
+  it("keys each disclosure subtree to the exact plant identity and group", () => {
+    for (const group of ["history", "harvest", "ai"] as const) {
+      const keyIndex = ACTIVE_PAGE.indexOf("key={`${plant.id}:" + group + "`}");
+      const groupIndex = ACTIVE_PAGE.indexOf(`group="${group}"`, keyIndex);
+
+      expect(keyIndex).toBeGreaterThan(-1);
+      expect(groupIndex).toBeGreaterThan(keyIndex);
+    }
   });
 
   it("keeps every long-form surface mounted exactly once", () => {

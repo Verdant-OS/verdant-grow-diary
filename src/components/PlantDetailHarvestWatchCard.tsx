@@ -205,6 +205,17 @@ export default function PlantDetailHarvestWatchCard({
 
   const onSupportingRecordsClick = useCallback(
     (event: MouseEvent<HTMLAnchorElement>) => {
+      if (
+        event.defaultPrevented ||
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      ) {
+        return;
+      }
+
       const target = resolvePlantDetailDisclosureTarget(
         vm?.photoEvidenceDisplay.supportingRecordsHref,
       );

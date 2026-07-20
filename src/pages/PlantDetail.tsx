@@ -747,6 +747,7 @@ export default function PlantDetail() {
         className="mt-4 min-w-0 space-y-3 pb-24 md:pb-6"
       >
         <PlantDetailDisclosureSection
+          key={`${plant.id}:history`}
           group="history"
           title="History"
           summary="Open the complete plant activity and timeline record."
@@ -780,6 +781,7 @@ export default function PlantDetail() {
         </PlantDetailDisclosureSection>
 
         <PlantDetailDisclosureSection
+          key={`${plant.id}:harvest`}
           group="harvest"
           title="Harvest evidence"
           summary="Review stage-gated harvest readiness and preserved evidence."
@@ -797,6 +799,7 @@ export default function PlantDetail() {
         </PlantDetailDisclosureSection>
 
         <PlantDetailDisclosureSection
+          key={`${plant.id}:ai`}
           group="ai"
           title="AI review & context"
           summary="Open evidence readiness, review tools, context, and prior sessions."

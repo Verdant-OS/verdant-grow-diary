@@ -127,8 +127,79 @@ describe("Evidence tile trust + traceability (render)", () => {
         onRevealAndNavigate={reveal}
       />,
     );
-    fireEvent.click(screen.getByTestId("evidence-tile-supporting-records-link"));
+    const pushState = vi.spyOn(window.history, "pushState");
+    const click = new MouseEvent("click", {
+      bubbles: true,
+      cancelable: true,
+      button: 0,
+    });
+    screen.getByTestId("evidence-tile-supporting-records-link").dispatchEvent(click);
+    expect(click.defaultPrevented).toBe(true);
+    expect(pushState).toHaveBeenCalledTimes(1);
     expect(reveal).toHaveBeenCalledWith("plant-recent-activity");
+    pushState.mockRestore();
+  });
+
+  it.each([
+    ["middle button", { button: 1 }],
+    ["Control", { button: 0, ctrlKey: true }],
+    ["Meta", { button: 0, metaKey: true }],
+    ["Shift", { button: 0, shiftKey: true }],
+    ["Alt", { button: 0, altKey: true }],
+  ])("leaves %s supporting-record navigation to the browser", (_label, init) => {
+    mocks.buildVm.mockReturnValue(
+      makeVm({ evidenceCount: 3, galleryPhotoCount: 0, dataSource: "live" }),
+    );
+    const reveal = vi.fn();
+    const pushState = vi.spyOn(window.history, "pushState");
+    const hrefBefore = window.location.href;
+    render(
+      <PlantDetailHarvestWatchCard
+        plantId="p1"
+        galleryPhotoCount={0}
+        dataSource="live"
+        onRevealAndNavigate={reveal}
+      />,
+    );
+    const click = new MouseEvent("click", {
+      bubbles: true,
+      cancelable: true,
+      ...init,
+    });
+    screen.getByTestId("evidence-tile-supporting-records-link").dispatchEvent(click);
+    expect(click.defaultPrevented).toBe(false);
+    expect(pushState).not.toHaveBeenCalled();
+    expect(reveal).not.toHaveBeenCalled();
+    expect(window.location.href).toBe(hrefBefore);
+    pushState.mockRestore();
+  });
+
+  it("does not take over an already-prevented supporting-records click", () => {
+    mocks.buildVm.mockReturnValue(
+      makeVm({ evidenceCount: 3, galleryPhotoCount: 0, dataSource: "live" }),
+    );
+    const reveal = vi.fn();
+    const pushState = vi.spyOn(window.history, "pushState");
+    const hrefBefore = window.location.href;
+    render(
+      <PlantDetailHarvestWatchCard
+        plantId="p1"
+        galleryPhotoCount={0}
+        dataSource="live"
+        onRevealAndNavigate={reveal}
+      />,
+    );
+    const click = new MouseEvent("click", {
+      bubbles: true,
+      cancelable: true,
+      button: 0,
+    });
+    click.preventDefault();
+    screen.getByTestId("evidence-tile-supporting-records-link").dispatchEvent(click);
+    expect(pushState).not.toHaveBeenCalled();
+    expect(reveal).not.toHaveBeenCalled();
+    expect(window.location.href).toBe(hrefBefore);
+    pushState.mockRestore();
   });
 
   it("labels demo evidence explicitly and never uses the bare word 'live'", () => {

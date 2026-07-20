@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -11,6 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { PrivacyNote, SupportLayout } from "./SupportLayout";
+import { HoneypotField } from "./HoneypotField";
+import { checkSpam, fingerprint, recordSubmission } from "./spamGuard";
 
 const RATING_LABELS = ["Poor", "Below average", "Okay", "Good", "Excellent"] as const;
 
@@ -113,6 +115,8 @@ function StarRating({
 export default function Feedback() {
   const [submitState, setSubmitState] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [honeypot, setHoneypot] = useState("");
+  const formOpenedAt = useRef<number>(Date.now());
 
   const form = useForm<FeedbackValues>({
     resolver: zodResolver(feedbackSchema),
@@ -136,6 +140,28 @@ export default function Feedback() {
   const onSubmit = async (values: FeedbackValues) => {
     setSubmitState("submitting");
     setErrorMessage(null);
+
+    const fp = fingerprint(
+      [
+        values.overall_rating,
+        values.whats_working ?? "",
+        values.whats_friction ?? "",
+        values.one_improvement ?? "",
+        values.contact_email ?? "",
+      ].join("|"),
+    );
+    const guard = checkSpam({
+      honeypotValue: honeypot,
+      formOpenedAt: formOpenedAt.current,
+      storageKey: "verdant.spam.feedback",
+      contentFingerprint: fp,
+    });
+    if (!guard.ok) {
+      setSubmitState("error");
+      setErrorMessage(guard.message);
+      return;
+    }
+
     const { data: sessionData } = await supabase.auth.getSession();
     const userId = sessionData.session?.user?.id ?? null;
 
@@ -161,6 +187,7 @@ export default function Feedback() {
       setErrorMessage(error.message || "Something went wrong. Please try again.");
       return;
     }
+    recordSubmission("verdant.spam.feedback", fp);
     setSubmitState("success");
   };
 
@@ -219,6 +246,7 @@ export default function Feedback() {
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="mt-8 space-y-8" noValidate>
+        <HoneypotField value={honeypot} onChange={setHoneypot} />
         <section className="rounded-lg border border-border bg-card p-5 space-y-3">
           <div>
             <Label className="text-base">

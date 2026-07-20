@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { clearLocalStorageForTest, setLocalStorageItemForTest, getLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
 
 const harness = vi.hoisted(() => ({
   activeGrowId: "g1" as string | null,
@@ -139,7 +140,7 @@ function renderQuickLog(prefill?: QuickLogPrefill) {
 }
 
 beforeEach(() => {
-  window.localStorage.clear();
+  clearLocalStorageForTest();
   harness.activeGrowId = "g1";
   harness.plants = [
     { id: "p1", name: "Plant One", grow_id: "g1", tent_id: "t1", stage: "veg" },
@@ -290,7 +291,7 @@ describe("Quick Log canonical target contract", () => {
   });
 
   it("holds an unknown route prefill instead of falling through to a remembered target", async () => {
-    window.localStorage.setItem(
+    setLocalStorageItemForTest(
       "verdant.quickLog.lastTarget.v1",
       JSON.stringify({
         plantId: "p1",
@@ -559,7 +560,7 @@ describe("Quick Log canonical target contract", () => {
       "p1",
     );
     expect(
-      JSON.parse(window.localStorage.getItem("verdant.quickLog.lastTarget.v1") ?? "{}"),
+      JSON.parse(getLocalStorageItemForTest("verdant.quickLog.lastTarget.v1") ?? "{}"),
     ).toEqual(expect.objectContaining({ plantId: "p1", growId: "g1", tentId: "t1" }));
     const invalidatedKeys = invalidateSpy.mock.calls.map(([options]) =>
       JSON.stringify(options.queryKey),

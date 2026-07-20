@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
 
 const harness = vi.hoisted(() => ({
   activeGrowId: "g1" as string | null,
@@ -401,7 +402,7 @@ function expectObservationDraftUnchanged(
 }
 
 beforeEach(() => {
-  window.localStorage.clear();
+  clearLocalStorageForTest();
   harness.activeGrowId = "g1";
   harness.rpc.mockReset();
   harness.growUpdate.mockReset();

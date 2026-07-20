@@ -55,6 +55,7 @@ vi.mock("sonner", () => ({
 vi.mock("@/components/QuickLogSensorSnapshotStrip", () => ({ default: () => null }));
 
 import QuickLog from "@/components/QuickLog";
+import { clearLocalStorageForTest, setLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
 
 const elementPrototype = Element.prototype as Element & {
   hasPointerCapture?: () => boolean;
@@ -82,7 +83,7 @@ const many = [
 
 beforeEach(() => {
   rpcMock.mockClear();
-  window.localStorage.clear();
+  clearLocalStorageForTest();
 });
 afterEach(() => cleanup());
 
@@ -97,7 +98,7 @@ describe("QuickLog global manual target selection", () => {
 
   it("does not auto-select a remembered target", () => {
     plantsMock = many;
-    window.localStorage.setItem(
+    setLocalStorageItemForTest(
       "verdant.quickLog.lastTarget.v1",
       JSON.stringify({
         plantId: "p2",

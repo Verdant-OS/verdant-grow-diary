@@ -51,7 +51,7 @@ function listSourceFiles(dir: string): string[] {
 const QUICK_LOG_V2_SAVE_CALLERS = [
   {
     file: "src/components/QuickLog.tsx",
-    telemetryIntent: /saveViaRpc\(built\.payload,\s*\{\s*telemetryIntent:\s*eventType\s*\}\)/,
+    telemetryIntent: /saveViaRpc\(built\.payload,\s*\{\s*telemetryIntent:\s*saveEventType\s*\}\)/,
   },
   {
     file: "src/components/QuickLogV2Sheet.tsx",
@@ -250,7 +250,7 @@ describe("ordering and safety constraints at the seams", () => {
   it("legacy Quick Log tracks the grower's validated semantic UI selection", () => {
     const src = read("src/components/QuickLog.tsx");
     const supportedGate = src.indexOf("if (!isSupportedLegacyEventType(eventType))");
-    const save = src.indexOf("saveViaRpc(built.payload, { telemetryIntent: eventType })");
+    const save = src.indexOf("saveViaRpc(built.payload, { telemetryIntent: saveEventType })");
     expect(supportedGate).toBeGreaterThan(-1);
     expect(save).toBeGreaterThan(supportedGate);
     expect(src).not.toMatch(/telemetryIntent:\s*built\.payload\.p_action/);

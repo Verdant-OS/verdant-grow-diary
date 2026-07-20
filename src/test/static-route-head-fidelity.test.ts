@@ -12,6 +12,8 @@ import { describe, expect, it } from "vitest";
 import {
   extractHead,
   checkRouteHead,
+  diffRouteHead,
+  renderMarkdownReport,
 } from "../../scripts/validate-static-route-head-fidelity.mjs";
 
 

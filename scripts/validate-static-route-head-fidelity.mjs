@@ -44,6 +44,62 @@ const HREF_REGEX = /href=["']([^"']*)["']/i;
 const CONTENT_REGEX = /content=["']([^"']*)["']/i;
 const NAME_REGEX = /name=["']([^"']+)["']/i;
 const PROPERTY_REGEX = /property=["']([^"']+)["']/i;
+const JSONLD_REGEX =
+  /<script\b[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+
+/**
+ * Extract every JSON-LD script block on the page and parse it. Blocks
+ * that fail to parse are returned with a `parseError` so the caller
+ * can surface them as an invariant violation rather than crashing.
+ * @param {string} html
+ */
+export function extractJsonLd(html) {
+  const blocks = [];
+  const matches = html.matchAll(JSONLD_REGEX);
+  for (const m of matches) {
+    const raw = (m[1] ?? "").trim();
+    if (raw.length === 0) {
+      blocks.push({ raw, parsed: null, parseError: "empty <script> block" });
+      continue;
+    }
+    try {
+      blocks.push({ raw, parsed: JSON.parse(raw), parseError: null });
+    } catch (err) {
+      blocks.push({
+        raw,
+        parsed: null,
+        parseError: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+  return blocks;
+}
+
+/**
+ * Flatten every JSON-LD node the page publishes. Handles top-level
+ * arrays and `@graph` children so downstream checks can look up nodes
+ * by `@type` without caring about wrapping.
+ * @param {ReturnType<typeof extractJsonLd>} blocks
+ */
+export function flattenJsonLdNodes(blocks) {
+  const nodes = [];
+  for (const block of blocks) {
+    if (!block.parsed) continue;
+    const roots = Array.isArray(block.parsed) ? block.parsed : [block.parsed];
+    for (const root of roots) {
+      if (!root || typeof root !== "object") continue;
+      if (Array.isArray(root["@graph"])) {
+        for (const child of root["@graph"]) {
+          if (child && typeof child === "object") nodes.push(child);
+        }
+      } else {
+        nodes.push(root);
+      }
+    }
+  }
+  return nodes;
+}
+
 
 function decode(value) {
   return value

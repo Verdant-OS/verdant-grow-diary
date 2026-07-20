@@ -124,6 +124,24 @@ type PlantOriginAssignmentEventRow = {
   created_at: string;
 };
 
+type GeneticsScreeningResultRow = {
+  id: string;
+  user_id: string;
+  subject_type: string;
+  subject_id: string;
+  target: string;
+  result: string;
+  sample_reference: string | null;
+  laboratory: string | null;
+  collected_date: string | null;
+  result_date: string | null;
+  evidence_reference: string | null;
+  supersedes_id: string | null;
+  recorded_by: string;
+  recorded_at: string;
+  created_at: string;
+};
+
 // ---------------------------------------------------------------------------
 // Function (RPC) argument + return types. Returns are the jsonb envelope (Json).
 // ---------------------------------------------------------------------------
@@ -200,6 +218,20 @@ export interface GeneticsTraceabilityDatabase {
         "id" | "from_batch_id" | "reason" | "changed_at" | "created_at",
         never
       >;
+      // Append-only screening evidence ledger — Update = never.
+      genetics_screening_results: Tbl<
+        GeneticsScreeningResultRow,
+        | "id"
+        | "sample_reference"
+        | "laboratory"
+        | "collected_date"
+        | "result_date"
+        | "evidence_reference"
+        | "supersedes_id"
+        | "recorded_at"
+        | "created_at",
+        never
+      >;
     };
     Views: Record<string, never>;
     Functions: {
@@ -221,6 +253,10 @@ export interface GeneticsTraceabilityDatabase {
         p_batch_id: string;
         p_plant_ids: string[];
         p_reason?: string | null;
+      }>;
+      genetics_screening_record: GeneticsFn<{
+        p_idempotency_key: string;
+        p_payload: Json;
       }>;
     };
     Enums: Record<string, never>;

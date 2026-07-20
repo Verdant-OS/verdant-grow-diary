@@ -27,9 +27,35 @@ const FIXTURE_META = {
   imageAlt: "Verdant pricing",
 } as const;
 
-function fixtureHtml(overrides: Partial<Record<string, string>> = {}) {
+const VALID_JSONLD = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "@id": "https://verdantgrowdiary.com/#app",
+  name: "Verdant Grow Diary",
+  applicationCategory: "BusinessApplication",
+  operatingSystem: "Web",
+  url: "https://verdantgrowdiary.com",
+  offers: [
+    { "@type": "Offer", name: "Free", price: "0", priceCurrency: "USD" },
+    { "@type": "Offer", name: "Pro (monthly)", price: "9", priceCurrency: "USD" },
+    { "@type": "Offer", name: "Pro (annual)", price: "90", priceCurrency: "USD" },
+    { "@type": "Offer", name: "Founder Lifetime", price: "129", priceCurrency: "USD" },
+  ],
+};
+
+function fixtureHtml(
+  overrides: Partial<Record<string, string>> = {},
+  opts: { jsonLd?: unknown | null } = {},
+) {
   const v = { ...FIXTURE_META, ...overrides } as Record<string, string>;
   const robots = v.robots ?? "index, follow";
+  const jsonLdNode = opts.jsonLd === undefined ? VALID_JSONLD : opts.jsonLd;
+  const jsonLdTag =
+    jsonLdNode === null
+      ? ""
+      : `<script type="application/ld+json">${
+          typeof jsonLdNode === "string" ? jsonLdNode : JSON.stringify(jsonLdNode)
+        }</script>`;
   return `<!doctype html><html><head>
     <title>${v.title}</title>
     <meta name="description" content="${v.description}" />
@@ -45,6 +71,7 @@ function fixtureHtml(overrides: Partial<Record<string, string>> = {}) {
     <meta name="twitter:description" content="${v.description}" />
     <meta name="twitter:image" content="${v.image}" />
     <meta name="robots" content="${robots}" />
+    ${jsonLdTag}
   </head><body></body></html>`;
 }
 

@@ -70,12 +70,15 @@ describe("ActionQueue — filter UI", () => {
     }
   });
 
-  it("keeps refresh and pending decision controls at least 44px tall on mobile", () => {
+  it("keeps refresh and every row decision control at least 44px tall on mobile", () => {
     for (const testId of [
       "action-queue-refresh-button",
       "action-queue-row-approve",
       "action-queue-row-simulate",
       "action-queue-row-reject",
+      "action-queue-row-cancel-pending",
+      "action-queue-row-complete-reviewed",
+      "action-queue-row-cancel-reviewed",
     ]) {
       const control = buttonOpeningTag(testId);
       expect(control, `${testId} must be a directly selectable Button`).toBeTruthy();

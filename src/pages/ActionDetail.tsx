@@ -971,6 +971,8 @@ export default function ActionDetail() {
                     variant="secondary"
                     disabled={busy}
                     onClick={() => openDialog("complete")}
+                    className="min-h-11 min-w-0 whitespace-normal sm:min-h-9"
+                    data-testid="action-detail-complete"
                     aria-label={buildActionButtonAriaLabel("complete", row, { disabledReason })}
                     title={disabledReason ?? undefined}
                   >
@@ -997,6 +999,8 @@ export default function ActionDetail() {
                     variant="ghost"
                     disabled={busy}
                     onClick={() => openDialog("cancel")}
+                    className="min-h-11 min-w-0 whitespace-normal sm:min-h-9"
+                    data-testid="action-detail-cancel"
                     aria-label={buildActionButtonAriaLabel("cancel", row, { disabledReason })}
                     title={disabledReason ?? undefined}
                   >

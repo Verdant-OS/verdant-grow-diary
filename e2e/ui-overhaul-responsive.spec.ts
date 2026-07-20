@@ -30,8 +30,24 @@ const GROW_ID = "11111111-1111-4111-8111-111111111111";
 const TENT_ID = "22222222-2222-4222-8222-222222222222";
 const PLANT_ID = "33333333-3333-4333-8333-333333333333";
 const ACTION_ID = "44444444-4444-4444-8444-444444444444";
+const REVIEWED_ACTION_ID = "77777777-7777-4777-8777-777777777777";
 const SESSION_ID = "55555555-5555-4555-8555-555555555555";
 const LONG_PLANT_NAME = "Responsive Proof Plant With A Deliberately Long Cultivar Selection Name";
+const FONT_FIXTURE_PROPERTY = "--verdant-e2e-font-fixture";
+const FONT_FIXTURE_VALUE = "settled";
+const FONT_FIXTURE_STYLESHEET = `
+  @font-face {
+    font-family: "Inter";
+    src: local("Arial");
+    font-display: block;
+  }
+  @font-face {
+    font-family: "Space Grotesk";
+    src: local("Arial");
+    font-display: block;
+  }
+  :root { ${FONT_FIXTURE_PROPERTY}: ${FONT_FIXTURE_VALUE}; }
+`;
 
 const FAKE_USER = {
   id: USER_ID,
@@ -125,6 +141,17 @@ const ACTION = {
   updated_at: "2026-07-18T12:00:00.000Z",
 };
 
+const REVIEWED_ACTION = {
+  ...ACTION,
+  id: REVIEWED_ACTION_ID,
+  source: "manual",
+  suggested_change: "Record the completed canopy review in the plant diary",
+  reason: "Grower-simulated follow-up retained for reviewed-action controls.",
+  status: "simulated",
+  created_at: "2026-07-18T11:00:00.000Z",
+  updated_at: "2026-07-18T11:30:00.000Z",
+};
+
 const AI_SESSION = {
   id: SESSION_ID,
   created_at: "2026-07-18T12:00:00.000Z",
@@ -195,16 +222,25 @@ const REDESIGNED_PRODUCTION_PAGES = {
   timeline: "src/pages/Timeline.tsx",
 } as const;
 
+type LocatorCardinality = "exact-one" | "one-or-more";
+
+type MobileTouchTarget = {
+  selector: string;
+  cardinality: LocatorCardinality;
+};
+
 type BrowserRoute = {
   sourcePage: string;
   routePattern: string;
   path: string;
   heading: string;
   readySelector: string;
+  readySelectorCardinality?: LocatorCardinality;
+  fixtureExpectedReadyCount?: number;
   criticalOperatingLoop?: boolean;
   mainSelector?: string;
   allowedHorizontalScrollTestIds?: readonly string[];
-  mobileTouchTargetSelectors?: readonly string[];
+  mobileTouchTargetSelectors?: readonly (string | MobileTouchTarget)[];
 };
 
 const BROWSER_ROUTES: readonly BrowserRoute[] = [
@@ -288,6 +324,8 @@ const BROWSER_ROUTES: readonly BrowserRoute[] = [
     path: actionsPath(),
     heading: "Action Queue",
     readySelector: '[data-testid="action-queue-row"]',
+    readySelectorCardinality: "one-or-more",
+    fixtureExpectedReadyCount: 2,
     criticalOperatingLoop: true,
     mobileTouchTargetSelectors: [
       '[aria-label="Status filter"]',
@@ -300,9 +338,30 @@ const BROWSER_ROUTES: readonly BrowserRoute[] = [
       '[aria-label="Previous page"]',
       '[aria-label="Next page"]',
       '[data-testid="action-queue-refresh-button"]',
-      '[data-testid="action-queue-row-approve"]',
-      '[data-testid="action-queue-row-simulate"]',
-      '[data-testid="action-queue-row-reject"]',
+      {
+        selector: '[data-testid="action-queue-row-approve"]',
+        cardinality: "one-or-more",
+      },
+      {
+        selector: '[data-testid="action-queue-row-simulate"]',
+        cardinality: "one-or-more",
+      },
+      {
+        selector: '[data-testid="action-queue-row-reject"]',
+        cardinality: "one-or-more",
+      },
+      {
+        selector: '[data-testid="action-queue-row-cancel-pending"]',
+        cardinality: "one-or-more",
+      },
+      {
+        selector: '[data-testid="action-queue-row-complete-reviewed"]',
+        cardinality: "one-or-more",
+      },
+      {
+        selector: '[data-testid="action-queue-row-cancel-reviewed"]',
+        cardinality: "one-or-more",
+      },
     ],
   },
   {
@@ -317,6 +376,7 @@ const BROWSER_ROUTES: readonly BrowserRoute[] = [
       '[data-testid="action-detail-approve"]',
       '[data-testid="action-detail-simulate"]',
       '[data-testid="action-detail-reject"]',
+      '[data-testid="action-detail-cancel"]',
     ],
   },
   {
@@ -527,7 +587,7 @@ function rowsForTable(table: string): unknown[] {
     case "diary_entries":
       return [PLANT_PHOTO_ENTRY];
     case "action_queue":
-      return [ACTION];
+      return [ACTION, REVIEWED_ACTION];
     case "ai_doctor_sessions":
       return [AI_SESSION];
     case "user_agreement_acceptances":
@@ -554,7 +614,33 @@ function rowsForTable(table: string): unknown[] {
   }
 }
 
+function rowsForRestRequest(table: string, url: URL): unknown[] {
+  const rows = rowsForTable(table);
+  if (table !== "action_queue") return rows;
+
+  const idFilter = url.searchParams.get("id");
+  if (!idFilter?.startsWith("eq.")) return rows;
+
+  const requestedId = idFilter.slice("eq.".length);
+  return rows.filter(
+    (row) =>
+      typeof row === "object" &&
+      row !== null &&
+      "id" in row &&
+      (row as { id?: unknown }).id === requestedId,
+  );
+}
+
 async function mockSignedInSupabase(page: Page) {
+  await page.route("https://fonts.googleapis.com/**", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "text/css",
+      body: FONT_FIXTURE_STYLESHEET,
+    }),
+  );
+  await page.route("https://fonts.gstatic.com/**", (route) => route.abort("blockedbyclient"));
+
   await page.route(/\/auth\/v1\//, async (route, request) => {
     if (/\/user(?:\?|$)/i.test(request.url())) {
       await route.fulfill({
@@ -570,7 +656,7 @@ async function mockSignedInSupabase(page: Page) {
   await page.route(/\/rest\/v1\//, async (route, request) => {
     const url = new URL(request.url());
     const table = url.pathname.match(/\/rest\/v1\/([^/]+)/i)?.[1] ?? "";
-    const rows = rowsForTable(table);
+    const rows = rowsForRestRequest(table, url);
     const headers = {
       "Access-Control-Allow-Origin": "*",
       "Content-Range": rows.length > 0 ? `0-${rows.length - 1}/${rows.length}` : "*/0",
@@ -609,6 +695,15 @@ async function mockSignedInSupabase(page: Page) {
 }
 
 async function waitForStableLayout(page: Page, mainSelector: string, routePath: string) {
+  await page.waitForFunction(
+    ({ property, value }) =>
+      getComputedStyle(document.documentElement).getPropertyValue(property).trim() === value,
+    { property: FONT_FIXTURE_PROPERTY, value: FONT_FIXTURE_VALUE },
+  );
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+  });
+
   let previousSignature: string | null = null;
   let stableSamples = 0;
 
@@ -970,6 +1065,24 @@ async function assertViewportFit(
   ).toEqual([]);
 }
 
+async function expectSelectorCardinality(
+  page: Page,
+  selector: string,
+  cardinality: LocatorCardinality,
+  message: string,
+): Promise<number> {
+  const locator = page.locator(selector);
+  if (cardinality === "exact-one") {
+    await expect(locator, message).toHaveCount(1);
+  } else {
+    await expect(locator.first(), message).toBeVisible();
+    expect(await locator.count(), message).toBeGreaterThanOrEqual(1);
+  }
+
+  await expect(locator.first(), message).toBeVisible();
+  return locator.count();
+}
+
 async function assertRouteFitsViewport(page: Page, route: BrowserRoute) {
   await page.goto(route.path, { waitUntil: "domcontentloaded" });
   await expect(page.getByRole("heading", { level: 1, name: route.heading })).toBeVisible();
@@ -980,32 +1093,49 @@ async function assertRouteFitsViewport(page: Page, route: BrowserRoute) {
     await expect(page.locator("main main")).toHaveCount(0);
   }
 
-  const ready = page.locator(route.readySelector);
-  await expect(
-    ready,
+  const readyCount = await expectSelectorCardinality(
+    page,
+    route.readySelector,
+    route.readySelectorCardinality ?? "exact-one",
     `${route.path} must reach ${route.readySelector} before measurement`,
-  ).toHaveCount(1);
-  await expect(ready).toBeVisible();
+  );
+  if (route.fixtureExpectedReadyCount !== undefined) {
+    expect(
+      readyCount,
+      `${route.path} fixture must render its expected ready-selector collection`,
+    ).toBe(route.fixtureExpectedReadyCount);
+  }
   await waitForStableLayout(page, mainSelector, route.path);
 
   await assertViewportFit(page, route);
 
   const viewport = page.viewportSize();
   if (viewport && viewport.width < 640) {
-    for (const selector of route.mobileTouchTargetSelectors ?? []) {
+    for (const target of route.mobileTouchTargetSelectors ?? []) {
+      const { selector, cardinality } =
+        typeof target === "string"
+          ? { selector: target, cardinality: "exact-one" as const }
+          : target;
       const controls = page.locator(selector);
-      await expect(
-        controls,
-        `${route.path} must render exactly one critical mobile control for ${selector}`,
-      ).toHaveCount(1);
-      const control = controls.first();
-      await expect(control, `${route.path} must render ${selector}`).toBeVisible();
-      const bounds = await control.boundingBox();
-      expect(bounds, `${route.path} ${selector} must have a box`).not.toBeNull();
-      expect(
-        bounds!.height,
-        `${route.path} ${selector} must be at least 44px on mobile`,
-      ).toBeGreaterThanOrEqual(44);
+      const controlCount = await expectSelectorCardinality(
+        page,
+        selector,
+        cardinality,
+        `${route.path} must render ${cardinality} critical mobile control(s) for ${selector}`,
+      );
+      for (let controlIndex = 0; controlIndex < controlCount; controlIndex += 1) {
+        const control = controls.nth(controlIndex);
+        await expect(control, `${route.path} must render ${selector}`).toBeVisible();
+        const bounds = await control.boundingBox();
+        expect(
+          bounds,
+          `${route.path} ${selector} #${controlIndex + 1} must have a box`,
+        ).not.toBeNull();
+        expect(
+          bounds!.height,
+          `${route.path} ${selector} #${controlIndex + 1} must be at least 44px on mobile`,
+        ).toBeGreaterThanOrEqual(44);
+      }
     }
   }
 }

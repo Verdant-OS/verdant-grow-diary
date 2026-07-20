@@ -1591,6 +1591,8 @@ export default function ActionQueue() {
                                   variant="ghost"
                                   disabled={disabled}
                                   onClick={() => cancelAction(row)}
+                                  className="min-h-11 min-w-0 whitespace-normal sm:min-h-9"
+                                  data-testid="action-queue-row-cancel-pending"
                                   aria-label={buildActionButtonAriaLabel("cancel", row, {
                                     disabledReason,
                                   })}
@@ -1762,6 +1764,8 @@ export default function ActionQueue() {
                                   variant="secondary"
                                   disabled={disabled}
                                   onClick={() => complete(row)}
+                                  className="min-h-11 min-w-0 whitespace-normal sm:min-h-9"
+                                  data-testid="action-queue-row-complete-reviewed"
                                   aria-label={buildActionButtonAriaLabel("complete", row, {
                                     disabledReason,
                                   })}
@@ -1776,6 +1780,8 @@ export default function ActionQueue() {
                                   variant="ghost"
                                   disabled={disabled}
                                   onClick={() => cancelAction(row)}
+                                  className="min-h-11 min-w-0 whitespace-normal sm:min-h-9"
+                                  data-testid="action-queue-row-cancel-reviewed"
                                   aria-label={buildActionButtonAriaLabel("cancel", row, {
                                     disabledReason,
                                   })}

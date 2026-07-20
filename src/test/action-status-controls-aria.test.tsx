@@ -183,11 +183,13 @@ describe("ActionDetail — status-control aria wiring", () => {
     expect(DETAIL).toMatch(/aria-label=\{buildStatusBadgeAriaLabel\(row\.status\)\}/);
   });
 
-  it("keeps pending decision controls directly selectable and touch-safe on mobile", () => {
+  it("keeps every detail decision control directly selectable and touch-safe on mobile", () => {
     for (const testId of [
       "action-detail-approve",
       "action-detail-simulate",
       "action-detail-reject",
+      "action-detail-complete",
+      "action-detail-cancel",
     ]) {
       const control = buttonOpeningTag(DETAIL, testId);
       expect(control, `${testId} must be a directly selectable Button`).toBeTruthy();

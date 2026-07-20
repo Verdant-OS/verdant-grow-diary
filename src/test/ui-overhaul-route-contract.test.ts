@@ -150,6 +150,25 @@ describe("Verdant UI overhaul route contract", () => {
     expect(exclusionsBlock.match(/contains:/g)).toHaveLength(12);
     expect(RESPONSIVE_SPEC).toContain("waitForStableLayout");
     expect(RESPONSIVE_SPEC).toMatch(/route\.readySelector/);
+
+    const stableLayoutBlock = RESPONSIVE_SPEC.slice(
+      RESPONSIVE_SPEC.indexOf("async function waitForStableLayout"),
+      RESPONSIVE_SPEC.indexOf("async function assertViewportFit"),
+    );
+    const fontMarkerIndex = stableLayoutBlock.indexOf("FONT_FIXTURE_PROPERTY");
+    const fontReadyIndex = stableLayoutBlock.indexOf("document.fonts.ready");
+    const signatureIndex = stableLayoutBlock.indexOf("const signature");
+
+    expect(RESPONSIVE_SPEC).toContain('page.route("https://fonts.googleapis.com/**"');
+    expect(RESPONSIVE_SPEC).toContain('page.route("https://fonts.gstatic.com/**"');
+    expect(fontMarkerIndex, "the fixture stylesheet marker must settle first").toBeGreaterThan(-1);
+    expect(fontReadyIndex, "document.fonts.ready must settle before sampling").toBeGreaterThan(
+      fontMarkerIndex,
+    );
+    expect(
+      signatureIndex,
+      "layout signatures must be sampled after font settlement",
+    ).toBeGreaterThan(fontReadyIndex);
   });
 
   it("connects the skip link to the single application main region", () => {

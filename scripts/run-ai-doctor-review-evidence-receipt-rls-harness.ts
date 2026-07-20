@@ -209,11 +209,13 @@ async function signedInClient(email: string, password: string): Promise<Supabase
 async function seedSpend(
   userId: string,
   feature: "ai_doctor_review" | "ai_coach",
+  growId: string | null = null,
 ): Promise<string> {
   const { data, error } = await admin
     .from("ai_credit_spends")
     .insert({
       user_id: userId,
+      grow_id: growId,
       period_key: periodKey,
       weight: 1,
       model_tier: "standard",
@@ -225,6 +227,19 @@ async function seedSpend(
     .single();
   if (error || !data?.id) throw new Error(`seed_spend_failed:${error?.code ?? "unknown"}`);
   return data.id;
+}
+
+async function monthlyUsedWeight(userId: string): Promise<number> {
+  const { data, error } = await admin
+    .from("ai_credit_spends")
+    .select("weight")
+    .eq("user_id", userId)
+    .eq("period_key", periodKey);
+  if (error) throw new Error(`read_monthly_weight_failed:${error.code ?? "unknown"}`);
+  return (data ?? []).reduce(
+    (total, row) => total + (typeof row.weight === "number" ? row.weight : 0),
+    0,
+  );
 }
 
 async function finalize(args: FinalizeArgs) {
@@ -312,6 +327,7 @@ async function cleanupStep(
 async function run(): Promise<void> {
   let uidA: string | null = null;
   let uidB: string | null = null;
+  let authUserADeleted = false;
   const cleanupFailures: string[] = [];
 
   try {
@@ -323,7 +339,20 @@ async function run(): Promise<void> {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    const reviewSpendId = await seedSpend(uidA, "ai_doctor_review");
+    const { data: grow, error: growError } = await admin
+      .from("grows")
+      .insert({
+        user_id: uidA,
+        name: `Evidence receipt lifecycle ${runId}`,
+        grow_type: "indoor",
+      })
+      .select("id")
+      .single();
+    if (growError || !grow?.id) {
+      throw new Error(`seed_grow_failed:${growError?.code ?? "missing_id"}`);
+    }
+    const growId = grow.id as string;
+    const reviewSpendId = await seedSpend(uidA, "ai_doctor_review", growId);
     const coachSpendId = await seedSpend(uidA, "ai_coach");
     const directDmlSpendId = await seedSpend(uidA, "ai_doctor_review");
     const args = buildFinalizeArgs(uidA, reviewSpendId, crypto.randomUUID());
@@ -538,6 +567,108 @@ async function run(): Promise<void> {
       const { data, error } = await anonymous.rpc("ai_doctor_finalize_review", args);
       check("anon client cannot invoke the finalizer", isDenied(error, data), error?.code);
     }
+
+    console.log("[ai-doctor-evidence-receipt] proving grow deletion preserves append-only history");
+    const monthlyWeightBeforeGrowDelete = await monthlyUsedWeight(uidA);
+    const { data: spendBeforeGrowDelete, error: spendBeforeGrowDeleteError } = await admin
+      .from("ai_credit_spends")
+      .select("id,user_id,grow_id,period_key,weight,status")
+      .eq("id", reviewSpendId)
+      .single();
+    const pairBeforeGrowDelete = await readPair(reviewSpendId);
+    if (
+      spendBeforeGrowDeleteError ||
+      spendBeforeGrowDelete?.grow_id !== growId ||
+      !hasIntactPair(pairBeforeGrowDelete, args)
+    ) {
+      throw new Error(
+        `grow_delete_precondition_failed:${spendBeforeGrowDeleteError?.code ?? "invalid_fixture"}`,
+      );
+    }
+
+    const { error: growDeleteError } = await owner
+      .from("grows")
+      .delete()
+      .eq("id", growId)
+      .eq("user_id", uidA);
+    const { count: growCountAfterDelete, error: growCountError } = await admin
+      .from("grows")
+      .select("id", { count: "exact", head: true })
+      .eq("id", growId);
+    check(
+      "grow deletion removes the grow row without a database error",
+      !growDeleteError && !growCountError && growCountAfterDelete === 0,
+      growDeleteError?.code ?? growCountError?.code,
+    );
+
+    const { data: spendAfterGrowDelete, error: spendAfterGrowDeleteError } = await admin
+      .from("ai_credit_spends")
+      .select("id,user_id,grow_id,period_key,weight,status")
+      .eq("id", reviewSpendId)
+      .single();
+    check(
+      "grow deletion preserves the spend and its historical grow_id",
+      !spendAfterGrowDeleteError &&
+        spendAfterGrowDelete?.id === spendBeforeGrowDelete.id &&
+        spendAfterGrowDelete?.user_id === uidA &&
+        spendAfterGrowDelete?.grow_id === growId &&
+        spendAfterGrowDelete?.period_key === spendBeforeGrowDelete.period_key &&
+        spendAfterGrowDelete?.weight === spendBeforeGrowDelete.weight &&
+        spendAfterGrowDelete?.status === spendBeforeGrowDelete.status,
+      spendAfterGrowDeleteError?.code,
+    );
+
+    const monthlyWeightAfterGrowDelete = await monthlyUsedWeight(uidA);
+    check(
+      "grow deletion preserves the monthly used credit weight",
+      monthlyWeightAfterGrowDelete === monthlyWeightBeforeGrowDelete,
+      JSON.stringify({ monthlyWeightBeforeGrowDelete, monthlyWeightAfterGrowDelete }),
+    );
+
+    const pairAfterGrowDelete = await readPair(reviewSpendId);
+    const [cacheRowsAfterGrowDelete, receiptRowsAfterGrowDelete] = await Promise.all([
+      cacheCount(reviewSpendId),
+      receiptCount(reviewSpendId),
+    ]);
+    check(
+      "grow deletion preserves the result-cache row and evidence receipt pair",
+      cacheRowsAfterGrowDelete === 1 &&
+        receiptRowsAfterGrowDelete === 1 &&
+        hasIntactPair(pairAfterGrowDelete, args),
+      pairAfterGrowDelete.cacheResponse.error?.code ??
+        pairAfterGrowDelete.receiptResponse.error?.code,
+    );
+
+    console.log(
+      "[ai-doctor-evidence-receipt] proving account deletion still cleans protected history",
+    );
+    const { error: accountDeleteError } = await admin.auth.admin.deleteUser(uidA);
+    authUserADeleted = !accountDeleteError;
+    check(
+      "account deletion succeeds after grow deletion",
+      !accountDeleteError,
+      accountDeleteError?.code,
+    );
+    const [
+      spendCountAfterAccountDelete,
+      cacheCountAfterAccountDelete,
+      receiptCountAfterAccountDelete,
+    ] = await Promise.all([
+      admin
+        .from("ai_credit_spends")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", uidA),
+      cacheCount(reviewSpendId),
+      receiptCount(reviewSpendId),
+    ]);
+    check(
+      "account deletion removes the spend, result-cache row, and evidence receipt",
+      !spendCountAfterAccountDelete.error &&
+        spendCountAfterAccountDelete.count === 0 &&
+        cacheCountAfterAccountDelete === 0 &&
+        receiptCountAfterAccountDelete === 0,
+      spendCountAfterAccountDelete.error?.code,
+    );
   } finally {
     console.log("[ai-doctor-evidence-receipt] tearing down disposable test rows");
     const userIds = [uidA, uidB].filter((id): id is string => Boolean(id));
@@ -548,11 +679,17 @@ async function run(): Promise<void> {
         cleanupFailures,
       );
       await cleanupStep(
+        "grow rows",
+        () => admin.from("grows").delete().in("user_id", userIds),
+        cleanupFailures,
+      );
+      await cleanupStep(
         "profile rows",
         () => admin.from("profiles").delete().in("user_id", userIds),
         cleanupFailures,
       );
       for (const userId of userIds) {
+        if (userId === uidA && authUserADeleted) continue;
         await cleanupStep("auth user", () => admin.auth.admin.deleteUser(userId), cleanupFailures);
       }
     }

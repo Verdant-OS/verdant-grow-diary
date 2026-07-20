@@ -381,4 +381,76 @@ describe("static route head fidelity helpers", () => {
       expect(jsonLdFields.every((f: any) => f.ok)).toBe(true);
     });
   });
+
+  describe("attribute parser: mixed quotes and HTML entities", () => {
+    it("parses single-quoted meta content when the value contains a double quote", () => {
+      const html = `<!doctype html><html><head>
+        <title>ok</title>
+        <meta name='description' content='He said "hi" to growers' />
+      </head></html>`;
+      const head = extractHead(html);
+      expect(head.metas.get("name:description")).toBe('He said "hi" to growers');
+    });
+
+    it("parses double-quoted meta content containing an apostrophe via entity", () => {
+      const html = `<!doctype html><html><head>
+        <title>ok</title>
+        <meta name="description" content="Paddle&#39;s role as MoR" />
+        <meta property="og:description" content="Paddle&apos;s role as MoR" />
+        <meta name="twitter:description" content="Paddle&#x27;s role as MoR" />
+      </head></html>`;
+      const head = extractHead(html);
+      expect(head.metas.get("name:description")).toBe("Paddle's role as MoR");
+      expect(head.metas.get("property:og:description")).toBe("Paddle's role as MoR");
+      expect(head.metas.get("name:twitter:description")).toBe("Paddle's role as MoR");
+    });
+
+    it("decodes &amp;, &quot;, &lt;, &gt;, &nbsp; in meta content", () => {
+      const html = `<!doctype html><html><head><title>ok</title>
+        <meta name="description" content="A &amp; B &quot;quoted&quot; &lt;tag&gt;&nbsp;end" />
+      </head></html>`;
+      const head = extractHead(html);
+      expect(head.metas.get("name:description")).toBe('A & B "quoted" <tag>\u00a0end');
+    });
+
+    it("leaves unknown named entities intact so drift stays visible", () => {
+      const html = `<!doctype html><html><head><title>ok</title>
+        <meta name="description" content="unknown &fakeentity; here" />
+      </head></html>`;
+      const head = extractHead(html);
+      expect(head.metas.get("name:description")).toBe("unknown &fakeentity; here");
+    });
+
+    it("handles unquoted attribute values", () => {
+      const html = `<!doctype html><html><head><title>ok</title>
+        <meta name=robots content=noindex,follow>
+        <link rel=canonical href=https://verdantgrowdiary.com/x>
+      </head></html>`;
+      const head = extractHead(html);
+      expect(head.metas.get("name:robots")).toBe("noindex,follow");
+      expect(head.canonical).toBe("https://verdantgrowdiary.com/x");
+    });
+
+    it("tolerates whitespace and mixed quoting around attribute equals", () => {
+      const html = `<!doctype html><html><head><title>ok</title>
+        <meta  name = "og:title"   property = 'og:title'  content =  "Verdant &amp; Co" />
+      </head></html>`;
+      const head = extractHead(html);
+      // name wins over property in our lookup order, but both should resolve.
+      expect(head.metas.get("name:og:title")).toBe("Verdant & Co");
+    });
+
+    it("does not truncate content containing embedded apostrophes (Paddle regression)", () => {
+      const html = fixtureHtml({
+        description: "Paddle&#39;s role as Merchant of Record payment processor.",
+      });
+      const head = extractHead(html);
+      expect(head.metas.get("name:twitter:description")).toBe(
+        "Paddle's role as Merchant of Record payment processor.",
+      );
+      expect(head.metas.get("property:og:description")).toBe(
+        "Paddle's role as Merchant of Record payment processor.",
+      );
+    });
+  });
 });

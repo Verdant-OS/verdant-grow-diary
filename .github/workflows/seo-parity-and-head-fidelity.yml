@@ -37,6 +37,15 @@ jobs:
       - name: Sitemap parity + head-fidelity helper tests
         run: bunx vitest run src/test/sitemap-public-route-parity.test.ts src/test/static-route-head-fidelity.test.ts --reporter=dot
 
+      # Per-guide head-tag regression gate — asserts every entry in
+      # VERDANT_SEO_GUIDES (and the Glossary) ships a correct title,
+      # meta description, self-referential canonical, Open Graph
+      # (og:title/description/url/type), and Twitter card metadata.
+      # A new or edited guide that drops or drifts any of these tags
+      # fails this step and blocks the PR.
+      - name: Guides + Glossary head-tag invariants (title, canonical, OG, Twitter)
+        run: bunx vitest run src/test/verdant-guides-glossary-head-invariants.test.ts src/test/verdant-seo-guides.test.ts src/test/verdant-seo-guides-render.test.tsx src/test/verdant-seo-structured-data.test.ts src/test/verdant-seo-sitemap-robots.test.ts --reporter=dot
+
       # Full production build; the postbuild hook runs
       # validate-static-route-head-fidelity.mjs and writes the
       # per-route diff report used below.

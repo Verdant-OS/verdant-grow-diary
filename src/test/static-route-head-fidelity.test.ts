@@ -269,6 +269,7 @@ describe("static route head fidelity helpers", () => {
       expect(creator!.expected).toBe(null);
       expect(creator!.actual).toBe("@rogue_handle");
     });
+  });
 
   describe("Schema.org JSON-LD invariants", () => {
     it("extractJsonLd parses every ld+json block on the page", () => {

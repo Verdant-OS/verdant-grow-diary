@@ -1136,8 +1136,10 @@ export default function McpToolExplorer() {
         }
         fieldErrors={tentIdTouched ? sensorErrors : []}
         onApplyArgs={(args) => {
-          setTentId(typeof args.tentId === "string" ? args.tentId : "");
+          const nextTentId = typeof args.tentId === "string" ? args.tentId : "";
+          setTentId(nextTentId);
           setTentIdTouched(true);
+          saveLastValidInputs("get_latest_sensor_snapshot", { tentId: nextTentId });
         }}
         buildArgs={() => ({ tentId: tentId.trim() })}
       >

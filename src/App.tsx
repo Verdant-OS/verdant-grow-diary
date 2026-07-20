@@ -82,6 +82,12 @@ const EcowittBridgeDebug = lazy(() => import("./pages/EcowittBridgeDebug"));
 const OneTentProofRecord = lazy(() => import("./pages/OneTentProofRecord"));
 const ActionDetail = lazy(() => import("./pages/ActionDetail"));
 const GrowLineageRepair = lazy(() => import("./pages/GrowLineageRepair"));
+// Genetics & Propagation Traceability (owner-scoped, RLS-protected).
+const GeneticsLibrary = lazy(() => import("./pages/GeneticsLibrary"));
+const AccessionDetail = lazy(() => import("./pages/AccessionDetail"));
+const PropagationBatchDetail = lazy(() => import("./pages/PropagationBatchDetail"));
+const TraceabilityView = lazy(() => import("./pages/TraceabilityView"));
+const ScreeningQuarantineHistory = lazy(() => import("./pages/ScreeningQuarantineHistory"));
 // GrowRoomMode (legacy Live Dashboard) consolidated into Dashboard; /grow-room redirects.
 const DailyCheck = lazy(() => import("./pages/DailyCheck"));
 const Landing = lazy(() => import("./pages/Landing"));
@@ -352,6 +358,11 @@ const App = () => (
                         bookmarks, docs, and external links working. */}
                     <Route path="/action-queue" element={<Navigate to="/actions" replace />} />
                     <Route path="/grow-lineage" element={<GrowLineageRepair />} />
+                    <Route path="/genetics" element={<GeneticsLibrary />} />
+                    <Route path="/genetics/accessions/:id" element={<AccessionDetail />} />
+                    <Route path="/genetics/batches/:id" element={<PropagationBatchDetail />} />
+                    <Route path="/genetics/trace/:kind/:id" element={<TraceabilityView />} />
+                    <Route path="/genetics/health/:kind/:id" element={<ScreeningQuarantineHistory />} />
                     <Route path="/grows" element={<Grows />} />
                     <Route path="/grows/:growId" element={<GrowDetail />} />
                     <Route path="/grows/:growId/learning" element={<GrowLearning />} />

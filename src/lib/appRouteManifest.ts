@@ -153,6 +153,18 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     access: "public",
     description: "Public Founder Lifetime acquisition and offer explainer.",
   },
+  {
+    path: "/genetics",
+    access: "auth",
+    label: "Genetics",
+    showInNav: true,
+    description:
+      "Genetics Library: accessions, propagation batches, screening/quarantine evidence, and lineage traceability (owner-scoped, RLS-protected).",
+  },
+  { path: "/genetics/accessions/:id", access: "auth" },
+  { path: "/genetics/batches/:id", access: "auth" },
+  { path: "/genetics/health/:kind/:id", access: "auth" },
+  { path: "/genetics/trace/:kind/:id", access: "auth" },
   { path: "/glossary", access: "public", description: "Public grower glossary (SEO)." },
   {
     path: "/grow-lineage",

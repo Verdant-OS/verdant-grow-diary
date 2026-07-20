@@ -100,6 +100,7 @@ const growerGroups: { label: string; items: NavItem[] }[] = [
       { to: "/reports", label: "Reports", icon: LineChart },
       { to: "/grows", label: "My Grows", icon: Sprout },
       { to: "/pheno-hunts", label: "Pheno Hunt", icon: Dna },
+      { to: "/genetics", label: "Genetics", icon: Dna },
       // /grow-lineage is manifest access "auth" (grower-facing repair tool).
       // Owner-scoped reads/writes only, RLS-protected. MUST stay visible to
       // every authenticated grower — do not gate behind operator role.

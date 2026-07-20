@@ -158,6 +158,7 @@ export function EnvironmentCsvImportLauncher(props: EnvironmentCsvImportLauncher
             : `${res.insertedCount} reading(s) added as CSV context.`;
         toast({ title: "CSV history imported", description });
         trackFunnelEvent("csv_import_completed", { rows: res.insertedCount });
+        qc.invalidateQueries({ queryKey: ["grow", "sensors"] });
         qc.invalidateQueries({ queryKey: ["sensor_readings"] });
         qc.invalidateQueries({ queryKey: ["csv-timeline-context"] });
         if (typeof window !== "undefined") {

@@ -15,13 +15,14 @@ vi.mock("@/lib/funnelAnalytics", () => ({ trackFunnelEvent }));
 import EnvironmentCsvImportLauncher from "@/components/EnvironmentCsvImportLauncher";
 
 const insertSpy = vi.fn();
+let insertError: { message: string; code?: string; details?: string } | null = null;
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: () => ({
       insert: (rows: unknown) => {
         insertSpy(rows);
-        return Promise.resolve({ error: null });
+        return Promise.resolve({ error: insertError });
       },
     }),
   },
@@ -31,13 +32,16 @@ vi.mock("@/store/auth", () => ({
   useAuth: () => ({ user: { id: "u-1" }, session: null, loading: false, signOut: vi.fn() }),
 }));
 
-function withQuery(ui: React.ReactElement) {
-  const qc = new QueryClient();
+function withQuery(ui: React.ReactElement, qc = new QueryClient()) {
   return <QueryClientProvider client={qc}>{ui}</QueryClientProvider>;
 }
 
 describe("EnvironmentCsvImportLauncher — mounting", () => {
-  beforeEach(() => trackFunnelEvent.mockReset());
+  beforeEach(() => {
+    trackFunnelEvent.mockReset();
+    insertSpy.mockReset();
+    insertError = null;
+  });
 
   it("renders calm message when no grow/tent selected (test 1, 6)", () => {
     render(
@@ -92,8 +96,11 @@ describe("EnvironmentCsvImportLauncher — mounting", () => {
   });
 
   it("Confirm CTA is the only insert path; payload uses source = csv (tests 10, 11, 12)", async () => {
-    insertSpy.mockClear();
-    render(withQuery(<EnvironmentCsvImportLauncher growId="g1" tentId="t1" testIdPrefix="x" />));
+    const qc = new QueryClient();
+    const invalidateSpy = vi.spyOn(qc, "invalidateQueries");
+    render(
+      withQuery(<EnvironmentCsvImportLauncher growId="g1" tentId="t1" testIdPrefix="x" />, qc),
+    );
     fireEvent.click(screen.getByTestId("x-button"));
     // upload a simple valid CSV with explicit Celsius header
     const input = screen.getByTestId("csv-import-file-input") as HTMLInputElement;
@@ -120,11 +127,17 @@ describe("EnvironmentCsvImportLauncher — mounting", () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows.every((r) => r.source === "csv")).toBe(true);
     expect(rows.every((r) => r.raw_payload.source_tag === "csv")).toBe(true);
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["grow", "sensors"] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["sensor_readings"] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["csv-timeline-context"] });
   });
 
   it("Cancel does not insert (test 8)", async () => {
-    insertSpy.mockClear();
-    render(withQuery(<EnvironmentCsvImportLauncher growId="g1" tentId="t1" testIdPrefix="x" />));
+    const qc = new QueryClient();
+    const invalidateSpy = vi.spyOn(qc, "invalidateQueries");
+    render(
+      withQuery(<EnvironmentCsvImportLauncher growId="g1" tentId="t1" testIdPrefix="x" />, qc),
+    );
     fireEvent.click(screen.getByTestId("x-button"));
     const input = screen.getByTestId("csv-import-file-input") as HTMLInputElement;
     const file = new File(
@@ -137,7 +150,33 @@ describe("EnvironmentCsvImportLauncher — mounting", () => {
     await waitFor(() => expect(screen.queryByTestId("csv-import-preview")).toBeTruthy());
     fireEvent.click(screen.getByTestId("csv-import-cancel"));
     expect(insertSpy).not.toHaveBeenCalled();
+    expect(invalidateSpy).not.toHaveBeenCalled();
     expect(trackFunnelEvent).toHaveBeenCalledWith("csv_import_started");
+    expect(trackFunnelEvent).not.toHaveBeenCalledWith("csv_import_completed", expect.anything());
+  });
+
+  it("failed persistence does not invalidate sensor chart caches", async () => {
+    insertError = { message: "Insert failed", code: "PGRST500" };
+    const qc = new QueryClient();
+    const invalidateSpy = vi.spyOn(qc, "invalidateQueries");
+    render(
+      withQuery(<EnvironmentCsvImportLauncher growId="g1" tentId="t1" testIdPrefix="x" />, qc),
+    );
+    fireEvent.click(screen.getByTestId("x-button"));
+    const input = screen.getByTestId("csv-import-file-input") as HTMLInputElement;
+    const file = new File(
+      ["Timestamp,Temperature (C),RH (%)\n2026-06-01T10:00:00Z,25,50\n"],
+      "e.csv",
+      { type: "text/csv" },
+    );
+    Object.defineProperty(input, "files", { value: [file] });
+    fireEvent.change(input);
+    await waitFor(() => expect(screen.queryByTestId("csv-import-preview")).toBeTruthy());
+    fireEvent.click(screen.getByTestId("csv-import-confirm"));
+    await waitFor(() => expect(screen.getByTestId("csv-import-error")).toBeTruthy());
+
+    expect(insertSpy).toHaveBeenCalled();
+    expect(invalidateSpy).not.toHaveBeenCalled();
     expect(trackFunnelEvent).not.toHaveBeenCalledWith("csv_import_completed", expect.anything());
   });
 });

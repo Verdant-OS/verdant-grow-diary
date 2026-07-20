@@ -312,7 +312,8 @@ export function diffRouteHead(head, entry) {
     ok: c.actual === c.expected,
   }));
   const policyIssues = policyChecks(head);
-  const allFields = [...fields, ...policyIssues];
+  const jsonLdIssues = jsonLdChecks(head);
+  const allFields = [...fields, ...policyIssues, ...jsonLdIssues];
   const mismatched = allFields.filter((f) => !f.ok);
   return {
     path: entry.path,

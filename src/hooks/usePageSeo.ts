@@ -55,7 +55,14 @@ function upsertLink(rel: string, href: string) {
 }
 
 export function usePageSeo(seo: PageSeo): void {
-  const { title, description, path, ogImage = DEFAULT_OG_IMAGE, noindex = false } = seo;
+  const {
+    title,
+    description,
+    path,
+    ogImage = DEFAULT_OG_IMAGE,
+    ogType = "website",
+    noindex = false,
+  } = seo;
 
   useEffect(() => {
     const url = path.startsWith("http") ? path : `${SITE_ORIGIN}${path}`;
@@ -76,7 +83,7 @@ export function usePageSeo(seo: PageSeo): void {
     upsertMeta('meta[property="og:url"]', "property", "og:url", url);
     upsertMeta('meta[property="og:image"]', "property", "og:image", ogImage);
     upsertMeta('meta[property="og:site_name"]', "property", "og:site_name", SITE_NAME);
-    upsertMeta('meta[property="og:type"]', "property", "og:type", "website");
+    upsertMeta('meta[property="og:type"]', "property", "og:type", ogType);
 
     upsertMeta('meta[name="twitter:title"]', "name", "twitter:title", title);
     upsertMeta('meta[name="twitter:description"]', "name", "twitter:description", description);
@@ -104,6 +111,7 @@ export function usePageSeo(seo: PageSeo): void {
       );
       upsertMeta('meta[property="og:url"]', "property", "og:url", SITE_ORIGIN);
       upsertMeta('meta[property="og:image"]', "property", "og:image", DEFAULT_OG_IMAGE);
+      upsertMeta('meta[property="og:type"]', "property", "og:type", "website");
       upsertMeta('meta[name="twitter:title"]', "name", "twitter:title", SITE_NAME);
       upsertMeta(
         'meta[name="twitter:description"]',
@@ -114,5 +122,5 @@ export function usePageSeo(seo: PageSeo): void {
       upsertMeta('meta[name="twitter:image"]', "name", "twitter:image", DEFAULT_OG_IMAGE);
       void prevTitle;
     };
-  }, [title, description, path, ogImage, noindex]);
+  }, [title, description, path, ogImage, ogType, noindex]);
 }

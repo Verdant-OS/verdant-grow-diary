@@ -10,8 +10,10 @@ import {
   ArrowRight,
   Sparkles,
   Gauge,
+  AlertTriangle,
+  LoaderCircle,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/PageHeader";
 import StageBadge from "@/components/StageBadge";
 import EmptyState from "@/components/EmptyState";
@@ -24,6 +26,7 @@ import PlantPhoto from "@/components/PlantPhoto";
 import PlantCardActionsMenu from "@/components/PlantCardActionsMenu";
 import InfoPopover, { HELP_COPY } from "@/components/InfoPopover";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useGrowPlants, useGrowTents, getGrowDataMeta } from "@/hooks/useGrowData";
 import { useAuth } from "@/store/auth";
@@ -50,11 +53,24 @@ import {
 import { buildPlantsTentFilterChips } from "@/lib/plantsTentFilterChipsRules";
 import { buildDashboardDailyGrowCheckPanel } from "@/lib/dashboardDailyGrowCheckPanelRules";
 import { buildDailyCheckEntryHref } from "@/lib/dailyCheckPostSubmitRules";
+import {
+  classifyPlantsScopeState,
+  classifyPlantsPageAsyncState,
+  PLANTS_SUPPLEMENTAL_QUERY_LABELS,
+  resolvePlantsTentFilter,
+  selectCurrentPlantsQueryData,
+  snapshotPlantsQuery,
+  type PlantsSupplementalQueryKey,
+} from "@/lib/plantsPageAsyncStateRules";
 import { isOneTentActivationIntent } from "@/lib/connectedOneTentActivationRules";
 import {
   buildPlantQuickLogPrefill,
   PLANT_QUICKLOG_PREFILL_EVENT,
 } from "@/lib/plantQuickLogPrefillRules";
+
+// Stable fail-closed fallback for unset/placeholder query data. Keeping this
+// outside render prevents false dependency changes in the derived view models.
+const EMPTY_QUERY_ROWS: never[] = [];
 
 function formatPlantHealthLabel(health: string | null | undefined): string {
   return `Plant health: ${health ?? "unknown"}`;
@@ -69,23 +85,42 @@ export default function Plants() {
   const { user } = useAuth();
   const { urlGrowId, scopedGrowName, isValidScopedGrow, backHref } = useScopedGrow();
   const navigate = useNavigate();
-  const { grows } = useGrows();
-  const validGrowId = isValidScopedGrow ? (urlGrowId ?? undefined) : undefined;
+  const {
+    grows,
+    loading: growsLoading = false,
+    error: growsError = null,
+    refresh: refreshGrows,
+  } = useGrows();
+  const validGrowId = isValidScopedGrow ? urlGrowId ?? undefined : undefined;
+  const scopeState = classifyPlantsScopeState({
+    hasRequestedGrow: !!urlGrowId,
+    isLoading: growsLoading,
+    hasError: !!growsError,
+    isValid: isValidScopedGrow,
+  });
   const [showArchived, setShowArchived] = useState(false);
   const [search, setSearch] = useState("");
   const activePlantsQuery = useGrowPlants(undefined, urlGrowId ?? undefined);
-  const { data: activePlants = [] } = activePlantsQuery;
   const allPlantsQuery = useGrowPlants(undefined, urlGrowId ?? undefined, {
     includeArchived: true,
   });
-  const { data: allPlants = [] } = allPlantsQuery;
   // Cross-grow plant list (for grow-filter option counts). Scoped to active
   // (non-archived/merged) plants — the grow filter intentionally only counts
   // plants growers normally work with.
-  const allGrowsActivePlantsQuery = useGrowPlants(undefined, undefined);
-  const { data: allGrowsActivePlants = [] } = allGrowsActivePlantsQuery;
+  const workspacePlantsQuery = useGrowPlants(undefined, undefined);
   const tentsQuery = useGrowTents(urlGrowId ?? undefined);
-  const { data: tents = [] } = tentsQuery;
+  const diaryQuery = useDiaryEntries();
+  const sensorReadingsQuery = useSensorReadings(undefined, 500);
+  const activePlants = selectCurrentPlantsQueryData(activePlantsQuery) ?? EMPTY_QUERY_ROWS;
+  const allPlants = selectCurrentPlantsQueryData(allPlantsQuery) ?? EMPTY_QUERY_ROWS;
+  const allGrowsActivePlants =
+    selectCurrentPlantsQueryData(workspacePlantsQuery) ?? EMPTY_QUERY_ROWS;
+  const tents = selectCurrentPlantsQueryData(tentsQuery) ?? EMPTY_QUERY_ROWS;
+  const rawDiary = selectCurrentPlantsQueryData(diaryQuery) ?? EMPTY_QUERY_ROWS;
+  const rawReadings = selectCurrentPlantsQueryData(sensorReadingsQuery) ?? EMPTY_QUERY_ROWS;
+  // One-tent onboarding activation handoff (feat #367): when arriving with the
+  // activation intent and a tent that resolves inside the scoped grow, the
+  // create dialog opens pre-scoped to that tent.
   const requestedActivationTentId = searchParams.get("tentId");
   const activationTent =
     validGrowId && isOneTentActivationIntent(searchParams.get("intent"))
@@ -94,24 +129,35 @@ export default function Plants() {
         ) ?? null)
       : null;
   const activationIntent = !!activationTent;
-  const growDataQueries = [
-    activePlantsQuery,
-    allPlantsQuery,
-    allGrowsActivePlantsQuery,
-    tentsQuery,
-  ];
-  const growDataError = growDataQueries.some((query) => query.isError);
-  const growDataLoading = growDataQueries.some((query) => query.isLoading);
-  const rawDiaryQuery = useDiaryEntries();
-  const { data: rawDiary = [] } = rawDiaryQuery;
-  const rawReadingsQuery = useSensorReadings(undefined, 500);
-  const { data: rawReadings = [] } = rawReadingsQuery;
-  const dailyCheckEvidenceError = rawDiaryQuery.isError || rawReadingsQuery.isError;
-  const dailyCheckEvidenceLoading = rawDiaryQuery.isLoading || rawReadingsQuery.isLoading;
+  const plantsAsyncState = classifyPlantsPageAsyncState({
+    primary: snapshotPlantsQuery(allPlantsQuery),
+    supplemental: [
+      { key: "active", query: snapshotPlantsQuery(activePlantsQuery) },
+      { key: "workspace", query: snapshotPlantsQuery(workspacePlantsQuery) },
+      { key: "tents", query: snapshotPlantsQuery(tentsQuery) },
+      { key: "diary", query: snapshotPlantsQuery(diaryQuery) },
+      { key: "sensors", query: snapshotPlantsQuery(sensorReadingsQuery) },
+    ],
+  });
+  // Daily-check evidence stays fail-closed (sensor-truth hardening): when the
+  // diary or sensor reads error or are still loading, daily-check status is
+  // withheld rather than assumed empty.
+  const dailyCheckEvidenceError = diaryQuery.isError || sensorReadingsQuery.isError;
+  const dailyCheckEvidenceLoading = diaryQuery.isLoading || sensorReadingsQuery.isLoading;
   const dailyCheckEvidenceReady = !dailyCheckEvidenceError && !dailyCheckEvidenceLoading;
   const plantsMeta = getGrowDataMeta(["grow", "plants", "all", urlGrowId ?? "all"], user?.id);
   const tentsMeta = getGrowDataMeta(["grow", "tents", urlGrowId ?? "all"], user?.id);
   const [tentFilter, setTentFilter] = useState<string>("all");
+  const effectiveTentFilter = resolvePlantsTentFilter(
+    tentFilter,
+    tents.map((tent) => tent.id),
+  );
+
+  // The state reset keeps the visible selection canonical after navigation;
+  // effectiveTentFilter already fails closed during the first new-scope render.
+  useEffect(() => {
+    setTentFilter("all");
+  }, [urlGrowId]);
 
   // Daily Grow Check: derive checked-today per plant using the same rules
   // module Dashboard and Plant Detail use. Read-only; never invents state.
@@ -166,9 +212,9 @@ export default function Plants() {
   // tent tab → plant search. Each step is independent and labeled in the UI.
   const visibleAfterArchive = filterVisiblePlants(allPlants, { showArchived });
   const visibleAfterTent =
-    tentFilter === "all"
+    effectiveTentFilter === "all"
       ? visibleAfterArchive
-      : visibleAfterArchive.filter((p) => p.tentId === tentFilter);
+      : visibleAfterArchive.filter((p) => p.tentId === effectiveTentFilter);
   const filtered = filterPlantsBySearch(visibleAfterTent, search, tents);
 
   // Filter chips — counts MUST match what the grid will render under the
@@ -199,37 +245,8 @@ export default function Plants() {
     navigate(value ? plantsPath(value) : plantsPath());
   };
 
-  if (growDataError || growDataLoading) {
-    return (
-      <div>
-        <GrowBreadcrumbs
-          growId={urlGrowId}
-          growName={scopedGrowName}
-          current="Plants"
-          section="plants"
-        />
-        <PageHeader
-          title="Plants"
-          description="Every plant you're tracking, across every tent."
-          icon={<Sprout className="h-5 w-5" />}
-        />
-        {growDataError ? (
-          <GrowDataLoadError
-            resource="Plant data"
-            testId="plants-grow-data-error"
-            onRetry={() => {
-              void Promise.all(growDataQueries.map((query) => query.refetch()));
-            }}
-          />
-        ) : (
-          <GrowDataLoadingState resource="Plant data" testId="plants-grow-data-loading" />
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <div>
+  const pageLead = (
+    <>
       <GrowBreadcrumbs
         growId={urlGrowId}
         growName={scopedGrowName}
@@ -241,36 +258,147 @@ export default function Plants() {
         description="Every plant you're tracking, across every tent."
         icon={<Sprout className="h-5 w-5" />}
         actions={
-          <CreatePlantDialog
-            key={activationIntent ? "one-tent-activation" : "standard-create"}
-            defaultGrowId={validGrowId}
-            defaultTentId={activationTent?.id}
-            requireTent={activationIntent}
-            initiallyOpen={activationIntent}
-            onCreated={
-              activationIntent && validGrowId && activationTent
-                ? (plant) => {
-                    const prefill = buildPlantQuickLogPrefill({
-                      plantId: plant.id,
-                      plantName: plant.name,
-                      growId: validGrowId,
-                      tentId: activationTent.id,
-                      tentName: activationTent.name,
-                    });
-                    navigate(dashboardPath(validGrowId));
-                    if (prefill && typeof window !== "undefined") {
-                      window.dispatchEvent(
-                        new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, {
-                          detail: prefill,
-                        }),
-                      );
+          scopeState === "unscoped" || scopeState === "valid" ? (
+            <CreatePlantDialog
+              key={activationIntent ? "one-tent-activation" : "standard-create"}
+              defaultGrowId={validGrowId}
+              defaultTentId={activationTent?.id}
+              requireTent={activationIntent}
+              initiallyOpen={activationIntent}
+              onCreated={
+                activationIntent && validGrowId && activationTent
+                  ? (plant) => {
+                      const prefill = buildPlantQuickLogPrefill({
+                        plantId: plant.id,
+                        plantName: plant.name,
+                        growId: validGrowId,
+                        tentId: activationTent.id,
+                        tentName: activationTent.name,
+                      });
+                      navigate(dashboardPath(validGrowId));
+                      if (prefill && typeof window !== "undefined") {
+                        window.dispatchEvent(
+                          new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, {
+                            detail: prefill,
+                          }),
+                        );
+                      }
                     }
-                  }
-                : undefined
-            }
-          />
+                  : undefined
+              }
+            />
+          ) : null
         }
       />
+    </>
+  );
+
+  const renderLoading = (reason: "scope" | "plants") => (
+    <div>
+      {pageLead}
+      <div
+        role="status"
+        aria-live="polite"
+        aria-busy="true"
+        data-testid="plants-loading"
+        data-loading-reason={reason}
+        className="glass rounded-2xl min-h-48 p-6 flex items-center justify-center text-center"
+      >
+        <div className="space-y-2">
+          <LoaderCircle className="h-6 w-6 animate-spin text-primary mx-auto" aria-hidden="true" />
+          <p className="font-medium">Loading plants…</p>
+          <p className="text-sm text-muted-foreground">
+            {reason === "scope"
+              ? "Confirming the selected grow before enabling plant actions."
+              : "Confirming the selected grow before showing plant records."}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+
+  if (scopeState === "loading") return renderLoading("scope");
+
+  if (scopeState === "error") {
+    return (
+      <div>
+        {pageLead}
+        <EmptyState
+          icon={<AlertTriangle className="h-6 w-6" />}
+          title="Grow scope unavailable"
+          description="We couldn't verify the selected grow. Plant actions stay disabled until that grow is confirmed."
+          action={
+            typeof refreshGrows === "function" ? (
+              <Button
+                type="button"
+                variant="outline"
+                data-testid="plants-retry-scope"
+                onClick={() => void refreshGrows()}
+              >
+                Retry grow scope
+              </Button>
+            ) : undefined
+          }
+        />
+      </div>
+    );
+  }
+
+  if (scopeState === "invalid") {
+    return (
+      <div>
+        {pageLead}
+        <EmptyState
+          icon={<AlertTriangle className="h-6 w-6" />}
+          title="Grow unavailable"
+          description="This grow could not be found in your account. No other grow was selected in its place."
+          action={
+            <Button asChild variant="outline">
+              <Link to={plantsPath()}>View all plants</Link>
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
+
+  if (plantsAsyncState.kind === "loading") return renderLoading("plants");
+
+  if (plantsAsyncState.kind === "error") {
+    return (
+      <div>
+        {pageLead}
+        <EmptyState
+          icon={<AlertTriangle className="h-6 w-6" />}
+          title="Plants unavailable"
+          description="We couldn't confirm your plant records. Nothing has been changed; try this plant-list request again."
+          action={
+            <Button
+              type="button"
+              variant="outline"
+              data-testid="plants-retry-primary"
+              aria-label="Retry plant list"
+              onClick={() => void allPlantsQuery.refetch()}
+            >
+              Retry plant list
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
+
+  const supplementalRefetch: Record<PlantsSupplementalQueryKey, () => unknown> = {
+    active: activePlantsQuery.refetch,
+    workspace: workspacePlantsQuery.refetch,
+    tents: tentsQuery.refetch,
+    diary: diaryQuery.refetch,
+    sensors: sensorReadingsQuery.refetch,
+  };
+
+  return (
+    <div>
+      {pageLead}
 
       {/* Grow filter + plant search row — the two controls are deliberately
           labeled separately so the grow filter is not mistaken for a plant
@@ -372,13 +500,101 @@ export default function Plants() {
         testId="plants-data-source-disclosure"
       />
 
+      {plantsAsyncState.kind === "limited" && allPlants.length > 0 && (
+        <section
+          role="status"
+          data-testid="plants-limited-data"
+          className="mb-4 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3"
+        >
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" aria-hidden="true" />
+            <div className="min-w-0 flex-1">
+              <h2 className="text-sm font-medium">Some plant details are limited</h2>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Confirmed plant cards stay visible. Missing tent or check details are not inferred.
+              </p>
+              <ul className="mt-2 space-y-1.5 text-xs">
+                {plantsAsyncState.primaryRefreshFailed && (
+                  <li
+                    data-testid="plants-primary-refresh-error"
+                    className="flex flex-wrap items-center justify-between gap-2"
+                  >
+                    <span>Plant list refresh unavailable.</span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      data-testid="plants-retry-primary"
+                      aria-label="Retry plant list refresh"
+                      onClick={() => void allPlantsQuery.refetch()}
+                    >
+                      Retry
+                    </Button>
+                  </li>
+                )}
+                {plantsAsyncState.failedSupplementalKeys.map((key) => (
+                  <li
+                    key={key}
+                    data-testid={`plants-supplemental-error-${key}`}
+                    className="flex flex-wrap items-center justify-between gap-2"
+                  >
+                    <span>{PLANTS_SUPPLEMENTAL_QUERY_LABELS[key]} unavailable.</span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      data-testid={`plants-retry-${key}`}
+                      aria-label={`Retry ${PLANTS_SUPPLEMENTAL_QUERY_LABELS[key].toLowerCase()}`}
+                      onClick={() => void supplementalRefetch[key]()}
+                    >
+                      Retry
+                    </Button>
+                  </li>
+                ))}
+                {plantsAsyncState.staleSupplementalKeys.map((key) => (
+                  <li
+                    key={key}
+                    data-testid={`plants-supplemental-stale-${key}`}
+                    className="flex flex-wrap items-center justify-between gap-2"
+                  >
+                    <span>
+                      {PLANTS_SUPPLEMENTAL_QUERY_LABELS[key]} refresh failed; showing last loaded
+                      data.
+                    </span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      data-testid={`plants-retry-${key}`}
+                      aria-label={`Retry ${PLANTS_SUPPLEMENTAL_QUERY_LABELS[key].toLowerCase()}`}
+                      onClick={() => void supplementalRefetch[key]()}
+                    >
+                      Retry
+                    </Button>
+                  </li>
+                ))}
+                {plantsAsyncState.pendingSupplementalKeys.map((key) => (
+                  <li
+                    key={key}
+                    data-testid={`plants-supplemental-pending-${key}`}
+                    className="text-muted-foreground"
+                  >
+                    {PLANTS_SUPPLEMENTAL_QUERY_LABELS[key]} still loading.
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </section>
+      )}
+
       {dailyCheckEvidenceError ? (
         <GrowDataLoadError
           resource="Daily check evidence"
           testId="plants-daily-check-evidence-error"
           message="Verdant could not load recent observations, so daily check status is unavailable rather than assumed empty."
           onRetry={() => {
-            void Promise.all([rawDiaryQuery.refetch(), rawReadingsQuery.refetch()]);
+            void Promise.all([diaryQuery.refetch(), sensorReadingsQuery.refetch()]);
           }}
         />
       ) : dailyCheckEvidenceLoading ? (
@@ -428,7 +644,7 @@ export default function Plants() {
             data-count={t.count}
             className={cn(
               "text-xs px-2.5 py-1 rounded-full border transition",
-              tentFilter === t.id
+              effectiveTentFilter === t.id
                 ? "bg-primary text-primary-foreground border-primary"
                 : "bg-secondary/50 border-border/50 hover:bg-secondary",
             )}

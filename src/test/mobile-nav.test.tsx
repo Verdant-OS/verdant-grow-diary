@@ -95,6 +95,7 @@ describe("MobileNav More sheet — Slice 4 grouping", () => {
         ["Lineage Repair", "/grow-lineage"],
         ["Agent Integrations", "/settings/agent-integrations"],
         ["AI Sessions", "/doctor/sessions"],
+        ["Genetics", "/genetics"],
       ],
       Account: [
         ["Settings", "/settings"],

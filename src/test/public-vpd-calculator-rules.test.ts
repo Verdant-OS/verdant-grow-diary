@@ -43,6 +43,25 @@ describe("public VPD calculator rules", () => {
     ).toEqual(celsius);
   });
 
+  it("keeps practical flower-room RH useful as an air estimate without evidence", () => {
+    const result = evaluatePublicVpdCalculator({
+      temperature: 25,
+      temperatureUnit: "C",
+      humidity: 45,
+      stage: "flower",
+    });
+
+    expect(result).toMatchObject({
+      state: "derived",
+      basis: "air_estimate",
+      confidence: "unverified",
+      canCompareToStageTarget: false,
+      classification: null,
+    });
+    expect(result.vpdKpa).toBeGreaterThan(0);
+    expect(result.trustIssues).toContain("humidity_reference_missing");
+  });
+
   it("unlocks stage comparison only for verified leaf VPD evidence", () => {
     const verified = evaluatePublicVpdCalculator({
       temperature: 25,

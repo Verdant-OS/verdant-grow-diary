@@ -110,6 +110,7 @@ const growerGroups: NavGroup[] = [
   {
     label: "Cultivation",
     items: [
+      { to: "/grows", label: "My Grows", icon: Sprout },
       { to: "/tents", label: "Tents", icon: Box },
       { to: "/plants", label: "Plants", icon: Sprout },
     ],
@@ -138,7 +139,7 @@ const growerGroups: NavGroup[] = [
   },
   {
     label: "More",
-    items: [{ to: "/grows", label: "My Grows", icon: Sprout }],
+    items: [],
     submenu: {
       label: "Labs",
       icon: FlaskConical,

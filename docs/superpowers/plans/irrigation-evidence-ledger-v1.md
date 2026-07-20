@@ -70,5 +70,24 @@ No Docker/Supabase CLI locally → the runtime RLS harness cannot execute here (
 ## 3. Acceptance gates (I1–I15) — mapping
 I1 untented fix (Slice 2 + harness) · I2 cross-tenant matrix (harness) · I3 zero partial rows (atomic block + harness) · I4/I5 idempotency replay-once / diff-request-reject (request hash + harness) · I6 one allowlisted contract (reuse canonical `p_water`/`p_feed`) · I7 explicit units (mS/cm labels) · I8 blank≠zero (existing null-preserving path) · I9 deterministic keyset (Slice 4) · I10 failed≠empty (Slice 4 states) · I11 overflow/44px (Slice 3/4 + Playwright) · I12 static scans clean (own static tests) · I13 existing quicklog green (preserve pins) · I14 no frozen file changes · I15 harness refuses prod + zero leftovers.
 
+## 3a. Design revisions from adversarial review
+
+**Idempotency hash (Slice 2)**
+- R1. Hash over the **RAW** request params exactly as received — never the resolved `v_occurred`/`now()`. `p_occurred_at`'s NULL is hashed as NULL, so two no-timestamp retries under one key replay (not conflict).
+- R2. Hash includes **every** request-distinguishing param: `p_grow_id, p_event_type, p_tent_id, p_plant_id, p_note, p_photo_url, p_occurred_at, p_sensor_snapshot, p_details, p_water, p_feed` — one `jsonb_build_object(...)::text` → `md5`. (The pre-check runs before grow-ownership, so grow_id/photo_url MUST be in the hash.)
+- R3. The `WHEN unique_violation` race handler re-reads `grow_event_id, request_hash` and applies the same null-or-equal rule (flat `IF … THEN RETURN … 'idempotency_key_conflict'; END IF;` — no nested BEGIN/END, no RAISE, no SQLERRM).
+- R4. **Legacy/cross-function keys** (NULL hash from pre-migration rows or `quicklog_save_manual`) replay permissively (unverifiable) — documented as best-effort; every NEW `quicklog_save_event` row carries a hash so the conflict guarantee is enforced going forward. Random per-submission keys make cross-function collision negligible.
+
+**Boundary (Slice 2)** — strict per the mission wording: `IF p_plant_id IS NOT NULL AND p_tent_id IS DISTINCT FROM v_plant_tent THEN reject 'plant_not_in_tent'` (exact equality incl. null; a plant logged without its tent must supply the plant's tent — documented in the Codex seam; the live path already derives it).
+
+**Pin-preserving RPC surgery (Slice 2)** — `CREATE OR REPLACE` with **no `DROP FUNCTION`** (avoids hijacking `quicklog-typed-payloads-migration-safety.test.ts`); keep `$function$` quoting + `SET search_path TO 'public','pg_temp'` verbatim; keep the pinned 3-column idempotency INSERT and set the hash via a **follow-on `UPDATE` inside the atomic block**; add the pre-check conflict guard as `IF FOUND AND …` (not `IF FOUND THEN`, to respect the `{0,300}` proximity pin); emit only `invalid_typed_payload` + `idempotency_key_conflict` as new reason codes; keep validation prose free of banned vocab (no dose/pump/valve/live/synced/connected). Update only the single defect-pin assertion (`v_plant_tent <> p_tent_id` → `p_tent_id IS DISTINCT FROM v_plant_tent`).
+
+**Keyset pagination + evidence truth (Slice 4)**
+- R5. The cursor is the **raw** `occurred_at` string from the DB row (+ `id`), carried separately from the display-normalized value — never a `Date→toISOString` round-trip (microsecond truncation drops boundary rows). The value is double-quoted inside `.or("occurred_at.lt.\"<iso>\",and(occurred_at.eq.\"<iso>\",id.lt.\"<id>\"))"`.
+- R6. `hasMore` + next cursor are derived from the **raw** result set (fetch `pageSize+1`, `hasMore = raw > pageSize`, cursor from the last raw row) — never from the null-dropping projection.
+- R7. The ledger renders **one row per non-deleted watering/feeding event** regardless of whether numeric metrics survive (a note-only watering is "Logged — no measurements," never omitted). Do NOT reuse the `hasEvidence` null-drop gate.
+- R8. Distinct **"could not load older entries"** partial state: a subsequent-page error keeps loaded rows, keeps a retry, and shows an inline error — a truncated ledger never reads as complete.
+- R9. The ledger has its **own** source normalization preserving `voice`→"Voice log" and `ai`→"AI-generated" as first-class labels; unavailable/unknown only for genuinely absent/unrecognized source (never mislabels known provenance; never shows manual/stale as live/healthy).
+
 ## 4. Rollback
 All changes additive except the `CREATE OR REPLACE` of `quicklog_save_event` (reversible by re-applying the v2 body) and one nullable column add (`request_hash`, droppable). New UI/hooks/harness are isolated and unmounted. No production data touched.

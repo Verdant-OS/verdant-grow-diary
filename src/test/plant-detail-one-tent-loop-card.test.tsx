@@ -4,10 +4,10 @@
  * fetching, Supabase, AI, or device control.
  */
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
+import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 
 // Spy on fetch to prove the card itself triggers no network calls.
 const fetchSpy = vi.spyOn(globalThis, "fetch" as never).mockImplementation((() => {
@@ -25,7 +25,6 @@ describe("PlantDetail One-Tent Loop next-step card wiring", () => {
         current="plant"
         ids={{ plantId: "p1", tentId: "t1", growId: "g1" }}
         testId="plant-detail-one-tent-loop-next-step-card"
-        onLocalAction={() => {}}
       />,
     );
     const card = screen.getByTestId("plant-detail-one-tent-loop-next-step-card");
@@ -40,43 +39,38 @@ describe("PlantDetail One-Tent Loop next-step card wiring", () => {
         current="plant"
         ids={{ plantId: "p1", tentId: "t1", growId: "g1" }}
         testId="plant-detail-one-tent-loop-next-step-card"
-        onLocalAction={() => {}}
       />,
     );
     const cta = screen.getByTestId("plant-detail-one-tent-loop-next-step-card-cta");
     expect(cta).toHaveTextContent(/Add quick log/i);
   });
 
-  it("invokes the typed Quick Log action instead of self-linking to Plant Detail", async () => {
-    const user = userEvent.setup();
-    const onLocalAction = vi.fn();
-    renderCard(
-      <OneTentLoopNextStepCard
-        current="plant"
-        ids={{ plantId: "p1" }}
-        testId="plant-detail-one-tent-loop-next-step-card"
-        onLocalAction={onLocalAction}
-      />,
-    );
-    const cta = screen.getByTestId("plant-detail-one-tent-loop-next-step-card-cta");
-    expect(cta.tagName).toBe("BUTTON");
-    expect(cta.querySelector("a")).toBeNull();
-    await user.click(cta);
-    expect(onLocalAction).toHaveBeenCalledOnce();
-    expect(onLocalAction).toHaveBeenCalledWith("open-quick-log");
-  });
+  it("opens the exact assigned plant in Quick Log without navigating or fetching", () => {
+    const listener = vi.fn();
+    window.addEventListener(PLANT_QUICKLOG_PREFILL_EVENT, listener);
+    try {
+      renderCard(
+        <OneTentLoopNextStepCard
+          current="plant"
+          ids={{ plantId: "p1", tentId: "t1", growId: "g1" }}
+          testId="plant-detail-one-tent-loop-next-step-card"
+        />,
+      );
+      const cta = screen.getByTestId("plant-detail-one-tent-loop-next-step-card-cta");
+      expect(cta.tagName).toBe("BUTTON");
+      expect(cta.querySelector("a")).toBeNull();
+      fireEvent.click(cta);
 
-  it("fails closed when the presenter does not provide a local-action handler", () => {
-    renderCard(
-      <OneTentLoopNextStepCard
-        current="plant"
-        ids={{ plantId: "p1" }}
-        testId="plant-detail-one-tent-loop-next-step-card"
-      />,
-    );
-    const cta = screen.getByTestId("plant-detail-one-tent-loop-next-step-card-cta-inert");
-    expect(cta).toBeDisabled();
-    expect(cta).toHaveTextContent("Add quick log");
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect((listener.mock.calls[0][0] as CustomEvent).detail).toMatchObject({
+        plantId: "p1",
+        tentId: "t1",
+        growId: "g1",
+      });
+      expect(fetchSpy).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, listener);
+    }
   });
 
   it("falls back to the safe disabled state when ids are missing", () => {
@@ -107,7 +101,7 @@ describe("PlantDetail One-Tent Loop next-step card wiring", () => {
     renderCard(
       <OneTentLoopNextStepCard
         current="plant"
-        ids={{ plantId: "p1" }}
+        ids={{ plantId: "p1", tentId: "t1", growId: "g1" }}
         testId="plant-detail-one-tent-loop-next-step-card"
       />,
     );

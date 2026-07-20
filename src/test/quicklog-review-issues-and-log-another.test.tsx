@@ -18,12 +18,7 @@ const { rpcMock, snapshotState } = vi.hoisted(() => ({
   snapshotState: {
     status: "ready" as "ready" | "loading" | "empty",
     payload: {
-      status: "fresh_live" as
-        | "fresh_live"
-        | "fresh_non_live"
-        | "stale"
-        | "invalid"
-        | "empty",
+      status: "fresh_live" as "fresh_live" | "fresh_non_live" | "stale" | "invalid" | "empty",
       source: "ecowitt" as string | null,
       captured_at: "2026-05-31T13:44:12.000Z" as string | null,
     },
@@ -51,7 +46,7 @@ vi.mock("@/store/grows", () => ({
 }));
 vi.mock("@/hooks/use-plants", () => ({ usePlants: () => ({ data: plantsData }) }));
 vi.mock("@/hooks/use-tents", () => ({
-  useTents: () => ({ data: [{ id: "t1", name: "Tent 1" }] }),
+  useTents: () => ({ data: [{ id: "t1", name: "Tent 1", grow_id: "g1" }] }),
 }));
 vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn(), message: vi.fn() },
@@ -103,20 +98,17 @@ describe("QuickLog — Review issues region", () => {
     expect(screen.queryByTestId("quick-log-review-issues")).toBeNull();
   });
 
-  it("renders + offers a mismatch jump link when mismatch banner is shown", async () => {
+  it("keeps a blocked named target outside the legacy mismatch issue path", async () => {
     renderQL({
       open: true,
       onOpenChange: () => {},
       prefill: { plantId: "p-other", plantName: "Old Plant", growId: "g1" },
     });
-    await screen.findByTestId("quick-log-plant-mismatch-banner");
-    const region = screen.getByTestId("quick-log-review-issues");
-    expect(region.getAttribute("aria-label")).toMatch(/review quick log issues/i);
-    const jump = screen.getByTestId("quick-log-review-jump-mismatch");
-    expect(jump.tabIndex).not.toBe(-1);
-    jump.click();
-    const trigger = screen.getByTestId("quick-log-plant-select");
-    expect(document.activeElement).toBe(trigger);
+    expect(await screen.findByTestId("quick-log-target-error")).toHaveTextContent(
+      /no longer available/i,
+    );
+    expect(screen.queryByTestId("quick-log-plant-mismatch-banner")).toBeNull();
+    expect(screen.queryByTestId("quick-log-review-jump-mismatch")).toBeNull();
   });
 
   it("offers a snapshot jump link when stale helper is shown and moves focus to attach section", async () => {
@@ -138,9 +130,7 @@ describe("QuickLog — Review issues region", () => {
     // Helper remains associated with the disabled Switch.
     const sw = screen.getByTestId("quick-log-snapshot-toggle") as HTMLButtonElement;
     expect(sw.disabled).toBe(true);
-    expect(sw.getAttribute("aria-describedby")).toBe(
-      "quick-log-snapshot-session-helper",
-    );
+    expect(sw.getAttribute("aria-describedby")).toBe("quick-log-snapshot-session-helper");
   });
 
   it("offers a watering jump link when validation error exists and focuses Watering (ml)", async () => {
@@ -149,28 +139,24 @@ describe("QuickLog — Review issues region", () => {
       onOpenChange: () => {},
       prefill: { plantId: "p2", growId: "g1", eventType: "watering" },
     });
-    const input = (await screen.findByTestId(
-      "quicklog-watering-ml",
-    )) as HTMLInputElement;
+    const input = (await screen.findByTestId("quicklog-watering-ml")) as HTMLInputElement;
     fireEvent.submit(input.closest("form") as HTMLFormElement);
-    await waitFor(() =>
-      expect(input.getAttribute("aria-invalid")).toBe("true"),
-    );
+    await waitFor(() => expect(input.getAttribute("aria-invalid")).toBe("true"));
     const jump = await screen.findByTestId("quick-log-review-jump-watering");
     input.blur();
     jump.click();
     await waitFor(() => expect(document.activeElement).toBe(input));
   });
 
-  it("static mismatch banner remains non-tabbable (no action children)", async () => {
+  it("static blocked-target alert remains non-tabbable (no action children)", async () => {
     renderQL({
       open: true,
       onOpenChange: () => {},
       prefill: { plantId: "p-other", plantName: "Old Plant", growId: "g1" },
     });
-    const banner = await screen.findByTestId("quick-log-plant-mismatch-banner");
-    expect(banner.tabIndex).toBe(-1);
-    expect(banner.querySelector("a,button,input,select,textarea")).toBeNull();
+    const error = await screen.findByTestId("quick-log-target-error");
+    expect(error.tabIndex).toBe(-1);
+    expect(error.querySelector("a,button,input,select,textarea")).toBeNull();
   });
 
   it("static stale helper paragraph is not a tab stop", async () => {
@@ -189,7 +175,7 @@ describe("QuickLog — Review issues region", () => {
     expect(helper.tabIndex).toBe(-1);
   });
 
-  it("review issue jump links appear in logical order: mismatch → snapshot → watering", async () => {
+  it("review issue jump links appear in logical order: snapshot → watering", async () => {
     snapshotState.payload = {
       status: "stale",
       source: "ecowitt",
@@ -199,26 +185,18 @@ describe("QuickLog — Review issues region", () => {
       open: true,
       onOpenChange: () => {},
       prefill: {
-        plantId: "p-other",
-        plantName: "Old Plant",
+        plantId: "p2",
         growId: "g1",
+        tentId: "t1",
         eventType: "watering",
       },
     });
-    const input = (await screen.findByTestId(
-      "quicklog-watering-ml",
-    )) as HTMLInputElement;
+    const input = (await screen.findByTestId("quicklog-watering-ml")) as HTMLInputElement;
     fireEvent.submit(input.closest("form") as HTMLFormElement);
     await screen.findByTestId("quick-log-review-jump-watering");
-    const mismatch = screen.getByTestId("quick-log-review-jump-mismatch");
     const snap = screen.getByTestId("quick-log-review-jump-snapshot");
     const water = screen.getByTestId("quick-log-review-jump-watering");
-    expect(
-      mismatch.compareDocumentPosition(snap) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-    expect(
-      snap.compareDocumentPosition(water) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
+    expect(snap.compareDocumentPosition(water) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });
 
@@ -227,7 +205,9 @@ describe("QuickLog — post-save View {plant} focus handling", () => {
     const { useState } = await import("react");
     function Host() {
       const [open, setOpen] = useState(true);
-      return <QuickLog open={open} onOpenChange={setOpen} prefill={{ plantId: "p2", growId: "g1" }} />;
+      return (
+        <QuickLog open={open} onOpenChange={setOpen} prefill={{ plantId: "p2", growId: "g1" }} />
+      );
     }
     const client = new QueryClient({
       defaultOptions: { queries: { retry: false, gcTime: 0 } },
@@ -240,38 +220,27 @@ describe("QuickLog — post-save View {plant} focus handling", () => {
     fireEvent.change(screen.getByPlaceholderText(/Watered, looking healthy/i), {
       target: { value: "ok" },
     });
-    fireEvent.submit(
-      screen.getByTestId("quick-log-save").closest("form") as HTMLFormElement,
-    );
-    const link = (await screen.findByTestId(
-      "quick-log-view-target-plant",
-    )) as HTMLAnchorElement;
+    fireEvent.submit(screen.getByTestId("quick-log-save").closest("form") as HTMLFormElement);
+    const link = (await screen.findByTestId("quick-log-view-target-plant")) as HTMLAnchorElement;
     link.addEventListener("click", (e) => e.preventDefault());
     link.focus();
     expect(document.activeElement).toBe(link);
     fireEvent.click(link);
     // After click the dialog unmounts (open=false). The link is gone.
-    await waitFor(() =>
-      expect(screen.queryByTestId("quick-log-view-target-plant")).toBeNull(),
-    );
+    await waitFor(() => expect(screen.queryByTestId("quick-log-view-target-plant")).toBeNull());
     // Focus must not remain on a now-unmounted element inside the dialog.
     expect(document.body.contains(link)).toBe(false);
     expect(document.activeElement === link).toBe(false);
   });
 });
 
-
 describe("QuickLog — Log another for {plant}", () => {
   async function saveOnce() {
     fireEvent.change(screen.getByPlaceholderText(/Watered, looking healthy/i), {
       target: { value: "ok" },
     });
-    fireEvent.submit(
-      screen.getByTestId("quick-log-save").closest("form") as HTMLFormElement,
-    );
-    return (await screen.findByTestId(
-      "quick-log-post-save-another",
-    )) as HTMLButtonElement;
+    fireEvent.submit(screen.getByTestId("quick-log-save").closest("form") as HTMLFormElement);
+    return (await screen.findByTestId("quick-log-post-save-another")) as HTMLButtonElement;
   }
 
   it("renders a keyboard-reachable 'Log another for {plant}' button after save", async () => {

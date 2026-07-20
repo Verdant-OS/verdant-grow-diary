@@ -75,17 +75,48 @@ describe("oneTentLoopNavigationRules", () => {
     expect(r2.href ?? "").not.toMatch(/^\/grows\//);
   });
 
-  it("routes tent navigation and resolves Plant -> Quick Log as a local action", () => {
+  it("enables the tent route when its id is present", () => {
     expect(resolveOneTentLoopNextStep("tent", { tentId: "t1" }).href).toBe("/tents/t1");
-    const plant = resolveOneTentLoopNextStep("plant", { plantId: "p1" });
-    expect(plant.disabled).toBe(false);
-    expect(plant.href).toBeNull();
-    expect(plant.localAction).toBe("open-quick-log");
   });
 
-  it("never self-links Plant -> Quick Log back to Plant Detail", () => {
-    const plant = resolveOneTentLoopNextStep("plant", { plantId: "p1" });
-    expect(plant.href ?? "").not.toMatch(/^\/plants\//);
+  it("opens an exact Quick Log intent from a fully assigned plant", () => {
+    expect(
+      resolveOneTentLoopNextStep("plant", {
+        plantId: "p1",
+        tentId: "t1",
+        growId: "g1",
+      }),
+    ).toMatchObject({
+      intent: "open_quick_log",
+      href: null,
+      disabled: false,
+      disabledReason: null,
+      quickLogPrefill: {
+        plantId: "p1",
+        plantName: null,
+        tentId: "t1",
+        tentName: null,
+        growId: "g1",
+        eventType: "observation",
+        suggestSnapshot: true,
+      },
+    });
+  });
+
+  it("keeps the plant Quick Log intent disabled when any assignment is missing", () => {
+    for (const ids of [
+      { plantId: "p1", tentId: "t1" },
+      { plantId: "p1", growId: "g1" },
+      { tentId: "t1", growId: "g1" },
+    ]) {
+      expect(resolveOneTentLoopNextStep("plant", ids)).toMatchObject({
+        intent: "open_quick_log",
+        href: null,
+        disabled: true,
+        disabledReason: ONE_TENT_LOOP_DISABLED_COPY,
+        quickLogPrefill: null,
+      });
+    }
   });
 
   it("routes quick-log → timeline and preserves a valid Timeline tent as a Sensors intent", () => {

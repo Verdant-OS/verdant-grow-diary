@@ -15,6 +15,7 @@ import OAuthPostAuthRedirect from "@/components/OAuthPostAuthRedirect";
 import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
 import { AgreementReconsentGate } from "@/components/AgreementReconsentGate";
 import RootEntry from "@/components/RootEntry";
+import RouteAliasRedirect from "@/components/RouteAliasRedirect";
 
 // Route pages and the authenticated AppShell are code-split so the public
 // marketing / auth entry paths (/welcome, /pricing, /hardware-integrations,
@@ -340,7 +341,7 @@ const App = () => (
                     <Route path="/sensors" element={<Sensors />} />
                     <Route path="/timeline" element={<Timeline />} />
                     {/* Legacy alias — canonical route is /timeline. */}
-                    <Route path="/logs" element={<Navigate to="/timeline" replace />} />
+                    <Route path="/logs" element={<RouteAliasRedirect to="/timeline" />} />
                     <Route path="/tasks" element={<Tasks />} />
                     {/* /cameras route removed — out of current V0 scope. */}
                     <Route path="/alerts" element={<Alerts />} />

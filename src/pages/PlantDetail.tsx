@@ -423,9 +423,6 @@ export default function PlantDetail() {
           growId: plant.growId ?? null,
         }}
         testId="plant-detail-one-tent-loop-next-step-card"
-        onLocalAction={(action) => {
-          if (action === "open-quick-log") setQuickLogOpen(true);
-        }}
       />
       <div
         id={PLANT_PHOTOS_ANCHOR_ID}

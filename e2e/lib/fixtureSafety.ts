@@ -20,6 +20,7 @@
  *   - never bypasses auth
  *   - never reads or logs secret values
  */
+import type { Page } from "@playwright/test";
 
 export type FixtureSafetyEnv = Readonly<{
   E2E_FIXTURE_MODE?: string;
@@ -27,6 +28,7 @@ export type FixtureSafetyEnv = Readonly<{
   E2E_FIXTURE_EXPECTED_GROW_NAME?: string;
   E2E_FIXTURE_EXPECTED_TENT_NAME?: string;
   E2E_FIXTURE_EXPECTED_PLANT_NAME?: string;
+  E2E_FIXTURE_EXPECTED_ACCOUNT_HINT?: string;
 }>;
 
 export interface FixtureEnvValidation {
@@ -38,6 +40,11 @@ export interface FixtureEnvValidation {
     tent: string;
     plant: string;
   };
+}
+
+export interface FixturePageRelationship {
+  plantHeading: string;
+  relatedTentName: string;
 }
 
 /**
@@ -65,9 +72,7 @@ export function validateFixtureEnv(env: FixtureSafetyEnv): FixtureEnvValidation 
   const errors: string[] = [];
 
   if (env.E2E_FIXTURE_MODE !== "true") {
-    errors.push(
-      "E2E_FIXTURE_MODE must be exactly 'true' before write-producing smoke can run.",
-    );
+    errors.push("E2E_FIXTURE_MODE must be exactly 'true' before write-producing smoke can run.");
   }
 
   const plantUrl = env.E2E_GROW_1_PLANT_URL ?? "";
@@ -144,9 +149,7 @@ export function pageTextMatchesFixture(
   ];
   for (const [label, value] of required) {
     if (value && !text.includes(value)) {
-      errors.push(
-        `Expected ${label} name '${value}' not visible on the target page.`,
-      );
+      errors.push(`Expected ${label} name '${value}' not visible on the target page.`);
     }
   }
 
@@ -154,17 +157,14 @@ export function pageTextMatchesFixture(
   // supplied. The current UI does not expose a Grow page in the setup
   // flow, so a missing grow name must not fail fixture verification.
   if (expected.grow && !text.includes(expected.grow)) {
-    errors.push(
-      `Expected grow name '${expected.grow}' not visible on the target page.`,
-    );
+    errors.push(`Expected grow name '${expected.grow}' not visible on the target page.`);
   }
 
   const hint = (options.accountHint ?? "").trim();
   if (hint) {
     // If the visible UI exposes any account-identity surface (email-like
     // string or "Signed in as" label), require the hint to be present.
-    const exposesAccount =
-      /signed in as|account:|@/i.test(text);
+    const exposesAccount = /signed in as|account:|@/i.test(text);
     if (exposesAccount && !text.toLowerCase().includes(hint.toLowerCase())) {
       errors.push(
         `Account hint '${hint}' not visible on a page that exposes account identity — refusing to assume the dedicated test account is signed in.`,
@@ -173,4 +173,108 @@ export function pageTextMatchesFixture(
   }
 
   return { ok: errors.length === 0, errors };
+}
+
+/**
+ * Verify the exact Plant Detail identity and its rendered tent relationship.
+ * The caller must read these values from the page heading and the scoped
+ * `plant-detail-tent` container rather than from unrelated body text.
+ */
+export function fixturePageRelationshipMatchesExpected(
+  actual: FixturePageRelationship,
+  expected: FixtureEnvValidation["expected"],
+): { ok: boolean; errors: string[] } {
+  const errors: string[] = [];
+
+  if (actual.plantHeading.trim() !== expected.plant) {
+    errors.push(
+      `Exact Plant Detail heading '${expected.plant}' was not rendered for the configured fixture.`,
+    );
+  }
+
+  if (actual.relatedTentName.trim() !== expected.tent) {
+    errors.push(
+      `Expected related tent '${expected.tent}' was not rendered in the Plant Detail tent container.`,
+    );
+  }
+
+  return { ok: errors.length === 0, errors };
+}
+
+/**
+ * Validate the already-open Plant Detail page before the Quick Log smoke
+ * performs any write-producing UI action. This deliberately composes the
+ * same pure env and visible-page checks used by fixture-safety.spec.ts so a
+ * direct `e2e:quicklog-smoke` invocation cannot bypass them.
+ */
+export async function validateQuickLogFixturePage(
+  page: Page,
+  env: FixtureSafetyEnv = {
+    E2E_FIXTURE_MODE: process.env.E2E_FIXTURE_MODE,
+    E2E_GROW_1_PLANT_URL: process.env.E2E_GROW_1_PLANT_URL,
+    E2E_FIXTURE_EXPECTED_GROW_NAME: process.env.E2E_FIXTURE_EXPECTED_GROW_NAME,
+    E2E_FIXTURE_EXPECTED_TENT_NAME: process.env.E2E_FIXTURE_EXPECTED_TENT_NAME,
+    E2E_FIXTURE_EXPECTED_PLANT_NAME: process.env.E2E_FIXTURE_EXPECTED_PLANT_NAME,
+    E2E_FIXTURE_EXPECTED_ACCOUNT_HINT: process.env.E2E_FIXTURE_EXPECTED_ACCOUNT_HINT,
+  },
+): Promise<FixtureEnvValidation> {
+  const envCheck = validateFixtureEnv(env);
+  if (!envCheck.ok) {
+    throw new Error(`Fixture env validation failed:\n - ${envCheck.errors.join("\n - ")}`);
+  }
+
+  if (page.url().includes("/auth")) {
+    throw new Error(
+      "Fixture validation reached /auth instead of the configured Plant Detail page.",
+    );
+  }
+
+  // Plant and Tent are the required visible relationship. The plant must
+  // be the exact current page h1, and the tent must be the exact name inside
+  // Plant Detail's related-tent container. Names elsewhere in body text do
+  // not satisfy this fence. Grow remains optional until the product exposes
+  // it in the setup flow.
+  const plantHeading = page.getByRole("heading", {
+    level: 1,
+    name: envCheck.expected.plant,
+    exact: true,
+  });
+  await plantHeading.waitFor({ state: "visible", timeout: 20_000 });
+
+  const relatedTentName = page
+    .getByTestId("plant-detail-tent")
+    .getByText(envCheck.expected.tent, { exact: true });
+  await relatedTentName.waitFor({ state: "visible", timeout: 20_000 });
+
+  const relationshipCheck = fixturePageRelationshipMatchesExpected(
+    {
+      plantHeading: await plantHeading.innerText(),
+      relatedTentName: await relatedTentName.innerText(),
+    },
+    envCheck.expected,
+  );
+  if (!relationshipCheck.ok) {
+    throw new Error(
+      `Plant Detail fixture relationship validation failed:\n - ${relationshipCheck.errors.join("\n - ")}`,
+    );
+  }
+
+  if (envCheck.expected.grow) {
+    await page
+      .getByText(envCheck.expected.grow, { exact: false })
+      .first()
+      .waitFor({ state: "visible", timeout: 20_000 });
+  }
+
+  const bodyText = (await page.locator("body").innerText()).slice(0, 50_000);
+  const pageCheck = pageTextMatchesFixture(bodyText, envCheck.expected, {
+    accountHint: env.E2E_FIXTURE_EXPECTED_ACCOUNT_HINT,
+  });
+  if (!pageCheck.ok) {
+    throw new Error(
+      `Target page does not look like a disposable E2E fixture:\n - ${pageCheck.errors.join("\n - ")}`,
+    );
+  }
+
+  return envCheck;
 }

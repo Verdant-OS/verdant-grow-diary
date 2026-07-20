@@ -33,6 +33,7 @@ import {
   ALLOWED_ROBOTS_DIRECTIVES,
   EXPECTED_TWITTER_SITE,
   EXPECTED_TWITTER_CREATOR,
+  EXPECTED_JSONLD_NODES,
 } from "./public-route-head-invariants.config.mjs";
 
 const META_TAG_REGEX = /<meta\b[^>]*>/gi;

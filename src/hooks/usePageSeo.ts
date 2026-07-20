@@ -28,6 +28,8 @@ export interface PageSeo {
   path: string;
   /** Absolute og:image URL. Defaults to the brand logo. */
   ogImage?: string;
+  /** Open Graph type. Defaults to "website"; use "article" for guides/posts. */
+  ogType?: "website" | "article";
   /** When true, emit <meta name="robots" content="noindex, follow">. */
   noindex?: boolean;
 }

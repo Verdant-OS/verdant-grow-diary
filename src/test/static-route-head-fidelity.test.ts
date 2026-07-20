@@ -101,4 +101,64 @@ describe("static route head fidelity helpers", () => {
     });
     expect(drifted.some((i: string) => i.includes("robots"))).toBe(true);
   });
+
+  it("diffRouteHead returns a per-field structured diff", () => {
+    const head = extractHead(fixtureHtml({ title: "Wrong title" }));
+    const diff = diffRouteHead(head, {
+      path: "/pricing",
+      fileName: "pricing.html",
+      metadata: FIXTURE_META,
+    });
+    expect(diff.ok).toBe(false);
+    expect(diff.path).toBe("/pricing");
+    expect(diff.fileName).toBe("pricing.html");
+    // Every field has ok/expected/actual/label.
+    for (const f of diff.fields) {
+      expect(f).toHaveProperty("label");
+      expect(f).toHaveProperty("expected");
+      expect(f).toHaveProperty("actual");
+      expect(typeof f.ok).toBe("boolean");
+    }
+    // Title mismatch is the only drift; og:title still matches (uses metadata.title).
+    const titleField = diff.fields.find((f: any) => f.label === "<title>");
+    expect(titleField.ok).toBe(false);
+    expect(titleField.expected).toBe(FIXTURE_META.title);
+    expect(titleField.actual).toBe("Wrong title");
+    expect(diff.mismatched).toHaveLength(1);
+  });
+
+  it("renderMarkdownReport summarizes drifted routes with expected vs actual", () => {
+    const cleanDiff = diffRouteHead(extractHead(fixtureHtml()), {
+      path: "/clean",
+      fileName: "clean.html",
+      metadata: FIXTURE_META,
+    });
+    const drifted = diffRouteHead(
+      extractHead(fixtureHtml({ title: "Wrong title" })),
+      { path: "/pricing", fileName: "pricing.html", metadata: FIXTURE_META },
+    );
+    const md = renderMarkdownReport([cleanDiff, drifted], {
+      generatedAt: "2026-07-20T00:00:00.000Z",
+      distDir: "/tmp/dist",
+      missingFiles: [{ path: "/gone", fileName: "gone.html" }],
+    });
+    expect(md).toContain("# SEO head fidelity report");
+    expect(md).toContain("Routes checked: 2");
+    expect(md).toContain("Routes with drift: 1");
+    expect(md).toContain("Missing pre-rendered files");
+    expect(md).toContain("`/gone`");
+    expect(md).toContain("### `/pricing`");
+    expect(md).toContain("Wrong title");
+    expect(md).toContain(FIXTURE_META.title);
+    // Clean route must not appear as a drifted section.
+    expect(md).not.toContain("### `/clean`");
+  });
+
+  it("renderMarkdownReport reports a green run when nothing drifted", () => {
+    const md = renderMarkdownReport(
+      [diffRouteHead(extractHead(fixtureHtml()), { path: "/pricing", metadata: FIXTURE_META })],
+      { generatedAt: "2026-07-20T00:00:00.000Z", distDir: "/tmp/dist", missingFiles: [] },
+    );
+    expect(md).toContain("All checked routes match");
+  });
 });

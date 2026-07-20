@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { Link, MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { Link, MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 
 const TENT_ID = "30000000-0000-4000-8000-000000000001";
@@ -87,13 +87,28 @@ import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 
 function TestContent() {
   const location = useLocation();
+  const navigate = useNavigate();
   return (
     <div>
       <span data-testid="current-path">{location.pathname}</span>
       <span data-testid="current-search">{location.search}</span>
+      <span data-testid="current-hash">{location.hash}</span>
+      <span data-testid="current-key">{location.key}</span>
       <Link to="/settings">Leave tent</Link>
       <Link to="/dashboard">Open dashboard</Link>
       <Link to={`/tents/${SECOND_TENT_ID}`}>Open second tent</Link>
+      <Link to="/daily-check?plantId=plant-b&growId=grow-1">Open plant B</Link>
+      <button
+        type="button"
+        onClick={() =>
+          navigate("/daily-check?plantId=plant-c&growId=grow-1", { replace: true })
+        }
+      >
+        Replace with plant C
+      </button>
+      <button type="button" onClick={() => navigate(-1)}>
+        Go back
+      </button>
     </div>
   );
 }
@@ -203,6 +218,80 @@ describe("AppShell mobile Quick Log routing", () => {
     fireEvent.click(screen.getByTestId("mobile-quick-log-fab"));
     expect(screen.getByTestId("legacy-quick-log")).toBeInTheDocument();
     expect(screen.queryByTestId("scoped-quick-log")).not.toBeInTheDocument();
+  });
+
+  it("discards typed Water across same-path push, replace, and back navigations", async () => {
+    renderAt("/daily-check?plantId=plant-a&growId=grow-1");
+    const initialKey = screen.getByTestId("current-key").textContent;
+    const openWater = (plantId: string) =>
+      dispatchRuntimeEvent(
+        new CustomEvent(QUICK_LOG_V2_OPEN_EVENT, {
+          detail: { targetKey: `plant:${plantId}`, action: "water" },
+        }),
+      );
+    const expectFreshClosedState = async () => {
+      await waitFor(() =>
+        expect(screen.queryByTestId("scoped-quick-log")).not.toBeInTheDocument(),
+      );
+      expect(screen.getByTestId("scoped-quick-log-state")).toHaveAttribute(
+        "data-open",
+        "false",
+      );
+      expect(screen.getByTestId("scoped-quick-log-state")).toHaveAttribute(
+        "data-target-key",
+        "",
+      );
+      expect(screen.getByTestId("scoped-quick-log-state")).toHaveAttribute(
+        "data-action",
+        "note",
+      );
+    };
+
+    openWater("plant-a");
+    expect(screen.getByTestId("scoped-quick-log")).toHaveAttribute(
+      "data-target-key",
+      "plant:plant-a",
+    );
+
+    fireEvent.click(screen.getByRole("link", { name: "Open plant B" }));
+    await waitFor(() =>
+      expect(screen.getByTestId("current-search")).toHaveTextContent(
+        "?plantId=plant-b&growId=grow-1",
+      ),
+    );
+    expect(screen.getByTestId("current-key").textContent).not.toBe(initialKey);
+    await expectFreshClosedState();
+
+    openWater("plant-b");
+    expect(screen.getByTestId("scoped-quick-log")).toHaveAttribute(
+      "data-target-key",
+      "plant:plant-b",
+    );
+    const plantBKey = screen.getByTestId("current-key").textContent;
+
+    fireEvent.click(screen.getByRole("button", { name: "Replace with plant C" }));
+    await waitFor(() =>
+      expect(screen.getByTestId("current-search")).toHaveTextContent(
+        "?plantId=plant-c&growId=grow-1",
+      ),
+    );
+    expect(screen.getByTestId("current-key").textContent).not.toBe(plantBKey);
+    await expectFreshClosedState();
+
+    openWater("plant-c");
+    expect(screen.getByTestId("scoped-quick-log")).toHaveAttribute(
+      "data-target-key",
+      "plant:plant-c",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Go back" }));
+    await waitFor(() =>
+      expect(screen.getByTestId("current-search")).toHaveTextContent(
+        "?plantId=plant-a&growId=grow-1",
+      ),
+    );
+    expect(screen.getByTestId("current-key").textContent).toBe(initialKey);
+    await expectFreshClosedState();
   });
 
   it("opens tent-scoped V2 logging from a zero-plant Tent Detail route", () => {

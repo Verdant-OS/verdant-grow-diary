@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import LegalFooterLinks from "@/components/LegalFooterLinks";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Bell, LogOut, Plus, Search } from "lucide-react";
@@ -34,6 +34,7 @@ import {
 export default function AppShell({ children }: { children?: ReactNode }) {
   const { user, loading } = useAuth();
   const location = useLocation();
+  const previousNavigationKeyRef = useRef(location.key);
   // Protected-route boundary: re-validate session against the auth server.
   // Keep both session checks on the same signed-out destination. Sending the
   // server revalidation to /auth while the shell sent cached-session misses to
@@ -143,13 +144,16 @@ export default function AppShell({ children }: { children?: ReactNode }) {
     if (!loading && !user) nav(signedOutRedirect, { replace: true });
   }, [loading, user, nav, signedOutRedirect]);
 
-  // Never carry an open structured sheet or typed intent across routes. The
-  // derived mobile target is null on every unscoped route, so key this cleanup
-  // to the pathname itself rather than to that target.
+  // Never carry an open structured sheet or typed intent across navigations,
+  // including same-path scope changes. Seeding the ref from the initial key
+  // prevents the first effect from immediately closing an opening intent.
   useEffect(() => {
+    if (previousNavigationKeyRef.current === location.key) return;
+
+    previousNavigationKeyRef.current = location.key;
     setOpenScopedLog(false);
     setStructuredOpenIntent(null);
-  }, [location.pathname]);
+  }, [location.key]);
 
   if (loading)
     return (

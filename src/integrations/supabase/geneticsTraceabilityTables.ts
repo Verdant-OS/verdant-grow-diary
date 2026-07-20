@@ -101,6 +101,29 @@ type PropagationBatchStatusEventRow = {
   created_at: string;
 };
 
+type PlantOriginAssignmentRow = {
+  id: string;
+  user_id: string;
+  plant_id: string;
+  batch_id: string;
+  assigned_at: string;
+  assigned_reason: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type PlantOriginAssignmentEventRow = {
+  id: string;
+  user_id: string;
+  plant_id: string;
+  from_batch_id: string | null;
+  to_batch_id: string;
+  reason: string | null;
+  action: string;
+  changed_at: string;
+  created_at: string;
+};
+
 // ---------------------------------------------------------------------------
 // Function (RPC) argument + return types. Returns are the jsonb envelope (Json).
 // ---------------------------------------------------------------------------
@@ -167,6 +190,16 @@ export interface GeneticsTraceabilityDatabase {
         "id" | "from_status" | "reason" | "changed_at" | "created_at",
         never
       >;
+      plant_origin_assignments: Tbl<
+        PlantOriginAssignmentRow,
+        "id" | "assigned_at" | "assigned_reason" | "created_at" | "updated_at"
+      >;
+      // Append-only assignment audit — Update = never.
+      plant_origin_assignment_events: Tbl<
+        PlantOriginAssignmentEventRow,
+        "id" | "from_batch_id" | "reason" | "changed_at" | "created_at",
+        never
+      >;
     };
     Views: Record<string, never>;
     Functions: {
@@ -182,6 +215,12 @@ export interface GeneticsTraceabilityDatabase {
       genetics_batch_upsert: GeneticsFn<{
         p_idempotency_key: string;
         p_payload: Json;
+      }>;
+      genetics_assign_plants: GeneticsFn<{
+        p_idempotency_key: string;
+        p_batch_id: string;
+        p_plant_ids: string[];
+        p_reason?: string | null;
       }>;
     };
     Enums: Record<string, never>;

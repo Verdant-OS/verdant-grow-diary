@@ -312,7 +312,9 @@ function ToolCard({
   const [confirmBeforeRetry, setConfirmBeforeRetry] = useState(true);
   const [retryPending, setRetryPending] = useState(false);
   const [justApplied, setJustApplied] = useState(false);
+  const [preApplySnapshot, setPreApplySnapshot] = useState<Record<string, unknown> | null>(null);
   const [copiedArgs, setCopiedArgs] = useState(false);
+
 
 
 

@@ -30,6 +30,16 @@ export interface GuideSection {
 }
 
 
+export interface GuideCallToAction {
+  readonly label: string;
+  /** Absolute in-app path. */
+  readonly to: string;
+  readonly heading: string;
+  readonly description: string;
+  /** Optional bullet prompts shown next to the CTA button. */
+  readonly prompts?: ReadonlyArray<string>;
+}
+
 export interface SeoGuidePage {
   readonly slug: string;
   readonly title: string;
@@ -41,7 +51,10 @@ export interface SeoGuidePage {
   readonly faq: ReadonlyArray<FaqEntry>;
   /** Related guide slugs surfaced as internal links. */
   readonly related: ReadonlyArray<string>;
+  /** Optional prominent CTA rendered near the top of the guide. */
+  readonly cta?: GuideCallToAction;
 }
+
 
 /* ------------------------------------------------------------------ */
 /* Grower guide FAQ (visible on /guides + FAQPage JSON-LD on /guides) */

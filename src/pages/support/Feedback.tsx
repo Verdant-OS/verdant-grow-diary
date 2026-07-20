@@ -96,7 +96,7 @@ function StarRating({
             aria-checked={value === n}
             aria-label={`${n} out of 5 — ${RATING_LABELS[n - 1]}`}
             onClick={() => onChange(n)}
-            className="rounded-md p-1.5 text-muted-foreground transition hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md p-2.5 text-muted-foreground transition hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             <Star
               className={`h-6 w-6 ${active ? "fill-primary text-primary" : ""}`}

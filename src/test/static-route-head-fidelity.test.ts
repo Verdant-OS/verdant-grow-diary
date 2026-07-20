@@ -27,6 +27,7 @@ const FIXTURE_META = {
 
 function fixtureHtml(overrides: Partial<Record<string, string>> = {}) {
   const v = { ...FIXTURE_META, ...overrides } as Record<string, string>;
+  const robots = v.robots ?? "index, follow";
   return `<!doctype html><html><head>
     <title>${v.title}</title>
     <meta name="description" content="${v.description}" />
@@ -34,12 +35,14 @@ function fixtureHtml(overrides: Partial<Record<string, string>> = {}) {
     <meta property="og:title" content="${v.title}" />
     <meta property="og:description" content="${v.description}" />
     <meta property="og:url" content="${v.url}" />
+    <meta property="og:type" content="website" />
     <meta property="og:image" content="${v.image}" />
     <meta property="og:image:alt" content="${v.imageAlt}" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="${v.title}" />
     <meta name="twitter:description" content="${v.description}" />
     <meta name="twitter:image" content="${v.image}" />
+    <meta name="robots" content="${robots}" />
   </head><body></body></html>`;
 }
 

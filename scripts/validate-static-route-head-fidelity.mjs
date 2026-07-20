@@ -33,6 +33,7 @@ import {
   ALLOWED_ROBOTS_DIRECTIVES,
   EXPECTED_TWITTER_SITE,
   EXPECTED_TWITTER_CREATOR,
+  EXPECTED_JSONLD_NODES,
 } from "./public-route-head-invariants.config.mjs";
 
 const META_TAG_REGEX = /<meta\b[^>]*>/gi;
@@ -43,6 +44,62 @@ const HREF_REGEX = /href=["']([^"']*)["']/i;
 const CONTENT_REGEX = /content=["']([^"']*)["']/i;
 const NAME_REGEX = /name=["']([^"']+)["']/i;
 const PROPERTY_REGEX = /property=["']([^"']+)["']/i;
+const JSONLD_REGEX =
+  /<script\b[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+
+/**
+ * Extract every JSON-LD script block on the page and parse it. Blocks
+ * that fail to parse are returned with a `parseError` so the caller
+ * can surface them as an invariant violation rather than crashing.
+ * @param {string} html
+ */
+export function extractJsonLd(html) {
+  const blocks = [];
+  const matches = html.matchAll(JSONLD_REGEX);
+  for (const m of matches) {
+    const raw = (m[1] ?? "").trim();
+    if (raw.length === 0) {
+      blocks.push({ raw, parsed: null, parseError: "empty <script> block" });
+      continue;
+    }
+    try {
+      blocks.push({ raw, parsed: JSON.parse(raw), parseError: null });
+    } catch (err) {
+      blocks.push({
+        raw,
+        parsed: null,
+        parseError: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+  return blocks;
+}
+
+/**
+ * Flatten every JSON-LD node the page publishes. Handles top-level
+ * arrays and `@graph` children so downstream checks can look up nodes
+ * by `@type` without caring about wrapping.
+ * @param {ReturnType<typeof extractJsonLd>} blocks
+ */
+export function flattenJsonLdNodes(blocks) {
+  const nodes = [];
+  for (const block of blocks) {
+    if (!block.parsed) continue;
+    const roots = Array.isArray(block.parsed) ? block.parsed : [block.parsed];
+    for (const root of roots) {
+      if (!root || typeof root !== "object") continue;
+      if (Array.isArray(root["@graph"])) {
+        for (const child of root["@graph"]) {
+          if (child && typeof child === "object") nodes.push(child);
+        }
+      } else {
+        nodes.push(root);
+      }
+    }
+  }
+  return nodes;
+}
+
 
 function decode(value) {
   return value
@@ -80,6 +137,7 @@ export function extractHead(html) {
     title: titleMatch ? decode(titleMatch[1].trim()) : null,
     canonical: canonical ? decode(canonical) : null,
     metas,
+    jsonLd: extractJsonLd(html),
   };
 }
 
@@ -159,6 +217,88 @@ function policyChecks(head) {
 }
 
 /**
+ * Structured-data invariants. Every pre-rendered route must publish
+ * the sitewide Schema.org JSON-LD (baked into index.html by the
+ * `softwareApplicationJsonLd` vite plugin) — same @context, same
+ * @type-keyed nodes, same required fields, same Offer catalog. Any
+ * drift (missing block, parse error, mutated @id, dropped offer)
+ * fails the postbuild fence just like a drifted title.
+ * @param {ReturnType<typeof extractHead>} head
+ */
+export function jsonLdChecks(head) {
+  const results = [];
+  const blocks = head.jsonLd ?? [];
+  results.push({
+    label: "JSON-LD: <script type=application/ld+json> present",
+    expected: "at least 1 block",
+    actual: `${blocks.length} block(s)`,
+    ok: blocks.length > 0,
+  });
+  for (let i = 0; i < blocks.length; i += 1) {
+    const b = blocks[i];
+    results.push({
+      label: `JSON-LD[${i}]: parses as JSON`,
+      expected: "valid JSON",
+      actual: b.parseError ?? "valid JSON",
+      ok: b.parseError === null,
+    });
+  }
+  const nodes = flattenJsonLdNodes(blocks);
+  for (let i = 0; i < blocks.length; i += 1) {
+    const b = blocks[i];
+    if (!b.parsed || typeof b.parsed !== "object") continue;
+    const ctx = b.parsed["@context"];
+    const ctxOk =
+      typeof ctx === "string"
+        ? ctx.includes("schema.org")
+        : Array.isArray(ctx)
+          ? ctx.some((c) => typeof c === "string" && c.includes("schema.org"))
+          : false;
+    results.push({
+      label: `JSON-LD[${i}]: @context includes schema.org`,
+      expected: "https://schema.org",
+      actual: ctx === undefined ? null : ctx,
+      ok: ctxOk,
+    });
+  }
+  for (const spec of EXPECTED_JSONLD_NODES) {
+    const node = nodes.find((n) => n && n["@type"] === spec.type);
+    if (!node) {
+      results.push({
+        label: `JSON-LD: node @type="${spec.type}" present`,
+        expected: `@type=${spec.type}`,
+        actual: nodes.map((n) => n?.["@type"] ?? null),
+        ok: false,
+      });
+      continue;
+    }
+    for (const [field, expected] of Object.entries(spec.required)) {
+      results.push({
+        label: `JSON-LD ${spec.type}.${field}`,
+        expected,
+        actual: node[field] ?? null,
+        ok: node[field] === expected,
+      });
+    }
+    if (spec.offerNames) {
+      const offers = Array.isArray(node.offers) ? node.offers : [];
+      const actualNames = offers
+        .filter((o) => o && o["@type"] === "Offer")
+        .map((o) => o.name);
+      const missing = spec.offerNames.filter((n) => !actualNames.includes(n));
+      results.push({
+        label: `JSON-LD ${spec.type}.offers[] names`,
+        expected: [...spec.offerNames],
+        actual: actualNames,
+        ok: missing.length === 0,
+      });
+    }
+  }
+  return results;
+}
+
+
+/**
  * Build a structured diff for one route — every checked field, plus a
  * boolean `ok` flag. Consumed by the JSON report writer and by
  * `checkRouteHead` (which flattens to legacy string issues).
@@ -172,7 +312,8 @@ export function diffRouteHead(head, entry) {
     ok: c.actual === c.expected,
   }));
   const policyIssues = policyChecks(head);
-  const allFields = [...fields, ...policyIssues];
+  const jsonLdIssues = jsonLdChecks(head);
+  const allFields = [...fields, ...policyIssues, ...jsonLdIssues];
   const mismatched = allFields.filter((f) => !f.ok);
   return {
     path: entry.path,

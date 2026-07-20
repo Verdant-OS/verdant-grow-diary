@@ -47,3 +47,39 @@ export const ALLOWED_ROBOTS_DIRECTIVES = Object.freeze([
  */
 export const EXPECTED_TWITTER_SITE = null;
 export const EXPECTED_TWITTER_CREATOR = null;
+
+/**
+ * Schema.org JSON-LD invariants baked into every pre-rendered public
+ * document by the `softwareApplicationJsonLd` vite plugin.
+ *
+ * Every route must ship at least one <script type="application/ld+json">
+ * block. Each entry below describes a node (top-level or under
+ * `@graph`) that must be present, matched by `@type`, and whose listed
+ * required fields must equal the expected values exactly. `offers`
+ * asserts a set of `{ "@type": "Offer", name }` entries by name so
+ * price drift is validated separately by
+ * `validate-jsonld-rich-results.mjs` and this fence just guards
+ * presence + naming — the two together cover both the shape of the
+ * catalog and the correctness of its values.
+ *
+ * Change these only when index.html actually changes. Drift here
+ * silently strips structured data from every public route.
+ */
+export const EXPECTED_JSONLD_NODES = Object.freeze([
+  Object.freeze({
+    type: "SoftwareApplication",
+    required: Object.freeze({
+      "@id": "https://verdantgrowdiary.com/#app",
+      name: "Verdant Grow Diary",
+      applicationCategory: "BusinessApplication",
+      operatingSystem: "Web",
+      url: "https://verdantgrowdiary.com",
+    }),
+    offerNames: Object.freeze([
+      "Free",
+      "Pro (monthly)",
+      "Pro (annual)",
+      "Founder Lifetime",
+    ]),
+  }),
+]);

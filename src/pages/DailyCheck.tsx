@@ -74,6 +74,7 @@ import {
 import {
   DAILY_CHECK_WHAT_COUNTS_HINT,
   resolveDailyCheckPlantSelection,
+  type DailyCheckPlantResolution,
 } from "@/lib/dailyCheckPlantSelectionRules";
 import {
   DAILY_CHECK_NOTE_SAVED_TOAST,
@@ -135,74 +136,107 @@ export default function DailyCheck() {
   const [step, setStep] = useState<DailyGrowCheckStep>("select");
   const [state, setState] = useState<DailyGrowCheckState>(INITIAL_DAILY_GROW_CHECK_STATE);
   const [quickLogOpen, setQuickLogOpen] = useState(false);
+  const [appliedRouteIdentity, setAppliedRouteIdentity] = useState<string | null>(null);
+  const [lastSubmittedAt, setLastSubmittedAt] = useState<number | null>(null);
+  const [lastSubmittedSource, setLastSubmittedSource] = useState<"note" | "sensor" | null>(null);
+
+  const selectablePlants = useMemo(
+    () => (urlGrowId ? plants.filter((plant) => plant.grow_id === urlGrowId) : plants),
+    [plants, urlGrowId],
+  );
 
   // Pure resolution of the ?plantId= URL param against the active plant
   // list and current grow scope. Never silently picks a different plant.
-  const plantResolution = useMemo(
-    () =>
-      resolveDailyCheckPlantSelection({
-        plantIdParam: initialPlantId,
-        plants,
-        activeGrowId: urlGrowId,
-      }),
-    [initialPlantId, plants, urlGrowId],
+  const plantResolution = useMemo((): DailyCheckPlantResolution => {
+    const resolution = resolveDailyCheckPlantSelection({
+      plantIdParam: initialPlantId,
+      plants,
+      activeGrowId: urlGrowId,
+    });
+
+    // Daily Check uses a strict scoped picker. A legacy plant without a
+    // grow assignment cannot be inferred into the current grow here.
+    if (urlGrowId && resolution.status === "valid" && resolution.plant?.grow_id !== urlGrowId) {
+      return {
+        status: "out-of-scope",
+        plant: null,
+        requestedPlantId: resolution.requestedPlantId,
+        message:
+          "That plant is not assigned to the grow you're viewing. Switch grow or pick a plant from this grow below.",
+      };
+    }
+
+    return resolution;
+  }, [initialPlantId, plants, urlGrowId]);
+
+  const routeIdentity = useMemo(
+    () => JSON.stringify([initialPlantId?.trim() ?? "", urlGrowId ?? "", methodHint ?? ""]),
+    [initialPlantId, methodHint, urlGrowId],
   );
+  const routePlant = plantResolution.status === "valid" ? plantResolution.plant : null;
+  const routePlantId = routePlant?.id ?? "";
+  const routeTentId = routePlant?.tent_id ?? "";
+  const routeStep: DailyGrowCheckStep =
+    methodHint === "note" && routePlant
+      ? "quicklog"
+      : methodHint === "sensor" && routePlant && routeTentId
+        ? "manual"
+        : "select";
+  const routeIdentityPending = appliedRouteIdentity !== routeIdentity;
+  const renderedPlantId = routeIdentityPending ? routePlantId : plantId;
+  const renderedStep = routeIdentityPending ? routeStep : step;
+  const renderedQuickLogOpen = routeIdentityPending ? routeStep === "quicklog" : quickLogOpen;
 
   const selectedPlant = useMemo(
-    () => plants.find((plant) => plant.id === plantId) ?? null,
-    [plantId, plants],
+    () => selectablePlants.find((plant) => plant.id === renderedPlantId) ?? null,
+    [renderedPlantId, selectablePlants],
   );
   // A selected plant owns the tent context. Derive this synchronously so an
   // untented plant can never render one frame against a previously selected or
   // default tent while the state-synchronizing effect catches up.
-  const effectiveTentId = plantId ? (selectedPlant?.tent_id ?? "") : tentId;
+  const effectiveTentId = routeIdentityPending
+    ? routeTentId
+    : renderedPlantId
+      ? (selectedPlant?.tent_id ?? "")
+      : tentId;
 
-  // Seed plant from query param ONLY when the resolution is valid. Invalid
-  // / out-of-scope / unknown cases fall through to the picker + banner.
+  // Reconcile every plant/grow/method route identity. Render-time route values
+  // above prevent the previous target or dialog state from painting while this
+  // effect resets the local guided-flow state.
   useEffect(() => {
-    if (plantId) return;
-    if (plantResolution.status !== "valid" || !plantResolution.plant) return;
-    setPlantId(plantResolution.plant.id);
-    setTentId(plantResolution.plant.tent_id ?? "");
-  }, [plantResolution, plantId]);
+    if (tentsLoading || plantsLoading || !routeIdentityPending) return;
+    setPlantId(routePlantId);
+    setTentId(routeTentId);
+    setStep(routeStep);
+    setQuickLogOpen(routeStep === "quicklog");
+    setState(INITIAL_DAILY_GROW_CHECK_STATE);
+    setLastSubmittedAt(null);
+    setLastSubmittedSource(null);
+    setAppliedRouteIdentity(routeIdentity);
+  }, [
+    plantsLoading,
+    routeIdentity,
+    routeIdentityPending,
+    routePlantId,
+    routeStep,
+    routeTentId,
+    tentsLoading,
+  ]);
 
   // When a plant is chosen, sync its assigned tent
   useEffect(() => {
+    if (routeIdentityPending) return;
     if (!plantId) return;
-    const match = plants.find((p) => p.id === plantId);
+    const match = selectablePlants.find((p) => p.id === plantId);
     setTentId(match?.tent_id ?? "");
-  }, [plantId, plants]);
+  }, [plantId, routeIdentityPending, selectablePlants]);
 
   // Default tent to first if none selected and no plant chosen
   useEffect(() => {
+    if (routeIdentityPending) return;
     if (plantResolution.status !== "missing") return;
     if (!tentId && !plantId && tents[0]?.id) setTentId(tents[0].id);
-  }, [plantResolution.status, tentId, plantId, tents]);
-
-  // Apply ?method= hint exactly once: when the plant resolution is valid
-  // and the grower is still on the default "select" step. Sensor focus is
-  // gated on a tent assignment — never silently pick a different tent.
-  // Never auto-submits; only prioritizes the matching option/dialog.
-  const [methodHintApplied, setMethodHintApplied] = useState(false);
-  useEffect(() => {
-    if (methodHintApplied) return;
-    if (!methodHint) return;
-    if (step !== "select") return;
-    if (plantResolution.status !== "valid" || !plantResolution.plant) return;
-    if (methodHint === "note") {
-      setStep("quicklog");
-      setQuickLogOpen(true);
-      setMethodHintApplied(true);
-      return;
-    }
-    if (methodHint === "sensor") {
-      // Sensor focus requires a tent. If missing, leave step alone —
-      // the existing `plant-needs-tent` guard renders the safe message.
-      if (!plantResolution.plant.tent_id) return;
-      setStep("manual");
-      setMethodHintApplied(true);
-    }
-  }, [methodHint, methodHintApplied, plantResolution, step]);
+  }, [plantResolution.status, tentId, plantId, routeIdentityPending, tents]);
 
   const selectedTent = useMemo(
     () => tents.find((tent) => tent.id === effectiveTentId) ?? null,
@@ -210,18 +244,21 @@ export default function DailyCheck() {
   );
   const growId = (selectedPlant as { grow_id?: string | null } | null)?.grow_id ?? null;
 
+  const manualSensorTents = useMemo(() => {
+    if (!selectedPlant) return tents;
+    if (!effectiveTentId) return [];
+    return tents.filter((tent) => tent.id === effectiveTentId);
+  }, [effectiveTentId, selectedPlant, tents]);
+  const manualSensorDefaultTentId = manualSensorTents.some((tent) => tent.id === effectiveTentId)
+    ? effectiveTentId
+    : undefined;
+
   const guard = evaluateDailyGrowCheckGuard({
     tentsCount: tents.length,
-    plantsCount: plants.length,
+    plantsCount: selectablePlants.length,
     selectedPlantTentId: selectedPlant?.tent_id ?? null,
     hasSelectedPlant: !!selectedPlant,
   });
-
-  // Post-submit confirmation is driven exclusively by QuickLog's
-  // `verdant:entry-created` window event, which is dispatched ONLY after a
-  // successful insert. Failed submits never set this state.
-  const [lastSubmittedAt, setLastSubmittedAt] = useState<number | null>(null);
-  const [lastSubmittedSource, setLastSubmittedSource] = useState<"note" | "sensor" | null>(null);
 
   // Listen for QuickLog success to mark steps as added + drive confirmation.
   // We prefer the `createdAt` carried on the event detail (set by QuickLog
@@ -236,8 +273,8 @@ export default function DailyCheck() {
       setLastSubmittedSource("note");
       setState((s) => {
         const next = { ...s };
-        if (step === "quicklog" && s.quicklog === "pending") next.quicklog = "added";
-        if (step === "handheld" && s.handheld === "pending") next.handheld = "added";
+        if (renderedStep === "quicklog" && s.quicklog === "pending") next.quicklog = "added";
+        if (renderedStep === "handheld" && s.handheld === "pending") next.handheld = "added";
         return next;
       });
     }
@@ -251,7 +288,7 @@ export default function DailyCheck() {
       setLastSubmittedAt(Number.isFinite(parsed) ? parsed : Date.now());
       setLastSubmittedSource("sensor");
       setState((s) =>
-        step === "manual" && s.manual === "pending" ? { ...s, manual: "added" } : s,
+        renderedStep === "manual" && s.manual === "pending" ? { ...s, manual: "added" } : s,
       );
     }
     window.addEventListener("verdant:entry-created", onEntry);
@@ -260,7 +297,7 @@ export default function DailyCheck() {
       window.removeEventListener("verdant:entry-created", onEntry);
       window.removeEventListener("verdant:sensor-reading-created", onSensor);
     };
-  }, [step]);
+  }, [renderedStep]);
 
   const postSubmitActions = useMemo(
     () =>
@@ -318,7 +355,7 @@ export default function DailyCheck() {
     [effectiveTentId, tentReadings],
   );
 
-  const progress = stepProgress(step);
+  const progress = stepProgress(renderedStep);
 
   function markAndAdvance(field: keyof DailyGrowCheckState, value: StepOutcome) {
     setState((s) => ({ ...s, [field]: value }));
@@ -371,7 +408,7 @@ export default function DailyCheck() {
         </div>
       )}
 
-      {(guard.ok || guard.reason === "plant-needs-tent") && step === "select" && (
+      {(guard.ok || guard.reason === "plant-needs-tent") && renderedStep === "select" && (
         <div className="w-full min-w-0" data-testid="daily-grow-check-target-selector">
           <StepCard
             title="Step 1 · Select Current Tent / Plant"
@@ -381,7 +418,7 @@ export default function DailyCheck() {
               <div className="min-w-0">
                 <Label className="text-xs">Current Plant</Label>
                 <Select
-                  value={plantId || "__none"}
+                  value={renderedPlantId || "__none"}
                   onValueChange={(value) => setPlantId(value === "__none" ? "" : value)}
                 >
                   <SelectTrigger
@@ -392,7 +429,7 @@ export default function DailyCheck() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none">No specific plant</SelectItem>
-                    {plants.map((plant) => (
+                    {selectablePlants.map((plant) => (
                       <SelectItem key={plant.id} value={plant.id}>
                         {plant.name}
                         {plant.strain ? ` · ${plant.strain}` : ""}
@@ -683,7 +720,7 @@ export default function DailyCheck() {
               No new persistence. No new sensor ingestion. Sensor snapshot
               option is gated on the effective current tent; a selected plant
               can use only its assigned tent and never falls back to another. */}
-          {step !== "done" && (
+          {renderedStep !== "done" && (
             <section
               className="glass mb-4 w-full min-w-0 space-y-3 rounded-2xl p-4"
               data-testid="daily-grow-check-choose"
@@ -740,7 +777,7 @@ export default function DailyCheck() {
                 </Button>
               </div>
 
-              {!selectedPlant && plants.length > 0 && (
+              {!selectedPlant && selectablePlants.length > 0 && (
                 <div
                   className="min-w-0 space-y-1 break-words rounded-md border border-border/50 bg-muted/30 p-2 text-xs"
                   data-testid="daily-grow-check-choose-no-plant"
@@ -827,7 +864,7 @@ export default function DailyCheck() {
           )}
 
           {/* Progress */}
-          {step !== "done" && (
+          {renderedStep !== "done" && (
             <>
               <h2
                 className="mb-2 mt-2 min-w-0 break-words font-display text-sm font-semibold text-muted-foreground"
@@ -843,7 +880,7 @@ export default function DailyCheck() {
                   <span>
                     Step {progress.index + 1} of {progress.total}
                   </span>
-                  <span className="capitalize">{step}</span>
+                  <span className="capitalize">{renderedStep}</span>
                 </div>
                 <Progress value={progress.percent} className="h-1.5" />
               </div>
@@ -851,7 +888,7 @@ export default function DailyCheck() {
           )}
 
           {/* Step content */}
-          {step === "environment" && (
+          {renderedStep === "environment" && (
             <StepCard
               title="Step 2 · Review Current Environment"
               icon={<Gauge className="h-4 w-4" />}
@@ -868,14 +905,14 @@ export default function DailyCheck() {
             </StepCard>
           )}
 
-          {step === "manual" && (
+          {renderedStep === "manual" && (
             <StepCard
               title="Step 3 · Add Manual Sensor Snapshot"
               icon={<Gauge className="h-4 w-4" />}
             >
               <ManualSensorReadingCard
-                tents={tents.map((t) => ({ id: t.id, name: t.name }))}
-                defaultTentId={effectiveTentId || undefined}
+                tents={manualSensorTents.map((t) => ({ id: t.id, name: t.name }))}
+                defaultTentId={manualSensorDefaultTentId}
                 successMessage={DAILY_CHECK_SENSOR_SAVED_TOAST}
                 onSaved={() => handleSubmitSuccess("sensor")}
               />
@@ -905,7 +942,7 @@ export default function DailyCheck() {
             </StepCard>
           )}
 
-          {step === "quicklog" && (
+          {renderedStep === "quicklog" && (
             <StepCard title="Step 4 · Quick Log" icon={<Sparkles className="h-4 w-4" />}>
               <p className="mb-3 min-w-0 break-words text-sm text-muted-foreground">
                 Add a quick note (and optional photo) about what you observed today.
@@ -950,7 +987,7 @@ export default function DailyCheck() {
             </StepCard>
           )}
 
-          {step === "handheld" && (
+          {renderedStep === "handheld" && (
             <StepCard title="Step 5 · Handheld Readings" icon={<Wrench className="h-4 w-4" />}>
               <p className="mb-3 min-w-0 break-words text-sm text-muted-foreground">
                 Optional. Use the Hardware readings block inside Quick Log (Spider Farmer pH/EC pen,
@@ -997,7 +1034,7 @@ export default function DailyCheck() {
             </StepCard>
           )}
 
-          {step === "review" && (
+          {renderedStep === "review" && (
             <StepCard
               title="Step 6 · Review Alerts & Pending Tasks"
               icon={<Bell className="h-4 w-4" />}
@@ -1037,7 +1074,7 @@ export default function DailyCheck() {
             </StepCard>
           )}
 
-          {step === "done" && (
+          {renderedStep === "done" && (
             <StepCard title="Today's check is saved" icon={<CheckCircle2 className="h-4 w-4" />}>
               <p
                 className="text-sm text-muted-foreground mb-3"
@@ -1111,21 +1148,21 @@ export default function DailyCheck() {
           )}
 
           {/* Sticky footer for Back/Next on mid-flow steps */}
-          {step !== "done" && step !== "select" && step !== "review" && (
+          {renderedStep !== "done" && renderedStep !== "select" && renderedStep !== "review" && (
             <div
               className="sticky bottom-2 mt-4 flex w-full min-w-0 gap-2 rounded-xl border bg-background/80 p-2 backdrop-blur"
               data-testid="daily-grow-check-footer"
             >
               <Button
                 variant="ghost"
-                onClick={() => setStep(previousStep(step))}
+                onClick={() => setStep(previousStep(renderedStep))}
                 className="min-h-11 min-w-0 flex-1 whitespace-normal"
               >
                 <ArrowLeft className="h-4 w-4" /> Back
               </Button>
               <Button
                 variant="default"
-                onClick={() => setStep(nextStep(step))}
+                onClick={() => setStep(nextStep(renderedStep))}
                 className="min-h-11 min-w-0 flex-1 whitespace-normal"
                 data-testid="daily-grow-check-next"
               >
@@ -1133,7 +1170,7 @@ export default function DailyCheck() {
               </Button>
             </div>
           )}
-          {step === "select" && guard.ok && (
+          {renderedStep === "select" && guard.ok && (
             <div className="sticky bottom-2 mt-4 flex w-full min-w-0 gap-2 rounded-xl border bg-background/80 p-2 backdrop-blur">
               <Button
                 className="min-h-11 min-w-0 flex-1 whitespace-normal"
@@ -1148,7 +1185,7 @@ export default function DailyCheck() {
 
           {/* Shared QuickLog dialog with prefill */}
           <QuickLog
-            open={quickLogOpen}
+            open={renderedQuickLogOpen}
             onOpenChange={setQuickLogOpen}
             onCreated={() => handleSubmitSuccess("note")}
             successMessage={DAILY_CHECK_NOTE_SAVED_TOAST}

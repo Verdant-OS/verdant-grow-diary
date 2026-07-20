@@ -7,12 +7,15 @@
  */
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { MemoryRouter } from "react-router-dom";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { useEffect } from "react";
+import { MemoryRouter, useNavigate } from "react-router-dom";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const useSensorReadingsMock = vi.hoisted(() =>
   vi.fn((_tentId?: string, _limit?: number) => ({ data: [] })),
 );
+const activityRenderMock = vi.hoisted(() => vi.fn());
+const quickLogRenderMock = vi.hoisted(() => vi.fn());
 
 const mockPlants = [
   {
@@ -22,6 +25,15 @@ const mockPlants = [
     grow_id: "g1",
     tent_id: "t2",
     stage: "veg",
+    is_archived: false,
+  },
+  {
+    id: "p-assigned-two",
+    name: "Second scoped plant",
+    strain: "Route Change",
+    grow_id: "g1",
+    tent_id: "t1",
+    stage: "flower",
     is_archived: false,
   },
   {
@@ -38,6 +50,15 @@ const mockPlants = [
     name: "Other grow plant",
     strain: null,
     grow_id: "g2",
+    tent_id: "t1",
+    stage: "veg",
+    is_archived: false,
+  },
+  {
+    id: "p-legacy",
+    name: "Legacy unassigned grow plant",
+    strain: null,
+    grow_id: null,
     tent_id: "t1",
     stage: "veg",
     is_archived: false,
@@ -71,18 +92,31 @@ vi.mock("@/components/QuickLogAllActivitiesSection", () => ({
     plantId: string | null;
     testIdPrefix: string;
   }) => (
-    <div
-      data-testid={testIdPrefix}
-      data-grow-id={growId ?? ""}
-      data-tent-id={tentId ?? ""}
-      data-plant-id={plantId ?? ""}
-    />
+    activityRenderMock({ growId, tentId, plantId }),
+    (
+      <div
+        data-testid={testIdPrefix}
+        data-grow-id={growId ?? ""}
+        data-tent-id={tentId ?? ""}
+        data-plant-id={plantId ?? ""}
+      />
+    )
   ),
 }));
 
 vi.mock("@/components/ManualSensorReadingCard", () => ({
-  default: ({ defaultTentId }: { defaultTentId?: string }) => (
-    <div data-testid="mock-manual-card" data-default-tent-id={defaultTentId ?? ""} />
+  default: ({
+    defaultTentId,
+    tents,
+  }: {
+    defaultTentId?: string;
+    tents: Array<{ id: string; name: string }>;
+  }) => (
+    <div
+      data-testid="mock-manual-card"
+      data-default-tent-id={defaultTentId ?? ""}
+      data-tent-options={tents.map((tent) => tent.id).join(",")}
+    />
   ),
 }));
 vi.mock("@/components/QuickLog", () => ({
@@ -93,13 +127,16 @@ vi.mock("@/components/QuickLog", () => ({
     open?: boolean;
     prefill?: { growId: string | null; tentId: string | null; plantId: string | null };
   }) => (
-    <div
-      data-testid="mock-quicklog"
-      data-open={open ? "1" : "0"}
-      data-prefill-grow-id={prefill?.growId ?? ""}
-      data-prefill-tent-id={prefill?.tentId ?? ""}
-      data-prefill-plant-id={prefill?.plantId ?? ""}
-    />
+    quickLogRenderMock({ open, prefill }),
+    (
+      <div
+        data-testid="mock-quicklog"
+        data-open={open ? "1" : "0"}
+        data-prefill-grow-id={prefill?.growId ?? ""}
+        data-prefill-tent-id={prefill?.tentId ?? ""}
+        data-prefill-plant-id={prefill?.plantId ?? ""}
+      />
+    )
   ),
 }));
 vi.mock("@/components/PlantStatusStrip", () => ({
@@ -147,14 +184,81 @@ function renderRoute(path: string) {
   );
 }
 
+let navigateInTest: ((path: string) => void) | null = null;
+
+function NavigationCapture() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    navigateInTest = (path) => navigate(path);
+    return () => {
+      navigateInTest = null;
+    };
+  }, [navigate]);
+
+  return null;
+}
+
+function renderNavigableRoute(path: string) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={[path]}>
+        <NavigationCapture />
+        <DailyCheck />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
+async function navigateRoute(path: string) {
+  expect(navigateInTest).not.toBeNull();
+  await act(async () => {
+    navigateInTest?.(path);
+  });
+}
+
+async function choosePlant(name: RegExp) {
+  const trigger = screen.getByTestId("daily-grow-check-plant-select");
+  fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerType: "mouse" });
+  fireEvent.click(trigger);
+  fireEvent.click(await screen.findByRole("option", { name }));
+}
+
 function expectBefore(earlier: HTMLElement, later: HTMLElement) {
   expect(earlier.compareDocumentPosition(later) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
 }
+
+function expectEveryActivityRenderToUse(plantId: string | null, tentId: string | null) {
+  expect(activityRenderMock).toHaveBeenCalled();
+  for (const [props] of activityRenderMock.mock.calls) {
+    expect(props).toMatchObject({ plantId, tentId });
+  }
+}
+
+beforeAll(() => {
+  if (!Element.prototype.hasPointerCapture) {
+    Element.prototype.hasPointerCapture = () => false;
+  }
+  if (!Element.prototype.setPointerCapture) {
+    Element.prototype.setPointerCapture = () => {};
+  }
+  if (!Element.prototype.releasePointerCapture) {
+    Element.prototype.releasePointerCapture = () => {};
+  }
+  if (!Element.prototype.scrollIntoView) {
+    Element.prototype.scrollIntoView = () => {};
+  }
+});
 
 describe("DailyCheck target selector order and exact-target truth", () => {
   beforeEach(() => {
     mockUrlGrowId = null;
     useSensorReadingsMock.mockClear();
+    activityRenderMock.mockClear();
+    quickLogRenderMock.mockClear();
   });
 
   it("renders one selector before activities, fast choices, and the guided heading", async () => {
@@ -270,9 +374,157 @@ describe("DailyCheck target selector order and exact-target truth", () => {
     expect(screen.getByTestId("mock-quicklog")).toHaveAttribute("data-prefill-tent-id", "t2");
   });
 
+  it("switches valid route plants without rendering the previous target first", async () => {
+    renderNavigableRoute("/daily-check?plantId=p-assigned");
+    await waitFor(() =>
+      expect(screen.getByTestId("daily-check-all-activities")).toHaveAttribute(
+        "data-plant-id",
+        "p-assigned",
+      ),
+    );
+
+    activityRenderMock.mockClear();
+    await navigateRoute("/daily-check?plantId=p-assigned-two");
+    await waitFor(() =>
+      expect(screen.getByTestId("daily-check-all-activities")).toHaveAttribute(
+        "data-plant-id",
+        "p-assigned-two",
+      ),
+    );
+    expectEveryActivityRenderToUse("p-assigned-two", "t1");
+    expect(screen.getByTestId("mock-quicklog")).toHaveAttribute(
+      "data-prefill-plant-id",
+      "p-assigned-two",
+    );
+  });
+
+  it.each([
+    ["unknown", "/daily-check?plantId=missing&method=note", null],
+    ["out-of-scope", "/daily-check?plantId=p-other-grow&growId=g1&method=note", "g1"],
+  ])(
+    "clears a mounted valid target before rendering a new %s route",
+    async (status, path, nextGrowId) => {
+      renderNavigableRoute("/daily-check?plantId=p-assigned&method=note");
+      await waitFor(() =>
+        expect(screen.getByTestId("mock-quicklog")).toHaveAttribute("data-open", "1"),
+      );
+
+      activityRenderMock.mockClear();
+      quickLogRenderMock.mockClear();
+      mockUrlGrowId = nextGrowId;
+      await navigateRoute(path);
+
+      expect(await screen.findByTestId("daily-grow-check-plant-rejected")).toHaveAttribute(
+        "data-rejection-status",
+        status,
+      );
+      expectEveryActivityRenderToUse(null, null);
+      expect(screen.getByTestId("mock-quicklog")).toHaveAttribute("data-open", "0");
+      for (const [props] of quickLogRenderMock.mock.calls) {
+        expect(props.prefill).toMatchObject({ plantId: null, tentId: null });
+      }
+    },
+  );
+
+  it("reconciles method changes on the same mounted plant route", async () => {
+    renderNavigableRoute("/daily-check?plantId=p-assigned&from=dashboard&method=note");
+    await waitFor(() =>
+      expect(screen.getByTestId("mock-quicklog")).toHaveAttribute("data-open", "1"),
+    );
+
+    quickLogRenderMock.mockClear();
+    await navigateRoute("/daily-check?plantId=p-assigned&from=dashboard&method=sensor");
+    expect(await screen.findByTestId("mock-manual-card")).toHaveAttribute(
+      "data-default-tent-id",
+      "t2",
+    );
+    expect(screen.queryByTestId("daily-grow-check-open-quicklog")).not.toBeInTheDocument();
+    for (const [props] of quickLogRenderMock.mock.calls) {
+      expect(props).toMatchObject({ open: false });
+      expect(props.prefill).toMatchObject({ plantId: "p-assigned", tentId: "t2" });
+    }
+
+    quickLogRenderMock.mockClear();
+    await navigateRoute("/daily-check?plantId=p-assigned&from=dashboard&method=note");
+    await waitFor(() =>
+      expect(screen.getByTestId("mock-quicklog")).toHaveAttribute("data-open", "1"),
+    );
+    for (const [props] of quickLogRenderMock.mock.calls) {
+      expect(props).toMatchObject({ open: true });
+      expect(props.prefill).toMatchObject({ plantId: "p-assigned", tentId: "t2" });
+    }
+  });
+
+  it("keeps local plant selection working while route identity is unchanged", async () => {
+    renderNavigableRoute("/daily-check?plantId=p-assigned");
+    await waitFor(() =>
+      expect(screen.getByTestId("daily-check-all-activities")).toHaveAttribute(
+        "data-plant-id",
+        "p-assigned",
+      ),
+    );
+
+    activityRenderMock.mockClear();
+    await choosePlant(/Second scoped plant/i);
+    await waitFor(() =>
+      expect(screen.getByTestId("daily-check-all-activities")).toHaveAttribute(
+        "data-plant-id",
+        "p-assigned-two",
+      ),
+    );
+    expectEveryActivityRenderToUse("p-assigned-two", "t1");
+  });
+
+  it("offers only plants from the current grow scope", async () => {
+    mockUrlGrowId = "g1";
+    renderNavigableRoute("/daily-check?growId=g1");
+    const trigger = await screen.findByTestId("daily-grow-check-plant-select");
+    fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerType: "mouse" });
+    fireEvent.click(trigger);
+
+    expect(await screen.findByRole("option", { name: /Assigned plant/i })).toBeVisible();
+    expect(screen.getByRole("option", { name: /Second scoped plant/i })).toBeVisible();
+    expect(screen.queryByRole("option", { name: /Other grow plant/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("option", { name: /Legacy unassigned grow plant/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("uses the scoped empty state when the current grow has no selectable plants", async () => {
+    mockUrlGrowId = "g-empty";
+    renderNavigableRoute("/daily-check?growId=g-empty");
+    expect(await screen.findByTestId("daily-grow-check-empty-no-plants-actions")).toBeVisible();
+    expect(screen.queryByTestId("daily-grow-check-target-selector")).not.toBeInTheDocument();
+  });
+
+  it("locks manual sensor entry to the selected plant's one assigned tent", async () => {
+    renderRoute("/daily-check?plantId=p-assigned&method=sensor");
+    const card = await screen.findByTestId("mock-manual-card");
+    expect(card).toHaveAttribute("data-default-tent-id", "t2");
+    expect(card).toHaveAttribute("data-tent-options", "t2");
+  });
+
+  it("keeps all manual sensor tent options for an explicit tent-only check", async () => {
+    renderRoute("/daily-check");
+    await waitFor(() =>
+      expect(screen.getByTestId("daily-grow-check-choose-snapshot")).not.toBeDisabled(),
+    );
+    fireEvent.click(screen.getByTestId("daily-grow-check-choose-snapshot"));
+    const card = await screen.findByTestId("mock-manual-card");
+    expect(card).toHaveAttribute("data-default-tent-id", "t1");
+    expect(card).toHaveAttribute("data-tent-options", "t1,t2");
+  });
+
+  it("never mounts manual sensor choices for an untented route plant", async () => {
+    renderRoute("/daily-check?plantId=p-untented&method=sensor");
+    expect(await screen.findByTestId("daily-grow-check-choose-snapshot")).toBeDisabled();
+    expect(screen.queryByTestId("mock-manual-card")).not.toBeInTheDocument();
+  });
+
   it.each([
     ["unknown", "/daily-check?plantId=missing&method=note"],
     ["out-of-scope", "/daily-check?plantId=p-other-grow&growId=g1&method=note"],
+    ["out-of-scope", "/daily-check?plantId=p-legacy&growId=g1&method=note"],
   ])("fails closed for %s route targets", async (status, path) => {
     if (status === "out-of-scope") mockUrlGrowId = "g1";
     renderRoute(path);

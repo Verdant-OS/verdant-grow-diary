@@ -1,5 +1,11 @@
 export interface GrowerNavigationDestination {
-  id: "phenoHunt" | "breedingPrograms" | "lineageRepair" | "agentIntegrations" | "aiSessions";
+  id:
+    | "phenoHunt"
+    | "breedingPrograms"
+    | "lineageRepair"
+    | "agentIntegrations"
+    | "aiSessions"
+    | "genetics";
   to: string;
   label: string;
 }
@@ -22,6 +28,7 @@ export const LABS_NAVIGATION_DESTINATIONS = [
     label: "Agent Integrations",
   },
   { id: "aiSessions", to: "/doctor/sessions", label: "AI Sessions" },
+  { id: "genetics", to: "/genetics", label: "Genetics" },
 ] as const satisfies readonly GrowerNavigationDestination[];
 
 export type LabsNavigationDestinationId = (typeof LABS_NAVIGATION_DESTINATIONS)[number]["id"];

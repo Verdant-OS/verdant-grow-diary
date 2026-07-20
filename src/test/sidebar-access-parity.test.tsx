@@ -105,6 +105,7 @@ describe("AppSidebar — non-operator authenticated grower", () => {
       "/grow-lineage",
       "/settings/agent-integrations",
       "/doctor/sessions",
+      "/genetics",
     ]) {
       expect(links.has(path), `Labs link ${path} must be hidden before disclosure`).toBe(false);
     }
@@ -117,6 +118,7 @@ describe("AppSidebar — non-operator authenticated grower", () => {
       "/grow-lineage",
       "/settings/agent-integrations",
       "/doctor/sessions",
+      "/genetics",
     ]) {
       expect(links.has(path), `missing grower link ${path}`).toBe(true);
     }
@@ -254,6 +256,7 @@ describe("UI Simplification Slice 1 — grower-facing group structure", () => {
       "Lineage Repair",
       "Agent Integrations",
       "AI Sessions",
+      "Genetics",
     ]) {
       expect(within(menu).getByRole("menuitem", { name: label })).toBeInTheDocument();
     }

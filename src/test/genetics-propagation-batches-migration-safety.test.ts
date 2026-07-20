@@ -133,7 +133,7 @@ describe("genetics propagation batches migration safety", () => {
     const fnStart = sql.indexOf("FUNCTION public.genetics_batch_upsert");
     const body = sql.slice(fnStart);
     expect(body).toMatch(/INSERT INTO public\.propagation_batch_status_events/);
-    expect(body).toMatch(/GET STACKED DIAGNOSTICS[\s\S]*?PG_EXCEPTION_CONSTRAINT/);
+    expect(body).toMatch(/GET STACKED DIAGNOSTICS[\s\S]*?CONSTRAINT_NAME/);
     expect(body).toMatch(/genetics_mutation_idempotency_pkey/);
   });
 

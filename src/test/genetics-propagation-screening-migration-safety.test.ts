@@ -95,7 +95,7 @@ describe("genetics screening ledger migration safety", () => {
     expect(body).toMatch(/'subject_not_found'/);
     // A correction must target the SAME subject + target and be owned.
     expect(body).toMatch(/'supersedes_invalid'/);
-    expect(body).toMatch(/GET STACKED DIAGNOSTICS[\s\S]*?PG_EXCEPTION_CONSTRAINT/);
+    expect(body).toMatch(/GET STACKED DIAGNOSTICS[\s\S]*?CONSTRAINT_NAME/);
   });
 
   it("grants nothing to anon/public, revokes execute from PUBLIC, no automation", () => {

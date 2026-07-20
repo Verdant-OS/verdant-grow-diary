@@ -101,7 +101,7 @@ describe("genetics accessions migration safety", () => {
 
   it("distinguishes an idempotency replay from a domain unique violation", () => {
     // Only the named idempotency PK short-circuits to a replay; anything else re-raises.
-    expect(sql).toMatch(/GET STACKED DIAGNOSTICS[\s\S]*?PG_EXCEPTION_CONSTRAINT/);
+    expect(sql).toMatch(/GET STACKED DIAGNOSTICS[\s\S]*?CONSTRAINT_NAME/);
     expect(sql).toMatch(
       /v_constraint = 'genetics_mutation_idempotency_pkey'/,
     );

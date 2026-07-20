@@ -27,6 +27,7 @@ const FIXTURE_META = {
 
 function fixtureHtml(overrides: Partial<Record<string, string>> = {}) {
   const v = { ...FIXTURE_META, ...overrides } as Record<string, string>;
+  const robots = v.robots ?? "index, follow";
   return `<!doctype html><html><head>
     <title>${v.title}</title>
     <meta name="description" content="${v.description}" />
@@ -34,12 +35,14 @@ function fixtureHtml(overrides: Partial<Record<string, string>> = {}) {
     <meta property="og:title" content="${v.title}" />
     <meta property="og:description" content="${v.description}" />
     <meta property="og:url" content="${v.url}" />
+    <meta property="og:type" content="website" />
     <meta property="og:image" content="${v.image}" />
     <meta property="og:image:alt" content="${v.imageAlt}" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="${v.title}" />
     <meta name="twitter:description" content="${v.description}" />
     <meta name="twitter:image" content="${v.image}" />
+    <meta name="robots" content="${robots}" />
   </head><body></body></html>`;
 }
 
@@ -162,5 +165,80 @@ describe("static route head fidelity helpers", () => {
       { generatedAt: "2026-07-20T00:00:00.000Z", distDir: "/tmp/dist", missingFiles: [] },
     );
     expect(md).toContain("All checked routes match");
+  });
+
+  describe("global head invariants (robots, og:type, twitter handles)", () => {
+    it("requires og:type=website on every pre-rendered route", () => {
+      const html = fixtureHtml().replace(
+        /<meta property="og:type"[^>]*>/,
+        '<meta property="og:type" content="article" />',
+      );
+      const diff = diffRouteHead(extractHead(html), { path: "/pricing", metadata: FIXTURE_META });
+      const field = diff.mismatched.find((f: any) => f.label.includes("og:type"));
+      expect(field).toBeTruthy();
+      expect(field!.expected).toBe("website");
+      expect(field!.actual).toBe("article");
+    });
+
+    it("flags a missing og:type as a mismatch (not silently allowed)", () => {
+      const html = fixtureHtml().replace(/<meta property="og:type"[^>]*>/, "");
+      const diff = diffRouteHead(extractHead(html), { path: "/pricing", metadata: FIXTURE_META });
+      expect(diff.mismatched.some((f: any) => f.label.includes("og:type") && f.actual === null)).toBe(
+        true,
+      );
+    });
+
+    it("requires an explicit robots directive on every route (default index, follow)", () => {
+      const html = fixtureHtml().replace(/<meta name="robots"[^>]*>/, "");
+      const diff = diffRouteHead(extractHead(html), { path: "/pricing", metadata: FIXTURE_META });
+      const field = diff.mismatched.find((f: any) => f.label === 'meta name="robots"');
+      expect(field).toBeTruthy();
+      expect(field!.expected).toBe("index, follow");
+      expect(field!.actual).toBe(null);
+    });
+
+    it("rejects robots values outside the allowed set", () => {
+      const html = fixtureHtml({ robots: "none" });
+      const diff = diffRouteHead(extractHead(html), { path: "/pricing", metadata: FIXTURE_META });
+      // Both the equality check AND the allowed-values policy check fire.
+      const policy = diff.mismatched.find((f: any) => f.label.includes("allowed values"));
+      expect(policy).toBeTruthy();
+      expect(policy!.actual).toBe("none");
+    });
+
+    it("accepts noindex, follow when the manifest opts in", () => {
+      const html = fixtureHtml({ robots: "noindex, follow" });
+      const diff = diffRouteHead(extractHead(html), {
+        path: "/pricing",
+        metadata: { ...FIXTURE_META, robots: "noindex, follow" },
+      });
+      expect(diff.ok).toBe(true);
+    });
+
+    it("asserts twitter:site and twitter:creator are absent while no handle is configured", () => {
+      // Fixture omits both — invariant currently expects null on both.
+      const diff = diffRouteHead(extractHead(fixtureHtml()), {
+        path: "/pricing",
+        metadata: FIXTURE_META,
+      });
+      const site = diff.fields.find((f: any) => f.label === 'meta name="twitter:site"');
+      const creator = diff.fields.find((f: any) => f.label === 'meta name="twitter:creator"');
+      expect(site?.ok).toBe(true);
+      expect(creator?.ok).toBe(true);
+      expect(site?.expected).toBe(null);
+      expect(creator?.expected).toBe(null);
+    });
+
+    it("flags an unexpected twitter:creator tag as drift when no handle is configured", () => {
+      const html = fixtureHtml().replace(
+        "</head>",
+        '<meta name="twitter:creator" content="@rogue_handle" /></head>',
+      );
+      const diff = diffRouteHead(extractHead(html), { path: "/pricing", metadata: FIXTURE_META });
+      const creator = diff.mismatched.find((f: any) => f.label === 'meta name="twitter:creator"');
+      expect(creator).toBeTruthy();
+      expect(creator!.expected).toBe(null);
+      expect(creator!.actual).toBe("@rogue_handle");
+    });
   });
 });

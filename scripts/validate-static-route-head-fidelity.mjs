@@ -27,6 +27,13 @@
  */
 import { readFileSync, existsSync, writeFileSync, mkdirSync } from "node:fs";
 import { resolve, join, dirname } from "node:path";
+import {
+  EXPECTED_OG_TYPE,
+  DEFAULT_ROBOTS_DIRECTIVE,
+  ALLOWED_ROBOTS_DIRECTIVES,
+  EXPECTED_TWITTER_SITE,
+  EXPECTED_TWITTER_CREATOR,
+} from "./public-route-head-invariants.config.mjs";
 
 const META_TAG_REGEX = /<meta\b[^>]*>/gi;
 const TITLE_REGEX = /<title\b[^>]*>([\s\S]*?)<\/title>/i;
@@ -98,14 +105,57 @@ function fieldChecks(head, entry) {
     { label: 'meta name="twitter:description"', expected: metadata.description, actual: head.metas.get("name:twitter:description") ?? null },
     { label: 'meta name="twitter:image"', expected: metadata.image, actual: head.metas.get("name:twitter:image") ?? null },
   ];
-  if (metadata.robots) {
-    checks.push({
-      label: 'meta name="robots"',
-      expected: metadata.robots,
-      actual: head.metas.get("name:robots") ?? null,
+  // Robots: always asserted. Per-route override wins; otherwise the
+  // sitewide default from index.html applies. Any value outside
+  // ALLOWED_ROBOTS_DIRECTIVES is a hard fail (checked separately in
+  // diffRouteHead so we can flag both "wrong value" and "unknown value").
+  const expectedRobots = metadata.robots ?? DEFAULT_ROBOTS_DIRECTIVE;
+  checks.push({
+    label: 'meta name="robots"',
+    expected: expectedRobots,
+    actual: head.metas.get("name:robots") ?? null,
+  });
+  // og:type: sitewide invariant inherited from index.html. Every
+  // pre-rendered route must preserve it.
+  checks.push({
+    label: 'meta property="og:type"',
+    expected: EXPECTED_OG_TYPE,
+    actual: head.metas.get("property:og:type") ?? null,
+  });
+  // twitter:site / twitter:creator: if a handle is configured, every
+  // route must publish exactly that handle. If null, every route
+  // must OMIT the tag (asserted as expected: null).
+  checks.push({
+    label: 'meta name="twitter:site"',
+    expected: EXPECTED_TWITTER_SITE,
+    actual: head.metas.get("name:twitter:site") ?? null,
+  });
+  checks.push({
+    label: 'meta name="twitter:creator"',
+    expected: EXPECTED_TWITTER_CREATOR,
+    actual: head.metas.get("name:twitter:creator") ?? null,
+  });
+  return checks;
+}
+
+/**
+ * Non-equality invariants that need a policy check rather than a
+ * simple expected/actual compare. Returned as field-shaped diffs so
+ * they render in the same JSON/Markdown report.
+ * @param {ReturnType<typeof extractHead>} head
+ */
+function policyChecks(head) {
+  const robots = head.metas.get("name:robots") ?? null;
+  const results = [];
+  if (robots !== null && !ALLOWED_ROBOTS_DIRECTIVES.includes(robots)) {
+    results.push({
+      label: 'meta name="robots" (allowed values)',
+      expected: `one of ${JSON.stringify(ALLOWED_ROBOTS_DIRECTIVES)}`,
+      actual: robots,
+      ok: false,
     });
   }
-  return checks;
+  return results;
 }
 
 /**
@@ -121,12 +171,14 @@ export function diffRouteHead(head, entry) {
     ...c,
     ok: c.actual === c.expected,
   }));
-  const mismatched = fields.filter((f) => !f.ok);
+  const policyIssues = policyChecks(head);
+  const allFields = [...fields, ...policyIssues];
+  const mismatched = allFields.filter((f) => !f.ok);
   return {
     path: entry.path,
     fileName: entry.fileName ?? null,
     ok: mismatched.length === 0,
-    fields,
+    fields: allFields,
     mismatched,
   };
 }

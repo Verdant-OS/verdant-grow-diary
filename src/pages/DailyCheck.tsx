@@ -144,6 +144,10 @@ export default function DailyCheck() {
     () => (urlGrowId ? plants.filter((plant) => plant.grow_id === urlGrowId) : plants),
     [plants, urlGrowId],
   );
+  const selectableTents = useMemo(
+    () => (urlGrowId ? tents.filter((tent) => tent.grow_id === urlGrowId) : tents),
+    [tents, urlGrowId],
+  );
 
   // Pure resolution of the ?plantId= URL param against the active plant
   // list and current grow scope. Never silently picks a different plant.
@@ -169,13 +173,33 @@ export default function DailyCheck() {
     return resolution;
   }, [initialPlantId, plants, urlGrowId]);
 
-  const routeIdentity = useMemo(
-    () => JSON.stringify([initialPlantId?.trim() ?? "", urlGrowId ?? "", methodHint ?? ""]),
-    [initialPlantId, methodHint, urlGrowId],
-  );
   const routePlant = plantResolution.status === "valid" ? plantResolution.plant : null;
   const routePlantId = routePlant?.id ?? "";
-  const routeTentId = routePlant?.tent_id ?? "";
+  const routeAssignedTentId = routePlant?.tent_id ?? "";
+  const routeTentId = selectableTents.some((tent) => tent.id === routeAssignedTentId)
+    ? routeAssignedTentId
+    : "";
+  const routeIdentity = useMemo(
+    () =>
+      JSON.stringify([
+        initialPlantId?.trim() ?? "",
+        urlGrowId ?? "",
+        methodHint ?? "",
+        plantResolution.status,
+        routePlantId,
+        routeAssignedTentId,
+        routeTentId,
+      ]),
+    [
+      initialPlantId,
+      methodHint,
+      plantResolution.status,
+      routeAssignedTentId,
+      routePlantId,
+      routeTentId,
+      urlGrowId,
+    ],
+  );
   const routeStep: DailyGrowCheckStep =
     methodHint === "note" && routePlant
       ? "quicklog"
@@ -184,21 +208,28 @@ export default function DailyCheck() {
         : "select";
   const routeIdentityPending = appliedRouteIdentity !== routeIdentity;
   const renderedPlantId = routeIdentityPending ? routePlantId : plantId;
-  const renderedStep = routeIdentityPending ? routeStep : step;
-  const renderedQuickLogOpen = routeIdentityPending ? routeStep === "quicklog" : quickLogOpen;
 
   const selectedPlant = useMemo(
     () => selectablePlants.find((plant) => plant.id === renderedPlantId) ?? null,
     [renderedPlantId, selectablePlants],
   );
+  const selectedPlantTentId =
+    selectedPlant?.tent_id && selectableTents.some((tent) => tent.id === selectedPlant.tent_id)
+      ? selectedPlant.tent_id
+      : "";
+  const selectedStandaloneTentId = selectableTents.some((tent) => tent.id === tentId) ? tentId : "";
   // A selected plant owns the tent context. Derive this synchronously so an
   // untented plant can never render one frame against a previously selected or
   // default tent while the state-synchronizing effect catches up.
   const effectiveTentId = routeIdentityPending
     ? routeTentId
     : renderedPlantId
-      ? (selectedPlant?.tent_id ?? "")
-      : tentId;
+      ? selectedPlantTentId
+      : selectedStandaloneTentId;
+  const requestedStep = routeIdentityPending ? routeStep : step;
+  const renderedStep = requestedStep === "manual" && !effectiveTentId ? "select" : requestedStep;
+  const requestedQuickLogOpen = routeIdentityPending ? routeStep === "quicklog" : quickLogOpen;
+  const renderedQuickLogOpen = requestedQuickLogOpen && !!selectedPlant;
 
   // Reconcile every plant/grow/method route identity. Render-time route values
   // above prevent the previous target or dialog state from painting while this
@@ -228,39 +259,57 @@ export default function DailyCheck() {
     if (routeIdentityPending) return;
     if (!plantId) return;
     const match = selectablePlants.find((p) => p.id === plantId);
-    setTentId(match?.tent_id ?? "");
-  }, [plantId, routeIdentityPending, selectablePlants]);
+    const assignedTentId = match?.tent_id ?? "";
+    setTentId(selectableTents.some((tent) => tent.id === assignedTentId) ? assignedTentId : "");
+  }, [plantId, routeIdentityPending, selectablePlants, selectableTents]);
 
   // Default tent to first if none selected and no plant chosen
   useEffect(() => {
     if (routeIdentityPending) return;
     if (plantResolution.status !== "missing") return;
-    if (!tentId && !plantId && tents[0]?.id) setTentId(tents[0].id);
-  }, [plantResolution.status, tentId, plantId, routeIdentityPending, tents]);
+    if (!selectedStandaloneTentId && !plantId && selectableTents[0]?.id) {
+      setTentId(selectableTents[0].id);
+    }
+  }, [
+    plantResolution.status,
+    plantId,
+    routeIdentityPending,
+    selectableTents,
+    selectedStandaloneTentId,
+  ]);
+
+  // A selected plant can lose or change its tent when query data refreshes.
+  // Leave manual entry synchronously at render time above, then persist the
+  // fail-closed step so the stale form cannot return on the next local update.
+  useEffect(() => {
+    if (routeIdentityPending || step !== "manual" || effectiveTentId) return;
+    setStep("select");
+  }, [effectiveTentId, routeIdentityPending, step]);
 
   const selectedTent = useMemo(
-    () => tents.find((tent) => tent.id === effectiveTentId) ?? null,
-    [effectiveTentId, tents],
+    () => selectableTents.find((tent) => tent.id === effectiveTentId) ?? null,
+    [effectiveTentId, selectableTents],
   );
-  const growId = (selectedPlant as { grow_id?: string | null } | null)?.grow_id ?? null;
+  const growId =
+    (selectedPlant as { grow_id?: string | null } | null)?.grow_id ?? urlGrowId ?? null;
   const quickLogTargetIdentity = JSON.stringify([
     selectedPlant?.id ?? null,
     effectiveTentId || null,
   ]);
 
   const manualSensorTents = useMemo(() => {
-    if (!selectedPlant) return tents;
+    if (!selectedPlant) return selectableTents;
     if (!effectiveTentId) return [];
-    return tents.filter((tent) => tent.id === effectiveTentId);
-  }, [effectiveTentId, selectedPlant, tents]);
+    return selectableTents.filter((tent) => tent.id === effectiveTentId);
+  }, [effectiveTentId, selectableTents, selectedPlant]);
   const manualSensorDefaultTentId = manualSensorTents.some((tent) => tent.id === effectiveTentId)
     ? effectiveTentId
     : undefined;
 
   const guard = evaluateDailyGrowCheckGuard({
-    tentsCount: tents.length,
+    tentsCount: selectableTents.length,
     plantsCount: selectablePlants.length,
-    selectedPlantTentId: selectedPlant?.tent_id ?? null,
+    selectedPlantTentId: selectedPlantTentId || null,
     hasSelectedPlant: !!selectedPlant,
   });
 
@@ -456,14 +505,14 @@ export default function DailyCheck() {
                     <SelectValue placeholder="Select a tent" />
                   </SelectTrigger>
                   <SelectContent>
-                    {tents.map((tent) => (
+                    {selectableTents.map((tent) => (
                       <SelectItem key={tent.id} value={tent.id}>
                         {tent.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                {selectedPlant?.tent_id && (
+                {selectedPlantTentId && (
                   <p className="mt-1 min-w-0 break-words text-[11px] text-muted-foreground">
                     Tent follows the selected plant's assignment.
                   </p>
@@ -729,7 +778,7 @@ export default function DailyCheck() {
               className="glass mb-4 w-full min-w-0 space-y-3 rounded-2xl p-4"
               data-testid="daily-grow-check-choose"
               data-plant-id={selectedPlant?.id ?? ""}
-              data-plant-tent-id={selectedPlant?.tent_id ?? ""}
+              data-plant-tent-id={selectedPlantTentId}
               data-method-hint={methodHint ?? ""}
             >
               <div className="min-w-0">
@@ -823,7 +872,7 @@ export default function DailyCheck() {
                 </div>
               )}
 
-              {selectedPlant && !selectedPlant.tent_id && (
+              {selectedPlant && !selectedPlantTentId && (
                 <div
                   className="min-w-0 space-y-1 break-words rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs"
                   data-testid="daily-grow-check-choose-no-tent"
@@ -915,6 +964,7 @@ export default function DailyCheck() {
               icon={<Gauge className="h-4 w-4" />}
             >
               <ManualSensorReadingCard
+                key={quickLogTargetIdentity}
                 tents={manualSensorTents.map((t) => ({ id: t.id, name: t.name }))}
                 defaultTentId={manualSensorDefaultTentId}
                 successMessage={DAILY_CHECK_SENSOR_SAVED_TOAST}

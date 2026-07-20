@@ -161,25 +161,27 @@ function decode(value) {
 export function extractHead(html) {
   const metas = new Map();
   for (const tag of html.match(META_TAG_REGEX) ?? []) {
-    const nameMatch = tag.match(NAME_REGEX);
-    const propMatch = tag.match(PROPERTY_REGEX);
-    const contentMatch = tag.match(CONTENT_REGEX);
-    if (!contentMatch) continue;
-    const key = nameMatch
-      ? `name:${nameMatch[2].toLowerCase()}`
-      : propMatch
-        ? `property:${propMatch[2].toLowerCase()}`
+    const nameVal = pickAttrValue(tag.match(NAME_REGEX));
+    const propVal = pickAttrValue(tag.match(PROPERTY_REGEX));
+    const contentVal = pickAttrValue(tag.match(CONTENT_REGEX));
+    if (contentVal === null) continue;
+    const key = nameVal
+      ? `name:${decode(nameVal).toLowerCase()}`
+      : propVal
+        ? `property:${decode(propVal).toLowerCase()}`
         : null;
     if (!key) continue;
     // Last one wins to mirror crawler behavior on duplicates.
-    metas.set(key, decode(contentMatch[2]));
+    metas.set(key, decode(contentVal));
   }
   const titleMatch = html.match(TITLE_REGEX);
   const canonicalTag = html.match(CANONICAL_REGEX);
-  const canonical = canonicalTag ? canonicalTag[0].match(HREF_REGEX)?.[2] ?? null : null;
+  const canonicalHref = canonicalTag
+    ? pickAttrValue(canonicalTag[0].match(HREF_REGEX))
+    : null;
   return {
     title: titleMatch ? decode(titleMatch[1].trim()) : null,
-    canonical: canonical ? decode(canonical) : null,
+    canonical: canonicalHref ? decode(canonicalHref) : null,
     metas,
     jsonLd: extractJsonLd(html),
   };

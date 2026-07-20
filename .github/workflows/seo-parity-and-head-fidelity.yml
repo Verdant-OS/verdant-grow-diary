@@ -1,0 +1,58 @@
+name: SEO parity & head fidelity
+
+# Blocks PR merges when the sitemap drifts from the pre-rendered
+# route set, or when any pre-rendered dist/*.html <head> diverges
+# from the manifest crawlers must see. Runs on every PR into any
+# branch and on pushes to main so main stays green.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: seo-parity-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  seo-parity-and-head-fidelity:
+    name: sitemap parity + head fidelity
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # Sitemap ↔ STATIC_PUBLIC_SEO_DOCUMENTS parity — fails when a
+      # public route is added/removed without updating the allowlists
+      # in scripts/public-route-parity.config.mjs.
+      - name: Sitemap parity + head-fidelity helper tests
+        run: bunx vitest run src/test/sitemap-public-route-parity.test.ts src/test/static-route-head-fidelity.test.ts --reporter=dot
+
+      # Full production build; the postbuild hook runs
+      # validate-static-route-head-fidelity.mjs and writes the
+      # per-route diff report used below.
+      - name: Build (runs postbuild head-fidelity validator)
+        run: bun run build
+
+      # Preserve the machine- and human-readable diff reports so
+      # failed runs are debuggable without re-running the build.
+      - name: Upload SEO head-fidelity report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: seo-head-fidelity-report
+          path: |
+            dist/seo-manifest.json
+            dist/seo-head-fidelity-report.json
+            dist/seo-head-fidelity-report.md
+          if-no-files-found: warn
+          retention-days: 14

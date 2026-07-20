@@ -978,11 +978,18 @@ export default function McpToolExplorer() {
         }
         fieldErrors={growsLimitTouched ? listGrowsErrors : []}
         onApplyArgs={(args) => {
-          setIncludeArchived(Boolean(args.includeArchived));
-          setGrowsLimit(
-            args.limit === undefined || args.limit === null ? "" : String(args.limit),
-          );
+          const nextIncludeArchived = Boolean(args.includeArchived);
+          const nextGrowsLimit =
+            args.limit === undefined || args.limit === null ? "" : String(args.limit);
+          setIncludeArchived(nextIncludeArchived);
+          setGrowsLimit(nextGrowsLimit);
           setGrowsLimitTouched(true);
+          // Persist applied form values immediately so reopening the explorer
+          // restores them even before a successful retry.
+          saveLastValidInputs("list_grows", {
+            includeArchived: nextIncludeArchived,
+            growsLimit: nextGrowsLimit,
+          });
         }}
         buildArgs={() => {
           const args: Record<string, unknown> = {};
@@ -1046,12 +1053,17 @@ export default function McpToolExplorer() {
             : []),
         ]}
         onApplyArgs={(args) => {
-          setGrowId(typeof args.growId === "string" ? args.growId : "");
-          setDiaryLimit(
-            args.limit === undefined || args.limit === null ? "" : String(args.limit),
-          );
+          const nextGrowId = typeof args.growId === "string" ? args.growId : "";
+          const nextDiaryLimit =
+            args.limit === undefined || args.limit === null ? "" : String(args.limit);
+          setGrowId(nextGrowId);
+          setDiaryLimit(nextDiaryLimit);
           setGrowIdTouched(true);
           setDiaryLimitTouched(true);
+          saveLastValidInputs("list_recent_diary_entries", {
+            growId: nextGrowId,
+            diaryLimit: nextDiaryLimit,
+          });
         }}
         buildArgs={() => {
           const args: Record<string, unknown> = { growId: growId.trim() };
@@ -1124,8 +1136,10 @@ export default function McpToolExplorer() {
         }
         fieldErrors={tentIdTouched ? sensorErrors : []}
         onApplyArgs={(args) => {
-          setTentId(typeof args.tentId === "string" ? args.tentId : "");
+          const nextTentId = typeof args.tentId === "string" ? args.tentId : "";
+          setTentId(nextTentId);
           setTentIdTouched(true);
+          saveLastValidInputs("get_latest_sensor_snapshot", { tentId: nextTentId });
         }}
         buildArgs={() => ({ tentId: tentId.trim() })}
       >

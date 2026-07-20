@@ -71,7 +71,7 @@ DECLARE
   v_subject_type text := btrim(p_payload->>'subject_type');
   v_subject_id uuid := nullif(p_payload->>'subject_id', '')::uuid;
   v_target text := lower(btrim(coalesce(p_payload->>'target', '')));
-  v_result text := btrim(p_payload->>'result');
+  v_result_value text := btrim(p_payload->>'result');
   v_collected date := nullif(p_payload->>'collected_date', '')::date;
   v_result_date date := nullif(p_payload->>'result_date', '')::date;
   v_supersedes uuid := nullif(p_payload->>'supersedes_id', '')::uuid;
@@ -104,7 +104,7 @@ BEGIN
   IF v_target = '' THEN
     RETURN jsonb_build_object('ok', false, 'reason', 'target_required');
   END IF;
-  IF v_result NOT IN ('positive', 'negative', 'inconclusive', 'not_tested') THEN
+  IF v_result_value NOT IN ('positive', 'negative', 'inconclusive', 'not_tested') THEN
     RETURN jsonb_build_object('ok', false, 'reason', 'invalid_result');
   END IF;
   IF v_collected IS NOT NULL AND v_collected > current_date THEN
@@ -142,7 +142,7 @@ BEGIN
       user_id, subject_type, subject_id, target, result, sample_reference, laboratory,
       collected_date, result_date, evidence_reference, supersedes_id, recorded_by
     ) VALUES (
-      uid, v_subject_type, v_subject_id, v_target, v_result,
+      uid, v_subject_type, v_subject_id, v_target, v_result_value,
       nullif(btrim(p_payload->>'sample_reference'), ''), nullif(btrim(p_payload->>'laboratory'), ''),
       v_collected, v_result_date, nullif(btrim(p_payload->>'evidence_reference'), ''),
       v_supersedes, uid
@@ -154,7 +154,7 @@ BEGIN
     INSERT INTO public.genetics_mutation_idempotency (user_id, operation, idempotency_key, request_hash, result)
     VALUES (uid, v_op, p_idempotency_key, v_hash, v_result);
   EXCEPTION WHEN unique_violation THEN
-    GET STACKED DIAGNOSTICS v_constraint = PG_EXCEPTION_CONSTRAINT;
+    GET STACKED DIAGNOSTICS v_constraint = CONSTRAINT_NAME;
     IF v_constraint = 'genetics_mutation_idempotency_pkey' THEN
       SELECT result, request_hash INTO v_prior, v_prior_hash
         FROM public.genetics_mutation_idempotency

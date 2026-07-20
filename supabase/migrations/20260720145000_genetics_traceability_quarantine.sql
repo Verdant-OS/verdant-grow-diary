@@ -160,7 +160,7 @@ BEGIN
     INSERT INTO public.genetics_mutation_idempotency (user_id, operation, idempotency_key, request_hash, result)
     VALUES (uid, v_op, p_idempotency_key, v_hash, v_result);
   EXCEPTION WHEN unique_violation THEN
-    GET STACKED DIAGNOSTICS v_constraint = PG_EXCEPTION_CONSTRAINT;
+    GET STACKED DIAGNOSTICS v_constraint = CONSTRAINT_NAME;
     IF v_constraint = 'genetics_mutation_idempotency_pkey' THEN
       SELECT result, request_hash INTO v_prior, v_prior_hash
         FROM public.genetics_mutation_idempotency
@@ -343,7 +343,7 @@ BEGIN
     INSERT INTO public.genetics_mutation_idempotency (user_id, operation, idempotency_key, request_hash, result)
     VALUES (uid, v_op, p_idempotency_key, v_hash, v_result);
   EXCEPTION WHEN unique_violation THEN
-    GET STACKED DIAGNOSTICS v_constraint = PG_EXCEPTION_CONSTRAINT;
+    GET STACKED DIAGNOSTICS v_constraint = CONSTRAINT_NAME;
     IF v_constraint = 'genetics_mutation_idempotency_pkey' THEN
       SELECT result, request_hash INTO v_prior, v_prior_hash
         FROM public.genetics_mutation_idempotency

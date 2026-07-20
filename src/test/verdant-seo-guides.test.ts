@@ -56,6 +56,7 @@ const EXPECTED_SLUGS: ReadonlyArray<string> = [
   "grow-journal-app-without-account",
   "daily-grow-log-checklist",
   "cronk-nutrients-grow-diary",
+  "bud-rot-prevention-identification",
 ];
 
 describe("Verdant grower guide FAQ (/guides)", () => {
@@ -107,8 +108,8 @@ describe("Verdant grower guide FAQ (/guides)", () => {
   });
 });
 
-describe("Verdant SEO guide pages (15)", () => {
-  it("defines exactly the fifteen expected slugs, in order", () => {
+describe("Verdant SEO guide pages (16)", () => {
+  it("defines exactly the sixteen expected slugs, in order", () => {
     expect(VERDANT_GUIDE_SLUGS).toEqual(EXPECTED_SLUGS);
   });
 

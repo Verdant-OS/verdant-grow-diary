@@ -27,6 +27,13 @@
  */
 import { readFileSync, existsSync, writeFileSync, mkdirSync } from "node:fs";
 import { resolve, join, dirname } from "node:path";
+import {
+  EXPECTED_OG_TYPE,
+  DEFAULT_ROBOTS_DIRECTIVE,
+  ALLOWED_ROBOTS_DIRECTIVES,
+  EXPECTED_TWITTER_SITE,
+  EXPECTED_TWITTER_CREATOR,
+} from "./public-route-head-invariants.config.mjs";
 
 const META_TAG_REGEX = /<meta\b[^>]*>/gi;
 const TITLE_REGEX = /<title\b[^>]*>([\s\S]*?)<\/title>/i;

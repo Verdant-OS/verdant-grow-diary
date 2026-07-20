@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -17,6 +17,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PrivacyNote, SupportLayout } from "./SupportLayout";
+import { HoneypotField } from "./HoneypotField";
+import { checkSpam, fingerprint, recordSubmission } from "./spamGuard";
 
 const CATEGORIES = [
   { value: "technical_support", label: "Technical Support" },
@@ -51,6 +53,8 @@ type ContactValues = z.infer<typeof contactSchema>;
 export default function Contact() {
   const [submitState, setSubmitState] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [honeypot, setHoneypot] = useState("");
+  const formOpenedAt = useRef<number>(Date.now());
 
   const form = useForm<ContactValues>({
     resolver: zodResolver(contactSchema),
@@ -68,6 +72,22 @@ export default function Contact() {
   const onSubmit = async (values: ContactValues) => {
     setSubmitState("submitting");
     setErrorMessage(null);
+
+    const fp = fingerprint(
+      [values.email.trim().toLowerCase(), values.category, values.message.trim()].join("|"),
+    );
+    const guard = checkSpam({
+      honeypotValue: honeypot,
+      formOpenedAt: formOpenedAt.current,
+      storageKey: "verdant.spam.contact",
+      contentFingerprint: fp,
+    });
+    if (!guard.ok) {
+      setSubmitState("error");
+      setErrorMessage(guard.message ?? "Submission blocked.");
+      return;
+    }
+
     const { data: sessionData } = await supabase.auth.getSession();
     const userId = sessionData.session?.user?.id ?? null;
 
@@ -87,6 +107,7 @@ export default function Contact() {
       setErrorMessage(error.message || "Something went wrong. Please try again.");
       return;
     }
+    recordSubmission("verdant.spam.contact", fp);
     setSubmitState("success");
   };
 
@@ -153,6 +174,7 @@ export default function Contact() {
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="mt-8 space-y-6" noValidate>
+        <HoneypotField value={honeypot} onChange={setHoneypot} />
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="name">

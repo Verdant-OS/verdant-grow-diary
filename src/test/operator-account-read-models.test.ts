@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   getLatestSensorSnapshotForOwnedTent,
   listRecentDiaryEntriesForOwnedGrow,
+  listRecentDiaryEntriesForOwnedTent,
   OPERATOR_SENSOR_METRICS,
   selectLatestMcpSensorReadings,
   type McpSensorQueryRow,
@@ -38,6 +39,63 @@ function diaryClient(input: {
           async maybeSingle() {
             calls.push({ table, method: "maybeSingle", args: [] });
             return { data: input.grow ?? null, error: input.growError ?? null };
+          },
+        };
+        return chain;
+      }
+
+      if (table !== "diary_entries") throw new Error(`Unexpected table: ${table}`);
+      const chain = {
+        select(...args: unknown[]) {
+          calls.push({ table, method: "select", args });
+          return chain;
+        },
+        eq(...args: unknown[]) {
+          calls.push({ table, method: "eq", args });
+          return chain;
+        },
+        order(...args: unknown[]) {
+          calls.push({ table, method: "order", args });
+          return chain;
+        },
+        async limit(...args: unknown[]) {
+          calls.push({ table, method: "limit", args });
+          return { data: input.entries ?? null, error: input.entriesError ?? null };
+        },
+      };
+      return chain;
+    },
+  };
+  return { client: client as never, calls };
+}
+
+function tentDiaryClient(input: {
+  grow?: { id: string } | null;
+  growError?: QueryError;
+  tent?: { id: string } | null;
+  tentError?: QueryError;
+  entries?: unknown[] | null;
+  entriesError?: QueryError;
+}) {
+  const calls: MockCall[] = [];
+  const client = {
+    from(table: string) {
+      calls.push({ table, method: "from", args: [] });
+      if (table === "grows" || table === "tents") {
+        const chain = {
+          select(...args: unknown[]) {
+            calls.push({ table, method: "select", args });
+            return chain;
+          },
+          eq(...args: unknown[]) {
+            calls.push({ table, method: "eq", args });
+            return chain;
+          },
+          async maybeSingle() {
+            calls.push({ table, method: "maybeSingle", args: [] });
+            return table === "grows"
+              ? { data: input.grow ?? null, error: input.growError ?? null }
+              : { data: input.tent ?? null, error: input.tentError ?? null };
           },
         };
         return chain;
@@ -248,6 +306,98 @@ describe("owner-scoped Operator account read models", () => {
         ok: false,
         reason: "unavailable",
         message: "diary read unavailable",
+      });
+    });
+  });
+
+  describe("listRecentDiaryEntriesForOwnedTent", () => {
+    it("checks the grow and exact tent relation before applying the child-row limit", async () => {
+      const entries = [
+        {
+          id: "entry-flower",
+          grow_id: "grow-1",
+          plant_id: null,
+          tent_id: "tent-flower",
+          stage: "flower",
+          note: "Pot feels light.",
+          entry_at: "2026-07-20T09:00:00Z",
+          created_at: "2026-07-20T09:01:00Z",
+        },
+      ];
+      const { client, calls } = tentDiaryClient({
+        grow: { id: "grow-1" },
+        tent: { id: "tent-flower" },
+        entries,
+      });
+
+      await expect(
+        listRecentDiaryEntriesForOwnedTent(client, "grow-1", "tent-flower", 10),
+      ).resolves.toEqual({ ok: true, data: { entries } });
+      expect(calls).toContainEqual({
+        table: "tents",
+        method: "eq",
+        args: ["grow_id", "grow-1"],
+      });
+      expect(calls).toContainEqual({
+        table: "diary_entries",
+        method: "eq",
+        args: ["grow_id", "grow-1"],
+      });
+      expect(calls).toContainEqual({
+        table: "diary_entries",
+        method: "eq",
+        args: ["tent_id", "tent-flower"],
+      });
+      expect(
+        calls.findIndex((call) => call.table === "tents" && call.method === "maybeSingle"),
+      ).toBeLessThan(
+        calls.findIndex((call) => call.table === "diary_entries" && call.method === "from"),
+      );
+      expect(calls).toContainEqual({ table: "diary_entries", method: "limit", args: [10] });
+    });
+
+    it("fails closed before diary rows when the tent is not linked to the owned grow", async () => {
+      const { client, calls } = tentDiaryClient({
+        grow: { id: "grow-1" },
+        tent: null,
+        entries: [{ id: "must-not-return" }],
+      });
+
+      await expect(
+        listRecentDiaryEntriesForOwnedTent(client, "grow-1", "foreign-tent"),
+      ).resolves.toEqual({
+        ok: false,
+        reason: "not_found",
+        message: "Tent not found in this grow for the signed-in grower.",
+      });
+      expect(calls.some((call) => call.table === "diary_entries")).toBe(false);
+    });
+
+    it("reports tent and diary read failures as unavailable", async () => {
+      const tentFailure = tentDiaryClient({
+        grow: { id: "grow-1" },
+        tentError: { message: "tent RLS unavailable" },
+      });
+      await expect(
+        listRecentDiaryEntriesForOwnedTent(tentFailure.client, "grow-1", "tent-1"),
+      ).resolves.toEqual({
+        ok: false,
+        reason: "unavailable",
+        message: "tent RLS unavailable",
+      });
+      expect(tentFailure.calls.some((call) => call.table === "diary_entries")).toBe(false);
+
+      const diaryFailure = tentDiaryClient({
+        grow: { id: "grow-1" },
+        tent: { id: "tent-1" },
+        entriesError: { message: "tent diary unavailable" },
+      });
+      await expect(
+        listRecentDiaryEntriesForOwnedTent(diaryFailure.client, "grow-1", "tent-1"),
+      ).resolves.toEqual({
+        ok: false,
+        reason: "unavailable",
+        message: "tent diary unavailable",
       });
     });
   });

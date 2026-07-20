@@ -33,7 +33,7 @@ import { formatSensorValue } from "@/lib/sensorFormat";
 
 export type OperatorWateringContextStatus = "loading" | "unavailable" | "insufficient" | "context";
 
-type OperatorWateringCollectionStatus = "loading" | "unavailable" | "ready";
+export type OperatorWateringCollectionStatus = "loading" | "unavailable" | "ready";
 export type OperatorManualObservationStatus = "loading" | "ready" | "unavailable";
 
 export interface OperatorWateringReadState {
@@ -104,8 +104,12 @@ export interface OperatorWateringContextViewModel {
   typedWateringCount: number;
   typedFeedingCount: number;
   recentRootZoneCycles: readonly OperatorRootZoneCycleRow[];
+  diaryObservationStatus: OperatorWateringCollectionStatus;
   diaryObservationCount: number;
   diaryObservations: readonly OperatorWateringDiaryObservationRow[];
+  diaryObservationAvailabilityNote:
+    | "Tent-linked observations are unavailable. Verdant cannot confirm this tent has no recent entries."
+    | null;
   sensorRows: readonly OperatorWateringSensorContextRow[];
   missingContext: readonly ("typed_root_zone_history" | "soil_moisture_snapshot")[];
   manualObservationStatus: OperatorManualObservationStatus;
@@ -133,6 +137,8 @@ const GROWER_CONTROL_NOTE =
   "Verdant presents read-only evidence here; the grower makes the decision." as const;
 const MANUAL_OBSERVATION_UNAVAILABLE_NOTE =
   "Grower-recorded manual root-zone observations are unavailable; review the source log before deciding." as const;
+const DIARY_OBSERVATION_UNAVAILABLE_NOTE =
+  "Tent-linked observations are unavailable. Verdant cannot confirm this tent has no recent entries." as const;
 
 const SECRET_LIKE_TEXT =
   /service[_-]?role|authorization|bearer\s+|api[_-]?key|secret|token|jwt|eyJ|sk_(?:live|test)_|sb_/i;
@@ -422,6 +428,10 @@ export function buildOperatorWateringContextViewModel(
     input?.rootZone?.status === "ready" && manualObservationStatus === "unavailable"
       ? MANUAL_OBSERVATION_UNAVAILABLE_NOTE
       : null;
+  const diaryObservationStatus: OperatorWateringCollectionStatus =
+    input?.diary?.status ?? "unavailable";
+  const diaryObservationAvailabilityNote =
+    diaryObservationStatus === "unavailable" ? DIARY_OBSERVATION_UNAVAILABLE_NOTE : null;
   const status: OperatorWateringContextStatus = sources.loading
     ? "loading"
     : !sources.anyReady
@@ -439,8 +449,10 @@ export function buildOperatorWateringContextViewModel(
     typedWateringCount: wateringObservations.length,
     typedFeedingCount: feedingObservations.length,
     recentRootZoneCycles,
+    diaryObservationStatus,
     diaryObservationCount: diary.count,
     diaryObservations: diary.rows,
+    diaryObservationAvailabilityNote,
     sensorRows,
     missingContext,
     manualObservationStatus,

@@ -16,6 +16,7 @@ import { isUuid } from "@/lib/isUuid";
 import {
   getLatestSensorSnapshotForOwnedTent,
   listRecentDiaryEntriesForOwnedGrow,
+  listRecentDiaryEntriesForOwnedTent,
 } from "@/lib/operatorAccountReadModels";
 import {
   buildOperatorDiaryEntryRows,
@@ -25,10 +26,18 @@ import {
   type OperatorPanelSensorState,
 } from "@/lib/operatorAccountReadModelsViewModel";
 import { buildOperatorWateringContextViewModel } from "@/lib/operatorWateringContextViewModel";
+import { buildOperatorWateringTentScope } from "@/lib/operatorWateringTentScopeRules";
 import { useAuth } from "@/store/auth";
 import { useGrows } from "@/store/grows";
 
 const EMPTY_ITEMS: readonly never[] = Object.freeze([] as never[]);
+
+type TentReadStatus = "loading" | "unavailable" | "empty" | "selection_required" | "ready";
+
+export interface UseOperatorAccountReadModelsOptions {
+  /** Required when the active grow has more than one valid tent. */
+  selectedTentId?: string | null;
+}
 
 function diaryState(
   enabled: boolean,
@@ -46,13 +55,16 @@ function diaryState(
 }
 
 function sensorState(
-  tentStatus: "loading" | "unavailable" | "empty" | "ready",
+  tentStatus: TentReadStatus,
   activeGrowId: string,
   query: ReturnType<typeof useSensorReadModelQuery>,
 ): OperatorPanelSensorState {
   if (tentStatus === "loading") return { status: "loading", items: EMPTY_ITEMS };
   if (tentStatus === "unavailable") return { status: "unavailable", items: EMPTY_ITEMS };
   if (tentStatus === "empty") return { status: "no_tent", items: EMPTY_ITEMS };
+  if (tentStatus === "selection_required") {
+    return { status: "select_tent", items: EMPTY_ITEMS };
+  }
   if (query.isLoading || (query.isFetching && !query.data)) {
     return { status: "loading", items: EMPTY_ITEMS };
   }
@@ -90,7 +102,29 @@ function useSensorReadModelQuery(userId: string | null, tentId: string | null) {
   });
 }
 
-export function useOperatorAccountReadModels(): OperatorAccountReadModelsPanelModel {
+function useTentDiaryReadModelQuery(
+  userId: string | null,
+  growId: string | null,
+  tentId: string | null,
+) {
+  return useQuery({
+    queryKey: [
+      "operator-account-read-model",
+      "watering-diary",
+      userId ?? "signed-out",
+      growId ?? "none",
+      tentId ?? "none",
+    ],
+    enabled: !!userId && !!growId && !!tentId && isUuid(growId) && isUuid(tentId),
+    retry: false,
+    queryFn: () =>
+      listRecentDiaryEntriesForOwnedTent(supabase, growId as string, tentId as string, 10),
+  });
+}
+
+export function useOperatorAccountReadModels(
+  options: UseOperatorAccountReadModelsOptions = {},
+): OperatorAccountReadModelsPanelModel {
   const { user } = useAuth();
   const { activeGrow, activeGrowId, loading: growsLoading, error: growsError } = useGrows();
   const validGrowId = activeGrowId && isUuid(activeGrowId) ? activeGrowId : null;
@@ -98,10 +132,20 @@ export function useOperatorAccountReadModels(): OperatorAccountReadModelsPanelMo
   // sentinel until a real grow exists; fetchTents then returns [] without a DB
   // request, preventing aggregate cross-grow cache reuse.
   const tentsQuery = useGrowTents(validGrowId ?? "operator-no-grow");
-  const selectedTent = validGrowId ? (tentsQuery.data?.[0] ?? null) : null;
+  const tentScope = useMemo(
+    () =>
+      buildOperatorWateringTentScope({
+        activeGrowId: validGrowId,
+        tents: tentsQuery.data,
+        requestedTentId: options.selectedTentId,
+      }),
+    [options.selectedTentId, tentsQuery.data, validGrowId],
+  );
+  const selectedTent = tentScope.selectedTent;
   const validTentId = selectedTent?.id && isUuid(selectedTent.id) ? selectedTent.id : null;
 
   const diaryQuery = useDiaryReadModelQuery(user?.id ?? null, validGrowId);
+  const tentDiaryQuery = useTentDiaryReadModelQuery(user?.id ?? null, validGrowId, validTentId);
   const sensorQuery = useSensorReadModelQuery(user?.id ?? null, validTentId);
   const rootZoneQuery = useOperatorRootZoneRecords(
     validGrowId && validTentId ? { growId: validGrowId, tentId: validTentId } : null,
@@ -114,25 +158,41 @@ export function useOperatorAccountReadModels(): OperatorAccountReadModelsPanelMo
     }
     if (!validGrowId || !activeGrow) return { status: "no_grow" };
 
-    const tentStatus = tentsQuery.isLoading
+    const tentStatus: TentReadStatus = tentsQuery.isLoading
       ? "loading"
       : tentsQuery.isError
         ? "unavailable"
-        : !selectedTent
+        : tentScope.status === "no_tents"
           ? "empty"
-          : validTentId
-            ? "ready"
-            : "unavailable";
+          : tentScope.status === "selection_required"
+            ? "selection_required"
+            : validTentId
+              ? "ready"
+              : "unavailable";
+    const tentScopeStatus = tentsQuery.isLoading
+      ? ("loading" as const)
+      : tentsQuery.isError
+        ? ("unavailable" as const)
+        : tentScope.status;
 
+    // The public diary tool remains grow-wide for the separate activity panel.
+    // Watering decisions use a server-filtered tent query so a busy sibling
+    // tent cannot push this room's latest observation beyond a grow-wide limit.
     const diaryReadState =
-      diaryQuery.isLoading || (diaryQuery.isFetching && !diaryQuery.data)
+      tentStatus === "loading"
         ? { status: "loading" as const }
-        : diaryQuery.isError || !diaryQuery.data?.ok
+        : tentStatus === "unavailable"
           ? { status: "unavailable" as const }
-          : {
-              status: "ready" as const,
-              entries: diaryQuery.data.data.entries,
-            };
+          : tentStatus === "empty" || tentStatus === "selection_required"
+            ? { status: "ready" as const, entries: [] }
+            : tentDiaryQuery.isLoading || (tentDiaryQuery.isFetching && !tentDiaryQuery.data)
+              ? { status: "loading" as const }
+              : tentDiaryQuery.isError || !tentDiaryQuery.data?.ok
+                ? { status: "unavailable" as const }
+                : {
+                    status: "ready" as const,
+                    entries: tentDiaryQuery.data.data.entries,
+                  };
 
     const sensorReadState =
       tentStatus === "loading"
@@ -141,23 +201,25 @@ export function useOperatorAccountReadModels(): OperatorAccountReadModelsPanelMo
           ? { status: "unavailable" as const }
           : tentStatus === "empty"
             ? { status: "no_tent" as const }
-            : sensorQuery.isLoading || (sensorQuery.isFetching && !sensorQuery.data)
-              ? { status: "loading" as const }
-              : sensorQuery.isError ||
-                  !sensorQuery.data?.ok ||
-                  sensorQuery.data.data.tent.grow_id !== validGrowId
-                ? { status: "unavailable" as const }
-                : {
-                    status: "ready" as const,
-                    readings: sensorQuery.data.data.snapshot?.readings ?? {},
-                  };
+            : tentStatus === "selection_required"
+              ? { status: "no_tent" as const }
+              : sensorQuery.isLoading || (sensorQuery.isFetching && !sensorQuery.data)
+                ? { status: "loading" as const }
+                : sensorQuery.isError ||
+                    !sensorQuery.data?.ok ||
+                    sensorQuery.data.data.tent.grow_id !== validGrowId
+                  ? { status: "unavailable" as const }
+                  : {
+                      status: "ready" as const,
+                      readings: sensorQuery.data.data.snapshot?.readings ?? {},
+                    };
 
     const rootZoneReadState =
       tentStatus === "loading"
         ? { status: "loading" as const }
         : tentStatus === "unavailable"
           ? { status: "unavailable" as const }
-          : tentStatus === "empty"
+          : tentStatus === "empty" || tentStatus === "selection_required"
             ? {
                 status: "ready" as const,
                 observations: [],
@@ -176,7 +238,10 @@ export function useOperatorAccountReadModels(): OperatorAccountReadModelsPanelMo
     return {
       status: "ready",
       growName: activeGrow.name?.trim() || "Unnamed grow",
-      tentName: tentStatus === "ready" ? selectedTent?.name?.trim() || "Unnamed tent" : null,
+      tentOptions: tentScope.options,
+      tentScopeStatus,
+      selectedTentId: validTentId,
+      tentName: tentStatus === "ready" ? (selectedTent?.name ?? "Unnamed tent") : null,
       diary: diaryState(true, diaryQuery),
       sensor: sensorState(tentStatus, validGrowId, sensorQuery),
       watering: buildOperatorWateringContextViewModel({
@@ -198,6 +263,8 @@ export function useOperatorAccountReadModels(): OperatorAccountReadModelsPanelMo
     rootZoneQuery.records,
     selectedTent,
     sensorQuery,
+    tentDiaryQuery,
+    tentScope,
     tentsQuery.isError,
     tentsQuery.isLoading,
     user,

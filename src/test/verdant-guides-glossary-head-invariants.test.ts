@@ -166,45 +166,53 @@ describe("Guides + glossary pre-rendered head matches global invariants", () => 
     },
   );
 
-  it.each(TARGET_PATHS)("%s ships og:type=website (never article/profile drift)", (path) => {
+  const headFor = (path: string) => {
     const doc = REGISTRY_BY_PATH.get(path)!;
-    const head = extractHead(buildStaticSocialRouteHtml(INDEX_HTML, doc.metadata));
-    expect(head.ogType).toBe(EXPECTED_OG_TYPE);
+    return {
+      doc,
+      head: extractHead(buildStaticSocialRouteHtml(INDEX_HTML, doc.metadata)) as {
+        title: string | null;
+        canonical: string | null;
+        metas: Map<string, string>;
+      },
+    };
+  };
+
+  it.each(TARGET_PATHS)("%s ships og:type=website (never article/profile drift)", (path) => {
+    const { head } = headFor(path);
+    expect(head.metas.get("property:og:type") ?? null).toBe(EXPECTED_OG_TYPE);
   });
 
   it.each(TARGET_PATHS)("%s ships the expected robots directive", (path) => {
-    const doc = REGISTRY_BY_PATH.get(path)!;
-    const head = extractHead(buildStaticSocialRouteHtml(INDEX_HTML, doc.metadata));
-    expect(head.robots).toBe(doc.metadata.robots ?? DEFAULT_ROBOTS_DIRECTIVE);
+    const { doc, head } = headFor(path);
+    expect(head.metas.get("name:robots") ?? null).toBe(
+      doc.metadata.robots ?? DEFAULT_ROBOTS_DIRECTIVE,
+    );
   });
 
   it.each(TARGET_PATHS)("%s ships twitter:card=summary_large_image", (path) => {
-    const doc = REGISTRY_BY_PATH.get(path)!;
-    const head = extractHead(buildStaticSocialRouteHtml(INDEX_HTML, doc.metadata));
-    expect(head.twitterCard).toBe("summary_large_image");
+    const { head } = headFor(path);
+    expect(head.metas.get("name:twitter:card") ?? null).toBe("summary_large_image");
   });
 
   it.each(TARGET_PATHS)(
     "%s does not ship twitter:site/creator while no handle is configured",
     (path) => {
-      const doc = REGISTRY_BY_PATH.get(path)!;
-      const head = extractHead(buildStaticSocialRouteHtml(INDEX_HTML, doc.metadata));
-      expect(head.twitterSite).toBe(EXPECTED_TWITTER_SITE);
-      expect(head.twitterCreator).toBe(EXPECTED_TWITTER_CREATOR);
+      const { head } = headFor(path);
+      expect(head.metas.get("name:twitter:site") ?? null).toBe(EXPECTED_TWITTER_SITE);
+      expect(head.metas.get("name:twitter:creator") ?? null).toBe(EXPECTED_TWITTER_CREATOR);
     },
   );
 
   it.each(TARGET_PATHS)(
     "%s canonical + og:url + twitter:image resolve to the route (no homepage drift)",
     (path) => {
-      const doc = REGISTRY_BY_PATH.get(path)!;
-      const head = extractHead(buildStaticSocialRouteHtml(INDEX_HTML, doc.metadata));
+      const { head } = headFor(path);
       const expectedUrl = `${VERDANT_SITE_ORIGIN}${path}`;
       expect(head.canonical).toBe(expectedUrl);
-      expect(head.ogUrl).toBe(expectedUrl);
-      // og:image / twitter:image must at least be absolute https.
-      expect(head.ogImage).toMatch(/^https:\/\//);
-      expect(head.twitterImage).toMatch(/^https:\/\//);
+      expect(head.metas.get("property:og:url") ?? null).toBe(expectedUrl);
+      expect(head.metas.get("property:og:image") ?? "").toMatch(/^https:\/\//);
+      expect(head.metas.get("name:twitter:image") ?? "").toMatch(/^https:\/\//);
     },
   );
 });

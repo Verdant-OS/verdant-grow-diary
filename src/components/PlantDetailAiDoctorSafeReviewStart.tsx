@@ -36,7 +36,10 @@ export default function PlantDetailAiDoctorSafeReviewStart({
   plantId,
   plant,
 }: PlantDetailAiDoctorSafeReviewStartProps) {
-  const { items } = useTimelineMemory({ kind: "plant", plantId }, TIMELINE_MEMORY_DEFAULT_LIMIT);
+  const { items: evidenceItems } = useTimelineMemory(
+    { kind: "plant", plantId, tentId: plant?.tentId ?? null },
+    TIMELINE_MEMORY_DEFAULT_LIMIT,
+  );
   const rootZoneScope = buildAiDoctorRootZoneReadinessScope({
     plantId,
     tentId: plant?.tentId,
@@ -49,10 +52,10 @@ export default function PlantDetailAiDoctorSafeReviewStart({
     () =>
       evaluateAiDoctorContextFromSources({
         plant,
-        timelineItems: items,
+        timelineItems: evidenceItems,
         rootZoneObservations,
       }),
-    [plant, items, rootZoneObservations],
+    [plant, evidenceItems, rootZoneObservations],
   );
 
   const view = useMemo(() => buildAiDoctorSafeReviewStart(result), [result]);

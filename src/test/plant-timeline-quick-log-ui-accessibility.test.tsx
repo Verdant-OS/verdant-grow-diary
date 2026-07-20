@@ -21,13 +21,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import {
-  render,
-  screen,
-  fireEvent,
-  waitFor,
-  within,
-} from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import QuickLogGroupedTimelineSection from "@/components/QuickLogGroupedTimelineSection";
@@ -63,6 +57,7 @@ vi.mock("@/integrations/supabase/client", () => {
     const q: Record<string, unknown> = {};
     q.select = () => q;
     q.eq = () => q;
+    q.not = () => q;
     q.in = () => q;
     q.or = () => q;
     q.order = () => q;
@@ -81,11 +76,7 @@ function renderSection() {
   });
   return render(
     <QueryClientProvider client={qc}>
-      <QuickLogGroupedTimelineSection
-        scope="plant"
-        plantId={PLANT}
-        tentId={TENT}
-      />
+      <QuickLogGroupedTimelineSection scope="plant" plantId={PLANT} tentId={TENT} />
     </QueryClientProvider>,
   );
 }
@@ -102,16 +93,10 @@ describe("Plant Timeline empty-state CTA", () => {
   it("renders the empty-state copy and opens the existing Quick Log sheet on click", async () => {
     nextRows = [];
     renderSection();
-    const empty = await screen.findByTestId(
-      "quick-log-grouped-timeline-empty",
-    );
+    const empty = await screen.findByTestId("quick-log-grouped-timeline-empty");
     expect(empty.textContent).toContain("No timeline entries yet.");
-    expect(empty.textContent).toContain(
-      "Add a Quick Log to start this plant's history.",
-    );
-    const cta = within(empty).getByTestId(
-      "quick-log-grouped-timeline-create-button",
-    );
+    expect(empty.textContent).toContain("Add a Quick Log to start this plant's history.");
+    const cta = within(empty).getByTestId("quick-log-grouped-timeline-create-button");
     // Existing app pattern: CTA opens the existing QuickLogV2Sheet.
     // No new launch path is invented (no route nav, no custom event).
     fireEvent.click(cta);
@@ -155,9 +140,7 @@ describe("Sensor snapshot source badge", () => {
       },
     ];
     renderSection();
-    const badge = await screen.findByTestId(
-      "quick-log-grouped-action-source",
-    );
+    const badge = await screen.findByTestId("quick-log-grouped-action-source");
     expect(badge.textContent).toBe(QUICK_LOG_MANUAL_SOURCE_LABEL);
   });
 
@@ -182,12 +165,8 @@ describe("Sensor snapshot source badge", () => {
     // With no usable telemetry, the row is dropped entirely → empty
     // state, and never gets a fabricated source badge.
     await screen.findByTestId("quick-log-grouped-timeline-empty");
-    expect(
-      screen.queryByTestId("quick-log-grouped-action-source"),
-    ).toBeNull();
-    expect(
-      screen.queryByTestId("quick-log-grouped-env-demo-source"),
-    ).toBeNull();
+    expect(screen.queryByTestId("quick-log-grouped-action-source")).toBeNull();
+    expect(screen.queryByTestId("quick-log-grouped-env-demo-source")).toBeNull();
   });
 
   it("never renders a 'Live' label anywhere in the timeline", async () => {
@@ -223,9 +202,7 @@ describe("Sensor snapshot source badge", () => {
     ];
     renderSection();
     await screen.findByTestId("quick-log-grouped-timeline-empty");
-    expect(
-      screen.queryByTestId("quick-log-grouped-action-source"),
-    ).toBeNull();
+    expect(screen.queryByTestId("quick-log-grouped-action-source")).toBeNull();
   });
 });
 
@@ -267,15 +244,9 @@ describe("Quick Log action labels via shared helpers", () => {
       warnings: [],
       isValidForAiContext: true,
     } as unknown as Entry;
-    expect(
-      mod.toTimelineItem({ ...base, eventType: "feeding" } as Entry).title,
-    ).toBe("Feeding");
-    expect(
-      mod.toTimelineItem({ ...base, eventType: "training" } as Entry).title,
-    ).toBe("Training");
-    expect(
-      mod.toTimelineItem({ ...base, eventType: "harvest" } as Entry).title,
-    ).toBe("Harvest");
+    expect(mod.toTimelineItem({ ...base, eventType: "feeding" } as Entry).title).toBe("Feeding");
+    expect(mod.toTimelineItem({ ...base, eventType: "training" } as Entry).title).toBe("Training");
+    expect(mod.toTimelineItem({ ...base, eventType: "harvest" } as Entry).title).toBe("Harvest");
   });
 
   it("Diagnosis label falls back deterministically via the shared helper (capitalized)", async () => {
@@ -328,9 +299,7 @@ describe("Quick Log action labels via shared helpers", () => {
       },
     ];
     renderSection();
-    const title = await screen.findByTestId(
-      "quick-log-grouped-action-title",
-    );
+    const title = await screen.findByTestId("quick-log-grouped-action-title");
     expect(title.textContent).toBe("Watering");
     const ts = screen.getByTestId("quick-log-grouped-action-occurred-at");
     expect(ts.textContent).toBe(formatQuickLogOccurredAt(iso));
@@ -375,9 +344,7 @@ describe("Plant Timeline accessibility", () => {
     ];
     renderSection();
     // Action label is rendered as visible text and identifies the type.
-    const title = await screen.findByTestId(
-      "quick-log-grouped-action-title",
-    );
+    const title = await screen.findByTestId("quick-log-grouped-action-title");
     expect(title.textContent).toBe("Note");
     // Source badge carries an accessible label, e.g. "Source: Manual".
     const badge = screen.getByTestId("quick-log-grouped-action-source");
@@ -388,9 +355,7 @@ describe("Plant Timeline accessibility", () => {
     // occurred_at carries an accessible "Occurred at …" label.
     const ts = screen.getByTestId("quick-log-grouped-action-occurred-at");
     const formatted = formatQuickLogOccurredAt(iso);
-    expect(ts.getAttribute("aria-label")).toBe(
-      quickLogOccurredAtAccessibleLabel(formatted),
-    );
+    expect(ts.getAttribute("aria-label")).toBe(quickLogOccurredAtAccessibleLabel(formatted));
     expect(ts.getAttribute("aria-label")).toMatch(/^Occurred at /);
     // Accessible text must not leak internal IDs.
     expect(ts.getAttribute("aria-label") ?? "").not.toContain("n-2");
@@ -404,17 +369,11 @@ describe("Plant Timeline accessibility", () => {
 
 describe("Static safety — presenter and shared view-model", () => {
   const presenter = readFileSync(
-    path.join(
-      process.cwd(),
-      "src/components/QuickLogGroupedTimelineSection.tsx",
-    ),
+    path.join(process.cwd(), "src/components/QuickLogGroupedTimelineSection.tsx"),
     "utf8",
   );
   const vm = readFileSync(
-    path.join(
-      process.cwd(),
-      "src/lib/quickLogGroupedTimelineFilterViewModel.ts",
-    ),
+    path.join(process.cwd(), "src/lib/quickLogGroupedTimelineFilterViewModel.ts"),
     "utf8",
   );
 
@@ -442,9 +401,7 @@ describe("Static safety — presenter and shared view-model", () => {
 
   it("presenter has no inline source-label map (uses shared constants)", () => {
     expect(presenter).toMatch(/QUICK_LOG_MANUAL_SOURCE_LABEL/);
-    expect(presenter).not.toMatch(
-      /\{\s*manual\s*:\s*["']Manual["']\s*,/,
-    );
+    expect(presenter).not.toMatch(/\{\s*manual\s*:\s*["']Manual["']\s*,/);
   });
 
   it("presenter never hard-codes a 'Live' fallback for QuickLog sources", () => {

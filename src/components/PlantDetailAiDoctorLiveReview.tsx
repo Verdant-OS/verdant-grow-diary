@@ -162,7 +162,10 @@ function PlantDetailAiDoctorLiveReviewScope({
     trackedSessionIdRef.current = null;
     pendingAcceptedReviewStartRef.current = null;
   }, [growId, plantId, tentId]);
-  const { items } = useTimelineMemory({ kind: "plant", plantId }, TIMELINE_MEMORY_DEFAULT_LIMIT);
+  const { items: evidenceItems } = useTimelineMemory(
+    { kind: "plant", plantId, tentId },
+    TIMELINE_MEMORY_DEFAULT_LIMIT,
+  );
   const rootZoneScope =
     isUuid(plantId) && isUuid(tentId) && isUuid(growId)
       ? ({ kind: "plant_context", plantId, tentId, growId } as const)
@@ -228,10 +231,10 @@ function PlantDetailAiDoctorLiveReviewScope({
     () =>
       evaluateAiDoctorContextFromSources({
         plant,
-        timelineItems: items,
+        timelineItems: evidenceItems,
         rootZoneObservations: queryRootZoneObservations,
       }),
-    [plant, items, queryRootZoneObservations],
+    [plant, evidenceItems, queryRootZoneObservations],
   );
 
   // Row-level, provenance-aware classification. The ingest audit only knows
@@ -252,7 +255,7 @@ function PlantDetailAiDoctorLiveReviewScope({
     (classification: Classification | null, now?: Date) =>
       buildAiDoctorReviewRequestPacket({
         plant,
-        timelineItems: items,
+        timelineItems: evidenceItems,
         context,
         csvHistoryRows: queryTentSensorRows,
         currentSensorRows,
@@ -260,7 +263,14 @@ function PlantDetailAiDoctorLiveReviewScope({
         now,
         hasFreshLiveSensorReadings: classification?.status === "usable",
       }),
-    [plant, items, context, queryTentSensorRows, currentSensorRows, queryRootZoneObservations],
+    [
+      plant,
+      evidenceItems,
+      context,
+      queryTentSensorRows,
+      currentSensorRows,
+      queryRootZoneObservations,
+    ],
   );
   const candidatePacket = useMemo(
     () => buildReviewPacket(sensorClassification),

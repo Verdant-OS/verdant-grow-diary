@@ -14,7 +14,10 @@ import type {
   OperatorSensorReadingRow,
   OperatorSensorTrustTone,
 } from "@/lib/operatorAccountReadModelsViewModel";
-import type { OperatorWateringContextViewModel } from "@/lib/operatorWateringContextViewModel";
+import type {
+  OperatorConfirmedRootZoneApplicationRow,
+  OperatorWateringContextViewModel,
+} from "@/lib/operatorWateringContextViewModel";
 
 export interface OperatorAccountReadModelsPanelProps {
   model: OperatorAccountReadModelsPanelModel;
@@ -172,6 +175,32 @@ function SensorPanel({
   );
 }
 
+function RootZoneApplicationSummary({
+  application,
+  emptyCopy,
+  label,
+  testId,
+}: {
+  application: OperatorConfirmedRootZoneApplicationRow | null;
+  emptyCopy: string;
+  label: "Last plain water" | "Last feed";
+  testId: string;
+}) {
+  return (
+    <div className="rounded-lg border border-border/60 bg-secondary/20 p-3" data-testid={testId}>
+      <h4 className="text-xs font-medium text-muted-foreground">{label}</h4>
+      {application ? (
+        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+          <time dateTime={application.occurredAt}>{readableTimestamp(application.occurredAt)}</time>
+          <Badge variant="outline">{application.sourceLabel}</Badge>
+        </div>
+      ) : (
+        <p className="mt-1 text-xs text-muted-foreground">{emptyCopy}</p>
+      )}
+    </div>
+  );
+}
+
 function WateringContextPanel({
   model,
   tentName,
@@ -188,7 +217,7 @@ function WateringContextPanel({
           <Badge variant="outline">Grower decides</Badge>
         </div>
         <CardDescription>
-          Confirmed typed watering history and source-labeled sensor context for{" "}
+          Confirmed typed water and feed applications with source-labeled sensor context for{" "}
           {tentName ?? "the active grow"}, plus recent active-grow observations.
         </CardDescription>
       </CardHeader>
@@ -208,8 +237,10 @@ function WateringContextPanel({
               <p className="text-sm">{model.summary}</p>
               {model.missingContext.length > 0 ? (
                 <div className="flex flex-wrap gap-1.5 text-xs text-muted-foreground">
-                  {model.missingContext.includes("typed_watering_history") ? (
-                    <Badge variant="outline">Typed watering history missing or unavailable</Badge>
+                  {model.missingContext.includes("typed_root_zone_history") ? (
+                    <Badge variant="outline">
+                      Typed root-zone application history missing or unavailable
+                    </Badge>
                   ) : null}
                   {model.missingContext.includes("soil_moisture_snapshot") ? (
                     <Badge variant="outline">Soil-moisture snapshot missing or unusable</Badge>
@@ -218,32 +249,33 @@ function WateringContextPanel({
               ) : null}
             </div>
 
-            <section aria-labelledby="operator-last-watering-title" className="space-y-2">
+            <section aria-labelledby="operator-last-application-title" className="space-y-2">
               <h3
-                id="operator-last-watering-title"
+                id="operator-last-application-title"
                 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
               >
-                Last confirmed typed watering
+                Last root-zone application
               </h3>
-              {model.lastConfirmedWatering ? (
+              {model.lastRootZoneApplication ? (
                 <div
                   className="rounded-lg border border-border/60 bg-secondary/20 p-3"
-                  data-testid="operator-last-confirmed-watering"
+                  data-testid="operator-last-root-zone-application"
                 >
                   <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                    <time dateTime={model.lastConfirmedWatering.occurredAt}>
-                      {readableTimestamp(model.lastConfirmedWatering.occurredAt)}
+                    <Badge variant="outline">{model.lastRootZoneApplication.eventLabel}</Badge>
+                    <time dateTime={model.lastRootZoneApplication.occurredAt}>
+                      {readableTimestamp(model.lastRootZoneApplication.occurredAt)}
                     </time>
-                    <Badge variant="outline">{model.lastConfirmedWatering.sourceLabel}</Badge>
-                    {model.lastConfirmedWatering.hasRejectedMetrics ? (
+                    <Badge variant="outline">{model.lastRootZoneApplication.sourceLabel}</Badge>
+                    {model.lastRootZoneApplication.hasRejectedMetrics ? (
                       <Badge variant="outline" className={trustToneClass("caution")}>
                         Some supplied measurements rejected
                       </Badge>
                     ) : null}
                   </div>
-                  {model.lastConfirmedWatering.metrics.length > 0 ? (
+                  {model.lastRootZoneApplication.metrics.length > 0 ? (
                     <dl className="mt-3 flex flex-wrap gap-2">
-                      {model.lastConfirmedWatering.metrics.map((metric) => (
+                      {model.lastRootZoneApplication.metrics.map((metric) => (
                         <div
                           key={metric.key}
                           className="rounded-md border border-border/50 px-2 py-1 text-xs"
@@ -258,11 +290,25 @@ function WateringContextPanel({
               ) : (
                 <p
                   className="text-sm text-muted-foreground"
-                  data-testid="operator-no-confirmed-watering"
+                  data-testid="operator-no-root-zone-application"
                 >
-                  No confirmed typed watering event is available for this tent.
+                  No confirmed typed water or feed application is available for this tent.
                 </p>
               )}
+              <div className="grid gap-2 sm:grid-cols-2" aria-label="Application type history">
+                <RootZoneApplicationSummary
+                  application={model.lastConfirmedWatering}
+                  emptyCopy="No typed plain-water application is available."
+                  label="Last plain water"
+                  testId="operator-last-plain-water"
+                />
+                <RootZoneApplicationSummary
+                  application={model.lastConfirmedFeeding}
+                  emptyCopy="No typed feed application is available."
+                  label="Last feed"
+                  testId="operator-last-feed"
+                />
+              </div>
             </section>
 
             <section aria-labelledby="operator-root-zone-cycles-title" className="space-y-2">

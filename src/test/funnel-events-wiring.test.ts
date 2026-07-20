@@ -142,8 +142,9 @@ const QUICK_LOG_SUCCESS_SEAMS: Array<{
   },
   {
     file: "src/components/QuickLogV2Sheet.tsx",
-    calls: 1,
-    extra: /trackQuickLogSuccess\("feed",\s*\{\s*reused:\s*result\.reused\s*\}\)/,
+    calls: 2,
+    extra:
+      /trackQuickLogSuccess\("feed",\s*\{\s*reused:\s*result\.reused\s*\}\)[\s\S]*trackQuickLogSuccess\("water",\s*\{\s*reused:\s*wateringResult\.reused\s*\}\)/,
   },
   {
     file: "src/components/PlantQuickLog.tsx",
@@ -256,12 +257,16 @@ describe("ordering and safety constraints at the seams", () => {
     expect(src).not.toMatch(/telemetryIntent:\s*built\.payload\.p_action/);
   });
 
-  it("structured feed and Plant Quick Log emit only after their write rejection gates", () => {
+  it("structured feed, Water, and Plant Quick Log emit only after their write rejection gates", () => {
     const sheet = read("src/components/QuickLogV2Sheet.tsx");
     expect(sheet.indexOf('trackQuickLogSuccess("feed"')).toBeGreaterThan(
       sheet.indexOf("if (result.ok !== true)"),
     );
     expect(sheet).toMatch(/trackQuickLogSuccess\("feed",\s*\{\s*reused:\s*result\.reused/);
+    expect(sheet.indexOf('trackQuickLogSuccess("water"')).toBeGreaterThan(
+      sheet.indexOf("if (wateringResult.ok !== true)"),
+    );
+    expect(sheet).toMatch(/trackQuickLogSuccess\("water",\s*\{\s*reused:\s*wateringResult\.reused/);
 
     const plant = read("src/components/PlantQuickLog.tsx");
     expect(plant.indexOf('trackQuickLogSuccess("plant_quick_log")')).toBeGreaterThan(

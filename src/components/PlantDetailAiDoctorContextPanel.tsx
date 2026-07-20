@@ -71,8 +71,8 @@ export default function PlantDetailAiDoctorContextPanel({
   plant,
   vpdDrift,
 }: PlantDetailAiDoctorContextPanelProps) {
-  const { items, isLoading } = useTimelineMemory(
-    { kind: "plant", plantId },
+  const { items: evidenceItems, isLoading } = useTimelineMemory(
+    { kind: "plant", plantId, tentId: plant?.tentId ?? null },
     TIMELINE_MEMORY_DEFAULT_LIMIT,
   );
   const rootZoneScope = buildAiDoctorRootZoneReadinessScope({
@@ -87,10 +87,10 @@ export default function PlantDetailAiDoctorContextPanel({
     () =>
       evaluateAiDoctorContextFromSources({
         plant,
-        timelineItems: items,
+        timelineItems: evidenceItems,
         rootZoneObservations,
       }),
-    [plant, items, rootZoneObservations],
+    [plant, evidenceItems, rootZoneObservations],
   );
 
   const style = READINESS_STYLES[result.readiness];

@@ -20,6 +20,28 @@ import type { ManualSnapshotTimelineCard } from "@/lib/manualSensorSnapshotViewM
 const trackFunnelEvent = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/funnelAnalytics", () => ({ trackFunnelEvent }));
 
+const entitlementState = vi.hoisted(() => ({
+  loading: false,
+  current: {
+    displayPlanId: "free",
+    effectivePlanId: "free",
+    status: "active" as string,
+    isActive: true,
+    capabilities: {},
+    degraded: false,
+    degradedReason: "null_row_free" as string | null,
+    isStaff: false,
+    source: "free",
+  },
+}));
+
+vi.mock("@/hooks/useMyEntitlements", () => ({
+  useMyEntitlements: () => ({
+    loading: entitlementState.loading,
+    entitlement: entitlementState.current,
+  }),
+}));
+
 function render(ui: ReactElement) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -127,6 +149,14 @@ describe("PlantDetailAiDoctorLiveReview", () => {
     cleanup();
     itemsRef.current = [];
     trackFunnelEvent.mockClear();
+    entitlementState.loading = false;
+    entitlementState.current.displayPlanId = "free";
+    entitlementState.current.effectivePlanId = "free";
+    entitlementState.current.status = "active";
+    entitlementState.current.isActive = true;
+    entitlementState.current.degraded = false;
+    entitlementState.current.degradedReason = "null_row_free";
+    entitlementState.current.isStaff = false;
   });
 
   it("renders nothing for insufficient readiness", () => {
@@ -223,6 +253,108 @@ describe("PlantDetailAiDoctorLiveReview", () => {
     });
   });
 
+  it("shows the post-value upgrade only after the final Free review is saved", async () => {
+    itemsRef.current = strongTimeline();
+    const invoke = vi.fn().mockResolvedValue({
+      data: {
+        ok: true,
+        result: validResult(),
+        credit: {
+          plan_id: "free",
+          remaining: 0,
+          scope: "per_grow",
+          scope_limit: 3,
+        },
+      },
+      error: null,
+    });
+    const persist = vi.fn().mockResolvedValue({ ok: true, id: "session-final-free" });
+    render(
+      <PlantDetailAiDoctorLiveReview
+        plantId="p1"
+        plant={strongPlant}
+        growId="grow-1"
+        tentId="tent-1"
+        invoke={invoke}
+        persist={persist}
+      />,
+    );
+
+    fireEvent.click(await screen.findByTestId("plant-ai-doctor-live-review-start"));
+
+    expect(await screen.findByTestId("plant-ai-doctor-history-saved")).toBeTruthy();
+    const paywall = await screen.findByTestId("plant-ai-doctor-post-value-upgrade");
+    expect(paywall).toHaveTextContent("3 included AI credits");
+    expect(screen.getByTestId("plant-detail-live-ai-doctor-review-result-preview")).toBeTruthy();
+    const link = screen.getByTestId("plant-ai-doctor-post-value-upgrade-link");
+    expect(link).toHaveAttribute(
+      "href",
+      "/pricing?returnTo=%2Fplants%2Fp1%3FtentId%3Dtent-1%23plant-ai-doctor-review",
+    );
+
+    const beforeClick = trackFunnelEvent.mock.calls.filter(([name]) =>
+      [
+        "ai_doctor_review_started",
+        "ai_doctor_result_received",
+        "ai_doctor_session_saved",
+        "paywall_viewed",
+      ].includes(name),
+    );
+    expect(beforeClick).toEqual([
+      ["ai_doctor_review_started", { surface: "standard" }],
+      ["ai_doctor_result_received", { surface: "standard" }],
+      ["ai_doctor_session_saved", { surface: "standard" }],
+      ["paywall_viewed", { surface: "ai_doctor_post_value" }],
+    ]);
+
+    fireEvent.click(link);
+    expect(trackFunnelEvent).toHaveBeenCalledWith("paywall_cta_clicked", {
+      surface: "ai_doctor_post_value",
+    });
+    expect(invoke).toHaveBeenCalledTimes(1);
+    expect(persist).toHaveBeenCalledTimes(1);
+  });
+
+  it("fails closed for a resolved unknown entitlement after the final Free review is saved", async () => {
+    itemsRef.current = strongTimeline();
+    entitlementState.current.status = "unknown";
+    entitlementState.current.isActive = false;
+    entitlementState.current.degraded = true;
+    entitlementState.current.degradedReason = "unknown_status";
+    const invoke = vi.fn().mockResolvedValue({
+      data: {
+        ok: true,
+        result: validResult(),
+        credit: {
+          plan_id: "free",
+          remaining: 0,
+          scope: "per_grow",
+          scope_limit: 3,
+        },
+      },
+      error: null,
+    });
+    const persist = vi.fn().mockResolvedValue({ ok: true, id: "session-unknown-viewer" });
+    render(
+      <PlantDetailAiDoctorLiveReview
+        plantId="p1"
+        plant={strongPlant}
+        growId="grow-1"
+        tentId="tent-1"
+        invoke={invoke}
+        persist={persist}
+      />,
+    );
+
+    fireEvent.click(await screen.findByTestId("plant-ai-doctor-live-review-start"));
+
+    expect(await screen.findByTestId("plant-ai-doctor-history-saved")).toBeTruthy();
+    expect(screen.queryByTestId("plant-ai-doctor-post-value-upgrade")).toBeNull();
+    expect(trackFunnelEvent).not.toHaveBeenCalledWith("paywall_viewed", {
+      surface: "ai_doctor_post_value",
+    });
+  });
+
   it("does not count a result that becomes ineligible before it can be displayed", async () => {
     itemsRef.current = strongTimeline();
     let resolveInvoke: ((value: { data: unknown; error: null }) => void) | null = null;
@@ -271,7 +403,16 @@ describe("PlantDetailAiDoctorLiveReview", () => {
   it("keeps the result visible, warns on save failure, and retries without rerunning AI", async () => {
     itemsRef.current = strongTimeline();
     const invoke = vi.fn().mockResolvedValue({
-      data: { ok: true, result: validResult() },
+      data: {
+        ok: true,
+        result: validResult(),
+        credit: {
+          plan_id: "free",
+          remaining: 0,
+          scope: "per_grow",
+          scope_limit: 3,
+        },
+      },
       error: null,
     });
     const diagnostic = buildAiDoctorSessionPersistenceFailureDiagnostic({
@@ -302,6 +443,7 @@ describe("PlantDetailAiDoctorLiveReview", () => {
     expect(warning).toHaveTextContent(AI_DOCTOR_HISTORY_SAVE_FAILED_COPY);
     expect(warning).toHaveAttribute("data-failure-category", "rls");
     expect(screen.getByTestId("plant-detail-live-ai-doctor-review-result-preview")).toBeTruthy();
+    expect(screen.queryByTestId("plant-ai-doctor-post-value-upgrade")).toBeNull();
 
     fireEvent.click(screen.getByTestId("plant-ai-doctor-history-save-retry"));
     expect(await screen.findByTestId("plant-ai-doctor-history-saved-link")).toHaveAttribute(
@@ -310,9 +452,15 @@ describe("PlantDetailAiDoctorLiveReview", () => {
     );
     expect(invoke).toHaveBeenCalledTimes(1);
     expect(persist).toHaveBeenCalledTimes(2);
+    expect(await screen.findByTestId("plant-ai-doctor-post-value-upgrade")).toBeTruthy();
     expect(
       trackFunnelEvent.mock.calls.filter(([name]) => name === "ai_doctor_session_saved"),
     ).toEqual([["ai_doctor_session_saved", { surface: "standard" }]]);
+    expect(
+      trackFunnelEvent.mock.calls.filter(
+        ([name, params]) => name === "paywall_viewed" && params?.surface === "ai_doctor_post_value",
+      ),
+    ).toHaveLength(1);
   });
 
   it("shows calm failure copy and offers a single manual retry on error", async () => {

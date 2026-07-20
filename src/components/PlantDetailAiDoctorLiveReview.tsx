@@ -40,6 +40,7 @@ import AiDoctorReviewResultPreview from "@/components/AiDoctorReviewResultPrevie
 import AiCreditRemainingBadge from "@/components/AiCreditRemainingBadge";
 import AiCreditLimitNotice from "@/components/AiCreditLimitNotice";
 import AiCreditServiceDegradedNotice from "@/components/AiCreditServiceDegradedNotice";
+import PaywallCta from "@/components/PaywallCta";
 import { useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
 import { useImportedSensorHistory } from "@/hooks/useImportedSensorHistory";
 import { useRootZoneObservations } from "@/hooks/useRootZoneObservations";
@@ -60,6 +61,10 @@ import {
   canRetryAiDoctorLiveReviewFailure,
 } from "@/lib/aiDoctorLiveReviewRecoveryRules";
 import { resolveAiDoctorImportedHistoryRecovery } from "@/lib/aiDoctorImportedHistoryRecoveryRules";
+import {
+  AI_DOCTOR_POST_VALUE_UPGRADE_SURFACE,
+  buildAiDoctorPostValueUpgradeViewModel,
+} from "@/lib/aiDoctorPostValueUpgradeViewModel";
 
 /** Stable empty-array identity so the packet memo does not churn. */
 const NO_TENT_SENSOR_ROWS: never[] = [];
@@ -145,6 +150,7 @@ function PlantDetailAiDoctorLiveReviewScope({
   const acceptedReviewModeRef = useRef<"standard" | "historical_review" | null>(null);
   const trackedResultRef = useRef<unknown>(null);
   const trackedSessionIdRef = useRef<string | null>(null);
+  const trackedPostValuePaywallResultRef = useRef<unknown>(null);
   const pendingAcceptedReviewStartRef = useRef<string | null>(null);
   const historyScopeKey = buildAiDoctorLiveReviewScopeKey(plantId, tentId, growId);
   const [historyOmissionScope, setHistoryOmissionScope] = useState<string | null>(null);
@@ -160,6 +166,7 @@ function PlantDetailAiDoctorLiveReviewScope({
     acceptedReviewModeRef.current = null;
     trackedResultRef.current = null;
     trackedSessionIdRef.current = null;
+    trackedPostValuePaywallResultRef.current = null;
     pendingAcceptedReviewStartRef.current = null;
   }, [growId, plantId, tentId]);
   const { items: evidenceItems } = useTimelineMemory(
@@ -398,7 +405,7 @@ function PlantDetailAiDoctorLiveReviewScope({
     startReview();
   }, [activeReviewRequest, historyScopeKey, reviewStatus, startReview]);
 
-  const { entitlement } = useMyEntitlements();
+  const { entitlement, loading: entitlementLoading } = useMyEntitlements();
   const canRetryReview = canRetryAiDoctorLiveReviewFailure(review.reason);
   // Preserve the existing same-scope guard when unrelated plant/timeline
   // context disappears. The narrow exception is a request that was accepted
@@ -443,6 +450,18 @@ function PlantDetailAiDoctorLiveReviewScope({
     [plantId, tentId],
   );
 
+  const postValueUpgrade = useMemo(
+    () =>
+      buildAiDoctorPostValueUpgradeViewModel({
+        credit: review.creditRemaining,
+        viewerEntitlement: entitlement,
+        entitlementLoading,
+        durableSessionSaved: review.persistence.status === "saved",
+        returnTo,
+      }),
+    [entitlement, entitlementLoading, returnTo, review.creditRemaining, review.persistence.status],
+  );
+
   // Keep funnel tracking aligned with the notice's server-plan + defensive
   // entitlement rules. Paid, founder, and unknown denials must never register
   // as an upgrade opportunity.
@@ -472,6 +491,12 @@ function PlantDetailAiDoctorLiveReviewScope({
     trackFunnelEvent("paywall_cta_clicked", { surface: "ai_doctor_limit" });
   }, []);
 
+  const handlePostValuePlansClick = useCallback(() => {
+    trackFunnelEvent("paywall_cta_clicked", {
+      surface: AI_DOCTOR_POST_VALUE_UPGRADE_SURFACE,
+    });
+  }, []);
+
   useEffect(() => {
     // These events describe value the grower can actually see. If eligibility
     // disappears while the request is in flight, the component renders
@@ -494,6 +519,26 @@ function PlantDetailAiDoctorLiveReviewScope({
       trackFunnelEvent("ai_doctor_session_saved", { surface });
     }
   }, [activeReviewVisible, review.persistence, review.result, review.status]);
+
+  useEffect(() => {
+    // Value must be visible and durably saved before a conversion impression.
+    // This effect is declared after the result/session milestone effect above,
+    // preserving result -> saved -> paywall ordering even when persistence and
+    // the provider result settle in the same render turn.
+    if (
+      !activeReviewVisible ||
+      review.status !== "result" ||
+      !review.result ||
+      !postValueUpgrade.visible
+    ) {
+      return;
+    }
+    if (trackedPostValuePaywallResultRef.current === review.result) return;
+    trackedPostValuePaywallResultRef.current = review.result;
+    trackFunnelEvent("paywall_viewed", {
+      surface: AI_DOCTOR_POST_VALUE_UPGRADE_SURFACE,
+    });
+  }, [activeReviewVisible, postValueUpgrade.visible, review.result, review.status]);
 
   const showHistoryOmission = historyRecovery.state === "omitted_by_choice";
   const showHistoryRecovery = historyRecovery.state === "decision_required" || showHistoryOmission;
@@ -827,6 +872,14 @@ function PlantDetailAiDoctorLiveReviewScope({
             />
           ) : null}
           <AiDoctorReviewResultPreview result={review.result} testIdPrefix="plant-detail-live" />
+          {postValueUpgrade.visible ? (
+            <PaywallCta
+              vm={postValueUpgrade.paywallVm}
+              onPrimaryCtaClick={handlePostValuePlansClick}
+              className="mt-4"
+              data-testid="plant-ai-doctor-post-value-upgrade"
+            />
+          ) : null}
         </div>
       ) : null}
     </section>

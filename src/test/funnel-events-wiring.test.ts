@@ -176,9 +176,10 @@ describe("each funnel event fires from its canonical seam", () => {
     expect(aiDoctor).toMatch(
       /trackFunnelEvent\("paywall_viewed",\s*\{\s*surface:\s*"ai_doctor_limit"\s*\}\)/,
     );
+    expect(aiDoctor).toContain("surface: AI_DOCTOR_POST_VALUE_UPGRADE_SURFACE");
   });
 
-  it("paywall_cta_clicked is only wired to the explicit Free AI Doctor limit CTA", () => {
+  it("paywall_cta_clicked is wired only to explicit AI Doctor pricing actions", () => {
     const aiDoctor = read("src/components/PlantDetailAiDoctorLiveReview.tsx");
     const notice = read("src/components/AiCreditLimitNotice.tsx");
     const coach = read("src/pages/Coach.tsx");
@@ -194,6 +195,10 @@ describe("each funnel event fires from its canonical seam", () => {
     expect(callback).not.toMatch(/user_id|plant_id|grow_id|tent_id|returnTo|email|plan/);
     expect(aiDoctor).toMatch(/onUpsellCtaClick=\{handleCreditLimitPlansClick\}/);
     expect(notice).toMatch(/onPrimaryCtaClick=\{onUpsellCtaClick\}/);
+    expect(aiDoctor).toMatch(
+      /const handlePostValuePlansClick[\s\S]{0,250}surface:\s*AI_DOCTOR_POST_VALUE_UPGRADE_SURFACE/,
+    );
+    expect(aiDoctor).toMatch(/onPrimaryCtaClick=\{handlePostValuePlansClick\}/);
     expect(coach).not.toContain("onUpsellCtaClick");
   });
 
@@ -366,6 +371,16 @@ describe("ordering and safety constraints at the seams", () => {
     expect(savedGate).toBeGreaterThan(resultTrack);
     expect(savedDedupe).toBeGreaterThan(savedGate);
     expect(savedTrack).toBeGreaterThan(savedDedupe);
+
+    const postValueGate = src.indexOf("!postValueUpgrade.visible", savedTrack);
+    const postValueDedupe = src.indexOf(
+      "trackedPostValuePaywallResultRef.current === review.result",
+      postValueGate,
+    );
+    const postValueTrack = src.indexOf('trackFunnelEvent("paywall_viewed"', postValueDedupe);
+    expect(postValueGate).toBeGreaterThan(savedTrack);
+    expect(postValueDedupe).toBeGreaterThan(postValueGate);
+    expect(postValueTrack).toBeGreaterThan(postValueDedupe);
   });
 
   it("checkout_return_completed fires only after confirmation and a sanitized return exists", () => {

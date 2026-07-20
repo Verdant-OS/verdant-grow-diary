@@ -68,6 +68,17 @@ These AI Doctor funnel events cover the canonical plant-detail
 claimed as measured by this client sequence; add its server-authoritative usage
 telemetry separately before including Coach in conversion reporting.
 
+After a Free grower's third review returns a contract-valid result and the
+history insert is durably confirmed, the saved result may expose a calm upgrade
+handoff. `paywall_viewed` then carries only
+`surface: "ai_doctor_post_value"`; `paywall_cta_clicked` uses that same closed
+surface only after an explicit pricing-link click. The handoff requires the
+server-resolved Free plan, the exact exhausted `3 per grow` allowance, and a
+settled client entitlement that is not paid or Founder. It stays hidden while
+history is saving or failed, for malformed or missing credit context, and for
+paid, Founder, or unknown viewers. The review remains visible and saved whether
+or not the grower opens pricing.
+
 When a Free grower is server-denied for the per-grow AI Doctor limit,
 `paywall_viewed` records that the rendered limit notice exposed an upgrade
 option. `paywall_cta_clicked` then records only an explicit click on that

@@ -137,6 +137,7 @@ export function extractHead(html) {
     title: titleMatch ? decode(titleMatch[1].trim()) : null,
     canonical: canonical ? decode(canonical) : null,
     metas,
+    jsonLd: extractJsonLd(html),
   };
 }
 

@@ -97,3 +97,22 @@ export const tentDetailPath = (tentId: string): string =>
 
 export const aiDoctorSessionDetailPath = (sessionId: string): string =>
   `/doctor/sessions/${encodeURIComponent(sessionId)}`;
+
+// --- Genetics & Propagation Traceability ---
+export const geneticsLibraryPath = (): string => "/genetics";
+
+export const geneticsAccessionDetailPath = (accessionId: string): string =>
+  `/genetics/accessions/${encodeURIComponent(accessionId)}`;
+
+export const geneticsBatchDetailPath = (batchId: string): string =>
+  `/genetics/batches/${encodeURIComponent(batchId)}`;
+
+export type GeneticsTraceKind = "accession" | "batch" | "plant" | "keeper" | "clone" | "cross";
+
+export const geneticsTracePath = (kind: GeneticsTraceKind, subjectId: string): string =>
+  `/genetics/trace/${kind}/${encodeURIComponent(subjectId)}`;
+
+export const geneticsHealthHistoryPath = (
+  kind: "accession" | "batch" | "plant",
+  subjectId: string,
+): string => `/genetics/health/${kind}/${encodeURIComponent(subjectId)}`;

@@ -76,7 +76,8 @@ describe("genetics accessions migration safety", () => {
 
   it("never defaults provenance dates to now() (unknown stays explicit NULL)", () => {
     // The column definition is a plain nullable date — no NOT NULL, no DEFAULT.
-    expect(sql).toMatch(/\n\s*acquisition_date date,\n/);
+    // (line-ending agnostic: the working tree may be CRLF on Windows.)
+    expect(sql).toMatch(/\bacquisition_date date,\r?\n/);
     // No same-line DEFAULT on the acquisition_date column definition.
     expect(sql).not.toMatch(/acquisition_date date[^\n]*DEFAULT/i);
   });

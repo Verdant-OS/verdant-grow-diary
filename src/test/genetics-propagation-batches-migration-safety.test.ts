@@ -68,7 +68,8 @@ describe("genetics propagation batches migration safety", () => {
 
   it("never defaults counts to zero or dates to now() (unknown stays explicit)", () => {
     for (const d of ["cut_date", "received_date", "started_date", "rooted_date"]) {
-      expect(sql).toMatch(new RegExp(`\\n\\s*${d} date,\\n`));
+      // line-ending agnostic (Windows working tree may be CRLF).
+      expect(sql).toMatch(new RegExp(`\\b${d} date,\\r?\\n`));
       expect(sql).not.toMatch(new RegExp(`${d} date[^\\n]*DEFAULT`, "i"));
     }
     // Counts are plain nullable ints (no DEFAULT 0), with explicit counts_unknown.

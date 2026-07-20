@@ -46,7 +46,7 @@ describe("public VPD calculator page", () => {
       screen.getByText(/Air estimate first · verified leaf VPD for target status/),
     ).toBeInTheDocument();
     await user.type(screen.getByLabelText("Air temperature"), "77");
-    await user.type(screen.getByLabelText("Relative humidity"), "65");
+    await user.type(screen.getByLabelText("Relative humidity (current room reading)"), "65");
     await user.selectOptions(screen.getByLabelText("Plant stage"), "veg");
     await user.click(screen.getByRole("button", { name: /Calculate VPD/ }));
 
@@ -69,17 +69,37 @@ describe("public VPD calculator page", () => {
     });
   });
 
+  it("makes normal flower-room RH explicit while keeping evidence optional", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(
+      screen.getByText(/Normal flower-room readings around 40–55% are valid here/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Leave blank for an air estimate/i)).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText("Air temperature"), "77");
+    await user.type(screen.getByLabelText("Relative humidity (current room reading)"), "45");
+    await user.selectOptions(screen.getByLabelText("Plant stage"), "flower");
+    await user.click(screen.getByRole("button", { name: /Calculate VPD/ }));
+
+    expect(screen.getByTestId("public-vpd-calculator-result")).toHaveTextContent(
+      "Air VPD estimate — no target claim",
+    );
+    expect(screen.getByTestId("public-vpd-confidence")).toHaveTextContent("unverified");
+  });
+
   it("unlocks target status after the full VPD evidence checklist", async () => {
     const user = userEvent.setup();
     renderPage();
 
     await user.type(screen.getByLabelText("Air temperature"), "77");
-    await user.type(screen.getByLabelText("Relative humidity"), "60");
+    await user.type(screen.getByLabelText("Relative humidity (current room reading)"), "60");
     await user.type(screen.getByLabelText("Measured leaf temperature"), "77");
     await user.selectOptions(screen.getByLabelText("Temperature/RH sensor placement"), "canopy");
     await user.type(screen.getByLabelText("Temperature reference"), "Traceable reference");
     await user.type(screen.getByLabelText("Temperature verified date"), "2026-06-01");
-    await user.type(screen.getByLabelText("RH reference point"), "75");
+    await user.type(screen.getByLabelText("Calibration RH reference (optional)"), "75");
     await user.type(screen.getByLabelText("Humidity verified date"), "2026-06-01");
     await user.click(
       screen.getByLabelText(/Temperature was checked against that reference at normal room/i),
@@ -123,7 +143,7 @@ describe("public VPD calculator page", () => {
     renderPage();
 
     await user.type(screen.getByLabelText("Air temperature"), "77");
-    await user.type(screen.getByLabelText("Relative humidity"), "65");
+    await user.type(screen.getByLabelText("Relative humidity (current room reading)"), "65");
     await user.selectOptions(screen.getByLabelText("Plant stage"), "veg");
     await user.click(screen.getByRole("button", { name: /Calculate VPD/ }));
     await user.click(screen.getByRole("button", { name: /Share calculator/ }));

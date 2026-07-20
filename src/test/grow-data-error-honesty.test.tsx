@@ -40,24 +40,34 @@ describe("private grow-data error honesty", () => {
   });
 
   it.each([
-    ["src/pages/Tents.tsx", "tents-grow-data-error", "No tents yet"],
+    ["src/pages/Tents.tsx", "tents-grow-data-error", "No tents yet", 'role="alert"'],
     // Plants was rewritten to the honest-async model: a failed primary plant
     // read returns the explicit "Plants unavailable" error branch (retry:
     // plants-retry-primary) before any empty/zero grid is reachable.
-    ["src/pages/Plants.tsx", "plants-retry-primary", "filtered.length === 0"],
-    ["src/pages/Dashboard.tsx", "dashboard-grow-data-error", "<KpiCard"],
-    ["src/pages/Sensors.tsx", "sensors-grow-data-error", "sensors-first-tent-setup"],
-  ])("puts a retryable failure branch before empty or zero UI in %s", (path, testId, emptyCue) => {
-    const source = readSource(path);
-    const errorIndex = source.indexOf(testId);
-    const emptyIndex = source.indexOf(emptyCue);
+    ["src/pages/Plants.tsx", "plants-retry-primary", "filtered.length === 0", "GrowDataLoadError"],
+    ["src/pages/Dashboard.tsx", "dashboard-grow-data-error", "<KpiCard", "GrowDataLoadError"],
+    [
+      "src/pages/Sensors.tsx",
+      "sensors-grow-data-error",
+      "sensors-first-tent-setup",
+      "GrowDataLoadError",
+    ],
+  ])(
+    "puts a retryable failure branch before empty or zero UI in %s",
+    (path, testId, emptyCue, errorCue) => {
+      const source = readSource(path);
+      const errorIndex = source.indexOf(testId);
+      const emptyIndex = source.indexOf(emptyCue);
 
-    expect(source).toContain("GrowDataLoadError");
-    expect(source).toContain(".isError");
-    expect(source).toContain(".refetch()");
-    expect(errorIndex).toBeGreaterThan(-1);
-    expect(emptyIndex).toBeGreaterThan(errorIndex);
-  });
+      expect(source).toContain(errorCue);
+      expect(source).toContain(
+        path === "src/pages/Tents.tsx" ? 'tentsAsyncState.kind === "error"' : ".isError",
+      );
+      expect(source).toContain(".refetch()");
+      expect(errorIndex).toBeGreaterThan(-1);
+      expect(emptyIndex).toBeGreaterThan(errorIndex);
+    },
+  );
 
   it("puts the classified Tents primary-query failure before its empty workspace", () => {
     const source = readSource("src/pages/Tents.tsx");

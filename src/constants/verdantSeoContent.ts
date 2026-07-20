@@ -29,7 +29,6 @@ export interface GuideSection {
   readonly links?: ReadonlyArray<GuideSectionLink>;
 }
 
-
 export interface GuideCallToAction {
   readonly label: string;
   /** Absolute in-app path. */
@@ -54,7 +53,6 @@ export interface SeoGuidePage {
   /** Optional prominent CTA rendered near the top of the guide. */
   readonly cta?: GuideCallToAction;
 }
-
 
 /* ------------------------------------------------------------------ */
 /* Grower guide FAQ (visible on /guides + FAQPage JSON-LD on /guides) */
@@ -699,7 +697,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       description:
         "Open a source-labeled humidity and VPD review for your tent — see how long conditions sat in the Botrytis risk band and log any suspicious buds while the context is fresh.",
       label: "Start Environment Check",
-      to: "/diary/environment-summary",
+      to: "/quick-log",
       prompts: [
         "Is late-flower humidity holding above ~60% for long stretches?",
         "Does humidity spike overnight after lights-off?",
@@ -708,7 +706,6 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       ],
     },
     sections: [
-
       {
         heading: "Early visual signs to log with a photo",
         body: "Bud rot identification usually starts with one wilted or discolored sugar leaf poking out of an otherwise healthy cola, a single dry-looking pistil cluster, or a bud that feels slightly soft when you gently touch it. Inside, cores turn grey, brown, or dusty. Log every suspicious bud in Quick Log with a close photo against the specific plant so the timeline holds the moment you first saw it. One photo is not a confident diagnosis — but a photo plus the surrounding humidity, VPD, and watering context is the evidence AI Doctor and future-you actually need.",
@@ -723,7 +720,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
         body: "The classic triggers are sustained high humidity above roughly 60% in late flower, cool overnight temperatures that push relative humidity even higher, dense canopies with poor airflow, wet foliage from foliar sprays or condensation, and dense colas that trap moisture inside. Verdant does not adjust your fans, dehumidifier, or lights. It surfaces the pattern — a source-labeled humidity reading holding above your target, or a VPD number sliding out of range overnight — so the grower can decide whether to defoliate lightly, improve airflow, or pull affected buds.",
         links: [
           { label: "Grow-room VPD tracker guide", to: "/guides/grow-room-vpd-tracker" },
-          { label: "Open Environment Check", to: "/diary/environment-summary" },
+          { label: "Open Environment Check", to: "/quick-log" },
         ],
       },
       {
@@ -731,7 +728,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
         body: "Open the plant timeline and scan the days before the first symptom. Look for humidity readings that stayed high for hours, temperature drops after lights-off that pushed humidity even higher, and VPD values that spent long stretches below your late-flower target. Every reading in Verdant carries a source label — live, manual, csv, demo, stale, or invalid — so a week-old or invalid number is flagged, not treated as current truth. CSV history imported from AC Infinity or Spider Farmer exports works the same way: read-only, source-labeled, and reviewable next to the photo you took.",
         links: [
           { label: "Sensor truth in the grow room", to: "/guides/sensor-truth-grow-room" },
-          { label: "Review humidity & VPD history (Environment Check)", to: "/diary/environment-summary" },
+          { label: "Review humidity & VPD history (Environment Check)", to: "/quick-log" },
         ],
       },
       {
@@ -742,7 +739,6 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
           { label: "How AI Doctor works", to: "/how-ai-doctor-works" },
         ],
       },
-
     ],
     faq: [
       {
@@ -780,7 +776,6 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
         answer:
           "No. Any bud showing Botrytis should be cut well below the visible damage and discarded away from the tent — do not smoke, extract, or dry-trim affected material, and do not attempt to salvage it. Inspect neighboring colas the next day, since spores spread easily. Log the removal in Quick Log with a photo so the timeline records what was pulled and when.",
       },
-
     ],
     related: [
       "grow-room-vpd-tracker",

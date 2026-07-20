@@ -1,6 +1,7 @@
 import { type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { usePageSeo } from "@/hooks/usePageSeo";
+import { dashboardPath } from "@/lib/routes";
 
 /**
  * Shared layout for public support pages (/feedback, /contact).
@@ -30,17 +31,26 @@ export function SupportLayout({
     <div className="min-h-screen bg-background text-foreground antialiased">
       <header className="border-b border-border/60">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
-          <Link to="/welcome" className="font-display text-base font-semibold tracking-tight hover:text-primary">
+          <Link
+            to="/welcome"
+            className="font-display text-base font-semibold tracking-tight hover:text-primary"
+          >
             Verdant Grow Diary
           </Link>
-          <nav aria-label="Support" className="flex items-center gap-4 text-sm text-muted-foreground">
+          <nav
+            aria-label="Support"
+            className="flex items-center gap-4 text-sm text-muted-foreground"
+          >
             <Link to="/feedback" className="hover:text-foreground">
               Feedback
             </Link>
             <Link to="/contact" className="hover:text-foreground">
               Contact
             </Link>
-            <Link to="/dashboard" className="hidden text-xs text-muted-foreground/80 hover:text-foreground sm:inline">
+            <Link
+              to={dashboardPath()}
+              className="hidden text-xs text-muted-foreground/80 hover:text-foreground sm:inline"
+            >
               Back to app
             </Link>
           </nav>

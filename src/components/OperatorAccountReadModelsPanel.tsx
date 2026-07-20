@@ -265,6 +265,119 @@ function WateringContextPanel({
               )}
             </section>
 
+            <section aria-labelledby="operator-root-zone-cycles-title" className="space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3
+                  id="operator-root-zone-cycles-title"
+                  className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                >
+                  Recent typed root-zone records ({model.recentRootZoneCycles.length})
+                </h3>
+                <span className="text-[11px] text-muted-foreground">Newest first · max 5</span>
+              </div>
+              {model.recentRootZoneCycles.length > 0 ? (
+                <ol className="space-y-2" data-testid="operator-root-zone-cycle-list">
+                  {model.recentRootZoneCycles.map((cycle) => (
+                    <li
+                      key={cycle.key}
+                      className="rounded-lg border border-border/60 bg-secondary/20 p-3"
+                      data-testid="operator-root-zone-cycle"
+                      data-event-type={cycle.eventType}
+                    >
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                        <Badge variant="outline">{cycle.eventLabel}</Badge>
+                        <time dateTime={cycle.occurredAt}>
+                          {readableTimestamp(cycle.occurredAt)}
+                        </time>
+                        <Badge variant="outline">{cycle.targetLabel}</Badge>
+                        <Badge variant="outline">{cycle.sourceLabel}</Badge>
+                        {cycle.warnings.length > 0 ? (
+                          <Badge variant="outline" className={trustToneClass("caution")}>
+                            Verify record
+                          </Badge>
+                        ) : null}
+                      </div>
+
+                      {cycle.metrics.length > 0 ? (
+                        <dl className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                          {cycle.metrics.map((metric) => (
+                            <div
+                              key={metric.key}
+                              className="rounded-md border border-border/50 px-2 py-1 text-xs"
+                            >
+                              <dt className="text-muted-foreground">{metric.label}</dt>
+                              <dd className="font-medium">{metric.valueLabel}</dd>
+                            </div>
+                          ))}
+                        </dl>
+                      ) : null}
+
+                      {cycle.nutrientLine || cycle.products.length > 0 ? (
+                        <div
+                          className="mt-3 space-y-2 rounded-md border border-border/50 p-2 text-xs"
+                          data-testid="operator-root-zone-cycle-nutrients"
+                        >
+                          {cycle.nutrientLine ? (
+                            <p>
+                              <span className="text-muted-foreground">Recorded nutrient line:</span>{" "}
+                              <span className="font-medium">{cycle.nutrientLine}</span>
+                            </p>
+                          ) : null}
+                          {cycle.products.length > 0 ? (
+                            <ul
+                              className="flex flex-wrap gap-1.5"
+                              aria-label="Recorded nutrient products"
+                            >
+                              {cycle.products.map((product, index) => (
+                                <li key={`${cycle.key}-product-${index}`}>
+                                  <Badge variant="outline">
+                                    {product.name}
+                                    {product.valueLabel ? ` · ${product.valueLabel}` : ""}
+                                  </Badge>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : null}
+                        </div>
+                      ) : null}
+
+                      {cycle.comparisons.length > 0 ? (
+                        <dl
+                          className="mt-3 flex flex-wrap gap-2"
+                          aria-label="Recorded root-zone arithmetic comparisons"
+                        >
+                          {cycle.comparisons.map((comparison) => (
+                            <div
+                              key={comparison.key}
+                              className="rounded-md border border-border/50 px-2 py-1 text-xs"
+                            >
+                              <dt className="text-muted-foreground">{comparison.label}</dt>
+                              <dd className="font-medium">{comparison.valueLabel}</dd>
+                            </div>
+                          ))}
+                        </dl>
+                      ) : null}
+
+                      {cycle.warnings.length > 0 ? (
+                        <ul className="mt-3 space-y-1 text-xs text-amber-700 dark:text-amber-300">
+                          {cycle.warnings.map((warning) => (
+                            <li key={warning}>{warning}</li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <p
+                  className="text-sm text-muted-foreground"
+                  data-testid="operator-no-root-zone-cycles"
+                >
+                  No typed watering or feeding cycles are available for this tent.
+                </p>
+              )}
+            </section>
+
             <section aria-labelledby="operator-watering-sensor-title" className="space-y-2">
               <h3
                 id="operator-watering-sensor-title"
@@ -349,6 +462,9 @@ function WateringContextPanel({
               <p>{model.decisionReminder}</p>
               <p>{model.snapshotCaveat}</p>
               <p>{model.airContextCaveat}</p>
+              <p>{model.cycleArithmeticCaveat}</p>
+              <p>{model.nutrientEvidenceCaveat}</p>
+              <p>{model.cycleScopeCaveat}</p>
               <p>{model.growerControlNote}</p>
             </div>
           </>

@@ -11,6 +11,8 @@
 import { describe, expect, it } from "vitest";
 import {
   extractHead,
+  extractJsonLd,
+  flattenJsonLdNodes,
   checkRouteHead,
   diffRouteHead,
   renderMarkdownReport,

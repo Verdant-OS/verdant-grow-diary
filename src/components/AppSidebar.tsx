@@ -77,6 +77,7 @@ const labsIcons: Record<LabsNavigationDestinationId, LucideIcon> = {
   lineageRepair: Wrench,
   agentIntegrations: PlugZap,
   aiSessions: History,
+  genetics: Dna,
 };
 
 const labsItems: NavItem[] = LABS_NAVIGATION_DESTINATIONS.map((item) => ({

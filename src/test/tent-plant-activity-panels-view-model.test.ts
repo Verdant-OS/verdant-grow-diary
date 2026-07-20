@@ -13,9 +13,9 @@ import {
 } from "@/lib/tentPlantActivityPanelsViewModel";
 
 const PLANTS = [
-  { id: "p1", name: "Blue Dream", strain: "Hybrid", stage: "veg", isArchived: false },
+  { id: "p1", name: "Blue Dream", strain: "Hybrid", stage: "flower", isArchived: false },
   { id: "p2", name: "Plant B", strain: null, stage: "flower", isArchived: false },
-  { id: "p3", name: "Gelato Auto", strain: null, stage: null, isArchived: true },
+  { id: "p3", name: "Gelato Auto", strain: null, stage: "flower", isArchived: true },
 ];
 
 const ACTIVITY = {
@@ -113,12 +113,20 @@ describe("buildTentPlantActivityPanelsViewModel", () => {
     const vm = buildTentPlantActivityPanelsViewModel(BASE);
     const p1 = vm.panels.find((p) => p.id === "p1")!;
     const p2 = vm.panels.find((p) => p.id === "p2")!;
-    expect(p1.harvestWatch.state).toBe("watch_window");
-    expect(p1.harvestWatch.isFallback).toBe(false);
-    expect(p1.harvestWatch.copy).toMatch(/observation window/i);
-    expect(p2.harvestWatch.state).toBeNull();
-    expect(p2.harvestWatch.isFallback).toBe(true);
-    expect(p2.harvestWatch.copy).toBe(TENT_PLANT_ACTIVITY_HARVEST_WATCH_FALLBACK_COPY);
+    expect(p1.harvestWatch!.state).toBe("watch_window");
+    expect(p1.harvestWatch!.isFallback).toBe(false);
+    expect(p1.harvestWatch!.copy).toMatch(/observation window/i);
+    expect(p2.harvestWatch!.state).toBeNull();
+    expect(p2.harvestWatch!.isFallback).toBe(true);
+    expect(p2.harvestWatch!.copy).toBe(TENT_PLANT_ACTIVITY_HARVEST_WATCH_FALLBACK_COPY);
+  });
+
+  it("suppresses Harvest Watch when an ineligible stage carries a stale public state", () => {
+    const vm = buildTentPlantActivityPanelsViewModel({
+      ...BASE,
+      plants: [{ ...PLANTS[0], stage: "veg" }],
+    });
+    expect(vm.panels[0].harvestWatch).toBeNull();
   });
 
   it("Unknown Harvest Watch states fall back safely", () => {
@@ -130,7 +138,7 @@ describe("buildTentPlantActivityPanelsViewModel", () => {
       },
     });
     const p1 = vm.panels.find((p) => p.id === "p1")!;
-    expect(p1.harvestWatch.isFallback).toBe(true);
+    expect(p1.harvestWatch!.isFallback).toBe(true);
   });
 
   it("Add Quick Log prefill carries the full plant+tent+grow context", () => {
@@ -205,7 +213,7 @@ describe("buildTentPlantActivityPanelsViewModel", () => {
     expect(p2.latestLogAt).toBeNull();
     expect(p2.latestLogSummary).toBeNull();
     expect(p2.hasRecentPhoto).toBe(false);
-    expect(p2.harvestWatch.state).toBeNull();
+    expect(p2.harvestWatch!.state).toBeNull();
   });
 
   it("blank plant name falls back to 'Unnamed plant' for CTA accessible label", () => {
@@ -273,7 +281,7 @@ describe("buildTentPlantActivityPanelsViewModel — Harvest Watch help text", ()
   for (const state of STATES) {
     it(`emits help text for "${state}"`, () => {
       const vm = buildTentPlantActivityPanelsViewModel({
-        plants: [{ id: "p1", name: "P", isArchived: false }],
+        plants: [{ id: "p1", name: "P", stage: "flower", isArchived: false }],
         activityByPlantId: { p1: { harvestWatchPublicState: state } },
         includeArchived: false,
         selectedPlantId: null,
@@ -282,19 +290,19 @@ describe("buildTentPlantActivityPanelsViewModel — Harvest Watch help text", ()
         growId: "g1",
       });
       const p1 = vm.panels[0];
-      expect(p1.harvestWatch.helpText).toBe(
+      expect(p1.harvestWatch!.helpText).toBe(
         TENT_PLANT_ACTIVITY_HARVEST_WATCH_HELP_TEXT[state],
       );
-      expect(p1.harvestWatch.cautionText).toBe(
+      expect(p1.harvestWatch!.cautionText).toBe(
         TENT_PLANT_ACTIVITY_HARVEST_WATCH_CAUTION_COPY,
       );
-      expect(p1.harvestWatch.cautionText).toMatch(/evidence-only/i);
+      expect(p1.harvestWatch!.cautionText).toMatch(/evidence-only/i);
     });
   }
 
   it("emits fallback help text for null/unknown states", () => {
     const vm = buildTentPlantActivityPanelsViewModel({
-      plants: [{ id: "p1", name: "P", isArchived: false }],
+      plants: [{ id: "p1", name: "P", stage: "flower", isArchived: false }],
       activityByPlantId: { p1: { harvestWatchPublicState: null } },
       includeArchived: false,
       selectedPlantId: null,
@@ -303,10 +311,10 @@ describe("buildTentPlantActivityPanelsViewModel — Harvest Watch help text", ()
       growId: "g1",
     });
     const p1 = vm.panels[0];
-    expect(p1.harvestWatch.helpText).toBe(
+    expect(p1.harvestWatch!.helpText).toBe(
       TENT_PLANT_ACTIVITY_HARVEST_WATCH_HELP_TEXT.unknown,
     );
-    expect(p1.harvestWatch.copy).toBe(
+    expect(p1.harvestWatch!.copy).toBe(
       TENT_PLANT_ACTIVITY_HARVEST_WATCH_FALLBACK_COPY,
     );
   });

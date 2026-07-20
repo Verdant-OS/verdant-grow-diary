@@ -43,3 +43,16 @@ BEGIN
     END IF;
   END LOOP;
 END $$;
+
+-- AI Doctor session history is browser-append-only. The production project
+-- inherits legacy DML defaults, so reapply its narrower migration grants after
+-- the blanket local parity grant above.
+DO $$
+BEGIN
+  IF to_regclass('public.ai_doctor_sessions') IS NOT NULL THEN
+    REVOKE ALL ON TABLE public.ai_doctor_sessions
+      FROM PUBLIC, anon, authenticated;
+    GRANT SELECT, INSERT ON TABLE public.ai_doctor_sessions TO authenticated;
+    GRANT ALL ON TABLE public.ai_doctor_sessions TO service_role;
+  END IF;
+END $$;

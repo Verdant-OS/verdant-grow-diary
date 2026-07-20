@@ -21,6 +21,11 @@ import { readFileSync, readdirSync } from "node:fs";
 import { basename, resolve } from "node:path";
 
 const TOOLS_DIR = resolve(process.cwd(), "src/lib/mcp/tools");
+const OPERATOR_READ_MODELS_FILE = resolve(process.cwd(), "src/lib/operatorAccountReadModels.ts");
+
+function withoutComments(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|\s)\/\/.*$/gm, "");
+}
 
 function toolFiles(): string[] {
   return readdirSync(TOOLS_DIR)
@@ -74,11 +79,15 @@ describe("MCP tool source-code safety scan", () => {
       it("uses raw_payload only for the latest-snapshot provenance fence", () => {
         // Strip block/line comments before checking so the safety note
         // (which mentions raw_payload by design) doesn't trigger.
-        const codeOnly = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|\s)\/\/.*$/gm, "");
+        const codeOnly = withoutComments(src);
         if (relative === "get-latest-sensor-snapshot.ts") {
-          expect(codeOnly).toMatch(/SENSOR_COLUMNS[\s\S]*raw_payload/);
-          expect(codeOnly).toMatch(/withoutDiagnosticSensorRows/);
-          expect(codeOnly).toMatch(/satisfies McpSensorReading/);
+          const sharedCode = withoutComments(readFileSync(OPERATOR_READ_MODELS_FILE, "utf8"));
+          const implementation = `${codeOnly}\n${sharedCode}`;
+
+          expect(codeOnly).toMatch(/getLatestSensorSnapshotForOwnedTent\s*\(/);
+          expect(implementation).toMatch(/SENSOR_COLUMNS[\s\S]*raw_payload/);
+          expect(implementation).toMatch(/withoutDiagnosticSensorRows/);
+          expect(implementation).toMatch(/satisfies McpSensorReading/);
           expect(codeOnly).not.toMatch(/structuredContent[\s\S]*raw_payload/);
         } else {
           expect(codeOnly).not.toMatch(/raw_payload/);

@@ -255,7 +255,9 @@ describe("<PlantDetailDoctorLaunchDialog /> Add Context First wiring", () => {
   it("Continue to AI Doctor remains available regardless of context gaps", () => {
     open();
     const cont = screen.getByTestId("plant-detail-doctor-launch-continue");
-    expect(cont.getAttribute("href")).toBe("/plants/p1#plant-ai-doctor-review");
+    expect(cont.getAttribute("href")).toBe(
+      "/plants/p1?tentId=t1#plant-ai-doctor-review",
+    );
   });
 
   it("does not render Add context button when no gaps exist (Ask Doctor still works)", () => {

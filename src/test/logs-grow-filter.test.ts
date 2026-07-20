@@ -13,8 +13,9 @@ const APP = readFileSync(resolve(ROOT, "src/App.tsx"), "utf8");
 
 describe("Logs — grow filter (/logs?growId=…)", () => {
   it("/logs redirects to /timeline, which renders Timeline", () => {
-    // /logs became a legacy alias; the canonical route is /timeline.
-    expect(APP).toMatch(/path="\/logs"\s+element=\{<Navigate\s+to="\/timeline"\s+replace\s*\/>\}/);
+    // /logs is a legacy alias; the shared redirect preserves growId/hash
+    // while forwarding to the canonical /timeline route.
+    expect(APP).toMatch(/path="\/logs"\s+element=\{<RouteAliasRedirect\s+to="\/timeline"\s*\/>\}/);
     expect(APP).toMatch(/path="\/timeline"\s+element=\{<Timeline\s*\/>\}/);
   });
 

@@ -105,12 +105,42 @@ describe("tentPlantRosterViewModel", () => {
   it("falls back to Harvest Watch handoff copy when no public state given", () => {
     const vm = buildTentPlantRosterViewModel({
       tentId: TENT,
-      plants: [{ id: "p1", name: "Alpha", tentId: TENT }],
+      plants: [{ id: "p1", name: "Alpha", stage: "flower", tentId: TENT }],
     });
     expect(vm.rows[0].harvestWatchPublicState).toBeNull();
     expect(vm.rows[0].harvestWatchFallbackCopy).toBe(
       TENT_PLANT_ROSTER_HARVEST_WATCH_FALLBACK_COPY,
     );
+  });
+
+  it("suppresses Harvest Watch for ineligible and archived plants", () => {
+    const vm = buildTentPlantRosterViewModel({
+      tentId: TENT,
+      includeArchived: true,
+      plants: [
+        {
+          id: "p1",
+          name: "Vegetative",
+          stage: "veg",
+          tentId: TENT,
+          harvestWatchPublicState: "watch_window",
+        },
+        {
+          id: "p2",
+          name: "Archived flower",
+          stage: "flower",
+          tentId: TENT,
+          isArchived: true,
+          harvestWatchPublicState: "ready_for_manual_review",
+        },
+      ],
+    });
+
+    for (const row of vm.rows) {
+      expect(row.harvestWatchAvailable).toBe(false);
+      expect(row.harvestWatchPublicState).toBeNull();
+      expect(row.harvestWatchFallbackCopy).toBeNull();
+    }
   });
 
   it("exposes shared environment copy and tent sensor context note", () => {

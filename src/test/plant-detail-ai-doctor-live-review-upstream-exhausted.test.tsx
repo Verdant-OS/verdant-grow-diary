@@ -87,34 +87,24 @@ describe("PlantDetailAiDoctorLiveReview — upstream_credit_exhausted branch", (
       error: null,
     });
     const { container } = render(
-      <PlantDetailAiDoctorLiveReview
-        plantId="p1"
-        plant={strongPlant}
-        invoke={invoke}
-      />,
+      <PlantDetailAiDoctorLiveReview plantId="p1" plant={strongPlant} invoke={invoke} />,
     );
-    fireEvent.click(
-      await screen.findByTestId("plant-ai-doctor-live-review-start"),
-    );
+    fireEvent.click(await screen.findByTestId("plant-ai-doctor-live-review-start"));
     const notice = await waitFor(() =>
-      screen.getByTestId(
-        "plant-ai-doctor-live-review-upstream-credit-exhausted",
-      ),
+      screen.getByTestId("plant-ai-doctor-live-review-upstream-credit-exhausted"),
     );
-    expect(notice.textContent).toContain(
-      "AI Doctor is briefly unavailable.",
-    );
+    expect(notice.textContent).toContain("AI Doctor is briefly unavailable.");
     expect(notice.textContent).toMatch(/not charged/i);
 
     // Hard fences: no credit-limit notice, no generic failure pane,
     // no pricing/upgrade link or paywall CTA anywhere.
-    expect(
-      screen.queryByTestId("plant-ai-doctor-live-review-credit-denied"),
-    ).toBeNull();
-    expect(
-      screen.queryByTestId("plant-ai-doctor-live-review-failure"),
-    ).toBeNull();
+    expect(screen.queryByTestId("plant-ai-doctor-live-review-credit-denied")).toBeNull();
+    expect(screen.queryByTestId("plant-ai-doctor-live-review-failure")).toBeNull();
     const pricingLink = container.querySelector('a[href*="pricing"]');
     expect(pricingLink).toBeNull();
+
+    const retry = screen.getByTestId("plant-ai-doctor-live-review-retry");
+    fireEvent.click(retry);
+    await waitFor(() => expect(invoke).toHaveBeenCalledTimes(2));
   });
 });

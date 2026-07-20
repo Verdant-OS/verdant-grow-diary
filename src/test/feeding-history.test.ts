@@ -2,10 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import {
-  normalizeDiaryEntries,
-  type NormalizedDiaryEntry,
-} from "@/lib/diaryEntryRules";
+import { normalizeDiaryEntries, type NormalizedDiaryEntry } from "@/lib/diaryEntryRules";
 import { buildFeedingHistory } from "@/lib/feedingHistoryRules";
 import { typedWateringWriteEnabled } from "@/lib/featureFlags";
 import { findMatches } from "./testFileSearchRules";
@@ -15,7 +12,6 @@ import { findMatches } from "./testFileSearchRules";
 // allowlist, or assertion is changed.
 import { installScannerGuardrail } from "./support/scannerGuardrailHarness";
 installScannerGuardrail({ file: __filename });
-
 
 const REPO_ROOT = process.cwd();
 
@@ -37,8 +33,12 @@ const validFeeding = {
     watering_amount_ml: 750,
     ph: 6.0,
     ec: 1.8,
+    ec_out: 2.1,
+    runoff_ml: 100,
     runoff_ph: 6.2,
     runoff_ec: 2.0,
+    water_temp_c: 21,
+    source: "manual",
     nutrients: [
       { name: "Grow A", amount: 2, unit: "ml/L" },
       { name: "Grow B", amount: 2, unit: "ml/L" },
@@ -58,13 +58,18 @@ describe("buildFeedingHistory", () => {
     expect(r.volumeMl).toBe(750);
     expect(r.ph).toBe(6);
     expect(r.ec).toBe(1.8);
+    expect(r.outputEc).toBe(2.1);
+    expect(r.runoffMl).toBe(100);
     expect(r.runoffPh).toBe(6.2);
     expect(r.runoffEc).toBe(2.0);
+    expect(r.waterTempC).toBe(21);
     expect(r.recipe).toBe("Veg Week 3");
     expect(r.nutrients.map((n) => n.name)).toEqual(["Grow A", "Grow B"]);
     expect(r.nutrients[0].amount).toBe(2);
     expect(r.nutrients[0].unit).toBe("ml/L");
     expect(r.notePreview).toContain("Fed");
+    expect(r.source).toBe("manual");
+    expect(r.sourceLabel).toBe("Manual log");
     expect(r.warnings).toEqual([]);
     expect(r.occurredAt).toBe("2025-05-10T12:00:00.000Z");
   });
@@ -133,6 +138,23 @@ describe("buildFeedingHistory", () => {
     expect(rows[0].warnings.join("|")).toMatch(/ec/i);
   });
 
+  it("flags implausible legacy output EC and water temperature", () => {
+    const e = {
+      ...validFeeding,
+      id: "outcome-range",
+      details: {
+        ...validFeeding.details,
+        ec_out: -1,
+        water_temp_c: 99,
+      },
+    };
+    const [row] = buildFeedingHistory(normalize([e]));
+    expect(row.outputEc).toBe(-1);
+    expect(row.waterTempC).toBe(99);
+    expect(row.warnings).toContain("ec_out out of range");
+    expect(row.warnings).toContain("water_temp_c out of range");
+  });
+
   it("invalid volume appears as a warning", () => {
     const e = {
       ...validFeeding,
@@ -191,6 +213,20 @@ describe("buildFeedingHistory", () => {
     const rows = buildFeedingHistory(normalize([bad, good]));
     expect(rows.map((r) => r.id)).toEqual(["y", "z"]);
   });
+
+  it("keeps missing provenance explicit instead of inventing manual or live", () => {
+    const legacy = {
+      ...validFeeding,
+      id: "legacy-source",
+      details: {
+        watering_amount_ml: 500,
+        nutrients: validFeeding.details.nutrients,
+      },
+    };
+    const [row] = buildFeedingHistory(normalize([legacy]));
+    expect(row.source).toBe("unknown");
+    expect(row.sourceLabel).toBe("Source unavailable");
+  });
 });
 
 describe("FeedingHistoryPanel runtime safety", () => {
@@ -209,10 +245,7 @@ describe("FeedingHistoryPanel runtime safety", () => {
   });
 
   it("FeedingHistoryPanel does not read raw diary details JSON or perform writes", () => {
-    const src = readFileSync(
-      resolve(REPO_ROOT, "src/components/FeedingHistoryPanel.tsx"),
-      "utf8",
-    );
+    const src = readFileSync(resolve(REPO_ROOT, "src/components/FeedingHistoryPanel.tsx"), "utf8");
     expect(src).not.toMatch(/\.details\?\./);
     expect(src).not.toMatch(/\["details"\]/);
     expect(src).not.toMatch(/JSON\.parse/);
@@ -221,5 +254,6 @@ describe("FeedingHistoryPanel runtime safety", () => {
     expect(src).not.toMatch(/\.upsert\s*\(/);
     expect(src).not.toMatch(/create_watering_event/);
     expect(src).not.toMatch(/service_role/i);
+    expect(src).toContain("Log provenance — not live sensor data");
   });
 });

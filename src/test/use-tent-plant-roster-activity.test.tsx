@@ -152,6 +152,22 @@ describe("useTentPlantRosterActivity", () => {
       ]).toContain(state);
     }
   });
+
+  it.each(["seedling", "veg", "flush", "harvest", "cure", null])(
+    "does not derive Harvest Watch state for ineligible stage %s",
+    async (stage) => {
+      mocks.diaryByPlant.set("p1", [diaryRow({ plant_id: "p1" })]);
+      const { result } = renderHook(
+        () => useTentPlantRosterActivity([{ id: "p1", name: "Alpha", stage }]),
+        { wrapper: wrap() },
+      );
+
+      await waitFor(() => {
+        expect(result.current.byPlantId.p1).toBeDefined();
+      });
+      expect(result.current.byPlantId.p1.harvestWatchPublicState).toBeNull();
+    },
+  );
 });
 
 describe("useTentPlantRosterActivity static safety", () => {

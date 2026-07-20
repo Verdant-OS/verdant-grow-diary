@@ -31,6 +31,8 @@ export interface EventTypeSelectorProps {
   id?: string;
   /** Optional test id; not set by default to preserve existing selectors. */
   testId?: string;
+  /** Freeze selection while the owning form has an in-flight save. */
+  disabled?: boolean;
 }
 
 export function EventTypeSelector({
@@ -39,13 +41,14 @@ export function EventTypeSelector({
   label = "Event",
   id,
   testId,
+  disabled = false,
 }: EventTypeSelectorProps) {
   return (
     <div>
       <Label className="text-xs" htmlFor={id}>
         {label}
       </Label>
-      <Select value={value} onValueChange={onValueChange}>
+      <Select value={value} onValueChange={onValueChange} disabled={disabled}>
         <SelectTrigger id={id} data-testid={testId}>
           <SelectValue />
         </SelectTrigger>

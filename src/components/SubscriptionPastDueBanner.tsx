@@ -10,12 +10,19 @@
  * revokes entitlement. Paddle's own dunning flow decides when the
  * subscription transitions to canceled.
  */
-import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { useOpenCustomerPortalState } from "@/lib/customerPortal";
+import type { ResolvedEntitlement } from "@/lib/entitlements";
 import { AlertTriangle } from "lucide-react";
 
-export function SubscriptionPastDueBanner() {
-  const { loading, entitlement } = useMyEntitlements();
+export interface SubscriptionPastDueBannerProps {
+  loading: boolean;
+  entitlement: ResolvedEntitlement;
+}
+
+export function SubscriptionPastDueBanner({
+  loading,
+  entitlement,
+}: SubscriptionPastDueBannerProps) {
   const { opening, error, open, clearError } = useOpenCustomerPortalState();
 
   if (loading) return null;
@@ -31,8 +38,8 @@ export function SubscriptionPastDueBanner() {
       <div className="max-w-5xl mx-auto flex flex-wrap items-center justify-center gap-2">
         <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
         <span>
-          Your last payment didn't go through. Update your payment method to
-          keep Pro access — we'll retry automatically.
+          Your last payment didn't go through. Update your payment method to keep Pro access — we'll
+          retry automatically.
         </span>
         <button
           type="button"

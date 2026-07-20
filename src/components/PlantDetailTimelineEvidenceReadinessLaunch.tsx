@@ -52,7 +52,7 @@ export const READINESS_ACTION_COPY = {
   no_recent_photos:
     "Add a recent photo so AI Doctor can compare visual symptoms with logs and sensor context.",
   no_recent_watering:
-    "Add recent watering history so AI Doctor can evaluate dryback and root-zone stress.",
+    "Add recent watering history so AI Doctor can review irrigation frequency and root-zone stress.",
   no_recent_feeding:
     "Add recent feeding history so AI Doctor can avoid guessing on nutrient issues.",
   no_recent_sensor_snapshot:
@@ -115,15 +115,10 @@ export default function PlantDetailTimelineEvidenceReadinessLaunch({
     [context, extras],
   );
 
-  const dispatchQuickLog = useCallback(
-    (detail: Record<string, unknown>) => {
-      if (typeof window === "undefined") return;
-      window.dispatchEvent(
-        new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, { detail }),
-      );
-    },
-    [],
-  );
+  const dispatchQuickLog = useCallback((detail: Record<string, unknown>) => {
+    if (typeof window === "undefined") return;
+    window.dispatchEvent(new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, { detail }));
+  }, []);
 
   const prefill = useMemo(
     () =>
@@ -173,8 +168,8 @@ export default function PlantDetailTimelineEvidenceReadinessLaunch({
           className="rounded-md border border-border/40 bg-background/30 p-3 space-y-2"
         >
           <p className="text-[11px] text-muted-foreground">
-            These buttons open existing capture flows. They never call AI
-            Doctor and never save data on their own.
+            These buttons open existing capture flows. They never call AI Doctor and never save data
+            on their own.
           </p>
           <div className="flex flex-wrap gap-2">
             {missingCodes.has("no_recent_photos") && (

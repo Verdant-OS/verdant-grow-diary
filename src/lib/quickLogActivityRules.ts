@@ -5,7 +5,7 @@
  * existing safe persistence path to invoke; this module never invokes
  * anything.
  *
- * Slice: Verdant Quick Log Activity Types v1a — no schema change.
+ * Slice: Verdant Quick Log Activity Types — no schema change.
  */
 
 import {
@@ -16,9 +16,7 @@ import {
   type QuickLogSaveRouteKind,
 } from "@/constants/quickLogActivityTypes";
 
-export function getQuickLogActivity(
-  id: QuickLogActivityId,
-): QuickLogActivityDefinition {
+export function getQuickLogActivity(id: QuickLogActivityId): QuickLogActivityDefinition {
   return QUICK_LOG_ACTIVITY_DEFINITIONS[id];
 }
 
@@ -26,11 +24,9 @@ export function isQuickLogActivityEnabled(id: QuickLogActivityId): boolean {
   return QUICK_LOG_ACTIVITY_DEFINITIONS[id].enabled;
 }
 
-export function getQuickLogDisabledReason(
-  id: QuickLogActivityId,
-): string | null {
+export function getQuickLogDisabledReason(id: QuickLogActivityId): string | null {
   const def = QUICK_LOG_ACTIVITY_DEFINITIONS[id];
-  return def.enabled ? null : def.disabledReason ?? null;
+  return def.enabled ? null : (def.disabledReason ?? null);
 }
 
 export interface QuickLogPersistencePlan {
@@ -45,13 +41,10 @@ export interface QuickLogPersistencePlan {
 }
 
 /**
- * Resolve the persistence plan for an activity. Returns `null` for
- * disabled activities (Harvest in v1a) so callers cannot accidentally
- * fake-save them.
+ * Resolve the persistence plan for an activity. Returns `null` for any
+ * disabled activity so callers cannot accidentally fake-save it.
  */
-export function planQuickLogPersistence(
-  id: QuickLogActivityId,
-): QuickLogPersistencePlan | null {
+export function planQuickLogPersistence(id: QuickLogActivityId): QuickLogPersistencePlan | null {
   const def = QUICK_LOG_ACTIVITY_DEFINITIONS[id];
   if (!def.enabled) return null;
   switch (def.saveRoute) {
@@ -119,7 +112,5 @@ export function resolveQuickLogEventTimelineLabel(input: {
   }
 }
 
-export {
-  QUICK_LOG_HARVEST_DISABLED_REASON,
-} from "@/constants/quickLogActivityTypes";
+export { QUICK_LOG_HARVEST_DISABLED_REASON } from "@/constants/quickLogActivityTypes";
 export { QUICK_LOG_HARVEST_BACKEND_UNAVAILABLE_REASON } from "@/constants/quickLogActivityTypes";

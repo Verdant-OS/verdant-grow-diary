@@ -33,6 +33,7 @@ import { useGrowPlant } from "@/hooks/useGrowData";
 import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
 import { buildPlantRecentActivity } from "@/lib/plantRecentActivityRules";
 import { buildPlantDetailHarvestWatchCardViewModel } from "@/lib/plantDetailHarvestWatchCardViewModel";
+import { isHarvestWatchEligible } from "@/lib/harvestWatchEligibilityRules";
 import type {
   HarvestWatchV0ReadinessState,
 } from "@/lib/harvestWatchCardEvidenceRules";
@@ -144,9 +145,15 @@ export default function PlantDetailHarvestWatchCard({
 }: PlantDetailHarvestWatchCardProps) {
   const { data: plant, isLoading: plantLoading } = useGrowPlant(plantId ?? undefined);
   const { data: rawRows, isLoading: activityLoading } = usePlantRecentActivity(plantId ?? null);
+  const harvestWatchEligible =
+    plant != null &&
+    isHarvestWatchEligible({
+      stage: plant.stage,
+      isArchived: plant.isArchived,
+    });
 
   const vm = useMemo(() => {
-    if (!plant) return null;
+    if (!plant || !harvestWatchEligible) return null;
     const rows = buildPlantRecentActivity(rawRows ?? [], {
       plantId: plant.id,
       limit: 20,
@@ -159,7 +166,15 @@ export default function PlantDetailHarvestWatchCard({
       dataSource: dataSource ?? null,
       supportingRecordsHref: supportingRecordsHref ?? null,
     });
-  }, [plant, rawRows, hasPlantPhoto, galleryPhotoCount, dataSource, supportingRecordsHref]);
+  }, [
+    plant,
+    rawRows,
+    hasPlantPhoto,
+    galleryPhotoCount,
+    dataSource,
+    supportingRecordsHref,
+    harvestWatchEligible,
+  ]);
 
 
   const onNextInspection = useCallback(() => {
@@ -178,6 +193,8 @@ export default function PlantDetailHarvestWatchCard({
   }, [vm, plant]);
 
   if (!plantId) return null;
+
+  if (plant && !harvestWatchEligible) return null;
 
   if (plantLoading || activityLoading || !vm) {
     return (

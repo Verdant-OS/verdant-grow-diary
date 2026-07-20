@@ -10,6 +10,7 @@
  */
 
 import {
+  AI_DOCTOR_RECENT_WINDOW_MS,
   evaluateAiDoctorContext,
   type AiDoctorContextInput,
   type AiDoctorContextEventInput,
@@ -18,6 +19,10 @@ import {
   type AiDoctorContextReadiness,
   type AiDoctorContextResult,
 } from "@/lib/aiDoctorContextRules";
+import {
+  normalizeRootZoneMetricsV1,
+  type RootZoneObservationV1,
+} from "@/lib/rootZoneObservationRules";
 import type { TimelineMemoryItem } from "@/lib/timelineFilterRules";
 import { classifyTimelineMemoryItem } from "@/lib/timelineFilterRules";
 
@@ -85,23 +90,110 @@ export function timelineItemsToAiDoctorContextSources(
   return { events, snapshots };
 }
 
+export interface AiDoctorRootZoneEventProjectionOptions {
+  /** Injected clock keeps recency filtering deterministic in tests and callers. */
+  now: number;
+  /** Optional threshold override kept aligned with the readiness evaluator. */
+  recentWindowMs?: number;
+}
+
+function normalizedEventTimestamp(at: AiDoctorContextEventInput["at"]): number | null {
+  const timestamp =
+    at instanceof Date
+      ? at.getTime()
+      : typeof at === "number"
+        ? at
+        : typeof at === "string"
+          ? Date.parse(at)
+          : Number.NaN;
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+/**
+ * Project trusted manual root-zone actions into plant-memory readiness.
+ *
+ * Measurements remain root-zone context and never become sensor snapshots.
+ * An invalid optional metric does not erase a real manual watering/feeding
+ * action, while malformed envelopes, untrusted provenance, and out-of-window
+ * timestamps fail closed. Same-instant root-zone rows are treated as one
+ * logical action with an explicit deterministic category tie-breaker.
+ */
+export function rootZoneObservationsToAiDoctorContextEvents(
+  observations: readonly RootZoneObservationV1[] | null | undefined,
+  options: AiDoctorRootZoneEventProjectionOptions,
+): AiDoctorContextEventInput[] {
+  if (!Array.isArray(observations) || !Number.isFinite(options.now)) return [];
+  const recentWindowMs =
+    typeof options.recentWindowMs === "number" &&
+    Number.isFinite(options.recentWindowMs) &&
+    options.recentWindowMs >= 0
+      ? options.recentWindowMs
+      : AI_DOCTOR_RECENT_WINDOW_MS;
+  const candidates: Array<AiDoctorContextEventInput & { timestamp: number }> = [];
+  for (const observation of observations) {
+    if (!observation || typeof observation !== "object") continue;
+    if (observation.source !== "manual") continue;
+    if (observation.eventType !== "watering" && observation.eventType !== "feeding") continue;
+    if (normalizeRootZoneMetricsV1(observation.metrics) === null) continue;
+
+    const timestamp = Date.parse(observation.occurredAt);
+    if (!Number.isFinite(timestamp)) continue;
+    const ageMs = options.now - timestamp;
+    if (ageMs < 0 || ageMs > recentWindowMs) continue;
+
+    candidates.push({
+      at: new Date(timestamp).toISOString(),
+      category: observation.eventType,
+      timestamp,
+    });
+  }
+
+  candidates.sort((a, b) => {
+    if (a.timestamp !== b.timestamp) return b.timestamp - a.timestamp;
+    const aCategory = String(a.category);
+    const bCategory = String(b.category);
+    return aCategory < bCategory ? -1 : aCategory > bCategory ? 1 : 0;
+  });
+  const seenTimestamps = new Set<number>();
+  const projected = candidates.filter(({ timestamp }) => {
+    if (seenTimestamps.has(timestamp)) return false;
+    seenTimestamps.add(timestamp);
+    return true;
+  });
+  return projected.map(({ at, category }) => ({ at, category }));
+}
+
 export interface BuildAiDoctorContextArgs {
   plant: AiDoctorContextPlantSource | null | undefined;
   timelineItems: readonly TimelineMemoryItem[] | null | undefined;
+  /** Successful, RLS-scoped root-zone read; never treated as sensor truth. */
+  rootZoneObservations?: readonly RootZoneObservationV1[] | null;
   now?: number;
 }
 
-export function buildAiDoctorContextInput(
-  args: BuildAiDoctorContextArgs,
-): AiDoctorContextInput {
-  const { events, snapshots } = timelineItemsToAiDoctorContextSources(
-    args.timelineItems,
+export function buildAiDoctorContextInput(args: BuildAiDoctorContextArgs): AiDoctorContextInput {
+  const { events, snapshots } = timelineItemsToAiDoctorContextSources(args.timelineItems);
+  const now = typeof args.now === "number" && Number.isFinite(args.now) ? args.now : Date.now();
+  const rootZoneEvents = rootZoneObservationsToAiDoctorContextEvents(args.rootZoneObservations, {
+    now,
+  });
+  // The manual Quick Log RPC can write both a typed root-zone row and a
+  // same-instant diary companion. Prefer the typed watering/feeding category
+  // and keep one logical event so readiness is neither inflated nor mislabeled.
+  const rootZoneTimestamps = new Set(
+    rootZoneEvents
+      .map((event) => normalizedEventTimestamp(event.at))
+      .filter((timestamp): timestamp is number => timestamp !== null),
   );
+  const timelineEventsWithoutRootZoneCompanions = events.filter((event) => {
+    const timestamp = normalizedEventTimestamp(event.at);
+    return timestamp === null || !rootZoneTimestamps.has(timestamp);
+  });
   return {
     plant: plantToAiDoctorContextPlant(args.plant),
-    recentEvents: events,
+    recentEvents: [...timelineEventsWithoutRootZoneCompanions, ...rootZoneEvents],
     recentManualSnapshots: snapshots,
-    now: args.now,
+    now,
   };
 }
 
@@ -115,10 +207,7 @@ export function evaluateAiDoctorContextFromSources(
 // Presenter labels
 // ---------------------------------------------------------------------------
 
-export const AI_DOCTOR_READINESS_LABELS: Record<
-  AiDoctorContextReadiness,
-  string
-> = {
+export const AI_DOCTOR_READINESS_LABELS: Record<AiDoctorContextReadiness, string> = {
   strong: "Strong context",
   partial: "Partial context",
   insufficient: "Insufficient context",
@@ -172,11 +261,7 @@ export function tooltipForEvidence(code: string): string {
 
 /** Tooltip / help text for a missing item. */
 export function tooltipForMissing(code: string): string {
-  return (
-    AI_DOCTOR_CONTEXT_MISSING_TOOLTIPS[code] ??
-    AI_DOCTOR_CONTEXT_TOOLTIPS[code] ??
-    ""
-  );
+  return AI_DOCTOR_CONTEXT_MISSING_TOOLTIPS[code] ?? AI_DOCTOR_CONTEXT_TOOLTIPS[code] ?? "";
 }
 
 /**
@@ -191,8 +276,7 @@ export const AI_DOCTOR_READINESS_ITEM_CODES = [
   "recent-warnings",
 ] as const;
 
-export type AiDoctorReadinessItemCode =
-  (typeof AI_DOCTOR_READINESS_ITEM_CODES)[number];
+export type AiDoctorReadinessItemCode = (typeof AI_DOCTOR_READINESS_ITEM_CODES)[number];
 
 export interface AiDoctorReadinessItemHelp {
   code: AiDoctorReadinessItemCode;
@@ -207,4 +291,3 @@ export function getAiDoctorReadinessItemHelp(): AiDoctorReadinessItemHelp[] {
     tooltip: tooltipForEvidence(code),
   }));
 }
-

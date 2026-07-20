@@ -11,7 +11,7 @@
  *     or fake-live copy in this component.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { render, screen, fireEvent, within, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import { readFileSync } from "node:fs";
@@ -70,14 +70,20 @@ vi.mock("@/hooks/use-plants", () => ({
   }),
 }));
 
+vi.mock("@/hooks/use-tents", () => ({
+  useTents: () => ({
+    data: [{ id: "tent-1", name: "Test Tent", grow_id: "grow-1" }],
+  }),
+}));
+
 vi.mock("sonner", () => ({
   toast: { error: vi.fn(), success: vi.fn(), message: vi.fn() },
 }));
 
 vi.mock("@/lib/growDiaryPdfExport", async () => {
-  const actual = await vi.importActual<
-    typeof import("@/lib/growDiaryPdfExport")
-  >("@/lib/growDiaryPdfExport");
+  const actual = await vi.importActual<typeof import("@/lib/growDiaryPdfExport")>(
+    "@/lib/growDiaryPdfExport",
+  );
   return {
     ...actual,
     exportGrowDiaryReportAsPdf: vi.fn(() => "printed"),
@@ -110,36 +116,68 @@ describe("QuickLog habit-capture polish — presentation", () => {
     expect(screen.getByTestId("quick-log-section-optional")).toBeInTheDocument();
   });
 
-  it("renders all 7 prompt chips", () => {
+  it("separates grow observations from Better/Same/Worse response checks", () => {
     renderWithClient(<QuickLog open={true} onOpenChange={vi.fn()} />);
-    const group = screen.getByTestId("quick-log-prompt-chips");
-    for (const label of [
-      "Better",
-      "Same",
-      "Worse",
-      "Watered",
-      "Fed",
-      "Spotted issue",
-      "Photo only",
-    ]) {
-      expect(within(group).getByText(label)).toBeInTheDocument();
+    const observations = screen.getByTestId("quick-log-prompt-chips");
+    const responses = screen.getByTestId("quick-log-response-chips");
+    for (const label of ["Watered", "Fed", "Spotted issue", "Photo only"]) {
+      expect(within(observations).getByText(label)).toBeInTheDocument();
+    }
+    for (const label of ["Better", "Same", "Worse"]) {
+      expect(within(responses).getByText(label)).toBeInTheDocument();
+      expect(within(observations).queryByText(label)).not.toBeInTheDocument();
     }
   });
 
-  it("clicking Better/Same/Worse updates the local note and does NOT save", () => {
+  it("response chips replace contradictions while preserving the grow action", () => {
+    renderWithClient(<QuickLog open={true} onOpenChange={vi.fn()} />);
+    const note = screen.getByTestId("quicklog-note") as HTMLTextAreaElement;
+
+    fireEvent.click(screen.getByTestId("quick-log-chip-watered"));
+    fireEvent.click(screen.getByTestId("quick-log-chip-worse"));
+    expect(note.value).toBe("Response check: Worse.\nWatered today.");
+    expect(screen.getByTestId("quick-log-chip-worse")).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(screen.getByTestId("quick-log-chip-same"));
+    expect(note.value).toBe("Response check: Same.\nWatered today.");
+    expect(note.value).not.toMatch(/Worse/);
+    expect(screen.getByTestId("quick-log-chip-worse")).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByTestId("quick-log-chip-same")).toHaveAttribute("aria-pressed", "true");
+
+    expect(saveMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps an observation explicit when the response is selected first", () => {
     renderWithClient(<QuickLog open={true} onOpenChange={vi.fn()} />);
     const note = screen.getByTestId("quicklog-note") as HTMLTextAreaElement;
 
     fireEvent.click(screen.getByTestId("quick-log-chip-better"));
-    expect(note.value).toMatch(/Better than yesterday/);
+    fireEvent.click(screen.getByTestId("quick-log-chip-watered"));
+    expect(note.value).toBe("Response check: Better.\nWatered today.");
 
     fireEvent.click(screen.getByTestId("quick-log-chip-same"));
-    expect(note.value).toMatch(/About the same/);
-
-    fireEvent.click(screen.getByTestId("quick-log-chip-worse"));
-    expect(note.value).toMatch(/Looking worse/);
-
+    expect(note.value).toBe("Response check: Same.\nWatered today.");
     expect(saveMock).not.toHaveBeenCalled();
+  });
+
+  it("saves the canonical response line through the existing RPC payload", async () => {
+    renderWithClient(
+      <QuickLog
+        open={true}
+        onOpenChange={vi.fn()}
+        prefill={{ plantId: "plant-1", tentId: "tent-1", growId: "grow-1" }}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("quick-log-chip-better"));
+    fireEvent.click(screen.getByTestId("quick-log-chip-watered"));
+    fireEvent.click(screen.getByTestId("quick-log-save"));
+
+    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
+    expect(saveMock.mock.calls[0][0]).toMatchObject({
+      p_target_type: "plant",
+      p_target_id: "plant-1",
+      p_note: "Response check: Better.\nWatered today.",
+    });
   });
 
   it("save button keeps clear 'Save entry' copy and renders helper line", () => {
@@ -221,10 +259,7 @@ describe("QuickLog history summary — diary PDF export", () => {
 });
 
 describe("QuickLog habit-capture polish — static safety", () => {
-  const SRC = readFileSync(
-    resolve(__dirname, "../components/QuickLog.tsx"),
-    "utf8",
-  );
+  const SRC = readFileSync(resolve(__dirname, "../components/QuickLog.tsx"), "utf8");
   const HISTORY_SRC = readFileSync(
     resolve(__dirname, "../components/QuickLogHistoryPanels.tsx"),
     "utf8",

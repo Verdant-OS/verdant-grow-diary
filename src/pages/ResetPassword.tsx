@@ -17,11 +17,18 @@ import {
   RESTART_FLOW_HREF,
   type ResetLinkDiagnosis,
 } from "@/lib/resetPasswordLinkRules";
+import { usePageSeo } from "@/hooks/usePageSeo";
 
 type Status = "checking" | "ready" | "link_problem" | "saving" | "done";
 
 
 export default function ResetPassword() {
+  usePageSeo({
+    title: "Reset password — Verdant Grow Diary",
+    description: "Set a new password for your Verdant Grow Diary account.",
+    path: "/reset-password",
+    noindex: true,
+  });
   const nav = useNavigate();
   const [status, setStatus] = useState<Status>("checking");
   const [password, setPassword] = useState("");

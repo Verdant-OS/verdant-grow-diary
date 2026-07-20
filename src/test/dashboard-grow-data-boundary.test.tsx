@@ -94,6 +94,12 @@ vi.mock("@/hooks/useDashboardScopedData", () => ({
     pending: { status: "ok", items: [] },
   }),
 }));
+vi.mock("@/hooks/useOneTentActivationEvidence", () => ({
+  useOneTentActivationEvidence: () => ({
+    status: "idle",
+    summary: { count: 0, latestAt: null, latestSource: null },
+  }),
+}));
 vi.mock("@/hooks/useLatestSensorSnapshot", () => ({
   useLatestSensorSnapshot: () => ({
     status: "idle",

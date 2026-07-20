@@ -36,21 +36,17 @@ describe("evaluateManualSnapshotAdvisor — pure guardrails", () => {
   });
 
   it("warns on very low and very high humidity", () => {
-    expect(
-      evaluateManualSnapshotAdvisor({ humidityPct: 10 }).warnings.join(" "),
-    ).toMatch(/unusually low/i);
-    expect(
-      evaluateManualSnapshotAdvisor({ humidityPct: 95 }).warnings.join(" "),
-    ).toMatch(/unusually high/i);
+    expect(evaluateManualSnapshotAdvisor({ humidityPct: 10 }).warnings.join(" ")).toMatch(
+      /unusually low/i,
+    );
+    expect(evaluateManualSnapshotAdvisor({ humidityPct: 95 }).warnings.join(" ")).toMatch(
+      /unusually high/i,
+    );
   });
 
   it("warns on unrealistic VPD", () => {
-    expect(
-      evaluateManualSnapshotAdvisor({ vpdKpa: 4 }).warnings.join(" "),
-    ).toMatch(/VPD/i);
-    expect(
-      evaluateManualSnapshotAdvisor({ vpdKpa: 0 }).warnings.join(" "),
-    ).toMatch(/VPD/i);
+    expect(evaluateManualSnapshotAdvisor({ vpdKpa: 4 }).warnings.join(" ")).toMatch(/VPD/i);
+    expect(evaluateManualSnapshotAdvisor({ vpdKpa: 0 }).warnings.join(" ")).toMatch(/VPD/i);
   });
 
   it("derives VPD when temp+RH present and VPD missing", () => {
@@ -61,43 +57,31 @@ describe("evaluateManualSnapshotAdvisor — pure guardrails", () => {
   });
 
   it("warns on CO2 below 300 ppm or above 2000 ppm", () => {
-    expect(
-      evaluateManualSnapshotAdvisor({ co2Ppm: 200 }).warnings.join(" "),
-    ).toMatch(/CO/);
-    expect(
-      evaluateManualSnapshotAdvisor({ co2Ppm: 2500 }).warnings.join(" "),
-    ).toMatch(/CO/);
+    expect(evaluateManualSnapshotAdvisor({ co2Ppm: 200 }).warnings.join(" ")).toMatch(/CO/);
+    expect(evaluateManualSnapshotAdvisor({ co2Ppm: 2500 }).warnings.join(" ")).toMatch(/CO/);
     expect(evaluateManualSnapshotAdvisor({ co2Ppm: 800 }).warnings).toEqual([]);
   });
 
   it("warns on soil moisture stuck at 0 or 100", () => {
-    expect(
-      evaluateManualSnapshotAdvisor({ soilMoisturePct: 0 }).warnings.join(" "),
-    ).toMatch(/stuck/i);
-    expect(
-      evaluateManualSnapshotAdvisor({ soilMoisturePct: 100 }).warnings.join(" "),
-    ).toMatch(/stuck/i);
-    expect(
-      evaluateManualSnapshotAdvisor({ soilMoisturePct: 45 }).warnings,
-    ).toEqual([]);
+    expect(evaluateManualSnapshotAdvisor({ soilMoisturePct: 0 }).warnings.join(" ")).toMatch(
+      /stuck/i,
+    );
+    expect(evaluateManualSnapshotAdvisor({ soilMoisturePct: 100 }).warnings.join(" ")).toMatch(
+      /stuck/i,
+    );
+    expect(evaluateManualSnapshotAdvisor({ soilMoisturePct: 45 }).warnings).toEqual([]);
   });
 
   it("warns when soil EC likely entered in µS/cm instead of mS/cm", () => {
-    expect(
-      evaluateManualSnapshotAdvisor({ soilEcMsCm: 1500 }).warnings.join(" "),
-    ).toMatch(/µS\/cm/);
-    expect(
-      evaluateManualSnapshotAdvisor({ soilEcMsCm: 2.0 }).warnings,
-    ).toEqual([]);
+    expect(evaluateManualSnapshotAdvisor({ soilEcMsCm: 1500 }).warnings.join(" ")).toMatch(
+      /µS\/cm/,
+    );
+    expect(evaluateManualSnapshotAdvisor({ soilEcMsCm: 2.0 }).warnings).toEqual([]);
   });
 
   it("warns on reservoir pH outside realistic range", () => {
-    expect(
-      evaluateManualSnapshotAdvisor({ reservoirPh: 2 }).warnings.join(" "),
-    ).toMatch(/pH/);
-    expect(
-      evaluateManualSnapshotAdvisor({ reservoirPh: 9 }).warnings.join(" "),
-    ).toMatch(/pH/);
+    expect(evaluateManualSnapshotAdvisor({ reservoirPh: 2 }).warnings.join(" ")).toMatch(/pH/);
+    expect(evaluateManualSnapshotAdvisor({ reservoirPh: 9 }).warnings.join(" ")).toMatch(/pH/);
     expect(evaluateManualSnapshotAdvisor({ reservoirPh: 6.0 }).warnings).toEqual([]);
   });
 
@@ -155,15 +139,16 @@ describe("ManualSensorReadingCard — advisor + derived VPD in UI", () => {
     fireEvent.change(screen.getByLabelText(/Air temp/i), { target: { value: "77" } });
     fireEvent.change(screen.getByLabelText(/Humidity/i), { target: { value: "55" } });
     expect(screen.getByTestId("manual-reading-derived-vpd").textContent).toMatch(
-      /Derived VPD/,
+      /Air VPD estimate/,
+    );
+    expect(screen.getByTestId("manual-reading-derived-vpd").textContent).toMatch(
+      /Stage unknown — no target check/,
     );
   });
 
   it("clearly labels the snapshot source as manual", () => {
     renderCard();
-    expect(screen.getByTestId("manual-reading-helper").textContent).toMatch(
-      /manual snapshot/i,
-    );
+    expect(screen.getByTestId("manual-reading-helper").textContent).toMatch(/manual snapshot/i);
   });
 });
 

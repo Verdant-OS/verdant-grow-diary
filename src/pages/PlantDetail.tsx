@@ -29,6 +29,7 @@ import PlantDetailRecentActionResponse from "@/components/PlantDetailRecentActio
 import PlantDetailHarvestWatchCard from "@/components/PlantDetailHarvestWatchCard";
 import { usePlantGalleryPhotoCount } from "@/hooks/usePlantGalleryPhotoCount";
 import PlantDetailHarvestEvidenceReportMount from "@/components/PlantDetailHarvestEvidenceReportMount";
+import { isHarvestWatchEligible } from "@/lib/harvestWatchEligibilityRules";
 import PlantDetailWhatsMissing from "@/components/PlantDetailWhatsMissing";
 import PlantDetailAiDoctorReadiness from "@/components/PlantDetailAiDoctorReadiness";
 import PlantDetailDoctorContextPreview from "@/components/PlantDetailDoctorContextPreview";
@@ -37,6 +38,7 @@ import PlantDetailAiDoctorReadinessGate from "@/components/PlantDetailAiDoctorRe
 import PlantDetailAiDoctorSafeReviewStart from "@/components/PlantDetailAiDoctorSafeReviewStart";
 import AiDoctorReviewResultPreview from "@/components/AiDoctorReviewResultPreview";
 import PlantDetailAiDoctorLiveReview from "@/components/PlantDetailAiDoctorLiveReview";
+import AiDoctorReviewAnchorRestorer from "@/components/AiDoctorReviewAnchorRestorer";
 import PlantDetailAiDoctorContextReadinessMount from "@/components/PlantDetailAiDoctorContextReadinessMount";
 import PlantProfileContextCard from "@/components/PlantProfileContextCard";
 import { updatePlantProfileMetadata } from "@/lib/plantProfileMetadataUpdate";
@@ -219,7 +221,7 @@ function ArchivedTimelineReadOnlyView({
           />
           <ManualSnapshotTimelineSection scope="plant" plantId={plant.id} />
           <QuickLogGroupedTimelineSection scope="plant" plantId={plant.id} tentId={plant.tentId} />
-          <TimelineMemorySection scope="plant" plantId={plant.id} />
+          <TimelineMemorySection scope="plant" plantId={plant.id} tentId={plant.tentId} />
           <PlantMemoryEpisodesSection growId={plant.growId} plantId={plant.id} />
         </div>
       </div>
@@ -351,6 +353,10 @@ export default function PlantDetail() {
   }
 
   const ageDays = Math.floor((Date.now() - new Date(plant.startedAt).getTime()) / 86400000);
+  const harvestWatchEligible = isHarvestWatchEligible({
+    stage: plant.stage,
+    isArchived: plant.isArchived,
+  });
   return (
     <div>
       <QuickLogV2Fab defaultTargetKey={`plant:${plant.id}`} />
@@ -471,12 +477,16 @@ export default function PlantDetail() {
         }}
       />
       <PlantDetailRecentActionResponse growId={plant.growId ?? null} plantId={plant.id} />
-      <PlantDetailHarvestWatchCard
-        plantId={plant.id}
-        hasPlantPhoto={!!plant.photo}
-        galleryPhotoCount={plantGalleryPhotoCount}
-      />
-      <PlantDetailHarvestEvidenceReportMount plantId={plant.id} />
+      {harvestWatchEligible && (
+        <>
+          <PlantDetailHarvestWatchCard
+            plantId={plant.id}
+            hasPlantPhoto={!!plant.photo}
+            galleryPhotoCount={plantGalleryPhotoCount}
+          />
+          <PlantDetailHarvestEvidenceReportMount plantId={plant.id} />
+        </>
+      )}
       <PlantDetailAiDoctorReadiness
         plantId={plant.id}
         growId={plant.growId ?? null}
@@ -529,6 +539,7 @@ export default function PlantDetail() {
         aria-label="Plant AI Doctor review"
         className="scroll-mt-16 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
+        <AiDoctorReviewAnchorRestorer />
         <PlantDetailAiDoctorReadinessGate plantId={plant.id} plant={plant} hasSafeAiDoctorFlow />
         <PlantDetailAiDoctorSafeReviewStart plantId={plant.id} plant={plant} />
         <AiDoctorReviewResultPreview testIdPrefix="plant-detail" />
@@ -729,7 +740,7 @@ export default function PlantDetail() {
             plantId={plant.id}
             tentId={plant.tentId ?? null}
           />
-          <TimelineMemorySection scope="plant" plantId={plant.id} />
+          <TimelineMemorySection scope="plant" plantId={plant.id} tentId={plant.tentId ?? null} />
 
           <section
             aria-labelledby="plant-daily-grow-check-section-heading"

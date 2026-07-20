@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -28,6 +28,16 @@ describe("AiCreditLimitNotice presenter", () => {
     expect(screen.getByTestId("ai-credit-limit-notice")).toHaveAttribute("data-kind", "upsell");
     const link = screen.getByTestId("ai-credit-limit-notice-paywall-link");
     expect(link).toHaveAttribute("href", "/pricing");
+  });
+
+  it("runs an explicit Free-upsell CTA callback exactly once", () => {
+    const onUpsellCtaClick = vi.fn();
+    renderWithRouter(
+      <AiCreditLimitNotice credit={denial("free")} onUpsellCtaClick={onUpsellCtaClick} />,
+    );
+
+    fireEvent.click(screen.getByTestId("ai-credit-limit-notice-paywall-link"));
+    expect(onUpsellCtaClick).toHaveBeenCalledTimes(1);
   });
 
   it("preserves a safe return target through the pricing CTA", () => {
@@ -65,6 +75,21 @@ describe("AiCreditLimitNotice presenter", () => {
     expect(screen.getByTestId("ai-credit-limit-notice")).toHaveAttribute("data-kind", "unknown");
     expect(screen.queryByRole("link")).toBeNull();
   });
+
+  it.each(["pro_monthly", "founder_lifetime", null])(
+    "never invokes an upsell callback for a %s denial without a CTA",
+    (planId) => {
+      const onUpsellCtaClick = vi.fn();
+      renderWithRouter(
+        <AiCreditLimitNotice
+          credit={denial(planId as string | null)}
+          onUpsellCtaClick={onUpsellCtaClick}
+        />,
+      );
+      expect(screen.queryByTestId("ai-credit-limit-notice-paywall-link")).toBeNull();
+      expect(onUpsellCtaClick).not.toHaveBeenCalled();
+    },
+  );
 
   it("rendered DOM text contains no banned words", () => {
     for (const plan of ["free", "pro_monthly", "founder_lifetime", null]) {

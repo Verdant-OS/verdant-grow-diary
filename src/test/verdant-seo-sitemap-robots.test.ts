@@ -48,6 +48,7 @@ const REQUIRED_GUIDE_URLS = [
   "https://verdantgrowdiary.com/guides/grow-journal-app-without-account",
   "https://verdantgrowdiary.com/guides/daily-grow-log-checklist",
   "https://verdantgrowdiary.com/guides/cronk-nutrients-grow-diary",
+  "https://verdantgrowdiary.com/guides/bud-rot-prevention-identification",
   "https://verdantgrowdiary.com/guides/cannabis-plant-care",
   "https://verdantgrowdiary.com/guides/grow-stage-care-guide",
 ];

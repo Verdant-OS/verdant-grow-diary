@@ -1,9 +1,9 @@
 /**
  * QuickLog post-save target-plant navigation + keyboard/a11y polish:
  *  - After save the dialog stays open and reveals a "View {plant}" action
- *    pointing at the saved target plant id (not the prefill plant id).
+ *    pointing at the exact saved target plant id.
  *  - The action is a keyboard-reachable anchor with focus styling.
- *  - The mismatch banner is screen-reader discoverable but not tabbable.
+ *  - A blocked named target is screen-reader discoverable but not tabbable.
  *  - The stale helper copy includes the formatted captured timestamp and
  *    is associated with the disabled Switch via aria-describedby.
  *  - The watering-missing error path sets aria-invalid + aria-describedby
@@ -18,12 +18,7 @@ const { rpcMock, snapshotState } = vi.hoisted(() => ({
   snapshotState: {
     status: "ready" as "ready" | "loading" | "empty",
     payload: {
-      status: "fresh_live" as
-        | "fresh_live"
-        | "fresh_non_live"
-        | "stale"
-        | "invalid"
-        | "empty",
+      status: "fresh_live" as "fresh_live" | "fresh_non_live" | "stale" | "invalid" | "empty",
       source: "ecowitt" as string | null,
       captured_at: "2026-05-31T13:44:12.000Z" as string | null,
     },
@@ -51,7 +46,7 @@ vi.mock("@/store/grows", () => ({
 }));
 vi.mock("@/hooks/use-plants", () => ({ usePlants: () => ({ data: plantsData }) }));
 vi.mock("@/hooks/use-tents", () => ({
-  useTents: () => ({ data: [{ id: "t1", name: "Tent 1" }] }),
+  useTents: () => ({ data: [{ id: "t1", name: "Tent 1", grow_id: "g1" }] }),
 }));
 vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn(), message: vi.fn() },
@@ -98,25 +93,18 @@ describe("QuickLog post-save target plant action", () => {
     renderQL({
       open: true,
       onOpenChange: () => {},
-      // Prefill plant differs from the auto-picked scoped plant (p2).
-      prefill: { plantId: "p-other", plantName: "Blue Dream", growId: "g1" },
+      prefill: { plantId: "p2", growId: "g1", tentId: "t1" },
     });
-    // Make sure mismatch banner shows (sanity: differs from prefill).
-    await screen.findByTestId("quick-log-plant-mismatch-banner");
     // Add a note so save passes.
     fireEvent.change(screen.getByPlaceholderText(/Watered, looking healthy/i), {
       target: { value: "looking good" },
     });
     const form = screen.getByTestId("quick-log-save").closest("form") as HTMLFormElement;
     fireEvent.submit(form);
-    const link = (await screen.findByTestId(
-      "quick-log-view-target-plant",
-    )) as HTMLAnchorElement;
+    const link = (await screen.findByTestId("quick-log-view-target-plant")) as HTMLAnchorElement;
     expect(link.tagName).toBe("A");
     expect(link.getAttribute("href")).toBe("/plants/p2");
     expect(link.getAttribute("data-target-plant-id")).toBe("p2");
-    // Does NOT point at the original prefill page plant.
-    expect(link.getAttribute("href")).not.toContain("p-other");
     expect(link.textContent ?? "").toMatch(/View timeline/);
   });
 
@@ -129,12 +117,8 @@ describe("QuickLog post-save target plant action", () => {
     fireEvent.change(screen.getByPlaceholderText(/Watered, looking healthy/i), {
       target: { value: "looking good" },
     });
-    fireEvent.submit(
-      screen.getByTestId("quick-log-save").closest("form") as HTMLFormElement,
-    );
-    const link = (await screen.findByTestId(
-      "quick-log-view-target-plant",
-    )) as HTMLAnchorElement;
+    fireEvent.submit(screen.getByTestId("quick-log-save").closest("form") as HTMLFormElement);
+    const link = (await screen.findByTestId("quick-log-view-target-plant")) as HTMLAnchorElement;
     expect(link.tabIndex).not.toBe(-1);
     expect(link.className).toMatch(/focus-visible:ring-2/);
     link.focus();
@@ -150,28 +134,24 @@ describe("QuickLog post-save target plant action", () => {
     fireEvent.change(screen.getByPlaceholderText(/Watered, looking healthy/i), {
       target: { value: "ok" },
     });
-    fireEvent.submit(
-      screen.getByTestId("quick-log-save").closest("form") as HTMLFormElement,
-    );
+    fireEvent.submit(screen.getByTestId("quick-log-save").closest("form") as HTMLFormElement);
     await screen.findByTestId("quick-log-view-target-plant");
     const save = screen.getByTestId("quick-log-save") as HTMLButtonElement;
     expect(save.disabled).toBe(true);
   });
 });
 
-describe("QuickLog mismatch banner accessibility", () => {
-  it("is screen-reader discoverable (role=status, aria-live=polite) and not tabbable", async () => {
+describe("QuickLog blocked-target accessibility", () => {
+  it("is screen-reader discoverable as an alert and has no interactive children", async () => {
     renderQL({
       open: true,
       onOpenChange: () => {},
       prefill: { plantId: "p-other", plantName: "Blue Dream", growId: "g1" },
     });
-    const banner = await screen.findByTestId("quick-log-plant-mismatch-banner");
-    expect(banner.getAttribute("role")).toBe("status");
-    expect(banner.getAttribute("aria-live")).toBe("polite");
-    // No focusable children, banner itself not tab-stop.
-    expect(banner.tabIndex).toBe(-1);
-    expect(banner.querySelector("a,button,input,select,textarea")).toBeNull();
+    const error = await screen.findByTestId("quick-log-target-error");
+    expect(error.getAttribute("role")).toBe("alert");
+    expect(error.tabIndex).toBe(-1);
+    expect(error.querySelector("a,button,input,select,textarea")).toBeNull();
   });
 });
 
@@ -193,9 +173,7 @@ describe("QuickLog stale helper copy", () => {
     const helper = await screen.findByTestId("quick-log-snapshot-stale-helper");
     expect(helper.textContent ?? "").toMatch(/Captured /);
     expect(helper.textContent ?? "").toMatch(/2026/);
-    expect(helper.textContent ?? "").toMatch(
-      /not saved as current sensor context/i,
-    );
+    expect(helper.textContent ?? "").toMatch(/not saved as current sensor context/i);
     expect(helper.textContent ?? "").not.toMatch(/T\d{2}:\d{2}/);
   });
 
@@ -205,13 +183,9 @@ describe("QuickLog stale helper copy", () => {
       onOpenChange: () => {},
       prefill: { plantId: "p2", growId: "g1" },
     });
-    const sw = (await screen.findByTestId(
-      "quick-log-snapshot-toggle",
-    )) as HTMLButtonElement;
+    const sw = (await screen.findByTestId("quick-log-snapshot-toggle")) as HTMLButtonElement;
     expect(sw.disabled).toBe(true);
-    expect(sw.getAttribute("aria-describedby")).toBe(
-      "quick-log-snapshot-session-helper",
-    );
+    expect(sw.getAttribute("aria-describedby")).toBe("quick-log-snapshot-session-helper");
     const helperRoot = document.getElementById("quick-log-snapshot-session-helper");
     expect(helperRoot).not.toBeNull();
     expect(helperRoot?.textContent ?? "").toMatch(/Captured /);
@@ -225,9 +199,7 @@ describe("QuickLog watering inline validation a11y", () => {
       onOpenChange: () => {},
       prefill: { plantId: "p2", growId: "g1", eventType: "watering" },
     });
-    const input = (await screen.findByTestId(
-      "quicklog-watering-ml",
-    )) as HTMLInputElement;
+    const input = (await screen.findByTestId("quicklog-watering-ml")) as HTMLInputElement;
     fireEvent.submit(input.closest("form") as HTMLFormElement);
     await waitFor(() => {
       expect(input.getAttribute("aria-invalid")).toBe("true");

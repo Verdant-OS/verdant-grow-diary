@@ -12,12 +12,12 @@
  *    migration to extend the trigger; out of scope here.
  *  - Source is always `manual`. Never fakes live data.
  *  - Air temp is entered in °F (grow-room friendly) and converted to °C
- *    before save. VPD is auto-computed from temp+RH when not provided.
+ *    before save. Air-only VPD is preview context and is never silently
+ *    persisted as though it were verified leaf-to-air VPD.
  */
 
 import { buildManualDeviceId } from "@/lib/manualSensorSourceLabel";
 import { classifyPpfd, PPFD_MAX } from "@/lib/ppfdRules";
-
 
 export type ManualMetric =
   | "temperature_c"
@@ -32,7 +32,7 @@ export interface ManualEntryInput {
   airTempF?: string | number | null;
   /** Relative humidity %. */
   humidityPct?: string | number | null;
-  /** VPD kPa. Optional — auto-derived from temp+RH when omitted. */
+  /** Grower-entered VPD kPa. Air-only estimates are preview-only. */
   vpdKpa?: string | number | null;
   /** CO2 ppm. */
   co2Ppm?: string | number | null;
@@ -130,6 +130,11 @@ export function validateManualEntry(input: ManualEntryInput): ManualEntryValidat
   if (vpd !== null && vpd >= 0 && vpd > 2.5) {
     warnings.push(`VPD ${vpd} kPa is unusually high (> 2.5).`);
   }
+  if (vpd === null && airTempF !== null && humidity !== null && humidity >= 0 && humidity <= 100) {
+    warnings.push(
+      "Air VPD estimate is preview-only and is not saved as verified VPD. Measure leaf temperature and complete calibration evidence before making a target claim.",
+    );
+  }
 
   // Build metric rows for accepted fields (only schema-supported metrics).
   if (airTempF !== null) {
@@ -149,12 +154,6 @@ export function validateManualEntry(input: ManualEntryInput): ManualEntryValidat
   }
   if (vpd !== null && vpd >= 0) {
     metrics.push({ metric: "vpd_kpa", value: vpd });
-  } else if (airTempF !== null && humidity !== null && humidity >= 0 && humidity <= 100) {
-    metrics.push({
-      metric: "vpd_kpa",
-      value: computeVpdKpa(fahrenheitToCelsius(airTempF), humidity),
-      derived: true,
-    });
   }
   if (ppfdClass.kind === "valid") {
     metrics.push({ metric: "ppfd", value: ppfdClass.value });

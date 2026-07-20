@@ -36,13 +36,13 @@ vi.mock("@/lib/insertManualSensorReadingReturningId", () => ({
   insertManualSensorReadingReturningId: (p: unknown) => returningId(p),
 }));
 
-
 import ManualSensorReadingCard from "@/components/ManualSensorReadingCard";
 import type { ManualCorrectionContext } from "@/lib/manualSensorCorrectionContext";
 
 const TENT = "11111111-1111-4111-8111-111111111111";
 const R_TEMP = "22222222-2222-4222-8222-222222222222";
 const R_RH = "33333333-3333-4333-8333-333333333333";
+const R_RH_NEXT = "44444444-4444-4444-8444-444444444444";
 
 function makeCtx(overrides?: Partial<ManualCorrectionContext>): ManualCorrectionContext {
   return {
@@ -55,15 +55,20 @@ function makeCtx(overrides?: Partial<ManualCorrectionContext>): ManualCorrection
   };
 }
 
-function renderCard(correction: ManualCorrectionContext | null) {
-  return render(
+function card(correction: ManualCorrectionContext | null) {
+  return (
     <MemoryRouter>
       <ManualSensorReadingCard
         tents={[{ id: TENT, name: "Tent A" }]}
+        defaultTentId={TENT}
         correction={correction}
       />
-    </MemoryRouter>,
+    </MemoryRouter>
   );
+}
+
+function renderCard(correction: ManualCorrectionContext | null) {
+  return render(card(correction));
 }
 
 beforeEach(() => {
@@ -90,6 +95,33 @@ describe("ManualSensorReadingCard — correction mode", () => {
     expect(Number(airTemp.value)).toBeCloseTo(75.2, 1);
     const rh = getByLabelText(/Humidity/i) as HTMLInputElement;
     expect(Number(rh.value)).toBe(58);
+  });
+
+  it("resets the draft when correction identity changes within the same tent", async () => {
+    const first = makeCtx();
+    const second = makeCtx({
+      originalCapturedAt: "2026-07-02T12:00:00.000Z",
+      originalReadingIds: { humidity_pct: R_RH_NEXT },
+      originalValues: { humidity_pct: 42 },
+    });
+    const { getByLabelText, getByTestId, queryByTestId, rerender } = renderCard(first);
+    const humidity = getByLabelText(/Humidity/i) as HTMLInputElement;
+
+    fireEvent.change(humidity, { target: { value: "99" } });
+    expect(humidity.value).toBe("99");
+
+    rerender(card(second));
+    await waitFor(() => expect(humidity.value).toBe("42"));
+
+    fireEvent.change(humidity, { target: { value: "43" } });
+    fireEvent.click(getByTestId("manual-reading-save"));
+    fireEvent.click(getByTestId("manual-sensor-review-confirm"));
+    await waitFor(() => expect(editMutate).toHaveBeenCalledTimes(1));
+    expect(editMutate.mock.calls[0][0].original_reading_id).toBe(R_RH_NEXT);
+
+    rerender(card(null));
+    await waitFor(() => expect(humidity.value).toBe(""));
+    expect(queryByTestId("manual-reading-correction-banner")).not.toBeInTheDocument();
   });
 
   it("ONE changed metric → ONE replacement insert + ONE audit row (changed_fields length 1)", async () => {

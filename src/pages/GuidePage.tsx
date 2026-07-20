@@ -23,6 +23,7 @@ import {
   VERDANT_SITE_ORIGIN,
 } from "@/constants/verdantSeoContent";
 import {
+  buildArticleJsonLd,
   buildBreadcrumbListJsonLd,
   buildFaqPageJsonLd,
   safeJsonLdStringify,
@@ -74,6 +75,7 @@ export default function GuidePage() {
       guide?.description ??
       "Verdant grower guides on grow diary logging, sensor truth, VPD, and AI Doctor.",
     path: guide ? `/guides/${guide.slug}` : "/guides",
+    ogType: guide ? "article" : "website",
   });
 
   useEffect(() => {
@@ -86,6 +88,17 @@ export default function GuidePage() {
     const crumbs = buildBreadcrumbListJsonLd({
       items: [...VERDANT_GUIDES_BREADCRUMB_ITEMS, { name: guide.h1, url: guideUrl }],
     });
+    // Evergreen guides — use the site's stable publish date so Article
+    // schema validates without inventing per-guide edit timestamps.
+    const article = buildArticleJsonLd({
+      headline: guide.h1,
+      description: guide.description,
+      url: guideUrl,
+      datePublished: "2025-01-01",
+      authorName: "Verdant Grow Diary",
+      publisherName: "Verdant Grow Diary",
+      siteUrl: VERDANT_SITE_ORIGIN,
+    });
     const faqScript = document.createElement("script");
     faqScript.type = "application/ld+json";
     faqScript.setAttribute("data-page-ldjson", `guide-${guide.slug}-faq`);
@@ -96,9 +109,15 @@ export default function GuidePage() {
     crumbScript.setAttribute("data-page-ldjson", `guide-${guide.slug}-breadcrumb`);
     crumbScript.text = safeJsonLdStringify(crumbs);
     document.head.appendChild(crumbScript);
+    const articleScript = document.createElement("script");
+    articleScript.type = "application/ld+json";
+    articleScript.setAttribute("data-page-ldjson", `guide-${guide.slug}-article`);
+    articleScript.text = safeJsonLdStringify(article);
+    document.head.appendChild(articleScript);
     return () => {
       faqScript.remove();
       crumbScript.remove();
+      articleScript.remove();
     };
   }, [guide]);
 
@@ -139,13 +158,67 @@ export default function GuidePage() {
         </h1>
         <p className="mt-5 text-lg text-muted-foreground">{guide.intro}</p>
 
+        {guide.cta && (
+          <aside
+            aria-label={guide.cta.heading}
+            className="mt-8 rounded-lg border border-primary/40 bg-primary/5 p-5 md:p-6 shadow-sm"
+          >
+            <h2 className="font-display text-xl md:text-2xl font-semibold text-foreground">
+              {guide.cta.heading}
+            </h2>
+            <p className="mt-2 text-sm md:text-base text-foreground/85">
+              {guide.cta.description}
+            </p>
+            {guide.cta.prompts && guide.cta.prompts.length > 0 && (
+              <ul className="mt-3 space-y-1 text-sm text-foreground/80 list-disc pl-5">
+                {guide.cta.prompts.map((prompt) => (
+                  <li key={prompt}>{prompt}</li>
+                ))}
+              </ul>
+            )}
+            <div className="mt-5">
+              <Link
+                to={guide.cta.to}
+                className="inline-flex items-center justify-center rounded-md bg-primary px-5 py-3 text-sm md:text-base font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary min-h-[44px]"
+              >
+                {guide.cta.label}
+              </Link>
+            </div>
+          </aside>
+        )}
+
+
+
         <div className="mt-10 space-y-8">
           {guide.sections.map((section) => (
             <section key={section.heading}>
               <h2 className="font-display text-xl md:text-2xl font-semibold">{section.heading}</h2>
               <p className="mt-3 text-base text-foreground/90">{section.body}</p>
+              {section.links && section.links.length > 0 && (
+                <nav
+                  aria-label={`In Verdant: ${section.heading}`}
+                  className="mt-4 rounded-md border border-border/60 bg-muted/30 px-4 py-3"
+                >
+                  <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground font-medium">
+                    In Verdant
+                  </p>
+                  <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-sm">
+                    {section.links.map((link) => (
+                      <li key={link.to}>
+                        <Link
+                          to={link.to}
+                          className="text-primary underline underline-offset-4 hover:text-primary/80"
+                        >
+                          {link.label}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </nav>
+              )}
             </section>
           ))}
+
         </div>
 
         {guide.faq.length > 0 && (
@@ -211,6 +284,38 @@ export default function GuidePage() {
             >
               Open the stage-aware VPD calculator
             </Link>
+          </section>
+        )}
+
+        {guide.slug === "bud-rot-prevention-identification" && (
+          <section
+            className="mt-12 rounded-xl border border-primary/30 bg-primary/5 p-5"
+            data-testid="guide-bud-rot-checklist-download"
+          >
+            <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">
+              Printable resource
+            </p>
+            <h2 className="mt-2 font-display text-xl font-semibold">
+              Download the Bud Rot prevention checklist (PDF)
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              A one-page, grower-approved checklist for late flower: environment
+              targets, a daily walk-through, a weekly Environment Check audit,
+              and what to do if you find rot. Print it and pin it next to the
+              tent, or keep it on your phone.
+            </p>
+            <a
+              href="/verdant-bud-rot-prevention-checklist.pdf"
+              download
+              className="mt-4 inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+              data-testid="guide-bud-rot-checklist-download-link"
+            >
+              Download checklist (PDF)
+            </a>
+            <p className="mt-3 text-xs text-muted-foreground">
+              Verdant suggests; the grower decides. Nothing on this checklist
+              triggers automation.
+            </p>
           </section>
         )}
 

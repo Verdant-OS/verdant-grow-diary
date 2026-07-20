@@ -14,8 +14,10 @@
 //    persisting a preference.
 //  - "Change later" copy points to Settings.
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, Navigate, Link } from "react-router-dom";
+import { useNavigate, Navigate, Link, useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/store/auth";
+import { useGrows } from "@/store/grows";
 import { Button } from "@/components/ui/button";
 import {
   DEFAULT_START_SCREEN,
@@ -33,15 +35,31 @@ import {
 import { runStarterSetup, StarterSetupError } from "@/lib/starterSetupService";
 import { starterSetupSupabaseAdapter } from "@/lib/starterSetupSupabaseAdapter";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
+import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 import PublicQuickLogHandoffCard from "@/components/PublicQuickLogHandoffCard";
+import {
+  buildCsvHistoryImportHandoffHref,
+  CSV_HISTORY_ONBOARDING_COPY,
+  CSV_HISTORY_ONBOARDING_HANDOFF_ERROR_COPY,
+  CSV_HISTORY_ONBOARDING_IMPORT_LABEL,
+  CSV_HISTORY_ONBOARDING_READY_COPY,
+  CSV_HISTORY_ONBOARDING_SETUP_LABEL,
+  CSV_HISTORY_ONBOARDING_TITLE,
+  readCsvHistoryOnboardingIntent,
+} from "@/lib/csvHistoryOnboardingIntentRules";
 
 export default function Onboarding() {
   const { user, loading } = useAuth();
+  const { refresh: refreshGrows } = useGrows();
+  const queryClient = useQueryClient();
   const nav = useNavigate();
+  const [searchParams] = useSearchParams();
   const [choice, setChoice] = useState<StartScreenChoice>(DEFAULT_START_SCREEN);
   const [starterBusy, setStarterBusy] = useState(false);
   const [starterError, setStarterError] = useState<string | null>(null);
+  const [csvHistoryImportHref, setCsvHistoryImportHref] = useState<string | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const csvHistoryIntent = readCsvHistoryOnboardingIntent(searchParams);
 
   useEffect(() => {
     // Land focus on the heading so screen readers announce context first and
@@ -57,19 +75,46 @@ export default function Onboarding() {
     nav(routeForStartScreen(c), { replace: true });
   }
 
-  async function handleStarterSetup() {
+  async function handleStarterSetup(next: "quick_log" | "csv_history") {
     if (starterBusy || !user) return;
     setStarterError(null);
     setStarterBusy(true);
     try {
-      const result = await runStarterSetup(user.id, starterSetupSupabaseAdapter);
-      const prefill = buildStarterQuickLogPrefill(result);
-      // AppShell listens for this event globally and opens Quick Log with
-      // the plant/tent/grow preselected. No sensor snapshot is inserted;
-      // the grower still authors the first log manually. Stay inside the
-      // current AppShell so its listener is not replaced before receiving
-      // this in-memory handoff.
-      window.dispatchEvent(new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, { detail: prefill }));
+      const result = await runStarterSetup(user.id, starterSetupSupabaseAdapter, {
+        onCreated(entity) {
+          if (entity === "grow") trackFunnelEvent("grow_created");
+          if (entity === "tent") trackFunnelEvent("tent_created");
+          if (entity === "plant") trackFunnelEvent("plant_created");
+        },
+      });
+      // Quick Log is permanently mounted and may still hold the pre-setup
+      // empty lists. Refresh every selector it uses before dispatching the
+      // in-memory handoff so the new grow/tent/plant can be selected and saved
+      // immediately, without waiting for a focus refetch or page reload.
+      await Promise.all([
+        refreshGrows(),
+        queryClient.invalidateQueries({ queryKey: ["tents"] }),
+        queryClient.invalidateQueries({ queryKey: ["plants"] }),
+      ]);
+      if (next === "quick_log") {
+        const prefill = buildStarterQuickLogPrefill(result);
+        // AppShell listens for this event globally and opens Quick Log with
+        // the plant/tent/grow preselected. No sensor snapshot is inserted;
+        // the grower still authors the first log manually. Stay inside the
+        // current AppShell so its listener is not replaced before receiving
+        // this in-memory handoff.
+        window.dispatchEvent(new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, { detail: prefill }));
+      } else {
+        const handoffHref = buildCsvHistoryImportHandoffHref(result.tentId);
+        if (!handoffHref) {
+          setStarterError(CSV_HISTORY_ONBOARDING_HANDOFF_ERROR_COPY);
+          return;
+        }
+        // This is navigation-only. It does not open a file picker, import a
+        // CSV, invoke AI Doctor, or create an Action Queue item.
+        setCsvHistoryImportHref(handoffHref);
+        trackFunnelEvent("csv_history_onboarding_ready", { surface: "onboarding" });
+      }
     } catch (err) {
       const message =
         err instanceof StarterSetupError ? STARTER_SETUP_ERROR_COPY : STARTER_SETUP_ERROR_COPY;
@@ -91,10 +136,14 @@ export default function Onboarding() {
           Where do you want Verdant to open first?
         </h1>
         <p className="text-sm text-muted-foreground mb-1">
-          Start with your grow diary first. You can change this later.
+          {csvHistoryIntent
+            ? "Set up one grow and tent, then continue to your CSV history import."
+            : "Start with your grow diary first. You can change this later."}
         </p>
         <p className="text-xs text-muted-foreground mb-4">
-          Verdant works best when logs come first, then sensors, then AI.
+          {csvHistoryIntent
+            ? "Imported history stays labeled as CSV context, never live telemetry."
+            : "Verdant works best when logs come first, then sensors, then AI."}
         </p>
 
         <PublicQuickLogHandoffCard className="mb-4" />
@@ -153,34 +202,90 @@ export default function Onboarding() {
           </Button>
         </div>
 
-        <div
-          data-testid="starter-setup-block"
-          className="mt-6 rounded-lg border border-border/60 p-4"
-        >
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">
-            Just want to try Quick Log?
-          </p>
-          <p className="mt-2 text-sm text-foreground/90">{STARTER_SETUP_HELPER_COPY}</p>
-          <Button
-            data-testid="starter-setup-button"
-            type="button"
-            variant="outline"
-            className="mt-3 w-full sm:w-auto"
-            disabled={starterBusy}
-            onClick={handleStarterSetup}
+        {csvHistoryIntent ? (
+          <section
+            data-testid="csv-history-onboarding-handoff"
+            aria-labelledby="csv-history-onboarding-title"
+            className="mt-6 rounded-lg border border-primary/30 bg-primary/5 p-4"
           >
-            {starterBusy ? "Creating starter setup…" : STARTER_SETUP_BUTTON_LABEL}
-          </Button>
-          {starterError ? (
-            <p
-              data-testid="starter-setup-error"
-              role="alert"
-              className="mt-3 text-xs text-destructive"
+            <h2
+              id="csv-history-onboarding-title"
+              className="text-xs font-semibold uppercase tracking-wide text-primary"
             >
-              {starterError}
+              {CSV_HISTORY_ONBOARDING_TITLE}
+            </h2>
+            <p className="mt-2 text-sm text-foreground/90">{CSV_HISTORY_ONBOARDING_COPY}</p>
+            {csvHistoryImportHref ? (
+              <div className="mt-3 space-y-3">
+                <p
+                  data-testid="csv-history-onboarding-ready"
+                  role="status"
+                  className="text-xs text-muted-foreground"
+                >
+                  {CSV_HISTORY_ONBOARDING_READY_COPY}
+                </p>
+                <Button asChild className="w-full sm:w-auto">
+                  <Link to={csvHistoryImportHref} data-testid="csv-history-onboarding-import-cta">
+                    {CSV_HISTORY_ONBOARDING_IMPORT_LABEL}
+                  </Link>
+                </Button>
+              </div>
+            ) : (
+              <Button
+                data-testid="csv-history-onboarding-setup-button"
+                type="button"
+                variant="outline"
+                className="mt-3 w-full sm:w-auto"
+                disabled={starterBusy}
+                onClick={() => {
+                  void handleStarterSetup("csv_history");
+                }}
+              >
+                {starterBusy ? "Creating starter setup…" : CSV_HISTORY_ONBOARDING_SETUP_LABEL}
+              </Button>
+            )}
+            {starterError ? (
+              <p
+                data-testid="csv-history-onboarding-error"
+                role="alert"
+                className="mt-3 text-xs text-destructive"
+              >
+                {starterError}
+              </p>
+            ) : null}
+          </section>
+        ) : (
+          <div
+            data-testid="starter-setup-block"
+            className="mt-6 rounded-lg border border-border/60 p-4"
+          >
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+              Just want to try Quick Log?
             </p>
-          ) : null}
-        </div>
+            <p className="mt-2 text-sm text-foreground/90">{STARTER_SETUP_HELPER_COPY}</p>
+            <Button
+              data-testid="starter-setup-button"
+              type="button"
+              variant="outline"
+              className="mt-3 w-full sm:w-auto"
+              disabled={starterBusy}
+              onClick={() => {
+                void handleStarterSetup("quick_log");
+              }}
+            >
+              {starterBusy ? "Creating starter setup…" : STARTER_SETUP_BUTTON_LABEL}
+            </Button>
+            {starterError ? (
+              <p
+                data-testid="starter-setup-error"
+                role="alert"
+                className="mt-3 text-xs text-destructive"
+              >
+                {starterError}
+              </p>
+            ) : null}
+          </div>
+        )}
 
         <p className="mt-4 text-[11px] text-muted-foreground text-center">
           You can change this later from{" "}

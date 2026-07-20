@@ -27,6 +27,14 @@ vi.mock("@/hooks/useTimelineMemory", () => ({
   TIMELINE_MEMORY_DEFAULT_LIMIT: 60,
   useTimelineMemory: () => ({ items: mockTimelineItems, isLoading: false }),
 }));
+vi.mock("@/hooks/useRootZoneObservations", () => ({
+  useRootZoneObservations: () => ({
+    observations: [],
+    isLoading: false,
+    isFetching: false,
+    isError: false,
+  }),
+}));
 
 const PLANT_STRONG = {
   id: "p1",
@@ -57,10 +65,7 @@ beforeEach(() => {
 const renderIt = (plant: unknown) =>
   render(
     <MemoryRouter>
-      <PlantDetailAiDoctorSafeReviewStart
-        plantId="p1"
-        plant={plant as never}
-      />
+      <PlantDetailAiDoctorSafeReviewStart plantId="p1" plant={plant as never} />
     </MemoryRouter>,
   );
 
@@ -80,21 +85,15 @@ describe("PlantDetailAiDoctorSafeReviewStart", () => {
     renderIt(PLANT_STRONG);
     const root = screen.getByTestId("plant-ai-doctor-safe-review-start");
     expect(root.getAttribute("data-variant")).toBe("partial");
-    fireEvent.click(
-      screen.getByTestId("plant-ai-doctor-safe-review-start-button"),
+    fireEvent.click(screen.getByTestId("plant-ai-doctor-safe-review-start-button"));
+    expect(screen.getByTestId("plant-ai-doctor-safe-review-readiness-notice").textContent).toMatch(
+      /limited confidence/i,
     );
-    expect(
-      screen.getByTestId("plant-ai-doctor-safe-review-readiness-notice")
-        .textContent,
-    ).toMatch(/limited confidence/i);
-    expect(
-      screen.getByTestId("plant-ai-doctor-safe-review-no-request-notice")
-        .textContent,
-    ).toBe("No AI request has been sent yet.");
+    expect(screen.getByTestId("plant-ai-doctor-safe-review-no-request-notice").textContent).toBe(
+      "No AI request has been sent yet.",
+    );
     // Disabled future button visible, never an active submit.
-    const disabled = screen.getByTestId(
-      "plant-ai-doctor-safe-review-disabled-submit",
-    );
+    const disabled = screen.getByTestId("plant-ai-doctor-safe-review-disabled-submit");
     expect(disabled.hasAttribute("disabled")).toBe(true);
   });
 
@@ -111,15 +110,10 @@ describe("PlantDetailAiDoctorSafeReviewStart", () => {
     renderIt(PLANT_STRONG);
     const root = screen.getByTestId("plant-ai-doctor-safe-review-start");
     expect(root.getAttribute("data-variant")).toBe("strong");
-    fireEvent.click(
-      screen.getByTestId("plant-ai-doctor-safe-review-start-button"),
+    fireEvent.click(screen.getByTestId("plant-ai-doctor-safe-review-start-button"));
+    expect(screen.getByTestId("plant-ai-doctor-safe-review-readiness-notice").textContent).toBe(
+      "Context is strong enough for a cautious review.",
     );
-    expect(
-      screen.getByTestId("plant-ai-doctor-safe-review-readiness-notice")
-        .textContent,
-    ).toBe("Context is strong enough for a cautious review.");
-    expect(
-      screen.getByTestId("plant-ai-doctor-safe-review-no-request-notice"),
-    ).toBeTruthy();
+    expect(screen.getByTestId("plant-ai-doctor-safe-review-no-request-notice")).toBeTruthy();
   });
 });

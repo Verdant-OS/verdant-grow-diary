@@ -61,6 +61,7 @@ vi.mock("@/integrations/supabase/client", () => {
     const q: Record<string, unknown> = {};
     q.select = () => q;
     q.eq = () => q;
+    q.not = () => q;
     q.in = () => q;
     q.or = () => q;
     q.order = () => q;
@@ -79,11 +80,7 @@ function renderSection() {
   });
   return render(
     <QueryClientProvider client={qc}>
-      <QuickLogGroupedTimelineSection
-        scope="plant"
-        plantId={PLANT}
-        tentId={TENT}
-      />
+      <QuickLogGroupedTimelineSection scope="plant" plantId={PLANT} tentId={TENT} />
     </QueryClientProvider>,
   );
 }
@@ -108,20 +105,14 @@ describe("Plant Timeline — Quick Log UI hardening", () => {
         },
       ];
       renderSection();
-      const note = await screen.findByTestId(
-        "quick-log-grouped-action-note",
-      );
+      const note = await screen.findByTestId("quick-log-grouped-action-note");
       expect(note.textContent).toBe("Top dressed with worm castings.");
       const title = screen.getByTestId("quick-log-grouped-action-title");
       expect(title.textContent).toBe("Note");
-      const ts = screen.getByTestId(
-        "quick-log-grouped-action-occurred-at",
-      );
+      const ts = screen.getByTestId("quick-log-grouped-action-occurred-at");
       // Formatted via shared helper, anchored in UTC for stability.
       expect(ts.textContent).toMatch(/2026.*UTC/);
-      const source = screen.getByTestId(
-        "quick-log-grouped-action-source",
-      );
+      const source = screen.getByTestId("quick-log-grouped-action-source");
       expect(source.textContent).toBe(QUICK_LOG_MANUAL_SOURCE_LABEL);
       expect(source.textContent).not.toMatch(/live|synced|connected|imported/i);
     });
@@ -157,9 +148,7 @@ describe("Plant Timeline — Quick Log UI hardening", () => {
       renderSection();
       const card = await screen.findByTestId("quick-log-grouped-card");
       expect(card.getAttribute("data-entry-kind")).toBe("grouped");
-      const source = within(card).getByTestId(
-        "quick-log-grouped-action-source",
-      );
+      const source = within(card).getByTestId("quick-log-grouped-action-source");
       expect(source.textContent).toBe(QUICK_LOG_MANUAL_SOURCE_LABEL);
     });
   });
@@ -168,25 +157,13 @@ describe("Plant Timeline — Quick Log UI hardening", () => {
     it("renders the user-safe title and hint when no entries exist", async () => {
       nextRows = [];
       renderSection();
-      const empty = await screen.findByTestId(
-        "quick-log-grouped-timeline-empty",
-      );
-      const title = within(empty).getByTestId(
-        "quick-log-grouped-timeline-empty-title",
-      );
-      const hint = within(empty).getByTestId(
-        "quick-log-grouped-timeline-empty-hint",
-      );
-      expect(title.textContent).toBe(
-        QUICK_LOG_GROUPED_TIMELINE_EMPTY_TITLE_TEXT,
-      );
-      expect(hint.textContent).toBe(
-        QUICK_LOG_GROUPED_TIMELINE_EMPTY_HINT_TEXT,
-      );
+      const empty = await screen.findByTestId("quick-log-grouped-timeline-empty");
+      const title = within(empty).getByTestId("quick-log-grouped-timeline-empty-title");
+      const hint = within(empty).getByTestId("quick-log-grouped-timeline-empty-hint");
+      expect(title.textContent).toBe(QUICK_LOG_GROUPED_TIMELINE_EMPTY_TITLE_TEXT);
+      expect(hint.textContent).toBe(QUICK_LOG_GROUPED_TIMELINE_EMPTY_HINT_TEXT);
       expect(title.textContent).toBe("No timeline entries yet.");
-      expect(hint.textContent).toBe(
-        "Add a Quick Log to start this plant's history.",
-      );
+      expect(hint.textContent).toBe("Add a Quick Log to start this plant's history.");
     });
   });
 });
@@ -221,28 +198,19 @@ describe("Plant Timeline — pure grouping VM determinism", () => {
       environmentRows: [],
       scope: SCOPE,
     });
-    expect(out.map((e) => (e.kind === "action" ? e.action.id : "?"))).toEqual([
-      "b",
-      "c",
-      "a",
-    ]);
+    expect(out.map((e) => (e.kind === "action" ? e.action.id : "?"))).toEqual(["b", "c", "a"]);
   });
 
   it("breaks ties by stable id ordering when occurred_at is identical", () => {
     const t = "2026-05-12T10:00:00.000Z";
     const input = {
-      actions: [
-        mkAction("z", t),
-        mkAction("a", t),
-        mkAction("m", t),
-      ],
+      actions: [mkAction("z", t), mkAction("a", t), mkAction("m", t)],
       environmentRows: [] as QuickLogV2EnvironmentRow[],
       scope: SCOPE,
     };
     const first = groupQuickLogTimelineEntries(input);
     const second = groupQuickLogTimelineEntries(input);
-    const ids = (xs: typeof first) =>
-      xs.map((e) => (e.kind === "action" ? e.action.id : "?"));
+    const ids = (xs: typeof first) => xs.map((e) => (e.kind === "action" ? e.action.id : "?"));
     // Same input → identical output (deterministic).
     expect(ids(first)).toEqual(ids(second));
     // Stable id-ascending tie-break.
@@ -292,17 +260,11 @@ describe("Plant Timeline — pure grouping VM determinism", () => {
 
 describe("Plant Timeline — static safety", () => {
   const presenter = readFileSync(
-    path.join(
-      process.cwd(),
-      "src/components/QuickLogGroupedTimelineSection.tsx",
-    ),
+    path.join(process.cwd(), "src/components/QuickLogGroupedTimelineSection.tsx"),
     "utf8",
   );
   const vm = readFileSync(
-    path.join(
-      process.cwd(),
-      "src/lib/quickLogGroupedTimelineFilterViewModel.ts",
-    ),
+    path.join(process.cwd(), "src/lib/quickLogGroupedTimelineFilterViewModel.ts"),
     "utf8",
   );
 
@@ -322,9 +284,7 @@ describe("Plant Timeline — static safety", () => {
     expect(presenter).toMatch(/QUICK_LOG_MANUAL_SOURCE_LABEL/);
     // No inline { manual: "Manual", demo: "Demo data", ... } map in the
     // presenter. The shared VM is the single source of truth.
-    expect(presenter).not.toMatch(
-      /\{\s*manual\s*:\s*["']Manual["']\s*,/,
-    );
+    expect(presenter).not.toMatch(/\{\s*manual\s*:\s*["']Manual["']\s*,/);
     // VM owns the canonical strings.
     expect(vm).toMatch(/QUICK_LOG_MANUAL_SOURCE_LABEL\s*=\s*"Manual"/);
   });

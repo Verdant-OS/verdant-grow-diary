@@ -7,6 +7,10 @@ project_id = "knkwiiywfkbqznbxwqfh"
     verify_jwt = true
   [functions.rls-selftest]
     verify_jwt = false
+  # AI Doctor is cost-bearing and user-scoped. Keep gateway JWT verification
+  # enabled in addition to the handler's auth.getUser() check.
+  [functions.ai-doctor-review]
+    verify_jwt = true
   # Paid-launch gate: JWT posture pinned explicitly per function.
   # get-paddle-price requires a signed-in user (and re-verifies via
   # auth.getUser inside the function — defence in depth).
@@ -21,7 +25,7 @@ project_id = "knkwiiywfkbqznbxwqfh"
   [functions.payments-webhook]
     verify_jwt = false
   # founder-slots-remaining is a public, read-only counter used by the
-  # /pricing card. Bounded 0..75 integer only; no user data.
+  # /pricing card. Bounded 0..100 integer only; no user data.
   [functions.founder-slots-remaining]
     verify_jwt = false
   # checkout-status re-verifies the caller JWT inside the function via

@@ -331,21 +331,25 @@ export default function TentPlantActivityPanels({
                     {panel.photoEmptyCopy}
                   </p>
                 )}
-                <p
-                  className="text-muted-foreground"
-                  data-testid={`${panel.testId}-harvest-watch`}
-                >
-                  {panel.harvestWatch.copy}
-                </p>
-                <p
-                  className="text-[11px] text-muted-foreground"
-                  data-testid={`${panel.testId}-harvest-watch-help`}
-                >
-                  {panel.harvestWatch.helpText} {panel.harvestWatch.cautionText}
-                </p>
+                {panel.harvestWatch && (
+                  <>
+                    <p
+                      className="text-muted-foreground"
+                      data-testid={`${panel.testId}-harvest-watch`}
+                    >
+                      {panel.harvestWatch.copy}
+                    </p>
+                    <p
+                      className="text-[11px] text-muted-foreground"
+                      data-testid={`${panel.testId}-harvest-watch-help`}
+                    >
+                      {panel.harvestWatch.helpText} {panel.harvestWatch.cautionText}
+                    </p>
+                  </>
+                )}
               </div>
 
-              <EvidenceNotesSection panel={panel} />
+              {panel.harvestWatch && <EvidenceNotesSection panel={panel} />}
 
 
 

@@ -301,7 +301,7 @@ export default function PublicVpdCalculator() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="vpd-humidity">Relative humidity</Label>
+                    <Label htmlFor="vpd-humidity">Relative humidity (current room reading)</Label>
                     <div className="relative">
                       <Input
                         id="vpd-humidity"
@@ -316,12 +316,17 @@ export default function PublicVpdCalculator() {
                           invalidateVisibleResult();
                         }}
                         placeholder="60"
+                        aria-describedby="vpd-humidity-help"
                         className="pr-10"
                       />
                       <span className="pointer-events-none absolute right-3 top-2.5 text-sm text-muted-foreground">
                         %
                       </span>
                     </div>
+                    <p id="vpd-humidity-help" className="text-xs text-muted-foreground">
+                      Normal flower-room readings around 40–55% are valid here for an air-VPD
+                      estimate. Target status still requires the optional evidence below.
+                    </p>
                   </div>
 
                   <div className="space-y-2">
@@ -357,7 +362,8 @@ export default function PublicVpdCalculator() {
                   <legend className="px-1 text-sm font-semibold">Measurement evidence</legend>
                   <p className="text-xs leading-5 text-muted-foreground">
                     These checks stay in this browser session and are not uploaded. Missing or old
-                    evidence keeps the result visible but blocks a target-status claim.
+                    evidence keeps the result visible as an estimate but blocks a target-status
+                    claim.
                   </p>
 
                   <div className="grid gap-4 sm:grid-cols-2">
@@ -419,7 +425,9 @@ export default function PublicVpdCalculator() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="vpd-humidity-reference">RH reference point</Label>
+                      <Label htmlFor="vpd-humidity-reference">
+                        Calibration RH reference (optional)
+                      </Label>
                       <div className="relative">
                         <Input
                           id="vpd-humidity-reference"
@@ -440,7 +448,10 @@ export default function PublicVpdCalculator() {
                           %
                         </span>
                       </div>
-                      <p className="text-xs text-muted-foreground">Must be at least 75% RH.</p>
+                      <p className="text-xs text-muted-foreground">
+                        Leave blank for an air estimate. Target status requires a documented 75–100%
+                        RH calibration reference, not the room setpoint.
+                      </p>
                     </div>
 
                     <div className="space-y-2">

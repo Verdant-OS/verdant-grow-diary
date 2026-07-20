@@ -257,8 +257,10 @@ describe("UI Simplification Slice 1 — grower-facing group structure", () => {
     ]) {
       expect(within(menu).getByRole("menuitem", { name: label })).toBeInTheDocument();
     }
-    expect(group?.textContent ?? "").toContain("My Grows");
     expect(group?.textContent ?? "").not.toContain("Reports");
+    const cultivationHeading = screen.getByText("Cultivation");
+    const cultivationGroup = cultivationHeading.closest('[data-sidebar="group"]');
+    expect(cultivationGroup?.textContent ?? "").toContain("My Grows");
   });
 
   it("keeps Customer publishing out of normal grower navigation before Phase 4", async () => {

@@ -74,7 +74,7 @@ describe("MobileNav More sheet — Slice 4 grouping", () => {
 
     // Group order
     const groupHeadings = screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
-    expect(groupHeadings).toEqual(["Daily", "Insight", "More", "Labs", "Account"]);
+    expect(groupHeadings).toEqual(["Cultivation", "Daily", "Insight", "Labs", "Account"]);
 
     // Each group contains the expected labels + route targets
     const expectations: Record<string, Array<[string, string]>> = {
@@ -88,7 +88,7 @@ describe("MobileNav More sheet — Slice 4 grouping", () => {
         ["AI Doctor", "/doctor"],
         ["Reports", "/reports"],
       ],
-      More: [["My Grows", "/grows"]],
+      Cultivation: [["My Grows", "/grows"]],
       Labs: [
         ["Pheno Hunt", "/pheno-hunts"],
         ["Breeding Programs", "/breeding"],

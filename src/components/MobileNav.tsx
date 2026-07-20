@@ -74,13 +74,18 @@ const labsItems: MoreItem[] = LABS_NAVIGATION_DESTINATIONS.map((item) => ({
 /**
  * Mobile More sheet — grouped for grower-first scanning.
  * Order is intentional: Daily (today's actions) → Insight (signals) →
- * More (lower-frequency core tools) → Labs (advanced tools) → Account.
+ * Cultivation (workspace structure) → Daily (today's actions) →
+ * Insight (signals) → Labs (advanced tools) → Account.
  *
  * Route targets are unchanged from the prior flat list. Operator-only
  * surfaces are NOT included here — they render separately via the
  * role-gated OperatorModeLink.
  */
 export const moreGroups: MoreGroup[] = [
+  {
+    heading: "Cultivation",
+    items: [{ to: "/grows", label: "My Grows", icon: Sprout }],
+  },
   {
     heading: "Daily",
     items: [
@@ -96,10 +101,6 @@ export const moreGroups: MoreGroup[] = [
       { to: "/doctor", label: "AI Doctor", icon: Stethoscope },
       { to: "/reports", label: "Reports", icon: LineChart },
     ],
-  },
-  {
-    heading: "More",
-    items: [{ to: "/grows", label: "My Grows", icon: Sprout }],
   },
   {
     heading: "Labs",

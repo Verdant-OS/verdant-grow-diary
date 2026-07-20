@@ -28,7 +28,8 @@ const FAKE_USER = {
   user_metadata: { email_verified: true },
 };
 
-const LONG = "Extraordinarily-Long Breeder And Cultivar Designation That Should Never Overflow The Viewport Horizontally";
+const LONG =
+  "Extraordinarily-Long Breeder And Cultivar Designation That Should Never Overflow The Viewport Horizontally";
 
 const ACCESSION = {
   id: "aaaaaaa1-1111-4111-8111-111111111111",
@@ -65,14 +66,58 @@ const TRACE_ENVELOPE = {
   node_count: 4,
   truncated: true,
   nodes: [
-    { key: `plant:${PLANT_ID}`, kind: "plant", id: PLANT_ID, depth: 0, label: LONG, edge_type: null, from: null, evidence: { state: "untested", targets: [], open_quarantine: true }, gaps: ["unassigned_origin"] },
-    { key: `batch:${BATCH.id}`, kind: "batch", id: BATCH.id, depth: 1, label: LONG, edge_type: "produced_by_batch", from: `plant:${PLANT_ID}`, evidence: null, gaps: ["unknown_origin"] },
-    { key: `accession:${ACCESSION.id}`, kind: "accession", id: ACCESSION.id, depth: 2, label: LONG, edge_type: "propagated_from_accession", from: `batch:${BATCH.id}`, evidence: null, gaps: [] },
-    { key: "keeper:ccccccc1", kind: "keeper", id: "ccccccc1-1111-4111-8111-111111111111", depth: 3, label: LONG, edge_type: "keeper_source", from: `plant:${PLANT_ID}`, evidence: null, gaps: ["no_accession_link"] },
+    {
+      key: `plant:${PLANT_ID}`,
+      kind: "plant",
+      id: PLANT_ID,
+      depth: 0,
+      label: LONG,
+      edge_type: null,
+      from: null,
+      evidence: { state: "untested", targets: [], open_quarantine: true },
+      gaps: ["unassigned_origin"],
+    },
+    {
+      key: `batch:${BATCH.id}`,
+      kind: "batch",
+      id: BATCH.id,
+      depth: 1,
+      label: LONG,
+      edge_type: "produced_by_batch",
+      from: `plant:${PLANT_ID}`,
+      evidence: null,
+      gaps: ["unknown_origin"],
+    },
+    {
+      key: `accession:${ACCESSION.id}`,
+      kind: "accession",
+      id: ACCESSION.id,
+      depth: 2,
+      label: LONG,
+      edge_type: "propagated_from_accession",
+      from: `batch:${BATCH.id}`,
+      evidence: null,
+      gaps: [],
+    },
+    {
+      key: "keeper:ccccccc1",
+      kind: "keeper",
+      id: "ccccccc1-1111-4111-8111-111111111111",
+      depth: 3,
+      label: LONG,
+      edge_type: "keeper_source",
+      from: `plant:${PLANT_ID}`,
+      evidence: null,
+      gaps: ["no_accession_link"],
+    },
   ],
   edges: [
     { from: `plant:${PLANT_ID}`, to: `batch:${BATCH.id}`, edge_type: "produced_by_batch" },
-    { from: `batch:${BATCH.id}`, to: `accession:${ACCESSION.id}`, edge_type: "propagated_from_accession" },
+    {
+      from: `batch:${BATCH.id}`,
+      to: `accession:${ACCESSION.id}`,
+      edge_type: "propagated_from_accession",
+    },
   ],
 };
 
@@ -105,13 +150,21 @@ async function seedFakeSession(page: Page) {
 async function mockSupabase(page: Page) {
   await page.route(/\/auth\/v1\//, async (route, request) => {
     if (/\/user/i.test(request.url())) {
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(FAKE_USER) });
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(FAKE_USER),
+      });
       return;
     }
     await route.fulfill({ status: 200, contentType: "application/json", body: "{}" });
   });
   await page.route(/\/rest\/v1\/rpc\/genetics_trace_resolve/, (route) =>
-    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(TRACE_ENVELOPE) }),
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(TRACE_ENVELOPE),
+    }),
   );
   await page.route(/\/rest\/v1\//, async (route, request) => {
     const pathname = new URL(request.url()).pathname;
@@ -131,7 +184,11 @@ async function mockSupabase(page: Page) {
       : pathname.endsWith("/rest/v1/propagation_batches")
         ? [BATCH]
         : [];
-    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(rows) });
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(rows),
+    });
   });
   await page.route(/\/functions\/v1\//, (route) =>
     route.fulfill({ status: 404, contentType: "application/json", body: "{}" }),
@@ -153,7 +210,7 @@ function expectNoOverflow(m: Awaited<ReturnType<typeof readOverflow>>, label: st
   expect(m.bodyScroll, `body overflow @ ${label}`).toBeLessThanOrEqual(m.bodyClient);
 }
 
-test.beforeEach(({}, testInfo) => {
+test.beforeEach(({ browserName: _browserName }, testInfo) => {
   test.skip(
     testInfo.project.name !== MOCKED_PROJECT,
     `genetics traceability overflow proof runs once, under the ${MOCKED_PROJECT} project`,
@@ -171,7 +228,9 @@ test("Genetics Library has no horizontal overflow at any width", async ({ page }
   }
 });
 
-test("Lineage tree is semantic and never overflows, even deep with long names", async ({ page }) => {
+test("Lineage tree is semantic and never overflows, even deep with long names", async ({
+  page,
+}) => {
   await seedFakeSession(page);
   await mockSupabase(page);
   await page.setViewportSize({ width: 375, height: 812 });

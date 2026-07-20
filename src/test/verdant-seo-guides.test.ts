@@ -56,6 +56,7 @@ const EXPECTED_SLUGS: ReadonlyArray<string> = [
   "grow-journal-app-without-account",
   "daily-grow-log-checklist",
   "cronk-nutrients-grow-diary",
+  "bud-rot-prevention-identification",
 ];
 
 describe("Verdant grower guide FAQ (/guides)", () => {

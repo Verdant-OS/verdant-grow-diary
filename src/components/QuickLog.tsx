@@ -911,22 +911,13 @@ export default function QuickLog({
       ? eventType
       : (prefill?.eventType ?? eventType);
 
-    if (
-      effectiveEventType === "watering" &&
-      !isVerifiedPublicStarterWateringHandoff(prefill, readPublicQuickLogStarterDraft())
-    ) {
-      setSaveError(ORDINARY_LEGACY_WATERING_BLOCKED_COPY);
-      toast.message(ORDINARY_LEGACY_WATERING_BLOCKED_COPY);
-      return;
-    }
-
     if (!user) {
       const message = "Pick a workspace first";
       setSaveError(message);
       toast.error(message);
       return;
     }
-    if (!isSupportedLegacyEventType(eventType)) {
+    if (!isSupportedLegacyEventType(effectiveEventType)) {
       toast.message(UNSUPPORTED_EVENT_TYPE_COPY);
       return;
     }
@@ -943,7 +934,7 @@ export default function QuickLog({
     const saveTarget = Object.freeze({ ...editorTarget.target });
     const saveStage = stage;
     const saveStageWasUserTouched = stageUserTouchedRef.current;
-    const saveEventType = eventType;
+    const saveEventType = effectiveEventType;
     const savePlant = selectedPlant;
     const saveTent = selectedTent;
     const saveGrow = resolvedTargetGrow;
@@ -966,6 +957,14 @@ export default function QuickLog({
         toast.error(message);
         return;
       }
+    }
+    if (
+      saveEventType === "watering" &&
+      !isVerifiedPublicStarterWateringHandoff(prefill, readPublicQuickLogStarterDraft())
+    ) {
+      setSaveError(ORDINARY_LEGACY_WATERING_BLOCKED_COPY);
+      toast.message(ORDINARY_LEGACY_WATERING_BLOCKED_COPY);
+      return;
     }
 
     setInFlightSaveContext(
@@ -1291,6 +1290,15 @@ export default function QuickLog({
           growId={resolvedTarget?.growId ?? null}
           tentId={resolvedTarget?.tentId ?? null}
           plantId={resolvedTarget?.plantId ?? null}
+          externalPersistenceBlockReason={
+            targetQueryPending
+              ? QUICK_LOG_TARGET_BLOCKED_COPY.prefill_target_pending
+              : targetQueryError
+                ? `We couldn't load the ${targetQueryErrorSubject} needed to confirm this Quick Log target.`
+                : editorTargetBlocked && editorTarget.status === "blocked"
+                  ? QUICK_LOG_TARGET_BLOCKED_COPY[editorTarget.reason]
+                  : null
+          }
           plantStage={
             (resolvedTargetPlant as { stage?: unknown } | null)?.stage ?? null
           }

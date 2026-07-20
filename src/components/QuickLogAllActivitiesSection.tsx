@@ -77,6 +77,8 @@ export interface QuickLogAllActivitiesSectionProps {
   isSaveBlocked?: () => boolean;
   /** Parent-owned close/reset seam used before handing Water to Quick Log v2. */
   onBeforeStructuredWaterOpen?: () => void;
+  /** Caller-owned fail-closed reason that must prevent every persistence path. */
+  externalPersistenceBlockReason?: string | null;
 }
 
 export interface QuickLogAllActivitiesSaveTarget {
@@ -140,6 +142,7 @@ export default function QuickLogAllActivitiesSection({
   saveBlocked = false,
   isSaveBlocked,
   onBeforeStructuredWaterOpen,
+  externalPersistenceBlockReason = null,
 }: QuickLogAllActivitiesSectionProps) {
   const currentTarget = useMemo(
     () => buildQuickLogTargetIdentity({ growId, tentId, plantId }),
@@ -229,6 +232,10 @@ export default function QuickLogAllActivitiesSection({
       setErrorForActivity(null);
       setStructuredWaterError(null);
       if (a.id === "watering") {
+        if (externalPersistenceBlockReason) {
+          setStructuredWaterError(externalPersistenceBlockReason);
+          return;
+        }
         if (!growId) {
           setStructuredWaterError("Missing grow context. Nothing opened.");
           return;
@@ -250,6 +257,7 @@ export default function QuickLogAllActivitiesSection({
     },
     [
       currentTarget,
+      externalPersistenceBlockReason,
       growId,
       isMutationBlocked,
       onBeforeStructuredWaterOpen,
@@ -260,6 +268,11 @@ export default function QuickLogAllActivitiesSection({
 
   const handleSave = useCallback(async () => {
     if (isMutationBlocked()) return;
+    if (externalPersistenceBlockReason) {
+      setErrorReason(externalPersistenceBlockReason);
+      setErrorForActivity(selected?.id ?? null);
+      return;
+    }
     if (!selected || !selectedDraft) return;
     // Re-evaluate against CURRENT context immediately before persistence.
     // This is independent of the picker/reset effect so a stale selection
@@ -417,6 +430,7 @@ export default function QuickLogAllActivitiesSection({
     onSaveStart,
     onSaveEnd,
     isMutationBlocked,
+    externalPersistenceBlockReason,
   ]);
 
   const noContext = !growId;
@@ -444,6 +458,17 @@ export default function QuickLogAllActivitiesSection({
           data-testid={`${testIdPrefix}-no-grow`}
         >
           Select a grow to enable Quick Log actions.
+        </p>
+      )}
+
+      {externalPersistenceBlockReason && (
+        <p
+          role="status"
+          aria-live="polite"
+          className="rounded-lg border border-border/60 bg-secondary/30 p-2.5 text-xs text-muted-foreground"
+          data-testid={`${testIdPrefix}-persistence-block`}
+        >
+          {externalPersistenceBlockReason}
         </p>
       )}
 
@@ -640,6 +665,7 @@ export default function QuickLogAllActivitiesSection({
               onClick={handleSave}
               disabled={
                 mutationBlocked ||
+                !!externalPersistenceBlockReason ||
                 noContext ||
                 selectedAvailability?.disabled ||
                 selected.id === "manual_sensor_snapshot" ||

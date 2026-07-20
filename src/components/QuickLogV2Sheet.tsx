@@ -1665,8 +1665,7 @@ export default function QuickLogV2Sheet({
                       feedingSaving ||
                       wateringSaving ||
                       videoChecking ||
-                      (contextBlocked && !wateringRetryPending) ||
-                      (!resolvedTarget.ok && !wateringRetryPending)
+                      (contextBlocked && !wateringRetryPending)
                     }
                     aria-describedby="qlv2-save-helper"
                     data-testid="qlv2-save"

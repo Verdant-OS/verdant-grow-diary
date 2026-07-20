@@ -263,15 +263,17 @@ describe("Landing and Pricing OG/Twitter metadata", () => {
   });
 });
 
-describe("Guide internal links to Customer Guide route", () => {
+describe("Customer Guide route remains available without a misleading public CTA", () => {
   it("Customer Guide path resolves to the real /customer/:shareId route", () => {
     expect(VERDANT_CUSTOMER_GUIDE_PATH.startsWith("/customer/")).toBe(true);
     expect(APP_TSX).toMatch(/path="\/customer\/:shareId"/);
   });
 
-  it("GuidePage and GuidesIndex link to the Customer Guide route", () => {
-    expect(GUIDE_PAGE).toContain("VERDANT_CUSTOMER_GUIDE_PATH");
-    expect(GUIDES_INDEX).toContain("VERDANT_CUSTOMER_GUIDE_PATH");
+  it("GuidePage and GuidesIndex neither import nor reference the placeholder path", () => {
+    expect(GUIDE_PAGE).not.toContain("VERDANT_CUSTOMER_GUIDE_PATH");
+    expect(GUIDES_INDEX).not.toContain("VERDANT_CUSTOMER_GUIDE_PATH");
+    expect(GUIDE_PAGE).not.toMatch(/Start with the Customer Guide/i);
+    expect(GUIDES_INDEX).not.toMatch(/start with the Customer Guide/i);
   });
 
   it("guide pages do not link to protected/private app routes", () => {

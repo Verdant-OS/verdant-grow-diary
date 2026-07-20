@@ -311,6 +311,8 @@ function ToolCard({
   const [onlyChanged, setOnlyChanged] = useState(true);
   const [confirmBeforeRetry, setConfirmBeforeRetry] = useState(true);
   const [retryPending, setRetryPending] = useState(false);
+  const [justApplied, setJustApplied] = useState(false);
+
 
   const run = useCallback(async () => {
     if (invalid) return;

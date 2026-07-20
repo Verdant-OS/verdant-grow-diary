@@ -502,38 +502,64 @@ function ToolCard({
                   </span>
                 )}
               </div>
-              {onApplyArgs && changed.length > 0 && state.args ? (
-                <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                {state.args ? (
                   <Button
                     type="button"
                     size="sm"
                     variant="outline"
-                    onClick={() => {
-                      onApplyArgs(state.args!);
-                      setJustApplied(true);
+                    onClick={async () => {
+                      const json = JSON.stringify(state.args, null, 2);
+                      try {
+                        await navigator.clipboard.writeText(json);
+                      } catch {
+                        // clipboard may be unavailable (insecure context, denied
+                        // permission); fall through so the button still confirms
+                        // to the user rather than throwing.
+                      }
+                      setCopiedArgs(true);
+                      window.setTimeout(() => setCopiedArgs(false), 1500);
                     }}
-                    data-testid={`tool-explorer-apply-changes-${toolName}`}
-                    aria-label="Apply changed values to the form for retry"
+                    data-testid={`tool-explorer-copy-args-${toolName}`}
+                    aria-label="Copy the current request arguments as JSON"
                   >
-                    Apply changes to form
+                    {copiedArgs ? "Copied" : "Copy applied args as JSON"}
                   </Button>
-                  {justApplied ? (
+                ) : null}
+                {onApplyArgs && changed.length > 0 && state.args ? (
+                  <>
                     <Button
                       type="button"
                       size="sm"
-                      onClick={requestRetry}
-                      disabled={state.loading || invalid || !connected || retryPending}
-                      aria-haspopup={confirmBeforeRetry ? "dialog" : undefined}
-                      aria-expanded={retryPending || undefined}
-                      data-testid={`tool-explorer-retry-now-${toolName}`}
-                      aria-label="Retry now with the applied values"
+                      variant="outline"
+                      onClick={() => {
+                        onApplyArgs(state.args!);
+                        setJustApplied(true);
+                      }}
+                      data-testid={`tool-explorer-apply-changes-${toolName}`}
+                      aria-label="Apply changed values to the form for retry"
                     >
-                      <RotateCcw className="mr-2 h-4 w-4" aria-hidden />
-                      Retry now
+                      Apply changes to form
                     </Button>
-                  ) : null}
-                </div>
-              ) : null}
+                    {justApplied ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={requestRetry}
+                        disabled={state.loading || invalid || !connected || retryPending}
+                        aria-haspopup={confirmBeforeRetry ? "dialog" : undefined}
+                        aria-expanded={retryPending || undefined}
+                        data-testid={`tool-explorer-retry-now-${toolName}`}
+                        aria-label="Retry now with the applied values"
+                      >
+                        <RotateCcw className="mr-2 h-4 w-4" aria-hidden />
+                        Retry now
+                      </Button>
+                    ) : null}
+                  </>
+                ) : null}
+              </div>
+
 
             </div>
 

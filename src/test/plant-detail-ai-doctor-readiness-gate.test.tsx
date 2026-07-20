@@ -37,6 +37,14 @@ vi.mock("@/hooks/useTimelineMemory", () => ({
   TIMELINE_MEMORY_DEFAULT_LIMIT: 60,
   useTimelineMemory: () => ({ items: mockTimelineItems, isLoading: false }),
 }));
+vi.mock("@/hooks/useRootZoneObservations", () => ({
+  useRootZoneObservations: () => ({
+    observations: [],
+    isLoading: false,
+    isFetching: false,
+    isError: false,
+  }),
+}));
 
 const PLANT = {
   id: "p1",
@@ -73,17 +81,13 @@ describe("PlantDetailAiDoctorReadinessGate — render", () => {
     renderGate();
     const gate = screen.getByTestId("plant-ai-doctor-readiness-gate");
     expect(gate.getAttribute("data-readiness")).toBe("insufficient");
-    expect(
-      screen.getByTestId("plant-ai-doctor-readiness-gate-message").textContent,
-    ).toBe("More context needed before AI Doctor should give confident guidance.");
-    const primary = screen.getByTestId(
-      "ai-doctor-readiness-gate-primary-add-context",
+    expect(screen.getByTestId("plant-ai-doctor-readiness-gate-message").textContent).toBe(
+      "More context needed before AI Doctor should give confident guidance.",
     );
+    const primary = screen.getByTestId("ai-doctor-readiness-gate-primary-add-context");
     expect(primary.textContent).toBe("Add missing context");
     expect(primary.getAttribute("data-action-kind")).toBe("focus_anchor");
-    expect(primary.getAttribute("data-anchor-id")).toBe(
-      "plant-ai-doctor-context-panel",
-    );
+    expect(primary.getAttribute("data-anchor-id")).toBe("plant-ai-doctor-context-panel");
   });
 
   it("strong: shows ready copy + cautious review primary + hides quick actions", () => {
@@ -100,24 +104,18 @@ describe("PlantDetailAiDoctorReadinessGate — render", () => {
     renderGate();
     const gate = screen.getByTestId("plant-ai-doctor-readiness-gate");
     expect(gate.getAttribute("data-readiness")).toBe("strong");
-    expect(
-      screen.getByTestId("plant-ai-doctor-readiness-gate-message").textContent,
-    ).toBe("Ready for a cautious AI Doctor review.");
-    expect(
-      screen.getByTestId("ai-doctor-readiness-gate-primary-open-review"),
-    ).toBeTruthy();
+    expect(screen.getByTestId("plant-ai-doctor-readiness-gate-message").textContent).toBe(
+      "Ready for a cautious AI Doctor review.",
+    );
+    expect(screen.getByTestId("ai-doctor-readiness-gate-primary-open-review")).toBeTruthy();
     // Quick actions hidden in strong.
-    expect(
-      screen.queryByTestId("plant-ai-doctor-readiness-gate-quick-actions"),
-    ).toBeNull();
+    expect(screen.queryByTestId("plant-ai-doctor-readiness-gate-quick-actions")).toBeNull();
   });
 
   it("preserves plant/grow/tent scope in quick-action event payloads", () => {
     mockTimelineItems = [];
     renderGate();
-    const addNote = screen.getByTestId(
-      "ai-doctor-context-quick-action-add-recent-log",
-    );
+    const addNote = screen.getByTestId("ai-doctor-context-quick-action-add-recent-log");
     // The quick-action button must exist; scoping is enforced by the
     // quick-actions view-model whose own tests cover payload contents.
     expect(addNote).toBeTruthy();

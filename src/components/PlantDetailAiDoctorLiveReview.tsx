@@ -22,6 +22,7 @@ import {
   evaluateAiDoctorContextFromSources,
   type AiDoctorContextPlantSource,
 } from "@/lib/aiDoctorContextViewModel";
+import type { AiDoctorContextReadiness } from "@/lib/aiDoctorContextRules";
 import {
   AI_DOCTOR_REVIEW_PACKET_CSV_ROW_CAP,
   AI_DOCTOR_REVIEW_PACKET_ROOT_ZONE_CAP,
@@ -123,6 +124,8 @@ interface AcceptedAiDoctorReviewRequest {
   sensorClassification: Classification | null;
   evidenceAcceptance: AiDoctorReviewEvidenceAcceptance;
   mode: "standard" | "historical_review";
+  readiness: AiDoctorContextReadiness;
+  includedRootZoneHistory: boolean;
   confidenceCopy: string;
   omittedImportedHistory: boolean;
   omittedRootZoneHistory: boolean;
@@ -226,8 +229,9 @@ function PlantDetailAiDoctorLiveReviewScope({
       evaluateAiDoctorContextFromSources({
         plant,
         timelineItems: items,
+        rootZoneObservations: queryRootZoneObservations,
       }),
-    [plant, items],
+    [plant, items, queryRootZoneObservations],
   );
 
   // Row-level, provenance-aware classification. The ingest audit only knows
@@ -386,16 +390,17 @@ function PlantDetailAiDoctorLiveReviewScope({
 
   const { entitlement } = useMyEntitlements();
   const canRetryReview = canRetryAiDoctorLiveReviewFailure(review.reason);
-  // Preserve the pre-existing same-scope safety gate for ordinary reviews:
-  // if their current context disappears before display, the result stays
-  // hidden. A frozen historical or explicitly omitted request remains
-  // explainable because its accepted evidence decision is still visible.
+  // Preserve the existing same-scope guard when unrelated plant/timeline
+  // context disappears. The narrow exception is a request that was accepted
+  // with root-zone history: a later background refresh cannot hide that
+  // already-started paid request while its frozen packet is still in flight.
   const activeReviewVisible =
     activeReviewRequest !== null &&
     (allowed ||
       activeReviewRequest.mode === "historical_review" ||
       activeReviewRequest.omittedImportedHistory ||
-      activeReviewRequest.omittedRootZoneHistory);
+      activeReviewRequest.omittedRootZoneHistory ||
+      (activeReviewRequest.includedRootZoneHistory && queryRootZoneRecovery.blocksReview));
 
   // If a background/refocus refetch succeeds before the grower starts, the
   // earlier omission choice is no longer relevant. Once a review has begun,
@@ -546,6 +551,8 @@ function PlantDetailAiDoctorLiveReviewScope({
       sensorClassification: acceptedSensorClassification,
       evidenceAcceptance: acceptedEvidenceAcceptance,
       mode: acceptedMode,
+      readiness: context.readiness,
+      includedRootZoneHistory: queryRootZoneObservations.length > 0,
       confidenceCopy: candidateConfidenceCopy,
       omittedImportedHistory: historyRecovery.state === "omitted_by_choice",
       omittedRootZoneHistory: rootZoneRecovery.state === "omitted_by_choice",
@@ -565,7 +572,7 @@ function PlantDetailAiDoctorLiveReviewScope({
     <section
       aria-labelledby="plant-ai-doctor-live-review-heading"
       data-testid="plant-ai-doctor-live-review"
-      data-readiness={context.readiness}
+      data-readiness={activeReviewRequest?.readiness ?? context.readiness}
       data-review-mode={activeReviewRequest?.mode ?? eligibility.mode}
       data-status={review.status}
       data-history-recovery-state={historyRecovery.state}

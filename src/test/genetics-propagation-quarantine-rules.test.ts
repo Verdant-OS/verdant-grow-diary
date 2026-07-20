@@ -29,7 +29,7 @@ describe("quarantine clearance preview (advisory mirror of the RPC)", () => {
   it("requires a qualifying negative", () => {
     const r = evaluateRelease(episode, []);
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.reason).toBe("no_qualifying_negative");
+    if (r.ok === false) expect(r.reason).toBe("no_qualifying_negative");
   });
 
   it("will not clear from another subject's certificate", () => {
@@ -61,7 +61,7 @@ describe("quarantine clearance preview (advisory mirror of the RPC)", () => {
       { id: "s3", subjectType: "plant", subjectId: "plant-1", target: "HLVd", result: "inconclusive", collectedDate: "2026-07-14" },
     ]);
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.reason).toBe("contradicting_or_newer_evidence");
+    if (r.ok === false) expect(r.reason).toBe("contradicting_or_newer_evidence");
   });
 
   it("clears with a current, matching, uncontradicted negative", () => {

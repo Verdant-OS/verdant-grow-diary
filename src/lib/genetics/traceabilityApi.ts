@@ -12,6 +12,7 @@
  */
 import { supabase } from "@/integrations/supabase/client";
 import { geneticsTraceabilityDb } from "@/integrations/supabase/geneticsTraceabilityTables";
+import type { Json } from "@/integrations/supabase/types";
 
 export type MutationResult<T = Record<string, unknown>> =
   | { ok: true; data: T; reused: boolean }
@@ -236,7 +237,7 @@ export async function upsertAccession(
 ): Promise<MutationResult> {
   const { data, error } = await geneticsTraceabilityDb.rpc("genetics_accession_upsert", {
     p_idempotency_key: idempotencyKey,
-    p_payload: payload,
+    p_payload: payload as Json,
   });
   return envelopeToResult(data, error);
 }
@@ -260,7 +261,7 @@ export async function upsertBatch(
 ): Promise<MutationResult> {
   const { data, error } = await geneticsTraceabilityDb.rpc("genetics_batch_upsert", {
     p_idempotency_key: idempotencyKey,
-    p_payload: payload,
+    p_payload: payload as Json,
   });
   return envelopeToResult(data, error);
 }
@@ -286,7 +287,7 @@ export async function recordScreening(
 ): Promise<MutationResult> {
   const { data, error } = await geneticsTraceabilityDb.rpc("genetics_screening_record", {
     p_idempotency_key: idempotencyKey,
-    p_payload: payload,
+    p_payload: payload as Json,
   });
   return envelopeToResult(data, error);
 }
@@ -297,7 +298,7 @@ export async function openQuarantine(
 ): Promise<MutationResult> {
   const { data, error } = await geneticsTraceabilityDb.rpc("genetics_quarantine_open", {
     p_idempotency_key: idempotencyKey,
-    p_payload: payload,
+    p_payload: payload as Json,
   });
   return envelopeToResult(data, error);
 }

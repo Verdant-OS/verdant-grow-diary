@@ -1053,12 +1053,17 @@ export default function McpToolExplorer() {
             : []),
         ]}
         onApplyArgs={(args) => {
-          setGrowId(typeof args.growId === "string" ? args.growId : "");
-          setDiaryLimit(
-            args.limit === undefined || args.limit === null ? "" : String(args.limit),
-          );
+          const nextGrowId = typeof args.growId === "string" ? args.growId : "";
+          const nextDiaryLimit =
+            args.limit === undefined || args.limit === null ? "" : String(args.limit);
+          setGrowId(nextGrowId);
+          setDiaryLimit(nextDiaryLimit);
           setGrowIdTouched(true);
           setDiaryLimitTouched(true);
+          saveLastValidInputs("list_recent_diary_entries", {
+            growId: nextGrowId,
+            diaryLimit: nextDiaryLimit,
+          });
         }}
         buildArgs={() => {
           const args: Record<string, unknown> = { growId: growId.trim() };

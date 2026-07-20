@@ -9,11 +9,11 @@
  * can never mask a real drift.
  */
 import { describe, expect, it } from "vitest";
-// @ts-expect-error — plain .mjs module, no types
 import {
   extractHead,
   checkRouteHead,
 } from "../../scripts/validate-static-route-head-fidelity.mjs";
+
 
 const FIXTURE_META = {
   title: "Pricing — Free, Pro & Founder Lifetime | Verdant Grow Diary",

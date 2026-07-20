@@ -25,11 +25,11 @@ import {
   STATIC_PUBLIC_SEO_DOCUMENTS,
   VERDANT_SITE_ORIGIN,
 } from "@/lib/build/staticPublicSeoDocuments";
-// @ts-expect-error — plain .mjs config module, no types
 import {
   SITEMAP_ONLY_ROUTES,
   STATIC_ONLY_ROUTES,
 } from "../../scripts/public-route-parity.config.mjs";
+
 
 const REPO = resolve(__dirname, "../..");
 const SITEMAP = readFileSync(resolve(REPO, "public/sitemap.xml"), "utf8");

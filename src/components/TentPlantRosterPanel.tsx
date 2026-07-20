@@ -259,12 +259,14 @@ export default function TentPlantRosterPanel({
                     </span>
                   )}
                 </div>
-                <p
-                  className="mt-2 text-[11px] text-muted-foreground"
-                  data-testid={`tent-plant-roster-row-${row.id}-harvest-watch`}
-                >
-                  {row.harvestWatchPublicState ?? row.harvestWatchFallbackCopy}
-                </p>
+                {row.harvestWatchAvailable && (
+                  <p
+                    className="mt-2 text-[11px] text-muted-foreground"
+                    data-testid={`tent-plant-roster-row-${row.id}-harvest-watch`}
+                  >
+                    {row.harvestWatchPublicState ?? row.harvestWatchFallbackCopy}
+                  </p>
+                )}
                 <div className="mt-3 flex items-center justify-between gap-2">
                   <Link
                     to={row.plantDetailHref}

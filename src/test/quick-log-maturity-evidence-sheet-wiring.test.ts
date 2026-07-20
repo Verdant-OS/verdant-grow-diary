@@ -13,7 +13,9 @@ describe("Quick Log maturity evidence sheet wiring", () => {
     const text = source();
 
     expect(text).toContain("QuickLogMaturityEvidenceFields");
-    expect(text).toContain('form.action !== "feed" && resolvedTarget.ok && resolvedTarget.targetType === "plant"');
+    expect(text).toContain(
+      'form.action !== "feed" && resolvedTarget.ok && resolvedTarget.targetType === "plant"',
+    );
     expect(text).toContain("visible={showMaturityEvidence}");
   });
 
@@ -22,7 +24,9 @@ describe("Quick Log maturity evidence sheet wiring", () => {
 
     expect(text).toContain("buildQuickLogMaturityEvidenceDetails");
     expect(text).toContain("quickLogMaturityEvidenceReasonToMessage");
-    expect(text).toContain("details: maturityEvidence.details");
+    expect(text).toContain("maturityDetails = maturityEvidence.details");
+    expect(text).toContain("baseDetails: maturityDetails");
+    expect(text).toContain("details: maturityDetails");
   });
 
   it("resets maturity evidence with the Quick Log sheet session", () => {

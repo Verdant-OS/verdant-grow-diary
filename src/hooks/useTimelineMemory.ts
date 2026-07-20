@@ -30,12 +30,30 @@ import type {
 import { deriveSensorEvidenceMode } from "@/lib/aiDoctorSessionPersistence";
 import { isQuickLogCompanionDiaryRow } from "@/lib/quick-log/quickLogDiaryCompanionRules";
 import { buildEarlyStageTimelineViewModel } from "@/lib/earlyStageTimelineViewModel";
-
+import {
+  attachQuickLogCompanionSnapshots,
+  buildTimelineMemoryDisplayItems,
+  selectQuickLogCompanionLinkedGrowEventIds,
+  type QuickLogCompanionSnapshotDiaryRow,
+} from "@/lib/quickLogCompanionSnapshotReadModel";
+import {
+  partitionQuickLogRows,
+  type RawGrowEventRow,
+} from "@/lib/quickLogGroupedTimelineRowAdapter";
+import {
+  groupQuickLogTimelineEntries,
+  type QuickLogTimelineEntry,
+} from "@/lib/quickLogTimelineGroupingViewModel";
+import {
+  buildQuickLogGroupedTimelineQueryOptions,
+  QUICK_LOG_GROUPED_TIMELINE_DEFAULT_LIMIT,
+  type QuickLogGroupedTimelineScope,
+} from "@/hooks/useQuickLogGroupedTimeline";
 
 export const TIMELINE_MEMORY_DEFAULT_LIMIT = 100;
 
 export type TimelineMemoryScope =
-  | { kind: "plant"; plantId: string }
+  | { kind: "plant"; plantId: string; tentId?: string | null }
   | { kind: "tent"; tentId: string };
 
 function readEventType(details: unknown): string | null {
@@ -85,9 +103,7 @@ function diaryRowToDiaryItem(
   };
 }
 
-function rowToManualSnapshotItem(
-  row: ManualSnapshotDiaryRow,
-): TimelineManualSnapshotItem | null {
+function rowToManualSnapshotItem(row: ManualSnapshotDiaryRow): TimelineManualSnapshotItem | null {
   const rec = diaryRowToManualSnapshotRecord(row);
   if (!rec) return null;
   const card: ManualSnapshotTimelineCard = buildManualSnapshotTimelineCard(rec);
@@ -103,10 +119,7 @@ interface RawRow extends ManualSnapshotDiaryRow {
   photo_url: string | null;
 }
 
-async function fetchRows(
-  scope: TimelineMemoryScope,
-  limit: number,
-): Promise<RawRow[]> {
+async function fetchRows(scope: TimelineMemoryScope, limit: number): Promise<RawRow[]> {
   let q = supabase
     .from("diary_entries")
     .select("id, plant_id, tent_id, entry_at, note, photo_url, details");
@@ -116,16 +129,75 @@ async function fetchRows(
   return (data ?? []) as RawRow[];
 }
 
+async function fetchQuickLogCompanionRows(
+  scope: TimelineMemoryScope,
+  limit: number,
+): Promise<{ rows: QuickLogCompanionSnapshotDiaryRow[]; unavailable: boolean }> {
+  try {
+    let q = supabase
+      .from("diary_entries")
+      .select("id, plant_id, tent_id, entry_at, note, photo_url, details")
+      .not("details->>linked_grow_event_id" as never, "is", null);
+    if (scope.kind === "plant") {
+      q =
+        scope.tentId && scope.tentId.length > 0
+          ? q.or(`plant_id.eq.${scope.plantId},and(plant_id.is.null,tent_id.eq.${scope.tentId})`)
+          : q.eq("plant_id", scope.plantId);
+    } else {
+      q = q.eq("tent_id", scope.tentId);
+    }
+    const { data, error } = await q.order("entry_at", { ascending: false }).limit(limit);
+    if (error) return { rows: [], unavailable: true };
+    return {
+      rows: (data ?? []) as unknown as QuickLogCompanionSnapshotDiaryRow[],
+      unavailable: false,
+    };
+  } catch {
+    return { rows: [], unavailable: true };
+  }
+}
+
+async function fetchQuickLogParentRows(
+  scope: TimelineMemoryScope,
+  linkedGrowEventIds: ReadonlyArray<string>,
+): Promise<{ rows: RawGrowEventRow[]; unavailable: boolean }> {
+  if (linkedGrowEventIds.length === 0) return { rows: [], unavailable: false };
+  try {
+    let q = supabase
+      .from("grow_events")
+      .select("id, plant_id, tent_id, occurred_at, event_type, source, note, is_deleted")
+      .eq("source", "manual")
+      .eq("is_deleted", false)
+      .in("event_type", ["watering", "observation"])
+      .in("id", [...linkedGrowEventIds]);
+    if (scope.kind === "plant") {
+      q =
+        scope.tentId && scope.tentId.length > 0
+          ? q.or(`plant_id.eq.${scope.plantId},and(plant_id.is.null,tent_id.eq.${scope.tentId})`)
+          : q.eq("plant_id", scope.plantId);
+    } else {
+      q = q.eq("tent_id", scope.tentId);
+    }
+    const { data, error } = await q
+      .order("occurred_at", { ascending: false })
+      .limit(linkedGrowEventIds.length);
+    if (error) return { rows: [], unavailable: true };
+    return {
+      rows: (data ?? []) as unknown as RawGrowEventRow[],
+      unavailable: false,
+    };
+  } catch {
+    return { rows: [], unavailable: true };
+  }
+}
+
 interface AiDoctorAuditRow {
   id: string;
   created_at: string;
-  sensor_snapshot_status:
-    | "usable" | "stale" | "invalid" | "needs_review" | "no_data"
-    | null;
+  sensor_snapshot_status: "usable" | "stale" | "invalid" | "needs_review" | "no_data" | null;
   sensor_snapshot_reason_code: string | null;
   counts_as_healthy_evidence: boolean | null;
-  sensor_evidence_mode:
-    | "healthy" | "cautionary" | "unsafe" | "missing" | null;
+  sensor_evidence_mode: "healthy" | "cautionary" | "unsafe" | "missing" | null;
   sensor_evidence_evaluated_at: string | null;
 }
 
@@ -139,13 +211,9 @@ async function fetchAiDoctorAuditRows(
       .select(
         "id,created_at,sensor_snapshot_status,sensor_snapshot_reason_code,counts_as_healthy_evidence,sensor_evidence_mode,sensor_evidence_evaluated_at",
       );
-    q = scope.kind === "plant"
-      ? q.eq("plant_id", scope.plantId)
-      : q.eq("tent_id", scope.tentId);
+    q = scope.kind === "plant" ? q.eq("plant_id", scope.plantId) : q.eq("tent_id", scope.tentId);
     q = q.not("sensor_snapshot_status", "is", null);
-    const { data, error } = await q
-      .order("created_at", { ascending: false })
-      .limit(limit);
+    const { data, error } = await q.order("created_at", { ascending: false }).limit(limit);
     if (error) return [];
     return (data ?? []) as unknown as AiDoctorAuditRow[];
   } catch {
@@ -153,9 +221,7 @@ async function fetchAiDoctorAuditRows(
   }
 }
 
-function auditRowToTimelineItem(
-  row: AiDoctorAuditRow,
-): TimelineAiDoctorEvidenceItem | null {
+function auditRowToTimelineItem(row: AiDoctorAuditRow): TimelineAiDoctorEvidenceItem | null {
   const status = row.sensor_snapshot_status;
   if (!status) return null;
   const mode = row.sensor_evidence_mode ?? deriveSensorEvidenceMode(status);
@@ -171,7 +237,18 @@ function auditRowToTimelineItem(
 }
 
 export interface UseTimelineMemoryResult {
+  /** Complete evidence/readiness input, including exact-linked companions. */
   items: TimelineMemoryItem[];
+  /**
+   * Visible Timeline Memory rows. Exact-linked companions are removed only
+   * while QuickLogGroupedTimelineSection owns their canonical visible card.
+   * Optional only so older test doubles remain source-compatible.
+   */
+  displayItems?: TimelineMemoryItem[];
+  /** Exact-linked manual companions, exposed for ownership-aware presenters. */
+  companionItems?: TimelineManualSnapshotItem[];
+  /** A linked row existed, but its companion/parent verification read failed. */
+  companionEvidenceUnavailable?: boolean;
   isLoading: boolean;
   isError: boolean;
   error: unknown;
@@ -182,23 +259,57 @@ export function useTimelineMemory(
   scope: TimelineMemoryScope | null,
   limit: number = TIMELINE_MEMORY_DEFAULT_LIMIT,
 ): UseTimelineMemoryResult {
+  const groupedScope: QuickLogGroupedTimelineScope | null =
+    scope?.kind === "plant"
+      ? { kind: "plant", plantId: scope.plantId, tentId: scope.tentId ?? null }
+      : scope?.kind === "tent"
+        ? { kind: "tent", tentId: scope.tentId }
+        : null;
+  // Observe the canonical grouped-timeline cache without starting another
+  // request. When the sibling grouped section owns a companion card, hide the
+  // duplicate here. When that reader fails or is absent, keep the manual card
+  // visible so valid evidence never disappears between independent reads.
+  const groupedTimeline = useQuery<QuickLogTimelineEntry[]>({
+    ...buildQuickLogGroupedTimelineQueryOptions(
+      groupedScope,
+      QUICK_LOG_GROUPED_TIMELINE_DEFAULT_LIMIT,
+    ),
+    enabled: false,
+  });
   const query = useQuery({
     queryKey: [
       "timeline_memory",
       scope?.kind ?? "none",
       scope?.kind === "plant" ? scope.plantId : null,
+      scope?.kind === "plant" ? (scope.tentId ?? null) : null,
       scope?.kind === "tent" ? scope.tentId : null,
       limit,
     ],
     enabled: scope !== null,
-    queryFn: async (): Promise<TimelineMemoryItem[]> => {
-      if (!scope) return [];
-      const [rows, auditRows] = await Promise.all([
+    queryFn: async (): Promise<{
+      items: TimelineMemoryItem[];
+      displayItems: TimelineMemoryItem[];
+      companionItems: TimelineManualSnapshotItem[];
+      companionEvidenceUnavailable: boolean;
+    }> => {
+      if (!scope) {
+        return {
+          items: [],
+          displayItems: [],
+          companionItems: [],
+          companionEvidenceUnavailable: false,
+        };
+      }
+      const [rows, auditRows, companionResult] = await Promise.all([
         fetchRows(scope, limit),
         fetchAiDoctorAuditRows(scope, limit),
+        fetchQuickLogCompanionRows(scope, limit),
       ]);
-
-      const out: TimelineMemoryItem[] = [];
+      const linkedGrowEventIds = selectQuickLogCompanionLinkedGrowEventIds(companionResult.rows);
+      const parentResult = companionResult.unavailable
+        ? { rows: [] as RawGrowEventRow[], unavailable: false }
+        : await fetchQuickLogParentRows(scope, linkedGrowEventIds);
+      const displayItems: TimelineMemoryItem[] = [];
       for (const row of rows) {
         // Quick Log v1 companion rows duplicate a grow_event already
         // rendered by QuickLogGroupedTimelineSection. Skip them here so
@@ -207,28 +318,67 @@ export function useTimelineMemory(
         if (isQuickLogCompanionDiaryRow(row)) continue;
         const snap = rowToManualSnapshotItem(row);
         if (snap) {
-          out.push(snap);
+          displayItems.push(snap);
         } else {
-          out.push(diaryRowToDiaryItem(row));
+          displayItems.push(diaryRowToDiaryItem(row));
         }
       }
 
       for (const row of auditRows) {
         const item = auditRowToTimelineItem(row);
-        if (item) out.push(item);
+        if (item) displayItems.push(item);
       }
-      // Deterministic occurredAt desc, then by key for ties.
-      out.sort((a, b) => {
-        if (a.occurredAt > b.occurredAt) return -1;
-        if (a.occurredAt < b.occurredAt) return 1;
-        if (a.kind !== b.kind) return a.kind < b.kind ? -1 : 1;
-        return a.key < b.key ? -1 : a.key > b.key ? 1 : 0;
+
+      const { actions } = partitionQuickLogRows(parentResult.rows);
+      const quickLogScope =
+        scope.kind === "plant"
+          ? ({ kind: "plant", plantId: scope.plantId, tentId: scope.tentId ?? null } as const)
+          : ({ kind: "tent", tentId: scope.tentId } as const);
+      const actionEntries = groupQuickLogTimelineEntries({
+        actions,
+        environmentRows: [],
+        scope: quickLogScope,
       });
-      return out;
+      const { companionItems, verifiedLinkedGrowEventIds } = attachQuickLogCompanionSnapshots(
+        actionEntries,
+        companionResult.rows,
+        quickLogScope,
+        actions,
+      );
+      const verifiedParentIds = new Set(verifiedLinkedGrowEventIds);
+      const companionEvidenceUnavailable =
+        companionResult.unavailable ||
+        parentResult.unavailable ||
+        linkedGrowEventIds.some((id) => !verifiedParentIds.has(id));
+
+      const sortItems = (values: TimelineMemoryItem[]): TimelineMemoryItem[] =>
+        values.sort((a, b) => {
+          if (a.occurredAt > b.occurredAt) return -1;
+          if (a.occurredAt < b.occurredAt) return 1;
+          if (a.kind !== b.kind) return a.kind < b.kind ? -1 : 1;
+          return a.key < b.key ? -1 : a.key > b.key ? 1 : 0;
+        });
+
+      sortItems(displayItems);
+      return {
+        items: sortItems([...displayItems, ...companionItems]),
+        displayItems,
+        companionItems,
+        companionEvidenceUnavailable,
+      };
     },
   });
+  const baseDisplayItems = query.data?.displayItems ?? [];
+  const companionItems = query.data?.companionItems ?? [];
   return {
-    items: query.data ?? [],
+    items: query.data?.items ?? [],
+    displayItems: buildTimelineMemoryDisplayItems(
+      baseDisplayItems,
+      companionItems,
+      groupedTimeline.data ?? [],
+    ),
+    companionItems,
+    companionEvidenceUnavailable: query.data?.companionEvidenceUnavailable ?? false,
     isLoading: query.isLoading,
     isError: query.isError,
     error: query.error,

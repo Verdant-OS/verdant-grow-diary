@@ -19,6 +19,11 @@ export interface AiCreditLimitNoticeProps {
   surface?: AiCreditLimitNoticeSurface;
   /** Optional same-origin route to restore after a confirmed checkout. */
   returnTo?: string | null;
+  /**
+   * Optional explicit intent callback for the rendered Free-plan CTA only.
+   * It is intentionally never attached to paid/founder/unknown notices.
+   */
+  onUpsellCtaClick?: () => void;
   "data-testid"?: string;
 }
 
@@ -27,6 +32,7 @@ export default function AiCreditLimitNotice({
   currentPlanLabel,
   surface,
   returnTo,
+  onUpsellCtaClick,
   ...rest
 }: AiCreditLimitNoticeProps) {
   const testId = rest["data-testid"] ?? "ai-credit-limit-notice";
@@ -57,7 +63,11 @@ export default function AiCreditLimitNotice({
           </h3>
           <p className="mt-1 text-sm text-muted-foreground">{vm.body}</p>
         </header>
-        <PaywallCta vm={vm.paywallVm} data-testid={`${testId}-paywall`} />
+        <PaywallCta
+          vm={vm.paywallVm}
+          data-testid={`${testId}-paywall`}
+          onPrimaryCtaClick={onUpsellCtaClick}
+        />
       </section>
     );
   }

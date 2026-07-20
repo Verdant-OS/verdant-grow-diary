@@ -16,6 +16,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { readMobileGrowerNavigationSource } from "@/test/utils/growerNavigationSource";
 import {
   DAILY_GROW_CHECK_STEPS,
   INITIAL_DAILY_GROW_CHECK_STATE,
@@ -295,7 +296,7 @@ describe("DailyCheck — completion screen polish", () => {
 });
 
 const GROW_ROOM = read("src/pages/GrowRoomMode.tsx");
-const MOBILE_NAV = read("src/components/MobileNav.tsx");
+const MOBILE_NAV = readMobileGrowerNavigationSource();
 
 describe("Daily Grow Check entry access — multi-surface", () => {
   it("GrowRoomMode (Live Dashboard) exposes a Start Check entry", () => {

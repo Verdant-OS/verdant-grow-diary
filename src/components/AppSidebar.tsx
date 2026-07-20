@@ -17,8 +17,21 @@ import {
   Users,
   HelpCircle,
   Dna,
+  ChevronRight,
+  FlaskConical,
+  GitFork,
+  History,
+  PlugZap,
   type LucideIcon,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Sidebar,
   SidebarContent,
@@ -35,25 +48,52 @@ import { cn } from "@/lib/utils";
 import BrandLogo from "@/components/BrandLogo";
 import OperatorModeLink from "@/components/OperatorModeLink";
 import { useHasRole } from "@/hooks/useHasRole";
+import { isNavigationItemActive, type NavigationActiveRule } from "@/lib/navigationActiveRules";
 import {
-  isNavigationItemActive,
-  type NavigationActiveRule,
-} from "@/lib/navigationActiveRules";
+  LABS_NAVIGATION_DESTINATIONS,
+  type LabsNavigationDestinationId,
+} from "@/lib/growerNavigationRules";
 
 interface NavItem extends NavigationActiveRule {
   label: string;
   icon: LucideIcon;
 }
 
+interface NavSubmenu {
+  label: string;
+  icon: LucideIcon;
+  items: NavItem[];
+}
+
+interface NavGroup {
+  label: string;
+  items: NavItem[];
+  submenu?: NavSubmenu;
+}
+
+const labsIcons: Record<LabsNavigationDestinationId, LucideIcon> = {
+  phenoHunt: Dna,
+  breedingPrograms: GitFork,
+  lineageRepair: Wrench,
+  agentIntegrations: PlugZap,
+  aiSessions: History,
+};
+
+const labsItems: NavItem[] = LABS_NAVIGATION_DESTINATIONS.map((item) => ({
+  ...item,
+  icon: labsIcons[item.id],
+}));
+
 /**
  * UI Simplification Slice 1 — Grower-facing groups.
  *
  * The One-Tent Loop spine (Today → Cultivation → Daily → Insight) is the
- * shape of the sidebar. Advanced/Account hold lower-frequency tools.
+ * shape of the sidebar. More/Account hold lower-frequency tools, while
+ * advanced authenticated destinations stay behind the Labs disclosure in More.
  * Operator/internal surfaces live in the separate `operatorGroups` block
  * below, which is rendered ONLY when `useHasRole("operator")` is granted.
  */
-const growerGroups: { label: string; items: NavItem[] }[] = [
+const growerGroups: NavGroup[] = [
   {
     label: "Today",
     items: [
@@ -92,19 +132,17 @@ const growerGroups: { label: string; items: NavItem[] }[] = [
         excludedPaths: ["/sensors/ecowitt-audit"],
       },
       { to: "/doctor", label: "AI Doctor", icon: Stethoscope },
+      { to: "/reports", label: "Reports", icon: LineChart },
     ],
   },
   {
-    label: "Advanced",
-    items: [
-      { to: "/reports", label: "Reports", icon: LineChart },
-      { to: "/grows", label: "My Grows", icon: Sprout },
-      { to: "/pheno-hunts", label: "Pheno Hunt", icon: Dna },
-      // /grow-lineage is manifest access "auth" (grower-facing repair tool).
-      // Owner-scoped reads/writes only, RLS-protected. MUST stay visible to
-      // every authenticated grower — do not gate behind operator role.
-      { to: "/grow-lineage", label: "Lineage Repair", icon: Wrench },
-    ],
+    label: "More",
+    items: [{ to: "/grows", label: "My Grows", icon: Sprout }],
+    submenu: {
+      label: "Labs",
+      icon: FlaskConical,
+      items: labsItems,
+    },
   },
   {
     label: "Account",
@@ -142,8 +180,11 @@ export default function AppSidebar() {
   const operatorRole = useHasRole("operator");
   const isOperator = operatorRole.status === "granted";
 
-  const renderGroup = (g: { label: string; items: NavItem[] }) => {
-    if (g.items.length === 0) return null;
+  const renderGroup = (g: NavGroup) => {
+    if (g.items.length === 0 && !g.submenu) return null;
+    const submenuActive =
+      g.submenu?.items.some((item) => isNavigationItemActive(pathname, item)) ?? false;
+
     return (
       <SidebarGroup key={g.label}>
         {!collapsed && (
@@ -168,6 +209,48 @@ export default function AppSidebar() {
                 </SidebarMenuItem>
               );
             })}
+            {g.submenu && (
+              <SidebarMenuItem>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <SidebarMenuButton
+                      isActive={submenuActive}
+                      aria-label={`Open ${g.submenu.label}`}
+                      title={g.submenu.label}
+                      className="gap-2.5"
+                    >
+                      <g.submenu.icon className="h-4 w-4 shrink-0" />
+                      <span className="truncate">{g.submenu.label}</span>
+                      <ChevronRight className="ml-auto h-4 w-4 shrink-0" aria-hidden="true" />
+                    </SidebarMenuButton>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    side="right"
+                    align="start"
+                    aria-label={g.submenu.label}
+                    className="w-56"
+                  >
+                    <DropdownMenuLabel>{g.submenu.label}</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {g.submenu.items.map((item) => {
+                      const active = isNavigationItemActive(pathname, item);
+                      return (
+                        <DropdownMenuItem key={item.to} asChild>
+                          <Link
+                            to={item.to}
+                            aria-current={active ? "page" : undefined}
+                            className="flex items-center gap-2"
+                          >
+                            <item.icon className="h-4 w-4 shrink-0" />
+                            <span>{item.label}</span>
+                          </Link>
+                        </DropdownMenuItem>
+                      );
+                    })}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </SidebarMenuItem>
+            )}
           </SidebarMenu>
         </SidebarGroupContent>
       </SidebarGroup>

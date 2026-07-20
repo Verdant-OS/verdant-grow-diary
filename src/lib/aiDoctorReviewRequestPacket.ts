@@ -33,6 +33,18 @@ import {
   buildAiDoctorCurrentSensorSnapshot,
   type AiDoctorCurrentSensorRowLike,
 } from "@/lib/aiDoctorCurrentSensorSnapshotRules";
+import {
+  ROOT_ZONE_OBSERVATION_CAP,
+  sortAndBoundRootZoneObservations,
+  type RootZoneInvalidField,
+  type RootZoneObservationV1,
+  type RootZoneSource,
+} from "@/lib/rootZoneObservationRules";
+import type {
+  RootZoneDrainageObservation,
+  RootZoneMediumSurface,
+  RootZonePotWeightFeel,
+} from "@/lib/rootZoneManualObservationRules";
 
 export const AI_DOCTOR_REVIEW_PACKET_EVENT_CAP = 20;
 /**
@@ -41,6 +53,7 @@ export const AI_DOCTOR_REVIEW_PACKET_EVENT_CAP = 20;
  * can never aggregate more history than the read path already bounds.
  */
 export const AI_DOCTOR_REVIEW_PACKET_CSV_ROW_CAP = 200;
+export const AI_DOCTOR_REVIEW_PACKET_ROOT_ZONE_CAP = ROOT_ZONE_OBSERVATION_CAP;
 export const AI_DOCTOR_REVIEW_PACKET_SCHEMA_VERSION = 1 as const;
 
 export interface AiDoctorReviewRequestPlantProfile {
@@ -77,6 +90,45 @@ export interface AiDoctorReviewRequestSnapshotAnnotation {
   missingInformationHints: string[];
 }
 
+export interface AiDoctorReviewRequestRootZoneProduct {
+  name: string;
+  amount: number | null;
+  unit: string | null;
+}
+
+/**
+ * Bounded grower-authored root-zone context captured with a typed watering
+ * event. These categorical labels are observations only: they are never
+ * sensor readings, measured dryback, or a watering instruction.
+ */
+export interface AiDoctorReviewRequestRootZoneManualObservation {
+  observedAt: string;
+  source: "manual";
+  advisoryOnly: true;
+  potWeightFeel: RootZonePotWeightFeel | null;
+  mediumSurface: RootZoneMediumSurface | null;
+  drainage: RootZoneDrainageObservation | null;
+}
+
+export interface AiDoctorReviewRequestRootZoneObservation {
+  at: string;
+  eventType: "watering" | "feeding";
+  source: RootZoneSource;
+  volumeMl: number | null;
+  inputPh: number | null;
+  inputEcMsCm: number | null;
+  outputEcMsCm: number | null;
+  runoffMl: number | null;
+  runoffPh: number | null;
+  runoffEcMsCm: number | null;
+  waterTempC: number | null;
+  nutrientLine: string | null;
+  products: AiDoctorReviewRequestRootZoneProduct[];
+  /** Optional for packet compatibility with older saved root-zone rows. */
+  manualObservation?: AiDoctorReviewRequestRootZoneManualObservation;
+  invalidFields?: RootZoneInvalidField[];
+}
+
 export interface AiDoctorReviewRequestPacket {
   schemaVersion: typeof AI_DOCTOR_REVIEW_PACKET_SCHEMA_VERSION;
   plant: AiDoctorReviewRequestPlantProfile;
@@ -86,6 +138,12 @@ export interface AiDoctorReviewRequestPacket {
     missing: string[];
   };
   recentEvents: AiDoctorReviewRequestEvent[];
+  /**
+   * Additive, bounded grower-recorded watering/feeding measurements from
+   * the existing typed event tables. Operational/database identifiers and
+   * raw payloads are never included. Optional for packet back-compat.
+   */
+  recentRootZoneObservations?: AiDoctorReviewRequestRootZoneObservation[];
   recentSensorSnapshot: AiDoctorReviewRequestSnapshot | null;
   /**
    * Additive: source-aware annotation built from the same shared helper
@@ -143,6 +201,8 @@ export interface BuildAiDoctorReviewPacketArgs {
    * compiler's live vocabulary.
    */
   hasFreshLiveSensorReadings?: boolean | null;
+  /** Existing typed watering/feeding rows, already RLS-scoped by caller. */
+  rootZoneObservations?: readonly RootZoneObservationV1[] | null;
 }
 
 function cleanStringOrNull(v: unknown): string | null {
@@ -233,6 +293,45 @@ export function buildAiDoctorReviewRequestPacket(
     recentEvents.push({ at, category: pickEventCategory(it) });
   }
 
+  const recentRootZoneObservations: AiDoctorReviewRequestRootZoneObservation[] =
+    sortAndBoundRootZoneObservations(
+      args.rootZoneObservations,
+      AI_DOCTOR_REVIEW_PACKET_ROOT_ZONE_CAP,
+    ).map((observation) => ({
+      at: observation.occurredAt,
+      eventType: observation.eventType,
+      source: observation.source,
+      volumeMl: observation.metrics.volumeMl,
+      inputPh: observation.metrics.inputPh,
+      inputEcMsCm: observation.metrics.inputEcMsCm,
+      outputEcMsCm: observation.metrics.outputEcMsCm,
+      runoffMl: observation.metrics.runoffMl,
+      runoffPh: observation.metrics.runoffPh,
+      runoffEcMsCm: observation.metrics.runoffEcMsCm,
+      waterTempC: observation.metrics.waterTempC,
+      nutrientLine: observation.metrics.nutrientLine,
+      products: observation.metrics.products.map((product) => ({
+        name: product.name,
+        amount: product.amount,
+        unit: product.unit,
+      })),
+      ...(observation.manualObservation
+        ? {
+            manualObservation: {
+              observedAt: observation.manualObservation.observedAt,
+              source: "manual" as const,
+              advisoryOnly: true as const,
+              potWeightFeel: observation.manualObservation.potWeightFeel ?? null,
+              mediumSurface: observation.manualObservation.mediumSurface ?? null,
+              drainage: observation.manualObservation.drainage ?? null,
+            },
+          }
+        : {}),
+      ...(observation.invalidFields && observation.invalidFields.length > 0
+        ? { invalidFields: [...observation.invalidFields] }
+        : {}),
+    }));
+
   const latest = pickMostRecentSnapshotItem(sorted);
   let recentSensorSnapshot: AiDoctorReviewRequestSnapshot | null = null;
   let recentSensorSnapshotAnnotation: AiDoctorReviewRequestSnapshotAnnotation | null = null;
@@ -316,6 +415,7 @@ export function buildAiDoctorReviewRequestPacket(
       missing: [...args.context.missing],
     },
     recentEvents,
+    ...(recentRootZoneObservations.length > 0 ? { recentRootZoneObservations } : {}),
     recentSensorSnapshot,
     recentSensorSnapshotAnnotation,
     imported_sensor_history,

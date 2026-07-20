@@ -2,22 +2,13 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import { resolve } from "path";
 
-const HELPER_SRC = readFileSync(
-  resolve(__dirname, "../lib/environmentStabilityRules.ts"),
-  "utf8",
-);
+const HELPER_SRC = readFileSync(resolve(__dirname, "../lib/environmentStabilityRules.ts"), "utf8");
 const CARD_SRC = readFileSync(
   resolve(__dirname, "../components/EnvironmentStabilityCard.tsx"),
   "utf8",
 );
-const TENT_SRC = readFileSync(
-  resolve(__dirname, "../pages/TentDetail.tsx"),
-  "utf8",
-);
-const SENSORS_SRC = readFileSync(
-  resolve(__dirname, "../pages/Sensors.tsx"),
-  "utf8",
-);
+const TENT_SRC = readFileSync(resolve(__dirname, "../pages/TentDetail.tsx"), "utf8");
+const SENSORS_SRC = readFileSync(resolve(__dirname, "../pages/Sensors.tsx"), "utf8");
 
 const FORBIDDEN =
   /saveAlert|logAlertEvent|action_queue|service_role|automation|device.control|from\(['"]alerts['"]\)|insertAlert/i;
@@ -54,9 +45,7 @@ describe("Environment Stability Summary v1 — safety + wiring", () => {
     );
     // The card must use the selected-tent slice narrowed to actual VPD
     // observations, not compatibility zeroes or global readings.
-    expect(SENSORS_SRC).toMatch(
-      /selectReadingsWithObservedMetric\(filtered,\s*["']vpd["']\)/,
-    );
+    expect(SENSORS_SRC).toMatch(/vpdStabilityReadings\s*=\s*readingsByMetric\.vpd/);
     expect(SENSORS_SRC).toMatch(
       /<EnvironmentStabilityCard[\s\S]*?testId=["']sensors-environment-stability["'][\s\S]*?computeEnvironmentStability\(\s*vpdStabilityReadings\s*,\s*\{[\s\S]*?stage:\s*selectedTentStage/,
     );

@@ -43,6 +43,8 @@ export interface DiaryEntryRowInput {
   details?: Record<string, unknown> | null;
   /** Optional logical link to a grow_events row (dedup key). */
   grow_event_id?: string | null;
+  /** Current writer alias for the same logical link. */
+  linked_grow_event_id?: string | null;
 }
 
 export interface GrowEventRowInput {
@@ -119,11 +121,11 @@ function normalizeDiaryRow(row: DiaryEntryRowInput): MergedTimelineEntry {
   const details = row.details ?? null;
   const eventTypeFromDetails =
     details && typeof details === "object"
-      ? (details["event_type"] as string | undefined) ?? null
+      ? ((details["event_type"] as string | undefined) ?? null)
       : null;
   const sourceFromDetails =
     details && typeof details === "object"
-      ? (details["source"] as string | undefined) ?? null
+      ? ((details["source"] as string | undefined) ?? null)
       : null;
   return {
     key: `diary_entries:${row.id}`,
@@ -161,10 +163,21 @@ function normalizeGrowEventRow(row: GrowEventRowInput): MergedTimelineEntry {
   };
 }
 
-function compareMergedEntries(
-  a: MergedTimelineEntry,
-  b: MergedTimelineEntry,
-): number {
+function pickLogicalGrowEventLink(row: DiaryEntryRowInput): string | null {
+  const details = row.details ?? null;
+  const candidates = [
+    row.linked_grow_event_id,
+    row.grow_event_id,
+    details?.linked_grow_event_id,
+    details?.grow_event_id,
+  ];
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate.length > 0) return candidate;
+  }
+  return null;
+}
+
+function compareMergedEntries(a: MergedTimelineEntry, b: MergedTimelineEntry): number {
   // 1) occurred timestamp descending; missing timestamps go last
   const aT = a.occurred_epoch_ms;
   const bT = b.occurred_epoch_ms;
@@ -191,9 +204,7 @@ function compareMergedEntries(
 // Public API
 // ---------------------------------------------------------------------------
 
-export function mergeTimelineSources(
-  input: MergeTimelineSourcesInput,
-): MergedTimelineEntry[] {
+export function mergeTimelineSources(input: MergeTimelineSourcesInput): MergedTimelineEntry[] {
   const normalized: MergedTimelineEntry[] = [];
 
   // grow_events first so logical dedup below prefers them
@@ -216,10 +227,7 @@ export function mergeTimelineSources(
     if (seenExact.has(entry.key)) continue;
     // Logical dedup: drop the diary mirror row when a matching
     // grow_events row is already present.
-    const logicalLink =
-      typeof row.grow_event_id === "string" && row.grow_event_id.length > 0
-        ? row.grow_event_id
-        : null;
+    const logicalLink = pickLogicalGrowEventLink(row);
     if (logicalLink && claimedGrowEventIds.has(logicalLink)) continue;
     seenExact.add(entry.key);
     normalized.push(entry);

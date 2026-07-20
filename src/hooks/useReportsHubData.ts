@@ -31,6 +31,7 @@ import {
 } from "@/lib/pendingOutcomeReviewRules";
 import { normalizeSensorSource } from "@/lib/sensor/sensorSourceRules";
 import { isDiagnosticSensorProvenanceRow } from "@/lib/sensorProvenanceFenceRules";
+import { resolveSensorObservationTime } from "@/lib/sensorObservationTimeRules";
 
 export type ReportsHubDataStatus = "idle" | "loading" | "ready" | "unavailable";
 
@@ -74,6 +75,7 @@ export const EMPTY_REPORTS_HUB_DATA: ReportsHubData = {
 
 export interface ReportsHubSensorRow {
   ts: string;
+  captured_at?: string | null;
   source?: string | null;
   raw_payload?: unknown;
 }
@@ -83,6 +85,7 @@ const REPORTS_HUB_CONTEXT_SOURCES = ["live", "manual", "csv"] as const;
 
 /** Pure row fence for the Hub's unlabeled sensor count/latest timestamp. */
 export function isReportsHubSensorContextRow(row: ReportsHubSensorRow): boolean {
+  if (!resolveSensorObservationTime(row)) return false;
   if (isDiagnosticSensorProvenanceRow(row)) return false;
   const source = normalizeSensorSource(row.source);
   return source === "live" || source === "manual" || source === "csv";
@@ -96,12 +99,24 @@ async function loadReportsHubSensorPage(input: {
 }): Promise<ReportsHubSensorRow[]> {
   let query = supabase
     .from("sensor_readings")
-    .select("ts,source,raw_payload")
+    .select("ts,captured_at,source,raw_payload")
     .in("tent_id", input.tentIds)
     .in("source", [...REPORTS_HUB_CONTEXT_SOURCES]);
-  if (input.recentSince) query = query.gte("ts", input.recentSince);
-  if (input.before) query = query.lt("ts", input.before);
+  // Use physical observation time for the learning summary. Legacy rows with
+  // no captured_at retain their established ts fallback; imported historical
+  // rows cannot inflate a recent count simply because they were imported now.
+  if (input.recentSince) {
+    query = query.or(
+      `captured_at.gte.${input.recentSince},and(captured_at.is.null,ts.gte.${input.recentSince})`,
+    );
+  }
+  if (input.before) {
+    query = query.or(
+      `captured_at.lt.${input.before},and(captured_at.is.null,ts.lt.${input.before})`,
+    );
+  }
   const { data, error } = await query
+    .order("captured_at", { ascending: false, nullsFirst: false })
     .order("ts", { ascending: false })
     .range(input.from, input.from + REPORTS_HUB_SENSOR_PAGE_SIZE - 1);
   if (error) throw error;
@@ -116,7 +131,7 @@ async function findLatestReportsHubSensorAt(
   while (true) {
     const page = await loadReportsHubSensorPage({ tentIds, from, before });
     const eligible = page.find(isReportsHubSensorContextRow);
-    if (eligible) return eligible.ts;
+    if (eligible) return resolveSensorObservationTime(eligible);
     if (page.length < REPORTS_HUB_SENSOR_PAGE_SIZE) return null;
     from += REPORTS_HUB_SENSOR_PAGE_SIZE;
   }
@@ -134,7 +149,7 @@ async function loadReportsHubSensorSummary(
     for (const row of page) {
       if (!isReportsHubSensorContextRow(row)) continue;
       recentSensorReadingCount += 1;
-      latestSensorCapturedAt ??= row.ts;
+      latestSensorCapturedAt ??= resolveSensorObservationTime(row);
     }
     if (page.length < REPORTS_HUB_SENSOR_PAGE_SIZE) break;
     from += REPORTS_HUB_SENSOR_PAGE_SIZE;

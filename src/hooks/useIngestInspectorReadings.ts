@@ -21,15 +21,14 @@ export function useIngestInspectorReadings(): UseQueryResult<InspectorQueryResul
   return useQuery({
     queryKey: ["ingest_inspector_readings"],
     queryFn: async (): Promise<InspectorQueryResult> => {
-      const sinceIso = new Date(
-        Date.now() - INGEST_INSPECTOR_DEFAULT_WINDOW_MS,
-      ).toISOString();
+      const sinceIso = new Date(Date.now() - INGEST_INSPECTOR_DEFAULT_WINDOW_MS).toISOString();
       const { data, error } = await supabase
         .from("sensor_readings")
         .select(
           "id, ts, captured_at, source, metric, value, quality, tent_id, device_id, raw_payload",
         )
-        .gte("ts", sinceIso)
+        .or(`captured_at.gte.${sinceIso},and(captured_at.is.null,ts.gte.${sinceIso})`)
+        .order("captured_at", { ascending: false, nullsFirst: false })
         .order("ts", { ascending: false })
         .limit(INGEST_INSPECTOR_MAX_ROWS);
       if (error) throw error;
@@ -40,10 +39,7 @@ export function useIngestInspectorReadings(): UseQueryResult<InspectorQueryResul
       );
       const tentNames: Record<string, string> = {};
       if (tentIds.length > 0) {
-        const { data: tents } = await supabase
-          .from("tents")
-          .select("id, name")
-          .in("id", tentIds);
+        const { data: tents } = await supabase.from("tents").select("id, name").in("id", tentIds);
         for (const t of tents ?? []) {
           if (t && typeof t.id === "string" && typeof t.name === "string") {
             tentNames[t.id] = t.name;

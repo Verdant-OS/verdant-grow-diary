@@ -23,10 +23,19 @@ import CustomerGuideTrustFooter from "@/components/customer/CustomerGuideTrustFo
 import { buildCustomerModeGuideViewModel } from "@/lib/customerModeGuideViewModel";
 import { VERDANT_CUSTOMER_MODE_GROWER_FAQ } from "@/constants/verdantSeoContent";
 import { buildFaqPageJsonLd, safeJsonLdStringify } from "@/lib/seoStructuredData";
+import { usePageSeo } from "@/hooks/usePageSeo";
 
 export default function CustomerModeGuide() {
   const params = useParams<{ shareId?: string }>();
   const shareId = params.shareId ?? null;
+  usePageSeo({
+    title: "Customer guide — Verdant Grow Diary",
+    description:
+      "A shared, customer-facing view of a Verdant grower's cultivation notes. Private share link — not indexed.",
+    path: shareId ? `/customer/${shareId}` : "/customer",
+    // Share links are opaque per-customer surfaces; keep them out of search.
+    noindex: true,
+  });
   const vm = useMemo(() => buildCustomerModeGuideViewModel({ shareId }), [shareId]);
 
   useEffect(() => {

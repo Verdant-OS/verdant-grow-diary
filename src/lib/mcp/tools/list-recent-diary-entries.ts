@@ -13,6 +13,7 @@
  */
 import { defineTool } from "@lovable.dev/mcp-js";
 import { z } from "zod";
+import { listRecentDiaryEntriesForOwnedGrow } from "../../operatorAccountReadModels";
 import { supabaseForUser, unauthenticated } from "./_supabase";
 
 export default defineTool({
@@ -35,36 +36,19 @@ export default defineTool({
   handler: async ({ growId, limit }, ctx) => {
     if (!ctx.isAuthenticated()) return unauthenticated();
     const supabase = supabaseForUser(ctx);
-    const { data: grow, error: growError } = await supabase
-      .from("grows")
-      .select("id")
-      .eq("id", growId)
-      .maybeSingle();
-    if (growError) {
+    const result = await listRecentDiaryEntriesForOwnedGrow(supabase, growId, limit);
+    if (result.ok === false) {
       return {
-        content: [{ type: "text", text: `Error: ${growError.message}` }],
+        content: [
+          {
+            type: "text",
+            text: result.reason === "unavailable" ? `Error: ${result.message}` : result.message,
+          },
+        ],
         isError: true,
       };
     }
-    if (!grow) {
-      return {
-        content: [{ type: "text", text: "Grow not found for the signed-in grower." }],
-        isError: true,
-      };
-    }
-    const { data, error } = await supabase
-      .from("diary_entries")
-      .select("id,grow_id,plant_id,tent_id,stage,note,entry_at,created_at")
-      .eq("grow_id", growId)
-      .order("entry_at", { ascending: false })
-      .limit(limit ?? 10);
-    if (error) {
-      return {
-        content: [{ type: "text", text: `Error: ${error.message}` }],
-        isError: true,
-      };
-    }
-    const rows = data ?? [];
+    const rows = result.data.entries;
     return {
       content: [
         {

@@ -87,6 +87,7 @@ const PUBLIC_MOBILE_ROUTES: string[] = [
   "/founder",
   "/how-ai-doctor-works",
   "/partners/csv-preview",
+  "/sensors/csv-preview",
   "/customer/:shareId",
   "/customer/:shareId/cannabis-care",
   // Read-only Pheno Comparison preview: public, fixture-only, mounted outside
@@ -94,6 +95,12 @@ const PUBLIC_MOBILE_ROUTES: string[] = [
   // zero private-table fetches.
   "/pheno-comparison",
   "/pheno-hunts/:id/compare",
+  // Read-only per-hunt showcase (pack → contenders → fight → cure → family
+  // tree): public + RLS-scoped, gated so it fetches nothing signed-out and
+  // renders the demo fallback. Plus the fixture-only /internal walkthrough
+  // (no Supabase at all).
+  "/pheno-hunts/:id/showcase",
+  "/internal/pheno-hunt-demo",
   "/.lovable/oauth/consent",
   "/breeder-beta",
   "/creator-beta",
@@ -106,6 +113,9 @@ const PUBLIC_MOBILE_ROUTES: string[] = [
   "/privacy",
   "/refund",
   "/tools/vpd-calculator",
+  // Public MCP API reference docs page: static content only, no Supabase
+  // fetch — must render signed-out with zero private-table fetches.
+  "/docs/mcp-api",
   // Public 30-second Quick Log starter: local draft only, mounted outside
   // AppShell — must render signed-out with zero private-table fetches.
   "/quick-log",
@@ -244,8 +254,17 @@ test.describe("Auth route-protection MOBILE (mocked, 390x844)", () => {
         `Private-table hits while signed out (mobile, ${path}): ${privateHits.join(", ")}`,
       ).toHaveLength(0);
       const body = ((await page.locator("body").textContent()) ?? "").toLowerCase();
+      expect(body).not.toContain("page not found");
       expect(body).not.toContain("live reading");
       expect(body).not.toContain("latest sensor:");
+      if (path === "/partners/csv-preview") {
+        await expect(
+          page.getByRole("heading", { name: /turn hardware exports into plant memory/i }),
+        ).toBeVisible();
+      }
+      if (path === "/sensors/csv-preview") {
+        await expect(page.getByRole("heading", { name: /csv sensor preview/i })).toBeVisible();
+      }
       for (const word of ["Tent 1", "Plant 1", "Diary"]) {
         expect(body).not.toContain(`${word.toLowerCase()} for owner`);
       }

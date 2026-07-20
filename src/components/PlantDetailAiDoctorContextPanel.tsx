@@ -5,10 +5,8 @@
 import { useMemo } from "react";
 import { CheckCircle2, AlertTriangle, Info } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
-import {
-  useTimelineMemory,
-  TIMELINE_MEMORY_DEFAULT_LIMIT,
-} from "@/hooks/useTimelineMemory";
+import { useTimelineMemory, TIMELINE_MEMORY_DEFAULT_LIMIT } from "@/hooks/useTimelineMemory";
+import { useRootZoneObservations } from "@/hooks/useRootZoneObservations";
 import {
   evaluateAiDoctorContextFromSources,
   AI_DOCTOR_READINESS_LABELS,
@@ -29,6 +27,11 @@ import {
 import AiDoctorContextQuickActions from "@/components/AiDoctorContextQuickActions";
 import AiDoctorVpdDriftSection from "@/components/AiDoctorVpdDriftSection";
 import type { AiDoctorVpdDriftContext } from "@/lib/vpdDriftRules";
+import {
+  buildAiDoctorRootZoneReadinessScope,
+  selectSettledAiDoctorRootZoneObservations,
+} from "@/lib/aiDoctorRootZoneReadinessScopeRules";
+import { ROOT_ZONE_OBSERVATION_CAP } from "@/lib/rootZoneObservationRules";
 
 export interface PlantDetailAiDoctorContextPanelProps {
   plantId: string;
@@ -48,10 +51,7 @@ export interface PlantDetailAiDoctorContextPanelProps {
   vpdDrift?: AiDoctorVpdDriftContext | null;
 }
 
-const READINESS_STYLES: Record<
-  AiDoctorContextReadiness,
-  { badge: string; icon: JSX.Element }
-> = {
+const READINESS_STYLES: Record<AiDoctorContextReadiness, { badge: string; icon: JSX.Element }> = {
   strong: {
     badge: "bg-emerald-500/15 text-emerald-300 border-emerald-500/40",
     icon: <CheckCircle2 className="h-4 w-4" aria-hidden="true" />,
@@ -71,18 +71,26 @@ export default function PlantDetailAiDoctorContextPanel({
   plant,
   vpdDrift,
 }: PlantDetailAiDoctorContextPanelProps) {
-  const { items, isLoading } = useTimelineMemory(
-    { kind: "plant", plantId },
+  const { items: evidenceItems, isLoading } = useTimelineMemory(
+    { kind: "plant", plantId, tentId: plant?.tentId ?? null },
     TIMELINE_MEMORY_DEFAULT_LIMIT,
   );
+  const rootZoneScope = buildAiDoctorRootZoneReadinessScope({
+    plantId,
+    tentId: plant?.tentId,
+    growId: plant?.growId,
+  });
+  const rootZoneHistory = useRootZoneObservations(rootZoneScope, ROOT_ZONE_OBSERVATION_CAP);
+  const rootZoneObservations = selectSettledAiDoctorRootZoneObservations(rootZoneHistory);
 
   const result = useMemo(
     () =>
       evaluateAiDoctorContextFromSources({
         plant,
-        timelineItems: items,
+        timelineItems: evidenceItems,
+        rootZoneObservations,
       }),
-    [plant, items],
+    [plant, evidenceItems, rootZoneObservations],
   );
 
   const style = READINESS_STYLES[result.readiness];
@@ -120,8 +128,8 @@ export default function PlantDetailAiDoctorContextPanel({
             AI Doctor Context
           </h2>
           <p className="text-xs text-muted-foreground">
-            A read-only summary of the context Verdant has available. This panel
-            does not run AI or claim a diagnosis.
+            A read-only summary of the context Verdant has available. This panel does not run AI or
+            claim a diagnosis.
           </p>
         </div>
         <span
@@ -134,24 +142,15 @@ export default function PlantDetailAiDoctorContextPanel({
       </header>
 
       {result.readiness !== "strong" ? (
-        <p
-          className="text-xs text-muted-foreground"
-          data-testid="plant-ai-doctor-context-notice"
-        >
+        <p className="text-xs text-muted-foreground" data-testid="plant-ai-doctor-context-notice">
           {AI_DOCTOR_INSUFFICIENT_NOTICE}
         </p>
       ) : null}
 
       <div className="grid grid-cols-2 gap-2 text-xs">
         <Stat label="Recent events (7d)" value={result.counts.recentEvents} />
-        <Stat
-          label="Recent watering/feeding"
-          value={result.counts.recentWateringOrFeeding}
-        />
-        <Stat
-          label="Manual snapshots (7d)"
-          value={result.counts.recentManualSnapshots}
-        />
+        <Stat label="Recent watering/feeding" value={result.counts.recentWateringOrFeeding} />
+        <Stat label="Manual snapshots (7d)" value={result.counts.recentManualSnapshots} />
         <Stat label="Warnings (7d)" value={result.counts.recentWarnings} />
       </div>
 
@@ -168,9 +167,7 @@ export default function PlantDetailAiDoctorContextPanel({
         <div data-testid="plant-ai-doctor-context-evidence">
           <div className="text-xs font-medium mb-1">Evidence available</div>
           {result.evidence.length === 0 ? (
-            <p className="text-xs text-muted-foreground">
-              No supporting context yet.
-            </p>
+            <p className="text-xs text-muted-foreground">No supporting context yet.</p>
           ) : (
             <ul className="space-y-0.5 text-xs">
               {result.evidence.map((code) => (
@@ -194,9 +191,7 @@ export default function PlantDetailAiDoctorContextPanel({
         <div data-testid="plant-ai-doctor-context-missing">
           <div className="text-xs font-medium mb-1">Missing information</div>
           {result.missing.length === 0 ? (
-            <p className="text-xs text-muted-foreground">
-              Nothing critical missing.
-            </p>
+            <p className="text-xs text-muted-foreground">Nothing critical missing.</p>
           ) : (
             <ul className="space-y-0.5 text-xs">
               {result.missing.map((code) => (
@@ -240,10 +235,7 @@ export default function PlantDetailAiDoctorContextPanel({
         </p>
       ) : null}
 
-      <p
-        className="text-xs"
-        data-testid="plant-ai-doctor-context-safe-next-step"
-      >
+      <p className="text-xs" data-testid="plant-ai-doctor-context-safe-next-step">
         <span className="font-medium">Safe next step: </span>
         <span className="text-muted-foreground">{result.safeNextStep}</span>
       </p>
@@ -260,9 +252,7 @@ export default function PlantDetailAiDoctorContextPanel({
 function Stat({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-md border border-border/40 bg-background/30 px-2 py-1.5">
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-        {label}
-      </div>
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
       <div className="text-sm font-medium tabular-nums">{value}</div>
     </div>
   );

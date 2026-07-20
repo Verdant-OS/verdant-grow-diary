@@ -10,6 +10,7 @@
 
 import { normalizeReportSensorSource } from "@/lib/postGrowReportRules";
 import { withoutDiagnosticSensorRows } from "@/lib/sensorProvenanceFenceRules";
+import { resolveSensorObservationTime } from "@/lib/sensorObservationTimeRules";
 
 export const POST_GROW_LESSON_EVENT_TYPE = "post_grow_learning_lesson";
 
@@ -37,9 +38,11 @@ export interface PostGrowDiaryLike {
 }
 
 export interface PostGrowSensorReadingLike {
+  id?: string | null;
   metric: string;
   value: number | null;
   ts: string;
+  captured_at?: string | null;
   source?: string | null;
   /** Classification-only provenance; never copied into the report view model. */
   raw_payload?: unknown;
@@ -198,7 +201,25 @@ function buildMetricAggregate(
 ): MetricAggregateView {
   const values = readings
     .filter((r) => r.metric === metric)
-    .map((r) => finite(r.value))
+    .map((reading, inputIndex) => ({
+      reading,
+      inputIndex,
+      observedAt: resolveSensorObservationTime(reading),
+    }))
+    .sort((a, b) => {
+      const aMs = Date.parse(a.observedAt ?? "");
+      const bMs = Date.parse(b.observedAt ?? "");
+      const aHasTime = Number.isFinite(aMs);
+      const bHasTime = Number.isFinite(bMs);
+      if (aHasTime && bHasTime && aMs !== bMs) return aMs - bMs;
+      if (aHasTime !== bHasTime) return aHasTime ? -1 : 1;
+
+      const timeTie = (a.observedAt ?? "").localeCompare(b.observedAt ?? "");
+      if (timeTie !== 0) return timeTie;
+      const idTie = (a.reading.id ?? "").localeCompare(b.reading.id ?? "");
+      return idTie !== 0 ? idTie : a.inputIndex - b.inputIndex;
+    })
+    .map(({ reading }) => finite(reading.value))
     .filter((v): v is number => v !== null);
   const stableCount = values.filter((v) => stableMetricValue(metric, v)).length;
   return {

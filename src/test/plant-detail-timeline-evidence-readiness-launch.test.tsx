@@ -32,11 +32,13 @@ import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 
 const fetchSpy = vi.spyOn(globalThis, "fetch" as never);
 
-function renderLaunch(overrides: {
-  hasPhoto?: boolean;
-  activity?: ReadonlyArray<Record<string, unknown>>;
-  manualLogs?: ReadonlyArray<Record<string, unknown>>;
-} = {}) {
+function renderLaunch(
+  overrides: {
+    hasPhoto?: boolean;
+    activity?: ReadonlyArray<Record<string, unknown>>;
+    manualLogs?: ReadonlyArray<Record<string, unknown>>;
+  } = {},
+) {
   recentActivityMock.mockReturnValue({
     data: overrides.activity ?? [],
     isLoading: false,
@@ -72,9 +74,7 @@ describe("PlantDetailTimelineEvidenceReadinessLaunch — mount", () => {
     expect(
       screen.getByTestId("plant-detail-timeline-evidence-readiness-launch"),
     ).toBeInTheDocument();
-    expect(
-      screen.getByTestId("timeline-evidence-readiness-panel"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("timeline-evidence-readiness-panel")).toBeInTheDocument();
   });
 
   it("does not call fetch when rendered", () => {
@@ -87,27 +87,27 @@ describe("PlantDetailTimelineEvidenceReadinessLaunch — operator actions", () =
   it("shows Fast Add Photo when photo is missing", () => {
     renderLaunch({ hasPhoto: false });
     expect(
-      screen.getByTestId(
-        "plant-detail-timeline-evidence-readiness-launch-action-add-photo",
-      ),
+      screen.getByTestId("plant-detail-timeline-evidence-readiness-launch-action-add-photo"),
     ).toBeInTheDocument();
   });
 
   it("shows Add Watering when watering history is missing", () => {
     renderLaunch();
-    expect(
-      screen.getByTestId(
-        "plant-detail-timeline-evidence-readiness-launch-action-add-watering",
-      ),
-    ).toBeInTheDocument();
+    const action = screen.getByTestId(
+      "plant-detail-timeline-evidence-readiness-launch-action-add-watering",
+    );
+    expect(action).toBeInTheDocument();
+    expect(action).toHaveAttribute(
+      "title",
+      "Add recent watering history so AI Doctor can review irrigation frequency and root-zone stress.",
+    );
+    expect(action.getAttribute("title")).not.toMatch(/dryback/i);
   });
 
   it("shows Add Feeding when feeding history is missing", () => {
     renderLaunch();
     expect(
-      screen.getByTestId(
-        "plant-detail-timeline-evidence-readiness-launch-action-add-feeding",
-      ),
+      screen.getByTestId("plant-detail-timeline-evidence-readiness-launch-action-add-feeding"),
     ).toBeInTheDocument();
   });
 
@@ -128,9 +128,7 @@ describe("PlantDetailTimelineEvidenceReadinessLaunch — operator actions", () =
     window.addEventListener(PLANT_QUICKLOG_PREFILL_EVENT, handler);
 
     fireEvent.click(
-      screen.getByTestId(
-        "plant-detail-timeline-evidence-readiness-launch-action-add-photo",
-      ),
+      screen.getByTestId("plant-detail-timeline-evidence-readiness-launch-action-add-photo"),
     );
     window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, handler);
 
@@ -146,14 +144,10 @@ describe("PlantDetailTimelineEvidenceReadinessLaunch — operator actions", () =
     window.addEventListener(PLANT_QUICKLOG_PREFILL_EVENT, handler);
 
     fireEvent.click(
-      screen.getByTestId(
-        "plant-detail-timeline-evidence-readiness-launch-action-add-watering",
-      ),
+      screen.getByTestId("plant-detail-timeline-evidence-readiness-launch-action-add-watering"),
     );
     fireEvent.click(
-      screen.getByTestId(
-        "plant-detail-timeline-evidence-readiness-launch-action-add-feeding",
-      ),
+      screen.getByTestId("plant-detail-timeline-evidence-readiness-launch-action-add-feeding"),
     );
     window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, handler);
 
@@ -166,19 +160,14 @@ describe("PlantDetailTimelineEvidenceReadinessLaunch — operator actions", () =
   it("hides photo button when a recent photo is already attached", () => {
     renderLaunch({ hasPhoto: true });
     expect(
-      screen.queryByTestId(
-        "plant-detail-timeline-evidence-readiness-launch-action-add-photo",
-      ),
+      screen.queryByTestId("plant-detail-timeline-evidence-readiness-launch-action-add-photo"),
     ).toBeNull();
   });
 });
 
 describe("PlantDetailTimelineEvidenceReadinessLaunch — static safety", () => {
   const source = readFileSync(
-    resolve(
-      __dirname,
-      "../components/PlantDetailTimelineEvidenceReadinessLaunch.tsx",
-    ),
+    resolve(__dirname, "../components/PlantDetailTimelineEvidenceReadinessLaunch.tsx"),
     "utf8",
   );
 

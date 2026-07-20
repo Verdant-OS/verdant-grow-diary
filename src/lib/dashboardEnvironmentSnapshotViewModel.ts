@@ -28,6 +28,7 @@ import { tempFFromC } from "@/lib/temperatureUnits";
 import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 import type { SensorReadingSource } from "@/mock";
 import { isDiagnosticSensorProvenanceRow } from "@/lib/sensorProvenanceFenceRules";
+import { resolveSensorObservationTime } from "@/lib/sensorObservationTimeRules";
 
 export type MetricStatus = "ok" | "stale" | "invalid" | "degraded" | "unknown";
 
@@ -196,7 +197,7 @@ export function buildTentSnapshotView(
   if (!rows || rows.length === 0) return EMPTY;
   const snap = snapshotFromReadings(rows);
   if (!snap) return EMPTY;
-  const latestRows = rows.filter((r) => r.ts === snap.ts);
+  const latestRows = rows.filter((r) => resolveSensorObservationTime(r) === snap.ts);
 
   // Source resolution is strict across the whole latest timestamp. A mixed
   // or unknown cohort stays visible but is never promoted to healthy/live.

@@ -52,6 +52,9 @@ Cronk Nutrients is the first publishing priority because it is the product line
 used consistently in Verdant's own documented grows. That makes it the strongest
 source of real, attributable plant-memory examples; it does not make Cronk a
 universal recommendation for every grower, medium, or cultivar.
+Before distributing the Cronk guide, ensure it visibly discloses the founder's
+Cronk membership or other material relationship, even when no other copy is
+being changed.
 
 | Priority | Working title                                                                              | Evaluation intent                                            | Verdant evidence to log                            |
 | -------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------ | -------------------------------------------------- |
@@ -111,9 +114,15 @@ question, intent, internal link target, and Verdant value driver.
   question (deep-link the section id where possible), and the
   Hardware Integrations page (`/hardware-integrations`) for
   hardware-cluster posts.
-- The blog surface does not currently exist in the repo. This plan
-  is docs-only — do not scaffold routes, tables, or sitemap entries
-  for posts that have not shipped.
+- This queue began as a docs-only plan, but the repository now ships a real
+  `/guides` index, 15 data-driven `/guides/:slug` pages, and a dedicated
+  grow-stage guide. Reconcile this queue against the shipped guide registry
+  before drafting anything: refresh an existing guide instead of publishing a
+  duplicate, and add routes or sitemap entries only when a real new page ships.
+- Use the [60-day growth execution calendar](../growth/verdant-60-day-growth-execution-calendar.md)
+  for publication order, distribution, measurement, creator work, and the
+  Cronk evidence cadence. The table above remains the editorial backlog, not a
+  claim that thirty new pages should be created blindly.
 - Forbidden-language reminder (also used by the public copy safety
   scanner): do not draft posts around autopilot, fully automated
   grow control, AI controls your equipment, automatic device
@@ -122,5 +131,7 @@ question, intent, internal link target, and Verdant value driver.
   fans, controls irrigation, controls humidifiers, or controls your
   equipment. Verdant is approval-required by design.
 - Sitemap: `public/sitemap.xml` currently lists `/`, `/welcome`,
-  `/pricing`, and `/hardware-integrations`. Add new URLs only after
-  a real page ships at that URL.
+  `/pricing`, `/founder`, `/hardware-integrations`, public tools and explainers,
+  the shipped guide pages, public cultivar pages, and legal pages. Add new URLs
+  only after a real public page ships at that URL; private application routes
+  must remain excluded.

@@ -148,3 +148,79 @@ describe("quickLogV2SavePayload", () => {
     expect(r.payload.p_details).toEqual(details);
   });
 });
+
+describe("quickLogV2SavePayload — canonical air-sensor bands", () => {
+  // Temperature and VPD previously had NO magnitude guard here: a fat-fingered
+  // "240" (24.0 mis-typed) or a physically impossible negative VPD wrote
+  // straight into a permanent diary entry. Reconcile onto the single canonical
+  // band (isTemperatureValid -10..60, isHumidityValid 0..100, isVpdValid 0..10;
+  // null = not provided) and emit the shared per-metric reason codes.
+  function reason(over: Record<string, unknown>): string {
+    const r = buildQuickLogV2SavePayload(base(over));
+    // `=== true` is what narrows to the error branch under non-strict tsconfig.
+    if (r.ok === true) throw new Error("expected the build to fail");
+    return r.reason;
+  }
+
+  it("rejects a fat-fingered temperature above 60°C", () => {
+    expect(reason({ temperatureC: "240" })).toBe("temperature_out_of_range");
+  });
+
+  it("rejects temperature below -10°C", () => {
+    expect(reason({ temperatureC: "-40" })).toBe("temperature_out_of_range");
+  });
+
+  it("rejects VPD above the canonical 10 kPa ceiling", () => {
+    expect(reason({ vpdKpa: "12" })).toBe("vpd_out_of_range");
+  });
+
+  it("rejects a physically impossible negative VPD", () => {
+    expect(reason({ vpdKpa: "-0.5" })).toBe("vpd_out_of_range");
+  });
+
+  it("still rejects humidity outside 0-100", () => {
+    expect(reason({ humidityPct: "150" })).toBe("humidity_out_of_range");
+  });
+
+  it("accepts VPD at 8 kPa (in-band, above the retired 4 kPa cap)", () => {
+    const r = buildQuickLogV2SavePayload(base({ vpdKpa: "8" }));
+    expect(r.ok).toBe(true);
+    if (!r.ok) throw new Error("expected ok");
+    expect(r.payload.p_vpd_kpa).toBe(8);
+  });
+
+  it("accepts the inclusive canonical boundaries (-10°C, 0%, 0 kPa)", () => {
+    const r = buildQuickLogV2SavePayload(
+      base({ temperatureC: "-10", humidityPct: "0", vpdKpa: "0" }),
+    );
+    expect(r.ok).toBe(true);
+    if (!r.ok) throw new Error("expected ok");
+    expect(r.payload.p_temperature_c).toBe(-10);
+    expect(r.payload.p_vpd_kpa).toBe(0);
+  });
+
+  it("accepts the upper canonical boundaries (60°C, 100%, 10 kPa)", () => {
+    const r = buildQuickLogV2SavePayload(
+      base({ temperatureC: "60", humidityPct: "100", vpdKpa: "10" }),
+    );
+    expect(r.ok).toBe(true);
+    if (!r.ok) throw new Error("expected ok");
+    expect(r.payload.p_temperature_c).toBe(60);
+    expect(r.payload.p_humidity_pct).toBe(100);
+    expect(r.payload.p_vpd_kpa).toBe(10);
+  });
+
+  it("rejects just past each boundary (epsilon edge)", () => {
+    expect(reason({ temperatureC: "60.01" })).toBe("temperature_out_of_range");
+    expect(reason({ temperatureC: "-10.01" })).toBe("temperature_out_of_range");
+    expect(reason({ vpdKpa: "10.01" })).toBe("vpd_out_of_range");
+  });
+
+  it("treats blank sensor fields as not-provided (null, still valid)", () => {
+    const r = buildQuickLogV2SavePayload(base({ note: "check-in" }));
+    expect(r.ok).toBe(true);
+    if (!r.ok) throw new Error("expected ok");
+    expect(r.payload.p_temperature_c).toBeNull();
+    expect(r.payload.p_vpd_kpa).toBeNull();
+  });
+});

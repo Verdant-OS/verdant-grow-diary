@@ -130,11 +130,20 @@ describe("PlantDetailAiDoctorLiveReview — credit_denied branch", () => {
   async function mountAndDeny(planId: string | null) {
     itemsRef.current = strongTimeline();
     const invoke = vi.fn().mockResolvedValue(denial(planId));
-    render(<PlantDetailAiDoctorLiveReview plantId="p1" plant={strongPlant} invoke={invoke} />);
+    render(
+      <PlantDetailAiDoctorLiveReview
+        plantId="p1"
+        plant={strongPlant}
+        tentId="tent-1"
+        invoke={invoke}
+      />,
+    );
     fireEvent.click(await screen.findByTestId("plant-ai-doctor-live-review-start"));
     await waitFor(() =>
       expect(screen.getByTestId("plant-ai-doctor-live-review-credit-denied")).toBeTruthy(),
     );
+    expect(screen.queryByTestId("plant-ai-doctor-live-review-retry")).toBeNull();
+    expect(screen.queryByTestId("plant-ai-doctor-post-value-upgrade")).toBeNull();
   }
 
   it("offers Free growers a return-safe pricing CTA and records the funnel view", async () => {
@@ -145,9 +154,22 @@ describe("PlantDetailAiDoctorLiveReview — credit_denied branch", () => {
     );
     expect(
       screen.getByTestId("plant-ai-doctor-live-review-credit-denied-paywall-link"),
-    ).toHaveAttribute("href", "/pricing?returnTo=%2Fplants%2Fp1");
-    expect(trackFunnelEvent).toHaveBeenCalledTimes(1);
+    ).toHaveAttribute(
+      "href",
+      "/pricing?returnTo=%2Fplants%2Fp1%3FtentId%3Dtent-1%23plant-ai-doctor-review",
+    );
+    expect(trackFunnelEvent.mock.calls.filter(([name]) => name === "paywall_viewed")).toHaveLength(
+      1,
+    );
     expect(trackFunnelEvent).toHaveBeenCalledWith("paywall_viewed", {
+      surface: "ai_doctor_limit",
+    });
+    expect(trackFunnelEvent).not.toHaveBeenCalledWith("paywall_cta_clicked", expect.anything());
+    fireEvent.click(screen.getByTestId("plant-ai-doctor-live-review-credit-denied-paywall-link"));
+    expect(
+      trackFunnelEvent.mock.calls.filter(([name]) => name === "paywall_cta_clicked"),
+    ).toHaveLength(1);
+    expect(trackFunnelEvent).toHaveBeenCalledWith("paywall_cta_clicked", {
       surface: "ai_doctor_limit",
     });
     // Generic failure pane must NOT render.
@@ -187,8 +209,13 @@ describe("PlantDetailAiDoctorLiveReview — credit_denied branch", () => {
     );
     expect(
       screen.getByTestId("plant-ai-doctor-live-review-credit-denied-paywall-link"),
-    ).toHaveAttribute("href", "/pricing?returnTo=%2Fplants%2Fp1");
-    expect(trackFunnelEvent).toHaveBeenCalledTimes(1);
+    ).toHaveAttribute(
+      "href",
+      "/pricing?returnTo=%2Fplants%2Fp1%3FtentId%3Dtent-1%23plant-ai-doctor-review",
+    );
+    expect(trackFunnelEvent.mock.calls.filter(([name]) => name === "paywall_viewed")).toHaveLength(
+      1,
+    );
     expect(trackFunnelEvent).toHaveBeenCalledWith("paywall_viewed", {
       surface: "ai_doctor_limit",
     });
@@ -205,7 +232,11 @@ describe("PlantDetailAiDoctorLiveReview — credit_denied branch", () => {
       expect(
         screen.queryByTestId("plant-ai-doctor-live-review-credit-denied-paywall-link"),
       ).toBeNull();
-      expect(trackFunnelEvent).not.toHaveBeenCalled();
+      expect(trackFunnelEvent).not.toHaveBeenCalledWith("paywall_viewed", expect.anything());
+      expect(trackFunnelEvent).not.toHaveBeenCalledWith("paywall_cta_clicked", expect.anything());
+      expect(trackFunnelEvent).toHaveBeenCalledWith("ai_doctor_review_started", {
+        surface: "standard",
+      });
     },
   );
 });

@@ -4,10 +4,11 @@ import { Button } from "@/components/ui/button";
 import OnboardingProgressPill from "@/components/OnboardingProgressPill";
 import { buildOnboardingChecklistViewModel } from "@/lib/onboardingChecklistViewModel";
 import { countActivatingSensorReadings } from "@/lib/onboardingSensorActivationRules";
+import { selectConnectedOneTentGraph } from "@/lib/connectedOneTentActivationRules";
+import { useOneTentActivationEvidence } from "@/hooks/useOneTentActivationEvidence";
 import { useGrows } from "@/store/grows";
 import { useGrowTents, useGrowPlants } from "@/hooks/useGrowData";
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
-import { useDiaryEntries } from "@/hooks/use-diary-entries";
 
 /**
  * Compact onboarding bridge shown on `/welcome` for authenticated users
@@ -16,26 +17,38 @@ import { useDiaryEntries } from "@/hooks/use-diary-entries";
  *
  * Data policy:
  *  - Reads only via existing hooks already used by the app (Grows
- *    context, useGrowTents, useGrowPlants, useSensorReadings,
- *    useDiaryEntries). No new Supabase queries are introduced beyond
- *    what the app would issue once the user opens the Dashboard.
+ *    context, useGrowTents, useGrowPlants, useSensorReadings, and the
+ *    canonical activation-evidence loader). Reads are bounded and RLS-scoped.
  *  - Never exposes private grow data details (no names, no IDs) — only
  *    provenance-qualified counts feed into the shared view model.
  *  - No writes, no automation, no device control, no fake-live data.
  */
 export default function LandingAuthedOnboardingBridge() {
-  const { grows } = useGrows();
+  const { grows, activeGrowId } = useGrows();
   const { data: tents = [] } = useGrowTents();
   const { data: plants = [] } = useGrowPlants();
-  const { data: readings = [] } = useSensorReadings();
-  const { data: diary = [] } = useDiaryEntries();
+  const activationGraph = selectConnectedOneTentGraph({
+    grows,
+    tents,
+    plants,
+    preferredGrowId: activeGrowId,
+  });
+  const { data: readings = [] } = useSensorReadings(activationGraph.tentId);
+  const activationEvidence = useOneTentActivationEvidence(activationGraph);
+  const connectedSensorRows = activationGraph.tentId
+    ? readings.filter((row) => row.tent_id === activationGraph.tentId)
+    : [];
 
   const vm = buildOnboardingChecklistViewModel({
     growCount: grows.length,
     tentCount: tents.length,
     plantCount: plants.length,
-    diaryEntryCount: diary.length,
-    sensorReadingCount: countActivatingSensorReadings(readings),
+    diaryEntryCount: 0,
+    sensorReadingCount: countActivatingSensorReadings(connectedSensorRows),
+    connectedScope: activationGraph,
+    firstLogEvidenceCount:
+      activationEvidence.status === "ok" ? activationEvidence.summary.count : null,
+    firstLogEvidenceStatus: activationEvidence.status,
   });
 
   const ctaLabel = vm.isFullyActivated ? "Open Dashboard" : "Continue setup in Dashboard";

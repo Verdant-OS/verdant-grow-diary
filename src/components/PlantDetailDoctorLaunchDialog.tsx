@@ -63,8 +63,7 @@ import {
   AI_DOCTOR_READINESS_GATE_ADD_CONTEXT_LABEL,
 } from "@/lib/aiDoctorReadinessGateViewModel";
 import { buildAiDoctorSnapshotStalenessExplanation } from "@/lib/aiDoctorSnapshotStalenessExplanationViewModel";
-import { PLANT_AI_DOCTOR_REVIEW_ANCHOR_ID } from "@/lib/plantDetailQuickActions";
-import { plantDetailPath } from "@/lib/routes";
+import { buildPlantAiDoctorReviewPath } from "@/lib/aiDoctorEntryRules";
 
 interface Props {
   plantId: string | null | undefined;
@@ -149,8 +148,8 @@ export default function PlantDetailDoctorLaunchDialog({
 }: Props) {
   const [open, setOpen] = useState(false);
   const { data: rawRows } = usePlantRecentActivity(plantId);
-  const { items: timelineItems } = useTimelineMemory(
-    plantId ? { kind: "plant", plantId } : null,
+  const { items: evidenceItems } = useTimelineMemory(
+    plantId ? { kind: "plant", plantId, tentId: tentId ?? null } : null,
     TIMELINE_MEMORY_DEFAULT_LIMIT,
   );
 
@@ -180,10 +179,10 @@ export default function PlantDetailDoctorLaunchDialog({
               hasPlantPhoto: !!hasPlantPhoto,
             }
           : null,
-        timelineItems,
+        timelineItems: evidenceItems,
         now: now ? now.getTime() : undefined,
       }),
-    [plantId, plantName, stage, hasPlantPhoto, timelineItems, now],
+    [plantId, plantName, stage, hasPlantPhoto, evidenceItems, now],
   );
 
   const gate = useMemo(
@@ -288,7 +287,7 @@ export default function PlantDetailDoctorLaunchDialog({
 
   if (!plantId) return null;
 
-  const plantReviewHref = `${plantDetailPath(plantId)}#${PLANT_AI_DOCTOR_REVIEW_ANCHOR_ID}`;
+  const plantReviewHref = buildPlantAiDoctorReviewPath({ plantId, tentId }) ?? "/doctor";
   const missingOrStale = preview.missingCount + preview.staleCount;
   const summaryNote =
     missingOrStale === 0
@@ -309,18 +308,13 @@ export default function PlantDetailDoctorLaunchDialog({
           <ArrowRight className="h-3.5 w-3.5" />
         </Button>
       </DialogTrigger>
-      <DialogContent
-        className="sm:max-w-md"
-        data-testid={DIALOG_TEST_ID}
-      >
+      <DialogContent className="sm:max-w-md" data-testid={DIALOG_TEST_ID}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base">
             <Stethoscope className="h-4 w-4 text-[hsl(var(--info))]" aria-hidden="true" />
             Doctor context summary
           </DialogTitle>
-          <DialogDescription className="text-xs">
-            {DOCTOR_LAUNCH_HELPER_LINES[0]}
-          </DialogDescription>
+          <DialogDescription className="text-xs">{DOCTOR_LAUNCH_HELPER_LINES[0]}</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3">
@@ -374,10 +368,7 @@ export default function PlantDetailDoctorLaunchDialog({
               aria-live="polite"
               aria-labelledby="plant-detail-doctor-launch-blocked-heading"
             >
-              <h3
-                id="plant-detail-doctor-launch-blocked-heading"
-                className="sr-only"
-              >
+              <h3 id="plant-detail-doctor-launch-blocked-heading" className="sr-only">
                 AI Doctor blocked: insufficient context
               </h3>
               <p
@@ -412,10 +403,7 @@ export default function PlantDetailDoctorLaunchDialog({
               aria-live="polite"
               aria-labelledby="plant-detail-doctor-launch-snapshot-stale-heading"
             >
-              <h3
-                id="plant-detail-doctor-launch-snapshot-stale-heading"
-                className="sr-only"
-              >
+              <h3 id="plant-detail-doctor-launch-snapshot-stale-heading" className="sr-only">
                 Manual sensor snapshot is stale
               </h3>
               <p
@@ -427,7 +415,6 @@ export default function PlantDetailDoctorLaunchDialog({
             </section>
           ) : null}
         </div>
-
 
         <DialogFooter
           className="gap-2 sm:gap-2 flex-col sm:flex-row"

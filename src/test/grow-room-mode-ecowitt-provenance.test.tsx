@@ -55,17 +55,17 @@ vi.mock("@/integrations/supabase/client", () => ({
     from: (table: string) => ({
       select: (columns: string) => {
         mockState.selectCalls.push({ table, columns });
-        return {
-          in: () => ({
-            order: () => ({
-              limit: () =>
-                Promise.resolve({
-                  data: table === "sensor_readings" ? mockState.readingRows : [],
-                  error: null,
-                }),
+        const ordered = {
+          order: () => ordered,
+          limit: () =>
+            Promise.resolve({
+              data: table === "sensor_readings" ? mockState.readingRows : [],
+              error: null,
             }),
-            limit: () => Promise.resolve({ data: [], error: null }),
-          }),
+        };
+        return {
+          in: () => ordered,
+          limit: () => Promise.resolve({ data: [], error: null }),
         };
       },
     }),
@@ -105,7 +105,7 @@ describe("GrowRoomMode ECOWITT provenance", () => {
     await screen.findByTestId("grow-room-card");
     expect(mockState.selectCalls).toContainEqual({
       table: "sensor_readings",
-      columns: "tent_id,metric,value,ts,source,quality,raw_payload",
+      columns: "tent_id,metric,value,ts,captured_at,created_at,source,quality,raw_payload",
     });
   });
 

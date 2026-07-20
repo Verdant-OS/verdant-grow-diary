@@ -5,8 +5,8 @@
  * No I/O, no React, no Supabase calls. Deterministic derivations only.
  *
  * Groups long-format sensor_readings rows (already scoped to a single
- * tent by the caller) by exact `ts`, then returns the latest 3-5
- * snapshots in descending captured_at order. Source is mapped through
+ * tent by the caller) by exact observation time (`captured_at` when present,
+ * otherwise `ts`), then returns the latest 3-5 snapshots. Source is mapped through
  * the existing classification used by snapshotFromReadings so manual
  * rows surface as "manual" (never "live") and sim-only rows as "sim".
  *
@@ -21,6 +21,7 @@ import {
   type SnapshotSource,
 } from "@/lib/sensorSnapshot";
 import { formatSensorDeviceDetail } from "@/lib/sensorDeviceLabels";
+import { resolveSensorObservationTime } from "@/lib/sensorObservationTimeRules";
 
 export const RECENT_HISTORY_DEFAULT_LIMIT = 5;
 export const RECENT_HISTORY_MIN_LIMIT = 3;
@@ -63,7 +64,7 @@ function pickMetric(rows: SensorReadingLike[], metric: string): number | null {
 
 /**
  * Build a newest-first list of recent sensor snapshots from long-format
- * readings. Rows sharing the same `ts` are folded into one snapshot.
+ * readings. Rows sharing the same observation time are folded into one snapshot.
  * Returns at most `limit` (clamped to [3, 5]).
  */
 export function buildRecentSensorSnapshotHistory(
@@ -74,19 +75,22 @@ export function buildRecentSensorSnapshotHistory(
   const limit = clampLimit(opts.limit);
   const now = opts.now ?? Date.now();
 
-  // Group by exact ts, preserve incoming order (caller orders desc).
+  // Group by actual observation time, preserving historical CSV samples even
+  // when they share one import-time ts.
   const order: string[] = [];
   const byTs = new Map<string, SensorReadingLike[]>();
   for (const r of rows) {
-    if (!r || typeof r.ts !== "string") continue;
-    const t = new Date(r.ts).getTime();
+    if (!r) continue;
+    const observedAt = resolveSensorObservationTime(r);
+    if (!observedAt) continue;
+    const t = new Date(observedAt).getTime();
     if (!Number.isFinite(t)) continue;
-    const existing = byTs.get(r.ts);
+    const existing = byTs.get(observedAt);
     if (existing) {
       existing.push(r);
     } else {
-      byTs.set(r.ts, [r]);
-      order.push(r.ts);
+      byTs.set(observedAt, [r]);
+      order.push(observedAt);
     }
   }
   if (order.length === 0) return [];

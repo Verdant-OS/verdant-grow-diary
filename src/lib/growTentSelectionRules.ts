@@ -5,8 +5,7 @@
  * `t1` prevents an old demo selection from becoming a real sensor query.
  */
 
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { isUuid } from "@/lib/isUuid";
 
 export interface GrowTentSelectionCandidate {
   id?: unknown;
@@ -21,24 +20,24 @@ export interface ResolveGrowTentSelectionInput {
 export function normalizePersistedGrowTentId(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const normalized = value.trim().toLowerCase();
-  return UUID_PATTERN.test(normalized) ? normalized : null;
+  return isUuid(normalized) ? normalized : null;
 }
 
 /**
- * Preserve a valid current selection; otherwise choose the lowest valid UUID.
- * Sorting makes the result stable even if an async query returns rows in a
- * different order. No valid persisted tent means no selection.
+ * Preserve a valid current selection; otherwise choose the first valid UUID
+ * in repository order. The repository's explicit ordering is product intent;
+ * re-sorting UUIDs here would silently replace it with identifier order.
+ * No valid persisted tent means no selection.
  */
-export function resolveGrowTentSelection(
-  input: ResolveGrowTentSelectionInput,
-): string | null {
-  const availableIds = Array.from(
-    new Set(
-      (input.tents ?? [])
-        .map((tent) => normalizePersistedGrowTentId(tent?.id))
-        .filter((id): id is string => id !== null),
-    ),
-  ).sort();
+export function resolveGrowTentSelection(input: ResolveGrowTentSelectionInput): string | null {
+  const availableIds: string[] = [];
+  const seen = new Set<string>();
+  for (const tent of input.tents ?? []) {
+    const id = normalizePersistedGrowTentId(tent?.id);
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    availableIds.push(id);
+  }
 
   if (availableIds.length === 0) return null;
 

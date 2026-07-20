@@ -22,9 +22,9 @@ import {
   __growDataFallbacks,
 } from "./useGrowData";
 
-function wrapper() {
+function wrapper(retry: boolean | number = false) {
   const client = new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: 0, staleTime: 0 } },
+    defaultOptions: { queries: { retry, gcTime: 0, staleTime: 0 } },
   });
   return ({ children }: { children: React.ReactNode }) =>
     React.createElement(QueryClientProvider, { client }, children);
@@ -99,11 +99,16 @@ describe("useGrowPlants", () => {
 });
 
 describe("useGrowSensorReadings", () => {
-  it("returns empty (no mock fallback) when repo fails — Sensor Truth P0", async () => {
-    vi.mocked(repo.fetchSensorReadings).mockRejectedValue(new Error("x"));
-    const { result } = renderHook(() => useGrowSensorReadings("t2"), { wrapper: wrapper() });
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data).toEqual([]);
+  it("preserves a failed sensor read as a retryable query error without automatic retries", async () => {
+    const error = new Error("sensor read failed");
+    vi.mocked(repo.fetchSensorReadings).mockRejectedValue(error);
+    const { result } = renderHook(() => useGrowSensorReadings("t2"), {
+      wrapper: wrapper(3),
+    });
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.data).toBeUndefined();
+    expect(result.current.error).toBe(error);
+    expect(repo.fetchSensorReadings).toHaveBeenCalledTimes(1);
   });
 
   it("returns empty (no mock fallback) when repo returns []", async () => {
@@ -113,7 +118,15 @@ describe("useGrowSensorReadings", () => {
     expect(result.current.data).toEqual([]);
   });
 
-
+  it("uses null as explicit no-scope and does not call the repository", async () => {
+    const { result } = renderHook(() => useGrowSensorReadings(null), {
+      wrapper: wrapper(),
+    });
+    await Promise.resolve();
+    expect(result.current.fetchStatus).toBe("idle");
+    expect(result.current.data).toBeUndefined();
+    expect(repo.fetchSensorReadings).not.toHaveBeenCalled();
+  });
 
   it("returns live data when repo returns non-empty", async () => {
     const live = [

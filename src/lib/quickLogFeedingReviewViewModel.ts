@@ -16,10 +16,9 @@ import type {
 } from "./quickLogFeedingFormViewModel";
 
 export const FEEDING_REVIEW_TITLE = "Review feeding log" as const;
-export const FEEDING_REVIEW_DEFAULTS_FLAG =
-  "Includes prefilled feeding defaults" as const;
+export const FEEDING_REVIEW_DEFAULTS_FLAG = "Includes prefilled feeding defaults" as const;
 export const FEEDING_REVIEW_NEEDS_INPUT =
-  "Add a nutrient line and product to preview the save." as const;
+  "Add a nutrient line, applied volume, and product to preview the save." as const;
 
 export interface FeedingReviewProductLabel {
   name: string;
@@ -75,9 +74,7 @@ function buildProductLabel(row: QuickLogFeedingFormProductRow): FeedingReviewPro
   };
 }
 
-function collectOptionalMetrics(
-  form: QuickLogFeedingFormState,
-): FeedingReviewOptionalMetric[] {
+function collectOptionalMetrics(form: QuickLogFeedingFormState): FeedingReviewOptionalMetric[] {
   const metrics: FeedingReviewOptionalMetric[] = [];
 
   const push = (label: string, raw: string) => {
@@ -85,6 +82,7 @@ function collectOptionalMetrics(
     if (t !== "") metrics.push({ label, value: t });
   };
 
+  push("Applied volume (ml)", form.volumeMl);
   push("pH", form.ph);
   push("EC in", form.ecIn);
   push("PPM in (500)", form.ppmIn);
@@ -104,11 +102,11 @@ export function buildFeedingReview(
   defaultsApplied: boolean,
 ): FeedingReviewModel {
   const lineId = trim(form.lineId);
-  const presentProducts = (form.products ?? []).filter(
-    (r) => trim(r?.name ?? "") !== "",
-  );
+  const presentProducts = (form.products ?? []).filter((r) => trim(r?.name ?? "") !== "");
+  const volume = Number(trim(form.volumeMl));
+  const hasValidVolume = Number.isFinite(volume) && volume > 0;
 
-  const needsInput = lineId === "" || presentProducts.length === 0;
+  const needsInput = lineId === "" || presentProducts.length === 0 || !hasValidVolume;
 
   const productLabels = presentProducts.map(buildProductLabel);
   const optionalMetrics = collectOptionalMetrics(form);

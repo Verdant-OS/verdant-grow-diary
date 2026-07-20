@@ -7,6 +7,8 @@
  *   is not configured. Never touches hosted Supabase, never requires
  *   secrets in CI.
  * - Seeds two isolated users via a LOCAL service-role key (seeding only).
+ *   User A is also granted the operator role so owner prechecks are proven
+ *   even where legacy child-table policies permit operator-wide reads.
  *   Tool execution itself routes exclusively through per-user anon
  *   sessions (`supabaseForUser(ctx)`), never service_role.
  * - Cleans up seeded rows / users on completion.
@@ -500,6 +502,12 @@ describeIfHarness("MCP local RLS integration", () => {
     });
 
     [userA, userB] = await Promise.all([seedUser("a"), seedUser("b")]);
+    const { error: operatorRoleError } = await admin
+      .from("user_roles")
+      .upsert({ user_id: userA.id, role: "operator" }, { onConflict: "user_id,role" });
+    if (operatorRoleError) {
+      throw new Error(`grant local operator role: ${fmtDbError(operatorRoleError)}`);
+    }
   }, 60_000);
 
   afterEach((ctx) => {
@@ -634,10 +642,10 @@ describeIfHarness("MCP local RLS integration", () => {
       return res;
     }
 
-    it("User A cannot read User B's diary via B's growId (ownership-gated error, no leak)", async () => {
+    it("operator User A cannot bypass the owner grow gate to read User B's diary", async () => {
       const res = await callAs(userA, { growId: userB.primaryGrow.id, limit: 10 });
-      // The tool ownership-gates on grows (no operator policy there), so a
-      // foreign growId surfaces as an error, never as another user's rows.
+      // diary_entries has a legacy operator-wide SELECT policy. The explicit
+      // owner-only grows precheck must still reject this foreign scope first.
       expect(res.isError).toBe(true);
       assertNoForeignMarker(res, userB);
       const rows = ((res.structuredContent as any)?.entries ?? []) as any[];
@@ -708,7 +716,7 @@ describeIfHarness("MCP local RLS integration", () => {
       return res;
     }
 
-    it("User A cannot read User B's tent snapshot (ownership-gated error, no leak)", async () => {
+    it("operator User A cannot bypass the owner tent gate to read User B's snapshot", async () => {
       const res = await callAs(userA, { tentId: userB.tentId });
       // Tent ownership is verified first; a foreign tent id surfaces as an
       // error, never as another user's readings.

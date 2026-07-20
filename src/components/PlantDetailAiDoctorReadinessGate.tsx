@@ -14,22 +14,21 @@ import {
   AI_DOCTOR_READINESS_LABELS,
   type AiDoctorContextPlantSource,
 } from "@/lib/aiDoctorContextViewModel";
-import {
-  buildAiDoctorContextQuickActions,
-} from "@/lib/aiDoctorContextQuickActionsViewModel";
-import {
-  buildAiDoctorReadinessGate,
-} from "@/lib/aiDoctorReadinessGateViewModel";
+import { buildAiDoctorContextQuickActions } from "@/lib/aiDoctorContextQuickActionsViewModel";
+import { buildAiDoctorReadinessGate } from "@/lib/aiDoctorReadinessGateViewModel";
 import {
   buildAiDoctorSnapshotFreshnessStatus,
   type AiDoctorSnapshotFreshnessState,
 } from "@/lib/aiDoctorSnapshotFreshnessStatusViewModel";
 import type { AiDoctorContextReadiness } from "@/lib/aiDoctorContextRules";
 import AiDoctorContextQuickActions from "@/components/AiDoctorContextQuickActions";
+import { useTimelineMemory, TIMELINE_MEMORY_DEFAULT_LIMIT } from "@/hooks/useTimelineMemory";
+import { useRootZoneObservations } from "@/hooks/useRootZoneObservations";
 import {
-  useTimelineMemory,
-  TIMELINE_MEMORY_DEFAULT_LIMIT,
-} from "@/hooks/useTimelineMemory";
+  buildAiDoctorRootZoneReadinessScope,
+  selectSettledAiDoctorRootZoneObservations,
+} from "@/lib/aiDoctorRootZoneReadinessScopeRules";
+import { ROOT_ZONE_OBSERVATION_CAP } from "@/lib/rootZoneObservationRules";
 
 export interface PlantDetailAiDoctorReadinessGateProps {
   plantId: string;
@@ -45,10 +44,7 @@ export interface PlantDetailAiDoctorReadinessGateProps {
   hasSafeAiDoctorFlow?: boolean;
 }
 
-const READINESS_STYLES: Record<
-  AiDoctorContextReadiness,
-  { badge: string; icon: JSX.Element }
-> = {
+const READINESS_STYLES: Record<AiDoctorContextReadiness, { badge: string; icon: JSX.Element }> = {
   strong: {
     badge: "bg-emerald-500/15 text-emerald-300 border-emerald-500/40",
     icon: <CheckCircle2 className="h-4 w-4" aria-hidden="true" />,
@@ -88,11 +84,7 @@ function FreshnessRow({
 }) {
   const s = FRESHNESS_STYLES[status.state];
   const stateWord =
-    status.state === "fresh"
-      ? "Fresh"
-      : status.state === "stale"
-        ? "Stale"
-        : "Missing";
+    status.state === "fresh" ? "Fresh" : status.state === "stale" ? "Stale" : "Missing";
   const groupLabel = `Manual sensor snapshot freshness: ${stateWord}. ${status.description}`;
   return (
     <div
@@ -104,9 +96,7 @@ function FreshnessRow({
       data-snapshot-at={status.snapshotAtIso ?? ""}
       data-age-minutes={status.ageMinutes ?? ""}
     >
-      <span className="sr-only">
-        Snapshot freshness status: {stateWord}.
-      </span>
+      <span className="sr-only">Snapshot freshness status: {stateWord}.</span>
       <span
         className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] sm:text-xs shrink-0 ${s.badge}`}
         data-testid="plant-ai-doctor-readiness-gate-snapshot-freshness-badge"
@@ -130,18 +120,26 @@ export default function PlantDetailAiDoctorReadinessGate({
   plant,
   hasSafeAiDoctorFlow,
 }: PlantDetailAiDoctorReadinessGateProps) {
-  const { items } = useTimelineMemory(
-    { kind: "plant", plantId },
+  const { items: evidenceItems } = useTimelineMemory(
+    { kind: "plant", plantId, tentId: plant?.tentId ?? null },
     TIMELINE_MEMORY_DEFAULT_LIMIT,
   );
+  const rootZoneScope = buildAiDoctorRootZoneReadinessScope({
+    plantId,
+    tentId: plant?.tentId,
+    growId: plant?.growId,
+  });
+  const rootZoneHistory = useRootZoneObservations(rootZoneScope, ROOT_ZONE_OBSERVATION_CAP);
+  const rootZoneObservations = selectSettledAiDoctorRootZoneObservations(rootZoneHistory);
 
   const result = useMemo(
     () =>
       evaluateAiDoctorContextFromSources({
         plant,
-        timelineItems: items,
+        timelineItems: evidenceItems,
+        rootZoneObservations,
       }),
-    [plant, items],
+    [plant, evidenceItems, rootZoneObservations],
   );
 
   const gate = useMemo(
@@ -171,16 +169,8 @@ export default function PlantDetailAiDoctorReadinessGate({
         tentId: plant?.tentId ?? null,
         snapshotFreshnessState: freshness.state,
       }),
-    [
-      result.missing,
-      plantId,
-      plant?.name,
-      plant?.growId,
-      plant?.tentId,
-      freshness.state,
-    ],
+    [result.missing, plantId, plant?.name, plant?.growId, plant?.tentId, freshness.state],
   );
-
 
   const onPrimary = useCallback(() => {
     const id = gate.primary.anchorId;
@@ -242,8 +232,7 @@ export default function PlantDetailAiDoctorReadinessGate({
       </div>
 
       {quickActions.length > 0 &&
-      (gate.showQuickActions ||
-        quickActions.some((a) => a.kind === "capture_new_snapshot")) ? (
+      (gate.showQuickActions || quickActions.some((a) => a.kind === "capture_new_snapshot")) ? (
         <AiDoctorContextQuickActions
           actions={
             gate.showQuickActions
@@ -253,7 +242,6 @@ export default function PlantDetailAiDoctorReadinessGate({
           testIdPrefix="plant-ai-doctor-readiness-gate"
         />
       ) : null}
-
     </section>
   );
 }

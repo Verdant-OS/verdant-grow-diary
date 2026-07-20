@@ -75,7 +75,7 @@ describe("packet-loop slice — Quick Log bridge stays single-path", () => {
 
   it("the explicit-goal reset effect is intact", () => {
     expect(quickLog).toMatch(
-      /setSelectedPhenoEvidenceGoal\(null\);\s*\}, \[open, plantId, selectedPhenoHuntId\]\)/,
+      /setSelectedPhenoEvidenceGoal\(null\);\s*\}, \[open, editorPlantId, selectedPhenoHuntId\]\)/,
     );
   });
 

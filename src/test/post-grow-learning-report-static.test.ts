@@ -78,7 +78,10 @@ describe("Post-Grow Learning Report safety", () => {
     expect(HOOK).toContain('from("diary_entries")');
     expect(HOOK).toContain('from("sensor_readings")');
     expect(HOOK).toContain('from("action_queue")');
-    expect(HOOK).toContain('.select("metric,value,ts,source,raw_payload")');
+    expect(HOOK).toContain('.select("id,metric,value,ts,captured_at,source,raw_payload")');
+    expect(HOOK).toContain('.order("captured_at", { ascending: true, nullsFirst: false })');
+    expect(HOOK).toContain('.order("ts", { ascending: true })');
+    expect(HOOK).toContain('.order("id", { ascending: true })');
     expect(RULES).toContain("withoutDiagnosticSensorRows");
     expect(PAGE + CARDS).not.toMatch(/raw_payload|bridge_tokens/i);
     expect(HOOK).not.toMatch(/bridge_tokens/i);

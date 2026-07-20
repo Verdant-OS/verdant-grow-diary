@@ -135,7 +135,7 @@ export default function TentDetail() {
   const series = buildTentSensorChartSeries(readings);
   const header = buildTentSensorHeaderView(readings);
   const snap = header.snapshot;
-  const tentMeta = getGrowDataMeta(["grow", "tent", id ?? null]);
+  const tentMeta = getGrowDataMeta(["grow", "tent", id ?? null], user?.id);
   const activeCount = getActivePlantCount(activePlants);
   const hasArchived = shouldShowArchivedToggle(allPlants);
   const visiblePlants = filterVisiblePlants(allPlants, { showArchived });

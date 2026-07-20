@@ -143,6 +143,71 @@ describe("buildPostGrowLearningReportViewModel", () => {
     expect(nonEvidenceOnly.sensorReadingSources).toEqual([{ source: "demo" }]);
   });
 
+  it("orders imported history by captured_at before shared import ts for sparklines", () => {
+    const vm = buildPostGrowLearningReportViewModel({
+      grow: archivedGrow,
+      sensorReadings: [
+        {
+          id: "row-3",
+          metric: "temperature_c",
+          value: 25,
+          captured_at: "2026-03-03T00:00:00.000Z",
+          ts: "2026-07-18T12:00:00.000Z",
+          source: "csv",
+        },
+        {
+          id: "row-1",
+          metric: "temperature_c",
+          value: 20,
+          captured_at: "2026-03-01T00:00:00.000Z",
+          ts: "2026-07-18T12:00:00.000Z",
+          source: "csv",
+        },
+        {
+          id: "row-2",
+          metric: "temperature_c",
+          value: 30,
+          captured_at: "2026-03-02T00:00:00.000Z",
+          ts: "2026-07-18T12:00:00.000Z",
+          source: "csv",
+        },
+      ],
+    });
+
+    expect(vm.environment.find((metric) => metric.key === "temperature_c")?.sparkline).toEqual([
+      { x: 0, y: 0 },
+      { x: 1, y: 1 },
+      { x: 2, y: 0.5 },
+    ]);
+  });
+
+  it("uses legacy ts when captured_at is absent", () => {
+    const vm = buildPostGrowLearningReportViewModel({
+      grow: archivedGrow,
+      sensorReadings: [
+        {
+          id: "legacy-late",
+          metric: "temperature_c",
+          value: 30,
+          ts: "2026-03-02T00:00:00.000Z",
+          source: "csv",
+        },
+        {
+          id: "captured-early",
+          metric: "temperature_c",
+          value: 20,
+          captured_at: "2026-03-01T00:00:00.000Z",
+          ts: "2026-07-18T12:00:00.000Z",
+          source: "csv",
+        },
+      ],
+    });
+
+    expect(vm.environment.find((metric) => metric.key === "temperature_c")?.sparkline).toEqual([
+      { x: 0, y: 0 },
+      { x: 1, y: 1 },
+    ]);
+  });
   it("keeps active veg grows ineligible and reports thin data honestly", () => {
     const vm = buildPostGrowLearningReportViewModel({
       grow: { id: "grow-2", name: "Active Veg", stage: "veg", is_archived: false },

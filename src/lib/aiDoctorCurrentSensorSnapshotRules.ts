@@ -43,6 +43,7 @@ export interface AiDoctorCurrentSensorRowLike {
   source?: unknown;
   metric?: unknown;
   value?: unknown;
+  quality?: unknown;
   captured_at?: unknown;
   ts?: unknown;
   created_at?: unknown;
@@ -98,9 +99,20 @@ function normalizeSource(value: unknown): AiDoctorCurrentSensorSource | null {
 }
 
 function finiteNumber(value: unknown): number | null {
-  if (value === null || value === undefined || value === "") return null;
+  if (value === null || value === undefined) return null;
+  if (typeof value === "string" && value.trim().length === 0) return null;
   const n = typeof value === "number" ? value : Number(value);
   return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Older rows can predate persisted quality, so null/missing stays eligible.
+ * Once a row carries an explicit quality classification, only canonical
+ * `ok` may contribute current values to AI Doctor model context.
+ */
+function hasUsablePersistedQuality(row: AiDoctorCurrentSensorRowLike): boolean {
+  if (row.quality === null || row.quality === undefined) return true;
+  return typeof row.quality === "string" && row.quality.trim().toLowerCase() === "ok";
 }
 
 function timestampOf(row: AiDoctorCurrentSensorRowLike): { ms: number; iso: string } | null {
@@ -176,6 +188,7 @@ function toCandidate(row: AiDoctorCurrentSensorRowLike): Candidate | null {
   // successful transport test. They are never plant evidence and must not
   // reach a model as current sensor truth.
   if (isSensorTestbenchRow(row)) return null;
+  if (!hasUsablePersistedQuality(row)) return null;
   const source = normalizeSource(row.source);
   const metric = typeof row.metric === "string" ? row.metric.trim().toLowerCase() : "";
   const value = finiteNumber(row.value);

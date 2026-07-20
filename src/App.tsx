@@ -7,12 +7,15 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/store/auth";
 import { GrowsProvider } from "@/store/grows";
 import { useGoogleAnalyticsPageViews } from "@/hooks/useGoogleAnalyticsPageViews";
+import { clearGrowDataMeta } from "@/hooks/useGrowData";
 import RootErrorBoundary from "@/components/RootErrorBoundary";
 import PhenoTrackerUpgradeGate from "@/components/PhenoTrackerUpgradeGate";
 import RequireOperatorRole from "./components/RequireOperatorRole";
+import OAuthPostAuthRedirect from "@/components/OAuthPostAuthRedirect";
 import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
 import { AgreementReconsentGate } from "@/components/AgreementReconsentGate";
 import RootEntry from "@/components/RootEntry";
+import RouteAliasRedirect from "@/components/RouteAliasRedirect";
 
 // Route pages and the authenticated AppShell are code-split so the public
 // marketing / auth entry paths (/welcome, /pricing, /hardware-integrations,
@@ -40,6 +43,7 @@ const Settings = lazy(() => import("./pages/Settings"));
 const AccountPreferences = lazy(() => import("./pages/AccountPreferences"));
 const GrowerInvite = lazy(() => import("./pages/GrowerInvite"));
 const AgentIntegrations = lazy(() => import("./pages/AgentIntegrations"));
+const McpApiReference = lazy(() => import("./pages/McpApiReference"));
 const Timeline = lazy(() => import("./pages/Timeline"));
 const Grows = lazy(() => import("./pages/Grows"));
 const GrowDetail = lazy(() => import("./pages/GrowDetail"));
@@ -47,6 +51,7 @@ const GrowLearning = lazy(() => import("./pages/GrowLearning"));
 const PhenoHuntsIndex = lazy(() => import("./pages/PhenoHuntsIndex"));
 const PhenoHuntNew = lazy(() => import("./pages/PhenoHuntNew"));
 const PhenoHuntCompare = lazy(() => import("./pages/PhenoHuntCompare"));
+const PhenoHuntShowcase = lazy(() => import("./pages/PhenoHuntShowcase"));
 const PhenoHuntWorkspace = lazy(() => import("./pages/PhenoHuntWorkspace"));
 const PhenoKeepersPage = lazy(() => import("./pages/PhenoKeepersPage"));
 const BreedingLogNew = lazy(() => import("./pages/BreedingLogNew"));
@@ -57,7 +62,7 @@ const Reports = lazy(() => import("./pages/Reports"));
 const PostGrowLearningReport = lazy(() => import("./pages/PostGrowLearningReport"));
 const DiaryRangeReportPage = lazy(() => import("./pages/DiaryRangeReportPage"));
 
-const Coach = lazy(() => import("./pages/Coach"));
+const AiDoctorStart = lazy(() => import("./pages/AiDoctorStart"));
 const AiDoctorSessionDetail = lazy(() => import("./pages/AiDoctorSessionDetail"));
 const AiDoctorSessionsIndex = lazy(() => import("./pages/AiDoctorSessionsIndex"));
 const Diagnostics = lazy(() => import("./pages/Diagnostics"));
@@ -78,11 +83,19 @@ const EcowittBridgeDebug = lazy(() => import("./pages/EcowittBridgeDebug"));
 const OneTentProofRecord = lazy(() => import("./pages/OneTentProofRecord"));
 const ActionDetail = lazy(() => import("./pages/ActionDetail"));
 const GrowLineageRepair = lazy(() => import("./pages/GrowLineageRepair"));
+// Genetics & Propagation Traceability (owner-scoped, RLS-protected).
+const GeneticsLibrary = lazy(() => import("./pages/GeneticsLibrary"));
+const AccessionDetail = lazy(() => import("./pages/AccessionDetail"));
+const PropagationBatchDetail = lazy(() => import("./pages/PropagationBatchDetail"));
+const TraceabilityView = lazy(() => import("./pages/TraceabilityView"));
+const ScreeningQuarantineHistory = lazy(() => import("./pages/ScreeningQuarantineHistory"));
 // GrowRoomMode (legacy Live Dashboard) consolidated into Dashboard; /grow-room redirects.
 const DailyCheck = lazy(() => import("./pages/DailyCheck"));
 const Landing = lazy(() => import("./pages/Landing"));
 // Demo page removed — Verdant is positioned around real grow data only.
 const HardwareIntegrations = lazy(() => import("./pages/HardwareIntegrations"));
+const PartnerCsvPreviewLanding = lazy(() => import("./pages/PartnerCsvPreviewLanding"));
+const SensorCsvPreview = lazy(() => import("./pages/SensorCsvPreview"));
 const CreatorBeta = lazy(() => import("./pages/CreatorBeta"));
 const BreederBeta = lazy(() => import("./pages/BreederBeta"));
 const Pricing = lazy(() => import("./pages/Pricing"));
@@ -103,6 +116,9 @@ const CheckoutCancel = lazy(() => import("./pages/CheckoutCancel"));
 const Terms = lazy(() => import("./pages/TermsOfService"));
 const Privacy = lazy(() => import("./pages/PrivacyPolicy"));
 const Refund = lazy(() => import("./pages/RefundPolicy"));
+const Feedback = lazy(() => import("./pages/support/Feedback"));
+const Contact = lazy(() => import("./pages/support/Contact"));
+const OperatorSupportInbox = lazy(() => import("./pages/OperatorSupportInbox"));
 
 const Leads = lazy(() => import("./pages/Leads"));
 const PiIngestStatus = lazy(() => import("./pages/PiIngestStatus"));
@@ -131,6 +147,7 @@ const OperatorAiDoctorPhase1Page = lazy(() =>
 const OneTentLiveProof = lazy(() => import("./pages/OneTentLiveProof"));
 const DemoProofWalkthrough = lazy(() => import("./pages/DemoProofWalkthrough"));
 const ContextualPhenoComparisonDemo = lazy(() => import("./pages/ContextualPhenoComparisonDemo"));
+const PhenoHuntDemo = lazy(() => import("./pages/PhenoHuntDemo"));
 const PhenoComparison = lazy(() => import("./pages/PhenoComparison"));
 const PhenoExpressionShowcase = lazy(() => import("./pages/PhenoExpressionShowcase"));
 const QuickLogStarter = lazy(() => import("./pages/QuickLogStarter"));
@@ -138,6 +155,16 @@ const ReleaseReadiness = lazy(() => import("./pages/ReleaseReadiness"));
 const HealthCheck = lazy(() => import("./pages/HealthCheck"));
 
 const queryClient = new QueryClient();
+
+function clearQueryCacheBeforeAuthIdentityChange() {
+  // Defense in depth for every private query family. Owner-suffixed keys stop
+  // cross-account reuse during render; clearing removes residual rows and
+  // cancels active observers before AuthProvider exposes the next identity.
+  // Source-disclosure metadata lives outside React Query and needs the same
+  // identity fence so one grower's status cannot flash for the next account.
+  queryClient.clear();
+  clearGrowDataMeta();
+}
 
 function AnalyticsShell() {
   useGoogleAnalyticsPageViews();
@@ -176,7 +203,8 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <AnalyticsShell />
-          <AuthProvider>
+          <AuthProvider onBeforeAuthIdentityChange={clearQueryCacheBeforeAuthIdentityChange}>
+            <OAuthPostAuthRedirect />
             <GrowsProvider>
               <PaymentTestModeBanner />
               <AgreementReconsentGate />
@@ -204,6 +232,10 @@ const App = () => (
                       Old bookmarks redirect to the landing page. */}
                   <Route path="/demo" element={<Navigate to="/welcome" replace />} />
                   <Route path="/hardware-integrations" element={<HardwareIntegrations />} />
+                  {/* Public, browser-local CSV proof. Both routes stay outside
+                      AppShell and perform no private reads or writes. */}
+                  <Route path="/partners/csv-preview" element={<PartnerCsvPreviewLanding />} />
+                  <Route path="/sensors/csv-preview" element={<SensorCsvPreview />} />
                   <Route path="/creator-beta" element={<CreatorBeta />} />
                   <Route path="/breeder-beta" element={<BreederBeta />} />
                   <Route path="/pricing" element={<Pricing />} />
@@ -225,6 +257,7 @@ const App = () => (
                   <Route path="/how-ai-doctor-works" element={<HowAiDoctorWorks />} />
                   <Route path="/ai-doctor-readiness-check" element={<AiDoctorContextCheck />} />
                   <Route path="/tools/vpd-calculator" element={<PublicVpdCalculator />} />
+                  <Route path="/docs/mcp-api" element={<McpApiReference />} />
                   {/* Legacy `/billing/:plan` entry — redirect to canonical
                       `/pricing` with plan preselect + safe returnTo. */}
                   <Route path="/billing/:plan" element={<LegacyBillingRedirect />} />
@@ -233,6 +266,8 @@ const App = () => (
                   <Route path="/terms" element={<Terms />} />
                   <Route path="/privacy" element={<Privacy />} />
                   <Route path="/refund" element={<Refund />} />
+                  <Route path="/feedback" element={<Feedback />} />
+                  <Route path="/contact" element={<Contact />} />
                   <Route path="/refunds" element={<Navigate to="/refund" replace />} />
                   <Route path="/refund-policy" element={<Navigate to="/refund" replace />} />
                   <Route path="/terms-of-service" element={<Navigate to="/terms" replace />} />
@@ -264,6 +299,12 @@ const App = () => (
                     element={<ContextualPhenoComparisonDemo />}
                   />
 
+                  {/* Internal read-only FULL pheno-hunt demo — pack → triage →
+                      keepers → clones → crosses → family tree, from labeled
+                      fixture data only. No fetch/Supabase/AI/writes. Hidden by
+                      URL only. */}
+                  <Route path="/internal/pheno-hunt-demo" element={<PhenoHuntDemo />} />
+
                   {/* Read-only Pheno Comparison PREVIEW surface. Fixture-only,
                       no fetch/Supabase/AI/writes. Mounted outside AppShell so
                       the read-only surface renders without operator chrome. */}
@@ -275,6 +316,11 @@ const App = () => (
                       RLS-scoped SELECT (empty/graceful without a session);
                       still read-only — no writes/AI/automation. */}
                   <Route path="/pheno-hunts/:id/compare" element={<PhenoHuntCompare />} />
+                  {/* LIVE per-hunt showcase — the grower's own hunt walked
+                      through the pack → contenders → fight → cure → family tree
+                      surfaces. RLS-scoped read; graceful demo fallback without a
+                      session/hunt. Read-only — no writes/AI/automation. */}
+                  <Route path="/pheno-hunts/:id/showcase" element={<PhenoHuntShowcase />} />
 
                   {/* Public 30-second Quick Log starter. Local draft on this
                       device only — no Supabase/AI/device calls, no fake-live
@@ -301,12 +347,12 @@ const App = () => (
                     <Route path="/sensors" element={<Sensors />} />
                     <Route path="/timeline" element={<Timeline />} />
                     {/* Legacy alias — canonical route is /timeline. */}
-                    <Route path="/logs" element={<Navigate to="/timeline" replace />} />
+                    <Route path="/logs" element={<RouteAliasRedirect to="/timeline" />} />
                     <Route path="/tasks" element={<Tasks />} />
                     {/* /cameras route removed — out of current V0 scope. */}
                     <Route path="/alerts" element={<Alerts />} />
                     <Route path="/alerts/:alertId" element={<AlertDetail />} />
-                    <Route path="/doctor" element={<Coach />} />
+                    <Route path="/doctor" element={<AiDoctorStart />} />
                     {/* Legacy alias — canonical route is /doctor. Growers
                         sometimes type /ai-doctor; redirect rather than 404. */}
                     <Route path="/ai-doctor" element={<Navigate to="/doctor" replace />} />
@@ -318,6 +364,11 @@ const App = () => (
                         bookmarks, docs, and external links working. */}
                     <Route path="/action-queue" element={<Navigate to="/actions" replace />} />
                     <Route path="/grow-lineage" element={<GrowLineageRepair />} />
+                    <Route path="/genetics" element={<GeneticsLibrary />} />
+                    <Route path="/genetics/accessions/:id" element={<AccessionDetail />} />
+                    <Route path="/genetics/batches/:id" element={<PropagationBatchDetail />} />
+                    <Route path="/genetics/trace/:kind/:id" element={<TraceabilityView />} />
+                    <Route path="/genetics/health/:kind/:id" element={<ScreeningQuarantineHistory />} />
                     <Route path="/grows" element={<Grows />} />
                     <Route path="/grows/:growId" element={<GrowDetail />} />
                     <Route path="/grows/:growId/learning" element={<GrowLearning />} />
@@ -440,6 +491,7 @@ const App = () => (
                         element={<OperatorGgsRealPayloadIngest />}
                       />
                       <Route path="/operator/demo-preview" element={<OperatorDemoPreview />} />
+                      <Route path="/operator/support-inbox" element={<OperatorSupportInbox />} />
                       <Route path="/operator/release-readiness" element={<ReleaseReadiness />} />
                       {/* Diagnostics Audience Split v1 — /diagnostics is an
                           operator-only RLS / round-trip / DevOps surface; manifest

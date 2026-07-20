@@ -10,6 +10,7 @@ import { toFiniteNumber } from "@/lib/sensorSnapshot";
 import { normalizeSensorSource } from "@/lib/sensor/sensorSourceRules";
 import { isDiagnosticSensorProvenanceRow } from "@/lib/sensorProvenanceFenceRules";
 import { calculateAirVpdKpa } from "@/lib/vpdRules";
+import { resolveSensorObservationTime } from "@/lib/sensorObservationTimeRules";
 
 export interface EnvironmentSample {
   ts: string;
@@ -124,6 +125,7 @@ export interface SensorReadingLike {
   tent_id?: string | null;
   /** Opaque provenance envelope used only by the shared testbench fence. */
   raw_payload?: unknown;
+  captured_at?: string | null;
 }
 
 const METRIC_MAP: Record<string, "temp" | "rh" | "vpd"> = {
@@ -170,11 +172,13 @@ export function samplesFromReadings(
   for (const r of rows) {
     const rowSource = resolveTrendSource(r);
     if (rowSource === null) continue;
-    const key = `${r.tent_id ?? ""}|${r.ts}`;
+    const observedAt = resolveSensorObservationTime(r);
+    if (!observedAt) continue;
+    const key = `${r.tent_id ?? ""}|${observedAt}`;
     let s = byKey.get(key);
     if (!s) {
       s = {
-        ts: r.ts,
+        ts: observedAt,
         temp: null,
         rh: null,
         vpd: null,

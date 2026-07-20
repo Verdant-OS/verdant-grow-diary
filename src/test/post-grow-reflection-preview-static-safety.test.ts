@@ -3,6 +3,10 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { getRoutesByAccess } from "@/lib/appRouteManifest";
+import {
+  readDesktopGrowerNavigationSource,
+  readMobileGrowerNavigationSource,
+} from "@/test/utils/growerNavigationSource";
 
 const read = (path: string) => readFileSync(resolve(process.cwd(), path), "utf8");
 
@@ -11,8 +15,8 @@ const VIEW_MODEL = read("src/lib/ai/postGrowReflectionPreviewViewModel.ts");
 const CARD = read("src/components/PostGrowReflectionPreviewCard.tsx");
 const PAGE = read("src/pages/OperatorPostGrowReflectionDryRun.tsx");
 const DOCS = read("docs/post-grow-reflection-phase2f.md");
-const SIDEBAR = read("src/components/AppSidebar.tsx");
-const MOBILE_NAV = read("src/components/MobileNav.tsx");
+const SIDEBAR = readDesktopGrowerNavigationSource();
+const MOBILE_NAV = readMobileGrowerNavigationSource();
 
 describe("Post-Grow Reflection preview static safety", () => {
   it("does not introduce runtime provider, DB, schema, or device-control surfaces", () => {

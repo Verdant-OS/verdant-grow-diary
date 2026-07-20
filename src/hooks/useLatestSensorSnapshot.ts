@@ -9,9 +9,9 @@
  *
  * Backed by TanStack Query so manual sensor inserts that invalidate
  * `["latest-sensor-snapshot"]` (or `["sensor_readings"]`) trigger a refetch
- * without a hard refresh. Sort uses `ts desc, created_at desc` as a
- * deterministic tie-breaker for rows sharing a timestamp (multi-metric
- * manual entries always share `ts`).
+ * without a hard refresh. Sort uses `captured_at desc, ts desc, created_at
+ * desc` so imported historical rows are ordered by their actual observation
+ * time rather than one shared import time.
  *
  * Read-only: no .insert/.update/.delete/.upsert/.rpc. No ai-coach call.
  * No device-control surface. No elevated keys. RLS enforces ownership.
@@ -49,8 +49,9 @@ export function useLatestSensorSnapshot(
         if (tentIds.length > 0) {
           const { data, error } = await supabase
             .from("sensor_readings")
-            .select("id,ts,metric,value,quality,source,tent_id,created_at,raw_payload")
+            .select("id,ts,captured_at,metric,value,quality,source,tent_id,created_at,raw_payload")
             .in("tent_id", tentIds)
+            .order("captured_at", { ascending: false, nullsFirst: false })
             .order("ts", { ascending: false })
             .order("created_at", { ascending: false })
             .limit(50);
@@ -60,6 +61,7 @@ export function useLatestSensorSnapshot(
               evidenceRows.map((r) => ({
                 id: (r as { id?: string | null }).id ?? null,
                 ts: r.ts,
+                captured_at: (r as { captured_at?: string | null }).captured_at ?? null,
                 metric: r.metric,
                 value: r.value as number | string | null,
                 source: r.source as string | null,

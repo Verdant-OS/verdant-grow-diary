@@ -99,8 +99,8 @@ export default function Coach() {
   const { data: ctxSensors = [] } = useGrowSensorReadings(undefined);
   const { data: ctxDiary = [] } = useDiaryEntries();
   const contextSufficiency = useMemo(() => {
-    const plantsMeta = getGrowDataMeta(["grow", "plants", "all", activeGrowId ?? "all"]);
-    const sensorsMeta = getGrowDataMeta(["grow", "sensors", "all"]);
+    const plantsMeta = getGrowDataMeta(["grow", "plants", "all", activeGrowId ?? "all"], user?.id);
+    const sensorsMeta = getGrowDataMeta(["grow", "sensors", "all"], user?.id);
     const sensorEvidence = buildLegacyAiSensorEvidence(ctxSensors, sensorsMeta);
     // Route raw diary rows through the normalization rules so malformed
     // details degrade context safely and valid pH/EC/watering/photo signals

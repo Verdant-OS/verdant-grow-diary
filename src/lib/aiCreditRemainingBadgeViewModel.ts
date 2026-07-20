@@ -25,6 +25,8 @@ export interface AiCreditRemainingInput {
   scope?: AiCreditRemainingScope | null;
   scope_limit?: number | null;
   period_key?: string | null;
+  /** Server-resolved plan identity. Optional for older/replayed responses. */
+  plan_id?: string | null;
 }
 
 export interface AiCreditRemainingBadgeViewModel {

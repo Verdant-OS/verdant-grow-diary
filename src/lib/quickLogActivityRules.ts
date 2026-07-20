@@ -56,6 +56,17 @@ export interface QuickLogActivityPickerViewModelInput {
   hiddenIds?: readonly QuickLogActivityId[];
 }
 
+export interface QuickLogPrePersistenceGateInput {
+  activityId: QuickLogActivityId;
+  /** Stage read from the current selected plant immediately before saving. */
+  currentPlantStage?: unknown;
+}
+
+export interface QuickLogPrePersistenceGateResult {
+  allowed: boolean;
+  blockedReason: string | null;
+}
+
 /**
  * Resolve one activity's current UI/save availability.
  *
@@ -86,6 +97,28 @@ export function evaluateQuickLogActivityAvailability(
     disabled,
     disabledReason,
     harvestEligibility,
+  };
+}
+
+/**
+ * Fail-closed fence for the last moment before a Quick Log persistence call.
+ *
+ * This intentionally accepts current context instead of selection-time
+ * context. A Harvest selected while eligible therefore cannot remain eligible
+ * after the selected plant or its stage changes.
+ */
+export function evaluateQuickLogPrePersistenceGate({
+  activityId,
+  currentPlantStage,
+}: QuickLogPrePersistenceGateInput): QuickLogPrePersistenceGateResult {
+  const availability = evaluateQuickLogActivityAvailability(
+    activityId,
+    currentPlantStage,
+  );
+
+  return {
+    allowed: !availability.disabled,
+    blockedReason: availability.disabled ? availability.disabledReason : null,
   };
 }
 

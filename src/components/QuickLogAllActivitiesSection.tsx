@@ -45,6 +45,7 @@ import {
 } from "@/lib/dailyCheckPostSubmitRules";
 import {
   evaluateQuickLogActivityAvailability,
+  evaluateQuickLogPrePersistenceGate,
   QUICK_LOG_HARVEST_STAGE_DISABLED_REASON,
 } from "@/lib/quickLogActivityRules";
 
@@ -204,13 +205,13 @@ export default function QuickLogAllActivitiesSection({
     // Re-evaluate against CURRENT context immediately before persistence.
     // This is independent of the picker so a stale Harvest selection cannot
     // write after the selected plant/stage changes.
-    const currentAvailability = evaluateQuickLogActivityAvailability(
-      selected.id,
-      plantStage,
-    );
-    if (currentAvailability.disabled) {
+    const persistenceGate = evaluateQuickLogPrePersistenceGate({
+      activityId: selected.id,
+      currentPlantStage: plantStage,
+    });
+    if (!persistenceGate.allowed) {
       setErrorReason(
-        currentAvailability.disabledReason ??
+        persistenceGate.blockedReason ??
           selected.disabledReason ??
           "This activity is not available.",
       );

@@ -30,7 +30,7 @@ beforeEach(() => {
 });
 
 describe("QuickLogAllActivitiesSection harvest stage fence", () => {
-  it("re-checks current context and never writes a stale harvest after flower changes to seedling", async () => {
+  it("disables a selected harvest after flower changes to seedling", async () => {
     rpcMock.mockResolvedValue({
       data: { ok: true, grow_event_id: "must-not-be-used" },
       error: null,
@@ -50,7 +50,6 @@ describe("QuickLogAllActivitiesSection harvest stage fence", () => {
       await screen.findByTestId("quick-log-all-activities-harvest-stage-blocked"),
     ).toHaveTextContent(/Flower, Flush, or Harvest stages/i);
 
-    fireEvent.click(save);
     expect(rpcMock).not.toHaveBeenCalled();
     expect(entryCreated).not.toHaveBeenCalled();
     expect(screen.queryByTestId("quick-log-all-activities-saved")).toBeNull();

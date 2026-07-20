@@ -694,7 +694,21 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
     targetKeyword: "bud rot identification",
     intro:
       "Bud rot identification is a race against a fungus that hides inside the flower before it shows on the outside. Botrytis cinerea thrives when humidity climbs, temperatures drop overnight, and airflow through the canopy stalls. Verdant does not diagnose bud rot for you — but the same plant memory and sensor truth that power the rest of the app make early signs visible, and let you review the humidity and VPD history around the moment things went wrong.",
+    cta: {
+      heading: "Start an Environment Check for bud rot risk",
+      description:
+        "Open a source-labeled humidity and VPD review for your tent — see how long conditions sat in the Botrytis risk band and log any suspicious buds while the context is fresh.",
+      label: "Start Environment Check",
+      to: "/diary/environment-summary",
+      prompts: [
+        "Is late-flower humidity holding above ~60% for long stretches?",
+        "Does humidity spike overnight after lights-off?",
+        "Is VPD sliding below your late-flower target for hours at a time?",
+        "Any suspicious buds to log with a Quick Log photo right now?",
+      ],
+    },
     sections: [
+
       {
         heading: "Early visual signs to log with a photo",
         body: "Bud rot identification usually starts with one wilted or discolored sugar leaf poking out of an otherwise healthy cola, a single dry-looking pistil cluster, or a bud that feels slightly soft when you gently touch it. Inside, cores turn grey, brown, or dusty. Log every suspicious bud in Quick Log with a close photo against the specific plant so the timeline holds the moment you first saw it. One photo is not a confident diagnosis — but a photo plus the surrounding humidity, VPD, and watering context is the evidence AI Doctor and future-you actually need.",

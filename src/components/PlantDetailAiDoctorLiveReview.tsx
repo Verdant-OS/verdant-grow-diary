@@ -646,11 +646,15 @@ function PlantDetailAiDoctorLiveReviewScope({
       omittedImportedHistory: historyRecovery.state === "omitted_by_choice",
       omittedRootZoneHistory: rootZoneRecovery.state === "omitted_by_choice",
     });
-    if (!reviewStartTrackedRef.current) {
+    if (!entitlementLookupFailed && !reviewStartTrackedRef.current) {
       reviewStartTrackedRef.current = true;
       trackFunnelEvent("ai_doctor_review_started", { surface: acceptedMode });
     }
-    if (acceptedEligibility.mode === "historical_review" && !historicalStartTrackedRef.current) {
+    if (
+      !entitlementLookupFailed &&
+      acceptedEligibility.mode === "historical_review" &&
+      !historicalStartTrackedRef.current
+    ) {
       historicalStartTrackedRef.current = true;
       trackFunnelEvent("historical_ai_review_started");
     }

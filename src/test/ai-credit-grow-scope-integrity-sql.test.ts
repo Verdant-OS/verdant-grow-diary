@@ -4,7 +4,9 @@ import { describe, expect, it } from "vitest";
 
 const ROOT = resolve(__dirname, "../..");
 const read = (path: string) => readFileSync(resolve(ROOT, path), "utf8");
-const MIGRATION = read("supabase/migrations/20260720093000_ai_credit_grow_scope_integrity.sql");
+const MIGRATION = read(
+  "supabase/migrations/20260720093000_ai_credit_grow_scope_integrity.sql",
+).replace(/\r\n/g, "\n");
 const TYPES = read("src/integrations/supabase/types.ts");
 
 function functionDefinition(firstParameter: string): string {

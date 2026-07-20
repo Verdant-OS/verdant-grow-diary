@@ -342,7 +342,10 @@ describe("ordering and safety constraints at the seams", () => {
     const src = read("src/components/PlantDetailAiDoctorLiveReview.tsx");
     const startHandler = src.indexOf("const handleInitialStart");
     const acceptedGate = src.indexOf("if (!review.canStart) return;", startHandler);
-    const startDedupe = src.indexOf("if (!reviewStartTrackedRef.current)", acceptedGate);
+    const startDedupe = src.indexOf(
+      "if (!entitlementLookupFailed && !reviewStartTrackedRef.current)",
+      acceptedGate,
+    );
     const startTrack = src.indexOf('trackFunnelEvent("ai_doctor_review_started"', startDedupe);
     const frozenMode = src.indexOf("acceptedReviewModeRef.current = acceptedMode", acceptedGate);
     expect(startTrack).toBeGreaterThan(startDedupe);
@@ -449,7 +452,7 @@ describe("ordering and safety constraints at the seams", () => {
     const acceptedGate = src.indexOf("if (!acceptedEligibility.allowed) return;", requestGate);
     const acceptedRequest = src.indexOf("setAcceptedReviewRequest({", acceptedGate);
     const historicalGate = src.indexOf(
-      'if (acceptedEligibility.mode === "historical_review"',
+      'acceptedEligibility.mode === "historical_review" &&',
       acceptedRequest,
     );
     const track = src.indexOf('trackFunnelEvent("historical_ai_review_started")', historicalGate);

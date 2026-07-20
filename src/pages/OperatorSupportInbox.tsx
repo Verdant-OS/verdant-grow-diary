@@ -234,8 +234,9 @@ function ReviewControls(props: ReviewControlsProps) {
 
 export default function OperatorSupportInbox() {
   usePageSeo({
-    title: "Support Inbox · Operator",
+    title: "Support Inbox · Operator | Verdant Grow Diary",
     description: "Operator-only inbox for customer feedback and contact messages.",
+    path: "/operator/support-inbox",
     noindex: true,
   });
 

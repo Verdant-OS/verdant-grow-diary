@@ -42,6 +42,11 @@ export interface FixtureEnvValidation {
   };
 }
 
+export interface FixturePageRelationship {
+  plantHeading: string;
+  relatedTentName: string;
+}
+
 /**
  * Known patterns that indicate the URL points at a real / production grow.
  * Extend this list when new known-real plants are identified.
@@ -171,6 +176,32 @@ export function pageTextMatchesFixture(
 }
 
 /**
+ * Verify the exact Plant Detail identity and its rendered tent relationship.
+ * The caller must read these values from the page heading and the scoped
+ * `plant-detail-tent` container rather than from unrelated body text.
+ */
+export function fixturePageRelationshipMatchesExpected(
+  actual: FixturePageRelationship,
+  expected: FixtureEnvValidation["expected"],
+): { ok: boolean; errors: string[] } {
+  const errors: string[] = [];
+
+  if (actual.plantHeading.trim() !== expected.plant) {
+    errors.push(
+      `Exact Plant Detail heading '${expected.plant}' was not rendered for the configured fixture.`,
+    );
+  }
+
+  if (actual.relatedTentName.trim() !== expected.tent) {
+    errors.push(
+      `Expected related tent '${expected.tent}' was not rendered in the Plant Detail tent container.`,
+    );
+  }
+
+  return { ok: errors.length === 0, errors };
+}
+
+/**
  * Validate the already-open Plant Detail page before the Quick Log smoke
  * performs any write-producing UI action. This deliberately composes the
  * same pure env and visible-page checks used by fixture-safety.spec.ts so a
@@ -198,16 +229,36 @@ export async function validateQuickLogFixturePage(
     );
   }
 
-  // Plant and Tent are the required visible relationship. Grow remains
-  // optional until the product exposes it in the setup flow.
-  await page
-    .getByText(envCheck.expected.plant, { exact: false })
-    .first()
-    .waitFor({ state: "visible", timeout: 20_000 });
-  await page
-    .getByText(envCheck.expected.tent, { exact: false })
-    .first()
-    .waitFor({ state: "visible", timeout: 20_000 });
+  // Plant and Tent are the required visible relationship. The plant must
+  // be the exact current page h1, and the tent must be the exact name inside
+  // Plant Detail's related-tent container. Names elsewhere in body text do
+  // not satisfy this fence. Grow remains optional until the product exposes
+  // it in the setup flow.
+  const plantHeading = page.getByRole("heading", {
+    level: 1,
+    name: envCheck.expected.plant,
+    exact: true,
+  });
+  await plantHeading.waitFor({ state: "visible", timeout: 20_000 });
+
+  const relatedTentName = page
+    .getByTestId("plant-detail-tent")
+    .getByText(envCheck.expected.tent, { exact: true });
+  await relatedTentName.waitFor({ state: "visible", timeout: 20_000 });
+
+  const relationshipCheck = fixturePageRelationshipMatchesExpected(
+    {
+      plantHeading: await plantHeading.innerText(),
+      relatedTentName: await relatedTentName.innerText(),
+    },
+    envCheck.expected,
+  );
+  if (!relationshipCheck.ok) {
+    throw new Error(
+      `Plant Detail fixture relationship validation failed:\n - ${relationshipCheck.errors.join("\n - ")}`,
+    );
+  }
+
   if (envCheck.expected.grow) {
     await page
       .getByText(envCheck.expected.grow, { exact: false })

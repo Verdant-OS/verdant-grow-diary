@@ -79,7 +79,7 @@ export type QuickLogSaveRouteKind =
 /**
  * Server-side event_type value used with `quicklog_save_event`.
  * Constrained to values the DB validator currently accepts:
- *   watering | feeding | training | observation | photo | environment
+ *   watering | feeding | training | observation | photo | environment | harvest
  */
 export type QuickLogEventTypeValue =
   | "watering"

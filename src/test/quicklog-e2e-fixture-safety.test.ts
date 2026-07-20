@@ -16,6 +16,7 @@ import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import {
+  fixturePageRelationshipMatchesExpected,
   validateFixtureEnv,
   pageTextMatchesFixture,
   isLikelyRealPlantUrl,
@@ -151,6 +152,32 @@ describe("Disposable E2E fixture safety helpers", () => {
     const genericTest = pageTextMatchesFixture("Test / Test", expected);
     expect(genericTest.ok).toBe(false);
   });
+
+  it("rejects a Plant Detail heading that only prefix-matches the configured plant", () => {
+    const result = fixturePageRelationshipMatchesExpected(
+      {
+        plantHeading: "E2E Test Plant Clone",
+        relatedTentName: "E2E Test Tent",
+      },
+      validateFixtureEnv(VALID_ENV).expected,
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.errors.join("\n")).toMatch(/exact plant detail heading/i);
+  });
+
+  it("rejects the expected tent elsewhere when Plant Detail relates the plant to another tent", () => {
+    const result = fixturePageRelationshipMatchesExpected(
+      {
+        plantHeading: "E2E Test Plant",
+        relatedTentName: "E2E Test Tent Overflow",
+      },
+      validateFixtureEnv(VALID_ENV).expected,
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.errors.join("\n")).toMatch(/related tent/i);
+  });
 });
 
 describe("E2E fixture safety: source-level guardrails", () => {
@@ -190,8 +217,7 @@ describe("E2E fixture safety: source-level guardrails", () => {
     expect(spec).toMatch(/from\s+["']\.\/lib\/authedTest["']/);
     // Uses normal page.goto + assertions, no localStorage token poke
     expect(spec).not.toMatch(/localStorage[\s\S]{0,40}(token|session|auth)/i);
-    expect(spec).toContain("validateFixtureEnv");
-    expect(spec).toContain("pageTextMatchesFixture");
+    expect(spec).toContain("validateQuickLogFixturePage");
     // The authed base itself must come from @playwright/test and must only
     // replay the auth.setup snapshot — never mint or embed tokens.
     const base = read("e2e/lib/authedTest.ts");
@@ -203,6 +229,7 @@ describe("E2E fixture safety: source-level guardrails", () => {
   it("the standalone smoke validates the visible fixture immediately after navigation and before any write", () => {
     const smoke = read("e2e/quicklog-smoke.spec.ts");
     const helper = read("e2e/lib/fixtureSafety.ts");
+    const fixtureSpec = read("e2e/fixture-safety.spec.ts");
     const goto = smoke.indexOf("await page.goto(PLANT_URL!)");
     const validate = smoke.indexOf("await validateQuickLogFixturePage(page");
     const reconsent = smoke.indexOf("await acceptReconsentGateIfShown(page)");
@@ -222,8 +249,23 @@ describe("E2E fixture safety: source-level guardrails", () => {
     expect(helper).toContain("export async function validateQuickLogFixturePage");
     expect(helper).toContain("validateFixtureEnv");
     expect(helper).toContain("pageTextMatchesFixture");
-    expect(helper).toMatch(/expected\.plant[\s\S]*toBeVisible|expected\.plant[\s\S]*waitFor/);
-    expect(helper).toMatch(/expected\.tent[\s\S]*toBeVisible|expected\.tent[\s\S]*waitFor/);
+    expect(helper).toMatch(
+      /getByRole\("heading",\s*\{[\s\S]*?level:\s*1,[\s\S]*?name:\s*envCheck\.expected\.plant,[\s\S]*?exact:\s*true/,
+    );
+    expect(helper).toContain('getByTestId("plant-detail-tent")');
+    expect(helper).toMatch(
+      /plant-detail-tent[\s\S]*?getByText\(envCheck\.expected\.tent,\s*\{\s*exact:\s*true\s*\}\)/,
+    );
+    expect(helper).not.toMatch(
+      /getByText\(envCheck\.expected\.(?:plant|tent),\s*\{\s*exact:\s*false\s*\}\)/,
+    );
+
+    const fixtureGoto = fixtureSpec.indexOf("await page.goto(env.E2E_GROW_1_PLANT_URL!)");
+    const fixtureValidate = fixtureSpec.indexOf("await validateQuickLogFixturePage(page, env)");
+    expect(fixtureSpec).toMatch(
+      /import\s*\{[^}]*validateQuickLogFixturePage[^}]*\}\s*from\s*["']\.\/lib\/fixtureSafety["']/s,
+    );
+    expect(fixtureValidate).toBeGreaterThan(fixtureGoto);
   });
 });
 
@@ -454,5 +496,19 @@ describe("Package + docs wiring", () => {
       /bun run e2e:quicklog-smoke[\s\S]{0,500}(?:internally|itself)[\s\S]{0,200}(?:fixture validation|validates the fixture)/i,
     );
     expect(readme).toMatch(/Tent \+ Plant[^\n]*required[^\n]*Grow[^\n]*optional/i);
+  });
+
+  it("README direct local smoke snippets include every required fixture guard", () => {
+    const readme = read("e2e/README.md");
+    const directSmokeBlocks = [...readme.matchAll(/```(?:bash|powershell)\r?\n([\s\S]*?)```/g)]
+      .map((match) => match[1])
+      .filter((block) => /(?:^|\r?\n)bun run e2e:quicklog-smoke\r?\n?$/.test(block));
+
+    expect(directSmokeBlocks).toHaveLength(4);
+    for (const block of directSmokeBlocks) {
+      expect(block).toContain("E2E_FIXTURE_MODE");
+      expect(block).toContain("E2E_FIXTURE_EXPECTED_TENT_NAME");
+      expect(block).toContain("E2E_FIXTURE_EXPECTED_PLANT_NAME");
+    }
   });
 });

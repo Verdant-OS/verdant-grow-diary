@@ -218,6 +218,9 @@ bun run e2e:install
 ```bash
 export E2E_BASE_URL="http://localhost:5173"
 export E2E_GROW_1_PLANT_URL="http://localhost:5173/plants/<grow1-plant-id>"
+export E2E_FIXTURE_MODE="true"
+export E2E_FIXTURE_EXPECTED_TENT_NAME="E2E Test Tent"
+export E2E_FIXTURE_EXPECTED_PLANT_NAME="E2E Test Plant"
 export E2E_TEST_EMAIL="you+e2e@example.com"
 export E2E_TEST_PASSWORD="••••••••"
 
@@ -237,6 +240,9 @@ and relationship are visible, and fails before writes on any mismatch.
 ```powershell
 $env:E2E_BASE_URL          = "http://localhost:5173"
 $env:E2E_GROW_1_PLANT_URL  = "http://localhost:5173/plants/<grow1-plant-id>"
+$env:E2E_FIXTURE_MODE                = "true"
+$env:E2E_FIXTURE_EXPECTED_TENT_NAME  = "E2E Test Tent"
+$env:E2E_FIXTURE_EXPECTED_PLANT_NAME = "E2E Test Plant"
 $env:E2E_TEST_EMAIL        = "you+e2e@example.com"
 $env:E2E_TEST_PASSWORD     = "********"
 
@@ -275,6 +281,9 @@ bun run e2e:install
 
 $env:E2E_BASE_URL="https://verdantgrowdiary-com.lovable.app"
 $env:E2E_GROW_1_PLANT_URL="https://verdantgrowdiary-com.lovable.app/plants/YOUR_TEST_PLANT_ID"
+$env:E2E_FIXTURE_MODE="true"
+$env:E2E_FIXTURE_EXPECTED_TENT_NAME="E2E Test Tent"
+$env:E2E_FIXTURE_EXPECTED_PLANT_NAME="E2E Test Plant"
 $env:E2E_GROW_1_SECOND_PLANT_NAME="E2E Test Plant 2"
 $env:E2E_TEST_EMAIL="your-test-email"
 $env:E2E_TEST_PASSWORD="your-test-password"
@@ -291,6 +300,9 @@ bun run e2e:install
 
 export E2E_BASE_URL="https://verdantgrowdiary-com.lovable.app"
 export E2E_GROW_1_PLANT_URL="https://verdantgrowdiary-com.lovable.app/plants/YOUR_TEST_PLANT_ID"
+export E2E_FIXTURE_MODE="true"
+export E2E_FIXTURE_EXPECTED_TENT_NAME="E2E Test Tent"
+export E2E_FIXTURE_EXPECTED_PLANT_NAME="E2E Test Plant"
 export E2E_GROW_1_SECOND_PLANT_NAME="E2E Test Plant 2"
 export E2E_TEST_EMAIL="your-test-email"
 export E2E_TEST_PASSWORD="your-test-password"

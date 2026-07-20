@@ -730,6 +730,7 @@ export type Database = {
       }
       contact_messages: {
         Row: {
+          admin_notes: string | null
           attachment_path: string | null
           category: string
           created_at: string
@@ -738,10 +739,13 @@ export type Database = {
           id: string
           message: string
           name: string
+          reviewed_at: string | null
+          reviewed_by: string | null
           user_agent: string | null
           user_id: string | null
         }
         Insert: {
+          admin_notes?: string | null
           attachment_path?: string | null
           category: string
           created_at?: string
@@ -750,10 +754,13 @@ export type Database = {
           id?: string
           message: string
           name: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           user_agent?: string | null
           user_id?: string | null
         }
         Update: {
+          admin_notes?: string | null
           attachment_path?: string | null
           category?: string
           created_at?: string
@@ -762,6 +769,8 @@ export type Database = {
           id?: string
           message?: string
           name?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           user_agent?: string | null
           user_id?: string | null
         }
@@ -769,6 +778,7 @@ export type Database = {
       }
       customer_feedback: {
         Row: {
+          admin_notes: string | null
           ai_doctor_rating: number | null
           contact_email: string | null
           created_at: string
@@ -778,6 +788,8 @@ export type Database = {
           one_improvement: string | null
           overall_rating: number
           quicklog_rating: number | null
+          reviewed_at: string | null
+          reviewed_by: string | null
           sensors_rating: number | null
           trust_rating: number | null
           user_agent: string | null
@@ -786,6 +798,7 @@ export type Database = {
           whats_working: string | null
         }
         Insert: {
+          admin_notes?: string | null
           ai_doctor_rating?: number | null
           contact_email?: string | null
           created_at?: string
@@ -795,6 +808,8 @@ export type Database = {
           one_improvement?: string | null
           overall_rating: number
           quicklog_rating?: number | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           sensors_rating?: number | null
           trust_rating?: number | null
           user_agent?: string | null
@@ -803,6 +818,7 @@ export type Database = {
           whats_working?: string | null
         }
         Update: {
+          admin_notes?: string | null
           ai_doctor_rating?: number | null
           contact_email?: string | null
           created_at?: string
@@ -812,6 +828,8 @@ export type Database = {
           one_improvement?: string | null
           overall_rating?: number
           quicklog_rating?: number | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           sensors_rating?: number | null
           trust_rating?: number | null
           user_agent?: string | null

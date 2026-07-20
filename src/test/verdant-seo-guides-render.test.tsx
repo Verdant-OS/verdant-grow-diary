@@ -63,7 +63,7 @@ describe("/guides hub — public render", () => {
 
   it("emits canonical, title, description, OG and Twitter metadata", () => {
     renderAt("/guides");
-    expect(document.title).toContain("Verdant Grower Guides");
+    expect(document.title).toContain("Grower Guides");
     expect(readMeta('meta[name="description"]')).toMatch(
       /source-labeled sensor data/i,
     );
@@ -75,13 +75,13 @@ describe("/guides hub — public render", () => {
       "https://verdantgrowdiary.com/guides",
     );
     expect(readMeta('meta[property="og:title"]')).toContain(
-      "Verdant Grower Guides",
+      "Grower Guides",
     );
     expect(readMeta('meta[property="og:description"]')).toBeTruthy();
     expect(readMeta('meta[property="og:type"]')).toBe("website");
     expect(readMeta('meta[name="twitter:card"]')).toBe("summary_large_image");
     expect(readMeta('meta[name="twitter:title"]')).toContain(
-      "Verdant Grower Guides",
+      "Grower Guides",
     );
   });
 

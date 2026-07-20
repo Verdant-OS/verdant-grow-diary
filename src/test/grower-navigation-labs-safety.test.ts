@@ -20,6 +20,7 @@ const EXPECTED_LABS_DESTINATIONS = [
     label: "Agent Integrations",
   },
   { id: "aiSessions", to: "/doctor/sessions", label: "AI Sessions" },
+  { id: "genetics", to: "/genetics", label: "Genetics" },
 ] as const satisfies readonly GrowerNavigationDestination[];
 
 interface CandidateDestination {

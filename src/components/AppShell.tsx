@@ -143,13 +143,13 @@ export default function AppShell({ children }: { children?: ReactNode }) {
     if (!loading && !user) nav(signedOutRedirect, { replace: true });
   }, [loading, user, nav, signedOutRedirect]);
 
-  // Never carry an open tent-scoped sheet across routes. Without this reset,
-  // leaving Tent A and later entering Tent B could reopen the sheet with stale
-  // UI state or silently retarget an in-progress log.
+  // Never carry an open structured sheet or typed intent across routes. The
+  // derived mobile target is null on every unscoped route, so key this cleanup
+  // to the pathname itself rather than to that target.
   useEffect(() => {
     setOpenScopedLog(false);
     setStructuredOpenIntent(null);
-  }, [mobileQuickLogTarget]);
+  }, [location.pathname]);
 
   if (loading)
     return (

@@ -310,6 +310,10 @@ export default function QuickLog({
   // (keep any stage the grower already picked).
   const prevPlantIdRef = useRef<string>("");
   const [eventType, setEventType] = useState<string>("observation");
+  // Until the grower deliberately changes activities, treat a prefilled event
+  // as the effective submit event even if its hydration effect has not flushed.
+  // Once touched, stale prefill metadata must never override the current form.
+  const eventTypeUserTouchedRef = useRef(false);
   const [plantId, setPlantId] = useState<string>("");
   const [dismissedBlockedPrefillKey, setDismissedBlockedPrefillKey] = useState<string | null>(null);
   const [snapshot, setSnapshot] = useState(false);
@@ -429,7 +433,10 @@ export default function QuickLog({
       // flows. Preserve their known grow scope, but never invent a plant.
       setActiveGrowId(prefill.growId);
     }
-    if (prefill?.eventType) setEventType(prefill.eventType);
+    if (prefill?.eventType) {
+      eventTypeUserTouchedRef.current = false;
+      setEventType(prefill.eventType);
+    }
     if (prefill?.suggestSnapshot && prefill.tentId) setSnapshot(true);
     // Seed a starter note only when the grower has not yet typed anything,
     // so we never overwrite in-progress text on re-open.
@@ -735,6 +742,7 @@ export default function QuickLog({
     lastFailedSaveSigRef.current = null;
     setNote("");
     setShowMore(false);
+    eventTypeUserTouchedRef.current = false;
     setEventType("observation");
     setPlantId("");
     setDismissedBlockedPrefillKey(null);
@@ -777,6 +785,9 @@ export default function QuickLog({
   function handleEventTypeChange(next: string) {
     if (isMainDraftMutationLocked()) return;
     const plan = planQuickLogActionSwitchReset(eventType, next);
+    // Radix clears a controlled value when an unverified legacy Water option
+    // is filtered out. An empty callback is normalization, not grower intent.
+    if (next.trim().length > 0) eventTypeUserTouchedRef.current = true;
     setEventType(next);
     if (!plan.changed) return;
     if (plan.clearHarvest) {
@@ -835,6 +846,7 @@ export default function QuickLog({
     const keepPlantId = savedTarget?.id ?? plantId;
     setNote("");
     setShowMore(false);
+    eventTypeUserTouchedRef.current = true;
     setEventType("observation");
     setSnapshot(false);
     snapshotUserTouchedRef.current = false;
@@ -895,8 +907,12 @@ export default function QuickLog({
   async function runSubmit() {
     setSaveError(null);
 
+    const effectiveEventType = eventTypeUserTouchedRef.current
+      ? eventType
+      : (prefill?.eventType ?? eventType);
+
     if (
-      (eventType === "watering" || prefill?.eventType === "watering") &&
+      effectiveEventType === "watering" &&
       !isVerifiedPublicStarterWateringHandoff(prefill, readPublicQuickLogStarterDraft())
     ) {
       setSaveError(ORDINARY_LEGACY_WATERING_BLOCKED_COPY);

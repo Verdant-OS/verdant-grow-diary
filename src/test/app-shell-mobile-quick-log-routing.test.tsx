@@ -53,23 +53,32 @@ vi.mock("@/components/QuickLogV2Sheet", () => ({
     defaultTargetKey: string | null;
     defaultAction?: string;
     onOpenChange: (open: boolean) => void;
-  }) =>
-    open ? (
-      <div
-        data-testid="scoped-quick-log"
+  }) => (
+    <>
+      <output
+        data-testid="scoped-quick-log-state"
+        data-open={String(open)}
         data-target-key={defaultTargetKey ?? ""}
         data-action={defaultAction ?? "note"}
-      >
-        Scoped Quick Log
-        <button
-          type="button"
-          data-testid="close-scoped-quick-log"
-          onClick={() => onOpenChange(false)}
+      />
+      {open ? (
+        <div
+          data-testid="scoped-quick-log"
+          data-target-key={defaultTargetKey ?? ""}
+          data-action={defaultAction ?? "note"}
         >
-          Close scoped Quick Log
-        </button>
-      </div>
-    ) : null,
+          Scoped Quick Log
+          <button
+            type="button"
+            data-testid="close-scoped-quick-log"
+            onClick={() => onOpenChange(false)}
+          >
+            Close scoped Quick Log
+          </button>
+        </div>
+      ) : null}
+    </>
+  ),
 }));
 
 import AppShell from "@/components/AppShell";
@@ -83,6 +92,7 @@ function TestContent() {
       <span data-testid="current-path">{location.pathname}</span>
       <span data-testid="current-search">{location.search}</span>
       <Link to="/settings">Leave tent</Link>
+      <Link to="/dashboard">Open dashboard</Link>
       <Link to={`/tents/${SECOND_TENT_ID}`}>Open second tent</Link>
     </div>
   );
@@ -167,6 +177,32 @@ describe("AppShell mobile Quick Log routing", () => {
       `tent:${TENT_ID}`,
     );
     expect(screen.getByTestId("scoped-quick-log")).toHaveAttribute("data-action", "note");
+  });
+
+  it("discards a typed Water intent when navigating between unscoped routes", async () => {
+    renderAt("/settings");
+    dispatchRuntimeEvent(
+      new CustomEvent(QUICK_LOG_V2_OPEN_EVENT, {
+        detail: { targetKey: "plant:typed-plant", action: "water" },
+      }),
+    );
+    expect(screen.getByTestId("scoped-quick-log")).toHaveAttribute(
+      "data-target-key",
+      "plant:typed-plant",
+    );
+    expect(screen.getByTestId("scoped-quick-log")).toHaveAttribute("data-action", "water");
+
+    fireEvent.click(screen.getByRole("link", { name: "Open dashboard" }));
+
+    await waitFor(() => expect(screen.getByTestId("current-path")).toHaveTextContent("/dashboard"));
+    await waitFor(() => expect(screen.queryByTestId("scoped-quick-log")).not.toBeInTheDocument());
+    expect(screen.getByTestId("scoped-quick-log-state")).toHaveAttribute("data-open", "false");
+    expect(screen.getByTestId("scoped-quick-log-state")).toHaveAttribute("data-target-key", "");
+    expect(screen.getByTestId("scoped-quick-log-state")).toHaveAttribute("data-action", "note");
+
+    fireEvent.click(screen.getByTestId("mobile-quick-log-fab"));
+    expect(screen.getByTestId("legacy-quick-log")).toBeInTheDocument();
+    expect(screen.queryByTestId("scoped-quick-log")).not.toBeInTheDocument();
   });
 
   it("opens tent-scoped V2 logging from a zero-plant Tent Detail route", () => {

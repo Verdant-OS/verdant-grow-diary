@@ -16,12 +16,14 @@ const props = {
   plantId: "plant-1",
 };
 
-function section(plantStage: unknown) {
-  return <QuickLogAllActivitiesSection {...props} plantStage={plantStage} />;
+function section(plantStage: unknown, targetOverrides: Partial<typeof props> = {}) {
+  return <QuickLogAllActivitiesSection {...props} {...targetOverrides} plantStage={plantStage} />;
 }
 
 function openHarvest() {
-  fireEvent.click(screen.getByRole("button", { name: "More activity types" }));
+  if (!screen.queryByTestId("quick-log-all-activities-picker-harvest")) {
+    fireEvent.click(screen.getByRole("button", { name: "More activity types" }));
+  }
   fireEvent.click(screen.getByTestId("quick-log-all-activities-picker-harvest"));
 }
 
@@ -85,5 +87,68 @@ describe("QuickLogAllActivitiesSection harvest stage fence", () => {
     );
 
     window.removeEventListener(QUICK_LOG_V2_ENTRY_CREATED_EVENT, entryCreated);
+  });
+
+  it("drops plant A's Harvest draft before an explicit plant B re-selection", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: { ok: true, grow_event_id: "harvest-b" },
+      error: null,
+    });
+    const { rerender } = render(section("flower", { plantId: "plant-a" }));
+
+    openHarvest();
+    fireEvent.change(await screen.findByTestId("quick-log-all-activities-harvest-wet"), {
+      target: { value: "120" },
+    });
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-note"), {
+      target: { value: "Plant A main cola" },
+    });
+    expect(screen.getByTestId("quick-log-all-activities-form")).toHaveAttribute(
+      "data-activity-id",
+      "harvest",
+    );
+
+    rerender(section("flower", { plantId: "plant-b" }));
+
+    await waitFor(() =>
+      expect(screen.queryByTestId("quick-log-all-activities-form")).not.toBeInTheDocument(),
+    );
+    expect(screen.queryByTestId("quick-log-all-activities-harvest-wet")).not.toBeInTheDocument();
+    expect(rpcMock).not.toHaveBeenCalled();
+
+    openHarvest();
+    expect(screen.getByTestId("quick-log-all-activities-harvest-wet")).toHaveValue("");
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-note"), {
+      target: { value: "Plant B main cola" },
+    });
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
+
+    await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(1));
+    expect(rpcMock.mock.calls[0][1]).toMatchObject({
+      p_event_type: "harvest",
+      p_plant_id: "plant-b",
+      p_note: "Plant B main cola",
+    });
+  });
+
+  it("clears a target-specific saved receipt when the plant changes", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: { ok: true, grow_event_id: "harvest-a" },
+      error: null,
+    });
+    const { rerender } = render(section("flower", { plantId: "plant-a" }));
+
+    openHarvest();
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
+    expect(await screen.findByTestId("quick-log-all-activities-saved-item")).toHaveAttribute(
+      "data-saved-activity-id",
+      "harvest",
+    );
+
+    rerender(section("flower", { plantId: "plant-b" }));
+
+    await waitFor(() =>
+      expect(screen.queryByTestId("quick-log-all-activities-saved")).not.toBeInTheDocument(),
+    );
   });
 });

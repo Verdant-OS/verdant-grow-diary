@@ -7,12 +7,21 @@ import type { QuickLogActivityId } from "@/constants/quickLogActivityTypes";
 import {
   evaluateQuickLogPrePersistenceGate,
   QUICK_LOG_HARVEST_STAGE_DISABLED_REASON,
+  type QuickLogTargetIdentity,
 } from "@/lib/quickLogActivityRules";
+
+const target: QuickLogTargetIdentity = {
+  growId: "grow-1",
+  tentId: "tent-1",
+  plantId: "plant-1",
+};
 
 function evaluateHarvest(currentPlantStage: unknown) {
   return evaluateQuickLogPrePersistenceGate({
     activityId: "harvest",
     currentPlantStage,
+    selectedTarget: target,
+    currentTarget: target,
   });
 }
 
@@ -59,12 +68,16 @@ describe("Quick Log Harvest pre-persistence gate", () => {
       evaluateQuickLogPrePersistenceGate({
         activityId: selectedActivityId,
         currentPlantStage: "flower",
+        selectedTarget: target,
+        currentTarget: target,
       }),
     ).toMatchObject({ allowed: true });
     expect(
       evaluateQuickLogPrePersistenceGate({
         activityId: selectedActivityId,
         currentPlantStage: "seedling",
+        selectedTarget: target,
+        currentTarget: target,
       }),
     ).toEqual({
       allowed: false,
@@ -89,5 +102,7 @@ describe("Quick Log Harvest pre-persistence gate", () => {
     expect(handleSave).toMatch(
       /if \(!persistenceGate\.allowed\) \{[\s\S]*?return;[\s\S]*?await save\(\{/,
     );
+    expect(handleSave).toContain("selectedTarget: selectedDraft.target");
+    expect(handleSave).toContain("currentTarget");
   });
 });

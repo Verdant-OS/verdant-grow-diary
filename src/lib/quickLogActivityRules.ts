@@ -23,6 +23,9 @@ import {
 export const QUICK_LOG_HARVEST_STAGE_DISABLED_REASON =
   "Harvest logging becomes available in Flower, Flush, or Harvest stages.";
 
+export const QUICK_LOG_TARGET_CHANGED_REASON =
+  "The Quick Log target changed. Choose the activity again before saving.";
+
 export const QUICK_LOG_PRIMARY_ACTIVITY_IDS = Object.freeze([
   "note",
   "photo",
@@ -56,15 +59,69 @@ export interface QuickLogActivityPickerViewModelInput {
   hiddenIds?: readonly QuickLogActivityId[];
 }
 
+export interface QuickLogTargetIdentityInput {
+  growId?: string | null;
+  tentId?: string | null;
+  plantId?: string | null;
+}
+
+export interface QuickLogTargetIdentity {
+  growId: string | null;
+  tentId: string | null;
+  plantId: string | null;
+}
+
+export interface QuickLogActivityDraftBinding {
+  activityId: QuickLogActivityId;
+  target: QuickLogTargetIdentity;
+  targetKey: string;
+}
+
 export interface QuickLogPrePersistenceGateInput {
   activityId: QuickLogActivityId;
   /** Stage read from the current selected plant immediately before saving. */
   currentPlantStage?: unknown;
+  /** Exact target captured when this activity draft was selected. */
+  selectedTarget: QuickLogTargetIdentityInput | null;
+  /** Target currently shown by the presenter immediately before saving. */
+  currentTarget: QuickLogTargetIdentityInput | null;
 }
 
 export interface QuickLogPrePersistenceGateResult {
   allowed: boolean;
   blockedReason: string | null;
+}
+
+/** Normalize optional target fields so null and partial inputs compare stably. */
+export function buildQuickLogTargetIdentity(
+  input: QuickLogTargetIdentityInput | null | undefined,
+): QuickLogTargetIdentity {
+  return {
+    growId: input?.growId ?? null,
+    tentId: input?.tentId ?? null,
+    plantId: input?.plantId ?? null,
+  };
+}
+
+/** Unambiguous deterministic key for target-change detection in presenters. */
+export function buildQuickLogTargetKey(
+  input: QuickLogTargetIdentityInput | null | undefined,
+): string {
+  const target = buildQuickLogTargetIdentity(input);
+  return JSON.stringify([target.growId, target.tentId, target.plantId]);
+}
+
+/** Bind a new activity draft to the exact target visible at selection time. */
+export function bindQuickLogActivityDraft(
+  activityId: QuickLogActivityId,
+  targetInput: QuickLogTargetIdentityInput | null | undefined,
+): QuickLogActivityDraftBinding {
+  const target = buildQuickLogTargetIdentity(targetInput);
+  return {
+    activityId,
+    target,
+    targetKey: buildQuickLogTargetKey(target),
+  };
 }
 
 /**
@@ -110,7 +167,20 @@ export function evaluateQuickLogActivityAvailability(
 export function evaluateQuickLogPrePersistenceGate({
   activityId,
   currentPlantStage,
+  selectedTarget,
+  currentTarget,
 }: QuickLogPrePersistenceGateInput): QuickLogPrePersistenceGateResult {
+  if (
+    !selectedTarget ||
+    buildQuickLogTargetKey(selectedTarget) !==
+      buildQuickLogTargetKey(currentTarget)
+  ) {
+    return {
+      allowed: false,
+      blockedReason: QUICK_LOG_TARGET_CHANGED_REASON,
+    };
+  }
+
   const availability = evaluateQuickLogActivityAvailability(
     activityId,
     currentPlantStage,

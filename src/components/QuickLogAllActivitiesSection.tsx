@@ -23,7 +23,7 @@
  *   - No recommendation, no health inference, no "safe to feed / train
  *     / defoliate", no harvest readiness, no diagnosis language.
  */
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -44,9 +44,13 @@ import {
   type DailyCheckSavedSource,
 } from "@/lib/dailyCheckPostSubmitRules";
 import {
+  bindQuickLogActivityDraft,
+  buildQuickLogTargetIdentity,
+  buildQuickLogTargetKey,
   evaluateQuickLogActivityAvailability,
   evaluateQuickLogPrePersistenceGate,
   QUICK_LOG_HARVEST_STAGE_DISABLED_REASON,
+  type QuickLogActivityDraftBinding,
 } from "@/lib/quickLogActivityRules";
 
 export interface QuickLogAllActivitiesSectionProps {
@@ -130,7 +134,20 @@ export default function QuickLogAllActivitiesSection({
   saveBlocked = false,
   isSaveBlocked,
 }: QuickLogAllActivitiesSectionProps) {
-  const [selected, setSelected] = useState<QuickLogActivityDefinition | null>(null);
+  const currentTarget = useMemo(
+    () => buildQuickLogTargetIdentity({ growId, tentId, plantId }),
+    [growId, plantId, tentId],
+  );
+  const currentTargetKey = useMemo(
+    () => buildQuickLogTargetKey(currentTarget),
+    [currentTarget],
+  );
+  const previousTargetKeyRef = useRef(currentTargetKey);
+  const [selectedDraft, setSelectedDraft] =
+    useState<QuickLogActivityDraftBinding | null>(null);
+  const selected = selectedDraft
+    ? QUICK_LOG_ACTIVITY_DEFINITIONS[selectedDraft.activityId]
+    : null;
   const [note, setNote] = useState("");
   const [harvestWet, setHarvestWet] = useState("");
   const [harvestDry, setHarvestDry] = useState("");
@@ -140,6 +157,22 @@ export default function QuickLogAllActivitiesSection({
   const [errorForActivity, setErrorForActivity] = useState<QuickLogActivityId | null>(null);
   const { save, saving } = useQuickLogActivitySave();
   const localSaveInFlightRef = useRef(false);
+
+  useEffect(() => {
+    if (previousTargetKeyRef.current === currentTargetKey) return;
+    previousTargetKeyRef.current = currentTargetKey;
+
+    // Drafts and receipts are target-specific. Never carry plant A's state
+    // into plant B's Quick Log surface.
+    setSelectedDraft(null);
+    setNote("");
+    setHarvestWet("");
+    setHarvestDry("");
+    setHarvestUnit("g");
+    setErrorReason(null);
+    setErrorForActivity(null);
+    setSaved([]);
+  }, [currentTargetKey]);
 
   const canPersistManualSensor = false; // Deferred to ManualSensorReadingCard.
 
@@ -185,29 +218,26 @@ export default function QuickLogAllActivitiesSection({
       if (isMutationBlocked()) return;
       setErrorReason(null);
       setErrorForActivity(null);
-      setSelected(a);
+      setSelectedDraft(bindQuickLogActivityDraft(a.id, currentTarget));
       setNote("");
       setHarvestWet("");
       setHarvestDry("");
       setHarvestUnit("g");
     },
-    [isMutationBlocked],
+    [currentTarget, isMutationBlocked],
   );
 
   const handleSave = useCallback(async () => {
     if (isMutationBlocked()) return;
-    if (!selected) return;
-    if (!growId) {
-      setErrorReason("Missing grow context. Nothing saved.");
-      setErrorForActivity(selected.id);
-      return;
-    }
+    if (!selected || !selectedDraft) return;
     // Re-evaluate against CURRENT context immediately before persistence.
-    // This is independent of the picker so a stale Harvest selection cannot
-    // write after the selected plant/stage changes.
+    // This is independent of the picker/reset effect so a stale selection
+    // cannot write after the grow, tent, plant, or stage changes.
     const persistenceGate = evaluateQuickLogPrePersistenceGate({
       activityId: selected.id,
       currentPlantStage: plantStage,
+      selectedTarget: selectedDraft.target,
+      currentTarget,
     });
     if (!persistenceGate.allowed) {
       setErrorReason(
@@ -215,6 +245,11 @@ export default function QuickLogAllActivitiesSection({
           selected.disabledReason ??
           "This activity is not available.",
       );
+      setErrorForActivity(selected.id);
+      return;
+    }
+    if (!growId) {
+      setErrorReason("Missing grow context. Nothing saved.");
       setErrorForActivity(selected.id);
       return;
     }
@@ -323,7 +358,7 @@ export default function QuickLogAllActivitiesSection({
       setHarvestWet("");
       setHarvestDry("");
       setHarvestUnit("g");
-      setSelected(null);
+      setSelectedDraft(null);
       setErrorReason(null);
       setErrorForActivity(null);
     } finally {
@@ -332,6 +367,8 @@ export default function QuickLogAllActivitiesSection({
     }
   }, [
     selected,
+    selectedDraft,
+    currentTarget,
     growId,
     tentId,
     plantId,
@@ -578,7 +615,7 @@ export default function QuickLogAllActivitiesSection({
               variant="ghost"
               onClick={() => {
                 if (isMutationBlocked()) return;
-                setSelected(null);
+                setSelectedDraft(null);
                 setNote("");
                 setErrorReason(null);
                 setErrorForActivity(null);

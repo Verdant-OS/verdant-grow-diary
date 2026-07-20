@@ -537,6 +537,9 @@ function ToolCard({
                       size="sm"
                       variant="outline"
                       onClick={() => {
+                        // Snapshot current form values BEFORE overwriting them
+                        // so Undo can restore exactly what was on screen.
+                        setPreApplySnapshot(buildArgs());
                         onApplyArgs(state.args!);
                         setJustApplied(true);
                       }}
@@ -545,6 +548,22 @@ function ToolCard({
                     >
                       Apply changes to form
                     </Button>
+                    {justApplied && preApplySnapshot ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          onApplyArgs(preApplySnapshot);
+                          setPreApplySnapshot(null);
+                          setJustApplied(false);
+                        }}
+                        data-testid={`tool-explorer-undo-apply-${toolName}`}
+                        aria-label="Undo — restore the form values from before Apply"
+                      >
+                        Undo
+                      </Button>
+                    ) : null}
                     {justApplied ? (
                       <Button
                         type="button"
@@ -561,6 +580,7 @@ function ToolCard({
                       </Button>
                     ) : null}
                   </>
+
                 ) : null}
               </div>
 

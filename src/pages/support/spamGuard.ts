@@ -6,9 +6,11 @@ export const HONEYPOT_FIELD = "website_url" as const;
 export const MIN_FILL_MS = 2500;
 export const COOLDOWN_MS = 60_000;
 
-export type SpamCheckResult =
-  | { ok: true }
-  | { ok: false; reason: "honeypot" | "too_fast" | "duplicate" | "cooldown"; message: string };
+export type SpamCheckResult = {
+  ok: boolean;
+  reason?: "honeypot" | "too_fast" | "duplicate" | "cooldown";
+  message?: string;
+};
 
 export function checkSpam(params: {
   honeypotValue: string;

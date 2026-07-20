@@ -122,17 +122,17 @@ export function extractHead(html) {
     const contentMatch = tag.match(CONTENT_REGEX);
     if (!contentMatch) continue;
     const key = nameMatch
-      ? `name:${nameMatch[1].toLowerCase()}`
+      ? `name:${nameMatch[2].toLowerCase()}`
       : propMatch
-        ? `property:${propMatch[1].toLowerCase()}`
+        ? `property:${propMatch[2].toLowerCase()}`
         : null;
     if (!key) continue;
     // Last one wins to mirror crawler behavior on duplicates.
-    metas.set(key, decode(contentMatch[1]));
+    metas.set(key, decode(contentMatch[2]));
   }
   const titleMatch = html.match(TITLE_REGEX);
   const canonicalTag = html.match(CANONICAL_REGEX);
-  const canonical = canonicalTag ? canonicalTag[0].match(HREF_REGEX)?.[1] ?? null : null;
+  const canonical = canonicalTag ? canonicalTag[0].match(HREF_REGEX)?.[2] ?? null : null;
   return {
     title: titleMatch ? decode(titleMatch[1].trim()) : null,
     canonical: canonical ? decode(canonical) : null,

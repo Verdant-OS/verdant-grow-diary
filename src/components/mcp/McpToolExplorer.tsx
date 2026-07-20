@@ -312,7 +312,9 @@ function ToolCard({
   const [confirmBeforeRetry, setConfirmBeforeRetry] = useState(true);
   const [retryPending, setRetryPending] = useState(false);
   const [justApplied, setJustApplied] = useState(false);
+  const [preApplySnapshot, setPreApplySnapshot] = useState<Record<string, unknown> | null>(null);
   const [copiedArgs, setCopiedArgs] = useState(false);
+
 
 
 
@@ -320,6 +322,8 @@ function ToolCard({
     if (invalid) return;
     const args = buildArgs();
     setJustApplied(false);
+    setPreApplySnapshot(null);
+
     setState((prev) => ({
       loading: true,
       outcome: null,
@@ -533,6 +537,9 @@ function ToolCard({
                       size="sm"
                       variant="outline"
                       onClick={() => {
+                        // Snapshot current form values BEFORE overwriting them
+                        // so Undo can restore exactly what was on screen.
+                        setPreApplySnapshot(buildArgs());
                         onApplyArgs(state.args!);
                         setJustApplied(true);
                       }}
@@ -541,6 +548,22 @@ function ToolCard({
                     >
                       Apply changes to form
                     </Button>
+                    {justApplied && preApplySnapshot ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          onApplyArgs(preApplySnapshot);
+                          setPreApplySnapshot(null);
+                          setJustApplied(false);
+                        }}
+                        data-testid={`tool-explorer-undo-apply-${toolName}`}
+                        aria-label="Undo — restore the form values from before Apply"
+                      >
+                        Undo
+                      </Button>
+                    ) : null}
                     {justApplied ? (
                       <Button
                         type="button"
@@ -557,6 +580,7 @@ function ToolCard({
                       </Button>
                     ) : null}
                   </>
+
                 ) : null}
               </div>
 

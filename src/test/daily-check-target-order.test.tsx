@@ -12,7 +12,7 @@ import { MemoryRouter, useNavigate } from "react-router-dom";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const useSensorReadingsMock = vi.hoisted(() =>
-  vi.fn((_tentId?: string, _limit?: number) => ({ data: [] })),
+  vi.fn((_tentId?: string | null, _limit?: number) => ({ data: [] })),
 );
 const activityRenderMock = vi.hoisted(() => vi.fn());
 const quickLogRenderMock = vi.hoisted(() => vi.fn());
@@ -376,7 +376,7 @@ describe("DailyCheck target selector order and exact-target truth", () => {
     expect(screen.getByTestId("daily-grow-check-tent-select")).toBeDisabled();
     expect(screen.getByTestId("daily-grow-check-choose-snapshot")).toBeDisabled();
     expect(screen.getByTestId("daily-grow-check-choose-no-tent")).toBeVisible();
-    expect(useSensorReadingsMock).toHaveBeenLastCalledWith(undefined, 50);
+    expect(useSensorReadingsMock).toHaveBeenLastCalledWith(null, 50);
   });
 
   it("preserves an available tent-only selection when no plant is selected", async () => {
@@ -392,6 +392,16 @@ describe("DailyCheck target selector order and exact-target truth", () => {
     expect(screen.getByTestId("daily-grow-check-tent-select")).not.toBeDisabled();
     expect(screen.getByTestId("daily-grow-check-choose-snapshot")).not.toBeDisabled();
     expect(screen.getByTestId("daily-grow-check-start")).not.toBeDisabled();
+    expect(useSensorReadingsMock).toHaveBeenLastCalledWith("t1", 50);
+  });
+
+  it("uses the explicit no-scope sensor sentinel when the grow has no selectable tent", async () => {
+    mockUrlGrowId = "g-no-tent";
+    renderRoute("/daily-check?growId=g-no-tent");
+
+    expect(await screen.findByTestId("daily-grow-check-empty-no-tents-actions")).toBeVisible();
+    expect(useSensorReadingsMock).toHaveBeenLastCalledWith(null, 50);
+    expect(useSensorReadingsMock).not.toHaveBeenCalledWith(undefined, 50);
   });
 
   it("preserves Start and Back semantics while every guided surface receives the exact tent", async () => {
@@ -599,6 +609,7 @@ describe("DailyCheck target selector order and exact-target truth", () => {
     expect(screen.getByTestId("mock-quicklog")).toHaveAttribute("data-prefill-tent-id", "");
     expect(screen.getByTestId("daily-grow-check-choose-snapshot")).toBeDisabled();
     expect(screen.queryByTestId("mock-manual-card")).not.toBeInTheDocument();
+    expect(useSensorReadingsMock).toHaveBeenLastCalledWith(null, 50);
     expect(useSensorReadingsMock).not.toHaveBeenCalledWith("t-g2", 50);
   });
 
@@ -619,6 +630,7 @@ describe("DailyCheck target selector order and exact-target truth", () => {
     expect(screen.getByTestId("mock-quicklog")).toHaveAttribute("data-prefill-tent-id", "");
     expect(screen.getByTestId("daily-grow-check-choose-snapshot")).toBeDisabled();
     expect(screen.queryByTestId("mock-manual-card")).not.toBeInTheDocument();
+    expect(useSensorReadingsMock).toHaveBeenLastCalledWith(null, 50);
     expect(useSensorReadingsMock).not.toHaveBeenCalledWith("t-g2", 50);
 
     const note = screen.getByTestId("daily-grow-check-choose-quicklog");
@@ -646,6 +658,7 @@ describe("DailyCheck target selector order and exact-target truth", () => {
     expect(screen.getByTestId("mock-quicklog")).toHaveAttribute("data-prefill-tent-id", "");
     expect(screen.getByTestId("daily-grow-check-choose-snapshot")).toBeDisabled();
     expect(screen.queryByTestId("mock-manual-card")).not.toBeInTheDocument();
+    expect(useSensorReadingsMock).toHaveBeenLastCalledWith(null, 50);
     expect(useSensorReadingsMock).not.toHaveBeenCalledWith("t-g2", 50);
     expect(screen.getByTestId("daily-grow-check-choose-quicklog")).not.toBeDisabled();
   });
@@ -692,6 +705,7 @@ describe("DailyCheck target selector order and exact-target truth", () => {
         });
       }
       expect(useSensorReadingsMock).not.toHaveBeenCalledWith("t2", 50);
+      expect(useSensorReadingsMock).toHaveBeenLastCalledWith(null, 50);
       expect(manualSaveTargetMock).not.toHaveBeenCalled();
     },
   );
@@ -753,6 +767,7 @@ describe("DailyCheck target selector order and exact-target truth", () => {
     expect(screen.getByTestId("daily-grow-check-choose-snapshot")).toBeDisabled();
     expectEveryActivityRenderToUse("p-assigned", null);
     expect(useSensorReadingsMock).not.toHaveBeenCalledWith("t2", 50);
+    expect(useSensorReadingsMock).toHaveBeenLastCalledWith(null, 50);
     expect(manualSaveTargetMock).not.toHaveBeenCalled();
   });
 
@@ -786,6 +801,7 @@ describe("DailyCheck target selector order and exact-target truth", () => {
     renderRoute("/daily-check?plantId=p-untented&method=sensor");
     expect(await screen.findByTestId("daily-grow-check-choose-snapshot")).toBeDisabled();
     expect(screen.queryByTestId("mock-manual-card")).not.toBeInTheDocument();
+    expect(useSensorReadingsMock).toHaveBeenLastCalledWith(null, 50);
   });
 
   it.each([
@@ -803,6 +819,7 @@ describe("DailyCheck target selector order and exact-target truth", () => {
     expect(screen.getByTestId("daily-check-all-activities")).toHaveAttribute("data-plant-id", "");
     expect(screen.getByTestId("daily-check-all-activities")).toHaveAttribute("data-tent-id", "");
     expect(screen.getByTestId("daily-grow-check-choose-snapshot")).toBeDisabled();
+    expect(useSensorReadingsMock).toHaveBeenLastCalledWith(null, 50);
   });
 
   it("uses the effective tent in the post-submit timeline continuity link", async () => {

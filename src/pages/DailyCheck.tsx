@@ -413,7 +413,7 @@ export default function DailyCheck() {
   // Pull the latest manual readings for the current tent so we can show a
   // compact "Changed since last snapshot" panel after a sensor save.
   // Read-only — no writes, no ingestion changes.
-  const { data: tentReadings = [] } = useSensorReadings(effectiveTentId || undefined, 50);
+  const { data: tentReadings = [] } = useSensorReadings(effectiveTentId || null, 50);
   const changeContext = useMemo(
     () => deriveChangeContextFromReadings(tentReadings, { tentId: effectiveTentId }),
     [effectiveTentId, tentReadings],

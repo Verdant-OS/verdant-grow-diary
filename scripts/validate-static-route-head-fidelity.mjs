@@ -171,12 +171,14 @@ export function diffRouteHead(head, entry) {
     ...c,
     ok: c.actual === c.expected,
   }));
-  const mismatched = fields.filter((f) => !f.ok);
+  const policyIssues = policyChecks(head);
+  const allFields = [...fields, ...policyIssues];
+  const mismatched = allFields.filter((f) => !f.ok);
   return {
     path: entry.path,
     fileName: entry.fileName ?? null,
     ok: mismatched.length === 0,
-    fields,
+    fields: allFields,
     mismatched,
   };
 }

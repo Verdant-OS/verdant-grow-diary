@@ -13,16 +13,23 @@
  *     vpd derived, ppfd manual/CSV).
  *   - ec / ph              ← latest `feeding_events` values (manually logged).
  *   - dli                  ← `aggregateDli()` result (derived; often absent).
+ *   - isDay                ← the tent's `light.on` flag (`tents.light_on`),
+ *     used to pick day vs night temperature bands.
+ *
+ * Stage is normalized with the live `normalizeVpdStage`, so real `plants.stage`
+ * values (seedling | veg | flower | flush | harvest | cure) score correctly and
+ * drying/curing plants (harvest) get real dry-room targets rather than
+ * `stage_unknown`.
  *
  * Missing metrics are surfaced as `provenance: "missing"` with a `nudge`
- * describing how to supply the reading — each a monetization/engagement hook,
- * never an implication that an absent metric is healthy.
+ * describing how to supply the reading — a monetization/engagement hook, never
+ * an implication that an absent metric is healthy.
  */
 
-import {
-  SOP_BLUEPRINT_TARGETS,
-  type BlueprintStageBands,
-  type MetricBand,
+import type {
+  BlueprintStageBands,
+  BlueprintTargetStage,
+  MetricBand,
 } from "@/constants/blueprintTargets";
 import {
   evaluateBlueprintMetric,
@@ -30,10 +37,7 @@ import {
   type BlueprintMetricResult,
 } from "@/lib/blueprintMetricRules";
 import type { SensorSnapshot } from "@/lib/sensorSnapshot";
-import {
-  normalizeToCanonicalVpdTargetStage,
-  type CanonicalVpdTargetStage,
-} from "@/lib/vpdStageNormalizationRules";
+import { normalizeVpdStage, type VpdStage } from "@/lib/vpdStageTargetRules";
 
 export type BlueprintMetricProvenance = "live" | "manual" | "derived" | "missing";
 
@@ -47,6 +51,8 @@ export interface BlueprintOverlayRow {
   provenance: BlueprintMetricProvenance;
   /** Present only when the metric has no value yet — how to supply it. */
   nudge?: string;
+  /** Extra context for the row (e.g. which temp band applied). */
+  context?: string;
 }
 
 export interface BlueprintOverlaySummary {
@@ -60,6 +66,8 @@ export interface BlueprintOverlaySummary {
 export interface BlueprintOverlayViewModel {
   stageLabel: string;
   stageKnown: boolean;
+  /** Resolved day/night context: true = day, false = night, null = unknown. */
+  isDay: boolean | null;
   rows: BlueprintOverlayRow[];
   summary: BlueprintOverlaySummary;
 }
@@ -77,7 +85,9 @@ export interface BuildBlueprintOverlayInput {
   latestFeeding: { ec: number | null; ph: number | null } | null | undefined;
   /** Computed daily light integral (`aggregateDli`), or null when unavailable. */
   dli: number | null | undefined;
-  bands?: Record<CanonicalVpdTargetStage, BlueprintStageBands>;
+  /** Tent light state (`tents.light_on`): true = day, false = night, null = unknown. */
+  isDay?: boolean | null;
+  bands?: Record<BlueprintTargetStage, BlueprintStageBands>;
   warnMargin?: number;
 }
 
@@ -127,16 +137,15 @@ const METRIC_META: readonly MetricMeta[] = [
   { key: "ph", label: "pH", unit: "", missingNudge: "Log a feed in Quick Log to score pH." },
 ];
 
-const STAGE_LABELS: Record<CanonicalVpdTargetStage, string> = {
+const STAGE_LABELS: Record<VpdStage, string> = {
   seedling: "Seedling",
-  early_veg: "Early veg",
-  late_veg: "Late veg",
-  early_flower: "Early flower",
-  mid_late_flower: "Mid–late flower",
-  ripening: "Ripening",
+  veg: "Veg",
+  preflower: "Pre-flower",
+  flower: "Flower",
+  late_flower: "Late flower / flush",
+  harvest: "Dry & cure",
+  unknown: "Stage not set",
 };
-
-const STAGE_UNKNOWN_LABEL = "Stage not set";
 
 function readValue(
   metricKey: BlueprintMetricKey,
@@ -182,13 +191,19 @@ function provenanceFor(
   }
 }
 
+function tempContext(isDay: boolean | null | undefined): string {
+  if (isDay === true) return "Day target (lights on)";
+  if (isDay === false) return "Night target (lights off)";
+  return "Day/night range (set tent light state to narrow)";
+}
+
 export function buildBlueprintOverlayViewModel(
   input: BuildBlueprintOverlayInput,
 ): BlueprintOverlayViewModel {
-  const normalized = normalizeToCanonicalVpdTargetStage(input.stage);
-  const stageKnown = normalized.known;
-  const stageLabel = stageKnown ? STAGE_LABELS[normalized.canonical] : STAGE_UNKNOWN_LABEL;
-  const bands = input.bands ?? SOP_BLUEPRINT_TARGETS;
+  const stage = normalizeVpdStage(input.stage);
+  const stageKnown = stage !== "unknown";
+  const stageLabel = STAGE_LABELS[stage];
+  const isDay = input.isDay ?? null;
 
   const summary: BlueprintOverlaySummary = { green: 0, amber: 0, red: 0, missing: 0 };
 
@@ -198,7 +213,8 @@ export function buildBlueprintOverlayViewModel(
       stage: input.stage,
       metricKey: meta.key,
       value,
-      bands,
+      isDay,
+      bands: input.bands,
       warnMargin: input.warnMargin,
     });
     const provenance = provenanceFor(meta.key, value, input.snapshot?.source);
@@ -230,8 +246,11 @@ export function buildBlueprintOverlayViewModel(
     if (provenance === "missing") {
       row.nudge = meta.missingNudge;
     }
+    if (meta.key === "tempC" && stageKnown && result.band) {
+      row.context = tempContext(isDay);
+    }
     return row;
   });
 
-  return { stageLabel, stageKnown, rows, summary };
+  return { stageLabel, stageKnown, isDay, rows, summary };
 }

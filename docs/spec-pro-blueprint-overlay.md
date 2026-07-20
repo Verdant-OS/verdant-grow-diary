@@ -53,8 +53,11 @@ temp/RH/VPD light up live and the rest render as "no reading yet" prompts.
 - `SensorSnapshot.soil_ec` is effectively always null (client reads metric
   `"soil_ec"`, DB only permits `"ec"`). **Do not** use the soil_ec sensor band
   for the SOP's nutrient EC — read `feeding_events` instead.
-- `plants.stage` is a free-text `string`. Always pass it through
-  `normalizeToCanonicalVpdTargetStage` before use.
+- `plants.stage` is a DB-enforced six-value set: `seedling | veg | flower |
+flush | harvest | cure` (default `seedling`). Normalize it with the **live**
+  `normalizeVpdStage` (`vpdStageTargetRules.ts`) — the strict
+  `normalizeToCanonicalVpdTargetStage` is a dead path that rejects
+  `flush`/`harvest`/`cure`. `flush → late_flower`; `harvest` & `cure → harvest`.
 - `sensor_readings` has **no `plant_id`** — a plant inherits its assigned
   tent's readings (`useLatestSensorSnapshot(growId, tentIds)` /
   `usePlantTentLatestReadings(tentId)`).
@@ -63,27 +66,35 @@ temp/RH/VPD light up live and the rest render as "no reading yet" prompts.
 
 ## 3. Data model — the SOP bands (founder IP)
 
-**Storage (MVP):** TS constants mirroring `VPD_STAGE_TARGETS`; no migration.
-Add a per-user override DB table later (like `vpd_targets`) only if growers
-ask to tweak.
+**Storage (MVP):** TS constants; no migration. Add a per-user override DB
+table later only if growers ask to tweak.
 
-**VPD is single-sourced.** VPD already has founder-tuned, DB-backed per-stage
-bands, so the Blueprint band table deliberately **excludes** VPD and the
-evaluator pulls it from `VPD_STAGE_TARGETS`. This avoids two competing VPD
-band sets.
+**Keyed off the real stage vocabulary.** The band table is keyed by the
+**normalized `VpdStage`** (`seedling | veg | preflower | flower | late_flower |
+harvest`) that `normalizeVpdStage` produces from `plants.stage` — so a lookup
+lines up 1:1 with the app's existing per-plant VPD/temp/RH classification and
+never lands on `stage_unknown` for a real stored stage.
 
-**Stage mapping:** the SOP has 4 phases; the canonical vocabulary has 6
-stages (`seedling, early_veg, late_veg, early_flower, mid_late_flower,
-ripening`). Only `seedling` is verbatim from the SOP; the rest interpolate the
-SOP's phases across the six stages and fill DLI where the SOP is silent. Temp
-bands are **DAY targets** (day/night-awareness is v2, keyed off the tent light
-cycle). "Dry & Cure" is a post-harvest environment, not a live-plant stage —
-handled separately or omitted.
+**VPD is single-sourced** from `getVpdTargetBand` (`vpdStageTargetRules.ts`) —
+the same bands the live VPD panel uses — so there's one VPD truth, not two.
+`harvest` is context-only there (no VPD target), which the Blueprint honors.
+
+**Day/night temperature.** `tempC` carries separate `day` / `night` bands; the
+overlay picks one from the tent's `light.on` flag (`tents.light_on`) — the only
+ready per-tent day/night signal (a manual toggle; no schedule anchor time or
+timezone is stored). Unknown light state → the widest merged band, so it never
+false-alarms.
+
+**Dry & cure is real value.** `harvest` (from `plants.stage` `harvest`/`cure`)
+gets the SOP's dry-room bands (15–16 °C / 58–62 % RH) — the live stack treats
+harvest as context-only with no target, so this is new.
 
 Implemented in **`src/constants/blueprintTargets.ts`** — `MetricBand`,
-`BlueprintStageBands` (optional `tempC, rh, ec, ph, ppfd, dli`; no `vpdKpa`),
-and `SOP_BLUEPRINT_TARGETS: Record<CanonicalVpdTargetStage, BlueprintStageBands>`.
-The interpolated rows are commented and marked **founder-to-confirm**.
+`DayNightBand`, `BlueprintStageBands` (optional `tempC` day/night, `rh, ec, ph,
+ppfd, dli`; no `vpdKpa`), and
+`SOP_BLUEPRINT_TARGETS: Record<BlueprintTargetStage, BlueprintStageBands>`. Only
+`seedling` (Propagation) and `harvest` (Dry & Cure) are verbatim from the SOP;
+the rest interpolate and are marked **founder-to-confirm**.
 
 ---
 

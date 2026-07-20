@@ -10,19 +10,24 @@
  *     `stage_unknown` and is NEVER healthy.
  *   - Missing/invalid value returns `unavailable`; a metric with no band for
  *     the stage returns `no_target`. Neither is ever healthy.
- *   - Stage is normalized to the canonical six-stage vocabulary via
- *     `normalizeToCanonicalVpdTargetStage`. The legacy → canonical mapping
- *     table is NOT duplicated here.
  *
- * Design:
- *   - Generalizes `evaluateVpdAgainstStageTarget` (which is binary in/out)
- *     to any metric, adding an AMBER band: a reading just outside the target
- *     (within `warnMargin` of the edge, as a fraction of band width) is
- *     `warn_low` / `warn_high` (amber); further out is `out_low` / `out_high`
- *     (red); inside the band is `in_band` (green, the only healthy state).
- *   - VPD is single-sourced from `VPD_STAGE_TARGETS` (see `resolveBlueprintBand`)
- *     so it is never forked into a second band set. The other six metrics come
+ * Stage handling (aligned with the LIVE app stack):
+ *   - Stage is normalized with `normalizeVpdStage` (src/lib/vpdStageTargetRules.ts),
+ *     the same normalizer the per-plant/tent VPD panel uses, so the real
+ *     `plants.stage` values (seedling | veg | flower | flush | harvest | cure)
+ *     map correctly (flush → late_flower, harvest & cure → harvest). The dead
+ *     `normalizeToCanonicalVpdTargetStage` path is intentionally NOT used — it
+ *     rejects flush/harvest/cure.
+ *   - VPD is single-sourced from `getVpdTargetBand`; the other six metrics come
  *     from `SOP_BLUEPRINT_TARGETS`.
+ *   - Temperature is day/night aware: pass `isDay` (from the tent's `light.on`).
+ *     When `isDay` is unknown, the day and night bands are merged into the
+ *     widest permissive range so an unknown light state never false-alarms.
+ *
+ * Amber zone: a reading just outside the band (within `warnMargin` of the edge,
+ * as a fraction of band width) is `warn_low` / `warn_high` (amber); further out
+ * is `out_low` / `out_high` (red); inside is `in_band` (green, the only healthy
+ * state).
  *
  * See: docs/spec-pro-blueprint-overlay.md
  */
@@ -30,13 +35,11 @@
 import {
   SOP_BLUEPRINT_TARGETS,
   type BlueprintStageBands,
+  type BlueprintTargetStage,
+  type DayNightBand,
   type MetricBand,
 } from "@/constants/blueprintTargets";
-import { VPD_STAGE_TARGETS } from "@/constants/vpdTargets";
-import {
-  normalizeToCanonicalVpdTargetStage,
-  type CanonicalVpdTargetStage,
-} from "@/lib/vpdStageNormalizationRules";
+import { getVpdTargetBand, normalizeVpdStage, type VpdStage } from "@/lib/vpdStageTargetRules";
 
 /** The seven metrics the Blueprint overlay scores. */
 export type BlueprintMetricKey = "tempC" | "rh" | "vpdKpa" | "ec" | "ph" | "ppfd" | "dli";
@@ -70,12 +73,6 @@ export interface BlueprintMetricResult {
  */
 export const DEFAULT_WARN_MARGIN = 0.15;
 
-const NEUTRAL_TONE_BY_CLASSIFICATION: Partial<Record<BlueprintClassification, BlueprintTone>> = {
-  stage_unknown: "neutral",
-  no_target: "neutral",
-  unavailable: "neutral",
-};
-
 /**
  * Classify a single numeric reading against one band. Band edges are
  * inclusive (a value equal to min or max is `in_band`).
@@ -86,20 +83,10 @@ export function classifyReadingAgainstBand(
   warnMargin: number = DEFAULT_WARN_MARGIN,
 ): BlueprintMetricResult {
   if (!band) {
-    return {
-      classification: "no_target",
-      band: null,
-      tone: NEUTRAL_TONE_BY_CLASSIFICATION.no_target ?? "neutral",
-      healthy: false,
-    };
+    return { classification: "no_target", band: null, tone: "neutral", healthy: false };
   }
   if (typeof value !== "number" || !Number.isFinite(value)) {
-    return {
-      classification: "unavailable",
-      band,
-      tone: "neutral",
-      healthy: false,
-    };
+    return { classification: "unavailable", band, tone: "neutral", healthy: false };
   }
 
   const width = band.max - band.min;
@@ -118,53 +105,81 @@ export function classifyReadingAgainstBand(
   return { classification: "in_band", band, tone: "green", healthy: true };
 }
 
+/** Pick the day or night temp band; merge to the widest range when unknown. */
+export function resolveDayNightBand(
+  band: DayNightBand,
+  isDay: boolean | null | undefined,
+): MetricBand {
+  if (isDay === true) return band.day;
+  if (isDay === false) return band.night;
+  // Unknown light state → widest permissive range so we never false-alarm.
+  return {
+    min: Math.min(band.day.min, band.night.min),
+    max: Math.max(band.day.max, band.night.max),
+  };
+}
+
+export interface ResolveBlueprintBandOptions {
+  isDay?: boolean | null;
+  bands?: Record<BlueprintTargetStage, BlueprintStageBands>;
+}
+
 /**
- * Resolve the target band for a metric at a canonical stage.
- * VPD comes from `VPD_STAGE_TARGETS` (single source of truth); the other six
- * come from the provided Blueprint band table (defaults to `SOP_BLUEPRINT_TARGETS`).
- * Returns null when no band is defined for that metric/stage.
+ * Resolve the target band for a metric at a normalized stage.
+ * VPD comes from `getVpdTargetBand` (single source of truth; null when the
+ * stage is context-only, e.g. harvest). Temperature is day/night aware. The
+ * other metrics come from the Blueprint band table. Returns null when no band
+ * applies (metric not targeted for that stage, or stage is "unknown").
  */
 export function resolveBlueprintBand(
-  stage: CanonicalVpdTargetStage,
+  stage: VpdStage,
   metricKey: BlueprintMetricKey,
-  bands: Record<CanonicalVpdTargetStage, BlueprintStageBands> = SOP_BLUEPRINT_TARGETS,
+  options: ResolveBlueprintBandOptions = {},
 ): MetricBand | null {
+  if (stage === "unknown") return null;
+  const bands = options.bands ?? SOP_BLUEPRINT_TARGETS;
+
   if (metricKey === "vpdKpa") {
-    const target = VPD_STAGE_TARGETS[stage];
-    return target ? { min: target.minKpa, max: target.maxKpa } : null;
+    const target = getVpdTargetBand(stage);
+    if (target.contextOnly || target.min === null || target.max === null) return null;
+    return { min: target.min, max: target.max };
   }
-  return bands[stage]?.[metricKey] ?? null;
+
+  const stageBands = bands[stage];
+  if (!stageBands) return null;
+
+  if (metricKey === "tempC") {
+    return stageBands.tempC ? resolveDayNightBand(stageBands.tempC, options.isDay) : null;
+  }
+  return stageBands[metricKey] ?? null;
 }
 
 export interface EvaluateBlueprintMetricInput {
   stage: string | null | undefined;
   metricKey: BlueprintMetricKey;
   value: number | null | undefined;
+  /** Tent light state (from `tents.light_on`) for day/night temp bands. */
+  isDay?: boolean | null;
   /** Override band table (defaults to `SOP_BLUEPRINT_TARGETS`). */
-  bands?: Record<CanonicalVpdTargetStage, BlueprintStageBands>;
+  bands?: Record<BlueprintTargetStage, BlueprintStageBands>;
   warnMargin?: number;
 }
 
 /**
- * Stage-aware entry point: normalize the stage, resolve the band for the
- * metric, and classify the reading. Unknown stage → `stage_unknown`.
+ * Stage-aware entry point: normalize the stage (via the live `normalizeVpdStage`),
+ * resolve the band for the metric, and classify the reading. Unknown stage →
+ * `stage_unknown`.
  */
 export function evaluateBlueprintMetric(
   input: EvaluateBlueprintMetricInput,
 ): BlueprintMetricResult {
-  const normalized = normalizeToCanonicalVpdTargetStage(input.stage);
-  if (!normalized.known) {
-    return {
-      classification: "stage_unknown",
-      band: null,
-      tone: "neutral",
-      healthy: false,
-    };
+  const stage = normalizeVpdStage(input.stage);
+  if (stage === "unknown") {
+    return { classification: "stage_unknown", band: null, tone: "neutral", healthy: false };
   }
-  const band = resolveBlueprintBand(
-    normalized.canonical,
-    input.metricKey,
-    input.bands ?? SOP_BLUEPRINT_TARGETS,
-  );
+  const band = resolveBlueprintBand(stage, input.metricKey, {
+    isDay: input.isDay,
+    bands: input.bands,
+  });
   return classifyReadingAgainstBand(input.value, band, input.warnMargin);
 }

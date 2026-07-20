@@ -38,10 +38,17 @@ describe("StructuredWateringEntry", () => {
 
   it("calls the canonical writer once with the built payload and shows saved", async () => {
     const writer = vi
-      .fn<[unknown], Promise<WriteWateringTypedEventResult>>()
+      .fn<(arg: unknown) => Promise<WriteWateringTypedEventResult>>()
       .mockResolvedValue({ ok: true, eventId: "evt-1", reused: false });
     const onSaved = vi.fn();
-    render(<StructuredWateringEntry growId={GROW} tentId={TENT} writer={writer as never} onSaved={onSaved} />);
+    render(
+      <StructuredWateringEntry
+        growId={GROW}
+        tentId={TENT}
+        writer={writer as never}
+        onSaved={onSaved}
+      />,
+    );
     typeVolume("1250");
     fireEvent.click(screen.getByRole("button", { name: /save watering record/i }));
     await waitFor(() => expect(screen.getByTestId("watering-saved")).toBeTruthy());
@@ -59,7 +66,7 @@ describe("StructuredWateringEntry", () => {
       { ok: false, reason: "rpc:error" },
       { ok: true, eventId: "evt-2", reused: true },
     ];
-    const writer = vi.fn<[unknown], Promise<WriteWateringTypedEventResult>>(() =>
+    const writer = vi.fn<(arg: unknown) => Promise<WriteWateringTypedEventResult>>(() =>
       Promise.resolve(results.shift()!),
     );
     render(<StructuredWateringEntry growId={GROW} writer={writer as never} />);
@@ -76,7 +83,7 @@ describe("StructuredWateringEntry", () => {
 
   it("blank optional fields stay unknown (never coerced to zero)", async () => {
     const writer = vi
-      .fn<[unknown], Promise<WriteWateringTypedEventResult>>()
+      .fn<(arg: unknown) => Promise<WriteWateringTypedEventResult>>()
       .mockResolvedValue({ ok: true, eventId: "evt-3", reused: false });
     render(<StructuredWateringEntry growId={GROW} writer={writer as never} />);
     typeVolume("500");

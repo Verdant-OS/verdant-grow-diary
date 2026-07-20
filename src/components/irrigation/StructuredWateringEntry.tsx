@@ -98,7 +98,8 @@ export function StructuredWateringEntry({
         form,
         note,
       });
-      if (!built.ok) {
+      // strict:false does not narrow `!x.ok`; compare the discriminant explicitly.
+      if (built.ok === false) {
         setStatus("failed");
         setError(wateringFormReasonToHelper(built.reason));
         return { ok: false, reason: "rpc:rejected" };
@@ -151,7 +152,9 @@ export function StructuredWateringEntry({
     >
       <div className="flex items-center gap-2 min-w-0">
         <Droplets className="h-5 w-5 shrink-0 text-sky-300" aria-hidden />
-        <h2 className="min-w-0 truncate text-sm font-semibold text-white/85">Structured watering record</h2>
+        <h2 className="min-w-0 truncate text-sm font-semibold text-white/85">
+          Structured watering record
+        </h2>
         <span
           data-testid="watering-source-manual"
           className="ml-auto shrink-0 rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[11px] text-white/60"
@@ -200,7 +203,10 @@ export function StructuredWateringEntry({
           Review — this saves to {targetLabel} as a manual record:
         </p>
         {review.needsInput ? (
-          <p data-testid="watering-review-needs-input" className="text-xs text-amber-300 break-words">
+          <p
+            data-testid="watering-review-needs-input"
+            className="text-xs text-amber-300 break-words"
+          >
             Add the applied volume to preview the watering record.
           </p>
         ) : (
@@ -214,7 +220,9 @@ export function StructuredWateringEntry({
             {note.trim() ? (
               <li className="flex min-w-0 items-start justify-between gap-2 text-xs">
                 <span className="shrink-0 text-white/50">Note</span>
-                <span className="min-w-0 break-words text-right font-medium text-white/85">{note.trim()}</span>
+                <span className="min-w-0 break-words text-right font-medium text-white/85">
+                  {note.trim()}
+                </span>
               </li>
             ) : null}
           </ul>
@@ -223,7 +231,11 @@ export function StructuredWateringEntry({
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <Button type="submit" className="min-h-11" disabled={status === "pending" || review.needsInput}>
+        <Button
+          type="submit"
+          className="min-h-11"
+          disabled={status === "pending" || review.needsInput}
+        >
           Save watering record
         </Button>
         <div aria-live="polite" className="flex min-w-0 flex-wrap items-center gap-2 text-sm">
@@ -233,12 +245,18 @@ export function StructuredWateringEntry({
             </span>
           ) : null}
           {status === "saved" ? (
-            <span className="inline-flex items-center gap-1.5 text-emerald-300" data-testid="watering-saved">
+            <span
+              className="inline-flex items-center gap-1.5 text-emerald-300"
+              data-testid="watering-saved"
+            >
               <CheckCircle2 className="h-4 w-4" aria-hidden /> {WATERING_SAVE_SUCCESS_MESSAGE}
             </span>
           ) : null}
           {status === "failed" ? (
-            <span className="inline-flex min-w-0 flex-wrap items-center gap-2" data-testid="watering-failed">
+            <span
+              className="inline-flex min-w-0 flex-wrap items-center gap-2"
+              data-testid="watering-failed"
+            >
               <span className="inline-flex min-w-0 items-center gap-1.5 text-red-300">
                 <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />
                 <span className="min-w-0 break-words">{error ?? "Save failed."}</span>

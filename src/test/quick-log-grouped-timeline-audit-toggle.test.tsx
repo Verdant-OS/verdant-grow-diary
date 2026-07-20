@@ -41,6 +41,7 @@ vi.mock("@/integrations/supabase/client", () => {
     const q: Record<string, unknown> = {};
     q.select = () => q;
     q.eq = () => q;
+    q.not = () => q;
     q.in = () => q;
     q.or = () => q;
     q.order = () => q;
@@ -50,9 +51,7 @@ vi.mock("@/integrations/supabase/client", () => {
   return { supabase: { from: () => makeQuery() } };
 });
 
-function renderSection(
-  props: Parameters<typeof QuickLogGroupedTimelineSection>[0],
-) {
+function renderSection(props: Parameters<typeof QuickLogGroupedTimelineSection>[0]) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
@@ -133,15 +132,9 @@ describe("Grouped Timeline Audit Toggle — defaults", () => {
     await waitFor(() => screen.getByTestId("quick-log-grouped-timeline-list"));
     const card = screen.getByTestId("quick-log-grouped-card");
     expect(card.getAttribute("data-audit-expanded")).toBe("false");
-    expect(
-      within(card).queryByTestId("quick-log-grouped-audit-expanded"),
-    ).toBeNull();
-    expect(within(card).getByTestId("quick-log-grouped-audit-toggle").textContent).toBe(
-      EXPAND,
-    );
-    expect(within(card).getByTestId("quick-log-grouped-action-source").textContent).toBe(
-      "Manual",
-    );
+    expect(within(card).queryByTestId("quick-log-grouped-audit-expanded")).toBeNull();
+    expect(within(card).getByTestId("quick-log-grouped-audit-toggle").textContent).toBe(EXPAND);
+    expect(within(card).getByTestId("quick-log-grouped-action-source").textContent).toBe("Manual");
   });
 
   it("grouped Note + env renders collapsed by default", async () => {
@@ -153,9 +146,7 @@ describe("Grouped Timeline Audit Toggle — defaults", () => {
     await waitFor(() => screen.getByTestId("quick-log-grouped-timeline-list"));
     const card = screen.getByTestId("quick-log-grouped-card");
     expect(card.getAttribute("data-audit-expanded")).toBe("false");
-    expect(within(card).getByTestId("quick-log-grouped-audit-toggle").textContent).toBe(
-      EXPAND,
-    );
+    expect(within(card).getByTestId("quick-log-grouped-audit-toggle").textContent).toBe(EXPAND);
   });
 });
 
@@ -170,31 +161,21 @@ describe("Grouped Timeline Audit Toggle — expand / collapse", () => {
     const card = screen.getByTestId("quick-log-grouped-card");
     fireEvent.click(within(card).getByTestId("quick-log-grouped-audit-toggle"));
     expect(card.getAttribute("data-audit-expanded")).toBe("true");
-    expect(
-      within(card).getByTestId("quick-log-grouped-audit-action-subcard"),
-    ).toBeInTheDocument();
+    expect(within(card).getByTestId("quick-log-grouped-audit-action-subcard")).toBeInTheDocument();
     expect(
       within(card).getByTestId("quick-log-grouped-audit-environment-subcard"),
     ).toBeInTheDocument();
     expect(
-      within(card).getByTestId(
-        "quick-log-grouped-audit-action-subcard-title",
-      ).textContent,
+      within(card).getByTestId("quick-log-grouped-audit-action-subcard-title").textContent,
     ).toBe("Action event");
     expect(
-      within(card).getByTestId(
-        "quick-log-grouped-audit-environment-subcard-title",
-      ).textContent,
+      within(card).getByTestId("quick-log-grouped-audit-environment-subcard-title").textContent,
     ).toBe("Manual environment snapshot");
-    expect(
-      within(card).getByTestId("quick-log-grouped-action-source").textContent,
-    ).toBe("Manual");
-    expect(
-      within(card).getByTestId("manual-snapshot-timeline-card-source").textContent,
-    ).toBe("Manual");
-    expect(within(card).getByTestId("quick-log-grouped-audit-toggle").textContent).toBe(
-      COLLAPSE,
+    expect(within(card).getByTestId("quick-log-grouped-action-source").textContent).toBe("Manual");
+    expect(within(card).getByTestId("manual-snapshot-timeline-card-source").textContent).toBe(
+      "Manual",
     );
+    expect(within(card).getByTestId("quick-log-grouped-audit-toggle").textContent).toBe(COLLAPSE);
   });
 
   it("collapse button restores collapsed grouped view", async () => {
@@ -209,9 +190,7 @@ describe("Grouped Timeline Audit Toggle — expand / collapse", () => {
     fireEvent.click(toggle);
     fireEvent.click(toggle);
     expect(card.getAttribute("data-audit-expanded")).toBe("false");
-    expect(
-      within(card).queryByTestId("quick-log-grouped-audit-expanded"),
-    ).toBeNull();
+    expect(within(card).queryByTestId("quick-log-grouped-audit-expanded")).toBeNull();
     expect(toggle.textContent).toBe(EXPAND);
   });
 });
@@ -223,9 +202,7 @@ describe("Grouped Timeline Audit Toggle — non-grouped entries", () => {
     await waitFor(() => screen.getByTestId("quick-log-grouped-timeline-list"));
     const card = screen.getByTestId("quick-log-grouped-card");
     expect(card.getAttribute("data-entry-kind")).toBe("environment");
-    expect(
-      within(card).queryByTestId("quick-log-grouped-audit-toggle"),
-    ).toBeNull();
+    expect(within(card).queryByTestId("quick-log-grouped-audit-toggle")).toBeNull();
   });
 
   it("ambiguous/unpaired action entries do not render the audit toggle", async () => {
@@ -262,9 +239,7 @@ describe("Grouped Timeline Audit Toggle — telemetry severity", () => {
     await waitFor(() => screen.getByTestId("quick-log-grouped-timeline-list"));
     const card = screen.getByTestId("quick-log-grouped-card");
     fireEvent.click(within(card).getByTestId("quick-log-grouped-audit-toggle"));
-    const subcard = within(card).getByTestId(
-      "quick-log-grouped-audit-environment-subcard",
-    );
+    const subcard = within(card).getByTestId("quick-log-grouped-audit-environment-subcard");
     const inner = within(subcard).getByTestId("manual-snapshot-timeline-card");
     expect(["warning", "invalid"]).toContain(inner.getAttribute("data-severity"));
   });
@@ -319,9 +294,7 @@ describe("Grouped Timeline Audit Toggle — invariants", () => {
     await waitFor(() => screen.getByTestId("quick-log-grouped-timeline-list"));
     fireEvent.click(screen.getByTestId("quick-log-grouped-audit-toggle"));
     const text =
-      screen
-        .getByTestId("quick-log-grouped-timeline-section")
-        .textContent?.toLowerCase() ?? "";
+      screen.getByTestId("quick-log-grouped-timeline-section").textContent?.toLowerCase() ?? "";
     expect(text).not.toMatch(/\blive\b/);
     expect(text).not.toMatch(/\bsynced\b/);
     expect(text).not.toMatch(/\bconnected\b/);

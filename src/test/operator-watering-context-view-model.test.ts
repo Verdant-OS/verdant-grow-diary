@@ -102,7 +102,7 @@ function readyState(overrides: Partial<OperatorWateringReadState> = {}): Operato
 }
 
 describe("operator watering context view model", () => {
-  it("presents the last confirmed typed watering, exact available metrics, and bounded observations", () => {
+  it("presents the latest root-zone application, separate water/feed evidence, and bounded observations", () => {
     const state = readyState({
       rootZone: {
         status: "ready",
@@ -147,10 +147,23 @@ describe("operator watering context view model", () => {
       label: "Output EC",
       valueLabel: "1.50 mS/cm · 750 ppm (500 scale)",
     });
+    expect(model.lastRootZoneApplication).toMatchObject({
+      occurredAt: "2026-07-19T18:30:00.000Z",
+      eventType: "feeding",
+      eventLabel: "Feed",
+      sourceLabel: "Manual log",
+    });
     expect(model.lastConfirmedWatering).toMatchObject({
       occurredAt: "2026-07-19T18:00:00.000Z",
+      eventType: "watering",
+      eventLabel: "Plain water",
       sourceLabel: "Manual log",
       hasRejectedMetrics: false,
+    });
+    expect(model.lastConfirmedFeeding).toMatchObject({
+      occurredAt: "2026-07-19T18:30:00.000Z",
+      eventType: "feeding",
+      eventLabel: "Feed",
     });
     expect(model.lastConfirmedWatering?.metrics).toEqual([
       { key: "volume_ml", label: "Volume", valueLabel: "900 mL" },
@@ -166,9 +179,11 @@ describe("operator watering context view model", () => {
     expect(model.diaryObservations.at(-1)?.note).toBe("Observation text hidden.");
     expect(model.missingContext).toEqual([]);
     expect(model.decisionReminder).toBe(
-      "Review the plant, pot weight or medium, drainage, and recent watering before deciding.",
+      "Review the plant, pot weight or medium, drainage, and recent water or feed applications before deciding.",
     );
-    expect(model.snapshotCaveat).toBe("One sensor snapshot is not a dryback trend.");
+    expect(model.snapshotCaveat).toBe(
+      "One sensor snapshot is not a dryback trend; elapsed review starts after the latest root-zone application.",
+    );
     expect(model.airContextCaveat).toBe("Air readings alone do not determine watering.");
   });
 
@@ -190,14 +205,15 @@ describe("operator watering context view model", () => {
     );
 
     expect(model.lastConfirmedWatering).toBeNull();
+    expect(model.lastRootZoneApplication).toBeNull();
     expect(model.typedWateringCount).toBe(0);
     expect(model.diaryObservationCount).toBe(1);
     expect(model.diaryObservations[0].note).toContain("Watered two liters");
     expect(model.status).toBe("insufficient");
-    expect(model.missingContext).toContain("typed_watering_history");
+    expect(model.missingContext).toContain("typed_root_zone_history");
   });
 
-  it("keeps typed feeding separate from confirmed watering", () => {
+  it("uses a typed feed as the latest root-zone application without calling it plain water", () => {
     const model = buildOperatorWateringContextViewModel(
       readyState({
         rootZone: {
@@ -210,7 +226,14 @@ describe("operator watering context view model", () => {
     expect(model.typedFeedingCount).toBe(1);
     expect(model.typedWateringCount).toBe(0);
     expect(model.lastConfirmedWatering).toBeNull();
-    expect(model.status).toBe("insufficient");
+    expect(model.lastRootZoneApplication).toMatchObject({
+      eventType: "feeding",
+      eventLabel: "Feed",
+      occurredAt: "2026-07-19T18:00:00.000Z",
+    });
+    expect(model.lastConfirmedFeeding).toEqual(model.lastRootZoneApplication);
+    expect(model.status).toBe("context");
+    expect(model.missingContext).not.toContain("typed_root_zone_history");
   });
 
   it("does not let a future-only watering satisfy confirmed history", () => {
@@ -230,10 +253,35 @@ describe("operator watering context view model", () => {
 
     expect(model.typedWateringCount).toBe(1);
     expect(model.lastConfirmedWatering).toBeNull();
-    expect(model.missingContext).toContain("typed_watering_history");
+    expect(model.lastRootZoneApplication).toBeNull();
+    expect(model.missingContext).toContain("typed_root_zone_history");
     expect(model.recentRootZoneCycles[0].warnings).toContain(
       "Timestamp is in the future; verify the recorded time before interpreting this record.",
     );
+  });
+
+  it("anchors history to the latest non-future application when a newer feed is future-dated", () => {
+    const model = buildOperatorWateringContextViewModel(
+      readyState({
+        rootZone: {
+          status: "ready",
+          observations: [
+            rootZoneObservation("2026-07-19T10:06:00.001Z", "feeding"),
+            rootZoneObservation("2026-07-19T09:00:00.000Z", "watering"),
+          ],
+        },
+      }),
+      { now: Date.parse("2026-07-19T10:00:00.000Z") },
+    );
+
+    expect(model.lastRootZoneApplication).toMatchObject({
+      eventType: "watering",
+      eventLabel: "Plain water",
+      occurredAt: "2026-07-19T09:00:00.000Z",
+    });
+    expect(model.lastConfirmedWatering).toEqual(model.lastRootZoneApplication);
+    expect(model.lastConfirmedFeeding).toBeNull();
+    expect(model.status).toBe("context");
   });
 
   it("reports insufficient context when typed watering history is absent or soil moisture is absent", () => {
@@ -253,7 +301,7 @@ describe("operator watering context view model", () => {
     );
 
     expect(noHistory.status).toBe("insufficient");
-    expect(noHistory.missingContext).toEqual(["typed_watering_history"]);
+    expect(noHistory.missingContext).toEqual(["typed_root_zone_history"]);
     expect(noSoil.status).toBe("insufficient");
     expect(noSoil.missingContext).toEqual(["soil_moisture_snapshot"]);
     expect(noSoil.sensorRows.every((row) => row.contextLabel === "Air context only")).toBe(true);
@@ -270,6 +318,7 @@ describe("operator watering context view model", () => {
     });
 
     expect(loading.status).toBe("loading");
+    expect(loading.lastRootZoneApplication).toBeNull();
     expect(loading.lastConfirmedWatering).toBeNull();
     expect(unavailable.status).toBe("unavailable");
     expect(unavailable.summary).toContain("unavailable");
@@ -445,7 +494,9 @@ describe("operator watering context view model", () => {
     expect(() => buildOperatorWateringContextViewModel(malformed)).not.toThrow();
     expect(buildOperatorWateringContextViewModel(malformed)).toMatchObject({
       status: "insufficient",
+      lastRootZoneApplication: null,
       lastConfirmedWatering: null,
+      lastConfirmedFeeding: null,
       typedWateringCount: 0,
       diaryObservationCount: 0,
       sensorRows: [],

@@ -192,10 +192,25 @@ describe("OperatorAccountReadModelsPanel", () => {
     });
 
     const card = screen.getByTestId("operator-watering-context-card");
-    expect(within(card).getByText(/last confirmed typed watering/i)).toBeInTheDocument();
+    expect(within(card).getByText(/last root-zone application/i)).toBeInTheDocument();
     expect(
-      within(screen.getByTestId("operator-last-confirmed-watering")).getByText(/900 ml/i),
+      within(screen.getByTestId("operator-last-root-zone-application")).getByText(/1000 ml/i),
     ).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("operator-last-root-zone-application")).getByText("Feed"),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("operator-last-plain-water")).toHaveTextContent(/last plain water/i);
+    expect(
+      screen
+        .getByTestId("operator-last-plain-water")
+        .querySelector('time[datetime="2026-07-19T10:00:00.000Z"]'),
+    ).not.toBeNull();
+    expect(screen.getByTestId("operator-last-feed")).toHaveTextContent(/last feed/i);
+    expect(
+      screen
+        .getByTestId("operator-last-feed")
+        .querySelector('time[datetime="2026-07-19T11:00:00.000Z"]'),
+    ).not.toBeNull();
     expect(within(card).getByText(/root-zone context/i)).toBeInTheDocument();
     const cycles = screen.getByTestId("operator-root-zone-cycle-list");
     expect(within(cycles).getAllByTestId("operator-root-zone-cycle")).toHaveLength(2);
@@ -218,6 +233,9 @@ describe("OperatorAccountReadModelsPanel", () => {
     );
     expect(screen.getByTestId("operator-watering-safety-fence")).toHaveTextContent(
       /same plant reference/i,
+    );
+    expect(screen.getByTestId("operator-watering-safety-fence")).toHaveTextContent(
+      /elapsed review starts after the latest root-zone application/i,
     );
     const text = card.textContent?.toLowerCase() ?? "";
     expect(text).not.toMatch(/water now|skip watering|start pump|open valve|set a schedule/);

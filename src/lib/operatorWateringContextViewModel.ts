@@ -68,12 +68,16 @@ export interface OperatorWateringMetricRow {
   valueLabel: string;
 }
 
-export interface OperatorConfirmedWateringRow {
+export interface OperatorConfirmedRootZoneApplicationRow {
   occurredAt: string;
+  eventType: "watering" | "feeding";
+  eventLabel: "Plain water" | "Feed";
   sourceLabel: string;
   metrics: readonly OperatorWateringMetricRow[];
   hasRejectedMetrics: boolean;
 }
+
+export type OperatorConfirmedWateringRow = OperatorConfirmedRootZoneApplicationRow;
 
 export interface OperatorWateringDiaryObservationRow {
   id: string;
@@ -92,16 +96,18 @@ export interface OperatorWateringSensorContextRow extends OperatorSensorReadingR
 export interface OperatorWateringContextViewModel {
   status: OperatorWateringContextStatus;
   summary: string;
+  lastRootZoneApplication: OperatorConfirmedRootZoneApplicationRow | null;
   lastConfirmedWatering: OperatorConfirmedWateringRow | null;
+  lastConfirmedFeeding: OperatorConfirmedRootZoneApplicationRow | null;
   typedWateringCount: number;
   typedFeedingCount: number;
   recentRootZoneCycles: readonly OperatorRootZoneCycleRow[];
   diaryObservationCount: number;
   diaryObservations: readonly OperatorWateringDiaryObservationRow[];
   sensorRows: readonly OperatorWateringSensorContextRow[];
-  missingContext: readonly ("typed_watering_history" | "soil_moisture_snapshot")[];
-  decisionReminder: "Review the plant, pot weight or medium, drainage, and recent watering before deciding.";
-  snapshotCaveat: "One sensor snapshot is not a dryback trend.";
+  missingContext: readonly ("typed_root_zone_history" | "soil_moisture_snapshot")[];
+  decisionReminder: "Review the plant, pot weight or medium, drainage, and recent water or feed applications before deciding.";
+  snapshotCaveat: "One sensor snapshot is not a dryback trend; elapsed review starts after the latest root-zone application.";
   airContextCaveat: "Air readings alone do not determine watering.";
   cycleArithmeticCaveat: typeof OPERATOR_ROOT_ZONE_CYCLE_ARITHMETIC_CAVEAT;
   nutrientEvidenceCaveat: typeof OPERATOR_ROOT_ZONE_CYCLE_NUTRIENT_CAVEAT;
@@ -113,8 +119,9 @@ const DIARY_SNIPPET_CAP = 3;
 const DIARY_SNIPPET_LENGTH = 180;
 
 const DECISION_REMINDER =
-  "Review the plant, pot weight or medium, drainage, and recent watering before deciding." as const;
-const SNAPSHOT_CAVEAT = "One sensor snapshot is not a dryback trend." as const;
+  "Review the plant, pot weight or medium, drainage, and recent water or feed applications before deciding." as const;
+const SNAPSHOT_CAVEAT =
+  "One sensor snapshot is not a dryback trend; elapsed review starts after the latest root-zone application." as const;
 const AIR_CONTEXT_CAVEAT = "Air readings alone do not determine watering." as const;
 const GROWER_CONTROL_NOTE =
   "Verdant presents read-only evidence here; the grower makes the decision." as const;
@@ -225,6 +232,20 @@ function buildWateringMetricRows(metrics: RootZoneMetricsV1): OperatorWateringMe
   return rows;
 }
 
+function buildConfirmedApplicationRow(
+  observation: NormalizedRootZoneObservation | null,
+): OperatorConfirmedRootZoneApplicationRow | null {
+  if (!observation) return null;
+  return {
+    occurredAt: observation.occurredAt,
+    eventType: observation.eventType,
+    eventLabel: observation.eventType === "feeding" ? "Feed" : "Plain water",
+    sourceLabel: observation.sourceLabel,
+    metrics: buildWateringMetricRows(observation.metrics),
+    hasRejectedMetrics: observation.hasRejectedMetrics,
+  };
+}
+
 function normalizeRootZoneObservations(
   observations: readonly OperatorRootZoneCycleInput[] | null | undefined,
   now: number,
@@ -320,13 +341,13 @@ function sourceStatus(input: OperatorWateringReadState | null | undefined): {
 function summaryFor(status: OperatorWateringContextStatus): string {
   switch (status) {
     case "loading":
-      return "Loading owner-scoped watering evidence.";
+      return "Loading owner-scoped root-zone evidence.";
     case "unavailable":
-      return "Watering evidence is unavailable right now.";
+      return "Root-zone evidence is unavailable right now.";
     case "context":
-      return "Owner-scoped watering history and sensor context are available for grower review.";
+      return "Owner-scoped water and feed history plus sensor context are available for grower review.";
     default:
-      return "There is not enough owner-scoped evidence to assess watering context.";
+      return "There is not enough owner-scoped evidence to assess root-zone context.";
   }
 }
 
@@ -345,18 +366,16 @@ export function buildOperatorWateringContextViewModel(
   const wateringObservations = rootZoneObservations.filter(
     (observation) => observation.eventType === "watering",
   );
-  const feedingCount = rootZoneObservations.filter(
+  const feedingObservations = rootZoneObservations.filter(
     (observation) => observation.eventType === "feeding",
-  ).length;
+  );
+  const lastRootZoneObservation =
+    rootZoneObservations.find((observation) => !observation.futureDated) ?? null;
   const lastWatering = wateringObservations.find((observation) => !observation.futureDated) ?? null;
-  const lastConfirmedWatering: OperatorConfirmedWateringRow | null = lastWatering
-    ? {
-        occurredAt: lastWatering.occurredAt,
-        sourceLabel: lastWatering.sourceLabel,
-        metrics: buildWateringMetricRows(lastWatering.metrics),
-        hasRejectedMetrics: lastWatering.hasRejectedMetrics,
-      }
-    : null;
+  const lastFeeding = feedingObservations.find((observation) => !observation.futureDated) ?? null;
+  const lastRootZoneApplication = buildConfirmedApplicationRow(lastRootZoneObservation);
+  const lastConfirmedWatering = buildConfirmedApplicationRow(lastWatering);
+  const lastConfirmedFeeding = buildConfirmedApplicationRow(lastFeeding);
   const recentRootZoneCycles =
     input?.rootZone?.status === "ready"
       ? buildOperatorRootZoneCycleRows(input.rootZone.observations, {
@@ -378,8 +397,8 @@ export function buildOperatorWateringContextViewModel(
       row.trustTone !== "invalid" &&
       row.capturedAt !== null,
   );
-  const missingContext: ("typed_watering_history" | "soil_moisture_snapshot")[] = [];
-  if (!lastConfirmedWatering) missingContext.push("typed_watering_history");
+  const missingContext: ("typed_root_zone_history" | "soil_moisture_snapshot")[] = [];
+  if (!lastRootZoneApplication) missingContext.push("typed_root_zone_history");
   if (!usableSoilMoisture) missingContext.push("soil_moisture_snapshot");
 
   const sources = sourceStatus(input);
@@ -394,9 +413,11 @@ export function buildOperatorWateringContextViewModel(
   return {
     status,
     summary: summaryFor(status),
+    lastRootZoneApplication,
     lastConfirmedWatering,
+    lastConfirmedFeeding,
     typedWateringCount: wateringObservations.length,
-    typedFeedingCount: feedingCount,
+    typedFeedingCount: feedingObservations.length,
     recentRootZoneCycles,
     diaryObservationCount: diary.count,
     diaryObservations: diary.rows,

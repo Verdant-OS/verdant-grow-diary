@@ -120,7 +120,10 @@ export default function PlantDetailAiDoctorReadinessGate({
   plant,
   hasSafeAiDoctorFlow,
 }: PlantDetailAiDoctorReadinessGateProps) {
-  const { items } = useTimelineMemory({ kind: "plant", plantId }, TIMELINE_MEMORY_DEFAULT_LIMIT);
+  const { items: evidenceItems } = useTimelineMemory(
+    { kind: "plant", plantId, tentId: plant?.tentId ?? null },
+    TIMELINE_MEMORY_DEFAULT_LIMIT,
+  );
   const rootZoneScope = buildAiDoctorRootZoneReadinessScope({
     plantId,
     tentId: plant?.tentId,
@@ -133,10 +136,10 @@ export default function PlantDetailAiDoctorReadinessGate({
     () =>
       evaluateAiDoctorContextFromSources({
         plant,
-        timelineItems: items,
+        timelineItems: evidenceItems,
         rootZoneObservations,
       }),
-    [plant, items, rootZoneObservations],
+    [plant, evidenceItems, rootZoneObservations],
   );
 
   const gate = useMemo(

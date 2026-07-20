@@ -55,7 +55,7 @@ const GUIDE_HUB = publicDocument("/guides", {
 });
 
 const CULTIVAR_HUB = publicDocument("/cultivars", {
-  title: "Cannabis Cultivar Guides — Oreoz, Do-Si-Dos, Blue Cookies Strain Info | Verdant",
+  title: "Cannabis Cultivar Guides: Oreoz, Do-Si-Dos & More | Verdant",
   description:
     "Evergreen cultivar profiles for serious home growers: environment ranges, flower windows, common issues, and what to compare when pheno-hunting.",
   imageAlt: "Verdant cultivar guides",

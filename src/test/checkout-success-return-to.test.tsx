@@ -83,6 +83,21 @@ function PlantDestination() {
   );
 }
 
+function AiDoctorSessionDestination() {
+  const { sessionId } = useParams();
+  const location = useLocation();
+  return (
+    <div
+      data-testid="landed-ai-doctor-session"
+      data-checkout-return-surface={readCheckoutReturnNavigationSurface(location.state) ?? ""}
+    >
+      session:{sessionId}|{location.pathname}
+      {location.search}
+      {location.hash}
+    </div>
+  );
+}
+
 function PhenoDestination({ testId, children }: { testId: string; children: string }) {
   const location = useLocation();
   return (
@@ -117,6 +132,7 @@ function renderAt(url: string) {
           element={<PhenoDestination testId="landed-keepers">keepers</PhenoDestination>}
         />
         <Route path="/plants/:id" element={<PlantDestination />} />
+        <Route path="/doctor/sessions/:sessionId" element={<AiDoctorSessionDestination />} />
         <Route path="/" element={<div data-testid="landed-home">home</div>} />
       </Routes>
     </MemoryRouter>,
@@ -165,6 +181,17 @@ describe("CheckoutSuccess returnTo handling", () => {
     });
   });
 
+  it("returns a post-value AI Doctor upgrade to the exact saved session", async () => {
+    mode.current = "confirmed";
+    const returnTo = "/doctor/sessions/session-final-free";
+    renderAt(`/checkout/success?returnTo=${encodeURIComponent(returnTo)}`);
+    await waitFor(() => {
+      expect(screen.getByTestId("landed-ai-doctor-session")).toHaveTextContent(
+        "session:session-final-free|/doctor/sessions/session-final-free",
+      );
+    });
+  });
+
   it("does not count a direct paid-user visit as a new activation or checkout return", async () => {
     mode.current = "confirmed";
     renderAt("/checkout/success?returnTo=%2Fpheno-hunts%2Fnew");
@@ -185,6 +212,22 @@ describe("CheckoutSuccess returnTo handling", () => {
       "data-checkout-return-surface",
       "ai_doctor",
     );
+  });
+
+  it("attributes a confirmed saved-session return as AI Doctor without exposing its id", async () => {
+    mode.current = "confirmed";
+    markCheckoutStarted(Date.now());
+    const returnTo = "/doctor/sessions/private-session-id";
+    renderAt(`/checkout/success?returnTo=${encodeURIComponent(returnTo)}`);
+    await waitFor(() => expect(screen.getByTestId("landed-ai-doctor-session")).toBeDefined());
+    expect(trackFunnelEvent.mock.calls).toEqual([
+      ["subscription_activated", { plan: "pro_monthly", surface: "ai_doctor" }],
+    ]);
+    expect(screen.getByTestId("landed-ai-doctor-session")).toHaveAttribute(
+      "data-checkout-return-surface",
+      "ai_doctor",
+    );
+    expect(JSON.stringify(trackFunnelEvent.mock.calls)).not.toContain("private-session-id");
   });
 
   it("attributes a confirmed Pheno activation without claiming gate completion", async () => {

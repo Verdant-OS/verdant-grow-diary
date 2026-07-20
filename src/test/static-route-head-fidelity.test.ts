@@ -269,5 +269,115 @@ describe("static route head fidelity helpers", () => {
       expect(creator!.expected).toBe(null);
       expect(creator!.actual).toBe("@rogue_handle");
     });
+
+  describe("Schema.org JSON-LD invariants", () => {
+    it("extractJsonLd parses every ld+json block on the page", () => {
+      const blocks = extractJsonLd(fixtureHtml());
+      expect(blocks).toHaveLength(1);
+      expect(blocks[0].parseError).toBe(null);
+      expect((blocks[0].parsed as any)["@type"]).toBe("SoftwareApplication");
+    });
+
+    it("extractJsonLd surfaces a parseError for malformed JSON without throwing", () => {
+      const blocks = extractJsonLd(fixtureHtml({}, { jsonLd: "{not-json" }));
+      expect(blocks).toHaveLength(1);
+      expect(blocks[0].parsed).toBe(null);
+      expect(typeof blocks[0].parseError).toBe("string");
+    });
+
+    it("flattenJsonLdNodes walks @graph containers", () => {
+      const graph = {
+        "@context": "https://schema.org",
+        "@graph": [VALID_JSONLD, { "@type": "WebSite", url: "https://verdantgrowdiary.com" }],
+      };
+      const nodes = flattenJsonLdNodes(extractJsonLd(fixtureHtml({}, { jsonLd: graph })));
+      expect(nodes.map((n: any) => n["@type"])).toEqual(["SoftwareApplication", "WebSite"]);
+    });
+
+    it("clean fixture passes every JSON-LD invariant", () => {
+      const diff = diffRouteHead(extractHead(fixtureHtml()), {
+        path: "/pricing",
+        metadata: FIXTURE_META,
+      });
+      const jsonLdFields = diff.fields.filter((f: any) => f.label.startsWith("JSON-LD"));
+      expect(jsonLdFields.length).toBeGreaterThan(0);
+      expect(jsonLdFields.every((f: any) => f.ok)).toBe(true);
+    });
+
+    it("flags a route with no JSON-LD block at all", () => {
+      const diff = diffRouteHead(extractHead(fixtureHtml({}, { jsonLd: null })), {
+        path: "/pricing",
+        metadata: FIXTURE_META,
+      });
+      const presence = diff.mismatched.find((f: any) => f.label.includes("present"));
+      expect(presence).toBeTruthy();
+      expect(presence!.ok).toBe(false);
+      // The required SoftwareApplication node is also missing.
+      expect(
+        diff.mismatched.some((f: any) => f.label.includes('SoftwareApplication')),
+      ).toBe(true);
+    });
+
+    it("flags a malformed JSON-LD block", () => {
+      const diff = diffRouteHead(extractHead(fixtureHtml({}, { jsonLd: "{oops" })), {
+        path: "/pricing",
+        metadata: FIXTURE_META,
+      });
+      expect(diff.mismatched.some((f: any) => f.label.includes("parses as JSON"))).toBe(true);
+    });
+
+    it("flags a missing @context on a JSON-LD root", () => {
+      const { ["@context"]: _dropped, ...noContext } = VALID_JSONLD as any;
+      const diff = diffRouteHead(extractHead(fixtureHtml({}, { jsonLd: noContext })), {
+        path: "/pricing",
+        metadata: FIXTURE_META,
+      });
+      expect(
+        diff.mismatched.some((f: any) => f.label.includes("@context includes schema.org")),
+      ).toBe(true);
+    });
+
+    it("flags a drifted @id on the SoftwareApplication node", () => {
+      const bad = { ...VALID_JSONLD, "@id": "https://verdantgrowdiary.com/#wrong" };
+      const diff = diffRouteHead(extractHead(fixtureHtml({}, { jsonLd: bad })), {
+        path: "/pricing",
+        metadata: FIXTURE_META,
+      });
+      const field = diff.mismatched.find((f: any) =>
+        f.label === "JSON-LD SoftwareApplication.@id",
+      );
+      expect(field).toBeTruthy();
+      expect(field!.expected).toBe("https://verdantgrowdiary.com/#app");
+      expect(field!.actual).toBe("https://verdantgrowdiary.com/#wrong");
+    });
+
+    it("flags a missing offer in the SoftwareApplication catalog", () => {
+      const bad = {
+        ...VALID_JSONLD,
+        offers: VALID_JSONLD.offers.filter((o) => o.name !== "Founder Lifetime"),
+      };
+      const diff = diffRouteHead(extractHead(fixtureHtml({}, { jsonLd: bad })), {
+        path: "/pricing",
+        metadata: FIXTURE_META,
+      });
+      const field = diff.mismatched.find((f: any) =>
+        f.label === "JSON-LD SoftwareApplication.offers[] names",
+      );
+      expect(field).toBeTruthy();
+      expect(field!.actual).not.toContain("Founder Lifetime");
+    });
+
+    it("accepts a SoftwareApplication node nested under @graph", () => {
+      const graph = {
+        "@context": "https://schema.org",
+        "@graph": [VALID_JSONLD],
+      };
+      const diff = diffRouteHead(extractHead(fixtureHtml({}, { jsonLd: graph })), {
+        path: "/pricing",
+        metadata: FIXTURE_META,
+      });
+      const jsonLdFields = diff.fields.filter((f: any) => f.label.startsWith("JSON-LD"));
+      expect(jsonLdFields.every((f: any) => f.ok)).toBe(true);
+    });
   });
 });

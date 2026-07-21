@@ -85,12 +85,15 @@ jobs:
         run: mkdir -p "${{ github.workspace }}/audit/sandbox/logs"
       - name: Fast-fail prefix diff (sandbox)
         id: prefix_diff_sandbox
-        if: ${{ secrets.SUPABASE_DB_URL_SANDBOX != '' }}
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL_SANDBOX }}
           TARGET_ENV: sandbox
         run: |
           set -o pipefail
+          if [ -z "${SUPABASE_DB_URL:-}" ]; then
+            echo "SUPABASE_DB_URL_SANDBOX not configured — skipping fast-fail diff; verify step will emit the missing-secret report."
+            exit 0
+          fi
           node scripts/diff-money-migration-prefixes.mjs --json \
             > "${{ github.workspace }}/audit/sandbox/prefix-diff-cli.json"
           node scripts/diff-money-migration-prefixes.mjs \

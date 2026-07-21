@@ -14,21 +14,28 @@
  *   node scripts/annotate-edge-shared-drift.mjs
  */
 import { spawnSync } from "node:child_process";
-import { appendFileSync, existsSync } from "node:fs";
+import { appendFileSync, existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
 import {
   collectFindings,
+  enrichFinding,
   formatAnnotation,
 } from "./lib/annotate-edge-shared-drift-parse.mjs";
 
-
 const ROOT = path.resolve(new URL("..", import.meta.url).pathname);
 const IN_ACTIONS = process.env.GITHUB_ACTIONS === "true";
+const MIRROR_REL = "supabase/functions/_shared/lib";
+
+// Pin the generator's tmp output dir so we can diff committed mirror
+// files against expected content to compute a real "first differing
+// line" number for DRIFT findings.
+const tmpDir = mkdtempSync(path.join(os.tmpdir(), "edge-shared-annot-"));
 
 const result = spawnSync(
   process.execPath,
   [path.join(ROOT, "scripts", "sync-edge-shared.mjs"), "--check"],
-  { encoding: "utf8" },
+  { encoding: "utf8", env: { ...process.env, SYNC_TMP_OUT: tmpDir } },
 );
 
 const stdout = result.stdout ?? "";
@@ -37,12 +44,40 @@ process.stdout.write(stdout);
 process.stderr.write(stderr);
 
 const exitCode = result.status ?? 1;
-if (exitCode === 0) process.exit(0);
+if (exitCode === 0) {
+  rmSync(tmpDir, { recursive: true, force: true });
+  process.exit(0);
+}
 
-const findings = collectFindings(stderr);
+const rawFindings = collectFindings(stderr);
+
+const safeRead = (rel) => {
+  try {
+    return readFileSync(path.join(ROOT, rel), "utf8");
+  } catch {
+    return null;
+  }
+};
+const safeReadExpected = (relInMirror) => {
+  try {
+    return readFileSync(path.join(tmpDir, relInMirror), "utf8");
+  } catch {
+    return null;
+  }
+};
+
+const findings = rawFindings.map((f) =>
+  enrichFinding(f, {
+    readFile: safeRead,
+    readExpected: safeReadExpected,
+    mirrorRel: MIRROR_REL,
+  }),
+);
+
+// Best-effort tmp cleanup — we've already read everything we needed.
+rmSync(tmpDir, { recursive: true, force: true });
 
 if (findings.length === 0) {
-  // Non-zero exit but no parseable drift — pass through as a generic annotation.
   if (IN_ACTIONS) {
     console.log(
       `::error title=Edge mirror drift check failed::sync-edge-shared --check exited ${exitCode}. See job log.`,
@@ -56,11 +91,13 @@ if (IN_ACTIONS) {
     console.log(formatAnnotation(f));
   }
 
-
   const summaryPath = process.env.GITHUB_STEP_SUMMARY;
   if (summaryPath && existsSync(path.dirname(summaryPath))) {
     const rows = findings
-      .map((f) => `| \`${f.file}\` | ${f.title} | ${f.message} |`)
+      .map((f) => {
+        const loc = f.line ? `:${f.line}${f.col ? `:${f.col}` : ""}` : "";
+        return `| \`${f.file}${loc}\` | ${f.title} | ${f.message} |`;
+      })
       .join("\n");
     appendFileSync(
       summaryPath,
@@ -79,3 +116,4 @@ if (IN_ACTIONS) {
 }
 
 process.exit(exitCode);
+

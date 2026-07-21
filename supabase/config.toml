@@ -58,3 +58,9 @@ project_id = "knkwiiywfkbqznbxwqfh"
   # inside (defence in depth); the grant itself is a service-role-only RPC.
   [functions.redeem-referral]
     verify_jwt = true
+  # operator-credits-audit is a read-only operator-only diagnostics surface.
+  # Requires a platform-verified JWT AND re-checks public.has_role(uid,'operator')
+  # inside before running any query. Returns row IDs, timestamps, enums, and
+  # UUID owner identifiers only — no email/name/profile fields.
+  [functions.operator-credits-audit]
+    verify_jwt = true

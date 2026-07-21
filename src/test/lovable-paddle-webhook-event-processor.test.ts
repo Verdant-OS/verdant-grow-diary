@@ -209,6 +209,69 @@ describe("decide: transaction.completed → founder_lifetime", () => {
   });
 });
 
+describe("decide: transaction.completed → AI credit pack", () => {
+  function packTxEvent(sku: string, overrides: Record<string, unknown> = {}) {
+    return {
+      eventId: "evt_tx_pack",
+      eventType: "transaction.completed",
+      data: {
+        id: "txn_pack_1",
+        customerId: "ctm_abc",
+        status: "completed",
+        customData: { userId: "user-uuid-1" },
+        items: [
+          { price: { id: "pri_pack", productId: "prod_pack", importMeta: { externalId: sku } } },
+        ],
+        ...overrides,
+      },
+    };
+  }
+
+  it("grants a credit_pack_50 purchase (50 credits, idempotent on the tx id)", () => {
+    const d = decide(packTxEvent("credit_pack_50"), "sandbox", NOW);
+    expect(d).toEqual({
+      kind: "grant_credit_pack",
+      userId: "user-uuid-1",
+      paddleTransactionId: "txn_pack_1",
+      credits: 50,
+      sku: "credit_pack_50",
+      env: "sandbox",
+    });
+  });
+
+  it("grants a credit_pack_150 purchase (150 credits) and persists live env", () => {
+    const d = decide(packTxEvent("credit_pack_150"), "live", NOW);
+    if (d.kind !== "grant_credit_pack") throw new Error("narrow");
+    expect(d.credits).toBe(150);
+    expect(d.env).toBe("live");
+  });
+
+  it("skips a pack transaction with no userId (never grants unattributed credits)", () => {
+    const d = decide(packTxEvent("credit_pack_50", { customData: null }), "sandbox", NOW);
+    expect(d).toEqual({ kind: "skip", reason: "missing_user_id" });
+  });
+
+  it("skips a pack transaction with no transaction id", () => {
+    const d = decide(packTxEvent("credit_pack_50", { id: undefined }), "sandbox", NOW);
+    expect(d).toEqual({ kind: "skip", reason: "missing_transaction_id" });
+  });
+
+  it("skips a recurring (subscriptionId) transaction even for a pack sku — packs are one-time", () => {
+    const d = decide(packTxEvent("credit_pack_50", { subscriptionId: "sub_x" }), "sandbox", NOW);
+    expect(d).toEqual({ kind: "skip", reason: "non_lifetime_transaction" });
+  });
+
+  it("regression: an unknown one-time price still skips as unknown_lifetime_price_id", () => {
+    const d = decide(packTxEvent("mystery_one_time"), "sandbox", NOW);
+    expect(d).toEqual({ kind: "skip", reason: "unknown_lifetime_price_id" });
+  });
+
+  it("never treats a pack sku as a founder or subscription grant (no entitlement leak)", () => {
+    const d = decide(packTxEvent("credit_pack_50"), "sandbox", NOW);
+    expect(["record_lifetime", "upsert_subscription", "update_subscription"]).not.toContain(d.kind);
+  });
+});
+
 describe("decide: unhandled types", () => {
   it("skips subscription.trialing / transaction.payment_failed / random types", () => {
     for (const t of ["transaction.payment_failed", "random.thing", undefined]) {

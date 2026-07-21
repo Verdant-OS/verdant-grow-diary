@@ -15,33 +15,33 @@
  * failure is transport-level and covered separately by the existing
  * static tests / index.ts inspection.
  */
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from "vitest";
 import {
   handleVerifiedEvent,
   redactError,
   type Deps,
   type ExistingEventRow,
-} from '../../supabase/functions/payments-webhook/orchestrator';
+} from "../../supabase/functions/payments-webhook/orchestrator";
 
-const NOW = new Date('2026-07-09T12:00:00.000Z');
+const NOW = new Date("2026-07-09T12:00:00.000Z");
 
-function subEvent(overrides: Record<string, unknown> = {}, eventId = 'evt_sub_1') {
+function subEvent(overrides: Record<string, unknown> = {}, eventId = "evt_sub_1") {
   return {
     eventId,
-    eventType: 'subscription.created',
+    eventType: "subscription.created",
     data: {
-      id: 'sub_abc',
-      customerId: 'ctm_abc',
-      status: 'active',
+      id: "sub_abc",
+      customerId: "ctm_abc",
+      status: "active",
       currentBillingPeriod: {
-        startsAt: '2026-07-01T00:00:00Z',
-        endsAt: '2026-08-01T00:00:00Z',
+        startsAt: "2026-07-01T00:00:00Z",
+        endsAt: "2026-08-01T00:00:00Z",
       },
-      customData: { userId: 'user-uuid-1' },
+      customData: { userId: "user-uuid-1" },
       items: [
         {
-          price: { id: 'pri_x', importMeta: { externalId: 'pro_monthly' } },
-          product: { id: 'pro_x', importMeta: { externalId: 'verdant_pro' } },
+          price: { id: "pri_x", importMeta: { externalId: "pro_monthly" } },
+          product: { id: "pro_x", importMeta: { externalId: "verdant_pro" } },
         },
       ],
       ...overrides,
@@ -49,23 +49,39 @@ function subEvent(overrides: Record<string, unknown> = {}, eventId = 'evt_sub_1'
   };
 }
 
-function txEvent(eventId = 'evt_tx_1') {
+function txEvent(eventId = "evt_tx_1") {
   return {
     eventId,
-    eventType: 'transaction.completed',
+    eventType: "transaction.completed",
     data: {
-      id: 'txn_abc',
-      customerId: 'ctm_abc',
-      status: 'completed',
-      customData: { userId: 'user-uuid-1' },
+      id: "txn_abc",
+      customerId: "ctm_abc",
+      status: "completed",
+      customData: { userId: "user-uuid-1" },
       items: [
         {
           price: {
-            id: 'pri_lifetime',
-            productId: 'pro_lifetime',
-            importMeta: { externalId: 'founder_lifetime' },
+            id: "pri_lifetime",
+            productId: "pro_lifetime",
+            importMeta: { externalId: "founder_lifetime" },
           },
         },
+      ],
+    },
+  };
+}
+
+function packTxEvent(sku = "credit_pack_50", eventId = "evt_tx_pack") {
+  return {
+    eventId,
+    eventType: "transaction.completed",
+    data: {
+      id: "txn_pack_1",
+      customerId: "ctm_abc",
+      status: "completed",
+      customData: { userId: "user-uuid-1" },
+      items: [
+        { price: { id: "pri_pack", productId: "prod_pack", importMeta: { externalId: sku } } },
       ],
     },
   };
@@ -74,47 +90,49 @@ function txEvent(eventId = 'evt_tx_1') {
 interface Fixture {
   deps: Deps;
   existingByEventId: Map<string, ExistingEventRow>;
-  markCalls: Array<{ id: string; patch: Parameters<Deps['markEvent']>[1] }>;
-  upsertCalls: Array<Parameters<Deps['upsertSubscription']>[0]>;
-  updateCalls: Array<{ id: string; patch: Parameters<Deps['updateSubscription']>[1] }>;
-  insertCalls: Array<Parameters<Deps['insertEventReceived']>[0]>;
+  markCalls: Array<{ id: string; patch: Parameters<Deps["markEvent"]>[1] }>;
+  upsertCalls: Array<Parameters<Deps["upsertSubscription"]>[0]>;
+  updateCalls: Array<{ id: string; patch: Parameters<Deps["updateSubscription"]>[1] }>;
+  insertCalls: Array<Parameters<Deps["insertEventReceived"]>[0]>;
 }
 
-function makeFixture(overrides: Partial<{
-  insertResult: Awaited<ReturnType<Deps['insertEventReceived']>>;
-  lookupResult: Awaited<ReturnType<Deps['getExistingEvent']>>;
-  upsertResult: Awaited<ReturnType<Deps['upsertSubscription']>>;
-  updateResult: Awaited<ReturnType<Deps['updateSubscription']>>;
-  markResult: Awaited<ReturnType<Deps['markEvent']>>;
-  seedExisting?: Array<[string, ExistingEventRow]>;
-}> = {}): Fixture {
+function makeFixture(
+  overrides: Partial<{
+    insertResult: Awaited<ReturnType<Deps["insertEventReceived"]>>;
+    lookupResult: Awaited<ReturnType<Deps["getExistingEvent"]>>;
+    upsertResult: Awaited<ReturnType<Deps["upsertSubscription"]>>;
+    updateResult: Awaited<ReturnType<Deps["updateSubscription"]>>;
+    markResult: Awaited<ReturnType<Deps["markEvent"]>>;
+    seedExisting?: Array<[string, ExistingEventRow]>;
+  }> = {},
+): Fixture {
   const existingByEventId = new Map<string, ExistingEventRow>(overrides.seedExisting ?? []);
-  const insertCalls: Fixture['insertCalls'] = [];
-  const markCalls: Fixture['markCalls'] = [];
-  const upsertCalls: Fixture['upsertCalls'] = [];
-  const updateCalls: Fixture['updateCalls'] = [];
+  const insertCalls: Fixture["insertCalls"] = [];
+  const markCalls: Fixture["markCalls"] = [];
+  const upsertCalls: Fixture["upsertCalls"] = [];
+  const updateCalls: Fixture["updateCalls"] = [];
 
   const deps: Deps = {
-    insertEventReceived: vi.fn(async (input): ReturnType<Deps['insertEventReceived']> => {
+    insertEventReceived: vi.fn(async (input): ReturnType<Deps["insertEventReceived"]> => {
       insertCalls.push(input);
       if (overrides.insertResult) return overrides.insertResult;
       if (existingByEventId.has(input.paddle_event_id)) return { ok: true, duplicate: true };
-      existingByEventId.set(input.paddle_event_id, { processing_status: 'received' });
+      existingByEventId.set(input.paddle_event_id, { processing_status: "received" });
       return { ok: true };
     }),
-    getExistingEvent: vi.fn(async (id): ReturnType<Deps['getExistingEvent']> => {
+    getExistingEvent: vi.fn(async (id): ReturnType<Deps["getExistingEvent"]> => {
       if (overrides.lookupResult) return overrides.lookupResult;
       return { ok: true, row: existingByEventId.get(id) ?? null };
     }),
-    upsertSubscription: vi.fn(async (row): ReturnType<Deps['upsertSubscription']> => {
+    upsertSubscription: vi.fn(async (row): ReturnType<Deps["upsertSubscription"]> => {
       upsertCalls.push(row);
       return overrides.upsertResult ?? { ok: true };
     }),
-    updateSubscription: vi.fn(async (id, patch): ReturnType<Deps['updateSubscription']> => {
+    updateSubscription: vi.fn(async (id, patch): ReturnType<Deps["updateSubscription"]> => {
       updateCalls.push({ id, patch });
       return overrides.updateResult ?? { ok: true };
     }),
-    markEvent: vi.fn(async (id, patch): ReturnType<Deps['markEvent']> => {
+    markEvent: vi.fn(async (id, patch): ReturnType<Deps["markEvent"]> => {
       markCalls.push({ id, patch });
       if (overrides.markResult) return overrides.markResult;
       existingByEventId.set(id, { processing_status: patch.processing_status });
@@ -122,153 +140,128 @@ function makeFixture(overrides: Partial<{
     }),
   };
 
-
   return { deps, existingByEventId, markCalls, upsertCalls, updateCalls, insertCalls };
 }
 
-describe('handleVerifiedEvent — success paths', () => {
-  it('subscription.created: durably records, upserts, marks processed, 200', async () => {
+describe("handleVerifiedEvent — success paths", () => {
+  it("subscription.created: durably records, upserts, marks processed, 200", async () => {
     const f = makeFixture();
-    const res = await handleVerifiedEvent(f.deps, subEvent(), 'sandbox', NOW, { raw: true });
+    const res = await handleVerifiedEvent(f.deps, subEvent(), "sandbox", NOW, { raw: true });
     expect(res.httpStatus).toBe(200);
-    expect(res.reason).toBe('processed:upsert_subscription');
+    expect(res.reason).toBe("processed:upsert_subscription");
     expect(f.insertCalls).toHaveLength(1);
     expect(f.upsertCalls).toHaveLength(1);
-    expect(f.upsertCalls[0].user_id).toBe('user-uuid-1');
-    expect(f.markCalls.at(-1)?.patch.processing_status).toBe('processed');
+    expect(f.upsertCalls[0].user_id).toBe("user-uuid-1");
+    expect(f.markCalls.at(-1)?.patch.processing_status).toBe("processed");
   });
 
-  it('founder_lifetime transaction: records lifetime row and marks processed, 200', async () => {
+  it("founder_lifetime transaction: records lifetime row and marks processed, 200", async () => {
     const f = makeFixture();
-    const res = await handleVerifiedEvent(f.deps, txEvent(), 'sandbox', NOW, { raw: true });
+    const res = await handleVerifiedEvent(f.deps, txEvent(), "sandbox", NOW, { raw: true });
     expect(res.httpStatus).toBe(200);
-    expect(res.reason).toBe('processed:record_lifetime');
-    expect(f.upsertCalls[0].price_id).toBe('founder_lifetime');
-    expect(f.markCalls.at(-1)?.patch.processing_status).toBe('processed');
+    expect(res.reason).toBe("processed:record_lifetime");
+    expect(f.upsertCalls[0].price_id).toBe("founder_lifetime");
+    expect(f.markCalls.at(-1)?.patch.processing_status).toBe("processed");
   });
 
-  it('skip reason is durably marked skipped and returns 200', async () => {
+  it("skip reason is durably marked skipped and returns 200", async () => {
     const f = makeFixture();
-    const noUser = subEvent({ customData: null }, 'evt_skip_1');
-    const res = await handleVerifiedEvent(f.deps, noUser, 'sandbox', NOW, {});
+    const noUser = subEvent({ customData: null }, "evt_skip_1");
+    const res = await handleVerifiedEvent(f.deps, noUser, "sandbox", NOW, {});
     expect(res.httpStatus).toBe(200);
-    expect(res.reason).toBe('skipped:missing_user_id');
+    expect(res.reason).toBe("skipped:missing_user_id");
     expect(f.upsertCalls).toHaveLength(0);
-    expect(f.markCalls.at(-1)?.patch.processing_status).toBe('skipped');
-    expect(f.markCalls.at(-1)?.patch.skip_reason).toBe('missing_user_id');
+    expect(f.markCalls.at(-1)?.patch.processing_status).toBe("skipped");
+    expect(f.markCalls.at(-1)?.patch.skip_reason).toBe("missing_user_id");
   });
 });
 
-describe('handleVerifiedEvent — failure paths return 500 so Paddle retries', () => {
-  it('DB failure on event-log insert returns 500 and does NOT write subscription', async () => {
+describe("handleVerifiedEvent — failure paths return 500 so Paddle retries", () => {
+  it("DB failure on event-log insert returns 500 and does NOT write subscription", async () => {
     const f = makeFixture({
-      insertResult: { ok: false, error: 'connection refused' },
+      insertResult: { ok: false, error: "connection refused" },
     });
-    const res = await handleVerifiedEvent(f.deps, subEvent(), 'sandbox', NOW, {});
+    const res = await handleVerifiedEvent(f.deps, subEvent(), "sandbox", NOW, {});
     expect(res.httpStatus).toBe(500);
     expect(res.reason).toMatch(/^event_log_insert_failed:/);
     expect(f.upsertCalls).toHaveLength(0);
     expect(f.markCalls).toHaveLength(0);
   });
 
-  it('DB failure on subscription upsert returns 500 and marks event failed', async () => {
+  it("DB failure on subscription upsert returns 500 and marks event failed", async () => {
     const f = makeFixture({
-      upsertResult: { ok: false, error: 'deadlock detected' },
+      upsertResult: { ok: false, error: "deadlock detected" },
     });
-    const res = await handleVerifiedEvent(f.deps, subEvent(), 'sandbox', NOW, {});
+    const res = await handleVerifiedEvent(f.deps, subEvent(), "sandbox", NOW, {});
     expect(res.httpStatus).toBe(500);
     expect(res.reason).toMatch(/^write_failed:/);
     const lastMark = f.markCalls.at(-1);
-    expect(lastMark?.patch.processing_status).toBe('failed');
-    expect(lastMark?.patch.last_error).toContain('deadlock');
+    expect(lastMark?.patch.processing_status).toBe("failed");
+    expect(lastMark?.patch.last_error).toContain("deadlock");
   });
 
-  it('DB failure on mark-processed returns 500 (Paddle retry will reapply idempotently)', async () => {
-    const f = makeFixture({ markResult: { ok: false, error: 'network blip' } });
-    const res = await handleVerifiedEvent(f.deps, subEvent(), 'sandbox', NOW, {});
+  it("DB failure on mark-processed returns 500 (Paddle retry will reapply idempotently)", async () => {
+    const f = makeFixture({ markResult: { ok: false, error: "network blip" } });
+    const res = await handleVerifiedEvent(f.deps, subEvent(), "sandbox", NOW, {});
     expect(res.httpStatus).toBe(500);
     expect(res.reason).toMatch(/^mark_processed_failed:/);
     expect(f.upsertCalls).toHaveLength(1);
   });
 });
 
-describe('handleVerifiedEvent — duplicate delivery semantics', () => {
-  it('duplicate already processed: no-op 200, no re-upsert', async () => {
+describe("handleVerifiedEvent — duplicate delivery semantics", () => {
+  it("duplicate already processed: no-op 200, no re-upsert", async () => {
     const f = makeFixture({
-      seedExisting: [['evt_dup_1', { processing_status: 'processed' }]],
+      seedExisting: [["evt_dup_1", { processing_status: "processed" }]],
     });
-    const res = await handleVerifiedEvent(
-      f.deps,
-      subEvent({}, 'evt_dup_1'),
-      'sandbox',
-      NOW,
-      {},
-    );
+    const res = await handleVerifiedEvent(f.deps, subEvent({}, "evt_dup_1"), "sandbox", NOW, {});
     expect(res.httpStatus).toBe(200);
-    expect(res.reason).toBe('duplicate_processed');
+    expect(res.reason).toBe("duplicate_processed");
     expect(f.upsertCalls).toHaveLength(0);
     // Only the initial received-insert was called; no mark update after.
     expect(f.markCalls).toHaveLength(0);
   });
 
-  it('duplicate previously skipped: no-op 200', async () => {
+  it("duplicate previously skipped: no-op 200", async () => {
     const f = makeFixture({
-      seedExisting: [['evt_dup_2', { processing_status: 'skipped' }]],
+      seedExisting: [["evt_dup_2", { processing_status: "skipped" }]],
     });
-    const res = await handleVerifiedEvent(
-      f.deps,
-      subEvent({}, 'evt_dup_2'),
-      'sandbox',
-      NOW,
-      {},
-    );
+    const res = await handleVerifiedEvent(f.deps, subEvent({}, "evt_dup_2"), "sandbox", NOW, {});
     expect(res.httpStatus).toBe(200);
-    expect(res.reason).toBe('duplicate_skipped');
+    expect(res.reason).toBe("duplicate_skipped");
     expect(f.upsertCalls).toHaveLength(0);
   });
 
-  it('duplicate previously failed: REPROCESSES instead of no-op', async () => {
+  it("duplicate previously failed: REPROCESSES instead of no-op", async () => {
     const f = makeFixture({
-      seedExisting: [['evt_retry_1', { processing_status: 'failed' }]],
+      seedExisting: [["evt_retry_1", { processing_status: "failed" }]],
     });
-    const res = await handleVerifiedEvent(
-      f.deps,
-      subEvent({}, 'evt_retry_1'),
-      'sandbox',
-      NOW,
-      {},
-    );
+    const res = await handleVerifiedEvent(f.deps, subEvent({}, "evt_retry_1"), "sandbox", NOW, {});
     expect(res.httpStatus).toBe(200);
-    expect(res.reason).toBe('processed:upsert_subscription');
+    expect(res.reason).toBe("processed:upsert_subscription");
     expect(f.upsertCalls).toHaveLength(1);
-    expect(f.markCalls.at(-1)?.patch.processing_status).toBe('processed');
+    expect(f.markCalls.at(-1)?.patch.processing_status).toBe("processed");
   });
 
-  it('duplicate previously in received (crashed mid-processing): reprocesses', async () => {
+  it("duplicate previously in received (crashed mid-processing): reprocesses", async () => {
     const f = makeFixture({
-      seedExisting: [['evt_stuck_1', { processing_status: 'received' }]],
+      seedExisting: [["evt_stuck_1", { processing_status: "received" }]],
     });
-    const res = await handleVerifiedEvent(
-      f.deps,
-      subEvent({}, 'evt_stuck_1'),
-      'sandbox',
-      NOW,
-      {},
-    );
+    const res = await handleVerifiedEvent(f.deps, subEvent({}, "evt_stuck_1"), "sandbox", NOW, {});
     expect(res.httpStatus).toBe(200);
-    expect(res.reason).toBe('processed:upsert_subscription');
+    expect(res.reason).toBe("processed:upsert_subscription");
     expect(f.upsertCalls).toHaveLength(1);
   });
 
-  it('DB failure on duplicate lookup returns 500', async () => {
+  it("DB failure on duplicate lookup returns 500", async () => {
     const f = makeFixture({
-      seedExisting: [['evt_dup_lookup', { processing_status: 'processed' }]],
-      lookupResult: { ok: false, error: 'timeout' },
+      seedExisting: [["evt_dup_lookup", { processing_status: "processed" }]],
+      lookupResult: { ok: false, error: "timeout" },
     });
     const res = await handleVerifiedEvent(
       f.deps,
-      subEvent({}, 'evt_dup_lookup'),
-      'sandbox',
+      subEvent({}, "evt_dup_lookup"),
+      "sandbox",
       NOW,
       {},
     );
@@ -277,16 +270,16 @@ describe('handleVerifiedEvent — duplicate delivery semantics', () => {
   });
 });
 
-describe('redactError', () => {
-  it('redacts secret-shaped substrings and caps length', () => {
-    const out = redactError('failed with service_role=eyJhbGciOi and api_key=abc');
-    expect(out).not.toContain('eyJhbGciOi');
-    expect(out).not.toContain('abc');
-    expect(out).toContain('[redacted]');
+describe("redactError", () => {
+  it("redacts secret-shaped substrings and caps length", () => {
+    const out = redactError("failed with service_role=eyJhbGciOi and api_key=abc");
+    expect(out).not.toContain("eyJhbGciOi");
+    expect(out).not.toContain("abc");
+    expect(out).toContain("[redacted]");
   });
 
-  it('truncates to 500 chars', () => {
-    expect(redactError('x'.repeat(2000)).length).toBe(500);
+  it("truncates to 500 chars", () => {
+    expect(redactError("x".repeat(2000)).length).toBe(500);
   });
 });
 
@@ -296,136 +289,134 @@ describe('redactError', () => {
  * the orchestrator must call resolvePriceExternalIdByPaddleId(env, priceId)
  * before decide() to identify founder_lifetime by paddle price id.
  */
-function txEventNoExternalId(priceId = 'pri_lifetime_sandbox', eventId = 'evt_tx_lookup_1') {
+function txEventNoExternalId(priceId = "pri_lifetime_sandbox", eventId = "evt_tx_lookup_1") {
   return {
     eventId,
-    eventType: 'transaction.completed',
+    eventType: "transaction.completed",
     data: {
-      id: 'txn_lookup_1',
-      customerId: 'ctm_abc',
-      status: 'completed',
-      customData: { userId: 'user-uuid-2' },
-      items: [{ price: { id: priceId, productId: 'pro_lifetime' } }],
+      id: "txn_lookup_1",
+      customerId: "ctm_abc",
+      status: "completed",
+      customData: { userId: "user-uuid-2" },
+      items: [{ price: { id: priceId, productId: "pro_lifetime" } }],
     },
   };
 }
 
-describe('handleVerifiedEvent — founder_lifetime price resolution', () => {
-  it('resolves paddle price id → founder_lifetime and records lifetime row', async () => {
+describe("handleVerifiedEvent — founder_lifetime price resolution", () => {
+  it("resolves paddle price id → founder_lifetime and records lifetime row", async () => {
     const f = makeFixture();
-    const resolver = vi.fn(async () => ({ ok: true as const, externalId: 'founder_lifetime' }));
+    const resolver = vi.fn(async () => ({ ok: true as const, externalId: "founder_lifetime" }));
     (f.deps as Deps).resolvePriceExternalIdByPaddleId = resolver;
 
     const res = await handleVerifiedEvent(
       f.deps,
-      txEventNoExternalId('pri_lifetime_sandbox'),
-      'sandbox',
+      txEventNoExternalId("pri_lifetime_sandbox"),
+      "sandbox",
       NOW,
       {},
     );
     expect(res.httpStatus).toBe(200);
-    expect(res.reason).toBe('processed:record_lifetime');
-    expect(resolver).toHaveBeenCalledWith('sandbox', 'pri_lifetime_sandbox');
+    expect(res.reason).toBe("processed:record_lifetime");
+    expect(resolver).toHaveBeenCalledWith("sandbox", "pri_lifetime_sandbox");
     expect(f.upsertCalls).toHaveLength(1);
-    expect(f.upsertCalls[0].price_id).toBe('founder_lifetime');
-    expect(f.upsertCalls[0].paddle_subscription_id).toBe('lifetime_txn_lookup_1');
+    expect(f.upsertCalls[0].price_id).toBe("founder_lifetime");
+    expect(f.upsertCalls[0].paddle_subscription_id).toBe("lifetime_txn_lookup_1");
     expect(f.upsertCalls[0].current_period_end).toBeNull();
   });
 
-  it('skips as unknown_lifetime_price_id when resolver returns null (unknown price)', async () => {
+  it("skips as unknown_lifetime_price_id when resolver returns null (unknown price)", async () => {
     const f = makeFixture();
-    (f.deps as Deps).resolvePriceExternalIdByPaddleId = vi.fn(
-      async () => ({ ok: true as const, externalId: null }),
-    );
+    (f.deps as Deps).resolvePriceExternalIdByPaddleId = vi.fn(async () => ({
+      ok: true as const,
+      externalId: null,
+    }));
     const res = await handleVerifiedEvent(
       f.deps,
-      txEventNoExternalId('pri_unknown'),
-      'sandbox',
+      txEventNoExternalId("pri_unknown"),
+      "sandbox",
       NOW,
       {},
     );
     expect(res.httpStatus).toBe(200);
-    expect(res.reason).toBe('skipped:unknown_lifetime_price_id');
+    expect(res.reason).toBe("skipped:unknown_lifetime_price_id");
     expect(f.upsertCalls).toHaveLength(0);
   });
 
-  it('skips as unknown_lifetime_price_id when resolver returns pro_monthly (double-write guard)', async () => {
+  it("skips as unknown_lifetime_price_id when resolver returns pro_monthly (double-write guard)", async () => {
     const f = makeFixture();
-    (f.deps as Deps).resolvePriceExternalIdByPaddleId = vi.fn(
-      async () => ({ ok: true as const, externalId: 'pro_monthly' }),
-    );
+    (f.deps as Deps).resolvePriceExternalIdByPaddleId = vi.fn(async () => ({
+      ok: true as const,
+      externalId: "pro_monthly",
+    }));
     const res = await handleVerifiedEvent(
       f.deps,
-      txEventNoExternalId('pri_pro_m'),
-      'sandbox',
+      txEventNoExternalId("pri_pro_m"),
+      "sandbox",
       NOW,
       {},
     );
-    expect(res.reason).toBe('skipped:unknown_lifetime_price_id');
+    expect(res.reason).toBe("skipped:unknown_lifetime_price_id");
     expect(f.upsertCalls).toHaveLength(0);
   });
 
-  it('returns 500 when resolver fails (transient) so Paddle retries', async () => {
+  it("returns 500 when resolver fails (transient) so Paddle retries", async () => {
     const f = makeFixture();
-    (f.deps as Deps).resolvePriceExternalIdByPaddleId = vi.fn(
-      async () => ({ ok: false as const, error: 'network timeout' }),
-    );
-    const res = await handleVerifiedEvent(
-      f.deps,
-      txEventNoExternalId('pri_x'),
-      'sandbox',
-      NOW,
-      {},
-    );
+    (f.deps as Deps).resolvePriceExternalIdByPaddleId = vi.fn(async () => ({
+      ok: false as const,
+      error: "network timeout",
+    }));
+    const res = await handleVerifiedEvent(f.deps, txEventNoExternalId("pri_x"), "sandbox", NOW, {});
     expect(res.httpStatus).toBe(500);
     expect(res.reason).toMatch(/^price_lookup_failed:/);
     expect(f.upsertCalls).toHaveLength(0);
   });
 
-  it('does NOT call the resolver for recurring transactions (subscriptionId set)', async () => {
+  it("does NOT call the resolver for recurring transactions (subscriptionId set)", async () => {
     const f = makeFixture();
-    const resolver = vi.fn(async () => ({ ok: true as const, externalId: 'founder_lifetime' }));
+    const resolver = vi.fn(async () => ({ ok: true as const, externalId: "founder_lifetime" }));
     (f.deps as Deps).resolvePriceExternalIdByPaddleId = resolver;
 
-    const ev = txEventNoExternalId('pri_x', 'evt_recurring_1');
-    (ev.data as { subscriptionId?: string }).subscriptionId = 'sub_abc';
+    const ev = txEventNoExternalId("pri_x", "evt_recurring_1");
+    (ev.data as { subscriptionId?: string }).subscriptionId = "sub_abc";
 
-    const res = await handleVerifiedEvent(f.deps, ev, 'sandbox', NOW, {});
+    const res = await handleVerifiedEvent(f.deps, ev, "sandbox", NOW, {});
     expect(resolver).not.toHaveBeenCalled();
-    expect(res.reason).toBe('skipped:non_lifetime_transaction');
+    expect(res.reason).toBe("skipped:non_lifetime_transaction");
   });
 
-  it('idempotent duplicate: second delivery of the same lifetime tx is a no-op', async () => {
+  it("idempotent duplicate: second delivery of the same lifetime tx is a no-op", async () => {
     const f = makeFixture();
-    (f.deps as Deps).resolvePriceExternalIdByPaddleId = vi.fn(
-      async () => ({ ok: true as const, externalId: 'founder_lifetime' }),
-    );
-    const ev = txEventNoExternalId('pri_lifetime_sandbox', 'evt_dup_lifetime');
+    (f.deps as Deps).resolvePriceExternalIdByPaddleId = vi.fn(async () => ({
+      ok: true as const,
+      externalId: "founder_lifetime",
+    }));
+    const ev = txEventNoExternalId("pri_lifetime_sandbox", "evt_dup_lifetime");
 
-    const first = await handleVerifiedEvent(f.deps, ev, 'sandbox', NOW, {});
-    expect(first.reason).toBe('processed:record_lifetime');
+    const first = await handleVerifiedEvent(f.deps, ev, "sandbox", NOW, {});
+    expect(first.reason).toBe("processed:record_lifetime");
 
     const second = await handleVerifiedEvent(
       f.deps,
-      txEventNoExternalId('pri_lifetime_sandbox', 'evt_dup_lifetime'),
-      'sandbox',
+      txEventNoExternalId("pri_lifetime_sandbox", "evt_dup_lifetime"),
+      "sandbox",
       NOW,
       {},
     );
-    expect(second.reason).toBe('duplicate_processed');
+    expect(second.reason).toBe("duplicate_processed");
     // Only one upsert total.
     expect(f.upsertCalls).toHaveLength(1);
   });
 });
 
-describe('handleVerifiedEvent — Pro→Founder provider cancellation (double-bill fix)', () => {
-  type CancelDep = NonNullable<Deps['cancelOtherRecurringSubscriptions']>;
+describe("handleVerifiedEvent — Pro→Founder provider cancellation (double-bill fix)", () => {
+  type CancelDep = NonNullable<Deps["cancelOtherRecurringSubscriptions"]>;
   type CancelResult = Awaited<ReturnType<CancelDep>>;
 
   function wireFounderPath(
     f: ReturnType<typeof makeFixture>,
     cancelResult: CancelResult,
-    allocReason: 'allocated' | 'idempotent' = 'allocated',
+    allocReason: "allocated" | "idempotent" = "allocated",
   ) {
     (f.deps as Deps).allocateFounderLifetime = vi.fn(async () => ({
       ok: true as const,
@@ -436,76 +427,182 @@ describe('handleVerifiedEvent — Pro→Founder provider cancellation (double-bi
     return cancel;
   }
 
-  it('successful grant cancels the other recurring subscriptions with the right scope', async () => {
+  it("successful grant cancels the other recurring subscriptions with the right scope", async () => {
     const f = makeFixture();
     const cancel = wireFounderPath(f, { ok: true, canceled: 1 });
-    const res = await handleVerifiedEvent(f.deps, txEvent('evt_cancel_1'), 'sandbox', NOW, {});
+    const res = await handleVerifiedEvent(f.deps, txEvent("evt_cancel_1"), "sandbox", NOW, {});
     expect(res.httpStatus).toBe(200);
-    expect(res.reason).toBe('processed:record_lifetime');
+    expect(res.reason).toBe("processed:record_lifetime");
     expect(cancel).toHaveBeenCalledTimes(1);
     expect(cancel).toHaveBeenCalledWith({
-      user_id: 'user-uuid-1',
-      environment: 'sandbox',
-      exceptPaddleSubscriptionId: 'lifetime_txn_abc',
+      user_id: "user-uuid-1",
+      environment: "sandbox",
+      exceptPaddleSubscriptionId: "lifetime_txn_abc",
     });
     const mark = f.markCalls.at(-1)?.patch;
-    expect(mark?.processing_status).toBe('processed');
+    expect(mark?.processing_status).toBe("processed");
     expect(mark?.processed_ok).toBe(true);
     expect(mark?.last_error).toBeNull();
   });
 
-  it('cancel failure NEVER unwinds the grant: still processed + 200, failure on last_error', async () => {
+  it("cancel failure NEVER unwinds the grant: still processed + 200, failure on last_error", async () => {
     const f = makeFixture();
-    wireFounderPath(f, { ok: false, error: 'sub_old_pro:paddle 502' });
-    const res = await handleVerifiedEvent(f.deps, txEvent('evt_cancel_2'), 'sandbox', NOW, {});
+    wireFounderPath(f, { ok: false, error: "sub_old_pro:paddle 502" });
+    const res = await handleVerifiedEvent(f.deps, txEvent("evt_cancel_2"), "sandbox", NOW, {});
     expect(res.httpStatus).toBe(200);
-    expect(res.reason).toBe('processed:record_lifetime;provider_cancel_failed');
+    expect(res.reason).toBe("processed:record_lifetime;provider_cancel_failed");
     const mark = f.markCalls.at(-1)?.patch;
-    expect(mark?.processing_status).toBe('processed');
+    expect(mark?.processing_status).toBe("processed");
     expect(mark?.processed_ok).toBe(true);
     expect(mark?.last_error).toMatch(/^provider_cancel_failed:/);
   });
 
-  it('idempotent replay re-attempts the cancel (retries a possibly-failed first pass)', async () => {
+  it("idempotent replay re-attempts the cancel (retries a possibly-failed first pass)", async () => {
     const f = makeFixture();
-    const cancel = wireFounderPath(f, { ok: true, canceled: 0 }, 'idempotent');
-    const res = await handleVerifiedEvent(f.deps, txEvent('evt_cancel_3'), 'sandbox', NOW, {});
+    const cancel = wireFounderPath(f, { ok: true, canceled: 0 }, "idempotent");
+    const res = await handleVerifiedEvent(f.deps, txEvent("evt_cancel_3"), "sandbox", NOW, {});
     expect(res.httpStatus).toBe(200);
     expect(cancel).toHaveBeenCalledTimes(1);
   });
 
-  it('cap_reached refusal never triggers a cancel (no grant → no cancellation)', async () => {
+  it("cap_reached refusal never triggers a cancel (no grant → no cancellation)", async () => {
     const f = makeFixture();
     (f.deps as Deps).allocateFounderLifetime = vi.fn(async () => ({
       ok: false as const,
-      reason: 'cap_reached',
+      reason: "cap_reached",
     }));
     const cancel = vi.fn(async (): Promise<CancelResult> => ({ ok: true, canceled: 0 }));
     (f.deps as Deps).cancelOtherRecurringSubscriptions = cancel;
-    const res = await handleVerifiedEvent(f.deps, txEvent('evt_cancel_4'), 'sandbox', NOW, {});
-    expect(res.reason).toBe('skipped:founder_cap_reached');
+    const res = await handleVerifiedEvent(f.deps, txEvent("evt_cancel_4"), "sandbox", NOW, {});
+    expect(res.reason).toBe("skipped:founder_cap_reached");
     expect(cancel).not.toHaveBeenCalled();
   });
 
-  it('allocator hard failure (500 path) never triggers a cancel', async () => {
+  it("allocator hard failure (500 path) never triggers a cancel", async () => {
     const f = makeFixture();
     (f.deps as Deps).allocateFounderLifetime = vi.fn(async () => ({
       ok: false as const,
-      reason: 'rpc_error:boom',
+      reason: "rpc_error:boom",
     }));
     const cancel = vi.fn(async (): Promise<CancelResult> => ({ ok: true, canceled: 0 }));
     (f.deps as Deps).cancelOtherRecurringSubscriptions = cancel;
-    const res = await handleVerifiedEvent(f.deps, txEvent('evt_cancel_5'), 'sandbox', NOW, {});
+    const res = await handleVerifiedEvent(f.deps, txEvent("evt_cancel_5"), "sandbox", NOW, {});
     expect(res.httpStatus).toBe(500);
     expect(cancel).not.toHaveBeenCalled();
   });
 
-  it('recurring subscription events never touch the cancel dep', async () => {
+  it("recurring subscription events never touch the cancel dep", async () => {
     const f = makeFixture();
     const cancel = vi.fn(async (): Promise<CancelResult> => ({ ok: true, canceled: 0 }));
     (f.deps as Deps).cancelOtherRecurringSubscriptions = cancel;
-    const res = await handleVerifiedEvent(f.deps, subEvent(undefined, 'evt_cancel_6'), 'sandbox', NOW, {});
-    expect(res.reason).toBe('processed:upsert_subscription');
+    const res = await handleVerifiedEvent(
+      f.deps,
+      subEvent(undefined, "evt_cancel_6"),
+      "sandbox",
+      NOW,
+      {},
+    );
+    expect(res.reason).toBe("processed:upsert_subscription");
     expect(cancel).not.toHaveBeenCalled();
+  });
+});
+
+describe("handleVerifiedEvent — AI credit-pack grant", () => {
+  type PackDep = NonNullable<Deps["allocateCreditPack"]>;
+  type PackResult = Awaited<ReturnType<PackDep>>;
+
+  function wirePack(f: ReturnType<typeof makeFixture>, result: PackResult) {
+    const grant = vi.fn(async () => result);
+    (f.deps as Deps).allocateCreditPack = grant;
+    return grant;
+  }
+
+  it("successful grant: durably records, grants, marks processed, 200 — never writes subscriptions", async () => {
+    const f = makeFixture();
+    const grant = wirePack(f, { ok: true, reason: "granted" });
+    const res = await handleVerifiedEvent(
+      f.deps,
+      packTxEvent("credit_pack_50", "evt_pack_1"),
+      "sandbox",
+      NOW,
+      {},
+    );
+    expect(res.httpStatus).toBe(200);
+    expect(res.reason).toBe("processed:grant_credit_pack");
+    expect(grant).toHaveBeenCalledWith({
+      user_id: "user-uuid-1",
+      paddle_transaction_id: "txn_pack_1",
+      credits: 50,
+      sku: "credit_pack_50",
+      environment: "sandbox",
+    });
+    expect(f.markCalls.at(-1)?.patch.processing_status).toBe("processed");
+    // A credit purchase must never touch the subscriptions (entitlement) table.
+    expect(f.upsertCalls).toHaveLength(0);
+  });
+
+  it("transient grant failure returns 500 so Paddle retries (grant is idempotent) and marks failed", async () => {
+    const f = makeFixture();
+    wirePack(f, { ok: false, reason: "rpc_error:boom" });
+    const res = await handleVerifiedEvent(
+      f.deps,
+      packTxEvent("credit_pack_150", "evt_pack_2"),
+      "sandbox",
+      NOW,
+      {},
+    );
+    expect(res.httpStatus).toBe(500);
+    expect(res.reason).toMatch(/^write_failed:credit_pack_grant_failed:/);
+    expect(f.markCalls.at(-1)?.patch.processing_status).toBe("failed");
+  });
+
+  it("invalid_input is non-retryable: skipped 200, not a 500 retry poison-pill", async () => {
+    const f = makeFixture();
+    wirePack(f, { ok: false, reason: "invalid_input" });
+    const res = await handleVerifiedEvent(
+      f.deps,
+      packTxEvent("credit_pack_50", "evt_pack_3"),
+      "sandbox",
+      NOW,
+      {},
+    );
+    expect(res.httpStatus).toBe(200);
+    expect(res.reason).toBe("skipped:credit_pack_invalid_input");
+    expect(f.markCalls.at(-1)?.patch.processing_status).toBe("skipped");
+  });
+
+  it("idempotent duplicate: second delivery is a no-op, only one grant call", async () => {
+    const f = makeFixture();
+    const grant = wirePack(f, { ok: true, reason: "granted" });
+    const first = await handleVerifiedEvent(
+      f.deps,
+      packTxEvent("credit_pack_50", "evt_pack_dup"),
+      "sandbox",
+      NOW,
+      {},
+    );
+    expect(first.reason).toBe("processed:grant_credit_pack");
+    const second = await handleVerifiedEvent(
+      f.deps,
+      packTxEvent("credit_pack_50", "evt_pack_dup"),
+      "sandbox",
+      NOW,
+      {},
+    );
+    expect(second.reason).toBe("duplicate_processed");
+    expect(grant).toHaveBeenCalledTimes(1);
+  });
+
+  it("grant dep not wired (pure subscription-path fixture): no-op success, still 200", async () => {
+    const f = makeFixture();
+    const res = await handleVerifiedEvent(
+      f.deps,
+      packTxEvent("credit_pack_50", "evt_pack_nodep"),
+      "sandbox",
+      NOW,
+      {},
+    );
+    expect(res.httpStatus).toBe(200);
+    expect(res.reason).toBe("processed:grant_credit_pack");
   });
 });

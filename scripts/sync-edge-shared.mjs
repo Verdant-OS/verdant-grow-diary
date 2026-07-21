@@ -286,19 +286,15 @@ async function findEntryFiles() {
     const fnPath = path.join(FUNCTIONS, d.name);
 
     if (d.name === "_shared") {
+      // All _shared/*.ts files are entries (except the generated mirror).
+      // Shim files that re-export from ./lib/lib/* get their transitive
+      // closure re-collected via the entry -> mirror -> src back-map.
       const files = await walk(fnPath);
       for (const f of files) {
         if (!f.endsWith(".ts")) continue;
         const inMirror = f === MIRROR_ABS || f.startsWith(MIRROR_ABS + path.sep);
         if (inMirror) continue;
-        const text = await fs.readFile(f, "utf8");
-        if (
-          /(\.\.\/){2,}src\//.test(text) ||
-          /@\/(lib|constants)\//.test(text) ||
-          /@\/integrations\/supabase\/types/.test(text)
-        ) {
-          out.push(f);
-        }
+        out.push(f);
       }
       continue;
     }

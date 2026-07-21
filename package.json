@@ -10,6 +10,7 @@
     "build:dev": "vite build --mode development",
     "sync-edge-shared": "node scripts/sync-edge-shared.mjs",
     "verify-edge-shared-in-sync": "node scripts/verify-edge-shared-in-sync.mjs",
+    "check:no-src-lib-imports": "node scripts/check-no-src-lib-imports.mjs",
     "check:jsonld": "node scripts/validate-jsonld-rich-results.mjs dist",
     "check:og-images": "node scripts/validate-og-image-urls.mjs dist",
     "check:og-url-canonical-parity": "node scripts/validate-og-url-canonical-parity.mjs dist",

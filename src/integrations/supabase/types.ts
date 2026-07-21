@@ -2718,6 +2718,27 @@ export type Database = {
           },
         ]
       }
+      phenoid_ingest_idempotency: {
+        Row: {
+          created_at: string
+          idempotency_key: string
+          result: Json
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          idempotency_key: string
+          result: Json
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          idempotency_key?: string
+          result?: Json
+          user_id?: string
+        }
+        Relationships: []
+      }
       photo_events: {
         Row: {
           caption: string | null
@@ -3895,6 +3916,10 @@ export type Database = {
           source_queue: string
         }
         Returns: number
+      }
+      pheno_ingest: {
+        Args: { p_idempotency_key: string; p_payload: Json }
+        Returns: Json
       }
       pi_ingest_commit_batch: {
         Args: {

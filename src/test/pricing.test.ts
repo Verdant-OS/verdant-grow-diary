@@ -120,6 +120,30 @@ describe("Craft tier", () => {
   });
 });
 
+describe("AI credit packs (top-up surface)", () => {
+  it("renders a buy-credits section with a CTA per pack", () => {
+    expect(PAGE).toMatch(/data-testid="pricing-credit-packs"/);
+    expect(PAGE).toMatch(/id="buy-credits"/);
+    expect(PAGE).toMatch(/CREDIT_PACKS\.map/);
+    expect(PAGE).toMatch(/pricing-cta-\$\{pack\.sku\}/);
+  });
+
+  it("defines the two credit packs in constants (50/$9, 150/$19)", () => {
+    expect(CONSTANTS).toMatch(/"credit_pack_50"/);
+    expect(CONSTANTS).toMatch(/"credit_pack_150"/);
+    expect(CONSTANTS).toMatch(/credits:\s*50\b/);
+    expect(CONSTANTS).toMatch(/credits:\s*150\b/);
+    expect(CONSTANTS).toMatch(/priceUsd:\s*9\b/);
+    expect(CONSTANTS).toMatch(/priceUsd:\s*19\b/);
+  });
+
+  it("opens the canonical checkout for the pack sku and fires the pack analytics event", () => {
+    expect(PAGE).toMatch(/openCheckout\(\{ priceId: sku \}\)/);
+    expect(PAGE).toMatch(/pricing_cta_credit_pack_clicked/);
+    expect(ANALYTICS).toMatch(/pricing_cta_credit_pack_clicked/);
+  });
+});
+
 describe("Pricing page imports constants", () => {
   it("imports pricing constants from @/constants/pricing", () => {
     expect(PAGE).toMatch(/from\s+"@\/constants\/pricing"/);

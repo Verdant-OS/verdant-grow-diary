@@ -4,6 +4,7 @@
  * kind (which itself branches on the server-supplied credit.plan_id).
  * No fetching, no entitlements logic.
  */
+import { Link } from "react-router-dom";
 import PaywallCta from "@/components/PaywallCta";
 import {
   buildAiCreditLimitNoticeViewModel,
@@ -24,6 +25,12 @@ export interface AiCreditLimitNoticeProps {
    * It is intentionally never attached to paid/founder/unknown notices.
    */
   onUpsellCtaClick?: () => void;
+  /**
+   * Optional analytics-intent callback for the paid "wait" notice's
+   * buy-a-credit-pack link. Navigation happens via the Link regardless; this is
+   * a privacy-safe funnel hook only, never a checkout.
+   */
+  onBuyCreditsClick?: () => void;
   "data-testid"?: string;
 }
 
@@ -33,6 +40,7 @@ export default function AiCreditLimitNotice({
   surface,
   returnTo,
   onUpsellCtaClick,
+  onBuyCreditsClick,
   ...rest
 }: AiCreditLimitNoticeProps) {
   const testId = rest["data-testid"] ?? "ai-credit-limit-notice";
@@ -83,6 +91,16 @@ export default function AiCreditLimitNotice({
         {vm.title}
       </h3>
       <p className="mt-2 text-sm text-muted-foreground">{vm.body}</p>
+      {vm.kind === "wait" ? (
+        <Link
+          to="/pricing#buy-credits"
+          data-testid={`${testId}-buy-credits`}
+          className="mt-3 inline-flex text-sm font-medium text-primary underline underline-offset-4"
+          onClick={onBuyCreditsClick}
+        >
+          Need more now? Buy a one-time credit pack
+        </Link>
+      ) : null}
     </section>
   );
 }

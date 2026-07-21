@@ -3,10 +3,7 @@ import {
   buildAiCreditLimitNoticeViewModel,
   type AiCreditDenial,
 } from "@/lib/aiCreditLimitNoticeViewModel";
-import {
-  paywallCtaFindBannedWords,
-  paywallCtaViewModelText,
-} from "@/lib/paywallCtaViewModel";
+import { paywallCtaFindBannedWords, paywallCtaViewModelText } from "@/lib/paywallCtaViewModel";
 
 const baseDenial = (plan_id: string | null | undefined): AiCreditDenial => ({
   ok: false,
@@ -30,7 +27,7 @@ describe("aiCreditLimitNoticeViewModel — branching by credit.plan_id", () => {
     expect(vm.paywallVm?.primaryCtaHref).toBe("/pricing");
   });
 
-  it.each(["pro_monthly", "pro_annual", "founder_lifetime"])(
+  it.each(["pro_monthly", "pro_annual", "craft_monthly", "craft_annual", "founder_lifetime"])(
     "%s → wait, NO paywallVm (trust gate), charged=false",
     (plan) => {
       const vm = buildAiCreditLimitNoticeViewModel({
@@ -63,8 +60,7 @@ describe("aiCreditLimitNoticeViewModel — branching by credit.plan_id", () => {
       currentPlanLabel: "Free",
     });
     expect(vm.paywallVm).toBeDefined();
-    const blob =
-      paywallCtaViewModelText(vm.paywallVm!) + "\n" + vm.title + "\n" + vm.body;
+    const blob = paywallCtaViewModelText(vm.paywallVm!) + "\n" + vm.title + "\n" + vm.body;
     expect(paywallCtaFindBannedWords(blob)).toEqual([]);
   });
 

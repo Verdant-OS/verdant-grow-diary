@@ -99,10 +99,23 @@ export const AI_CREDIT_EXPLAINER = {
     "1 standard AI Doctor analysis = 1 credit",
     "Advanced / escalated review may use more credits",
     "Free users can upgrade when credits are used",
-    "Pro and Lifetime users can buy credit packs later if needed",
+    "Pro, Craft and Founder members can buy one-time credit packs when they need more",
   ],
-  note: "Included AI Doctor credits work today: Free includes 3 per grow; Pro and Founder include 100 per month. Buying extra credit packs is planned — that purchase flow isn't built yet.",
+  note: "Included AI Doctor credits work today: Free includes 3 per grow; Pro and Founder include 100 per month; Craft includes 300. Out of monthly credits? A one-time AI credit pack tops you up (50 for $9, 150 for $19) — packs never expire and are spent only after your monthly allowance.",
 } as const;
+
+/**
+ * One-time AI credit packs. Server-authoritative: each `sku` is the Paddle
+ * price external id that get-paddle-price resolves and the payments-webhook
+ * grants credits for (public.ai_credit_grants). Packs are NOT plans — they add
+ * to a per-user balance spent only after the monthly allowance is used.
+ */
+export const CREDIT_PACKS = [
+  { sku: "credit_pack_50", credits: 50, priceUsd: 9 },
+  { sku: "credit_pack_150", credits: 150, priceUsd: 19 },
+] as const;
+
+export type CreditPackSku = (typeof CREDIT_PACKS)[number]["sku"];
 
 export const TRUST_STRIP = {
   label: "Safe by Design",

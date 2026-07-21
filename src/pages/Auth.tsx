@@ -61,6 +61,11 @@ import {
   clearPendingOAuthSignupAcquisition,
   savePendingOAuthSignupAcquisition,
 } from "@/lib/oauthSignupAcquisitionRules";
+import { buildSignupReferralMetadata, resolveReferralCode } from "@/lib/referralCaptureRules";
+import {
+  clearPendingOAuthReferral,
+  savePendingOAuthReferral,
+} from "@/lib/oauthReferralCaptureRules";
 import {
   clearPendingOAuthPostAuthRedirect,
   savePendingOAuthPostAuthRedirect,
@@ -85,6 +90,9 @@ export default function Auth() {
   const redirectTo = explicitRedirect ?? "/";
   const signupSource = useMemo(() => resolveSignupAcquisitionSource(search), [search]);
   const signupUserMetadata = useMemo(() => buildSignupUserMetadata(search), [search]);
+  // Referral claim (?ref=<code>) — attribution-only ride-along; the grant is
+  // server-gated on email confirmation (see referralCaptureRules).
+  const referralMetadata = useMemo(() => buildSignupReferralMetadata(search), [search]);
   const initialMode: AuthMode = (() => {
     const raw = search.get("mode");
     if (raw === "signup" || raw === "forgot" || raw === "signin") return raw;
@@ -120,6 +128,16 @@ export default function Auth() {
       savePendingOAuthSignupAcquisition(signupSource);
     } else {
       clearPendingOAuthSignupAcquisition();
+    }
+    // Referral bridge: options.data does not round-trip managed OAuth, so the
+    // sanitized ?ref code rides sessionStorage to the post-session redeem
+    // flush. Saved in any mode (a new referee may land on the signin tab);
+    // the server's fresh-attribution age gate makes stray saves harmless.
+    const oauthReferralCode = resolveReferralCode(search);
+    if (oauthReferralCode) {
+      savePendingOAuthReferral(oauthReferralCode);
+    } else {
+      clearPendingOAuthReferral();
     }
     // Google returns to the configured public origin. The helper preserves
     // only Verdant's fixed CSV onboarding target for the post-OAuth root
@@ -322,7 +340,7 @@ export default function Auth() {
         // must never be used for roles, billing, credits, or entitlements.
         // The explicit boolean opt-in is copied by the auth trigger so it also
         // survives confirmation-required signups that have no session yet.
-        data: { ...signupUserMetadata, marketing_opt_in: marketingOptIn },
+        data: { ...signupUserMetadata, ...referralMetadata, marketing_opt_in: marketingOptIn },
       },
     });
     if (error) {

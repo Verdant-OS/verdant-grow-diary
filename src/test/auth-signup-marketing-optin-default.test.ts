@@ -21,8 +21,11 @@ describe("Auth signup marketing opt-in default", () => {
   });
 
   it("sends the explicit state through signup metadata before any session exists", () => {
+    // The metadata object also carries the referral ride-along
+    // (...referralMetadata, attribution-only) between the acquisition spread
+    // and the explicit marketing boolean.
     expect(AUTH).toMatch(
-      /data:\s*\{\s*\.\.\.signupUserMetadata,\s*marketing_opt_in:\s*marketingOptIn\s*\}/,
+      /data:\s*\{\s*\.\.\.signupUserMetadata,\s*\.\.\.referralMetadata,\s*marketing_opt_in:\s*marketingOptIn\s*\}/,
     );
   });
 

@@ -13,6 +13,7 @@ import {
   flushPendingOAuthSignupAcquisition,
   type SignupAcquisitionRpcClient,
 } from "@/lib/oauthSignupAcquisitionRules";
+import { flushPendingReferralRedeem, type ReferralRedeemClient } from "@/lib/referralRedeem";
 
 interface Ctx {
   user: User | null;
@@ -71,6 +72,20 @@ export function AuthProvider({ children, onBeforeAuthIdentityChange }: AuthProvi
     if (!sessionUserId) return;
     void flushPendingOAuthSignupAcquisition(supabase as unknown as SignupAcquisitionRpcClient);
   }, [sessionUserId]);
+
+  // Verified referral conversion: once a CONFIRMED session exists, hand the
+  // referee's code claim to the redeem-referral edge fn (server re-verifies
+  // identity, confirmation, and environment; the client grants nothing).
+  const sessionUserForRedeem = session?.user ?? null;
+  useEffect(() => {
+    if (!sessionUserForRedeem?.id) return;
+    void flushPendingReferralRedeem(
+      supabase as unknown as ReferralRedeemClient,
+      sessionUserForRedeem,
+    );
+    // Keyed by user id (not the object) so a token refresh does not re-fire.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionUserForRedeem?.id]);
 
   return (
     <AuthCtx.Provider

@@ -27,6 +27,12 @@ export interface AiCreditRemainingInput {
   period_key?: string | null;
   /** Server-resolved plan identity. Optional for older/replayed responses. */
   plan_id?: string | null;
+  /**
+   * Purchased credit-pack balance (paid per-month scope only). Spent AFTER the
+   * monthly allowance, so it must be surfaced separately or the badge would read
+   * "0 left this month" right after a successful pack-funded review.
+   */
+  pack_balance?: number | null;
 }
 
 export interface AiCreditRemainingBadgeViewModel {
@@ -37,6 +43,8 @@ export interface AiCreditRemainingBadgeViewModel {
   scope?: "per_grow" | "per_month";
   remaining?: number;
   scopeLimit?: number;
+  /** Remaining purchased pack credits (per_month only, set only when > 0). */
+  packBalance?: number;
 }
 
 const HIDDEN: AiCreditRemainingBadgeViewModel = { visible: false, label: "" };
@@ -93,12 +101,22 @@ export function buildAiCreditRemainingBadgeViewModel(
     };
   }
 
+  // Purchased packs apply to the paid per-month scope. Surface any remaining
+  // pack balance so a pack-funded review (monthly remaining = 0) doesn't read
+  // as "0 left" when the grower still has credits to spend.
+  const packBalance = isFiniteInt(input.pack_balance) ? clampNonNegative(input.pack_balance) : 0;
+  const monthLabel = `${remainingClamped} of ${limitClamped} ${noun} left this month`;
+
   return {
     visible: true,
-    label: `${remainingClamped} of ${limitClamped} ${noun} left this month`,
+    label:
+      packBalance > 0
+        ? `${monthLabel} · ${packBalance} pack ${packBalance === 1 ? "credit" : "credits"} available`
+        : monthLabel,
     helper: PER_MONTH_HELPER,
     scope: "per_month",
     remaining: remainingClamped,
     scopeLimit: limitClamped,
+    ...(packBalance > 0 ? { packBalance } : {}),
   };
 }

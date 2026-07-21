@@ -53,3 +53,8 @@ project_id = "knkwiiywfkbqznbxwqfh"
   # disabling platform JWT verification only lets that strict verifier run.
   [functions.ecowitt-ingest]
     verify_jwt = false
+  # redeem-referral fires the verified referral credit conversion for the
+  # signed-in caller. Requires a platform JWT AND re-verifies via auth.getUser
+  # inside (defence in depth); the grant itself is a service-role-only RPC.
+  [functions.redeem-referral]
+    verify_jwt = true

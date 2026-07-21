@@ -277,6 +277,10 @@ if (!DB_URL && !HAS_PG_ENV) {
     "Configure the appropriate `SUPABASE_DB_URL_*` secret and re-run the workflow.",
   ]);
   writeAudit("no_db_connection", { note: "No SUPABASE_DB_URL / PGHOST env." });
+  writeDiff("no_db_connection", {
+    expectedRows: expected.map((e) => ({ ...e, applied: false })),
+    appliedVersions: [],
+  });
   process.exit(EXIT.NO_DB_CONNECTION);
 }
 

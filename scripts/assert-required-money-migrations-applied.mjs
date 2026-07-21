@@ -85,7 +85,7 @@ function writeAudit(outcome, extra = {}) {
     tool: "assert-required-money-migrations-applied",
     target_env: TARGET_ENV,
     checked_at: new Date().toISOString(),
-    outcome, // "verified" | "missing_migrations" | "connection_error" | "tracker_query_failed" | "no_db_connection"
+    outcome, // "verified" | "missing_migrations" | "malformed_filename" | "psql_not_invocable" | "tracker_query_failed" | "no_db_connection"
     expected_count: extra.expected?.length ?? 0,
     applied_count: extra.expected?.filter((e) => e.applied).length ?? 0,
     missing_count: extra.expected?.filter((e) => !e.applied).length ?? 0,

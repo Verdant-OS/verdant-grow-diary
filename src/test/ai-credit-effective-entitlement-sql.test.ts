@@ -115,7 +115,11 @@ describe("ai_credit_spend FINAL migration state (regression-proof)", () => {
   });
 
   it("keeps the Lovable-source status/period policy aligned with dunning and cancellation grace", () => {
-    expect(FINAL).toContain("s.price_id IN ('pro_monthly','pro_annual')");
+    // Craft (craft_monthly/craft_annual) are recurring paid plans resolved
+    // alongside Pro; the pack-overflow migration widened this IN-list.
+    expect(FINAL).toContain(
+      "s.price_id IN ('pro_monthly','pro_annual','craft_monthly','craft_annual')",
+    );
     expect(FINAL).toContain("s.current_period_end IS NOT NULL");
     expect(FINAL).toContain("s.status IN ('active','trialing') AND s.current_period_end > now()");
     expect(FINAL).toContain("OR s.status = 'past_due'");

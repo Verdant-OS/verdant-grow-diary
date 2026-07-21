@@ -718,13 +718,14 @@ export default function PlantDetail() {
           />
 
           {/* Pro Blueprint overlay: scores live readings green/amber/red
-              against the per-stage SOP targets, gated behind Pro. isDay is
-              null in v1 (widest merged temp band); wiring the tent light
-              state for day/night targets is a follow-up. */}
+              against the per-stage SOP targets, gated behind Pro. `isDay` comes
+              from the assigned tent's light state (`tents.light_on`) so the
+              temperature row scores against the day or night target. */}
           <PlantBlueprintOverlaySection
             growId={plant.growId ?? null}
             tentId={plant.tentId ?? null}
             stage={plant.stage ?? null}
+            isDay={tent?.light?.on ?? null}
           />
 
           <PlantRecentActivityPanel plantId={plant.id} plantName={plant.name} />

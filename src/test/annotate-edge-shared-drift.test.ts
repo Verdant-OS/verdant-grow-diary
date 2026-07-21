@@ -256,8 +256,10 @@ describe("enrichFinding", () => {
     });
     // Line 3 = the `import { thing } from "@/lib/thing"` line.
     expect(enriched.line).toBe(3);
-    // Col points at the start of the matched import statement.
-    expect(enriched.col).toBe(1);
+    // Col points at the start of the matched `from "..."` clause
+    // (char 18 = the `f` in `from`, 1-based).
+    expect(enriched.col).toBe(18);
+
   });
 
   it("prefers an actual import over a stray string literal in a comment", () => {

@@ -131,6 +131,19 @@ jobs:
         with:
           header: money-migration-guard-sandbox
           path: audit/sandbox/report.md
+      - name: Summarize prefix-diff JSON for PR
+        if: always() && github.event_name == 'pull_request' && hashFiles('audit/sandbox/prefix-diff-cli.json') != ''
+        run: |
+          node scripts/summarize-prefix-diff-json.mjs \
+            --in="${{ github.workspace }}/audit/sandbox/prefix-diff-cli.json" \
+            --out="${{ github.workspace }}/audit/sandbox/prefix-diff-summary.md" \
+            --header="Money-migration prefix drift"
+      - name: Post PR comment with prefix-diff summary
+        if: always() && github.event_name == 'pull_request' && hashFiles('audit/sandbox/prefix-diff-summary.md') != ''
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: money-migration-prefix-diff-sandbox
+          path: audit/sandbox/prefix-diff-summary.md
       - name: Clear stale sandbox PR comment on success
         if: success() && github.event_name == 'pull_request'
         uses: marocchino/sticky-pull-request-comment@v2

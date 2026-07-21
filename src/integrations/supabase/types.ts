@@ -1371,6 +1371,68 @@ export type Database = {
         }
         Relationships: []
       }
+      genetics_screening_results: {
+        Row: {
+          collected_date: string | null
+          created_at: string
+          evidence_reference: string | null
+          id: string
+          laboratory: string | null
+          recorded_at: string
+          recorded_by: string
+          result: string
+          result_date: string | null
+          sample_reference: string | null
+          subject_id: string
+          subject_type: string
+          supersedes_id: string | null
+          target: string
+          user_id: string
+        }
+        Insert: {
+          collected_date?: string | null
+          created_at?: string
+          evidence_reference?: string | null
+          id?: string
+          laboratory?: string | null
+          recorded_at?: string
+          recorded_by: string
+          result: string
+          result_date?: string | null
+          sample_reference?: string | null
+          subject_id: string
+          subject_type: string
+          supersedes_id?: string | null
+          target: string
+          user_id: string
+        }
+        Update: {
+          collected_date?: string | null
+          created_at?: string
+          evidence_reference?: string | null
+          id?: string
+          laboratory?: string | null
+          recorded_at?: string
+          recorded_by?: string
+          result?: string
+          result_date?: string | null
+          sample_reference?: string | null
+          subject_id?: string
+          subject_type?: string
+          supersedes_id?: string | null
+          target?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "genetics_screening_results_supersedes_id_fkey"
+            columns: ["supersedes_id"]
+            isOneToOne: false
+            referencedRelation: "genetics_screening_results"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       grow_events: {
         Row: {
           created_at: string
@@ -4266,6 +4328,10 @@ export type Database = {
         Returns: boolean
       }
       genetics_lock_lineage: { Args: { p_owner: string }; Returns: undefined }
+      genetics_screening_record: {
+        Args: { p_idempotency_key: string; p_payload: Json }
+        Returns: Json
+      }
       get_latest_tent_sensor_snapshot: {
         Args: { _tent_id: string }
         Returns: Json

@@ -2552,6 +2552,172 @@ export type Database = {
           },
         ]
       }
+      phenoid_candidate_extras: {
+        Row: {
+          breeding_score: number | null
+          capture_mode: string
+          cut_status: string
+          frame_index: number
+          hunt_id: string
+          id: string
+          imported_at: string
+          loud_shortlist: boolean
+          model_id: string
+          model_version: string
+          nose_score: number | null
+          pack_index: number
+          pack_label: string
+          pack_size: number
+          phenoid_uuid: string
+          plant_id: string
+          rating: number | null
+          resin_score: number | null
+          scored_by: string
+          source: string
+          stack_id: string
+          structure_score: number | null
+          updated_at: string
+          user_id: string
+          winner_score: number | null
+          yield_score: number | null
+        }
+        Insert: {
+          breeding_score?: number | null
+          capture_mode?: string
+          cut_status?: string
+          frame_index?: number
+          hunt_id: string
+          id?: string
+          imported_at?: string
+          loud_shortlist?: boolean
+          model_id?: string
+          model_version?: string
+          nose_score?: number | null
+          pack_index?: number
+          pack_label?: string
+          pack_size?: number
+          phenoid_uuid: string
+          plant_id: string
+          rating?: number | null
+          resin_score?: number | null
+          scored_by?: string
+          source?: string
+          stack_id?: string
+          structure_score?: number | null
+          updated_at?: string
+          user_id: string
+          winner_score?: number | null
+          yield_score?: number | null
+        }
+        Update: {
+          breeding_score?: number | null
+          capture_mode?: string
+          cut_status?: string
+          frame_index?: number
+          hunt_id?: string
+          id?: string
+          imported_at?: string
+          loud_shortlist?: boolean
+          model_id?: string
+          model_version?: string
+          nose_score?: number | null
+          pack_index?: number
+          pack_label?: string
+          pack_size?: number
+          phenoid_uuid?: string
+          plant_id?: string
+          rating?: number | null
+          resin_score?: number | null
+          scored_by?: string
+          source?: string
+          stack_id?: string
+          structure_score?: number | null
+          updated_at?: string
+          user_id?: string
+          winner_score?: number | null
+          yield_score?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "phenoid_candidate_extras_hunt_id_fkey"
+            columns: ["hunt_id"]
+            isOneToOne: false
+            referencedRelation: "pheno_hunts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "phenoid_candidate_extras_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      phenoid_fights: {
+        Row: {
+          basis: string
+          crew: string
+          fight_uuid: string
+          fought_at: string
+          hunt_id: string
+          id: string
+          note: string
+          plant_a_id: string
+          plant_b_id: string
+          user_id: string
+          winner: string
+        }
+        Insert: {
+          basis?: string
+          crew?: string
+          fight_uuid: string
+          fought_at?: string
+          hunt_id: string
+          id?: string
+          note?: string
+          plant_a_id: string
+          plant_b_id: string
+          user_id: string
+          winner: string
+        }
+        Update: {
+          basis?: string
+          crew?: string
+          fight_uuid?: string
+          fought_at?: string
+          hunt_id?: string
+          id?: string
+          note?: string
+          plant_a_id?: string
+          plant_b_id?: string
+          user_id?: string
+          winner?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "phenoid_fights_hunt_id_fkey"
+            columns: ["hunt_id"]
+            isOneToOne: false
+            referencedRelation: "pheno_hunts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "phenoid_fights_plant_a_id_fkey"
+            columns: ["plant_a_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "phenoid_fights_plant_b_id_fkey"
+            columns: ["plant_b_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       photo_events: {
         Row: {
           caption: string | null
@@ -3708,6 +3874,7 @@ export type Database = {
         Args: { _user_id: string }
         Returns: boolean
       }
+      has_phenoid_entitlement: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

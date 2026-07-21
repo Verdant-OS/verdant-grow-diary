@@ -407,3 +407,65 @@ Pair it with the file-presence guard when auditing locally:
 node scripts/assert-required-money-migrations.mjs
 ```
 
+### Unit tests for `migrationVersion()` and applied-check logic
+
+`src/test/required-money-migrations-version.test.ts` covers the 14-digit
+prefix extractor (`migrationVersion()` in
+`scripts/required-money-migrations.mjs`) and the applied-vs-required
+comparison used by `assert-required-money-migrations-applied.mjs`.
+
+Run just this file (fast, no DB needed):
+
+```bash
+# Focused run — recommended
+bunx vitest run src/test/required-money-migrations-version.test.ts
+
+# Verbose reporter (shows every case name)
+bunx vitest run src/test/required-money-migrations-version.test.ts --reporter=verbose
+
+# Filter to a single case
+bunx vitest run src/test/required-money-migrations-version.test.ts -t "migrationVersion"
+bunx vitest run src/test/required-money-migrations-version.test.ts -t "applied-check"
+```
+
+To inspect the exact prefixes the extractor produces for the current
+required list (useful when a filename rename shows up as one missing +
+one unknown):
+
+```bash
+node -e "
+  import('./scripts/required-money-migrations.mjs').then(m => {
+    for (const f of m.REQUIRED_MONEY_MIGRATIONS) {
+      console.log(m.migrationVersion(f).padEnd(16), f);
+    }
+  });
+"
+```
+
+To compare expected (required) vs actual (applied in a target DB) prefixes
+without running the guard, use the same pooled URL as the applied-check:
+
+```bash
+# Expected prefixes (from the source-of-truth list)
+node -e "
+  import('./scripts/required-money-migrations.mjs').then(m => {
+    console.log(m.REQUIRED_MONEY_MIGRATIONS.map(m.migrationVersion).sort().join('\n'));
+  });
+" > /tmp/expected-versions.txt
+
+# Actual prefixes (from the target DB's migration tracker)
+psql "$SUPABASE_DB_URL" -Atc \
+  "SELECT version FROM supabase_migrations.schema_migrations ORDER BY version" \
+  > /tmp/applied-versions.txt
+
+# Required but NOT applied (what the guard would flag)
+comm -23 <(sort -u /tmp/expected-versions.txt) <(sort -u /tmp/applied-versions.txt)
+
+# Applied but NOT required (informational — expected to be non-empty)
+comm -13 <(sort -u /tmp/expected-versions.txt) <(sort -u /tmp/applied-versions.txt)
+```
+
+The guard itself uses the same `SELECT` and comparison; these commands
+just let you eyeball the two sides independently.
+
+

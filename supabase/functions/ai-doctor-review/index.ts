@@ -31,27 +31,30 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { validateAiDoctorReviewResult } from "./contract.ts";
-import { buildAiDoctorPromptMessages } from "../../../src/lib/aiDoctorPromptAssembly.ts";
-import { parseAiDoctorReviewRequestEnvelope } from "../../../src/lib/aiDoctorReviewRequestTransportRules.ts";
-import { validateAndNormalizeAiDoctorReviewRequestPacket } from "../../../src/lib/aiDoctorReviewRequestPacketValidationRules.ts";
+// All src/lib touch-points routed through _shared/ shims. See
+// _shared/unionEntitlementLookup.ts for the re-export convention: this
+// function must not import from ../../../src/lib/** directly.
+import { buildAiDoctorPromptMessages } from "../_shared/aiDoctorPromptAssembly.ts";
+import { parseAiDoctorReviewRequestEnvelope } from "../_shared/aiDoctorReviewRequestTransportRules.ts";
+import { validateAndNormalizeAiDoctorReviewRequestPacket } from "../_shared/aiDoctorReviewRequestPacketValidationRules.ts";
 import {
   buildAiDoctorReviewEvidenceReceiptSnapshot,
   isAiDoctorReviewEvidenceAcceptanceCoherentWithPacket,
   isAiDoctorReviewEvidenceReceiptSnapshot,
   normalizeAiDoctorReviewEvidenceAcceptance,
-} from "../../../src/lib/aiDoctorReviewEvidenceReceiptRules.ts";
+} from "../_shared/aiDoctorReviewEvidenceReceiptRules.ts";
 import {
   classifyAiDoctorCreditSpend,
   isConfirmedAiDoctorCreditRefund,
   parseAiDoctorResultAttachment,
-} from "../../../src/lib/aiDoctorCreditReplayRules.ts";
+} from "../_shared/aiDoctorCreditReplayRules.ts";
 import { resolveRequiredServerBillingEnvironment } from "../_shared/unionEntitlementLookup.ts";
 import { isMissingAiCreditRpcOverload } from "../_shared/aiCreditRpcCompatibility.ts";
 // Measurement-only cost wiring. Pure helpers; no persistence, no I/O.
 import {
   attachProviderResponseUsageToAiDoctorPromptMeasurement,
   buildAiDoctorPromptMeasurement,
-} from "../../../src/lib/cost/index.ts";
+} from "../_shared/cost.ts";
 
 const TIMEOUT_MS = 25_000;
 const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";

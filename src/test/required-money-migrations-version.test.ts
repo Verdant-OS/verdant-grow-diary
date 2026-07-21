@@ -128,3 +128,122 @@ describe("applied-check comparison logic", () => {
     expect(missing).toEqual([]);
   });
 });
+
+describe("applied-check comparison — tricky whitespace & line endings", () => {
+  it("tolerates Windows CRLF newlines (\\r\\n) between rows", () => {
+    const stdout = REQUIRED_MONEY_MIGRATIONS.map(migrationVersion).join("\r\n") + "\r\n";
+    const { missing } = classifyApplied(REQUIRED_MONEY_MIGRATIONS, stdout);
+    expect(missing).toEqual([]);
+  });
+
+  it("tolerates a stray \\r appended to each version (old-Mac / mixed shells)", () => {
+    const stdout = REQUIRED_MONEY_MIGRATIONS.map((f) => `${migrationVersion(f)}\r`).join("\n");
+    const { missing } = classifyApplied(REQUIRED_MONEY_MIGRATIONS, stdout);
+    expect(missing).toEqual([]);
+  });
+
+  it("tolerates mixed LF and CRLF line endings in the same payload", () => {
+    const versions = REQUIRED_MONEY_MIGRATIONS.map(migrationVersion);
+    const stdout = versions
+      .map((v, i) => (i % 2 === 0 ? `${v}\n` : `${v}\r\n`))
+      .join("");
+    const { missing } = classifyApplied(REQUIRED_MONEY_MIGRATIONS, stdout);
+    expect(missing).toEqual([]);
+  });
+
+  it("tolerates tabs and mixed-width padding around each version", () => {
+    const stdout = REQUIRED_MONEY_MIGRATIONS.map(
+      (f) => `\t  ${migrationVersion(f)}\t\t  `,
+    ).join("\n");
+    const { missing } = classifyApplied(REQUIRED_MONEY_MIGRATIONS, stdout);
+    expect(missing).toEqual([]);
+  });
+
+  it("ignores duplicate rows for the same version (Set dedupes)", () => {
+    const versions = REQUIRED_MONEY_MIGRATIONS.map(migrationVersion);
+    const stdout = [...versions, ...versions, ...versions].join("\n");
+    const { applied, missing } = classifyApplied(REQUIRED_MONEY_MIGRATIONS, stdout);
+    expect(missing).toEqual([]);
+    expect(applied).toEqual([...REQUIRED_MONEY_MIGRATIONS]);
+  });
+
+  it("tolerates a lone CRLF-only payload as 'nothing applied' (not a false positive)", () => {
+    const { applied, missing } = classifyApplied(REQUIRED_MONEY_MIGRATIONS, "\r\n\r\n\r\n");
+    expect(applied).toEqual([]);
+    expect(missing).toEqual([...REQUIRED_MONEY_MIGRATIONS]);
+  });
+});
+
+describe("applied-check comparison — partial-file corruption", () => {
+  it("does not match when a version is truncated by one leading digit", () => {
+    const versions = REQUIRED_MONEY_MIGRATIONS.map(migrationVersion);
+    const stdout = versions.map((v) => v.slice(1)).join("\n"); // 13 chars, drops first digit
+    const { applied, missing } = classifyApplied(REQUIRED_MONEY_MIGRATIONS, stdout);
+    expect(applied).toEqual([]);
+    expect(missing).toEqual([...REQUIRED_MONEY_MIGRATIONS]);
+  });
+
+  it("does not match when a version has an extra trailing digit appended", () => {
+    const versions = REQUIRED_MONEY_MIGRATIONS.map(migrationVersion);
+    const stdout = versions.map((v) => `${v}9`).join("\n"); // 15 chars
+    const { applied, missing } = classifyApplied(REQUIRED_MONEY_MIGRATIONS, stdout);
+    expect(applied).toEqual([]);
+    expect(missing).toEqual([...REQUIRED_MONEY_MIGRATIONS]);
+  });
+
+  it("does not match when versions are glued together without a separator", () => {
+    // Simulates a corrupt psql fetch where newlines were stripped and rows concatenated.
+    const stdout = REQUIRED_MONEY_MIGRATIONS.map(migrationVersion).join("");
+    const { applied, missing } = classifyApplied(REQUIRED_MONEY_MIGRATIONS, stdout);
+    expect(applied).toEqual([]);
+    expect(missing).toEqual([...REQUIRED_MONEY_MIGRATIONS]);
+  });
+
+  it("does not match when a version has an internal non-digit character", () => {
+    // e.g. a stray column separator or NUL byte injected mid-prefix.
+    const versions = REQUIRED_MONEY_MIGRATIONS.map(migrationVersion);
+    const stdout = versions.map((v) => `${v.slice(0, 8)}X${v.slice(9)}`).join("\n");
+    const { applied, missing } = classifyApplied(REQUIRED_MONEY_MIGRATIONS, stdout);
+    expect(applied).toEqual([]);
+    expect(missing).toEqual([...REQUIRED_MONEY_MIGRATIONS]);
+  });
+
+  it("does not match a version embedded inside a longer token", () => {
+    // e.g. psql accidentally returns `<schema>.<version>_<name>` in one column.
+    const stdout = REQUIRED_MONEY_MIGRATIONS.map(
+      (f) => `public.${migrationVersion(f)}_extra`,
+    ).join("\n");
+    const { applied, missing } = classifyApplied(REQUIRED_MONEY_MIGRATIONS, stdout);
+    expect(applied).toEqual([]);
+    expect(missing).toEqual([...REQUIRED_MONEY_MIGRATIONS]);
+  });
+
+  it("classifies only the corrupted subset as missing, not the entire required list", () => {
+    const versions = REQUIRED_MONEY_MIGRATIONS.map(migrationVersion);
+    // Corrupt exactly the first row; the rest are clean.
+    const corrupted = [`${versions[0]}X`, ...versions.slice(1)].join("\n");
+    const { applied, missing } = classifyApplied(REQUIRED_MONEY_MIGRATIONS, corrupted);
+    expect(missing).toEqual([REQUIRED_MONEY_MIGRATIONS[0]]);
+    expect(applied).toEqual(REQUIRED_MONEY_MIGRATIONS.slice(1));
+  });
+
+  it("does not falsely apply when the payload contains only a UTF-8 BOM + versions on one line", () => {
+    // BOM at start + no newline separator between the concatenated versions.
+    const stdout = "\uFEFF" + REQUIRED_MONEY_MIGRATIONS.map(migrationVersion).join("");
+    const { applied, missing } = classifyApplied(REQUIRED_MONEY_MIGRATIONS, stdout);
+    expect(applied).toEqual([]);
+    expect(missing).toEqual([...REQUIRED_MONEY_MIGRATIONS]);
+  });
+
+  it("tolerates a UTF-8 BOM (U+FEFF) prefixed on each row — trim() strips it", () => {
+    // String.prototype.trim() treats U+FEFF as whitespace, so a BOM-prefixed
+    // row still matches the Set lookup. Lock this in so future refactors that
+    // swap trim() for a stricter stripper don't silently start missing rows.
+    const versions = REQUIRED_MONEY_MIGRATIONS.map(migrationVersion);
+    const stdout = versions.map((v) => `\uFEFF${v}`).join("\n");
+    const { missing } = classifyApplied(REQUIRED_MONEY_MIGRATIONS, stdout);
+    expect(missing).toEqual([]);
+  });
+
+});
+

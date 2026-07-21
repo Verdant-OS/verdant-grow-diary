@@ -1851,6 +1851,7 @@ export type Database = {
       }
       pheno_hunts: {
         Row: {
+          breeding_objective: Json
           created_at: string
           evidence_goals: Json
           grow_id: string
@@ -1863,6 +1864,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          breeding_objective?: Json
           created_at?: string
           evidence_goals?: Json
           grow_id: string
@@ -1875,6 +1877,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          breeding_objective?: Json
           created_at?: string
           evidence_goals?: Json
           grow_id?: string

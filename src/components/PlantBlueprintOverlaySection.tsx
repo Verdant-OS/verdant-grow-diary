@@ -18,14 +18,17 @@
  */
 
 import { ProBlueprintOverlay } from "@/components/ProBlueprintOverlay";
+import { BlueprintTeaser } from "@/components/BlueprintTeaser";
 import PaywallCta from "@/components/PaywallCta";
 import { buildPaywallCtaViewModel } from "@/lib/paywallCtaViewModel";
 import { buildBlueprintOverlayViewModel } from "@/lib/blueprintOverlayViewModel";
+import { buildBlueprintTeaserViewModel } from "@/lib/blueprintTeaserViewModel";
 import { selectLatestInputEcPh } from "@/lib/blueprintFeedingInput";
 import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";
 import { useRootZoneObservations } from "@/hooks/useRootZoneObservations";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { canUseCapability } from "@/lib/entitlements/capabilityAccess";
+import { cn } from "@/lib/utils";
 
 export interface PlantBlueprintOverlaySectionProps {
   growId: string | null;
@@ -70,7 +73,17 @@ export function PlantBlueprintOverlaySection({
   if (entLoading) return null;
 
   if (!unlocked) {
-    return <PaywallCta vm={PAYWALL_VM} data-testid="pro-blueprint-paywall" className={className} />;
+    // Conversion demo: preview the real per-stage SOP target bands (what Craft
+    // scores against) above the paywall CTA, so the paid value is concrete on
+    // the grower's own plant. Static bands only — no live values, no scoring,
+    // no data fetch on the locked path.
+    const teaserVm = buildBlueprintTeaserViewModel({ stage, isDay });
+    return (
+      <div data-testid="pro-blueprint-locked" className={cn("flex flex-col gap-3", className)}>
+        <BlueprintTeaser vm={teaserVm} />
+        <PaywallCta vm={PAYWALL_VM} data-testid="pro-blueprint-paywall" />
+      </div>
+    );
   }
 
   const vm = buildBlueprintOverlayViewModel({

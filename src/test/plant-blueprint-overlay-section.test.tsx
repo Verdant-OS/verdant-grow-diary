@@ -77,6 +77,19 @@ describe("PlantBlueprintOverlaySection", () => {
     expect(screen.queryByTestId("pro-blueprint-overlay")).toBeNull();
   });
 
+  it("previews the stage's SOP target bands (conversion demo) above the paywall", () => {
+    // Locked grower on a veg plant sees the real per-stage targets Craft scores
+    // against — the paid value made concrete — with the paywall CTA beneath it.
+    entitlementsMock.mockReturnValue(entitlement(false));
+    renderSection();
+    expect(screen.getByTestId("pro-blueprint-locked")).toBeTruthy();
+    expect(screen.getByTestId("pro-blueprint-teaser")).toBeTruthy();
+    // veg temperature target, straight from the SOP band table.
+    expect(screen.getByTestId("pro-blueprint-teaser-row-tempC").textContent).toMatch(/°C/);
+    // The teaser never fetches or shows the grower's own readings (static bands).
+    expect(screen.queryByTestId("pro-blueprint-overlay")).toBeNull();
+  });
+
   it("renders the paywall when the entitlement lookup failed (fail closed)", () => {
     entitlementsMock.mockReturnValue(entitlement(true, { lookupFailed: true }));
     renderSection();

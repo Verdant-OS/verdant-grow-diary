@@ -83,8 +83,24 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
       - name: Prepare audit dir
         run: mkdir -p "${{ github.workspace }}/audit/sandbox/logs"
+      - name: Fast-fail prefix diff (sandbox)
+        id: prefix_diff_sandbox
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL_SANDBOX }}
+          TARGET_ENV: sandbox
+        run: |
+          set -o pipefail
+          if [ -z "${SUPABASE_DB_URL:-}" ]; then
+            echo "SUPABASE_DB_URL_SANDBOX not configured — skipping fast-fail diff; verify step will emit the missing-secret report."
+            exit 0
+          fi
+          node scripts/diff-money-migration-prefixes.mjs --json \
+            > "${{ github.workspace }}/audit/sandbox/prefix-diff-cli.json"
+          node scripts/diff-money-migration-prefixes.mjs \
+            | tee "${{ github.workspace }}/audit/sandbox/prefix-diff-cli.txt"
       - name: Verify applied migrations in sandbox DB
         id: verify_sandbox
+        if: always()
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL_SANDBOX }}
           TARGET_ENV: sandbox
@@ -141,8 +157,24 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
       - name: Prepare audit dir
         run: mkdir -p "${{ github.workspace }}/audit/live/logs"
+      - name: Fast-fail prefix diff (live)
+        id: prefix_diff_live
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL_LIVE }}
+          TARGET_ENV: live
+        run: |
+          set -o pipefail
+          if [ -z "${SUPABASE_DB_URL:-}" ]; then
+            echo "SUPABASE_DB_URL_LIVE not configured — skipping fast-fail diff; verify step will emit the missing-secret report."
+            exit 0
+          fi
+          node scripts/diff-money-migration-prefixes.mjs --json \
+            > "${{ github.workspace }}/audit/live/prefix-diff-cli.json"
+          node scripts/diff-money-migration-prefixes.mjs \
+            | tee "${{ github.workspace }}/audit/live/prefix-diff-cli.txt"
       - name: Verify applied migrations in live DB
         id: verify_live
+        if: always()
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL_LIVE }}
           TARGET_ENV: live

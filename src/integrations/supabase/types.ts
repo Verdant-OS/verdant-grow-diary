@@ -2077,6 +2077,7 @@ export type Database = {
           keeper_name: string
           note: string | null
           source_plant_id: string
+          stability_runs: Json
           updated_at: string
           user_id: string
         }
@@ -2087,6 +2088,7 @@ export type Database = {
           keeper_name: string
           note?: string | null
           source_plant_id: string
+          stability_runs?: Json
           updated_at?: string
           user_id: string
         }
@@ -2097,6 +2099,7 @@ export type Database = {
           keeper_name?: string
           note?: string | null
           source_plant_id?: string
+          stability_runs?: Json
           updated_at?: string
           user_id?: string
         }

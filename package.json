@@ -13,8 +13,9 @@
     "verify-edge-shared-in-sync": "node scripts/verify-edge-shared-in-sync.mjs",
     "report:edge-shared-drift": "node scripts/report-edge-shared-drift.mjs",
     "predeploy:functions": "node scripts/verify-edge-shared-in-sync.mjs && node scripts/check-no-src-lib-imports.mjs",
-
+    "predeploy:functions:all": "node scripts/sync-edge-shared.mjs --check && node scripts/verify-edge-shared-in-sync.mjs && node scripts/check-no-src-lib-imports.mjs",
     "deploy:functions": "supabase functions deploy",
+    "deploy:functions:all": "bun run predeploy:functions:all && supabase functions deploy",
     "check:no-src-lib-imports": "node scripts/check-no-src-lib-imports.mjs",
     "check:jsonld": "node scripts/validate-jsonld-rich-results.mjs dist",
     "check:og-images": "node scripts/validate-og-image-urls.mjs dist",

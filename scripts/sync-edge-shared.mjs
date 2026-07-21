@@ -385,14 +385,24 @@ async function main() {
     }
     for (const entry of entries) {
       const text = await fs.readFile(entry, "utf8");
-      if (
-        /(\.\.\/){2,}src\//.test(text) ||
-        /@\/(lib|constants)\//.test(text) ||
-        /@\/integrations\/supabase\/types/.test(text)
-      ) {
-        drift.push(
-          `ENTRY not rewritten: ${path.relative(ROOT, entry)} still imports src/** directly`,
-        );
+      for (const spec of extractSpecifiers(text)) {
+        const badAlias =
+          spec.startsWith("@/lib/") ||
+          spec.startsWith("@/constants/") ||
+          spec === "@/integrations/supabase/types";
+        const badRelative =
+          spec.startsWith(".") &&
+          (() => {
+            const abs = path.resolve(path.dirname(entry), spec);
+            const resolved = tryResolve(abs);
+            return resolved !== null && isMirrorable(resolved);
+          })();
+        if (badAlias || badRelative) {
+          drift.push(
+            `ENTRY not rewritten: ${path.relative(ROOT, entry)} still imports "${spec}"`,
+          );
+          break;
+        }
       }
     }
     if (drift.length) {

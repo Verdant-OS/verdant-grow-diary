@@ -3,9 +3,9 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import {
   resolveQuickLogSensorSnapshotForAi,
   type QuickLogSensorAcquisitionRow,
-} from "../_shared/lib/lib/quick-log/quickLogSensorSnapshotAcquisitionRules.ts";
-import { buildAiSensorSnapshotContext } from "../_shared/lib/lib/aiSensorSnapshotContextRules.ts";
-import { pickLatestSensorSnapshotEvidenceByCapturedAt } from "../_shared/lib/lib/aiCoachLatestSensorSnapshot.ts";
+} from "@/lib/quick-log/quickLogSensorSnapshotAcquisitionRules";
+import { buildAiSensorSnapshotContext } from "@/lib/aiSensorSnapshotContextRules";
+import { pickLatestSensorSnapshotEvidenceByCapturedAt } from "@/lib/aiCoachLatestSensorSnapshot";
 import { resolveRequiredServerBillingEnvironment } from "../_shared/unionEntitlementLookup.ts";
 import { isMissingAiCreditRpcOverload } from "../_shared/aiCreditRpcCompatibility.ts";
 

@@ -2,23 +2,12 @@ name: edge-shared-sync
 
 on:
   pull_request:
-    paths:
-      - "src/lib/**"
-      - "src/constants/**"
-      - "src/integrations/supabase/types.ts"
-      - "supabase/functions/**"
-      - "scripts/sync-edge-shared.mjs"
-      - "scripts/verify-edge-shared-in-sync.mjs"
-      - ".github/workflows/edge-shared-sync.yml"
+    # Run on every PR — do not path-filter. A PR that only touches
+    # unrelated files can still regress edge-function imports (e.g. a
+    # merge of stale mirror state), so the gate must always run.
   push:
     branches: [main]
-    paths:
-      - "src/lib/**"
-      - "src/constants/**"
-      - "src/integrations/supabase/types.ts"
-      - "supabase/functions/**"
-      - "scripts/sync-edge-shared.mjs"
-      - "scripts/verify-edge-shared-in-sync.mjs"
+
 
 jobs:
   verify:

@@ -396,10 +396,14 @@ SUPABASE_DB_URL='postgresql://postgres.<live-ref>:<password>@aws-0-<region>.pool
 ```
 
 Exit codes: `0` = all required migrations applied, `1` = one or more
-missing (do not deploy), `2` = connection or tooling failure (treat as
-blocking). The script writes a machine-readable audit to
-`audit/money-migrations/applied-audit.json` on every exit branch — the
-same file CI uploads as an artifact.
+missing (do not deploy), `2` = malformed required-file name (extractor
+could not derive a 14-digit prefix), `3` = no DB connection string,
+`4` = `psql` not on `PATH`, `5` = tracker query failed. Treat `2-5` as
+blocking. The script writes a machine-readable audit to
+`audit/money-migrations/applied-audit.json` and an expected-vs-actual
+diff to `audit/money-migrations/applied-audit.diff.txt` on every exit
+branch — the same files CI uploads as artifacts. Override the diff path
+with `DIFF_PATH=/tmp/foo.diff.txt`.
 
 Pair it with the file-presence guard when auditing locally:
 

@@ -724,6 +724,7 @@ export default function PlantDetail() {
           <PlantBlueprintOverlaySection
             growId={plant.growId ?? null}
             tentId={plant.tentId ?? null}
+            plantId={plant.id}
             stage={plant.stage ?? null}
             isDay={tent?.light?.on ?? null}
           />

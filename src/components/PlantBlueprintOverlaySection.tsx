@@ -9,9 +9,10 @@
  * premium ANALYSIS over readings the grower already has — the SOP target bands
  * and green/amber/red scoring are the paid value.
  *
- * v1 wires the live snapshot (temp/rh/vpd/ppfd), the plant stage, and day/night
- * (tent light state). EC/pH (feeding logs) and DLI (PPFD integration) render as
- * "log this" nudges until their inputs are wired — a follow-up.
+ * Wires the live snapshot (temp/rh/vpd/ppfd), plant stage, day/night (tent
+ * light state), and the latest logged input EC/pH (feeding history). DLI still
+ * renders as a "log a PPFD reading" nudge — it needs PPFD samples + a stored
+ * timezone the schema does not carry yet.
  *
  * See docs/spec-pro-blueprint-overlay.md.
  */
@@ -20,13 +21,16 @@ import { ProBlueprintOverlay } from "@/components/ProBlueprintOverlay";
 import PaywallCta from "@/components/PaywallCta";
 import { buildPaywallCtaViewModel } from "@/lib/paywallCtaViewModel";
 import { buildBlueprintOverlayViewModel } from "@/lib/blueprintOverlayViewModel";
+import { selectLatestInputEcPh } from "@/lib/blueprintFeedingInput";
 import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";
+import { useRootZoneObservations } from "@/hooks/useRootZoneObservations";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { canUseCapability } from "@/lib/entitlements/capabilityAccess";
 
 export interface PlantBlueprintOverlaySectionProps {
   growId: string | null;
   tentId: string | null;
+  plantId: string | null;
   stage: string | null;
   /** Tent light state (`tents.light_on`) for day/night temp bands. */
   isDay?: boolean | null;
@@ -46,27 +50,33 @@ const PAYWALL_VM = buildPaywallCtaViewModel({
 export function PlantBlueprintOverlaySection({
   growId,
   tentId,
+  plantId,
   stage,
   isDay = null,
   className,
 }: PlantBlueprintOverlaySectionProps) {
   // Hooks are called unconditionally (React rules), before any early return.
   const { entitlement, loading: entLoading, lookupFailed } = useMyEntitlements();
+  const unlocked = !lookupFailed && canUseCapability(entitlement, "liveSensors");
   const snapState = useLatestSensorSnapshot(growId, tentId ? [tentId] : []);
+  // Only fetch feeding history once unlocked — free growers see the paywall.
+  const { observations } = useRootZoneObservations(
+    unlocked && plantId ? { kind: "plant", plantId } : null,
+  );
 
   // Presentation-only gate; the client hint is never authoritative for data
   // access (RLS enforces that). Blueprint is premium analysis, so hiding it
   // behind Pro is a UX gate, not a data gate.
   if (entLoading) return null;
 
-  if (lookupFailed || !canUseCapability(entitlement, "liveSensors")) {
+  if (!unlocked) {
     return <PaywallCta vm={PAYWALL_VM} data-testid="pro-blueprint-paywall" className={className} />;
   }
 
   const vm = buildBlueprintOverlayViewModel({
     stage,
     snapshot: snapState.snapshot,
-    latestFeeding: null,
+    latestFeeding: selectLatestInputEcPh(observations),
     dli: null,
     isDay,
   });

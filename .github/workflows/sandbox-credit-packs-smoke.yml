@@ -42,7 +42,7 @@ jobs:
       - name: Install psql client
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
       - name: Prepare audit dir
-        run: mkdir -p "${{ github.workspace }}/audit/sandbox-smoke"
+        run: mkdir -p "${{ github.workspace }}/audit/sandbox-smoke/checkpoints"
       - name: Resolve target user
         id: user
         env:

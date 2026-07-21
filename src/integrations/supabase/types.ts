@@ -1252,6 +1252,125 @@ export type Database = {
         }
         Relationships: []
       }
+      genetics_accessions: {
+        Row: {
+          acquisition_date: string | null
+          archived_at: string | null
+          created_at: string
+          cultivar_name: string | null
+          generation: string | null
+          id: string
+          known_state: string
+          line_name: string | null
+          linked_clone_id: string | null
+          linked_cross_id: string | null
+          linked_keeper_id: string | null
+          linked_plant_id: string | null
+          notes: string | null
+          selection_id: string | null
+          source_kind: string
+          source_party: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          acquisition_date?: string | null
+          archived_at?: string | null
+          created_at?: string
+          cultivar_name?: string | null
+          generation?: string | null
+          id?: string
+          known_state?: string
+          line_name?: string | null
+          linked_clone_id?: string | null
+          linked_cross_id?: string | null
+          linked_keeper_id?: string | null
+          linked_plant_id?: string | null
+          notes?: string | null
+          selection_id?: string | null
+          source_kind?: string
+          source_party?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          acquisition_date?: string | null
+          archived_at?: string | null
+          created_at?: string
+          cultivar_name?: string | null
+          generation?: string | null
+          id?: string
+          known_state?: string
+          line_name?: string | null
+          linked_clone_id?: string | null
+          linked_cross_id?: string | null
+          linked_keeper_id?: string | null
+          linked_plant_id?: string | null
+          notes?: string | null
+          selection_id?: string | null
+          source_kind?: string
+          source_party?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "genetics_accessions_linked_clone_id_fkey"
+            columns: ["linked_clone_id"]
+            isOneToOne: false
+            referencedRelation: "pheno_keeper_clones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "genetics_accessions_linked_cross_id_fkey"
+            columns: ["linked_cross_id"]
+            isOneToOne: false
+            referencedRelation: "pheno_crosses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "genetics_accessions_linked_keeper_id_fkey"
+            columns: ["linked_keeper_id"]
+            isOneToOne: false
+            referencedRelation: "pheno_keepers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "genetics_accessions_linked_plant_id_fkey"
+            columns: ["linked_plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      genetics_mutation_idempotency: {
+        Row: {
+          created_at: string
+          idempotency_key: string
+          operation: string
+          request_hash: string
+          result: Json
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          idempotency_key: string
+          operation: string
+          request_hash: string
+          result: Json
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          idempotency_key?: string
+          operation?: string
+          request_hash?: string
+          result?: Json
+          user_id?: string
+        }
+        Relationships: []
+      }
       grow_events: {
         Row: {
           created_at: string
@@ -3877,6 +3996,18 @@ export type Database = {
       founder_lifetime_slots_remaining: { Args: never; Returns: number }
       founders_seats_consumed: { Args: never; Returns: number }
       founders_wall_count: { Args: never; Returns: number }
+      genetics_accession_archive: {
+        Args: {
+          p_accession_id: string
+          p_archived: boolean
+          p_idempotency_key: string
+        }
+        Returns: Json
+      }
+      genetics_accession_upsert: {
+        Args: { p_idempotency_key: string; p_payload: Json }
+        Returns: Json
+      }
       get_latest_tent_sensor_snapshot: {
         Args: { _tent_id: string }
         Returns: Json

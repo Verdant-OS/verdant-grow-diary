@@ -39,9 +39,20 @@ Deno.
 # Regenerate the mirror + rewrite entries. Commit the result.
 bun run sync-edge-shared
 
-# Verify the committed mirror matches src/ exactly (CI runs this).
+# Verify the committed mirror matches src/ exactly (CI + prebuild run this).
 bun run verify-edge-shared-in-sync
+
+# Full-project publish pipeline entry point for edge functions.
+# Runs sync -> verify -> forbidden-import scan, then supabase functions deploy.
+# Pass function names as extra args, e.g.
+#   bun run deploy:functions redeem-referral payments-webhook ai-doctor-review
+bun run deploy:functions <fn> [<fn>...]
 ```
+
+`prebuild` runs `verify-edge-shared-in-sync` so any `bun run build`
+fails fast on committed drift. `predeploy:functions` runs the full
+sync+verify+scan before invoking `supabase functions deploy`, so no
+edge deploy can ship a stale mirror.
 
 ## When to regenerate
 

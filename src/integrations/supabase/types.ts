@@ -159,12 +159,14 @@ export type Database = {
           credits: number
           environment: string
           expires_at: string | null
+          grant_ref: string | null
           id: string
           kind: string
           meta: Json
-          paddle_transaction_id: string
+          paddle_transaction_id: string | null
           reverses: string | null
-          sku: string
+          sku: string | null
+          source: string
           user_id: string
         }
         Insert: {
@@ -172,12 +174,14 @@ export type Database = {
           credits: number
           environment: string
           expires_at?: string | null
+          grant_ref?: string | null
           id?: string
           kind?: string
           meta?: Json
-          paddle_transaction_id: string
+          paddle_transaction_id?: string | null
           reverses?: string | null
-          sku: string
+          sku?: string | null
+          source?: string
           user_id: string
         }
         Update: {
@@ -185,12 +189,14 @@ export type Database = {
           credits?: number
           environment?: string
           expires_at?: string | null
+          grant_ref?: string | null
           id?: string
           kind?: string
           meta?: Json
-          paddle_transaction_id?: string
+          paddle_transaction_id?: string | null
           reverses?: string | null
-          sku?: string
+          sku?: string | null
+          source?: string
           user_id?: string
         }
         Relationships: [
@@ -4484,6 +4490,16 @@ export type Database = {
           p_expected_user_id: string
           p_paddle_transaction_id: string
           p_sku: string
+        }
+        Returns: Json
+      }
+      grant_lovable_credits: {
+        Args: {
+          p_credits: number
+          p_environment: string
+          p_expected_user_id: string
+          p_grant_ref: string
+          p_source: string
         }
         Returns: Json
       }

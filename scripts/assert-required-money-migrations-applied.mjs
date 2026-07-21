@@ -270,9 +270,14 @@ if (missing.length > 0) {
       "environment, then re-run this workflow. Do not deploy until the guard turns green.",
     ],
   );
+  writeDiff("missing_migrations", {
+    expectedRows: expectedWithApplied,
+    appliedVersions: [...applied],
+  });
   writeAudit("missing_migrations", { expected: expectedWithApplied });
   process.exit(1);
 }
+
 
 console.log(
   `✓ All ${expected.length} money-critical migrations applied in target env (${TARGET_ENV}).`,

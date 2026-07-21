@@ -42,7 +42,7 @@ jobs:
       - name: Install psql client
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
       - name: Prepare audit dir
-        run: mkdir -p "${{ github.workspace }}/audit/sandbox-smoke"
+        run: mkdir -p "${{ github.workspace }}/audit/sandbox-smoke/checkpoints"
       - name: Resolve target user
         id: user
         env:
@@ -64,6 +64,7 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF_SANDBOX }}
           TRANSCRIPT: ${{ github.workspace }}/audit/sandbox-smoke/transcript.log
+          CHECKPOINT_DIR: ${{ github.workspace }}/audit/sandbox-smoke/checkpoints
         run: |
           if [ -z "${SUPABASE_DB_URL:-}" ]; then
             echo "::error::SUPABASE_DB_URL_SANDBOX secret not set."
@@ -93,6 +94,18 @@ jobs:
             echo '```'
             grep -E '^\s*[✓✗•]|^SUMMARY:|^==|^--' audit/sandbox-smoke/transcript.log || tail -40 audit/sandbox-smoke/transcript.log
             echo '```'
+            if ls audit/sandbox-smoke/checkpoints/*.log >/dev/null 2>&1; then
+              echo ""
+              echo "#### Per-checkpoint summaries"
+              echo ""
+              echo '```'
+              for f in audit/sandbox-smoke/checkpoints/*.log; do
+                name=$(basename "$f" .log)
+                line=$(grep -E '^SUMMARY:' "$f" | tail -1 || echo "SUMMARY: (missing)")
+                printf '%-24s %s\n' "$name" "$line"
+              done
+              echo '```'
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Upload smoke transcript
         if: always()

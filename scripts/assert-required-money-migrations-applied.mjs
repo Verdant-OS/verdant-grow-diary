@@ -140,6 +140,7 @@ if (result.error) {
     "The deploy guard could not query the migration tracker: `psql` was not invocable.",
     "Install `postgresql-client` on the runner and re-run the workflow.",
   ]);
+  writeAudit("connection_error", { note: "psql binary not invocable on runner." });
   process.exit(2);
 }
 if (result.status !== 0) {

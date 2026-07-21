@@ -36,7 +36,8 @@ describe("account deletion billing and data safety", () => {
   });
 
   it("makes the destructive UI disclose immediate cancellation and refund behavior", () => {
-    expect(SETTINGS).toContain("Any recurring Paddle subscription is canceled");
+    // Whitespace-tolerant: prettier may wrap this sentence across JSX lines.
+    expect(SETTINGS).toMatch(/Any recurring Paddle subscription is\s+canceled/);
     expect(SETTINGS).toContain("Deletion does not automatically");
     expect(SETTINGS).toContain("issue a refund");
     expect(SETTINGS).toContain("Cancel billing and delete");

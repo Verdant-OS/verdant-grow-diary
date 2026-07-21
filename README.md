@@ -343,3 +343,67 @@ against a fresh local Supabase on the runner:
 - [Security checklist](docs/security-checklist.md)
 - [Scanner guardrail harness](docs/testing/scanner-guardrails.md) — scannerIt/installScannerGuardrail usage and slow-test telemetry contract
 - [Pi-ingest smoke runbook](docs/pi-ingest-smoke-runbook.md)
+
+## Money-migration applied-check
+
+`scripts/assert-required-money-migrations-applied.mjs` verifies that every
+migration listed in `scripts/required-money-migrations.mjs` is actually
+present in the target database's `supabase_migrations.schema_migrations`
+tracker. It is read-only (single `SELECT`) and blocks deploys when a
+required migration exists on disk but has not been applied to the target
+environment.
+
+The `.github/workflows/required-money-migrations.yml` workflow runs this
+check against both sandbox and live. It reads the DB connection strings
+from two repository secrets:
+
+- `SUPABASE_DB_URL_SANDBOX`
+- `SUPABASE_DB_URL_LIVE`
+
+### Setting the GitHub secrets
+
+1. Get each project's pooled connection string from the Lovable Cloud
+   project settings (Database → Connection string → **Session pooler**,
+   URI format). It looks like
+   `postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres`.
+   The password is the database password, not the anon or service-role key.
+2. In GitHub, open **Settings → Secrets and variables → Actions → New
+   repository secret**.
+3. Create `SUPABASE_DB_URL_SANDBOX` and paste the sandbox project's URL.
+4. Create `SUPABASE_DB_URL_LIVE` and paste the live project's URL.
+5. Re-run the `required-money-migrations` workflow to confirm both jobs
+   go green. If a job errors with exit code `2`, the URL is wrong or the
+   pooler is unreachable; exit code `1` means a required migration is
+   missing from that environment and must be applied before deploying.
+
+Rotate these secrets whenever the database password is rotated.
+
+### Running the applied-check locally
+
+Requires `psql` on `PATH` (`brew install libpq` on macOS,
+`sudo apt-get install postgresql-client` on Debian/Ubuntu).
+
+```bash
+# Sandbox
+SUPABASE_DB_URL='postgresql://postgres.<sandbox-ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres' \
+  TARGET_ENV=sandbox \
+  node scripts/assert-required-money-migrations-applied.mjs
+
+# Live
+SUPABASE_DB_URL='postgresql://postgres.<live-ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres' \
+  TARGET_ENV=live \
+  node scripts/assert-required-money-migrations-applied.mjs
+```
+
+Exit codes: `0` = all required migrations applied, `1` = one or more
+missing (do not deploy), `2` = connection or tooling failure (treat as
+blocking). The script writes a machine-readable audit to
+`audit/money-migrations/applied-audit.json` on every exit branch — the
+same file CI uploads as an artifact.
+
+Pair it with the file-presence guard when auditing locally:
+
+```bash
+node scripts/assert-required-money-migrations.mjs
+```
+

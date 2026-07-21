@@ -3,19 +3,20 @@
  * sync-edge-shared.mjs
  *
  * Generates supabase/functions/_shared/lib/** as a byte-stable mirror of the
- * subset of src/lib/** (plus the auto-generated Supabase types file) that
- * edge functions transitively import. Also rewrites imports in every
- * supabase/functions/<fn>/*.ts entry file so they point at the mirror
- * instead of ../../../src/**.
+ * subset of src/** that edge functions transitively import (limited to
+ * src/lib/**, src/constants/**, and src/integrations/supabase/types.ts).
+ *
+ * Also rewrites imports in every supabase/functions/<fn>/*.ts entry file so
+ * they point at the mirror instead of ../../../src/**.
  *
  * Contract:
- *   - src/lib/** and src/integrations/supabase/types.ts are the sources of truth.
- *     This script only READS from them.
+ *   - src/lib/**, src/constants/**, and src/integrations/supabase/types.ts
+ *     are the sources of truth. This script only READS from them.
  *   - _shared/lib/** is 100% generated. Never hand-edit.
  *   - Every mirrored file carries a @generated banner + source sha256.
  *   - A manifest at _shared/lib/.sync-manifest.json enables drift detection.
- *   - Frontend-only imports (@/components, @/hooks, @/pages, react, supabase
- *     client, etc.) are a hard fail.
+ *   - Frontend-only imports (@/components, @/hooks, @/pages, @/context,
+ *     @/fixtures, react, @/integrations/supabase/client, etc.) are a hard fail.
  *
  * Usage:
  *   node scripts/sync-edge-shared.mjs             # write mirror + rewrite entries
@@ -28,19 +29,23 @@ import { createHash } from "node:crypto";
 
 const ROOT = path.resolve(new URL("..", import.meta.url).pathname);
 const SRC = path.join(ROOT, "src");
-const SRC_LIB = path.join(SRC, "lib");
-const SUPABASE_TYPES_SRC = path.join(SRC, "integrations", "supabase", "types.ts");
 const FUNCTIONS = path.join(ROOT, "supabase", "functions");
 const MIRROR_REL = path.join("supabase", "functions", "_shared", "lib");
+const MIRROR_ABS = path.join(ROOT, MIRROR_REL);
 const CHECK = process.argv.includes("--check");
 
-const FRONTEND_FORBIDDEN = [
-  /^@\/components(\/|$)/,
-  /^@\/hooks(\/|$)/,
-  /^@\/pages(\/|$)/,
-  /^react(\/|$|-dom)/,
-  /^@\/integrations\/supabase\/client$/,
+/** Allowed src-relative roots that may be mirrored. */
+const ALLOWED_SRC_ROOTS = ["lib", "constants"];
+const ALLOWED_EXACT_FILES = [path.join("integrations", "supabase", "types.ts")];
+
+/** Alias prefixes and their src-relative root. */
+const ALLOWED_ALIAS_PREFIXES = [
+  { prefix: "@/lib/", srcRoot: "lib" },
+  { prefix: "@/constants/", srcRoot: "constants" },
 ];
+const ALLOWED_ALIAS_EXACT = {
+  "@/integrations/supabase/types": path.join("integrations", "supabase", "types.ts"),
+};
 
 const IMPORT_RE =
   /((?:^|\n)\s*(?:import|export)(?:\s+[\s\S]*?\s+from)?\s*["'])([^"']+)(["'])/g;
@@ -95,60 +100,92 @@ function resolveExtension(p) {
   throw new Error(`Cannot resolve module path: ${p}`);
 }
 
+/** Absolute src file path -> src-relative path (e.g. "lib/foo/bar.ts"). */
+function srcRelOf(absPath) {
+  return path.relative(SRC, absPath);
+}
+
+function isMirrorable(absPath) {
+  const rel = srcRelOf(absPath);
+  if (rel.startsWith("..") || path.isAbsolute(rel)) return false;
+  const top = rel.split(path.sep)[0];
+  if (ALLOWED_SRC_ROOTS.includes(top)) return true;
+  if (ALLOWED_EXACT_FILES.includes(rel)) return true;
+  return false;
+}
+
 /**
  * Resolve a specifier to an absolute source path we should mirror,
  * or return null for external specifiers we leave untouched.
  * Throws for forbidden frontend imports.
  */
 function resolveSource(spec, fromFile) {
-  for (const rx of FRONTEND_FORBIDDEN) {
-    if (rx.test(spec)) {
-      throw new Error(
-        `Forbidden frontend import "${spec}" reached from ${path.relative(
-          ROOT,
-          fromFile,
-        )} — edge-function code cannot depend on browser-only modules.`,
-      );
+  // Exact alias hits.
+  if (ALLOWED_ALIAS_EXACT[spec]) {
+    return path.join(SRC, ALLOWED_ALIAS_EXACT[spec]);
+  }
+
+  // Alias prefix hits.
+  for (const { prefix, srcRoot } of ALLOWED_ALIAS_PREFIXES) {
+    if (spec.startsWith(prefix)) {
+      return resolveExtension(path.join(SRC, srcRoot, spec.slice(prefix.length)));
     }
   }
+
+  // Any other @/ alias -> forbidden.
+  if (spec.startsWith("@/")) {
+    throw new Error(
+      `Forbidden alias import "${spec}" from ${path.relative(
+        ROOT,
+        fromFile,
+      )} — edge-function code may only reach @/lib/*, @/constants/*, and @/integrations/supabase/types.`,
+    );
+  }
+
+  // Runtime specifiers.
   if (/^(npm:|jsr:|node:|https?:|deno:)/.test(spec)) return null;
 
-  if (spec === "@/integrations/supabase/types") return SUPABASE_TYPES_SRC;
+  // Bare specifier (npm-like) — leave alone.
+  if (!spec.startsWith(".")) return null;
 
-  if (spec.startsWith("@/")) {
-    if (!spec.startsWith("@/lib/")) {
+  const abs = path.resolve(path.dirname(fromFile), spec);
+  const resolved = tryResolve(abs);
+  if (!resolved) return null;
+  if (!isMirrorable(resolved)) {
+    // If the resolved path is outside allowed src trees, it's a violation
+    // ONLY if it lives under src/ (frontend leakage). Otherwise it's
+    // legitimately outside the mirror (e.g. inside supabase/functions/_shared).
+    if (resolved.startsWith(SRC + path.sep)) {
       throw new Error(
-        `Non-lib alias import "${spec}" from ${path.relative(
+        `Forbidden relative import "${spec}" from ${path.relative(
           ROOT,
           fromFile,
-        )} — only @/lib/* and @/integrations/supabase/types may cross into edge code.`,
+        )} — resolved to ${path.relative(
+          ROOT,
+          resolved,
+        )}, which is outside the mirrorable src roots (${ALLOWED_SRC_ROOTS.join(", ")}).`,
       );
     }
-    return resolveExtension(path.join(SRC_LIB, spec.slice("@/lib/".length)));
-  }
-
-  if (spec.startsWith(".")) {
-    const abs = path.resolve(path.dirname(fromFile), spec);
-    // Only follow relative imports that land inside a mirrored source tree.
-    if (abs === SRC_LIB || abs.startsWith(SRC_LIB + path.sep)) {
-      return resolveExtension(abs);
-    }
-    if (abs === SUPABASE_TYPES_SRC) return SUPABASE_TYPES_SRC;
     return null;
   }
-
-  return null; // bare npm/deno specifier
+  return resolved;
 }
 
-/**
- * Map a source absolute path to its mirror-relative path (relative to the
- * mirror root at supabase/functions/_shared/lib/).
- */
-function mirrorRelFromSource(srcAbs) {
-  if (srcAbs === SUPABASE_TYPES_SRC) {
-    return path.join("_supabase", "types.ts");
+function tryResolve(abs) {
+  try {
+    return resolveExtension(abs);
+  } catch {
+    return null;
   }
-  return path.relative(SRC_LIB, srcAbs);
+}
+
+function toPosix(p) {
+  return p.split(path.sep).join("/");
+}
+
+/** Mirror-relative path for a mirrorable source file. */
+function mirrorRelFromSource(srcAbs) {
+  return srcRelOf(srcAbs);
 }
 
 async function collectFromEntries(entries) {
@@ -176,54 +213,32 @@ async function collectFromEntries(entries) {
   return visited;
 }
 
-function toPosix(p) {
-  return p.split(path.sep).join("/");
-}
-
 /**
- * For an already-mirrored file at srcAbs, rewrite import specifiers so they
- * reach other mirrored files via relative paths. Relative specifiers that
- * already stay inside a mirrored tree resolve to the same tree in the mirror
- * (because we preserve the src/lib tree shape) — but supabase types lives
- * elsewhere in the mirror, so relative imports into it get rewritten too.
+ * Rewrite import specifiers inside a mirrored file so they reach other
+ * mirrored files via correct relative paths. Because the mirror preserves
+ * the src/ tree shape exactly under _shared/lib/, any relative specifier
+ * that stayed inside a mirrorable root already resolves correctly — but
+ * @/... aliases must be rewritten to relatives.
  */
-function rewriteMirrorSource(text, srcAbs, mirrorRootAbs) {
-  const fromMirrorAbs = path.join(mirrorRootAbs, mirrorRelFromSource(srcAbs));
+function rewriteMirrorSource(text, srcAbs) {
+  const fromMirrorAbs = path.join(MIRROR_ABS, mirrorRelFromSource(srcAbs));
 
   const remap = (spec) => {
     const target = resolveSource(spec, srcAbs);
     if (!target) return null;
-    const targetMirrorAbs = path.join(mirrorRootAbs, mirrorRelFromSource(target));
-    let rel = toPosix(
-      path.relative(path.dirname(fromMirrorAbs), targetMirrorAbs),
-    );
+    if (!isMirrorable(target)) return null;
+    // If already a relative specifier, keep the original form.
+    if (spec.startsWith(".")) return null;
+    const targetMirrorAbs = path.join(MIRROR_ABS, mirrorRelFromSource(target));
+    let rel = toPosix(path.relative(path.dirname(fromMirrorAbs), targetMirrorAbs));
     if (!rel.startsWith(".")) rel = "./" + rel;
     return rel;
   };
 
   const apply = (input, re) =>
     input.replace(re, (full, pre, spec, post) => {
-      // Skip if this is a relative import that stays inside src/lib AND the
-      // mirror tree shape matches — relative form still resolves correctly,
-      // but we always call remap so cross-tree jumps (into _supabase) work.
-      const isRelInsideSameTree =
-        spec.startsWith(".") &&
-        srcAbs !== SUPABASE_TYPES_SRC &&
-        (() => {
-          try {
-            const abs = path.resolve(path.dirname(srcAbs), spec);
-            return abs.startsWith(SRC_LIB + path.sep) || abs === SRC_LIB;
-          } catch {
-            return false;
-          }
-        })();
-      const remapped = remap(spec);
-      if (remapped === null) return full;
-      if (isRelInsideSameTree) {
-        // Keep the original relative specifier — preserves diff-friendliness.
-        return full;
-      }
-      return pre + remapped + post;
+      const rewritten = remap(spec);
+      return rewritten === null ? full : pre + rewritten + post;
     });
 
   let out = apply(text, IMPORT_RE);
@@ -232,25 +247,12 @@ function rewriteMirrorSource(text, srcAbs, mirrorRootAbs) {
   return out;
 }
 
-/**
- * For an entry file inside supabase/functions/<fn>/, rewrite any specifier
- * that reaches a mirrored source into a relative path into the mirror.
- * Never touches specifiers that resolve outside the mirror set.
- */
-function rewriteEntry(text, entryAbs, mirrorRootAbs) {
+function rewriteEntry(text, entryAbs) {
   const remap = (spec) => {
-    let target = null;
-    try {
-      target = resolveSource(spec, entryAbs);
-    } catch (err) {
-      // Bubble frontend-import errors up.
-      throw err;
-    }
-    if (!target) return null;
-    const targetMirrorAbs = path.join(mirrorRootAbs, mirrorRelFromSource(target));
-    let rel = toPosix(
-      path.relative(path.dirname(entryAbs), targetMirrorAbs),
-    );
+    const target = resolveSource(spec, entryAbs);
+    if (!target || !isMirrorable(target)) return null;
+    const targetMirrorAbs = path.join(MIRROR_ABS, mirrorRelFromSource(target));
+    let rel = toPosix(path.relative(path.dirname(entryAbs), targetMirrorAbs));
     if (!rel.startsWith(".")) rel = "./" + rel;
     return rel;
   };
@@ -276,19 +278,15 @@ async function findEntryFiles() {
     const fnPath = path.join(FUNCTIONS, d.name);
 
     if (d.name === "_shared") {
-      // Entry-eligible: existing _shared/*.ts files that reach into src/**.
-      // Skip anything inside the generated mirror.
       const files = await walk(fnPath);
       for (const f of files) {
         if (!f.endsWith(".ts")) continue;
-        const inMirror =
-          f === path.join(ROOT, MIRROR_REL) ||
-          f.startsWith(path.join(ROOT, MIRROR_REL) + path.sep);
+        const inMirror = f === MIRROR_ABS || f.startsWith(MIRROR_ABS + path.sep);
         if (inMirror) continue;
         const text = await fs.readFile(f, "utf8");
         if (
           /(\.\.\/){2,}src\//.test(text) ||
-          /@\/lib\//.test(text) ||
+          /@\/(lib|constants)\//.test(text) ||
           /@\/integrations\/supabase\/types/.test(text)
         ) {
           out.push(f);
@@ -317,8 +315,7 @@ function banner(srcRel, hash) {
 async function main() {
   const outRoot = CHECK
     ? await fs.mkdtemp(path.join(os.tmpdir(), "edge-shared-"))
-    : path.join(ROOT, MIRROR_REL);
-  const mirrorRootAbs = path.join(ROOT, MIRROR_REL);
+    : MIRROR_ABS;
 
   const entries = await findEntryFiles();
   const collected = await collectFromEntries(entries);
@@ -328,7 +325,7 @@ async function main() {
   for (const [srcAbs, srcText] of collected) {
     const relInMirror = mirrorRelFromSource(srcAbs);
     const outAbs = path.join(outRoot, relInMirror);
-    const rewritten = rewriteMirrorSource(srcText, srcAbs, mirrorRootAbs);
+    const rewritten = rewriteMirrorSource(srcText, srcAbs);
     const hash = sha256(srcText);
     const srcRel = toPosix(path.relative(ROOT, srcAbs));
     const withBanner = banner(srcRel, hash) + rewritten;
@@ -346,7 +343,7 @@ async function main() {
     const drift = [];
     for (const [outAbs, content] of mirrorFiles) {
       const rel = path.relative(outRoot, outAbs);
-      const committedAbs = path.join(mirrorRootAbs, rel);
+      const committedAbs = path.join(MIRROR_ABS, rel);
       let committed = null;
       try {
         committed = await fs.readFile(committedAbs, "utf8");
@@ -358,9 +355,9 @@ async function main() {
         drift.push(`DRIFT: ${MIRROR_REL}/${rel} differs from generator output`);
       }
     }
-    const committedFiles = await walk(mirrorRootAbs);
+    const committedFiles = await walk(MIRROR_ABS);
     for (const f of committedFiles) {
-      const rel = path.relative(mirrorRootAbs, f);
+      const rel = path.relative(MIRROR_ABS, f);
       if (rel === ".sync-manifest.json") continue;
       const expectedAbs = path.join(outRoot, rel);
       if (!mirrorFiles.has(expectedAbs)) {
@@ -371,10 +368,7 @@ async function main() {
     }
     try {
       const committedManifest = JSON.parse(
-        await fs.readFile(
-          path.join(mirrorRootAbs, ".sync-manifest.json"),
-          "utf8",
-        ),
+        await fs.readFile(path.join(MIRROR_ABS, ".sync-manifest.json"), "utf8"),
       );
       if (
         JSON.stringify(committedManifest.sourceHashes) !==
@@ -389,14 +383,11 @@ async function main() {
       const text = await fs.readFile(entry, "utf8");
       if (
         /(\.\.\/){2,}src\//.test(text) ||
-        /@\/lib\//.test(text) ||
+        /@\/(lib|constants)\//.test(text) ||
         /@\/integrations\/supabase\/types/.test(text)
       ) {
         drift.push(
-          `ENTRY not rewritten: ${path.relative(
-            ROOT,
-            entry,
-          )} still imports src/** directly`,
+          `ENTRY not rewritten: ${path.relative(ROOT, entry)} still imports src/** directly`,
         );
       }
     }
@@ -406,19 +397,17 @@ async function main() {
       console.error("\nRun `bun run sync-edge-shared` and commit the result.");
       process.exit(1);
     }
-    console.log(
-      `OK — ${mirrorFiles.size} mirrored files in sync with src/lib.`,
-    );
+    console.log(`OK — ${mirrorFiles.size} mirrored files in sync with src/.`);
     return;
   }
 
-  await fs.rm(mirrorRootAbs, { recursive: true, force: true });
+  await fs.rm(MIRROR_ABS, { recursive: true, force: true });
   for (const [outAbs, content] of mirrorFiles) {
     await fs.mkdir(path.dirname(outAbs), { recursive: true });
     await fs.writeFile(outAbs, content, "utf8");
   }
   await fs.writeFile(
-    path.join(mirrorRootAbs, ".sync-manifest.json"),
+    path.join(MIRROR_ABS, ".sync-manifest.json"),
     JSON.stringify(manifest, null, 2) + "\n",
     "utf8",
   );
@@ -426,7 +415,7 @@ async function main() {
   let rewrittenCount = 0;
   for (const entry of entries) {
     const before = await fs.readFile(entry, "utf8");
-    const after = rewriteEntry(before, entry, mirrorRootAbs);
+    const after = rewriteEntry(before, entry);
     if (after !== before) {
       await fs.writeFile(entry, after, "utf8");
       rewrittenCount++;

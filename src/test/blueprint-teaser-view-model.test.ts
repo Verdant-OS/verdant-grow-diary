@@ -17,19 +17,38 @@ function keys(vm: ReturnType<typeof buildBlueprintTeaserViewModel>) {
 }
 
 describe("buildBlueprintTeaserViewModel", () => {
-  it("previews all seven veg targets in overlay order, day temp band when lights on", () => {
+  it("previews the six scoreable veg targets in overlay order, day temp band when lights on", () => {
     const vm = buildBlueprintTeaserViewModel({ stage: "veg", isDay: true });
     expect(vm.stageKnown).toBe(true);
     expect(vm.stageLabel).toBe("Veg");
-    expect(vm.targetCount).toBe(7);
-    expect(keys(vm)).toEqual(["vpdKpa", "tempC", "rh", "ppfd", "dli", "ec", "ph"]);
+    // DLI is omitted — the overlay cannot score it yet (dli: null), so the
+    // teaser must not advertise it.
+    expect(vm.targetCount).toBe(6);
+    expect(keys(vm)).toEqual(["vpdKpa", "tempC", "rh", "ppfd", "ec", "ph"]);
     expect(band(vm, "vpdKpa")).toEqual({ min: 0.8, max: 1.2 });
     expect(band(vm, "tempC")).toEqual({ min: 24, max: 27 }); // veg day band
     expect(band(vm, "rh")).toEqual({ min: 60, max: 70 });
     expect(band(vm, "ec")).toEqual({ min: 1.0, max: 1.8 });
     expect(band(vm, "ph")).toEqual({ min: 5.8, max: 5.9 });
     expect(band(vm, "ppfd")).toEqual({ min: 400, max: 700 });
-    expect(band(vm, "dli")).toEqual({ min: 25, max: 40 });
+    expect(band(vm, "dli")).toBeNull();
+  });
+
+  it("never previews DLI (structurally unscoreable) at any stage", () => {
+    for (const stage of ["seedling", "veg", "preflower", "flower", "flush"]) {
+      expect(keys(buildBlueprintTeaserViewModel({ stage }))).not.toContain("dli");
+    }
+  });
+
+  it("labels the temperature row with the applicable day/night context", () => {
+    const day = buildBlueprintTeaserViewModel({ stage: "veg", isDay: true });
+    expect(day.rows.find((r) => r.metricKey === "tempC")?.context).toBe("Day");
+    const night = buildBlueprintTeaserViewModel({ stage: "veg", isDay: false });
+    expect(night.rows.find((r) => r.metricKey === "tempC")?.context).toBe("Night");
+    const unknown = buildBlueprintTeaserViewModel({ stage: "veg", isDay: null });
+    expect(unknown.rows.find((r) => r.metricKey === "tempC")?.context).toBe("Day + night");
+    // Non-temperature rows carry no context.
+    expect(day.rows.find((r) => r.metricKey === "rh")?.context).toBeUndefined();
   });
 
   it("uses the night temp band when lights are off", () => {
@@ -58,7 +77,7 @@ describe("buildBlueprintTeaserViewModel", () => {
     expect(keys(buildBlueprintTeaserViewModel({ stage: "cure" }))).toEqual(["tempC", "rh"]);
     const flush = buildBlueprintTeaserViewModel({ stage: "flush", isDay: true });
     expect(flush.stageLabel).toBe("Late flower / flush");
-    expect(flush.targetCount).toBe(7);
+    expect(flush.targetCount).toBe(6); // 7 minus the omitted DLI
     expect(band(flush, "ec")).toEqual({ min: 1.0, max: 1.6 }); // late_flower EC
   });
 

@@ -35,7 +35,10 @@
  *   - `preflower` is reachable only via the "transition" alias (no `plants.stage`
  *     value maps to it), so its band is a conservative early-flower interpolation.
  *
- * ⚠️ FOUNDER TO CONFIRM the interpolated rows before this ships to users.
+ * Founder-confirmed for user-facing display (2026-07-21): the interpolated
+ * veg/preflower/flower/late_flower rows are approved to show to non-paying
+ * growers (e.g. the locked Blueprint teaser), alongside the SOP-verbatim
+ * seedling/harvest rows. Revisit the numbers as real grow data accrues.
  *
  * See: docs/spec-pro-blueprint-overlay.md
  */

@@ -18,12 +18,17 @@ describe("BlueprintTeaser", () => {
     // Conversion framing names the paid scoring value.
     expect(screen.getByTestId("pro-blueprint-teaser").textContent).toMatch(/Craft scores against/i);
 
-    // A concrete target row for the grower's stage (real SOP numbers).
+    // A concrete target row for the grower's stage (real SOP numbers), with the
+    // day/night context that mirrors the paywall's own selling point.
     const tempRow = screen.getByTestId("pro-blueprint-teaser-row-tempC");
     expect(tempRow.textContent).toMatch(/Temperature/);
     expect(tempRow.textContent).toMatch(/24–27 °C/);
+    expect(tempRow.textContent).toMatch(/Day/);
     // Humidity band renders too.
     expect(screen.getByTestId("pro-blueprint-teaser-row-rh").textContent).toMatch(/60–70 %/);
+    // The target count is surfaced (concrete conversion pitch) and DLI is absent.
+    expect(screen.getByTestId("pro-blueprint-teaser").textContent).toMatch(/6 pro stage targets/);
+    expect(screen.queryByTestId("pro-blueprint-teaser-row-dli")).toBeNull();
   });
 
   it("shows a set-the-stage prompt when there is nothing to preview", () => {

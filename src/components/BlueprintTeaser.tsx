@@ -41,21 +41,22 @@ export function BlueprintTeaser({
         <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary/80">
           Pro Blueprint · preview
         </p>
-        <h3
+        <h2
           data-testid={`${testId}-stage`}
           className="font-display text-lg font-bold text-foreground"
         >
           {vm.stageKnown ? `${vm.stageLabel} targets` : "Pro stage targets"}
-        </h3>
+        </h2>
       </header>
 
       {vm.stageKnown ? (
         <>
           <p className="mb-3 text-sm text-muted-foreground">
-            The pro stage targets Craft scores against. Upgrade to see each of your live and logged
-            readings scored <span className="text-emerald-600">green</span>,{" "}
-            <span className="text-amber-600">amber</span> or{" "}
-            <span className="text-red-600">red</span> against them.
+            The {vm.targetCount} pro stage targets Craft scores against. Upgrade to see each of your
+            live and logged readings scored{" "}
+            <span className="font-medium text-emerald-700 dark:text-emerald-400">green</span>,{" "}
+            <span className="font-medium text-amber-700 dark:text-amber-400">amber</span> or{" "}
+            <span className="font-medium text-red-700 dark:text-red-400">red</span> against them.
           </p>
           <ul className="flex flex-col gap-1.5" data-testid={`${testId}-rows`}>
             {vm.rows.map((row) => (
@@ -67,6 +68,7 @@ export function BlueprintTeaser({
                 <span className="font-medium text-foreground">{row.label}</span>
                 <span className="tabular-nums text-sm text-muted-foreground">
                   Target {formatBand(row)}
+                  {row.context ? ` · ${row.context}` : ""}
                 </span>
               </li>
             ))}

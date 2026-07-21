@@ -43,6 +43,10 @@ export interface PlantBlueprintOverlaySectionProps {
 const PAYWALL_VM = buildPaywallCtaViewModel({
   featureTitle: "Pro Blueprint",
   requiredPlanLabel: "Craft",
+  // Land the grower on Craft, pre-selected (annual = the Pricing default +
+  // highest LTV), instead of the generic four-plan page they'd have to
+  // re-navigate. `?plan=` is the canonical preselect (resolvePricingPlanPreselect).
+  pricingHref: "/pricing?plan=craft_annual",
   unlockBullets: [
     "Score each reading green, amber or red against pro stage targets",
     "Per-stage VPD, temperature, humidity, EC, pH and light bands",
@@ -61,8 +65,12 @@ export function PlantBlueprintOverlaySection({
   // Hooks are called unconditionally (React rules), before any early return.
   const { entitlement, loading: entLoading, lookupFailed } = useMyEntitlements();
   const unlocked = !lookupFailed && canUseCapability(entitlement, "blueprint");
-  const snapState = useLatestSensorSnapshot(growId, tentId ? [tentId] : []);
-  // Only fetch feeding history once unlocked — free growers see the paywall.
+  // Only fetch live/logged data once unlocked — the locked teaser is static
+  // (derived from stage alone), so free growers trigger no sensor/feeding query.
+  const snapState = useLatestSensorSnapshot(
+    unlocked ? growId : null,
+    unlocked && tentId ? [tentId] : [],
+  );
   const { observations } = useRootZoneObservations(
     unlocked && plantId ? { kind: "plant", plantId } : null,
   );
@@ -75,8 +83,9 @@ export function PlantBlueprintOverlaySection({
   if (!unlocked) {
     // Conversion demo: preview the real per-stage SOP target bands (what Craft
     // scores against) above the paywall CTA, so the paid value is concrete on
-    // the grower's own plant. Static bands only — no live values, no scoring,
-    // no data fetch on the locked path.
+    // the grower's own plant. The teaser is pure — derived from stage + light
+    // state only, with no live values, no scoring, and no data fetch (the data
+    // hooks above are disabled while locked).
     const teaserVm = buildBlueprintTeaserViewModel({ stage, isDay });
     return (
       <div data-testid="pro-blueprint-locked" className={cn("flex flex-col gap-3", className)}>

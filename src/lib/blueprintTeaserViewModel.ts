@@ -34,6 +34,25 @@ export interface BlueprintTeaserRow {
   label: string;
   unit: string;
   band: MetricBand;
+  /** Extra context for the row (e.g. which temperature band applies). */
+  context?: string;
+}
+
+/**
+ * Metrics the unlocked overlay cannot currently SCORE, so the teaser must not
+ * advertise them — previewing a band would promise per-reading scoring the paid
+ * product can't yet deliver (an overclaim on a conversion surface). DLI is
+ * hardcoded `dli: null` in the overlay input (PlantBlueprintOverlaySection)
+ * because it needs PPFD samples + a stored timezone the schema does not carry.
+ * Re-enable it here the moment DLI scoring is wired.
+ */
+const TEASER_UNSCOREABLE_METRICS: ReadonlySet<BlueprintMetricKey> = new Set(["dli"]);
+
+/** Short day/night label for the temperature row, mirroring the overlay. */
+function tempContext(isDay: boolean | null | undefined): string {
+  if (isDay === true) return "Day";
+  if (isDay === false) return "Night";
+  return "Day + night";
 }
 
 export interface BlueprintTeaserViewModel {
@@ -69,12 +88,20 @@ export function buildBlueprintTeaserViewModel(
   const rows: BlueprintTeaserRow[] = [];
   if (stageKnown) {
     for (const meta of METRIC_META) {
+      if (TEASER_UNSCOREABLE_METRICS.has(meta.key)) continue; // don't advertise what Craft can't score
       const band = resolveBlueprintBand(stage, meta.key, {
         isDay: input.isDay,
         bands: input.bands,
       });
       if (!band) continue; // metric not targeted at this stage → omit
-      rows.push({ metricKey: meta.key, label: meta.label, unit: meta.unit, band });
+      const row: BlueprintTeaserRow = {
+        metricKey: meta.key,
+        label: meta.label,
+        unit: meta.unit,
+        band,
+      };
+      if (meta.key === "tempC") row.context = tempContext(input.isDay);
+      rows.push(row);
     }
   }
 

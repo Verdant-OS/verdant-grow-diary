@@ -26,8 +26,22 @@ permissions:
   pull-requests: write
 
 jobs:
+  unit-tests-migration-version:
+    name: Unit tests — migrationVersion + applied-check logic
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Run required-money-migrations unit tests
+        run: bunx vitest run src/test/required-money-migrations-version.test.ts --reporter=dot
+
   assert-required-money-migrations:
     name: Assert required credit-spend + referral migrations present
+    needs: unit-tests-migration-version
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -35,6 +49,7 @@ jobs:
         run: node scripts/assert-required-money-migrations.mjs
       - name: Assert no unreviewed money-adjacent migrations
         run: node scripts/assert-no-unreviewed-money-migrations.mjs
+
 
   assert-money-migrations-applied-sandbox:
     name: Assert money migrations applied in SANDBOX

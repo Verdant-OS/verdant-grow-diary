@@ -6,6 +6,7 @@ on:
       - "supabase/migrations/**"
       - "scripts/assert-required-money-migrations.mjs"
       - "scripts/assert-required-money-migrations-applied.mjs"
+      - "scripts/assert-no-unreviewed-money-migrations.mjs"
       - "scripts/required-money-migrations.mjs"
       - ".github/workflows/required-money-migrations.yml"
   push:
@@ -25,6 +26,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Assert filename allowlist
         run: node scripts/assert-required-money-migrations.mjs
+      - name: Assert no unreviewed money-adjacent migrations
+        run: node scripts/assert-no-unreviewed-money-migrations.mjs
 
   assert-money-migrations-applied-sandbox:
     name: Assert money migrations applied in SANDBOX

@@ -65,7 +65,6 @@ import { sanitizeCheckoutReturnTo } from "@/lib/checkoutReturnTo";
 import { usePaddleCheckout } from "@/hooks/usePaddleCheckout";
 import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 
-
 // --- Paddle overlay typing (loose — we only call a couple of methods). -------
 interface PaddleCheckoutOpenPayload {
   items: Array<{ priceId: string; quantity: number }>;
@@ -645,8 +644,7 @@ export default function Upgrade() {
     refetch: refetchEntitlement,
   } = useMyEntitlements();
 
-  const currentPlanKnown =
-    !entLoading && !entitlementLookupFailed && !!entitlement?.displayPlanId;
+  const currentPlanKnown = !entLoading && !entitlementLookupFailed && !!entitlement?.displayPlanId;
   const currentPlanId = currentPlanKnown ? (entitlement.displayPlanId as string) : null;
 
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
@@ -689,7 +687,6 @@ export default function Upgrade() {
       successUrl,
     });
   };
-
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-12">
@@ -749,7 +746,7 @@ export default function Upgrade() {
 
       <section
         aria-label="Pricing tiers"
-        className="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-4"
+        className="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-3"
       >
         {PRICING_TIERS.map((tier) => (
           <TierCard
@@ -773,7 +770,6 @@ export default function Upgrade() {
       </section>
 
       <UpgradeFaq />
-
 
       <p className="mt-12 text-center text-xs text-muted-foreground">
         New to Verdant?{" "}

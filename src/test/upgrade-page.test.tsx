@@ -139,11 +139,13 @@ afterEach(() => {
 });
 
 describe("Upgrade page", () => {
-  it("renders all four tiers", () => {
+  it("renders all tiers including Craft", () => {
     renderPage();
     expect(screen.getByTestId("tier-free")).toBeInTheDocument();
     expect(screen.getByTestId("tier-pro_monthly")).toBeInTheDocument();
     expect(screen.getByTestId("tier-pro_annual")).toBeInTheDocument();
+    expect(screen.getByTestId("tier-craft_monthly")).toBeInTheDocument();
+    expect(screen.getByTestId("tier-craft_annual")).toBeInTheDocument();
     expect(screen.getByTestId("tier-founder_lifetime")).toBeInTheDocument();
   });
 
@@ -154,9 +156,7 @@ describe("Upgrade page", () => {
     expect(screen.getByTestId("upgrade-plan-verification-failed")).toBeInTheDocument();
     expect(screen.getByTestId("tier-free-cta")).not.toHaveTextContent("Current plan");
     expect(screen.getByTestId("tier-pro_monthly-cta")).toBeDisabled();
-    expect(screen.getByTestId("tier-pro_monthly-cta")).toHaveTextContent(
-      "Plan check unavailable",
-    );
+    expect(screen.getByTestId("tier-pro_monthly-cta")).toHaveTextContent("Plan check unavailable");
     fireEvent.click(screen.getByTestId("tier-pro_monthly-cta"));
     expect(canonicalCheckout.openCheckout).not.toHaveBeenCalled();
     fireEvent.click(screen.getByTestId("upgrade-plan-verification-retry"));
@@ -355,8 +355,7 @@ describe("Upgrade page — success panel", () => {
     const founder = resolveTierFeatures("founder_lifetime");
 
     // Same shared features must appear in the same relative order everywhere.
-    const rank = (list: string[]) =>
-      list.map((f) => CANONICAL_FEATURE_ORDER.indexOf(f));
+    const rank = (list: string[]) => list.map((f) => CANONICAL_FEATURE_ORDER.indexOf(f));
     for (const list of [pro, annual, founder]) {
       const r = rank(list);
       const sorted = [...r].sort((a, b) => a - b);
@@ -370,9 +369,7 @@ describe("Upgrade page — success panel", () => {
     expect(founderShared).toEqual(proShared);
 
     // Founder perk is anchored at the end of the canonical order.
-    expect(founder[founder.length - 1]).toBe(
-      "Founder badge & early-supporter perks",
-    );
+    expect(founder[founder.length - 1]).toBe("Founder badge & early-supporter perks");
   });
 
   it("does not call Paddle.Checkout.open when success panel is shown", () => {
@@ -390,13 +387,9 @@ describe("Upgrade page — success panel", () => {
 
 describe("Upgrade page — success panel feature row identity", () => {
   it("assigns deterministic keys via successPanelFeatureRowKey for known features", async () => {
-    const { successPanelFeatureRowKey, CANONICAL_FEATURE_ORDER } = await import(
-      "@/config/pricing"
-    );
+    const { successPanelFeatureRowKey, CANONICAL_FEATURE_ORDER } = await import("@/config/pricing");
     for (let i = 0; i < CANONICAL_FEATURE_ORDER.length; i++) {
-      expect(successPanelFeatureRowKey(CANONICAL_FEATURE_ORDER[i])).toBe(
-        `feat-${i}`,
-      );
+      expect(successPanelFeatureRowKey(CANONICAL_FEATURE_ORDER[i])).toBe(`feat-${i}`);
     }
   });
 
@@ -480,25 +473,17 @@ describe("Upgrade page — success panel feature order snapshots", () => {
 
 describe("sortSuccessPanelFeatures — unknown feature sorting", () => {
   it("sorts known canonical features before unknown features", async () => {
-    const { sortSuccessPanelFeatures, CANONICAL_FEATURE_ORDER } = await import(
-      "@/config/pricing"
-    );
+    const { sortSuccessPanelFeatures, CANONICAL_FEATURE_ORDER } = await import("@/config/pricing");
     const known1 = CANONICAL_FEATURE_ORDER[0];
     const known2 = CANONICAL_FEATURE_ORDER[1] ?? CANONICAL_FEATURE_ORDER[0];
     const input = ["zzz_unknown", known2, "aaa_unknown", known1];
     const out = sortSuccessPanelFeatures(input);
-    const knownsInOut = out.filter(
-      (f) => CANONICAL_FEATURE_ORDER.indexOf(f) !== -1,
-    );
-    const unknowns = out.filter(
-      (f) => CANONICAL_FEATURE_ORDER.indexOf(f) === -1,
-    );
+    const knownsInOut = out.filter((f) => CANONICAL_FEATURE_ORDER.indexOf(f) !== -1);
+    const unknowns = out.filter((f) => CANONICAL_FEATURE_ORDER.indexOf(f) === -1);
     // Knowns first, in canonical order.
     expect(knownsInOut).toEqual(
       [...knownsInOut].sort(
-        (a, b) =>
-          CANONICAL_FEATURE_ORDER.indexOf(a) -
-          CANONICAL_FEATURE_ORDER.indexOf(b),
+        (a, b) => CANONICAL_FEATURE_ORDER.indexOf(a) - CANONICAL_FEATURE_ORDER.indexOf(b),
       ),
     );
     // Every unknown appears after every known.
@@ -509,12 +494,7 @@ describe("sortSuccessPanelFeatures — unknown feature sorting", () => {
 
   it("tie-breaks unknown features lexically (not by input index)", async () => {
     const { sortSuccessPanelFeatures } = await import("@/config/pricing");
-    const out = sortSuccessPanelFeatures([
-      "unknown_z",
-      "unknown_a",
-      "unknown_m",
-      "unknown_b",
-    ]);
+    const out = sortSuccessPanelFeatures(["unknown_z", "unknown_a", "unknown_m", "unknown_b"]);
     expect(out).toEqual(["unknown_a", "unknown_b", "unknown_m", "unknown_z"]);
   });
 
@@ -528,19 +508,12 @@ describe("sortSuccessPanelFeatures — unknown feature sorting", () => {
 
   it("dedupes repeated entries deterministically", async () => {
     const { sortSuccessPanelFeatures } = await import("@/config/pricing");
-    const out = sortSuccessPanelFeatures([
-      "unknown_a",
-      "unknown_a",
-      "unknown_b",
-      "unknown_a",
-    ]);
+    const out = sortSuccessPanelFeatures(["unknown_a", "unknown_a", "unknown_b", "unknown_a"]);
     expect(out).toEqual(["unknown_a", "unknown_b"]);
   });
 
   it("orders known features by canonical index, not by input order", async () => {
-    const { sortSuccessPanelFeatures, CANONICAL_FEATURE_ORDER } = await import(
-      "@/config/pricing"
-    );
+    const { sortSuccessPanelFeatures, CANONICAL_FEATURE_ORDER } = await import("@/config/pricing");
     if (CANONICAL_FEATURE_ORDER.length < 2) return;
     const first = CANONICAL_FEATURE_ORDER[0];
     const last = CANONICAL_FEATURE_ORDER[CANONICAL_FEATURE_ORDER.length - 1];
@@ -550,9 +523,7 @@ describe("sortSuccessPanelFeatures — unknown feature sorting", () => {
   });
 
   it("is deterministic across repeated calls with the same input", async () => {
-    const { sortSuccessPanelFeatures, CANONICAL_FEATURE_ORDER } = await import(
-      "@/config/pricing"
-    );
+    const { sortSuccessPanelFeatures, CANONICAL_FEATURE_ORDER } = await import("@/config/pricing");
     const input = [
       "unknown_z",
       CANONICAL_FEATURE_ORDER[0],
@@ -560,9 +531,7 @@ describe("sortSuccessPanelFeatures — unknown feature sorting", () => {
       CANONICAL_FEATURE_ORDER[1] ?? CANONICAL_FEATURE_ORDER[0],
       "unknown_m",
     ];
-    const runs = Array.from({ length: 5 }, () =>
-      sortSuccessPanelFeatures(input),
-    );
+    const runs = Array.from({ length: 5 }, () => sortSuccessPanelFeatures(input));
     for (let i = 1; i < runs.length; i++) {
       expect(runs[i]).toEqual(runs[0]);
     }
@@ -627,4 +596,3 @@ describe("Upgrade success panel — source guard", () => {
     expect(src).not.toMatch(/key=\{\s*(?:index|i|idx)\s*\}/);
   });
 });
-

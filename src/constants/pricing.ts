@@ -52,6 +52,27 @@ export const PRICING = {
       "Export / backups",
     ],
   },
+  craft: {
+    name: "Craft",
+    slug: "craft",
+    subtitle: "Craft Grower",
+    monthlyPrice: 29,
+    annualPrice: 249,
+    cadenceMonthly: "/ month",
+    cadenceAnnual: "/ year",
+    highlighted: false,
+    badge: "For craft growers" as string | undefined,
+    annualSavingsPercent: 28,
+    description:
+      "For craft growers dialing in every run — the live Blueprint scores each reading against your SOP.",
+    features: [
+      "Everything in Pro",
+      "Pro Blueprint: live per-stage SOP scoring",
+      "300 AI Doctor credits / month",
+      "Per-stage VPD, temperature, humidity, EC, pH and light bands",
+      "Day/night-aware temperature targets",
+    ],
+  },
   founder: {
     name: "Founder Lifetime",
     slug: "founder-lifetime",
@@ -92,3 +113,5 @@ export const FOUNDER_LIFETIME_LIMIT = PRICING.founder.limit;
 export const FOUNDER_LIFETIME_PRICE_USD = PRICING.founder.price;
 export const PRO_MONTHLY_PRICE_USD = PRICING.pro.monthlyPrice;
 export const PRO_ANNUAL_PRICE_USD = PRICING.pro.annualPrice;
+export const CRAFT_MONTHLY_PRICE_USD = PRICING.craft.monthlyPrice;
+export const CRAFT_ANNUAL_PRICE_USD = PRICING.craft.annualPrice;

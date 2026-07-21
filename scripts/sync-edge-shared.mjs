@@ -33,6 +33,7 @@ const FUNCTIONS = path.join(ROOT, "supabase", "functions");
 const MIRROR_REL = path.join("supabase", "functions", "_shared", "lib");
 const MIRROR_ABS = path.join(ROOT, MIRROR_REL);
 const CHECK = process.argv.includes("--check");
+const DRY_RUN = process.argv.includes("--dry-run");
 
 /** Allowed src-relative roots that may be mirrored. */
 const ALLOWED_SRC_ROOTS = ["lib", "constants"];
@@ -434,6 +435,54 @@ async function main() {
       process.exit(1);
     }
     console.log(`OK — ${mirrorFiles.size} mirrored files in sync with src/.`);
+    return;
+  }
+
+  if (DRY_RUN) {
+    const planned = { create: [], update: [], unchanged: 0, deleteStale: [] };
+    for (const [outAbs, content] of mirrorFiles) {
+      let existing = null;
+      try {
+        existing = await fs.readFile(outAbs, "utf8");
+      } catch {}
+      const rel = path.relative(ROOT, outAbs);
+      if (existing === null) planned.create.push(rel);
+      else if (existing !== content) planned.update.push(rel);
+      else planned.unchanged++;
+    }
+    try {
+      const committedFiles = await walk(MIRROR_ABS);
+      for (const f of committedFiles) {
+        const rel = path.relative(MIRROR_ABS, f);
+        if (rel === ".sync-manifest.json") continue;
+        const expectedAbs = path.join(MIRROR_ABS, rel);
+        if (!mirrorFiles.has(expectedAbs)) {
+          planned.deleteStale.push(path.join(MIRROR_REL, rel));
+        }
+      }
+    } catch {}
+
+    const entryChanges = [];
+    for (const entry of entries) {
+      const before = await fs.readFile(entry, "utf8");
+      const after = rewriteEntry(before, entry);
+      if (after !== before) entryChanges.push(path.relative(ROOT, entry));
+    }
+
+    console.log("DRY RUN — no files written.\n");
+    console.log(`Mirror target: ${MIRROR_REL}`);
+    console.log(`  create:    ${planned.create.length}`);
+    for (const f of planned.create) console.log(`    + ${f}`);
+    console.log(`  update:    ${planned.update.length}`);
+    for (const f of planned.update) console.log(`    ~ ${f}`);
+    console.log(`  unchanged: ${planned.unchanged}`);
+    console.log(`  stale (would be removed by mirror rewrite): ${planned.deleteStale.length}`);
+    for (const f of planned.deleteStale) console.log(`    - ${f}`);
+    console.log(`\nEntry files to rewrite: ${entryChanges.length}`);
+    for (const f of entryChanges) console.log(`    ~ ${f}`);
+    console.log(
+      `\nRun without --dry-run to apply. Total mirrored files planned: ${mirrorFiles.size}.`,
+    );
     return;
   }
 

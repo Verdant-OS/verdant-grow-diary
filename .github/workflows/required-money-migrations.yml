@@ -90,6 +90,7 @@ jobs:
           TARGET_ENV: sandbox
           REPORT_PATH: ${{ github.workspace }}/audit/sandbox/report.md
           AUDIT_PATH: ${{ github.workspace }}/audit/sandbox/applied-audit.json
+          DIFF_PATH: ${{ github.workspace }}/audit/sandbox/prefix-diff.txt
         run: |
           if [ -z "${SUPABASE_DB_URL:-}" ]; then
             printf '### Money-critical migration deploy guard — SANDBOX\n\n**Status:** ❌ SUPABASE_DB_URL_SANDBOX secret is not configured\n\nThe deploy guard could not run because the sandbox database connection secret is missing.\nConfigure `SUPABASE_DB_URL_SANDBOX` in the repository secrets and re-run the workflow.\n\n_Do NOT deploy until this check passes._\n' > "$REPORT_PATH"

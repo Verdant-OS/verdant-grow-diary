@@ -304,6 +304,10 @@ if (result.error) {
     "Install `postgresql-client` on the runner and re-run the workflow.",
   ]);
   writeAudit("psql_not_invocable", { note: "psql binary not invocable on runner." });
+  writeDiff("psql_not_invocable", {
+    expectedRows: expected.map((e) => ({ ...e, applied: false })),
+    appliedVersions: [],
+  });
   process.exit(EXIT.PSQL_NOT_INVOCABLE);
 }
 if (result.status !== 0) {
@@ -319,6 +323,10 @@ if (result.status !== 0) {
   ]);
   writeAudit("tracker_query_failed", {
     note: `psql exited ${result.status} querying supabase_migrations.schema_migrations.`,
+  });
+  writeDiff("tracker_query_failed", {
+    expectedRows: expected.map((e) => ({ ...e, applied: false })),
+    appliedVersions: [],
   });
   process.exit(EXIT.TRACKER_QUERY_FAILED);
 }

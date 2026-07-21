@@ -235,13 +235,15 @@ describe("applied-check comparison — partial-file corruption", () => {
     expect(missing).toEqual([...REQUIRED_MONEY_MIGRATIONS]);
   });
 
-  it("does not match when a version is prefixed with a UTF-8 BOM on its row", () => {
-    // trim() does not strip U+FEFF, so a BOM-prefixed row must miss the Set lookup.
+  it("tolerates a UTF-8 BOM (U+FEFF) prefixed on each row — trim() strips it", () => {
+    // String.prototype.trim() treats U+FEFF as whitespace, so a BOM-prefixed
+    // row still matches the Set lookup. Lock this in so future refactors that
+    // swap trim() for a stricter stripper don't silently start missing rows.
     const versions = REQUIRED_MONEY_MIGRATIONS.map(migrationVersion);
     const stdout = versions.map((v) => `\uFEFF${v}`).join("\n");
-    const { applied, missing } = classifyApplied(REQUIRED_MONEY_MIGRATIONS, stdout);
-    expect(applied).toEqual([]);
-    expect(missing).toEqual([...REQUIRED_MONEY_MIGRATIONS]);
+    const { missing } = classifyApplied(REQUIRED_MONEY_MIGRATIONS, stdout);
+    expect(missing).toEqual([]);
   });
+
 });
 

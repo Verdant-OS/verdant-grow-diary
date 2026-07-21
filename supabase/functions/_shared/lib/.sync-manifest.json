@@ -1,6 +1,6 @@
 {
   "generator": "scripts/sync-edge-shared.mjs",
-  "sourceCount": 81,
+  "sourceCount": 82,
   "sourceHashes": {
     "src/lib/aiDoctorCreditReplayRules.ts": "55c948e68e1f444b482b8d7e3a772553057dcf76ad1d2b95c737bdfbe463936b",
     "src/lib/aiDoctorPromptAssembly.ts": "d1c7a5a0472ad910a10a0a6438887ae1f6acaf929b231e1da591cbd1f6c1a37c",
@@ -13,6 +13,7 @@
     "src/lib/entitlements/lovablePaddleAdapter.ts": "46b09a6310f0065709916d68667321af6269479526fd24c8f831a4f5270ef0ab",
     "src/lib/quick-log/quickLogSensorSnapshotAcquisitionRules.ts": "1077e578c64091e2003d04a8e50f5a86e99d10510c5ae188f0c2e72392e20b0a",
     "src/lib/aiSensorSnapshotContextRules.ts": "cb3e00dd10c25d300d58ea4544b1153801970a473ca95db721b739cd2cb43d2c",
+    "src/lib/aiCoachLatestSensorSnapshot.ts": "b37f8baccdf66becef9023a2e632383c3a9cb3bd095d3d5faf813051ae6f32f5",
     "src/lib/billingCustomerLinkCaptureRules.ts": "7f4bfebc8b0ce0e6d87f455fdfa86521baa56876856dcc0375e10d1e2bc9f8e7",
     "src/lib/piIngestServerSecretResolverTypes.ts": "741d2a615ef6dcb52ba03976b22604b2331ed31bede77ef5c292022b38d12342",
     "src/lib/piIngestAuthRules.ts": "43ba763955b861128b5bf2469378957af8fddbc19f621f60586c8792e71b4fa0",

@@ -11,6 +11,7 @@
     "build:dev": "vite build --mode development",
     "sync-edge-shared": "node scripts/sync-edge-shared.mjs",
     "verify-edge-shared-in-sync": "node scripts/verify-edge-shared-in-sync.mjs",
+    "report:edge-shared-drift": "node scripts/report-edge-shared-drift.mjs",
     "predeploy:functions": "node scripts/verify-edge-shared-in-sync.mjs && node scripts/check-no-src-lib-imports.mjs",
 
     "deploy:functions": "supabase functions deploy",

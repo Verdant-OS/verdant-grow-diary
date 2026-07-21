@@ -351,6 +351,21 @@ async function main() {
   };
 
   if (CHECK) {
+    // When a caller pinned SYNC_TMP_OUT, materialize the freshly
+    // generated mirror there so downstream tools (annotator,
+    // human-readable drift report) can diff/hash expected vs actual
+    // without re-running the generator themselves.
+    if (process.env.SYNC_TMP_OUT) {
+      for (const [outAbs, content] of mirrorFiles) {
+        await fs.mkdir(path.dirname(outAbs), { recursive: true });
+        await fs.writeFile(outAbs, content, "utf8");
+      }
+      await fs.writeFile(
+        path.join(outRoot, ".sync-manifest.json"),
+        JSON.stringify(manifest, null, 2) + "\n",
+        "utf8",
+      );
+    }
     const drift = [];
     for (const [outAbs, content] of mirrorFiles) {
       const rel = path.relative(outRoot, outAbs);

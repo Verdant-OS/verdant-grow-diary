@@ -21,4 +21,17 @@ jobs:
       - name: Fail on any ../../../src/lib import in supabase/functions/*/index.ts
         run: node scripts/check-no-src-lib-imports.mjs
       - name: Verify committed edge shared-lib mirror matches src/ (with PR annotations)
+        id: verify-mirror
         run: node scripts/annotate-edge-shared-drift.mjs
+      - name: Human-readable drift report (expected vs actual sha256)
+        if: always() && steps.verify-mirror.outcome == 'failure'
+        env:
+          DRIFT_REPORT_OUT: edge-shared-drift-report.md
+        run: node scripts/report-edge-shared-drift.mjs
+      - name: Upload drift report artifact
+        if: always() && steps.verify-mirror.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: edge-shared-drift-report
+          path: edge-shared-drift-report.md
+          if-no-files-found: ignore

@@ -153,6 +153,56 @@ export type Database = {
           },
         ]
       }
+      ai_credit_grants: {
+        Row: {
+          created_at: string
+          credits: number
+          environment: string
+          expires_at: string | null
+          id: string
+          kind: string
+          meta: Json
+          paddle_transaction_id: string
+          reverses: string | null
+          sku: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          credits: number
+          environment: string
+          expires_at?: string | null
+          id?: string
+          kind?: string
+          meta?: Json
+          paddle_transaction_id: string
+          reverses?: string | null
+          sku: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          credits?: number
+          environment?: string
+          expires_at?: string | null
+          id?: string
+          kind?: string
+          meta?: Json
+          paddle_transaction_id?: string
+          reverses?: string | null
+          sku?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_credit_grants_reverses_fkey"
+            columns: ["reverses"]
+            isOneToOne: false
+            referencedRelation: "ai_credit_grants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_credit_spends: {
         Row: {
           created_at: string
@@ -3359,6 +3409,16 @@ export type Database = {
       founders_wall_count: { Args: never; Returns: number }
       get_latest_tent_sensor_snapshot: {
         Args: { _tent_id: string }
+        Returns: Json
+      }
+      grant_lovable_credit_pack: {
+        Args: {
+          p_credits: number
+          p_environment: string
+          p_expected_user_id: string
+          p_paddle_transaction_id: string
+          p_sku: string
+        }
         Returns: Json
       }
       has_pheno_tracker_entitlement: {

@@ -4,7 +4,11 @@ import {
   escapeWorkflowCommand,
   formatAnnotation,
   collectFindings,
+  locateSubstring,
+  firstDifferingLine,
+  enrichFinding,
 } from "../../scripts/lib/annotate-edge-shared-drift-parse.mjs";
+
 
 const MANIFEST = "supabase/functions/_shared/lib/.sync-manifest.json";
 

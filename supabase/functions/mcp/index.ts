@@ -251,8 +251,15 @@ function withoutDiagnosticSensorRows(rows) {
 // src/lib/sensorReadingNormalizationRules.ts
 var STALE_THRESHOLD_MS = 30 * 60 * 1e3;
 
+// src/lib/ecUnits.ts
+var EC_PLAUSIBLE_MAX = {
+  "mS/cm": 5,
+  "\xB5S/cm": 5e3,
+  "PPM-500": 2500,
+  "PPM-700": 3500
+};
+
 // src/lib/sensorValidation.ts
-import { EC_PLAUSIBLE_MAX } from "npm:@/lib/ecUnits";
 function num(v) {
   if (v === null || v === void 0 || v === "") return null;
   const n = typeof v === "number" ? v : Number(String(v).trim());

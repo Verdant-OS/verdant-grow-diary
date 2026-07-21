@@ -4456,6 +4456,20 @@ export type Database = {
         Args: { p_idempotency_key: string; p_payload: Json }
         Returns: Json
       }
+      genetics_subject_evidence: {
+        Args: { p_owner: string; p_subject_id: string; p_subject_type: string }
+        Returns: Json
+      }
+      genetics_trace_resolve: {
+        Args: {
+          p_direction?: string
+          p_max_depth?: number
+          p_max_nodes?: number
+          p_subject_id: string
+          p_subject_type: string
+        }
+        Returns: Json
+      }
       get_latest_tent_sensor_snapshot: {
         Args: { _tent_id: string }
         Returns: Json

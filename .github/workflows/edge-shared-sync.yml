@@ -31,5 +31,5 @@ jobs:
           node-version: "22"
       - name: Fail on any ../../../src/lib import in supabase/functions/*/index.ts
         run: node scripts/check-no-src-lib-imports.mjs
-      - name: Verify committed edge shared-lib mirror matches src/
-        run: node scripts/verify-edge-shared-in-sync.mjs
+      - name: Verify committed edge shared-lib mirror matches src/ (with PR annotations)
+        run: node scripts/annotate-edge-shared-drift.mjs

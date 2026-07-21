@@ -169,6 +169,11 @@ const applied = new Set(
 
 const missing = expected.filter((e) => !applied.has(e.version));
 
+const expectedWithApplied = expected.map((e) => ({
+  ...e,
+  applied: applied.has(e.version),
+}));
+
 if (missing.length > 0) {
   console.error(
     `✗ Money-critical migrations NOT applied in target env (${TARGET_ENV}):`,
@@ -193,9 +198,11 @@ if (missing.length > 0) {
       "environment, then re-run this workflow. Do not deploy until the guard turns green.",
     ],
   );
+  writeAudit("missing_migrations", { expected: expectedWithApplied });
   process.exit(1);
 }
 
 console.log(
   `✓ All ${expected.length} money-critical migrations applied in target env (${TARGET_ENV}).`,
 );
+writeAudit("verified", { expected: expectedWithApplied });

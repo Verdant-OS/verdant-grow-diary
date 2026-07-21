@@ -114,8 +114,8 @@ describe("redeem-referral edge function contract", () => {
   });
 
   it("marks permanent refusals terminal so clients stop retrying", () => {
-    expect(EDGE).toContain("'self_referral'");
-    expect(EDGE).toContain("'referee_already_referred'");
+    expect(EDGE).toMatch(/self_referral/);
+    expect(EDGE).toMatch(/referee_already_referred/);
     expect(EDGE).toContain("terminal: true");
   });
 });

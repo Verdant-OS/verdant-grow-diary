@@ -187,7 +187,11 @@ BEGIN
           NEW.id,
           v_ref_code,
           COALESCE(NULLIF(current_setting('app.payments_environment', true), ''), 'live'),
+          -- Fail closed: only grant DB-side when the environment GUC is explicitly
+          -- set; otherwise record pending and let the edge fn grant with the
+          -- server-resolved environment.
           NEW.email_confirmed_at IS NOT NULL
+            AND NULLIF(current_setting('app.payments_environment', true), '') IS NOT NULL
         );
       END IF;
     END IF;

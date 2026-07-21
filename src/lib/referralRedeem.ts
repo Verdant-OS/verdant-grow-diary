@@ -86,8 +86,8 @@ export async function flushPendingReferralRedeem(
   const bridgeCode = readPendingOAuthReferral(storage, now);
   const code = metadataCode ?? bridgeCode;
   if (!code) {
-    // Nothing to redeem for this account — never ask again on this device.
-    setDoneMarker(user.id);
+    // No code visible in THIS tab. Do NOT set the done-marker: the OAuth
+    // bridge is per-tab sessionStorage, and a sibling tab may still hold it.
     return "none";
   }
 

@@ -7,6 +7,7 @@ import GrowDataSourceDisclosure from "@/components/GrowDataSourceDisclosure";
 import PlantDetailDataSourceDisclosure from "@/components/PlantDetailDataSourceDisclosure";
 import AssignTentDialog from "@/components/AssignTentDialog";
 import PlantTentEnvironmentPanel from "@/components/PlantTentEnvironmentPanel";
+import { PlantBlueprintOverlaySection } from "@/components/PlantBlueprintOverlaySection";
 import PlantRecentActivityPanel from "@/components/PlantRecentActivityPanel";
 import PlantRelativeTimelineSection from "@/components/PlantRelativeTimelineSection";
 import ManualSnapshotTimelineSection from "@/components/ManualSnapshotTimelineSection";
@@ -714,6 +715,16 @@ export default function PlantDetail() {
             plantName={plant.name}
             growId={plant.growId ?? null}
             plantStage={plant.stage ?? null}
+          />
+
+          {/* Pro Blueprint overlay: scores live readings green/amber/red
+              against the per-stage SOP targets, gated behind Pro. isDay is
+              null in v1 (widest merged temp band); wiring the tent light
+              state for day/night targets is a follow-up. */}
+          <PlantBlueprintOverlaySection
+            growId={plant.growId ?? null}
+            tentId={plant.tentId ?? null}
+            stage={plant.stage ?? null}
           />
 
           <PlantRecentActivityPanel plantId={plant.id} plantName={plant.name} />

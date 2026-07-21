@@ -154,8 +154,21 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
       - name: Prepare audit dir
         run: mkdir -p "${{ github.workspace }}/audit/live/logs"
+      - name: Fast-fail prefix diff (live)
+        id: prefix_diff_live
+        if: ${{ secrets.SUPABASE_DB_URL_LIVE != '' }}
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL_LIVE }}
+          TARGET_ENV: live
+        run: |
+          set -o pipefail
+          node scripts/diff-money-migration-prefixes.mjs --json \
+            > "${{ github.workspace }}/audit/live/prefix-diff-cli.json"
+          node scripts/diff-money-migration-prefixes.mjs \
+            | tee "${{ github.workspace }}/audit/live/prefix-diff-cli.txt"
       - name: Verify applied migrations in live DB
         id: verify_live
+        if: always()
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL_LIVE }}
           TARGET_ENV: live

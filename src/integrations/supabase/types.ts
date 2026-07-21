@@ -295,6 +295,53 @@ export type Database = {
           },
         ]
       }
+      ai_doctor_review_evidence_receipts: {
+        Row: {
+          evidence: Json
+          model_id: string
+          prompt_contract_version: string
+          prompt_hmac_key_id: string
+          prompt_hmac_sha256: string
+          recorded_at: string
+          session_id: string | null
+          spend_id: string
+          tool_schema_version: string
+          user_id: string
+        }
+        Insert: {
+          evidence: Json
+          model_id: string
+          prompt_contract_version: string
+          prompt_hmac_key_id: string
+          prompt_hmac_sha256: string
+          recorded_at?: string
+          session_id?: string | null
+          spend_id: string
+          tool_schema_version: string
+          user_id: string
+        }
+        Update: {
+          evidence?: Json
+          model_id?: string
+          prompt_contract_version?: string
+          prompt_hmac_key_id?: string
+          prompt_hmac_sha256?: string
+          recorded_at?: string
+          session_id?: string | null
+          spend_id?: string
+          tool_schema_version?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_doctor_review_evidence_receipts_spend_id_fkey"
+            columns: ["spend_id"]
+            isOneToOne: true
+            referencedRelation: "ai_credit_spends"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_doctor_session_reviews: {
         Row: {
           created_at: string
@@ -3537,6 +3584,21 @@ export type Database = {
             }
             Returns: Json
           }
+      ai_doctor_finalize_review: {
+        Args: {
+          p_evidence: Json
+          p_expected_user_id: string
+          p_model_id: string
+          p_prompt_contract_version: string
+          p_prompt_hmac_key_id: string
+          p_prompt_hmac_sha256: string
+          p_result: Json
+          p_session_id?: string
+          p_spend_id: string
+          p_tool_schema_version: string
+        }
+        Returns: Json
+      }
       allocate_lovable_founder_lifetime: {
         Args: {
           p_environment: string

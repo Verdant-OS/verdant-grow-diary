@@ -97,6 +97,9 @@ jobs:
             | tee "${{ github.workspace }}/audit/sandbox/prefix-diff-cli.txt"
       - name: Verify applied migrations in sandbox DB
         id: verify_sandbox
+        # Run even if fast-fail exited non-zero so the full report / PR comment
+        # / audit JSON still get produced for the artifact bundle.
+        if: always() && needs.assert-required-money-migrations.result == 'success'
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL_SANDBOX }}
           TARGET_ENV: sandbox

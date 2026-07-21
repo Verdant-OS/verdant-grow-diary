@@ -94,6 +94,18 @@ jobs:
             echo '```'
             grep -E '^\s*[✓✗•]|^SUMMARY:|^==|^--' audit/sandbox-smoke/transcript.log || tail -40 audit/sandbox-smoke/transcript.log
             echo '```'
+            if ls audit/sandbox-smoke/checkpoints/*.log >/dev/null 2>&1; then
+              echo ""
+              echo "#### Per-checkpoint summaries"
+              echo ""
+              echo '```'
+              for f in audit/sandbox-smoke/checkpoints/*.log; do
+                name=$(basename "$f" .log)
+                line=$(grep -E '^SUMMARY:' "$f" | tail -1 || echo "SUMMARY: (missing)")
+                printf '%-24s %s\n' "$name" "$line"
+              done
+              echo '```'
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Upload smoke transcript
         if: always()

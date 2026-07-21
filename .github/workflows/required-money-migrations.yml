@@ -36,8 +36,29 @@ jobs:
           bun-version: latest
       - name: Install dependencies
         run: bun install --frozen-lockfile
+      - name: Prepare vitest log dir
+        run: mkdir -p "${{ github.workspace }}/audit/vitest"
       - name: Run required-money-migrations unit tests
-        run: bunx vitest run src/test/required-money-migrations-version.test.ts --reporter=dot
+        id: vitest_run
+        run: |
+          set -o pipefail
+          bunx vitest run src/test/required-money-migrations-version.test.ts \
+            --reporter=verbose \
+            2>&1 | tee "${{ github.workspace }}/audit/vitest/required-money-migrations.log"
+      - name: Dump extractor expected prefixes
+        if: always()
+        run: |
+          node scripts/diff-money-migration-prefixes.mjs --expected \
+            > "${{ github.workspace }}/audit/vitest/expected-prefixes.txt" || true
+          node scripts/diff-money-migration-prefixes.mjs --expected --json \
+            > "${{ github.workspace }}/audit/vitest/expected-prefixes.json" || true
+      - name: Upload vitest + extractor artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: required-money-migrations-vitest
+          path: audit/vitest
+          if-no-files-found: warn
 
   assert-required-money-migrations:
     name: Assert required credit-spend + referral migrations present
@@ -69,6 +90,7 @@ jobs:
           TARGET_ENV: sandbox
           REPORT_PATH: ${{ github.workspace }}/audit/sandbox/report.md
           AUDIT_PATH: ${{ github.workspace }}/audit/sandbox/applied-audit.json
+          DIFF_PATH: ${{ github.workspace }}/audit/sandbox/prefix-diff.txt
         run: |
           if [ -z "${SUPABASE_DB_URL:-}" ]; then
             printf '### Money-critical migration deploy guard — SANDBOX\n\n**Status:** ❌ SUPABASE_DB_URL_SANDBOX secret is not configured\n\nThe deploy guard could not run because the sandbox database connection secret is missing.\nConfigure `SUPABASE_DB_URL_SANDBOX` in the repository secrets and re-run the workflow.\n\n_Do NOT deploy until this check passes._\n' > "$REPORT_PATH"
@@ -126,6 +148,7 @@ jobs:
           TARGET_ENV: live
           REPORT_PATH: ${{ github.workspace }}/audit/live/report.md
           AUDIT_PATH: ${{ github.workspace }}/audit/live/applied-audit.json
+          DIFF_PATH: ${{ github.workspace }}/audit/live/prefix-diff.txt
         run: |
           if [ -z "${SUPABASE_DB_URL:-}" ]; then
             printf '### Money-critical migration deploy guard — LIVE\n\n**Status:** ❌ SUPABASE_DB_URL_LIVE secret is not configured\n\nThe deploy guard could not run because the live database connection secret is missing.\nConfigure `SUPABASE_DB_URL_LIVE` in the repository secrets and re-run the workflow.\n\n_Do NOT deploy until this check passes._\n' > "$REPORT_PATH"

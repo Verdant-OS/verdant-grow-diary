@@ -31,12 +31,12 @@ import {
   isCo2Valid,
   isSoilMoistureValid,
   isPpfdReadingValid,
-} from "./sensorReadingNormalizationRules";
+} from "./sensorReadingNormalizationRules.ts";
 import {
   buildVpdDriftAiContext,
   type AiDoctorVpdDriftContext,
   type VpdDriftResult,
-} from "./vpdDriftRules";
+} from "./vpdDriftRules.ts";
 
 // ---------------------------------------------------------------------------
 // Types

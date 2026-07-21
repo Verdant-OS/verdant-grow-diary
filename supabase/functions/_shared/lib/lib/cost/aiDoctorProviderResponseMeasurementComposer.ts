@@ -21,11 +21,11 @@
  *    provider calls. Live provider call-site wiring remains blocked.
  */
 
-import { type AiDoctorPromptMeasurement } from "./costDomains";
-import { extractProviderReportedUsageCandidate } from "./aiDoctorProviderResponseUsageExtractor";
-import { attachProviderReportedUsageToAiDoctorPromptMeasurement } from "./aiDoctorProviderUsageMeasurementAdapter";
+import { type AiDoctorPromptMeasurement } from "./costDomains.ts";
+import { extractProviderReportedUsageCandidate } from "./aiDoctorProviderResponseUsageExtractor.ts";
+import { attachProviderReportedUsageToAiDoctorPromptMeasurement } from "./aiDoctorProviderUsageMeasurementAdapter.ts";
 
-export { type AiDoctorPromptMeasurement } from "./costDomains";
+export { type AiDoctorPromptMeasurement } from "./costDomains.ts";
 
 /**
  * Compose a new `AiDoctorPromptMeasurement` with `providerReportedTokens`

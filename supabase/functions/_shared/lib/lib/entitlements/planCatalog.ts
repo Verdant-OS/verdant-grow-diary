@@ -18,8 +18,8 @@
  *  - `blueprint` (the Pro Blueprint overlay) is Craft-exclusive, plus Founder.
  */
 
-import type { Capabilities, PlanId } from "./types";
-import { FREE_CAPABILITIES } from "./capabilities";
+import type { Capabilities, PlanId } from "./types.ts";
+import { FREE_CAPABILITIES } from "./capabilities.ts";
 
 const PRO_CAPABILITIES: Readonly<Capabilities> = Object.freeze({
   maxActiveGrows: null,

@@ -15,7 +15,7 @@
 import {
   isDiagnosticSensorProvenanceRow,
   withoutDiagnosticSensorRows,
-} from "../sensorProvenanceFenceRules";
+} from "../sensorProvenanceFenceRules.ts";
 
 export interface QuickLogSensorAcquisitionRow {
   id?: string | null;

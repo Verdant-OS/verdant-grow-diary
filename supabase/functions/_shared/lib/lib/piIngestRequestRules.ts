@@ -26,7 +26,7 @@
  *    every issue so the caller can refuse the whole batch)
  */
 
-import type { ExternalSensorIngestPayload } from "./sensorIngestNormalizationRules";
+import type { ExternalSensorIngestPayload } from "./sensorIngestNormalizationRules.ts";
 
 // ----------------------------- Types -----------------------------
 

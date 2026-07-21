@@ -20,7 +20,7 @@ import {
   EARLY_STAGE_VIGOR_OPTIONS,
   isMilestoneValue,
   isVigorValue,
-} from "./earlyStageQuickLogRules";
+} from "./earlyStageQuickLogRules.ts";
 
 export interface EarlyStageTimelineViewModel {
   /** Resolved milestone display label, or null when no milestone was saved. */

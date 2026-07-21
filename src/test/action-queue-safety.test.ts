@@ -248,6 +248,15 @@ describe("Action Queue safety — current posture (suggest-only by construction)
     // "mqtt" literal in the same Set, which triggers the control-call regex
     // as a false positive. Keep file-specific.
     const AI_DOCTOR_CONTEXT_COMPILER_PATH = resolve(ROOT, "src/lib/aiDoctorContextCompiler.ts");
+    // Also allow-list (EXACT FILE PATH ONLY): the generated mirror twin of
+    // aiDoctorContextCompiler.ts, byte-synced into the edge-function shared
+    // mirror by scripts/sync-edge-shared.mjs (drift-gated; see
+    // docs/edge-shared-sync.md). Identical read-only LIVE_VENDORS Set,
+    // identical "mqtt"-adjacency false positive as its src twin above.
+    const AI_DOCTOR_CONTEXT_COMPILER_MIRROR_PATH = resolve(
+      ROOT,
+      "supabase/functions/_shared/lib/lib/aiDoctorContextCompiler.ts",
+    );
     const piContexts = [...ALL_PROD_CODE.matchAll(/pi[_-]bridge/gi)];
     for (const m of piContexts) {
       const ctx = ALL_PROD_CODE.slice(Math.max(0, m.index! - 60), m.index! + 60);
@@ -257,7 +266,8 @@ describe("Action Queue safety — current posture (suggest-only by construction)
       if (
         path === PROVIDER_LABELS_PATH ||
         path === SENSOR_INGEST_PROVENANCE_PATH ||
-        path === AI_DOCTOR_CONTEXT_COMPILER_PATH
+        path === AI_DOCTOR_CONTEXT_COMPILER_PATH ||
+        path === AI_DOCTOR_CONTEXT_COMPILER_MIRROR_PATH
       )
         continue;
       expect(ctx, `pi_bridge reference must not be a control call: ${ctx}`).not.toMatch(

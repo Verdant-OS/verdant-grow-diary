@@ -33,7 +33,10 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { validateAiDoctorReviewResult } from "./contract.ts";
 // All src/lib touch-points routed through _shared/ shims. See
 // _shared/unionEntitlementLookup.ts for the re-export convention: this
-// function must not import from ../../../src/lib/** directly.
+// function must not import from ../../../src/lib (any depth) directly.
+// (Do not write the glob form here — a "/" + "*" sequence inside a line
+// comment opens a phantom block for the naive comment-strippers used by
+// the static boundary tests, swallowing real code between comments.)
 import { buildAiDoctorPromptMessages } from "../_shared/aiDoctorPromptAssembly.ts";
 import { parseAiDoctorReviewRequestEnvelope } from "../_shared/aiDoctorReviewRequestTransportRules.ts";
 import { validateAndNormalizeAiDoctorReviewRequestPacket } from "../_shared/aiDoctorReviewRequestPacketValidationRules.ts";

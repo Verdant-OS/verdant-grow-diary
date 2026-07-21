@@ -203,6 +203,35 @@ export type Database = {
           },
         ]
       }
+      ai_credit_spend_results: {
+        Row: {
+          feature: string
+          recorded_at: string
+          result: Json
+          spend_id: string
+        }
+        Insert: {
+          feature: string
+          recorded_at?: string
+          result: Json
+          spend_id: string
+        }
+        Update: {
+          feature?: string
+          recorded_at?: string
+          result?: Json
+          spend_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_credit_spend_results_spend_id_fkey"
+            columns: ["spend_id"]
+            isOneToOne: true
+            referencedRelation: "ai_credit_spends"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_credit_spends: {
         Row: {
           created_at: string
@@ -261,6 +290,53 @@ export type Database = {
             foreignKeyName: "ai_credit_spends_refund_of_fkey"
             columns: ["refund_of"]
             isOneToOne: false
+            referencedRelation: "ai_credit_spends"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_doctor_review_evidence_receipts: {
+        Row: {
+          evidence: Json
+          model_id: string
+          prompt_contract_version: string
+          prompt_hmac_key_id: string
+          prompt_hmac_sha256: string
+          recorded_at: string
+          session_id: string | null
+          spend_id: string
+          tool_schema_version: string
+          user_id: string
+        }
+        Insert: {
+          evidence: Json
+          model_id: string
+          prompt_contract_version: string
+          prompt_hmac_key_id: string
+          prompt_hmac_sha256: string
+          recorded_at?: string
+          session_id?: string | null
+          spend_id: string
+          tool_schema_version: string
+          user_id: string
+        }
+        Update: {
+          evidence?: Json
+          model_id?: string
+          prompt_contract_version?: string
+          prompt_hmac_key_id?: string
+          prompt_hmac_sha256?: string
+          recorded_at?: string
+          session_id?: string | null
+          spend_id?: string
+          tool_schema_version?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_doctor_review_evidence_receipts_spend_id_fkey"
+            columns: ["spend_id"]
+            isOneToOne: true
             referencedRelation: "ai_credit_spends"
             referencedColumns: ["id"]
           },
@@ -3155,6 +3231,167 @@ export type Database = {
         }
         Relationships: []
       }
+      vpd_calibration_records: {
+        Row: {
+          device_id: string
+          evidence_source: string
+          humidity_correction_offset_pct: number | null
+          humidity_reference_rh_pct: number
+          humidity_sensor_rh_pct: number
+          humidity_verified_at: string
+          id: string
+          notes: string | null
+          placement: string
+          recorded_at: string
+          sensor_commissioned_at: string | null
+          sensor_label: string | null
+          temperature_correction_offset_c: number | null
+          temperature_reference: string
+          temperature_reference_value_c: number
+          temperature_sensor_value_c: number
+          temperature_verified_at: string
+          temperature_verified_at_operating_conditions: boolean
+          tent_id: string
+          user_id: string
+        }
+        Insert: {
+          device_id: string
+          evidence_source?: string
+          humidity_correction_offset_pct?: number | null
+          humidity_reference_rh_pct: number
+          humidity_sensor_rh_pct: number
+          humidity_verified_at: string
+          id?: string
+          notes?: string | null
+          placement: string
+          recorded_at?: string
+          sensor_commissioned_at?: string | null
+          sensor_label?: string | null
+          temperature_correction_offset_c?: number | null
+          temperature_reference: string
+          temperature_reference_value_c: number
+          temperature_sensor_value_c: number
+          temperature_verified_at: string
+          temperature_verified_at_operating_conditions?: boolean
+          tent_id: string
+          user_id?: string
+        }
+        Update: {
+          device_id?: string
+          evidence_source?: string
+          humidity_correction_offset_pct?: number | null
+          humidity_reference_rh_pct?: number
+          humidity_sensor_rh_pct?: number
+          humidity_verified_at?: string
+          id?: string
+          notes?: string | null
+          placement?: string
+          recorded_at?: string
+          sensor_commissioned_at?: string | null
+          sensor_label?: string | null
+          temperature_correction_offset_c?: number | null
+          temperature_reference?: string
+          temperature_reference_value_c?: number
+          temperature_sensor_value_c?: number
+          temperature_verified_at?: string
+          temperature_verified_at_operating_conditions?: boolean
+          tent_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vpd_calibration_records_tent_id_fkey"
+            columns: ["tent_id"]
+            isOneToOne: false
+            referencedRelation: "tents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vpd_measurement_provenance: {
+        Row: {
+          air_temperature_reading_id: string
+          algorithm_version: string | null
+          calibration_record_id: string | null
+          humidity_reading_id: string
+          id: string
+          leaf_temperature_c: number | null
+          leaf_temperature_measured_at: string | null
+          leaf_temperature_method: string | null
+          measurement_basis: string
+          recorded_at: string
+          tent_id: string
+          user_id: string
+          vpd_reading_id: string
+        }
+        Insert: {
+          air_temperature_reading_id: string
+          algorithm_version?: string | null
+          calibration_record_id?: string | null
+          humidity_reading_id: string
+          id?: string
+          leaf_temperature_c?: number | null
+          leaf_temperature_measured_at?: string | null
+          leaf_temperature_method?: string | null
+          measurement_basis: string
+          recorded_at?: string
+          tent_id: string
+          user_id?: string
+          vpd_reading_id: string
+        }
+        Update: {
+          air_temperature_reading_id?: string
+          algorithm_version?: string | null
+          calibration_record_id?: string | null
+          humidity_reading_id?: string
+          id?: string
+          leaf_temperature_c?: number | null
+          leaf_temperature_measured_at?: string | null
+          leaf_temperature_method?: string | null
+          measurement_basis?: string
+          recorded_at?: string
+          tent_id?: string
+          user_id?: string
+          vpd_reading_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vpd_measurement_provenance_air_temperature_reading_id_fkey"
+            columns: ["air_temperature_reading_id"]
+            isOneToOne: false
+            referencedRelation: "sensor_readings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vpd_measurement_provenance_calibration_record_id_fkey"
+            columns: ["calibration_record_id"]
+            isOneToOne: false
+            referencedRelation: "vpd_calibration_records"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vpd_measurement_provenance_humidity_reading_id_fkey"
+            columns: ["humidity_reading_id"]
+            isOneToOne: false
+            referencedRelation: "sensor_readings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vpd_measurement_provenance_tent_id_fkey"
+            columns: ["tent_id"]
+            isOneToOne: false
+            referencedRelation: "tents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vpd_measurement_provenance_vpd_reading_id_fkey"
+            columns: ["vpd_reading_id"]
+            isOneToOne: true
+            referencedRelation: "sensor_readings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vpd_targets: {
         Row: {
           created_at: string
@@ -3288,6 +3525,15 @@ export type Database = {
           per_month: number
         }[]
       }
+      ai_credit_attach_result: {
+        Args: {
+          p_expected_feature: string
+          p_expected_user_id: string
+          p_result: Json
+          p_spend_id: string
+        }
+        Returns: Json
+      }
       ai_credit_effective_credit_plan_id: {
         Args: {
           p_current_period_end: string
@@ -3338,6 +3584,21 @@ export type Database = {
             }
             Returns: Json
           }
+      ai_doctor_finalize_review: {
+        Args: {
+          p_evidence: Json
+          p_expected_user_id: string
+          p_model_id: string
+          p_prompt_contract_version: string
+          p_prompt_hmac_key_id: string
+          p_prompt_hmac_sha256: string
+          p_result: Json
+          p_session_id?: string
+          p_spend_id: string
+          p_tool_schema_version: string
+        }
+        Returns: Json
+      }
       allocate_lovable_founder_lifetime: {
         Args: {
           p_environment: string

@@ -36,8 +36,29 @@ jobs:
           bun-version: latest
       - name: Install dependencies
         run: bun install --frozen-lockfile
+      - name: Prepare vitest log dir
+        run: mkdir -p "${{ github.workspace }}/audit/vitest"
       - name: Run required-money-migrations unit tests
-        run: bunx vitest run src/test/required-money-migrations-version.test.ts --reporter=dot
+        id: vitest_run
+        run: |
+          set -o pipefail
+          bunx vitest run src/test/required-money-migrations-version.test.ts \
+            --reporter=verbose \
+            2>&1 | tee "${{ github.workspace }}/audit/vitest/required-money-migrations.log"
+      - name: Dump extractor expected prefixes
+        if: always()
+        run: |
+          node scripts/diff-money-migration-prefixes.mjs --expected \
+            > "${{ github.workspace }}/audit/vitest/expected-prefixes.txt" || true
+          node scripts/diff-money-migration-prefixes.mjs --expected --json \
+            > "${{ github.workspace }}/audit/vitest/expected-prefixes.json" || true
+      - name: Upload vitest + extractor artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: required-money-migrations-vitest
+          path: audit/vitest
+          if-no-files-found: warn
 
   assert-required-money-migrations:
     name: Assert required credit-spend + referral migrations present

@@ -27,8 +27,21 @@
  *
  * Read-only: issues a single SELECT. No writes, no schema changes.
  *
- * Exit codes: 0 = all applied, 1 = one or more missing, 2 = connection /
- * tooling failure (treat as blocking — do NOT deploy on unknown state).
+ * Exit codes (distinct per failure mode so CI can branch on the specific
+ * cause instead of parsing log text):
+ *   0  = all required migrations applied in target env
+ *   1  = one or more required migrations not applied (deploy would regress)
+ *   2  = malformed filename in REQUIRED_MONEY_MIGRATIONS (prefix extraction
+ *        failed) — a config regression in the required-migrations manifest;
+ *        block the deploy and fix the manifest, do NOT touch the target DB
+ *   3  = no database connection configured (SUPABASE_DB_URL / PG* env unset)
+ *   4  = psql binary not invocable on the runner
+ *   5  = migration-tracker query failed (psql returned non-zero) — target
+ *        state is unknown; treat as blocking
+ *
+ * Any non-zero exit MUST be treated as "do not deploy". Codes 2-5 also mean
+ * "the guard did not actually verify anything" — never interpret them as a
+ * soft pass.
  */
 import { spawnSync } from "node:child_process";
 import { writeFileSync, mkdirSync } from "node:fs";
@@ -37,6 +50,16 @@ import {
   REQUIRED_MONEY_MIGRATIONS,
   migrationVersion,
 } from "./required-money-migrations.mjs";
+
+const EXIT = Object.freeze({
+  OK: 0,
+  MISSING_MIGRATIONS: 1,
+  MALFORMED_FILENAME: 2,
+  NO_DB_CONNECTION: 3,
+  PSQL_NOT_INVOCABLE: 4,
+  TRACKER_QUERY_FAILED: 5,
+});
+
 
 const TARGET_ENV = process.env.TARGET_ENV ?? "unspecified";
 const DB_URL = process.env.SUPABASE_DB_URL ?? process.env.DATABASE_URL ?? "";

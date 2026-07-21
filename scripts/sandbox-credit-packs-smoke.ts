@@ -212,6 +212,7 @@ interface CreditPackGrant {
 
 async function checkCreditPackPurchase(userId: string, env: Environment): Promise<CreditPackGrant | null> {
   const section = "CREDIT PACK";
+  beginCheckpoint(section);
   const rows = psqlJson<CreditPackGrant>(
     `SELECT id::text, credits, sku, paddle_transaction_id, environment, created_at, meta
        FROM public.ai_credit_grants

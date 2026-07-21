@@ -64,6 +64,7 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF_SANDBOX }}
           TRANSCRIPT: ${{ github.workspace }}/audit/sandbox-smoke/transcript.log
+          CHECKPOINT_DIR: ${{ github.workspace }}/audit/sandbox-smoke/checkpoints
         run: |
           if [ -z "${SUPABASE_DB_URL:-}" ]; then
             echo "::error::SUPABASE_DB_URL_SANDBOX secret not set."

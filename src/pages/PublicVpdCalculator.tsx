@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import { ArrowRight, Calculator, Gauge, RotateCcw, Share2, ShieldCheck } from "lucide-react";
 
 import BrandLogo from "@/components/BrandLogo";
+import { BlueprintTeaser } from "@/components/BlueprintTeaser";
+import { buildBlueprintTeaserViewModel } from "@/lib/blueprintTeaserViewModel";
 import {
   Accordion,
   AccordionContent,
@@ -665,6 +667,50 @@ export default function PublicVpdCalculator() {
             .
           </p>
         </section>
+
+        {stage !== "unknown" && (
+          <section
+            className="mx-auto mt-12 max-w-3xl"
+            data-testid="public-vpd-blueprint-teaser"
+            aria-labelledby="vpd-blueprint-heading"
+          >
+            <h2 id="vpd-blueprint-heading" className="font-display text-2xl font-semibold">
+              The full pro targets for this stage
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              VPD is one signal. Craft&rsquo;s Pro Blueprint scores temperature, humidity, EC, pH
+              and light against per-stage targets too. Here are the targets for the stage you
+              selected above.
+            </p>
+            <div className="mt-5">
+              <BlueprintTeaser vm={buildBlueprintTeaserViewModel({ stage })} />
+            </div>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <Button asChild>
+                <Link
+                  to={PRICING_PATH}
+                  onClick={() =>
+                    trackPricingEvent("vpd_calculator_pricing_clicked", {
+                      item: "blueprint_teaser",
+                    })
+                  }
+                >
+                  See Craft &amp; the Pro Blueprint
+                </Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link
+                  to={SIGNUP_PATH}
+                  onClick={() =>
+                    trackPricingEvent("vpd_calculator_signup_clicked", { item: "blueprint_teaser" })
+                  }
+                >
+                  Start free
+                </Link>
+              </Button>
+            </div>
+          </section>
+        )}
 
         <section className="mx-auto mt-12 max-w-3xl" aria-labelledby="vpd-faq-heading">
           <h2 id="vpd-faq-heading" className="font-display text-2xl font-semibold">

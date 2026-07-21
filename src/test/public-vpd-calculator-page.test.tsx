@@ -69,6 +69,24 @@ describe("public VPD calculator page", () => {
     });
   });
 
+  it("previews the Pro Blueprint stage targets once a stage is selected", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    // No stage picked → no Blueprint teaser (avoids the 'set a stage' prompt).
+    expect(screen.queryByTestId("public-vpd-blueprint-teaser")).toBeNull();
+
+    await user.selectOptions(screen.getByLabelText("Plant stage"), "veg");
+    expect(screen.getByTestId("public-vpd-blueprint-teaser")).toBeInTheDocument();
+    // Real per-stage SOP bands (the same BlueprintTeaser shipped in-app).
+    expect(screen.getByTestId("pro-blueprint-teaser-row-tempC").textContent).toMatch(/°C/);
+
+    await user.click(screen.getByRole("link", { name: "See Craft & the Pro Blueprint" }));
+    expect(mocks.track).toHaveBeenCalledWith("vpd_calculator_pricing_clicked", {
+      item: "blueprint_teaser",
+    });
+  });
+
   it("makes normal flower-room RH explicit while keeping evidence optional", async () => {
     const user = userEvent.setup();
     renderPage();

@@ -153,6 +153,10 @@ export default function PhenoHuntShowcase() {
       {pack.length > 0 && (
         <section aria-label="The pack" className="mb-8">
           <SectionHead title="The pack" />
+          <p className="mb-2.5 text-xs text-muted-foreground" data-testid="pheno-showcase-disclaimer">
+            Scores sort the pack to compare — they don&rsquo;t decide. The keeper call is yours,
+            earned at the cure.
+          </p>
           <ul className="grid gap-2.5 sm:grid-cols-2" data-testid="pheno-hunt-showcase-pack">
             {pack.map((c) => (
               <LivePackCard key={String(c.id)} c={c} />

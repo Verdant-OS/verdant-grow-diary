@@ -1,0 +1,19 @@
+name: Required money-critical migrations present
+
+on:
+  pull_request:
+    paths:
+      - "supabase/migrations/**"
+      - "scripts/assert-required-money-migrations.mjs"
+      - ".github/workflows/required-money-migrations.yml"
+  push:
+    branches: [main]
+
+jobs:
+  assert-required-money-migrations:
+    name: Assert required credit-spend + referral migrations present
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assert filename allowlist
+        run: node scripts/assert-required-money-migrations.mjs

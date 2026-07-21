@@ -43,6 +43,78 @@ const DB_URL = process.env.SUPABASE_DB_URL ?? process.env.DATABASE_URL ?? "";
 const HAS_PG_ENV = Boolean(process.env.PGHOST);
 const REPORT_PATH = process.env.REPORT_PATH ?? "";
 const AUDIT_PATH = process.env.AUDIT_PATH ?? "";
+const DIFF_PATH =
+  process.env.DIFF_PATH ??
+  (REPORT_PATH ? REPORT_PATH.replace(/\.[^./]+$/, "") + ".diff.txt" : "");
+
+/**
+ * Persist a plain-text, side-by-side "expected vs actual" prefix diff to
+ * DIFF_PATH (defaults to `<REPORT_PATH>.diff.txt`) whenever the guard
+ * fails. Intended for humans reading a CI artifact: no markdown, no
+ * escaping, just the two sets of 14-digit prefixes and their delta so an
+ * on-call can eyeball drift without opening the DB.
+ *
+ * Also mirrored to stderr so the failure log itself carries the diff.
+ */
+function writeDiff(kind, { expectedRows, appliedVersions }) {
+  const expectedSet = new Set(expectedRows.map((r) => r.version).filter(Boolean));
+  const appliedSet = new Set(appliedVersions);
+  const missing = [...expectedSet].filter((v) => !appliedSet.has(v)).sort();
+  const unexpected = [...appliedSet].filter((v) => !expectedSet.has(v)).sort();
+  const common = [...expectedSet].filter((v) => appliedSet.has(v)).sort();
+
+  const width = 16;
+  const pad = (s) => String(s).padEnd(width, " ");
+  const lines = [
+    `Money-critical migration prefix diff — target env: ${TARGET_ENV}`,
+    `Failure mode: ${kind}`,
+    `Generated:    ${new Date().toISOString()}`,
+    "",
+    `Expected: ${expectedSet.size}    Applied (in required set): ${common.length}    Missing: ${missing.length}    Unexpected: ${unexpected.length}`,
+    "",
+    `${pad("EXPECTED")}  ${pad("ACTUAL")}  STATUS`,
+    `${pad("-".repeat(14))}  ${pad("-".repeat(14))}  ------`,
+  ];
+
+  // Row per required file: expected prefix on the left, matching applied
+  // prefix on the right (blank if not found), plus a status marker.
+  for (const row of expectedRows) {
+    if (!row.version) {
+      lines.push(`${pad(row.file)}  ${pad("")}  MALFORMED`);
+      continue;
+    }
+    const hit = appliedSet.has(row.version);
+    lines.push(
+      `${pad(row.version)}  ${pad(hit ? row.version : "")}  ${hit ? "OK" : "MISSING"}    ${row.file}`,
+    );
+  }
+
+  if (unexpected.length > 0) {
+    lines.push("");
+    lines.push("Applied prefixes NOT in the required-migrations manifest");
+    lines.push("(informational only — not a failure, but worth an eyeball):");
+    for (const v of unexpected) {
+      lines.push(`${pad("")}  ${pad(v)}  UNEXPECTED`);
+    }
+  }
+
+  const body = lines.join("\n") + "\n";
+
+  // Mirror to stderr so the failing log surfaces the diff even if the
+  // artifact upload step is skipped or truncated.
+  console.error("\n----- expected-vs-actual prefix diff -----");
+  console.error(body);
+  console.error("----- end diff -----\n");
+
+  if (!DIFF_PATH) return;
+  try {
+    mkdirSync(dirname(DIFF_PATH), { recursive: true });
+    writeFileSync(DIFF_PATH, body);
+  } catch (err) {
+    console.error(`(warning) failed to write diff to ${DIFF_PATH}: ${err.message}`);
+  }
+}
+
 
 /**
  * Persist a machine-readable audit trail of exactly which required money
@@ -198,9 +270,14 @@ if (missing.length > 0) {
       "environment, then re-run this workflow. Do not deploy until the guard turns green.",
     ],
   );
+  writeDiff("missing_migrations", {
+    expectedRows: expectedWithApplied,
+    appliedVersions: [...applied],
+  });
   writeAudit("missing_migrations", { expected: expectedWithApplied });
   process.exit(1);
 }
+
 
 console.log(
   `✓ All ${expected.length} money-critical migrations applied in target env (${TARGET_ENV}).`,

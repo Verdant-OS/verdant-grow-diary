@@ -49,7 +49,13 @@ export interface AiCreditLimitNoticeViewModel {
   paywallVm?: PaywallCtaViewModel;
 }
 
-const PAID_PLAN_IDS = new Set(["pro_monthly", "pro_annual", "founder_lifetime"]);
+const PAID_PLAN_IDS = new Set([
+  "pro_monthly",
+  "pro_annual",
+  "craft_monthly",
+  "craft_annual",
+  "founder_lifetime",
+]);
 
 interface SurfaceCopy {
   featureTitle: string;

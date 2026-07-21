@@ -1,7 +1,7 @@
-import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
-import { createClient } from 'npm:@supabase/supabase-js@2';
-import { gatewayFetch, type PaddleEnv } from '../_shared/paddle.ts';
-import { resolveServerBillingEnvironment } from '../_shared/unionEntitlementLookup.ts';
+import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { createClient } from "npm:@supabase/supabase-js@2";
+import { gatewayFetch, type PaddleEnv } from "../_shared/paddle.ts";
+import { resolveServerBillingEnvironment } from "../_shared/unionEntitlementLookup.ts";
 
 /**
  * Resolve a paid plan id to its public Paddle price ID. Read-only; no DB
@@ -32,9 +32,14 @@ import { resolveServerBillingEnvironment } from '../_shared/unionEntitlementLook
  * function is deployed to a live environment.
  */
 const PAID_PLAN_ALLOWLIST: ReadonlySet<string> = new Set([
-  'pro_monthly',
-  'pro_annual',
-  'founder_lifetime',
+  "pro_monthly",
+  "pro_annual",
+  "founder_lifetime",
+  // One-time AI credit packs. These are purchasable price ids (SKU-recognition
+  // seam) — NOT plans: they never enter planCatalog / KNOWN_PRICE_TO_PLAN, so a
+  // credit purchase can never resolve to a Pro entitlement.
+  "credit_pack_50",
+  "credit_pack_150",
 ]);
 
 /**
@@ -47,38 +52,40 @@ const PAID_PLAN_ALLOWLIST: ReadonlySet<string> = new Set([
  * Keep keys in lockstep with PAID_PLAN_ALLOWLIST above.
  */
 const SERVER_PRICE_CONFIG: Readonly<Record<string, string>> = {
-  pro_monthly: Deno.env.get('PADDLE_PRICE_PRO_MONTHLY') ?? '',
-  pro_annual: Deno.env.get('PADDLE_PRICE_PRO_ANNUAL') ?? '',
-  founder_lifetime: Deno.env.get('PADDLE_PRICE_FOUNDER_LIFETIME') ?? '',
+  pro_monthly: Deno.env.get("PADDLE_PRICE_PRO_MONTHLY") ?? "",
+  pro_annual: Deno.env.get("PADDLE_PRICE_PRO_ANNUAL") ?? "",
+  founder_lifetime: Deno.env.get("PADDLE_PRICE_FOUNDER_LIFETIME") ?? "",
+  credit_pack_50: Deno.env.get("PADDLE_PRICE_CREDIT_PACK_50") ?? "",
+  credit_pack_150: Deno.env.get("PADDLE_PRICE_CREDIT_PACK_150") ?? "",
 };
 
 function json(status: number, body: Record<string, unknown>): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 }
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
   }
-  if (req.method !== 'POST') {
-    return json(405, { error: 'method_not_allowed' });
+  if (req.method !== "POST") {
+    return json(405, { error: "method_not_allowed" });
   }
 
   try {
     // 1. Verified signed-in user. The anon key + caller Authorization header
     //    means auth.getUser() re-validates the JWT against the auth server;
     //    no service_role anywhere in this function.
-    const authHeader = req.headers.get('Authorization') ?? '';
-    if (!authHeader.startsWith('Bearer ')) {
-      return json(401, { error: 'auth_required' });
+    const authHeader = req.headers.get("Authorization") ?? "";
+    if (!authHeader.startsWith("Bearer ")) {
+      return json(401, { error: "auth_required" });
     }
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
     if (!supabaseUrl || !supabaseAnonKey) {
-      return json(500, { error: 'price_resolution_unavailable' });
+      return json(500, { error: "price_resolution_unavailable" });
     }
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
@@ -86,16 +93,16 @@ Deno.serve(async (req) => {
     });
     const { data: userData, error: userError } = await supabase.auth.getUser();
     if (userError || !userData?.user) {
-      return json(401, { error: 'auth_required' });
+      return json(401, { error: "auth_required" });
     }
 
     // 2. Plan allowlist. The request field keeps its legacy name (priceId)
     //    so the existing checkout client works unchanged, but only the three
     //    paid plan ids pass; everything else fails closed.
     const body = await req.json().catch(() => ({}));
-    const requested = typeof body?.priceId === 'string' ? body.priceId.trim() : '';
+    const requested = typeof body?.priceId === "string" ? body.priceId.trim() : "";
     if (!PAID_PLAN_ALLOWLIST.has(requested)) {
-      return json(400, { error: 'unknown_plan' });
+      return json(400, { error: "unknown_plan" });
     }
 
     // 2b. Founder Lifetime is a capped one-time plan (75 slots). Block a
@@ -106,16 +113,16 @@ Deno.serve(async (req) => {
     //     pre-payment guard; the allocation RPC's advisory-locked cap check
     //     stays the authoritative backstop for the tiny residual race between
     //     this read and settlement (operator refund case, per the runbook).
-    if (requested === 'founder_lifetime') {
+    if (requested === "founder_lifetime") {
       const { data: remaining, error: capError } = await supabase.rpc(
-        'founder_lifetime_slots_remaining',
+        "founder_lifetime_slots_remaining",
       );
       if (capError) {
         // Fail closed: if availability cannot be proven, no founder checkout.
-        return json(503, { error: 'price_resolution_unavailable' });
+        return json(503, { error: "price_resolution_unavailable" });
       }
-      if (typeof remaining !== 'number' || remaining <= 0) {
-        return json(409, { error: 'plan_sold_out' });
+      if (typeof remaining !== "number" || remaining <= 0) {
+        return json(409, { error: "plan_sold_out" });
       }
     }
 
@@ -132,8 +139,6 @@ Deno.serve(async (req) => {
     // fail-closed behavior without a hardcoded environment refusal.
     const environment: PaddleEnv = resolveServerBillingEnvironment();
 
-
-
     const response = await gatewayFetch(
       environment,
       `/prices?external_id=${encodeURIComponent(requested)}`,
@@ -141,27 +146,27 @@ Deno.serve(async (req) => {
     if (!response.ok) {
       // Upstream/gateway problems (including an environment with no
       // configured credentials) fail closed without leaking detail.
-      return json(502, { error: 'price_resolution_unavailable' });
+      return json(502, { error: "price_resolution_unavailable" });
     }
     const data = await response.json().catch(() => null);
     const paddleId = data?.data?.[0]?.id;
 
-    if (typeof paddleId !== 'string' || paddleId.length === 0) {
-      return json(404, { error: 'price_not_configured' });
+    if (typeof paddleId !== "string" || paddleId.length === 0) {
+      return json(404, { error: "price_not_configured" });
     }
 
     // Validate the gateway result against the server-configured price ID for
     // this plan. If the sources have drifted (or the env var is not set), we
     // reject rather than return an ID the webhook would classify as
     // unknown_price_id and leave the buyer without an entitlement.
-    const configuredId = SERVER_PRICE_CONFIG[requested] ?? '';
+    const configuredId = SERVER_PRICE_CONFIG[requested] ?? "";
     if (configuredId.length === 0 || paddleId !== configuredId) {
-      return json(502, { error: 'price_resolution_unavailable' });
+      return json(502, { error: "price_resolution_unavailable" });
     }
 
     return json(200, { paddleId });
   } catch (_err) {
     // Never surface upstream error text, stack, or configuration detail.
-    return json(500, { error: 'price_resolution_unavailable' });
+    return json(500, { error: "price_resolution_unavailable" });
   }
 });

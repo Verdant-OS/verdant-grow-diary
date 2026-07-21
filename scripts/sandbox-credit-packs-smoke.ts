@@ -34,6 +34,8 @@
  */
 
 import { spawnSync } from "node:child_process";
+import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 
 type Environment = "sandbox" | "live";
 type CheckStatus = "pass" | "fail" | "skip";
@@ -45,11 +47,57 @@ interface CheckResult {
 }
 
 const results: CheckResult[] = [];
+
+// Per-checkpoint transcripts. When CHECKPOINT_DIR is set (CI does this), each
+// section's lines are additionally appended to its own file so a failed run
+// can be triaged without scrolling through the combined transcript.
+const checkpointDir = process.env.CHECKPOINT_DIR?.trim() || "";
+const checkpointFiles = new Map<string, string>();
+function sectionSlug(section: string): string {
+  return section.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+function checkpointPathFor(section: string): string | null {
+  if (!checkpointDir) return null;
+  let p = checkpointFiles.get(section);
+  if (!p) {
+    p = join(checkpointDir, `${sectionSlug(section)}.log`);
+    checkpointFiles.set(section, p);
+  }
+  return p;
+}
+function writeCheckpointLine(section: string, line: string) {
+  const p = checkpointPathFor(section);
+  if (!p) return;
+  appendFileSync(p, line + "\n");
+}
+function beginCheckpoint(section: string) {
+  const p = checkpointPathFor(section);
+  if (!p) return;
+  const header = `# Checkpoint: ${section}\n# Started: ${new Date().toISOString()}\n\n`;
+  writeFileSync(p, header);
+}
+function finalizeCheckpoints() {
+  if (!checkpointDir) return;
+  for (const section of checkpointFiles.keys()) {
+    const rows = results.filter((r) => r.section === section);
+    const pass = rows.filter((r) => r.status === "pass").length;
+    const fail = rows.filter((r) => r.status === "fail").length;
+    const skip = rows.filter((r) => r.status === "skip").length;
+    const status = fail > 0 ? "FAIL" : pass === 0 ? "SKIPPED" : "PASS";
+    writeCheckpointLine(
+      section,
+      `\nSUMMARY: ${status} pass=${pass} fail=${fail} skip=${skip} total=${rows.length}`,
+    );
+  }
+}
+
 function record(section: string, name: string, status: CheckStatus, detail?: string) {
   results.push({ section, name, status, detail });
   const icon = status === "pass" ? "✓" : status === "fail" ? "✗" : "•";
   const tag = status === "skip" ? " SKIPPED" : "";
-  console.log(`  ${icon} [${section}] ${name}${tag}${detail ? ` — ${detail}` : ""}`);
+  const line = `  ${icon} [${section}] ${name}${tag}${detail ? ` — ${detail}` : ""}`;
+  console.log(line);
+  writeCheckpointLine(section, line);
 }
 
 function parseArgs(argv: string[]): { user: string; env: Environment } {

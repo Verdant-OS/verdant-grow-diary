@@ -148,6 +148,7 @@ jobs:
           TARGET_ENV: live
           REPORT_PATH: ${{ github.workspace }}/audit/live/report.md
           AUDIT_PATH: ${{ github.workspace }}/audit/live/applied-audit.json
+          DIFF_PATH: ${{ github.workspace }}/audit/live/prefix-diff.txt
         run: |
           if [ -z "${SUPABASE_DB_URL:-}" ]; then
             printf '### Money-critical migration deploy guard — LIVE\n\n**Status:** ❌ SUPABASE_DB_URL_LIVE secret is not configured\n\nThe deploy guard could not run because the live database connection secret is missing.\nConfigure `SUPABASE_DB_URL_LIVE` in the repository secrets and re-run the workflow.\n\n_Do NOT deploy until this check passes._\n' > "$REPORT_PATH"

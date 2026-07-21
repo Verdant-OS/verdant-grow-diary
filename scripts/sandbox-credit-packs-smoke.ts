@@ -108,17 +108,22 @@ function psqlJson<T = unknown>(sql: string): T[] {
 }
 
 async function resolveUserId(userArg: string): Promise<{ id: string; email: string | null } | null> {
-  if (UUID_RE.test(userArg)) {
-    const rows = psqlJson<{ id: string; email: string | null }>(
-      `SELECT id::text, email FROM auth.users WHERE id = '${userArg}' LIMIT 1`,
+  if (!UUID_RE.test(userArg)) {
+    // auth.users is not reachable via the read-only exec role; email lookup
+    // isn't possible without service-role access. Ask for a UUID instead of
+    // silently returning nothing.
+    console.error(
+      "Email-based lookup requires auth.users access, which is unavailable to this read-only runner.\n" +
+        "Pass the user's UUID via --user <uuid> instead (find it in the Users tab of the Backend view).",
     );
-    return rows[0] ?? null;
+    return null;
   }
-  const safe = userArg.replace(/'/g, "''");
-  const rows = psqlJson<{ id: string; email: string | null }>(
-    `SELECT id::text, email FROM auth.users WHERE lower(email) = lower('${safe}') LIMIT 1`,
+  // Verify the UUID exists as a profile row so we fail fast on typos.
+  const rows = psqlJson<{ id: string }>(
+    `SELECT user_id::text AS id FROM public.profiles WHERE user_id = '${userArg}' LIMIT 1`,
   );
-  return rows[0] ?? null;
+  if (rows.length === 0) return null;
+  return { id: rows[0].id, email: null };
 }
 
 // ---- optional edge-function log lookup ---------------------------------------

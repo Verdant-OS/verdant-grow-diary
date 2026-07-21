@@ -203,6 +203,35 @@ export type Database = {
           },
         ]
       }
+      ai_credit_spend_results: {
+        Row: {
+          feature: string
+          recorded_at: string
+          result: Json
+          spend_id: string
+        }
+        Insert: {
+          feature: string
+          recorded_at?: string
+          result: Json
+          spend_id: string
+        }
+        Update: {
+          feature?: string
+          recorded_at?: string
+          result?: Json
+          spend_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_credit_spend_results_spend_id_fkey"
+            columns: ["spend_id"]
+            isOneToOne: true
+            referencedRelation: "ai_credit_spends"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_credit_spends: {
         Row: {
           created_at: string
@@ -3287,6 +3316,15 @@ export type Database = {
           per_grow: number
           per_month: number
         }[]
+      }
+      ai_credit_attach_result: {
+        Args: {
+          p_expected_feature: string
+          p_expected_user_id: string
+          p_result: Json
+          p_spend_id: string
+        }
+        Returns: Json
       }
       ai_credit_effective_credit_plan_id: {
         Args: {

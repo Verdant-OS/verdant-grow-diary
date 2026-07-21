@@ -9,7 +9,9 @@ on:
       - "scripts/assert-no-unreviewed-money-migrations.mjs"
       - "scripts/required-money-migrations.mjs"
       - "scripts/collect-money-edge-function-logs.mjs"
+      - "src/test/required-money-migrations-version.test.ts"
       - ".github/workflows/required-money-migrations.yml"
+
   push:
     branches: [main]
   workflow_dispatch:

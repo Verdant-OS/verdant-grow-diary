@@ -3420,6 +3420,116 @@ export type Database = {
           },
         ]
       }
+      quarantine_episodes: {
+        Row: {
+          closed_at: string | null
+          closure_kind: string | null
+          closure_screening_result_id: string | null
+          created_at: string
+          id: string
+          opened_at: string
+          opened_reason: string | null
+          reopened_at: string | null
+          status: string
+          subject_id: string
+          subject_type: string
+          target: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          closed_at?: string | null
+          closure_kind?: string | null
+          closure_screening_result_id?: string | null
+          created_at?: string
+          id?: string
+          opened_at?: string
+          opened_reason?: string | null
+          reopened_at?: string | null
+          status?: string
+          subject_id: string
+          subject_type: string
+          target: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          closed_at?: string | null
+          closure_kind?: string | null
+          closure_screening_result_id?: string | null
+          created_at?: string
+          id?: string
+          opened_at?: string
+          opened_reason?: string | null
+          reopened_at?: string | null
+          status?: string
+          subject_id?: string
+          subject_type?: string
+          target?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quarantine_episodes_closure_screening_result_id_fkey"
+            columns: ["closure_screening_result_id"]
+            isOneToOne: false
+            referencedRelation: "genetics_screening_results"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quarantine_transition_events: {
+        Row: {
+          action: string
+          changed_at: string
+          created_at: string
+          episode_id: string
+          id: string
+          is_override: boolean
+          reason: string | null
+          screening_result_id: string | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          changed_at?: string
+          created_at?: string
+          episode_id: string
+          id?: string
+          is_override?: boolean
+          reason?: string | null
+          screening_result_id?: string | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          changed_at?: string
+          created_at?: string
+          episode_id?: string
+          id?: string
+          is_override?: boolean
+          reason?: string | null
+          screening_result_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quarantine_transition_events_episode_id_fkey"
+            columns: ["episode_id"]
+            isOneToOne: false
+            referencedRelation: "quarantine_episodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quarantine_transition_events_screening_result_id_fkey"
+            columns: ["screening_result_id"]
+            isOneToOne: false
+            referencedRelation: "genetics_screening_results"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       quicklog_audit_events: {
         Row: {
           created_at: string
@@ -4328,6 +4438,20 @@ export type Database = {
         Returns: boolean
       }
       genetics_lock_lineage: { Args: { p_owner: string }; Returns: undefined }
+      genetics_quarantine_open: {
+        Args: { p_idempotency_key: string; p_payload: Json }
+        Returns: Json
+      }
+      genetics_quarantine_transition: {
+        Args: {
+          p_action: string
+          p_episode_id: string
+          p_idempotency_key: string
+          p_reason?: string
+          p_screening_result_id?: string
+        }
+        Returns: Json
+      }
       genetics_screening_record: {
         Args: { p_idempotency_key: string; p_payload: Json }
         Returns: Json

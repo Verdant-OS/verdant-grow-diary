@@ -3590,6 +3590,48 @@ export type Database = {
         }
         Relationships: []
       }
+      referrals: {
+        Row: {
+          code: string
+          converted_at: string | null
+          created_at: string
+          environment: string
+          id: string
+          meta: Json
+          referee_credits: number
+          referee_user_id: string
+          referrer_credits: number
+          referrer_user_id: string
+          status: string
+        }
+        Insert: {
+          code: string
+          converted_at?: string | null
+          created_at?: string
+          environment: string
+          id?: string
+          meta?: Json
+          referee_credits?: number
+          referee_user_id: string
+          referrer_credits?: number
+          referrer_user_id: string
+          status?: string
+        }
+        Update: {
+          code?: string
+          converted_at?: string | null
+          created_at?: string
+          environment?: string
+          id?: string
+          meta?: Json
+          referee_credits?: number
+          referee_user_id?: string
+          referrer_credits?: number
+          referrer_user_id?: string
+          status?: string
+        }
+        Relationships: []
+      }
       sensor_ingest_audit_log: {
         Row: {
           auth_type: string
@@ -4346,6 +4388,16 @@ export type Database = {
           level: number
           tier: string
         }[]
+      }
+      convert_referral: {
+        Args: {
+          p_code: string
+          p_environment: string
+          p_referee_user_id: string
+          p_referrer_user_id: string
+          p_verified: boolean
+        }
+        Returns: Json
       }
       create_feeding_event: {
         Args: {

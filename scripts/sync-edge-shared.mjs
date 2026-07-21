@@ -151,10 +151,18 @@ function resolveSource(spec, fromFile) {
   const abs = path.resolve(path.dirname(fromFile), spec);
   const resolved = tryResolve(abs);
   if (!resolved) return null;
+
+  // Entry files (post-rewrite) import into the mirror at
+  // supabase/functions/_shared/lib/**. Map those references back to the
+  // src source so the drift check re-collects the same closure.
+  if (resolved === MIRROR_ABS || resolved.startsWith(MIRROR_ABS + path.sep)) {
+    const relInMirror = path.relative(MIRROR_ABS, resolved);
+    const srcCandidate = path.join(SRC, relInMirror);
+    if (isMirrorable(srcCandidate)) return srcCandidate;
+    return null;
+  }
+
   if (!isMirrorable(resolved)) {
-    // If the resolved path is outside allowed src trees, it's a violation
-    // ONLY if it lives under src/ (frontend leakage). Otherwise it's
-    // legitimately outside the mirror (e.g. inside supabase/functions/_shared).
     if (resolved.startsWith(SRC + path.sep)) {
       throw new Error(
         `Forbidden relative import "${spec}" from ${path.relative(

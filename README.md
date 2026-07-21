@@ -539,6 +539,56 @@ only.
 Treat `2` the same as `1` for gating: the check could not complete, so
 the target's state is unknown.
 
+#### Structured CI annotations (`--sarif` / `--github-annotations`)
+
+For surfacing failures in the GitHub Actions UI instead of buried in a log:
+
+```bash
+# SARIF 2.1.0 to stdout — pipe to a file or consume directly.
+node scripts/diff-money-migration-prefixes.mjs --sarif
+
+# SARIF to a file (text diff still prints to stdout for the CI log).
+node scripts/diff-money-migration-prefixes.mjs \
+  --sarif --sarif-out=audit/money-migrations/diff.sarif
+
+# GitHub workflow-command annotations on stderr — file-annotated ::error::
+# lines that surface in the PR "Files changed" tab without SARIF ingestion.
+node scripts/diff-money-migration-prefixes.mjs --github-annotations
+```
+
+Upload the SARIF file to code scanning to get one annotation per finding on
+the offending migration file:
+
+```yaml
+- name: Prefix diff (SARIF)
+  run: |
+    node scripts/diff-money-migration-prefixes.mjs \
+      --sarif --sarif-out=audit/money-migrations/diff.sarif || true
+- uses: github/codeql-action/upload-sarif@v3
+  with:
+    sarif_file: audit/money-migrations/diff.sarif
+    category: money-migration-drift
+```
+
+Rule catalog (always present in the SARIF `tool.driver.rules`, even on
+clean runs):
+
+| Rule ID                         | Fires when                                                        |
+|---------------------------------|-------------------------------------------------------------------|
+| `money-migration-drift`         | A required 14-digit prefix is absent from the target DB.          |
+| `money-migration-malformed`     | A `REQUIRED_MONEY_MIGRATIONS` entry has no 14-digit prefix.       |
+| `money-migration-tooling`       | No DB URL, `psql` missing, or the tracker query failed.           |
+
+Every result is `level: error`, points at
+`supabase/migrations/<file>` (or the manifest for malformed / tooling
+findings), and includes `partialFingerprints` (`migrationVersion`,
+`targetEnv`) so code-scanning de-duplicates re-runs of the same drift.
+
+`--sarif` and `--github-annotations` are additive — they can be combined
+with each other and with `--json`. Exit codes are unchanged: SARIF/annotation
+output is a report on the same underlying result, not a separate check.
+
+
 
 
 

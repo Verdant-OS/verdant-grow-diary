@@ -31,6 +31,8 @@
  * tooling failure (treat as blocking — do NOT deploy on unknown state).
  */
 import { spawnSync } from "node:child_process";
+import { writeFileSync, mkdirSync } from "node:fs";
+import { dirname } from "node:path";
 import {
   REQUIRED_MONEY_MIGRATIONS,
   migrationVersion,
@@ -39,13 +41,44 @@ import {
 const TARGET_ENV = process.env.TARGET_ENV ?? "unspecified";
 const DB_URL = process.env.SUPABASE_DB_URL ?? process.env.DATABASE_URL ?? "";
 const HAS_PG_ENV = Boolean(process.env.PGHOST);
+const REPORT_PATH = process.env.REPORT_PATH ?? "";
+
+/**
+ * Persist a human-readable failure report for downstream consumers (CI PR
+ * comment, workflow summary, local review). Never contains secrets — only
+ * the target env label, filenames, and version prefixes already public in
+ * the repo.
+ */
+function writeReport(kind, bodyLines) {
+  if (!REPORT_PATH) return;
+  const md = [
+    `### Money-critical migration deploy guard — ${TARGET_ENV.toUpperCase()}`,
+    "",
+    `**Status:** ❌ ${kind}`,
+    "",
+    ...bodyLines,
+    "",
+    "_Do NOT deploy until this check passes._",
+    "",
+  ].join("\n");
+  try {
+    mkdirSync(dirname(REPORT_PATH), { recursive: true });
+    writeFileSync(REPORT_PATH, md);
+  } catch (err) {
+    console.error(`(warning) failed to write report to ${REPORT_PATH}: ${err.message}`);
+  }
+}
 
 if (!DB_URL && !HAS_PG_ENV) {
-  console.error(
-    "✗ No database connection configured.\n" +
-      "  Set SUPABASE_DB_URL (or DATABASE_URL), or the PG* env vars, before running.\n" +
-      "  This check must NOT be skipped silently — deploys assume it ran.",
-  );
+  const msg =
+    "No database connection configured.\n" +
+    "Set SUPABASE_DB_URL (or DATABASE_URL), or the PG* env vars, before running.\n" +
+    "This check must NOT be skipped silently — deploys assume it ran.";
+  console.error(`✗ ${msg}`);
+  writeReport("No database connection configured", [
+    "The deploy guard could not run because no database connection was configured.",
+    "Configure the appropriate `SUPABASE_DB_URL_*` secret and re-run the workflow.",
+  ]);
   process.exit(2);
 }
 
@@ -68,12 +101,23 @@ const result = spawnSync("psql", args, {
 if (result.error) {
   console.error(`✗ Failed to invoke psql: ${result.error.message}`);
   console.error("  Install postgresql-client and retry. Do NOT deploy.");
+  writeReport("psql not available on runner", [
+    "The deploy guard could not query the migration tracker: `psql` was not invocable.",
+    "Install `postgresql-client` on the runner and re-run the workflow.",
+  ]);
   process.exit(2);
 }
 if (result.status !== 0) {
   console.error(`✗ psql exited ${result.status} while querying migration tracker.`);
   if (result.stderr) console.error(result.stderr.trim());
   console.error("  Do NOT deploy — target migration state is unknown.");
+  writeReport("Migration tracker query failed", [
+    "`psql` returned a non-zero exit code while reading `supabase_migrations.schema_migrations`.",
+    "The target database's migration state is unknown; treat as blocking.",
+    "",
+    "See the workflow log for the full `psql` error output (stderr is not mirrored here to avoid",
+    "leaking connection details).",
+  ]);
   process.exit(2);
 }
 
@@ -96,6 +140,19 @@ if (missing.length > 0) {
   console.error(
     "\nDo NOT deploy. Apply the missing migration(s) via the Supabase CLI\n" +
       "against this environment, re-run this check, and only then continue.",
+  );
+  writeReport(
+    `${missing.length} of ${expected.length} required migration(s) not applied`,
+    [
+      `The following money-critical migrations are present on \`main\` but have NOT been applied to the \`${TARGET_ENV}\` database:`,
+      "",
+      "| Version | File |",
+      "| --- | --- |",
+      ...missing.map((m) => `| \`${m.version}\` | \`supabase/migrations/${m.file}\` |`),
+      "",
+      "**Next step:** apply the missing migration(s) via the Supabase CLI against this",
+      "environment, then re-run this workflow. Do not deploy until the guard turns green.",
+    ],
   );
   process.exit(1);
 }

@@ -18,6 +18,10 @@ on:
         required: true
         default: "sandbox"
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   assert-required-money-migrations:
     name: Assert required credit-spend + referral migrations present
@@ -39,15 +43,34 @@ jobs:
       - name: Install psql client
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
       - name: Verify applied migrations in sandbox DB
+        id: verify_sandbox
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL_SANDBOX }}
           TARGET_ENV: sandbox
+          REPORT_PATH: ${{ github.workspace }}/money-migration-report-sandbox.md
         run: |
+          mkdir -p "$(dirname "$REPORT_PATH")"
           if [ -z "${SUPABASE_DB_URL:-}" ]; then
+            printf '### Money-critical migration deploy guard — SANDBOX\n\n**Status:** ❌ SUPABASE_DB_URL_SANDBOX secret is not configured\n\nThe deploy guard could not run because the sandbox database connection secret is missing.\nConfigure `SUPABASE_DB_URL_SANDBOX` in the repository secrets and re-run the workflow.\n\n_Do NOT deploy until this check passes._\n' > "$REPORT_PATH"
             echo "::error::SUPABASE_DB_URL_SANDBOX secret is not set. Configure it before merging money-critical changes."
             exit 1
           fi
           node scripts/assert-required-money-migrations-applied.mjs
+      - name: Append report to workflow summary
+        if: always() && hashFiles('money-migration-report-sandbox.md') != ''
+        run: cat money-migration-report-sandbox.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Post PR comment with missing migrations
+        if: failure() && github.event_name == 'pull_request' && hashFiles('money-migration-report-sandbox.md') != ''
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: money-migration-guard-sandbox
+          path: money-migration-report-sandbox.md
+      - name: Clear stale sandbox PR comment on success
+        if: success() && github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: money-migration-guard-sandbox
+          delete: true
 
   assert-money-migrations-applied-live:
     name: Assert money migrations applied in LIVE (pre-deploy gate)
@@ -60,12 +83,25 @@ jobs:
       - name: Install psql client
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
       - name: Verify applied migrations in live DB
+        id: verify_live
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL_LIVE }}
           TARGET_ENV: live
+          REPORT_PATH: ${{ github.workspace }}/money-migration-report-live.md
         run: |
+          mkdir -p "$(dirname "$REPORT_PATH")"
           if [ -z "${SUPABASE_DB_URL:-}" ]; then
+            printf '### Money-critical migration deploy guard — LIVE\n\n**Status:** ❌ SUPABASE_DB_URL_LIVE secret is not configured\n\nThe deploy guard could not run because the live database connection secret is missing.\nConfigure `SUPABASE_DB_URL_LIVE` in the repository secrets and re-run the workflow.\n\n_Do NOT deploy until this check passes._\n' > "$REPORT_PATH"
             echo "::error::SUPABASE_DB_URL_LIVE secret is not set. Configure it before deploying money-critical changes to live."
             exit 1
           fi
           node scripts/assert-required-money-migrations-applied.mjs
+      - name: Append report to workflow summary
+        if: always() && hashFiles('money-migration-report-live.md') != ''
+        run: cat money-migration-report-live.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload report artifact
+        if: failure() && hashFiles('money-migration-report-live.md') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: money-migration-report-live
+          path: money-migration-report-live.md

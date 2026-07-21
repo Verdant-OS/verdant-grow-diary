@@ -91,7 +91,7 @@ export interface BuildBlueprintOverlayInput {
   warnMargin?: number;
 }
 
-interface MetricMeta {
+export interface MetricMeta {
   key: BlueprintMetricKey;
   label: string;
   unit: string;
@@ -101,8 +101,13 @@ interface MetricMeta {
 /**
  * Display order + labels/units. Live-capable environment first, then light,
  * then root zone — so the metrics most growers actually have score at the top.
+ *
+ * Exported so the locked-state Blueprint teaser (blueprintTeaserViewModel)
+ * renders the same metrics in the same order/labels as the unlocked overlay —
+ * the teaser must preview EXACTLY what Craft scores against, never a divergent
+ * list.
  */
-const METRIC_META: readonly MetricMeta[] = [
+export const METRIC_META: readonly MetricMeta[] = [
   {
     key: "vpdKpa",
     label: "VPD",
@@ -137,7 +142,7 @@ const METRIC_META: readonly MetricMeta[] = [
   { key: "ph", label: "pH", unit: "", missingNudge: "Log a feed in Quick Log to score pH." },
 ];
 
-const STAGE_LABELS: Record<VpdStage, string> = {
+export const STAGE_LABELS: Record<VpdStage, string> = {
   seedling: "Seedling",
   veg: "Veg",
   preflower: "Pre-flower",

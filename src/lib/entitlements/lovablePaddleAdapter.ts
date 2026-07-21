@@ -59,6 +59,8 @@ export interface MapLovableOptions {
 const KNOWN_PRICE_TO_PLAN: Readonly<Record<string, PlanId>> = Object.freeze({
   pro_monthly: "pro_monthly",
   pro_annual: "pro_annual",
+  craft_monthly: "craft_monthly",
+  craft_annual: "craft_annual",
   founder_lifetime: "founder_lifetime",
 });
 

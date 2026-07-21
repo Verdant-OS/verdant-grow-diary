@@ -13,6 +13,8 @@ export const SUBSCRIBER_INTEREST_SOURCE = "pricing_interest" as const;
 const PLAN_LABELS: Readonly<Record<SubscriberInterestPlanId, string>> = Object.freeze({
   pro_monthly: "Pro Monthly",
   pro_annual: "Pro Annual",
+  craft_monthly: "Craft Monthly",
+  craft_annual: "Craft Annual",
   founder_lifetime: "Founder Lifetime",
 });
 
@@ -41,7 +43,13 @@ export type SubscriberInterestBuildResult =
   | { ok: false; reason: "invalid_email" | "invalid_plan" };
 
 export function isSubscriberInterestPlanId(value: unknown): value is SubscriberInterestPlanId {
-  return value === "pro_monthly" || value === "pro_annual" || value === "founder_lifetime";
+  return (
+    value === "pro_monthly" ||
+    value === "pro_annual" ||
+    value === "craft_monthly" ||
+    value === "craft_annual" ||
+    value === "founder_lifetime"
+  );
 }
 
 export function subscriberInterestPlanLabel(planId: SubscriberInterestPlanId): string {

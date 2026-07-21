@@ -24,9 +24,10 @@ vi.mock("@/hooks/useRootZoneObservations", () => ({
 import { PlantBlueprintOverlaySection } from "@/components/PlantBlueprintOverlaySection";
 import { EMPTY_SNAPSHOT } from "@/lib/sensorSnapshot";
 
-function entitlement(liveSensors: boolean, extra: Record<string, unknown> = {}) {
+function entitlement(blueprint: boolean, extra: Record<string, unknown> = {}) {
   return {
-    entitlement: { isActive: true, capabilities: { liveSensors } },
+    // Blueprint is Craft-exclusive: the gate checks the `blueprint` capability.
+    entitlement: { isActive: true, capabilities: { blueprint } },
     loading: false,
     lookupFailed: false,
     ...extra,
@@ -47,7 +48,7 @@ beforeEach(() => {
 });
 
 describe("PlantBlueprintOverlaySection", () => {
-  it("renders the overlay for a Pro grower (liveSensors capability)", () => {
+  it("renders the overlay for a Craft grower (blueprint capability)", () => {
     entitlementsMock.mockReturnValue(entitlement(true));
     renderSection();
     expect(screen.getByTestId("pro-blueprint-overlay")).toBeTruthy();
@@ -73,6 +74,19 @@ describe("PlantBlueprintOverlaySection", () => {
     entitlementsMock.mockReturnValue(entitlement(false));
     renderSection();
     expect(screen.getByTestId("pro-blueprint-paywall")).toBeTruthy();
+    expect(screen.queryByTestId("pro-blueprint-overlay")).toBeNull();
+  });
+
+  it("previews the stage's SOP target bands (conversion demo) above the paywall", () => {
+    // Locked grower on a veg plant sees the real per-stage targets Craft scores
+    // against — the paid value made concrete — with the paywall CTA beneath it.
+    entitlementsMock.mockReturnValue(entitlement(false));
+    renderSection();
+    expect(screen.getByTestId("pro-blueprint-locked")).toBeTruthy();
+    expect(screen.getByTestId("pro-blueprint-teaser")).toBeTruthy();
+    // veg temperature target, straight from the SOP band table.
+    expect(screen.getByTestId("pro-blueprint-teaser-row-tempC").textContent).toMatch(/°C/);
+    // The teaser never fetches or shows the grower's own readings (static bands).
     expect(screen.queryByTestId("pro-blueprint-overlay")).toBeNull();
   });
 

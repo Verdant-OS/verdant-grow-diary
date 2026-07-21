@@ -4,6 +4,8 @@ import { resolvePricingPlanPreselect, type PricingPreselectPlan } from "@/lib/pr
 const PLAN_LABELS: Readonly<Record<PricingPreselectPlan, string>> = Object.freeze({
   pro_monthly: "Pro Monthly",
   pro_annual: "Pro Annual",
+  craft_monthly: "Craft Monthly",
+  craft_annual: "Craft Annual",
   founder_lifetime: "Founder Lifetime",
 });
 

@@ -28,7 +28,12 @@ export interface PickStrongestResult {
   source: EntitlementSource;
 }
 
-const RECURRING_PLANS: ReadonlyArray<PlanId> = ["pro_monthly", "pro_annual"];
+const RECURRING_PLANS: ReadonlyArray<PlanId> = [
+  "pro_monthly",
+  "pro_annual",
+  "craft_monthly",
+  "craft_annual",
+];
 
 function rowGrantsPaidAccess(row: BillingSubscriptionRow | null, now: Date): boolean {
   if (row == null) return false;

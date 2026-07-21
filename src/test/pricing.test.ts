@@ -86,6 +86,40 @@ describe("Pricing tiers in constants", () => {
   });
 });
 
+describe("Craft tier", () => {
+  it("renders a Craft pricing card with toggle-aware CTAs", () => {
+    expect(PAGE).toMatch(/testId="pricing-card-craft"/);
+    expect(PAGE).toMatch(/pricing-cta-craft-annual/);
+    expect(PAGE).toMatch(/pricing-cta-craft-monthly/);
+    expect(PAGE).toMatch(/Upgrade to Craft/);
+  });
+
+  it("prices Craft at $29/month and $249/year in constants", () => {
+    expect(CONSTANTS).toMatch(/monthlyPrice:\s*29/);
+    expect(CONSTANTS).toMatch(/annualPrice:\s*249/);
+    expect(CONSTANTS).toMatch(/name:\s*"Craft"/);
+  });
+
+  it("Craft card highlights the Pro Blueprint and 300 AI Doctor credits", () => {
+    expect(CONSTANTS).toMatch(/Pro Blueprint: live per-stage SOP scoring/);
+    expect(CONSTANTS).toMatch(/300 AI Doctor credits \/ month/);
+  });
+
+  it("Craft CTAs open Paddle checkout with craft price keys", () => {
+    expect(PAGE).toMatch(/craft_annual/);
+    expect(PAGE).toMatch(/craft_monthly/);
+  });
+
+  it("comparison table adds a Blueprint row that only Craft and Founder include", () => {
+    expect(PAGE).toMatch(/label:\s*"Blueprint \(live SOP scoring\)"/);
+  });
+
+  it("analytics shim knows the Craft CTA events", () => {
+    expect(ANALYTICS).toMatch(/pricing_cta_craft_monthly_clicked/);
+    expect(ANALYTICS).toMatch(/pricing_cta_craft_annual_clicked/);
+  });
+});
+
 describe("Pricing page imports constants", () => {
   it("imports pricing constants from @/constants/pricing", () => {
     expect(PAGE).toMatch(/from\s+"@\/constants\/pricing"/);
@@ -119,16 +153,22 @@ describe("Free vs Pro vs Founder Lifetime comparison", () => {
     }
   });
 
-  it("comparison table renders all three columns (Free / Pro / Founder Lifetime)", () => {
+  it("comparison table renders all four columns (Free / Pro / Craft / Founder Lifetime)", () => {
     expect(PAGE).toMatch(/data-testid="pricing-comparison-table"/);
     expect(PAGE).toMatch(/>Free<\/th>/);
     expect(PAGE).toMatch(/>Pro<\/th>/);
+    expect(PAGE).toMatch(/>Craft<\/th>/);
     expect(PAGE).toMatch(/Founder Lifetime\s*<\/th>/);
   });
 
   it("comparison rows expose a founder column", () => {
     expect(PAGE).toMatch(/founder:\s*(true|false|"|')/);
     expect(PAGE).toMatch(/row\.founder/);
+  });
+
+  it("comparison rows expose a craft column", () => {
+    expect(PAGE).toMatch(/craft:\s*(true|false|"|')/);
+    expect(PAGE).toMatch(/row\.craft/);
   });
 
   it("includes Best for and Price rows for at-a-glance comparison", () => {
@@ -182,18 +222,21 @@ describe("Trust strip", () => {
 
 describe("Mobile-first pricing layout", () => {
   it("tier card grid uses extra vertical spacing on mobile", () => {
-    expect(PAGE).toMatch(/grid\s+gap-8\s+md:gap-6\s+md:grid-cols-3/);
+    // Four tiers (Free / Pro / Craft / Founder): 1-up on mobile, 2-up on md,
+    // 4-up from xl. Extra mobile gap (gap-8) still guards vertical spacing.
+    expect(PAGE).toMatch(/grid\s+gap-8\s+md:gap-6\s+md:grid-cols-2\s+xl:grid-cols-4/);
   });
 
   it("comparison table is horizontally scrollable on small screens", () => {
     expect(PAGE).toMatch(/overflow-x-auto/);
-    expect(PAGE).toMatch(/min-w-\[640px\]/);
+    // Widened from 640px to 760px to fit the fourth (Craft) column.
+    expect(PAGE).toMatch(/min-w-\[760px\]/);
   });
 
   it('CTA buttons use size="lg" for comfortable tap targets', () => {
     const ctaButtons = PAGE.match(/<Button[\s\S]*?<\/Button>/g) ?? [];
     expect(ctaButtons.length).toBeGreaterThan(0);
-    const ctaText = /(Start Free|Upgrade to Pro|Claim Founder Lifetime)/;
+    const ctaText = /(Start Free|Upgrade to Pro|Upgrade to Craft|Claim Founder Lifetime)/;
     for (const b of ctaButtons) {
       if (ctaText.test(b)) {
         expect(b).toMatch(/size="lg"/);
@@ -227,6 +270,8 @@ describe("CTAs", () => {
     expect(PAGE).toMatch(/openCheckout\(/);
     expect(PAGE).toMatch(/pro_monthly/);
     expect(PAGE).toMatch(/pro_annual/);
+    expect(PAGE).toMatch(/craft_monthly/);
+    expect(PAGE).toMatch(/craft_annual/);
     expect(PAGE).toMatch(/founder_lifetime/);
   });
 
@@ -235,6 +280,8 @@ describe("CTAs", () => {
     expect(PAGE).toMatch(/pricing_cta_free_clicked/);
     expect(PAGE).toMatch(/pricing_cta_pro_monthly_clicked/);
     expect(PAGE).toMatch(/pricing_cta_pro_annual_clicked/);
+    expect(PAGE).toMatch(/pricing_cta_craft_monthly_clicked/);
+    expect(PAGE).toMatch(/pricing_cta_craft_annual_clicked/);
     expect(PAGE).toMatch(/pricing_cta_founder_lifetime_clicked/);
     expect(PAGE).toMatch(/pricing_faq_opened/);
   });

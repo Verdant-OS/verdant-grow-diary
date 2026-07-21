@@ -37,7 +37,7 @@ export interface SubscriptionAccessInput {
 }
 
 const CURRENT_PERIOD_STATUSES = new Set(["active", "trialing"]);
-const RECURRING_PLAN_IDS = new Set(["pro_monthly", "pro_annual"]);
+const RECURRING_PLAN_IDS = new Set(["pro_monthly", "pro_annual", "craft_monthly", "craft_annual"]);
 
 /** `null` means intentionally absent; `undefined` means malformed. */
 function toDateOrInvalid(value: string | Date | null | undefined): Date | null | undefined {

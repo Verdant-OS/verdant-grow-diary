@@ -20,6 +20,8 @@
 import {
   PRO_MONTHLY_PRICE_USD,
   PRO_ANNUAL_PRICE_USD,
+  CRAFT_MONTHLY_PRICE_USD,
+  CRAFT_ANNUAL_PRICE_USD,
   FOUNDER_LIFETIME_PRICE_USD,
   FOUNDER_LIFETIME_LIMIT,
 } from "@/constants/pricing";
@@ -52,6 +54,12 @@ const PRO_UNLOCKED_FEATURES = [
   "Full grow history",
   "Priority support",
   "Advanced grow reports (planned)",
+];
+
+const CRAFT_UNLOCKED_FEATURES = [
+  ...PRO_UNLOCKED_FEATURES,
+  "Pro Blueprint: live per-stage SOP scoring",
+  "300 AI Doctor credits / month",
 ];
 
 export const PRICING_TIERS: PricingTier[] = [
@@ -91,6 +99,24 @@ export const PRICING_TIERS: PricingTier[] = [
     features: [...PRO_UNLOCKED_FEATURES, "Annual billing value"],
   },
   {
+    id: "craft_monthly",
+    name: "Craft",
+    priceDisplay: `$${CRAFT_MONTHLY_PRICE_USD}`,
+    priceSubtext: "per month",
+    billingPeriod: "monthly",
+    paddlePriceId: "craft_monthly",
+    features: [...CRAFT_UNLOCKED_FEATURES],
+  },
+  {
+    id: "craft_annual",
+    name: "Craft Annual",
+    priceDisplay: `$${CRAFT_ANNUAL_PRICE_USD}`,
+    priceSubtext: "per year",
+    billingPeriod: "annual",
+    paddlePriceId: "craft_annual",
+    features: [...CRAFT_UNLOCKED_FEATURES, "Annual billing value"],
+  },
+  {
     id: "founder_lifetime",
     name: "Founder Lifetime",
     priceDisplay: `$${FOUNDER_LIFETIME_PRICE_USD}`,
@@ -105,7 +131,6 @@ export const PRICING_TIERS: PricingTier[] = [
     ],
   },
 ];
-
 
 /**
  * Plan comparison rows.
@@ -126,6 +151,8 @@ export const PLAN_COMPARISON: PlanComparisonRow[] = [
       free: "$0",
       pro_monthly: `$${PRO_MONTHLY_PRICE_USD} / mo`,
       pro_annual: `$${PRO_ANNUAL_PRICE_USD} / yr`,
+      craft_monthly: `$${CRAFT_MONTHLY_PRICE_USD} / mo`,
+      craft_annual: `$${CRAFT_ANNUAL_PRICE_USD} / yr`,
       founder_lifetime: `$${FOUNDER_LIFETIME_PRICE_USD} once`,
     },
   },
@@ -136,12 +163,21 @@ export const PLAN_COMPARISON: PlanComparisonRow[] = [
       free: "Free",
       pro_monthly: "Monthly",
       pro_annual: "Annual",
+      craft_monthly: "Monthly",
+      craft_annual: "Annual",
       founder_lifetime: "One-time",
     },
   },
   {
     label: "Core grow diary",
-    values: { free: true, pro_monthly: true, pro_annual: true, founder_lifetime: true },
+    values: {
+      free: true,
+      pro_monthly: true,
+      pro_annual: true,
+      craft_monthly: true,
+      craft_annual: true,
+      founder_lifetime: true,
+    },
   },
   {
     label: "Plant & tent tracking",
@@ -149,16 +185,32 @@ export const PLAN_COMPARISON: PlanComparisonRow[] = [
       free: "1 tent · 1 plant",
       pro_monthly: "Multi-tent",
       pro_annual: "Multi-tent",
+      craft_monthly: "Multi-tent",
+      craft_annual: "Multi-tent",
       founder_lifetime: "Multi-tent",
     },
   },
   {
     label: "Photo logs",
-    values: { free: true, pro_monthly: true, pro_annual: true, founder_lifetime: true },
+    values: {
+      free: true,
+      pro_monthly: true,
+      pro_annual: true,
+      craft_monthly: true,
+      craft_annual: true,
+      founder_lifetime: true,
+    },
   },
   {
     label: "Manual sensor snapshots",
-    values: { free: true, pro_monthly: true, pro_annual: true, founder_lifetime: true },
+    values: {
+      free: true,
+      pro_monthly: true,
+      pro_annual: true,
+      craft_monthly: true,
+      craft_annual: true,
+      founder_lifetime: true,
+    },
   },
   {
     label: "Timeline & history depth",
@@ -166,28 +218,87 @@ export const PLAN_COMPARISON: PlanComparisonRow[] = [
       free: "Recent",
       pro_monthly: "Full history",
       pro_annual: "Full history",
+      craft_monthly: "Full history",
+      craft_annual: "Full history",
       founder_lifetime: "Full history",
     },
   },
   {
+    label: "AI Doctor credits",
+    values: {
+      free: "3 / grow",
+      pro_monthly: "100 / mo",
+      pro_annual: "100 / mo",
+      craft_monthly: "300 / mo",
+      craft_annual: "300 / mo",
+      founder_lifetime: "100 / mo",
+    },
+  },
+  {
+    label: "Pro Blueprint (live SOP scoring)",
+    values: {
+      free: false,
+      pro_monthly: false,
+      pro_annual: false,
+      craft_monthly: true,
+      craft_annual: true,
+      founder_lifetime: true,
+    },
+  },
+  {
     label: "Date-range diary report (PDF)",
-    values: { free: false, pro_monthly: true, pro_annual: true, founder_lifetime: true },
+    values: {
+      free: false,
+      pro_monthly: true,
+      pro_annual: true,
+      craft_monthly: true,
+      craft_annual: true,
+      founder_lifetime: true,
+    },
   },
   {
     label: "Exports (CSV / PDF)",
-    values: { free: "Limited", pro_monthly: true, pro_annual: true, founder_lifetime: true },
+    values: {
+      free: "Limited",
+      pro_monthly: true,
+      pro_annual: true,
+      craft_monthly: true,
+      craft_annual: true,
+      founder_lifetime: true,
+    },
   },
   {
     label: "Priority support",
-    values: { free: false, pro_monthly: true, pro_annual: true, founder_lifetime: true },
+    values: {
+      free: false,
+      pro_monthly: true,
+      pro_annual: true,
+      craft_monthly: true,
+      craft_annual: true,
+      founder_lifetime: true,
+    },
   },
   {
     label: "Advanced grow reports (planned)",
-    values: { free: false, pro_monthly: true, pro_annual: true, founder_lifetime: true },
+    values: {
+      free: false,
+      pro_monthly: true,
+      pro_annual: true,
+      craft_monthly: true,
+      craft_annual: true,
+      founder_lifetime: true,
+    },
   },
   {
     label: "Founder badge & early-supporter perks",
-    values: { free: false, pro_monthly: false, pro_annual: false, founder_lifetime: true },
+    values: {
+      free: false,
+      pro_monthly: false,
+      pro_annual: false,
+      craft_monthly: false,
+      craft_annual: false,
+      founder_lifetime: true,
+    },
   },
   {
     label: "Availability",
@@ -195,6 +306,8 @@ export const PLAN_COMPARISON: PlanComparisonRow[] = [
       free: "Available",
       pro_monthly: "Checkout finalizing",
       pro_annual: "Checkout finalizing",
+      craft_monthly: "Checkout finalizing",
+      craft_annual: "Checkout finalizing",
       founder_lifetime: "Checkout finalizing",
     },
   },
@@ -238,9 +351,7 @@ export const CANONICAL_FEATURE_ORDER: readonly string[] = (() => {
  * features, deterministically tie-broken by locale-independent
  * lexicographic order of the raw feature string. Pure and mutation-safe.
  */
-export function sortSuccessPanelFeatures(
-  features: readonly string[],
-): string[] {
+export function sortSuccessPanelFeatures(features: readonly string[]): string[] {
   const deduped: string[] = [];
   const seen = new Set<string>();
   for (const f of features) {
@@ -284,6 +395,9 @@ export function resolveTierFeatures(tierId: string): string[] {
   if (tierId === "pro_annual") {
     const pro = PRICING_TIERS.find((t) => t.id === "pro_monthly");
     raw = pro ? [...pro.features] : [...tier.features];
+  } else if (tierId === "craft_annual") {
+    const craft = PRICING_TIERS.find((t) => t.id === "craft_monthly");
+    raw = craft ? [...craft.features] : [...tier.features];
   } else if (tierId === "founder_lifetime") {
     const pro = PRICING_TIERS.find((t) => t.id === "pro_monthly");
     const base = pro ? [...pro.features] : [...tier.features];

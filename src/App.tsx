@@ -119,6 +119,7 @@ const Refund = lazy(() => import("./pages/RefundPolicy"));
 const Feedback = lazy(() => import("./pages/support/Feedback"));
 const Contact = lazy(() => import("./pages/support/Contact"));
 const OperatorSupportInbox = lazy(() => import("./pages/OperatorSupportInbox"));
+const OperatorCreditsAudit = lazy(() => import("./pages/OperatorCreditsAudit"));
 
 const Leads = lazy(() => import("./pages/Leads"));
 const PiIngestStatus = lazy(() => import("./pages/PiIngestStatus"));

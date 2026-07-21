@@ -126,6 +126,67 @@ function writeReport(kind, bodyLines) {
   }
 }
 
+// -----------------------------------------------------------------------
+// Pre-flight #1: validate every REQUIRED_MONEY_MIGRATIONS filename BEFORE
+// we touch the network. A malformed prefix means the required-migrations
+// manifest itself is broken — the target DB is not at fault, and querying
+// it can only mask the real bug. Fail loudly with a distinct exit code so
+// CI can distinguish "manifest bug" from "DB out of date".
+// -----------------------------------------------------------------------
+const expected = [];
+const malformed = [];
+for (const file of REQUIRED_MONEY_MIGRATIONS) {
+  try {
+    expected.push({ file, version: migrationVersion(file) });
+  } catch (err) {
+    malformed.push({ file, reason: err instanceof Error ? err.message : String(err) });
+  }
+}
+
+if (malformed.length > 0) {
+  console.error(
+    `✗ REQUIRED_MONEY_MIGRATIONS contains ${malformed.length} filename(s) whose`,
+  );
+  console.error(
+    "  14-digit migrationVersion() prefix could not be extracted:",
+  );
+  for (const m of malformed) {
+    console.error(`    ${m.file}   (${m.reason})`);
+  }
+  console.error(
+    "\n  Fix scripts/required-money-migrations.mjs so every entry matches\n" +
+      "  /^\\d{14}_.+\\.sql$/. Do NOT deploy — the guard did not run.",
+  );
+  writeReport(
+    `${malformed.length} required migration filename(s) have a malformed 14-digit prefix`,
+    [
+      "The required-migrations manifest lists filename(s) whose leading 14-digit",
+      "timestamp prefix could not be extracted. The deploy guard did NOT query the",
+      "target database — this is a manifest bug, not a database drift.",
+      "",
+      "| File | Reason |",
+      "| --- | --- |",
+      ...malformed.map(
+        (m) => `| \`supabase/migrations/${m.file}\` | \`${m.reason}\` |`,
+      ),
+      "",
+      "**Next step:** correct `scripts/required-money-migrations.mjs` so every",
+      "entry matches `/^\\d{14}_.+\\.sql$/`, then re-run this workflow.",
+    ],
+  );
+  writeAudit("malformed_filename", {
+    note: `${malformed.length} filename(s) failed migrationVersion() extraction.`,
+    expected: malformed.map((m) => ({ file: m.file, version: null, applied: false, reason: m.reason })),
+  });
+  process.exit(EXIT.MALFORMED_FILENAME);
+}
+
+// -----------------------------------------------------------------------
+// Pre-flight #2: require a database connection. A missing connection is a
+// distinct failure mode from a broken manifest and from a psql tooling
+// gap — CI needs to react differently to each (fix a secret vs fix the
+// runner image vs fix a source file).
+// -----------------------------------------------------------------------
 if (!DB_URL && !HAS_PG_ENV) {
   const msg =
     "No database connection configured.\n" +
@@ -137,13 +198,9 @@ if (!DB_URL && !HAS_PG_ENV) {
     "Configure the appropriate `SUPABASE_DB_URL_*` secret and re-run the workflow.",
   ]);
   writeAudit("no_db_connection", { note: "No SUPABASE_DB_URL / PGHOST env." });
-  process.exit(2);
+  process.exit(EXIT.NO_DB_CONNECTION);
 }
 
-const expected = REQUIRED_MONEY_MIGRATIONS.map((f) => ({
-  file: f,
-  version: migrationVersion(f),
-}));
 const versionList = expected.map((e) => `'${e.version}'`).join(",");
 
 const sql = `SELECT version FROM supabase_migrations.schema_migrations WHERE version IN (${versionList});`;
@@ -163,8 +220,8 @@ if (result.error) {
     "The deploy guard could not query the migration tracker: `psql` was not invocable.",
     "Install `postgresql-client` on the runner and re-run the workflow.",
   ]);
-  writeAudit("connection_error", { note: "psql binary not invocable on runner." });
-  process.exit(2);
+  writeAudit("psql_not_invocable", { note: "psql binary not invocable on runner." });
+  process.exit(EXIT.PSQL_NOT_INVOCABLE);
 }
 if (result.status !== 0) {
   console.error(`✗ psql exited ${result.status} while querying migration tracker.`);
@@ -180,7 +237,7 @@ if (result.status !== 0) {
   writeAudit("tracker_query_failed", {
     note: `psql exited ${result.status} querying supabase_migrations.schema_migrations.`,
   });
-  process.exit(2);
+  process.exit(EXIT.TRACKER_QUERY_FAILED);
 }
 
 const applied = new Set(
@@ -201,8 +258,14 @@ if (missing.length > 0) {
   console.error(
     `✗ Money-critical migrations NOT applied in target env (${TARGET_ENV}):`,
   );
+  console.error(
+    `  ${missing.length} of ${expected.length} required migration(s) missing from`,
+  );
+  console.error(
+    "  supabase_migrations.schema_migrations. Each row: <expected version>  <file>",
+  );
   for (const m of missing) {
-    console.error(`    ${m.version}  ${m.file}`);
+    console.error(`    ${m.version}  supabase/migrations/${m.file}`);
   }
   console.error(
     "\nDo NOT deploy. Apply the missing migration(s) via the Supabase CLI\n" +
@@ -222,10 +285,12 @@ if (missing.length > 0) {
     ],
   );
   writeAudit("missing_migrations", { expected: expectedWithApplied });
-  process.exit(1);
+  process.exit(EXIT.MISSING_MIGRATIONS);
 }
 
 console.log(
   `✓ All ${expected.length} money-critical migrations applied in target env (${TARGET_ENV}).`,
 );
 writeAudit("verified", { expected: expectedWithApplied });
+process.exit(EXIT.OK);
+

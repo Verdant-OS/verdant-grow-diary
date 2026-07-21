@@ -33,6 +33,7 @@ const FUNCTIONS = path.join(ROOT, "supabase", "functions");
 const MIRROR_REL = path.join("supabase", "functions", "_shared", "lib");
 const MIRROR_ABS = path.join(ROOT, MIRROR_REL);
 const CHECK = process.argv.includes("--check");
+const DRY_RUN = process.argv.includes("--dry-run");
 
 /** Allowed src-relative roots that may be mirrored. */
 const ALLOWED_SRC_ROOTS = ["lib", "constants"];

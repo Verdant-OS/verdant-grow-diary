@@ -112,7 +112,9 @@ describe("generate-release-workbook-templates", () => {
     ];
     for (const f of xlsxFiles) {
       if (!existsSync(f)) continue;
-      const wb = XLSX.readFile(f);
+      // Buffer read: the xlsx 0.20.x ESM build no longer auto-binds node:fs,
+      // so path-based readFile() throws "Cannot access file" under vitest.
+      const wb = XLSX.read(readFileSync(f));
       const parts: string[] = [];
       for (const name of wb.SheetNames) {
         const ws = wb.Sheets[name];

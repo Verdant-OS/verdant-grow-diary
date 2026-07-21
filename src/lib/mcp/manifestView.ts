@@ -61,7 +61,7 @@ export const MCP_MANIFEST: MCPManifestView = Object.freeze({
   serverName: "verdant-grow-os-mcp",
   serverTitle: "Verdant Grow OS",
   version: "0.1.0",
-  sdkVersion: "0.20.0",
+  sdkVersion: "0.24.0",
   path: "/functions/v1/mcp",
   oauthIssuer: "https://knkwiiywfkbqznbxwqfh.supabase.co/auth/v1",
   acceptedAudiences: ["authenticated"],

@@ -250,6 +250,13 @@ if (malformed.length > 0) {
     note: `${malformed.length} filename(s) failed migrationVersion() extraction.`,
     expected: malformed.map((m) => ({ file: m.file, version: null, applied: false, reason: m.reason })),
   });
+  writeDiff("malformed_filename", {
+    expectedRows: [
+      ...expected.map((e) => ({ ...e, applied: false })),
+      ...malformed.map((m) => ({ file: m.file, version: null, applied: false })),
+    ],
+    appliedVersions: [],
+  });
   process.exit(EXIT.MALFORMED_FILENAME);
 }
 

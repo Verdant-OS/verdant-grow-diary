@@ -86,6 +86,16 @@ function writeDiff(kind, { expectedRows, appliedVersions }) {
   const unexpected = [...appliedSet].filter((v) => !expectedSet.has(v)).sort();
   const common = [...expectedSet].filter((v) => appliedSet.has(v)).sort();
 
+  // For failure modes where the DB was never successfully queried, the
+  // "actual" column is not truly empty — it is UNKNOWN. Say so explicitly
+  // so the artifact isn't misread as "DB confirmed empty".
+  const actualUnknown =
+    kind === "no_db_connection" ||
+    kind === "psql_not_invocable" ||
+    kind === "tracker_query_failed" ||
+    kind === "malformed_filename";
+  const unknownMarker = "?? UNKNOWN ??";
+
   const width = 16;
   const pad = (s) => String(s).padEnd(width, " ");
   const lines = [
@@ -93,17 +103,24 @@ function writeDiff(kind, { expectedRows, appliedVersions }) {
     `Failure mode: ${kind}`,
     `Generated:    ${new Date().toISOString()}`,
     "",
-    `Expected: ${expectedSet.size}    Applied (in required set): ${common.length}    Missing: ${missing.length}    Unexpected: ${unexpected.length}`,
+    actualUnknown
+      ? `Expected: ${expectedSet.size}    Applied: UNKNOWN (guard did not complete a tracker query)`
+      : `Expected: ${expectedSet.size}    Applied (in required set): ${common.length}    Missing: ${missing.length}    Unexpected: ${unexpected.length}`,
     "",
     `${pad("EXPECTED")}  ${pad("ACTUAL")}  STATUS`,
     `${pad("-".repeat(14))}  ${pad("-".repeat(14))}  ------`,
   ];
 
   // Row per required file: expected prefix on the left, matching applied
-  // prefix on the right (blank if not found), plus a status marker.
+  // prefix on the right (blank if not found, or "?? UNKNOWN ??" when the
+  // DB was never queried), plus a status marker.
   for (const row of expectedRows) {
     if (!row.version) {
       lines.push(`${pad(row.file)}  ${pad("")}  MALFORMED`);
+      continue;
+    }
+    if (actualUnknown) {
+      lines.push(`${pad(row.version)}  ${pad(unknownMarker)}  UNKNOWN   ${row.file}`);
       continue;
     }
     const hit = appliedSet.has(row.version);
@@ -112,7 +129,7 @@ function writeDiff(kind, { expectedRows, appliedVersions }) {
     );
   }
 
-  if (unexpected.length > 0) {
+  if (!actualUnknown && unexpected.length > 0) {
     lines.push("");
     lines.push("Applied prefixes NOT in the required-migrations manifest");
     lines.push("(informational only — not a failure, but worth an eyeball):");
@@ -120,6 +137,21 @@ function writeDiff(kind, { expectedRows, appliedVersions }) {
       lines.push(`${pad("")}  ${pad(v)}  UNEXPECTED`);
     }
   }
+
+  if (actualUnknown) {
+    lines.push("");
+    lines.push(
+      "NOTE: the ACTUAL column is UNKNOWN because the guard exited before it",
+    );
+    lines.push(
+      "could successfully read supabase_migrations.schema_migrations. Do NOT",
+    );
+    lines.push(
+      "interpret blank/UNKNOWN rows as 'not applied' — the DB state was never",
+    );
+    lines.push("observed. Fix the failure mode above, then re-run the guard.");
+  }
+
 
   const body = lines.join("\n") + "\n";
 

@@ -189,7 +189,7 @@ describe("ai-coach edge function — static safety + wiring scan", () => {
     "utf8",
   );
   const helperSrc = readFileSync(
-    resolve(process.cwd(), "supabase/functions/ai-coach/sensorSnapshotContext.ts"),
+    resolve(process.cwd(), "src/lib/aiCoachSensorSnapshotContext.ts"),
     "utf8",
   );
 
@@ -204,7 +204,9 @@ describe("ai-coach edge function — static safety + wiring scan", () => {
   });
 
   it("imports and uses the shared buildAiSensorSnapshotContext helper", () => {
-    expect(indexSrc).toContain('from "./sensorSnapshotContextRules.ts"');
+    expect(indexSrc).toContain(
+      'from "../_shared/lib/lib/aiSensorSnapshotContextRules.ts"',
+    );
     expect(indexSrc).toContain("buildAiSensorSnapshotContext(latestSnapshot");
   });
 

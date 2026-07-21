@@ -18,7 +18,7 @@
  *    promoting diagnoses from a single milestone or photo.
  *  - Does not classify telemetry; only reflects which evidence is missing.
  */
-import { buildEarlyStageTimelineViewModel } from "./earlyStageTimelineViewModel";
+import { buildEarlyStageTimelineViewModel } from "./earlyStageTimelineViewModel.ts";
 
 /** Per-entry source label rendered alongside an early-stage memory line. */
 export type EarlyStageMemorySourceLabel = "Quick Log" | "Manual diary";

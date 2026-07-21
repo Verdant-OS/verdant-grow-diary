@@ -16,7 +16,7 @@ import {
   projectRootZoneManualObservationFromDetails,
   type RootZoneManualObservationProjection,
   type RootZoneManualObservationV1,
-} from "./rootZoneManualObservationRules";
+} from "./rootZoneManualObservationRules.ts";
 
 export const ROOT_ZONE_OBSERVATION_SCHEMA_VERSION = 1 as const;
 export const ROOT_ZONE_OBSERVATION_CAP = 20;

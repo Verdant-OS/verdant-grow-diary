@@ -20,7 +20,7 @@
  *  - Preserves the canonical AI Doctor required output structure.
  */
 
-import { sanitizeAiDoctorPromptText } from "./aiDoctorPromptVocabularyRules";
+import { sanitizeAiDoctorPromptText } from "./aiDoctorPromptVocabularyRules.ts";
 
 /** Canonical AI Doctor required-output sections (rendered verbatim). */
 export const AI_DOCTOR_REQUIRED_OUTPUT_SECTIONS: readonly string[] = Object.freeze([

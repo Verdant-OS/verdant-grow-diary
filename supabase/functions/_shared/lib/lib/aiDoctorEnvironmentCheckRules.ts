@@ -16,7 +16,7 @@
  *  - No device control, no automation, no Action Queue writes.
  */
 
-import { DIARY_ENVIRONMENT_CHECK_TITLE } from "./ecowittDiaryEnvironmentCheckRules";
+import { DIARY_ENVIRONMENT_CHECK_TITLE } from "./ecowittDiaryEnvironmentCheckRules.ts";
 
 export const AI_DOCTOR_ENV_CHECK_SOURCE_LABEL =
   "local EcoWitt validation / test-local evidence";

@@ -27,24 +27,24 @@ import {
   type BridgeAuthRequest,
   type BridgeAuthResult,
   type BridgeCredential,
-} from "./piIngestAuthRules";
+} from "./piIngestAuthRules.ts";
 import {
   validateBridgeBatchScope,
   type BridgeBatchScopeResult,
-} from "./piIngestBridgeRules";
+} from "./piIngestBridgeRules.ts";
 import {
   evaluateBridgeAbuseGuard,
   type BridgeAbuseGuardResult,
-} from "./piIngestRateLimitRules";
+} from "./piIngestRateLimitRules.ts";
 import {
   toExternalSensorIngestPayload,
   validatePiIngestRequestEnvelope,
   type PiIngestRequestValidationResult,
-} from "./piIngestRequestRules";
+} from "./piIngestRequestRules.ts";
 import {
   normalizeIngestPayload,
   type NormalizedSensorReadingDraft,
-} from "./sensorIngestNormalizationRules";
+} from "./sensorIngestNormalizationRules.ts";
 
 // ----------------------------- Types -----------------------------
 

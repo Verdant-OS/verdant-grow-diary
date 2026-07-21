@@ -95,7 +95,7 @@ export interface TimelineDiaryItem {
    * milestone + vigor + short note) extracted from `details.early_stage`.
    * Presenter-only — never echoed as raw payload.
    */
-  earlyStage?: import("./earlyStageTimelineViewModel").EarlyStageTimelineViewModel | null;
+  earlyStage?: import("./earlyStageTimelineViewModel.ts").EarlyStageTimelineViewModel | null;
 }
 
 export interface TimelineManualSnapshotItem {

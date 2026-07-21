@@ -21,15 +21,15 @@
  * - Metadata-only authorization support.
  */
 
-import type { BridgeCredentialMetadata } from "./piIngestBridgeCredentialMetadataResolver";
+import type { BridgeCredentialMetadata } from "./piIngestBridgeCredentialMetadataResolver.ts";
 import {
   evaluateBridgeOwnerScope,
   type BridgeOwnerScopeRejectionReason,
-} from "./piIngestBridgeOwnerScopeRules";
+} from "./piIngestBridgeOwnerScopeRules.ts";
 import {
   evaluateBridgeTentScope,
   type BridgeTentScopeRejectionReason,
-} from "./piIngestBridgeTentScopeRules";
+} from "./piIngestBridgeTentScopeRules.ts";
 
 export type BridgeAuthorizationStage = "owner" | "tent";
 

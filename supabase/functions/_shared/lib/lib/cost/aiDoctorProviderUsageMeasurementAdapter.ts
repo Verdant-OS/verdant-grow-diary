@@ -22,12 +22,12 @@
  *    calls yet.
  */
 
-import { type AiDoctorPromptMeasurement } from "./costDomains";
-import { normalizeProviderReportedTokenUsage } from "./aiDoctorProviderUsageRules";
+import { type AiDoctorPromptMeasurement } from "./costDomains.ts";
+import { normalizeProviderReportedTokenUsage } from "./aiDoctorProviderUsageRules.ts";
 
 export {
   type AiDoctorPromptMeasurement,
-} from "./costDomains";
+} from "./costDomains.ts";
 
 /**
  * Attaches a provider-reported token usage object to an existing

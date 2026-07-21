@@ -373,6 +373,7 @@ async function checkOverflowSpend(userId: string, env: Environment): Promise<voi
 
 async function checkReferralConversion(userId: string, env: Environment): Promise<void> {
   const section = "REFERRAL";
+  beginCheckpoint(section);
   // User could be either referrer OR referee — check both angles.
   const asReferrer = psqlJson<{
     id: string;

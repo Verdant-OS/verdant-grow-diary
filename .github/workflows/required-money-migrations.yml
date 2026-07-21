@@ -159,12 +159,15 @@ jobs:
         run: mkdir -p "${{ github.workspace }}/audit/live/logs"
       - name: Fast-fail prefix diff (live)
         id: prefix_diff_live
-        if: ${{ secrets.SUPABASE_DB_URL_LIVE != '' }}
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL_LIVE }}
           TARGET_ENV: live
         run: |
           set -o pipefail
+          if [ -z "${SUPABASE_DB_URL:-}" ]; then
+            echo "SUPABASE_DB_URL_LIVE not configured — skipping fast-fail diff; verify step will emit the missing-secret report."
+            exit 0
+          fi
           node scripts/diff-money-migration-prefixes.mjs --json \
             > "${{ github.workspace }}/audit/live/prefix-diff-cli.json"
           node scripts/diff-money-migration-prefixes.mjs \

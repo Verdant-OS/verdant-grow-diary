@@ -42,10 +42,14 @@ let shimDir: string;
 
 /** Write a shell shim named `psql` that echoes fixed output and exits with a fixed code. */
 function installPsqlShim(stub: StubPsql): void {
+  const stdoutPath = join(shimDir, "psql.stdout");
+  const stderrPath = join(shimDir, "psql.stderr");
+  writeFileSync(stdoutPath, stub.stdout ?? "");
+  writeFileSync(stderrPath, stub.stderr ?? "");
   const body =
     `#!/usr/bin/env bash\n` +
-    `printf '%s' ${JSON.stringify(stub.stdout ?? "")}\n` +
-    `printf '%s' ${JSON.stringify(stub.stderr ?? "")} 1>&2\n` +
+    `cat ${JSON.stringify(stdoutPath)}\n` +
+    `cat ${JSON.stringify(stderrPath)} 1>&2\n` +
     `exit ${stub.exit ?? 0}\n`;
   const path = join(shimDir, "psql");
   writeFileSync(path, body, { encoding: "utf8" });
@@ -60,17 +64,22 @@ interface RunOptions {
 }
 
 function runScript(opts: RunOptions = {}) {
+  // Keep the real system PATH so `bash` (used by the shim) resolves, but
+  // prepend shimDir so our `psql` wins over any real one. When omitShim is
+  // true, we drop shimDir entirely — the real `psql` may or may not exist,
+  // so tests that rely on "psql not invocable" use a bogus PATH.
+  const basePath = opts.omitShim ? "/nonexistent-empty-path" : `${shimDir}:/usr/bin:/bin`;
   const env: Record<string, string> = {
-    // Deliberately minimal — no inherited DB creds.
-    PATH: opts.omitShim ? "/nonexistent-empty-path" : `${shimDir}:/usr/bin:/bin`,
+    PATH: basePath,
     HOME: process.env.HOME ?? "/root",
-    NODE_PATH: process.env.NODE_PATH ?? "",
   };
   for (const [k, v] of Object.entries(opts.env ?? {})) {
     if (v === undefined) delete env[k];
     else env[k] = v;
   }
-  return spawnSync("node", [SCRIPT, ...(opts.args ?? [])], {
+  // Use the current node binary directly so tests don't depend on `node`
+  // being resolvable through the trimmed PATH above.
+  return spawnSync(process.execPath, [SCRIPT, ...(opts.args ?? [])], {
     encoding: "utf8",
     env,
   });

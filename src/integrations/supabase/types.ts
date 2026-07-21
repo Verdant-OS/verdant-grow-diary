@@ -3004,6 +3004,98 @@ export type Database = {
           },
         ]
       }
+      plant_origin_assignment_events: {
+        Row: {
+          action: string
+          changed_at: string
+          created_at: string
+          from_batch_id: string | null
+          id: string
+          plant_id: string
+          reason: string | null
+          to_batch_id: string
+          user_id: string
+        }
+        Insert: {
+          action: string
+          changed_at?: string
+          created_at?: string
+          from_batch_id?: string | null
+          id?: string
+          plant_id: string
+          reason?: string | null
+          to_batch_id: string
+          user_id: string
+        }
+        Update: {
+          action?: string
+          changed_at?: string
+          created_at?: string
+          from_batch_id?: string | null
+          id?: string
+          plant_id?: string
+          reason?: string | null
+          to_batch_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plant_origin_assignment_events_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plant_origin_assignments: {
+        Row: {
+          assigned_at: string
+          assigned_reason: string | null
+          batch_id: string
+          created_at: string
+          id: string
+          plant_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          assigned_at?: string
+          assigned_reason?: string | null
+          batch_id: string
+          created_at?: string
+          id?: string
+          plant_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          assigned_at?: string
+          assigned_reason?: string | null
+          batch_id?: string
+          created_at?: string
+          id?: string
+          plant_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plant_origin_assignments_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "propagation_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plant_origin_assignments_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: true
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       plants: {
         Row: {
           candidate_label: string | null
@@ -4150,9 +4242,28 @@ export type Database = {
         Args: { p_idempotency_key: string; p_payload: Json }
         Returns: Json
       }
+      genetics_assign_plants: {
+        Args: {
+          p_batch_id: string
+          p_idempotency_key: string
+          p_plant_ids: string[]
+          p_reason?: string
+        }
+        Returns: Json
+      }
       genetics_batch_upsert: {
         Args: { p_idempotency_key: string; p_payload: Json }
         Returns: Json
+      }
+      genetics_lineage_has_cycle: {
+        Args: {
+          p_owner: string
+          p_start_id: string
+          p_start_kind: string
+          p_target_id: string
+          p_target_kind: string
+        }
+        Returns: boolean
       }
       genetics_lock_lineage: { Args: { p_owner: string }; Returns: undefined }
       get_latest_tent_sensor_snapshot: {

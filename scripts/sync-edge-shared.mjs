@@ -24,10 +24,11 @@
  */
 import { promises as fs, statSync } from "node:fs";
 import * as path from "node:path";
+import { fileURLToPath } from "node:url";
 import * as os from "node:os";
 import { createHash } from "node:crypto";
 
-const ROOT = path.resolve(new URL("..", import.meta.url).pathname);
+const ROOT = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const SRC = path.join(ROOT, "src");
 const FUNCTIONS = path.join(ROOT, "supabase", "functions");
 const MIRROR_REL = path.join("supabase", "functions", "_shared", "lib");
@@ -54,7 +55,10 @@ const DYNAMIC_IMPORT_RE = /(\bimport\s*\(\s*["'])([^"']+)(["']\s*\))/g;
 const INLINE_TYPE_IMPORT_RE = /(import\(\s*["'])([^"']+)(["']\s*\))/g;
 
 function sha256(buf) {
-  return createHash("sha256").update(buf).digest("hex");
+  // Normalize CRLF so Windows (autocrlf) checkouts hash identically to the
+  // LF originals CI and the generator see.
+  const text = typeof buf === "string" ? buf : buf.toString("utf8");
+  return createHash("sha256").update(text.replaceAll("\r\n", "\n")).digest("hex");
 }
 
 async function walk(dir) {

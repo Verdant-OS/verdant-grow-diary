@@ -5,9 +5,10 @@
  * supabase/functions/_shared/lib/**. See docs/edge-shared-sync.md.
  */
 import { readdirSync, readFileSync, statSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { join, relative, resolve } from "node:path";
 
-const ROOT = resolve(new URL("..", import.meta.url).pathname);
+const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const FUNCTIONS = join(ROOT, "supabase", "functions");
 
 // Match import/export ... from "<spec>" and bare `import "<spec>"`, single or double quoted.

@@ -7,9 +7,10 @@
  * script without shell quoting.
  */
 import { spawn } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import * as path from "node:path";
 
-const ROOT = path.resolve(new URL("..", import.meta.url).pathname);
+const ROOT = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const child = spawn(
   process.execPath,
   [path.join(ROOT, "scripts", "sync-edge-shared.mjs"), "--check"],

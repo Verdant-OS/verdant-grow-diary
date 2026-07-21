@@ -3254,6 +3254,7 @@ export type Database = {
           marketing_opt_in: boolean
           marketing_opt_in_at: string | null
           nugs_total: number
+          referral_code: string | null
           tier: string
           updated_at: string
           user_id: string
@@ -3266,6 +3267,7 @@ export type Database = {
           marketing_opt_in?: boolean
           marketing_opt_in_at?: string | null
           nugs_total?: number
+          referral_code?: string | null
           tier?: string
           updated_at?: string
           user_id: string
@@ -3278,6 +3280,7 @@ export type Database = {
           marketing_opt_in?: boolean
           marketing_opt_in_at?: string | null
           nugs_total?: number
+          referral_code?: string | null
           tier?: string
           updated_at?: string
           user_id?: string
@@ -4463,6 +4466,7 @@ export type Database = {
       founder_lifetime_slots_remaining: { Args: never; Returns: number }
       founders_seats_consumed: { Args: never; Returns: number }
       founders_wall_count: { Args: never; Returns: number }
+      generate_referral_code: { Args: never; Returns: string }
       genetics_accession_archive: {
         Args: {
           p_accession_id: string

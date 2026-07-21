@@ -15,7 +15,7 @@
  * so operators reviewing the diary cannot confuse it with live telemetry.
  */
 
-import { redactEvidenceValue } from "./ecowittValidationEvidenceRules";
+import { redactEvidenceValue } from "./ecowittValidationEvidenceRules.ts";
 
 export const DIARY_ENVIRONMENT_CHECK_TITLE = "EcoWitt Environment Check";
 export const DIARY_ENVIRONMENT_CHECK_EVENT_TYPE = "environment_check";

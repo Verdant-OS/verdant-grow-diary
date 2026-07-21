@@ -17,7 +17,7 @@
  * - Metadata-only authorization support.
  */
 
-import type { BridgeCredentialMetadata } from "./piIngestBridgeCredentialMetadataResolver";
+import type { BridgeCredentialMetadata } from "./piIngestBridgeCredentialMetadataResolver.ts";
 
 export type BridgeTentScopeRejectionReason =
   | "unknown_bridge"

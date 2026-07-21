@@ -28,7 +28,7 @@
  *  - Never returns raw Paddle IDs in the mapped output.
  */
 
-import type { BillingSubscriptionRow, PlanId, SubscriptionStatus } from "./types";
+import type { BillingSubscriptionRow, PlanId, SubscriptionStatus } from "./types.ts";
 
 export type LovableBillingEnvironment = "sandbox" | "live";
 

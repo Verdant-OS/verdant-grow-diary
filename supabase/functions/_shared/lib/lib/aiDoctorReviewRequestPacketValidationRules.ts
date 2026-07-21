@@ -21,23 +21,23 @@ import type {
   AiDoctorReviewRequestRootZoneProduct,
   AiDoctorReviewRequestSnapshot,
   AiDoctorReviewRequestSnapshotAnnotation,
-} from "./aiDoctorReviewRequestPacket";
+} from "./aiDoctorReviewRequestPacket.ts";
 import {
   hasRootZoneSecretHint,
   ROOT_ZONE_INVALID_FIELDS,
   type RootZoneInvalidField,
-} from "./rootZoneObservationRules";
+} from "./rootZoneObservationRules.ts";
 import {
   ROOT_ZONE_DRAINAGE_OBSERVATIONS,
   ROOT_ZONE_MEDIUM_SURFACES,
   ROOT_ZONE_POT_WEIGHT_FEELS,
-} from "./rootZoneManualObservationRules";
+} from "./rootZoneManualObservationRules.ts";
 import {
   AI_DOCTOR_CSV_HISTORY_LABEL,
   AI_DOCTOR_CSV_HISTORY_NOT_LIVE_NOTE,
   AI_DOCTOR_IMPORTED_SENSOR_HISTORY_GUIDANCE,
   AI_DOCTOR_IMPORTED_SENSOR_HISTORY_SECTION_LABEL,
-} from "../constants/aiDoctorImportedHistory";
+} from "../constants/aiDoctorImportedHistory.ts";
 
 export const AI_DOCTOR_REVIEW_PACKET_MAX_TEXT_LENGTH = 512;
 export const AI_DOCTOR_REVIEW_PACKET_MAX_ANNOTATION_LENGTH = 1_024;

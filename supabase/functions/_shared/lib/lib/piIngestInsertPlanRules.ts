@@ -20,8 +20,8 @@
  *    the plan item, and is never spliced into the row payload.
  */
 
-import type { PiIngestPipelineResult } from "./piIngestPipeline";
-import type { NormalizedSensorReadingDraft } from "./sensorIngestNormalizationRules";
+import type { PiIngestPipelineResult } from "./piIngestPipeline.ts";
+import type { NormalizedSensorReadingDraft } from "./sensorIngestNormalizationRules.ts";
 
 // ----------------------------- Types -----------------------------
 

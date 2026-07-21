@@ -33,18 +33,18 @@ import {
   type AiDoctorEnvironmentCheckResult,
   type BestEnvironmentCheckSelection,
   type EnvironmentCheckEventInput,
-} from "./aiDoctorEnvironmentCheckRules";
-import type { AiDoctorSensorContext } from "./aiDoctorSensorContextRules";
+} from "./aiDoctorEnvironmentCheckRules.ts";
+import type { AiDoctorSensorContext } from "./aiDoctorSensorContextRules.ts";
 import {
   buildAiDoctorCsvHistoryContext,
   type AiDoctorCsvHistoryContext,
   type CsvHistorySensorRowLike,
-} from "./aiDoctorCsvHistoryContextRules";
+} from "./aiDoctorCsvHistoryContextRules.ts";
 import {
   buildEarlyStageAiDoctorContext,
   type EarlyStageAiDoctorContext,
-} from "./earlyStageAiDoctorContextRules";
-import { isSensorTestbenchRow } from "./sensorTestbenchIndicatorRules";
+} from "./earlyStageAiDoctorContextRules.ts";
+import { isSensorTestbenchRow } from "./sensorTestbenchIndicatorRules.ts";
 import {
   AI_DOCTOR_IMPORTED_SENSOR_HISTORY_GUIDANCE,
   AI_DOCTOR_IMPORTED_SENSOR_HISTORY_SECTION_LABEL,

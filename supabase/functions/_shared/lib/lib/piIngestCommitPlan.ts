@@ -24,15 +24,15 @@
  *   - Sensor row and idempotency row are emitted at the same index so the
  *     caller can correlate them after a successful insert.
  */
-import type { PiIngestPipelineResult } from "./piIngestPipeline";
-import type { NormalizedSensorReadingDraft } from "./sensorIngestNormalizationRules";
+import type { PiIngestPipelineResult } from "./piIngestPipeline.ts";
+import type { NormalizedSensorReadingDraft } from "./sensorIngestNormalizationRules.ts";
 import {
   buildPiIngestInsertPlan,
   partitionAgainstExistingKeys,
   summarizeInsertPlanPartition,
   type PiIngestInsertPlanItem,
   type PiIngestInsertPartitionSummary,
-} from "./piIngestInsertPlanRules";
+} from "./piIngestInsertPlanRules.ts";
 
 // ----------------------------- Types -----------------------------
 

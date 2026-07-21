@@ -240,8 +240,11 @@ function rewriteMirrorSource(text, srcAbs) {
     const target = resolveSource(spec, srcAbs);
     if (!target) return null;
     if (!isMirrorable(target)) return null;
-    // If already a relative specifier, keep the original form.
-    if (spec.startsWith(".")) return null;
+    // Relative specifiers must still be rewritten so extensionless imports
+    // (e.g. "./foo") get a Deno-required ".ts" suffix via mirrorRelFromSource.
+    // If the spec already has an explicit extension AND resolves correctly,
+    // keep it; otherwise fall through to recompute.
+    if (spec.startsWith(".") && /\.(ts|tsx|js|mjs|cjs|json)$/.test(spec)) return null;
     const targetMirrorAbs = path.join(MIRROR_ABS, mirrorRelFromSource(target));
     let rel = toPosix(path.relative(path.dirname(fromMirrorAbs), targetMirrorAbs));
     if (!rel.startsWith(".")) rel = "./" + rel;

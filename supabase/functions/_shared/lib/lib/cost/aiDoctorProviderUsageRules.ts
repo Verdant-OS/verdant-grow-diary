@@ -17,7 +17,7 @@
  *  - Does not export raw responses, headers, request IDs, or secrets.
  */
 
-import { type ProviderReportedTokenUsage } from "./aiDoctorPromptMeasurement";
+import { type ProviderReportedTokenUsage } from "./aiDoctorPromptMeasurement.ts";
 
 export { type ProviderReportedTokenUsage };
 

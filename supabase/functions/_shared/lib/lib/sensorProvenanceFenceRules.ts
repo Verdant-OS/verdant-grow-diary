@@ -14,7 +14,7 @@
  * Raw payload is classification-only. Callers must strip it before returning
  * MCP content, persisting Quick Log details, or assembling model context.
  */
-import { isSensorTestbenchRow } from "./sensorTestbenchIndicatorRules";
+import { isSensorTestbenchRow } from "./sensorTestbenchIndicatorRules.ts";
 
 export interface SensorProvenanceRowLike {
   source?: string | null;

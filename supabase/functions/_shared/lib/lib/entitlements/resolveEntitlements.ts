@@ -25,10 +25,10 @@ import type {
   PlanId,
   ResolvedEntitlement,
   SubscriptionStatus,
-} from "./types";
-import { FREE_CAPABILITIES } from "./capabilities";
-import { PLAN_CATALOG, isKnownPlanId } from "./planCatalog";
-import { subscriptionGrantsAccess } from "../paddleSubscriptionAccessRules";
+} from "./types.ts";
+import { FREE_CAPABILITIES } from "./capabilities.ts";
+import { PLAN_CATALOG, isKnownPlanId } from "./planCatalog.ts";
+import { subscriptionGrantsAccess } from "../paddleSubscriptionAccessRules.ts";
 
 const KNOWN_STATUSES: ReadonlyArray<SubscriptionStatus> = [
   "active",

@@ -23,12 +23,12 @@ import {
   buildAiDoctorImportedHistoryPromptFragment,
   IMPORTED_HISTORY_PROMPT_STRINGS,
   AI_DOCTOR_REQUIRED_OUTPUT_SECTIONS,
-} from "./aiDoctorImportedHistoryPromptRules";
+} from "./aiDoctorImportedHistoryPromptRules.ts";
 import {
   buildValidatorSafeAiDoctorPromptValue,
   sanitizeAiDoctorPromptText,
-} from "./aiDoctorPromptVocabularyRules";
-import { stripAiDoctorReviewRequestTransportFields } from "./aiDoctorReviewRequestTransportRules";
+} from "./aiDoctorPromptVocabularyRules.ts";
+import { stripAiDoctorReviewRequestTransportFields } from "./aiDoctorReviewRequestTransportRules.ts";
 
 export const AI_DOCTOR_BASE_SYSTEM_PROMPT =
   "You are a cautious cannabis grow assistant. Reply ONLY through the " +

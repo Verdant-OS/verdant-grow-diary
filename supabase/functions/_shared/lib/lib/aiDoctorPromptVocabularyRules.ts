@@ -12,7 +12,7 @@
  * them without mutating the authoritative context packet.
  */
 
-import { AI_DOCTOR_REVIEW_BANNED_WORDS } from "./aiDoctorReviewResultContract";
+import { AI_DOCTOR_REVIEW_BANNED_WORDS } from "./aiDoctorReviewResultContract.ts";
 
 const SAFE_REPLACEMENTS: Readonly<Record<string, string>> = Object.freeze({
   confirmed: "supported",

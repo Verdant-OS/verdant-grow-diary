@@ -21,7 +21,7 @@
  *  - write before validation
  */
 
-import type { BridgeCredential } from "./piIngestAuthRules";
+import type { BridgeCredential } from "./piIngestAuthRules.ts";
 
 export type { BridgeCredential };
 

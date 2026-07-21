@@ -25,7 +25,7 @@ export {
   type RawHistoryFallbackState,
   type MeasurementStatus,
   type CostDomain,
-} from "./costDomains";
+} from "./costDomains.ts";
 
 export {
   buildAiDoctorPromptMeasurement,
@@ -34,6 +34,6 @@ export {
   type AiDoctorPromptMeasurementMetadata,
   type BuildAiDoctorPromptMeasurementInput,
   type ProviderReportedTokenUsage,
-} from "./aiDoctorPromptMeasurement";
+} from "./aiDoctorPromptMeasurement.ts";
 
-export { attachProviderResponseUsageToAiDoctorPromptMeasurement } from "./aiDoctorProviderResponseMeasurementComposer";
+export { attachProviderResponseUsageToAiDoctorPromptMeasurement } from "./aiDoctorProviderResponseMeasurementComposer.ts";

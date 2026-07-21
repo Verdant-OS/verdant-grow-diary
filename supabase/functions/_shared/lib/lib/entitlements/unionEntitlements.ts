@@ -19,8 +19,8 @@
  * Pure. No React, no Supabase, no fetch. Time is injected.
  */
 
-import type { BillingSubscriptionRow, PlanId } from "./types";
-import { subscriptionGrantsAccess } from "../paddleSubscriptionAccessRules";
+import type { BillingSubscriptionRow, PlanId } from "./types.ts";
+import { subscriptionGrantsAccess } from "../paddleSubscriptionAccessRules.ts";
 
 export type EntitlementSource =
   | "free"
@@ -96,13 +96,13 @@ export function pickStrongestBilling(
   return { row: null, source: "free" };
 }
 
-import { resolveEntitlements, type ResolveEntitlementsOptions } from "./resolveEntitlements";
-import type { ResolvedEntitlement } from "./types";
+import { resolveEntitlements, type ResolveEntitlementsOptions } from "./resolveEntitlements.ts";
+import type { ResolvedEntitlement } from "./types.ts";
 import {
   mapLovableSubscriptionRow,
   type LovableSubscriptionRow,
   type LovableBillingEnvironment,
-} from "./lovablePaddleAdapter";
+} from "./lovablePaddleAdapter.ts";
 
 export interface ResolveUnionInput {
   byoRow: BillingSubscriptionRow | null;

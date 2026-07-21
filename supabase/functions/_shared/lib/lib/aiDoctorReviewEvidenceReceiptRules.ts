@@ -11,8 +11,8 @@
  * prompt text or user-entered measurement values. An exact prompt fingerprint
  * is recorded separately by the server finalizer.
  */
-import type { AiDoctorReviewRequestPacket } from "./aiDoctorReviewRequestPacket";
-import { ROOT_ZONE_INVALID_FIELDS } from "./rootZoneObservationRules";
+import type { AiDoctorReviewRequestPacket } from "./aiDoctorReviewRequestPacket.ts";
+import { ROOT_ZONE_INVALID_FIELDS } from "./rootZoneObservationRules.ts";
 
 export const AI_DOCTOR_REVIEW_EVIDENCE_RECEIPT_SCHEMA_VERSION = 1 as const;
 export const AI_DOCTOR_REVIEW_EVIDENCE_RECEIPT_MAX_BYTES = 65_536;

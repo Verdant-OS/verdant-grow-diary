@@ -23,6 +23,7 @@ import SubscriberInterestForm from "@/components/SubscriberInterestForm";
 import {
   PRICING,
   AI_CREDIT_EXPLAINER,
+  CREDIT_PACKS,
   TRUST_STRIP,
   PRO_MONTHLY_PRICE_USD,
   PRO_ANNUAL_PRICE_USD,
@@ -197,6 +198,22 @@ export default function Pricing() {
       return;
     }
     void openCheckout({ priceId: planId });
+  }
+
+  // One-time AI credit-pack checkout. Packs are not plans, so this bypasses the
+  // plan-intent state and opens checkout for the pack SKU directly. Same
+  // canonical checkout hook — this stays inside Pricing.tsx (checkout ownership).
+  function handleBuyPack(sku: string) {
+    trackPricingEvent("pricing_cta_credit_pack_clicked", { source: "credit_pack", plan: sku });
+    if (checkoutRecoveryReason) {
+      trackPricingEvent("pricing_checkout_blocked", {
+        plan: sku,
+        source: "credit_pack",
+        reason: blockedReason ? "runtime_failure" : "environment_unavailable",
+      });
+      return;
+    }
+    void openCheckout({ priceId: sku });
   }
   usePageSeo({
     title: "Pricing — Free, Pro & Founder Lifetime | Verdant Grow Diary",
@@ -634,6 +651,46 @@ export default function Pricing() {
             ))}
           </ul>
           <p className="mt-4 text-xs text-muted-foreground italic">{AI_CREDIT_EXPLAINER.note}</p>
+        </div>
+      </section>
+
+      {/* Top up AI Doctor credits — one-time packs (the canonical checkout
+          surface for the out-of-credits buy-CTA elsewhere in the app). */}
+      <section
+        id="buy-credits"
+        data-testid="pricing-credit-packs"
+        className="px-6 pb-12 max-w-4xl mx-auto scroll-mt-24"
+      >
+        <h2 className="font-display text-2xl md:text-3xl font-semibold text-center">
+          Top up AI Doctor credits
+        </h2>
+        <p className="mt-3 text-sm text-muted-foreground text-center max-w-2xl mx-auto">
+          Out of monthly credits? Buy a one-time pack. Packs never expire and are spent only after
+          your included monthly allowance.
+        </p>
+        <div className="mt-8 grid gap-6 sm:grid-cols-2">
+          {CREDIT_PACKS.map((pack) => (
+            <div
+              key={pack.sku}
+              data-testid={`pricing-credit-pack-${pack.sku}`}
+              className="rounded-2xl border border-border/60 bg-card/40 backdrop-blur p-6 flex flex-col items-start min-w-0"
+            >
+              <p className="text-3xl md:text-4xl font-display font-bold">{pack.credits}</p>
+              <p className="text-sm text-muted-foreground">AI Doctor credits</p>
+              <p className="mt-3 text-2xl font-display font-semibold">${pack.priceUsd}</p>
+              <Button
+                size="lg"
+                className="mt-5 w-full h-auto min-h-11 whitespace-normal"
+                disabled={checkoutLoading}
+                data-testid={`pricing-cta-${pack.sku}`}
+                onClick={() => handleBuyPack(pack.sku)}
+              >
+                {checkoutRecoveryReason
+                  ? "Checkout unavailable"
+                  : `Buy ${pack.credits} credits — $${pack.priceUsd}`}
+              </Button>
+            </div>
+          ))}
         </div>
       </section>
 

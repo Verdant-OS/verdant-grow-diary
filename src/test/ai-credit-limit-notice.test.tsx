@@ -82,16 +82,29 @@ describe("AiCreditLimitNotice presenter", () => {
     );
   });
 
-  it("wait branch (pro_monthly) renders NO CTA link", () => {
+  it("wait branch (pro_monthly) renders a top-up link but NO upgrade/paywall CTA", () => {
     renderWithRouter(<AiCreditLimitNotice credit={denial("pro_monthly")} />);
     expect(screen.getByTestId("ai-credit-limit-notice")).toHaveAttribute("data-kind", "wait");
+    // A paid grower must NEVER see an upgrade prompt...
     expect(screen.queryByTestId("ai-credit-limit-notice-paywall-link")).toBeNull();
-    expect(screen.queryByRole("link")).toBeNull();
+    // ...but MAY buy a one-time top-up pack (routes to the canonical checkout).
+    const buyLink = screen.getByTestId("ai-credit-limit-notice-buy-credits");
+    expect(buyLink).toHaveAttribute("href", "/pricing#buy-credits");
   });
 
-  it("wait branch (founder_lifetime) renders NO CTA link", () => {
+  it("wait branch (founder_lifetime) renders a top-up link but NO upgrade/paywall CTA", () => {
     renderWithRouter(<AiCreditLimitNotice credit={denial("founder_lifetime")} />);
     expect(screen.queryByTestId("ai-credit-limit-notice-paywall-link")).toBeNull();
+    expect(screen.getByTestId("ai-credit-limit-notice-buy-credits")).toHaveAttribute(
+      "href",
+      "/pricing#buy-credits",
+    );
+  });
+
+  it("upsell (free) branch does NOT render the buy-credits top-up link", () => {
+    // Free growers get the upgrade path, not a pack top-up.
+    renderWithRouter(<AiCreditLimitNotice credit={denial("free")} />);
+    expect(screen.queryByTestId("ai-credit-limit-notice-buy-credits")).toBeNull();
   });
 
   it("unknown branch (null plan_id) renders NO CTA link", () => {
@@ -104,10 +117,7 @@ describe("AiCreditLimitNotice presenter", () => {
     entitlementLookup.failed = true;
     renderWithRouter(<AiCreditLimitNotice credit={denial("free")} />);
 
-    expect(screen.getByTestId("ai-credit-limit-notice")).toHaveAttribute(
-      "data-kind",
-      "unknown",
-    );
+    expect(screen.getByTestId("ai-credit-limit-notice")).toHaveAttribute("data-kind", "unknown");
     expect(screen.queryByRole("link")).toBeNull();
   });
 

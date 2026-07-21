@@ -625,6 +625,9 @@ Deno.serve(async (req) => {
       scope: spendObj.scope,
       scope_limit: spendObj.scope_limit,
       plan_id: spendObj.plan_id,
+      // Purchased pack balance (PR2 return field) so the badge can show it
+      // instead of reading "0 left" after a pack-funded review.
+      pack_balance: spendObj.pack_balance,
     });
   } catch {
     console.log("ai-doctor-review status=unexpected");

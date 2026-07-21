@@ -61,6 +61,7 @@ export type PricingAnalyticsName =
   | "pricing_cta_pro_annual_clicked"
   | "pricing_cta_craft_monthly_clicked"
   | "pricing_cta_craft_annual_clicked"
+  | "pricing_cta_credit_pack_clicked"
   | "pricing_cta_founder_lifetime_clicked"
   | "pricing_founder_details_clicked"
   | "pricing_faq_opened"

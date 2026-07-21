@@ -483,7 +483,112 @@ database — in a single command, with no audit-file side effects.
 Use it for fast local drift checks and as the "fast-fail" gate in CI
 before the heavier verifier runs.
 
+#### Local prerequisites
+
+Runtime:
+
+- **Node.js 20+** — the script is a plain ESM module, no build step.
+- **`psql`** on `PATH` — only required for the DB-diff mode; `--expected`
+  runs fully offline.
+  - macOS: `brew install libpq && brew link --force libpq`
+  - Debian/Ubuntu: `sudo apt-get install -y postgresql-client`
+  - Windows: install PostgreSQL and add its `bin/` to `PATH`, or use WSL.
+
+Environment variables:
+
+| Variable                | Required?                     | Purpose                                                                 |
+|-------------------------|-------------------------------|-------------------------------------------------------------------------|
+| `SUPABASE_DB_URL`       | Yes (diff mode)               | Direct Postgres connection string used by `psql`. Overrides `TARGET_ENV`. |
+| `TARGET_ENV`            | Optional                      | `sandbox` or `live`. When `SUPABASE_DB_URL` is unset, the script reads `SUPABASE_DB_URL_SANDBOX` or `SUPABASE_DB_URL_LIVE`. Also stamped into JSON/SARIF output as `target_env`. |
+| `SUPABASE_DB_URL_SANDBOX` / `SUPABASE_DB_URL_LIVE` | Optional | Convenience env-selected URLs used with `TARGET_ENV`.                    |
+
+The connection string must be the **direct** Postgres URL for the target
+project (usually `postgres://postgres:<PASSWORD>@db.<REF>.supabase.co:5432/postgres`),
+not the PostgREST/API URL. Never commit it — export it in your shell or
+load from a local `.env` that is gitignored.
+
+#### Sample expected-prefixes file
+
+Piping `--expected --json` to a file gives you a small, reviewable
+snapshot of every 14-digit prefix the extractor currently expects. Keep
+one under `audit/expected/` when reviewing a PR that touches the
+required-money-migrations manifest.
+
+`audit/expected/expected-prefixes.sample.json`:
+
+```json
+{
+  "target_env": "sandbox",
+  "expected": [
+    { "file": "supabase/migrations/20260615120000_ai_credit_spend.sql",       "version": "20260615120000" },
+    { "file": "supabase/migrations/20260615123000_ai_credit_spend_rls.sql",   "version": "20260615123000" },
+    { "file": "supabase/migrations/20260616090000_referrals_schema.sql",      "version": "20260616090000" },
+    { "file": "supabase/migrations/20260616093000_referrals_rls.sql",         "version": "20260616093000" }
+  ],
+  "malformed": []
+}
+```
+
+The plain-text form (`--expected` without `--json`) is the same data,
+one prefix + filename per line, suitable for `diff` / `comm`.
+
+#### Worked example
+
+End-to-end local run against sandbox, capturing both human and machine
+output:
+
+```bash
+# 1) Export the sandbox DB URL for this shell session.
+export SUPABASE_DB_URL="postgres://postgres:${SANDBOX_DB_PASSWORD}@db.knkwiiywfkbqznbxwqfh.supabase.co:5432/postgres"
+export TARGET_ENV=sandbox
+
+# 2) Snapshot expected prefixes offline (no DB call).
+mkdir -p audit/expected
+node scripts/diff-money-migration-prefixes.mjs --expected \
+  > audit/expected/expected-prefixes.txt
+node scripts/diff-money-migration-prefixes.mjs --expected --json \
+  > audit/expected/expected-prefixes.json
+
+# 3) Run the actual diff and keep both formats.
+node scripts/diff-money-migration-prefixes.mjs \
+  | tee audit/expected/prefix-diff.txt
+node scripts/diff-money-migration-prefixes.mjs --json \
+  > audit/expected/prefix-diff.json
+echo "exit=$?"
+```
+
+Expected clean-run output (truncated):
+
+```text
+Expected: 12   Applied: 12   Missing: 0
+
+20260615120000  20260615120000  OK       supabase/migrations/20260615120000_ai_credit_spend.sql
+...
+✓ All required migrations present in sandbox.
+exit=0
+```
+
+Drift example (one required migration missing locally):
+
+```text
+Expected: 12   Applied: 11   Missing: 1
+
+20260615120000  20260615120000  OK       supabase/migrations/20260615120000_ai_credit_spend.sql
+20260714120000                  MISSING  supabase/migrations/20260714120000_referral_conversion_fix.sql
+...
+✗ 1 required migration(s) not applied in sandbox. Do NOT deploy.
+exit=1
+```
+
+Quick one-liner to see just the missing files from JSON:
+
+```bash
+node scripts/diff-money-migration-prefixes.mjs --json \
+  | jq -r '.missing[] | "\(.version)  \(.file)"'
+```
+
 #### Common invocations
+
 
 ```bash
 # 1) Full diff: expected (manifest) vs. actual (target DB).

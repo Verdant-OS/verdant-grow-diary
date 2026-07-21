@@ -472,4 +472,73 @@ comm -13 <(sort -u /tmp/expected-versions.txt) <(sort -u /tmp/applied-versions.t
 The guard itself uses the same `SELECT` and comparison; these commands
 just let you eyeball the two sides independently.
 
+### One-shot prefix diff CLI (`diff-money-migration-prefixes.mjs`)
+
+`scripts/diff-money-migration-prefixes.mjs` is a lightweight companion
+to the applied-check. It dumps the extractor's expected 14-digit
+prefixes from the required-money-migrations manifest and (optionally)
+diffs them against `supabase_migrations.schema_migrations` in a target
+database — in a single command, with no audit-file side effects.
+
+Use it for fast local drift checks and as the "fast-fail" gate in CI
+before the heavier verifier runs.
+
+#### Common invocations
+
+```bash
+# 1) Full diff: expected (manifest) vs. actual (target DB).
+#    Requires SUPABASE_DB_URL (or SUPABASE_DB_URL_SANDBOX /
+#    SUPABASE_DB_URL_LIVE selected via TARGET_ENV=sandbox|live).
+node scripts/diff-money-migration-prefixes.mjs
+
+# 2) Manifest-only dump (offline, no DB needed) — useful for reviewing
+#    which 14-digit prefixes the extractor currently expects.
+node scripts/diff-money-migration-prefixes.mjs --expected
+
+# 3) Machine-readable JSON output — pipe into jq, CI summaries, or
+#    downstream tooling. Works with or without --expected.
+node scripts/diff-money-migration-prefixes.mjs --json
+node scripts/diff-money-migration-prefixes.mjs --expected --json
+
+# 4) Point at a specific DB without exporting env vars.
+SUPABASE_DB_URL="postgres://..." \
+  node scripts/diff-money-migration-prefixes.mjs
+
+# 5) Select the CI-style env explicitly.
+TARGET_ENV=live node scripts/diff-money-migration-prefixes.mjs
+```
+
+#### Interpreting `--json` output
+
+The JSON payload is stable and safe to parse:
+
+```json
+{
+  "mode": "diff",              // "diff" | "expected-only"
+  "target": "live",            // "sandbox" | "live" | "custom" | null
+  "expected": ["20260101000000", "..."],
+  "applied":  ["20260101000000", "..."],   // omitted in --expected mode
+  "missing":  ["20260714120000"],          // required but NOT applied
+  "unexpected": ["20260101999999"],        // applied but NOT required (informational)
+  "ok": false
+}
+```
+
+`missing` is the only field that drives the exit code. `unexpected` is
+expected to be non-empty in real projects and is reported for context
+only.
+
+#### Exit codes
+
+| Code | Meaning                                                              |
+|------|----------------------------------------------------------------------|
+| `0`  | OK — every required prefix is present in the target DB (or `--expected` succeeded). |
+| `1`  | Drift — at least one required prefix is missing. **Do not deploy.**  |
+| `2`  | Failure — no DB URL, `psql` missing, tracker query failed, or a required file has a malformed 14-digit prefix. |
+
+Treat `2` the same as `1` for gating: the check could not complete, so
+the target's state is unknown.
+
+
+
 

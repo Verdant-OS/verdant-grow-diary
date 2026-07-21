@@ -23,7 +23,9 @@
  * (client clears pending state); non-terminal failures are retryable.
  */
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { resolveRequiredServerBillingEnvironment } from "../_shared/unionEntitlementLookup.ts";
+// Self-contained twin of the resolver in _shared/unionEntitlementLookup.ts —
+// this function must bundle from supabase/functions/** alone (Lovable deploy).
+import { resolveRequiredServerBillingEnvironment } from "../_shared/serverBillingEnvironment.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

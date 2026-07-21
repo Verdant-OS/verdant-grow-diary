@@ -493,6 +493,7 @@ const App = () => (
                       />
                       <Route path="/operator/demo-preview" element={<OperatorDemoPreview />} />
                       <Route path="/operator/support-inbox" element={<OperatorSupportInbox />} />
+                      <Route path="/operator/credits-audit" element={<OperatorCreditsAudit />} />
                       <Route path="/operator/release-readiness" element={<ReleaseReadiness />} />
                       {/* Diagnostics Audience Split v1 — /diagnostics is an
                           operator-only RLS / round-trip / DevOps surface; manifest

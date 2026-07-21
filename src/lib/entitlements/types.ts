@@ -5,7 +5,13 @@
  * No checkout, no webhook, no UI gating, no server enforcement yet.
  */
 
-export type PlanId = "free" | "pro_monthly" | "pro_annual" | "founder_lifetime";
+export type PlanId =
+  | "free"
+  | "pro_monthly"
+  | "pro_annual"
+  | "craft_monthly"
+  | "craft_annual"
+  | "founder_lifetime";
 
 export type SubscriptionStatus =
   | "active"
@@ -46,6 +52,8 @@ export interface Capabilities {
   multiTent: boolean;
   sensorHistoryDays: number | null; // null = unlimited
   prioritySupport: boolean;
+  /** Pro Blueprint overlay (per-stage SOP scoring). Craft-exclusive + Founder. */
+  blueprint: boolean;
 }
 
 /**

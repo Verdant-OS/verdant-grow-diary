@@ -15,7 +15,12 @@
 
 export type PricingBillingPeriod = "monthly" | "annual";
 
-export type PricingPreselectPlan = "pro_monthly" | "pro_annual" | "founder_lifetime";
+export type PricingPreselectPlan =
+  | "pro_monthly"
+  | "pro_annual"
+  | "craft_monthly"
+  | "craft_annual"
+  | "founder_lifetime";
 
 export interface PricingPlanPreselect {
   /** Canonical plan id chosen by the query param, or `null` when absent/unknown. */
@@ -35,6 +40,8 @@ export interface PricingPlanPreselect {
 const PLAN_PARAM_MAP: Readonly<Record<string, PricingPreselectPlan>> = Object.freeze({
   pro_monthly: "pro_monthly",
   pro_annual: "pro_annual",
+  craft_monthly: "craft_monthly",
+  craft_annual: "craft_annual",
   founder_lifetime: "founder_lifetime",
 });
 
@@ -42,6 +49,8 @@ const BILLING_FOR_PLAN: Readonly<Record<PricingPreselectPlan, PricingBillingPeri
   Object.freeze({
     pro_monthly: "monthly",
     pro_annual: "annual",
+    craft_monthly: "monthly",
+    craft_annual: "annual",
     founder_lifetime: null,
   });
 
@@ -58,5 +67,11 @@ export function resolvePricingPlanPreselect(
 
 /** Type-guard used by tests / callers that need the paid preselect subset. */
 export function isPreselectPlanId(value: unknown): value is PricingPreselectPlan {
-  return value === "pro_monthly" || value === "pro_annual" || value === "founder_lifetime";
+  return (
+    value === "pro_monthly" ||
+    value === "pro_annual" ||
+    value === "craft_monthly" ||
+    value === "craft_annual" ||
+    value === "founder_lifetime"
+  );
 }

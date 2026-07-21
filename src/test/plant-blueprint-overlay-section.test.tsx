@@ -24,9 +24,10 @@ vi.mock("@/hooks/useRootZoneObservations", () => ({
 import { PlantBlueprintOverlaySection } from "@/components/PlantBlueprintOverlaySection";
 import { EMPTY_SNAPSHOT } from "@/lib/sensorSnapshot";
 
-function entitlement(liveSensors: boolean, extra: Record<string, unknown> = {}) {
+function entitlement(blueprint: boolean, extra: Record<string, unknown> = {}) {
   return {
-    entitlement: { isActive: true, capabilities: { liveSensors } },
+    // Blueprint is Craft-exclusive: the gate checks the `blueprint` capability.
+    entitlement: { isActive: true, capabilities: { blueprint } },
     loading: false,
     lookupFailed: false,
     ...extra,
@@ -47,7 +48,7 @@ beforeEach(() => {
 });
 
 describe("PlantBlueprintOverlaySection", () => {
-  it("renders the overlay for a Pro grower (liveSensors capability)", () => {
+  it("renders the overlay for a Craft grower (blueprint capability)", () => {
     entitlementsMock.mockReturnValue(entitlement(true));
     renderSection();
     expect(screen.getByTestId("pro-blueprint-overlay")).toBeTruthy();

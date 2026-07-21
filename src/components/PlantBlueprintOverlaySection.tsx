@@ -39,7 +39,7 @@ export interface PlantBlueprintOverlaySectionProps {
 
 const PAYWALL_VM = buildPaywallCtaViewModel({
   featureTitle: "Pro Blueprint",
-  requiredPlanLabel: "Pro",
+  requiredPlanLabel: "Craft",
   unlockBullets: [
     "Score each reading green, amber or red against pro stage targets",
     "Per-stage VPD, temperature, humidity, EC, pH and light bands",
@@ -57,7 +57,7 @@ export function PlantBlueprintOverlaySection({
 }: PlantBlueprintOverlaySectionProps) {
   // Hooks are called unconditionally (React rules), before any early return.
   const { entitlement, loading: entLoading, lookupFailed } = useMyEntitlements();
-  const unlocked = !lookupFailed && canUseCapability(entitlement, "liveSensors");
+  const unlocked = !lookupFailed && canUseCapability(entitlement, "blueprint");
   const snapState = useLatestSensorSnapshot(growId, tentId ? [tentId] : []);
   // Only fetch feeding history once unlocked — free growers see the paywall.
   const { observations } = useRootZoneObservations(

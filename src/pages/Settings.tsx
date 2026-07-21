@@ -16,13 +16,11 @@ import { Input } from "@/components/ui/input";
 import { useOpenCustomerPortalState } from "@/lib/customerPortal";
 import { usePaddleCancelNotice } from "@/hooks/usePaddleCancelNotice";
 
-import {
-  DELETE_ACCOUNT_CONFIRMATION,
-  requestAccountDeletion,
-} from "@/lib/accountDeletion";
+import { DELETE_ACCOUNT_CONFIRMATION, requestAccountDeletion } from "@/lib/accountDeletion";
 import { useAuth } from "@/store/auth";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import AccountPlanBadge from "@/components/AccountPlanBadge";
+import RewardedReferralCard from "@/components/RewardedReferralCard";
 import { PRICING_TIERS } from "@/config/pricing";
 import {
   describeSettingsTile,
@@ -46,7 +44,6 @@ import {
   clearTemperatureUnitPreference,
 } from "@/lib/temperatureUnitPreference";
 
-
 interface TileProps {
   name: string;
   state: SettingsTileState;
@@ -64,7 +61,11 @@ function Tile({ name, state, children }: TileProps) {
     >
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3 gap-2">
         <h2 className="font-display font-semibold">{name}</h2>
-        <Badge variant={badge.variant} data-testid="settings-tile-badge" className="self-start sm:self-auto shrink-0">
+        <Badge
+          variant={badge.variant}
+          data-testid="settings-tile-badge"
+          className="self-start sm:self-auto shrink-0"
+        >
           {badge.label}
         </Badge>
       </div>
@@ -106,10 +107,7 @@ function StartScreenTile({ userId }: { userId: string }) {
       >
         <legend className="sr-only">Start screen</legend>
         {START_SCREEN_OPTIONS.map((opt) => (
-          <label
-            key={opt.key}
-            className="flex items-start gap-2 text-sm cursor-pointer"
-          >
+          <label key={opt.key} className="flex items-start gap-2 text-sm cursor-pointer">
             <input
               type="radio"
               name="start-screen"
@@ -126,32 +124,19 @@ function StartScreenTile({ userId }: { userId: string }) {
               <span className="font-medium">
                 {opt.label}
                 {opt.recommended ? (
-                  <span className="ml-2 text-xs text-muted-foreground">
-                    (recommended)
-                  </span>
+                  <span className="ml-2 text-xs text-muted-foreground">(recommended)</span>
                 ) : null}
               </span>
-              <span className="block text-xs text-muted-foreground">
-                {opt.description}
-              </span>
+              <span className="block text-xs text-muted-foreground">{opt.description}</span>
             </span>
           </label>
         ))}
       </fieldset>
       <div className="flex flex-wrap gap-2 mt-3">
-        <Button
-          size="sm"
-          onClick={onSave}
-          data-testid="start-screen-save"
-        >
+        <Button size="sm" onClick={onSave} data-testid="start-screen-save">
           Save
         </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={onReset}
-          data-testid="start-screen-reset"
-        >
+        <Button size="sm" variant="outline" onClick={onReset} data-testid="start-screen-reset">
           Use diary-first default
         </Button>
       </div>
@@ -170,9 +155,7 @@ function StartScreenTile({ userId }: { userId: string }) {
 }
 
 function TemperatureUnitTile() {
-  const [choice, setChoice] = useState<TemperatureUnitPreference>(
-    DEFAULT_TEMPERATURE_UNIT,
-  );
+  const [choice, setChoice] = useState<TemperatureUnitPreference>(DEFAULT_TEMPERATURE_UNIT);
   const [saved, setSaved] = useState<string | null>(null);
 
   useEffect(() => {
@@ -191,12 +174,8 @@ function TemperatureUnitTile() {
 
   return (
     <Tile name="Units" state="available">
-      <p className="text-sm text-muted-foreground mb-1">
-        Display temperature as
-      </p>
-      <p className="text-xs text-muted-foreground mb-3">
-        Stored sensor values are unchanged.
-      </p>
+      <p className="text-sm text-muted-foreground mb-1">Display temperature as</p>
+      <p className="text-xs text-muted-foreground mb-3">Stored sensor values are unchanged.</p>
       <fieldset
         className="grid gap-2"
         aria-label="Display temperature unit"
@@ -204,10 +183,7 @@ function TemperatureUnitTile() {
       >
         <legend className="sr-only">Display temperature unit</legend>
         {TEMPERATURE_UNIT_OPTIONS.map((opt) => (
-          <label
-            key={opt.key}
-            className="flex items-start gap-2 text-sm cursor-pointer"
-          >
+          <label key={opt.key} className="flex items-start gap-2 text-sm cursor-pointer">
             <input
               type="radio"
               name="temperature-unit"
@@ -224,14 +200,10 @@ function TemperatureUnitTile() {
               <span className="font-medium">
                 {opt.label}
                 {opt.recommended ? (
-                  <span className="ml-2 text-xs text-muted-foreground">
-                    (default)
-                  </span>
+                  <span className="ml-2 text-xs text-muted-foreground">(default)</span>
                 ) : null}
               </span>
-              <span className="block text-xs text-muted-foreground">
-                {opt.description}
-              </span>
+              <span className="block text-xs text-muted-foreground">{opt.description}</span>
             </span>
           </label>
         ))}
@@ -245,12 +217,7 @@ function TemperatureUnitTile() {
         >
           Save
         </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={onReset}
-          data-testid="temperature-unit-reset"
-        >
+        <Button size="sm" variant="outline" onClick={onReset} data-testid="temperature-unit-reset">
           Use Fahrenheit default
         </Button>
       </div>
@@ -279,20 +246,25 @@ function TemperatureUnitTile() {
  */
 function SubscriptionTile() {
   const { loading, lookupFailed, entitlement, refetch } = useMyEntitlements();
-  const { opening, error: portalError, open: openPortal, clearError } = useOpenCustomerPortalState();
+  const {
+    opening,
+    error: portalError,
+    open: openPortal,
+    clearError,
+  } = useOpenCustomerPortalState();
   const cancelNotice = usePaddleCancelNotice();
 
   const planId = lookupFailed ? null : (entitlement?.displayPlanId ?? null);
 
-  const tier = planId ? PRICING_TIERS.find((t) => t.id === planId) ?? null : null;
+  const tier = planId ? (PRICING_TIERS.find((t) => t.id === planId) ?? null) : null;
 
   const label = loading
     ? "Loading…"
     : lookupFailed
       ? "Plan status unavailable"
-    : tier
-      ? tier.name
-      : "Plan status unavailable";
+      : tier
+        ? tier.name
+        : "Plan status unavailable";
 
   const isFree = !loading && !lookupFailed && (planId === "free" || (!tier && !planId));
   const isPaid = !loading && !lookupFailed && !!tier && planId !== "free";
@@ -310,10 +282,7 @@ function SubscriptionTile() {
         <div>
           <p className="text-sm flex items-center gap-2 flex-wrap">
             <span>Current plan:</span>
-            <span
-              className="font-medium text-foreground"
-              data-testid="settings-subscription-plan"
-            >
+            <span className="font-medium text-foreground" data-testid="settings-subscription-plan">
               {label}
             </span>
             {!lookupFailed && <AccountPlanBadge entitlement={entitlement} loading={loading} />}
@@ -327,10 +296,7 @@ function SubscriptionTile() {
             </p>
           )}
           {entitlement?.status === "past_due" && (
-            <p
-              className="text-xs text-amber-700 mt-1"
-              data-testid="settings-subscription-past-due"
-            >
+            <p className="text-xs text-amber-700 mt-1" data-testid="settings-subscription-past-due">
               Payment retry in progress — update your payment method to avoid interruption.
             </p>
           )}
@@ -352,8 +318,8 @@ function SubscriptionTile() {
 
           {!loading && !tier && (
             <p className="text-xs text-muted-foreground">
-              We couldn't determine your plan right now. Your grow data is safe
-              — try refreshing in a moment.
+              We couldn't determine your plan right now. Your grow data is safe — try refreshing in
+              a moment.
             </p>
           )}
           {!loading && lookupFailed && (
@@ -384,11 +350,7 @@ function SubscriptionTile() {
 
       <div className="flex flex-wrap gap-2 mt-3">
         {isFree && (
-          <Button
-            asChild
-            size="sm"
-            data-testid="settings-subscription-upgrade"
-          >
+          <Button asChild size="sm" data-testid="settings-subscription-upgrade">
             <Link to="/pricing">Upgrade to Pro</Link>
           </Button>
         )}
@@ -426,8 +388,8 @@ function SubscriptionTile() {
 
       {isPaid && !isLifetime ? (
         <p className="text-[11px] text-muted-foreground mt-2">
-          Cancel, change payment method, or download invoices in the Paddle
-          customer portal. Opens in a new tab.
+          Cancel, change payment method, or download invoices in the Paddle customer portal. Opens
+          in a new tab.
         </p>
       ) : null}
     </Tile>
@@ -468,8 +430,7 @@ function DeleteAccountTile() {
   return (
     <Tile name="Delete account" state="available">
       <p className="text-sm text-muted-foreground mb-3">
-        Permanently delete your Verdant account and all associated grow data.
-        This cannot be undone.
+        Permanently delete your Verdant account and all associated grow data. This cannot be undone.
       </p>
       <Button
         size="sm"
@@ -494,16 +455,15 @@ function DeleteAccountTile() {
           <DialogHeader>
             <DialogTitle>Delete your Verdant account?</DialogTitle>
             <DialogDescription>
-              This permanently deletes your account, grows, tents, plants,
-              diary entries, photos, and sensor snapshots. This cannot be
-              undone. Any recurring Paddle subscription is canceled
-              immediately before deletion. Deletion does not automatically
-              issue a refund.
+              This permanently deletes your account, grows, tents, plants, diary entries, photos,
+              and sensor snapshots. This cannot be undone. Any recurring Paddle subscription is
+              canceled immediately before deletion. Deletion does not automatically issue a refund.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-2 py-2">
             <label htmlFor="delete-confirm" className="text-xs text-muted-foreground">
-              Type <span className="font-mono font-semibold text-foreground">DELETE</span> to confirm.
+              Type <span className="font-mono font-semibold text-foreground">DELETE</span> to
+              confirm.
             </label>
             <Input
               id="delete-confirm"
@@ -544,7 +504,6 @@ function DeleteAccountTile() {
   );
 }
 
-
 export default function Settings() {
   const { user, signOut } = useAuth();
   const integrations = ["Spider Farmer", "AC Infinity", "Vivosun", "Raspberry Pi 5"];
@@ -578,13 +537,14 @@ export default function Settings() {
 
         <SubscriptionTile />
 
+        <Tile name="Refer a friend" state="available">
+          <RewardedReferralCard />
+        </Tile>
+
         <TemperatureUnitTile />
 
-
         <Tile name="Notifications" state="coming_soon">
-          <p className="text-sm text-muted-foreground">
-            Critical alerts only · Email + in-app
-          </p>
+          <p className="text-sm text-muted-foreground">Critical alerts only · Email + in-app</p>
         </Tile>
 
         <Tile name="Integrations" state="disabled">
@@ -602,9 +562,9 @@ export default function Settings() {
 
         <Tile name="Agent integrations" state="available">
           <p className="text-sm text-muted-foreground mb-3">
-            Connect ChatGPT, Claude, or another MCP-capable assistant. Read-only
-            access to your grows, recent diary entries, and latest sensor
-            snapshots — never writes, AI Doctor runs, or device control.
+            Connect ChatGPT, Claude, or another MCP-capable assistant. Read-only access to your
+            grows, recent diary entries, and latest sensor snapshots — never writes, AI Doctor runs,
+            or device control.
           </p>
           <Button asChild size="sm" data-testid="agent-integrations-link">
             <Link to="/settings/agent-integrations">Open agent integrations</Link>

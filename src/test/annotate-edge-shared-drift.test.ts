@@ -104,7 +104,7 @@ describe("escapeWorkflowCommand", () => {
 });
 
 describe("formatAnnotation", () => {
-  it("emits ::error file=...,line=1,col=1,title=...::message", () => {
+  it("defaults to line=1,col=1 when the finding has no location", () => {
     const line = formatAnnotation({
       file: "supabase/functions/_shared/lib/foo.ts",
       title: "Edge mirror drift",
@@ -113,6 +113,28 @@ describe("formatAnnotation", () => {
     expect(line).toBe(
       "::error file=supabase/functions/_shared/lib/foo.ts,line=1,col=1,title=Edge mirror drift::foo.ts does not match its src/ origin.",
     );
+  });
+
+  it("uses finding.line / finding.col when provided", () => {
+    const line = formatAnnotation({
+      file: "a.ts",
+      title: "t",
+      message: "m",
+      line: 42,
+      col: 7,
+    });
+    expect(line).toBe("::error file=a.ts,line=42,col=7,title=t::m");
+  });
+
+  it("ignores non-integer or non-positive line/col values", () => {
+    const line = formatAnnotation({
+      file: "a.ts",
+      title: "t",
+      message: "m",
+      line: 0,
+      col: -3,
+    });
+    expect(line).toBe("::error file=a.ts,line=1,col=1,title=t::m");
   });
 
   it("escapes newlines in the message so a multi-line message stays on one annotation", () => {
@@ -124,6 +146,7 @@ describe("formatAnnotation", () => {
     expect(line).toBe("::error file=a.ts,line=1,col=1,title=t::line1%0Aline2");
   });
 });
+
 
 describe("collectFindings", () => {
   it("parses a full checker stderr block covering every drift shape", () => {

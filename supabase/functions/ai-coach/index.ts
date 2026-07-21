@@ -4,8 +4,8 @@ import {
   resolveQuickLogSensorSnapshotForAi,
   type QuickLogSensorAcquisitionRow,
 } from "../_shared/lib/lib/quick-log/quickLogSensorSnapshotAcquisitionRules.ts";
-import { buildAiSensorSnapshotContext } from "./sensorSnapshotContextRules.ts";
-import { pickLatestSensorSnapshotEvidenceByCapturedAt } from "./latestSensorSnapshot.ts";
+import { buildAiSensorSnapshotContext } from "../_shared/lib/lib/aiSensorSnapshotContextRules.ts";
+import { pickLatestSensorSnapshotEvidenceByCapturedAt } from "../_shared/lib/lib/aiCoachLatestSensorSnapshot.ts";
 import { resolveRequiredServerBillingEnvironment } from "../_shared/unionEntitlementLookup.ts";
 import { isMissingAiCreditRpcOverload } from "../_shared/aiCreditRpcCompatibility.ts";
 

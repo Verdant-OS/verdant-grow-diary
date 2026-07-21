@@ -3297,24 +3297,47 @@ export type Database = {
         }
         Returns: string
       }
-      ai_credit_refund: {
-        Args: {
-          p_idempotency_key: string
-          p_reason?: string
-          p_spend_id: string
-        }
-        Returns: Json
-      }
-      ai_credit_spend: {
-        Args: {
-          p_feature: string
-          p_grow_id: string
-          p_idempotency_key: string
-          p_model_tier: string
-          p_result?: Json
-        }
-        Returns: Json
-      }
+      ai_credit_refund:
+        | {
+            Args: {
+              p_expected_user_id: string
+              p_idempotency_key: string
+              p_reason?: string
+              p_spend_id: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_idempotency_key: string
+              p_reason?: string
+              p_spend_id: string
+            }
+            Returns: Json
+          }
+      ai_credit_spend:
+        | {
+            Args: {
+              p_feature: string
+              p_grow_id: string
+              p_idempotency_key: string
+              p_model_tier: string
+              p_result?: Json
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_billing_environment: string
+              p_feature: string
+              p_grow_id: string
+              p_idempotency_key: string
+              p_model_tier: string
+              p_result?: Json
+              p_user_id: string
+            }
+            Returns: Json
+          }
       allocate_lovable_founder_lifetime: {
         Args: {
           p_environment: string

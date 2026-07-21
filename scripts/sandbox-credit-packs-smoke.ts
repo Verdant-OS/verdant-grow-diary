@@ -469,6 +469,10 @@ async function checkReferralConversion(userId: string, env: Environment): Promis
 async function main() {
   const { user, env } = parseArgs(process.argv.slice(2));
 
+  if (checkpointDir) {
+    mkdirSync(checkpointDir, { recursive: true });
+  }
+
   // Preflight: psql is reachable.
   if (!process.env.PGHOST && !process.env.SUPABASE_DB_URL) {
     console.error("Neither PGHOST nor SUPABASE_DB_URL is set — cannot reach the database.");
@@ -495,6 +499,8 @@ async function main() {
   await checkOverflowSpend(resolved.id, env);
   console.log("");
   await checkReferralConversion(resolved.id, env);
+
+  finalizeCheckpoints();
 
   const pass = results.filter((r) => r.status === "pass").length;
   const fail = results.filter((r) => r.status === "fail").length;

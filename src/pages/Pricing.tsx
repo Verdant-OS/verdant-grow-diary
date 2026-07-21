@@ -26,6 +26,8 @@ import {
   TRUST_STRIP,
   PRO_MONTHLY_PRICE_USD,
   PRO_ANNUAL_PRICE_USD,
+  CRAFT_MONTHLY_PRICE_USD,
+  CRAFT_ANNUAL_PRICE_USD,
   FOUNDER_LIFETIME_PRICE_USD,
   FOUNDER_LIFETIME_LIMIT,
 } from "@/constants/pricing";
@@ -51,31 +53,98 @@ import { useFounderSlotsRemaining } from "@/hooks/useFounderSlotsRemaining";
 type BillingPeriod = "monthly" | "annual";
 
 type Cell = boolean | string;
-type Row = { label: string; free: Cell; pro: Cell; founder: Cell };
+type Row = { label: string; free: Cell; pro: Cell; craft: Cell; founder: Cell };
 
 const COMPARISON_ROWS: Row[] = [
   {
     label: "Best for",
     free: "Starting a grow diary",
     pro: "Active growers who want sync, history & exports",
+    craft: "Craft growers dialing in every run against an SOP",
     founder: "Early supporters who want lifetime Pro access",
   },
-  { label: "Price", free: "$0", pro: "See toggle above", founder: "$129 one-time" },
-  { label: "Plant profiles & grow diary", free: true, pro: true, founder: true },
-  { label: "Photo logs", free: true, pro: true, founder: true },
-  { label: "Manual sensor snapshots", free: true, pro: true, founder: true },
-  { label: "Timeline history", free: "Basic", pro: "Extended", founder: "Extended" },
-  { label: "Cultivation calendar (history-aware)", free: true, pro: true, founder: true },
-  { label: "Date-range diary report (Print / Save PDF)", free: false, pro: true, founder: true },
-  { label: "Multi-tent support", free: false, pro: true, founder: true },
-  { label: "Exports", free: "Limited", pro: "Advanced", founder: "Advanced" },
-  { label: "Post-Grow Learning Report (Print / Save PDF)", free: false, pro: true, founder: true },
-  { label: "CSV sensor import (source-labeled)", free: true, pro: true, founder: true },
-  { label: "Sensor snapshot history", free: false, pro: true, founder: true },
-  { label: "Better timeline filtering", free: false, pro: true, founder: true },
-  { label: "Priority support", free: false, pro: true, founder: true },
-  { label: "Future Pro features as they stabilize", free: false, pro: true, founder: true },
-  { label: "Founder badge / early-supporter access", free: false, pro: false, founder: true },
+  {
+    label: "Price",
+    free: "$0",
+    pro: "See toggle above",
+    craft: "See toggle above",
+    founder: "$129 one-time",
+  },
+  {
+    label: "AI Doctor credits",
+    free: "3 / grow",
+    pro: "100 / month",
+    craft: "300 / month",
+    founder: "100 / month",
+  },
+  {
+    // Label intentionally drops the "Pro" prefix used by the product name
+    // (PRICING.craft: "Pro Blueprint"): in a table with a Pro column, a row
+    // called "Pro Blueprint" marked "Not included" under Pro reads as a
+    // contradiction. The capability is Craft + Founder only.
+    label: "Blueprint (live SOP scoring)",
+    free: false,
+    pro: false,
+    craft: true,
+    founder: true,
+  },
+  { label: "Plant profiles & grow diary", free: true, pro: true, craft: true, founder: true },
+  { label: "Photo logs", free: true, pro: true, craft: true, founder: true },
+  { label: "Manual sensor snapshots", free: true, pro: true, craft: true, founder: true },
+  {
+    label: "Timeline history",
+    free: "Basic",
+    pro: "Extended",
+    craft: "Extended",
+    founder: "Extended",
+  },
+  {
+    label: "Cultivation calendar (history-aware)",
+    free: true,
+    pro: true,
+    craft: true,
+    founder: true,
+  },
+  {
+    label: "Date-range diary report (Print / Save PDF)",
+    free: false,
+    pro: true,
+    craft: true,
+    founder: true,
+  },
+  { label: "Multi-tent support", free: false, pro: true, craft: true, founder: true },
+  { label: "Exports", free: "Limited", pro: "Advanced", craft: "Advanced", founder: "Advanced" },
+  {
+    label: "Post-Grow Learning Report (Print / Save PDF)",
+    free: false,
+    pro: true,
+    craft: true,
+    founder: true,
+  },
+  {
+    label: "CSV sensor import (source-labeled)",
+    free: true,
+    pro: true,
+    craft: true,
+    founder: true,
+  },
+  { label: "Sensor snapshot history", free: false, pro: true, craft: true, founder: true },
+  { label: "Better timeline filtering", free: false, pro: true, craft: true, founder: true },
+  { label: "Priority support", free: false, pro: true, craft: true, founder: true },
+  {
+    label: "Future Pro features as they stabilize",
+    free: false,
+    pro: true,
+    craft: true,
+    founder: true,
+  },
+  {
+    label: "Founder badge / early-supporter access",
+    free: false,
+    pro: false,
+    craft: false,
+    founder: true,
+  },
 ];
 
 export default function Pricing() {
@@ -264,6 +333,14 @@ export default function Pricing() {
       ? `~${PRICING.pro.annualSavingsPercent}% savings vs. monthly`
       : `Or $${PRO_ANNUAL_PRICE_USD}/year — save ~${PRICING.pro.annualSavingsPercent}%`;
 
+  const craftPrice =
+    billing === "annual" ? `$${CRAFT_ANNUAL_PRICE_USD}` : `$${CRAFT_MONTHLY_PRICE_USD}`;
+  const craftCadence = billing === "annual" ? "/ year" : "/ month";
+  const craftFootnote =
+    billing === "annual"
+      ? `~${PRICING.craft.annualSavingsPercent}% savings vs. monthly`
+      : `Or $${CRAFT_ANNUAL_PRICE_USD}/year — save ~${PRICING.craft.annualSavingsPercent}%`;
+
   return (
     <main
       className="min-h-screen bg-background text-foreground"
@@ -358,7 +435,7 @@ export default function Pricing() {
       </section>
 
       {/* Pricing tier cards */}
-      <section className="px-6 pb-10 max-w-6xl mx-auto grid gap-8 md:gap-6 md:grid-cols-3">
+      <section className="px-6 pb-10 max-w-6xl mx-auto grid gap-8 md:gap-6 md:grid-cols-2 xl:grid-cols-4">
         {/* Free */}
         <PricingCard
           testId="pricing-card-free"
@@ -422,6 +499,51 @@ export default function Pricing() {
                 <>
                   Upgrade to Pro — {proPrice}
                   {proCadence}
+                </>
+              )}
+            </Button>
+          }
+        />
+
+        {/* Craft */}
+        <PricingCard
+          testId="pricing-card-craft"
+          name={PRICING.craft.name}
+          subtitle={PRICING.craft.subtitle}
+          price={craftPrice}
+          cadence={craftCadence}
+          description={PRICING.craft.description}
+          features={PRICING.craft.features}
+          badge={PRICING.craft.badge}
+          footnote={craftFootnote}
+          cta={
+            <Button
+              size="lg"
+              // Same wrap-safety class set as the other priced CTAs: the
+              // label ("Upgrade to Craft — $249/ year") must wrap rather
+              // than force the card wider than a ≤390px viewport.
+              className="w-full h-auto min-h-11 whitespace-normal"
+              disabled={checkoutLoading}
+              data-testid={
+                billing === "annual" ? "pricing-cta-craft-annual" : "pricing-cta-craft-monthly"
+              }
+              onClick={() => {
+                const priceId = billing === "annual" ? "craft_annual" : "craft_monthly";
+                handlePaidIntent(
+                  priceId,
+                  billing === "annual"
+                    ? "pricing_cta_craft_annual_clicked"
+                    : "pricing_cta_craft_monthly_clicked",
+                  "plan_card",
+                );
+              }}
+            >
+              {checkoutRecoveryReason ? (
+                "Join the Craft launch list"
+              ) : (
+                <>
+                  Upgrade to Craft — {craftPrice}
+                  {craftCadence}
                 </>
               )}
             </Button>
@@ -621,21 +743,23 @@ export default function Pricing() {
       {/* Comparison table */}
       <section className="px-6 py-12 max-w-5xl mx-auto">
         <h2 className="font-display text-2xl md:text-3xl font-semibold text-center">
-          Compare Free, Pro, and Founder Lifetime
+          Compare Free, Pro, Craft, and Founder Lifetime
         </h2>
         <p className="mt-3 text-sm text-muted-foreground text-center max-w-2xl mx-auto">
           Free is genuinely useful for starting a grow diary. Pro adds deeper history, advanced
-          exports, and multi-tent support. Founder Lifetime is a limited early-supporter offer that
-          includes full Pro access.
+          exports, and multi-tent support. Craft adds the live Pro Blueprint that scores every
+          reading against your per-stage SOP. Founder Lifetime is a limited early-supporter offer
+          that includes full Pro access and the Pro Blueprint.
         </p>
 
         <div className="mt-8 overflow-x-auto rounded-xl border border-border/60">
-          <table className="w-full min-w-[640px] text-sm" data-testid="pricing-comparison-table">
+          <table className="w-full min-w-[760px] text-sm" data-testid="pricing-comparison-table">
             <thead className="bg-secondary/40 text-muted-foreground">
               <tr>
                 <th className="text-left font-medium px-4 py-3">Feature</th>
                 <th className="text-center font-medium px-4 py-3">Free</th>
                 <th className="text-center font-medium px-4 py-3 text-primary">Pro</th>
+                <th className="text-center font-medium px-4 py-3 text-primary">Craft</th>
                 <th className="text-center font-medium px-4 py-3 text-primary">Founder Lifetime</th>
               </tr>
             </thead>
@@ -650,6 +774,9 @@ export default function Pricing() {
                     <CellValue value={row.pro} accent />
                   </td>
                   <td className="px-4 py-3 text-center">
+                    <CellValue value={row.craft} accent />
+                  </td>
+                  <td className="px-4 py-3 text-center">
                     <CellValue value={row.founder} accent />
                   </td>
                 </tr>
@@ -658,7 +785,7 @@ export default function Pricing() {
           </table>
         </div>
         <p className="mt-3 text-xs text-muted-foreground text-center sm:hidden">
-          Swipe to compare all three plans →
+          Swipe to compare all four plans →
         </p>
       </section>
 

@@ -19,7 +19,7 @@
  *    even a zero-age snapshot is treated as untrusted because the
  *    caller has explicitly removed the freshness window.
  */
-import { isDiagnosticSensorProvenanceRow } from "../../../src/lib/sensorProvenanceFenceRules.ts";
+import { isDiagnosticSensorProvenanceRow } from "../_shared/lib/lib/sensorProvenanceFenceRules.ts";
 
 export type AiSensorSnapshotSource =
   | "live"

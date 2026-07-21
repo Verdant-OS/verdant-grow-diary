@@ -9,7 +9,7 @@
 // any decrypted secret material. The resolver in `secretResolver.ts`
 // is the only consumer that ever sees raw plaintext.
 
-import type { ResolveBridgeSecretInput } from "../../../src/lib/piIngestServerSecretResolverTypes.ts";
+import type { ResolveBridgeSecretInput } from "../_shared/lib/lib/piIngestServerSecretResolverTypes.ts";
 
 export type PiIngestBridgeSecretStatus =
   | "pending_rotation"

@@ -14,7 +14,7 @@ import {
   type PiIngestSecretKeyProvider,
   resolveBridgeSecret,
 } from "./secretResolver.ts";
-import type { ResolveBridgeSecretInput } from "../../../src/lib/piIngestServerSecretResolverTypes.ts";
+import type { ResolveBridgeSecretInput } from "../_shared/lib/lib/piIngestServerSecretResolverTypes.ts";
 
 const PLAINTEXT_SECRET = "in-memory-only-hmac-secret-material";
 const BRIDGE_ID = "bridge-abc-123";

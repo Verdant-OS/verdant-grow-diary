@@ -1,51 +1,120 @@
-# Turn B — Founding 100
+# Shared-lib Sync — Generated Mirror for Edge Functions
 
-Ships the refund-retire webhook path, the public Wall + hero counter on `/founder`, the owner prefs form, the four required invariant tests, and the FE cap ripple (75 → 100) triggered by Turn A's DB migration.
+## Goal
 
-## Backend
+Every edge function under `supabase/functions/*` imports only files inside `supabase/functions/`. Shared logic stays authored in `src/lib/**`; a build step **generates** a mirror at `supabase/functions/_shared/lib/**` and a CI gate fails if the mirror drifts. Sandbox `deploy_edge_functions` and the production Lovable pipeline both bundle cleanly with no per-function bundler reach.
 
-**Migration** `founding_100_turn_b_refund_and_prefs.sql`:
-- `public.revoke_lovable_founder_lifetime_by_transaction(p_paddle_transaction_id text, p_environment text, p_now timestamptz)` RPC:
-  - `SECURITY DEFINER`, service_role only.
-  - Atomically: `UPDATE public.subscriptions SET status='canceled', current_period_end=p_now, updated_at=p_now WHERE paddle_subscription_id='lifetime_'||p_paddle_transaction_id AND environment=p_environment` AND `UPDATE public.founders SET status='refunded', updated_at=p_now WHERE paddle_transaction_id=p_paddle_transaction_id AND environment=p_environment`.
-  - Returns `{ ok: true, revoked: boolean }`. Seat stays consumed (row + number preserved), user's Pro is revoked, wall view naturally drops the row (status<>'confirmed').
-- `GRANT EXECUTE ... TO service_role` only; `REVOKE ... FROM anon, authenticated`.
+Supersedes the six thin re-export shims from the previous slice (they still transitively reach `src/lib` and don't survive the sandbox bundler).
 
-**Webhook** (`eventProcessor.ts` + `orchestrator.ts` + `index.ts`):
-- Extend `decide()` for `adjustment.created` where `action IN ('refund','chargeback')` and `status='approved'` and `transactionId` is present → new decision `{ kind: 'revoke_lifetime', paddleTransactionId, env }`.
-- Non-approved / non-refund adjustments → skip (existing behavior).
-- New `Deps.revokeFounderLifetime(txId, env, now)` calls the RPC. Wired in `index.ts`.
+## What we're building
 
-## Cap ripple (Turn A raised DB cap to 100)
+1. `scripts/sync-edge-shared.mjs` — the generator.
+2. `scripts/verify-edge-shared-in-sync.mjs` — the CI drift gate.
+3. `supabase/functions/_shared/lib/**` — the generated mirror (committed; marked generated; never hand-edited).
+4. `.github/workflows/edge-shared-sync.yml` — runs the drift gate on every PR touching `src/lib/**` or `supabase/functions/**`.
+5. `package.json` script `sync-edge-shared` + optional `prepush` husky hook.
+6. `docs/edge-shared-sync.md` — runbook.
+7. One committed pass of the generator so every current edge function is migrated off `../../../src/lib/**` imports.
 
-- `src/constants/pricing.ts`: `limit: 75 → 100`, `badge: "First 75 only" → "First 100 only"`.
-- `supabase/functions/founder-slots-remaining/contract.ts`: `FOUNDER_SLOTS_TOTAL = 75 → 100`.
-- Update the 3 test files that hardcode 75 in ways that must track the cap:
-  - `src/test/founder-slots-remaining-contract.test.ts` (expects 75)
-  - `src/test/subscriber-growth-live-parity-script.test.ts` (total:75 fixtures)
-  - `src/test/upgrade-page.test.tsx` (cap fixtures)
-- Leave the two static-SQL tests that assert against the **old BYO `billing_subscriptions` migration** (`entitlements-rls.test.ts`, `paddle-paid-launch-gate-static.test.ts`) as-is — they check historical migration text, not the current `founders` cap.
+## Sync algorithm
 
-## UI + rules
+Input roots: every `supabase/functions/*/index.ts` plus every `supabase/functions/*/*.ts` test file.
 
-- **`src/lib/founderWallRules.ts`** (pure):
-  - `deriveWallDisplayName(row)` mirroring the DB CASE for the owner's own preview only (public wall reads the view; server is authoritative).
-  - `founderPrefsSchema` zod: `display_name` ≤60, no control chars; `optional_link` https-only, reject `javascript:`/`data:`/`http:`/relative/whitespace; `display_style` enum; `show_on_wall` boolean.
-- **`src/hooks/useFoundersWall.ts`**: `select('founder_number, public_display_name, optional_link').order('founder_number', { ascending: true })` from `founders_wall_public`.
-- **`src/components/FoundersWall.tsx`**: renders list; every `optional_link` gets `target="_blank" rel="noopener noreferrer nofollow"`.
-- **`src/components/FoundersHeroCounter.tsx`**: uses `useFounderSlotsRemaining` — shows `{claimed} of 100 claimed` (seats-consumed via existing RPC, already pointed at `founders_seats_consumed()` in A.1).
-- **`src/components/FounderOwnerPrefsForm.tsx`**: fetches own `founders` row; edits `display_name`, `display_style`, `show_on_wall`, `optional_link`; validates with zod; writes via a new tiny `save-founder-prefs` edge fn (service_role, verifies `auth.uid()===user_id`, re-validates server-side).
-- **`supabase/functions/save-founder-prefs/index.ts`**: JWT-verified; zod-parse; UPDATE own row only.
-- **`src/pages/Founder.tsx`**: mount `<FoundersHeroCounter />` in hero; mount `<FoundersWall />` in a new section; mount `<FounderOwnerPrefsForm />` when signed-in user has a founder row.
+```text
+1. Parse each entry file's imports (regex + verify with a tiny TS AST pass).
+2. For each import matching /(\.\.\/)+src\/lib\/(.+)\.ts/:
+     a. Resolve the source path in src/lib.
+     b. Add to work queue.
+3. Drain queue transitively — for each queued file, parse its imports too:
+     - Relative imports staying inside src/lib: enqueue.
+     - "@/..." alias imports: resolve via tsconfig paths, enqueue if under src/lib,
+       hard-fail if it reaches src/components, src/hooks, src/pages, or React.
+     - npm:/https:/jsr: specifiers: leave untouched.
+4. Copy each queued file to supabase/functions/_shared/lib/<same-relative-path>.
+5. Rewrite imports inside each copied file:
+     - Relative "./x" / "../x" preserved (same tree shape in the mirror).
+     - "@/lib/x" -> relative path inside _shared/lib.
+     - Any "@/components", "@/hooks", "@/pages" hit -> hard fail (frontend-only code).
+6. For every entry file, rewrite "../../../src/lib/x.ts" -> "../_shared/lib/x.ts"
+   (index.ts) or "../../_shared/lib/x.ts" (test files under function dir).
+7. Prepend generated-file banner to each mirror file:
+     // @generated by scripts/sync-edge-shared.mjs — DO NOT EDIT
+     // Source: src/lib/<relative>.ts  sha256=<hash>
+8. Write supabase/functions/_shared/lib/.sync-manifest.json:
+     { generatedAt, sourceHashes: { "src/lib/x.ts": "<sha256>", ... },
+       entryRewrites: { "supabase/functions/ai-doctor-review/index.ts": [...] } }
+```
 
-## Tests (four load-bearing invariants)
+## Drift gate
 
-1. `src/test/founders-view-exposure-static.test.ts` — reads Turn A migration text; asserts view exposes exactly `founder_number, public_display_name, optional_link`; `security_barrier=true`; `REVOKE ... FROM anon` on `public.founders`.
-2. `src/test/founders-refund-retire-static.test.ts` — reads Turn B migration text; asserts RPC updates BOTH `public.subscriptions` status='canceled' AND `public.founders` status='refunded'; grants only to `service_role`.
-3. `src/test/founder-wall-rules.test.ts` — pure rules: name derivation per style (custom / first_initial / number_only / hidden) incl. null/empty; prefs zod rejects all listed dangerous URL schemes + control chars + >60 chars; accepts valid.
-4. `src/test/founders-webhook-refund-decision.test.ts` — orchestrator decision for `adjustment.created` refund → `revoke_lifetime`; non-approved skipped; happy-path dep invoked with correct tx id.
+`verify-edge-shared-in-sync.mjs`:
 
-## Deferred
+1. Run the generator to a tmp dir (no writes to the repo).
+2. Compare tmp output byte-for-byte with the committed `_shared/lib/` tree + manifest.
+3. Fail with a per-file diff if anything differs.
+4. Also fail if any `supabase/functions/*/index.ts` still contains `../../../src/lib/`.
 
-- Automated Playwright screenshot of `/founder` — sandbox environment gate (session replay only shows real signed-in state on verdant-testbench). I'll ship the code and provide instructions for the user to capture.
-- No changes to the existing double-bill cancellation, allocator, or AI Doctor paths.
+Runs in CI on any PR touching `src/lib/**`, `supabase/functions/**`, or the sync scripts themselves.
+
+## Rollback
+
+Revert the generator commit + the mirror tree. Edge functions revert to `../../../src/lib/**` imports, which continue to work under the production Lovable pipeline (only the sandbox `deploy_edge_functions` regresses).
+
+## Deliberately out of scope
+
+- No changes to `src/lib/**` logic.
+- No changes to any function's business behavior.
+- No changes to `supabase/config.toml`, RLS, migrations, or secrets.
+- No touching billing/entitlement/AI credit code paths.
+- No changes to Vite alias or frontend imports — `src/lib/**` stays the single source of truth for both sides.
+
+## Safety
+
+- Frontend-only imports (`@/components`, `@/hooks`, `@/pages`, React, DOM globals) are a hard fail in the generator, not a silent copy — prevents pulling browser code into Deno.
+- Mirror is generated and gated; edits to `_shared/lib/*` fail CI, so single-source-of-truth is preserved.
+- Test files that live under `supabase/functions/*/` and import from src/lib get the same rewrite — behavior parity maintained.
+
+## Validation
+
+1. `bun run sync-edge-shared` (one commit of the generated tree).
+2. `bun run verify-edge-shared-in-sync` — must pass on the same commit.
+3. `bunx tsgo --noEmit` — 0 errors.
+4. Targeted Vitest: existing edge-function-adjacent tests (ai-doctor, paddle-webhook, pi-ingest, ai-coach).
+5. `supabase test edge functions` for the Deno test suites under each function.
+6. Manual: `supabase deploy edge functions [ai-doctor-review]` from the sandbox to confirm the bundler is unblocked.
+
+## Files touched (approx)
+
+New:
+```text
+scripts/sync-edge-shared.mjs
+scripts/verify-edge-shared-in-sync.mjs
+.github/workflows/edge-shared-sync.yml
+docs/edge-shared-sync.md
+supabase/functions/_shared/lib/**  (generated mirror)
+supabase/functions/_shared/lib/.sync-manifest.json
+```
+
+Edited (imports rewritten; behavior unchanged):
+```text
+supabase/functions/ai-doctor-review/index.ts
+supabase/functions/ai-doctor-review/providerUsageWiring.test.ts
+supabase/functions/ai-coach/index.ts
+supabase/functions/ai-coach/sensorSnapshotContextRules.ts
+supabase/functions/paddle-webhook/index.ts
+supabase/functions/pi-ingest-readings/index.ts
+supabase/functions/pi-ingest-readings/index.test.ts
+supabase/functions/pi-ingest-readings/secretResolver.ts
+supabase/functions/pi-ingest-readings/secretResolver.test.ts
+supabase/functions/pi-ingest-readings/smoke.test.ts
+supabase/functions/pi-ingest-readings/bridgeCredentialRow.ts
+supabase/functions/_shared/unionEntitlementLookup.ts
+supabase/functions/_shared/aiDoctor*.ts  (six shims from prior slice — replaced with imports from _shared/lib)
+supabase/functions/_shared/cost.ts       (same)
+package.json  (add "sync-edge-shared" + "verify-edge-shared-in-sync" scripts)
+```
+
+## Two confirmations before I execute
+
+1. **Prior-slice shims** (the six `_shared/aiDoctor*.ts` + `_shared/cost.ts` I just added) get **replaced** by the generated mirror — their re-exports repoint at `_shared/lib/*` instead of `../../../src/lib/*`. Same public surface for `ai-doctor-review/index.ts`; no second migration needed later. Confirm this is the intent, or you'd rather keep the shims and mirror only the deeper transitive files.
+2. **Husky prepush hook** — add it (fast local feedback, one extra ~2s check on push), or CI-only? I recommend adding it.

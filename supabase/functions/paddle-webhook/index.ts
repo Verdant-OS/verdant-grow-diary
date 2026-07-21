@@ -40,7 +40,7 @@ import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supa
 import {
   buildBillingCustomerLinkCapturePlan,
   type BillingCustomerLinkInsertPayload,
-} from "../../../src/lib/billingCustomerLinkCaptureRules.ts";
+} from "../_shared/lib/lib/billingCustomerLinkCaptureRules.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",

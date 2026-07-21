@@ -13,4 +13,4 @@ export {
   type AiDoctorReviewRequestEnvelopeOptions,
   type AiDoctorReviewIdempotencyKeyCreationResult,
   type ParsedAiDoctorReviewRequestEnvelope,
-} from "../../../src/lib/aiDoctorReviewRequestTransportRules.ts";
+} from "./lib/lib/aiDoctorReviewRequestTransportRules.ts";

@@ -18,7 +18,7 @@ import type {
   BridgeSecretResolverFailureReason,
   BridgeSecretResolverResult,
   ResolveBridgeSecretInput,
-} from "../../../src/lib/piIngestServerSecretResolverTypes.ts";
+} from "../_shared/lib/lib/piIngestServerSecretResolverTypes.ts";
 
 /**
  * Injectable provider that returns raw key material for a given key

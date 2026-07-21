@@ -1,0 +1,103 @@
+name: Sandbox credit-packs smoke (read-only)
+
+# Runs the read-only sandbox smoke script against the staging (sandbox)
+# Supabase project and uploads the per-checkpoint transcript as an
+# artifact for audit. The script never mutates data, policies, or Paddle.
+#
+# Triggers:
+#   - manual dispatch (allows overriding the target user)
+#   - nightly at 09:00 UTC so a regression against the staging project
+#     surfaces within 24h without waiting for a release
+#
+# Required repo secrets:
+#   SUPABASE_DB_URL_SANDBOX   — read connection string for the sandbox DB
+#   SANDBOX_SMOKE_USER        — email or UUID of the test grower to inspect
+# Optional (enables webhook-log checks; log checks are SKIPPED without them):
+#   SUPABASE_ACCESS_TOKEN
+#   SUPABASE_PROJECT_REF_SANDBOX
+
+on:
+  workflow_dispatch:
+    inputs:
+      user:
+        description: "Override test grower (email or UUID). Blank = use SANDBOX_SMOKE_USER secret."
+        required: false
+        default: ""
+  schedule:
+    - cron: "0 9 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  sandbox-credit-packs-smoke:
+    name: Sandbox credit-packs smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install psql client
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+      - name: Prepare audit dir
+        run: mkdir -p "${{ github.workspace }}/audit/sandbox-smoke"
+      - name: Resolve target user
+        id: user
+        env:
+          INPUT_USER: ${{ inputs.user }}
+          SECRET_USER: ${{ secrets.SANDBOX_SMOKE_USER }}
+        run: |
+          U="${INPUT_USER:-$SECRET_USER}"
+          if [ -z "$U" ]; then
+            echo "::error::No target user configured. Set SANDBOX_SMOKE_USER secret or pass 'user' input."
+            exit 1
+          fi
+          # Never echo the resolved value — it may be a real email.
+          echo "resolved=1" >> "$GITHUB_OUTPUT"
+          printf '%s' "$U" > "$RUNNER_TEMP/smoke_user"
+      - name: Run sandbox credit-packs smoke (read-only)
+        id: smoke
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL_SANDBOX }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF_SANDBOX }}
+          TRANSCRIPT: ${{ github.workspace }}/audit/sandbox-smoke/transcript.log
+        run: |
+          if [ -z "${SUPABASE_DB_URL:-}" ]; then
+            echo "::error::SUPABASE_DB_URL_SANDBOX secret not set."
+            exit 1
+          fi
+          USER_VAL="$(cat "$RUNNER_TEMP/smoke_user")"
+          {
+            printf '# Sandbox credit-packs smoke — %s\n' "$(date -u +%FT%TZ)"
+            printf '# Env: sandbox   Commit: %s\n\n' "${GITHUB_SHA}"
+          } > "$TRANSCRIPT"
+          set +e
+          bun run scripts/sandbox-credit-packs-smoke.ts \
+            --user "$USER_VAL" --env sandbox >> "$TRANSCRIPT" 2>&1
+          RC=$?
+          set -e
+          echo "" >> "$TRANSCRIPT"
+          echo "# Exit code: $RC" >> "$TRANSCRIPT"
+          # Surface the SUMMARY line in the workflow log without leaking the user.
+          grep -E '^SUMMARY:' "$TRANSCRIPT" || echo "SUMMARY: (not emitted — see transcript)"
+          exit $RC
+      - name: Append summary to workflow summary
+        if: always() && hashFiles('audit/sandbox-smoke/transcript.log') != ''
+        run: |
+          {
+            echo "### Sandbox credit-packs smoke"
+            echo ""
+            echo '```'
+            grep -E '^\s*[✓✗•]|^SUMMARY:|^==|^--' audit/sandbox-smoke/transcript.log || tail -40 audit/sandbox-smoke/transcript.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload smoke transcript
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sandbox-credit-packs-smoke
+          path: audit/sandbox-smoke
+          if-no-files-found: warn

@@ -42,6 +42,40 @@ const TARGET_ENV = process.env.TARGET_ENV ?? "unspecified";
 const DB_URL = process.env.SUPABASE_DB_URL ?? process.env.DATABASE_URL ?? "";
 const HAS_PG_ENV = Boolean(process.env.PGHOST);
 const REPORT_PATH = process.env.REPORT_PATH ?? "";
+const AUDIT_PATH = process.env.AUDIT_PATH ?? "";
+
+/**
+ * Persist a machine-readable audit trail of exactly which required money
+ * migrations were checked against which target env, and their applied
+ * state. Uploaded as a CI artifact so an auditor can later prove *what*
+ * this guard actually verified for a given commit — not just that it
+ * "passed".
+ *
+ * Safe to write on every run (success and failure). Contains no secrets:
+ * only the target env label, filenames, version prefixes, applied booleans,
+ * and outcome — all derivable from the public repo.
+ */
+function writeAudit(outcome, extra = {}) {
+  if (!AUDIT_PATH) return;
+  const payload = {
+    schema_version: 1,
+    tool: "assert-required-money-migrations-applied",
+    target_env: TARGET_ENV,
+    checked_at: new Date().toISOString(),
+    outcome, // "verified" | "missing_migrations" | "connection_error" | "tracker_query_failed" | "no_db_connection"
+    expected_count: extra.expected?.length ?? 0,
+    applied_count: extra.expected?.filter((e) => e.applied).length ?? 0,
+    missing_count: extra.expected?.filter((e) => !e.applied).length ?? 0,
+    expected: extra.expected ?? [],
+    ...(extra.note ? { note: extra.note } : {}),
+  };
+  try {
+    mkdirSync(dirname(AUDIT_PATH), { recursive: true });
+    writeFileSync(AUDIT_PATH, JSON.stringify(payload, null, 2) + "\n");
+  } catch (err) {
+    console.error(`(warning) failed to write audit to ${AUDIT_PATH}: ${err.message}`);
+  }
+}
 
 /**
  * Persist a human-readable failure report for downstream consumers (CI PR

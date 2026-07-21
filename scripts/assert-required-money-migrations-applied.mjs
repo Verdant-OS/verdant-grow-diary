@@ -154,6 +154,9 @@ if (result.status !== 0) {
     "See the workflow log for the full `psql` error output (stderr is not mirrored here to avoid",
     "leaking connection details).",
   ]);
+  writeAudit("tracker_query_failed", {
+    note: `psql exited ${result.status} querying supabase_migrations.schema_migrations.`,
+  });
   process.exit(2);
 }
 

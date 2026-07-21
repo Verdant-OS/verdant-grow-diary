@@ -3124,6 +3124,148 @@ export type Database = {
         }
         Relationships: []
       }
+      propagation_batch_status_events: {
+        Row: {
+          batch_id: string
+          changed_at: string
+          created_at: string
+          from_status: string | null
+          id: string
+          reason: string | null
+          to_status: string
+          user_id: string
+        }
+        Insert: {
+          batch_id: string
+          changed_at?: string
+          created_at?: string
+          from_status?: string | null
+          id?: string
+          reason?: string | null
+          to_status: string
+          user_id: string
+        }
+        Update: {
+          batch_id?: string
+          changed_at?: string
+          created_at?: string
+          from_status?: string | null
+          id?: string
+          reason?: string | null
+          to_status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "propagation_batch_status_events_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "propagation_batches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      propagation_batches: {
+        Row: {
+          batch_code: string
+          counts_unknown: boolean
+          created_at: string
+          cut_date: string | null
+          grow_id: string | null
+          id: string
+          initial_quantity: number | null
+          mother_plant_id: string | null
+          name: string | null
+          notes: string | null
+          origin_unknown: boolean
+          propagation_method: string
+          received_date: string | null
+          rooted_date: string | null
+          source_accession_id: string | null
+          started_date: string | null
+          status: string
+          tent_id: string | null
+          updated_at: string
+          user_id: string
+          viable_quantity: number | null
+        }
+        Insert: {
+          batch_code: string
+          counts_unknown?: boolean
+          created_at?: string
+          cut_date?: string | null
+          grow_id?: string | null
+          id?: string
+          initial_quantity?: number | null
+          mother_plant_id?: string | null
+          name?: string | null
+          notes?: string | null
+          origin_unknown?: boolean
+          propagation_method?: string
+          received_date?: string | null
+          rooted_date?: string | null
+          source_accession_id?: string | null
+          started_date?: string | null
+          status?: string
+          tent_id?: string | null
+          updated_at?: string
+          user_id: string
+          viable_quantity?: number | null
+        }
+        Update: {
+          batch_code?: string
+          counts_unknown?: boolean
+          created_at?: string
+          cut_date?: string | null
+          grow_id?: string | null
+          id?: string
+          initial_quantity?: number | null
+          mother_plant_id?: string | null
+          name?: string | null
+          notes?: string | null
+          origin_unknown?: boolean
+          propagation_method?: string
+          received_date?: string | null
+          rooted_date?: string | null
+          source_accession_id?: string | null
+          started_date?: string | null
+          status?: string
+          tent_id?: string | null
+          updated_at?: string
+          user_id?: string
+          viable_quantity?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "propagation_batches_grow_id_fkey"
+            columns: ["grow_id"]
+            isOneToOne: false
+            referencedRelation: "grows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "propagation_batches_mother_plant_id_fkey"
+            columns: ["mother_plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "propagation_batches_source_accession_id_fkey"
+            columns: ["source_accession_id"]
+            isOneToOne: false
+            referencedRelation: "genetics_accessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "propagation_batches_tent_id_fkey"
+            columns: ["tent_id"]
+            isOneToOne: false
+            referencedRelation: "tents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       quicklog_audit_events: {
         Row: {
           created_at: string
@@ -4008,6 +4150,11 @@ export type Database = {
         Args: { p_idempotency_key: string; p_payload: Json }
         Returns: Json
       }
+      genetics_batch_upsert: {
+        Args: { p_idempotency_key: string; p_payload: Json }
+        Returns: Json
+      }
+      genetics_lock_lineage: { Args: { p_owner: string }; Returns: undefined }
       get_latest_tent_sensor_snapshot: {
         Args: { _tent_id: string }
         Returns: Json

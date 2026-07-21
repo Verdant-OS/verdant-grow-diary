@@ -16,6 +16,11 @@
 import { spawnSync } from "node:child_process";
 import { appendFileSync, existsSync } from "node:fs";
 import * as path from "node:path";
+import {
+  collectFindings,
+  formatAnnotation,
+} from "./lib/annotate-edge-shared-drift-parse.mjs";
+
 
 const ROOT = path.resolve(new URL("..", import.meta.url).pathname);
 const IN_ACTIONS = process.env.GITHUB_ACTIONS === "true";

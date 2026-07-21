@@ -8,4 +8,4 @@
  * The `.ts` file (not a directory) keeps the shim path flat, matching the
  * other _shared/ shims.
  */
-export * from "../../../src/lib/cost/index.ts";
+export * from "./lib/lib/cost/index.ts";

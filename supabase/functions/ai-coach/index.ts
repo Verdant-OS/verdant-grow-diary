@@ -3,7 +3,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import {
   resolveQuickLogSensorSnapshotForAi,
   type QuickLogSensorAcquisitionRow,
-} from "../../../src/lib/quick-log/quickLogSensorSnapshotAcquisitionRules.ts";
+} from "../_shared/lib/lib/quick-log/quickLogSensorSnapshotAcquisitionRules.ts";
 import { buildAiSensorSnapshotContext } from "./sensorSnapshotContextRules.ts";
 import { pickLatestSensorSnapshotEvidenceByCapturedAt } from "./latestSensorSnapshot.ts";
 import { resolveRequiredServerBillingEnvironment } from "../_shared/unionEntitlementLookup.ts";

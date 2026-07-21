@@ -29,13 +29,13 @@ import {
   pickEntitlingLovableRow,
   lovableRowEntitles,
   SUBSCRIPTION_ROW_SCAN_LIMIT,
-} from "../../../src/lib/entitlements/unionEntitlements.ts";
-import type { BillingSubscriptionRow } from "../../../src/lib/entitlements/types.ts";
+} from "./lib/lib/entitlements/unionEntitlements.ts";
+import type { BillingSubscriptionRow } from "./lib/lib/entitlements/types.ts";
 import type {
   LovableBillingEnvironment,
   LovableSubscriptionRow,
-} from "../../../src/lib/entitlements/lovablePaddleAdapter.ts";
-import type { ResolvedEntitlement } from "../../../src/lib/entitlements/types.ts";
+} from "./lib/lib/entitlements/lovablePaddleAdapter.ts";
+import type { ResolvedEntitlement } from "./lib/lib/entitlements/types.ts";
 
 /**
  * Server-authoritative billing environment resolver.

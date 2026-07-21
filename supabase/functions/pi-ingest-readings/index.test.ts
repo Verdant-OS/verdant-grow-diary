@@ -18,7 +18,7 @@ import type {
 import {
   buildSigningString,
   computeHmacSha256Hex,
-} from "../../../src/lib/piIngestAuthRules.ts";
+} from "../_shared/lib/lib/piIngestAuthRules.ts";
 
 const ENDPOINT = "http://localhost/functions/v1/pi-ingest-readings";
 const NOW_MS = Date.parse("2026-05-23T12:00:00Z");

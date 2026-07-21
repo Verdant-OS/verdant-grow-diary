@@ -28,7 +28,7 @@ import {
 import {
   attachProviderResponseUsageToAiDoctorPromptMeasurement,
   buildAiDoctorPromptMeasurement,
-} from "../../../src/lib/cost/index.ts";
+} from "../_shared/lib/lib/cost/index.ts";
 
 function freshMeasurement() {
   return buildAiDoctorPromptMeasurement({

@@ -13,4 +13,4 @@ export {
   IMPORTED_HISTORY_PROMPT_STRINGS,
   AI_DOCTOR_REQUIRED_OUTPUT_SECTIONS,
   type AiDoctorPromptMessages,
-} from "../../../src/lib/aiDoctorPromptAssembly.ts";
+} from "./lib/lib/aiDoctorPromptAssembly.ts";

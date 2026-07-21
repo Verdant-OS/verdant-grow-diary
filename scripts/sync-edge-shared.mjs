@@ -18,7 +18,7 @@
  *   node scripts/sync-edge-shared.mjs             # write mirror + rewrite entries
  *   node scripts/sync-edge-shared.mjs --check     # write to tmp; exit 1 on drift
  */
-import { promises as fs } from "node:fs";
+import { promises as fs, statSync } from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import { createHash } from "node:crypto";
@@ -118,14 +118,7 @@ function resolveExtension(p) {
   ];
   for (const c of candidates) {
     try {
-      // sync-ish existence via require of fs is fine here; use lstat later.
-      // We only need to return the first that plausibly exists; caller stats it.
-      // Use a synchronous existence probe via fs.statSync would break in this ESM
-      // context without import, so return the first .ts guess and let the caller
-      // verify with fs.stat.
-      // But we need real existence — mirror correctness matters. Do a sync fs read:
-      // eslint-disable-next-line no-undef
-      const s = require("node:fs").statSync(c);
+      const s = statSync(c);
       if (s.isFile()) return c;
     } catch {
       /* keep trying */

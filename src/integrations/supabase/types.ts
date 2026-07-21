@@ -3565,18 +3565,21 @@ export type Database = {
           created_at: string
           grow_event_id: string
           idempotency_key: string
+          request_hash: string | null
           user_id: string
         }
         Insert: {
           created_at?: string
           grow_event_id: string
           idempotency_key: string
+          request_hash?: string | null
           user_id: string
         }
         Update: {
           created_at?: string
           grow_event_id?: string
           idempotency_key?: string
+          request_hash?: string | null
           user_id?: string
         }
         Relationships: []

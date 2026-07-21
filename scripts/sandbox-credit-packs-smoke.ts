@@ -300,6 +300,7 @@ async function checkCreditPackPurchase(userId: string, env: Environment): Promis
 
 async function checkOverflowSpend(userId: string, env: Environment): Promise<void> {
   const section = "OVERFLOW SPEND";
+  beginCheckpoint(section);
   // Current UTC period key = YYYY-MM.
   const periodKey = new Date().toISOString().slice(0, 7);
 

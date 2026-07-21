@@ -159,12 +159,14 @@ export type Database = {
           credits: number
           environment: string
           expires_at: string | null
+          grant_ref: string | null
           id: string
           kind: string
           meta: Json
-          paddle_transaction_id: string
+          paddle_transaction_id: string | null
           reverses: string | null
-          sku: string
+          sku: string | null
+          source: string
           user_id: string
         }
         Insert: {
@@ -172,12 +174,14 @@ export type Database = {
           credits: number
           environment: string
           expires_at?: string | null
+          grant_ref?: string | null
           id?: string
           kind?: string
           meta?: Json
-          paddle_transaction_id: string
+          paddle_transaction_id?: string | null
           reverses?: string | null
-          sku: string
+          sku?: string | null
+          source?: string
           user_id: string
         }
         Update: {
@@ -185,12 +189,14 @@ export type Database = {
           credits?: number
           environment?: string
           expires_at?: string | null
+          grant_ref?: string | null
           id?: string
           kind?: string
           meta?: Json
-          paddle_transaction_id?: string
+          paddle_transaction_id?: string | null
           reverses?: string | null
-          sku?: string
+          sku?: string | null
+          source?: string
           user_id?: string
         }
         Relationships: [
@@ -1251,6 +1257,187 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      genetics_accessions: {
+        Row: {
+          acquisition_date: string | null
+          archived_at: string | null
+          created_at: string
+          cultivar_name: string | null
+          generation: string | null
+          id: string
+          known_state: string
+          line_name: string | null
+          linked_clone_id: string | null
+          linked_cross_id: string | null
+          linked_keeper_id: string | null
+          linked_plant_id: string | null
+          notes: string | null
+          selection_id: string | null
+          source_kind: string
+          source_party: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          acquisition_date?: string | null
+          archived_at?: string | null
+          created_at?: string
+          cultivar_name?: string | null
+          generation?: string | null
+          id?: string
+          known_state?: string
+          line_name?: string | null
+          linked_clone_id?: string | null
+          linked_cross_id?: string | null
+          linked_keeper_id?: string | null
+          linked_plant_id?: string | null
+          notes?: string | null
+          selection_id?: string | null
+          source_kind?: string
+          source_party?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          acquisition_date?: string | null
+          archived_at?: string | null
+          created_at?: string
+          cultivar_name?: string | null
+          generation?: string | null
+          id?: string
+          known_state?: string
+          line_name?: string | null
+          linked_clone_id?: string | null
+          linked_cross_id?: string | null
+          linked_keeper_id?: string | null
+          linked_plant_id?: string | null
+          notes?: string | null
+          selection_id?: string | null
+          source_kind?: string
+          source_party?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "genetics_accessions_linked_clone_id_fkey"
+            columns: ["linked_clone_id"]
+            isOneToOne: false
+            referencedRelation: "pheno_keeper_clones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "genetics_accessions_linked_cross_id_fkey"
+            columns: ["linked_cross_id"]
+            isOneToOne: false
+            referencedRelation: "pheno_crosses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "genetics_accessions_linked_keeper_id_fkey"
+            columns: ["linked_keeper_id"]
+            isOneToOne: false
+            referencedRelation: "pheno_keepers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "genetics_accessions_linked_plant_id_fkey"
+            columns: ["linked_plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      genetics_mutation_idempotency: {
+        Row: {
+          created_at: string
+          idempotency_key: string
+          operation: string
+          request_hash: string
+          result: Json
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          idempotency_key: string
+          operation: string
+          request_hash: string
+          result: Json
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          idempotency_key?: string
+          operation?: string
+          request_hash?: string
+          result?: Json
+          user_id?: string
+        }
+        Relationships: []
+      }
+      genetics_screening_results: {
+        Row: {
+          collected_date: string | null
+          created_at: string
+          evidence_reference: string | null
+          id: string
+          laboratory: string | null
+          recorded_at: string
+          recorded_by: string
+          result: string
+          result_date: string | null
+          sample_reference: string | null
+          subject_id: string
+          subject_type: string
+          supersedes_id: string | null
+          target: string
+          user_id: string
+        }
+        Insert: {
+          collected_date?: string | null
+          created_at?: string
+          evidence_reference?: string | null
+          id?: string
+          laboratory?: string | null
+          recorded_at?: string
+          recorded_by: string
+          result: string
+          result_date?: string | null
+          sample_reference?: string | null
+          subject_id: string
+          subject_type: string
+          supersedes_id?: string | null
+          target: string
+          user_id: string
+        }
+        Update: {
+          collected_date?: string | null
+          created_at?: string
+          evidence_reference?: string | null
+          id?: string
+          laboratory?: string | null
+          recorded_at?: string
+          recorded_by?: string
+          result?: string
+          result_date?: string | null
+          sample_reference?: string | null
+          subject_id?: string
+          subject_type?: string
+          supersedes_id?: string | null
+          target?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "genetics_screening_results_supersedes_id_fkey"
+            columns: ["supersedes_id"]
+            isOneToOne: false
+            referencedRelation: "genetics_screening_results"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       grow_events: {
         Row: {
@@ -2552,6 +2739,193 @@ export type Database = {
           },
         ]
       }
+      phenoid_candidate_extras: {
+        Row: {
+          breeding_score: number | null
+          capture_mode: string
+          cut_status: string
+          frame_index: number
+          hunt_id: string
+          id: string
+          imported_at: string
+          loud_shortlist: boolean
+          model_id: string
+          model_version: string
+          nose_score: number | null
+          pack_index: number
+          pack_label: string
+          pack_size: number
+          phenoid_uuid: string
+          plant_id: string
+          rating: number | null
+          resin_score: number | null
+          scored_by: string
+          source: string
+          stack_id: string
+          structure_score: number | null
+          updated_at: string
+          user_id: string
+          winner_score: number | null
+          yield_score: number | null
+        }
+        Insert: {
+          breeding_score?: number | null
+          capture_mode?: string
+          cut_status?: string
+          frame_index?: number
+          hunt_id: string
+          id?: string
+          imported_at?: string
+          loud_shortlist?: boolean
+          model_id?: string
+          model_version?: string
+          nose_score?: number | null
+          pack_index?: number
+          pack_label?: string
+          pack_size?: number
+          phenoid_uuid: string
+          plant_id: string
+          rating?: number | null
+          resin_score?: number | null
+          scored_by?: string
+          source?: string
+          stack_id?: string
+          structure_score?: number | null
+          updated_at?: string
+          user_id: string
+          winner_score?: number | null
+          yield_score?: number | null
+        }
+        Update: {
+          breeding_score?: number | null
+          capture_mode?: string
+          cut_status?: string
+          frame_index?: number
+          hunt_id?: string
+          id?: string
+          imported_at?: string
+          loud_shortlist?: boolean
+          model_id?: string
+          model_version?: string
+          nose_score?: number | null
+          pack_index?: number
+          pack_label?: string
+          pack_size?: number
+          phenoid_uuid?: string
+          plant_id?: string
+          rating?: number | null
+          resin_score?: number | null
+          scored_by?: string
+          source?: string
+          stack_id?: string
+          structure_score?: number | null
+          updated_at?: string
+          user_id?: string
+          winner_score?: number | null
+          yield_score?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "phenoid_candidate_extras_hunt_id_fkey"
+            columns: ["hunt_id"]
+            isOneToOne: false
+            referencedRelation: "pheno_hunts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "phenoid_candidate_extras_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      phenoid_fights: {
+        Row: {
+          basis: string
+          crew: string
+          fight_uuid: string
+          fought_at: string
+          hunt_id: string
+          id: string
+          note: string
+          plant_a_id: string
+          plant_b_id: string
+          user_id: string
+          winner: string
+        }
+        Insert: {
+          basis?: string
+          crew?: string
+          fight_uuid: string
+          fought_at?: string
+          hunt_id: string
+          id?: string
+          note?: string
+          plant_a_id: string
+          plant_b_id: string
+          user_id: string
+          winner: string
+        }
+        Update: {
+          basis?: string
+          crew?: string
+          fight_uuid?: string
+          fought_at?: string
+          hunt_id?: string
+          id?: string
+          note?: string
+          plant_a_id?: string
+          plant_b_id?: string
+          user_id?: string
+          winner?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "phenoid_fights_hunt_id_fkey"
+            columns: ["hunt_id"]
+            isOneToOne: false
+            referencedRelation: "pheno_hunts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "phenoid_fights_plant_a_id_fkey"
+            columns: ["plant_a_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "phenoid_fights_plant_b_id_fkey"
+            columns: ["plant_b_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      phenoid_ingest_idempotency: {
+        Row: {
+          created_at: string
+          idempotency_key: string
+          result: Json
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          idempotency_key: string
+          result: Json
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          idempotency_key?: string
+          result?: Json
+          user_id?: string
+        }
+        Relationships: []
+      }
       photo_events: {
         Row: {
           caption: string | null
@@ -2698,6 +3072,98 @@ export type Database = {
           },
         ]
       }
+      plant_origin_assignment_events: {
+        Row: {
+          action: string
+          changed_at: string
+          created_at: string
+          from_batch_id: string | null
+          id: string
+          plant_id: string
+          reason: string | null
+          to_batch_id: string
+          user_id: string
+        }
+        Insert: {
+          action: string
+          changed_at?: string
+          created_at?: string
+          from_batch_id?: string | null
+          id?: string
+          plant_id: string
+          reason?: string | null
+          to_batch_id: string
+          user_id: string
+        }
+        Update: {
+          action?: string
+          changed_at?: string
+          created_at?: string
+          from_batch_id?: string | null
+          id?: string
+          plant_id?: string
+          reason?: string | null
+          to_batch_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plant_origin_assignment_events_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plant_origin_assignments: {
+        Row: {
+          assigned_at: string
+          assigned_reason: string | null
+          batch_id: string
+          created_at: string
+          id: string
+          plant_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          assigned_at?: string
+          assigned_reason?: string | null
+          batch_id: string
+          created_at?: string
+          id?: string
+          plant_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          assigned_at?: string
+          assigned_reason?: string | null
+          batch_id?: string
+          created_at?: string
+          id?: string
+          plant_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plant_origin_assignments_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "propagation_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plant_origin_assignments_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: true
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       plants: {
         Row: {
           candidate_label: string | null
@@ -2788,6 +3254,7 @@ export type Database = {
           marketing_opt_in: boolean
           marketing_opt_in_at: string | null
           nugs_total: number
+          referral_code: string | null
           tier: string
           updated_at: string
           user_id: string
@@ -2800,6 +3267,7 @@ export type Database = {
           marketing_opt_in?: boolean
           marketing_opt_in_at?: string | null
           nugs_total?: number
+          referral_code?: string | null
           tier?: string
           updated_at?: string
           user_id: string
@@ -2812,11 +3280,264 @@ export type Database = {
           marketing_opt_in?: boolean
           marketing_opt_in_at?: string | null
           nugs_total?: number
+          referral_code?: string | null
           tier?: string
           updated_at?: string
           user_id?: string
         }
         Relationships: []
+      }
+      propagation_batch_status_events: {
+        Row: {
+          batch_id: string
+          changed_at: string
+          created_at: string
+          from_status: string | null
+          id: string
+          reason: string | null
+          to_status: string
+          user_id: string
+        }
+        Insert: {
+          batch_id: string
+          changed_at?: string
+          created_at?: string
+          from_status?: string | null
+          id?: string
+          reason?: string | null
+          to_status: string
+          user_id: string
+        }
+        Update: {
+          batch_id?: string
+          changed_at?: string
+          created_at?: string
+          from_status?: string | null
+          id?: string
+          reason?: string | null
+          to_status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "propagation_batch_status_events_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "propagation_batches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      propagation_batches: {
+        Row: {
+          batch_code: string
+          counts_unknown: boolean
+          created_at: string
+          cut_date: string | null
+          grow_id: string | null
+          id: string
+          initial_quantity: number | null
+          mother_plant_id: string | null
+          name: string | null
+          notes: string | null
+          origin_unknown: boolean
+          propagation_method: string
+          received_date: string | null
+          rooted_date: string | null
+          source_accession_id: string | null
+          started_date: string | null
+          status: string
+          tent_id: string | null
+          updated_at: string
+          user_id: string
+          viable_quantity: number | null
+        }
+        Insert: {
+          batch_code: string
+          counts_unknown?: boolean
+          created_at?: string
+          cut_date?: string | null
+          grow_id?: string | null
+          id?: string
+          initial_quantity?: number | null
+          mother_plant_id?: string | null
+          name?: string | null
+          notes?: string | null
+          origin_unknown?: boolean
+          propagation_method?: string
+          received_date?: string | null
+          rooted_date?: string | null
+          source_accession_id?: string | null
+          started_date?: string | null
+          status?: string
+          tent_id?: string | null
+          updated_at?: string
+          user_id: string
+          viable_quantity?: number | null
+        }
+        Update: {
+          batch_code?: string
+          counts_unknown?: boolean
+          created_at?: string
+          cut_date?: string | null
+          grow_id?: string | null
+          id?: string
+          initial_quantity?: number | null
+          mother_plant_id?: string | null
+          name?: string | null
+          notes?: string | null
+          origin_unknown?: boolean
+          propagation_method?: string
+          received_date?: string | null
+          rooted_date?: string | null
+          source_accession_id?: string | null
+          started_date?: string | null
+          status?: string
+          tent_id?: string | null
+          updated_at?: string
+          user_id?: string
+          viable_quantity?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "propagation_batches_grow_id_fkey"
+            columns: ["grow_id"]
+            isOneToOne: false
+            referencedRelation: "grows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "propagation_batches_mother_plant_id_fkey"
+            columns: ["mother_plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "propagation_batches_source_accession_id_fkey"
+            columns: ["source_accession_id"]
+            isOneToOne: false
+            referencedRelation: "genetics_accessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "propagation_batches_tent_id_fkey"
+            columns: ["tent_id"]
+            isOneToOne: false
+            referencedRelation: "tents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quarantine_episodes: {
+        Row: {
+          closed_at: string | null
+          closure_kind: string | null
+          closure_screening_result_id: string | null
+          created_at: string
+          id: string
+          opened_at: string
+          opened_reason: string | null
+          reopened_at: string | null
+          status: string
+          subject_id: string
+          subject_type: string
+          target: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          closed_at?: string | null
+          closure_kind?: string | null
+          closure_screening_result_id?: string | null
+          created_at?: string
+          id?: string
+          opened_at?: string
+          opened_reason?: string | null
+          reopened_at?: string | null
+          status?: string
+          subject_id: string
+          subject_type: string
+          target: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          closed_at?: string | null
+          closure_kind?: string | null
+          closure_screening_result_id?: string | null
+          created_at?: string
+          id?: string
+          opened_at?: string
+          opened_reason?: string | null
+          reopened_at?: string | null
+          status?: string
+          subject_id?: string
+          subject_type?: string
+          target?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quarantine_episodes_closure_screening_result_id_fkey"
+            columns: ["closure_screening_result_id"]
+            isOneToOne: false
+            referencedRelation: "genetics_screening_results"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quarantine_transition_events: {
+        Row: {
+          action: string
+          changed_at: string
+          created_at: string
+          episode_id: string
+          id: string
+          is_override: boolean
+          reason: string | null
+          screening_result_id: string | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          changed_at?: string
+          created_at?: string
+          episode_id: string
+          id?: string
+          is_override?: boolean
+          reason?: string | null
+          screening_result_id?: string | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          changed_at?: string
+          created_at?: string
+          episode_id?: string
+          id?: string
+          is_override?: boolean
+          reason?: string | null
+          screening_result_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quarantine_transition_events_episode_id_fkey"
+            columns: ["episode_id"]
+            isOneToOne: false
+            referencedRelation: "quarantine_episodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quarantine_transition_events_screening_result_id_fkey"
+            columns: ["screening_result_id"]
+            isOneToOne: false
+            referencedRelation: "genetics_screening_results"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       quicklog_audit_events: {
         Row: {
@@ -2853,19 +3574,64 @@ export type Database = {
           created_at: string
           grow_event_id: string
           idempotency_key: string
+          request_hash: string | null
           user_id: string
         }
         Insert: {
           created_at?: string
           grow_event_id: string
           idempotency_key: string
+          request_hash?: string | null
           user_id: string
         }
         Update: {
           created_at?: string
           grow_event_id?: string
           idempotency_key?: string
+          request_hash?: string | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      referrals: {
+        Row: {
+          code: string
+          converted_at: string | null
+          created_at: string
+          environment: string
+          id: string
+          meta: Json
+          referee_credits: number
+          referee_user_id: string
+          referrer_credits: number
+          referrer_user_id: string
+          status: string
+        }
+        Insert: {
+          code: string
+          converted_at?: string | null
+          created_at?: string
+          environment: string
+          id?: string
+          meta?: Json
+          referee_credits?: number
+          referee_user_id: string
+          referrer_credits?: number
+          referrer_user_id: string
+          status?: string
+        }
+        Update: {
+          code?: string
+          converted_at?: string | null
+          created_at?: string
+          environment?: string
+          id?: string
+          meta?: Json
+          referee_credits?: number
+          referee_user_id?: string
+          referrer_credits?: number
+          referrer_user_id?: string
+          status?: string
         }
         Relationships: []
       }
@@ -3626,6 +4392,16 @@ export type Database = {
           tier: string
         }[]
       }
+      convert_referral: {
+        Args: {
+          p_code: string
+          p_environment: string
+          p_referee_user_id: string
+          p_referrer_user_id: string
+          p_verified: boolean
+        }
+        Returns: Json
+      }
       create_feeding_event: {
         Args: {
           _ec_in?: number
@@ -3690,6 +4466,75 @@ export type Database = {
       founder_lifetime_slots_remaining: { Args: never; Returns: number }
       founders_seats_consumed: { Args: never; Returns: number }
       founders_wall_count: { Args: never; Returns: number }
+      generate_referral_code: { Args: never; Returns: string }
+      genetics_accession_archive: {
+        Args: {
+          p_accession_id: string
+          p_archived: boolean
+          p_idempotency_key: string
+        }
+        Returns: Json
+      }
+      genetics_accession_upsert: {
+        Args: { p_idempotency_key: string; p_payload: Json }
+        Returns: Json
+      }
+      genetics_assign_plants: {
+        Args: {
+          p_batch_id: string
+          p_idempotency_key: string
+          p_plant_ids: string[]
+          p_reason?: string
+        }
+        Returns: Json
+      }
+      genetics_batch_upsert: {
+        Args: { p_idempotency_key: string; p_payload: Json }
+        Returns: Json
+      }
+      genetics_lineage_has_cycle: {
+        Args: {
+          p_owner: string
+          p_start_id: string
+          p_start_kind: string
+          p_target_id: string
+          p_target_kind: string
+        }
+        Returns: boolean
+      }
+      genetics_lock_lineage: { Args: { p_owner: string }; Returns: undefined }
+      genetics_quarantine_open: {
+        Args: { p_idempotency_key: string; p_payload: Json }
+        Returns: Json
+      }
+      genetics_quarantine_transition: {
+        Args: {
+          p_action: string
+          p_episode_id: string
+          p_idempotency_key: string
+          p_reason?: string
+          p_screening_result_id?: string
+        }
+        Returns: Json
+      }
+      genetics_screening_record: {
+        Args: { p_idempotency_key: string; p_payload: Json }
+        Returns: Json
+      }
+      genetics_subject_evidence: {
+        Args: { p_owner: string; p_subject_id: string; p_subject_type: string }
+        Returns: Json
+      }
+      genetics_trace_resolve: {
+        Args: {
+          p_direction?: string
+          p_max_depth?: number
+          p_max_nodes?: number
+          p_subject_id: string
+          p_subject_type: string
+        }
+        Returns: Json
+      }
       get_latest_tent_sensor_snapshot: {
         Args: { _tent_id: string }
         Returns: Json
@@ -3704,10 +4549,21 @@ export type Database = {
         }
         Returns: Json
       }
+      grant_lovable_credits: {
+        Args: {
+          p_credits: number
+          p_environment: string
+          p_expected_user_id: string
+          p_grant_ref: string
+          p_source: string
+        }
+        Returns: Json
+      }
       has_pheno_tracker_entitlement: {
         Args: { _user_id: string }
         Returns: boolean
       }
+      has_phenoid_entitlement: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -3728,6 +4584,10 @@ export type Database = {
           source_queue: string
         }
         Returns: number
+      }
+      pheno_ingest: {
+        Args: { p_idempotency_key: string; p_payload: Json }
+        Returns: Json
       }
       pi_ingest_commit_batch: {
         Args: {

@@ -317,9 +317,16 @@ function banner(srcRel, hash) {
 }
 
 async function main() {
+  // In --check mode, callers (e.g. the drift annotator) can pin the tmp
+  // output dir via SYNC_TMP_OUT so they can diff committed mirror files
+  // against the freshly generated content to compute a real line number.
   const outRoot = CHECK
-    ? await fs.mkdtemp(path.join(os.tmpdir(), "edge-shared-"))
+    ? (process.env.SYNC_TMP_OUT
+        ? (await fs.mkdir(process.env.SYNC_TMP_OUT, { recursive: true }),
+          process.env.SYNC_TMP_OUT)
+        : await fs.mkdtemp(path.join(os.tmpdir(), "edge-shared-")))
     : MIRROR_ABS;
+
 
   const entries = await findEntryFiles();
   const collected = await collectFromEntries(entries);

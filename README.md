@@ -846,7 +846,134 @@ this order:
   the **Branch** filter if you're looking at the default branch but the
   run was on a feature branch.
 
+##### Downloading and inspecting SARIF artifacts from a workflow run
+
+The `required-money-migrations` workflow uploads every generated SARIF
+file as part of the `money-migration-audit-<env>` artifact bundle, so
+you can pull the exact bytes GitHub processed and diff them against a
+local run.
+
+**Step 1 — Download the artifact.**
+
+Via the GitHub UI:
+- Repo → **Actions** → the failed/passing run → scroll to **Artifacts**
+  at the bottom of the summary page.
+- Click `money-migration-audit-sandbox` (or `-live`) to download a
+  `.zip`. The bundle contains at least:
+  ```
+  diff.sarif                    # SARIF uploaded to Code scanning
+  diff.txt                      # human-readable text diff (if generated)
+  prefix-diff-cli.json          # machine-readable JSON from the CLI
+  prefix-diff-cli.txt           # text mirror of the same run
+  applied-audit.json            # applied-check machine-readable report
+  applied-audit.md              # Markdown summary posted to Step Summary
+  edge-function-logs/*.log      # per-function log excerpts (when collected)
+  ```
+
+Via `gh` CLI (faster, scriptable):
+```bash
+# List recent runs of the workflow
+gh run list --workflow required-money-migrations.yml --limit 5
+
+# Download every artifact from a specific run into ./artifacts/
+gh run download <run-id> --dir artifacts/
+
+# Or just the sandbox bundle
+gh run download <run-id> --name money-migration-audit-sandbox --dir artifacts/
+```
+
+If the run was on a PR from a fork, `gh run download` requires
+`--repo <owner>/<repo>` and a token with `actions: read`. Artifacts
+expire after 90 days (repo default) — grab them before then.
+
+**Step 2 — Regenerate the equivalent SARIF locally.**
+
+Use the same `TARGET_ENV` and DB URL the failing job used (check the
+job's `env:` block) so the comparison is apples-to-apples:
+
+```bash
+TARGET_ENV=sandbox \
+SUPABASE_DB_URL_SANDBOX="$SUPABASE_DB_URL_SANDBOX" \
+  node scripts/diff-money-migration-prefixes.mjs \
+    --sarif --sarif-out=local-diff.sarif
+```
+
+**Step 3 — Compare the two SARIF files.**
+
+SARIF has some non-deterministic fields (timestamps, absolute paths in
+`invocations`, tool version if you're on a different branch). Normalize
+before diffing:
+
+```bash
+# Strip volatile fields and canonicalize
+jq -S 'del(
+    .runs[].invocations,
+    .runs[].tool.driver.semanticVersion,
+    .runs[].results[].locations[].physicalLocation.artifactLocation.uriBaseId
+  )' artifacts/money-migration-audit-sandbox/diff.sarif > /tmp/ci.norm.json
+
+jq -S 'del(
+    .runs[].invocations,
+    .runs[].tool.driver.semanticVersion,
+    .runs[].results[].locations[].physicalLocation.artifactLocation.uriBaseId
+  )' local-diff.sarif > /tmp/local.norm.json
+
+diff -u /tmp/ci.norm.json /tmp/local.norm.json
+```
+
+Zero diff = your local environment reproduces the CI finding exactly.
+Any diff is real drift between environments (usually a migration
+applied locally but not in sandbox, or vice versa).
+
+**Step 4 — Compare just the findings.**
+
+If the full SARIF diff is noisy, compare the `results[]` fingerprints
+directly — this is what Code scanning actually keys on:
+
+```bash
+extract_fps() {
+  jq -r '.runs[0].results[]
+    | [.ruleId,
+       .locations[0].physicalLocation.artifactLocation.uri,
+       .partialFingerprints.migrationVersion // "-"]
+    | @tsv' "$1" | sort
+}
+
+diff <(extract_fps artifacts/money-migration-audit-sandbox/diff.sarif) \
+     <(extract_fps local-diff.sarif)
+```
+
+Each line is `<ruleId>\t<uri>\t<migrationVersion>`. Missing lines on
+the left = findings CI reported that you no longer reproduce; missing
+on the right = new findings your local DB shows that CI didn't.
+
+**Step 5 — Cross-check with the JSON audit.**
+
+`prefix-diff-cli.json` in the artifact is the same structure documented
+in the **JSON schema** section above. Sanity-check the counts match the
+SARIF:
+
+```bash
+jq '.summary' artifacts/money-migration-audit-sandbox/prefix-diff-cli.json
+jq '.runs[0].results | length' artifacts/money-migration-audit-sandbox/diff.sarif
+```
+
+`summary.driftCount + summary.malformedCount + summary.toolingCount`
+should equal the SARIF `results` length. A mismatch means one of the
+two outputs was truncated — re-download the artifact.
+
+**Step 6 — Common gotchas.**
+
+| Symptom                                                     | Cause / fix                                                                                              |
+|-------------------------------------------------------------|----------------------------------------------------------------------------------------------------------|
+| `gh run download` says *no artifacts found*                 | Artifact expired (>90 days) or the job was skipped/cancelled before the upload step ran.                 |
+| Local SARIF has findings, CI SARIF is empty                 | You're pointed at a different DB. Re-check `TARGET_ENV` and that `SUPABASE_DB_URL_*` matches the job env. |
+| Rule IDs differ (`money-migration-drift` vs old name)       | You're on an older branch locally. Rebase onto `main` and rerun.                                         |
+| `jq: error: Cannot iterate over null (null)`                | SARIF has `results: []` (clean run). Wrap the filter in `.runs[0].results // [] \| .[]`.                 |
+| Fingerprints match but URIs differ                          | One run used absolute paths, the other used repo-relative. The `del(...uriBaseId)` step above fixes it.  |
+
 ##### Walkthrough: inspecting PR file annotations from an uploaded SARIF
+
 
 Once `upload-sarif` finishes on a PR run, GitHub renders each SARIF
 result as an inline annotation on the PR. Here's exactly where to click

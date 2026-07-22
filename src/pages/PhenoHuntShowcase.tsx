@@ -1,15 +1,16 @@
 /**
  * PhenoHuntShowcase — LIVE, read-only walk of the grower's OWN hunt through the
  * same surfaces as the /internal demo: pack → contenders → fight → cure → family
- * tree. Reads via RLS-scoped SELECT (usePhenoHuntView); no session / no hunt /
+ * tree. Reads via RLS-scoped SELECT (usePhenoHuntView); no session / no hunt id /
  * still loading falls back to the labeled demo, so the page is never blank and
- * never fabricates.
+ * never fabricates. A specific hunt id that resolves to nothing renders the
+ * explicit not-found notice instead — demo sections never impersonate it.
  *
  * Read-only: no writes, no AI, no automation. Mounted outside AppShell (like the
  * per-hunt comparison) so the read surface renders without operator chrome.
  */
 import { useMemo } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import PageHeader from "@/components/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -151,6 +152,34 @@ export default function PhenoHuntShowcase() {
     : [];
 
   const isDemo = source === "demo";
+
+  // A signed-in grower pointed at a specific hunt that resolved to nothing:
+  // say so plainly and render NO sections — sample data must never stand in
+  // for a particular hunt. (After all hooks, so the hook order stays stable.)
+  if (source === "not_found") {
+    return (
+      <div data-testid="pheno-hunt-showcase-page" className="container mx-auto max-w-5xl px-4 py-6">
+        <PageHeader
+          title="Pheno Hunt"
+          description="A read-only walk of your hunt: triage, compare, decide, and trace lineage — you make every call."
+        />
+        <p
+          data-testid="pheno-hunt-showcase-source"
+          className="mb-5 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300"
+        >
+          This hunt was not found or has no candidates yet, so there&rsquo;s nothing to walk
+          through.{" "}
+          <Link
+            to="/pheno-hunts"
+            className="font-medium underline underline-offset-2"
+            data-testid="pheno-hunt-showcase-not-found-link"
+          >
+            Back to your pheno hunts
+          </Link>
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div data-testid="pheno-hunt-showcase-page" className="container mx-auto max-w-5xl px-4 py-6">

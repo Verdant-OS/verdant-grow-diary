@@ -6,7 +6,11 @@
  * usePhenoHuntWorkspace (candidate scores + keeper decisions) and usePhenoKeepers
  * (keepers, clones, crosses, reversals) — projects those rows onto the adapter's
  * source contract, and runs them through phenoHuntViewAdapter. No session / no
- * such hunt / still loading → the demo fixture, clearly flagged by `source`.
+ * hunt id → the demo fixture, clearly flagged by `source`. A signed-in grower
+ * pointing at a SPECIFIC hunt id that resolves to nothing (no row, RLS-hidden,
+ * or zero candidates) gets `source: "not_found"` with EMPTY data — the demo
+ * never stands in for a particular hunt, so a missing hunt is never mistaken
+ * for a persisted one.
  *
  * Read-only: no writes, no AI, no automation. Security is the tables' RLS; this
  * hook is presentation only.
@@ -41,7 +45,7 @@ import {
   DEMO_CLONES,
 } from "@/lib/demo/phenoHuntDemoFixture";
 
-export type PhenoHuntViewSource = "live" | "demo";
+export type PhenoHuntViewSource = "live" | "demo" | "not_found";
 
 export interface PhenoHuntViewMeta {
   readonly name: string;
@@ -106,6 +110,15 @@ function demoBundle(): {
 
 const DEMO = demoBundle();
 
+/** Empty bundle for `not_found` — a missing hunt renders nothing, never demo rows. */
+const NOT_FOUND_DATA: PhenoHuntViewData = buildPhenoHuntView({
+  candidates: [],
+  keepers: [],
+  crosses: [],
+  clones: [],
+});
+const NOT_FOUND_CLONE_ROWS: Record<string, CloneTreeRow[]> = {};
+
 function candidateDisplayName(c: {
   candidateLabel?: string | null;
   plantLabel?: string | null;
@@ -136,7 +149,8 @@ export function usePhenoHuntView(huntId: string | null | undefined): UsePhenoHun
   const ws = usePhenoHuntWorkspace(liveHuntId);
   const kp = usePhenoKeepers(liveHuntId);
 
-  const hasLive = !!user && (huntId?.trim().length ?? 0) > 0 && ws.candidates.length > 0;
+  const wantsLive = !!user && (huntId?.trim().length ?? 0) > 0;
+  const hasLive = wantsLive && ws.candidates.length > 0;
 
   // Load each scoring round on demand so the cure timeline can draw the grow
   // nodes (veg→flower→cure), not just the cure marker. Idempotent per round;
@@ -250,6 +264,39 @@ export function usePhenoHuntView(huntId: string | null | undefined): UsePhenoHun
     };
   }
 
+  if (wantsLive) {
+    // Signed-in grower asking for a SPECIFIC hunt. While the workspace reads
+    // are in flight ("idle" = pre-effect mount, "loading" = fetch running)
+    // stay in loading; only once BOTH hooks settle ("ok"/"error") with zero
+    // candidates do we conclude the hunt resolves to nothing — no pheno_hunts
+    // row, RLS-hidden, or simply empty. That is not_found, never the demo:
+    // sample data must not impersonate a particular hunt.
+    const settled =
+      (ws.status === "ok" || ws.status === "error") &&
+      (kp.status === "ok" || kp.status === "error");
+    if (!settled) {
+      return {
+        status: "loading",
+        source: "demo",
+        meta: DEMO_META,
+        data: DEMO.data,
+        cloneRowsByKeeperId: DEMO.cloneRowsByKeeperId,
+      };
+    }
+    return {
+      status: "ready",
+      source: "not_found",
+      meta: {
+        name: ws.hunt?.name ?? kp.hunt?.name ?? "This hunt",
+        packLabel: null,
+        packSize: null,
+      },
+      data: NOT_FOUND_DATA,
+      cloneRowsByKeeperId: NOT_FOUND_CLONE_ROWS,
+    };
+  }
+
+  // Signed out (public preview) or signed in with no hunt id: the labeled demo.
   return {
     status: loading ? "loading" : "ready",
     source: "demo",

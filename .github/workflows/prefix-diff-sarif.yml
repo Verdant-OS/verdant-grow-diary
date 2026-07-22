@@ -49,10 +49,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: 1.3.14
 
@@ -91,7 +91,7 @@ jobs:
 
       - name: Upload SARIF to Code Scanning
         if: hashFiles(env.SARIF_PATH) != ''
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@08d09a53f0f5d694f253bd25732e4429c9e9337f # v3.37.2
         with:
           sarif_file: ${{ env.SARIF_PATH }}
           # Category lets multiple SARIF uploads coexist without overwriting
@@ -100,7 +100,7 @@ jobs:
 
       - name: Archive SARIF + JSON as workflow artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: prefix-diff-sarif-${{ env.TARGET_ENV }}
           path: |

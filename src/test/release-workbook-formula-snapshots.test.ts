@@ -31,6 +31,12 @@ function cell(ws: XLSX.WorkSheet, addr: string): string {
   return c.f ? `=${c.f}` : String(c.v ?? "");
 }
 
+function readWorkbook(path: string): XLSX.WorkBook {
+  // xlsx 0.20.x ESM does not auto-bind node:fs under Vitest, so its
+  // path-based readFile() reports a tracked workbook as inaccessible.
+  return XLSX.read(readFileSync(path));
+}
+
 function expectFormulaCell(
   ws: XLSX.WorkSheet,
   addr: string,
@@ -61,7 +67,7 @@ const FORBIDDEN_IN_FORMULAS = [
 
 describe("v1.3 workbook formula snapshots — XLSX must match contract exactly", () => {
   it("Seed Production: column L (viability) formula matches contract for every generated row", () => {
-    const wb = XLSX.readFile(SEED_XLSX);
+    const wb = readWorkbook(SEED_XLSX);
     const sheetName = wb.SheetNames.find((n) => n.startsWith("Seed_Production"))!;
     const ws = wb.Sheets[sheetName];
     for (const r of SEED_ROWS) {
@@ -70,7 +76,7 @@ describe("v1.3 workbook formula snapshots — XLSX must match contract exactly",
   });
 
   it("Seed Production: column W (quality flag) formula matches contract for every generated row", () => {
-    const wb = XLSX.readFile(SEED_XLSX);
+    const wb = readWorkbook(SEED_XLSX);
     const sheetName = wb.SheetNames.find((n) => n.startsWith("Seed_Production"))!;
     const ws = wb.Sheets[sheetName];
     for (const r of SEED_ROWS) {
@@ -79,7 +85,7 @@ describe("v1.3 workbook formula snapshots — XLSX must match contract exactly",
   });
 
   it("Commercial Release Review: AC (Review Status) formula matches contract and never says Released", () => {
-    const wb = XLSX.readFile(REVIEW_XLSX);
+    const wb = readWorkbook(REVIEW_XLSX);
     const sheetName = wb.SheetNames.find((n) => n.startsWith("Commercial_Release_Review"))!;
     const ws = wb.Sheets[sheetName];
     for (const r of REVIEW_ROWS) {
@@ -92,7 +98,7 @@ describe("v1.3 workbook formula snapshots — XLSX must match contract exactly",
   });
 
   it("Commercial Release Review: AB (Missing Evidence Count) is operator-entered (no formula in any row)", () => {
-    const wb = XLSX.readFile(REVIEW_XLSX);
+    const wb = readWorkbook(REVIEW_XLSX);
     const sheetName = wb.SheetNames.find((n) => n.startsWith("Commercial_Release_Review"))!;
     const ws = wb.Sheets[sheetName];
     for (const r of REVIEW_ROWS) {
@@ -105,7 +111,7 @@ describe("v1.3 workbook formula snapshots — XLSX must match contract exactly",
   });
 
   it("Commercial Release Review: human-decision columns (AD reviewer/date/queue draft) have no formulas", () => {
-    const wb = XLSX.readFile(REVIEW_XLSX);
+    const wb = readWorkbook(REVIEW_XLSX);
     const sheetName = wb.SheetNames.find((n) => n.startsWith("Commercial_Release_Review"))!;
     const ws = wb.Sheets[sheetName];
     for (const r of REVIEW_ROWS) {
@@ -120,7 +126,7 @@ describe("v1.3 workbook formula snapshots — XLSX must match contract exactly",
   });
 
   it("XLSX header rows match canonical contracts exactly", () => {
-    const seedWb = XLSX.readFile(SEED_XLSX);
+    const seedWb = readWorkbook(SEED_XLSX);
     const seedWs = seedWb.Sheets[seedWb.SheetNames.find((n) => n.startsWith("Seed_Production"))!];
     const seedHeaders = SEED_PRODUCTION_HEADERS.map((_, i) => {
       const ref = XLSX.utils.encode_cell({ r: 0, c: i });
@@ -128,8 +134,9 @@ describe("v1.3 workbook formula snapshots — XLSX must match contract exactly",
     });
     expect(seedHeaders).toEqual(SEED_PRODUCTION_HEADERS);
 
-    const revWb = XLSX.readFile(REVIEW_XLSX);
-    const revWs = revWb.Sheets[revWb.SheetNames.find((n) => n.startsWith("Commercial_Release_Review"))!];
+    const revWb = readWorkbook(REVIEW_XLSX);
+    const revWs =
+      revWb.Sheets[revWb.SheetNames.find((n) => n.startsWith("Commercial_Release_Review"))!];
     const revHeaders = COMMERCIAL_REVIEW_HEADERS.map((_, i) => {
       const ref = XLSX.utils.encode_cell({ r: 0, c: i });
       return String(revWs[ref]?.v ?? "");

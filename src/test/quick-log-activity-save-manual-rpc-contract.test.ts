@@ -5,8 +5,8 @@
  * quicklog_save_manual signature is target-scoped
  * (p_target_type/p_target_id/p_idempotency_key/...), so the old
  * p_grow_id shape always failed with PGRST202 and quietly made Quick Log
- * notes/waterings unsavable through this hook. These tests pin the real
- * payload shape so it cannot drift back.
+ * notes unsavable through this hook. These tests pin the real payload
+ * shape so it cannot drift back.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
@@ -28,9 +28,7 @@ beforeEach(() => {
   rpcMock.mockReset();
 });
 
-type SaveResult = Awaited<
-  ReturnType<ReturnType<typeof useQuickLogActivitySave>["save"]>
->;
+type SaveResult = Awaited<ReturnType<ReturnType<typeof useQuickLogActivitySave>["save"]>>;
 
 async function save(input: Parameters<ReturnType<typeof useQuickLogActivitySave>["save"]>[0]) {
   const { result } = renderHook(() => useQuickLogActivitySave());
@@ -75,19 +73,21 @@ describe("useQuickLogActivitySave — quicklog_save_manual payload shape", () =>
     expect(payload).not.toHaveProperty("p_plant_id");
   });
 
-  it("falls back to the tent target and threads the watering volume", async () => {
+  it("falls back to the tent target for a tent-scoped note", async () => {
     rpcMock.mockResolvedValueOnce(OK_RESPONSE);
-    await save({
-      activityId: "watering",
+    const res = await save({
+      activityId: "note",
       growId: "grow-1",
       tentId: "tent-1",
-      volumeMl: 500,
+      note: "Room walk complete",
     });
+    expect(res.ok).toBe(true);
+    expect(rpcMock).toHaveBeenCalledTimes(1);
     const [, payload] = rpcMock.mock.calls[0];
     expect(payload.p_target_type).toBe("tent");
     expect(payload.p_target_id).toBe("tent-1");
-    expect(payload.p_action).toBe("water");
-    expect(payload.p_volume_ml).toBe(500);
+    expect(payload.p_action).toBe("note");
+    expect(payload.p_volume_ml).toBeNull();
   });
 
   it("omits p_details without extra details and nulls a server-invalid key", async () => {

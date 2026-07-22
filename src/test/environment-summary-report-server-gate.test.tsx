@@ -45,6 +45,8 @@ vi.mock("@/hooks/useMyEntitlements", () => ({
         multiTent: gateMock.clientPremium,
         sensorHistoryDays: null,
         prioritySupport: gateMock.clientPremium,
+        phenoComparison: gateMock.clientPremium,
+        blueprint: gateMock.clientPremium,
       },
       degraded: false,
       degradedReason: null,

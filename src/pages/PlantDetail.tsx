@@ -21,6 +21,7 @@ import PlantAssignedTentActionsPanel from "@/components/PlantAssignedTentActions
 import PlantStatusStrip from "@/components/PlantStatusStrip";
 import QuickLogV2Fab from "@/components/QuickLogV2Fab";
 import PlantQuickStatusStrip from "@/components/PlantQuickStatusStrip";
+import PlantLogStreakMarker from "@/components/PlantLogStreakMarker";
 import PlantDetailQuickActions from "@/components/PlantDetailQuickActions";
 import PlantDetailPhotoStrip from "@/components/PlantDetailPhotoStrip";
 import PlantDetailRecentActivityRecap from "@/components/PlantDetailRecentActivityRecap";
@@ -394,6 +395,7 @@ export default function PlantDetail() {
         tentId={plant.tentId ?? null}
         growId={plant.growId ?? null}
       />
+      <PlantLogStreakMarker plantId={plant.id} />
       <PlantDetailQuickActions
         plantId={plant.id}
         plantName={plant.name}

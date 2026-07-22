@@ -24,15 +24,31 @@ const PRO_CAPABILITIES: Readonly<Capabilities> = Object.freeze({
   multiTent: true,
   sensorHistoryDays: null,
   prioritySupport: true,
+  phenoComparison: true,
+  // Blueprint overlay is Craft-exclusive (+ Founder) — not part of Pro.
+  blueprint: false,
 });
 
 /**
- * Founder Lifetime: Pro capabilities forever. AI credits are intentionally
- * the same 100/month cap as Pro — never unlimited.
+ * Founder Lifetime: Pro capabilities forever, PLUS the Blueprint overlay. AI
+ * credits are intentionally the same 100/month cap as Pro — never unlimited.
  */
 const FOUNDER_LIFETIME_CAPABILITIES: Readonly<Capabilities> = Object.freeze({
   ...PRO_CAPABILITIES,
   aiMonthlyCredits: 100,
+  blueprint: true,
+});
+
+/**
+ * Craft: everything Pro has, plus the Blueprint overlay and a larger monthly
+ * AI-credit bucket (300). The craft-grower / rosin tier. Matches the deploy
+ * branch's Craft definition so the two lineages stay converged. Both cadences
+ * resolve identically, mirroring pro_monthly/pro_annual.
+ */
+const CRAFT_CAPABILITIES: Readonly<Capabilities> = Object.freeze({
+  ...PRO_CAPABILITIES,
+  aiMonthlyCredits: 300,
+  blueprint: true,
 });
 
 export const PLAN_CATALOG: Readonly<Record<PlanId, Readonly<Capabilities>>> =
@@ -41,6 +57,8 @@ export const PLAN_CATALOG: Readonly<Record<PlanId, Readonly<Capabilities>>> =
     pro_monthly: PRO_CAPABILITIES,
     pro_annual: PRO_CAPABILITIES,
     founder_lifetime: FOUNDER_LIFETIME_CAPABILITIES,
+    craft_monthly: CRAFT_CAPABILITIES,
+    craft_annual: CRAFT_CAPABILITIES,
   });
 
 export const KNOWN_PLAN_IDS: ReadonlyArray<PlanId> = [
@@ -48,6 +66,8 @@ export const KNOWN_PLAN_IDS: ReadonlyArray<PlanId> = [
   "pro_monthly",
   "pro_annual",
   "founder_lifetime",
+  "craft_monthly",
+  "craft_annual",
 ];
 
 export function isKnownPlanId(value: unknown): value is PlanId {

@@ -9,7 +9,14 @@ export type PlanId =
   | "free"
   | "pro_monthly"
   | "pro_annual"
-  | "founder_lifetime";
+  | "founder_lifetime"
+  // Craft: the craft-grower / rosin tier. Everything Pro has, plus the Blueprint
+  // overlay and a 300/month AI-credit bucket (see planCatalog). Definition mirrors
+  // the deploy branch so the lineages stay converged. Fully resolvable everywhere
+  // the app reasons about entitlements; activation is only the Paddle products
+  // (no billing row can carry these until they exist).
+  | "craft_monthly"
+  | "craft_annual";
 
 export type SubscriptionStatus =
   | "active"
@@ -49,6 +56,19 @@ export interface Capabilities {
   multiTent: boolean;
   sensorHistoryDays: number | null;  // null = unlimited
   prioritySupport: boolean;
+  /**
+   * Real-data Pheno Comparison — side-by-side candidate selection evidence for
+   * a real grow's hunt (not the public sample preview). Paid: false for free,
+   * true for Pro/founder. Presentation gate only (the data is the user's own,
+   * RLS-scoped) — no money spent, so a client capability check is sufficient.
+   */
+  phenoComparison: boolean;
+  /**
+   * Pro Blueprint overlay (per-stage SOP scoring). Craft-exclusive (+ Founder).
+   * The overlay feature itself lives on the deploy branch; on main this flag is
+   * carried for entitlement-shape parity so the lineages stay converged.
+   */
+  blueprint: boolean;
 }
 
 /**

@@ -315,6 +315,7 @@ export function findCultivarBySlug(slug: string | undefined): VerdantCultivarPro
 }
 
 const uniqueStrings = (values: readonly string[]): string[] => [...new Set(values.filter((value) => value.trim().length > 0))];
+const uniqueGuidance = (values: readonly CultivarGuidanceItem[]): CultivarGuidanceItem[] => [...new Map(values.map((value) => [value.text, value])).values()];
 
 function buildBaseGuide(lifeCycle: CultivarLifeCycle): readonly CultivarGuideSection[] {
   return CULTIVAR_GUIDE_SECTION_KEYS.map((key) => {
@@ -337,7 +338,7 @@ export function getCultivarGuideSections(cultivar: VerdantCultivarProfile): read
       summary: overlay.summary ?? section.summary,
       confidence: overlay.confidence ?? section.confidence,
       reportedTendencies: [...section.reportedTendencies, ...(overlay.reportedTendencies ?? [])],
-      guidance: [...section.guidance, ...(overlay.guidance ?? [])],
+      guidance: uniqueGuidance([...section.guidance, ...(overlay.guidance ?? [])]),
       cautions: uniqueStrings([...section.cautions, ...(overlay.cautions ?? [])]),
       missingInformation: uniqueStrings([...section.missingInformation, ...(overlay.missingInformation ?? [])]),
     } : section;

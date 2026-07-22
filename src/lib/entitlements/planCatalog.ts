@@ -24,6 +24,7 @@ const PRO_CAPABILITIES: Readonly<Capabilities> = Object.freeze({
   multiTent: true,
   sensorHistoryDays: null,
   prioritySupport: true,
+  phenoComparison: true,
 });
 
 /**

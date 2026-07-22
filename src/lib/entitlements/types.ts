@@ -49,6 +49,13 @@ export interface Capabilities {
   multiTent: boolean;
   sensorHistoryDays: number | null;  // null = unlimited
   prioritySupport: boolean;
+  /**
+   * Real-data Pheno Comparison — side-by-side candidate selection evidence for
+   * a real grow's hunt (not the public sample preview). Paid: false for free,
+   * true for Pro/founder. Presentation gate only (the data is the user's own,
+   * RLS-scoped) — no money spent, so a client capability check is sufficient.
+   */
+  phenoComparison: boolean;
 }
 
 /**

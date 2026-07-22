@@ -15,6 +15,22 @@ const withGrowId = (base: string, growId?: string | null): string =>
 export const growDetailPath = (growId: string): string =>
   `/grows/${encodeURIComponent(growId)}`;
 
+/** Pro-gated real-data Pheno Comparison for a grow's most recent hunt. */
+export const growPhenoComparePath = (growId: string): string =>
+  `/grows/${encodeURIComponent(growId)}/pheno-compare`;
+
+/** New Pheno Hunt wizard, pre-scoped to a grow (and optional tent). */
+export const phenoHuntNewPath = (
+  growId?: string | null,
+  tentId?: string | null,
+): string => {
+  const params = new URLSearchParams();
+  if (growId) params.set("growId", growId);
+  if (tentId) params.set("tentId", tentId);
+  const qs = params.toString();
+  return qs ? `/pheno-hunts/new?${qs}` : "/pheno-hunts/new";
+};
+
 export const logsPath = (growId?: string | null): string => withGrowId("/logs", growId);
 export const timelinePath = (growId?: string | null): string => withGrowId("/timeline", growId);
 export const plantsPath = (growId?: string | null): string => withGrowId("/plants", growId);

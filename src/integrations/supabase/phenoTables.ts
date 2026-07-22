@@ -255,6 +255,7 @@ type PhenoCandidatePlantRow = {
   candidate_number: number | null;
   strain: string | null;
   stage: string | null;
+  plant_type: string | null;
   grow_id: string | null;
   tent_id: string | null;
   photo_url: string | null;
@@ -378,6 +379,7 @@ export interface PhenoDatabase {
         | "candidate_number"
         | "strain"
         | "stage"
+        | "plant_type"
         | "grow_id"
         | "tent_id"
         | "photo_url"

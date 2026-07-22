@@ -681,24 +681,12 @@ async function main() {
   // 15. Server trust boundary (2026-07-22 revoke): authenticated must be
   // denied on legacy typed-event RPCs. Denial MUST be a genuine permission
   // rejection — "function does not exist" / "no function matches" / PostgREST
-  // cache misses do NOT count, because they wouldn't prove the privilege was
-  // revoked (they'd prove the function isn't callable at all).
-  const isGenuinePermissionDenial = (
-    err: { code?: string | null; message?: string | null } | null,
-  ): boolean => {
-    if (!err) return false;
-    if (err.code === "42501") return true;
-    return /permission denied/i.test(err.message ?? "");
-  };
-  const isMissingFunction = (
-    err: { code?: string | null; message?: string | null } | null,
-  ): boolean => {
-    if (!err) return false;
-    if (err.code === "42883" || err.code === "PGRST202" || err.code === "PGRST203") return true;
-    return /does not exist|could not find the function|no function matches|schema cache/i.test(
-      err.message ?? "",
-    );
-  };
+  // schema-cache misses do NOT count, because they wouldn't prove the
+  // privilege was revoked (they'd prove the function isn't callable at all).
+  // formatDenialDetail() tags each failure with its classified failure mode
+  // (genuine-permission-denial / missing-function / schema-cache-miss /
+  //  unexpected-error / success-instead-of-denial) so the diagnostic column
+  // makes remediation obvious.
   const legacyWatering = await ownerC.rpc("create_watering_event" as never, {
     _grow_id: oGrow,
     _volume_ml: 100,
@@ -708,7 +696,7 @@ async function main() {
   check(
     "authenticated denied create_watering_event with genuine permission error (not missing-function)",
     isGenuinePermissionDenial(legacyWatering.error) && !isMissingFunction(legacyWatering.error),
-    legacyWatering.error?.message ?? "expected 42501 / permission denied, got success",
+    formatDenialDetail(legacyWatering.error),
   );
   const legacyFeeding = await ownerC.rpc("create_feeding_event" as never, {
     _grow_id: oGrow,
@@ -720,7 +708,7 @@ async function main() {
   check(
     "authenticated denied create_feeding_event with genuine permission error (not missing-function)",
     isGenuinePermissionDenial(legacyFeeding.error) && !isMissingFunction(legacyFeeding.error),
-    legacyFeeding.error?.message ?? "expected 42501 / permission denied, got success",
+    formatDenialDetail(legacyFeeding.error),
   );
 
   // 16. Direct DML denial for INSERT / UPDATE / DELETE on all three event

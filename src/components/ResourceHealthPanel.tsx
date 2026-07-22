@@ -102,6 +102,16 @@ export function ResourceHealthPanel() {
   const [checks, setChecks] = useState<ResourceCheck[]>(initial);
   const [running, setRunning] = useState(false);
   const [lastRunAt, setLastRunAt] = useState<string | null>(null);
+  const [history, setHistory] = useState<RunSummary[]>([]);
+  const [intervalMs, setIntervalMs] = useState<number>(() => {
+    if (typeof window === "undefined") return 0;
+    const raw = window.localStorage.getItem(INTERVAL_STORAGE_KEY);
+    const parsed = raw ? Number.parseInt(raw, 10) : 0;
+    return INTERVAL_OPTIONS.some((o) => o.value === parsed) ? parsed : 0;
+  });
+  const runningRef = useRef(false);
+
+
 
   const runAll = useCallback(async () => {
     setRunning(true);

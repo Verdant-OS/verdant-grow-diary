@@ -1097,7 +1097,215 @@ jq -r '.runs[0].results[]
   | @tsv' diff.sarif | sort
 ```
 
+##### Verifying alerts via the GitHub Code Scanning REST API (curl)
+
+Sometimes the fastest way to confirm a SARIF upload landed correctly is
+to skip the UI entirely and ask the REST API. This walkthrough uses
+`curl` + `jq` to list, filter, and inspect the alerts created by the
+`required-money-migrations` workflow.
+
+**Prerequisites.**
+
+- A token with `security_events: read` (for private repos) or
+  `public_repo` (for public repos). Any of these work:
+  - **Fine-grained PAT:** *Repository permissions → Code scanning
+    alerts → Read-only*, scoped to the repo.
+  - **Classic PAT:** `repo` scope for private repos, `public_repo` for
+    public.
+  - **Inside a workflow:** the built-in `${{ github.token }}` if the
+    job has `permissions: security-events: read`.
+- Export it once so every `curl` picks it up:
+  ```bash
+  export GH_TOKEN=ghp_...
+  export OWNER=<owner>
+  export REPO=<repo>
+  ```
+
+Every request below uses the same three headers:
+
+```bash
+AUTH=(-H "Authorization: Bearer $GH_TOKEN"
+      -H "Accept: application/vnd.github+json"
+      -H "X-GitHub-Api-Version: 2022-11-28")
+```
+
+**Step 1 — List all open alerts from this tool.**
+
+Filter by `tool_name` so you only see alerts uploaded by
+`diff-money-migration-prefixes` (not CodeQL or other scanners on the
+same repo):
+
+```bash
+curl -sSL "${AUTH[@]}" \
+  "https://api.github.com/repos/$OWNER/$REPO/code-scanning/alerts?tool_name=diff-money-migration-prefixes&state=open&per_page=100" \
+  | jq '.[] | {number, rule: .rule.id, severity: .rule.severity, state, path: .most_recent_instance.location.path, ref: .most_recent_instance.ref}'
+```
+
+Sample output:
+
+```json
+{
+  "number": 42,
+  "rule": "money-migration-drift",
+  "severity": "error",
+  "state": "open",
+  "path": "supabase/migrations/20260715120000_ai_credit_spend.sql",
+  "ref": "refs/heads/main"
+}
+```
+
+Useful query params (combine with `&`):
+
+| Param            | Values                                        | Notes                                                          |
+|------------------|-----------------------------------------------|----------------------------------------------------------------|
+| `tool_name`      | `diff-money-migration-prefixes`               | Scopes to this scanner only                                    |
+| `state`          | `open`, `closed`, `dismissed`, `fixed`        | Omit for all                                                   |
+| `severity`       | `error`, `warning`, `note`                    | Matches the SARIF `level`                                      |
+| `ref`            | `refs/heads/main`, `refs/pull/1234/merge`     | Scopes to a branch or PR                                       |
+| `rule`           | `money-migration-drift` etc.                  | Same value as `ruleId` in SARIF                                |
+| `sort` / `direction` | `created`/`updated`, `asc`/`desc`         | Default: most recently created first                           |
+| `per_page`       | 1–100                                         | Paginate with `?page=N` or follow the `Link: rel="next"` header |
+
+**Step 2 — Fetch one alert's full detail.**
+
+```bash
+ALERT=42
+curl -sSL "${AUTH[@]}" \
+  "https://api.github.com/repos/$OWNER/$REPO/code-scanning/alerts/$ALERT" \
+  | jq
+```
+
+Key fields and their SARIF counterparts (mirrors the mapping table in
+the *SARIF field → Code scanning UI mapping* section):
+
+| API field                                                | SARIF source                                                        |
+|----------------------------------------------------------|---------------------------------------------------------------------|
+| `number`                                                 | Assigned by GitHub — **not** in SARIF                               |
+| `rule.id`                                                | `results[].ruleId`                                                  |
+| `rule.severity` / `rule.security_severity_level`         | `rules[].defaultConfiguration.level` (overridden by `results[].level`) |
+| `tool.name` / `tool.version`                             | `runs[].tool.driver.name` / `.semanticVersion`                      |
+| `most_recent_instance.message.text`                      | `results[].message.text`                                            |
+| `most_recent_instance.location.path`                     | `results[].locations[0].physicalLocation.artifactLocation.uri`      |
+| `most_recent_instance.location.start_line`               | `results[].locations[0].physicalLocation.region.startLine`          |
+| `most_recent_instance.ref`                               | Git ref of the workflow run (`GITHUB_REF`)                          |
+| `most_recent_instance.analysis_key`                      | Workflow file + job name that uploaded the SARIF                    |
+| `most_recent_instance.category`                          | `upload-sarif` step's `category:` input                             |
+| `most_recent_instance.commit_sha`                        | SHA at the time of the upload                                       |
+| `state`                                                  | `open`, `dismissed`, `fixed` (derived from re-upload behavior)      |
+| `dismissed_reason` / `dismissed_by` / `dismissed_at`     | UI dismissal metadata; absent when not dismissed                    |
+
+**Step 3 — Verify one specific finding from your local SARIF exists as an alert.**
+
+Given a `ruleId` + `uri` + `migrationVersion` triple from your local
+`diff.sarif` (see the *fingerprint recipes* section), confirm GitHub
+created the matching alert:
+
+```bash
+RULE=money-migration-drift
+URI=supabase/migrations/20260715120000_ai_credit_spend.sql
+
+curl -sSL "${AUTH[@]}" \
+  "https://api.github.com/repos/$OWNER/$REPO/code-scanning/alerts?tool_name=diff-money-migration-prefixes&rule=$RULE&state=open&per_page=100" \
+  | jq --arg uri "$URI" \
+      '[.[] | select(.most_recent_instance.location.path == $uri)]
+       | if length == 0 then "MISSING: no alert for \($uri)"
+         else .[0] | {number, state, rule: .rule.id, path: .most_recent_instance.location.path, message: .most_recent_instance.message.text}
+         end'
+```
+
+- `MISSING: no alert for …` → the SARIF was uploaded but GitHub did
+  not create an alert for that fingerprint. Usually a category or
+  branch mismatch — re-check the query params in Step 1.
+- Non-null object → the alert exists; compare its `message` and
+  `rule` fields to your local SARIF result.
+
+**Step 4 — List the instances (per-branch / per-run history) of one alert.**
+
+The alert itself is deduped across runs; the timeline of "detected in
+run #N" entries lives at `/instances`:
+
+```bash
+curl -sSL "${AUTH[@]}" \
+  "https://api.github.com/repos/$OWNER/$REPO/code-scanning/alerts/$ALERT/instances?per_page=100" \
+  | jq '.[] | {ref, analysis_key, category, commit_sha, state, message: .message.text}'
+```
+
+Each element is one SARIF upload that still contained the alert's
+fingerprint. If you re-ran the workflow and expected the alert to
+auto-close, this endpoint tells you which uploads still see it and on
+which branch.
+
+**Step 5 — Inspect the SARIF analyses GitHub has processed.**
+
+To confirm the workflow's `upload-sarif` step actually registered with
+Code scanning (independent of whether it produced any alerts), list the
+analyses:
+
+```bash
+curl -sSL "${AUTH[@]}" \
+  "https://api.github.com/repos/$OWNER/$REPO/code-scanning/analyses?tool_name=diff-money-migration-prefixes&per_page=10" \
+  | jq '.[] | {id, ref, category, created_at, results_count, rules_count, sarif_id, commit_sha}'
+```
+
+- `results_count: 0` on the latest analysis for a branch = clean run
+  (SARIF had `results: []`).
+- `results_count: N` but `curl …/alerts?state=open` returns fewer than
+  `N` = alerts were dismissed or auto-closed on prior runs.
+- Compare `sarif_id` to the value printed by `upload-sarif` in the
+  workflow log — they must match, otherwise you're looking at a
+  different upload.
+
+You can also download the raw SARIF GitHub stored:
+
+```bash
+ANALYSIS_ID=<from previous step>
+curl -sSL "${AUTH[@]}" \
+  -H "Accept: application/sarif+json" \
+  "https://api.github.com/repos/$OWNER/$REPO/code-scanning/analyses/$ANALYSIS_ID" \
+  > github-stored.sarif
+
+jq '.runs[0].results | length' github-stored.sarif
+```
+
+Diff this against your local `diff.sarif` using the normalization
+recipe in the *Downloading and inspecting SARIF artifacts* section.
+
+**Step 6 — Cross-check totals against the workflow output.**
+
+Final sanity pass: the number of Open alerts for this tool + branch
+should equal the number of results in the latest uploaded SARIF minus
+any dismissed alerts.
+
+```bash
+# Alerts open on main
+open=$(curl -sSL "${AUTH[@]}" \
+  "https://api.github.com/repos/$OWNER/$REPO/code-scanning/alerts?tool_name=diff-money-migration-prefixes&state=open&ref=refs/heads/main&per_page=100" \
+  | jq 'length')
+
+# Results in the latest analysis
+results=$(curl -sSL "${AUTH[@]}" \
+  "https://api.github.com/repos/$OWNER/$REPO/code-scanning/analyses?tool_name=diff-money-migration-prefixes&ref=refs/heads/main&per_page=1" \
+  | jq '.[0].results_count')
+
+echo "open=$open  latest_results=$results"
+```
+
+`open == latest_results` and both match `jq '.summary' prefix-diff-cli.json`
+from the artifact = the pipeline is fully in sync.
+
+**Common gotchas.**
+
+| Symptom                                                              | Cause / fix                                                                                              |
+|----------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------|
+| `HTTP 403 Resource not accessible by personal access token`          | Token lacks `security_events: read` (fine-grained) or `repo`/`public_repo` (classic). Regenerate.        |
+| `HTTP 404` on `/code-scanning/alerts`                                | Code scanning not enabled on the repo, or the org disabled it. See *Required GitHub settings* section.   |
+| Empty list even though the Security tab shows alerts                 | Missing `tool_name` filter picks the wrong scanner's namespace, or `ref` doesn't match the branch.       |
+| `most_recent_instance.location.path` shows an absolute path          | The SARIF used `uriBaseId` — GitHub resolved it. Normalize before comparing (see *artifact diff* recipe).|
+| `state: fixed` but the alert reappears in the next run               | Fingerprint changed. Compare `partialFingerprints` across the two SARIFs; usually a renamed migration.   |
+| `X-RateLimit-Remaining: 0` on rapid polling                          | REST API is rate-limited to 5,000/hr per token. Batch with `per_page=100` and cache results.             |
+
 ##### Walkthrough: inspecting PR file annotations from an uploaded SARIF
+
 
 
 

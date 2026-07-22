@@ -1,0 +1,133 @@
+
+[1m[46m RUN [49m[22m [36mv3.2.4 [39m[90m/home/runner/work/verdant-grow-diary/verdant-grow-diary[39m
+
+ [32m✓[39m src/test/strain-reference-library-v1.test.ts[2m > [22mStrain Reference Library V1 data contract[2m > [22mships ten labeled sample/reference profiles including the required discovery set[32m 4[2mms[22m[39m
+ [32m✓[39m src/test/strain-reference-library-v1.test.ts[2m > [22mStrain Reference Library V1 data contract[2m > [22muses unique slugs while allowing aliases and disputed/common names[32m 1[2mms[22m[39m
+ [32m✓[39m src/test/strain-reference-library-v1.test.ts[2m > [22mStrain Reference Library V1 data contract[2m > [22mrenders every guide from a complete 14-section template plus cultivar overlays[32m 12[2mms[22m[39m
+ [32m✓[39m src/test/strain-reference-library-v1.test.ts[2m > [22mStrain Reference Library V1 data contract[2m > [22mkeeps an autoflower base template and conservative training posture[32m 1[2mms[22m[39m
+ [32m✓[39m src/test/strain-reference-library-v1.test.ts[2m > [22mStrain Reference Library V1 data contract[2m > [22mkeeps direct summary ranges aligned with the cited Wave 1 records[32m 1[2mms[22m[39m
+ [32m✓[39m src/test/strain-reference-library-v1.test.ts[2m > [22mStrain Reference Library V1 data contract[2m > [22mresolves explicit sources for every profile[32m 3[2mms[22m[39m
+ [32m✓[39m src/test/strain-reference-library-v1.test.ts[2m > [22mStrain Reference Library V1 data contract[2m > [22mdoes not encode universal recipe or certainty copy[32m 2[2mms[22m[39m
+ [32m✓[39m src/test/static-public-seo-documents.test.ts[2m > [22mstatic public SEO documents[2m > [22mpre-renders every public acquisition hub, guide, and cultivar route[32m 5[2mms[22m[39m
+ [32m✓[39m src/test/static-public-seo-documents.test.ts[2m > [22mstatic public SEO documents[2m > [22memits deterministic route-local documents with canonical, crawlable metadata[32m 12[2mms[22m[39m
+ [32m✓[39m src/test/static-public-seo-documents.test.ts[2m > [22mstatic public SEO documents[2m > [22mserves static public documents with clean URLs before the SPA fallback and redirects legacy strain aliases[32m 2[2mms[22m[39m
+[90mstderr[2m | src/test/cultivar-index-seo-rules.test.tsx[2m > [22m[2mCultivarsIndex crawl-safety wiring[2m > [22m[2mkeeps the original accessible hub UI and indexable metadata for /cultivars
+[22m[39m⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+ [32m✓[39m src/test/cultivar-index-seo-rules.test.tsx[2m > [22mcultivarIndexSeoRules[2m > [22mkeeps the clean hub indexable[32m 4[2mms[22m[39m
+ [32m✓[39m src/test/cultivar-index-seo-rules.test.tsx[2m > [22mcultivarIndexSeoRules[2m > [22mmarks ?q=oreoz as a non-indexable filter variant with a clean path[32m 1[2mms[22m[39m
+ [32m✓[39m src/test/cultivar-index-seo-rules.test.tsx[2m > [22mcultivarIndexSeoRules[2m > [22mmarks ?q= as a non-indexable filter variant with a clean path[32m 1[2mms[22m[39m
+ [32m✓[39m src/test/cultivar-index-seo-rules.test.tsx[2m > [22mcultivarIndexSeoRules[2m > [22mmarks ?difficulty=Advanced as a non-indexable filter variant with a clean path[32m 1[2mms[22m[39m
+ [32m✓[39m src/test/cultivar-index-seo-rules.test.tsx[2m > [22mcultivarIndexSeoRules[2m > [22mmarks ?difficulty=all as a non-indexable filter variant with a clean path[32m 1[2mms[22m[39m
+ [32m✓[39m src/test/cultivar-index-seo-rules.test.tsx[2m > [22mcultivarIndexSeoRules[2m > [22mmarks ?q=oreoz&difficulty=Advanced as a non-indexable filter variant with a clean path[32m 1[2mms[22m[39m
+ [32m✓[39m src/test/cultivar-index-seo-rules.test.tsx[2m > [22mcultivarIndexSeoRules[2m > [22mmarks ?difficulty=not-a-real-filter as a non-indexable filter variant with a clean path[32m 0[2mms[22m[39m
+ [32m✓[39m src/test/cultivar-index-seo-rules.test.tsx[2m > [22mcultivarIndexSeoRules[2m > [22mmarks ?utm_source=discord as a non-indexable filter variant with a clean path[32m 0[2mms[22m[39m
+ [32m✓[39m src/test/cultivar-index-seo-rules.test.tsx[2m > [22mcultivarIndexSeoRules[2m > [22mmarks ?q=%20oreoz%20 as a non-indexable filter variant with a clean path[32m 1[2mms[22m[39m
+ [32m✓[39m src/test/cultivar-index-seo-rules.test.tsx[2m > [22mcultivarIndexSeoRules[2m > [22mmarks q=oreoz as a non-indexable filter variant with a clean path[32m 0[2mms[22m[39m
+ [32m✓[39m src/test/cultivar-index-seo-rules.test.tsx[2m > [22mcultivarIndexSeoRules[2m > [22mmarks q=&difficulty= as a non-indexable filter variant with a clean path[32m 0[2mms[22m[39m
+ [32m✓[39m src/test/cultivar-index-seo-rules.test.tsx[2m > [22mCultivarsIndex crawl-safety wiring[2m > [22mkeeps the original accessible hub UI and indexable metadata for /cultivars[33m 498[2mms[22m[39m
+ [32m✓[39m src/test/cultivar-index-seo-rules.test.tsx[2m > [22mCultivarsIndex crawl-safety wiring[2m > [22msets noindex while canonical and og:url remain the clean hub for query variants[32m 15[2mms[22m[39m
+ [32m✓[39m src/test/strain-reference-library-migration.test.ts[2m > [22mStrain Reference Library V1 migration[2m > [22mcreates the source-backed identity, claim, versioned guide, and import staging model[32m 4[2mms[22m[39m
+ [32m✓[39m src/test/strain-reference-library-migration.test.ts[2m > [22mStrain Reference Library V1 migration[2m > [22madds full-text, trigram, filter, and published partial indexes[32m 1[2mms[22m[39m
+ [32m✓[39m src/test/strain-reference-library-migration.test.ts[2m > [22mStrain Reference Library V1 migration[2m > [22mis client read-only and keeps import staging server/admin-only[32m 1[2mms[22m[39m
+ [32m✓[39m src/test/strain-reference-library-migration.test.ts[2m > [22mStrain Reference Library V1 migration[2m > [22mdoes not touch the One-Tent Loop, sensor, AI, alert, or action tables[32m 4[2mms[22m[39m
+[90mstderr[2m | src/test/cultivar-page-v1.test.tsx[2m > [22m[2mStrain Reference Library V1 detail[2m > [22m[2mrenders a complete sticky guide, source links, and sample boundary
+[22m[39mWarning: Encountered two children with the same key, `Use gentle low-stress canopy support only while the plant is healthy and actively growing.`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version.
+    at ul
+    at div
+    at div
+    at section
+    at div
+    at div
+    at article
+    at main
+    at CultivarPage (/home/runner/work/verdant-grow-diary/verdant-grow-diary/src/pages/CultivarPage.tsx:36:44)
+    at RenderedRoute (/home/runner/work/verdant-grow-diary/verdant-grow-diary/node_modules/react-router/dist/umd/react-router.development.js:535:7)
+    at Routes (/home/runner/work/verdant-grow-diary/verdant-grow-diary/node_modules/react-router/dist/umd/react-router.development.js:1269:7)
+    at Router (/home/runner/work/verdant-grow-diary/verdant-grow-diary/node_modules/react-router/dist/umd/react-router.development.js:1203:17)
+    at MemoryRouter (/home/runner/work/verdant-grow-diary/verdant-grow-diary/node_modules/react-router/dist/umd/react-router.development.js:1097:7)
+⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+ [32m✓[39m src/test/cultivar-page-v1.test.tsx[2m > [22mStrain Reference Library V1 detail[2m > [22mrenders a complete sticky guide, source links, and sample boundary[33m 457[2mms[22m[39m
+ [32m✓[39m src/test/cultivar-page-v1.test.tsx[2m > [22mStrain Reference Library V1 detail[2m > [22mstates the no-alert/no-action boundary in the grow diary handoff[32m 111[2mms[22m[39m
+ [32m✓[39m src/test/cultivar-page-v1.test.tsx[2m > [22mStrain Reference Library V1 detail[2m > [22mredirects unknown slugs to the library[32m 8[2mms[22m[39m
+ [32m✓[39m src/test/global-search-entity-results.test.ts[2m > [22mshared global search entity results[2m > [22mresolves existing entity query Banana Cough[32m 3[2mms[22m[39m
+ [32m✓[39m src/test/global-search-entity-results.test.ts[2m > [22mshared global search entity results[2m > [22mresolves existing entity query McDonald[32m 2[2mms[22m[39m
+ [32m✓[39m src/test/global-search-entity-results.test.ts[2m > [22mshared global search entity results[2m > [22mresolves existing entity query Candidate[32m 1[2mms[22m[39m
+ [32m✓[39m src/test/global-search-entity-results.test.ts[2m > [22mshared global search entity results[2m > [22mresolves existing entity query Loud Cake[32m 1[2mms[22m[39m
+ [32m✓[39m src/test/global-search-entity-results.test.ts[2m > [22mshared global search entity results[2m > [22mresolves existing entity query Starter[32m 1[2mms[22m[39m
+ [32m✓[39m src/test/global-search-entity-results.test.ts[2m > [22mshared global search entity results[2m > [22mresolves existing entity query Seedling A[32m 1[2mms[22m[39m
+ [32m✓[39m src/test/global-search-entity-results.test.ts[2m > [22mshared global search entity results[2m > [22muses the same search model for public cultivar aliases[32m 2[2mms[22m[39m
+ [32m✓[39m src/test/global-search-entity-results.test.ts[2m > [22mshared global search entity results[2m > [22mdeduplicates routes and returns stable ordering[32m 1[2mms[22m[39m
+[90mstderr[2m | src/test/cultivars-index-v1.test.tsx[2m > [22m[2mStrain Reference Library V1 index[2m > [22m[2mshows the sample-data boundary and all ten profiles
+[22m[39m⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+ [32m✓[39m src/test/cultivars-index-v1.test.tsx[2m > [22mStrain Reference Library V1 index[2m > [22mshows the sample-data boundary and all ten profiles[33m 465[2mms[22m[39m
+ [32m✓[39m src/test/cultivars-index-v1.test.tsx[2m > [22mStrain Reference Library V1 index[2m > [22mfinds GG4 by legacy alias through the shared pure search rules[32m 52[2mms[22m[39m
+ [32m✓[39m src/test/cultivars-index-v1.test.tsx[2m > [22mStrain Reference Library V1 index[2m > [22mfilters lifecycle without hiding the clear state[32m 110[2mms[22m[39m
+ [32m✓[39m src/test/cultivar-reference-search-rules.test.ts[2m > [22mcultivarReferenceSearchRules[2m > [22mmatches exact names and aliases before broader text matches[32m 3[2mms[22m[39m
+ [32m✓[39m src/test/cultivar-reference-search-rules.test.ts[2m > [22mcultivarReferenceSearchRules[2m > [22msearches breeder and lineage text[32m 2[2mms[22m[39m
+ [31m×[39m src/test/cultivar-reference-search-rules.test.ts[2m > [22mcultivarReferenceSearchRules[2m > [22mcombines lifecycle and difficulty filters deterministically[32m 9[2mms[22m[39m
+[31m   → expected [] to deeply equal [ 'sour-stomper' ][39m
+ [32m✓[39m src/test/cultivar-reference-search-rules.test.ts[2m > [22mcultivarReferenceSearchRules[2m > [22mnormalizes punctuation and accents without randomness[32m 0[2mms[22m[39m
+ [32m✓[39m src/test/strain-reference-library-static-safety.test.ts[2m > [22mStrain Reference Library V1 static safety[2m > [22mstays read-only and does not invoke private or write boundaries[32m 3[2mms[22m[39m
+ [32m✓[39m src/test/strain-reference-library-static-safety.test.ts[2m > [22mStrain Reference Library V1 static safety[2m > [22mdoes not create AI, alert, Action Queue, automation, or device-control behavior[32m 2[2mms[22m[39m
+ [32m✓[39m src/test/strain-reference-library-static-safety.test.ts[2m > [22mStrain Reference Library V1 static safety[2m > [22mkeeps the grower-authority and sample-data boundary visible[32m 1[2mms[22m[39m
+ [32m✓[39m src/test/cultivar-reference-view-model.test.ts[2m > [22mcultivarReferenceViewModel[2m > [22mformats reported ranges without inventing missing values[32m 2[2mms[22m[39m
+ [32m✓[39m src/test/cultivar-reference-view-model.test.ts[2m > [22mcultivarReferenceViewModel[2m > [22mformats seed expression for grower-facing reference copy[32m 1[2mms[22m[39m
+ [32m✓[39m src/test/cultivar-reference-view-model.test.ts[2m > [22mcultivarReferenceViewModel[2m > [22mbuilds deterministic source-backed summary rows[32m 2[2mms[22m[39m
+ [32m✓[39m src/test/shared-search-text-rules.test.ts[2m > [22msharedSearchTextRules[2m > [22mnormalizes punctuation, spacing, case, and accents deterministically[32m 3[2mms[22m[39m
+ [31m×[39m src/test/shared-search-text-rules.test.ts[2m > [22msharedSearchTextRules[2m > [22mgives entity and cultivar discovery the same punctuation behavior[32m 9[2mms[22m[39m
+[31m   → expected false to be true // Object.is equality[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 2 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m src/test/cultivar-reference-search-rules.test.ts[2m > [22mcultivarReferenceSearchRules[2m > [22mcombines lifecycle and difficulty filters deterministically
+[31m[1mAssertionError[22m: expected [] to deeply equal [ 'sour-stomper' ][39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- [[39m
+[32m-   "sour-stomper",[39m
+[32m- ][39m
+[31m+ [][39m
+
+[36m [2m❯[22m src/test/cultivar-reference-search-rules.test.ts:[2m44:50[22m[39m
+    [90m 42| [39m    })[33m;[39m
+    [90m 43| [39m    [34mexpect[39m(first)[33m.[39m[34mtoEqual[39m(second)[33m;[39m
+    [90m 44| [39m    expect(first.map((profile) => profile.slug)).toEqual(["sour-stompe…
+    [90m   | [39m                                                 [31m^[39m
+    [90m 45| [39m  })[33m;[39m
+    [90m 46| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/test/shared-search-text-rules.test.ts[2m > [22msharedSearchTextRules[2m > [22mgives entity and cultivar discovery the same punctuation behavior
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/test/shared-search-text-rules.test.ts:[2m15:69[22m[39m
+    [90m 13| [39m
+    [90m 14| [39m  it("gives entity and cultivar discovery the same punctuation behavio…
+    [90m 15| [39m    expect(sharedSearchTextIncludes("Original Glue (GG4)", "GG-4")).to…
+    [90m   | [39m                                                                    [31m^[39m
+    [90m 16| [39m    expect(sharedSearchTextIncludes("Project McDonald", "McDonald")).t…
+    [90m 17| [39m  })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m9 passed[39m[22m[90m (11)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m51 passed[39m[22m[90m (53)[39m
+[2m   Start at [22m 21:53:41
+[2m   Duration [22m 5.47s[2m (transform 353ms, setup 2.34s, collect 759ms, tests 1.85s, environment 6.07s, prepare 1.50s)[22m
+

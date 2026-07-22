@@ -52,6 +52,9 @@ const supabaseMock = vi.hoisted(() => {
     const chain: any = {
       select: () => chain,
       eq: () => chain,
+      // BUG-A grow attribution: candidates load via .or(grow_id OR tent_id in
+      // the grow's tents) after a tents-id lookup.
+      or: () => chain,
       maybeSingle: async () => ({
         data: table === "grows" ? growRow : null,
         error: null,

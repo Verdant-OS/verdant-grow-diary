@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { SensorReadingInsert } from "@/lib/db";
 import type { Tent, Plant, SensorReading } from "@/mock";
 import { mapTentRow, mapPlantRow, groupSensorReadingRows } from "./growAdapters";
+import { buildGrowScopedPlantsOrFilter } from "./growAttributionRules";
 import { isUuid } from "./isUuid";
 
 function fail(scope: string, error: { message?: string } | null): never {
@@ -47,7 +48,18 @@ export async function fetchPlants(
   let q = supabase.from("plants").select("*");
   if (!opts.includeArchived) q = q.eq("is_archived", false);
   if (tentId) q = q.eq("tent_id", tentId);
-  if (growId) q = q.eq("grow_id", growId);
+  if (growId && !tentId) {
+    // BUG-A: resolve the grow's plants through tent rollup too, so plants
+    // whose own grow_id is null but whose tent belongs to the grow don't
+    // vanish from grow-scoped views. Tent-fetch failure degrades to the
+    // legacy own-grow_id filter (never a silent empty grid).
+    const { data: tents } = await supabase.from("tents").select("id").eq("grow_id", growId);
+    q = q.or(
+      buildGrowScopedPlantsOrFilter(growId, (tents ?? []).map((t: { id: string }) => t.id)),
+    );
+  } else if (growId) {
+    q = q.eq("grow_id", growId);
+  }
   const { data, error } = await q.order("created_at", { ascending: false });
   if (error) fail("fetchPlants", error);
   return (data ?? []).map(mapPlantRow);

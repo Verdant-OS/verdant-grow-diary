@@ -123,15 +123,19 @@ describe("quicklog_save_manual revoke-anon-execute contract migration", () => {
   });
 
   it("only touches quicklog_save_manual (no other object modified)", () => {
-    // No REVOKE / GRANT / ALTER / CREATE / DROP against any other identifier.
-    const otherRevoke = executable.match(
-      /(REVOKE|GRANT|ALTER|CREATE|DROP)[\s\S]*?(?:ON|TO|FROM)\s+[a-zA-Z_.]+/gi,
-    );
-    for (const stmt of otherRevoke ?? []) {
+    // Split into statements and require every REVOKE/GRANT/ALTER/CREATE/DROP
+    // to name quicklog_save_manual. NOTIFY pgrst is the only allowed non-DDL.
+    const stmts = executable
+      .split(/;\s*/)
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+    for (const stmt of stmts) {
+      if (!/^(REVOKE|GRANT|ALTER|CREATE|DROP)\b/i.test(stmt)) continue;
       expect(
         stmt,
-        `unexpected statement touches something other than quicklog_save_manual: ${stmt}`,
-      ).toMatch(/quicklog_save_manual|PUBLIC|anon|authenticated|service_role|pgrst/i);
+        `unexpected DDL/DCL touches something other than quicklog_save_manual`,
+      ).toMatch(/quicklog_save_manual/i);
     }
   });
+
 });

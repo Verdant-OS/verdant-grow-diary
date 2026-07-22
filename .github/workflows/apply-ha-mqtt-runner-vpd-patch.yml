@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - agent/ha-mqtt-runner-vpd-pairing
+  pull_request:
+    branches:
+      - verdant-grow-diary
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: write

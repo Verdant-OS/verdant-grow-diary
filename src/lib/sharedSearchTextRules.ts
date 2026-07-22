@@ -16,5 +16,12 @@ export function normalizeSharedSearchText(value: string): string {
 export function sharedSearchTextIncludes(haystack: string, query: string): boolean {
   const needle = normalizeSharedSearchText(query);
   if (!needle) return true;
-  return normalizeSharedSearchText(haystack).includes(needle);
+
+  const normalizedHaystack = normalizeSharedSearchText(haystack);
+  if (normalizedHaystack.includes(needle)) return true;
+
+  // Preserve word-oriented normalization for ranking/display while also
+  // allowing common compact aliases such as GG4 to match GG-4. This is
+  // deterministic and shared by entity and cultivar discovery.
+  return normalizedHaystack.replace(/\s+/g, "").includes(needle.replace(/\s+/g, ""));
 }

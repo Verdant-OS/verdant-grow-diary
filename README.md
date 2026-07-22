@@ -649,10 +649,15 @@ the target's state is unknown.
 For surfacing failures in the GitHub Actions UI instead of buried in a log:
 
 ```bash
-# SARIF 2.1.0 to stdout — pipe to a file or consume directly.
+# SARIF 2.1.0 to stdout — no file is written. The human-readable text diff
+# is SUPPRESSED so stdout is pure JSON you can pipe into `jq`, `tee`, or
+# `upload-sarif`. Diagnostics (missing DB URL, psql errors, etc.) still go
+# to stderr.
 node scripts/diff-money-migration-prefixes.mjs --sarif
 
-# SARIF to a file (text diff still prints to stdout for the CI log).
+# SARIF to a file. Parent directories are created automatically (recursive
+# mkdir). Because a path was given, the text diff is ALSO printed to stdout
+# so the CI log stays readable.
 node scripts/diff-money-migration-prefixes.mjs \
   --sarif --sarif-out=audit/money-migrations/diff.sarif
 
@@ -660,6 +665,34 @@ node scripts/diff-money-migration-prefixes.mjs \
 # lines that surface in the PR "Files changed" tab without SARIF ingestion.
 node scripts/diff-money-migration-prefixes.mjs --github-annotations
 ```
+
+##### Default output when `--sarif-out` is omitted
+
+`--sarif-out=PATH` is optional. Behavior when you omit it:
+
+| Aspect                   | `--sarif` only (no `--sarif-out`)                                        | `--sarif --sarif-out=PATH`                                    |
+|--------------------------|--------------------------------------------------------------------------|---------------------------------------------------------------|
+| SARIF destination        | **stdout** — one JSON document, newline-terminated.                      | File at `PATH` (UTF-8, pretty-printed, newline-terminated).   |
+| Text diff on stdout      | **Suppressed** so stdout is machine-parseable SARIF only.                | Printed after the file write so CI logs remain readable.      |
+| Parent directory of PATH | N/A                                                                      | Created automatically (`mkdir -p`) before the write.          |
+| Default filename         | None — there is no implicit `diff.sarif` on disk.                        | Exactly the path you passed. No suffix is appended.           |
+| Stderr                   | Diagnostics only (DB URL missing, psql errors, etc.).                    | Same.                                                         |
+| Exit code                | Unchanged: `0` clean / `1` drift / `2` tooling failure.                  | Same. The file is written on every exit code, including `0`.  |
+
+Practical consequences:
+
+- If you want a file, you must pass `--sarif-out=PATH` explicitly. There is
+  no fallback like `./diff.sarif` or `$GITHUB_WORKSPACE/diff.sarif`.
+- If you want both SARIF **and** the human-readable text diff, always pass
+  `--sarif-out=PATH`. Piping `--sarif` alone through `tee` loses the diff.
+- `github/codeql-action/upload-sarif` requires a file path, so CI steps
+  that upload to code scanning must use `--sarif-out=`. `--sarif` alone
+  (stdout) is intended for local inspection or ad-hoc `jq` piping.
+- Redirecting stdout works too: `node ... --sarif > diff.sarif`. The
+  script does not create parent directories in that case — the shell does
+  the redirect, so `mkdir -p` yourself if needed.
+
+
 
 Upload the SARIF file to code scanning to get one annotation per finding on
 the offending migration file:
@@ -773,7 +806,7 @@ Common failure modes and the fastest fix for each. All apply to both
 | `psql: FATAL: password authentication failed`                                    | Stale or wrong pooler credentials in the DB URL                     | Refresh the connection string; ensure no shell-escaped `$` characters in the password. Test with `psql "$SUPABASE_DB_URL_SANDBOX" -c 'select 1'`. |
 | `Tracker query failed` / SARIF `money-migration-tooling`                          | `supabase_migrations.schema_migrations` unreachable (network, SSL, wrong DB) | Add `?sslmode=require` if the pooler needs it, and confirm the URL points at the Supabase project's Postgres, not a local instance.   |
 | Exit `1` immediately, no drift table                                              | Manifest entry missing a 14-digit prefix (`money-migration-malformed`) | Open `scripts/required-money-migrations.mjs` and confirm each path begins with a 14-digit timestamp. Re-run the unit tests: `bun run test:prefix-diff`. |
-| `mkdir` errors when writing SARIF/diff artifacts                                  | The script does not create parent directories                       | `mkdir -p audit/money-migrations` before passing `--sarif-out=` or `DIFF_PATH=`.                                                      |
+| `mkdir` / `ENOENT` errors when writing diff or redirected SARIF artifacts        | `DIFF_PATH` and shell `>` redirects don't auto-create parent dirs   | `mkdir -p audit/money-migrations` before setting `DIFF_PATH=` or `--sarif > path`. `--sarif-out=PATH` creates parents itself.          |
 | CI green locally, red in Actions                                                  | `SUPABASE_DB_URL_SANDBOX` / `_LIVE` GitHub secrets missing or misnamed | Re-check the exact names in the repo Secrets settings — the workflow only reads those two, not `DATABASE_URL`.                        |
 | Sandbox smoke script hangs                                                       | Missing `SANDBOX_SMOKE_USER` or the user has no Paddle sandbox entitlement | Set `SANDBOX_SMOKE_USER` to a real sandbox account UUID; re-run with `--verbose` to see the checkpoint it stalls on.                  |
 

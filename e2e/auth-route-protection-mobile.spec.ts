@@ -31,6 +31,7 @@ const PROTECTED_MOBILE_ROUTES: string[] = [
   "/operator/ai-doctor-phase1",
   "/operator/billing-entitlement-resolution",
   "/operator/billing-subscription-updates",
+  "/operator/credits-audit",
   "/operator/ecowitt",
   "/operator/ecowitt-bridge-status",
   "/operator/ecowitt-bridge-debug",

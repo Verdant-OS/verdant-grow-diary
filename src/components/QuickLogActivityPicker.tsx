@@ -81,7 +81,7 @@ function ActivityGrid({
                 if (optionDisabled) return;
                 onSelect(activity);
               }}
-              title={disabled ? disabledReason ?? undefined : activity.description}
+              title={disabled ? (disabledReason ?? undefined) : activity.description}
             >
               <span className="min-w-0 break-words whitespace-normal text-left leading-snug">
                 {activity.label}
@@ -149,6 +149,7 @@ export default function QuickLogActivityPicker({
             size="sm"
             variant="ghost"
             disabled={disabled}
+            aria-disabled={disabled || undefined}
             className="min-h-11 w-full justify-between whitespace-normal text-left sm:w-auto"
             aria-expanded={additionalOpen}
             aria-controls={additionalId}

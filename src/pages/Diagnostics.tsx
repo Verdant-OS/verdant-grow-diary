@@ -11,6 +11,7 @@ import { EvidenceCoveragePanel } from "@/components/EvidenceCoveragePanel";
 import { useEvidenceCoverage } from "@/hooks/useEvidenceCoverage";
 import { BuildInfoPanel } from "@/components/BuildInfoPanel";
 import { ResourceHealthPanel } from "@/components/ResourceHealthPanel";
+import { LocalDataHealthPanel } from "@/components/LocalDataHealthPanel";
 
 type CheckStatus = "pending" | "running" | "pass" | "fail" | "skip";
 
@@ -189,6 +190,9 @@ export default function Diagnostics() {
       <BuildInfoPanel />
 
       <ResourceHealthPanel />
+
+      <LocalDataHealthPanel />
+
 
 
 

@@ -418,7 +418,7 @@ export function parseHaJsonMessage(args: ParseHaJsonArgs): HaAdapterResult {
 
   const unit = normalizeUnit(env.unit_of_measurement);
   const validated = validateAndCoerce(mapEntry.metric, stateNum, unit);
-  if (!validated.ok) return rejectResult(provenanceBase, [validated.reason]);
+  if ("reason" in validated) return rejectResult(provenanceBase, [validated.reason]);
 
   const capturedAtRaw =
     typeof env.last_updated === "string"
@@ -610,7 +610,7 @@ export function parseHaStatestreamMessage(
     (assembled.attributes as Record<string, unknown>).unit_of_measurement,
   );
   const validated = validateAndCoerce(mapEntry.metric, stateNum, unit);
-  if (!validated.ok) return rejectResult(provenanceBase, [validated.reason]);
+  if ("reason" in validated) return rejectResult(provenanceBase, [validated.reason]);
 
   const capturedAtRaw =
     typeof assembled.attributes.last_updated === "string"

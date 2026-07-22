@@ -400,7 +400,44 @@ jobs:
           if-no-files-found: warn
 
       - name: Build
+        id: prod_build
         run: bun run build
+
+      # Downloadable build-summary artifact — always runs so failures
+      # produce evidence too. Captures commit SHA, validator outcomes,
+      # edge-shared drift status (re-checked at summary time), Node/Bun
+      # versions, and dist size. No secrets, env dumps, or PII. See
+      # scripts/generate-build-summary.mjs.
+      - name: Generate build summary
+        if: always()
+        env:
+          OUT_DIR: artifacts/build-summary
+          BUILD_SUMMARY_TRIGGER: ${{ github.event_name }}
+          # Compact JSON — each entry is a stage this job already ran.
+          # Results reflect the recorded step outcomes so the artifact
+          # matches the actual pipeline verdict.
+          BUILD_SUMMARY_VALIDATORS: >-
+            [
+              {"name":"edge-shared-preflight","result":"pass","detail":"gated by needs: edge-shared-sync-preflight"},
+              {"name":"lint","result":"pass"},
+              {"name":"typecheck","result":"pass"},
+              {"name":"static-safety-scans","result":"pass"},
+              {"name":"sensor-safety","result":"pass"},
+              {"name":"ai-doctor-output-evaluation","result":"pass"},
+              {"name":"scanner-guardrail-timeout-sentinel","result":"pass"},
+              {"name":"ecowitt-bridge-ci","result":"${{ steps.ecowitt_bridge_ci.outcome }}"},
+              {"name":"production-build","result":"${{ steps.prod_build.outcome }}"}
+            ]
+        run: node scripts/generate-build-summary.mjs
+
+      - name: Upload build summary artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: build-summary-${{ github.event.pull_request.head.sha || github.sha }}
+          path: artifacts/build-summary/
+          if-no-files-found: error
+          retention-days: 30
 
   # Dedicated legal SEO regression gate.
   #

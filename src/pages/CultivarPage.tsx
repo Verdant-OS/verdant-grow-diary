@@ -24,7 +24,7 @@ import {
 import { buildCultivarSummaryRows } from "@/lib/cultivarReferenceViewModel";
 
 function sectionId(key: CultivarGuideSectionKey): string {
-  return `guide-${key.replaceAll("_", "-")}`;
+  return `guide-${key.replace(/_/g, "-")}`;
 }
 
 function formatDate(value: string): string {
@@ -284,7 +284,7 @@ export default function CultivarPage() {
                       {source.title}
                     </a>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {source.publisher} · {source.sourceType.replaceAll("_", " ")} · retrieved {formatDate(source.retrievedAt)}
+                      {source.publisher} · {source.sourceType.replace(/_/g, " ")} · retrieved {formatDate(source.retrievedAt)}
                     </p>
                   </li>
                 ))}

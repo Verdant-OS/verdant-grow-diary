@@ -79,7 +79,10 @@ describe("RewardedReferralCard", () => {
     expect(screen.getByTestId("rewarded-referral-card").textContent).toContain(
       "you get 10 AI Doctor credits and they get 10",
     );
-    expect(mocks.track).toHaveBeenCalledWith("referral_card_view");
+    // The view event fires in a passive effect scheduled after the commit
+    // that waitFor observed — poll for it instead of asserting synchronously
+    // (the synchronous form was flaky on CI's forked jsdom).
+    await waitFor(() => expect(mocks.track).toHaveBeenCalledWith("referral_card_view"));
   });
 
   it("renders a graceful not-ready state when no code exists yet", async () => {

@@ -1,11 +1,12 @@
 /**
  * Craft tier staging — client catalog + server SQL guardrails.
  *
- * Craft (craft_monthly / craft_annual) is a distinct paid SKU staged for launch
- * with Pro-equivalent capabilities. These tests pin that the tier is fully
- * resolvable everywhere the app reasons about entitlements — so activation is
- * only the founder's Paddle-product step — while asserting the staging invents
- * no new pricing and changes no existing plan.
+ * Craft (craft_monthly / craft_annual) is the craft-grower / rosin tier:
+ * everything Pro has plus the Blueprint overlay capability and a 300/month
+ * AI-credit bucket. Its definition mirrors the deploy branch so the lineages
+ * stay converged. These tests pin that the tier is fully resolvable everywhere
+ * the app reasons about entitlements (activation is only the Paddle products)
+ * while asserting existing plans are unchanged.
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
@@ -28,12 +29,21 @@ describe("Craft — client catalog", () => {
     expect(KNOWN_PLAN_IDS).toContain("craft_annual");
   });
 
-  it("Craft capabilities equal Pro (invents no new pricing yet)", () => {
-    expect(PLAN_CATALOG.craft_monthly).toEqual(PLAN_CATALOG.pro_monthly);
-    expect(PLAN_CATALOG.craft_annual).toEqual(PLAN_CATALOG.pro_monthly);
-    // Includes the Pro-tier feature flags.
+  it("Craft = Pro plus Blueprint and a 300/month bucket (matches deploy)", () => {
+    expect(PLAN_CATALOG.craft_monthly).toEqual(PLAN_CATALOG.craft_annual);
     expect(PLAN_CATALOG.craft_monthly.phenoComparison).toBe(true);
-    expect(PLAN_CATALOG.craft_monthly.aiMonthlyCredits).toBe(100);
+    expect(PLAN_CATALOG.craft_monthly.blueprint).toBe(true);
+    expect(PLAN_CATALOG.craft_monthly.aiMonthlyCredits).toBe(300);
+    // Everything else tracks Pro.
+    const { aiMonthlyCredits: _c, blueprint: _b, ...craftRest } = PLAN_CATALOG.craft_monthly;
+    const { aiMonthlyCredits: _pc, blueprint: _pb, ...proRest } = PLAN_CATALOG.pro_monthly;
+    expect(craftRest).toEqual(proRest);
+  });
+
+  it("Blueprint is Craft-exclusive plus Founder — not Free or Pro", () => {
+    expect(PLAN_CATALOG.free.blueprint).toBe(false);
+    expect(PLAN_CATALOG.pro_monthly.blueprint).toBe(false);
+    expect(PLAN_CATALOG.founder_lifetime.blueprint).toBe(true);
   });
 
   it("existing plans are unchanged (no regression from adding Craft)", () => {
@@ -63,11 +73,13 @@ describe("Craft — resolver", () => {
     };
   }
 
-  it("an active craft row resolves to Craft (Pro-equivalent) capabilities", () => {
+  it("an active craft row resolves to Craft capabilities (300/mo + blueprint)", () => {
     const r = resolveEntitlements(row({}), new Date(now));
     expect(r.effectivePlanId).toBe("craft_monthly");
     expect(r.isActive).toBe(true);
     expect(r.capabilities).toEqual(PLAN_CATALOG.craft_monthly);
+    expect(r.capabilities.aiMonthlyCredits).toBe(300);
+    expect(r.capabilities.blueprint).toBe(true);
   });
 
   it("a canceled craft row degrades to free (same as any paid plan)", () => {
@@ -90,10 +102,10 @@ describe("Craft — server SQL staging migration", () => {
     );
   });
 
-  it("teaches ai_credit_allowance craft = pro (per_month 100)", () => {
+  it("teaches ai_credit_allowance craft = 300/month (parity with the TS catalog)", () => {
     expect(MIG).toMatch(/CREATE\s+OR\s+REPLACE\s+FUNCTION\s+public\.ai_credit_allowance/i);
-    expect(MIG).toMatch(/WHEN\s+'craft_monthly'\s+THEN\s+100/i);
-    expect(MIG).toMatch(/WHEN\s+'craft_annual'\s+THEN\s+100/i);
+    expect(MIG).toMatch(/WHEN\s+'craft_monthly'\s+THEN\s+300/i);
+    expect(MIG).toMatch(/WHEN\s+'craft_annual'\s+THEN\s+300/i);
   });
 
   it("recognises craft as a known plan in effective-credit resolution", () => {

@@ -2,11 +2,10 @@
 --
 -- Introduces the craft_monthly / craft_annual paid SKUs to every place the
 -- database reasons about entitlements, so the tier is fully resolvable BEFORE
--- the Paddle products exist. Capabilities are Pro-equivalent for now (this
--- migration invents no new pricing) — mirrors how founder_lifetime is
--- Pro-equivalent. Activation after this lands is only: create the Paddle Craft
--- products, map their price ids, and (optionally, later) differentiate the
--- Craft capability set.
+-- the Paddle products exist. Craft = everything Pro has plus a 300/month
+-- AI-credit bucket (and, in the client capability set, the Blueprint overlay) —
+-- matching the deploy branch's Craft so the lineages stay converged. Activation
+-- after this lands is only: create the Paddle Craft products and map price ids.
 --
 -- Additive + idempotent-friendly: widens the billing_subscriptions.plan_id
 -- CHECK and CREATE-OR-REPLACEs the two AI-credit SQL functions to know craft.
@@ -61,8 +60,8 @@ AS $$
       WHEN 'pro_monthly' THEN 100
       WHEN 'pro_annual' THEN 100
       WHEN 'founder_lifetime' THEN 100
-      WHEN 'craft_monthly' THEN 100
-      WHEN 'craft_annual' THEN 100
+      WHEN 'craft_monthly' THEN 300
+      WHEN 'craft_annual' THEN 300
       ELSE 0
     END::int AS per_month;
 $$;

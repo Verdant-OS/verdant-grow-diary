@@ -23,4 +23,5 @@ export const FREE_CAPABILITIES: Readonly<Capabilities> = Object.freeze({
   sensorHistoryDays: 90,
   prioritySupport: false,
   phenoComparison: false,
+  blueprint: false,
 });

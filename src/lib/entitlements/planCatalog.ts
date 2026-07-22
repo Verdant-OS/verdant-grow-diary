@@ -25,26 +25,30 @@ const PRO_CAPABILITIES: Readonly<Capabilities> = Object.freeze({
   sensorHistoryDays: null,
   prioritySupport: true,
   phenoComparison: true,
+  // Blueprint overlay is Craft-exclusive (+ Founder) — not part of Pro.
+  blueprint: false,
 });
 
 /**
- * Founder Lifetime: Pro capabilities forever. AI credits are intentionally
- * the same 100/month cap as Pro — never unlimited.
+ * Founder Lifetime: Pro capabilities forever, PLUS the Blueprint overlay. AI
+ * credits are intentionally the same 100/month cap as Pro — never unlimited.
  */
 const FOUNDER_LIFETIME_CAPABILITIES: Readonly<Capabilities> = Object.freeze({
   ...PRO_CAPABILITIES,
   aiMonthlyCredits: 100,
+  blueprint: true,
 });
 
 /**
- * Craft: a distinct paid SKU staged for launch. Capabilities are currently
- * Pro-equivalent — this deliberately invents NO new pricing (credits, limits)
- * so activation is purely the founder's Paddle-product step plus an optional
- * later capability differentiation. Both cadences resolve identically, mirroring
- * pro_monthly/pro_annual.
+ * Craft: everything Pro has, plus the Blueprint overlay and a larger monthly
+ * AI-credit bucket (300). The craft-grower / rosin tier. Matches the deploy
+ * branch's Craft definition so the two lineages stay converged. Both cadences
+ * resolve identically, mirroring pro_monthly/pro_annual.
  */
 const CRAFT_CAPABILITIES: Readonly<Capabilities> = Object.freeze({
   ...PRO_CAPABILITIES,
+  aiMonthlyCredits: 300,
+  blueprint: true,
 });
 
 export const PLAN_CATALOG: Readonly<Record<PlanId, Readonly<Capabilities>>> =

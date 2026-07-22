@@ -10,11 +10,11 @@ export type PlanId =
   | "pro_monthly"
   | "pro_annual"
   | "founder_lifetime"
-  // Craft: a distinct paid SKU staged for launch. Capabilities are currently
-  // Pro-equivalent (see planCatalog) — the tier is fully resolvable everywhere
-  // the app reasons about entitlements, so activation is only the Paddle
-  // product + (optional later) capability differentiation. No billing row can
-  // carry these until the Paddle products exist.
+  // Craft: the craft-grower / rosin tier. Everything Pro has, plus the Blueprint
+  // overlay and a 300/month AI-credit bucket (see planCatalog). Definition mirrors
+  // the deploy branch so the lineages stay converged. Fully resolvable everywhere
+  // the app reasons about entitlements; activation is only the Paddle products
+  // (no billing row can carry these until they exist).
   | "craft_monthly"
   | "craft_annual";
 
@@ -63,6 +63,12 @@ export interface Capabilities {
    * RLS-scoped) — no money spent, so a client capability check is sufficient.
    */
   phenoComparison: boolean;
+  /**
+   * Pro Blueprint overlay (per-stage SOP scoring). Craft-exclusive (+ Founder).
+   * The overlay feature itself lives on the deploy branch; on main this flag is
+   * carried for entitlement-shape parity so the lineages stay converged.
+   */
+  blueprint: boolean;
 }
 
 /**

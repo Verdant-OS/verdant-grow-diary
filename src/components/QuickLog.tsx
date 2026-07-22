@@ -1029,6 +1029,7 @@ export default function QuickLog({
         plantId: saveTarget.plantId,
         plantTentId: saveTarget.tentId,
         details,
+        stage: saveStage,
         sensorAttachPayload,
         earlyStage: earlyStageRecord,
         environmentCheck: environmentCheckRecord,

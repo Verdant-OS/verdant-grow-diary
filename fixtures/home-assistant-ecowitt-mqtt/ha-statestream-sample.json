@@ -1,0 +1,16 @@
+{
+  "parts": [
+    {
+      "topic": "homeassistant/sensor/ecowitt_gw1200_outdoor_temperature/state",
+      "payload": "\"78.6\"",
+      "retained": false,
+      "receivedAt": "2026-07-22T18:00:01.000Z"
+    },
+    {
+      "topic": "homeassistant/sensor/ecowitt_gw1200_outdoor_temperature/attributes",
+      "payload": "{\"unit_of_measurement\":\"°F\",\"last_updated\":\"2026-07-22T18:00:00.000Z\",\"friendly_name\":\"Ecowitt GW1200 outdoor temperature\"}",
+      "retained": false,
+      "receivedAt": "2026-07-22T18:00:01.010Z"
+    }
+  ]
+}

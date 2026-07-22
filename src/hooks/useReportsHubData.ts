@@ -6,7 +6,8 @@
  *  - Open environment alert counts by severity
  *  - Latest sensor reading captured_at + count of recent readings, scoped to
  *    the grow's tents (grow-linked tents plus tents hosting the grow's
- *    active plants — matching what the Dashboard shows for the grow)
+ *    active plants — so a reading the grower sees on the default Dashboard's
+ *    Environment Snapshot for a plant-hosted tent is never invisible here)
  *  - Diary entry total + last-7-days count for timeline activity summary,
  *    merged with the manual `grow_events` spine (a plain Quick Log save has
  *    no diary companion; companions dedupe by linkage + timestamp pair)
@@ -105,9 +106,11 @@ export function isReportsHubSensorContextRow(row: ReportsHubSensorRow): boolean 
 /**
  * Resolve which tents count as the grow's tents for the sensor summary.
  * A tent qualifies when the grower linked it directly (`tents.grow_id`)
- * OR when it hosts the grow's active plants (`plants.tent_id`) — the
- * Dashboard renders readings for such a tent as the grow's environment,
- * so the Hub must not claim "no readings" for it (live audit #16).
+ * OR when it hosts the grow's active plants (`plants.tent_id`). Manual
+ * readings land on ANY owned tent (the Sensors page tent list is not
+ * grow-filtered) and the default unscoped Dashboard shows them — so the
+ * Hub must not claim "no readings recorded for this grow" for a tent the
+ * grower stocked with this grow's plants (live audit #16).
  * Pure: dedupes, drops blanks, sorts for deterministic query keys.
  */
 export function resolveReportsHubSensorTentIds(

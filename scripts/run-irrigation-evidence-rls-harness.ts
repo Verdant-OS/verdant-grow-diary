@@ -594,8 +594,26 @@ async function main() {
   }
 
   // 15. Server trust boundary (2026-07-22 revoke): authenticated must be
-  // denied on legacy typed-event RPCs and on direct DML into the three event
-  // tables. SELECT on own rows must remain available.
+  // denied on legacy typed-event RPCs. Denial MUST be a genuine permission
+  // rejection — "function does not exist" / "no function matches" / PostgREST
+  // cache misses do NOT count, because they wouldn't prove the privilege was
+  // revoked (they'd prove the function isn't callable at all).
+  const isGenuinePermissionDenial = (
+    err: { code?: string | null; message?: string | null } | null,
+  ): boolean => {
+    if (!err) return false;
+    if (err.code === "42501") return true;
+    return /permission denied/i.test(err.message ?? "");
+  };
+  const isMissingFunction = (
+    err: { code?: string | null; message?: string | null } | null,
+  ): boolean => {
+    if (!err) return false;
+    if (err.code === "42883" || err.code === "PGRST202" || err.code === "PGRST203") return true;
+    return /does not exist|could not find the function|no function matches|schema cache/i.test(
+      err.message ?? "",
+    );
+  };
   const legacyWatering = await ownerC.rpc("create_watering_event" as never, {
     _grow_id: oGrow,
     _volume_ml: 100,
@@ -603,13 +621,9 @@ async function main() {
     _plant_id: oPlantInTent,
   } as never);
   check(
-    "authenticated cannot call legacy create_watering_event",
-    legacyWatering.error !== null &&
-      (legacyWatering.error.code === "42501" ||
-        /permission denied|does not exist|could not find the function|no function matches/i.test(
-          legacyWatering.error.message ?? "",
-        )),
-    legacyWatering.error?.message ?? "expected denial, got success",
+    "authenticated denied create_watering_event with genuine permission error (not missing-function)",
+    isGenuinePermissionDenial(legacyWatering.error) && !isMissingFunction(legacyWatering.error),
+    legacyWatering.error?.message ?? "expected 42501 / permission denied, got success",
   );
   const legacyFeeding = await ownerC.rpc("create_feeding_event" as never, {
     _grow_id: oGrow,
@@ -619,17 +633,41 @@ async function main() {
     _plant_id: oPlantInTent,
   } as never);
   check(
-    "authenticated cannot call legacy create_feeding_event",
-    legacyFeeding.error !== null &&
-      (legacyFeeding.error.code === "42501" ||
-        /permission denied|does not exist|could not find the function|no function matches/i.test(
-          legacyFeeding.error.message ?? "",
-        )),
-    legacyFeeding.error?.message ?? "expected denial, got success",
+    "authenticated denied create_feeding_event with genuine permission error (not missing-function)",
+    isGenuinePermissionDenial(legacyFeeding.error) && !isMissingFunction(legacyFeeding.error),
+    legacyFeeding.error?.message ?? "expected 42501 / permission denied, got success",
   );
 
+  // 16. Direct DML denial for INSERT / UPDATE / DELETE on all three event
+  // tables via the authenticated client. SELECT on own rows must remain
+  // available. Seed one owner-owned row per subtype via service_role so
+  // UPDATE / DELETE have a real target — a missing target could mask denial.
+  const seededParent = await admin
+    .from("grow_events")
+    .insert({
+      user_id: owner.id,
+      grow_id: oGrow,
+      tent_id: oTent,
+      event_type: "watering",
+      source: "manual",
+    })
+    .select("id")
+    .single();
+  check("seed: service_role inserted grow_events row", seededParent.error === null, seededParent.error?.message);
+  const seededEventId = seededParent.data?.id as string | undefined;
+  if (seededEventId) {
+    const seededWater = await admin
+      .from("watering_events")
+      .insert({ event_id: seededEventId, user_id: owner.id, volume_ml: 100 });
+    check("seed: service_role inserted watering_events row", seededWater.error === null, seededWater.error?.message);
+    const seededFeed = await admin
+      .from("feeding_events")
+      .insert({ event_id: seededEventId, user_id: owner.id, line_id: "x", products: [] });
+    check("seed: service_role inserted feeding_events row", seededFeed.error === null, seededFeed.error?.message);
+  }
+
   for (const table of ["grow_events", "watering_events", "feeding_events"] as const) {
-    const payload: Record<string, unknown> =
+    const insertPayload: Record<string, unknown> =
       table === "grow_events"
         ? {
             user_id: owner.id,
@@ -643,24 +681,69 @@ async function main() {
             user_id: owner.id,
             ...(table === "watering_events" ? { volume_ml: 100 } : { line_id: "x", products: [] }),
           };
-    const res = await ownerC.from(table).insert(payload);
+    const ins = await ownerC.from(table).insert(insertPayload);
     check(
-      `authenticated cannot direct-insert into ${table}`,
-      res.error !== null &&
-        (res.error.code === "42501" ||
-          /permission denied|not allowed|insufficient/i.test(res.error.message ?? "")),
-      res.error?.message ?? "expected denial, got success",
+      `authenticated denied INSERT on ${table} (genuine permission error)`,
+      isGenuinePermissionDenial(ins.error),
+      ins.error?.message ?? "expected 42501 / permission denied, got success",
     );
+
+    const upd = await ownerC.from(table).update({ user_id: owner.id }).eq("user_id", owner.id);
+    check(
+      `authenticated denied UPDATE on ${table} (genuine permission error)`,
+      isGenuinePermissionDenial(upd.error),
+      upd.error?.message ?? "expected 42501 / permission denied, got success",
+    );
+
+    const del = await ownerC.from(table).delete().eq("user_id", owner.id);
+    check(
+      `authenticated denied DELETE on ${table} (genuine permission error)`,
+      isGenuinePermissionDenial(del.error),
+      del.error?.message ?? "expected 42501 / permission denied, got success",
+    );
+
+    const sel = await ownerC.from(table).select("user_id").eq("user_id", owner.id).limit(1);
+    check(`authenticated retains SELECT on ${table}`, sel.error === null, sel.error?.message);
   }
 
-  for (const table of ["grow_events", "watering_events", "feeding_events"] as const) {
-    const res = await ownerC.from(table).select("user_id").eq("user_id", owner.id).limit(1);
-    check(
-      `authenticated retains SELECT on ${table}`,
-      res.error === null,
-      res.error?.message,
-    );
-  }
+  // 17. service_role retains legacy-RPC EXECUTE and direct write access —
+  // needed for admin/edge-function code paths that must repair or backfill
+  // evidence rows without going through the canonical Quick Log path.
+  const svcWatering = await admin.rpc("create_watering_event" as never, {
+    _grow_id: oGrow,
+    _volume_ml: 5,
+    _tent_id: oTent,
+    _plant_id: oPlantInTent,
+  } as never);
+  check(
+    "service_role can call legacy create_watering_event",
+    svcWatering.error === null,
+    svcWatering.error?.message,
+  );
+  const svcFeeding = await admin.rpc("create_feeding_event" as never, {
+    _grow_id: oGrow,
+    _line_id: "default",
+    _products: [],
+    _tent_id: oTent,
+    _plant_id: oPlantInTent,
+  } as never);
+  check(
+    "service_role can call legacy create_feeding_event",
+    svcFeeding.error === null,
+    svcFeeding.error?.message,
+  );
+  const svcDirect = await admin
+    .from("grow_events")
+    .insert({
+      user_id: owner.id,
+      grow_id: oGrow,
+      tent_id: oTent,
+      event_type: "watering",
+      source: "manual",
+    })
+    .select("id")
+    .single();
+  check("service_role retains direct INSERT on grow_events", svcDirect.error === null, svcDirect.error?.message);
 }
 
 

@@ -379,6 +379,7 @@ export interface PhenoDatabase {
         | "candidate_number"
         | "strain"
         | "stage"
+        | "plant_type"
         | "grow_id"
         | "tent_id"
         | "photo_url"

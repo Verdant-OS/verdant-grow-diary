@@ -656,33 +656,71 @@ async function main() {
 
   // 16. Direct DML denial for INSERT / UPDATE / DELETE on all three event
   // tables via the authenticated client. SELECT on own rows must remain
-  // available. Seed one owner-owned row per subtype via service_role so
-  // UPDATE / DELETE have a real target — a missing target could mask denial.
-  const seededParent = await admin
-    .from("grow_events")
-    .insert({
-      user_id: owner.id,
-      grow_id: oGrow,
-      tent_id: oTent,
-      event_type: "watering",
-      source: "manual",
-    })
-    .select("id")
-    .single();
-  check("seed: service_role inserted grow_events row", seededParent.error === null, seededParent.error?.message);
-  const seededEventId = seededParent.data?.id as string | undefined;
-  if (seededEventId) {
-    const seededWater = await admin
-      .from("watering_events")
-      .insert({ event_id: seededEventId, user_id: owner.id, volume_ml: 100 });
-    check("seed: service_role inserted watering_events row", seededWater.error === null, seededWater.error?.message);
-    const seededFeed = await admin
-      .from("feeding_events")
-      .insert({ event_id: seededEventId, user_id: owner.id, line_id: "x", products: [] });
-    check("seed: service_role inserted feeding_events row", seededFeed.error === null, seededFeed.error?.message);
+  // available. Real target rows are seeded via the CANONICAL authenticated
+  // path (quicklog_save_event) — never via service_role direct table inserts
+  // — so UPDATE / DELETE denial cannot be masked by an empty table, and no
+  // second write path exists in the harness.
+  //
+  // The event-table denial allowlist is closed to exactly these three tables.
+  // Adding a table here means adding matching REVOKE coverage and pgTAP proof.
+  const DENIAL_ALLOWLIST = ["grow_events", "watering_events", "feeding_events"] as const;
+
+  const wateringSeedKey = key();
+  const wateringSeed = await save(ownerC, baseArgs({ p_idempotency_key: wateringSeedKey }));
+  check(
+    "dml-denial seed: canonical watering save succeeds",
+    wateringSeed.env?.ok === true,
+    JSON.stringify(wateringSeed.env),
+  );
+  const wateringSeedEventId = wateringSeed.env?.grow_event_id as string | undefined;
+  check(
+    "dml-denial seed: watering save returned a concrete grow_event_id",
+    typeof wateringSeedEventId === "string" && wateringSeedEventId.length > 0,
+  );
+
+  const feedingSeedKey = key();
+  const feedingSeed = await save(ownerC, feedingArgs({ p_idempotency_key: feedingSeedKey }));
+  check(
+    "dml-denial seed: canonical feeding save succeeds",
+    feedingSeed.env?.ok === true,
+    JSON.stringify(feedingSeed.env),
+  );
+  const feedingSeedEventId = feedingSeed.env?.grow_event_id as string | undefined;
+  check(
+    "dml-denial seed: feeding save returned a concrete grow_event_id",
+    typeof feedingSeedEventId === "string" && feedingSeedEventId.length > 0,
+  );
+  check(
+    "dml-denial seed: watering and feeding are independent parent events",
+    typeof wateringSeedEventId === "string" &&
+      typeof feedingSeedEventId === "string" &&
+      wateringSeedEventId !== feedingSeedEventId,
+  );
+
+  if (typeof wateringSeedEventId === "string") {
+    const wCounts = await eventSetCounts(owner.id, wateringSeedEventId, wateringSeedKey);
+    check(
+      "watering seed exists only in watering_events (no feeding subtype row)",
+      wCounts.grow === 1 &&
+        wCounts.watering === 1 &&
+        wCounts.feeding === 0 &&
+        wCounts.idempotency === 1,
+      JSON.stringify(wCounts),
+    );
+  }
+  if (typeof feedingSeedEventId === "string") {
+    const fCounts = await eventSetCounts(owner.id, feedingSeedEventId, feedingSeedKey);
+    check(
+      "feeding seed exists only in feeding_events (no watering subtype row)",
+      fCounts.grow === 1 &&
+        fCounts.feeding === 1 &&
+        fCounts.watering === 0 &&
+        fCounts.idempotency === 1,
+      JSON.stringify(fCounts),
+    );
   }
 
-  for (const table of ["grow_events", "watering_events", "feeding_events"] as const) {
+  for (const table of DENIAL_ALLOWLIST) {
     const insertPayload: Record<string, unknown> =
       table === "grow_events"
         ? {
@@ -700,21 +738,21 @@ async function main() {
     const ins = await ownerC.from(table).insert(insertPayload);
     check(
       `authenticated denied INSERT on ${table} (genuine permission error)`,
-      isGenuinePermissionDenial(ins.error),
+      isGenuinePermissionDenial(ins.error) && !isMissingFunction(ins.error),
       ins.error?.message ?? "expected 42501 / permission denied, got success",
     );
 
     const upd = await ownerC.from(table).update({ user_id: owner.id }).eq("user_id", owner.id);
     check(
       `authenticated denied UPDATE on ${table} (genuine permission error)`,
-      isGenuinePermissionDenial(upd.error),
+      isGenuinePermissionDenial(upd.error) && !isMissingFunction(upd.error),
       upd.error?.message ?? "expected 42501 / permission denied, got success",
     );
 
     const del = await ownerC.from(table).delete().eq("user_id", owner.id);
     check(
       `authenticated denied DELETE on ${table} (genuine permission error)`,
-      isGenuinePermissionDenial(del.error),
+      isGenuinePermissionDenial(del.error) && !isMissingFunction(del.error),
       del.error?.message ?? "expected 42501 / permission denied, got success",
     );
 
@@ -722,45 +760,17 @@ async function main() {
     check(`authenticated retains SELECT on ${table}`, sel.error === null, sel.error?.message);
   }
 
-  // 17. service_role retains legacy-RPC EXECUTE and direct write access —
-  // needed for admin/edge-function code paths that must repair or backfill
-  // evidence rows without going through the canonical Quick Log path.
-  const svcWatering = await admin.rpc("create_watering_event" as never, {
-    _grow_id: oGrow,
-    _volume_ml: 5,
-    _tent_id: oTent,
-    _plant_id: oPlantInTent,
-  } as never);
-  check(
-    "service_role can call legacy create_watering_event",
-    svcWatering.error === null,
-    svcWatering.error?.message,
-  );
-  const svcFeeding = await admin.rpc("create_feeding_event" as never, {
-    _grow_id: oGrow,
-    _line_id: "default",
-    _products: [],
-    _tent_id: oTent,
-    _plant_id: oPlantInTent,
-  } as never);
-  check(
-    "service_role can call legacy create_feeding_event",
-    svcFeeding.error === null,
-    svcFeeding.error?.message,
-  );
-  const svcDirect = await admin
-    .from("grow_events")
-    .insert({
-      user_id: owner.id,
-      grow_id: oGrow,
-      tent_id: oTent,
-      event_type: "watering",
-      source: "manual",
-    })
-    .select("id")
-    .single();
-  check("service_role retains direct INSERT on grow_events", svcDirect.error === null, svcDirect.error?.message);
+  // 17. service-role ACL / RPC-execution posture is intentionally NOT proved
+  // at runtime here. The legacy create_watering_event / create_feeding_event
+  // RPCs are SECURITY INVOKER and depend on auth.uid() — a service_role JWT
+  // supplies no user identity, so a "successful" runtime call would prove
+  // nothing about ACL preservation and a failing call would falsely look
+  // like a denial regression. ACL possession (service_role retains EXECUTE
+  // on both legacy overloads; anon and authenticated do not; service_role
+  // retains SELECT/INSERT/UPDATE/DELETE on the three event tables) is proved
+  // out-of-band in the pgTAP suites under supabase/tests/.
 }
+
 
 
 async function teardown(): Promise<void> {

@@ -96,8 +96,10 @@ BEGIN
     FROM pg_proc p
     JOIN pg_namespace n ON n.oid = p.pronamespace
    WHERE n.nspname = 'public' AND p.proname = 'create_watering_event';
+  ASSERT is_def IS NOT NULL,
+    'DIAGNOSTIC[missing-function]: create_watering_event not found while checking SECURITY INVOKER';
   ASSERT is_def = false,
-    'create_watering_event must be SECURITY INVOKER, not SECURITY DEFINER';
+    'DIAGNOSTIC[security-mode-mismatch]: create_watering_event must be SECURITY INVOKER, not SECURITY DEFINER';
   RAISE NOTICE '✓ create_watering_event is SECURITY INVOKER';
 END $$;
 
@@ -115,12 +117,15 @@ DECLARE
   }'::jsonb;
   role_name TEXT; priv TEXT; expected BOOLEAN; got BOOLEAN;
 BEGIN
+  ASSERT to_regclass('public.watering_events') IS NOT NULL,
+    'DIAGNOSTIC[missing-table]: public.watering_events not found while checking table ACL';
   FOR role_name IN SELECT jsonb_object_keys(want) LOOP
     FOR priv IN SELECT jsonb_object_keys(want -> role_name) LOOP
       expected := ((want -> role_name) ->> priv)::boolean;
       got := has_table_privilege(role_name, 'public.watering_events', priv);
       ASSERT got = expected,
-        format('watering_events %s for %I: expected %s, got %s',
+        format('DIAGNOSTIC[table-acl-mismatch]: watering_events %s for %I: expected=%s got=%s '
+               '(table present, ACL disagrees with trust-boundary contract)',
                priv, role_name, expected, got);
     END LOOP;
   END LOOP;
@@ -138,12 +143,15 @@ DECLARE
   }'::jsonb;
   role_name TEXT; priv TEXT; expected BOOLEAN; got BOOLEAN;
 BEGIN
+  ASSERT to_regclass('public.grow_events') IS NOT NULL,
+    'DIAGNOSTIC[missing-table]: public.grow_events not found while checking table ACL';
   FOR role_name IN SELECT jsonb_object_keys(want) LOOP
     FOR priv IN SELECT jsonb_object_keys(want -> role_name) LOOP
       expected := ((want -> role_name) ->> priv)::boolean;
       got := has_table_privilege(role_name, 'public.grow_events', priv);
       ASSERT got = expected,
-        format('grow_events %s for %I: expected %s, got %s',
+        format('DIAGNOSTIC[table-acl-mismatch]: grow_events %s for %I: expected=%s got=%s '
+               '(table present, ACL disagrees with trust-boundary contract)',
                priv, role_name, expected, got);
     END LOOP;
   END LOOP;

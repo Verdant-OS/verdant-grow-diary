@@ -708,6 +708,76 @@ the offending migration file:
     category: money-migration-drift
 ```
 
+##### Verifying uploaded findings in GitHub code scanning
+
+After the workflow finishes (green **or** red — `upload-sarif` runs under
+`if: always()`), confirm the findings actually landed. Do the checks in
+this order:
+
+**1. Confirm the SARIF was accepted.**
+- Open the workflow run: repo → **Actions** → pick the run → expand the
+  `Prefix diff (SARIF)` job.
+- Look at the **Upload SARIF** step log. A successful upload prints
+  `Uploading results` followed by `SARIF upload complete`. If you see
+  `Invalid SARIF file` or `Path does not exist`, the file wasn't
+  generated — jump to the `--sarif` troubleshooting table above.
+- On the run summary page, the **Artifacts** section should list
+  `money-migration-audit-sandbox` (or `-live`) containing `diff.sarif`.
+  Download it and re-check locally with the `jq -e` self-check from the
+  "Sample SARIF output" section.
+
+**2. Find the findings in the Security tab.**
+- Repo → **Security** → **Code scanning** (left sidebar).
+- In the filter bar, set:
+  - **Tool:** `diff-money-migration-prefixes`
+  - **Branch:** the branch the workflow ran on (defaults to the default branch)
+  - **Category:** `money-migration-drift` (or whatever `category:` you
+    passed to `upload-sarif`; sandbox and live should be distinct)
+  - **Rule:** optional — filter to `money-migration-drift`,
+    `money-migration-malformed`, or `money-migration-tooling`
+- Each row shows the migration file, the rule ID, and severity **Error**.
+  Click a row to see the full message (`Required money migration not
+  applied in <env>: prefix <14-digit>`) and the file location.
+
+**3. Verify per-file annotations on the PR.**
+- Open the PR → **Files changed** tab.
+- Each drifted `supabase/migrations/<file>.sql` should show a red
+  gutter marker on line 1 with the same "Required money migration not
+  applied…" message. `money-migration-malformed` and
+  `money-migration-tooling` annotate the manifest
+  (`scripts/required-money-migrations.mjs`) instead.
+- If PR annotations are missing but the Security tab shows the findings,
+  the SARIF uploaded from a non-PR event (push/schedule). Re-run the
+  workflow on the PR itself, or add a `pull_request` trigger.
+
+**4. Confirm de-duplication across re-runs.**
+- Re-run the workflow. In **Security → Code scanning**, the finding
+  count should stay the same, not double. The **History** panel on the
+  finding shows one entry per run, all pointing at the same
+  `partialFingerprints` (`migrationVersion` + `targetEnv`).
+- If duplicates appear, `TARGET_ENV` or the file path changed between
+  runs — see the last row of the `--sarif` troubleshooting table.
+
+**5. Confirm resolution.**
+- After the missing migration is applied, the next workflow run uploads
+  a SARIF with `"results": []`. In **Security → Code scanning**, the
+  matching finding's status flips from **Open** to **Closed** (labelled
+  *"Fixed in <sha>"*). A clean run does **not** delete the history —
+  the finding stays visible under the **Closed** filter as an audit trail.
+
+**Requirements checklist** if the Security tab is empty:
+- Repository setting **Settings → Code security → Code scanning** must
+  be enabled (public repos: on by default; private repos: requires
+  Advanced Security or a public repo).
+- The workflow needs `permissions: security-events: write` at the job or
+  workflow level. Without it, `upload-sarif` fails with `Resource not
+  accessible by integration`.
+- Findings are scoped to the branch the SARIF was uploaded from. Switch
+  the **Branch** filter if you're looking at the default branch but the
+  run was on a feature branch.
+
+
+
 Rule catalog (always present in the SARIF `tool.driver.rules`, even on
 clean runs):
 

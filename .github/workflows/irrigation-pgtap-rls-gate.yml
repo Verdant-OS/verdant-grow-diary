@@ -74,12 +74,16 @@ jobs:
               - "supabase/tests/create_feeding_event.sql"
               - "supabase/tests/create_watering_event.sql"
               - "supabase/seed.sql"
-              # Runtime harness sources typechecked by this gate.
+              # Runtime harness sources typechecked by this gate. Explicit
+              # allowlist — new irrigation harnesses MUST be added here or
+              # the gate will silently skip on PRs that only touch them.
               - "scripts/run-irrigation-evidence-rls-harness.ts"
+              - "scripts/run-irrigation-integrity-suite.mjs"
               - "scripts/run-create-feeding-event-rls-harness.ts"
               - "scripts/run-quicklog-save-event-rls-harness.ts"
               - "scripts/run-quicklog-save-manual-rls-harness.ts"
               - "scripts/run-quicklog-rpc-rls-harnesses.ts"
+              - "scripts/run-quicklog-typed-payloads-harness.ts"
               # The workflow itself — any change here re-runs the full gate.
               - ".github/workflows/irrigation-pgtap-rls-gate.yml"
 

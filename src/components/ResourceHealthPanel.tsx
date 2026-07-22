@@ -214,6 +214,8 @@ export function ResourceHealthPanel() {
 
   const failing = checks.filter((c) => c.status === "fail").length;
   const passing = checks.filter((c) => c.status === "pass").length;
+  const lastRun = history[0];
+  const currentFailures = checks.filter((c) => c.status === "fail");
 
   return (
     <Card>
@@ -230,19 +232,59 @@ export function ResourceHealthPanel() {
               {passing} / {checks.length} passing
             </Badge>
           )}
+          {intervalMs > 0 && <Badge variant="outline">Auto</Badge>}
         </div>
       </CardHeader>
-      <CardContent className="text-sm space-y-3">
+      <CardContent className="text-sm space-y-4">
         <div className="flex flex-wrap items-center gap-2">
           <Button onClick={() => void runAll()} disabled={running} size="sm">
             {running ? "Checking…" : "Re-run checks"}
           </Button>
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span>Auto-scan</span>
+            <Select
+              value={String(intervalMs)}
+              onValueChange={(v) => setIntervalMs(Number.parseInt(v, 10) || 0)}
+            >
+              <SelectTrigger className="h-8 w-[140px]" aria-label="Auto-scan interval">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {INTERVAL_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={String(o.value)}>
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </label>
           {lastRunAt && (
             <span className="text-xs text-muted-foreground">
               Last run: {new Date(lastRunAt).toLocaleString()}
             </span>
           )}
         </div>
+
+        {currentFailures.length > 0 && (
+          <div
+            role="alert"
+            className="rounded-md border border-destructive/50 bg-destructive/5 p-3 space-y-1"
+          >
+            <p className="font-medium text-destructive">
+              {currentFailures.length} failing check
+              {currentFailures.length === 1 ? "" : "s"} on last run
+            </p>
+            <ul className="text-xs text-muted-foreground list-disc pl-5 space-y-0.5">
+              {currentFailures.map((f) => (
+                <li key={f.path}>
+                  <span className="font-medium text-foreground">{f.name}</span>{" "}
+                  <code>{f.path}</code>
+                  {f.detail ? ` — ${f.detail}` : ""}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <ul className="divide-y rounded-md border">
           {checks.map((c) => (
@@ -266,10 +308,48 @@ export function ResourceHealthPanel() {
           ))}
         </ul>
 
+        {history.length > 0 && (
+          <details className="rounded-md border p-3">
+            <summary className="cursor-pointer text-xs font-medium">
+              Recent runs ({history.length})
+              {lastRun && (
+                <span className="ml-2 font-normal text-muted-foreground">
+                  · last: {lastRun.passing}/{lastRun.total} passing
+                  {lastRun.failing > 0 ? `, ${lastRun.failing} failing` : ""}
+                </span>
+              )}
+            </summary>
+            <ul className="mt-2 space-y-1 text-xs">
+              {history.map((h) => (
+                <li key={h.ranAt} className="flex flex-wrap items-center gap-2">
+                  <span className="text-muted-foreground tabular-nums">
+                    {new Date(h.ranAt).toLocaleTimeString()}
+                  </span>
+                  {h.failing > 0 ? (
+                    <Badge variant="destructive" className="text-[10px]">
+                      {h.failing} failing
+                    </Badge>
+                  ) : (
+                    <Badge variant="secondary" className="text-[10px]">
+                      all {h.total} passing
+                    </Badge>
+                  )}
+                  {h.failing > 0 && (
+                    <span className="text-muted-foreground break-words">
+                      {h.failures.map((f) => f.name).join(", ")}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
+
         <p className="text-xs text-muted-foreground">
           Fetches each resource with <code>cache: "no-store"</code> from the current origin.
-          No auth, no writes, no secrets.
+          Auto-scan pauses while the tab is hidden. No auth, no writes, no secrets.
         </p>
+
       </CardContent>
     </Card>
   );

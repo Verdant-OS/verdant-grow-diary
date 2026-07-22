@@ -987,6 +987,137 @@ curl -sS -v "${AUTH[@]}" https://api.github.com/user 2>&1 \
 - Running the curl inside a workflow that overrides `GITHUB_TOKEN` with
   an empty env var — `env | grep GITHUB_TOKEN` in the step to confirm.
 
+##### End-to-end CI snippet: upload SARIF, then verify the alerts in the same run
+
+The workflow below runs the prefix-diff, uploads the SARIF, and
+immediately calls the Code Scanning REST API to prove the alerts landed
+against **this** commit. If the verification step doesn't see the
+analysis or the expected number of results, the job fails — so silent
+upload regressions can't slip through as green.
+
+```yaml
+# .github/workflows/prefix-diff-sarif-verify.yml
+name: prefix-diff-sarif-verify
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write   # upload-sarif + read alerts back
+  actions: read            # required on private repos
+
+jobs:
+  sarif:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with: { bun-version: latest }
+
+      - name: Install deps
+        run: bun install --frozen-lockfile
+
+      # 1. Generate SARIF. Exit 0 even on drift so upload still runs.
+      - name: Run prefix-diff (SARIF)
+        id: diff
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL_SANDBOX }}
+          TARGET_ENV: sandbox
+        run: |
+          set +e
+          bun run scripts/diff-money-migration-prefixes.mjs \
+            --sarif --sarif-out=prefix-diff.sarif
+          echo "exit=$?" >> "$GITHUB_OUTPUT"
+          test -s prefix-diff.sarif   # fail fast if no SARIF was written
+
+      # 2. Structural validation before upload — cheap, catches most upload rejections.
+      - name: Validate SARIF structure
+        run: bun run scripts/validate-sarif.mjs prefix-diff.sarif
+
+      # 3. Upload. Capture the sarif-id so the verify step can poll the exact analysis.
+      - name: Upload SARIF
+        id: upload
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: prefix-diff.sarif
+          category: prefix-diff-${{ env.TARGET_ENV || 'sandbox' }}
+          wait-for-processing: true   # blocks until GitHub finishes ingesting
+
+      # 4. Verify: the analysis exists for THIS sha, and the alert count matches SARIF.
+      - name: Verify alerts landed
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          CATEGORY: prefix-diff-${{ env.TARGET_ENV || 'sandbox' }}
+        run: |
+          set -euo pipefail
+          AUTH=(-H "Authorization: Bearer $GH_TOKEN"
+                -H "Accept: application/vnd.github+json"
+                -H "X-GitHub-Api-Version: 2022-11-28")
+
+          echo "Expected results in SARIF:"
+          expected=$(jq '[.runs[].results[]] | length' prefix-diff.sarif)
+          echo "  $expected"
+
+          # 4a. Analysis for this sha + category must exist.
+          echo "Looking up analysis for sha=$SHA category=$CATEGORY ..."
+          analysis=$(curl -sS "${AUTH[@]}" \
+            "https://api.github.com/repos/$REPO/code-scanning/analyses?ref=refs/pull/${{ github.event.pull_request.number }}/head&sarif_id=${{ steps.upload.outputs.sarif-id }}")
+          echo "$analysis" | jq '.[0] // "NONE"'
+          test "$(echo "$analysis" | jq 'length')" -gt 0
+
+          # 4b. Alert count for this category on this sha matches SARIF result count.
+          echo "Counting open alerts for category=$CATEGORY ..."
+          actual=$(curl -sS "${AUTH[@]}" \
+            "https://api.github.com/repos/$REPO/code-scanning/alerts?state=open&tool_name=prefix-diff&per_page=100" \
+            | jq --arg cat "$CATEGORY" \
+                '[.[] | select(.most_recent_instance.category == $cat)] | length')
+          echo "  SARIF results: $expected"
+          echo "  API alerts:    $actual"
+          test "$expected" -eq "$actual" || {
+            echo "::error::Alert count mismatch — SARIF uploaded but not fully ingested."
+            exit 1
+          }
+
+      # 5. Keep the SARIF + a small verification report as artifacts.
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prefix-diff-sarif
+          path: |
+            prefix-diff.sarif
+```
+
+**What each step guarantees.**
+
+| Step                        | Fails when                                                                 |
+|-----------------------------|----------------------------------------------------------------------------|
+| Run prefix-diff (SARIF)     | The tool crashed *before* writing SARIF (test `-s` catches empty files).   |
+| Validate SARIF structure    | Missing `partialFingerprints`, empty rule catalog, malformed `version`.    |
+| Upload SARIF                | Missing `security-events: write`, invalid SARIF, or fork PR upload denied. |
+| Verify alerts landed        | No analysis exists for this sha, or the alert count ≠ SARIF result count.  |
+| Upload artifacts            | Never — runs under `if: always()` so failures still ship the SARIF.        |
+
+**Notes.**
+
+- `wait-for-processing: true` on `upload-sarif` is what makes step 4
+  reliable — without it the verify step races GitHub's ingestion and
+  intermittently sees zero alerts.
+- Use `${{ steps.upload.outputs.sarif-id }}` to scope the analysis
+  lookup to *this* upload; otherwise a concurrent workflow on the same
+  sha can mask a failure.
+- For fork PRs, step 3 is skipped by GitHub. Guard step 4 with
+  `if: github.event.pull_request.head.repo.full_name == github.repository`
+  if you accept fork contributions.
+- The alert-count assertion is deliberately strict. If your workflow
+  runs on both `push` and `pull_request`, dedupe by scoping the API
+  query to the exact `sarif_id`, not `ref` alone.
+
 ##### Verifying uploaded findings in GitHub code scanning
 
 

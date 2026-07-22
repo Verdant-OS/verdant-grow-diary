@@ -759,8 +759,25 @@ Combine with `--sarif` when you also want code-scanning history and
 de-duplication across re-runs; use `--github-annotations` alone when you
 only need the inline PR markers.
 
+#### Troubleshooting
 
+Common failure modes and the fastest fix for each. All apply to both
+`scripts/assert-required-money-migrations-applied.mjs` and
+`scripts/diff-money-migration-prefixes.mjs` unless noted.
 
+| Symptom                                                                          | Likely cause                                                        | Quickest fix                                                                                                                          |
+|----------------------------------------------------------------------------------|---------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------|
+| `No DB URL provided` / exit code `2` / SARIF `money-migration-tooling`           | Neither `SUPABASE_DB_URL` nor the env-specific URL is set           | `export SUPABASE_DB_URL_SANDBOX=...` (or `_LIVE`) **and** `export TARGET_ENV=sandbox`. Verify with `env \| grep SUPABASE_DB_URL`.     |
+| `psql: command not found` / `spawn psql ENOENT`                                  | Postgres client not installed or not on `PATH`                      | macOS: `brew install libpq && brew link --force libpq`. Debian/Ubuntu: `sudo apt-get install postgresql-client`. Confirm: `which psql`. |
+| Applied-check reports drift but sandbox is definitely up to date                 | `TARGET_ENV` points at the wrong DB (e.g. `live` while URL is sandbox) | Set `TARGET_ENV` to match the URL variable you exported. Cross-check with `echo $TARGET_ENV` and the `target_env` field in JSON output. |
+| `psql: FATAL: password authentication failed`                                    | Stale or wrong pooler credentials in the DB URL                     | Refresh the connection string; ensure no shell-escaped `$` characters in the password. Test with `psql "$SUPABASE_DB_URL_SANDBOX" -c 'select 1'`. |
+| `Tracker query failed` / SARIF `money-migration-tooling`                          | `supabase_migrations.schema_migrations` unreachable (network, SSL, wrong DB) | Add `?sslmode=require` if the pooler needs it, and confirm the URL points at the Supabase project's Postgres, not a local instance.   |
+| Exit `1` immediately, no drift table                                              | Manifest entry missing a 14-digit prefix (`money-migration-malformed`) | Open `scripts/required-money-migrations.mjs` and confirm each path begins with a 14-digit timestamp. Re-run the unit tests: `bun run test:prefix-diff`. |
+| `mkdir` errors when writing SARIF/diff artifacts                                  | The script does not create parent directories                       | `mkdir -p audit/money-migrations` before passing `--sarif-out=` or `DIFF_PATH=`.                                                      |
+| CI green locally, red in Actions                                                  | `SUPABASE_DB_URL_SANDBOX` / `_LIVE` GitHub secrets missing or misnamed | Re-check the exact names in the repo Secrets settings — the workflow only reads those two, not `DATABASE_URL`.                        |
+| Sandbox smoke script hangs                                                       | Missing `SANDBOX_SMOKE_USER` or the user has no Paddle sandbox entitlement | Set `SANDBOX_SMOKE_USER` to a real sandbox account UUID; re-run with `--verbose` to see the checkpoint it stalls on.                  |
 
-
+Still stuck? Run the diff CLI with `--json` and share the output — every
+failure mode is annotated with `target_env`, exit code, and the exact
+missing/malformed prefix, which is enough to diagnose without repo access.
 

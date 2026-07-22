@@ -18,7 +18,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write   # required to push the tag back to the repo
+  contents: write # required to push the tag back to the repo
 
 concurrency:
   # Serialize per branch so two rapid pushes can't race to tag the
@@ -33,7 +33,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           # Need full tag history to detect existing tags on HEAD and
           # to push new tags back.

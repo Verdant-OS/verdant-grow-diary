@@ -6,6 +6,15 @@
 --            EXECUTE on every overload of create_watering_event and create_feeding_event
 --              from anon, authenticated, PUBLIC.
 
+-- Fresh Supabase local stacks use hardened default table privileges, while the
+-- hosted project still has the legacy table-access baseline. Explicitly pin the
+-- privileges this migration promises to preserve so clean replay does not rely
+-- on seed.sql running after all migrations.
+GRANT SELECT ON public.grow_events, public.watering_events, public.feeding_events
+  TO authenticated;
+GRANT ALL ON public.grow_events, public.watering_events, public.feeding_events
+  TO service_role;
+
 REVOKE INSERT, UPDATE, DELETE ON public.grow_events     FROM anon, authenticated, PUBLIC;
 REVOKE INSERT, UPDATE, DELETE ON public.watering_events FROM anon, authenticated, PUBLIC;
 REVOKE INSERT, UPDATE, DELETE ON public.feeding_events  FROM anon, authenticated, PUBLIC;

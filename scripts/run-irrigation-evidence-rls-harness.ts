@@ -592,7 +592,77 @@ async function main() {
         : `rows=${Array.isArray(data) ? data.length : "unknown"}`,
     );
   }
+
+  // 15. Server trust boundary (2026-07-22 revoke): authenticated must be
+  // denied on legacy typed-event RPCs and on direct DML into the three event
+  // tables. SELECT on own rows must remain available.
+  const legacyWatering = await ownerC.rpc("create_watering_event" as never, {
+    _grow_id: oGrow,
+    _volume_ml: 100,
+    _tent_id: oTent,
+    _plant_id: oPlantInTent,
+  } as never);
+  check(
+    "authenticated cannot call legacy create_watering_event",
+    legacyWatering.error !== null &&
+      (legacyWatering.error.code === "42501" ||
+        /permission denied|does not exist|could not find the function|no function matches/i.test(
+          legacyWatering.error.message ?? "",
+        )),
+    legacyWatering.error?.message ?? "expected denial, got success",
+  );
+  const legacyFeeding = await ownerC.rpc("create_feeding_event" as never, {
+    _grow_id: oGrow,
+    _line_id: "default",
+    _products: [],
+    _tent_id: oTent,
+    _plant_id: oPlantInTent,
+  } as never);
+  check(
+    "authenticated cannot call legacy create_feeding_event",
+    legacyFeeding.error !== null &&
+      (legacyFeeding.error.code === "42501" ||
+        /permission denied|does not exist|could not find the function|no function matches/i.test(
+          legacyFeeding.error.message ?? "",
+        )),
+    legacyFeeding.error?.message ?? "expected denial, got success",
+  );
+
+  for (const table of ["grow_events", "watering_events", "feeding_events"] as const) {
+    const payload: Record<string, unknown> =
+      table === "grow_events"
+        ? {
+            user_id: owner.id,
+            grow_id: oGrow,
+            tent_id: oTent,
+            event_type: "watering",
+            source: "manual",
+          }
+        : {
+            event_id: crypto.randomUUID(),
+            user_id: owner.id,
+            ...(table === "watering_events" ? { volume_ml: 100 } : { line_id: "x", products: [] }),
+          };
+    const res = await ownerC.from(table).insert(payload);
+    check(
+      `authenticated cannot direct-insert into ${table}`,
+      res.error !== null &&
+        (res.error.code === "42501" ||
+          /permission denied|not allowed|insufficient/i.test(res.error.message ?? "")),
+      res.error?.message ?? "expected denial, got success",
+    );
+  }
+
+  for (const table of ["grow_events", "watering_events", "feeding_events"] as const) {
+    const res = await ownerC.from(table).select("user_id").eq("user_id", owner.id).limit(1);
+    check(
+      `authenticated retains SELECT on ${table}`,
+      res.error === null,
+      res.error?.message,
+    );
+  }
 }
+
 
 async function teardown(): Promise<void> {
   try {

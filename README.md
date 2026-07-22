@@ -810,7 +810,24 @@ Common failure modes and the fastest fix for each. All apply to both
 | CI green locally, red in Actions                                                  | `SUPABASE_DB_URL_SANDBOX` / `_LIVE` GitHub secrets missing or misnamed | Re-check the exact names in the repo Secrets settings — the workflow only reads those two, not `DATABASE_URL`.                        |
 | Sandbox smoke script hangs                                                       | Missing `SANDBOX_SMOKE_USER` or the user has no Paddle sandbox entitlement | Set `SANDBOX_SMOKE_USER` to a real sandbox account UUID; re-run with `--verbose` to see the checkpoint it stalls on.                  |
 
+##### `--sarif` specific issues
+
+Symptoms and fixes unique to the SARIF output path:
+
+| Symptom                                                                          | Likely cause                                                        | Quickest fix                                                                                                                          |
+|----------------------------------------------------------------------------------|---------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------|
+| `jq: parse error: Invalid numeric literal` when piping `--sarif` into `jq`       | Text diff was mixed into stdout (e.g. `--sarif-out=PATH` was passed, so stdout has the human diff, not JSON) | For piping to `jq`, use `--sarif` **without** `--sarif-out`. Or read the file: `jq . audit/money-migrations/diff.sarif`.              |
+| `jq: error: Cannot iterate over null` on `.runs[0].results[]`                    | Clean run — SARIF has an empty `results: []` array, which is valid  | Guard with `//`: `jq '.runs[0].results // [] \| length'`. Empty results = no drift, not a failure.                                    |
+| `upload-sarif` step: `Path does not exist: audit/money-migrations/diff.sarif`    | You passed `--sarif` (stdout) instead of `--sarif-out=PATH`, or the step exited before the file was written | Always use `--sarif-out=PATH` in CI. Add `if: always()` on the upload step so tooling failures (exit `2`) still upload the SARIF.     |
+| `upload-sarif` rejects the file: `Invalid SARIF file`                            | stdout was redirected on top of workflow-command output, or the file is empty | Use `--sarif-out=PATH` (never `--sarif > path` in CI). Verify locally: `jq '.version, .runs \| length' path/to/diff.sarif`.           |
+| SARIF file exists but code scanning shows **no** findings on a known-drifted DB   | Wrong `category:` on `upload-sarif`, or the file was overwritten by a later clean run | Use a stable `category: money-migration-drift` per env; upload sandbox and live to distinct categories so they don't overwrite.       |
+| Non-zero exit (`1` or `2`) fails the workflow before `upload-sarif` runs         | Default `run:` step short-circuits on non-zero exit                 | Append `\|\| true` to the diff step and gate the real failure on the `upload-sarif` outcome, or put `upload-sarif` under `if: always()`. |
+| Exit `2` with SARIF that only contains a `money-migration-tooling` result        | DB URL missing, `psql` missing, or tracker query failed — no drift was actually evaluated | Fix the tooling cause first (see the main troubleshooting table). Exit `2` is never drift; treat it as infrastructure, not data.      |
+| SARIF `results[].locations[0].physicalLocation.artifactLocation.uri` is a manifest path, not a migration file | Finding is `money-migration-malformed` or `money-migration-tooling` — no specific migration to point at | Expected. Only `money-migration-drift` results point at `supabase/migrations/<file>.sql`.                                             |
+| Duplicate annotations in code scanning after re-running the workflow             | `partialFingerprints` mismatch (e.g. `TARGET_ENV` changed between runs) | Keep `TARGET_ENV` stable per category. The script fingerprints on `(migrationVersion, targetEnv)` — changing either creates a new finding. |
+
 Still stuck? Run the diff CLI with `--json` and share the output — every
 failure mode is annotated with `target_env`, exit code, and the exact
 missing/malformed prefix, which is enough to diagnose without repo access.
+
 

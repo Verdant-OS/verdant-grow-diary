@@ -282,10 +282,13 @@ function StatusBadge({ status }: { status: CheckStatus }) {
   return <Badge variant={variant}>{label}</Badge>;
 }
 
+const LOCAL_SCHEMA_KEYS = new Set(LOCAL_SCHEMAS.map((s) => s.key));
+
 export function LocalDataHealthPanel() {
   const [checks, setChecks] = useState<CheckResult[]>([]);
   const [running, setRunning] = useState(false);
   const [lastRunAt, setLastRunAt] = useState<string | null>(null);
+  const [fixNotice, setFixNotice] = useState<string | null>(null);
 
   const run = useCallback(async () => {
     setRunning(true);
@@ -317,6 +320,50 @@ export function LocalDataHealthPanel() {
   const failed = checks.filter((c) => c.status === "fail");
   const warned = checks.filter((c) => c.status === "warn");
 
+  // Only local-schema keys are safe to auto-clear. Diary/RLS failures are
+  // never touched here — we never mutate server data from a diagnostics panel.
+  const fixableKeys = Array.from(
+    new Set(
+      checks
+        .filter((c) => (c.status === "fail" || c.status === "warn") && c.meta && LOCAL_SCHEMA_KEYS.has(c.meta))
+        .map((c) => c.meta as string),
+    ),
+  );
+
+  const runFix = useCallback(async () => {
+    if (fixableKeys.length === 0) return;
+    const confirmed =
+      typeof window === "undefined"
+        ? true
+        : window.confirm(
+            `Clear ${fixableKeys.length} corrupted or outdated local draft${
+              fixableKeys.length === 1 ? "" : "s"
+            }?\n\nThis removes the stored value(s) on this device only. Anything unsaved in those drafts will be lost. Server data is not touched.`,
+          );
+    if (!confirmed) return;
+    const s = safeStorage();
+    if (!s) {
+      setFixNotice("Could not clear — local storage is unavailable.");
+      return;
+    }
+    const cleared: string[] = [];
+    const errors: string[] = [];
+    for (const key of fixableKeys) {
+      try {
+        s.removeItem(key);
+        cleared.push(key);
+      } catch (err) {
+        errors.push(`${key}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+    const parts: string[] = [];
+    if (cleared.length > 0)
+      parts.push(`Cleared ${cleared.length} local key${cleared.length === 1 ? "" : "s"}.`);
+    if (errors.length > 0) parts.push(`Failed to clear: ${errors.join("; ")}`);
+    setFixNotice(parts.join(" "));
+    await run();
+  }, [fixableKeys, run]);
+
   return (
     <Card>
       <CardHeader className="space-y-2 pb-2">
@@ -341,9 +388,22 @@ export function LocalDataHealthPanel() {
         </p>
       </CardHeader>
       <CardContent className="text-sm space-y-3">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <Button size="sm" onClick={() => void run()} disabled={running}>
             {running ? "Running…" : "Re-run checks"}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => void runFix()}
+            disabled={running || fixableKeys.length === 0}
+            title={
+              fixableKeys.length === 0
+                ? "No corrupted local schemas detected"
+                : `Clear ${fixableKeys.length} local key(s) and re-check`
+            }
+          >
+            Fix issues{fixableKeys.length > 0 ? ` (${fixableKeys.length})` : ""}
           </Button>
           {lastRunAt && (
             <span className="text-xs text-muted-foreground">
@@ -351,6 +411,15 @@ export function LocalDataHealthPanel() {
             </span>
           )}
         </div>
+
+        <p className="text-[11px] text-muted-foreground">
+          “Fix issues” only clears local browser drafts flagged as corrupt or outdated. It never
+          modifies server data, and diary/RLS findings are informational only.
+        </p>
+
+        {fixNotice && (
+          <div className="rounded-md border border-border bg-muted/40 p-2 text-xs">{fixNotice}</div>
+        )}
 
         {failed.length > 0 && (
           <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 space-y-1">

@@ -1068,7 +1068,84 @@ what you're seeing.
   scanning is disabled on the repo.
 
 
+##### Dismiss vs resolve: alert lifecycle and re-run behavior
+
+Code scanning distinguishes **dismissing** an alert (you decided it
+isn't actionable) from **resolving** it (the underlying drift was
+fixed). Both change the PR annotation and the Security tab row, but
+they behave differently on the next SARIF upload.
+
+**Dismissing an alert (manual, from the UI).**
+
+- Open the alert (Security → Code scanning → click the row, or
+  **View alert** from the PR annotation) → **Dismiss alert** dropdown
+  in the top-right → pick a reason:
+  - *Won't fix* — accepted risk; drift is intentional
+  - *False positive* — the finding is wrong
+  - *Used in tests* — expected in this context
+- Immediate effects:
+  - Security tab row moves from **Open** → **Closed** with a
+    **Dismissed (<reason>)** badge and your username.
+  - PR **Files changed** tab: the red gutter marker on the migration
+    file disappears on refresh, and the *N errors* badge decrements.
+  - The alert history gains a `Dismissed by <user>` timeline entry.
+- What does **not** happen:
+  - The SARIF file is not modified. The dismissal lives in GitHub's
+    alert database, keyed on `(ruleId, uri, partialFingerprints)`.
+  - Local `diff.sarif` regeneration still shows the finding — the
+    dismissal is server-side only.
+
+**Resolving an alert (by fixing the underlying drift).**
+
+- Apply the missing migration in the target DB (or add the required
+  migration file), so the next `diff-money-migration-prefixes.mjs` run
+  no longer emits that result.
+- You do not click anything in the UI. Resolution happens when the
+  next SARIF upload arrives **without** the fingerprint.
+
+**What you should see after re-running the workflow.**
+
+Re-trigger the workflow (Actions → run → **Re-run all jobs**, or push
+a new commit). The alert's next state depends on whether the fingerprint
+reappears in the freshly uploaded SARIF:
+
+| Previous state       | Next SARIF contains the same fingerprint? | New alert state                                                        | PR annotation                                            |
+|----------------------|-------------------------------------------|------------------------------------------------------------------------|----------------------------------------------------------|
+| Open                 | Yes                                       | **Open** (unchanged); history gains a new "Detected in run #N" row     | Red gutter marker stays on migration file line 1         |
+| Open                 | No                                        | **Closed → Fixed in `<sha>`**; auto-closed by GitHub                    | Red gutter marker disappears; *N errors* badge decrements |
+| Dismissed (any)      | Yes                                       | **Closed → Dismissed** (unchanged); history gains "Detected in run #N" | No annotation (dismissed alerts don't annotate PRs)      |
+| Dismissed (any)      | No                                        | **Closed → Fixed in `<sha>`**; dismissal is superseded by the fix       | No annotation; alert history shows both events           |
+| Closed → Fixed       | Yes (regression)                          | **Reopened → Open**; history shows "Reopened by run #N"                | Red gutter marker returns on the migration file          |
+| Closed → Fixed       | No                                        | **Closed → Fixed** (unchanged); no new history entry                    | No annotation                                            |
+
+**Verification checklist after the re-run.**
+
+1. **Actions run** — the `Upload SARIF` step logs `SARIF upload complete`
+   and the artifact bundle contains the new `diff.sarif`.
+2. **Security tab** — filter **Status: All** and confirm the row
+   transitioned per the table above. Click the row → the **Timeline**
+   section shows the new run entry with its SHA and workflow link.
+3. **PR Files changed tab** — hard-reload (Cmd/Ctrl-Shift-R; GitHub
+   caches this view). The gutter marker either appears, disappears, or
+   returns, matching the expected column above.
+4. **Local sanity check** — regenerate `local-diff.sarif` and diff
+   fingerprints against the CI artifact (see the "Downloading and
+   inspecting SARIF artifacts" section). If your local run still shows
+   a finding that CI closed as Fixed, your local DB is behind — apply
+   the missing migration locally.
+
+**Common gotchas.**
+
+| Symptom                                                             | Cause / fix                                                                                                     |
+|---------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------|
+| Dismissed alert reappears as a **new** Open alert after re-run      | The fingerprint changed (e.g. filename renamed, migrationVersion prefix shifted). Dismissals are per-fingerprint. |
+| Alert stuck on **Open** even after applying the migration           | Wrong `TARGET_ENV` in the re-run — the job is still pointed at the environment where drift exists.              |
+| PR annotation lingers after dismissal                               | Browser cache. Hard-reload the *Files changed* tab.                                                             |
+| Alert flips to **Fixed** then back to **Open** on the next run      | Two workflows uploading with the **same** `category:` but different DB targets are overwriting each other. Give each env a distinct category (`money-migration-drift-sandbox`, `-live`). |
+| Timeline shows the re-run but status didn't change                  | The re-run used a cached `diff.sarif` artifact instead of regenerating it. Confirm the CLI step actually ran (check the job log, not just `upload-sarif`). |
+
 ##### Security tab looks empty (GitHub UI gotchas)
+
 
 
 If `Upload SARIF` printed `SARIF upload complete` but **Security → Code

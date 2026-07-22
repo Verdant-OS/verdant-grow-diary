@@ -128,8 +128,11 @@ jobs:
             echo ""
             echo "- Event: \`$EVENT\`"
             echo "- Irrigation surface changed: \`$IRRIGATION\`"
-            if [ "$EVENT" = "workflow_dispatch" ] && [ "$DRY_RUN" = "true" ]; then
+            if [ "$DRY_RUN" = "true" ]; then
               echo "- **Dry-run mode** → pgTAP + typecheck jobs will skip."
+              if [ "$EVENT" = "pull_request" ]; then
+                echo "  (triggered by PR label \`ci:dry-run-irrigation\`)"
+              fi
             elif [ "$EVENT" = "workflow_dispatch" ]; then
               echo "- Manual dispatch → downstream jobs always run."
             elif [ "$IRRIGATION" = "true" ]; then

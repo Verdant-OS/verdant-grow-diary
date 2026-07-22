@@ -51,6 +51,7 @@ jobs:
       pull-requests: read
     outputs:
       irrigation: ${{ steps.filter.outputs.irrigation }}
+      dry_run: ${{ steps.dry-run.outputs.dry_run }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
@@ -96,20 +97,42 @@ jobs:
               # The workflow itself — any change here re-runs the full gate.
               - ".github/workflows/irrigation-pgtap-rls-gate.yml"
 
+      - name: Resolve dry-run mode
+        id: dry-run
+        env:
+          EVENT: ${{ github.event_name }}
+          DISPATCH_DRY_RUN: ${{ github.event.inputs.dry_run }}
+          # PR label allowlist — apply `ci:dry-run-irrigation` to a PR to
+          # exercise the filter/allowlist summary without booting Postgres
+          # or running the harness typecheck.
+          PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: |
+          set -eo pipefail
+          DRY_RUN=false
+          if [ "$EVENT" = "workflow_dispatch" ] && [ "$DISPATCH_DRY_RUN" = "true" ]; then
+            DRY_RUN=true
+          elif [ "$EVENT" = "pull_request" ] && echo "$PR_LABELS" | grep -q '"ci:dry-run-irrigation"'; then
+            DRY_RUN=true
+          fi
+          echo "dry_run=$DRY_RUN" >> "$GITHUB_OUTPUT"
+
       - name: Report filter decision
         env:
           IRRIGATION: ${{ steps.filter.outputs.irrigation }}
           IRRIGATION_FILES: ${{ steps.filter.outputs.irrigation_files }}
           EVENT: ${{ github.event_name }}
-          DRY_RUN: ${{ github.event.inputs.dry_run }}
+          DRY_RUN: ${{ steps.dry-run.outputs.dry_run }}
         run: |
           {
             echo "## Irrigation change-detection"
             echo ""
             echo "- Event: \`$EVENT\`"
             echo "- Irrigation surface changed: \`$IRRIGATION\`"
-            if [ "$EVENT" = "workflow_dispatch" ] && [ "$DRY_RUN" = "true" ]; then
+            if [ "$DRY_RUN" = "true" ]; then
               echo "- **Dry-run mode** → pgTAP + typecheck jobs will skip."
+              if [ "$EVENT" = "pull_request" ]; then
+                echo "  (triggered by PR label \`ci:dry-run-irrigation\`)"
+              fi
             elif [ "$EVENT" = "workflow_dispatch" ]; then
               echo "- Manual dispatch → downstream jobs always run."
             elif [ "$IRRIGATION" = "true" ]; then
@@ -176,7 +199,7 @@ jobs:
     needs: changes
     if: >-
       (needs.changes.outputs.irrigation == 'true' || github.event_name == 'workflow_dispatch')
-      && github.event.inputs.dry_run != 'true'
+      && needs.changes.outputs.dry_run != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -208,7 +231,7 @@ jobs:
     needs: changes
     if: >-
       (needs.changes.outputs.irrigation == 'true' || github.event_name == 'workflow_dispatch')
-      && github.event.inputs.dry_run != 'true'
+      && needs.changes.outputs.dry_run != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

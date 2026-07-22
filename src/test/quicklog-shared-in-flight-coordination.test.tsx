@@ -739,7 +739,8 @@ describe("Quick Log shared in-flight coordination", () => {
         }),
       }),
     );
-    expect(JSON.stringify(capturedPayload)).not.toMatch(/Blocked|999|9\.[1-9]/);
+    expect(capturedPayload.p_note).toEqual(expect.stringContaining("Original main observation"));
+    expect(capturedPayload.p_note).not.toMatch(/Blocked|999|9\.[1-9]/);
 
     await act(async () => {
       pending.resolve({ data: { ok: true, grow_event_id: "main-event" }, error: null });

@@ -503,6 +503,13 @@ export function LocalDataHealthPanel() {
 
       <RemediationChecklist checks={checks} onReviewKey={openDrawerForOne} running={running} />
 
+      <BackupsPanel
+        backups={backups}
+        onRestore={(id) => void handleRestore(id)}
+        onDelete={handleDeleteBackup}
+        running={running}
+      />
+
       <RemediationDrawer
         keys={drawerKeys}
         onCancel={() => setDrawerKeys(null)}
@@ -512,6 +519,7 @@ export function LocalDataHealthPanel() {
     </>
   );
 }
+
 
 // ---------------------------------------------------------------------------
 // Remediation checklist

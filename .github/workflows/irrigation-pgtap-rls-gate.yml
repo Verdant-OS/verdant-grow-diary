@@ -84,8 +84,16 @@ jobs:
       - name: Export local Supabase DB URL
         id: supabase-env
         run: |
-          set -eo pipefail
-          DB_URL="$(supabase status -o json | jq -r '.DB_URL // .db_url // empty')"
+          set -euo pipefail
+          STATUS_ENV="$(supabase status -o env || true)"
+          eval "$STATUS_ENV"
+          DB_URL="${DB_URL:-${POSTGRES_URL:-}}"
+          if [ -z "$DB_URL" ] && command -v jq >/dev/null 2>&1; then
+            DB_URL="$(supabase status -o json | jq -r '.DB_URL // .db_url // .POSTGRES_URL // .postgres_url // empty')"
+          fi
+          if [ -z "$DB_URL" ]; then
+            DB_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+          fi
           if [ -z "$DB_URL" ]; then
             echo "BLOCKED: local Supabase did not expose DB_URL." >&2
             exit 2
@@ -99,6 +107,7 @@ jobs:
               exit 2
               ;;
           esac
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -At -c "select 1" >/dev/null
           echo "::add-mask::$DB_URL"
           echo "SUPABASE_DB_URL=$DB_URL" >> "$GITHUB_ENV"
 

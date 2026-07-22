@@ -89,7 +89,7 @@ jobs:
       - name: Notify on drift (PR comment or tracking issue)
         if: always() && steps.verify-mirror.outcome == 'failure'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
           DRIFT_REPORT_PATH: edge-shared-drift-report.md
         run: node scripts/notify-edge-shared-drift.mjs
 

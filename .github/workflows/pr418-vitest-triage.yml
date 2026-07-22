@@ -45,6 +45,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          REPORT="artifacts/triage/pr418-vitest-batch-${BATCH}.txt"
+          mkdir -p "$(dirname "$REPORT")"
+          : > "$REPORT"
+          report() { echo "$*" | tee -a "$REPORT"; }
 
           mapfile -t files < <(node --input-type=module <<'NODE'
           import { existsSync, readdirSync, statSync } from "node:fs";
@@ -72,8 +76,8 @@ jobs:
           NODE
           )
 
-          echo "TRIAGE_BATCH=$BATCH"
-          echo "TRIAGE_HEAD_FILE_COUNT=${#files[@]}"
+          report "TRIAGE_BATCH=$BATCH"
+          report "TRIAGE_HEAD_FILE_COUNT=${#files[@]}"
 
           failing_file=""
           for file in "${files[@]}"; do
@@ -91,19 +95,19 @@ jobs:
             set -e
 
             if [[ $retry_status -eq 0 ]]; then
-              echo "TRIAGE_HEAD_FLAKE_FILE=$file"
+              report "TRIAGE_HEAD_FLAKE_FILE=$file"
               continue
             fi
 
             failing_file="$file"
-            echo "TRIAGE_HEAD_FAILED_FILE=$file"
-            echo "--- HEAD FAILURE TAIL ---"
-            tail -n 160 /tmp/pr418-head-test-retry.log
+            report "TRIAGE_HEAD_FAILED_FILE=$file"
+            report "--- HEAD FAILURE TAIL ---"
+            tail -n 160 /tmp/pr418-head-test-retry.log | tee -a "$REPORT"
             break
           done
 
           if [[ -z "$failing_file" ]]; then
-            echo "TRIAGE_HEAD_RESULT=PASS_OR_FLAKE_ONLY"
+            report "TRIAGE_HEAD_RESULT=PASS_OR_FLAKE_ONLY"
             exit 0
           fi
 
@@ -111,8 +115,8 @@ jobs:
           bun install --frozen-lockfile
 
           if [[ ! -f "$failing_file" ]]; then
-            echo "TRIAGE_BASE_RESULT=MISSING_FILE"
-            echo "TRIAGE_CLASSIFICATION=PR_INTRODUCED_TEST_OR_PATH"
+            report "TRIAGE_BASE_RESULT=MISSING_FILE"
+            report "TRIAGE_CLASSIFICATION=PR_INTRODUCED_TEST_OR_PATH"
             exit 0
           fi
 
@@ -122,13 +126,22 @@ jobs:
           set -e
 
           if [[ $base_status -eq 0 ]]; then
-            echo "TRIAGE_BASE_RESULT=PASS"
-            echo "TRIAGE_CLASSIFICATION=PR_REGRESSION_OR_BASE_INTERACTION"
+            report "TRIAGE_BASE_RESULT=PASS"
+            report "TRIAGE_CLASSIFICATION=PR_REGRESSION_OR_BASE_INTERACTION"
           else
-            echo "TRIAGE_BASE_RESULT=FAIL"
-            echo "TRIAGE_CLASSIFICATION=PRE_EXISTING_FAILURE"
-            echo "--- BASE FAILURE TAIL ---"
-            tail -n 160 /tmp/pr418-base-test.log
+            report "TRIAGE_BASE_RESULT=FAIL"
+            report "TRIAGE_CLASSIFICATION=PRE_EXISTING_FAILURE"
+            report "--- BASE FAILURE TAIL ---"
+            tail -n 160 /tmp/pr418-base-test.log | tee -a "$REPORT"
           fi
 
           exit 0
+
+      - name: Upload compact triage receipt
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: pr418-vitest-triage-batch-${{ matrix.batch }}
+          path: artifacts/triage/pr418-vitest-batch-${{ matrix.batch }}.txt
+          retention-days: 3
+          if-no-files-found: error

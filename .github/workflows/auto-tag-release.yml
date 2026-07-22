@@ -1,0 +1,80 @@
+name: auto-tag-release
+
+# Automatic release tagging on push to the release branches. Creates
+# an immutable, date-based tag pointing at the built commit so every
+# production build has a permanent, human-readable version anchor that
+# matches the `+<yyyymmdd>.<shortSha>` stamp emitted by
+# scripts/stamp-version.mjs.
+#
+# Tag format:  v<yyyy>.<mm>.<dd>-<shortSha>
+# Example:     v2026.07.22-bdbed85ec994
+#
+# Idempotent: if the current commit is already tagged (any tag), the
+# job exits successfully without creating a duplicate. Safe to re-run.
+
+on:
+  push:
+    branches: [main, verdant-grow-diary]
+  workflow_dispatch:
+
+permissions:
+  contents: write   # required to push the tag back to the repo
+
+concurrency:
+  # Serialize per branch so two rapid pushes can't race to tag the
+  # same commit — the second run either no-ops (already tagged) or
+  # tags the newer commit, never both simultaneously.
+  group: auto-tag-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    name: Create release tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Need full tag history to detect existing tags on HEAD and
+          # to push new tags back.
+          fetch-depth: 0
+
+      - name: Create date + sha tag if HEAD is untagged
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          SHA="$(git rev-parse HEAD)"
+          SHORT="${SHA:0:12}"
+          DATE="$(date -u +%Y.%m.%d)"
+          TAG="v${DATE}-${SHORT}"
+
+          # Skip if this commit already carries any tag (manual tag,
+          # previous run, or a semver release tag) — never stack.
+          EXISTING="$(git tag --points-at "$SHA" | head -n1 || true)"
+          if [ -n "$EXISTING" ]; then
+            echo "Commit $SHORT already tagged as $EXISTING — no new tag created."
+            echo "tag=$EXISTING" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Skip if the exact tag already exists elsewhere in the
+          # repo (extremely unlikely — same-day + same 12-char SHA —
+          # but treat as a no-op rather than a failure).
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists — no-op."
+            exit 0
+          fi
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git tag -a "$TAG" -m "Automated release tag for ${SHORT} on ${GITHUB_REF_NAME}"
+          git push origin "$TAG"
+
+          echo "Created and pushed tag $TAG for commit $SHORT."
+          echo "### Release tag" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Tag: \`$TAG\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Commit: \`$SHORT\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Branch: \`${GITHUB_REF_NAME}\`" >> "$GITHUB_STEP_SUMMARY"

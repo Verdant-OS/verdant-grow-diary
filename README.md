@@ -902,6 +902,91 @@ curl -sS -o /dev/null -w "%{http_code}\n" \
 If step 1 returns nothing, you're on a fine-grained token — use step 3
 to prove the scope instead of grepping `x-oauth-scopes`.
 
+##### Troubleshooting GitHub API auth failures (401 / 403)
+
+`401` and `403` from `api.github.com` look similar but mean different
+things. Read the response **body** and headers before changing the token
+— GitHub tells you exactly which check failed.
+
+| Status | Response body (`message` field)                                          | Root cause                                                                        | Fix                                                                                                                              |
+|--------|--------------------------------------------------------------------------|-----------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------|
+| `401`  | `Bad credentials`                                                        | Token is malformed, revoked, or expired.                                          | Regenerate the PAT. Confirm you're sending it via `Authorization: Bearer <token>` (no `token ` prefix mixups, no stray newline). |
+| `401`  | `Requires authentication`                                                | Header missing entirely, or wrong header name (`Authentication:` instead of `Authorization:`). | Fix the header name and re-send.                                                                                                 |
+| `403`  | `Resource not accessible by integration`                                 | Workflow's `GITHUB_TOKEN` is missing the required `permissions:` block.           | Add `security-events: write` (or the endpoint's permission) to the job's `permissions:`.                                          |
+| `403`  | `Resource not accessible by personal access token`                       | Fine-grained PAT lacks the **Code scanning alerts** repository permission, or classic PAT lacks `security_events`. | Regenerate the token with the scopes from the table above.                                                                       |
+| `403`  | `Must have admin rights to Repository`                                   | Token owner has Read on the repo but the endpoint (e.g. `PATCH /alerts`) needs Write. | Get Write access on the repo, or use a token from an account that has it.                                                        |
+| `403`  | `API rate limit exceeded for user ID …`                                  | Hit the 5,000/hour authenticated limit (or 60/hour unauthenticated).              | Wait until `X-RateLimit-Reset`, or authenticate/use a different token.                                                           |
+| `403`  | `You have exceeded a secondary rate limit`                               | Too many concurrent or bursty requests to the same endpoint.                       | Back off, add `sleep`s between calls, respect `Retry-After`.                                                                     |
+| `403`  | `SAML enforcement`                                                       | Token is valid but not SSO-authorized for the org.                                | Open the token in **Developer settings** → **Configure SSO** → **Authorize** for that org.                                       |
+| `403`  | `Repository access blocked`                                              | Org policy blocks this repo (e.g. IP allow-list, third-party access restrictions). | Add your IP to the allow-list, or enable third-party access for the org.                                                         |
+| `403`  | (empty body, `x-github-sso: required; url=...` header present)           | Token needs SSO authorization for the org named in the header.                    | Visit the URL from the header and click **Authorize**.                                                                           |
+| `404`  | `Not Found` (with a valid token that *should* see the repo)               | GitHub returns `404` (not `403`) when a token exists but lacks visibility. Ambiguous with a real "wrong path" `404`. | Confirm the repo slug, then verify the token's repo access. For classic PATs, `repo` scope is required on private repos.        |
+
+**Validate the token and headers with curl.**
+
+Run these against a repo you *know* you can reach. Any deviation from
+the expected output points at exactly one row in the table above.
+
+```bash
+export GH_TOKEN=ghp_...            # or github_pat_... (fine-grained)
+export REPO=owner/name
+AUTH=(-H "Authorization: Bearer $GH_TOKEN" \
+      -H "Accept: application/vnd.github+json" \
+      -H "X-GitHub-Api-Version: 2022-11-28")
+
+# 1. Is the token itself valid? Also reveals classic-PAT scopes and SSO state.
+curl -sS -D /tmp/gh-headers -o /tmp/gh-body -w "HTTP %{http_code}\n" \
+  "${AUTH[@]}" https://api.github.com/user
+grep -Ei '^(x-oauth-scopes|x-accepted-oauth-scopes|x-github-sso|x-ratelimit-remaining):' /tmp/gh-headers
+cat /tmp/gh-body | head -c 300; echo
+
+# Expected on success:
+#   HTTP 200
+#   x-oauth-scopes: repo, security_events    (empty line for fine-grained tokens)
+#   x-ratelimit-remaining: 4999
+#   body: {"login":"you", ...}
+
+# 2. Can the token see the target repo?
+curl -sS -o /dev/null -w "HTTP %{http_code}\n" "${AUTH[@]}" \
+  "https://api.github.com/repos/$REPO"
+# 200 = visible. 404 = repo missing OR token cannot see it (fix scopes). 401 = bad token.
+
+# 3. Can it read Code Scanning alerts on that repo?
+curl -sS -D /tmp/cs-headers -o /tmp/cs-body -w "HTTP %{http_code}\n" \
+  "${AUTH[@]}" "https://api.github.com/repos/$REPO/code-scanning/alerts?per_page=1"
+grep -i '^x-accepted-github-permissions:' /tmp/cs-headers   # tells you exactly what's needed
+jq -r '.message // "ok"' /tmp/cs-body
+# 200 = good. 403 = scope missing (read x-accepted-github-permissions). 404 = code scanning disabled.
+
+# 4. Prove the header actually left your machine intact (catches shell-quoting bugs).
+curl -sS -v "${AUTH[@]}" https://api.github.com/user 2>&1 \
+  | grep -E '^> (Authorization|Accept|X-GitHub)'
+# Expect three '>' lines. Missing 'Authorization' = your header never made it.
+```
+
+**Header cheatsheet — what each one tells you.**
+
+| Response header                       | What to read from it                                                                 |
+|--------------------------------------|--------------------------------------------------------------------------------------|
+| `x-oauth-scopes`                     | Scopes the (classic) token currently has. Empty for fine-grained tokens.             |
+| `x-accepted-oauth-scopes`            | Scopes the endpoint would accept — compare against the row above to find the gap.    |
+| `x-accepted-github-permissions`      | Fine-grained permission required (e.g. `code_scanning_alerts=read`).                 |
+| `x-github-sso`                       | `required; url=...` means authorize the token for the org at that URL.               |
+| `x-ratelimit-remaining` / `-reset`   | Requests left this hour and Unix epoch when the window resets.                       |
+| `x-github-request-id`                | Include this when opening a GitHub support ticket about a specific failure.          |
+
+**Common self-inflicted 401/403s.**
+
+- Pasting the token with a trailing newline (`echo "Bearer $GH_TOKEN"`
+  shows two lines) — regenerate `$GH_TOKEN` with `printf`, not `echo`.
+- Using `Authorization: token $GH_TOKEN` for a fine-grained PAT — the
+  `token` scheme works but `Bearer` is the current recommendation and
+  is required for GitHub Apps.
+- Committing the token to a public repo — GitHub auto-revokes on push;
+  subsequent calls return `401 Bad credentials` with no other warning.
+- Running the curl inside a workflow that overrides `GITHUB_TOKEN` with
+  an empty env var — `env | grep GITHUB_TOKEN` in the step to confirm.
+
 ##### Verifying uploaded findings in GitHub code scanning
 
 

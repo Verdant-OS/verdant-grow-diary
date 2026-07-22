@@ -93,6 +93,7 @@ jobs:
       - name: Report filter decision
         env:
           IRRIGATION: ${{ steps.filter.outputs.irrigation }}
+          IRRIGATION_FILES: ${{ steps.filter.outputs.irrigation_files }}
           EVENT: ${{ github.event_name }}
         run: |
           {
@@ -106,6 +107,22 @@ jobs:
               echo "- Downstream jobs will run."
             else
               echo "- Downstream jobs will skip (no-op success)."
+            fi
+            echo ""
+            echo "### Matched files"
+            if [ -n "$IRRIGATION_FILES" ]; then
+              echo ""
+              echo '```'
+              # `list-files: shell` returns a space-separated, shell-quoted
+              # string. Split on whitespace so each matched path prints on
+              # its own line for readability.
+              for f in $IRRIGATION_FILES; do
+                echo "$f"
+              done
+              echo '```'
+            else
+              echo ""
+              echo "_No files matched the irrigation filter._"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 

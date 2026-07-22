@@ -53,8 +53,29 @@ export function BuildInfoPanel() {
     remote.status === "ok" ? remote.data.version ?? "—" : remote.status === "loading" ? "…" : "—";
   const remoteBuildTime =
     remote.status === "ok" ? remote.data.buildTime : undefined;
-  const drift =
-    remote.status === "ok" && remote.data.version && remote.data.version !== bundled;
+
+  type FieldDiff = {
+    field: string;
+    bundled: string | undefined;
+    remote: string | undefined;
+  };
+  const fieldDiffs: FieldDiff[] = [];
+  if (remote.status === "ok") {
+    const compare: Array<[string, string | undefined, string | undefined]> = [
+      ["version", bundled, remote.data.version],
+      ["buildTime", bundledBuildTime, remote.data.buildTime],
+      ["commit", buildInfo.commit, remote.data.commit],
+      ["shortCommit", buildInfo.shortCommit, remote.data.shortCommit],
+      ["ref", buildInfo.ref, remote.data.ref],
+      ["tag", buildInfo.tag ?? undefined, remote.data.tag ?? undefined],
+    ];
+    for (const [field, b, r] of compare) {
+      // Only flag when both sides have a value AND they differ. Missing values are ignored
+      // to avoid noise when a field isn't stamped in one source.
+      if (b && r && b !== r) fieldDiffs.push({ field, bundled: b, remote: r });
+    }
+  }
+  const drift = fieldDiffs.length > 0;
 
   return (
     <Card>
@@ -98,11 +119,31 @@ export function BuildInfoPanel() {
         </dl>
 
         {drift && (
-          <p className="text-xs text-muted-foreground">
-            The bundled JS was built from a different commit than the currently deployed{" "}
-            <code>/version.json</code>. A hard reload should pick up the newer build.
-          </p>
+          <div className="space-y-2 rounded-md border border-destructive/40 bg-destructive/5 p-3">
+            <p className="text-xs font-medium text-destructive">
+              Version drift detected in {fieldDiffs.length} field
+              {fieldDiffs.length === 1 ? "" : "s"}
+            </p>
+            <ul className="space-y-1 text-xs">
+              {fieldDiffs.map((d) => (
+                <li key={d.field} className="font-mono break-all">
+                  <span className="font-semibold">{d.field}</span>: bundled=
+                  <code>{d.bundled ?? "—"}</code> · remote=
+                  <code>{d.remote ?? "—"}</code>
+                </li>
+              ))}
+            </ul>
+            <p className="text-xs text-muted-foreground">
+              Remediation: hard-reload the page (Ctrl/Cmd+Shift+R) to fetch the newer
+              bundle. If drift persists after reload, the deployment is mid-rollout or a
+              CDN/service-worker cache is stale — purge the CDN cache for{" "}
+              <code>/version.json</code> and the JS assets, or unregister the service
+              worker under DevTools → Application.
+            </p>
+          </div>
         )}
+
+
 
         <p className="text-xs text-muted-foreground">
           Source: <code>src/generated/buildInfo.ts</code> (bundled at build time) and{" "}

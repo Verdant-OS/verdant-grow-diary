@@ -13,6 +13,10 @@ jobs:
   verify:
     name: Verify _shared/lib mirror is in sync
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write         # notify-edge-shared-drift.mjs opens/updates a tracking issue
+      pull-requests: write  # notify-edge-shared-drift.mjs posts a PR comment on drift
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -35,3 +39,12 @@ jobs:
           name: edge-shared-drift-report
           path: edge-shared-drift-report.md
           if-no-files-found: ignore
+      # Immediate GitHub notification so drift is visible before the
+      # next build. Posts a PR comment on pull_request events, otherwise
+      # opens/updates a single tracking issue. Always exits 0.
+      - name: Notify on drift (PR comment or tracking issue)
+        if: always() && steps.verify-mirror.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DRIFT_REPORT_PATH: edge-shared-drift-report.md
+        run: node scripts/notify-edge-shared-drift.mjs

@@ -133,6 +133,75 @@ function check(name: string, ok: boolean, detail?: string): void {
   }
 }
 
+type DbLikeError = { code?: string | null; message?: string | null } | null | undefined;
+
+/**
+ * Classify a PostgREST / pg error into one of a small set of labels so that
+ * per-assertion output distinguishes a real ACL rejection from noise that
+ * *looks* like a denial but proves nothing about privileges.
+ *
+ *   genuine-permission-denial → 42501 or "permission denied" in message
+ *   missing-function          → 42883 / "does not exist" / "no function matches"
+ *   schema-cache-miss         → PostgREST PGRST202 / PGRST203 / "schema cache"
+ *   unexpected-error          → any other non-null error
+ *   no-error                  → err is null/undefined (call succeeded)
+ *
+ * missing-function and schema-cache-miss are distinct labels because the
+ * remediations differ: the former means the DDL was never applied on this
+ * database, the latter means PostgREST has not reloaded its cache. Neither
+ * proves that EXECUTE was revoked, so both must fail an ACL-denial assertion.
+ */
+type ErrorClass =
+  | "genuine-permission-denial"
+  | "missing-function"
+  | "schema-cache-miss"
+  | "unexpected-error"
+  | "no-error";
+
+function classifyDbError(err: DbLikeError): ErrorClass {
+  if (!err) return "no-error";
+  const code = err.code ?? "";
+  const message = err.message ?? "";
+  if (code === "42501" || /permission denied/i.test(message)) {
+    return "genuine-permission-denial";
+  }
+  if (code === "PGRST202" || code === "PGRST203" || /schema cache/i.test(message)) {
+    return "schema-cache-miss";
+  }
+  if (
+    code === "42883" ||
+    /does not exist|could not find the function|no function matches/i.test(message)
+  ) {
+    return "missing-function";
+  }
+  return "unexpected-error";
+}
+
+const isGenuinePermissionDenial = (err: DbLikeError): boolean => {
+  return classifyDbError(err) === "genuine-permission-denial";
+};
+const isMissingFunction = (err: DbLikeError): boolean => {
+  const c = classifyDbError(err);
+  return c === "missing-function" || c === "schema-cache-miss";
+};
+
+/**
+ * Format the per-assertion detail column so operators can immediately see
+ * whether a "denied" assertion failed because we got a real ACL rejection, a
+ * missing function, a schema-cache miss, an unexpected error, or (worst) a
+ * successful call that should have been denied.
+ */
+function formatDenialDetail(
+  err: DbLikeError,
+  expected = "expected 42501 / permission denied",
+): string {
+  const cls = classifyDbError(err);
+  if (cls === "no-error") return `[success-instead-of-denial] ${expected}, got success`;
+  const code = err?.code ? ` code=${err.code}` : "";
+  const msg = err?.message ?? "unknown error";
+  return `[${cls}]${code} ${msg}`;
+}
+
 function isRecord(v: unknown): v is Record<string, unknown> {
   return !!v && typeof v === "object" && !Array.isArray(v);
 }
@@ -289,17 +358,37 @@ async function waitForRaceContention(): Promise<boolean> {
 }
 
 const createdUserIds: string[] = [];
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function formatSupabaseError(error: unknown): string {
+  if (!error) return "unknown";
+  if (error instanceof Error) return error.message || error.name || "unknown-error";
+  try {
+    const encoded = JSON.stringify(error);
+    return encoded && encoded !== "{}" ? encoded : String(error);
+  } catch {
+    return String(error);
+  }
+}
+
 async function createUser(label: string) {
   const email = `irrigation-${label}-${runId}@verdant.test`;
   const password = crypto.randomUUID();
-  const { data, error } = await admin.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-  });
-  if (error || !data.user) throw new Error(`create_user_failed:${error?.message ?? "unknown"}`);
-  createdUserIds.push(data.user.id);
-  return { id: data.user.id, email, password };
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= 20; attempt += 1) {
+    const { data, error } = await admin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+    });
+    if (!error && data.user) {
+      createdUserIds.push(data.user.id);
+      return { id: data.user.id, email, password };
+    }
+    lastError = error ?? "missing user in createUser response";
+    await delay(250);
+  }
+  throw new Error(`create_user_failed:${formatSupabaseError(lastError)}`);
 }
 async function signIn(email: string, password: string): Promise<SupabaseClient> {
   const c = createClient(SUPABASE_URL, ANON_KEY, {
@@ -383,7 +472,6 @@ async function main() {
     p_feed: feed,
     ...over,
   });
-
 
   // 1. owner success
   const ok = await save(ownerC, baseArgs({}));
@@ -612,46 +700,40 @@ async function main() {
   // 15. Server trust boundary (2026-07-22 revoke): authenticated must be
   // denied on legacy typed-event RPCs. Denial MUST be a genuine permission
   // rejection — "function does not exist" / "no function matches" / PostgREST
-  // cache misses do NOT count, because they wouldn't prove the privilege was
-  // revoked (they'd prove the function isn't callable at all).
-  const isGenuinePermissionDenial = (
-    err: { code?: string | null; message?: string | null } | null,
-  ): boolean => {
-    if (!err) return false;
-    if (err.code === "42501") return true;
-    return /permission denied/i.test(err.message ?? "");
-  };
-  const isMissingFunction = (
-    err: { code?: string | null; message?: string | null } | null,
-  ): boolean => {
-    if (!err) return false;
-    if (err.code === "42883" || err.code === "PGRST202" || err.code === "PGRST203") return true;
-    return /does not exist|could not find the function|no function matches|schema cache/i.test(
-      err.message ?? "",
-    );
-  };
-  const legacyWatering = await ownerC.rpc("create_watering_event" as never, {
-    _grow_id: oGrow,
-    _volume_ml: 100,
-    _tent_id: oTent,
-    _plant_id: oPlantInTent,
-  } as never);
+  // schema-cache misses do NOT count, because they wouldn't prove the
+  // privilege was revoked (they'd prove the function isn't callable at all).
+  // formatDenialDetail() tags each failure with its classified failure mode
+  // (genuine-permission-denial / missing-function / schema-cache-miss /
+  //  unexpected-error / success-instead-of-denial) so the diagnostic column
+  // makes remediation obvious.
+  const legacyWatering = await ownerC.rpc(
+    "create_watering_event" as never,
+    {
+      _grow_id: oGrow,
+      _volume_ml: 100,
+      _tent_id: oTent,
+      _plant_id: oPlantInTent,
+    } as never,
+  );
   check(
     "authenticated denied create_watering_event with genuine permission error (not missing-function)",
     isGenuinePermissionDenial(legacyWatering.error) && !isMissingFunction(legacyWatering.error),
-    legacyWatering.error?.message ?? "expected 42501 / permission denied, got success",
+    formatDenialDetail(legacyWatering.error),
   );
-  const legacyFeeding = await ownerC.rpc("create_feeding_event" as never, {
-    _grow_id: oGrow,
-    _line_id: "default",
-    _products: [],
-    _tent_id: oTent,
-    _plant_id: oPlantInTent,
-  } as never);
+  const legacyFeeding = await ownerC.rpc(
+    "create_feeding_event" as never,
+    {
+      _grow_id: oGrow,
+      _line_id: "default",
+      _products: [],
+      _tent_id: oTent,
+      _plant_id: oPlantInTent,
+    } as never,
+  );
   check(
     "authenticated denied create_feeding_event with genuine permission error (not missing-function)",
     isGenuinePermissionDenial(legacyFeeding.error) && !isMissingFunction(legacyFeeding.error),
-    legacyFeeding.error?.message ?? "expected 42501 / permission denied, got success",
+    formatDenialDetail(legacyFeeding.error),
   );
 
   // 16. Direct DML denial for INSERT / UPDATE / DELETE on all three event
@@ -739,25 +821,29 @@ async function main() {
     check(
       `authenticated denied INSERT on ${table} (genuine permission error)`,
       isGenuinePermissionDenial(ins.error) && !isMissingFunction(ins.error),
-      ins.error?.message ?? "expected 42501 / permission denied, got success",
+      formatDenialDetail(ins.error),
     );
 
     const upd = await ownerC.from(table).update({ user_id: owner.id }).eq("user_id", owner.id);
     check(
       `authenticated denied UPDATE on ${table} (genuine permission error)`,
       isGenuinePermissionDenial(upd.error) && !isMissingFunction(upd.error),
-      upd.error?.message ?? "expected 42501 / permission denied, got success",
+      formatDenialDetail(upd.error),
     );
 
     const del = await ownerC.from(table).delete().eq("user_id", owner.id);
     check(
       `authenticated denied DELETE on ${table} (genuine permission error)`,
       isGenuinePermissionDenial(del.error) && !isMissingFunction(del.error),
-      del.error?.message ?? "expected 42501 / permission denied, got success",
+      formatDenialDetail(del.error),
     );
 
     const sel = await ownerC.from(table).select("user_id").eq("user_id", owner.id).limit(1);
-    check(`authenticated retains SELECT on ${table}`, sel.error === null, sel.error?.message);
+    check(
+      `authenticated retains SELECT on ${table}`,
+      sel.error === null,
+      sel.error ? formatDenialDetail(sel.error, "expected success") : undefined,
+    );
   }
 
   // 17. service-role ACL / RPC-execution posture is intentionally NOT proved
@@ -770,8 +856,6 @@ async function main() {
   // retains SELECT/INSERT/UPDATE/DELETE on the three event tables) is proved
   // out-of-band in the pgTAP suites under supabase/tests/.
 }
-
-
 
 async function teardown(): Promise<void> {
   try {

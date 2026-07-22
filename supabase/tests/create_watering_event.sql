@@ -47,6 +47,23 @@ END $$;
 -- 3. EXECUTE grants on create_watering_event: anon FALSE, authenticated FALSE,
 --    service_role TRUE. Legacy typed-event RPC is server-only after the
 --    2026-07-22 revoke. Canonical writes go through quicklog_save_event.
+--
+-- Preflight: the function itself must exist. A missing function would make
+-- every EXECUTE check trivially "expected=false, got=false" for anon/auth and
+-- silently pass — that's a false green. Fail loudly and distinctly instead.
+DO $$
+DECLARE fn_count INT;
+BEGIN
+  SELECT count(*) INTO fn_count
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+   WHERE n.nspname = 'public' AND p.proname = 'create_watering_event';
+  ASSERT fn_count > 0,
+    'DIAGNOSTIC[missing-function]: public.create_watering_event does not exist — '
+    'apply the legacy typed-event RPC migration before asserting its ACL.';
+  RAISE NOTICE '✓ create_watering_event is present (% overload(s))', fn_count;
+END $$;
+
 DO $$
 DECLARE want JSONB := '{
     "anon": false,
@@ -67,13 +84,14 @@ BEGIN
       JOIN pg_namespace n ON n.oid = p.pronamespace
      WHERE n.nspname = 'public' AND p.proname = 'create_watering_event';
     ASSERT overload_count > 0,
-      'create_watering_event missing';
+      'DIAGNOSTIC[missing-function]: create_watering_event missing while checking EXECUTE overload matrix';
     ASSERT (
       expected AND granted_count = overload_count
     ) OR (
       NOT expected AND granted_count = 0
     ), format(
-      'EXECUTE create_watering_event for %I: expected all=%s, granted=%s/%s',
+      'DIAGNOSTIC[genuine-permission-mismatch]: EXECUTE create_watering_event for %I: expected all=%s, granted=%s/%s '
+      '(function present, ACL disagrees with trust-boundary contract)',
       role_name, expected, granted_count, overload_count
     );
   END LOOP;
@@ -89,8 +107,10 @@ BEGIN
     FROM pg_proc p
     JOIN pg_namespace n ON n.oid = p.pronamespace
    WHERE n.nspname = 'public' AND p.proname = 'create_watering_event';
+  ASSERT is_def IS NOT NULL,
+    'DIAGNOSTIC[missing-function]: create_watering_event not found while checking SECURITY INVOKER';
   ASSERT is_def = false,
-    'create_watering_event must be SECURITY INVOKER, not SECURITY DEFINER';
+    'DIAGNOSTIC[security-mode-mismatch]: create_watering_event must be SECURITY INVOKER, not SECURITY DEFINER';
   RAISE NOTICE '✓ create_watering_event is SECURITY INVOKER';
 END $$;
 
@@ -108,12 +128,15 @@ DECLARE
   }'::jsonb;
   role_name TEXT; priv TEXT; expected BOOLEAN; got BOOLEAN;
 BEGIN
+  ASSERT to_regclass('public.watering_events') IS NOT NULL,
+    'DIAGNOSTIC[missing-table]: public.watering_events not found while checking table ACL';
   FOR role_name IN SELECT jsonb_object_keys(want) LOOP
     FOR priv IN SELECT jsonb_object_keys(want -> role_name) LOOP
       expected := ((want -> role_name) ->> priv)::boolean;
       got := has_table_privilege(role_name, 'public.watering_events', priv);
       ASSERT got = expected,
-        format('watering_events %s for %I: expected %s, got %s',
+        format('DIAGNOSTIC[table-acl-mismatch]: watering_events %s for %I: expected=%s got=%s '
+               '(table present, ACL disagrees with trust-boundary contract)',
                priv, role_name, expected, got);
     END LOOP;
   END LOOP;
@@ -131,12 +154,15 @@ DECLARE
   }'::jsonb;
   role_name TEXT; priv TEXT; expected BOOLEAN; got BOOLEAN;
 BEGIN
+  ASSERT to_regclass('public.grow_events') IS NOT NULL,
+    'DIAGNOSTIC[missing-table]: public.grow_events not found while checking table ACL';
   FOR role_name IN SELECT jsonb_object_keys(want) LOOP
     FOR priv IN SELECT jsonb_object_keys(want -> role_name) LOOP
       expected := ((want -> role_name) ->> priv)::boolean;
       got := has_table_privilege(role_name, 'public.grow_events', priv);
       ASSERT got = expected,
-        format('grow_events %s for %I: expected %s, got %s',
+        format('DIAGNOSTIC[table-acl-mismatch]: grow_events %s for %I: expected=%s got=%s '
+               '(table present, ACL disagrees with trust-boundary contract)',
                priv, role_name, expected, got);
     END LOOP;
   END LOOP;

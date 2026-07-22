@@ -46,6 +46,21 @@ const SOURCE_LABEL: Record<SensorSource, string> = {
   invalid: "Invalid reading",
 };
 
+/**
+ * Every RAW stored value that normalizes to one of the given canonical
+ * sources. Lets server-side queries pre-filter on the same alias table
+ * the client fence uses, so the two can never disagree about which raw
+ * tokens are eligible.
+ */
+export function rawSensorSourceValuesFor(
+  targets: ReadonlyArray<SensorSource>,
+): string[] {
+  return Object.entries(ALIAS)
+    .filter(([, canonical]) => targets.includes(canonical))
+    .map(([raw]) => raw)
+    .sort();
+}
+
 /** Normalize any caller-supplied string into a canonical SensorSource. */
 export function normalizeSensorSource(input: unknown): SensorSource {
   if (typeof input !== "string") return "invalid";

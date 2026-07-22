@@ -35,7 +35,15 @@ interface Props {
 
 export default function AlertsAutoPersistForGrow({ growId, stage }: Props) {
   const safeGrowId = growId ?? null;
-  const { data: tents = [] } = useGrowTents(safeGrowId ?? undefined);
+  const tentsQuery = useGrowTents(safeGrowId ?? undefined);
+  const tents = tentsQuery.data ?? [];
+  // Persistence is gated on the tent read having SETTLED (success or
+  // error): while the query is pending, `tents` is a placeholder empty
+  // array and the resolver would fall back to the grow row alone — an
+  // alert persisted against a stale grow stage in that window would not
+  // be removed when the tent stages arrive. After an error, proceeding
+  // with the grow row alone matches the pre-resolver behavior.
+  const tentsSettled = tentsQuery.isFetched;
   const tentIds = tents.map((t) => t.id);
   const sensorState = useLatestSensorSnapshot(safeGrowId, tentIds);
   const targetsState = useGrowTargets(safeGrowId);
@@ -56,7 +64,7 @@ export default function AlertsAutoPersistForGrow({ growId, stage }: Props) {
       sensorState.status === "ok" ? sensorState.snapshot : null,
       targetsState.status === "ok" ? targetsState.targets : null,
     ),
-    enabled: !!safeGrowId,
+    enabled: !!safeGrowId && tentsSettled,
     stage: resolvedStage,
   });
 

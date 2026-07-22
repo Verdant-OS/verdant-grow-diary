@@ -65,8 +65,11 @@ jobs:
               - "supabase/migrations/**grow_event*.sql"
               - "supabase/migrations/**quicklog*.sql"
               - "supabase/migrations/**event_tables*.sql"
-              - "supabase/migrations/**revoke*.sql"
-              - "supabase/migrations/**grant*.sql"
+              # Irrigation event-table DML revoke migration (UUID-named, so
+              # not matched by the quicklog/feeding/watering/grow_event globs
+              # above). Pinned explicitly instead of a broad `**revoke*` glob
+              # that would drag in unrelated AI-doctor / credit-grant files.
+              - "supabase/migrations/20260722062644_8cdef271-abf0-4d82-9eca-970a91b6c547.sql"
               # Contract-migrations lane.
               - "supabase/contract-migrations/**irrigation*.sql"
               - "supabase/contract-migrations/**feeding*.sql"

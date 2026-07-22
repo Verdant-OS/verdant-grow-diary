@@ -368,6 +368,22 @@ async function main() {
     p_water: water,
     ...over,
   });
+  // Feeding uses a distinct helper so p_water is explicitly cleared. The RPC
+  // rejects a non-null p_water when p_event_type = 'feeding', so inheriting
+  // baseArgs and spreading a p_feed override would fail closed with
+  // water_not_allowed_for_feeding instead of exercising the feeding path.
+  const feed = { line_id: "default", products: [] as unknown[] };
+  const feedingArgs = (over: Record<string, unknown>) => ({
+    p_idempotency_key: key(),
+    p_grow_id: oGrow,
+    p_event_type: "feeding",
+    p_tent_id: oTent,
+    p_plant_id: oPlantInTent,
+    p_water: null,
+    p_feed: feed,
+    ...over,
+  });
+
 
   // 1. owner success
   const ok = await save(ownerC, baseArgs({}));

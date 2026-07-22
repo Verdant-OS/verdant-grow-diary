@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "bridge": "home_assistant",
+  "upstream_mode": "ha_core_ecowitt_push",
+  "statestream_topic_prefix": "homeassistant",
+  "entities": [
+    {
+      "entity_id": "sensor.ecowitt_gw1200_outdoor_temperature",
+      "metric": "air_temp_f",
+      "expected_unit": "°F",
+      "tent_id": "00000000-0000-0000-0000-0000000000aa",
+      "plant_id": null,
+      "channel": "outdoor"
+    },
+    {
+      "entity_id": "sensor.ecowitt_gw1200_outdoor_humidity",
+      "metric": "humidity_pct",
+      "expected_unit": "%",
+      "tent_id": "00000000-0000-0000-0000-0000000000aa",
+      "plant_id": null,
+      "channel": "outdoor"
+    },
+    {
+      "entity_id": "sensor.ecowitt_gw1200_soil_moisture_1",
+      "metric": "soil_moisture_pct",
+      "expected_unit": "%",
+      "tent_id": "00000000-0000-0000-0000-0000000000aa",
+      "plant_id": null,
+      "channel": "soil_1"
+    },
+    {
+      "entity_id": "sensor.ecowitt_gw1200_soil_moisture_2",
+      "metric": "soil_moisture_pct",
+      "expected_unit": "%",
+      "tent_id": "00000000-0000-0000-0000-0000000000aa",
+      "plant_id": null,
+      "channel": "soil_2"
+    },
+    {
+      "entity_id": "sensor.ecowitt_gw1200_soil_temp_1",
+      "metric": "soil_temp_f",
+      "expected_unit": "°F",
+      "tent_id": "00000000-0000-0000-0000-0000000000aa",
+      "plant_id": null,
+      "channel": "soil_1"
+    },
+    {
+      "entity_id": "sensor.ecowitt_gw1200_co2",
+      "metric": "co2_ppm",
+      "expected_unit": "ppm",
+      "tent_id": "00000000-0000-0000-0000-0000000000aa",
+      "plant_id": null,
+      "channel": "co2"
+    }
+  ]
+}

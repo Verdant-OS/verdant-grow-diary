@@ -17,51 +17,189 @@ name: Irrigation pgTAP + Harness Typecheck
 on:
   pull_request:
     branches: [main, verdant-grow-diary]
-    # Scoped to irrigation-trust-boundary surfaces only. Broad
-    # `supabase/migrations/**` was pruned intentionally: this gate
-    # exists to catch RLS/ACL regressions on event tables + quicklog
-    # RPCs, and unrelated migrations (billing, credits, pheno, seo,
-    # etc.) do not touch those grants. Non-irrigation migration drift
-    # is still covered by security-regression.yml / supabase-security-baseline.yml.
-    # Add a new glob here if a future migration must be gated by this suite.
-    paths:
-      # Irrigation-scoped migrations. Globs cover the historical naming
-      # for the event tables, quicklog RPCs, and any grant/revoke on
-      # those surfaces.
-      - "supabase/migrations/**irrigation*.sql"
-      - "supabase/migrations/**feeding*.sql"
-      - "supabase/migrations/**watering*.sql"
-      - "supabase/migrations/**grow_event*.sql"
-      - "supabase/migrations/**quicklog*.sql"
-      - "supabase/migrations/**event_tables*.sql"
-      - "supabase/migrations/**revoke*.sql"
-      - "supabase/migrations/**grant*.sql"
-      # Contract-migrations lane, same scope.
-      - "supabase/contract-migrations/**irrigation*.sql"
-      - "supabase/contract-migrations/**feeding*.sql"
-      - "supabase/contract-migrations/**watering*.sql"
-      - "supabase/contract-migrations/**quicklog*.sql"
-      # pgTAP suites + seed parity.
-      - "supabase/tests/create_feeding_event.sql"
-      - "supabase/tests/create_watering_event.sql"
-      - "supabase/seed.sql"
-      # Runtime harness sources typechecked by this gate.
-      - "scripts/run-irrigation-evidence-rls-harness.ts"
-      - "scripts/run-create-feeding-event-rls-harness.ts"
-      - "scripts/run-quicklog-save-event-rls-harness.ts"
-      - "scripts/run-quicklog-save-manual-rls-harness.ts"
-      - "scripts/run-quicklog-rpc-rls-harnesses.ts"
-      # The workflow itself.
-      - ".github/workflows/irrigation-pgtap-rls-gate.yml"
+    # NOTE: top-level `paths:` intentionally removed. Path filtering is
+    # now done inside the workflow by the `changes` job (dorny/paths-filter),
+    # which authoritatively decides whether the pgTAP + typecheck jobs
+    # execute based on the PR's actual diff. This has two advantages:
+    #   1. Works when a PR touches irrigation files alongside unrelated
+    #      dirs — the filter reads the true changed-file set, not the
+    #      trigger's coarse path predicate.
+    #   2. Keeps this workflow as a stable required check for branch
+    #      protection: it always runs and reports a status, but the
+    #      expensive jobs no-op when no irrigation surface changed.
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Filter dry-run: print matched irrigation allowlist files and skip pgTAP + typecheck jobs."
+        type: boolean
+        required: false
+        default: false
 
 concurrency:
   group: irrigation-pgtap-rls-gate-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  # Cheap gate — reads the PR diff and emits `irrigation=true|false`.
+  # Both real jobs `needs: changes` and skip themselves when false.
+  changes:
+    name: detect irrigation-scoped changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      irrigation: ${{ steps.filter.outputs.irrigation }}
+      dry_run: ${{ steps.dry-run.outputs.dry_run }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Filter changed files
+        id: filter
+        # dorny/paths-filter v3.0.2 — pinned by commit SHA.
+        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+        with:
+          # On workflow_dispatch there is no diff to inspect; force-run
+          # by setting the output to 'true' via the fallback below.
+          predicate-quantifier: "some"
+          # Emit newline-separated matched file list on `<filter>_files`
+          # so the debug step below can print exactly what triggered the gate.
+          list-files: shell
+          filters: |
+            irrigation:
+              # Explicit allowlist of irrigation-scoped migration files.
+              # New irrigation migrations MUST be added here AND to the
+              # required-migrations manifest so this gate runs against them.
+              - "supabase/migrations/20260703093500_harden_quicklog_save_event_grants.sql"
+              - "supabase/migrations/20260707130000_quicklog_save_event_trust_boundary_hardening.sql"
+              - "supabase/migrations/20260707220000_quicklog_save_event_atomic_idempotency_v2.sql"
+              - "supabase/migrations/20260709160000_quicklog_save_manual_idempotency.sql"
+              - "supabase/migrations/20260720160000_quicklog_save_event_irrigation_boundary_hardening.sql"
+              # Irrigation event-table DML revoke migration (UUID-named).
+              - "supabase/migrations/20260722062644_8cdef271-abf0-4d82-9eca-970a91b6c547.sql"
+              # Contract-migrations lane.
+              - "supabase/contract-migrations/quicklog_save_manual_revoke_anon_execute.sql"
+              # pgTAP suites + prod-parity seed.
+              - "supabase/tests/create_feeding_event.sql"
+              - "supabase/tests/create_watering_event.sql"
+              - "supabase/seed.sql"
+              # Runtime harness sources typechecked by this gate. Explicit
+              # allowlist — new irrigation harnesses MUST be added here or
+              # the gate will silently skip on PRs that only touch them.
+              - "scripts/run-irrigation-evidence-rls-harness.ts"
+              - "scripts/run-irrigation-integrity-suite.mjs"
+              - "scripts/run-create-feeding-event-rls-harness.ts"
+              - "scripts/run-quicklog-save-event-rls-harness.ts"
+              - "scripts/run-quicklog-save-manual-rls-harness.ts"
+              - "scripts/run-quicklog-rpc-rls-harnesses.ts"
+              - "scripts/run-quicklog-typed-payloads-harness.ts"
+              # The workflow itself — any change here re-runs the full gate.
+              - ".github/workflows/irrigation-pgtap-rls-gate.yml"
+
+      - name: Resolve dry-run mode
+        id: dry-run
+        env:
+          EVENT: ${{ github.event_name }}
+          DISPATCH_DRY_RUN: ${{ github.event.inputs.dry_run }}
+          # PR label allowlist — apply `ci:dry-run-irrigation` to a PR to
+          # exercise the filter/allowlist summary without booting Postgres
+          # or running the harness typecheck.
+          PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: |
+          set -eo pipefail
+          DRY_RUN=false
+          if [ "$EVENT" = "workflow_dispatch" ] && [ "$DISPATCH_DRY_RUN" = "true" ]; then
+            DRY_RUN=true
+          elif [ "$EVENT" = "pull_request" ] && echo "$PR_LABELS" | grep -q '"ci:dry-run-irrigation"'; then
+            DRY_RUN=true
+          fi
+          echo "dry_run=$DRY_RUN" >> "$GITHUB_OUTPUT"
+
+      - name: Report filter decision
+        env:
+          IRRIGATION: ${{ steps.filter.outputs.irrigation }}
+          IRRIGATION_FILES: ${{ steps.filter.outputs.irrigation_files }}
+          EVENT: ${{ github.event_name }}
+          DRY_RUN: ${{ steps.dry-run.outputs.dry_run }}
+        run: |
+          {
+            echo "## Irrigation change-detection"
+            echo ""
+            echo "- Event: \`$EVENT\`"
+            echo "- Irrigation surface changed: \`$IRRIGATION\`"
+            if [ "$DRY_RUN" = "true" ]; then
+              echo "- **Dry-run mode** → pgTAP + typecheck jobs will skip."
+              if [ "$EVENT" = "pull_request" ]; then
+                echo "  (triggered by PR label \`ci:dry-run-irrigation\`)"
+              fi
+            elif [ "$EVENT" = "workflow_dispatch" ]; then
+              echo "- Manual dispatch → downstream jobs always run."
+            elif [ "$IRRIGATION" = "true" ]; then
+              echo "- Downstream jobs will run."
+            else
+              echo "- Downstream jobs will skip (no-op success)."
+            fi
+            echo ""
+            echo "### Matched files"
+            if [ -n "$IRRIGATION_FILES" ]; then
+              echo ""
+              echo '```'
+              for f in $IRRIGATION_FILES; do
+                echo "$f"
+              done
+              echo '```'
+            else
+              echo ""
+              echo "_No PR-diff files matched the irrigation filter._"
+            fi
+            if [ "$DRY_RUN" = "true" ]; then
+              echo ""
+              echo "### Full irrigation allowlist (dry-run)"
+              echo ""
+              echo "Files declared in the \`irrigation\` paths-filter, with repo-presence check:"
+              echo ""
+              echo '```'
+              # Keep in sync with the paths-filter above.
+              ALLOWLIST=(
+                "supabase/migrations/20260703093500_harden_quicklog_save_event_grants.sql"
+                "supabase/migrations/20260707130000_quicklog_save_event_trust_boundary_hardening.sql"
+                "supabase/migrations/20260707220000_quicklog_save_event_atomic_idempotency_v2.sql"
+                "supabase/migrations/20260709160000_quicklog_save_manual_idempotency.sql"
+                "supabase/migrations/20260720160000_quicklog_save_event_irrigation_boundary_hardening.sql"
+                "supabase/migrations/20260722062644_8cdef271-abf0-4d82-9eca-970a91b6c547.sql"
+                "supabase/contract-migrations/quicklog_save_manual_revoke_anon_execute.sql"
+                "supabase/tests/create_feeding_event.sql"
+                "supabase/tests/create_watering_event.sql"
+                "supabase/seed.sql"
+                "scripts/run-irrigation-evidence-rls-harness.ts"
+                "scripts/run-irrigation-integrity-suite.mjs"
+                "scripts/run-create-feeding-event-rls-harness.ts"
+                "scripts/run-quicklog-save-event-rls-harness.ts"
+                "scripts/run-quicklog-save-manual-rls-harness.ts"
+                "scripts/run-quicklog-rpc-rls-harnesses.ts"
+                "scripts/run-quicklog-typed-payloads-harness.ts"
+                ".github/workflows/irrigation-pgtap-rls-gate.yml"
+              )
+              for f in "${ALLOWLIST[@]}"; do
+                if [ -e "$f" ]; then
+                  echo "present  $f"
+                else
+                  echo "MISSING  $f"
+                fi
+              done
+              echo '```'
+              echo ""
+              echo "_Dry-run does not execute pgTAP suites or the harness typecheck._"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
   harness-typecheck:
     name: harness typecheck (tsgo --noEmit)
+    needs: changes
+    if: >-
+      (needs.changes.outputs.irrigation == 'true' || github.event_name == 'workflow_dispatch')
+      && needs.changes.outputs.dry_run != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -90,6 +228,10 @@ jobs:
 
   pgtap-irrigation:
     name: pgTAP irrigation (feeding + watering)
+    needs: changes
+    if: >-
+      (needs.changes.outputs.irrigation == 'true' || github.event_name == 'workflow_dispatch')
+      && needs.changes.outputs.dry_run != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

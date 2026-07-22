@@ -17,8 +17,24 @@ const ROOT = resolve(__dirname, "../..");
 const PAGE = readFileSync(resolve(ROOT, "src/pages/GrowDetail.tsx"), "utf8") + "\n" + readFileSync(resolve(ROOT, "src/hooks/useGrowDetailData.ts"), "utf8") + "\n" + readFileSync(resolve(ROOT, "src/lib/growStatus.ts"), "utf8");
 
 describe("GrowDetail — related counts", () => {
-  it("issues a count query against plants by grow_id", () => {
-    expect(PAGE).toMatch(/countFrom\(\s*["']plants["']\s*\)/);
+  it("counts plants via grow attribution (own grow_id OR the grow's tents)", () => {
+    // BUG-A: a plain .eq("grow_id") count hid plants living in the grow's
+    // tents with a null own grow_id. The count now fetches the grow's tent
+    // ids first and applies the shared OR filter.
+    expect(PAGE).toMatch(/countGrowScopedPlants\(\)/);
+    expect(PAGE).toMatch(
+      /from\(\s*["']tents["']\s*\)[\s\S]{0,120}\.select\(\s*["']id["']\s*\)[\s\S]{0,80}\.eq\(\s*["']grow_id["']\s*,\s*growId/,
+    );
+    expect(PAGE).toMatch(
+      /from\(\s*["']plants["']\s*\)[\s\S]{0,200}\.or\(\s*buildGrowScopedPlantsOrFilter\(\s*growId/,
+    );
+  });
+  it("plants count keeps head:true exact-count shape and degrades to unavailable", () => {
+    expect(PAGE).toMatch(
+      /from\(\s*["']plants["']\s*\)[\s\S]{0,120}\.select\(\s*["']id["']\s*,\s*\{\s*count:\s*["']exact["']\s*,\s*head:\s*true\s*\}\s*\)/,
+    );
+    // Tent-id lookup failure must not silently undercount.
+    expect(PAGE).toMatch(/if\s*\(tErr\)\s*return\s+["']unavailable["']/);
   });
   it("issues a count query against tents by grow_id", () => {
     expect(PAGE).toMatch(/countFrom\(\s*["']tents["']\s*\)/);

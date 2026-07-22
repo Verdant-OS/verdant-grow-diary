@@ -23,6 +23,7 @@
  */
 
 import type { QuickLogV2SavePayload } from "./quickLogV2SavePayload";
+import { normalizeQuickLogStage } from "./quickLogStageDefaultRules";
 import type { buildSensorSnapshotSavePayload } from "./latestSensorSnapshotRules";
 import type { PhenoEvidenceReceiptDetails } from "./phenoEvidenceCaptureRules";
 
@@ -74,6 +75,12 @@ export interface LegacyQuickLogFormInput {
   plantId: string | null;
   plantTentId: string | null;
   details: LegacyQuickLogDetails;
+  /**
+   * Stage tag from the dialog's stage select (audit fix #2). Normalized in
+   * the builder; unknown/blank values are omitted so a bad stage never
+   * blocks a save.
+   */
+  stage?: string | null;
   /**
    * Optional redacted sensor envelope from buildSensorSnapshotSavePayload.
    * When non-null, emitted as `p_details: { sensor: ... }` on the RPC
@@ -183,6 +190,9 @@ export function buildLegacyQuickLogUnifiedPayload(
   }
   const detailsEnvelope: Record<string, unknown> | null =
     Object.keys(envelopeFields).length > 0 ? envelopeFields : null;
+  // Stage tag rides on every save; the RPC persists it onto the diary
+  // companion (and writes that companion for stage-only saves).
+  const stageTag = normalizeQuickLogStage(input.stage ?? "") || null;
 
   if (input.eventType === "watering") {
     const raw = trimStr(input.details.watering);
@@ -207,6 +217,7 @@ export function buildLegacyQuickLogUnifiedPayload(
         p_vpd_kpa: null,
         p_occurred_at: null,
         p_details: detailsEnvelope,
+        p_stage: stageTag,
         p_idempotency_key: input.idempotencyKey,
       },
     };
@@ -233,6 +244,7 @@ export function buildLegacyQuickLogUnifiedPayload(
       p_vpd_kpa: null,
       p_occurred_at: null,
       p_details: detailsEnvelope,
+      p_stage: stageTag,
       p_idempotency_key: input.idempotencyKey,
     },
   };

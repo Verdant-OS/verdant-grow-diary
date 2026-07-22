@@ -32,6 +32,7 @@ import {
   CORE_SENSOR_METRIC_KEYS,
   emptyStateCopy,
   PHENO_COMPARISON_CONFIDENCE_CAVEAT,
+  PHENO_COMPARISON_REAL_CONFIDENCE_CAVEAT,
 } from "@/lib/phenoComparisonRules";
 import type { SelectionTone } from "@/lib/phenoSelectionRules";
 import { PHENO_COMPARISON_DEMO_INPUT } from "@/lib/phenoComparisonFixtures";
@@ -121,7 +122,9 @@ export default function PhenoComparison({
           data-testid="pheno-comparison-confidence-caveat"
           className="rounded-md border border-border/60 bg-muted/30 p-2 text-xs text-muted-foreground"
         >
-          {PHENO_COMPARISON_CONFIDENCE_CAVEAT}
+          {vm.isDemo
+            ? PHENO_COMPARISON_CONFIDENCE_CAVEAT
+            : PHENO_COMPARISON_REAL_CONFIDENCE_CAVEAT}
         </p>
 
         <SourceLegend />

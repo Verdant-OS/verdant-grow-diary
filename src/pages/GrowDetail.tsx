@@ -12,6 +12,7 @@ import {
   Sparkles,
   Bell,
   SlidersHorizontal,
+  Columns2,
 } from "lucide-react";
 import { useGrowDetailData, type GrowOutcomesState } from "@/hooks/useGrowDetailData";
 import {
@@ -26,6 +27,7 @@ import {
   alertDetailPath,
   alertsPath,
   dashboardPath,
+  growPhenoComparePath,
   logsPath,
   plantsPath,
   postGrowLearningReportPath,
@@ -128,6 +130,17 @@ export default function GrowDetail() {
 
         <div className="mt-4 flex flex-wrap gap-2">
           <StartPhenoHuntButton growId={grow.id} />
+          <Button
+            asChild
+            size="sm"
+            variant="outline"
+            data-testid="grow-detail-compare-candidates"
+          >
+            <Link to={growPhenoComparePath(grow.id)}>
+              <Columns2 className="h-4 w-4 mr-1.5" />
+              Compare candidates
+            </Link>
+          </Button>
           <StartBreedingLogButton growId={grow.id} />
           <Button
             type="button"

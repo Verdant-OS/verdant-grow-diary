@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
+import { useGrows } from "@/store/grows";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,15 +20,29 @@ interface Props {
 
 export default function CreateTentDialog({ trigger, defaultGrowId, onCreated }: Props) {
   const { user } = useAuth();
+  const { grows = [] } = useGrows();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [form, setForm] = useState({ name: "", size: "", brand: "", stage: "seedling" });
+  const [form, setForm] = useState({ name: "", size: "", brand: "", stage: "seedling", grow_id: "" });
+
+  // Resolve which grow the new tent will belong to: an explicit page context
+  // wins, otherwise the grower's in-dialog selection. When neither resolves
+  // and grows exist, submit is blocked — never silently bind to a stale grow.
+  const targetGrowId = defaultGrowId ?? (form.grow_id || undefined);
+  const targetGrowName = targetGrowId
+    ? grows.find((g) => g.id === targetGrowId)?.name ?? "Selected grow"
+    : null;
+  const needsGrowSelection = !defaultGrowId && grows.length > 0;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!user) {
       toast.error("Not signed in");
+      return;
+    }
+    if (needsGrowSelection && !form.grow_id) {
+      toast.error("Pick which grow this tent belongs to first");
       return;
     }
     setBusy(true);
@@ -40,6 +55,7 @@ export default function CreateTentDialog({ trigger, defaultGrowId, onCreated }: 
     };
     // Preselect grow context when provided. RLS enforces ownership server-side.
     if (defaultGrowId) payload.grow_id = defaultGrowId;
+    else if (form.grow_id) payload.grow_id = form.grow_id;
     const { data, error } = await supabase
       .from("tents")
       .insert(payload as never)
@@ -53,7 +69,7 @@ export default function CreateTentDialog({ trigger, defaultGrowId, onCreated }: 
     toast.success("Tent created");
     qc.invalidateQueries({ queryKey: ["tents"] });
     qc.invalidateQueries({ queryKey: ["grow", "tents"] });
-    setForm({ name: "", size: "", brand: "", stage: "seedling" });
+    setForm({ name: "", size: "", brand: "", stage: "seedling", grow_id: "" });
     setOpen(false);
     if (data && onCreated) onCreated(data as { id: string; name: string });
   }
@@ -71,10 +87,37 @@ export default function CreateTentDialog({ trigger, defaultGrowId, onCreated }: 
         <DialogHeader>
           <DialogTitle className="font-display">New tent</DialogTitle>
         </DialogHeader>
+        {targetGrowName ? (
+          <div data-testid="create-tent-target-grow" className="rounded-md border border-primary/40 bg-primary/10 px-3 py-2 text-xs -mt-1">
+            Creating in grow: <span className="font-medium text-foreground">{targetGrowName}</span>
+          </div>
+        ) : grows.length > 0 ? (
+          <div data-testid="create-tent-grow-required" className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs -mt-1">
+            No grow selected — pick which grow this tent belongs to below.
+          </div>
+        ) : (
+          <div data-testid="create-tent-no-grow-note" className="rounded-md border border-border/60 bg-secondary/30 px-3 py-2 text-xs -mt-1">
+            No grows yet — this tent will be created without a grow. You can link it later in Lineage Repair.
+          </div>
+        )}
         <p className="text-xs text-muted-foreground -mt-1">
           Start simple. You can add size, brand, and stage later. Verdant works best once your first plant memory exists.
         </p>
         <form onSubmit={submit} className="grid gap-3">
+          {needsGrowSelection && (
+            <div>
+              <Label>Grow</Label>
+              <Select value={form.grow_id} onValueChange={(v) => setForm({ ...form, grow_id: v })}>
+                <SelectTrigger data-testid="create-tent-grow-select"><SelectValue placeholder="Select a grow" /></SelectTrigger>
+                <SelectContent>
+                  {grows.map((g) => (
+                    <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground mt-1">Required so the tent lands in the right grow.</p>
+            </div>
+          )}
           <div>
             <Label>Name</Label>
             <Input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Tent #1" />

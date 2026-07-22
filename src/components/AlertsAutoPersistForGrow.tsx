@@ -23,9 +23,13 @@ import { useGrowTargets } from "@/hooks/useGrowTargets";
 import { usePersistEnvironmentAlerts } from "@/hooks/usePersistEnvironmentAlerts";
 import { evaluateSensorQuality } from "@/lib/sensorQuality";
 import { compareSnapshotToTargets } from "@/lib/environmentTargetComparison";
+import { resolveAlertContextStage } from "@/lib/alertStageResolution";
 
 interface Props {
   growId: string | null | undefined;
+  /** The grow row's stage. Persisted alerts evaluate against the stage
+   * resolved from this PLUS the grow's tents' stages, so a stale
+   * `grows.stage` cannot drive outdated stage bands (live audit #14). */
   stage?: string | null;
 }
 
@@ -35,6 +39,12 @@ export default function AlertsAutoPersistForGrow({ growId, stage }: Props) {
   const tentIds = tents.map((t) => t.id);
   const sensorState = useLatestSensorSnapshot(safeGrowId, tentIds);
   const targetsState = useGrowTargets(safeGrowId);
+  // Stage precedence lives in resolveAlertContextStage: grow stage + tent
+  // stages, most advanced known stage wins on disagreement.
+  const resolvedStage = resolveAlertContextStage({
+    growStage: stage,
+    tentStages: tents.map((t) => t.stage),
+  }).stage;
 
   usePersistEnvironmentAlerts({
     growId: safeGrowId,
@@ -47,7 +57,7 @@ export default function AlertsAutoPersistForGrow({ growId, stage }: Props) {
       targetsState.status === "ok" ? targetsState.targets : null,
     ),
     enabled: !!safeGrowId,
-    stage: stage ?? null,
+    stage: resolvedStage,
   });
 
   return null;

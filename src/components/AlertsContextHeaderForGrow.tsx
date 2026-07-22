@@ -16,11 +16,15 @@ import { useGrowTents } from "@/hooks/useGrowData";
 import { useGrowTargets } from "@/hooks/useGrowTargets";
 import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";
 import { buildAlertsHeaderContext } from "@/lib/alertFreshnessContext";
+import { resolveAlertContextStage } from "@/lib/alertStageResolution";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 
 interface Props {
   growId: string;
   growName: string | null;
+  /** The grow row's stage. The rendered header stage is resolved from this
+   * PLUS the grow's tents' stages via `resolveAlertContextStage`, so a
+   * stale `grows.stage` cannot claim outdated targets (live audit #14). */
   stage: string | null;
   /** When true, shows a small "Showing alert context for X" note so the
    * operator can tell the header is using a fallback grow, not the one
@@ -43,12 +47,22 @@ export default function AlertsContextHeaderForGrow({
   const sensorState = useLatestSensorSnapshot(growId, tentIds);
   const targetsState = useGrowTargets(growId);
   const tempUnit = useTemperatureUnitPreference();
+  // Stage precedence lives in resolveAlertContextStage: grow stage + tent
+  // stages, most advanced known stage wins on disagreement.
+  const resolvedStage = useMemo(
+    () =>
+      resolveAlertContextStage({
+        growStage: stage,
+        tentStages: tents.map((t) => t.stage),
+      }).stage,
+    [stage, tents],
+  );
 
   const vm = useMemo(
     () =>
       buildAlertsHeaderContext({
         growName,
-        stage,
+        stage: resolvedStage,
         targets: targetsState.status === "ok" ? targetsState.targets : null,
         snapshot: sensorState.status === "ok" ? sensorState.snapshot : null,
         status: sensorState.status,
@@ -56,7 +70,7 @@ export default function AlertsContextHeaderForGrow({
       }),
     [
       growName,
-      stage,
+      resolvedStage,
       targetsState.status,
       targetsState.targets,
       sensorState.status,

@@ -2,6 +2,7 @@ import VpdStageMissingBadge from "@/components/VpdStageMissingBadge";
 import EcowittLatestSnapshotCard from "@/components/EcowittLatestSnapshotCard";
 import { stripBackPointerTokens } from "@/lib/actionQueueProvenanceRules";
 import { computeEnvironmentStability } from "@/lib/environmentStabilityRules";
+import { resolveAlertContextStage } from "@/lib/alertStageResolution";
 import { formatStabilityChipView } from "@/lib/dashboardStabilityChipCopyRules";
 import StabilityChipDrilldown from "@/components/StabilityChipDrilldown";
 import {
@@ -157,6 +158,17 @@ export default function Dashboard() {
   const tentIds = tents.map((t) => t.id).filter((id) => isUuid(id));
   const { byTent: readingsByTent, statusByTent: sensorStatusByTent } =
     useSensorReadingsByTents(tentIds);
+  // Stage for alert/threshold evaluation on the scoped Dashboard. Resolved
+  // from the grow row PLUS the grow's tents (most advanced known stage wins
+  // on disagreement) so a stale `grows.stage` cannot drive outdated stage
+  // bands while the tent badges show a later stage (live audit #14). When
+  // unscoped `tents` is the full set, so no tent stage may be inferred.
+  const alertContextStage = scopedGrow
+    ? resolveAlertContextStage({
+        growStage: scopedGrow.stage,
+        tentStages: tents.map((t) => t.stage),
+      }).stage
+    : null;
   // Freshness is time-relative: re-evaluate the snapshot strip's clock every
   // minute so an open tab cannot keep a fresh label past the stale boundary.
   const nowTick = useNowTick();
@@ -232,7 +244,7 @@ export default function Dashboard() {
       targetsState.status === "ok" ? targetsState.targets : null,
     ),
     enabled: !!scopedGrowId,
-    stage: scopedGrow?.stage ?? null,
+    stage: alertContextStage,
   });
 
   const dueToday = tasks.filter((t) => t.status === "today").length;
@@ -1282,7 +1294,7 @@ export default function Dashboard() {
                     const stale = snap ? isStale(snap.ts) : false;
                     const vpd = classifyVpdAgainstStage({
                       value: vpdValue,
-                      stage: scopedGrow?.stage ?? null,
+                      stage: alertContextStage,
                       stale,
                     });
                     const toneCls =
@@ -1338,10 +1350,10 @@ export default function Dashboard() {
                 snapshot: snap,
                 quality,
                 targets: targetsCmp,
-                stage: scopedGrow?.stage ?? null,
+                stage: alertContextStage,
               });
               const vpdStageMissing =
-                snap?.vpd != null && normalizeVpdStage(scopedGrow?.stage) === "unknown";
+                snap?.vpd != null && normalizeVpdStage(alertContextStage) === "unknown";
               return (
                 <div>
                   <div className="flex items-center justify-between mb-2">

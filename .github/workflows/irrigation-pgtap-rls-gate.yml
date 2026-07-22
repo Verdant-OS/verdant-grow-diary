@@ -199,7 +199,7 @@ jobs:
     needs: changes
     if: >-
       (needs.changes.outputs.irrigation == 'true' || github.event_name == 'workflow_dispatch')
-      && github.event.inputs.dry_run != 'true'
+      && needs.changes.outputs.dry_run != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -231,7 +231,7 @@ jobs:
     needs: changes
     if: >-
       (needs.changes.outputs.irrigation == 'true' || github.event_name == 'workflow_dispatch')
-      && github.event.inputs.dry_run != 'true'
+      && needs.changes.outputs.dry_run != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

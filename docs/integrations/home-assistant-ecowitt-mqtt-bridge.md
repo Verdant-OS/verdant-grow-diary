@@ -1,33 +1,65 @@
-# Home Assistant + EcoWitt MQTT Bridge — V1 (adapter slice)
+# Home Assistant + EcoWitt MQTT Bridge — V1 dry-run runner
 
-Verdant's local EcoWitt MQTT runner can consume EcoWitt entities that
-Home Assistant publishes over MQTT, alongside the existing direct
-`ecowitt2mqtt → Mosquitto → runner` path. This document covers the
-adapter's contract; it does not claim always-on continuous-live support.
+Verdant's local EcoWitt MQTT runner can now consume EcoWitt entities that Home
+Assistant publishes over MQTT while preserving the existing direct
+`ecowitt2mqtt → Mosquitto → runner` route.
 
-> **Status:** V1 pure-adapter slice. No hosted MQTT. No device control.
-> No always-on end-user service. No grower-facing mapping UI. No schema,
-> RLS, Edge Function, auth, or UI changes.
+> **Status:** Home Assistant routes are integrated for local **dry-run only**.
+> No hosted MQTT, no schema/RLS/Edge/auth/UI changes, no device control, and no
+> continuous-live claim.
 
----
+## Routes
+
+| Route | Configuration | Behavior |
+|---|---|---|
+| Existing direct EcoWitt | No `HA_MQTT_MAPPING_PATH` | Existing `ecowitt_raw` runner behavior is preserved. |
+| HA selective JSON | Mapping has `adapter_mode: "ha_json"` | One JSON envelope per HA sensor entity. Dry-run only. |
+| HA MQTT Statestream | Mapping has `adapter_mode: "ha_statestream"` | Deterministically assembles state and sibling attribute topics. Dry-run only. |
+
+## Config-only routing
+
+The runner does **not** inspect an MQTT topic and guess which parser to use.
+Routing is explicit:
+
+1. If `HA_MQTT_MAPPING_PATH` is absent, the runner keeps the existing
+   `ecowitt_raw` route and `ECOWITT_MQTT_TOPIC` behavior.
+2. If `HA_MQTT_MAPPING_PATH` is present, the version-1 JSON config must declare:
+   - `adapter_mode`: `ha_json` or `ha_statestream`
+   - `mqtt_topic`: the exact MQTT subscription filter
+   - `bridge`: `home_assistant`
+   - `upstream_mode`: `ha_core_ecowitt_push` or `ha_ecowitt_iot_poll`
+   - exact entity mappings
+3. HA routes refuse to start unless `--dry-run` is present.
+
+Example selective-JSON config:
+`fixtures/home-assistant-ecowitt-mqtt/example-mapping.json`.
+
+Example Statestream config:
+`fixtures/home-assistant-ecowitt-mqtt/example-statestream-mapping.json`.
+
+Run either HA route with:
+
+```bash
+HA_MQTT_MAPPING_PATH=fixtures/home-assistant-ecowitt-mqtt/example-mapping.json \
+  bun run scripts/dev/ecowitt-mqtt-runner.ts --dry-run
+```
+
+The mapping file, not the topic shape, selects the adapter.
 
 ## Supported upstream modes
 
-| upstream_mode              | Description                                                                                                             |
-| -------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `ha_core_ecowitt_push`     | Preferred. Ecowitt gateway pushes to HA Core's built-in Ecowitt integration; HA republishes as native `sensor.*` entities. |
-| `ha_ecowitt_iot_poll`      | HA polls the official EcoWitt Local integration.                                                                        |
-| `ecowitt_custom_upload`    | Legacy direct `ecowitt2mqtt` → `ecowitt/grow` raw aggregate topic. Preserves existing runner behavior exactly.          |
-| `unknown`                  | Never inferred. Must be set explicitly in the mapping file.                                                             |
+| `upstream_mode` | Meaning |
+|---|---|
+| `ha_core_ecowitt_push` | EcoWitt gateway pushes locally to HA Core's built-in EcoWitt integration. |
+| `ha_ecowitt_iot_poll` | HA uses EcoWitt's local-poll integration. |
 
-`upstream_mode` MUST come from configuration. The adapter never infers
-it from topic shape, entity id, unit string, or attribute contents.
+`ecowitt_custom_upload` remains the direct `ecowitt_raw` path and is not valid
+inside a Home Assistant runner mapping. `unknown` is rejected for HA runner
+configuration instead of being presented as trusted provenance.
 
-## Preferred publishing path
+## Selective HA JSON envelope
 
-For the two `ha_*` upstreams the preferred HA-side publisher is
-**selective JSON** — an HA automation that publishes one MQTT message
-per entity with the envelope:
+Preferred HA-side publishing uses one JSON object per entity:
 
 ```json
 {
@@ -39,132 +71,151 @@ per entity with the envelope:
 }
 ```
 
-**MQTT Statestream** is supported as a legacy-compatibility path only,
-because Statestream splits state, attributes, and (optionally)
-per-attribute fields across sibling topics. The adapter's
-`HaStatestreamAssembler` deterministically reassembles them per
-entity id; it never assumes one generic `/attributes` topic layout and
-never guesses the `last_updated` timestamp.
+The runner also accepts the boundary aliases `value` for `state` and `unit` for
+`unit_of_measurement`. They are normalized immediately. It never fills a
+missing source timestamp with broker receive time.
+
+## Real MQTT Statestream assembly
+
+The runner's `DeterministicHaStatestreamAssembler` supports Home Assistant's
+sibling-topic shape:
+
+```text
+<prefix>/<domain>/<object_id>/state
+<prefix>/<domain>/<object_id>/last_updated
+<prefix>/<domain>/<object_id>/last_changed
+<prefix>/<domain>/<object_id>/<attribute_name>
+```
+
+Example:
+
+```text
+homeassistant/sensor/ecowitt_gw1200_outdoor_temperature/state
+homeassistant/sensor/ecowitt_gw1200_outdoor_temperature/last_updated
+homeassistant/sensor/ecowitt_gw1200_outdoor_temperature/unit_of_measurement
+homeassistant/sensor/ecowitt_gw1200_outdoor_temperature/device_class
+```
+
+Messages may arrive in any order. The assembler waits for state plus a source
+timestamp and any required unit metadata before emitting a complete reading.
+An aggregate `/attributes` JSON topic is accepted only for compatibility; it is
+not required.
+
+The MQTT packet's retained flag is captured from the **state** topic. A later
+non-retained attribute topic cannot erase retained provenance. Identical
+complete assemblies are suppressed deterministically.
 
 ## Exact entity mapping
 
-Mapping is versioned and lives outside code. Example:
-`fixtures/home-assistant-ecowitt-mqtt/example-mapping.json`.
+Each entry is:
+
+```text
+entity_id → metric + tent_id + optional plant_id/channel + expected_unit
+```
 
 Rules:
 
-- Each mapping entry is `entity_id → { metric, tent_id, plant_id?, channel?, expected_unit? }`.
-- Tent id is **never inferred** from entity name, friendly name, area,
-  device, or topic.
-- Plant id is optional and never auto-assigned.
-- Unknown entities are ignored with reason `unknown_entity`.
-- Control-shaped domains (`switch.`, `light.`, `fan.`, `humidifier.`,
-  `climate.`, `cover.`, `media_player.`, `automation.`, `script.`,
-  `button.`, `input_boolean.`, `input_button.`, `lock.`, `vacuum.`,
-  `siren.`, `valve.`, `water_heater.`, `notify.`, `remote.`,
-  `select.`, `input_select.`) are dropped with reason
-  `control_shaped_entity_dropped`.
-- No secrets, tokens, MQTT credentials, or bridge passwords may appear
-  in mapping files. Store them in the runner's environment only.
+- Tent and plant are never inferred from names, areas, devices, or topics.
+- Duplicate entity mappings are rejected.
+- Unknown entities are rejected by the adapter; they are never auto-assigned.
+- `upstream_mode` is copied from configuration only.
+- Control-shaped entities remain blocked by the pure adapter.
+- Mapping files must not contain credentials, tokens, or private environment
+  values.
 
-## Freshness and retained-message behavior
+## Freshness and retained messages
 
-- Live freshness window: **15 minutes** (`ECOWITT_MQTT_STALE_MS`).
-- Future skew tolerance: **5 minutes** (`ECOWITT_MQTT_FUTURE_TOLERANCE_MS`).
-- Valid but old source timestamp → `stale`, never `invalid`.
-- Missing or malformed source timestamp → `invalid`.
-- Future timestamp outside tolerance → `invalid`.
-- **Retained message without a valid source timestamp → `invalid`.** The
-  MQTT broker's message-receive time is preserved as
-  `broker_received_at` for auditing but MUST NOT silently replace
-  `captured_at`.
-- The adapter never promotes `stale` or `invalid` telemetry to `live`.
+- Freshness window: **15 minutes**.
+- Future skew tolerance: **5 minutes**.
+- Valid and fresh → `live`.
+- Valid but old → `stale`.
+- Missing/malformed timestamp → `invalid`.
+- Retained HA JSON without a source timestamp → `invalid`.
+- Incomplete retained Statestream state remains pending and is never emitted as
+  live until source timestamp metadata arrives.
+- `broker_received_at` is audit context only and never replaces `captured_at`.
 
-## Provenance envelope
+## VPD pairing
 
-Every result carries an envelope. **Bridge names never appear in the
-`source` field.**
+The runner caches validated live temperature and humidity readings by:
 
-```ts
-{
-  source: "live" | "stale" | "invalid",
-  provider: "ecowitt",
-  transport: "mqtt",
-  bridge: "home_assistant" | "ecowitt2mqtt",
-  upstream_mode: "ha_core_ecowitt_push" | "ha_ecowitt_iot_poll"
-              | "ecowitt_custom_upload" | "unknown",
-  topic: string,
-  retained: boolean,
-  captured_at: string | null,       // ISO
-  received_at: string | null,       // runner clock
-  broker_received_at: string | null, // audit only
-  tent_id, plant_id, confidence,
-  reason_codes: HaAdapterReason[],
-  raw_payload: unknown              // redacted at report time, never at adapter time
-}
+```text
+tent_id + plant_id (when present) + configured channel
 ```
 
-If the persistent schema lacks dedicated provenance columns for
-`bridge` / `upstream_mode` / `retained`, callers must pass them through
-the existing webhook `metadata` / `raw_payload` mechanism. **No
-migration is required or proposed by this slice.**
+VPD is derived only when both readings:
 
-## VPD
+- are live and valid;
+- map to the same pairing identity;
+- are within the adapter's two-minute pairing window.
 
-- VPD is derived **only** through Verdant's existing Tetens
-  implementation (`calculateAirVpdKpa` in `src/lib/vpdRules.ts`).
-- Pairing requires: same tent, valid temperature, valid humidity, both
-  live, timestamps within `HA_VPD_PAIRING_WINDOW_MS` (default 2 min).
-- Stale or invalid inputs never derive VPD.
-- HA-precomputed `vpd_kpa` is **not** treated as authoritative. Any
-  mapped `vpd_kpa` entity is rejected at the adapter and re-derivation
-  is required.
+Verdant's existing Tetens implementation remains authoritative. HA-precomputed
+VPD is not trusted as a substitute.
 
 ## Idempotency
 
-`buildHaIdempotencyKey({bridge, upstream_mode, tent_id, metric, captured_at, value})`
-returns a stable string. Retained-message replays and reconnect storms
-of the same source-timestamp reading produce the same key. The runner
-should pass this string as the existing webhook `Idempotency-Key`
-header — no DB constraint or migration is added by this slice.
+The pure adapter's reading is strengthened at the runner boundary. The runner
+key includes:
 
-## MQTT safety
+```text
+provider
+bridge
+upstream_mode
+exact entity identity (or the sorted temp+RH pair for derived VPD)
+tent_id
+plant_id
+channel
+metric
+captured_at
+normalized value
+canonical unit
+```
 
-- The runner is **subscribe-only**. No `mqtt.publish` calls exist in
-  this module or the runner. No command / set / service topics are
-  handled. No Home Assistant `services/*` calls are made.
-- Control-shaped entities are dropped, never round-tripped.
-- Bridge tokens, MQTT usernames, MQTT passwords, and HA long-lived
-  tokens are never logged. Dry-run remains the default. Live posting to
-  `sensor-ingest-webhook` requires explicit mode + configured
-  `VERDANT_BRIDGE_TOKEN`.
+This keeps exact replays stable while preventing two probes in the same tent
+from colliding when they share a timestamp and value.
 
-## Real end-to-end verification checklist
+## Dry-run report
 
-One tent, one operator, one real reading. Nothing else is claimed.
+Each complete HA reading prints a redacted report containing:
 
-1. Configure the HA-side publisher (selective JSON preferred) for one
-   Ecowitt temperature entity and one humidity entity in the same tent.
-2. Copy `example-mapping.json`, replace the tent UUID, restrict the
-   mapping to those two entities.
-3. Confirm no control-domain entities are in the mapping.
-4. Start the local runner in `--dry-run`. Confirm the printed report
-   shows `source: "live"`, correct `tent_id`, `bridge: "home_assistant"`,
-   `upstream_mode: "ha_core_ecowitt_push"`, matching `topic`, and
-   `retained: false` for freshly-published messages.
-5. Restart the broker and confirm the next message is classified
-   `retained: true` **and** still respects the source timestamp — a
-   retained message without a source timestamp must classify `invalid`.
-6. Confirm derived VPD only appears when both temp and RH are live and
-   within the 2-minute pairing window and share the same tent.
-7. Only after items 1–6 pass, run the runner without `--dry-run` with a
-   configured `VERDANT_BRIDGE_TOKEN`.
+- adapter and `upstream_mode`;
+- source classification;
+- provider, transport, bridge, topic, and retained flag;
+- captured/received/broker timestamps;
+- mapped tent/plant;
+- normalized readings and idempotency keys;
+- the explicit note that nothing was sent or stored.
+
+Pending and duplicate Statestream events are logged without pretending a
+reading was ingested.
+
+## Safety boundary
+
+- HA routes do not call the ingest webhook.
+- No MQTT publish calls.
+- No Home Assistant service calls.
+- No direct Supabase writes.
+- No alerts or Action Queue writes.
+- No device commands or command-topic handling.
+- Bridge tokens and MQTT passwords are not used by HA dry-run reports.
+
+## Real verification gate
+
+Before enabling any future HA webhook posting:
+
+1. Capture one real EcoWitt entity through HA.
+2. Confirm config-routed `ha_json` or `ha_statestream` selection.
+3. Confirm fresh, stale, invalid, and retained behavior.
+4. Confirm same-channel temperature/RH derives VPD only inside the pairing
+   window.
+5. Confirm exact replay yields the same idempotency key.
+6. Confirm two soil channels cannot collide.
+7. Confirm no MQTT publish or HA service call exists.
+8. Then separately design and review the persistence boundary.
 
 ## Continuous-live claim
 
-**Blocked.** V1 is a validated adapter slice. Verdant does not market
-continuous live sync from Home Assistant until one full end-to-end
-payload → dry-run → webhook → in-app provenance path has been proven
-on real hardware for at least one operator, and the "no device
-control" invariant has been re-verified against the entities in that
-operator's mapping.
+**Blocked.** Verdant can accurately say the HA adapters are wired into the local
+runner for deterministic dry-run validation. It cannot claim continuous live
+Home Assistant sync until a real end-to-end MQTT → adapter → webhook → durable
+row → UI provenance test and restart/replay endurance test are complete.

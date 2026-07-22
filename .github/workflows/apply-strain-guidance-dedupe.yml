@@ -1,0 +1,57 @@
+name: Apply Strain Guidance Dedupe
+
+on:
+  push:
+    branches:
+      - feature/strain-reference-library-v1
+    paths:
+      - ".github/workflows/apply-strain-guidance-dedupe.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: feature/strain-reference-library-v1
+          fetch-depth: 0
+
+      - name: Dedupe merged guidance and remove diagnostics
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("src/constants/strainReferenceLibrary.ts")
+          text = path.read_text(encoding="utf-8")
+          anchor = 'const uniqueStrings = (values: readonly string[]): string[] => [...new Set(values.filter((value) => value.trim().length > 0))];\n'
+          addition = anchor + 'const uniqueGuidance = (values: readonly CultivarGuidanceItem[]): CultivarGuidanceItem[] => [...new Map(values.map((value) => [value.text, value])).values()];\n'
+          if text.count(anchor) != 1:
+              raise SystemExit("Expected uniqueStrings anchor exactly once")
+          text = text.replace(anchor, addition)
+
+          old = '      guidance: [...section.guidance, ...(overlay.guidance ?? [])],\n'
+          new = '      guidance: uniqueGuidance([...section.guidance, ...(overlay.guidance ?? [])]),\n'
+          if text.count(old) != 1:
+              raise SystemExit("Expected merged guidance expression exactly once")
+          text = text.replace(old, new)
+          path.write_text(text, encoding="utf-8")
+          PY
+          rm -f .diagnostics/strain-reference-migration-safety.txt
+          rm -f .github/workflows/apply-strain-guidance-dedupe.yml
+
+      - name: Commit cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add -A
+          git config user.name "verdant-ci"
+          git config user.email "actions@users.noreply.github.com"
+          git commit -m "fix(strains): dedupe merged guide guidance"
+          git push origin HEAD:feature/strain-reference-library-v1

@@ -114,21 +114,46 @@ describe("resolveAlertContextStage — precedence", () => {
     ).toEqual({ stage: "preflower", normalizedStage: "preflower", source: "grow" });
   });
 
-  it("multi-tent disagreement resolves to the most advanced known stage", () => {
+  it("mixed-stage tents abstain — the grow row's declared stage governs", () => {
+    // A grow deliberately running tents at different stages has no single
+    // tent truth; behavior matches the pre-resolver code (grow row wins).
     expect(
       resolveAlertContextStage({
         growStage: "veg",
         tentStages: ["seedling", "flower", "veg"],
       }),
-    ).toEqual({ stage: "flower", normalizedStage: "flower", source: "tent" });
+    ).toEqual({ stage: "veg", normalizedStage: "veg", source: "grow" });
+    // Disagreeing tents with an unknown grow resolve to null, same as before.
+    expect(
+      resolveAlertContextStage({ growStage: null, tentStages: ["veg", "flower"] }),
+    ).toEqual({ stage: null, normalizedStage: "unknown", source: null });
+    // Agreement across vocab forms still counts as consensus.
+    expect(
+      resolveAlertContextStage({
+        growStage: "seedling",
+        tentStages: ["veg", "Vegetative"],
+      }),
+    ).toEqual({ stage: "veg", normalizedStage: "veg", source: "tent" });
   });
 
-  it("advances past flower when a later stage is set anywhere", () => {
+  it("harvest cap: a leftover harvest/cure tent cannot switch off an active grow's banding", () => {
+    // Reused-tent repro (adversarial review): GrowLineageRepair repoints
+    // tents.grow_id without resetting stage, so an active veg grow can
+    // hold a tent still staged cure/harvest. The grow row's live decision
+    // keeps governing — stage-band alerts stay on.
+    expect(
+      resolveAlertContextStage({ growStage: "veg", tentStages: ["cure"] }),
+    ).toEqual({ stage: "veg", normalizedStage: "veg", source: "grow" });
     expect(
       resolveAlertContextStage({ growStage: "flower", tentStages: ["harvest"] }),
-    ).toEqual({ stage: "harvest", normalizedStage: "harvest", source: "tent" });
+    ).toEqual({ stage: "flower", normalizedStage: "flower", source: "grow" });
+    // Closing out is the grow row's call: a harvest-stage grow governs...
     expect(
       resolveAlertContextStage({ growStage: "drying", tentStages: ["flower"] }),
     ).toEqual({ stage: "drying", normalizedStage: "harvest", source: "grow" });
+    // ...and with no grow signal at all, an agreeing harvest tent stands.
+    expect(
+      resolveAlertContextStage({ growStage: null, tentStages: ["harvest"] }),
+    ).toEqual({ stage: "harvest", normalizedStage: "harvest", source: "tent" });
   });
 });

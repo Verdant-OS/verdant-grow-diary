@@ -95,10 +95,34 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
+      # Cache the apt archive for postgresql-client. Restore-only pattern:
+      # the install step still runs `apt-get update && install`, so the
+      # resolved version is identical to an uncached run — the cache only
+      # skips the .deb download when the exact version is already present.
+      - name: Cache apt archives (postgresql-client)
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: /var/cache/apt/archives
+          key: ${{ runner.os }}-apt-postgresql-client-v1
+          restore-keys: |
+            ${{ runner.os }}-apt-postgresql-client-
+
       - name: Install psql client
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends postgresql-client
+
+      # Cache the Supabase CLI's own state dir (config templates, function
+      # bundle cache). Does NOT include Docker image layers or the local
+      # DB state under supabase/.branches — those are intentionally left
+      # ephemeral so `supabase db reset` runs against a truly fresh stack.
+      - name: Cache Supabase CLI state
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.supabase
+          key: ${{ runner.os }}-supabase-cli-2.109.1-${{ hashFiles('supabase/config.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-supabase-cli-2.109.1-
 
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf # v1

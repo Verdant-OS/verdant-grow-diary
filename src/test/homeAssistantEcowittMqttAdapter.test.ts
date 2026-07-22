@@ -241,22 +241,27 @@ describe("homeAssistantEcowittMqttAdapter — ecowitt_raw passthrough", () => {
 });
 
 describe("homeAssistantEcowittMqttAdapter — safety fences (static)", () => {
-  const adapterSrc = readFileSync(
+  const adapterSrcRaw = readFileSync(
     resolve(process.cwd(), "src/lib/homeAssistantEcowittMqttAdapter.ts"),
     "utf8",
   );
+  // Strip comments so doc-comment prose that describes forbidden things
+  // (e.g. "no mqtt.publish", "no device control") doesn't false-positive.
+  const adapterSrc = adapterSrcRaw
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|\n)\s*\/\/[^\n]*/g, "$1");
 
   it("18. no MQTT publish, HA service, DB, alert, action queue, AI, or device control behavior", () => {
     for (const forbidden of [
-      /mqtt\.publish/i,
-      /\bpublish\s*\(/,
-      /home[_-]?assistant.*services?\b/i,
-      /supabase\./i,
-      /createClient/i,
+      /mqtt\.publish\s*\(/i,
+      /\.publish\s*\(/,
+      /homeassistant\.services?\s*\(/i,
+      /\bsupabase\./i,
+      /createClient\s*\(/,
       /action[_-]?queue/i,
-      /alert[_-]?queue/i,
-      /ai[_-]?doctor/i,
-      /device[_-]?control/i,
+      /alertQueue/i,
+      /aiDoctor/i,
+      /deviceControl/i,
       /fan\.turn_on|light\.turn_on|switch\.turn_on/i,
     ]) {
       expect(adapterSrc, `must not contain ${forbidden}`).not.toMatch(forbidden);

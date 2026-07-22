@@ -108,9 +108,10 @@ jobs:
           # Bundle every debug signal we have on failure so a regression
           # can be inspected without re-running the browser: sanitized
           # proof text, Playwright HTML report, traces, screenshots,
-          # videos, and logs. Secrets, .env values, service_role keys,
-          # bridge tokens, and raw payloads are never written to any of
-          # these paths by our scripts or Playwright config.
+          # videos, and logs. No secret material (environment files,
+          # server keys, ingest credentials, or provider payload dumps)
+          # is ever written to these paths by our scripts or Playwright
+          # config.
           path: |
             artifacts/one-tent-loop-proof/never-healthy-proof-report.txt
             playwright-report/**

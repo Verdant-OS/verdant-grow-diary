@@ -47,9 +47,16 @@ import {
 export interface PhenoComparisonProps {
   /**
    * Optional pre-built input. Defaults to the labeled demo/sample dataset.
-   * Injected only by tests / future live wiring — the route uses the demo.
+   * Injected only by tests / live wiring — the public route uses the demo.
    */
   input?: PhenoComparisonInput;
+  /**
+   * Optional clock (epoch ms) for snapshot freshness classification. The
+   * sample route omits it so fixtures stay deterministic; the REAL-data
+   * surface (GrowPhenoComparison) must pass a real clock or live readings
+   * would be graded against the fixed fixture epoch.
+   */
+  now?: number;
 }
 
 /** Cautious tone classes. `neutral` is muted — never a green success badge. */
@@ -67,8 +74,12 @@ function toneClass(tone: SelectionTone): string {
 
 export default function PhenoComparison({
   input = PHENO_COMPARISON_DEMO_INPUT,
+  now,
 }: PhenoComparisonProps): JSX.Element {
-  const vm: PhenoComparisonViewModel = buildPhenoComparisonViewModel(input);
+  const vm: PhenoComparisonViewModel = buildPhenoComparisonViewModel(
+    input,
+    now !== undefined ? { now } : {},
+  );
 
   return (
     <div

@@ -9,10 +9,12 @@
 import { describe, it, expect } from "vitest";
 import {
   buildRealPhenoComparisonInput,
+  phenoSnapshotFromSensorSnapshot,
   type RealPhenoCandidatePlant,
   type RealPhenoActivityRow,
 } from "@/lib/phenoComparisonRealInput";
 import { buildPhenoComparisonViewModel } from "@/lib/phenoComparisonViewModel";
+import type { SensorSnapshot } from "@/lib/sensorSnapshot";
 
 function plant(over: Partial<RealPhenoCandidatePlant> & { id: string }): RealPhenoCandidatePlant {
   return {
@@ -100,6 +102,37 @@ describe("buildRealPhenoComparisonInput", () => {
     expect(input.candidates[0].plantName).toBe("Plant A");
   });
 
+  it("attaches the tent snapshot and photo when provided", () => {
+    const input = buildRealPhenoComparisonInput({
+      huntName: "H",
+      growName: "Run A",
+      tentNameById: { t1: "Flower Tent" },
+      candidates: [
+        plant({ id: "p1", candidate_label: "#1", tent_id: "t1" }),
+        plant({ id: "p2", candidate_label: "#2", tent_id: "t9" }),
+      ],
+      activityByPlant: {},
+      photoUrlByPlant: { p1: "https://example.test/signed/photo1.jpg" },
+      snapshotByTent: {
+        t1: {
+          source: "manual",
+          capturedAt: "2026-07-20T10:00:00Z",
+          temp: 24.5,
+          rh: 55,
+          vpd: 1.1,
+        },
+      },
+    });
+    expect(input.candidates[0].photoUrl).toBe(
+      "https://example.test/signed/photo1.jpg",
+    );
+    expect(input.candidates[0].snapshot?.source).toBe("manual");
+    expect(input.candidates[0].snapshot?.temp).toBe(24.5);
+    // Candidate in an unmapped tent gets no snapshot — honest gap, not a copy.
+    expect(input.candidates[1].snapshot ?? null).toBeNull();
+    expect(input.candidates[1].photoUrl ?? null).toBeNull();
+  });
+
   it("omits structured phenotype/postCure/snapshot so the engine flags honest gaps", () => {
     const input = buildRealPhenoComparisonInput({
       huntName: "H",
@@ -114,7 +147,9 @@ describe("buildRealPhenoComparisonInput", () => {
     for (const c of input.candidates) {
       expect(c.phenotype).toBeUndefined();
       expect(c.postCure).toBeUndefined();
-      expect(c.snapshot).toBeUndefined();
+      // Snapshot is explicitly null (not fabricated) when no tent snapshot
+      // was provided — the engine renders the honest no-snapshot flag.
+      expect(c.snapshot ?? null).toBeNull();
     }
     // The shared engine must accept this input and surface evidence-gap caveats
     // (thin phenotype, no sensor snapshot) rather than inventing data.
@@ -123,5 +158,51 @@ describe("buildRealPhenoComparisonInput", () => {
     expect(vm.candidateCount).toBe(2);
     const codes = vm.candidates[0].selectionCaveats.map((c) => c.code);
     expect(codes).toContain("thin_phenotype");
+  });
+});
+
+describe("phenoSnapshotFromSensorSnapshot — canonical snapshot bridge", () => {
+  function snap(over: Partial<SensorSnapshot>): SensorSnapshot {
+    return {
+      source: "manual",
+      ts: "2026-07-20T10:00:00Z",
+      temp: 24,
+      rh: 55,
+      vpd: 1.1,
+      co2: null,
+      soil: null,
+      soil_ec: null,
+      soil_temp: null,
+      ppfd: null,
+      device_id: null,
+      csvVendor: null,
+      ...over,
+    } as SensorSnapshot;
+  }
+
+  it("maps source/capturedAt/metrics through", () => {
+    const out = phenoSnapshotFromSensorSnapshot(snap({}));
+    expect(out).toEqual({
+      source: "manual",
+      capturedAt: "2026-07-20T10:00:00Z",
+      temp: 24,
+      rh: 55,
+      vpd: 1.1,
+      ppfd: null,
+    });
+  });
+
+  it("maps sim → demo so simulated data is never presented as real", () => {
+    expect(phenoSnapshotFromSensorSnapshot(snap({ source: "sim" }))?.source).toBe(
+      "demo",
+    );
+  });
+
+  it("maps unavailable/missing to null (honest no-snapshot flag)", () => {
+    expect(
+      phenoSnapshotFromSensorSnapshot(snap({ source: "unavailable" })),
+    ).toBeNull();
+    expect(phenoSnapshotFromSensorSnapshot(null)).toBeNull();
+    expect(phenoSnapshotFromSensorSnapshot(undefined)).toBeNull();
   });
 });

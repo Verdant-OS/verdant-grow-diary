@@ -2,10 +2,10 @@
  * Static contract pin for the unapplied ACL remediation:
  *   supabase/contract-migrations/quicklog_save_manual_revoke_anon_execute.sql
  *
- * The remediation lives in the audit lane (`supabase/contract-migrations/`)
- * and is intentionally NOT under `supabase/migrations/`, so the auto-apply
- * lane never picks it up. This test pins the reviewed SQL shape so a copy
- * into a real `supabase migration new` file preserves the exact contract:
+ * The remediation starts in the audit lane (`supabase/contract-migrations/`)
+ * so the auto-apply lane cannot pick it up before approval. This test pins the
+ * reviewed SQL shape and permits at most one generated production migration,
+ * provided its contents remain byte-equivalent after newline normalization:
  *
  *   - additive only (no CREATE OR REPLACE / DROP of the function)
  *   - targets the exact 11-argument overload signature
@@ -23,27 +23,34 @@ import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 
 const ROOT = resolve(__dirname, "../..");
-const CONTRACT_PATH =
-  "supabase/contract-migrations/quicklog_save_manual_revoke_anon_execute.sql";
+const CONTRACT_PATH = "supabase/contract-migrations/quicklog_save_manual_revoke_anon_execute.sql";
 const abs = resolve(ROOT, CONTRACT_PATH);
-const raw = existsSync(abs) ? readFileSync(abs, "utf8") : "";
+const normalizeNewlines = (value: string): string => value.replace(/\r\n?/g, "\n");
+const raw = existsSync(abs) ? normalizeNewlines(readFileSync(abs, "utf8")) : "";
 // Strip SQL line comments so pins target executable statements only.
 const executable = raw.replace(/^\s*--.*$/gm, "").trim();
+const productionMigrationNames = existsSync(resolve(ROOT, "supabase/migrations"))
+  ? readdirSync(resolve(ROOT, "supabase/migrations")).filter((name) =>
+      /^\d+_quicklog_save_manual_revoke_anon_execute\.sql$/.test(name),
+    )
+  : [];
 
 const OVERLOAD_ARGS =
   "text, uuid, text, numeric, text, numeric, numeric, numeric,\n  timestamptz, jsonb, text";
 
 describe("quicklog_save_manual revoke-anon-execute contract migration", () => {
-  it("exists in the audit-lane directory (never under supabase/migrations/)", () => {
+  it("stays in the audit lane until one generated production migration is promoted", () => {
     expect(existsSync(abs)).toBe(true);
-    const productionMigrations = existsSync(resolve(ROOT, "supabase/migrations"))
-      ? readdirSync(resolve(ROOT, "supabase/migrations"))
-      : [];
-    for (const name of productionMigrations) {
+    expect(productionMigrationNames.length).toBeLessThanOrEqual(1);
+
+    for (const name of productionMigrationNames) {
+      const productionSql = normalizeNewlines(
+        readFileSync(resolve(ROOT, "supabase/migrations", name), "utf8"),
+      );
       expect(
-        name,
-        `contract-migration must not be copied verbatim into supabase/migrations/ (${name})`,
-      ).not.toContain("quicklog_save_manual_revoke_anon_execute");
+        productionSql,
+        `${name} must remain byte-equivalent to the reviewed contract after newline normalization`,
+      ).toBe(raw);
     }
   });
 
@@ -93,12 +100,16 @@ describe("quicklog_save_manual revoke-anon-execute contract migration", () => {
     // quicklog_save_manual in the public schema, so a stray overload cannot
     // silently retain anon EXECUTE.
     expect(executable).toMatch(/DO\s*\$\$/i);
-    expect(executable).toMatch(/FROM\s+pg_proc\s+p[\s\S]*?p\.proname\s*=\s*'quicklog_save_manual'/i);
+    expect(executable).toMatch(
+      /FROM\s+pg_proc\s+p[\s\S]*?p\.proname\s*=\s*'quicklog_save_manual'/i,
+    );
     expect(executable).toMatch(/FOR\s+bad\s+IN[\s\S]*?LOOP/i);
   });
 
   it("postcondition asserts every overload: anon=false, authenticated=true, service_role=true", () => {
-    expect(executable).toMatch(/has_function_privilege\(\s*'anon'\s*,\s*p\.oid\s*,\s*'EXECUTE'\s*\)/i);
+    expect(executable).toMatch(
+      /has_function_privilege\(\s*'anon'\s*,\s*p\.oid\s*,\s*'EXECUTE'\s*\)/i,
+    );
     expect(executable).toMatch(
       /has_function_privilege\(\s*'authenticated'\s*,\s*p\.oid\s*,\s*'EXECUTE'\s*\)/i,
     );
@@ -131,11 +142,9 @@ describe("quicklog_save_manual revoke-anon-execute contract migration", () => {
       .filter((s) => s.length > 0);
     for (const stmt of stmts) {
       if (!/^(REVOKE|GRANT|ALTER|CREATE|DROP)\b/i.test(stmt)) continue;
-      expect(
-        stmt,
-        `unexpected DDL/DCL touches something other than quicklog_save_manual`,
-      ).toMatch(/quicklog_save_manual/i);
+      expect(stmt, `unexpected DDL/DCL touches something other than quicklog_save_manual`).toMatch(
+        /quicklog_save_manual/i,
+      );
     }
   });
-
 });

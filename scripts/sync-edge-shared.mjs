@@ -49,8 +49,7 @@ const ALLOWED_ALIAS_EXACT = {
   "@/integrations/supabase/types": path.join("integrations", "supabase", "types.ts"),
 };
 
-const IMPORT_RE =
-  /((?:^|\n)\s*(?:import|export)(?:\s+[\s\S]*?\s+from)?\s*["'])([^"']+)(["'])/g;
+const IMPORT_RE = /((?:^|\n)\s*(?:import|export)(?:\s+[\s\S]*?\s+from)?\s*["'])([^"']+)(["'])/g;
 const DYNAMIC_IMPORT_RE = /(\bimport\s*\(\s*["'])([^"']+)(["']\s*\))/g;
 const INLINE_TYPE_IMPORT_RE = /(import\(\s*["'])([^"']+)(["']\s*\))/g;
 
@@ -69,6 +68,7 @@ async function walk(dir) {
   } catch {
     return out;
   }
+  entries.sort((a, b) => a.name.localeCompare(b.name));
   for (const e of entries) {
     const p = path.join(dir, e.name);
     if (e.isDirectory()) out.push(...(await walk(p)));
@@ -196,6 +196,20 @@ function toPosix(p) {
   return p.split(path.sep).join("/");
 }
 
+function orderedObject(entries) {
+  return Object.fromEntries([...entries].sort(([a], [b]) => a.localeCompare(b)));
+}
+
+function sameStringMap(a, b) {
+  const aEntries = Object.entries(a ?? {}).sort(([ak], [bk]) => ak.localeCompare(bk));
+  const bEntries = Object.entries(b ?? {}).sort(([ak], [bk]) => ak.localeCompare(bk));
+  if (aEntries.length !== bEntries.length) return false;
+  return aEntries.every(([key, value], index) => {
+    const [otherKey, otherValue] = bEntries[index];
+    return key === otherKey && value === otherValue;
+  });
+}
+
 /** Mirror-relative path for a mirrorable source file. */
 function mirrorRelFromSource(srcAbs) {
   return srcRelOf(srcAbs);
@@ -288,6 +302,7 @@ function rewriteEntry(text, entryAbs) {
 async function findEntryFiles() {
   const out = [];
   const dirents = await fs.readdir(FUNCTIONS, { withFileTypes: true });
+  dirents.sort((a, b) => a.name.localeCompare(b.name));
   for (const d of dirents) {
     if (!d.isDirectory()) continue;
     if (d.name.startsWith(".")) continue;
@@ -312,7 +327,7 @@ async function findEntryFiles() {
       if (f.endsWith(".ts")) out.push(f);
     }
   }
-  return out;
+  return out.sort((a, b) => a.localeCompare(b));
 }
 
 function banner(srcRel, hash) {
@@ -329,19 +344,20 @@ async function main() {
   // output dir via SYNC_TMP_OUT so they can diff committed mirror files
   // against the freshly generated content to compute a real line number.
   const outRoot = CHECK
-    ? (process.env.SYNC_TMP_OUT
-        ? (await fs.mkdir(process.env.SYNC_TMP_OUT, { recursive: true }),
-          process.env.SYNC_TMP_OUT)
-        : await fs.mkdtemp(path.join(os.tmpdir(), "edge-shared-")))
+    ? process.env.SYNC_TMP_OUT
+      ? (await fs.mkdir(process.env.SYNC_TMP_OUT, { recursive: true }), process.env.SYNC_TMP_OUT)
+      : await fs.mkdtemp(path.join(os.tmpdir(), "edge-shared-"))
     : MIRROR_ABS;
-
 
   const entries = await findEntryFiles();
   const collected = await collectFromEntries(entries);
 
   const mirrorFiles = new Map();
-  const sourceHashes = {};
-  for (const [srcAbs, srcText] of collected) {
+  const sourceHashEntries = [];
+  const collectedEntries = [...collected.entries()].sort(([a], [b]) =>
+    toPosix(path.relative(ROOT, a)).localeCompare(toPosix(path.relative(ROOT, b))),
+  );
+  for (const [srcAbs, srcText] of collectedEntries) {
     const relInMirror = mirrorRelFromSource(srcAbs);
     const outAbs = path.join(outRoot, relInMirror);
     const rewritten = rewriteMirrorSource(srcText, srcAbs);
@@ -349,8 +365,9 @@ async function main() {
     const srcRel = toPosix(path.relative(ROOT, srcAbs));
     const withBanner = banner(srcRel, hash) + rewritten;
     mirrorFiles.set(outAbs, withBanner);
-    sourceHashes[srcRel] = hash;
+    sourceHashEntries.push([srcRel, hash]);
   }
+  const sourceHashes = orderedObject(sourceHashEntries);
 
   const manifest = {
     generator: "scripts/sync-edge-shared.mjs",
@@ -404,10 +421,7 @@ async function main() {
       const committedManifest = JSON.parse(
         await fs.readFile(path.join(MIRROR_ABS, ".sync-manifest.json"), "utf8"),
       );
-      if (
-        JSON.stringify(committedManifest.sourceHashes) !==
-        JSON.stringify(sourceHashes)
-      ) {
+      if (!sameStringMap(committedManifest.sourceHashes, sourceHashes)) {
         drift.push("DRIFT: .sync-manifest.json sourceHashes differ");
       }
     } catch {
@@ -428,9 +442,7 @@ async function main() {
             return resolved !== null && isMirrorable(resolved);
           })();
         if (badAlias || badRelative) {
-          drift.push(
-            `ENTRY not rewritten: ${path.relative(ROOT, entry)} still imports "${spec}"`,
-          );
+          drift.push(`ENTRY not rewritten: ${path.relative(ROOT, entry)} still imports "${spec}"`);
           break;
         }
       }

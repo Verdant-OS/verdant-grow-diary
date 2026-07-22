@@ -97,13 +97,24 @@ jobs:
       - name: Start disposable local Supabase
         run: |
           set -euo pipefail
+          mkdir -p artifacts/irrigation-evidence
           # Supabase prints ephemeral credentials in its startup summary. Keep
-          # that output private until the next step has masked every credential.
-          if ! supabase start --exclude studio,mailpit,imgproxy,postgres-meta,supavisor,realtime,edge-runtime,logflare,vector,storage-api >"${RUNNER_TEMP}/irrigation-supabase-start.log" 2>&1; then
+          # that output private until the next step has masked every credential;
+          # only a redacted diagnostic copy is persisted on failure. Use the
+          # same full-stack start path as the pgTAP gate instead of a brittle
+          # exclude list, because the local CLI's service dependency graph can
+          # change across Supabase releases.
+          if ! supabase start --workdir . >"${RUNNER_TEMP}/irrigation-supabase-start.log" 2>&1; then
+            grep -Eiv '(ANON_KEY|SERVICE_ROLE_KEY|JWT_SECRET|SECRET_KEY|DB_URL|DATABASE_URL|API KEY|access token)' \
+              "${RUNNER_TEMP}/irrigation-supabase-start.log" \
+              > artifacts/irrigation-evidence/supabase-start-redacted.log || true
             echo "::error::Disposable local Supabase failed to start"
             exit 1
           fi
           if ! supabase db reset --local >"${RUNNER_TEMP}/irrigation-supabase-reset.log" 2>&1; then
+            grep -Eiv '(ANON_KEY|SERVICE_ROLE_KEY|JWT_SECRET|SECRET_KEY|DB_URL|DATABASE_URL|API KEY|access token)' \
+              "${RUNNER_TEMP}/irrigation-supabase-reset.log" \
+              > artifacts/irrigation-evidence/supabase-reset-redacted.log || true
             echo "::error::Disposable local Supabase migration reset failed"
             exit 1
           fi
@@ -138,7 +149,10 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: irrigation-evidence-runtime-failure
-          path: artifacts/irrigation-evidence/runtime-harness.log
+          path: |
+            artifacts/irrigation-evidence/runtime-harness.log
+            artifacts/irrigation-evidence/supabase-start-redacted.log
+            artifacts/irrigation-evidence/supabase-reset-redacted.log
           if-no-files-found: ignore
           retention-days: 7
 

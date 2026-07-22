@@ -16,6 +16,10 @@ import { resolve } from "node:path";
 const ROOT = resolve(__dirname, "../..");
 const HARNESS = "scripts/run-irrigation-evidence-rls-harness.ts";
 const WORKFLOW = ".github/workflows/irrigation-evidence-gate.yml";
+const ACL_PGTAP_FILES = [
+  "supabase/tests/create_watering_event.sql",
+  "supabase/tests/create_feeding_event.sql",
+] as const;
 const harnessPath = resolve(ROOT, HARNESS);
 const src = existsSync(harnessPath) ? readFileSync(harnessPath, "utf8") : "";
 const workflowPath = resolve(ROOT, WORKFLOW);
@@ -104,6 +108,21 @@ describe("irrigation evidence RLS harness — service_role boundary", () => {
   });
 });
 
+describe("irrigation evidence pgTAP — every legacy RPC overload is pinned", () => {
+  for (const path of ACL_PGTAP_FILES) {
+    it(`${path} requires the complete overload set to match the EXECUTE contract`, () => {
+      const sql = readFileSync(resolve(ROOT, path), "utf8");
+
+      expect(sql).toMatch(/overload_count\s+BIGINT/);
+      expect(sql).toMatch(/granted_count\s+BIGINT/);
+      expect(sql).toMatch(/ASSERT\s+overload_count\s*>\s*0/i);
+      expect(sql).toMatch(/granted_count\s*=\s*overload_count/i);
+      expect(sql).toMatch(/granted_count\s*=\s*0/i);
+      expect(sql).not.toMatch(/bool_or\s*\(\s*has_function_privilege/i);
+    });
+  }
+});
+
 describe("irrigation evidence RLS harness — no device-control / automation / forbidden writes", () => {
   const DEVICE =
     /\b(actuator|relay|fan_on|light_on_cmd|pump|dose|valve|switch_on|switch_off|device_control|mqtt_publish|home_assistant|pi_bridge)\b/i;
@@ -140,9 +159,7 @@ describe("irrigation evidence RLS harness — no device-control / automation / f
     // those are SECURITY INVOKER and depend on auth.uid(); a service_role JWT
     // cannot honestly prove ACL possession by successful execution. ACL
     // possession is proved in pgTAP instead.
-    expect(src).not.toMatch(
-      /admin\s*\.rpc\(\s*['"]create_(watering|feeding)_event['"]/i,
-    );
+    expect(src).not.toMatch(/admin\s*\.rpc\(\s*['"]create_(watering|feeding)_event['"]/i);
   });
   it("uses a distinct feedingArgs helper that explicitly clears p_water", () => {
     // The RPC rejects a non-null p_water when p_event_type = 'feeding'
@@ -173,7 +190,9 @@ describe("irrigation evidence RLS harness — no device-control / automation / f
     // Every DML denial assertion must combine both helpers so a
     // missing-function error cannot satisfy an RPC/table-denial check.
     const dmlDenials = Array.from(
-      src.matchAll(/authenticated denied (?:INSERT|UPDATE|DELETE|create_[a-z_]+_event)[^\n]*\n\s*([^\n]+)/gi),
+      src.matchAll(
+        /authenticated denied (?:INSERT|UPDATE|DELETE|create_[a-z_]+_event)[^\n]*\n\s*([^\n]+)/gi,
+      ),
     ).map((m) => m[1]);
     expect(dmlDenials.length, "expected denial assertions to exist").toBeGreaterThan(0);
     for (const line of dmlDenials) {
@@ -200,7 +219,6 @@ describe("irrigation evidence RLS harness — no device-control / automation / f
     expect(src).toMatch(/feeding seed exists only in feeding_events/);
   });
 });
-
 
 describe("irrigation evidence RLS harness — disposable + self-cleaning", () => {
   it("only ever creates @verdant.test users", () => {

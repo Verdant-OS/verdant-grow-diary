@@ -21,7 +21,7 @@
  * Windows / macOS / Linux friendly. Requires: node, bun, supabase CLI, psql.
  */
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -62,7 +62,12 @@ function run(cmd, args, opts = {}) {
   log(`$ ${cmd} ${args.join(" ")}`);
   const r = spawnSync(cmd, args, {
     cwd: REPO_ROOT,
-    stdio: opts.capture ? ["ignore", "pipe", "pipe"] : "inherit",
+    input: opts.input,
+    stdio: opts.capture
+      ? ["pipe", "pipe", "pipe"]
+      : opts.input
+        ? ["pipe", "inherit", "inherit"]
+        : "inherit",
     env: { ...process.env, ...(opts.env ?? {}) },
     shell: process.platform === "win32",
     encoding: "utf8",
@@ -71,15 +76,105 @@ function run(cmd, args, opts = {}) {
   return r;
 }
 
-function requireBin(bin) {
-  const probe = spawnSync(bin, ["--version"], {
+function probeBin(bin, args = ["--version"]) {
+  const probe = spawnSync(bin, args, {
     stdio: "ignore",
     shell: process.platform === "win32",
   });
-  if (probe.status !== 0) {
-    console.error(`[irrigation-integrity] required binary not found on PATH: ${bin}`);
+  return probe.status === 0;
+}
+
+function requireBin(bin) {
+  if (probeBin(bin)) return;
+  console.error(`[irrigation-integrity] required binary not found on PATH: ${bin}`);
+  process.exit(2);
+}
+
+function resolveSupabaseCommand() {
+  if (probeBin("supabase")) return { cmd: "supabase", args: [] };
+  const probe = spawnSync("bunx", ["supabase", "--version"], {
+    stdio: "ignore",
+    shell: process.platform === "win32",
+  });
+  if (probe.status === 0) return { cmd: "bunx", args: ["supabase"] };
+  console.error(
+    "[irrigation-integrity] required Supabase CLI not found via `supabase` or `bunx supabase`",
+  );
+  process.exit(2);
+}
+
+function runSupabase(args, opts = {}) {
+  return run(SUPABASE.cmd, [...SUPABASE.args, ...args], opts);
+}
+
+function redactSupabaseStartupOutput(output) {
+  return output
+    .split(/\r?\n/)
+    .filter(
+      (line) =>
+        !/"(?:ANON_KEY|JWT_SECRET|PUBLISHABLE_KEY|SECRET_KEY|SERVICE_ROLE_KEY|S3_PROTOCOL_ACCESS_KEY_ID|S3_PROTOCOL_ACCESS_KEY_SECRET)":/.test(
+          line,
+        ),
+    )
+    .join("\n");
+}
+
+function resolvePsqlRunner() {
+  if (probeBin("psql")) {
+    return {
+      kind: "host",
+      runFile(dbUrl, sqlFile) {
+        return run("psql", [dbUrl, "-v", "ON_ERROR_STOP=1", "-f", sqlFile]);
+      },
+    };
+  }
+
+  if (!probeBin("docker")) {
+    console.error(
+      "[irrigation-integrity] required psql not found on PATH and Docker fallback is unavailable",
+    );
     process.exit(2);
   }
+
+  const ps = run("docker", ["ps", "--format", "{{.Names}}"], { capture: true });
+  if (ps.status !== 0) {
+    console.error("[irrigation-integrity] Docker fallback could not list running containers");
+    process.exit(2);
+  }
+  const dbContainers = (ps.stdout || "")
+    .split(/\r?\n/)
+    .map((s) => s.trim())
+    .filter((name) => /^supabase_db_/.test(name));
+
+  if (dbContainers.length !== 1) {
+    console.error(
+      `[irrigation-integrity] Docker psql fallback expected exactly one supabase_db_* container, found ${dbContainers.length}`,
+    );
+    process.exit(2);
+  }
+
+  const container = dbContainers[0];
+  return {
+    kind: "docker",
+    runFile(_dbUrl, sqlFile) {
+      return run(
+        "docker",
+        [
+          "exec",
+          "-i",
+          container,
+          "psql",
+          "-U",
+          "postgres",
+          "-d",
+          "postgres",
+          "-v",
+          "ON_ERROR_STOP=1",
+        ],
+        { input: readFileSync(resolve(REPO_ROOT, sqlFile), "utf8") },
+      );
+    },
+  };
 }
 
 // -- Preflight --------------------------------------------------------------
@@ -89,20 +184,23 @@ for (const f of [...STATIC_PIN_FILES, ...PGTAP_FILES]) {
     process.exit(2);
   }
 }
-for (const bin of ["node", "bun", "supabase", "psql"]) requireBin(bin);
+for (const bin of ["node", "bun"]) requireBin(bin);
+const SUPABASE = resolveSupabaseCommand();
+const PSQL = resolvePsqlRunner();
 
 // -- 1. supabase start ------------------------------------------------------
 let apiUrl, dbUrl, anonKey, serviceKey;
 try {
   // Idempotent: `supabase start` is a no-op if already running.
-  const start = run("supabase", ["start"], { capture: true });
+  const start = runSupabase(["start"], { capture: true });
   if (start.status !== 0) {
     fail("supabase start", (start.stderr || start.stdout || "").trim().slice(0, 400));
     printSummaryAndExit(1);
   }
-  process.stdout.write(start.stdout ?? "");
+  const redactedStartOutput = redactSupabaseStartupOutput(start.stdout ?? "");
+  if (redactedStartOutput.trim()) process.stdout.write(`${redactedStartOutput}\n`);
 
-  const status = run("supabase", ["status", "-o", "env"], { capture: true });
+  const status = runSupabase(["status", "-o", "env"], { capture: true });
   if (status.status !== 0) {
     fail("supabase status", (status.stderr || status.stdout || "").trim().slice(0, 400));
     printSummaryAndExit(1);
@@ -143,7 +241,7 @@ try {
 
 // -- 2. supabase db reset ---------------------------------------------------
 {
-  const r = run("supabase", ["db", "reset"]);
+  const r = runSupabase(["db", "reset"]);
   if (r.status !== 0) {
     fail("supabase db reset", `exit ${r.status}`);
     printSummaryAndExit(1);
@@ -176,7 +274,7 @@ try {
 
 // -- 4/5. pgTAP suites ------------------------------------------------------
 for (const sql of PGTAP_FILES) {
-  const r = run("psql", [dbUrl, "-v", "ON_ERROR_STOP=1", "-f", sql]);
+  const r = PSQL.runFile(dbUrl, sql);
   const label = `pgTAP ${sql.split("/").pop()}`;
   if (r.status !== 0) fail(label, `exit ${r.status}`);
   else ok(label, "structural + ACL matrix", ["trust-boundary-contract"]);

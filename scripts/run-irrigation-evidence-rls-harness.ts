@@ -177,13 +177,13 @@ function classifyDbError(err: DbLikeError): ErrorClass {
   return "unexpected-error";
 }
 
-function isGenuinePermissionDenial(err: DbLikeError): boolean {
+const isGenuinePermissionDenial = (err: DbLikeError): boolean => {
   return classifyDbError(err) === "genuine-permission-denial";
-}
-function isMissingFunction(err: DbLikeError): boolean {
+};
+const isMissingFunction = (err: DbLikeError): boolean => {
   const c = classifyDbError(err);
   return c === "missing-function" || c === "schema-cache-miss";
-}
+};
 
 /**
  * Format the per-assertion detail column so operators can immediately see
@@ -358,17 +358,37 @@ async function waitForRaceContention(): Promise<boolean> {
 }
 
 const createdUserIds: string[] = [];
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function formatSupabaseError(error: unknown): string {
+  if (!error) return "unknown";
+  if (error instanceof Error) return error.message || error.name || "unknown-error";
+  try {
+    const encoded = JSON.stringify(error);
+    return encoded && encoded !== "{}" ? encoded : String(error);
+  } catch {
+    return String(error);
+  }
+}
+
 async function createUser(label: string) {
   const email = `irrigation-${label}-${runId}@verdant.test`;
   const password = crypto.randomUUID();
-  const { data, error } = await admin.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-  });
-  if (error || !data.user) throw new Error(`create_user_failed:${error?.message ?? "unknown"}`);
-  createdUserIds.push(data.user.id);
-  return { id: data.user.id, email, password };
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= 20; attempt += 1) {
+    const { data, error } = await admin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+    });
+    if (!error && data.user) {
+      createdUserIds.push(data.user.id);
+      return { id: data.user.id, email, password };
+    }
+    lastError = error ?? "missing user in createUser response";
+    await delay(250);
+  }
+  throw new Error(`create_user_failed:${formatSupabaseError(lastError)}`);
 }
 async function signIn(email: string, password: string): Promise<SupabaseClient> {
   const c = createClient(SUPABASE_URL, ANON_KEY, {
@@ -452,7 +472,6 @@ async function main() {
     p_feed: feed,
     ...over,
   });
-
 
   // 1. owner success
   const ok = await save(ownerC, baseArgs({}));
@@ -687,24 +706,30 @@ async function main() {
   // (genuine-permission-denial / missing-function / schema-cache-miss /
   //  unexpected-error / success-instead-of-denial) so the diagnostic column
   // makes remediation obvious.
-  const legacyWatering = await ownerC.rpc("create_watering_event" as never, {
-    _grow_id: oGrow,
-    _volume_ml: 100,
-    _tent_id: oTent,
-    _plant_id: oPlantInTent,
-  } as never);
+  const legacyWatering = await ownerC.rpc(
+    "create_watering_event" as never,
+    {
+      _grow_id: oGrow,
+      _volume_ml: 100,
+      _tent_id: oTent,
+      _plant_id: oPlantInTent,
+    } as never,
+  );
   check(
     "authenticated denied create_watering_event with genuine permission error (not missing-function)",
     isGenuinePermissionDenial(legacyWatering.error) && !isMissingFunction(legacyWatering.error),
     formatDenialDetail(legacyWatering.error),
   );
-  const legacyFeeding = await ownerC.rpc("create_feeding_event" as never, {
-    _grow_id: oGrow,
-    _line_id: "default",
-    _products: [],
-    _tent_id: oTent,
-    _plant_id: oPlantInTent,
-  } as never);
+  const legacyFeeding = await ownerC.rpc(
+    "create_feeding_event" as never,
+    {
+      _grow_id: oGrow,
+      _line_id: "default",
+      _products: [],
+      _tent_id: oTent,
+      _plant_id: oPlantInTent,
+    } as never,
+  );
   check(
     "authenticated denied create_feeding_event with genuine permission error (not missing-function)",
     isGenuinePermissionDenial(legacyFeeding.error) && !isMissingFunction(legacyFeeding.error),
@@ -831,8 +856,6 @@ async function main() {
   // retains SELECT/INSERT/UPDATE/DELETE on the three event tables) is proved
   // out-of-band in the pgTAP suites under supabase/tests/.
 }
-
-
 
 async function teardown(): Promise<void> {
   try {

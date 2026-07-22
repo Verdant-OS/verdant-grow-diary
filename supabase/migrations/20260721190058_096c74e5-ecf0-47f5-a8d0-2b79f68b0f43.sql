@@ -80,7 +80,7 @@ BEGIN
      )
      AND (
        (
-         s.price_id IN ('pro_monthly','pro_annual')
+         s.price_id IN ('pro_monthly','pro_annual','craft_monthly','craft_annual')
          AND s.current_period_end IS NOT NULL
          AND (
            (s.status IN ('active','trialing') AND s.current_period_end > now())

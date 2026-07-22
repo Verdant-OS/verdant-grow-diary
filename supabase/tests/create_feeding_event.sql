@@ -39,12 +39,14 @@ BEGIN
   RAISE NOTICE '✓ feeding_events has required owner-scoped policies';
 END $$;
 
--- 3. EXECUTE grants on create_feeding_event: anon FALSE, authenticated TRUE,
---    service_role TRUE.
+-- 3. EXECUTE grants on create_feeding_event: anon FALSE, authenticated FALSE,
+--    service_role TRUE. Legacy typed-event RPC is server-only after the
+--    irrigation evidence trust-boundary revoke (2026-07-22). Canonical writes
+--    go through quicklog_save_event / quicklog_save_manual.
 DO $$
 DECLARE want JSONB := '{
     "anon": false,
-    "authenticated": true,
+    "authenticated": false,
     "service_role": true
   }'::jsonb;
   role_name TEXT; expected BOOLEAN; got BOOLEAN;
@@ -60,8 +62,9 @@ BEGIN
       format('EXECUTE create_feeding_event for %I: expected %s, got %s',
              role_name, expected, got);
   END LOOP;
-  RAISE NOTICE '✓ create_feeding_event EXECUTE grants match watering pattern';
+  RAISE NOTICE '✓ create_feeding_event EXECUTE is server-only (service_role)';
 END $$;
+
 
 -- 4. Function is SECURITY INVOKER (mirrors create_watering_event).
 DO $$

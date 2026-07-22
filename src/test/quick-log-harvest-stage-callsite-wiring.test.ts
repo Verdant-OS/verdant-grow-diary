@@ -13,10 +13,10 @@ function allActivitiesCall(path: string) {
 }
 
 describe("Quick Log harvest stage call-site wiring", () => {
-  it("passes the selected plant's persisted stage from QuickLog", () => {
+  it("passes the resolved target plant's persisted stage from QuickLog", () => {
     const call = allActivitiesCall("src/components/QuickLog.tsx");
 
-    expect(call).toMatch(/plantStage=\{[\s\S]*?selectedPlant[\s\S]*?stage/);
+    expect(call).toMatch(/plantStage=\{[\s\S]*?resolvedTargetPlant[\s\S]*?stage/);
     expect(call).not.toMatch(/plantStage=\{stage\}/);
   });
 

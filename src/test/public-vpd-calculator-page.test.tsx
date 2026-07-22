@@ -225,7 +225,7 @@ describe("public VPD calculator page", () => {
     renderPage();
 
     await user.type(screen.getByLabelText("Air temperature"), "78");
-    await user.type(screen.getByLabelText("Relative humidity"), "60");
+    await user.type(screen.getByLabelText(/^Relative humidity/), "60");
     await user.click(screen.getByRole("button", { name: /Calculate VPD/ }));
     const initialResult = screen.getByTestId("public-vpd-calculator-result").textContent;
     await user.click(screen.getByRole("button", { name: /Share calculator/ }));
@@ -245,7 +245,7 @@ describe("public VPD calculator page", () => {
     renderPage();
 
     fireEvent.change(screen.getByLabelText("Air temperature"), { target: { value: "141" } });
-    await user.type(screen.getByLabelText("Relative humidity"), "60");
+    await user.type(screen.getByLabelText(/^Relative humidity/), "60");
     await user.selectOptions(screen.getByLabelText("Temperature unit"), "C");
     expect(screen.getByLabelText("Air temperature")).toHaveValue(60.6);
 

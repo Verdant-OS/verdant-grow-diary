@@ -871,6 +871,8 @@ what you're seeing.
   scanning is disabled on the repo.
 
 
+##### Security tab looks empty (GitHub UI gotchas)
+
 
 If `Upload SARIF` printed `SARIF upload complete` but **Security → Code
 scanning** still shows no findings, it's almost always a filter/scope

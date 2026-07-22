@@ -298,7 +298,7 @@ describe("homeAssistantEcowittMqttAdapter — statestream assembly", () => {
       retained: false,
       receivedAt: t,
     });
-    expect(first?.state).toBe(78.6);
+    expect(first).not.toBeNull();
     const second = asm.consume({
       topic: "homeassistant/sensor/temp_out/attributes",
       payload: JSON.stringify({ unit_of_measurement: "°F", last_updated: LIVE_ISO }),

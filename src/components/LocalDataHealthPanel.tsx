@@ -297,6 +297,7 @@ export function LocalDataHealthPanel() {
   const [running, setRunning] = useState(false);
   const [lastRunAt, setLastRunAt] = useState<string | null>(null);
   const [fixNotice, setFixNotice] = useState<string | null>(null);
+  const [drawerKeys, setDrawerKeys] = useState<string[] | null>(null);
 
   const run = useCallback(async () => {
     setRunning(true);
@@ -338,53 +339,39 @@ export function LocalDataHealthPanel() {
     ),
   );
 
-  const runFix = useCallback(async () => {
+  const openDrawerForAll = useCallback(() => {
     if (fixableKeys.length === 0) return;
-    const confirmed =
-      typeof window === "undefined"
-        ? true
-        : window.confirm(
-            `Clear ${fixableKeys.length} corrupted or outdated local draft${
-              fixableKeys.length === 1 ? "" : "s"
-            }?\n\nThis removes the stored value(s) on this device only. Anything unsaved in those drafts will be lost. Server data is not touched.`,
-          );
-    if (!confirmed) return;
-    const s = safeStorage();
-    if (!s) {
-      setFixNotice("Could not clear — local storage is unavailable.");
-      return;
-    }
-    const cleared: string[] = [];
-    const errors: string[] = [];
-    for (const key of fixableKeys) {
-      try {
-        s.removeItem(key);
-        cleared.push(key);
-      } catch (err) {
-        errors.push(`${key}: ${err instanceof Error ? err.message : String(err)}`);
-      }
-    }
-    const parts: string[] = [];
-    if (cleared.length > 0)
-      parts.push(`Cleared ${cleared.length} local key${cleared.length === 1 ? "" : "s"}.`);
-    if (errors.length > 0) parts.push(`Failed to clear: ${errors.join("; ")}`);
-    setFixNotice(parts.join(" "));
-    await run();
-  }, [fixableKeys, run]);
+    setDrawerKeys(fixableKeys);
+  }, [fixableKeys]);
 
-  const clearOne = useCallback(
-    async (key: string) => {
+  const openDrawerForOne = useCallback((key: string) => {
+    setDrawerKeys([key]);
+  }, []);
+
+  const handleConfirmClear = useCallback(
+    async (keys: string[]) => {
       const s = safeStorage();
       if (!s) {
         setFixNotice("Could not clear — local storage is unavailable.");
+        setDrawerKeys(null);
         return;
       }
-      try {
-        s.removeItem(key);
-        setFixNotice(`Cleared local key: ${key}`);
-      } catch (err) {
-        setFixNotice(`Failed to clear ${key}: ${err instanceof Error ? err.message : String(err)}`);
+      const cleared: string[] = [];
+      const errors: string[] = [];
+      for (const key of keys) {
+        try {
+          s.removeItem(key);
+          cleared.push(key);
+        } catch (err) {
+          errors.push(`${key}: ${err instanceof Error ? err.message : String(err)}`);
+        }
       }
+      const parts: string[] = [];
+      if (cleared.length > 0)
+        parts.push(`Cleared ${cleared.length} local key${cleared.length === 1 ? "" : "s"}.`);
+      if (errors.length > 0) parts.push(`Failed to clear: ${errors.join("; ")}`);
+      setFixNotice(parts.join(" "));
+      setDrawerKeys(null);
       await run();
     },
     [run],
@@ -418,12 +405,12 @@ export function LocalDataHealthPanel() {
             <Button
               size="sm"
               variant="outline"
-              onClick={() => void runFix()}
+              onClick={openDrawerForAll}
               disabled={running || fixableKeys.length === 0}
               title={
                 fixableKeys.length === 0
                   ? "No corrupted local schemas detected"
-                  : `Clear ${fixableKeys.length} local key(s) and re-check`
+                  : `Review and clear ${fixableKeys.length} local key(s)`
               }
             >
               Fix issues{fixableKeys.length > 0 ? ` (${fixableKeys.length})` : ""}
@@ -436,8 +423,9 @@ export function LocalDataHealthPanel() {
           </div>
 
           <p className="text-[11px] text-muted-foreground">
-            “Fix issues” only clears local browser drafts flagged as corrupt or outdated. It never
-            modifies server data, and diary/RLS findings are informational only.
+            “Fix issues” opens a review drawer that shows the affected schemas, validation errors,
+            and exact keys to be removed — with stored values redacted — before you confirm. It
+            never modifies server data.
           </p>
 
           {fixNotice && (
@@ -479,7 +467,14 @@ export function LocalDataHealthPanel() {
         </CardContent>
       </Card>
 
-      <RemediationChecklist checks={checks} onClearKey={(k) => void clearOne(k)} running={running} />
+      <RemediationChecklist checks={checks} onReviewKey={openDrawerForOne} running={running} />
+
+      <RemediationDrawer
+        keys={drawerKeys}
+        onCancel={() => setDrawerKeys(null)}
+        onConfirm={(keys) => void handleConfirmClear(keys)}
+        running={running}
+      />
     </>
   );
 }

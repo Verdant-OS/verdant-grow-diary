@@ -777,6 +777,131 @@ If all four are true and findings still don't show, jump to the
 *Security tab looks empty (GitHub UI gotchas)* table below — the cause
 is almost always a filter/scope mismatch in the UI.
 
+##### Token permissions and scopes (SARIF upload + Code Scanning REST API)
+
+Three different tokens can talk to Code Scanning, and each one grants
+scopes differently. Pick by **who is calling**:
+
+- **The workflow itself** → `GITHUB_TOKEN` (automatic, per-job).
+- **A script or curl call from your laptop / another CI** → fine-grained
+  PAT or classic PAT.
+- **A GitHub App** → installation token with repo permissions.
+
+**1. `GITHUB_TOKEN` (workflow-scoped, auto-issued).**
+
+Granted through the workflow's `permissions:` block. Nothing to create
+in Settings.
+
+| Operation                                                        | Required permission               | Notes                                                                                              |
+|------------------------------------------------------------------|-----------------------------------|----------------------------------------------------------------------------------------------------|
+| `github/codeql-action/upload-sarif@v3` (POST `/code-scanning/sarifs`) | `security-events: write`      | The one non-negotiable scope. Without it: `Resource not accessible by integration`.                |
+| Checkout the repo (`actions/checkout`)                           | `contents: read`                  | Needed to run the diff at all.                                                                     |
+| Read the current run (private repos only)                        | `actions: read`                   | `upload-sarif` reads the run to attach analysis metadata; public repos work without it.            |
+| Post a PR comment (e.g. `summarize-prefix-diff-json.mjs`)        | `pull-requests: write`            | Only if you also comment. Not required for SARIF upload itself.                                    |
+| Read existing alerts inside the workflow (e.g. `curl /alerts`)   | `security-events: read`           | `write` implies `read`, so declaring `write` is sufficient.                                        |
+
+Minimum block for the SARIF workflow:
+
+```yaml
+permissions:
+  contents: read
+  security-events: write
+  actions: read           # private repos
+```
+
+**2. Fine-grained personal access token (recommended for scripts).**
+
+Create at **Settings → Developer settings → Personal access tokens →
+Fine-grained tokens**. Scope to a single repo or a specific org.
+
+| Operation                                                                 | Repository permission             | Access level |
+|---------------------------------------------------------------------------|-----------------------------------|--------------|
+| `POST /repos/{owner}/{repo}/code-scanning/sarifs` (upload)                | **Code scanning alerts**          | **Read and write** |
+| `GET  /repos/{owner}/{repo}/code-scanning/analyses`                       | **Code scanning alerts**          | Read         |
+| `GET  /repos/{owner}/{repo}/code-scanning/alerts`                         | **Code scanning alerts**          | Read         |
+| `GET  /repos/{owner}/{repo}/code-scanning/alerts/{n}` and `/instances`    | **Code scanning alerts**          | Read         |
+| `PATCH /repos/{owner}/{repo}/code-scanning/alerts/{n}` (dismiss / reopen) | **Code scanning alerts**          | Read and write |
+| `GET  /repos/{owner}/{repo}/pulls/{n}` and `/pulls/{n}/files` (used by the troubleshooting checks) | **Pull requests** | Read         |
+| Any of the above on a **private** repo                                    | **Metadata**                      | Read (auto-granted; leave enabled) |
+| Any of the above on a public repo you don't own                           | *No token needed for unauthenticated reads* | Rate-limited to 60 req/hour |
+
+Fine-grained tokens do **not** need `repo` or `security_events` — those
+are classic-PAT names. Selecting **Code scanning alerts** on the
+resource-permissions page grants the equivalent.
+
+**3. Classic personal access token (legacy).**
+
+Only use these when a tool doesn't support fine-grained tokens yet.
+
+| Operation                              | Required classic scope                                                                 |
+|----------------------------------------|----------------------------------------------------------------------------------------|
+| Upload SARIF (public repo)             | `public_repo` **and** `security_events`                                                |
+| Upload SARIF (private / internal repo) | `repo` **and** `security_events`                                                       |
+| List / read alerts (public repo)       | `security_events` (or none for unauthenticated public reads, subject to 60/hour)       |
+| List / read alerts (private repo)      | `repo` **and** `security_events`                                                       |
+| Dismiss / reopen alerts                | Same as read + write access to the repo (`repo` or `public_repo`).                     |
+
+`security_events` is the classic-scope equivalent of the fine-grained
+**Code scanning alerts** permission. `repo` alone is **not** enough for
+Code Scanning endpoints — the API returns `403 Resource not accessible
+by personal access token` until `security_events` is added.
+
+**4. GitHub App installation token.**
+
+If you're calling from an App instead of a user token, request these
+repository permissions in the App manifest:
+
+| API surface                                    | App permission                    | Access level     |
+|-----------------------------------------------|-----------------------------------|------------------|
+| Upload SARIF, read/list/patch alerts           | **Code scanning alerts**          | Read & write     |
+| Read PR files (for the annotation-check curl)  | **Pull requests**                 | Read-only        |
+| Clone the repo before running the diff         | **Contents**                      | Read-only        |
+
+Install the App on the target repo. The installation token inherits
+these permissions automatically — no per-call scope negotiation.
+
+**Org-level SSO gotcha.** If the org enforces SAML SSO, every PAT
+(classic or fine-grained) must be **authorized for that org**:
+
+- Fine-grained: **Settings → Developer settings → Personal access tokens
+  → Fine-grained tokens → *Your token* → Configure SSO → Authorize**.
+- Classic: **Settings → Developer settings → Personal access tokens →
+  Tokens (classic) → *Your token* → Configure SSO → Authorize**.
+
+Without authorization, every API call returns `200` with an empty body
+or `404` — not a permission error, which makes this failure mode easy
+to misdiagnose. Check `X-GitHub-SSO` in the response headers; if it
+says `required; url=...`, that's the fix.
+
+**Quick verification.**
+
+Confirm a token has the right scopes before wiring it into anything:
+
+```bash
+# 1. Prints the granted scopes for a classic PAT (empty for fine-grained).
+curl -sI -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/user \
+  | grep -i '^x-oauth-scopes:'
+# Expect: x-oauth-scopes: repo, security_events
+
+# 2. Confirms the token can read Code Scanning on the target repo.
+curl -sS -o /dev/null -w "%{http_code}\n" \
+  -H "Accept: application/vnd.github+json" \
+  -H "Authorization: Bearer $GH_TOKEN" \
+  -H "X-GitHub-Api-Version: 2022-11-28" \
+  "https://api.github.com/repos/$REPO/code-scanning/alerts?per_page=1"
+# Expect: 200. 403 = missing scope. 404 = code scanning disabled or wrong repo. 401 = bad token.
+
+# 3. Fine-grained tokens: verify the resource permission by hitting the
+#    dedicated preview endpoint (returns 200 when Code scanning alerts=Read).
+curl -sS -o /dev/null -w "%{http_code}\n" \
+  -H "Accept: application/vnd.github+json" \
+  -H "Authorization: Bearer $GH_TOKEN" \
+  "https://api.github.com/repos/$REPO/code-scanning/analyses?per_page=1"
+```
+
+If step 1 returns nothing, you're on a fine-grained token — use step 3
+to prove the scope instead of grepping `x-oauth-scopes`.
+
 ##### Verifying uploaded findings in GitHub code scanning
 
 

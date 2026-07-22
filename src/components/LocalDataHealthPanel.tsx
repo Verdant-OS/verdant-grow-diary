@@ -203,9 +203,9 @@ async function checkDiaryAccess(): Promise<CheckResult[]> {
   // ownership drifted, the entry will look like an orphan to this client.
   const { data: entries, error: entriesError } = await supabase
     .from("diary_entries")
-    .select("id, plant_id, entry_date")
+    .select("id, plant_id, entry_at")
     .eq("user_id", userId)
-    .order("entry_date", { ascending: false })
+    .order("entry_at", { ascending: false })
     .limit(50);
 
   if (entriesError) {

@@ -364,95 +364,266 @@ export function LocalDataHealthPanel() {
     await run();
   }, [fixableKeys, run]);
 
+  const clearOne = useCallback(
+    async (key: string) => {
+      const s = safeStorage();
+      if (!s) {
+        setFixNotice("Could not clear — local storage is unavailable.");
+        return;
+      }
+      try {
+        s.removeItem(key);
+        setFixNotice(`Cleared local key: ${key}`);
+      } catch (err) {
+        setFixNotice(`Failed to clear ${key}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+      await run();
+    },
+    [run],
+  );
+
   return (
-    <Card>
+    <>
+      <Card>
+        <CardHeader className="space-y-2 pb-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <CardTitle className="text-base">Local data & storage health</CardTitle>
+            <Badge variant="outline">Diagnostics</Badge>
+            {failed.length > 0 && <Badge variant="destructive">{failed.length} failing</Badge>}
+            {failed.length === 0 && warned.length > 0 && (
+              <Badge variant="secondary">
+                {warned.length} warning{warned.length === 1 ? "" : "s"}
+              </Badge>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Verifies known Verdant localStorage schemas and — when signed in — that your grows,
+            plants, and diary entries are reachable via the RLS-scoped client. Stored draft
+            contents are never printed.
+          </p>
+        </CardHeader>
+        <CardContent className="text-sm space-y-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <Button size="sm" onClick={() => void run()} disabled={running}>
+              {running ? "Running…" : "Re-run checks"}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void runFix()}
+              disabled={running || fixableKeys.length === 0}
+              title={
+                fixableKeys.length === 0
+                  ? "No corrupted local schemas detected"
+                  : `Clear ${fixableKeys.length} local key(s) and re-check`
+              }
+            >
+              Fix issues{fixableKeys.length > 0 ? ` (${fixableKeys.length})` : ""}
+            </Button>
+            {lastRunAt && (
+              <span className="text-xs text-muted-foreground">
+                Last run: {new Date(lastRunAt).toLocaleString()}
+              </span>
+            )}
+          </div>
+
+          <p className="text-[11px] text-muted-foreground">
+            “Fix issues” only clears local browser drafts flagged as corrupt or outdated. It never
+            modifies server data, and diary/RLS findings are informational only.
+          </p>
+
+          {fixNotice && (
+            <div className="rounded-md border border-border bg-muted/40 p-2 text-xs">{fixNotice}</div>
+          )}
+
+          {failed.length > 0 && (
+            <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 space-y-1">
+              <p className="text-xs font-medium text-destructive">Current failures</p>
+              <ul className="text-xs space-y-1">
+                {failed.map((c, i) => (
+                  <li key={i}>
+                    <span className="font-medium">{c.name}:</span> {c.detail}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <ul className="space-y-2">
+            {checks.map((c, i) => (
+              <li key={i} className="rounded border border-border/60 p-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-medium">{c.name}</span>
+                  <StatusBadge status={c.status} />
+                </div>
+                <p className="text-xs text-muted-foreground mt-1 break-words">{c.detail}</p>
+                {c.meta && (
+                  <p className="text-[11px] text-muted-foreground/80 mt-0.5 font-mono break-all">
+                    key: {c.meta}
+                  </p>
+                )}
+              </li>
+            ))}
+            {checks.length === 0 && !running && (
+              <li className="text-xs text-muted-foreground">No checks run yet.</li>
+            )}
+          </ul>
+        </CardContent>
+      </Card>
+
+      <RemediationChecklist checks={checks} onClearKey={(k) => void clearOne(k)} running={running} />
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Remediation checklist
+// ---------------------------------------------------------------------------
+
+interface RemediationStep {
+  title: string;
+  action: string;
+  fixableKey?: string;
+  severity: "fail" | "warn";
+}
+
+function buildRemediation(check: CheckResult): RemediationStep | null {
+  if (check.status !== "fail" && check.status !== "warn") return null;
+
+  // Local schema keys — safe to clear from this device.
+  if (check.meta && LOCAL_SCHEMA_KEYS.has(check.meta)) {
+    if (check.status === "fail") {
+      return {
+        severity: "fail",
+        title: check.name,
+        action:
+          "This local draft is present but unreadable (invalid JSON or read error). Click Clear to remove the corrupt value on this device. Anything unsaved in that draft will be lost; server data is unaffected.",
+        fixableKey: check.meta,
+      };
+    }
+    return {
+      severity: "warn",
+      title: check.name,
+      action:
+        "Stored schema version doesn't match what this build expects. A future migration will handle it automatically. If you'd rather reset now, click Clear to remove the old draft on this device.",
+      fixableKey: check.meta,
+    };
+  }
+
+  // Browser storage itself unavailable.
+  if (check.name === "Browser storage available" && check.status === "fail") {
+    return {
+      severity: "fail",
+      title: check.name,
+      action:
+        "localStorage is blocked. Exit private/incognito mode, allow site data for this domain in your browser settings, or free up storage quota, then re-run the checks.",
+    };
+  }
+
+  // Diary reachability — server-side, we never mutate from here.
+  if (/reachable$/.test(check.name) && check.status === "fail") {
+    return {
+      severity: "fail",
+      title: check.name,
+      action:
+        "The RLS-scoped read failed. Sign out and sign back in to refresh your session, then re-run. If it still fails, capture the error text above and report it — do not attempt schema or RLS changes from this page.",
+    };
+  }
+
+  // Diary consistency warnings (orphans / missing plant_id).
+  if (check.name.startsWith("Diary consistency") && check.status === "warn") {
+    return {
+      severity: "warn",
+      title: check.name,
+      action:
+        "Informational only. Orphaned references usually mean a plant was archived or reassigned. No automatic repair is performed — open the affected plant/grow to reconcile manually if needed.",
+    };
+  }
+  if (check.name.startsWith("Diary consistency") && check.status === "fail") {
+    return {
+      severity: "fail",
+      title: check.name,
+      action:
+        "Could not sample recent diary entries. Refresh your session and re-run. If it persists, report the error text above.",
+    };
+  }
+
+  // Fallback for anything else that fails.
+  if (check.status === "fail") {
+    return {
+      severity: "fail",
+      title: check.name,
+      action: "Re-run the checks. If the failure persists, report the error text above.",
+    };
+  }
+  return null;
+}
+
+interface RemediationChecklistProps {
+  checks: CheckResult[];
+  onClearKey: (key: string) => void;
+  running: boolean;
+}
+
+function RemediationChecklist({ checks, onClearKey, running }: RemediationChecklistProps) {
+  const steps = checks
+    .map(buildRemediation)
+    .filter((s): s is RemediationStep => s !== null);
+
+  const failCount = steps.filter((s) => s.severity === "fail").length;
+  const warnCount = steps.filter((s) => s.severity === "warn").length;
+
+  return (
+    <Card className="mt-4">
       <CardHeader className="space-y-2 pb-2">
         <div className="flex flex-wrap items-center gap-2">
-          <CardTitle className="text-base">Local data & storage health</CardTitle>
-          <Badge variant="outline">Diagnostics</Badge>
-          {failed.length > 0 && (
-            <Badge variant="destructive">
-              {failed.length} failing
-            </Badge>
-          )}
-          {failed.length === 0 && warned.length > 0 && (
+          <CardTitle className="text-base">Remediation checklist</CardTitle>
+          <Badge variant="outline">Next actions</Badge>
+          {failCount > 0 && <Badge variant="destructive">{failCount} to fix</Badge>}
+          {failCount === 0 && warnCount > 0 && (
             <Badge variant="secondary">
-              {warned.length} warning{warned.length === 1 ? "" : "s"}
+              {warnCount} advisory
             </Badge>
           )}
         </div>
         <p className="text-xs text-muted-foreground">
-          Verifies known Verdant localStorage schemas and — when signed in — that your grows,
-          plants, and diary entries are reachable via the RLS-scoped client. Stored draft
-          contents are never printed.
+          One recommended next action per failed or advisory check above. Local-only actions are
+          clearly labeled; server data is never modified from this page.
         </p>
       </CardHeader>
-      <CardContent className="text-sm space-y-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <Button size="sm" onClick={() => void run()} disabled={running}>
-            {running ? "Running…" : "Re-run checks"}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => void runFix()}
-            disabled={running || fixableKeys.length === 0}
-            title={
-              fixableKeys.length === 0
-                ? "No corrupted local schemas detected"
-                : `Clear ${fixableKeys.length} local key(s) and re-check`
-            }
-          >
-            Fix issues{fixableKeys.length > 0 ? ` (${fixableKeys.length})` : ""}
-          </Button>
-          {lastRunAt && (
-            <span className="text-xs text-muted-foreground">
-              Last run: {new Date(lastRunAt).toLocaleString()}
-            </span>
-          )}
-        </div>
-
-        <p className="text-[11px] text-muted-foreground">
-          “Fix issues” only clears local browser drafts flagged as corrupt or outdated. It never
-          modifies server data, and diary/RLS findings are informational only.
-        </p>
-
-        {fixNotice && (
-          <div className="rounded-md border border-border bg-muted/40 p-2 text-xs">{fixNotice}</div>
+      <CardContent className="text-sm">
+        {steps.length === 0 ? (
+          <p className="text-xs text-muted-foreground">
+            Nothing to do — no failed or advisory checks in the last run.
+          </p>
+        ) : (
+          <ol className="space-y-2 list-decimal pl-5">
+            {steps.map((s, i) => (
+              <li key={i} className="rounded border border-border/60 p-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-medium">{s.title}</span>
+                  <StatusBadge status={s.severity} />
+                </div>
+                <p className="text-xs text-muted-foreground mt-1 break-words">{s.action}</p>
+                {s.fixableKey && (
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onClearKey(s.fixableKey as string)}
+                      disabled={running}
+                    >
+                      Clear this local key
+                    </Button>
+                    <span className="text-[11px] text-muted-foreground font-mono break-all">
+                      {s.fixableKey}
+                    </span>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ol>
         )}
-
-        {failed.length > 0 && (
-          <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 space-y-1">
-            <p className="text-xs font-medium text-destructive">Current failures</p>
-            <ul className="text-xs space-y-1">
-              {failed.map((c, i) => (
-                <li key={i}>
-                  <span className="font-medium">{c.name}:</span> {c.detail}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        <ul className="space-y-2">
-          {checks.map((c, i) => (
-            <li key={i} className="rounded border border-border/60 p-2">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="font-medium">{c.name}</span>
-                <StatusBadge status={c.status} />
-              </div>
-              <p className="text-xs text-muted-foreground mt-1 break-words">{c.detail}</p>
-              {c.meta && (
-                <p className="text-[11px] text-muted-foreground/80 mt-0.5 font-mono break-all">
-                  key: {c.meta}
-                </p>
-              )}
-            </li>
-          ))}
-          {checks.length === 0 && !running && (
-            <li className="text-xs text-muted-foreground">No checks run yet.</li>
-          )}
-        </ul>
       </CardContent>
     </Card>
   );

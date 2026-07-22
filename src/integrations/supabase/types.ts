@@ -4630,6 +4630,7 @@ export type Database = {
           p_idempotency_key?: string
           p_note?: string
           p_occurred_at?: string
+          p_stage?: string
           p_target_id: string
           p_target_type: string
           p_temperature_c?: number

@@ -298,6 +298,8 @@ export function LocalDataHealthPanel() {
   const [lastRunAt, setLastRunAt] = useState<string | null>(null);
   const [fixNotice, setFixNotice] = useState<string | null>(null);
   const [drawerKeys, setDrawerKeys] = useState<string[] | null>(null);
+  const [backups, setBackups] = useState<BackupSnapshot[]>(() => listBackups());
+
 
   const run = useCallback(async () => {
     setRunning(true);

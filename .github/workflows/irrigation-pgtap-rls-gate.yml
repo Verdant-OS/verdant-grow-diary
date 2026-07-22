@@ -1,0 +1,171 @@
+name: Irrigation pgTAP + Harness Typecheck
+
+# Required PR gate for RLS/ACL regressions on irrigation-evidence trust boundary.
+#
+# Runs on every PR:
+#   1. Boots a disposable local Supabase stack (loopback only; never touches
+#      the hosted project ref knkwiiywfkbqznbxwqfh).
+#   2. Applies migrations + supabase/seed.sql (production GRANT parity).
+#   3. Executes the pgTAP feeding and watering suites via psql.
+#   4. Runs `tsgo --noEmit` on the runtime harness sources to catch harness
+#      drift before the disposable-stack lane can be scheduled.
+#
+# This lane is deliberately narrow: it does NOT execute the runtime harness
+# (that lives in security-db-local.yml / the manual disposable-stack lane).
+# It exists to catch pgTAP + harness-source regressions on every PR.
+
+on:
+  pull_request:
+    branches: [main, verdant-grow-diary]
+    paths:
+      - "supabase/migrations/**"
+      - "supabase/tests/create_feeding_event.sql"
+      - "supabase/tests/create_watering_event.sql"
+      - "supabase/seed.sql"
+      - "scripts/run-irrigation-evidence-rls-harness.ts"
+      - "scripts/run-create-feeding-event-rls-harness.ts"
+      - "scripts/run-quicklog-save-event-rls-harness.ts"
+      - "scripts/run-quicklog-save-manual-rls-harness.ts"
+      - "scripts/run-quicklog-rpc-rls-harnesses.ts"
+      - "supabase/contract-migrations/**"
+      - ".github/workflows/irrigation-pgtap-rls-gate.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: irrigation-pgtap-rls-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  harness-typecheck:
+    name: harness typecheck (tsgo --noEmit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck (full project — includes irrigation harnesses)
+        # tsgo is a stop-ship gate. Full-project noEmit catches any
+        # harness drift; scoping to specific files would miss shared
+        # type surface changes.
+        run: bunx tsgo --noEmit
+
+  pgtap-irrigation:
+    name: pgTAP irrigation (feeding + watering)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Install psql client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends postgresql-client
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf # v1
+        with:
+          # Pinned deliberately — "latest" rate-limits on shared runners.
+          version: 2.109.1
+
+      - name: Start local Supabase (disposable, loopback only)
+        id: supabase-start
+        run: |
+          set -eo pipefail
+          supabase start --workdir . 2>&1 | tee supabase-start.log
+
+      - name: Export local Supabase DB URL
+        id: supabase-env
+        run: |
+          set -eo pipefail
+          DB_URL="$(supabase status -o json | jq -r '.DB_URL // .db_url // empty')"
+          if [ -z "$DB_URL" ]; then
+            echo "BLOCKED: local Supabase did not expose DB_URL." >&2
+            exit 2
+          fi
+          # Loopback guard — refuse anything that isn't localhost.
+          HOST="$(echo "$DB_URL" | awk -F'[@:/]' '{print $4}')"
+          case "$HOST" in
+            localhost|127.0.0.1|::1) ;;
+            *)
+              echo "BLOCKED: refusing non-loopback DB host '$HOST'." >&2
+              exit 2
+              ;;
+          esac
+          echo "::add-mask::$DB_URL"
+          echo "SUPABASE_DB_URL=$DB_URL" >> "$GITHUB_ENV"
+
+      - name: Apply migrations + prod-parity seed
+        # NOT --no-seed: supabase/seed.sql restores the production GRANT
+        # baseline that fresh local stacks (hardened default ACL) omit.
+        # Without it, pgTAP ACL-matrix assertions read the wrong ground
+        # truth and false-flag drift.
+        run: |
+          set -o pipefail
+          supabase db reset 2>&1 | tee supabase-db-reset.log
+
+      - name: pgTAP — create_feeding_event
+        id: pgtap-feeding
+        run: |
+          set -o pipefail
+          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 \
+            -f supabase/tests/create_feeding_event.sql 2>&1 \
+            | tee pgtap-feeding.log
+
+      - name: pgTAP — create_watering_event
+        id: pgtap-watering
+        run: |
+          set -o pipefail
+          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 \
+            -f supabase/tests/create_watering_event.sql 2>&1 \
+            | tee pgtap-watering.log
+
+      - name: Upload failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: irrigation-pgtap-rls-gate-logs
+          path: |
+            supabase-start.log
+            supabase-db-reset.log
+            pgtap-feeding.log
+            pgtap-watering.log
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Write job summary
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          {
+            echo "## Irrigation pgTAP + Harness Typecheck"
+            echo ""
+            case "$JOB_STATUS" in
+              success) echo "**Status:** passed" ;;
+              failure) echo "**Status:** failed" ;;
+              cancelled) echo "**Status:** cancelled" ;;
+              *) echo "**Status:** $JOB_STATUS" ;;
+            esac
+            echo ""
+            echo "**Suites:**"
+            echo "- \`supabase/tests/create_feeding_event.sql\`"
+            echo "- \`supabase/tests/create_watering_event.sql\`"
+            echo ""
+            echo "**Artifact:** \`irrigation-pgtap-rls-gate-logs\` (failure only, 14d)"
+            echo ""
+            echo "**Run:** ${RUN_URL}"
+            echo ""
+            echo "_Summary contains no secrets, service-role values, JWTs, or DB URLs._"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Stop local Supabase
+        if: always()
+        run: supabase stop --no-backup || true

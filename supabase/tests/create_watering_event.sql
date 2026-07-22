@@ -53,20 +53,31 @@ DECLARE want JSONB := '{
     "authenticated": false,
     "service_role": true
   }'::jsonb;
-  role_name TEXT; expected BOOLEAN; got BOOLEAN;
+  role_name TEXT; expected BOOLEAN;
+  overload_count BIGINT; granted_count BIGINT;
 BEGIN
   FOR role_name IN SELECT jsonb_object_keys(want) LOOP
     expected := (want ->> role_name)::boolean;
-    SELECT bool_or(has_function_privilege(role_name, p.oid, 'EXECUTE'))
-      INTO got
+    SELECT count(*),
+           count(*) FILTER (
+             WHERE has_function_privilege(role_name, p.oid, 'EXECUTE')
+           )
+      INTO overload_count, granted_count
       FROM pg_proc p
       JOIN pg_namespace n ON n.oid = p.pronamespace
      WHERE n.nspname = 'public' AND p.proname = 'create_watering_event';
-    ASSERT got = expected,
-      format('EXECUTE create_watering_event for %I: expected %s, got %s',
-             role_name, expected, got);
+    ASSERT overload_count > 0,
+      'create_watering_event missing';
+    ASSERT (
+      expected AND granted_count = overload_count
+    ) OR (
+      NOT expected AND granted_count = 0
+    ), format(
+      'EXECUTE create_watering_event for %I: expected all=%s, granted=%s/%s',
+      role_name, expected, granted_count, overload_count
+    );
   END LOOP;
-  RAISE NOTICE '✓ create_watering_event EXECUTE is server-only (service_role)';
+  RAISE NOTICE '✓ every create_watering_event overload is server-only (service_role)';
 END $$;
 
 -- 4. Function is SECURITY INVOKER (never SECURITY DEFINER).

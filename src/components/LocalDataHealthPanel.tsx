@@ -1010,4 +1010,205 @@ function RemediationDrawer({ keys, onCancel, onConfirm, running }: RemediationDr
   );
 }
 
+// ---------------------------------------------------------------------------
+// Versioned local-storage backup & one-click restore
+// ---------------------------------------------------------------------------
+
+const BACKUP_STORE_KEY = "verdant.diagnostics.local-backups.v1";
+const BACKUP_MAX = 10;
+
+interface BackupEntry {
+  key: string;
+  /** JSON-stringified previous value; null if the key was absent. */
+  value: string | null;
+  sizeBytes: number;
+}
+
+interface BackupSnapshot {
+  id: string;
+  createdAt: string;
+  reason: string;
+  entries: BackupEntry[];
+}
+
+function readBackupStore(): BackupSnapshot[] {
+  const s = safeStorage();
+  if (!s) return [];
+  try {
+    const raw = s.getItem(BACKUP_STORE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (b): b is BackupSnapshot =>
+        b && typeof b.id === "string" && Array.isArray(b.entries) && typeof b.createdAt === "string",
+    );
+  } catch {
+    return [];
+  }
+}
+
+function writeBackupStore(list: BackupSnapshot[]): void {
+  const s = safeStorage();
+  if (!s) return;
+  try {
+    s.setItem(BACKUP_STORE_KEY, JSON.stringify(list.slice(0, BACKUP_MAX)));
+  } catch {
+    // Quota or serialization failure — silently drop; caller checks return of listBackups.
+  }
+}
+
+function listBackups(): BackupSnapshot[] {
+  return readBackupStore().sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+}
+
+function createBackupSnapshot(keys: string[], reason: string): BackupSnapshot | null {
+  const s = safeStorage();
+  if (!s || keys.length === 0) return null;
+  const entries: BackupEntry[] = keys.map((key) => {
+    let value: string | null = null;
+    try {
+      value = s.getItem(key);
+    } catch {
+      value = null;
+    }
+    return {
+      key,
+      value,
+      sizeBytes: value === null ? 0 : new Blob([value]).size,
+    };
+  });
+  // Only bother saving if at least one key had a value.
+  if (entries.every((e) => e.value === null)) return null;
+  const snapshot: BackupSnapshot = {
+    id:
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `bk_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
+    createdAt: new Date().toISOString(),
+    reason,
+    entries,
+  };
+  const next = [snapshot, ...readBackupStore()].slice(0, BACKUP_MAX);
+  writeBackupStore(next);
+  return snapshot;
+}
+
+function restoreBackup(id: string): { restored: string[]; errors: string[] } {
+  const s = safeStorage();
+  if (!s) return { restored: [], errors: ["local storage unavailable"] };
+  const snap = readBackupStore().find((b) => b.id === id);
+  if (!snap) return { restored: [], errors: ["backup not found"] };
+  const restored: string[] = [];
+  const errors: string[] = [];
+  for (const entry of snap.entries) {
+    try {
+      if (entry.value === null) {
+        s.removeItem(entry.key);
+      } else {
+        s.setItem(entry.key, entry.value);
+      }
+      restored.push(entry.key);
+    } catch (err) {
+      errors.push(`${entry.key}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+  return { restored, errors };
+}
+
+function deleteBackup(id: string): void {
+  writeBackupStore(readBackupStore().filter((b) => b.id !== id));
+}
+
+interface BackupsPanelProps {
+  backups: BackupSnapshot[];
+  onRestore: (id: string) => void;
+  onDelete: (id: string) => void;
+  running: boolean;
+}
+
+function BackupsPanel({ backups, onRestore, onDelete, running }: BackupsPanelProps) {
+  return (
+    <Card className="mt-4">
+      <CardHeader className="space-y-2 pb-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <CardTitle className="text-base">Backups & restore</CardTitle>
+          <Badge variant="outline">Reversible</Badge>
+          {backups.length > 0 && (
+            <Badge variant="secondary">
+              {backups.length} snapshot{backups.length === 1 ? "" : "s"}
+            </Badge>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Every “Fix issues” action snapshots the affected localStorage keys first. Restore
+          reinstates the exact prior values on this device and re-runs the checks. Snapshot
+          contents are never displayed. Only the last {BACKUP_MAX} snapshots are retained.
+        </p>
+      </CardHeader>
+      <CardContent className="text-sm">
+        {backups.length === 0 ? (
+          <p className="text-xs text-muted-foreground">
+            No backups yet — one will appear here the first time you clear a local key.
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {backups.map((b) => {
+              const totalBytes = b.entries.reduce((sum, e) => sum + e.sizeBytes, 0);
+              return (
+                <li key={b.id} className="rounded border border-border/60 p-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-medium text-xs">
+                        {new Date(b.createdAt).toLocaleString()}{" "}
+                        <span className="text-muted-foreground font-normal">· {b.reason}</span>
+                      </p>
+                      <p className="text-[11px] text-muted-foreground font-mono break-all">
+                        id: {b.id}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => onRestore(b.id)}
+                        disabled={running}
+                      >
+                        Restore
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => onDelete(b.id)}
+                        disabled={running}
+                      >
+                        Delete
+                      </Button>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    {b.entries.length} key{b.entries.length === 1 ? "" : "s"} · {totalBytes} B
+                    total
+                  </p>
+                  <ul className="mt-1 space-y-0.5">
+                    {b.entries.map((e) => (
+                      <li
+                        key={e.key}
+                        className="text-[11px] text-muted-foreground font-mono break-all"
+                      >
+                        {e.value === null ? "∅" : `${e.sizeBytes}B`} · {e.key}
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default LocalDataHealthPanel;
+

@@ -17,42 +17,16 @@ name: Irrigation pgTAP + Harness Typecheck
 on:
   pull_request:
     branches: [main, verdant-grow-diary]
-    # Scoped to irrigation-trust-boundary surfaces only. Broad
-    # `supabase/migrations/**` was pruned intentionally: this gate
-    # exists to catch RLS/ACL regressions on event tables + quicklog
-    # RPCs, and unrelated migrations (billing, credits, pheno, seo,
-    # etc.) do not touch those grants. Non-irrigation migration drift
-    # is still covered by security-regression.yml / supabase-security-baseline.yml.
-    # Add a new glob here if a future migration must be gated by this suite.
-    paths:
-      # Irrigation-scoped migrations. Globs cover the historical naming
-      # for the event tables, quicklog RPCs, and any grant/revoke on
-      # those surfaces.
-      - "supabase/migrations/**irrigation*.sql"
-      - "supabase/migrations/**feeding*.sql"
-      - "supabase/migrations/**watering*.sql"
-      - "supabase/migrations/**grow_event*.sql"
-      - "supabase/migrations/**quicklog*.sql"
-      - "supabase/migrations/**event_tables*.sql"
-      - "supabase/migrations/**revoke*.sql"
-      - "supabase/migrations/**grant*.sql"
-      # Contract-migrations lane, same scope.
-      - "supabase/contract-migrations/**irrigation*.sql"
-      - "supabase/contract-migrations/**feeding*.sql"
-      - "supabase/contract-migrations/**watering*.sql"
-      - "supabase/contract-migrations/**quicklog*.sql"
-      # pgTAP suites + seed parity.
-      - "supabase/tests/create_feeding_event.sql"
-      - "supabase/tests/create_watering_event.sql"
-      - "supabase/seed.sql"
-      # Runtime harness sources typechecked by this gate.
-      - "scripts/run-irrigation-evidence-rls-harness.ts"
-      - "scripts/run-create-feeding-event-rls-harness.ts"
-      - "scripts/run-quicklog-save-event-rls-harness.ts"
-      - "scripts/run-quicklog-save-manual-rls-harness.ts"
-      - "scripts/run-quicklog-rpc-rls-harnesses.ts"
-      # The workflow itself.
-      - ".github/workflows/irrigation-pgtap-rls-gate.yml"
+    # NOTE: top-level `paths:` intentionally removed. Path filtering is
+    # now done inside the workflow by the `changes` job (dorny/paths-filter),
+    # which authoritatively decides whether the pgTAP + typecheck jobs
+    # execute based on the PR's actual diff. This has two advantages:
+    #   1. Works when a PR touches irrigation files alongside unrelated
+    #      dirs — the filter reads the true changed-file set, not the
+    #      trigger's coarse path predicate.
+    #   2. Keeps this workflow as a stable required check for branch
+    #      protection: it always runs and reports a status, but the
+    #      expensive jobs no-op when no irrigation surface changed.
   workflow_dispatch:
 
 concurrency:
@@ -60,8 +34,80 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Cheap gate — reads the PR diff and emits `irrigation=true|false`.
+  # Both real jobs `needs: changes` and skip themselves when false.
+  changes:
+    name: detect irrigation-scoped changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      irrigation: ${{ steps.filter.outputs.irrigation }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Filter changed files
+        id: filter
+        # dorny/paths-filter v3.0.2 — pinned by commit SHA.
+        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+        with:
+          # On workflow_dispatch there is no diff to inspect; force-run
+          # by setting the output to 'true' via the fallback below.
+          predicate-quantifier: "some"
+          filters: |
+            irrigation:
+              # Irrigation-scoped migrations.
+              - "supabase/migrations/**irrigation*.sql"
+              - "supabase/migrations/**feeding*.sql"
+              - "supabase/migrations/**watering*.sql"
+              - "supabase/migrations/**grow_event*.sql"
+              - "supabase/migrations/**quicklog*.sql"
+              - "supabase/migrations/**event_tables*.sql"
+              - "supabase/migrations/**revoke*.sql"
+              - "supabase/migrations/**grant*.sql"
+              # Contract-migrations lane.
+              - "supabase/contract-migrations/**irrigation*.sql"
+              - "supabase/contract-migrations/**feeding*.sql"
+              - "supabase/contract-migrations/**watering*.sql"
+              - "supabase/contract-migrations/**quicklog*.sql"
+              # pgTAP suites + prod-parity seed.
+              - "supabase/tests/create_feeding_event.sql"
+              - "supabase/tests/create_watering_event.sql"
+              - "supabase/seed.sql"
+              # Runtime harness sources typechecked by this gate.
+              - "scripts/run-irrigation-evidence-rls-harness.ts"
+              - "scripts/run-create-feeding-event-rls-harness.ts"
+              - "scripts/run-quicklog-save-event-rls-harness.ts"
+              - "scripts/run-quicklog-save-manual-rls-harness.ts"
+              - "scripts/run-quicklog-rpc-rls-harnesses.ts"
+              # The workflow itself — any change here re-runs the full gate.
+              - ".github/workflows/irrigation-pgtap-rls-gate.yml"
+
+      - name: Report filter decision
+        env:
+          IRRIGATION: ${{ steps.filter.outputs.irrigation }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          {
+            echo "## Irrigation change-detection"
+            echo ""
+            echo "- Event: \`$EVENT\`"
+            echo "- Irrigation surface changed: \`$IRRIGATION\`"
+            if [ "$EVENT" = "workflow_dispatch" ]; then
+              echo "- Manual dispatch → downstream jobs always run."
+            elif [ "$IRRIGATION" = "true" ]; then
+              echo "- Downstream jobs will run."
+            else
+              echo "- Downstream jobs will skip (no-op success)."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
   harness-typecheck:
     name: harness typecheck (tsgo --noEmit)
+    needs: changes
+    if: needs.changes.outputs.irrigation == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

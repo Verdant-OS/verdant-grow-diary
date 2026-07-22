@@ -110,8 +110,11 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     const [rpcName, args] = rpcMock.mock.calls[0];
     expect(rpcName).toBe("quicklog_save_manual");
     expect(args.p_action).toBe("note");
-    expect(args.p_grow_id).toBe(GROW);
-    expect(args.p_plant_id).toBe(PLANT);
+    // Real deployed signature is target-scoped; the RPC derives grow/tent
+    // server-side from the owned plant target (p_grow_id never existed).
+    expect(args.p_target_type).toBe("plant");
+    expect(args.p_target_id).toBe(PLANT);
+    expect(args).not.toHaveProperty("p_grow_id");
     expect(args.p_note).toBe("seedling perky");
     await waitFor(() => expect(l.events.length).toBe(1));
     const items = await screen.findAllByTestId("quick-log-all-activities-saved-item");

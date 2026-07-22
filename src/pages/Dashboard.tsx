@@ -195,12 +195,19 @@ export default function Dashboard() {
   const connectedSensorReadingCount = activationGraph.tentId
     ? countActivatingSensorReadings(readingsByTent[activationGraph.tentId] ?? [])
     : 0;
+  // Quick-log-carried manual snapshot evidence on the connected tent (diary
+  // details.manual_sensor_snapshot rows + manual environment grow_events).
+  // Additive only — the sensor_readings path above is never weakened.
+  const quickLogManualSnapshotCount =
+    activationEvidence.status === "ok"
+      ? (activationEvidence.summary.manualSnapshotCount ?? 0)
+      : 0;
   const onboardingVm = buildOnboardingChecklistViewModel({
     growCount: grows.length,
     tentCount: tents.length,
     plantCount: plants.length,
     diaryEntryCount: 0,
-    sensorReadingCount: connectedSensorReadingCount,
+    sensorReadingCount: connectedSensorReadingCount + quickLogManualSnapshotCount,
     connectedScope: activationGraph,
     firstLogEvidenceCount:
       activationEvidence.status === "ok" ? activationEvidence.summary.count : null,

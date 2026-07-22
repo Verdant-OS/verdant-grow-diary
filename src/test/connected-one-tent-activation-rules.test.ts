@@ -212,10 +212,11 @@ describe("summarizeConnectedActivationEvidence", () => {
       hasEvidence: true,
       latestAt: "2026-07-19T13:00:00Z",
       latestSource: "grow_events",
+      manualSnapshotCount: 0,
     });
   });
 
-  it("accepts grow-level and tent-level rows but rejects explicit other scope", () => {
+  it("accepts grow-level, tent-level, and sibling-plant rows but rejects explicit other tent/grow", () => {
     const result = summarizeConnectedActivationEvidence({
       ...scope,
       growEvents: [
@@ -223,14 +224,29 @@ describe("summarizeConnectedActivationEvidence", () => {
         growEvent({ id: "tent-level", plant_id: null }),
         growEvent({ id: "other-grow", grow_id: "grow-b" }),
         growEvent({ id: "other-tent", tent_id: "tent-b" }),
-        growEvent({ id: "other-plant", plant_id: "plant-b" }),
+        growEvent({ id: "sibling-plant", plant_id: "plant-b" }),
       ],
       diaryEntries: [
         diaryEntry({ id: "diary-grow", tent_id: null, plant_id: null }),
-        diaryEntry({ id: "diary-other", plant_id: "plant-b" }),
+        diaryEntry({ id: "diary-sibling", plant_id: "plant-b" }),
       ],
     });
-    expect(result.count).toBe(3);
+    expect(result.count).toBe(5);
+  });
+
+  it("counts a sibling-plant manual log in the connected tent as first-log evidence", () => {
+    expect(
+      summarizeConnectedActivationEvidence({
+        ...scope,
+        growEvents: [growEvent({ id: "sibling", event_type: "watering", plant_id: "plant-b" })],
+      }),
+    ).toEqual({
+      count: 1,
+      hasEvidence: true,
+      latestAt: "2026-07-19T12:00:00Z",
+      latestSource: "grow_events",
+      manualSnapshotCount: 0,
+    });
   });
 
   it("ignores deleted, non-manual, noncanonical, invalid, and unscoped events", () => {
@@ -250,7 +266,13 @@ describe("summarizeConnectedActivationEvidence", () => {
           diaryEntry({ id: "", entry_at: "2026-07-19T14:00:00Z" }),
         ],
       }),
-    ).toEqual({ count: 0, hasEvidence: false, latestAt: null, latestSource: null });
+    ).toEqual({
+      count: 0,
+      hasEvidence: false,
+      latestAt: null,
+      latestSource: null,
+      manualSnapshotCount: 0,
+    });
   });
 
   it("deduplicates companion diary rows from top-level and details links", () => {
@@ -269,10 +291,10 @@ describe("summarizeConnectedActivationEvidence", () => {
     expect(result.count).toBe(2);
   });
 
-  it("does not let a broad diary companion linked to another plant count", () => {
+  it("does not let a broad diary companion linked to an out-of-scope parent count", () => {
     const result = summarizeConnectedActivationEvidence({
       ...scope,
-      growEvents: [growEvent({ id: "other-parent", plant_id: "plant-b" })],
+      growEvents: [growEvent({ id: "other-parent", tent_id: "tent-b", plant_id: "plant-b" })],
       diaryEntries: [
         diaryEntry({
           id: "broad-companion",
@@ -286,6 +308,7 @@ describe("summarizeConnectedActivationEvidence", () => {
       hasEvidence: false,
       latestAt: null,
       latestSource: null,
+      manualSnapshotCount: 0,
     });
   });
 
@@ -320,6 +343,7 @@ describe("summarizeConnectedActivationEvidence", () => {
       hasEvidence: true,
       latestAt: "2026-07-19T12:00:00Z",
       latestSource: "grow_events",
+      manualSnapshotCount: 0,
     });
     expect(reversed).toEqual(forward);
   });
@@ -332,6 +356,38 @@ describe("summarizeConnectedActivationEvidence", () => {
         plantId: null,
         growEvents: [growEvent()],
       }),
-    ).toEqual({ count: 0, hasEvidence: false, latestAt: null, latestSource: null });
+    ).toEqual({
+      count: 0,
+      hasEvidence: false,
+      latestAt: null,
+      latestSource: null,
+      manualSnapshotCount: 0,
+    });
+  });
+
+  it("surfaces quick-log manual snapshot evidence for the connected tent only", () => {
+    const result = summarizeConnectedActivationEvidence({
+      ...scope,
+      growEvents: [
+        growEvent({ id: "env-here", event_type: "environment", plant_id: null }),
+        growEvent({ id: "env-elsewhere", event_type: "environment", tent_id: "tent-b" }),
+        growEvent({ id: "env-deleted", event_type: "environment", is_deleted: true }),
+      ],
+      diaryEntries: [
+        diaryEntry({
+          id: "manual-snap",
+          details: { manual_sensor_snapshot: { source: "manual", temp_f: 72.4 } },
+        }),
+        diaryEntry({
+          id: "empty-snap",
+          details: { manual_sensor_snapshot: { source: "manual" } },
+        }),
+        diaryEntry({
+          id: "unlabeled-snap",
+          details: { manual_sensor_snapshot: { temp_f: 72.4 } },
+        }),
+      ],
+    });
+    expect(result.manualSnapshotCount).toBe(2);
   });
 });

@@ -5,7 +5,9 @@
  *  - Outcome rollup + Action Outcome Learning report (action_outcome diary rows)
  *  - Open environment alert counts by severity
  *  - Latest sensor reading captured_at + count of recent readings (tents in grow)
- *  - Diary entry total + last-7-days count for timeline activity summary
+ *  - Diary entry total + last-7-days count for timeline activity summary,
+ *    merged with the manual `grow_events` spine (a plain Quick Log save has
+ *    no diary companion; companions dedupe by linkage + timestamp pair)
  *
  * SAFETY:
  *  - Read-only: no .insert/.update/.delete/.upsert/.rpc.
@@ -32,6 +34,14 @@ import {
 import { normalizeSensorSource } from "@/lib/sensor/sensorSourceRules";
 import { isDiagnosticSensorProvenanceRow } from "@/lib/sensorProvenanceFenceRules";
 import { resolveSensorObservationTime } from "@/lib/sensorObservationTimeRules";
+import {
+  countMergedManualGrowActivity,
+  type ConnectedActivationDiaryEntryRow,
+  type ConnectedActivationGrowEventRow,
+} from "@/lib/connectedOneTentActivationRules";
+
+/** Bounded dedupe window for merging diary rows with the grow_events spine. */
+const REPORTS_HUB_ACTIVITY_MERGE_WINDOW = 1_000;
 
 export type ReportsHubDataStatus = "idle" | "loading" | "ready" | "unavailable";
 
@@ -193,6 +203,8 @@ export function useReportsHubData(growId: string | null | undefined): ReportsHub
         alertsWarnRes,
         diaryTotalRes,
         diary7dRes,
+        activityDiaryRowsRes,
+        activitySpineRowsRes,
         sensorSummary,
         firstOpenAlertRes,
         completedActionsRes,
@@ -230,6 +242,23 @@ export function useReportsHubData(growId: string | null | undefined): ReportsHub
           .select("id", { count: "exact", head: true })
           .eq("grow_id", growId)
           .gte("entry_at", sevenDaysAgo),
+        // Bounded row windows for the diary + grow_events spine merge. The
+        // spine is the canonical Quick Log record; companion diary rows are
+        // deduped by linkage and identical (plant_id, timestamp) pairs.
+        supabase
+          .from("diary_entries")
+          .select("id,plant_id,entry_at,created_at,details")
+          .eq("grow_id", growId)
+          .order("entry_at", { ascending: false })
+          .limit(REPORTS_HUB_ACTIVITY_MERGE_WINDOW),
+        supabase
+          .from("grow_events")
+          .select("id,tent_id,plant_id,event_type,occurred_at,created_at,source,is_deleted,deleted_at")
+          .eq("grow_id", growId)
+          .eq("source", "manual")
+          .eq("is_deleted", false)
+          .order("occurred_at", { ascending: false })
+          .limit(REPORTS_HUB_ACTIVITY_MERGE_WINDOW),
         tentIds.length > 0
           ? loadReportsHubSensorSummary(tentIds, sevenDaysAgo)
           : Promise.resolve({
@@ -254,6 +283,36 @@ export function useReportsHubData(growId: string | null | undefined): ReportsHub
       ]);
 
       const outcomeRows = (outcomeRes.data ?? []) as RawGrowOutcomeRow[];
+
+      // Merge the manual grow_events spine into the diary activity numbers.
+      // Row-fetch failure degrades to the plain diary counts (never inflates);
+      // a saturated window clamps against the exact per-table counts.
+      let diaryEntriesTotal = diaryTotalRes.count ?? 0;
+      let diaryEntriesLast7d = diary7dRes.count ?? 0;
+      if (!activityDiaryRowsRes.error && !activitySpineRowsRes.error) {
+        const activityDiaryRows = (activityDiaryRowsRes.data ??
+          []) as ConnectedActivationDiaryEntryRow[];
+        const activitySpineRows = (activitySpineRowsRes.data ??
+          []) as ConnectedActivationGrowEventRow[];
+        const mergedTotal = countMergedManualGrowActivity({
+          diaryEntries: activityDiaryRows,
+          growEvents: activitySpineRows,
+        });
+        const merged7d = countMergedManualGrowActivity({
+          diaryEntries: activityDiaryRows,
+          growEvents: activitySpineRows,
+          since: sevenDaysAgo,
+        });
+        const windowSaturated =
+          activityDiaryRows.length >= REPORTS_HUB_ACTIVITY_MERGE_WINDOW ||
+          activitySpineRows.length >= REPORTS_HUB_ACTIVITY_MERGE_WINDOW;
+        diaryEntriesTotal = windowSaturated
+          ? Math.max(mergedTotal, diaryEntriesTotal)
+          : mergedTotal;
+        diaryEntriesLast7d = windowSaturated
+          ? Math.max(merged7d, diaryEntriesLast7d)
+          : merged7d;
+      }
       const pendingReviews = findPendingOutcomeReviews({
         completedActions: (completedActionsRes.data ?? []) as never,
         outcomes: (outcomeRes.data ?? []) as never,
@@ -277,8 +336,8 @@ export function useReportsHubData(growId: string | null | undefined): ReportsHub
         firstOpenAlertCreatedAt: firstAlert?.created_at ?? null,
         latestSensorCapturedAt: sensorSummary.latestSensorCapturedAt,
         recentSensorReadingCount: sensorSummary.recentSensorReadingCount,
-        diaryEntriesTotal: diaryTotalRes.count ?? 0,
-        diaryEntriesLast7d: diary7dRes.count ?? 0,
+        diaryEntriesTotal,
+        diaryEntriesLast7d,
         pendingOutcomeReviewCount: pendingReviews.length,
         firstPendingActionId: pendingReviews[0]?.action_queue_id ?? null,
         oldestPendingCompletedAt: pendingReviews[0]?.completed_at ?? null,

@@ -4,8 +4,15 @@
  * Owns all data fetching for the Grow Detail page:
  *  - grow row (maybeSingle, safe not-found)
  *  - related counts (plants, tents, diary, action_queue, action_queue_events)
- *  - recent activity (latest 5 diary + latest 5 action_queue_events, merged)
- *  - grow status (pending action risk + last diary timestamp)
+ *  - recent activity (latest 5 diary + latest 5 manual grow_events + latest 5
+ *    action_queue_events, merged)
+ *  - grow status (pending action risk + last diary/manual-log timestamp)
+ *
+ * Diary/activity numbers merge the `grow_events` spine with `diary_entries`:
+ * every confirmed Quick Log save writes a spine row, while a diary companion
+ * exists only when structured details exist. Companions are deduped by
+ * linkage (details.linked_grow_event_id) and by identical (plant_id,
+ * timestamp) pairs so nothing double-counts.
  *
  * Read-only: no .insert/.update/.delete/.upsert/.rpc. No ai-coach call.
  * No device-control surface. No elevated keys. RLS enforces ownership.
@@ -38,6 +45,19 @@ import {
   EMPTY_LEARNING_REPORT,
   type ActionOutcomeLearningReport,
 } from "@/lib/actionOutcomeLearningRules";
+import {
+  countMergedManualGrowActivity,
+  dedupeMergedManualGrowActivityRows,
+  type ConnectedActivationDiaryEntryRow,
+  type ConnectedActivationGrowEventRow,
+} from "@/lib/connectedOneTentActivationRules";
+import { resolveQuickLogEventTimelineLabel } from "@/lib/quickLogActivityRules";
+
+/** Bounded dedupe window for merging diary rows with the grow_events spine. */
+const ACTIVITY_MERGE_WINDOW = 1000;
+
+type MergeDiaryRow = ConnectedActivationDiaryEntryRow;
+type MergeGrowEventRow = ConnectedActivationGrowEventRow & { note?: string | null };
 
 export type GrowOutcomesState = {
   status: "loading" | "ready" | "unavailable";
@@ -163,6 +183,7 @@ export function useGrowDetailData(): UseGrowDetailData {
         | "plants"
         | "tents"
         | "diary_entries"
+        | "grow_events"
         | "action_queue"
         | "action_queue_events"
         | "alerts",
@@ -185,7 +206,8 @@ export function useGrowDetailData(): UseGrowDetailData {
     const [
       plants,
       tents,
-      diary,
+      diaryOnly,
+      manualEvents,
       actionsPending,
       actionsTotal,
       auditEvents,
@@ -196,6 +218,7 @@ export function useGrowDetailData(): UseGrowDetailData {
       countFrom("plants"),
       countFrom("tents"),
       countFrom("diary_entries"),
+      countFrom("grow_events", (q) => q.eq("source", "manual").eq("is_deleted", false)),
       countFrom("action_queue", (q) => q.eq("status", "pending_approval")),
       countFrom("action_queue"),
       countFrom("action_queue_events"),
@@ -203,6 +226,51 @@ export function useGrowDetailData(): UseGrowDetailData {
       countFrom("alerts", (q) => q.eq("status", "open").eq("severity", "critical")),
       countFrom("alerts", (q) => q.eq("status", "open").eq("severity", "warning")),
     ]);
+
+    // Merge the grow_events spine into the diary/activity counter. A plain
+    // Quick Log save has no diary companion, so diary_entries alone hides it;
+    // companion rows are deduped inside the bounded window, and the exact
+    // per-table counts clamp the result if the window ever saturates.
+    let diary: CountValue = diaryOnly;
+    try {
+      const [diaryRowsRes, spineRowsRes] = await Promise.all([
+        supabase
+          .from("diary_entries")
+          .select("id,plant_id,entry_at,created_at,details")
+          .eq("grow_id", growId)
+          .order("entry_at", { ascending: false })
+          .limit(ACTIVITY_MERGE_WINDOW),
+        supabase
+          .from("grow_events")
+          .select("id,tent_id,plant_id,event_type,occurred_at,created_at,source,is_deleted,deleted_at")
+          .eq("grow_id", growId)
+          .eq("source", "manual")
+          .eq("is_deleted", false)
+          .order("occurred_at", { ascending: false })
+          .limit(ACTIVITY_MERGE_WINDOW),
+      ]);
+      if (!diaryRowsRes.error && !spineRowsRes.error) {
+        const diaryRows = (diaryRowsRes.data ?? []) as MergeDiaryRow[];
+        const spineRows = (spineRowsRes.data ?? []) as MergeGrowEventRow[];
+        const merged = countMergedManualGrowActivity({
+          diaryEntries: diaryRows,
+          growEvents: spineRows,
+        });
+        const windowSaturated =
+          diaryRows.length >= ACTIVITY_MERGE_WINDOW ||
+          spineRows.length >= ACTIVITY_MERGE_WINDOW;
+        diary = windowSaturated
+          ? Math.max(
+              merged,
+              typeof diaryOnly === "number" ? diaryOnly : 0,
+              typeof manualEvents === "number" ? manualEvents : 0,
+            )
+          : merged;
+      }
+    } catch {
+      // Keep the plain diary count — degraded, never inflated.
+    }
+
     setCounts({
       plants,
       tents,
@@ -215,15 +283,23 @@ export function useGrowDetailData(): UseGrowDetailData {
       alertsWarning,
     });
 
-    // Recent activity: latest 5 diary + latest 5 action_queue_events
-    // + latest 5 alert_events (read-only audit trail merge).
+    // Recent activity: latest 5 diary + latest 5 manual grow_events +
+    // latest 5 action_queue_events + latest 5 alert_events (read-only merge).
     try {
-      const [diaryRes, eventsRes, alertEventsRes] = await Promise.all([
+      const [diaryRes, growEventsRes, eventsRes, alertEventsRes] = await Promise.all([
         supabase
           .from("diary_entries")
-          .select("id,entry_at,stage,note")
+          .select("id,plant_id,entry_at,stage,note,details")
           .eq("grow_id", growId)
           .order("entry_at", { ascending: false })
+          .limit(5),
+        supabase
+          .from("grow_events")
+          .select("id,tent_id,plant_id,event_type,occurred_at,source,is_deleted,deleted_at,note")
+          .eq("grow_id", growId)
+          .eq("source", "manual")
+          .eq("is_deleted", false)
+          .order("occurred_at", { ascending: false })
           .limit(5),
         supabase
           .from("action_queue_events")
@@ -239,16 +315,37 @@ export function useGrowDetailData(): UseGrowDetailData {
           .limit(5),
       ]);
 
-      if (diaryRes.error || eventsRes.error || alertEventsRes.error) {
+      if (diaryRes.error || growEventsRes.error || eventsRes.error || alertEventsRes.error) {
         setRecent({ status: "unavailable" });
       } else {
-        const diaryItems: RecentItem[] = (diaryRes.data ?? []).map((d) => ({
+        // Dedupe companion diary rows against their grow_events parents so a
+        // Quick Log save never renders twice in the merged recent list.
+        const activityRows = dedupeMergedManualGrowActivityRows({
+          diaryEntries: (diaryRes.data ?? []) as (MergeDiaryRow & {
+            stage?: string | null;
+            note?: string | null;
+          })[],
+          growEvents: (growEventsRes.data ?? []) as MergeGrowEventRow[],
+        });
+
+        const diaryItems: RecentItem[] = activityRows.diaryEntries.map((d) => ({
           id: `diary-${d.id}`,
           kind: "diary",
-          ts: d.entry_at,
+          ts: d.entry_at ?? "",
           title: d.stage ? `Diary entry (${d.stage})` : "Diary entry",
           detail: d.note,
         }));
+
+        const growEventItems: RecentItem[] = activityRows.growEvents.map((e) => {
+          const label = resolveQuickLogEventTimelineLabel({ eventType: e.event_type });
+          return {
+            id: `grow-event-${e.id}`,
+            kind: "diary",
+            ts: e.occurred_at ?? e.created_at ?? "",
+            title: label ? `Quick log (${label})` : "Quick log entry",
+            detail: e.note ?? null,
+          };
+        });
 
         const actionIds = Array.from(
           new Set((eventsRes.data ?? []).map((e) => e.action_queue_id).filter(Boolean)),
@@ -319,7 +416,7 @@ export function useGrowDetailData(): UseGrowDetailData {
 
         setRecent({
           status: "ok",
-          items: mergeRecent([...diaryItems, ...eventItems, ...alertItems]),
+          items: mergeRecent([...diaryItems, ...growEventItems, ...eventItems, ...alertItems]),
         });
       }
     } catch {
@@ -337,13 +434,35 @@ export function useGrowDetailData(): UseGrowDetailData {
         .limit(50);
       const highestRisk: RiskRank = riskErr ? "unknown" : rankRisk(riskRows ?? []);
 
-      const { data: lastDiaryRows, error: lastDiaryErr } = await supabase
-        .from("diary_entries")
-        .select("entry_at")
-        .eq("grow_id", growId)
-        .order("entry_at", { ascending: false })
-        .limit(1);
-      const lastDiaryAt = lastDiaryErr ? null : (lastDiaryRows?.[0]?.entry_at ?? null);
+      const [
+        { data: lastDiaryRows, error: lastDiaryErr },
+        { data: lastEventRows, error: lastEventErr },
+      ] = await Promise.all([
+        supabase
+          .from("diary_entries")
+          .select("entry_at")
+          .eq("grow_id", growId)
+          .order("entry_at", { ascending: false })
+          .limit(1),
+        supabase
+          .from("grow_events")
+          .select("occurred_at")
+          .eq("grow_id", growId)
+          .eq("source", "manual")
+          .eq("is_deleted", false)
+          .order("occurred_at", { ascending: false })
+          .limit(1),
+      ]);
+      const lastDiaryOnlyAt = lastDiaryErr ? null : (lastDiaryRows?.[0]?.entry_at ?? null);
+      // A spine-only Quick Log save is real grower activity: freshness uses
+      // the later of the last diary entry and the last manual grow_event.
+      const lastManualEventAt = lastEventErr ? null : (lastEventRows?.[0]?.occurred_at ?? null);
+      const lastDiaryAt =
+        lastDiaryOnlyAt && lastManualEventAt
+          ? Date.parse(lastManualEventAt) > Date.parse(lastDiaryOnlyAt)
+            ? lastManualEventAt
+            : lastDiaryOnlyAt
+          : (lastDiaryOnlyAt ?? lastManualEventAt);
 
       const pending = actionsPending;
       const { level, reason } = deriveStatus({ pending, highestRisk, lastDiaryAt });

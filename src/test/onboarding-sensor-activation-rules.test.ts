@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { countActivatingSensorReadings } from "@/lib/onboardingSensorActivationRules";
+import {
+  countActivatingSensorReadings,
+  countManualSnapshotQuickLogEvidence,
+} from "@/lib/onboardingSensorActivationRules";
 
 const diagnosticPayload = {
   vendor: "ecowitt_windows_testbench",
@@ -61,5 +64,74 @@ describe("countActivatingSensorReadings", () => {
     expect(countActivatingSensorReadings(rows)).toBe(1);
     expect(countActivatingSensorReadings(rows)).toBe(1);
     expect(JSON.stringify(rows)).toBe(before);
+  });
+});
+
+describe("countManualSnapshotQuickLogEvidence", () => {
+  const TENT = "tent-a";
+
+  it("counts labeled manual snapshot diary rows on the connected tent only", () => {
+    expect(
+      countManualSnapshotQuickLogEvidence({
+        tentId: TENT,
+        diaryEntries: [
+          {
+            tent_id: TENT,
+            details: { manual_sensor_snapshot: { source: "manual", temp_f: 72.4 } },
+          },
+          {
+            tent_id: TENT,
+            details: { manual_sensor_snapshot: { source: "manual", humidity_percent: 55 } },
+          },
+          // Different tent, missing tent, unlabeled source, no readings —
+          // none of these prove sensor truth for the connected tent.
+          {
+            tent_id: "tent-b",
+            details: { manual_sensor_snapshot: { source: "manual", temp_f: 70 } },
+          },
+          {
+            tent_id: null,
+            details: { manual_sensor_snapshot: { source: "manual", temp_f: 70 } },
+          },
+          { tent_id: TENT, details: { manual_sensor_snapshot: { temp_f: 70 } } },
+          { tent_id: TENT, details: { manual_sensor_snapshot: { source: "manual" } } },
+          { tent_id: TENT, details: {} },
+          null,
+        ],
+      }),
+    ).toBe(2);
+  });
+
+  it("counts manual, non-deleted environment grow_events on the connected tent", () => {
+    expect(
+      countManualSnapshotQuickLogEvidence({
+        tentId: TENT,
+        growEvents: [
+          { tent_id: TENT, event_type: "environment", source: "manual", is_deleted: false },
+          { tent_id: TENT, event_type: "environment", source: "manual", is_deleted: true },
+          {
+            tent_id: TENT,
+            event_type: "environment",
+            source: "manual",
+            deleted_at: "2026-07-19T12:00:00Z",
+          },
+          { tent_id: TENT, event_type: "environment", source: "live" },
+          { tent_id: TENT, event_type: "watering", source: "manual" },
+          { tent_id: "tent-b", event_type: "environment", source: "manual" },
+          null,
+        ],
+      }),
+    ).toBe(1);
+  });
+
+  it("fails closed without a connected tent and on empty input", () => {
+    expect(countManualSnapshotQuickLogEvidence(null)).toBe(0);
+    expect(countManualSnapshotQuickLogEvidence({ tentId: null })).toBe(0);
+    expect(
+      countManualSnapshotQuickLogEvidence({
+        tentId: "  ",
+        growEvents: [{ tent_id: "  ", event_type: "environment", source: "manual" }],
+      }),
+    ).toBe(0);
   });
 });

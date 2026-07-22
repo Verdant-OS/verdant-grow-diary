@@ -581,9 +581,8 @@ describe("Quick Log shared in-flight coordination", () => {
     expect(harness.rpc).toHaveBeenCalledWith(
       "quicklog_save_manual",
       expect.objectContaining({
-        p_grow_id: "g1",
-        p_tent_id: "t1",
-        p_plant_id: "p1",
+        p_target_type: "plant",
+        p_target_id: "p1",
       }),
     );
     expectParentSelectorsLocked(true);
@@ -654,7 +653,9 @@ describe("Quick Log shared in-flight coordination", () => {
     });
 
     expect(harness.rpc).toHaveBeenCalledTimes(1);
-    expect(harness.rpc.mock.calls[0][1]).toEqual(expect.objectContaining({ p_plant_id: "p1" }));
+    expect(harness.rpc.mock.calls[0][1]).toEqual(
+      expect.objectContaining({ p_target_type: "plant", p_target_id: "p1" }),
+    );
 
     await act(async () => {
       pending.resolve({ data: { ok: true, grow_event_id: "child-event" }, error: null });

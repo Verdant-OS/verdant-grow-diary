@@ -100,7 +100,10 @@ describe("useQuickLogActivitySave — routing", () => {
     const [name, payload] = rpcMock.mock.calls[0];
     expect(name).toBe("quicklog_save_manual");
     expect(payload.p_action).toBe("note");
-    expect(payload.p_grow_id).toBe("g1");
+    // Real deployed signature is target-scoped; p_grow_id never existed.
+    expect(payload.p_target_type).toBe("plant");
+    expect(payload.p_target_id).toBe("p1");
+    expect(payload).not.toHaveProperty("p_grow_id");
   });
 
   it("routes Watering through quicklog_save_manual with p_action=water", async () => {
@@ -110,11 +113,29 @@ describe("useQuickLogActivitySave — routing", () => {
       await result.current.save({
         activityId: "watering",
         growId: "g1",
+        tentId: "t1",
+        volumeMl: 350,
       });
     });
     const [name, payload] = rpcMock.mock.calls[0];
     expect(name).toBe("quicklog_save_manual");
     expect(payload.p_action).toBe("water");
+    expect(payload.p_target_type).toBe("tent");
+    expect(payload.p_target_id).toBe("t1");
+    expect(payload.p_volume_ml).toBe(350);
+  });
+
+  it("refuses the manual route without a tent or plant target (no RPC call)", async () => {
+    const { result } = renderHook(() => useQuickLogActivitySave());
+    let res!: Awaited<ReturnType<typeof result.current.save>>;
+    await act(async () => {
+      res = await result.current.save({
+        activityId: "note",
+        growId: "g1",
+      });
+    });
+    expect(res).toEqual({ ok: false, reason: "missing_target" });
+    expect(rpcMock).not.toHaveBeenCalled();
   });
 
   it.each([

@@ -34,10 +34,15 @@ export interface QuickLogActivitySaveInput {
   plantId?: string | null;
   note?: string | null;
   photoUrl?: string | null;
-  /** Required for event-route dedupe. Ignored by manual route. */
+  /**
+   * Required for event-route dedupe. The manual route forwards it too when
+   * it is server-valid (8..200 chars) so retries reuse one grow_event.
+   */
   idempotencyKey?: string | null;
-  /** Extra details to merge into event p_details (safe metadata only). */
+  /** Extra details to merge into p_details (safe metadata only). */
   extraDetails?: Record<string, unknown> | null;
+  /** Watering volume in ml, forwarded to the manual water route only. */
+  volumeMl?: number | null;
 }
 
 export type QuickLogActivitySaveReason =
@@ -46,6 +51,7 @@ export type QuickLogActivitySaveReason =
   | "activity_disabled"
   | "unsupported_activity"
   | "missing_idempotency_key"
+  | "missing_target"
   | "save_failed";
 
 export interface QuickLogActivitySaveResult {
@@ -106,15 +112,42 @@ export function useQuickLogActivitySave() {
       setError(null);
       try {
         if (plan.saveRoute === "manual_note" || plan.saveRoute === "manual_water") {
+          // quicklog_save_manual is target-scoped (p_target_type/p_target_id)
+          // and derives grow/tent/plant server-side from the owned target row
+          // — mirroring useQuickLogV2Save + quickLogV2SavePayload. No deployed
+          // signature ever accepted p_grow_id (that shape always PGRST202'd).
+          const targetType = input.plantId ? "plant" : input.tentId ? "tent" : null;
+          const targetId = input.plantId ?? input.tentId ?? null;
+          if (!targetType || !targetId) {
+            setError("missing_target");
+            return { ok: false, reason: "missing_target" };
+          }
+          const manualDetails: Record<string, unknown> = {
+            ...(input.extraDetails ?? {}),
+          };
+          const manualIdempotencyKey =
+            input.idempotencyKey &&
+            input.idempotencyKey.length >= 8 &&
+            input.idempotencyKey.length <= 200
+              ? input.idempotencyKey
+              : null;
           const { data, error: rpcErr } = await supabase.rpc(
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             "quicklog_save_manual" as any,
             {
-              p_grow_id: input.growId,
-              p_tent_id: input.tentId ?? null,
-              p_plant_id: input.plantId ?? null,
+              p_target_type: targetType,
+              p_target_id: targetId,
               p_action: plan.manualAction,
+              p_volume_ml: input.volumeMl ?? null,
               p_note: input.note ?? null,
+              p_temperature_c: null,
+              p_humidity_pct: null,
+              p_vpd_kpa: null,
+              p_occurred_at: null,
+              ...(Object.keys(manualDetails).length > 0
+                ? { p_details: manualDetails }
+                : {}),
+              p_idempotency_key: manualIdempotencyKey,
             } as unknown as Record<string, unknown>,
           );
           if (rpcErr) {
@@ -136,6 +169,7 @@ export function useQuickLogActivitySave() {
             ok: true,
             reason: "ok",
             growEventId: r.grow_event_id ?? null,
+            reused: r.reused === true,
           };
         }
 

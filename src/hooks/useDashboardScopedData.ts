@@ -3,7 +3,9 @@
  * Dashboard.
  *
  * Fetches, for a single grow_id:
- *   - latest 5 diary_entries
+ *   - latest 5 diary_entries + latest 5 manual grow_events (merged; a plain
+ *     Quick Log save writes only the grow_events spine, so reading
+ *     diary_entries alone hides it — companions are deduped, never doubled)
  *   - latest 5 action_queue_events (with parent suggested_change/reason)
  *   - pending action_queue rows (status = 'pending_approval')
  *
@@ -17,6 +19,12 @@ import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import { type RecentItem, mergeRecent } from "@/lib/growStatus";
+import {
+  dedupeMergedManualGrowActivityRows,
+  type ConnectedActivationDiaryEntryRow,
+  type ConnectedActivationGrowEventRow,
+} from "@/lib/connectedOneTentActivationRules";
+import { resolveQuickLogEventTimelineLabel } from "@/lib/quickLogActivityRules";
 
 export interface PendingAction {
   id: string;
@@ -65,14 +73,23 @@ export function useDashboardScopedData(
     setRecent({ status: "loading" });
     setPending({ status: "loading" });
 
-    // Recent activity: latest 5 diary + latest 5 action_queue_events.
+    // Recent activity: latest 5 diary + latest 5 manual grow_events +
+    // latest 5 action_queue_events.
     try {
-      const [diaryRes, eventsRes] = await Promise.all([
+      const [diaryRes, growEventsRes, eventsRes] = await Promise.all([
         supabase
           .from("diary_entries")
-          .select("id,entry_at,stage,note")
+          .select("id,plant_id,entry_at,stage,note,details")
           .eq("grow_id", growId)
           .order("entry_at", { ascending: false })
+          .limit(5),
+        supabase
+          .from("grow_events")
+          .select("id,tent_id,plant_id,event_type,occurred_at,source,is_deleted,deleted_at,note")
+          .eq("grow_id", growId)
+          .eq("source", "manual")
+          .eq("is_deleted", false)
+          .order("occurred_at", { ascending: false })
           .limit(5),
         supabase
           .from("action_queue_events")
@@ -84,16 +101,39 @@ export function useDashboardScopedData(
           .limit(5),
       ]);
 
-      if (diaryRes.error || eventsRes.error) {
+      if (diaryRes.error || growEventsRes.error || eventsRes.error) {
         setRecent({ status: "unavailable" });
       } else {
-        const diaryItems: RecentItem[] = (diaryRes.data ?? []).map((d) => ({
+        // Companion diary rows dedupe against their grow_events parents so a
+        // single Quick Log save never shows up twice.
+        const activityRows = dedupeMergedManualGrowActivityRows({
+          diaryEntries: (diaryRes.data ?? []) as (ConnectedActivationDiaryEntryRow & {
+            stage?: string | null;
+            note?: string | null;
+          })[],
+          growEvents: (growEventsRes.data ?? []) as (ConnectedActivationGrowEventRow & {
+            note?: string | null;
+          })[],
+        });
+
+        const diaryItems: RecentItem[] = activityRows.diaryEntries.map((d) => ({
           id: `diary-${d.id}`,
           kind: "diary",
-          ts: d.entry_at,
+          ts: d.entry_at ?? "",
           title: d.stage ? `Diary entry (${d.stage})` : "Diary entry",
           detail: d.note,
         }));
+
+        const growEventItems: RecentItem[] = activityRows.growEvents.map((e) => {
+          const label = resolveQuickLogEventTimelineLabel({ eventType: e.event_type });
+          return {
+            id: `grow-event-${e.id}`,
+            kind: "diary",
+            ts: e.occurred_at ?? e.created_at ?? "",
+            title: label ? `Quick log (${label})` : "Quick log entry",
+            detail: e.note ?? null,
+          };
+        });
 
         const actionIds = Array.from(
           new Set(
@@ -128,7 +168,7 @@ export function useDashboardScopedData(
 
         setRecent({
           status: "ok",
-          items: mergeRecent([...diaryItems, ...eventItems]),
+          items: mergeRecent([...diaryItems, ...growEventItems, ...eventItems]),
         });
       }
     } catch {

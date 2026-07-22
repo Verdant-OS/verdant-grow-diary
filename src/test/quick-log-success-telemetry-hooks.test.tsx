@@ -201,7 +201,8 @@ describe("useQuickLogActivitySave telemetry", () => {
     const { result } = renderHook(() => useQuickLogActivitySave());
 
     await act(async () => {
-      await result.current.save({ activityId: "note", growId: "grow-1" });
+      // Target-scoped manual route: the RPC needs a tent or plant target.
+      await result.current.save({ activityId: "note", growId: "grow-1", plantId: "plant-1" });
     });
 
     expect(quickLogEvents()).toEqual([["event", "quick_log_saved", { event_type: "note" }]]);

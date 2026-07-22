@@ -6,6 +6,7 @@
  * constrained by the signed-in grower's RLS-scoped reads.
  */
 import { QUICK_LOG_ACTIVITY_LIST } from "@/constants/quickLogActivityTypes";
+import { countManualSnapshotQuickLogEvidence } from "@/lib/onboardingSensorActivationRules";
 import { buildSensorsTentRouteHref, SENSORS_TENT_ROUTE } from "@/lib/sensorRouteTentIntentRules";
 
 export interface ConnectedActivationGrowRow {
@@ -90,6 +91,12 @@ export interface ConnectedActivationEvidenceSummary {
   hasEvidence: boolean;
   latestAt: string | null;
   latestSource: ConnectedActivationEvidenceSource | null;
+  /**
+   * Quick-log-carried manual snapshot evidence on the connected tent
+   * (diary details.manual_sensor_snapshot rows + manual environment
+   * grow_events). Optional so frozen legacy summaries stay assignable.
+   */
+  manualSnapshotCount?: number;
 }
 
 export const ONE_TENT_ACTIVATION_INTENT = "one_tent_activation" as const;
@@ -296,10 +303,12 @@ function matchesConnectedScope(
 ): boolean {
   const growId = nonBlankId(row.grow_id);
   const tentId = nonBlankId(row.tent_id);
-  const plantId = nonBlankId(row.plant_id);
   if (growId !== scope.growId) return false;
   if (tentId !== null && tentId !== scope.tentId) return false;
-  if (plantId !== null && plantId !== scope.plantId) return false;
+  // First-log evidence accepts any plant inside the connected grow whose
+  // tent is null-or-matching. A sibling plant's manual log is still real
+  // grower activity on this connected graph; only an explicit different
+  // tent or grow stays out of scope.
   return true;
 }
 
@@ -348,10 +357,12 @@ function growEventIdentityRank(row: ConnectedActivationGrowEventRow): string {
  * Count canonical persisted evidence for one connected graph.
  *
  * Plant-null tent/grow events are allowed because Quick Log supports broad
- * observations. An explicit different tent/plant is never allowed. Companion
- * diary rows are removed whenever their known parent grow_event is present,
- * including when that parent is deleted or outside the selected plant, so a
- * broad companion cannot resurrect or misattribute that event.
+ * observations, and sibling-plant rows are allowed because a manual log on
+ * any plant in the connected grow/tent is real grower activity. An explicit
+ * different tent/grow is never allowed. Companion diary rows are removed
+ * whenever their known parent grow_event is present, including when that
+ * parent is deleted or outside the connected tent, so a broad companion
+ * cannot resurrect or misattribute that event.
  */
 export function summarizeConnectedActivationEvidence(
   input: ConnectedActivationEvidenceInput,
@@ -360,7 +371,13 @@ export function summarizeConnectedActivationEvidence(
   const tentId = nonBlankId(input?.tentId);
   const plantId = nonBlankId(input?.plantId);
   if (!growId || !tentId || !plantId) {
-    return { count: 0, hasEvidence: false, latestAt: null, latestSource: null };
+    return {
+      count: 0,
+      hasEvidence: false,
+      latestAt: null,
+      latestSource: null,
+      manualSnapshotCount: 0,
+    };
   }
 
   const scope = { growId, tentId, plantId };
@@ -437,5 +454,124 @@ export function summarizeConnectedActivationEvidence(
     hasEvidence: unique.length > 0,
     latestAt: latest?.at ?? null,
     latestSource: latest?.source ?? null,
+    // Sensor-step evidence rides on the same RLS-scoped rows: quick-log
+    // manual snapshots on the connected tent, additive to sensor_readings.
+    manualSnapshotCount: countManualSnapshotQuickLogEvidence({
+      tentId,
+      diaryEntries: input?.diaryEntries ?? [],
+      growEvents: [...allGrowEventsById.values()],
+    }),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Merged manual grow activity (grow_events spine + standalone diary rows)
+// ---------------------------------------------------------------------------
+//
+// Every confirmed Quick Log save writes a `grow_events` spine row; a
+// `diary_entries` companion exists only when structured details exist.
+// Readers that count or list "diary activity" from diary_entries alone hide
+// plain quick logs. These helpers merge both tables without double-counting:
+//  - a diary row linked to a grow_event (details.linked_grow_event_id /
+//    grow_event_id) is always the companion of its spine parent
+//  - an unlinked companion written by quicklog_save_manual shares the exact
+//    (plant_id, timestamp) pair with its parent — an identical pair is
+//    conservatively treated as the same logical save
+//  - a sibling `environment` spine row written at the same instant as its
+//    watering/observation parent collapses into that parent, so one sensor-
+//    carrying save counts once (standalone environment checks still count).
+
+export interface MergedManualGrowActivityInput<
+  D extends ConnectedActivationDiaryEntryRow = ConnectedActivationDiaryEntryRow,
+  G extends ConnectedActivationGrowEventRow = ConnectedActivationGrowEventRow,
+> {
+  diaryEntries?: ReadonlyArray<D | null | undefined> | null;
+  growEvents?: ReadonlyArray<G | null | undefined> | null;
+  /** Inclusive ISO lower bound applied to both sources when present. */
+  since?: string | null;
+}
+
+export interface MergedManualGrowActivityRows<D, G> {
+  diaryEntries: D[];
+  growEvents: G[];
+}
+
+function pairKey(plantId: unknown, epochMs: number): string {
+  return [nonBlankId(plantId) ?? "", String(epochMs)].join("|");
+}
+
+/**
+ * Split rows into the deduplicated merged activity set. Input order is
+ * preserved inside each source; callers own any presentation sort.
+ */
+export function dedupeMergedManualGrowActivityRows<
+  D extends ConnectedActivationDiaryEntryRow,
+  G extends ConnectedActivationGrowEventRow,
+>(input: MergedManualGrowActivityInput<D, G>): MergedManualGrowActivityRows<D, G> {
+  const sinceMs = input?.since ? Date.parse(input.since) : Number.NaN;
+  const hasSince = Number.isFinite(sinceMs);
+
+  // Spine rows: manual, not deleted, timestamped, unique by id.
+  const spineById = new Map<string, { row: G; epochMs: number }>();
+  for (const row of input?.growEvents ?? []) {
+    if (!row) continue;
+    const id = nonBlankId(row.id);
+    if (!id || spineById.has(id)) continue;
+    if (nonBlankId(row.source) !== "manual") continue;
+    if (row.is_deleted === true || nonBlankId(row.deleted_at) !== null) continue;
+    const timestamp = parseTimestamp(row.occurred_at, row.created_at);
+    if (!timestamp) continue;
+    if (hasSince && timestamp.epochMs < sinceMs) continue;
+    spineById.set(id, { row, epochMs: timestamp.epochMs });
+  }
+
+  const siblingKey = (row: G, epochMs: number) =>
+    [nonBlankId(row.tent_id) ?? "", nonBlankId(row.plant_id) ?? "", String(epochMs)].join(
+      "|",
+    );
+  const nonEnvironmentKeys = new Set<string>();
+  const spinePairKeys = new Set<string>();
+  for (const { row, epochMs } of spineById.values()) {
+    spinePairKeys.add(pairKey(row.plant_id, epochMs));
+    if (nonBlankId(row.event_type) !== "environment") {
+      nonEnvironmentKeys.add(siblingKey(row, epochMs));
+    }
+  }
+
+  const growEvents: G[] = [];
+  for (const { row, epochMs } of spineById.values()) {
+    const isEnvironmentSibling =
+      nonBlankId(row.event_type) === "environment" &&
+      nonEnvironmentKeys.has(siblingKey(row, epochMs));
+    if (isEnvironmentSibling) continue;
+    growEvents.push(row);
+  }
+
+  const diaryEntries: D[] = [];
+  const seenDiaryIds = new Set<string>();
+  for (const row of input?.diaryEntries ?? []) {
+    if (!row) continue;
+    const id = nonBlankId(row.id);
+    if (!id || seenDiaryIds.has(id)) continue;
+    seenDiaryIds.add(id);
+    // A linked companion always belongs to a grow_events parent — even when
+    // that parent is deleted or outside the fetched window, the diary copy
+    // must not resurrect it as a second activity.
+    if (diaryLinks(row).length > 0) continue;
+    const timestamp = parseTimestamp(row.entry_at, row.created_at);
+    if (!timestamp) continue;
+    if (hasSince && timestamp.epochMs < sinceMs) continue;
+    if (spinePairKeys.has(pairKey(row.plant_id, timestamp.epochMs))) continue;
+    diaryEntries.push(row);
+  }
+
+  return { diaryEntries, growEvents };
+}
+
+/** Count the merged manual activity across both persisted shapes. */
+export function countMergedManualGrowActivity(
+  input: MergedManualGrowActivityInput,
+): number {
+  const rows = dedupeMergedManualGrowActivityRows(input);
+  return rows.growEvents.length + rows.diaryEntries.length;
 }

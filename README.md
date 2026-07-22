@@ -693,6 +693,90 @@ findings), and includes `partialFingerprints` (`migrationVersion`,
 with each other and with `--json`. Exit codes are unchanged: SARIF/annotation
 output is a report on the same underlying result, not a separate check.
 
+#### Worked example: `--sarif` and `--sarif-out=PATH`
+
+End-to-end walkthrough that generates a SARIF file locally, inspects it, and
+(optionally) uploads it to GitHub code scanning.
+
+```bash
+# 1. Point at the target DB (sandbox shown here).
+export SUPABASE_DB_URL_SANDBOX="postgres://postgres:PASSWORD@HOST:5432/postgres"
+export TARGET_ENV=sandbox
+
+# 2. Make sure the output directory exists (the script does NOT create parents).
+mkdir -p audit/money-migrations
+
+# 3. Run the diff and emit SARIF to a file. The human-readable text diff
+#    still prints to stdout so CI logs remain useful.
+node scripts/diff-money-migration-prefixes.mjs \
+  --sarif \
+  --sarif-out=audit/money-migrations/diff.sarif
+# Exit codes: 0 = clean, 1 = drift, 2 = tooling failure.
+# The SARIF file is written on every exit code, including 0 (empty results array).
+```
+
+Shortcut equivalents from `package.json`:
+
+```bash
+# Writes to audit/money-migrations/diff.sarif using the sandbox DB URL.
+bun run prefix-diff:sarif
+
+# Same, targeted at live.
+TARGET_ENV=live bun run prefix-diff:sarif
+```
+
+**Inspecting the SARIF locally**
+
+```bash
+# Quick sanity check — jq shows the tool banner, rule catalog, and result count.
+jq '.runs[0].tool.driver.name,
+    (.runs[0].tool.driver.rules | map(.id)),
+    (.runs[0].results | length),
+    .runs[0].results[0]' \
+   audit/money-migrations/diff.sarif
+
+# List every finding: rule ID, offending file, and message.
+jq -r '.runs[0].results[] |
+       "\(.ruleId)\t\(.locations[0].physicalLocation.artifactLocation.uri)\t\(.message.text)"' \
+   audit/money-migrations/diff.sarif
+```
+
+Prefer a UI? Two options:
+
+- **VS Code** — install the `MS-SarifVSCode.sarif-viewer` extension, then
+  `code audit/money-migrations/diff.sarif`. Findings open in the "SARIF
+  Results" panel with jump-to-file navigation.
+- **GitHub code scanning** — upload the file from any workflow (public
+  repos, or private repos with Advanced Security). Each result appears
+  as an inline annotation on the offending migration file:
+
+  ```yaml
+  - name: Prefix diff (SARIF)
+    run: |
+      mkdir -p audit/money-migrations
+      node scripts/diff-money-migration-prefixes.mjs \
+        --sarif --sarif-out=audit/money-migrations/diff.sarif || true
+  - uses: github/codeql-action/upload-sarif@v3
+    with:
+      sarif_file: audit/money-migrations/diff.sarif
+      category: money-migration-drift-${{ env.TARGET_ENV }}
+  ```
+
+  Use a distinct `category` per environment so sandbox and live results
+  don't overwrite each other in the Security tab.
+
+**Interpreting a run**
+
+- Empty `runs[0].results` + exit `0` → no drift. The rule catalog is still
+  present so code scanning keeps the category alive.
+- `money-migration-drift` results + exit `1` → required prefixes missing
+  from the target DB. `artifactLocation.uri` points at the exact
+  `supabase/migrations/<file>` that needs to be applied.
+- `money-migration-tooling` results + exit `2` → the check couldn't
+  complete (no DB URL, `psql` missing, tracker query failed). Fix the
+  environment before trusting a "clean" run.
+
+
 
 
 

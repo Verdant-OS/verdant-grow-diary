@@ -28,6 +28,12 @@ on:
     #      protection: it always runs and reports a status, but the
     #      expensive jobs no-op when no irrigation surface changed.
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Filter dry-run: print matched irrigation allowlist files and skip pgTAP + typecheck jobs."
+        type: boolean
+        required: false
+        default: false
 
 concurrency:
   group: irrigation-pgtap-rls-gate-${{ github.ref }}

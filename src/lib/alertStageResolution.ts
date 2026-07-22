@@ -15,65 +15,100 @@
  *
  * PRECEDENCE (explicit, deterministic):
  *  1. Candidates are the grow's own stage plus each of the grow's tents'
- *     stages, normalized to the canonical `STAGES` vocabulary via
- *     `normalizeQuickLogStage` (labels such as "Vegetative" and aliases
- *     such as plant-side "cure" are folded in; unknown text drops out).
- *  2. A single known candidate — or full agreement — wins outright.
- *  3. On disagreement, the MOST ADVANCED stage in `STAGES` order wins
- *     (seedling → veg → flower → flush → harvest → drying). A trailing
- *     value is a stale creation default the grower never advanced, not a
- *     decision; growers advance stage fields, they do not regress them.
- *     (An intentional regression — e.g. re-veg — requires updating the
- *     leading field, exactly as it did before this helper existed.)
- *  4. When no candidate is a known stage the result is null — callers keep
- *     their existing "no active stage target" handling. Never guess.
+ *     stages. Each is classified with the live `normalizeVpdStage` alias
+ *     table (the same normalizer the downstream classifiers use, covering
+ *     legacy tokens like "Vegetative", "transition", "bloom", "flush",
+ *     "curing"); candidates it cannot recognize drop out.
+ *  2. A single recognized candidate — or full agreement — wins outright.
+ *  3. On disagreement, the MOST ADVANCED candidate in stage progression
+ *     order wins (seedling → veg → preflower → flower → late_flower →
+ *     harvest). A trailing value is a stale creation default the grower
+ *     never advanced, not a decision; growers advance stage fields, they
+ *     do not regress them. (An intentional regression — e.g. re-veg —
+ *     requires updating the leading field, exactly as it did before this
+ *     helper existed.) The grow's value wins rank ties, preserving its
+ *     historical primacy.
+ *  4. The winner is returned as the field's RAW stored value, not the
+ *     normalized token, so downstream consumers (`classifyVpdAgainstStage`,
+ *     `classifyTempAgainstStage`, header copy) receive exactly the string
+ *     they would have received before this helper and keep their own alias
+ *     handling.
+ *  5. When no candidate is recognized the result is null — callers keep
+ *     their existing "no active stage target" handling. Never guess. (This
+ *     is stricter than the old raw passthrough only for garbage values the
+ *     classifiers already treated as stage-unknown; the header now says
+ *     "no active stage" instead of echoing the garbage token.)
  *
  * Pure: no I/O, no React, no Supabase, no time.
  */
-import { STAGES } from "@/lib/grow";
-import { normalizeQuickLogStage } from "@/lib/quickLogStageDefaultRules";
+import { normalizeVpdStage, type VpdStage } from "@/lib/vpdStageTargetRules";
 
-/** Canonical stage progression rank, from the single STAGES source of truth. */
-const STAGE_RANK: ReadonlyMap<string, number> = new Map(
-  STAGES.map((s, index) => [s.value, index]),
-);
+/** Stage progression rank. `unknown` is not a candidate and has no rank. */
+const STAGE_PROGRESSION: readonly Exclude<VpdStage, "unknown">[] = [
+  "seedling",
+  "veg",
+  "preflower",
+  "flower",
+  "late_flower",
+  "harvest",
+];
+
+function progressionRank(stage: VpdStage): number {
+  return STAGE_PROGRESSION.indexOf(stage as Exclude<VpdStage, "unknown">);
+}
 
 export interface ResolveAlertContextStageInput {
-  /** The grow row's stage (raw value or label; unknown text tolerated). */
+  /** The grow row's stage (raw stored value; unknown text tolerated). */
   growStage?: unknown;
-  /** Stages of the grow's tents (raw values or labels; unknowns drop out). */
+  /** The grow's tents' stages (raw stored values; unknowns drop out). */
   tentStages?: ReadonlyArray<unknown> | null;
 }
 
 export interface ResolvedAlertContextStage {
-  /** Canonical `STAGES` value, or null when nothing is known. */
+  /** RAW stored value of the winning field, or null when none recognized. */
   stage: string | null;
+  /** The winner classified via `normalizeVpdStage`; "unknown" only when
+   * `stage` is null. */
+  normalizedStage: VpdStage;
   /** Which field supplied the winning stage. "grow" also covers ties. */
   source: "grow" | "tent" | null;
+}
+
+function asRawStage(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
 }
 
 export function resolveAlertContextStage(
   input: ResolveAlertContextStageInput,
 ): ResolvedAlertContextStage {
-  const growStage = normalizeQuickLogStage(input.growStage);
-  let winner = growStage;
-  let source: "grow" | "tent" | null = growStage ? "grow" : null;
+  let winnerRaw: string | null = null;
+  let winnerNormalized: VpdStage = "unknown";
+  let source: "grow" | "tent" | null = null;
 
-  for (const raw of input.tentStages ?? []) {
-    const tentStage = normalizeQuickLogStage(raw);
-    if (!tentStage) continue;
-    if (!winner) {
-      winner = tentStage;
-      source = "tent";
-      continue;
+  const growRaw = asRawStage(input.growStage);
+  if (growRaw) {
+    const normalized = normalizeVpdStage(growRaw);
+    if (normalized !== "unknown") {
+      winnerRaw = growRaw;
+      winnerNormalized = normalized;
+      source = "grow";
     }
-    const winnerRank = STAGE_RANK.get(winner) ?? -1;
-    const tentRank = STAGE_RANK.get(tentStage) ?? -1;
-    if (tentRank > winnerRank) {
-      winner = tentStage;
+  }
+
+  for (const candidate of input.tentStages ?? []) {
+    const raw = asRawStage(candidate);
+    if (!raw) continue;
+    const normalized = normalizeVpdStage(raw);
+    if (normalized === "unknown") continue;
+    // Strictly-greater keeps the grow (and earlier tents) winning ties.
+    if (progressionRank(normalized) > progressionRank(winnerNormalized)) {
+      winnerRaw = raw;
+      winnerNormalized = normalized;
       source = "tent";
     }
   }
 
-  return { stage: winner, source };
+  return { stage: winnerRaw, normalizedStage: winnerNormalized, source };
 }

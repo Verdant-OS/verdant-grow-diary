@@ -776,7 +776,101 @@ this order:
   the **Branch** filter if you're looking at the default branch but the
   run was on a feature branch.
 
-##### Security tab looks empty (GitHub UI gotchas)
+##### Walkthrough: inspecting PR file annotations from an uploaded SARIF
+
+Once `upload-sarif` finishes on a PR run, GitHub renders each SARIF
+result as an inline annotation on the PR. Here's exactly where to click
+and what each UI element maps back to in the SARIF file so you can trust
+what you're seeing.
+
+**Step 1 — Open the PR's Files changed tab.**
+- Repo → **Pull requests** → your PR → **Files changed** (top tab bar,
+  next to *Conversation*, *Commits*, *Checks*).
+- The tab header shows a small badge like **`3 errors`** in red — that
+  count comes directly from the number of SARIF `results` with
+  `level: "error"` uploaded for this PR's head SHA. If the badge is
+  missing, the SARIF either wasn't uploaded on the PR run or contained
+  `results: []` (clean run).
+
+**Step 2 — Locate a red gutter marker.**
+- Scroll to any `supabase/migrations/<file>.sql` listed in the PR diff.
+  If the file isn't in the diff, jump directly via the **Jump to file**
+  dropdown at the top of *Files changed*.
+- A red circle with a white **×** in the left gutter on **line 1** marks
+  a drift finding. That gutter position corresponds to the SARIF field:
+  ```
+  locations[0].physicalLocation.region.startLine  // always 1
+  locations[0].physicalLocation.artifactLocation.uri  // the file path
+  ```
+- `money-migration-malformed` and `money-migration-tooling` findings
+  annotate `scripts/required-money-migrations.mjs` (the manifest)
+  instead of a migration file — same visual, different `uri`.
+
+**Step 3 — Expand the annotation.**
+- Click the red gutter marker. An inline expandable panel opens directly
+  below line 1 with three visible pieces:
+
+  | UI element                                   | SARIF field it comes from                                          |
+  |----------------------------------------------|--------------------------------------------------------------------|
+  | Bold header, e.g. **`Code scanning / diff-money-migration-prefixes`** | `runs[0].tool.driver.name`                                       |
+  | Rule ID chip, e.g. `money-migration-drift`   | `results[i].ruleId`                                                |
+  | Severity pill (**Error** in red)             | `results[i].level` (`"error"` → red, `"warning"` → yellow)         |
+  | Message text — *"Required money migration not applied in sandbox: prefix 20260715120000…"* | `results[i].message.text`                                          |
+  | **View alert** link (bottom-right of panel)  | Deep-link to `Security → Code scanning → alert #N` for this result |
+  | **Dismiss** dropdown (*False positive*, *Used in tests*, *Won't fix*) | Writes a `dismissal` back to the alert; SARIF file is unchanged    |
+
+**Step 4 — Confirm the finding matches your local SARIF.**
+- Download the `diff.sarif` artifact from the workflow run
+  (**Actions → run → Artifacts → `money-migration-audit-<env>`**).
+- Cross-reference one annotation against the file:
+  ```bash
+  jq '.runs[0].results[]
+      | select(.locations[0].physicalLocation.artifactLocation.uri
+              == "supabase/migrations/20260715120000_ai_credit_spend.sql")
+      | {ruleId, level, message: .message.text,
+         fingerprints: .partialFingerprints}' \
+    diff.sarif
+  ```
+- The `message` should match the annotation text verbatim, and
+  `partialFingerprints.migrationVersion` should be the 14-digit prefix
+  named in the message.
+
+**Step 5 — Follow the "View alert" deep-link.**
+- Clicking **View alert** on the annotation lands you on
+  `Security → Code scanning → alert #N` for this exact result.
+- The alert page shows:
+  - **History timeline** — one row per workflow run that reported this
+    fingerprint. Same `partialFingerprints` across runs = one alert with
+    an appended history entry (not a duplicate).
+  - **Affected branches** — the branches whose latest SARIF still
+    contains this result. When the migration is applied and the next
+    run uploads `results: []`, the branch drops off this list and the
+    alert status flips to **Closed → Fixed in `<sha>`**.
+  - **Rule** panel (right sidebar) — the human name and description
+    pulled from `runs[0].tool.driver.rules[]` matching `ruleId`.
+
+**Step 6 — Handle the "no annotations visible" case.**
+- If the *Files changed* badge shows errors but no red gutter markers
+  appear on the migration file, the file is likely **collapsed**. Look
+  for a *"Load diff"* link at the top of the file card and click it —
+  GitHub skips annotations on unloaded diffs.
+- If the migration file isn't in the PR diff at all, annotations for it
+  will **only** appear in the Security tab. The PR *Files changed* view
+  is scoped to changed files; annotations on unchanged files render on
+  the branch's default file view instead
+  (`https://github.com/<owner>/<repo>/blob/<sha>/<path>#L1`).
+
+**Step 7 — Compare with the `--github-annotations` fallback.**
+- If you also ran the script with `--github-annotations`, the same
+  findings appear as **`::error file=…,line=1::…`** entries in the
+  workflow **job log** (Actions → run → job → the diff step). Those are
+  workflow-command annotations, not SARIF alerts — they render in the
+  job log and, when the path matches a file in the PR diff, also as
+  gutter markers. They are ephemeral (one per run) and do **not**
+  create Security tab alerts. Use them as a quick fallback when Code
+  scanning is disabled on the repo.
+
+
 
 If `Upload SARIF` printed `SARIF upload complete` but **Security → Code
 scanning** still shows no findings, it's almost always a filter/scope

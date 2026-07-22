@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "prebuild": "node scripts/verify-edge-shared-in-sync.mjs && node scripts/check-no-src-lib-imports.mjs",
+    "prebuild": "node scripts/verify-edge-shared-in-sync.mjs && node scripts/check-no-src-lib-imports.mjs && node scripts/stamp-version.mjs",
+    "stamp-version": "node scripts/stamp-version.mjs",
     "build": "vite build",
     "postbuild": "node scripts/check-no-src-lib-imports.mjs && node scripts/validate-jsonld-rich-results.mjs dist && node scripts/validate-og-image-urls.mjs dist && node scripts/validate-og-url-canonical-parity.mjs dist && node scripts/validate-canonical-singleton.mjs dist && node scripts/validate-canonical-shape.mjs dist && node scripts/validate-title-description.mjs dist && node scripts/validate-jsonld-id-canonical-parity.mjs dist && node scripts/validate-static-route-head-fidelity.mjs dist",
     "build:dev": "vite build --mode development",

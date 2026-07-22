@@ -23,7 +23,7 @@ on:
       - ".github/workflows/strain-reference-library-v1-gate.yml"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   validate:
@@ -33,8 +33,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with:
-          fetch-depth: 0
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
@@ -48,47 +46,20 @@ jobs:
         run: bun run typecheck
 
       - name: Targeted library and shared-search tests
-        id: targeted_tests
-        continue-on-error: true
-        shell: bash
-        run: |
-          mkdir -p .diagnostics
-          set +e
-          bunx vitest run \
-            src/test/strain-reference-library-v1.test.ts \
-            src/test/strain-reference-library-migration.test.ts \
-            src/test/strain-reference-library-static-safety.test.ts \
-            src/test/shared-search-text-rules.test.ts \
-            src/test/cultivar-reference-search-rules.test.ts \
-            src/test/cultivar-reference-view-model.test.ts \
-            src/test/global-search-entity-results.test.ts \
-            src/test/cultivars-index-v1.test.tsx \
-            src/test/cultivar-page-v1.test.tsx \
-            src/test/cultivar-index-seo-rules.test.tsx \
-            src/test/static-public-seo-documents.test.ts \
-            --reporter=verbose > .diagnostics/strain-reference-tests.txt 2>&1
-          status=$?
-          set -e
-          cat .diagnostics/strain-reference-tests.txt
-          exit "$status"
-
-      - name: Commit focused test diagnostics on branch push
-        if: github.event_name == 'push' && steps.targeted_tests.outcome == 'failure'
-        shell: bash
-        run: |
-          set -euo pipefail
-          git add .diagnostics/strain-reference-tests.txt
-          if git diff --cached --quiet; then
-            exit 0
-          fi
-          git config user.name "verdant-ci"
-          git config user.email "actions@users.noreply.github.com"
-          git commit -m "chore(strains): capture focused test diagnostics"
-          git push origin HEAD:feature/strain-reference-library-v1
-
-      - name: Stop after targeted test failure
-        if: steps.targeted_tests.outcome == 'failure'
-        run: exit 1
+        run: >-
+          bunx vitest run
+          src/test/strain-reference-library-v1.test.ts
+          src/test/strain-reference-library-migration.test.ts
+          src/test/strain-reference-library-static-safety.test.ts
+          src/test/shared-search-text-rules.test.ts
+          src/test/cultivar-reference-search-rules.test.ts
+          src/test/cultivar-reference-view-model.test.ts
+          src/test/global-search-entity-results.test.ts
+          src/test/cultivars-index-v1.test.tsx
+          src/test/cultivar-page-v1.test.tsx
+          src/test/cultivar-index-seo-rules.test.tsx
+          src/test/static-public-seo-documents.test.ts
+          --reporter=verbose
 
       - name: Supabase migration safety
         run: bun run check:supabase-security

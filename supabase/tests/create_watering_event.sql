@@ -47,6 +47,23 @@ END $$;
 -- 3. EXECUTE grants on create_watering_event: anon FALSE, authenticated FALSE,
 --    service_role TRUE. Legacy typed-event RPC is server-only after the
 --    2026-07-22 revoke. Canonical writes go through quicklog_save_event.
+--
+-- Preflight: the function itself must exist. A missing function would make
+-- every EXECUTE check trivially "expected=false, got=false" for anon/auth and
+-- silently pass — that's a false green. Fail loudly and distinctly instead.
+DO $$
+DECLARE fn_count INT;
+BEGIN
+  SELECT count(*) INTO fn_count
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+   WHERE n.nspname = 'public' AND p.proname = 'create_watering_event';
+  ASSERT fn_count > 0,
+    'DIAGNOSTIC[missing-function]: public.create_watering_event does not exist — '
+    'apply the legacy typed-event RPC migration before asserting its ACL.';
+  RAISE NOTICE '✓ create_watering_event is present (% overload(s))', fn_count;
+END $$;
+
 DO $$
 DECLARE want JSONB := '{
     "anon": false,
@@ -63,7 +80,8 @@ BEGIN
       JOIN pg_namespace n ON n.oid = p.pronamespace
      WHERE n.nspname = 'public' AND p.proname = 'create_watering_event';
     ASSERT got = expected,
-      format('EXECUTE create_watering_event for %I: expected %s, got %s',
+      format('DIAGNOSTIC[genuine-permission-mismatch]: EXECUTE create_watering_event for %I: expected=%s got=%s '
+             '(function present, ACL disagrees with trust-boundary contract)',
              role_name, expected, got);
   END LOOP;
   RAISE NOTICE '✓ create_watering_event EXECUTE is server-only (service_role)';

@@ -1,0 +1,13 @@
+$ node scripts/check-supabase-migration-safety.mjs
+[supabase-security] FAIL — 2 new high-risk finding(s) not in baseline:
+  • [PERMISSIVE_POLICY] 20260720162307_7553dade-f540-4641-95ff-f647054e7bcc.sql :: Anyone FOR INSERT
+      fingerprint=db4665a2832f03a0
+      CREATE POLICY "Anyone can submit feedback" ON public.customer_feedback FOR INSERT TO anon, authenticated WITH CHECK (true);
+  • [PERMISSIVE_POLICY] 20260720162307_7553dade-f540-4641-95ff-f647054e7bcc.sql :: Anyone FOR INSERT
+      fingerprint=27af402130342ba4
+      CREATE POLICY "Anyone can send a contact message" ON public.contact_messages FOR INSERT TO anon, authenticated WITH CHECK (true);
+
+Fix the migration, or (only for a legitimate pre-existing case) run:
+  node scripts/check-supabase-migration-safety.mjs --update-baseline
+and justify the change in review.
+error: script "check:supabase-security" exited with code 1

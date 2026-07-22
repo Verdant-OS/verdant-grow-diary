@@ -726,6 +726,105 @@ findings), and includes `partialFingerprints` (`migrationVersion`,
 with each other and with `--json`. Exit codes are unchanged: SARIF/annotation
 output is a report on the same underlying result, not a separate check.
 
+##### Sample SARIF output
+
+Use these to sanity-check what you're generating locally. Both are real,
+schema-valid SARIF 2.1.0 documents you can paste through
+[the OASIS SARIF validator](https://sarifweb.azurewebsites.net/Validation)
+or `jq` before wiring up `upload-sarif`.
+
+**Sample invocation** (drift against sandbox, file + stdout for inspection):
+
+```bash
+TARGET_ENV=sandbox \
+SUPABASE_DB_URL_SANDBOX="postgres://..." \
+node scripts/diff-money-migration-prefixes.mjs \
+  --sarif --sarif-out=audit/money-migrations/diff.sarif
+
+# Verify structure without eyeballing every field:
+jq '{version, schema: ."$schema", runs: (.runs | length),
+     tool: .runs[0].tool.driver.name,
+     rules: [.runs[0].tool.driver.rules[].id],
+     results: (.runs[0].results | length),
+     firstResult: .runs[0].results[0]}' \
+  audit/money-migrations/diff.sarif
+```
+
+**Sample output — clean run (no drift, exit `0`):**
+
+```jsonc
+{
+  "version": "2.1.0",
+  "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/Schemata/sarif-schema-2.1.0.json",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "diff-money-migration-prefixes",
+          "informationUri": "https://github.com/<owner>/<repo>",
+          "rules": [
+            { "id": "money-migration-drift",     "shortDescription": { "text": "Required migration prefix not applied in target DB" } },
+            { "id": "money-migration-malformed", "shortDescription": { "text": "Manifest entry missing a 14-digit prefix" } },
+            { "id": "money-migration-tooling",   "shortDescription": { "text": "DB URL missing, psql missing, or tracker query failed" } }
+          ]
+        }
+      },
+      "results": []   // empty on a clean run — this is valid SARIF, not an error
+    }
+  ]
+}
+```
+
+**Sample output — one drift finding (exit `1`):**
+
+```jsonc
+{
+  "version": "2.1.0",
+  "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/Schemata/sarif-schema-2.1.0.json",
+  "runs": [
+    {
+      "tool": { "driver": { "name": "diff-money-migration-prefixes", "rules": [ /* …3 rules… */ ] } },
+      "results": [
+        {
+          "ruleId": "money-migration-drift",
+          "level": "error",
+          "message": {
+            "text": "Required money migration not applied in sandbox: prefix 20260715120000 (supabase/migrations/20260715120000_ai_credit_spend.sql)"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": { "uri": "supabase/migrations/20260715120000_ai_credit_spend.sql" },
+                "region": { "startLine": 1 }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "migrationVersion": "20260715120000",
+            "targetEnv": "sandbox"
+          }
+        }
+      ]
+    }
+  ]
+}
+```
+
+Quick local self-check that what you generated is the shape above:
+
+```bash
+jq -e '
+  .version == "2.1.0"
+  and (.runs | length) == 1
+  and (.runs[0].tool.driver.name == "diff-money-migration-prefixes")
+  and ([.runs[0].tool.driver.rules[].id] | sort)
+      == ["money-migration-drift","money-migration-malformed","money-migration-tooling"]
+' audit/money-migrations/diff.sarif >/dev/null \
+  && echo "SARIF OK" || echo "SARIF INVALID"
+```
+
+
+
 ##### Using `--github-annotations` locally and in CI
 
 `--github-annotations` emits [GitHub workflow commands](https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#setting-an-error-message)

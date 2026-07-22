@@ -11,6 +11,7 @@
  * sufficient here (unlike AI-credit or export surfaces, which also re-check
  * server-side). No writes, no AI, no device control.
  */
+import { useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Loader2, Sprout, ArrowLeft } from "lucide-react";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
@@ -49,6 +50,11 @@ export default function GrowPhenoComparison() {
   const { data, isLoading, isError } = useGrowPhenoComparison(
     canCompare ? growId : undefined,
   );
+
+  // Stable real clock for snapshot freshness on THIS render of real data —
+  // without it the presenter would grade live readings against the fixed
+  // sample-fixture epoch. Memoized so re-renders don't flap stale badges.
+  const comparisonNow = useMemo(() => Date.now(), []);
 
   return (
     <div className="container max-w-6xl py-4 space-y-4">
@@ -136,7 +142,7 @@ export default function GrowPhenoComparison() {
         />
       ) : (
         <div data-testid="grow-pheno-comparison-live">
-          <PhenoComparison input={data.input} />
+          <PhenoComparison input={data.input} now={comparisonNow} />
         </div>
       )}
     </div>

@@ -21,6 +21,8 @@ import type {
   PhenoQuickLogInput,
   PhenoTimelineEventInput,
 } from "@/lib/phenoComparisonViewModel";
+import type { PhenoSensorSnapshotInput } from "@/lib/phenoComparisonRules";
+import type { SensorSnapshot } from "@/lib/sensorSnapshot";
 
 /** A candidate plant tagged into a pheno hunt. */
 export interface RealPhenoCandidatePlant {
@@ -52,6 +54,12 @@ export interface BuildRealPhenoComparisonInputArgs {
   activityByPlant: Readonly<Record<string, readonly RealPhenoActivityRow[]>>;
   /** plant_id → already-resolved (signed) photo URL, when one exists. */
   photoUrlByPlant?: Readonly<Record<string, string | null>>;
+  /**
+   * tent_id → latest classified-ready sensor snapshot input (context only).
+   * Candidates sharing a tent share the snapshot. Missing/null → the engine
+   * shows the honest "No sensor snapshot attached" flag.
+   */
+  snapshotByTent?: Readonly<Record<string, PhenoSensorSnapshotInput | null>>;
   /** Max quick-log / timeline rows carried per candidate. Default 5. */
   maxActivityPerCandidate?: number;
 }
@@ -115,6 +123,34 @@ function toTimelineEvents(
 }
 
 /**
+ * Bridge a canonical `SensorSnapshot` (sensorSnapshot.ts — the same folding
+ * the Dashboard "Latest Environment" card uses) into the pheno engine's
+ * snapshot input. Pure. Source honesty is preserved:
+ *   - "sim" maps to "demo" (the pheno canonical for simulated data);
+ *   - "diary" maps to "manual" (a diary-sourced reading was hand-entered);
+ *   - "unavailable" (or a missing snapshot) maps to null so the engine shows
+ *     the honest no-snapshot flag instead of a fabricated reading.
+ * EC/pH/PPFD relevance flags are left unset (false): tent readings are
+ * context only here, so absent metrics are not alarmed as "missing".
+ */
+export function phenoSnapshotFromSensorSnapshot(
+  snap: SensorSnapshot | null | undefined,
+): PhenoSensorSnapshotInput | null {
+  if (!snap) return null;
+  if (snap.source === "unavailable") return null;
+  const source =
+    snap.source === "sim" ? "demo" : snap.source === "diary" ? "manual" : snap.source;
+  return {
+    source,
+    capturedAt: snap.ts ?? null,
+    temp: snap.temp,
+    rh: snap.rh,
+    vpd: snap.vpd,
+    ppfd: snap.ppfd ?? null,
+  };
+}
+
+/**
  * Build a real (non-sample) PhenoComparisonInput. `isDemo` is always false so
  * the presenter never stamps a real comparison as sample data.
  */
@@ -127,10 +163,13 @@ export function buildRealPhenoComparisonInput(
 
   const ordered = [...args.candidates].sort(compareCandidates);
 
+  const snapshotByTent = args.snapshotByTent ?? {};
+
   const candidates: PhenoCandidateInput[] = ordered.map((c, index) => {
     const activity = args.activityByPlant[c.id] ?? [];
     const tentName = c.tent_id ? nullableText(args.tentNameById[c.tent_id]) : null;
     const photoUrl = nullableText(photoByPlant[c.id] ?? null);
+    const snapshot = c.tent_id ? snapshotByTent[c.tent_id] ?? null : null;
     return {
       id: c.id,
       candidateLabel: cleanLabel(c.candidate_label, `#${index + 1}`),
@@ -144,9 +183,10 @@ export function buildRealPhenoComparisonInput(
       photoUrl,
       quickLogs: toQuickLogs(activity, max),
       timelineEvents: toTimelineEvents(activity, max),
-      // phenotype / postCure / dayOfFlower / replicateCount / snapshot are
-      // intentionally unset — no structured store exists yet, and the engine
-      // renders honest evidence-gap caveats for each.
+      snapshot,
+      // phenotype / postCure / dayOfFlower / replicateCount are intentionally
+      // unset — no structured store exists yet, and the engine renders honest
+      // evidence-gap caveats for each.
     };
   });
 

@@ -10,6 +10,7 @@ import { DevOpsBackupEncryptionCard } from "@/components/DevOpsBackupEncryptionC
 import { EvidenceCoveragePanel } from "@/components/EvidenceCoveragePanel";
 import { useEvidenceCoverage } from "@/hooks/useEvidenceCoverage";
 import { BuildInfoPanel } from "@/components/BuildInfoPanel";
+import { ResourceHealthPanel } from "@/components/ResourceHealthPanel";
 
 type CheckStatus = "pending" | "running" | "pass" | "fail" | "skip";
 
@@ -186,6 +187,10 @@ export default function Diagnostics() {
       </header>
 
       <BuildInfoPanel />
+
+      <ResourceHealthPanel />
+
+
 
 
 

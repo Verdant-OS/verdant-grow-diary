@@ -1,0 +1,166 @@
+name: deployment-preview
+
+# Deployment-preview pipeline: on every PR (and manual dispatch), gate
+# the Lovable preview environment behind the same checks that run in
+# CI's production path — edge-shared mirror preflight, typecheck, and a
+# full production build. Green pipeline → the Lovable preview URL is
+# safe to share. Red pipeline → the preview is still served by Lovable
+# but the PR comment flags it as unverified.
+#
+# This does NOT publish to production. Publishing to Lovable's
+# published URL is a manual action from the Lovable UI. This pipeline
+# only certifies the preview is buildable + mirror-consistent.
+
+on:
+  pull_request:
+    branches: [main, verdant-grow-diary]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write   # post/update the preview-status comment
+  issues: write          # (pull_request comments API is under /issues/)
+
+concurrency:
+  # One preview build per PR — cancel superseded runs so the PR comment
+  # always reflects the latest commit, not a stale in-flight build.
+  group: deployment-preview-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Stage 1 — cheap gate. Fails in <1 min if the edge shared-lib mirror
+  # is out of sync, so the expensive build stage never starts.
+  preflight:
+    name: Preflight — edge shared-lib mirror
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: No src/lib imports from supabase/functions
+        run: node scripts/check-no-src-lib-imports.mjs
+
+      - name: Verify edge shared-lib mirror is in sync
+        id: verify-mirror
+        run: node scripts/verify-edge-shared-in-sync.mjs --check-only
+
+      - name: Human-readable drift report
+        if: always() && steps.verify-mirror.outcome == 'failure'
+        env:
+          DRIFT_REPORT_OUT: edge-shared-drift-report.md
+        run: node scripts/report-edge-shared-drift.mjs || true
+
+      - name: Upload drift report
+        if: always() && steps.verify-mirror.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: edge-shared-drift-report-preview
+          path: edge-shared-drift-report.md
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # Stage 2 — production build. Uses the same command Lovable's hosted
+  # build runs (`vite build` via `bun run build`) so a green here means
+  # the same bytecode Lovable will serve on preview refresh.
+  build:
+    name: Production build (preview-bound)
+    needs: preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck (stop-ship gate)
+        run: bun run typecheck
+
+      - name: Production build
+        env:
+          NODE_ENV: production
+        run: bun run build
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview-build-${{ github.event.pull_request.head.sha || github.sha }}
+          path: dist
+          retention-days: 7
+
+  # Stage 3 — publish the preview status back to the PR. Runs even when
+  # earlier stages fail so the PR always shows current preview health.
+  publish-preview-status:
+    name: Publish preview status to PR
+    needs: [preflight, build]
+    if: always() && github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Post preview-status comment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+          PREFLIGHT: ${{ needs.preflight.result }}
+          BUILD: ${{ needs.build.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          MARKER="<!-- deployment-preview-status -->"
+
+          if [ "$PREFLIGHT" = "success" ] && [ "$BUILD" = "success" ]; then
+            STATUS="✅ **Preview verified** — safe to share"
+            NOTE="Edge-shared mirror in sync, typecheck clean, production build succeeded."
+          else
+            STATUS="❌ **Preview unverified** — do not share"
+            NOTE="One or more gates failed. The Lovable preview may still load, but its build may not match \`main\`."
+          fi
+
+          BODY=$(cat <<EOF
+          $MARKER
+          ### Deployment preview pipeline
+
+          $STATUS
+
+          | Stage                       | Result       |
+          |-----------------------------|--------------|
+          | Edge-shared preflight       | \`$PREFLIGHT\` |
+          | Typecheck + production build| \`$BUILD\`     |
+
+          $NOTE
+
+          - Commit: \`${SHA:0:12}\`
+          - Workflow run: $RUN_URL
+          - Lovable preview: use the preview URL from the Lovable editor for this branch.
+          EOF
+          )
+
+          # Idempotent update: patch existing marker comment if present.
+          EXISTING=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
+            -q ".[] | select(.body | contains(\"$MARKER\")) | .id" | head -n1)
+
+          if [ -n "$EXISTING" ]; then
+            gh api --method PATCH "repos/$REPO/issues/comments/$EXISTING" -f body="$BODY" >/dev/null
+            echo "Updated preview-status comment $EXISTING."
+          else
+            gh pr comment "$PR" --repo "$REPO" --body "$BODY"
+            echo "Posted preview-status comment on PR #$PR."
+          fi
+
+      # Mirror the pipeline result into the job outcome so branch
+      # protection rules can require "publish-preview-status" as a
+      # single required check that reflects overall preview health.
+      - name: Enforce overall preview verdict
+        run: |
+          if [ "${{ needs.preflight.result }}" != "success" ] || [ "${{ needs.build.result }}" != "success" ]; then
+            echo "::error::Deployment preview pipeline failed — see stage results above."
+            exit 1
+          fi

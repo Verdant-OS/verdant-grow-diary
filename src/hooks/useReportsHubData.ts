@@ -5,9 +5,10 @@
  *  - Outcome rollup + Action Outcome Learning report (action_outcome diary rows)
  *  - Open environment alert counts by severity
  *  - Latest sensor reading captured_at + count of recent readings, scoped to
- *    the grow's tents (grow-linked tents plus tents hosting the grow's
- *    active plants — so a reading the grower sees on the default Dashboard's
- *    Environment Snapshot for a plant-hosted tent is never invisible here)
+ *    the grow's tents (grow-linked tents plus UNASSIGNED tents hosting the
+ *    grow's active plants — so a reading the grower sees on the default
+ *    Dashboard's Environment Snapshot for an orphaned plant-hosted tent is
+ *    never invisible here; tents linked to another grow never leak in)
  *  - Diary entry total + last-7-days count for timeline activity summary,
  *    merged with the manual `grow_events` spine (a plain Quick Log save has
  *    no diary companion; companions dedupe by linkage + timestamp pair)
@@ -34,7 +35,10 @@ import {
   findPendingOutcomeReviews,
   PENDING_OUTCOME_REVIEW_THRESHOLD_MS,
 } from "@/lib/pendingOutcomeReviewRules";
-import { normalizeSensorSource } from "@/lib/sensor/sensorSourceRules";
+import {
+  normalizeSensorSource,
+  rawSensorSourceValuesFor,
+} from "@/lib/sensor/sensorSourceRules";
 import { isDiagnosticSensorProvenanceRow } from "@/lib/sensorProvenanceFenceRules";
 import { resolveSensorObservationTime } from "@/lib/sensorObservationTimeRules";
 import {
@@ -106,25 +110,42 @@ export function isReportsHubSensorContextRow(row: ReportsHubSensorRow): boolean 
 /**
  * Resolve which tents count as the grow's tents for the sensor summary.
  * A tent qualifies when the grower linked it directly (`tents.grow_id`)
- * OR when it hosts the grow's active plants (`plants.tent_id`). Manual
- * readings land on ANY owned tent (the Sensors page tent list is not
- * grow-filtered) and the default unscoped Dashboard shows them — so the
- * Hub must not claim "no readings recorded for this grow" for a tent the
- * grower stocked with this grow's plants (live audit #16).
+ * OR when it is UNASSIGNED (`grow_id` null) and hosts the grow's active
+ * plants (`plants.tent_id`). Manual readings land on ANY owned tent (the
+ * Sensors page tent list is not grow-filtered) and the default unscoped
+ * Dashboard shows them — so the Hub must not claim "no readings recorded
+ * for this grow" for an orphaned tent the grower stocked with this grow's
+ * plants (live audit #16).
+ *
+ * A tent explicitly assigned to ANOTHER grow never qualifies: moving one
+ * plant into grow B's tent (AssignTentDialog updates only plants.tent_id)
+ * must not pull grow B's entire sensor history into grow A's report.
  * Pure: dedupes, drops blanks, sorts for deterministic query keys.
  */
 export function resolveReportsHubSensorTentIds(
-  growLinkedTents: ReadonlyArray<{ id?: string | null } | null | undefined> | null,
+  candidateTents:
+    | ReadonlyArray<{ id?: string | null; grow_id?: string | null } | null | undefined>
+    | null,
   growPlants: ReadonlyArray<{ tent_id?: string | null } | null | undefined> | null,
+  growId: string,
 ): string[] {
-  const ids = new Set<string>();
-  for (const row of growLinkedTents ?? []) {
-    const id = typeof row?.id === "string" ? row.id.trim() : "";
-    if (id) ids.add(id);
-  }
+  const plantTentIds = new Set<string>();
   for (const row of growPlants ?? []) {
     const id = typeof row?.tent_id === "string" ? row.tent_id.trim() : "";
-    if (id) ids.add(id);
+    if (id) plantTentIds.add(id);
+  }
+  const ids = new Set<string>();
+  for (const row of candidateTents ?? []) {
+    const id = typeof row?.id === "string" ? row.id.trim() : "";
+    if (!id) continue;
+    const hostGrowId =
+      typeof row?.grow_id === "string" && row.grow_id.trim() ? row.grow_id.trim() : null;
+    if (hostGrowId === growId) {
+      ids.add(id);
+    } else if (hostGrowId === null && plantTentIds.has(id)) {
+      ids.add(id);
+    }
+    // hostGrowId set to a different grow: never included.
   }
   return [...ids].sort();
 }
@@ -135,15 +156,18 @@ async function loadReportsHubSensorPage(input: {
   recentSince?: string;
   before?: string;
 }): Promise<ReportsHubSensorRow[]> {
-  // No raw SQL `source` filter here: the Dashboard's readings query has
-  // none either, and raw values are normalized (e.g. "user" → manual)
-  // before the fence decides. `isReportsHubSensorContextRow` is the single
-  // eligibility authority, so a row the Dashboard shows as a usable
-  // manual/live/CSV reading is never invisible to the Hub.
+  // Server-side source pre-filter DERIVED from the same alias table the
+  // client fence normalizes with (rawSensorSourceValuesFor), so the two
+  // can never disagree about which raw tokens are eligible — e.g. legacy
+  // "user" rows normalize to manual and stay visible — while demo /
+  // diagnostic-heavy tents don't force paging through excluded rows.
+  // `isReportsHubSensorContextRow` remains the eligibility authority
+  // (observation time + diagnostic provenance are client-side checks).
   let query = supabase
     .from("sensor_readings")
     .select("ts,captured_at,source,raw_payload")
-    .in("tent_id", input.tentIds);
+    .in("tent_id", input.tentIds)
+    .in("source", rawSensorSourceValuesFor(["live", "manual", "csv"]));
   // Use physical observation time for the learning summary. Legacy rows with
   // no captured_at retain their established ts fallback; imported historical
   // rows cannot inflate a recent count simply because they were imported now.
@@ -165,6 +189,22 @@ async function loadReportsHubSensorPage(input: {
   return (data ?? []) as ReportsHubSensorRow[];
 }
 
+/**
+ * Later of two ISO observation times. The query orders by captured_at
+ * with nulls last, so a legacy null-captured_at row (ts fallback) can sit
+ * AFTER a physically older row — "latest" must compare resolved
+ * observation times, never trust database order.
+ */
+export function laterObservation(a: string | null, b: string | null): string | null {
+  if (!a) return b;
+  if (!b) return a;
+  const aMs = Date.parse(a);
+  const bMs = Date.parse(b);
+  if (!Number.isFinite(bMs)) return a;
+  if (!Number.isFinite(aMs)) return b;
+  return bMs > aMs ? b : a;
+}
+
 async function findLatestReportsHubSensorAt(
   tentIds: string[],
   before: string,
@@ -172,8 +212,15 @@ async function findLatestReportsHubSensorAt(
   let from = 0;
   while (true) {
     const page = await loadReportsHubSensorPage({ tentIds, from, before });
-    const eligible = page.find(isReportsHubSensorContextRow);
-    if (eligible) return resolveSensorObservationTime(eligible);
+    // Scan the WHOLE page and keep the max resolved observation time —
+    // the first eligible row in database order is not necessarily the
+    // physically latest one (legacy null-captured_at rows sort last).
+    let latest: string | null = null;
+    for (const row of page) {
+      if (!isReportsHubSensorContextRow(row)) continue;
+      latest = laterObservation(latest, resolveSensorObservationTime(row));
+    }
+    if (latest) return latest;
     if (page.length < REPORTS_HUB_SENSOR_PAGE_SIZE) return null;
     from += REPORTS_HUB_SENSOR_PAGE_SIZE;
   }
@@ -191,7 +238,10 @@ async function loadReportsHubSensorSummary(
     for (const row of page) {
       if (!isReportsHubSensorContextRow(row)) continue;
       recentSensorReadingCount += 1;
-      latestSensorCapturedAt ??= resolveSensorObservationTime(row);
+      latestSensorCapturedAt = laterObservation(
+        latestSensorCapturedAt,
+        resolveSensorObservationTime(row),
+      );
     }
     if (page.length < REPORTS_HUB_SENSOR_PAGE_SIZE) break;
     from += REPORTS_HUB_SENSOR_PAGE_SIZE;
@@ -216,11 +266,16 @@ export function useReportsHubData(growId: string | null | undefined): ReportsHub
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
     try {
-      // Resolve tent ids for sensor lookup. Grow-linked tents plus tents
-      // hosting the grow's active plants — see resolveReportsHubSensorTentIds
-      // for the scoping contract (live audit #16).
+      // Resolve tent ids for sensor lookup. Candidates are this grow's
+      // linked tents plus UNASSIGNED tents (grow_id null); the pure helper
+      // admits an unassigned candidate only when it hosts this grow's
+      // active plants, and a tent linked to another grow is never a
+      // candidate — see resolveReportsHubSensorTentIds (live audit #16).
       const [tentRowsRes, plantTentRowsRes] = await Promise.all([
-        supabase.from("tents").select("id").eq("grow_id", growId),
+        supabase
+          .from("tents")
+          .select("id,grow_id")
+          .or(`grow_id.eq.${growId},grow_id.is.null`),
         supabase
           .from("plants")
           .select("tent_id")
@@ -231,8 +286,9 @@ export function useReportsHubData(growId: string | null | undefined): ReportsHub
       if (tentRowsRes.error) throw tentRowsRes.error;
       if (plantTentRowsRes.error) throw plantTentRowsRes.error;
       const tentIds = resolveReportsHubSensorTentIds(
-        tentRowsRes.data as { id?: string | null }[] | null,
+        tentRowsRes.data as { id?: string | null; grow_id?: string | null }[] | null,
         plantTentRowsRes.data as { tent_id?: string | null }[] | null,
+        growId,
       );
 
       const completedCutoffIso = new Date(

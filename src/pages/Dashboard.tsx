@@ -247,7 +247,11 @@ export default function Dashboard() {
       dashboardHealthSnapshot,
       targetsState.status === "ok" ? targetsState.targets : null,
     ),
-    enabled: !!scopedGrowId,
+    // Gated on the tent read having settled: while it is pending, `tents`
+    // is a placeholder empty array and alertContextStage falls back to the
+    // grow row alone — an alert persisted against a stale grow stage in
+    // that window would not be removed once the tent stages arrive.
+    enabled: !!scopedGrowId && tentsQuery.isFetched,
     stage: alertContextStage,
   });
 

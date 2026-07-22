@@ -42,9 +42,18 @@ vi.mock("@/components/GrowTargetsEditor", () => ({ default: () => null }));
 const ROOT = resolve(__dirname, "../..");
 const DASHBOARD_PAGE = readFileSync(resolve(ROOT, "src/pages/Dashboard.tsx"), "utf8");
 
-function mockTents(stages: (string | null)[]) {
+function mockTents(stages: (string | null)[], opts: { settled?: boolean } = {}) {
   vi.mocked(useGrowTents).mockReturnValue({
     data: stages.map((stage, i) => ({ id: `tent-${i}`, name: `Tent ${i}`, stage })),
+    isFetched: opts.settled ?? true,
+  } as never);
+}
+
+function mockTentsPending() {
+  // React Query placeholder shape while the tent read is in flight.
+  vi.mocked(useGrowTents).mockReturnValue({
+    data: undefined,
+    isFetched: false,
   } as never);
 }
 
@@ -112,6 +121,25 @@ describe("AlertsAutoPersistForGrow — resolved stage feeds persistence", () => 
       expect.objectContaining({ stage: null }),
     );
   });
+
+  it("holds persistence (enabled: false) while the tent read is still pending", () => {
+    // Review follow-up: while useGrowTents is in flight the resolver only
+    // sees the grow row — persisting a stale-stage alert in that window
+    // would not be undone when the tent stages arrive.
+    mockTentsPending();
+    render(<AlertsAutoPersistForGrow growId="g1" stage="seedling" />);
+    expect(vi.mocked(usePersistEnvironmentAlerts)).toHaveBeenCalledWith(
+      expect.objectContaining({ enabled: false }),
+    );
+  });
+
+  it("enables persistence once the tent read has settled", () => {
+    mockTents(["veg"], { settled: true });
+    render(<AlertsAutoPersistForGrow growId="g1" stage="seedling" />);
+    expect(vi.mocked(usePersistEnvironmentAlerts)).toHaveBeenCalledWith(
+      expect.objectContaining({ enabled: true, stage: "veg" }),
+    );
+  });
 });
 
 describe("Dashboard — static wiring of the shared stage resolver", () => {
@@ -131,5 +159,9 @@ describe("Dashboard — static wiring of the shared stage resolver", () => {
     expect(DASHBOARD_PAGE).toContain("normalizeVpdStage(alertContextStage)");
     // No alert/threshold evaluation site reads scopedGrow?.stage directly.
     expect(DASHBOARD_PAGE).not.toMatch(/stage:\s*scopedGrow\?\.stage/);
+  });
+
+  it("persistence waits for the tent read to settle before trusting the stage", () => {
+    expect(DASHBOARD_PAGE).toContain("enabled: !!scopedGrowId && tentsQuery.isFetched");
   });
 });

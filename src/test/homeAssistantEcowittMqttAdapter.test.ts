@@ -35,8 +35,8 @@ const mapping: HaMqttMappingFile = {
   ],
 };
 
-function jsonArgs(overrides: Partial<Parameters<typeof parseHaJsonMessage>[0]["payload"] & { topic?: string; retained?: boolean }> = {}) {
-  const { topic, retained, ...payloadOverrides } = overrides as Record<string, unknown>;
+function jsonArgs(overrides: Record<string, unknown> = {}) {
+  const { topic, retained, ...payloadOverrides } = overrides;
   return {
     topic: (topic as string) ?? "homeassistant/ha_json",
     retained: (retained as boolean) ?? false,

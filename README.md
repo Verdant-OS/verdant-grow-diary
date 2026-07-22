@@ -693,6 +693,73 @@ findings), and includes `partialFingerprints` (`migrationVersion`,
 with each other and with `--json`. Exit codes are unchanged: SARIF/annotation
 output is a report on the same underlying result, not a separate check.
 
+##### Using `--github-annotations` locally and in CI
+
+`--github-annotations` emits [GitHub workflow commands](https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#setting-an-error-message)
+(`::error file=...,line=1::<message>`) on **stderr**. It reads the same
+inputs as any other invocation of the CLI — nothing extra to prepare:
+
+- `scripts/required-money-migrations.mjs` (the `REQUIRED_MONEY_MIGRATIONS`
+  manifest) — for the expected 14-digit prefixes and their file paths.
+- `supabase/migrations/*.sql` on disk — to confirm each required file
+  exists and to extract its prefix.
+- The target database's `supabase_migrations.schema_migrations` table
+  (via `psql` + `SUPABASE_DB_URL` / `SUPABASE_DB_URL_SANDBOX` /
+  `SUPABASE_DB_URL_LIVE`, selected by `TARGET_ENV`) — for the applied
+  prefixes. Omit the DB URL when running `--expected` only; the CLI
+  emits `money-migration-malformed` annotations without a DB round-trip.
+
+Annotations map 1:1 to SARIF results:
+
+| Rule                            | `file=` points at                                     |
+|---------------------------------|-------------------------------------------------------|
+| `money-migration-drift`         | `supabase/migrations/<missing-file>.sql`              |
+| `money-migration-malformed`     | `scripts/required-money-migrations.mjs` (manifest)    |
+| `money-migration-tooling`       | `scripts/required-money-migrations.mjs` (manifest)    |
+
+**Local usage.** Annotations render as plain `::error ...::` lines
+outside Actions — useful for a quick eyeball, but the text diff on
+stdout is easier to read:
+
+```bash
+# Print annotations to stderr; keep the text diff on stdout.
+TARGET_ENV=sandbox node scripts/diff-money-migration-prefixes.mjs \
+  --github-annotations
+
+# Capture just the annotations for inspection.
+TARGET_ENV=sandbox node scripts/diff-money-migration-prefixes.mjs \
+  --github-annotations 2> annotations.txt
+```
+
+There is also a shortcut in `package.json`:
+
+```bash
+bun run prefix-diff:annotations           # current env
+TARGET_ENV=live bun run prefix-diff:annotations
+```
+
+**CI usage.** Inside a GitHub Actions job, stderr is parsed automatically
+— no `upload-sarif` step required. Annotations appear in two places:
+
+1. The **job log**, inline with the failing step, expanded by default.
+2. The **PR "Files changed" tab**, as red gutter markers on the exact
+   `supabase/migrations/<file>.sql` (or manifest) referenced by `file=`.
+
+Minimal step:
+
+```yaml
+- name: Prefix diff (annotations)
+  env:
+    TARGET_ENV: sandbox
+    SUPABASE_DB_URL_SANDBOX: ${{ secrets.SUPABASE_DB_URL_SANDBOX }}
+  run: node scripts/diff-money-migration-prefixes.mjs --github-annotations
+```
+
+Combine with `--sarif` when you also want code-scanning history and
+de-duplication across re-runs; use `--github-annotations` alone when you
+only need the inline PR markers.
+
+
 
 
 

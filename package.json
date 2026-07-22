@@ -57,6 +57,7 @@
     "prefix-diff:sandbox": "cross-env TARGET_ENV=sandbox node scripts/diff-money-migration-prefixes.mjs --json",
     "prefix-diff:live": "cross-env TARGET_ENV=live node scripts/diff-money-migration-prefixes.mjs --json",
     "prefix-diff:summarize": "node scripts/summarize-prefix-diff-json.mjs",
+    "validate:sarif": "node scripts/validate-sarif.mjs",
     "test:prefix-diff": "bunx vitest run src/test/diff-money-migration-prefixes.test.ts src/test/required-money-migrations-version.test.ts",
     "test:prefix-diff:local": "bunx vitest run src/test/diff-money-migration-prefixes.test.ts src/test/required-money-migrations-version.test.ts --reporter=verbose",
     "test:vitest:controlled": "node scripts/vitest-controlled/cli.mjs run --shard 1/1",

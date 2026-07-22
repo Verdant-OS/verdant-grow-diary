@@ -185,6 +185,10 @@ export default function Diagnostics() {
         </p>
       </header>
 
+      <BuildInfoPanel />
+
+
+
       <Button onClick={runAll} disabled={running}>
         {running ? "Running…" : "Run checks"}
       </Button>

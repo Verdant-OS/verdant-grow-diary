@@ -99,7 +99,7 @@ jobs:
             exit 2
           fi
           # Loopback guard — refuse anything that isn't localhost.
-          HOST="$(echo "$DB_URL" | awk -F'[@:/]' '{print $4}')"
+          HOST="$(python3 -c 'import sys; from urllib.parse import urlparse; print(urlparse(sys.argv[1]).hostname or "")' "$DB_URL")"
           case "$HOST" in
             localhost|127.0.0.1|::1) ;;
             *)

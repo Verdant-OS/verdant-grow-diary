@@ -19,7 +19,10 @@ const stripped = SRC.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]
 
 describe("get-paddle-price — paid plan allowlist", () => {
   it("accepts exactly pro_monthly, pro_annual, founder_lifetime", () => {
-    expect(SRC).toMatch(/PAID_PLAN_ALLOWLIST[\s\S]{0,120}'pro_monthly',\s*'pro_annual',\s*'founder_lifetime',/);
+    // Quote-agnostic: prettier normalizes edge functions to double quotes.
+    expect(SRC).toMatch(
+      /PAID_PLAN_ALLOWLIST[\s\S]{0,120}["']pro_monthly["'],\s*["']pro_annual["'],\s*["']founder_lifetime["'],/,
+    );
     expect(SRC).toMatch(/PAID_PLAN_ALLOWLIST\.has\(requested\)/);
     // Fail-closed branch for anything outside the allowlist.
     expect(SRC).toMatch(/unknown_plan/);
@@ -59,14 +62,15 @@ describe("get-paddle-price — server-controlled environment", () => {
 
 describe("get-paddle-price — founder sold-out pre-check (before payment)", () => {
   it("founder_lifetime availability is checked via the aggregate RPC before any price is returned", () => {
-    expect(SRC).toMatch(/requested === 'founder_lifetime'/);
-    expect(SRC).toMatch(/supabase\.rpc\(\s*'founder_lifetime_slots_remaining',?\s*\)/);
+    // Quote-agnostic: prettier normalizes edge functions to double quotes.
+    expect(SRC).toMatch(/requested === ["']founder_lifetime["']/);
+    expect(SRC).toMatch(/supabase\.rpc\(\s*["']founder_lifetime_slots_remaining["'],?\s*\)/);
     expect(SRC).toMatch(/plan_sold_out/);
   });
 
   it("fails closed: RPC error blocks checkout, and a non-number or <=0 count is sold out", () => {
     expect(stripped).toMatch(/if \(capError\) \{/);
-    expect(stripped).toMatch(/typeof remaining !== 'number' \|\| remaining <= 0/);
+    expect(stripped).toMatch(/typeof remaining !== ["']number["'] \|\| remaining <= 0/);
     // The pre-check happens BEFORE the gateway price fetch in source order,
     // so a sold-out founder plan can never reach checkout pricing at all.
     const soldOutIdx = stripped.indexOf("plan_sold_out");

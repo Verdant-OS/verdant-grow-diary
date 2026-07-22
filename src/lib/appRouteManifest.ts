@@ -270,6 +270,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     description: "Operator billing subscription update audit (read-only).",
   },
   {
+    path: "/operator/credits-audit",
+    access: "operator",
+    description: "Operator AI-credit grants/spends audit (read-only).",
+  },
+  {
     path: "/operator/demo-preview",
     access: "operator",
     description: "Operator demo preview (read-only).",

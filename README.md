@@ -693,71 +693,88 @@ findings), and includes `partialFingerprints` (`migrationVersion`,
 with each other and with `--json`. Exit codes are unchanged: SARIF/annotation
 output is a report on the same underlying result, not a separate check.
 
-##### Using `--github-annotations` locally and in CI
+#### Worked example: `--sarif` and `--sarif-out=PATH`
 
-`--github-annotations` emits [GitHub workflow commands](https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#setting-an-error-message)
-(`::error file=...,line=1::<message>`) on **stderr**. It reads the same
-inputs as any other invocation of the CLI — nothing extra to prepare:
-
-- `scripts/required-money-migrations.mjs` (the `REQUIRED_MONEY_MIGRATIONS`
-  manifest) — for the expected 14-digit prefixes and their file paths.
-- `supabase/migrations/*.sql` on disk — to confirm each required file
-  exists and to extract its prefix.
-- The target database's `supabase_migrations.schema_migrations` table
-  (via `psql` + `SUPABASE_DB_URL` / `SUPABASE_DB_URL_SANDBOX` /
-  `SUPABASE_DB_URL_LIVE`, selected by `TARGET_ENV`) — for the applied
-  prefixes. Omit the DB URL when running `--expected` only; the CLI
-  emits `money-migration-malformed` annotations without a DB round-trip.
-
-Annotations map 1:1 to SARIF results:
-
-| Rule                            | `file=` points at                                     |
-|---------------------------------|-------------------------------------------------------|
-| `money-migration-drift`         | `supabase/migrations/<missing-file>.sql`              |
-| `money-migration-malformed`     | `scripts/required-money-migrations.mjs` (manifest)    |
-| `money-migration-tooling`       | `scripts/required-money-migrations.mjs` (manifest)    |
-
-**Local usage.** Annotations render as plain `::error ...::` lines
-outside Actions — useful for a quick eyeball, but the text diff on
-stdout is easier to read:
+End-to-end walkthrough that generates a SARIF file locally, inspects it, and
+(optionally) uploads it to GitHub code scanning.
 
 ```bash
-# Print annotations to stderr; keep the text diff on stdout.
-TARGET_ENV=sandbox node scripts/diff-money-migration-prefixes.mjs \
-  --github-annotations
+# 1. Point at the target DB (sandbox shown here).
+export SUPABASE_DB_URL_SANDBOX="postgres://postgres:PASSWORD@HOST:5432/postgres"
+export TARGET_ENV=sandbox
 
-# Capture just the annotations for inspection.
-TARGET_ENV=sandbox node scripts/diff-money-migration-prefixes.mjs \
-  --github-annotations 2> annotations.txt
+# 2. Make sure the output directory exists (the script does NOT create parents).
+mkdir -p audit/money-migrations
+
+# 3. Run the diff and emit SARIF to a file. The human-readable text diff
+#    still prints to stdout so CI logs remain useful.
+node scripts/diff-money-migration-prefixes.mjs \
+  --sarif \
+  --sarif-out=audit/money-migrations/diff.sarif
+# Exit codes: 0 = clean, 1 = drift, 2 = tooling failure.
+# The SARIF file is written on every exit code, including 0 (empty results array).
 ```
 
-There is also a shortcut in `package.json`:
+Shortcut equivalents from `package.json`:
 
 ```bash
-bun run prefix-diff:annotations           # current env
-TARGET_ENV=live bun run prefix-diff:annotations
+# Writes to audit/money-migrations/diff.sarif using the sandbox DB URL.
+bun run prefix-diff:sarif
+
+# Same, targeted at live.
+TARGET_ENV=live bun run prefix-diff:sarif
 ```
 
-**CI usage.** Inside a GitHub Actions job, stderr is parsed automatically
-— no `upload-sarif` step required. Annotations appear in two places:
+**Inspecting the SARIF locally**
 
-1. The **job log**, inline with the failing step, expanded by default.
-2. The **PR "Files changed" tab**, as red gutter markers on the exact
-   `supabase/migrations/<file>.sql` (or manifest) referenced by `file=`.
+```bash
+# Quick sanity check — jq shows the tool banner, rule catalog, and result count.
+jq '.runs[0].tool.driver.name,
+    (.runs[0].tool.driver.rules | map(.id)),
+    (.runs[0].results | length),
+    .runs[0].results[0]' \
+   audit/money-migrations/diff.sarif
 
-Minimal step:
-
-```yaml
-- name: Prefix diff (annotations)
-  env:
-    TARGET_ENV: sandbox
-    SUPABASE_DB_URL_SANDBOX: ${{ secrets.SUPABASE_DB_URL_SANDBOX }}
-  run: node scripts/diff-money-migration-prefixes.mjs --github-annotations
+# List every finding: rule ID, offending file, and message.
+jq -r '.runs[0].results[] |
+       "\(.ruleId)\t\(.locations[0].physicalLocation.artifactLocation.uri)\t\(.message.text)"' \
+   audit/money-migrations/diff.sarif
 ```
 
-Combine with `--sarif` when you also want code-scanning history and
-de-duplication across re-runs; use `--github-annotations` alone when you
-only need the inline PR markers.
+Prefer a UI? Two options:
+
+- **VS Code** — install the `MS-SarifVSCode.sarif-viewer` extension, then
+  `code audit/money-migrations/diff.sarif`. Findings open in the "SARIF
+  Results" panel with jump-to-file navigation.
+- **GitHub code scanning** — upload the file from any workflow (public
+  repos, or private repos with Advanced Security). Each result appears
+  as an inline annotation on the offending migration file:
+
+  ```yaml
+  - name: Prefix diff (SARIF)
+    run: |
+      mkdir -p audit/money-migrations
+      node scripts/diff-money-migration-prefixes.mjs \
+        --sarif --sarif-out=audit/money-migrations/diff.sarif || true
+  - uses: github/codeql-action/upload-sarif@v3
+    with:
+      sarif_file: audit/money-migrations/diff.sarif
+      category: money-migration-drift-${{ env.TARGET_ENV }}
+  ```
+
+  Use a distinct `category` per environment so sandbox and live results
+  don't overwrite each other in the Security tab.
+
+**Interpreting a run**
+
+- Empty `runs[0].results` + exit `0` → no drift. The rule catalog is still
+  present so code scanning keeps the category alive.
+- `money-migration-drift` results + exit `1` → required prefixes missing
+  from the target DB. `artifactLocation.uri` points at the exact
+  `supabase/migrations/<file>` that needs to be applied.
+- `money-migration-tooling` results + exit `2` → the check couldn't
+  complete (no DB URL, `psql` missing, tracker query failed). Fix the
+  environment before trusting a "clean" run.
 
 
 

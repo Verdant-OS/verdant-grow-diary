@@ -76,6 +76,7 @@ interface Plant {
   growId?: string | null;
   lastNote?: string | null;
   photo?: string | null;
+  plantType?: string | null;
 }
 
 interface Props {

@@ -12,19 +12,26 @@
  *   - plants (pheno_hunt_id) — candidate plants + candidate_label.
  *   - grows / tents          — display names for context.
  *   - grow_events            — recent activity per candidate (kind + note).
+ *   - diary_entries.photo_url — latest photo per candidate (signed via the
+ *     diary-photos bucket, same flow as Timeline).
+ *   - sensor_readings        — latest reading set per candidate tent, folded
+ *     through the canonical snapshotFromReadings and bridged into the pheno
+ *     engine's snapshot input (context only; stale/demo stay flagged).
  *
- * Structured phenotype / post-cure / photo / sensor enrichment is deliberately
- * out of scope for now; the comparability engine surfaces those as honest
- * evidence gaps.
+ * Structured phenotype / post-cure records are deliberately out of scope for
+ * now; the comparability engine surfaces those as honest evidence gaps.
  */
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import {
   buildRealPhenoComparisonInput,
+  phenoSnapshotFromSensorSnapshot,
   type RealPhenoActivityRow,
   type RealPhenoCandidatePlant,
 } from "@/lib/phenoComparisonRealInput";
+import { snapshotFromReadings } from "@/lib/sensorSnapshot";
+import type { PhenoSensorSnapshotInput } from "@/lib/phenoComparisonRules";
 import type { PhenoComparisonInput } from "@/lib/phenoComparisonViewModel";
 
 const ACTIVITY_PER_CANDIDATE = 5;
@@ -91,8 +98,8 @@ export function useGrowPhenoComparison(growId: string | null | undefined) {
         new Set(candidates.map((c) => c.tent_id).filter((t): t is string => !!t)),
       );
 
-      // Grow name + tent names + recent activity, in parallel.
-      const [growRes, tentRes, eventRes] = await Promise.all([
+      // Grow name + tent names + recent activity + latest photos, in parallel.
+      const [growRes, tentRes, eventRes, photoRes] = await Promise.all([
         supabase.from("grows").select("id,name").eq("id", growId).maybeSingle(),
         tentIds.length > 0
           ? supabase.from("tents").select("id,name").in("id", tentIds)
@@ -104,10 +111,83 @@ export function useGrowPhenoComparison(growId: string | null | undefined) {
           .eq("is_deleted", false)
           .order("occurred_at", { ascending: false })
           .limit(plantIds.length * ACTIVITY_PER_CANDIDATE * 2),
+        supabase
+          .from("diary_entries")
+          .select("plant_id,photo_url,entry_at")
+          .in("plant_id", plantIds)
+          .not("photo_url", "is", null)
+          .order("entry_at", { ascending: false })
+          .limit(plantIds.length * 3),
       ]);
       if (growRes.error) throw growRes.error;
       if (tentRes.error) throw tentRes.error;
       if (eventRes.error) throw eventRes.error;
+      // Photo enrichment is best-effort: a failed photo query must never
+      // break the comparison itself.
+      const photoRows = photoRes.error
+        ? []
+        : ((photoRes.data ?? []) as Array<{
+            plant_id: string | null;
+            photo_url: string | null;
+            entry_at: string | null;
+          }>);
+
+      // Latest photo per candidate. Storage paths (non-http) are signed via
+      // the diary-photos bucket — same flow the Timeline uses.
+      const latestPhotoPathByPlant: Record<string, string> = {};
+      for (const row of photoRows) {
+        if (!row.plant_id || !row.photo_url) continue;
+        if (latestPhotoPathByPlant[row.plant_id]) continue; // rows are newest-first
+        latestPhotoPathByPlant[row.plant_id] = row.photo_url;
+      }
+      const photoUrlByPlant: Record<string, string | null> = {};
+      const toSign: Array<{ plantId: string; path: string }> = [];
+      for (const [plantId, url] of Object.entries(latestPhotoPathByPlant)) {
+        if (url.startsWith("http")) photoUrlByPlant[plantId] = url;
+        else toSign.push({ plantId, path: url });
+      }
+      if (toSign.length > 0) {
+        const { data: signed } = await supabase.storage
+          .from("diary-photos")
+          .createSignedUrls(toSign.map((t) => t.path), 3600);
+        const byPath = new Map(
+          (signed ?? []).map((s) => [s.path as string, s.signedUrl] as const),
+        );
+        for (const t of toSign) {
+          const url = byPath.get(t.path);
+          if (url) photoUrlByPlant[t.plantId] = url;
+        }
+      }
+
+      // Latest sensor snapshot per candidate tent (context only). Per-tent
+      // queries so one tent's rows can't starve another's under the limit;
+      // errors degrade to "no snapshot" rather than failing the comparison.
+      const snapshotByTent: Record<string, PhenoSensorSnapshotInput | null> = {};
+      await Promise.all(
+        tentIds.map(async (tentId) => {
+          const { data: readings, error: readErr } = await supabase
+            .from("sensor_readings")
+            .select("ts,metric,value,source,created_at,device_id")
+            .eq("tent_id", tentId)
+            .order("ts", { ascending: false })
+            .order("created_at", { ascending: false })
+            .limit(20);
+          if (readErr || !readings || readings.length === 0) {
+            snapshotByTent[tentId] = null;
+            return;
+          }
+          const folded = snapshotFromReadings(
+            readings.map((r) => ({
+              ts: r.ts as string,
+              metric: r.metric as string,
+              value: r.value as number | string | null,
+              source: (r as { source?: string | null }).source ?? null,
+              device_id: (r as { device_id?: string | null }).device_id ?? null,
+            })),
+          );
+          snapshotByTent[tentId] = phenoSnapshotFromSensorSnapshot(folded);
+        }),
+      );
 
       const tentNameById: Record<string, string> = {};
       for (const t of (tentRes.data ?? []) as Array<{ id: string; name: string | null }>) {
@@ -142,6 +222,8 @@ export function useGrowPhenoComparison(growId: string | null | undefined) {
         tentNameById,
         candidates,
         activityByPlant,
+        photoUrlByPlant,
+        snapshotByTent,
         maxActivityPerCandidate: ACTIVITY_PER_CANDIDATE,
       });
 

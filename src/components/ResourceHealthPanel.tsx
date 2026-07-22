@@ -1,10 +1,36 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { APP_VERSION } from "@/generated/buildInfo";
 
 type ResourceStatus = "pending" | "running" | "pass" | "fail";
+
+interface RunSummary {
+  ranAt: string;
+  passing: number;
+  failing: number;
+  total: number;
+  failures: { name: string; path: string; detail?: string }[];
+}
+
+const INTERVAL_STORAGE_KEY = "verdant.diagnostics.healthCheck.intervalMs";
+const HISTORY_LIMIT = 10;
+
+const INTERVAL_OPTIONS: { label: string; value: number }[] = [
+  { label: "Off", value: 0 },
+  { label: "Every 1 min", value: 60_000 },
+  { label: "Every 5 min", value: 5 * 60_000 },
+  { label: "Every 15 min", value: 15 * 60_000 },
+];
+
 
 interface ResourceCheck {
   name: string;

@@ -1,0 +1,67 @@
+name: HA MQTT runner gate
+
+# Narrow fail-fast gate for the config-routed Home Assistant MQTT runner.
+# This does not replace the full suite. It isolates the adapter/runner contract
+# so freshness, retained-state, VPD, idempotency, and no-write safety failures
+# are visible without unrelated shard noise.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [verdant-grow-diary]
+    paths:
+      - ".github/workflows/ha-mqtt-runner-gate.yml"
+      - "scripts/dev/ecowitt-mqtt-runner.ts"
+      - "src/lib/ecowittMqttIngestRules.ts"
+      - "src/lib/homeAssistantEcowittMqttAdapter.ts"
+      - "src/lib/homeAssistantMqttRunnerRules.ts"
+      - "src/test/ecowitt-mqtt-*.test.ts"
+      - "src/test/homeAssistantEcowittMqttAdapter.test.ts"
+      - "src/test/sensor-ecowitt-home-assistant-docs.test.ts"
+      - "fixtures/home-assistant-ecowitt-mqtt/**"
+      - "docs/integrations/home-assistant-ecowitt-mqtt-*.md"
+
+jobs:
+  ha-mqtt-runner:
+    name: Typecheck, HA runner tests, sensor safety
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Cache Bun packages
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: HA MQTT runner targeted tests
+        run: >-
+          bunx vitest run
+          src/test/homeAssistantEcowittMqttAdapter.test.ts
+          src/test/ecowitt-mqtt-ingest-rules.test.ts
+          src/test/ecowitt-mqtt-evidence.test.ts
+          src/test/ecowitt-mqtt-runner-safety.test.ts
+          src/test/ecowitt-mqtt-runner-ha-config.test.ts
+          src/test/ecowitt-mqtt-runner-ha-dry-run.test.ts
+          src/test/ecowitt-mqtt-runner-ha-statestream-freshness.test.ts
+          src/test/sensor-ecowitt-home-assistant-docs.test.ts
+          --reporter=verbose
+
+      - name: Sensor safety scan
+        run: node scripts/sensor-safety-check.mjs

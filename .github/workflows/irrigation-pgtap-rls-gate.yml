@@ -51,10 +51,11 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Typecheck (full project — includes irrigation harnesses)
-        # tsgo is a stop-ship gate. Full-project noEmit catches any
-        # harness drift; scoping to specific files would miss shared
-        # type surface changes.
-        run: bunx tsgo --noEmit
+        # Full-project noEmit catches any harness drift; scoping to specific
+        # files would miss shared type surface changes. Use the repo's
+        # canonical typecheck script so this gate does not depend on an
+        # unavailable `tsgo` package.
+        run: bun run typecheck
 
   pgtap-irrigation:
     name: pgTAP irrigation (feeding + watering)

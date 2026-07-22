@@ -10,7 +10,20 @@
  * (they're already out); the keeper decision stays with the grower and the cure.
  *
  * Pure: no I/O, no writes, no ranking authority. Deterministic ordering.
+ *
+ * Comparability (autoflower/photoperiod plan, 2026-07-21): a board whose
+ * contenders mix plant types, include an unknown type, or sit further apart
+ * than the locked stage tolerance is marked not_comparable — the sorted
+ * payload is still produced (organizing only), but presenters must strike the
+ * rank/score/leads visuals and show the non-comparable banner.
  */
+import {
+  areComparable,
+  normalizePlantType,
+  plantStageRank,
+  type ComparabilityReason,
+  type PlantType,
+} from "@/lib/plantTypeRules";
 
 export type AxisKey = "nose" | "resin" | "structure" | "yield" | "breeding";
 export type ContenderVerdict = "keep" | "maybe" | "cull";
@@ -29,6 +42,10 @@ export interface ContenderInput {
   readonly verdict: ContenderVerdict;
   readonly aroma?: readonly string[] | null;
   readonly axes: ContenderAxisInput;
+  /** Declared plant type; absent/unrecognized = unknown (never comparable). */
+  readonly plantType?: string | null;
+  /** Plants-table stage (for the locked stage-distance tolerance). */
+  readonly stage?: string | null;
 }
 
 export interface AxisDef {
@@ -66,7 +83,11 @@ export interface ContenderRow {
   /** 1-based shortlist position by score (NOT a ranking of worth). */
   readonly rank: number;
   readonly axes: readonly ContenderAxis[];
+  /** Normalized declared type — presenters render a persistent badge. */
+  readonly plantType: PlantType;
 }
+
+export type BoardComparability = "comparable" | "not_comparable";
 
 export interface ContendersBoard {
   readonly axes: readonly AxisDef[];
@@ -75,6 +96,15 @@ export interface ContendersBoard {
   readonly culledCount: number;
   /** Highest composite on the board, for scaling the score bar. */
   readonly maxScore: number;
+  /**
+   * Cross-candidate comparability. "not_comparable" when any pair of
+   * contenders mixes types, includes an unknown type, or exceeds the locked
+   * stage tolerance. The sorted payload above is still emitted (organizing
+   * only) — presenters must strike rank/score/leads visuals when set.
+   */
+  readonly comparability: BoardComparability;
+  /** Deduped reasons in fixed precedence order; empty when comparable. */
+  readonly comparabilityReasons: readonly ComparabilityReason[];
 }
 
 function clamp10(v: unknown): number {
@@ -145,6 +175,7 @@ export function buildContenders(
         aroma: (raw.aroma ?? []).filter((x): x is string => !!clean(x)),
         score: contenderScore(vals),
         axes,
+        plantType: normalizePlantType(raw.plantType),
       };
     })
     .sort(
@@ -156,5 +187,30 @@ export function buildContenders(
 
   const maxScore = rows.reduce((m, r) => Math.max(m, r.score), 0);
 
-  return { axes: CONTENDER_AXES, contenders: rows, culledCount, maxScore };
+  // Pairwise comparability over the in-running pack. Every failing pair
+  // contributes its reason; reasons are deduped into a fixed precedence
+  // order so the payload is deterministic.
+  const subjects = inRunning.map((c) => ({
+    plantType: c.plantType ?? null,
+    stageRank: plantStageRank(c.stage ?? null),
+  }));
+  const seenReasons = new Set<ComparabilityReason>();
+  for (let i = 0; i < subjects.length; i++) {
+    for (let j = i + 1; j < subjects.length; j++) {
+      const verdict = areComparable(subjects[i], subjects[j]);
+      if (!verdict.comparable && verdict.reason) seenReasons.add(verdict.reason);
+    }
+  }
+  const comparabilityReasons = (
+    ["type_unknown", "type_mismatch", "stage_mismatch"] as const
+  ).filter((r) => seenReasons.has(r));
+
+  return {
+    axes: CONTENDER_AXES,
+    contenders: rows,
+    culledCount,
+    maxScore,
+    comparability: comparabilityReasons.length > 0 ? "not_comparable" : "comparable",
+    comparabilityReasons,
+  };
 }

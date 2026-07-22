@@ -64,6 +64,10 @@ export interface HuntCandidateSource {
   /** pheno_smoke_tests.flavor_descriptors, or grower aroma tags. */
   readonly aroma?: readonly string[] | null;
   readonly tags?: readonly string[] | null;
+  /** plants.plant_type (declared; absent = unknown, never inferred). */
+  readonly plantType?: string | null;
+  /** plants.stage — feeds the locked stage-distance comparability check. */
+  readonly stage?: string | null;
 }
 
 export interface HuntKeeperSource {
@@ -132,6 +136,8 @@ export function adaptContenders(
       verdict: decisionToVerdict(c.decision),
       aroma: cleanStrings(c.aroma),
       axes: traitsToLoudAxes(c.traits),
+      plantType: c.plantType ?? null,
+      stage: c.stage ?? null,
     }));
 }
 

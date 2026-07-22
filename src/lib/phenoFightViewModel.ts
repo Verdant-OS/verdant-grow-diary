@@ -18,6 +18,13 @@ import {
   type ContenderInput,
   type ContenderVerdict,
 } from "@/lib/phenoContendersViewModel";
+import {
+  areComparable,
+  normalizePlantType,
+  plantStageRank,
+  type ComparabilityVerdict,
+  type PlantType,
+} from "@/lib/plantTypeRules";
 
 export type FightEdge = "a" | "b" | "tie";
 
@@ -40,6 +47,8 @@ export interface FightSide {
   readonly score: number;
   /** Traits where this side has the edge (informational). */
   readonly axisWins: number;
+  /** Normalized declared type — presenters render a persistent badge. */
+  readonly plantType: PlantType;
 }
 
 export interface PhenoFight {
@@ -47,6 +56,13 @@ export interface PhenoFight {
   readonly b: FightSide;
   readonly axes: readonly FightAxis[];
   readonly ties: number;
+  /**
+   * Pair comparability (autoflower/photoperiod plan, 2026-07-21): mixed or
+   * unknown types, or stages beyond the locked tolerance, mark the fight
+   * not comparable — presenters strike the tally/composite visuals and show
+   * the banner. Axis values stay visible (organizing only).
+   */
+  readonly comparability: ComparabilityVerdict;
   // No `winner`, by design — the call is the grower's.
 }
 
@@ -80,6 +96,7 @@ function toSide(input: ContenderInput, vals: Record<AxisKey, number>, axisWins: 
     aroma: (input.aroma ?? []).filter((x): x is string => !!clean(x)),
     score: contenderScore(vals),
     axisWins,
+    plantType: normalizePlantType(input.plantType),
   };
 }
 
@@ -124,5 +141,9 @@ export function buildFight(
     b: toSide(b, bv, bWins),
     axes,
     ties,
+    comparability: areComparable(
+      { plantType: a.plantType ?? null, stageRank: plantStageRank(a.stage ?? null) },
+      { plantType: b.plantType ?? null, stageRank: plantStageRank(b.stage ?? null) },
+    ),
   };
 }

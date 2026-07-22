@@ -1682,6 +1682,93 @@ reappears in the freshly uploaded SARIF:
 | Alert flips to **Fixed** then back to **Open** on the next run      | Two workflows uploading with the **same** `category:` but different DB targets are overwriting each other. Give each env a distinct category (`money-migration-drift-sandbox`, `-live`). |
 | Timeline shows the re-run but status didn't change                  | The re-run used a cached `diff.sarif` artifact instead of regenerating it. Confirm the CLI step actually ran (check the job log, not just `upload-sarif`). |
 
+##### Fingerprint collisions: when alerts merge vs split
+
+Code scanning decides "same alert as last time?" **only** from the alert
+key. It does **not** compare `message.text`, `region.startLine`, the
+snippet, or the artifact contents. Once two results share the key, the
+UI treats them as one alert and silently overwrites the visible fields
+with whatever the latest upload sent.
+
+**The alert key.**
+
+```text
+alertKey = (
+  runs[].tool.driver.name,           // "diff-money-migration-prefixes"
+  results[].ruleId,                  // "prefix-drift" | "malformed-migration" | "tooling-failure"
+  results[].partialFingerprints,     // full object, key order ignored, values compared as strings
+  upload category,                   // upload-sarif `category:` input (defaults to workflow file path)
+  Git ref                            // branch or PR head, per the run's event
+)
+```
+
+Change any component of the key → GitHub creates a **new** alert.
+Keep the whole key stable → GitHub **updates the existing** alert in
+place, no matter what else changed in the result.
+
+**Behavior matrix — two results with the same `partialFingerprints`.**
+
+Assume both results have identical `ruleId`, `partialFingerprints`,
+category, and ref. Only the columns marked as varying differ between
+the two results:
+
+| Scenario                                                | `location.uri` | `region.startLine` | `message.text` | UI outcome                                                                                     |
+|---------------------------------------------------------|----------------|--------------------|----------------|------------------------------------------------------------------------------------------------|
+| Identical results (idempotent re-upload)                | same           | same               | same           | **1 alert.** Timeline gains "Detected in run #N". No visible change.                            |
+| Same file, different line                               | same           | **different**      | same           | **1 alert.** Gutter marker moves to the new line; old line's marker disappears on refresh.     |
+| Same file, different message                            | same           | same               | **different**  | **1 alert.** Alert detail page shows the **newest** message; old text is discarded (not diffed). |
+| Different file, same line/message                       | **different**  | same               | same           | **1 alert.** Alert's *Location* changes to the new URI. The previous file loses its annotation. Ambiguous — usually a fingerprint bug. |
+| Two results in the **same SARIF run** with same key     | any            | any                | any            | **1 alert.** GitHub keeps the **first** `results[]` entry and drops the rest silently. Check `jq '[.runs[0].results[] \| .partialFingerprints] \| group_by(.) \| map(select(length>1))' diff.sarif`. |
+| Different `ruleId`, same fingerprint                    | same           | same               | same           | **2 alerts.** `ruleId` is part of the key. Expected when a finding is reclassified. |
+| Same fingerprint, different upload `category:`          | same           | same               | same           | **2 alerts** (one per category stream). This is why sandbox/live use distinct categories. |
+| Same fingerprint, different Git ref (branch/PR head)    | same           | same               | same           | **2 alerts**, one per ref. Merging the PR into the default branch does **not** merge the alerts — the default-branch run creates its own. |
+
+**When alerts split (new alert appears instead of updating).**
+
+Any of these will produce a fresh Open alert while the old one stays as
+`Open` or auto-closes to `Fixed` on the next clean run:
+
+- A `partialFingerprints` **value** changed (even a whitespace or case
+  difference — values are compared as strings).
+- A `partialFingerprints` **key** was added or removed.
+- `ruleId` changed (e.g. `prefix-drift` → `malformed-migration`).
+- The upload `category:` changed between runs.
+- The Git ref changed (branch rename, force-push that rewrites the head
+  SHA on a different ref).
+
+**Practical rules for this repo.**
+
+- Fingerprints in `diff-money-migration-prefixes.mjs` are
+  `{ migrationVersion, targetEnv }`. Keep both stable across re-runs of
+  the same drift, or every rerun spawns a duplicate.
+- If you need to change `message.text` (e.g. to add more context to an
+  existing finding), you can — the alert updates in place and the new
+  text appears immediately. Reviewers won't see a diff of old vs new
+  message; only the latest is stored.
+- If you need to relocate a finding within the same file (line moved
+  after a migration edit), let the fingerprint stay the same. The
+  gutter marker follows to the new `startLine` automatically.
+- If you want the finding to **split** (e.g. sandbox vs live are now
+  genuinely separate findings), change the fingerprint deliberately
+  (add `targetEnv` if you weren't already) and upload with distinct
+  `category:` values.
+
+**Verifying merge vs split before pushing.**
+
+```bash
+# List all fingerprints in a SARIF, one per line, sorted.
+jq -r '.runs[0].results[]
+       | (.ruleId + " | " + (.partialFingerprints | tostring))' diff.sarif | sort
+
+# Find duplicates within the same run (these get silently dropped on upload).
+jq '[.runs[0].results[] | .partialFingerprints]
+    | group_by(.) | map(select(length > 1))' diff.sarif
+```
+
+If the second command prints anything other than `[]`, fix the
+generator — two results in the same upload with the same key means one
+of them will disappear in the UI with no warning.
+
 ##### Security tab looks empty (GitHub UI gotchas)
 
 

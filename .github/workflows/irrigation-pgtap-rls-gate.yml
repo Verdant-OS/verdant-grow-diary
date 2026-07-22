@@ -97,12 +97,31 @@ jobs:
               # The workflow itself — any change here re-runs the full gate.
               - ".github/workflows/irrigation-pgtap-rls-gate.yml"
 
+      - name: Resolve dry-run mode
+        id: dry-run
+        env:
+          EVENT: ${{ github.event_name }}
+          DISPATCH_DRY_RUN: ${{ github.event.inputs.dry_run }}
+          # PR label allowlist — apply `ci:dry-run-irrigation` to a PR to
+          # exercise the filter/allowlist summary without booting Postgres
+          # or running the harness typecheck.
+          PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: |
+          set -eo pipefail
+          DRY_RUN=false
+          if [ "$EVENT" = "workflow_dispatch" ] && [ "$DISPATCH_DRY_RUN" = "true" ]; then
+            DRY_RUN=true
+          elif [ "$EVENT" = "pull_request" ] && echo "$PR_LABELS" | grep -q '"ci:dry-run-irrigation"'; then
+            DRY_RUN=true
+          fi
+          echo "dry_run=$DRY_RUN" >> "$GITHUB_OUTPUT"
+
       - name: Report filter decision
         env:
           IRRIGATION: ${{ steps.filter.outputs.irrigation }}
           IRRIGATION_FILES: ${{ steps.filter.outputs.irrigation_files }}
           EVENT: ${{ github.event_name }}
-          DRY_RUN: ${{ github.event.inputs.dry_run }}
+          DRY_RUN: ${{ steps.dry-run.outputs.dry_run }}
         run: |
           {
             echo "## Irrigation change-detection"

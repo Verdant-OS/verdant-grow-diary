@@ -12,6 +12,8 @@ import { useAuth } from "@/store/auth";
 import {
   createPhenoHunt,
   defaultHuntName,
+  phenoHuntSaveErrorMessage,
+  PHENO_TRACKER_PRO_REQUIRED_MESSAGE,
 } from "@/lib/phenoHuntService";
 
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
@@ -177,7 +179,7 @@ export default function PhenoHuntNew() {
     // cached mount) still cannot reach createPhenoHunt without an active
     // Pro/lifetime entitlement.
     if (!canWriteFeatureData(entitlement, "pheno_tracker")) {
-      toast.error("Pheno Tracker is a Pro feature. Upgrade to Pro to start a hunt.");
+      toast.error(PHENO_TRACKER_PRO_REQUIRED_MESSAGE);
       return;
     }
     setSaving(true);
@@ -195,7 +197,9 @@ export default function PhenoHuntNew() {
       // Enter the workspace — grower can continue setup from there.
       navigate(`/pheno-hunts/${res.huntId}/workspace`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not create pheno hunt");
+      // Server-side RLS denials (e.g. pheno_hunts_pro_required_insert) map to
+      // the same friendly copy as the pre-write guard — never raw policy text.
+      toast.error(phenoHuntSaveErrorMessage(err));
       setSaving(false);
     }
   };

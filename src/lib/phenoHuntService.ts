@@ -43,6 +43,63 @@ export class PhenoHuntError extends Error {
   }
 }
 
+/**
+ * Grower-facing copy for a Pro-entitlement denial. Single source for both the
+ * pre-write client guard and the save error path, so a grower never sees two
+ * different explanations for the same restriction.
+ */
+export const PHENO_TRACKER_PRO_REQUIRED_MESSAGE =
+  "Pheno Tracker is a Pro feature. Upgrade to Pro to start a hunt.";
+
+function errorText(candidate: unknown): string {
+  if (typeof candidate === "string") return candidate;
+  if (
+    candidate &&
+    typeof candidate === "object" &&
+    typeof (candidate as { message?: unknown }).message === "string"
+  ) {
+    return (candidate as { message: string }).message;
+  }
+  return "";
+}
+
+/**
+ * True when a pheno write was rejected by Postgres row-level security or
+ * privilege enforcement — e.g. the RESTRICTIVE
+ * `pheno_hunts_pro_required_insert` policy denying a lapsed-plan write that
+ * slipped past the client-side entitlement check (stale cache, race at the
+ * paid-through boundary). Inspects both the error itself and its wrapped
+ * `cause`, where PhenoHuntError preserves the raw Supabase error.
+ */
+export function isPhenoEntitlementDenial(err: unknown): boolean {
+  const layers = [err, (err as { cause?: unknown } | null | undefined)?.cause];
+  for (const layer of layers) {
+    if (!layer) continue;
+    if ((layer as { code?: unknown }).code === "42501") return true;
+    const msg = errorText(layer).toLowerCase();
+    if (
+      msg.includes("row-level security") ||
+      msg.includes("permission denied") ||
+      msg.includes("pro_required")
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Map a failed hunt save to grower-facing copy. Entitlement/RLS denials get
+ * the friendly Pro-upgrade message — never raw policy text like
+ * `new row violates row-level security policy "pheno_hunts_pro_required_insert"`.
+ * Everything else keeps its message so real failures stay diagnosable.
+ */
+export function phenoHuntSaveErrorMessage(err: unknown): string {
+  if (isPhenoEntitlementDenial(err)) return PHENO_TRACKER_PRO_REQUIRED_MESSAGE;
+  const msg = err instanceof Error ? err.message : "";
+  return msg || "Could not create pheno hunt";
+}
+
 /** "#1", "#2"... — used when no label override is supplied. */
 export function defaultCandidateLabel(index: number): string {
   return `#${index + 1}`;

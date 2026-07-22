@@ -129,4 +129,33 @@ BEGIN
   RAISE NOTICE '✓ trigger structural check skipped (covered by runtime harness)';
 END $$;
 
+-- 9. Table-level DML ACL preservation:
+--   * service_role retains SELECT/INSERT/UPDATE/DELETE on feeding_events (required
+--     for admin/edge-function backfill and repair paths).
+--   * anon and authenticated retain SELECT (RLS still filters per row) but must
+--     NOT possess INSERT/UPDATE/DELETE at the table-privilege level after the
+--     2026-07-22 irrigation-evidence trust-boundary revoke — canonical writes
+--     go through quicklog_save_event / quicklog_save_manual.
+DO $$
+DECLARE
+  want JSONB := '{
+    "anon":          {"SELECT": true,  "INSERT": false, "UPDATE": false, "DELETE": false},
+    "authenticated": {"SELECT": true,  "INSERT": false, "UPDATE": false, "DELETE": false},
+    "service_role":  {"SELECT": true,  "INSERT": true,  "UPDATE": true,  "DELETE": true}
+  }'::jsonb;
+  role_name TEXT; priv TEXT; expected BOOLEAN; got BOOLEAN;
+BEGIN
+  FOR role_name IN SELECT jsonb_object_keys(want) LOOP
+    FOR priv IN SELECT jsonb_object_keys(want -> role_name) LOOP
+      expected := ((want -> role_name) ->> priv)::boolean;
+      got := has_table_privilege(role_name, 'public.feeding_events', priv);
+      ASSERT got = expected,
+        format('feeding_events %s for %I: expected %s, got %s',
+               priv, role_name, expected, got);
+    END LOOP;
+  END LOOP;
+  RAISE NOTICE '✓ feeding_events table DML ACL matches trust-boundary contract';
+END $$;
+
 ROLLBACK;
+

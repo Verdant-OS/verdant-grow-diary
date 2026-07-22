@@ -83,9 +83,32 @@ jobs:
         run: bun run typecheck
 
       - name: Production build
+        id: prod_build
         env:
           NODE_ENV: production
         run: bun run build
+
+      - name: Generate build summary
+        if: always()
+        env:
+          OUT_DIR: artifacts/build-summary
+          BUILD_SUMMARY_TRIGGER: ${{ github.event_name }}
+          BUILD_SUMMARY_VALIDATORS: >-
+            [
+              {"name":"edge-shared-preflight","result":"pass","detail":"gated by needs: preflight"},
+              {"name":"typecheck","result":"pass"},
+              {"name":"production-build","result":"${{ steps.prod_build.outcome }}"}
+            ]
+        run: node scripts/generate-build-summary.mjs
+
+      - name: Upload build summary artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-summary-preview-${{ github.event.pull_request.head.sha || github.sha }}
+          path: artifacts/build-summary/
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4

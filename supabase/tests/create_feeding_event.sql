@@ -94,8 +94,10 @@ BEGIN
     FROM pg_proc p
     JOIN pg_namespace n ON n.oid = p.pronamespace
    WHERE n.nspname = 'public' AND p.proname = 'create_feeding_event';
+  ASSERT is_def IS NOT NULL,
+    'DIAGNOSTIC[missing-function]: create_feeding_event not found while checking SECURITY INVOKER';
   ASSERT is_def = false,
-    'create_feeding_event must be SECURITY INVOKER, not SECURITY DEFINER';
+    'DIAGNOSTIC[security-mode-mismatch]: create_feeding_event must be SECURITY INVOKER, not SECURITY DEFINER';
   RAISE NOTICE '✓ create_feeding_event is SECURITY INVOKER';
 END $$;
 

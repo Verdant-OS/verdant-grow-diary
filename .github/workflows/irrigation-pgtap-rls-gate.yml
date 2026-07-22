@@ -58,23 +58,18 @@ jobs:
           predicate-quantifier: "some"
           filters: |
             irrigation:
-              # Irrigation-scoped migrations.
-              - "supabase/migrations/**irrigation*.sql"
-              - "supabase/migrations/**feeding*.sql"
-              - "supabase/migrations/**watering*.sql"
-              - "supabase/migrations/**grow_event*.sql"
-              - "supabase/migrations/**quicklog*.sql"
-              - "supabase/migrations/**event_tables*.sql"
-              # Irrigation event-table DML revoke migration (UUID-named, so
-              # not matched by the quicklog/feeding/watering/grow_event globs
-              # above). Pinned explicitly instead of a broad `**revoke*` glob
-              # that would drag in unrelated AI-doctor / credit-grant files.
+              # Explicit allowlist of irrigation-scoped migration files.
+              # New irrigation migrations MUST be added here AND to the
+              # required-migrations manifest so this gate runs against them.
+              - "supabase/migrations/20260703093500_harden_quicklog_save_event_grants.sql"
+              - "supabase/migrations/20260707130000_quicklog_save_event_trust_boundary_hardening.sql"
+              - "supabase/migrations/20260707220000_quicklog_save_event_atomic_idempotency_v2.sql"
+              - "supabase/migrations/20260709160000_quicklog_save_manual_idempotency.sql"
+              - "supabase/migrations/20260720160000_quicklog_save_event_irrigation_boundary_hardening.sql"
+              # Irrigation event-table DML revoke migration (UUID-named).
               - "supabase/migrations/20260722062644_8cdef271-abf0-4d82-9eca-970a91b6c547.sql"
               # Contract-migrations lane.
-              - "supabase/contract-migrations/**irrigation*.sql"
-              - "supabase/contract-migrations/**feeding*.sql"
-              - "supabase/contract-migrations/**watering*.sql"
-              - "supabase/contract-migrations/**quicklog*.sql"
+              - "supabase/contract-migrations/quicklog_save_manual_revoke_anon_execute.sql"
               # pgTAP suites + prod-parity seed.
               - "supabase/tests/create_feeding_event.sql"
               - "supabase/tests/create_watering_event.sql"

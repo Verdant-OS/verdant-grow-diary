@@ -17,17 +17,41 @@ name: Irrigation pgTAP + Harness Typecheck
 on:
   pull_request:
     branches: [main, verdant-grow-diary]
+    # Scoped to irrigation-trust-boundary surfaces only. Broad
+    # `supabase/migrations/**` was pruned intentionally: this gate
+    # exists to catch RLS/ACL regressions on event tables + quicklog
+    # RPCs, and unrelated migrations (billing, credits, pheno, seo,
+    # etc.) do not touch those grants. Non-irrigation migration drift
+    # is still covered by security-regression.yml / supabase-security-baseline.yml.
+    # Add a new glob here if a future migration must be gated by this suite.
     paths:
-      - "supabase/migrations/**"
+      # Irrigation-scoped migrations. Globs cover the historical naming
+      # for the event tables, quicklog RPCs, and any grant/revoke on
+      # those surfaces.
+      - "supabase/migrations/**irrigation*.sql"
+      - "supabase/migrations/**feeding*.sql"
+      - "supabase/migrations/**watering*.sql"
+      - "supabase/migrations/**grow_event*.sql"
+      - "supabase/migrations/**quicklog*.sql"
+      - "supabase/migrations/**event_tables*.sql"
+      - "supabase/migrations/**revoke*.sql"
+      - "supabase/migrations/**grant*.sql"
+      # Contract-migrations lane, same scope.
+      - "supabase/contract-migrations/**irrigation*.sql"
+      - "supabase/contract-migrations/**feeding*.sql"
+      - "supabase/contract-migrations/**watering*.sql"
+      - "supabase/contract-migrations/**quicklog*.sql"
+      # pgTAP suites + seed parity.
       - "supabase/tests/create_feeding_event.sql"
       - "supabase/tests/create_watering_event.sql"
       - "supabase/seed.sql"
+      # Runtime harness sources typechecked by this gate.
       - "scripts/run-irrigation-evidence-rls-harness.ts"
       - "scripts/run-create-feeding-event-rls-harness.ts"
       - "scripts/run-quicklog-save-event-rls-harness.ts"
       - "scripts/run-quicklog-save-manual-rls-harness.ts"
       - "scripts/run-quicklog-rpc-rls-harnesses.ts"
-      - "supabase/contract-migrations/**"
+      # The workflow itself.
       - ".github/workflows/irrigation-pgtap-rls-gate.yml"
   workflow_dispatch:
 
@@ -71,10 +95,34 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
+      # Cache the apt archive for postgresql-client. Restore-only pattern:
+      # the install step still runs `apt-get update && install`, so the
+      # resolved version is identical to an uncached run — the cache only
+      # skips the .deb download when the exact version is already present.
+      - name: Cache apt archives (postgresql-client)
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: /var/cache/apt/archives
+          key: ${{ runner.os }}-apt-postgresql-client-v1
+          restore-keys: |
+            ${{ runner.os }}-apt-postgresql-client-
+
       - name: Install psql client
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends postgresql-client
+
+      # Cache the Supabase CLI's own state dir (config templates, function
+      # bundle cache). Does NOT include Docker image layers or the local
+      # DB state under supabase/.branches — those are intentionally left
+      # ephemeral so `supabase db reset` runs against a truly fresh stack.
+      - name: Cache Supabase CLI state
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.supabase
+          key: ${{ runner.os }}-supabase-cli-2.109.1-${{ hashFiles('supabase/config.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-supabase-cli-2.109.1-
 
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf # v1

@@ -191,6 +191,9 @@ export default function Diagnostics() {
 
       <ResourceHealthPanel />
 
+      <LocalDataHealthPanel />
+
+
 
 
 

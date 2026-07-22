@@ -796,25 +796,29 @@ async function main() {
     check(
       `authenticated denied INSERT on ${table} (genuine permission error)`,
       isGenuinePermissionDenial(ins.error) && !isMissingFunction(ins.error),
-      ins.error?.message ?? "expected 42501 / permission denied, got success",
+      formatDenialDetail(ins.error),
     );
 
     const upd = await ownerC.from(table).update({ user_id: owner.id }).eq("user_id", owner.id);
     check(
       `authenticated denied UPDATE on ${table} (genuine permission error)`,
       isGenuinePermissionDenial(upd.error) && !isMissingFunction(upd.error),
-      upd.error?.message ?? "expected 42501 / permission denied, got success",
+      formatDenialDetail(upd.error),
     );
 
     const del = await ownerC.from(table).delete().eq("user_id", owner.id);
     check(
       `authenticated denied DELETE on ${table} (genuine permission error)`,
       isGenuinePermissionDenial(del.error) && !isMissingFunction(del.error),
-      del.error?.message ?? "expected 42501 / permission denied, got success",
+      formatDenialDetail(del.error),
     );
 
     const sel = await ownerC.from(table).select("user_id").eq("user_id", owner.id).limit(1);
-    check(`authenticated retains SELECT on ${table}`, sel.error === null, sel.error?.message);
+    check(
+      `authenticated retains SELECT on ${table}`,
+      sel.error === null,
+      sel.error ? formatDenialDetail(sel.error, "expected success") : undefined,
+    );
   }
 
   // 17. service-role ACL / RPC-execution posture is intentionally NOT proved

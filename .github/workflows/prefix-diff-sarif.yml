@@ -1,0 +1,118 @@
+name: Prefix Diff — SARIF upload
+
+# Example workflow: runs scripts/diff-money-migration-prefixes.mjs, validates
+# the SARIF output, uploads it to GitHub Code Scanning (so results show up as
+# PR file annotations and in the Security tab), and archives the artifact.
+#
+# Prereqs (Repo Settings):
+#   - Settings → Code security → Code scanning: enabled (default setup off)
+#   - Settings → Actions → Workflow permissions: "Read and write" OR the
+#     `permissions:` block below (security-events: write) is present.
+#   - Secrets: SUPABASE_DB_URL_SANDBOX and/or SUPABASE_DB_URL_LIVE.
+
+on:
+  pull_request:
+    paths:
+      - "supabase/migrations/**"
+      - "scripts/diff-money-migration-prefixes.mjs"
+      - "scripts/validate-sarif.mjs"
+      - ".github/workflows/prefix-diff-sarif.yml"
+  workflow_dispatch:
+    inputs:
+      target_env:
+        description: "Target environment (sandbox | live)"
+        required: true
+        default: "sandbox"
+        type: choice
+        options: [sandbox, live]
+
+concurrency:
+  group: prefix-diff-sarif-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  prefix-diff-sarif:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    # Required so upload-sarif can write to the Code Scanning API.
+    permissions:
+      contents: read
+      security-events: write
+      pull-requests: read
+
+    env:
+      TARGET_ENV: ${{ inputs.target_env || 'sandbox' }}
+      SUPABASE_DB_URL: ${{ inputs.target_env == 'live' && secrets.SUPABASE_DB_URL_LIVE || secrets.SUPABASE_DB_URL_SANDBOX }}
+      SARIF_PATH: artifacts/prefix-diff.sarif
+      DIFF_JSON_PATH: artifacts/prefix-diff.json
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install psql client
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Prepare artifacts dir
+        run: mkdir -p artifacts
+
+      # Produce both JSON (for the PR-comment summarizer) and SARIF (for
+      # Code Scanning). Do not fail the job here — we want the SARIF uploaded
+      # even when drift is detected, so annotations render on the PR.
+      - name: Run prefix diff (JSON)
+        id: diff-json
+        continue-on-error: true
+        run: |
+          node scripts/diff-money-migration-prefixes.mjs \
+            --json > "${DIFF_JSON_PATH}"
+          echo "exit=$?" >> "$GITHUB_OUTPUT"
+
+      - name: Run prefix diff (SARIF)
+        id: diff-sarif
+        continue-on-error: true
+        run: |
+          node scripts/diff-money-migration-prefixes.mjs \
+            --sarif --sarif-out="${SARIF_PATH}"
+          echo "exit=$?" >> "$GITHUB_OUTPUT"
+
+      # Structural pre-upload check: catches missing fingerprints, bad
+      # locations, or schema drift before the Code Scanning upload rejects it.
+      - name: Validate SARIF structure
+        run: node scripts/validate-sarif.mjs "${SARIF_PATH}"
+
+      - name: Upload SARIF to Code Scanning
+        if: hashFiles(env.SARIF_PATH) != ''
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: ${{ env.SARIF_PATH }}
+          # Category lets multiple SARIF uploads coexist without overwriting
+          # each other's alerts (per-target-env stream).
+          category: prefix-diff-${{ env.TARGET_ENV }}
+
+      - name: Archive SARIF + JSON as workflow artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prefix-diff-sarif-${{ env.TARGET_ENV }}
+          path: |
+            ${{ env.SARIF_PATH }}
+            ${{ env.DIFF_JSON_PATH }}
+          if-no-files-found: warn
+          retention-days: 14
+
+      # Optional: fail the check-run when drift or malformed migrations were
+      # found, AFTER the SARIF is uploaded and annotations are visible.
+      - name: Fail on drift
+        if: steps.diff-sarif.outputs.exit != '0'
+        run: |
+          echo "::error::prefix-diff reported exit ${{ steps.diff-sarif.outputs.exit }} — see PR file annotations and the Security tab."
+          exit 1

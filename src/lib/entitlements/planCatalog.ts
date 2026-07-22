@@ -36,12 +36,25 @@ const FOUNDER_LIFETIME_CAPABILITIES: Readonly<Capabilities> = Object.freeze({
   aiMonthlyCredits: 100,
 });
 
+/**
+ * Craft: a distinct paid SKU staged for launch. Capabilities are currently
+ * Pro-equivalent — this deliberately invents NO new pricing (credits, limits)
+ * so activation is purely the founder's Paddle-product step plus an optional
+ * later capability differentiation. Both cadences resolve identically, mirroring
+ * pro_monthly/pro_annual.
+ */
+const CRAFT_CAPABILITIES: Readonly<Capabilities> = Object.freeze({
+  ...PRO_CAPABILITIES,
+});
+
 export const PLAN_CATALOG: Readonly<Record<PlanId, Readonly<Capabilities>>> =
   Object.freeze({
     free: FREE_CAPABILITIES,
     pro_monthly: PRO_CAPABILITIES,
     pro_annual: PRO_CAPABILITIES,
     founder_lifetime: FOUNDER_LIFETIME_CAPABILITIES,
+    craft_monthly: CRAFT_CAPABILITIES,
+    craft_annual: CRAFT_CAPABILITIES,
   });
 
 export const KNOWN_PLAN_IDS: ReadonlyArray<PlanId> = [
@@ -49,6 +62,8 @@ export const KNOWN_PLAN_IDS: ReadonlyArray<PlanId> = [
   "pro_monthly",
   "pro_annual",
   "founder_lifetime",
+  "craft_monthly",
+  "craft_annual",
 ];
 
 export function isKnownPlanId(value: unknown): value is PlanId {

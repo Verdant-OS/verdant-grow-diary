@@ -9,7 +9,14 @@ export type PlanId =
   | "free"
   | "pro_monthly"
   | "pro_annual"
-  | "founder_lifetime";
+  | "founder_lifetime"
+  // Craft: a distinct paid SKU staged for launch. Capabilities are currently
+  // Pro-equivalent (see planCatalog) — the tier is fully resolvable everywhere
+  // the app reasons about entitlements, so activation is only the Paddle
+  // product + (optional later) capability differentiation. No billing row can
+  // carry these until the Paddle products exist.
+  | "craft_monthly"
+  | "craft_annual";
 
 export type SubscriptionStatus =
   | "active"

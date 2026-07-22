@@ -1097,7 +1097,211 @@ jq -r '.runs[0].results[]
   | @tsv' diff.sarif | sort
 ```
 
+##### Sample multi-file SARIF and how it groups in PR annotations
+
+The single-finding SARIF earlier in this section is useful for a
+"clean run" reference, but the real workflow usually emits several
+results across different migration files. Below is a labeled multi-file
+sample plus a field-by-field breakdown of how each `results[]` entry
+surfaces in a PR's **Files changed** tab.
+
+**Sample SARIF (`diff.sarif`) — 4 results across 3 files, 2 rules.**
+
+```json
+{
+  "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "diff-money-migration-prefixes",
+          "semanticVersion": "1.4.0",
+          "informationUri": "https://github.com/OWNER/REPO#money-migration-applied-check",
+          "rules": [
+            {
+              "id": "money-migration-drift",
+              "name": "MoneyMigrationDrift",
+              "shortDescription": { "text": "Required migration prefix differs from applied prefix" },
+              "fullDescription":  { "text": "The 14-digit prefix on this required file does not match the prefix recorded in supabase_migrations.schema_migrations for the target environment." },
+              "defaultConfiguration": { "level": "error" },
+              "helpUri": "https://github.com/OWNER/REPO#money-migration-applied-check"
+            },
+            {
+              "id": "money-migration-malformed",
+              "name": "MoneyMigrationMalformed",
+              "shortDescription": { "text": "Required migration file has an unparseable 14-digit prefix" },
+              "defaultConfiguration": { "level": "warning" },
+              "helpUri": "https://github.com/OWNER/REPO#money-migration-applied-check"
+            }
+          ]
+        }
+      },
+      "automationDetails": { "id": "required-money-migrations/live" },
+      "results": [
+        {
+          "ruleId": "money-migration-drift",
+          "level": "error",
+          "message": { "text": "Expected prefix 20260715120000 but sandbox has 20260715115959." },
+          "locations": [{
+            "physicalLocation": {
+              "artifactLocation": { "uri": "supabase/migrations/20260715120000_ai_credit_spend.sql" },
+              "region": { "startLine": 1 }
+            }
+          }],
+          "partialFingerprints": { "primaryLocationLineHash": "ai_credit_spend:20260715120000" }
+        },
+        {
+          "ruleId": "money-migration-drift",
+          "level": "error",
+          "message": { "text": "Expected prefix 20260716090000 but sandbox has 20260716085500." },
+          "locations": [{
+            "physicalLocation": {
+              "artifactLocation": { "uri": "supabase/migrations/20260716090000_referral_conversions.sql" },
+              "region": { "startLine": 1 }
+            }
+          }],
+          "partialFingerprints": { "primaryLocationLineHash": "referral_conversions:20260716090000" }
+        },
+        {
+          "ruleId": "money-migration-drift",
+          "level": "error",
+          "message": { "text": "Expected prefix 20260717000000 but sandbox has 20260716235959." },
+          "locations": [{
+            "physicalLocation": {
+              "artifactLocation": { "uri": "supabase/migrations/20260717000000_credit_pack_grants.sql" },
+              "region": { "startLine": 1 }
+            }
+          }],
+          "partialFingerprints": { "primaryLocationLineHash": "credit_pack_grants:20260717000000" }
+        },
+        {
+          "ruleId": "money-migration-malformed",
+          "level": "warning",
+          "message": { "text": "File name does not begin with a 14-digit prefix; cannot compare to applied migrations." },
+          "locations": [{
+            "physicalLocation": {
+              "artifactLocation": { "uri": "supabase/migrations/credit_pack_grants_fix.sql" },
+              "region": { "startLine": 1 }
+            }
+          }],
+          "partialFingerprints": { "primaryLocationLineHash": "credit_pack_grants_fix:malformed" }
+        }
+      ]
+    }
+  ]
+}
+```
+
+**How those 4 results appear in the PR "Files changed" tab.**
+
+GitHub does **not** collapse annotations by rule or by directory — it
+attaches one marker per `results[]` entry, at the file+line named in
+`locations[0].physicalLocation`. Grouping is entirely by file path.
+
+| File in the PR diff                                              | Markers attached                                                                          | Rule / severity chip                                        |
+|------------------------------------------------------------------|-------------------------------------------------------------------------------------------|-------------------------------------------------------------|
+| `supabase/migrations/20260715120000_ai_credit_spend.sql`         | 1 red marker in the line-1 gutter                                                         | `money-migration-drift` · **Error**                          |
+| `supabase/migrations/20260716090000_referral_conversions.sql`    | 1 red marker in the line-1 gutter                                                         | `money-migration-drift` · **Error**                          |
+| `supabase/migrations/20260717000000_credit_pack_grants.sql`      | 1 red marker in the line-1 gutter                                                         | `money-migration-drift` · **Error**                          |
+| `supabase/migrations/credit_pack_grants_fix.sql`                 | 1 yellow marker in the line-1 gutter                                                      | `money-migration-malformed` · **Warning**                    |
+| Any other file in the PR                                         | No markers                                                                                | —                                                            |
+
+Concretely, that means:
+
+- **Per file, per line = one annotation.** If a file appears in
+  `results[]` twice at the same line, GitHub stacks both annotations
+  under one expander on that line, ordered by severity (Error → Warning
+  → Note), then by ruleId alphabetically.
+- **Same rule, different files = separate annotations.** The three
+  `money-migration-drift` results above stay on their own files — they
+  are *not* rolled up into a single "3 issues" entry.
+- **Different rules, same file = separate annotations stacked on that
+  line.** If `credit_pack_grants_fix.sql` also had a `drift` result,
+  its line-1 marker would expand to show both the Warning and the
+  Error, each with its own **View alert** link.
+- **Files not touched by the PR still get alerts, but no PR markers.**
+  Only files present in the PR diff show gutter annotations; the rest
+  appear only in the Security tab. If a drifted migration isn't in the
+  diff, expect zero PR annotations and 3 Security-tab alerts.
+
+**Files-changed sidebar counts.**
+
+The left-hand file tree in **Files changed** shows a small annotation
+badge next to each file with at least one marker. In the sample above:
+
+- 3 files show a red "1" badge (one Error each).
+- 1 file shows a yellow "1" badge (one Warning).
+- The tree does **not** roll counts up to parent folders — you'll see
+  4 individually-badged files under `supabase/migrations/`, not a
+  single "4" on the folder.
+
+**Conversation tab summary.**
+
+At the top of the PR's **Conversation** tab, the code-scanning check
+run summarizes the same 4 results as:
+
+```
+Code scanning results / diff-money-migration-prefixes
+4 new alerts including 3 errors
+```
+
+Clicking through opens the check run detail page, which lists all 4
+results grouped by **rule** (not by file) — this is the *only* place
+in the UI where rule-level grouping happens:
+
+```
+money-migration-drift (3)
+  supabase/migrations/20260715120000_ai_credit_spend.sql:1
+  supabase/migrations/20260716090000_referral_conversions.sql:1
+  supabase/migrations/20260717000000_credit_pack_grants.sql:1
+money-migration-malformed (1)
+  supabase/migrations/credit_pack_grants_fix.sql:1
+```
+
+**What controls the grouping.**
+
+| SARIF field                                                  | Effect on PR UI                                                                    |
+|--------------------------------------------------------------|------------------------------------------------------------------------------------|
+| `results[].locations[0].physicalLocation.artifactLocation.uri` | Determines *which file* gets the marker. Must match the PR diff path exactly.      |
+| `results[].locations[0].physicalLocation.region.startLine`     | Determines *which line* the marker attaches to.                                    |
+| `results[].ruleId`                                             | Shown as the chip on the annotation; used for rule-level grouping on the check-run detail page only. |
+| `results[].level` (or `rules[].defaultConfiguration.level`)    | Drives marker color (Error = red, Warning = yellow, Note = blue) and sort order within a stacked annotation. |
+| `results[].partialFingerprints`                                | Not shown, but controls whether a result on the *next* run is treated as the same alert (dedupe) or a new one. |
+| `automationDetails.id` (category)                              | Not shown, but scopes dedupe: two uploads with different categories create two separate alerts on the same line. |
+
+**Verifying the sample locally.**
+
+Save the JSON block above as `sample-multifile.sarif` and inspect it
+with the same `jq` recipes documented earlier:
+
+```bash
+# Count results per rule (matches the check-run detail grouping)
+jq '.runs[0].results | group_by(.ruleId) | map({rule: .[0].ruleId, count: length})' sample-multifile.sarif
+
+# Count results per file (matches the Files-changed sidebar badges)
+jq '.runs[0].results
+    | group_by(.locations[0].physicalLocation.artifactLocation.uri)
+    | map({file: .[0].locations[0].physicalLocation.artifactLocation.uri, count: length})' sample-multifile.sarif
+```
+
+Expected output:
+
+```json
+[
+  { "rule": "money-migration-drift",     "count": 3 },
+  { "rule": "money-migration-malformed", "count": 1 }
+]
+```
+
+If the per-file `jq` groups don't match the badge counts you see in
+the PR after upload, re-check the *Common gotchas* row about
+`uriBaseId` — GitHub compares resolved paths, and a mismatched base
+URI is the usual cause of "SARIF has 4 results but only 2 files show
+markers."
+
 ##### Verifying alerts via the GitHub Code Scanning REST API (curl)
+
 
 Sometimes the fastest way to confirm a SARIF upload landed correctly is
 to skip the UI entirely and ask the REST API. This walkthrough uses

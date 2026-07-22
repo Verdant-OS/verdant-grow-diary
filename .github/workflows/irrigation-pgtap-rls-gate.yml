@@ -28,6 +28,12 @@ on:
     #      protection: it always runs and reports a status, but the
     #      expensive jobs no-op when no irrigation surface changed.
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Filter dry-run: print matched irrigation allowlist files and skip pgTAP + typecheck jobs."
+        type: boolean
+        required: false
+        default: false
 
 concurrency:
   group: irrigation-pgtap-rls-gate-${{ github.ref }}
@@ -95,13 +101,16 @@ jobs:
           IRRIGATION: ${{ steps.filter.outputs.irrigation }}
           IRRIGATION_FILES: ${{ steps.filter.outputs.irrigation_files }}
           EVENT: ${{ github.event_name }}
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
         run: |
           {
             echo "## Irrigation change-detection"
             echo ""
             echo "- Event: \`$EVENT\`"
             echo "- Irrigation surface changed: \`$IRRIGATION\`"
-            if [ "$EVENT" = "workflow_dispatch" ]; then
+            if [ "$EVENT" = "workflow_dispatch" ] && [ "$DRY_RUN" = "true" ]; then
+              echo "- **Dry-run mode** → pgTAP + typecheck jobs will skip."
+            elif [ "$EVENT" = "workflow_dispatch" ]; then
               echo "- Manual dispatch → downstream jobs always run."
             elif [ "$IRRIGATION" = "true" ]; then
               echo "- Downstream jobs will run."
@@ -113,23 +122,61 @@ jobs:
             if [ -n "$IRRIGATION_FILES" ]; then
               echo ""
               echo '```'
-              # `list-files: shell` returns a space-separated, shell-quoted
-              # string. Split on whitespace so each matched path prints on
-              # its own line for readability.
               for f in $IRRIGATION_FILES; do
                 echo "$f"
               done
               echo '```'
             else
               echo ""
-              echo "_No files matched the irrigation filter._"
+              echo "_No PR-diff files matched the irrigation filter._"
+            fi
+            if [ "$DRY_RUN" = "true" ]; then
+              echo ""
+              echo "### Full irrigation allowlist (dry-run)"
+              echo ""
+              echo "Files declared in the \`irrigation\` paths-filter, with repo-presence check:"
+              echo ""
+              echo '```'
+              # Keep in sync with the paths-filter above.
+              ALLOWLIST=(
+                "supabase/migrations/20260703093500_harden_quicklog_save_event_grants.sql"
+                "supabase/migrations/20260707130000_quicklog_save_event_trust_boundary_hardening.sql"
+                "supabase/migrations/20260707220000_quicklog_save_event_atomic_idempotency_v2.sql"
+                "supabase/migrations/20260709160000_quicklog_save_manual_idempotency.sql"
+                "supabase/migrations/20260720160000_quicklog_save_event_irrigation_boundary_hardening.sql"
+                "supabase/migrations/20260722062644_8cdef271-abf0-4d82-9eca-970a91b6c547.sql"
+                "supabase/contract-migrations/quicklog_save_manual_revoke_anon_execute.sql"
+                "supabase/tests/create_feeding_event.sql"
+                "supabase/tests/create_watering_event.sql"
+                "supabase/seed.sql"
+                "scripts/run-irrigation-evidence-rls-harness.ts"
+                "scripts/run-irrigation-integrity-suite.mjs"
+                "scripts/run-create-feeding-event-rls-harness.ts"
+                "scripts/run-quicklog-save-event-rls-harness.ts"
+                "scripts/run-quicklog-save-manual-rls-harness.ts"
+                "scripts/run-quicklog-rpc-rls-harnesses.ts"
+                "scripts/run-quicklog-typed-payloads-harness.ts"
+                ".github/workflows/irrigation-pgtap-rls-gate.yml"
+              )
+              for f in "${ALLOWLIST[@]}"; do
+                if [ -e "$f" ]; then
+                  echo "present  $f"
+                else
+                  echo "MISSING  $f"
+                fi
+              done
+              echo '```'
+              echo ""
+              echo "_Dry-run does not execute pgTAP suites or the harness typecheck._"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
   harness-typecheck:
     name: harness typecheck (tsgo --noEmit)
     needs: changes
-    if: needs.changes.outputs.irrigation == 'true' || github.event_name == 'workflow_dispatch'
+    if: >-
+      (needs.changes.outputs.irrigation == 'true' || github.event_name == 'workflow_dispatch')
+      && github.event.inputs.dry_run != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -159,7 +206,9 @@ jobs:
   pgtap-irrigation:
     name: pgTAP irrigation (feeding + watering)
     needs: changes
-    if: needs.changes.outputs.irrigation == 'true' || github.event_name == 'workflow_dispatch'
+    if: >-
+      (needs.changes.outputs.irrigation == 'true' || github.event_name == 'workflow_dispatch')
+      && github.event.inputs.dry_run != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

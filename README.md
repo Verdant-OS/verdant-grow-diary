@@ -776,6 +776,33 @@ this order:
   the **Branch** filter if you're looking at the default branch but the
   run was on a feature branch.
 
+##### Security tab looks empty (GitHub UI gotchas)
+
+If `Upload SARIF` printed `SARIF upload complete` but **Security → Code
+scanning** still shows no findings, it's almost always a filter/scope
+mismatch in the UI rather than a real upload failure. Walk this table
+top-to-bottom — the fixes are ordered by how often each one bites:
+
+| Symptom                                                                 | Likely cause                                                                                          | Where to look / quick fix                                                                                                                        |
+|-------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------|
+| "No open alerts" on Security tab, but upload succeeded                   | **Branch filter** defaults to the repo's default branch; your run was on a feature/PR branch          | Top of Code scanning → **Branch** dropdown → select the branch the workflow ran on (or `All branches`).                                          |
+| Findings appear then vanish on refresh                                   | **Status filter** defaults to `Open`; a follow-up clean run auto-closed them                          | Change **Open** → **Closed** (or `All`). Closed = fixed by a later run, not deleted.                                                             |
+| Only some findings visible                                               | **Tool** or **Category** filter narrowed to something else (CodeQL, another SARIF category)           | Set **Tool:** `diff-money-migration-prefixes` and clear **Category**, or select the exact `money-migration-drift` category you uploaded.         |
+| Nothing at all under Code scanning, even with all filters cleared        | **Code scanning not enabled** on the repo                                                             | Repo → **Settings → Code security → Code scanning** → enable. Private repos need GitHub Advanced Security; public repos are free.                |
+| Upload step logs `Resource not accessible by integration`                | Missing `permissions: security-events: write` on the workflow/job                                     | Add at the workflow or job level: `permissions:\n  security-events: write\n  contents: read`. Re-run.                                            |
+| Upload succeeds on PR but Security tab is empty for the PR head branch   | GitHub only stores PR-scoped alerts when the workflow runs on `pull_request`, not `push`             | Trigger the workflow on `pull_request:` (not only `push:`). Existing `push` runs populate the target branch instead.                             |
+| Findings show on default branch but not on the feature branch            | Same as above — `push` events attach findings to the pushed branch only                              | Push the branch, or add a `pull_request` trigger so the PR head branch gets its own scan.                                                        |
+| Sandbox and live findings collide / one overwrites the other             | Both uploads used the same `category:`                                                                | Give each env a distinct category: `category: money-migration-drift-sandbox` and `-live`. Findings are keyed on `(tool, category, ref)`.         |
+| Fork PR: upload step is skipped with a permissions warning               | GitHub blocks `security-events: write` for pull requests **from forks** by design                    | Expected. Findings only appear once the PR merges (workflow re-runs on `push` to the default branch) or when run via `pull_request_target`.      |
+| Security tab entirely missing from repo nav                              | Repo is in an org that disabled Advanced Security, or you lack **Security** permission                | Org owner: **Organization → Settings → Code security** → enable. Individual: ask a maintainer for the **Security manager** role or write access. |
+| Findings visible in the Security tab but no red gutter on **Files changed** | PR annotations only render if the SARIF was uploaded from the **same PR run**, on the PR head SHA | Confirm the workflow ran on the PR (not just `main`). Re-run the workflow on the PR to attach annotations to the current head SHA.               |
+| "This SARIF file was processed" banner but zero results                  | SARIF's `results: []` was empty — clean run, no drift to show                                        | Expected. Re-check locally with `jq '.runs[0].results \| length' diff.sarif`. `0` means nothing to report, not a bug.                            |
+| Findings dated hours ago don't refresh after a re-run                    | Browser cached the Security tab                                                                       | Hard-reload (Cmd/Ctrl-Shift-R). GitHub does not push updates over websocket here.                                                                |
+
+If none of the above matches, download the `diff.sarif` artifact from
+the workflow run and run the `jq -e` self-check in the "Sample SARIF
+output" section. A valid-but-empty SARIF means the diff itself found no
+drift — the upload path is fine, there's just nothing to show.
 
 
 Rule catalog (always present in the SARIF `tool.driver.rules`, even on

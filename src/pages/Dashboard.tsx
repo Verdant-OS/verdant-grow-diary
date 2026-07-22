@@ -158,17 +158,6 @@ export default function Dashboard() {
   const tentIds = tents.map((t) => t.id).filter((id) => isUuid(id));
   const { byTent: readingsByTent, statusByTent: sensorStatusByTent } =
     useSensorReadingsByTents(tentIds);
-  // Stage for alert/threshold evaluation on the scoped Dashboard. Resolved
-  // from the grow row PLUS the grow's tents (most advanced known stage wins
-  // on disagreement) so a stale `grows.stage` cannot drive outdated stage
-  // bands while the tent badges show a later stage (live audit #14). When
-  // unscoped `tents` is the full set, so no tent stage may be inferred.
-  const alertContextStage = scopedGrow
-    ? resolveAlertContextStage({
-        growStage: scopedGrow.stage,
-        tentStages: tents.map((t) => t.stage),
-      }).stage
-    : null;
   // Freshness is time-relative: re-evaluate the snapshot strip's clock every
   // minute so an open tab cannot keep a fresh label past the stale boundary.
   const nowTick = useNowTick();
@@ -181,6 +170,21 @@ export default function Dashboard() {
   const selectableTents = tents.map((t) => ({ id: t.id, name: t.name }));
   const selectedTentIds = resolveSelectedTentIds(selectableTents, tentSelection);
   const sensorState = useLatestSensorSnapshot(scopedGrowId ?? null, selectedTentIds);
+  // Stage for alert/threshold evaluation on the scoped Dashboard (live
+  // audit #14). Resolved from the grow row PLUS the tents in the SAME
+  // selection scope as the snapshot being classified — a specific tent
+  // selection evaluates that tent's reading against its own stage; "all"
+  // considers every grow tent (most advanced known stage wins, so a stale
+  // `grows.stage` cannot drive outdated bands while the tent badge shows
+  // a later stage). Unscoped renders pass null: `tents` is the full
+  // account set there, so no tent stage may be inferred.
+  const stageContextTents = tents.filter((t) => selectedTentIds.includes(t.id));
+  const alertContextStage = scopedGrow
+    ? resolveAlertContextStage({
+        growStage: scopedGrow.stage,
+        tentStages: stageContextTents.map((t) => t.stage),
+      }).stage
+    : null;
   const trendsState = useEnvironmentTrends(
     scopedGrowId ?? null,
     tents.map((t) => t.id),

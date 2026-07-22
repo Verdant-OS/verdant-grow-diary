@@ -39,6 +39,17 @@
  *     classifiers already treated as stage-unknown; the header now says
  *     "no active stage" instead of echoing the garbage token.)
  *
+ * Known multi-tent residual (accepted): a harvested/curing tent still
+ * linked to a grow with other active tents advances the grow-LEVEL context
+ * to harvest, which intentionally drops cultivation bands (VPD becomes
+ * context-only). Callers evaluating a reading from a specific tent should
+ * therefore pass only that tent's stage in `tentStages` — the scoped
+ * Dashboard passes the snapshot-selection tents for exactly this reason.
+ * Grow-level surfaces (Alerts header/persist) accept the residual: it
+ * matches the "furthest field is the grower's latest action" contract, and
+ * suppressing cultivation alerts once a harvest-stage tent exists errs
+ * quiet, never noisy.
+ *
  * Pure: no I/O, no React, no Supabase, no time.
  */
 import { normalizeVpdStage, type VpdStage } from "@/lib/vpdStageTargetRules";

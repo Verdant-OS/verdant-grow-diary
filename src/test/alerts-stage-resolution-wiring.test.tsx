@@ -117,7 +117,13 @@ describe("AlertsAutoPersistForGrow — resolved stage feeds persistence", () => 
 describe("Dashboard — static wiring of the shared stage resolver", () => {
   it("scoped evaluation sites use resolveAlertContextStage, not raw grows.stage", () => {
     expect(DASHBOARD_PAGE).toContain("resolveAlertContextStage({");
-    expect(DASHBOARD_PAGE).toContain("tentStages: tents.map((t) => t.stage)");
+    // Stage candidates follow the snapshot's tent-selection scope, so a
+    // reading from one selected tent is never classified against a
+    // sibling tent's stage.
+    expect(DASHBOARD_PAGE).toContain(
+      "const stageContextTents = tents.filter((t) => selectedTentIds.includes(t.id));",
+    );
+    expect(DASHBOARD_PAGE).toContain("tentStages: stageContextTents.map((t) => t.stage)");
     // Persist hook + stage-aware VPD box + Environment Alerts panel all
     // consume the shared resolved value.
     const uses = DASHBOARD_PAGE.match(/stage:\s*alertContextStage/g) ?? [];

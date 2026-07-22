@@ -358,6 +358,8 @@ export function LocalDataHealthPanel() {
         setDrawerKeys(null);
         return;
       }
+      // Snapshot BEFORE mutation so every clear is reversible.
+      const snapshot = createBackupSnapshot(keys, "fix-issues");
       const cleared: string[] = [];
       const errors: string[] = [];
       for (const key of keys) {
@@ -369,15 +371,45 @@ export function LocalDataHealthPanel() {
         }
       }
       const parts: string[] = [];
-      if (cleared.length > 0)
+      if (snapshot && cleared.length > 0)
+        parts.push(
+          `Backup saved (${snapshot.id.slice(0, 8)}) — ${cleared.length} key${cleared.length === 1 ? "" : "s"} cleared. Restore below if needed.`,
+        );
+      else if (cleared.length > 0)
         parts.push(`Cleared ${cleared.length} local key${cleared.length === 1 ? "" : "s"}.`);
       if (errors.length > 0) parts.push(`Failed to clear: ${errors.join("; ")}`);
       setFixNotice(parts.join(" "));
+      setBackups(listBackups());
       setDrawerKeys(null);
       await run();
     },
     [run],
   );
+
+  const handleRestore = useCallback(
+    async (id: string) => {
+      const result = restoreBackup(id);
+      const parts: string[] = [];
+      if (result.restored.length > 0)
+        parts.push(
+          `Restored ${result.restored.length} key${result.restored.length === 1 ? "" : "s"} from backup ${id.slice(0, 8)}.`,
+        );
+      if (result.errors.length > 0) parts.push(`Errors: ${result.errors.join("; ")}`);
+      if (result.restored.length === 0 && result.errors.length === 0)
+        parts.push("Backup was empty — nothing to restore.");
+      setFixNotice(parts.join(" "));
+      setBackups(listBackups());
+      await run();
+    },
+    [run],
+  );
+
+  const handleDeleteBackup = useCallback((id: string) => {
+    deleteBackup(id);
+    setBackups(listBackups());
+    setFixNotice(`Backup ${id.slice(0, 8)} deleted.`);
+  }, []);
+
 
   return (
     <>

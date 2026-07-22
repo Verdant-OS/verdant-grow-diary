@@ -43,6 +43,24 @@ END $$;
 --    service_role TRUE. Legacy typed-event RPC is server-only after the
 --    irrigation evidence trust-boundary revoke (2026-07-22). Canonical writes
 --    go through quicklog_save_event / quicklog_save_manual.
+--
+-- Preflight: the function itself must exist. A missing function would make
+-- every EXECUTE check trivially "expected=false, got=false" for anon/auth and
+-- silently pass — that's a false green. Fail loudly and distinctly instead so
+-- the operator sees "function missing" rather than "ACL wrong".
+DO $$
+DECLARE fn_count INT;
+BEGIN
+  SELECT count(*) INTO fn_count
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+   WHERE n.nspname = 'public' AND p.proname = 'create_feeding_event';
+  ASSERT fn_count > 0,
+    'DIAGNOSTIC[missing-function]: public.create_feeding_event does not exist — '
+    'apply the legacy typed-event RPC migration before asserting its ACL.';
+  RAISE NOTICE '✓ create_feeding_event is present (% overload(s))', fn_count;
+END $$;
+
 DO $$
 DECLARE want JSONB := '{
     "anon": false,
@@ -59,7 +77,8 @@ BEGIN
       JOIN pg_namespace n ON n.oid = p.pronamespace
      WHERE n.nspname = 'public' AND p.proname = 'create_feeding_event';
     ASSERT got = expected,
-      format('EXECUTE create_feeding_event for %I: expected %s, got %s',
+      format('DIAGNOSTIC[genuine-permission-mismatch]: EXECUTE create_feeding_event for %I: expected=%s got=%s '
+             '(function present, ACL disagrees with trust-boundary contract)',
              role_name, expected, got);
   END LOOP;
   RAISE NOTICE '✓ create_feeding_event EXECUTE is server-only (service_role)';

@@ -188,6 +188,10 @@ export default function Diagnostics() {
 
       <BuildInfoPanel />
 
+      <ResourceHealthPanel />
+
+
+
 
 
       <Button onClick={runAll} disabled={running}>

@@ -17,7 +17,13 @@
  *
  * This file supersedes the earlier `stageAwareVpdTargets.ts`, which now
  * re-exports from here for backward compatibility with the Dashboard wiring.
+ *
+ * Plant-type awareness (autoflower/photoperiod plan, 2026-07-21): an optional
+ * plantType narrows the band to the stable lower side for autoflowers and
+ * explicitly-unknown types. Omitting the parameter (every legacy caller) or
+ * passing "photoperiod" reproduces the historical bands exactly.
  */
+import { normalizePlantType, type PlantType } from "@/lib/plantTypeRules";
 
 export type VpdStage =
   | "seedling"
@@ -163,9 +169,40 @@ export function normalizeVpdStage(input: string | null | undefined | VpdStage): 
   }
 }
 
-export function getVpdTargetBand(stage: string | null | undefined | VpdStage): VpdTargetBand {
+/**
+ * Lower/stable-side max caps for autoflower and explicitly-unknown plant
+ * types (kPa). Locked by the plan's binary criteria: seedling ≤ 0.7,
+ * mid ≤ 1.1, flower ≤ 1.35. Mins are unchanged; harvest stays context-only.
+ */
+const LOWER_SIDE_MAX_CAP: Partial<Record<VpdStage, number>> = {
+  seedling: 0.7,
+  veg: 1.1,
+  preflower: 1.1,
+  flower: 1.35,
+  late_flower: 1.35,
+  unknown: 1.2,
+};
+
+const LOWER_SIDE_HELPER_NOTE =
+  "Autoflower or unverified plant type: hold the stable lower side of the band.";
+
+export function getVpdTargetBand(
+  stage: string | null | undefined | VpdStage,
+  plantType?: PlantType | string | null,
+): VpdTargetBand {
   const key = normalizeVpdStage(stage);
-  return { stage: key, ...BAND_TABLE[key] };
+  const base: VpdTargetBand = { stage: key, ...BAND_TABLE[key] };
+  // Omitted (or null) plantType = every pre-existing caller: historical bands.
+  if (plantType === undefined || plantType === null) return base;
+  if (normalizePlantType(plantType) === "photoperiod") return base;
+  // Autoflower and explicitly-unknown types get the conservative lower side.
+  const cap = LOWER_SIDE_MAX_CAP[key];
+  if (cap === undefined || base.max === null) return base; // harvest: context-only unchanged
+  return {
+    ...base,
+    max: Math.min(base.max, cap),
+    helper: `${LOWER_SIDE_HELPER_NOTE} ${base.helper}`,
+  };
 }
 
 function isFiniteNumber(v: unknown): v is number {
@@ -176,8 +213,10 @@ export function classifyVpdAgainstStage(input: {
   value: number | null | undefined;
   stage: string | null | undefined | VpdStage;
   stale?: boolean;
+  /** Optional declared plant type; omitted = historical band behavior. */
+  plantType?: PlantType | string | null;
 }): VpdClassificationResult {
-  const band = getVpdTargetBand(input.stage);
+  const band = getVpdTargetBand(input.stage, input.plantType);
   const value = isFiniteNumber(input.value) ? input.value : null;
   const stale = !!input.stale;
 

@@ -17,6 +17,7 @@ import { Loader2, Sprout, ArrowLeft } from "lucide-react";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import PaywallCta from "@/components/PaywallCta";
 import PhenoComparison from "@/pages/PhenoComparison";
+import PhenoScorecardDialog from "@/components/PhenoScorecardDialog";
 import { Button } from "@/components/ui/button";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { useGrowPhenoComparison } from "@/hooks/useGrowPhenoComparison";
@@ -142,6 +143,19 @@ export default function GrowPhenoComparison() {
         />
       ) : (
         <div data-testid="grow-pheno-comparison-live">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <p className="text-xs text-muted-foreground">
+              Rate candidates on the traits you select on — your scores fill the
+              phenotype rows below.
+            </p>
+            {data.huntId ? (
+              <PhenoScorecardDialog
+                huntId={data.huntId}
+                candidates={data.scorecardCandidates}
+                scoreTraitsByPlant={data.scoreTraitsByPlant}
+              />
+            ) : null}
+          </div>
           <PhenoComparison input={data.input} now={comparisonNow} />
         </div>
       )}

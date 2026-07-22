@@ -36,6 +36,13 @@ import type { PhenoComparisonInput } from "@/lib/phenoComparisonViewModel";
 
 const ACTIVITY_PER_CANDIDATE = 5;
 
+/** A candidate available to score in the scorecard dialog. */
+export interface PhenoScorecardCandidate {
+  plantId: string;
+  candidateLabel: string;
+  plantName: string | null;
+}
+
 export interface GrowPhenoComparisonResult {
   /** Null until a hunt is found. */
   huntId: string | null;
@@ -43,6 +50,10 @@ export interface GrowPhenoComparisonResult {
   candidateCount: number;
   /** Built comparison input (candidates: [] when no hunt / no candidates). */
   input: PhenoComparisonInput;
+  /** Candidates in stable label order, for the scorecard dialog. */
+  scorecardCandidates: PhenoScorecardCandidate[];
+  /** plant_id → stored traits jsonb, for prefilling the scorecard dialog. */
+  scoreTraitsByPlant: Record<string, unknown>;
 }
 
 const EMPTY_RESULT: GrowPhenoComparisonResult = {
@@ -50,6 +61,8 @@ const EMPTY_RESULT: GrowPhenoComparisonResult = {
   huntName: null,
   candidateCount: 0,
   input: { huntName: null, isDemo: false, candidates: [] },
+  scorecardCandidates: [],
+  scoreTraitsByPlant: {},
 };
 
 export function useGrowPhenoComparison(growId: string | null | undefined) {
@@ -90,6 +103,8 @@ export function useGrowPhenoComparison(growId: string | null | undefined) {
             isDemo: false,
             candidates: [],
           },
+          scorecardCandidates: [],
+          scoreTraitsByPlant: {},
         };
       }
 
@@ -99,7 +114,7 @@ export function useGrowPhenoComparison(growId: string | null | undefined) {
       );
 
       // Grow name + tent names + recent activity + latest photos, in parallel.
-      const [growRes, tentRes, eventRes, photoRes] = await Promise.all([
+      const [growRes, tentRes, eventRes, photoRes, scoreRes] = await Promise.all([
         supabase.from("grows").select("id,name").eq("id", growId).maybeSingle(),
         tentIds.length > 0
           ? supabase.from("tents").select("id,name").in("id", tentIds)
@@ -118,10 +133,23 @@ export function useGrowPhenoComparison(growId: string | null | undefined) {
           .not("photo_url", "is", null)
           .order("entry_at", { ascending: false })
           .limit(plantIds.length * 3),
+        supabase
+          .from("pheno_candidate_scores")
+          .select("plant_id,traits")
+          .eq("hunt_id", hunt.id),
       ]);
       if (growRes.error) throw growRes.error;
       if (tentRes.error) throw tentRes.error;
       if (eventRes.error) throw eventRes.error;
+      // Scores are enrichment: a failed score query must never break the
+      // comparison itself (e.g. before the table exists on a branch).
+      const scoreRows = scoreRes.error
+        ? []
+        : ((scoreRes.data ?? []) as Array<{ plant_id: string | null; traits: unknown }>);
+      const scoreTraitsByPlant: Record<string, unknown> = {};
+      for (const row of scoreRows) {
+        if (row.plant_id) scoreTraitsByPlant[row.plant_id] = row.traits;
+      }
       // Photo enrichment is best-effort: a failed photo query must never
       // break the comparison itself.
       const photoRows = photoRes.error
@@ -224,14 +252,26 @@ export function useGrowPhenoComparison(growId: string | null | undefined) {
         activityByPlant,
         photoUrlByPlant,
         snapshotByTent,
+        scoreTraitsByPlant,
         maxActivityPerCandidate: ACTIVITY_PER_CANDIDATE,
       });
+
+      // Scorecard candidate list mirrors the comparison's label order.
+      const scorecardCandidates: PhenoScorecardCandidate[] = input.candidates.map(
+        (c) => ({
+          plantId: c.id,
+          candidateLabel: c.candidateLabel,
+          plantName: c.plantName ?? null,
+        }),
+      );
 
       return {
         huntId: hunt.id,
         huntName,
         candidateCount: candidates.length,
         input,
+        scorecardCandidates,
+        scoreTraitsByPlant,
       };
     },
   });

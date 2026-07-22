@@ -56,6 +56,9 @@ jobs:
           # On workflow_dispatch there is no diff to inspect; force-run
           # by setting the output to 'true' via the fallback below.
           predicate-quantifier: "some"
+          # Emit newline-separated matched file list on `<filter>_files`
+          # so the debug step below can print exactly what triggered the gate.
+          list-files: shell
           filters: |
             irrigation:
               # Explicit allowlist of irrigation-scoped migration files.

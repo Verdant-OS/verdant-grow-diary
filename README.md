@@ -1913,6 +1913,9 @@ Common failure modes and the fastest fix for each. All apply to both
 | `mkdir` / `ENOENT` errors when writing diff or redirected SARIF artifacts        | `DIFF_PATH` and shell `>` redirects don't auto-create parent dirs   | `mkdir -p audit/money-migrations` before setting `DIFF_PATH=` or `--sarif > path`. `--sarif-out=PATH` creates parents itself.          |
 | CI green locally, red in Actions                                                  | `SUPABASE_DB_URL_SANDBOX` / `_LIVE` GitHub secrets missing or misnamed | Re-check the exact names in the repo Secrets settings — the workflow only reads those two, not `DATABASE_URL`.                        |
 | Sandbox smoke script hangs                                                       | Missing `SANDBOX_SMOKE_USER` or the user has no Paddle sandbox entitlement | Set `SANDBOX_SMOKE_USER` to a real sandbox account UUID; re-run with `--verbose` to see the checkpoint it stalls on.                  |
+| `Edge shared-lib mirror is out of sync` during `bun run build` / prebuild        | Files under `src/lib` (or imported closure) changed without regenerating `supabase/functions/_shared/lib` and `.sync-manifest.json` | Run `bun run sync-edge-shared`, then `git add supabase/functions/_shared/lib .sync-manifest.json` and commit. Locally, `prebuild` auto-regenerates; in CI (`CI=1` / `--check-only`) it fails closed so drift can't be papered over — commit the sync output and push. |
+
+
 
 ##### `--sarif` specific issues
 

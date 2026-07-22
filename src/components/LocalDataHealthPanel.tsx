@@ -16,10 +16,18 @@
  * the grower still owns. Anonymous visitors see only local checks —
  * diary checks are labeled "skipped: signed out", never failing.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
 import { supabase } from "@/integrations/supabase/client";
 import { PUBLIC_QUICK_LOG_STARTER_DRAFT_KEY } from "@/lib/publicQuickLogStarterRules";
 
@@ -289,6 +297,7 @@ export function LocalDataHealthPanel() {
   const [running, setRunning] = useState(false);
   const [lastRunAt, setLastRunAt] = useState<string | null>(null);
   const [fixNotice, setFixNotice] = useState<string | null>(null);
+  const [drawerKeys, setDrawerKeys] = useState<string[] | null>(null);
 
   const run = useCallback(async () => {
     setRunning(true);
@@ -330,53 +339,39 @@ export function LocalDataHealthPanel() {
     ),
   );
 
-  const runFix = useCallback(async () => {
+  const openDrawerForAll = useCallback(() => {
     if (fixableKeys.length === 0) return;
-    const confirmed =
-      typeof window === "undefined"
-        ? true
-        : window.confirm(
-            `Clear ${fixableKeys.length} corrupted or outdated local draft${
-              fixableKeys.length === 1 ? "" : "s"
-            }?\n\nThis removes the stored value(s) on this device only. Anything unsaved in those drafts will be lost. Server data is not touched.`,
-          );
-    if (!confirmed) return;
-    const s = safeStorage();
-    if (!s) {
-      setFixNotice("Could not clear — local storage is unavailable.");
-      return;
-    }
-    const cleared: string[] = [];
-    const errors: string[] = [];
-    for (const key of fixableKeys) {
-      try {
-        s.removeItem(key);
-        cleared.push(key);
-      } catch (err) {
-        errors.push(`${key}: ${err instanceof Error ? err.message : String(err)}`);
-      }
-    }
-    const parts: string[] = [];
-    if (cleared.length > 0)
-      parts.push(`Cleared ${cleared.length} local key${cleared.length === 1 ? "" : "s"}.`);
-    if (errors.length > 0) parts.push(`Failed to clear: ${errors.join("; ")}`);
-    setFixNotice(parts.join(" "));
-    await run();
-  }, [fixableKeys, run]);
+    setDrawerKeys(fixableKeys);
+  }, [fixableKeys]);
 
-  const clearOne = useCallback(
-    async (key: string) => {
+  const openDrawerForOne = useCallback((key: string) => {
+    setDrawerKeys([key]);
+  }, []);
+
+  const handleConfirmClear = useCallback(
+    async (keys: string[]) => {
       const s = safeStorage();
       if (!s) {
         setFixNotice("Could not clear — local storage is unavailable.");
+        setDrawerKeys(null);
         return;
       }
-      try {
-        s.removeItem(key);
-        setFixNotice(`Cleared local key: ${key}`);
-      } catch (err) {
-        setFixNotice(`Failed to clear ${key}: ${err instanceof Error ? err.message : String(err)}`);
+      const cleared: string[] = [];
+      const errors: string[] = [];
+      for (const key of keys) {
+        try {
+          s.removeItem(key);
+          cleared.push(key);
+        } catch (err) {
+          errors.push(`${key}: ${err instanceof Error ? err.message : String(err)}`);
+        }
       }
+      const parts: string[] = [];
+      if (cleared.length > 0)
+        parts.push(`Cleared ${cleared.length} local key${cleared.length === 1 ? "" : "s"}.`);
+      if (errors.length > 0) parts.push(`Failed to clear: ${errors.join("; ")}`);
+      setFixNotice(parts.join(" "));
+      setDrawerKeys(null);
       await run();
     },
     [run],
@@ -410,12 +405,12 @@ export function LocalDataHealthPanel() {
             <Button
               size="sm"
               variant="outline"
-              onClick={() => void runFix()}
+              onClick={openDrawerForAll}
               disabled={running || fixableKeys.length === 0}
               title={
                 fixableKeys.length === 0
                   ? "No corrupted local schemas detected"
-                  : `Clear ${fixableKeys.length} local key(s) and re-check`
+                  : `Review and clear ${fixableKeys.length} local key(s)`
               }
             >
               Fix issues{fixableKeys.length > 0 ? ` (${fixableKeys.length})` : ""}
@@ -428,8 +423,9 @@ export function LocalDataHealthPanel() {
           </div>
 
           <p className="text-[11px] text-muted-foreground">
-            “Fix issues” only clears local browser drafts flagged as corrupt or outdated. It never
-            modifies server data, and diary/RLS findings are informational only.
+            “Fix issues” opens a review drawer that shows the affected schemas, validation errors,
+            and exact keys to be removed — with stored values redacted — before you confirm. It
+            never modifies server data.
           </p>
 
           {fixNotice && (
@@ -471,7 +467,14 @@ export function LocalDataHealthPanel() {
         </CardContent>
       </Card>
 
-      <RemediationChecklist checks={checks} onClearKey={(k) => void clearOne(k)} running={running} />
+      <RemediationChecklist checks={checks} onReviewKey={openDrawerForOne} running={running} />
+
+      <RemediationDrawer
+        keys={drawerKeys}
+        onCancel={() => setDrawerKeys(null)}
+        onConfirm={(keys) => void handleConfirmClear(keys)}
+        running={running}
+      />
     </>
   );
 }
@@ -561,11 +564,11 @@ function buildRemediation(check: CheckResult): RemediationStep | null {
 
 interface RemediationChecklistProps {
   checks: CheckResult[];
-  onClearKey: (key: string) => void;
+  onReviewKey: (key: string) => void;
   running: boolean;
 }
 
-function RemediationChecklist({ checks, onClearKey, running }: RemediationChecklistProps) {
+function RemediationChecklist({ checks, onReviewKey, running }: RemediationChecklistProps) {
   const steps = checks
     .map(buildRemediation)
     .filter((s): s is RemediationStep => s !== null);
@@ -610,10 +613,10 @@ function RemediationChecklist({ checks, onClearKey, running }: RemediationCheckl
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => onClearKey(s.fixableKey as string)}
+                      onClick={() => onReviewKey(s.fixableKey as string)}
                       disabled={running}
                     >
-                      Clear this local key
+                      Review & clear…
                     </Button>
                     <span className="text-[11px] text-muted-foreground font-mono break-all">
                       {s.fixableKey}
@@ -626,6 +629,342 @@ function RemediationChecklist({ checks, onClearKey, running }: RemediationCheckl
         )}
       </CardContent>
     </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Remediation drawer — detailed, redacted review before clearing local keys
+// ---------------------------------------------------------------------------
+
+const SENSITIVE_KEY_HINTS = [
+  "token",
+  "secret",
+  "password",
+  "passwd",
+  "apikey",
+  "api_key",
+  "authorization",
+  "auth",
+  "bearer",
+  "session",
+  "jwt",
+  "refresh",
+  "signature",
+  "sig",
+  "private",
+  "credential",
+  "cred",
+];
+
+function isSensitiveKeyName(name: string): boolean {
+  const n = name.toLowerCase();
+  return SENSITIVE_KEY_HINTS.some((hint) => n.includes(hint));
+}
+
+interface RemediationEntry {
+  key: string;
+  label: string;
+  expectedVersion?: number;
+  present: boolean;
+  sizeBytes: number;
+  category: "invalid-json" | "version-mismatch" | "read-error" | "missing-required" | "unknown";
+  errorMessage: string;
+  foundVersion?: unknown;
+  // Redacted safe metadata (never raw values):
+  topLevelFieldPreview?: Array<{ name: string; displayed: string }>;
+  charClassSummary?: {
+    ascii: number;
+    nonAscii: number;
+    whitespace: number;
+    control: number;
+  };
+}
+
+function buildRemediationEntry(key: string): RemediationEntry {
+  const schema = LOCAL_SCHEMAS.find((s) => s.key === key);
+  const label = schema?.label ?? key;
+  const expectedVersion = schema?.expectedVersion;
+
+  const s = safeStorage();
+  if (!s) {
+    return {
+      key,
+      label,
+      expectedVersion,
+      present: false,
+      sizeBytes: 0,
+      category: "read-error",
+      errorMessage: "localStorage is unavailable in this tab.",
+    };
+  }
+
+  let raw: string | null = null;
+  try {
+    raw = s.getItem(key);
+  } catch (err) {
+    return {
+      key,
+      label,
+      expectedVersion,
+      present: false,
+      sizeBytes: 0,
+      category: "read-error",
+      errorMessage: err instanceof Error ? err.message : String(err),
+    };
+  }
+
+  if (raw === null) {
+    return {
+      key,
+      label,
+      expectedVersion,
+      present: false,
+      sizeBytes: 0,
+      category: schema?.optional === false ? "missing-required" : "unknown",
+      errorMessage:
+        schema?.optional === false
+          ? "Required schema is missing on this device."
+          : "Key is not present on this device (nothing to remove).",
+    };
+  }
+
+  const sizeBytes = new Blob([raw]).size;
+  const charClassSummary = {
+    ascii: 0,
+    nonAscii: 0,
+    whitespace: 0,
+    control: 0,
+  };
+  for (const ch of raw) {
+    const code = ch.charCodeAt(0);
+    if (/\s/.test(ch)) charClassSummary.whitespace += 1;
+    else if (code < 32 || code === 127) charClassSummary.control += 1;
+    else if (code < 128) charClassSummary.ascii += 1;
+    else charClassSummary.nonAscii += 1;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    return {
+      key,
+      label,
+      expectedVersion,
+      present: true,
+      sizeBytes,
+      category: "invalid-json",
+      errorMessage: err instanceof Error ? err.message : String(err),
+      charClassSummary,
+    };
+  }
+
+  // Parseable JSON — build a redacted top-level field preview. We show
+  // field NAMES only, plus the `v` version integer (which is metadata,
+  // not user content). All other values are replaced with a type token
+  // so we never leak grower notes, emails, ids, or credentials.
+  let topLevelFieldPreview: RemediationEntry["topLevelFieldPreview"];
+  let foundVersion: unknown;
+  if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+    const obj = parsed as Record<string, unknown>;
+    if ("v" in obj) foundVersion = obj.v;
+    topLevelFieldPreview = Object.keys(obj).map((name) => {
+      if (name === "v") {
+        return { name, displayed: `v${JSON.stringify(obj.v)}` };
+      }
+      if (isSensitiveKeyName(name)) {
+        return { name, displayed: "[redacted — sensitive field]" };
+      }
+      const value = obj[name];
+      if (value === null) return { name, displayed: "null" };
+      if (Array.isArray(value)) {
+        return { name, displayed: `array (${value.length} item${value.length === 1 ? "" : "s"})` };
+      }
+      const t = typeof value;
+      if (t === "object") return { name, displayed: "object" };
+      // Never print the primitive value itself — it could be a note, id, email, etc.
+      return { name, displayed: `${t}` };
+    });
+  } else if (Array.isArray(parsed)) {
+    topLevelFieldPreview = [{ name: "(array)", displayed: `array (${parsed.length} items)` }];
+  }
+
+  if (expectedVersion !== undefined && foundVersion !== expectedVersion) {
+    return {
+      key,
+      label,
+      expectedVersion,
+      present: true,
+      sizeBytes,
+      category: "version-mismatch",
+      errorMessage: `Stored schema version is ${
+        foundVersion === undefined ? "missing" : JSON.stringify(foundVersion)
+      }, but this build expects v${expectedVersion}.`,
+      foundVersion,
+      topLevelFieldPreview,
+      charClassSummary,
+    };
+  }
+
+  return {
+    key,
+    label,
+    expectedVersion,
+    present: true,
+    sizeBytes,
+    category: "unknown",
+    errorMessage: "No validation issue detected for this key right now.",
+    foundVersion,
+    topLevelFieldPreview,
+    charClassSummary,
+  };
+}
+
+function categoryLabel(cat: RemediationEntry["category"]): string {
+  switch (cat) {
+    case "invalid-json":
+      return "Corrupted (invalid JSON)";
+    case "version-mismatch":
+      return "Outdated schema version";
+    case "read-error":
+      return "Read error";
+    case "missing-required":
+      return "Required schema missing";
+    case "unknown":
+      return "No issue detected";
+  }
+}
+
+interface RemediationDrawerProps {
+  keys: string[] | null;
+  onCancel: () => void;
+  onConfirm: (keys: string[]) => void;
+  running: boolean;
+}
+
+function RemediationDrawer({ keys, onCancel, onConfirm, running }: RemediationDrawerProps) {
+  const open = keys !== null && keys.length > 0;
+  const entries = useMemo(() => (keys ?? []).map(buildRemediationEntry), [keys]);
+  const clearableKeys = entries.filter((e) => e.present).map((e) => e.key);
+
+  return (
+    <Drawer open={open} onOpenChange={(next) => (!next ? onCancel() : undefined)}>
+      <DrawerContent className="max-h-[90vh]">
+        <DrawerHeader>
+          <DrawerTitle>Review corrupted local data</DrawerTitle>
+          <DrawerDescription>
+            The following browser-local drafts will be removed from this device on confirm. Server
+            data (grows, plants, diary entries) is not touched. Stored values are redacted below —
+            only schema metadata (field names, sizes, versions) is shown.
+          </DrawerDescription>
+        </DrawerHeader>
+
+        <div className="overflow-y-auto px-4 pb-2 text-sm space-y-3">
+          {entries.length === 0 ? (
+            <p className="text-xs text-muted-foreground">Nothing to review.</p>
+          ) : (
+            entries.map((e) => (
+              <div key={e.key} className="rounded-md border border-border/70 p-3 space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-medium">{e.label}</span>
+                  <Badge
+                    variant={
+                      e.category === "invalid-json" || e.category === "read-error"
+                        ? "destructive"
+                        : e.category === "version-mismatch" || e.category === "missing-required"
+                          ? "secondary"
+                          : "outline"
+                    }
+                  >
+                    {categoryLabel(e.category)}
+                  </Badge>
+                </div>
+
+                <div className="text-[11px] font-mono break-all text-muted-foreground">
+                  key: {e.key}
+                </div>
+
+                <dl className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-xs">
+                  <dt className="text-muted-foreground">Present</dt>
+                  <dd>{e.present ? "yes" : "no"}</dd>
+                  <dt className="text-muted-foreground">Size</dt>
+                  <dd>{e.sizeBytes} bytes</dd>
+                  {e.expectedVersion !== undefined && (
+                    <>
+                      <dt className="text-muted-foreground">Expected version</dt>
+                      <dd>v{e.expectedVersion}</dd>
+                    </>
+                  )}
+                  {e.foundVersion !== undefined && (
+                    <>
+                      <dt className="text-muted-foreground">Found version</dt>
+                      <dd className="font-mono">{JSON.stringify(e.foundVersion)}</dd>
+                    </>
+                  )}
+                </dl>
+
+                <div>
+                  <p className="text-xs font-medium">Validation error</p>
+                  <p className="text-xs text-muted-foreground break-words">{e.errorMessage}</p>
+                </div>
+
+                {e.topLevelFieldPreview && e.topLevelFieldPreview.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium">Top-level fields (values redacted)</p>
+                    <ul className="text-[11px] font-mono space-y-0.5 mt-1">
+                      {e.topLevelFieldPreview.map((f) => (
+                        <li key={f.name} className="break-all">
+                          <span className="text-foreground">{f.name}</span>
+                          <span className="text-muted-foreground">: {f.displayed}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {e.category === "invalid-json" && e.charClassSummary && (
+                  <div>
+                    <p className="text-xs font-medium">Content shape (redacted)</p>
+                    <p className="text-[11px] text-muted-foreground font-mono">
+                      ascii:{e.charClassSummary.ascii} · non-ascii:{e.charClassSummary.nonAscii} ·
+                      whitespace:{e.charClassSummary.whitespace} · control:
+                      {e.charClassSummary.control}
+                    </p>
+                  </div>
+                )}
+
+                <div className="rounded border border-border/60 bg-muted/40 p-2 text-xs">
+                  <span className="font-medium">Proposed action:</span>{" "}
+                  {e.present
+                    ? `Remove the localStorage entry at "${e.key}" on this device. Any unsaved work in that draft will be lost. Server data is unaffected.`
+                    : "No action needed — key is not present on this device."}
+                </div>
+              </div>
+            ))
+          )}
+
+          <p className="text-[11px] text-muted-foreground">
+            Values, notes, ids, emails, and any sensitive fields are never displayed. Only field
+            names, byte sizes, and schema versions are shown for review.
+          </p>
+        </div>
+
+        <DrawerFooter className="border-t">
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button variant="ghost" onClick={onCancel} disabled={running}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => onConfirm(clearableKeys)}
+              disabled={running || clearableKeys.length === 0}
+            >
+              Confirm — clear {clearableKeys.length} key{clearableKeys.length === 1 ? "" : "s"}
+            </Button>
+          </div>
+        </DrawerFooter>
+      </DrawerContent>
+    </Drawer>
   );
 }
 

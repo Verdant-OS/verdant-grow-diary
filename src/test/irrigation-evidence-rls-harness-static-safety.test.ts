@@ -165,8 +165,10 @@ describe("irrigation evidence RLS harness — no device-control / automation / f
     // Helpers must exist and cover the PostgREST/Postgres error codes that
     // can masquerade as denial: 42883, PGRST202, PGRST203, /does not exist/,
     // /schema cache/, /no function matches/.
-    expect(src).toMatch(/isGenuinePermissionDenial\s*=/);
-    expect(src).toMatch(/isMissingFunction\s*=/);
+    // Accept either declaration form (const arrow or function declaration) —
+    // the contract is that the named helpers exist, not how they are bound.
+    expect(src).toMatch(/isGenuinePermissionDenial\s*[=(]/);
+    expect(src).toMatch(/isMissingFunction\s*[=(]/);
     expect(src).toMatch(/42883/);
     expect(src).toMatch(/PGRST202/);
     expect(src).toMatch(/schema cache/i);

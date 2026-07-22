@@ -2,6 +2,7 @@ import VpdStageMissingBadge from "@/components/VpdStageMissingBadge";
 import EcowittLatestSnapshotCard from "@/components/EcowittLatestSnapshotCard";
 import { stripBackPointerTokens } from "@/lib/actionQueueProvenanceRules";
 import { computeEnvironmentStability } from "@/lib/environmentStabilityRules";
+import { resolveAlertContextStage } from "@/lib/alertStageResolution";
 import { formatStabilityChipView } from "@/lib/dashboardStabilityChipCopyRules";
 import StabilityChipDrilldown from "@/components/StabilityChipDrilldown";
 import {
@@ -169,6 +170,21 @@ export default function Dashboard() {
   const selectableTents = tents.map((t) => ({ id: t.id, name: t.name }));
   const selectedTentIds = resolveSelectedTentIds(selectableTents, tentSelection);
   const sensorState = useLatestSensorSnapshot(scopedGrowId ?? null, selectedTentIds);
+  // Stage for alert/threshold evaluation on the scoped Dashboard (live
+  // audit #14). Resolved from the grow row PLUS the tents in the SAME
+  // selection scope as the snapshot being classified — a specific tent
+  // selection evaluates that tent's reading against its own stage; "all"
+  // considers every grow tent (most advanced known stage wins, so a stale
+  // `grows.stage` cannot drive outdated bands while the tent badge shows
+  // a later stage). Unscoped renders pass null: `tents` is the full
+  // account set there, so no tent stage may be inferred.
+  const stageContextTents = tents.filter((t) => selectedTentIds.includes(t.id));
+  const alertContextStage = scopedGrow
+    ? resolveAlertContextStage({
+        growStage: scopedGrow.stage,
+        tentStages: stageContextTents.map((t) => t.stage),
+      }).stage
+    : null;
   const trendsState = useEnvironmentTrends(
     scopedGrowId ?? null,
     tents.map((t) => t.id),
@@ -232,7 +248,7 @@ export default function Dashboard() {
       targetsState.status === "ok" ? targetsState.targets : null,
     ),
     enabled: !!scopedGrowId,
-    stage: scopedGrow?.stage ?? null,
+    stage: alertContextStage,
   });
 
   const dueToday = tasks.filter((t) => t.status === "today").length;
@@ -1282,7 +1298,7 @@ export default function Dashboard() {
                     const stale = snap ? isStale(snap.ts) : false;
                     const vpd = classifyVpdAgainstStage({
                       value: vpdValue,
-                      stage: scopedGrow?.stage ?? null,
+                      stage: alertContextStage,
                       stale,
                     });
                     const toneCls =
@@ -1338,10 +1354,10 @@ export default function Dashboard() {
                 snapshot: snap,
                 quality,
                 targets: targetsCmp,
-                stage: scopedGrow?.stage ?? null,
+                stage: alertContextStage,
               });
               const vpdStageMissing =
-                snap?.vpd != null && normalizeVpdStage(scopedGrow?.stage) === "unknown";
+                snap?.vpd != null && normalizeVpdStage(alertContextStage) === "unknown";
               return (
                 <div>
                   <div className="flex items-center justify-between mb-2">

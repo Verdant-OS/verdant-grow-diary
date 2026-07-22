@@ -17,17 +17,41 @@ name: Irrigation pgTAP + Harness Typecheck
 on:
   pull_request:
     branches: [main, verdant-grow-diary]
+    # Scoped to irrigation-trust-boundary surfaces only. Broad
+    # `supabase/migrations/**` was pruned intentionally: this gate
+    # exists to catch RLS/ACL regressions on event tables + quicklog
+    # RPCs, and unrelated migrations (billing, credits, pheno, seo,
+    # etc.) do not touch those grants. Non-irrigation migration drift
+    # is still covered by security-regression.yml / supabase-security-baseline.yml.
+    # Add a new glob here if a future migration must be gated by this suite.
     paths:
-      - "supabase/migrations/**"
+      # Irrigation-scoped migrations. Globs cover the historical naming
+      # for the event tables, quicklog RPCs, and any grant/revoke on
+      # those surfaces.
+      - "supabase/migrations/**irrigation*.sql"
+      - "supabase/migrations/**feeding*.sql"
+      - "supabase/migrations/**watering*.sql"
+      - "supabase/migrations/**grow_event*.sql"
+      - "supabase/migrations/**quicklog*.sql"
+      - "supabase/migrations/**event_tables*.sql"
+      - "supabase/migrations/**revoke*.sql"
+      - "supabase/migrations/**grant*.sql"
+      # Contract-migrations lane, same scope.
+      - "supabase/contract-migrations/**irrigation*.sql"
+      - "supabase/contract-migrations/**feeding*.sql"
+      - "supabase/contract-migrations/**watering*.sql"
+      - "supabase/contract-migrations/**quicklog*.sql"
+      # pgTAP suites + seed parity.
       - "supabase/tests/create_feeding_event.sql"
       - "supabase/tests/create_watering_event.sql"
       - "supabase/seed.sql"
+      # Runtime harness sources typechecked by this gate.
       - "scripts/run-irrigation-evidence-rls-harness.ts"
       - "scripts/run-create-feeding-event-rls-harness.ts"
       - "scripts/run-quicklog-save-event-rls-harness.ts"
       - "scripts/run-quicklog-save-manual-rls-harness.ts"
       - "scripts/run-quicklog-rpc-rls-harnesses.ts"
-      - "supabase/contract-migrations/**"
+      # The workflow itself.
       - ".github/workflows/irrigation-pgtap-rls-gate.yml"
   workflow_dispatch:
 

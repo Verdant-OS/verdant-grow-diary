@@ -780,23 +780,25 @@ export default function PlantDetail() {
           <TimelineMemorySection scope="plant" plantId={plant.id} tentId={plant.tentId ?? null} />
         </PlantDetailDisclosureSection>
 
-        <PlantDetailDisclosureSection
-          key={`${plant.id}:harvest`}
-          group="harvest"
-          title="Harvest evidence"
-          summary="Review stage-gated harvest readiness and preserved evidence."
-          anchorId={PLANT_DETAIL_HARVEST_EVIDENCE_ANCHOR_ID}
-          open={openGroups.harvest}
-          onOpenChange={(open) => setGroupOpen("harvest", open)}
-        >
-          <PlantDetailHarvestWatchCard
-            plantId={plant.id}
-            hasPlantPhoto={!!plant.photo}
-            galleryPhotoCount={plantGalleryPhotoCount}
-            onRevealAndNavigate={revealAndNavigate}
-          />
-          <PlantDetailHarvestEvidenceReportMount plantId={plant.id} />
-        </PlantDetailDisclosureSection>
+        {harvestWatchEligible && (
+          <PlantDetailDisclosureSection
+            key={`${plant.id}:harvest`}
+            group="harvest"
+            title="Harvest evidence"
+            summary="Review stage-gated harvest readiness and preserved evidence."
+            anchorId={PLANT_DETAIL_HARVEST_EVIDENCE_ANCHOR_ID}
+            open={openGroups.harvest}
+            onOpenChange={(open) => setGroupOpen("harvest", open)}
+          >
+            <PlantDetailHarvestWatchCard
+              plantId={plant.id}
+              hasPlantPhoto={!!plant.photo}
+              galleryPhotoCount={plantGalleryPhotoCount}
+              onRevealAndNavigate={revealAndNavigate}
+            />
+            <PlantDetailHarvestEvidenceReportMount plantId={plant.id} />
+          </PlantDetailDisclosureSection>
+        )}
 
         <PlantDetailDisclosureSection
           key={`${plant.id}:ai`}

@@ -23,6 +23,7 @@ import type {
 } from "@/lib/phenoComparisonViewModel";
 import type { PhenoSensorSnapshotInput } from "@/lib/phenoComparisonRules";
 import type { SensorSnapshot } from "@/lib/sensorSnapshot";
+import { phenotypeInputFromScoreTraits } from "@/lib/phenoScorecardRules";
 
 /** A candidate plant tagged into a pheno hunt. */
 export interface RealPhenoCandidatePlant {
@@ -60,6 +61,12 @@ export interface BuildRealPhenoComparisonInputArgs {
    * shows the honest "No sensor snapshot attached" flag.
    */
   snapshotByTent?: Readonly<Record<string, PhenoSensorSnapshotInput | null>>;
+  /**
+   * plant_id → stored pheno_candidate_scores.traits jsonb (grower's 1-5 trait
+   * ratings). Bridged into the engine's phenotype input so rated candidates
+   * stop showing "Not recorded". Missing → the engine keeps its honest gaps.
+   */
+  scoreTraitsByPlant?: Readonly<Record<string, unknown>>;
   /** Max quick-log / timeline rows carried per candidate. Default 5. */
   maxActivityPerCandidate?: number;
 }
@@ -164,12 +171,17 @@ export function buildRealPhenoComparisonInput(
   const ordered = [...args.candidates].sort(compareCandidates);
 
   const snapshotByTent = args.snapshotByTent ?? {};
+  const scoreTraitsByPlant = args.scoreTraitsByPlant ?? {};
 
   const candidates: PhenoCandidateInput[] = ordered.map((c, index) => {
     const activity = args.activityByPlant[c.id] ?? [];
     const tentName = c.tent_id ? nullableText(args.tentNameById[c.tent_id]) : null;
     const photoUrl = nullableText(photoByPlant[c.id] ?? null);
     const snapshot = c.tent_id ? snapshotByTent[c.tent_id] ?? null : null;
+    // Grower-entered trait scores become the phenotype record. Absent scores
+    // yield an empty phenotype → the engine still shows honest "Not recorded".
+    const rawScores = scoreTraitsByPlant[c.id];
+    const phenotype = rawScores ? phenotypeInputFromScoreTraits(rawScores) : undefined;
     return {
       id: c.id,
       candidateLabel: cleanLabel(c.candidate_label, `#${index + 1}`),
@@ -184,8 +196,9 @@ export function buildRealPhenoComparisonInput(
       quickLogs: toQuickLogs(activity, max),
       timelineEvents: toTimelineEvents(activity, max),
       snapshot,
-      // phenotype / postCure / dayOfFlower / replicateCount are intentionally
-      // unset — no structured store exists yet, and the engine renders honest
+      phenotype,
+      // postCure / dayOfFlower / replicateCount are intentionally unset — no
+      // structured store exists yet, and the engine renders honest
       // evidence-gap caveats for each.
     };
   });

@@ -39,17 +39,51 @@ per entity with the envelope:
 }
 ```
 
-**MQTT Statestream** is supported as a legacy-compatibility path only,
-because Statestream splits state, attributes, and (optionally)
-per-attribute fields across sibling topics. The adapter's
-`HaStatestreamAssembler` deterministically reassembles them per
-entity id; it never assumes one generic `/attributes` topic layout and
-never guesses the `last_updated` timestamp.
+Boundary aliases: `value` (for `state`) and `unit` (for
+`unit_of_measurement`) are accepted at the envelope boundary and
+normalized immediately into the single internal representation. The
+canonical field wins when both are present. Aliases never propagate
+into the rules engine.
+
+**MQTT Statestream** is fully supported using its real wire format:
+Statestream fans every entity out into individual sibling topics, one
+value per topic —
+
+```
+<prefix>/<domain>/<object_id>/state
+<prefix>/<domain>/<object_id>/last_updated
+<prefix>/<domain>/<object_id>/last_changed
+<prefix>/<domain>/<object_id>/<attribute_name>   (e.g. unit_of_measurement, device_class)
+```
+
+There is **no wire-level `/attributes` JSON-blob topic** and the
+adapter never requires one. `HaStatestreamAssembler` keys an internal
+per-entity cache by exact entity id and folds each topic event into it,
+so messages may arrive in any order and still assemble to the identical
+result. The `attribute_cache` on the assembled message is that internal
+cache — assembled from individual attribute topics, not a wire blob.
+Unknown attribute suffixes are stored there deterministically as
+evidence (last write per suffix wins) and are never interpreted.
+JSON-serialized numbers and JSON-quoted strings are both decoded. A
+non-standard legacy `/attributes` JSON object, if one is ever published,
+is merged into the same cache for compatibility, but dedicated suffix
+topics always win — it is never required.
+
+**Timestamp policy (all paths):** `last_updated` is the preferred
+source timestamp; `last_changed` is accepted only as an explicitly
+documented fallback when `last_updated` is absent. Broker/adapter
+receive time is NEVER substituted for a missing source timestamp — it
+is preserved separately (`broker_received_at` / `received_at`) for
+audit only, and a state without a valid source timestamp (retained or
+not) classifies `invalid`, never `live`.
 
 ## Exact entity mapping
 
 Mapping is versioned and lives outside code. Example:
-`fixtures/home-assistant-ecowitt-mqtt/example-mapping.json`.
+`fixtures/home-assistant-ecowitt-mqtt/example-mapping.json`. Official
+Statestream separate-topic wire fixtures (in-order, out-of-order,
+retained-without-timestamp, identical soil channels, °C unit) live in
+`fixtures/home-assistant-ecowitt-mqtt/ha-statestream-scenarios.json`.
 
 Rules:
 
@@ -122,11 +156,29 @@ migration is required or proposed by this slice.**
 
 ## Idempotency
 
-`buildHaIdempotencyKey({bridge, upstream_mode, tent_id, metric, captured_at, value})`
-returns a stable string. Retained-message replays and reconnect storms
-of the same source-timestamp reading produce the same key. The runner
-should pass this string as the existing webhook `Idempotency-Key`
-header — no DB constraint or migration is added by this slice.
+`buildHaIdempotencyKey(preimage)` returns a stable string built from
+the full preimage, in this exact field order:
+
+```
+version | provider | bridge | upstream_mode | entity_id | tent_id |
+plant_id | channel | metric | captured_at | value | unit
+```
+
+- `entity_id` is the exact HA entity id, or a stable mapping identity
+  for non-entity paths (`ecowitt_raw:<topic>` for the raw aggregate
+  passthrough, `vpd_derived:<temp>+<rh>` for derived VPD).
+- `plant_id` and `channel` serialize as empty segments when absent.
+- `value` is the normalized value (canonical unit, 3-decimal collapse);
+  `unit` is the canonical unit for the metric.
+
+Retained-message replays and reconnect storms of the same
+source-timestamp reading produce the same key, while different
+entities, soil channels, plants, or tents never collide even with an
+identical timestamp + value. The runner should pass this string as the
+existing webhook `Idempotency-Key` header — no DB constraint or
+migration is added by this slice. (A deterministic hash of the string
+would be equally valid; the preimage, not the encoding, is the
+contract.)
 
 ## MQTT safety
 

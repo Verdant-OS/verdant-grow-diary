@@ -24,6 +24,15 @@
  * decides whether to POST the resulting draft to the validated
  * `sensor-ingest-webhook` Edge Function, and only when explicit live
  * mode + bridge token are configured.
+ *
+ * Timestamp policy (applies to every path in this module):
+ *   - `last_updated` is the preferred source timestamp.
+ *   - `last_changed` is accepted ONLY as an explicitly documented
+ *     fallback when `last_updated` is absent.
+ *   - Broker/adapter receive time is NEVER used as `captured_at`. It is
+ *     preserved separately (`broker_received_at` / `received_at`) for
+ *     audit only. A reading without a valid source timestamp — retained
+ *     or not — classifies `invalid`, never `live`.
  */
 
 import {
@@ -147,8 +156,17 @@ export interface HaProvenanceEnvelope {
 export interface HaMetricReading {
   metric: HaCanonicalMetric;
   value: number;
+  /**
+   * Exact HA entity id for entity-scoped paths, or a stable mapping
+   * identity for non-entity paths (`ecowitt_raw:<topic>` for the raw
+   * aggregate passthrough, `vpd_derived:<temp>+<rh>` for derived VPD).
+   * Part of the idempotency preimage — never inferred, never fuzzy.
+   */
+  entity_id: string;
   tent_id: string;
   plant_id: string | null;
+  /** Mapping-declared channel (e.g. soil probe channel). Null when unmapped. */
+  channel: string | null;
   captured_at: string; // ISO
   provenance: HaProvenanceEnvelope;
   idempotency_key: string;
@@ -240,27 +258,83 @@ function isFinitePositiveWindow(ms: unknown): ms is number {
   return typeof ms === "number" && Number.isFinite(ms) && ms >= 0;
 }
 
-/** SHA-free deterministic idempotency string. Stable across identical inputs. */
-export function buildHaIdempotencyKey(args: {
+/** Canonical unit for each internal metric. Values are always stored in this unit. */
+export function canonicalUnitForMetric(
+  metric: HaCanonicalMetric,
+): "°F" | "%" | "ppm" | "kPa" {
+  switch (metric) {
+    case "air_temp_f":
+    case "soil_temp_f":
+      return "°F";
+    case "humidity_pct":
+    case "soil_moisture_pct":
+      return "%";
+    case "co2_ppm":
+      return "ppm";
+    case "vpd_kpa":
+      return "kPa";
+  }
+}
+
+/** Key-format version tag. Bump whenever the preimage field list changes. */
+export const HA_IDEMPOTENCY_KEY_VERSION = "hav2" as const;
+
+/**
+ * Full idempotency preimage. Field order is part of the contract:
+ *   version | provider | bridge | upstream_mode | entity_id | tent_id |
+ *   plant_id | channel | metric | captured_at | value | unit
+ *
+ * Every dimension that distinguishes one physical reading from another
+ * is present, so identical replays collapse to one key while different
+ * entities / soil channels / plants / tents NEVER collide even with an
+ * identical timestamp + value. Absent plant_id/channel serialize as the
+ * empty segment (real ids are never empty strings).
+ */
+export interface HaIdempotencyPreimage {
+  provider: string;
   bridge: HaBridge;
   upstream_mode: HaUpstreamMode;
+  /** Exact entity id, or the stable mapping identity for non-entity paths. */
+  entity_id: string;
   tent_id: string;
+  plant_id?: string | null;
+  channel?: string | null;
   metric: HaCanonicalMetric;
   captured_at: string;
   value: number;
-}): string {
+  /** Canonical unit the normalized value is expressed in. */
+  unit: string;
+}
+
+/** Escape the join delimiter so free-text segments cannot forge boundaries. */
+function escapeKeySegment(s: string): string {
+  return s.replace(/\|/g, "%7C");
+}
+
+/**
+ * SHA-free deterministic idempotency string. Stable across identical
+ * inputs; any single preimage dimension change produces a different key.
+ * (A deterministic hash of this string would be equally valid — the
+ * preimage, not the encoding, is the contract.)
+ */
+export function buildHaIdempotencyKey(args: HaIdempotencyPreimage): string {
   // Normalize value to 3 decimals so trivially different string forms of
   // the same number collapse (e.g. 72.4000 vs 72.4). Values that survive
   // sensor-truth validation are always finite.
   const v = Math.round(args.value * 1000) / 1000;
   return [
-    "ha",
+    HA_IDEMPOTENCY_KEY_VERSION,
+    escapeKeySegment(args.provider),
     args.bridge,
     args.upstream_mode,
-    args.tent_id,
+    escapeKeySegment(args.entity_id),
+    escapeKeySegment(args.tent_id),
+    args.plant_id ? escapeKeySegment(args.plant_id) : "",
+    args.channel ? escapeKeySegment(args.channel) : "",
     args.metric,
     args.captured_at,
     v.toString(),
+    args.unit,
   ].join("|");
 }
 
@@ -361,11 +435,22 @@ function classifyFreshness(args: {
  * Minimal HA "selective JSON" envelope. Verdant expects the HA side to
  * publish one message per entity containing at least entity_id, state,
  * and a source timestamp (last_updated).
+ *
+ * Boundary aliases: some HA template payloads emit `value` instead of
+ * `state` and `unit` instead of `unit_of_measurement`. Both aliases are
+ * accepted HERE, at the envelope boundary, and normalized immediately
+ * into the single internal representation. When both the canonical
+ * field and its alias are present, the canonical field wins. Aliases
+ * never propagate past `parseHaJsonMessage` into the rules engine.
  */
 export interface HaJsonEnvelope {
   entity_id?: unknown;
   state?: unknown;
+  /** Alias for `state` — normalized at the boundary, canonical wins. */
+  value?: unknown;
   unit_of_measurement?: unknown;
+  /** Alias for `unit_of_measurement` — normalized at the boundary, canonical wins. */
+  unit?: unknown;
   last_updated?: unknown;
   last_changed?: unknown;
   device_class?: unknown;
@@ -410,16 +495,24 @@ export function parseHaJsonMessage(args: ParseHaJsonArgs): HaAdapterResult {
   const mapEntry = args.mapping.entities.find((e) => e.entity_id === entityId);
   if (!mapEntry) return rejectResult(provenanceBase, ["unknown_entity"]);
 
-  const rawState = env.state;
+  // Boundary alias normalization: `state` | `value`, `unit_of_measurement`
+  // | `unit`. The canonical field wins when both are present. Past this
+  // point only the canonical internal representation exists — aliases
+  // never reach validation, freshness, or the rules engine.
+  const rawState = env.state !== undefined ? env.state : env.value;
   const stateNum = toNumber(rawState);
   if (stateNum === null) {
     return rejectResult(provenanceBase, ["unknown_or_unavailable_state"]);
   }
 
-  const unit = normalizeUnit(env.unit_of_measurement);
+  const rawUnit =
+    env.unit_of_measurement !== undefined ? env.unit_of_measurement : env.unit;
+  const unit = normalizeUnit(rawUnit);
   const validated = validateAndCoerce(mapEntry.metric, stateNum, unit);
   if ("reason" in validated) return rejectResult(provenanceBase, [validated.reason]);
 
+  // Timestamp policy: prefer last_updated; last_changed is the documented
+  // fallback. Receive time is never a substitute.
   const capturedAtRaw =
     typeof env.last_updated === "string"
       ? env.last_updated
@@ -446,14 +539,36 @@ export function parseHaJsonMessage(args: ParseHaJsonArgs): HaAdapterResult {
 // ---------------------------------------------------------------------------
 
 /**
- * HA MQTT Statestream publishes each entity at
- *   <prefix>/<domain>/<object_id>/state
- *   <prefix>/<domain>/<object_id>/attributes  (JSON blob)
- *   optionally per-attribute topics
+ * HA MQTT Statestream — REAL wire format. Statestream fans every entity
+ * out into individual sibling topics, one value per topic:
  *
- * We accumulate state + attributes per-entity so a message pair can
- * assemble into one deterministic reading. Callers own the buffer's
- * lifetime; nothing is timer-driven inside this module.
+ *   <prefix>/<domain>/<object_id>/state
+ *   <prefix>/<domain>/<object_id>/last_updated
+ *   <prefix>/<domain>/<object_id>/last_changed
+ *   <prefix>/<domain>/<object_id>/<attribute_name>   (unit_of_measurement, device_class, ...)
+ *
+ * There is NO wire-level `/attributes` JSON-blob topic, and this adapter
+ * never requires one. The assembler keys an internal cache by EXACT
+ * entity id and folds each topic event into it, so messages can arrive
+ * in any order and still assemble to the same result.
+ *
+ * `attribute_cache` below is that internal per-entity cache — it is
+ * assembled from the individual attribute topics and does NOT imply a
+ * wire-level `/attributes` topic. (If a non-standard bridge does emit a
+ * legacy `/attributes` JSON object, it is merged into the same cache for
+ * compatibility; dedicated suffix topics always win over blob values, so
+ * arrival order cannot change the outcome.)
+ *
+ * Determinism rules:
+ *   - cache keyed by exact entity id; exact mapping still required at parse.
+ *   - known suffixes: `state`, `last_updated`, `last_changed`.
+ *   - every other suffix is stored in the attribute cache as evidence,
+ *     last write per suffix wins (matches retained-then-live wire reality).
+ *   - JSON-serialized numbers and JSON-quoted strings are both decoded.
+ *   - a reading is emitted only once `state` exists; freshness/validity
+ *     is classified by the parser, never by the assembler.
+ *   - receive time is tracked as max across parts, for audit only —
+ *     NEVER as a source timestamp.
  */
 export interface StatestreamPart {
   topic: string;
@@ -465,17 +580,39 @@ export interface StatestreamPart {
 export interface StatestreamAssembledMessage {
   entity_id: string;
   state: unknown;
-  attributes: Record<string, unknown>;
-  retained: boolean;
+  /** From the dedicated `/last_updated` topic. Preferred source timestamp. */
+  last_updated: string | null;
+  /** From the dedicated `/last_changed` topic. Documented fallback ONLY. */
+  last_changed: string | null;
+  /**
+   * Internal per-entity attribute cache assembled from individual
+   * attribute suffix topics. NOT a wire-level `/attributes` payload.
+   * Unknown suffixes are retained here deterministically as evidence.
+   */
+  attribute_cache: Record<string, unknown>;
+  /** Retained flag of the `/state` topic specifically. */
+  state_retained: boolean;
+  /** Latest adapter receive time across consumed parts. Audit only. */
   receivedAt: Date;
 }
 
 interface StatestreamBuffer {
   entity_id: string;
   state?: unknown;
-  attributes?: Record<string, unknown>;
-  retained: boolean;
-  receivedAt: Date;
+  last_updated?: string;
+  last_changed?: string;
+  attribute_cache: Record<string, unknown>;
+  state_retained: boolean;
+  receivedAtMs: number;
+}
+
+/** Deterministic (lexicographically key-sorted) shallow copy. */
+function sortedShallowCopy(
+  obj: Record<string, unknown>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const k of Object.keys(obj).sort()) out[k] = obj[k];
+  return out;
 }
 
 export class HaStatestreamAssembler {
@@ -489,26 +626,52 @@ export class HaStatestreamAssembler {
     this.prefix = prefix.replace(/\/+$/, "");
   }
 
-  /** Assemble deterministically; returns a message when state is present. */
+  /**
+   * Fold one topic event into the per-entity cache. Returns the current
+   * assembled snapshot once `state` is known (parser decides validity),
+   * or null when the topic is outside the prefix / malformed / state is
+   * still missing.
+   */
   consume(part: StatestreamPart): StatestreamAssembledMessage | null {
     const parsed = this.parseTopic(part.topic);
     if (!parsed) return null;
-    const { entity_id, kind } = parsed;
+    const { entity_id, leaf } = parsed;
     const buf: StatestreamBuffer = this.buffers.get(entity_id) ?? {
       entity_id,
-      retained: part.retained,
-      receivedAt: part.receivedAt,
+      attribute_cache: {},
+      state_retained: false,
+      receivedAtMs: part.receivedAt.getTime(),
     };
-    // Track most-recent metadata but do not silently overwrite retained
-    // status to false if a live update replaces a retained one.
-    buf.retained = part.retained;
-    buf.receivedAt = part.receivedAt;
+    // Max (not last-consumed) so out-of-order replays of the same parts
+    // assemble to an identical snapshot. Audit metadata only.
+    buf.receivedAtMs = Math.max(buf.receivedAtMs, part.receivedAt.getTime());
 
-    if (kind === "state") {
-      buf.state = this.decodeStatePayload(part.payload);
-    } else if (kind === "attributes") {
-      const attrs = this.decodeAttributesPayload(part.payload);
-      buf.attributes = attrs ?? buf.attributes ?? {};
+    if (leaf === "state") {
+      buf.state = this.decodeScalarPayload(part.payload);
+      // The retained flag of the state topic drives retained-message
+      // classification; attribute topics never flip it.
+      buf.state_retained = part.retained;
+    } else if (leaf === "last_updated" || leaf === "last_changed") {
+      const ts = this.decodeTimestampPayload(part.payload);
+      if (ts !== null) buf[leaf] = ts;
+    } else if (leaf === "attributes") {
+      // Legacy-compat only (non-standard bridges). Dedicated suffix
+      // topics always win: blob values fill gaps, never overwrite.
+      const blob = this.decodeAttributesBlob(part.payload);
+      if (blob) {
+        for (const [k, v] of Object.entries(blob)) {
+          if (k === "last_updated" || k === "last_changed") {
+            if (typeof v === "string" && buf[k] === undefined) buf[k] = v;
+          } else if (!(k in buf.attribute_cache)) {
+            buf.attribute_cache[k] = v;
+          }
+        }
+      }
+    } else {
+      // Individual attribute topic (unit_of_measurement, device_class,
+      // or any unknown suffix). Stored deterministically as evidence;
+      // unknown suffixes are never interpreted.
+      buf.attribute_cache[leaf] = this.decodeScalarPayload(part.payload);
     }
     this.buffers.set(entity_id, buf);
 
@@ -516,31 +679,32 @@ export class HaStatestreamAssembler {
     return {
       entity_id,
       state: buf.state,
-      attributes: buf.attributes ?? {},
-      retained: buf.retained,
-      receivedAt: buf.receivedAt,
+      last_updated: buf.last_updated ?? null,
+      last_changed: buf.last_changed ?? null,
+      // Key-sorted copy so identical part sets assemble to byte-identical
+      // snapshots regardless of arrival order.
+      attribute_cache: sortedShallowCopy(buf.attribute_cache),
+      state_retained: buf.state_retained,
+      receivedAt: new Date(buf.receivedAtMs),
     };
   }
 
-  private parseTopic(
-    topic: string,
-  ): { entity_id: string; kind: "state" | "attributes" | "other" } | null {
+  private parseTopic(topic: string): { entity_id: string; leaf: string } | null {
     if (!topic.startsWith(this.prefix + "/")) return null;
     const rest = topic.slice(this.prefix.length + 1).split("/");
-    if (rest.length < 3) return null;
+    // Exactly <domain>/<object_id>/<leaf> after the prefix; anything else
+    // is deterministically ignored.
+    if (rest.length !== 3) return null;
     const [domain, object_id, leaf] = rest;
     if (!domain || !object_id || !leaf) return null;
-    const entity_id = `${domain}.${object_id}`;
-    if (leaf === "state") return { entity_id, kind: "state" };
-    if (leaf === "attributes") return { entity_id, kind: "attributes" };
-    return { entity_id, kind: "other" };
+    return { entity_id: `${domain}.${object_id}`, leaf };
   }
 
-  private decodeStatePayload(payload: unknown): unknown {
+  /** Decode state / attribute payloads: JSON first (`"72.4"`, `72.4`), raw string fallback. */
+  private decodeScalarPayload(payload: unknown): unknown {
     if (typeof payload === "string") {
       const s = payload.trim();
       if (!s) return null;
-      // Try JSON first for `"72.4"` style; fall back to raw string.
       try {
         return JSON.parse(s) as unknown;
       } catch {
@@ -550,7 +714,26 @@ export class HaStatestreamAssembler {
     return payload;
   }
 
-  private decodeAttributesPayload(
+  /**
+   * Decode a timestamp topic payload. Accepts a bare ISO string or a
+   * JSON-quoted ISO string. Any other JSON type (numeric epoch, object,
+   * boolean) is rejected deterministically — a timestamp is never
+   * invented or coerced from a non-string payload.
+   */
+  private decodeTimestampPayload(payload: unknown): string | null {
+    if (typeof payload !== "string") return null;
+    const s = payload.trim();
+    if (!s) return null;
+    try {
+      const parsedTs = JSON.parse(s) as unknown;
+      return typeof parsedTs === "string" ? parsedTs : null;
+    } catch {
+      // Bare ISO strings are not valid JSON — use the raw string.
+      return s;
+    }
+  }
+
+  private decodeAttributesBlob(
     payload: unknown,
   ): Record<string, unknown> | null {
     if (typeof payload === "string") {
@@ -587,10 +770,16 @@ export function parseHaStatestreamMessage(
   const provenanceBase = baseProvenance({
     mapping: args.mapping,
     topic,
-    retained: assembled.retained,
+    retained: assembled.state_retained,
     receivedAt: assembled.receivedAt,
     brokerReceivedAt: args.brokerReceivedAt ?? null,
-    raw: { entity_id: assembled.entity_id, state: assembled.state, attributes: assembled.attributes },
+    raw: {
+      entity_id: assembled.entity_id,
+      state: assembled.state,
+      last_updated: assembled.last_updated,
+      last_changed: assembled.last_changed,
+      attribute_cache: assembled.attribute_cache,
+    },
   });
 
   if (isControlShaped(assembled.entity_id)) {
@@ -606,21 +795,25 @@ export function parseHaStatestreamMessage(
     return rejectResult(provenanceBase, ["unknown_or_unavailable_state"]);
   }
 
-  const unit = normalizeUnit(
-    (assembled.attributes as Record<string, unknown>).unit_of_measurement,
-  );
+  // Unit comes from the individual `/unit_of_measurement` topic (cached
+  // per entity). A bare `unit` suffix is accepted as a boundary alias and
+  // normalized here; the canonical suffix wins when both were seen.
+  const rawUnit =
+    assembled.attribute_cache.unit_of_measurement !== undefined
+      ? assembled.attribute_cache.unit_of_measurement
+      : assembled.attribute_cache.unit;
+  const unit = normalizeUnit(rawUnit);
   const validated = validateAndCoerce(mapEntry.metric, stateNum, unit);
   if ("reason" in validated) return rejectResult(provenanceBase, [validated.reason]);
 
-  const capturedAtRaw =
-    typeof assembled.attributes.last_updated === "string"
-      ? (assembled.attributes.last_updated as string)
-      : typeof assembled.attributes.last_changed === "string"
-        ? (assembled.attributes.last_changed as string)
-        : null;
+  // Timestamp policy: the dedicated `/last_updated` topic is preferred;
+  // `/last_changed` is the explicitly documented fallback. Broker/adapter
+  // receive time is NEVER substituted — a state (retained or not) with no
+  // valid source timestamp classifies invalid.
+  const capturedAtRaw = assembled.last_updated ?? assembled.last_changed;
   const fresh = classifyFreshness({
     capturedAtRaw,
-    retained: assembled.retained,
+    retained: assembled.state_retained,
     now,
   });
   if (fresh.source === "invalid") return rejectResult(provenanceBase, fresh.reasons);
@@ -712,23 +905,35 @@ export function parseEcowittRawMessage(
     { metric: "co2_ppm", value: d.co2_ppm },
     { metric: "vpd_kpa", value: d.vpd_kpa },
   ];
+  // Stable mapping identity for the raw aggregate path: the raw topic
+  // carries one whole station, so `ecowitt_raw:<topic>` is the entity
+  // dimension of the idempotency preimage (per-metric disambiguation
+  // comes from the metric segment).
+  const rawEntityIdentity = `ecowitt_raw:${args.topic}`;
   if (fresh.source === "live" && d.tent_id) {
     for (const { metric, value } of perMetric) {
       if (typeof value !== "number" || !Number.isFinite(value)) continue;
       readings.push({
         metric,
         value,
+        entity_id: rawEntityIdentity,
         tent_id: d.tent_id,
         plant_id: d.plant_id,
+        channel: null,
         captured_at: fresh.capturedAt!,
         provenance,
         idempotency_key: buildHaIdempotencyKey({
+          provider: HA_PROVIDER,
           bridge: provenance.bridge,
           upstream_mode: provenance.upstream_mode,
+          entity_id: rawEntityIdentity,
           tent_id: d.tent_id,
+          plant_id: d.plant_id,
+          channel: null,
           metric,
           captured_at: fresh.capturedAt!,
           value,
+          unit: canonicalUnitForMetric(metric),
         }),
       });
     }
@@ -806,20 +1011,31 @@ export function deriveVpdIfPaired(
     reason_codes: [...temp.provenance.reason_codes, ...rh.provenance.reason_codes],
     captured_at,
   };
+  // Stable mapping identity for the derived reading: the ordered pair of
+  // source entity ids. Derived VPD is tent-level, so channel is null.
+  const derivedEntityIdentity = `vpd_derived:${temp.entity_id}+${rh.entity_id}`;
+  const plant_id = temp.plant_id ?? rh.plant_id ?? null;
   return {
     metric: "vpd_kpa",
     value: vpd,
+    entity_id: derivedEntityIdentity,
     tent_id: temp.tent_id,
-    plant_id: temp.plant_id ?? rh.plant_id ?? null,
+    plant_id,
+    channel: null,
     captured_at,
     provenance,
     idempotency_key: buildHaIdempotencyKey({
+      provider: HA_PROVIDER,
       bridge: provenance.bridge,
       upstream_mode: provenance.upstream_mode,
+      entity_id: derivedEntityIdentity,
       tent_id: temp.tent_id,
+      plant_id,
+      channel: null,
       metric: "vpd_kpa",
       captured_at,
       value: vpd,
+      unit: canonicalUnitForMetric("vpd_kpa"),
     }),
   };
 }
@@ -892,17 +1108,24 @@ function buildReadingResult(args: {
           {
             metric: mapEntry.metric,
             value,
+            entity_id: mapEntry.entity_id,
             tent_id: mapEntry.tent_id,
             plant_id: mapEntry.plant_id ?? null,
+            channel: mapEntry.channel ?? null,
             captured_at: freshness.capturedAt,
             provenance,
             idempotency_key: buildHaIdempotencyKey({
+              provider: HA_PROVIDER,
               bridge: provenance.bridge,
               upstream_mode: provenance.upstream_mode,
+              entity_id: mapEntry.entity_id,
               tent_id: mapEntry.tent_id,
+              plant_id: mapEntry.plant_id ?? null,
+              channel: mapEntry.channel ?? null,
               metric: mapEntry.metric,
               captured_at: freshness.capturedAt,
               value,
+              unit: canonicalUnitForMetric(mapEntry.metric),
             }),
           },
         ]

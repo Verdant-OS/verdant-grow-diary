@@ -29,6 +29,14 @@
       "channel": "soil_1"
     },
     {
+      "entity_id": "sensor.ecowitt_gw1200_soil_moisture_2",
+      "metric": "soil_moisture_pct",
+      "expected_unit": "%",
+      "tent_id": "00000000-0000-0000-0000-0000000000aa",
+      "plant_id": null,
+      "channel": "soil_2"
+    },
+    {
       "entity_id": "sensor.ecowitt_gw1200_soil_temp_1",
       "metric": "soil_temp_f",
       "expected_unit": "°F",

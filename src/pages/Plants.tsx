@@ -45,12 +45,18 @@ import {
 } from "@/lib/archivedPlantVisibilityRules";
 import {
   buildGrowFilterOptions,
+  filterPlantsByGrow,
   filterPlantsBySearch,
   summarizePlantsPageFilters,
   formatPlantsPageFilterSummary,
   plantsPageEmptyStateCopy,
+  UNASSIGNED_GROW_FILTER_ID,
+  UNASSIGNED_GROW_OPTION_NAME,
 } from "@/lib/plantsPageFilterRules";
-import { buildPlantsTentFilterChips } from "@/lib/plantsTentFilterChipsRules";
+import {
+  buildPlantsTentFilterChips,
+  filterPlantsByTentChip,
+} from "@/lib/plantsTentFilterChipsRules";
 import { buildDashboardDailyGrowCheckPanel } from "@/lib/dashboardDailyGrowCheckPanelRules";
 import { buildDailyCheckEntryHref } from "@/lib/dailyCheckPostSubmitRules";
 import {
@@ -148,15 +154,17 @@ export default function Plants() {
   const plantsMeta = getGrowDataMeta(["grow", "plants", "all", urlGrowId ?? "all"], user?.id);
   const tentsMeta = getGrowDataMeta(["grow", "tents", urlGrowId ?? "all"], user?.id);
   const [tentFilter, setTentFilter] = useState<string>("all");
-  const effectiveTentFilter = resolvePlantsTentFilter(
-    tentFilter,
-    tents.map((tent) => tent.id),
-  );
+  // Unassigned grow bucket: plants.grow_id is nullable, and there is no real
+  // grow id to route to, so the sentinel selection lives in component state
+  // while the URL stays unscoped (all-grows query).
+  const [showUnassignedOnly, setShowUnassignedOnly] = useState(false);
 
   // The state reset keeps the visible selection canonical after navigation;
   // effectiveTentFilter already fails closed during the first new-scope render.
   useEffect(() => {
     setTentFilter("all");
+    // A real grow scope always clears the display-side unassigned bucket.
+    if (urlGrowId) setShowUnassignedOnly(false);
   }, [urlGrowId]);
 
   // Daily Grow Check: derive checked-today per plant using the same rules
@@ -205,44 +213,63 @@ export default function Plants() {
     [grows, allGrowsActivePlants],
   );
 
-  const hasArchived = shouldShowArchivedToggle(allPlants);
-  const archivedCount = allPlants.filter((p) => isArchivedPlant(p) || isMergedPlant(p)).length;
+  // Grow scope: real grows are scoped server-side via urlGrowId; the
+  // unassigned bucket is display-side only, so it is applied here before
+  // every consumer (chips, grid, summary) reads the list.
+  const growScopedPlants = showUnassignedOnly
+    ? filterPlantsByGrow(allPlants, UNASSIGNED_GROW_FILTER_ID)
+    : allPlants;
 
-  // Pipeline: archived visibility → grow scope (already in query) →
-  // tent tab → plant search. Each step is independent and labeled in the UI.
-  const visibleAfterArchive = filterVisiblePlants(allPlants, { showArchived });
-  const visibleAfterTent =
-    effectiveTentFilter === "all"
-      ? visibleAfterArchive
-      : visibleAfterArchive.filter((p) => p.tentId === effectiveTentFilter);
-  const filtered = filterPlantsBySearch(visibleAfterTent, search, tents);
+  const hasArchived = shouldShowArchivedToggle(growScopedPlants);
+  const archivedCount = growScopedPlants.filter(
+    (p) => isArchivedPlant(p) || isMergedPlant(p),
+  ).length;
 
   // Filter chips — counts MUST match what the grid will render under the
   // currently-applied archived + search filters (AUD-005). Tent buckets
   // are derived from the same post-archive + post-search set the grid
-  // uses, so chip totals and visible card counts always agree.
-  const filterEntries = buildPlantsTentFilterChips(allPlants, tents, {
+  // uses, so chip totals and visible card counts always agree. Built
+  // before the tent selection is reconciled so the "No tent" sentinel
+  // chip is a valid selection exactly while it is rendered.
+  const filterEntries = buildPlantsTentFilterChips(growScopedPlants, tents, {
     showArchived,
     search,
   });
+  const effectiveTentFilter = resolvePlantsTentFilter(
+    tentFilter,
+    filterEntries.filter((chip) => chip.id !== "all").map((chip) => chip.id),
+  );
+
+  // Pipeline: archived visibility → grow scope (query or unassigned bucket,
+  // already applied above) → tent chip → plant search. Each step is
+  // independent and labeled in the UI.
+  const visibleAfterArchive = filterVisiblePlants(growScopedPlants, { showArchived });
+  const visibleAfterTent = filterPlantsByTentChip(visibleAfterArchive, effectiveTentFilter);
+  const filtered = filterPlantsBySearch(visibleAfterTent, search, tents);
 
   // Filter summary — counts only active plants under the current grow scope.
-  const summary = summarizePlantsPageFilters(allPlants, {
-    selectedGrowId: urlGrowId,
-    selectedGrowName: scopedGrowName,
+  const summary = summarizePlantsPageFilters(growScopedPlants, {
+    selectedGrowId: showUnassignedOnly ? UNASSIGNED_GROW_FILTER_ID : urlGrowId,
+    selectedGrowName: showUnassignedOnly ? UNASSIGNED_GROW_OPTION_NAME : scopedGrowName,
     search,
   });
   const summaryLine = formatPlantsPageFilterSummary(summary);
 
   const emptyCopy = plantsPageEmptyStateCopy(filtered.length, {
-    selectedGrowId: urlGrowId,
-    selectedGrowName: scopedGrowName,
+    selectedGrowId: showUnassignedOnly ? UNASSIGNED_GROW_FILTER_ID : urlGrowId,
+    selectedGrowName: showUnassignedOnly ? UNASSIGNED_GROW_OPTION_NAME : scopedGrowName,
     search,
   });
 
   const handleGrowFilterChange = (value: string) => {
+    // Sentinel → display-side unassigned bucket; there is no grow id to
+    // route to, so the URL clears to the unscoped (all-grows) query.
+    setShowUnassignedOnly(value === UNASSIGNED_GROW_FILTER_ID);
+    // Every grow-scope change restarts the tent selection at "all" — the
+    // URL effect only covers changes that actually move urlGrowId.
+    setTentFilter("all");
     // "" → All grows (clear scope).
-    navigate(value ? plantsPath(value) : plantsPath());
+    navigate(value && value !== UNASSIGNED_GROW_FILTER_ID ? plantsPath(value) : plantsPath());
   };
 
   const pageLead = (
@@ -420,7 +447,7 @@ export default function Plants() {
             id="plants-grow-filter-select"
             data-testid="plants-grow-filter-select"
             aria-label="Filter plants by grow"
-            value={urlGrowId ?? ""}
+            value={showUnassignedOnly ? UNASSIGNED_GROW_FILTER_ID : (urlGrowId ?? "")}
             onChange={(e) => handleGrowFilterChange(e.target.value)}
             className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
           >

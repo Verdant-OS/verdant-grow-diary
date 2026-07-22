@@ -13,6 +13,17 @@
  * access. Safe to use anywhere in the client.
  */
 
+/**
+ * Sentinel id for the "Unassigned" grow filter option. plants.grow_id is
+ * legitimately nullable, so plants outside every grow need their own bucket
+ * or the per-grow counts never sum to the "All grows" total. Deliberately
+ * non-UUID so it can never collide with a real grow id.
+ */
+export const UNASSIGNED_GROW_FILTER_ID = "__unassigned__";
+
+/** Display name for the unassigned-grow bucket. */
+export const UNASSIGNED_GROW_OPTION_NAME = "Unassigned";
+
 export interface PlantsPageGrowOption {
   /** "" represents the "All grows" pseudo-option. */
   id: string;
@@ -61,6 +72,14 @@ function isInactive(p: MinimalPlant): boolean {
   return !!(p.isArchived || p.archivedAt || p.mergedIntoPlantId);
 }
 
+/**
+ * True when the plant belongs to no grow. The adapter maps a null grow_id
+ * to null, but "" is treated the same defensively (tent ids map that way).
+ */
+function isUnassignedToGrow(p: MinimalPlant): boolean {
+  return !p.growId;
+}
+
 function pluralPlants(n: number): string {
   return n === 1 ? "1 plant" : `${n} plants`;
 }
@@ -70,6 +89,11 @@ function pluralPlants(n: number): string {
  * "All grows" option whose count reflects every *active* plant the user
  * can see. Counts always reflect active plants only — archived/merged
  * plants are handled separately by the archived toggle.
+ *
+ * When any active plant has no grow (grow_id is nullable), a trailing
+ * "Unassigned" option is appended under UNASSIGNED_GROW_FILTER_ID so the
+ * per-option counts always sum to the "All grows" total. No unassigned
+ * plants → no option.
  */
 export function buildGrowFilterOptions(
   grows: ReadonlyArray<MinimalGrow>,
@@ -89,6 +113,19 @@ export function buildGrowFilterOptions(
     };
   });
 
+  const unassignedCount = activePlants.filter(isUnassignedToGrow).length;
+  const unassigned: PlantsPageGrowOption[] =
+    unassignedCount > 0
+      ? [
+          {
+            id: UNASSIGNED_GROW_FILTER_ID,
+            name: UNASSIGNED_GROW_OPTION_NAME,
+            plantCount: unassignedCount,
+            label: `${UNASSIGNED_GROW_OPTION_NAME} (${pluralPlants(unassignedCount)})`,
+          },
+        ]
+      : [];
+
   return [
     {
       id: "",
@@ -97,18 +134,23 @@ export function buildGrowFilterOptions(
       label: `All grows (${pluralPlants(totalActive)})`,
     },
     ...perGrow,
+    ...unassigned,
   ];
 }
 
 /**
  * Filter plants to those belonging to the selected grow. A null/empty
- * selectedGrowId means "All grows" — return the input untouched.
+ * selectedGrowId means "All grows" — return the input untouched. The
+ * UNASSIGNED_GROW_FILTER_ID sentinel selects plants with no grow at all.
  */
 export function filterPlantsByGrow<T extends MinimalPlant>(
   plants: ReadonlyArray<T>,
   selectedGrowId: string | null,
 ): T[] {
   if (!selectedGrowId) return [...plants];
+  if (selectedGrowId === UNASSIGNED_GROW_FILTER_ID) {
+    return plants.filter(isUnassignedToGrow);
+  }
   return plants.filter((p) => p.growId === selectedGrowId);
 }
 

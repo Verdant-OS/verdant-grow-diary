@@ -1,0 +1,7 @@
+exit_code=2
+--- typecheck output ---
+$ tsc -p tsconfig.app.json --noEmit
+src/pages/CultivarPage.tsx(27,23): error TS2551: Property 'replaceAll' does not exist on type '"environment" | "harvest" | "training" | "watering" | "post_harvest" | "germination" | "vegetative" | "flowering" | "overview" | "early_growth" | "nutrition" | "common_issues" | "pheno_tips" | "missing_information"'. Did you mean 'replace'?
+  Property 'replaceAll' does not exist on type '"environment"'.
+src/pages/CultivarPage.tsx(287,63): error TS2551: Property 'replaceAll' does not exist on type '"laboratory" | "breeder" | "community" | "horticultural_reference" | "grower_report" | "verdant_editorial"'. Did you mean 'replace'?
+  Property 'replaceAll' does not exist on type '"laboratory"'.

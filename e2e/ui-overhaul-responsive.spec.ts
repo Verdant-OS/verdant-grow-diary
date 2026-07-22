@@ -282,7 +282,7 @@ const BROWSER_ROUTES: readonly BrowserRoute[] = [
     routePattern: "/tents",
     path: tentsPath(),
     heading: "Tents",
-    readySelector: '[data-testid="tent-card-health-chip"]',
+    readySelector: `[data-testid="tent-card-plant-health-status-${TENT_ID}"]`,
     criticalOperatingLoop: true,
   },
   {
@@ -905,10 +905,7 @@ async function assertViewportFit(
         ),
       ).flatMap((element) => {
         const bounds = element.getBoundingClientRect();
-        if (
-          isIgnoredForWidthChecks(element) ||
-          isInsideValidatedScroller(element)
-        ) {
+        if (isIgnoredForWidthChecks(element) || isInsideValidatedScroller(element)) {
           return [];
         }
         if (bounds.left >= -0.5 && bounds.right <= viewportWidth + 0.5) return [];
@@ -929,10 +926,7 @@ async function assertViewportFit(
         ),
       ).flatMap((element) => {
         const bounds = element.getBoundingClientRect();
-        if (
-          isIgnoredForWidthChecks(element) ||
-          isInsideValidatedScroller(element)
-        ) {
+        if (isIgnoredForWidthChecks(element) || isInsideValidatedScroller(element)) {
           return [];
         }
         if (bounds.left >= -0.5 && bounds.right <= viewportWidth + 0.5) return [];
@@ -987,8 +981,7 @@ async function assertViewportFit(
             const escapesContainer =
               descendantBounds.left < bounds.left - 0.5 ||
               descendantBounds.right > bounds.right + 0.5;
-            const concealsOwnContent =
-              descendant.scrollWidth - descendant.clientWidth > 1;
+            const concealsOwnContent = descendant.scrollWidth - descendant.clientWidth > 1;
             return escapesContainer || concealsOwnContent;
           });
           if (!hasMeaningfulDirectText && !hasProblematicDescendant) return [];
@@ -1270,10 +1263,9 @@ test.describe("Verdant UI-overhaul responsive routes", () => {
       }
       adversarialResults.push({
         name: fixture.name,
-        rejectedForWidth:
-          /visible content|structural content|intrinsic horizontal overflow/i.test(
-            rejectionMessage,
-          ),
+        rejectedForWidth: /visible content|structural content|intrinsic horizontal overflow/i.test(
+          rejectionMessage,
+        ),
       });
     }
     expect(adversarialResults).toEqual(

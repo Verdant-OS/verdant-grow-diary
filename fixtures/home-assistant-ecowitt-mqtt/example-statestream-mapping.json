@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "adapter_mode": "ha_statestream",
+  "mqtt_topic": "homeassistant/#",
+  "bridge": "home_assistant",
+  "upstream_mode": "ha_ecowitt_iot_poll",
+  "statestream_topic_prefix": "homeassistant",
+  "entities": [
+    {
+      "entity_id": "sensor.ecowitt_gw1200_outdoor_temperature",
+      "metric": "air_temp_f",
+      "expected_unit": "°F",
+      "tent_id": "00000000-0000-0000-0000-0000000000aa",
+      "plant_id": null,
+      "channel": "outdoor"
+    },
+    {
+      "entity_id": "sensor.ecowitt_gw1200_outdoor_humidity",
+      "metric": "humidity_pct",
+      "expected_unit": "%",
+      "tent_id": "00000000-0000-0000-0000-0000000000aa",
+      "plant_id": null,
+      "channel": "outdoor"
+    }
+  ]
+}

@@ -33,6 +33,13 @@ export interface DemoCandidate {
   readonly rounds: readonly ("veg" | "early_flower" | "mid_flower" | "late_flower" | "post_cure")[];
   readonly mother: boolean;
   readonly note: string;
+  /**
+   * Uniform across the demo pack (photoperiod, at the cure) so the sample
+   * hunt renders as a comparable, ranked board. Mixed-type/unknown states
+   * are exercised by tests, not by the labeled demo.
+   */
+  readonly plantType: "photoperiod";
+  readonly stage: "cure";
 }
 
 export const DEMO_HUNT = {
@@ -47,7 +54,7 @@ export const DEMO_HUNT = {
 const K_GAS = "keeper-gas-runtz";
 const K_CAKE = "keeper-sherb-cake";
 
-export const DEMO_CANDIDATES: readonly DemoCandidate[] = [
+const DEMO_CANDIDATES_RAW: readonly Omit<DemoCandidate, "plantType" | "stage">[] = [
   { candidateNumber: 1, name: "Runtz #1", strain: "Sunset Runtz F2", aroma: ["candy", "fuel"],
     verdict: "cull", winnerScore: 41, loud: { nose: 5, resin: 4, structure: 4, yield: 6, breeding: 3 },
     tags: [], rounds: ["veg", "mid_flower"], mother: false, note: "Thin, faded early." },
@@ -75,6 +82,12 @@ export const DEMO_CANDIDATES: readonly DemoCandidate[] = [
     verdict: "maybe", winnerScore: 60, loud: { nose: 7, resin: 5, structure: 6, yield: 7, breeding: 5 },
     tags: [], rounds: ["veg", "mid_flower", "late_flower"], mother: false, note: "Nice berry; average frost." },
 ];
+
+export const DEMO_CANDIDATES: readonly DemoCandidate[] = DEMO_CANDIDATES_RAW.map((c) => ({
+  ...c,
+  plantType: "photoperiod",
+  stage: "cure",
+}));
 
 /** Two keepers (mothers), with stability + reversal reflecting the ethos. */
 export const DEMO_KEEPERS: readonly PedigreeKeeperInput[] = [

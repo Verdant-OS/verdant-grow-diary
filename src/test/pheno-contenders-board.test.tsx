@@ -10,6 +10,8 @@ const DEMO_INPUT: ContenderInput[] = DEMO_CANDIDATES.map((c) => ({
   verdict: c.verdict,
   aroma: c.aroma,
   axes: c.loud,
+  plantType: c.plantType,
+  stage: c.stage,
 }));
 
 afterEach(cleanup);

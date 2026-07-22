@@ -13,6 +13,8 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import PhenoComparabilityBanner from "@/components/PhenoComparabilityBanner";
+import { plantTypeBadgeLabel } from "@/lib/plantTypeRules";
 import { buildFight, type FightSide, type FightAxis } from "@/lib/phenoFightViewModel";
 import type { ContenderInput } from "@/lib/phenoContendersViewModel";
 
@@ -33,6 +35,7 @@ function SidePicker({
   otherValue,
   onChange,
   align,
+  showComposite,
 }: {
   pool: readonly ContenderInput[];
   side: FightSide;
@@ -40,6 +43,7 @@ function SidePicker({
   otherValue: string;
   onChange: (id: string) => void;
   align: "left" | "right";
+  showComposite: boolean;
 }) {
   const accent =
     align === "left"
@@ -75,17 +79,33 @@ function SidePicker({
         >
           {side.verdict}
         </Badge>
-        <span className="text-[11px] text-muted-foreground">
-          Loud <span className="font-semibold text-foreground">{side.score}</span>
-        </span>
+        <Badge
+          variant="outline"
+          data-testid={`${testid}-type`}
+          className={cn(
+            "text-[9px] uppercase tracking-wide",
+            side.plantType === "unknown"
+              ? "border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+              : "border-border bg-secondary text-muted-foreground",
+          )}
+        >
+          {plantTypeBadgeLabel(side.plantType)}
+        </Badge>
+        {showComposite && (
+          <span className="text-[11px] text-muted-foreground">
+            Loud <span className="font-semibold text-foreground">{side.score}</span>
+          </span>
+        )}
       </div>
     </div>
   );
 }
 
-function AxisRow({ axis }: { axis: FightAxis }) {
-  const aWins = axis.edge === "a";
-  const bWins = axis.edge === "b";
+function AxisRow({ axis, ranked }: { axis: FightAxis; ranked: boolean }) {
+  // Edge highlighting is a cross-plant comparison — muted when not comparable
+  // (values stay visible: they organize notes, they don't rank).
+  const aWins = ranked && axis.edge === "a";
+  const bWins = ranked && axis.edge === "b";
   return (
     <div
       data-testid={`pheno-fight-axis-${axis.key}`}
@@ -176,6 +196,7 @@ export default function PhenoFightNight({
   const fight = buildFight(aInput, bInput);
   if (!fight) return null;
   const { a, b, axes, ties } = fight;
+  const ranked = fight.comparability.comparable;
 
   // Changing the matchup clears a stale call.
   const pick = (setter: (id: string) => void) => (id: string) => {
@@ -207,6 +228,10 @@ export default function PhenoFightNight({
       aria-label="Fight night"
       className={cn("rounded-lg border border-border bg-card p-4", className)}
     >
+      {!ranked && fight.comparability.reason && (
+        <PhenoComparabilityBanner reasons={[fight.comparability.reason]} />
+      )}
+
       {/* Two corners (pickers) + VS */}
       <div className="grid grid-cols-[1fr_auto_1fr] items-start gap-3">
         <SidePicker
@@ -216,6 +241,7 @@ export default function PhenoFightNight({
           otherValue={bId}
           onChange={pick(setAId)}
           align="left"
+          showComposite={ranked}
         />
         <span className="mt-1.5 rounded-full border border-border bg-secondary px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
           vs
@@ -227,32 +253,43 @@ export default function PhenoFightNight({
           otherValue={aId}
           onChange={pick(setBId)}
           align="right"
+          showComposite={ranked}
         />
       </div>
 
       <div className="mt-3 space-y-0.5 border-t border-border/60 pt-3">
         {axes.map((axis) => (
-          <AxisRow key={axis.key} axis={axis} />
+          <AxisRow key={axis.key} axis={axis} ranked={ranked} />
         ))}
       </div>
 
-      {/* Trait tally — informational, not a verdict */}
-      <div
-        data-testid="pheno-fight-tally"
-        className="mt-3 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 rounded-md bg-secondary/40 px-3 py-2 text-[11px]"
-      >
-        <span className="text-emerald-600 dark:text-emerald-400">
-          {a.name} leads <span className="font-semibold">{a.axisWins}</span>
-        </span>
-        <span className="text-muted-foreground/60">·</span>
-        <span className="text-muted-foreground">
-          {ties} tie{ties === 1 ? "" : "s"}
-        </span>
-        <span className="text-muted-foreground/60">·</span>
-        <span className="text-fuchsia-600 dark:text-fuchsia-400">
-          {b.name} leads <span className="font-semibold">{b.axisWins}</span>
-        </span>
-      </div>
+      {/* Trait tally — informational, not a verdict; hidden when the pair
+          can't be fairly compared (see the banner above). */}
+      {ranked ? (
+        <div
+          data-testid="pheno-fight-tally"
+          className="mt-3 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 rounded-md bg-secondary/40 px-3 py-2 text-[11px]"
+        >
+          <span className="text-emerald-600 dark:text-emerald-400">
+            {a.name} leads <span className="font-semibold">{a.axisWins}</span>
+          </span>
+          <span className="text-muted-foreground/60">·</span>
+          <span className="text-muted-foreground">
+            {ties} tie{ties === 1 ? "" : "s"}
+          </span>
+          <span className="text-muted-foreground/60">·</span>
+          <span className="text-fuchsia-600 dark:text-fuchsia-400">
+            {b.name} leads <span className="font-semibold">{b.axisWins}</span>
+          </span>
+        </div>
+      ) : (
+        <div
+          data-testid="pheno-fight-tally-hidden"
+          className="mt-3 rounded-md bg-secondary/40 px-3 py-2 text-center text-[11px] text-muted-foreground"
+        >
+          Trait tally hidden — this pairing can&rsquo;t be fairly compared.
+        </div>
+      )}
 
       {/* The call — the grower's, not the app's */}
       <div

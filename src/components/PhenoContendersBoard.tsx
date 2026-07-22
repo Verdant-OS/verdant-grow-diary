@@ -12,6 +12,8 @@
  */
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import PhenoComparabilityBanner from "@/components/PhenoComparabilityBanner";
+import { plantTypeBadgeLabel, type PlantType } from "@/lib/plantTypeRules";
 import type {
   ContendersBoard,
   ContenderAxis,
@@ -63,8 +65,28 @@ const VERDICT_BADGE: Record<ContenderVerdict, string> = {
   cull: "border-border bg-secondary text-muted-foreground",
 };
 
-function AxisCell({ axis, id }: { axis: ContenderAxis; id: string }) {
+const TYPE_BADGE: Record<PlantType, string> = {
+  autoflower: "border-border bg-secondary text-muted-foreground",
+  photoperiod: "border-border bg-secondary text-muted-foreground",
+  unknown: "border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+};
+
+function PlantTypeBadge({ type, testId }: { type: PlantType; testId: string }) {
+  return (
+    <Badge
+      variant="outline"
+      data-testid={testId}
+      className={cn("shrink-0 text-[9px] uppercase tracking-wide", TYPE_BADGE[type])}
+    >
+      {plantTypeBadgeLabel(type)}
+    </Badge>
+  );
+}
+
+function AxisCell({ axis, id, ranked }: { axis: ContenderAxis; id: string; ranked: boolean }) {
   const hue = AXIS_HUE[axis.key];
+  // Leads styling is a cross-candidate comparison — struck when not ranked.
+  const showLeader = ranked && axis.leader;
   return (
     <td
       className="px-2 py-1.5 align-middle"
@@ -74,7 +96,7 @@ function AxisCell({ axis, id }: { axis: ContenderAxis; id: string }) {
         <div
           className={cn(
             "relative h-1.5 w-10 shrink-0 overflow-hidden rounded-full bg-secondary",
-            axis.leader && cn("ring-1", hue.ring),
+            showLeader && cn("ring-1", hue.ring),
           )}
         >
           <div
@@ -85,12 +107,12 @@ function AxisCell({ axis, id }: { axis: ContenderAxis; id: string }) {
         <span
           className={cn(
             "w-4 shrink-0 tabular-nums text-[11px]",
-            axis.leader ? cn("font-semibold", hue.text) : "text-muted-foreground",
+            showLeader ? cn("font-semibold", hue.text) : "text-muted-foreground",
           )}
         >
           {axis.value}
         </span>
-        {axis.leader && (
+        {showLeader && (
           <span
             data-testid={`pheno-contenders-leader-${id}-${axis.key}`}
             className={cn("text-[9px] leading-none", hue.text)}
@@ -107,6 +129,7 @@ function AxisCell({ axis, id }: { axis: ContenderAxis; id: string }) {
 
 export default function PhenoContendersBoard({ board, className }: PhenoContendersBoardProps) {
   const { axes, contenders, culledCount } = board;
+  const ranked = board.comparability === "comparable";
 
   return (
     <section
@@ -114,6 +137,7 @@ export default function PhenoContendersBoard({ board, className }: PhenoContende
       aria-label="Contenders board"
       className={cn("rounded-lg border border-border bg-card p-4", className)}
     >
+      {!ranked && <PhenoComparabilityBanner reasons={board.comparabilityReasons} />}
       <header className="mb-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <p className="max-w-prose text-xs text-muted-foreground">
           The shortlist, compared on the merits. Each trait has its own colour — scan a column to
@@ -163,7 +187,7 @@ export default function PhenoContendersBoard({ board, className }: PhenoContende
                     <td className="px-2 py-1.5 align-middle">
                       <div className="flex items-center gap-1.5">
                         <span className="w-4 shrink-0 text-right text-[10px] tabular-nums text-muted-foreground">
-                          {r.rank}
+                          {ranked ? r.rank : "—"}
                         </span>
                         <span className="truncate text-sm font-medium text-foreground">
                           {r.name}
@@ -174,6 +198,10 @@ export default function PhenoContendersBoard({ board, className }: PhenoContende
                         >
                           {r.verdict}
                         </Badge>
+                        <PlantTypeBadge
+                          type={r.plantType}
+                          testId={`pheno-contenders-type-${r.id}`}
+                        />
                         {r.aroma.slice(0, 2).map((a) => (
                           <span
                             key={a}
@@ -185,20 +213,29 @@ export default function PhenoContendersBoard({ board, className }: PhenoContende
                       </div>
                     </td>
                     {r.axes.map((axis) => (
-                      <AxisCell key={axis.key} axis={axis} id={r.id} />
+                      <AxisCell key={axis.key} axis={axis} id={r.id} ranked={ranked} />
                     ))}
                     <td className="px-2 py-1.5 text-right align-middle">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <div className="hidden h-1.5 w-12 overflow-hidden rounded-full bg-secondary sm:block">
-                          <div
-                            className="h-full rounded-full bg-gradient-to-r from-sky-400 via-teal-400 to-emerald-400"
-                            style={{ width: `${r.score}%` }}
-                          />
+                      {ranked ? (
+                        <div className="flex items-center justify-end gap-1.5">
+                          <div className="hidden h-1.5 w-12 overflow-hidden rounded-full bg-secondary sm:block">
+                            <div
+                              className="h-full rounded-full bg-gradient-to-r from-sky-400 via-teal-400 to-emerald-400"
+                              style={{ width: `${r.score}%` }}
+                            />
+                          </div>
+                          <span className="w-8 tabular-nums text-sm font-semibold text-foreground">
+                            {r.score}
+                          </span>
                         </div>
-                        <span className="w-8 tabular-nums text-sm font-semibold text-foreground">
-                          {r.score}
+                      ) : (
+                        <span
+                          data-testid={`pheno-contenders-score-hidden-${r.id}`}
+                          className="text-[11px] text-muted-foreground"
+                        >
+                          hidden
                         </span>
-                      </div>
+                      )}
                     </td>
                   </tr>
                 );

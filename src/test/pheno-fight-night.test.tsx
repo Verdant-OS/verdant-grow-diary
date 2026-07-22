@@ -10,6 +10,8 @@ const pool: ContenderInput[] = DEMO_CANDIDATES.filter((c) => c.verdict !== "cull
   verdict: c.verdict,
   aroma: c.aroma,
   axes: c.loud,
+  plantType: c.plantType,
+  stage: c.stage,
 }));
 
 afterEach(cleanup);

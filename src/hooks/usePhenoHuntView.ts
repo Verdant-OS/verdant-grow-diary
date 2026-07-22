@@ -77,6 +77,10 @@ function demoBundle(): {
       traits: c.loud as unknown as Record<string, number>,
       aroma: c.aroma,
       tags: c.tags,
+      // Uniform demo pack: same type + stage, so the sample hunt stays a
+      // comparable, ranked board (labeled demo data).
+      plantType: c.plantType,
+      stage: c.stage,
     })),
     keepers: DEMO_KEEPERS.map((k) => {
       const cand = DEMO_CANDIDATES.find((c) => c.name === k.name);

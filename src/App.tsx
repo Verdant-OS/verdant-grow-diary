@@ -378,8 +378,12 @@ const App = () => (
                         read-only /pheno-comparison and /pheno-hunts/:id/compare
                         remain ungated above so historical records stay
                         viewable — we never hide diary history as a billing
-                        punishment. Server-side entitlement enforcement is a
-                        follow-up slice; this PR is UI/route gating only. */}
+                        punishment. Server-side enforcement exists too:
+                        has_pheno_tracker_entitlement RLS + the candidate-number
+                        trigger gate writes (20260712010343). The separate
+                        phenoid_* add-on layer still runs on PLACEHOLDER
+                        plan_ids — do not describe PhenoID ranking as a paid
+                        feature until real SKUs are wired. */}
                     <Route
                       path="/pheno-hunts"
                       element={

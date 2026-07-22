@@ -58,4 +58,22 @@ describe("PhenoID add-on carve-out conditions", () => {
       expect(src).not.toMatch(/recommended keeper|AI top pick|guaranteed keeper|picks winners/i);
     }
   });
+
+  it("claim hygiene — no paid-enforcement claims on add-on surfaces while plan_ids are placeholders", () => {
+    // Step 8 of the autoflower/photoperiod plan (2026-07-21): until real
+    // phenoid SKUs are wired and verified, no add-on surface may state or
+    // imply that ranking is a server-enforced paid/subscription feature.
+    // (Core Pheno Tracker Pro gating copy lives elsewhere and is genuine.)
+    const BANNER = read("components/PhenoComparabilityBanner.tsx");
+    for (const src of [CONTENDERS_VM, FIGHT_VM, BOARD, SHOWCASE, BANNER]) {
+      expect(src).not.toMatch(
+        /paid add-on|Pro feature|requires (a |an active )?subscription|unlocked with/i,
+      );
+    }
+  });
+
+  it("claim hygiene — the plant type field itself is core, never entitlement-gated", () => {
+    const TYPE_RULES = read("lib/plantTypeRules.ts");
+    expect(TYPE_RULES).not.toMatch(/entitlement|phenoid|plan_id|subscription/i);
+  });
 });

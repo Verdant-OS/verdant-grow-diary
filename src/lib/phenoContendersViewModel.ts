@@ -107,6 +107,19 @@ export interface ContendersBoard {
   readonly comparabilityReasons: readonly ComparabilityReason[];
 }
 
+/**
+ * Human copy for each comparability reason. Honest and non-deciding: the
+ * banner explains why ranking is hidden, never who would have won.
+ */
+export const COMPARABILITY_REASON_MESSAGES: Readonly<Record<ComparabilityReason, string>> = {
+  type_unknown:
+    "Plant type is unknown for at least one plant — set Autoflower or Photoperiod on each plant to compare them.",
+  type_mismatch:
+    "Autoflowers and photoperiods run on different clocks — scores don't compare across types.",
+  stage_mismatch:
+    "These plants are more than one stage apart — traits don't read the same across stages.",
+};
+
 function clamp10(v: unknown): number {
   const n = typeof v === "number" ? v : Number(v);
   if (!Number.isFinite(n)) return 0;

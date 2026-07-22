@@ -13,6 +13,8 @@ import { useParams } from "react-router-dom";
 import PageHeader from "@/components/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import PhenoComparabilityBanner from "@/components/PhenoComparabilityBanner";
+import { normalizePlantType, plantTypeBadgeLabel } from "@/lib/plantTypeRules";
 import PhenoRadar from "@/components/PhenoRadar";
 import PhenoContendersBoard from "@/components/PhenoContendersBoard";
 import PhenoFightNight from "@/components/PhenoFightNight";
@@ -43,9 +45,10 @@ function SectionHead({ title }: { title: string }) {
   );
 }
 
-function LivePackCard({ c }: { c: ContenderInput }) {
+function LivePackCard({ c, ranked }: { c: ContenderInput; ranked: boolean }) {
   const score = contenderScore(c.axes);
   const isKeeper = c.verdict === "keep";
+  const plantType = normalizePlantType(c.plantType);
   return (
     <li
       className={cn(
@@ -61,15 +64,29 @@ function LivePackCard({ c }: { c: ContenderInput }) {
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
             <span className="truncate text-sm font-semibold text-foreground">{c.name}</span>
-            <Badge
-              variant="outline"
-              className={cn(
-                "shrink-0 text-[10px] uppercase tracking-wide",
-                VERDICT_TONE[c.verdict],
-              )}
-            >
-              {c.verdict}
-            </Badge>
+            <span className="flex shrink-0 items-center gap-1">
+              <Badge
+                variant="outline"
+                data-testid={`pheno-showcase-type-${String(c.id)}`}
+                className={cn(
+                  "text-[9px] uppercase tracking-wide",
+                  plantType === "unknown"
+                    ? "border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+                    : "border-border bg-secondary text-muted-foreground",
+                )}
+              >
+                {plantTypeBadgeLabel(plantType)}
+              </Badge>
+              <Badge
+                variant="outline"
+                className={cn(
+                  "shrink-0 text-[10px] uppercase tracking-wide",
+                  VERDICT_TONE[c.verdict],
+                )}
+              >
+                {c.verdict}
+              </Badge>
+            </span>
           </div>
           {c.aroma.length > 0 && (
             <div className="mt-1.5 flex flex-wrap gap-1">
@@ -83,16 +100,24 @@ function LivePackCard({ c }: { c: ContenderInput }) {
               ))}
             </div>
           )}
-          <div className="mt-2 text-[11px] text-muted-foreground">
-            Loud score <span className="font-semibold text-foreground">{score}</span>
-            <span className="opacity-70"> · shortlist</span>
-          </div>
-          <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-secondary">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-sky-400 via-teal-400 to-emerald-400"
-              style={{ width: `${score}%` }}
-            />
-          </div>
+          {ranked ? (
+            <>
+              <div className="mt-2 text-[11px] text-muted-foreground">
+                Loud score <span className="font-semibold text-foreground">{score}</span>
+                <span className="opacity-70"> · shortlist</span>
+              </div>
+              <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-secondary">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-sky-400 via-teal-400 to-emerald-400"
+                  style={{ width: `${score}%` }}
+                />
+              </div>
+            </>
+          ) : (
+            <div className="mt-2 text-[11px] text-muted-foreground">
+              Score hidden — pack isn&rsquo;t comparable (see notice above).
+            </div>
+          )}
         </div>
         <PhenoRadar
           values={c.axes}
@@ -157,9 +182,16 @@ export default function PhenoHuntShowcase() {
             Scores sort the pack to compare — they don&rsquo;t decide. The keeper call is yours,
             earned at the cure.
           </p>
+          {board.comparability === "not_comparable" && (
+            <PhenoComparabilityBanner reasons={board.comparabilityReasons} />
+          )}
           <ul className="grid gap-2.5 sm:grid-cols-2" data-testid="pheno-hunt-showcase-pack">
             {pack.map((c) => (
-              <LivePackCard key={String(c.id)} c={c} />
+              <LivePackCard
+                key={String(c.id)}
+                c={c}
+                ranked={board.comparability === "comparable"}
+              />
             ))}
           </ul>
         </section>

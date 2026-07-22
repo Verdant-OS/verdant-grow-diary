@@ -204,17 +204,24 @@ describe("AI Doctor Readiness UI — evidence section header ordering", () => {
   });
 
   it("omits QuickActions/Limitations/Missing headers on a strong-context panel", () => {
-    const context = buildReadinessContext({
-      growEvents: [
-        { occurred_at: ago(12 * HOUR), event_type: "watering", source: "manual" },
-        { occurred_at: ago(8 * HOUR), event_type: "feeding", source: "manual" },
-        { occurred_at: ago(4 * HOUR), event_type: "photo", source: "manual" },
-      ],
-      sensorReadings: [
-        buildReadingForSource("live"),
-        buildReadingForSource("live", { metric: "humidity_pct", value: 55 }),
-      ],
-    });
+    const context = {
+      ...buildReadinessContext({
+        growEvents: [
+          { occurred_at: ago(12 * HOUR), event_type: "watering", source: "manual" },
+          { occurred_at: ago(8 * HOUR), event_type: "feeding", source: "manual" },
+          { occurred_at: ago(4 * HOUR), event_type: "photo", source: "manual" },
+        ],
+        sensorReadings: [
+          buildReadingForSource("live"),
+          buildReadingForSource("live", { metric: "humidity_pct", value: 55 }),
+        ],
+      }),
+      // Strong readiness now also requires a known plant type and recent
+      // root-zone history (autoflower/photoperiod plan, 2026-07-21). Supply
+      // both on the compiled context so this fixture stays strong.
+      plant_type: "photoperiod" as const,
+      recent_root_zone_observation_count: 1,
+    };
     render(<AiDoctorContextReadinessPanel context={context} openAlertsCount={0} />);
     const panel = screen.getByTestId("ai-doctor-context-readiness-panel");
     const headers = Array.from(panel.querySelectorAll("h2, h3")).map(

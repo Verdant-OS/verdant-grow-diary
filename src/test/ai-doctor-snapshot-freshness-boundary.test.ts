@@ -38,6 +38,8 @@ function baseInput(snapAgeMs: number): AiDoctorContextInput {
       stage: "veg",
       medium: "coco",
       hasPlantPhoto: true,
+      // Known plant type → clears the plant-type gate.
+      plantType: "photoperiod",
     },
     // Two recent notes → clears recent-timeline-activity (>=2).
     recentEvents: [
@@ -45,6 +47,9 @@ function baseInput(snapAgeMs: number): AiDoctorContextInput {
       { at: NOW - 90 * 60 * 1000, category: "watering" },
     ],
     recentManualSnapshots: [{ at: NOW - snapAgeMs, severity: "ok" }],
+    // Root-zone history present → clears the root-zone-history gate,
+    // leaving snapshot freshness as the only discriminator.
+    recentRootZoneObservations: 1,
   };
 }
 

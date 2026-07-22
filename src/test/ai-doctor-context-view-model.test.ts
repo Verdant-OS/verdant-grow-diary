@@ -131,7 +131,7 @@ describe("evaluateAiDoctorContextFromSources", () => {
     expect(r.readiness).toBe("insufficient");
   });
 
-  it("returns strong when plant + recent activity + fresh snapshot present", () => {
+  it("returns strong when plant + plant type + recent activity + fresh snapshot + root-zone history present", () => {
     const items: TimelineMemoryItem[] = [
       {
         kind: "diary",
@@ -163,8 +163,10 @@ describe("evaluateAiDoctorContextFromSources", () => {
         stage: "veg",
         medium: "Coco",
         photo: "https://x/y.jpg",
+        plantType: "photoperiod",
       },
       timelineItems: items,
+      rootZoneObservations: [makeRootZoneObservation({ occurredAt: iso(-3 * HOUR) })],
       now: NOW,
     });
     expect(r.readiness).toBe("strong");
@@ -320,6 +322,7 @@ describe("buildAiDoctorContextInput", () => {
     expect(input.now).toBe(NOW);
     expect(input.plant?.hasProfile).toBe(true);
     expect(input.recentEvents).toEqual([]);
+    expect(input.recentRootZoneObservations).toBe(0);
   });
 });
 

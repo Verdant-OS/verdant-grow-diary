@@ -15,6 +15,7 @@ exports[`AI Doctor Golden Cases v1 — deterministic serialization > produces st
     "missing_information": [
       "No live or manual sensor readings in the last 7 days.",
       "Image was not analyzed in this stub pass — no visual evidence available.",
+      "Plant type (autoflower or photoperiod) is not recorded.",
     ],
     "possible_causes": [
       "Insufficient evidence to enumerate likely causes; observe and re-check.",
@@ -45,6 +46,7 @@ exports[`AI Doctor Golden Cases v1 — deterministic serialization > produces st
     "missing_information": [
       "No grow events logged in the last 14 days for context.",
       "Image was not analyzed in this stub pass — no visual evidence available.",
+      "Plant type (autoflower or photoperiod) is not recorded.",
     ],
     "possible_causes": [
       "Insufficient evidence to enumerate likely causes; observe and re-check.",
@@ -76,6 +78,7 @@ exports[`AI Doctor Golden Cases v1 — deterministic serialization > produces st
     "likely_issue": "",
     "missing_information": [
       "Image was not analyzed in this stub pass — no visual evidence available.",
+      "Plant type (autoflower or photoperiod) is not recorded.",
     ],
     "possible_causes": [
       "Environmental drift consistent with the listed 7-day deviations.",
@@ -107,6 +110,7 @@ exports[`AI Doctor Golden Cases v1 — deterministic serialization > produces st
       "No grow events logged in the last 14 days for context.",
       "Only demo sensor data available — not usable for a real diagnosis.",
       "Image was not analyzed in this stub pass — no visual evidence available.",
+      "Plant type (autoflower or photoperiod) is not recorded.",
     ],
     "possible_causes": [
       "Insufficient evidence to enumerate likely causes; observe and re-check.",
@@ -139,6 +143,7 @@ exports[`AI Doctor Golden Cases v1 — deterministic serialization > produces st
     "likely_issue": "",
     "missing_information": [
       "Image was not analyzed in this stub pass — no visual evidence available.",
+      "Plant type (autoflower or photoperiod) is not recorded.",
     ],
     "possible_causes": [
       "Environmental drift consistent with the listed 7-day deviations.",
@@ -169,6 +174,7 @@ exports[`AI Doctor Golden Cases v1 — deterministic serialization > produces st
     "likely_issue": "",
     "missing_information": [
       "Image was not analyzed in this stub pass — no visual evidence available.",
+      "Plant type (autoflower or photoperiod) is not recorded.",
     ],
     "possible_causes": [
       "Insufficient evidence to enumerate likely causes; observe and re-check.",
@@ -198,6 +204,7 @@ exports[`AI Doctor Golden Cases v1 — deterministic serialization > produces st
     "likely_issue": "",
     "missing_information": [
       "Image was not analyzed in this stub pass — no visual evidence available.",
+      "Plant type (autoflower or photoperiod) is not recorded.",
     ],
     "possible_causes": [
       "Insufficient evidence to enumerate likely causes; observe and re-check.",
@@ -227,6 +234,7 @@ exports[`AI Doctor Golden Cases v1 — deterministic serialization > produces st
     "missing_information": [
       "No live or manual sensor readings in the last 7 days.",
       "Image was not analyzed in this stub pass — no visual evidence available.",
+      "Plant type (autoflower or photoperiod) is not recorded.",
     ],
     "possible_causes": [
       "Insufficient evidence to enumerate likely causes; observe and re-check.",
@@ -264,6 +272,7 @@ exports[`AI Doctor Golden Cases v1 — deterministic serialization > produces st
       "Some recent sensor readings are stale or invalid — fresh confirmation needed.",
       "No grow events logged in the last 14 days for context.",
       "Image was not analyzed in this stub pass — no visual evidence available.",
+      "Plant type (autoflower or photoperiod) is not recorded.",
     ],
     "possible_causes": [
       "Sensor pipeline issue (stale/invalid readings) — diagnosis cannot rely on these.",
@@ -293,6 +302,7 @@ exports[`AI Doctor Golden Cases v1 — deterministic serialization > produces st
     "likely_issue": "",
     "missing_information": [
       "Image was not analyzed in this stub pass — no visual evidence available.",
+      "Plant type (autoflower or photoperiod) is not recorded.",
     ],
     "possible_causes": [
       "Insufficient evidence to enumerate likely causes; observe and re-check.",
@@ -322,6 +332,7 @@ exports[`AI Doctor Golden Cases v1 — deterministic serialization > produces st
     "missing_information": [
       "No live or manual sensor readings in the last 7 days.",
       "Image was not analyzed in this stub pass — no visual evidence available.",
+      "Plant type (autoflower or photoperiod) is not recorded.",
     ],
     "possible_causes": [
       "Insufficient evidence to enumerate likely causes; observe and re-check.",
@@ -362,6 +373,7 @@ exports[`AI Doctor Golden Cases v1 — deterministic serialization > produces st
     "missing_information": [
       "Some recent sensor readings are stale or invalid — fresh confirmation needed.",
       "Image was not analyzed in this stub pass — no visual evidence available.",
+      "Plant type (autoflower or photoperiod) is not recorded.",
     ],
     "possible_causes": [
       "Sensor pipeline issue (stale/invalid readings) — diagnosis cannot rely on these.",
@@ -391,6 +403,7 @@ exports[`AI Doctor Golden Cases v1 — deterministic serialization > produces st
     "missing_information": [
       "No live or manual sensor readings in the last 7 days.",
       "Image was not analyzed in this stub pass — no visual evidence available.",
+      "Plant type (autoflower or photoperiod) is not recorded.",
     ],
     "possible_causes": [
       "Insufficient evidence to enumerate likely causes; observe and re-check.",
@@ -421,6 +434,7 @@ exports[`AI Doctor Golden Cases v1 — deterministic serialization > produces st
     "likely_issue": "",
     "missing_information": [
       "Image was not analyzed in this stub pass — no visual evidence available.",
+      "Plant type (autoflower or photoperiod) is not recorded.",
     ],
     "possible_causes": [
       "Environmental drift consistent with the listed 7-day deviations.",
@@ -457,6 +471,7 @@ exports[`AI Doctor Golden Cases v1 — deterministic serialization > produces st
       "No live or manual sensor readings in the last 7 days.",
       "Some recent sensor readings are stale or invalid — fresh confirmation needed.",
       "Image was not analyzed in this stub pass — no visual evidence available.",
+      "Plant type (autoflower or photoperiod) is not recorded.",
     ],
     "possible_causes": [
       "Sensor pipeline issue (stale/invalid readings) — diagnosis cannot rely on these.",
@@ -486,6 +501,7 @@ exports[`AI Doctor Golden Cases v1 — deterministic serialization > produces st
       "No live or manual sensor readings in the last 7 days.",
       "No grow events logged in the last 14 days for context.",
       "Image was not analyzed in this stub pass — no visual evidence available.",
+      "Plant type (autoflower or photoperiod) is not recorded.",
     ],
     "possible_causes": [
       "Insufficient evidence to enumerate likely causes; observe and re-check.",

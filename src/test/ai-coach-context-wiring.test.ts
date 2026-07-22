@@ -15,7 +15,7 @@ const SRC = readFileSync(resolve(__dirname, "../../supabase/functions/ai-coach/i
 describe("ai-coach edge function — wiring regression", () => {
   it("imports the shared source-aware annotator", () => {
     expect(SRC).toMatch(/buildAiSensorSnapshotContext/);
-    expect(SRC).toMatch(/sensorSnapshotContextRules/);
+    expect(SRC).toMatch(/aiSensorSnapshotContextRules/);
   });
 
   it("selects the latest snapshot via the captured_at picker (not array order)", () => {

@@ -34,6 +34,8 @@ export interface AiDoctorContextPlantSource {
   medium?: string | null;
   photo?: string | null;
   hasPlantPhoto?: boolean;
+  /** Declared plant type (autoflower / photoperiod / unknown). Never inferred. */
+  plantType?: string | null;
 }
 
 /** Map a Plant record into the rules' plant input shape. */
@@ -51,6 +53,7 @@ export function plantToAiDoctorContextPlant(
     stage: plant.stage ?? null,
     medium: plant.medium ?? undefined,
     hasPlantPhoto: hasPhoto,
+    plantType: plant.plantType ?? null,
   };
 }
 
@@ -193,6 +196,9 @@ export function buildAiDoctorContextInput(args: BuildAiDoctorContextArgs): AiDoc
     plant: plantToAiDoctorContextPlant(args.plant),
     recentEvents: [...timelineEventsWithoutRootZoneCompanions, ...rootZoneEvents],
     recentManualSnapshots: snapshots,
+    // Settled root-zone observations double as the root-zone-history signal:
+    // feed guidance stays withheld until at least one exists.
+    recentRootZoneObservations: rootZoneEvents.length,
     now,
   };
 }
@@ -222,6 +228,8 @@ export const AI_DOCTOR_MISSING_LABELS: Record<string, string> = {
   "recent-timeline-activity": "Recent timeline activity (last 7 days)",
   "recent-watering-or-feeding": "Recent watering or feeding log",
   "recent-manual-sensor-snapshot": "Recent manual sensor snapshot",
+  "plant-type": "Plant type (autoflower or photoperiod)",
+  "root-zone-history": "Root-zone history (dry-back, runoff, pot weight)",
 };
 
 export const AI_DOCTOR_EVIDENCE_LABELS: Record<string, string> = {
@@ -235,6 +243,8 @@ export const AI_DOCTOR_EVIDENCE_LABELS: Record<string, string> = {
   "recent-manual-sensor-snapshot": "Recent manual sensor snapshot",
   "fresh-manual-sensor-snapshot": "Manual sensor snapshot within 48 hours",
   "recent-warnings": "Recent warnings flagged",
+  "plant-type": "Plant type recorded",
+  "root-zone-history": "Root-zone history recorded",
 };
 
 export function labelMissing(code: string): string {

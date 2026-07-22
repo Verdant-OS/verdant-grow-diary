@@ -30,6 +30,7 @@ import {
   type EnvironmentCheckEventInput,
 } from "./aiDoctorEnvironmentCheckRules";
 import type { AiDoctorSensorContext } from "./aiDoctorSensorContextRules";
+import { normalizePlantType, type PlantType } from "./plantTypeRules";
 import {
   buildAiDoctorCsvHistoryContext,
   type AiDoctorCsvHistoryContext,
@@ -208,6 +209,20 @@ export interface PlantContextPayload {
    * row. Null when missing, empty, or blank. Never inferred.
    */
   pot_size: string | null;
+  /**
+   * Declared plant type from the plant row, normalized to the canonical
+   * vocabulary (autoflower | photoperiod | unknown). Absent, blank, or
+   * unrecognized values are "unknown" — never a silent photoperiod default,
+   * and never inferred from strain text (the isLikelyAutoflower name
+   * heuristic stays a separate safety net on top).
+   */
+  plant_type?: PlantType;
+  /**
+   * Count of recent settled root-zone observations (dry-back, runoff, pot
+   * weight) available as evidence. Absent or 0 = none — the safety rules
+   * withhold feed/taper language until root-zone history exists.
+   */
+  recent_root_zone_observation_count?: number;
   recent_grow_events: readonly RecentGrowEvent[];
   recentSensorReadings: readonly RecentSensorReading[];
   sensor_groups: readonly SensorSourceGroup[];
@@ -242,6 +257,8 @@ export interface PlantRowLike {
    * compiler only normalizes whitespace and rejects blanks.
    */
   pot_size?: string | null;
+  /** Declared plant type (autoflower / photoperiod / unknown). Never inferred. */
+  plant_type?: string | null;
 }
 
 export interface GrowEventRowLike {
@@ -488,6 +505,7 @@ export function compilePlantContextFromRows(
     stage: plant?.stage ?? plant?.growth_stage ?? null,
     medium,
     pot_size,
+    plant_type: normalizePlantType(plant?.plant_type),
     recent_grow_events: Object.freeze(recent_grow_events),
     recentSensorReadings: Object.freeze(recentSensorReadings),
     sensor_groups: Object.freeze(sensor_groups),

@@ -22,6 +22,7 @@ import type {
   PlantContextPayload as AiDoctorContext,
   SensorSourceTag,
 } from "./aiDoctorContextCompiler";
+import { normalizePlantType, type PlantType } from "./plantTypeRules";
 
 export type AiDoctorRiskLevel = "low" | "medium" | "high";
 export type AiDoctorConfidenceBand = "low" | "medium" | "high";
@@ -72,10 +73,33 @@ export const AUTOFLOWER_NEVER_DO: readonly string[] = Object.freeze([
   "Do not perform an aggressive flush on this autoflower.",
 ]);
 
+/**
+ * Low-stress baseline for plants whose type is not confirmed. Same
+ * prohibitions as AUTOFLOWER_NEVER_DO, worded for an unverified type —
+ * an unknown plant might be an autoflower, so high-stress recovery is
+ * off the table until the grower records the type
+ * (autoflower/photoperiod plan, 2026-07-21).
+ */
+export const UNKNOWN_TYPE_NEVER_DO: readonly string[] = Object.freeze([
+  "Do not heavily defoliate until the plant type (autoflower vs photoperiod) is confirmed.",
+  "Do not transplant based on this output until the plant type is confirmed.",
+  "Do not apply high-stress training (topping, FIM, severe LST) until the plant type is confirmed.",
+  "Do not perform an aggressive flush until the plant type is confirmed.",
+]);
+
 /** Heuristic: name/strain contains "auto" → treat as autoflower. */
 export function isLikelyAutoflower(context: AiDoctorContext): boolean {
   const blob = `${context.strain ?? ""} ${context.plant_name ?? ""}`.toLowerCase();
   return /\bauto(flower)?s?\b|auto$/.test(blob) || blob.includes("autoflower");
+}
+
+/**
+ * Declared type from the context payload. The declared field wins when it
+ * says autoflower; the name heuristic stays as a safety net on top (a plant
+ * declared photoperiod but named "Auto ..." is still treated conservatively).
+ */
+export function declaredPlantType(context: AiDoctorContext): PlantType {
+  return normalizePlantType(context.plant_type ?? null);
 }
 
 export interface ContextStrength {
@@ -147,6 +171,23 @@ const DEVICE_COMMAND_PATTERNS: readonly RegExp[] = [
   /\bautomat(e|ion)\b/i,
   /\bexecute\b/i,
   /\brun (the )?(pump|fan|light|heater|dehumidifier|humidifier)\b/i,
+];
+
+/**
+ * Feed/taper wording that requires root-zone evidence before it may appear in
+ * the actionable fields (immediate_action / follow_up_24h /
+ * recovery_plan_3_day). Uppercase "EC" is matched case-sensitively so prose
+ * words ("second", "recheck") never trip it.
+ */
+const FEED_CHANGE_PATTERNS: readonly RegExp[] = [
+  /\bfeed(ing)?\b/i,
+  /\bnutrient/i,
+  /\bfertiliz/i,
+  /\bEC\b/,
+  /\bppm\b/i,
+  /\btaper\b/i,
+  /\bflush/i,
+  /\bwater(ing)? (more|less|schedule|frequency)\b/i,
 ];
 
 /**
@@ -225,6 +266,11 @@ export function applyAiDoctorSafetyRules(
   if (!context.stage) {
     missing.add("Plant stage is not recorded.");
   }
+  const plantType = declaredPlantType(context);
+  if (plantType === "unknown") {
+    missing.add("Plant type (autoflower or photoperiod) is not recorded.");
+    applied.push("missing_information_when_plant_type_unknown");
+  }
 
   // ---- confidence cap: weak evidence ⇒ never above medium ----
   let confidence = Number.isFinite(draft.confidence)
@@ -245,24 +291,70 @@ export function applyAiDoctorSafetyRules(
     applied.push("cap_confidence_without_trustworthy_sensors");
   }
 
-  // ---- what_not_to_do baseline + autoflower extras ----
+  // ---- what_not_to_do baseline + type-aware low-stress extras ----
+  // Declared autoflower OR the name heuristic → autoflower prohibitions.
+  // Declared unknown (or absent) without the heuristic → the same
+  // prohibitions worded for an unverified type. Only a declared photoperiod
+  // with no autoflower name signal escapes the low-stress baseline.
   const neverDo: string[] = [...draft.what_not_to_do];
   for (const n of NEVER_DO_BASELINE) {
     if (!neverDo.includes(n)) neverDo.push(n);
   }
-  if (isLikelyAutoflower(context)) {
+  const treatAsAutoflower = plantType === "autoflower" || isLikelyAutoflower(context);
+  if (treatAsAutoflower) {
     for (const n of AUTOFLOWER_NEVER_DO) {
       if (!neverDo.includes(n)) neverDo.push(n);
     }
     applied.push("autoflower_block_heavy_stress_recovery");
+  } else if (plantType === "unknown") {
+    for (const n of UNKNOWN_TYPE_NEVER_DO) {
+      if (!neverDo.includes(n)) neverDo.push(n);
+    }
+    applied.push("unknown_type_low_stress_baseline");
   }
 
   // ---- strip any device-command-style wording defensively ----
-  const safeImmediate = DEVICE_COMMAND_PATTERNS.some((rx) => rx.test(draft.immediate_action))
+  let safeImmediate = DEVICE_COMMAND_PATTERNS.some((rx) => rx.test(draft.immediate_action))
     ? "Observe and re-check. Do not change inputs based on this output."
     : draft.immediate_action;
   if (safeImmediate !== draft.immediate_action) {
     applied.push("stripped_device_command_from_immediate_action");
+  }
+
+  // ---- feed/taper language requires root-zone evidence ----
+  // Deterministic gate, not model guidance: with no recent settled root-zone
+  // observations (dry-back, runoff, pot weight), any feed/EC/taper/watering-
+  // change wording in the actionable fields is replaced with an observation-
+  // first instruction, and the gap is surfaced in missing_information. When
+  // root-zone history exists it is named in Evidence — so feed language never
+  // appears without root-zone evidence alongside it.
+  const rootZoneObservations =
+    typeof context.recent_root_zone_observation_count === "number" &&
+    Number.isFinite(context.recent_root_zone_observation_count)
+      ? Math.max(0, context.recent_root_zone_observation_count)
+      : 0;
+  const evidenceOut: string[] = draft.evidence.slice();
+  let followUp = draft.follow_up_24h;
+  let recoveryPlan = draft.recovery_plan_3_day;
+  if (rootZoneObservations > 0) {
+    evidenceOut.push(
+      `Root-zone history: ${rootZoneObservations} recent observation(s) (dry-back / runoff / pot weight).`,
+    );
+  } else {
+    const vetoed = FEED_CHANGE_PATTERNS.some(
+      (rx) => rx.test(safeImmediate) || rx.test(followUp) || rx.test(recoveryPlan),
+    );
+    if (vetoed) {
+      const fallback =
+        "Log root-zone observations (dry-back, pot weight, runoff) before any feed or watering change.";
+      if (FEED_CHANGE_PATTERNS.some((rx) => rx.test(safeImmediate))) safeImmediate = fallback;
+      if (FEED_CHANGE_PATTERNS.some((rx) => rx.test(followUp))) followUp = fallback;
+      if (FEED_CHANGE_PATTERNS.some((rx) => rx.test(recoveryPlan))) recoveryPlan = fallback;
+      applied.push("feed_language_requires_root_zone_history");
+    }
+    missing.add(
+      "No root-zone history (dry-back, runoff, pot weight) recorded — feed guidance withheld.",
+    );
   }
 
   // ---- action queue: never executable, always pending approval ----
@@ -297,13 +389,13 @@ export function applyAiDoctorSafetyRules(
     likely_issue: draft.likely_issue,
     confidence,
     confidence_band: bandForConfidence(confidence),
-    evidence: Object.freeze(draft.evidence.slice()),
+    evidence: Object.freeze(evidenceOut),
     missing_information: Object.freeze(Array.from(missing)),
     possible_causes: Object.freeze(draft.possible_causes.slice()),
     immediate_action: safeImmediate,
     what_not_to_do: Object.freeze(stripDeviceCommands(neverDo)),
-    follow_up_24h: draft.follow_up_24h,
-    recovery_plan_3_day: draft.recovery_plan_3_day,
+    follow_up_24h: followUp,
+    recovery_plan_3_day: recoveryPlan,
     risk_level,
     action_queue_suggestion: suggestion,
     applied_safety_rules: Object.freeze(applied),

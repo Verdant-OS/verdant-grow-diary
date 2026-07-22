@@ -27,14 +27,35 @@ vi.mock("@/hooks/useTimelineMemory", () => ({
   TIMELINE_MEMORY_DEFAULT_LIMIT: 60,
   useTimelineMemory: () => ({ items: mockTimelineItems, isLoading: false }),
 }));
+let mockRootZoneObservations: unknown[] = [];
 vi.mock("@/hooks/useRootZoneObservations", () => ({
   useRootZoneObservations: () => ({
-    observations: [],
+    observations: mockRootZoneObservations,
     isLoading: false,
     isFetching: false,
     isError: false,
   }),
 }));
+
+/** Settled manual root-zone watering within the recent window. */
+const rootZoneWatering = (agoMs: number) => ({
+  occurredAt: ago(agoMs),
+  eventType: "watering",
+  source: "manual",
+  metrics: {
+    schemaVersion: 1,
+    volumeMl: 500,
+    inputPh: 5.9,
+    inputEcMsCm: 1.2,
+    outputEcMsCm: null,
+    runoffMl: 60,
+    runoffPh: 6,
+    runoffEcMsCm: 1.6,
+    waterTempC: 21,
+    nutrientLine: null,
+    products: [],
+  },
+});
 
 const PLANT_STRONG = {
   id: "p1",
@@ -43,6 +64,7 @@ const PLANT_STRONG = {
   stage: "veg",
   medium: "soil",
   photo: "/photo.jpg",
+  plantType: "autoflower",
   growId: "g1",
   tentId: "t1",
 } as const;
@@ -60,6 +82,7 @@ const PLANT_INSUFFICIENT = {
 
 beforeEach(() => {
   mockTimelineItems = [];
+  mockRootZoneObservations = [];
 });
 
 const renderIt = (plant: unknown) =>
@@ -77,11 +100,14 @@ describe("PlantDetailAiDoctorSafeReviewStart", () => {
   });
 
   it("renders limited-confidence prep for partial context", () => {
-    // Profile present + 2 recent events but no fresh snapshot → partial.
+    // Profile (incl. plant type) + root-zone history + 2 recent events,
+    // but no fresh snapshot → partial. Snapshot freshness stays the
+    // discriminator between this case and the strong one below.
     mockTimelineItems = [
       { kind: "diary_entry", occurredAt: ago(12 * HOUR), entryType: "note" },
       { kind: "diary_entry", occurredAt: ago(24 * HOUR), entryType: "note" },
     ];
+    mockRootZoneObservations = [rootZoneWatering(18 * HOUR)];
     renderIt(PLANT_STRONG);
     const root = screen.getByTestId("plant-ai-doctor-safe-review-start");
     expect(root.getAttribute("data-variant")).toBe("partial");
@@ -107,6 +133,7 @@ describe("PlantDetailAiDoctorSafeReviewStart", () => {
       { kind: "diary_entry", occurredAt: ago(12 * HOUR), entryType: "watering" },
       { kind: "diary_entry", occurredAt: ago(36 * HOUR), entryType: "note" },
     ];
+    mockRootZoneObservations = [rootZoneWatering(18 * HOUR)];
     renderIt(PLANT_STRONG);
     const root = screen.getByTestId("plant-ai-doctor-safe-review-start");
     expect(root.getAttribute("data-variant")).toBe("strong");

@@ -39,6 +39,7 @@ const plant = {
   stage: "veg",
   medium: "Coco",
   hasPlantPhoto: true,
+  plantType: "photoperiod",
 } as const;
 
 /** Runs the full chain: rules → gate. */
@@ -72,6 +73,7 @@ const PARTIAL_VARIANTS: ReadonlyArray<{
         { at: iso(-2 * HOUR), category: "notes" },
       ],
       recentManualSnapshots: [],
+      recentRootZoneObservations: 1,
       now: NOW,
     },
   },
@@ -81,6 +83,7 @@ const PARTIAL_VARIANTS: ReadonlyArray<{
       plant,
       recentEvents: [],
       recentManualSnapshots: [{ at: iso(-HOUR), severity: "ok" }],
+      recentRootZoneObservations: 1,
       now: NOW,
     },
   },
@@ -95,6 +98,7 @@ const PARTIAL_VARIANTS: ReadonlyArray<{
       recentManualSnapshots: [
         { at: iso(-(AI_DOCTOR_SNAPSHOT_FRESH_MS + HOUR)), severity: "ok" },
       ],
+      recentRootZoneObservations: 1,
       now: NOW,
     },
   },
@@ -107,6 +111,7 @@ const PARTIAL_VARIANTS: ReadonlyArray<{
         { at: iso(-2 * HOUR), category: "notes" },
       ],
       recentManualSnapshots: [{ at: iso(-HOUR), severity: "ok" }],
+      recentRootZoneObservations: 1,
       now: NOW,
     },
   },
@@ -119,6 +124,7 @@ const PARTIAL_VARIANTS: ReadonlyArray<{
         { at: iso(-2 * HOUR), category: "notes" },
       ],
       recentManualSnapshots: [{ at: iso(-HOUR), severity: "ok" }],
+      recentRootZoneObservations: 1,
       now: NOW,
     },
   },
@@ -158,6 +164,7 @@ describe("gate consistency: stale snapshots never mask readiness", () => {
     recentManualSnapshots: [
       { at: iso(-(AI_DOCTOR_SNAPSHOT_FRESH_MS + HOUR)), severity: "ok" as const },
     ],
+    recentRootZoneObservations: 1,
     now: NOW,
   };
 

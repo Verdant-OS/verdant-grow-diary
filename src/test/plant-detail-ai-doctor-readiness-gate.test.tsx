@@ -10,6 +10,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import PlantDetailAiDoctorReadinessGate from "@/components/PlantDetailAiDoctorReadinessGate";
+import type { RootZoneObservationV1 } from "@/lib/rootZoneObservationRules";
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
@@ -37,19 +38,42 @@ vi.mock("@/hooks/useTimelineMemory", () => ({
   TIMELINE_MEMORY_DEFAULT_LIMIT: 60,
   useTimelineMemory: () => ({ items: mockTimelineItems, isLoading: false }),
 }));
+// Stub the root-zone observations hook the same way; settled (not loading,
+// not fetching, no error) so the gate consumes the observations directly.
+let mockRootZoneObservations: RootZoneObservationV1[] = [];
 vi.mock("@/hooks/useRootZoneObservations", () => ({
   useRootZoneObservations: () => ({
-    observations: [],
+    observations: mockRootZoneObservations,
     isLoading: false,
     isFetching: false,
     isError: false,
   }),
 }));
 
+const manualWateringObservation = (occurredAt: string): RootZoneObservationV1 => ({
+  occurredAt,
+  eventType: "watering",
+  source: "manual",
+  metrics: {
+    schemaVersion: 1,
+    volumeMl: 500,
+    inputPh: 5.9,
+    inputEcMsCm: 1.2,
+    outputEcMsCm: null,
+    runoffMl: 50,
+    runoffPh: 6,
+    runoffEcMsCm: 1.6,
+    waterTempC: 21,
+    nutrientLine: null,
+    products: [],
+  },
+});
+
 const PLANT = {
   id: "p1",
   name: "Plant A",
   strain: "NL Auto",
+  plantType: "autoflower",
   stage: "veg",
   medium: "soil",
   photo: "/photo.jpg",
@@ -73,6 +97,7 @@ const renderGate = (
 
 beforeEach(() => {
   mockTimelineItems = [];
+  mockRootZoneObservations = [];
 });
 
 describe("PlantDetailAiDoctorReadinessGate — render", () => {
@@ -91,7 +116,9 @@ describe("PlantDetailAiDoctorReadinessGate — render", () => {
   });
 
   it("strong: shows ready copy + cautious review primary + hides quick actions", () => {
-    // Two recent notes + a fresh manual snapshot card and photo present.
+    // Two recent notes + a fresh manual snapshot card and photo present,
+    // plus a known plant type and recent root-zone history (both required
+    // for "strong" under the autoflower/photoperiod plan).
     mockTimelineItems = [
       {
         kind: "manual_sensor_snapshot",
@@ -101,6 +128,7 @@ describe("PlantDetailAiDoctorReadinessGate — render", () => {
       { kind: "diary_entry", occurredAt: ago(12 * HOUR), entryType: "watering" },
       { kind: "diary_entry", occurredAt: ago(36 * HOUR), entryType: "note" },
     ];
+    mockRootZoneObservations = [manualWateringObservation(ago(10 * HOUR))];
     renderGate();
     const gate = screen.getByTestId("plant-ai-doctor-readiness-gate");
     expect(gate.getAttribute("data-readiness")).toBe("strong");

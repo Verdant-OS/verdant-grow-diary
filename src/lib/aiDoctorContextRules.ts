@@ -25,6 +25,13 @@ export interface AiDoctorContextPlantInput {
   stage: string | null;
   medium?: string | null;
   hasPlantPhoto?: boolean;
+  /**
+   * Declared plant type (autoflower / photoperiod / unknown). Absent or
+   * unknown blocks "strong" readiness — recovery guidance differs enough
+   * between autoflowers and photoperiods that type is key context
+   * (autoflower/photoperiod plan, 2026-07-21).
+   */
+  plantType?: string | null;
 }
 
 export interface AiDoctorContextEventInput {
@@ -52,6 +59,12 @@ export interface AiDoctorContextInput {
   plant: AiDoctorContextPlantInput | null;
   recentEvents?: readonly AiDoctorContextEventInput[];
   recentManualSnapshots?: readonly AiDoctorContextManualSnapshotInput[];
+  /**
+   * Count of recent settled root-zone observations (dry-back, runoff, pot
+   * weight). Absent or 0 blocks "strong" readiness — feed guidance without
+   * root-zone history is guesswork (autoflower/photoperiod plan, 2026-07-21).
+   */
+  recentRootZoneObservations?: number;
   /** Optional now injection for deterministic tests. */
   now?: number;
   /** Optional readiness threshold override (testing / future tuning). */
@@ -86,6 +99,7 @@ import {
   AI_DOCTOR_CONTEXT_READINESS_CONFIG,
   type AiDoctorContextReadinessConfig,
 } from "@/constants/aiDoctorContextReadiness";
+import { normalizePlantType } from "@/lib/plantTypeRules";
 
 /** Re-exported for back-compat. Source of truth lives in constants/. */
 export const AI_DOCTOR_RECENT_WINDOW_MS =
@@ -200,6 +214,9 @@ export function evaluateAiDoctorContext(
 
     if (plant.hasPlantPhoto) evidence.push("plant-photo");
     else missing.push("plant-photo");
+
+    if (normalizePlantType(plant.plantType ?? null) !== "unknown") evidence.push("plant-type");
+    else missing.push("plant-type");
   }
 
   // --- Activity ---------------------------------------------------------
@@ -219,11 +236,22 @@ export function evaluateAiDoctorContext(
     missing.push("recent-manual-sensor-snapshot");
   }
 
+  // --- Root-zone history --------------------------------------------------
+  const rootZoneCount =
+    typeof safe.recentRootZoneObservations === "number" &&
+    Number.isFinite(safe.recentRootZoneObservations)
+      ? Math.max(0, safe.recentRootZoneObservations)
+      : 0;
+  if (rootZoneCount > 0) evidence.push("root-zone-history");
+  else missing.push("root-zone-history");
+
   if (counts.recentWarnings > 0) evidence.push("recent-warnings");
 
   // --- Readiness --------------------------------------------------------
   const hasProfile = !!plant && plant.hasProfile;
   const hasStage = !!plant && nonBlank(plant.stage);
+  const hasKnownPlantType =
+    !!plant && normalizePlantType(plant.plantType ?? null) !== "unknown";
   const hasRecentActivity = recent.length >= 2;
   const hasRecentSnap = recentSnaps > 0;
   const freshSnap =
@@ -237,10 +265,12 @@ export function evaluateAiDoctorContext(
   } else if (
     hasProfile &&
     hasStage &&
+    hasKnownPlantType &&
     hasRecentActivity &&
     hasRecentSnap &&
     freshSnap &&
-    hasPhotoOrWaterFeed
+    hasPhotoOrWaterFeed &&
+    rootZoneCount > 0
   ) {
     readiness = "strong";
   } else {

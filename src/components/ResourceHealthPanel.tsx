@@ -114,6 +114,8 @@ export function ResourceHealthPanel() {
 
 
   const runAll = useCallback(async () => {
+    if (runningRef.current) return;
+    runningRef.current = true;
     setRunning(true);
     setChecks((prev) => prev.map((c) => ({ ...c, status: "running", detail: undefined })));
 
@@ -173,14 +175,42 @@ export function ResourceHealthPanel() {
       }),
     );
 
+    const ranAt = new Date().toISOString();
+    const failures = results
+      .filter((r) => r.status === "fail")
+      .map((r) => ({ name: r.name, path: r.path, detail: r.detail }));
+    const summary: RunSummary = {
+      ranAt,
+      total: results.length,
+      passing: results.filter((r) => r.status === "pass").length,
+      failing: failures.length,
+      failures,
+    };
+
     setChecks(results);
-    setLastRunAt(new Date().toISOString());
+    setLastRunAt(ranAt);
+    setHistory((prev) => [summary, ...prev].slice(0, HISTORY_LIMIT));
     setRunning(false);
+    runningRef.current = false;
   }, []);
 
   useEffect(() => {
     void runAll();
   }, [runAll]);
+
+  // Persist interval + schedule periodic background scans.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(INTERVAL_STORAGE_KEY, String(intervalMs));
+    if (intervalMs <= 0) return;
+    const id = window.setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      void runAll();
+    }, intervalMs);
+    return () => window.clearInterval(id);
+  }, [intervalMs, runAll]);
+
+
 
   const failing = checks.filter((c) => c.status === "fail").length;
   const passing = checks.filter((c) => c.status === "pass").length;

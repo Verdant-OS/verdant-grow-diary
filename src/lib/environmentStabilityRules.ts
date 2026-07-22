@@ -262,7 +262,8 @@ export function computeEnvironmentStability(
       last24h: { ...EMPTY_WINDOW },
       last7d: { ...EMPTY_WINDOW },
       sparse: true,
-      message: "No usable VPD readings for the recent window.",
+      message:
+        "No directly measured VPD readings in the recent window. Derived VPD (calculated from temperature and humidity) is shown on the VPD card but is not used for stability tracking.",
       stage: normalizedStage,
     };
   }
@@ -276,7 +277,8 @@ export function computeEnvironmentStability(
       last24h: w24.stats,
       last7d: w7d.stats,
       sparse: true,
-      message: "No usable VPD readings for the recent window.",
+      message:
+        "No directly measured VPD readings in the recent window. Derived VPD (calculated from temperature and humidity) is shown on the VPD card but is not used for stability tracking.",
       stage: normalizedStage,
     };
   }

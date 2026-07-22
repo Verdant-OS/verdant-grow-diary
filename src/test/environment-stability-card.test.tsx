@@ -78,6 +78,44 @@ describe("EnvironmentStabilityCard presenter", () => {
     expect(screen.queryByTestId("card-window-24h")).toBeNull();
   });
 
+  it("prefixes the stage-band why context when the summary is unavailable", () => {
+    // With no directly measured VPD series the summary is unavailable; the
+    // stage band must read as reference context only, never as a live
+    // classification of a derived VPD estimate shown elsewhere on the page.
+    render(
+      <EnvironmentStabilityCard
+        testId="card"
+        result={baseResult({
+          status: "unavailable",
+          stage: "flower",
+          message:
+            "No directly measured VPD readings in the recent window. Derived VPD (calculated from temperature and humidity) is shown on the VPD card but is not used for stability tracking.",
+          sparse: true,
+        })}
+      />,
+    );
+    const why = screen.getByTestId("card-why-context");
+    expect(why.textContent).toBe(
+      "Target for reference: Flower VPD target: 1.0–1.5 kPa",
+    );
+    expect(screen.getByTestId("card-inactive-note").textContent).toContain(
+      "No directly measured VPD readings",
+    );
+    expect(screen.queryByTestId("card-window-24h")).toBeNull();
+  });
+
+  it("does not prefix the stage-band why context when the summary is active", () => {
+    render(
+      <EnvironmentStabilityCard
+        testId="card"
+        result={baseResult({ status: "stable", stage: "flower" })}
+      />,
+    );
+    expect(screen.getByTestId("card-why-context").textContent).toBe(
+      "Flower VPD target: 1.0–1.5 kPa",
+    );
+  });
+
   it("shows inactive note for context_only (harvest)", () => {
     render(
       <EnvironmentStabilityCard

@@ -47,7 +47,23 @@ describe("Environment Stability Summary v1 — safety + wiring", () => {
     // observations, not compatibility zeroes or global readings.
     expect(SENSORS_SRC).toMatch(/vpdStabilityReadings\s*=\s*readingsByMetric\.vpd/);
     expect(SENSORS_SRC).toMatch(
-      /<EnvironmentStabilityCard[\s\S]*?testId=["']sensors-environment-stability["'][\s\S]*?computeEnvironmentStability\(\s*vpdStabilityReadings\s*,\s*\{[\s\S]*?stage:\s*selectedTentStage/,
+      /computeEnvironmentStability\(\s*vpdStabilityReadings\s*,\s*\{[\s\S]*?stage:\s*selectedTentStage/,
+    );
+    expect(SENSORS_SRC).toMatch(
+      /<EnvironmentStabilityCard[\s\S]*?testId=["']sensors-environment-stability["'][\s\S]*?result=\{vpdStability\}/,
+    );
+  });
+
+  it("Sensors page reconciles derived VPD with an unavailable stability summary", () => {
+    // When only a derived VPD estimate exists, the stability card reports
+    // unavailable (it consumes directly measured VPD only). The sibling note
+    // must name both facts so they cannot read as contradictory.
+    expect(SENSORS_SRC).toMatch(
+      /derivedVpdKpa\s*!==\s*null\s*&&\s*vpdStability\.status\s*===\s*["']unavailable["']/,
+    );
+    expect(SENSORS_SRC).toContain("sensors-derived-vpd-stability-note");
+    expect(SENSORS_SRC).toMatch(
+      /A derived VPD estimate is available below; stability tracking requires\s+directly recorded VPD readings\./,
     );
   });
 

@@ -215,6 +215,17 @@ export default function Sensors() {
   const displayedVpdKpa = latestObservedVpd ?? derivedVpdKpa;
   const vpdStageMissing =
     displayedVpdKpa !== null && normalizeVpdStage(selectedTentStage) === "unknown";
+  // Stability deliberately consumes only directly measured VPD readings —
+  // the derived point estimate below is never fed into stability tracking.
+  // Computed once here so the card and the derived-VPD reconciliation note
+  // stay in sync over the same result.
+  const vpdStability = useMemo(
+    () =>
+      computeEnvironmentStability(vpdStabilityReadings, {
+        stage: selectedTentStage,
+      }),
+    [vpdStabilityReadings, selectedTentStage],
+  );
 
   // AUD-003 fix: classify based on the actual latest reading. If a reading
   // exists but is older than the freshness window, label it "Stale" and
@@ -339,10 +350,20 @@ export default function Sensors() {
       <EnvironmentStabilityCard
         testId="sensors-environment-stability"
         className="mb-4"
-        result={computeEnvironmentStability(vpdStabilityReadings, {
-          stage: selectedTentStage,
-        })}
+        result={vpdStability}
       />
+      {/* Presenter-only reconciliation: a derived VPD estimate can exist on
+          the VPD card while stability is unavailable (no directly measured
+          VPD series). Name both facts so they cannot read as contradictory. */}
+      {derivedVpdKpa !== null && vpdStability.status === "unavailable" && (
+        <p
+          className="text-xs text-muted-foreground -mt-2 mb-4"
+          data-testid="sensors-derived-vpd-stability-note"
+        >
+          A derived VPD estimate is available below; stability tracking requires
+          directly recorded VPD readings.
+        </p>
+      )}
       <div className="grid lg:grid-cols-2 gap-4">
         {METRICS.map((m) => {
           // Resolve each metric from its own latest actual observation. A

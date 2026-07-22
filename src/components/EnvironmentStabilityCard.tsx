@@ -53,6 +53,14 @@ export default function EnvironmentStabilityCard({
     status === "context_only" ||
     status === "unavailable";
   const why = deriveStabilityWhyContext(stage);
+  // Copy reconciliation: when the summary is inactive (unavailable /
+  // stage_unknown / context_only) the stage band is reference context only.
+  // Prefixing it keeps the band from reading as a live classification of a
+  // derived VPD estimate rendered elsewhere on the page.
+  const whyText =
+    inactive && why.kind === "stage"
+      ? `Target for reference: ${why.text}`
+      : why.text;
 
   return (
     <div
@@ -98,7 +106,7 @@ export default function EnvironmentStabilityCard({
         data-testid={`${testId}-why-context`}
         data-why-kind={why.kind}
       >
-        {why.text}
+        {whyText}
       </p>
 
 

@@ -972,7 +972,133 @@ two outputs was truncated — re-download the artifact.
 | `jq: error: Cannot iterate over null (null)`                | SARIF has `results: []` (clean run). Wrap the filter in `.runs[0].results // [] \| .[]`.                 |
 | Fingerprints match but URIs differ                          | One run used absolute paths, the other used repo-relative. The `del(...uriBaseId)` step above fixes it.  |
 
+##### SARIF field → Code scanning UI mapping
+
+When you're reading a code-scanning alert row and trying to trace it
+back to the SARIF the workflow uploaded (or vice versa), use this
+table. Each row is one column/element in the **Security → Code
+scanning** alert list (or on the alert detail page) and the SARIF
+JSONPath it comes from.
+
+Assume this SARIF shape (matches what
+`scripts/diff-money-migration-prefixes.mjs --sarif` emits):
+
+```jsonc
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [{
+    "tool": {
+      "driver": {
+        "name": "diff-money-migration-prefixes",
+        "semanticVersion": "1.0.0",
+        "informationUri": "https://github.com/<owner>/<repo>",
+        "rules": [
+          { "id": "money-migration-drift", "shortDescription": {...}, "defaultConfiguration": { "level": "error" } },
+          { "id": "money-migration-malformed", ... },
+          { "id": "money-migration-tooling", ... }
+        ]
+      }
+    },
+    "automationDetails": { "id": "money-migration-drift-sandbox/2026-07-22T12:00:00Z" },
+    "results": [{
+      "ruleId": "money-migration-drift",
+      "level": "error",
+      "message": { "text": "Required money migration not applied in sandbox: prefix 20260715120000…" },
+      "locations": [{
+        "physicalLocation": {
+          "artifactLocation": { "uri": "supabase/migrations/20260715120000_ai_credit_spend.sql" },
+          "region": { "startLine": 1 }
+        }
+      }],
+      "partialFingerprints": { "migrationVersion": "20260715120000" }
+    }]
+  }]
+}
+```
+
+**Alert list columns (Security → Code scanning table).**
+
+| UI column / element                    | SARIF field                                                                                                    | Example value                                                             |
+|----------------------------------------|----------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------|
+| Alert title (bold, first line)         | `runs[].results[].message.text` (first line, truncated)                                                        | *Required money migration not applied in sandbox: prefix 20260715120000…* |
+| Rule ID chip (small, next to title)    | `runs[].results[].ruleId`                                                                                       | `money-migration-drift`                                                   |
+| Tool filter dropdown value             | `runs[].tool.driver.name`                                                                                       | `diff-money-migration-prefixes`                                           |
+| Severity pill (colored dot + label)    | `runs[].results[].level` (or the rule's `defaultConfiguration.level` when omitted on the result)               | `error` → red **Error**; `warning` → yellow; `note` → blue                |
+| File path (grey, under the title)      | `runs[].results[].locations[0].physicalLocation.artifactLocation.uri`                                          | `supabase/migrations/20260715120000_ai_credit_spend.sql`                  |
+| Line-number suffix on the file path    | `runs[].results[].locations[0].physicalLocation.region.startLine`                                              | `:1`                                                                      |
+| Branch column                          | The Git ref the workflow ran on (from `GITHUB_REF`), not a SARIF field                                          | `main`, `pr/1234`                                                         |
+| Category filter value                  | `upload-sarif` step's `category:` input (mirrored into `runs[].automationDetails.id` as `<category>/<uuid>`)   | `money-migration-drift-sandbox`                                           |
+| Alert number (`#123`, in the URL)      | Assigned by GitHub on first upload; stable across re-runs that share the same fingerprint                       | `#123`                                                                    |
+| Status column (Open / Closed / Dismissed) | Derived: presence of the fingerprint in the latest SARIF + any manual dismissal on this alert number         | *Open*, *Closed – Fixed*, *Closed – Dismissed (Won't fix)*                |
+
+**Alert detail page (click a row).**
+
+| UI element                             | SARIF field                                                                                     |
+|----------------------------------------|-------------------------------------------------------------------------------------------------|
+| Header title                           | `runs[].results[].message.text` (full, not truncated)                                           |
+| **Rule** sidebar → Name + description  | `runs[].tool.driver.rules[]` where `id == result.ruleId` → `shortDescription.text` / `fullDescription.text` |
+| **Rule** sidebar → Severity            | `rules[].defaultConfiguration.level`, overridden by `results[].level` when present              |
+| **Rule** sidebar → Tool name + version | `runs[].tool.driver.name` and `runs[].tool.driver.semanticVersion`                              |
+| **Rule** sidebar → *More info* link    | `runs[].tool.driver.rules[].helpUri` (falls back to `runs[].tool.driver.informationUri`)        |
+| Code snippet with red gutter on line 1 | `locations[0].physicalLocation.artifactLocation.uri` + `region.startLine`                       |
+| **Show paths** (multi-location)        | Additional entries in `results[].locations[]` and `results[].codeFlows[]` (unused by this tool) |
+| Timeline: *Detected in run #N*         | Each SARIF upload whose `results[]` still contains the same `partialFingerprints`                |
+| Timeline: *In branch `<name>`*         | Ref of the workflow run that uploaded that SARIF                                                 |
+| Alert dedupe key                       | `(runs[].tool.driver.name, ruleId, results[].partialFingerprints)` — **not** the alert number   |
+| Fingerprint value (visible in the URL when filtering) | `results[].partialFingerprints.migrationVersion` (14-digit prefix)                |
+
+**Two things that look like SARIF fields but aren't.**
+
+- **`runId` / workflow run ID.** GitHub shows a "Detected in run
+  #12345" link on the timeline. This is the `GITHUB_RUN_ID` of the
+  workflow run, injected by `upload-sarif`. It is **not** stored in
+  the SARIF itself — the SARIF's own `runs[]` array is unrelated
+  (SARIF calls each *tool invocation* a "run"; this tool always emits
+  exactly one).
+- **Alert number (`#N`).** Assigned by GitHub, not present in SARIF.
+  Two uploads with the same `(tool, ruleId, partialFingerprints,
+  category)` update the same alert number; changing any of those four
+  creates a new one.
+
+**Fingerprint stability rules for this tool.**
+
+The dedupe key that keeps a re-run from creating a duplicate alert is:
+
+```
+tool.driver.name  = "diff-money-migration-prefixes"     # constant
+ruleId            = "money-migration-drift" | "-malformed" | "-tooling"
+partialFingerprints.migrationVersion = "<14-digit prefix>"
+category          = "money-migration-drift-<env>"       # from upload-sarif input
+```
+
+Any change to those fields (renaming the tool, renaming a rule, editing
+the prefix on a required migration file, or changing the `category:`
+between sandbox and live) will create a **new** alert instead of
+updating the existing one. Keep them stable across runs unless you
+deliberately want a fresh alert stream.
+
+**Quick `jq` recipes to cross-reference one alert.**
+
+```bash
+# Given an alert's rule + file from the UI, find the SARIF result
+jq --arg rule money-migration-drift \
+   --arg uri  supabase/migrations/20260715120000_ai_credit_spend.sql \
+   '.runs[0].results[]
+     | select(.ruleId == $rule
+              and .locations[0].physicalLocation.artifactLocation.uri == $uri)' \
+   diff.sarif
+
+# List every (ruleId, uri, fingerprint) triple the SARIF will produce alerts for
+jq -r '.runs[0].results[]
+  | [.ruleId,
+     .locations[0].physicalLocation.artifactLocation.uri,
+     .partialFingerprints.migrationVersion // "-"]
+  | @tsv' diff.sarif | sort
+```
+
 ##### Walkthrough: inspecting PR file annotations from an uploaded SARIF
+
 
 
 Once `upload-sarif` finishes on a PR run, GitHub renders each SARIF

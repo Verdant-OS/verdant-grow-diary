@@ -6,6 +6,9 @@ on:
       - feature/strain-reference-library-v1
     paths:
       - ".github/workflows/pr418-vitest-triage.yml"
+  pull_request:
+    paths:
+      - ".github/workflows/pr418-vitest-triage.yml"
 
 permissions:
   contents: read

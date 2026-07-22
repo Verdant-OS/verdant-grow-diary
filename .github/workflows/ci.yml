@@ -11,9 +11,78 @@ on:
   merge_group:
 
 jobs:
+  # Preflight: verify the edge shared-lib mirror
+  # (`supabase/functions/_shared/lib` + `.sync-manifest.json`) is in sync
+  # with `src/` BEFORE the heavy `test` job runs. Fails fast with exact
+  # drift details (per-file expected-vs-actual sha256) so a stale mirror
+  # doesn't burn a 45-minute build slot to surface the same failure.
+  # `test` gates on this via `needs: edge-shared-sync-preflight` — if the
+  # mirror drifts, install/lint/typecheck/tests/build never start.
+  edge-shared-sync-preflight:
+    name: Preflight — edge shared-lib mirror in sync
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # Guard 1: no edge function may import `../../../src/lib/*`. Cheap
+      # static scan — runs first so an obvious violation is reported
+      # without paying for the sync check.
+      - name: No src/lib imports from supabase/functions
+        run: node scripts/check-no-src-lib-imports.mjs
+
+      # Guard 2: committed mirror files + .sync-manifest.json must match
+      # what sync-edge-shared.mjs would generate right now. `--check-only`
+      # forces the wrapper to fail closed (no auto-fix in CI), matching
+      # the local prebuild's fail-closed CI behavior. `id: verify-mirror`
+      # lets the follow-up steps detect drift without swallowing the
+      # non-zero exit.
+      - name: Verify edge shared-lib mirror is in sync
+        id: verify-mirror
+        run: node scripts/verify-edge-shared-in-sync.mjs --check-only
+
+      # On drift, print the per-file expected-vs-actual sha256 table and
+      # the offending .sync-manifest.json entries directly into the job
+      # log so the failure is diagnosable without downloading artifacts.
+      - name: Print exact drift details (per-file sha256 diff)
+        if: always() && steps.verify-mirror.outcome == 'failure'
+        run: |
+          echo "::group::Edge shared-lib drift — expected vs actual"
+          node scripts/report-edge-shared-drift.mjs || true
+          echo "::endgroup::"
+          echo ""
+          echo "::error title=Edge shared-lib mirror out of sync::Run \`bun run sync-edge-shared\` locally, commit the regenerated files under supabase/functions/_shared/lib and .sync-manifest.json, and push."
+
+      # Persist the human-readable drift report as an artifact for
+      # deeper inspection (matches the standalone edge-shared-sync
+      # workflow's artifact contract so downstream tooling doesn't
+      # need to know which workflow produced it).
+      - name: Upload drift report artifact
+        if: always() && steps.verify-mirror.outcome == 'failure'
+        env:
+          DRIFT_REPORT_OUT: edge-shared-drift-report.md
+        run: node scripts/report-edge-shared-drift.mjs > /dev/null || true
+
+      - name: Upload drift report
+        if: always() && steps.verify-mirror.outcome == 'failure'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: edge-shared-drift-report-ci-preflight
+          path: edge-shared-drift-report.md
+          if-no-files-found: ignore
+          retention-days: 14
+
   test:
     name: Lint, typecheck, test, build
+    needs: edge-shared-sync-preflight
     runs-on: ubuntu-latest
+
     # This job runs the entire src/test vitest suite in one process (see the
     # monolithic full-suite step below); 20 minutes was sized before the
     # suite grew. 45 gives honest headroom so a timeout means "stuck", not

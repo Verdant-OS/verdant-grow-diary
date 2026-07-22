@@ -987,6 +987,70 @@ curl -sS -v "${AUTH[@]}" https://api.github.com/user 2>&1 \
 - Running the curl inside a workflow that overrides `GITHUB_TOKEN` with
   an empty env var — `env | grep GITHUB_TOKEN` in the step to confirm.
 
+##### Uploading a SARIF file to GitHub with curl
+
+Use this when you want to upload SARIF from outside GitHub Actions — a
+laptop, a different CI, or when debugging why `upload-sarif@v3` is
+misbehaving. The endpoint is `POST /repos/{owner}/{repo}/code-scanning/sarifs`.
+
+The API requires the SARIF to be **gzip-compressed and base64-encoded**,
+and the request must reference a real commit sha on a real branch.
+
+```bash
+export GH_TOKEN=ghp_...             # scopes: security_events (+ repo on private)
+export REPO=owner/name
+export SHA=$(git rev-parse HEAD)    # commit the findings apply to
+export REF=refs/heads/$(git rev-parse --abbrev-ref HEAD)
+export SARIF=prefix-diff.sarif
+
+# 1. Encode: gzip → base64 (single line, no wraps).
+ENCODED=$(gzip -c "$SARIF" | base64 -w0)
+
+# 2. Upload. Capture the sarif-id — you need it to poll status.
+RESPONSE=$(curl -sS -X POST \
+  -H "Authorization: Bearer $GH_TOKEN" \
+  -H "Accept: application/vnd.github+json" \
+  -H "X-GitHub-Api-Version: 2022-11-28" \
+  "https://api.github.com/repos/$REPO/code-scanning/sarifs" \
+  -d "$(jq -n --arg sha "$SHA" --arg ref "$REF" --arg s "$ENCODED" \
+        '{commit_sha:$sha, ref:$ref, sarif:$s, tool_name:"prefix-diff"}')")
+
+echo "$RESPONSE" | jq
+SARIF_ID=$(echo "$RESPONSE" | jq -r '.id')
+
+# 3. Poll processing status until it leaves "pending".
+while :; do
+  STATUS=$(curl -sS \
+    -H "Authorization: Bearer $GH_TOKEN" \
+    -H "Accept: application/vnd.github+json" \
+    "https://api.github.com/repos/$REPO/code-scanning/sarifs/$SARIF_ID" \
+    | jq -r '.processing_status')
+  echo "status=$STATUS"
+  [ "$STATUS" = "complete" ] && break
+  [ "$STATUS" = "failed" ]   && { echo "upload failed"; exit 1; }
+  sleep 3
+done
+```
+
+**Expected success:**
+
+```json
+{ "id": "abc123...", "url": "https://api.github.com/.../sarifs/abc123..." }
+```
+
+**Common failures.**
+
+| Response                                              | Cause                                                                       | Fix                                                                             |
+|-------------------------------------------------------|-----------------------------------------------------------------------------|---------------------------------------------------------------------------------|
+| `403 Resource not accessible by personal access token` | Token missing `security_events` (classic) or **Code scanning alerts=Write** (fine-grained). | Regenerate token with the correct scope (see *Token permissions and scopes*).   |
+| `422 commit_sha is not a valid commit`                | Sha isn't pushed to the remote, or is on a branch the token can't see.      | `git push` first, then re-run.                                                  |
+| `422 ref must be a fully-qualified ref`               | Passed `main` instead of `refs/heads/main`.                                 | Use `refs/heads/<branch>` or `refs/pull/<n>/head`.                              |
+| `413 Payload Too Large`                               | SARIF over 10 MB compressed.                                                | Split by tool/category, or trim results before upload.                          |
+| `processing_status: failed` with `errors: [...]`       | Structural SARIF problem GitHub caught after ingest.                        | Run `bun run scripts/validate-sarif.mjs <file>` locally to reproduce.           |
+
+Once `processing_status` is `complete`, the findings appear under
+**Security → Code scanning** for the specified `commit_sha` and category.
+
 ##### End-to-end CI snippet: upload SARIF, then verify the alerts in the same run
 
 The workflow below runs the prefix-diff, uploads the SARIF, and

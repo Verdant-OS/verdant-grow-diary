@@ -64,6 +64,17 @@ try {
 
 // Validator results: opt-in via BUILD_SUMMARY_VALIDATORS JSON so any
 // stage can register its outcome without this script hard-coding them.
+// Accept both our canonical set (pass|fail|skipped) and GitHub Actions
+// step outcomes (success|failure|cancelled|skipped) so validator rows
+// wired directly to `steps.<id>.outcome` render cleanly.
+function normalizeResult(raw) {
+  const v = String(raw ?? "").toLowerCase();
+  if (["pass", "success"].includes(v)) return "pass";
+  if (["fail", "failure", "cancelled"].includes(v)) return "fail";
+  if (v === "skipped") return "skipped";
+  return "unknown";
+}
+
 let validators = [];
 if (process.env.BUILD_SUMMARY_VALIDATORS) {
   try {

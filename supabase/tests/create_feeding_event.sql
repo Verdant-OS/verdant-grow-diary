@@ -166,12 +166,15 @@ DECLARE
   }'::jsonb;
   role_name TEXT; priv TEXT; expected BOOLEAN; got BOOLEAN;
 BEGIN
+  ASSERT to_regclass('public.feeding_events') IS NOT NULL,
+    'DIAGNOSTIC[missing-table]: public.feeding_events not found while checking table ACL';
   FOR role_name IN SELECT jsonb_object_keys(want) LOOP
     FOR priv IN SELECT jsonb_object_keys(want -> role_name) LOOP
       expected := ((want -> role_name) ->> priv)::boolean;
       got := has_table_privilege(role_name, 'public.feeding_events', priv);
       ASSERT got = expected,
-        format('feeding_events %s for %I: expected %s, got %s',
+        format('DIAGNOSTIC[table-acl-mismatch]: feeding_events %s for %I: expected=%s got=%s '
+               '(table present, ACL disagrees with trust-boundary contract)',
                priv, role_name, expected, got);
     END LOOP;
   END LOOP;

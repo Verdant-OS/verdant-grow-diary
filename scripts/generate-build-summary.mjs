@@ -73,7 +73,7 @@ if (process.env.BUILD_SUMMARY_VALIDATORS) {
         .filter((v) => v && typeof v.name === "string")
         .map((v) => ({
           name: String(v.name),
-          result: ["pass", "fail", "skipped"].includes(v.result) ? v.result : "unknown",
+          result: normalizeResult(v.result),
           detail: v.detail ? String(v.detail).slice(0, 500) : "",
         }));
     }

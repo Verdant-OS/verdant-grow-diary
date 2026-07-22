@@ -1799,6 +1799,183 @@ the workflow run and run the `jq -e` self-check in the "Sample SARIF
 output" section. A valid-but-empty SARIF means the diff itself found no
 drift — the upload path is fine, there's just nothing to show.
 
+##### PR annotations don't appear after upload
+
+The Security tab can show the alert while the **Files changed** tab
+shows no red gutter marker. That means the SARIF was accepted but
+GitHub couldn't (or wouldn't) attach it to this PR's diff. Walk this
+list top-to-bottom; each step includes a `curl`+`jq` check you can run
+without leaving the terminal.
+
+Set these once and reuse them in the snippets below:
+
+```bash
+export GH_TOKEN=ghp_...                       # scopes: repo, security_events
+export REPO=verdantgrower/verdant-grow-diary
+export PR=1234
+export SHA=$(gh pr view "$PR" --repo "$REPO" --json headRefOid -q .headRefOid)
+export API="https://api.github.com"
+export H_ACCEPT="Accept: application/vnd.github+json"
+export H_AUTH="Authorization: Bearer $GH_TOKEN"
+export H_VER="X-GitHub-Api-Version: 2022-11-28"
+```
+
+1. **The upload never actually happened on this SHA.**
+   Annotations attach to the exact commit the workflow ran on. If the
+   workflow ran on `main` (post-merge) instead of the PR head, no
+   annotations appear on the PR.
+
+   ```bash
+   # Latest analyses for this ref, newest first.
+   curl -sS -H "$H_ACCEPT" -H "$H_AUTH" -H "$H_VER" \
+     "$API/repos/$REPO/code-scanning/analyses?ref=refs/pull/$PR/head&per_page=5" \
+     | jq -r '.[] | [.created_at, .commit_sha, .category, .tool.name, .results_count] | @tsv'
+   ```
+
+   Fix: the top row's `commit_sha` must equal `$SHA`. If it doesn't,
+   the workflow didn't run on the PR head — re-run it on the PR
+   (`gh workflow run ... --ref refs/pull/$PR/head`) or push a new commit.
+
+2. **Fork PR: `security-events: write` is silently downgraded.**
+   GitHub blocks that permission for `pull_request` runs from forks.
+   The upload step is skipped with a warning, so nothing to annotate.
+
+   ```bash
+   curl -sS -H "$H_ACCEPT" -H "$H_AUTH" -H "$H_VER" \
+     "$API/repos/$REPO/pulls/$PR" \
+     | jq '{fork: .head.repo.fork, head_repo: .head.repo.full_name, base_repo: .base.repo.full_name}'
+   ```
+
+   Fix: expected behavior. Use `pull_request_target` (with care), or
+   wait for merge — annotations appear on the default-branch run.
+
+3. **SARIF has zero results (clean run).**
+   Upload succeeds, Code Scanning stores it, but there are no findings
+   to annotate.
+
+   ```bash
+   # From the local or downloaded SARIF:
+   jq '.runs[0].results | length' diff.sarif
+   # Or via API — last analysis's results_count:
+   curl -sS -H "$H_ACCEPT" -H "$H_AUTH" -H "$H_VER" \
+     "$API/repos/$REPO/code-scanning/analyses?ref=refs/pull/$PR/head&per_page=1" \
+     | jq '.[0] | {commit_sha, results_count, rules_count}'
+   ```
+
+   Fix: expected when there's no drift. Nothing to render.
+
+4. **All results are dismissed or auto-fixed on this branch.**
+   Dismissed alerts don't annotate PRs; fixed alerts don't either.
+
+   ```bash
+   curl -sS -H "$H_ACCEPT" -H "$H_AUTH" -H "$H_VER" \
+     "$API/repos/$REPO/code-scanning/alerts?ref=refs/pull/$PR/head&state=open&per_page=100" \
+     | jq -r '.[] | [.number, .rule.id, .state, .most_recent_instance.location.path] | @tsv'
+   ```
+
+   Fix: if this returns `[]` but the SARIF has results, they're all
+   `closed` (dismissed/fixed) — that's why no gutter markers. Reopen
+   in the UI or push a change that reintroduces the fingerprint.
+
+5. **`location.uri` doesn't match a file in the PR diff.**
+   GitHub only draws annotations on lines that actually appear in the
+   PR's changed files. Absolute paths, wrong casing, or files that
+   weren't touched → no gutter marker even though the alert exists.
+
+   ```bash
+   # (a) Paths GitHub sees on each alert:
+   curl -sS -H "$H_ACCEPT" -H "$H_AUTH" -H "$H_VER" \
+     "$API/repos/$REPO/code-scanning/alerts?ref=refs/pull/$PR/head&per_page=100" \
+     | jq -r '.[] | .most_recent_instance.location.path' | sort -u
+
+   # (b) Paths actually in the PR diff:
+   curl -sS -H "$H_ACCEPT" -H "$H_AUTH" -H "$H_VER" \
+     "$API/repos/$REPO/pulls/$PR/files?per_page=100" \
+     | jq -r '.[].filename' | sort -u
+
+   # (c) Diff them — anything only in (a) will never annotate this PR:
+   diff <(...paths from a...) <(...paths from b...)
+   ```
+
+   Fix: emit repo-relative POSIX paths in `physicalLocation.artifactLocation.uri`
+   (no leading `/`, no `C:\`, exact casing). `bun run validate:sarif`
+   warns on absolute paths for this reason.
+
+6. **`region.startLine` points outside the diff hunk.**
+   The file is in the PR but the annotated line wasn't changed, so the
+   marker collapses into the file header instead of appearing inline.
+
+   ```bash
+   # For each alert, show its line and check if the PR patch touched it:
+   curl -sS -H "$H_ACCEPT" -H "$H_AUTH" -H "$H_VER" \
+     "$API/repos/$REPO/code-scanning/alerts?ref=refs/pull/$PR/head&per_page=100" \
+     | jq -r '.[] | [.number, .most_recent_instance.location.path,
+                     .most_recent_instance.location.start_line] | @tsv'
+   ```
+
+   Fix: expected — expand the file in **Files changed** to see the
+   marker, or scope the SARIF to lines inside the hunk.
+
+7. **Wrong `category:` in `upload-sarif`, or category changed between runs.**
+   Alerts are keyed on `(tool, category, ref)`. A new category creates
+   a parallel alert stream that may not surface where you're looking.
+
+   ```bash
+   curl -sS -H "$H_ACCEPT" -H "$H_AUTH" -H "$H_VER" \
+     "$API/repos/$REPO/code-scanning/analyses?ref=refs/pull/$PR/head&per_page=10" \
+     | jq -r '.[] | [.created_at, .category, .commit_sha[:7], .results_count] | @tsv'
+   ```
+
+   Fix: pick one stable category per environment
+   (`prefix-diff-sandbox`, `prefix-diff-live`) and don't rename it.
+
+8. **Code scanning disabled or permission missing.**
+   The upload step would have failed loudly, but it's worth confirming
+   before chasing SARIF shape.
+
+   ```bash
+   # 404 => code scanning not enabled or token lacks security_events.
+   curl -sS -o /dev/null -w "%{http_code}\n" \
+     -H "$H_ACCEPT" -H "$H_AUTH" -H "$H_VER" \
+     "$API/repos/$REPO/code-scanning/alerts?per_page=1"
+   ```
+
+   Fix: `404` → enable at **Settings → Code security → Code scanning**,
+   and ensure the workflow has `permissions: security-events: write`.
+   `403` → PAT is missing the `security_events` scope.
+
+9. **Browser cached the Files-changed view.**
+   The alert is attached, the analysis is fresh, but you're looking at
+   a stale render.
+
+   ```bash
+   # Confirm the analysis is newer than your tab:
+   curl -sS -H "$H_ACCEPT" -H "$H_AUTH" -H "$H_VER" \
+     "$API/repos/$REPO/code-scanning/analyses?ref=refs/pull/$PR/head&per_page=1" \
+     | jq -r '.[0].created_at'
+   ```
+
+   Fix: hard-reload (Cmd/Ctrl-Shift-R) on the **Files changed** tab.
+
+**One-shot health check.**
+
+If you don't know which of the above applies, run this and read the
+output top-to-bottom — it answers steps 1, 3, 4, and 7 in one call:
+
+```bash
+curl -sS -H "$H_ACCEPT" -H "$H_AUTH" -H "$H_VER" \
+  "$API/repos/$REPO/code-scanning/analyses?ref=refs/pull/$PR/head&per_page=5" \
+  | jq --arg sha "$SHA" '
+      map({created_at, commit_sha, category, tool: .tool.name,
+           results_count, matches_pr_head: (.commit_sha == $sha)})'
+```
+
+If no row has `matches_pr_head: true`, you're in case 1. If the
+matching row has `results_count: 0`, case 3. If it's non-zero but the
+PR shows nothing, jump to cases 4–6.
+
+
+
 
 Rule catalog (always present in the SARIF `tool.driver.rules`, even on
 clean runs):

@@ -118,7 +118,7 @@ export async function loadPhenoHuntCandidates(
   const { data: plantRows, error: plantsError } = await phenoDb
     .from("plants")
     .select(
-      "id, name, candidate_label, candidate_number, strain, stage, grow_id, tent_id, photo_url, is_archived",
+      "id, name, candidate_label, candidate_number, strain, stage, plant_type, grow_id, tent_id, photo_url, is_archived",
     )
     .eq("pheno_hunt_id", id)
     .eq("is_archived", false);
@@ -417,7 +417,7 @@ export async function loadPhenoHuntCandidatePage(
   let query = phenoDb
     .from("plants")
     .select(
-      "id, name, candidate_label, candidate_number, strain, stage, grow_id, tent_id, photo_url, is_archived",
+      "id, name, candidate_label, candidate_number, strain, stage, plant_type, grow_id, tent_id, photo_url, is_archived",
       { count: "exact" },
     )
     .eq("pheno_hunt_id", id)

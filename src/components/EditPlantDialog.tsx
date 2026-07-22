@@ -113,6 +113,7 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
     tent_id: plant.tentId ?? "none",
     started_at: plant.startedAt ? plant.startedAt.slice(0, 10) : "",
     last_note: plant.lastNote ?? "",
+    plant_type: plant.plantType ?? "unknown",
   });
 
   function resetLocalPhotoState() {
@@ -133,6 +134,7 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
         tent_id: plant.tentId ?? "none",
         started_at: plant.startedAt ? plant.startedAt.slice(0, 10) : "",
         last_note: plant.lastNote ?? "",
+        plant_type: plant.plantType ?? "unknown",
       });
       resetLocalPhotoState();
     } else {
@@ -200,6 +202,7 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
       health: form.health,
       tent_id: form.tent_id === "none" ? null : form.tent_id,
       last_note: form.last_note.trim() || null,
+      plant_type: form.plant_type,
     };
     if (newReference) {
       payload.photo_url = newReference;
@@ -523,6 +526,26 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
                 </SelectContent>
               </Select>
             </div>
+          </div>
+          <div>
+            <Label>Type</Label>
+            <Select
+              value={form.plant_type}
+              onValueChange={(v) => setForm({ ...form, plant_type: v })}
+            >
+              <SelectTrigger data-testid="edit-plant-type-select">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="unknown">Not sure</SelectItem>
+                <SelectItem value="autoflower">Autoflower</SelectItem>
+                <SelectItem value="photoperiod">Photoperiod</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Autoflower vs photoperiod — keeps AI guidance gentle and pheno
+              comparisons honest.
+            </p>
           </div>
           <div>
             <Label>Started at</Label>

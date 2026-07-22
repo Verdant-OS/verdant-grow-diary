@@ -38,6 +38,8 @@ export interface PhenoHuntCandidatePlantRow {
   tent_id: string | null;
   photo_url: string | null;
   is_archived: boolean;
+  /** Declared plant type (plants.plant_type). Optional for older stubs. */
+  plant_type?: string | null;
 }
 
 /** Optional grower-recorded score card (pheno_candidate_scores). */
@@ -231,6 +233,7 @@ export function adaptPhenoHuntCandidates(
       plantLabel: cleanLabel(p.name),
       strain: cleanLabel(p.strain),
       stage,
+      plantType: cleanLabel(p.plant_type ?? null),
       growLabel: p.grow_id ? (growNames[p.grow_id] ?? null) : null,
       tentLabel: p.tent_id ? (tentNames[p.tent_id] ?? null) : null,
       requireEcPh: requireFull,

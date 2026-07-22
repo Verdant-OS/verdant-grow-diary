@@ -31,6 +31,8 @@ export interface Plant {
   medium?: string | null;
   /** Container / pot size when recorded on the plant profile (e.g. "3 gal"). */
   potSize?: string | null;
+  /** Declared plant type: autoflower | photoperiod | unknown. Never inferred. */
+  plantType?: string | null;
 }
 
 /**

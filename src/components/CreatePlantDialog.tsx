@@ -76,6 +76,8 @@ export default function CreatePlantDialog({
     stage: "seedling",
     health: "healthy",
     started_at: "",
+    // "unknown" = Not sure. Deliberately never defaults to photoperiod.
+    plant_type: "unknown",
   });
 
   async function submit(e: React.FormEvent) {
@@ -99,6 +101,7 @@ export default function CreatePlantDialog({
       strain: trimmedStrain || null,
       stage: form.stage,
       health: form.health,
+      plant_type: form.plant_type,
     };
     if (form.tent_id && form.tent_id !== "none") payload.tent_id = form.tent_id;
     // Preselect grow context when provided. RLS enforces ownership server-side.
@@ -135,6 +138,7 @@ export default function CreatePlantDialog({
       stage: "seedling",
       health: "healthy",
       started_at: "",
+      plant_type: "unknown",
     });
     setOpen(false);
     if (data && onCreated) onCreated(data as { id: string; name: string });
@@ -184,6 +188,25 @@ export default function CreatePlantDialog({
                 ))}
               </SelectContent>
             </Select>
+          </div>
+          <div>
+            <Label>Type (optional)</Label>
+            <Select
+              value={form.plant_type}
+              onValueChange={(v) => setForm({ ...form, plant_type: v })}
+            >
+              <SelectTrigger data-testid="create-plant-type-select">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="unknown">Not sure</SelectItem>
+                <SelectItem value="autoflower">Autoflower</SelectItem>
+                <SelectItem value="photoperiod">Photoperiod</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Helps AI Doctor stay gentle and keeps pheno comparisons honest.
+            </p>
           </div>
           <div>
             <div className="flex items-center justify-between mb-1">

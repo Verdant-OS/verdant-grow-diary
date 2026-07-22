@@ -167,6 +167,7 @@ export function mapPlantRow(row: PlantRow): Plant {
     isArchived: Boolean(row.is_archived ?? false),
     medium: cleanPlantString(row.medium),
     potSize: cleanPlantString(row.pot_size),
+    plantType: cleanPlantString((row as { plant_type?: string | null }).plant_type),
   };
 }
 

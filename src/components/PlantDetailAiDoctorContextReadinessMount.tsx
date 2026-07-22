@@ -32,6 +32,8 @@ export interface PlantDetailAiDoctorContextReadinessMountProps {
   plantName?: string | null;
   strain?: string | null;
   stage?: string | null;
+  /** Declared plant type (autoflower / photoperiod / unknown). Never inferred. */
+  plantType?: string | null;
   /**
    * Optional pass-through for growing medium. The Plant Detail data
    * source (`useGrowPlant` / `plants` table) does NOT yet expose this
@@ -74,6 +76,7 @@ export default function PlantDetailAiDoctorContextReadinessMount({
   stage,
   medium,
   potSize,
+  plantType,
 }: PlantDetailAiDoctorContextReadinessMountProps) {
   const recentActivity = usePlantRecentActivity(plantId);
   const manualLogs = usePlantManualSensorLogs(plantId);
@@ -93,8 +96,9 @@ export default function PlantDetailAiDoctorContextReadinessMount({
       // No inference: undefined stays unknown on the context payload.
       medium: medium ?? null,
       pot_size: potSize ?? null,
+      plant_type: plantType ?? null,
     }),
-    [plantId, plantName, strain, stage, growId, tentId, medium, potSize],
+    [plantId, plantName, strain, stage, growId, tentId, medium, potSize, plantType],
   );
 
   const built = useMemo(() => {

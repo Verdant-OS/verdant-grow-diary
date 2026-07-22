@@ -515,6 +515,7 @@ export default function PlantDetail() {
         stage={plant.stage ?? null}
         medium={plant.medium ?? null}
         potSize={plant.potSize ?? null}
+        plantType={plant.plantType ?? null}
       />
       <PlantDetailTimelineEvidenceReadinessLaunch
         plantId={plant.id}

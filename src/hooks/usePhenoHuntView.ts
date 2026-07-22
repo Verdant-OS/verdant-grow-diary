@@ -158,10 +158,10 @@ export function usePhenoHuntView(huntId: string | null | undefined): UsePhenoHun
       // Aroma = the smoke test's flavor descriptors (post-cure — where flavor
       // is earned, per the Loud ruling). Descriptive only, never scored.
       aroma: coerceDescriptors(ws.smokeByPlant[c.candidateId]?.flavorDescriptors),
-      // Comparability inputs (autoflower/photoperiod plan): stage flows now;
-      // plantType flows once plants.plant_type ships — absent = unknown.
+      // Comparability inputs (autoflower/photoperiod plan): declared type +
+      // stage from the plants row — absent = unknown, never inferred.
       stage: c.stage ?? null,
-      plantType: (c as { plantType?: string | null }).plantType ?? null,
+      plantType: c.plantType ?? null,
     }));
 
     const labelBySourcePlant = new Map<string, string>();

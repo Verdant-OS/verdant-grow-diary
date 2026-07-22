@@ -30,7 +30,7 @@
     "src/lib/cost/aiDoctorProviderResponseMeasurementComposer.ts": "3c67c24f251cb0e12a72c10ca57f3854047c51d752ea3e06f4c2e1ba38e6385a",
     "src/lib/piIngestBridgeOwnerScopeRules.ts": "6eb5e282d16ac06aa75cf8165005da15c6ecd6eadd49a68543737dd3423915fb",
     "src/lib/piIngestBridgeTentScopeRules.ts": "0bdde0ff025de131b7577f2e755ea545e195a464e3be8051070a59cdcd53541c",
-    "src/integrations/supabase/types.ts": "a6a887e5b34979551564708eba9900e9721267bafb25be0bd0ce865ad250d4c8",
+    "src/integrations/supabase/types.ts": "639792aaeca6b7fec92832fe220c50cd3f32bf10fea9715e3768a8ca8bd38872",
     "src/lib/vpdRules.ts": "85005edca6ce5ba8d70466f3f441338f012f2c1ad96081d8a7508e3423532dea",
     "src/lib/piIngestPipeline.ts": "0ca7010a18dd01abf2e8c7afe6b2bef1f57f2f85ec6568668496dacf783f2ee2",
     "src/lib/piIngestInsertPlanRules.ts": "981c1c7fee9bb438707fe65f068f659a8a2e5c747364525801ce5fa05e313e42",

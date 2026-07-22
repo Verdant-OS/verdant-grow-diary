@@ -69,6 +69,8 @@ export interface PhenoCandidateInput {
   readonly plantLabel?: string | null;
   readonly strain?: string | null;
   readonly stage?: string | null;
+  /** Declared plant type (autoflower / photoperiod / unknown). Never inferred. */
+  readonly plantType?: string | null;
   readonly quickLogEntries?: readonly PhenoQuickLogEntryInput[] | null;
   readonly timelineEvents?: readonly PhenoTimelineEventInput[] | null;
   readonly photos?: readonly PhenoPhotoInput[] | null;

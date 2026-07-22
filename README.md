@@ -708,7 +708,77 @@ the offending migration file:
     category: money-migration-drift
 ```
 
+##### Required GitHub settings and permissions for SARIF upload
+
+Before the workflow's SARIF ever reaches the Security tab, the repo,
+workflow, and (for org repos) organization all need to be configured to
+accept it. Verify these once per repo — most "empty Security tab" bugs
+come from one of the rows below being missing.
+
+**Repository settings** — repo → **Settings**.
+
+| Setting                                                      | Location                                                         | Required value                                                                                          |
+|--------------------------------------------------------------|------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------|
+| Code scanning enabled                                        | **Settings → Code security → Code scanning**                     | Enabled. Free on public repos; on private repos it requires GitHub Advanced Security (GHAS).            |
+| Actions enabled for the repo                                 | **Settings → Actions → General → Actions permissions**           | *Allow all actions and reusable workflows* (or an allow-list that includes `github/codeql-action/*`).   |
+| Workflow token permissions default                           | **Settings → Actions → General → Workflow permissions**          | *Read repository contents and packages permissions* (the per-workflow `permissions:` block widens it).  |
+| Fork PRs allowed to run workflows (only if you accept forks) | **Settings → Actions → General → Fork pull request workflows**   | *Require approval for first-time contributors* (default). SARIF upload from forks is blocked by design. |
+| Default branch matches your `on:` triggers                   | **Settings → General → Default branch**                          | Must be one of the branches your workflow runs on, or PR annotations won't attach to the base branch.   |
+
+**Workflow YAML permissions** — required in the workflow that calls
+`github/codeql-action/upload-sarif@v3`. Add at either workflow or job
+scope; job scope is safer.
+
+```yaml
+permissions:
+  contents: read           # checkout
+  security-events: write   # upload-sarif → Security tab
+  actions: read            # required for private repos so upload-sarif can read the run
+  pull-requests: write     # optional; only if you also post PR comments from summarize-prefix-diff-json.mjs
+```
+
+- `security-events: write` is the one that unlocks Code scanning. Without
+  it `upload-sarif` fails with `Resource not accessible by integration`.
+- `actions: read` is only required on **private** repos; public repos
+  work without it but adding it is harmless.
+- If you use a reusable workflow, the caller must also declare
+  `security-events: write` — permissions do not inherit upward.
+
+**Organization settings** — only relevant if the repo is inside an org
+(**Organization → Settings**).
+
+| Setting                                                     | Location                                                                             | Required value                                                                                          |
+|-------------------------------------------------------------|--------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------|
+| GitHub Advanced Security enabled (private repos only)       | **Organization → Settings → Code security → Global settings → GitHub Advanced Security** | Enabled for the repo, or Code scanning is unavailable. Public repos do not need GHAS.                   |
+| Code scanning not blocked at org level                      | **Organization → Settings → Code security → Global settings → Code scanning default setup** | *Not disabled* for this repo. Org-wide disable overrides repo enable.                                   |
+| Actions permission policy allows `github/codeql-action/*`   | **Organization → Settings → Actions → General → Policies**                            | *Allow all actions* or an allow-list that includes `github/codeql-action/*`.                            |
+| `GITHUB_TOKEN` default permissions not restricted below `read` | **Organization → Settings → Actions → General → Workflow permissions**            | Must allow the per-workflow `permissions:` block to grant `security-events: write`.                     |
+
+**Account / caller permissions.**
+
+| Actor                           | Required permission                                                                                    |
+|---------------------------------|--------------------------------------------------------------------------------------------------------|
+| You (viewing findings)          | **Read** on the repo is enough to view Code scanning alerts. **Write** is required to dismiss them.    |
+| The workflow's `GITHUB_TOKEN`   | Automatic — the `permissions:` block above grants it. No PAT or app installation required.             |
+| Fork contributors               | Cannot upload SARIF from a `pull_request` event. Use `pull_request_target` or wait until merge.        |
+| Dependabot PRs                  | Same restriction as forks — SARIF upload is skipped. Findings attach on the follow-up `push` to main.  |
+
+**Fast preflight checklist.** Before debugging an empty Security tab,
+confirm all four:
+
+- [ ] Repo has **Settings → Code security → Code scanning** enabled.
+- [ ] Workflow job declares `permissions: security-events: write`.
+- [ ] The run was triggered by `push` or `pull_request` on a branch you
+      have permission to see (not a fork PR).
+- [ ] `upload-sarif` step logs `SARIF upload complete` (not `Resource
+      not accessible` or `Invalid SARIF file`).
+
+If all four are true and findings still don't show, jump to the
+*Security tab looks empty (GitHub UI gotchas)* table below — the cause
+is almost always a filter/scope mismatch in the UI.
+
 ##### Verifying uploaded findings in GitHub code scanning
+
 
 After the workflow finishes (green **or** red — `upload-sarif` runs under
 `if: always()`), confirm the findings actually landed. Do the checks in

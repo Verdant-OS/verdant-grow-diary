@@ -8,7 +8,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 
 const ROOT = resolve(__dirname, "..", "..");
 const FUNCTIONS = join(ROOT, "supabase", "functions");
@@ -24,8 +24,7 @@ function walk(dir: string): string[] {
   return out;
 }
 
-const IMPORT_RE =
-  /(?:^|\n)\s*(?:import|export)(?:\s+[\s\S]*?\s+from)?\s*["']([^"']+)["']/g;
+const IMPORT_RE = /(?:^|\n)\s*(?:import|export)(?:\s+[\s\S]*?\s+from)?\s*["']([^"']+)["']/g;
 
 function specifiersOf(src: string): string[] {
   const out: string[] = [];
@@ -35,10 +34,7 @@ function specifiersOf(src: string): string[] {
 
 describe("edge functions: no direct src/lib reach", () => {
   const files = walk(FUNCTIONS).filter(
-    (f) =>
-      f.endsWith(".ts") &&
-      !f.startsWith(MIRROR + require("node:path").sep) &&
-      f !== MIRROR,
+    (f) => f.endsWith(".ts") && !f.startsWith(MIRROR + sep) && f !== MIRROR,
   );
 
   it("finds at least one edge-function .ts file", () => {

@@ -160,6 +160,59 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     expect(args.p_details).not.toHaveProperty("user_id");
   });
 
+  it("Defoliation → quicklog_save_event carries amount + canopy area in p_details (with subtype fence)", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: { ok: true, grow_event_id: "e-defol" },
+      error: null,
+    });
+    mountSection();
+    selectActivity("defoliation");
+    await screen.findByTestId("quick-log-all-activities-form");
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-detail-amount"), {
+      target: { value: "moderate" },
+    });
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-detail-canopyArea"), {
+      target: { value: "lower" },
+    });
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-note"), {
+      target: { value: "cleared lower fan leaves" },
+    });
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
+
+    await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(1));
+    const [rpcName, args] = rpcMock.mock.calls[0];
+    expect(rpcName).toBe("quicklog_save_event");
+    expect(args.p_event_type).toBe("training"); // defoliation persists as training + subtype
+    expect(args.p_details).toMatchObject({
+      subtype: "defoliation",
+      amount: "moderate",
+      canopyArea: "lower",
+    });
+  });
+
+  it("Photo → quicklog_save_event carries subject + caption in p_details", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: { ok: true, grow_event_id: "e-photo" },
+      error: null,
+    });
+    mountSection();
+    selectActivity("photo");
+    await screen.findByTestId("quick-log-all-activities-form");
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-detail-subject"), {
+      target: { value: "buds" },
+    });
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-detail-caption"), {
+      target: { value: "day 40 flower" },
+    });
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
+
+    await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(1));
+    const [rpcName, args] = rpcMock.mock.calls[0];
+    expect(rpcName).toBe("quicklog_save_event");
+    expect(args.p_event_type).toBe("photo");
+    expect(args.p_details).toMatchObject({ subject: "buds", caption: "day 40 flower" });
+  });
+
   it("Training drops an unchosen (blank) technique — no technique key in p_details", async () => {
     rpcMock.mockResolvedValueOnce({
       data: { ok: true, grow_event_id: "e-train2" },

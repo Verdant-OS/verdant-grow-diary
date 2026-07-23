@@ -84,6 +84,71 @@ export const QUICK_LOG_ACTIVITY_DETAIL_FIELDS: Partial<
       ],
     },
   ],
+  // Records what the grower removed — a description of the action, not a claim
+  // about recovery, stress, or plant health.
+  defoliation: [
+    {
+      key: "amount",
+      label: "Amount removed",
+      kind: "select",
+      options: [
+        { value: "light", label: "Light" },
+        { value: "moderate", label: "Moderate" },
+        { value: "heavy", label: "Heavy" },
+      ],
+    },
+    {
+      key: "canopyArea",
+      label: "Canopy area",
+      kind: "select",
+      options: [
+        { value: "upper", label: "Upper canopy" },
+        { value: "middle", label: "Middle canopy" },
+        { value: "lower", label: "Lower canopy" },
+        { value: "inner", label: "Inner / lollipop" },
+        { value: "whole", label: "Whole plant" },
+      ],
+    },
+  ],
+  // Describes what the photo is OF. Neutral anatomical subjects only — never a
+  // judgement about the plant's condition (that stays the grower's, in the note).
+  photo: [
+    {
+      key: "subject",
+      label: "Subject",
+      kind: "select",
+      options: [
+        { value: "whole_plant", label: "Whole plant" },
+        { value: "leaves", label: "Leaves" },
+        { value: "buds", label: "Buds / flower" },
+        { value: "trichomes", label: "Trichomes / macro" },
+        { value: "roots", label: "Roots" },
+        { value: "stem", label: "Stem / node" },
+        { value: "setup", label: "Setup / environment" },
+        { value: "other", label: "Other" },
+      ],
+    },
+    {
+      key: "caption",
+      label: "Caption",
+      kind: "text",
+      placeholder: "What this photo shows",
+    },
+  ],
+  // A note stays freeform; the tag is only a light, optional way to file it.
+  note: [
+    {
+      key: "noteTag",
+      label: "Tag",
+      kind: "select",
+      options: [
+        { value: "general", label: "General" },
+        { value: "reminder", label: "Reminder" },
+        { value: "change", label: "Change made" },
+        { value: "question", label: "Question" },
+      ],
+    },
+  ],
 });
 
 export function getQuickLogActivityDetailFields(

@@ -40,8 +40,33 @@ describe("quickLogActivityDetailFields — training technique spec", () => {
   });
 
   it("returns no fields for activities without a detail slice yet", () => {
-    expect(getQuickLogActivityDetailFields("note")).toEqual([]);
-    expect(getQuickLogActivityDetailFields("photo")).toEqual([]);
+    // The two doctrine-cardinal activities are intentionally still note-only
+    // until their field options are confirmed.
+    expect(getQuickLogActivityDetailFields("issue_observation")).toEqual([]);
+    expect(getQuickLogActivityDetailFields("environment_check")).toEqual([]);
+  });
+
+  it("exposes doctrine-safe detail fields for defoliation, photo, and note", () => {
+    expect(getQuickLogActivityDetailFields("defoliation").map((f) => f.key)).toEqual([
+      "amount",
+      "canopyArea",
+    ]);
+    expect(getQuickLogActivityDetailFields("photo").map((f) => f.key)).toEqual([
+      "subject",
+      "caption",
+    ]);
+    expect(getQuickLogActivityDetailFields("note").map((f) => f.key)).toEqual(["noteTag"]);
+  });
+
+  it("keeps every option label across all activities free of diagnosis/recommendation language", () => {
+    const banned = /(should|recommend|diagnos|deficien|healthy|unhealthy|cure|treat|toxic|burn)/i;
+    for (const specs of Object.values(QUICK_LOG_ACTIVITY_DETAIL_FIELDS)) {
+      for (const spec of specs ?? []) {
+        for (const opt of spec.options ?? []) {
+          expect(opt.label, `option ${opt.value}`).not.toMatch(banned);
+        }
+      }
+    }
   });
 });
 
@@ -76,9 +101,30 @@ describe("sanitizeQuickLogActivityDetails", () => {
   });
 
   it("returns null for activities without a detail slice and for empty input", () => {
-    expect(sanitizeQuickLogActivityDetails("note", { technique: "lst" })).toBeNull();
+    expect(sanitizeQuickLogActivityDetails("issue_observation", { foo: "bar" })).toBeNull();
     expect(sanitizeQuickLogActivityDetails("training", null)).toBeNull();
     expect(sanitizeQuickLogActivityDetails("training", {})).toBeNull();
+  });
+
+  it("sanitizes multi-field activities, keeping only valid values", () => {
+    expect(
+      sanitizeQuickLogActivityDetails("defoliation", {
+        amount: "moderate",
+        canopyArea: "lower",
+        bogus: "x",
+      }),
+    ).toEqual({ amount: "moderate", canopyArea: "lower" });
+    // out-of-set amount dropped, valid area kept
+    expect(
+      sanitizeQuickLogActivityDetails("defoliation", { amount: "nuclear", canopyArea: "upper" }),
+    ).toEqual({ canopyArea: "upper" });
+  });
+
+  it("accepts free-text caption on photo and caps its length", () => {
+    const long = "x".repeat(500);
+    const out = sanitizeQuickLogActivityDetails("photo", { subject: "buds", caption: long });
+    expect(out?.subject).toBe("buds");
+    expect((out?.caption ?? "").length).toBe(QUICK_LOG_DETAIL_TEXT_MAX);
   });
 });
 

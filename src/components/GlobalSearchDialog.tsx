@@ -596,7 +596,20 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
               </>
             )}
           </CommandList>
+            </CommandList>
+            {hasQuery && !isLoading && !isError ? (
+              <GlobalSearchResultPreview
+                row={previewRow}
+                routePath={previewRow ? routeFor(previewRow) : null}
+                query={query}
+                onOpen={() => {
+                  if (previewRow) handleSelectResult(previewRow);
+                }}
+              />
+            ) : null}
+          </div>
         </CommandPrimitive>
+
       </DialogContent>
     </Dialog>
   );

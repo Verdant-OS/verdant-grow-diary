@@ -110,24 +110,20 @@ jobs:
           bun run build
           git diff --check
 
-      - name: Commit only permanent repairs and remove helper workflow
+      - name: Commit only permanent repairs
         shell: bash
         run: |
           set -euo pipefail
-          rm .github/workflows/repair-repo-ci-green-once.yml
-
           git add \
             .github/workflows/deployment-preview.yml \
             .github/workflows/prefix-diff-sarif.yml \
             src/test/release-workbook-formula-snapshots.test.ts \
             src/lib/growAdapters.test.ts \
             src/test/edge-shared-mirror-static-safety.test.ts
-          git add -u .github/workflows/repair-repo-ci-green-once.yml
 
           printf '%s\n' \
             '.github/workflows/deployment-preview.yml' \
             '.github/workflows/prefix-diff-sarif.yml' \
-            '.github/workflows/repair-repo-ci-green-once.yml' \
             'src/lib/growAdapters.test.ts' \
             'src/test/edge-shared-mirror-static-safety.test.ts' \
             'src/test/release-workbook-formula-snapshots.test.ts' \

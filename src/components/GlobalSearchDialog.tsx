@@ -595,7 +595,6 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
                 ) : null}
               </>
             )}
-          </CommandList>
             </CommandList>
             {hasQuery && !isLoading && !isError ? (
               <GlobalSearchResultPreview

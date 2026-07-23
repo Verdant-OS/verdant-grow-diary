@@ -427,6 +427,30 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
                     </CommandGroup>
                   );
                 })}
+                {canShowMore ? (
+                  <div
+                    className="flex flex-col items-center gap-1 border-t px-3 py-3"
+                    data-testid="global-search-show-more-wrapper"
+                  >
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        setVisibleCount((n) =>
+                          Math.min(results.length, n + PAGE_SIZE),
+                        )
+                      }
+                      data-testid="global-search-show-more"
+                    >
+                      Show {Math.min(PAGE_SIZE, remaining)} more
+                    </Button>
+                    <span className="text-[11px] text-muted-foreground tabular-nums">
+                      {remaining} more{" "}
+                      {remaining === 1 ? "result" : "results"} available
+                    </span>
+                  </div>
+                ) : null}
               </>
             )}
           </CommandList>

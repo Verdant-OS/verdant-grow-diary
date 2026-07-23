@@ -42,6 +42,7 @@ import {
   DEFAULT_FILTERS,
   readGlobalSearchSession,
   writeGlobalSearchSession,
+  clearGlobalSearchSession,
   readGlobalSearchHistory,
   pushGlobalSearchHistory,
   clearGlobalSearchHistory,
@@ -240,6 +241,20 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
   const handleClearHistory = () => {
     clearGlobalSearchHistory();
     setHistory([]);
+  };
+
+  // Nuke everything the palette remembers for this session: resumed
+  // query + filter toggles (sessionStorage), replayable history entries,
+  // and the localStorage "recent searches" list. Also resets the live UI
+  // state back to defaults so the user sees a clean slate immediately.
+  const handleClearAllSearchState = () => {
+    clearGlobalSearchSession();
+    clearGlobalSearchHistory();
+    clearRecentSearches();
+    setHistory([]);
+    setRecent([]);
+    setQuery("");
+    setEnabledTypes({ ...DEFAULT_FILTERS });
   };
 
 
@@ -469,10 +484,22 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
                       </div>
                     </CommandGroup>
                   ) : null}
+                  <div className="flex justify-center border-t border-border/40 px-2 pb-2 pt-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={handleClearAllSearchState}
+                      data-testid="global-search-clear-all"
+                      className="h-7 text-xs text-muted-foreground hover:text-destructive"
+                    >
+                      Clear search history
+                    </Button>
+                  </div>
                 </>
               ) : (
-                <div className="py-6 text-center text-sm text-muted-foreground">
-                  Type to search your grows, tents, plants, and cultivars.
+                <div className="flex flex-col items-center gap-3 py-6 text-center text-sm text-muted-foreground">
+                  <p>Type to search your grows, tents, plants, and cultivars.</p>
                 </div>
               )
             ) : isLoading ? (

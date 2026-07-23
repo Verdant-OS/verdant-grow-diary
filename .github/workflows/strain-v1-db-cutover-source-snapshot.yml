@@ -1,0 +1,41 @@
+name: Strain V1 database cutover source snapshot
+
+on:
+  push:
+    branches:
+      - release/strain-v1-db-cutover
+    paths:
+      - .github/workflows/strain-v1-db-cutover-source-snapshot.yml
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Create source snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/source-snapshot
+          tar \
+            --exclude=.git \
+            --exclude=node_modules \
+            --exclude=dist \
+            --exclude=artifacts \
+            -czf artifacts/source-snapshot/verdant-strain-v1-db-cutover-source.tgz .
+          sha256sum artifacts/source-snapshot/verdant-strain-v1-db-cutover-source.tgz \
+            > artifacts/source-snapshot/sha256.txt
+
+      - name: Upload source snapshot
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: verdant-strain-v1-db-cutover-source
+          path: artifacts/source-snapshot/
+          if-no-files-found: error
+          retention-days: 3

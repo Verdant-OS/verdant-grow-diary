@@ -8,12 +8,19 @@ on:
       - .github/workflows/qa-fake-account-live-once.yml
       - playwright.qa-fake-account.config.ts
       - e2e/qa-fake-account-live.spec.ts
+  pull_request:
+    branches:
+      - verdant-grow-diary
+    paths:
+      - .github/workflows/qa-fake-account-live-once.yml
+      - playwright.qa-fake-account.config.ts
+      - e2e/qa-fake-account-live.spec.ts
 
 permissions:
   contents: read
 
 concurrency:
-  group: qa-fake-account-live-20260723
+  group: qa-fake-account-live-20260723-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: false
 
 jobs:

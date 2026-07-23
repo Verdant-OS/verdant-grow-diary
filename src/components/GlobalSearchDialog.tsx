@@ -31,6 +31,7 @@ import {
   type GlobalSearchResult,
 } from "@/hooks/useGlobalSearch";
 import { growDetailPath, plantDetailPath, tentDetailPath } from "@/lib/routes";
+import { highlightMatch } from "@/lib/highlightMatch";
 
 interface Props {
   open: boolean;

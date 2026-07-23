@@ -14,7 +14,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Command as CommandPrimitive } from "cmdk";
-import { AlertTriangle, Clock, Dna, Leaf, RefreshCw, Sprout, Tent, X } from "lucide-react";
+import { AlertTriangle, Clock, Dna, Leaf, NotebookPen, RefreshCw, SearchX, Sprout, Tent, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -259,7 +259,38 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
                   </div>
                 ) : null}
                 {!hasAny && !isError ? (
-                  <CommandEmpty>No matches for that search.</CommandEmpty>
+                  <CommandEmpty className="py-6">
+                    <div
+                      className="mx-auto flex max-w-xs flex-col items-center gap-3 text-center"
+                      data-testid="global-search-empty"
+                    >
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                        <SearchX className="h-5 w-5" aria-hidden="true" />
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium text-foreground">
+                          No matches for “{trimmed}”
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Nothing in your grows, tents, plants, or the cultivar
+                          library matched. Log what’s happening in the tent
+                          instead — that’s how Verdant learns.
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => {
+                          onOpenChange(false);
+                          navigate("/quick-log");
+                        }}
+                        data-testid="global-search-empty-quicklog"
+                      >
+                        <NotebookPen className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                        Start a Quick Log
+                      </Button>
+                    </div>
+                  </CommandEmpty>
                 ) : null}
                 {GROUP_ORDER.map((type) => {
                   const rows = grouped[type];

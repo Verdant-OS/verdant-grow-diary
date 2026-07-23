@@ -7,6 +7,7 @@
 import { useEffect } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import BrandLogo from "@/components/BrandLogo";
+import CultivarBlueprintCrossSell from "@/components/CultivarBlueprintCrossSell";
 import CultivarFollowButton from "@/components/CultivarFollowButton";
 import CultivarPhenoSampleModule from "@/components/CultivarPhenoSampleModule";
 import CultivarQaPanel from "@/components/CultivarQaPanel";
@@ -357,6 +358,8 @@ export default function CultivarPage() {
         </section>
 
         <CultivarQaPanel cultivar={cultivar} />
+
+        <CultivarBlueprintCrossSell cultivar={cultivar} />
 
         <section className="mt-10 rounded-xl border border-primary/30 bg-primary/5 p-5">
           <h2 className="font-display text-xl font-semibold">

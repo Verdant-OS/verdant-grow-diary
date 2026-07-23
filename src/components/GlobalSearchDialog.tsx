@@ -91,6 +91,7 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
   );
   const [recent, setRecent] = useState<string[]>([]);
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
+  const [previewRow, setPreviewRow] = useState<GlobalSearchResult | null>(null);
   const [enabledTypes, setEnabledTypes] = useState<
     Record<GlobalSearchEntityType, boolean>
   >(() => readGlobalSearchSession().filters);

@@ -170,7 +170,7 @@ const GUIDE_DOCUMENTS = VERDANT_SEO_GUIDES.map((guide) =>
 
 const CULTIVAR_DOCUMENTS = VERDANT_CULTIVARS.map((cultivar) =>
   publicDocument(`/cultivars/${cultivar.slug}`, {
-    title: `${cultivar.name} Cultivar Guide (${cultivar.searchAlias} info) | Verdant`,
+    title: `${cultivar.name} Cultivar Grow Guide | Verdant`,
     description: `${cultivar.name} grow guide: lineage (${cultivar.lineage}), ${cultivar.flowerWeeks} flower, environment ranges by stage, and common issues home growers report.`,
     imageAlt: `${cultivar.name} cultivar guide`,
   }),

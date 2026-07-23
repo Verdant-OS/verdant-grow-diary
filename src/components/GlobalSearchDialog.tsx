@@ -330,7 +330,9 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
           ) : null}
 
 
-          <CommandList>
+          <div className="flex min-h-0 flex-1">
+            <CommandList className="flex-1">
+
             {!hasQuery ? (
               recent.length > 0 ? (
                 <CommandGroup

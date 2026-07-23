@@ -43,6 +43,7 @@ import {
   readGlobalSearchSession,
   writeGlobalSearchSession,
 } from "@/lib/globalSearchSession";
+import GlobalSearchResultPreview from "@/components/GlobalSearchResultPreview";
 
 
 interface Props {
@@ -90,6 +91,7 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
   );
   const [recent, setRecent] = useState<string[]>([]);
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
+  const [previewRow, setPreviewRow] = useState<GlobalSearchResult | null>(null);
   const [enabledTypes, setEnabledTypes] = useState<
     Record<GlobalSearchEntityType, boolean>
   >(() => readGlobalSearchSession().filters);
@@ -127,6 +129,22 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
     () => filteredResults.slice(0, visibleCount),
     [filteredResults, visibleCount],
   );
+
+  // Keep the preview panel in sync: default to the first visible result, and
+  // clear it whenever nothing is visible (loading / empty / filtered-empty).
+  useEffect(() => {
+    if (visibleResults.length === 0) {
+      setPreviewRow(null);
+      return;
+    }
+    setPreviewRow((prev) => {
+      if (prev && visibleResults.some((r) => r.id === prev.id && r.entity_type === prev.entity_type)) {
+        return prev;
+      }
+      return visibleResults[0];
+    });
+  }, [visibleResults]);
+
 
   const grouped = useMemo(() => {
     const map: Record<GlobalSearchEntityType, GlobalSearchResult[]> = {
@@ -194,7 +212,7 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="overflow-hidden p-0 shadow-lg">
+      <DialogContent className="overflow-hidden p-0 shadow-lg md:max-w-3xl">
         <CommandPrimitive
           shouldFilter={false}
           className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-group]]:px-2 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5 flex h-full w-full flex-col overflow-hidden rounded-md bg-popover text-popover-foreground"
@@ -312,7 +330,9 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
           ) : null}
 
 
-          <CommandList>
+          <div className="flex min-h-0 flex-1">
+            <CommandList className="flex-1">
+
             {!hasQuery ? (
               recent.length > 0 ? (
                 <CommandGroup
@@ -501,8 +521,11 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
                           key={`${type}:${row.id}`}
                           value={`${type}:${row.id}`}
                           onSelect={() => handleSelectResult(row)}
+                          onMouseEnter={() => setPreviewRow(row)}
+                          onFocus={() => setPreviewRow(row)}
                           data-testid={`global-search-item-${type}-${row.id}`}
                         >
+
                           <Icon
                             className={cn(
                               "mr-2 h-4 w-4 shrink-0 text-muted-foreground",
@@ -572,8 +595,20 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
                 ) : null}
               </>
             )}
-          </CommandList>
+            </CommandList>
+            {hasQuery && !isLoading && !isError ? (
+              <GlobalSearchResultPreview
+                row={previewRow}
+                routePath={previewRow ? routeFor(previewRow) : null}
+                query={query}
+                onOpen={() => {
+                  if (previewRow) handleSelectResult(previewRow);
+                }}
+              />
+            ) : null}
+          </div>
         </CommandPrimitive>
+
       </DialogContent>
     </Dialog>
   );

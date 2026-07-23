@@ -306,6 +306,8 @@ export default function CultivarsIndex() {
           .
         </p>
       </section>
+
+      <GlobalSearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
     </main>
   );
 }

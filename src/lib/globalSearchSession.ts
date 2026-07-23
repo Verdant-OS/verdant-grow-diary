@@ -97,3 +97,97 @@ export function clearGlobalSearchSession(): void {
 }
 
 export const GLOBAL_SEARCH_SESSION_STORAGE_KEY = STORAGE_KEY;
+
+// ---------------------------------------------------------------------------
+// Per-session query history — remembers recent {query, filters} snapshots for
+// the current tab so a grower can re-run a search + its filter shape in one
+// click. Stored separately from the "resume last state" blob so clearing one
+// doesn't nuke the other.
+// ---------------------------------------------------------------------------
+
+export interface GlobalSearchHistoryEntry {
+  query: string;
+  filters: Record<GlobalSearchEntityType, boolean>;
+  ts: number;
+}
+
+const HISTORY_STORAGE_KEY = "verdant.globalSearch.history.v1";
+const HISTORY_MAX_ENTRIES = 8;
+
+function sameFilters(
+  a: Record<GlobalSearchEntityType, boolean>,
+  b: Record<GlobalSearchEntityType, boolean>,
+): boolean {
+  return (
+    a.grow === b.grow &&
+    a.tent === b.tent &&
+    a.plant === b.plant &&
+    a.cultivar === b.cultivar
+  );
+}
+
+export function readGlobalSearchHistory(): GlobalSearchHistoryEntry[] {
+  const storage = safeStorage();
+  if (!storage) return [];
+  try {
+    const raw = storage.getItem(HISTORY_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    const out: GlobalSearchHistoryEntry[] = [];
+    for (const item of parsed) {
+      if (!item || typeof item !== "object") continue;
+      const q = (item as { query?: unknown }).query;
+      const ts = (item as { ts?: unknown }).ts;
+      if (typeof q !== "string" || !q.trim()) continue;
+      out.push({
+        query: q.slice(0, MAX_QUERY_LENGTH),
+        filters: normalizeFilters((item as { filters?: unknown }).filters),
+        ts: typeof ts === "number" && Number.isFinite(ts) ? ts : 0,
+      });
+      if (out.length >= HISTORY_MAX_ENTRIES) break;
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+export function pushGlobalSearchHistory(
+  entry: Omit<GlobalSearchHistoryEntry, "ts"> & { ts?: number },
+): GlobalSearchHistoryEntry[] {
+  const q = (entry.query ?? "").trim();
+  if (!q) return readGlobalSearchHistory();
+  const filters = normalizeFilters(entry.filters);
+  const ts = entry.ts ?? Date.now();
+  const existing = readGlobalSearchHistory().filter(
+    (e) => !(e.query === q && sameFilters(e.filters, filters)),
+  );
+  const next = [{ query: q.slice(0, MAX_QUERY_LENGTH), filters, ts }, ...existing].slice(
+    0,
+    HISTORY_MAX_ENTRIES,
+  );
+  const storage = safeStorage();
+  if (storage) {
+    try {
+      storage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(next));
+    } catch {
+      /* ignore */
+    }
+  }
+  return next;
+}
+
+export function clearGlobalSearchHistory(): void {
+  const storage = safeStorage();
+  if (!storage) return;
+  try {
+    storage.removeItem(HISTORY_STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+export const GLOBAL_SEARCH_HISTORY_STORAGE_KEY = HISTORY_STORAGE_KEY;
+export const GLOBAL_SEARCH_HISTORY_MAX = HISTORY_MAX_ENTRIES;
+

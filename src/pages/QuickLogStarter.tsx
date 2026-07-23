@@ -92,9 +92,19 @@ export default function QuickLogStarter() {
   const draft = usePublicQuickLogStarterDraft();
 
   const [plantNickname, setPlantNickname] = useState(() => draft?.plantNickname ?? "");
-  const [logType, setLogType] = useState<PublicQuickLogStarterLogType>(
-    () => draft?.logType ?? "observation",
-  );
+  const [logType, setLogType] = useState<PublicQuickLogStarterLogType>(() => {
+    // Optional ?type= seed from deep links (e.g. GlobalSearch empty-state quick-starts).
+    // Falls back to the persisted draft, then to "observation".
+    const params = new URLSearchParams(location.search);
+    const requested = params.get("type");
+    if (
+      requested &&
+      (PUBLIC_QUICK_LOG_STARTER_LOG_TYPES as readonly string[]).includes(requested)
+    ) {
+      return requested as PublicQuickLogStarterLogType;
+    }
+    return draft?.logType ?? "observation";
+  });
   const [stage, setStage] = useState(() => draft?.stage ?? UNKNOWN_STAGE);
   const [note, setNote] = useState(() => draft?.note ?? "");
   const [wateringVolumeRaw, setWateringVolumeRaw] = useState(() =>

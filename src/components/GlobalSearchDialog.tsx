@@ -121,12 +121,30 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
               <>
                 {isError ? (
                   <div
-                    className="px-2 py-3 text-center text-sm text-destructive"
+                    role="alert"
+                    className="mx-2 my-2 flex flex-col gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-3 text-sm text-destructive"
                     data-testid="global-search-error"
                   >
-                    Your grows, tents, and plants couldn’t be searched just now.
-                    Cultivar references below may be incomplete — try again in a
-                    moment.
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                      <p className="text-left leading-snug">
+                        Your grows, tents, and plants couldn’t be searched just
+                        now. Cultivar references below may be incomplete.
+                      </p>
+                    </div>
+                    <div className="flex justify-end">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => retry()}
+                        data-testid="global-search-retry"
+                        className="h-8"
+                      >
+                        <RefreshCw className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                        Retry
+                      </Button>
+                    </div>
                   </div>
                 ) : null}
                 {!hasAny && !isError ? (

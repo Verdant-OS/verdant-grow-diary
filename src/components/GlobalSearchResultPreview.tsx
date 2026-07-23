@@ -7,7 +7,9 @@
  * No queries, no writes, no navigation — the parent dialog owns selection and
  * routing. Content comes entirely from the already-fetched result row.
  */
-import { Dna, ExternalLink, Leaf, Sprout, Tent } from "lucide-react";
+import { Check, Copy, Dna, ExternalLink, Leaf, SquareArrowOutUpRight, Sprout, Tent } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type {
@@ -51,6 +53,45 @@ export default function GlobalSearchResultPreview({
   onOpen,
   className,
 }: GlobalSearchResultPreviewProps) {
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    setCopied(false);
+  }, [routePath]);
+
+  const absoluteUrl = routePath
+    ? (typeof window !== "undefined" ? window.location.origin : "") + routePath
+    : null;
+
+  const handleOpenInNewTab = useCallback(() => {
+    if (!absoluteUrl) return;
+    window.open(absoluteUrl, "_blank", "noopener,noreferrer");
+  }, [absoluteUrl]);
+
+  const handleCopyLink = useCallback(async () => {
+    if (!absoluteUrl) return;
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(absoluteUrl);
+      } else {
+        const el = document.createElement("textarea");
+        el.value = absoluteUrl;
+        el.setAttribute("readonly", "");
+        el.style.position = "absolute";
+        el.style.left = "-9999px";
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand("copy");
+        document.body.removeChild(el);
+      }
+      setCopied(true);
+      toast.success("Link copied to clipboard");
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Could not copy link");
+    }
+  }, [absoluteUrl]);
+
   if (!row || !routePath) {
     return (
       <aside
@@ -165,6 +206,37 @@ export default function GlobalSearchResultPreview({
           <ExternalLink className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
           Open {typeLabel.toLowerCase()}
         </Button>
+        <div className="grid grid-cols-2 gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={handleOpenInNewTab}
+            disabled={!absoluteUrl}
+            data-testid="global-search-preview-open-new-tab"
+            aria-label={`Open ${typeLabel.toLowerCase()} in new tab`}
+          >
+            <SquareArrowOutUpRight className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+            New tab
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={handleCopyLink}
+            disabled={!absoluteUrl}
+            data-testid="global-search-preview-copy-link"
+            aria-label={copied ? "Link copied" : `Copy link to ${typeLabel.toLowerCase()}`}
+          >
+            {copied ? (
+              <Check className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+            ) : (
+              <Copy className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+            )}
+            {copied ? "Copied" : "Copy link"}
+          </Button>
+        </div>
+
       </div>
     </aside>
   );

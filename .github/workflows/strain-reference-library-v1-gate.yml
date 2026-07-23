@@ -12,7 +12,7 @@ on:
       - "src/lib/globalSearchItems.ts"
       - "src/lib/sharedSearchTextRules.ts"
       - "src/lib/strainSourceVerification.ts"
-      - "src/hooks/useGlobalSearchItems.ts"
+      - "src/hooks/useGlobalSearch.ts"
       - "src/components/GlobalSearchDialog.tsx"
       - "src/pages/Cultivar*.tsx"
       - "src/test/cultivar*.test.*"

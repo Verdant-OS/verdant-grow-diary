@@ -99,6 +99,7 @@ import { Button } from "@/components/ui/button";
 import GrowTargetsEditor from "@/components/GrowTargetsEditor";
 import DailyGrowCheckStatusCard from "@/components/DailyGrowCheckStatusCard";
 import DashboardDailyGrowCheckPanel from "@/components/DashboardDailyGrowCheckPanel";
+import GuidedActionChecklistPanel from "@/components/GuidedActionChecklistPanel";
 
 import { Badge } from "@/components/ui/badge";
 import SensorSourceBadge from "@/components/SensorSourceBadge";

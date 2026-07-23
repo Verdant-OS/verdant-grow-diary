@@ -41,6 +41,7 @@ export interface UseGlobalSearchReturn {
   results: GlobalSearchResult[];
   isLoading: boolean;
   isError: boolean;
+  retry: () => void;
 }
 
 export function useGlobalSearch(query: string): UseGlobalSearchReturn {
@@ -48,7 +49,7 @@ export function useGlobalSearch(query: string): UseGlobalSearchReturn {
   const debounced = useDebouncedValue(trimmed, DEBOUNCE_MS);
   const enabled = debounced.length > 0;
 
-  const { data, isLoading, isFetching, isError } = useQuery({
+  const { data, isLoading, isFetching, isError, refetch } = useQuery({
     queryKey: ["global-search", debounced],
     enabled,
     queryFn: async (): Promise<PrivateSearchRow[]> => {
@@ -61,6 +62,7 @@ export function useGlobalSearch(query: string): UseGlobalSearchReturn {
       return (data ?? []) as PrivateSearchRow[];
     },
     staleTime: 30_000,
+    retry: false,
   });
 
   // Public cultivar references resolve synchronously from bundled constants and
@@ -84,5 +86,8 @@ export function useGlobalSearch(query: string): UseGlobalSearchReturn {
     // Show loading while debouncing a non-empty query, or while fetching.
     isLoading: enabled && (isLoading || isFetching || trimmed !== debounced),
     isError,
+    retry: () => {
+      if (enabled) void refetch();
+    },
   };
 }

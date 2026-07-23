@@ -1,3 +1,4 @@
+// Temporary live browser QA only. Never merge this test branch.
 import { test, expect, type Page } from "@playwright/test";
 import { mkdir, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";

@@ -233,11 +233,11 @@ export default function CultivarsIndex() {
             </select>
           </div>
 
-          {hasFilters ? (
+          {difficulty !== "all" || lifeCycle !== "all" || verificationStatus !== "all" ? (
             <button
               type="button"
               onClick={() => setSearchParams(new URLSearchParams(), { replace: true })}
-              className="min-h-[44px] rounded-md border border-border px-3 py-2 text-sm text-muted-foreground hover:border-primary/40 hover:text-foreground sm:col-span-2 lg:col-span-4 lg:justify-self-start"
+              className="min-h-[44px] rounded-md border border-border px-3 py-2 text-sm text-muted-foreground hover:border-primary/40 hover:text-foreground sm:col-span-3 sm:justify-self-start"
             >
               Clear filters
             </button>

@@ -130,6 +130,22 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
     [filteredResults, visibleCount],
   );
 
+  // Keep the preview panel in sync: default to the first visible result, and
+  // clear it whenever nothing is visible (loading / empty / filtered-empty).
+  useEffect(() => {
+    if (visibleResults.length === 0) {
+      setPreviewRow(null);
+      return;
+    }
+    setPreviewRow((prev) => {
+      if (prev && visibleResults.some((r) => r.id === prev.id && r.entity_type === prev.entity_type)) {
+        return prev;
+      }
+      return visibleResults[0];
+    });
+  }, [visibleResults]);
+
+
   const grouped = useMemo(() => {
     const map: Record<GlobalSearchEntityType, GlobalSearchResult[]> = {
       grow: [],

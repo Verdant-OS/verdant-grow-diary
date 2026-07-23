@@ -42,7 +42,13 @@ export default function CultivarQaPanel({ cultivar }: Props) {
 
   if (loading) return null;
 
-  if (!entitlement.isActive) {
+  // `isActive` is true even for the free tier (resolveEntitlements: null_row_free
+  // resolves to isActive=true, effectivePlanId="free"), so it is NOT a paid
+  // signal. Gate on genuine paid access — matches resolveEntitlements' own
+  // `isActive && effectivePlanId !== "free"` check and the edge function.
+  const isPaid = entitlement.isActive && entitlement.effectivePlanId !== "free";
+
+  if (!isPaid) {
     return (
       <section
         data-testid="cultivar-qa-upsell"

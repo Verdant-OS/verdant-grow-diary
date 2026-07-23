@@ -70,7 +70,11 @@ Deno.serve(async (req) => {
       new Date(),
     );
     if (lookupFailed) return json({ ok: false, reason: "entitlement_unavailable" }, 200);
-    if (!entitlement.isActive) return json({ ok: false, reason: "upgrade_required" }, 200);
+    // `isActive` is true even for the free tier (null_row_free resolves to
+    // isActive=true, effectivePlanId="free"), so it is NOT a paid signal. Require
+    // a genuine paid plan before spending an LLM call.
+    const isPaid = entitlement.isActive && entitlement.effectivePlanId !== "free";
+    if (!isPaid) return json({ ok: false, reason: "upgrade_required" }, 200);
 
     const lovableKey = Deno.env.get("LOVABLE_API_KEY");
     if (!lovableKey) return json({ ok: false, reason: "not_configured" }, 500);

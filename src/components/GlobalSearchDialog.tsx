@@ -17,6 +17,7 @@ import { Command as CommandPrimitive } from "cmdk";
 import { AlertTriangle, Clock, Dna, Leaf, RefreshCw, Sprout, Tent } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   CommandEmpty,
   CommandGroup,
@@ -172,10 +173,27 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
               )
             ) : isLoading ? (
               <div
-                className="py-6 text-center text-sm text-muted-foreground"
+                className="space-y-1 py-2"
+                role="status"
+                aria-live="polite"
+                aria-label="Searching your grows, tents, plants, and cultivars"
                 data-testid="global-search-loading"
               >
-                Searching…
+                <span className="sr-only">Searching…</span>
+                {[0, 1, 2, 3].map((i) => (
+                  <div
+                    key={i}
+                    className="flex items-center gap-2 rounded-sm px-2 py-3"
+                    data-testid="global-search-loading-row"
+                  >
+                    <Skeleton className="h-4 w-4 shrink-0 rounded-sm" />
+                    <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                      <Skeleton className={cn("h-3.5", i % 2 === 0 ? "w-2/5" : "w-1/2")} />
+                      <Skeleton className={cn("h-3", i % 2 === 0 ? "w-3/5" : "w-1/3")} />
+                    </div>
+                    <Skeleton className="ml-2 h-4 w-16 shrink-0 rounded-sm" />
+                  </div>
+                ))}
               </div>
             ) : (
               <>

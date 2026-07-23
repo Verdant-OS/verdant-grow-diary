@@ -42,8 +42,13 @@ import {
   DEFAULT_FILTERS,
   readGlobalSearchSession,
   writeGlobalSearchSession,
+  readGlobalSearchHistory,
+  pushGlobalSearchHistory,
+  clearGlobalSearchHistory,
+  type GlobalSearchHistoryEntry,
 } from "@/lib/globalSearchSession";
 import GlobalSearchResultPreview from "@/components/GlobalSearchResultPreview";
+
 
 
 interface Props {
@@ -90,6 +95,7 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
     () => readGlobalSearchSession().query,
   );
   const [recent, setRecent] = useState<string[]>([]);
+  const [history, setHistory] = useState<GlobalSearchHistoryEntry[]>([]);
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
   const [previewRow, setPreviewRow] = useState<GlobalSearchResult | null>(null);
   const [enabledTypes, setEnabledTypes] = useState<
@@ -100,6 +106,7 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
   useEffect(() => {
     if (open) {
       setRecent(readRecentSearches());
+      setHistory(readGlobalSearchHistory());
       // Re-hydrate on open in case another tab / dialog instance updated it.
       const restored = readGlobalSearchSession();
       setQuery(restored.query);
@@ -112,6 +119,18 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
   // Persist query + filters whenever they change so the next open resumes.
   useEffect(() => {
     writeGlobalSearchSession({ query, filters: enabledTypes });
+  }, [query, enabledTypes]);
+
+  // Debounced push to session history: capture stable {query, filters} tuples
+  // (≥2 chars) so re-running a prior search is one click. Selecting a result
+  // also pushes immediately (in handleSelectResult).
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) return;
+    const timeout = setTimeout(() => {
+      setHistory(pushGlobalSearchHistory({ query: q, filters: enabledTypes }));
+    }, 600);
+    return () => clearTimeout(timeout);
   }, [query, enabledTypes]);
 
 
@@ -200,6 +219,7 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
   const handleSelectResult = (row: GlobalSearchResult) => {
     if (trimmed) {
       setRecent(pushRecentSearch(trimmed));
+      setHistory(pushGlobalSearchHistory({ query: trimmed, filters: enabledTypes }));
     }
     onOpenChange(false);
     navigate(routeFor(row));
@@ -209,6 +229,19 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
     clearRecentSearches();
     setRecent([]);
   };
+
+  const handleReplayHistory = (entry: GlobalSearchHistoryEntry) => {
+    setEnabledTypes({ ...entry.filters });
+    setQuery(entry.query);
+    // Bump this entry to the top so repeated replays keep it fresh.
+    setHistory(pushGlobalSearchHistory({ query: entry.query, filters: entry.filters }));
+  };
+
+  const handleClearHistory = () => {
+    clearGlobalSearchHistory();
+    setHistory([]);
+  };
+
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -334,40 +367,109 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
             <CommandList className="flex-1">
 
             {!hasQuery ? (
-              recent.length > 0 ? (
-                <CommandGroup
-                  heading="Recent searches"
-                  data-testid="global-search-recent"
-                >
-                  {recent.map((term) => (
-                    <CommandItem
-                      key={`recent:${term}`}
-                      value={`recent:${term}`}
-                      onSelect={() => setQuery(term)}
-                      data-testid={`global-search-recent-item-${term}`}
+              recent.length > 0 || history.length > 0 ? (
+                <>
+                  {history.length > 0 ? (
+                    <CommandGroup
+                      heading="This session"
+                      data-testid="global-search-history"
                     >
-                      <Clock
-                        className="mr-2 h-4 w-4 shrink-0 text-muted-foreground"
-                        aria-hidden="true"
-                      />
-                      <span className="truncate text-sm text-foreground">
-                        {term}
-                      </span>
-                    </CommandItem>
-                  ))}
-                  <div className="flex justify-end px-1 pt-1">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      onClick={handleClearRecent}
-                      data-testid="global-search-recent-clear"
-                      className="h-7 text-xs text-muted-foreground"
+                      {history.map((entry) => {
+                        const activeFilters = GROUP_ORDER.filter(
+                          (t) => entry.filters[t],
+                        );
+                        const allOn = activeFilters.length === GROUP_ORDER.length;
+                        const key = `history:${entry.query}:${activeFilters.join(",")}`;
+                        return (
+                          <CommandItem
+                            key={key}
+                            value={key}
+                            onSelect={() => handleReplayHistory(entry)}
+                            data-testid={`global-search-history-item-${entry.query}`}
+                            className="flex items-center gap-2"
+                          >
+                            <Clock
+                              className="h-4 w-4 shrink-0 text-muted-foreground"
+                              aria-hidden="true"
+                            />
+                            <span className="truncate text-sm text-foreground">
+                              {entry.query}
+                            </span>
+                            {!allOn ? (
+                              <span
+                                className="ml-auto flex flex-wrap items-center gap-1"
+                                aria-label={`Filters: ${activeFilters
+                                  .map((t) => GROUP_HEADINGS[t])
+                                  .join(", ")}`}
+                              >
+                                {activeFilters.map((t) => {
+                                  const Icon = GROUP_ICONS[t];
+                                  return (
+                                    <span
+                                      key={t}
+                                      className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-muted/40 px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                                      data-testid={`global-search-history-filter-${t}`}
+                                    >
+                                      <Icon className="h-3 w-3" aria-hidden="true" />
+                                      {GROUP_HEADINGS[t]}
+                                    </span>
+                                  );
+                                })}
+                              </span>
+                            ) : null}
+                          </CommandItem>
+                        );
+                      })}
+                      <div className="flex justify-end px-1 pt-1">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={handleClearHistory}
+                          data-testid="global-search-history-clear"
+                          className="h-7 text-xs text-muted-foreground"
+                        >
+                          Clear session history
+                        </Button>
+                      </div>
+                    </CommandGroup>
+                  ) : null}
+                  {recent.length > 0 ? (
+                    <CommandGroup
+                      heading="Recent searches"
+                      data-testid="global-search-recent"
                     >
-                      Clear recent
-                    </Button>
-                  </div>
-                </CommandGroup>
+                      {recent.map((term) => (
+                        <CommandItem
+                          key={`recent:${term}`}
+                          value={`recent:${term}`}
+                          onSelect={() => setQuery(term)}
+                          data-testid={`global-search-recent-item-${term}`}
+                        >
+                          <Clock
+                            className="mr-2 h-4 w-4 shrink-0 text-muted-foreground"
+                            aria-hidden="true"
+                          />
+                          <span className="truncate text-sm text-foreground">
+                            {term}
+                          </span>
+                        </CommandItem>
+                      ))}
+                      <div className="flex justify-end px-1 pt-1">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={handleClearRecent}
+                          data-testid="global-search-recent-clear"
+                          className="h-7 text-xs text-muted-foreground"
+                        >
+                          Clear recent
+                        </Button>
+                      </div>
+                    </CommandGroup>
+                  ) : null}
+                </>
               ) : (
                 <div className="py-6 text-center text-sm text-muted-foreground">
                   Type to search your grows, tents, plants, and cultivars.
@@ -375,6 +477,7 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
               )
             ) : isLoading ? (
               <div
+
                 className="space-y-1 py-2"
                 role="status"
                 aria-live="polite"

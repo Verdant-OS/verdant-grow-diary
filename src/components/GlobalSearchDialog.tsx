@@ -248,6 +248,9 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
       setRecent(pushRecentSearch(trimmed));
       setHistory(pushGlobalSearchHistory({ query: trimmed, filters: enabledTypes }));
     }
+    const entry = { entity_type: row.entity_type, id: row.id };
+    writeGlobalSearchLastSelected(entry);
+    setLastSelected({ ...entry, ts: Date.now() });
     onOpenChange(false);
     navigate(routeFor(row));
   };

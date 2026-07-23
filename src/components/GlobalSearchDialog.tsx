@@ -83,23 +83,35 @@ const PAGE_SIZE = 10;
 
 export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
   const navigate = useNavigate();
-  const [query, setQuery] = useState("");
+  // Lazy initializers hydrate from sessionStorage exactly once so reopening
+  // the palette within the same tab resumes the last query + filter toggles.
+  const [query, setQuery] = useState<string>(
+    () => readGlobalSearchSession().query,
+  );
   const [recent, setRecent] = useState<string[]>([]);
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
   const [enabledTypes, setEnabledTypes] = useState<
     Record<GlobalSearchEntityType, boolean>
-  >({ grow: true, tent: true, plant: true, cultivar: true });
+  >(() => readGlobalSearchSession().filters);
   const { results, isLoading, isError, retry } = useGlobalSearch(query);
 
   useEffect(() => {
     if (open) {
       setRecent(readRecentSearches());
-    } else {
-      setQuery("");
-      // Reset filters when the dialog closes so it opens clean next time.
-      setEnabledTypes({ grow: true, tent: true, plant: true, cultivar: true });
+      // Re-hydrate on open in case another tab / dialog instance updated it.
+      const restored = readGlobalSearchSession();
+      setQuery(restored.query);
+      setEnabledTypes(restored.filters);
     }
+    // Intentionally do NOT clear query/filters on close — session memory is
+    // the whole point of this hook.
   }, [open]);
+
+  // Persist query + filters whenever they change so the next open resumes.
+  useEffect(() => {
+    writeGlobalSearchSession({ query, filters: enabledTypes });
+  }, [query, enabledTypes]);
+
 
   const filteredResults = useMemo(
     () => results.filter((row) => enabledTypes[row.entity_type]),

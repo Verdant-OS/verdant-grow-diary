@@ -389,6 +389,36 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
                     </div>
                   </div>
                 ) : null}
+                {hasAny && !hasFilteredAny && !isError ? (
+                  <div
+                    className="mx-auto flex max-w-xs flex-col items-center gap-3 py-6 text-center"
+                    data-testid="global-search-filtered-empty"
+                  >
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                      <SearchX className="h-5 w-5" aria-hidden="true" />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-foreground">
+                        All categories are hidden
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {results.length}{" "}
+                        {results.length === 1 ? "result matches" : "results match"}{" "}
+                        “{trimmed}”, but the current filters hide{" "}
+                        {results.length === 1 ? "it" : "them all"}.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={resetFilters}
+                      data-testid="global-search-filtered-empty-reset"
+                    >
+                      Show all categories
+                    </Button>
+                  </div>
+                ) : null}
                 {!hasAny && !isError ? (
                   <CommandEmpty className="py-6">
                     <div

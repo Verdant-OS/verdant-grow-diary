@@ -120,6 +120,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          git restore --source=HEAD --staged --worktree docs/artifacts || true
+          git clean -fd docs/artifacts
           rm .github/workflows/fix-full-suite-batches-1-5-10-once.yml
           git status --short
           unexpected="$(git status --porcelain | awk '$2 !~ /^(src\/test\/release-workbook-formula-snapshots\.test\.ts|\.github\/workflows\/deployment-preview\.yml|\.github\/workflows\/prefix-diff-sarif\.yml|public\/sitemap\.xml|\.github\/workflows\/fix-full-suite-batches-1-5-10-once\.yml)$/ { print }')"

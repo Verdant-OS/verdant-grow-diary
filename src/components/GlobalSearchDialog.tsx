@@ -664,18 +664,28 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
                           <X className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
                           Clear query
                         </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={() => {
-                            onOpenChange(false);
-                            navigate("/quick-log");
-                          }}
-                          data-testid="global-search-empty-quicklog"
-                        >
-                          <NotebookPen className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
-                          Start a Quick Log
-                        </Button>
+                        {(
+                          [
+                            { type: "observation", label: "Diary note", testId: "note" },
+                            { type: "watering", label: "Watering", testId: "watering" },
+                            { type: "feeding", label: "Feeding", testId: "feeding" },
+                          ] as const
+                        ).map(({ type, label, testId }) => (
+                          <Button
+                            key={type}
+                            type="button"
+                            size="sm"
+                            variant={type === "observation" ? "default" : "secondary"}
+                            onClick={() => {
+                              onOpenChange(false);
+                              navigate(`/quick-log?type=${type}`);
+                            }}
+                            data-testid={`global-search-empty-start-${testId}`}
+                          >
+                            <NotebookPen className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                            {label}
+                          </Button>
+                        ))}
                       </div>
                     </div>
                   </CommandEmpty>

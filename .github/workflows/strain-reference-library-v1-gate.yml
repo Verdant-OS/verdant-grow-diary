@@ -60,7 +60,22 @@ jobs:
           --reporter=verbose
 
       - name: Offline source provenance verification report
+        id: source_verification
+        continue-on-error: true
         run: bun scripts/verify-cultivar-sources.mjs
+
+      - name: Upload source verification evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: strain-source-verification-v0
+          path: artifacts/source-verification/report.json
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Stop after source verification failure
+        if: steps.source_verification.outcome == 'failure'
+        run: exit 1
 
       - name: Supabase migration safety — V1 finding fence
         shell: bash

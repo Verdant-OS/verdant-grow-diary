@@ -371,7 +371,11 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
                   return (
                     <CommandGroup
                       key={type}
-                      heading={`${GROUP_HEADINGS[type]} (${rows.length})`}
+                      heading={
+                        rows.length < totalsByGroup[type]
+                          ? `${GROUP_HEADINGS[type]} (${rows.length} of ${totalsByGroup[type]})`
+                          : `${GROUP_HEADINGS[type]} (${rows.length})`
+                      }
                     >
                       {rows.map((row) => (
                         <CommandItem

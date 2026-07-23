@@ -204,8 +204,11 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
               <span className="tabular-nums">
                 Showing 1–{results.length} of {results.length}
               </span>
+              <span className="tabular-nums">
+                Showing 1–{shownCount} of {results.length}
+              </span>
               <span className="ml-auto flex flex-wrap items-center gap-1.5">
-                {GROUP_ORDER.filter((t) => grouped[t].length > 0).map((t) => {
+                {GROUP_ORDER.filter((t) => totalsByGroup[t] > 0).map((t) => {
                   const Icon = GROUP_ICONS[t];
                   return (
                     <span

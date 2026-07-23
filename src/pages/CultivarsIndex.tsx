@@ -4,9 +4,11 @@
  * Mobile-first presenter. Search/filter rules are pure and shared; cards render
  * labeled sample/reference data only. No private grow reads or writes.
  */
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { Search } from "lucide-react";
 import BrandLogo from "@/components/BrandLogo";
+import GlobalSearchDialog from "@/components/GlobalSearchDialog";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import {
   VERDANT_CULTIVARS,
@@ -52,6 +54,7 @@ function validOption<T extends string>(
 
 export default function CultivarsIndex() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const [searchOpen, setSearchOpen] = useState(false);
   usePageSeo(buildCultivarsIndexSeo(searchParams));
 
   const query = searchParams.get("q") ?? "";
@@ -141,28 +144,41 @@ export default function CultivarsIndex() {
       </section>
 
       <section className="mx-auto max-w-6xl px-4 pb-16 sm:px-6">
+        <div className="mb-4">
+          <button
+            type="button"
+            onClick={() => setSearchOpen(true)}
+            data-testid="cultivars-index-open-search"
+            className="flex min-h-[44px] w-full items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-left text-sm text-muted-foreground outline-none transition-colors hover:border-primary/40 hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary/60"
+          >
+            <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span className="flex-1 truncate">
+              Search cultivars, your grows, tents, and plants…
+            </span>
+            <kbd className="hidden shrink-0 rounded border border-border/60 bg-muted/40 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground sm:inline">
+              ⌘K
+            </kbd>
+          </button>
+          {query ? (
+            <p className="mt-2 text-xs text-muted-foreground">
+              Filtering by “{query}” from URL.{" "}
+              <button
+                type="button"
+                onClick={() => updateParam("q", "", "")}
+                className="underline hover:text-foreground"
+              >
+                Clear
+              </button>
+            </p>
+          ) : null}
+        </div>
+
         <form
           role="search"
           aria-label="Filter cultivar guides"
-          className="grid gap-3 rounded-xl border border-border/60 bg-card/40 p-4 sm:grid-cols-2 lg:grid-cols-4"
+          className="grid gap-3 rounded-xl border border-border/60 bg-card/40 p-4 sm:grid-cols-3"
           onSubmit={(event) => event.preventDefault()}
         >
-          <div className="sm:col-span-2 lg:col-span-1">
-            <label htmlFor="cultivar-search" className="mb-1 block text-xs uppercase tracking-wide text-muted-foreground">
-              Search
-            </label>
-            <input
-              id="cultivar-search"
-              type="search"
-              inputMode="search"
-              autoComplete="off"
-              placeholder="Name, alias, breeder, or lineage…"
-              value={query}
-              onChange={(event) => updateParam("q", event.target.value, "")}
-              className="min-h-[44px] w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
-            />
-          </div>
-
           <div>
             <label htmlFor="cultivar-difficulty" className="mb-1 block text-xs uppercase tracking-wide text-muted-foreground">
               Difficulty
@@ -217,11 +233,11 @@ export default function CultivarsIndex() {
             </select>
           </div>
 
-          {hasFilters ? (
+          {difficulty !== "all" || lifeCycle !== "all" || verificationStatus !== "all" ? (
             <button
               type="button"
               onClick={() => setSearchParams(new URLSearchParams(), { replace: true })}
-              className="min-h-[44px] rounded-md border border-border px-3 py-2 text-sm text-muted-foreground hover:border-primary/40 hover:text-foreground sm:col-span-2 lg:col-span-4 lg:justify-self-start"
+              className="min-h-[44px] rounded-md border border-border px-3 py-2 text-sm text-muted-foreground hover:border-primary/40 hover:text-foreground sm:col-span-3 sm:justify-self-start"
             >
               Clear filters
             </button>
@@ -290,6 +306,8 @@ export default function CultivarsIndex() {
           .
         </p>
       </section>
+
+      <GlobalSearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
     </main>
   );
 }

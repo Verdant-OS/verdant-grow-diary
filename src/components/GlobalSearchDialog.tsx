@@ -280,8 +280,11 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
     clearGlobalSearchSession();
     clearGlobalSearchHistory();
     clearRecentSearches();
+    clearGlobalSearchLastSelected();
     setHistory([]);
     setRecent([]);
+    setLastSelected(null);
+    setPreviewRow(null);
     setQuery("");
     setEnabledTypes({ ...DEFAULT_FILTERS });
   };

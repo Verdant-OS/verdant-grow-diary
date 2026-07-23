@@ -229,7 +229,7 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
                             )}
                             aria-hidden="true"
                           />
-                          <div className="flex min-w-0 flex-col">
+                          <div className="flex min-w-0 flex-1 flex-col">
                             <span className="truncate text-sm text-foreground">
                               {highlightMatch(row.label, trimmed)}
                             </span>
@@ -239,6 +239,28 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
                               </span>
                             ) : null}
                           </div>
+                          <div
+                            className="ml-2 flex shrink-0 items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground"
+                            aria-label={`Match ${row.match_kind}, rank ${row.rank}, score ${row.score.toFixed(2)}`}
+                            data-testid={`global-search-item-meta-${row.entity_type}-${row.id}`}
+                          >
+                            <span
+                              className={cn(
+                                "rounded-sm border px-1.5 py-0.5 font-medium",
+                                row.match_kind === "exact"
+                                  ? "border-primary/40 bg-primary/10 text-primary"
+                                  : row.match_kind === "prefix"
+                                    ? "border-foreground/20 bg-muted text-foreground/80"
+                                    : "border-border bg-transparent",
+                              )}
+                            >
+                              {row.match_kind}
+                            </span>
+                            <span className="tabular-nums">
+                              r{row.rank}·{row.score.toFixed(2)}
+                            </span>
+                          </div>
+
                         </CommandItem>
                       ))}
                     </CommandGroup>

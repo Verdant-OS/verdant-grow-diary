@@ -79,10 +79,19 @@ export default function AppShell({ children }: { children?: ReactNode }) {
     entitlement.effectivePlanId !== "free";
   useCheckoutReturnCompletionTracking(paidDestinationReady);
 
-  // Global ⌘K / Ctrl+K shortcut to open the search palette.
+  // Global ⌘K / Ctrl+K shortcut to open the search palette. Guarded so
+  // it does not steal keystrokes while the grower is typing in an input,
+  // textarea, or contenteditable surface.
   useEffect(() => {
+    function isTypingTarget(target: EventTarget | null): boolean {
+      if (!(target instanceof HTMLElement)) return false;
+      if (target.isContentEditable) return true;
+      const tag = target.tagName;
+      return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+    }
     function onKey(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        if (isTypingTarget(e.target)) return;
         e.preventDefault();
         setSearchOpen((v) => !v);
       }
@@ -209,6 +218,19 @@ export default function AppShell({ children }: { children?: ReactNode }) {
                     ⌘K
                   </kbd>
                 </button>
+                {/* Mobile-reachable search entry: the ⌘K composite button
+                    above is desktop-only, so mobile growers need an
+                    always-visible icon target that opens the same dialog. */}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setSearchOpen(true)}
+                  aria-label="Search"
+                  data-testid="mobile-global-search-trigger"
+                  className="md:hidden"
+                >
+                  <Search className="h-4 w-4" />
+                </Button>
                 {/* Quick Log is the single grower-facing logging entry
                     point on desktop. The dropdown surfaces event-type
                     presets (diary note, watering, feeding, training,

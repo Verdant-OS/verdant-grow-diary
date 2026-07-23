@@ -23,18 +23,36 @@ import { useGrowTargets } from "@/hooks/useGrowTargets";
 import { usePersistEnvironmentAlerts } from "@/hooks/usePersistEnvironmentAlerts";
 import { evaluateSensorQuality } from "@/lib/sensorQuality";
 import { compareSnapshotToTargets } from "@/lib/environmentTargetComparison";
+import { resolveAlertContextStage } from "@/lib/alertStageResolution";
 
 interface Props {
   growId: string | null | undefined;
+  /** The grow row's stage. Persisted alerts evaluate against the stage
+   * resolved from this PLUS the grow's tents' stages, so a stale
+   * `grows.stage` cannot drive outdated stage bands (live audit #14). */
   stage?: string | null;
 }
 
 export default function AlertsAutoPersistForGrow({ growId, stage }: Props) {
   const safeGrowId = growId ?? null;
-  const { data: tents = [] } = useGrowTents(safeGrowId ?? undefined);
+  const tentsQuery = useGrowTents(safeGrowId ?? undefined);
+  const tents = tentsQuery.data ?? [];
+  // Persistence is gated on the tent read having SETTLED (success or
+  // error): while the query is pending, `tents` is a placeholder empty
+  // array and the resolver would fall back to the grow row alone — an
+  // alert persisted against a stale grow stage in that window would not
+  // be removed when the tent stages arrive. After an error, proceeding
+  // with the grow row alone matches the pre-resolver behavior.
+  const tentsSettled = tentsQuery.isFetched;
   const tentIds = tents.map((t) => t.id);
   const sensorState = useLatestSensorSnapshot(safeGrowId, tentIds);
   const targetsState = useGrowTargets(safeGrowId);
+  // Stage precedence lives in resolveAlertContextStage: grow stage + tent
+  // stages, most advanced known stage wins on disagreement.
+  const resolvedStage = resolveAlertContextStage({
+    growStage: stage,
+    tentStages: tents.map((t) => t.stage),
+  }).stage;
 
   usePersistEnvironmentAlerts({
     growId: safeGrowId,
@@ -46,8 +64,8 @@ export default function AlertsAutoPersistForGrow({ growId, stage }: Props) {
       sensorState.status === "ok" ? sensorState.snapshot : null,
       targetsState.status === "ok" ? targetsState.targets : null,
     ),
-    enabled: !!safeGrowId,
-    stage: stage ?? null,
+    enabled: !!safeGrowId && tentsSettled,
+    stage: resolvedStage,
   });
 
   return null;

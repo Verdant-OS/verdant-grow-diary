@@ -19,6 +19,10 @@ const SEED_CSV = join(ART, "seed-production-tracking-v1.3-template.csv");
 const REVIEW_CSV = join(ART, "commercial-release-review-traceability-v1.3-template.csv");
 const CONTRACTS_MD = join(ART, "release-workbook-formula-contracts.md");
 
+function readWorkbook(path: string): XLSX.WorkBook {
+  return XLSX.read(readFileSync(path));
+}
+
 beforeAll(() => {
   if (!existsSync(SEED_XLSX) || !existsSync(REVIEW_XLSX) || !existsSync(CONTRACTS_MD)) {
     execSync("node scripts/generate-release-workbook-templates.mjs", { stdio: "inherit" });
@@ -135,8 +139,7 @@ describe("v1.3 workbook formula snapshots — XLSX must match contract exactly",
     expect(seedHeaders).toEqual(SEED_PRODUCTION_HEADERS);
 
     const revWb = readWorkbook(REVIEW_XLSX);
-    const revWs =
-      revWb.Sheets[revWb.SheetNames.find((n) => n.startsWith("Commercial_Release_Review"))!];
+    const revWs = revWb.Sheets[revWb.SheetNames.find((n) => n.startsWith("Commercial_Release_Review"))!];
     const revHeaders = COMMERCIAL_REVIEW_HEADERS.map((_, i) => {
       const ref = XLSX.utils.encode_cell({ r: 0, c: i });
       return String(revWs[ref]?.v ?? "");

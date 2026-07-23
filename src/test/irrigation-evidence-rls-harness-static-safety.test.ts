@@ -123,14 +123,86 @@ describe("irrigation evidence RLS harness — no device-control / automation / f
     );
   });
   it("only writes through the canonical quicklog_save_event RPC (no second write path)", () => {
-    // Every authz assertion drives the RPC; direct spine inserts would be a
-    // competing writer. service_role seeds fixtures (grows/tents/plants) only.
+    // Every authz assertion drives the RPC. Direct spine inserts/upserts and
+    // service-role admin writes into the event tables would be a competing
+    // writer that hides denial regressions. service_role seeds fixtures
+    // (grows/tents/plants) only — never event tables.
     expect(src).toMatch(/rpc\("quicklog_save_event"/);
+    // No client of any role writes the three event tables directly.
     expect(src).not.toMatch(
-      /\.from\(\s*['"](grow_events|watering_events|feeding_events)['"]\s*\)\s*\.insert/i,
+      /\.from\(\s*['"](grow_events|watering_events|feeding_events)['"]\s*\)\s*\.(insert|upsert|update|delete)\s*\(/i,
+    );
+    // Specifically: no `admin.` (service_role) direct write into the event tables.
+    expect(src).not.toMatch(
+      /admin\s*\.from\(\s*['"](grow_events|watering_events|feeding_events)['"]\s*\)\s*\.(insert|upsert|update|delete)\s*\(/i,
+    );
+    // No runtime service-role RPC call to the legacy typed-event functions —
+    // those are SECURITY INVOKER and depend on auth.uid(); a service_role JWT
+    // cannot honestly prove ACL possession by successful execution. ACL
+    // possession is proved in pgTAP instead.
+    expect(src).not.toMatch(
+      /admin\s*\.rpc\(\s*['"]create_(watering|feeding)_event['"]/i,
     );
   });
+  it("uses a distinct feedingArgs helper that explicitly clears p_water", () => {
+    // The RPC rejects a non-null p_water when p_event_type = 'feeding'
+    // (water_not_allowed_for_feeding). Inheriting baseArgs would fail closed
+    // for the wrong reason and never prove the feeding path. Feeding must be
+    // seeded through its own helper that pins p_water: null.
+    expect(src).toMatch(/const\s+feedingArgs\s*=/);
+    expect(src).toMatch(/p_event_type:\s*"feeding"/);
+    expect(src).toMatch(/p_water:\s*null/);
+    expect(src).toMatch(/p_feed:\s*feed/);
+  });
+  it("pins the closed three-table denial allowlist", () => {
+    expect(src).toMatch(
+      /DENIAL_ALLOWLIST\s*=\s*\[\s*"grow_events"\s*,\s*"watering_events"\s*,\s*"feeding_events"\s*\]\s*as\s+const/,
+    );
+    // The DML denial loop must iterate the allowlist, not an ad-hoc array.
+    expect(src).toMatch(/for\s*\(\s*const\s+table\s+of\s+DENIAL_ALLOWLIST\s*\)/);
+  });
+  it("distinguishes genuine permission denial from missing-function errors", () => {
+    // Helpers must exist and cover the PostgREST/Postgres error codes that
+    // can masquerade as denial: 42883, PGRST202, PGRST203, /does not exist/,
+    // /schema cache/, /no function matches/.
+    // Accept either declaration form (const arrow or function declaration) —
+    // the contract is that the named helpers exist, not how they are bound.
+    expect(src).toMatch(/isGenuinePermissionDenial\s*[=(]/);
+    expect(src).toMatch(/isMissingFunction\s*[=(]/);
+    expect(src).toMatch(/42883/);
+    expect(src).toMatch(/PGRST202/);
+    expect(src).toMatch(/schema cache/i);
+    // Every DML denial assertion must combine both helpers so a
+    // missing-function error cannot satisfy an RPC/table-denial check.
+    const dmlDenials = Array.from(
+      src.matchAll(/authenticated denied (?:INSERT|UPDATE|DELETE|create_[a-z_]+_event)[^\n]*\n\s*([^\n]+)/gi),
+    ).map((m) => m[1]);
+    expect(dmlDenials.length, "expected denial assertions to exist").toBeGreaterThan(0);
+    for (const line of dmlDenials) {
+      expect(line, `denial assertion must gate on isGenuinePermissionDenial: ${line}`).toMatch(
+        /isGenuinePermissionDenial\(/,
+      );
+      expect(line, `denial assertion must also reject missing-function: ${line}`).toMatch(
+        /!isMissingFunction\(/,
+      );
+    }
+  });
+  it("seeds real DML-denial targets through the canonical RPC only", () => {
+    // Watering and feeding are seeded as two independent parent events via
+    // save(ownerC, ...) — never via service_role direct inserts — and each
+    // returned grow_event_id is asserted. Subtype exclusivity is pinned so
+    // watering rows appear only in watering_events and feeding rows only in
+    // feeding_events.
+    expect(src).toMatch(/dml-denial seed: canonical watering save succeeds/);
+    expect(src).toMatch(/dml-denial seed: canonical feeding save succeeds/);
+    expect(src).toMatch(/watering save returned a concrete grow_event_id/);
+    expect(src).toMatch(/feeding save returned a concrete grow_event_id/);
+    expect(src).toMatch(/watering and feeding are independent parent events/);
+    expect(src).toMatch(/watering seed exists only in watering_events/);
+    expect(src).toMatch(/feeding seed exists only in feeding_events/);
+  });
 });
+
 
 describe("irrigation evidence RLS harness — disposable + self-cleaning", () => {
   it("only ever creates @verdant.test users", () => {

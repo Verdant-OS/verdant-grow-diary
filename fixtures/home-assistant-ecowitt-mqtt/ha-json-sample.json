@@ -1,0 +1,10 @@
+{
+  "entity_id": "sensor.ecowitt_gw1200_outdoor_temperature",
+  "state": "78.6",
+  "unit_of_measurement": "°F",
+  "last_updated": "2026-07-22T18:00:00.000Z",
+  "device_class": "temperature",
+  "attributes": {
+    "friendly_name": "Ecowitt GW1200 outdoor temperature"
+  }
+}

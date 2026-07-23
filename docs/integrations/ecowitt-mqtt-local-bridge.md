@@ -54,13 +54,56 @@ and bridge-token auth.
 
 ---
 
+## Adapter modes (configuration-based routing)
+
+The runner selects its upstream adapter mode **strictly from
+configuration** — never from topic shapes, payload sniffing, or any
+other inference.
+
+| `UPSTREAM_MODE`  | What it consumes                                              | Posture |
+| ---------------- | ------------------------------------------------------------- | ------- |
+| `ecowitt_raw`    | ecowitt2mqtt raw JSON on `ECOWITT_MQTT_TOPIC` (existing path) | unchanged — dry-run or validated webhook POST |
+| `ha_json`        | Home Assistant selective-JSON envelopes, one per message      | **dry-run only** — report output, no POST |
+| `ha_statestream` | HA MQTT Statestream separate-topic wire format (`<prefix>/<domain>/<object_id>/state`, `/last_updated`, per-attribute topics), assembled per entity | **dry-run only** — report output, no POST |
+
+Fail-closed rules:
+
+- `UPSTREAM_MODE` is **required**. A missing or invalid value stops the
+  runner at startup with an error listing the valid modes. There is no
+  silent default and no inference fallback.
+- `ha_json` / `ha_statestream` additionally **require**
+  `HA_MQTT_MAPPING_PATH` — a filesystem path to the exact-entity mapping
+  JSON (shape: `fixtures/home-assistant-ecowitt-mqtt/example-mapping.json`).
+  The file is read **once at startup, read-only**. A missing, unreadable,
+  or invalid mapping stops the runner with a path-safe error that never
+  echoes file contents.
+- `ha_statestream` requires the mapping's `statestream_topic_prefix`;
+  the runner subscribes to `<prefix>/#` and assembles per-entity state
+  through the adapter's `HaStatestreamAssembler`.
+- A statestream-shaped topic arriving in `ecowitt_raw` mode is parsed as
+  a raw payload (and rejected as malformed) — it is **never**
+  statestream-parsed. The reverse also holds.
+
+HA-mode dry-run reports print, per message: the shared ingest attempt
+report plus adapter detail — readings with `hav2` idempotency keys,
+reason codes (`unknown_entity`, `retained_without_source_timestamp`,
+`stale_reading`, …) and cumulative reason counts. Unknown entities and
+suffixes are counted, never dropped silently. Broker receive time is
+audit metadata only and is never used as `captured_at`; a reading with
+no source timestamp classifies invalid, never live. These modes make no
+network calls, write no rows, and control no devices.
+
+---
+
 ## Required env vars
 
 | Var                    | Meaning                                                  |
 | ---------------------- | -------------------------------------------------------- |
-| `VERDANT_INGEST_URL`   | Full ingest URL, `https://<ref>.supabase.co/functions/v1/sensor-ingest-webhook` |
-| `VERDANT_BRIDGE_TOKEN` | Bridge token (`vbt_...`) — keep secret                   |
-| `VERDANT_TENT_ID`      | Target tent UUID                                         |
+| `UPSTREAM_MODE`        | Adapter mode: `ecowitt_raw` \| `ha_json` \| `ha_statestream` (required, fail-closed) |
+| `VERDANT_INGEST_URL`   | Full ingest URL, `https://<ref>.supabase.co/functions/v1/sensor-ingest-webhook` (`ecowitt_raw` live POST only) |
+| `VERDANT_BRIDGE_TOKEN` | Bridge token (`vbt_...`) — keep secret (`ecowitt_raw` live POST only) |
+| `VERDANT_TENT_ID`      | Target tent UUID (`ecowitt_raw` only)                    |
+| `HA_MQTT_MAPPING_PATH` | Path to exact-entity mapping JSON (required for `ha_json` / `ha_statestream`) |
 
 ## Optional env vars
 

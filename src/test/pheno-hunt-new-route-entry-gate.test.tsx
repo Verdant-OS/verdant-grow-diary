@@ -83,10 +83,13 @@ function mockGrowData() {
         }),
       };
     }
-    if (table === "plants") {
+    // BUG-A grow attribution: the wizard resolves the grow's tent ids first
+    // so orphan-attributed plants can appear as candidates.
+    if (table === "tents" || table === "plants") {
       const builder = {
         select: () => builder,
         eq: () => builder,
+        or: () => builder,
         then: (res: (v: unknown) => unknown) =>
           Promise.resolve({ data: [], error: null }).then(res),
       } as unknown as PromiseLike<unknown> & Record<string, unknown>;

@@ -8,7 +8,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 
 const ROOT = resolve(__dirname, "..", "..");
 const FUNCTIONS = join(ROOT, "supabase", "functions");
@@ -37,7 +37,7 @@ describe("edge functions: no direct src/lib reach", () => {
   const files = walk(FUNCTIONS).filter(
     (f) =>
       f.endsWith(".ts") &&
-      !f.startsWith(MIRROR + require("node:path").sep) &&
+      !f.startsWith(MIRROR + sep) &&
       f !== MIRROR,
   );
 

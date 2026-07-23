@@ -1,6 +1,7 @@
 import { useParams, Link } from "react-router-dom";
 import { AlertTriangle, Archive, ArrowLeft, ArrowRight, Box, GitMerge, Sprout } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
+import PlantCultivarReferenceHint from "@/components/PlantCultivarReferenceHint";
 import StageBadge from "@/components/StageBadge";
 import EmptyState from "@/components/EmptyState";
 import GrowDataSourceDisclosure from "@/components/GrowDataSourceDisclosure";
@@ -22,6 +23,7 @@ import PlantAssignedTentActionsPanel from "@/components/PlantAssignedTentActions
 import PlantStatusStrip from "@/components/PlantStatusStrip";
 import QuickLogV2Fab from "@/components/QuickLogV2Fab";
 import PlantQuickStatusStrip from "@/components/PlantQuickStatusStrip";
+import PlantLogStreakMarker from "@/components/PlantLogStreakMarker";
 import PlantDetailQuickActions from "@/components/PlantDetailQuickActions";
 import PlantDetailPhotoStrip from "@/components/PlantDetailPhotoStrip";
 import PhotoDiagnosisReviewDialog from "@/components/PhotoDiagnosisReviewDialog";
@@ -399,6 +401,7 @@ export default function PlantDetail() {
           </div>
         }
       />
+      <PlantCultivarReferenceHint strain={plant.strain} plantId={plant.id} />
       <PlantDetailDataSourceDisclosure
         metas={[plantMeta, tentMeta]}
         testId="plant-detail-data-source-disclosure"
@@ -412,6 +415,7 @@ export default function PlantDetail() {
         growId={plant.growId ?? null}
         onRevealAndNavigate={revealAndNavigate}
       />
+      <PlantLogStreakMarker plantId={plant.id} />
       <PlantDetailQuickActions
         plantId={plant.id}
         plantName={plant.name}

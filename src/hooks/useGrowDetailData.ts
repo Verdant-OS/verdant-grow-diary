@@ -52,6 +52,7 @@ import {
   type ConnectedActivationGrowEventRow,
 } from "@/lib/connectedOneTentActivationRules";
 import { resolveQuickLogEventTimelineLabel } from "@/lib/quickLogActivityRules";
+import { buildGrowScopedPlantsOrFilter } from "@/lib/growAttributionRules";
 
 /** Bounded dedupe window for merging diary rows with the grow_events spine. */
 const ACTIVITY_MERGE_WINDOW = 1000;
@@ -203,6 +204,31 @@ export function useGrowDetailData(): UseGrowDetailData {
       }
     }
 
+    // Plants count resolves grow attribution (BUG-A): a plant belongs to
+    // this grow when its own grow_id matches OR it lives in one of the
+    // grow's tents (orphaned-tent rollup). Tent-id lookup failure degrades
+    // to "unavailable" — never a silent undercount.
+    async function countGrowScopedPlants(): Promise<CountValue> {
+      try {
+        const { data: tentRows, error: tErr } = await supabase
+          .from("tents")
+          .select("id")
+          .eq("grow_id", growId!);
+        if (tErr) return "unavailable";
+        const tentIds = (tentRows ?? [])
+          .map((r) => (r as { id?: string | null }).id ?? "")
+          .filter((id): id is string => typeof id === "string" && id.length > 0);
+        const { count, error: cErr } = await supabase
+          .from("plants")
+          .select("id", { count: "exact", head: true })
+          .or(buildGrowScopedPlantsOrFilter(growId!, tentIds));
+        if (cErr) return "unavailable";
+        return count ?? 0;
+      } catch {
+        return "unavailable";
+      }
+    }
+
     const [
       plants,
       tents,
@@ -215,7 +241,7 @@ export function useGrowDetailData(): UseGrowDetailData {
       alertsCritical,
       alertsWarning,
     ] = await Promise.all([
-      countFrom("plants"),
+      countGrowScopedPlants(),
       countFrom("tents"),
       countFrom("diary_entries"),
       countFrom("grow_events", (q) => q.eq("source", "manual").eq("is_deleted", false)),

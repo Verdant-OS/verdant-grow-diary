@@ -235,7 +235,9 @@ vi.mock("@/hooks/useAlertsLinkedActionCounts", () => ({
   useAlertsLinkedActionCounts: () => ({ get: () => undefined }),
 }));
 vi.mock("@/hooks/useGrowData", () => ({
-  useGrowTents: () => ({ data: [] }),
+  // Settled empty tent read: persistence gates on `isFetched` so a pending
+  // tent query can never persist against the grow row's stage alone.
+  useGrowTents: () => ({ data: [], isFetched: true }),
 }));
 vi.mock("@/hooks/useLatestSensorSnapshot", () => ({
   useLatestSensorSnapshot: () => ({ status: "loading" }),

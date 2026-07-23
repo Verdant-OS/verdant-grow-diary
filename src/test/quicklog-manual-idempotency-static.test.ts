@@ -67,8 +67,12 @@ describe("quicklog_save_manual idempotency contract (migration)", () => {
   });
 
   it("drops the old signature exactly (no ambiguous overload pair)", () => {
+    // The parameter list grows over time (…, jsonb → +p_idempotency_key →
+    // +p_stage). Whatever the latest migration is, it must drop the exact
+    // immediately-prior signature: the shared 10-arg prefix plus zero or
+    // more appended text parameters.
     expect(sql).toMatch(
-      /DROP FUNCTION IF EXISTS public\.quicklog_save_manual\(\s*text, uuid, text, numeric, text, numeric, numeric, numeric, timestamptz, jsonb\s*\)/,
+      /DROP FUNCTION IF EXISTS public\.quicklog_save_manual\(\s*text, uuid, text, numeric, text, numeric, numeric, numeric, timestamptz, jsonb(?:, text)*\s*\)/,
     );
   });
 });

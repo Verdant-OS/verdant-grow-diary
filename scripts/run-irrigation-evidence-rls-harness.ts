@@ -133,6 +133,75 @@ function check(name: string, ok: boolean, detail?: string): void {
   }
 }
 
+type DbLikeError = { code?: string | null; message?: string | null } | null | undefined;
+
+/**
+ * Classify a PostgREST / pg error into one of a small set of labels so that
+ * per-assertion output distinguishes a real ACL rejection from noise that
+ * *looks* like a denial but proves nothing about privileges.
+ *
+ *   genuine-permission-denial → 42501 or "permission denied" in message
+ *   missing-function          → 42883 / "does not exist" / "no function matches"
+ *   schema-cache-miss         → PostgREST PGRST202 / PGRST203 / "schema cache"
+ *   unexpected-error          → any other non-null error
+ *   no-error                  → err is null/undefined (call succeeded)
+ *
+ * missing-function and schema-cache-miss are distinct labels because the
+ * remediations differ: the former means the DDL was never applied on this
+ * database, the latter means PostgREST has not reloaded its cache. Neither
+ * proves that EXECUTE was revoked, so both must fail an ACL-denial assertion.
+ */
+type ErrorClass =
+  | "genuine-permission-denial"
+  | "missing-function"
+  | "schema-cache-miss"
+  | "unexpected-error"
+  | "no-error";
+
+function classifyDbError(err: DbLikeError): ErrorClass {
+  if (!err) return "no-error";
+  const code = err.code ?? "";
+  const message = err.message ?? "";
+  if (code === "42501" || /permission denied/i.test(message)) {
+    return "genuine-permission-denial";
+  }
+  if (code === "PGRST202" || code === "PGRST203" || /schema cache/i.test(message)) {
+    return "schema-cache-miss";
+  }
+  if (
+    code === "42883" ||
+    /does not exist|could not find the function|no function matches/i.test(message)
+  ) {
+    return "missing-function";
+  }
+  return "unexpected-error";
+}
+
+function isGenuinePermissionDenial(err: DbLikeError): boolean {
+  return classifyDbError(err) === "genuine-permission-denial";
+}
+function isMissingFunction(err: DbLikeError): boolean {
+  const c = classifyDbError(err);
+  return c === "missing-function" || c === "schema-cache-miss";
+}
+
+/**
+ * Format the per-assertion detail column so operators can immediately see
+ * whether a "denied" assertion failed because we got a real ACL rejection, a
+ * missing function, a schema-cache miss, an unexpected error, or (worst) a
+ * successful call that should have been denied.
+ */
+function formatDenialDetail(
+  err: DbLikeError,
+  expected = "expected 42501 / permission denied",
+): string {
+  const cls = classifyDbError(err);
+  if (cls === "no-error") return `[success-instead-of-denial] ${expected}, got success`;
+  const code = err?.code ? ` code=${err.code}` : "";
+  const msg = err?.message ?? "unknown error";
+  return `[${cls}]${code} ${msg}`;
+}
+
 function isRecord(v: unknown): v is Record<string, unknown> {
   return !!v && typeof v === "object" && !Array.isArray(v);
 }
@@ -368,6 +437,22 @@ async function main() {
     p_water: water,
     ...over,
   });
+  // Feeding uses a distinct helper so p_water is explicitly cleared. The RPC
+  // rejects a non-null p_water when p_event_type = 'feeding', so inheriting
+  // baseArgs and spreading a p_feed override would fail closed with
+  // water_not_allowed_for_feeding instead of exercising the feeding path.
+  const feed = { line_id: "default", products: [] as unknown[] };
+  const feedingArgs = (over: Record<string, unknown>) => ({
+    p_idempotency_key: key(),
+    p_grow_id: oGrow,
+    p_event_type: "feeding",
+    p_tent_id: oTent,
+    p_plant_id: oPlantInTent,
+    p_water: null,
+    p_feed: feed,
+    ...over,
+  });
+
 
   // 1. owner success
   const ok = await save(ownerC, baseArgs({}));
@@ -592,7 +677,162 @@ async function main() {
         : `rows=${Array.isArray(data) ? data.length : "unknown"}`,
     );
   }
+
+  // 15. Server trust boundary (2026-07-22 revoke): authenticated must be
+  // denied on legacy typed-event RPCs. Denial MUST be a genuine permission
+  // rejection — "function does not exist" / "no function matches" / PostgREST
+  // schema-cache misses do NOT count, because they wouldn't prove the
+  // privilege was revoked (they'd prove the function isn't callable at all).
+  // formatDenialDetail() tags each failure with its classified failure mode
+  // (genuine-permission-denial / missing-function / schema-cache-miss /
+  //  unexpected-error / success-instead-of-denial) so the diagnostic column
+  // makes remediation obvious.
+  const legacyWatering = await ownerC.rpc("create_watering_event" as never, {
+    _grow_id: oGrow,
+    _volume_ml: 100,
+    _tent_id: oTent,
+    _plant_id: oPlantInTent,
+  } as never);
+  check(
+    "authenticated denied create_watering_event with genuine permission error (not missing-function)",
+    isGenuinePermissionDenial(legacyWatering.error) && !isMissingFunction(legacyWatering.error),
+    formatDenialDetail(legacyWatering.error),
+  );
+  const legacyFeeding = await ownerC.rpc("create_feeding_event" as never, {
+    _grow_id: oGrow,
+    _line_id: "default",
+    _products: [],
+    _tent_id: oTent,
+    _plant_id: oPlantInTent,
+  } as never);
+  check(
+    "authenticated denied create_feeding_event with genuine permission error (not missing-function)",
+    isGenuinePermissionDenial(legacyFeeding.error) && !isMissingFunction(legacyFeeding.error),
+    formatDenialDetail(legacyFeeding.error),
+  );
+
+  // 16. Direct DML denial for INSERT / UPDATE / DELETE on all three event
+  // tables via the authenticated client. SELECT on own rows must remain
+  // available. Real target rows are seeded via the CANONICAL authenticated
+  // path (quicklog_save_event) — never via service_role direct table inserts
+  // — so UPDATE / DELETE denial cannot be masked by an empty table, and no
+  // second write path exists in the harness.
+  //
+  // The event-table denial allowlist is closed to exactly these three tables.
+  // Adding a table here means adding matching REVOKE coverage and pgTAP proof.
+  const DENIAL_ALLOWLIST = ["grow_events", "watering_events", "feeding_events"] as const;
+
+  const wateringSeedKey = key();
+  const wateringSeed = await save(ownerC, baseArgs({ p_idempotency_key: wateringSeedKey }));
+  check(
+    "dml-denial seed: canonical watering save succeeds",
+    wateringSeed.env?.ok === true,
+    JSON.stringify(wateringSeed.env),
+  );
+  const wateringSeedEventId = wateringSeed.env?.grow_event_id as string | undefined;
+  check(
+    "dml-denial seed: watering save returned a concrete grow_event_id",
+    typeof wateringSeedEventId === "string" && wateringSeedEventId.length > 0,
+  );
+
+  const feedingSeedKey = key();
+  const feedingSeed = await save(ownerC, feedingArgs({ p_idempotency_key: feedingSeedKey }));
+  check(
+    "dml-denial seed: canonical feeding save succeeds",
+    feedingSeed.env?.ok === true,
+    JSON.stringify(feedingSeed.env),
+  );
+  const feedingSeedEventId = feedingSeed.env?.grow_event_id as string | undefined;
+  check(
+    "dml-denial seed: feeding save returned a concrete grow_event_id",
+    typeof feedingSeedEventId === "string" && feedingSeedEventId.length > 0,
+  );
+  check(
+    "dml-denial seed: watering and feeding are independent parent events",
+    typeof wateringSeedEventId === "string" &&
+      typeof feedingSeedEventId === "string" &&
+      wateringSeedEventId !== feedingSeedEventId,
+  );
+
+  if (typeof wateringSeedEventId === "string") {
+    const wCounts = await eventSetCounts(owner.id, wateringSeedEventId, wateringSeedKey);
+    check(
+      "watering seed exists only in watering_events (no feeding subtype row)",
+      wCounts.grow === 1 &&
+        wCounts.watering === 1 &&
+        wCounts.feeding === 0 &&
+        wCounts.idempotency === 1,
+      JSON.stringify(wCounts),
+    );
+  }
+  if (typeof feedingSeedEventId === "string") {
+    const fCounts = await eventSetCounts(owner.id, feedingSeedEventId, feedingSeedKey);
+    check(
+      "feeding seed exists only in feeding_events (no watering subtype row)",
+      fCounts.grow === 1 &&
+        fCounts.feeding === 1 &&
+        fCounts.watering === 0 &&
+        fCounts.idempotency === 1,
+      JSON.stringify(fCounts),
+    );
+  }
+
+  for (const table of DENIAL_ALLOWLIST) {
+    const insertPayload: Record<string, unknown> =
+      table === "grow_events"
+        ? {
+            user_id: owner.id,
+            grow_id: oGrow,
+            tent_id: oTent,
+            event_type: "watering",
+            source: "manual",
+          }
+        : {
+            event_id: crypto.randomUUID(),
+            user_id: owner.id,
+            ...(table === "watering_events" ? { volume_ml: 100 } : { line_id: "x", products: [] }),
+          };
+    const ins = await ownerC.from(table).insert(insertPayload);
+    check(
+      `authenticated denied INSERT on ${table} (genuine permission error)`,
+      isGenuinePermissionDenial(ins.error) && !isMissingFunction(ins.error),
+      formatDenialDetail(ins.error),
+    );
+
+    const upd = await ownerC.from(table).update({ user_id: owner.id }).eq("user_id", owner.id);
+    check(
+      `authenticated denied UPDATE on ${table} (genuine permission error)`,
+      isGenuinePermissionDenial(upd.error) && !isMissingFunction(upd.error),
+      formatDenialDetail(upd.error),
+    );
+
+    const del = await ownerC.from(table).delete().eq("user_id", owner.id);
+    check(
+      `authenticated denied DELETE on ${table} (genuine permission error)`,
+      isGenuinePermissionDenial(del.error) && !isMissingFunction(del.error),
+      formatDenialDetail(del.error),
+    );
+
+    const sel = await ownerC.from(table).select("user_id").eq("user_id", owner.id).limit(1);
+    check(
+      `authenticated retains SELECT on ${table}`,
+      sel.error === null,
+      sel.error ? formatDenialDetail(sel.error, "expected success") : undefined,
+    );
+  }
+
+  // 17. service-role ACL / RPC-execution posture is intentionally NOT proved
+  // at runtime here. The legacy create_watering_event / create_feeding_event
+  // RPCs are SECURITY INVOKER and depend on auth.uid() — a service_role JWT
+  // supplies no user identity, so a "successful" runtime call would prove
+  // nothing about ACL preservation and a failing call would falsely look
+  // like a denial regression. ACL possession (service_role retains EXECUTE
+  // on both legacy overloads; anon and authenticated do not; service_role
+  // retains SELECT/INSERT/UPDATE/DELETE on the three event tables) is proved
+  // out-of-band in the pgTAP suites under supabase/tests/.
 }
+
+
 
 async function teardown(): Promise<void> {
   try {

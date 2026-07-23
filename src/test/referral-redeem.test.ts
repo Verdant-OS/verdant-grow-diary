@@ -10,6 +10,7 @@ import {
   type ReferralRedeemClient,
 } from "@/lib/referralRedeem";
 import { OAUTH_REFERRAL_STORAGE_KEY } from "@/lib/oauthReferralCaptureRules";
+import { clearLocalStorageForTest, getLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
 
 function fakeStorage(seed: Record<string, string> = {}) {
   const map = new Map(Object.entries(seed));
@@ -37,7 +38,7 @@ const CONFIRMED_USER = {
 };
 
 beforeEach(() => {
-  window.localStorage.clear();
+  clearLocalStorageForTest();
 });
 
 describe("flushPendingReferralRedeem", () => {
@@ -72,7 +73,7 @@ describe("flushPendingReferralRedeem", () => {
     const status = await flushPendingReferralRedeem(client, CONFIRMED_USER, fakeStorage());
     expect(status).toBe("converted");
     expect(invoke).toHaveBeenCalledWith("redeem-referral", { body: { code: "abc234kmn" } });
-    expect(window.localStorage.getItem(REFERRAL_REDEEMED_MARKER_PREFIX + CONFIRMED_USER.id)).toBe(
+    expect(getLocalStorageItemForTest(REFERRAL_REDEEMED_MARKER_PREFIX + CONFIRMED_USER.id)).toBe(
       "1",
     );
   });
@@ -110,7 +111,7 @@ describe("flushPendingReferralRedeem", () => {
     );
     expect(status).toBe("terminal");
     expect(storage.getItem(OAUTH_REFERRAL_STORAGE_KEY)).toBeNull();
-    expect(window.localStorage.getItem(REFERRAL_REDEEMED_MARKER_PREFIX + CONFIRMED_USER.id)).toBe(
+    expect(getLocalStorageItemForTest(REFERRAL_REDEEMED_MARKER_PREFIX + CONFIRMED_USER.id)).toBe(
       "1",
     );
   });
@@ -120,7 +121,7 @@ describe("flushPendingReferralRedeem", () => {
     const status = await flushPendingReferralRedeem(client, CONFIRMED_USER, fakeStorage());
     expect(status).toBe("retry");
     expect(
-      window.localStorage.getItem(REFERRAL_REDEEMED_MARKER_PREFIX + CONFIRMED_USER.id),
+      getLocalStorageItemForTest(REFERRAL_REDEEMED_MARKER_PREFIX + CONFIRMED_USER.id),
     ).toBeNull();
   });
 

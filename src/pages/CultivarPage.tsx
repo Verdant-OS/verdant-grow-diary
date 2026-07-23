@@ -7,6 +7,7 @@
 import { useEffect } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import BrandLogo from "@/components/BrandLogo";
+import CultivarFollowButton from "@/components/CultivarFollowButton";
 import CultivarPhenoSampleModule from "@/components/CultivarPhenoSampleModule";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import {
@@ -113,6 +114,10 @@ export default function CultivarPage() {
           <p className="mt-2 text-sm text-muted-foreground">
             Aliases: {cultivar.aliases.length > 0 ? cultivar.aliases.join(", ") : "None recorded"}
           </p>
+
+          <div className="mt-4">
+            <CultivarFollowButton cultivar={cultivar} />
+          </div>
 
           <div
             data-testid="cultivar-reference-banner"

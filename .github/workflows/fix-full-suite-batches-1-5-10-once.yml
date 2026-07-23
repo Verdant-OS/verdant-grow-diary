@@ -55,8 +55,8 @@ jobs:
                   raise SystemExit("Workbook helper insertion marker missing")
               text = text.replace(marker, helper, 1)
           replacements = text.count("XLSX.readFile(")
-          if replacements != 6:
-              raise SystemExit(f"Expected 6 XLSX.readFile calls, found {replacements}")
+          if replacements != 7:
+              raise SystemExit(f"Expected 7 XLSX.readFile calls, found {replacements}")
           text = text.replace("XLSX.readFile(", "readWorkbook(")
           test_path.write_text(text)
 

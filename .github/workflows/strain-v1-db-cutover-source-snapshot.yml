@@ -6,6 +6,11 @@ on:
       - release/strain-v1-db-cutover
     paths:
       - .github/workflows/strain-v1-db-cutover-source-snapshot.yml
+  pull_request:
+    branches:
+      - verdant-grow-diary
+    paths:
+      - .github/workflows/strain-v1-db-cutover-source-snapshot.yml
 
 permissions:
   contents: read

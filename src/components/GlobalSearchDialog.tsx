@@ -17,6 +17,7 @@ import { Command as CommandPrimitive } from "cmdk";
 import { AlertTriangle, Clock, Dna, Leaf, RefreshCw, Sprout, Tent } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   CommandEmpty,
   CommandGroup,

@@ -42,8 +42,13 @@ import {
   DEFAULT_FILTERS,
   readGlobalSearchSession,
   writeGlobalSearchSession,
+  readGlobalSearchHistory,
+  pushGlobalSearchHistory,
+  clearGlobalSearchHistory,
+  type GlobalSearchHistoryEntry,
 } from "@/lib/globalSearchSession";
 import GlobalSearchResultPreview from "@/components/GlobalSearchResultPreview";
+
 
 
 interface Props {

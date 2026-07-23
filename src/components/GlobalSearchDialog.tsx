@@ -701,6 +701,7 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
                           onMouseEnter={() => setPreviewRow(row)}
                           onFocus={() => setPreviewRow(row)}
                           data-testid={`global-search-item-${type}-${row.id}`}
+                          className="data-[selected=true]:ring-2 data-[selected=true]:ring-primary/60 data-[selected=true]:ring-inset"
                         >
 
                           <Icon

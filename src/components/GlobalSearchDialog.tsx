@@ -14,7 +14,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Command as CommandPrimitive } from "cmdk";
-import { AlertTriangle, Dna, Leaf, RefreshCw, Sprout, Tent } from "lucide-react";
+import { AlertTriangle, Clock, Dna, Leaf, RefreshCw, Sprout, Tent } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import {
@@ -32,6 +32,11 @@ import {
 } from "@/hooks/useGlobalSearch";
 import { growDetailPath, plantDetailPath, tentDetailPath } from "@/lib/routes";
 import { highlightMatch } from "@/lib/highlightMatch";
+import {
+  clearRecentSearches,
+  pushRecentSearch,
+  readRecentSearches,
+} from "@/lib/recentGlobalSearches";
 
 interface Props {
   open: boolean;

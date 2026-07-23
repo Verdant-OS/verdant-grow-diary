@@ -8,6 +8,7 @@ import { useEffect } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import BrandLogo from "@/components/BrandLogo";
 import CultivarPhenoSampleModule from "@/components/CultivarPhenoSampleModule";
+import CultivarQaPanel from "@/components/CultivarQaPanel";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import {
   findCultivarBySlug,
@@ -292,6 +293,8 @@ export default function CultivarPage() {
             </section>
           </aside>
         </div>
+
+        <CultivarQaPanel cultivar={cultivar} />
 
         <section className="mt-10 rounded-xl border border-primary/30 bg-primary/5 p-5">
           <h2 className="font-display text-xl font-semibold">Build plant memory for your own run</h2>

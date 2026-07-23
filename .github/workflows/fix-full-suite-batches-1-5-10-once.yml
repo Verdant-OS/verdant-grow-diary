@@ -6,6 +6,11 @@ on:
       - fix/full-suite-batches-1-5-10
     paths:
       - .github/workflows/fix-full-suite-batches-1-5-10-once.yml
+  pull_request:
+    branches:
+      - verdant-grow-diary
+    paths:
+      - .github/workflows/fix-full-suite-batches-1-5-10-once.yml
 
 permissions:
   contents: write

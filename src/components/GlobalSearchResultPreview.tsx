@@ -206,6 +206,37 @@ export default function GlobalSearchResultPreview({
           <ExternalLink className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
           Open {typeLabel.toLowerCase()}
         </Button>
+        <div className="grid grid-cols-2 gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={handleOpenInNewTab}
+            disabled={!absoluteUrl}
+            data-testid="global-search-preview-open-new-tab"
+            aria-label={`Open ${typeLabel.toLowerCase()} in new tab`}
+          >
+            <SquareArrowOutUpRight className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+            New tab
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={handleCopyLink}
+            disabled={!absoluteUrl}
+            data-testid="global-search-preview-copy-link"
+            aria-label={copied ? "Link copied" : `Copy link to ${typeLabel.toLowerCase()}`}
+          >
+            {copied ? (
+              <Check className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+            ) : (
+              <Copy className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+            )}
+            {copied ? "Copied" : "Copy link"}
+          </Button>
+        </div>
+
       </div>
     </aside>
   );

@@ -135,6 +135,45 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     l.dispose();
   });
 
+  it("Training → quicklog_save_event carries the chosen technique in p_details", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: { ok: true, grow_event_id: "e-train" },
+      error: null,
+    });
+    mountSection();
+    selectActivity("training");
+    await screen.findByTestId("quick-log-all-activities-form");
+    // The structured technique select is rendered from the detail-field spec.
+    const technique = screen.getByTestId("quick-log-all-activities-detail-technique");
+    fireEvent.change(technique, { target: { value: "topping" } });
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-note"), {
+      target: { value: "topped above 5th node" },
+    });
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
+
+    await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(1));
+    const [rpcName, args] = rpcMock.mock.calls[0];
+    expect(rpcName).toBe("quicklog_save_event");
+    expect(args.p_event_type).toBe("training");
+    expect(args.p_details).toMatchObject({ technique: "topping" });
+    // Never leak a reserved identity key through the detail seam.
+    expect(args.p_details).not.toHaveProperty("user_id");
+  });
+
+  it("Training drops an unchosen (blank) technique — no technique key in p_details", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: { ok: true, grow_event_id: "e-train2" },
+      error: null,
+    });
+    mountSection();
+    await saveWithNote("training", "defoliated nothing, just LST by hand");
+    await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(1));
+    const [, args] = rpcMock.mock.calls[0];
+    expect(args.p_event_type).toBe("training");
+    // No technique chosen → sanitized out, not persisted as blank.
+    if (args.p_details) expect(args.p_details).not.toHaveProperty("technique");
+  });
+
   it("Watering emits the exact structured V2 intent after the parent-close seam, with no inline Save or RPC", () => {
     const order: string[] = [];
     const events: CustomEvent[] = [];

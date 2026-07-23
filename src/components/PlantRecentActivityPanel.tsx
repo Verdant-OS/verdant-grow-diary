@@ -20,13 +20,25 @@ import {
   PHOTO_NON_DIAGNOSTIC_LABEL,
   PHOTO_NON_DIAGNOSTIC_TESTID,
 } from "@/lib/photoEventNonDiagnosticLabelRules";
+import {
+  describeQuickLogDetailsFromExtras,
+  type QuickLogDetailDisplayLine,
+} from "@/lib/quickLogActivityDetailFields";
 
 interface Props {
   plantId: string | null | undefined;
   plantName?: string | null;
 }
 
-function EntryRow({ row, plantName }: { row: PlantRecentActivityRow; plantName?: string | null }) {
+function EntryRow({
+  row,
+  plantName,
+  detailLines,
+}: {
+  row: PlantRecentActivityRow;
+  plantName?: string | null;
+  detailLines: readonly QuickLogDetailDisplayLine[];
+}) {
   return (
     <li
       className="rounded-lg border bg-card/40 p-3 text-sm"
@@ -71,9 +83,27 @@ function EntryRow({ row, plantName }: { row: PlantRecentActivityRow; plantName?:
           ) : null}
         </div>
       </div>
+      {detailLines.length > 0 ? (
+        <ul
+          className="mt-2 flex flex-wrap gap-1.5"
+          data-testid="plant-recent-activity-detail-lines"
+        >
+          {detailLines.map((line) => (
+            <li key={line.key}>
+              <Badge
+                variant="outline"
+                className="text-[11px] font-normal"
+                data-testid={`plant-recent-activity-detail-${line.key}`}
+              >
+                {line.label}: {line.value}
+              </Badge>
+            </li>
+          ))}
+        </ul>
+      ) : null}
       {row.notePreview ? (
         <p className="mt-2 text-sm leading-snug">{row.notePreview}</p>
-      ) : !row.hasHardwareReadings ? (
+      ) : !row.hasHardwareReadings && detailLines.length === 0 ? (
         <p className="mt-2 text-xs text-muted-foreground italic">No note</p>
       ) : null}
       {row.hasPhoto && row.showPhotoNonDiagnosticLabel ? (
@@ -123,9 +153,20 @@ function EntryRow({ row, plantName }: { row: PlantRecentActivityRow; plantName?:
 export default function PlantRecentActivityPanel({ plantId, plantName }: Props) {
   const enabled = !!plantId;
   const { data, isLoading } = usePlantRecentActivity(plantId);
-  const rows = buildPlantRecentActivity(enabled ? data ?? [] : [], {
+  const rawRows = enabled ? data ?? [] : [];
+  const rows = buildPlantRecentActivity(rawRows, {
     plantId: plantId ?? null,
   });
+  // Structured activity detail (e.g. training technique) is recovered from the
+  // raw stored details here in the presenter — deliberately NOT in
+  // buildPlantRecentActivity, which is mirrored into the edge bundle and must
+  // stay free of UI-only describe logic. Keyed by entry id for O(1) lookup.
+  const detailLinesById = new Map<string, readonly QuickLogDetailDisplayLine[]>();
+  for (const raw of rawRows as Array<{ id?: unknown; details?: unknown }>) {
+    if (typeof raw?.id !== "string") continue;
+    const lines = describeQuickLogDetailsFromExtras(raw.details);
+    if (lines.length > 0) detailLinesById.set(raw.id, lines);
+  }
 
   return (
     <Card
@@ -163,7 +204,12 @@ export default function PlantRecentActivityPanel({ plantId, plantName }: Props) 
         ) : (
           <ul className="space-y-2" data-testid="plant-recent-activity-list">
             {rows.map((r) => (
-              <EntryRow key={r.id} row={r} plantName={plantName} />
+              <EntryRow
+                key={r.id}
+                row={r}
+                plantName={plantName}
+                detailLines={detailLinesById.get(r.id) ?? []}
+              />
             ))}
           </ul>
         )}

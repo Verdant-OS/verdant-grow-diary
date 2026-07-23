@@ -39,6 +39,10 @@ import {
 } from "@/constants/quickLogActivityTypes";
 import { buildHarvestDetailsPayload, validateHarvestWeightInput } from "@/lib/harvestDetailsRules";
 import {
+  getQuickLogActivityDetailFields,
+  sanitizeQuickLogActivityDetails,
+} from "@/lib/quickLogActivityDetailFields";
+import {
   buildDailyCheckSavedItems,
   type DailyCheckSavedItem,
   type DailyCheckSavedSource,
@@ -162,6 +166,9 @@ export default function QuickLogAllActivitiesSection({
   const [harvestWet, setHarvestWet] = useState("");
   const [harvestDry, setHarvestDry] = useState("");
   const [harvestUnit, setHarvestUnit] = useState<QuickLogWeightUnit>("g");
+  // Generic per-activity structured detail values (e.g. training technique),
+  // keyed by field spec key. Sanitized before persistence.
+  const [detailValues, setDetailValues] = useState<Record<string, string>>({});
   const [saved, setSaved] = useState<SavedRecord[]>([]);
   const [errorReason, setErrorReason] = useState<string | null>(null);
   const [errorForActivity, setErrorForActivity] = useState<QuickLogActivityId | null>(null);
@@ -180,6 +187,7 @@ export default function QuickLogAllActivitiesSection({
     setHarvestWet("");
     setHarvestDry("");
     setHarvestUnit("g");
+    setDetailValues({});
     setErrorReason(null);
     setErrorForActivity(null);
     setStructuredWaterError(null);
@@ -254,6 +262,7 @@ export default function QuickLogAllActivitiesSection({
       setHarvestWet("");
       setHarvestDry("");
       setHarvestUnit("g");
+      setDetailValues({});
     },
     [
       currentTarget,
@@ -346,6 +355,14 @@ export default function QuickLogAllActivitiesSection({
       }
     }
 
+    // Generic structured activity detail (e.g. training technique). Sanitized
+    // to the closed spec — out-of-set, blank, reserved-identity, and over-long
+    // values are dropped, never persisted.
+    const activityDetails = sanitizeQuickLogActivityDetails(selected.id, detailValues);
+    if (activityDetails) {
+      Object.assign(extraDetails, activityDetails);
+    }
+
     const capturedTarget = Object.freeze({
       growId,
       tentId: tentId ?? null,
@@ -402,6 +419,7 @@ export default function QuickLogAllActivitiesSection({
       setHarvestWet("");
       setHarvestDry("");
       setHarvestUnit("g");
+      setDetailValues({});
       setSelectedDraft(null);
       setErrorReason(null);
       setErrorForActivity(null);
@@ -427,6 +445,7 @@ export default function QuickLogAllActivitiesSection({
     harvestWeightsInvalid,
     harvestWetValidation,
     harvestDryValidation,
+    detailValues,
     onSaveStart,
     onSaveEnd,
     isMutationBlocked,
@@ -510,6 +529,59 @@ export default function QuickLogAllActivitiesSection({
               {selectedAvailability.disabledReason ??
                 QUICK_LOG_HARVEST_STAGE_DISABLED_REASON}
             </p>
+          )}
+
+          {getQuickLogActivityDetailFields(selected.id).length > 0 && (
+            <div
+              className="grid grid-cols-1 sm:grid-cols-2 gap-2"
+              data-testid={`${testIdPrefix}-detail-fields`}
+            >
+              {getQuickLogActivityDetailFields(selected.id).map((field) => (
+                <div key={field.key} className="space-y-1">
+                  <Label
+                    htmlFor={`${testIdPrefix}-detail-${field.key}`}
+                    className="text-[11px] text-muted-foreground"
+                  >
+                    {field.label} (optional)
+                  </Label>
+                  {field.kind === "select" ? (
+                    <select
+                      id={`${testIdPrefix}-detail-${field.key}`}
+                      data-testid={`${testIdPrefix}-detail-${field.key}`}
+                      value={detailValues[field.key] ?? ""}
+                      onChange={(e) => {
+                        if (isMutationBlocked()) return;
+                        const v = e.target.value;
+                        setDetailValues((prev) => ({ ...prev, [field.key]: v }));
+                      }}
+                      disabled={mutationBlocked}
+                      className="w-full text-sm h-9 rounded-md border border-input bg-background px-2"
+                    >
+                      <option value="">Not recorded</option>
+                      {(field.options ?? []).map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <Input
+                      id={`${testIdPrefix}-detail-${field.key}`}
+                      data-testid={`${testIdPrefix}-detail-${field.key}`}
+                      value={detailValues[field.key] ?? ""}
+                      onChange={(e) => {
+                        if (isMutationBlocked()) return;
+                        const v = e.target.value;
+                        setDetailValues((prev) => ({ ...prev, [field.key]: v }));
+                      }}
+                      disabled={mutationBlocked}
+                      placeholder={field.placeholder}
+                      className="text-sm"
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
           )}
 
           {selected.id === "manual_sensor_snapshot" ? (

@@ -70,9 +70,11 @@ import {
 import { buildIngestAttemptReport } from "../../src/lib/ingestAttemptReportRules";
 import {
   HaStatestreamAssembler,
+  deriveVpdIfPaired,
   parseHaJsonMessage,
   parseHaStatestreamMessage,
   type HaAdapterResult,
+  type HaMetricReading,
   type HaMqttMappingFile,
 } from "../../src/lib/homeAssistantEcowittMqttAdapter";
 
@@ -364,6 +366,16 @@ export interface HaDryRunState {
   reasonCounts: Record<string, number>;
   /** Ordered unique hav2 keys (capped at HA_DRY_RUN_MAX_TRACKED_KEYS). */
   idempotencyKeys: string[];
+  /**
+   * Latest validated live temp/RH readings keyed by exact
+   * tent + plant + configured channel identity. The runner never pairs
+   * across channels or targets, and stale/invalid adapter results never
+   * enter this cache.
+   */
+  vpdPairCache: Map<
+    string,
+    { temp: HaMetricReading | null; rh: HaMetricReading | null }
+  >;
   seenKeys: Set<string>;
 }
 
@@ -384,6 +396,7 @@ export function createHaDryRunState(config: RunnerModeConfig): HaDryRunState {
     duplicatesSuppressed: 0,
     reasonCounts: {},
     idempotencyKeys: [],
+    vpdPairCache: new Map(),
     seenKeys: new Set<string>(),
   };
 }
@@ -470,6 +483,53 @@ function classifyUnassembledStatestreamPart(
   return "statestream_part_buffered";
 }
 
+function haVpdPairIdentity(reading: HaMetricReading): string {
+  return JSON.stringify([
+    reading.tent_id,
+    reading.plant_id ?? null,
+    reading.channel ?? null,
+  ]);
+}
+
+/**
+ * Add a derived VPD reading only when the canonical adapter has emitted
+ * validated LIVE temperature and humidity readings for the same exact
+ * tent/plant/channel identity. The adapter owns Tetens math, the two-minute
+ * pairing window, provenance, and the hav2 idempotency preimage.
+ */
+function appendDerivedVpdReadings(
+  state: HaDryRunState,
+  incoming: readonly HaMetricReading[],
+): HaMetricReading[] {
+  const output = [...incoming];
+
+  for (const reading of incoming) {
+    if (
+      reading.provenance.source !== "live" ||
+      (reading.metric !== "air_temp_f" && reading.metric !== "humidity_pct")
+    ) {
+      continue;
+    }
+
+    const identity = haVpdPairIdentity(reading);
+    const pair = state.vpdPairCache.get(identity) ?? { temp: null, rh: null };
+    if (reading.metric === "air_temp_f") pair.temp = reading;
+    else pair.rh = reading;
+    state.vpdPairCache.set(identity, pair);
+
+    if (!pair.temp || !pair.rh) continue;
+
+    const derived = deriveVpdIfPaired({ temp: pair.temp, rh: pair.rh });
+    if ("metric" in derived) {
+      output.push(derived);
+    } else {
+      countReason(state, derived.reason);
+    }
+  }
+
+  return output;
+}
+
 function adapterResultToDryRunReport(args: {
   state: HaDryRunState;
   topic: string;
@@ -478,7 +538,11 @@ function adapterResultToDryRunReport(args: {
 }): HaDryRunReport {
   const { state, result } = args;
   for (const reason of result.reasons) countReason(state, reason);
-  const readings: HaDryRunReading[] = result.readings.map((r) => ({
+  const readingsWithDerivedVpd = appendDerivedVpdReadings(
+    state,
+    result.readings,
+  );
+  const readings: HaDryRunReading[] = readingsWithDerivedVpd.map((r) => ({
     metric: r.metric,
     value: r.value,
     entity_id: r.entity_id,

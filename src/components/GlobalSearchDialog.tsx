@@ -243,6 +243,20 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
     setHistory([]);
   };
 
+  // Nuke everything the palette remembers for this session: resumed
+  // query + filter toggles (sessionStorage), replayable history entries,
+  // and the localStorage "recent searches" list. Also resets the live UI
+  // state back to defaults so the user sees a clean slate immediately.
+  const handleClearAllSearchState = () => {
+    clearGlobalSearchSession();
+    clearGlobalSearchHistory();
+    clearRecentSearches();
+    setHistory([]);
+    setRecent([]);
+    setQuery("");
+    setEnabledTypes({ ...DEFAULT_FILTERS });
+  };
+
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

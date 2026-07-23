@@ -4,10 +4,13 @@ on:
   push:
     branches:
       - qa/browser-fake-account-20260723
+      - qa/browser-fake-account-pr-run-20260723
     paths:
       - .github/workflows/qa-fake-account-live-once.yml
       - playwright.qa-fake-account.config.ts
       - e2e/qa-fake-account-live.spec.ts
+      - playwright.qa-gmail-account.config.ts
+      - e2e/qa-gmail-account-live.spec.ts
   pull_request:
     branches:
       - verdant-grow-diary
@@ -15,13 +18,15 @@ on:
       - .github/workflows/qa-fake-account-live-once.yml
       - playwright.qa-fake-account.config.ts
       - e2e/qa-fake-account-live.spec.ts
+      - playwright.qa-gmail-account.config.ts
+      - e2e/qa-gmail-account-live.spec.ts
 
 permissions:
   contents: read
 
 concurrency:
   group: qa-fake-account-live-20260723-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   live-qa:
@@ -29,9 +34,15 @@ jobs:
     timeout-minutes: 25
     env:
       E2E_BASE_URL: https://verdantgrowdiary-com.lovable.app
+      QA_PHASE: signup
+      QA_EMAIL: cheekhimself+verdantqa-20260723-live1@gmail.com
+      QA_PASSWORD: VqA!20260723Live1z7#Aa
     steps:
       - name: Checkout isolated QA branch
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Mask fake-account password
+        run: echo "::add-mask::$QA_PASSWORD"
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
@@ -44,17 +55,17 @@ jobs:
       - name: Install Chromium
         run: bunx playwright install --with-deps chromium
 
-      - name: Create disposable account and exercise published app
-        run: bunx playwright test --config=playwright.qa-fake-account.config.ts
+      - name: Create Gmail-owned fake account through published UI
+        run: bunx playwright test --config=playwright.qa-gmail-account.config.ts
 
       - name: Upload QA receipt, traces, screenshots, and video
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: verdant-fake-account-live-qa-${{ github.run_id }}
+          name: verdant-gmail-account-live-qa-${{ github.run_id }}
           path: |
-            artifacts/qa-fake-account/
-            playwright-report/
-            test-results/qa-fake-account/
+            artifacts/qa-gmail-account/
+            playwright-report-gmail-qa/
+            test-results/qa-gmail-account/
           if-no-files-found: warn
           retention-days: 7

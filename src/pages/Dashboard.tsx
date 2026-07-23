@@ -99,6 +99,7 @@ import { Button } from "@/components/ui/button";
 import GrowTargetsEditor from "@/components/GrowTargetsEditor";
 import DailyGrowCheckStatusCard from "@/components/DailyGrowCheckStatusCard";
 import DashboardDailyGrowCheckPanel from "@/components/DashboardDailyGrowCheckPanel";
+import GuidedActionChecklistPanel from "@/components/GuidedActionChecklistPanel";
 
 import { Badge } from "@/components/ui/badge";
 import SensorSourceBadge from "@/components/SensorSourceBadge";
@@ -392,6 +393,8 @@ export default function Dashboard() {
       <DailyGrowCheckStatusCard className="mb-6" tentIds={tents.map((t) => t.id)} />
 
       <DashboardDailyGrowCheckPanel scopedGrowId={scopedGrowId ?? null} className="mb-6" />
+
+      <GuidedActionChecklistPanel scopedGrowId={scopedGrowId ?? null} className="mb-6" />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         <KpiCard label="Active tents" value={tents.length} icon={<Box className="h-3.5 w-3.5" />} />

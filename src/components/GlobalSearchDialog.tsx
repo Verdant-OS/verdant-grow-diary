@@ -223,34 +223,76 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
           {hasQuery && !isLoading && hasAny ? (
             <div
               className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b bg-muted/40 px-3 py-2 text-xs text-muted-foreground"
-              role="status"
-              aria-live="polite"
+              role="group"
+              aria-label="Result summary and category filters"
               data-testid="global-search-result-count"
             >
-              <span className="text-sm font-semibold text-foreground tabular-nums">
-                {results.length} {results.length === 1 ? "result" : "results"}
+              <span
+                className="text-sm font-semibold text-foreground tabular-nums"
+                aria-live="polite"
+              >
+                {filteredResults.length}{" "}
+                {filteredResults.length === 1 ? "result" : "results"}
+                {!allEnabled && filteredResults.length !== results.length ? (
+                  <span className="ml-1 font-normal text-muted-foreground">
+                    of {results.length}
+                  </span>
+                ) : null}
               </span>
-              <span className="tabular-nums">
-                Showing 1–{shownCount} of {results.length}
-              </span>
-              <span className="ml-auto flex flex-wrap items-center gap-1.5">
-                {GROUP_ORDER.filter((t) => totalsByGroup[t] > 0).map((t) => {
+              {hasFilteredAny ? (
+                <span className="tabular-nums">
+                  Showing 1–{shownCount} of {filteredResults.length}
+                </span>
+              ) : null}
+              {!allEnabled ? (
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  className="rounded-sm px-1.5 py-0.5 text-[11px] font-medium text-primary hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  data-testid="global-search-filters-reset"
+                >
+                  Show all
+                </button>
+              ) : null}
+              <span
+                className="ml-auto flex flex-wrap items-center gap-1.5"
+                role="group"
+                aria-label="Filter results by category"
+              >
+                {GROUP_ORDER.map((t) => {
                   const Icon = GROUP_ICONS[t];
+                  const total = totalsByGroup[t];
+                  const isOn = enabledTypes[t];
+                  const isDisabled = total === 0;
                   return (
-                    <span
+                    <button
                       key={t}
-                      className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2 py-0.5 text-[11px] font-medium text-foreground"
-                      data-testid={`global-search-count-${t}`}
+                      type="button"
+                      role="switch"
+                      aria-checked={isOn}
+                      aria-label={`${GROUP_HEADINGS[t]} (${total}) — ${isOn ? "shown" : "hidden"}`}
+                      onClick={() => toggleType(t)}
+                      disabled={isDisabled}
+                      className={cn(
+                        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                        isOn
+                          ? "border-primary/40 bg-primary/10 text-foreground hover:bg-primary/20"
+                          : "border-border bg-background text-muted-foreground line-through opacity-70 hover:opacity-100",
+                        isDisabled && "cursor-not-allowed opacity-40 hover:opacity-40",
+                      )}
+                      data-testid={`global-search-filter-${t}`}
+                      data-state={isOn ? "on" : "off"}
                     >
                       <Icon className="h-3 w-3 text-muted-foreground" aria-hidden="true" />
-                      <span className="tabular-nums">{totalsByGroup[t]}</span>
+                      <span className="tabular-nums">{total}</span>
                       <span className="text-muted-foreground">{GROUP_HEADINGS[t]}</span>
-                    </span>
+                    </button>
                   );
                 })}
               </span>
             </div>
           ) : null}
+
 
           <CommandList>
             {!hasQuery ? (

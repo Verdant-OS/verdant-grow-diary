@@ -169,7 +169,7 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
       // Guard: never let the user disable every category — reset to all-on.
       const anyOn = GROUP_ORDER.some((k) => next[k]);
       if (!anyOn) {
-        return { grow: true, tent: true, plant: true, cultivar: true };
+        return { ...DEFAULT_FILTERS };
       }
       return next;
     });

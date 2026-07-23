@@ -72,10 +72,14 @@ function routeFor(row: GlobalSearchResult): string {
   }
 }
 
+const INITIAL_VISIBLE = 10;
+const PAGE_SIZE = 10;
+
 export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [recent, setRecent] = useState<string[]>([]);
+  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
   const { results, isLoading, isError, retry } = useGlobalSearch(query);
 
   useEffect(() => {
@@ -86,6 +90,16 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
     }
   }, [open]);
 
+  // Reset pagination whenever the query changes or new results arrive.
+  useEffect(() => {
+    setVisibleCount(INITIAL_VISIBLE);
+  }, [query, results]);
+
+  const visibleResults = useMemo(
+    () => results.slice(0, visibleCount),
+    [results, visibleCount],
+  );
+
   const grouped = useMemo(() => {
     const map: Record<GlobalSearchEntityType, GlobalSearchResult[]> = {
       grow: [],
@@ -94,15 +108,29 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
       cultivar: [],
     };
     // Preserve the hook's deterministic order within each entity_type.
-    for (const row of results) {
+    for (const row of visibleResults) {
       map[row.entity_type]?.push(row);
     }
+    return map;
+  }, [visibleResults]);
+
+  const totalsByGroup = useMemo(() => {
+    const map: Record<GlobalSearchEntityType, number> = {
+      grow: 0,
+      tent: 0,
+      plant: 0,
+      cultivar: 0,
+    };
+    for (const row of results) map[row.entity_type] += 1;
     return map;
   }, [results]);
 
   const trimmed = query.trim();
   const hasQuery = trimmed.length > 0;
   const hasAny = results.length > 0;
+  const shownCount = visibleResults.length;
+  const remaining = Math.max(0, results.length - shownCount);
+  const canShowMore = remaining > 0;
 
   const handleSelectResult = (row: GlobalSearchResult) => {
     if (trimmed) {
@@ -174,10 +202,10 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
                 {results.length} {results.length === 1 ? "result" : "results"}
               </span>
               <span className="tabular-nums">
-                Showing 1–{results.length} of {results.length}
+                Showing 1–{shownCount} of {results.length}
               </span>
               <span className="ml-auto flex flex-wrap items-center gap-1.5">
-                {GROUP_ORDER.filter((t) => grouped[t].length > 0).map((t) => {
+                {GROUP_ORDER.filter((t) => totalsByGroup[t] > 0).map((t) => {
                   const Icon = GROUP_ICONS[t];
                   return (
                     <span
@@ -186,7 +214,7 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
                       data-testid={`global-search-count-${t}`}
                     >
                       <Icon className="h-3 w-3 text-muted-foreground" aria-hidden="true" />
-                      <span className="tabular-nums">{grouped[t].length}</span>
+                      <span className="tabular-nums">{totalsByGroup[t]}</span>
                       <span className="text-muted-foreground">{GROUP_HEADINGS[t]}</span>
                     </span>
                   );
@@ -343,7 +371,11 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
                   return (
                     <CommandGroup
                       key={type}
-                      heading={`${GROUP_HEADINGS[type]} (${rows.length})`}
+                      heading={
+                        rows.length < totalsByGroup[type]
+                          ? `${GROUP_HEADINGS[type]} (${rows.length} of ${totalsByGroup[type]})`
+                          : `${GROUP_HEADINGS[type]} (${rows.length})`
+                      }
                     >
                       {rows.map((row) => (
                         <CommandItem
@@ -395,6 +427,30 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
                     </CommandGroup>
                   );
                 })}
+                {canShowMore ? (
+                  <div
+                    className="flex flex-col items-center gap-1 border-t px-3 py-3"
+                    data-testid="global-search-show-more-wrapper"
+                  >
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        setVisibleCount((n) =>
+                          Math.min(results.length, n + PAGE_SIZE),
+                        )
+                      }
+                      data-testid="global-search-show-more"
+                    >
+                      Show {Math.min(PAGE_SIZE, remaining)} more
+                    </Button>
+                    <span className="text-[11px] text-muted-foreground tabular-nums">
+                      {remaining} more{" "}
+                      {remaining === 1 ? "result" : "results"} available
+                    </span>
+                  </div>
+                ) : null}
               </>
             )}
           </CommandList>

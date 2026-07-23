@@ -38,6 +38,12 @@ import {
   pushRecentSearch,
   readRecentSearches,
 } from "@/lib/recentGlobalSearches";
+import {
+  DEFAULT_FILTERS,
+  readGlobalSearchSession,
+  writeGlobalSearchSession,
+} from "@/lib/globalSearchSession";
+
 
 interface Props {
   open: boolean;

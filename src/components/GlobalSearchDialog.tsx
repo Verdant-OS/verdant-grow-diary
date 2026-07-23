@@ -1,16 +1,20 @@
 /**
- * GlobalSearchDialog — command palette that queries the shared
- * public.verdant_search RPC via useGlobalSearch and jumps to the
- * matching grow / tent / plant detail route.
+ * GlobalSearchDialog — the ONE command palette for Verdant discovery.
  *
- * cmdk's built-in client-side filter is disabled (shouldFilter={false})
- * so results render in exactly the deterministic order the RPC returns
- * (exact → prefix → fuzzy).
+ * Private owner-scoped grows / tents / plants come from the RLS-enforced
+ * public.verdant_search RPC; public cultivar references come from the bundled
+ * Strain Reference Library V1 constants. Both are merged by useGlobalSearch into
+ * one deterministic result model and rendered here as distinct groups.
+ *
+ * cmdk's built-in client-side filter is disabled (shouldFilter={false}) so
+ * results render in exactly the deterministic order the hook returns
+ * (rank → group → score → label). A private RPC failure surfaces an inline
+ * notice and never presents "no matches" as a verified empty conclusion.
  */
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Command as CommandPrimitive } from "cmdk";
-import { Leaf, Sprout, Tent } from "lucide-react";
+import { Dna, Leaf, Sprout, Tent } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import {
   CommandEmpty,
@@ -32,16 +36,18 @@ interface Props {
   onOpenChange: (open: boolean) => void;
 }
 
-const GROUP_ORDER: GlobalSearchEntityType[] = ["grow", "tent", "plant"];
+const GROUP_ORDER: GlobalSearchEntityType[] = ["grow", "tent", "plant", "cultivar"];
 const GROUP_HEADINGS: Record<GlobalSearchEntityType, string> = {
   grow: "Grows",
   tent: "Tents",
   plant: "Plants",
+  cultivar: "Cultivars",
 };
 const GROUP_ICONS: Record<GlobalSearchEntityType, typeof Sprout> = {
   grow: Sprout,
   tent: Tent,
   plant: Leaf,
+  cultivar: Dna,
 };
 
 function routeFor(row: GlobalSearchResult): string {
@@ -52,6 +58,9 @@ function routeFor(row: GlobalSearchResult): string {
       return tentDetailPath(row.id);
     case "plant":
       return plantDetailPath(row.id);
+    case "cultivar":
+      // Public bundled cultivar reference — never a private plant link.
+      return `/cultivars/${row.id}`;
   }
 }
 
@@ -69,8 +78,9 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
       grow: [],
       tent: [],
       plant: [],
+      cultivar: [],
     };
-    // Preserve RPC ordering within each entity_type.
+    // Preserve the hook's deterministic order within each entity_type.
     for (const row of results) {
       map[row.entity_type]?.push(row);
     }
@@ -89,7 +99,7 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
           className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-group]]:px-2 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5 flex h-full w-full flex-col overflow-hidden rounded-md bg-popover text-popover-foreground"
         >
           <CommandInput
-            placeholder="Search your grows, tents, and plants…"
+            placeholder="Search your grows, tents, plants, and cultivars…"
             value={query}
             onValueChange={setQuery}
             data-testid="global-search-input"
@@ -97,7 +107,7 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
           <CommandList>
             {!hasQuery ? (
               <div className="py-6 text-center text-sm text-muted-foreground">
-                Type to search your grows, tents, and plants.
+                Type to search your grows, tents, plants, and cultivars.
               </div>
             ) : isLoading ? (
               <div
@@ -106,48 +116,59 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
               >
                 Searching…
               </div>
-            ) : isError ? (
-              <div className="py-6 text-center text-sm text-destructive">
-                Search failed. Try again in a moment.
-              </div>
-            ) : !hasAny ? (
-              <CommandEmpty>No matches for that search.</CommandEmpty>
             ) : (
-              GROUP_ORDER.map((type) => {
-                const rows = grouped[type];
-                if (rows.length === 0) return null;
-                const Icon = GROUP_ICONS[type];
-                return (
-                  <CommandGroup key={type} heading={GROUP_HEADINGS[type]}>
-                    {rows.map((row) => (
-                      <CommandItem
-                        key={`${type}:${row.id}`}
-                        value={`${type}:${row.id}`}
-                        onSelect={() => {
-                          onOpenChange(false);
-                          navigate(routeFor(row));
-                        }}
-                        data-testid={`global-search-item-${type}-${row.id}`}
-                      >
-                        <Icon
-                          className={cn("mr-2 h-4 w-4 shrink-0 text-muted-foreground")}
-                          aria-hidden="true"
-                        />
-                        <div className="flex min-w-0 flex-col">
-                          <span className="truncate text-sm text-foreground">
-                            {row.label}
-                          </span>
-                          {row.sublabel ? (
-                            <span className="truncate text-xs text-muted-foreground">
-                              {row.sublabel}
+              <>
+                {isError ? (
+                  <div
+                    className="px-2 py-3 text-center text-sm text-destructive"
+                    data-testid="global-search-error"
+                  >
+                    Your grows, tents, and plants couldn’t be searched just now.
+                    Cultivar references below may be incomplete — try again in a
+                    moment.
+                  </div>
+                ) : null}
+                {!hasAny && !isError ? (
+                  <CommandEmpty>No matches for that search.</CommandEmpty>
+                ) : null}
+                {GROUP_ORDER.map((type) => {
+                  const rows = grouped[type];
+                  if (rows.length === 0) return null;
+                  const Icon = GROUP_ICONS[type];
+                  return (
+                    <CommandGroup key={type} heading={GROUP_HEADINGS[type]}>
+                      {rows.map((row) => (
+                        <CommandItem
+                          key={`${type}:${row.id}`}
+                          value={`${type}:${row.id}`}
+                          onSelect={() => {
+                            onOpenChange(false);
+                            navigate(routeFor(row));
+                          }}
+                          data-testid={`global-search-item-${type}-${row.id}`}
+                        >
+                          <Icon
+                            className={cn(
+                              "mr-2 h-4 w-4 shrink-0 text-muted-foreground",
+                            )}
+                            aria-hidden="true"
+                          />
+                          <div className="flex min-w-0 flex-col">
+                            <span className="truncate text-sm text-foreground">
+                              {row.label}
                             </span>
-                          ) : null}
-                        </div>
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                );
-              })
+                            {row.sublabel ? (
+                              <span className="truncate text-xs text-muted-foreground">
+                                {row.sublabel}
+                              </span>
+                            ) : null}
+                          </div>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  );
+                })}
+              </>
             )}
           </CommandList>
         </CommandPrimitive>

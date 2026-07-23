@@ -6,6 +6,11 @@ on:
       - fix/repo-ci-green
     paths:
       - .github/workflows/repair-repo-ci-green-once.yml
+  pull_request:
+    branches:
+      - verdant-grow-diary
+    paths:
+      - .github/workflows/repair-repo-ci-green-once.yml
 
 permissions:
   contents: write

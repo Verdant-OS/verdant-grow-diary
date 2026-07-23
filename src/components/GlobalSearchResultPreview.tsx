@@ -53,6 +53,45 @@ export default function GlobalSearchResultPreview({
   onOpen,
   className,
 }: GlobalSearchResultPreviewProps) {
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    setCopied(false);
+  }, [routePath]);
+
+  const absoluteUrl = routePath
+    ? (typeof window !== "undefined" ? window.location.origin : "") + routePath
+    : null;
+
+  const handleOpenInNewTab = useCallback(() => {
+    if (!absoluteUrl) return;
+    window.open(absoluteUrl, "_blank", "noopener,noreferrer");
+  }, [absoluteUrl]);
+
+  const handleCopyLink = useCallback(async () => {
+    if (!absoluteUrl) return;
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(absoluteUrl);
+      } else {
+        const el = document.createElement("textarea");
+        el.value = absoluteUrl;
+        el.setAttribute("readonly", "");
+        el.style.position = "absolute";
+        el.style.left = "-9999px";
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand("copy");
+        document.body.removeChild(el);
+      }
+      setCopied(true);
+      toast.success("Link copied to clipboard");
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Could not copy link");
+    }
+  }, [absoluteUrl]);
+
   if (!row || !routePath) {
     return (
       <aside

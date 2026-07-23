@@ -1,7 +1,7 @@
 /**
- * Shared global search. Backed by the public.verdant_search RPC. Public
- * cultivar and static destination results are merged by GlobalSearchDialog;
- * private grow entities remain server-filtered and RLS-scoped here.
+ * Shared global search. Backed by the public.verdant_search RPC. The
+ * Strain Library will reuse this same RPC + the GlobalSearchDialog
+ * rather than forking a second search system.
  */
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -25,8 +25,8 @@ const MAX_RESULTS = 20;
 function useDebouncedValue<T>(value: T, delayMs: number): T {
   const [debounced, setDebounced] = useState(value);
   useEffect(() => {
-    const timer = setTimeout(() => setDebounced(value), delayMs);
-    return () => clearTimeout(timer);
+    const t = setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(t);
   }, [value, delayMs]);
   return debounced;
 }
@@ -46,13 +46,13 @@ export function useGlobalSearch(query: string): UseGlobalSearchReturn {
     queryKey: ["global-search", debounced],
     enabled,
     queryFn: async (): Promise<GlobalSearchResult[]> => {
-      const { data: rows, error } = await supabase.rpc("verdant_search", {
+      const { data, error } = await supabase.rpc("verdant_search", {
         q: debounced,
         max_results: MAX_RESULTS,
       });
       if (error) throw error;
       // Preserve RPC ordering (exact → prefix → fuzzy).
-      return (rows ?? []) as GlobalSearchResult[];
+      return (data ?? []) as GlobalSearchResult[];
     },
     staleTime: 30_000,
   });

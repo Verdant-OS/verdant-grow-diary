@@ -1,36 +1,55 @@
 /**
- * CultivarPage — public /cultivars/:slug detail.
+ * Public source-backed cultivar detail page.
  *
- * Presenter only. Evergreen cultivator-focused profile from constants.
- * If the slug is unknown, redirects to the index rather than 404-ing —
- * keeps the SEO surface predictable without shipping a thin page.
+ * The profile is reference context only. It does not read private plant data,
+ * write rows, diagnose a plant, create alerts, or generate Action Queue items.
  */
 import { useEffect } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import BrandLogo from "@/components/BrandLogo";
 import CultivarPhenoSampleModule from "@/components/CultivarPhenoSampleModule";
 import { usePageSeo } from "@/hooks/usePageSeo";
-import { findCultivarBySlug } from "@/constants/verdantCultivars";
+import {
+  findCultivarBySlug,
+  formatVerificationStatus,
+  getCultivarGuideSections,
+  getCultivarSources,
+  type CultivarGuideSectionKey,
+} from "@/constants/verdantCultivars";
 import { VERDANT_SITE_ORIGIN } from "@/constants/verdantSeoContent";
 import {
   buildCultivarCollectionJsonLd,
   safeJsonLdStringify,
 } from "@/lib/seoStructuredData";
+import { buildCultivarSummaryRows } from "@/lib/cultivarReferenceViewModel";
+
+function sectionId(key: CultivarGuideSectionKey): string {
+  return `guide-${key.replace(/_/g, "-")}`;
+}
+
+function formatDate(value: string): string {
+  const date = new Date(value);
+  return Number.isFinite(date.getTime())
+    ? new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(date)
+    : "Not recorded";
+}
 
 export default function CultivarPage() {
   const { slug } = useParams<{ slug: string }>();
   const cultivar = findCultivarBySlug(slug);
+  const sections = cultivar ? getCultivarGuideSections(cultivar) : [];
+  const sources = cultivar ? getCultivarSources(cultivar) : [];
+  const summaryRows = cultivar
+    ? buildCultivarSummaryRows(cultivar, formatDate(cultivar.lastVerifiedAt))
+    : [];
 
-  // Hooks must run unconditionally (rules-of-hooks): call before the
-  // unknown-slug redirect, falling back to the index metadata for the
-  // momentary render before <Navigate> unmounts this page.
   usePageSeo({
     title: cultivar
       ? `${cultivar.name} Cultivator Guide (${cultivar.searchAlias} info) | Verdant`
-      : "Cultivar Guides | Verdant",
+      : "Strain Reference Library | Verdant",
     description: cultivar
       ? `${cultivar.name} grow guide: lineage (${cultivar.lineage}), ${cultivar.flowerWeeks} flower, environment ranges by stage, and common issues home growers report.`
-      : "Cultivator-focused grow guides for popular cultivars.",
+      : "Source-backed cultivar references with reported tendencies, confidence, and missing information.",
     path: cultivar ? `/cultivars/${cultivar.slug}` : "/cultivars",
   });
 
@@ -38,17 +57,16 @@ export default function CultivarPage() {
     if (!cultivar) return;
     const url = `${VERDANT_SITE_ORIGIN}/cultivars/${cultivar.slug}`;
     const jsonLd = buildCultivarCollectionJsonLd({
-      name: `${cultivar.name} grow guide`,
-      alternateName: cultivar.searchAlias,
-      description: `${cultivar.name} cultivator profile: lineage ${cultivar.lineage}, ${cultivar.flowerWeeks} flower window, difficulty ${cultivar.difficulty}, plus environment ranges by stage and common issues home growers report.`,
+      name: `${cultivar.name} source-backed grow reference`,
+      alternateName: [cultivar.searchAlias, ...cultivar.aliases].join(", "),
+      description: `${cultivar.name} reference profile with reported lineage (${cultivar.lineage}), ${cultivar.flowerWeeks}, sources, confidence, and missing-information notes.`,
       url,
       properties: [
         { name: "Lineage", value: cultivar.lineage },
-        { name: "Flower window", value: cultivar.flowerWeeks },
+        { name: "Life cycle", value: cultivar.lifeCycle },
+        { name: "Reported flower window", value: cultivar.flowerWeeks },
         { name: "Difficulty", value: cultivar.difficulty },
-        { name: "Seedling environment", value: cultivar.environment.seedling },
-        { name: "Vegetative environment", value: cultivar.environment.veg },
-        { name: "Flower environment", value: cultivar.environment.flower },
+        { name: "Evidence state", value: formatVerificationStatus(cultivar.verificationStatus) },
       ],
     });
     const script = document.createElement("script");
@@ -56,14 +74,10 @@ export default function CultivarPage() {
     script.setAttribute("data-page-ldjson", `cultivar-${cultivar.slug}-collection`);
     script.text = safeJsonLdStringify(jsonLd);
     document.head.appendChild(script);
-    return () => {
-      script.remove();
-    };
+    return () => script.remove();
   }, [cultivar]);
 
-  if (!cultivar) {
-    return <Navigate to="/cultivars" replace />;
-  }
+  if (!cultivar) return <Navigate to="/cultivars" replace />;
 
   return (
     <main
@@ -71,13 +85,13 @@ export default function CultivarPage() {
       data-cultivar-slug={cultivar.slug}
       className="min-h-screen bg-background text-foreground"
     >
-      <header className="px-6 py-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 max-w-6xl mx-auto">
+      <header className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-4 gap-y-3 px-4 py-5 sm:px-6">
         <Link to="/welcome" aria-label="Verdant Grow Diary home">
           <BrandLogo size="md" showText />
         </Link>
         <nav className="flex w-full items-center justify-between gap-4 text-sm sm:w-auto sm:justify-start">
           <Link to="/cultivars" className="text-muted-foreground hover:text-foreground">
-            All cultivars
+            All references
           </Link>
           <Link to="/guides" className="text-muted-foreground hover:text-foreground">
             Guides
@@ -88,91 +102,203 @@ export default function CultivarPage() {
         </nav>
       </header>
 
-      <article className="px-6 pt-8 pb-16 max-w-3xl mx-auto">
-        <p className="text-sm uppercase tracking-[0.2em] text-primary/80 font-medium">
-          Cultivar guide
-        </p>
-        <h1 className="mt-3 font-display text-3xl md:text-5xl font-bold tracking-tight">
-          {cultivar.name} grow guide
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Also searched as “{cultivar.searchAlias}”.
-        </p>
+      <article className="mx-auto max-w-6xl px-4 pb-16 pt-8 sm:px-6">
+        <div className="max-w-4xl">
+          <p className="text-sm font-medium uppercase tracking-[0.2em] text-primary/80">
+            Strain Reference Library
+          </p>
+          <h1 className="mt-3 font-display text-3xl font-bold tracking-tight md:text-5xl">
+            {cultivar.name}
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Aliases: {cultivar.aliases.length > 0 ? cultivar.aliases.join(", ") : "None recorded"}
+          </p>
 
-        <dl className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
-          <div className="rounded-lg border border-border/60 p-3">
-            <dt className="text-xs uppercase tracking-wide text-muted-foreground">Lineage</dt>
-            <dd className="mt-1 font-medium">{cultivar.lineage}</dd>
+          <div
+            data-testid="cultivar-reference-banner"
+            className="mt-6 rounded-xl border border-amber-500/35 bg-amber-500/10 p-4"
+          >
+            <p className="font-semibold text-amber-800 dark:text-amber-200">
+              {formatVerificationStatus(cultivar.verificationStatus)} — not plant-specific advice
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              This profile supplies a starting hypothesis. Your plant&apos;s logs, stage, medium,
+              source-labeled sensors, and observed response remain authoritative.
+            </p>
           </div>
-          <div className="rounded-lg border border-border/60 p-3">
-            <dt className="text-xs uppercase tracking-wide text-muted-foreground">Flower window</dt>
-            <dd className="mt-1 font-medium">{cultivar.flowerWeeks}</dd>
-          </div>
-          <div className="rounded-lg border border-border/60 p-3">
-            <dt className="text-xs uppercase tracking-wide text-muted-foreground">Difficulty</dt>
-            <dd className="mt-1 font-medium">{cultivar.difficulty}</dd>
-          </div>
+        </div>
+
+        <dl className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {summaryRows.map((row) => (
+            <div key={row.label} className="rounded-lg border border-border/60 p-3">
+              <dt className="text-xs uppercase tracking-wide text-muted-foreground">{row.label}</dt>
+              <dd className="mt-1 font-medium">{row.value}</dd>
+            </div>
+          ))}
         </dl>
 
-        <p className="mt-6 text-lg text-muted-foreground">{cultivar.intro}</p>
-
-        <section className="mt-10">
-          <h2 className="font-display text-2xl font-semibold">Environment by stage</h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Ranges reflect common horticultural best practice. Use your own source-labeled sensor
-            snapshots to confirm what your tent is actually doing — Verdant records the data; the
-            grower decides.
+        <div className="mt-6 max-w-4xl">
+          <p className="text-lg text-muted-foreground">{cultivar.intro}</p>
+          <p className="mt-4 text-sm text-muted-foreground">
+            <span className="font-semibold text-foreground">Reported lineage:</span>{" "}
+            {cultivar.lineage}
           </p>
-          <ul className="mt-4 space-y-3 text-sm">
-            <li>
-              <span className="font-semibold">Seedling:</span> {cultivar.environment.seedling}
-            </li>
-            <li>
-              <span className="font-semibold">Vegetative:</span> {cultivar.environment.veg}
-            </li>
-            <li>
-              <span className="font-semibold">Flower:</span> {cultivar.environment.flower}
-            </li>
-          </ul>
-        </section>
+        </div>
 
-        <section className="mt-10">
-          <h2 className="font-display text-2xl font-semibold">Common issues growers report</h2>
-          <ul className="mt-4 space-y-4">
-            {cultivar.commonIssues.map((it) => (
-              <li key={it.issue} className="rounded-lg border border-border/60 p-4">
-                <p className="font-semibold">{it.issue}</p>
-                <p className="mt-1 text-sm text-muted-foreground">{it.mitigation}</p>
+        <nav
+          aria-label={`${cultivar.name} guide sections`}
+          data-testid="cultivar-sticky-section-nav"
+          className="sticky top-14 z-20 -mx-4 mt-8 overflow-x-auto border-y border-border/60 bg-background/95 px-4 py-3 backdrop-blur sm:mx-0 sm:rounded-lg sm:border"
+        >
+          <ul className="flex min-w-max gap-2 text-sm">
+            {sections.map((section) => (
+              <li key={section.key}>
+                <a
+                  href={`#${sectionId(section.key)}`}
+                  className="inline-flex min-h-[40px] items-center rounded-full border border-border/70 px-3 py-1.5 text-muted-foreground hover:border-primary/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                >
+                  {section.title}
+                </a>
               </li>
             ))}
+            <li>
+              <a
+                href="#sources"
+                className="inline-flex min-h-[40px] items-center rounded-full border border-border/70 px-3 py-1.5 text-muted-foreground hover:border-primary/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+              >
+                Sources
+              </a>
+            </li>
           </ul>
-        </section>
+        </nav>
 
-        <section className="mt-10">
-          <h2 className="font-display text-2xl font-semibold">
-            What to compare when pheno-hunting {cultivar.name}
-          </h2>
-          <ul className="mt-4 list-disc list-inside space-y-2 text-sm text-muted-foreground">
-            {cultivar.phenoHuntFocus.map((f) => (
-              <li key={f}>{f}</li>
+        <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
+          <div className="space-y-6">
+            {sections.map((section) => (
+              <section
+                key={section.key}
+                id={sectionId(section.key)}
+                data-guide-section={section.key}
+                className="scroll-mt-32 rounded-xl border border-border/60 p-5"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <h2 className="font-display text-2xl font-semibold">{section.title}</h2>
+                  <span className="rounded-full border border-border/70 px-2.5 py-1 text-xs capitalize text-muted-foreground">
+                    {section.confidence} confidence
+                  </span>
+                </div>
+                <p className="mt-3 text-sm leading-6 text-muted-foreground">{section.summary}</p>
+
+                {section.reportedTendencies.length > 0 ? (
+                  <div className="mt-5">
+                    <h3 className="text-sm font-semibold">Reported tendencies</h3>
+                    <ul className="mt-2 space-y-3">
+                      {section.reportedTendencies.map((item) => (
+                        <li key={`${item.text}-${item.confidence}`} className="rounded-lg bg-muted/35 p-3 text-sm">
+                          <p>{item.text}</p>
+                          <p className="mt-1 text-xs capitalize text-muted-foreground">
+                            {item.confidence} confidence · {item.evidenceKeys.length} evidence reference
+                            {item.evidenceKeys.length === 1 ? "" : "s"}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+
+                <div className="mt-5 grid gap-4 md:grid-cols-2">
+                  <div>
+                    <h3 className="text-sm font-semibold">Cautious guidance</h3>
+                    <ul className="mt-2 space-y-2 text-sm text-muted-foreground">
+                      {section.guidance.map((item) => (
+                        <li key={item.text} className="rounded-lg border border-border/50 p-3">
+                          {item.text}
+                          <span className="ml-2 text-xs uppercase tracking-wide">Risk: {item.risk}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold">Cautions</h3>
+                    <ul className="mt-2 list-disc space-y-2 pl-5 text-sm text-muted-foreground">
+                      {section.cautions.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+
+                {section.missingInformation.length > 0 ? (
+                  <div className="mt-5 rounded-lg border border-dashed border-border/70 p-3">
+                    <h3 className="text-sm font-semibold">Information limited</h3>
+                    <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                      {section.missingInformation.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+              </section>
             ))}
-          </ul>
-          <p className="mt-4 text-sm text-muted-foreground">
-            Verdant organizes the evidence; the breeder decides the keeper. See{" "}
-            <Link to="/pheno-comparison" className="underline hover:text-foreground">
-              Pheno comparison
-            </Link>{" "}
-            for how side-by-side runs are structured.
-          </p>
-        </section>
 
-        <CultivarPhenoSampleModule cultivar={cultivar} />
+            <CultivarPhenoSampleModule cultivar={cultivar} />
+          </div>
+
+          <aside className="space-y-4 lg:sticky lg:top-32 lg:self-start">
+            <section className="rounded-xl border border-border/60 p-4">
+              <h2 className="font-display text-lg font-semibold">Profile summary</h2>
+              <dl className="mt-3 space-y-3 text-sm">
+                <div>
+                  <dt className="text-xs uppercase tracking-wide text-muted-foreground">Difficulty</dt>
+                  <dd className="mt-1">{cultivar.difficulty}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs uppercase tracking-wide text-muted-foreground">Height tendency</dt>
+                  <dd className="mt-1 capitalize">{cultivar.heightCategory}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs uppercase tracking-wide text-muted-foreground">Market classification</dt>
+                  <dd className="mt-1 capitalize">{cultivar.marketClassification}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs uppercase tracking-wide text-muted-foreground">Data origin</dt>
+                  <dd className="mt-1 capitalize">{cultivar.dataOrigin}</dd>
+                </div>
+              </dl>
+            </section>
+
+            <section id="sources" className="scroll-mt-32 rounded-xl border border-border/60 p-4">
+              <h2 className="font-display text-lg font-semibold">Sources</h2>
+              <p className="mt-2 text-xs text-muted-foreground">
+                References support individual claims. Verdant does not copy source marketing text.
+              </p>
+              <ul className="mt-4 space-y-3 text-sm">
+                {sources.map((source) => (
+                  <li key={source.key} className="rounded-lg bg-muted/30 p-3">
+                    <a
+                      href={source.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-medium underline-offset-4 hover:underline"
+                    >
+                      {source.title}
+                    </a>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {source.publisher} · {source.sourceType.replace(/_/g, " ")} · retrieved {formatDate(source.retrievedAt)}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          </aside>
+        </div>
 
         <section className="mt-10 rounded-xl border border-primary/30 bg-primary/5 p-5">
-          <h2 className="font-display text-xl font-semibold">Log your own {cultivar.name} run</h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Verdant turns waterings, feedings, photos, and source-labeled sensor snapshots into a
-            plant timeline you can look back on next run — no device control, no automatic actions.
+          <h2 className="font-display text-xl font-semibold">Build plant memory for your own run</h2>
+          <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
+            A linked reference may provide context later, but Verdant will keep the plant&apos;s actual
+            logs and sensors in charge. Reference pages never create alerts, nutrient actions,
+            irrigation actions, or equipment commands.
           </p>
           <div className="mt-4 flex flex-wrap gap-3 text-sm">
             <Link
@@ -182,10 +308,10 @@ export default function CultivarPage() {
               Start a free grow diary
             </Link>
             <Link
-              to="/guides"
+              to="/cultivars"
               className="inline-flex items-center rounded-md border border-border px-4 py-2 font-semibold hover:border-primary/40"
             >
-              Read the grower guides
+              Browse all references
             </Link>
           </div>
         </section>

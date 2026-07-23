@@ -1,78 +1,103 @@
 /**
- * CultivarsIndex — public /cultivars hub.
+ * Public Strain Reference Library V1 at the canonical /cultivars route.
  *
- * Presenter only. Evergreen, curated cultivator-focused profiles. No live
- * grow diaries, no fake sensor data, no AI-picks-winners claims. Content
- * comes from `verdantCultivars` constants so copy cannot drift.
- *
- * Search + difficulty filter are URL-synced (?q=, ?difficulty=) so a
- * filtered view is directly deep-linkable and shareable.
+ * Mobile-first presenter. Search/filter rules are pure and shared; cards render
+ * labeled sample/reference data only. No private grow reads or writes.
  */
 import { useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import BrandLogo from "@/components/BrandLogo";
 import { usePageSeo } from "@/hooks/usePageSeo";
-import { VERDANT_CULTIVARS, type VerdantCultivarProfile } from "@/constants/verdantCultivars";
+import {
+  VERDANT_CULTIVARS,
+  formatVerificationStatus,
+  type CultivarDifficulty,
+  type CultivarLifeCycle,
+  type CultivarVerificationStatus,
+} from "@/constants/verdantCultivars";
 import { buildCultivarsIndexSeo } from "@/lib/cultivarIndexSeoRules";
+import { filterCultivarReferenceProfiles } from "@/lib/cultivarReferenceSearchRules";
 
-type DifficultyFilter = "all" | VerdantCultivarProfile["difficulty"];
-
-const DIFFICULTY_OPTIONS: ReadonlyArray<{ value: DifficultyFilter; label: string }> = [
+const DIFFICULTY_OPTIONS: ReadonlyArray<{ value: "all" | CultivarDifficulty; label: string }> = [
   { value: "all", label: "All levels" },
   { value: "Beginner-friendly", label: "Beginner-friendly" },
   { value: "Intermediate", label: "Intermediate" },
   { value: "Advanced", label: "Advanced" },
 ];
 
-function normalize(s: string): string {
-  return s.toLowerCase().trim();
-}
+const LIFE_CYCLE_OPTIONS: ReadonlyArray<{ value: "all" | CultivarLifeCycle; label: string }> = [
+  { value: "all", label: "All life cycles" },
+  { value: "photoperiod", label: "Photoperiod" },
+  { value: "autoflower", label: "Autoflower" },
+];
 
-function matchesQuery(c: VerdantCultivarProfile, q: string): boolean {
-  if (!q) return true;
-  const needle = normalize(q);
-  return (
-    normalize(c.name).includes(needle) ||
-    normalize(c.searchAlias).includes(needle) ||
-    normalize(c.lineage).includes(needle) ||
-    normalize(c.slug).includes(needle)
-  );
+const VERIFICATION_OPTIONS: ReadonlyArray<{
+  value: "all" | CultivarVerificationStatus;
+  label: string;
+}> = [
+  { value: "all", label: "All evidence states" },
+  { value: "sample", label: "Sample reference data" },
+  { value: "community", label: "Community-supported" },
+  { value: "reviewed", label: "Verdant reviewed" },
+  { value: "verified", label: "Source-backed" },
+];
+
+function validOption<T extends string>(
+  value: string,
+  options: ReadonlyArray<{ value: T; label: string }>,
+  fallback: T,
+): T {
+  return options.some((option) => option.value === value) ? (value as T) : fallback;
 }
 
 export default function CultivarsIndex() {
   const [searchParams, setSearchParams] = useSearchParams();
   usePageSeo(buildCultivarsIndexSeo(searchParams));
-  const rawQuery = searchParams.get("q") ?? "";
-  const rawDifficulty = (searchParams.get("difficulty") ?? "all") as DifficultyFilter;
-  const difficulty: DifficultyFilter = DIFFICULTY_OPTIONS.some((o) => o.value === rawDifficulty)
-    ? rawDifficulty
-    : "all";
 
-  const updateParam = (key: "q" | "difficulty", value: string) => {
+  const query = searchParams.get("q") ?? "";
+  const difficulty = validOption(
+    searchParams.get("difficulty") ?? "all",
+    DIFFICULTY_OPTIONS,
+    "all",
+  );
+  const lifeCycle = validOption(
+    searchParams.get("lifeCycle") ?? "all",
+    LIFE_CYCLE_OPTIONS,
+    "all",
+  );
+  const verificationStatus = validOption(
+    searchParams.get("verification") ?? "all",
+    VERIFICATION_OPTIONS,
+    "all",
+  );
+
+  const updateParam = (key: string, value: string, emptyValue = "all") => {
     const next = new URLSearchParams(searchParams);
-    if (!value || (key === "difficulty" && value === "all")) {
-      next.delete(key);
-    } else {
-      next.set(key, value);
-    }
+    if (!value || value === emptyValue) next.delete(key);
+    else next.set(key, value);
     setSearchParams(next, { replace: true });
   };
 
   const filtered = useMemo(
     () =>
-      VERDANT_CULTIVARS.filter(
-        (c) =>
-          matchesQuery(c, rawQuery) && (difficulty === "all" ? true : c.difficulty === difficulty),
-      ),
-    [rawQuery, difficulty],
+      filterCultivarReferenceProfiles(VERDANT_CULTIVARS, {
+        query,
+        difficulty,
+        lifeCycle,
+        verificationStatus,
+      }),
+    [difficulty, lifeCycle, query, verificationStatus],
   );
 
-  const clearAll = () => setSearchParams(new URLSearchParams(), { replace: true });
-  const hasFilters = rawQuery.trim().length > 0 || difficulty !== "all";
+  const hasFilters =
+    query.trim().length > 0 ||
+    difficulty !== "all" ||
+    lifeCycle !== "all" ||
+    verificationStatus !== "all";
 
   return (
     <main data-testid="cultivars-index-page" className="min-h-screen bg-background text-foreground">
-      <header className="px-6 py-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 max-w-6xl mx-auto">
+      <header className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-4 gap-y-3 px-4 py-5 sm:px-6">
         <Link to="/welcome" aria-label="Verdant Grow Diary home">
           <BrandLogo size="md" showText />
         </Link>
@@ -89,39 +114,41 @@ export default function CultivarsIndex() {
         </nav>
       </header>
 
-      <section className="px-6 pt-8 pb-6 max-w-3xl mx-auto">
-        <p className="text-sm uppercase tracking-[0.2em] text-primary/80 font-medium">
-          Cultivar guides
+      <section className="mx-auto max-w-6xl px-4 pb-6 pt-8 sm:px-6">
+        <p className="text-sm font-medium uppercase tracking-[0.2em] text-primary/80">
+          Strain Reference Library
         </p>
-        <h1 className="mt-3 font-display text-3xl md:text-5xl font-bold tracking-tight">
-          Cannabis cultivar guides for serious home growers
+        <h1 className="mt-3 max-w-4xl font-display text-3xl font-bold tracking-tight md:text-5xl">
+          Source-backed cultivar profiles and reported grow tendencies
         </h1>
-        <p className="mt-4 text-lg text-muted-foreground">
-          Practical, evergreen profiles for popular cannabis cultivars — often called strains. Each
-          page covers lineage, flower window, environment ranges by stage, common issues home
-          growers report, and the evidence points that matter when running a Pheno Hunt. No
-          cherry-picked diary photos, no guaranteed-yield claims, no AI picking winners for you.
+        <p className="mt-4 max-w-3xl text-lg text-muted-foreground">
+          The library supplies a hypothesis. Your plant&apos;s logs, source-labeled sensors, medium,
+          stage, and observed response supply the truth.
         </p>
-        <p className="mt-4 text-sm text-muted-foreground">
-          Verdant is a grow diary and Pheno Hunt tool. It records what you did and what changed; it
-          does not control your equipment.
-        </p>
+
+        <div
+          data-testid="cultivar-sample-banner"
+          className="mt-6 rounded-xl border border-amber-500/35 bg-amber-500/10 p-4 text-sm"
+        >
+          <p className="font-semibold text-amber-800 dark:text-amber-200">
+            Sample reference data — not a universal grow recipe
+          </p>
+          <p className="mt-1 text-muted-foreground">
+            Every profile shows sources, confidence, and missing information. No profile controls
+            equipment, creates alerts, or overrides the grower&apos;s plant history.
+          </p>
+        </div>
       </section>
 
-      <section className="px-6 pb-16 max-w-3xl mx-auto">
-        <h2 className="font-display text-2xl font-semibold mb-4">Featured cultivars</h2>
-
+      <section className="mx-auto max-w-6xl px-4 pb-16 sm:px-6">
         <form
           role="search"
           aria-label="Filter cultivar guides"
-          className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end"
-          onSubmit={(e) => e.preventDefault()}
+          className="grid gap-3 rounded-xl border border-border/60 bg-card/40 p-4 sm:grid-cols-2 lg:grid-cols-4"
+          onSubmit={(event) => event.preventDefault()}
         >
-          <div className="flex-1">
-            <label
-              htmlFor="cultivar-search"
-              className="block text-xs uppercase tracking-wide text-muted-foreground mb-1"
-            >
+          <div className="sm:col-span-2 lg:col-span-1">
+            <label htmlFor="cultivar-search" className="mb-1 block text-xs uppercase tracking-wide text-muted-foreground">
               Search
             </label>
             <input
@@ -129,51 +156,86 @@ export default function CultivarsIndex() {
               type="search"
               inputMode="search"
               autoComplete="off"
-              placeholder="Try “Oreoz”, “cookies”, “blueberry”…"
-              value={rawQuery}
-              onChange={(e) => updateParam("q", e.target.value)}
-              className="w-full min-h-[44px] rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+              placeholder="Name, alias, breeder, or lineage…"
+              value={query}
+              onChange={(event) => updateParam("q", event.target.value, "")}
+              className="min-h-[44px] w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
             />
           </div>
-          <div className="sm:w-56">
-            <label
-              htmlFor="cultivar-difficulty"
-              className="block text-xs uppercase tracking-wide text-muted-foreground mb-1"
-            >
+
+          <div>
+            <label htmlFor="cultivar-difficulty" className="mb-1 block text-xs uppercase tracking-wide text-muted-foreground">
               Difficulty
             </label>
             <select
               id="cultivar-difficulty"
               value={difficulty}
-              onChange={(e) => updateParam("difficulty", e.target.value)}
-              className="w-full min-h-[44px] rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+              onChange={(event) => updateParam("difficulty", event.target.value)}
+              className="min-h-[44px] w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
             >
-              {DIFFICULTY_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
+              {DIFFICULTY_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
                 </option>
               ))}
             </select>
           </div>
+
+          <div>
+            <label htmlFor="cultivar-life-cycle" className="mb-1 block text-xs uppercase tracking-wide text-muted-foreground">
+              Life cycle
+            </label>
+            <select
+              id="cultivar-life-cycle"
+              value={lifeCycle}
+              onChange={(event) => updateParam("lifeCycle", event.target.value)}
+              className="min-h-[44px] w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+            >
+              {LIFE_CYCLE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="cultivar-verification" className="mb-1 block text-xs uppercase tracking-wide text-muted-foreground">
+              Evidence state
+            </label>
+            <select
+              id="cultivar-verification"
+              value={verificationStatus}
+              onChange={(event) => updateParam("verification", event.target.value)}
+              className="min-h-[44px] w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+            >
+              {VERIFICATION_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {hasFilters ? (
             <button
               type="button"
-              onClick={clearAll}
-              className="min-h-[44px] rounded-md border border-border px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:border-primary/40"
+              onClick={() => setSearchParams(new URLSearchParams(), { replace: true })}
+              className="min-h-[44px] rounded-md border border-border px-3 py-2 text-sm text-muted-foreground hover:border-primary/40 hover:text-foreground sm:col-span-2 lg:col-span-4 lg:justify-self-start"
             >
-              Clear
+              Clear filters
             </button>
           ) : null}
         </form>
 
         <p
-          className="mb-3 text-xs text-muted-foreground"
+          className="mb-4 mt-5 text-sm text-muted-foreground"
           aria-live="polite"
           data-testid="cultivars-index-result-count"
         >
           {filtered.length === VERDANT_CULTIVARS.length
-            ? `Showing all ${VERDANT_CULTIVARS.length} cultivars`
-            : `Showing ${filtered.length} of ${VERDANT_CULTIVARS.length} cultivars`}
+            ? `Showing all ${VERDANT_CULTIVARS.length} reference profiles`
+            : `Showing ${filtered.length} of ${VERDANT_CULTIVARS.length} reference profiles`}
         </p>
 
         {filtered.length === 0 ? (
@@ -181,37 +243,47 @@ export default function CultivarsIndex() {
             data-testid="cultivars-index-empty"
             className="rounded-lg border border-dashed border-border/60 p-6 text-sm text-muted-foreground"
           >
-            No cultivar guides match those filters yet. Try clearing the search or picking a
-            different difficulty — the library is small and curated on purpose.
+            No reference profiles match those filters. Try an alias such as “GG4,” clear a filter,
+            or search by lineage.
           </div>
         ) : (
-          <ul className="space-y-4">
-            {filtered.map((c) => (
-              <li
-                key={c.slug}
-                className="rounded-lg border border-border/60 p-4 hover:border-primary/40 transition-colors"
-              >
-                <Link to={`/cultivars/${c.slug}`} className="block">
-                  <div className="flex items-baseline justify-between gap-4">
-                    <h3 className="font-semibold text-lg">{c.name}</h3>
-                    <span className="text-xs text-muted-foreground">{c.flowerWeeks}</span>
+          <ul className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {filtered.map((cultivar) => (
+              <li key={cultivar.slug} className="h-full">
+                <Link
+                  to={`/cultivars/${cultivar.slug}`}
+                  className="flex h-full flex-col rounded-xl border border-border/60 bg-card/30 p-5 transition-colors hover:border-primary/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                >
+                  <div className="flex flex-wrap gap-2 text-[11px] uppercase tracking-wide text-muted-foreground">
+                    <span className="rounded-full border border-border/70 px-2 py-0.5">
+                      {cultivar.lifeCycle}
+                    </span>
+                    <span className="rounded-full border border-border/70 px-2 py-0.5">
+                      {cultivar.difficulty}
+                    </span>
+                    <span className="rounded-full border border-amber-500/35 bg-amber-500/10 px-2 py-0.5 text-amber-800 dark:text-amber-200">
+                      {formatVerificationStatus(cultivar.verificationStatus)}
+                    </span>
                   </div>
+                  <h2 className="mt-4 font-display text-xl font-semibold">{cultivar.name}</h2>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Lineage: {c.lineage} · {c.difficulty}
+                    {cultivar.breeder ? `${cultivar.breeder} · ` : "Breeder/source varies · "}
+                    {cultivar.flowerWeeks}
                   </p>
-                  <p className="mt-2 text-sm text-muted-foreground">{c.intro}</p>
+                  <p className="mt-3 line-clamp-4 text-sm text-muted-foreground">{cultivar.intro}</p>
+                  <p className="mt-auto pt-5 text-xs text-primary/90">Open source and guide evidence →</p>
                 </Link>
               </li>
             ))}
           </ul>
         )}
 
-        <p className="mt-8 text-sm text-muted-foreground">
-          Looking for stage-by-stage checklists? See the{" "}
+        <p className="mt-10 text-sm text-muted-foreground">
+          Looking for stage fundamentals? See the{" "}
           <Link to="/guides/grow-stage-care-guide" className="underline hover:text-foreground">
             grow-stage care guide
           </Link>
-          . Comparing keepers across a run? See{" "}
+          . Comparing candidate expressions? See{" "}
           <Link to="/pheno-comparison" className="underline hover:text-foreground">
             Pheno comparison
           </Link>

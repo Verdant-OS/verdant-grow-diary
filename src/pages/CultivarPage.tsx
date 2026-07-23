@@ -7,6 +7,7 @@
 import { useEffect } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import BrandLogo from "@/components/BrandLogo";
+import CultivarBlueprintCrossSell from "@/components/CultivarBlueprintCrossSell";
 import CultivarPhenoSampleModule from "@/components/CultivarPhenoSampleModule";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import {
@@ -292,6 +293,8 @@ export default function CultivarPage() {
             </section>
           </aside>
         </div>
+
+        <CultivarBlueprintCrossSell cultivar={cultivar} />
 
         <section className="mt-10 rounded-xl border border-primary/30 bg-primary/5 p-5">
           <h2 className="font-display text-xl font-semibold">Build plant memory for your own run</h2>

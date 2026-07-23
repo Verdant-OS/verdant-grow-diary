@@ -329,7 +329,10 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
                   if (rows.length === 0) return null;
                   const Icon = GROUP_ICONS[type];
                   return (
-                    <CommandGroup key={type} heading={GROUP_HEADINGS[type]}>
+                    <CommandGroup
+                      key={type}
+                      heading={`${GROUP_HEADINGS[type]} (${rows.length})`}
+                    >
                       {rows.map((row) => (
                         <CommandItem
                           key={`${type}:${row.id}`}

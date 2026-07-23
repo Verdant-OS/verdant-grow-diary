@@ -96,4 +96,27 @@ jobs:
         run: node scripts/sensor-safety-check.mjs
 
       - name: Production build and static SEO validation
-        run: bun run build
+        id: production_build
+        continue-on-error: true
+        shell: bash
+        run: |
+          mkdir -p .diagnostics
+          set +e
+          bun run build > .diagnostics/strain-reference-build.txt 2>&1
+          status=$?
+          set -e
+          cat .diagnostics/strain-reference-build.txt
+          exit "$status"
+
+      - name: Upload focused build diagnostics
+        if: steps.production_build.outcome == 'failure'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: strain-reference-build-diagnostics
+          path: .diagnostics/strain-reference-build.txt
+          if-no-files-found: error
+          retention-days: 3
+
+      - name: Stop after production build failure
+        if: steps.production_build.outcome == 'failure'
+        run: exit 1

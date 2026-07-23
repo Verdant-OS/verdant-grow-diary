@@ -21,7 +21,7 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      - name: Checkout branch
+      - name: Checkout feature branch
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           ref: feature/strain-reference-library-v1
@@ -35,22 +35,22 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Run canonical generator
+      - name: Merge current base and run canonical generator
+        shell: bash
         run: |
           set -euo pipefail
+          git config user.name "verdant-ci"
+          git config user.email "actions@users.noreply.github.com"
+          git fetch origin verdant-grow-diary
+          git merge --no-edit origin/verdant-grow-diary
           bun run sync-edge-shared
           bun run verify-edge-shared-in-sync
           git diff --check
 
-      - name: Commit generated mirror only when changed
+      - name: Commit generated output and push updated branch
         shell: bash
         run: |
           set -euo pipefail
-          if git diff --quiet -- supabase/functions; then
-            echo "Edge mirror already synchronized."
-            exit 0
-          fi
-
           unexpected="$(git status --porcelain | awk '$2 !~ /^supabase\/functions\// { print }')"
           if [ -n "$unexpected" ]; then
             echo "Canonical sync changed an unexpected path:"
@@ -58,8 +58,9 @@ jobs:
             exit 1
           fi
 
-          git add supabase/functions
-          git config user.name "verdant-ci"
-          git config user.email "actions@users.noreply.github.com"
-          git commit -m "chore(edge): sync generated shared mirror"
+          if ! git diff --quiet -- supabase/functions; then
+            git add supabase/functions
+            git commit -m "chore(edge): sync generated shared mirror"
+          fi
+
           git push origin HEAD:feature/strain-reference-library-v1

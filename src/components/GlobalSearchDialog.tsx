@@ -42,6 +42,7 @@ import {
   DEFAULT_FILTERS,
   readGlobalSearchSession,
   writeGlobalSearchSession,
+  clearGlobalSearchSession,
   readGlobalSearchHistory,
   pushGlobalSearchHistory,
   clearGlobalSearchHistory,

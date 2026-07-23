@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - release/strain-v1-full-suite-triage
+  pull_request:
+    branches:
+      - verdant-grow-diary
   workflow_dispatch:
 
 permissions:

@@ -1,0 +1,53 @@
+name: Temporary fake-account live browser QA
+
+on:
+  push:
+    branches:
+      - qa/browser-fake-account-20260723
+    paths:
+      - .github/workflows/qa-fake-account-live-once.yml
+      - playwright.qa-fake-account.config.ts
+      - e2e/qa-fake-account-live.spec.ts
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qa-fake-account-live-20260723
+  cancel-in-progress: false
+
+jobs:
+  live-qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      E2E_BASE_URL: https://verdantgrowdiary-com.lovable.app
+    steps:
+      - name: Checkout isolated QA branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Install locked dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install Chromium
+        run: bunx playwright install --with-deps chromium
+
+      - name: Create disposable account and exercise published app
+        run: bunx playwright test --config=playwright.qa-fake-account.config.ts
+
+      - name: Upload QA receipt, traces, screenshots, and video
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: verdant-fake-account-live-qa-${{ github.run_id }}
+          path: |
+            artifacts/qa-fake-account/
+            playwright-report/
+            test-results/qa-fake-account/
+          if-no-files-found: warn
+          retention-days: 7

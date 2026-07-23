@@ -1,0 +1,121 @@
+name: Release triage — Vitest batches 1, 5, 10
+
+on:
+  push:
+    branches:
+      - release/strain-v1-full-suite-triage
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  triage:
+    name: Triage batch ${{ matrix.batch }}/16
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        batch: [1, 5, 10]
+    env:
+      NODE_OPTIONS: --max-old-space-size=4096
+      BATCH: ${{ matrix.batch }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run and capture batch
+        id: run_batch
+        shell: bash
+        run: |
+          set +e
+          mkdir -p artifacts/full-suite-triage
+          LOG="artifacts/full-suite-triage/batch-${BATCH}.log"
+          SUMMARY="artifacts/full-suite-triage/batch-${BATCH}-summary.txt"
+
+          node scripts/run-vitest-batches.mjs \
+            --batches=16 \
+            --batch="${BATCH}" \
+            --strategy=round-robin \
+            --reporter=dot \
+            --chunk-size=1 \
+            --isolate \
+            --pool=forks \
+            --retry-failed-chunk-once \
+            >"${LOG}" 2>&1
+          status=$?
+
+          python3 - "${LOG}" "${SUMMARY}" "${BATCH}" "${status}" <<'PY'
+          import pathlib
+          import re
+          import sys
+
+          log_path = pathlib.Path(sys.argv[1])
+          summary_path = pathlib.Path(sys.argv[2])
+          batch = sys.argv[3]
+          status = sys.argv[4]
+          text = log_path.read_text(encoding="utf-8", errors="replace")
+          lines = text.splitlines()
+
+          interesting = []
+          patterns = [
+              re.compile(r"(?:FAIL|Failed Tests|AssertionError|Error:|Test Files|Tests\s+)", re.I),
+              re.compile(r"src/test/[^\s:]+\.test\.(?:ts|tsx)"),
+              re.compile(r"retry", re.I),
+          ]
+          for index, line in enumerate(lines):
+              if any(pattern.search(line) for pattern in patterns):
+                  start = max(0, index - 2)
+                  end = min(len(lines), index + 5)
+                  interesting.extend(lines[start:end])
+
+          deduped = []
+          seen = set()
+          for line in interesting:
+              if line not in seen:
+                  seen.add(line)
+                  deduped.append(line)
+
+          tail = lines[-300:]
+          summary_path.write_text(
+              "\n".join([
+                  f"BATCH={batch}",
+                  f"EXIT_CODE={status}",
+                  "",
+                  "=== MATCHED FAILURE CONTEXT ===",
+                  *deduped,
+                  "",
+                  "=== LAST 300 LOG LINES ===",
+                  *tail,
+                  "",
+              ]),
+              encoding="utf-8",
+          )
+          PY
+
+          echo "${status}" > "artifacts/full-suite-triage/batch-${BATCH}-exit-code.txt"
+          echo "exit_code=${status}" >> "$GITHUB_OUTPUT"
+          cat "${SUMMARY}"
+          exit 0
+
+      - name: Upload compact triage evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: full-suite-triage-batch-${{ matrix.batch }}
+          path: artifacts/full-suite-triage/
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Preserve failing status
+        if: steps.run_batch.outputs.exit_code != '0'
+        run: exit 1

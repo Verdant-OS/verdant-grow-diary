@@ -99,6 +99,14 @@ const PAGE_SIZE = 10;
 
 export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
   const navigate = useNavigate();
+  const location = useLocation();
+  // Best-effort current-context derivation so empty-state "Create" buttons can
+  // prefill the Quick Log form with the plant/tent the grower is looking at.
+  // Returns null on routes like /dashboard where no plant/tent segment matches.
+  const createContext = useMemo(
+    () => deriveSelectionContextFromPathname(location.pathname),
+    [location.pathname],
+  );
   // Lazy initializers hydrate from sessionStorage exactly once so reopening
   // the palette within the same tab resumes the last query + filter toggles.
   const [query, setQuery] = useState<string>(

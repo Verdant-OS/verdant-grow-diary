@@ -18,8 +18,11 @@ The UI uses **Strain Reference Library** for grower discovery and keeps
   and missing-information notes.
 - Complete guides are composed from a photoperiod/autoflower base template plus
   cultivar-specific overlays. Shared fundamentals are not copied ten times.
-- The authenticated command palette uses one shared search surface for pages,
-  owner-scoped grows/tents/plants, and public cultivar references.
+- The public directory provides deterministic name, alias, breeder, lineage,
+  lifecycle, difficulty, and evidence-state filtering.
+- Mainline's RLS-backed command palette remains the authority for private grow,
+  tent, and plant search. Cultivar union into that RPC is deferred until the
+  database read model and content-parity gate are deployed.
 - A migration establishes the read-only reference schema and future controlled
   import staging tables.
 
@@ -30,7 +33,7 @@ The UI uses **Strain Reference Library** for grower discovery and keeps
 - No AI-generated copy is marked reviewed or verified.
 - No images are embedded, avoiding licensing ambiguity.
 - Public profile data is visibly labeled sample/reference data.
-- Private entity search remains owner-scoped through existing RLS-backed reads.
+- Private entity search remains owner-scoped through the mainline RLS-backed RPC.
 - Import staging tables have no anon/authenticated write grants or policies.
 
 ## Data model
@@ -56,21 +59,18 @@ Editorial/import writes remain a future server/admin workflow.
 
 Private grow, tent, and plant matches come from the RLS-backed
 `public.verdant_search` RPC through `src/hooks/useGlobalSearch.ts`. The RPC owns
-private exact, prefix, and fuzzy matching; the client does not fetch every
-private row to build a second index.
+private exact, prefix, and fuzzy matching; the Strain Reference Library does not
+fetch every private row or build a parallel owner-data index.
 
-`src/lib/globalSearchItems.ts` merges those already-matched RPC rows with:
+Public cultivar discovery remains on `/cultivars` for V1 and uses the shared
+normalization boundary in `src/lib/sharedSearchTextRules.ts`. It supports exact
+names, approved aliases, breeder and lineage text, punctuation normalization,
+and deterministic filters without touching private grow records.
 
-1. static application destinations; and
-2. bundled public cultivar names, aliases, breeder, and lineage.
-
-`GlobalSearchDialog` is the single presenter surface. Server-side fuzzy matches
-are preserved rather than re-filtered with a local substring check. Public
-cultivar and page search remains available if a private RPC read fails, with the
-failure stated explicitly and no demo fallback.
-
-The palette does not infer or auto-link `plants.strain` to a cultivar record.
-Exact-name and alias results navigate to the existing entity or reference route.
+After database content parity is proven and the migration is deployed, a later
+scoped change may extend `public.verdant_search` with published cultivar rows.
+That future union must keep private RLS behavior unchanged, must navigate by the
+canonical cultivar slug, and must not infer or auto-link `plants.strain`.
 
 ## Automated Source Verification V0
 
@@ -181,6 +181,7 @@ Until that gate is green:
 ## Deferred work
 
 - Production database seed/cutover after content-parity verification.
+- Command-palette cultivar union after the DB read model is deployed.
 - Admin-only draft/review/publish UI.
 - CSV import execution after preview, checksum, duplicate, and moderation gates.
 - Optional nullable `plants.cultivar_id` linking.

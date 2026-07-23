@@ -1,6 +1,7 @@
 import { useParams, Link } from "react-router-dom";
 import { AlertTriangle, Archive, ArrowLeft, ArrowRight, Box, GitMerge, Sprout } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
+import PlantCultivarReferenceHint from "@/components/PlantCultivarReferenceHint";
 import StageBadge from "@/components/StageBadge";
 import EmptyState from "@/components/EmptyState";
 import GrowDataSourceDisclosure from "@/components/GrowDataSourceDisclosure";
@@ -392,6 +393,7 @@ export default function PlantDetail() {
           </div>
         }
       />
+      <PlantCultivarReferenceHint strain={plant.strain} plantId={plant.id} />
       <PlantDetailDataSourceDisclosure
         metas={[plantMeta, tentMeta]}
         testId="plant-detail-data-source-disclosure"

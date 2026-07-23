@@ -12,6 +12,7 @@ import { Link } from "react-router-dom";
 import type { VerdantCultivarProfile } from "@/constants/verdantCultivars";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { canUseCapability } from "@/lib/entitlements/capabilityAccess";
+import { plantsPath } from "@/lib/routes";
 
 interface Props {
   cultivar: VerdantCultivarProfile;
@@ -43,7 +44,7 @@ export default function CultivarBlueprintCrossSell({ cultivar }: Props) {
       </p>
       {unlocked ? (
         <Link
-          to="/plants"
+          to={plantsPath()}
           data-testid="cultivar-blueprint-open"
           className="mt-4 inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
         >

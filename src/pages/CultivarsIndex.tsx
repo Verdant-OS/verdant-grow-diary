@@ -54,6 +54,7 @@ function validOption<T extends string>(
 
 export default function CultivarsIndex() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const [searchOpen, setSearchOpen] = useState(false);
   usePageSeo(buildCultivarsIndexSeo(searchParams));
 
   const query = searchParams.get("q") ?? "";

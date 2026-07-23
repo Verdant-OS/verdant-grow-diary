@@ -4,6 +4,13 @@ on:
   push:
     branches:
       - feature/strain-reference-library-v1
+  pull_request:
+    branches:
+      - verdant-grow-diary
+    paths:
+      - ".github/workflows/pr418-sync-edge-shared.yml"
+      - "src/integrations/supabase/types.ts"
+      - "supabase/functions/**"
 
 permissions:
   contents: write

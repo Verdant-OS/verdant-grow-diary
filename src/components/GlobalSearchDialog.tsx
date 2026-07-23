@@ -163,6 +163,25 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
               </button>
             ) : null}
           </div>
+          {hasQuery && !isLoading && hasAny ? (
+            <div
+              className="flex items-center justify-between border-b bg-muted/30 px-3 py-1.5 text-[11px] text-muted-foreground"
+              role="status"
+              aria-live="polite"
+              data-testid="global-search-result-count"
+            >
+              <span>
+                Showing <span className="font-medium text-foreground tabular-nums">1–{results.length}</span>{" "}
+                of <span className="font-medium text-foreground tabular-nums">{results.length}</span>{" "}
+                {results.length === 1 ? "result" : "results"}
+              </span>
+              <span className="tabular-nums">
+                {GROUP_ORDER.filter((t) => grouped[t].length > 0)
+                  .map((t) => `${grouped[t].length} ${GROUP_HEADINGS[t].toLowerCase()}`)
+                  .join(" · ")}
+              </span>
+            </div>
+          ) : null}
           <CommandList>
             {!hasQuery ? (
               recent.length > 0 ? (

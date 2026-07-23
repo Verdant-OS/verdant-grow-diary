@@ -7,7 +7,9 @@
  * No queries, no writes, no navigation — the parent dialog owns selection and
  * routing. Content comes entirely from the already-fetched result row.
  */
-import { Dna, ExternalLink, Leaf, Sprout, Tent } from "lucide-react";
+import { Check, Copy, Dna, ExternalLink, Leaf, SquareArrowOutUpRight, Sprout, Tent } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type {

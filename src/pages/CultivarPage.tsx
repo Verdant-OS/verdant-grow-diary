@@ -9,6 +9,7 @@ import { Link, Navigate, useParams } from "react-router-dom";
 import BrandLogo from "@/components/BrandLogo";
 import CultivarBlueprintCrossSell from "@/components/CultivarBlueprintCrossSell";
 import CultivarPhenoSampleModule from "@/components/CultivarPhenoSampleModule";
+import CultivarQaPanel from "@/components/CultivarQaPanel";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import {
   findCultivarBySlug,
@@ -350,6 +351,8 @@ export default function CultivarPage() {
             ))}
           </dl>
         </section>
+
+        <CultivarQaPanel cultivar={cultivar} />
 
         <CultivarBlueprintCrossSell cultivar={cultivar} />
 

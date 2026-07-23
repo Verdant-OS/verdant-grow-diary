@@ -74,10 +74,15 @@ function routeFor(row: GlobalSearchResult): string {
 export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
+  const [recent, setRecent] = useState<string[]>([]);
   const { results, isLoading, isError, retry } = useGlobalSearch(query);
 
   useEffect(() => {
-    if (!open) setQuery("");
+    if (open) {
+      setRecent(readRecentSearches());
+    } else {
+      setQuery("");
+    }
   }, [open]);
 
   const grouped = useMemo(() => {
@@ -97,6 +102,19 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
   const trimmed = query.trim();
   const hasQuery = trimmed.length > 0;
   const hasAny = results.length > 0;
+
+  const handleSelectResult = (row: GlobalSearchResult) => {
+    if (trimmed) {
+      setRecent(pushRecentSearch(trimmed));
+    }
+    onOpenChange(false);
+    navigate(routeFor(row));
+  };
+
+  const handleClearRecent = () => {
+    clearRecentSearches();
+    setRecent([]);
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

@@ -176,7 +176,7 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
   };
 
   const resetFilters = () =>
-    setEnabledTypes({ grow: true, tent: true, plant: true, cultivar: true });
+    setEnabledTypes({ ...DEFAULT_FILTERS });
 
 
   const handleSelectResult = (row: GlobalSearchResult) => {

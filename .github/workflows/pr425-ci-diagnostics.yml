@@ -6,6 +6,11 @@ on:
       - tmp/pr425-ci-diagnostics
     paths:
       - .github/workflows/pr425-ci-diagnostics.yml
+  pull_request:
+    branches:
+      - verdant-grow-diary
+    paths:
+      - .github/workflows/pr425-ci-diagnostics.yml
   workflow_dispatch:
 
 permissions:

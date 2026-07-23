@@ -21,7 +21,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        batch: [1, 10]
+        batch: [1, 4, 10]
     env:
       BATCH: ${{ matrix.batch }}
       BASE_SHA: feca15c541bc77105f6873ee41fd1d0436122b5d

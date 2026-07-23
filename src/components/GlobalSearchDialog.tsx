@@ -175,11 +175,11 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
                           />
                           <div className="flex min-w-0 flex-col">
                             <span className="truncate text-sm text-foreground">
-                              {row.label}
+                              {highlightMatch(row.label, trimmed)}
                             </span>
                             {row.sublabel ? (
                               <span className="truncate text-xs text-muted-foreground">
-                                {row.sublabel}
+                                {highlightMatch(row.sublabel, trimmed)}
                               </span>
                             ) : null}
                           </div>

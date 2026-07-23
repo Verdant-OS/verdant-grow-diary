@@ -43,6 +43,7 @@ import {
   readGlobalSearchSession,
   writeGlobalSearchSession,
 } from "@/lib/globalSearchSession";
+import GlobalSearchResultPreview from "@/components/GlobalSearchResultPreview";
 
 
 interface Props {

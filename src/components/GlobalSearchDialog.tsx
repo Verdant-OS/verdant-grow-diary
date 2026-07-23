@@ -114,6 +114,17 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
     return map;
   }, [visibleResults]);
 
+  const totalsByGroup = useMemo(() => {
+    const map: Record<GlobalSearchEntityType, number> = {
+      grow: 0,
+      tent: 0,
+      plant: 0,
+      cultivar: 0,
+    };
+    for (const row of results) map[row.entity_type] += 1;
+    return map;
+  }, [results]);
+
   const trimmed = query.trim();
   const hasQuery = trimmed.length > 0;
   const hasAny = results.length > 0;

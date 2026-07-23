@@ -18,8 +18,8 @@ The UI uses **Strain Reference Library** for grower discovery and keeps
   and missing-information notes.
 - Complete guides are composed from a photoperiod/autoflower base template plus
   cultivar-specific overlays. Shared fundamentals are not copied ten times.
-- The authenticated command palette uses one shared search model for pages,
-  grows, tents, plants, and cultivar references.
+- The authenticated command palette uses one shared search surface for pages,
+  owner-scoped grows/tents/plants, and public cultivar references.
 - A migration establishes the read-only reference schema and future controlled
   import staging tables.
 
@@ -54,11 +54,20 @@ Editorial/import writes remain a future server/admin workflow.
 
 ## Search foundation
 
-`src/lib/globalSearchItems.ts` is the shared search model. It combines:
+Private grow, tent, and plant matches come from the RLS-backed
+`public.verdant_search` RPC through `src/hooks/useGlobalSearch.ts`. The RPC owns
+private exact, prefix, and fuzzy matching; the client does not fetch every
+private row to build a second index.
 
-1. static application destinations;
-2. owner-scoped grows, tents, and plants;
-3. public cultivar names, aliases, breeder, and lineage.
+`src/lib/globalSearchItems.ts` merges those already-matched RPC rows with:
+
+1. static application destinations; and
+2. bundled public cultivar names, aliases, breeder, and lineage.
+
+`GlobalSearchDialog` is the single presenter surface. Server-side fuzzy matches
+are preserved rather than re-filtered with a local substring check. Public
+cultivar and page search remains available if a private RPC read fails, with the
+failure stated explicitly and no demo fallback.
 
 The palette does not infer or auto-link `plants.strain` to a cultivar record.
 Exact-name and alias results navigate to the existing entity or reference route.

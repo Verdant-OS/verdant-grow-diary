@@ -682,11 +682,13 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
                             { actionId: "diary_note", label: "Note", testId: "note", fallbackType: "observation" },
                             { actionId: "watering", label: "Watering", testId: "watering", fallbackType: "watering" },
                             { actionId: "feeding", label: "Feeding", testId: "feeding", fallbackType: "feeding" },
+                            { actionId: "environment", label: "Environment check", testId: "environment", fallbackType: "environment" },
+                            { actionId: "training", label: "Training", testId: "training", fallbackType: null },
                           ] as ReadonlyArray<{
                             actionId: FastAddActionId;
                             label: string;
                             testId: string;
-                            fallbackType: "observation" | "watering" | "feeding";
+                            fallbackType: "observation" | "watering" | "feeding" | "environment" | null;
                           }>
                         ).map(({ actionId, label, testId, fallbackType }) => (
                           <Button

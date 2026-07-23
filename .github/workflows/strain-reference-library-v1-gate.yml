@@ -11,6 +11,7 @@ on:
       - "src/lib/cultivarReference*.ts"
       - "src/lib/globalSearchItems.ts"
       - "src/lib/sharedSearchTextRules.ts"
+      - "src/lib/strainSourceVerification.ts"
       - "src/hooks/useGlobalSearchItems.ts"
       - "src/components/GlobalSearchDialog.tsx"
       - "src/pages/Cultivar*.tsx"
@@ -18,6 +19,7 @@ on:
       - "src/test/global-search-entity-results.test.ts"
       - "src/test/shared-search-text-rules.test.ts"
       - "src/test/strain-reference-library*.test.ts"
+      - "scripts/verify-cultivar-sources.mjs"
       - "supabase/migrations/20260722203000_strain_reference_library_v1.sql"
       - "docs/product/strain-reference-library-v1.md"
       - ".github/workflows/strain-reference-library-v1-gate.yml"
@@ -49,6 +51,7 @@ jobs:
         run: >-
           bunx vitest run
           src/test/strain-reference-library-v1.test.ts
+          src/test/strain-reference-library-source-verification.test.ts
           src/test/strain-reference-library-migration.test.ts
           src/test/strain-reference-library-static-safety.test.ts
           src/test/shared-search-text-rules.test.ts
@@ -60,6 +63,9 @@ jobs:
           src/test/cultivar-index-seo-rules.test.tsx
           src/test/static-public-seo-documents.test.ts
           --reporter=verbose
+
+      - name: Offline source provenance verification report
+        run: bun scripts/verify-cultivar-sources.mjs
 
       - name: Supabase migration safety — V1 finding fence
         shell: bash

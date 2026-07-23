@@ -63,6 +63,47 @@ Editorial/import writes remain a future server/admin workflow.
 The palette does not infer or auto-link `plants.strain` to a cultivar record.
 Exact-name and alias results navigate to the existing entity or reference route.
 
+## Automated Source Verification V0
+
+V0 verifies **provenance hygiene**, not the scientific truth of a reported range,
+terpene order, chemotype, or cultivation tendency.
+
+The offline structural layer checks:
+
+- unique source keys and required citation fields;
+- HTTPS-only source URLs and known source-type values;
+- non-empty citation/license boundaries;
+- parseable retrieval timestamps;
+- resolution of every profile, terpene-claim, and cannabinoid-claim source key;
+- a machine-readable source-classification mix.
+
+Run the CI-safe structural contract and report with:
+
+```bash
+bunx vitest run src/test/strain-reference-library-source-verification.test.ts
+bun scripts/verify-cultivar-sources.mjs
+```
+
+Optional network reachability is explicit and rate-limited:
+
+```bash
+bun scripts/verify-cultivar-sources.mjs --network
+bun scripts/verify-cultivar-sources.mjs --network --strict-network
+```
+
+The CLI writes `artifacts/source-verification/report.json`. Community-profile
+reachability remains advisory. Strict network mode may fail only when a critical
+scholarly, PubMed, laboratory, horticultural-reference, or breeder source is
+unreachable.
+
+Automated verification never:
+
+- changes claim values or ranges;
+- changes confidence;
+- changes `verificationStatus` or `lastVerifiedAt`;
+- promotes sample/community evidence to reviewed or verified;
+- replaces human editorial review.
+
 ## Deferred work
 
 - Production database seed/cutover from static public profiles.

@@ -46,7 +46,11 @@ import {
   readGlobalSearchHistory,
   pushGlobalSearchHistory,
   clearGlobalSearchHistory,
+  readGlobalSearchLastSelected,
+  writeGlobalSearchLastSelected,
+  clearGlobalSearchLastSelected,
   type GlobalSearchHistoryEntry,
+  type GlobalSearchLastSelected,
 } from "@/lib/globalSearchSession";
 import GlobalSearchResultPreview from "@/components/GlobalSearchResultPreview";
 

@@ -717,8 +717,9 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
                                 }
                               }
                               // No plant/tent in the current route — fall back
-                              // to the public Quick Log starter with a type hint.
-                              navigate(`/quick-log?type=${fallbackType}`);
+                              // to the public Quick Log starter with a type hint
+                              // when the starter supports it (training does not).
+                              navigate(fallbackType ? `/quick-log?type=${fallbackType}` : "/quick-log");
                             }}
                             data-testid={`global-search-empty-start-${testId}`}
                           >

@@ -14,7 +14,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Command as CommandPrimitive } from "cmdk";
-import { AlertTriangle, Clock, Dna, Leaf, RefreshCw, Sprout, Tent } from "lucide-react";
+import { AlertTriangle, Clock, Dna, Leaf, RefreshCw, Sprout, Tent, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";

@@ -12,9 +12,14 @@
  * notice and never presents "no matches" as a verified empty conclusion.
  */
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Command as CommandPrimitive } from "cmdk";
-import { AlertTriangle, Clock, Dna, Leaf, NotebookPen, RefreshCw, SearchX, Sprout, Tent, X } from "lucide-react";
+import { AlertTriangle, Clock, Dna, Leaf, NotebookPen, Plus, RefreshCw, SearchX, Sprout, Tent, X } from "lucide-react";
+import {
+  deriveSelectionContextFromPathname,
+  resolveFastAddIntent,
+  type FastAddActionId,
+} from "@/lib/fastAddActionRules";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";

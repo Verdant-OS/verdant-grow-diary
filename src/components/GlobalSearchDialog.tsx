@@ -1,90 +1,85 @@
 /**
- * GlobalSearchDialog — one command palette for RLS-backed private entity
- * matches, bundled public cultivar references, and static destinations.
+ * GlobalSearchDialog — command palette that queries the shared
+ * public.verdant_search RPC via useGlobalSearch and jumps to the
+ * matching grow / tent / plant detail route.
  *
- * Private grow/tent/plant matches come from public.verdant_search. Public
- * references remain read-only bundled data until the database cutover gate is
- * proven. The presenter performs no writes and never falls back to demo rows.
+ * cmdk's built-in client-side filter is disabled (shouldFilter={false})
+ * so results render in exactly the deterministic order the RPC returns
+ * (exact → prefix → fuzzy).
  */
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Command as CommandPrimitive } from "cmdk";
-import {
-  BookOpen,
-  FileText,
-  Leaf,
-  Sprout,
-  Tent,
-  type LucideIcon,
-} from "lucide-react";
+import { Leaf, Sprout, Tent } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import {
+  CommandEmpty,
   CommandGroup,
   CommandInput,
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { VERDANT_CULTIVARS } from "@/constants/verdantCultivars";
-import { useGlobalSearch } from "@/hooks/useGlobalSearch";
+import { cn } from "@/lib/utils";
 import {
-  buildGlobalSearchItems,
-  filterGlobalSearchItems,
-  type GlobalSearchItem,
-  type GlobalSearchItemKind,
-} from "@/lib/globalSearchItems";
+  useGlobalSearch,
+  type GlobalSearchEntityType,
+  type GlobalSearchResult,
+} from "@/hooks/useGlobalSearch";
+import { growDetailPath, plantDetailPath, tentDetailPath } from "@/lib/routes";
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Optional deterministic override used by isolated presenter tests. */
-  items?: readonly GlobalSearchItem[];
 }
 
-const ITEM_ICONS: Record<GlobalSearchItemKind, LucideIcon> = {
+const GROUP_ORDER: GlobalSearchEntityType[] = ["grow", "tent", "plant"];
+const GROUP_HEADINGS: Record<GlobalSearchEntityType, string> = {
+  grow: "Grows",
+  tent: "Tents",
+  plant: "Plants",
+};
+const GROUP_ICONS: Record<GlobalSearchEntityType, typeof Sprout> = {
   grow: Sprout,
   tent: Tent,
   plant: Leaf,
-  cultivar: BookOpen,
-  page: FileText,
 };
 
-export default function GlobalSearchDialog({ open, onOpenChange, items }: Props) {
+function routeFor(row: GlobalSearchResult): string {
+  switch (row.entity_type) {
+    case "grow":
+      return growDetailPath(row.id);
+    case "tent":
+      return tentDetailPath(row.id);
+    case "plant":
+      return plantDetailPath(row.id);
+  }
+}
+
+export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
-  const privateSearch = useGlobalSearch(items === undefined ? query : "");
+  const { results, isLoading, isError } = useGlobalSearch(query);
 
   useEffect(() => {
     if (!open) setQuery("");
   }, [open]);
 
-  const resolvedItems = useMemo(
-    () =>
-      items ??
-      buildGlobalSearchItems({
-        entityResults: privateSearch.results,
-        cultivars: VERDANT_CULTIVARS,
-      }),
-    [items, privateSearch.results],
-  );
-
-  const groups = useMemo(() => {
-    const filtered = filterGlobalSearchItems(resolvedItems, query);
-    const grouped = new Map<string, GlobalSearchItem[]>();
-    for (const item of filtered) {
-      const group = grouped.get(item.group) ?? [];
-      group.push(item);
-      grouped.set(item.group, group);
+  const grouped = useMemo(() => {
+    const map: Record<GlobalSearchEntityType, GlobalSearchResult[]> = {
+      grow: [],
+      tent: [],
+      plant: [],
+    };
+    // Preserve RPC ordering within each entity_type.
+    for (const row of results) {
+      map[row.entity_type]?.push(row);
     }
-    return Array.from(grouped.entries());
-  }, [query, resolvedItems]);
+    return map;
+  }, [results]);
 
-  const hasQuery = query.trim().length > 0;
-  const hasResults = groups.some(([, groupItems]) => groupItems.length > 0);
-  const emptyCopy = privateSearch.isLoading
-    ? "Searching your grow records…"
-    : privateSearch.isError
-      ? "Private grow records are temporarily unavailable. No matching public reference or page was found."
-      : "No matches for that search.";
+  const trimmed = query.trim();
+  const hasQuery = trimmed.length > 0;
+  const hasAny = results.length > 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -94,59 +89,65 @@ export default function GlobalSearchDialog({ open, onOpenChange, items }: Props)
           className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-group]]:px-2 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5 flex h-full w-full flex-col overflow-hidden rounded-md bg-popover text-popover-foreground"
         >
           <CommandInput
-            placeholder="Search grows, tents, plants, strains, and pages…"
+            placeholder="Search your grows, tents, and plants…"
             value={query}
             onValueChange={setQuery}
             data-testid="global-search-input"
           />
           <CommandList>
-            {hasQuery && privateSearch.isLoading && hasResults ? (
+            {!hasQuery ? (
+              <div className="py-6 text-center text-sm text-muted-foreground">
+                Type to search your grows, tents, and plants.
+              </div>
+            ) : isLoading ? (
               <div
-                className="px-4 py-2 text-xs text-muted-foreground"
+                className="py-6 text-center text-sm text-muted-foreground"
                 data-testid="global-search-loading"
               >
-                Searching private grow records…
+                Searching…
               </div>
-            ) : null}
-
-            {hasQuery && privateSearch.isError && hasResults ? (
-              <div className="px-4 py-2 text-xs text-destructive">
-                Private grow records are temporarily unavailable. Public reference and page results remain available.
+            ) : isError ? (
+              <div className="py-6 text-center text-sm text-destructive">
+                Search failed. Try again in a moment.
               </div>
-            ) : null}
-
-            {!hasResults ? (
-              <div className="py-6 text-center text-sm text-muted-foreground">{emptyCopy}</div>
+            ) : !hasAny ? (
+              <CommandEmpty>No matches for that search.</CommandEmpty>
             ) : (
-              groups.map(([group, groupItems]) => (
-                <CommandGroup key={group} heading={group}>
-                  {groupItems.map((item) => {
-                    const Icon = ITEM_ICONS[item.kind];
-                    return (
+              GROUP_ORDER.map((type) => {
+                const rows = grouped[type];
+                if (rows.length === 0) return null;
+                const Icon = GROUP_ICONS[type];
+                return (
+                  <CommandGroup key={type} heading={GROUP_HEADINGS[type]}>
+                    {rows.map((row) => (
                       <CommandItem
-                        key={item.to}
-                        value={item.to}
+                        key={`${type}:${row.id}`}
+                        value={`${type}:${row.id}`}
                         onSelect={() => {
                           onOpenChange(false);
-                          navigate(item.to);
+                          navigate(routeFor(row));
                         }}
-                        data-testid={`global-search-item-${item.to}`}
+                        data-testid={`global-search-item-${type}-${row.id}`}
                       >
                         <Icon
-                          className="mr-2 h-4 w-4 shrink-0 text-muted-foreground"
+                          className={cn("mr-2 h-4 w-4 shrink-0 text-muted-foreground")}
                           aria-hidden="true"
                         />
                         <div className="flex min-w-0 flex-col">
-                          <span className="truncate text-sm text-foreground">{item.label}</span>
-                          <span className="truncate text-xs text-muted-foreground">
-                            {item.description ?? item.to}
+                          <span className="truncate text-sm text-foreground">
+                            {row.label}
                           </span>
+                          {row.sublabel ? (
+                            <span className="truncate text-xs text-muted-foreground">
+                              {row.sublabel}
+                            </span>
+                          ) : null}
                         </div>
                       </CommandItem>
-                    );
-                  })}
-                </CommandGroup>
-              ))
+                    ))}
+                  </CommandGroup>
+                );
+              })
             )}
           </CommandList>
         </CommandPrimitive>

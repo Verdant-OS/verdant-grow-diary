@@ -27,6 +27,18 @@ describe("Automated Source Verification V0", () => {
     expect(classifySourceUrl("not-a-url")).toBe("invalid");
   });
 
+  it("does not trust lookalike or suffix-spoofed hostnames", () => {
+    expect(classifySourceUrl("https://pubmed.ncbi.nlm.nih.gov.evil.example/record")).toBe(
+      "generic_https",
+    );
+    expect(classifySourceUrl("https://nature.com.evil.example/article")).toBe("generic_https");
+    expect(classifySourceUrl("https://notnature.com/article")).toBe("generic_https");
+    expect(classifySourceUrl("https://mephistogenetics.com.evil.example/product")).toBe(
+      "generic_https",
+    );
+    expect(classifySourceUrl("https://leafly.com.evil.example/strain")).toBe("generic_https");
+  });
+
   it("passes the current 14-source / 10-cultivar structural contract without mutation", () => {
     const sourceSnapshot = JSON.stringify(CULTIVAR_SOURCES);
     const cultivarSnapshot = JSON.stringify(VERDANT_CULTIVARS);
@@ -94,7 +106,12 @@ describe("Automated Source Verification V0", () => {
 
     expect(result.ok).toBe(false);
     expect(result.issues.map((issue) => issue.code)).toEqual(
-      expect.arrayContaining(["url_not_https", "url_invalid", "missing_license_notes", "invalid_retrieved_at"]),
+      expect.arrayContaining([
+        "url_not_https",
+        "url_invalid",
+        "missing_license_notes",
+        "invalid_retrieved_at",
+      ]),
     );
     expect(JSON.stringify(malformed)).toBe(snapshot);
   });

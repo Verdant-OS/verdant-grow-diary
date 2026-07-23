@@ -53,23 +53,32 @@ const ALLOWED_SOURCE_TYPES = new Set([
   "verdant_editorial",
 ] as const);
 
+function hostnameMatches(hostname: string, trustedDomain: string): boolean {
+  const normalizedHost = hostname.toLowerCase().replace(/\.$/, "");
+  const normalizedDomain = trustedDomain.toLowerCase().replace(/\.$/, "");
+  return normalizedHost === normalizedDomain || normalizedHost.endsWith(`.${normalizedDomain}`);
+}
+
 export function classifySourceUrl(url: string): SourceUrlClass {
   try {
     const parsed = new URL(url);
     if (parsed.protocol !== "https:") return "invalid";
     const host = parsed.hostname.toLowerCase();
-    if (host.includes("pubmed.ncbi.nlm.nih.gov")) return "pubmed";
+
+    if (hostnameMatches(host, "pubmed.ncbi.nlm.nih.gov")) return "pubmed";
+
     if (
-      host.includes("nature.com") ||
-      host.includes("academic.oup.com") ||
-      host.includes("doi.org") ||
-      host.includes("genomebiology") ||
-      host.includes("oup.com")
+      hostnameMatches(host, "nature.com") ||
+      hostnameMatches(host, "academic.oup.com") ||
+      hostnameMatches(host, "doi.org") ||
+      hostnameMatches(host, "genomebiology.biomedcentral.com") ||
+      hostnameMatches(host, "oup.com")
     ) {
       return "scholarly";
     }
-    if (host.includes("mephistogenetics.com")) return "breeder";
-    if (host.includes("leafly.com")) return "community_profile";
+
+    if (hostnameMatches(host, "mephistogenetics.com")) return "breeder";
+    if (hostnameMatches(host, "leafly.com")) return "community_profile";
     return "generic_https";
   } catch {
     return "invalid";
@@ -84,7 +93,8 @@ function isValidIsoDate(value: string): boolean {
 
 /**
  * Offline structural validation of sources + claim linkages.
- * Safe to run in every CI job; produces a deterministic result.
+ * Safe to run in every CI job; produces a deterministic result apart from the
+ * explicit checkedAt evidence timestamp.
  */
 export function validateCultivarSourcesStructural(
   sources: readonly CultivarSource[],
@@ -193,7 +203,8 @@ export function validateCultivarSourcesStructural(
     }
   }
 
-  // Claim / tendency linkage
+  // Claim / profile linkage. Guide tendency evidence keys intentionally refer
+  // to claim/evidence identifiers and are not assumed to be source keys.
   const unresolved = new Set<string>();
   let claimLinkCount = 0;
 
@@ -221,7 +232,7 @@ export function validateCultivarSourcesStructural(
     });
   }
 
-  const errorCount = issues.filter((i) => i.severity === "error").length;
+  const errorCount = issues.filter((issue) => issue.severity === "error").length;
 
   return {
     ok: errorCount === 0,

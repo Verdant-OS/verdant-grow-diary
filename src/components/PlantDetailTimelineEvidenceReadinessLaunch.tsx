@@ -36,6 +36,10 @@ import {
 } from "@/lib/plantQuickLogPrefillRules";
 import { sensorsPath } from "@/lib/routes";
 import type { PlantRowLike } from "@/lib/aiDoctorContextCompiler";
+import {
+  QUICK_LOG_V2_OPEN_EVENT,
+  buildQuickLogV2OpenIntent,
+} from "@/lib/quickLogV2OpenIntent";
 
 export interface PlantDetailTimelineEvidenceReadinessLaunchProps {
   plantId: string;
@@ -137,8 +141,11 @@ export default function PlantDetailTimelineEvidenceReadinessLaunch({
   }, [dispatchQuickLog, prefill]);
 
   const handleAddWatering = useCallback(() => {
-    dispatchQuickLog(prefill ? { ...prefill, eventType: "watering" } : { eventType: "watering" });
-  }, [dispatchQuickLog, prefill]);
+    if (typeof window === "undefined") return;
+    const intent = buildQuickLogV2OpenIntent({ plantId, tentId, action: "water" });
+    if (!intent) return;
+    window.dispatchEvent(new CustomEvent(QUICK_LOG_V2_OPEN_EVENT, { detail: intent }));
+  }, [plantId, tentId]);
 
   const handleAddFeeding = useCallback(() => {
     dispatchQuickLog(prefill ? { ...prefill, eventType: "feeding" } : { eventType: "feeding" });

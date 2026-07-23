@@ -68,6 +68,15 @@ describe("ManualSensorReadingCard — snapshot quality badge", () => {
     expect(within(quality).getAllByText(/Source: manual/i).length).toBeGreaterThan(0);
   });
 
+  it("shows Missing current reading for a blank form", () => {
+    renderCard();
+    const quality = screen.getByTestId("manual-snapshot-quality");
+
+    expect(quality.getAttribute("data-quality")).toBe("missing");
+    expect(within(quality).getByText("Missing current reading")).toBeInTheDocument();
+    expect(within(quality).queryByText("Usable current reading")).not.toBeInTheDocument();
+  });
+
   it("flags humidity stuck at 0% as invalid with a reason", () => {
     renderCard();
     setField(/Air temp/i, "75");

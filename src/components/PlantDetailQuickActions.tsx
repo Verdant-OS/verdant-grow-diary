@@ -4,17 +4,10 @@
  * dispatches the existing `verdant:open-quicklog` event, links to an
  * existing route, or scrolls to the in-page Plant Relative Timeline
  * anchor. Read-only — no diary writes, no readings, no diagnoses, no
- * alerts, 
+ * alerts,
  */
 import { Link } from "react-router-dom";
-import {
-  Activity,
-  Camera,
-  ListOrdered,
-  MessageSquare,
-  NotebookPen,
-  Scissors,
-} from "lucide-react";
+import { Activity, Camera, ListOrdered, MessageSquare, NotebookPen, Scissors } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
@@ -24,6 +17,7 @@ import {
   type PlantDetailQuickActionKind,
   type PlantDetailQuickLogEventPayload,
 } from "@/lib/plantDetailQuickActions";
+import type { PlantDetailRevealAndNavigate } from "@/hooks/usePlantDetailDisclosureNavigation";
 
 const ICON: Record<PlantDetailQuickActionKind, typeof NotebookPen> = {
   quicklog: NotebookPen,
@@ -44,13 +38,12 @@ interface Props {
   tentId?: string | null;
   tentName?: string | null;
   hasTimelineSection?: boolean;
+  onRevealAndNavigate?: PlantDetailRevealAndNavigate;
 }
 
 function dispatchQuickLog(payload: PlantDetailQuickLogEventPayload | null) {
   if (typeof window === "undefined") return;
-  window.dispatchEvent(
-    new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, { detail: payload }),
-  );
+  window.dispatchEvent(new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, { detail: payload }));
 }
 
 function scrollToAnchor(targetId: string) {
@@ -78,17 +71,20 @@ function describedByFor(entry: PlantDetailQuickActionEntry): string {
   return ids.join(" ");
 }
 
-function renderEntry(entry: PlantDetailQuickActionEntry) {
+function renderEntry(
+  entry: PlantDetailQuickActionEntry,
+  onRevealAndNavigate?: PlantDetailRevealAndNavigate,
+) {
   const Icon = ICON[entry.kind];
   const inner = (
     <>
       <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-      <span className="truncate">{entry.label}</span>
+      <span className="min-w-0 whitespace-normal break-words">{entry.label}</span>
     </>
   );
   const ariaLabel = ariaLabelFor(entry);
   const describedBy = describedByFor(entry);
-  const baseClasses = `gap-1.5 w-full justify-start sm:w-auto ${FOCUS_CLASSES}`;
+  const baseClasses = `min-h-11 min-w-0 gap-1.5 w-full justify-start whitespace-normal sm:w-auto ${FOCUS_CLASSES}`;
 
   const descriptionNode = (
     <p
@@ -182,7 +178,9 @@ function renderEntry(entry: PlantDetailQuickActionEntry) {
           data-testid={entry.testId}
           aria-label={ariaLabel}
           aria-describedby={describedBy}
-          onClick={() => scrollToAnchor(target)}
+          onClick={() =>
+            onRevealAndNavigate ? onRevealAndNavigate(target) : scrollToAnchor(target)
+          }
         >
           {inner}
         </Button>
@@ -201,6 +199,7 @@ export default function PlantDetailQuickActions({
   tentId = null,
   tentName = null,
   hasTimelineSection = true,
+  onRevealAndNavigate,
 }: Props) {
   const entries = buildPlantDetailQuickActions({
     plantId,
@@ -217,7 +216,7 @@ export default function PlantDetailQuickActions({
       data-testid="plant-detail-quick-actions"
       className="my-4 grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:items-start sm:gap-2"
     >
-      {entries.map(renderEntry)}
+      {entries.map((entry) => renderEntry(entry, onRevealAndNavigate))}
     </nav>
   );
 }

@@ -3,11 +3,11 @@
  *
  * Asserts:
  *  - hyperLogDraftRules has no Supabase / write / AI / Action Queue imports
- *  - GlobalFastAddButton dispatches the existing `verdant:open-quicklog`
- *    event from HyperLogModal's onCommit (no new write path)
+ *  - HyperLog no longer exposes Water; the ordinary Watering action remains
+ *    available through its structured Quick Log v2 handoff
  *  - HyperLogModal still labels demo data clearly (DEMO SNAPSHOT / DEMO ONLY)
  */
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen, fireEvent } from "@testing-library/react";
@@ -69,34 +69,15 @@ describe("HyperLog draft → Quick Log handoff — static safety", () => {
 });
 
 describe("GlobalFastAddButton HyperLog handoff", () => {
-  it("dispatches verdant:open-quicklog with mapped prefill when HyperLog commits", () => {
-    const onDispatchEvent = vi.fn();
+  it("removes the HyperLog Water affordance while preserving structured Watering", () => {
     render(
       <MemoryRouter initialEntries={["/plants/p-99"]}>
-        <GlobalFastAddButton onDispatchEvent={onDispatchEvent} />
+        <GlobalFastAddButton />
       </MemoryRouter>,
     );
 
-    // Open the Quick Log menu
     fireEvent.click(screen.getByTestId("global-fast-add-trigger"));
-    // Launch HyperLog demo with "water" preselected
-    fireEvent.click(
-      screen.getByTestId("global-fast-add-hyperlog-water") ??
-        screen.getByRole("button", { name: /water/i }),
-    );
-
-    // Click the commit CTA inside HyperLogModal
-    const commit = screen.getByTestId("hyperlog-commit");
-    fireEvent.click(commit);
-
-    // The existing wired event name must be used — no new write path.
-    expect(onDispatchEvent).toHaveBeenCalled();
-    const [eventName, detail] = onDispatchEvent.mock.calls[0];
-    expect(eventName).toBe("verdant:open-quicklog");
-    expect(detail).toMatchObject({ eventType: "watering" });
-    // No demo sensor values leaked
-    const json = JSON.stringify(detail);
-    expect(json).not.toMatch(/24\.6/);
-    expect(json).not.toMatch(/1\.12/);
+    expect(screen.queryByTestId("global-fast-add-hyperlog-water")).toBeNull();
+    expect(screen.getByTestId("global-fast-add-action-watering")).toBeInTheDocument();
   });
 });

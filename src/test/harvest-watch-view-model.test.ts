@@ -125,6 +125,27 @@ describe("row view model", () => {
     expect(vm.readiness.score).toBeNull();
     expect(vm.confidenceLabel).toBe("Low");
     expect(vm.lastPhotoLabel).toBe("No photos yet");
+    expect(vm.harvestWindowLabel).toBe("Flower start date needed");
+    expect(vm.harvestWindow.caption).toMatch(/flower start|flip date/i);
+    expect(vm.harvestWindowLabel).not.toMatch(/^Day /);
+  });
+
+  it("does not treat a negative flower-day value as a usable date anchor", () => {
+    const vm = buildHarvestWatchRowViewModel(
+      input({ daysInFlower: -1, expectedHarvestDay: null }),
+    );
+
+    expect(vm.harvestWindowLabel).toBe("Flower start date needed");
+    expect(vm.harvestWindow.caption).toMatch(/flower start|flip date/i);
+  });
+
+  it("does not treat phenotype duration history as this plant's flower-date anchor", () => {
+    const vm = buildHarvestWatchRowViewModel(
+      input({ daysInFlower: null, expectedHarvestDay: 63 }),
+    );
+
+    expect(vm.harvestWindowLabel).toBe("Flower start date needed");
+    expect(vm.harvestWindow.caption).toMatch(/flower start|flip date/i);
   });
 
   it("computes days-vs-history delta with sign-aware label", () => {

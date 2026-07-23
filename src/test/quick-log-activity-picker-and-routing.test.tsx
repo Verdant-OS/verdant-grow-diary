@@ -1,6 +1,6 @@
 /**
  * quick-log-activity-picker + save-routing tests for Verdant Quick Log
- * Activity Types v1a — no schema change.
+ * Activity Types and stage-aware presenter — no schema change.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
@@ -10,7 +10,6 @@ import { renderHook, act } from "@testing-library/react";
 import QuickLogActivityPicker from "@/components/QuickLogActivityPicker";
 import {
   QUICK_LOG_ACTIVITY_DEFINITIONS,
-  QUICK_LOG_HARVEST_DISABLED_REASON,
   QUICK_LOG_HARVEST_BACKEND_UNAVAILABLE_REASON,
 } from "@/constants/quickLogActivityTypes";
 import { useQuickLogActivitySave } from "@/hooks/useQuickLogActivitySave";
@@ -28,16 +27,22 @@ beforeEach(() => {
 });
 
 describe("QuickLogActivityPicker", () => {
-  it("renders every supported v1a activity label", () => {
+  it("renders every supported activity label after expanding additional types", () => {
     const onSelect = vi.fn();
-    render(<QuickLogActivityPicker onSelect={onSelect} />);
+    render(<QuickLogActivityPicker plantStage="flower" onSelect={onSelect} />);
+    fireEvent.click(
+      screen.getByRole("button", { name: "More activity types" }),
+    );
     for (const def of Object.values(QUICK_LOG_ACTIVITY_DEFINITIONS)) {
       expect(screen.getByText(def.label)).toBeInTheDocument();
     }
   });
 
-  it("renders Harvest as enabled (v1b) with safety copy denying readiness/yield", () => {
-    render(<QuickLogActivityPicker onSelect={vi.fn()} />);
+  it("renders Harvest as enabled for Flower with safety copy denying readiness/yield", () => {
+    render(<QuickLogActivityPicker plantStage="flower" onSelect={vi.fn()} />);
+    fireEvent.click(
+      screen.getByRole("button", { name: "More activity types" }),
+    );
     const harvest = screen.getByTestId("quick-log-activity-harvest");
     expect(harvest).not.toBeDisabled();
     expect(
@@ -46,17 +51,18 @@ describe("QuickLogActivityPicker", () => {
     expect(
       screen.getByTestId("quick-log-activity-harvest-safety"),
     ).toHaveTextContent(/does not claim harvest readiness or final yield/i);
-    // Legacy disabled reason is still exported for stale callers.
-    expect(QUICK_LOG_HARVEST_DISABLED_REASON).toMatch(/backend update/i);
   });
 
-  it("calls onSelect for enabled activities including Harvest (v1b)", () => {
+  it("calls onSelect for enabled activities including eligible Harvest", () => {
     const onSelect = vi.fn();
-    render(<QuickLogActivityPicker onSelect={onSelect} />);
+    render(<QuickLogActivityPicker plantStage="flower" onSelect={onSelect} />);
     fireEvent.click(screen.getByTestId("quick-log-activity-feeding"));
     expect(onSelect).toHaveBeenCalledTimes(1);
     expect(onSelect.mock.calls[0][0].id).toBe("feeding");
 
+    fireEvent.click(
+      screen.getByRole("button", { name: "More activity types" }),
+    );
     fireEvent.click(screen.getByTestId("quick-log-activity-harvest"));
     expect(onSelect).toHaveBeenCalledTimes(2);
     expect(onSelect.mock.calls[1][0].id).toBe("harvest");
@@ -64,6 +70,9 @@ describe("QuickLogActivityPicker", () => {
 
   it("uses safety copy from shared definitions (no diagnosis/recommendation)", () => {
     render(<QuickLogActivityPicker onSelect={vi.fn()} />);
+    fireEvent.click(
+      screen.getByRole("button", { name: "More activity types" }),
+    );
     expect(
       screen.getByTestId("quick-log-activity-feeding-safety"),
     ).toHaveTextContent(/not a nutrient recommendation/i);
@@ -106,23 +115,19 @@ describe("useQuickLogActivitySave — routing", () => {
     expect(payload).not.toHaveProperty("p_grow_id");
   });
 
-  it("routes Watering through quicklog_save_manual with p_action=water", async () => {
-    rpcMock.mockResolvedValueOnce({ data: { ok: true, grow_event_id: "w1" }, error: null });
+  it("refuses direct Watering saves so callers must use the structured form", async () => {
     const { result } = renderHook(() => useQuickLogActivitySave());
+    let res!: Awaited<ReturnType<typeof result.current.save>>;
     await act(async () => {
-      await result.current.save({
+      res = await result.current.save({
         activityId: "watering",
         growId: "g1",
         tentId: "t1",
         volumeMl: 350,
       });
     });
-    const [name, payload] = rpcMock.mock.calls[0];
-    expect(name).toBe("quicklog_save_manual");
-    expect(payload.p_action).toBe("water");
-    expect(payload.p_target_type).toBe("tent");
-    expect(payload.p_target_id).toBe("t1");
-    expect(payload.p_volume_ml).toBe(350);
+    expect(res).toEqual({ ok: false, reason: "unsupported_activity" });
+    expect(rpcMock).not.toHaveBeenCalled();
   });
 
   it("refuses the manual route without a tent or plant target (no RPC call)", async () => {

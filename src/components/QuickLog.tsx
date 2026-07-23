@@ -81,6 +81,8 @@ import { useQuickLogV2Save } from "@/hooks/useQuickLogV2Save";
 import {
   buildLegacyQuickLogUnifiedPayload,
   isSupportedLegacyEventType,
+  isVerifiedPublicStarterWateringHandoff,
+  ORDINARY_LEGACY_WATERING_BLOCKED_COPY,
   UNSUPPORTED_EVENT_TYPE_COPY,
 } from "@/lib/legacyQuickLogUnifiedSave";
 import {
@@ -286,6 +288,10 @@ export default function QuickLog({
   const activeTents = useMemo(() => tentsQuery.data ?? [], [tentsQuery.data]);
   const queryClient = useQueryClient();
   const { save: saveViaRpc } = useQuickLogV2Save();
+  const verifiedPublicStarterWatering = isVerifiedPublicStarterWateringHandoff(
+    prefill,
+    readPublicQuickLogStarterDraft(),
+  );
 
   const tentSetupRequired =
     shouldRequireFirstTentSetup(activeTents) &&
@@ -304,6 +310,10 @@ export default function QuickLog({
   // (keep any stage the grower already picked).
   const prevPlantIdRef = useRef<string>("");
   const [eventType, setEventType] = useState<string>("observation");
+  // Until the grower deliberately changes activities, treat a prefilled event
+  // as the effective submit event even if its hydration effect has not flushed.
+  // Once touched, stale prefill metadata must never override the current form.
+  const eventTypeUserTouchedRef = useRef(false);
   const [plantId, setPlantId] = useState<string>("");
   const [dismissedBlockedPrefillKey, setDismissedBlockedPrefillKey] = useState<string | null>(null);
   const [snapshot, setSnapshot] = useState(false);
@@ -423,7 +433,10 @@ export default function QuickLog({
       // flows. Preserve their known grow scope, but never invent a plant.
       setActiveGrowId(prefill.growId);
     }
-    if (prefill?.eventType) setEventType(prefill.eventType);
+    if (prefill?.eventType) {
+      eventTypeUserTouchedRef.current = false;
+      setEventType(prefill.eventType);
+    }
     if (prefill?.suggestSnapshot && prefill.tentId) setSnapshot(true);
     // Seed a starter note only when the grower has not yet typed anything,
     // so we never overwrite in-progress text on re-open.
@@ -729,6 +742,7 @@ export default function QuickLog({
     lastFailedSaveSigRef.current = null;
     setNote("");
     setShowMore(false);
+    eventTypeUserTouchedRef.current = false;
     setEventType("observation");
     setPlantId("");
     setDismissedBlockedPrefillKey(null);
@@ -771,6 +785,9 @@ export default function QuickLog({
   function handleEventTypeChange(next: string) {
     if (isMainDraftMutationLocked()) return;
     const plan = planQuickLogActionSwitchReset(eventType, next);
+    // Radix clears a controlled value when an unverified legacy Water option
+    // is filtered out. An empty callback is normalization, not grower intent.
+    if (next.trim().length > 0) eventTypeUserTouchedRef.current = true;
     setEventType(next);
     if (!plan.changed) return;
     if (plan.clearHarvest) {
@@ -829,6 +846,7 @@ export default function QuickLog({
     const keepPlantId = savedTarget?.id ?? plantId;
     setNote("");
     setShowMore(false);
+    eventTypeUserTouchedRef.current = true;
     setEventType("observation");
     setSnapshot(false);
     snapshotUserTouchedRef.current = false;
@@ -889,13 +907,17 @@ export default function QuickLog({
   async function runSubmit() {
     setSaveError(null);
 
+    const effectiveEventType = eventTypeUserTouchedRef.current
+      ? eventType
+      : (prefill?.eventType ?? eventType);
+
     if (!user) {
       const message = "Pick a workspace first";
       setSaveError(message);
       toast.error(message);
       return;
     }
-    if (!isSupportedLegacyEventType(eventType)) {
+    if (!isSupportedLegacyEventType(effectiveEventType)) {
       toast.message(UNSUPPORTED_EVENT_TYPE_COPY);
       return;
     }
@@ -912,7 +934,7 @@ export default function QuickLog({
     const saveTarget = Object.freeze({ ...editorTarget.target });
     const saveStage = stage;
     const saveStageWasUserTouched = stageUserTouchedRef.current;
-    const saveEventType = eventType;
+    const saveEventType = effectiveEventType;
     const savePlant = selectedPlant;
     const saveTent = selectedTent;
     const saveGrow = resolvedTargetGrow;
@@ -935,6 +957,14 @@ export default function QuickLog({
         toast.error(message);
         return;
       }
+    }
+    if (
+      saveEventType === "watering" &&
+      !isVerifiedPublicStarterWateringHandoff(prefill, readPublicQuickLogStarterDraft())
+    ) {
+      setSaveError(ORDINARY_LEGACY_WATERING_BLOCKED_COPY);
+      toast.message(ORDINARY_LEGACY_WATERING_BLOCKED_COPY);
+      return;
     }
 
     setInFlightSaveContext(
@@ -1261,12 +1291,28 @@ export default function QuickLog({
           growId={resolvedTarget?.growId ?? null}
           tentId={resolvedTarget?.tentId ?? null}
           plantId={resolvedTarget?.plantId ?? null}
+          externalPersistenceBlockReason={
+            targetQueryPending
+              ? QUICK_LOG_TARGET_BLOCKED_COPY.prefill_target_pending
+              : targetQueryError
+                ? `We couldn't load the ${targetQueryErrorSubject} needed to confirm this Quick Log target.`
+                : editorTargetBlocked && editorTarget.status === "blocked"
+                  ? QUICK_LOG_TARGET_BLOCKED_COPY[editorTarget.reason]
+                  : null
+          }
+          plantStage={
+            (resolvedTargetPlant as { stage?: unknown } | null)?.stage ?? null
+          }
           heading="All activity types"
           testIdPrefix="quick-log-dialog-all-activities"
           onSaveStart={beginAllActivitiesSave}
           onSaveEnd={endAllActivitiesSave}
           saveBlocked={saveLocked}
           isSaveBlocked={isSaveInFlight}
+          onBeforeStructuredWaterOpen={() => {
+            onOpenChange(false);
+            reset();
+          }}
         />
 
         <form onSubmit={submit} className="grid gap-4">
@@ -1812,6 +1858,7 @@ export default function QuickLog({
                   value={displayedEventType}
                   onValueChange={handleEventTypeChange}
                   disabled={saveLocked}
+                  allowLegacyWatering={verifiedPublicStarterWatering}
                 />
                 <div>
                   <Label className="text-xs">Stage</Label>

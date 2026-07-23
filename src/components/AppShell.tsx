@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import LegalFooterLinks from "@/components/LegalFooterLinks";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Bell, LogOut, Plus, Search } from "lucide-react";
@@ -25,10 +25,16 @@ import { resolveMobileQuickLogTarget } from "@/lib/quickLogRouteTargetRules";
 import { consumeQuickLogStartIntent } from "@/lib/startScreenPreferences";
 import { useCheckoutReturnCompletionTracking } from "@/hooks/useCheckoutReturnCompletionTracking";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
+import {
+  QUICK_LOG_V2_OPEN_EVENT,
+  isQuickLogV2OpenIntent,
+  type QuickLogV2OpenIntent,
+} from "@/lib/quickLogV2OpenIntent";
 
 export default function AppShell({ children }: { children?: ReactNode }) {
   const { user, loading } = useAuth();
   const location = useLocation();
+  const previousNavigationKeyRef = useRef(location.key);
   // Protected-route boundary: re-validate session against the auth server.
   // Keep both session checks on the same signed-out destination. Sending the
   // server revalidation to /auth while the shell sent cached-session misses to
@@ -52,6 +58,9 @@ export default function AppShell({ children }: { children?: ReactNode }) {
   const nav = useNavigate();
   const [openLog, setOpenLog] = useState(false);
   const [openScopedLog, setOpenScopedLog] = useState(false);
+  const [structuredOpenIntent, setStructuredOpenIntent] =
+    useState<QuickLogV2OpenIntent | null>(null);
+  const [legacyQuickLogSession, setLegacyQuickLogSession] = useState(0);
   const [prefill, setPrefill] = useState<QuickLogPrefill | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const mobileQuickLogTarget = resolveMobileQuickLogTarget(location.pathname);
@@ -92,6 +101,24 @@ export default function AppShell({ children }: { children?: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    function onOpenV2(event: Event) {
+      const detail = (event as CustomEvent<unknown>).detail;
+      if (!isQuickLogV2OpenIntent(detail)) return;
+
+      // Close and remount-reset legacy Quick Log in the same state transition
+      // before opening V2, so two modal focus locks can never remain active.
+      setOpenLog(false);
+      setPrefill(null);
+      setLegacyQuickLogSession((session) => session + 1);
+      setStructuredOpenIntent(detail);
+      setOpenScopedLog(true);
+    }
+    window.addEventListener(QUICK_LOG_V2_OPEN_EVENT, onOpenV2 as EventListener);
+    return () =>
+      window.removeEventListener(QUICK_LOG_V2_OPEN_EVENT, onOpenV2 as EventListener);
+  }, []);
+
+  useEffect(() => {
     function onOpen(e: Event) {
       const detail = (e as CustomEvent<QuickLogPrefill>).detail ?? null;
       setPrefill(detail);
@@ -126,12 +153,16 @@ export default function AppShell({ children }: { children?: ReactNode }) {
     if (!loading && !user) nav(signedOutRedirect, { replace: true });
   }, [loading, user, nav, signedOutRedirect]);
 
-  // Never carry an open tent-scoped sheet across routes. Without this reset,
-  // leaving Tent A and later entering Tent B could reopen the sheet with stale
-  // UI state or silently retarget an in-progress log.
+  // Never carry an open structured sheet or typed intent across navigations,
+  // including same-path scope changes. Seeding the ref from the initial key
+  // prevents the first effect from immediately closing an opening intent.
   useEffect(() => {
+    if (previousNavigationKeyRef.current === location.key) return;
+
+    previousNavigationKeyRef.current = location.key;
     setOpenScopedLog(false);
-  }, [mobileQuickLogTarget]);
+    setStructuredOpenIntent(null);
+  }, [location.key]);
 
   if (loading)
     return (
@@ -145,8 +176,18 @@ export default function AppShell({ children }: { children?: ReactNode }) {
   const pageContent = children ?? <Outlet />;
 
   return (
-    <SidebarProvider defaultOpen>
-      <div className="min-h-screen flex w-full">
+    <SidebarProvider defaultOpen className="bg-background">
+      <div className="relative isolate flex min-h-screen w-full">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(circle_at_82%_0%,hsl(var(--primary)/0.09),transparent_30%),radial-gradient(circle_at_5%_85%,hsl(var(--accent)/0.12),transparent_32%)]"
+        />
+        <a
+          href="#main-content"
+          className="fixed left-3 top-3 z-[100] -translate-y-24 rounded-xl border border-primary/30 bg-background px-4 py-2 text-sm font-semibold text-foreground shadow-elevated transition-transform focus:translate-y-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
+          Skip to main content
+        </a>
         {/* Desktop sidebar */}
         <div className="hidden md:block">
           <AppSidebar />
@@ -154,8 +195,8 @@ export default function AppShell({ children }: { children?: ReactNode }) {
 
         <div className="flex-1 flex flex-col min-w-0">
           {/* Top bar */}
-          <header className="sticky top-0 z-30 backdrop-blur-xl bg-background/70 border-b border-border/40">
-            <div className="h-14 px-3 md:px-5 flex items-center gap-3">
+          <header className="sticky top-0 z-40 border-b border-border/50 bg-background/80 backdrop-blur-2xl">
+            <div className="flex h-16 items-center gap-3 px-3 md:px-5">
               <div className="hidden md:block">
                 <SidebarTrigger />
               </div>
@@ -224,7 +265,11 @@ export default function AppShell({ children }: { children?: ReactNode }) {
 
           <SubscriptionPastDueBanner loading={entitlementLoading} entitlement={entitlement} />
 
-          <main className="flex-1 px-4 md:px-6 lg:px-8 py-5 pb-28 md:pb-8 max-w-[1400px] w-full mx-auto">
+          <main
+            id="main-content"
+            tabIndex={-1}
+            className="mx-auto w-full min-w-0 max-w-[1440px] flex-1 px-3 pb-28 pt-5 sm:px-5 md:px-7 md:pb-9 md:pt-7 lg:px-10"
+          >
             {isEmailVerificationPending(user) ? (
               <VerificationPendingBanner email={user.email ?? ""} />
             ) : (
@@ -245,6 +290,7 @@ export default function AppShell({ children }: { children?: ReactNode }) {
         <button
           onClick={() => {
             if (mobileQuickLogTarget) {
+              setStructuredOpenIntent(null);
               setOpenScopedLog(true);
             } else {
               setPrefill(null);
@@ -253,7 +299,7 @@ export default function AppShell({ children }: { children?: ReactNode }) {
           }}
           aria-label="Open Quick Log"
           data-testid="mobile-quick-log-fab"
-          className="md:hidden fixed z-40 bottom-20 right-4 h-14 w-14 rounded-full gradient-leaf shadow-elevated flex items-center justify-center text-primary-foreground hover:scale-105 transition active:scale-95 glow-accent"
+          className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full gradient-leaf text-primary-foreground shadow-elevated transition hover:scale-105 active:scale-95 glow-accent md:hidden"
         >
           <Plus className="h-6 w-6" />
         </button>
@@ -261,6 +307,7 @@ export default function AppShell({ children }: { children?: ReactNode }) {
         <MobileNav />
 
         <QuickLog
+          key={legacyQuickLogSession}
           open={openLog}
           onOpenChange={(o) => {
             setOpenLog(o);
@@ -270,13 +317,15 @@ export default function AppShell({ children }: { children?: ReactNode }) {
           onCreated={() => window.dispatchEvent(new Event("verdant:entry-created"))}
         />
 
-        {mobileQuickLogTarget ? (
-          <QuickLogV2Sheet
-            open={openScopedLog}
-            onOpenChange={setOpenScopedLog}
-            defaultTargetKey={mobileQuickLogTarget}
-          />
-        ) : null}
+        <QuickLogV2Sheet
+          open={openScopedLog}
+          onOpenChange={(nextOpen) => {
+            setOpenScopedLog(nextOpen);
+            if (!nextOpen) setStructuredOpenIntent(null);
+          }}
+          defaultTargetKey={structuredOpenIntent?.targetKey ?? mobileQuickLogTarget}
+          defaultAction={structuredOpenIntent?.action ?? "note"}
+        />
 
         <GlobalSearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
       </div>

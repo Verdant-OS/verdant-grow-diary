@@ -210,12 +210,12 @@ export default function PlantTentEnvironmentPanel({
           </div>
         ) : null}
         {enabled && prefill ? (
-          <div className="mt-4">
+          <div className="mt-4 min-w-0">
             <Button
               type="button"
               variant="outline"
               size="sm"
-              className="gap-1"
+              className="h-auto min-h-11 min-w-0 w-full gap-1 whitespace-normal sm:w-auto sm:min-h-9"
               onClick={openQuickLog}
               data-testid="plant-tent-environment-log-with-context"
             >

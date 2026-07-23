@@ -293,7 +293,11 @@ export default function PhenoKeepersPage() {
   }
 
   return (
-    <main data-testid="pheno-keepers" className="container mx-auto max-w-4xl space-y-6 px-4 py-6">
+    <section
+      aria-label="Pheno hunt keepers"
+      data-testid="pheno-keepers"
+      className="container mx-auto max-w-4xl space-y-6 px-4 py-6"
+    >
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold">
           Keepers &amp; crosses: {ks.hunt?.name ?? "this hunt"}
@@ -527,6 +531,6 @@ export default function PhenoKeepersPage() {
           <PhenoTimelineEntries entries={timelineEntries} />
         </section>
       )}
-    </main>
+    </section>
   );
 }

@@ -27,10 +27,18 @@ vi.mock("@/integrations/supabase/client", () => ({
 
 function mountForm() {
   return render(
-    <QuickLogAllActivitiesSection growId="g1" tentId="t1" plantId="p1" />,
+    <QuickLogAllActivitiesSection
+      growId="g1"
+      tentId="t1"
+      plantId="p1"
+      plantStage="flower"
+    />,
   );
 }
 function selectHarvest() {
+  fireEvent.click(
+    screen.getByRole("button", { name: "More activity types" }),
+  );
   fireEvent.click(
     screen.getByTestId("quick-log-all-activities-picker-harvest"),
   );

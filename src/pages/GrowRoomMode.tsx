@@ -62,6 +62,7 @@ import {
   type QuickActionPlantLite,
 } from "@/lib/growRoomQuickActionRules";
 import { classifyVpdAgainstStage, normalizeVpdStage } from "@/lib/vpdStageTargetRules";
+import { QUICK_LOG_V2_OPEN_EVENT } from "@/lib/quickLogV2OpenIntent";
 
 const QUICK_ACTION_ICON: Record<QuickActionKind, typeof Sprout> = {
   quick_log: NotebookPen,
@@ -488,9 +489,18 @@ export default function GrowRoomMode() {
                           data-prefill-event-type={action.quickLogPrefill?.eventType}
                           data-prefill-tent-id={action.quickLogPrefill?.tentId}
                           data-prefill-plant-id={action.quickLogPrefill?.plantId ?? ""}
-                          onClick={() =>
-                            action.quickLogPrefill && openQuickLog(action.quickLogPrefill)
-                          }
+                          data-structured-target-key={action.quickLogV2Intent?.targetKey ?? ""}
+                          onClick={() => {
+                            if (action.quickLogV2Intent && typeof window !== "undefined") {
+                              window.dispatchEvent(
+                                new CustomEvent(QUICK_LOG_V2_OPEN_EVENT, {
+                                  detail: action.quickLogV2Intent,
+                                }),
+                              );
+                              return;
+                            }
+                            if (action.quickLogPrefill) openQuickLog(action.quickLogPrefill);
+                          }}
                         >
                           <Icon className="h-4 w-4" />
                           <span className="truncate">{action.label}</span>

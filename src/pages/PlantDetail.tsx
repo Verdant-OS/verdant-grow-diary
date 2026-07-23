@@ -41,7 +41,6 @@ import PlantDetailAiDoctorReadinessGate from "@/components/PlantDetailAiDoctorRe
 import PlantDetailAiDoctorSafeReviewStart from "@/components/PlantDetailAiDoctorSafeReviewStart";
 import AiDoctorReviewResultPreview from "@/components/AiDoctorReviewResultPreview";
 import PlantDetailAiDoctorLiveReview from "@/components/PlantDetailAiDoctorLiveReview";
-import AiDoctorReviewAnchorRestorer from "@/components/AiDoctorReviewAnchorRestorer";
 import PlantDetailAiDoctorContextReadinessMount from "@/components/PlantDetailAiDoctorContextReadinessMount";
 import PlantProfileContextCard from "@/components/PlantProfileContextCard";
 import { updatePlantProfileMetadata } from "@/lib/plantProfileMetadataUpdate";
@@ -54,6 +53,12 @@ import {
 } from "@/lib/plantDetailQuickActions";
 import PlantDetailSectionNav from "@/components/PlantDetailSectionNav";
 import { PLANT_DETAIL_SECTION_ANCHORS } from "@/lib/plantDetailSectionAnchors";
+import PlantDetailDisclosureSection from "@/components/PlantDetailDisclosureSection";
+import { usePlantDetailDisclosureNavigation } from "@/hooks/usePlantDetailDisclosureNavigation";
+import {
+  PLANT_AI_DOCTOR_CONTEXT_PANEL_ANCHOR_ID,
+  PLANT_DETAIL_HARVEST_EVIDENCE_ANCHOR_ID,
+} from "@/lib/plantDetailDisclosureRules";
 
 import PlantCardActionsMenu from "@/components/PlantCardActionsMenu";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
@@ -248,6 +253,9 @@ export default function PlantDetail() {
   const contextTentId = searchParams.get("tentId");
   const { data: plant, isLoading, isError, refetch } = useGrowPlant(id);
   const { data: tent } = useGrowTent(plant?.tentId);
+  const { openGroups, setGroupOpen, revealAndNavigate } = usePlantDetailDisclosureNavigation({
+    plantId: plant?.id ?? null,
+  });
   const plantGalleryPhotoCount = usePlantGalleryPhotoCount(plant?.id ?? null);
   const plantMeta = getGrowDataMeta(["grow", "plant", id ?? null], user?.id);
   const tentMeta = getGrowDataMeta(["grow", "tent", plant?.tentId ?? null], user?.id);
@@ -405,6 +413,7 @@ export default function PlantDetail() {
         stage={plant.stage}
         tentId={plant.tentId ?? null}
         growId={plant.growId ?? null}
+        onRevealAndNavigate={revealAndNavigate}
       />
       <PlantLogStreakMarker plantId={plant.id} />
       <PlantDetailQuickActions
@@ -413,17 +422,14 @@ export default function PlantDetail() {
         growId={plant.growId ?? null}
         tentId={plant.tentId ?? null}
         tentName={tent?.name ?? null}
-      />
-      <PlantDetailAskDoctorHelper
-        plantId={plant.id}
-        stage={plant.stage ?? null}
-        hasPlantPhoto={!!plant.photo}
+        onRevealAndNavigate={revealAndNavigate}
       />
       <PlantDetailSectionNav
         hasAlertsSection
         hasActionsSection
         hasDoctorSection
         hasAssignedTent={!!plant.tentId}
+        onRevealAndNavigate={revealAndNavigate}
       />
       <OneTentLoopNextStepCard
         current="plant"
@@ -468,103 +474,6 @@ export default function PlantDetail() {
         />
       </div>
 
-      <PlantDetailWhatsMissing
-        plantId={plant.id}
-        growId={plant.growId ?? null}
-        stage={plant.stage ?? null}
-        hasPlantPhoto={!!plant.photo}
-      />
-      <PlantDetailRecentActivityRecap
-        plantId={plant.id}
-        onAddQuickCheck={() => {
-          setQuickLogFocusResponse(true);
-          setQuickLogOpen(true);
-        }}
-      />
-      <PlantDetailRecentActionResponse growId={plant.growId ?? null} plantId={plant.id} />
-      {harvestWatchEligible && (
-        <>
-          <PlantDetailHarvestWatchCard
-            plantId={plant.id}
-            hasPlantPhoto={!!plant.photo}
-            galleryPhotoCount={plantGalleryPhotoCount}
-          />
-          <PlantDetailHarvestEvidenceReportMount plantId={plant.id} />
-        </>
-      )}
-      <PlantDetailAiDoctorReadiness
-        plantId={plant.id}
-        growId={plant.growId ?? null}
-        tentId={plant.tentId ?? null}
-        stage={plant.stage ?? null}
-        hasPlantPhoto={!!plant.photo}
-      />
-      <PlantProfileContextCard
-        stage={plant.stage ?? null}
-        strain={plant.strain ?? null}
-        medium={plant.medium ?? null}
-        potSize={plant.potSize ?? null}
-        onSave={async ({ medium, potSize }) => {
-          await updatePlantProfileMetadata(plant.id, { medium, potSize });
-          await refetch();
-        }}
-      />
-
-      <PlantDetailAiDoctorContextReadinessMount
-        plantId={plant.id}
-        growId={plant.growId ?? null}
-        tentId={plant.tentId ?? null}
-        plantName={plant.name}
-        strain={plant.strain}
-        stage={plant.stage ?? null}
-        medium={plant.medium ?? null}
-        potSize={plant.potSize ?? null}
-        plantType={plant.plantType ?? null}
-      />
-      <PlantDetailTimelineEvidenceReadinessLaunch
-        plantId={plant.id}
-        growId={plant.growId ?? null}
-        tentId={plant.tentId ?? null}
-        plantName={plant.name}
-        strain={plant.strain}
-        stage={plant.stage ?? null}
-        hasPlantPhoto={!!plant.photo}
-      />
-      <PlantDetailDoctorContextPreview
-        plantId={plant.id}
-        stage={plant.stage ?? null}
-        hasPlantPhoto={!!plant.photo}
-        growId={plant.growId ?? null}
-        tentId={plant.tentId ?? null}
-        plantName={plant.name}
-        tentName={tent?.name ?? null}
-      />
-      <section
-        id={PLANT_AI_DOCTOR_REVIEW_ANCHOR_ID}
-        tabIndex={-1}
-        aria-label="Plant AI Doctor review"
-        className="scroll-mt-16 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        <AiDoctorReviewAnchorRestorer />
-        <PlantDetailAiDoctorReadinessGate plantId={plant.id} plant={plant} hasSafeAiDoctorFlow />
-        <PlantDetailAiDoctorSafeReviewStart plantId={plant.id} plant={plant} />
-        <AiDoctorReviewResultPreview testIdPrefix="plant-detail" />
-        <PlantDetailAiDoctorLiveReview
-          plantId={plant.id}
-          plant={plant}
-          growId={plant.growId ?? null}
-          tentId={plant.tentId ?? null}
-        />
-      </section>
-
-      <div
-        id="plant-ai-doctor-context-panel"
-        tabIndex={-1}
-        className="scroll-mt-16 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
-      >
-        <PlantDetailAiDoctorContextPanel plantId={plant.id} plant={plant} />
-      </div>
-
       {!isActivePlant(plant) && (
         <ArchivedPlantBanner plantId={plant.id} lastNote={plant.lastNote} />
       )}
@@ -587,127 +496,166 @@ export default function PlantDetail() {
           hideView
         />
       </div>
-      <div
+      <section
         id={PLANT_DETAIL_SECTION_ANCHORS.overview}
         tabIndex={-1}
         aria-label="Plant overview section"
-        className="grid lg:grid-cols-3 gap-4 scroll-mt-16 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
+        className="min-w-0 space-y-4 scroll-mt-16 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
-        <div className="lg:col-span-1 glass rounded-2xl overflow-hidden">
-          <PlantPhoto
-            src={plant.photo}
-            alt={plant.name}
-            className="aspect-square"
-            caption="No plant photo yet"
-          />
-        </div>
-        <div className="lg:col-span-2 glass rounded-2xl p-5 space-y-3">
-          <PlantStatusStrip
-            tentId={plant.tentId ?? null}
-            tentName={tent?.name ?? null}
-            growId={plant.growId ?? null}
-          />
-          <PlantRecentMoveCard plantId={plant.id} />
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <div data-testid="plant-detail-tent">
-              <div className="text-xs text-muted-foreground uppercase tracking-wider">Tent</div>
-              {tent ? (
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <span>{tent.name}</span>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      asChild
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 px-2 gap-1"
-                      data-testid="plant-detail-view-tent"
+        <div className="grid min-w-0 gap-4 lg:grid-cols-3">
+          <div className="min-w-0 rounded-2xl glass overflow-hidden lg:col-span-1">
+            <PlantPhoto
+              src={plant.photo}
+              alt={plant.name}
+              className="aspect-square"
+              caption="No plant photo yet"
+            />
+          </div>
+          <div className="min-w-0 space-y-3 rounded-2xl p-5 glass lg:col-span-2">
+            <PlantStatusStrip
+              tentId={plant.tentId ?? null}
+              tentName={tent?.name ?? null}
+              growId={plant.growId ?? null}
+            />
+            <PlantRecentMoveCard plantId={plant.id} />
+            <div className="grid min-w-0 grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+              <div className="min-w-0" data-testid="plant-detail-tent">
+                <div className="text-xs uppercase tracking-wider text-muted-foreground">Tent</div>
+                {tent ? (
+                  <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+                    <span className="min-w-0 break-words">{tent.name}</span>
+                    <div className="flex flex-wrap items-center gap-1">
+                      <Button
+                        asChild
+                        variant="ghost"
+                        size="sm"
+                        className="min-h-11 gap-1 px-2 whitespace-normal"
+                        data-testid="plant-detail-view-tent"
+                      >
+                        <Link to={tentDetailPath(tent.id)}>
+                          <Box className="h-3.5 w-3.5" /> View Tent{" "}
+                          <ArrowRight className="h-3.5 w-3.5" />
+                        </Link>
+                      </Button>
+                      <AssignTentDialog
+                        plantId={plant.id}
+                        growId={plant.growId ?? null}
+                        currentTentId={plant.tentId ?? null}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex min-w-0 flex-col gap-1.5">
+                    <div
+                      className="flex items-center gap-1.5 text-[hsl(var(--warning))]"
+                      data-testid="plant-detail-no-tent"
                     >
-                      <Link to={tentDetailPath(tent.id)}>
-                        <Box className="h-3.5 w-3.5" /> View Tent{" "}
-                        <ArrowRight className="h-3.5 w-3.5" />
-                      </Link>
-                    </Button>
+                      <AlertTriangle className="h-3.5 w-3.5" /> No tent assigned.
+                    </div>
                     <AssignTentDialog
                       plantId={plant.id}
                       growId={plant.growId ?? null}
-                      currentTentId={plant.tentId ?? null}
+                      currentTentId={null}
                     />
                   </div>
+                )}
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs uppercase tracking-wider text-muted-foreground">Age</div>
+                <div>{ageDays} days</div>
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs uppercase tracking-wider text-muted-foreground">
+                  Started
                 </div>
-              ) : (
-                <div className="flex flex-col gap-1.5">
-                  <div
-                    className="flex items-center gap-1.5 text-[hsl(var(--warning))]"
-                    data-testid="plant-detail-no-tent"
-                  >
-                    <AlertTriangle className="h-3.5 w-3.5" /> No tent assigned.
-                  </div>
-                  <AssignTentDialog
-                    plantId={plant.id}
-                    growId={plant.growId ?? null}
-                    currentTentId={null}
-                  />
-                </div>
-              )}
+                <div>{format(new Date(plant.startedAt), "PP")}</div>
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs uppercase tracking-wider text-muted-foreground">Health</div>
+                <div className="capitalize">{plant.health}</div>
+              </div>
             </div>
-            <div>
-              <div className="text-xs text-muted-foreground uppercase tracking-wider">Age</div>
-              <div>{ageDays} days</div>
+            <div className="min-w-0">
+              <div className="mb-1 text-xs uppercase tracking-wider text-muted-foreground">
+                Last activity
+              </div>
+              <p className="break-words text-sm">{plant.lastNote}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Updated {formatDistanceToNow(new Date(plant.startedAt), { addSuffix: true })}
+              </p>
             </div>
-            <div>
-              <div className="text-xs text-muted-foreground uppercase tracking-wider">Started</div>
-              <div>{format(new Date(plant.startedAt), "PP")}</div>
+            <div className="flex min-w-0 flex-wrap gap-2">
+              <Button
+                size="sm"
+                type="button"
+                onClick={() => setQuickLogOpen(true)}
+                data-testid="plant-detail-quick-log-open"
+                className="min-h-11 gap-1 whitespace-normal bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                <Zap className="h-3.5 w-3.5" /> Quick Log
+              </Button>
+              <Button asChild variant="outline" size="sm" className="min-h-11 whitespace-normal">
+                <Link to={logsPath()}>Open Logs</Link>
+              </Button>
+              <Button
+                asChild
+                size="sm"
+                variant="outline"
+                className="min-h-11 whitespace-normal"
+                data-testid="plant-detail-daily-grow-check-entry"
+              >
+                <Link to={`/daily-check?plantId=${plant.id}&from=plant-detail`}>
+                  Daily Grow Check
+                </Link>
+              </Button>
             </div>
-            <div>
-              <div className="text-xs text-muted-foreground uppercase tracking-wider">Health</div>
-              <div className="capitalize">{plant.health}</div>
-            </div>
+            <PlantQuickLog
+              open={quickLogOpen}
+              onOpenChange={(o) => {
+                setQuickLogOpen(o);
+                if (!o) setQuickLogFocusResponse(false);
+              }}
+              plantId={plant.id}
+              plantName={plant.name}
+              growId={plant.growId ?? null}
+              tentId={plant.tentId ?? null}
+              focusResponseCheckOnOpen={quickLogFocusResponse}
+            />
           </div>
-          <div>
-            <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">
-              Last activity
-            </div>
-            <p className="text-sm">{plant.lastNote}</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Updated {formatDistanceToNow(new Date(plant.startedAt), { addSuffix: true })}
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              size="sm"
-              type="button"
-              onClick={() => setQuickLogOpen(true)}
-              data-testid="plant-detail-quick-log-open"
-              className="bg-primary text-primary-foreground hover:bg-primary/90 gap-1"
-            >
-              <Zap className="h-3.5 w-3.5" /> Quick Log
-            </Button>
-            <Button asChild variant="outline" size="sm">
-              <Link to={logsPath()}>Open Logs</Link>
-            </Button>
-            <Button
-              asChild
-              size="sm"
-              variant="outline"
-              data-testid="plant-detail-daily-grow-check-entry"
-            >
-              <Link to={`/daily-check?plantId=${plant.id}&from=plant-detail`}>
-                Daily Grow Check
-              </Link>
-            </Button>
-          </div>
-          <PlantQuickLog
-            open={quickLogOpen}
-            onOpenChange={(o) => {
-              setQuickLogOpen(o);
-              if (!o) setQuickLogFocusResponse(false);
-            }}
-            plantId={plant.id}
-            plantName={plant.name}
-            growId={plant.growId ?? null}
-            tentId={plant.tentId ?? null}
-            focusResponseCheckOnOpen={quickLogFocusResponse}
-          />
+        </div>
+
+        <PlantProfileContextCard
+          stage={plant.stage ?? null}
+          strain={plant.strain ?? null}
+          medium={plant.medium ?? null}
+          potSize={plant.potSize ?? null}
+          onSave={async ({ medium, potSize }) => {
+            await updatePlantProfileMetadata(plant.id, { medium, potSize });
+            await refetch();
+          }}
+        />
+
+        <PlantDetailWhatsMissing
+          plantId={plant.id}
+          growId={plant.growId ?? null}
+          stage={plant.stage ?? null}
+          hasPlantPhoto={!!plant.photo}
+        />
+        <PlantDetailRecentActivityRecap
+          plantId={plant.id}
+          onRevealAndNavigate={revealAndNavigate}
+          onAddQuickCheck={() => {
+            setQuickLogFocusResponse(true);
+            setQuickLogOpen(true);
+          }}
+        />
+        <PlantDetailRecentActionResponse growId={plant.growId ?? null} plantId={plant.id} />
+
+        <section
+          aria-label="Plant environment and sensor status"
+          data-testid="plant-detail-environment-status"
+          className="min-w-0 space-y-3"
+        >
           <PlantManualSensorFreshnessCard
             plantId={plant.id}
             onUpdate={() => setQuickLogOpen(true)}
@@ -721,25 +669,101 @@ export default function PlantDetail() {
             growId={plant.growId ?? null}
             plantStage={plant.stage ?? null}
           />
+        </section>
 
-          {/* Pro Blueprint overlay: scores live readings green/amber/red
-              against the per-stage SOP targets, gated behind Pro. `isDay` comes
-              from the assigned tent's light state (`tents.light_on`) so the
-              temperature row scores against the day or night target. */}
-          <PlantBlueprintOverlaySection
-            growId={plant.growId ?? null}
-            tentId={plant.tentId ?? null}
-            plantId={plant.id}
-            stage={plant.stage ?? null}
-            isDay={tent?.light?.on ?? null}
+        {/* Pro Blueprint overlay: scores live readings green/amber/red
+            against the per-stage SOP targets, gated behind Pro. `isDay` comes
+            from the assigned tent's light state (`tents.light_on`) so the
+            temperature row scores against the day or night target. */}
+        <PlantBlueprintOverlaySection
+          growId={plant.growId ?? null}
+          tentId={plant.tentId ?? null}
+          plantId={plant.id}
+          stage={plant.stage ?? null}
+          isDay={tent?.light?.on ?? null}
+        />
+
+        <section
+          aria-labelledby="plant-daily-grow-check-section-heading"
+          data-testid="plant-daily-grow-check-section"
+          className="min-w-0 space-y-4 sm:space-y-3"
+        >
+          <div className="flex min-w-0 flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-2">
+            <h2
+              id="plant-daily-grow-check-section-heading"
+              className="text-base font-semibold tracking-tight"
+            >
+              Daily Grow Check
+            </h2>
+            <p className="text-xs leading-snug text-muted-foreground">
+              <span>Status: today's entry and recent activity.</span>
+              <span aria-hidden="true" className="hidden sm:inline">
+                {" "}
+                ·{" "}
+              </span>
+              <span className="block sm:inline">Next: log today's check to keep rhythm.</span>
+            </p>
+          </div>
+          <DailyGrowCheckOnboardingCard
+            focusedPlantId={plant.id}
+            focusedTentId={plant.tentId ?? null}
+            tentIds={plant.tentId ? [plant.tentId] : null}
+            hideWhenReady
           />
+          <PlantDailyGrowCheckConsistencyCard
+            plantId={plant.id}
+            currentTentId={plant.tentId ?? null}
+          />
+          <PlantDailyGrowCheckHistoryCard
+            plantId={plant.id}
+            currentTentId={plant.tentId ?? null}
+            hideHeaderCta
+          />
+        </section>
+        <div
+          id={PLANT_DETAIL_SECTION_ANCHORS.alerts}
+          tabIndex={-1}
+          aria-label="Plant alerts section"
+          className="min-w-0 scroll-mt-16 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <PlantAssignedTentAlertsPanel
+            tentId={plant.tentId ?? null}
+            tentName={tent?.name ?? null}
+            growId={plant.growId ?? null}
+          />
+        </div>
+        <div
+          id={PLANT_DETAIL_SECTION_ANCHORS.actions}
+          tabIndex={-1}
+          aria-label="Plant actions section"
+          className="min-w-0 scroll-mt-16 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <PlantAssignedTentActionsPanel
+            tentId={plant.tentId ?? null}
+            tentName={tent?.name ?? null}
+            growId={plant.growId ?? null}
+          />
+        </div>
+      </section>
 
+      <div
+        data-testid="plant-detail-secondary-disclosures"
+        className="mt-4 min-w-0 space-y-3 pb-24 md:pb-6"
+      >
+        <PlantDetailDisclosureSection
+          key={`${plant.id}:history`}
+          group="history"
+          title="History"
+          summary="Open the complete plant activity and timeline record."
+          open={openGroups.history}
+          onOpenChange={(open) => setGroupOpen("history", open)}
+        >
           <PlantRecentActivityPanel plantId={plant.id} plantName={plant.name} />
           <div
             id={PLANT_RELATIVE_TIMELINE_ANCHOR_ID}
             tabIndex={-1}
             aria-label="Plant Relative Timeline section"
-            className="scroll-mt-16 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
+            className="min-w-0 scroll-mt-16 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <PlantRelativeTimelineSection
               plantId={plant.id}
@@ -751,7 +775,6 @@ export default function PlantDetail() {
               tentId={plant.tentId ?? null}
             />
           </div>
-
           <ManualSnapshotTimelineSection scope="plant" plantId={plant.id} />
           <QuickLogGroupedTimelineSection
             scope="plant"
@@ -759,77 +782,113 @@ export default function PlantDetail() {
             tentId={plant.tentId ?? null}
           />
           <TimelineMemorySection scope="plant" plantId={plant.id} tentId={plant.tentId ?? null} />
+        </PlantDetailDisclosureSection>
 
-          <section
-            aria-labelledby="plant-daily-grow-check-section-heading"
-            data-testid="plant-daily-grow-check-section"
-            className="space-y-4 sm:space-y-3"
+        {harvestWatchEligible && (
+          <PlantDetailDisclosureSection
+            key={`${plant.id}:harvest`}
+            group="harvest"
+            title="Harvest evidence"
+            summary="Review stage-gated harvest readiness and preserved evidence."
+            anchorId={PLANT_DETAIL_HARVEST_EVIDENCE_ANCHOR_ID}
+            open={openGroups.harvest}
+            onOpenChange={(open) => setGroupOpen("harvest", open)}
           >
-            <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-2">
-              <h2
-                id="plant-daily-grow-check-section-heading"
-                className="text-base font-semibold tracking-tight"
-              >
-                Daily Grow Check
-              </h2>
-              <p className="text-xs leading-snug text-muted-foreground">
-                <span>Status: today's entry and recent activity.</span>
-                <span aria-hidden="true" className="hidden sm:inline">
-                  {" "}
-                  ·{" "}
-                </span>
-                <span className="block sm:inline">Next: log today's check to keep rhythm.</span>
-              </p>
-            </div>
-            <DailyGrowCheckOnboardingCard
-              focusedPlantId={plant.id}
-              focusedTentId={plant.tentId ?? null}
-              tentIds={plant.tentId ? [plant.tentId] : null}
-              hideWhenReady
-            />
-            <PlantDailyGrowCheckConsistencyCard
+            <PlantDetailHarvestWatchCard
               plantId={plant.id}
-              currentTentId={plant.tentId ?? null}
+              hasPlantPhoto={!!plant.photo}
+              galleryPhotoCount={plantGalleryPhotoCount}
+              onRevealAndNavigate={revealAndNavigate}
             />
-            <PlantDailyGrowCheckHistoryCard
+            <PlantDetailHarvestEvidenceReportMount plantId={plant.id} />
+          </PlantDetailDisclosureSection>
+        )}
+
+        <PlantDetailDisclosureSection
+          key={`${plant.id}:ai`}
+          group="ai"
+          title="AI review & context"
+          summary="Open evidence readiness, review tools, context, and prior sessions."
+          open={openGroups.ai}
+          onOpenChange={(open) => setGroupOpen("ai", open)}
+        >
+          <PlantDetailAskDoctorHelper
+            plantId={plant.id}
+            stage={plant.stage ?? null}
+            hasPlantPhoto={!!plant.photo}
+          />
+          <PlantDetailAiDoctorReadiness
+            plantId={plant.id}
+            growId={plant.growId ?? null}
+            tentId={plant.tentId ?? null}
+            stage={plant.stage ?? null}
+            hasPlantPhoto={!!plant.photo}
+          />
+          <PlantDetailAiDoctorContextReadinessMount
+            plantId={plant.id}
+            growId={plant.growId ?? null}
+            tentId={plant.tentId ?? null}
+            plantName={plant.name}
+            strain={plant.strain}
+            stage={plant.stage ?? null}
+            medium={plant.medium ?? null}
+            potSize={plant.potSize ?? null}
+            plantType={plant.plantType ?? null}
+          />
+          <PlantDetailTimelineEvidenceReadinessLaunch
+            plantId={plant.id}
+            growId={plant.growId ?? null}
+            tentId={plant.tentId ?? null}
+            plantName={plant.name}
+            strain={plant.strain}
+            stage={plant.stage ?? null}
+            hasPlantPhoto={!!plant.photo}
+          />
+          <PlantDetailDoctorContextPreview
+            plantId={plant.id}
+            stage={plant.stage ?? null}
+            hasPlantPhoto={!!plant.photo}
+            growId={plant.growId ?? null}
+            tentId={plant.tentId ?? null}
+            plantName={plant.name}
+            tentName={tent?.name ?? null}
+          />
+          <section
+            id={PLANT_AI_DOCTOR_REVIEW_ANCHOR_ID}
+            tabIndex={-1}
+            aria-label="Plant AI Doctor review"
+            className="min-w-0 scroll-mt-16 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <PlantDetailAiDoctorReadinessGate
               plantId={plant.id}
-              currentTentId={plant.tentId ?? null}
-              hideHeaderCta
+              plant={plant}
+              hasSafeAiDoctorFlow
+            />
+            <PlantDetailAiDoctorSafeReviewStart plantId={plant.id} plant={plant} />
+            <AiDoctorReviewResultPreview testIdPrefix="plant-detail" />
+            <PlantDetailAiDoctorLiveReview
+              plantId={plant.id}
+              plant={plant}
+              growId={plant.growId ?? null}
+              tentId={plant.tentId ?? null}
             />
           </section>
           <div
-            id={PLANT_DETAIL_SECTION_ANCHORS.alerts}
+            id={PLANT_AI_DOCTOR_CONTEXT_PANEL_ANCHOR_ID}
             tabIndex={-1}
-            aria-label="Plant alerts section"
-            className="scroll-mt-16 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
+            className="min-w-0 scroll-mt-16 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <PlantAssignedTentAlertsPanel
-              tentId={plant.tentId ?? null}
-              tentName={tent?.name ?? null}
-              growId={plant.growId ?? null}
-            />
-          </div>
-          <div
-            id={PLANT_DETAIL_SECTION_ANCHORS.actions}
-            tabIndex={-1}
-            aria-label="Plant actions section"
-            className="scroll-mt-16 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
-          >
-            <PlantAssignedTentActionsPanel
-              tentId={plant.tentId ?? null}
-              tentName={tent?.name ?? null}
-              growId={plant.growId ?? null}
-            />
+            <PlantDetailAiDoctorContextPanel plantId={plant.id} plant={plant} />
           </div>
           <div
             id={PLANT_DETAIL_SECTION_ANCHORS.doctor}
             tabIndex={-1}
             aria-label="Plant Doctor sessions section"
-            className="scroll-mt-16 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
+            className="min-w-0 scroll-mt-16 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <PlantAiDoctorSessionsPanel plantId={plant.id} />
           </div>
-        </div>
+        </PlantDetailDisclosureSection>
       </div>
     </div>
   );

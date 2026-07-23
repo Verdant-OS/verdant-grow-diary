@@ -18,8 +18,8 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write   # post/update the preview-status comment
-  issues: write          # (pull_request comments API is under /issues/)
+  pull-requests: write # post/update the preview-status comment
+  issues: write # (pull_request comments API is under /issues/)
 
 concurrency:
   # One preview build per PR — cancel superseded runs so the PR comment

@@ -24,6 +24,7 @@ import {
   type FastAddActionId,
 } from "@/lib/fastAddActionRules";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
+import { QUICK_LOG_V2_OPEN_EVENT } from "@/lib/quickLogV2OpenIntent";
 import { EVENT_TYPE_MAP } from "@/lib/diary";
 
 afterEach(() => cleanup());
@@ -101,9 +102,7 @@ describe("Quick Log preset menu — order and completeness", () => {
     renderQuickLog({ plantId: "p1", tentId: null, growId: "g1" });
     fireEvent.click(screen.getByTestId("global-fast-add-trigger"));
     for (const a of FAST_ADD_ACTIONS) {
-      expect(
-        screen.getByTestId(`global-fast-add-action-${a.id}`),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId(`global-fast-add-action-${a.id}`)).toBeInTheDocument();
     }
   });
 
@@ -117,17 +116,14 @@ describe("Quick Log preset menu — order and completeness", () => {
 
 describe("Quick Log preset menu — event wiring", () => {
   it.each(
-    FAST_ADD_ACTIONS.filter((a) => a.id !== "diagnosis").map(
+    FAST_ADD_ACTIONS.filter((a) => a.id !== "diagnosis" && a.id !== "watering").map(
       (a) => [a.id, a.quickLogEventType!] as const,
     ),
   )(
     "clicking '%s' dispatches the existing Quick Log event with eventType=%s",
     (actionId, expectedEventType) => {
       const onDispatchEvent = vi.fn();
-      renderQuickLog(
-        { plantId: "p1", tentId: null, growId: "g1" },
-        { onDispatchEvent },
-      );
+      renderQuickLog({ plantId: "p1", tentId: null, growId: "g1" }, { onDispatchEvent });
       fireEvent.click(screen.getByTestId("global-fast-add-trigger"));
       fireEvent.click(screen.getByTestId(`global-fast-add-action-${actionId}`));
       expect(onDispatchEvent).toHaveBeenCalledTimes(1);
@@ -137,13 +133,26 @@ describe("Quick Log preset menu — event wiring", () => {
     },
   );
 
+  it("routes Watering through the closed Quick Log v2 intent", () => {
+    const onDispatchEvent = vi.fn();
+    renderQuickLog({ plantId: "p1", tentId: null, growId: "g1" }, { onDispatchEvent });
+    fireEvent.click(screen.getByTestId("global-fast-add-trigger"));
+    fireEvent.click(screen.getByTestId("global-fast-add-action-watering"));
+
+    // Exactly one dispatch: this component sits in an area with documented
+    // duplicate-dispatch/duplicate-save sensitivity (#317), so a stray second
+    // fire must fail the test rather than pass silently under toHaveBeenCalledWith.
+    expect(onDispatchEvent).toHaveBeenCalledTimes(1);
+    expect(onDispatchEvent).toHaveBeenCalledWith(QUICK_LOG_V2_OPEN_EVENT, {
+      targetKey: "plant:p1",
+      action: "water",
+    });
+  });
+
   it("diagnosis preset navigates instead of dispatching an event", () => {
     const onNavigate = vi.fn();
     const onDispatchEvent = vi.fn();
-    renderQuickLog(
-      { plantId: "p1", tentId: null, growId: "g1" },
-      { onNavigate, onDispatchEvent },
-    );
+    renderQuickLog({ plantId: "p1", tentId: null, growId: "g1" }, { onNavigate, onDispatchEvent });
     fireEvent.click(screen.getByTestId("global-fast-add-trigger"));
     fireEvent.click(screen.getByTestId("global-fast-add-action-diagnosis"));
     expect(onNavigate).toHaveBeenCalledWith("/plants/p1#ai-doctor");

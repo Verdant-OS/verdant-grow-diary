@@ -14,24 +14,16 @@
  * never silently removed unless they don't exist on this page.
  */
 
-export type PlantDetailSectionKind =
-  | "overview"
-  | "timeline"
-  | "alerts"
-  | "actions"
-  | "doctor";
+export type PlantDetailSectionKind = "overview" | "timeline" | "alerts" | "actions" | "doctor";
 
 /** Stable static DOM anchor ids. Safe to expose in the DOM. */
-export const PLANT_DETAIL_SECTION_ANCHORS: Record<
-  PlantDetailSectionKind,
-  string
-> = {
+export const PLANT_DETAIL_SECTION_ANCHORS = {
   overview: "plant-overview",
   timeline: "plant-relative-timeline",
   alerts: "plant-alerts",
   actions: "plant-actions",
   doctor: "plant-doctor",
-};
+} as const satisfies Record<PlantDetailSectionKind, string>;
 
 export interface PlantDetailSectionEntry {
   kind: PlantDetailSectionKind;

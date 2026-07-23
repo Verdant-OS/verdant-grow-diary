@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   buildQuickLogV2TargetOptions,
+  isStaleQuickLogV2TargetSelection,
   resolveQuickLogV2Target,
   shouldShowVolumeField,
   isPhotoSavingSupported,
@@ -57,6 +58,16 @@ describe("quickLogV2Rules", () => {
     const r = resolveQuickLogV2Target(opts, "plant:nope");
     expect(r.ok).toBe(false);
     expect(r.reason).toBe("selection_not_found");
+  });
+
+  it("distinguishes a stale target from an incomplete target draft", () => {
+    const opts = buildQuickLogV2TargetOptions(tents as any, plants as any);
+
+    expect(isStaleQuickLogV2TargetSelection(resolveQuickLogV2Target(opts, null))).toBe(false);
+    expect(
+      isStaleQuickLogV2TargetSelection(resolveQuickLogV2Target(opts, "plant:nope")),
+    ).toBe(true);
+    expect(isStaleQuickLogV2TargetSelection(resolveQuickLogV2Target(opts, "plant:p2"))).toBe(false);
   });
 
   it("only shows volume field for water", () => {

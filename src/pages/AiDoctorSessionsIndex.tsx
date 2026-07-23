@@ -23,8 +23,9 @@ import {
   Info,
 } from "lucide-react";
 import { format } from "date-fns";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import PageHeader from "@/components/PageHeader";
 import {
   copyShareLink,
   readCurrentShareUrl,
@@ -150,11 +151,11 @@ function IndexRow({
 
   return (
     <li
-      className="rounded-lg border bg-card/40 p-3 text-sm space-y-1.5"
+      className="space-y-3 rounded-2xl border border-border/60 bg-card/65 p-4 text-sm shadow-sm transition-colors hover:border-primary/35 hover:bg-card/80"
       data-testid="ai-doctor-sessions-index-row"
       data-session-id={row.id}
     >
-      <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex flex-wrap items-center gap-2">
         {row.created_at ? (
           <span
             className="text-xs text-muted-foreground"
@@ -265,33 +266,38 @@ function IndexRow({
       </div>
 
       {d?.likelyIssue ? (
-        <p className="font-medium leading-snug" data-testid="ai-doctor-sessions-index-likely-issue">
+        <p
+          className="break-words font-medium leading-snug"
+          data-testid="ai-doctor-sessions-index-likely-issue"
+        >
           {d.likelyIssue}
         </p>
       ) : null}
 
       {preview ? (
         <p
-          className="text-xs text-muted-foreground leading-snug"
+          className="break-words text-xs leading-snug text-muted-foreground"
           data-testid="ai-doctor-sessions-index-summary"
         >
           {preview}
         </p>
       ) : null}
 
-      <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground pt-1">
-        {row.grow_id ? (
-          <span data-testid="ai-doctor-sessions-index-grow-context">Grow context</span>
-        ) : null}
-        {row.plant_id ? (
-          <span data-testid="ai-doctor-sessions-index-plant-context">Plant context</span>
-        ) : null}
-        {row.tent_id ? (
-          <span data-testid="ai-doctor-sessions-index-tent-context">Tent context</span>
-        ) : null}
+      <div className="flex flex-col gap-2 border-t border-border/50 pt-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+          {row.grow_id ? (
+            <span data-testid="ai-doctor-sessions-index-grow-context">Grow context</span>
+          ) : null}
+          {row.plant_id ? (
+            <span data-testid="ai-doctor-sessions-index-plant-context">Plant context</span>
+          ) : null}
+          {row.tent_id ? (
+            <span data-testid="ai-doctor-sessions-index-tent-context">Tent context</span>
+          ) : null}
+        </div>
         <Link
           to={`/doctor/sessions/${row.id}`}
-          className="text-primary underline rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="inline-flex w-fit shrink-0 rounded text-primary underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           data-testid="ai-doctor-sessions-index-view-link"
           aria-label={`View AI Doctor session${d?.likelyIssue ? `: ${d.likelyIssue}` : row.created_at ? ` from ${fmtDate(row.created_at)}` : ""}`}
         >
@@ -567,7 +573,10 @@ export default function AiDoctorSessionsIndex() {
   };
 
   return (
-    <div data-testid="ai-doctor-sessions-index-page" className="space-y-4">
+    <div
+      data-testid="ai-doctor-sessions-index-page"
+      className="mx-auto w-full max-w-6xl min-w-0 space-y-4"
+    >
       <OneTentLoopNextStepCard
         current="ai-doctor"
         ids={{}}
@@ -579,26 +588,23 @@ export default function AiDoctorSessionsIndex() {
       >
         AI Doctor uses available context. Missing context will be shown.
       </p>
-      <Card>
-        <CardHeader className="space-y-1">
-          <div className="flex items-start justify-between gap-2">
-            {/* h1 (CardTitle renders an h3): this is the page's main title.
-                Classes mirror CardTitle's base look at the text-lg size. */}
-            <h1
-              className="text-lg font-semibold leading-none tracking-tight flex items-center gap-2"
-              data-testid="ai-doctor-sessions-index-title"
-            >
-              <Stethoscope className="h-4 w-4" /> AI Doctor Sessions
-            </h1>
-            <div className="flex items-center gap-2">
+      <div data-testid="ai-doctor-sessions-index-title">
+        <PageHeader
+          title="AI Doctor Sessions"
+          eyebrow="Review history"
+          description="Saved diagnosis snapshots. Opening a session does not re-run AI or create actions."
+          icon={<Stethoscope className="size-5" aria-hidden="true" />}
+          actions={
+            <>
               <div
-                className="flex items-center gap-1"
+                className="flex min-w-0 flex-1 items-center gap-1 sm:flex-none"
                 data-testid="ai-doctor-sessions-index-view-switch"
               >
                 <Button
                   variant={isLedgerView ? "outline" : "secondary"}
                   size="sm"
                   onClick={exitLedgerView}
+                  className="min-w-0 flex-1 sm:flex-none"
                   data-testid="ai-doctor-sessions-index-view-switch-history"
                   aria-pressed={!isLedgerView}
                 >
@@ -608,6 +614,7 @@ export default function AiDoctorSessionsIndex() {
                   variant={isLedgerView ? "secondary" : "outline"}
                   size="sm"
                   onClick={enterLedgerView}
+                  className="min-w-0 flex-1 sm:flex-none"
                   data-testid="ai-doctor-sessions-index-view-switch-ledger"
                   aria-pressed={isLedgerView}
                 >
@@ -618,6 +625,7 @@ export default function AiDoctorSessionsIndex() {
                 variant="outline"
                 size="sm"
                 onClick={handleCopyLink}
+                className="min-w-0 flex-1 sm:flex-none"
                 data-testid="ai-doctor-sessions-index-copy-link"
                 aria-live="polite"
               >
@@ -638,570 +646,589 @@ export default function AiDoctorSessionsIndex() {
                   </>
                 )}
               </Button>
-            </div>
-          </div>
-          <p
-            className="text-xs text-muted-foreground"
-            data-testid="ai-doctor-sessions-index-helper"
-          >
-            Saved diagnosis snapshots. Opening a session does not re-run AI or create actions.
-          </p>
-        </CardHeader>
-        <CardContent className="text-sm space-y-4">
+            </>
+          }
+        />
+      </div>
+      <p className="sr-only" aria-hidden="true" data-testid="ai-doctor-sessions-index-helper">
+        Saved diagnosis snapshots. Opening a session does not re-run AI or create actions.
+      </p>
+
+      <Card className="rounded-2xl border-border/60 bg-card/65 shadow-card">
+        <CardContent className="space-y-4 p-4 pt-4 text-sm sm:p-5 sm:pt-5">
           {isLedgerView ? (
             <AiDoctorSessionIntegrityLedger />
           ) : (
             <>
-          <div
-            className="flex flex-wrap items-end gap-3"
-            data-testid="ai-doctor-sessions-index-filters"
-          >
-            <label className="flex flex-col gap-1 text-xs">
-              <span className="text-muted-foreground">Risk</span>
-              <select
-                value={filters.risk}
-                onChange={(e) => updateFilter("risk", e.target.value as RiskFilter)}
-                data-testid="ai-doctor-sessions-index-filter-risk"
-                className="rounded border bg-background px-2 py-1 text-sm"
+              <section
+                aria-label="Session filters"
+                className="rounded-xl border border-border/60 bg-muted/20 p-3 sm:p-4"
               >
-                <option value="all">All</option>
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-                <option value="critical">Critical</option>
-              </select>
-            </label>
-            <label className="flex flex-col gap-1 text-xs">
-              <span className="text-muted-foreground">Suggested actions</span>
-              <select
-                value={filters.hasActions}
-                onChange={(e) => updateFilter("hasActions", e.target.value as HasActionsFilter)}
-                data-testid="ai-doctor-sessions-index-filter-has-actions"
-                className="rounded border bg-background px-2 py-1 text-sm"
-              >
-                <option value="all">All</option>
-                <option value="yes">Has actions</option>
-                <option value="no">No actions</option>
-              </select>
-            </label>
-            <label className="flex flex-col gap-1 text-xs">
-              <span className="text-muted-foreground">Date range</span>
-              <select
-                value={filters.dateRange}
-                onChange={(e) => updateFilter("dateRange", e.target.value as DateRangeFilter)}
-                data-testid="ai-doctor-sessions-index-filter-date-range"
-                className="rounded border bg-background px-2 py-1 text-sm"
-              >
-                <option value="all">All time</option>
-                <option value="7d">Last 7 days</option>
-                <option value="30d">Last 30 days</option>
-              </select>
-            </label>
-            <label className="flex flex-col gap-1 text-xs">
-              <span className="text-muted-foreground">Needs review</span>
-              <select
-                value={filters.needsReview}
-                onChange={(e) => updateFilter("needsReview", e.target.value as NeedsReviewFilter)}
-                data-testid="ai-doctor-sessions-index-filter-needs-review"
-                className="rounded border bg-background px-2 py-1 text-sm"
-              >
-                <option value="all">All</option>
-                <option value="yes">Needs review</option>
-                <option value="no">No review needed</option>
-              </select>
-            </label>
-            <label className="flex flex-col gap-1 text-xs">
-              <span className="text-muted-foreground">Caution</span>
-              <select
-                value={filters.caution}
-                onChange={(e) => updateFilter("caution", e.target.value as CautionFilter)}
-                data-testid="ai-doctor-sessions-index-filter-caution"
-                className="rounded border bg-background px-2 py-1 text-sm"
-              >
-                <option value="all">All</option>
-                <option value="yes">Caution only</option>
-                <option value="no">No caution</option>
-              </select>
-            </label>
-            <label className="flex flex-col gap-1 text-xs">
-              <span className="text-muted-foreground">Review checklist</span>
-              <select
-                value={filters.hasChecklist}
-                onChange={(e) => updateFilter("hasChecklist", e.target.value as HasChecklistFilter)}
-                data-testid="ai-doctor-sessions-index-filter-has-checklist"
-                className="rounded border bg-background px-2 py-1 text-sm"
-              >
-                <option value="all">All</option>
-                <option value="yes">Has checklist</option>
-                <option value="no">No checklist</option>
-              </select>
-            </label>
-            <label className="flex flex-col gap-1 text-xs">
-              <span className="text-muted-foreground">Confidence</span>
-              <select
-                value={filters.confidence}
-                onChange={(e) => updateFilter("confidence", e.target.value as ConfidenceFilter)}
-                data-testid="ai-doctor-sessions-index-filter-confidence"
-                className="rounded border bg-background px-2 py-1 text-sm"
-              >
-                <option value="all">All</option>
-                <option value="low">Low (≤60%)</option>
-                <option value="medium">Medium (61–80%)</option>
-                <option value="high">High ({">"}80%)</option>
-                <option value="unknown">Unknown</option>
-              </select>
-            </label>
-            <label className="flex flex-col gap-1 text-xs">
-              <span className="text-muted-foreground">Review</span>
-              <select
-                value={filters.reviewStatus}
-                onChange={(e) =>
-                  updateFilter("reviewStatus", e.target.value as AiDoctorSessionReviewStatusFilter)
-                }
-                data-testid="ai-doctor-sessions-index-filter-review-status"
-                className="rounded border bg-background px-2 py-1 text-sm"
-                title="Filter by durable review status"
-              >
-                <option value="any">Any</option>
-                <option value="not_reviewed">Not reviewed</option>
-                <option value="reviewed">Reviewed</option>
-                <option value="needs_follow_up">Needs follow-up</option>
-              </select>
-            </label>
-            <label className="flex flex-col gap-1 text-xs">
-              <span className="text-muted-foreground">Sort</span>
-              <select
-                value={filters.sort}
-                onChange={(e) => updateFilter("sort", e.target.value as SortOption)}
-                data-testid="ai-doctor-sessions-index-filter-sort"
-                className="rounded border bg-background px-2 py-1 text-sm"
-                title="Sort applies to the currently loaded page"
-              >
-                <option value="newest">Newest first</option>
-                <option value="oldest">Oldest first</option>
-                <option value="highest-risk">Highest risk first</option>
-                <option value="lowest-confidence">Lowest confidence first</option>
-                <option value="review-priority">Review priority</option>
-              </select>
-            </label>
-            <Button
-              variant={needsAttentionActive ? "secondary" : "outline"}
-              size="sm"
-              onClick={needsAttentionActive ? clearNeedsAttention : applyNeedsAttention}
-              data-testid="ai-doctor-sessions-index-needs-attention-preset"
-              aria-pressed={needsAttentionActive}
-              title="Caution + review checklist"
-            >
-              {NEEDS_ATTENTION_PRESET_LABEL}
-              {needsAttentionVisible > 0 ? (
-                <span
-                  className="ml-1 text-[11px] text-muted-foreground"
-                  data-testid="ai-doctor-sessions-index-needs-attention-count"
+                <div
+                  className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                  data-testid="ai-doctor-sessions-index-filters"
                 >
-                  : {needsAttentionVisible} visible
-                </span>
-              ) : null}
-            </Button>
-            <button
-              type="button"
-              className="inline-flex items-center rounded-full border bg-muted px-2 py-0.5 text-[11px] text-muted-foreground hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-              data-testid="ai-doctor-sessions-index-needs-follow-up-visible-chip"
-              title="Show built-in Needs follow-up view · visible count only"
-              aria-label={formatNeedsFollowUpVisibleLabel(needsFollowUpVisible)}
-              onClick={() => applySavedView(BUILTIN_SAVED_VIEW_NEEDS_FOLLOW_UP_ID)}
-            >
-              {formatNeedsFollowUpVisibleLabel(needsFollowUpVisible)}
-            </button>
-            {filtersActive ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={clearFilters}
-                data-testid="ai-doctor-sessions-index-clear-filters"
-              >
-                Clear filters
-              </Button>
-            ) : null}
-          </div>
-
-          <div
-            className="flex flex-wrap items-end gap-2"
-            data-testid="ai-doctor-sessions-saved-views"
-          >
-            <label className="flex flex-col gap-1 text-xs">
-              <span className="text-muted-foreground">Saved views</span>
-              <select
-                value={effectiveSelectedSavedViewId}
-                onChange={(e) => applySavedView(e.target.value)}
-                data-testid="ai-doctor-sessions-saved-views-select"
-                className="rounded border bg-background px-2 py-1 text-sm"
-                disabled={displaySavedViews.length === 0}
-              >
-                <option value="">
-                  {displaySavedViews.length === 0 ? "No saved views" : "Apply a saved view…"}
-                </option>
-                {displaySavedViews.map((v) => {
-                  const isBuiltIn = isBuiltInSavedViewId(v.id);
-                  return (
-                    <option
-                      key={v.id}
-                      value={v.id}
-                      title={isBuiltIn ? BUILTIN_SAVED_VIEW_TOOLTIP : undefined}
-                      data-testid={
-                        isBuiltIn ? "ai-doctor-sessions-saved-views-builtin-option" : undefined
-                      }
+                  <label className="flex min-w-0 flex-col gap-1 text-xs">
+                    <span className="text-muted-foreground">Risk</span>
+                    <select
+                      value={filters.risk}
+                      onChange={(e) => updateFilter("risk", e.target.value as RiskFilter)}
+                      data-testid="ai-doctor-sessions-index-filter-risk"
+                      className="w-full rounded border bg-background px-2 py-1 text-sm"
                     >
-                      {isBuiltIn ? `★ ${v.label} (Built-in)` : v.label}
-                    </option>
-                  );
-                })}
-              </select>
-            </label>
-            {isBuiltInSavedViewId(effectiveSelectedSavedViewId) ? (
-              <Badge
-                variant="outline"
-                className="text-[11px]"
-                title={BUILTIN_SAVED_VIEW_TOOLTIP}
-                aria-label={BUILTIN_SAVED_VIEW_TOOLTIP}
-                data-testid="ai-doctor-sessions-saved-views-builtin-badge"
-              >
-                Built-in
-              </Badge>
-            ) : null}
-            {(() => {
-              if (!effectiveSelectedSavedViewId) return null;
-              const view = isBuiltInSavedViewId(effectiveSelectedSavedViewId)
-                ? findBuiltInSavedView(effectiveSelectedSavedViewId)
-                : findSavedView(savedViews, effectiveSelectedSavedViewId);
-              if (!view) return null;
-              const summary = formatSavedViewSummary(view.filters, view.page);
-              if (!summary) return null;
-              return (
-                <span
-                  className="text-[11px] text-muted-foreground"
-                  data-testid="ai-doctor-sessions-saved-views-summary-preview"
-                >
-                  {summary}
-                </span>
-              );
-            })()}
-            {effectiveSelectedSavedViewId && !isBuiltInSavedViewId(effectiveSelectedSavedViewId) ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => requestDeleteSavedView(effectiveSelectedSavedViewId)}
-                data-testid="ai-doctor-sessions-saved-views-delete"
-                aria-label="Delete saved view"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-                Delete
-              </Button>
-            ) : null}
-            {savingView ? (
+                      <option value="all">All</option>
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                      <option value="critical">Critical</option>
+                    </select>
+                  </label>
+                  <label className="flex min-w-0 flex-col gap-1 text-xs">
+                    <span className="text-muted-foreground">Suggested actions</span>
+                    <select
+                      value={filters.hasActions}
+                      onChange={(e) =>
+                        updateFilter("hasActions", e.target.value as HasActionsFilter)
+                      }
+                      data-testid="ai-doctor-sessions-index-filter-has-actions"
+                      className="w-full rounded border bg-background px-2 py-1 text-sm"
+                    >
+                      <option value="all">All</option>
+                      <option value="yes">Has actions</option>
+                      <option value="no">No actions</option>
+                    </select>
+                  </label>
+                  <label className="flex min-w-0 flex-col gap-1 text-xs">
+                    <span className="text-muted-foreground">Date range</span>
+                    <select
+                      value={filters.dateRange}
+                      onChange={(e) => updateFilter("dateRange", e.target.value as DateRangeFilter)}
+                      data-testid="ai-doctor-sessions-index-filter-date-range"
+                      className="w-full rounded border bg-background px-2 py-1 text-sm"
+                    >
+                      <option value="all">All time</option>
+                      <option value="7d">Last 7 days</option>
+                      <option value="30d">Last 30 days</option>
+                    </select>
+                  </label>
+                  <label className="flex min-w-0 flex-col gap-1 text-xs">
+                    <span className="text-muted-foreground">Needs review</span>
+                    <select
+                      value={filters.needsReview}
+                      onChange={(e) =>
+                        updateFilter("needsReview", e.target.value as NeedsReviewFilter)
+                      }
+                      data-testid="ai-doctor-sessions-index-filter-needs-review"
+                      className="w-full rounded border bg-background px-2 py-1 text-sm"
+                    >
+                      <option value="all">All</option>
+                      <option value="yes">Needs review</option>
+                      <option value="no">No review needed</option>
+                    </select>
+                  </label>
+                  <label className="flex min-w-0 flex-col gap-1 text-xs">
+                    <span className="text-muted-foreground">Caution</span>
+                    <select
+                      value={filters.caution}
+                      onChange={(e) => updateFilter("caution", e.target.value as CautionFilter)}
+                      data-testid="ai-doctor-sessions-index-filter-caution"
+                      className="w-full rounded border bg-background px-2 py-1 text-sm"
+                    >
+                      <option value="all">All</option>
+                      <option value="yes">Caution only</option>
+                      <option value="no">No caution</option>
+                    </select>
+                  </label>
+                  <label className="flex min-w-0 flex-col gap-1 text-xs">
+                    <span className="text-muted-foreground">Review checklist</span>
+                    <select
+                      value={filters.hasChecklist}
+                      onChange={(e) =>
+                        updateFilter("hasChecklist", e.target.value as HasChecklistFilter)
+                      }
+                      data-testid="ai-doctor-sessions-index-filter-has-checklist"
+                      className="w-full rounded border bg-background px-2 py-1 text-sm"
+                    >
+                      <option value="all">All</option>
+                      <option value="yes">Has checklist</option>
+                      <option value="no">No checklist</option>
+                    </select>
+                  </label>
+                  <label className="flex min-w-0 flex-col gap-1 text-xs">
+                    <span className="text-muted-foreground">Confidence</span>
+                    <select
+                      value={filters.confidence}
+                      onChange={(e) =>
+                        updateFilter("confidence", e.target.value as ConfidenceFilter)
+                      }
+                      data-testid="ai-doctor-sessions-index-filter-confidence"
+                      className="w-full rounded border bg-background px-2 py-1 text-sm"
+                    >
+                      <option value="all">All</option>
+                      <option value="low">Low (≤60%)</option>
+                      <option value="medium">Medium (61–80%)</option>
+                      <option value="high">High ({">"}80%)</option>
+                      <option value="unknown">Unknown</option>
+                    </select>
+                  </label>
+                  <label className="flex min-w-0 flex-col gap-1 text-xs">
+                    <span className="text-muted-foreground">Review</span>
+                    <select
+                      value={filters.reviewStatus}
+                      onChange={(e) =>
+                        updateFilter(
+                          "reviewStatus",
+                          e.target.value as AiDoctorSessionReviewStatusFilter,
+                        )
+                      }
+                      data-testid="ai-doctor-sessions-index-filter-review-status"
+                      className="w-full rounded border bg-background px-2 py-1 text-sm"
+                      title="Filter by durable review status"
+                    >
+                      <option value="any">Any</option>
+                      <option value="not_reviewed">Not reviewed</option>
+                      <option value="reviewed">Reviewed</option>
+                      <option value="needs_follow_up">Needs follow-up</option>
+                    </select>
+                  </label>
+                  <label className="flex min-w-0 flex-col gap-1 text-xs">
+                    <span className="text-muted-foreground">Sort</span>
+                    <select
+                      value={filters.sort}
+                      onChange={(e) => updateFilter("sort", e.target.value as SortOption)}
+                      data-testid="ai-doctor-sessions-index-filter-sort"
+                      className="w-full rounded border bg-background px-2 py-1 text-sm"
+                      title="Sort applies to the currently loaded page"
+                    >
+                      <option value="newest">Newest first</option>
+                      <option value="oldest">Oldest first</option>
+                      <option value="highest-risk">Highest risk first</option>
+                      <option value="lowest-confidence">Lowest confidence first</option>
+                      <option value="review-priority">Review priority</option>
+                    </select>
+                  </label>
+                  <Button
+                    variant={needsAttentionActive ? "secondary" : "outline"}
+                    size="sm"
+                    onClick={needsAttentionActive ? clearNeedsAttention : applyNeedsAttention}
+                    data-testid="ai-doctor-sessions-index-needs-attention-preset"
+                    aria-pressed={needsAttentionActive}
+                    title="Caution + review checklist"
+                  >
+                    {NEEDS_ATTENTION_PRESET_LABEL}
+                    {needsAttentionVisible > 0 ? (
+                      <span
+                        className="ml-1 text-[11px] text-muted-foreground"
+                        data-testid="ai-doctor-sessions-index-needs-attention-count"
+                      >
+                        : {needsAttentionVisible} visible
+                      </span>
+                    ) : null}
+                  </Button>
+                  <button
+                    type="button"
+                    className="inline-flex items-center rounded-full border bg-muted px-2 py-0.5 text-[11px] text-muted-foreground hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                    data-testid="ai-doctor-sessions-index-needs-follow-up-visible-chip"
+                    title="Show built-in Needs follow-up view · visible count only"
+                    aria-label={formatNeedsFollowUpVisibleLabel(needsFollowUpVisible)}
+                    onClick={() => applySavedView(BUILTIN_SAVED_VIEW_NEEDS_FOLLOW_UP_ID)}
+                  >
+                    {formatNeedsFollowUpVisibleLabel(needsFollowUpVisible)}
+                  </button>
+                  {filtersActive ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearFilters}
+                      data-testid="ai-doctor-sessions-index-clear-filters"
+                    >
+                      Clear filters
+                    </Button>
+                  ) : null}
+                </div>
+              </section>
+
               <div
-                className="flex items-end gap-2"
-                data-testid="ai-doctor-sessions-saved-views-form"
+                className="flex flex-wrap items-end gap-2"
+                data-testid="ai-doctor-sessions-saved-views"
               >
                 <label className="flex flex-col gap-1 text-xs">
-                  <span className="text-muted-foreground">Label</span>
-                  <input
-                    type="text"
-                    value={pendingLabel}
-                    onChange={(e) => {
-                      setPendingLabel(e.target.value);
+                  <span className="text-muted-foreground">Saved views</span>
+                  <select
+                    value={effectiveSelectedSavedViewId}
+                    onChange={(e) => applySavedView(e.target.value)}
+                    data-testid="ai-doctor-sessions-saved-views-select"
+                    className="rounded border bg-background px-2 py-1 text-sm"
+                    disabled={displaySavedViews.length === 0}
+                  >
+                    <option value="">
+                      {displaySavedViews.length === 0 ? "No saved views" : "Apply a saved view…"}
+                    </option>
+                    {displaySavedViews.map((v) => {
+                      const isBuiltIn = isBuiltInSavedViewId(v.id);
+                      return (
+                        <option
+                          key={v.id}
+                          value={v.id}
+                          title={isBuiltIn ? BUILTIN_SAVED_VIEW_TOOLTIP : undefined}
+                          data-testid={
+                            isBuiltIn ? "ai-doctor-sessions-saved-views-builtin-option" : undefined
+                          }
+                        >
+                          {isBuiltIn ? `★ ${v.label} (Built-in)` : v.label}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </label>
+                {isBuiltInSavedViewId(effectiveSelectedSavedViewId) ? (
+                  <Badge
+                    variant="outline"
+                    className="text-[11px]"
+                    title={BUILTIN_SAVED_VIEW_TOOLTIP}
+                    aria-label={BUILTIN_SAVED_VIEW_TOOLTIP}
+                    data-testid="ai-doctor-sessions-saved-views-builtin-badge"
+                  >
+                    Built-in
+                  </Badge>
+                ) : null}
+                {(() => {
+                  if (!effectiveSelectedSavedViewId) return null;
+                  const view = isBuiltInSavedViewId(effectiveSelectedSavedViewId)
+                    ? findBuiltInSavedView(effectiveSelectedSavedViewId)
+                    : findSavedView(savedViews, effectiveSelectedSavedViewId);
+                  if (!view) return null;
+                  const summary = formatSavedViewSummary(view.filters, view.page);
+                  if (!summary) return null;
+                  return (
+                    <span
+                      className="text-[11px] text-muted-foreground"
+                      data-testid="ai-doctor-sessions-saved-views-summary-preview"
+                    >
+                      {summary}
+                    </span>
+                  );
+                })()}
+                {effectiveSelectedSavedViewId &&
+                !isBuiltInSavedViewId(effectiveSelectedSavedViewId) ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => requestDeleteSavedView(effectiveSelectedSavedViewId)}
+                    data-testid="ai-doctor-sessions-saved-views-delete"
+                    aria-label="Delete saved view"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Delete
+                  </Button>
+                ) : null}
+                {savingView ? (
+                  <div
+                    className="flex items-end gap-2"
+                    data-testid="ai-doctor-sessions-saved-views-form"
+                  >
+                    <label className="flex flex-col gap-1 text-xs">
+                      <span className="text-muted-foreground">Label</span>
+                      <input
+                        type="text"
+                        value={pendingLabel}
+                        onChange={(e) => {
+                          setPendingLabel(e.target.value);
+                          setSaveError(null);
+                        }}
+                        data-testid="ai-doctor-sessions-saved-views-label-input"
+                        className="rounded border bg-background px-2 py-1 text-sm"
+                        autoFocus
+                      />
+                    </label>
+                    <Button
+                      size="sm"
+                      onClick={handleSaveView}
+                      data-testid="ai-doctor-sessions-saved-views-confirm"
+                    >
+                      Save
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setSavingView(false);
+                        setPendingLabel("");
+                        setSaveError(null);
+                      }}
+                      data-testid="ai-doctor-sessions-saved-views-cancel"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSavingView(true);
                       setSaveError(null);
                     }}
-                    data-testid="ai-doctor-sessions-saved-views-label-input"
-                    className="rounded border bg-background px-2 py-1 text-sm"
-                    autoFocus
-                  />
-                </label>
-                <Button
-                  size="sm"
-                  onClick={handleSaveView}
-                  data-testid="ai-doctor-sessions-saved-views-confirm"
-                >
-                  Save
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setSavingView(false);
-                    setPendingLabel("");
-                    setSaveError(null);
-                  }}
-                  data-testid="ai-doctor-sessions-saved-views-cancel"
-                >
-                  Cancel
-                </Button>
+                    data-testid="ai-doctor-sessions-saved-views-open"
+                  >
+                    <Bookmark className="h-3.5 w-3.5" />
+                    Save view
+                  </Button>
+                )}
+                {saveError ? (
+                  <span
+                    className="text-xs text-destructive"
+                    data-testid="ai-doctor-sessions-saved-views-error"
+                  >
+                    {saveError === "empty-label"
+                      ? "Enter a label."
+                      : saveError === "label-too-long"
+                        ? "Label is too long."
+                        : saveError === "duplicate-label"
+                          ? "A saved view with that name already exists."
+                          : saveError === "duplicate-params"
+                            ? "These exact filters are already saved."
+                            : "Saved view limit reached."}
+                  </span>
+                ) : null}
               </div>
-            ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setSavingView(true);
-                  setSaveError(null);
-                }}
-                data-testid="ai-doctor-sessions-saved-views-open"
-              >
-                <Bookmark className="h-3.5 w-3.5" />
-                Save view
-              </Button>
-            )}
-            {saveError ? (
-              <span
-                className="text-xs text-destructive"
-                data-testid="ai-doctor-sessions-saved-views-error"
-              >
-                {saveError === "empty-label"
-                  ? "Enter a label."
-                  : saveError === "label-too-long"
-                    ? "Label is too long."
-                    : saveError === "duplicate-label"
-                      ? "A saved view with that name already exists."
-                      : saveError === "duplicate-params"
-                        ? "These exact filters are already saved."
-                        : "Saved view limit reached."}
-              </span>
-            ) : null}
-          </div>
 
-          <div
-            className="flex flex-wrap items-start gap-2"
-            data-testid="ai-doctor-sessions-saved-views-portability"
-          >
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleExportViews}
-              data-testid="ai-doctor-sessions-saved-views-export"
-              aria-live="polite"
-              disabled={savedViews.length === 0 && exportStatus === "idle"}
-            >
-              {exportStatus === "success" ? (
-                <span data-testid="ai-doctor-sessions-saved-views-export-success">Copied</span>
-              ) : exportStatus === "error" ? (
-                <span data-testid="ai-doctor-sessions-saved-views-export-error">Export failed</span>
-              ) : (
-                <span>Export views</span>
-              )}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setImportOpen((v) => !v);
-                setImportError(null);
-                setImportSummary(null);
-              }}
-              data-testid="ai-doctor-sessions-saved-views-import-toggle"
-            >
-              {importOpen ? "Close import" : "Import views"}
-            </Button>
-          </div>
-
-          {importOpen ? (
-            <div
-              className="flex flex-col gap-2 rounded border bg-card/40 p-2"
-              data-testid="ai-doctor-sessions-saved-views-import-panel"
-            >
-              <label className="flex flex-col gap-1 text-xs">
-                <span className="text-muted-foreground">Paste exported saved views JSON</span>
-                <textarea
-                  value={importText}
-                  onChange={(e) => {
-                    setImportText(e.target.value);
-                    setImportError(null);
-                  }}
-                  data-testid="ai-doctor-sessions-saved-views-import-textarea"
-                  className="rounded border bg-background px-2 py-1 text-xs font-mono min-h-[6rem]"
-                />
-              </label>
-              <div className="flex gap-2">
+              <div
+                className="flex flex-wrap items-start gap-2"
+                data-testid="ai-doctor-sessions-saved-views-portability"
+              >
                 <Button
+                  variant="outline"
                   size="sm"
-                  onClick={handleConfirmImport}
-                  data-testid="ai-doctor-sessions-saved-views-import-confirm"
+                  onClick={handleExportViews}
+                  data-testid="ai-doctor-sessions-saved-views-export"
+                  aria-live="polite"
+                  disabled={savedViews.length === 0 && exportStatus === "idle"}
                 >
-                  Import
+                  {exportStatus === "success" ? (
+                    <span data-testid="ai-doctor-sessions-saved-views-export-success">Copied</span>
+                  ) : exportStatus === "error" ? (
+                    <span data-testid="ai-doctor-sessions-saved-views-export-error">
+                      Export failed
+                    </span>
+                  ) : (
+                    <span>Export views</span>
+                  )}
                 </Button>
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
                   onClick={() => {
-                    setImportOpen(false);
-                    setImportText("");
+                    setImportOpen((v) => !v);
                     setImportError(null);
                     setImportSummary(null);
                   }}
-                  data-testid="ai-doctor-sessions-saved-views-import-cancel"
+                  data-testid="ai-doctor-sessions-saved-views-import-toggle"
                 >
-                  Cancel
+                  {importOpen ? "Close import" : "Import views"}
                 </Button>
               </div>
-              {importError ? (
-                <span
-                  className="text-xs text-destructive"
-                  data-testid="ai-doctor-sessions-saved-views-import-error"
-                >
-                  {importError === "empty-input"
-                    ? "Paste JSON to import."
-                    : importError === "invalid-json"
-                      ? "That isn't valid JSON."
-                      : importError === "wrong-shape"
-                        ? "JSON shape isn't a saved-views export."
-                        : "No valid views to import."}
-                </span>
-              ) : null}
-              {importSummary ? (
-                <span
-                  className="text-xs text-muted-foreground"
-                  data-testid="ai-doctor-sessions-saved-views-import-success"
-                >
-                  Imported {importSummary.added} view
-                  {importSummary.added === 1 ? "" : "s"}
-                  {importSummary.skipped > 0 ? ` · skipped ${importSummary.skipped}` : ""}.
-                </span>
-              ) : null}
-            </div>
-          ) : null}
 
-          {filtersActive ? (
-            <div
-              className="flex flex-wrap items-center gap-2"
-              data-testid="ai-doctor-sessions-index-active-filters"
-            >
-              {needsAttentionActive ? (
-                <Badge
-                  variant="default"
-                  className="text-[11px]"
-                  data-testid="ai-doctor-sessions-index-needs-attention-badge"
+              {importOpen ? (
+                <div
+                  className="flex flex-col gap-2 rounded border bg-card/40 p-2"
+                  data-testid="ai-doctor-sessions-saved-views-import-panel"
                 >
-                  {NEEDS_ATTENTION_PRESET_LABEL}
-                </Badge>
+                  <label className="flex flex-col gap-1 text-xs">
+                    <span className="text-muted-foreground">Paste exported saved views JSON</span>
+                    <textarea
+                      value={importText}
+                      onChange={(e) => {
+                        setImportText(e.target.value);
+                        setImportError(null);
+                      }}
+                      data-testid="ai-doctor-sessions-saved-views-import-textarea"
+                      className="rounded border bg-background px-2 py-1 text-xs font-mono min-h-[6rem]"
+                    />
+                  </label>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      onClick={handleConfirmImport}
+                      data-testid="ai-doctor-sessions-saved-views-import-confirm"
+                    >
+                      Import
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setImportOpen(false);
+                        setImportText("");
+                        setImportError(null);
+                        setImportSummary(null);
+                      }}
+                      data-testid="ai-doctor-sessions-saved-views-import-cancel"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                  {importError ? (
+                    <span
+                      className="text-xs text-destructive"
+                      data-testid="ai-doctor-sessions-saved-views-import-error"
+                    >
+                      {importError === "empty-input"
+                        ? "Paste JSON to import."
+                        : importError === "invalid-json"
+                          ? "That isn't valid JSON."
+                          : importError === "wrong-shape"
+                            ? "JSON shape isn't a saved-views export."
+                            : "No valid views to import."}
+                    </span>
+                  ) : null}
+                  {importSummary ? (
+                    <span
+                      className="text-xs text-muted-foreground"
+                      data-testid="ai-doctor-sessions-saved-views-import-success"
+                    >
+                      Imported {importSummary.added} view
+                      {importSummary.added === 1 ? "" : "s"}
+                      {importSummary.skipped > 0 ? ` · skipped ${importSummary.skipped}` : ""}.
+                    </span>
+                  ) : null}
+                </div>
               ) : null}
-              {activeLabels.map((label) => (
-                <Badge
-                  key={label}
-                  variant="secondary"
-                  className="text-[11px]"
-                  data-testid="ai-doctor-sessions-index-active-filter-label"
-                >
-                  {label}
-                </Badge>
-              ))}
-            </div>
-          ) : null}
 
-          {isLoading ? (
-            <div
-              role="status"
-              aria-live="polite"
-              aria-busy="true"
-              className="space-y-2"
-              data-testid="ai-doctor-sessions-index-loading"
-            >
-              <p className="text-muted-foreground">Loading AI Doctor sessions…</p>
-              <div className="space-y-2" aria-hidden="true">
-                {[0, 1, 2].map((i) => (
-                  <div key={i} className="h-16 rounded-lg border bg-muted/30 animate-pulse" />
-                ))}
-              </div>
-            </div>
-          ) : error ? (
-            <div
-              role="alert"
-              className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm space-y-2"
-              data-testid="ai-doctor-sessions-index-error"
-            >
-              <p className="font-medium text-foreground">Unable to load AI Doctor sessions.</p>
-              <p className="text-xs text-muted-foreground">
-                Check your connection and try again. No changes were made.
-              </p>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  void refetch();
-                }}
-                disabled={isRefetching}
-                data-testid="ai-doctor-sessions-index-error-retry"
-                className="focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-              >
-                {isRefetching ? "Retrying…" : "Retry"}
-              </Button>
-            </div>
-          ) : rows.length === 0 && page === 0 ? (
-            filtersActive ? (
-              <div
-                className="rounded-lg border bg-muted/20 p-4 text-sm space-y-2"
-                data-testid="ai-doctor-sessions-index-empty-filtered"
-              >
-                <p className="font-medium text-foreground">No sessions match these filters.</p>
-                <p className="text-xs text-muted-foreground">
-                  Try adjusting or clearing your filters to review more sessions.
-                </p>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={clearFilters}
-                  data-testid="ai-doctor-sessions-index-empty-filtered-clear"
-                  className="focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+              {filtersActive ? (
+                <div
+                  className="flex flex-wrap items-center gap-2"
+                  data-testid="ai-doctor-sessions-index-active-filters"
                 >
-                  Clear filters
-                </Button>
-              </div>
-            ) : (
-              <div
-                className="rounded-lg border bg-muted/20 p-4 text-sm space-y-1"
-                data-testid="ai-doctor-sessions-index-empty"
-              >
-                <p className="font-medium text-foreground">No AI Doctor sessions yet.</p>
-                <p className="text-xs text-muted-foreground">
-                  Saved diagnosis snapshots will appear here for you to review. Opening a session
-                  never re-runs AI or creates actions.
-                </p>
-              </div>
-            )
-          ) : (
-            <>
-              <ul className="space-y-2" data-testid="ai-doctor-sessions-index-list">
-                {rows.map((r) => (
-                  <IndexRow
-                    key={r.id}
-                    row={r}
-                    reviewState={reviewStateBySession?.get(r.id) ?? null}
-                  />
-                ))}
-              </ul>
-              <div
-                className="flex items-center justify-between pt-2"
-                data-testid="ai-doctor-sessions-index-pager"
-              >
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page === 0}
-                  onClick={() => goToPage(page - 1)}
-                  data-testid="ai-doctor-sessions-index-prev"
+                  {needsAttentionActive ? (
+                    <Badge
+                      variant="default"
+                      className="text-[11px]"
+                      data-testid="ai-doctor-sessions-index-needs-attention-badge"
+                    >
+                      {NEEDS_ATTENTION_PRESET_LABEL}
+                    </Badge>
+                  ) : null}
+                  {activeLabels.map((label) => (
+                    <Badge
+                      key={label}
+                      variant="secondary"
+                      className="text-[11px]"
+                      data-testid="ai-doctor-sessions-index-active-filter-label"
+                    >
+                      {label}
+                    </Badge>
+                  ))}
+                </div>
+              ) : null}
+
+              {isLoading ? (
+                <div
+                  role="status"
+                  aria-live="polite"
+                  aria-busy="true"
+                  className="space-y-2"
+                  data-testid="ai-doctor-sessions-index-loading"
                 >
-                  Previous
-                </Button>
-                <span className="text-xs text-muted-foreground">Page {page + 1}</span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={!hasMore}
-                  onClick={() => goToPage(page + 1)}
-                  data-testid="ai-doctor-sessions-index-next"
+                  <p className="text-muted-foreground">Loading AI Doctor sessions…</p>
+                  <div className="space-y-2" aria-hidden="true">
+                    {[0, 1, 2].map((i) => (
+                      <div key={i} className="h-16 rounded-lg border bg-muted/30 animate-pulse" />
+                    ))}
+                  </div>
+                </div>
+              ) : error ? (
+                <div
+                  role="alert"
+                  className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm space-y-2"
+                  data-testid="ai-doctor-sessions-index-error"
                 >
-                  Next
-                </Button>
-              </div>
-            </>
-          )}
+                  <p className="font-medium text-foreground">Unable to load AI Doctor sessions.</p>
+                  <p className="text-xs text-muted-foreground">
+                    Check your connection and try again. No changes were made.
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      void refetch();
+                    }}
+                    disabled={isRefetching}
+                    data-testid="ai-doctor-sessions-index-error-retry"
+                    className="focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                  >
+                    {isRefetching ? "Retrying…" : "Retry"}
+                  </Button>
+                </div>
+              ) : rows.length === 0 && page === 0 ? (
+                filtersActive ? (
+                  <div
+                    className="rounded-lg border bg-muted/20 p-4 text-sm space-y-2"
+                    data-testid="ai-doctor-sessions-index-empty-filtered"
+                  >
+                    <p className="font-medium text-foreground">No sessions match these filters.</p>
+                    <p className="text-xs text-muted-foreground">
+                      Try adjusting or clearing your filters to review more sessions.
+                    </p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearFilters}
+                      data-testid="ai-doctor-sessions-index-empty-filtered-clear"
+                      className="focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                    >
+                      Clear filters
+                    </Button>
+                  </div>
+                ) : (
+                  <div
+                    className="rounded-lg border bg-muted/20 p-4 text-sm space-y-1"
+                    data-testid="ai-doctor-sessions-index-empty"
+                  >
+                    <p className="font-medium text-foreground">No AI Doctor sessions yet.</p>
+                    <p className="text-xs text-muted-foreground">
+                      Saved diagnosis snapshots will appear here for you to review. Opening a
+                      session never re-runs AI or creates actions.
+                    </p>
+                  </div>
+                )
+              ) : (
+                <>
+                  <ul className="space-y-2" data-testid="ai-doctor-sessions-index-list">
+                    {rows.map((r) => (
+                      <IndexRow
+                        key={r.id}
+                        row={r}
+                        reviewState={reviewStateBySession?.get(r.id) ?? null}
+                      />
+                    ))}
+                  </ul>
+                  <div
+                    className="flex items-center justify-between pt-2"
+                    data-testid="ai-doctor-sessions-index-pager"
+                  >
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={page === 0}
+                      onClick={() => goToPage(page - 1)}
+                      data-testid="ai-doctor-sessions-index-prev"
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-xs text-muted-foreground">Page {page + 1}</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={!hasMore}
+                      onClick={() => goToPage(page + 1)}
+                      data-testid="ai-doctor-sessions-index-next"
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </>
+              )}
             </>
           )}
         </CardContent>

@@ -172,11 +172,11 @@ export default function TentSensorWebhookSettingsCard({ tentId }: { tentId: stri
           generate a <strong>bridge token</strong> instead — it&apos;s scoped to this tent
           and revocable.
         </p>
-        <div className="mt-2">
+        <div className="mt-2 min-w-0">
           <Button
             size="sm"
             variant="ghost"
-            className="text-[11px] h-7 px-2"
+            className="h-auto min-h-11 min-w-0 w-full whitespace-normal px-2 text-[11px] sm:h-7 sm:min-h-7 sm:w-auto"
             disabled={!sessionToken}
             onClick={copyWithLiveToken}
             data-testid="tent-sensor-webhook-copy-curl-with-token"

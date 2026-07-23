@@ -87,7 +87,6 @@ const ACTION_TILES: Array<{
   label: string;
   icon: typeof Droplets;
 }> = [
-  { id: "water", label: "Water", icon: Droplets },
   { id: "feed", label: "Feed", icon: Leaf },
   { id: "defoliate", label: "Defoliate", icon: Scissors },
   { id: "note", label: "Note", icon: NotebookPen },
@@ -129,14 +128,16 @@ export function HyperLogModal({
   initialAction = null,
   strain,
 }: HyperLogModalProps) {
-  const [selected, setSelected] = useState<HyperLogAction | null>(initialAction);
+  const [selected, setSelected] = useState<HyperLogAction | null>(
+    initialAction === "water" ? null : initialAction,
+  );
   const [form, setForm] = useState<HyperLogDemoFormState>(EMPTY_FORM);
   const [photos, setPhotos] = useState<Array<{ id: string; url: string; name: string }>>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Sync initialAction when modal re-opens with a preselect.
   useEffect(() => {
-    if (open) setSelected(initialAction ?? null);
+    if (open) setSelected(initialAction === "water" ? null : (initialAction ?? null));
   }, [open, initialAction]);
 
   // Revoke any local object URLs on unmount.
@@ -630,7 +631,7 @@ function buildTimelinePreview(
   if (!action) {
     return {
       headline: "No entry yet",
-      summary: "Choose Water, Feed, Defoliate, or Note to see how this entry will appear in the plant memory timeline.",
+      summary: "Choose Feed, Defoliate, Note, or Env Check to see how this entry will appear in the plant memory timeline.",
       meta: null,
     };
   }

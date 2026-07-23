@@ -45,6 +45,17 @@ describe("public VPD acquisition surface", () => {
     expect(combined).toMatch(/does not issue device commands/i);
   });
 
+  it("uses one unit-change transaction for both fields and one visible-result invalidation", () => {
+    const handler = PAGE.match(
+      /function changeTemperatureUnit[\s\S]*?\r?\n\s{2}}\r?\n\r?\n\s{2}function reset/,
+    )?.[0];
+    expect(handler).toBeTruthy();
+    expect(handler).toContain("setTemperature(");
+    expect(handler).toContain("setLeafTemperature(");
+    expect(handler).toContain("setTemperatureUnit(nextUnit)");
+    expect(handler?.match(/invalidateVisibleResult\(\)/g)).toHaveLength(1);
+  });
+
   it("tracks signup and pricing interest through fixed, PII-free allowlists", () => {
     expect(ATTRIBUTION).toContain('source: "vpd_calculator"');
     expect(ATTRIBUTION).toContain('leadSource: "pricing_interest_vpd_calculator"');

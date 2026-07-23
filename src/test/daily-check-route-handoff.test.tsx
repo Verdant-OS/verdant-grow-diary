@@ -145,8 +145,8 @@ const mockPlants = [
   },
 ];
 const mockTents = [
-  { id: "t1", name: "Tent A" },
-  { id: "t2", name: "Tent B" },
+  { id: "t1", name: "Tent A", grow_id: "g1" },
+  { id: "t2", name: "Tent B", grow_id: "g2" },
 ];
 
 vi.mock("@/hooks/use-tents", () => ({
@@ -214,9 +214,7 @@ describe("DailyCheck route handoff", () => {
 
   it("valid plantId prefills QuickLog with that plant", async () => {
     renderRoute("/daily-check?plantId=p1");
-    expect(
-      screen.queryByTestId("daily-grow-check-plant-rejected"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("daily-grow-check-plant-rejected")).not.toBeInTheDocument();
     const ql = await screen.findByTestId("mock-quicklog");
     expect(ql.getAttribute("data-prefill-plant-id")).toBe("p1");
   });
@@ -224,9 +222,7 @@ describe("DailyCheck route handoff", () => {
   it("missing plantId renders the chooser with no rejection banner", () => {
     renderRoute("/daily-check");
     expect(screen.getByTestId("daily-grow-check-plant-select")).toBeInTheDocument();
-    expect(
-      screen.queryByTestId("daily-grow-check-plant-rejected"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("daily-grow-check-plant-rejected")).not.toBeInTheDocument();
   });
 
   it("invalid plantId shows a safe rejection banner and does not auto-pick another plant", () => {
@@ -253,10 +249,7 @@ describe("DailyCheck route handoff", () => {
 // ---------------------------------------------------------------------------
 describe("Daily Check CTA contract + safety", () => {
   const root = resolve(__dirname, "../..");
-  const rules = readFileSync(
-    resolve(root, "src/lib/dailyCheckPlantSelectionRules.ts"),
-    "utf8",
-  );
+  const rules = readFileSync(resolve(root, "src/lib/dailyCheckPlantSelectionRules.ts"), "utf8");
   const page = readFileSync(resolve(root, "src/pages/DailyCheck.tsx"), "utf8");
   const dashboardPanel = readFileSync(
     resolve(root, "src/components/DashboardDailyGrowCheckPanel.tsx"),
@@ -275,7 +268,6 @@ describe("Daily Check CTA contract + safety", () => {
     expect(dashboardRules).toMatch(/\/daily-check\?plantId=\$\{plant\.id\}/);
     expect(dashboardPanel).toMatch(/buildDailyCheckEntryHref/);
     expect(dashboardPanel).toMatch(/source:\s*"dashboard"/);
-
   });
 
   it("Plant Detail consistency card CTA still routes to /daily-check?plantId=<id>", () => {

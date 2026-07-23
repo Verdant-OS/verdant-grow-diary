@@ -255,7 +255,7 @@ describe("ordering and safety constraints at the seams", () => {
 
   it("legacy Quick Log tracks the grower's validated semantic UI selection", () => {
     const src = read("src/components/QuickLog.tsx");
-    const supportedGate = src.indexOf("if (!isSupportedLegacyEventType(eventType))");
+    const supportedGate = src.indexOf("if (!isSupportedLegacyEventType(effectiveEventType))");
     const save = src.indexOf("saveViaRpc(built.payload, { telemetryIntent: saveEventType })");
     expect(supportedGate).toBeGreaterThan(-1);
     expect(save).toBeGreaterThan(supportedGate);

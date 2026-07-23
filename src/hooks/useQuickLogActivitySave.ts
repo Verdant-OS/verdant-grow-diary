@@ -111,7 +111,7 @@ export function useQuickLogActivitySave() {
       setSaving(true);
       setError(null);
       try {
-        if (plan.saveRoute === "manual_note" || plan.saveRoute === "manual_water") {
+        if (plan.saveRoute === "manual_note") {
           // quicklog_save_manual is target-scoped (p_target_type/p_target_id)
           // and derives grow/tent/plant server-side from the owned target row
           // — mirroring useQuickLogV2Save + quickLogV2SavePayload. No deployed

@@ -42,9 +42,7 @@ export function useEcowittAuditRows(tentId: string | null | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("sensor_readings")
-        .select(
-          "id,tent_id,source,metric,value,quality,captured_at,ts,raw_payload",
-        )
+        .select("id,tent_id,source,metric,value,quality,captured_at,ts,raw_payload")
         .eq("tent_id", tentId!)
         .eq("source", "ecowitt")
         .order("captured_at", { ascending: false, nullsFirst: false })
@@ -59,9 +57,7 @@ export function useEcowittAuditRows(tentId: string | null | undefined) {
 export default function EcowittIngestAudit() {
   const { data: tents = [] } = useTents();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [userSelectedTentId, setUserSelectedTentId] = useState<string | null>(
-    null,
-  );
+  const [userSelectedTentId, setUserSelectedTentId] = useState<string | null>(null);
   const urlTentId = readEcowittAuditTentIdFromSearch(searchParams);
   const selection = useMemo(
     () =>
@@ -82,19 +78,14 @@ export default function EcowittIngestAudit() {
     if (!effectiveTentId) return;
     if (selection.invalidRequested) return;
     if (urlTentId === effectiveTentId) return;
-    setSearchParams(
-      (current) =>
-        applyEcowittAuditTentIdToSearch(current, effectiveTentId),
-      { replace: true },
-    );
+    setSearchParams((current) => applyEcowittAuditTentIdToSearch(current, effectiveTentId), {
+      replace: true,
+    });
   }, [effectiveTentId, urlTentId, selection.invalidRequested, setSearchParams]);
 
   const handleTentChange = (next: string | null) => {
     setUserSelectedTentId(next);
-    setSearchParams(
-      (current) => applyEcowittAuditTentIdToSearch(current, next),
-      { replace: true },
-    );
+    setSearchParams((current) => applyEcowittAuditTentIdToSearch(current, next), { replace: true });
   };
 
   const query = useEcowittAuditRows(effectiveTentId);
@@ -115,20 +106,13 @@ export default function EcowittIngestAudit() {
         .limit(50);
       if (error) throw error;
       return (data ?? [])
-        .filter(
-          (r) =>
-            typeof r.note === "string" &&
-            r.note.includes("EcoWitt Environment Check"),
-        )
+        .filter((r) => typeof r.note === "string" && r.note.includes("EcoWitt Environment Check"))
         .map((r) => r.occurred_at as string);
     },
   });
 
   const mergedLogged = useMemo(
-    () =>
-      Array.from(
-        new Set([...(loggedEventsQuery.data ?? []), ...loggedCapturedAts]),
-      ),
+    () => Array.from(new Set([...(loggedEventsQuery.data ?? []), ...loggedCapturedAts])),
     [loggedEventsQuery.data, loggedCapturedAts],
   );
 
@@ -141,9 +125,7 @@ export default function EcowittIngestAudit() {
     [query.data, effectiveTentId],
   );
 
-  const handleLogEnvironmentCheck = async (
-    draft: DiaryEnvironmentCheckDraft,
-  ) => {
+  const handleLogEnvironmentCheck = async (draft: DiaryEnvironmentCheckDraft) => {
     if (!draft.eligible || !draft.rpcPayload.p_target_id) return;
     if (mergedLogged.includes(draft.occurredAt)) return;
     setLoggedCapturedAts((prev) =>
@@ -151,17 +133,14 @@ export default function EcowittIngestAudit() {
     );
     const result = await saveQuickLog(draft.rpcPayload);
     if (!result.ok) {
-      setLoggedCapturedAts((prev) =>
-        prev.filter((x) => x !== draft.occurredAt),
-      );
+      setLoggedCapturedAts((prev) => prev.filter((x) => x !== draft.occurredAt));
       return;
     }
     void loggedEventsQuery.refetch();
   };
 
-
   return (
-    <main
+    <div
       className="mx-auto max-w-4xl space-y-4 p-4"
       aria-labelledby="ecowitt-audit-title"
       data-testid="ecowitt-audit-page"
@@ -186,9 +165,7 @@ export default function EcowittIngestAudit() {
           value={effectiveTentId ?? ""}
           onChange={(e) => handleTentChange(e.target.value || null)}
         >
-          {tents.length === 0 ? (
-            <option value="">No tents</option>
-          ) : null}
+          {tents.length === 0 ? <option value="">No tents</option> : null}
           {(tents as Array<{ id: string; name?: string | null }>).map((t) => (
             <option key={t.id} value={t.id}>
               {t.name ?? t.id}
@@ -207,7 +184,6 @@ export default function EcowittIngestAudit() {
         </p>
       ) : null}
 
-
       <EcowittIngestValidationPanel
         input={{
           rows: query.data ?? [],
@@ -223,7 +199,6 @@ export default function EcowittIngestAudit() {
         isLogging={isLogging}
       />
 
-
       {query.isLoading ? (
         <p
           data-testid="ecowitt-audit-loading"
@@ -235,20 +210,13 @@ export default function EcowittIngestAudit() {
       ) : null}
 
       {query.isError ? (
-        <p
-          data-testid="ecowitt-audit-error"
-          role="alert"
-          className="text-sm text-destructive"
-        >
+        <p data-testid="ecowitt-audit-error" role="alert" className="text-sm text-destructive">
           Couldn’t load EcoWitt ingest records. Check your connection and try again.
         </p>
       ) : null}
 
       {!query.isLoading && !query.isError && !vm.hasRows ? (
-        <p
-          data-testid="ecowitt-audit-empty"
-          className="text-sm text-muted-foreground"
-        >
+        <p data-testid="ecowitt-audit-empty" className="text-sm text-muted-foreground">
           {effectiveTentId
             ? ECOWITT_AUDIT_EMPTY_FOR_TENT_COPY
             : (vm.emptyStateMessage ?? ECOWITT_AUDIT_EMPTY_MESSAGE)}
@@ -256,10 +224,7 @@ export default function EcowittIngestAudit() {
       ) : null}
 
       {vm.hasRows ? (
-        <ul
-          data-testid="ecowitt-audit-list"
-          className="space-y-2"
-        >
+        <ul data-testid="ecowitt-audit-list" className="space-y-2">
           {vm.rows.map((row) => (
             <li
               key={row.id}
@@ -305,6 +270,6 @@ export default function EcowittIngestAudit() {
           ))}
         </ul>
       ) : null}
-    </main>
+    </div>
   );
 }

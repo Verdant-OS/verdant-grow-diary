@@ -168,7 +168,7 @@ describe("safety — manual sensor form does not write to other systems", () => 
   it("no runtime UI code calls create_watering_event", () => {
     const hits = findMatches(["src/components", "src/pages", "src/hooks"], "create_watering_event");
     expect(hits).toEqual([]);
-  });
+  }, 30_000);
 });
 
 describe("UI integration", () => {

@@ -12,8 +12,8 @@
  * src/constants/*.
  *
  * Safety fences:
- *   - Harvest is enabled and persists through the canonical event route;
- *     its copy does not claim readiness or final yield.
+ *   - Harvest is stage-gated in the picker and re-checked immediately
+ *     before save. Missing, stale, or ineligible context never reaches RPC.
  *   - Manual sensor snapshot is intentionally deferred to the existing
  *     ManualSensorReadingCard path — this section shows the shared
  *     safety copy and links out; it does NOT persist a reading itself.
@@ -23,7 +23,7 @@
  *   - No recommendation, no health inference, no "safe to feed / train
  *     / defoliate", no harvest readiness, no diagnosis language.
  */
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,7 +32,6 @@ import QuickLogActivityPicker from "@/components/QuickLogActivityPicker";
 import { useQuickLogActivitySave } from "@/hooks/useQuickLogActivitySave";
 import {
   QUICK_LOG_ACTIVITY_DEFINITIONS,
-  QUICK_LOG_HARVEST_DISABLED_REASON,
   QUICK_LOG_WEIGHT_UNITS,
   type QuickLogActivityDefinition,
   type QuickLogActivityId,
@@ -44,11 +43,26 @@ import {
   type DailyCheckSavedItem,
   type DailyCheckSavedSource,
 } from "@/lib/dailyCheckPostSubmitRules";
+import {
+  bindQuickLogActivityDraft,
+  buildQuickLogTargetIdentity,
+  buildQuickLogTargetKey,
+  evaluateQuickLogActivityAvailability,
+  evaluateQuickLogPrePersistenceGate,
+  QUICK_LOG_HARVEST_STAGE_DISABLED_REASON,
+  type QuickLogActivityDraftBinding,
+} from "@/lib/quickLogActivityRules";
+import {
+  QUICK_LOG_V2_OPEN_EVENT,
+  buildQuickLogV2OpenIntent,
+} from "@/lib/quickLogV2OpenIntent";
 
 export interface QuickLogAllActivitiesSectionProps {
   growId: string | null | undefined;
   tentId?: string | null;
   plantId?: string | null;
+  /** Current selected-plant stage. Harvest fails closed when this is missing. */
+  plantStage?: unknown;
   /** Optional heading override for the section. */
   heading?: string;
   /** Optional testid prefix. Defaults to "quick-log-all-activities". */
@@ -61,6 +75,10 @@ export interface QuickLogAllActivitiesSectionProps {
   saveBlocked?: boolean;
   /** Reads the same parent-owned synchronous guard used to acquire a save. */
   isSaveBlocked?: () => boolean;
+  /** Parent-owned close/reset seam used before handing Water to Quick Log v2. */
+  onBeforeStructuredWaterOpen?: () => void;
+  /** Caller-owned fail-closed reason that must prevent every persistence path. */
+  externalPersistenceBlockReason?: string | null;
 }
 
 export interface QuickLogAllActivitiesSaveTarget {
@@ -116,14 +134,30 @@ export default function QuickLogAllActivitiesSection({
   growId,
   tentId = null,
   plantId = null,
+  plantStage = null,
   heading = "All quick actions",
   testIdPrefix = "quick-log-all-activities",
   onSaveStart,
   onSaveEnd,
   saveBlocked = false,
   isSaveBlocked,
+  onBeforeStructuredWaterOpen,
+  externalPersistenceBlockReason = null,
 }: QuickLogAllActivitiesSectionProps) {
-  const [selected, setSelected] = useState<QuickLogActivityDefinition | null>(null);
+  const currentTarget = useMemo(
+    () => buildQuickLogTargetIdentity({ growId, tentId, plantId }),
+    [growId, plantId, tentId],
+  );
+  const currentTargetKey = useMemo(
+    () => buildQuickLogTargetKey(currentTarget),
+    [currentTarget],
+  );
+  const previousTargetKeyRef = useRef(currentTargetKey);
+  const [selectedDraft, setSelectedDraft] =
+    useState<QuickLogActivityDraftBinding | null>(null);
+  const selected = selectedDraft
+    ? QUICK_LOG_ACTIVITY_DEFINITIONS[selectedDraft.activityId]
+    : null;
   const [note, setNote] = useState("");
   const [harvestWet, setHarvestWet] = useState("");
   const [harvestDry, setHarvestDry] = useState("");
@@ -131,14 +165,46 @@ export default function QuickLogAllActivitiesSection({
   const [saved, setSaved] = useState<SavedRecord[]>([]);
   const [errorReason, setErrorReason] = useState<string | null>(null);
   const [errorForActivity, setErrorForActivity] = useState<QuickLogActivityId | null>(null);
+  const [structuredWaterError, setStructuredWaterError] = useState<string | null>(null);
   const { save, saving } = useQuickLogActivitySave();
   const localSaveInFlightRef = useRef(false);
 
+  useEffect(() => {
+    if (previousTargetKeyRef.current === currentTargetKey) return;
+    previousTargetKeyRef.current = currentTargetKey;
+
+    // Drafts and receipts are target-specific. Never carry plant A's state
+    // into plant B's Quick Log surface.
+    setSelectedDraft(null);
+    setNote("");
+    setHarvestWet("");
+    setHarvestDry("");
+    setHarvestUnit("g");
+    setErrorReason(null);
+    setErrorForActivity(null);
+    setStructuredWaterError(null);
+    setSaved([]);
+  }, [currentTargetKey]);
+
   const canPersistManualSensor = false; // Deferred to ManualSensorReadingCard.
 
-  const harvestWetValidation = useMemo(() => validateHarvestWeightInput(harvestWet), [harvestWet]);
-  const harvestDryValidation = useMemo(() => validateHarvestWeightInput(harvestDry), [harvestDry]);
-  const harvestWeightsInvalid = !harvestWetValidation.ok || !harvestDryValidation.ok;
+  const harvestWetValidation = useMemo(
+    () => validateHarvestWeightInput(harvestWet),
+    [harvestWet],
+  );
+  const harvestDryValidation = useMemo(
+    () => validateHarvestWeightInput(harvestDry),
+    [harvestDry],
+  );
+  const harvestWeightsInvalid =
+    !harvestWetValidation.ok || !harvestDryValidation.ok;
+  const selectedAvailability = useMemo(
+    () =>
+      selected
+        ? evaluateQuickLogActivityAvailability(selected.id, plantStage)
+        : null,
+    [plantStage, selected],
+  );
 
   const requiresNote = useMemo(() => {
     if (!selected) return false;
@@ -164,26 +230,70 @@ export default function QuickLogAllActivitiesSection({
       if (isMutationBlocked()) return;
       setErrorReason(null);
       setErrorForActivity(null);
-      setSelected(a);
+      setStructuredWaterError(null);
+      if (a.id === "watering") {
+        if (externalPersistenceBlockReason) {
+          setStructuredWaterError(externalPersistenceBlockReason);
+          return;
+        }
+        if (!growId) {
+          setStructuredWaterError("Missing grow context. Nothing opened.");
+          return;
+        }
+        const intent = buildQuickLogV2OpenIntent({ plantId, tentId, action: "water" });
+        if (!intent || typeof window === "undefined") {
+          setStructuredWaterError("Choose a plant or tent before logging Water.");
+          return;
+        }
+        onBeforeStructuredWaterOpen?.();
+        window.dispatchEvent(new CustomEvent(QUICK_LOG_V2_OPEN_EVENT, { detail: intent }));
+        return;
+      }
+      setSelectedDraft(bindQuickLogActivityDraft(a.id, currentTarget));
       setNote("");
       setHarvestWet("");
       setHarvestDry("");
       setHarvestUnit("g");
     },
-    [isMutationBlocked],
+    [
+      currentTarget,
+      externalPersistenceBlockReason,
+      growId,
+      isMutationBlocked,
+      onBeforeStructuredWaterOpen,
+      plantId,
+      tentId,
+    ],
   );
 
   const handleSave = useCallback(async () => {
     if (isMutationBlocked()) return;
-    if (!selected) return;
-    if (!growId) {
-      setErrorReason("Missing grow context. Nothing saved.");
+    if (externalPersistenceBlockReason) {
+      setErrorReason(externalPersistenceBlockReason);
+      setErrorForActivity(selected?.id ?? null);
+      return;
+    }
+    if (!selected || !selectedDraft) return;
+    // Re-evaluate against CURRENT context immediately before persistence.
+    // This is independent of the picker/reset effect so a stale selection
+    // cannot write after the grow, tent, plant, or stage changes.
+    const persistenceGate = evaluateQuickLogPrePersistenceGate({
+      activityId: selected.id,
+      currentPlantStage: plantStage,
+      selectedTarget: selectedDraft.target,
+      currentTarget,
+    });
+    if (!persistenceGate.allowed) {
+      setErrorReason(
+        persistenceGate.blockedReason ??
+          selected.disabledReason ??
+          "This activity is not available.",
+      );
       setErrorForActivity(selected.id);
       return;
     }
-    // Disabled activities must never reach RPC.
-    if (!selected.enabled) {
-      setErrorReason(selected.disabledReason ?? QUICK_LOG_HARVEST_DISABLED_REASON);
+    if (!growId) {
+      setErrorReason("Missing grow context. Nothing saved.");
       setErrorForActivity(selected.id);
       return;
     }
@@ -292,7 +402,7 @@ export default function QuickLogAllActivitiesSection({
       setHarvestWet("");
       setHarvestDry("");
       setHarvestUnit("g");
-      setSelected(null);
+      setSelectedDraft(null);
       setErrorReason(null);
       setErrorForActivity(null);
     } finally {
@@ -301,9 +411,12 @@ export default function QuickLogAllActivitiesSection({
     }
   }, [
     selected,
+    selectedDraft,
+    currentTarget,
     growId,
     tentId,
     plantId,
+    plantStage,
     note,
     requiresNote,
     save,
@@ -317,6 +430,7 @@ export default function QuickLogAllActivitiesSection({
     onSaveStart,
     onSaveEnd,
     isMutationBlocked,
+    externalPersistenceBlockReason,
   ]);
 
   const noContext = !growId;
@@ -347,12 +461,34 @@ export default function QuickLogAllActivitiesSection({
         </p>
       )}
 
+      {externalPersistenceBlockReason && (
+        <p
+          role="status"
+          aria-live="polite"
+          className="rounded-lg border border-border/60 bg-secondary/30 p-2.5 text-xs text-muted-foreground"
+          data-testid={`${testIdPrefix}-persistence-block`}
+        >
+          {externalPersistenceBlockReason}
+        </p>
+      )}
+
       <QuickLogActivityPicker
         onSelect={handleSelect}
         disabled={mutationBlocked}
         selectedId={selected?.id ?? null}
+        plantStage={plantStage}
         testIdPrefix={`${testIdPrefix}-picker`}
       />
+
+      {structuredWaterError && (
+        <p
+          role="alert"
+          className="text-xs text-destructive"
+          data-testid={`${testIdPrefix}-structured-water-error`}
+        >
+          {structuredWaterError}
+        </p>
+      )}
 
       {selected && selected.enabled && (
         <div
@@ -364,6 +500,17 @@ export default function QuickLogAllActivitiesSection({
             <p className="text-xs font-medium">{selected.label}</p>
             <p className="text-[11px] text-muted-foreground">{selected.safetyNote}</p>
           </div>
+
+          {selected.id === "harvest" && selectedAvailability?.disabled && (
+            <p
+              role="note"
+              className="text-xs text-muted-foreground"
+              data-testid={`${testIdPrefix}-harvest-stage-blocked`}
+            >
+              {selectedAvailability.disabledReason ??
+                QUICK_LOG_HARVEST_STAGE_DISABLED_REASON}
+            </p>
+          )}
 
           {selected.id === "manual_sensor_snapshot" ? (
             <p
@@ -518,7 +665,9 @@ export default function QuickLogAllActivitiesSection({
               onClick={handleSave}
               disabled={
                 mutationBlocked ||
+                !!externalPersistenceBlockReason ||
                 noContext ||
+                selectedAvailability?.disabled ||
                 selected.id === "manual_sensor_snapshot" ||
                 (requiresNote && note.trim().length === 0) ||
                 (selected.id === "harvest" && harvestWeightsInvalid)
@@ -533,7 +682,7 @@ export default function QuickLogAllActivitiesSection({
               variant="ghost"
               onClick={() => {
                 if (isMutationBlocked()) return;
-                setSelected(null);
+                setSelectedDraft(null);
                 setNote("");
                 setErrorReason(null);
                 setErrorForActivity(null);

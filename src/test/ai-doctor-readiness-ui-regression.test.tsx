@@ -380,7 +380,6 @@ const QUICK_ACTION_DETAIL_BANNED_KEYS = [
   "command",
   "execute",
   "automation",
-  "action",
   "action_queue",
   "insert",
   "update",
@@ -396,7 +395,7 @@ const QUICK_ACTION_DETAIL_BANNED_KEYS = [
 ] as const;
 
 describe("AI Doctor Readiness UI — quick-action safety (mount)", () => {
-  it("dispatches verdant:open-quicklog CustomEvent with safe identifiers only on Add Watering", () => {
+  it("dispatches the closed typed V2 Water intent with exact plant target on Add Watering", () => {
     recentActivityState = { data: [], isLoading: false };
     manualLogsState = { data: [], isLoading: false };
 
@@ -410,7 +409,7 @@ describe("AI Doctor Readiness UI — quick-action safety (mount)", () => {
     const handler = (e: Event) => {
       events.push(e as CustomEvent);
     };
-    window.addEventListener(PLANT_QUICKLOG_PREFILL_EVENT, handler);
+    window.addEventListener("verdant:open-quicklog-v2", handler);
 
     try {
       render(
@@ -428,7 +427,7 @@ describe("AI Doctor Readiness UI — quick-action safety (mount)", () => {
       expect(button.disabled).toBe(false);
       fireEvent.click(button);
     } finally {
-      window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, handler);
+      window.removeEventListener("verdant:open-quicklog-v2", handler);
       localStorageSetSpy.mockRestore();
       sessionStorageSetSpy.mockRestore();
     }
@@ -436,12 +435,12 @@ describe("AI Doctor Readiness UI — quick-action safety (mount)", () => {
     expect(events).toHaveLength(1);
     const evt = events[0];
     expect(evt).toBeInstanceOf(CustomEvent);
-    expect(evt.type).toBe("verdant:open-quicklog");
+    expect(evt.type).toBe("verdant:open-quicklog-v2");
 
     const detail = (evt.detail ?? {}) as Record<string, unknown>;
     const detailKeys = Object.keys(detail).sort();
-    expect(detailKeys).toEqual(["growId", "plantId", "tentId"]);
-    expect(detail).toEqual({ plantId: "p1", growId: "g1", tentId: "t1" });
+    expect(detailKeys).toEqual(["action", "targetKey"]);
+    expect(detail).toEqual({ targetKey: "plant:p1", action: "water" });
 
     // No banned write/command/device tokens anywhere in the payload keys
     // or stringified values.

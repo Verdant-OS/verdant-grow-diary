@@ -19,10 +19,6 @@ const SEED_CSV = join(ART, "seed-production-tracking-v1.3-template.csv");
 const REVIEW_CSV = join(ART, "commercial-release-review-traceability-v1.3-template.csv");
 const CONTRACTS_MD = join(ART, "release-workbook-formula-contracts.md");
 
-function readWorkbook(path: string): XLSX.WorkBook {
-  return XLSX.read(readFileSync(path));
-}
-
 beforeAll(() => {
   if (!existsSync(SEED_XLSX) || !existsSync(REVIEW_XLSX) || !existsSync(CONTRACTS_MD)) {
     execSync("node scripts/generate-release-workbook-templates.mjs", { stdio: "inherit" });
@@ -33,6 +29,12 @@ function cell(ws: XLSX.WorkSheet, addr: string): string {
   const c = ws[addr];
   if (!c) return "";
   return c.f ? `=${c.f}` : String(c.v ?? "");
+}
+
+function readWorkbook(path: string): XLSX.WorkBook {
+  // xlsx 0.20.x ESM does not auto-bind node:fs under Vitest, so its
+  // path-based readFile() reports a tracked workbook as inaccessible.
+  return XLSX.read(readFileSync(path));
 }
 
 function expectFormulaCell(

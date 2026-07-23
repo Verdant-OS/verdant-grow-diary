@@ -6,6 +6,11 @@ on:
       - tmp/pr433-localstorage-diagnostics
     paths:
       - .github/workflows/pr433-localstorage-diagnostics.yml
+  pull_request:
+    branches:
+      - verdant-grow-diary
+    paths:
+      - .github/workflows/pr433-localstorage-diagnostics.yml
 
 permissions:
   contents: read

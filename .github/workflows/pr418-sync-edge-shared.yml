@@ -60,7 +60,7 @@ jobs:
 
           if ! git diff --quiet -- supabase/functions; then
             git add supabase/functions
-            git commit -m "chore(edge): sync generated shared mirror"
+            HUSKY=0 git -c core.hooksPath=/dev/null commit -m "chore(edge): sync generated shared mirror"
           fi
 
           git push origin HEAD:feature/strain-reference-library-v1

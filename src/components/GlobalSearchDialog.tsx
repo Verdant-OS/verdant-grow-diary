@@ -14,7 +14,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Command as CommandPrimitive } from "cmdk";
-import { AlertTriangle, Dna, Leaf, RefreshCw, Sprout, Tent } from "lucide-react";
+import { AlertTriangle, Clock, Dna, Leaf, RefreshCw, Sprout, Tent } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import {
@@ -32,6 +32,11 @@ import {
 } from "@/hooks/useGlobalSearch";
 import { growDetailPath, plantDetailPath, tentDetailPath } from "@/lib/routes";
 import { highlightMatch } from "@/lib/highlightMatch";
+import {
+  clearRecentSearches,
+  pushRecentSearch,
+  readRecentSearches,
+} from "@/lib/recentGlobalSearches";
 
 interface Props {
   open: boolean;
@@ -69,10 +74,15 @@ function routeFor(row: GlobalSearchResult): string {
 export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
+  const [recent, setRecent] = useState<string[]>([]);
   const { results, isLoading, isError, retry } = useGlobalSearch(query);
 
   useEffect(() => {
-    if (!open) setQuery("");
+    if (open) {
+      setRecent(readRecentSearches());
+    } else {
+      setQuery("");
+    }
   }, [open]);
 
   const grouped = useMemo(() => {
@@ -93,6 +103,19 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
   const hasQuery = trimmed.length > 0;
   const hasAny = results.length > 0;
 
+  const handleSelectResult = (row: GlobalSearchResult) => {
+    if (trimmed) {
+      setRecent(pushRecentSearch(trimmed));
+    }
+    onOpenChange(false);
+    navigate(routeFor(row));
+  };
+
+  const handleClearRecent = () => {
+    clearRecentSearches();
+    setRecent([]);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="overflow-hidden p-0 shadow-lg">
@@ -108,9 +131,45 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
           />
           <CommandList>
             {!hasQuery ? (
-              <div className="py-6 text-center text-sm text-muted-foreground">
-                Type to search your grows, tents, plants, and cultivars.
-              </div>
+              recent.length > 0 ? (
+                <CommandGroup
+                  heading="Recent searches"
+                  data-testid="global-search-recent"
+                >
+                  {recent.map((term) => (
+                    <CommandItem
+                      key={`recent:${term}`}
+                      value={`recent:${term}`}
+                      onSelect={() => setQuery(term)}
+                      data-testid={`global-search-recent-item-${term}`}
+                    >
+                      <Clock
+                        className="mr-2 h-4 w-4 shrink-0 text-muted-foreground"
+                        aria-hidden="true"
+                      />
+                      <span className="truncate text-sm text-foreground">
+                        {term}
+                      </span>
+                    </CommandItem>
+                  ))}
+                  <div className="flex justify-end px-1 pt-1">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={handleClearRecent}
+                      data-testid="global-search-recent-clear"
+                      className="h-7 text-xs text-muted-foreground"
+                    >
+                      Clear recent
+                    </Button>
+                  </div>
+                </CommandGroup>
+              ) : (
+                <div className="py-6 text-center text-sm text-muted-foreground">
+                  Type to search your grows, tents, plants, and cultivars.
+                </div>
+              )
             ) : isLoading ? (
               <div
                 className="py-6 text-center text-sm text-muted-foreground"
@@ -161,10 +220,7 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
                         <CommandItem
                           key={`${type}:${row.id}`}
                           value={`${type}:${row.id}`}
-                          onSelect={() => {
-                            onOpenChange(false);
-                            navigate(routeFor(row));
-                          }}
+                          onSelect={() => handleSelectResult(row)}
                           data-testid={`global-search-item-${type}-${row.id}`}
                         >
                           <Icon

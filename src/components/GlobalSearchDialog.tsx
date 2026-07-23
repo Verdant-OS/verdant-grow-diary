@@ -158,8 +158,9 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
     [filteredResults, visibleCount],
   );
 
-  // Keep the preview panel in sync: default to the first visible result, and
-  // clear it whenever nothing is visible (loading / empty / filtered-empty).
+  // Keep the preview panel in sync: prefer the last-selected row (if still
+  // visible), otherwise keep the current selection, otherwise fall back to the
+  // first visible result. Clear when nothing is visible.
   useEffect(() => {
     if (visibleResults.length === 0) {
       setPreviewRow(null);
@@ -169,9 +170,26 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
       if (prev && visibleResults.some((r) => r.id === prev.id && r.entity_type === prev.entity_type)) {
         return prev;
       }
+      if (lastSelected) {
+        const restored = visibleResults.find(
+          (r) => r.id === lastSelected.id && r.entity_type === lastSelected.entity_type,
+        );
+        if (restored) return restored;
+      }
       return visibleResults[0];
     });
-  }, [visibleResults]);
+  }, [visibleResults, lastSelected]);
+
+  // Persist the row the user is previewing so reopening the palette restores
+  // it. Only writes when the preview is a real row the user is actively
+  // considering — never overwrites with null on unmount.
+  useEffect(() => {
+    if (!previewRow) return;
+    const entry = { entity_type: previewRow.entity_type, id: previewRow.id };
+    writeGlobalSearchLastSelected(entry);
+    setLastSelected({ ...entry, ts: Date.now() });
+  }, [previewRow]);
+
 
 
   const grouped = useMemo(() => {

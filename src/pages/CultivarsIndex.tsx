@@ -143,6 +143,7 @@ export default function CultivarsIndex() {
         </div>
       </section>
 
+      <section className="mx-auto max-w-6xl px-4 pb-16 sm:px-6">
         <div className="mb-4">
           <button
             type="button"

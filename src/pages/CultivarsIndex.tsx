@@ -4,9 +4,11 @@
  * Mobile-first presenter. Search/filter rules are pure and shared; cards render
  * labeled sample/reference data only. No private grow reads or writes.
  */
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { Search } from "lucide-react";
 import BrandLogo from "@/components/BrandLogo";
+import GlobalSearchDialog from "@/components/GlobalSearchDialog";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import {
   VERDANT_CULTIVARS,

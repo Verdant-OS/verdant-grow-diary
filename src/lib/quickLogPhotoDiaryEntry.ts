@@ -28,6 +28,12 @@ export interface QuickLogPhotoDiaryEntryInput {
   noteRaw: string;
   /** The Quick Log action the photo was attached to (e.g. "water"). */
   action: string;
+  /**
+   * Optional sanitized structured detail (e.g. photo subject/caption from the
+   * Quick Log activity spec). Merged into details; the fixed identity keys
+   * (event_type/source/attached_to_action) always win.
+   */
+  extraDetails?: Readonly<Record<string, string>> | null;
   /** Injectable clock for deterministic tests. Defaults to `new Date()`. */
   now?: () => Date;
 }
@@ -43,7 +49,7 @@ export interface QuickLogPhotoDiaryEntryRow {
     event_type: "quicklog_photo_attachment";
     source: "manual";
     attached_to_action: string;
-  };
+  } & Record<string, string>;
 }
 
 export const QUICK_LOG_PHOTO_DIARY_DEFAULT_NOTE =
@@ -67,6 +73,9 @@ export function buildQuickLogPhotoDiaryEntryRow(
     photo_url: input.photoPath,
     entry_at: now.toISOString(),
     details: {
+      // Caller-supplied structured detail first; fixed identity keys win so
+      // no extraDetails key can spoof the attachment envelope.
+      ...(input.extraDetails ?? {}),
       event_type: "quicklog_photo_attachment",
       source: "manual",
       attached_to_action: input.action,

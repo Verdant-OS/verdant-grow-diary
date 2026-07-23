@@ -16,6 +16,17 @@
  *  - describeQuickLogActivityDetails() reads the stored details back into ordered
  *    label/value display lines for the timeline + recent-activity surfaces.
  *
+ * Canonical-contract conformance (Codex review, PR #441):
+ *  - Training/defoliation VALUE CODES come from the canonical vocabulary in
+ *    quickLogTypedEventPayloadRules.ts (TRAINING_TECHNIQUES / TRAINING_INTENSITIES)
+ *    so the typed adapter accepts them and diaryCalendarViewModel labels them.
+ *    Codes are load-bearing; labels here are grower-facing only.
+ *  - Environment-check manual readings persist inside the canonical NESTED
+ *    envelope `details.environment_check = { temp_c, humidity_pct }` (numbers),
+ *    which environmentCheckInsightsViewModel / environmentCheckTimelineViewModel
+ *    read via pickEnvelope(). temp is CELSIUS → `temp_c`; never `room_temp_f`
+ *    (that key is Fahrenheit — mis-mapping silently corrupts to ~-4 °C).
+ *
  * Doctrine (see project knowledge):
  *  - Every field records what the GROWER DID or OBSERVED. Never a diagnosis,
  *    never a recommendation, never a claim about plant health or outcome.
@@ -46,7 +57,7 @@ export interface QuickLogDetailSelectOption {
 export type QuickLogDetailFieldKind = "select" | "text" | "number";
 
 export interface QuickLogDetailFieldSpec {
-  /** Stored key under details.<key>. Never a reserved identity key. */
+  /** Stored key under details.<key> (or under details.<envelope>.<key>). */
   readonly key: string;
   /** Grower-facing label (menus, form, timeline). */
   readonly label: string;
@@ -56,24 +67,46 @@ export interface QuickLogDetailFieldSpec {
   /** Placeholder for `text` / `number` fields. */
   readonly placeholder?: string;
   /**
-   * Inclusive plausibility bounds for `number` fields. A value outside the band
-   * is dropped (fail-closed) rather than stored — keeps a fat-fingered reading
-   * out of the permanent log. The grower's exact entry is preserved as a string.
+   * Inclusive plausibility bounds for `number` fields. The UI blocks the save
+   * with an inline error when a value is out of band (see
+   * validateQuickLogDetailNumberInput); sanitize keeps the same band as a
+   * defensive floor so an out-of-band value can never be persisted.
    */
   readonly min?: number;
   readonly max?: number;
   /** Display unit for `number` fields (e.g. "°C", "%"). Display-only. */
   readonly unit?: string;
+  /**
+   * When set, the value is stored NESTED at details.<envelope>.<key> as a
+   * NUMBER — used to conform to an existing canonical envelope contract
+   * (e.g. details.environment_check.temp_c) instead of inventing flat keys.
+   */
+  readonly envelope?: string;
 }
 
 /**
+ * Fixed details an activity always persists alongside grower-chosen fields.
+ * Defoliation must carry technique="defoliation" so the canonical typed
+ * training adapter (which requires an explicit `technique`) accepts it — the
+ * details.subtype fence alone is only read by the calendar presenter.
+ */
+export const QUICK_LOG_ACTIVITY_FIXED_DETAILS: Partial<
+  Record<QuickLogActivityId, Readonly<Record<string, string>>>
+> = Object.freeze({
+  defoliation: Object.freeze({ technique: "defoliation" }),
+});
+
+/**
  * Ordered detail fields per activity. Only activities that gain structured
- * detail appear here; the rest keep their existing note-only capture until
- * their own slice lands (built one by one).
+ * detail appear here; the rest keep their existing note-only capture.
  */
 export const QUICK_LOG_ACTIVITY_DETAIL_FIELDS: Partial<
   Record<QuickLogActivityId, readonly QuickLogDetailFieldSpec[]>
 > = Object.freeze({
+  // Value codes are the canonical TRAINING_TECHNIQUES subset (excluding
+  // "defoliation", which is its own activity). Adding a non-canonical code here
+  // would be rejected by the typed adapter as technique:invalid and silently
+  // unlabeled on the diary calendar.
   training: [
     {
       key: "technique",
@@ -83,26 +116,24 @@ export const QUICK_LOG_ACTIVITY_DETAIL_FIELDS: Partial<
         { value: "lst", label: "Low-stress training (LST)" },
         { value: "topping", label: "Topping" },
         { value: "fim", label: "FIMing" },
-        { value: "supercrop", label: "Super cropping" },
-        { value: "lollipop", label: "Lollipopping" },
-        { value: "mainline", label: "Mainlining / manifold" },
+        { value: "supercropping", label: "Super cropping" },
+        { value: "manifold", label: "Mainlining / manifold" },
         { value: "scrog", label: "SCROG net" },
-        { value: "staking", label: "Staking / trellis" },
-        { value: "transplant", label: "Transplant" },
         { value: "other", label: "Other" },
       ],
     },
   ],
   // Records what the grower removed — a description of the action, not a claim
-  // about recovery, stress, or plant health.
+  // about recovery, stress, or plant health. Key `intensity` + values
+  // light/medium/heavy are the canonical TRAINING_INTENSITIES contract.
   defoliation: [
     {
-      key: "amount",
+      key: "intensity",
       label: "Amount removed",
       kind: "select",
       options: [
         { value: "light", label: "Light" },
-        { value: "moderate", label: "Moderate" },
+        { value: "medium", label: "Medium" },
         { value: "heavy", label: "Heavy" },
       ],
     },
@@ -197,9 +228,10 @@ export const QUICK_LOG_ACTIVITY_DETAIL_FIELDS: Partial<
   ],
   // CARDINAL doctrine: stays a MANUAL observation, distinct from live sensor
   // data. The qualitative check is primary; the optional temp/RH are explicitly
-  // labeled "manual" and validated to plausible bands. These are logged as
-  // event metadata only — they do NOT flow into the sensor_readings pipeline or
-  // VPD surfaces (that is the Manual Sensor Snapshot path).
+  // labeled "manual", plausibility-bounded, and persisted inside the canonical
+  // details.environment_check envelope (as numbers) so the Diary Calendar
+  // insights/timeline read them. They do NOT flow into the sensor_readings
+  // pipeline or VPD surfaces (that is the Manual Sensor Snapshot path).
   environment_check: [
     {
       key: "checkType",
@@ -216,22 +248,24 @@ export const QUICK_LOG_ACTIVITY_DETAIL_FIELDS: Partial<
       ],
     },
     {
-      key: "manualTempC",
+      key: "temp_c",
       label: "Temperature (manual)",
       kind: "number",
       min: -10,
       max: 60,
       unit: "°C",
       placeholder: "e.g. 24",
+      envelope: "environment_check",
     },
     {
-      key: "manualHumidityPct",
+      key: "humidity_pct",
       label: "Humidity (manual)",
       kind: "number",
       min: 0,
       max: 100,
       unit: "%",
       placeholder: "e.g. 55",
+      envelope: "environment_check",
     },
   ],
 });
@@ -242,29 +276,90 @@ export function getQuickLogActivityDetailFields(
   return QUICK_LOG_ACTIVITY_DETAIL_FIELDS[activityId] ?? [];
 }
 
+/**
+ * Every TOP-LEVEL details key this module can produce: flat field keys,
+ * envelope parent keys, fixed-detail keys, plus the save hook's `subtype`
+ * fence. Read surfaces (e.g. the Timeline generic chip loop) use this to keep
+ * structured keys out of raw `key: value` rendering — including keys whose
+ * VALUE fails validation and therefore produces no labeled display line.
+ */
+export const QUICK_LOG_DETAIL_FIELD_KEYS: ReadonlySet<string> = new Set([
+  ...Object.values(QUICK_LOG_ACTIVITY_DETAIL_FIELDS).flatMap((specs) =>
+    (specs ?? []).map((s) => s.envelope ?? s.key),
+  ),
+  ...Object.values(QUICK_LOG_ACTIVITY_FIXED_DETAILS).flatMap((fixed) =>
+    Object.keys(fixed ?? {}),
+  ),
+  // Written by useQuickLogActivitySave's metadata fence (e.g. "defoliation",
+  // "issue"); machine routing data, never useful as a raw chip.
+  "subtype",
+]);
+
 function optionLabel(spec: QuickLogDetailFieldSpec, value: string): string | null {
   const match = spec.options?.find((o) => o.value === value);
   return match ? match.label : null;
 }
 
+export interface QuickLogDetailNumberValidation {
+  ok: boolean;
+  error: string | null;
+}
+
+export function quickLogDetailNumberRangeError(spec: QuickLogDetailFieldSpec): string {
+  const unit = spec.unit ? ` ${spec.unit}` : "";
+  return `Enter a value between ${spec.min} and ${spec.max}${unit}.`;
+}
+
+/**
+ * Blocking UI validation for `number` detail fields — magnitude only, matching
+ * the canonical env-check gate (validateEnvironmentCheckSensorBand): blank and
+ * non-numeric mean "not provided" and pass (the sanitizer floor drops them);
+ * a real number outside [min, max] must BLOCK the save with an inline error so
+ * the grower's entry is never silently discarded.
+ */
+export function validateQuickLogDetailNumberInput(
+  spec: QuickLogDetailFieldSpec,
+  raw: string | null | undefined,
+): QuickLogDetailNumberValidation {
+  if (spec.kind !== "number") return { ok: true, error: null };
+  if (raw == null) return { ok: true, error: null };
+  const trimmed = String(raw).trim();
+  if (trimmed === "") return { ok: true, error: null };
+  const n = Number(trimmed);
+  if (!Number.isFinite(n)) return { ok: true, error: null };
+  if (typeof spec.min === "number" && n < spec.min) {
+    return { ok: false, error: quickLogDetailNumberRangeError(spec) };
+  }
+  if (typeof spec.max === "number" && n > spec.max) {
+    return { ok: false, error: quickLogDetailNumberRangeError(spec) };
+  }
+  return { ok: true, error: null };
+}
+
 /**
  * Turn raw form values into a sanitized, doctrine-safe details object suitable
  * for extraDetails. Drops unknown keys, reserved identity keys, blank values,
- * out-of-set select values, and over-long text. Returns null when nothing valid
+ * out-of-set select values, out-of-band numbers, and over-long text. Envelope
+ * fields are nested (as numbers) under their canonical parent key. Fixed
+ * details for the activity are always merged in. Returns null when nothing
  * remains so callers omit p_details entirely rather than storing {}.
  */
 export function sanitizeQuickLogActivityDetails(
   activityId: QuickLogActivityId,
   rawValues: Readonly<Record<string, unknown>> | null | undefined,
-): Record<string, string> | null {
-  if (!rawValues) return null;
+): Record<string, unknown> | null {
   const specs = getQuickLogActivityDetailFields(activityId);
-  if (specs.length === 0) return null;
+  const fixed = QUICK_LOG_ACTIVITY_FIXED_DETAILS[activityId] ?? null;
+  if (specs.length === 0 && !fixed) return null;
 
-  const out: Record<string, string> = {};
+  const out: Record<string, unknown> = {};
+  const values = rawValues ?? {};
   for (const spec of specs) {
-    if (QUICK_LOG_DETAIL_RESERVED_KEYS.includes(spec.key)) continue; // defense-in-depth
-    const raw = rawValues[spec.key];
+    // Defense-in-depth: neither the storage key nor an envelope parent may be
+    // a reserved identity key.
+    if (QUICK_LOG_DETAIL_RESERVED_KEYS.includes(spec.key)) continue;
+    if (spec.envelope && QUICK_LOG_DETAIL_RESERVED_KEYS.includes(spec.envelope)) continue;
+    const raw = values[spec.key];
     if (typeof raw !== "string") continue;
     const trimmed = raw.trim();
     if (trimmed === "") continue;
@@ -274,15 +369,31 @@ export function sanitizeQuickLogActivityDetails(
       if (optionLabel(spec, trimmed) === null) continue;
       out[spec.key] = trimmed;
     } else if (spec.kind === "number") {
-      // Plausibility fence: finite and within the inclusive band, else dropped.
+      // Plausibility floor: finite and within the inclusive band, else dropped.
+      // (The UI gate blocks out-of-band saves before this ever runs.)
       const n = Number(trimmed);
       if (!Number.isFinite(n)) continue;
       if (typeof spec.min === "number" && n < spec.min) continue;
       if (typeof spec.max === "number" && n > spec.max) continue;
-      // Preserve the grower's exact entry as a string (matches harvest details).
-      out[spec.key] = trimmed.slice(0, QUICK_LOG_DETAIL_TEXT_MAX);
+      if (spec.envelope) {
+        // Canonical nested envelope, numeric — e.g. environment_check.temp_c.
+        const parent = (out[spec.envelope] ?? {}) as Record<string, unknown>;
+        parent[spec.key] = n;
+        out[spec.envelope] = parent;
+      } else {
+        // Flat number fields keep the grower's exact entry as a string
+        // (matches harvest details).
+        out[spec.key] = trimmed.slice(0, QUICK_LOG_DETAIL_TEXT_MAX);
+      }
     } else {
       out[spec.key] = trimmed.slice(0, QUICK_LOG_DETAIL_TEXT_MAX);
+    }
+  }
+
+  if (fixed) {
+    for (const [k, v] of Object.entries(fixed)) {
+      if (QUICK_LOG_DETAIL_RESERVED_KEYS.includes(k)) continue;
+      out[k] = v;
     }
   }
 
@@ -300,11 +411,28 @@ export interface QuickLogDetailDisplayLine {
  * Format one stored value against its field spec into a display line, or null
  * when the value is blank/invalid/out-of-band. Shared by both describers so
  * select-label mapping, number bounds, and unit suffixing stay in one place.
+ * Number fields accept stored numbers (canonical envelopes) or numeric strings.
  */
 function formatDetailLine(
   spec: QuickLogDetailFieldSpec,
   raw: unknown,
 ): QuickLogDetailDisplayLine | null {
+  if (spec.kind === "number") {
+    let n: number;
+    if (typeof raw === "number") {
+      n = raw;
+    } else if (typeof raw === "string" && raw.trim() !== "") {
+      n = Number(raw.trim());
+    } else {
+      return null;
+    }
+    if (!Number.isFinite(n)) return null;
+    if (typeof spec.min === "number" && n < spec.min) return null;
+    if (typeof spec.max === "number" && n > spec.max) return null;
+    const shown = String(n).slice(0, QUICK_LOG_DETAIL_TEXT_MAX);
+    return { key: spec.key, label: spec.label, value: spec.unit ? `${shown} ${spec.unit}` : shown };
+  }
+
   if (typeof raw !== "string") return null;
   const trimmed = raw.trim();
   if (trimmed === "") return null;
@@ -314,15 +442,17 @@ function formatDetailLine(
     if (label === null) return null;
     return { key: spec.key, label: spec.label, value: label };
   }
-  if (spec.kind === "number") {
-    const n = Number(trimmed);
-    if (!Number.isFinite(n)) return null;
-    if (typeof spec.min === "number" && n < spec.min) return null;
-    if (typeof spec.max === "number" && n > spec.max) return null;
-    const shown = trimmed.slice(0, QUICK_LOG_DETAIL_TEXT_MAX);
-    return { key: spec.key, label: spec.label, value: spec.unit ? `${shown} ${spec.unit}` : shown };
-  }
   return { key: spec.key, label: spec.label, value: trimmed.slice(0, QUICK_LOG_DETAIL_TEXT_MAX) };
+}
+
+/** Resolve a spec's stored value from a details record (flat or enveloped). */
+function readSpecValue(spec: QuickLogDetailFieldSpec, record: Record<string, unknown>): unknown {
+  if (spec.envelope) {
+    const parent = record[spec.envelope];
+    if (!parent || typeof parent !== "object" || Array.isArray(parent)) return undefined;
+    return (parent as Record<string, unknown>)[spec.key];
+  }
+  return record[spec.key];
 }
 
 /**
@@ -341,7 +471,7 @@ export function describeQuickLogActivityDetails(
 
   const lines: QuickLogDetailDisplayLine[] = [];
   for (const spec of specs) {
-    const line = formatDetailLine(spec, record[spec.key]);
+    const line = formatDetailLine(spec, readSpecValue(spec, record));
     if (line) lines.push(line);
   }
   return lines;
@@ -350,11 +480,12 @@ export function describeQuickLogActivityDetails(
 /**
  * Describe stored Quick Log detail WITHOUT knowing the activity id.
  *
- * The event-route diary mirror does not preserve a specific activity/event_type
- * on the diary row, so plant-scoped read surfaces cannot pick a per-activity
- * spec. This scans a stored details object for any recognized detail-field key
- * (keys are globally unique) and returns the same ordered display lines. Unknown
- * keys, blank values, and out-of-set select codes are skipped.
+ * The event-route diary mirror does not always preserve a specific
+ * activity/event_type on the diary row, so plant-scoped read surfaces cannot
+ * pick a per-activity spec. This scans a stored details object for any
+ * recognized detail-field key — flat or inside a canonical envelope — and
+ * returns the same ordered display lines. Unknown keys, blank values, and
+ * out-of-set select codes are skipped.
  */
 export function describeQuickLogDetailsFromExtras(
   details: unknown,
@@ -367,10 +498,10 @@ export function describeQuickLogDetailsFromExtras(
   const seen = new Set<string>();
   for (const specs of Object.values(QUICK_LOG_ACTIVITY_DETAIL_FIELDS)) {
     for (const spec of specs ?? []) {
-      if (seen.has(spec.key)) continue;
-      seen.add(spec.key);
-      if (!(spec.key in record)) continue;
-      const line = formatDetailLine(spec, record[spec.key]);
+      const dedupeKey = spec.envelope ? `${spec.envelope}.${spec.key}` : spec.key;
+      if (seen.has(dedupeKey)) continue;
+      seen.add(dedupeKey);
+      const line = formatDetailLine(spec, readSpecValue(spec, record));
       if (line) lines.push(line);
     }
   }

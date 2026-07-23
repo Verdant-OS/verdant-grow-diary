@@ -20,9 +20,31 @@ import { QUICK_LOG_V2_ENTRY_CREATED_EVENT } from "@/lib/quickLogV2EntryCreatedEv
 import { QUICK_LOG_V2_OPEN_EVENT } from "@/lib/quickLogV2OpenIntent";
 
 const rpcMock = vi.fn();
+// Photo activity goes diary-only: storage upload + diary_entries insert.
+const storageUploadMock = vi.fn(async (..._args: unknown[]) => ({
+  data: { path: "p" },
+  error: null as { message: string } | null,
+}));
+const storageRemoveMock = vi.fn(async (..._args: unknown[]) => ({ data: null, error: null }));
+const diaryInsertMock = vi.fn(async (..._args: unknown[]) => ({ error: null }));
 
 vi.mock("@/integrations/supabase/client", () => ({
-  supabase: { rpc: (...args: unknown[]) => rpcMock(...args) },
+  supabase: {
+    rpc: (...args: unknown[]) => rpcMock(...args),
+    storage: {
+      from: (bucket: string) => ({
+        upload: (...args: unknown[]) => storageUploadMock(bucket, ...(args as [])),
+        remove: (...args: unknown[]) => storageRemoveMock(bucket, ...(args as [])),
+      }),
+    },
+    from: (table: string) => ({
+      insert: (...args: unknown[]) => diaryInsertMock(table, ...(args as [])),
+    }),
+  },
+}));
+
+vi.mock("@/store/auth", () => ({
+  useAuth: () => ({ user: { id: "user-1" }, loading: false }),
 }));
 
 const GROW = "grow-1";
@@ -83,6 +105,14 @@ async function saveWithoutNote(activityId: string) {
 
 beforeEach(() => {
   rpcMock.mockReset();
+  storageUploadMock.mockClear();
+  storageUploadMock.mockImplementation(async (..._args: unknown[]) => ({
+    data: { path: "p" },
+    error: null,
+  }));
+  storageRemoveMock.mockClear();
+  diaryInsertMock.mockClear();
+  diaryInsertMock.mockImplementation(async (..._args: unknown[]) => ({ error: null }));
 });
 
 describe("QuickLogAllActivitiesSection — shared taxonomy", () => {
@@ -160,7 +190,7 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     expect(args.p_details).not.toHaveProperty("user_id");
   });
 
-  it("Defoliation → quicklog_save_event carries amount + canopy area in p_details (with subtype fence)", async () => {
+  it("Defoliation → quicklog_save_event carries canonical intensity + canopy area + fixed technique", async () => {
     rpcMock.mockResolvedValueOnce({
       data: { ok: true, grow_event_id: "e-defol" },
       error: null,
@@ -168,8 +198,8 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     mountSection();
     selectActivity("defoliation");
     await screen.findByTestId("quick-log-all-activities-form");
-    fireEvent.change(screen.getByTestId("quick-log-all-activities-detail-amount"), {
-      target: { value: "moderate" },
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-detail-intensity"), {
+      target: { value: "medium" },
     });
     fireEvent.change(screen.getByTestId("quick-log-all-activities-detail-canopyArea"), {
       target: { value: "lower" },
@@ -183,34 +213,80 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     const [rpcName, args] = rpcMock.mock.calls[0];
     expect(rpcName).toBe("quicklog_save_event");
     expect(args.p_event_type).toBe("training"); // defoliation persists as training + subtype
+    // Canonical contract: key `intensity` (light/medium/heavy) + explicit
+    // technique=defoliation so the typed training adapter accepts the row.
     expect(args.p_details).toMatchObject({
       subtype: "defoliation",
-      amount: "moderate",
+      technique: "defoliation",
+      intensity: "medium",
       canopyArea: "lower",
     });
   });
 
-  it("Photo → quicklog_save_event carries subject + caption in p_details", async () => {
-    rpcMock.mockResolvedValueOnce({
-      data: { ok: true, grow_event_id: "e-photo" },
-      error: null,
-    });
+  it("Photo requires a real image: uploads to diary-photos and writes the diary row (no RPC)", async () => {
     mountSection();
     selectActivity("photo");
     await screen.findByTestId("quick-log-all-activities-form");
+    // No image chosen → Save disabled (a photo entry with no photo must never confirm).
+    expect(screen.getByTestId("quick-log-all-activities-save")).toBeDisabled();
+
     fireEvent.change(screen.getByTestId("quick-log-all-activities-detail-subject"), {
       target: { value: "buds" },
     });
     fireEvent.change(screen.getByTestId("quick-log-all-activities-detail-caption"), {
       target: { value: "day 40 flower" },
     });
+    const file = new File(["img-bytes"], "bud.jpg", { type: "image/jpeg" });
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-photo-file"), {
+      target: { files: [file] },
+    });
+    expect(screen.getByTestId("quick-log-all-activities-save")).not.toBeDisabled();
     fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
 
-    await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(1));
-    const [rpcName, args] = rpcMock.mock.calls[0];
-    expect(rpcName).toBe("quicklog_save_event");
-    expect(args.p_event_type).toBe("photo");
-    expect(args.p_details).toMatchObject({ subject: "buds", caption: "day 40 flower" });
+    await waitFor(() => expect(diaryInsertMock).toHaveBeenCalledTimes(1));
+    // Uploaded to the private diary-photos bucket under the uploader's uid.
+    expect(storageUploadMock).toHaveBeenCalledTimes(1);
+    const [bucket, path] = storageUploadMock.mock.calls[0] as unknown as [string, string];
+    expect(bucket).toBe("diary-photos");
+    expect(path.startsWith("user-1/grow-1/")).toBe(true);
+    // Diary row: photo_url COLUMN carries the bare storage path (the shape
+    // Timeline signs); subject/caption ride details; identity keys win.
+    const [table, row] = diaryInsertMock.mock.calls[0] as unknown as [
+      string,
+      Record<string, unknown>,
+    ];
+    expect(table).toBe("diary_entries");
+    expect(row.photo_url).toBe(path);
+    expect(row.details).toMatchObject({
+      event_type: "quicklog_photo_attachment",
+      subject: "buds",
+      caption: "day 40 flower",
+    });
+    // The event-route RPC is never used for photo — it cannot render an image.
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+
+  it("Photo upload failure surfaces the error and never writes a diary row", async () => {
+    storageUploadMock.mockImplementationOnce(async () => ({
+      data: null,
+      error: { message: "bucket unavailable" },
+    }));
+    mountSection();
+    selectActivity("photo");
+    await screen.findByTestId("quick-log-all-activities-form");
+    const file = new File(["img-bytes"], "bud.jpg", { type: "image/jpeg" });
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-photo-file"), {
+      target: { files: [file] },
+    });
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("quick-log-all-activities-error")).toHaveTextContent(
+        /photo upload failed/i,
+      ),
+    );
+    expect(diaryInsertMock).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("quick-log-all-activities-saved-item")).toBeNull();
   });
 
   it("Issue/Observation → quicklog_save_event carries observed sign + location (never a cause)", async () => {
@@ -243,7 +319,7 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     });
   });
 
-  it("Environment check → quicklog_save_event carries qualitative check + manual (plausible) temp/RH", async () => {
+  it("Environment check → canonical nested environment_check envelope (numbers) in p_details", async () => {
     rpcMock.mockResolvedValueOnce({
       data: { ok: true, grow_event_id: "e-env" },
       error: null,
@@ -254,12 +330,11 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     fireEvent.change(screen.getByTestId("quick-log-all-activities-detail-checkType"), {
       target: { value: "airflow" },
     });
-    fireEvent.change(screen.getByTestId("quick-log-all-activities-detail-manualTempC"), {
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-detail-temp_c"), {
       target: { value: "24" },
     });
-    // Physically impossible humidity must be dropped at the sanitize seam.
-    fireEvent.change(screen.getByTestId("quick-log-all-activities-detail-manualHumidityPct"), {
-      target: { value: "999" },
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-detail-humidity_pct"), {
+      target: { value: "55" },
     });
     fireEvent.change(screen.getByTestId("quick-log-all-activities-note"), {
       target: { value: "bumped the fan up a notch" },
@@ -270,9 +345,30 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     const [rpcName, args] = rpcMock.mock.calls[0];
     expect(rpcName).toBe("quicklog_save_event");
     expect(args.p_event_type).toBe("environment");
-    expect(args.p_details).toMatchObject({ checkType: "airflow", manualTempC: "24" });
-    // The impossible humidity was dropped, not stored.
-    expect(args.p_details).not.toHaveProperty("manualHumidityPct");
+    // Canonical envelope: nested, numeric, temp in CELSIUS under temp_c — the
+    // shape Diary Calendar insights/timeline pickEnvelope() actually reads.
+    expect(args.p_details).toMatchObject({
+      checkType: "airflow",
+      environment_check: { temp_c: 24, humidity_pct: 55 },
+    });
+  });
+
+  it("Environment check BLOCKS the save on an impossible manual reading (inline error, no RPC)", async () => {
+    mountSection();
+    selectActivity("environment_check");
+    await screen.findByTestId("quick-log-all-activities-form");
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-detail-humidity_pct"), {
+      target: { value: "999" },
+    });
+    // Inline per-field error + disabled Save: the grower corrects the entry;
+    // it is never silently dropped behind a success receipt.
+    expect(
+      screen.getByTestId("quick-log-all-activities-detail-humidity_pct-error"),
+    ).toHaveTextContent(/between 0 and 100/);
+    expect(screen.getByTestId("quick-log-all-activities-save")).toBeDisabled();
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
+    expect(rpcMock).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("quick-log-all-activities-saved-item")).toBeNull();
   });
 
   it("Training drops an unchosen (blank) technique — no technique key in p_details", async () => {
@@ -364,7 +460,9 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     await saveWithNote("training", "topped node 5");
     const [, args] = rpcMock.mock.calls[0];
     expect(args.p_event_type).toBe("training");
-    expect(args.p_details ?? null).toBeNull();
+    // The diary companion carries its type inside details (badge recovery);
+    // no subtype/technique for plain training with nothing chosen.
+    expect(args.p_details).toEqual({ event_type: "training" });
   });
 
   it("Defoliation → event_type=training + details.subtype=defoliation (fence)", async () => {
@@ -376,18 +474,20 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     await saveWithNote("defoliation", "removed 6 fan leaves");
     const [, args] = rpcMock.mock.calls[0];
     expect(args.p_event_type).toBe("training");
-    expect(args.p_details).toEqual({ subtype: "defoliation" });
+    // subtype fence + fixed canonical technique + diary event_type stamp.
+    expect(args.p_details).toEqual({
+      subtype: "defoliation",
+      technique: "defoliation",
+      event_type: "training",
+    });
   });
 
-  it("Photo → quicklog_save_event event_type=photo", async () => {
-    rpcMock.mockResolvedValueOnce({
-      data: { ok: true, grow_event_id: "e-p" },
-      error: null,
-    });
+  it("Photo without an image cannot save at all (no RPC, no diary write)", async () => {
     mountSection();
-    await saveWithoutNote("photo");
-    const [, args] = rpcMock.mock.calls[0];
-    expect(args.p_event_type).toBe("photo");
+    await saveWithoutNote("photo"); // click lands on a disabled Save
+    expect(rpcMock).not.toHaveBeenCalled();
+    expect(diaryInsertMock).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("quick-log-all-activities-saved-item")).toBeNull();
   });
 
   it("Environment check → quicklog_save_event event_type=environment", async () => {
@@ -410,7 +510,7 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     await saveWithNote("issue_observation", "yellowing on fan leaf");
     const [, args] = rpcMock.mock.calls[0];
     expect(args.p_event_type).toBe("observation");
-    expect(args.p_details).toEqual({ subtype: "issue" });
+    expect(args.p_details).toEqual({ subtype: "issue", event_type: "observation" });
   });
 });
 
@@ -468,6 +568,8 @@ describe("QuickLogAllActivitiesSection — Harvest v1b", () => {
       if (!def.enabled) continue;
       if (def.saveRoute !== "event") continue;
       if (def.id === "harvest") continue;
+      // Photo is diary-route only now (requires a real image, no RPC).
+      if (def.id === "photo") continue;
       rpcMock.mockReset();
       rpcMock.mockResolvedValueOnce({
         data: { ok: true, grow_event_id: `id-${def.id}` },
@@ -668,6 +770,7 @@ describe("QuickLogAllActivitiesSection — Harvest v1b.next hardening", () => {
     const [, args] = rpcMock.mock.calls[0];
     expect(args.p_details).toEqual({
       harvest: { wetWeight: "12.5", dryWeight: "3.25", weightUnit: "g" },
+      event_type: "harvest",
     });
     const items = await screen.findAllByTestId(
       "quick-log-all-activities-saved-item",

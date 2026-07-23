@@ -309,18 +309,30 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
                           instead — that’s how Verdant learns.
                         </p>
                       </div>
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={() => {
-                          onOpenChange(false);
-                          navigate("/quick-log");
-                        }}
-                        data-testid="global-search-empty-quicklog"
-                      >
-                        <NotebookPen className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
-                        Start a Quick Log
-                      </Button>
+                      <div className="flex flex-wrap items-center justify-center gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setQuery("")}
+                          data-testid="global-search-empty-clear"
+                        >
+                          <X className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                          Clear query
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => {
+                            onOpenChange(false);
+                            navigate("/quick-log");
+                          }}
+                          data-testid="global-search-empty-quicklog"
+                        >
+                          <NotebookPen className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                          Start a Quick Log
+                        </Button>
+                      </div>
                     </div>
                   </CommandEmpty>
                 ) : null}

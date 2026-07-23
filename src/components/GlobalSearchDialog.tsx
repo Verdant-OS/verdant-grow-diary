@@ -521,8 +521,11 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
                           key={`${type}:${row.id}`}
                           value={`${type}:${row.id}`}
                           onSelect={() => handleSelectResult(row)}
+                          onMouseEnter={() => setPreviewRow(row)}
+                          onFocus={() => setPreviewRow(row)}
                           data-testid={`global-search-item-${type}-${row.id}`}
                         >
+
                           <Icon
                             className={cn(
                               "mr-2 h-4 w-4 shrink-0 text-muted-foreground",

@@ -191,3 +191,84 @@ export function clearGlobalSearchHistory(): void {
 export const GLOBAL_SEARCH_HISTORY_STORAGE_KEY = HISTORY_STORAGE_KEY;
 export const GLOBAL_SEARCH_HISTORY_MAX = HISTORY_MAX_ENTRIES;
 
+// ---------------------------------------------------------------------------
+// Last selected result — remembers the {entity_type, id} of the row the user
+// most recently highlighted or opened so reopening the palette restores the
+// preview panel to that item (when it's still present in the current result
+// set). Never used to auto-navigate; presentation-only.
+// ---------------------------------------------------------------------------
+
+export interface GlobalSearchLastSelected {
+  entity_type: GlobalSearchEntityType;
+  id: string;
+  ts: number;
+}
+
+const LAST_SELECTED_STORAGE_KEY = "verdant.globalSearch.lastSelected.v1";
+const VALID_TYPES: readonly GlobalSearchEntityType[] = [
+  "grow",
+  "tent",
+  "plant",
+  "cultivar",
+];
+
+export function readGlobalSearchLastSelected(): GlobalSearchLastSelected | null {
+  const storage = safeStorage();
+  if (!storage) return null;
+  try {
+    const raw = storage.getItem(LAST_SELECTED_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return null;
+    const entity_type = (parsed as { entity_type?: unknown }).entity_type;
+    const id = (parsed as { id?: unknown }).id;
+    const ts = (parsed as { ts?: unknown }).ts;
+    if (
+      typeof entity_type !== "string" ||
+      !VALID_TYPES.includes(entity_type as GlobalSearchEntityType) ||
+      typeof id !== "string" ||
+      !id
+    ) {
+      return null;
+    }
+    return {
+      entity_type: entity_type as GlobalSearchEntityType,
+      id,
+      ts: typeof ts === "number" && Number.isFinite(ts) ? ts : 0,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function writeGlobalSearchLastSelected(
+  entry: Omit<GlobalSearchLastSelected, "ts"> & { ts?: number },
+): void {
+  const storage = safeStorage();
+  if (!storage) return;
+  if (!VALID_TYPES.includes(entry.entity_type) || !entry.id) return;
+  try {
+    const payload: GlobalSearchLastSelected = {
+      entity_type: entry.entity_type,
+      id: entry.id,
+      ts: entry.ts ?? Date.now(),
+    };
+    storage.setItem(LAST_SELECTED_STORAGE_KEY, JSON.stringify(payload));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function clearGlobalSearchLastSelected(): void {
+  const storage = safeStorage();
+  if (!storage) return;
+  try {
+    storage.removeItem(LAST_SELECTED_STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+export const GLOBAL_SEARCH_LAST_SELECTED_STORAGE_KEY = LAST_SELECTED_STORAGE_KEY;
+
+

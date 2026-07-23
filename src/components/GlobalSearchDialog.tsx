@@ -46,7 +46,11 @@ import {
   readGlobalSearchHistory,
   pushGlobalSearchHistory,
   clearGlobalSearchHistory,
+  readGlobalSearchLastSelected,
+  writeGlobalSearchLastSelected,
+  clearGlobalSearchLastSelected,
   type GlobalSearchHistoryEntry,
+  type GlobalSearchLastSelected,
 } from "@/lib/globalSearchSession";
 import GlobalSearchResultPreview from "@/components/GlobalSearchResultPreview";
 
@@ -99,6 +103,9 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
   const [history, setHistory] = useState<GlobalSearchHistoryEntry[]>([]);
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
   const [previewRow, setPreviewRow] = useState<GlobalSearchResult | null>(null);
+  const [lastSelected, setLastSelected] = useState<GlobalSearchLastSelected | null>(
+    () => readGlobalSearchLastSelected(),
+  );
   const [enabledTypes, setEnabledTypes] = useState<
     Record<GlobalSearchEntityType, boolean>
   >(() => readGlobalSearchSession().filters);
@@ -112,6 +119,7 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
       const restored = readGlobalSearchSession();
       setQuery(restored.query);
       setEnabledTypes(restored.filters);
+      setLastSelected(readGlobalSearchLastSelected());
     }
     // Intentionally do NOT clear query/filters on close — session memory is
     // the whole point of this hook.
@@ -150,8 +158,9 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
     [filteredResults, visibleCount],
   );
 
-  // Keep the preview panel in sync: default to the first visible result, and
-  // clear it whenever nothing is visible (loading / empty / filtered-empty).
+  // Keep the preview panel in sync: prefer the last-selected row (if still
+  // visible), otherwise keep the current selection, otherwise fall back to the
+  // first visible result. Clear when nothing is visible.
   useEffect(() => {
     if (visibleResults.length === 0) {
       setPreviewRow(null);
@@ -161,9 +170,26 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
       if (prev && visibleResults.some((r) => r.id === prev.id && r.entity_type === prev.entity_type)) {
         return prev;
       }
+      if (lastSelected) {
+        const restored = visibleResults.find(
+          (r) => r.id === lastSelected.id && r.entity_type === lastSelected.entity_type,
+        );
+        if (restored) return restored;
+      }
       return visibleResults[0];
     });
-  }, [visibleResults]);
+  }, [visibleResults, lastSelected]);
+
+  // Persist the row the user is previewing so reopening the palette restores
+  // it. Only writes when the preview is a real row the user is actively
+  // considering — never overwrites with null on unmount.
+  useEffect(() => {
+    if (!previewRow) return;
+    const entry = { entity_type: previewRow.entity_type, id: previewRow.id };
+    writeGlobalSearchLastSelected(entry);
+    setLastSelected({ ...entry, ts: Date.now() });
+  }, [previewRow]);
+
 
 
   const grouped = useMemo(() => {
@@ -222,6 +248,9 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
       setRecent(pushRecentSearch(trimmed));
       setHistory(pushGlobalSearchHistory({ query: trimmed, filters: enabledTypes }));
     }
+    const entry = { entity_type: row.entity_type, id: row.id };
+    writeGlobalSearchLastSelected(entry);
+    setLastSelected({ ...entry, ts: Date.now() });
     onOpenChange(false);
     navigate(routeFor(row));
   };
@@ -251,8 +280,11 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
     clearGlobalSearchSession();
     clearGlobalSearchHistory();
     clearRecentSearches();
+    clearGlobalSearchLastSelected();
     setHistory([]);
     setRecent([]);
+    setLastSelected(null);
+    setPreviewRow(null);
     setQuery("");
     setEnabledTypes({ ...DEFAULT_FILTERS });
   };

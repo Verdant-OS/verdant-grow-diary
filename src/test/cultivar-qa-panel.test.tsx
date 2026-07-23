@@ -6,12 +6,16 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { MemoryRouter } from "react-router-dom";
 import { VERDANT_CULTIVARS } from "@/constants/verdantCultivars";
 
-let isActive = false;
+// isActive and effectivePlanId are decoupled on purpose: the free tier resolves
+// to isActive=true, effectivePlanId="free" (resolveEntitlements null_row_free),
+// so a realistic free mock must set isActive=true. Gating on isActive alone is
+// the bug this suite guards against.
+let entitlementState = { isActive: true, effectivePlanId: "free" };
 vi.mock("@/hooks/useMyEntitlements", () => ({
   useMyEntitlements: () => ({
     loading: false,
     lookupFailed: false,
-    entitlement: { isActive, effectivePlanId: isActive ? "pro_monthly" : "free" },
+    entitlement: entitlementState,
     refetch: () => {},
   }),
 }));
@@ -37,20 +41,30 @@ function renderPanel() {
 beforeEach(() => {
   invokeSpy.mockClear();
   invokeResult = { data: { ok: true, answer: "Reported context answer." }, error: null };
+  entitlementState = { isActive: true, effectivePlanId: "free" };
 });
 afterEach(cleanup);
 
 describe("CultivarQaPanel", () => {
-  it("shows a Pro upsell (not the ask box) for non-paid users", () => {
-    isActive = false;
+  it("shows a Pro upsell (not the ask box) for the FREE tier (isActive=true, plan=free)", () => {
+    // Regression: free resolves to isActive=true, so gating on isActive alone
+    // wrongly showed the paid ask box to free/signed-out visitors.
+    entitlementState = { isActive: true, effectivePlanId: "free" };
     renderPanel();
     expect(screen.getByTestId("cultivar-qa-upsell")).toBeInTheDocument();
     expect(screen.getByTestId("cultivar-qa-upgrade-cta")).toHaveAttribute("href", "/pricing");
     expect(screen.queryByTestId("cultivar-qa-input")).toBeNull();
   });
 
+  it("shows a Pro upsell for a degraded/inactive entitlement", () => {
+    entitlementState = { isActive: false, effectivePlanId: "free" };
+    renderPanel();
+    expect(screen.getByTestId("cultivar-qa-upsell")).toBeInTheDocument();
+    expect(screen.queryByTestId("cultivar-qa-input")).toBeNull();
+  });
+
   it("shows the ask box for paid users and renders a grounded answer", async () => {
-    isActive = true;
+    entitlementState = { isActive: true, effectivePlanId: "pro_monthly" };
     renderPanel();
     expect(screen.queryByTestId("cultivar-qa-upsell")).toBeNull();
     fireEvent.change(screen.getByTestId("cultivar-qa-input"), {
@@ -71,7 +85,7 @@ describe("CultivarQaPanel", () => {
   });
 
   it("shows an error notice (never a fabricated answer) when the call fails", async () => {
-    isActive = true;
+    entitlementState = { isActive: true, effectivePlanId: "pro_monthly" };
     invokeResult = { data: { ok: false, reason: "upstream_error" }, error: null };
     renderPanel();
     fireEvent.change(screen.getByTestId("cultivar-qa-input"), {

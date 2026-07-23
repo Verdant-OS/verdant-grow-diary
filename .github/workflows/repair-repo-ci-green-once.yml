@@ -53,14 +53,12 @@ jobs:
                   raise SystemExit(f"{path_str}: expected {expected_count} occurrence(s), found {count}: {old!r}")
               path.write_text(text.replace(old, new, expected_count))
 
-          # CI reproducibility: eliminate the two remaining floating Bun versions.
           for workflow in [
               ".github/workflows/deployment-preview.yml",
               ".github/workflows/prefix-diff-sarif.yml",
           ]:
               replace_exact(workflow, "bun-version: latest", "bun-version: 1.3.14")
 
-          # xlsx 0.20.x ESM does not auto-bind node:fs under Vitest.
           workbook = Path("src/test/release-workbook-formula-snapshots.test.ts")
           text = workbook.read_text()
           marker = 'const CONTRACTS_MD = join(ART, "release-workbook-formula-contracts.md");\n'
@@ -74,14 +72,12 @@ jobs:
               raise SystemExit(f"Expected 7 XLSX.readFile calls, found {call_count}")
           workbook.write_text(text.replace("XLSX.readFile(", "readWorkbook("))
 
-          # Adapter contract now includes the nullable plantType field.
           replace_exact(
               "src/lib/growAdapters.test.ts",
               "      medium: null,\n      potSize: null,\n    });",
               "      medium: null,\n      potSize: null,\n      plantType: null,\n    });",
           )
 
-          # ESM-safe path separator import; no CommonJS require in TS tests.
           replace_exact(
               "src/test/edge-shared-mirror-static-safety.test.ts",
               'import { join, relative, resolve } from "node:path";',
@@ -118,17 +114,27 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git restore --source=HEAD --staged --worktree docs/artifacts || true
-          git clean -fd docs/artifacts
           rm .github/workflows/repair-repo-ci-green-once.yml
-          git status --short
-          unexpected="$(git status --porcelain | awk '$2 !~ /^(\.github\/workflows\/deployment-preview\.yml|\.github\/workflows\/prefix-diff-sarif\.yml|src\/test\/release-workbook-formula-snapshots\.test\.ts|src\/lib\/growAdapters\.test\.ts|src\/test\/edge-shared-mirror-static-safety\.test\.ts|\.github\/workflows\/repair-repo-ci-green-once\.yml)$/ { print }')"
-          if [ -n "$unexpected" ]; then
-            echo "Unexpected files changed:"
-            echo "$unexpected"
-            exit 1
-          fi
-          git add -A
+
+          git add \
+            .github/workflows/deployment-preview.yml \
+            .github/workflows/prefix-diff-sarif.yml \
+            src/test/release-workbook-formula-snapshots.test.ts \
+            src/lib/growAdapters.test.ts \
+            src/test/edge-shared-mirror-static-safety.test.ts
+          git add -u .github/workflows/repair-repo-ci-green-once.yml
+
+          printf '%s\n' \
+            '.github/workflows/deployment-preview.yml' \
+            '.github/workflows/prefix-diff-sarif.yml' \
+            '.github/workflows/repair-repo-ci-green-once.yml' \
+            'src/lib/growAdapters.test.ts' \
+            'src/test/edge-shared-mirror-static-safety.test.ts' \
+            'src/test/release-workbook-formula-snapshots.test.ts' \
+            | sort > /tmp/expected-staged.txt
+          git diff --cached --name-only | sort > /tmp/actual-staged.txt
+          diff -u /tmp/expected-staged.txt /tmp/actual-staged.txt
+
           git config user.name "verdant-ci"
           git config user.email "actions@users.noreply.github.com"
           git commit -m "fix(ci): restore repository green baseline"

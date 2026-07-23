@@ -258,7 +258,7 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     expect(table).toBe("diary_entries");
     expect(row.photo_url).toBe(path);
     expect(row.details).toMatchObject({
-      event_type: "quicklog_photo_attachment",
+      event_type: "photo", // displayable type — badges as Photo, not Note
       subject: "buds",
       caption: "day 40 flower",
     });

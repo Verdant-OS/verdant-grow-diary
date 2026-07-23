@@ -149,6 +149,24 @@ describe("QuickLogV2Sheet static safety — photo diary extraction", () => {
     });
   });
 
+  it("eventType override gives standalone Photo saves a displayable type (default marker preserved)", () => {
+    const base = {
+      growId: "g1",
+      tentId: null,
+      plantId: "p1",
+      photoPath: "u1/g1/1.jpg",
+      noteRaw: "",
+      action: "photo",
+      now: () => new Date("2026-07-23T00:00:00Z"),
+    };
+    expect(buildQuickLogPhotoDiaryEntryRow(base).details.event_type).toBe(
+      "quicklog_photo_attachment",
+    );
+    expect(
+      buildQuickLogPhotoDiaryEntryRow({ ...base, eventType: "photo" }).details.event_type,
+    ).toBe("photo");
+  });
+
   it("QuickLogV2Sheet.tsx no longer contains a direct supabase.from(...) write", () => {
     const raw = readFileSync(
       join(process.cwd(), "src", "components", "QuickLogV2Sheet.tsx"),

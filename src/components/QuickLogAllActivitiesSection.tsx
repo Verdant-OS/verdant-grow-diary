@@ -452,6 +452,10 @@ export default function QuickLogAllActivitiesSection({
             photoPath: path,
             noteRaw: note,
             action: "photo",
+            // Displayable type: the standalone Photo activity badges as Photo
+            // on Timeline/Recent Activity (allow-listed), unlike the V2-sheet
+            // attachment marker the plant-memory episodes key on.
+            eventType: "photo",
             extraDetails:
               Object.keys(photoExtraDetails).length > 0 ? photoExtraDetails : null,
           });

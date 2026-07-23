@@ -34,6 +34,14 @@ export interface QuickLogPhotoDiaryEntryInput {
    * (event_type/source/attached_to_action) always win.
    */
   extraDetails?: Readonly<Record<string, string>> | null;
+  /**
+   * Diary event type. Defaults to the attachment marker
+   * "quicklog_photo_attachment" (the V2-sheet contract plant-memory episodes
+   * key on). The STANDALONE Photo activity passes "photo" so the read layers
+   * (normalizeDiaryEntry allow-list, Timeline classification) badge the row as
+   * a Photo instead of falling back to Note/Observation.
+   */
+  eventType?: "quicklog_photo_attachment" | "photo";
   /** Injectable clock for deterministic tests. Defaults to `new Date()`. */
   now?: () => Date;
 }
@@ -46,7 +54,7 @@ export interface QuickLogPhotoDiaryEntryRow {
   photo_url: string;
   entry_at: string;
   details: {
-    event_type: "quicklog_photo_attachment";
+    event_type: "quicklog_photo_attachment" | "photo";
     source: "manual";
     attached_to_action: string;
   } & Record<string, string>;
@@ -76,7 +84,7 @@ export function buildQuickLogPhotoDiaryEntryRow(
       // Caller-supplied structured detail first; fixed identity keys win so
       // no extraDetails key can spoof the attachment envelope.
       ...(input.extraDetails ?? {}),
-      event_type: "quicklog_photo_attachment",
+      event_type: input.eventType ?? "quicklog_photo_attachment",
       source: "manual",
       attached_to_action: input.action,
     },

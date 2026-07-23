@@ -80,6 +80,9 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
   const [query, setQuery] = useState("");
   const [recent, setRecent] = useState<string[]>([]);
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
+  const [enabledTypes, setEnabledTypes] = useState<
+    Record<GlobalSearchEntityType, boolean>
+  >({ grow: true, tent: true, plant: true, cultivar: true });
   const { results, isLoading, isError, retry } = useGlobalSearch(query);
 
   useEffect(() => {
@@ -87,17 +90,24 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
       setRecent(readRecentSearches());
     } else {
       setQuery("");
+      // Reset filters when the dialog closes so it opens clean next time.
+      setEnabledTypes({ grow: true, tent: true, plant: true, cultivar: true });
     }
   }, [open]);
 
-  // Reset pagination whenever the query changes or new results arrive.
+  const filteredResults = useMemo(
+    () => results.filter((row) => enabledTypes[row.entity_type]),
+    [results, enabledTypes],
+  );
+
+  // Reset pagination whenever the query, filters, or new results arrive.
   useEffect(() => {
     setVisibleCount(INITIAL_VISIBLE);
-  }, [query, results]);
+  }, [query, results, enabledTypes]);
 
   const visibleResults = useMemo(
-    () => results.slice(0, visibleCount),
-    [results, visibleCount],
+    () => filteredResults.slice(0, visibleCount),
+    [filteredResults, visibleCount],
   );
 
   const grouped = useMemo(() => {
@@ -128,9 +138,28 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
   const trimmed = query.trim();
   const hasQuery = trimmed.length > 0;
   const hasAny = results.length > 0;
+  const hasFilteredAny = filteredResults.length > 0;
   const shownCount = visibleResults.length;
-  const remaining = Math.max(0, results.length - shownCount);
+  const remaining = Math.max(0, filteredResults.length - shownCount);
   const canShowMore = remaining > 0;
+  const enabledCount = GROUP_ORDER.filter((t) => enabledTypes[t]).length;
+  const allEnabled = enabledCount === GROUP_ORDER.length;
+
+  const toggleType = (t: GlobalSearchEntityType) => {
+    setEnabledTypes((prev) => {
+      const next = { ...prev, [t]: !prev[t] };
+      // Guard: never let the user disable every category — reset to all-on.
+      const anyOn = GROUP_ORDER.some((k) => next[k]);
+      if (!anyOn) {
+        return { grow: true, tent: true, plant: true, cultivar: true };
+      }
+      return next;
+    });
+  };
+
+  const resetFilters = () =>
+    setEnabledTypes({ grow: true, tent: true, plant: true, cultivar: true });
+
 
   const handleSelectResult = (row: GlobalSearchResult) => {
     if (trimmed) {

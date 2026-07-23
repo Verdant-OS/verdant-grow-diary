@@ -104,9 +104,74 @@ Automated verification never:
 - promotes sample/community evidence to reviewed or verified;
 - replaces human editorial review.
 
+## Offline research enrichment boundaries
+
+Research enrichment is **offline only**. Neither chemistry nor genetics datasets
+are runtime dependencies, identity authorities, or automatic publication paths.
+All generated material remains a draft until a human reviewer approves the
+specific source, matching method, context, and wording.
+
+### Public COA chemistry aggregates
+
+Cannlytics chemistry datasets distributed through Hugging Face may support
+human-reviewed draft context under their **CC BY 4.0** license. Any retained
+aggregate must include attribution, a license reference, and a note describing
+Verdant's transformations.
+
+Minimum acceptance rules:
+
+- normalized exact-name or approved-alias matching only;
+- flower/bud products preferred;
+- at least 30 matching observations before proposing a numeric range;
+- observed quantiles or clearly labeled ranges, never a mean presented as a
+  universal “typical” value;
+- method mix, state mix, sample count, and date range retained in `sampleScope`;
+- non-random-public-subset and cleaning limitations retained in the variability
+  note;
+- confidence capped at community or medium pending human review;
+- no use of personal/contact fields;
+- no invention of values for intentionally missing V1 fields.
+
+A public aggregate is not the grower's batch, a genotype result, or one fixed
+cultivar signature. It must never auto-link to free-text `plants.strain`, change
+`verificationStatus`, remove missing-information notes, or generate medical or
+effect claims.
+
+### Genetics and pedigree resources
+
+Open reference genomes, marker papers, NCBI, CannabisGDB, and CannSeek may
+strengthen method context and cautious chemotype priors. A specific public
+accession report may be cited after human review. Pedigree catalogs may support
+directional lineage text at community confidence.
+
+These resources are **not genotype proof for a commercial name**. Verdant must
+never:
+
+- claim that a name match DNA-verifies a cultivar;
+- assign `plants.cultivar_id` or a genotype from a label;
+- bulk-scrape sources behind login or terms-of-service restrictions;
+- treat breeder-reported pedigree as measured ancestry;
+- auto-publish a grower-uploaded genotype report to the public library.
+
+The plant's observed phenotype, private timeline, and source-labeled sensor
+history remain authoritative for the run in front of the grower.
+
+## Database cutover gate
+
+The bundled V1 profiles are richer than the current normalized SQL seed in some
+areas. Public pages must not switch to database reads until a parity check proves
+that the deployed read model preserves the approved profiles, source links,
+claims, guide sections, cautions, and missing-information states.
+
+Until that gate is green:
+
+- bundled sample/reference profiles remain the public presenter source;
+- the migration remains unapplied to production;
+- no “database-backed public reads” or “shipped” claim is allowed.
+
 ## Deferred work
 
-- Production database seed/cutover from static public profiles.
+- Production database seed/cutover after content-parity verification.
 - Admin-only draft/review/publish UI.
 - CSV import execution after preview, checksum, duplicate, and moderation gates.
 - Optional nullable `plants.cultivar_id` linking.

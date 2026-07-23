@@ -13,6 +13,10 @@ const FILES = [
 ];
 const SOURCE = FILES.map((file) => readFileSync(resolve(ROOT, file), "utf8")).join("\n");
 const EXECUTABLE = SOURCE.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+const PRODUCT_CONTRACT = readFileSync(
+  resolve(ROOT, "docs/product/strain-reference-library-v1.md"),
+  "utf8",
+);
 
 describe("Strain Reference Library V1 static safety", () => {
   it("stays read-only and does not invoke private or write boundaries", () => {
@@ -33,5 +37,22 @@ describe("Strain Reference Library V1 static safety", () => {
     expect(SOURCE).toMatch(/sample reference data/i);
     expect(SOURCE).toMatch(/logs[\s\S]{0,200}sensors[\s\S]{0,200}truth/i);
     expect(SOURCE).toMatch(/never create alerts/i);
+  });
+
+  it("locks chemistry and genetics enrichment to offline, attributed, human review", () => {
+    expect(PRODUCT_CONTRACT).toMatch(/research enrichment is \*\*offline only\*\*/i);
+    expect(PRODUCT_CONTRACT).toMatch(/CC BY 4\.0/i);
+    expect(PRODUCT_CONTRACT).toMatch(/at least 30 matching observations/i);
+    expect(PRODUCT_CONTRACT).toMatch(/must never auto-link to free-text `plants\.strain`/i);
+    expect(PRODUCT_CONTRACT).toMatch(/not genotype proof for a commercial name/i);
+    expect(PRODUCT_CONTRACT).toMatch(/human reviewer approves/i);
+    expect(PRODUCT_CONTRACT).not.toMatch(/runtime dependency for (hugging face|cannlytics|cannabisgdb|cannseek)/i);
+  });
+
+  it("blocks database cutover until content parity is proven", () => {
+    expect(PRODUCT_CONTRACT).toMatch(/database cutover gate/i);
+    expect(PRODUCT_CONTRACT).toMatch(/must not switch to database reads until a parity check proves/i);
+    expect(PRODUCT_CONTRACT).toMatch(/migration remains unapplied to production/i);
+    expect(PRODUCT_CONTRACT).toMatch(/no “database-backed public reads” or “shipped” claim/i);
   });
 });

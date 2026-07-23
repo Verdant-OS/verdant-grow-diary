@@ -310,12 +310,15 @@ export function quickLogDetailNumberRangeError(spec: QuickLogDetailFieldSpec): s
   return `Enter a value between ${spec.min} and ${spec.max}${unit}.`;
 }
 
+export const QUICK_LOG_DETAIL_NOT_A_NUMBER_ERROR = "Enter a number.";
+
 /**
- * Blocking UI validation for `number` detail fields — magnitude only, matching
- * the canonical env-check gate (validateEnvironmentCheckSensorBand): blank and
- * non-numeric mean "not provided" and pass (the sanitizer floor drops them);
- * a real number outside [min, max] must BLOCK the save with an inline error so
- * the grower's entry is never silently discarded.
+ * Blocking UI validation for `number` detail fields. Blank/missing means "not
+ * provided" and passes (all fields are optional). Everything the grower DID
+ * type must either persist or block: a non-numeric entry ("24C", "fifty") and
+ * an out-of-band number both BLOCK the save with an inline error, so a typed
+ * value is never silently discarded behind a success receipt (harvest-gate
+ * strictness — the free-text input only hints inputMode=decimal).
  */
 export function validateQuickLogDetailNumberInput(
   spec: QuickLogDetailFieldSpec,
@@ -326,7 +329,9 @@ export function validateQuickLogDetailNumberInput(
   const trimmed = String(raw).trim();
   if (trimmed === "") return { ok: true, error: null };
   const n = Number(trimmed);
-  if (!Number.isFinite(n)) return { ok: true, error: null };
+  if (!Number.isFinite(n)) {
+    return { ok: false, error: QUICK_LOG_DETAIL_NOT_A_NUMBER_ERROR };
+  }
   if (typeof spec.min === "number" && n < spec.min) {
     return { ok: false, error: quickLogDetailNumberRangeError(spec) };
   }

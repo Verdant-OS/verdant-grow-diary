@@ -217,10 +217,18 @@ describe("validateQuickLogDetailNumberInput (blocking UI gate)", () => {
     (f) => f.key === "humidity_pct",
   )!;
 
-  it("passes blank / missing / non-numeric (optional field semantics)", () => {
+  it("passes blank / missing (optional field semantics)", () => {
     expect(validateQuickLogDetailNumberInput(temp, "")).toEqual({ ok: true, error: null });
+    expect(validateQuickLogDetailNumberInput(temp, "   ")).toEqual({ ok: true, error: null });
     expect(validateQuickLogDetailNumberInput(temp, null)).toEqual({ ok: true, error: null });
-    expect(validateQuickLogDetailNumberInput(temp, "warm")).toEqual({ ok: true, error: null });
+  });
+
+  it("BLOCKS a typed non-numeric value — never silently dropped behind a receipt", () => {
+    for (const raw of ["warm", "24C", "fifty"]) {
+      const v = validateQuickLogDetailNumberInput(temp, raw);
+      expect(v.ok, raw).toBe(false);
+      expect(v.error).toMatch(/enter a number/i);
+    }
   });
 
   it("passes an in-band value and BLOCKS an out-of-band one with grower-facing copy", () => {

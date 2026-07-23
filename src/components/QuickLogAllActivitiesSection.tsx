@@ -48,6 +48,7 @@ import {
   getQuickLogActivityDetailFields,
   sanitizeQuickLogActivityDetails,
   validateQuickLogDetailNumberInput,
+  QUICK_LOG_DETAIL_TEXT_MAX,
 } from "@/lib/quickLogActivityDetailFields";
 import {
   buildDailyCheckSavedItems,
@@ -690,6 +691,10 @@ export default function QuickLogAllActivitiesSection({
                         }}
                         disabled={mutationBlocked}
                         inputMode={field.kind === "number" ? "decimal" : undefined}
+                        // Text detail is capped at the persistence limit IN the
+                        // input, so nothing a grower types is ever silently
+                        // truncated behind a success receipt.
+                        maxLength={field.kind === "text" ? QUICK_LOG_DETAIL_TEXT_MAX : undefined}
                         aria-invalid={
                           field.kind === "number"
                             ? !(detailNumberValidations.find((v) => v.key === field.key)?.ok ?? true)

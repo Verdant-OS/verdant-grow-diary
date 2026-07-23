@@ -9,14 +9,10 @@ on:
       - "src/constants/strainReferenceLibrary.ts"
       - "src/constants/verdantCultivars.ts"
       - "src/lib/cultivarReference*.ts"
-      - "src/lib/globalSearchItems.ts"
       - "src/lib/sharedSearchTextRules.ts"
       - "src/lib/strainSourceVerification.ts"
-      - "src/hooks/useGlobalSearch.ts"
-      - "src/components/GlobalSearchDialog.tsx"
       - "src/pages/Cultivar*.tsx"
       - "src/test/cultivar*.test.*"
-      - "src/test/global-search-entity-results.test.ts"
       - "src/test/shared-search-text-rules.test.ts"
       - "src/test/strain-reference-library*.test.ts"
       - "scripts/verify-cultivar-sources.mjs"
@@ -57,7 +53,6 @@ jobs:
           src/test/shared-search-text-rules.test.ts
           src/test/cultivar-reference-search-rules.test.ts
           src/test/cultivar-reference-view-model.test.ts
-          src/test/global-search-entity-results.test.ts
           src/test/cultivars-index-v1.test.tsx
           src/test/cultivar-page-v1.test.tsx
           src/test/cultivar-index-seo-rules.test.tsx

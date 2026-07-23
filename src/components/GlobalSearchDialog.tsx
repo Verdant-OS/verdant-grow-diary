@@ -131,9 +131,45 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
           />
           <CommandList>
             {!hasQuery ? (
-              <div className="py-6 text-center text-sm text-muted-foreground">
-                Type to search your grows, tents, plants, and cultivars.
-              </div>
+              recent.length > 0 ? (
+                <CommandGroup
+                  heading="Recent searches"
+                  data-testid="global-search-recent"
+                >
+                  {recent.map((term) => (
+                    <CommandItem
+                      key={`recent:${term}`}
+                      value={`recent:${term}`}
+                      onSelect={() => setQuery(term)}
+                      data-testid={`global-search-recent-item-${term}`}
+                    >
+                      <Clock
+                        className="mr-2 h-4 w-4 shrink-0 text-muted-foreground"
+                        aria-hidden="true"
+                      />
+                      <span className="truncate text-sm text-foreground">
+                        {term}
+                      </span>
+                    </CommandItem>
+                  ))}
+                  <div className="flex justify-end px-1 pt-1">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={handleClearRecent}
+                      data-testid="global-search-recent-clear"
+                      className="h-7 text-xs text-muted-foreground"
+                    >
+                      Clear recent
+                    </Button>
+                  </div>
+                </CommandGroup>
+              ) : (
+                <div className="py-6 text-center text-sm text-muted-foreground">
+                  Type to search your grows, tents, plants, and cultivars.
+                </div>
+              )
             ) : isLoading ? (
               <div
                 className="py-6 text-center text-sm text-muted-foreground"
@@ -184,10 +220,7 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
                         <CommandItem
                           key={`${type}:${row.id}`}
                           value={`${type}:${row.id}`}
-                          onSelect={() => {
-                            onOpenChange(false);
-                            navigate(routeFor(row));
-                          }}
+                          onSelect={() => handleSelectResult(row)}
                           data-testid={`global-search-item-${type}-${row.id}`}
                         >
                           <Icon

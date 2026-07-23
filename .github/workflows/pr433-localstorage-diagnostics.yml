@@ -1,0 +1,58 @@
+name: PR433 localStorage diagnostics
+
+on:
+  push:
+    branches:
+      - tmp/pr433-localstorage-diagnostics
+    paths:
+      - .github/workflows/pr433-localstorage-diagnostics.yml
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.14
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Run localStorage enforcement with full evidence
+        shell: bash
+        run: |
+          mkdir -p artifacts/localstorage-diagnostics
+          set +e
+          node scripts/assert-test-localstorage-helper-usage.mjs > artifacts/localstorage-diagnostics/assert.log 2>&1
+          assert_status=$?
+          node scripts/test-localstorage-helper-usage-audit.mjs > artifacts/localstorage-diagnostics/audit.log 2>&1
+          audit_status=$?
+          set -e
+          printf '%s\n' "$assert_status" > artifacts/localstorage-diagnostics/assert-exit.txt
+          printf '%s\n' "$audit_status" > artifacts/localstorage-diagnostics/audit-exit.txt
+          echo '=== ASSERT OUTPUT ==='
+          cat artifacts/localstorage-diagnostics/assert.log
+          echo '=== AUDIT OUTPUT ==='
+          cat artifacts/localstorage-diagnostics/audit.log
+          echo "assert_status=$assert_status audit_status=$audit_status"
+      - name: Upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: pr433-localstorage-diagnostics
+          path: artifacts/localstorage-diagnostics/
+          if-no-files-found: error
+          retention-days: 3
+      - name: Preserve diagnostic verdict
+        shell: bash
+        run: |
+          assert_status="$(cat artifacts/localstorage-diagnostics/assert-exit.txt)"
+          audit_status="$(cat artifacts/localstorage-diagnostics/audit-exit.txt)"
+          if [ "$assert_status" -ne 0 ] || [ "$audit_status" -ne 0 ]; then
+            exit 1
+          fi

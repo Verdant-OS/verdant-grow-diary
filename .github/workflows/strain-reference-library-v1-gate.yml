@@ -16,6 +16,8 @@ on:
       - "src/test/shared-search-text-rules.test.ts"
       - "src/test/strain-reference-library*.test.ts"
       - "scripts/verify-cultivar-sources.mjs"
+      - "supabase/functions/_shared/lib/.sync-manifest.json"
+      - "supabase/functions/_shared/lib/integrations/supabase/types.ts"
       - "supabase/migrations/20260722203000_strain_reference_library_v1.sql"
       - "docs/product/strain-reference-library-v1.md"
       - ".github/workflows/strain-reference-library-v1-gate.yml"
@@ -40,24 +42,43 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Verify Edge shared mirror
+        run: |
+          bun run verify-edge-shared-in-sync
+          bun run check:no-src-lib-imports
+
       - name: Typecheck
         run: bun run typecheck
 
       - name: Targeted library and shared-search tests
-        run: >-
-          bunx vitest run
-          src/test/strain-reference-library-v1.test.ts
-          src/test/strain-reference-library-source-verification.test.ts
-          src/test/strain-reference-library-migration.test.ts
-          src/test/strain-reference-library-static-safety.test.ts
-          src/test/shared-search-text-rules.test.ts
-          src/test/cultivar-reference-search-rules.test.ts
-          src/test/cultivar-reference-view-model.test.ts
-          src/test/cultivars-index-v1.test.tsx
-          src/test/cultivar-page-v1.test.tsx
-          src/test/cultivar-index-seo-rules.test.tsx
-          src/test/static-public-seo-documents.test.ts
-          --reporter=verbose
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/strain-reference-library
+          bunx vitest run \
+            src/test/strain-reference-library-v1.test.ts \
+            src/test/strain-reference-library-source-verification.test.ts \
+            src/test/strain-reference-library-migration.test.ts \
+            src/test/strain-reference-library-static-safety.test.ts \
+            src/test/shared-search-text-rules.test.ts \
+            src/test/cultivar-reference-search-rules.test.ts \
+            src/test/cultivar-reference-view-model.test.ts \
+            src/test/cultivars-index-v1.test.tsx \
+            src/test/cultivar-page-v1.test.tsx \
+            src/test/cultivar-index-seo-rules.test.tsx \
+            src/test/static-public-seo-documents.test.ts \
+            --reporter=verbose \
+            --reporter=json \
+            --outputFile=artifacts/strain-reference-library/targeted-tests.json
+
+      - name: Upload targeted test receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: strain-reference-library-targeted-tests
+          path: artifacts/strain-reference-library/targeted-tests.json
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Offline source provenance verification report
         id: source_verification

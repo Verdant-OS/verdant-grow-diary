@@ -111,6 +111,7 @@ describe("mapPlantRow", () => {
       isArchived: false,
       medium: null,
       potSize: null,
+      plantType: null,
     });
   });
   it("defaults null tent_id, strain, photo, note, and invalid health", () => {

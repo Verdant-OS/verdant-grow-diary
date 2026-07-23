@@ -56,7 +56,7 @@ export default function CultivarPage() {
 
   usePageSeo({
     title: cultivar
-      ? `${cultivar.name} Cultivator Guide (${cultivar.searchAlias} info) | Verdant`
+      ? `${cultivar.name} Cultivar Grow Guide | Verdant`
       : "Strain Reference Library | Verdant",
     description: cultivar
       ? `${cultivar.name} grow guide: lineage (${cultivar.lineage}), ${cultivar.flowerWeeks} flower, environment ranges by stage, and common issues home growers report.`
@@ -90,7 +90,7 @@ export default function CultivarPage() {
       items: buildCultivarBreadcrumbItems(cultivar, VERDANT_SITE_ORIGIN),
     });
     const article = buildArticleJsonLd({
-      headline: `${cultivar.name} Cultivar Guide`,
+      headline: `${cultivar.name} Cultivar Grow Guide`,
       description: `${cultivar.name} source-backed grow reference: reported lineage (${cultivar.lineage}), ${cultivar.flowerWeeks}, environment context by stage, and common issues home growers report.`,
       url,
       datePublished: verifiedDate,

@@ -72,10 +72,14 @@ function routeFor(row: GlobalSearchResult): string {
   }
 }
 
+const INITIAL_VISIBLE = 10;
+const PAGE_SIZE = 10;
+
 export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [recent, setRecent] = useState<string[]>([]);
+  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
   const { results, isLoading, isError, retry } = useGlobalSearch(query);
 
   useEffect(() => {
@@ -86,6 +90,16 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
     }
   }, [open]);
 
+  // Reset pagination whenever the query changes or new results arrive.
+  useEffect(() => {
+    setVisibleCount(INITIAL_VISIBLE);
+  }, [query, results]);
+
+  const visibleResults = useMemo(
+    () => results.slice(0, visibleCount),
+    [results, visibleCount],
+  );
+
   const grouped = useMemo(() => {
     const map: Record<GlobalSearchEntityType, GlobalSearchResult[]> = {
       grow: [],
@@ -94,15 +108,18 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
       cultivar: [],
     };
     // Preserve the hook's deterministic order within each entity_type.
-    for (const row of results) {
+    for (const row of visibleResults) {
       map[row.entity_type]?.push(row);
     }
     return map;
-  }, [results]);
+  }, [visibleResults]);
 
   const trimmed = query.trim();
   const hasQuery = trimmed.length > 0;
   const hasAny = results.length > 0;
+  const shownCount = visibleResults.length;
+  const remaining = Math.max(0, results.length - shownCount);
+  const canShowMore = remaining > 0;
 
   const handleSelectResult = (row: GlobalSearchResult) => {
     if (trimmed) {

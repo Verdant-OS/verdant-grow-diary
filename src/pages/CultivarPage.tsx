@@ -18,10 +18,17 @@ import {
 } from "@/constants/verdantCultivars";
 import { VERDANT_SITE_ORIGIN } from "@/constants/verdantSeoContent";
 import {
+  buildArticleJsonLd,
+  buildBreadcrumbListJsonLd,
   buildCultivarCollectionJsonLd,
+  buildFaqPageJsonLd,
   safeJsonLdStringify,
 } from "@/lib/seoStructuredData";
 import { buildCultivarSummaryRows } from "@/lib/cultivarReferenceViewModel";
+import {
+  buildCultivarBreadcrumbItems,
+  buildCultivarFaqItems,
+} from "@/lib/cultivarDetailSeo";
 
 function sectionId(key: CultivarGuideSectionKey): string {
   return `guide-${key.replace(/_/g, "-")}`;
@@ -42,6 +49,7 @@ export default function CultivarPage() {
   const summaryRows = cultivar
     ? buildCultivarSummaryRows(cultivar, formatDate(cultivar.lastVerifiedAt))
     : [];
+  const faqItems = cultivar ? buildCultivarFaqItems(cultivar) : [];
 
   usePageSeo({
     title: cultivar
@@ -69,13 +77,40 @@ export default function CultivarPage() {
         { name: "Evidence state", value: formatVerificationStatus(cultivar.verificationStatus) },
       ],
     });
-    const script = document.createElement("script");
-    script.type = "application/ld+json";
-    script.setAttribute("data-page-ldjson", `cultivar-${cultivar.slug}-collection`);
-    script.text = safeJsonLdStringify(jsonLd);
-    document.head.appendChild(script);
-    return () => script.remove();
-  }, [cultivar]);
+    // Editorial FAQ + Article + Breadcrumb enrich discovery. The FAQ JSON-LD is
+    // built from the SAME faqItems rendered visibly below (single source of
+    // truth). No Product/Offer schema: these are reference profiles, not
+    // products, and carry no fixed chemistry or guaranteed outcome.
+    const verifiedDate = cultivar.lastVerifiedAt.slice(0, 10);
+    const faq = buildFaqPageJsonLd({ pageUrl: url, questions: faqItems });
+    const crumbs = buildBreadcrumbListJsonLd({
+      items: buildCultivarBreadcrumbItems(cultivar, VERDANT_SITE_ORIGIN),
+    });
+    const article = buildArticleJsonLd({
+      headline: `${cultivar.name} Cultivar Guide`,
+      description: `${cultivar.name} source-backed grow reference: reported lineage (${cultivar.lineage}), ${cultivar.flowerWeeks}, environment context by stage, and common issues home growers report.`,
+      url,
+      datePublished: verifiedDate,
+      dateModified: verifiedDate,
+      siteUrl: VERDANT_SITE_ORIGIN,
+    });
+
+    const docs: Array<[string, unknown]> = [
+      [`cultivar-${cultivar.slug}-collection`, jsonLd],
+      [`cultivar-${cultivar.slug}-faq`, faq],
+      [`cultivar-${cultivar.slug}-breadcrumb`, crumbs],
+      [`cultivar-${cultivar.slug}-article`, article],
+    ];
+    const scripts = docs.map(([id, data]) => {
+      const script = document.createElement("script");
+      script.type = "application/ld+json";
+      script.setAttribute("data-page-ldjson", id);
+      script.text = safeJsonLdStringify(data);
+      document.head.appendChild(script);
+      return script;
+    });
+    return () => scripts.forEach((script) => script.remove());
+  }, [cultivar, faqItems]);
 
   if (!cultivar) return <Navigate to="/cultivars" replace />;
 
@@ -293,8 +328,32 @@ export default function CultivarPage() {
           </aside>
         </div>
 
+        <section
+          data-testid="cultivar-faq"
+          aria-labelledby="cultivar-faq-heading"
+          className="mt-10"
+        >
+          <h2 id="cultivar-faq-heading" className="font-display text-2xl font-semibold">
+            Common questions about {cultivar.name}
+          </h2>
+          <dl className="mt-4 space-y-4">
+            {faqItems.map((item) => (
+              <div
+                key={item.question}
+                data-testid="cultivar-faq-item"
+                className="rounded-xl border border-border/70 p-4"
+              >
+                <dt className="font-semibold text-foreground">{item.question}</dt>
+                <dd className="mt-1 text-sm text-muted-foreground">{item.answer}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+
         <section className="mt-10 rounded-xl border border-primary/30 bg-primary/5 p-5">
-          <h2 className="font-display text-xl font-semibold">Build plant memory for your own run</h2>
+          <h2 className="font-display text-xl font-semibold">
+            Track {cultivar.name} in your own grow
+          </h2>
           <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
             A linked reference may provide context later, but Verdant will keep the plant&apos;s actual
             logs and sensors in charge. Reference pages never create alerts, nutrient actions,
@@ -303,6 +362,7 @@ export default function CultivarPage() {
           <div className="mt-4 flex flex-wrap gap-3 text-sm">
             <Link
               to="/auth"
+              data-testid="cultivar-signup-cta"
               className="inline-flex items-center rounded-md bg-primary px-4 py-2 font-semibold text-primary-foreground hover:opacity-90"
             >
               Start a free grow diary

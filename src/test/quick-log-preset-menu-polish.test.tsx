@@ -139,6 +139,10 @@ describe("Quick Log preset menu — event wiring", () => {
     fireEvent.click(screen.getByTestId("global-fast-add-trigger"));
     fireEvent.click(screen.getByTestId("global-fast-add-action-watering"));
 
+    // Exactly one dispatch: this component sits in an area with documented
+    // duplicate-dispatch/duplicate-save sensitivity (#317), so a stray second
+    // fire must fail the test rather than pass silently under toHaveBeenCalledWith.
+    expect(onDispatchEvent).toHaveBeenCalledTimes(1);
     expect(onDispatchEvent).toHaveBeenCalledWith(QUICK_LOG_V2_OPEN_EVENT, {
       targetKey: "plant:p1",
       action: "water",

@@ -202,9 +202,6 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
                 {results.length} {results.length === 1 ? "result" : "results"}
               </span>
               <span className="tabular-nums">
-                Showing 1–{results.length} of {results.length}
-              </span>
-              <span className="tabular-nums">
                 Showing 1–{shownCount} of {results.length}
               </span>
               <span className="ml-auto flex flex-wrap items-center gap-1.5">
@@ -217,7 +214,7 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
                       data-testid={`global-search-count-${t}`}
                     >
                       <Icon className="h-3 w-3 text-muted-foreground" aria-hidden="true" />
-                      <span className="tabular-nums">{grouped[t].length}</span>
+                      <span className="tabular-nums">{totalsByGroup[t]}</span>
                       <span className="text-muted-foreground">{GROUP_HEADINGS[t]}</span>
                     </span>
                   );

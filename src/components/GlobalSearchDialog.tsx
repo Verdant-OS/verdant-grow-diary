@@ -95,6 +95,7 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
     () => readGlobalSearchSession().query,
   );
   const [recent, setRecent] = useState<string[]>([]);
+  const [history, setHistory] = useState<GlobalSearchHistoryEntry[]>([]);
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
   const [previewRow, setPreviewRow] = useState<GlobalSearchResult | null>(null);
   const [enabledTypes, setEnabledTypes] = useState<
@@ -105,6 +106,7 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
   useEffect(() => {
     if (open) {
       setRecent(readRecentSearches());
+      setHistory(readGlobalSearchHistory());
       // Re-hydrate on open in case another tab / dialog instance updated it.
       const restored = readGlobalSearchSession();
       setQuery(restored.query);
@@ -117,6 +119,18 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
   // Persist query + filters whenever they change so the next open resumes.
   useEffect(() => {
     writeGlobalSearchSession({ query, filters: enabledTypes });
+  }, [query, enabledTypes]);
+
+  // Debounced push to session history: capture stable {query, filters} tuples
+  // (≥2 chars) so re-running a prior search is one click. Selecting a result
+  // also pushes immediately (in handleSelectResult).
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) return;
+    const timeout = setTimeout(() => {
+      setHistory(pushGlobalSearchHistory({ query: q, filters: enabledTypes }));
+    }, 600);
+    return () => clearTimeout(timeout);
   }, [query, enabledTypes]);
 
 

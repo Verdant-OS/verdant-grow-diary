@@ -1,0 +1,61 @@
+name: PR425 lint diagnostics
+
+on:
+  push:
+    branches:
+      - tmp/pr425-ci-diagnostics
+    paths:
+      - .github/workflows/pr425-lint-diagnostics.yml
+  pull_request:
+    branches:
+      - verdant-grow-diary
+    paths:
+      - .github/workflows/pr425-lint-diagnostics.yml
+
+permissions:
+  contents: read
+
+jobs:
+  lint-diagnostics:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.14
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Capture lint JSON
+        shell: bash
+        run: |
+          mkdir -p artifacts/pr425-lint
+          set +e
+          bunx eslint . --format json --output-file artifacts/pr425-lint/eslint.json
+          status=$?
+          set -e
+          printf '%s\n' "$status" > artifacts/pr425-lint/exit.txt
+          node - <<'NODE'
+          const fs = require('fs');
+          const rows = JSON.parse(fs.readFileSync('artifacts/pr425-lint/eslint.json', 'utf8'));
+          const compact = rows
+            .filter((row) => row.errorCount || row.warningCount)
+            .map((row) => ({
+              filePath: row.filePath,
+              errorCount: row.errorCount,
+              warningCount: row.warningCount,
+              messages: row.messages.map(({ line, column, ruleId, severity, message }) => ({ line, column, ruleId, severity, message })),
+            }));
+          fs.writeFileSync('artifacts/pr425-lint/compact.json', JSON.stringify(compact, null, 2));
+          console.log(JSON.stringify(compact, null, 2));
+          NODE
+      - name: Upload lint diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: pr425-lint-diagnostics
+          path: artifacts/pr425-lint/
+          if-no-files-found: error
+          retention-days: 3

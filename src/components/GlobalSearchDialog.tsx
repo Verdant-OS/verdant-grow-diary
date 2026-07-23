@@ -679,24 +679,53 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
                         </Button>
                         {(
                           [
-                            { type: "observation", label: "Diary note", testId: "note" },
-                            { type: "watering", label: "Watering", testId: "watering" },
-                            { type: "feeding", label: "Feeding", testId: "feeding" },
-                          ] as const
-                        ).map(({ type, label, testId }) => (
+                            { actionId: "diary_note", label: "Note", testId: "note", fallbackType: "observation" },
+                            { actionId: "watering", label: "Watering", testId: "watering", fallbackType: "watering" },
+                            { actionId: "feeding", label: "Feeding", testId: "feeding", fallbackType: "feeding" },
+                          ] as ReadonlyArray<{
+                            actionId: FastAddActionId;
+                            label: string;
+                            testId: string;
+                            fallbackType: "observation" | "watering" | "feeding";
+                          }>
+                        ).map(({ actionId, label, testId, fallbackType }) => (
                           <Button
-                            key={type}
+                            key={actionId}
                             type="button"
                             size="sm"
-                            variant={type === "observation" ? "default" : "secondary"}
+                            variant={actionId === "diary_note" ? "default" : "secondary"}
                             onClick={() => {
                               onOpenChange(false);
-                              navigate(`/quick-log?type=${type}`);
+                              // With plant/tent context: dispatch the same Quick
+                              // Log prefill event the plant/tent detail pages
+                              // already listen for. The form opens prefilled
+                              // with plant + occurred_at=now; the grower still
+                              // confirms and saves — no silent writes here.
+                              if (createContext) {
+                                const intent = resolveFastAddIntent(actionId, createContext);
+                                if (intent.kind === "open-quicklog" || intent.kind === "open-quicklog-v2") {
+                                  const detail =
+                                    intent.kind === "open-quicklog-v2" ? intent.detail : intent.prefill;
+                                  if (typeof window !== "undefined") {
+                                    window.dispatchEvent(
+                                      new CustomEvent(intent.eventName, { detail }),
+                                    );
+                                  }
+                                  return;
+                                }
+                              }
+                              // No plant/tent in the current route — fall back
+                              // to the public Quick Log starter with a type hint.
+                              navigate(`/quick-log?type=${fallbackType}`);
                             }}
                             data-testid={`global-search-empty-start-${testId}`}
                           >
-                            <NotebookPen className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
-                            {label}
+                            {createContext ? (
+                              <Plus className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                            ) : (
+                              <NotebookPen className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                            )}
+                            {createContext ? `Create ${label.toLowerCase()}` : label}
                           </Button>
                         ))}
                       </div>

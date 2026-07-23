@@ -119,6 +119,7 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
       const restored = readGlobalSearchSession();
       setQuery(restored.query);
       setEnabledTypes(restored.filters);
+      setLastSelected(readGlobalSearchLastSelected());
     }
     // Intentionally do NOT clear query/filters on close — session memory is
     // the whole point of this hook.

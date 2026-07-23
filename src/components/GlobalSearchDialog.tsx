@@ -124,12 +124,45 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
           shouldFilter={false}
           className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-group]]:px-2 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5 flex h-full w-full flex-col overflow-hidden rounded-md bg-popover text-popover-foreground"
         >
-          <CommandInput
-            placeholder="Search your grows, tents, plants, and cultivars…"
-            value={query}
-            onValueChange={setQuery}
-            data-testid="global-search-input"
-          />
+          <div className="relative">
+            <CommandInput
+              placeholder="Search your grows, tents, plants, and cultivars…"
+              value={query}
+              onValueChange={setQuery}
+              onKeyDown={(event) => {
+                // Esc clears a non-empty query first; a second Esc closes the dialog.
+                if (event.key === "Escape" && trimmed.length > 0) {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  setQuery("");
+                  return;
+                }
+                // Mod+Backspace wipes the whole query in one shot.
+                if (
+                  (event.metaKey || event.ctrlKey) &&
+                  event.key === "Backspace" &&
+                  trimmed.length > 0
+                ) {
+                  event.preventDefault();
+                  setQuery("");
+                }
+              }}
+              className={hasQuery ? "pr-9" : undefined}
+              data-testid="global-search-input"
+            />
+            {hasQuery ? (
+              <button
+                type="button"
+                onClick={() => setQuery("")}
+                aria-label="Clear search (Esc)"
+                title="Clear search (Esc)"
+                data-testid="global-search-clear"
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-sm p-1 text-muted-foreground opacity-70 transition hover:bg-muted hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <X className="h-4 w-4" aria-hidden="true" />
+              </button>
+            ) : null}
+          </div>
           <CommandList>
             {!hasQuery ? (
               recent.length > 0 ? (

@@ -1,11 +1,6 @@
 name: One-shot repository CI baseline repair
 
 on:
-  push:
-    branches:
-      - fix/repo-ci-green
-    paths:
-      - .github/workflows/repair-repo-ci-green-once.yml
   pull_request:
     branches:
       - verdant-grow-diary
@@ -17,12 +12,15 @@ permissions:
 
 concurrency:
   group: repair-repo-ci-green-once
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   repair:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REPAIR_BRANCH: fix/repo-ci-green
     steps:
       - name: Checkout exact repair branch
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -110,28 +108,48 @@ jobs:
           bun run build
           git diff --check
 
-      - name: Commit only permanent repairs
+      - name: Create one exact Git Data commit
         shell: bash
         run: |
           set -euo pipefail
-          git add \
-            .github/workflows/deployment-preview.yml \
-            .github/workflows/prefix-diff-sarif.yml \
-            src/test/release-workbook-formula-snapshots.test.ts \
-            src/lib/growAdapters.test.ts \
-            src/test/edge-shared-mirror-static-safety.test.ts
+          repo="$GITHUB_REPOSITORY"
+          ref_path="heads/$REPAIR_BRANCH"
+          parent_sha="$(gh api "repos/$repo/git/ref/$ref_path" --jq '.object.sha')"
+          base_tree="$(gh api "repos/$repo/git/commits/$parent_sha" --jq '.tree.sha')"
 
-          printf '%s\n' \
-            '.github/workflows/deployment-preview.yml' \
-            '.github/workflows/prefix-diff-sarif.yml' \
-            'src/lib/growAdapters.test.ts' \
-            'src/test/edge-shared-mirror-static-safety.test.ts' \
-            'src/test/release-workbook-formula-snapshots.test.ts' \
-            | sort > /tmp/expected-staged.txt
-          git diff --cached --name-only | sort > /tmp/actual-staged.txt
-          diff -u /tmp/expected-staged.txt /tmp/actual-staged.txt
+          files=(
+            ".github/workflows/deployment-preview.yml"
+            ".github/workflows/prefix-diff-sarif.yml"
+            "src/test/release-workbook-formula-snapshots.test.ts"
+            "src/lib/growAdapters.test.ts"
+            "src/test/edge-shared-mirror-static-safety.test.ts"
+          )
 
-          git config user.name "verdant-ci"
-          git config user.email "actions@users.noreply.github.com"
-          git commit -m "fix(ci): restore repository green baseline"
-          git push origin HEAD:fix/repo-ci-green
+          tree_entries='[]'
+          for path in "${files[@]}"; do
+            content="$(base64 -w0 "$path")"
+            blob_sha="$(jq -n --arg content "$content" '{content:$content,encoding:"base64"}' \
+              | gh api --method POST "repos/$repo/git/blobs" --input - --jq '.sha')"
+            tree_entries="$(jq \
+              --arg path "$path" \
+              --arg sha "$blob_sha" \
+              '. + [{path:$path,mode:"100644",type:"blob",sha:$sha}]' \
+              <<<"$tree_entries")"
+          done
+
+          tree_sha="$(jq -n \
+            --arg base_tree "$base_tree" \
+            --argjson tree "$tree_entries" \
+            '{base_tree:$base_tree,tree:$tree}' \
+            | gh api --method POST "repos/$repo/git/trees" --input - --jq '.sha')"
+
+          commit_sha="$(jq -n \
+            --arg message "fix(ci): restore repository green baseline" \
+            --arg tree "$tree_sha" \
+            --arg parent "$parent_sha" \
+            '{message:$message,tree:$tree,parents:[$parent]}' \
+            | gh api --method POST "repos/$repo/git/commits" --input - --jq '.sha')"
+
+          jq -n --arg sha "$commit_sha" '{sha:$sha,force:false}' \
+            | gh api --method PATCH "repos/$repo/git/refs/$ref_path" --input - >/dev/null
+          echo "Committed validated repairs at $commit_sha"

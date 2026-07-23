@@ -68,7 +68,7 @@ function routeFor(row: GlobalSearchResult): string {
 export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
-  const { results, isLoading, isError } = useGlobalSearch(query);
+  const { results, isLoading, isError, retry } = useGlobalSearch(query);
 
   useEffect(() => {
     if (!open) setQuery("");

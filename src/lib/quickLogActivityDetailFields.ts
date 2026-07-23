@@ -43,7 +43,7 @@ export interface QuickLogDetailSelectOption {
   readonly label: string;
 }
 
-export type QuickLogDetailFieldKind = "select" | "text";
+export type QuickLogDetailFieldKind = "select" | "text" | "number";
 
 export interface QuickLogDetailFieldSpec {
   /** Stored key under details.<key>. Never a reserved identity key. */
@@ -53,8 +53,17 @@ export interface QuickLogDetailFieldSpec {
   readonly kind: QuickLogDetailFieldKind;
   /** Closed option set for `select` fields. */
   readonly options?: readonly QuickLogDetailSelectOption[];
-  /** Placeholder for `text` fields. */
+  /** Placeholder for `text` / `number` fields. */
   readonly placeholder?: string;
+  /**
+   * Inclusive plausibility bounds for `number` fields. A value outside the band
+   * is dropped (fail-closed) rather than stored — keeps a fat-fingered reading
+   * out of the permanent log. The grower's exact entry is preserved as a string.
+   */
+  readonly min?: number;
+  readonly max?: number;
+  /** Display unit for `number` fields (e.g. "°C", "%"). Display-only. */
+  readonly unit?: string;
 }
 
 /**
@@ -149,6 +158,82 @@ export const QUICK_LOG_ACTIVITY_DETAIL_FIELDS: Partial<
       ],
     },
   ],
+  // CARDINAL doctrine: captures what the grower SAW, never a cause or diagnosis.
+  // Options are visible signs ("yellowing"), not causes ("nitrogen deficiency").
+  // Closed set (no free-text "Other") so a logged observation can never smuggle
+  // in a diagnosis. Location is where the sign was seen.
+  issue_observation: [
+    {
+      key: "observedSign",
+      label: "What you observed",
+      kind: "select",
+      options: [
+        { value: "discoloration", label: "Discoloration / yellowing" },
+        { value: "spots", label: "Spots or lesions" },
+        { value: "curling", label: "Curling or clawing leaves" },
+        { value: "wilting", label: "Wilting or drooping" },
+        { value: "crispy_edges", label: "Crispy / burnt edges or tips" },
+        { value: "pests_seen", label: "Pests seen (bugs / webbing / eggs)" },
+        { value: "mold_seen", label: "Mold or powder seen" },
+        { value: "unusual_smell", label: "Unusual smell" },
+        { value: "slow_growth", label: "Slow / stalled growth" },
+        { value: "physical_damage", label: "Physical damage" },
+      ],
+    },
+    {
+      key: "observationLocation",
+      label: "Location",
+      kind: "select",
+      options: [
+        { value: "lower_leaves", label: "Lower leaves" },
+        { value: "upper_growth", label: "Upper / new growth" },
+        { value: "whole_plant", label: "Whole plant" },
+        { value: "buds", label: "Buds / flower" },
+        { value: "stems", label: "Stems" },
+        { value: "medium_surface", label: "Soil / medium surface" },
+        { value: "roots", label: "Roots" },
+      ],
+    },
+  ],
+  // CARDINAL doctrine: stays a MANUAL observation, distinct from live sensor
+  // data. The qualitative check is primary; the optional temp/RH are explicitly
+  // labeled "manual" and validated to plausible bands. These are logged as
+  // event metadata only — they do NOT flow into the sensor_readings pipeline or
+  // VPD surfaces (that is the Manual Sensor Snapshot path).
+  environment_check: [
+    {
+      key: "checkType",
+      label: "What you checked / adjusted",
+      kind: "select",
+      options: [
+        { value: "airflow", label: "Airflow / fans" },
+        { value: "condensation", label: "Condensation / moisture" },
+        { value: "smell", label: "Smell / odor" },
+        { value: "light", label: "Light (on-off / height)" },
+        { value: "equipment", label: "Equipment / noise" },
+        { value: "walkthrough", label: "General walkthrough" },
+        { value: "other", label: "Other" },
+      ],
+    },
+    {
+      key: "manualTempC",
+      label: "Temperature (manual)",
+      kind: "number",
+      min: -10,
+      max: 60,
+      unit: "°C",
+      placeholder: "e.g. 24",
+    },
+    {
+      key: "manualHumidityPct",
+      label: "Humidity (manual)",
+      kind: "number",
+      min: 0,
+      max: 100,
+      unit: "%",
+      placeholder: "e.g. 55",
+    },
+  ],
 });
 
 export function getQuickLogActivityDetailFields(
@@ -188,6 +273,14 @@ export function sanitizeQuickLogActivityDetails(
       // Only accept values that are in the closed option set.
       if (optionLabel(spec, trimmed) === null) continue;
       out[spec.key] = trimmed;
+    } else if (spec.kind === "number") {
+      // Plausibility fence: finite and within the inclusive band, else dropped.
+      const n = Number(trimmed);
+      if (!Number.isFinite(n)) continue;
+      if (typeof spec.min === "number" && n < spec.min) continue;
+      if (typeof spec.max === "number" && n > spec.max) continue;
+      // Preserve the grower's exact entry as a string (matches harvest details).
+      out[spec.key] = trimmed.slice(0, QUICK_LOG_DETAIL_TEXT_MAX);
     } else {
       out[spec.key] = trimmed.slice(0, QUICK_LOG_DETAIL_TEXT_MAX);
     }
@@ -201,6 +294,35 @@ export interface QuickLogDetailDisplayLine {
   readonly label: string;
   /** Human-readable value (option label for selects, raw text otherwise). */
   readonly value: string;
+}
+
+/**
+ * Format one stored value against its field spec into a display line, or null
+ * when the value is blank/invalid/out-of-band. Shared by both describers so
+ * select-label mapping, number bounds, and unit suffixing stay in one place.
+ */
+function formatDetailLine(
+  spec: QuickLogDetailFieldSpec,
+  raw: unknown,
+): QuickLogDetailDisplayLine | null {
+  if (typeof raw !== "string") return null;
+  const trimmed = raw.trim();
+  if (trimmed === "") return null;
+
+  if (spec.kind === "select") {
+    const label = optionLabel(spec, trimmed);
+    if (label === null) return null;
+    return { key: spec.key, label: spec.label, value: label };
+  }
+  if (spec.kind === "number") {
+    const n = Number(trimmed);
+    if (!Number.isFinite(n)) return null;
+    if (typeof spec.min === "number" && n < spec.min) return null;
+    if (typeof spec.max === "number" && n > spec.max) return null;
+    const shown = trimmed.slice(0, QUICK_LOG_DETAIL_TEXT_MAX);
+    return { key: spec.key, label: spec.label, value: spec.unit ? `${shown} ${spec.unit}` : shown };
+  }
+  return { key: spec.key, label: spec.label, value: trimmed.slice(0, QUICK_LOG_DETAIL_TEXT_MAX) };
 }
 
 /**
@@ -219,41 +341,11 @@ export function describeQuickLogActivityDetails(
 
   const lines: QuickLogDetailDisplayLine[] = [];
   for (const spec of specs) {
-    const raw = record[spec.key];
-    if (typeof raw !== "string") continue;
-    const trimmed = raw.trim();
-    if (trimmed === "") continue;
-
-    if (spec.kind === "select") {
-      const label = optionLabel(spec, trimmed);
-      if (label === null) continue;
-      lines.push({ key: spec.key, label: spec.label, value: label });
-    } else {
-      lines.push({
-        key: spec.key,
-        label: spec.label,
-        value: trimmed.slice(0, QUICK_LOG_DETAIL_TEXT_MAX),
-      });
-    }
+    const line = formatDetailLine(spec, record[spec.key]);
+    if (line) lines.push(line);
   }
   return lines;
 }
-
-/**
- * Flat lookup of every detail field spec by its (globally unique) key. Built
- * once so the extras-scanning describer below stays O(keys).
- */
-const DETAIL_FIELD_BY_KEY: ReadonlyMap<string, QuickLogDetailFieldSpec> = (() => {
-  const map = new Map<string, QuickLogDetailFieldSpec>();
-  for (const specs of Object.values(QUICK_LOG_ACTIVITY_DETAIL_FIELDS)) {
-    for (const spec of specs ?? []) {
-      // Field keys are globally unique across activities (enforced by test);
-      // first-writer-wins keeps this deterministic even if that ever regresses.
-      if (!map.has(spec.key)) map.set(spec.key, spec);
-    }
-  }
-  return map;
-})();
 
 /**
  * Describe stored Quick Log detail WITHOUT knowing the activity id.
@@ -269,24 +361,17 @@ export function describeQuickLogDetailsFromExtras(
 ): readonly QuickLogDetailDisplayLine[] {
   if (!details || typeof details !== "object") return [];
   const record = details as Record<string, unknown>;
+  // Preserve spec order per activity rather than raw-key insertion order, so
+  // multi-field activities (e.g. observed sign then location) read consistently.
   const lines: QuickLogDetailDisplayLine[] = [];
-  for (const [key, raw] of Object.entries(record)) {
-    const spec = DETAIL_FIELD_BY_KEY.get(key);
-    if (!spec) continue;
-    if (typeof raw !== "string") continue;
-    const trimmed = raw.trim();
-    if (trimmed === "") continue;
-
-    if (spec.kind === "select") {
-      const label = optionLabel(spec, trimmed);
-      if (label === null) continue;
-      lines.push({ key: spec.key, label: spec.label, value: label });
-    } else {
-      lines.push({
-        key: spec.key,
-        label: spec.label,
-        value: trimmed.slice(0, QUICK_LOG_DETAIL_TEXT_MAX),
-      });
+  const seen = new Set<string>();
+  for (const specs of Object.values(QUICK_LOG_ACTIVITY_DETAIL_FIELDS)) {
+    for (const spec of specs ?? []) {
+      if (seen.has(spec.key)) continue;
+      seen.add(spec.key);
+      if (!(spec.key in record)) continue;
+      const line = formatDetailLine(spec, record[spec.key]);
+      if (line) lines.push(line);
     }
   }
   return lines;

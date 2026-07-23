@@ -542,7 +542,8 @@ export default function QuickLogAllActivitiesSection({
                     htmlFor={`${testIdPrefix}-detail-${field.key}`}
                     className="text-[11px] text-muted-foreground"
                   >
-                    {field.label} (optional)
+                    {field.label}
+                    {field.unit ? ` (${field.unit})` : ""} (optional)
                   </Label>
                   {field.kind === "select" ? (
                     <select
@@ -575,6 +576,7 @@ export default function QuickLogAllActivitiesSection({
                         setDetailValues((prev) => ({ ...prev, [field.key]: v }));
                       }}
                       disabled={mutationBlocked}
+                      inputMode={field.kind === "number" ? "decimal" : undefined}
                       placeholder={field.placeholder}
                       className="text-sm"
                     />

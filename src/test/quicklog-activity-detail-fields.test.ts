@@ -39,11 +39,34 @@ describe("quickLogActivityDetailFields — training technique spec", () => {
     }
   });
 
-  it("returns no fields for activities without a detail slice yet", () => {
-    // The two doctrine-cardinal activities are intentionally still note-only
-    // until their field options are confirmed.
-    expect(getQuickLogActivityDetailFields("issue_observation")).toEqual([]);
-    expect(getQuickLogActivityDetailFields("environment_check")).toEqual([]);
+  it("returns no fields for activities that remain note-only", () => {
+    expect(getQuickLogActivityDetailFields("feeding")).toEqual([]);
+    expect(getQuickLogActivityDetailFields("harvest")).toEqual([]);
+  });
+
+  it("issue_observation captures observed signs (never causes) as a fully CLOSED set", () => {
+    const [sign, location] = getQuickLogActivityDetailFields("issue_observation");
+    expect(sign.key).toBe("observedSign");
+    expect(location.key).toBe("observationLocation");
+    // Fully closed: no free-text "other" escape that could smuggle a diagnosis.
+    expect((sign.options ?? []).some((o) => o.value === "other")).toBe(false);
+    // Every option is a visible sign, never a cause/diagnosis. (Note: "burnt
+    // edges" describes appearance and is allowed; "nutrient burn" — a cause —
+    // is not.)
+    const banned = /(deficien|nitrogen|phosphor|potassium|calcium|septoria|fungus|overwater|nutrient burn|lockout|diagnos)/i;
+    for (const o of sign.options ?? []) expect(o.label).not.toMatch(banned);
+  });
+
+  it("environment_check keeps manual temp/RH plausibility-bounded and clearly manual", () => {
+    const fields = getQuickLogActivityDetailFields("environment_check");
+    const temp = fields.find((f) => f.key === "manualTempC")!;
+    const rh = fields.find((f) => f.key === "manualHumidityPct")!;
+    expect(temp.kind).toBe("number");
+    expect(temp.min).toBe(-10);
+    expect(temp.max).toBe(60);
+    expect(rh.min).toBe(0);
+    expect(rh.max).toBe(100);
+    expect(temp.label.toLowerCase()).toContain("manual");
   });
 
   it("exposes doctrine-safe detail fields for defoliation, photo, and note", () => {
@@ -59,7 +82,9 @@ describe("quickLogActivityDetailFields — training technique spec", () => {
   });
 
   it("keeps every option label across all activities free of diagnosis/recommendation language", () => {
-    const banned = /(should|recommend|diagnos|deficien|healthy|unhealthy|cure|treat|toxic|burn)/i;
+    // "burnt" describes appearance (allowed); the cause-word "nutrient burn" is
+    // guarded in the issue_observation-specific test above.
+    const banned = /(should|recommend|diagnos|deficien|healthy|unhealthy|cure|toxic)/i;
     for (const specs of Object.values(QUICK_LOG_ACTIVITY_DETAIL_FIELDS)) {
       for (const spec of specs ?? []) {
         for (const opt of spec.options ?? []) {
@@ -125,6 +150,46 @@ describe("sanitizeQuickLogActivityDetails", () => {
     const out = sanitizeQuickLogActivityDetails("photo", { subject: "buds", caption: long });
     expect(out?.subject).toBe("buds");
     expect((out?.caption ?? "").length).toBe(QUICK_LOG_DETAIL_TEXT_MAX);
+  });
+
+  it("issue_observation drops an out-of-set observed sign (closed set, fail closed)", () => {
+    expect(
+      sanitizeQuickLogActivityDetails("issue_observation", {
+        observedSign: "nitrogen_deficiency",
+        observationLocation: "lower_leaves",
+      }),
+    ).toEqual({ observationLocation: "lower_leaves" });
+  });
+
+  it("environment_check keeps a plausible manual reading (as a string) and drops an impossible one", () => {
+    expect(
+      sanitizeQuickLogActivityDetails("environment_check", {
+        checkType: "airflow",
+        manualTempC: "24",
+        manualHumidityPct: "55",
+      }),
+    ).toEqual({ checkType: "airflow", manualTempC: "24", manualHumidityPct: "55" });
+    // out-of-band temp + humidity dropped, qualitative check kept
+    expect(
+      sanitizeQuickLogActivityDetails("environment_check", {
+        checkType: "walkthrough",
+        manualTempC: "999",
+        manualHumidityPct: "150",
+      }),
+    ).toEqual({ checkType: "walkthrough" });
+    // non-numeric manual reading dropped
+    expect(
+      sanitizeQuickLogActivityDetails("environment_check", { manualTempC: "warm" }),
+    ).toBeNull();
+  });
+
+  it("describes a manual environment reading with its unit", () => {
+    expect(
+      describeQuickLogDetailsFromExtras({ checkType: "airflow", manualTempC: "24" }),
+    ).toEqual([
+      { key: "checkType", label: "What you checked / adjusted", value: "Airflow / fans" },
+      { key: "manualTempC", label: "Temperature (manual)", value: "24 °C" },
+    ]);
   });
 });
 

@@ -213,6 +213,68 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     expect(args.p_details).toMatchObject({ subject: "buds", caption: "day 40 flower" });
   });
 
+  it("Issue/Observation → quicklog_save_event carries observed sign + location (never a cause)", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: { ok: true, grow_event_id: "e-obs" },
+      error: null,
+    });
+    mountSection();
+    selectActivity("issue_observation");
+    await screen.findByTestId("quick-log-all-activities-form");
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-detail-observedSign"), {
+      target: { value: "discoloration" },
+    });
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-detail-observationLocation"), {
+      target: { value: "lower_leaves" },
+    });
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-note"), {
+      target: { value: "noticed this today" },
+    });
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
+
+    await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(1));
+    const [rpcName, args] = rpcMock.mock.calls[0];
+    expect(rpcName).toBe("quicklog_save_event");
+    expect(args.p_event_type).toBe("observation");
+    expect(args.p_details).toMatchObject({
+      subtype: "issue",
+      observedSign: "discoloration",
+      observationLocation: "lower_leaves",
+    });
+  });
+
+  it("Environment check → quicklog_save_event carries qualitative check + manual (plausible) temp/RH", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: { ok: true, grow_event_id: "e-env" },
+      error: null,
+    });
+    mountSection();
+    selectActivity("environment_check");
+    await screen.findByTestId("quick-log-all-activities-form");
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-detail-checkType"), {
+      target: { value: "airflow" },
+    });
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-detail-manualTempC"), {
+      target: { value: "24" },
+    });
+    // Physically impossible humidity must be dropped at the sanitize seam.
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-detail-manualHumidityPct"), {
+      target: { value: "999" },
+    });
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-note"), {
+      target: { value: "bumped the fan up a notch" },
+    });
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
+
+    await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(1));
+    const [rpcName, args] = rpcMock.mock.calls[0];
+    expect(rpcName).toBe("quicklog_save_event");
+    expect(args.p_event_type).toBe("environment");
+    expect(args.p_details).toMatchObject({ checkType: "airflow", manualTempC: "24" });
+    // The impossible humidity was dropped, not stored.
+    expect(args.p_details).not.toHaveProperty("manualHumidityPct");
+  });
+
   it("Training drops an unchosen (blank) technique — no technique key in p_details", async () => {
     rpcMock.mockResolvedValueOnce({
       data: { ok: true, grow_event_id: "e-train2" },

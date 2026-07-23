@@ -219,6 +219,7 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
   const handleSelectResult = (row: GlobalSearchResult) => {
     if (trimmed) {
       setRecent(pushRecentSearch(trimmed));
+      setHistory(pushGlobalSearchHistory({ query: trimmed, filters: enabledTypes }));
     }
     onOpenChange(false);
     navigate(routeFor(row));
@@ -228,6 +229,19 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
     clearRecentSearches();
     setRecent([]);
   };
+
+  const handleReplayHistory = (entry: GlobalSearchHistoryEntry) => {
+    setEnabledTypes({ ...entry.filters });
+    setQuery(entry.query);
+    // Bump this entry to the top so repeated replays keep it fresh.
+    setHistory(pushGlobalSearchHistory({ query: entry.query, filters: entry.filters }));
+  };
+
+  const handleClearHistory = () => {
+    clearGlobalSearchHistory();
+    setHistory([]);
+  };
+
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

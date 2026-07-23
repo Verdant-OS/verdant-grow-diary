@@ -4655,6 +4655,24 @@ export type Database = {
         }
         Returns: Json
       }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
+      verdant_normalize_search_text: {
+        Args: { p_text: string }
+        Returns: string
+      }
+      verdant_search: {
+        Args: { max_results?: number; q: string }
+        Returns: {
+          entity_type: string
+          id: string
+          label: string
+          match_kind: string
+          rank: number
+          score: number
+          sublabel: string
+        }[]
+      }
     }
     Enums: {
       agreement_type: "terms" | "privacy"

@@ -129,6 +129,7 @@ import {
   buildEcCompensationPreview,
   EC_COMPENSATION_PREVIEW_DISCLAIMER,
 } from "@/lib/ecCompensationPreviewViewModel";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import { buildEnvironmentCheckSensorContext } from "@/lib/environmentCheckSensorContextRules";
 import { buildSensorNormalizationPreviewViewModel } from "@/lib/sensors/sensorNormalizationPreviewViewModel";
 import { SensorNormalizationPreviewPanel } from "@/components/SensorNormalizationPreviewPanel";
@@ -355,7 +356,15 @@ export default function QuickLog({
   const [envHumidityPct, setEnvHumidityPct] = useState<string>("");
   const [envVpdKpa, setEnvVpdKpa] = useState<string>("");
   const [envWaterTempValue, setEnvWaterTempValue] = useState<string>("");
-  const [envWaterTempUnit, setEnvWaterTempUnit] = useState<EnvironmentCheckWaterTempUnit>("F");
+  // The legacy Environment Check water-temp field is already unit-aware via
+  // an explicit °F/°C selector (conversion happens once inside
+  // environmentCheckQuickLogRules). Seed and reset that selector from the
+  // grower's temperature unit preference instead of hardcoding °F.
+  const temperatureUnitPreference = useTemperatureUnitPreference();
+  const defaultEnvWaterTempUnit: EnvironmentCheckWaterTempUnit =
+    temperatureUnitPreference === "celsius" ? "C" : "F";
+  const [envWaterTempUnit, setEnvWaterTempUnit] =
+    useState<EnvironmentCheckWaterTempUnit>(defaultEnvWaterTempUnit);
   const [envEcMscm, setEnvEcMscm] = useState<string>("");
   const [harvestPhotoAngle, setHarvestPhotoAngle] = useState<HarvestPhotoAngle | "">("");
   const [harvestPhotoLighting, setHarvestPhotoLighting] = useState<HarvestPhotoLighting | "">("");
@@ -767,7 +776,7 @@ export default function QuickLog({
     setEnvHumidityPct("");
     setEnvVpdKpa("");
     setEnvWaterTempValue("");
-    setEnvWaterTempUnit("F");
+    setEnvWaterTempUnit(defaultEnvWaterTempUnit);
     setEnvEcMscm("");
     setHarvestPhotoAngle("");
     setHarvestPhotoLighting("");
@@ -805,7 +814,7 @@ export default function QuickLog({
       setEnvHumidityPct("");
       setEnvVpdKpa("");
       setEnvWaterTempValue("");
-      setEnvWaterTempUnit("F");
+      setEnvWaterTempUnit(defaultEnvWaterTempUnit);
       setEnvEcMscm("");
     }
     if (plan.clearMaturity) {
@@ -865,7 +874,7 @@ export default function QuickLog({
     setEnvHumidityPct("");
     setEnvVpdKpa("");
     setEnvWaterTempValue("");
-    setEnvWaterTempUnit("F");
+    setEnvWaterTempUnit(defaultEnvWaterTempUnit);
     setEnvEcMscm("");
     setHarvestPhotoAngle("");
     setHarvestPhotoLighting("");

@@ -28,6 +28,30 @@ import {
   EC_COMPENSATION_PREVIEW_DISCLAIMER,
 } from "@/lib/ecCompensationPreviewViewModel";
 import { updateEcPpm500Pair, type EcPpm500EditSource } from "@/lib/ecPpm500PairRules";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
+import {
+  fahrenheitToCelsius,
+  getTemperatureUnitSymbol,
+  type TemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
+
+const PLAIN_TEMP_INPUT = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/;
+
+/**
+ * Convert the grower-typed water temperature (entered in the active
+ * preference unit) into a canonical-°C string EXACTLY ONCE for the
+ * review/EC-preview consumers, which interpret their input as °C.
+ * Blank stays blank and non-numeric text passes through unchanged so
+ * the existing validators keep rejecting it with their original reasons.
+ */
+function typedTempToCelsiusInput(raw: string, unit: TemperatureUnitPreference): string {
+  if (unit !== "fahrenheit") return raw;
+  const trimmed = raw.trim();
+  if (trimmed === "" || !PLAIN_TEMP_INPUT.test(trimmed)) return raw;
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed)) return raw;
+  return String(Math.round(fahrenheitToCelsius(parsed) * 100) / 100);
+}
 
 interface Props {
   value: QuickLogFeedingFormState;
@@ -42,6 +66,13 @@ export default function QuickLogFeedingForm({
   disabled,
   defaultsApplied = false,
 }: Props) {
+  const temperatureUnit = useTemperatureUnitPreference();
+  const temperatureUnitSymbol = getTemperatureUnitSymbol(temperatureUnit);
+  // Display-side canonicalization only: the write seam converts from the
+  // raw typed value itself (QuickLogV2Sheet), never from this derived copy,
+  // so no value is ever converted twice.
+  const canonicalWaterTempC = typedTempToCelsiusInput(value.waterTempC, temperatureUnit);
+
   const setField = <K extends keyof QuickLogFeedingFormState>(
     k: K,
     v: QuickLogFeedingFormState[K],
@@ -65,7 +96,9 @@ export default function QuickLogFeedingForm({
     onChange({ ...value, [ecKey]: pair.ec, [ppmKey]: pair.ppm });
   };
 
-  const review = buildFeedingReview(value, defaultsApplied);
+  // The review summarizes what will be SAVED, and the viewmodel labels its
+  // temperature line "(°C)" — hand it the canonical-°C value.
+  const review = buildFeedingReview({ ...value, waterTempC: canonicalWaterTempC }, defaultsApplied);
 
   return (
     <div className="space-y-4" data-testid="qlv2-feeding-form">
@@ -268,7 +301,7 @@ export default function QuickLogFeedingForm({
             />
           </div>
           <div>
-            <Label htmlFor="qlv2-feed-water-temp">Water (°C)</Label>
+            <Label htmlFor="qlv2-feed-water-temp">Water ({temperatureUnitSymbol})</Label>
             <Input
               id="qlv2-feed-water-temp"
               inputMode="decimal"
@@ -348,7 +381,7 @@ export default function QuickLogFeedingForm({
                 <dd className="font-medium">{review.note}</dd>
               </div>
             )}
-            <EcCompensationPreviewLine ec={value.ecIn} waterTempC={value.waterTempC} />
+            <EcCompensationPreviewLine ec={value.ecIn} waterTempC={canonicalWaterTempC} />
           </dl>
         )}
       </div>

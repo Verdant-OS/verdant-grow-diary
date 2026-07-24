@@ -15,6 +15,12 @@
  *     parses note text aggressively.
  */
 
+import {
+  celsiusToFahrenheit,
+  loadTemperatureUnitPreference,
+  type TemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
+
 export const ENVIRONMENT_CHECK_TIMELINE_TITLE = "Environment check" as const;
 export const ENVIRONMENT_CHECK_TIMELINE_SOURCE_LABEL =
   "Quick Log environment check — not live sensor telemetry" as const;
@@ -117,11 +123,17 @@ function pickEnvelope(details: unknown): Record<string, unknown> | null {
 
 function buildFields(
   envelope: Record<string, unknown> | null,
+  tempUnit: TemperatureUnitPreference,
 ): EnvironmentCheckTimelineField[] {
   if (!envelope) return [];
   const fields: EnvironmentCheckTimelineField[] = [];
 
-  // Temp: prefer Celsius when available; otherwise show Fahrenheit.
+  // Temp: prefer the canonical Celsius value when available; otherwise use
+  // the grower-entered Fahrenheit value. Display honors `tempUnit`:
+  //  - fahrenheit → °C values convert once at string-build time; °F values
+  //    render as-is (never double-converted).
+  //  - celsius → the legacy strings are preserved exactly (°C as-is; a
+  //    °F-only envelope still renders °F rather than silently converting).
   const tempC = asFiniteNumber(
     envelope.temp_c ?? envelope.tempC ?? envelope.air_temp_c,
   );
@@ -129,7 +141,14 @@ function buildFields(
     envelope.room_temp_f ?? envelope.tempF ?? envelope.air_temp_f,
   );
   if (tempC != null) {
-    fields.push({ key: "temp", label: "Temp", value: `${tempC.toFixed(1)}°C` });
+    fields.push({
+      key: "temp",
+      label: "Temp",
+      value:
+        tempUnit === "fahrenheit"
+          ? `${celsiusToFahrenheit(tempC).toFixed(1)}°F`
+          : `${tempC.toFixed(1)}°C`,
+    });
   } else if (tempF != null) {
     fields.push({ key: "temp", label: "Temp", value: `${tempF.toFixed(1)}°F` });
   }
@@ -158,9 +177,13 @@ function buildFields(
  * Build a presenter-safe Environment Check timeline view model for a
  * single diary entry. Returns null when the entry is not an Environment
  * Check, is missing a usable id, or has no parseable timestamp.
+ *
+ * `tempUnit` controls only the DISPLAY unit of the temperature field —
+ * stored values stay canonical and conversion happens at string-build time.
  */
 export function buildEnvironmentCheckTimelineViewModel(
   raw: EnvironmentCheckTimelineRawEntry | null | undefined,
+  tempUnit: TemperatureUnitPreference = loadTemperatureUnitPreference(),
 ): EnvironmentCheckTimelineViewModel | null {
   try {
     if (!raw || typeof raw !== "object") return null;
@@ -171,7 +194,7 @@ export function buildEnvironmentCheckTimelineViewModel(
     if (!occurredAt) return null;
 
     const envelope = pickEnvelope(raw.details);
-    const fields = buildFields(envelope);
+    const fields = buildFields(envelope, tempUnit);
     // Prefer envelope note when present, fall back to entry note.
     const envelopeNote = envelope ? asString(envelope.note) : null;
     const noteSummary = clipNote(envelopeNote ?? raw.note ?? null);
@@ -200,11 +223,13 @@ export function buildEnvironmentCheckTimelineViewModel(
  */
 export function buildEnvironmentCheckTimelineList(
   rawEntries: readonly EnvironmentCheckTimelineRawEntry[] | null | undefined,
+  // Resolved once here (never inside the loop) and passed down per entry.
+  tempUnit: TemperatureUnitPreference = loadTemperatureUnitPreference(),
 ): EnvironmentCheckTimelineViewModel[] {
   const list = Array.isArray(rawEntries) ? rawEntries : [];
   const out: EnvironmentCheckTimelineViewModel[] = [];
   for (const r of list) {
-    const vm = buildEnvironmentCheckTimelineViewModel(r);
+    const vm = buildEnvironmentCheckTimelineViewModel(r, tempUnit);
     if (vm) out.push(vm);
   }
   out.sort((a, b) => {

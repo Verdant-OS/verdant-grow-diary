@@ -23,6 +23,11 @@ import {
   type EnvironmentCheckTimelineRawEntry,
 } from "@/lib/environmentCheckTimelineViewModel";
 import { TRAINING_INTENSITIES, TRAINING_TECHNIQUES } from "@/lib/quickLogTypedEventPayloadRules";
+import {
+  celsiusToFahrenheit,
+  loadTemperatureUnitPreference,
+  type TemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 
 export type DiaryCalendarEventKind =
   | "watering"
@@ -309,7 +314,10 @@ function buildWateringFields(d: Record<string, unknown>): DiaryCalendarEventDisp
   return fields;
 }
 
-function buildFeedingFields(d: Record<string, unknown>): DiaryCalendarEventDisplayField[] {
+function buildFeedingFields(
+  d: Record<string, unknown>,
+  tempUnit: TemperatureUnitPreference,
+): DiaryCalendarEventDisplayField[] {
   const fields: DiaryCalendarEventDisplayField[] = [];
 
   const recipe = pickFirstString(d, ["nutrients", "recipe", "nutrient_line", "nutrientLine"]);
@@ -325,9 +333,16 @@ function buildFeedingFields(d: Record<string, unknown>): DiaryCalendarEventDispl
   const ecUnit = normalizeEcUnit(d.ec_unit ?? d.ecUnit) ?? "mS/cm";
   if (ec != null) fields.push({ label: "EC", value: `${ec} ${ecUnit}` });
 
+  // Stored water temp is canonical Celsius; convert at string-build time only.
   const waterTempC = pickFirstFiniteNumber(d, ["water_temp_c", "waterTempC"]);
   if (waterTempC != null) {
-    fields.push({ label: "Water temp", value: `${waterTempC.toFixed(1)}°C` });
+    fields.push({
+      label: "Water temp",
+      value:
+        tempUnit === "fahrenheit"
+          ? `${celsiusToFahrenheit(waterTempC).toFixed(1)}°F`
+          : `${waterTempC.toFixed(1)}°C`,
+    });
   }
 
   return fields;
@@ -426,7 +441,10 @@ const DIARY_CALENDAR_EMPTY_DETAILS_FALLBACK = "No extra details saved for this e
 
 export const DIARY_CALENDAR_DETAILS_EMPTY = DIARY_CALENDAR_EMPTY_DETAILS_FALLBACK;
 
-function buildEnvironmentFields(rawEntry: DiaryCalendarRawEntry): DiaryCalendarEventDisplayField[] {
+function buildEnvironmentFields(
+  rawEntry: DiaryCalendarRawEntry,
+  tempUnit: TemperatureUnitPreference,
+): DiaryCalendarEventDisplayField[] {
   // Delegate parsing to the existing environment-check timeline VM so we
   // never duplicate envelope parsing logic inside the calendar layer.
   const envEntry: EnvironmentCheckTimelineRawEntry = {
@@ -437,7 +455,7 @@ function buildEnvironmentFields(rawEntry: DiaryCalendarRawEntry): DiaryCalendarE
     note: rawEntry.note ?? null,
     details: rawEntry.details,
   };
-  const vm = buildEnvironmentCheckTimelineViewModel(envEntry);
+  const vm = buildEnvironmentCheckTimelineViewModel(envEntry, tempUnit);
   if (!vm) return [];
   return vm.fields.map((f) => ({ label: f.label, value: f.value }));
 }
@@ -446,6 +464,7 @@ function buildEventDetails(
   kind: DiaryCalendarEventKind,
   rawEntry: DiaryCalendarRawEntry,
   noteSnippet: string | null,
+  tempUnit: TemperatureUnitPreference,
 ): DiaryCalendarEventDetails {
   const d = pickRecord(rawEntry.details);
   let fields: DiaryCalendarEventDisplayField[] = [];
@@ -454,13 +473,13 @@ function buildEventDetails(
   let fallback: string | null = null;
 
   if (kind === "environment") {
-    fields = buildEnvironmentFields(rawEntry);
+    fields = buildEnvironmentFields(rawEntry, tempUnit);
     subtitle = ENVIRONMENT_CHECK_NOT_LIVE_SUBTITLE;
     if (fields.length === 0) fallback = ENVIRONMENT_CHECK_NO_VALUES_COPY;
   } else if (d) {
     if (kind === "watering") fields = buildWateringFields(d);
     else if (kind === "feeding") {
-      fields = buildFeedingFields(d);
+      fields = buildFeedingFields(d, tempUnit);
       const ec = pickFirstFiniteNumber(d, ["ec", "ec_value", "ecValue"]);
       const ecUnit = normalizeEcUnit(d.ec_unit ?? d.ecUnit) ?? "mS/cm";
       const waterTempC = pickFirstFiniteNumber(d, ["water_temp_c", "waterTempC"]);
@@ -519,9 +538,14 @@ function dateKeyUtc(iso: string): string {
  * - Groups by UTC calendar date (YYYY-MM-DD).
  * - Sorts groups newest-first, events within a day newest-first,
  *   stable-tiebreaks by id.
+ *
+ * `tempUnit` controls only the DISPLAY unit of temperature detail fields
+ * (environment-check air temp, feeding water temp). It is resolved once
+ * here — never inside the entry loop — and stored values stay canonical.
  */
 export function buildDiaryCalendarViewModel(
   rawEntries: readonly DiaryCalendarRawEntry[] | null | undefined,
+  tempUnit: TemperatureUnitPreference = loadTemperatureUnitPreference(),
 ): DiaryCalendarDayGroup[] {
   const list = Array.isArray(rawEntries) ? rawEntries : [];
   const events: DiaryCalendarEvent[] = [];

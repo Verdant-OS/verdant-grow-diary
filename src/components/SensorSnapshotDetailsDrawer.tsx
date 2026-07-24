@@ -10,6 +10,11 @@ import {
 } from "@/components/ui/sheet";
 import CanonicalSourceBadge from "@/components/CanonicalSourceBadge";
 import { formatVpdKpa } from "@/lib/vpdCalculationRules";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
+import {
+  celsiusToFahrenheit,
+  type TemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 import {
   matchSnapshotDiaryLinks,
   describeSnapshotDiaryLinkAttempt,
@@ -61,6 +66,20 @@ function fmtNum(v: number | null, suffix = ""): string {
   return `${v}${suffix}`;
 }
 
+/**
+ * Display-only air temperature. The stored value is canonical Celsius;
+ * conversion happens exactly once, here. The celsius preference renders
+ * the legacy string unchanged; missing/invalid stays "Not available".
+ */
+function fmtAirTemp(
+  v: number | null,
+  unit: TemperatureUnitPreference,
+): string {
+  if (typeof v !== "number" || !Number.isFinite(v)) return "Not available";
+  if (unit === "celsius") return `${v}°C`;
+  return `${celsiusToFahrenheit(v).toFixed(1)}°F`;
+}
+
 function Row({
   label,
   value,
@@ -90,6 +109,7 @@ export default function SensorSnapshotDetailsDrawer({
 }: SensorSnapshotDetailsDrawerProps) {
   const titleId = useId();
   const descriptionId = useId();
+  const temperatureUnit = useTemperatureUnitPreference();
   const linkAttempt = describeSnapshotDiaryLinkAttempt();
   const relatedLinks = data && relatedCandidates
     ? matchSnapshotDiaryLinks({
@@ -201,7 +221,7 @@ export default function SensorSnapshotDetailsDrawer({
               />
               <Row
                 label="Air temperature"
-                value={fmtNum(data.airTemperatureC, "°C")}
+                value={fmtAirTemp(data.airTemperatureC, temperatureUnit)}
                 testId="snapshot-drawer-air-temp"
               />
               <Row

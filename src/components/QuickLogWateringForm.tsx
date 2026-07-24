@@ -15,6 +15,30 @@ import {
   buildEcCompensationPreview,
   EC_COMPENSATION_PREVIEW_DISCLAIMER,
 } from "@/lib/ecCompensationPreviewViewModel";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
+import {
+  fahrenheitToCelsius,
+  getTemperatureUnitSymbol,
+  type TemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
+
+const PLAIN_TEMP_INPUT = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/;
+
+/**
+ * Convert the grower-typed water temperature (entered in the active
+ * preference unit) into a canonical-°C string EXACTLY ONCE for the
+ * review/EC-preview consumers, which interpret their input as °C.
+ * Blank stays blank and non-numeric text passes through unchanged so
+ * the existing validators keep rejecting it with their original reasons.
+ */
+function typedTempToCelsiusInput(raw: string, unit: TemperatureUnitPreference): string {
+  if (unit !== "fahrenheit") return raw;
+  const trimmed = raw.trim();
+  if (trimmed === "" || !PLAIN_TEMP_INPUT.test(trimmed)) return raw;
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed)) return raw;
+  return String(Math.round(fahrenheitToCelsius(parsed) * 100) / 100);
+}
 
 interface Props {
   value: QuickLogWateringFormState;
@@ -29,6 +53,13 @@ interface ObservationOption {
 }
 
 export default function QuickLogWateringForm({ value, onChange, context, disabled }: Props) {
+  const temperatureUnit = useTemperatureUnitPreference();
+  const temperatureUnitSymbol = getTemperatureUnitSymbol(temperatureUnit);
+  // Display-side canonicalization only: the write seam converts from the
+  // raw typed value itself (QuickLogV2Sheet), never from this derived copy,
+  // so no value is ever converted twice.
+  const canonicalWaterTempC = typedTempToCelsiusInput(value.waterTempC, temperatureUnit);
+
   const setField = <K extends keyof QuickLogWateringFormState>(
     key: K,
     next: QuickLogWateringFormState[K],
@@ -44,7 +75,9 @@ export default function QuickLogWateringForm({ value, onChange, context, disable
     onChange({ ...value, [ecKey]: pair.ec, [ppmKey]: pair.ppm });
   };
 
-  const review = buildWateringReview(value);
+  // The review summarizes what will be SAVED, and the viewmodel labels its
+  // temperature line "(°C)" — hand it the canonical-°C value.
+  const review = buildWateringReview({ ...value, waterTempC: canonicalWaterTempC });
 
   return (
     <div className="space-y-4" data-testid="qlv2-watering-form">
@@ -173,7 +206,7 @@ export default function QuickLogWateringForm({ value, onChange, context, disable
             />
           </div>
           <div>
-            <Label htmlFor="qlv2-water-temp">Water temperature (°C)</Label>
+            <Label htmlFor="qlv2-water-temp">Water temperature ({temperatureUnitSymbol})</Label>
             <Input
               id="qlv2-water-temp"
               inputMode="decimal"
@@ -255,7 +288,7 @@ export default function QuickLogWateringForm({ value, onChange, context, disable
             {review.manualObservations.map((item) => (
               <ReviewRow key={item.label} label={`${item.label} (manual)`} value={item.value} />
             ))}
-            <EcCompensationPreviewLine ec={value.ec} waterTempC={value.waterTempC} />
+            <EcCompensationPreviewLine ec={value.ec} waterTempC={canonicalWaterTempC} />
           </dl>
         )}
         <p className="mt-2 text-xs text-muted-foreground">{review.safetyNote}</p>

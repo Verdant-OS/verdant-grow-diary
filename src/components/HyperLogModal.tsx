@@ -33,6 +33,12 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { GeneticsBadge } from "@/components/GeneticsBadge";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
+import {
+  fahrenheitToCelsius,
+  getTemperatureUnitSymbol,
+  type TemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 
 export type HyperLogAction =
   | "water"
@@ -104,6 +110,24 @@ const WATER_UNITS = ["ml", "L", "cups"] as const;
 
 const VERDANT_GREEN = "#00C853";
 
+const PLAIN_TEMP_INPUT = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/;
+
+/**
+ * Convert the grower-typed environment temperature (entered in the active
+ * preference unit) into a canonical-°C string EXACTLY ONCE at the commit
+ * handoff — the dispatched draft stores canonical °C, which is what
+ * hyperLogDraftRules renders as "Temp X°C". Blank stays blank and
+ * non-numeric text passes through unchanged.
+ */
+function typedTempToCelsiusInput(raw: string, unit: TemperatureUnitPreference): string {
+  if (unit !== "fahrenheit") return raw;
+  const trimmed = raw.trim();
+  if (trimmed === "" || !PLAIN_TEMP_INPUT.test(trimmed)) return raw;
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed)) return raw;
+  return String(Math.round(fahrenheitToCelsius(parsed) * 100) / 100);
+}
+
 const EMPTY_FORM: HyperLogDemoFormState = {
   waterAmount: "",
   waterUnit: "ml",
@@ -134,6 +158,8 @@ export function HyperLogModal({
   const [form, setForm] = useState<HyperLogDemoFormState>(EMPTY_FORM);
   const [photos, setPhotos] = useState<Array<{ id: string; url: string; name: string }>>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const temperatureUnit = useTemperatureUnitPreference();
+  const temperatureUnitSymbol = getTemperatureUnitSymbol(temperatureUnit);
 
   // Sync initialAction when modal re-opens with a preselect.
   useEffect(() => {
@@ -208,7 +234,13 @@ export function HyperLogModal({
 
   const handleCommit = () => {
     if (!selected) return;
-    onCommit?.(selected, form, { photoCount: photos.length });
+    // Unit seam: envTemp was typed in the preference unit; the committed
+    // draft stores canonical °C. Converted exactly once, right here.
+    const committedForm: HyperLogDemoFormState = {
+      ...form,
+      envTemp: typedTempToCelsiusInput(form.envTemp, temperatureUnit),
+    };
+    onCommit?.(selected, committedForm, { photoCount: photos.length });
     onOpenChange(false);
     resetAll();
   };
@@ -219,8 +251,8 @@ export function HyperLogModal({
   };
 
   const timelinePreview = useMemo(
-    () => buildTimelinePreview(selected, form, photos.length),
-    [selected, form, photos.length],
+    () => buildTimelinePreview(selected, form, photos.length, temperatureUnitSymbol),
+    [selected, form, photos.length, temperatureUnitSymbol],
   );
 
   return (
@@ -626,6 +658,7 @@ function buildTimelinePreview(
   action: HyperLogAction | null,
   form: HyperLogDemoFormState,
   photoCount: number,
+  temperatureUnitSymbol: string,
 ): { headline: string; summary: string; meta: string | null } {
   const photoMeta = photoCount > 0 ? `${photoCount} photo${photoCount === 1 ? "" : "s"} attached` : null;
   if (!action) {
@@ -653,7 +686,10 @@ function buildTimelinePreview(
   }
   if (action === "environment") {
     const parts: string[] = [];
-    if (form.envTemp.trim()) parts.push(`Temp ${form.envTemp.trim()}°C`);
+    // Live preview shows the raw typed value (not yet converted — that
+    // happens once in handleCommit), so the symbol must match what the
+    // grower is actually typing right now.
+    if (form.envTemp.trim()) parts.push(`Temp ${form.envTemp.trim()}${temperatureUnitSymbol}`);
     if (form.envHumidity.trim()) parts.push(`RH ${form.envHumidity.trim()}%`);
     if (form.envVpd.trim()) parts.push(`VPD ${form.envVpd.trim()} kPa`);
     if (form.envCo2.trim()) parts.push(`CO₂ ${form.envCo2.trim()} ppm`);

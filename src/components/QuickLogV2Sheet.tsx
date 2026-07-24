@@ -104,6 +104,32 @@ import {
   type QuickLogPostSaveSuccess,
 } from "@/lib/quickLogSaveGuardRules";
 import { trackQuickLogSuccess } from "@/lib/quickLogSuccessTelemetry";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
+import {
+  fahrenheitToCelsius,
+  getTemperatureUnitSymbol,
+  type TemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
+
+const PLAIN_TEMP_INPUT = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/;
+
+/**
+ * Convert a grower-typed temperature string (entered in the active
+ * preference unit) into a canonical-°C string. Called EXACTLY ONCE per
+ * save attempt, at the payload-build seam, on the raw typed value — the
+ * built payload (including the locked watering retry submission) already
+ * holds °C and is never re-converted. Blank stays blank and non-numeric
+ * text passes through unchanged so the existing validators keep rejecting
+ * it with their original reasons.
+ */
+function typedTempToCelsiusInput(raw: string, unit: TemperatureUnitPreference): string {
+  if (unit !== "fahrenheit") return raw;
+  const trimmed = raw.trim();
+  if (trimmed === "" || !PLAIN_TEMP_INPUT.test(trimmed)) return raw;
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed)) return raw;
+  return String(Math.round(fahrenheitToCelsius(parsed) * 100) / 100);
+}
 
 interface Props {
   open: boolean;
@@ -166,6 +192,8 @@ export default function QuickLogV2Sheet({
     [tentsQ.data],
   );
   const queryClient = useQueryClient();
+  const temperatureUnit = useTemperatureUnitPreference();
+  const temperatureUnitSymbol = getTemperatureUnitSymbol(temperatureUnit);
   const inRouter = useInRouterContext();
   // `useNavigate` throws when called outside a Router. The sheet is
   // always mounted inside the app's Router in production, but some
@@ -681,7 +709,12 @@ export default function QuickLogV2Sheet({
         tentId: resolved.tentId ?? null,
         plantId: resolved.plantId ?? null,
         idempotencyKey: saveIdempotencyKeyRef.current,
-        form: feedingForm,
+        // Unit seam: the grower typed water temperature in the preference
+        // unit; canonical °C is produced exactly once, right here.
+        form: {
+          ...feedingForm,
+          waterTempC: typedTempToCelsiusInput(feedingForm.waterTempC, temperatureUnit),
+        },
       });
       if (mapped.ok !== true) {
         setLocalError(feedingFormReasonToHelper(mapped.reason));
@@ -762,9 +795,16 @@ export default function QuickLogV2Sheet({
         plantId: resolved.plantId ?? null,
         idempotencyKey: saveIdempotencyKeyRef.current,
         occurredAt,
-        form: wateringForm,
+        // Unit seam: water temp + manual snapshot temp were typed in the
+        // preference unit; canonical °C is produced exactly once, right
+        // here. The locked retry submission reuses the built payload and
+        // is never re-converted.
+        form: {
+          ...wateringForm,
+          waterTempC: typedTempToCelsiusInput(wateringForm.waterTempC, temperatureUnit),
+        },
         note: form.note,
-        temperatureC: form.temperatureC,
+        temperatureC: typedTempToCelsiusInput(form.temperatureC, temperatureUnit),
         humidityPct: form.humidityPct,
         vpdKpa: form.vpdKpa,
         baseDetails: maturityDetails,
@@ -854,7 +894,9 @@ export default function QuickLogV2Sheet({
         action: form.action,
         volumeMl: form.volumeMl,
         note: form.note,
-        temperatureC: form.temperatureC,
+        // Unit seam: manual snapshot temp was typed in the preference unit;
+        // canonical °C is produced exactly once, right here.
+        temperatureC: typedTempToCelsiusInput(form.temperatureC, temperatureUnit),
         humidityPct: form.humidityPct,
         vpdKpa: form.vpdKpa,
         details: maturityDetails,
@@ -1507,7 +1549,7 @@ export default function QuickLogV2Sheet({
               </summary>
               <div className="mt-3 grid grid-cols-3 gap-2">
                 <div>
-                  <Label htmlFor="qlv2-temp">Temp (°C)</Label>
+                  <Label htmlFor="qlv2-temp">Temp ({temperatureUnitSymbol})</Label>
                   <Input
                     id="qlv2-temp"
                     inputMode="decimal"

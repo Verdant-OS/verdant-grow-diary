@@ -187,3 +187,86 @@ describe("`config validate --fix-hints` CLI", () => {
     expect(r.stderr).toMatch(/VERDANT_TENT_ID/);
   });
 });
+
+import { buildRedactedEffectiveConfig, maskUuid, hostOnly } from "../../scripts/ecowitt-live-soil-bridge";
+
+describe("buildRedactedEffectiveConfig (pure)", () => {
+  const TENT = "11111111-1111-4111-8111-111111111111";
+  const PLANT = "33333333-3333-4333-8333-333333333333";
+  const map = { soilmoisture1: { tent_id: TENT, plant_id: PLANT, label: "A" } };
+
+  it("masks tent and plant UUIDs to last-4", () => {
+    expect(maskUuid(TENT)).toBe("uuid:…1111");
+    expect(maskUuid("not-a-uuid")).toBe("uuid:invalid");
+    expect(maskUuid(null)).toBeNull();
+  });
+
+  it("hostOnly strips paths and query", () => {
+    expect(hostOnly("https://a.b.co/functions/v1/x?y=1")).toBe("https://a.b.co");
+    expect(hostOnly("bogus")).toBe("invalid_url");
+    expect(hostOnly(null)).toBeNull();
+  });
+
+  it("never leaks raw UUIDs, tokens, ingest paths, or MQTT credentials", () => {
+    const cfg = buildRedactedEffectiveConfig(
+      {
+        VERDANT_TENT_ID: TENT,
+        VERDANT_PLANT_ID: PLANT,
+        VERDANT_INGEST_URL: "https://proj.functions.supabase.co/sensor-ingest-webhook",
+        VERDANT_BRIDGE_TOKEN: "vbt_supersecrettoken_1234567890",
+        ECOWITT_MQTT_URL: "mqtt://broker.local:1883",
+        ECOWITT_MQTT_USERNAME: "u",
+        ECOWITT_MQTT_PASSWORD: "p",
+        ECOWITT_MQTT_TOPIC: "ecowitt/grow",
+        ECOWITT_SOIL_CHANNEL_MAP_JSON: JSON.stringify(map),
+      },
+      [],
+    );
+    const serialized = JSON.stringify(cfg);
+    expect(serialized).not.toContain(TENT);
+    expect(serialized).not.toContain(PLANT);
+    expect(serialized).not.toContain("supersecrettoken");
+    expect(serialized).not.toContain("sensor-ingest-webhook");
+    expect(serialized).not.toContain('"u"');
+    expect(serialized).not.toContain('"p"');
+    expect(cfg.event).toBe("config_effective");
+    expect(cfg.channel_map.count).toBe(1);
+    expect(cfg.channel_map.channels[0].tent_id).toBe("uuid:…1111");
+    expect(cfg.mqtt.username_present).toBe(true);
+    expect(cfg.mqtt.password_present).toBe(true);
+    expect(cfg.ingest_url_host).toBe("https://proj.functions.supabase.co");
+  });
+});
+
+describe("`config validate --dry-run` CLI", () => {
+  if (!bunAvailable()) {
+    it.skip("skipped — bun runtime not available", () => {});
+    return;
+  }
+  const TENT = "11111111-1111-4111-8111-111111111111";
+
+  it("exits 0 and prints config_ok + config_effective on success", () => {
+    const r = spawnSync(
+      "bun",
+      ["run", "scripts/ecowitt-live-soil-bridge.ts", "config", "validate", "--dry-run"],
+      { encoding: "utf8", env: { ...process.env, VERDANT_TENT_ID: TENT, ECOWITT_SOIL_CHANNEL_MAP_JSON: undefined }, timeout: 15_000 },
+    );
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('"event":"config_ok"');
+    expect(r.stdout).toContain('"event":"config_effective"');
+    expect(r.stdout).toContain('"tent_id":"uuid:…1111"');
+    // Never imports mqtt or connects
+    expect(r.stderr).not.toMatch(/mqtt_connected|ECONNREFUSED|Cannot find module/i);
+  });
+
+  it("exits 2 without printing config_effective on failure", () => {
+    const r = spawnSync(
+      "bun",
+      ["run", "scripts/ecowitt-live-soil-bridge.ts", "config", "validate", "--dry-run"],
+      { encoding: "utf8", env: { ...process.env, VERDANT_TENT_ID: undefined }, timeout: 15_000 },
+    );
+    expect(r.status).toBe(2);
+    expect(r.stdout).not.toContain('"config_effective"');
+    expect(r.stderr).toContain('"code":"missing_tent_id"');
+  });
+});

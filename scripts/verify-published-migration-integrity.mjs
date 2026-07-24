@@ -42,12 +42,22 @@ const DEFAULT_BASELINE =
 
 // ─── arg parsing ──────────────────────────────────────────────────────
 function parseArgs(argv) {
-  const out = { baseline: DEFAULT_BASELINE, json: false, only: null };
+  const out = {
+    baseline: DEFAULT_BASELINE,
+    json: false,
+    only: null,
+    allow: [], // Array<{ path, reason }>
+    strictAllowlist: false,
+  };
   for (const a of argv.slice(2)) {
     if (a === "--json") out.json = true;
     else if (a.startsWith("--baseline=")) out.baseline = a.slice(11);
     else if (a.startsWith("--only=")) out.only = a.slice(7);
-    else if (a === "--help" || a === "-h") {
+    else if (a === "--strict-allowlist") out.strictAllowlist = true;
+    else if (a.startsWith("--allow=")) out.allow.push(parseAllowSpec(a.slice(8)));
+    else if (a.startsWith("--allow-file=")) {
+      for (const entry of loadAllowFile(a.slice(13))) out.allow.push(entry);
+    } else if (a === "--help" || a === "-h") {
       // eslint-disable-next-line no-console
       console.log(readFileSync(new URL(import.meta.url)).toString().split("\n").slice(1, 34).join("\n"));
       process.exit(0);
@@ -56,6 +66,78 @@ function parseArgs(argv) {
     }
   }
   return out;
+}
+
+/**
+ * Parse a single `--allow=<path>:<reason>` spec. Path is normalized so
+ * bare filenames (`20260722100000_foo.sql`) resolve to the canonical
+ * `supabase/migrations/<name>` path. Reason is required and cannot be
+ * whitespace-only — an unlabeled allowlist is a doctrine violation.
+ */
+function parseAllowSpec(raw) {
+  const idx = raw.indexOf(":");
+  if (idx < 0) {
+    fail(
+      2,
+      `--allow requires "<path>:<reason>" (got ${JSON.stringify(raw)}). ` +
+        `Example: --allow=supabase/migrations/20260722_foo.sql:"restore missing GRANT"`,
+    );
+  }
+  const path = normalizeAllowPath(raw.slice(0, idx).trim());
+  const reason = raw.slice(idx + 1).trim();
+  if (!path) fail(2, `--allow spec has empty path: ${JSON.stringify(raw)}`);
+  if (!reason) {
+    fail(
+      2,
+      `--allow spec requires a non-empty reason (got ${JSON.stringify(raw)}). ` +
+        `Every allowlisted edit MUST be justified in writing.`,
+    );
+  }
+  return { path, reason };
+}
+
+function normalizeAllowPath(p) {
+  if (!p) return p;
+  if (p.startsWith(`${MIGRATIONS_DIR}/`)) return p;
+  if (p.includes("/")) return p;
+  return `${MIGRATIONS_DIR}/${p}`;
+}
+
+/**
+ * Load an allowlist JSON file. Accepts either a bare array of entries
+ * or `{ "allow": [...] }`. Each entry needs `path` and `reason`.
+ */
+function loadAllowFile(filePath) {
+  const abs = resolve(process.cwd(), filePath);
+  if (!existsSync(abs)) fail(2, `--allow-file not found: ${filePath}`);
+  let parsed;
+  try {
+    parsed = JSON.parse(readFileSync(abs, "utf8"));
+  } catch (err) {
+    fail(2, `--allow-file ${filePath} is not valid JSON: ${err.message}`);
+  }
+  const list = Array.isArray(parsed) ? parsed : parsed?.allow;
+  if (!Array.isArray(list)) {
+    fail(
+      2,
+      `--allow-file ${filePath} must be a JSON array or { "allow": [...] }`,
+    );
+  }
+  return list.map((entry, i) => {
+    if (!entry || typeof entry !== "object") {
+      fail(2, `--allow-file ${filePath} entry #${i} is not an object`);
+    }
+    const path = normalizeAllowPath(String(entry.path ?? "").trim());
+    const reason = String(entry.reason ?? "").trim();
+    if (!path) fail(2, `--allow-file ${filePath} entry #${i} missing "path"`);
+    if (!reason) {
+      fail(
+        2,
+        `--allow-file ${filePath} entry #${i} (${path}) missing non-empty "reason"`,
+      );
+    }
+    return { path, reason };
+  });
 }
 
 function fail(code, msg) {

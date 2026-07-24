@@ -189,3 +189,66 @@ describe("summarize-playwright-flakes", () => {
     expect(markdown).toContain("_No flaky tests detected in this run._");
   });
 });
+
+describe("buildPrComment", () => {
+  it("emits a sticky PR comment with per-attempt attachments and artifact links", () => {
+    const body = buildPrComment(flakyReport, {
+      tracesUrl: "https://github.com/o/r/actions/runs/1/artifacts/traces",
+      mediaUrl: "https://github.com/o/r/actions/runs/1/artifacts/media",
+      reportUrl: "https://github.com/o/r/actions/runs/1/artifacts/report",
+      bundleUrl: "https://github.com/o/r/actions/runs/1/artifacts/bundle",
+      runUrl: "https://github.com/o/r/actions/runs/1",
+    });
+    // Sticky marker so the comment updates in place across re-runs.
+    expect(body).toContain("<!-- verdant:playwright-flake-pr-comment -- do not edit -->");
+    // Header + counts
+    expect(body).toContain("## Playwright failure artifacts");
+    expect(body).toContain("**Flaky:** 1");
+    expect(body).toContain("**Failed:** 1");
+    // Artifact bundle links
+    expect(body).toContain("Traces bundle");
+    expect(body).toContain("Media bundle");
+    expect(body).toContain("actions/runs/1/artifacts/traces");
+    expect(body).toContain("actions/runs/1/artifacts/media");
+    expect(body).toContain("actions/runs/1/artifacts/report");
+    expect(body).toContain("actions/runs/1");
+    // Flaky test with BOTH attempts labeled
+    expect(body).toContain("FLAKY · logs a watering event");
+    expect(body).toContain("Attempt 1 (initial)");
+    expect(body).toContain("Retry 1");
+    // Attempt 1 (failing) attachments listed with kind + path
+    expect(body).toContain("**trace**");
+    expect(body).toContain("trace.zip");
+    expect(body).toContain("test-failed-1.png");
+    expect(body).toContain("video.webm");
+    // Hard failure block for the second failing test
+    expect(body).toContain("FAILED · logs environment reading");
+    // Bundle-hint deep links
+    expect(body).toContain("[open in traces bundle]");
+    expect(body).toContain("[open in media bundle]");
+  });
+
+  it("reports 'no failed or flaky tests' when the run is clean", () => {
+    const clean = {
+      suites: [
+        {
+          file: "e2e/x.spec.ts",
+          specs: [
+            {
+              title: "a",
+              tests: [
+                {
+                  projectName: "chromium-authed",
+                  status: "passed",
+                  results: [{ retry: 0, status: "passed", attachments: [] }],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const body = buildPrComment(clean, {});
+    expect(body).toContain("_No failed or flaky tests in this run — no per-attempt artifacts to link._");
+  });
+});

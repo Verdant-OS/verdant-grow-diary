@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-// @ts-expect-error - .mjs script has no types
+// @ts-ignore - .mjs script has no types
 import { resolveBaseline } from "../../scripts/verify-published-migration-integrity.mjs";
+
 
 /**
  * Pins the precedence order documented in the script header:

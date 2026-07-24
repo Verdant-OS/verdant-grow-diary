@@ -306,6 +306,12 @@ export const CONFIG_ERROR_FIX_HINTS: Record<string, string> = {
     "Install the mqtt client in the environment running the bridge: `bun add mqtt` (or `npm i mqtt`).",
   channel_map_parse_error:
     "ECOWITT_SOIL_CHANNEL_MAP_JSON could not be parsed. Ensure it is single-line valid JSON with no trailing commas, then re-run `config validate`.",
+  out_flag_requires_dry_run:
+    "--out=<path> writes the redacted config_effective envelope, which is only produced by --dry-run. Add --dry-run or drop --out.",
+  out_flag_missing_value:
+    "--out needs a file path, e.g. `--out=./config-effective.json` or `--out ./config-effective.json`.",
+  out_write_failed:
+    "Could not write the redacted config_effective envelope to the given --out path. Check the directory exists and is writable, then re-run.",
 };
 
 export function fixHintForCode(code: string): string {

@@ -8,6 +8,10 @@ const harness = vi.hoisted(() => ({
   setActiveGrowId: vi.fn(),
   reloadActionResponseMemory: vi.fn(),
   createSignedUrls: vi.fn(),
+  // Controllable per-test; defaults to false (advanced/Pro date-range
+  // filters locked) so the many existing tests below that never touch this
+  // keep exercising the same no-bounds behavior they always have.
+  canUseFeature: vi.fn((..._args: unknown[]) => false),
   growsState: {
     activeGrow: null as Record<string, unknown> | null,
     activeGrowId: null as string | null,
@@ -121,7 +125,7 @@ vi.mock("@/hooks/useMyEntitlements", () => ({
 }));
 
 vi.mock("@/lib/featureEntitlements", () => ({
-  canUseFeature: () => false,
+  canUseFeature: (...args: unknown[]) => harness.canUseFeature(...args),
 }));
 
 vi.mock("@/hooks/useActionResponseMemory", () => ({
@@ -187,7 +191,12 @@ const GROW_B = {
   started_at: "2026-07-10T00:00:00.000Z",
 };
 
-function diaryEntry(id: string, note: string, entryAt = "2026-07-20T12:00:00.000Z") {
+function diaryEntry(
+  id: string,
+  note: string,
+  entryAt = "2026-07-20T12:00:00.000Z",
+  loggedAt = entryAt,
+) {
   return {
     id,
     note,
@@ -195,6 +204,10 @@ function diaryEntry(id: string, note: string, entryAt = "2026-07-20T12:00:00.000
     stage: "vegetative",
     details: { event_type: "note", source: "manual" },
     entry_at: entryAt,
+    // Captured time: the real column the query/cursor now filter/order/
+    // paginate by. Defaults to entry_at so existing scenarios that don't
+    // care about the entry_at/logged_at distinction keep working unchanged.
+    logged_at: loggedAt,
     plant_id: null,
     tent_id: null,
   };
@@ -220,7 +233,7 @@ function growIdFrom(spec: QuerySpec): string | null {
 }
 
 function isOlderPage(spec: QuerySpec): boolean {
-  return spec.filters.some((item) => item.op === "lt" && item.column === "entry_at");
+  return spec.filters.some((item) => item.op === "lt" && item.column === "logged_at");
 }
 
 function defaultResult(spec: QuerySpec): QueryResult {
@@ -263,6 +276,8 @@ describe("Timeline mounted read-state boundary", () => {
     harness.refreshGrows.mockReset();
     harness.setActiveGrowId.mockReset();
     harness.reloadActionResponseMemory.mockReset();
+    harness.canUseFeature.mockReset();
+    harness.canUseFeature.mockReturnValue(false);
     harness.createSignedUrls.mockReset();
     harness.createSignedUrls.mockImplementation((paths: string[]) =>
       Promise.resolve({
@@ -639,5 +654,163 @@ describe("Timeline mounted read-state boundary", () => {
     expect(await screen.findByText("Older text survives photo failure")).toBeInTheDocument();
     expect(screen.getByTestId("timeline-partial-read-warning")).toBeInTheDocument();
     expect(screen.queryByTestId("timeline-load-older-error")).not.toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PR #442 remediation: the Pro advanced date-range filter (?start/?end) must
+// window by the real `logged_at` (Captured) column end-to-end -- both at the
+// Supabase query level (diary_entries AND grow_events) and in the client-side
+// `filterTimelineEvidenceRows` re-check that runs against the same applied
+// bounds after the fetch. Before this fix, a row's Captured moment could
+// fall inside the visible window while its entry_at (save-time) fell
+// outside it (or vice versa), and the query/re-check disagreed with each
+// other, silently mis-windowing the row either at fetch time or after.
+// ---------------------------------------------------------------------------
+describe("Timeline advanced date-range windowing (Pro) — Captured (logged_at), not entry_at/occurred_at", () => {
+  beforeEach(() => {
+    harness.executeQuery.mockReset();
+    harness.refreshGrows.mockReset();
+    harness.setActiveGrowId.mockReset();
+    harness.reloadActionResponseMemory.mockReset();
+    harness.createSignedUrls.mockReset();
+    harness.createSignedUrls.mockImplementation((paths: string[]) =>
+      Promise.resolve({
+        data: paths.map((path) => ({ path, signedUrl: `https://signed.test/${path}` })),
+        error: null,
+      }),
+    );
+    harness.canUseFeature.mockReset();
+    harness.canUseFeature.mockReturnValue(true);
+    Object.assign(harness.growsState, {
+      activeGrow: GROW_A,
+      activeGrowId: GROW_A.id,
+      grows: [GROW_A],
+      loading: false,
+      error: null,
+    });
+    Object.assign(harness.scopedGrowState, {
+      urlGrowId: null,
+      scopedGrow: null,
+      scopedGrowName: null,
+      isValidScopedGrow: false,
+      backHref: undefined,
+    });
+  });
+
+  it("windows diary_entries and grow_events by logged_at, and the client-side re-check agrees instead of silently re-dropping a Captured-in-window row", async () => {
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries") {
+        return {
+          data: [
+            {
+              ...diaryEntry(
+                "captured-in-window",
+                "Captured time inside the window",
+                "2026-07-11T00:00:00.000Z", // entry_at (save-time) OUTSIDE the window
+                "2026-07-05T12:00:00.000Z", // logged_at (Captured) INSIDE the window
+              ),
+            },
+            {
+              ...diaryEntry(
+                "captured-out-of-window",
+                "Captured time outside the window",
+                "2026-07-05T12:00:00.000Z", // entry_at (save-time) INSIDE the window
+                "2026-07-11T00:00:00.000Z", // logged_at (Captured) OUTSIDE the window
+              ),
+            },
+          ],
+          error: null,
+          count: 2,
+        };
+      }
+      return defaultResult(spec);
+    });
+
+    renderTimeline("/timeline?start=2026-07-05&end=2026-07-05");
+
+    // The row whose Captured moment is inside the window survives both the
+    // DB fetch and the client-side date-range re-check.
+    expect(await screen.findByText("Captured time inside the window")).toBeInTheDocument();
+    // The row whose Captured moment is outside the window stays excluded by
+    // the client-side re-check even though its entry_at falls inside it --
+    // proving the re-check no longer relies on the stale entry_at field.
+    expect(screen.queryByText("Captured time outside the window")).not.toBeInTheDocument();
+
+    const diarySpecs = harness.executeQuery.mock.calls
+      .map(([spec]) => spec as QuerySpec)
+      .filter((spec) => spec.table === "diary_entries" && !isOlderPage(spec));
+    expect(diarySpecs.length).toBeGreaterThan(0);
+    for (const spec of diarySpecs) {
+      const gte = spec.filters.find((f) => f.op === "gte");
+      const lte = spec.filters.find((f) => f.op === "lte");
+      expect(gte).toMatchObject({ column: "logged_at", value: "2026-07-05T00:00:00.000Z" });
+      expect(lte).toMatchObject({ column: "logged_at", value: "2026-07-05T23:59:59.999Z" });
+      expect(spec.filters.some((f) => f.column === "entry_at")).toBe(false);
+    }
+
+    const growEventSpecs = harness.executeQuery.mock.calls
+      .map(([spec]) => spec as QuerySpec)
+      .filter((spec) => spec.table === "grow_events");
+    expect(growEventSpecs.length).toBeGreaterThan(0);
+    for (const spec of growEventSpecs) {
+      const gte = spec.filters.find((f) => f.op === "gte");
+      const lte = spec.filters.find((f) => f.op === "lte");
+      expect(gte).toMatchObject({ column: "logged_at", value: "2026-07-05T00:00:00.000Z" });
+      expect(lte).toMatchObject({ column: "logged_at", value: "2026-07-05T23:59:59.999Z" });
+      expect(spec.filters.some((f) => f.column === "occurred_at")).toBe(false);
+    }
+  });
+
+  it("keyset-pages diary_entries by logged_at: the cursor and .lt() bound both read the Captured column", async () => {
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries" && isOlderPage(spec)) {
+        return {
+          data: [
+            diaryEntry(
+              "older-captured",
+              "Older Captured-windowed entry",
+              "2026-07-05T01:00:00.000Z",
+              "2026-07-05T09:00:00.000Z",
+            ),
+          ],
+          error: null,
+        };
+      }
+      if (spec.table === "diary_entries") {
+        return {
+          data: [
+            diaryEntry(
+              "newest-captured",
+              "Newest Captured-windowed entry",
+              "2026-07-05T23:00:00.000Z",
+              "2026-07-05T18:00:00.000Z",
+            ),
+          ],
+          error: null,
+          count: 2,
+        };
+      }
+      return defaultResult(spec);
+    });
+
+    renderTimeline("/timeline?start=2026-07-05&end=2026-07-05");
+    expect(await screen.findByText("Newest Captured-windowed entry")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("timeline-load-older"));
+    expect(await screen.findByText("Older Captured-windowed entry")).toBeInTheDocument();
+
+    const olderSpec = harness.executeQuery.mock.calls
+      .map(([spec]) => spec as QuerySpec)
+      .find((spec) => spec.table === "diary_entries" && isOlderPage(spec));
+    expect(olderSpec).toBeDefined();
+    const cursorFilter = olderSpec!.filters.find((f) => f.op === "lt");
+    // The cursor is the previous page's logged_at (18:00), not its entry_at
+    // (23:00) -- proves the pager reads the Captured field off the state
+    // row, not the save-time one.
+    expect(cursorFilter).toMatchObject({
+      column: "logged_at",
+      value: "2026-07-05T18:00:00.000Z",
+    });
   });
 });

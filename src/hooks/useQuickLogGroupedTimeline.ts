@@ -92,7 +92,7 @@ async function fetchRows(
     q = q.eq("tent_id", scope.tentId);
   }
 
-  const { data, error } = await q.order("occurred_at", { ascending: false }).limit(limit);
+  const { data, error } = await q.order("logged_at", { ascending: false }).limit(limit);
   if (error) throw error;
   return (data ?? []) as unknown as RawGrowEventRow[];
 }
@@ -120,7 +120,7 @@ async function fetchTimelineDiaryRows(
     q = q.eq("tent_id", scope.tentId);
   }
 
-  const { data, error } = await q.order("entry_at", { ascending: false }).limit(limit);
+  const { data, error } = await q.order("logged_at", { ascending: false }).limit(limit);
   if (error) {
     // Enrichment failure must never break the timeline. Return empty.
     return [];
@@ -152,7 +152,7 @@ async function fetchQuickLogCompanionRows(
     q = q.eq("tent_id", scope.tentId);
   }
 
-  const { data, error } = await q.order("entry_at", { ascending: false }).limit(limit);
+  const { data, error } = await q.order("logged_at", { ascending: false }).limit(limit);
   if (error) return [];
   return (data ?? []) as unknown as QuickLogCompanionSnapshotDiaryRow[];
 }
@@ -175,7 +175,7 @@ async function fetchQuickLogCompanionParentRows(
   } else {
     q = q.eq("tent_id", scope.tentId);
   }
-  const { data, error } = await q.order("occurred_at", { ascending: false }).limit(limit);
+  const { data, error } = await q.order("logged_at", { ascending: false }).limit(limit);
   if (error) return [];
   return (data ?? []) as unknown as RawGrowEventRow[];
 }

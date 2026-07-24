@@ -490,6 +490,29 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     expect(rpcMock).not.toHaveBeenCalled();
   });
 
+  it("Training future Captured value BLOCKS the save with an inline error (no RPC)", async () => {
+    mountSection();
+    selectActivity("training");
+    await screen.findByTestId("quick-log-all-activities-form");
+    const future = new Date(Date.now() + 60 * 60 * 1000);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const futureLocal = `${future.getFullYear()}-${pad(future.getMonth() + 1)}-${pad(
+      future.getDate(),
+    )}T${pad(future.getHours())}:${pad(future.getMinutes())}`;
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-logged-at"), {
+      target: { value: futureLocal },
+    });
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-note"), {
+      target: { value: "backfilling notes for a plant I checked earlier" },
+    });
+    expect(
+      screen.getByTestId("quick-log-all-activities-logged-at-error"),
+    ).toHaveTextContent(/future/i);
+    expect(screen.getByTestId("quick-log-all-activities-save")).toBeDisabled();
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+
   it("mid-open retarget: timestamps survive, draft resets, save binds the NEW target", async () => {
     rpcMock.mockResolvedValueOnce({
       data: { ok: true, grow_event_id: "e-retarget" },

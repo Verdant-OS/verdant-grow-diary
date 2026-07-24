@@ -111,6 +111,68 @@ describe("date-range matching", () => {
   });
 });
 
+describe("date-range matching prefers logged_at (Captured) over entry_at", () => {
+  // PR #442 remediation: this dimension must agree with the Supabase query
+  // it runs downstream of, which now windows by logged_at, not entry_at
+  // (see src/pages/Timeline.tsx). A row whose Captured moment is inside the
+  // window but whose entry_at (save-time) falls outside it -- or vice versa
+  // -- must be decided by logged_at here too, or the query's fetch and this
+  // client-side re-check silently disagree.
+  it("keeps a row whose logged_at is inside the window even though entry_at falls outside it", () => {
+    const kept = filterTimelineEvidenceRows(
+      [
+        {
+          id: "captured-in-window",
+          note: "n",
+          stage: "veg",
+          plant_id: null,
+          tent_id: null,
+          entry_at: "2026-07-20T00:00:00.000Z",
+          logged_at: "2026-07-05T12:00:00.000Z",
+          details: {},
+        },
+      ],
+      { startDate: "2026-07-01", endDate: "2026-07-10" },
+    ).map((r) => r.id);
+    expect(kept).toEqual(["captured-in-window"]);
+  });
+
+  it("excludes a row whose logged_at is outside the window even though entry_at falls inside it", () => {
+    const kept = filterTimelineEvidenceRows(
+      [
+        {
+          id: "captured-out-of-window",
+          note: "n",
+          stage: "veg",
+          plant_id: null,
+          tent_id: null,
+          entry_at: "2026-07-05T12:00:00.000Z",
+          logged_at: "2026-07-20T00:00:00.000Z",
+          details: {},
+        },
+      ],
+      { startDate: "2026-07-01", endDate: "2026-07-10" },
+    ).map((r) => r.id);
+    expect(kept).toEqual([]);
+  });
+
+  it("falls back to entry_at when logged_at is absent (older/partial callers)", () => {
+    const noLoggedAtRows = [
+      row("before", "2026-06-30T23:59:59.000Z"),
+      row("start-day", "2026-07-01T00:00:00.000Z"),
+      row("inside", "2026-07-05T12:00:00.000Z"),
+      row("end-day", "2026-07-10T23:59:59.000Z"),
+      row("after", "2026-07-11T00:00:00.000Z"),
+      row("no-timestamp", null),
+    ];
+    const kept = filterTimelineEvidenceRows(noLoggedAtRows, {
+      startDate: "2026-07-01",
+      endDate: "2026-07-10",
+    }).map((r) => r.id);
+    expect(kept).toEqual(["start-day", "inside", "end-day"]);
+  });
+});
+
 describe("advanced_timeline_filters entitlement key", () => {
   it("is a registered feature key", () => {
     expect(FEATURE_KEYS).toContain("advanced_timeline_filters");
@@ -166,10 +228,19 @@ describe("static wiring — src/pages/Timeline.tsx", () => {
   });
 
   it("applies the bounds at the query level for initial load AND keyset pagination", () => {
-    const gteCount = (src.match(/\.gte\("entry_at"/g) ?? []).length;
-    const lteCount = (src.match(/\.lte\("entry_at"/g) ?? []).length;
+    // The diary_entries / grow_events queries filter/order/paginate by the
+    // real `logged_at` (Captured) column, not entry_at/occurred_at -- see
+    // supabase/migrations/20260724120000_diary_grow_events_logged_at.sql and
+    // PR #442's remediation of the "Captured is a post-fetch display overlay"
+    // bug. entry_at itself must no longer appear as a bound column.
+    const gteCount = (src.match(/\.gte\("logged_at"/g) ?? []).length;
+    const lteCount = (src.match(/\.lte\("logged_at"/g) ?? []).length;
     expect(gteCount).toBeGreaterThanOrEqual(2);
     expect(lteCount).toBeGreaterThanOrEqual(2);
+    expect(src).not.toMatch(/\.gte\("entry_at"/);
+    expect(src).not.toMatch(/\.lte\("entry_at"/);
+    expect(src).not.toMatch(/\.gte\("occurred_at"/);
+    expect(src).not.toMatch(/\.lte\("occurred_at"/);
     expect(src).toContain("T00:00:00.000Z");
     expect(src).toContain("T23:59:59.999Z");
   });

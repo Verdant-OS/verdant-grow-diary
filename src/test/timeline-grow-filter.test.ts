@@ -41,7 +41,11 @@ describe("Timeline — grow filter", () => {
   });
 
   it("preserves newest-first ordering", () => {
-    expect(TIMELINE).toMatch(/entry_at["']\s*,\s*\{\s*ascending:\s*false/);
+    // The diary_entries/grow_events core queries and the keyset pager order
+    // by the real logged_at (Captured) column now, not entry_at/occurred_at
+    // -- see supabase/migrations/20260724120000_diary_grow_events_logged_at.sql
+    // and PR #442's remediation of the Captured-as-post-fetch-overlay bug.
+    expect(TIMELINE).toMatch(/logged_at["']\s*,\s*\{\s*ascending:\s*false/);
     expect(TIMELINE).toMatch(/created_at["']\s*,\s*\{\s*ascending:\s*false/);
   });
 

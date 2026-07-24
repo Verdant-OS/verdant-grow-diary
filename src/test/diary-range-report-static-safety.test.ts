@@ -43,6 +43,32 @@ describe("route + manifest registration", () => {
   });
 });
 
+describe("diary/grow_events window bound uses logged_at, not entry_at/occurred_at (PR #442)", () => {
+  it("fetches, filters, and orders both tables by the real logged_at column", () => {
+    expect(HOOK).toContain('.select("id,note,photo_url,entry_at,logged_at,details")');
+    expect(HOOK).toContain('.select("id,event_type,occurred_at,logged_at,note")');
+    expect(HOOK.match(/\.gte\("logged_at", startIso\)/g) ?? []).toHaveLength(2);
+    expect(HOOK.match(/\.lte\("logged_at", endIso\)/g) ?? []).toHaveLength(2);
+    expect(HOOK.match(/\.order\("logged_at", \{ ascending: true \}\)/g) ?? []).toHaveLength(2);
+  });
+
+  it("never re-introduces entry_at/occurred_at as the fetch window bound", () => {
+    expect(HOOK).not.toMatch(/\.gte\("entry_at"/);
+    expect(HOOK).not.toMatch(/\.lte\("entry_at"/);
+    expect(HOOK).not.toMatch(/\.order\("entry_at"/);
+    expect(HOOK).not.toMatch(/\.gte\("occurred_at"/);
+    expect(HOOK).not.toMatch(/\.lte\("occurred_at"/);
+    expect(HOOK).not.toMatch(/\.order\("occurred_at"/);
+  });
+
+  it("the range-partition confirmation filter in the rules module resolves via the shared resolver, not raw occurred_at", () => {
+    expect(RULES).toMatch(/from "@\/lib\/quickLogTimestampRules"/);
+    expect(RULES).not.toMatch(/utcDay\(r\.occurred_at\)/);
+    expect(RULES).not.toMatch(/utcDay\(e\.occurred_at\)/);
+    expect(RULES.match(/resolveDiaryEntryObservationTime\(/g) ?? []).toHaveLength(7);
+  });
+});
+
 describe("print wiring", () => {
   it("index.css makes the diary-range print section visible", () => {
     expect(CSS).toContain('[data-print-section="diary-range-report"]');

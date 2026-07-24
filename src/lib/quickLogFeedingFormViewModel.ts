@@ -149,6 +149,10 @@ export interface FeedingFormMapInput {
   plantId?: string | null;
   idempotencyKey: string;
   form: QuickLogFeedingFormState;
+  /** Non-authoritative display metadata (e.g. Captured `logged_at`) folded
+   * into `FeedingTypedEventInput.details`, mirroring the watering form's
+   * `baseDetails`. */
+  baseDetails?: Record<string, unknown> | null;
 }
 
 export type FeedingFormMapResult =
@@ -270,6 +274,8 @@ export function buildFeedingFormPayload(input: FeedingFormMapInput): FeedingForm
 
   const note = trim(input.form.note);
 
+  const details: Record<string, unknown> = { ...(input.baseDetails ?? {}) };
+
   const payload: FeedingTypedEventInput = {
     idempotency_key: idempotencyKey,
     grow_id: growId,
@@ -279,6 +285,7 @@ export function buildFeedingFormPayload(input: FeedingFormMapInput): FeedingForm
     products,
     volume_ml: parsedVolume.value,
     note: note === "" ? null : note,
+    details: Object.keys(details).length > 0 ? details : null,
     ...parsedNumerics,
   };
 

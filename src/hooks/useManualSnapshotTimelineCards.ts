@@ -28,22 +28,26 @@ export type ManualSnapshotTimelineScope =
   | { kind: "tent"; tentId: string };
 
 async function fetchPlantRows(plantId: string, limit: number): Promise<ManualSnapshotDiaryRow[]> {
+  // Top-N cutoff by Captured time (logged_at), not row save-time (entry_at) —
+  // see PR #442 remediation: a backdated/forward-dated entry_at would
+  // otherwise silently fall outside (or wrongly inside) this window.
   const { data, error } = await supabase
     .from("diary_entries")
     .select("id, plant_id, tent_id, entry_at, note, details")
     .eq("plant_id", plantId)
-    .order("entry_at", { ascending: false })
+    .order("logged_at", { ascending: false })
     .limit(limit);
   if (error) throw error;
   return (data ?? []) as ManualSnapshotDiaryRow[];
 }
 
 async function fetchTentRows(tentId: string, limit: number): Promise<ManualSnapshotDiaryRow[]> {
+  // Same Captured-time cutoff fix as fetchPlantRows above.
   const { data, error } = await supabase
     .from("diary_entries")
     .select("id, plant_id, tent_id, entry_at, note, details")
     .eq("tent_id", tentId)
-    .order("entry_at", { ascending: false })
+    .order("logged_at", { ascending: false })
     .limit(limit);
   if (error) throw error;
   return (data ?? []) as ManualSnapshotDiaryRow[];

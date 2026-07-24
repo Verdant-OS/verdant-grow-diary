@@ -60,6 +60,14 @@ export default function AppShell({ children }: { children?: ReactNode }) {
   const [openScopedLog, setOpenScopedLog] = useState(false);
   const [structuredOpenIntent, setStructuredOpenIntent] =
     useState<QuickLogV2OpenIntent | null>(null);
+  // "Captured" seed for the route-scoped mobile FAB launcher. This path opens
+  // QuickLogV2Sheet directly (no QUICK_LOG_V2_OPEN_EVENT, so no
+  // structuredOpenIntent.loggedAt) — without an explicit open-time seed here,
+  // QuickLogV2Sheet falls back to stamping logged_at at SAVE time, so leaving
+  // the sheet open across a midnight boundary silently shifts the Captured
+  // bucket to the next day. Captured once at the moment the FAB opens the
+  // sheet, not when Save is eventually tapped.
+  const [mobileFabLoggedAtIso, setMobileFabLoggedAtIso] = useState<string | null>(null);
   const [legacyQuickLogSession, setLegacyQuickLogSession] = useState(0);
   const [prefill, setPrefill] = useState<QuickLogPrefill | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -172,6 +180,7 @@ export default function AppShell({ children }: { children?: ReactNode }) {
     previousNavigationKeyRef.current = location.key;
     setOpenScopedLog(false);
     setStructuredOpenIntent(null);
+    setMobileFabLoggedAtIso(null);
   }, [location.key]);
 
   if (loading)
@@ -301,6 +310,9 @@ export default function AppShell({ children }: { children?: ReactNode }) {
           onClick={() => {
             if (mobileQuickLogTarget) {
               setStructuredOpenIntent(null);
+              // Capture "now" at the moment the sheet opens, not later at
+              // Save — see mobileFabLoggedAtIso comment above.
+              setMobileFabLoggedAtIso(new Date().toISOString());
               setOpenScopedLog(true);
             } else {
               setPrefill(null);
@@ -331,11 +343,14 @@ export default function AppShell({ children }: { children?: ReactNode }) {
           open={openScopedLog}
           onOpenChange={(nextOpen) => {
             setOpenScopedLog(nextOpen);
-            if (!nextOpen) setStructuredOpenIntent(null);
+            if (!nextOpen) {
+              setStructuredOpenIntent(null);
+              setMobileFabLoggedAtIso(null);
+            }
           }}
           defaultTargetKey={structuredOpenIntent?.targetKey ?? mobileQuickLogTarget}
           defaultAction={structuredOpenIntent?.action ?? "note"}
-          defaultLoggedAtIso={structuredOpenIntent?.loggedAt ?? null}
+          defaultLoggedAtIso={structuredOpenIntent?.loggedAt ?? mobileFabLoggedAtIso}
         />
 
         <GlobalSearchDialog open={searchOpen} onOpenChange={setSearchOpen} />

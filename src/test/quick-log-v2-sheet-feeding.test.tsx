@@ -4,6 +4,7 @@
  * Verifies that the Feed action wires through writeFeedingTypedEvent and
  * never touches supabase.rpc / direct table writes from the component.
  */
+import type React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -58,7 +59,10 @@ vi.mock("@/hooks/useRecentFeedingsForDefaults", () => ({
   useRecentFeedingsForDefaults: () => ({ data: [] }),
 }));
 
-function renderSheet(defaultTargetKey: string) {
+function renderSheet(
+  defaultTargetKey: string,
+  extraProps?: Partial<React.ComponentProps<typeof QuickLogV2Sheet>>,
+) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
@@ -69,6 +73,7 @@ function renderSheet(defaultTargetKey: string) {
         open={true}
         onOpenChange={onOpenChange}
         defaultTargetKey={defaultTargetKey}
+        {...extraProps}
       />
     </QueryClientProvider>,
   );
@@ -195,6 +200,30 @@ describe("QuickLogV2Sheet — structured feeding", () => {
       }),
     ]);
     window.removeEventListener("verdant:entry-created", onEntryCreated);
+  });
+
+  it("folds a supplied Captured time into details.logged_at (#5 regression: no longer null)", async () => {
+    writeFeedingMock.mockResolvedValue({ ok: true, eventId: "evt-captured", reused: false });
+    const SEED = "2026-07-01T08:15:00.000Z";
+    renderSheet("plant:plant-1", { defaultLoggedAtIso: SEED });
+    clickFeed();
+    fillRequiredFeedingFields();
+    clickSave();
+    await waitFor(() => expect(writeFeedingMock).toHaveBeenCalledTimes(1));
+    const payload = writeFeedingMock.mock.calls[0][0];
+    expect(payload.details).toEqual({ logged_at: SEED });
+  });
+
+  it("falls back to a save-time stamp for details.logged_at when no Captured time is supplied", async () => {
+    writeFeedingMock.mockResolvedValue({ ok: true, eventId: "evt-fallback", reused: false });
+    renderSheet("plant:plant-1");
+    clickFeed();
+    fillRequiredFeedingFields();
+    clickSave();
+    await waitFor(() => expect(writeFeedingMock).toHaveBeenCalledTimes(1));
+    const payload = writeFeedingMock.mock.calls[0][0];
+    expect(typeof payload.details?.logged_at).toBe("string");
+    expect(Number.isFinite(Date.parse(payload.details.logged_at))).toBe(true);
   });
 
   it("maps optional pH/EC/runoff/water-temp fields into the writer payload", async () => {

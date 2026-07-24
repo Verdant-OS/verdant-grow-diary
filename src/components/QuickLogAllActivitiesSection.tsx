@@ -53,6 +53,7 @@ import {
 import {
   buildQuickLogSubmissionTimestamps,
   seedLoggedAtIso,
+  validateLoggedAtInput,
   validateOccurredAtInput,
 } from "@/lib/quickLogTimestampRules";
 import {
@@ -284,6 +285,14 @@ export default function QuickLogAllActivitiesSection({
     () => validateOccurredAtInput(occurredAtLocal, Date.now()),
     [occurredAtLocal],
   );
+  // Blocking gate for the overridable "Captured" (logged-at) field — same
+  // no-silent-loss principle as occurred-at: a future Captured value must
+  // block the save, never persist and misplace the entry into a future
+  // calendar/report bucket (Codex finding #1).
+  const loggedAtValidation = useMemo(
+    () => validateLoggedAtInput(loggedAtIso, Date.now()),
+    [loggedAtIso],
+  );
   const selectedAvailability = useMemo(
     () =>
       selected
@@ -423,6 +432,11 @@ export default function QuickLogAllActivitiesSection({
     }
     if (!occurredAtValidation.ok) {
       setErrorReason(occurredAtValidation.error ?? "Fix the happened-at field before saving.");
+      setErrorForActivity(selected.id);
+      return;
+    }
+    if (!loggedAtValidation.ok) {
+      setErrorReason(loggedAtValidation.error ?? "Fix the Captured field before saving.");
       setErrorForActivity(selected.id);
       return;
     }
@@ -664,6 +678,7 @@ export default function QuickLogAllActivitiesSection({
     occurredAtValidation,
     occurredAtLocal,
     loggedAtIso,
+    loggedAtValidation,
     user,
     photoFile,
     onSaveStart,
@@ -921,8 +936,18 @@ export default function QuickLogAllActivitiesSection({
                     setLoggedAtIso(e.target.value);
                   }}
                   disabled={mutationBlocked}
+                  aria-invalid={!loggedAtValidation.ok}
                   className="text-sm"
                 />
+                {loggedAtValidation.error && (
+                  <p
+                    role="alert"
+                    className="text-[11px] text-destructive"
+                    data-testid={`${testIdPrefix}-logged-at-error`}
+                  >
+                    {loggedAtValidation.error}
+                  </p>
+                )}
               </div>
             </div>
           )}
@@ -1138,7 +1163,8 @@ export default function QuickLogAllActivitiesSection({
                 (selected.id === "harvest" && harvestWeightsInvalid) ||
                 (selected.id === "photo" && !photoFile) ||
                 detailNumbersInvalid ||
-                !occurredAtValidation.ok
+                !occurredAtValidation.ok ||
+                !loggedAtValidation.ok
               }
               data-testid={`${testIdPrefix}-save`}
             >

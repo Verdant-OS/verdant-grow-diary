@@ -73,11 +73,19 @@ describe("Timeline.tsx — planRecentLaneRawEntries wire-up", () => {
   });
 
   it("applies the active date bounds to the typed grow_events query", () => {
+    // Bounds (and ordering) moved from occurred_at to the real logged_at
+    // (Captured) column so a row visible/invisible by Captured time can no
+    // longer be silently mis-windowed by the true-occurrence timestamp. See
+    // supabase/migrations/20260724120000_diary_grow_events_logged_at.sql.
     expect(TIMELINE_SRC).toMatch(
-      /growEventsQuery\s*=\s*growEventsQuery\.gte\(\s*["']occurred_at["']/,
+      /growEventsQuery\s*=\s*growEventsQuery\.gte\(\s*["']logged_at["']/,
     );
     expect(TIMELINE_SRC).toMatch(
-      /growEventsQuery\s*=\s*growEventsQuery\.lte\(\s*["']occurred_at["']/,
+      /growEventsQuery\s*=\s*growEventsQuery\.lte\(\s*["']logged_at["']/,
+    );
+    expect(TIMELINE_SRC).toMatch(/\.order\(\s*["']logged_at["']/);
+    expect(TIMELINE_SRC).not.toMatch(
+      /growEventsQuery\s*=\s*growEventsQuery\.(?:gte|lte)\(\s*["']occurred_at["']/,
     );
   });
 

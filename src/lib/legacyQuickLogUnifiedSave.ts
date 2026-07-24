@@ -163,6 +163,15 @@ export interface LegacyQuickLogFormInput {
    * stay informative without depending on JSON details.
    */
   noteSuffix?: string | null;
+  /**
+   * Optional "Captured" moment (grower-perceived, backdatable time — e.g.
+   * from a Fast Add / Pheno evidence handoff prefill). Folded into
+   * `p_details.logged_at` alongside the other envelope fields, matching how
+   * QuickLogAllActivitiesSection / useQuickLogActivitySave already persist
+   * it for their own submit paths. Never invented: omitted (no key) when
+   * absent so a save without a Captured seed behaves exactly as before.
+   */
+  loggedAt?: string | null;
 }
 
 export type LegacyUnifiedBuildResult =
@@ -235,6 +244,9 @@ export function buildLegacyQuickLogUnifiedPayload(
   }
   if (input.environmentCheck != null) {
     envelopeFields.environment_check = input.environmentCheck;
+  }
+  if (input.loggedAt) {
+    envelopeFields.logged_at = input.loggedAt;
   }
   const detailsEnvelope: Record<string, unknown> | null =
     Object.keys(envelopeFields).length > 0 ? envelopeFields : null;

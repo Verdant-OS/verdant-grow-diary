@@ -25,6 +25,17 @@ export interface TimelineEvidenceRow {
   plant_id: string | null | undefined;
   tent_id: string | null | undefined;
   entry_at?: string | null;
+  /**
+   * Captured time (grower-perceived, backdatable "logged_at"). Preferred
+   * over `entry_at` for the date-range dimension below so a row whose
+   * Captured day is inside the applied window but whose `entry_at`
+   * (save-time) falls outside it -- or vice versa -- isn't silently
+   * re-excluded/re-included here after the caller's Supabase query has
+   * already correctly windowed by `logged_at`. Falls back to `entry_at`
+   * when absent. See supabase/migrations/
+   * 20260724120000_diary_grow_events_logged_at.sql.
+   */
+  logged_at?: string | null;
   details?: Record<string, unknown> | null;
 }
 
@@ -40,10 +51,14 @@ export interface TimelineEvidenceFilterInput {
    */
   sensorSources?: ReadonlyArray<TimelineSensorSourceKind> | null;
   /**
-   * Inclusive ISO date bounds (YYYY-MM-DD) compared against the UTC day
-   * of `entry_at` (its ISO date slice). Malformed values are ignored as
-   * "no constraint"; rows without a parseable `entry_at` are hidden while
-   * a bound is active, because their day is unknowable — never guessed.
+   * Inclusive ISO date bounds (YYYY-MM-DD) compared against the UTC day of
+   * the row's Captured time (`logged_at`, its ISO date slice), falling
+   * back to `entry_at` when `logged_at` is absent -- this must stay the
+   * same field the caller's Supabase query windows by, or a row can be
+   * fetched and then silently dropped again here. Malformed values are
+   * ignored as "no constraint"; rows without a parseable timestamp are
+   * hidden while a bound is active, because their day is unknowable —
+   * never guessed.
    */
   startDate?: string | null;
   endDate?: string | null;
@@ -95,9 +110,13 @@ export function isTimelineDateFilterValue(value: string | null | undefined): val
   return typeof value === "string" && ISO_DATE_RE.test(value);
 }
 
-/** The UTC day (YYYY-MM-DD) of an `entry_at` ISO timestamp, or null. */
+/**
+ * The UTC day (YYYY-MM-DD) of a row's Captured (`logged_at`) timestamp,
+ * falling back to `entry_at` when `logged_at` isn't present, or null when
+ * neither is a parseable ISO timestamp.
+ */
 function rowUtcDay(row: TimelineEvidenceRow): string | null {
-  const at = row.entry_at;
+  const at = typeof row.logged_at === "string" ? row.logged_at : row.entry_at;
   if (typeof at !== "string" || at.length < 10) return null;
   const day = at.slice(0, 10);
   return ISO_DATE_RE.test(day) ? day : null;

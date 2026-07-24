@@ -222,6 +222,32 @@ describe("Quick Log per-lane builders", () => {
     expect(rows.map((r) => r.id)).toEqual(["c", "b"]);
   });
 
+  // Regression (#10): a backdated-but-recently-logged entry must keep its
+  // Captured-time position through buildRecentQuickLogActivity's resort —
+  // not fall back to where its occurred_at (entry_at) alone would place it.
+  it("Recent Quick Log activity orders by Captured time (details.logged_at), not occurred_at", () => {
+    const dated = normalize([
+      // Backdated: happened weeks ago (occurred_at), but the grower is
+      // Capturing/logging it right now — logged_at is the most recent.
+      rawEntry({
+        id: "backdated-but-just-logged",
+        event_type: "observation",
+        at: "2026-05-01T12:00:00Z",
+        details: { logged_at: "2026-05-24T09:00:00Z" },
+      }),
+      // No Captured override — occurred_at doubles as Captured time.
+      rawEntry({ id: "mid", event_type: "watering", at: "2026-05-23T12:00:00Z" }),
+      rawEntry({ id: "oldest", event_type: "feeding", at: "2026-05-22T12:00:00Z" }),
+    ]);
+    const rows = buildRecentQuickLogActivity(dated, 10);
+    expect(rows.map((r) => r.id)).toEqual(["backdated-but-just-logged", "mid", "oldest"]);
+    // Sanity: occurredAt still reflects the true occurred_at (unchanged),
+    // while capturedAt reflects the Captured override used for ordering.
+    const backdated = rows.find((r) => r.id === "backdated-but-just-logged")!;
+    expect(backdated.occurredAt).toBe("2026-05-01T12:00:00.000Z");
+    expect(backdated.capturedAt).toBe("2026-05-24T09:00:00Z");
+  });
+
   it("Recent Quick Log activity collapses companion diary and grow_event rows once", () => {
     const at = "2026-06-19T06:06:26.969Z";
     const baseNote = "Smoke Test 2026-06-19: Plant observed in Flower tent.";

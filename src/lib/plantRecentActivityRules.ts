@@ -67,13 +67,19 @@ function toRow(
   const snapshotAt = snap?.at ?? null;
   const hasSnapshot = !!snap;
   const split = splitHardwareReadingsFromNote(entry.note);
+  // Display ordering prefers the grower's "Captured" moment when stamped;
+  // createdAt itself stays untouched upstream (dayOfGrow math depends on it).
+  const occurredAt = entry.loggedAt ?? entry.createdAt;
   return {
     id: entry.id,
     eventType: entry.eventType,
-    // Display ordering prefers the grower's "Captured" moment when stamped;
-    // createdAt itself stays untouched upstream (dayOfGrow math depends on it).
-    occurredAt: entry.loggedAt ?? entry.createdAt,
-    occurredAtLabel: entry.createdAtLabel,
+    occurredAt,
+    // The label MUST derive from the same value as occurredAt (used by
+    // compareNewestFirst below) — entry.createdAtLabel is entry_at-only and
+    // could disagree with a Captured-time sort position, showing a row
+    // sorted among one day's entries but labeled with a different day
+    // (Codex finding #3, PR #442).
+    occurredAtLabel: occurredAt ?? "Unknown time",
     notePreview: previewNote(split.body),
     plantId: entry.plantId,
     tentId: entry.tentId,

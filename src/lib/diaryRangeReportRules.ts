@@ -38,6 +38,8 @@ export interface DiaryRangeDiaryRow {
   note?: string | null;
   photo_url?: string | null;
   entry_at?: string | null;
+  /** Real column (PR #442 remediation); the grower's "Captured" moment. */
+  logged_at?: string | null;
   details?: Record<string, unknown> | null;
 }
 
@@ -45,6 +47,8 @@ export interface DiaryRangeGrowEventRow {
   id: string;
   event_type?: string | null;
   occurred_at?: string | null;
+  /** Real column (PR #442 remediation); the grower's "Captured" moment. */
+  logged_at?: string | null;
   note?: string | null;
   details?: Record<string, unknown> | null;
 }
@@ -238,9 +242,12 @@ export function buildDiaryRangeReport(
   let excludedNoTimestamp = 0;
 
   const diaryInRange = (input.diaryEntries ?? []).filter((r) => {
-    // Diary rows group by the grower's "Captured" moment when present
-    // (details.logged_at), falling back to entry_at. grow_events rows have
-    // no details column, so they stay on occurred_at below.
+    // Both diary_entries and grow_events now carry a real `logged_at`
+    // column (PR #442 remediation) that the fetch itself is already
+    // bounded/ordered by; this filter is a same-shape consistency
+    // confirmation, not the authoritative "too late" bound. Diary rows
+    // group by the grower's "Captured" moment: the real column, else
+    // details.logged_at (pre-migration/in-memory rows), else entry_at.
     const day = utcDay(resolveDiaryEntryObservationTime(r));
     if (day === null) {
       excludedNoTimestamp += 1;
@@ -250,7 +257,9 @@ export function buildDiaryRangeReport(
   });
 
   const eventsInRange = (input.growEvents ?? []).filter((r) => {
-    const day = utcDay(r.occurred_at);
+    // grow_events rows have no details column, so this resolves to the
+    // real logged_at column, else occurred_at.
+    const day = utcDay(resolveDiaryEntryObservationTime(r));
     if (day === null) {
       excludedNoTimestamp += 1;
       return false;
@@ -302,7 +311,7 @@ export function buildDiaryRangeReport(
   for (const r of eventsInRange) {
     push(categoryOf(r.event_type), {
       id: r.id,
-      day: utcDay(r.occurred_at) as string,
+      day: utcDay(resolveDiaryEntryObservationTime(r)) as string,
       eventType: r.event_type ?? null,
       detailLabel: null,
       fromDiary: false,
@@ -471,7 +480,7 @@ export function buildDiaryRangeReport(
     const wet = harvestDetailGrams(e.details ?? null, "wet");
     const dry = harvestDetailGrams(e.details ?? null, "dry");
     harvestEntries.push({
-      dateLabel: utcDay(e.occurred_at) as string,
+      dateLabel: utcDay(resolveDiaryEntryObservationTime(e)) as string,
       wetGrams: wet,
       dryGrams: dry,
     });

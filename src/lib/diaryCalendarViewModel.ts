@@ -179,8 +179,23 @@ export interface DiaryCalendarEvent {
   id: string;
   kind: DiaryCalendarEventKind;
   label: string;
-  /** ISO timestamp of the event (entry_at preferred). */
-  occurredAt: string;
+  /**
+   * "Captured" ISO timestamp — the grower-perceived, backdatable moment they
+   * recorded the entry (resolved via resolveDiaryEntryObservationTime: real
+   * logged_at column, then details.logged_at, then entry_at/occurred_at).
+   * Used for display and calendar-day bucketing ONLY. Never feed this into
+   * cadence/interval math — a grower backfilling several entries in one
+   * session can give them nearly identical Captured times while the real
+   * activities were spaced days apart. Use `trueOccurredAt` for that.
+   */
+  capturedAt: string;
+  /**
+   * Raw entry_at/occurred_at column value (entry_at preferred), UNRESOLVED
+   * through the Captured-preferring resolver. Reflects true occurrence
+   * spacing and is unaffected by Captured backdating — this is what cadence
+   * math (buildCultivationCalendarProjectedReviewBlocks) must consume.
+   */
+  trueOccurredAt: string;
   /** YYYY-MM-DD bucket key in UTC. */
   dateKey: string;
   /** Optional safe plant name pulled from a vetted field. */
@@ -535,13 +550,21 @@ export function buildDiaryCalendarViewModel(
     // it) with entry_at/occurred_at fallback — resolver never invents.
     const iso = toIso(resolveDiaryEntryObservationTime(raw) ?? null);
     if (!iso) continue;
+    // True occurrence spacing: the raw entry_at/occurred_at column, NEVER
+    // resolved through the Captured-preferring resolver, so cadence math
+    // downstream sees real spacing even when Captured was backdated or
+    // backfilled in a batch. Falls back to the Captured value only when
+    // neither raw column is present/parseable (no true-occurrence signal
+    // exists) — never worse than the pre-fix uniform behavior.
+    const trueIso = toIso(raw.entry_at ?? raw.occurred_at ?? null) ?? iso;
 
     const noteSnippet = safeNote(raw.note);
     events.push({
       id: raw.id,
       kind,
       label: DIARY_CALENDAR_KIND_LABEL[kind],
-      occurredAt: iso,
+      capturedAt: iso,
+      trueOccurredAt: trueIso,
       dateKey: dateKeyUtc(iso),
       plantName: safePlantName(raw.details),
       stage: safeCalendarStage(raw.stage),
@@ -560,7 +583,7 @@ export function buildDiaryCalendarViewModel(
   const groups: DiaryCalendarDayGroup[] = [];
   for (const [dateKey, items] of byDate) {
     items.sort((a, b) => {
-      const t = Date.parse(b.occurredAt) - Date.parse(a.occurredAt);
+      const t = Date.parse(b.capturedAt) - Date.parse(a.capturedAt);
       if (t !== 0) return t;
       return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
     });

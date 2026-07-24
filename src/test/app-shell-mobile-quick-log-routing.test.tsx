@@ -54,11 +54,13 @@ vi.mock("@/components/QuickLogV2Sheet", () => ({
     open,
     defaultTargetKey,
     defaultAction,
+    defaultLoggedAtIso,
     onOpenChange,
   }: {
     open: boolean;
     defaultTargetKey: string | null;
     defaultAction?: string;
+    defaultLoggedAtIso?: string | null;
     onOpenChange: (open: boolean) => void;
   }) => (
     <>
@@ -67,12 +69,14 @@ vi.mock("@/components/QuickLogV2Sheet", () => ({
         data-open={String(open)}
         data-target-key={defaultTargetKey ?? ""}
         data-action={defaultAction ?? "note"}
+        data-logged-at-iso={defaultLoggedAtIso ?? ""}
       />
       {open ? (
         <div
           data-testid="scoped-quick-log"
           data-target-key={defaultTargetKey ?? ""}
           data-action={defaultAction ?? "note"}
+          data-logged-at-iso={defaultLoggedAtIso ?? ""}
         >
           Scoped Quick Log
           <button
@@ -311,6 +315,59 @@ describe("AppShell mobile Quick Log routing", () => {
       `tent:${TENT_ID}`,
     );
     expect(screen.queryByTestId("legacy-quick-log")).not.toBeInTheDocument();
+  });
+
+  it("seeds defaultLoggedAtIso with the FAB open-time moment, not save-time (Codex #8)", () => {
+    vi.useFakeTimers();
+    try {
+      const OPEN_TIME = new Date("2026-07-23T23:59:00.000Z");
+      vi.setSystemTime(OPEN_TIME);
+
+      renderAt(`/tents/${TENT_ID}`);
+      fireEvent.click(screen.getByTestId("mobile-quick-log-fab"));
+
+      // Captured at the moment the sheet opened...
+      expect(screen.getByTestId("scoped-quick-log")).toHaveAttribute(
+        "data-logged-at-iso",
+        OPEN_TIME.toISOString(),
+      );
+
+      // ...and leaving the sheet open across the midnight boundary must not
+      // shift the seeded value to the later moment — it stays pinned to
+      // open-time even though "now" has moved into the next day.
+      vi.setSystemTime(new Date("2026-07-24T00:05:00.000Z"));
+      expect(screen.getByTestId("scoped-quick-log")).toHaveAttribute(
+        "data-logged-at-iso",
+        OPEN_TIME.toISOString(),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("clears the FAB-seeded Captured time on close so a later reopen re-seeds fresh", () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-07-23T10:00:00.000Z"));
+      renderAt(`/tents/${TENT_ID}`);
+      fireEvent.click(screen.getByTestId("mobile-quick-log-fab"));
+      expect(screen.getByTestId("scoped-quick-log")).toHaveAttribute(
+        "data-logged-at-iso",
+        "2026-07-23T10:00:00.000Z",
+      );
+
+      fireEvent.click(screen.getByTestId("close-scoped-quick-log"));
+      expect(screen.queryByTestId("scoped-quick-log")).not.toBeInTheDocument();
+
+      vi.setSystemTime(new Date("2026-07-23T14:00:00.000Z"));
+      fireEvent.click(screen.getByTestId("mobile-quick-log-fab"));
+      expect(screen.getByTestId("scoped-quick-log")).toHaveAttribute(
+        "data-logged-at-iso",
+        "2026-07-23T14:00:00.000Z",
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("preserves the existing unscoped Quick Log fallback away from Tent Detail", () => {

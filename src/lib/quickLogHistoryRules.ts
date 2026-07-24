@@ -12,6 +12,7 @@
 import { EVENT_TYPES } from "@/lib/diary";
 import type { NormalizedDiaryEntry } from "@/lib/diaryEntryRules";
 import { splitHardwareReadingsFromNote } from "@/lib/quickLogHardwareReadingsDisplayRules";
+import { resolveDiaryEntryObservationTime } from "@/lib/quickLogTimestampRules";
 
 export type HistoryLane =
   | "watering"
@@ -156,6 +157,15 @@ export interface QuickLogHistoryRow {
   id: string;
   occurredAt: string | null;
   occurredAtLabel: string;
+  /**
+   * The grower's "Captured" moment (entry.loggedAt) when present and
+   * parseable, else falls back to occurredAt. This is the ordering key
+   * `buildRecentQuickLogActivity` sorts by (#10 fix) — Timeline-style
+   * surfaces resolve Captured time the same way via
+   * `resolveDiaryEntryObservationTime`, and this row must not discard
+   * that resolution by re-sorting on occurredAt alone.
+   */
+  capturedAt: string | null;
   plantId: string | null;
   tentId: string | null;
   stage: string | null;
@@ -166,12 +176,27 @@ export interface QuickLogHistoryRow {
   warnings: string[];
 }
 
+/**
+ * Resolve the row's Captured-time ordering key from an already-normalized
+ * entry: `entry.loggedAt` (the grower's "Captured" moment, parsed from
+ * `details.logged_at` upstream) when present and parseable, else
+ * `entry.createdAt`. Reuses the canonical resolver so this never drifts
+ * from the same fallback chain Timeline/report surfaces use.
+ */
+function resolveCapturedAt(entry: NormalizedDiaryEntry): string | null {
+  return resolveDiaryEntryObservationTime({
+    logged_at: entry.loggedAt,
+    entry_at: entry.createdAt,
+  });
+}
+
 function toRow(entry: NormalizedDiaryEntry): QuickLogHistoryRow {
   const split = splitHardwareReadingsFromNote(entry.note);
   return {
     id: entry.id,
     occurredAt: entry.createdAt,
     occurredAtLabel: entry.createdAtLabel,
+    capturedAt: resolveCapturedAt(entry),
     plantId: entry.plantId,
     tentId: entry.tentId,
     stage: entry.stage,
@@ -186,6 +211,23 @@ function toRow(entry: NormalizedDiaryEntry): QuickLogHistoryRow {
 function compareNewestFirst(a: QuickLogHistoryRow, b: QuickLogHistoryRow): number {
   const at = a.occurredAt ? Date.parse(a.occurredAt) : -Infinity;
   const bt = b.occurredAt ? Date.parse(b.occurredAt) : -Infinity;
+  if (at !== bt) return bt - at;
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+}
+
+/**
+ * Same newest-first ordering as `compareNewestFirst`, but keyed on the
+ * row's resolved Captured time instead of occurredAt (#10 fix). A
+ * backdated-but-recently-logged entry (Captured "now", occurred_at set
+ * in the past by the grower) must keep its Captured-time position in the
+ * "Recent activity" feed, not fall to where its occurred_at would place it.
+ */
+function compareByCapturedAtNewestFirst(
+  a: QuickLogHistoryRow,
+  b: QuickLogHistoryRow,
+): number {
+  const at = a.capturedAt ? Date.parse(a.capturedAt) : -Infinity;
+  const bt = b.capturedAt ? Date.parse(b.capturedAt) : -Infinity;
   if (at !== bt) return bt - at;
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 }
@@ -287,6 +329,9 @@ export function buildRecentQuickLogActivity(
   limit = 10,
 ): QuickLogHistoryRow[] {
   const rows = dedupeRecentQuickLogCompanionRows(entries.map(toRow));
-  rows.sort(compareNewestFirst);
+  // #10 fix: sort by the resolved Captured time, not occurredAt/createdAt —
+  // otherwise a backdated-but-just-logged entry loses the position the
+  // grower's "Captured" moment earned it upstream.
+  rows.sort(compareByCapturedAtNewestFirst);
   return rows.slice(0, Math.max(0, limit));
 }

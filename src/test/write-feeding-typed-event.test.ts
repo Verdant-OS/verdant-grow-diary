@@ -113,6 +113,22 @@ describe("mapFeedingInputToRpcArgs", () => {
     expect(result.args.p_feed).not.toHaveProperty("ph");
     expect(result.args.p_feed).not.toHaveProperty("ec_in");
   });
+
+  it("#5 regression: carries a supplied Captured time through to p_details (previously always null)", () => {
+    const result = mapFeedingInputToRpcArgs(
+      baseInput({ details: { logged_at: "2026-07-01T08:15:00.000Z" } }),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.args.p_details).toEqual({ logged_at: "2026-07-01T08:15:00.000Z" });
+  });
+
+  it("keeps p_details null when no details are supplied", () => {
+    const result = mapFeedingInputToRpcArgs(baseInput());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.args.p_details).toBeNull();
+  });
 });
 
 describe("writeFeedingTypedEvent — validation", () => {

@@ -75,6 +75,85 @@ describe("range handling", () => {
     expect(vm.watering.count).toBe(1);
     expect(vm.header.excludedNoTimestamp).toBe(1);
   });
+
+  it("a diary row's real logged_at column decides range membership over entry_at (PR #442)", () => {
+    // entry_at is outside the range; the real logged_at column (the
+    // grower's "Captured" moment) is inside it and must win.
+    const vm = buildDiaryRangeReport(
+      baseInput({
+        diaryEntries: [
+          {
+            id: "w1",
+            note: "",
+            photo_url: null,
+            entry_at: "2026-07-20T10:00:00.000Z",
+            logged_at: "2026-07-05T10:00:00.000Z",
+            details: { event_type: "watering" },
+          },
+        ],
+      }),
+    );
+    expect(vm.watering.count).toBe(1);
+    expect(vm.header.excludedNoTimestamp).toBe(0);
+  });
+
+  it("a diary row's real logged_at column can also exclude a row whose entry_at is in range", () => {
+    const vm = buildDiaryRangeReport(
+      baseInput({
+        diaryEntries: [
+          {
+            id: "w1",
+            note: "",
+            photo_url: null,
+            entry_at: "2026-07-05T10:00:00.000Z",
+            logged_at: "2026-07-20T10:00:00.000Z",
+            details: { event_type: "watering" },
+          },
+        ],
+      }),
+    );
+    expect(vm.watering.count).toBe(0);
+    expect(vm.header.totalInRange).toBe(0);
+  });
+
+  it("a grow_events row's real logged_at column decides range membership over occurred_at (PR #442)", () => {
+    // occurred_at is outside the range; logged_at (mirrored from the
+    // diary companion row, or backfilled from occurred_at) is inside it
+    // and must win — the previous bug silently dropped rows like this.
+    const vm = buildDiaryRangeReport(
+      baseInput({
+        growEvents: [
+          {
+            id: "ge1",
+            event_type: "watering",
+            occurred_at: "2026-07-20T12:00:00.000Z",
+            logged_at: "2026-07-05T12:00:00.000Z",
+            note: "",
+          },
+        ],
+      }),
+    );
+    expect(vm.watering.count).toBe(1);
+    expect(vm.watering.entries[0]?.dateLabel).toBe("2026-07-05");
+    expect(vm.header.excludedNoTimestamp).toBe(0);
+  });
+
+  it("a grow_events row without logged_at falls back to occurred_at", () => {
+    const vm = buildDiaryRangeReport(
+      baseInput({
+        growEvents: [
+          {
+            id: "ge1",
+            event_type: "watering",
+            occurred_at: "2026-07-05T12:00:00.000Z",
+            note: "",
+          },
+        ],
+      }),
+    );
+    expect(vm.watering.count).toBe(1);
+    expect(vm.watering.entries[0]?.dateLabel).toBe("2026-07-05");
+  });
 });
 
 describe("watering / feeding — logged-only numbers", () => {

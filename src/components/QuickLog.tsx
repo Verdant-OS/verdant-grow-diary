@@ -1077,6 +1077,7 @@ export default function QuickLog({
         environmentCheck: environmentCheckRecord,
         phenoEvidenceReceipt,
         noteSuffix: earlyStageSuffix || null,
+        loggedAt: prefill?.logged_at ?? null,
       });
       if (built.ok !== true) {
         setSaveError(built.message);

@@ -27,6 +27,7 @@ import {
   type EnvironmentCheckDiaryViewModel,
 } from "@/lib/environmentCheckViewModel";
 import { buildEnvironmentSummaryReportViewModel } from "@/lib/environmentSummaryReportViewModel";
+import { resolveDiaryEntryObservationTime } from "@/lib/quickLogTimestampRules";
 import {
   defaultEnvironmentSummaryRange,
   isValidEnvironmentSummaryRange,
@@ -49,9 +50,13 @@ type PrintMode = "full_report" | "drilldown";
 
 function toViewModel(entry: any): EnvironmentCheckDiaryViewModel | null {
   if (!isEnvironmentCheckKind(entry?.kind)) return null;
+  // Grower-facing "Captured" moment: real logged_at column, else
+  // details.logged_at, else entry_at, else occurred_at (PR #442
+  // remediation — see resolveDiaryEntryObservationTime).
+  const observedAt = resolveDiaryEntryObservationTime(entry);
   return buildEnvironmentCheckDiaryViewModel({
     entryId: entry.id ?? entry.entryId ?? String(entry.entry_at ?? ""),
-    occurredAt: entry.entry_at ?? entry.occurredAt ?? new Date(0).toISOString(),
+    occurredAt: observedAt ?? entry.occurredAt ?? new Date(0).toISOString(),
     kind: entry.kind ?? "environment",
     snapshot: entry.snapshot ?? entry.payload?.snapshot ?? null,
   });
@@ -99,7 +104,10 @@ export default function EnvironmentSummaryReportPage() {
     const endIso = `${endDate}T23:59:59.999Z`;
     const out: EnvironmentCheckDiaryViewModel[] = [];
     for (const e of entries) {
-      const ts = e?.entry_at;
+      // Filter by the grower's "Captured" moment (logged_at), not the raw
+      // entry_at the fetch happens to be ordered by — see
+      // resolveDiaryEntryObservationTime (PR #442 remediation).
+      const ts = resolveDiaryEntryObservationTime(e);
       if (typeof ts !== "string") continue;
       if (ts < startIso || ts > endIso) continue;
       const vm = toViewModel(e);

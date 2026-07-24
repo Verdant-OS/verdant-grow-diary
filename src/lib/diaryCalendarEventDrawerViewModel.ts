@@ -362,7 +362,7 @@ export function buildDiaryCalendarEventDrawerViewModel(
     eventId: event.id,
     kind: event.kind,
     title: event.label,
-    occurredAtIso: event.occurredAt,
+    occurredAtIso: event.capturedAt,
     plantName: event.plantName,
     noteSnippet: event.noteSnippet,
     readOnlyLabel: DIARY_CALENDAR_DRAWER_READ_ONLY_LABEL,

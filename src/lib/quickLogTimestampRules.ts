@@ -144,6 +144,7 @@ export function seedLoggedAtIso(now: number): string {
 export interface DiaryObservationTimeRow {
   entry_at?: unknown;
   occurred_at?: unknown;
+  logged_at?: unknown;
   details?: unknown;
 }
 
@@ -155,15 +156,20 @@ function parseableIso(v: unknown): string | null {
 
 /**
  * The observation time a report/calendar surface should group and filter by:
- * details.logged_at WHEN PRESENT AND PARSEABLE (the grower's "Captured"
- * moment), else entry_at, else occurred_at. Unparseable or missing logged_at
- * silently degrades to today's behavior — never invents, never throws.
- * (Mirrors the shipped resolveSensorObservationTime fallback pattern.)
+ * the real logged_at column WHEN PRESENT AND PARSEABLE (the grower's
+ * "Captured" moment, now fetched/filtered/paginated by directly at every
+ * query site — see PR #442 remediation), else details.logged_at (rows from
+ * before the column existed, or any in-memory object built without it), else
+ * entry_at, else occurred_at. Unparseable or missing logged_at silently
+ * degrades to today's behavior — never invents, never throws. (Mirrors the
+ * shipped resolveSensorObservationTime fallback pattern.)
  */
 export function resolveDiaryEntryObservationTime(
   row: DiaryObservationTimeRow | null | undefined,
 ): string | null {
   if (!row) return null;
+  const column = parseableIso(row.logged_at);
+  if (column !== null) return column;
   const details = row.details;
   if (details && typeof details === "object" && !Array.isArray(details)) {
     const logged = parseableIso((details as Record<string, unknown>).logged_at);

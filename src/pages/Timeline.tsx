@@ -196,6 +196,12 @@ interface Entry {
   stage: string | null;
   details: Record<string, unknown>;
   entry_at: string;
+  // Captured ("logged_at"): grower-perceived, backdatable moment. The
+  // authoritative column both core Timeline queries and the keyset cursor
+  // filter/order/paginate by -- entry_at remains only for display/cadence
+  // math elsewhere on this page. See supabase/migrations/
+  // 20260724120000_diary_grow_events_logged_at.sql.
+  logged_at: string;
   plant_id: string | null;
   tent_id: string | null;
 }
@@ -508,16 +514,16 @@ export default function Timeline() {
       // after both reads succeed for the same owner/grow/range key.
       let entriesQuery = supabase
         .from("diary_entries")
-        .select("id,note,photo_url,stage,details,entry_at,plant_id,tent_id", {
+        .select("id,note,photo_url,stage,details,entry_at,logged_at,plant_id,tent_id", {
           count: "exact",
         })
         .eq("grow_id", activeGrowId)
-        .order("entry_at", { ascending: false })
+        .order("logged_at", { ascending: false })
         .limit(100);
       if (effectiveStartDate)
-        entriesQuery = entriesQuery.gte("entry_at", `${effectiveStartDate}T00:00:00.000Z`);
+        entriesQuery = entriesQuery.gte("logged_at", `${effectiveStartDate}T00:00:00.000Z`);
       if (effectiveEndDate)
-        entriesQuery = entriesQuery.lte("entry_at", `${effectiveEndDate}T23:59:59.999Z`);
+        entriesQuery = entriesQuery.lte("logged_at", `${effectiveEndDate}T23:59:59.999Z`);
       const entriesResult = await entriesQuery;
       if (!isCurrentRequest()) return;
       if (hasTimelineRequiredReadError(entriesResult)) throw entriesResult.error;
@@ -536,12 +542,12 @@ export default function Timeline() {
         .select(ROOT_ZONE_GROW_EVENT_SELECT)
         .eq("grow_id", activeGrowId)
         .eq("is_deleted", false)
-        .order("occurred_at", { ascending: false })
+        .order("logged_at", { ascending: false })
         .limit(100);
       if (effectiveStartDate)
-        growEventsQuery = growEventsQuery.gte("occurred_at", `${effectiveStartDate}T00:00:00.000Z`);
+        growEventsQuery = growEventsQuery.gte("logged_at", `${effectiveStartDate}T00:00:00.000Z`);
       if (effectiveEndDate)
-        growEventsQuery = growEventsQuery.lte("occurred_at", `${effectiveEndDate}T23:59:59.999Z`);
+        growEventsQuery = growEventsQuery.lte("logged_at", `${effectiveEndDate}T23:59:59.999Z`);
       const growEventsResult = await growEventsQuery;
       if (!isCurrentRequest()) return;
       if (hasTimelineRequiredReadError(growEventsResult)) throw growEventsResult.error;
@@ -655,8 +661,8 @@ export default function Timeline() {
 
   /**
    * Keyset "Load older" — fetches the next page strictly before the oldest
-   * loaded entry_at. Read-only, owner-scoped by RLS, same signing pass as
-   * the initial page for storage photo paths.
+   * loaded logged_at (Captured time). Read-only, owner-scoped by RLS, same
+   * signing pass as the initial page for storage photo paths.
    */
   async function loadOlder() {
     if (
@@ -668,7 +674,7 @@ export default function Timeline() {
       entries.length === 0
     )
       return;
-    const cursor = entries[entries.length - 1]?.entry_at;
+    const cursor = entries[entries.length - 1]?.logged_at;
     if (!cursor) return;
     const requestedGrowId = activeGrowId;
     const requestedReadKey = activeReadKey;
@@ -682,15 +688,15 @@ export default function Timeline() {
       // never walks out of the filtered range.
       let olderQuery = supabase
         .from("diary_entries")
-        .select("id,note,photo_url,stage,details,entry_at,plant_id,tent_id")
+        .select("id,note,photo_url,stage,details,entry_at,logged_at,plant_id,tent_id")
         .eq("grow_id", requestedGrowId)
-        .lt("entry_at", cursor)
-        .order("entry_at", { ascending: false })
+        .lt("logged_at", cursor)
+        .order("logged_at", { ascending: false })
         .limit(100);
       if (effectiveStartDate)
-        olderQuery = olderQuery.gte("entry_at", `${effectiveStartDate}T00:00:00.000Z`);
+        olderQuery = olderQuery.gte("logged_at", `${effectiveStartDate}T00:00:00.000Z`);
       if (effectiveEndDate)
-        olderQuery = olderQuery.lte("entry_at", `${effectiveEndDate}T23:59:59.999Z`);
+        olderQuery = olderQuery.lte("logged_at", `${effectiveEndDate}T23:59:59.999Z`);
       const olderResult = await olderQuery;
       if (!isCurrentPage()) return;
       if (hasTimelineRequiredReadError(olderResult)) throw olderResult.error;

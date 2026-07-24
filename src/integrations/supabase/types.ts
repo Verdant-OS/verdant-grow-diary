@@ -971,6 +971,11 @@ export type Database = {
           entry_at: string
           grow_id: string
           id: string
+          // MANUAL PATCH pending real `bun run sb:types` regeneration once
+          // 20260724120000_diary_grow_events_logged_at.sql is actually applied
+          // -- see PR #442 remediation plan. Replace this whole table block
+          // with the real generated output at that point.
+          logged_at: string | null
           note: string
           photo_url: string | null
           plant_id: string | null
@@ -984,6 +989,7 @@ export type Database = {
           entry_at?: string
           grow_id: string
           id?: string
+          logged_at?: string | null
           note: string
           photo_url?: string | null
           plant_id?: string | null
@@ -997,6 +1003,7 @@ export type Database = {
           entry_at?: string
           grow_id?: string
           id?: string
+          logged_at?: string | null
           note?: string
           photo_url?: string | null
           plant_id?: string | null
@@ -1447,6 +1454,11 @@ export type Database = {
           grow_id: string
           id: string
           is_deleted: boolean
+          // MANUAL PATCH pending real `bun run sb:types` regeneration once
+          // 20260724120000_diary_grow_events_logged_at.sql is actually applied
+          // -- see PR #442 remediation plan. Replace this whole table block
+          // with the real generated output at that point.
+          logged_at: string | null
           note: string | null
           occurred_at: string
           plant_id: string | null
@@ -1463,6 +1475,7 @@ export type Database = {
           grow_id: string
           id?: string
           is_deleted?: boolean
+          logged_at?: string | null
           note?: string | null
           occurred_at?: string
           plant_id?: string | null
@@ -1479,6 +1492,7 @@ export type Database = {
           grow_id?: string
           id?: string
           is_deleted?: boolean
+          logged_at?: string | null
           note?: string | null
           occurred_at?: string
           plant_id?: string | null

@@ -324,4 +324,90 @@ describe("Captured (logged_at) grouping", () => {
     ]);
     expect(groups.map((g) => g.dateKey)).toEqual(["2026-07-24"]);
   });
+
+  it("exposes capturedAt (Captured, resolver-preferred) and trueOccurredAt (raw entry_at/occurred_at) as distinct fields", () => {
+    const groups = buildDiaryCalendarViewModel([
+      {
+        id: "e3",
+        entry_at: "2026-07-10T09:00:00Z",
+        event_type: "watering",
+        details: { logged_at: "2026-07-24T18:00:00Z" },
+      },
+    ]);
+    const event = groups[0].events[0];
+    expect(event.capturedAt).toBe("2026-07-24T18:00:00.000Z");
+    expect(event.trueOccurredAt).toBe("2026-07-10T09:00:00.000Z");
+  });
+});
+
+describe("Captured vs true-occurrence: cadence math must not compress on a backfill session", () => {
+  it("a same-session backfill with near-identical Captured times but real spaced-out occurrences still projects the real cadence", async () => {
+    // Regression for PR #442 finding #9: DiaryCalendarEvent.occurredAt used to
+    // conflate "Captured" (grower-editable, session-time) with "true
+    // occurrence" (real interval spacing cadence math needs). A grower who
+    // backfills 3 watering logs in one sitting could give them near-identical
+    // Captured times while the real waterings were 4 days apart each -- the
+    // old single-field design would have made cadence math see them as
+    // minutes apart instead of 4 days apart.
+    const { buildCultivationCalendarProjectedReviewBlocks } = await import(
+      "@/lib/cultivationCalendarProjectionRules"
+    );
+    const NOW = new Date("2026-07-24T20:00:00.000Z");
+    // All 3 "Captured" within the same few-minute session -- a valid distinct
+    // (not zero) interval is needed for the median-positive-interval cadence
+    // math to produce a block at all, but it must stay minutes, not days.
+
+    const groups = buildDiaryCalendarViewModel([
+      {
+        id: "w1",
+        entry_at: "2026-07-12T09:00:00Z", // true occurrence: 12 days before NOW
+        event_type: "watering",
+        details: { logged_at: "2026-07-24T19:55:00.000Z" },
+      },
+      {
+        id: "w2",
+        entry_at: "2026-07-16T09:00:00Z", // true occurrence: 8 days before NOW
+        event_type: "watering",
+        details: { logged_at: "2026-07-24T19:56:00.000Z" },
+      },
+      {
+        id: "w3",
+        entry_at: "2026-07-20T09:00:00Z", // true occurrence: 4 days before NOW
+        event_type: "watering",
+        details: { logged_at: "2026-07-24T19:57:00.000Z" },
+      },
+    ]);
+    const events = groups.flatMap((g) => g.events).filter((e) => e.kind === "watering");
+    expect(events).toHaveLength(3);
+    // All 3 Captured times land within the same minute-scale backfill session
+    // -- the signature this bug depends on -- while true occurrences below
+    // remain 4 days apart.
+    const capturedSpanMs =
+      Math.max(...events.map((e) => Date.parse(e.capturedAt))) -
+      Math.min(...events.map((e) => Date.parse(e.capturedAt)));
+    expect(capturedSpanMs).toBeLessThan(10 * 60 * 1000);
+
+    // Mirrors DiaryCalendarSection's historyFacts builder: must use
+    // trueOccurredAt, never capturedAt, for cadence math.
+    const correctFacts = events.map((e) => ({
+      category: "watering" as const,
+      occurredAt: e.trueOccurredAt,
+      id: e.id,
+    }));
+    const correctBlocks = buildCultivationCalendarProjectedReviewBlocks(correctFacts, NOW);
+    expect(correctBlocks).toHaveLength(1);
+    expect(correctBlocks[0].cadenceMs).toBe(4 * 24 * 60 * 60 * 1000); // real 4-day spacing
+
+    // Proof the bug is real: feeding the WRONG (capturedAt) field in instead
+    // collapses the cadence to ~0 (all logged within the same 5-minute
+    // session), which is exactly what the pre-fix single-field design did.
+    const buggyFacts = events.map((e) => ({
+      category: "watering" as const,
+      occurredAt: e.capturedAt,
+      id: e.id,
+    }));
+    const buggyBlocks = buildCultivationCalendarProjectedReviewBlocks(buggyFacts, NOW);
+    expect(buggyBlocks[0].cadenceMs).toBeLessThan(10 * 60 * 1000); // under 10 minutes, not 4 days
+    expect(buggyBlocks[0].cadenceMs).not.toBe(correctBlocks[0].cadenceMs);
+  });
 });

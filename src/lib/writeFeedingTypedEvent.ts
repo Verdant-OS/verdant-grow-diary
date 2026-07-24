@@ -37,7 +37,7 @@ export interface QuickLogFeedingEventRpcArgs {
   p_photo_url: null;
   p_sensor_snapshot: null;
   p_occurred_at: string | null;
-  p_details: null;
+  p_details: Record<string, unknown> | null;
   p_water: null;
   p_feed: QuickLogFeedingRpcPayload;
 }
@@ -58,6 +58,10 @@ export interface FeedingTypedEventInput {
   plant_id?: string | null;
   occurred_at?: string | Date | number | null;
   note?: string | null;
+  /** Carries the grower-perceived "Captured" time (details.logged_at) and any
+   * other non-authoritative display metadata. Passed through to `p_details`
+   * as-is; the RPC owns final validation. */
+  details?: Record<string, unknown> | null;
   /** Preferred app-level field. `line_id` remains an accepted alias. */
   nutrient_line_id?: string | null;
   line_id?: string | null;
@@ -221,7 +225,7 @@ export function mapFeedingInputToRpcArgs(
       p_photo_url: null,
       p_sensor_snapshot: null,
       p_occurred_at: occurred.iso,
-      p_details: null,
+      p_details: input.details ?? null,
       p_water: null,
       p_feed: feed,
     },

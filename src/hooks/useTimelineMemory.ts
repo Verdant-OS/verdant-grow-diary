@@ -124,7 +124,10 @@ async function fetchRows(scope: TimelineMemoryScope, limit: number): Promise<Raw
     .from("diary_entries")
     .select("id, plant_id, tent_id, entry_at, note, photo_url, details");
   q = scope.kind === "plant" ? q.eq("plant_id", scope.plantId) : q.eq("tent_id", scope.tentId);
-  const { data, error } = await q.order("entry_at", { ascending: false }).limit(limit);
+  // Top-N cutoff by Captured time (logged_at), not row save-time (entry_at) —
+  // see PR #442 remediation: a backdated/forward-dated entry_at would
+  // otherwise silently fall outside (or wrongly inside) this window.
+  const { data, error } = await q.order("logged_at", { ascending: false }).limit(limit);
   if (error) throw error;
   return (data ?? []) as RawRow[];
 }
@@ -146,7 +149,8 @@ async function fetchQuickLogCompanionRows(
     } else {
       q = q.eq("tent_id", scope.tentId);
     }
-    const { data, error } = await q.order("entry_at", { ascending: false }).limit(limit);
+    // Same Captured-time cutoff fix as fetchRows above.
+    const { data, error } = await q.order("logged_at", { ascending: false }).limit(limit);
     if (error) return { rows: [], unavailable: true };
     return {
       rows: (data ?? []) as unknown as QuickLogCompanionSnapshotDiaryRow[],
@@ -178,8 +182,10 @@ async function fetchQuickLogParentRows(
     } else {
       q = q.eq("tent_id", scope.tentId);
     }
+    // Ordered by Captured time for consistency with the diary-side fetches
+    // above; the exact `.in()` id set already bounds correctness here.
     const { data, error } = await q
-      .order("occurred_at", { ascending: false })
+      .order("logged_at", { ascending: false })
       .limit(linkedGrowEventIds.length);
     if (error) return { rows: [], unavailable: true };
     return {

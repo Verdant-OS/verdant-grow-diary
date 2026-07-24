@@ -18,7 +18,12 @@ export function usePlantRecentActivity(plantId: string | null | undefined) {
         .from("diary_entries")
         .select("*")
         .eq("plant_id", plantId as string)
-        .order("entry_at", { ascending: false })
+        // Order by the same "Captured" moment the panel displays and sorts
+        // by (plantRecentActivityRules' occurredAt / occurredAtLabel), not
+        // entry_at (save time) — otherwise a backdated-but-recently-Captured
+        // entry beyond this Top-N cutoff would be silently excluded even
+        // though it belongs in the visible window (Codex finding #6, PR #442).
+        .order("logged_at", { ascending: false })
         .limit(PLANT_RECENT_ACTIVITY_LIMIT);
       if (error) throw error;
       return data ?? [];

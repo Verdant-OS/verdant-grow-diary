@@ -677,6 +677,14 @@ export default function QuickLogV2Sheet({
       return;
     }
 
+    // "Captured": the launcher-click seed when the intent carried one, else
+    // this save moment. Computed once, up front, so every branch below —
+    // including the typed-Feed early return — folds it into details.logged_at.
+    // The water path freezes it inside the locked submission so retries
+    // reuse it (#317).
+    const occurredAt = new Date().toISOString();
+    const loggedAtIso = defaultLoggedAtIso ?? occurredAt;
+
     if (!pendingWateringSubmission && form.action === "feed") {
       if (!resolved.growId) {
         setLocalError(feedingFormReasonToHelper("grow_id:missing"));
@@ -688,6 +696,7 @@ export default function QuickLogV2Sheet({
         plantId: resolved.plantId ?? null,
         idempotencyKey: saveIdempotencyKeyRef.current,
         form: feedingForm,
+        baseDetails: { logged_at: loggedAtIso },
       });
       if (mapped.ok !== true) {
         setLocalError(feedingFormReasonToHelper(mapped.reason));
@@ -742,11 +751,6 @@ export default function QuickLogV2Sheet({
       return;
     }
 
-    const occurredAt = new Date().toISOString();
-    // "Captured": the launcher-click seed when the intent carried one, else
-    // this save moment. Folded into details.logged_at below; the water path
-    // freezes it inside the locked submission so retries reuse it (#317).
-    const loggedAtIso = defaultLoggedAtIso ?? occurredAt;
     let maturityDetails: Record<string, unknown> | null = null;
     if (!pendingWateringSubmission) {
       const maturityEvidence = buildQuickLogMaturityEvidenceDetails({

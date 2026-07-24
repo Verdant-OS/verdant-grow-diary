@@ -6,6 +6,12 @@
  * ids, diary entries / grow events / harvests / sensor readings bounded
  * to the requested range, and 1-hour signed URLs for storage photo
  * paths. Strictly read-only: no inserts, no updates, no RPCs.
+ *
+ * diary_entries and grow_events are fetched/ordered/paginated by the real
+ * `logged_at` column (the grower's "Captured" moment) rather than
+ * entry_at/occurred_at, so a row whose Captured time falls inside the
+ * requested range is never silently excluded by a fetch bounded on the
+ * wrong timestamp (PR #442 remediation; see quickLogTimestampRules.ts).
  */
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -98,20 +104,20 @@ export function useDiaryRangeReportData(
       const [diaryRes, eventsRes, harvestRes, sensorRes] = await Promise.all([
         supabase
           .from("diary_entries")
-          .select("id,note,photo_url,entry_at,details")
+          .select("id,note,photo_url,entry_at,logged_at,details")
           .eq("grow_id", growId)
-          .gte("entry_at", startIso)
-          .lte("entry_at", endIso)
-          .order("entry_at", { ascending: true })
+          .gte("logged_at", startIso)
+          .lte("logged_at", endIso)
+          .order("logged_at", { ascending: true })
           .limit(250),
         supabase
           .from("grow_events")
-          .select("id,event_type,occurred_at,note")
+          .select("id,event_type,occurred_at,logged_at,note")
           .eq("grow_id", growId)
           .eq("is_deleted", false)
-          .gte("occurred_at", startIso)
-          .lte("occurred_at", endIso)
-          .order("occurred_at", { ascending: true })
+          .gte("logged_at", startIso)
+          .lte("logged_at", endIso)
+          .order("logged_at", { ascending: true })
           .limit(100),
         supabase
           .from("harvests")

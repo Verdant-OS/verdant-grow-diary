@@ -78,6 +78,61 @@ describe("buildPlantRecentActivity (pure)", () => {
     expect(rows.length).toBe(10);
   });
 
+  it("orders newest first by Captured time (details.logged_at) even when it disagrees with entry_at", () => {
+    const rows = buildPlantRecentActivity(
+      [
+        // Saved (entry_at) on May 20 — the oldest entry_at of the three —
+        // but backdated so the grower's Captured moment is May 23, the most
+        // recent. It must sort FIRST, not last (Codex finding #6).
+        entry({
+          id: "backdated-captured-recent",
+          entry_at: "2026-05-20T00:00:00Z",
+          details: { logged_at: "2026-05-23T09:00:00Z" },
+        }),
+        entry({ id: "mid", entry_at: "2026-05-21T00:00:00Z" }),
+        entry({ id: "old", entry_at: "2026-05-20T12:00:00Z" }),
+      ],
+      { plantId: "p1", now: NOW },
+    );
+    expect(rows.map((r) => r.id)).toEqual([
+      "backdated-captured-recent",
+      "mid",
+      "old",
+    ]);
+  });
+
+  it("regression: the rendered label always matches the timestamp the row was sorted by (no sort/label mismatch)", () => {
+    // Codex finding #3: a row was sorted by loggedAt but labeled from
+    // createdAt/entry_at, so a row could be positioned among one day's
+    // entries yet display a different day. Assert both facts together:
+    // (a) sort order follows Captured time, (b) every row's label is
+    // derived from that SAME Captured-preferring value.
+    const rows = buildPlantRecentActivity(
+      [
+        entry({
+          id: "captured-later",
+          entry_at: "2026-05-20T00:00:00Z",
+          details: { logged_at: "2026-05-23T09:00:00Z" },
+        }),
+        entry({ id: "plain", entry_at: "2026-05-22T00:00:00Z" }),
+      ],
+      { plantId: "p1", now: NOW },
+    );
+
+    // Every row's label must agree with its own occurredAt — never with
+    // createdAt/entry_at when they diverge.
+    for (const row of rows) {
+      expect(row.occurredAtLabel).toBe(row.occurredAt ?? "Unknown time");
+    }
+
+    const capturedRow = rows.find((r) => r.id === "captured-later");
+    expect(capturedRow?.occurredAt).toBe("2026-05-23T09:00:00Z");
+    // The label reflects the Captured date (May 23), never the entry_at
+    // date (May 20) that produced its sort position pre-fix.
+    expect(capturedRow?.occurredAtLabel).toBe("2026-05-23T09:00:00Z");
+    expect(capturedRow?.occurredAtLabel).not.toMatch(/^2026-05-20/);
+  });
+
   it("respects custom limit", () => {
     const many = Array.from({ length: 8 }, (_, i) =>
       entry({ id: `e${i}`, entry_at: `2026-05-${10 + i}T00:00:00Z` }),
@@ -232,10 +287,15 @@ describe("Plant Detail wiring", () => {
     expect(PANEL).toContain("plant-recent-activity-empty");
   });
 
-  it("hook queries diary_entries scoped to plant_id and orders newest-first", () => {
+  it("hook queries diary_entries scoped to plant_id and orders newest-first by Captured time (logged_at)", () => {
     expect(HOOK).toMatch(/\.from\(["']diary_entries["']\)/);
     expect(HOOK).toMatch(/\.eq\(["']plant_id["']/);
-    expect(HOOK).toMatch(/\.order\(["']entry_at["'],\s*\{\s*ascending:\s*false/);
+    // Ordered by logged_at (Captured time), not entry_at (save time) — the
+    // Top-N cutoff must match the same field the panel sorts/labels by, or a
+    // backdated-but-recently-Captured entry could be excluded (Codex finding
+    // #6, PR #442).
+    expect(HOOK).toMatch(/\.order\(["']logged_at["'],\s*\{\s*ascending:\s*false/);
+    expect(HOOK).not.toMatch(/\.order\(["']entry_at["']/);
     expect(HOOK).toMatch(/\.limit\(/);
     expect(HOOK).toMatch(/enabled:\s*!!plantId/);
   });

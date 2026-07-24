@@ -313,7 +313,7 @@ export function useReportsHubData(growId: string | null | undefined): ReportsHub
           .select("id,entry_at,created_at,note,details")
           .eq("grow_id", growId)
           .eq("details->>event_type", "action_outcome")
-          .order("entry_at", { ascending: false })
+          .order("logged_at", { ascending: false, nullsFirst: false })
           .limit(50),
         supabase
           .from("alerts")
@@ -340,7 +340,7 @@ export function useReportsHubData(growId: string | null | undefined): ReportsHub
           .from("diary_entries")
           .select("id", { count: "exact", head: true })
           .eq("grow_id", growId)
-          .gte("entry_at", sevenDaysAgo),
+          .gte("logged_at", sevenDaysAgo),
         // Bounded row windows for the diary + grow_events spine merge. The
         // spine is the canonical Quick Log record; companion diary rows are
         // deduped by linkage and identical (plant_id, timestamp) pairs.
@@ -348,7 +348,7 @@ export function useReportsHubData(growId: string | null | undefined): ReportsHub
           .from("diary_entries")
           .select("id,plant_id,entry_at,created_at,details")
           .eq("grow_id", growId)
-          .order("entry_at", { ascending: false })
+          .order("logged_at", { ascending: false, nullsFirst: false })
           .limit(REPORTS_HUB_ACTIVITY_MERGE_WINDOW),
         supabase
           .from("grow_events")
@@ -356,7 +356,7 @@ export function useReportsHubData(growId: string | null | undefined): ReportsHub
           .eq("grow_id", growId)
           .eq("source", "manual")
           .eq("is_deleted", false)
-          .order("occurred_at", { ascending: false })
+          .order("logged_at", { ascending: false, nullsFirst: false })
           .limit(REPORTS_HUB_ACTIVITY_MERGE_WINDOW),
         tentIds.length > 0
           ? loadReportsHubSensorSummary(tentIds, sevenDaysAgo)

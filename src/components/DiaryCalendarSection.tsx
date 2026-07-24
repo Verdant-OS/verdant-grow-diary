@@ -128,7 +128,11 @@ export default function DiaryCalendarSection({
         ) {
           facts.push({
             category: event.kind,
-            occurredAt: event.occurredAt,
+            // True occurrence spacing, NOT Captured display time — a
+            // grower backfilling several entries in one session must not
+            // compress cadence math into "minutes apart" just because their
+            // Captured timestamps happen to be close together.
+            occurredAt: event.trueOccurredAt,
             id: event.id,
           });
         }
@@ -505,7 +509,7 @@ export default function DiaryCalendarSection({
                     >
                       {group.events.map((ev) => {
                         const Icon = KIND_ICON[ev.kind];
-                        const time = new Date(ev.occurredAt).toLocaleTimeString(undefined, {
+                        const time = new Date(ev.capturedAt).toLocaleTimeString(undefined, {
                           hour: "numeric",
                           minute: "2-digit",
                         });

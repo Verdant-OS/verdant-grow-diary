@@ -24,7 +24,8 @@ function event(
       kind === "environment"
         ? "Environment Check"
         : `${kind.slice(0, 1).toUpperCase()}${kind.slice(1)}`,
-    occurredAt,
+    capturedAt: occurredAt,
+    trueOccurredAt: occurredAt,
     dateKey: occurredAt.slice(0, 10),
     plantName: null,
     stage,

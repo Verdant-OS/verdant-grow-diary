@@ -203,6 +203,67 @@ describe("legacyQuickLogUnifiedSave", () => {
   it("appendLegacyDetailsToNote returns base note unchanged when no extras", () => {
     expect(appendLegacyDetailsToNote("hi", baseInput.details)).toBe("hi");
   });
+
+  // Regression for Codex finding #4 (PR #442): a Captured ("logged_at")
+  // seed forwarded from a prefill (e.g. Fast Add / Pheno evidence handoff)
+  // must survive the legacy canonical submit path, not just the
+  // QuickLogAllActivitiesSection / useQuickLogActivitySave paths. Before the
+  // fix, `loggedAt` was silently dropped here and never reached `p_details`.
+  it("folds a Captured (loggedAt) seed into p_details.logged_at", () => {
+    const capturedAt = "2026-07-20T09:30:00.000Z";
+    const r = buildLegacyQuickLogUnifiedPayload({ ...baseInput, loggedAt: capturedAt });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.payload.p_details).toMatchObject({ logged_at: capturedAt });
+  });
+
+  it("folds a Captured seed alongside the watering action too", () => {
+    const capturedAt = "2026-07-21T14:00:00.000Z";
+    const r = buildLegacyQuickLogUnifiedPayload({
+      ...baseInput,
+      eventType: "watering",
+      noteWithHardware: "",
+      details: { ...baseInput.details, watering: "500" },
+      loggedAt: capturedAt,
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.payload.p_details).toMatchObject({ logged_at: capturedAt });
+  });
+
+  it("does not invent p_details.logged_at when no Captured seed is provided", () => {
+    const r = buildLegacyQuickLogUnifiedPayload(baseInput);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.payload.p_details).toBeNull();
+  });
+
+  it("merges a Captured seed with an existing sensor/Pheno receipt envelope", () => {
+    const capturedAt = "2026-07-22T18:15:00.000Z";
+    const r = buildLegacyQuickLogUnifiedPayload({
+      ...baseInput,
+      loggedAt: capturedAt,
+      phenoEvidenceReceipt: {
+        kind: "pheno_evidence_receipt",
+        receipt_version: 1,
+        source: "manual",
+        evidence_only: true,
+        hunt_id: "hunt-1",
+        plant_id: PLANT_ID,
+        evidence_goal: "structure",
+        stage: "flower",
+        automatic_selection: false,
+        action_queue_created: false,
+        device_control: false,
+      },
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.payload.p_details).toMatchObject({
+      hunt_id: "hunt-1",
+      logged_at: capturedAt,
+    });
+  });
 });
 
 describe("legacyQuickLogUnifiedSave — static safety", () => {
@@ -211,6 +272,21 @@ describe("legacyQuickLogUnifiedSave — static safety", () => {
     const src = await fs.readFile("src/components/QuickLog.tsx", "utf8");
     expect(src).not.toMatch(/\.from\(\s*["']diary_entries["']\s*\)\s*\.insert/);
     expect(src).not.toMatch(/\.from\(\s*["']grow_events["']\s*\)\s*\.insert/);
+  });
+
+  // Regression for Codex finding #4 (PR #442): `prefill.logged_at` was only
+  // ever forwarded to QuickLogAllActivitiesSection via `defaultLoggedAtIso`;
+  // the legacy canonical submit path's buildLegacyQuickLogUnifiedPayload
+  // call never included it, so a Captured value set via this path was
+  // silently dropped instead of persisted. Pins the actual call-site wiring
+  // (not just that the symbol is present) so a future edit that drops the
+  // argument again fails this test.
+  it("threads the Captured (logged_at) prefill seed into the legacy canonical submit payload", async () => {
+    const fs = await import("node:fs/promises");
+    const src = await fs.readFile("src/components/QuickLog.tsx", "utf8");
+    const callSiteMatch = src.match(/const built = buildLegacyQuickLogUnifiedPayload\(\{[\s\S]*?\}\);/);
+    expect(callSiteMatch).not.toBeNull();
+    expect(callSiteMatch![0]).toMatch(/loggedAt:\s*prefill\?\.logged_at\s*\?\?\s*null/);
   });
 });
 

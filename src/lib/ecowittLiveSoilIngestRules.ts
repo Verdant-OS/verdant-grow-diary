@@ -472,7 +472,11 @@ export function parseEcowittSoilChannelMap(raw: unknown): EcowittSoilChannelMap 
  * included — this error is written to logs and process exit paths.
  */
 export class EcowittBridgeConfigError extends Error {
-  readonly code: "mixed_tent_channel_map" | "channel_map_tent_mismatch";
+  readonly code:
+    | "mixed_tent_channel_map"
+    | "channel_map_tent_mismatch"
+    | "mixed_tent_ha_mapping"
+    | "ha_mapping_tent_mismatch";
   constructor(code: EcowittBridgeConfigError["code"], message: string) {
     super(message);
     this.name = "EcowittBridgeConfigError";

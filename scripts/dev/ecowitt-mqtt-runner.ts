@@ -23,7 +23,11 @@
  * fixtures/home-assistant-ecowitt-mqtt/example-mapping.json). The file
  * is read once at startup, read-only. A missing, unreadable, or invalid
  * mapping fails closed with a path-safe error that never echoes file
- * contents.
+ * contents. Every entity in that mapping MUST route to the same
+ * `tent_id` (one bridge process → one tent); mixed-tent mappings are
+ * rejected before any MQTT import or broker connection, and if
+ * `VERDANT_TENT_ID` is set the mapping's tent must match it. The
+ * runner exits with code 2 on any such violation.
  *
  * HA modes are dry-run only: they normalize through the pure
  * homeAssistantEcowittMqttAdapter, print evidence reports with hav2

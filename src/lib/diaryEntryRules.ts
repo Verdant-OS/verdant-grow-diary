@@ -110,6 +110,10 @@ const KNOWN_DETAIL_KEYS = new Set([
   // column; quick-log companions carry the type inside details) — not an extra.
   "event_type",
   "eventType",
+  // "Captured" timestamp (when the grower logged the entry) — consumed by the
+  // observation-time resolver for report/calendar grouping, never an extra.
+  "logged_at",
+  "loggedAt",
 ]);
 
 /**

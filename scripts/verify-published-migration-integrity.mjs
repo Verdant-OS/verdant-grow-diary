@@ -42,12 +42,22 @@ const DEFAULT_BASELINE =
 
 // ─── arg parsing ──────────────────────────────────────────────────────
 function parseArgs(argv) {
-  const out = { baseline: DEFAULT_BASELINE, json: false, only: null };
+  const out = {
+    baseline: DEFAULT_BASELINE,
+    json: false,
+    only: null,
+    allow: [], // Array<{ path, reason }>
+    strictAllowlist: false,
+  };
   for (const a of argv.slice(2)) {
     if (a === "--json") out.json = true;
     else if (a.startsWith("--baseline=")) out.baseline = a.slice(11);
     else if (a.startsWith("--only=")) out.only = a.slice(7);
-    else if (a === "--help" || a === "-h") {
+    else if (a === "--strict-allowlist") out.strictAllowlist = true;
+    else if (a.startsWith("--allow=")) out.allow.push(parseAllowSpec(a.slice(8)));
+    else if (a.startsWith("--allow-file=")) {
+      for (const entry of loadAllowFile(a.slice(13))) out.allow.push(entry);
+    } else if (a === "--help" || a === "-h") {
       // eslint-disable-next-line no-console
       console.log(readFileSync(new URL(import.meta.url)).toString().split("\n").slice(1, 34).join("\n"));
       process.exit(0);
@@ -56,6 +66,78 @@ function parseArgs(argv) {
     }
   }
   return out;
+}
+
+/**
+ * Parse a single `--allow=<path>:<reason>` spec. Path is normalized so
+ * bare filenames (`20260722100000_foo.sql`) resolve to the canonical
+ * `supabase/migrations/<name>` path. Reason is required and cannot be
+ * whitespace-only — an unlabeled allowlist is a doctrine violation.
+ */
+function parseAllowSpec(raw) {
+  const idx = raw.indexOf(":");
+  if (idx < 0) {
+    fail(
+      2,
+      `--allow requires "<path>:<reason>" (got ${JSON.stringify(raw)}). ` +
+        `Example: --allow=supabase/migrations/20260722_foo.sql:"restore missing GRANT"`,
+    );
+  }
+  const path = normalizeAllowPath(raw.slice(0, idx).trim());
+  const reason = raw.slice(idx + 1).trim();
+  if (!path) fail(2, `--allow spec has empty path: ${JSON.stringify(raw)}`);
+  if (!reason) {
+    fail(
+      2,
+      `--allow spec requires a non-empty reason (got ${JSON.stringify(raw)}). ` +
+        `Every allowlisted edit MUST be justified in writing.`,
+    );
+  }
+  return { path, reason };
+}
+
+function normalizeAllowPath(p) {
+  if (!p) return p;
+  if (p.startsWith(`${MIGRATIONS_DIR}/`)) return p;
+  if (p.includes("/")) return p;
+  return `${MIGRATIONS_DIR}/${p}`;
+}
+
+/**
+ * Load an allowlist JSON file. Accepts either a bare array of entries
+ * or `{ "allow": [...] }`. Each entry needs `path` and `reason`.
+ */
+function loadAllowFile(filePath) {
+  const abs = resolve(process.cwd(), filePath);
+  if (!existsSync(abs)) fail(2, `--allow-file not found: ${filePath}`);
+  let parsed;
+  try {
+    parsed = JSON.parse(readFileSync(abs, "utf8"));
+  } catch (err) {
+    fail(2, `--allow-file ${filePath} is not valid JSON: ${err.message}`);
+  }
+  const list = Array.isArray(parsed) ? parsed : parsed?.allow;
+  if (!Array.isArray(list)) {
+    fail(
+      2,
+      `--allow-file ${filePath} must be a JSON array or { "allow": [...] }`,
+    );
+  }
+  return list.map((entry, i) => {
+    if (!entry || typeof entry !== "object") {
+      fail(2, `--allow-file ${filePath} entry #${i} is not an object`);
+    }
+    const path = normalizeAllowPath(String(entry.path ?? "").trim());
+    const reason = String(entry.reason ?? "").trim();
+    if (!path) fail(2, `--allow-file ${filePath} entry #${i} missing "path"`);
+    if (!reason) {
+      fail(
+        2,
+        `--allow-file ${filePath} entry #${i} (${path}) missing non-empty "reason"`,
+      );
+    }
+    return { path, reason };
+  });
 }
 
 function fail(code, msg) {
@@ -139,6 +221,13 @@ function main() {
     args.only ? p.includes(args.only) : true,
   );
 
+  // Allowlist: at most one reason per path (last spec wins if duplicated),
+  // and a "used" flag so we can report unjustified/unused entries.
+  const allowMap = new Map();
+  for (const entry of args.allow) {
+    allowMap.set(entry.path, { reason: entry.reason, used: false });
+  }
+
   const results = {
     baseline: args.baseline,
     checked: 0,
@@ -146,7 +235,17 @@ function main() {
     edited: [],
     deleted: [],
     noop_stubs: [],
+    allowlisted: [], // { path, kind: "edited"|"noop"|"deleted", reason, ... }
+    allowlist_unused: [],
     new_on_branch: [],
+  };
+
+  const markAllowlisted = (path, kind, entry) => {
+    const allow = allowMap.get(path);
+    if (!allow) return false;
+    allow.used = true;
+    results.allowlisted.push({ path, kind, reason: allow.reason, ...entry });
+    return true;
   };
 
   // Every migration on baseline must exist unchanged on the current tree.
@@ -156,7 +255,9 @@ function main() {
     const baselineBytes = baselineBlobBytes(args.baseline, path);
     const baselineHash = sha256Bytes(baselineBytes);
     if (!existsSync(abs)) {
-      results.deleted.push({ path, baseline_sha256: baselineHash });
+      if (!markAllowlisted(path, "deleted", { baseline_sha256: baselineHash })) {
+        results.deleted.push({ path, baseline_sha256: baselineHash });
+      }
       continue;
     }
     const currentBytes = readFileSync(abs);
@@ -172,7 +273,9 @@ function main() {
       baseline_bytes: baselineBytes.length,
       current_bytes: currentBytes.length,
     };
-    if (looksLikeNoop(currentBytes)) results.noop_stubs.push(entry);
+    const kind = looksLikeNoop(currentBytes) ? "noop" : "edited";
+    if (markAllowlisted(path, kind, entry)) continue;
+    if (kind === "noop") results.noop_stubs.push(entry);
     else results.edited.push(entry);
   }
 
@@ -199,8 +302,16 @@ function main() {
     }
   }
 
-  const failures =
+  // Any allow entry we never used is either stale (target now matches
+  // baseline again) or points at a path not on the baseline at all.
+  for (const [path, allow] of allowMap.entries()) {
+    if (!allow.used) results.allowlist_unused.push({ path, reason: allow.reason });
+  }
+
+  const realFailures =
     results.edited.length + results.deleted.length + results.noop_stubs.length;
+  const strictFailures = args.strictAllowlist ? results.allowlist_unused.length : 0;
+  const failures = realFailures + strictFailures;
 
   if (args.json) {
     // eslint-disable-next-line no-console
@@ -210,19 +321,15 @@ function main() {
     console.log(
       `\n[verify-published-migration-integrity] baseline=${args.baseline}`,
     );
-    // eslint-disable-next-line no-console
-    console.log(`  checked:        ${results.checked} published migrations`);
-    // eslint-disable-next-line no-console
-    console.log(`  matched:        ${results.matched.length}`);
-    // eslint-disable-next-line no-console
-    console.log(`  edited:         ${results.edited.length}`);
-    // eslint-disable-next-line no-console
-    console.log(`  no-op stubs:    ${results.noop_stubs.length}`);
-    // eslint-disable-next-line no-console
-    console.log(`  deleted:        ${results.deleted.length}`);
-    // eslint-disable-next-line no-console
+    console.log(`  checked:         ${results.checked} published migrations`);
+    console.log(`  matched:         ${results.matched.length}`);
+    console.log(`  edited:          ${results.edited.length}`);
+    console.log(`  no-op stubs:     ${results.noop_stubs.length}`);
+    console.log(`  deleted:         ${results.deleted.length}`);
+    console.log(`  allowlisted:     ${results.allowlisted.length}`);
+    console.log(`  allowlist unused:${results.allowlist_unused.length}`);
     console.log(
-      `  new on branch:  ${results.new_on_branch.length} (additive, ok)\n`,
+      `  new on branch:   ${results.new_on_branch.length} (additive, ok)\n`,
     );
     for (const e of results.edited) {
       console.log(
@@ -237,13 +344,25 @@ function main() {
     for (const e of results.deleted) {
       console.log(`  DELETED  ${e.path}`);
     }
+    for (const e of results.allowlisted) {
+      console.log(
+        `  ALLOWED  ${e.path} [${e.kind}] — reason: ${e.reason}`,
+      );
+    }
+    for (const e of results.allowlist_unused) {
+      console.log(
+        `  UNUSED   ${e.path} — allowlisted but current file matches baseline (or path not on baseline). Remove the --allow entry. Reason was: ${e.reason}`,
+      );
+    }
     for (const p of results.new_on_branch) {
       console.log(`  new      ${p}`);
     }
     console.log(
       failures === 0
-        ? "\nOK — every published migration matches baseline.\n"
-        : `\nFAIL — ${failures} published migration(s) diverge from baseline. Restore with:\n  git checkout ${args.baseline} -- <path>\n`,
+        ? "\nOK — every published migration matches baseline (or is explicitly allowlisted).\n"
+        : `\nFAIL — ${realFailures} unallowlisted divergence(s)` +
+            (strictFailures ? ` + ${strictFailures} unused allowlist entr(ies) under --strict-allowlist` : "") +
+            `. Restore with:\n  git checkout ${args.baseline} -- <path>\nOr, if the edit is intentional, add:\n  --allow=<path>:"<justification>"\n`,
     );
   }
 

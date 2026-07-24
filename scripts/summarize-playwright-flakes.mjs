@@ -232,6 +232,140 @@ export function buildSummary(report, { cwd = process.cwd() } = {}) {
   };
 }
 
+const PR_COMMENT_MARKER =
+  "<!-- verdant:playwright-flake-pr-comment -- do not edit -->";
+
+/**
+ * Build the sticky PR comment body. Includes per-test, per-attempt
+ * (attempt 1 = retry0, attempt 2 = retry1) attachment listings and direct
+ * links to the uploaded artifact bundles so the user can open the exact
+ * trace/video/screenshot without digging through the run.
+ *
+ * GitHub artifact URLs point to the artifact zip — inside each zip, the
+ * per-attempt file path is what's printed next to each attachment.
+ */
+export function buildPrComment(
+  report,
+  {
+    cwd = process.cwd(),
+    tracesUrl = "",
+    mediaUrl = "",
+    reportUrl = "",
+    bundleUrl = "",
+    runUrl = "",
+  } = {},
+) {
+  const tests = collectTests(report).map(classifyTest);
+  const flakes = tests.filter((t) => t.isFlake);
+  const failed = tests.filter(
+    (t) => !t.isFlake && FAIL_STATUSES.has(t.finalStatus),
+  );
+  const noteworthy = [...flakes, ...failed];
+
+  const lines = [];
+  lines.push(PR_COMMENT_MARKER);
+  lines.push("## Playwright failure artifacts");
+  lines.push("");
+  lines.push(
+    `**Flaky:** ${flakes.length}  ·  **Failed:** ${failed.length}  ·  **Total tests:** ${tests.length}`,
+  );
+  lines.push("");
+
+  const artifactLinks = [];
+  if (tracesUrl)
+    artifactLinks.push(`- [Traces bundle (\`*.zip\`)](${tracesUrl})`);
+  if (mediaUrl)
+    artifactLinks.push(`- [Media bundle (screenshots + videos)](${mediaUrl})`);
+  if (reportUrl)
+    artifactLinks.push(`- [Playwright HTML report](${reportUrl})`);
+  if (bundleUrl)
+    artifactLinks.push(`- [Full smoke artifact bundle](${bundleUrl})`);
+  if (runUrl) artifactLinks.push(`- [Workflow run](${runUrl})`);
+  if (artifactLinks.length) {
+    lines.push("### Artifact bundles for this run");
+    lines.push("");
+    for (const link of artifactLinks) lines.push(link);
+    lines.push("");
+    lines.push(
+      "> GitHub artifact URLs point to the artifact zip. Download the bundle above, then open the file path listed under each attempt.",
+    );
+    lines.push("");
+  }
+
+  if (noteworthy.length === 0) {
+    lines.push("_No failed or flaky tests in this run — no per-attempt artifacts to link._");
+    lines.push("");
+    return lines.join("\n");
+  }
+
+  for (const t of noteworthy) {
+    const relFile = t.file
+      ? relative(cwd, resolve(cwd, t.file)) || t.file
+      : "";
+    const badge = t.isFlake ? "FLAKY" : "FAILED";
+    lines.push(`### ${badge} · ${t.title}`);
+    lines.push("");
+    lines.push(
+      `\`${relFile}\`${t.projectName ? ` · project \`${t.projectName}\`` : ""} · attempts: ${t.attempts} · retry count: ${t.retryCount}`,
+    );
+    lines.push("");
+
+    for (const attempt of t.attemptResults) {
+      const label =
+        attempt.retry === 0 ? "Attempt 1 (initial)" : `Retry ${attempt.retry}`;
+      lines.push(`**${label} — status: \`${attempt.status || "unknown"}\`**`);
+      if (attempt.attachments.length === 0) {
+        lines.push("");
+        lines.push("- _no attachments captured for this attempt_");
+        lines.push("");
+        continue;
+      }
+      lines.push("");
+      for (const a of attempt.attachments) {
+        const rel = a.path
+          ? relative(cwd, resolve(cwd, a.path)) || a.path
+          : "";
+        const kind = describeAttachmentKind(a);
+        const bundleHint = bundleHintFor(a, { tracesUrl, mediaUrl });
+        const pathCell = rel ? `\`${rel}\`` : "_(path unavailable)_";
+        const link = bundleHint ? ` — [open in ${bundleHint.label}](${bundleHint.url})` : "";
+        lines.push(`- ${kind}: ${pathCell}${link}`);
+      }
+      lines.push("");
+    }
+  }
+
+  return lines.join("\n");
+}
+
+function describeAttachmentKind(a) {
+  const name = a.name?.toLowerCase() ?? "";
+  const ct = a.contentType?.toLowerCase() ?? "";
+  if (name === "trace" || ct === "application/zip") return "**trace**";
+  if (name === "video" || ct.startsWith("video/")) return "**video**";
+  if (name.includes("screenshot") || ct.startsWith("image/"))
+    return "**screenshot**";
+  return `**${a.name || "attachment"}**`;
+}
+
+function bundleHintFor(a, { tracesUrl, mediaUrl }) {
+  const ct = a.contentType?.toLowerCase() ?? "";
+  const name = a.name?.toLowerCase() ?? "";
+  if ((name === "trace" || ct === "application/zip") && tracesUrl) {
+    return { label: "traces bundle", url: tracesUrl };
+  }
+  if (
+    mediaUrl &&
+    (name === "video" ||
+      name.includes("screenshot") ||
+      ct.startsWith("video/") ||
+      ct.startsWith("image/"))
+  ) {
+    return { label: "media bundle", url: mediaUrl };
+  }
+  return null;
+}
+
 function escapeCell(value) {
   return String(value ?? "")
     .replace(/\|/g, "\\|")

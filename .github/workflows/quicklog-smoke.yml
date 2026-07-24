@@ -338,6 +338,7 @@ jobs:
             || echo "::warning::flake summarizer exited non-zero (see logs)"
 
       - name: Upload smoke artifacts
+        id: upload_smoke_bundle
         if: always() && steps.e2e_config.outputs.should_run == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:

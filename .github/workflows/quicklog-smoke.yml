@@ -426,12 +426,18 @@ jobs:
           REPORT_URL: ${{ steps.upload_playwright_report.outputs.artifact-url }}
           BUNDLE_URL: ${{ steps.upload_smoke_bundle.outputs.artifact-url }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          PR_COMMENT_MIN_FAILED: ${{ github.event_name == 'workflow_dispatch' && inputs.pr_comment_min_failed || '1' }}
         run: |
           # Regenerates the flake summary as a PR-comment body with direct
           # links to the uploaded artifact bundles for both attempt 1 and
           # retry1. `artifact-url` outputs are only populated by
           # actions/upload-artifact@v4 AFTER the upload step runs, so this
           # step must live after every upload_playwright_* step.
+          #
+          # PR_COMMENT_MIN_FAILED gates comment creation: the file (and
+          # therefore the sticky comment) is only written when the hard-
+          # failure count is >= this threshold. Default 1 keeps PRs quiet
+          # on flake-only runs; set to 0 to always post.
           if [ ! -f "e2e/results/playwright-report.json" ]; then
             echo "::notice::No Playwright JSON report — skipping PR comment."
             echo "comment_ready=false" >> "$GITHUB_OUTPUT"
@@ -445,6 +451,7 @@ jobs:
             --report-url="${REPORT_URL}" \
             --bundle-url="${BUNDLE_URL}" \
             --run-url="${RUN_URL}" \
+            --min-failed="${PR_COMMENT_MIN_FAILED:-1}" \
             > /dev/null \
             || echo "::warning::PR-comment builder exited non-zero (see logs)"
           if [ -s "e2e/results/playwright-flake-pr-comment.md" ]; then
@@ -452,6 +459,7 @@ jobs:
           else
             echo "comment_ready=false" >> "$GITHUB_OUTPUT"
           fi
+
 
       - name: Post Playwright failure artifacts PR comment
         if: always() && steps.build_pr_comment.outputs.comment_ready == 'true'

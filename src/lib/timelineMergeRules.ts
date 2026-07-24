@@ -210,6 +210,60 @@ function compareMergedEntries(a: MergedTimelineEntry, b: MergedTimelineEntry): n
 // Public API
 // ---------------------------------------------------------------------------
 
+/**
+ * Ordered decision for rebuilding the Timeline "recent lane" raw-entry list.
+ *
+ * The recent lane re-maps each merged entry back to a concrete raw-entry
+ * object (the original diary row, or a grow_events row lifted through
+ * `mapGrowEventToRecentRawEntry`). That lift has no `details` column, so a
+ * Quick Log save's "Captured" moment — which `mergeTimelineSources` folded
+ * onto the kept spine row's `occurred_at` — would be lost. This planner
+ * surfaces, per grow_events row, the Captured time to re-inject as
+ * `details.logged_at` so downstream calendar/detailed-history grouping
+ * (`resolveDiaryEntryObservationTime`) buckets by Captured. `entry_at` stays
+ * the true "when it happened" so irrigation-cadence math is unaffected.
+ */
+export interface RecentLaneRawEntryDecision {
+  source_table: TimelineSourceTable;
+  source_id: string;
+  /**
+   * grow_events rows only: mirror-inherited Captured time to inject as
+   * `details.logged_at`, or `null` to keep the row's own occurred_at.
+   */
+  inheritedLoggedAt: string | null;
+}
+
+export function planRecentLaneRawEntries(
+  input: MergeTimelineSourcesInput,
+): RecentLaneRawEntryDecision[] {
+  const merged = mergeTimelineSources(input);
+  // The recent-lane grow mapper sets entry_at = occurred_at, so compare the
+  // merge-resolved time against the row's own occurred_at: they match unless
+  // the merge mirror-inherited a distinct Captured moment from a diary mirror.
+  const growOccurredById = new Map<string, string | null>();
+  for (const row of input.growEvents ?? []) {
+    if (!row || typeof row.id !== "string" || row.id.length === 0) continue;
+    growOccurredById.set(row.id, pickOccurredAt(row.occurred_at, row.entry_at));
+  }
+  return merged.map((m) => {
+    if (m.source_table === "grow_events") {
+      const own = growOccurredById.get(m.source_id) ?? null;
+      const inheritedLoggedAt =
+        m.occurred_at && m.occurred_at !== own ? m.occurred_at : null;
+      return {
+        source_table: m.source_table,
+        source_id: m.source_id,
+        inheritedLoggedAt,
+      };
+    }
+    return {
+      source_table: m.source_table,
+      source_id: m.source_id,
+      inheritedLoggedAt: null,
+    };
+  });
+}
+
 export function mergeTimelineSources(input: MergeTimelineSourcesInput): MergedTimelineEntry[] {
   const normalized: MergedTimelineEntry[] = [];
 

@@ -261,10 +261,21 @@ const isMain =
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+export interface ConfigValidateFieldError {
+  path: string;
+  message: string;
+}
+
 export interface ConfigValidateResult {
   ok: boolean;
   code?: string;
   message?: string;
+  /**
+   * Present only for failures that can be attributed to specific entries
+   * inside `ECOWITT_SOIL_CHANNEL_MAP_JSON`. Stable structural paths only
+   * (e.g. `$.soilmoisture2.tent_id`) — never contains raw UUIDs or tokens.
+   */
+  fields?: ConfigValidateFieldError[];
   /** Present only when includeFixHints is true. Concise operator remedy. */
   fix?: string;
 }
@@ -377,7 +388,9 @@ export function runConfigValidate(
     assertSingleTentSoilChannelMap(channelMap, tentId);
   } catch (e) {
     if (e instanceof EcowittBridgeConfigError) {
-      return withHint({ ok: false, code: e.code, message: e.message });
+      const base: ConfigValidateResult = { ok: false, code: e.code, message: e.message };
+      if (e.fields && e.fields.length > 0) base.fields = e.fields.map((f) => ({ ...f }));
+      return withHint(base);
     }
     return withHint({
       ok: false,
@@ -475,21 +488,32 @@ export function buildRedactedEffectiveConfig(
 }
 
 async function runCli(): Promise<void> {
-  const emitConfigError = (code: string, message: string, fix?: string): void => {
+  const emitConfigError = (
+    code: string,
+    message: string,
+    fix?: string,
+    fields?: ConfigValidateFieldError[],
+  ): void => {
+    const hasFields = Array.isArray(fields) && fields.length > 0;
+    const fieldsSummary = hasFields
+      ? fields!
+          .slice(0, 5)
+          .map((f) => `${f.path}: ${f.message}`)
+          .join("; ")
+      : "";
     // eslint-disable-next-line no-console
     console.error(
       `[ecowitt-bridge] config_error code=${code} message=${JSON.stringify(message)}${
         fix ? ` fix=${JSON.stringify(fix)}` : ""
-      }`,
+      }${hasFields ? ` fields=${JSON.stringify(fieldsSummary)}` : ""}`,
     );
+    // Envelope key order (stable for downstream jq consumers):
+    //   event, code, message, [fields], [fix]
+    const envelope: Record<string, unknown> = { event: "config_error", code, message };
+    if (hasFields) envelope.fields = fields;
+    if (fix) envelope.fix = fix;
     // eslint-disable-next-line no-console
-    console.error(
-      JSON.stringify(
-        fix
-          ? { event: "config_error", code, message, fix }
-          : { event: "config_error", code, message },
-      ),
-    );
+    console.error(JSON.stringify(envelope));
   };
 
   // ---- `config validate [--fix-hints] [--dry-run]` subcommand ----
@@ -526,7 +550,7 @@ async function runCli(): Promise<void> {
       process.exit(0);
       return;
     }
-    emitConfigError(res.code!, res.message!, res.fix);
+    emitConfigError(res.code!, res.message!, res.fix, res.fields);
     process.exit(2);
     return;
   }
@@ -559,7 +583,7 @@ async function runCli(): Promise<void> {
     assertBridgeStartupSafe(env, process.env.ECOWITT_SOIL_CHANNEL_MAP_JSON ?? null);
   } catch (e) {
     if (e instanceof EcowittBridgeConfigError) {
-      emitConfigError(e.code, e.message);
+      emitConfigError(e.code, e.message, undefined, e.fields);
       process.exit(2);
       return;
     }

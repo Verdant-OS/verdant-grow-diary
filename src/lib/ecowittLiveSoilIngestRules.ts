@@ -174,10 +174,7 @@ function resolveAirTempF(payload: Record<string, unknown>): number | null {
 }
 
 /** Resolve soil temperature in Fahrenheit for a given channel suffix. */
-function resolveSoilTempF(
-  payload: Record<string, unknown>,
-  channelIdx: number,
-): number | null {
+function resolveSoilTempF(payload: Record<string, unknown>, channelIdx: number): number | null {
   const f = pick(payload, [`soiltemp${channelIdx}f`]);
   if (f !== null) return f;
   const c = pick(payload, [`soiltemp${channelIdx}c`]);
@@ -266,7 +263,11 @@ export function normalizeEcowittLiveSoilPayload(
     now.toISOString();
   // We always have a captured_at (fallback to injected now). But if dateutc
   // was provided AND unparsable, flag malformed and bail.
-  if ("dateutc" in payload && payload["dateutc"] !== null && parseEcowittDateUtc(payload["dateutc"]) === null) {
+  if (
+    "dateutc" in payload &&
+    payload["dateutc"] !== null &&
+    parseEcowittDateUtc(payload["dateutc"]) === null
+  ) {
     return { payloads: [], reasons: ["missing_captured_at"], chips: ["Missing captured_at"] };
   }
 
@@ -355,9 +356,7 @@ export function normalizeEcowittLiveSoilPayload(
   for (const key of soilKeys) {
     const idx = soilChannelIndex(key);
     if (idx === null) continue;
-    const target =
-      input.soilChannelMap?.[key] ??
-      input.soilChannelMap?.[key.toLowerCase()];
+    const target = input.soilChannelMap?.[key] ?? input.soilChannelMap?.[key.toLowerCase()];
 
     const raw = toNum(payload[key]);
     if (raw === null) continue;
@@ -457,6 +456,109 @@ export function parseEcowittSoilChannelMap(raw: unknown): EcowittSoilChannelMap 
     };
   }
   return Object.freeze(out);
+}
+
+export type EcowittChannelMapJsonInputState = "absent" | "malformed" | "parsed";
+
+/**
+ * Classify the raw `ECOWITT_SOIL_CHANNEL_MAP_JSON` string itself, distinct
+ * from `parseEcowittSoilChannelMap`'s fail-safe empty-map return. Operators
+ * need to tell "I didn't set a channel map" (`absent`) apart from "I set one
+ * but it's broken JSON / not an object" (`malformed`) — both currently
+ * collapse to the same empty `{}` map, which would let a typo silently look
+ * identical to "no channels configured" in `--validate-config` output.
+ */
+export function classifyEcowittChannelMapJsonInput(raw: unknown): EcowittChannelMapJsonInputState {
+  if (typeof raw !== "string" || !raw.trim()) return "absent";
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return "malformed";
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return "malformed";
+  return "parsed";
+}
+
+// ---------------------------------------------------------------------------
+// Single-tent channel map enforcement
+// ---------------------------------------------------------------------------
+//
+// The channel map data shape (`{ [channelKey]: { tent_id, ... } }`) is
+// inherently multi-tent capable — each channel can name any tent, and
+// `normalizeEcowittLiveSoilPayload` above will happily route each probe to
+// whichever tent its own entry names. That stays true; this section does
+// NOT change routing behavior.
+//
+// What it adds is an *operator-facing configuration check*: a single bridge
+// process is meant to serve one physical grow room, identified by
+// `VERDANT_TENT_ID`. If a channel map entry names a different tent, that is
+// almost always a copy-paste mistake (e.g. a channel map reused from another
+// bridge instance) rather than an intentional multi-tent bridge — and a
+// silently-misrouted soil reading is exactly the kind of "sensor truth"
+// violation this bridge exists to prevent. `validateChannelMapSingleTent`
+// lets the bridge fail loudly on that misconfiguration *before* it ever
+// connects to MQTT, rather than silently forwarding to the wrong tent.
+//
+// Generic over any channel map shaped like `EcowittSoilChannelMap` — if the
+// bridge ever gains a second channel map for a different metric family, the
+// same function applies to it unchanged (see docs/ecowitt-live-soil-bridge.md).
+
+export type ChannelMapTentStatus = "accepted" | "empty" | "mixed-tent";
+
+export interface ChannelMapTentValidation {
+  /** "empty" = no channels configured; "accepted" = all channels agree with
+   * VERDANT_TENT_ID (or with each other, when VERDANT_TENT_ID is unset);
+   * "mixed-tent" = at least one channel names a different tent. */
+  readonly status: ChannelMapTentStatus;
+  readonly channelCount: number;
+  /** Distinct tent ids seen across the channel map + VERDANT_TENT_ID.
+   * A count, never the actual tent id strings — callers building an
+   * operator-facing summary must not print raw tent UUIDs. */
+  readonly distinctTentCount: number;
+  /** Channel KEYS (e.g. "soilmoisture2") that disagree with the expected
+   * tent. Never contains a tent_id value. */
+  readonly offendingChannels: readonly string[];
+}
+
+/**
+ * Validate that every entry in a channel map names the same tent as
+ * `verdantTentId` (the bridge's single configured tent). Pure: no I/O, no
+ * mqtt, no fetch — safe to call before any network connection exists.
+ */
+export function validateChannelMapSingleTent(
+  channelMap: Readonly<Record<string, { readonly tent_id: string }>>,
+  verdantTentId: string | null,
+): ChannelMapTentValidation {
+  const entries = Object.entries(channelMap ?? {});
+  if (entries.length === 0) {
+    return {
+      status: "empty",
+      channelCount: 0,
+      distinctTentCount: verdantTentId ? 1 : 0,
+      offendingChannels: [],
+    };
+  }
+
+  const expected = verdantTentId ?? entries[0][1].tent_id;
+  const offendingChannels: string[] = [];
+  const distinctTentIds = new Set<string>(verdantTentId ? [verdantTentId] : []);
+  for (const [key, target] of entries) {
+    distinctTentIds.add(target.tent_id);
+    if (target.tent_id !== expected) offendingChannels.push(key);
+  }
+  // Sort so the result — and any message built from it — is identical
+  // regardless of what order the channel keys appeared in the source JSON.
+  // Object/JSON key order is otherwise insertion order, which is NOT a
+  // property callers should have to rely on for a stable, testable message.
+  offendingChannels.sort();
+
+  return {
+    status: offendingChannels.length > 0 ? "mixed-tent" : "accepted",
+    channelCount: entries.length,
+    distinctTentCount: distinctTentIds.size,
+    offendingChannels: Object.freeze(offendingChannels),
+  };
 }
 
 // ---------------------------------------------------------------------------

@@ -39,31 +39,118 @@ The bridge:
 
 ## Environment variables
 
-| Var | Purpose |
-| --- | --- |
-| `ECOWITT_MQTT_URL` | Full URL e.g. `mqtt://127.0.0.1:1883`. Overrides host/port. |
-| `ECOWITT_MQTT_HOST` / `ECOWITT_MQTT_PORT` | Used when `*_URL` is unset. |
-| `ECOWITT_MQTT_USERNAME` / `ECOWITT_MQTT_PASSWORD` | Optional broker auth. |
-| `ECOWITT_MQTT_TOPIC` | Default `ecowitt/grow`. |
-| `VERDANT_INGEST_URL` | Verdant `sensor-ingest-webhook` URL. Required unless dry-run. |
-| `VERDANT_BRIDGE_TOKEN` | `vbt_…` bridge token. Required unless dry-run. Never paste it into chat / logs / commits. |
-| `VERDANT_TENT_ID` | Fallback tent UUID for air/CO₂/VPD metrics. |
-| `VERDANT_PLANT_ID` | Optional fallback plant UUID. |
-| `ECOWITT_SOIL_CHANNEL_MAP_JSON` | JSON map per soil probe (see below). |
-| `ECOWITT_BRIDGE_DRY_RUN` | `"1"` to force dry-run. |
+| Var                                               | Purpose                                                                                                               |
+| ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `ECOWITT_MQTT_URL`                                | Full URL e.g. `mqtt://127.0.0.1:1883`. Overrides host/port.                                                           |
+| `ECOWITT_MQTT_HOST` / `ECOWITT_MQTT_PORT`         | Used when `*_URL` is unset.                                                                                           |
+| `ECOWITT_MQTT_USERNAME` / `ECOWITT_MQTT_PASSWORD` | Optional broker auth.                                                                                                 |
+| `ECOWITT_MQTT_TOPIC`                              | Default `ecowitt/grow`.                                                                                               |
+| `VERDANT_INGEST_URL`                              | Verdant `sensor-ingest-webhook` URL. Required unless dry-run.                                                         |
+| `VERDANT_BRIDGE_TOKEN`                            | `vbt_…` bridge token. Required unless dry-run. Never paste it into chat / logs / commits.                             |
+| `VERDANT_TENT_ID`                                 | Fallback tent UUID for air/CO₂/VPD metrics.                                                                           |
+| `VERDANT_PLANT_ID`                                | Optional fallback plant UUID.                                                                                         |
+| `ECOWITT_SOIL_CHANNEL_MAP_JSON`                   | JSON map per soil probe (see below).                                                                                  |
+| `ECOWITT_BRIDGE_DRY_RUN`                          | `"1"` to force dry-run.                                                                                               |
+| `ECOWITT_BRIDGE_VALIDATE_CONFIG`                  | `"1"` to run config-validation-only mode (alias for `--validate-config`).                                             |
+| `ECOWITT_BRIDGE_JSON_ERRORS`                      | `"1"` to print only a single JSON envelope in `--validate-config` mode (alias for `--format json` / `--json-errors`). |
 
 ### Channel map
 
 ```json
 {
-  "soilmoisture1": { "tent_id": "TENT_UUID_A", "plant_id": "PLANT_UUID", "label": "front_left_pot" },
+  "soilmoisture1": {
+    "tent_id": "TENT_UUID_A",
+    "plant_id": "PLANT_UUID",
+    "label": "front_left_pot"
+  },
   "soilmoisture2": { "tent_id": "TENT_UUID_B", "label": "front_right_pot" }
 }
 ```
 
 Probes without a mapping are **dropped** (we never invent routing).
 
+### Single-tent rule
+
+The channel map's data shape is technically multi-tent capable — each
+channel entry names its own `tent_id`, and the normalizer will route each
+probe wherever its own entry says. In practice, **one running bridge
+process is meant to serve one physical grow room**: every soil channel
+in `ECOWITT_SOIL_CHANNEL_MAP_JSON` should map to the _same_ tent as
+`VERDANT_TENT_ID`.
+
+A channel that names a different tent almost always means a channel map
+copied from another bridge instance — a silent mis-route is exactly the
+kind of "sensor truth" violation this bridge exists to prevent. Run
+`--validate-config` (below) to check this **before** connecting to MQTT.
+If you genuinely run one bridge across multiple tents, mapping different
+channels to different tents still works at runtime — `--validate-config`
+will just report `mixed-tent` rather than block you; treat that as a
+prompt to double-check the map, not a hard rule enforced at the network
+layer.
+
 ## Run modes
+
+### Validate configuration only (no MQTT connection, no network at all)
+
+Before wiring up MQTT, sanity-check that your channel map agrees with
+`VERDANT_TENT_ID`:
+
+```bash
+VERDANT_TENT_ID=<uuid> \
+ECOWITT_SOIL_CHANNEL_MAP_JSON='{"soilmoisture1":{"tent_id":"<uuid>"}}' \
+bun run scripts/ecowitt-live-soil-bridge.ts --validate-config
+```
+
+This mode never imports the `mqtt` package, never opens a network
+connection, and never calls the ingest webhook — it only reads env vars
+and prints a summary, then exits. The printed summary is deliberately
+calm and redacted: it reports **counts** (`channelCount`,
+`distinctTentCount`, `offendingChannelCount`) and **channel keys** (e.g.
+`soilmoisture2`) only — it never prints a tent UUID or the raw
+`ECOWITT_SOIL_CHANNEL_MAP_JSON` value.
+
+| Status             | Meaning                                                                                                 | Exit code |
+| ------------------ | ------------------------------------------------------------------------------------------------------- | --------- |
+| `accepted`         | Every channel matches `VERDANT_TENT_ID` (or the map is empty and `VERDANT_TENT_ID` is set).             | `0`       |
+| `empty`            | No channel map configured — the bridge will only forward air/environment metrics via `VERDANT_TENT_ID`. | `0`       |
+| `mixed-tent`       | At least one channel names a different tent than `VERDANT_TENT_ID`. See "Single-tent rule" above.       | `3`       |
+| `malformed_config` | `ECOWITT_SOIL_CHANNEL_MAP_JSON` is set but is not valid JSON, or not a JSON object.                     | `4`       |
+
+These exit codes are a stable contract — safe to branch on in scripts
+without parsing stderr text. A `malformed_config` check runs **before**
+the channel map is inspected, so a JSON typo is never silently reported
+as `empty`.
+
+#### Machine-readable output (`--format json` / `--json-errors`)
+
+For automation, add `--format json` (or the equivalent `--json-errors`
+flag / `ECOWITT_BRIDGE_JSON_ERRORS=1` env var) to `--validate-config`.
+The bridge then prints **only** a single-line JSON envelope to stdout —
+no other log line — so a caller can `JSON.parse()` stdout directly
+instead of scraping text:
+
+```bash
+VERDANT_TENT_ID=<uuid> \
+ECOWITT_SOIL_CHANNEL_MAP_JSON='{"soilmoisture1":{"tent_id":"<uuid>"}}' \
+bun run scripts/ecowitt-live-soil-bridge.ts --validate-config --format json
+```
+
+```json
+{
+  "mode": "validate-config",
+  "status": "accepted",
+  "channelCount": 1,
+  "distinctTentCount": 1,
+  "offendingChannelCount": 0,
+  "offendingChannels": [],
+  "message": "Channel map accepted: 1 channel(s) all match the expected tent."
+}
+```
+
+The `message` field is deterministic for a given logical configuration —
+it does not depend on the key order channels appeared in
+`ECOWITT_SOIL_CHANNEL_MAP_JSON` — and, like the rest of the envelope,
+never contains a tent UUID, a bridge token, or the raw channel-map JSON.
 
 ### Dry-run first (no network writes)
 
@@ -75,7 +162,7 @@ VERDANT_TENT_ID=<uuid> \
 bun run scripts/ecowitt-live-soil-bridge.ts --dry-run
 ```
 
-The bridge will log each normalized, redacted payload it *would* POST.
+The bridge will log each normalized, redacted payload it _would_ POST.
 
 ### Send one valid reading
 
@@ -157,23 +244,23 @@ auditable from `scripts/ecowitt-live-soil-bridge.ts`.
 
 ### Required local tools
 
-| Tool | Purpose |
-| --- | --- |
-| EcoWitt gateway (e.g. GW1200/GW2000) | Source of raw soil/environment readings. |
-| `ecowitt2mqtt` (or equivalent) | Translates the gateway's custom-upload HTTP push into MQTT JSON. |
-| Mosquitto | Local MQTT broker on the LAN. Auth optional but recommended. |
-| MQTT Explorer or `mosquitto_sub` | Inspect raw topic traffic during dry-run. |
-| `scripts/ecowitt-live-soil-bridge.ts` | Verdant-side normalizer + forwarder. |
+| Tool                                  | Purpose                                                          |
+| ------------------------------------- | ---------------------------------------------------------------- |
+| EcoWitt gateway (e.g. GW1200/GW2000)  | Source of raw soil/environment readings.                         |
+| `ecowitt2mqtt` (or equivalent)        | Translates the gateway's custom-upload HTTP push into MQTT JSON. |
+| Mosquitto                             | Local MQTT broker on the LAN. Auth optional but recommended.     |
+| MQTT Explorer or `mosquitto_sub`      | Inspect raw topic traffic during dry-run.                        |
+| `scripts/ecowitt-live-soil-bridge.ts` | Verdant-side normalizer + forwarder.                             |
 
 ### Required Verdant environment variables
 
-| Var | Required | Purpose |
-| --- | --- | --- |
-| `VERDANT_INGEST_URL` | Required (non dry-run) | Verdant `sensor-ingest-webhook` URL. |
-| `VERDANT_BRIDGE_TOKEN` | Required (non dry-run) | `vbt_…` bridge token issued for this bridge. |
-| `VERDANT_TENT_ID` | Required for air/env metrics | Fallback tent UUID when no channel map covers a metric. |
-| `VERDANT_PLANT_ID` | Optional | Fallback plant UUID. |
-| `ECOWITT_SOIL_CHANNEL_MAP_JSON` | Optional | Per-probe tent/plant routing. Unmapped probes are dropped. |
+| Var                             | Required                     | Purpose                                                    |
+| ------------------------------- | ---------------------------- | ---------------------------------------------------------- |
+| `VERDANT_INGEST_URL`            | Required (non dry-run)       | Verdant `sensor-ingest-webhook` URL.                       |
+| `VERDANT_BRIDGE_TOKEN`          | Required (non dry-run)       | `vbt_…` bridge token issued for this bridge.               |
+| `VERDANT_TENT_ID`               | Required for air/env metrics | Fallback tent UUID when no channel map covers a metric.    |
+| `VERDANT_PLANT_ID`              | Optional                     | Fallback plant UUID.                                       |
+| `ECOWITT_SOIL_CHANNEL_MAP_JSON` | Optional                     | Per-probe tent/plant routing. Unmapped probes are dropped. |
 
 ### Dry-run command (no network, no Supabase)
 
@@ -223,19 +310,19 @@ station serial, or token.
 
 ### Field mapping
 
-| EcoWitt MQTT key(s) | Verdant canonical field |
-| --- | --- |
-| `tempf`, `temp1f`, `tempinf` | air temperature (°F) |
-| `tempc`, `temp1c`, `tempinc` | air temperature (°C) |
-| `humidity`, `humidity1`, `humidityin` | `humidity_pct` |
-| `soilmoisture1` | soil moisture channel 1 |
-| `soilmoisture2` | soil moisture channel 2 (multi-probe) |
-| `soiltemp1f` / `soiltemp1c` | soil temperature channel 1 |
-| `co2`, `co2in` | `co2_ppm` |
-| `dateutc` | `captured_at` (UTC) |
-| derived from air temp + RH | `vpd_kpa` (only when both valid) |
-| (any) | `metadata.transport = "mqtt"` |
-| (any) | `vendor = "ecowitt"` |
+| EcoWitt MQTT key(s)                   | Verdant canonical field               |
+| ------------------------------------- | ------------------------------------- |
+| `tempf`, `temp1f`, `tempinf`          | air temperature (°F)                  |
+| `tempc`, `temp1c`, `tempinc`          | air temperature (°C)                  |
+| `humidity`, `humidity1`, `humidityin` | `humidity_pct`                        |
+| `soilmoisture1`                       | soil moisture channel 1               |
+| `soilmoisture2`                       | soil moisture channel 2 (multi-probe) |
+| `soiltemp1f` / `soiltemp1c`           | soil temperature channel 1            |
+| `co2`, `co2in`                        | `co2_ppm`                             |
+| `dateutc`                             | `captured_at` (UTC)                   |
+| derived from air temp + RH            | `vpd_kpa` (only when both valid)      |
+| (any)                                 | `metadata.transport = "mqtt"`         |
+| (any)                                 | `vendor = "ecowitt"`                  |
 
 ### Canonical Verdant source
 

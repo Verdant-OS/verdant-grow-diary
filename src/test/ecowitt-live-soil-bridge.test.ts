@@ -6,6 +6,8 @@ import { describe, it, expect, vi } from "vitest";
 import {
   normalizeEcowittLiveSoilPayload,
   parseEcowittSoilChannelMap,
+  validateChannelMapSingleTent,
+  classifyEcowittChannelMapJsonInput,
   redactRawPayloadForOutbound,
   redactForLog,
   maskBridgeToken,
@@ -16,6 +18,9 @@ import {
   handleMqttMessage,
   forwardWithBackoff,
   readBridgeEnv,
+  buildConfigValidationSummary,
+  runBridge,
+  type BridgeEnv,
 } from "../../scripts/ecowitt-live-soil-bridge";
 
 const TENT = "11111111-1111-1111-1111-111111111111";
@@ -301,9 +306,7 @@ describe("parseEcowittSoilChannelMap", () => {
     expect(Object.keys(parseEcowittSoilChannelMap("not-json"))).toHaveLength(0);
     expect(Object.keys(parseEcowittSoilChannelMap(JSON.stringify([1, 2])))).toHaveLength(0);
     expect(
-      Object.keys(
-        parseEcowittSoilChannelMap(JSON.stringify({ soilmoisture1: { label: "x" } })),
-      ),
+      Object.keys(parseEcowittSoilChannelMap(JSON.stringify({ soilmoisture1: { label: "x" } }))),
     ).toHaveLength(0);
   });
 });
@@ -322,9 +325,7 @@ describe("redaction + token masking", () => {
   });
 
   it("maskBridgeToken never reveals the full token", () => {
-    expect(maskBridgeToken("vbt_supersecrettoken_123")).not.toContain(
-      "supersecrettoken",
-    );
+    expect(maskBridgeToken("vbt_supersecrettoken_123")).not.toContain("supersecrettoken");
     expect(maskBridgeToken(null)).toBe("[missing]");
   });
 
@@ -354,6 +355,78 @@ describe("fullJitterBackoffMs", () => {
   });
 });
 
+describe("classifyEcowittChannelMapJsonInput", () => {
+  it("is 'absent' when unset, undefined, empty, or whitespace-only", () => {
+    expect(classifyEcowittChannelMapJsonInput(undefined)).toBe("absent");
+    expect(classifyEcowittChannelMapJsonInput("")).toBe("absent");
+    expect(classifyEcowittChannelMapJsonInput("   ")).toBe("absent");
+  });
+  it("is 'malformed' for invalid JSON syntax", () => {
+    expect(classifyEcowittChannelMapJsonInput("{not-json")).toBe("malformed");
+  });
+  it("is 'malformed' for valid JSON that isn't an object (array, string, number)", () => {
+    expect(classifyEcowittChannelMapJsonInput("[1,2,3]")).toBe("malformed");
+    expect(classifyEcowittChannelMapJsonInput('"just a string"')).toBe("malformed");
+    expect(classifyEcowittChannelMapJsonInput("42")).toBe("malformed");
+    expect(classifyEcowittChannelMapJsonInput("null")).toBe("malformed");
+  });
+  it("is 'parsed' for a valid JSON object, including an empty one", () => {
+    expect(
+      classifyEcowittChannelMapJsonInput(JSON.stringify({ soilmoisture1: { tent_id: TENT } })),
+    ).toBe("parsed");
+    expect(classifyEcowittChannelMapJsonInput("{}")).toBe("parsed");
+  });
+});
+
+describe("readBridgeEnv — --json-errors / --format json detection", () => {
+  const REQUIRED = {
+    VERDANT_INGEST_URL: "https://example.test/ingest",
+    VERDANT_BRIDGE_TOKEN: "vbt_test_token_xxxxxxxxxx",
+    VERDANT_TENT_ID: TENT,
+  } as NodeJS.ProcessEnv;
+
+  it("jsonErrors is false by default", () => {
+    expect(readBridgeEnv(REQUIRED, []).jsonErrors).toBe(false);
+  });
+  it("--json-errors flag sets jsonErrors", () => {
+    expect(readBridgeEnv(REQUIRED, ["--validate-config", "--json-errors"]).jsonErrors).toBe(true);
+  });
+  it("--format json sets jsonErrors", () => {
+    expect(readBridgeEnv(REQUIRED, ["--validate-config", "--format", "json"]).jsonErrors).toBe(
+      true,
+    );
+  });
+  it("--format text (or any other value) does not set jsonErrors", () => {
+    expect(readBridgeEnv(REQUIRED, ["--validate-config", "--format", "text"]).jsonErrors).toBe(
+      false,
+    );
+  });
+  it("ECOWITT_BRIDGE_JSON_ERRORS=1 env var sets jsonErrors", () => {
+    expect(
+      readBridgeEnv({ ...REQUIRED, ECOWITT_BRIDGE_JSON_ERRORS: "1" } as NodeJS.ProcessEnv, [])
+        .jsonErrors,
+    ).toBe(true);
+  });
+  it("computes channelMapJsonState from the raw env var independent of parse fallback", () => {
+    expect(readBridgeEnv(REQUIRED, []).channelMapJsonState).toBe("absent");
+    expect(
+      readBridgeEnv(
+        { ...REQUIRED, ECOWITT_SOIL_CHANNEL_MAP_JSON: "{not-json" } as NodeJS.ProcessEnv,
+        [],
+      ).channelMapJsonState,
+    ).toBe("malformed");
+    expect(
+      readBridgeEnv(
+        {
+          ...REQUIRED,
+          ECOWITT_SOIL_CHANNEL_MAP_JSON: JSON.stringify({ soilmoisture1: { tent_id: TENT } }),
+        } as NodeJS.ProcessEnv,
+        [],
+      ).channelMapJsonState,
+    ).toBe("parsed");
+  });
+});
+
 describe("handleMqttMessage (bridge orchestration)", () => {
   const baseEnv = readBridgeEnv(
     {
@@ -367,10 +440,12 @@ describe("handleMqttMessage (bridge orchestration)", () => {
   it("dry-run does not call forward()", async () => {
     const forward = vi.fn();
     const log = vi.fn();
-    const res = await handleMqttMessage(
-      JSON.stringify(basePayload()),
-      { env: { ...baseEnv, dryRun: true }, forward, log, now: NOW },
-    );
+    const res = await handleMqttMessage(JSON.stringify(basePayload()), {
+      env: { ...baseEnv, dryRun: true },
+      forward,
+      log,
+      now: NOW,
+    });
     expect(forward).not.toHaveBeenCalled();
     expect(res.accepted).toBeGreaterThan(0);
   });
@@ -378,10 +453,12 @@ describe("handleMqttMessage (bridge orchestration)", () => {
   it("enabled mode posts to forward() once per accepted payload", async () => {
     const forward = vi.fn(async () => ({ ok: true, status: 200 }));
     const log = vi.fn();
-    const res = await handleMqttMessage(
-      JSON.stringify(basePayload()),
-      { env: baseEnv, forward, log, now: NOW },
-    );
+    const res = await handleMqttMessage(JSON.stringify(basePayload()), {
+      env: baseEnv,
+      forward,
+      log,
+      now: NOW,
+    });
     expect(forward).toHaveBeenCalledTimes(res.accepted);
     expect(res.accepted).toBeGreaterThan(0);
   });
@@ -431,7 +508,9 @@ describe("handleMqttMessage (bridge orchestration)", () => {
 
 describe("forwardWithBackoff", () => {
   it("sends Authorization bearer header and returns ok on 2xx", async () => {
-    const fetchImpl = vi.fn(async () => new Response("{}", { status: 200 })) as unknown as typeof fetch;
+    const fetchImpl = vi.fn(
+      async () => new Response("{}", { status: 200 }),
+    ) as unknown as typeof fetch;
     const r = await forwardWithBackoff(
       {
         tent_id: TENT,
@@ -515,19 +594,394 @@ describe("forwardWithBackoff", () => {
 describe("static safety", () => {
   it("bridge script and rules contain no device-control / Supabase / service_role strings", async () => {
     const fs = await import("node:fs/promises");
-    const files = [
-      "src/lib/ecowittLiveSoilIngestRules.ts",
-      "scripts/ecowitt-live-soil-bridge.ts",
-    ];
+    const files = ["src/lib/ecowittLiveSoilIngestRules.ts", "scripts/ecowitt-live-soil-bridge.ts"];
     for (const f of files) {
       const src = await fs.readFile(f, "utf8");
       expect(src).not.toMatch(/service_role/);
       expect(src).not.toMatch(/SUPABASE_SERVICE_ROLE_KEY/);
       expect(src).not.toMatch(/createClient\(/); // no Supabase client
-      expect(src).not.toMatch(/execute_device|setpoint_write|irrigation_control|light_control|fan_control/);
+      expect(src).not.toMatch(
+        /execute_device|setpoint_write|irrigation_control|light_control|fan_control/,
+      );
       expect(src).not.toMatch(/action_queue/);
       // No hardcoded bridge token
       expect(src).not.toMatch(/vbt_[A-Za-z0-9]{8,}/);
     }
+  });
+});
+
+describe("validateChannelMapSingleTent", () => {
+  it("reports 'empty' with no channels configured", () => {
+    const r = validateChannelMapSingleTent({}, TENT);
+    expect(r.status).toBe("empty");
+    expect(r.channelCount).toBe(0);
+    expect(r.offendingChannels).toHaveLength(0);
+  });
+
+  it("reports 'accepted' when every channel matches VERDANT_TENT_ID", () => {
+    const map = parseEcowittSoilChannelMap(
+      JSON.stringify({
+        soilmoisture1: { tent_id: TENT },
+        soilmoisture2: { tent_id: TENT },
+      }),
+    );
+    const r = validateChannelMapSingleTent(map, TENT);
+    expect(r.status).toBe("accepted");
+    expect(r.channelCount).toBe(2);
+    expect(r.distinctTentCount).toBe(1);
+    expect(r.offendingChannels).toHaveLength(0);
+  });
+
+  it("reports 'mixed-tent' when one channel names a different tent than VERDANT_TENT_ID", () => {
+    const map = parseEcowittSoilChannelMap(
+      JSON.stringify({
+        soilmoisture1: { tent_id: TENT },
+        soilmoisture2: { tent_id: TENT_B },
+      }),
+    );
+    const r = validateChannelMapSingleTent(map, TENT);
+    expect(r.status).toBe("mixed-tent");
+    expect(r.distinctTentCount).toBe(2);
+    expect(r.offendingChannels).toEqual(["soilmoisture2"]);
+  });
+
+  it("without VERDANT_TENT_ID: 'accepted' when channels agree with each other", () => {
+    const map = parseEcowittSoilChannelMap(
+      JSON.stringify({
+        soilmoisture1: { tent_id: TENT },
+        soilmoisture2: { tent_id: TENT },
+      }),
+    );
+    const r = validateChannelMapSingleTent(map, null);
+    expect(r.status).toBe("accepted");
+  });
+
+  it("without VERDANT_TENT_ID: 'mixed-tent' when channels disagree with each other", () => {
+    const map = parseEcowittSoilChannelMap(
+      JSON.stringify({
+        soilmoisture1: { tent_id: TENT },
+        soilmoisture2: { tent_id: TENT_B },
+      }),
+    );
+    const r = validateChannelMapSingleTent(map, null);
+    expect(r.status).toBe("mixed-tent");
+    expect(r.offendingChannels).toEqual(["soilmoisture2"]);
+  });
+
+  it("never returns a tent_id string anywhere in the result", () => {
+    const map = parseEcowittSoilChannelMap(
+      JSON.stringify({
+        soilmoisture1: { tent_id: TENT },
+        soilmoisture2: { tent_id: TENT_B },
+      }),
+    );
+    const r = validateChannelMapSingleTent(map, TENT);
+    const dump = JSON.stringify(r);
+    expect(dump).not.toContain(TENT);
+    expect(dump).not.toContain(TENT_B);
+  });
+});
+
+describe("buildConfigValidationSummary", () => {
+  const withEnv = (overrides: Partial<BridgeEnv>): BridgeEnv => ({
+    ingestUrl: "https://example.test/ingest",
+    bridgeToken: "vbt_test_token_xxxxxxxxxx",
+    defaultTentId: TENT,
+    defaultPlantId: null,
+    channelMap: {},
+    dryRun: false,
+    validateConfig: true,
+    jsonErrors: false,
+    channelMapJsonState: "absent" as const,
+    ...overrides,
+  });
+
+  it("exits 0 for an accepted config", () => {
+    const env = withEnv({
+      channelMap: parseEcowittSoilChannelMap(JSON.stringify({ soilmoisture1: { tent_id: TENT } })),
+    });
+    const r = buildConfigValidationSummary(env);
+    expect(r.status).toBe("accepted");
+    expect(r.exitCode).toBe(0);
+  });
+
+  it("exits 0 for an empty config", () => {
+    const r = buildConfigValidationSummary(withEnv({ channelMap: {} }));
+    expect(r.status).toBe("empty");
+    expect(r.exitCode).toBe(0);
+  });
+
+  it("exits 3 (non-zero, with the documented code) for a mixed-tent config", () => {
+    const env = withEnv({
+      channelMap: parseEcowittSoilChannelMap(
+        JSON.stringify({
+          soilmoisture1: { tent_id: TENT },
+          soilmoisture2: { tent_id: TENT_B },
+        }),
+      ),
+    });
+    const r = buildConfigValidationSummary(env);
+    expect(r.status).toBe("mixed-tent");
+    expect(r.exitCode).toBe(3);
+    expect(r.exitCode).not.toBe(0);
+  });
+
+  it("the printed summary never contains a tent UUID or raw channel-map JSON", () => {
+    const rawChannelMapJson = JSON.stringify({
+      soilmoisture1: { tent_id: TENT },
+      soilmoisture2: { tent_id: TENT_B },
+    });
+    const env = withEnv({ channelMap: parseEcowittSoilChannelMap(rawChannelMapJson) });
+    const r = buildConfigValidationSummary(env);
+    const dump = JSON.stringify(r.summary);
+    expect(dump).not.toContain(TENT);
+    expect(dump).not.toContain(TENT_B);
+    expect(dump).not.toContain(rawChannelMapJson);
+    // Only counts and channel keys are expected to appear.
+    expect(r.summary).toMatchObject({
+      mode: "validate-config",
+      status: "mixed-tent",
+      channelCount: 2,
+      distinctTentCount: 2,
+      offendingChannelCount: 1,
+    });
+  });
+});
+
+describe("runBridge — validate-config never touches mqtt/forward", () => {
+  const baseEnv: BridgeEnv = {
+    ingestUrl: "https://example.test/ingest",
+    bridgeToken: "vbt_test_token_xxxxxxxxxx",
+    defaultTentId: TENT,
+    defaultPlantId: null,
+    channelMap: {},
+    dryRun: false,
+    validateConfig: false,
+    jsonErrors: false,
+    channelMapJsonState: "absent",
+  };
+
+  it("mixed-tent config: never calls connectAndListen, exits with code 3", async () => {
+    const connectAndListen = vi.fn();
+    const exit = vi.fn();
+    const log = vi.fn();
+    const writeJson = vi.fn();
+    const env: BridgeEnv = {
+      ...baseEnv,
+      validateConfig: true,
+      channelMap: parseEcowittSoilChannelMap(
+        JSON.stringify({
+          soilmoisture1: { tent_id: TENT },
+          soilmoisture2: { tent_id: TENT_B },
+        }),
+      ),
+    };
+
+    await runBridge(env, { log, connectAndListen, exit, writeJson });
+
+    expect(connectAndListen).not.toHaveBeenCalled();
+    expect(exit).toHaveBeenCalledTimes(1);
+    expect(exit).toHaveBeenCalledWith(3);
+  });
+
+  it("accepted config: never calls connectAndListen, exits with code 0", async () => {
+    const connectAndListen = vi.fn();
+    const exit = vi.fn();
+    const log = vi.fn();
+    const writeJson = vi.fn();
+    const env: BridgeEnv = {
+      ...baseEnv,
+      validateConfig: true,
+      channelMap: parseEcowittSoilChannelMap(JSON.stringify({ soilmoisture1: { tent_id: TENT } })),
+    };
+
+    await runBridge(env, { log, connectAndListen, exit, writeJson });
+
+    expect(connectAndListen).not.toHaveBeenCalled();
+    expect(exit).toHaveBeenCalledWith(0);
+  });
+
+  it("empty config: never calls connectAndListen, exits with code 0", async () => {
+    const connectAndListen = vi.fn();
+    const exit = vi.fn();
+    const log = vi.fn();
+    const writeJson = vi.fn();
+    const env: BridgeEnv = { ...baseEnv, validateConfig: true, channelMap: {} };
+
+    await runBridge(env, { log, connectAndListen, exit, writeJson });
+
+    expect(connectAndListen).not.toHaveBeenCalled();
+    expect(exit).toHaveBeenCalledWith(0);
+  });
+
+  it("malformed channel-map JSON: never calls connectAndListen, exits with code 4", async () => {
+    const connectAndListen = vi.fn();
+    const exit = vi.fn();
+    const log = vi.fn();
+    const writeJson = vi.fn();
+    const env: BridgeEnv = {
+      ...baseEnv,
+      validateConfig: true,
+      channelMapJsonState: "malformed",
+    };
+
+    await runBridge(env, { log, connectAndListen, exit, writeJson });
+
+    expect(connectAndListen).not.toHaveBeenCalled();
+    expect(exit).toHaveBeenCalledWith(4);
+  });
+
+  it("no log call in validate-config mode contains a tent UUID", async () => {
+    const connectAndListen = vi.fn();
+    const exit = vi.fn();
+    const log = vi.fn();
+    const writeJson = vi.fn();
+    const env: BridgeEnv = {
+      ...baseEnv,
+      validateConfig: true,
+      channelMap: parseEcowittSoilChannelMap(
+        JSON.stringify({
+          soilmoisture1: { tent_id: TENT },
+          soilmoisture2: { tent_id: TENT_B },
+        }),
+      ),
+    };
+
+    await runBridge(env, { log, connectAndListen, exit, writeJson });
+
+    for (const call of log.mock.calls) {
+      const dump = JSON.stringify(call);
+      expect(dump).not.toContain(TENT);
+      expect(dump).not.toContain(TENT_B);
+    }
+  });
+
+  it("--json-errors: writes only the JSON envelope, never calls log", async () => {
+    const connectAndListen = vi.fn();
+    const exit = vi.fn();
+    const log = vi.fn();
+    const writeJson = vi.fn();
+    const env: BridgeEnv = {
+      ...baseEnv,
+      validateConfig: true,
+      jsonErrors: true,
+      channelMap: parseEcowittSoilChannelMap(JSON.stringify({ soilmoisture1: { tent_id: TENT } })),
+    };
+
+    await runBridge(env, { log, connectAndListen, exit, writeJson });
+
+    expect(connectAndListen).not.toHaveBeenCalled();
+    expect(log).not.toHaveBeenCalled();
+    expect(writeJson).toHaveBeenCalledTimes(1);
+    expect(writeJson).toHaveBeenCalledWith(
+      expect.objectContaining({ mode: "validate-config", status: "accepted" }),
+    );
+    expect(exit).toHaveBeenCalledWith(0);
+  });
+
+  it("without --json-errors, validate-config never calls writeJson", async () => {
+    const connectAndListen = vi.fn();
+    const exit = vi.fn();
+    const log = vi.fn();
+    const writeJson = vi.fn();
+    const env: BridgeEnv = { ...baseEnv, validateConfig: true };
+
+    await runBridge(env, { log, connectAndListen, exit, writeJson });
+
+    expect(writeJson).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledTimes(1);
+  });
+
+  it("normal (listen) mode still calls connectAndListen exactly once and never exits", async () => {
+    const connectAndListen = vi.fn(async () => {});
+    const exit = vi.fn();
+    const log = vi.fn();
+    const writeJson = vi.fn();
+
+    await runBridge(baseEnv, { log, connectAndListen, exit, writeJson });
+
+    expect(connectAndListen).toHaveBeenCalledTimes(1);
+    expect(exit).not.toHaveBeenCalled();
+  });
+
+  it("missing VERDANT_INGEST_URL: exits 2 and never calls connectAndListen (regression guard)", async () => {
+    const connectAndListen = vi.fn();
+    const exit = vi.fn();
+    const log = vi.fn();
+    const writeJson = vi.fn();
+    const env: BridgeEnv = { ...baseEnv, ingestUrl: null };
+
+    await runBridge(env, { log, connectAndListen, exit, writeJson });
+
+    expect(connectAndListen).not.toHaveBeenCalled();
+    expect(exit).toHaveBeenCalledWith(2);
+  });
+});
+
+describe("buildConfigValidationSummary — determinism and malformed config", () => {
+  const withEnv = (overrides: Partial<BridgeEnv>): BridgeEnv => ({
+    ingestUrl: "https://example.test/ingest",
+    bridgeToken: "vbt_test_token_xxxxxxxxxx",
+    defaultTentId: TENT,
+    defaultPlantId: null,
+    channelMap: {},
+    dryRun: false,
+    validateConfig: true,
+    jsonErrors: false,
+    channelMapJsonState: "absent",
+    ...overrides,
+  });
+
+  it("malformed ECOWITT_SOIL_CHANNEL_MAP_JSON: status malformed_config, exit 4", () => {
+    const env = withEnv({ channelMapJsonState: "malformed" });
+    const r = buildConfigValidationSummary(env);
+    expect(r.status).toBe("malformed_config");
+    expect(r.exitCode).toBe(4);
+  });
+
+  it("malformed config message never contains a tent UUID or raw JSON", () => {
+    const env = withEnv({ channelMapJsonState: "malformed", defaultTentId: TENT });
+    const r = buildConfigValidationSummary(env);
+    const dump = JSON.stringify(r.summary);
+    expect(dump).not.toContain(TENT);
+    expect(typeof r.summary.message).toBe("string");
+    expect((r.summary.message as string).length).toBeGreaterThan(0);
+  });
+
+  it("mixed-tent message is deterministic and identical regardless of channel-map key insertion order", () => {
+    const mapA = parseEcowittSoilChannelMap(
+      JSON.stringify({
+        soilmoisture1: { tent_id: TENT },
+        soilmoisture2: { tent_id: TENT_B },
+        soilmoisture3: { tent_id: TENT_B },
+      }),
+    );
+    const mapB = parseEcowittSoilChannelMap(
+      JSON.stringify({
+        soilmoisture3: { tent_id: TENT_B },
+        soilmoisture1: { tent_id: TENT },
+        soilmoisture2: { tent_id: TENT_B },
+      }),
+    );
+    const messageA = buildConfigValidationSummary(withEnv({ channelMap: mapA })).summary.message;
+    const messageB = buildConfigValidationSummary(withEnv({ channelMap: mapB })).summary.message;
+    expect(messageA).toBe(messageB);
+  });
+
+  it("mixed-tent message never contains a tent UUID or bridge token", () => {
+    const env = withEnv({
+      bridgeToken: "vbt_super_secret_token_zzzz",
+      channelMap: parseEcowittSoilChannelMap(
+        JSON.stringify({
+          soilmoisture1: { tent_id: TENT },
+          soilmoisture2: { tent_id: TENT_B },
+        }),
+      ),
+    });
+    const r = buildConfigValidationSummary(env);
+    const message = r.summary.message as string;
+    expect(message).not.toContain(TENT);
+    expect(message).not.toContain(TENT_B);
+    expect(message).not.toContain("vbt_super_secret_token_zzzz");
   });
 });

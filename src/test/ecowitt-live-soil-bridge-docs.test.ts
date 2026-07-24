@@ -2,10 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const DOCS = readFileSync(
-  resolve(__dirname, "../../docs/ecowitt-live-soil-bridge.md"),
-  "utf8",
-);
+const DOCS = readFileSync(resolve(__dirname, "../../docs/ecowitt-live-soil-bridge.md"), "utf8");
 
 describe("docs/ecowitt-live-soil-bridge.md operator-polish sections", () => {
   it("contains a Rollback section", () => {
@@ -39,9 +36,7 @@ describe("docs/ecowitt-live-soil-bridge.md operator-polish sections", () => {
   });
 
   it("contains a MQTT → normalized mapping section", () => {
-    expect(DOCS).toMatch(
-      /^##\s+MQTT message → Verdant normalized payload mapping\s*$/m,
-    );
+    expect(DOCS).toMatch(/^##\s+MQTT message → Verdant normalized payload mapping\s*$/m);
     for (const key of [
       "tempf",
       "tempc",
@@ -81,5 +76,38 @@ describe("docs/ecowitt-live-soil-bridge.md operator-polish sections", () => {
     expect(DOCS).toMatch(/service-role/i);
     expect(DOCS).toMatch(/no device control/i);
     expect(DOCS).toMatch(/no automation/i);
+  });
+
+  it("documents the single-tent channel map rule against VERDANT_TENT_ID", () => {
+    expect(DOCS).toMatch(/Single-tent rule/);
+    expect(DOCS).toMatch(
+      /every soil channel[\s\S]{0,80}VERDANT_TENT_ID|VERDANT_TENT_ID[\s\S]{0,120}same tent/i,
+    );
+  });
+
+  it("documents the --validate-config mode, its exit codes, and its no-UUID-leak guarantee", () => {
+    expect(DOCS).toMatch(/--validate-config/);
+    expect(DOCS).toMatch(/ECOWITT_BRIDGE_VALIDATE_CONFIG/);
+    expect(DOCS).toMatch(/never imports the `mqtt` package|never opens a network connection/i);
+    expect(DOCS).toMatch(/never prints? a tent UUID|never a tent UUID/i);
+    for (const status of ["accepted", "empty", "mixed-tent", "malformed_config"]) {
+      expect(DOCS).toContain(status);
+    }
+  });
+
+  it("documents malformed_config as exit code 4, checked before mixed-tent/empty", () => {
+    expect(DOCS).toMatch(/malformed_config/);
+    expect(DOCS).toMatch(/not valid JSON/i);
+    expect(DOCS).toMatch(/stable contract/i);
+    expect(DOCS).toMatch(/never silently reported\s+as `empty`/);
+  });
+
+  it("documents --format json / --json-errors machine-readable output", () => {
+    expect(DOCS).toMatch(/--format json/);
+    expect(DOCS).toMatch(/--json-errors/);
+    expect(DOCS).toMatch(/ECOWITT_BRIDGE_JSON_ERRORS/);
+    expect(DOCS).toMatch(/single-line JSON envelope/);
+    expect(DOCS).toMatch(/deterministic for a given logical configuration/);
+    expect(DOCS).toMatch(/never contains a tent UUID, a bridge token/);
   });
 });

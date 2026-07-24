@@ -124,3 +124,66 @@ describe("`config validate` CLI subcommand", () => {
     expect(r.stderr).not.toMatch(/ECONNREFUSED|mqtt_connected|Cannot find module/i);
   });
 });
+
+import { CONFIG_ERROR_FIX_HINTS, fixHintForCode } from "../../scripts/ecowitt-live-soil-bridge";
+
+describe("runConfigValidate --fix-hints", () => {
+  it("omits fix by default", () => {
+    const r = runConfigValidate({});
+    expect(r.ok).toBe(false);
+    expect(r.fix).toBeUndefined();
+  });
+
+  it("includes a concise fix hint when includeFixHints is true", () => {
+    const r = runConfigValidate({}, { includeFixHints: true });
+    expect(r.ok).toBe(false);
+    expect(r.fix).toBe(CONFIG_ERROR_FIX_HINTS.missing_tent_id);
+    expect(r.fix ?? "").toMatch(/VERDANT_TENT_ID/);
+  });
+
+  it("has a fix hint for every documented error code", () => {
+    const codes = [
+      "missing_tent_id",
+      "invalid_tent_id",
+      "invalid_channel_map_schema",
+      "mixed_tent_channel_map",
+      "channel_map_tent_mismatch",
+      "missing_ingest_url",
+      "missing_bridge_token",
+      "mqtt_package_missing",
+      "channel_map_parse_error",
+    ];
+    for (const c of codes) {
+      expect(CONFIG_ERROR_FIX_HINTS[c]).toBeTruthy();
+      expect(fixHintForCode(c)).toBe(CONFIG_ERROR_FIX_HINTS[c]);
+    }
+  });
+
+  it("falls back to a docs pointer for unknown codes", () => {
+    expect(fixHintForCode("some_future_code")).toMatch(/docs\//);
+  });
+
+  it("still returns ok:true with no fix when config is valid", () => {
+    const TENT_A = "11111111-1111-4111-8111-111111111111";
+    const r = runConfigValidate({ VERDANT_TENT_ID: TENT_A }, { includeFixHints: true });
+    expect(r).toEqual({ ok: true });
+  });
+});
+
+describe("`config validate --fix-hints` CLI", () => {
+  if (!bunAvailable()) {
+    it.skip("skipped — bun runtime not available", () => {});
+    return;
+  }
+  it("adds fix field to the JSON envelope on failure", () => {
+    const r = spawnSync(
+      "bun",
+      ["run", "scripts/ecowitt-live-soil-bridge.ts", "config", "validate", "--fix-hints"],
+      { encoding: "utf8", env: { ...process.env, VERDANT_TENT_ID: undefined }, timeout: 15_000 },
+    );
+    expect(r.status).toBe(2);
+    expect(r.stderr).toContain('"code":"missing_tent_id"');
+    expect(r.stderr).toContain('"fix":');
+    expect(r.stderr).toMatch(/VERDANT_TENT_ID/);
+  });
+});

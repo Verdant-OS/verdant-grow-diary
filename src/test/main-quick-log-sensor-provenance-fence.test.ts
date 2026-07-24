@@ -97,6 +97,7 @@ describe("main Quick Log sensor provenance fence", () => {
       snapshot,
       hasTent: true,
       now: NOW,
+      temperatureUnit: "celsius",
     });
 
     expect(snapshot.status).toBe("empty");
@@ -119,6 +120,7 @@ describe("main Quick Log sensor provenance fence", () => {
       snapshot,
       hasTent: true,
       now: NOW,
+      temperatureUnit: "celsius",
     });
     const saved = buildSensorSnapshotSavePayload(snapshot);
 

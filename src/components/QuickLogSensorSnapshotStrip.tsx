@@ -20,6 +20,7 @@ import {
   buildQuickLogStripFromTentState,
   type QuickLogSnapshotStripStatus,
 } from "@/lib/quickLogSnapshotStripAdapter";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import SnapshotTrustBadge from "@/components/SnapshotTrustBadge";
 import { buildQuickLogSensorSnapshotViewModel } from "@/lib/quickLogSensorSnapshotViewModel";
 import { adaptQuickLogSensorContextInput } from "@/lib/quickLogSensorSnapshotViewModelAdapter";
@@ -111,11 +112,20 @@ export default function QuickLogSensorSnapshotStrip({
   manualValues,
 }: Props) {
   const state = useLatestTentSensorSnapshot(tentId ?? null);
+  // Read-only reference display (Pattern B, not a grower-typed draft): the
+  // strip's Temp metric must always reflect the CURRENT live preference,
+  // recomputed on every render — never frozen at mount. Codex round-6
+  // finding: this call previously omitted the unit entirely, so the strip
+  // always rendered the tent snapshot's temperature hardcoded as °C even
+  // when the grower's active preference (and every other Temp field in
+  // this same dialog) was Fahrenheit.
+  const temperatureUnit = useTemperatureUnitPreference();
   const view = buildQuickLogStripFromTentState({
     status: state.status,
     snapshot: state.snapshot,
     hasTent: !!tentId,
     attached,
+    temperatureUnit,
   });
 
   // Additive: derive a single consistent freshness/empty advisory line

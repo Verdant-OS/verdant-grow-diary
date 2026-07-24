@@ -81,7 +81,8 @@ describe("buildBlueprintOverlayViewModel — rows", () => {
   });
 
   it("pulls each value from its correct source", () => {
-    const vm = buildBlueprintOverlayViewModel(healthySeedling());
+    // Unit-agnostic intent: verify source wiring, not temp conversion.
+    const vm = buildBlueprintOverlayViewModel(healthySeedling(), "celsius");
     const byKey = Object.fromEntries(vm.rows.map((r) => [r.metricKey, r.value]));
     expect(byKey.vpdKpa).toBe(0.6);
     expect(byKey.tempC).toBe(25);
@@ -181,6 +182,7 @@ describe("buildBlueprintOverlayViewModel — scoring & summary", () => {
   });
 
   it("counts everything as missing when the stage is unknown", () => {
+    // Unit-agnostic intent: verify missing-stage classification, not temp conversion.
     const vm = buildBlueprintOverlayViewModel(
       baseInput({
         stage: "banana",
@@ -188,6 +190,7 @@ describe("buildBlueprintOverlayViewModel — scoring & summary", () => {
         latestFeeding: { ec: 0.7, ph: 6.0 },
         dli: 30,
       }),
+      "celsius",
     );
     expect(vm.stageKnown).toBe(false);
     expect(vm.summary.missing).toBe(METRIC_ORDER.length);

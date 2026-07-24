@@ -10,7 +10,7 @@ import { buildBlueprintTeaserViewModel } from "@/lib/blueprintTeaserViewModel";
 
 describe("BlueprintTeaser", () => {
   it("renders the stage's target bands with an upgrade framing", () => {
-    const vm = buildBlueprintTeaserViewModel({ stage: "veg", isDay: true });
+    const vm = buildBlueprintTeaserViewModel({ stage: "veg", isDay: true }, "celsius");
     render(<BlueprintTeaser vm={vm} />);
 
     expect(screen.getByTestId("pro-blueprint-teaser")).toBeTruthy();

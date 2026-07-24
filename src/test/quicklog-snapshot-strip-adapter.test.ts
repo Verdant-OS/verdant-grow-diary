@@ -26,7 +26,12 @@ function snap(partial: Partial<SensorSnapshot>): SensorSnapshot {
 
 describe("buildQuickLogSnapshotStrip", () => {
   it("no_data — exact copy, labels, and navigation when there is no tent", () => {
-    const v = buildQuickLogSnapshotStrip({ snapshot: snap({}), hasTent: false, now: NOW });
+    const v = buildQuickLogSnapshotStrip({
+      snapshot: snap({}),
+      hasTent: false,
+      now: NOW,
+      temperatureUnit: "celsius",
+    });
     expect(v.status).toBe("no_data");
     expect(v.title).toBe("No sensor snapshot attached");
     expect(v.description).toBe("Add a snapshot so this log has room context.");
@@ -40,7 +45,12 @@ describe("buildQuickLogSnapshotStrip", () => {
   });
 
   it("no_data — exact copy when loader is still loading", () => {
-    const v = buildQuickLogSnapshotStrip({ snapshot: null, loading: true, now: NOW });
+    const v = buildQuickLogSnapshotStrip({
+      snapshot: null,
+      loading: true,
+      now: NOW,
+      temperatureUnit: "celsius",
+    });
     expect(v.status).toBe("no_data");
     expect(v.title).toBe("No sensor snapshot attached");
     expect(v.description).toBe("Add a snapshot so this log has room context.");
@@ -48,7 +58,12 @@ describe("buildQuickLogSnapshotStrip", () => {
   });
 
   it("no_data — exact copy when snapshot source is unavailable", () => {
-    const v = buildQuickLogSnapshotStrip({ snapshot: EMPTY_SNAPSHOT, hasTent: true, now: NOW });
+    const v = buildQuickLogSnapshotStrip({
+      snapshot: EMPTY_SNAPSHOT,
+      hasTent: true,
+      now: NOW,
+      temperatureUnit: "celsius",
+    });
     expect(v.status).toBe("no_data");
     expect(v.title).toBe("No sensor snapshot attached");
     expect(v.description).toBe("Add a snapshot so this log has room context.");
@@ -56,7 +71,12 @@ describe("buildQuickLogSnapshotStrip", () => {
   });
 
   it("usable — exact copy, labels, metrics, and navigation for a fresh live snapshot", () => {
-    const v = buildQuickLogSnapshotStrip({ snapshot: snap({}), hasTent: true, now: NOW });
+    const v = buildQuickLogSnapshotStrip({
+      snapshot: snap({}),
+      hasTent: true,
+      now: NOW,
+      temperatureUnit: "celsius",
+    });
     expect(v.status).toBe("usable");
     expect(v.title).toBe("Sensor context ready");
     expect(v.description).toBe("This log will include current sensor context.");
@@ -78,6 +98,7 @@ describe("buildQuickLogSnapshotStrip", () => {
       snapshot: snap({ temp: null, vpd: null }),
       hasTent: true,
       now: NOW,
+      temperatureUnit: "celsius",
     });
     expect(v.status).toBe("usable");
     expect(v.metrics).toEqual([{ label: "RH", value: "55%" }]);
@@ -88,6 +109,7 @@ describe("buildQuickLogSnapshotStrip", () => {
       snapshot: snap({ ts: hoursAgo(48) }),
       hasTent: true,
       now: NOW,
+      temperatureUnit: "celsius",
     });
     expect(v.status).toBe("stale");
     expect(v.title).toBe("Sensor snapshot stale");
@@ -110,6 +132,7 @@ describe("buildQuickLogSnapshotStrip", () => {
       snapshot: snap({ ts: hoursAgo(3) }),
       hasTent: true,
       now: NOW,
+      temperatureUnit: "celsius",
     });
     expect(v1.ageLabel).toBe("3 hr ago");
 
@@ -117,6 +140,7 @@ describe("buildQuickLogSnapshotStrip", () => {
       snapshot: snap({ ts: hoursAgo(25) }),
       hasTent: true,
       now: NOW,
+      temperatureUnit: "celsius",
     });
     expect(v2.ageLabel).toBe("1 day ago");
   });
@@ -126,6 +150,7 @@ describe("buildQuickLogSnapshotStrip", () => {
       snapshot: snap({ source: "sim" }),
       hasTent: true,
       now: NOW,
+      temperatureUnit: "celsius",
     });
     expect(v.status).toBe("invalid");
     expect(v.title).toBe("Sensor snapshot not trusted");
@@ -143,6 +168,7 @@ describe("buildQuickLogSnapshotStrip", () => {
       snapshot: snap({ source: "sim", temp: null, rh: null, vpd: null }),
       hasTent: true,
       now: NOW,
+      temperatureUnit: "celsius",
     });
     expect(v.status).toBe("invalid");
     expect(v.metrics).toHaveLength(0);
@@ -159,6 +185,7 @@ describe("buildQuickLogSnapshotStrip", () => {
         snapshot: snap({ ts }),
         hasTent: true,
         now: NOW,
+        temperatureUnit: "celsius",
       });
       if (expectedHref) {
         expect(v.action.kind).not.toBe("none");
@@ -181,7 +208,7 @@ describe("buildQuickLogSnapshotStrip", () => {
       { snapshot: null, hasTent: true, loading: true, expectedHref: "/sensors#manual-reading" }, // no_data → add (deep link)
     ];
     for (const { expectedHref, ...args } of allStatuses) {
-      const v = buildQuickLogSnapshotStrip({ ...args, now: NOW });
+      const v = buildQuickLogSnapshotStrip({ ...args, now: NOW, temperatureUnit: "celsius" });
       if (v.action.kind !== "none") {
         expect(v.action.href).toBe(expectedHref);
         expect(v.action.href.startsWith("/sensors")).toBe(true);
@@ -190,7 +217,12 @@ describe("buildQuickLogSnapshotStrip", () => {
   });
 
   it("classification is delegated to the contract for every state", () => {
-    const usable = buildQuickLogSnapshotStrip({ snapshot: snap({}), hasTent: true, now: NOW });
+    const usable = buildQuickLogSnapshotStrip({
+      snapshot: snap({}),
+      hasTent: true,
+      now: NOW,
+      temperatureUnit: "celsius",
+    });
     expect(usable.classification.status).toBe("usable");
     expect(usable.classification.isHealthyEvidence).toBe(true);
 
@@ -198,6 +230,7 @@ describe("buildQuickLogSnapshotStrip", () => {
       snapshot: snap({ ts: hoursAgo(48) }),
       hasTent: true,
       now: NOW,
+      temperatureUnit: "celsius",
     });
     expect(stale.classification.status).toBe("stale");
     expect(stale.classification.isHealthyEvidence).toBe(false);
@@ -206,11 +239,17 @@ describe("buildQuickLogSnapshotStrip", () => {
       snapshot: snap({ source: "sim" }),
       hasTent: true,
       now: NOW,
+      temperatureUnit: "celsius",
     });
     expect(invalid.classification.status).toBe("invalid");
     expect(invalid.classification.isHealthyEvidence).toBe(false);
 
-    const noData = buildQuickLogSnapshotStrip({ snapshot: null, hasTent: true, now: NOW });
+    const noData = buildQuickLogSnapshotStrip({
+      snapshot: null,
+      hasTent: true,
+      now: NOW,
+      temperatureUnit: "celsius",
+    });
     expect(noData.classification.status).toBe("no_data");
     expect(noData.classification.isHealthyEvidence).toBe(false);
   });

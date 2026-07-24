@@ -150,7 +150,7 @@ describe("QuickLogV2Sheet — Last Feeding Defaults", () => {
     expect((screen.getByLabelText("Runoff (ml)") as HTMLInputElement).value).toBe("");
     expect((screen.getByLabelText("Runoff pH") as HTMLInputElement).value).toBe("");
     expect((screen.getByLabelText("Runoff EC") as HTMLInputElement).value).toBe("");
-    expect((screen.getByLabelText("Water (°C)") as HTMLInputElement).value).toBe("");
+    expect((screen.getByLabelText("Water (°F)") as HTMLInputElement).value).toBe("");
   });
 
   it("does not erase a draft when feeding defaults arrive late", async () => {

@@ -14,6 +14,7 @@ import type {
   QuickLogFeedingFormState,
   QuickLogFeedingFormProductRow,
 } from "./quickLogFeedingFormViewModel";
+import { getTemperatureUnitSymbol, type TemperatureUnitPreference } from "./temperatureUnitPreference";
 
 export const FEEDING_REVIEW_TITLE = "Review feeding log" as const;
 export const FEEDING_REVIEW_DEFAULTS_FLAG = "Includes prefilled feeding defaults" as const;
@@ -74,7 +75,10 @@ function buildProductLabel(row: QuickLogFeedingFormProductRow): FeedingReviewPro
   };
 }
 
-function collectOptionalMetrics(form: QuickLogFeedingFormState): FeedingReviewOptionalMetric[] {
+function collectOptionalMetrics(
+  form: QuickLogFeedingFormState,
+  tempUnit: TemperatureUnitPreference,
+): FeedingReviewOptionalMetric[] {
   const metrics: FeedingReviewOptionalMetric[] = [];
 
   const push = (label: string, raw: string) => {
@@ -92,7 +96,7 @@ function collectOptionalMetrics(form: QuickLogFeedingFormState): FeedingReviewOp
   push("Runoff pH", form.runoffPh);
   push("Runoff EC", form.runoffEc);
   push("Runoff PPM (500)", form.runoffPpm);
-  push("Water (°C)", form.waterTempC);
+  push(`Water (${getTemperatureUnitSymbol(tempUnit)})`, form.waterTempC);
 
   return metrics;
 }
@@ -100,6 +104,7 @@ function collectOptionalMetrics(form: QuickLogFeedingFormState): FeedingReviewOp
 export function buildFeedingReview(
   form: QuickLogFeedingFormState,
   defaultsApplied: boolean,
+  tempUnit: TemperatureUnitPreference = "celsius",
 ): FeedingReviewModel {
   const lineId = trim(form.lineId);
   const presentProducts = (form.products ?? []).filter((r) => trim(r?.name ?? "") !== "");
@@ -109,7 +114,7 @@ export function buildFeedingReview(
   const needsInput = lineId === "" || presentProducts.length === 0 || !hasValidVolume;
 
   const productLabels = presentProducts.map(buildProductLabel);
-  const optionalMetrics = collectOptionalMetrics(form);
+  const optionalMetrics = collectOptionalMetrics(form, tempUnit);
   const noteRaw = trim(form.note);
 
   return {

@@ -1,5 +1,10 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { formatVpdKpa } from "@/lib/vpdCalculationRules";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
+import {
+  celsiusToFahrenheit,
+  type TemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 import CanonicalSourceBadge from "@/components/CanonicalSourceBadge";
 import CanonicalSourceLegend from "@/components/CanonicalSourceLegend";
 import {
@@ -49,6 +54,21 @@ function isPageSize(n: number): n is AuditReportPageSize {
   return (AUDIT_REPORT_PAGE_SIZES as ReadonlyArray<number>).includes(n);
 }
 
+/**
+ * Grower-facing temp cell only. `airTemperatureC` is canonical Celsius;
+ * conversion happens exactly once, here. The celsius preference renders
+ * the legacy cell unchanged. Raw payload previews, metric summaries, and
+ * the CSV export stay canonical Celsius on purpose.
+ */
+function fmtAuditTemp(
+  v: number | null,
+  unit: TemperatureUnitPreference,
+): string {
+  if (typeof v !== "number" || !Number.isFinite(v)) return "";
+  if (unit === "celsius") return String(v);
+  return celsiusToFahrenheit(v).toFixed(1);
+}
+
 function parseStoredAuditState(raw: string | null): AuditUrlState | null {
   if (!raw) return null;
   try {
@@ -91,6 +111,7 @@ export default function SensorIngestAuditReport({
   className,
   urlBinding,
 }: SensorIngestAuditReportProps) {
+  const temperatureUnit = useTemperatureUnitPreference();
   const urlEnabled = operatorMode && !!urlBinding;
   const initialFromUrl: AuditUrlState | null = urlEnabled
     ? parseAuditUrlState(urlBinding!.searchParams)
@@ -389,7 +410,9 @@ export default function SensorIngestAuditReport({
               <th className="text-left p-1">vpd</th>
               <th className="text-left p-1">soil%</th>
               <th className="text-left p-1">humidity%</th>
-              <th className="text-left p-1">temp°C</th>
+              <th className="text-left p-1">
+                {temperatureUnit === "celsius" ? "temp°C" : "temp°F"}
+              </th>
               <th className="text-left p-1">freshness</th>
               <th className="text-left p-1">device</th>
               <th className="text-left p-1">raw</th>
@@ -427,7 +450,7 @@ export default function SensorIngestAuditReport({
                     </td>
                     <td className="p-1">{r.soilMoisturePct ?? ""}</td>
                     <td className="p-1">{r.humidityPct ?? ""}</td>
-                    <td className="p-1">{r.airTemperatureC ?? ""}</td>
+                    <td className="p-1">{fmtAuditTemp(r.airTemperatureC, temperatureUnit)}</td>
                     <td className="p-1">{r.freshness}</td>
                     <td className="p-1" data-testid={`audit-row-${r.id}-device`}>
                       {r.deviceStationDisplayId ?? "Not available"}

@@ -68,6 +68,8 @@ import {
   QUICK_LOG_V2_OPEN_EVENT,
   buildQuickLogV2OpenIntent,
 } from "@/lib/quickLogV2OpenIntent";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
+import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 
 export interface QuickLogAllActivitiesSectionProps {
   growId: string | null | undefined;
@@ -189,6 +191,16 @@ export default function QuickLogAllActivitiesSection({
   const [structuredWaterError, setStructuredWaterError] = useState<string | null>(null);
   const { save, saving } = useQuickLogActivitySave();
   const localSaveInFlightRef = useRef(false);
+  const temperatureUnit = useTemperatureUnitPreference();
+  // Pinned at the moment the Environment Check manual Temperature draft
+  // transitions from empty to non-empty (see the detail-field onChange
+  // below) so its label, plausibility bounds, and save payload all agree on
+  // ONE unit even if the live preference changes while the grower is
+  // mid-entry — the same contract as QuickLogWateringForm's water
+  // temperature field. Null when no draft is in progress (falls back to the
+  // live preference).
+  const envCheckTempEntryUnitRef = useRef<TemperatureUnitPreference | null>(null);
+  const activeEnvCheckTempUnit = envCheckTempEntryUnitRef.current ?? temperatureUnit;
 
   useEffect(() => {
     if (previousTargetKeyRef.current === currentTargetKey) return;
@@ -202,6 +214,7 @@ export default function QuickLogAllActivitiesSection({
     setHarvestDry("");
     setHarvestUnit("g");
     setDetailValues({});
+    envCheckTempEntryUnitRef.current = null;
     setPhotoFile(null);
     setErrorReason(null);
     setErrorForActivity(null);
@@ -226,10 +239,10 @@ export default function QuickLogAllActivitiesSection({
   // silently dropped while the grower sees a success receipt.
   const detailNumberValidations = useMemo(() => {
     if (!selected) return [] as { key: string; ok: boolean; error: string | null }[];
-    return getQuickLogActivityDetailFields(selected.id)
+    return getQuickLogActivityDetailFields(selected.id, activeEnvCheckTempUnit)
       .filter((f) => f.kind === "number")
       .map((f) => ({ key: f.key, ...validateQuickLogDetailNumberInput(f, detailValues[f.key]) }));
-  }, [selected, detailValues]);
+  }, [selected, detailValues, activeEnvCheckTempUnit]);
   const detailNumbersInvalid = detailNumberValidations.some((v) => !v.ok);
   const firstDetailNumberError =
     detailNumberValidations.find((v) => !v.ok)?.error ?? null;
@@ -290,6 +303,7 @@ export default function QuickLogAllActivitiesSection({
       setHarvestDry("");
       setHarvestUnit("g");
       setDetailValues({});
+      envCheckTempEntryUnitRef.current = null;
       setPhotoFile(null);
     },
     [
@@ -392,8 +406,14 @@ export default function QuickLogAllActivitiesSection({
 
     // Generic structured activity detail (e.g. training technique). Sanitized
     // to the closed spec — out-of-set, blank, reserved-identity, and over-long
-    // values are dropped, never persisted.
-    const activityDetails = sanitizeQuickLogActivityDetails(selected.id, detailValues);
+    // values are dropped, never persisted. A temperature field's raw entry is
+    // in `activeEnvCheckTempUnit` (the unit pinned when the draft was typed)
+    // and is converted back to canonical °C exactly once, inside the sanitizer.
+    const activityDetails = sanitizeQuickLogActivityDetails(
+      selected.id,
+      detailValues,
+      activeEnvCheckTempUnit,
+    );
     if (activityDetails) {
       Object.assign(extraDetails, activityDetails);
     }
@@ -550,6 +570,7 @@ export default function QuickLogAllActivitiesSection({
       setHarvestDry("");
       setHarvestUnit("g");
       setDetailValues({});
+      envCheckTempEntryUnitRef.current = null;
       setPhotoFile(null);
       setSelectedDraft(null);
       setErrorReason(null);
@@ -585,6 +606,7 @@ export default function QuickLogAllActivitiesSection({
     onSaveEnd,
     isMutationBlocked,
     externalPersistenceBlockReason,
+    activeEnvCheckTempUnit,
   ]);
 
   const noContext = !growId;
@@ -666,12 +688,12 @@ export default function QuickLogAllActivitiesSection({
             </p>
           )}
 
-          {getQuickLogActivityDetailFields(selected.id).length > 0 && (
+          {getQuickLogActivityDetailFields(selected.id, activeEnvCheckTempUnit).length > 0 && (
             <div
               className="grid grid-cols-1 sm:grid-cols-2 gap-2"
               data-testid={`${testIdPrefix}-detail-fields`}
             >
-              {getQuickLogActivityDetailFields(selected.id).map((field) => (
+              {getQuickLogActivityDetailFields(selected.id, activeEnvCheckTempUnit).map((field) => (
                 <div key={field.key} className="space-y-1">
                   <Label
                     htmlFor={`${testIdPrefix}-detail-${field.key}`}
@@ -709,6 +731,20 @@ export default function QuickLogAllActivitiesSection({
                         onChange={(e) => {
                           if (isMutationBlocked()) return;
                           const v = e.target.value;
+                          if (field.temperatureCelsius) {
+                            // Pin the unit the instant this draft goes
+                            // empty → non-empty (using the LIVE preference at
+                            // that moment), so label/bounds/save agree even
+                            // if the preference changes mid-entry. Clearing
+                            // the field releases the pin.
+                            const wasEmpty = (detailValues[field.key] ?? "").trim() === "";
+                            const isEmpty = v.trim() === "";
+                            if (wasEmpty && !isEmpty) {
+                              envCheckTempEntryUnitRef.current = temperatureUnit;
+                            } else if (isEmpty) {
+                              envCheckTempEntryUnitRef.current = null;
+                            }
+                          }
                           setDetailValues((prev) => ({ ...prev, [field.key]: v }));
                         }}
                         disabled={mutationBlocked}

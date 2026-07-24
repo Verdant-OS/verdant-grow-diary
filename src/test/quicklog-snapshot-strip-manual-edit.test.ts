@@ -50,7 +50,12 @@ function strictManualSnap(partial: Partial<StrictSnapshot> = {}): StrictSnapshot
 
 describe("quickLogSnapshotStripAdapter — manual edit action + captured label", () => {
   it("legacy adapter: manual usable snapshot exposes Edit manual readings action", () => {
-    const v = buildQuickLogSnapshotStrip({ snapshot: snap({}), hasTent: true, now: NOW });
+    const v = buildQuickLogSnapshotStrip({
+      snapshot: snap({}),
+      hasTent: true,
+      now: NOW,
+      temperatureUnit: "celsius",
+    });
     expect(v.status).toBe("usable");
     expect(v.action).toEqual(MANUAL_SNAPSHOT_EDIT_ACTION);
     expect(v.action.kind).toBe("edit");
@@ -65,6 +70,7 @@ describe("quickLogSnapshotStripAdapter — manual edit action + captured label",
       snapshot: snap({ ts: new Date(NOW.getTime() - 48 * 3600_000).toISOString() }),
       hasTent: true,
       now: NOW,
+      temperatureUnit: "celsius",
     });
     expect(v.status).toBe("stale");
     expect(v.action.kind).toBe("edit");
@@ -75,6 +81,7 @@ describe("quickLogSnapshotStripAdapter — manual edit action + captured label",
       snapshot: snap({ source: "live" }),
       hasTent: true,
       now: NOW,
+      temperatureUnit: "celsius",
     });
     expect(v.action.kind).not.toBe("edit");
   });
@@ -84,23 +91,39 @@ describe("quickLogSnapshotStripAdapter — manual edit action + captured label",
       snapshot: snap({ source: "sim" }),
       hasTent: true,
       now: NOW,
+      temperatureUnit: "celsius",
     });
     expect(v.action.kind).not.toBe("edit");
   });
 
   it("legacy adapter: capturedAtLabel is a deterministic absolute string when data exists", () => {
-    const v = buildQuickLogSnapshotStrip({ snapshot: snap({}), hasTent: true, now: NOW });
+    const v = buildQuickLogSnapshotStrip({
+      snapshot: snap({}),
+      hasTent: true,
+      now: NOW,
+      temperatureUnit: "celsius",
+    });
     expect(v.capturedAtLabel).toBe("Jul 7, 2026, 7:09 PM UTC");
     expect(v.capturedAt).toBe(minutesAgo(5));
   });
 
   it("legacy adapter: capturedAtLabel is null with no snapshot", () => {
-    const v = buildQuickLogSnapshotStrip({ snapshot: null, hasTent: true, now: NOW });
+    const v = buildQuickLogSnapshotStrip({
+      snapshot: null,
+      hasTent: true,
+      now: NOW,
+      temperatureUnit: "celsius",
+    });
     expect(v.capturedAtLabel).toBeNull();
   });
 
   it("legacy adapter: editing does not promote manual source to live in trust badge", () => {
-    const v = buildQuickLogSnapshotStrip({ snapshot: snap({}), hasTent: true, now: NOW });
+    const v = buildQuickLogSnapshotStrip({
+      snapshot: snap({}),
+      hasTent: true,
+      now: NOW,
+      temperatureUnit: "celsius",
+    });
     expect(v.providerLabel).not.toBe("live");
     expect(v.trustBadge.label.toLowerCase()).not.toContain("live");
   });
@@ -111,6 +134,7 @@ describe("quickLogSnapshotStripAdapter — manual edit action + captured label",
       snapshot: strictManualSnap(),
       hasTent: true,
       now: NOW,
+      temperatureUnit: "celsius",
     });
     expect(v.action.kind).toBe("edit");
     expect(v.capturedAtLabel).toBe("Jul 7, 2026, 7:09 PM UTC");
@@ -122,6 +146,7 @@ describe("quickLogSnapshotStripAdapter — manual edit action + captured label",
       snapshot: strictManualSnap({ source: "live", status: "fresh_live" }),
       hasTent: true,
       now: NOW,
+      temperatureUnit: "celsius",
     });
     expect(v.action.kind).not.toBe("edit");
   });

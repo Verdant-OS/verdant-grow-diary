@@ -175,6 +175,14 @@ describe("buildFeedingReview — optional metrics", () => {
     });
   });
 
+  it("labels water temperature in the active display unit (fahrenheit)", () => {
+    const r = buildFeedingReview(withForm({ waterTempC: "69.8" }), false, "fahrenheit");
+    expect(r.optionalMetrics).toContainEqual({
+      label: "Water (°F)",
+      value: "69.8",
+    });
+  });
+
   it("does not include whitespace-only optional fields", () => {
     const r = buildFeedingReview(withForm({ ph: "   ", ecIn: "1.6" }), false);
     expect(r.optionalMetrics).toHaveLength(2);

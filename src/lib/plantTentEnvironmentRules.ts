@@ -15,7 +15,12 @@ import {
   type SensorSnapshot,
 } from "@/lib/sensorSnapshot";
 import { formatSensorSourceLabel } from "@/lib/manualSensorSourceLabel";
-import { tempFFromC } from "@/lib/temperatureUnits";
+import {
+  convertCelsiusForDisplay,
+  getTemperatureUnitSymbol,
+  loadTemperatureUnitPreference,
+  type TemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 
 export interface PlantTentEnvironmentMetric {
   key: string;
@@ -61,11 +66,13 @@ function metric(
 export function buildPlantTentEnvironmentView(
   rows: SensorReadingLike[] | null | undefined,
   now: number = Date.now(),
+  tempUnit: TemperatureUnitPreference = loadTemperatureUnitPreference(),
 ): PlantTentEnvironmentView {
   if (!rows || rows.length === 0) return EMPTY_VIEW;
   const snap: SensorSnapshot | null = snapshotFromReadings(rows);
   if (!snap) return EMPTY_VIEW;
   const stale = isStale(snap.ts, now);
+  const tempSymbol = getTemperatureUnitSymbol(tempUnit);
   return {
     hasReadings: true,
     capturedAt: snap.ts,
@@ -77,13 +84,19 @@ export function buildPlantTentEnvironmentView(
     canAssessStage:
       !stale && (snap.source === "live" || snap.source === "manual" || snap.source === "csv"),
     metrics: [
-      // Stored as Celsius; displayed as Fahrenheit per Verdant convention.
-      metric("temp", "Temperature", tempFFromC(snap.temp), "°F"),
+      // Stored as canonical Celsius; displayed in the grower's preferred
+      // unit (default Fahrenheit) — conversion happens exactly once, here.
+      metric("temp", "Temperature", convertCelsiusForDisplay(snap.temp, tempUnit), tempSymbol),
       metric("rh", "Humidity", snap.rh, "%"),
       metric("vpd", "VPD", snap.vpd, " kPa", 2),
       metric("soil", "Soil moisture", snap.soil, "%"),
       metric("soil_ec", "Soil EC", snap.soil_ec, " mS/cm", 2),
-      metric("soil_temp", "Soil temp", tempFFromC(snap.soil_temp), "°F"),
+      metric(
+        "soil_temp",
+        "Soil temp",
+        convertCelsiusForDisplay(snap.soil_temp, tempUnit),
+        tempSymbol,
+      ),
       metric("ppfd", "PPFD", snap.ppfd, " µmol", 0),
       metric("co2", "CO₂", snap.co2, " ppm", 0),
     ],

@@ -28,6 +28,17 @@ import type {
 import { resolveBlueprintBand, type BlueprintMetricKey } from "@/lib/blueprintMetricRules";
 import { METRIC_META, STAGE_LABELS } from "@/lib/blueprintOverlayViewModel";
 import { normalizeVpdStage } from "@/lib/vpdStageTargetRules";
+import {
+  celsiusToFahrenheit,
+  loadTemperatureUnitPreference,
+  type TemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
+
+/** Round for display after °C→°F conversion (never mutates canonical data). */
+function roundTo(n: number, digits: number): number {
+  const f = 10 ** digits;
+  return Math.round(n * f) / f;
+}
 
 export interface BlueprintTeaserRow {
   metricKey: BlueprintMetricKey;
@@ -77,9 +88,14 @@ export interface BuildBlueprintTeaserInput {
  * order as the unlocked overlay), the target band at this plant's stage. When
  * the stage is unknown, there is nothing to preview (`stageKnown: false`,
  * empty rows).
+ *
+ * `tempUnit` controls the DISPLAY unit of the temperature row only (band +
+ * unit symbol) — mirrors `buildBlueprintOverlayViewModel` so the teaser never
+ * shows a different unit than the overlay it's previewing.
  */
 export function buildBlueprintTeaserViewModel(
   input: BuildBlueprintTeaserInput,
+  tempUnit: TemperatureUnitPreference = loadTemperatureUnitPreference(),
 ): BlueprintTeaserViewModel {
   const stage = normalizeVpdStage(input.stage);
   const stageKnown = stage !== "unknown";
@@ -94,11 +110,18 @@ export function buildBlueprintTeaserViewModel(
         bands: input.bands,
       });
       if (!band) continue; // metric not targeted at this stage → omit
+      const displayFahrenheit = meta.key === "tempC" && tempUnit === "fahrenheit";
+      const displayBand: MetricBand = displayFahrenheit
+        ? {
+            min: roundTo(celsiusToFahrenheit(band.min), 1),
+            max: roundTo(celsiusToFahrenheit(band.max), 1),
+          }
+        : band;
       const row: BlueprintTeaserRow = {
         metricKey: meta.key,
         label: meta.label,
-        unit: meta.unit,
-        band,
+        unit: displayFahrenheit ? "°F" : meta.unit,
+        band: displayBand,
       };
       if (meta.key === "tempC") row.context = tempContext(input.isDay);
       rows.push(row);

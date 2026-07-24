@@ -6,7 +6,7 @@
  * never treated as sensor_readings, and never break sibling
  * watering/feeding/diagnosis behavior.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { render, screen, fireEvent, within } from "@testing-library/react";
@@ -15,6 +15,14 @@ import {
   buildDiaryCalendarViewModel,
   DIARY_CALENDAR_FILTERS,
 } from "@/lib/diaryCalendarViewModel";
+import {
+  clearTemperatureUnitPreference,
+  saveTemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
+
+beforeEach(() => {
+  clearTemperatureUnitPreference();
+});
 
 const ENV_ENTRY = {
   id: "env-1",
@@ -37,7 +45,8 @@ describe("Diary Calendar — Environment Check", () => {
     expect(DIARY_CALENDAR_FILTERS.map((f) => f.value)).toContain("environment");
   });
 
-  it("renders an Environment Check event on the correct day with the not-live disclaimer", () => {
+  it("renders an Environment Check event on the correct day with the not-live disclaimer (celsius preference)", () => {
+    saveTemperatureUnitPreference("celsius");
     render(<DiaryCalendarSection rawEntries={[ENV_ENTRY]} />);
     const events = screen.getAllByTestId("diary-calendar-event");
     expect(events).toHaveLength(1);
@@ -48,6 +57,15 @@ describe("Diary Calendar — Environment Check", () => {
       /Quick Log environment check — not live sensor telemetry/i,
     );
     expect(screen.getByText(/24\.6°C/)).toBeInTheDocument();
+    expect(screen.getByText(/58%/)).toBeInTheDocument();
+    expect(screen.getByText(/1\.12 kPa/)).toBeInTheDocument();
+    expect(screen.getByText(/850 ppm/)).toBeInTheDocument();
+  });
+
+  it("renders the Environment Check temp converted to Fahrenheit by default", () => {
+    render(<DiaryCalendarSection rawEntries={[ENV_ENTRY]} />);
+    // 24.6°C → 76.28°F, displayed to 1 decimal.
+    expect(screen.getByText(/76\.3°F/)).toBeInTheDocument();
     expect(screen.getByText(/58%/)).toBeInTheDocument();
     expect(screen.getByText(/1\.12 kPa/)).toBeInTheDocument();
     expect(screen.getByText(/850 ppm/)).toBeInTheDocument();

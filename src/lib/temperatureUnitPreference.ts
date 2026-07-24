@@ -49,6 +49,23 @@ export const TEMPERATURE_UNIT_OPTIONS: ReadonlyArray<{
 
 const STORAGE_KEY = "verdant:temperatureUnit" as const;
 
+/**
+ * Dispatched on `window` whenever the preference is saved/cleared, so
+ * same-document listeners (useTemperatureUnitPreference) can react —
+ * the native `storage` event only fires in OTHER tabs/windows, never
+ * the one that made the change.
+ */
+export const TEMPERATURE_UNIT_CHANGE_EVENT = "verdant:temperatureUnitChange" as const;
+
+function notifyChange(): void {
+  try {
+    if (typeof window === "undefined") return;
+    window.dispatchEvent(new Event(TEMPERATURE_UNIT_CHANGE_EVENT));
+  } catch {
+    /* ignore */
+  }
+}
+
 /** Pure conversion. Single source of truth. */
 export function celsiusToFahrenheit(celsius: number): number {
   return celsius * (9 / 5) + 32;
@@ -93,6 +110,7 @@ export function saveTemperatureUnitPreference(
   } catch {
     /* fail open */
   }
+  notifyChange();
 }
 
 export function clearTemperatureUnitPreference(): void {
@@ -103,6 +121,7 @@ export function clearTemperatureUnitPreference(): void {
   } catch {
     /* ignore */
   }
+  notifyChange();
 }
 
 /** Resolve any unknown candidate into a valid preference. */

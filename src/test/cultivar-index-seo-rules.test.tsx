@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import CultivarsIndex from "@/pages/CultivarsIndex";
 import {
@@ -13,10 +14,16 @@ const ORIGIN = "https://verdantgrowdiary.com";
 afterEach(cleanup);
 
 function renderCultivars(entry: string) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+
   return render(
-    <MemoryRouter initialEntries={[entry]}>
-      <CultivarsIndex />
-    </MemoryRouter>,
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={[entry]}>
+        <CultivarsIndex />
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 

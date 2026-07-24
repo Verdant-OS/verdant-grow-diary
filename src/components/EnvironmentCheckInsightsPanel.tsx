@@ -9,6 +9,7 @@ import {
   type EnvironmentCheckInsightsTargets,
 } from "@/lib/environmentCheckInsightsViewModel";
 import type { EnvironmentCheckTimelineRawEntry } from "@/lib/environmentCheckTimelineViewModel";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import { cn } from "@/lib/utils";
 
 export const ENVIRONMENT_CHECK_INSIGHTS_EXPAND_LABEL = "Show insights";
@@ -26,9 +27,11 @@ export default function EnvironmentCheckInsightsPanel({
   plantSpecificTargets,
 }: EnvironmentCheckInsightsPanelProps) {
   const [expanded, setExpanded] = useState(false);
+  const temperatureUnit = useTemperatureUnitPreference();
   const vm = buildEnvironmentCheckInsightsViewModel(rawEntries, {
     targets,
     plantSpecificTargets,
+    tempUnit: temperatureUnit,
   });
 
   const regionId = "env-check-insights-region";

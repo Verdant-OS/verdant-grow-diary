@@ -460,6 +460,72 @@ export function parseEcowittSoilChannelMap(raw: unknown): EcowittSoilChannelMap 
 }
 
 // ---------------------------------------------------------------------------
+// Single-tent startup guard
+// ---------------------------------------------------------------------------
+
+/**
+ * Typed configuration error raised at bridge startup when the parsed
+ * soil channel map violates the "one bridge process → one tent" rule.
+ *
+ * Deliberately carries only a stable, non-sensitive message. Tent IDs,
+ * bridge tokens, raw JSON, PASSKEYs, and private IPs MUST NOT be
+ * included — this error is written to logs and process exit paths.
+ */
+export class EcowittBridgeConfigError extends Error {
+  readonly code: "mixed_tent_channel_map" | "channel_map_tent_mismatch";
+  constructor(code: EcowittBridgeConfigError["code"], message: string) {
+    super(message);
+    this.name = "EcowittBridgeConfigError";
+    this.code = code;
+  }
+}
+
+/**
+ * Enforce "one bridge process → one tent → one bridge token" at the
+ * process boundary. The pure normalizer is intentionally multi-tent
+ * capable; this guard only restricts what a single bridge *process*
+ * may be configured to forward.
+ *
+ * Rules:
+ *   - Empty map → accepted.
+ *   - All channels mapped to the same tent → accepted.
+ *   - Any two channels mapped to different tents → rejected.
+ *   - If `defaultTentId` is provided and the map's tent does not match
+ *     it → rejected.
+ *
+ * Does not mutate `map`. Never echoes tent IDs, tokens, or raw JSON.
+ */
+export function assertSingleTentSoilChannelMap(
+  map: EcowittSoilChannelMap,
+  defaultTentId?: string | null,
+): void {
+  if (!map || typeof map !== "object") return;
+  const tents = new Set<string>();
+  for (const target of Object.values(map)) {
+    if (target && typeof target.tent_id === "string" && target.tent_id) {
+      tents.add(target.tent_id);
+    }
+  }
+  if (tents.size === 0) return;
+  if (tents.size > 1) {
+    throw new EcowittBridgeConfigError(
+      "mixed_tent_channel_map",
+      "EcoWitt bridge configuration must map every soil channel to one tent and match VERDANT_TENT_ID.",
+    );
+  }
+  const expected = typeof defaultTentId === "string" ? defaultTentId.trim() : "";
+  if (expected) {
+    const [only] = tents;
+    if (only !== expected) {
+      throw new EcowittBridgeConfigError(
+        "channel_map_tent_mismatch",
+        "EcoWitt bridge configuration must map every soil channel to one tent and match VERDANT_TENT_ID.",
+      );
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Redaction
 // ---------------------------------------------------------------------------
 

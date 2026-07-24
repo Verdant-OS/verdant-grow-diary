@@ -74,7 +74,8 @@ function isDenied(err: { code?: string; message?: string } | null | undefined): 
 
 async function recreateUser(email: string, password: string): Promise<string> {
   const { data: list } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
-  const prior = list?.users?.find((u) => u.email === email);
+  const users = (list?.users ?? []) as Array<{ id: string; email?: string }>;
+  const prior = users.find((u) => u.email === email);
   if (prior) await admin.auth.admin.deleteUser(prior.id);
   const { data, error } = await admin.auth.admin.createUser({
     email,
@@ -246,4 +247,3 @@ main().catch((e) => {
   console.error(e);
   process.exit(1);
 });
-

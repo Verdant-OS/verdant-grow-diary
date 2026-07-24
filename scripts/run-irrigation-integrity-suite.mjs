@@ -108,14 +108,11 @@ function runSupabase(args, opts = {}) {
 }
 
 function redactSupabaseStartupOutput(output) {
+  const credentialLabel =
+    /\b(?:anon[ _-]?key|service[ _-]?role[ _-]?key|jwt[ _-]?secret|publishable[ _-]?key|secret[ _-]?key|db[ _-]?url|database[ _-]?url|api[ _-]?key|access[ _-]?token|s3[ _-]?protocol[ _-]?access[ _-]?key(?:[ _-]?(?:id|secret))?)\b/i;
   return output
     .split(/\r?\n/)
-    .filter(
-      (line) =>
-        !/"(?:ANON_KEY|JWT_SECRET|PUBLISHABLE_KEY|SECRET_KEY|SERVICE_ROLE_KEY|S3_PROTOCOL_ACCESS_KEY_ID|S3_PROTOCOL_ACCESS_KEY_SECRET)":/.test(
-          line,
-        ),
-    )
+    .filter((line) => !credentialLabel.test(line))
     .join("\n");
 }
 
@@ -186,7 +183,6 @@ for (const f of [...STATIC_PIN_FILES, ...PGTAP_FILES]) {
 }
 for (const bin of ["node", "bun"]) requireBin(bin);
 const SUPABASE = resolveSupabaseCommand();
-const PSQL = resolvePsqlRunner();
 
 // -- 1. supabase start ------------------------------------------------------
 let apiUrl, dbUrl, anonKey, serviceKey;
@@ -238,6 +234,10 @@ try {
   fail("supabase start", String(e?.message ?? e));
   printSummaryAndExit(1);
 }
+
+// A clean Docker-only machine has no supabase_db_* container until the start
+// step above completes. Resolve the psql runner only after that boundary.
+const PSQL = resolvePsqlRunner();
 
 // -- 2. supabase db reset ---------------------------------------------------
 {

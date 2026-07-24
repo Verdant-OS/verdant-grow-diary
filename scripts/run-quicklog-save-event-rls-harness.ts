@@ -73,7 +73,8 @@ async function recreateUser(email: string, password: string): Promise<string> {
     page: 1,
     perPage: 200,
   });
-  const prior = list?.users?.find((u) => u.email === email);
+  const users = (list?.users ?? []) as Array<{ id: string; email?: string }>;
+  const prior = users.find((u) => u.email === email);
   if (prior) await admin.auth.admin.deleteUser(prior.id);
   const { data, error } = await admin.auth.admin.createUser({
     email,
@@ -84,10 +85,7 @@ async function recreateUser(email: string, password: string): Promise<string> {
   return data.user.id;
 }
 
-async function signedInClient(
-  email: string,
-  password: string,
-): Promise<SupabaseClient> {
+async function signedInClient(email: string, password: string): Promise<SupabaseClient> {
   const c = createClient(SUPABASE_URL, ANON_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
@@ -370,8 +368,7 @@ async function main() {
       const after = await countGrowEvents(uidA);
       check(
         "invalid event_type rejected → invalid_event_type, no insert",
-        (data as { reason?: string })?.reason === "invalid_event_type" &&
-          before === after,
+        (data as { reason?: string })?.reason === "invalid_event_type" && before === after,
         `${JSON.stringify(data)} delta=${after - before}`,
       );
     }
@@ -394,8 +391,7 @@ async function main() {
       const afterD = await countDiary(uidA);
       check(
         "invalid sensor metric rejected → invalid_sensor_metric, no orphan grow_events",
-        (data as { reason?: string })?.reason === "invalid_sensor_metric" &&
-          before === after,
+        (data as { reason?: string })?.reason === "invalid_sensor_metric" && before === after,
         `${JSON.stringify(data)} ge_delta=${after - before}`,
       );
       check(
@@ -445,8 +441,8 @@ async function main() {
       const statuses = new Set((events ?? []).map((e) => e.status));
       check(
         "audit emits save_started/save_succeeded/duplicate_reused/validation_failed",
-        ["save_started", "save_succeeded", "duplicate_reused", "validation_failed"].every(
-          (s) => statuses.has(s),
+        ["save_started", "save_succeeded", "duplicate_reused", "validation_failed"].every((s) =>
+          statuses.has(s),
         ),
         Array.from(statuses).join(","),
       );
@@ -456,12 +452,8 @@ async function main() {
       const safe = reasons.every(
         (r) =>
           /^[a-z][a-z0-9_]{2,40}$/.test(r) &&
-          !/select|insert|update|delete|from|where|jwt|bearer|token|secret/i.test(
-            r,
-          ) &&
-          !/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(
-            r,
-          ),
+          !/select|insert|update|delete|from|where|jwt|bearer|token|secret/i.test(r) &&
+          !/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(r),
       );
       check(
         "audit reason codes are short safe tokens (no SQL/JWT/UUID leakage)",
@@ -482,19 +474,11 @@ async function main() {
         p_note: note,
         p_details: { kind: "note", concurrency_test: true },
       };
-      const results = await Promise.all(
-        Array.from({ length: 10 }, () => call(cA, args)),
-      );
-      const allOk = results.every(
-        (r) => !r.error && (r.data as { ok?: boolean })?.ok === true,
-      );
-      const ids = results.map(
-        (r) => (r.data as { grow_event_id?: string })?.grow_event_id,
-      );
+      const results = await Promise.all(Array.from({ length: 10 }, () => call(cA, args)));
+      const allOk = results.every((r) => !r.error && (r.data as { ok?: boolean })?.ok === true);
+      const ids = results.map((r) => (r.data as { grow_event_id?: string })?.grow_event_id);
       const allSame = ids.every((id) => id && id === ids[0]);
-      const anyReused = results.some(
-        (r) => (r.data as { reused?: boolean })?.reused === true,
-      );
+      const anyReused = results.some((r) => (r.data as { reused?: boolean })?.reused === true);
       check("parallel idempotent calls all return ok=true", allOk);
       check("all parallel calls return the same grow_event_id", allSame, ids.join(","));
       check("at least one parallel call is reused=true", anyReused);
@@ -513,9 +497,17 @@ async function main() {
         .select("*", { count: "exact", head: true })
         .eq("user_id", uidA)
         .eq("note", note);
-      check("exactly one quicklog_idempotency row for the racy key", idemCount === 1, `${idemCount}`);
+      check(
+        "exactly one quicklog_idempotency row for the racy key",
+        idemCount === 1,
+        `${idemCount}`,
+      );
       check("exactly one grow_events row for the racy key", geCount === 1, `${geCount}`);
-      check("exactly one diary_entries companion row for the racy key", deCount === 1, `${deCount}`);
+      check(
+        "exactly one diary_entries companion row for the racy key",
+        deCount === 1,
+        `${deCount}`,
+      );
     }
   } finally {
     await teardown([uidA, uidB]);

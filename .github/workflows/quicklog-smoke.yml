@@ -153,6 +153,10 @@ jobs:
         if: steps.e2e_config.outputs.should_run == 'true'
         run: bun run e2e:fixture-checklist
 
+      - name: Repair disposable E2E Quick Log lineage
+        if: steps.e2e_config.outputs.should_run == 'true'
+        run: bun run e2e:repair-fixture-lineage
+
       # Optional UI-only disposable E2E fixture bootstrap. OFF by default.
       # Only runs when vars.E2E_ALLOW_FIXTURE_BOOTSTRAP == 'true'.
       # Never deletes, renames, or modifies existing grow data. Refuses to

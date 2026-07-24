@@ -259,6 +259,14 @@ export async function validateQuickLogFixturePage(
     );
   }
 
+  const quickLogButton = page.getByTestId("plant-detail-quick-action-quicklog");
+  await quickLogButton.waitFor({ state: "visible", timeout: 20_000 });
+  if (!(await quickLogButton.isEnabled())) {
+    throw new Error(
+      "Configured fixture is not Quick Log-ready: its grow/tent/plant lineage is incomplete.",
+    );
+  }
+
   if (envCheck.expected.grow) {
     await page
       .getByText(envCheck.expected.grow, { exact: false })

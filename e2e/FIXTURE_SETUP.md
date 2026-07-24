@@ -96,6 +96,14 @@ The CI step `Verify disposable E2E fixture` will hard-fail and block
 the smoke if the required tent/plant names are missing, or if the
 optional grow name is supplied but not visible.
 
+Before that verification, CI runs `e2e:repair-fixture-lineage` against
+the dedicated test account through the normal publishable-key sign-in
+and owner-scoped RLS policies. It may create only `E2E Test Grow` and a
+missing `E2E Test Plant 2`, and may fill only null `grow_id` values on
+the exact configured tent/plants. It never uses service role, deletes,
+renames, moves, or overwrites non-null lineage. Ambiguous or conflicting
+rows fail the job for manual review.
+
 ## 5. Screenshots for maintainers
 
 Capture and store these reference screenshots locally for hand-off.

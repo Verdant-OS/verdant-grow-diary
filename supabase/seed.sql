@@ -57,45 +57,12 @@ BEGIN
   END IF;
 END $$;
 
--- Irrigation event history keeps authenticated SELECT for timeline readers, but
--- all client writes must route through quicklog_save_event / quicklog_save_manual.
--- Re-apply the deliberate 20260722062644 hardening after the local parity grant
--- above so disposable stacks match the production trust boundary.
-DO $$
-DECLARE
-  r record;
-BEGIN
-  IF to_regclass('public.grow_events') IS NOT NULL THEN
-    GRANT SELECT ON TABLE public.grow_events TO authenticated;
-    GRANT ALL ON TABLE public.grow_events TO service_role;
-    REVOKE INSERT, UPDATE, DELETE ON TABLE public.grow_events
-      FROM PUBLIC, anon, authenticated;
-  END IF;
-
-  IF to_regclass('public.watering_events') IS NOT NULL THEN
-    GRANT SELECT ON TABLE public.watering_events TO authenticated;
-    GRANT ALL ON TABLE public.watering_events TO service_role;
-    REVOKE INSERT, UPDATE, DELETE ON TABLE public.watering_events
-      FROM PUBLIC, anon, authenticated;
-  END IF;
-
-  IF to_regclass('public.feeding_events') IS NOT NULL THEN
-    GRANT SELECT ON TABLE public.feeding_events TO authenticated;
-    GRANT ALL ON TABLE public.feeding_events TO service_role;
-    REVOKE INSERT, UPDATE, DELETE ON TABLE public.feeding_events
-      FROM PUBLIC, anon, authenticated;
-  END IF;
-
-  FOR r IN
-    SELECT p.oid::regprocedure::text AS sig
-      FROM pg_proc p
-      JOIN pg_namespace n ON n.oid = p.pronamespace
-     WHERE n.nspname = 'public'
-       AND p.proname IN ('create_watering_event', 'create_feeding_event')
-  LOOP
-    EXECUTE format(
-      'REVOKE EXECUTE ON FUNCTION %s FROM PUBLIC, anon, authenticated',
-      r.sig
-    );
-  END LOOP;
-END $$;
+-- Preserve the irrigation event ACL established by
+-- 20260724055000_irrigation_event_acl_parity.sql after the local-only blanket
+-- grants above. Hosted projects receive this posture from the migration itself.
+REVOKE INSERT, UPDATE, DELETE
+  ON TABLE public.grow_events, public.watering_events, public.feeding_events
+  FROM PUBLIC, anon, authenticated;
+GRANT SELECT
+  ON TABLE public.grow_events, public.watering_events, public.feeding_events
+  TO authenticated;

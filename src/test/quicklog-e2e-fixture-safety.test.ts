@@ -207,6 +207,26 @@ describe("E2E fixture safety: source-level guardrails", () => {
     }
   });
 
+  it("requires the configured fixture to expose an enabled Quick Log entry point", () => {
+    const helper = read("e2e/lib/fixtureSafety.ts");
+    expect(helper).toContain('getByTestId("plant-detail-quick-action-quicklog")');
+    expect(helper).toMatch(/quickLogButton\.isEnabled\(\)/);
+    expect(helper).toMatch(/grow\/tent\/plant lineage is incomplete/);
+  });
+
+  it("repairs only null lineage through normal RLS-scoped fixture auth", () => {
+    const repair = read("e2e/scripts/repair-quicklog-fixture-lineage.ts");
+    expect(repair).toContain("signInWithPassword");
+    expect(repair).toContain("VITE_SUPABASE_PUBLISHABLE_KEY");
+    expect(repair).not.toMatch(/SERVICE_ROLE|service_role|auth\.admin/);
+    expect(repair).not.toMatch(/\.delete\(|\bDELETE\b|\.upsert\(/i);
+    expect(repair).toMatch(/\.is\("grow_id", null\)/);
+    expect(repair).toMatch(/refusing to overwrite/i);
+    expect(repair).toContain("isLikelyRealPlantUrl");
+    expect(repair).toContain('const CANONICAL_GROW_NAME = "E2E Test Grow"');
+    expect(repair).toContain('const DEFAULT_SECOND_PLANT_NAME = "E2E Test Plant 2"');
+  });
+
   it("fixture spec relies on normal login (replayed via authedTest) and not on token injection", () => {
     const spec = read("e2e/fixture-safety.spec.ts");
     // The spec imports the shared authed test base, which replays the
@@ -274,12 +294,14 @@ describe("Workflow: fixture verification gates smoke", () => {
 
   it("runs the non-writing checklist before optional bootstrap, verification, and smoke", () => {
     const checklist = wf.indexOf("- name: Print disposable E2E fixture checklist");
+    const repair = wf.indexOf("- name: Repair disposable E2E Quick Log lineage");
     const bootstrap = wf.indexOf("- name: Bootstrap disposable E2E fixture");
     const verify = wf.indexOf("- name: Verify disposable E2E fixture");
     const smoke = wf.indexOf("- name: Run Quick Log Playwright smoke");
 
     expect(checklist).toBeGreaterThan(0);
-    expect(checklist).toBeLessThan(bootstrap);
+    expect(checklist).toBeLessThan(repair);
+    expect(repair).toBeLessThan(bootstrap);
     expect(bootstrap).toBeLessThan(verify);
     expect(verify).toBeLessThan(smoke);
     expect(wf).toMatch(

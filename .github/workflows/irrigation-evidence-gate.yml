@@ -105,14 +105,14 @@ jobs:
           # exclude list, because the local CLI's service dependency graph can
           # change across Supabase releases.
           if ! supabase start --workdir . >"${RUNNER_TEMP}/irrigation-supabase-start.log" 2>&1; then
-            grep -Eiv '(ANON_KEY|SERVICE_ROLE_KEY|JWT_SECRET|SECRET_KEY|DB_URL|DATABASE_URL|API KEY|access token)' \
+            grep -Eiv '(ANON[ _-]?KEY|SERVICE[ _-]?ROLE[ _-]?KEY|JWT[ _-]?SECRET|PUBLISHABLE[ _-]?KEY|SECRET[ _-]?KEY|DB[ _-]?URL|DATABASE[ _-]?URL|API[ _-]?KEY|ACCESS[ _-]?TOKEN)' \
               "${RUNNER_TEMP}/irrigation-supabase-start.log" \
               > artifacts/irrigation-evidence/supabase-start-redacted.log || true
             echo "::error::Disposable local Supabase failed to start"
             exit 1
           fi
           if ! supabase db reset --local >"${RUNNER_TEMP}/irrigation-supabase-reset.log" 2>&1; then
-            grep -Eiv '(ANON_KEY|SERVICE_ROLE_KEY|JWT_SECRET|SECRET_KEY|DB_URL|DATABASE_URL|API KEY|access token)' \
+            grep -Eiv '(ANON[ _-]?KEY|SERVICE[ _-]?ROLE[ _-]?KEY|JWT[ _-]?SECRET|PUBLISHABLE[ _-]?KEY|SECRET[ _-]?KEY|DB[ _-]?URL|DATABASE[ _-]?URL|API[ _-]?KEY|ACCESS[ _-]?TOKEN)' \
               "${RUNNER_TEMP}/irrigation-supabase-reset.log" \
               > artifacts/irrigation-evidence/supabase-reset-redacted.log || true
             echo "::error::Disposable local Supabase migration reset failed"

@@ -16,6 +16,9 @@ import { resolve } from "node:path";
 const ROOT = resolve(__dirname, "../..");
 const HARNESS = "scripts/run-irrigation-evidence-rls-harness.ts";
 const WORKFLOW = ".github/workflows/irrigation-evidence-gate.yml";
+const INTEGRITY_SUITE = "scripts/run-irrigation-integrity-suite.mjs";
+const PGTAP_WORKFLOW = ".github/workflows/irrigation-pgtap-rls-gate.yml";
+const HARNESS_TSCONFIG = "tsconfig.irrigation-harness.json";
 const ACL_PGTAP_FILES = [
   "supabase/tests/create_watering_event.sql",
   "supabase/tests/create_feeding_event.sql",
@@ -25,6 +28,12 @@ const src = existsSync(harnessPath) ? readFileSync(harnessPath, "utf8") : "";
 const workflowPath = resolve(ROOT, WORKFLOW);
 const workflowSrc = existsSync(workflowPath) ? readFileSync(workflowPath, "utf8") : "";
 const workflowCode = workflowSrc.replace(/^\s*#.*$/gm, "");
+const integritySuiteSrc = readFileSync(resolve(ROOT, INTEGRITY_SUITE), "utf8");
+const pgtapWorkflowSrc = readFileSync(resolve(ROOT, PGTAP_WORKFLOW), "utf8");
+const harnessTsconfig = JSON.parse(readFileSync(resolve(ROOT, HARNESS_TSCONFIG), "utf8")) as {
+  include?: string[];
+  compilerOptions?: { types?: string[] };
+};
 const PRODUCTION_PROJECT_REF = "knkwiiywfkbqznbxwqfh";
 
 const pkg = JSON.parse(readFileSync(resolve(ROOT, "package.json"), "utf8")) as {
@@ -347,6 +356,15 @@ describe("irrigation evidence CI gate — authoritative and non-production", () 
     );
     expect(workflowCode).not.toMatch(/path:[\s\S]{0,120}irrigation-supabase-start\.log/);
     expect(workflowCode).not.toMatch(/path:[\s\S]{0,120}irrigation-supabase-reset\.log/);
+    for (const label of [
+      "ANON[ _-]?KEY",
+      "SERVICE[ _-]?ROLE[ _-]?KEY",
+      "JWT[ _-]?SECRET",
+      "DB[ _-]?URL",
+      "DATABASE[ _-]?URL",
+    ]) {
+      expect(workflowCode).toContain(label);
+    }
   });
 
   it("runs the exact styled Chromium overflow proof as an independent blocking job", () => {
@@ -369,6 +387,52 @@ describe("irrigation evidence CI gate — authoritative and non-production", () 
       '"vite.config.ts"',
     ]) {
       expect(workflowCode).toContain(path);
+    }
+  });
+});
+
+describe("irrigation integrity runner — clean-start portability", () => {
+  it("discovers the Docker psql container only after Supabase starts", () => {
+    const start = integritySuiteSrc.indexOf('runSupabase(["start"]');
+    const resolvePsql = integritySuiteSrc.indexOf("const PSQL = resolvePsqlRunner()");
+    const reset = integritySuiteSrc.indexOf('runSupabase(["db", "reset"]');
+
+    expect(start).toBeGreaterThan(-1);
+    expect(resolvePsql).toBeGreaterThan(start);
+    expect(reset).toBeGreaterThan(resolvePsql);
+    expect(integritySuiteSrc.slice(0, start)).not.toContain("const PSQL = resolvePsqlRunner()");
+  });
+
+  it("filters both machine and human-readable Supabase credential labels", () => {
+    expect(integritySuiteSrc).toMatch(/anon\[ _-\]\?key/i);
+    expect(integritySuiteSrc).toMatch(/service\[ _-\]\?role\[ _-\]\?key/i);
+    expect(integritySuiteSrc).toMatch(/jwt\[ _-\]\?secret/i);
+    expect(integritySuiteSrc).toMatch(/db\[ _-\]\?url/i);
+    expect(integritySuiteSrc).toMatch(/credentialLabel\.test\(line\)/);
+  });
+});
+
+describe("irrigation harness typecheck — exact source coverage", () => {
+  const expectedHarnesses = [
+    "scripts/run-irrigation-evidence-rls-harness.ts",
+    "scripts/run-create-feeding-event-rls-harness.ts",
+    "scripts/run-quicklog-save-event-rls-harness.ts",
+    "scripts/run-quicklog-save-manual-rls-harness.ts",
+    "scripts/run-quicklog-rpc-rls-harnesses.ts",
+  ];
+
+  it("uses a dedicated TypeScript project instead of src-only tsconfig.app.json", () => {
+    expect(pgtapWorkflowSrc).toContain("bunx tsc -p tsconfig.irrigation-harness.json --noEmit");
+    expect(pgtapWorkflowSrc).not.toMatch(
+      /Typecheck irrigation harnesses[\s\S]{0,300}bun run typecheck/,
+    );
+  });
+
+  it("includes every harness named by the pgTAP workflow with Bun types", () => {
+    expect(harnessTsconfig.compilerOptions?.types).toEqual(expect.arrayContaining(["bun", "node"]));
+    for (const harness of expectedHarnesses) {
+      expect(harnessTsconfig.include).toContain(harness);
+      expect(pgtapWorkflowSrc).toContain(`- "${harness}"`);
     }
   });
 });

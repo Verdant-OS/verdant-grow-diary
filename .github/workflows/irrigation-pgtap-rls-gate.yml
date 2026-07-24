@@ -27,6 +27,7 @@ on:
       - "scripts/run-quicklog-save-event-rls-harness.ts"
       - "scripts/run-quicklog-save-manual-rls-harness.ts"
       - "scripts/run-quicklog-rpc-rls-harnesses.ts"
+      - "tsconfig.irrigation-harness.json"
       - "supabase/contract-migrations/**"
       - ".github/workflows/irrigation-pgtap-rls-gate.yml"
   workflow_dispatch:
@@ -50,12 +51,10 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Typecheck (full project — includes irrigation harnesses)
-        # Full-project noEmit catches any harness drift; scoping to specific
-        # files would miss shared type surface changes. Use the repo's
-        # canonical typecheck script so this gate does not depend on an
-        # unavailable `tsgo` package.
-        run: bun run typecheck
+      - name: Typecheck irrigation harnesses
+        # This dedicated config includes every run-*-rls-harness.ts source
+        # named in this workflow. tsconfig.app.json only includes src/.
+        run: bunx tsc -p tsconfig.irrigation-harness.json --noEmit
 
   pgtap-irrigation:
     name: pgTAP irrigation (feeding + watering)

@@ -657,6 +657,24 @@ describe("QuickLogV2Sheet — structured watering", () => {
     expect(payload.p_temperature_c).toBe(25);
   });
 
+  it("keeps the manual sensor snapshot Temp label showing the pinned entry unit, not the live one, through a mid-draft preference flip", async () => {
+    // Codex round-6 finding: the save payload was already correctly pinned
+    // (see the two tests above), but the visible label still read the live
+    // unit — a grower who typed 25 meaning 25°C would see the field relabel
+    // itself to "(°F)" after a cross-tab flip even though 25°C is what gets
+    // saved.
+    saveTemperatureUnitPreference("celsius");
+    renderSheet(); // defaults to action "note"
+    fireEvent.change(screen.getByLabelText("Temp (°C)"), { target: { value: "25" } });
+
+    act(() => {
+      saveTemperatureUnitPreference("fahrenheit");
+    });
+
+    expect(screen.getByLabelText("Temp (°C)")).toBeTruthy();
+    expect(screen.queryByLabelText("Temp (°F)")).toBeNull();
+  });
+
   it("pins the Water temperature draft to its entry unit through a live preference flip", async () => {
     saveTemperatureUnitPreference("celsius");
     renderSheet();

@@ -115,6 +115,7 @@ describe("buildQuickLogStripFromTentState — trust badge gating (no Live for ve
       snapshot: snap({ source: "ecowitt_mqtt", status: "stale", freshness: "stale" }),
       hasTent: true,
       now: NOW,
+      temperatureUnit: "celsius",
     });
     expect(v.trustBadge.badge).not.toBe("live");
     expect(v.trustBadge.badge).toBe("stale");
@@ -127,6 +128,7 @@ describe("buildQuickLogStripFromTentState — trust badge gating (no Live for ve
       snapshot: snap({ source: "wat", status: "stale", freshness: "stale" }),
       hasTent: true,
       now: NOW,
+      temperatureUnit: "celsius",
     });
     expect(v.trustBadge.badge).not.toBe("live");
     expect(v.trustBadge.attachable).toBe(false);
@@ -138,6 +140,7 @@ describe("buildQuickLogStripFromTentState — trust badge gating (no Live for ve
       snapshot: { ...EMPTY_SENSOR_SNAPSHOT },
       hasTent: true,
       now: NOW,
+      temperatureUnit: "celsius",
     });
     expect(v.status).toBe("no_data");
     expect(v.trustBadge.badge).not.toBe("live");
@@ -150,6 +153,7 @@ describe("buildQuickLogStripFromTentState — trust badge gating (no Live for ve
       snapshot: snap({ source: "ecowitt", status: "fresh_live" }),
       hasTent: true,
       now: NOW,
+      temperatureUnit: "celsius",
     });
     expect(v.trustBadge.badge).toBe("live");
     expect(v.providerLabel).toBe("EcoWitt");

@@ -1877,7 +1877,7 @@ export default function Timeline() {
                           const detailLines: readonly QuickLogDetailDisplayLine[] =
                             isLearningLoopEvent || isReadinessCheckEvent
                               ? []
-                              : describeQuickLogDetailsFromExtras(e.details);
+                              : describeQuickLogDetailsFromExtras(e.details, temperatureUnit);
                           // Exclude the FULL structured-key set (not just
                           // rendered lines): a present-but-invalid structured
                           // value yields no labeled line and must still never

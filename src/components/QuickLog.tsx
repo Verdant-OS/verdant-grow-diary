@@ -649,8 +649,12 @@ export default function QuickLog({
         snapshot: sensorState.snapshot,
         hasTent: !!sensorTentId,
         attached: snapshot,
+        // Read-only reference value (Pattern B) — this memo only drives the
+        // .status auto-attach effects below, but must still stay unit-aware
+        // like every other consumer of this adapter.
+        temperatureUnit: temperatureUnitPreference,
       }),
-    [sensorState.status, sensorState.snapshot, sensorTentId, snapshot],
+    [sensorState.status, sensorState.snapshot, sensorTentId, snapshot, temperatureUnitPreference],
   );
 
   useEffect(() => {

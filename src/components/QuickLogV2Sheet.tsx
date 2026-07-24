@@ -193,7 +193,6 @@ export default function QuickLogV2Sheet({
   );
   const queryClient = useQueryClient();
   const temperatureUnit = useTemperatureUnitPreference();
-  const temperatureUnitSymbol = getTemperatureUnitSymbol(temperatureUnit);
   const inRouter = useInRouterContext();
   // `useNavigate` throws when called outside a Router. The sheet is
   // always mounted inside the app's Router in production, but some
@@ -1598,7 +1597,9 @@ export default function QuickLogV2Sheet({
               </summary>
               <div className="mt-3 grid grid-cols-3 gap-2">
                 <div>
-                  <Label htmlFor="qlv2-temp">Temp ({temperatureUnitSymbol})</Label>
+                  <Label htmlFor="qlv2-temp">
+                    Temp ({getTemperatureUnitSymbol(manualTempEntryUnitRef.current ?? temperatureUnit)})
+                  </Label>
                   <Input
                     id="qlv2-temp"
                     inputMode="decimal"

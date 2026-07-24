@@ -137,6 +137,40 @@ The full code → fix mapping lives in
 `scripts/ecowitt-live-soil-bridge.ts` as `CONFIG_ERROR_FIX_HINTS` and
 mirrors the table in section 2.
 
+### `--dry-run`
+
+Pass `--dry-run` to `config validate` to additionally print a
+schema-validated, fully redacted view of the effective config. Nothing
+starts — no `mqtt` import, no broker connect, no HTTP.
+
+```bash
+bun run scripts/ecowitt-live-soil-bridge.ts config validate --dry-run
+# stdout on success:
+# {"event":"config_ok","check":"ecowitt-bridge"}
+# {"event":"config_effective","check":"ecowitt-bridge",
+#  "tent_id":"uuid:…1111","plant_id":null,
+#  "ingest_url_host":"https://proj.functions.supabase.co",
+#  "bridge_token":"vbt_…(redacted, len=N)",
+#  "mqtt":{"url_host":"mqtt://127.0.0.1:1883","topic":"ecowitt/grow",
+#          "username_present":false,"password_present":false},
+#  "channel_map":{"count":2,"channels":[
+#    {"channel":"soilmoisture1","tent_id":"uuid:…1111","plant_id":"uuid:…3333","label":"A"},
+#    ...]},
+#  "dry_run":false,"once":false}
+```
+
+Redaction rules (see `buildRedactedEffectiveConfig`):
+
+- Tent / plant UUIDs → `uuid:…XXXX` (last 4 hex only).
+- Bridge token → presence + length via `maskBridgeToken`.
+- Ingest and MQTT URLs → protocol + host only (no paths, no creds).
+- MQTT credentials → `username_present` / `password_present` booleans.
+- Channel map → count + per-channel entries with masked UUIDs.
+
+On failure, `--dry-run` is suppressed and only the standard
+`config_error` envelope is emitted, exit 2.
+
+
 
 ## 5. Related files
 

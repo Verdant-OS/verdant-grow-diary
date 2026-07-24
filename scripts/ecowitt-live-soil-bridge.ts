@@ -550,7 +550,7 @@ async function runCli(): Promise<void> {
       process.exit(0);
       return;
     }
-    emitConfigError(res.code!, res.message!, res.fix);
+    emitConfigError(res.code!, res.message!, res.fix, res.fields);
     process.exit(2);
     return;
   }

@@ -13,7 +13,14 @@
  * never echoes tent UUIDs or bridge tokens beyond checking for their absence.
  */
 import { spawnSync } from "node:child_process";
-import { readFileSync, readdirSync, existsSync } from "node:fs";
+import {
+  readFileSync,
+  readdirSync,
+  existsSync,
+  mkdtempSync,
+  rmSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 const REPO = resolve(new URL("..", import.meta.url).pathname);

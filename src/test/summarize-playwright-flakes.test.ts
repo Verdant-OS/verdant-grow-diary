@@ -270,7 +270,29 @@ describe("summarize-playwright-flakes CLI --min-failed gate", () => {
   const { tmpdir } = require("node:os");
   const { join } = require("node:path");
 
-  const flakeOnlyReport = flakyReport; // hard-failed=0, flaky=1
+  const flakeOnlyReport = {
+    suites: [
+      {
+        file: "e2e/quicklog.spec.ts",
+        specs: [
+          {
+            title: "logs a watering event",
+            line: 12,
+            tests: [
+              {
+                projectName: "chromium-authed",
+                status: "passed",
+                results: [
+                  { retry: 0, status: "failed", attachments: [] },
+                  { retry: 1, status: "passed", attachments: [] },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  };
   const hardFailedReport = {
     suites: [
       {
@@ -294,6 +316,7 @@ describe("summarize-playwright-flakes CLI --min-failed gate", () => {
       },
     ],
   };
+
 
   const runCli = (report: unknown, minFailed: number) => {
     const dir = mkdtempSync(join(tmpdir(), "pw-flakes-"));

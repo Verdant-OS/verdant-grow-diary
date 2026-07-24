@@ -15,7 +15,7 @@
  *    strings, no raw_payload/service_role/token leakage
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, within, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, within, waitFor, act } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import QuickLog from "@/components/QuickLog";
@@ -182,6 +182,38 @@ describe("Quick Log Environment Check — save behavior", () => {
     const env = details.environment_check as Record<string, unknown>;
     expect(env.temp_c).toBe(24);
     expect(env.room_temp_f).toBe(75.2);
+  });
+
+  it("pins the room-temp unit at first keystroke so a live preference flip mid-draft can't silently reinterpret it", async () => {
+    // Regression test for the temperature-draft "unit race": envRoomTempUnit
+    // used to be derived fresh every render straight from the live, reactive
+    // preference. If the preference flipped (another tab via `storage`, or
+    // same-tab via TEMPERATURE_UNIT_CHANGE_EVENT) while an unsaved digit was
+    // still sitting in the room-temp field, the draft would be silently
+    // reinterpreted under the NEW unit at save time — e.g. a typed "25"
+    // meaning 25°C persisted as ~-3.89°C instead.
+    saveTemperatureUnitPreference("celsius");
+    const dialog = openEnvironmentForm();
+    const ta = dialog.querySelector("textarea") as HTMLTextAreaElement;
+    fireEvent.change(ta, { target: { value: "Reading before the flip." } });
+    fireEvent.change(within(dialog).getByTestId("quick-log-env-room-temp-f"), {
+      target: { value: "25" },
+    });
+    // Preference flips live while the draft is still open (e.g. the grower
+    // changed it in another tab before hitting Save here). The event
+    // synchronously updates React state outside of Testing Library's own
+    // helpers, so it must be wrapped in `act()`.
+    act(() => {
+      saveTemperatureUnitPreference("fahrenheit");
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: /save log/i }));
+    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
+    const payload = saveMock.mock.calls[0]?.[0] as Record<string, unknown>;
+    const details = (payload.p_details ?? {}) as Record<string, unknown>;
+    const env = details.environment_check as Record<string, unknown>;
+    // The ORIGINAL celsius interpretation must win — 25°C, not 25°F.
+    expect(env.temp_c).toBe(25);
+    expect(env.room_temp_f).toBe(77);
   });
 
   it("forwards room temp / humidity / VPD under details.environment_check", async () => {

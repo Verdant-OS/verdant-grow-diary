@@ -5,7 +5,7 @@
  * never touches supabase.rpc / direct table writes from the component.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -354,5 +354,23 @@ describe("QuickLogV2Sheet — structured feeding", () => {
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
     expect(rpcMock).not.toHaveBeenCalled();
     expect(tableMethods.insert).not.toHaveBeenCalled();
+  });
+
+  it("pins the feeding Water temperature draft to its entry unit through a live preference flip", async () => {
+    saveTemperatureUnitPreference("celsius");
+    writeFeedingMock.mockResolvedValue({ ok: true, eventId: "evt-temp-pin", reused: false });
+    renderSheet("plant:plant-1");
+    clickFeed();
+    fillRequiredFeedingFields();
+    fireEvent.change(screen.getByLabelText("Water (°C)"), { target: { value: "18" } });
+
+    act(() => {
+      saveTemperatureUnitPreference("fahrenheit");
+    });
+
+    clickSave();
+    await waitFor(() => expect(writeFeedingMock).toHaveBeenCalledTimes(1));
+    const payload = writeFeedingMock.mock.calls[0][0];
+    expect(payload.water_temp_c).toBe(18);
   });
 });

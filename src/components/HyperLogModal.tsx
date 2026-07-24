@@ -160,6 +160,13 @@ export function HyperLogModal({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const temperatureUnit = useTemperatureUnitPreference();
   const temperatureUnitSymbol = getTemperatureUnitSymbol(temperatureUnit);
+  // Pattern-A draft-input race guard: pins the ACTIVE temperatureUnit at the
+  // moment the raw envTemp draft transitions from empty to non-empty, so a
+  // live preference flip (e.g. from another tab) between typing and Commit
+  // can never silently reinterpret already-typed digits under the new unit.
+  // Cleared back to null whenever the draft returns to empty or the modal
+  // resets.
+  const envTempEntryUnitRef = useRef<TemperatureUnitPreference | null>(null);
 
   // Sync initialAction when modal re-opens with a preselect.
   useEffect(() => {
@@ -182,9 +189,22 @@ export function HyperLogModal({
 
   const updateField = useCallback(
     <K extends keyof HyperLogDemoFormState>(key: K, value: HyperLogDemoFormState[K]) => {
+      if (key === "envTemp") {
+        const nextRaw = String(value);
+        setForm((prev) => {
+          const prevRaw = prev.envTemp;
+          if (prevRaw.trim() === "" && nextRaw.trim() !== "") {
+            envTempEntryUnitRef.current = temperatureUnit;
+          } else if (nextRaw.trim() === "") {
+            envTempEntryUnitRef.current = null;
+          }
+          return { ...prev, [key]: value };
+        });
+        return;
+      }
       setForm((prev) => ({ ...prev, [key]: value }));
     },
-    [],
+    [temperatureUnit],
   );
 
   const handleFiles = useCallback((files: FileList | null) => {
@@ -229,6 +249,7 @@ export function HyperLogModal({
       return [];
     });
     setForm(EMPTY_FORM);
+    envTempEntryUnitRef.current = null;
     setSelected(null);
   }, []);
 
@@ -238,7 +259,7 @@ export function HyperLogModal({
     // draft stores canonical °C. Converted exactly once, right here.
     const committedForm: HyperLogDemoFormState = {
       ...form,
-      envTemp: typedTempToCelsiusInput(form.envTemp, temperatureUnit),
+      envTemp: typedTempToCelsiusInput(form.envTemp, envTempEntryUnitRef.current ?? temperatureUnit),
     };
     onCommit?.(selected, committedForm, { photoCount: photos.length });
     onOpenChange(false);
@@ -250,9 +271,17 @@ export function HyperLogModal({
     onOpenChange(next);
   };
 
+  // Pin read for the live preview line: labels the raw draft with whatever
+  // unit is currently pinned (or the live preference if nothing is pinned
+  // yet), so the preview never relabels itself mid-edit due to an
+  // unrelated preference flip in another tab.
+  const envTempPreviewUnitSymbol = getTemperatureUnitSymbol(
+    envTempEntryUnitRef.current ?? temperatureUnit,
+  );
+
   const timelinePreview = useMemo(
-    () => buildTimelinePreview(selected, form, photos.length, temperatureUnitSymbol),
-    [selected, form, photos.length, temperatureUnitSymbol],
+    () => buildTimelinePreview(selected, form, photos.length, envTempPreviewUnitSymbol),
+    [selected, form, photos.length, envTempPreviewUnitSymbol],
   );
 
   return (

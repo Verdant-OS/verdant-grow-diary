@@ -6,11 +6,11 @@
  *  - Drawer must never render raw payloads, vendor metadata, tokens,
  *    service_role strings, private keys, internal IDs, or unknown keys.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { render, screen, fireEvent, within, act } from "@testing-library/react";
 import DiaryCalendarSection from "@/components/DiaryCalendarSection";
 import { buildDiaryCalendarViewModel } from "@/lib/diaryCalendarViewModel";
 import {
@@ -23,8 +23,16 @@ import {
   DIARY_CALENDAR_DRAWER_PHOTO_ATTACHED,
   DIARY_CALENDAR_DRAWER_SENSOR_LINKED,
 } from "@/lib/diaryCalendarEventDrawerViewModel";
+import {
+  clearTemperatureUnitPreference,
+  saveTemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+beforeEach(() => {
+  clearTemperatureUnitPreference();
+});
 
 function firstEvent(raw: Parameters<typeof buildDiaryCalendarViewModel>[0]) {
   return buildDiaryCalendarViewModel(raw)[0].events[0];
@@ -376,6 +384,38 @@ describe("DiaryCalendarSection — event drawer UI", () => {
     expect(
       within(drawer).getByText(DIARY_CALENDAR_DRAWER_SENSOR_EMPTY),
     ).toBeInTheDocument();
+  });
+
+  it("keeps the open drawer's temperature reactive to a live unit-preference change (no stale cache)", () => {
+    saveTemperatureUnitPreference("celsius");
+    openFirstDrawer([
+      {
+        id: "f1",
+        entry_at: "2026-06-10T09:00:00Z",
+        event_type: "feeding",
+        details: {
+          nutrients: "GH 3-2-1",
+          ec: 1.6,
+          ec_unit: "mS/cm",
+          water_temp_c: 22,
+        },
+      },
+    ]);
+    const drawer = screen.getByTestId("diary-calendar-event-drawer");
+    // Opened while the preference was celsius: raw 22°C shown as 22.0°C.
+    expect(within(drawer).getByText("22.0°C")).toBeInTheDocument();
+
+    // Flip the preference (e.g. from another tab) while the drawer stays
+    // open. This dispatches TEMPERATURE_UNIT_CHANGE_EVENT, which the
+    // live-reactive useTemperatureUnitPreference hook picks up.
+    act(() => {
+      saveTemperatureUnitPreference("fahrenheit");
+    });
+
+    // The drawer must re-derive its displayed value from the raw event
+    // (not replay a formatted-at-open-time snapshot) — 22°C -> 71.6°F.
+    expect(within(drawer).getByText("71.6°F")).toBeInTheDocument();
+    expect(within(drawer).queryByText("22.0°C")).not.toBeInTheDocument();
   });
 
   it("drawer never renders raw_payload/service_role/token/private keys/unknown keys", () => {

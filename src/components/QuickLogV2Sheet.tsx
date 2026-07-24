@@ -294,6 +294,19 @@ export default function QuickLogV2Sheet({
   // rapid re-taps during photo capture/upload cannot enqueue a second
   // insert before the first resolves. Reset in try/finally.
   const photoDiaryInFlightRef = useRef(false);
+  // Pattern-A draft-input race guards (temperature unit reactivity): each
+  // pins the ACTIVE temperatureUnit at the moment its paired raw draft
+  // transitions from empty to non-empty, so a live preference flip (e.g.
+  // from another tab) between typing and Save can never silently
+  // reinterpret already-typed digits under the new unit. Cleared back to
+  // null whenever the draft returns to empty, so a fresh field always
+  // tracks the live preference again. One ref per independently-editable
+  // temperature draft — the manual sensor-snapshot Temp field and the
+  // Water/Feed water-temperature fields can each be pinned at different
+  // times, or not at all.
+  const manualTempEntryUnitRef = useRef<TemperatureUnitPreference | null>(null);
+  const wateringTempEntryUnitRef = useRef<TemperatureUnitPreference | null>(null);
+  const feedingTempEntryUnitRef = useRef<TemperatureUnitPreference | null>(null);
 
   const options = useMemo(() => buildQuickLogV2TargetOptions(tents, plants), [tents, plants]);
 
@@ -403,8 +416,11 @@ export default function QuickLogV2Sheet({
         selectedKey: defaultTargetKey ?? null,
         action: defaultAction,
       });
+      manualTempEntryUnitRef.current = null;
       setFeedingForm(EMPTY_QUICKLOG_FEEDING_FORM);
+      feedingTempEntryUnitRef.current = null;
       setWateringForm(EMPTY_QUICKLOG_WATERING_FORM);
+      wateringTempEntryUnitRef.current = null;
       setMaturityEvidenceForm(EMPTY_QUICK_LOG_MATURITY_EVIDENCE_FORM);
       setFeedingDefaultsApplied(false);
       setLocalError(null);
@@ -458,12 +474,14 @@ export default function QuickLogV2Sheet({
     // a stale line/products list can't ride along into a note/water save.
     if (prev === "feed") {
       setFeedingForm(EMPTY_QUICKLOG_FEEDING_FORM);
+      feedingTempEntryUnitRef.current = null;
       setFeedingDefaultsApplied(false);
     }
     // Water-only measurements and manual observations never ride along when
     // the grower changes actions. Returning to Water starts a fresh record.
     if (prev === "water") {
       setWateringForm(EMPTY_QUICKLOG_WATERING_FORM);
+      wateringTempEntryUnitRef.current = null;
     }
     // Entering feed → maturity evidence surface hides; clear its draft
     // so stale plant-maturity notes don't get retained under the hood.
@@ -713,7 +731,10 @@ export default function QuickLogV2Sheet({
         // unit; canonical °C is produced exactly once, right here.
         form: {
           ...feedingForm,
-          waterTempC: typedTempToCelsiusInput(feedingForm.waterTempC, temperatureUnit),
+          waterTempC: typedTempToCelsiusInput(
+            feedingForm.waterTempC,
+            feedingTempEntryUnitRef.current ?? temperatureUnit,
+          ),
         },
       });
       if (mapped.ok !== true) {
@@ -801,10 +822,16 @@ export default function QuickLogV2Sheet({
         // is never re-converted.
         form: {
           ...wateringForm,
-          waterTempC: typedTempToCelsiusInput(wateringForm.waterTempC, temperatureUnit),
+          waterTempC: typedTempToCelsiusInput(
+            wateringForm.waterTempC,
+            wateringTempEntryUnitRef.current ?? temperatureUnit,
+          ),
         },
         note: form.note,
-        temperatureC: typedTempToCelsiusInput(form.temperatureC, temperatureUnit),
+        temperatureC: typedTempToCelsiusInput(
+          form.temperatureC,
+          manualTempEntryUnitRef.current ?? temperatureUnit,
+        ),
         humidityPct: form.humidityPct,
         vpdKpa: form.vpdKpa,
         baseDetails: maturityDetails,
@@ -896,7 +923,10 @@ export default function QuickLogV2Sheet({
         note: form.note,
         // Unit seam: manual snapshot temp was typed in the preference unit;
         // canonical °C is produced exactly once, right here.
-        temperatureC: typedTempToCelsiusInput(form.temperatureC, temperatureUnit),
+        temperatureC: typedTempToCelsiusInput(
+          form.temperatureC,
+          manualTempEntryUnitRef.current ?? temperatureUnit,
+        ),
         humidityPct: form.humidityPct,
         vpdKpa: form.vpdKpa,
         details: maturityDetails,
@@ -1082,8 +1112,11 @@ export default function QuickLogV2Sheet({
       ...EMPTY_QUICKLOG_V2_FORM,
       selectedKey: prev.selectedKey,
     }));
+    manualTempEntryUnitRef.current = null;
     setFeedingForm(EMPTY_QUICKLOG_FEEDING_FORM);
+    feedingTempEntryUnitRef.current = null;
     setWateringForm(EMPTY_QUICKLOG_WATERING_FORM);
+    wateringTempEntryUnitRef.current = null;
     setWateringRetryPending(false);
     setWateringSubmissionLocked(false);
     wateringRetrySubmissionRef.current = null;
@@ -1305,11 +1338,19 @@ export default function QuickLogV2Sheet({
               <QuickLogFeedingForm
                 value={feedingForm}
                 onChange={(next) => {
+                  const prevWaterTempC = feedingForm.waterTempC.trim();
+                  const nextWaterTempC = next.waterTempC.trim();
+                  if (prevWaterTempC === "" && nextWaterTempC !== "") {
+                    feedingTempEntryUnitRef.current = temperatureUnit;
+                  } else if (nextWaterTempC === "") {
+                    feedingTempEntryUnitRef.current = null;
+                  }
                   setFeedingForm(next);
                   setLocalError(null);
                 }}
                 disabled={feedingSaving || wateringSaving || saving || wateringSubmissionLocked}
                 defaultsApplied={feedingDefaultsApplied}
+                entryTemperatureUnit={feedingTempEntryUnitRef.current ?? temperatureUnit}
               />
             </div>
           )}
@@ -1322,9 +1363,17 @@ export default function QuickLogV2Sheet({
                 disabled={wateringSaving || feedingSaving || saving || wateringSubmissionLocked}
                 onChange={(next) => {
                   if (wateringSubmissionLockedRef.current) return;
+                  const prevWaterTempC = wateringForm.waterTempC.trim();
+                  const nextWaterTempC = next.waterTempC.trim();
+                  if (prevWaterTempC === "" && nextWaterTempC !== "") {
+                    wateringTempEntryUnitRef.current = temperatureUnit;
+                  } else if (nextWaterTempC === "") {
+                    wateringTempEntryUnitRef.current = null;
+                  }
                   setWateringForm(next);
                   setLocalError(null);
                 }}
+                entryTemperatureUnit={wateringTempEntryUnitRef.current ?? temperatureUnit}
               />
               {wateringRetryPending && (
                 <p
@@ -1555,7 +1604,15 @@ export default function QuickLogV2Sheet({
                     inputMode="decimal"
                     value={form.temperatureC}
                     disabled={wateringSubmissionLocked}
-                    onChange={(e) => setField("temperatureC", e.target.value)}
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      if (form.temperatureC.trim() === "" && next.trim() !== "") {
+                        manualTempEntryUnitRef.current = temperatureUnit;
+                      } else if (next.trim() === "") {
+                        manualTempEntryUnitRef.current = null;
+                      }
+                      setField("temperatureC", next);
+                    }}
                   />
                 </div>
                 <div>

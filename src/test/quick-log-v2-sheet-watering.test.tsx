@@ -620,4 +620,57 @@ describe("QuickLogV2Sheet — structured watering", () => {
     expect((screen.getByLabelText("Volume (ml)") as HTMLInputElement).value).toBe("");
     expect((screen.getByLabelText("Input EC") as HTMLInputElement).value).toBe("");
   });
+
+  it("pins the manual sensor snapshot Temp draft to its entry unit through a live preference flip (Water save path)", async () => {
+    saveTemperatureUnitPreference("celsius");
+    renderSheet();
+    clickWater();
+    enterVolume("500");
+    fireEvent.change(screen.getByLabelText("Temp (°C)"), { target: { value: "25" } });
+
+    act(() => {
+      saveTemperatureUnitPreference("fahrenheit");
+    });
+
+    clickSave();
+    await waitFor(() => expect(wateringWriterMock).toHaveBeenCalledTimes(1));
+    const payload = wateringWriterMock.mock.calls[0][0];
+    expect(payload.sensor_snapshot.metrics.temperature_c).toBe(25);
+  });
+
+  it("pins the manual sensor snapshot Temp draft to its entry unit through a live preference flip (Note save path)", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: { ok: true, grow_event_id: "note-event-temp-pin", environment_event_id: null },
+      error: null,
+    });
+    saveTemperatureUnitPreference("celsius");
+    renderSheet(); // defaults to action "note"
+    fireEvent.change(screen.getByLabelText("Temp (°C)"), { target: { value: "25" } });
+
+    act(() => {
+      saveTemperatureUnitPreference("fahrenheit");
+    });
+
+    clickSave();
+    await waitFor(() => expect(rpcMock).toHaveBeenCalled());
+    const [, payload] = rpcMock.mock.calls[0] as [string, { p_temperature_c: number | null }];
+    expect(payload.p_temperature_c).toBe(25);
+  });
+
+  it("pins the Water temperature draft to its entry unit through a live preference flip", async () => {
+    saveTemperatureUnitPreference("celsius");
+    renderSheet();
+    clickWater();
+    enterVolume("500");
+    fireEvent.change(screen.getByLabelText("Water temperature (°C)"), { target: { value: "18" } });
+
+    act(() => {
+      saveTemperatureUnitPreference("fahrenheit");
+    });
+
+    clickSave();
+    await waitFor(() => expect(wateringWriterMock).toHaveBeenCalledTimes(1));
+    const payload = wateringWriterMock.mock.calls[0][0];
+    expect(payload.water_temp_c).toBe(18);
+  });
 });

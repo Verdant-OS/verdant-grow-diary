@@ -58,6 +58,13 @@ interface Props {
   onChange: (next: QuickLogFeedingFormState) => void;
   disabled?: boolean;
   defaultsApplied?: boolean;
+  /**
+   * The temperatureUnit pinned at the moment the grower started typing the
+   * Water temperature draft (set by the parent QuickLogV2Sheet). Falls back
+   * to the live preference when no draft is in progress, so this preview
+   * always agrees with what the write seam will actually save.
+   */
+  entryTemperatureUnit?: TemperatureUnitPreference;
 }
 
 export default function QuickLogFeedingForm({
@@ -65,13 +72,18 @@ export default function QuickLogFeedingForm({
   onChange,
   disabled,
   defaultsApplied = false,
+  entryTemperatureUnit,
 }: Props) {
   const temperatureUnit = useTemperatureUnitPreference();
   const temperatureUnitSymbol = getTemperatureUnitSymbol(temperatureUnit);
   // Display-side canonicalization only: the write seam converts from the
   // raw typed value itself (QuickLogV2Sheet), never from this derived copy,
-  // so no value is ever converted twice.
-  const canonicalWaterTempC = typedTempToCelsiusInput(value.waterTempC, temperatureUnit);
+  // so no value is ever converted twice. Uses the entry-pinned unit (when
+  // available) so this preview never disagrees with what will be saved.
+  const canonicalWaterTempC = typedTempToCelsiusInput(
+    value.waterTempC,
+    entryTemperatureUnit ?? temperatureUnit,
+  );
 
   const setField = <K extends keyof QuickLogFeedingFormState>(
     k: K,

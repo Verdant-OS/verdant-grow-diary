@@ -261,10 +261,21 @@ const isMain =
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+export interface ConfigValidateFieldError {
+  path: string;
+  message: string;
+}
+
 export interface ConfigValidateResult {
   ok: boolean;
   code?: string;
   message?: string;
+  /**
+   * Present only for failures that can be attributed to specific entries
+   * inside `ECOWITT_SOIL_CHANNEL_MAP_JSON`. Stable structural paths only
+   * (e.g. `$.soilmoisture2.tent_id`) — never contains raw UUIDs or tokens.
+   */
+  fields?: ConfigValidateFieldError[];
   /** Present only when includeFixHints is true. Concise operator remedy. */
   fix?: string;
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-// @ts-expect-error - .mjs script exports pure helpers for testing.
+// @ts-ignore - .mjs script exports pure helpers for testing.
 import { buildSummary, classifyTest } from "../../scripts/summarize-playwright-flakes.mjs";
 
 const flakyReport = {

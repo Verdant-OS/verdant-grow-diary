@@ -32,6 +32,11 @@ on:
         description: "Playwright retry count per test (default 1 in CI). Increase to 2 or 3 for deeper flake triage."
         required: false
         default: "1"
+      pr_comment_min_failed:
+        description: "Minimum hard-failure count required to post the PR comment. 0 = always post; 1 = only when at least one test stays red after retries."
+        required: false
+        default: "1"
+
   push:
     branches: [verdant-grow-diary]
     paths:

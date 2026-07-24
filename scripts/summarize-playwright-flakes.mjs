@@ -39,6 +39,7 @@ function parseArgs(argv) {
     bundleUrl: "",
     runUrl: "",
     failOnFlake: false,
+    minFailed: 0,
   };
   for (const raw of argv) {
     if (raw.startsWith("--report=")) args.reportPath = raw.slice("--report=".length);
@@ -50,15 +51,21 @@ function parseArgs(argv) {
     else if (raw.startsWith("--bundle-url=")) args.bundleUrl = raw.slice("--bundle-url=".length);
     else if (raw.startsWith("--run-url=")) args.runUrl = raw.slice("--run-url=".length);
     else if (raw === "--fail-on-flake") args.failOnFlake = true;
+    else if (raw.startsWith("--min-failed=")) {
+      const raw2 = raw.slice("--min-failed=".length).trim();
+      const parsed = Number.parseInt(raw2, 10);
+      args.minFailed = Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+    }
     else if (raw === "--help" || raw === "-h") {
       process.stdout.write(
-        "Usage: summarize-playwright-flakes.mjs --report=<path> [--out=<path>] [--pr-comment=<path>] [--traces-url=<url>] [--media-url=<url>] [--report-url=<url>] [--bundle-url=<url>] [--run-url=<url>] [--fail-on-flake]\n",
+        "Usage: summarize-playwright-flakes.mjs --report=<path> [--out=<path>] [--pr-comment=<path>] [--traces-url=<url>] [--media-url=<url>] [--report-url=<url>] [--bundle-url=<url>] [--run-url=<url>] [--fail-on-flake] [--min-failed=<N>]\n",
       );
       process.exit(0);
     }
   }
   return args;
 }
+
 
 /**
  * Walk the Playwright JSON report structure and collect every leaf test.

@@ -161,6 +161,37 @@ describe("mapPlantRow", () => {
     expect(p.medium).toBeNull();
     expect(p.potSize).toBeNull();
   });
+
+  describe("plantType fallback (never a silent photoperiod default)", () => {
+    it("defaults to 'unknown' when plant_type is missing from the row", () => {
+      const { plant_type: _omit, ...rowWithoutType } = plantRow;
+      void _omit;
+      const p = mapPlantRow(rowWithoutType as unknown as typeof plantRow);
+      expect(p.plantType).toBe("unknown");
+    });
+    it("defaults to 'unknown' when plant_type is null", () => {
+      const p = mapPlantRow({ ...plantRow, plant_type: null as unknown as string });
+      expect(p.plantType).toBe("unknown");
+    });
+    it("defaults to 'unknown' when plant_type is blank or whitespace", () => {
+      expect(mapPlantRow({ ...plantRow, plant_type: "" as unknown as string }).plantType).toBe(
+        "unknown",
+      );
+      expect(mapPlantRow({ ...plantRow, plant_type: "   " as unknown as string }).plantType).toBe(
+        "unknown",
+      );
+    });
+    it("defaults to 'unknown' for unrecognized values (never silently photoperiod)", () => {
+      const p = mapPlantRow({ ...plantRow, plant_type: "sativa" as unknown as string });
+      expect(p.plantType).toBe("unknown");
+    });
+    it("preserves declared autoflower and photoperiod, normalizing synonyms/case", () => {
+      expect(mapPlantRow({ ...plantRow, plant_type: "autoflower" }).plantType).toBe("autoflower");
+      expect(mapPlantRow({ ...plantRow, plant_type: "AUTO" }).plantType).toBe("autoflower");
+      expect(mapPlantRow({ ...plantRow, plant_type: "photoperiod" }).plantType).toBe("photoperiod");
+      expect(mapPlantRow({ ...plantRow, plant_type: "Photo" }).plantType).toBe("photoperiod");
+    });
+  });
 });
 
 describe("mapSensorReadingRow", () => {

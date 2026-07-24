@@ -638,26 +638,53 @@ export function assertSingleTentSoilChannelMap(
   defaultTentId?: string | null,
 ): void {
   if (!map || typeof map !== "object") return;
-  const tents = new Set<string>();
-  for (const target of Object.values(map)) {
+
+  // Collect (channelKey, tent_id) pairs in natural channel order so that
+  // reference-tent selection and reported field paths are deterministic.
+  const orderedKeys = Object.keys(map).sort(compareChannelKeys);
+  const perChannel: Array<{ key: string; tent: string }> = [];
+  for (const key of orderedKeys) {
+    const target = map[key];
     if (target && typeof target.tent_id === "string" && target.tent_id) {
-      tents.add(target.tent_id);
+      perChannel.push({ key, tent: target.tent_id });
     }
   }
-  if (tents.size === 0) return;
+  if (perChannel.length === 0) return;
+
+  const tents = new Set(perChannel.map((c) => c.tent));
   if (tents.size > 1) {
+    // Reference tent = tent of the first-in-natural-order channel; every
+    // channel with a different tent_id is reported by its structural path.
+    const referenceTent = perChannel[0].tent;
+    const fields: EcowittSoilChannelMapSchemaError[] = perChannel
+      .filter((c) => c.tent !== referenceTent)
+      .slice(0, 20)
+      .map((c) => ({
+        path: `$.${c.key}.tent_id`,
+        message: "tent_id differs from tent_id used by other channels in the map",
+      }));
     throw new EcowittBridgeConfigError(
       "mixed_tent_channel_map",
       "EcoWitt bridge configuration must map every soil channel to one tent and match VERDANT_TENT_ID.",
+      fields,
     );
   }
+
   const expected = typeof defaultTentId === "string" ? defaultTentId.trim() : "";
   if (expected) {
     const [only] = tents;
     if (only !== expected) {
+      const fields: EcowittSoilChannelMapSchemaError[] = perChannel
+        .filter((c) => c.tent !== expected)
+        .slice(0, 20)
+        .map((c) => ({
+          path: `$.${c.key}.tent_id`,
+          message: "tent_id does not match VERDANT_TENT_ID",
+        }));
       throw new EcowittBridgeConfigError(
         "channel_map_tent_mismatch",
         "EcoWitt bridge configuration must map every soil channel to one tent and match VERDANT_TENT_ID.",
+        fields,
       );
     }
   }

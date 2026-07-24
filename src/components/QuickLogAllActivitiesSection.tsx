@@ -51,6 +51,11 @@ import {
   QUICK_LOG_DETAIL_TEXT_MAX,
 } from "@/lib/quickLogActivityDetailFields";
 import {
+  buildQuickLogSubmissionTimestamps,
+  seedLoggedAtIso,
+  validateOccurredAtInput,
+} from "@/lib/quickLogTimestampRules";
+import {
   buildDailyCheckSavedItems,
   type DailyCheckSavedItem,
   type DailyCheckSavedSource,
@@ -177,6 +182,13 @@ export default function QuickLogAllActivitiesSection({
   // Generic per-activity structured detail values (e.g. training technique),
   // keyed by field spec key. Sanitized before persistence.
   const [detailValues, setDetailValues] = useState<Record<string, string>>({});
+  // Dual timestamps (founder-locked model): occurredAtLocal = backdatable
+  // "when it happened" (datetime-local; blank = "now" → server stamps commit
+  // time); loggedAtIso = "Captured" — seeded when the activity form OPENS,
+  // overridable, persisted as details.logged_at (the report/calendar grouping
+  // key). Both are frozen at submit beside the idempotency key (#317 hash).
+  const [occurredAtLocal, setOccurredAtLocal] = useState("");
+  const [loggedAtIso, setLoggedAtIso] = useState("");
   // Photo activity: a real image is REQUIRED before Save — a photo entry with
   // no image must never be confirmable. Uploaded to the private diary-photos
   // bucket; the diary row's photo_url column carries the bare storage path.
@@ -202,6 +214,8 @@ export default function QuickLogAllActivitiesSection({
     setHarvestDry("");
     setHarvestUnit("g");
     setDetailValues({});
+    setOccurredAtLocal("");
+    setLoggedAtIso("");
     setPhotoFile(null);
     setErrorReason(null);
     setErrorForActivity(null);
@@ -233,6 +247,12 @@ export default function QuickLogAllActivitiesSection({
   const detailNumbersInvalid = detailNumberValidations.some((v) => !v.ok);
   const firstDetailNumberError =
     detailNumberValidations.find((v) => !v.ok)?.error ?? null;
+  // Blocking gate for the backdatable happened-at field (unparseable or
+  // future values must block, never silently reinterpret).
+  const occurredAtValidation = useMemo(
+    () => validateOccurredAtInput(occurredAtLocal, Date.now()),
+    [occurredAtLocal],
+  );
   const selectedAvailability = useMemo(
     () =>
       selected
@@ -290,6 +310,9 @@ export default function QuickLogAllActivitiesSection({
       setHarvestDry("");
       setHarvestUnit("g");
       setDetailValues({});
+      setOccurredAtLocal("");
+      // "Captured" seeds at the moment the capture surface opens.
+      setLoggedAtIso(seedLoggedAtIso(Date.now()));
       setPhotoFile(null);
     },
     [
@@ -365,6 +388,11 @@ export default function QuickLogAllActivitiesSection({
       setErrorForActivity(selected.id);
       return;
     }
+    if (!occurredAtValidation.ok) {
+      setErrorReason(occurredAtValidation.error ?? "Fix the happened-at field before saving.");
+      setErrorForActivity(selected.id);
+      return;
+    }
 
     // Harvest optional weight details — sanitized in the shared rules
     // module. Empty / invalid / negative values are dropped, never sent.
@@ -409,6 +437,13 @@ export default function QuickLogAllActivitiesSection({
 
     try {
       const idempotencyKey = newIdempotencyKey(selected.id);
+      // Freeze BOTH timestamps once per logical submission, beside the key
+      // (#317: the event route hashes p_occurred_at + p_details for dedupe).
+      const submissionTimestamps = buildQuickLogSubmissionTimestamps({
+        loggedAtRaw: loggedAtIso,
+        occurredAtRaw: occurredAtLocal,
+        now: Date.now(),
+      });
       if (selected.id === "photo") {
         // Photo goes diary-only through the proven QuickLog photo-attachment
         // path (upload to the private diary-photos bucket, then one
@@ -449,6 +484,7 @@ export default function QuickLogAllActivitiesSection({
           for (const [k, v] of Object.entries(extraDetails)) {
             if (typeof v === "string") photoExtraDetails[k] = v;
           }
+          photoExtraDetails.logged_at = submissionTimestamps.loggedAtIso;
           const entryResult = await createQuickLogPhotoDiaryEntry({
             growId: capturedTarget.growId,
             tentId: capturedTarget.tentId,
@@ -462,6 +498,9 @@ export default function QuickLogAllActivitiesSection({
             eventType: "photo",
             extraDetails:
               Object.keys(photoExtraDetails).length > 0 ? photoExtraDetails : null,
+            // entry_at honors a backdated happened-at; defaults to now.
+            now: () =>
+              new Date(submissionTimestamps.occurredAtIso ?? Date.now()),
           });
           if (!entryResult.ok) {
             // (strictNullChecks is off in this app config, so cast the failure
@@ -511,6 +550,8 @@ export default function QuickLogAllActivitiesSection({
           note: note.trim().length > 0 ? note.trim() : null,
           idempotencyKey,
           extraDetails: Object.keys(extraDetails).length > 0 ? extraDetails : null,
+          occurredAt: submissionTimestamps.occurredAtIso,
+          loggedAt: submissionTimestamps.loggedAtIso,
         });
 
         if (!result.ok) {
@@ -550,6 +591,8 @@ export default function QuickLogAllActivitiesSection({
       setHarvestDry("");
       setHarvestUnit("g");
       setDetailValues({});
+      setOccurredAtLocal("");
+      setLoggedAtIso("");
       setPhotoFile(null);
       setSelectedDraft(null);
       setErrorReason(null);
@@ -579,6 +622,9 @@ export default function QuickLogAllActivitiesSection({
     detailValues,
     detailNumbersInvalid,
     firstDetailNumberError,
+    occurredAtValidation,
+    occurredAtLocal,
+    loggedAtIso,
     user,
     photoFile,
     onSaveStart,
@@ -742,6 +788,78 @@ export default function QuickLogAllActivitiesSection({
                   )}
                 </div>
               ))}
+            </div>
+          )}
+
+          {selected.id === "training" && (
+            <div
+              className="grid grid-cols-1 sm:grid-cols-2 gap-2"
+              data-testid={`${testIdPrefix}-timestamps`}
+            >
+              <div className="space-y-1">
+                <Label
+                  htmlFor={`${testIdPrefix}-occurred-at`}
+                  className="text-[11px] text-muted-foreground"
+                >
+                  Happened at (optional — blank means now)
+                </Label>
+                <Input
+                  id={`${testIdPrefix}-occurred-at`}
+                  data-testid={`${testIdPrefix}-occurred-at`}
+                  type="datetime-local"
+                  value={occurredAtLocal}
+                  onChange={(e) => {
+                    if (isMutationBlocked()) return;
+                    setOccurredAtLocal(e.target.value);
+                  }}
+                  disabled={mutationBlocked}
+                  aria-invalid={!occurredAtValidation.ok}
+                  className="text-sm"
+                />
+                {occurredAtValidation.error && (
+                  <p
+                    role="alert"
+                    className="text-[11px] text-destructive"
+                    data-testid={`${testIdPrefix}-occurred-at-error`}
+                  >
+                    {occurredAtValidation.error}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-1">
+                <Label
+                  htmlFor={`${testIdPrefix}-logged-at`}
+                  className="text-[11px] text-muted-foreground"
+                >
+                  Captured (when you logged this)
+                </Label>
+                <Input
+                  id={`${testIdPrefix}-logged-at`}
+                  data-testid={`${testIdPrefix}-logged-at`}
+                  type="datetime-local"
+                  // Seeded at form open as ISO; datetime-local wants the
+                  // local wall-clock minute slice — derive it for display and
+                  // store the grower's override back as the raw local string
+                  // (the freeze point converts faithfully at submit).
+                  value={
+                    loggedAtIso.includes("T") && loggedAtIso.endsWith("Z")
+                      ? (() => {
+                          const d = new Date(loggedAtIso);
+                          const pad = (n: number) => String(n).padStart(2, "0");
+                          return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(
+                            d.getDate(),
+                          )}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                        })()
+                      : loggedAtIso
+                  }
+                  onChange={(e) => {
+                    if (isMutationBlocked()) return;
+                    setLoggedAtIso(e.target.value);
+                  }}
+                  disabled={mutationBlocked}
+                  className="text-sm"
+                />
+              </div>
             </div>
           )}
 
@@ -955,7 +1073,8 @@ export default function QuickLogAllActivitiesSection({
                 (requiresNote && note.trim().length === 0) ||
                 (selected.id === "harvest" && harvestWeightsInvalid) ||
                 (selected.id === "photo" && !photoFile) ||
-                detailNumbersInvalid
+                detailNumbersInvalid ||
+                !occurredAtValidation.ok
               }
               data-testid={`${testIdPrefix}-save`}
             >

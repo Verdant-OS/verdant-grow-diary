@@ -115,6 +115,7 @@ describe("Harvest Quick Log form", () => {
     expect(args.p_details).toEqual({
       harvest: { wetWeight: "120", weightUnit: "g" },
       event_type: "harvest",
+      logged_at: expect.any(String),
     });
 
     await waitFor(() => expect(events.length).toBe(1));
@@ -161,8 +162,11 @@ describe("Harvest Quick Log form", () => {
     const args = rpcMock.mock.calls[0][1] as Record<string, unknown>;
     expect(args.p_event_type).toBe("harvest");
     expect(args.p_note).toBe("Just a note");
-    // No harvest weights → no harvest envelope; only the diary event_type
-    // stamp remains (badge recovery on the plant-scoped read layer).
-    expect(args.p_details).toEqual({ event_type: "harvest" });
+    // No harvest weights → no harvest envelope; the diary event_type stamp
+    // and the "Captured" logged_at remain.
+    expect(args.p_details).toEqual({
+      event_type: "harvest",
+      logged_at: expect.any(String),
+    });
   });
 });

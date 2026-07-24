@@ -103,13 +103,17 @@ describe("QuickLog harvest → Vocab A→B persistence wiring", () => {
     expect(args.p_details).toEqual({
       harvest: { wetWeight: "120", dryWeight: "22", weightUnit: "g" },
       event_type: "harvest",
+      logged_at: expect.any(String),
     });
   });
 
   it("empty wet/dry with lb unit omits harvest entirely (no fake 0 g)", async () => {
     const args = await saveHarvest("", "", "lb");
-    // No weights → no harvest envelope; only the diary event_type stamp.
-    expect(args.p_details).toEqual({ event_type: "harvest" });
+    // No weights → no harvest envelope; the event_type + logged_at stamps remain.
+    expect(args.p_details).toEqual({
+      event_type: "harvest",
+      logged_at: expect.any(String),
+    });
   });
 
   it("dry-only kg entry stamps dry grams, not wet", async () => {

@@ -394,6 +394,63 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     expect(screen.queryByTestId("quick-log-all-activities-saved-item")).toBeNull();
   });
 
+  it("Training backdate: happened-at forwards as p_occurred_at; Captured rides details.logged_at", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: { ok: true, grow_event_id: "e-ts" },
+      error: null,
+    });
+    mountSection();
+    selectActivity("training");
+    await screen.findByTestId("quick-log-all-activities-form");
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-occurred-at"), {
+      target: { value: "2026-07-20T09:30" },
+    });
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-note"), {
+      target: { value: "topped three days ago, logging now" },
+    });
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
+
+    await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(1));
+    const [, args] = rpcMock.mock.calls[0];
+    // Backdated moment converts via the local clock (tz-naive datetime-local).
+    expect(args.p_occurred_at).toBe(new Date("2026-07-20T09:30").toISOString());
+    // "Captured" (form-open seed) persists for report/calendar grouping.
+    expect(typeof args.p_details.logged_at).toBe("string");
+    expect(Number.isFinite(Date.parse(args.p_details.logged_at))).toBe(true);
+  });
+
+  it("Training blank happened-at sends null so the server stamps commit time (today's behavior)", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: { ok: true, grow_event_id: "e-ts2" },
+      error: null,
+    });
+    mountSection();
+    await saveWithNote("training", "just now");
+    await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(1));
+    const [, args] = rpcMock.mock.calls[0];
+    expect(args.p_occurred_at).toBeNull();
+  });
+
+  it("Training future happened-at BLOCKS the save with an inline error (no RPC)", async () => {
+    mountSection();
+    selectActivity("training");
+    await screen.findByTestId("quick-log-all-activities-form");
+    const future = new Date(Date.now() + 60 * 60 * 1000);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const futureLocal = `${future.getFullYear()}-${pad(future.getMonth() + 1)}-${pad(
+      future.getDate(),
+    )}T${pad(future.getHours())}:${pad(future.getMinutes())}`;
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-occurred-at"), {
+      target: { value: futureLocal },
+    });
+    expect(
+      screen.getByTestId("quick-log-all-activities-occurred-at-error"),
+    ).toHaveTextContent(/future/i);
+    expect(screen.getByTestId("quick-log-all-activities-save")).toBeDisabled();
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+
   it("Training drops an unchosen (blank) technique — no technique key in p_details", async () => {
     rpcMock.mockResolvedValueOnce({
       data: { ok: true, grow_event_id: "e-train2" },
@@ -485,7 +542,10 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     expect(args.p_event_type).toBe("training");
     // The diary companion carries its type inside details (badge recovery);
     // no subtype/technique for plain training with nothing chosen.
-    expect(args.p_details).toEqual({ event_type: "training" });
+    expect(args.p_details).toEqual({
+      event_type: "training",
+      logged_at: expect.any(String),
+    });
   });
 
   it("Defoliation → event_type=training + details.subtype=defoliation (fence)", async () => {
@@ -502,6 +562,7 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
       subtype: "defoliation",
       technique: "defoliation",
       event_type: "training",
+      logged_at: expect.any(String),
     });
   });
 
@@ -533,7 +594,11 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     await saveWithNote("issue_observation", "yellowing on fan leaf");
     const [, args] = rpcMock.mock.calls[0];
     expect(args.p_event_type).toBe("observation");
-    expect(args.p_details).toEqual({ subtype: "issue", event_type: "observation" });
+    expect(args.p_details).toEqual({
+      subtype: "issue",
+      event_type: "observation",
+      logged_at: expect.any(String),
+    });
   });
 });
 
@@ -794,6 +859,7 @@ describe("QuickLogAllActivitiesSection — Harvest v1b.next hardening", () => {
     expect(args.p_details).toEqual({
       harvest: { wetWeight: "12.5", dryWeight: "3.25", weightUnit: "g" },
       event_type: "harvest",
+      logged_at: expect.any(String),
     });
     const items = await screen.findAllByTestId(
       "quick-log-all-activities-saved-item",

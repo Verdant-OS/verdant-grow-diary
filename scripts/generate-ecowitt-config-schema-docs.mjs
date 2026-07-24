@@ -97,6 +97,64 @@ const ENV_VARS = [
       "Alternative way to enable dry-run mode without passing `--dry-run`. Any other value is ignored.",
     example: "1",
   },
+  {
+    name: "ECOWITT_MQTT_URL",
+    type: "mqtt(s):// URL",
+    required: "when running (either this OR HOST+PORT)",
+    default: "unset",
+    validator: "runMqttBridge (URL takes precedence over HOST+PORT)",
+    description:
+      "Full MQTT broker URL. When set, `ECOWITT_MQTT_HOST` and `ECOWITT_MQTT_PORT` are ignored.",
+    example: "mqtt://broker.local:1883",
+  },
+  {
+    name: "ECOWITT_MQTT_HOST",
+    type: "hostname",
+    required: false,
+    default: "127.0.0.1",
+    validator: "runMqttBridge (used only when `ECOWITT_MQTT_URL` is unset)",
+    description: "MQTT broker hostname. Combined with `ECOWITT_MQTT_PORT` to form the connection URL.",
+    example: "broker.local",
+  },
+  {
+    name: "ECOWITT_MQTT_PORT",
+    type: "port number (string)",
+    required: false,
+    default: "1883",
+    validator: "runMqttBridge (used only when `ECOWITT_MQTT_URL` is unset)",
+    description: "MQTT broker port. Combined with `ECOWITT_MQTT_HOST`.",
+    example: "1883",
+  },
+  {
+    name: "ECOWITT_MQTT_TOPIC",
+    type: "MQTT topic",
+    required: false,
+    default: "ecowitt/grow",
+    validator: "runMqttBridge (passthrough)",
+    description:
+      "MQTT topic the bridge subscribes to for EcoWitt raw payloads. Must match the topic configured on the EcoWitt gateway.",
+    example: "ecowitt/grow",
+  },
+  {
+    name: "ECOWITT_MQTT_USERNAME",
+    type: "string",
+    required: false,
+    default: "unset",
+    validator: "runMqttBridge (passthrough)",
+    description:
+      "Optional MQTT broker username. Only `username_present: true|false` is echoed in logs — the value itself is never printed.",
+    example: "verdant-bridge",
+  },
+  {
+    name: "ECOWITT_MQTT_PASSWORD",
+    type: "secret string",
+    required: false,
+    default: "unset",
+    validator: "runMqttBridge (passthrough)",
+    description:
+      "Optional MQTT broker password. Only `password_present: true|false` is echoed in logs — the value itself is never printed.",
+    example: "••••••••",
+  },
 ];
 
 function loadSchema() {

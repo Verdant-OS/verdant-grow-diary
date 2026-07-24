@@ -32,15 +32,27 @@ function parseArgs(argv) {
   const args = {
     reportPath: "e2e/results/playwright-report.json",
     outPath: null,
+    prCommentPath: null,
+    tracesUrl: "",
+    mediaUrl: "",
+    reportUrl: "",
+    bundleUrl: "",
+    runUrl: "",
     failOnFlake: false,
   };
   for (const raw of argv) {
     if (raw.startsWith("--report=")) args.reportPath = raw.slice("--report=".length);
     else if (raw.startsWith("--out=")) args.outPath = raw.slice("--out=".length);
+    else if (raw.startsWith("--pr-comment=")) args.prCommentPath = raw.slice("--pr-comment=".length);
+    else if (raw.startsWith("--traces-url=")) args.tracesUrl = raw.slice("--traces-url=".length);
+    else if (raw.startsWith("--media-url=")) args.mediaUrl = raw.slice("--media-url=".length);
+    else if (raw.startsWith("--report-url=")) args.reportUrl = raw.slice("--report-url=".length);
+    else if (raw.startsWith("--bundle-url=")) args.bundleUrl = raw.slice("--bundle-url=".length);
+    else if (raw.startsWith("--run-url=")) args.runUrl = raw.slice("--run-url=".length);
     else if (raw === "--fail-on-flake") args.failOnFlake = true;
     else if (raw === "--help" || raw === "-h") {
       process.stdout.write(
-        "Usage: summarize-playwright-flakes.mjs --report=<path> [--out=<path>] [--fail-on-flake]\n",
+        "Usage: summarize-playwright-flakes.mjs --report=<path> [--out=<path>] [--pr-comment=<path>] [--traces-url=<url>] [--media-url=<url>] [--report-url=<url>] [--bundle-url=<url>] [--run-url=<url>] [--fail-on-flake]\n",
       );
       process.exit(0);
     }
@@ -112,6 +124,22 @@ export function classifyTest(test) {
     }
   }
 
+  // Per-attempt breakdown for the PR-comment view: every attempt keeps its
+  // status + full attachment list (trace zip, screenshot, video), grouped by
+  // retry index so users can jump straight to the exact attempt's evidence.
+  const attemptResults = results.map((r) => ({
+    retry: r?.retry ?? 0,
+    status: String(r?.status ?? ""),
+    durationMs: typeof r?.duration === "number" ? r.duration : null,
+    attachments: (Array.isArray(r?.attachments) ? r.attachments : [])
+      .filter(Boolean)
+      .map((a) => ({
+        name: String(a.name ?? "attachment"),
+        contentType: String(a.contentType ?? ""),
+        path: a.path ? String(a.path) : "",
+      })),
+  }));
+
   return {
     file: test.file,
     title: test.title,
@@ -122,6 +150,7 @@ export function classifyTest(test) {
     failedAttemptCount: failedAttempts.length,
     isFlake,
     attachments,
+    attemptResults,
   };
 }
 
@@ -203,6 +232,140 @@ export function buildSummary(report, { cwd = process.cwd() } = {}) {
   };
 }
 
+const PR_COMMENT_MARKER =
+  "<!-- verdant:playwright-flake-pr-comment -- do not edit -->";
+
+/**
+ * Build the sticky PR comment body. Includes per-test, per-attempt
+ * (attempt 1 = retry0, attempt 2 = retry1) attachment listings and direct
+ * links to the uploaded artifact bundles so the user can open the exact
+ * trace/video/screenshot without digging through the run.
+ *
+ * GitHub artifact URLs point to the artifact zip — inside each zip, the
+ * per-attempt file path is what's printed next to each attachment.
+ */
+export function buildPrComment(
+  report,
+  {
+    cwd = process.cwd(),
+    tracesUrl = "",
+    mediaUrl = "",
+    reportUrl = "",
+    bundleUrl = "",
+    runUrl = "",
+  } = {},
+) {
+  const tests = collectTests(report).map(classifyTest);
+  const flakes = tests.filter((t) => t.isFlake);
+  const failed = tests.filter(
+    (t) => !t.isFlake && FAIL_STATUSES.has(t.finalStatus),
+  );
+  const noteworthy = [...flakes, ...failed];
+
+  const lines = [];
+  lines.push(PR_COMMENT_MARKER);
+  lines.push("## Playwright failure artifacts");
+  lines.push("");
+  lines.push(
+    `**Flaky:** ${flakes.length}  ·  **Failed:** ${failed.length}  ·  **Total tests:** ${tests.length}`,
+  );
+  lines.push("");
+
+  const artifactLinks = [];
+  if (tracesUrl)
+    artifactLinks.push(`- [Traces bundle (\`*.zip\`)](${tracesUrl})`);
+  if (mediaUrl)
+    artifactLinks.push(`- [Media bundle (screenshots + videos)](${mediaUrl})`);
+  if (reportUrl)
+    artifactLinks.push(`- [Playwright HTML report](${reportUrl})`);
+  if (bundleUrl)
+    artifactLinks.push(`- [Full smoke artifact bundle](${bundleUrl})`);
+  if (runUrl) artifactLinks.push(`- [Workflow run](${runUrl})`);
+  if (artifactLinks.length) {
+    lines.push("### Artifact bundles for this run");
+    lines.push("");
+    for (const link of artifactLinks) lines.push(link);
+    lines.push("");
+    lines.push(
+      "> GitHub artifact URLs point to the artifact zip. Download the bundle above, then open the file path listed under each attempt.",
+    );
+    lines.push("");
+  }
+
+  if (noteworthy.length === 0) {
+    lines.push("_No failed or flaky tests in this run — no per-attempt artifacts to link._");
+    lines.push("");
+    return lines.join("\n");
+  }
+
+  for (const t of noteworthy) {
+    const relFile = t.file
+      ? relative(cwd, resolve(cwd, t.file)) || t.file
+      : "";
+    const badge = t.isFlake ? "FLAKY" : "FAILED";
+    lines.push(`### ${badge} · ${t.title}`);
+    lines.push("");
+    lines.push(
+      `\`${relFile}\`${t.projectName ? ` · project \`${t.projectName}\`` : ""} · attempts: ${t.attempts} · retry count: ${t.retryCount}`,
+    );
+    lines.push("");
+
+    for (const attempt of t.attemptResults) {
+      const label =
+        attempt.retry === 0 ? "Attempt 1 (initial)" : `Retry ${attempt.retry}`;
+      lines.push(`**${label} — status: \`${attempt.status || "unknown"}\`**`);
+      if (attempt.attachments.length === 0) {
+        lines.push("");
+        lines.push("- _no attachments captured for this attempt_");
+        lines.push("");
+        continue;
+      }
+      lines.push("");
+      for (const a of attempt.attachments) {
+        const rel = a.path
+          ? relative(cwd, resolve(cwd, a.path)) || a.path
+          : "";
+        const kind = describeAttachmentKind(a);
+        const bundleHint = bundleHintFor(a, { tracesUrl, mediaUrl });
+        const pathCell = rel ? `\`${rel}\`` : "_(path unavailable)_";
+        const link = bundleHint ? ` — [open in ${bundleHint.label}](${bundleHint.url})` : "";
+        lines.push(`- ${kind}: ${pathCell}${link}`);
+      }
+      lines.push("");
+    }
+  }
+
+  return lines.join("\n");
+}
+
+function describeAttachmentKind(a) {
+  const name = a.name?.toLowerCase() ?? "";
+  const ct = a.contentType?.toLowerCase() ?? "";
+  if (name === "trace" || ct === "application/zip") return "**trace**";
+  if (name === "video" || ct.startsWith("video/")) return "**video**";
+  if (name.includes("screenshot") || ct.startsWith("image/"))
+    return "**screenshot**";
+  return `**${a.name || "attachment"}**`;
+}
+
+function bundleHintFor(a, { tracesUrl, mediaUrl }) {
+  const ct = a.contentType?.toLowerCase() ?? "";
+  const name = a.name?.toLowerCase() ?? "";
+  if ((name === "trace" || ct === "application/zip") && tracesUrl) {
+    return { label: "traces bundle", url: tracesUrl };
+  }
+  if (
+    mediaUrl &&
+    (name === "video" ||
+      name.includes("screenshot") ||
+      ct.startsWith("video/") ||
+      ct.startsWith("image/"))
+  ) {
+    return { label: "media bundle", url: mediaUrl };
+  }
+  return null;
+}
+
 function escapeCell(value) {
   return String(value ?? "")
     .replace(/\|/g, "\\|")
@@ -238,6 +401,19 @@ async function main() {
     const outAbs = resolve(process.cwd(), args.outPath);
     mkdirSync(dirname(outAbs), { recursive: true });
     writeFileSync(outAbs, `${markdown}\n`, "utf8");
+  }
+
+  if (args.prCommentPath) {
+    const prBody = buildPrComment(report, {
+      tracesUrl: args.tracesUrl,
+      mediaUrl: args.mediaUrl,
+      reportUrl: args.reportUrl,
+      bundleUrl: args.bundleUrl,
+      runUrl: args.runUrl,
+    });
+    const prAbs = resolve(process.cwd(), args.prCommentPath);
+    mkdirSync(dirname(prAbs), { recursive: true });
+    writeFileSync(prAbs, `${prBody}\n`, "utf8");
   }
 
   const stepSummary = process.env.GITHUB_STEP_SUMMARY;

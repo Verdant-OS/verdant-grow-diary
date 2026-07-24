@@ -476,10 +476,22 @@ export class EcowittBridgeConfigError extends Error {
     | "mixed_tent_channel_map"
     | "channel_map_tent_mismatch"
     | "invalid_channel_map_schema";
-  constructor(code: EcowittBridgeConfigError["code"], message: string) {
+  /**
+   * Optional per-field diagnostic paths that pinpoint the exact offending
+   * entries inside `ECOWITT_SOIL_CHANNEL_MAP_JSON` (e.g.
+   * `$.soilmoisture2.tent_id`). Never contains raw UUIDs, tokens, or the
+   * raw JSON — only structural paths and stable reason strings.
+   */
+  readonly fields?: EcowittSoilChannelMapSchemaError[];
+  constructor(
+    code: EcowittBridgeConfigError["code"],
+    message: string,
+    fields?: EcowittSoilChannelMapSchemaError[],
+  ) {
     super(message);
     this.name = "EcowittBridgeConfigError";
     this.code = code;
+    if (fields && fields.length > 0) this.fields = fields;
   }
 }
 

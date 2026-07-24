@@ -24,6 +24,7 @@ import {
   describeQuickLogDetailsFromExtras,
   type QuickLogDetailDisplayLine,
 } from "@/lib/quickLogActivityDetailFields";
+import { resolveQuickLogEventTimelineLabel } from "@/lib/quickLogActivityRules";
 
 interface Props {
   plantId: string | null | undefined;
@@ -34,11 +35,20 @@ function EntryRow({
   row,
   plantName,
   detailLines,
+  detailsSubtype,
 }: {
   row: PlantRecentActivityRow;
   plantName?: string | null;
   detailLines: readonly QuickLogDetailDisplayLine[];
+  detailsSubtype: string | null;
 }) {
+  // Subtype-aware type badge (Codex F14): a training row fenced with
+  // details.subtype=defoliation badges as "Defoliation" via the shared
+  // resolver — never a duplicated presenter mapping.
+  const resolvedLabel = resolveQuickLogEventTimelineLabel({
+    eventType: row.eventType,
+    detailsSubtype,
+  });
   return (
     <li
       className="rounded-lg border bg-card/40 p-3 text-sm"
@@ -48,7 +58,7 @@ function EntryRow({
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
           <Badge variant="secondary" className="capitalize" data-testid="plant-recent-activity-event-type">
-            {row.eventType}
+            {resolvedLabel || row.eventType}
           </Badge>
           {row.isManualEntry ? (
             <Badge
@@ -162,10 +172,16 @@ export default function PlantRecentActivityPanel({ plantId, plantName }: Props) 
   // buildPlantRecentActivity, which is mirrored into the edge bundle and must
   // stay free of UI-only describe logic. Keyed by entry id for O(1) lookup.
   const detailLinesById = new Map<string, readonly QuickLogDetailDisplayLine[]>();
+  const subtypeById = new Map<string, string>();
   for (const raw of rawRows as Array<{ id?: unknown; details?: unknown }>) {
     if (typeof raw?.id !== "string") continue;
     const lines = describeQuickLogDetailsFromExtras(raw.details);
     if (lines.length > 0) detailLinesById.set(raw.id, lines);
+    const d = raw.details;
+    if (d && typeof d === "object" && !Array.isArray(d)) {
+      const sub = (d as Record<string, unknown>).subtype;
+      if (typeof sub === "string" && sub.trim() !== "") subtypeById.set(raw.id, sub);
+    }
   }
 
   return (
@@ -209,6 +225,7 @@ export default function PlantRecentActivityPanel({ plantId, plantName }: Props) 
                 row={r}
                 plantName={plantName}
                 detailLines={detailLinesById.get(r.id) ?? []}
+                detailsSubtype={subtypeById.get(r.id) ?? null}
               />
             ))}
           </ul>

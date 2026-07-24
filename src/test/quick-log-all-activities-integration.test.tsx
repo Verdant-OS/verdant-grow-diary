@@ -289,7 +289,9 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     expect(screen.queryByTestId("quick-log-all-activities-saved-item")).toBeNull();
   });
 
-  it("Photo insert REJECTION surfaces an error and removes the orphaned upload", async () => {
+  it("Photo insert REJECTION is treated as AMBIGUOUS: uncertainty copy, upload KEPT", async () => {
+    // A rejected insert may have committed with only its response lost —
+    // removing the upload could orphan a real row's image (Codex F12).
     diaryInsertMock.mockImplementationOnce(async () => {
       throw new Error("network interrupted");
     });
@@ -304,12 +306,49 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
 
     await waitFor(() =>
       expect(screen.getByTestId("quick-log-all-activities-error")).toHaveTextContent(
-        /photo save failed/i,
+        /could not confirm the photo attachment/i,
       ),
     );
-    // The uploaded object is cleaned up, and no success artifacts appear.
+    expect(storageRemoveMock).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("quick-log-all-activities-saved-item")).toBeNull();
+  });
+
+  it("Photo confirmed insert FAILURE ({ok:false}) removes the orphaned upload", async () => {
+    diaryInsertMock.mockImplementationOnce(async () => ({
+      error: { message: "row rejected" },
+    }));
+    mountSection();
+    selectActivity("photo");
+    await screen.findByTestId("quick-log-all-activities-form");
+    const file = new File(["img-bytes"], "bud.jpg", { type: "image/jpeg" });
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-photo-file"), {
+      target: { files: [file] },
+    });
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
+
     await waitFor(() => expect(storageRemoveMock).toHaveBeenCalledTimes(1));
     expect(screen.queryByTestId("quick-log-all-activities-saved-item")).toBeNull();
+  });
+
+  it("Photo caption stands in as the diary note when no note was typed (Photo History)", async () => {
+    mountSection();
+    selectActivity("photo");
+    await screen.findByTestId("quick-log-all-activities-form");
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-detail-caption"), {
+      target: { value: "day 40 canopy" },
+    });
+    const file = new File(["img-bytes"], "bud.jpg", { type: "image/jpeg" });
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-photo-file"), {
+      target: { files: [file] },
+    });
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
+
+    await waitFor(() => expect(diaryInsertMock).toHaveBeenCalledTimes(1));
+    const [, row] = diaryInsertMock.mock.calls[0] as unknown as [
+      string,
+      Record<string, unknown>,
+    ];
+    expect(row.note).toBe("day 40 canopy");
   });
 
   it("Issue/Observation → quicklog_save_event carries observed sign + location (never a cause)", async () => {

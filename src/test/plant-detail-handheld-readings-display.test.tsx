@@ -181,6 +181,39 @@ describe("PlantRecentActivityPanel hardware readings rendering", () => {
     expect(screen.getByText(/topped above 5th node/)).toBeTruthy();
   });
 
+  it("badges a defoliation-fenced training row as Defoliation (subtype-aware, Codex F14)", async () => {
+    renderPanel([
+      {
+        id: "e1",
+        plant_id: "p1",
+        tent_id: "t",
+        event_type: "training",
+        note: "removed lower fans",
+        entry_at: "2026-05-23T10:00:00.000Z",
+        details: { subtype: "defoliation", intensity: "medium" },
+      },
+    ]);
+    const badge = await screen.findByTestId("plant-recent-activity-event-type");
+    expect(badge).toHaveTextContent(/defoliation/i);
+    expect(badge).not.toHaveTextContent(/^training$/i);
+  });
+
+  it("plain training rows still badge as Training (no subtype fence)", async () => {
+    renderPanel([
+      {
+        id: "e1",
+        plant_id: "p1",
+        tent_id: "t",
+        event_type: "training",
+        note: "LST by hand",
+        entry_at: "2026-05-23T10:00:00.000Z",
+        details: {},
+      },
+    ]);
+    const badge = await screen.findByTestId("plant-recent-activity-event-type");
+    expect(badge).toHaveTextContent(/training/i);
+  });
+
   it("shows no detail badge when the entry has no recognized detail field", () => {
     renderPanel([
       {

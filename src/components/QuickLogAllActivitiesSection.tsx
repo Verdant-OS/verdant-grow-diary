@@ -523,7 +523,15 @@ export default function QuickLogAllActivitiesSection({
             tentId: capturedTarget.tentId,
             plantId: capturedTarget.plantId,
             photoPath: path,
-            noteRaw: note,
+            // Photo History derives its gallery caption from entry.note —
+            // when the grower typed no note, the structured caption stands in
+            // so their entered text is never invisible (Codex F13).
+            noteRaw:
+              note.trim() !== ""
+                ? note
+                : typeof extraDetails.caption === "string"
+                  ? extraDetails.caption
+                  : "",
             action: "photo",
             // Displayable type: the standalone Photo activity badges as Photo
             // on Timeline/Recent Activity (allow-listed), unlike the V2-sheet
@@ -558,17 +566,15 @@ export default function QuickLogAllActivitiesSection({
           });
           trackQuickLogSuccess("photo", { reused: false });
         } catch {
-          // A REJECTED promise (network interruption) must never escape the
-          // click handler as a silent nothing: surface the failure and clean
-          // up an already-uploaded object so no orphan is left behind.
-          if (uploadedPath) {
-            try {
-              await supabase.storage.from("diary-photos").remove([uploadedPath]);
-            } catch {
-              // Best-effort only.
-            }
-          }
-          setErrorReason("Photo save failed. Nothing was saved.");
+          // A REJECTED promise is AMBIGUOUS (Codex F12): the insert may have
+          // committed with only its response lost — deleting the upload here
+          // could leave a real diary row pointing at a removed image, and a
+          // "nothing was saved" message would invite a duplicate retry.
+          // Mirror the V2 sheet: surface uncertainty, keep the object, and
+          // let removal happen ONLY on the confirmed {ok:false} path above.
+          setErrorReason(
+            "Could not confirm the photo attachment; it may still appear in history.",
+          );
           setErrorForActivity(selected.id);
           return;
         } finally {

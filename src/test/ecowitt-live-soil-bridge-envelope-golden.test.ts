@@ -63,10 +63,17 @@ describe("config validate — failure envelope golden shape (pure)", () => {
     expect(r.ok).toBe(false);
     expect(r.code).toBe("mixed_tent_channel_map");
     expect(typeof r.message).toBe("string");
-    expect(Object.keys(r).sort()).toEqual(["code", "message", "ok"]);
-    // Message must never contain raw tent UUIDs (fail-closed redaction).
-    expect(r.message).not.toContain(TENT_A);
-    expect(r.message).not.toContain(TENT_B);
+    expect(Object.keys(r).sort()).toEqual(["code", "fields", "message", "ok"]);
+    expect(r.fields).toEqual([
+      {
+        path: "$.soilmoisture2.tent_id",
+        message: "tent_id differs from tent_id used by other channels in the map",
+      },
+    ]);
+    // Message + fields must never contain raw tent UUIDs (fail-closed redaction).
+    const serialized = JSON.stringify(r);
+    expect(serialized).not.toContain(TENT_A);
+    expect(serialized).not.toContain(TENT_B);
   });
 });
 

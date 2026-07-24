@@ -1127,6 +1127,10 @@ async function main(): Promise<void> {
   let modeConfig: RunnerModeConfig;
   try {
     modeConfig = resolveRunnerModeConfig(process.env);
+    // Single-tent startup guard — MUST run before runHaDryRunLoop,
+    // connectMqttClient, and any `mqtt` dynamic import. Rejects mixed-
+    // tent HA mappings and mappings that disagree with VERDANT_TENT_ID.
+    assertRunnerStartupSafe(modeConfig, process.env);
   } catch (e) {
     // eslint-disable-next-line no-console
     console.error(
@@ -1136,6 +1140,7 @@ async function main(): Promise<void> {
     process.exit(2);
     return;
   }
+
 
   if (modeConfig.upstreamMode !== "ecowitt_raw") {
     // eslint-disable-next-line no-console

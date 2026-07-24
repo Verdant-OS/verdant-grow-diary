@@ -77,6 +77,12 @@ export interface FastAddSelectionContext {
 export interface FastAddTimestampDefaults {
   occurred_at?: string;
   captured_at?: string;
+  /**
+   * "Captured" seed — when the grower CLICKED the Fast Add preset. Seeded for
+   * every save-capable preset so timestamps stay consistent app-wide;
+   * persisted as details.logged_at (the report/calendar grouping key).
+   */
+  logged_at?: string;
 }
 
 export interface FastAddNavigateIntent {
@@ -167,6 +173,7 @@ export function resolveFastAddIntent(
       plantId: context.plantId,
       tentId: context.tentId,
       action: "water",
+      loggedAt: (options.now ?? (() => new Date()))().toISOString(),
     });
     return detail
       ? { kind: "open-quicklog-v2", eventName: QUICK_LOG_V2_OPEN_EVENT, detail }
@@ -201,11 +208,13 @@ export function resolveFastAddIntent(
  * still owns the actual write; this only seeds initial values.
  *
  * Rules:
- *  - All logging presets set `occurred_at = now`.
- *  - Environment and Training additionally set `captured_at = now` — both
- *    represent an event happening in the tent at the moment of capture,
- *    so the two timestamps line up for consistent timeline sorting.
- *  - Diagnosis is navigation-only and returns {}.
+ *  - All logging presets set `occurred_at = now` (legacy seed) AND
+ *    `logged_at = now` — the "Captured" moment the grower clicked the
+ *    preset, consumed by the capture surfaces and persisted as
+ *    details.logged_at for report/calendar grouping.
+ *  - Environment and Training additionally keep the legacy `captured_at`
+ *    seed (historical shape; logged_at is the consumed key).
+ *  - Diagnosis is navigation-only (never saves) and returns {}.
  */
 export function buildFastAddTimestampDefaults(
   actionId: FastAddActionId,
@@ -214,9 +223,9 @@ export function buildFastAddTimestampDefaults(
   if (actionId === "diagnosis") return {};
   const iso = now().toISOString();
   if (actionId === "environment" || actionId === "training") {
-    return { occurred_at: iso, captured_at: iso };
+    return { occurred_at: iso, captured_at: iso, logged_at: iso };
   }
-  return { occurred_at: iso };
+  return { occurred_at: iso, logged_at: iso };
 }
 
 /**
@@ -224,7 +233,11 @@ export function buildFastAddTimestampDefaults(
  * overwriting any user-edited values already present.
  */
 export function applyFastAddTimestampDefaults<
-  T extends { occurred_at?: string | null; captured_at?: string | null },
+  T extends {
+    occurred_at?: string | null;
+    captured_at?: string | null;
+    logged_at?: string | null;
+  },
 >(existing: T, defaults: FastAddTimestampDefaults): T {
   const out: T = { ...existing };
   if (defaults.occurred_at && !existing.occurred_at) {
@@ -232,6 +245,9 @@ export function applyFastAddTimestampDefaults<
   }
   if (defaults.captured_at && !existing.captured_at) {
     (out as { captured_at?: string }).captured_at = defaults.captured_at;
+  }
+  if (defaults.logged_at && !existing.logged_at) {
+    (out as { logged_at?: string }).logged_at = defaults.logged_at;
   }
   return out;
 }

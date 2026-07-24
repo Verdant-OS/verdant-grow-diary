@@ -45,12 +45,18 @@ describe("buildFastAddTimestampDefaults", () => {
 describe("resolveFastAddIntent — defaults flow into Quick Log prefill", () => {
   const ctx = { plantId: "p1", tentId: null, growId: "g1" };
 
-  it("routes watering through the closed V2 intent without legacy timestamps", () => {
+  it("routes watering through the closed V2 intent with ONLY the loggedAt seed", () => {
     const intent = resolveFastAddIntent("watering", ctx, { now });
     expect(intent.kind).toBe("open-quicklog-v2");
     if (intent.kind === "open-quicklog-v2") {
-      expect(intent.detail).toEqual({ targetKey: "plant:p1", action: "water" });
+      expect(intent.detail).toEqual({
+        targetKey: "plant:p1",
+        action: "water",
+        loggedAt: FIXED.toISOString(),
+      });
+      // Legacy timestamp keys never ride the closed intent.
       expect(intent.detail).not.toHaveProperty("occurred_at");
+      expect(intent.detail).not.toHaveProperty("captured_at");
     }
   });
 

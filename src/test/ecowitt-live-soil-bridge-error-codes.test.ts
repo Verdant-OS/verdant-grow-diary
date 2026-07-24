@@ -58,6 +58,8 @@ interface ParsedEnvelope {
   event: string;
   code: string;
   message: string;
+  fields?: Array<{ path: string; message: string }>;
+  fix?: string;
 }
 
 function findConfigErrorEnvelope(stderr: string): ParsedEnvelope | null {

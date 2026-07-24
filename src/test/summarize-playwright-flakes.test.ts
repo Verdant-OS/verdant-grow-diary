@@ -263,3 +263,72 @@ describe("buildPrComment", () => {
     expect(body).toContain("_No failed or flaky tests in this run — no per-attempt artifacts to link._");
   });
 });
+
+describe("summarize-playwright-flakes CLI --min-failed gate", () => {
+  const { execFileSync } = require("node:child_process");
+  const { mkdtempSync, writeFileSync, existsSync, rmSync } = require("node:fs");
+  const { tmpdir } = require("node:os");
+  const { join } = require("node:path");
+
+  const flakeOnlyReport = flakyReport; // hard-failed=0, flaky=1
+  const hardFailedReport = {
+    suites: [
+      {
+        file: "e2e/quicklog.spec.ts",
+        specs: [
+          {
+            title: "logs a watering event",
+            line: 12,
+            tests: [
+              {
+                projectName: "chromium-authed",
+                status: "failed",
+                results: [
+                  { retry: 0, status: "failed", attachments: [] },
+                  { retry: 1, status: "failed", attachments: [] },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+
+  const runCli = (report: unknown, minFailed: number) => {
+    const dir = mkdtempSync(join(tmpdir(), "pw-flakes-"));
+    const reportPath = join(dir, "report.json");
+    const commentPath = join(dir, "pr-comment.md");
+    writeFileSync(reportPath, JSON.stringify(report), "utf8");
+    execFileSync(
+      process.execPath,
+      [
+        "scripts/summarize-playwright-flakes.mjs",
+        `--report=${reportPath}`,
+        `--pr-comment=${commentPath}`,
+        `--min-failed=${minFailed}`,
+      ],
+      { stdio: "ignore" },
+    );
+    const written = existsSync(commentPath);
+    rmSync(dir, { recursive: true, force: true });
+    return written;
+  };
+
+  it("skips PR comment on flake-only runs when --min-failed=1", () => {
+    expect(runCli(flakeOnlyReport, 1)).toBe(false);
+  });
+
+  it("writes PR comment on flake-only runs when --min-failed=0", () => {
+    expect(runCli(flakeOnlyReport, 0)).toBe(true);
+  });
+
+  it("writes PR comment when hard failures meet threshold", () => {
+    expect(runCli(hardFailedReport, 1)).toBe(true);
+  });
+
+  it("skips PR comment when hard failures below threshold", () => {
+    expect(runCli(hardFailedReport, 2)).toBe(false);
+  });
+});
+

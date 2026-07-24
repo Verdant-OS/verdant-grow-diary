@@ -3177,6 +3177,7 @@ export type Database = {
           name: string
           pheno_hunt_id: string | null
           photo_url: string | null
+          plant_type: string
           pot_size: string | null
           schema_version: number
           stage: string
@@ -3198,6 +3199,7 @@ export type Database = {
           name: string
           pheno_hunt_id?: string | null
           photo_url?: string | null
+          plant_type?: string
           pot_size?: string | null
           schema_version?: number
           stage?: string
@@ -3219,6 +3221,7 @@ export type Database = {
           name?: string
           pheno_hunt_id?: string | null
           photo_url?: string | null
+          plant_type?: string
           pot_size?: string | null
           schema_version?: number
           stage?: string

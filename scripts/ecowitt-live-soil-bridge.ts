@@ -452,18 +452,27 @@ async function runCli(): Promise<void> {
     );
   };
 
-  // ---- `config validate [--fix-hints]` subcommand ----
+  // ---- `config validate [--fix-hints] [--dry-run]` subcommand ----
   // Runs the same assertions used at startup, exits 0 on success or 2
   // with a machine-readable error line on failure. Never imports mqtt.
+  // `--dry-run` additionally prints a schema-validated, redacted view
+  // of the effective config so operators can eyeball it without risk of
+  // leaking tent UUIDs, tokens, or full URLs.
   const argv = process.argv.slice(2);
   if (argv[0] === "config" && argv[1] === "validate") {
     const includeFixHints = argv.slice(2).includes("--fix-hints");
+    const dryRun = argv.slice(2).includes("--dry-run");
     const res = runConfigValidate(process.env, { includeFixHints });
     if (res.ok) {
       // eslint-disable-next-line no-console
       console.log(
         JSON.stringify({ event: "config_ok", check: "ecowitt-bridge" }),
       );
+      if (dryRun) {
+        const effective = buildRedactedEffectiveConfig(process.env, process.argv);
+        // eslint-disable-next-line no-console
+        console.log(JSON.stringify(effective));
+      }
       process.exit(0);
       return;
     }
@@ -471,6 +480,7 @@ async function runCli(): Promise<void> {
     process.exit(2);
     return;
   }
+
 
 
   const env = readBridgeEnv(process.env, process.argv);

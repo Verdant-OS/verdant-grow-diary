@@ -26,6 +26,8 @@
  *     are passed through as `null` when missing.
  */
 
+import { resolveDiaryEntryObservationTime } from "@/lib/quickLogTimestampRules";
+
 // ---------------------------------------------------------------------------
 // Input row shapes (loose by design — accept upstream variations)
 // ---------------------------------------------------------------------------
@@ -117,7 +119,11 @@ function pickOccurredAt(
 }
 
 function normalizeDiaryRow(row: DiaryEntryRowInput): MergedTimelineEntry {
-  const occurred_at = pickOccurredAt(row.entry_at, row.occurred_at);
+  // "Captured" ordering: details.logged_at when present, else entry_at,
+  // else occurred_at (resolver never invents).
+  const occurred_at =
+    resolveDiaryEntryObservationTime(row) ??
+    pickOccurredAt(row.entry_at, row.occurred_at);
   const details = row.details ?? null;
   const eventTypeFromDetails =
     details && typeof details === "object"
@@ -211,10 +217,38 @@ export function mergeTimelineSources(input: MergeTimelineSourcesInput): MergedTi
   const seenExact = new Set<string>();
   const claimedGrowEventIds = new Set<string>();
 
+  // Mirror-inherit: grow_events rows have no details column, so a Quick Log
+  // save's "Captured" moment (details.logged_at) lives only on its diary
+  // mirror — which the dedup below DROPS in favor of the spine row. Map the
+  // logical link → logged_at up front so the kept spine row inherits it;
+  // without this, v2 saves would never benefit from Captured ordering.
+  const mirrorLoggedAtByLink = new Map<string, string>();
+  for (const row of input.diaryEntries ?? []) {
+    if (!row || typeof row.id !== "string" || row.id.length === 0) continue;
+    const link = pickLogicalGrowEventLink(row);
+    if (!link) continue;
+    const d = row.details;
+    const logged =
+      d && typeof d === "object" && !Array.isArray(d)
+        ? (d as Record<string, unknown>).logged_at
+        : null;
+    if (typeof logged === "string" && Number.isFinite(Date.parse(logged))) {
+      mirrorLoggedAtByLink.set(link, logged);
+    }
+  }
+
   for (const row of input.growEvents ?? []) {
     if (!row || typeof row.id !== "string" || row.id.length === 0) continue;
     if (row.is_deleted === true) continue;
-    const entry = normalizeGrowEventRow(row);
+    let entry = normalizeGrowEventRow(row);
+    const inheritedLoggedAt = mirrorLoggedAtByLink.get(entry.source_id);
+    if (inheritedLoggedAt) {
+      entry = {
+        ...entry,
+        occurred_at: inheritedLoggedAt,
+        occurred_epoch_ms: safeEpoch(inheritedLoggedAt),
+      };
+    }
     if (seenExact.has(entry.key)) continue;
     seenExact.add(entry.key);
     claimedGrowEventIds.add(entry.source_id);

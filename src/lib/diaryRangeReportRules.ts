@@ -23,6 +23,7 @@
  */
 
 import { classifyTimelineEntry } from "@/lib/timelineEntryClassification";
+import { resolveDiaryEntryObservationTime } from "@/lib/quickLogTimestampRules";
 import { normalizeDiaryEntries } from "@/lib/diaryEntryRules";
 import { normalizeReportSensorSource, redactSecrets } from "@/lib/postGrowReportRules";
 import { withoutDiagnosticSensorRows } from "@/lib/sensorProvenanceFenceRules";
@@ -237,7 +238,10 @@ export function buildDiaryRangeReport(
   let excludedNoTimestamp = 0;
 
   const diaryInRange = (input.diaryEntries ?? []).filter((r) => {
-    const day = utcDay(r.entry_at);
+    // Diary rows group by the grower's "Captured" moment when present
+    // (details.logged_at), falling back to entry_at. grow_events rows have
+    // no details column, so they stay on occurred_at below.
+    const day = utcDay(resolveDiaryEntryObservationTime(r));
     if (day === null) {
       excludedNoTimestamp += 1;
       return false;
@@ -289,7 +293,7 @@ export function buildDiaryRangeReport(
         : null;
     push(categoryOf(et), {
       id: r.id,
-      day: utcDay(r.entry_at) as string,
+      day: utcDay(resolveDiaryEntryObservationTime(r)) as string,
       eventType: et,
       detailLabel: null,
       fromDiary: true,
@@ -441,7 +445,7 @@ export function buildDiaryRangeReport(
     (r) => typeof r.photo_url === "string" && r.photo_url !== "",
   );
   const photoItems = photoRows.slice(0, DIARY_RANGE_PHOTO_CAP).map((r) => {
-    const day = utcDay(r.entry_at) as string;
+    const day = utcDay(resolveDiaryEntryObservationTime(r)) as string;
     return {
       id: r.id,
       url: r.photo_url as string,
@@ -483,7 +487,7 @@ export function buildDiaryRangeReport(
     const wet = harvestDetailGrams(r.details ?? null, "wet");
     const dry = harvestDetailGrams(r.details ?? null, "dry");
     harvestEntries.push({
-      dateLabel: utcDay(r.entry_at) as string,
+      dateLabel: utcDay(resolveDiaryEntryObservationTime(r)) as string,
       wetGrams: wet,
       dryGrams: dry,
     });

@@ -153,3 +153,41 @@ describe("mergeTimelineSources — Timeline integration contract", () => {
     ).not.toThrow();
   });
 });
+
+
+describe("Captured (logged_at) mirror-inherit", () => {
+  it("the kept grow_events spine row inherits its diary mirror's logged_at ordering", async () => {
+    const { mergeTimelineSources } = await import("@/lib/timelineMergeRules");
+    const merged = mergeTimelineSources({
+      growEvents: [
+        { id: "ge-1", occurred_at: "2026-07-24T02:00:00.000Z", event_type: "training" },
+      ],
+      diaryEntries: [
+        {
+          id: "d-1",
+          entry_at: "2026-07-24T02:00:01.000Z",
+          details: { linked_grow_event_id: "ge-1", logged_at: "2026-07-22T21:00:00.000Z" },
+        },
+      ],
+    });
+    // Dedup keeps the spine row; it must carry the mirror's Captured moment.
+    expect(merged).toHaveLength(1);
+    expect(merged[0].source_table).toBe("grow_events");
+    expect(merged[0].occurred_at).toBe("2026-07-22T21:00:00.000Z");
+  });
+
+  it("a diary row with logged_at orders by it directly", async () => {
+    const { mergeTimelineSources } = await import("@/lib/timelineMergeRules");
+    const merged = mergeTimelineSources({
+      growEvents: [],
+      diaryEntries: [
+        {
+          id: "d-2",
+          entry_at: "2026-07-24T02:00:00.000Z",
+          details: { logged_at: "2026-07-20T10:00:00.000Z" },
+        },
+      ],
+    });
+    expect(merged[0].occurred_at).toBe("2026-07-20T10:00:00.000Z");
+  });
+});

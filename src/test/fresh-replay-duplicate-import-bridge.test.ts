@@ -16,14 +16,15 @@ describe("fresh replay duplicate-import bridge", () => {
     expect(sql).toContain("20260721182752");
   });
 
-  it("no-ops when any imported migration is already recorded", () => {
+  it("no-ops only when the first imported migration is recorded", () => {
     const historyGuard = sql.indexOf("FROM supabase_migrations.schema_migrations");
     const returnIndex = sql.indexOf("RETURN;", historyGuard);
     const firstDrop = sql.indexOf("DROP CONSTRAINT");
     expect(historyGuard).toBeGreaterThan(-1);
     expect(returnIndex).toBeGreaterThan(historyGuard);
     expect(firstDrop).toBeGreaterThan(returnIndex);
-    expect(sql).toMatch(/WHERE version >= '20260721182752'/);
+    expect(sql).toMatch(/WHERE version = '20260721182752'/);
+    expect(sql).not.toMatch(/WHERE version\s*(?:>=|>|<=|<)\s*'20260721182752'/);
   });
 
   it("aborts on data before executing any duplicate-table drop", () => {
@@ -66,14 +67,15 @@ describe("fresh replay Quick Log stage import bridge", () => {
     expect("20260722160000" < "20260722165149").toBe(true);
   });
 
-  it("no-ops when the immutable import is already recorded", () => {
+  it("no-ops only when the immutable import is recorded", () => {
     const historyGuard = quicklogSql.indexOf("FROM supabase_migrations.schema_migrations");
     const returnIndex = quicklogSql.indexOf("RETURN;", historyGuard);
     const dropIndex = quicklogSql.indexOf("DROP FUNCTION");
     expect(historyGuard).toBeGreaterThan(-1);
     expect(returnIndex).toBeGreaterThan(historyGuard);
     expect(dropIndex).toBeGreaterThan(returnIndex);
-    expect(quicklogSql).toMatch(/WHERE version >= '20260722165149'/);
+    expect(quicklogSql).toMatch(/WHERE version = '20260722165149'/);
+    expect(quicklogSql).not.toMatch(/WHERE version\s*(?:>=|>|<=|<)\s*'20260722165149'/);
   });
 
   it("drops only the exact duplicate 12-argument overload without CASCADE", () => {

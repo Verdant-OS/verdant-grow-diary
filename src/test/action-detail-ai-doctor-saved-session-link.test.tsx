@@ -84,14 +84,16 @@ vi.mock("@/integrations/supabase/client", () => {
   };
   return {
     supabase: {
-      from: (table: string) =>
-        table === "action_queue" ? makeActionQueueChain() : makeGeneric(),
+      from: (table: string) => (table === "action_queue" ? makeActionQueueChain() : makeGeneric()),
     },
   };
 });
 
 vi.mock("@/store/auth", () => ({
-  useAuth: () => ({ user: { id: "u1", email: "u@example.com" } }),
+  useAuth: (() => {
+    const user = { id: "u1", email: "u@example.com" };
+    return () => ({ user });
+  })(),
 }));
 vi.mock("@/store/grows", () => ({
   useGrows: () => ({
@@ -148,23 +150,23 @@ describe("ActionDetail header — View saved AI Doctor session link", () => {
     detailRow = AI_DOCTOR_ROW_NO_SESSION;
     renderDetail("aq-ai-2");
     await screen.findByText("Raise the light by 10 cm", undefined, FIND_TIMEOUT);
-    expect(
-      screen.queryByTestId("action-detail-ai-doctor-saved-session-link"),
-    ).toBeNull();
+    expect(screen.queryByTestId("action-detail-ai-doctor-saved-session-link")).toBeNull();
   });
 
   it("does not render the link on non-AI-Doctor actions", async () => {
     detailRow = COACH_ROW;
     renderDetail("aq-coach-1");
     await screen.findByText("Lower humidity to 55%", undefined, FIND_TIMEOUT);
-    expect(
-      screen.queryByTestId("action-detail-ai-doctor-saved-session-link"),
-    ).toBeNull();
+    expect(screen.queryByTestId("action-detail-ai-doctor-saved-session-link")).toBeNull();
   });
 
   it("preserves the existing 'Suggestion origin' panel", async () => {
     renderDetail();
-    const panel = await screen.findByTestId("action-detail-ai-doctor-provenance", undefined, FIND_TIMEOUT);
+    const panel = await screen.findByTestId(
+      "action-detail-ai-doctor-provenance",
+      undefined,
+      FIND_TIMEOUT,
+    );
     expect(panel.textContent ?? "").toContain("Suggestion origin");
   });
 
@@ -208,25 +210,16 @@ describe("ActionDetail header — View saved AI Doctor session link", () => {
 });
 
 // --- Static safety scans ----------------------------------------------------
-const DETAIL_SRC = readFileSync(
-  resolve(__dirname, "../..", "src/pages/ActionDetail.tsx"),
-  "utf8",
-);
+const DETAIL_SRC = readFileSync(resolve(__dirname, "../..", "src/pages/ActionDetail.tsx"), "utf8");
 
 describe("ActionDetail saved-session link — static safety", () => {
   it("introduces no new write paths into action_queue", () => {
     const lower = DETAIL_SRC.toLowerCase();
     expect(lower).not.toContain("functions.invoke");
     expect(lower).not.toContain("service_role");
-    expect(lower).not.toMatch(
-      /from\(["']action_queue["'][\s\S]{0,200}?\.upsert\(/,
-    );
-    expect(lower).not.toMatch(
-      /from\(["']action_queue["'][\s\S]{0,200}?\.delete\(/,
-    );
-    expect(lower).not.toMatch(
-      /from\(["']action_queue["'][\s\S]{0,200}?\.rpc\(/,
-    );
+    expect(lower).not.toMatch(/from\(["']action_queue["'][\s\S]{0,200}?\.upsert\(/);
+    expect(lower).not.toMatch(/from\(["']action_queue["'][\s\S]{0,200}?\.delete\(/);
+    expect(lower).not.toMatch(/from\(["']action_queue["'][\s\S]{0,200}?\.rpc\(/);
   });
 
   it("uses the shared route helper and pure extractor", () => {

@@ -7,7 +7,7 @@
 -- after the descriptive files and otherwise stops on duplicate objects.
 --
 -- This bridge is deliberately ordered immediately before the imported batch.
--- Existing environments that have recorded any imported version NO-OP. A
+-- Existing environments that have recorded the first imported version NO-OP. A
 -- fresh/partial environment may continue only when every duplicated table is
 -- empty; any data aborts the migration before cleanup. The imported migrations
 -- then recreate the canonical objects from their published bodies.
@@ -40,7 +40,7 @@ BEGIN
   IF EXISTS (
     SELECT 1
     FROM supabase_migrations.schema_migrations
-    WHERE version >= '20260721182752'
+    WHERE version = '20260721182752'
   ) THEN
     RAISE NOTICE
       'fresh replay bridge skipped: imported migration batch is already recorded';

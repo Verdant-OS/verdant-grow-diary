@@ -5,10 +5,14 @@ import {
   dismissItem,
   readActiveDismissals,
 } from "@/lib/guidedActionChecklistDismissals";
+import {
+  clearLocalStorageForTest,
+  setLocalStorageItemForTest,
+} from "./helpers/localStorageTestHelper";
 
 describe("guidedActionChecklistDismissals", () => {
   beforeEach(() => {
-    window.localStorage.clear();
+    clearLocalStorageForTest();
   });
 
   it("returns empty when nothing is stored", () => {
@@ -18,9 +22,7 @@ describe("guidedActionChecklistDismissals", () => {
   it("stores and returns dismissed ids", () => {
     dismissItem("sensor:t1", 1_000);
     dismissItem("cadence:water:p1", 2_000);
-    expect(readActiveDismissals(3_000).sort()).toEqual(
-      ["cadence:water:p1", "sensor:t1"],
-    );
+    expect(readActiveDismissals(3_000).sort()).toEqual(["cadence:water:p1", "sensor:t1"]);
   });
 
   it("prunes entries beyond the TTL", () => {
@@ -42,10 +44,7 @@ describe("guidedActionChecklistDismissals", () => {
   });
 
   it("ignores malformed stored payload", () => {
-    window.localStorage.setItem(
-      "verdant.guidedActionChecklist.dismissedV1",
-      "not json",
-    );
+    setLocalStorageItemForTest("verdant.guidedActionChecklist.dismissedV1", "not json");
     expect(readActiveDismissals()).toEqual([]);
   });
 });

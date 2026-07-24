@@ -83,6 +83,7 @@ const PLANT_ROW = {
   is_archived: false,
   medium: "soil",
   pot_size: "3 gal",
+  plant_type: "unknown",
   created_at: "2026-07-01T00:00:00.000Z",
 };
 

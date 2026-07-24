@@ -51,6 +51,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
+    # Job scope: read code, post a sticky PR comment linking to Playwright
+    # artifact bundles for failed/flaky tests. No other write scopes.
+    permissions:
+      contents: read
+      pull-requests: write
+
     env:
       E2E_BASE_URL: ${{ vars.E2E_BASE_URL }}
       E2E_GROW_1_PLANT_URL: ${{ vars.E2E_GROW_1_PLANT_URL }}

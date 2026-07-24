@@ -13,10 +13,10 @@
  */
 import { describe, it, expect } from "vitest";
 import {
-  PLANT_QUICKLOG_PREFILL_EVENT,
   resolveFastAddIntent,
   type FastAddSelectionContext,
 } from "../lib/fastAddActionRules";
+import { PLANT_QUICKLOG_PREFILL_EVENT } from "../lib/plantQuickLogPrefillRules";
 
 const FIXED = new Date("2026-07-24T09:00:00.000Z");
 const now = () => FIXED;

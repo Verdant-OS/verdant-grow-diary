@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 // @ts-ignore - .mjs script exports pure helpers for testing.
-import { buildSummary, classifyTest, buildPrComment } from "../../scripts/summarize-playwright-flakes.mjs";
+import { buildSummary, classifyTest, buildPrComment, buildTraceabilityHeader } from "../../scripts/summarize-playwright-flakes.mjs";
 
 const flakyReport = {
   suites: [
@@ -392,6 +392,53 @@ describe("summarize-playwright-flakes CLI --min-failed gate", () => {
     // Suppression notice explains the empty PR comment
     expect(summary).toContain("PR comment suppressed by `--min-failed=1`");
     rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+describe("buildTraceabilityHeader", () => {
+  const reportWithConfig = {
+    config: {
+      version: "1.47.0",
+      workers: 4,
+      projects: [
+        { name: "chromium-authed", use: { defaultBrowserType: "chromium", viewport: { width: 1280, height: 720 } } },
+        { name: "firefox-guest", use: { defaultBrowserType: "firefox" } },
+      ],
+    },
+    suites: [],
+  };
+
+  it("renders commit SHA, workflow, and browser/config rows from env + report", () => {
+    const header = buildTraceabilityHeader(reportWithConfig, {
+      GITHUB_SHA: "abcdef1234567890",
+      GITHUB_REPOSITORY: "o/r",
+      GITHUB_RUN_ID: "42",
+      GITHUB_RUN_ATTEMPT: "2",
+      GITHUB_SERVER_URL: "https://github.com",
+      GITHUB_WORKFLOW: "quicklog-smoke",
+      GITHUB_JOB: "e2e",
+      GITHUB_EVENT_NAME: "pull_request",
+      GITHUB_REF_NAME: "feature/x",
+      GITHUB_ACTOR: "verdant",
+    });
+    expect(header).toContain("### Run traceability");
+    expect(header).toContain("`quicklog-smoke`");
+    expect(header).toContain("job `e2e`");
+    expect(header).toContain("`pull_request`");
+    expect(header).toContain("ref `feature/x`");
+    expect(header).toContain("[`abcdef1`](https://github.com/o/r/commit/abcdef1234567890)");
+    expect(header).toContain("[42 (attempt 2)](https://github.com/o/r/actions/runs/42/attempts/2)");
+    expect(header).toContain("Playwright workers | 4");
+    expect(header).toContain("`1.47.0`");
+    expect(header).toContain("`chromium-authed` → chromium · viewport 1280×720");
+    expect(header).toContain("`firefox-guest` → firefox · viewport default");
+  });
+
+  it("omits rows for missing env vars", () => {
+    const header = buildTraceabilityHeader({ suites: [] }, {});
+    expect(header).toContain("### Run traceability");
+    expect(header).not.toContain("Workflow |");
+    expect(header).not.toContain("Commit |");
   });
 });
 

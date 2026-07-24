@@ -101,21 +101,35 @@ describe("Fast Add — Watering prefill (Quick Log v2 handoff)", () => {
     expect(intent.kind).toBe("open-quicklog-v2");
     if (intent.kind !== "open-quicklog-v2") return;
     expect(intent.eventName).toBe(QUICK_LOG_V2_OPEN_EVENT);
-    expect(intent.detail).toEqual({ targetKey: "plant:p1", action: "water" });
+    expect(intent.detail).toEqual({
+      targetKey: "plant:p1",
+      action: "water",
+      // "Captured" seed from the preset click (report/calendar grouping key).
+      loggedAt: expect.any(String),
+    });
   });
 
   it("watering from plant-only context uses plant targetKey", () => {
     const intent = resolveFastAddIntent("watering", PLANT_ONLY, { now });
     expect(intent.kind).toBe("open-quicklog-v2");
     if (intent.kind !== "open-quicklog-v2") return;
-    expect(intent.detail).toEqual({ targetKey: "plant:p1", action: "water" });
+    expect(intent.detail).toEqual({
+      targetKey: "plant:p1",
+      action: "water",
+      // "Captured" seed from the preset click (report/calendar grouping key).
+      loggedAt: expect.any(String),
+    });
   });
 
   it("watering from tent-only context falls back to tent targetKey", () => {
     const intent = resolveFastAddIntent("watering", TENT_ONLY, { now });
     expect(intent.kind).toBe("open-quicklog-v2");
     if (intent.kind !== "open-quicklog-v2") return;
-    expect(intent.detail).toEqual({ targetKey: "tent:t1", action: "water" });
+    expect(intent.detail).toEqual({
+      targetKey: "tent:t1",
+      action: "water",
+      loggedAt: expect.any(String),
+    });
   });
 
   it("watering with no plant or tent returns needs-context (blocks silent writes)", () => {

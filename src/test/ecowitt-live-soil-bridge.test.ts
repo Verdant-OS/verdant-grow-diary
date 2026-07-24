@@ -668,6 +668,54 @@ describe("validateChannelMapSingleTent", () => {
     expect(r.offendingChannels).toEqual(["soilmoisture2"]);
   });
 
+  it("without VERDANT_TENT_ID: the reference tent is the majority tent, not 'whichever channel came first in the JSON'", () => {
+    // Same logical map, two different key orders. TENT appears twice (majority),
+    // TENT_B once — the minority channel must be flagged as offending
+    // regardless of which channel happened to be listed first.
+    const mapA = parseEcowittSoilChannelMap(
+      JSON.stringify({
+        soilmoisture1: { tent_id: TENT_B },
+        soilmoisture2: { tent_id: TENT },
+        soilmoisture3: { tent_id: TENT },
+      }),
+    );
+    const mapB = parseEcowittSoilChannelMap(
+      JSON.stringify({
+        soilmoisture2: { tent_id: TENT },
+        soilmoisture3: { tent_id: TENT },
+        soilmoisture1: { tent_id: TENT_B },
+      }),
+    );
+    const rA = validateChannelMapSingleTent(mapA, null);
+    const rB = validateChannelMapSingleTent(mapB, null);
+    expect(rA.offendingChannels).toEqual(["soilmoisture1"]);
+    expect(rB.offendingChannels).toEqual(["soilmoisture1"]);
+    expect(rA).toEqual(rB);
+  });
+
+  it("without VERDANT_TENT_ID: a genuine tie is broken by the lexicographically smallest tent_id, not key order", () => {
+    // Exactly one channel per tent — a real tie. TENT (starts with '1') sorts
+    // before TENT_B (starts with '2'), so TENT must win regardless of which
+    // channel is listed first.
+    const mapA = parseEcowittSoilChannelMap(
+      JSON.stringify({
+        soilmoisture1: { tent_id: TENT_B },
+        soilmoisture2: { tent_id: TENT },
+      }),
+    );
+    const mapB = parseEcowittSoilChannelMap(
+      JSON.stringify({
+        soilmoisture2: { tent_id: TENT },
+        soilmoisture1: { tent_id: TENT_B },
+      }),
+    );
+    const rA = validateChannelMapSingleTent(mapA, null);
+    const rB = validateChannelMapSingleTent(mapB, null);
+    expect(rA.offendingChannels).toEqual(["soilmoisture1"]);
+    expect(rB.offendingChannels).toEqual(["soilmoisture1"]);
+    expect(rA).toEqual(rB);
+  });
+
   it("never returns a tent_id string anywhere in the result", () => {
     const map = parseEcowittSoilChannelMap(
       JSON.stringify({
@@ -879,6 +927,80 @@ describe("runBridge — validate-config never touches mqtt/forward", () => {
     expect(exit).toHaveBeenCalledWith(0);
   });
 
+  it("--json-errors with a malformed channel-map: writeJson gets the malformed_config envelope, never log, exits 4", async () => {
+    const connectAndListen = vi.fn();
+    const exit = vi.fn();
+    const log = vi.fn();
+    const writeJson = vi.fn();
+    const env: BridgeEnv = {
+      ...baseEnv,
+      validateConfig: true,
+      jsonErrors: true,
+      channelMapJsonState: "malformed",
+    };
+
+    await runBridge(env, { log, connectAndListen, exit, writeJson });
+
+    expect(connectAndListen).not.toHaveBeenCalled();
+    expect(log).not.toHaveBeenCalled();
+    expect(writeJson).toHaveBeenCalledTimes(1);
+    expect(writeJson).toHaveBeenCalledWith(
+      expect.objectContaining({ mode: "validate-config", status: "malformed_config" }),
+    );
+    expect(exit).toHaveBeenCalledWith(4);
+  });
+
+  it("--json-errors with a mixed-tent channel-map: writeJson gets the mixed-tent envelope, never log, exits 3", async () => {
+    const connectAndListen = vi.fn();
+    const exit = vi.fn();
+    const log = vi.fn();
+    const writeJson = vi.fn();
+    const env: BridgeEnv = {
+      ...baseEnv,
+      validateConfig: true,
+      jsonErrors: true,
+      channelMap: parseEcowittSoilChannelMap(
+        JSON.stringify({
+          soilmoisture1: { tent_id: TENT },
+          soilmoisture2: { tent_id: TENT_B },
+        }),
+      ),
+    };
+
+    await runBridge(env, { log, connectAndListen, exit, writeJson });
+
+    expect(connectAndListen).not.toHaveBeenCalled();
+    expect(log).not.toHaveBeenCalled();
+    expect(writeJson).toHaveBeenCalledTimes(1);
+    expect(writeJson).toHaveBeenCalledWith(
+      expect.objectContaining({ mode: "validate-config", status: "mixed-tent" }),
+    );
+    expect(exit).toHaveBeenCalledWith(3);
+  });
+
+  it("--json-errors with an empty channel-map: writeJson gets the empty envelope, never log, exits 0", async () => {
+    const connectAndListen = vi.fn();
+    const exit = vi.fn();
+    const log = vi.fn();
+    const writeJson = vi.fn();
+    const env: BridgeEnv = {
+      ...baseEnv,
+      validateConfig: true,
+      jsonErrors: true,
+      channelMap: {},
+    };
+
+    await runBridge(env, { log, connectAndListen, exit, writeJson });
+
+    expect(connectAndListen).not.toHaveBeenCalled();
+    expect(log).not.toHaveBeenCalled();
+    expect(writeJson).toHaveBeenCalledTimes(1);
+    expect(writeJson).toHaveBeenCalledWith(
+      expect.objectContaining({ mode: "validate-config", status: "empty" }),
+    );
+    expect(exit).toHaveBeenCalledWith(0);
+  });
+
   it("without --json-errors, validate-config never calls writeJson", async () => {
     const connectAndListen = vi.fn();
     const exit = vi.fn();
@@ -966,6 +1088,32 @@ describe("buildConfigValidationSummary — determinism and malformed config", ()
     const messageA = buildConfigValidationSummary(withEnv({ channelMap: mapA })).summary.message;
     const messageB = buildConfigValidationSummary(withEnv({ channelMap: mapB })).summary.message;
     expect(messageA).toBe(messageB);
+  });
+
+  it("mixed-tent message is deterministic even without VERDANT_TENT_ID set (regression: previously picked whichever channel came first in the JSON)", () => {
+    const mapA = parseEcowittSoilChannelMap(
+      JSON.stringify({
+        soilmoisture1: { tent_id: TENT_B },
+        soilmoisture2: { tent_id: TENT },
+        soilmoisture3: { tent_id: TENT },
+      }),
+    );
+    const mapB = parseEcowittSoilChannelMap(
+      JSON.stringify({
+        soilmoisture2: { tent_id: TENT },
+        soilmoisture3: { tent_id: TENT },
+        soilmoisture1: { tent_id: TENT_B },
+      }),
+    );
+    const summaryA = buildConfigValidationSummary(
+      withEnv({ defaultTentId: null, channelMap: mapA }),
+    );
+    const summaryB = buildConfigValidationSummary(
+      withEnv({ defaultTentId: null, channelMap: mapB }),
+    );
+    expect(summaryA.summary.message).toBe(summaryB.summary.message);
+    expect(summaryA.summary.offendingChannels).toEqual(["soilmoisture1"]);
+    expect(summaryB.summary.offendingChannels).toEqual(["soilmoisture1"]);
   });
 
   it("mixed-tent message never contains a tent UUID or bridge token", () => {

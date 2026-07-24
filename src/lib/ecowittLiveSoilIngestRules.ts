@@ -526,6 +526,30 @@ export interface ChannelMapTentValidation {
  * `verdantTentId` (the bridge's single configured tent). Pure: no I/O, no
  * mqtt, no fetch — safe to call before any network connection exists.
  */
+/**
+ * The tent_id that appears most often across `entries`, ties broken by the
+ * lexicographically smallest tent_id string. Used (only when no
+ * `verdantTentId` is configured) instead of "whichever channel came first
+ * in the JSON" so the result — and any message built from it — never
+ * depends on channel-map key insertion order.
+ */
+function mostCommonTentId(entries: ReadonlyArray<[string, { readonly tent_id: string }]>): string {
+  const counts = new Map<string, number>();
+  for (const [, target] of entries) {
+    counts.set(target.tent_id, (counts.get(target.tent_id) ?? 0) + 1);
+  }
+  let best: string | null = null;
+  let bestCount = -1;
+  for (const [tentId, count] of counts) {
+    if (count > bestCount || (count === bestCount && (best === null || tentId < best))) {
+      best = tentId;
+      bestCount = count;
+    }
+  }
+  // entries.length > 0 is guaranteed by the caller's empty-map early return.
+  return best as string;
+}
+
 export function validateChannelMapSingleTent(
   channelMap: Readonly<Record<string, { readonly tent_id: string }>>,
   verdantTentId: string | null,
@@ -540,7 +564,7 @@ export function validateChannelMapSingleTent(
     };
   }
 
-  const expected = verdantTentId ?? entries[0][1].tent_id;
+  const expected = verdantTentId ?? mostCommonTentId(entries);
   const offendingChannels: string[] = [];
   const distinctTentIds = new Set<string>(verdantTentId ? [verdantTentId] : []);
   for (const [key, target] of entries) {

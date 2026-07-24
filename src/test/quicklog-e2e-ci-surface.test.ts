@@ -245,7 +245,7 @@ describe("Quick Log Playwright CI surface", () => {
       "Cannot find Grow #1 plant page",
       "Cannot find same-grow second target plant",
       "Stale snapshot helper missing",
-      "Watering validation focus failed",
+      "Structured watering validation failed",
       "Report says a later step failed after save",
       "How to read the report",
     ]) {

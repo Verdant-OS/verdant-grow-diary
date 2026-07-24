@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-// @ts-ignore - .mjs script has no types
+// @ts-expect-error - .mjs script exports pure helpers without TypeScript declarations.
 import { resolveBaseline } from "../../scripts/verify-published-migration-integrity.mjs";
 
 

@@ -1,5 +1,9 @@
+import { execFileSync } from "node:child_process";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, it, expect } from "vitest";
-// @ts-ignore - .mjs script exports pure helpers for testing.
+// @ts-expect-error - .mjs script exports pure helpers without TypeScript declarations.
 import { buildSummary, classifyTest, buildPrComment, buildTraceabilityHeader } from "../../scripts/summarize-playwright-flakes.mjs";
 
 const flakyReport = {
@@ -265,11 +269,6 @@ describe("buildPrComment", () => {
 });
 
 describe("summarize-playwright-flakes CLI --min-failed gate", () => {
-  const { execFileSync } = require("node:child_process");
-  const { mkdtempSync, writeFileSync, existsSync, rmSync } = require("node:fs");
-  const { tmpdir } = require("node:os");
-  const { join } = require("node:path");
-
   const flakeOnlyReport = {
     suites: [
       {
@@ -355,7 +354,6 @@ describe("summarize-playwright-flakes CLI --min-failed gate", () => {
   });
 
   it("writes Job Summary with failed/flaky sections + top links even when PR comment is gated by --min-failed", () => {
-    const { readFileSync } = require("node:fs");
     const dir = mkdtempSync(join(tmpdir(), "pw-flakes-jobsum-"));
     const reportPath = join(dir, "report.json");
     const commentPath = join(dir, "pr-comment.md");

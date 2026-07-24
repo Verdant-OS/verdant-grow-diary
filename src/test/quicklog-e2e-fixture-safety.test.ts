@@ -254,7 +254,7 @@ describe("E2E fixture safety: source-level guardrails", () => {
     const validate = smoke.indexOf("await validateQuickLogFixturePage(page");
     const reconsent = smoke.indexOf("await acceptReconsentGateIfShown(page)");
     const openQuickLog = smoke.indexOf("await openQuickLogDialog(page)");
-    const firstSave = smoke.indexOf('getByTestId("quick-log-save").click()');
+    const firstSave = smoke.indexOf('getByTestId("qlv2-save").click()');
 
     expect(smoke).toMatch(
       /import\s*\{[^}]*validateQuickLogFixturePage[^}]*\}\s*from\s*["']\.\/lib\/fixtureSafety["']/s,

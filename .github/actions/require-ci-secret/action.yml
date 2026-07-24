@@ -17,7 +17,7 @@ inputs:
   secret-value:
     description: >
       Value of the secret, injected by the caller as
-      `${{ secrets.<SECRET-NAME> }}`. Empty or whitespace-only counts as
+      the matching GitHub Actions repository secret expression. Empty or whitespace-only counts as
       missing. Composite actions cannot read `secrets.*` themselves, so
       the caller MUST pass it in.
     required: true

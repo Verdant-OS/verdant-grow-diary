@@ -61,9 +61,12 @@ function readPlantRouteId(plantUrl: string): string {
 
 function readObservedQuickLogTargetId(request: Request): string | null {
   try {
-    const body = request.postDataJSON() as { p_target_id?: unknown } | null;
+    const body = request.postDataJSON() as {
+      p_target_id?: unknown;
+      p_plant_id?: unknown;
+    } | null;
     if (!body) return null;
-    const candidate = body.p_target_id;
+    const candidate = body.p_target_id ?? body.p_plant_id;
     return isSafeTargetId(candidate) ? candidate : null;
   } catch {
     return null;
@@ -160,7 +163,12 @@ test.describe("Quick Log smoke checklist", () => {
       } catch {
         return;
       }
-      if (!pathname.endsWith("/rpc/quicklog_save_manual")) return;
+      if (
+        !pathname.endsWith("/rpc/quicklog_save_manual") &&
+        !pathname.endsWith("/rpc/quicklog_save_event")
+      ) {
+        return;
+      }
       const candidate = readObservedQuickLogTargetId(request);
       if (candidate) observedRpcTargetId = candidate;
     });
@@ -300,130 +308,102 @@ test.describe("Quick Log smoke checklist", () => {
         return "attach section focused";
       });
 
-      await report.run(12, "Select Watering event type", async () => {
-        // The activity-type chips are presentational; `eventType` (which
-        // drives the required-watering-ml validation) is owned by the Event
-        // select (EventTypeSelector, id=quick-log-event-type). Clicking only
-        // the chip leaves eventType on the default, so the blank-ml save
-        // would bounce off the note gate instead of the watering gate.
-        const eventSelect = dialog.locator("#quick-log-event-type");
-        await eventSelect.click();
-        await page.getByRole("option", { name: /^watering$/i }).click();
-        await expect(eventSelect).toContainText(/watering/i);
-        return "watering selected";
+      const structuredSheet = page
+        .getByRole("dialog")
+        .filter({ has: page.locator("#qlv2-target") });
+      let selectedTarget: QuickLogTargetTuple | null = null;
+      await report.run(12, "Open canonical structured Water flow", async () => {
+        selectedTarget = await readTargetTuple(dialog);
+        await dialog
+          .getByTestId("quick-log-dialog-all-activities-picker-watering")
+          .click();
+        await expect(structuredSheet).toBeVisible();
+        await expect(structuredSheet.getByTestId("qlv2-watering-form")).toBeVisible();
+        await expect(structuredSheet.getByTestId("qlv2-target-panel-plant-value")).toHaveText(
+          TARGET_NAME,
+        );
+        return "structured Water flow opened for the selected plant";
       });
 
-      // Watering save validation is driven ADAPTIVELY so this checklist
-      // matches the live deployed app today and the branch contract once it
-      // ships. The live app requires a note before saving a watering entry
-      // (it surfaces "Add a quick note"); the branch adds an undeployed
-      // required Watering (ml) field on top. We attempt a blank save, confirm
-      // it is BLOCKED, then satisfy whatever the running build requires.
-      await report.run(13, "Blank watering save is blocked by validation", async () => {
-        await dialog.getByTestId("quick-log-save").click();
-        // A validation error must keep the dialog in edit mode — no post-save.
-        await expect(dialog.getByTestId("quick-log-post-save")).toHaveCount(0);
-        // Some visible error must explain the block (note-required on live,
-        // or the watering-ml error on the deployed-branch build).
-        const wateringErr = dialog.getByTestId("quicklog-watering-error");
-        const saveErr = dialog.getByTestId("quick-log-save-error");
-        const shown =
-          (await wateringErr.count()) > 0
-            ? await wateringErr.isVisible()
-            : (await saveErr.count()) > 0 && (await saveErr.isVisible());
-        if (shown) return "blocked with a visible validation error";
-        // Real browsers can block the submit BEFORE the app handler runs:
-        // the native `required` constraint shows a "Please fill out this
-        // field" bubble that lives outside the DOM, so neither app error
-        // element renders (CI screenshot evidence on #193). Accept that
-        // mechanism via ValidityState.
-        for (const testId of ["quicklog-watering-ml", "quicklog-note"]) {
-          const field = dialog.getByTestId(testId);
-          if ((await field.count()) === 0) continue;
-          const valueMissing = await field.evaluate(
-            (el) => (el as HTMLInputElement | HTMLTextAreaElement).validity?.valueMissing ?? false,
-          );
-          if (valueMissing) return `blocked by native required validation (${testId})`;
-        }
-        throw new Error("Blank save produced no visible validation error");
+      await report.run(13, "Blank structured Water save is blocked by validation", async () => {
+        await structuredSheet.getByTestId("qlv2-save").click();
+        await expect(structuredSheet.getByTestId("qlv2-post-save")).toHaveCount(0);
+        await expect(structuredSheet.getByTestId("qlv2-missing-volume-help")).toBeVisible();
+        return "blocked with required volume guidance";
       });
 
-      await report.run(14, "Satisfy required fields (note; watering ml when present)", async () => {
-        await dialog.getByTestId("quicklog-note").fill("Smoke watering log");
-        // The Watering (ml) field lives inside the collapsed "Add more
-        // details" section on builds that enforce it. Expand and fill when
-        // present; skip cleanly on the live build that needs only a note.
-        let ml = dialog.getByTestId("quicklog-watering-ml");
-        if ((await ml.count()) === 0) {
-          const moreToggle = dialog.getByRole("switch", { name: /add more details/i });
-          if ((await moreToggle.count()) > 0) await moreToggle.click();
-          ml = dialog.getByTestId("quicklog-watering-ml");
-        }
-        if ((await ml.count()) > 0) {
-          await ml.fill("250");
-          return "note + watering ml (250) filled";
-        }
-        return "note filled (no watering ml field on this build)";
+      await report.run(14, "Enter required structured Water evidence", async () => {
+        await structuredSheet.locator("#qlv2-volume").fill("250");
+        await structuredSheet.locator("#qlv2-note").fill("Smoke watering log");
+        await expect(structuredSheet.getByTestId("qlv2-watering-review")).toContainText("250");
+        return "volume (250 ml) and note filled";
       });
 
       await report.run(15, "Save uses displayed target", async () => {
-        const displayedTargetId = await dialog
-          .getByTestId("quick-log-target-card")
-          .getAttribute("data-target-plant-id");
-        if (!isSafeTargetId(displayedTargetId)) {
-          throw new Error("Displayed Quick Log target is missing or invalid before Save.");
+        if (!selectedTarget) {
+          throw new Error("Structured Water target was not captured before Save.");
         }
+        await expect(structuredSheet.getByTestId("qlv2-target-panel-plant-value")).toHaveText(
+          TARGET_NAME,
+        );
         observedRpcTargetId = null;
-        await dialog.getByTestId("quick-log-save").click();
-        await expect.poll(() => observedRpcTargetId).toBe(displayedTargetId);
-        await expect(dialog.getByTestId("quick-log-post-save")).toBeVisible({
+        await structuredSheet.getByTestId("qlv2-save").click();
+        await expect.poll(() => observedRpcTargetId).toBe(selectedTarget.plantId);
+        await expect(structuredSheet.getByTestId("qlv2-post-save")).toBeVisible({
           timeout: 15_000,
         });
         return "post-save shown and RPC target matched displayed target";
       });
 
       await report.run(16, "Post-save actions visible (View / Log another / Close)", async () => {
-        await expect(dialog.getByTestId("quick-log-view-target-plant")).toBeVisible();
-        await expect(dialog.getByTestId("quick-log-post-save-another")).toBeVisible();
-        await expect(dialog.getByTestId("quick-log-post-save-close")).toBeVisible();
+        await expect(structuredSheet.getByTestId("quick-log-post-save-view")).toBeVisible();
+        await expect(structuredSheet.getByTestId("quick-log-post-save-another")).toBeVisible();
+        await expect(structuredSheet.getByTestId("quick-log-post-save-close")).toBeVisible();
         return "all three actions visible";
       });
 
       await report.run(17, "Tab reaches Log another", async () => {
-        await dialog.getByTestId("quick-log-view-target-plant").focus();
+        await structuredSheet.getByTestId("quick-log-post-save-view").focus();
         await page.keyboard.press("Tab");
-        await expect(dialog.getByTestId("quick-log-post-save-another")).toBeFocused();
+        await expect(structuredSheet.getByTestId("quick-log-post-save-another")).toBeFocused();
         return "focused";
       });
 
       await report.run(18, "Activate Log another", async () => {
-        await dialog.getByTestId("quick-log-post-save-another").click();
+        await structuredSheet.getByTestId("quick-log-post-save-another").click();
         return "activated";
       });
 
       await report.run(19, "Same target plant remains selected", async () => {
-        await expect(dialog.getByTestId("quick-log-post-save")).toHaveCount(0);
-        await expect(dialog.getByTestId("quick-log-plant-select")).toHaveText(TARGET_NAME);
+        await expect(structuredSheet.getByTestId("qlv2-post-save")).toHaveCount(0);
+        await expect(structuredSheet.getByTestId("qlv2-target-panel-plant-value")).toHaveText(
+          TARGET_NAME,
+        );
         return "kept selected plant";
       });
 
-      await report.run(20, "Form resets, focus lands in note field", async () => {
-        await expect(dialog.getByTestId("quicklog-note")).toBeFocused();
-        await expect(dialog.getByTestId("quicklog-note")).toHaveValue("");
-        return "note focused, empty";
+      await report.run(20, "Form resets to a blank Note", async () => {
+        await expect(structuredSheet.getByTestId("qlv2-watering-form")).toHaveCount(0);
+        await expect(structuredSheet.locator("#qlv2-note")).toHaveValue("");
+        return "Note selected and note field empty";
       });
 
-      await report.run(21, "Save quick Observation", async () => {
-        await dialog.getByTestId("quicklog-note").fill("Smoke checklist observation");
-        await dialog.getByTestId("quick-log-save").click();
-        await expect(dialog.getByTestId("quick-log-post-save")).toBeVisible({
+      await report.run(21, "Save quick Note through V2", async () => {
+        if (!selectedTarget) {
+          throw new Error("Structured Water target was not retained for Log another.");
+        }
+        observedRpcTargetId = null;
+        await structuredSheet.locator("#qlv2-note").fill("Smoke checklist observation");
+        await structuredSheet.getByTestId("qlv2-save").click();
+        await expect.poll(() => observedRpcTargetId).toBe(selectedTarget.plantId);
+        await expect(structuredSheet.getByTestId("qlv2-post-save")).toBeVisible({
           timeout: 15_000,
         });
         return "second save succeeded";
       });
 
       await report.run(22, "Close and reopen Quick Log", async () => {
-        await dialog.getByTestId("quick-log-post-save-close").click();
+        await structuredSheet.getByTestId("quick-log-post-save-close").click();
         await expect(page.getByRole("dialog")).toHaveCount(0);
         // Reopening hits the same type-picker menu as the initial open —
         // reuse the shared helper (Codex review on #193).

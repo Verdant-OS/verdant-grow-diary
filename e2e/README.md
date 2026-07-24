@@ -659,9 +659,10 @@ Common failure cases:
   - Fix: inspect the failing report step, screenshots, and the current
     sensor state for the target plant.
 
-- **Watering validation focus failed**
-  - Likely: the Watering (ml) field copy/selector or focus restoration
-    behavior changed.
+- **Structured watering validation failed**
+  - Likely: the canonical V2 Water activity no longer opens the structured
+    watering sheet, the selected target was not preserved, or required volume
+    validation changed.
   - Fix: inspect the failing step in the report and open the Playwright
     trace for that step.
 

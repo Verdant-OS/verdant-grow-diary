@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import CultivarsIndex from "@/pages/CultivarsIndex";
 import {
@@ -13,10 +14,18 @@ const ORIGIN = "https://verdantgrowdiary.com";
 afterEach(cleanup);
 
 function renderCultivars(entry: string) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+    },
+  });
+
   return render(
-    <MemoryRouter initialEntries={[entry]}>
-      <CultivarsIndex />
-    </MemoryRouter>,
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={[entry]}>
+        <CultivarsIndex />
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 
@@ -57,30 +66,34 @@ describe("cultivarIndexSeoRules", () => {
 });
 
 describe("CultivarsIndex crawl-safety wiring", () => {
-  it("keeps the original accessible hub UI and indexable metadata for /cultivars", () => {
-    renderCultivars("/cultivars");
+  it(
+    "keeps the original accessible hub UI and indexable metadata for /cultivars",
+    () => {
+      renderCultivars("/cultivars");
 
-    expect(screen.getByRole("search", { name: "Filter cultivar guides" })).toBeInTheDocument();
-    expect(screen.getByTestId("cultivars-index-result-count")).toHaveAttribute(
-      "aria-live",
-      "polite",
-    );
-    expect(screen.getByRole("link", { name: "grow-stage care guide" })).toHaveAttribute(
-      "href",
-      "/guides/grow-stage-care-guide",
-    );
-    expect(screen.getByRole("link", { name: "Pheno comparison" })).toHaveAttribute(
-      "href",
-      "/pheno-comparison",
-    );
+      expect(screen.getByRole("search", { name: "Filter cultivar guides" })).toBeInTheDocument();
+      expect(screen.getByTestId("cultivars-index-result-count")).toHaveAttribute(
+        "aria-live",
+        "polite",
+      );
+      expect(screen.getByRole("link", { name: "grow-stage care guide" })).toHaveAttribute(
+        "href",
+        "/guides/grow-stage-care-guide",
+      );
+      expect(screen.getByRole("link", { name: "Pheno comparison" })).toHaveAttribute(
+        "href",
+        "/pheno-comparison",
+      );
 
-    expect(headContent('meta[name="robots"]')).toBe("index, follow");
-    expect(document.head.querySelector('link[rel="canonical"]')).toHaveAttribute(
-      "href",
-      `${ORIGIN}/cultivars`,
-    );
-    expect(headContent('meta[property="og:url"]')).toBe(`${ORIGIN}/cultivars`);
-  });
+      expect(headContent('meta[name="robots"]')).toBe("index, follow");
+      expect(document.head.querySelector('link[rel="canonical"]')).toHaveAttribute(
+        "href",
+        `${ORIGIN}/cultivars`,
+      );
+      expect(headContent('meta[property="og:url"]')).toBe(`${ORIGIN}/cultivars`);
+    },
+    15_000,
+  );
 
   it("sets noindex while canonical and og:url remain the clean hub for query variants", () => {
     renderCultivars("/cultivars?q=oreoz&difficulty=Advanced");

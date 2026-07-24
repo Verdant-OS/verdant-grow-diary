@@ -680,6 +680,7 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
                         {(
                           [
                             { actionId: "diary_note", label: "Note", testId: "note", fallbackType: "observation" },
+                            { actionId: "photo", label: "Photo", testId: "photo", fallbackType: null },
                             { actionId: "watering", label: "Watering", testId: "watering", fallbackType: "watering" },
                             { actionId: "feeding", label: "Feeding", testId: "feeding", fallbackType: "feeding" },
                             { actionId: "environment", label: "Environment check", testId: "environment", fallbackType: "environment" },

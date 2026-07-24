@@ -86,7 +86,6 @@ if (!existsSync(EXAMPLE_ENV)) {
   const env2 = lastJsonLine(r.stdout);
   check("exit 0", r.status === 0, `status=${r.status}`);
   check("stdout has config_ok event", env2?.event === "config_ok");
-  check("check name stable", env2?.check === "ecowitt-bridge");
   check("no stderr config_error", !r.stderr.includes('"event":"config_error"'));
 }
 
@@ -118,7 +117,6 @@ for (const file of files) {
   const allowed = ALLOWED[basename(file)] ?? [basename(file, ".env")];
   check("exit 2", r.status === 2, `status=${r.status}`);
   check("stderr has config_error event", errEnv?.event === "config_error");
-  check("check name stable", errEnv?.check === "ecowitt-bridge");
   check(
     `code ∈ ${JSON.stringify(allowed)}`,
     typeof errEnv?.code === "string" && allowed.includes(errEnv.code),

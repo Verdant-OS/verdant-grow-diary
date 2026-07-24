@@ -54,7 +54,12 @@ describe("fastAddActionRules", () => {
     const intent = resolveFastAddIntent("watering", ctx);
     expect(intent.kind).toBe("open-quicklog-v2");
     if (intent.kind === "open-quicklog-v2") {
-      expect(intent.detail).toEqual({ targetKey: "plant:p1", action: "water" });
+      // "Captured" seed from the preset click — the report/calendar grouping key.
+      expect(intent.detail).toEqual({
+        targetKey: "plant:p1",
+        action: "water",
+        loggedAt: expect.any(String),
+      });
       expect(intent.eventName).toBe("verdant:open-quicklog-v2");
     }
   });
@@ -129,6 +134,7 @@ describe("GlobalFastAddButton", () => {
     expect(onDispatchEvent).toHaveBeenCalledWith("verdant:open-quicklog-v2", {
       targetKey: "plant:p1",
       action: "water",
+      loggedAt: expect.any(String),
     });
   });
 

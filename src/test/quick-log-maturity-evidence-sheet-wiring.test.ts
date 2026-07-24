@@ -25,8 +25,10 @@ describe("Quick Log maturity evidence sheet wiring", () => {
     expect(text).toContain("buildQuickLogMaturityEvidenceDetails");
     expect(text).toContain("quickLogMaturityEvidenceReasonToMessage");
     expect(text).toContain("maturityDetails = maturityEvidence.details");
-    expect(text).toContain("baseDetails: maturityDetails");
-    expect(text).toContain("details: maturityDetails");
+    // baseDetails/details fold in logged_at (the "Captured" moment, frozen
+    // beside the idempotency key per #317) alongside maturityDetails.
+    expect(text).toContain("baseDetails: { ...(maturityDetails ?? {}), logged_at: loggedAtIso }");
+    expect(text).toContain("details: { ...(maturityDetails ?? {}), logged_at: loggedAtIso }");
   });
 
   it("resets maturity evidence with the Quick Log sheet session", () => {

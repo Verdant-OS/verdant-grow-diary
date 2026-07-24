@@ -3,28 +3,41 @@
  * Verify that every already-published Supabase migration file in the
  * current working tree matches the baseline branch byte-for-byte.
  *
- * "Already-published" = the file exists on the baseline ref (default
- * `origin/verdant-grow-diary`). New migration files that only exist on
- * the current branch are reported separately and never fail the gate —
- * they are the correct way to land follow-up changes.
+ * "Already-published" = the file exists on the baseline ref. New
+ * migration files that only exist on the current branch are reported
+ * separately and never fail the gate — they are the correct way to
+ * land follow-up changes.
  *
  * A published migration that has been edited (any byte change), deleted,
  * or replaced with a no-op counts as a FAIL. This is the invariant:
  * migration history is append-only.
  *
- * Usage (run from repo root, with git available — i.e. your Windows
- * checkout, not the Lovable sandbox):
+ * Baseline resolution precedence (first match wins):
+ *   1. --baseline=<ref>                     explicit flag
+ *   2. VERDANT_MIGRATION_BASELINE_REF       explicit env override
+ *   3. origin/$GITHUB_BASE_REF              when GITHUB_EVENT_NAME=pull_request
+ *                                           (auto-detected on GitHub Actions PRs)
+ *   4. origin/verdant-grow-diary            hard-coded fallback
  *
+ * The auto-detected PR baseline is what the `published-migration-integrity`
+ * workflow already fetches; the script now picks it up with no extra
+ * wiring so ad-hoc `node scripts/…` invocations from inside a workflow
+ * step match the CI job's baseline exactly.
+ *
+ * Usage:
  *   node scripts/verify-published-migration-integrity.mjs
  *   node scripts/verify-published-migration-integrity.mjs --baseline=origin/verdant-grow-diary
  *   node scripts/verify-published-migration-integrity.mjs --json
  *   node scripts/verify-published-migration-integrity.mjs --only=20260721
+ *   node scripts/verify-published-migration-integrity.mjs --allow=<path>:<reason>
+ *   node scripts/verify-published-migration-integrity.mjs --allow-file=allow.json
  *
  * Env overrides:
- *   VERDANT_MIGRATION_BASELINE_REF   default baseline ref
+ *   VERDANT_MIGRATION_BASELINE_REF   explicit baseline ref (beats auto-detect)
+ *   GITHUB_EVENT_NAME + GITHUB_BASE_REF   set by GitHub Actions on pull_request
  *
  * Exit codes:
- *   0  every published migration matches baseline
+ *   0  every published migration matches baseline (or is allowlisted)
  *   1  one or more published migrations were edited / deleted / no-op'd
  *   2  invocation / git / IO error (baseline ref missing, not a git repo)
  *
@@ -37,13 +50,39 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 
 const MIGRATIONS_DIR = "supabase/migrations";
-const DEFAULT_BASELINE =
-  process.env.VERDANT_MIGRATION_BASELINE_REF ?? "origin/verdant-grow-diary";
+const FALLBACK_BASELINE = "origin/verdant-grow-diary";
+
+/**
+ * Pick the baseline ref when the user did not pass --baseline.
+ *
+ * Returns an object so the CLI can log *why* a particular ref was chosen
+ * (which turns "baseline ref 'origin/foo' does not exist" errors from a
+ * mystery into a one-line "auto-detected from GITHUB_BASE_REF" trail).
+ */
+export function resolveBaseline({ explicit, env = process.env } = {}) {
+  if (explicit) return { ref: explicit, source: "flag" };
+  const envRef = env.VERDANT_MIGRATION_BASELINE_REF;
+  if (envRef && envRef.trim()) {
+    return { ref: envRef.trim(), source: "env:VERDANT_MIGRATION_BASELINE_REF" };
+  }
+  const eventName = (env.GITHUB_EVENT_NAME ?? "").trim();
+  const baseRef = (env.GITHUB_BASE_REF ?? "").trim();
+  if (
+    (eventName === "pull_request" || eventName === "pull_request_target") &&
+    baseRef
+  ) {
+    return {
+      ref: `origin/${baseRef}`,
+      source: `github:${eventName}(GITHUB_BASE_REF=${baseRef})`,
+    };
+  }
+  return { ref: FALLBACK_BASELINE, source: "fallback" };
+}
 
 // ─── arg parsing ──────────────────────────────────────────────────────
 function parseArgs(argv) {
   const out = {
-    baseline: DEFAULT_BASELINE,
+    baseline: null, // resolved lazily so we can log why it was picked
     json: false,
     only: null,
     allow: [], // Array<{ path, reason }>
@@ -59,7 +98,7 @@ function parseArgs(argv) {
       for (const entry of loadAllowFile(a.slice(13))) out.allow.push(entry);
     } else if (a === "--help" || a === "-h") {
       // eslint-disable-next-line no-console
-      console.log(readFileSync(new URL(import.meta.url)).toString().split("\n").slice(1, 34).join("\n"));
+      console.log(readFileSync(new URL(import.meta.url)).toString().split("\n").slice(1, 45).join("\n"));
       process.exit(0);
     } else {
       fail(2, `unknown arg: ${a}`);
@@ -67,6 +106,7 @@ function parseArgs(argv) {
   }
   return out;
 }
+
 
 /**
  * Parse a single `--allow=<path>:<reason>` spec. Path is normalized so
@@ -214,6 +254,15 @@ function looksLikeNoop(bytes) {
 // ─── main ─────────────────────────────────────────────────────────────
 function main() {
   const args = parseArgs(process.argv);
+  const resolved = resolveBaseline({ explicit: args.baseline });
+  args.baseline = resolved.ref;
+  args.baseline_source = resolved.source;
+  if (!args.json) {
+    // eslint-disable-next-line no-console
+    console.error(
+      `[verify-published-migration-integrity] baseline=${resolved.ref} source=${resolved.source}`,
+    );
+  }
   assertGitRepo();
   assertBaselineExists(args.baseline);
 
@@ -230,8 +279,10 @@ function main() {
 
   const results = {
     baseline: args.baseline,
+    baseline_source: args.baseline_source,
     checked: 0,
     matched: [],
+
     edited: [],
     deleted: [],
     noop_stubs: [],
@@ -319,8 +370,9 @@ function main() {
   } else {
     // eslint-disable-next-line no-console
     console.log(
-      `\n[verify-published-migration-integrity] baseline=${args.baseline}`,
+      `\n[verify-published-migration-integrity] baseline=${args.baseline} (source=${args.baseline_source})`,
     );
+
     console.log(`  checked:         ${results.checked} published migrations`);
     console.log(`  matched:         ${results.matched.length}`);
     console.log(`  edited:          ${results.edited.length}`);
@@ -369,4 +421,8 @@ function main() {
   process.exit(failures === 0 ? 0 : 1);
 }
 
-main();
+// Only run as a CLI when invoked directly — tests import resolveBaseline.
+const invokedDirectly =
+  process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href;
+if (invokedDirectly) main();
+

@@ -39,6 +39,7 @@ function parseArgs(argv) {
     bundleUrl: "",
     runUrl: "",
     failOnFlake: false,
+    quietWhenNoFailed: false,
   };
   for (const raw of argv) {
     if (raw.startsWith("--report=")) args.reportPath = raw.slice("--report=".length);
@@ -50,13 +51,15 @@ function parseArgs(argv) {
     else if (raw.startsWith("--bundle-url=")) args.bundleUrl = raw.slice("--bundle-url=".length);
     else if (raw.startsWith("--run-url=")) args.runUrl = raw.slice("--run-url=".length);
     else if (raw === "--fail-on-flake") args.failOnFlake = true;
+    else if (raw === "--quiet-when-no-failed") args.quietWhenNoFailed = true;
     else if (raw === "--help" || raw === "-h") {
       process.stdout.write(
-        "Usage: summarize-playwright-flakes.mjs --report=<path> [--out=<path>] [--pr-comment=<path>] [--traces-url=<url>] [--media-url=<url>] [--report-url=<url>] [--bundle-url=<url>] [--run-url=<url>] [--fail-on-flake]\n",
+        "Usage: summarize-playwright-flakes.mjs --report=<path> [--out=<path>] [--pr-comment=<path>] [--traces-url=<url>] [--media-url=<url>] [--report-url=<url>] [--bundle-url=<url>] [--run-url=<url>] [--fail-on-flake] [--quiet-when-no-failed]\n",
       );
       process.exit(0);
     }
   }
+
   return args;
 }
 

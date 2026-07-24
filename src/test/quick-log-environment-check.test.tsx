@@ -19,6 +19,10 @@ import { render, screen, fireEvent, within, waitFor } from "@testing-library/rea
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import QuickLog from "@/components/QuickLog";
+import {
+  clearTemperatureUnitPreference,
+  saveTemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 
 const saveMock = vi.fn();
 vi.mock("@/hooks/useQuickLogV2Save", () => ({
@@ -85,6 +89,7 @@ function renderWithClient(ui: ReactElement) {
 }
 
 beforeEach(() => {
+  clearTemperatureUnitPreference();
   saveMock.mockReset();
   saveMock.mockResolvedValue({ ok: true, eventId: "ev-1" });
   insertMock.mockReset();
@@ -150,6 +155,33 @@ describe("Quick Log Environment Check — save behavior", () => {
     expect(toastSuccess).toHaveBeenCalledWith(
       expect.stringMatching(/^Saved environment check for Verdant Test Plant$/),
     );
+  });
+
+  it("labels room temperature with the active unit (fahrenheit by default)", () => {
+    const dialog = openEnvironmentForm();
+    expect(
+      within(dialog).getByLabelText("Room temperature (°F)"),
+    ).toBeInTheDocument();
+  });
+
+  it("labels room temperature in Celsius and stores temp_c when the preference is celsius", async () => {
+    saveTemperatureUnitPreference("celsius");
+    const dialog = openEnvironmentForm();
+    expect(
+      within(dialog).getByLabelText("Room temperature (°C)"),
+    ).toBeInTheDocument();
+    const ta = dialog.querySelector("textarea") as HTMLTextAreaElement;
+    fireEvent.change(ta, { target: { value: "Reading." } });
+    fireEvent.change(within(dialog).getByTestId("quick-log-env-room-temp-f"), {
+      target: { value: "24" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: /save log/i }));
+    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
+    const payload = saveMock.mock.calls[0]?.[0] as Record<string, unknown>;
+    const details = (payload.p_details ?? {}) as Record<string, unknown>;
+    const env = details.environment_check as Record<string, unknown>;
+    expect(env.temp_c).toBe(24);
+    expect(env.room_temp_f).toBe(75.2);
   });
 
   it("forwards room temp / humidity / VPD under details.environment_check", async () => {

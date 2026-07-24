@@ -27,6 +27,7 @@ import { selectLatestInputEcPh } from "@/lib/blueprintFeedingInput";
 import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";
 import { useRootZoneObservations } from "@/hooks/useRootZoneObservations";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import { canUseCapability } from "@/lib/entitlements/capabilityAccess";
 import { cn } from "@/lib/utils";
 
@@ -63,6 +64,7 @@ export function PlantBlueprintOverlaySection({
   className,
 }: PlantBlueprintOverlaySectionProps) {
   // Hooks are called unconditionally (React rules), before any early return.
+  const temperatureUnit = useTemperatureUnitPreference();
   const { entitlement, loading: entLoading, lookupFailed } = useMyEntitlements();
   const unlocked = !lookupFailed && canUseCapability(entitlement, "blueprint");
   // Only fetch live/logged data once unlocked — the locked teaser is static
@@ -86,7 +88,7 @@ export function PlantBlueprintOverlaySection({
     // the grower's own plant. The teaser is pure — derived from stage + light
     // state only, with no live values, no scoring, and no data fetch (the data
     // hooks above are disabled while locked).
-    const teaserVm = buildBlueprintTeaserViewModel({ stage, isDay });
+    const teaserVm = buildBlueprintTeaserViewModel({ stage, isDay }, temperatureUnit);
     return (
       <div data-testid="pro-blueprint-locked" className={cn("flex flex-col gap-3", className)}>
         <BlueprintTeaser vm={teaserVm} />
@@ -95,13 +97,16 @@ export function PlantBlueprintOverlaySection({
     );
   }
 
-  const vm = buildBlueprintOverlayViewModel({
-    stage,
-    snapshot: snapState.snapshot,
-    latestFeeding: selectLatestInputEcPh(observations),
-    dli: null,
-    isDay,
-  });
+  const vm = buildBlueprintOverlayViewModel(
+    {
+      stage,
+      snapshot: snapState.snapshot,
+      latestFeeding: selectLatestInputEcPh(observations),
+      dli: null,
+      isDay,
+    },
+    temperatureUnit,
+  );
 
   return <ProBlueprintOverlay vm={vm} className={className} />;
 }

@@ -79,7 +79,13 @@ describe("public VPD calculator page", () => {
 
     await user.selectOptions(screen.getByLabelText("Plant stage"), "veg");
     expect(screen.getByTestId("public-vpd-blueprint-teaser")).toBeInTheDocument();
-    // Real per-stage SOP bands (the same BlueprintTeaser shipped in-app).
+    // Real per-stage SOP bands (the same BlueprintTeaser shipped in-app),
+    // matching this page's own calculator unit toggle (°F by default).
+    expect(screen.getByTestId("pro-blueprint-teaser-row-tempC").textContent).toMatch(/°F/);
+
+    // Switching the calculator's own unit toggle flips the teaser too —
+    // the two must never disagree on the same page.
+    await user.selectOptions(screen.getByLabelText("Temperature unit"), "C");
     expect(screen.getByTestId("pro-blueprint-teaser-row-tempC").textContent).toMatch(/°C/);
 
     await user.click(screen.getByRole("link", { name: "See Craft & the Pro Blueprint" }));

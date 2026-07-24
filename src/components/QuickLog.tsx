@@ -365,6 +365,10 @@ export default function QuickLog({
     temperatureUnitPreference === "celsius" ? "C" : "F";
   const [envWaterTempUnit, setEnvWaterTempUnit] =
     useState<EnvironmentCheckWaterTempUnit>(defaultEnvWaterTempUnit);
+  // Room temperature has no independent unit selector of its own — it
+  // always follows the grower's global display preference directly.
+  const envRoomTempUnit: EnvironmentCheckWaterTempUnit =
+    temperatureUnitPreference === "celsius" ? "C" : "F";
   const [envEcMscm, setEnvEcMscm] = useState<string>("");
   const [harvestPhotoAngle, setHarvestPhotoAngle] = useState<HarvestPhotoAngle | "">("");
   const [harvestPhotoLighting, setHarvestPhotoLighting] = useState<HarvestPhotoLighting | "">("");
@@ -1016,6 +1020,7 @@ export default function QuickLog({
       if (saveEventType === "environment") {
         const bandCheck = validateEnvironmentCheckSensorBand({
           roomTempF: envRoomTempF,
+          roomTempUnit: envRoomTempUnit,
           humidityPct: envHumidityPct,
           vpdKpa: envVpdKpa,
         });
@@ -1031,6 +1036,7 @@ export default function QuickLog({
         saveEventType === "environment"
           ? buildEnvironmentCheckDetails({
               roomTempF: envRoomTempF,
+              roomTempUnit: envRoomTempUnit,
               humidityPct: envHumidityPct,
               vpdKpa: envVpdKpa,
               waterTempValue: envWaterTempValue,
@@ -2153,6 +2159,7 @@ export default function QuickLog({
               (() => {
                 const hasMeasurement = hasAnyEnvironmentCheckMeasurement({
                   roomTempF: envRoomTempF,
+                  roomTempUnit: envRoomTempUnit,
                   humidityPct: envHumidityPct,
                   vpdKpa: envVpdKpa,
                   waterTempValue: envWaterTempValue,
@@ -2195,7 +2202,7 @@ export default function QuickLog({
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <Label className="text-xs" htmlFor="quick-log-env-room-temp-f">
-                          Room temperature (°F)
+                          Room temperature ({envRoomTempUnit === "C" ? "°C" : "°F"})
                         </Label>
                         <Input
                           id="quick-log-env-room-temp-f"
@@ -2206,7 +2213,7 @@ export default function QuickLog({
                             if (restoreLockedDraftValue(e.currentTarget, envRoomTempF)) return;
                             setEnvRoomTempF(e.target.value);
                           }}
-                          placeholder="76"
+                          placeholder={envRoomTempUnit === "C" ? "24" : "76"}
                           autoComplete="off"
                         />
                       </div>
@@ -2345,7 +2352,8 @@ export default function QuickLog({
                       (() => {
                         const normPreviewVm = buildSensorNormalizationPreviewViewModel({
                           payload: {
-                            temperature_f: envRoomTempF || undefined,
+                            [envRoomTempUnit === "C" ? "temperature_c" : "temperature_f"]:
+                              envRoomTempF || undefined,
                             humidity_pct: envHumidityPct || undefined,
                             vpd_kpa: envVpdKpa || undefined,
                             soil_ec_ms_cm: envEcMscm || undefined,

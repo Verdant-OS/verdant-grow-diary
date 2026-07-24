@@ -289,6 +289,29 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     expect(screen.queryByTestId("quick-log-all-activities-saved-item")).toBeNull();
   });
 
+  it("Photo insert REJECTION surfaces an error and removes the orphaned upload", async () => {
+    diaryInsertMock.mockImplementationOnce(async () => {
+      throw new Error("network interrupted");
+    });
+    mountSection();
+    selectActivity("photo");
+    await screen.findByTestId("quick-log-all-activities-form");
+    const file = new File(["img-bytes"], "bud.jpg", { type: "image/jpeg" });
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-photo-file"), {
+      target: { files: [file] },
+    });
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("quick-log-all-activities-error")).toHaveTextContent(
+        /photo save failed/i,
+      ),
+    );
+    // The uploaded object is cleaned up, and no success artifacts appear.
+    await waitFor(() => expect(storageRemoveMock).toHaveBeenCalledTimes(1));
+    expect(screen.queryByTestId("quick-log-all-activities-saved-item")).toBeNull();
+  });
+
   it("Issue/Observation → quicklog_save_event carries observed sign + location (never a cause)", async () => {
     rpcMock.mockResolvedValueOnce({
       data: { ok: true, grow_event_id: "e-obs" },

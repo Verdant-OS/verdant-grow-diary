@@ -428,6 +428,9 @@ export default function QuickLogAllActivitiesSection({
         }
         if (photoDiaryInFlightRef.current) return;
         photoDiaryInFlightRef.current = true;
+        // Tracks a successful upload so a LATER rejection (e.g. the diary
+        // insert dying mid-network) can clean up the orphaned object.
+        let uploadedPath: string | null = null;
         try {
           const ext = (photoFile.name.split(".").pop() || "jpg").toLowerCase();
           // RLS: the first path segment MUST be the uploader's auth.uid().
@@ -440,6 +443,7 @@ export default function QuickLogAllActivitiesSection({
             setErrorForActivity(selected.id);
             return;
           }
+          uploadedPath = path;
           // Structured photo detail (subject/caption) rides the same diary row.
           const photoExtraDetails: Record<string, string> = {};
           for (const [k, v] of Object.entries(extraDetails)) {
@@ -481,6 +485,20 @@ export default function QuickLogAllActivitiesSection({
             source: "quick_log_v2",
           });
           trackQuickLogSuccess("photo", { reused: false });
+        } catch {
+          // A REJECTED promise (network interruption) must never escape the
+          // click handler as a silent nothing: surface the failure and clean
+          // up an already-uploaded object so no orphan is left behind.
+          if (uploadedPath) {
+            try {
+              await supabase.storage.from("diary-photos").remove([uploadedPath]);
+            } catch {
+              // Best-effort only.
+            }
+          }
+          setErrorReason("Photo save failed. Nothing was saved.");
+          setErrorForActivity(selected.id);
+          return;
         } finally {
           photoDiaryInFlightRef.current = false;
         }

@@ -16,6 +16,7 @@ import {
 } from "@/lib/sensorSnapshotStatusContract";
 import { isSensorTestbenchRow } from "@/lib/sensorTestbenchIndicatorRules";
 import { resolveSensorObservationTime } from "@/lib/sensorObservationTimeRules";
+import { normalizePlantType } from "@/lib/plantTypeRules";
 
 const VALID_SOURCES: readonly SensorReadingSource[] = [
   "live",

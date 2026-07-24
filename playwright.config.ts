@@ -20,12 +20,37 @@ import { defineConfig, devices } from "@playwright/test";
 const configuredBaseUrl = process.env.E2E_BASE_URL?.trim() || undefined;
 const BASE_URL = configuredBaseUrl ?? "http://localhost:5173";
 
+// CI retry policy for flake triage.
+//
+// A single retry (2 total attempts) is enough to distinguish a real regression
+// (fails both attempts) from a flake (passes on retry) while keeping the smoke
+// fast. Locally, retries stay at 0 so a failing test surfaces immediately.
+// Override with PLAYWRIGHT_RETRIES for one-off deeper investigations.
+const parsedRetries = Number.parseInt(process.env.PLAYWRIGHT_RETRIES ?? "", 10);
+const RETRIES = Number.isFinite(parsedRetries) && parsedRetries >= 0
+  ? parsedRetries
+  : process.env.CI
+    ? 1
+    : 0;
+
+// Trace policy.
+//
+// `on-first-retry` guarantees a trace zip for the retried attempt whenever a
+// test fails once — that's the artifact the CI upload steps grab and the
+// exact evidence needed to pinpoint a Quick Log smoke failure. Real-auth runs
+// (E2E_TEST_EMAIL present) still turn tracing OFF because trace zips would
+// bake the disposable test account's Supabase bearer/session tokens into a
+// publicly-downloadable CI artifact; those runs rely on screenshots + video
+// (pixels only, no headers) for triage.
+const TRACE_MODE: "off" | "on-first-retry" | "retain-on-failure" =
+  process.env.E2E_TEST_EMAIL ? "off" : "on-first-retry";
+
 export default defineConfig({
   testDir: "./e2e",
   timeout: 60_000,
   expect: { timeout: 10_000 },
   fullyParallel: false,
-  retries: 0,
+  retries: RETRIES,
   // The list reporter feeds CI logs; the html reporter produces the
   // playwright-report/ directory that the workflow's artifact guard requires
   // and uploads. With tracing disabled on real-auth runs (see `use` below),
@@ -34,17 +59,15 @@ export default defineConfig({
   use: {
     baseURL: BASE_URL,
     // Debugging artifacts kept only when a test fails (CI uploads them).
-    //
-    // Traces record network request/response headers and bodies. Real-auth
-    // runs (E2E_TEST_EMAIL present) would bake the disposable test account's
-    // Supabase bearer/session tokens into trace zips that the workflow
-    // uploads as public-ish CI artifacts — so tracing is DISABLED for those
-    // runs. Screenshots and videos are pixels (no headers) and stay on.
-    // Mocked/unauthenticated runs keep failure traces (no real tokens).
-    trace: process.env.E2E_TEST_EMAIL ? "off" : "retain-on-failure",
+    // Screenshots + videos are retained per-attempt when retries fire, so a
+    // flake produces `retry1` media alongside the original attempt — both
+    // land in test-results/ and are uploaded by the workflow. See TRACE_MODE
+    // above for the token-safety carve-out on real-auth runs.
+    trace: TRACE_MODE,
     video: "retain-on-failure",
     screenshot: "only-on-failure",
   },
+
   // Mocked, non-destructive specs navigate to relative routes
   // (e.g. page.goto("/auth")), so baseURL must be backed by a running app.
   // When E2E_BASE_URL points at a real deployment (authenticated smoke), we

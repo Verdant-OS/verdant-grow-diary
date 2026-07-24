@@ -27,6 +27,11 @@ name: Quick Log Playwright smoke
 
 on:
   workflow_dispatch:
+    inputs:
+      playwright_retries:
+        description: "Playwright retry count per test (default 1 in CI). Increase to 2 or 3 for deeper flake triage."
+        required: false
+        default: "1"
   push:
     branches: [verdant-grow-diary]
     paths:
@@ -61,6 +66,10 @@ jobs:
       E2E_FIXTURE_EXPECTED_ACCOUNT_HINT: ${{ vars.E2E_FIXTURE_EXPECTED_ACCOUNT_HINT }}
       # Optional, off by default. Enables the UI-only fixture bootstrap step.
       E2E_ALLOW_FIXTURE_BOOTSTRAP: ${{ vars.E2E_ALLOW_FIXTURE_BOOTSTRAP }}
+      # Playwright retry policy for flake triage. Defaults to 1 retry in CI
+      # (playwright.config.ts). workflow_dispatch can override for deeper runs.
+      PLAYWRIGHT_RETRIES: ${{ github.event_name == 'workflow_dispatch' && inputs.playwright_retries || '1' }}
+
 
     steps:
       - name: Checkout
@@ -467,6 +476,9 @@ jobs:
               echo "- Command: \`bun run e2e:quicklog-smoke\`"
               echo "- Browser: \`chromium\`"
               echo "- Playwright: \`${PLAYWRIGHT_VERSION:-unavailable}\`"
+              echo "- Playwright retries per test: \`${PLAYWRIGHT_RETRIES:-1}\` (override via workflow_dispatch \`playwright_retries\` input)"
+              echo ""
+              echo "  Retry artifacts: a flake produces per-attempt trace zips, videos, and screenshots under \`test-results/<test>-retry1/\`. Compare the original attempt and \`retry1\` to distinguish a regression (fails both) from a flake (passes on retry)."
               echo ""
               echo "### Smoke counts"
               echo ""

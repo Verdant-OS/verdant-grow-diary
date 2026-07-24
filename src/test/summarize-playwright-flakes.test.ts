@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 // @ts-ignore - .mjs script exports pure helpers for testing.
-import { buildSummary, classifyTest } from "../../scripts/summarize-playwright-flakes.mjs";
+import { buildSummary, classifyTest, buildPrComment } from "../../scripts/summarize-playwright-flakes.mjs";
 
 const flakyReport = {
   suites: [

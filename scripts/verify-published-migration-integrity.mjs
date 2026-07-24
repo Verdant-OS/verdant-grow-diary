@@ -254,6 +254,15 @@ function looksLikeNoop(bytes) {
 // ─── main ─────────────────────────────────────────────────────────────
 function main() {
   const args = parseArgs(process.argv);
+  const resolved = resolveBaseline({ explicit: args.baseline });
+  args.baseline = resolved.ref;
+  args.baseline_source = resolved.source;
+  if (!args.json) {
+    // eslint-disable-next-line no-console
+    console.error(
+      `[verify-published-migration-integrity] baseline=${resolved.ref} source=${resolved.source}`,
+    );
+  }
   assertGitRepo();
   assertBaselineExists(args.baseline);
 
@@ -270,8 +279,10 @@ function main() {
 
   const results = {
     baseline: args.baseline,
+    baseline_source: args.baseline_source,
     checked: 0,
     matched: [],
+
     edited: [],
     deleted: [],
     noop_stubs: [],

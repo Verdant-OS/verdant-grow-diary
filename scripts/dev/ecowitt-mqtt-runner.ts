@@ -354,6 +354,27 @@ export function resolveRunnerModeConfig(
   return { upstreamMode, mappingPath: mappingPath.trim(), mapping };
 }
 
+/**
+ * Fail-closed single-tent startup guard for the HA runner. Executed
+ * BEFORE the MQTT dynamic import, broker connect, subscribe, or the HA
+ * dry-run loop. `ecowitt_raw` uses `VERDANT_TENT_ID` directly and has
+ * no mapping file, so this is a no-op for that mode. HA modes delegate
+ * to the shared pure guard, which raises `EcowittBridgeConfigError`
+ * (id-safe / path-safe message) on any mixed-tent or tent-mismatch
+ * configuration. Exported so tests can drive it directly.
+ */
+export function assertRunnerStartupSafe(
+  config: RunnerModeConfig,
+  env: NodeJS.ProcessEnv,
+): void {
+  if (config.upstreamMode === "ecowitt_raw" || !config.mapping) return;
+  assertSingleTentHaMappingEntities(
+    config.mapping.entities,
+    typeof env.VERDANT_TENT_ID === "string" ? env.VERDANT_TENT_ID : undefined,
+  );
+}
+
+
 // ---------------------------------------------------------------------------
 // HA dry-run pipeline (ha_json + ha_statestream)
 // ---------------------------------------------------------------------------

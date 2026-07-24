@@ -202,7 +202,9 @@ export function resolveFastAddIntent(
  *
  * Rules:
  *  - All logging presets set `occurred_at = now`.
- *  - Environment additionally sets `captured_at = now`.
+ *  - Environment and Training additionally set `captured_at = now` — both
+ *    represent an event happening in the tent at the moment of capture,
+ *    so the two timestamps line up for consistent timeline sorting.
  *  - Diagnosis is navigation-only and returns {}.
  */
 export function buildFastAddTimestampDefaults(
@@ -211,7 +213,7 @@ export function buildFastAddTimestampDefaults(
 ): FastAddTimestampDefaults {
   if (actionId === "diagnosis") return {};
   const iso = now().toISOString();
-  if (actionId === "environment") {
+  if (actionId === "environment" || actionId === "training") {
     return { occurred_at: iso, captured_at: iso };
   }
   return { occurred_at: iso };

@@ -101,6 +101,18 @@ export interface QuickLogAllActivitiesSectionProps {
    * When absent, the section seeds its own form-open time.
    */
   defaultLoggedAtIso?: string | null;
+  /**
+   * Display-only label of the current target (e.g. "Blue Dream · Tent 2").
+   * Renders as a chip on the capture form so the grower always sees what
+   * they are logging against.
+   */
+  targetLabel?: string | null;
+  /**
+   * Parent-owned retarget affordance (the parent owns target selection).
+   * When provided, the chip shows a "Change" action that invokes it —
+   * timestamps in this section survive the change (see target-change effect).
+   */
+  onRequestTargetChange?: (() => void) | null;
 }
 
 export interface QuickLogAllActivitiesSaveTarget {
@@ -166,6 +178,8 @@ export default function QuickLogAllActivitiesSection({
   onBeforeStructuredWaterOpen,
   externalPersistenceBlockReason = null,
   defaultLoggedAtIso = null,
+  targetLabel = null,
+  onRequestTargetChange = null,
 }: QuickLogAllActivitiesSectionProps) {
   const currentTarget = useMemo(
     () => buildQuickLogTargetIdentity({ growId, tentId, plantId }),
@@ -214,19 +228,30 @@ export default function QuickLogAllActivitiesSection({
 
     // Drafts and receipts are target-specific. Never carry plant A's state
     // into plant B's Quick Log surface.
-    setSelectedDraft(null);
+    // Retarget continuity: REBIND an open draft to the new target instead of
+    // discarding it — the pre-persistence gate re-checks draft-vs-current
+    // target at save time, so a rebound draft stays fail-closed while the
+    // grower keeps their place (and the chip shows the new target).
+    setSelectedDraft((prev) =>
+      prev ? bindQuickLogActivityDraft(prev.activityId, currentTarget) : null,
+    );
     setNote("");
     setHarvestWet("");
     setHarvestDry("");
     setHarvestUnit("g");
     setDetailValues({});
-    setOccurredAtLocal("");
-    setLoggedAtIso("");
+    // Deliberately NOT resetting occurredAtLocal / loggedAtIso here: the
+    // dual timestamps are grower record-keeping (when it happened / when it
+    // was captured), not target-bound state — retargeting mid-entry must
+    // never lose them. Content fields above still reset fail-closed so a
+    // note about plant A can never silently save against plant B.
     setPhotoFile(null);
     setErrorReason(null);
     setErrorForActivity(null);
     setStructuredWaterError(null);
     setSaved([]);
+    // currentTarget is stable per currentTargetKey (memo of the same inputs).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentTargetKey]);
 
   const canPersistManualSensor = false; // Deferred to ManualSensorReadingCard.
@@ -708,6 +733,31 @@ export default function QuickLogAllActivitiesSection({
             <p className="text-xs font-medium">{selected.label}</p>
             <p className="text-[11px] text-muted-foreground">{selected.safetyNote}</p>
           </div>
+
+          {targetLabel && (
+            <div
+              className="flex items-center gap-2 flex-wrap"
+              data-testid={`${testIdPrefix}-target-chip`}
+            >
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-border/50 bg-secondary/40 px-2.5 py-0.5 text-[11px]">
+                Logging against: <span className="font-medium">{targetLabel}</span>
+              </span>
+              {onRequestTargetChange && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isMutationBlocked()) return;
+                    onRequestTargetChange();
+                  }}
+                  disabled={mutationBlocked}
+                  className="text-[11px] underline text-muted-foreground hover:text-foreground disabled:opacity-50"
+                  data-testid={`${testIdPrefix}-target-chip-change`}
+                >
+                  Change (keeps your timestamps)
+                </button>
+              )}
+            </div>
+          )}
 
           {selected.id === "harvest" && selectedAvailability?.disabled && (
             <p

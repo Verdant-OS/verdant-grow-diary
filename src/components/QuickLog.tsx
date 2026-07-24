@@ -1318,6 +1318,14 @@ export default function QuickLog({
           heading="All activity types"
           testIdPrefix="quick-log-dialog-all-activities"
           defaultLoggedAtIso={prefill?.logged_at ?? null}
+          targetLabel={
+            resolvedTarget
+              ? `${targetPlantName}${
+                  resolvedTargetTent?.name ? ` · ${resolvedTargetTent.name}` : ""
+                }`
+              : null
+          }
+          onRequestTargetChange={focusPlant}
           onSaveStart={beginAllActivitiesSave}
           onSaveEnd={endAllActivitiesSave}
           saveBlocked={saveLocked}

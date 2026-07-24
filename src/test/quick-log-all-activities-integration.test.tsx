@@ -451,6 +451,64 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     expect(rpcMock).not.toHaveBeenCalled();
   });
 
+  it("mid-open retarget: timestamps survive, draft resets, save binds the NEW target", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: { ok: true, grow_event_id: "e-retarget" },
+      error: null,
+    });
+    const view = mountSection({ targetLabel: "Plant A · Tent 1" });
+    selectActivity("training");
+    await screen.findByTestId("quick-log-all-activities-form");
+    // Chip shows the current target with the timestamp-preserving change affordance.
+    expect(screen.getByTestId("quick-log-all-activities-target-chip")).toHaveTextContent(
+      /plant a · tent 1/i,
+    );
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-occurred-at"), {
+      target: { value: "2026-07-20T09:30" },
+    });
+
+    // Parent retargets (plant swap) mid-open — the fail-closed effect must
+    // reset the draft selection but PRESERVE the grower's timestamps.
+    view.rerender(
+      <QuickLogAllActivitiesSection
+        growId={GROW}
+        tentId={TENT}
+        plantId="plant-2"
+        plantStage="flower"
+        targetLabel="Plant B · Tent 1"
+      />,
+    );
+    // The draft REBINDS to the new target — the form stays open (content
+    // fields reset fail-closed; the pre-persistence gate re-checks at save).
+    expect(screen.getByTestId("quick-log-all-activities-form")).toBeInTheDocument();
+    // Timestamps survived the retarget.
+    expect(screen.getByTestId("quick-log-all-activities-occurred-at")).toHaveValue(
+      "2026-07-20T09:30",
+    );
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-note"), {
+      target: { value: "after retarget" },
+    });
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
+    await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(1));
+    const [, args] = rpcMock.mock.calls[0];
+    // The save binds the NEW plant and keeps the preserved backdate.
+    expect(args.p_plant_id).toBe("plant-2");
+    expect(args.p_occurred_at).toBe(new Date("2026-07-20T09:30").toISOString());
+  });
+
+  it("Fast Add prefill seed: defaultLoggedAtIso flows into details.logged_at", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: { ok: true, grow_event_id: "e-seed" },
+      error: null,
+    });
+    const SEED = "2026-07-24T05:00:00.000Z";
+    mountSection({ defaultLoggedAtIso: SEED });
+    await saveWithNote("training", "seeded from fast add");
+    await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(1));
+    const [, args] = rpcMock.mock.calls[0];
+    expect(args.p_details.logged_at).toBe(SEED);
+  });
+
   it("Training drops an unchosen (blank) technique — no technique key in p_details", async () => {
     rpcMock.mockResolvedValueOnce({
       data: { ok: true, grow_event_id: "e-train2" },

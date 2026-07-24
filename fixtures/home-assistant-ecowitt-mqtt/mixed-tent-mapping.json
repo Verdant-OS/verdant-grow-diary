@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "bridge": "home_assistant",
+  "upstream_mode": "ha_core_ecowitt_push",
+  "statestream_topic_prefix": "homeassistant",
+  "entities": [
+    {
+      "entity_id": "sensor.ecowitt_tent_a_soil_moisture_1",
+      "metric": "soil_moisture_pct",
+      "expected_unit": "%",
+      "tent_id": "00000000-0000-0000-0000-0000000000aa",
+      "plant_id": null,
+      "channel": "soil_1"
+    },
+    {
+      "entity_id": "sensor.ecowitt_tent_b_soil_moisture_1",
+      "metric": "soil_moisture_pct",
+      "expected_unit": "%",
+      "tent_id": "00000000-0000-0000-0000-0000000000bb",
+      "plant_id": null,
+      "channel": "soil_1"
+    }
+  ]
+}

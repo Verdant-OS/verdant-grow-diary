@@ -98,11 +98,17 @@ d("ecowitt-live-soil-bridge CLI — machine-readable error codes", () => {
     const env = findConfigErrorEnvelope(r.stderr);
     expect(env).not.toBeNull();
     expect(env?.code).toBe("mixed_tent_channel_map");
-    // Never leak tent UUIDs or channel identifiers.
+    // Never leak tent UUIDs. Channel keys (soilmoistureN) ARE structural
+    // and intentionally surfaced via the fields[] array so operators can
+    // pinpoint the offending entry — asserted directly below.
     expect(r.stderr).not.toContain(TENT_A);
     expect(r.stderr).not.toContain(TENT_B);
-    expect(r.stderr).not.toContain("soilmoisture1");
-    expect(r.stderr).not.toContain("soilmoisture2");
+    expect(env?.fields).toEqual([
+      {
+        path: "$.soilmoisture2.tent_id",
+        message: "tent_id differs from tent_id used by other channels in the map",
+      },
+    ]);
   });
 
   it("emits code=channel_map_tent_mismatch when a channel disagrees with VERDANT_TENT_ID", () => {

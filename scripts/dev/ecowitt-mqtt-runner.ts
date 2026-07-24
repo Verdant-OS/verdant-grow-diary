@@ -23,11 +23,7 @@
  * fixtures/home-assistant-ecowitt-mqtt/example-mapping.json). The file
  * is read once at startup, read-only. A missing, unreadable, or invalid
  * mapping fails closed with a path-safe error that never echoes file
- * contents. Every entity in that mapping MUST route to the same
- * `tent_id` (one bridge process → one tent); mixed-tent mappings are
- * rejected before any MQTT import or broker connection, and if
- * `VERDANT_TENT_ID` is set the mapping's tent must match it. The
- * runner exits with code 2 on any such violation.
+ * contents.
  *
  * HA modes are dry-run only: they normalize through the pure
  * homeAssistantEcowittMqttAdapter, print evidence reports with hav2
@@ -61,9 +57,6 @@
  */
 
 import { readFileSync } from "node:fs";
-import {
-  assertSingleTentHaMappingEntities,
-} from "../../src/lib/ecowittLiveSoilIngestRules";
 import {
   buildEcowittLocalTestPayload,
   redactBridgeToken,
@@ -352,27 +345,6 @@ export function resolveRunnerModeConfig(
   });
   return { upstreamMode, mappingPath: mappingPath.trim(), mapping };
 }
-
-/**
- * Fail-closed single-tent startup guard for the HA runner. Executed
- * BEFORE the MQTT dynamic import, broker connect, subscribe, or the HA
- * dry-run loop. `ecowitt_raw` uses `VERDANT_TENT_ID` directly and has
- * no mapping file, so this is a no-op for that mode. HA modes delegate
- * to the shared pure guard, which raises `EcowittBridgeConfigError`
- * (id-safe / path-safe message) on any mixed-tent or tent-mismatch
- * configuration. Exported so tests can drive it directly.
- */
-export function assertRunnerStartupSafe(
-  config: RunnerModeConfig,
-  env: NodeJS.ProcessEnv,
-): void {
-  if (config.upstreamMode === "ecowitt_raw" || !config.mapping) return;
-  assertSingleTentHaMappingEntities(
-    config.mapping.entities,
-    typeof env.VERDANT_TENT_ID === "string" ? env.VERDANT_TENT_ID : undefined,
-  );
-}
-
 
 // ---------------------------------------------------------------------------
 // HA dry-run pipeline (ha_json + ha_statestream)
@@ -1126,10 +1098,6 @@ async function main(): Promise<void> {
   let modeConfig: RunnerModeConfig;
   try {
     modeConfig = resolveRunnerModeConfig(process.env);
-    // Single-tent startup guard — MUST run before runHaDryRunLoop,
-    // connectMqttClient, and any `mqtt` dynamic import. Rejects mixed-
-    // tent HA mappings and mappings that disagree with VERDANT_TENT_ID.
-    assertRunnerStartupSafe(modeConfig, process.env);
   } catch (e) {
     // eslint-disable-next-line no-console
     console.error(
@@ -1139,7 +1107,6 @@ async function main(): Promise<void> {
     process.exit(2);
     return;
   }
-
 
   if (modeConfig.upstreamMode !== "ecowitt_raw") {
     // eslint-disable-next-line no-console

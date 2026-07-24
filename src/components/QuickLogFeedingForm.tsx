@@ -28,12 +28,43 @@ import {
   EC_COMPENSATION_PREVIEW_DISCLAIMER,
 } from "@/lib/ecCompensationPreviewViewModel";
 import { updateEcPpm500Pair, type EcPpm500EditSource } from "@/lib/ecPpm500PairRules";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
+import {
+  fahrenheitToCelsius,
+  getTemperatureUnitSymbol,
+  type TemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
+
+const PLAIN_TEMP_INPUT = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/;
+
+/**
+ * Convert the grower-typed water temperature (entered in the active
+ * preference unit) into a canonical-°C string EXACTLY ONCE for the
+ * review/EC-preview consumers, which interpret their input as °C.
+ * Blank stays blank and non-numeric text passes through unchanged so
+ * the existing validators keep rejecting it with their original reasons.
+ */
+function typedTempToCelsiusInput(raw: string, unit: TemperatureUnitPreference): string {
+  if (unit !== "fahrenheit") return raw;
+  const trimmed = raw.trim();
+  if (trimmed === "" || !PLAIN_TEMP_INPUT.test(trimmed)) return raw;
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed)) return raw;
+  return String(Math.round(fahrenheitToCelsius(parsed) * 100) / 100);
+}
 
 interface Props {
   value: QuickLogFeedingFormState;
   onChange: (next: QuickLogFeedingFormState) => void;
   disabled?: boolean;
   defaultsApplied?: boolean;
+  /**
+   * The temperatureUnit pinned at the moment the grower started typing the
+   * Water temperature draft (set by the parent QuickLogV2Sheet). Falls back
+   * to the live preference when no draft is in progress, so this preview
+   * always agrees with what the write seam will actually save.
+   */
+  entryTemperatureUnit?: TemperatureUnitPreference;
 }
 
 export default function QuickLogFeedingForm({
@@ -41,7 +72,18 @@ export default function QuickLogFeedingForm({
   onChange,
   disabled,
   defaultsApplied = false,
+  entryTemperatureUnit,
 }: Props) {
+  const temperatureUnit = useTemperatureUnitPreference();
+  // Display-side canonicalization only: the write seam converts from the
+  // raw typed value itself (QuickLogV2Sheet), never from this derived copy,
+  // so no value is ever converted twice. Uses the entry-pinned unit (when
+  // available) so this preview never disagrees with what will be saved.
+  const canonicalWaterTempC = typedTempToCelsiusInput(
+    value.waterTempC,
+    entryTemperatureUnit ?? temperatureUnit,
+  );
+
   const setField = <K extends keyof QuickLogFeedingFormState>(
     k: K,
     v: QuickLogFeedingFormState[K],
@@ -65,7 +107,14 @@ export default function QuickLogFeedingForm({
     onChange({ ...value, [ecKey]: pair.ec, [ppmKey]: pair.ppm });
   };
 
-  const review = buildFeedingReview(value, defaultsApplied);
+  // The review is a display surface: show the grower's own typed value in
+  // their active unit, not the canonical-°C conversion (that's only for
+  // the save payload and the EC-compensation preview below). Uses the
+  // entry-pinned unit (when a draft is in progress) so the label never
+  // disagrees with what the write seam will actually save — mirrors
+  // canonicalWaterTempC above.
+  const entryTemperatureUnitSymbol = getTemperatureUnitSymbol(entryTemperatureUnit ?? temperatureUnit);
+  const review = buildFeedingReview(value, defaultsApplied, entryTemperatureUnit ?? temperatureUnit);
 
   return (
     <div className="space-y-4" data-testid="qlv2-feeding-form">
@@ -268,7 +317,7 @@ export default function QuickLogFeedingForm({
             />
           </div>
           <div>
-            <Label htmlFor="qlv2-feed-water-temp">Water (°C)</Label>
+            <Label htmlFor="qlv2-feed-water-temp">Water ({entryTemperatureUnitSymbol})</Label>
             <Input
               id="qlv2-feed-water-temp"
               inputMode="decimal"
@@ -348,7 +397,7 @@ export default function QuickLogFeedingForm({
                 <dd className="font-medium">{review.note}</dd>
               </div>
             )}
-            <EcCompensationPreviewLine ec={value.ecIn} waterTempC={value.waterTempC} />
+            <EcCompensationPreviewLine ec={value.ecIn} waterTempC={canonicalWaterTempC} />
           </dl>
         )}
       </div>

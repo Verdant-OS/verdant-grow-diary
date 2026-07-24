@@ -1,6 +1,7 @@
 /** Pure review model for the structured Quick Log Water form. */
 
 import type { QuickLogWateringFormState } from "./quickLogWateringFormViewModel";
+import { getTemperatureUnitSymbol, type TemperatureUnitPreference } from "./temperatureUnitPreference";
 
 export const WATERING_REVIEW_TITLE = "Review watering record" as const;
 export const WATERING_REVIEW_NEEDS_INPUT =
@@ -44,7 +45,10 @@ function pushIfPresent(items: WateringReviewItem[], label: string, raw: string):
   if (value !== "") items.push({ label, value });
 }
 
-export function buildWateringReview(form: QuickLogWateringFormState): WateringReviewModel {
+export function buildWateringReview(
+  form: QuickLogWateringFormState,
+  tempUnit: TemperatureUnitPreference = "celsius",
+): WateringReviewModel {
   const volumeRaw = form.volumeMl.trim();
   const volume = /^\+?(?:\d+(?:\.\d*)?|\.\d+)$/.test(volumeRaw) ? Number(volumeRaw) : Number.NaN;
   const needsInput = !Number.isFinite(volume) || volume <= 0 || volume > 1_000_000;
@@ -57,7 +61,11 @@ export function buildWateringReview(form: QuickLogWateringFormState): WateringRe
   pushIfPresent(measurements, "Runoff pH", form.runoffPh);
   pushIfPresent(measurements, "Runoff EC (mS/cm)", form.runoffEc);
   pushIfPresent(measurements, "Runoff PPM (500)", form.runoffPpm);
-  pushIfPresent(measurements, "Water temperature (°C)", form.waterTempC);
+  pushIfPresent(
+    measurements,
+    `Water temperature (${getTemperatureUnitSymbol(tempUnit)})`,
+    form.waterTempC,
+  );
 
   const manualObservations: WateringReviewItem[] = [];
   if (form.potWeightFeel) {

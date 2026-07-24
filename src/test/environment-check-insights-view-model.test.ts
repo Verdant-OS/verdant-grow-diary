@@ -59,11 +59,15 @@ describe("environmentCheckInsightsViewModel", () => {
   });
 
   it("computes min/max/average over numeric samples", () => {
-    const vm = buildEnvironmentCheckInsightsViewModel([
-      makeEntry("a", "2026-06-10T10:00:00Z", { temp_c: 22, humidity_pct: 50 }),
-      makeEntry("b", "2026-06-15T10:00:00Z", { temp_c: 24, humidity_pct: 55 }),
-      makeEntry("c", "2026-06-17T10:00:00Z", { temp_c: 26, humidity_pct: 60 }),
-    ]);
+    // Unit-agnostic intent: verify the aggregation math, not temp conversion.
+    const vm = buildEnvironmentCheckInsightsViewModel(
+      [
+        makeEntry("a", "2026-06-10T10:00:00Z", { temp_c: 22, humidity_pct: 50 }),
+        makeEntry("b", "2026-06-15T10:00:00Z", { temp_c: 24, humidity_pct: 55 }),
+        makeEntry("c", "2026-06-17T10:00:00Z", { temp_c: 26, humidity_pct: 60 }),
+      ],
+      { tempUnit: "celsius" },
+    );
     const temp = vm.metrics.find((m) => m.key === "temp");
     expect(temp).toBeDefined();
     expect(temp!.min).toBe(22);
@@ -126,22 +130,39 @@ describe("environmentCheckInsightsViewModel", () => {
     expect(vm.missingDataNote).toBe(ENVIRONMENT_CHECK_INSIGHTS_MISSING_DATA);
   });
 
-  it("returns latest values formatted with units", () => {
-    const vm = buildEnvironmentCheckInsightsViewModel([
-      makeEntry("a", "2026-06-15T10:00:00Z", { temp_c: 24, humidity_pct: 55 }),
-      makeEntry("b", "2026-06-17T10:00:00Z", {
-        temp_c: 26,
-        humidity_pct: 60,
-        vpd_kpa: 1.2,
-        co2_ppm: 800,
-      }),
-    ]);
+  it("returns latest values formatted with units (celsius preference)", () => {
+    const vm = buildEnvironmentCheckInsightsViewModel(
+      [
+        makeEntry("a", "2026-06-15T10:00:00Z", { temp_c: 24, humidity_pct: 55 }),
+        makeEntry("b", "2026-06-17T10:00:00Z", {
+          temp_c: 26,
+          humidity_pct: 60,
+          vpd_kpa: 1.2,
+          co2_ppm: 800,
+        }),
+      ],
+      { tempUnit: "celsius" },
+    );
     expect(vm.latest).not.toBeNull();
     const map = new Map(vm.latest!.values.map((v) => [v.key, v.value]));
     expect(map.get("temp")).toBe("26.0°C");
     expect(map.get("humidity")).toBe("60%");
     expect(map.get("vpd")).toBe("1.20 kPa");
     expect(map.get("co2")).toBe("800 ppm");
+  });
+
+  it("returns latest temp formatted in Fahrenheit by default", () => {
+    const vm = buildEnvironmentCheckInsightsViewModel([
+      makeEntry("a", "2026-06-15T10:00:00Z", { temp_c: 24, humidity_pct: 55 }),
+      makeEntry("b", "2026-06-17T10:00:00Z", { temp_c: 26, humidity_pct: 60 }),
+    ]);
+    const map = new Map(vm.latest!.values.map((v) => [v.key, v.value]));
+    expect(map.get("temp")).toBe("78.8°F");
+    expect(map.get("humidity")).toBe("60%");
+    const temp = vm.metrics.find((m) => m.key === "temp")!;
+    expect(temp.unit).toBe("°F");
+    expect(temp.min).toBeCloseTo(75.2, 1);
+    expect(temp.max).toBeCloseTo(78.8, 1);
   });
 
   it("always returns the not-live disclaimer", () => {

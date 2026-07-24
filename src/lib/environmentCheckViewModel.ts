@@ -32,6 +32,11 @@ import {
   assessRootZoneEc,
   type RootZoneEcInput,
 } from "./greenhouseRootZoneRules";
+import {
+  celsiusToFahrenheit,
+  loadTemperatureUnitPreference,
+  type TemperatureUnitPreference,
+} from "./temperatureUnitPreference";
 
 export type EnvironmentCheckDiaryStatus =
   | "valid"
@@ -153,9 +158,14 @@ function fmtNumber(n: number | null | undefined, digits = 1, unit = ""): string 
  *  - No snapshot → review_required (nothing to verify).
  *  - Source is stale/invalid/demo → review_required (or invalid).
  *  - DST-ambiguous DLI/dark-window → dst_ambiguous (never styled valid).
+ *
+ * `tempUnit` controls only the DISPLAY unit of the air-temperature value
+ * label. All rule evaluation (VPD, condensation, DLI, root zone) stays on
+ * canonical Celsius; conversion happens strictly at label build time.
  */
 export function buildEnvironmentCheckDiaryViewModel(
   entry: EnvironmentCheckEntryInput,
+  tempUnit: TemperatureUnitPreference = loadTemperatureUnitPreference(),
 ): EnvironmentCheckDiaryViewModel {
   const snapshot = entry.snapshot ?? null;
   const sourceLabel = normalizeGreenhouseSource(snapshot?.source);
@@ -220,7 +230,10 @@ export function buildEnvironmentCheckDiaryViewModel(
     metrics.push({
       metricKey: "temp_c",
       label: "Air temp",
-      valueLabel: fmtNumber(snapshot.tempC, 1, "°C"),
+      valueLabel:
+        tempUnit === "fahrenheit" && Number.isFinite(snapshot.tempC)
+          ? fmtNumber(celsiusToFahrenheit(snapshot.tempC), 1, "°F")
+          : fmtNumber(snapshot.tempC, 1, "°C"),
       status: sourceLabel === "invalid" ? "invalid" : "valid",
     });
   }

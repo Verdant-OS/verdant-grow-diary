@@ -18,6 +18,10 @@ import QuickLogAllActivitiesSection from "@/components/QuickLogAllActivitiesSect
 import { QUICK_LOG_ACTIVITY_DEFINITIONS } from "@/constants/quickLogActivityTypes";
 import { QUICK_LOG_V2_ENTRY_CREATED_EVENT } from "@/lib/quickLogV2EntryCreatedEvent";
 import { QUICK_LOG_V2_OPEN_EVENT } from "@/lib/quickLogV2OpenIntent";
+import {
+  saveTemperatureUnitPreference,
+  clearTemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 
 const rpcMock = vi.fn();
 // Photo activity goes diary-only: storage upload + diary_entries insert.
@@ -381,7 +385,12 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     });
   });
 
-  it("Environment check → canonical nested environment_check envelope (numbers) in p_details", async () => {
+  it("Environment check → canonical nested environment_check envelope (numbers) in p_details (celsius preference)", async () => {
+    // Grower has explicitly set Celsius — the manual Temperature field labels
+    // and validates as °C, and "24" is a plausible room temperature entered
+    // (and stored) in that same unit. See the sibling Fahrenheit-preference
+    // test below for the default-preference conversion path.
+    saveTemperatureUnitPreference("celsius");
     rpcMock.mockResolvedValueOnce({
       data: { ok: true, grow_event_id: "e-env" },
       error: null,
@@ -389,6 +398,10 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     mountSection();
     selectActivity("environment_check");
     await screen.findByTestId("quick-log-all-activities-form");
+    expect(screen.getByTestId("quick-log-all-activities-detail-temp_c")).toHaveAttribute(
+      "placeholder",
+      "e.g. 24",
+    );
     fireEvent.change(screen.getByTestId("quick-log-all-activities-detail-checkType"), {
       target: { value: "airflow" },
     });
@@ -413,6 +426,55 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
       checkType: "airflow",
       environment_check: { temp_c: 24, humidity_pct: 55 },
     });
+  });
+
+  it("Environment check manual Temperature pins Fahrenheit at entry (default/live preference) and converts to canonical °C on save", async () => {
+    // No explicit preference saved — the app default is Fahrenheit. The
+    // field must label/validate/placeholder in °F and convert the grower's
+    // typed value back to canonical Celsius exactly once before persistence,
+    // never store the raw Fahrenheit number under temp_c.
+    clearTemperatureUnitPreference();
+    rpcMock.mockResolvedValueOnce({
+      data: { ok: true, grow_event_id: "e-env-f" },
+      error: null,
+    });
+    mountSection();
+    selectActivity("environment_check");
+    await screen.findByTestId("quick-log-all-activities-form");
+    const tempInput = screen.getByTestId("quick-log-all-activities-detail-temp_c");
+    expect(tempInput).toHaveAttribute("placeholder", "e.g. 75");
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-detail-checkType"), {
+      target: { value: "airflow" },
+    });
+    fireEvent.change(tempInput, { target: { value: "75" } });
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-note"), {
+      target: { value: "bumped the fan up a notch" },
+    });
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
+
+    await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(1));
+    const [, args] = rpcMock.mock.calls[0];
+    // 75°F → (75-32)*5/9 = 23.888..., rounded to 2 decimals.
+    const stored = (args.p_details as { environment_check?: { temp_c?: number } })
+      .environment_check?.temp_c;
+    expect(stored).toBeCloseTo(23.89, 2);
+    expect(stored).not.toBe(75);
+  });
+
+  it("Environment check manual Temperature rejects an out-of-band Fahrenheit entry (140°F ceiling, not the celsius 60 ceiling)", async () => {
+    clearTemperatureUnitPreference();
+    mountSection();
+    selectActivity("environment_check");
+    await screen.findByTestId("quick-log-all-activities-form");
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-detail-temp_c"), {
+      target: { value: "150" },
+    });
+    expect(
+      screen.getByTestId("quick-log-all-activities-detail-temp_c-error"),
+    ).toHaveTextContent(/between 14 and 140/);
+    expect(screen.getByTestId("quick-log-all-activities-save")).toBeDisabled();
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
+    expect(rpcMock).not.toHaveBeenCalled();
   });
 
   it("Environment check BLOCKS the save on an impossible manual reading (inline error, no RPC)", async () => {

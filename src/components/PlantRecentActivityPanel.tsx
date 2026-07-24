@@ -25,6 +25,7 @@ import {
   type QuickLogDetailDisplayLine,
 } from "@/lib/quickLogActivityDetailFields";
 import { resolveQuickLogEventTimelineLabel } from "@/lib/quickLogActivityRules";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 
 interface Props {
   plantId: string | null | undefined;
@@ -162,6 +163,7 @@ function EntryRow({
 
 export default function PlantRecentActivityPanel({ plantId, plantName }: Props) {
   const enabled = !!plantId;
+  const temperatureUnit = useTemperatureUnitPreference();
   const { data, isLoading } = usePlantRecentActivity(plantId);
   const rawRows = enabled ? data ?? [] : [];
   const rows = buildPlantRecentActivity(rawRows, {
@@ -175,7 +177,7 @@ export default function PlantRecentActivityPanel({ plantId, plantName }: Props) 
   const subtypeById = new Map<string, string>();
   for (const raw of rawRows as Array<{ id?: unknown; details?: unknown }>) {
     if (typeof raw?.id !== "string") continue;
-    const lines = describeQuickLogDetailsFromExtras(raw.details);
+    const lines = describeQuickLogDetailsFromExtras(raw.details, temperatureUnit);
     if (lines.length > 0) detailLinesById.set(raw.id, lines);
     const d = raw.details;
     if (d && typeof d === "object" && !Array.isArray(d)) {

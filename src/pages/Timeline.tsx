@@ -121,6 +121,7 @@ import {
   type MissingActionResult,
 } from "@/lib/timelineMissingActionRules";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import { canUseFeature } from "@/lib/featureEntitlements";
 import {
   buildTimelinePhotoLightboxList,
@@ -278,6 +279,7 @@ function entryKinds(e: Entry): EventFilter[] {
 }
 
 export default function Timeline() {
+  const temperatureUnit = useTemperatureUnitPreference();
   const authUser = useAuth().user;
   // Keep the read callback keyed to a stable primitive. Auth providers and
   // test adapters may return an equivalent user object with a new identity on
@@ -1890,7 +1892,7 @@ export default function Timeline() {
                           const detailLines: readonly QuickLogDetailDisplayLine[] =
                             isLearningLoopEvent || isReadinessCheckEvent
                               ? []
-                              : describeQuickLogDetailsFromExtras(e.details);
+                              : describeQuickLogDetailsFromExtras(e.details, temperatureUnit);
                           // Exclude the FULL structured-key set (not just
                           // rendered lines): a present-but-invalid structured
                           // value yields no labeled line and must still never
@@ -2177,22 +2179,25 @@ export default function Timeline() {
                                 };
                                 const src =
                                   typeof details.source === "string" ? details.source : "manual";
-                                const vm = buildEnvironmentCheckDiaryViewModel({
-                                  entryId: e.id,
-                                  occurredAt: String(
-                                    (e as { occurred_at?: string; created_at?: string })
-                                      .occurred_at ??
-                                      (e as { created_at?: string }).created_at ??
-                                      "",
-                                  ),
-                                  kind: kindValue ?? "environment",
-                                  snapshot: {
-                                    source: src,
-                                    tempC: num("temp_c") ?? num("tempC"),
-                                    rhPercent: num("rh_percent") ?? num("humidity"),
-                                    vpdKpa: num("vpd_kpa") ?? num("vpdKpa"),
+                                const vm = buildEnvironmentCheckDiaryViewModel(
+                                  {
+                                    entryId: e.id,
+                                    occurredAt: String(
+                                      (e as { occurred_at?: string; created_at?: string })
+                                        .occurred_at ??
+                                        (e as { created_at?: string }).created_at ??
+                                        "",
+                                    ),
+                                    kind: kindValue ?? "environment",
+                                    snapshot: {
+                                      source: src,
+                                      tempC: num("temp_c") ?? num("tempC"),
+                                      rhPercent: num("rh_percent") ?? num("humidity"),
+                                      vpdKpa: num("vpd_kpa") ?? num("vpdKpa"),
+                                    },
                                   },
-                                });
+                                  temperatureUnit,
+                                );
                                 return (
                                   <>
                                     <EnvironmentCheckTimelineBadge viewModel={vm} />

@@ -21,6 +21,10 @@ import type {
   DiaryCalendarEvent,
   DiaryCalendarEventKind,
 } from "@/lib/diaryCalendarViewModel";
+import {
+  celsiusToFahrenheit,
+  type TemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 
 export const DIARY_CALENDAR_DRAWER_READ_ONLY_LABEL =
   "Read-only diary event" as const;
@@ -233,9 +237,16 @@ function buildSummarySection(
   return fields;
 }
 
+function formatTempC(tempC: number, tempUnit: TemperatureUnitPreference): string {
+  return tempUnit === "fahrenheit"
+    ? `${celsiusToFahrenheit(tempC).toFixed(1)}°F`
+    : `${tempC.toFixed(1)}°C`;
+}
+
 function buildMeasurementsSection(
   kind: DiaryCalendarEventKind,
   d: Record<string, unknown> | null,
+  tempUnit: TemperatureUnitPreference,
 ): { fields: DiaryCalendarDrawerField[]; ecPreview: EcCompensationPreviewModel | null } {
   if (!d) return { fields: [], ecPreview: null };
   const fields: DiaryCalendarDrawerField[] = [];
@@ -263,7 +274,7 @@ function buildMeasurementsSection(
     if (ec != null) fields.push({ label: "EC", value: `${ec} ${ecUnit}` });
     const waterTempC = pickFirstFiniteNumber(d, ["water_temp_c", "waterTempC"]);
     if (waterTempC != null) {
-      fields.push({ label: "Water temp", value: `${waterTempC.toFixed(1)}°C` });
+      fields.push({ label: "Water temp", value: formatTempC(waterTempC, tempUnit) });
     }
     if (ec != null && waterTempC != null) {
       const preview = buildEcCompensationPreview({
@@ -279,7 +290,7 @@ function buildMeasurementsSection(
   // Allowlisted environment check fields — surface only when explicitly
   // present in details; never invent values.
   const tempC = pickFirstFiniteNumber(d, ["temp_c", "tempC", "air_temp_c", "airTempC"]);
-  if (tempC != null) fields.push({ label: "Air temp", value: `${tempC.toFixed(1)}°C` });
+  if (tempC != null) fields.push({ label: "Air temp", value: formatTempC(tempC, tempUnit) });
   const humidity = pickFirstFiniteNumber(d, ["humidity_pct", "humidityPct", "rh", "humidity"]);
   if (humidity != null && humidity >= 0 && humidity <= 100) {
     fields.push({ label: "Humidity", value: `${Math.round(humidity)}%` });
@@ -351,10 +362,11 @@ function buildAttachments(
 export function buildDiaryCalendarEventDrawerViewModel(
   event: DiaryCalendarEvent,
   rawDetails: unknown,
+  tempUnit: TemperatureUnitPreference = "celsius",
 ): DiaryCalendarEventDrawerViewModel {
   const d = pickRecord(rawDetails);
   const summaryFields = buildSummarySection(event.kind, d);
-  const measurements = buildMeasurementsSection(event.kind, d);
+  const measurements = buildMeasurementsSection(event.kind, d, tempUnit);
   const plantMemoryFields = buildPlantMemorySection(event, d);
   const attachments = buildAttachments(d);
 

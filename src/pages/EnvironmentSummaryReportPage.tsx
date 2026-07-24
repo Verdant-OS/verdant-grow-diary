@@ -45,21 +45,29 @@ import {
 import EnvironmentSummaryPrePrintModal from "@/components/EnvironmentSummaryPrePrintModal";
 import EnvironmentSummaryExportHistoryPanel from "@/components/EnvironmentSummaryExportHistoryPanel";
 import { canUseCapability } from "@/lib/entitlements";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
+import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 
 type PrintMode = "full_report" | "drilldown";
 
-function toViewModel(entry: any): EnvironmentCheckDiaryViewModel | null {
+function toViewModel(
+  entry: any,
+  tempUnit: TemperatureUnitPreference,
+): EnvironmentCheckDiaryViewModel | null {
   if (!isEnvironmentCheckKind(entry?.kind)) return null;
   // Grower-facing "Captured" moment: real logged_at column, else
   // details.logged_at, else entry_at, else occurred_at (PR #442
   // remediation — see resolveDiaryEntryObservationTime).
   const observedAt = resolveDiaryEntryObservationTime(entry);
-  return buildEnvironmentCheckDiaryViewModel({
-    entryId: entry.id ?? entry.entryId ?? String(entry.entry_at ?? ""),
-    occurredAt: observedAt ?? entry.occurredAt ?? new Date(0).toISOString(),
-    kind: entry.kind ?? "environment",
-    snapshot: entry.snapshot ?? entry.payload?.snapshot ?? null,
-  });
+  return buildEnvironmentCheckDiaryViewModel(
+    {
+      entryId: entry.id ?? entry.entryId ?? String(entry.entry_at ?? ""),
+      occurredAt: observedAt ?? entry.occurredAt ?? new Date(0).toISOString(),
+      kind: entry.kind ?? "environment",
+      snapshot: entry.snapshot ?? entry.payload?.snapshot ?? null,
+    },
+    tempUnit,
+  );
 }
 
 export default function EnvironmentSummaryReportPage() {
@@ -76,6 +84,7 @@ export default function EnvironmentSummaryReportPage() {
     null,
   );
   const [exportHistoryRefreshKey, setExportHistoryRefreshKey] = useState(0);
+  const temperatureUnit = useTemperatureUnitPreference();
 
 
   useEffect(() => {
@@ -110,11 +119,11 @@ export default function EnvironmentSummaryReportPage() {
       const ts = resolveDiaryEntryObservationTime(e);
       if (typeof ts !== "string") continue;
       if (ts < startIso || ts > endIso) continue;
-      const vm = toViewModel(e);
+      const vm = toViewModel(e, temperatureUnit);
       if (vm) out.push(vm);
     }
     return out;
-  }, [entries, startDate, endDate, rangeValid]);
+  }, [entries, startDate, endDate, rangeValid, temperatureUnit]);
 
   const report = useMemo(
     () =>

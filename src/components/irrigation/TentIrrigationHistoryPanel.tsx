@@ -16,6 +16,11 @@ import {
   useTentIrrigationLedger,
   IRRIGATION_LEDGER_PAGE_SIZE,
 } from "@/hooks/useTentIrrigationLedger";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
+import {
+  celsiusToFahrenheit,
+  type TemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 import type { IrrigationLedgerRow } from "@/lib/irrigation/irrigationLedgerRules";
 
 export interface TentIrrigationHistoryPanelProps {
@@ -30,6 +35,20 @@ function fmt(n: number | null): string {
   return n === null ? "—" : String(n);
 }
 
+/**
+ * Display-only water temperature. `waterTempC` is stored canonical
+ * Celsius; conversion happens exactly once, here. The celsius preference
+ * renders the legacy string unchanged; unknown stays "—".
+ */
+function fmtWaterTemp(
+  n: number | null,
+  unit: TemperatureUnitPreference,
+): string {
+  if (n === null) return "—";
+  if (unit === "celsius") return String(n);
+  return celsiusToFahrenheit(n).toFixed(1);
+}
+
 function occurredLabel(occurredAt: string | null): string {
   if (!occurredAt) return "Time unrecorded";
   const t = Date.parse(occurredAt);
@@ -37,6 +56,7 @@ function occurredLabel(occurredAt: string | null): string {
 }
 
 function LedgerRow({ row }: { row: IrrigationLedgerRow }) {
+  const temperatureUnit = useTemperatureUnitPreference();
   const metrics: Array<[string, string]> = [
     ["Volume (ml)", fmt(row.volumeMl)],
     ["Input pH", fmt(row.ph)],
@@ -45,7 +65,10 @@ function LedgerRow({ row }: { row: IrrigationLedgerRow }) {
     ["Runoff (ml)", fmt(row.runoffMl)],
     ["Runoff pH", fmt(row.runoffPh)],
     ["Runoff EC (mS/cm)", fmt(row.runoffEcMsCm)],
-    ["Water temp (°C)", fmt(row.waterTempC)],
+    [
+      temperatureUnit === "celsius" ? "Water temp (°C)" : "Water temp (°F)",
+      fmtWaterTemp(row.waterTempC, temperatureUnit),
+    ],
   ];
   return (
     <li

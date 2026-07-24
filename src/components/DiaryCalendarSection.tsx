@@ -48,6 +48,7 @@ import {
 } from "@/lib/diaryCalendarFilterPersistence";
 
 import { cn } from "@/lib/utils";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 
 export const ENVIRONMENT_CHECK_SHOW_DETAILS_LABEL = "Show details";
 export const ENVIRONMENT_CHECK_HIDE_DETAILS_LABEL = "Hide details";
@@ -115,7 +116,11 @@ export default function DiaryCalendarSection({
   // inject a precise instant. The history projector never reads ambient time.
   const internalNowRef = useRef(new Date());
   const calendarNow = now ?? internalNowRef.current;
-  const allGroups = useMemo(() => buildDiaryCalendarViewModel(rawEntries ?? []), [rawEntries]);
+  const temperatureUnit = useTemperatureUnitPreference();
+  const allGroups = useMemo(
+    () => buildDiaryCalendarViewModel(rawEntries ?? [], temperatureUnit),
+    [rawEntries, temperatureUnit],
+  );
   const historyFacts = useMemo<CultivationCalendarHistoryFact[]>(() => {
     const facts: CultivationCalendarHistoryFact[] = [];
     for (const group of allGroups) {
@@ -207,10 +212,27 @@ export default function DiaryCalendarSection({
     }
     return map;
   }, [rawEntries]);
-  const [drawerEvent, setDrawerEvent] = useState<DiaryCalendarEventDrawerViewModel | null>(null);
+  // Hold the RAW selected event (not the formatted view-model) so the
+  // drawer's displayed temperatures stay live: if the temperature-unit
+  // preference changes (another tab, or the same-tab
+  // TEMPERATURE_UNIT_CHANGE_EVENT) while the drawer is open, the
+  // memoized view-model below recomputes instead of showing a stale unit
+  // until close/reopen.
+  const [drawerEvent, setDrawerEvent] = useState<DiaryCalendarEvent | null>(null);
   const openEventDrawer = (ev: DiaryCalendarEvent) => {
-    setDrawerEvent(buildDiaryCalendarEventDrawerViewModel(ev, rawDetailsById.get(ev.id) ?? null));
+    setDrawerEvent(ev);
   };
+  const drawerViewModel = useMemo<DiaryCalendarEventDrawerViewModel | null>(
+    () =>
+      drawerEvent
+        ? buildDiaryCalendarEventDrawerViewModel(
+            drawerEvent,
+            rawDetailsById.get(drawerEvent.id) ?? null,
+            temperatureUnit,
+          )
+        : null,
+    [drawerEvent, rawDetailsById, temperatureUnit],
+  );
   const [openDay, setOpenDay] = useState<string | null>(visibleGroups[0]?.dateKey ?? null);
 
   // Switching filter: jump to the newest month with matching events under
@@ -690,7 +712,7 @@ export default function DiaryCalendarSection({
         </>
       )}
       <DiaryCalendarEventDrawer
-        model={drawerEvent}
+        model={drawerViewModel}
         open={drawerEvent !== null}
         onOpenChange={(open) => {
           if (!open) setDrawerEvent(null);

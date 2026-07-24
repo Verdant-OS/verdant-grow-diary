@@ -111,6 +111,32 @@ describe("spec shape", () => {
     expect(temp.label.toLowerCase()).toContain("manual");
   });
 
+  it("environment_check's manual Temperature is Fahrenheit-adjusted on request, without touching RH", () => {
+    // Default (no unit arg, and explicit "celsius") stays the canonical basis.
+    const celsiusTemp = getQuickLogActivityDetailFields("environment_check").find(
+      (f) => f.key === "temp_c",
+    )!;
+    expect(celsiusTemp.unit).toBe("°C");
+    expect(celsiusTemp.min).toBe(-10);
+    expect(celsiusTemp.max).toBe(60);
+
+    const fFields = getQuickLogActivityDetailFields("environment_check", "fahrenheit");
+    const fTemp = fFields.find((f) => f.key === "temp_c")!;
+    const fRh = fFields.find((f) => f.key === "humidity_pct")!;
+    // -10°C/60°C are exact round Fahrenheit bounds: 14°F/140°F.
+    expect(fTemp.unit).toBe("°F");
+    expect(fTemp.min).toBe(14);
+    expect(fTemp.max).toBe(140);
+    expect(fTemp.placeholder).toBe("e.g. 75");
+    // The storage key/envelope never change — only the display-facing fields.
+    expect(fTemp.key).toBe("temp_c");
+    expect(fTemp.envelope).toBe("environment_check");
+    // Non-temperature fields are untouched by the unit switch.
+    expect(fRh.unit).toBe("%");
+    expect(fRh.min).toBe(0);
+    expect(fRh.max).toBe(100);
+  });
+
   it("keeps every option label across all activities free of diagnosis/recommendation language", () => {
     // "burnt" describes appearance (allowed); the cause-word "nutrient burn" is
     // guarded in the issue_observation-specific test above.
@@ -207,6 +233,43 @@ describe("sanitizeQuickLogActivityDetails", () => {
     // non-numeric manual reading dropped
     expect(sanitizeQuickLogActivityDetails("environment_check", { temp_c: "warm" })).toBeNull();
   });
+
+  it("converts a Fahrenheit-entered manual temp back to canonical °C exactly once", () => {
+    // 75°F → 23.888...°C, rounded to 2 decimals. Humidity is unaffected by
+    // the temp unit and stays a straight passthrough.
+    expect(
+      sanitizeQuickLogActivityDetails(
+        "environment_check",
+        { checkType: "airflow", temp_c: "75", humidity_pct: "55" },
+        "fahrenheit",
+      ),
+    ).toEqual({
+      checkType: "airflow",
+      environment_check: { temp_c: 23.89, humidity_pct: 55 },
+    });
+  });
+
+  it("bounds-checks a Fahrenheit entry against Fahrenheit bounds, not the celsius -10..60 floor", () => {
+    // 150°F is a real, physically valid temperature but outside the
+    // Fahrenheit-adjusted 14..140 band — must drop, not silently convert.
+    expect(
+      sanitizeQuickLogActivityDetails(
+        "environment_check",
+        { temp_c: "150" },
+        "fahrenheit",
+      ),
+    ).toBeNull();
+    // 100°F is in-band and converts (100°F → 37.78°C).
+    expect(
+      sanitizeQuickLogActivityDetails("environment_check", { temp_c: "100" }, "fahrenheit"),
+    ).toEqual({ environment_check: { temp_c: 37.78 } });
+  });
+
+  it("omitting tempUnit (default celsius) never double-converts an explicitly-celsius entry", () => {
+    expect(
+      sanitizeQuickLogActivityDetails("environment_check", { temp_c: "24" }, "celsius"),
+    ).toEqual({ environment_check: { temp_c: 24 } });
+  });
 });
 
 describe("validateQuickLogDetailNumberInput (blocking UI gate)", () => {
@@ -247,6 +310,22 @@ describe("validateQuickLogDetailNumberInput (blocking UI gate)", () => {
       ok: true,
       error: null,
     });
+  });
+
+  it("validates against Fahrenheit-adjusted bounds when the spec was resolved for °F", () => {
+    const fTemp = getQuickLogActivityDetailFields("environment_check", "fahrenheit").find(
+      (f) => f.key === "temp_c",
+    )!;
+    expect(validateQuickLogDetailNumberInput(fTemp, "75").ok).toBe(true);
+    // 5 is a plausible °C reading (well within -10..60) but below the
+    // Fahrenheit-adjusted 14°F floor — proves the bounds actually switched,
+    // not just the label.
+    const tooCold = validateQuickLogDetailNumberInput(fTemp, "5");
+    expect(tooCold.ok).toBe(false);
+    expect(tooCold.error).toMatch(/between 14 and 140/);
+    const tooHot = validateQuickLogDetailNumberInput(fTemp, "150");
+    expect(tooHot.ok).toBe(false);
+    expect(tooHot.error).toMatch(/between 14 and 140/);
   });
 });
 
@@ -302,6 +381,33 @@ describe("describeQuickLogDetailsFromExtras (activity-id-free render path)", () 
     expect(describeQuickLogDetailsFromExtras({ foo: "bar", technique: "napalm" })).toEqual([]);
     expect(describeQuickLogDetailsFromExtras(null)).toEqual([]);
     expect(describeQuickLogDetailsFromExtras("garbage")).toEqual([]);
+  });
+
+  it("re-renders a stored canonical °C reading in °F when the live preference is Fahrenheit (Pattern B: read-only history reflects the CURRENT preference)", () => {
+    // Stored value is unchanged canonical Celsius regardless of which unit
+    // was active when it was logged; only the display conversion changes.
+    expect(
+      describeQuickLogDetailsFromExtras(
+        { checkType: "airflow", environment_check: { temp_c: 24, humidity_pct: 55 } },
+        "fahrenheit",
+      ),
+    ).toEqual([
+      { key: "checkType", label: "What you checked / adjusted", value: "Airflow / fans" },
+      { key: "temp_c", label: "Temperature (manual)", value: "75.2 °F" },
+      { key: "humidity_pct", label: "Humidity (manual)", value: "55 %" },
+    ]);
+  });
+
+  it("bounds-checks a stored temperature against its canonical °C floor even when displaying in °F", () => {
+    // An out-of-band stored value (would only happen from a corrupted/legacy
+    // row) must still degrade to no line — the plausibility floor is always
+    // evaluated in the stored (°C) basis, never the display unit.
+    expect(
+      describeQuickLogDetailsFromExtras(
+        { environment_check: { temp_c: 999 } },
+        "fahrenheit",
+      ),
+    ).toEqual([]);
   });
 });
 

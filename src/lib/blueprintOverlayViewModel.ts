@@ -37,6 +37,11 @@ import {
   type BlueprintMetricResult,
 } from "@/lib/blueprintMetricRules";
 import type { SensorSnapshot } from "@/lib/sensorSnapshot";
+import {
+  celsiusToFahrenheit,
+  loadTemperatureUnitPreference,
+  type TemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 import { normalizeVpdStage, type VpdStage } from "@/lib/vpdStageTargetRules";
 
 export type BlueprintMetricProvenance = "live" | "manual" | "derived" | "missing";
@@ -202,8 +207,25 @@ function tempContext(isDay: boolean | null | undefined): string {
   return "Day/night range (set tent light state to narrow)";
 }
 
+/** Round for display after °C→°F conversion (never mutates canonical data). */
+function roundTo(n: number, digits: number): number {
+  const f = 10 ** digits;
+  return Math.round(n * f) / f;
+}
+
+/**
+ * Build the overlay view model.
+ *
+ * `tempUnit` controls the DISPLAY unit of the temperature row only (value,
+ * unit symbol, and target band shown to the grower). Scoring, provenance,
+ * summary counts, and `row.result` always evaluate against canonical Celsius —
+ * conversion happens strictly at row/string build time. Callers and tests may
+ * inject a unit; the default follows the saved display preference
+ * (Fahrenheit when unset).
+ */
 export function buildBlueprintOverlayViewModel(
   input: BuildBlueprintOverlayInput,
+  tempUnit: TemperatureUnitPreference = loadTemperatureUnitPreference(),
 ): BlueprintOverlayViewModel {
   const stage = normalizeVpdStage(input.stage);
   const stageKnown = stage !== "unknown";
@@ -239,12 +261,28 @@ export function buildBlueprintOverlayViewModel(
         break;
     }
 
+    // Temperature is stored/scored in canonical Celsius; convert the
+    // DISPLAYED value/unit/band only, at row build time. Null never becomes
+    // a number; `row.result` keeps the canonical (°C) evaluation.
+    const displayFahrenheit = meta.key === "tempC" && tempUnit === "fahrenheit";
+    const displayValue =
+      displayFahrenheit && value !== null && Number.isFinite(value)
+        ? roundTo(celsiusToFahrenheit(value), 2)
+        : value;
+    const displayBand: MetricBand | null =
+      displayFahrenheit && result.band
+        ? {
+            min: roundTo(celsiusToFahrenheit(result.band.min), 1),
+            max: roundTo(celsiusToFahrenheit(result.band.max), 1),
+          }
+        : result.band;
+
     const row: BlueprintOverlayRow = {
       metricKey: meta.key,
       label: meta.label,
-      unit: meta.unit,
-      value,
-      band: result.band,
+      unit: displayFahrenheit ? "°F" : meta.unit,
+      value: displayValue,
+      band: displayBand,
       result,
       provenance,
     };

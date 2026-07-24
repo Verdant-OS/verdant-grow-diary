@@ -32,15 +32,27 @@ function parseArgs(argv) {
   const args = {
     reportPath: "e2e/results/playwright-report.json",
     outPath: null,
+    prCommentPath: null,
+    tracesUrl: "",
+    mediaUrl: "",
+    reportUrl: "",
+    bundleUrl: "",
+    runUrl: "",
     failOnFlake: false,
   };
   for (const raw of argv) {
     if (raw.startsWith("--report=")) args.reportPath = raw.slice("--report=".length);
     else if (raw.startsWith("--out=")) args.outPath = raw.slice("--out=".length);
+    else if (raw.startsWith("--pr-comment=")) args.prCommentPath = raw.slice("--pr-comment=".length);
+    else if (raw.startsWith("--traces-url=")) args.tracesUrl = raw.slice("--traces-url=".length);
+    else if (raw.startsWith("--media-url=")) args.mediaUrl = raw.slice("--media-url=".length);
+    else if (raw.startsWith("--report-url=")) args.reportUrl = raw.slice("--report-url=".length);
+    else if (raw.startsWith("--bundle-url=")) args.bundleUrl = raw.slice("--bundle-url=".length);
+    else if (raw.startsWith("--run-url=")) args.runUrl = raw.slice("--run-url=".length);
     else if (raw === "--fail-on-flake") args.failOnFlake = true;
     else if (raw === "--help" || raw === "-h") {
       process.stdout.write(
-        "Usage: summarize-playwright-flakes.mjs --report=<path> [--out=<path>] [--fail-on-flake]\n",
+        "Usage: summarize-playwright-flakes.mjs --report=<path> [--out=<path>] [--pr-comment=<path>] [--traces-url=<url>] [--media-url=<url>] [--report-url=<url>] [--bundle-url=<url>] [--run-url=<url>] [--fail-on-flake]\n",
       );
       process.exit(0);
     }

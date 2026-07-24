@@ -45,7 +45,9 @@ jobs:
         run: |
           start=$(date +%s%3N)
           set +e
-          bunx tsgo --noEmit
+          # `tsgo` is the bin shipped by @typescript/native-preview, not an
+          # installable package on its own — bare `bunx tsgo` 404s.
+          bunx --package=@typescript/native-preview tsgo --noEmit
           rc=$?
           set -e
           end=$(date +%s%3N)

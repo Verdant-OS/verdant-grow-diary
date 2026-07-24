@@ -353,5 +353,45 @@ describe("summarize-playwright-flakes CLI --min-failed gate", () => {
   it("skips PR comment when hard failures below threshold", () => {
     expect(runCli(hardFailedReport, 2)).toBe(false);
   });
+
+  it("writes Job Summary with failed/flaky sections + top links even when PR comment is gated by --min-failed", () => {
+    const { readFileSync } = require("node:fs");
+    const dir = mkdtempSync(join(tmpdir(), "pw-flakes-jobsum-"));
+    const reportPath = join(dir, "report.json");
+    const commentPath = join(dir, "pr-comment.md");
+    const stepSummaryPath = join(dir, "step-summary.md");
+    writeFileSync(reportPath, JSON.stringify(flakeOnlyReport), "utf8");
+    writeFileSync(stepSummaryPath, "", "utf8");
+    execFileSync(
+      process.execPath,
+      [
+        "scripts/summarize-playwright-flakes.mjs",
+        `--report=${reportPath}`,
+        `--pr-comment=${commentPath}`,
+        `--min-failed=1`,
+        `--traces-url=https://gh/traces`,
+        `--media-url=https://gh/media`,
+        `--run-url=https://gh/run`,
+      ],
+      {
+        stdio: "ignore",
+        env: { ...process.env, GITHUB_STEP_SUMMARY: stepSummaryPath },
+      },
+    );
+    expect(existsSync(commentPath)).toBe(false);
+    const summary = readFileSync(stepSummaryPath, "utf8");
+    // Top-level counts + section headings present
+    expect(summary).toContain("## Playwright failure artifacts");
+    expect(summary).toContain("### ❌ Failed");
+    expect(summary).toContain("### ⚠️ Flaky (1)");
+    expect(summary).toContain("logs a watering event");
+    // Top trace/media/run links published
+    expect(summary).toContain("https://gh/traces");
+    expect(summary).toContain("https://gh/media");
+    expect(summary).toContain("https://gh/run");
+    // Suppression notice explains the empty PR comment
+    expect(summary).toContain("PR comment suppressed by `--min-failed=1`");
+    rmSync(dir, { recursive: true, force: true });
+  });
 });
 

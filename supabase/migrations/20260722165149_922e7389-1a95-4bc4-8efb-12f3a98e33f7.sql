@@ -4,7 +4,13 @@ DROP FUNCTION IF EXISTS public.quicklog_save_manual(
   text, uuid, text, numeric, text, numeric, numeric, numeric, timestamptz, jsonb, text
 );
 
-CREATE FUNCTION public.quicklog_save_manual(
+-- CREATE OR REPLACE, not bare CREATE: the target 12-arg signature is
+-- byte-identical to what 20260722100000 already created. A fresh replay
+-- where 100000 has already run leaves that 12-arg overload in place, and a
+-- bare CREATE FUNCTION here would collide with it (SQLSTATE 42723). OR
+-- REPLACE makes this statement idempotent regardless of whether the 12-arg
+-- overload already exists, independent of schema_migrations bookkeeping.
+CREATE OR REPLACE FUNCTION public.quicklog_save_manual(
   p_target_type text,
   p_target_id uuid,
   p_action text,

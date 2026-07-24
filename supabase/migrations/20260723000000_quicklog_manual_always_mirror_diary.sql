@@ -32,7 +32,11 @@ DROP FUNCTION IF EXISTS public.quicklog_save_manual(
   text, uuid, text, numeric, text, numeric, numeric, numeric, timestamptz, jsonb, text, text
 );
 
-CREATE FUNCTION public.quicklog_save_manual(
+-- CREATE OR REPLACE, not bare CREATE: the signature is unchanged from the
+-- immediately-prior migration, so the preceding DROP + this CREATE is a
+-- fragile two-statement dance for what OR REPLACE does atomically and
+-- safely regardless of the exact database state at replay time.
+CREATE OR REPLACE FUNCTION public.quicklog_save_manual(
   p_target_type text,
   p_target_id uuid,
   p_action text,

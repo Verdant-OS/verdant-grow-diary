@@ -457,10 +457,27 @@ async function main() {
   }
 
 
+  // GitHub Actions Job Summary always gets the full failed/flaky breakdown
+  // + top trace/media links, even when the PR comment is suppressed via
+  // --min-failed. The Job Summary is scoped to the workflow run and never
+  // leaks to reviewers, so there is no noise cost to keeping it verbose.
   const stepSummary = process.env.GITHUB_STEP_SUMMARY;
   if (stepSummary) {
     try {
-      writeFileSync(stepSummary, `${markdown}\n`, { flag: "a" });
+      const jobSummary = buildPrComment(report, {
+        tracesUrl: args.tracesUrl,
+        mediaUrl: args.mediaUrl,
+        reportUrl: args.reportUrl,
+        bundleUrl: args.bundleUrl,
+        runUrl: args.runUrl,
+      });
+      const gate =
+        args.minFailed > 0 && counts.failed < args.minFailed
+          ? `\n> _PR comment suppressed by \`--min-failed=${args.minFailed}\` (hard failures: ${counts.failed}). This Job Summary is unaffected._\n`
+          : "";
+      writeFileSync(stepSummary, `${markdown}\n\n${jobSummary}${gate}\n`, {
+        flag: "a",
+      });
     } catch (err) {
       process.stderr.write(
         `summarize-playwright-flakes: unable to append to GITHUB_STEP_SUMMARY: ${err instanceof Error ? err.message : String(err)}\n`,

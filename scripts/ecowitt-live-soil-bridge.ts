@@ -298,7 +298,7 @@ async function runCli(): Promise<void> {
   // Fail-closed single-tent enforcement — MUST run before any MQTT
   // dynamic import, broker connection, subscription, or HTTP forward.
   try {
-    assertBridgeStartupSafe(env);
+    assertBridgeStartupSafe(env, process.env.ECOWITT_SOIL_CHANNEL_MAP_JSON ?? null);
   } catch (e) {
     if (e instanceof EcowittBridgeConfigError) {
       emitConfigError(e.code, e.message);

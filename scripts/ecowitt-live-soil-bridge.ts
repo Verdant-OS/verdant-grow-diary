@@ -41,9 +41,21 @@ import {
   redactForLog,
   maskBridgeToken,
   fullJitterBackoffMs,
+  assertSingleTentSoilChannelMap,
+  EcowittBridgeConfigError,
   type CanonicalWebhookPayload,
   type EcowittSoilChannelMap,
 } from "../src/lib/ecowittLiveSoilIngestRules";
+
+/**
+ * Enforce "one bridge process → one tent → one bridge token" before any
+ * MQTT import, broker connection, subscription, or HTTP traffic. Throws
+ * `EcowittBridgeConfigError` on violation; runCli converts that into a
+ * calm non-zero exit. Kept exported so tests can drive it directly.
+ */
+export function assertBridgeStartupSafe(env: BridgeEnv): void {
+  assertSingleTentSoilChannelMap(env.channelMap, env.defaultTentId);
+}
 
 // ---------- Pure bridge orchestration (testable, no I/O) ----------
 
@@ -254,6 +266,20 @@ async function runCli(): Promise<void> {
       process.exit(2);
     }
   }
+
+  // Fail-closed single-tent enforcement — MUST run before any MQTT
+  // dynamic import, broker connection, subscription, or HTTP forward.
+  try {
+    assertBridgeStartupSafe(env);
+  } catch (e) {
+    if (e instanceof EcowittBridgeConfigError) {
+      log("error", e.message);
+      process.exit(2);
+      return;
+    }
+    throw e;
+  }
+
   log("info", "starting", {
     dryRun: env.dryRun,
     once: env.once,

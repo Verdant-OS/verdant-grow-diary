@@ -59,8 +59,12 @@ jobs:
         run: bun install --frozen-lockfile
 
       # Stop-ship gate: typecheck must pass before tests are meaningful.
+      # `tsgo` is not an installable npm package on its own — it is the bin
+      # name shipped by @typescript/native-preview, which is not a repo
+      # devDependency. Bare `bunx tsgo` 404s against the registry; pin the
+      # real package explicitly so bunx installs the right thing on demand.
       - name: Typecheck (tsgo --noEmit)
-        run: bunx tsgo --noEmit
+        run: bunx --package=@typescript/native-preview tsgo --noEmit
 
       # Targeted CLI + rules coverage. Kept batched into a single vitest run
       # so failures surface with one exit code and one artifact.

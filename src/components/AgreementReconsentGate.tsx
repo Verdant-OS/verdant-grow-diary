@@ -177,7 +177,11 @@ export function AgreementReconsentGate() {
         <DialogHeader>
           <div className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-primary" aria-hidden />
-            <DialogTitle id="reconsent-title">
+            {/* No manual id here: Radix auto-wires DialogTitle/Description ids
+                into DialogContent's aria-labelledby/aria-describedby. A manual
+                id breaks that association (dialog loses its accessible name)
+                and trips Radix's missing-DialogTitle warning. */}
+            <DialogTitle>
               {anyPrior ? "Updated agreements" : "Accept our agreements"}
             </DialogTitle>
           </div>

@@ -26,6 +26,9 @@ const PAYLOAD_KEYS = [
   "captured_at",
   "eventType",
   "growId",
+  // "Captured" seed (the consumed report/calendar grouping key);
+  // captured_at above remains the legacy Environment/Training seed shape.
+  "logged_at",
   "occurred_at",
   "plantId",
   "plantName",
@@ -62,7 +65,13 @@ describe("Fast Add action → handler wiring", () => {
     expect(intent.kind).toBe("open-quicklog-v2");
     if (intent.kind !== "open-quicklog-v2") return;
     expect(intent.eventName).toBe(QUICK_LOG_V2_OPEN_EVENT);
-    expect(intent.detail).toEqual({ targetKey: "plant:p1", action: "water" });
+    // loggedAt is the optional validated "Captured" seed added to the closed
+    // intent contract (validator still fails closed on any OTHER extra key).
+    expect(intent.detail).toEqual({
+      targetKey: "plant:p1",
+      action: "water",
+      loggedAt: FIXED.toISOString(),
+    });
   });
 });
 
@@ -87,10 +96,12 @@ describe("Fast Add payload → diary EVENT_TYPES alignment", () => {
     expect(keys).toEqual([...PAYLOAD_KEYS].sort());
   });
 
-  it("watering detail carries no legacy prefill or timestamp fields", () => {
+  it("watering detail carries no legacy prefill fields beyond the closed contract", () => {
     const intent = resolveFastAddIntent("watering", ctx, { now });
     if (intent.kind !== "open-quicklog-v2") throw new Error("expected open-quicklog-v2");
-    expect(Object.keys(intent.detail).sort()).toEqual(["action", "targetKey"]);
+    // Closed V2 intent: exactly targetKey + action + the optional validated
+    // loggedAt "Captured" seed. No legacy prefill keys (plantId, eventType…).
+    expect(Object.keys(intent.detail).sort()).toEqual(["action", "loggedAt", "targetKey"]);
   });
 });
 

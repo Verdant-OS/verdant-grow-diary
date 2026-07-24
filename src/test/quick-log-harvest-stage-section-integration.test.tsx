@@ -89,7 +89,11 @@ describe("QuickLogAllActivitiesSection harvest stage fence", () => {
     window.removeEventListener(QUICK_LOG_V2_ENTRY_CREATED_EVENT, entryCreated);
   });
 
-  it("drops plant A's Harvest draft before an explicit plant B re-selection", async () => {
+  it("clears plant A's Harvest draft content when retargeting to plant B (rebound, fail-closed)", async () => {
+    // Retarget continuity contract: the open draft REBINDS to plant B (the
+    // grower keeps their place; the chip shows the new target) while every
+    // content field resets fail-closed — plant A's weights/note can never
+    // save against plant B, and no RPC fires from the target change itself.
     rpcMock.mockResolvedValueOnce({
       data: { ok: true, grow_event_id: "harvest-b" },
       error: null,
@@ -110,14 +114,18 @@ describe("QuickLogAllActivitiesSection harvest stage fence", () => {
 
     rerender(section("flower", { plantId: "plant-b" }));
 
+    // Rebound: the harvest form stays open against plant B with ALL of plant
+    // A's content cleared, and nothing persisted by the retarget.
     await waitFor(() =>
-      expect(screen.queryByTestId("quick-log-all-activities-form")).not.toBeInTheDocument(),
+      expect(screen.getByTestId("quick-log-all-activities-harvest-wet")).toHaveValue(""),
     );
-    expect(screen.queryByTestId("quick-log-all-activities-harvest-wet")).not.toBeInTheDocument();
+    expect(screen.getByTestId("quick-log-all-activities-form")).toHaveAttribute(
+      "data-activity-id",
+      "harvest",
+    );
+    expect(screen.getByTestId("quick-log-all-activities-note")).toHaveValue("");
     expect(rpcMock).not.toHaveBeenCalled();
 
-    openHarvest();
-    expect(screen.getByTestId("quick-log-all-activities-harvest-wet")).toHaveValue("");
     fireEvent.change(screen.getByTestId("quick-log-all-activities-note"), {
       target: { value: "Plant B main cola" },
     });

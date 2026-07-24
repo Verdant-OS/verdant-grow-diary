@@ -370,8 +370,9 @@ function main() {
   } else {
     // eslint-disable-next-line no-console
     console.log(
-      `\n[verify-published-migration-integrity] baseline=${args.baseline}`,
+      `\n[verify-published-migration-integrity] baseline=${args.baseline} (source=${args.baseline_source})`,
     );
+
     console.log(`  checked:         ${results.checked} published migrations`);
     console.log(`  matched:         ${results.matched.length}`);
     console.log(`  edited:          ${results.edited.length}`);

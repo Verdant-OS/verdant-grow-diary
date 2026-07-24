@@ -129,7 +129,7 @@ describe("`config validate` CLI subcommand", () => {
   });
 });
 
-import { CONFIG_ERROR_FIX_HINTS, fixHintForCode } from "../../scripts/ecowitt-live-soil-bridge";
+import { fixHintForCode } from "../../scripts/ecowitt-live-soil-bridge";
 
 describe("runConfigValidate --fix-hints", () => {
   it("omits fix by default", () => {

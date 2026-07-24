@@ -151,6 +151,7 @@ type PhenoKeeperRow = {
   source_plant_id: string;
   keeper_name: string;
   note: string | null;
+  stability_runs: unknown;
   created_at: string;
   updated_at: string;
 };
@@ -254,6 +255,7 @@ type PhenoCandidatePlantRow = {
   candidate_number: number | null;
   strain: string | null;
   stage: string | null;
+  plant_type: string | null;
   grow_id: string | null;
   tent_id: string | null;
   photo_url: string | null;
@@ -322,7 +324,10 @@ export interface PhenoDatabase {
         | "created_at"
         | "updated_at"
       >;
-      pheno_keepers: Tbl<PhenoKeeperRow, "id" | "note" | "created_at" | "updated_at">;
+      pheno_keepers: Tbl<
+        PhenoKeeperRow,
+        "id" | "note" | "stability_runs" | "created_at" | "updated_at"
+      >;
       pheno_keeper_clones: Tbl<
         PhenoKeeperCloneRow,
         | "id"
@@ -374,6 +379,7 @@ export interface PhenoDatabase {
         | "candidate_number"
         | "strain"
         | "stage"
+        | "plant_type"
         | "grow_id"
         | "tent_id"
         | "photo_url"

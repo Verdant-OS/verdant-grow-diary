@@ -43,7 +43,7 @@
 
 ## Known limitations
 
-- Operator Mode (`?operator=1`) is a URL surface gate, not a role/capability check. Data access is still scoped by Supabase RLS; the URL cannot widen access. Documented in `docs/v0-release-checkpoint.md` §15.1.
+- Operator Mode requires both `?operator=1` and a server-verified operator role. Data access remains scoped by Supabase RLS; the URL cannot grant or widen access. Documented in `docs/v0-release-checkpoint.md` §15.1.
 - Ingest-audit proof depends on the `"Users view own ingest audit"` RLS policy; permission/network failures collapse to `blocked` / `error` states with calm copy and never imply a healthy state.
 - Sensor-proof window is the last 24 hours by design; report copy says "current proof window" explicitly.
 - AI Doctor remains advisory only — no Action Queue auto-write.
@@ -51,7 +51,7 @@
 ## Demo script (short)
 
 1. Pick a grow, then a tent on the Sensors page.
-2. Append `?operator=1` to the Sensors URL — show row-level live proof + ingest-audit proof panels (counts, last-accepted, last-rejected, proof window).
+2. With an operator-role account, append `?operator=1` to the Sensors URL — show row-level live proof + ingest-audit proof panels (counts, last-accepted, last-rejected, proof window).
 3. Open One-Tent Live Proof — show the 6-step checklist + sensor-proof section + shortcut links.
 4. Click **Copy proof summary** — paste into a notes app to show the sanitized markdown report (no IDs, no timestamps below day-level for audit rows).
 5. Walk the loop: Quick Log → Timeline category → AI Doctor readiness → Alert → Add to Action Queue (approval required) → Complete → Follow-up diary entry → Timeline back-pointer.

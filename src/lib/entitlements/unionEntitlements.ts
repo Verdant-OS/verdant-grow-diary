@@ -2,19 +2,20 @@
  * unionEntitlements — pure union of BYO Paddle and Lovable Paddle rows.
  *
  * Selects the STRONGEST entitlement source deterministically:
- *   1. Active founder_lifetime (from Lovable Paddle) — beats everything.
- *   2. Active paid recurring subscription (BYO or Lovable, whichever is
- *      currently active-and-in-period). If both are simultaneously active,
- *      BYO wins as the incumbent source of truth for existing customers.
- *   3. Any non-null row that is degraded (past_due / paused / canceled /
- *      expired) — BYO preferred, so existing operator audit surfaces keep
- *      their signal.
+ *   1. Entitling founder_lifetime (from Lovable Paddle) — beats everything.
+ *   2. Entitling paid recurring subscription (BYO or Lovable, whichever is
+ *      active, trialing, in dunning, or within cancellation grace). If both
+ *      are simultaneously entitling, BYO wins as the incumbent source of
+ *      truth for existing customers.
+ *   3. Any non-null row that is not currently entitled — BYO preferred, so
+ *      existing operator audit surfaces keep their signal.
  *   4. null → free.
  *
  * Pure. No React, no Supabase, no fetch. Time is injected.
  */
 
-import type { BillingSubscriptionRow, PlanId, SubscriptionStatus } from "./types";
+import type { BillingSubscriptionRow, PlanId } from "./types";
+import { subscriptionGrantsAccess } from "../paddleSubscriptionAccessRules";
 
 export type EntitlementSource =
   | "free"
@@ -27,33 +28,27 @@ export interface PickStrongestResult {
   source: EntitlementSource;
 }
 
-const RECURRING_PLANS: ReadonlyArray<PlanId> = ["pro_monthly", "pro_annual"];
+const RECURRING_PLANS: ReadonlyArray<PlanId> = [
+  "pro_monthly",
+  "pro_annual",
+  "craft_monthly",
+  "craft_annual",
+];
 
-function isActiveInPeriod(
-  row: BillingSubscriptionRow | null,
-  now: Date,
-): boolean {
+function rowGrantsPaidAccess(row: BillingSubscriptionRow | null, now: Date): boolean {
   if (row == null) return false;
-  if (row.status !== ("active" as SubscriptionStatus)) return false;
-  if (row.current_period_end == null) return true; // e.g. founder_lifetime
-  const end = new Date(row.current_period_end);
-  if (Number.isNaN(end.getTime())) return false;
-  return end.getTime() > now.getTime();
+  return subscriptionGrantsAccess(row, now);
 }
 
-function isLifetimeActive(row: BillingSubscriptionRow | null, now: Date): boolean {
-  return (
-    row != null &&
-    row.plan_id === "founder_lifetime" &&
-    isActiveInPeriod(row, now)
-  );
+function isEntitlingLifetime(row: BillingSubscriptionRow | null, now: Date): boolean {
+  return row != null && row.plan_id === "founder_lifetime" && rowGrantsPaidAccess(row, now);
 }
 
-function isRecurringActive(row: BillingSubscriptionRow | null, now: Date): boolean {
+function isEntitlingRecurring(row: BillingSubscriptionRow | null, now: Date): boolean {
   return (
     row != null &&
     (RECURRING_PLANS as ReadonlyArray<string>).includes(row.plan_id) &&
-    isActiveInPeriod(row, now)
+    rowGrantsPaidAccess(row, now)
   );
 }
 
@@ -63,19 +58,20 @@ export function pickStrongestBilling(
   now: Date,
 ): PickStrongestResult {
   // 1. Lifetime wins over everything.
-  if (isLifetimeActive(lovableRow, now)) {
+  if (isEntitlingLifetime(lovableRow, now)) {
     return { row: lovableRow, source: "lovable_paddle_lifetime" };
   }
   // (BYO lifetime, should it ever exist, folds into byo_paddle branch below.)
-  if (isLifetimeActive(byoRow, now)) {
+  if (isEntitlingLifetime(byoRow, now)) {
     return { row: byoRow, source: "byo_paddle" };
   }
 
-  // 2. Active recurring subscription. BYO is incumbent → tie goes to BYO.
-  const byoActive = isRecurringActive(byoRow, now);
-  const lovableActive = isRecurringActive(lovableRow, now);
-  if (byoActive) return { row: byoRow, source: "byo_paddle" };
-  if (lovableActive) {
+  // 2. Any entitlement-granting recurring subscription. BYO is incumbent →
+  // tie goes to BYO, including a customer in dunning or cancellation grace.
+  const byoEntitles = isEntitlingRecurring(byoRow, now);
+  const lovableEntitles = isEntitlingRecurring(lovableRow, now);
+  if (byoEntitles) return { row: byoRow, source: "byo_paddle" };
+  if (lovableEntitles) {
     return { row: lovableRow, source: "lovable_paddle_subscription" };
   }
 
@@ -119,13 +115,92 @@ export interface ResolveUnionInput {
  * Does NOT read from Supabase or React. Callers (hook + server gates)
  * supply the two raw rows and the expected environment.
  */
-export function resolveUnionEntitlements(
-  input: ResolveUnionInput,
-): ResolvedEntitlement {
+export function resolveUnionEntitlements(input: ResolveUnionInput): ResolvedEntitlement {
   const mappedLovable = mapLovableSubscriptionRow(input.lovableRow, {
     expectedBillingEnvironment: input.expectedBillingEnvironment,
   });
   const picked = pickStrongestBilling(input.byoRow, mappedLovable, input.now);
   const resolved = resolveEntitlements(picked.row, input.now, input.opts);
   return { ...resolved, source: picked.source };
+}
+
+/**
+ * Bounded newest-first scan window for public.subscriptions reads.
+ *
+ * public.subscriptions is unique per paddle_subscription_id, NOT per user,
+ * so one account can hold several rows in one environment (e.g. an active
+ * Founder Lifetime row plus a newer canceled Pro row). A single-newest-row
+ * read lets the non-entitling newer row shadow the entitling older one, so
+ * readers scan a bounded window and apply any-entitling-row semantics — the
+ * same EXISTS shape the DB gates use. 20 comfortably exceeds any real
+ * per-user, per-environment row count.
+ *
+ * Mirrors SUBSCRIPTION_ROW_SCAN_LIMIT in
+ * supabase/functions/_shared/unionEntitlementLookup.ts.
+ */
+export const SUBSCRIPTION_ROW_SCAN_LIMIT = 20;
+
+// Resolve one Lovable row in isolation. No opts on purpose: caller-level
+// lifts (e.g. staff) must not make every row look entitling, or the picker
+// would degenerate back to newest-row-wins.
+function resolveLovableRowAlone(
+  row: LovableSubscriptionRow,
+  environment: LovableBillingEnvironment,
+  now: Date,
+): ResolvedEntitlement {
+  return resolveUnionEntitlements({
+    byoRow: null,
+    lovableRow: row,
+    expectedBillingEnvironment: environment,
+    now,
+  });
+}
+
+function isEntitling(resolved: ResolvedEntitlement): boolean {
+  return resolved.isActive && resolved.effectivePlanId !== "free";
+}
+
+/**
+ * Per-row entitlement probe. Shared with the server helper
+ * (supabase/functions/_shared/unionEntitlementLookup.ts) so both sides use
+ * identical row-level semantics.
+ */
+export function lovableRowEntitles(
+  row: LovableSubscriptionRow,
+  environment: LovableBillingEnvironment,
+  now: Date,
+): boolean {
+  return isEntitling(resolveLovableRowAlone(row, environment, now));
+}
+
+/**
+ * Any-entitling-row selection over a bounded window (matches the DB gates'
+ * EXISTS semantics). Shared by the client hook and the server helper
+ * (supabase/functions/_shared/unionEntitlementLookup.ts).
+ *
+ * Rows MUST arrive newest-first with a unique tiebreak (created_at desc,
+ * paddle_subscription_id desc — created_at alone is not unique, so without
+ * the tiebreak equal timestamps make the pick nondeterministic).
+ *
+ * Selection mirrors pickStrongestBilling's precedence:
+ *   1. Newest entitling founder_lifetime row — lifetime beats any recurring
+ *      plan regardless of recency, so a Founder who also holds a newer
+ *      active Pro row still displays as Founder.
+ *   2. Newest entitling recurring row.
+ *   3. Newest row (entitling or not), so the degraded-display resolution
+ *      behaves exactly as the previous single-newest-row read did.
+ */
+export function pickEntitlingLovableRow(
+  rows: ReadonlyArray<LovableSubscriptionRow>,
+  environment: LovableBillingEnvironment,
+  now: Date,
+): LovableSubscriptionRow | null {
+  let newestEntitlingRecurring: LovableSubscriptionRow | null = null;
+  for (const row of rows) {
+    const resolved = resolveLovableRowAlone(row, environment, now);
+    if (!isEntitling(resolved)) continue;
+    if (resolved.effectivePlanId === "founder_lifetime") return row;
+    if (newestEntitlingRecurring == null) newestEntitlingRecurring = row;
+  }
+  return newestEntitlingRecurring ?? (rows.length > 0 ? rows[0] : null);
 }

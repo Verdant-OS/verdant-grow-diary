@@ -251,7 +251,7 @@ describe("AiDoctorContextReadinessPanel — diary fixture golden context", () =>
     );
     const offenders = out
       .split("\n")
-      .map((l) => l.trim())
+      .map((l) => l.trim().split("\\").join("/"))
       .filter((l) => l && !l.startsWith("src/test/"));
     expect(offenders).toEqual([]);
   });

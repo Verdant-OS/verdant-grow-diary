@@ -80,6 +80,15 @@ describe("live-sensor-entitlement edge function — server safety", () => {
     expect(FN).toMatch(/entitlement_lookup_failed/);
   });
 
+  it("returns a generic fail-closed response when the entitlement or ownership check throws", () => {
+    expect(FN).toMatch(/catch \(err\)/);
+    const response = FN.match(
+      /return json\(500, \{\s*ok: false,\s*reason: "entitlement_check_failed",\s*surface,\s*\}\);/,
+    )?.[0];
+    expect(response).toBeDefined();
+    expect(response).not.toMatch(/\b(?:detail|error|message|stack)\s*:/);
+  });
+
   it("performs no privileged writes, no sensor ingest, no device control, no AI calls, no telemetry reads", () => {
     for (const t of [
       ".insert(",

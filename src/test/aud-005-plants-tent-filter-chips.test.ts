@@ -4,7 +4,11 @@
  * lock in the pure helper that powers the chip row.
  */
 import { describe, it, expect } from "vitest";
-import { buildPlantsTentFilterChips } from "@/lib/plantsTentFilterChipsRules";
+import {
+  buildPlantsTentFilterChips,
+  filterPlantsByTentChip,
+  NO_TENT_FILTER_CHIP_ID,
+} from "@/lib/plantsTentFilterChipsRules";
 import { filterVisiblePlants } from "@/lib/archivedPlantVisibilityRules";
 import { filterPlantsBySearch } from "@/lib/plantsPageFilterRules";
 
@@ -103,5 +107,80 @@ describe("AUD-005 buildPlantsTentFilterChips", () => {
       search: "diesel",
     });
     expect(a).toEqual(b);
+  });
+
+  it("renders no 'No tent' chip when every plant has a tent", () => {
+    const chips = buildPlantsTentFilterChips(plants, tents, {
+      showArchived: true,
+      search: "",
+    });
+    expect(chips.some((c) => c.id === NO_TENT_FILTER_CHIP_ID)).toBe(false);
+  });
+});
+
+describe("AUD-005 'No tent' bucket", () => {
+  // plants.tent_id is nullable; the adapter maps a null tent_id to "".
+  const plantsWithNoTent = [
+    { id: "p1", name: "Blue Dream", strain: "Blue Dream", tentId: "tent-a" },
+    { id: "p2", name: "Loose One", strain: "Gelato", tentId: null },
+    { id: "p3", name: "Loose Two", strain: "Gelato", tentId: "" },
+    // Archived and tent-less at once.
+    { id: "p4", name: "Old Loose", strain: "OG Kush", tentId: null, isArchived: true },
+  ];
+
+  it("appends a 'No tent (n)' chip when visible plants have no tent", () => {
+    const chips = buildPlantsTentFilterChips(plantsWithNoTent, tents, {
+      showArchived: false,
+      search: "",
+    });
+    expect(chips[chips.length - 1]).toMatchObject({
+      id: NO_TENT_FILTER_CHIP_ID,
+      name: "No tent",
+      count: 2,
+    });
+  });
+
+  it("chip counts including 'No tent' sum to the 'All tents' total", () => {
+    for (const showArchived of [false, true]) {
+      const chips = buildPlantsTentFilterChips(plantsWithNoTent, tents, {
+        showArchived,
+        search: "",
+      });
+      const all = chips.find((c) => c.id === "all");
+      const sum = chips
+        .filter((c) => c.id !== "all")
+        .reduce((acc, c) => acc + c.count, 0);
+      expect(sum).toBe(all?.count);
+    }
+  });
+
+  it("keeps the chip (count 0) while search hides the tent-less plants", () => {
+    const chips = buildPlantsTentFilterChips(plantsWithNoTent, tents, {
+      showArchived: false,
+      search: "blue",
+    });
+    expect(chips.find((c) => c.id === NO_TENT_FILTER_CHIP_ID)?.count).toBe(0);
+  });
+
+  it("filterPlantsByTentChip mirrors the chip buckets exactly", () => {
+    const visible = filterVisiblePlants(plantsWithNoTent, { showArchived: false });
+    expect(
+      filterPlantsByTentChip(visible, NO_TENT_FILTER_CHIP_ID).map((p) => p.id),
+    ).toEqual(["p2", "p3"]);
+    expect(filterPlantsByTentChip(visible, "tent-a").map((p) => p.id)).toEqual(["p1"]);
+    expect(filterPlantsByTentChip(visible, "all").length).toBe(visible.length);
+  });
+
+  it("chip counts equal filterPlantsByTentChip over the same pipeline", () => {
+    const opts = { showArchived: true, search: "loose" };
+    const chips = buildPlantsTentFilterChips(plantsWithNoTent, tents, opts);
+    const visible = filterPlantsBySearch(
+      filterVisiblePlants(plantsWithNoTent, { showArchived: opts.showArchived }),
+      opts.search,
+      tents,
+    );
+    for (const chip of chips.filter((c) => c.id !== "all")) {
+      expect(filterPlantsByTentChip(visible, chip.id).length).toBe(chip.count);
+    }
   });
 });

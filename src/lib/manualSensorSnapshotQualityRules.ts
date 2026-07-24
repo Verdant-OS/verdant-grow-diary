@@ -141,6 +141,20 @@ export function evaluateManualSensorSnapshotQuality(
     reasons.push("Missing captured-at timestamp.");
   }
 
+  const hasPresentMetric = [
+    input.temperature_c,
+    input.humidity_pct,
+    input.vpd_kpa,
+    input.soil_temp_c,
+    input.soil_moisture_pct,
+    input.soil_ec_mscm,
+    input.ph,
+  ].some((value) => typeof value === "number" && Number.isFinite(value));
+
+  if (!hasPresentMetric) {
+    missingFields.push("metrics");
+  }
+
   // Numeric range checks (only when value is present)
   const checkNum = (
     field: string,
@@ -232,7 +246,12 @@ export function evaluateManualSensorSnapshotQuality(
 
   const isHistorical = mode === "historical";
 
-  if (sourceLabel === "invalid" || invalidFields.length > 0) {
+  if (!hasPresentMetric) {
+    quality = "missing";
+    summary = isHistorical
+      ? "Historical reading needs review"
+      : "Missing current reading";
+  } else if (sourceLabel === "invalid" || invalidFields.length > 0) {
     quality = "invalid";
     summary = isHistorical
       ? "Historical invalid reading — review before use"

@@ -115,8 +115,11 @@ describe("billing_subscription_update_audit migration", () => {
 });
 
 describe("paddle webhook -> audited wrapper handoff", () => {
-  it("webhook calls the audited wrapper RPC", () => {
-    expect(WEBHOOK).toMatch(/rpc\(\s*["']apply_paddle_subscription_update_with_audit["']/);
+  it("webhook calls the audited wrapper RPCs via the founder-aware dispatch", () => {
+    expect(WEBHOOK).toMatch(
+      /const rpcName = processing\.isFounderCandidate\s*\?\s*"allocate_founder_lifetime_with_audit"\s*:\s*"apply_paddle_subscription_update_with_audit";/,
+    );
+    expect(WEBHOOK).toMatch(/await supabase\.rpc\(rpcName,\s*\{\s*p_processing_id: processing\.id,?\s*\}/);
   });
 
   it("webhook does not call the raw updater RPC directly", () => {

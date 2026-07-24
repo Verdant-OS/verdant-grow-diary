@@ -1,6 +1,8 @@
 import VpdStageMissingBadge from "@/components/VpdStageMissingBadge";
 import EcowittLatestSnapshotCard from "@/components/EcowittLatestSnapshotCard";
+import { stripBackPointerTokens } from "@/lib/actionQueueProvenanceRules";
 import { computeEnvironmentStability } from "@/lib/environmentStabilityRules";
+import { resolveAlertContextStage } from "@/lib/alertStageResolution";
 import { formatStabilityChipView } from "@/lib/dashboardStabilityChipCopyRules";
 import StabilityChipDrilldown from "@/components/StabilityChipDrilldown";
 import {
@@ -22,25 +24,34 @@ import SensorChart from "@/components/SensorChart";
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import DashboardDataSourceDisclosure from "@/components/DashboardDataSourceDisclosure";
+import GrowDataLoadError, { GrowDataLoadingState } from "@/components/GrowDataLoadError";
 // Mock side-panel hooks intentionally removed — the Dashboard renders
 // honest empty states for Tasks and AI Insights until backed by real data.
 // See docs/qa/v0-demo-loop-checklist.md and docs/safety/static-safety-scans.md.
 import { useGrowPlants, useGrowTents } from "@/hooks/useGrowData";
 import { useGrows } from "@/store/grows";
 import OnboardingChecklistCard from "@/components/OnboardingChecklistCard";
-import FirstRunChecklist from "@/components/FirstRunChecklist";
+import PublicQuickLogHandoffCard from "@/components/PublicQuickLogHandoffCard";
 import OnboardingProgressPill from "@/components/OnboardingProgressPill";
 import DashboardZeroTentEmptyState from "@/components/DashboardZeroTentEmptyState";
+import OperatorModeCallout from "@/components/OperatorModeCallout";
+import { usePageSeo } from "@/hooks/usePageSeo";
+import ReleaseReadinessOperatorCard from "@/components/ReleaseReadinessOperatorCard";
+import LineageRepairCta from "@/components/LineageRepairCta";
 
 import DashboardPendingOutcomeReviewsCard from "@/components/DashboardPendingOutcomeReviewsCard";
 import SafeByDesignNotice from "@/components/SafeByDesignNotice";
 import DashboardSensorHealthSummary from "@/components/DashboardSensorHealthSummary";
 import { buildDashboardSensorHealthSummary } from "@/lib/dashboardSensorHealthViewModel";
 import { sanitizeActionCopy } from "@/lib/actionQueueRowView";
-import { stripBackPointerTokens } from "@/lib/actionQueueProvenanceRules";
 import { APPROVAL_QUEUE_EMPTY_COPY, mapRiskToSeverity } from "@/lib/dashboardActionQueueViewModel";
 import { buildOnboardingChecklistViewModel } from "@/lib/onboardingChecklistViewModel";
+import { selectConnectedOneTentGraph } from "@/lib/connectedOneTentActivationRules";
+import { countActivatingSensorReadings } from "@/lib/onboardingSensorActivationRules";
+import { useOneTentActivationEvidence } from "@/hooks/useOneTentActivationEvidence";
 import { useSensorReadings, useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
+import { useNowTick } from "@/hooks/useNowTick";
+import { isUuid } from "@/lib/isUuid";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { useDashboardScopedData } from "@/hooks/useDashboardScopedData";
 import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";
@@ -82,14 +93,13 @@ import { toast } from "sonner";
 import { SOURCE_LABEL, formatValue, isStale } from "@/lib/sensorSnapshot";
 import { buildSensorSourceDisplayLabel } from "@/lib/sensorSourceDisplayLabel";
 import { formatSensorSourceLabel } from "@/lib/manualSensorSourceLabel";
-import { evaluateSensorQuality } from "@/lib/sensorQuality";
 import { formatTemperatureDisplay } from "@/lib/temperatureUnitPreference";
 
-import type { SensorReadingRow } from "@/lib/db";
 import { Button } from "@/components/ui/button";
 import GrowTargetsEditor from "@/components/GrowTargetsEditor";
 import DailyGrowCheckStatusCard from "@/components/DailyGrowCheckStatusCard";
 import DashboardDailyGrowCheckPanel from "@/components/DashboardDailyGrowCheckPanel";
+import GuidedActionChecklistPanel from "@/components/GuidedActionChecklistPanel";
 
 import { Badge } from "@/components/ui/badge";
 import SensorSourceBadge from "@/components/SensorSourceBadge";
@@ -99,7 +109,7 @@ import {
   alertDetailPath,
   alertsPath,
   dashboardPath,
-  logsPath,
+  timelinePath,
   tentDetailPath,
   tentsPath,
 } from "@/lib/routes";
@@ -108,66 +118,50 @@ import {
   type BuildTentSnapshotInput,
 } from "@/lib/dashboardEnvironmentSnapshotViewModel";
 import { formatDistanceToNow } from "date-fns";
-
-type DashReading = {
-  ts: string;
-  tentId: string;
-  temp: number | null;
-  rh: number | null;
-  vpd: number | null;
-  co2: number | null;
-  soil: number | null;
-};
-
-const METRIC_KEY: Record<string, keyof Omit<DashReading, "ts" | "tentId">> = {
-  temperature_c: "temp",
-  humidity_pct: "rh",
-  vpd_kpa: "vpd",
-  co2_ppm: "co2",
-  soil_moisture_pct: "soil",
-};
-
-function groupReadings(rows: SensorReadingRow[]): DashReading[] {
-  const byKey = new Map<string, DashReading>();
-  for (const row of rows) {
-    const key = `${row.tent_id}|${row.ts}`;
-    let r = byKey.get(key);
-    if (!r) {
-      r = {
-        ts: row.ts,
-        tentId: row.tent_id,
-        temp: null,
-        rh: null,
-        vpd: null,
-        co2: null,
-        soil: null,
-      };
-      byKey.set(key, r);
-    }
-    const k = METRIC_KEY[row.metric];
-    const v = Number(row.value);
-    if (k && Number.isFinite(v)) r[k] = v;
-  }
-  // Ascending by ts for chart readability
-  return Array.from(byKey.values()).sort((a, b) => (a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0));
-}
+import {
+  buildDashboardStabilityReadings,
+  dashboardSnapshotForHealthyCues,
+  evaluateDashboardSensorQuality,
+  groupDashboardSensorReadings,
+  selectDashboardSensorEvidenceRows,
+} from "@/lib/dashboardSensorEvidenceRules";
 
 export default function Dashboard() {
+  usePageSeo({
+    title: "Grow Room Dashboard | Verdant Grow Diary",
+    description:
+      "Track tents, plants, sensor snapshots, environment stability, and grow activity in one grower-controlled dashboard.",
+    path: "/",
+  });
   // Shared URL `?growId=` resolution against RLS-loaded grows. When growId is
   // absent or invalid, hooks fetch the user's full set (legacy behavior).
   const { urlGrowId, scopedGrow, scopedGrowName, isValidScopedGrow, backHref } = useScopedGrow();
   const scopedGrowId = isValidScopedGrow ? (urlGrowId ?? undefined) : undefined;
-  const { data: tents = [] } = useGrowTents(scopedGrowId);
-  const { data: plants = [] } = useGrowPlants(undefined, scopedGrowId);
+  const tentsQuery = useGrowTents(scopedGrowId);
+  const plantsQuery = useGrowPlants(undefined, scopedGrowId);
+  const { data: tents = [] } = tentsQuery;
+  const { data: plants = [] } = plantsQuery;
   // Tasks: no real-data hook yet — render an honest empty state below.
   const tasks: { status: string }[] = [];
-  const { data: rawReadings = [] } = useSensorReadings();
-  const readings = groupReadings(rawReadings);
+  const dashboardReadingsQuery = useSensorReadings();
+  const { data: rawReadings = [] } = dashboardReadingsQuery;
+  // Diagnostic packets may be stored with a canonical `live` source. Keep
+  // raw provenance only through this shared fence; charts/counts receive the
+  // evidence-only rows and the grouped projection contains no raw payload.
+  const dashboardSensorRows = selectDashboardSensorEvidenceRows(rawReadings);
+  const readings = groupDashboardSensorReadings(dashboardSensorRows);
   // Per-tent sensor windows for the stability summary. Each tent gets its
   // own 200-row window so a busy tent cannot push another tent's VPD rows
   // out of a shared global cap. Read-only; no writes.
-  const tentIds = tents.map((t) => t.id);
-  const { byTent: readingsByTent } = useSensorReadingsByTents(tentIds);
+  // Mock-fallback tent ids ("t1"…) would 400 against the uuid tent_id
+  // column — only query real UUIDs; a non-UUID id cannot have rows, so its
+  // absence is established (same guard as the Tents list).
+  const tentIds = tents.map((t) => t.id).filter((id) => isUuid(id));
+  const { byTent: readingsByTent, statusByTent: sensorStatusByTent } =
+    useSensorReadingsByTents(tentIds);
+  // Freshness is time-relative: re-evaluate the snapshot strip's clock every
+  // minute so an open tab cannot keep a fresh label past the stale boundary.
+  const nowTick = useNowTick();
   // AI Insights: no real-data hook yet — render an honest empty state below.
   const { recent, pending } = useDashboardScopedData(scopedGrowId ?? null);
   // Multi-tent selector for the Latest Environment card. Defaults to "all"
@@ -177,24 +171,64 @@ export default function Dashboard() {
   const selectableTents = tents.map((t) => ({ id: t.id, name: t.name }));
   const selectedTentIds = resolveSelectedTentIds(selectableTents, tentSelection);
   const sensorState = useLatestSensorSnapshot(scopedGrowId ?? null, selectedTentIds);
+  // Stage for alert/threshold evaluation on the scoped Dashboard (live
+  // audit #14). Resolved from the grow row PLUS the tents in the SAME
+  // selection scope as the snapshot being classified — a specific tent
+  // selection evaluates that tent's reading against its own stage; "all"
+  // considers every grow tent (most advanced known stage wins, so a stale
+  // `grows.stage` cannot drive outdated bands while the tent badge shows
+  // a later stage). Unscoped renders pass null: `tents` is the full
+  // account set there, so no tent stage may be inferred.
+  const stageContextTents = tents.filter((t) => selectedTentIds.includes(t.id));
+  const alertContextStage = scopedGrow
+    ? resolveAlertContextStage({
+        growStage: scopedGrow.stage,
+        tentStages: stageContextTents.map((t) => t.stage),
+      }).stage
+    : null;
   const trendsState = useEnvironmentTrends(
     scopedGrowId ?? null,
     tents.map((t) => t.id),
   );
   const targetsState = useGrowTargets(scopedGrowId ?? null);
   const [targetsEditorOpen, setTargetsEditorOpen] = useState(false);
+  const currentSensorSnapshot = sensorState.status === "ok" ? sensorState.snapshot : null;
+  // Unverified/simulated snapshots remain visible with their honest source
+  // label, but they cannot drive green quality, target, stage, alert, or
+  // persistence semantics.
+  const dashboardHealthSnapshot = dashboardSnapshotForHealthyCues(currentSensorSnapshot);
+  const dashboardSensorQuality = evaluateDashboardSensorQuality(currentSensorSnapshot, nowTick);
 
-  // First-run onboarding checklist — derived from data the Dashboard
-  // already loads. No extra Supabase queries, no writes.
-  const { grows } = useGrows();
-  const diaryRecentCount =
-    recent.status === "ok" ? recent.items.filter((i) => i.kind === "diary").length : 0;
+  // First-run activation is relationship-aware. Independent grow/tent/plant
+  // counts cannot prove that a usable One-Tent chain exists.
+  const { grows, activeGrowId } = useGrows();
+  const activationGraph = selectConnectedOneTentGraph({
+    grows,
+    tents,
+    plants,
+    preferredGrowId: scopedGrowId ?? activeGrowId,
+  });
+  const activationEvidence = useOneTentActivationEvidence(activationGraph);
+  const connectedSensorReadingCount = activationGraph.tentId
+    ? countActivatingSensorReadings(readingsByTent[activationGraph.tentId] ?? [])
+    : 0;
+  // Quick-log-carried manual snapshot evidence on the connected tent (diary
+  // details.manual_sensor_snapshot rows + manual environment grow_events).
+  // Additive only — the sensor_readings path above is never weakened.
+  const quickLogManualSnapshotCount =
+    activationEvidence.status === "ok"
+      ? (activationEvidence.summary.manualSnapshotCount ?? 0)
+      : 0;
   const onboardingVm = buildOnboardingChecklistViewModel({
     growCount: grows.length,
     tentCount: tents.length,
     plantCount: plants.length,
-    diaryEntryCount: diaryRecentCount,
-    sensorReadingCount: rawReadings.length,
+    diaryEntryCount: 0,
+    sensorReadingCount: connectedSensorReadingCount + quickLogManualSnapshotCount,
+    connectedScope: activationGraph,
+    firstLogEvidenceCount:
+      activationEvidence.status === "ok" ? activationEvidence.summary.count : null,
+    firstLogEvidenceStatus: activationEvidence.status,
   });
   // Real persisted alerts for this grow (open only). Read-only display so
   // growers can see the loop close: manual reading → derived alert → persisted.
@@ -208,14 +242,18 @@ export default function Dashboard() {
   // user-scoped via RLS. Not automation; not device control.
   usePersistEnvironmentAlerts({
     growId: scopedGrowId ?? null,
-    snapshot: sensorState.status === "ok" ? sensorState.snapshot : null,
-    quality: evaluateSensorQuality(sensorState.status === "ok" ? sensorState.snapshot : null),
+    snapshot: dashboardHealthSnapshot,
+    quality: dashboardSensorQuality,
     targets: compareSnapshotToTargets(
-      sensorState.status === "ok" ? sensorState.snapshot : null,
+      dashboardHealthSnapshot,
       targetsState.status === "ok" ? targetsState.targets : null,
     ),
-    enabled: !!scopedGrowId,
-    stage: scopedGrow?.stage ?? null,
+    // Gated on the tent read having settled: while it is pending, `tents`
+    // is a placeholder empty array and alertContextStage falls back to the
+    // grow row alone — an alert persisted against a stale grow stage in
+    // that window would not be removed once the tent stages arrive.
+    enabled: !!scopedGrowId && tentsQuery.isFetched,
+    stage: alertContextStage,
   });
 
   const dueToday = tasks.filter((t) => t.status === "today").length;
@@ -225,16 +263,68 @@ export default function Dashboard() {
   // Latest reading per tent for the strip + a read-only stability summary
   // computed from the same tent-scoped readings (no extra fetches, no writes).
   const latestPerTent = tents.map((t) => {
-    const tentRows = readingsByTent[t.id] ?? [];
-    const rs = groupReadings(tentRows);
+    const tentRows = selectDashboardSensorEvidenceRows(readingsByTent[t.id] ?? []);
+    const chartRows = groupDashboardSensorReadings(tentRows);
+    const rs = buildDashboardStabilityReadings(tentRows);
     const stability = computeEnvironmentStability(rs, { stage: t.stage });
-    return { tent: t, last: rs[rs.length - 1], stability };
+    return {
+      tent: t,
+      last: chartRows[chartRows.length - 1],
+      stability,
+      tentRows,
+    };
   });
 
   const recentAlerts = persistedAlertsState.alerts.slice(0, 3);
 
+  if (tentsQuery.isError || plantsQuery.isError) {
+    return (
+      <div className="space-y-4 md:space-y-6" data-testid="dashboard-root">
+        <GrowBreadcrumbs
+          growId={urlGrowId}
+          growName={scopedGrowName}
+          current="Dashboard"
+          section="dashboard"
+        />
+        <PageHeader
+          title="Dashboard"
+          description="Track your tents, plants, sensors, and grow activity in one place."
+          icon={<Sparkles className="h-5 w-5" />}
+        />
+        <GrowDataLoadError
+          resource="Dashboard grow data"
+          testId="dashboard-grow-data-error"
+          onRetry={() => {
+            void Promise.all([tentsQuery.refetch(), plantsQuery.refetch()]);
+          }}
+        />
+      </div>
+    );
+  }
+
+  if (tentsQuery.isLoading || plantsQuery.isLoading) {
+    return (
+      <div className="space-y-4 md:space-y-6" data-testid="dashboard-root">
+        <GrowBreadcrumbs
+          growId={urlGrowId}
+          growName={scopedGrowName}
+          current="Dashboard"
+          section="dashboard"
+        />
+        <PageHeader
+          title="Dashboard"
+          description="Track your tents, plants, sensors, and grow activity in one place."
+          icon={<Sparkles className="h-5 w-5" />}
+        />
+        <GrowDataLoadingState resource="Dashboard grow data" testId="dashboard-grow-data-loading" />
+      </div>
+    );
+  }
+
+  // Non-landmark container: AppShell already owns the <main> landmark around
+  // the route Outlet, so the page root must not nest another.
   return (
-    <div>
+    <div className="space-y-4 md:space-y-6" data-testid="dashboard-root">
       <QuickLogV2Fab />
       <GrowBreadcrumbs
         growId={urlGrowId}
@@ -250,7 +340,10 @@ export default function Dashboard() {
           <div className="flex items-center gap-2 flex-wrap">
             <OnboardingProgressPill vm={onboardingVm} />
             <Button asChild variant="outline" data-testid="dashboard-daily-grow-check-entry">
-              <Link to="/daily-check">Daily Grow Check</Link>
+              {/* Route still targets /daily-check (the underlying Quick Log
+                  surface). Label unified to "Quick Log" so the Dashboard
+                  presents a single grower-facing logging concept. */}
+              <Link to="/daily-check">Quick Log</Link>
             </Button>
             <Button asChild className="gradient-leaf text-primary-foreground">
               <Link to={tentsPath()}>Open tents</Link>
@@ -269,18 +362,21 @@ export default function Dashboard() {
       )}
 
       <div className="my-3">
+        <PublicQuickLogHandoffCard className="mb-3" />
         <OnboardingChecklistCard vm={onboardingVm} />
       </div>
 
       <div className="my-3">
-        <FirstRunChecklist
-          growCount={grows.length}
-          tentCount={tents.length}
-          plantCount={plants.length}
-          quickLogCount={diaryRecentCount}
-          sensorSnapshotCount={rawReadings.length}
-        />
+        <OperatorModeCallout />
       </div>
+
+      <div className="my-3">
+        <ReleaseReadinessOperatorCard />
+      </div>
+
+      {/* Lineage Repair stays below the core Quick Log + Environment loop.
+          First-run guidance now has one canonical relationship-aware card
+          above, so two checklists cannot disagree or compete on mobile. */}
 
       {/* Dashboard intentionally has a single Quick Log entry point (QuickLogV2Fab).
           The "Log your first plant memory" CTA was a duplicate entry point and was removed.
@@ -298,13 +394,15 @@ export default function Dashboard() {
 
       <DashboardDailyGrowCheckPanel scopedGrowId={scopedGrowId ?? null} className="mb-6" />
 
+      <GuidedActionChecklistPanel scopedGrowId={scopedGrowId ?? null} className="mb-6" />
+
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         <KpiCard label="Active tents" value={tents.length} icon={<Box className="h-3.5 w-3.5" />} />
         <KpiCard
           label="Plants"
           value={plants.length}
           icon={<Sprout className="h-3.5 w-3.5" />}
-          hint={`${plants.filter((p) => p.health === "healthy").length} healthy`}
+          hint={`${plants.filter((p) => p.health === "healthy").length} marked healthy · user-assigned, not sensor-derived`}
           accent="success"
         />
         <KpiCard
@@ -323,283 +421,427 @@ export default function Dashboard() {
       </div>
 
       {tents.length === 0 ? (
-        <DashboardZeroTentEmptyState />
+        <DashboardZeroTentEmptyState growId={activationGraph.growId} />
       ) : (
-        <section
-          aria-labelledby="dashboard-environment-snapshot-heading"
-          data-testid="dashboard-environment-snapshot"
-          className="mb-6"
-        >
-          <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
-            <div>
-              <h2
-                id="dashboard-environment-snapshot-heading"
-                className="font-display font-semibold text-base"
-              >
-                Environment Snapshot
-              </h2>
-              <p className="text-xs text-muted-foreground">
-                Latest reading per tent with honest source labels.
-              </p>
-            </div>
-            <Button asChild size="sm" variant="ghost">
-              <Link to="/sensors">
-                Open sensors <ArrowRight className="h-3 w-3" />
-              </Link>
-            </Button>
-          </div>
-          {(() => {
-            const anyReading = latestPerTent.some((x) => !!x.last);
-            const snapshotQuality =
-              sensorState.status === "ok" ? evaluateSensorQuality(sensorState.snapshot) : null;
-            const isStaleSnap =
-              sensorState.status === "ok" &&
-              !!sensorState.snapshot.ts &&
-              isStale(sensorState.snapshot.ts);
-            const isInvalidSnap = !!snapshotQuality && snapshotQuality.suspiciousFields.length > 0;
-            if (!anyReading) {
-              return (
-                <div
-                  data-testid="dashboard-environment-snapshot-empty"
-                  className="glass rounded-2xl p-6 text-center"
+        <>
+          <h2
+            data-testid="dashboard-section-heading-environment"
+            className="font-display text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mt-2 mb-1 md:mt-4"
+          >
+            Environment
+          </h2>
+          <section
+            aria-labelledby="dashboard-environment-snapshot-heading"
+            data-testid="dashboard-environment-snapshot"
+            className="mb-6"
+          >
+            <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
+              <div>
+                <h2
+                  id="dashboard-environment-snapshot-heading"
+                  className="font-display font-semibold text-base"
                 >
-                  <h3 className="font-display font-semibold text-base mb-1">
-                    No sensor snapshot yet
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    Add a manual reading or{" "}
-                    <Link
-                      to="/sensors"
-                      data-testid="dashboard-environment-snapshot-empty-sensors-link"
-                      className="underline text-primary hover:opacity-80"
-                    >
-                      connect Ecowitt
-                    </Link>{" "}
-                    to see your environment here.
-                  </p>
-                  <div className="mt-3 flex items-center justify-center gap-2 flex-wrap">
-                    <Button asChild size="sm" className="gradient-leaf text-primary-foreground">
-                      <Link
-                        to="/sensors#manual-reading"
-                        data-testid="dashboard-environment-snapshot-add-manual-reading"
-                        aria-label="Add manual sensor reading"
-                      >
-                        Add manual reading
-                      </Link>
-                    </Button>
-                    <Button asChild size="sm" variant="outline">
-                      <Link
-                        to="/sensors#import-sensor-data"
-                        data-testid="dashboard-environment-snapshot-import-sensor-data"
-                        aria-label="Import sensor data"
-                      >
-                        Import sensor data
-                      </Link>
-                    </Button>
-                    <Button asChild size="sm" variant="outline">
+                  Environment Snapshot
+                </h2>
+                <p className="text-xs text-muted-foreground">
+                  Latest reading per tent with honest source labels.
+                </p>
+              </div>
+              <Button asChild size="sm" variant="ghost">
+                <Link to="/sensors">
+                  Open sensors <ArrowRight className="h-3 w-3" />
+                </Link>
+              </Button>
+            </div>
+            {(() => {
+              const anyReading = latestPerTent.some((x) => !!x.last);
+              const hasPendingTentRead = tentIds.some(
+                (tentId) => sensorStatusByTent[tentId] === "loading",
+              );
+              const hasFailedTentRead = tentIds.some(
+                (tentId) =>
+                  sensorStatusByTent[tentId] === "error" ||
+                  sensorStatusByTent[tentId] === "refresh_error",
+              );
+              const snapshotQuality = sensorState.status === "ok" ? dashboardSensorQuality : null;
+              const isStaleSnap =
+                sensorState.status === "ok" &&
+                !!sensorState.snapshot.ts &&
+                isStale(sensorState.snapshot.ts);
+              const isInvalidSnap =
+                !!snapshotQuality && snapshotQuality.suspiciousFields.length > 0;
+              const isUnverifiedSnap =
+                sensorState.status === "ok" &&
+                sensorState.snapshot.source !== "unavailable" &&
+                dashboardHealthSnapshot === null;
+              if (dashboardReadingsQuery.isLoading || (!anyReading && hasPendingTentRead)) {
+                return (
+                  <GrowDataLoadingState
+                    resource="Environment snapshots"
+                    testId="dashboard-environment-snapshot-loading"
+                  />
+                );
+              }
+              if (dashboardReadingsQuery.isError) {
+                return (
+                  <GrowDataLoadError
+                    resource="Dashboard sensor history"
+                    testId="dashboard-sensor-history-error"
+                    message="Sensor history couldn't be loaded. No empty-state or environment conclusion is shown until that read succeeds."
+                    onRetry={() => {
+                      void dashboardReadingsQuery.refetch();
+                    }}
+                  />
+                );
+              }
+              if (!anyReading && hasFailedTentRead) {
+                return (
+                  <GrowDataLoadError
+                    resource="Environment snapshots"
+                    testId="dashboard-environment-snapshot-error"
+                    message="One or more tent reads failed. We can't confirm that sensor history is empty."
+                  />
+                );
+              }
+              if (!anyReading) {
+                return (
+                  <div
+                    data-testid="dashboard-environment-snapshot-empty"
+                    className="glass rounded-2xl p-6 text-center"
+                  >
+                    <h3 className="font-display font-semibold text-base mb-1">
+                      No sensor snapshot yet
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      Add a manual reading or{" "}
                       <Link
                         to="/sensors"
-                        data-testid="dashboard-environment-snapshot-go-to-sensors"
-                        aria-label="Go to Sensors page"
+                        data-testid="dashboard-environment-snapshot-empty-sensors-link"
+                        className="underline text-primary hover:opacity-80"
                       >
-                        Go to Sensors
-                      </Link>
-                    </Button>
-                  </div>
-                </div>
-              );
-            }
-            return (
-              <>
-                {(isStaleSnap || isInvalidSnap) && (
-                  <div
-                    data-testid="dashboard-environment-snapshot-status-banner"
-                    data-state={isInvalidSnap ? "invalid" : "stale"}
-                    className="mb-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-200"
-                  >
-                    {isInvalidSnap
-                      ? "Latest reading looks invalid — not shown as current. Check the sensor source on the Sensors page."
-                      : "Latest reading is stale (older than 30 minutes) — not shown as current."}
-                  </div>
-                )}
-                <div className="grid lg:grid-cols-3 gap-4">
-                  <div className="lg:col-span-2 glass rounded-2xl p-4">
-                    <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <div>
-                          <h2 className="font-display font-semibold">Tent A · 7-day environment</h2>
-                          <p className="text-xs text-muted-foreground">
-                            Temperature, humidity, VPD
-                          </p>
-                        </div>
-                        {(() => {
-                          const latest = (readings as unknown as SensorReading[])
-                            .filter((r) => r.tentId === (tents[0]?.id ?? ""))
-                            .slice(-1)[0];
-                          if (!latest) return null;
-                          return (
-                            <SensorSourceBadge
-                              source={latest.source}
-                              status={latest.status}
-                              testId="dashboard-tent-chart-source-badge"
-                            />
-                          );
-                        })()}
-                      </div>
-                      <Button asChild size="sm" variant="ghost">
-                        <Link to="/sensors">
-                          Sensor data <ArrowRight className="h-3 w-3" />
+                        connect Ecowitt
+                      </Link>{" "}
+                      to see your environment here.
+                    </p>
+                    <div className="mt-3 flex items-center justify-center gap-2 flex-wrap">
+                      {/* Sensors entry-point dedupe: a single primary "Go to
+                      Sensors" CTA. Manual reading + Import sensor data
+                      remain available as secondary anchors into the same
+                      Sensors page (no new routes). */}
+                      <Button asChild size="sm" className="gradient-leaf text-primary-foreground">
+                        <Link
+                          to="/sensors"
+                          data-testid="dashboard-environment-snapshot-go-to-sensors"
+                          aria-label="Go to Sensors page"
+                        >
+                          Go to Sensors
+                        </Link>
+                      </Button>
+                      <Button asChild size="sm" variant="outline">
+                        <Link
+                          to="/sensors#manual-reading"
+                          data-testid="dashboard-environment-snapshot-add-manual-reading"
+                          aria-label="Add manual sensor reading"
+                        >
+                          Add manual reading
+                        </Link>
+                      </Button>
+                      <Button asChild size="sm" variant="outline">
+                        <Link
+                          to="/sensors#import-sensor-data"
+                          data-testid="dashboard-environment-snapshot-import-sensor-data"
+                          aria-label="Import sensor data"
+                        >
+                          Import sensor data
                         </Link>
                       </Button>
                     </div>
-                    <SensorChart
-                      data={
-                        readings.filter(
-                          (r) => r.tentId === (tents[0]?.id ?? ""),
-                        ) as unknown as SensorReading[]
-                      }
-                      metric="temp"
-                      height={200}
-                    />
                   </div>
+                );
+              }
+              return (
+                <>
+                  {(isStaleSnap || isInvalidSnap || isUnverifiedSnap) && (
+                    <div
+                      data-testid="dashboard-environment-snapshot-status-banner"
+                      data-state={
+                        isUnverifiedSnap ? "unverified" : isInvalidSnap ? "invalid" : "stale"
+                      }
+                      className="mb-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-200"
+                    >
+                      {isUnverifiedSnap
+                        ? "Latest reading has unverified or simulated provenance — shown as context only, never as healthy sensor evidence."
+                        : isInvalidSnap
+                          ? "Latest reading looks invalid — not shown as current. Check the sensor source on the Sensors page."
+                          : "Latest reading is stale (older than 30 minutes) — not shown as current."}
+                    </div>
+                  )}
+                  <div className="grid lg:grid-cols-3 gap-4">
+                    {(() => {
+                      // Pick the first tent that actually has readings so the chart
+                      // isn't blank when tents[0] has none but other tents do.
+                      // Falls back to tents[0] (or null) so the label + empty state
+                      // still make sense.
+                      const chartTent =
+                        tents.find((t) =>
+                          (readings as unknown as SensorReading[]).some((r) => r.tentId === t.id),
+                        ) ??
+                        tents[0] ??
+                        null;
+                      const chartTentName = chartTent?.name ?? "Tent";
+                      const chartReadings = chartTent
+                        ? (readings as unknown as SensorReading[]).filter(
+                            (r) => r.tentId === chartTent.id,
+                          )
+                        : [];
+                      const latest = chartReadings.slice(-1)[0];
+                      return (
+                        <div className="lg:col-span-2 glass rounded-2xl p-4">
+                          <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <div>
+                                <h2 className="font-display font-semibold">
+                                  {chartTentName} · 7-day environment
+                                </h2>
+                                <p className="text-xs text-muted-foreground">
+                                  Temperature, humidity, VPD
+                                </p>
+                              </div>
+                              {latest && (
+                                <SensorSourceBadge
+                                  source={latest.source}
+                                  status={latest.status}
+                                  testId="dashboard-tent-chart-source-badge"
+                                />
+                              )}
+                            </div>
+                            <Button asChild size="sm" variant="ghost">
+                              <Link to="/sensors">
+                                Sensor data <ArrowRight className="h-3 w-3" />
+                              </Link>
+                            </Button>
+                          </div>
+                          {chartReadings.length === 0 ? (
+                            <div
+                              data-testid="dashboard-tent-chart-empty"
+                              className="rounded-xl border border-border/40 bg-secondary/20 p-4 text-center text-sm text-muted-foreground"
+                            >
+                              No readings yet for {chartTentName}. Add a manual reading or connect a
+                              sensor to see the 7-day environment here.
+                            </div>
+                          ) : (
+                            <SensorChart data={chartReadings} metric="temp" height={200} />
+                          )}
+                        </div>
+                      );
+                    })()}
 
-                  <div className="glass rounded-2xl p-4">
-                    <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h2 className="font-display font-semibold">Environment strip</h2>
+                    <div className="glass rounded-2xl p-4">
+                      <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h2 className="font-display font-semibold">Environment strip</h2>
+                          {(() => {
+                            const latest = (readings as unknown as SensorReading[]).slice(-1)[0];
+                            if (!latest) return null;
+                            return (
+                              <SensorSourceBadge
+                                source={latest.source}
+                                status={latest.status}
+                                testId="dashboard-env-strip-source-badge"
+                              />
+                            );
+                          })()}
+                        </div>
                         {(() => {
-                          const latest = (readings as unknown as SensorReading[]).slice(-1)[0];
-                          if (!latest) return null;
+                          const rollup = computeStabilityRollup(
+                            latestPerTent.map((x) => x.stability),
+                          );
                           return (
-                            <SensorSourceBadge
-                              source={latest.source}
-                              status={latest.status}
-                              testId="dashboard-env-strip-source-badge"
-                            />
+                            <div
+                              data-testid="dashboard-stability-rollup"
+                              className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] ${STABILITY_ROLLUP_TONE_CLASS[rollup.tone]}`}
+                            >
+                              {rollup.copy}
+                            </div>
                           );
                         })()}
                       </div>
-                      {(() => {
-                        const rollup = computeStabilityRollup(
-                          latestPerTent.map((x) => x.stability),
-                        );
-                        return (
-                          <div
-                            data-testid="dashboard-stability-rollup"
-                            className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] ${STABILITY_ROLLUP_TONE_CLASS[rollup.tone]}`}
-                          >
-                            {rollup.copy}
-                          </div>
-                        );
-                      })()}
-                    </div>
 
-                    <div className="space-y-2.5">
-                      {latestPerTent.map(({ tent, last, stability }) => {
-                        const stabilityView = formatStabilityChipView(stability);
-                        const snapView = buildTentSnapshotView(
-                          (readingsByTent[tent.id] ?? []) as BuildTentSnapshotInput[],
-                          tent.stage,
-                        );
-                        const ariaParts = [
-                          tent.name,
-                          snapView.hasReading ? `source ${snapView.sourceLabel}` : null,
-                          snapView.hasReading
-                            ? `last updated ${snapView.lastUpdatedDisplay}`
-                            : null,
-                          ...snapView.metrics.map(
-                            (m) =>
-                              `${m.label} ${m.display}${m.unit}${m.statusLabel ? ` (${m.statusLabel})` : ""}`,
-                          ),
-                        ].filter(Boolean);
-                        return (
-                          <Link
-                            key={tent.id}
-                            to={tentDetailPath(tent.id)}
-                            aria-label={ariaParts.join(", ")}
-                            data-testid={`dashboard-env-snapshot-tent-${tent.id}`}
-                            className="block rounded-xl border border-border/40 p-3 hover:bg-secondary/30 transition"
-                          >
-                            <div className="flex items-center justify-between mb-1.5 gap-2 flex-wrap">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-medium text-sm">{tent.name}</span>
-                                <StageBadge stage={tent.stage as Stage} />
+                      <div className="space-y-2.5">
+                        {latestPerTent.map(({ tent, stability, tentRows }) => {
+                          const stabilityView = formatStabilityChipView(stability);
+                          const snapView = buildTentSnapshotView(
+                            tentRows as BuildTentSnapshotInput[],
+                            tent.stage,
+                            nowTick,
+                          );
+                          // Pending/failed reads must not masquerade as established
+                          // absence or as data. Non-UUID ids (mock-fallback tents)
+                          // are never queried — a uuid column cannot hold them, so
+                          // their absence is established (parity with the Tents list).
+                          const sensorReadStatus = isUuid(tent.id)
+                            ? (sensorStatusByTent[tent.id] ?? "loading")
+                            : "success";
+                          const sensorReadStatusLabel =
+                            sensorReadStatus === "loading"
+                              ? "sensor data loading"
+                              : sensorReadStatus === "error"
+                                ? "sensor data unavailable"
+                                : sensorReadStatus === "refresh_error"
+                                  ? snapView.hasReading
+                                    ? "sensor refresh unavailable, last loaded readings shown"
+                                    : "sensor refresh unavailable, no last loaded readings"
+                                  : null;
+                          const ariaParts = [
+                            tent.name,
+                            sensorReadStatusLabel,
+                            snapView.hasReading ? `source ${snapView.sourceLabel}` : null,
+                            snapView.hasReading
+                              ? `last updated ${snapView.lastUpdatedDisplay}`
+                              : null,
+                            ...snapView.metrics.map(
+                              (m) =>
+                                `${m.label} ${m.display}${m.unit}${m.statusLabel ? ` (${m.statusLabel})` : ""}`,
+                            ),
+                          ].filter(Boolean);
+                          return (
+                            <Link
+                              key={tent.id}
+                              to={tentDetailPath(tent.id)}
+                              aria-label={ariaParts.join(", ")}
+                              data-testid={`dashboard-env-snapshot-tent-${tent.id}`}
+                              className="block rounded-xl border border-border/40 p-3 hover:bg-secondary/30 transition"
+                            >
+                              <div className="flex items-center justify-between mb-1.5 gap-2 flex-wrap">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-medium text-sm">{tent.name}</span>
+                                  <StageBadge stage={tent.stage as Stage} />
+                                  {snapView.hasReading && (
+                                    <span
+                                      data-testid={`dashboard-env-snapshot-source-${tent.id}`}
+                                      data-source-label={snapView.sourceLabel}
+                                      className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide border-border/50 bg-secondary/40 text-muted-foreground"
+                                    >
+                                      {snapView.sourceLabel}
+                                    </span>
+                                  )}
+                                </div>
                                 {snapView.hasReading && (
                                   <span
-                                    data-testid={`dashboard-env-snapshot-source-${tent.id}`}
-                                    data-source-label={snapView.sourceLabel}
-                                    className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide border-border/50 bg-secondary/40 text-muted-foreground"
+                                    data-testid={`dashboard-env-snapshot-last-updated-${tent.id}`}
+                                    className="text-[11px] text-muted-foreground"
                                   >
-                                    {snapView.sourceLabel}
+                                    Last updated {snapView.lastUpdatedDisplay}
                                   </span>
                                 )}
                               </div>
-                              {snapView.hasReading && (
-                                <span
-                                  data-testid={`dashboard-env-snapshot-last-updated-${tent.id}`}
-                                  className="text-[11px] text-muted-foreground"
+                              {sensorReadStatus === "loading" ? (
+                                <p
+                                  className="text-xs text-muted-foreground animate-pulse"
+                                  data-testid={`dashboard-env-snapshot-loading-${tent.id}`}
                                 >
-                                  Last updated {snapView.lastUpdatedDisplay}
-                                </span>
-                              )}
-                            </div>
-                            {last && (
-                              <div className="flex flex-wrap gap-1.5">
-                                {snapView.metrics.map((m) => (
-                                  <div
-                                    key={m.key}
-                                    data-testid={`dashboard-env-snapshot-metric-${tent.id}-${m.key}`}
-                                    data-status={m.status}
-                                    className="inline-flex items-center gap-1"
-                                  >
-                                    <MetricChip
-                                      label={m.key === "temp" ? "T" : m.key === "rh" ? "RH" : "VPD"}
-                                      value={m.display}
-                                      unit={m.unit}
-                                      status={m.chipStatus}
-                                    />
-                                    {m.statusLabel && (
-                                      <span
-                                        data-testid={`dashboard-env-snapshot-metric-status-${tent.id}-${m.key}`}
-                                        className={
-                                          m.status === "invalid"
-                                            ? "text-[10px] uppercase tracking-wide text-destructive"
-                                            : m.status === "stale"
-                                              ? "text-[10px] uppercase tracking-wide text-amber-600"
-                                              : "text-[10px] uppercase tracking-wide text-muted-foreground"
-                                        }
+                                  Loading sensor data…
+                                </p>
+                              ) : sensorReadStatus === "error" ? (
+                                <p
+                                  className="text-xs text-muted-foreground"
+                                  data-testid={`dashboard-env-snapshot-unavailable-${tent.id}`}
+                                >
+                                  Sensor data unavailable — readings couldn't be loaded.
+                                </p>
+                              ) : sensorReadStatus === "refresh_error" && !snapView.hasReading ? (
+                                <p
+                                  className="text-xs text-muted-foreground"
+                                  data-testid={`dashboard-env-snapshot-refresh-unavailable-${tent.id}`}
+                                >
+                                  Sensor refresh unavailable — no last loaded readings are
+                                  available.
+                                </p>
+                              ) : snapView.hasReading ? (
+                                <div className="space-y-2">
+                                  {sensorReadStatus === "refresh_error" && (
+                                    <p
+                                      className="text-xs text-amber-700 dark:text-amber-300"
+                                      data-testid={`dashboard-env-snapshot-refresh-error-${tent.id}`}
+                                    >
+                                      Sensor refresh unavailable — last loaded readings shown.
+                                    </p>
+                                  )}
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {snapView.metrics.map((m) => (
+                                      <div
+                                        key={m.key}
+                                        data-testid={`dashboard-env-snapshot-metric-${tent.id}-${m.key}`}
+                                        data-status={m.status}
+                                        className="inline-flex items-center gap-1"
                                       >
-                                        {m.statusLabel}
-                                      </span>
-                                    )}
+                                        <MetricChip
+                                          label={
+                                            m.key === "temp" ? "T" : m.key === "rh" ? "RH" : "VPD"
+                                          }
+                                          value={m.display}
+                                          unit={m.unit}
+                                          status={m.chipStatus}
+                                        />
+                                        {m.statusLabel && (
+                                          <span
+                                            data-testid={`dashboard-env-snapshot-metric-status-${tent.id}-${m.key}`}
+                                            className={
+                                              m.status === "invalid"
+                                                ? "text-[10px] uppercase tracking-wide text-destructive"
+                                                : m.status === "stale"
+                                                  ? "text-[10px] uppercase tracking-wide text-amber-600"
+                                                  : "text-[10px] uppercase tracking-wide text-muted-foreground"
+                                            }
+                                          >
+                                            {m.statusLabel}
+                                          </span>
+                                        )}
+                                      </div>
+                                    ))}
                                   </div>
-                                ))}
+                                </div>
+                              ) : (
+                                <p
+                                  className="text-xs text-muted-foreground"
+                                  data-testid={`dashboard-env-snapshot-no-data-${tent.id}`}
+                                >
+                                  No sensor data yet
+                                </p>
+                              )}
+                              <div className="mt-1.5">
+                                <StabilityChipDrilldown
+                                  tentId={tent.id}
+                                  tentName={tent.name}
+                                  stability={stability}
+                                  view={stabilityView}
+                                />
                               </div>
-                            )}
-                            <div className="mt-1.5">
-                              <StabilityChipDrilldown
-                                tentId={tent.id}
-                                tentName={tent.name}
-                                stability={stability}
-                                view={stabilityView}
-                              />
-                            </div>
-                          </Link>
-                        );
-                      })}
+                            </Link>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
-                </div>
-              </>
-            );
-          })()}
-        </section>
+                </>
+              );
+            })()}
+          </section>
+        </>
       )}
 
+      <h2
+        data-testid="dashboard-section-heading-needs-attention"
+        className="font-display text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mt-4 mb-1"
+      >
+        Needs attention
+      </h2>
       <div className="grid lg:grid-cols-2 gap-4">
         <div className="glass rounded-2xl p-4">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="font-display font-semibold">Needs attention</h2>
+            {/* h3: nested under the "Needs attention" section H2 above —
+                keeping both as H2 rendered two identical visible H2s. */}
+            <h3 className="font-display font-semibold">Needs attention</h3>
             <Button asChild size="sm" variant="ghost">
               <Link to={alertsPath()}>
                 All alerts <ArrowRight className="h-3 w-3" />
@@ -683,7 +925,8 @@ export default function Dashboard() {
               <div>
                 <h2 className="font-display font-semibold">Latest Environment</h2>
                 <p className="text-xs text-muted-foreground">
-                  Most recent reading for this grow. Not live device control.
+                  Grow-scoped detail with per-tent filter and persisted alerts. Not live device
+                  control.
                 </p>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
@@ -709,7 +952,10 @@ export default function Dashboard() {
                     </SelectContent>
                   </Select>
                 )}
-                <Link to={logsPath(scopedGrowId)} className="text-xs text-primary hover:underline">
+                <Link
+                  to={timelinePath(scopedGrowId)}
+                  className="text-xs text-primary hover:underline"
+                >
                   Open Timeline →
                 </Link>
               </div>
@@ -835,7 +1081,7 @@ export default function Dashboard() {
           {sensorState.status === "ok" && (
             <section className="glass rounded-2xl p-4 mt-4" aria-label="Sensor Data Quality">
               {(() => {
-                const q = evaluateSensorQuality(sensorState.snapshot);
+                const q = dashboardSensorQuality;
                 const tone =
                   q.quality === "good"
                     ? "border-emerald-500 text-emerald-600"
@@ -852,7 +1098,7 @@ export default function Dashboard() {
                         </p>
                       </div>
                       <Link
-                        to={logsPath(scopedGrowId)}
+                        to={timelinePath(scopedGrowId)}
                         className="text-xs text-primary hover:underline"
                       >
                         Inspect history →
@@ -880,7 +1126,16 @@ export default function Dashboard() {
               })()}
             </section>
           )}
-          <section className="glass rounded-2xl p-4 mt-4" aria-label="Environment Trends">
+          <div className="my-3">
+            <LineageRepairCta />
+          </div>
+          <h2
+            data-testid="dashboard-section-heading-advanced"
+            className="font-display text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mt-6 mb-1"
+          >
+            Advanced
+          </h2>
+          <section className="glass rounded-2xl p-4 mt-2" aria-label="Environment Trends">
             <div className="flex items-center justify-between mb-2">
               <div>
                 <h2 className="font-display font-semibold">Environment Trends</h2>
@@ -888,7 +1143,10 @@ export default function Dashboard() {
                   Recent readings summary. Not a plant-health diagnosis.
                 </p>
               </div>
-              <Link to={logsPath(scopedGrowId)} className="text-xs text-primary hover:underline">
+              <Link
+                to={timelinePath(scopedGrowId)}
+                className="text-xs text-primary hover:underline"
+              >
                 Open Timeline →
               </Link>
             </div>
@@ -955,7 +1213,7 @@ export default function Dashboard() {
           </section>
           <section className="glass rounded-2xl p-4 mt-4" aria-label="Target Comparison">
             {(() => {
-              const snap = sensorState.status === "ok" ? sensorState.snapshot : null;
+              const snap = dashboardHealthSnapshot;
               const targets = targetsState.status === "ok" ? targetsState.targets : null;
               const result = compareSnapshotToTargets(snap, targets);
               const tone =
@@ -975,7 +1233,7 @@ export default function Dashboard() {
                     </div>
                     <div className="flex items-center gap-3">
                       <Link
-                        to={logsPath(scopedGrowId)}
+                        to={timelinePath(scopedGrowId)}
                         className="text-xs text-primary hover:underline"
                       >
                         Inspect history →
@@ -1047,7 +1305,7 @@ export default function Dashboard() {
                     const stale = snap ? isStale(snap.ts) : false;
                     const vpd = classifyVpdAgainstStage({
                       value: vpdValue,
-                      stage: scopedGrow?.stage ?? null,
+                      stage: alertContextStage,
                       stale,
                     });
                     const toneCls =
@@ -1093,8 +1351,8 @@ export default function Dashboard() {
           </section>
           <section className="glass rounded-2xl p-4 mt-4" aria-label="Environment Alerts">
             {(() => {
-              const snap = sensorState.status === "ok" ? sensorState.snapshot : null;
-              const quality = evaluateSensorQuality(snap);
+              const snap = dashboardHealthSnapshot;
+              const quality = dashboardSensorQuality;
               const targetsCmp = compareSnapshotToTargets(
                 snap,
                 targetsState.status === "ok" ? targetsState.targets : null,
@@ -1103,10 +1361,10 @@ export default function Dashboard() {
                 snapshot: snap,
                 quality,
                 targets: targetsCmp,
-                stage: scopedGrow?.stage ?? null,
+                stage: alertContextStage,
               });
               const vpdStageMissing =
-                snap?.vpd != null && normalizeVpdStage(scopedGrow?.stage) === "unknown";
+                snap?.vpd != null && normalizeVpdStage(alertContextStage) === "unknown";
               return (
                 <div>
                   <div className="flex items-center justify-between mb-2">
@@ -1213,11 +1471,20 @@ export default function Dashboard() {
               }}
             />
           )}
-          <div className="grid lg:grid-cols-2 gap-4 mt-4">
+          <h2
+            data-testid="dashboard-section-heading-recent-activity"
+            className="font-display text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mt-6 mb-1"
+          >
+            Recent activity
+          </h2>
+          <div className="grid lg:grid-cols-2 gap-4 mt-2">
             <section className="glass rounded-2xl p-4" aria-label="Recent activity">
               <div className="flex items-center justify-between mb-3">
                 <h2 className="font-display font-semibold">Recent Activity</h2>
-                <Link to={logsPath(scopedGrowId)} className="text-xs text-primary hover:underline">
+                <Link
+                  to={timelinePath(scopedGrowId)}
+                  className="text-xs text-primary hover:underline"
+                >
                   View full Timeline →
                 </Link>
               </div>

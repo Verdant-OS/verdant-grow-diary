@@ -5,6 +5,52 @@ import { describe, it, expect } from "vitest";
 import { buildAiCreditRemainingBadgeViewModel } from "@/lib/aiCreditRemainingBadgeViewModel";
 import { paywallCtaHasBannedWords } from "@/lib/paywallCtaViewModel";
 
+describe("buildAiCreditRemainingBadgeViewModel — pack balance", () => {
+  it("surfaces remaining pack credits so a pack-funded review doesn't read '0 left'", () => {
+    // Monthly exhausted (remaining 0) but 49 purchased pack credits remain.
+    const vm = buildAiCreditRemainingBadgeViewModel({
+      remaining: 0,
+      scope: "per_month",
+      scope_limit: 100,
+      pack_balance: 49,
+    });
+    expect(vm.visible).toBe(true);
+    expect(vm.packBalance).toBe(49);
+    expect(vm.label).toContain("0 of 100");
+    expect(vm.label).toContain("49 pack credits available");
+  });
+
+  it("uses singular 'credit' for a pack balance of 1", () => {
+    const vm = buildAiCreditRemainingBadgeViewModel({
+      remaining: 0,
+      scope: "per_month",
+      scope_limit: 100,
+      pack_balance: 1,
+    });
+    expect(vm.label).toContain("1 pack credit available");
+  });
+
+  it("omits pack copy when the pack balance is zero / absent / free scope", () => {
+    const noPack = buildAiCreditRemainingBadgeViewModel({
+      remaining: 5,
+      scope: "per_month",
+      scope_limit: 100,
+      pack_balance: 0,
+    });
+    expect(noPack.label).not.toContain("pack");
+    expect(noPack.packBalance).toBeUndefined();
+    // Packs are paid per-month only — never surfaced on the Free per-grow scope.
+    const freeScope = buildAiCreditRemainingBadgeViewModel({
+      remaining: 1,
+      scope: "per_grow",
+      scope_limit: 3,
+      pack_balance: 20,
+    });
+    expect(freeScope.label).not.toContain("pack");
+    expect(freeScope.packBalance).toBeUndefined();
+  });
+});
+
 describe("buildAiCreditRemainingBadgeViewModel", () => {
   it("hidden on null/undefined input", () => {
     expect(buildAiCreditRemainingBadgeViewModel(null).visible).toBe(false);
@@ -16,8 +62,7 @@ describe("buildAiCreditRemainingBadgeViewModel", () => {
       buildAiCreditRemainingBadgeViewModel({
         scope: "per_grow",
         scope_limit: 3,
-      } as unknown as Parameters<typeof buildAiCreditRemainingBadgeViewModel>[0])
-        .visible,
+      } as unknown as Parameters<typeof buildAiCreditRemainingBadgeViewModel>[0]).visible,
     ).toBe(false);
   });
 
@@ -99,14 +144,7 @@ describe("buildAiCreditRemainingBadgeViewModel", () => {
       scope_limit: 100,
     });
     const text = `${vm.label} ${vm.helper ?? ""}`.toLowerCase();
-    for (const word of [
-      "guaranteed",
-      "guarantee",
-      "certain",
-      "confirmed",
-      "act now",
-      "hurry",
-    ]) {
+    for (const word of ["guaranteed", "guarantee", "certain", "confirmed", "act now", "hurry"]) {
       expect(text).not.toContain(word);
     }
   });

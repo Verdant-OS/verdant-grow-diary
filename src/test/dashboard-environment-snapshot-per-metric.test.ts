@@ -56,6 +56,8 @@ describe("buildTentSnapshotView · source labels", () => {
       NOW,
     );
     expect(v.sourceLabel).toBe("Manual");
+    expect(v.provenanceEligible).toBe(true);
+    expect(v.canAssessStage).toBe(true);
   });
 
   it("CSV/import readings show CSV", () => {
@@ -94,34 +96,79 @@ describe("buildTentSnapshotView · source labels", () => {
       "veg",
       NOW,
     );
-    expect(v.sourceLabel).not.toBe("Live");
-    expect(["Unknown", "Manual", "CSV", "Stale", "Invalid", "Ecowitt"]).toContain(v.sourceLabel);
+    expect(v.sourceLabel).toBe("Unknown");
+    expect(v.provenanceEligible).toBe(false);
+    expect(v.canAssessStage).toBe(false);
+    for (const metric of v.metrics) {
+      expect(metric.status).toBe("degraded");
+      expect(metric.statusLabel).toBe("Needs verification");
+      expect(metric.chipStatus).not.toBe("ok");
+    }
+  });
+
+  it("fails a mixed trusted and unknown latest group closed", () => {
+    const v = buildTentSnapshotView(
+      [
+        row({ source: "pi_bridge" }),
+        row({ metric: "humidity_pct", value: 55, source: "junk-vendor" }),
+        row({ metric: "vpd_kpa", value: 1.1, source: "pi_bridge" }),
+      ],
+      "veg",
+      NOW,
+    );
+    expect(v.sourceLabel).toBe("Unknown");
+    expect(v.provenanceEligible).toBe(false);
+    expect(v.canAssessStage).toBe(false);
+    for (const metric of v.metrics) expect(metric.chipStatus).not.toBe("ok");
+  });
+
+  it("keeps diagnostic canonical-live rows visible as demo context only", () => {
+    const diagnosticPayload = {
+      vendor: "ecowitt_windows_testbench",
+      metadata: { reported_verdant_source: "live" },
+    };
+    const v = buildTentSnapshotView(
+      [
+        row({ source: "live", raw_payload: diagnosticPayload }),
+        row({ metric: "humidity_pct", value: 55, source: "live", raw_payload: diagnosticPayload }),
+        row({ metric: "vpd_kpa", value: 1.1, source: "live", raw_payload: diagnosticPayload }),
+      ],
+      "veg",
+      NOW,
+    );
+    expect(v.sourceLabel).toBe("Demo");
+    expect(v.provenanceEligible).toBe(false);
+    expect(v.canAssessStage).toBe(false);
+    for (const metric of v.metrics) {
+      expect(metric.statusLabel).toBe("Needs verification");
+      expect(metric.chipStatus).not.toBe("ok");
+    }
   });
 });
 
 describe("buildTentSnapshotView · last updated", () => {
   it("renders captured_at, not invented", () => {
-    const v = buildTentSnapshotView(
-      [row({ captured_at: FRESH_TS })],
-      "veg",
-      NOW,
-    );
+    const v = buildTentSnapshotView([row({ captured_at: FRESH_TS })], "veg", NOW);
     expect(v.lastUpdatedIso).toBe(FRESH_TS);
     expect(v.lastUpdatedDisplay).not.toBe("Unknown");
   });
 
   it("missing captured_at falls back to ts when valid", () => {
-    const v = buildTentSnapshotView(
-      [row({ captured_at: null })],
-      "veg",
-      NOW,
-    );
+    const v = buildTentSnapshotView([row({ captured_at: null })], "veg", NOW);
     expect(v.lastUpdatedIso).toBe(FRESH_TS);
   });
 
   it("invalid captured_at + invalid ts → Unknown, no invented time", () => {
     const v = buildTentSnapshotView(
-      [{ ts: "not-a-date", metric: "temperature_c", value: 24, source: "manual", captured_at: "junk" }],
+      [
+        {
+          ts: "not-a-date",
+          metric: "temperature_c",
+          value: 24,
+          source: "manual",
+          captured_at: "junk",
+        },
+      ],
       "veg",
       NOW,
     );
@@ -179,8 +226,19 @@ describe("buildTentSnapshotView · per-metric status", () => {
   it("does not show stale/invalid as current source", () => {
     const v = buildTentSnapshotView(
       [
-        row({ ts: STALE_TS, captured_at: STALE_TS, source: "live", raw_payload: { vendor: "ecowitt" } }),
-        row({ ts: STALE_TS, metric: "humidity_pct", value: 55, captured_at: STALE_TS, source: "live" }),
+        row({
+          ts: STALE_TS,
+          captured_at: STALE_TS,
+          source: "live",
+          raw_payload: { vendor: "ecowitt" },
+        }),
+        row({
+          ts: STALE_TS,
+          metric: "humidity_pct",
+          value: 55,
+          captured_at: STALE_TS,
+          source: "live",
+        }),
         row({ ts: STALE_TS, metric: "vpd_kpa", value: 1.1, captured_at: STALE_TS, source: "live" }),
       ],
       "veg",

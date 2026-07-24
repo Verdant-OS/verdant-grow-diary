@@ -25,6 +25,7 @@ import {
   QUICK_LOG_V2_ENTRY_CREATED_EVENT,
   dispatchQuickLogV2EntryCreated,
 } from "@/lib/quickLogV2EntryCreatedEvent";
+import { trackQuickLogSuccess } from "@/lib/quickLogSuccessTelemetry";
 
 export interface QuickLogActivitySaveInput {
   activityId: QuickLogActivityId;
@@ -33,10 +34,15 @@ export interface QuickLogActivitySaveInput {
   plantId?: string | null;
   note?: string | null;
   photoUrl?: string | null;
-  /** Required for event-route dedupe. Ignored by manual route. */
+  /**
+   * Required for event-route dedupe. The manual route forwards it too when
+   * it is server-valid (8..200 chars) so retries reuse one grow_event.
+   */
   idempotencyKey?: string | null;
-  /** Extra details to merge into event p_details (safe metadata only). */
+  /** Extra details to merge into p_details (safe metadata only). */
   extraDetails?: Record<string, unknown> | null;
+  /** Watering volume in ml, forwarded to the manual water route only. */
+  volumeMl?: number | null;
 }
 
 export type QuickLogActivitySaveReason =
@@ -45,6 +51,7 @@ export type QuickLogActivitySaveReason =
   | "activity_disabled"
   | "unsupported_activity"
   | "missing_idempotency_key"
+  | "missing_target"
   | "save_failed";
 
 export interface QuickLogActivitySaveResult {
@@ -67,6 +74,7 @@ interface ManualRpcResponse {
   reason?: string;
   grow_event_id?: string | null;
   environment_event_id?: string | null;
+  reused?: boolean;
 }
 
 export function useQuickLogActivitySave() {
@@ -103,16 +111,43 @@ export function useQuickLogActivitySave() {
       setSaving(true);
       setError(null);
       try {
-        if (plan.saveRoute === "manual_note" || plan.saveRoute === "manual_water") {
+        if (plan.saveRoute === "manual_note") {
+          // quicklog_save_manual is target-scoped (p_target_type/p_target_id)
+          // and derives grow/tent/plant server-side from the owned target row
+          // — mirroring useQuickLogV2Save + quickLogV2SavePayload. No deployed
+          // signature ever accepted p_grow_id (that shape always PGRST202'd).
+          const targetType = input.plantId ? "plant" : input.tentId ? "tent" : null;
+          const targetId = input.plantId ?? input.tentId ?? null;
+          if (!targetType || !targetId) {
+            setError("missing_target");
+            return { ok: false, reason: "missing_target" };
+          }
+          const manualDetails: Record<string, unknown> = {
+            ...(input.extraDetails ?? {}),
+          };
+          const manualIdempotencyKey =
+            input.idempotencyKey &&
+            input.idempotencyKey.length >= 8 &&
+            input.idempotencyKey.length <= 200
+              ? input.idempotencyKey
+              : null;
           const { data, error: rpcErr } = await supabase.rpc(
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             "quicklog_save_manual" as any,
             {
-              p_grow_id: input.growId,
-              p_tent_id: input.tentId ?? null,
-              p_plant_id: input.plantId ?? null,
+              p_target_type: targetType,
+              p_target_id: targetId,
               p_action: plan.manualAction,
+              p_volume_ml: input.volumeMl ?? null,
               p_note: input.note ?? null,
+              p_temperature_c: null,
+              p_humidity_pct: null,
+              p_vpd_kpa: null,
+              p_occurred_at: null,
+              ...(Object.keys(manualDetails).length > 0
+                ? { p_details: manualDetails }
+                : {}),
+              p_idempotency_key: manualIdempotencyKey,
             } as unknown as Record<string, unknown>,
           );
           if (rpcErr) {
@@ -129,10 +164,12 @@ export function useQuickLogActivitySave() {
             growEventId: r.grow_event_id ?? null,
             source: "quick_log_v2",
           });
+          trackQuickLogSuccess(input.activityId, { reused: r.reused === true });
           return {
             ok: true,
             reason: "ok",
             growEventId: r.grow_event_id ?? null,
+            reused: r.reused === true,
           };
         }
 
@@ -145,6 +182,15 @@ export function useQuickLogActivitySave() {
             ...(input.extraDetails ?? {}),
           };
           if (plan.detailsSubtype) details.subtype = plan.detailsSubtype;
+          // Carry the event type on the diary companion too: diary_entries has
+          // no event_type column and the RPC's mirror INSERT omits it, so
+          // without this the plant-scoped read layer defaults the row to
+          // "note" (wrong badge for e.g. Training). details.event_type is the
+          // established diary convention (action_followup/action_outcome rows
+          // already use it). The server-side migration also stamps this
+          // authoritatively; this client copy covers rows saved before that
+          // migration is applied to prod.
+          details.event_type = plan.eventType;
           const { data, error: rpcErr } = await supabase.rpc(
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             "quicklog_save_event" as any,
@@ -188,6 +234,7 @@ export function useQuickLogActivitySave() {
             growEventId: r.grow_event_id,
             source: "quick_log_v2",
           });
+          trackQuickLogSuccess(input.activityId, { reused: r.reused === true });
           return {
             ok: true,
             reason: "ok",

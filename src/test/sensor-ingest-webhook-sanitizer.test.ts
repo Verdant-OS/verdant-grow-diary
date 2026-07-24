@@ -59,9 +59,7 @@ describe("sanitizeForResponse — value redaction", () => {
 
   it("handles nested objects + arrays without leaking", () => {
     const out = sanitizeForResponse({
-      rejected: [
-        { error: "bad_metric", reason: "vbt_leaked_token_value_here" },
-      ],
+      rejected: [{ error: "bad_metric", reason: "vbt_leaked_token_value_here" }],
     });
     const text = JSON.stringify(out);
     expect(text).not.toContain("vbt_leaked");
@@ -111,10 +109,15 @@ describe("CI workflow — Deno edge tests", () => {
     expect(existsSync(path)).toBe(true);
   });
 
-  it("runs the Deno cors_e2e_test and uses fake env only", () => {
+  it("runs auth, CORS, and both handler E2E tests with fake env only", () => {
     const wf = readFileSync(path, "utf8");
     expect(wf).toMatch(/deno test/);
-    expect(wf).toMatch(/cors_e2e_test\.ts/);
+    expect(wf).toContain("supabase/functions/sensor-ingest-webhook/auth.test.ts");
+    expect(wf).toContain("supabase/functions/sensor-ingest-webhook/cors_e2e_test.ts");
+    expect(wf).toContain("supabase/functions/sensor-ingest-webhook/handler_e2e_test.ts");
+    expect(wf).toContain("supabase/functions/ecowitt-ingest/handler_e2e_test.ts");
+    expect(wf).toContain("branches: [main, verdant-grow-diary]");
+    expect(wf).toContain('"supabase/functions/_shared/**"');
     expect(wf).toMatch(/SUPABASE_URL:\s*https:\/\/example\.test/);
     expect(wf).toMatch(/SUPABASE_ANON_KEY:\s*test-anon-key/);
     // Must NOT upload .env, raw JSONL listener output, or local logs.

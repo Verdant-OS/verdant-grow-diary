@@ -12,7 +12,8 @@
  *
  *   - stored source MUST be canonical "live" (never "ecowitt")
  *   - transport lineage preserved in raw_payload.metadata.transport_source
- *   - verdant_source mirror present in raw_payload.metadata
+ *   - canonical source mirror present in raw_payload.metadata.verdant_source
+ *   - listener decision preserved in metadata.reported_verdant_source
  *   - vendor lineage preserved in raw_payload.vendor
  *   - user_id stamped from auth, not from the request body
  *   - tent_id carried through verbatim
@@ -33,11 +34,20 @@
  */
 import { describe, expect, it } from "vitest";
 import { normalizeWebhookIngestPayload } from "../../supabase/functions/sensor-ingest-webhook/webhookIngest";
-import { buildStoredRow } from "../../supabase/functions/sensor-ingest-webhook/storageMapping";
+import { buildStoredRow as buildStoredRowRaw } from "../../supabase/functions/sensor-ingest-webhook/storageMapping";
 
 const TENT_ID = "11111111-2222-3333-4444-555555555555";
 const AUTH_USER_ID = "99999999-aaaa-4bbb-8ccc-dddddddddddd";
 const BODY_SPOOFED_USER_ID = "00000000-0000-0000-0000-000000000000";
+const FIXTURE_NOW = new Date("2026-06-17T05:45:30.000Z");
+
+function buildStoredRow<R extends Record<string, unknown>>(args: {
+  row: R;
+  userId: string;
+  idempotencyKey: string | null;
+}) {
+  return buildStoredRowRaw({ ...args, now: FIXTURE_NOW });
+}
 
 const PASSKEY = "DEVICESECRET-DO-NOT-LEAK";
 const FAKE_BRIDGE_TOKEN = "vbt_fake_should_never_appear_xyz";
@@ -114,6 +124,7 @@ describe("sensor-ingest-webhook E2E insert contract — EcoWitt", () => {
       expect(meta).toBeDefined();
       expect(meta?.transport_source).toBe("ecowitt");
       expect(meta?.verdant_source).toBe("live");
+      expect(meta?.reported_verdant_source).toBe("live");
     }
   });
 
@@ -198,7 +209,8 @@ describe("sensor-ingest-webhook E2E insert contract — EcoWitt", () => {
  * payload must produce a canonical sensor_readings row whose:
  *   - source === "live"
  *   - raw_payload.metadata.transport_source === forwarded payload's `source`
- *   - raw_payload.metadata.verdant_source === "live"
+ *   - raw_payload.metadata.verdant_source === "live" (canonical mirror)
+ *   - raw_payload.metadata.reported_verdant_source === "live" (listener report)
  *
  * This is the TypeScript-side mirror of the Python golden contract in
  * tools/ecowitt-testbench/test_forwarding_contract.py.
@@ -213,5 +225,6 @@ describe("EcoWitt forwarded transport ↔ stored row agreement", () => {
     >;
     expect(meta.transport_source).toBe(ECOWITT_FORWARDED_PAYLOAD.source);
     expect(meta.verdant_source).toBe("live");
+    expect(meta.reported_verdant_source).toBe("live");
   });
 });

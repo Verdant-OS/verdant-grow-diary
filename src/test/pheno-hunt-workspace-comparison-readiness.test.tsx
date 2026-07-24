@@ -110,6 +110,7 @@ function mountAt(input: ScenarioInput) {
     decisionHistoryByPlant: {},
     sexByPlant: {},
     reversedPlantIds: new Set<string>(),
+    clonedPlantIds: new Set<string>(),
     smokeByPlant: input.smokeByPlant ?? {},
     labByKey: {},
     error: null,

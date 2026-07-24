@@ -9,7 +9,6 @@ import { useMemo } from "react";
 import { HelpCircle, Plus, Upload, Activity } from "lucide-react";
 import { Link } from "react-router-dom";
 
-import PlantDetailHarvestWatchCard from "@/components/PlantDetailHarvestWatchCard";
 import {
   buildPlantDetailWhatsMissing,
   type PlantDetailWhatsMissingInput,
@@ -88,13 +87,11 @@ export default function PlantDetailWhatsMissing({
   }, [plantId, growId, stage, signals]);
 
   return (
-    <>
-      <PlantDetailHarvestWatchCard plantId={plantId} hasPlantPhoto={hasPlantPhoto} />
-      <section
-        aria-labelledby={HEADING_ID}
-        data-testid={PANEL_TEST_ID}
-        className="glass rounded-2xl p-4 my-3"
-      >
+    <section
+      aria-labelledby={HEADING_ID}
+      data-testid={PANEL_TEST_ID}
+      className="glass rounded-2xl p-4 my-3"
+    >
         <header className="flex items-center gap-2 mb-3">
           <h2
             id={HEADING_ID}
@@ -196,6 +193,5 @@ export default function PlantDetailWhatsMissing({
           </ul>
         )}
       </section>
-    </>
   );
 }

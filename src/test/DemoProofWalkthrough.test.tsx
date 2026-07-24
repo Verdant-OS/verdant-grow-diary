@@ -59,11 +59,11 @@ describe("DemoProofWalkthrough page", () => {
     }
   });
 
-  it("renders safety summary with URL surface gate copy", () => {
+  it("renders safety summary with verified operator-role copy", () => {
     renderPage();
     const safety = screen.getByTestId("demo-proof-walkthrough-safety-summary")
       .textContent ?? "";
-    expect(safety).toMatch(/URL surface gate/i);
+    expect(safety).toMatch(/server-verified operator role/i);
     expect(safety).toMatch(/no device control or automation/i);
     expect(safety).toMatch(/growers approve/i);
   });

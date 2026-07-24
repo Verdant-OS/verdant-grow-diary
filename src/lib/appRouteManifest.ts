@@ -65,40 +65,74 @@ export interface AppRouteEntry {
  */
 export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "*", access: "public", description: "NotFound catch-all." },
-  { path: "/", access: "auth", description: "Dashboard." },
-  { path: "/.lovable/oauth/consent", access: "public", description: "OAuth consent screen." },
-  { path: "/account/preferences", access: "auth" },
+  {
+    path: "/",
+    access: "public",
+    description: "Public landing when signed out; authenticated Dashboard when signed in.",
+  },
+  {
+    path: "/.lovable/oauth/consent",
+    access: "public",
+    description: "Lovable MCP OAuth consent page (public by protocol requirement).",
+  },
+  {
+    path: "/account/preferences",
+    access: "auth",
+    description: "Grower account preferences.",
+  },
   { path: "/action-queue", access: "redirect", description: "→ /actions" },
   { path: "/actions", access: "auth" },
   { path: "/actions/:actionId", access: "auth" },
   { path: "/admin/leads", access: "internal" },
   { path: "/ai-doctor", access: "redirect", description: "→ /doctor" },
+  {
+    path: "/ai-doctor-readiness-check",
+    access: "public",
+    description: "Private, no-diagnosis AI Doctor context coverage check.",
+  },
   { path: "/alerts", access: "auth" },
   { path: "/alerts/:alertId", access: "auth" },
   { path: "/auth", access: "public" },
   {
     path: "/billing/:plan",
     access: "redirect",
-    description: "Legacy billing entry — redirects to /pricing with plan preselect.",
+    description: "→ /pricing?plan=<canonical> (legacy billing entry; /pricing owns live checkout).",
   },
   { path: "/breeder-beta", access: "public", description: "Breeder beta landing page." },
-  { path: "/breeding", access: "auth" },
-  { path: "/breeding/:programId", access: "auth" },
+  { path: "/breeding", access: "auth", description: "Breeding programs index." },
+  { path: "/breeding/:programId", access: "auth", description: "Breeding program detail." },
   { path: "/breeding/new", access: "auth", description: "New breeding event entry." },
-  { path: "/checkout/cancel", access: "public", description: "Checkout cancelled landing page." },
-  { path: "/checkout/success", access: "public", description: "Checkout success landing page." },
+  { path: "/checkout/cancel", access: "public", description: "Checkout cancellation return." },
+  { path: "/checkout/success", access: "public", description: "Checkout success return." },
+  { path: "/contact", access: "public", description: "Public support contact page." },
   { path: "/creator-beta", access: "public", description: "Creator beta landing page." },
+  { path: "/cultivars", access: "public", description: "Public cultivar guides index." },
+  {
+    path: "/cultivars/:slug",
+    access: "public",
+    description: "Public per-cultivar guide page (evergreen best-practice content).",
+  },
   {
     path: "/customer/:shareId",
     access: "public",
     description: "Customer Mode QR guide shell (read-only, no private grow data).",
   },
+  {
+    path: "/customer/:shareId/cannabis-care",
+    access: "public",
+    description: "Customer Mode cannabis plant care FAQ page (read-only).",
+  },
   { path: "/daily-check", access: "auth" },
+  {
+    path: "/dashboard",
+    access: "auth",
+    description: "Authenticated Dashboard alias; preserves optional growId scope.",
+  },
   { path: "/demo", access: "redirect", description: "→ /welcome" },
   {
     path: "/demo/one-tent-live-proof",
     access: "operator",
-    description: "One-tent live proof page (legacy /demo path, operator-only).",
+    description: "Legacy operator one-tent live proof page.",
   },
   { path: "/diagnostics", access: "operator" },
   {
@@ -106,12 +140,41 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     access: "auth",
     description: "Environment summary report (diary).",
   },
+  {
+    path: "/docs/mcp-api",
+    access: "public",
+    description: "Public MCP API reference documentation.",
+  },
   { path: "/doctor", access: "auth" },
   { path: "/doctor/sessions", access: "auth" },
   { path: "/doctor/sessions/:sessionId", access: "auth" },
   { path: "/features", access: "redirect", description: "→ /welcome" },
-  { path: "/glossary", access: "public" },
-  { path: "/grow-lineage", access: "auth" },
+  { path: "/feedback", access: "public", description: "Public support feedback page." },
+  {
+    path: "/founder",
+    access: "public",
+    description: "Public Founder Lifetime acquisition and offer explainer.",
+  },
+  {
+    path: "/genetics",
+    access: "auth",
+    label: "Genetics",
+    showInNav: true,
+    description:
+      "Genetics Library: accessions, propagation batches, screening/quarantine evidence, and lineage traceability (owner-scoped, RLS-protected).",
+  },
+  { path: "/genetics/accessions/:id", access: "auth" },
+  { path: "/genetics/batches/:id", access: "auth" },
+  { path: "/genetics/health/:kind/:id", access: "auth" },
+  { path: "/genetics/trace/:kind/:id", access: "auth" },
+  { path: "/glossary", access: "public", description: "Public grower glossary (SEO)." },
+  {
+    path: "/grow-lineage",
+    access: "auth",
+    label: "Lineage Repair",
+    description:
+      "Grower-facing repair tool for reassigning tents to grows (owner-scoped, RLS-protected).",
+  },
   { path: "/grow-room", access: "redirect", description: "→ /" },
   { path: "/grows", access: "auth" },
   { path: "/grows/:growId", access: "auth" },
@@ -122,9 +185,18 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   },
   { path: "/guides", access: "public", description: "Grower guides index." },
   { path: "/guides/:slug", access: "public", description: "Individual grower guide page." },
+  {
+    path: "/guides/grow-stage-care-guide",
+    access: "public",
+    description: "Searchable grow-stage care guide with checklists.",
+  },
   { path: "/hardware-integrations", access: "public" },
-  { path: "/health", access: "auth", description: "Health check page." },
-  { path: "/how-ai-doctor-works", access: "public", description: "AI Doctor explainer page." },
+  { path: "/health", access: "auth", description: "Authenticated app health page." },
+  {
+    path: "/how-ai-doctor-works",
+    access: "public",
+    description: "Public AI Doctor safety and workflow explainer.",
+  },
   { path: "/ingest-inspector", access: "operator" },
   {
     path: "/internal/ai-doctor-confidence-audit",
@@ -138,13 +210,15 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   },
   {
     path: "/internal/contextual-pheno-comparison-demo",
-    access: "internal",
-    description: "Internal read-only Contextual Pheno Comparison v0.1 demo (fixture data only).",
+    access: "public",
+    description:
+      "Read-only Contextual Pheno Comparison v0.1 demo (fixture data only; mounted outside AppShell, unlinked / hidden by URL — no private data).",
   },
   {
     path: "/internal/demo-proof-walkthrough",
-    access: "internal",
-    description: "Read-only operator walkthrough of the V0 One-Tent Loop proof path.",
+    access: "public",
+    description:
+      "Read-only walkthrough of the V0 One-Tent Loop proof path (fixture-only presenter; mounted outside AppShell, unlinked / hidden by URL — no private data).",
   },
   {
     path: "/internal/one-tent-loop-proof",
@@ -152,9 +226,20 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     description: "One-tent loop internal proof checklist.",
   },
   {
+    path: "/internal/pheno-hunt-demo",
+    access: "public",
+    description:
+      "Read-only full pheno-hunt demo (pack → triage → keepers → clones → crosses → family tree; fixture data only; mounted outside AppShell, unlinked / hidden by URL — no private data).",
+  },
+  {
     path: "/internal/sensor-truth-audit",
     access: "internal",
     description: "Sensor truth internal static audit.",
+  },
+  {
+    path: "/invite",
+    access: "auth",
+    description: "Authenticated PII-free grower referral surface.",
   },
   { path: "/leads", access: "internal" },
   { path: "/login", access: "redirect", description: "→ /auth" },
@@ -166,8 +251,8 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   },
   {
     path: "/one-tent-loop-proof",
-    access: "internal",
-    description: "Live one-tent loop proof page (operator-gated).",
+    access: "operator",
+    description: "Operator-only One-Tent Loop proof surface.",
   },
   {
     path: "/operator/ai-doctor-phase1",
@@ -185,9 +270,14 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     description: "Operator billing subscription update audit (read-only).",
   },
   {
+    path: "/operator/credits-audit",
+    access: "operator",
+    description: "Operator AI-credit grants/spends audit (read-only).",
+  },
+  {
     path: "/operator/demo-preview",
     access: "operator",
-    description: "Operator demo preview page (read-only).",
+    description: "Operator demo preview (read-only).",
   },
   { path: "/operator/ecowitt", access: "operator", description: "Cloud Canary preview." },
   {
@@ -243,7 +333,24 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   {
     path: "/operator/release-readiness",
     access: "operator",
-    description: "Operator release readiness checklist (read-only).",
+    description:
+      "Read-only release readiness / validation status snapshot (static/manual, no live CI feed).",
+  },
+  {
+    path: "/operator/subscriber-growth",
+    access: "operator",
+    description:
+      "Operator subscriber-growth goal snapshot from authoritative billing counts (read-only).",
+  },
+  {
+    path: "/operator/support-inbox",
+    access: "operator",
+    description: "Operator support inbox (read-only).",
+  },
+  {
+    path: "/partners/csv-preview",
+    access: "public",
+    description: "Read-only partner explainer for the browser-local CSV sensor preview.",
   },
   {
     path: "/pheno-comparison",
@@ -254,17 +361,24 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   {
     path: "/pheno-expression-showcase",
     access: "public",
-    description: "Mix-and-match showcase of example phenos (fixture-only, network-free).",
+    description: "Fixture-only public pheno expression showcase.",
+  },
+  {
+    path: "/pheno-hunts",
+    access: "auth",
+    description: "Pheno hunts index (the grower's own hunts).",
   },
   {
     path: "/pheno-hunts/:id/compare",
     access: "public",
-    description: "Per-hunt comparison (read-only, graceful without session).",
+    description: "Read-only per-hunt comparison with graceful unauthenticated state.",
   },
+  { path: "/pheno-hunts/:id/keepers", access: "auth", description: "Pheno keeper selection." },
   {
-    path: "/pheno-hunts/:id/keepers",
-    access: "auth",
-    description: "Pheno hunt keepers selection.",
+    path: "/pheno-hunts/:id/showcase",
+    access: "public",
+    description:
+      "Read-only per-hunt showcase (pack, contenders, fight, cure, family tree) with graceful demo fallback.",
   },
   { path: "/pheno-hunts/:id/workspace", access: "auth", description: "Pheno hunt workspace." },
   { path: "/pheno-hunts/new", access: "auth", description: "New pheno hunt entry." },
@@ -272,32 +386,59 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/plants", access: "auth" },
   { path: "/plants/:id", access: "auth" },
   { path: "/pricing", access: "public" },
-  { path: "/privacy", access: "public", description: "Privacy policy page." },
+  { path: "/privacy", access: "public", description: "Privacy policy." },
   { path: "/privacy-policy", access: "redirect", description: "→ /privacy" },
+  {
+    path: "/quick-log",
+    access: "public",
+    description:
+      "Public 30-second Quick Log starter (local draft on this device only; routes to signup with allow-listed UTM attribution).",
+  },
   { path: "/refund", access: "public", description: "Refund policy page." },
   { path: "/refund-policy", access: "redirect", description: "→ /refund" },
   { path: "/refunds", access: "redirect", description: "→ /refund" },
   { path: "/register", access: "redirect", description: "→ /auth" },
   { path: "/reports", access: "auth" },
+  {
+    path: "/reports/diary-range",
+    access: "auth",
+    description: "Date-range diary report (Print / Save PDF).",
+  },
   { path: "/reports/post-grow/:growId", access: "auth", description: "Post-grow learning report." },
   { path: "/reset-password", access: "public", description: "Password reset landing page." },
   { path: "/sensors", access: "auth" },
+  {
+    path: "/sensors/csv-preview",
+    access: "public",
+    description: "Browser-local CSV/TSV sensor preview with no upload or persistence.",
+  },
   { path: "/sensors/ecowitt-audit", access: "operator" },
   { path: "/sensors/ingest-normalizer", access: "operator" },
   { path: "/settings", access: "auth" },
   {
     path: "/settings/agent-integrations",
     access: "auth",
-    description: "Agent integrations settings.",
+    description: "Authenticated agent integrations settings.",
   },
   { path: "/signup", access: "redirect", description: "→ /auth" },
+  { path: "/strains", access: "redirect", description: "→ /cultivars" },
+  { path: "/strains/:slug", access: "redirect", description: "→ /cultivars/:slug" },
   { path: "/tasks", access: "auth" },
   { path: "/tents", access: "auth" },
   { path: "/tents/:id", access: "auth" },
-  { path: "/terms", access: "public", description: "Terms of service page." },
+  { path: "/terms", access: "public", description: "Terms of service." },
   { path: "/terms-of-service", access: "redirect", description: "→ /terms" },
   { path: "/timeline", access: "auth" },
-  { path: "/upgrade", access: "public", description: "Upgrade / pricing presenter page." },
+  {
+    path: "/tools/vpd-calculator",
+    access: "public",
+    description: "Public manual-input, stage-aware air VPD calculator.",
+  },
+  {
+    path: "/upgrade",
+    access: "redirect",
+    description: "→ /pricing with allowlisted plan, acquisition, and return intent.",
+  },
   { path: "/welcome", access: "public" },
 ];
 

@@ -26,15 +26,25 @@ describe("<TentSensorSourceHealthCard />", () => {
   it("renders a clear empty state when no readings exist", () => {
     setMockReadings([]);
     render(<TentSensorSourceHealthCard tentId="tent-1" />);
-    expect(
-      screen.getByTestId("tent-sensor-source-health-empty"),
-    ).toHaveTextContent(/no sensor readings received for this tent yet/i);
+    expect(screen.getByTestId("tent-sensor-source-health-empty")).toHaveTextContent(
+      /no sensor readings received for this tent yet/i,
+    );
   });
 
   it("renders active and stale source badges correctly", () => {
     setMockReadings([
-      { source: "esp32_arduino", metric: "temperature_c", captured_at: minutesAgo(2), ts: minutesAgo(2) },
-      { source: "old_bridge", metric: "humidity_pct", captured_at: minutesAgo(120), ts: minutesAgo(120) },
+      {
+        source: "esp32_arduino",
+        metric: "temperature_c",
+        captured_at: minutesAgo(2),
+        ts: minutesAgo(2),
+      },
+      {
+        source: "old_bridge",
+        metric: "humidity_pct",
+        captured_at: minutesAgo(120),
+        ts: minutesAgo(120),
+      },
     ]);
     render(<TentSensorSourceHealthCard tentId="tent-2" />);
 
@@ -48,5 +58,26 @@ describe("<TentSensorSourceHealthCard />", () => {
     expect(rows[1].getAttribute("data-source")).toBe("old_bridge");
     expect(rows[1].getAttribute("data-status")).toBe("stale");
     expect(within(rows[1]).getByText("stale")).toBeInTheDocument();
+  });
+
+  it("labels a fresh Windows testbench packet diagnostic only, never active", () => {
+    setMockReadings([
+      {
+        source: "live",
+        metric: "temperature_c",
+        captured_at: minutesAgo(1),
+        ts: minutesAgo(1),
+        raw_payload: {
+          vendor: "ecowitt_windows_testbench",
+          metadata: { confidence: "test", verdant_source: "live" },
+        },
+      },
+    ]);
+    render(<TentSensorSourceHealthCard tentId="tent-3" />);
+
+    const row = screen.getByTestId("tent-sensor-source-health-row");
+    expect(row).toHaveAttribute("data-status", "diagnostic");
+    expect(within(row).getByText("diagnostic only")).toBeInTheDocument();
+    expect(within(row).queryByText("active")).toBeNull();
   });
 });

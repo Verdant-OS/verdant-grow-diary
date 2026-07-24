@@ -11,6 +11,7 @@ import LeadDetailHeader from "@/components/LeadDetailHeader";
 import LeadDetailContactSection from "@/components/LeadDetailContactSection";
 import LeadDetailMetadataSection from "@/components/LeadDetailMetadataSection";
 import LeadDetailIntelligenceSection from "@/components/LeadDetailIntelligenceSection";
+import LeadConversionOutreachPanel from "@/components/LeadConversionOutreachPanel";
 
 export interface LeadDetailDrawerProps {
   lead: LeadRow | null;
@@ -103,6 +104,7 @@ function LeadDetailBody({
 
       {/* 5. Existing lead details/fields */}
       <LeadDetailContactSection lead={lead} vm={vm} />
+      <LeadConversionOutreachPanel lead={lead} />
       <LeadDetailMetadataSection
         lead={lead}
         vm={vm}

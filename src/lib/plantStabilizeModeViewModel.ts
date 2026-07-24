@@ -1,14 +1,11 @@
 import type { PlantRecentActivityRow } from "@/lib/plantRecentActivityRules";
-import {
-  evaluateStabilizeMode,
-  type StabilizeModeResult,
-} from "@/lib/stabilizeModeRules";
+import { evaluateStabilizeMode, type StabilizeModeResult } from "@/lib/stabilizeModeRules";
+import { actionTextWithoutResponseContext } from "@/lib/tenSecondQuickCheckRules";
 
 const HOUR_MS = 60 * 60 * 1000;
 const WINDOW_HOURS = 48;
 
 const ACTION_EVENT_TYPES = [
-  "quick_log",
   "watering",
   "water",
   "feeding",
@@ -23,7 +20,6 @@ const ACTION_EVENT_TYPES = [
 ] as const;
 
 const ACTION_NOTE_KEYWORDS = [
-  "quick check:",
   "watered",
   "watering",
   "fed",
@@ -45,6 +41,7 @@ const ACTION_NOTE_KEYWORDS = [
   "changed vpd",
   "changed humidity",
   "changed temp",
+  "environment changed",
 ] as const;
 
 const MAJOR_EVENT_TYPES = [
@@ -109,17 +106,19 @@ function inWindow(row: PlantRecentActivityRow, nowMs: number): boolean {
 
 function isAction(row: PlantRecentActivityRow): boolean {
   const eventType = row.eventType.toLowerCase();
+  const actionText = actionTextWithoutResponseContext(row.notePreview);
   return (
     ACTION_EVENT_TYPES.some((type) => eventType.includes(type)) ||
-    includesAny(row.notePreview, ACTION_NOTE_KEYWORDS)
+    includesAny(actionText, ACTION_NOTE_KEYWORDS)
   );
 }
 
 function isMajor(row: PlantRecentActivityRow): boolean {
   const eventType = row.eventType.toLowerCase();
+  const actionText = actionTextWithoutResponseContext(row.notePreview);
   return (
     MAJOR_EVENT_TYPES.some((type) => eventType.includes(type)) ||
-    includesAny(row.notePreview, MAJOR_NOTE_KEYWORDS)
+    includesAny(actionText, MAJOR_NOTE_KEYWORDS)
   );
 }
 

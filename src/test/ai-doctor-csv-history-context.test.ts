@@ -24,6 +24,7 @@ describe("aiDoctorCsvHistoryContextRules", () => {
     expect(ctx.dateRange).toBeNull();
     expect(ctx.vendors).toEqual([]);
     expect(ctx.metrics).toEqual([]);
+    expect(ctx.excludedQualityCount).toBe(0);
   });
 
   it("ignores non-CSV rows (does not promote live to history)", () => {
@@ -106,6 +107,33 @@ describe("aiDoctorCsvHistoryContextRules", () => {
       ],
     });
     expect(ctx.suspiciousFlagCount).toBe(2);
+  });
+
+  it("excludes non-ok quality rows from metric evidence and preserves safe counts", () => {
+    const ctx = buildAiDoctorCsvHistoryContext({
+      rows: [
+        baseRow({ value: 20, quality: "ok" }),
+        baseRow({ value: 22, quality: undefined }),
+        baseRow({ value: 80, quality: "degraded" }),
+        baseRow({ value: 81, quality: "stale" }),
+        baseRow({ value: 82, quality: "invalid" }),
+        baseRow({ value: 83, quality: "unknown" }),
+      ],
+    });
+
+    expect(ctx.totalReadings).toBe(6);
+    expect(ctx.excludedQualityCount).toBe(4);
+    expect(ctx.suspiciousFlagCount).toBe(4);
+    expect(ctx.metrics).toEqual([
+      {
+        metric: "temperature_c",
+        unit: "C",
+        count: 2,
+        min: 20,
+        max: 22,
+        avg: 21,
+      },
+    ]);
   });
 
   it("never includes raw payload internals or internal IDs", () => {

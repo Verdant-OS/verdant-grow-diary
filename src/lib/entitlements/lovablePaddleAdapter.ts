@@ -15,7 +15,7 @@
  *      price_id === "founder_lifetime"
  *      status   === "active"
  *      paddle_subscription_id starts with "lifetime_"
- *      current_period_end IS NULL
+ *      current_period_end is exactly null (a missing value is rejected)
  *    Any deviation → null (defense against a stray monthly-shaped row
  *    claiming to be lifetime).
  *  - Environment must match `expectedBillingEnvironment` — mismatch → null.
@@ -23,11 +23,7 @@
  *  - Never returns raw Paddle IDs in the mapped output.
  */
 
-import type {
-  BillingSubscriptionRow,
-  PlanId,
-  SubscriptionStatus,
-} from "./types";
+import type { BillingSubscriptionRow, PlanId, SubscriptionStatus } from "./types";
 
 export type LovableBillingEnvironment = "sandbox" | "live";
 
@@ -63,11 +59,14 @@ export interface MapLovableOptions {
 const KNOWN_PRICE_TO_PLAN: Readonly<Record<string, PlanId>> = Object.freeze({
   pro_monthly: "pro_monthly",
   pro_annual: "pro_annual",
+  craft_monthly: "craft_monthly",
+  craft_annual: "craft_annual",
   founder_lifetime: "founder_lifetime",
 });
 
 const KNOWN_STATUSES: ReadonlyArray<SubscriptionStatus> = [
   "active",
+  "trialing",
   "past_due",
   "canceled",
   "paused",
@@ -83,8 +82,10 @@ export function mapLovableSubscriptionRow(
   opts: MapLovableOptions,
 ): BillingSubscriptionRow | null {
   if (row == null) return null;
-  if (opts?.expectedBillingEnvironment !== "sandbox" &&
-      opts?.expectedBillingEnvironment !== "live") {
+  if (
+    opts?.expectedBillingEnvironment !== "sandbox" &&
+    opts?.expectedBillingEnvironment !== "live"
+  ) {
     return null;
   }
   if (row.environment !== opts.expectedBillingEnvironment) return null;
@@ -98,11 +99,7 @@ export function mapLovableSubscriptionRow(
     const startsLifetime =
       typeof row.paddle_subscription_id === "string" &&
       row.paddle_subscription_id.startsWith("lifetime_");
-    if (
-      row.status !== "active" ||
-      !startsLifetime ||
-      row.current_period_end != null
-    ) {
+    if (row.status !== "active" || !startsLifetime || row.current_period_end !== null) {
       return null;
     }
   } else {

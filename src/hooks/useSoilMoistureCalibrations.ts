@@ -3,12 +3,7 @@ import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { SoilMoistureCalibrationRow } from "@/lib/db";
 import type { SoilMoistureCalibrationCandidate } from "@/lib/soilMoistureCalibrationSelectionRules";
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-function isUuid(value: string | null | undefined): value is string {
-  return typeof value === "string" && UUID_RE.test(value);
-}
+import { isUuid } from "@/lib/isUuid";
 
 export function mapSoilMoistureCalibrationRow(
   row: SoilMoistureCalibrationRow,
@@ -67,6 +62,9 @@ export function useSoilMoistureCalibrations(args: {
     staleTime: 1000 * 60,
     gcTime: 1000 * 60 * 5,
     refetchOnWindowFocus: false,
-    retry: 1,
+    // A failed calibration read is a first-class unavailable state in the
+    // Sensors presenter. Do not hide it behind automatic retries or let an
+    // empty default masquerade as "Uncalibrated" while the request repeats.
+    retry: false,
   });
 }

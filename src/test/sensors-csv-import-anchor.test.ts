@@ -8,16 +8,11 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const SENSORS_SRC = readFileSync(
-  resolve(__dirname, "../pages/Sensors.tsx"),
-  "utf8",
-);
+const SENSORS_SRC = readFileSync(resolve(__dirname, "../pages/Sensors.tsx"), "utf8");
 
 describe("Sensors page — CSV import regression guard", () => {
   it("imports the EnvironmentCsvImportLauncher", () => {
-    expect(SENSORS_SRC).toMatch(
-      /from\s+["']@\/components\/EnvironmentCsvImportLauncher["']/,
-    );
+    expect(SENSORS_SRC).toMatch(/from\s+["']@\/components\/EnvironmentCsvImportLauncher["']/);
   });
 
   it("mounts the launcher with a sensors-csv-import test anchor", () => {
@@ -26,9 +21,11 @@ describe("Sensors page — CSV import regression guard", () => {
     expect(SENSORS_SRC).toMatch(/testIdPrefix="sensors-csv-import"/);
   });
 
-  it("passes the selected grow and tent through to the launcher", () => {
+  it("passes only the synchronously validated grow and tent through to the launcher", () => {
     expect(SENSORS_SRC).toMatch(/growId=\{selectedGrowId\}/);
-    expect(SENSORS_SRC).toMatch(/tentId=\{tentId\}/);
+    expect(SENSORS_SRC).toMatch(/tentId=\{activeTentId\}/);
+    expect(SENSORS_SRC).toMatch(/requiredTentGate\.reselectionRequired/);
+    expect(SENSORS_SRC).toMatch(/data-testid="sensors-csv-import-target-unavailable"/);
   });
 
   it("preserves the existing manual reading anchor and bridge health card", () => {
@@ -36,20 +33,22 @@ describe("Sensors page — CSV import regression guard", () => {
     expect(SENSORS_SRC).toMatch(/<SensorBridgeHealthCard/);
   });
 
+  it("scrolls and focuses the manual-reading target when the route hash changes", () => {
+    expect(SENSORS_SRC).toMatch(/useLocation\(\)/);
+    expect(SENSORS_SRC).toMatch(/location\.hash\.startsWith\("#manual-reading"\)/);
+    expect(SENSORS_SRC).toMatch(/scrollIntoView/);
+    expect(SENSORS_SRC).toMatch(/target\.focus/);
+    expect(SENSORS_SRC).toMatch(/id="manual-reading"[\s\S]{0,120}tabIndex=\{-1\}/);
+  });
+
   it("never labels csv readings as live in the page copy", () => {
-    const stripped = SENSORS_SRC.replace(/\/\*[\s\S]*?\*\//g, "").replace(
-      /\/\/.*$/gm,
-      "",
-    );
+    const stripped = SENSORS_SRC.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
     expect(stripped).not.toMatch(/csv[^a-z]+live/i);
     expect(stripped).not.toMatch(/live\s+csv/i);
   });
 
   it("does not introduce AI, Action Queue, alerts, or device-control wiring on the Sensors page", () => {
-    const stripped = SENSORS_SRC.replace(/\/\*[\s\S]*?\*\//g, "").replace(
-      /\/\/.*$/gm,
-      "",
-    );
+    const stripped = SENSORS_SRC.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
     expect(stripped).not.toMatch(/action_queue/i);
     expect(stripped).not.toMatch(/from\(['"]alerts['"]\)/i);
     expect(stripped).not.toMatch(/lovable-ai|openai|gemini/i);

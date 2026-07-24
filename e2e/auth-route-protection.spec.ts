@@ -18,6 +18,17 @@ const PRIVATE_TABLES = [
   "action_queue",
 ];
 
+const PROTECTED_TABLES = [...PRIVATE_TABLES, "pheno_hunts", "pheno_keepers"];
+
+const PROTECTED_DESKTOP_ROUTES = [
+  "/sensors",
+  "/actions",
+  "/settings",
+  "/operator/ecowitt",
+  "/pheno-hunts",
+  "/pheno-hunts/new",
+] as const;
+
 async function mockAllSupabase(page: Page, opts: { signedIn?: boolean } = {}) {
   await page.route(/\/auth\/v1\//, async (route, req) => {
     const url = req.url();
@@ -78,14 +89,42 @@ async function mockAllSupabase(page: Page, opts: { signedIn?: boolean } = {}) {
 test.describe("Auth route-protection (mocked, 1280x800)", () => {
   test.use({ viewport: { width: 1280, height: 800 } });
 
+  test.beforeAll(async ({ browser, baseURL }, testInfo) => {
+    // Keep cold Vite compilation outside the route assertions so startup time
+    // cannot masquerade as an auth-redirect regression.
+    testInfo.setTimeout(120_000);
+    const page = await browser.newPage({ baseURL });
+    try {
+      await mockAllSupabase(page);
+      await page.goto("/welcome", { waitUntil: "domcontentloaded", timeout: 110_000 });
+    } finally {
+      await page.close();
+    }
+  });
+
   test.beforeEach(async ({ page }) => {
     await mockAllSupabase(page);
   });
 
-  for (const path of ["/sensors", "/actions", "/settings", "/operator/ecowitt"]) {
-    test(`signed-out → ${path} redirects to /auth`, async ({ page, baseURL }) => {
+  for (const path of PROTECTED_DESKTOP_ROUTES) {
+    test(`signed-out → ${path} redirects to /welcome and makes no private REST hits`, async ({
+      page,
+      baseURL,
+    }) => {
+      const privateHits: string[] = [];
+      await page.route(/\/rest\/v1\//, (route, req) => {
+        const url = req.url();
+        if (PROTECTED_TABLES.some((table) => url.includes(`/rest/v1/${table}`))) {
+          privateHits.push(url);
+        }
+        return route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify([]),
+        });
+      });
       await page.goto(path);
-      await page.waitForURL((u) => u.pathname === "/auth", { timeout: 8000 });
+      await page.waitForURL((u) => u.pathname === "/welcome", { timeout: 8000 });
       const url = new URL(page.url());
       expect(url.origin).toBe(new URL(baseURL!).origin);
       const redirectTo = url.searchParams.get("redirectTo");
@@ -95,6 +134,10 @@ test.describe("Auth route-protection (mocked, 1280x800)", () => {
         expect(redirectTo.startsWith("//")).toBe(false);
         expect(redirectTo).not.toMatch(/^https?:/i);
       }
+      expect(
+        privateHits,
+        `Private-table hits while signed out (${path}): ${privateHits.join(", ")}`,
+      ).toHaveLength(0);
       // No private grow content should be visible pre-auth.
       const body = (await page.locator("body").textContent()) ?? "";
       for (const word of ["Tent 1", "Plant 1", "Diary", "Last reading"]) {
@@ -120,10 +163,12 @@ test.describe("Auth route-protection (mocked, 1280x800)", () => {
   });
 
   for (const path of [
+    "/",
     "/welcome",
     "/pricing",
     "/hardware-integrations",
     "/partners/csv-preview",
+    "/sensors/csv-preview",
   ]) {
     test(`public route ${path} renders signed-out without private fetches`, async ({
       page,
@@ -147,11 +192,23 @@ test.describe("Auth route-protection (mocked, 1280x800)", () => {
       const origin = new URL(page.url()).origin;
       expect(origin).toBe(new URL(baseURL!).origin);
       // Public pages must not query any private grow table while signed out.
-      expect(privateHits, `Private-table hits while signed out: ${privateHits.join(", ")}`).toHaveLength(0);
+      expect(
+        privateHits,
+        `Private-table hits while signed out: ${privateHits.join(", ")}`,
+      ).toHaveLength(0);
       // No fake-live wording allowed on public pages.
       const body = ((await page.locator("body").textContent()) ?? "").toLowerCase();
+      expect(body).not.toContain("page not found");
       expect(body).not.toContain("live reading");
       expect(body).not.toContain("latest sensor:");
+      if (path === "/partners/csv-preview") {
+        await expect(
+          page.getByRole("heading", { name: /turn hardware exports into plant memory/i }),
+        ).toBeVisible();
+      }
+      if (path === "/sensors/csv-preview") {
+        await expect(page.getByRole("heading", { name: /csv sensor preview/i })).toBeVisible();
+      }
     });
   }
 });

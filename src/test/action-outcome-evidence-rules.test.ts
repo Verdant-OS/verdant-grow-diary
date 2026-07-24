@@ -22,9 +22,22 @@ function row(overrides: Partial<RawSensorReadingRow> = {}): RawSensorReadingRow 
     captured_at: "2026-07-10T10:00:00.000Z",
     source: "live",
     quality: "ok",
+    raw_payload: null,
     ...overrides,
   };
 }
+
+const PHYSICAL_WINDOWS_PAYLOAD = {
+  vendor: "ecowitt_windows_testbench",
+  metadata: {
+    reported_verdant_source: "live",
+    raw_payload: {
+      stationtype: "GW2000A_V3.2.4",
+      model: "GW2000A",
+      dateutc: "2026-07-10 10:00:00",
+    },
+  },
+};
 
 function normalize(rows: RawSensorReadingRow[]) {
   return normalizeSensorEvidence({ rows, actionTentId: TENT, analysisAt: ANALYSIS });
@@ -53,6 +66,37 @@ describe("sensor source doctrine", () => {
     const r = normalize([row({ source: "demo" })]);
     expect(r.metrics).toHaveLength(0);
     expect(r.rejections[0].reason).toBe("unusable_source");
+  });
+
+  it("canonical-live Windows diagnostics are unusable", () => {
+    const r = normalize([
+      row({
+        raw_payload: {
+          vendor: "ecowitt_windows_testbench",
+          metadata: { confidence: "test", verdant_source: "live" },
+        },
+      }),
+    ]);
+    expect(r.metrics).toHaveLength(0);
+    expect(r.rejections[0].reason).toBe("unusable_source");
+  });
+
+  it("Windows vendor rows missing physical provenance fail closed", () => {
+    const r = normalize([
+      row({
+        raw_payload: {
+          vendor: "ecowitt_windows_testbench",
+          metadata: { verdant_source: "live" },
+        },
+      }),
+    ]);
+    expect(r.metrics).toHaveLength(0);
+  });
+
+  it("physical Windows gateway evidence remains usable live evidence", () => {
+    const r = normalize([row({ raw_payload: PHYSICAL_WINDOWS_PAYLOAD })]);
+    expect(r.metrics).toHaveLength(1);
+    expect(r.metrics[0].source).toBe("live");
   });
 
   it("stale evidence is unusable", () => {

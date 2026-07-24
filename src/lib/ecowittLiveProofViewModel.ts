@@ -9,7 +9,7 @@
  *   - Picks the newest valid EcoWitt row as the "proof candidate".
  *   - Counts accepted vs rejected EcoWitt-vendor rows strictly within the
  *     proof window (last 24 hours).
- *   - Never claims "Live" for demo/manual/csv/stale/invalid rows.
+ *   - Never claims "Live" for demo/manual/csv/testbench/stale/invalid rows.
  *   - Exposes ONLY allowlisted human-readable metric labels, never raw
  *     payload keys or values.
  */
@@ -23,10 +23,8 @@ import {
   type EcowittProofRow,
   type EcowittProofRowStatus,
 } from "@/lib/ecowittLiveProofRules";
-import {
-  SENSOR_FIELD_LABELS,
-  type SensorFieldKey,
-} from "@/constants/sensorFields";
+import { SENSOR_FIELD_LABELS, type SensorFieldKey } from "@/constants/sensorFields";
+import { isSensorTestbenchRow } from "@/lib/sensorTestbenchIndicatorRules";
 
 export type EcowittLiveProofTone = "ok" | "warn" | "neutral";
 
@@ -136,6 +134,13 @@ function buildHeadline(
         detail: "Latest EcoWitt reading is older than the freshness window.",
         tone: "warn",
       };
+    case "testbench":
+      return {
+        headline: "EcoWitt testbench packet received",
+        detail:
+          "The diagnostic path responded, but a test packet cannot confirm a physical EcoWitt sensor. Send one real bridge reading to complete live ingest proof.",
+        tone: "neutral",
+      };
     case "invalid":
       return {
         headline: "EcoWitt reading looks invalid",
@@ -151,8 +156,7 @@ function buildHeadline(
     case "limited":
       return {
         headline: "Not enough EcoWitt history yet",
-        detail:
-          "Need more recent EcoWitt readings before confirming live ingest.",
+        detail: "Need more recent EcoWitt readings before confirming live ingest.",
         tone: "neutral",
       };
     case "not_ecowitt":
@@ -182,9 +186,7 @@ export function buildEcowittLiveProofViewModel(
   const windowStart = nowMs - ECOWITT_PROOF_WINDOW_MS;
 
   // Tent scope first.
-  const tentRows = (rows ?? []).filter(
-    (r) => (r.tent_id ?? null) === tentId,
-  );
+  const tentRows = (rows ?? []).filter((r) => (r.tent_id ?? null) === tentId);
 
   // Sort deterministically; never trust input order.
   const sorted = sortRowsByCapturedAtDesc(tentRows);
@@ -206,17 +208,20 @@ export function buildEcowittLiveProofViewModel(
     // count as "observed" so they show up in rejected counts.
     return ms >= windowStart;
   });
+  // Soil stuck/coverage checks must use only physical EcoWitt history.
+  // Diagnostic rows may be newer and valid-looking, but cannot supply the
+  // three-sample evidence required to confirm or reject a real probe.
+  const physicalHistory = ecowittRows.filter((r) => !isSensorTestbenchRow(r));
 
   // Classify each in-window row.
-  const classifications = inWindow.map((r) =>
-    classifyEcowittProofRow(r, sorted, nowMs),
-  );
+  const classifications = inWindow.map((r) => classifyEcowittProofRow(r, physicalHistory, nowMs));
 
   let acceptedCount = 0;
   let rejectedCount = 0;
   for (const c of classifications) {
     if (c.status === "live_confirmed") acceptedCount += 1;
     else if (
+      c.status === "testbench" ||
       c.status === "stale" ||
       c.status === "invalid" ||
       c.status === "unknown" ||
@@ -232,15 +237,11 @@ export function buildEcowittLiveProofViewModel(
     inWindow[0] ??
     null;
   const candidate =
-    candidateRow !== null
-      ? classifyEcowittProofRow(candidateRow, sorted, nowMs)
-      : null;
+    candidateRow !== null ? classifyEcowittProofRow(candidateRow, physicalHistory, nowMs) : null;
 
-  const isLegacyBridgeSource =
-    candidate?.sourceKind === "legacy_ecowitt" ? true : false;
+  const isLegacyBridgeSource = candidate?.sourceKind === "legacy_ecowitt" ? true : false;
 
-  const candidateCapturedAt =
-    candidateRow?.captured_at ?? candidateRow?.ts ?? null;
+  const candidateCapturedAt = candidateRow?.captured_at ?? candidateRow?.ts ?? null;
 
   const metricLabel = normalizeMetricLabel(candidateRow?.metric ?? null);
   const candidateMetricLabels: readonly string[] = metricLabel

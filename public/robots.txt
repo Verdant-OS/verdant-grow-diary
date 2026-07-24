@@ -8,6 +8,10 @@
 User-agent: Googlebot
 Disallow: /auth
 Disallow: /reset-password
+Disallow: /login
+Disallow: /signup
+Disallow: /register
+Disallow: /.lovable/
 Disallow: /onboarding
 Disallow: /daily-check
 Disallow: /tents
@@ -40,6 +44,10 @@ Allow: /
 User-agent: Bingbot
 Disallow: /auth
 Disallow: /reset-password
+Disallow: /login
+Disallow: /signup
+Disallow: /register
+Disallow: /.lovable/
 Disallow: /onboarding
 Disallow: /daily-check
 Disallow: /tents
@@ -72,6 +80,10 @@ Allow: /
 User-agent: *
 Disallow: /auth
 Disallow: /reset-password
+Disallow: /login
+Disallow: /signup
+Disallow: /register
+Disallow: /.lovable/
 Disallow: /onboarding
 Disallow: /daily-check
 Disallow: /tents

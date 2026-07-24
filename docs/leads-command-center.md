@@ -26,8 +26,6 @@ pipeline visibility — nothing else.
 - **Purpose:** business development, partner tracking, and outreach
   pipeline visibility. Not a CRM for grower-customer relationships.
 
-
-
 ## Page Purpose
 
 `src/pages/Leads.tsx` is the operator console for inbound leads. It loads the
@@ -68,26 +66,27 @@ corrupt payload falls back to defaults.
 Every panel is driven by a pure helper in `src/lib/`. No panel reads raw leads
 out of band.
 
-| Panel / Concern               | Helper                                  |
-| ----------------------------- | --------------------------------------- |
-| Executive Summary card        | `leadExecutiveSummaryRules`             |
-| Saved Views menu              | `leadSavedViewsRules`                   |
-| Command Center Guidance       | `leadCommandCenterGuidanceRules`        |
-| Status Summary strip          | `leadStatusSummaryRules`                |
-| Pipeline Health panel         | `leadPipelineHealthRules`               |
-| Priority Queue panel          | `leadPriorityQueueRules`                |
-| Data Quality Audit panel      | `leadDataQualityAuditRules`             |
-| Source Insights panel         | `leadSourceInsightRules`                |
-| Analytics panel               | `leadAnalyticsRules`                    |
-| Search / filter / sort        | `leadSearchRules`                       |
-| Section order + visibility    | `leadCommandCenterLayoutRules`          |
-| Detail drawer snapshot        | `leadDetailSnapshotRules`               |
-| Detail drawer view model      | `leadDetailViewModel`                   |
-| Next action recommendation    | `leadNextActionRules`                   |
-| Quality score badge           | `leadQualityScoreRules`                 |
-| Activity timeline             | `leadActivityRules` + `leadEventRules`  |
-| Follow-up scheduling          | `leadFollowupRules`                     |
-| Shared field normalization    | `leadFieldUtils`                        |
+| Panel / Concern              | Helper                                 |
+| ---------------------------- | -------------------------------------- |
+| Executive Summary card       | `leadExecutiveSummaryRules`            |
+| Saved Views menu             | `leadSavedViewsRules`                  |
+| Command Center Guidance      | `leadCommandCenterGuidanceRules`       |
+| Status Summary strip         | `leadStatusSummaryRules`               |
+| Pipeline Health panel        | `leadPipelineHealthRules`              |
+| Priority Queue panel         | `leadPriorityQueueRules`               |
+| Data Quality Audit panel     | `leadDataQualityAuditRules`            |
+| Source Insights panel        | `leadSourceInsightRules`               |
+| Analytics panel              | `leadAnalyticsRules`                   |
+| Search / filter / sort       | `leadSearchRules`                      |
+| Section order + visibility   | `leadCommandCenterLayoutRules`         |
+| Detail drawer snapshot       | `leadDetailSnapshotRules`              |
+| Detail drawer view model     | `leadDetailViewModel`                  |
+| Next action recommendation   | `leadNextActionRules`                  |
+| Quality score badge          | `leadQualityScoreRules`                |
+| Activity timeline            | `leadActivityRules` + `leadEventRules` |
+| Follow-up scheduling         | `leadFollowupRules`                    |
+| Checkout conversion worklist | `leadConversionQueueRules`             |
+| Shared field normalization   | `leadFieldUtils`                       |
 
 `leadExecutiveSummaryRules` is a **composition** helper — it consumes the
 outputs of `leadStatusSummaryRules`, `leadPipelineHealthRules`,
@@ -96,10 +95,10 @@ outputs of `leadStatusSummaryRules`, `leadPipelineHealthRules`,
 
 ## localStorage Keys
 
-| Key                                       | Owner                              | Stores                                                              |
-| ----------------------------------------- | ---------------------------------- | ------------------------------------------------------------------- |
-| `verdant.leads.commandCenterLayout.v1`    | `leadCommandCenterLayoutRules.ts`  | Panel order + visibility ({ sections: [{ id, visible, order }] }). |
-| `verdant.leads.savedViews.v1`             | `leadSavedViewsRules.ts`           | User-defined saved filter/search/sort views.                        |
+| Key                                    | Owner                             | Stores                                                             |
+| -------------------------------------- | --------------------------------- | ------------------------------------------------------------------ |
+| `verdant.leads.commandCenterLayout.v1` | `leadCommandCenterLayoutRules.ts` | Panel order + visibility ({ sections: [{ id, visible, order }] }). |
+| `verdant.leads.savedViews.v1`          | `leadSavedViewsRules.ts`          | User-defined saved filter/search/sort views.                       |
 
 Both keys are versioned (`.v1`), parsed defensively, and sanitized — unknown
 ids and malformed payloads are dropped silently and replaced with defaults.
@@ -185,6 +184,23 @@ Mounted order inside the drawer:
 The priority queue can hand the drawer any lead id from the filtered set
 without requiring hidden fields — view-model helpers tolerate missing optional
 data.
+
+## Checkout Conversion Worklist
+
+The operator-only checkout conversion worklist sits above the general command
+center. It reads explicit `pricing_interest*` requests from the same RLS-scoped
+lead result and ranks only requests that can produce the existing reviewed
+draft:
+
+1. due or unscheduled human follow-ups,
+2. untouched checkout requests, oldest first,
+3. future scheduled follow-ups.
+
+The subscriber-growth sprint deep-links to the first-contact or follow-up view.
+Unknown query values fall back to the complete worklist. The queue sends
+nothing, logs nothing, and never changes lead, billing, or entitlement state;
+the operator must open a lead, review the generated draft, send it through their
+own mail client, then explicitly record the interaction.
 
 ## Testing Strategy
 

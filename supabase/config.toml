@@ -7,6 +7,10 @@ project_id = "knkwiiywfkbqznbxwqfh"
     verify_jwt = true
   [functions.rls-selftest]
     verify_jwt = false
+  # AI Doctor is cost-bearing and user-scoped. Keep gateway JWT verification
+  # enabled in addition to the handler's auth.getUser() check.
+  [functions.ai-doctor-review]
+    verify_jwt = true
   # Paid-launch gate: JWT posture pinned explicitly per function.
   # get-paddle-price requires a signed-in user (and re-verifies via
   # auth.getUser inside the function — defence in depth).
@@ -20,3 +24,43 @@ project_id = "knkwiiywfkbqznbxwqfh"
     verify_jwt = false
   [functions.payments-webhook]
     verify_jwt = false
+  # founder-slots-remaining is a public, read-only counter used by the
+  # /pricing card. Bounded 0..100 integer only; no user data.
+  [functions.founder-slots-remaining]
+    verify_jwt = false
+  # checkout-status re-verifies the caller JWT inside the function via
+  # auth.getUser (defence in depth) but keeps platform verify_jwt off so
+  # tests / previews can hit it without editing project auth config.
+  [functions.checkout-status]
+    verify_jwt = false
+  # paddle-portal-session mints a Paddle customer-portal URL for the
+  # signed-in caller. Re-verifies the caller JWT inside the function via
+  # auth.getUser; keeps platform verify_jwt off for parity with the other
+  # audited billing surfaces.
+  [functions.paddle-portal-session]
+    verify_jwt = false
+  # delete-account revokes the caller's sessions and deletes their auth
+  # user. Re-verifies JWT inside via auth.getUser before any destructive
+  # write; service_role is only used after that check succeeds.
+  [functions.delete-account]
+    verify_jwt = false
+  # ECOWITT bridge requests use a tent-scoped `vbt_...` bearer rather than a
+  # platform JWT. The handler requires that bridge bearer and enforces its tent
+  # scope before accepting any trusted reading; ordinary user JWTs are denied.
+  [functions.sensor-ingest-webhook]
+    verify_jwt = false
+  # The direct ECOWITT canary has the same handler-level bearer verification;
+  # disabling platform JWT verification only lets that strict verifier run.
+  [functions.ecowitt-ingest]
+    verify_jwt = false
+  # redeem-referral fires the verified referral credit conversion for the
+  # signed-in caller. Requires a platform JWT AND re-verifies via auth.getUser
+  # inside (defence in depth); the grant itself is a service-role-only RPC.
+  [functions.redeem-referral]
+    verify_jwt = true
+  # operator-credits-audit is a read-only operator-only diagnostics surface.
+  # Requires a platform-verified JWT AND re-checks public.has_role(uid,'operator')
+  # inside before running any query. Returns row IDs, timestamps, enums, and
+  # UUID owner identifiers only — no email/name/profile fields.
+  [functions.operator-credits-audit]
+    verify_jwt = true

@@ -33,7 +33,9 @@ const FINAL = latestMigrationDefining("public.ai_credit_spend");
 
 describe("AI credit SQL effective entitlement hardening", () => {
   it("adds a deterministic SQL helper for effective credit plan resolution", () => {
-    expect(MIGRATION).toContain("CREATE OR REPLACE FUNCTION public.ai_credit_effective_credit_plan_id");
+    expect(MIGRATION).toContain(
+      "CREATE OR REPLACE FUNCTION public.ai_credit_effective_credit_plan_id",
+    );
     expect(MIGRATION).toContain("p_plan_id text");
     expect(MIGRATION).toContain("p_status text");
     expect(MIGRATION).toContain("p_current_period_end timestamptz");
@@ -43,9 +45,13 @@ describe("AI credit SQL effective entitlement hardening", () => {
   });
 
   it("degrades inactive, unknown, null, and elapsed billing rows to free", () => {
-    expect(MIGRATION).toContain("p_plan_id IS NULL OR p_plan_id NOT IN ('free','pro_monthly','pro_annual','founder_lifetime') THEN 'free'");
+    expect(MIGRATION).toContain(
+      "p_plan_id IS NULL OR p_plan_id NOT IN ('free','pro_monthly','pro_annual','founder_lifetime') THEN 'free'",
+    );
     expect(MIGRATION).toContain("p_status IS DISTINCT FROM 'active' THEN 'free'");
-    expect(MIGRATION).toContain("p_current_period_end IS NOT NULL AND p_current_period_end <= p_now THEN 'free'");
+    expect(MIGRATION).toContain(
+      "p_current_period_end IS NOT NULL AND p_current_period_end <= p_now THEN 'free'",
+    );
   });
 
   it("rewires ai_credit_spend to read status and period, not raw plan alone", () => {
@@ -93,24 +99,44 @@ describe("AI credit SQL effective entitlement hardening", () => {
 });
 
 describe("ai_credit_spend FINAL migration state (regression-proof)", () => {
-  it("reads BOTH billing sources — BYO billing_subscriptions AND Lovable subscriptions", () => {
-    expect(FINAL).toMatch(/FROM\s+public\.billing_subscriptions/i);
+  it("reads plan only from the canonical Lovable subscriptions table (BYO branch retired 2026-07-16)", () => {
+    // Canonical lane: BYO billing_subscriptions is no longer a plan source in
+    // the LATEST ai_credit_spend definition. Any prior entitling BYO row was
+    // backfilled into public.subscriptions in the narrowing migration.
     expect(FINAL).toMatch(/FROM\s+public\.subscriptions/i);
     expect(FINAL).toContain("s.environment = 'live'");
+    expect(FINAL).toContain("p_billing_environment = 'sandbox' AND s.environment = 'sandbox'");
+    // Function body must not read billing_subscriptions.
+    const bodyMatch = FINAL.match(
+      /CREATE OR REPLACE FUNCTION public\.ai_credit_spend[\s\S]*?LANGUAGE plpgsql[\s\S]*?\$function\$;/,
+    );
+    expect(bodyMatch).not.toBeNull();
+    expect(bodyMatch![0]).not.toMatch(/FROM\s+public\.billing_subscriptions/i);
   });
 
-  it("keeps the status/period hardening on both sources (no raw plan_id trust)", () => {
-    // BYO row goes through the effective-plan helper…
-    expect(FINAL).toContain("public.ai_credit_effective_credit_plan_id");
-    // …and the Lovable row carries the same strictness inline.
-    expect(FINAL).toContain("s.status = 'active'");
-    expect(FINAL).toMatch(/current_period_end IS NULL OR s\.current_period_end > now\(\)/);
-    // The regression signature: a bare plan_id read feeding the allowance.
-    expect(FINAL).not.toMatch(/SELECT\s+plan_id\s+INTO\s+v_plan_id\s+FROM\s+public\.billing_subscriptions/i);
+  it("keeps the Lovable-source status/period policy aligned with dunning and cancellation grace", () => {
+    // Craft (craft_monthly/craft_annual) are recurring paid plans resolved
+    // alongside Pro; the pack-overflow migration widened this IN-list.
+    expect(FINAL).toContain(
+      "s.price_id IN ('pro_monthly','pro_annual','craft_monthly','craft_annual')",
+    );
+    expect(FINAL).toContain("s.current_period_end IS NOT NULL");
+    expect(FINAL).toContain("s.status IN ('active','trialing') AND s.current_period_end > now()");
+    expect(FINAL).toContain("OR s.status = 'past_due'");
+    expect(FINAL).toContain("(s.status = 'canceled' AND s.current_period_end > now())");
+    expect(FINAL).toContain("s.price_id = 'founder_lifetime'");
+    // `_` is a SQL LIKE wildcard; a literal Founder prefix is required.
+    expect(FINAL).toContain("left(s.paddle_subscription_id, 9) = 'lifetime_'");
+    expect(FINAL).not.toContain("s.paddle_subscription_id LIKE 'lifetime_%'");
+    // The regression signature: a bare plan_id read feeding the allowance
+    // from billing_subscriptions.
+    expect(FINAL).not.toMatch(
+      /SELECT\s+plan_id\s+INTO\s+v_plan_id\s+FROM\s+public\.billing_subscriptions/i,
+    );
   });
 
-  it("only known plan ids can be unlocked from the Lovable source", () => {
-    expect(FINAL).toContain("s.price_id IN ('pro_monthly','pro_annual','founder_lifetime')");
+  it("fails closed for paused or expired recurring statuses", () => {
+    expect(FINAL).not.toMatch(/s\.status\s*=\s*'(?:paused|expired)'/i);
   });
 
   it("preserves the ledger contract: idempotent replay, advisory lock, append-only", () => {
@@ -121,10 +147,14 @@ describe("ai_credit_spend FINAL migration state (regression-proof)", () => {
     expect(FINAL).not.toMatch(/DELETE\s+FROM\s+public\.ai_credit_spends/i);
   });
 
-  it("keeps staff metering capped and the grant posture tight", () => {
+  it("keeps staff metering capped and the grant posture server-only", () => {
     expect(FINAL).toContain("v_per_month := 10000");
     expect(FINAL).toMatch(/REVOKE ALL ON FUNCTION public\.ai_credit_spend[^;]+FROM PUBLIC/);
     expect(FINAL).toMatch(/REVOKE ALL ON FUNCTION public\.ai_credit_spend[^;]+FROM anon/);
-    expect(FINAL).toMatch(/GRANT EXECUTE ON FUNCTION public\.ai_credit_spend[^;]+TO authenticated/);
+    expect(FINAL).toMatch(/REVOKE ALL ON FUNCTION public\.ai_credit_spend[^;]+FROM authenticated/);
+    expect(FINAL).toMatch(/GRANT EXECUTE ON FUNCTION public\.ai_credit_spend[^;]+TO service_role/);
+    expect(FINAL).not.toMatch(
+      /GRANT EXECUTE ON FUNCTION public\.ai_credit_spend[^;]+TO authenticated/,
+    );
   });
 });

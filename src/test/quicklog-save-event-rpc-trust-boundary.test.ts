@@ -120,10 +120,14 @@ describe("quicklog_save_event — ownership and cross-boundary attachment", () =
     );
   });
 
-  it("rejects plant that does not belong to the selected tent with 'plant_not_in_tent'", () => {
+  it("rejects plant/tent mismatch NULL-correctly with 'plant_not_in_tent' (incl. untented plant + arbitrary tent)", () => {
+    // Supplied tent must EXACTLY equal the plant's stored tent, including null.
     expect(body).toMatch(
-      /v_plant_tent[\s\S]{0,80}<>\s*p_tent_id[\s\S]{0,200}'plant_not_in_tent'/i,
+      /p_tent_id\s+IS\s+DISTINCT\s+FROM\s+v_plant_tent[\s\S]{0,200}'plant_not_in_tent'/i,
     );
+    // The old defect (only rejecting when the plant already had a non-null tent)
+    // must be gone: an untented plant + arbitrary tent no longer slips through.
+    expect(body).not.toMatch(/v_plant_tent\s+IS\s+NOT\s+NULL\s+AND\s+v_plant_tent\s*<>\s*p_tent_id/i);
   });
 
   it("all ownership/scope checks occur before the first INSERT into grow_events", () => {

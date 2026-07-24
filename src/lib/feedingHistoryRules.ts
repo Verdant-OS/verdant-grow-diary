@@ -8,6 +8,11 @@
  * reach into raw `details` JSON.
  */
 import type { NormalizedDiaryEntry } from "./diaryEntryRules";
+import {
+  normalizeRootZoneSource,
+  rootZoneSourceLabel,
+  type RootZoneSource,
+} from "./rootZoneObservationRules";
 
 export interface FeedingNutrient {
   name: string;
@@ -17,6 +22,8 @@ export interface FeedingNutrient {
 
 export interface FeedingHistoryRow {
   id: string;
+  /** Exact global Timeline anchor for structured grow_events rows only. */
+  timelineAnchorId: string | null;
   /** ISO string when valid, otherwise null. Never an epoch-0 fabrication. */
   occurredAt: string | null;
   occurredAtLabel: string;
@@ -25,7 +32,10 @@ export interface FeedingHistoryRow {
   volumeMl: number | null;
   ph: number | null;
   ec: number | null;
+  /** Measured output/drain EC when it was logged separately. */
+  outputEc: number | null;
   tds: number | null;
+  runoffMl: number | null;
   runoffPh: number | null;
   runoffEc: number | null;
   runoffTds: number | null;
@@ -36,8 +46,8 @@ export interface FeedingHistoryRow {
   recipe: string | null;
   notePreview: string;
   warnings: string[];
-  /** Quick Log feedings are always grower-entered → manual. */
-  sourceLabel: "manual";
+  source: RootZoneSource;
+  sourceLabel: string;
 }
 
 const NOTE_PREVIEW_MAX = 140;
@@ -84,8 +94,10 @@ function rangeWarnings(row: {
   volumeMl: number | null;
   ph: number | null;
   ec: number | null;
+  outputEc: number | null;
   runoffPh: number | null;
   runoffEc: number | null;
+  waterTempC: number | null;
 }): string[] {
   const w: string[] = [];
   if (row.volumeMl !== null && row.volumeMl <= 0) {
@@ -94,14 +106,20 @@ function rangeWarnings(row: {
   if (row.ph !== null && (row.ph < 0 || row.ph > 14)) {
     w.push("ph out of range");
   }
-  if (row.ec !== null && row.ec < 0) {
-    w.push("ec_ms_cm < 0");
+  if (row.ec !== null && (row.ec < 0 || row.ec > 10)) {
+    w.push("ec_ms_cm out of range");
+  }
+  if (row.outputEc !== null && (row.outputEc < 0 || row.outputEc > 10)) {
+    w.push("ec_out out of range");
   }
   if (row.runoffPh !== null && (row.runoffPh < 0 || row.runoffPh > 14)) {
     w.push("runoff_ph out of range");
   }
-  if (row.runoffEc !== null && row.runoffEc < 0) {
-    w.push("runoff_ec < 0");
+  if (row.runoffEc !== null && (row.runoffEc < 0 || row.runoffEc > 10)) {
+    w.push("runoff_ec out of range");
+  }
+  if (row.waterTempC !== null && (row.waterTempC < -10 || row.waterTempC > 60)) {
+    w.push("water_temp_c out of range");
   }
   return w;
 }
@@ -126,6 +144,12 @@ function pickRunoffMl(entry: NormalizedDiaryEntry): number | null {
   return pickNumber(extras.runoff_ml) ?? pickNumber(extras.runoffMl) ?? null;
 }
 
+function pickOutputEc(entry: NormalizedDiaryEntry): number | null {
+  const extras = entry.details.extras;
+  if (!extras) return null;
+  return pickNumber(extras.ec_out) ?? pickNumber(extras.ecOut) ?? null;
+}
+
 function pickWaterTempC(entry: NormalizedDiaryEntry): number | null {
   const extras = entry.details.extras;
   if (!extras) return null;
@@ -135,6 +159,10 @@ function pickWaterTempC(entry: NormalizedDiaryEntry): number | null {
     pickNumber(extras.waterTempCelsius) ??
     null
   );
+}
+
+function pickSource(entry: NormalizedDiaryEntry): RootZoneSource {
+  return normalizeRootZoneSource(entry.details.extras?.source);
 }
 
 function toNutrients(entry: NormalizedDiaryEntry): FeedingNutrient[] {
@@ -155,27 +183,32 @@ function toNutrients(entry: NormalizedDiaryEntry): FeedingNutrient[] {
 
 function toRow(entry: NormalizedDiaryEntry): FeedingHistoryRow {
   const volumeMl =
-    entry.details.wateringAmountMl !== undefined
-      ? entry.details.wateringAmountMl
-      : null;
+    entry.details.wateringAmountMl !== undefined ? entry.details.wateringAmountMl : null;
   const ph = entry.details.ph ?? null;
   const ec = entry.details.ec ?? null;
   const tds = entry.details.tds ?? null;
   const runoffPh = entry.details.runoffPh ?? null;
   const runoffEc = entry.details.runoffEc ?? null;
   const runoffTds = entry.details.runoffTds ?? null;
-  // runoff_ml is surfaced as a chip via extras; not part of FeedingHistoryRow's
-  // required field set but range-checked below in case it is present.
   const runoffMl = pickRunoffMl(entry);
+  const outputEc = pickOutputEc(entry);
+  const waterTempC = pickWaterTempC(entry);
 
   const extra = rangeWarnings({
     volumeMl,
     ph,
     ec,
+    outputEc,
     runoffPh,
     runoffEc,
+    waterTempC,
   });
   if (runoffMl !== null && runoffMl < 0) extra.push("runoff_ml < 0");
+  if (entry.details.extras?.root_zone_status === "unavailable") {
+    extra.push("Structured measurements unavailable");
+  } else if (entry.details.extras?.root_zone_status === "partial") {
+    extra.push("Some structured measurements were omitted as invalid");
+  }
 
   const seen = new Set<string>();
   const warnings: string[] = [];
@@ -186,8 +219,14 @@ function toRow(entry: NormalizedDiaryEntry): FeedingHistoryRow {
     }
   }
 
+  const source = pickSource(entry);
   return {
     id: entry.id,
+    timelineAnchorId:
+      entry.details.extras?.root_zone_status === "available" ||
+      entry.details.extras?.root_zone_status === "partial"
+        ? `timeline-entry-${entry.id}`
+        : null,
     occurredAt: entry.createdAt,
     occurredAtLabel: entry.createdAtLabel,
     plantId: entry.plantId,
@@ -195,16 +234,19 @@ function toRow(entry: NormalizedDiaryEntry): FeedingHistoryRow {
     volumeMl,
     ph,
     ec,
+    outputEc,
     tds,
+    runoffMl,
     runoffPh,
     runoffEc,
     runoffTds,
-    waterTempC: pickWaterTempC(entry),
+    waterTempC,
     nutrients: toNutrients(entry),
     recipe: pickRecipe(entry),
     notePreview: previewNote(entry.note),
     warnings,
-    sourceLabel: "manual",
+    source,
+    sourceLabel: rootZoneSourceLabel(source),
   };
 }
 
@@ -213,10 +255,7 @@ function toRow(entry: NormalizedDiaryEntry): FeedingHistoryRow {
  *   1. Entries with a valid `occurredAt` first, sorted by timestamp desc.
  *   2. Entries without a valid timestamp last, sorted by id asc.
  */
-function compareNewestFirst(
-  a: FeedingHistoryRow,
-  b: FeedingHistoryRow,
-): number {
+function compareNewestFirst(a: FeedingHistoryRow, b: FeedingHistoryRow): number {
   const aHas = a.occurredAt !== null;
   const bHas = b.occurredAt !== null;
   if (aHas && bHas) {
@@ -230,9 +269,7 @@ function compareNewestFirst(
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 }
 
-export function buildFeedingHistory(
-  entries: readonly NormalizedDiaryEntry[],
-): FeedingHistoryRow[] {
+export function buildFeedingHistory(entries: readonly NormalizedDiaryEntry[]): FeedingHistoryRow[] {
   if (!entries || entries.length === 0) return [];
   const rows = entries.filter(isFeedingEntry).map(toRow);
   rows.sort(compareNewestFirst);

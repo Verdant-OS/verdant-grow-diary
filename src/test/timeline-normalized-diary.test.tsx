@@ -8,9 +8,16 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { render, screen } from "@testing-library/react";
+import { render as rtlRender, screen } from "@testing-library/react";
+import type { ReactElement } from "react";
+import { MemoryRouter } from "react-router-dom";
 import DiaryEntryBadges from "@/components/DiaryEntryBadges";
 import { buildGrowDiaryTimeline } from "@/lib/growDiaryTimelineRules";
+
+// DiaryEntryBadges now renders DiaryEntryFaqLink (a react-router <Link>),
+// so every render needs a Router. Shadowing `render` keeps call sites
+// unchanged.
+const render = (ui: ReactElement) => rtlRender(ui, { wrapper: MemoryRouter });
 
 const ROOT = resolve(__dirname, "../..");
 const TIMELINE = readFileSync(resolve(ROOT, "src/pages/Timeline.tsx"), "utf8");

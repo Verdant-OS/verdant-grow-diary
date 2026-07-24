@@ -15,6 +15,8 @@ import {
 } from "@/lib/growEventToDiaryRawEntry";
 import { normalizeDiaryEntries } from "@/lib/diaryEntryRules";
 import { buildRecentQuickLogActivity } from "@/lib/quickLogHistoryRules";
+import { buildWateringHistory } from "@/lib/wateringHistoryRules";
+import { buildFeedingHistory } from "@/lib/feedingHistoryRules";
 
 describe("mapGrowEventToRecentRawEntry", () => {
   it("maps occurred_at to entry_at and preserves event_type/source", () => {
@@ -61,6 +63,129 @@ describe("mapGrowEventToRecentRawEntry", () => {
     expect(out.details.source).toBe("manual");
     const json = JSON.stringify(out);
     expect(json).not.toMatch(/\blive\b|guaranteed/i);
+  });
+
+  it("projects joined watering and feeding measurements into the existing history models", () => {
+    const raw = mapGrowEventsToRecentRawEntries([
+      {
+        id: "water-typed",
+        grow_id: "g1",
+        plant_id: "p1",
+        tent_id: "t1",
+        event_type: "watering",
+        occurred_at: "2026-07-19T12:00:00Z",
+        source: "manual",
+        watering_events: {
+          volume_ml: 950,
+          ph: 6.25,
+          ec_ms_cm: 1.35,
+          runoff_ml: 120,
+          runoff_ph: 6.1,
+          runoff_ec: 1.55,
+          water_temp_c: 20.5,
+        },
+      },
+      {
+        id: "feed-typed",
+        grow_id: "g1",
+        plant_id: "p1",
+        tent_id: "t1",
+        event_type: "feeding",
+        occurred_at: "2026-07-19T13:00:00Z",
+        source: "csv",
+        feeding_events: [
+          {
+            volume_ml: 1_100,
+            ph: 5.9,
+            ec_in: 1.8,
+            ec_out: 2.1,
+            runoff_ml: 180,
+            runoff_ph: 6.05,
+            runoff_ec: 2.05,
+            water_temp_c: 21,
+            nutrient_brand: "CRONK",
+            products: [{ name: "Bonnie", amount: 2, unit: "ml/L" }],
+          },
+        ],
+      },
+    ]);
+    const normalized = normalizeDiaryEntries({ rawEntries: raw });
+    const wateringRows = buildWateringHistory(normalized);
+    const feedingRows = buildFeedingHistory(normalized);
+
+    expect(wateringRows).toHaveLength(1);
+    expect(wateringRows.map((row) => row.id)).toEqual(["water-typed"]);
+    expect(wateringRows[0]).toMatchObject({
+      id: "water-typed",
+      timelineAnchorId: "timeline-entry-water-typed",
+      volumeMl: 950,
+      ph: 6.25,
+      ec: 1.35,
+      runoffMl: 120,
+      runoffPh: 6.1,
+      runoffEc: 1.55,
+      waterTempC: 20.5,
+      source: "manual",
+      sourceLabel: "Manual log",
+      warnings: [],
+    });
+    expect(feedingRows).toHaveLength(1);
+    expect(feedingRows.map((row) => row.id)).toEqual(["feed-typed"]);
+    expect(feedingRows[0]).toMatchObject({
+      id: "feed-typed",
+      timelineAnchorId: "timeline-entry-feed-typed",
+      volumeMl: 1_100,
+      ph: 5.9,
+      ec: 1.8,
+      outputEc: 2.1,
+      runoffMl: 180,
+      runoffPh: 6.05,
+      runoffEc: 2.05,
+      waterTempC: 21,
+      recipe: "CRONK",
+      source: "csv",
+      sourceLabel: "CSV log",
+      warnings: [],
+    });
+    expect(feedingRows[0].nutrients).toEqual([{ name: "Bonnie", amount: 2, unit: "ml/L" }]);
+  });
+
+  it("marks typed root-zone rows with a missing child as unavailable", () => {
+    const normalized = normalizeDiaryEntries({
+      rawEntries: [
+        mapGrowEventToRecentRawEntry({
+          id: "missing-child",
+          event_type: "watering",
+          occurred_at: "2026-07-19T12:00:00Z",
+          source: null,
+        }),
+      ],
+    });
+
+    expect(buildWateringHistory(normalized)[0]).toMatchObject({
+      source: "unknown",
+      sourceLabel: "Source unavailable",
+    });
+    expect(buildWateringHistory(normalized)[0].warnings).toContain(
+      "Structured measurements unavailable",
+    );
+  });
+
+  it("marks partially invalid typed measurements instead of presenting a clean row", () => {
+    const raw = mapGrowEventToRecentRawEntry({
+      id: "partial-water",
+      event_type: "watering",
+      occurred_at: "2026-07-19T12:00:00Z",
+      source: "manual",
+      watering_events: { volume_ml: 500, ph: 99 },
+    });
+    const [row] = buildWateringHistory(normalizeDiaryEntries({ rawEntries: [raw] }));
+
+    expect(raw.details.root_zone_status).toBe("partial");
+    expect(raw.details.root_zone_invalid_fields).toEqual(["inputPh"]);
+    expect(row.volumeMl).toBe(500);
+    expect(row.ph).toBeNull();
+    expect(row.warnings).toContain("Some structured measurements were omitted as invalid");
   });
 });
 

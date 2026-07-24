@@ -6,12 +6,21 @@
  * RLS scopes ownership via auth.uid().
  */
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Stethoscope, Copy, Check, AlertCircle, Link as LinkIcon, ExternalLink } from "lucide-react";
+import {
+  ArrowLeft,
+  Stethoscope,
+  Copy,
+  Check,
+  AlertCircle,
+  Link as LinkIcon,
+  ExternalLink,
+} from "lucide-react";
 import { useState } from "react";
 import { format } from "date-fns";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import PageHeader from "@/components/PageHeader";
 import { useAiDoctorSession } from "@/hooks/use-ai-doctor-sessions";
 import {
   buildCautionNote,
@@ -313,9 +322,7 @@ function ReviewSummarySection({
                   data-linked-action-queue-id={linkedMatch?.id ?? undefined}
                 >
                   <span className="font-medium">{a.title}</span>
-                  {a.detail ? (
-                    <span className="text-muted-foreground"> — {a.detail}</span>
-                  ) : null}
+                  {a.detail ? <span className="text-muted-foreground"> — {a.detail}</span> : null}
                   {linkedMatch ? (
                     <div
                       className="mt-1 flex flex-wrap items-center gap-2"
@@ -341,10 +348,7 @@ function ReviewSummarySection({
                     </div>
                   ) : null}
                   {session ? (
-                    <AiDoctorSessionActionQueueButton
-                      session={session}
-                      action={a}
-                    />
+                    <AiDoctorSessionActionQueueButton session={session} action={a} />
                   ) : null}
                 </li>
               );
@@ -352,7 +356,6 @@ function ReviewSummarySection({
           </ul>
         )}
       </div>
-
 
       <ReviewList
         title="What not to do"
@@ -427,9 +430,7 @@ function ReviewBlock({
       <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         {title}
       </h4>
-      <p className={children ? "text-sm" : "text-xs text-muted-foreground"}>
-        {children ?? empty}
-      </p>
+      <p className={children ? "text-sm" : "text-xs text-muted-foreground"}>{children ?? empty}</p>
     </div>
   );
 }
@@ -451,10 +452,7 @@ function ReviewList({
         {title}
       </h4>
       {items.length === 0 ? (
-        <p
-          className="text-xs text-muted-foreground"
-          data-testid={`${testid}-empty`}
-        >
+        <p className="text-xs text-muted-foreground" data-testid={`${testid}-empty`}>
           {empty}
         </p>
       ) : (
@@ -617,10 +615,7 @@ function SessionReviewStatusPanel({
           {vm.statusLabel}
         </Badge>
       </div>
-      <div
-        className="mt-2"
-        data-testid="ai-doctor-session-detail-review-status-history"
-      >
+      <div className="mt-2" data-testid="ai-doctor-session-detail-review-status-history">
         {vm.isEmpty ? (
           <p
             className="text-xs text-muted-foreground"
@@ -676,9 +671,7 @@ function SessionReviewActions({
   const mutation = useMarkAiDoctorSessionReview();
   const submitting = mutation.isPending;
 
-  const handle = async (
-    eventType: "marked_reviewed" | "needs_follow_up" | "cleared",
-  ) => {
+  const handle = async (eventType: "marked_reviewed" | "needs_follow_up" | "cleared") => {
     setErrorText(null);
     try {
       await mutation.mutateAsync({
@@ -693,17 +686,14 @@ function SessionReviewActions({
           ? (e as { message?: unknown }).message
           : null;
       const message =
-        typeof raw === "string" && raw.length > 0
-          ? raw
-          : "Could not save review event.";
+        typeof raw === "string" && raw.length > 0 ? raw : "Could not save review event.";
       setErrorText(message);
     }
   };
 
   const copy = buildSessionReviewActionsCopy(status);
   const disableMarkReviewed = submitting || copy.isMarkReviewedDisabledByStatus;
-  const disableNeedsFollowUp =
-    submitting || copy.isNeedsFollowUpDisabledByStatus;
+  const disableNeedsFollowUp = submitting || copy.isNeedsFollowUpDisabledByStatus;
   const disableClear = submitting || copy.isClearDisabledByStatus;
 
   return (
@@ -893,10 +883,7 @@ function SessionSummaryPanel({
             <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">
               {it.label}
             </dt>
-            <dd
-              className="text-sm capitalize"
-              data-testid={it.testid}
-            >
+            <dd className="text-sm capitalize" data-testid={it.testid}>
               {it.value}
             </dd>
           </div>
@@ -921,7 +908,8 @@ function SessionSummaryPanel({
         className="text-[11px] text-muted-foreground"
         data-testid="ai-doctor-session-summary-review-note"
       >
-        Review this snapshot before acting on any suggestion. Verdant does not execute actions automatically.
+        Review this snapshot before acting on any suggestion. Verdant does not execute actions
+        automatically.
       </p>
     </section>
   );
@@ -957,8 +945,8 @@ function LinkedActionQueueEmpty() {
     >
       <h3 className="text-sm font-semibold">Linked Action Queue items</h3>
       <p className="text-xs text-muted-foreground">
-        No approval-required action has been queued from this review yet. Review the
-        snapshot before adding one.
+        No approval-required action has been queued from this review yet. Review the snapshot before
+        adding one.
       </p>
     </section>
   );
@@ -1010,10 +998,7 @@ function LinkedActionQueueSection({ vm }: { vm: LinkedActionsViewModel }) {
           View in Action Queue
         </Link>
       ) : (
-        <ul
-          className="space-y-1"
-          data-testid="ai-doctor-session-detail-linked-action-queue-list"
-        >
+        <ul className="space-y-1" data-testid="ai-doctor-session-detail-linked-action-queue-list">
           {vm.items.map((item) => (
             <li
               key={item.id}
@@ -1030,9 +1015,7 @@ function LinkedActionQueueSection({ vm }: { vm: LinkedActionsViewModel }) {
                 View in Action Queue
               </Link>
               {item.reasonText ? (
-                <span className="ml-2 text-muted-foreground">
-                  — {item.reasonText}
-                </span>
+                <span className="ml-2 text-muted-foreground">— {item.reasonText}</span>
               ) : null}
             </li>
           ))}
@@ -1041,7 +1024,6 @@ function LinkedActionQueueSection({ vm }: { vm: LinkedActionsViewModel }) {
     </section>
   );
 }
-
 
 function LinkedAlertSection({ vm }: { vm: LinkedActionsViewModel }) {
   const alertIds = vm.linkedAlertIds;
@@ -1065,8 +1047,8 @@ function LinkedAlertSection({ vm }: { vm: LinkedActionsViewModel }) {
         className="text-xs text-muted-foreground"
         data-testid="ai-doctor-session-detail-linked-alert-helper"
       >
-        This AI Doctor review is connected to an alert through an
-        approval-required Action Queue item.
+        This AI Doctor review is connected to an alert through an approval-required Action Queue
+        item.
       </p>
       <ul className="space-y-1" data-testid="ai-doctor-session-detail-linked-alert-list">
         {alertIds.map((aid) => (
@@ -1085,9 +1067,6 @@ function LinkedAlertSection({ vm }: { vm: LinkedActionsViewModel }) {
   );
 }
 
-
-
-
 function fmtConfidence(val: number | null | undefined): string | null {
   if (typeof val !== "number" || !Number.isFinite(val)) return null;
   return `${Math.round(val * 100)}%`;
@@ -1099,46 +1078,46 @@ export default function AiDoctorSessionDetail() {
   const { data, isLoading, error, refetch, isFetching } = useAiDoctorSession(sessionId);
 
   return (
-    <div data-testid="ai-doctor-session-detail-page" className="space-y-4">
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => navigate(-1)}
-        className="focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-      >
-        <ArrowLeft className="h-4 w-4" /> Back
-      </Button>
+    <div
+      data-testid="ai-doctor-session-detail-page"
+      className="mx-auto w-full max-w-5xl min-w-0 space-y-4"
+    >
+      <div data-testid="ai-doctor-session-detail-title">
+        <PageHeader
+          title="Historical AI Doctor Session"
+          eyebrow="Saved review"
+          description="This is a saved diagnosis snapshot. It does not re-run AI or execute actions."
+          icon={<Stethoscope className="size-5" aria-hidden="true" />}
+          actions={
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate(-1)}
+                className="min-w-0 flex-1 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:flex-none"
+              >
+                <ArrowLeft className="h-4 w-4" /> Back
+              </Button>
+              {sessionId ? (
+                <div className="flex min-w-0 w-full flex-wrap items-center gap-2 sm:w-auto">
+                  <SessionQuickJumpLinks
+                    plantId={data?.plant_id ?? null}
+                    tentId={data?.tent_id ?? null}
+                  />
+                  <CopyLinkButton sessionId={sessionId} />
+                  <OpenInNewTabLink sessionId={sessionId} />
+                </div>
+              ) : null}
+            </>
+          }
+        />
+      </div>
+      <p className="sr-only" aria-hidden="true" data-testid="ai-doctor-session-detail-helper">
+        This is a saved diagnosis snapshot. It does not re-run AI or execute actions.
+      </p>
 
-      <Card>
-        <CardHeader className="space-y-1">
-          <div className="flex flex-wrap items-start justify-between gap-2">
-            <div className="space-y-1">
-              <CardTitle
-                className="text-lg flex items-center gap-2"
-                data-testid="ai-doctor-session-detail-title"
-              >
-                <Stethoscope className="h-4 w-4" /> Historical AI Doctor Session
-              </CardTitle>
-              <p
-                className="text-xs text-muted-foreground"
-                data-testid="ai-doctor-session-detail-helper"
-              >
-                This is a saved diagnosis snapshot. It does not re-run AI or execute actions.
-              </p>
-            </div>
-            {sessionId ? (
-              <div className="flex flex-wrap items-center gap-2">
-                <SessionQuickJumpLinks
-                  plantId={data?.plant_id ?? null}
-                  tentId={data?.tent_id ?? null}
-                />
-                <CopyLinkButton sessionId={sessionId} />
-                <OpenInNewTabLink sessionId={sessionId} />
-              </div>
-            ) : null}
-          </div>
-        </CardHeader>
-        <CardContent className="text-sm space-y-4">
+      <Card className="rounded-2xl border-border/60 bg-card/65 shadow-card">
+        <CardContent className="space-y-4 p-4 pt-4 text-sm sm:p-5 sm:pt-5">
           {isLoading ? (
             <div
               role="status"
@@ -1216,53 +1195,57 @@ function SessionDetailBody({
   );
   const linkedActions = useAiDoctorSessionLinkedActionQueueItems(row.id);
 
-
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        {row.created_at ? (
-          <span
-            className="text-xs text-muted-foreground"
-            data-testid="ai-doctor-session-detail-date"
-          >
-            {fmtDate(row.created_at)}
-          </span>
-        ) : null}
-        {d?.riskLevel ? (
+      <section
+        aria-label="Review context"
+        className="rounded-xl border border-border/60 bg-muted/20 p-3"
+      >
+        <div className="flex flex-wrap items-center gap-2">
+          {row.created_at ? (
+            <span
+              className="text-xs text-muted-foreground"
+              data-testid="ai-doctor-session-detail-date"
+            >
+              {fmtDate(row.created_at)}
+            </span>
+          ) : null}
+          {d?.riskLevel ? (
+            <Badge
+              variant="outline"
+              className="capitalize text-[11px]"
+              data-testid="ai-doctor-session-detail-risk"
+            >
+              Risk: {d.riskLevel}
+            </Badge>
+          ) : null}
+          {confidence ? (
+            <Badge
+              variant="outline"
+              className="text-[11px]"
+              data-testid="ai-doctor-session-detail-confidence"
+            >
+              Confidence: {confidence}
+            </Badge>
+          ) : null}
+          {row.context_confidence_ceiling ? (
+            <Badge
+              variant="outline"
+              className="text-[11px] text-muted-foreground"
+              data-testid="ai-doctor-session-detail-context-ceiling"
+            >
+              Ceiling: {row.context_confidence_ceiling}
+            </Badge>
+          ) : null}
           <Badge
-            variant="outline"
-            className="capitalize text-[11px]"
-            data-testid="ai-doctor-session-detail-risk"
-          >
-            Risk: {d.riskLevel}
-          </Badge>
-        ) : null}
-        {confidence ? (
-          <Badge
-            variant="outline"
+            variant="secondary"
             className="text-[11px]"
-            data-testid="ai-doctor-session-detail-confidence"
+            data-testid="ai-doctor-session-detail-action-count"
           >
-            Confidence: {confidence}
+            {actions.length} suggested action{actions.length !== 1 ? "s" : ""}
           </Badge>
-        ) : null}
-        {row.context_confidence_ceiling ? (
-          <Badge
-            variant="outline"
-            className="text-[11px] text-muted-foreground"
-            data-testid="ai-doctor-session-detail-context-ceiling"
-          >
-            Ceiling: {row.context_confidence_ceiling}
-          </Badge>
-        ) : null}
-        <Badge
-          variant="secondary"
-          className="text-[11px]"
-          data-testid="ai-doctor-session-detail-action-count"
-        >
-          {actions.length} suggested action{actions.length !== 1 ? "s" : ""}
-        </Badge>
-      </div>
+        </div>
+      </section>
 
       <SessionSummaryPanel
         createdAt={row.created_at}
@@ -1296,15 +1279,10 @@ function SessionDetailBody({
                 data-testid="ai-doctor-session-detail-caution-checklist"
                 className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm"
               >
-                <p className="font-medium text-xs text-muted-foreground mb-1">
-                  Review checklist
-                </p>
+                <p className="font-medium text-xs text-muted-foreground mb-1">Review checklist</p>
                 <ul className="list-disc pl-5 text-sm space-y-0.5">
                   {checklist.map((item, i) => (
-                    <li
-                      key={i}
-                      data-testid="ai-doctor-session-detail-caution-checklist-item"
-                    >
+                    <li key={i} data-testid="ai-doctor-session-detail-caution-checklist-item">
                       {item}
                     </li>
                   ))}
@@ -1339,46 +1317,45 @@ function SessionDetailBody({
         linkedActions={linkedActions.vm}
       />
 
-
-
-
       {d?.likelyIssue ? (
-        <div>
+        <section className="rounded-xl border border-border/60 bg-card/45 p-3 sm:p-4">
           <h3 className="text-sm font-semibold">Likely issue</h3>
-          <p data-testid="ai-doctor-session-detail-likely-issue">{d.likelyIssue}</p>
-        </div>
+          <p className="mt-1 break-words" data-testid="ai-doctor-session-detail-likely-issue">
+            {d.likelyIssue}
+          </p>
+        </section>
       ) : null}
 
       {d?.summary ? (
-        <div>
+        <section className="rounded-xl border border-border/60 bg-card/45 p-3 sm:p-4">
           <h3 className="text-sm font-semibold">Summary</h3>
           <p
-            className="text-muted-foreground"
+            className="mt-1 break-words text-muted-foreground"
             data-testid="ai-doctor-session-detail-summary"
           >
             {d.summary}
           </p>
-        </div>
+        </section>
       ) : null}
 
       {row.question ? (
-        <div>
+        <section className="rounded-xl border border-border/60 bg-card/45 p-3 sm:p-4">
           <h3 className="text-sm font-semibold">Question asked</h3>
-          <p className="text-muted-foreground" data-testid="ai-doctor-session-detail-question">
+          <p
+            className="mt-1 break-words text-muted-foreground"
+            data-testid="ai-doctor-session-detail-question"
+          >
             {row.question}
           </p>
-        </div>
+        </section>
       ) : null}
 
       <EvidenceSection items={reviewVm.evidence} />
 
       <MissingInformationSection items={reviewVm.missingInformation} />
 
-
-      <div>
-        <h3 className="text-sm font-semibold">
-          Suggested actions (read-only snapshot)
-        </h3>
+      <section className="rounded-xl border border-border/60 bg-card/45 p-3 sm:p-4">
+        <h3 className="text-sm font-semibold">Suggested actions (read-only snapshot)</h3>
         {actions.length === 0 ? (
           <p
             className="text-muted-foreground text-xs"
@@ -1387,20 +1364,15 @@ function SessionDetailBody({
             No suggested actions saved.
           </p>
         ) : (
-          <ul
-            className="space-y-2 mt-1"
-            data-testid="ai-doctor-session-detail-actions-list"
-          >
+          <ul className="mt-3 space-y-2" data-testid="ai-doctor-session-detail-actions-list">
             {actions.map((a, i) => (
               <li
                 key={i}
-                className="rounded-md border bg-card/40 p-2 text-xs"
+                className="rounded-lg border border-border/60 bg-card/65 p-3 text-xs"
                 data-testid="ai-doctor-session-detail-action"
               >
                 <div className="font-medium text-sm">{a.title}</div>
-                {a.detail ? (
-                  <p className="text-muted-foreground">{a.detail}</p>
-                ) : null}
+                {a.detail ? <p className="text-muted-foreground">{a.detail}</p> : null}
                 {a.reason ? (
                   <p className="text-muted-foreground italic">Reason: {a.reason}</p>
                 ) : null}
@@ -1408,7 +1380,7 @@ function SessionDetailBody({
             ))}
           </ul>
         )}
-      </div>
+      </section>
     </div>
   );
 }

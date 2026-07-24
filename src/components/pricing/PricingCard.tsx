@@ -37,10 +37,11 @@ export default function PricingCard({
     <div
       data-testid={testId}
       className={[
-        "relative rounded-2xl border p-6 flex flex-col bg-card/40 backdrop-blur",
-        highlighted
-          ? "border-primary/40 shadow-md"
-          : "border-border/60",
+        // min-w-0: as a grid item the card must be allowed to shrink below
+        // its content's min-content width, or a long CTA label props the
+        // whole track open and overflows narrow (≤390px) viewports.
+        "relative rounded-2xl border p-6 flex flex-col bg-card/40 backdrop-blur min-w-0",
+        highlighted ? "border-primary/40 shadow-md" : "border-border/60",
       ].join(" ")}
     >
       {badge && (
@@ -59,9 +60,7 @@ export default function PricingCard({
         </span>
       </div>
 
-      <p className="mt-2 text-sm text-muted-foreground min-h-[2.5rem]">
-        {description}
-      </p>
+      <p className="mt-2 text-sm text-muted-foreground min-h-[2.5rem]">{description}</p>
 
       <div className="mt-4 flex items-baseline gap-1" data-testid={`${testId}-price`}>
         <span className="text-3xl md:text-4xl font-display font-bold">{price}</span>
@@ -77,9 +76,7 @@ export default function PricingCard({
         ))}
       </ul>
 
-      {footnote && (
-        <p className="mt-4 text-xs text-muted-foreground">{footnote}</p>
-      )}
+      {footnote && <p className="mt-4 text-xs text-muted-foreground">{footnote}</p>}
 
       <div className="mt-6">{cta}</div>
     </div>

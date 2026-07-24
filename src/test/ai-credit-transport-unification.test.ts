@@ -19,13 +19,23 @@ describe("ai-coach edge — 200-envelope credit transport", () => {
   const src = read("supabase/functions/ai-coach/index.ts");
 
   it("ai_credit_spend denial returns 200 with { ok:false, reason:'credit_denied', credit }", () => {
-    // The denial branch must not return a non-200 status.
+    // Only an authoritative denied status reaches the paywall branch, and the
+    // denial branch must not return a non-200 status.
     expect(src).toMatch(
-      /spendObj\.ok\s*!==\s*true[\s\S]{0,300}return\s+json\(\s*\{\s*ok:\s*false,\s*reason:\s*"credit_denied",\s*credit:\s*spendObj\s*\}\s*,\s*200\s*\)/,
+      /spendObj\.ok\s*!==\s*true\s*&&\s*spendObj\.status\s*!==\s*"denied"[\s\S]{0,500}spendObj\.ok\s*!==\s*true[\s\S]{0,300}return\s+json\(\s*\{\s*ok:\s*false,\s*reason:\s*"credit_denied",\s*credit:\s*spendObj\s*\}\s*,\s*200\s*\)/,
     );
     // Legacy shapes removed.
     expect(src).not.toMatch(
       /return\s+json\(\s*\{\s*error:\s*"credit_denied"[\s\S]{0,80}\}\s*,\s*402/,
+    );
+  });
+
+  it("keeps refunded and context-conflicting replays out of the credit-denied paywall", () => {
+    expect(src).toMatch(
+      /spendObj\.ok\s*!==\s*true\s*&&\s*spendObj\.status\s*!==\s*"denied"[\s\S]{0,500}return\s+json\(\s*\{\s*ok:\s*false,\s*reason:\s*"invalid"\s*\}\s*,\s*200\s*\)/,
+    );
+    expect(src.indexOf('spendObj.status !== "denied"')).toBeLessThan(
+      src.indexOf('reason: "credit_denied"'),
     );
   });
 
@@ -39,18 +49,20 @@ describe("ai-coach edge — 200-envelope credit transport", () => {
 
   it("logs the new HTTP=200 business envelopes", () => {
     expect(src).toMatch(/ai-coach status=credit_denied http=200/);
+    expect(src).toMatch(/ai-coach status=credit_invalid http=200/);
     expect(src).toMatch(/ai-coach status=upstream_credit_exhausted http=200/);
   });
 
-  it("does not introduce new RPCs, action_queue writes, device control, or service_role", () => {
-    const rpcCalls = [
-      ...src.matchAll(/\.rpc\s*\(\s*["'`]([a-zA-Z0-9_]+)["'`]/g),
-    ].map((m) => m[1]);
+  it("keeps RPCs scoped and uses service role only for server-authoritative credit spending", () => {
+    const rpcCalls = [...src.matchAll(/\.rpc\s*\(\s*["'`]([a-zA-Z0-9_]+)["'`]/g)].map((m) => m[1]);
     for (const name of rpcCalls) {
       expect(["ai_credit_spend", "ai_credit_refund"]).toContain(name);
     }
     expect(src).not.toMatch(/\baction_queue\b/);
-    expect(src).not.toMatch(/\bservice_role\b/);
+    expect(src).toContain("resolveRequiredServerBillingEnvironment()");
+    expect(src).toMatch(/creditSupabase\.rpc\(\s*["']ai_credit_spend["']/);
+    expect(src).toMatch(/creditSupabase\.rpc\(\s*["']ai_credit_refund["']/);
+    expect(src).not.toMatch(/creditSupabase\s*\.from\(/);
     expect(src).not.toMatch(/\b(turn on|switch off|toggle the|power the)\b/i);
   });
 });
@@ -59,13 +71,18 @@ describe("ai-doctor-review edge — credit_denied envelope unchanged", () => {
   const src = read("supabase/functions/ai-doctor-review/index.ts");
 
   it("still returns HTTP 200 { ok:false, reason:'credit_denied', credit } via calmFailure", () => {
+    // A previously refunded replay is terminal and must be separated before
+    // the ordinary denied-spend path. Every remaining denial still preserves
+    // the established calm credit payload instead of becoming a generic error.
     expect(src).toMatch(
-      /spendObj\.ok\s*!==\s*true[\s\S]{0,300}return\s+calmFailure\(\s*"credit_denied"\s*,\s*\{\s*credit:\s*spendObj\s*\}\s*\)/,
+      /spendDecision\.kind\s*===\s*"refunded"[\s\S]{0,300}return\s+calmFailure\(\s*"result_recording_failed"\s*\)[\s\S]{0,300}spendDecision\.kind\s*===\s*"denied"[\s\S]{0,300}return\s+calmFailure\(\s*"credit_denied"\s*,\s*\{\s*credit:\s*spendObj\s*\}\s*\)/,
     );
     // calmFailure returns 200.
-    expect(src).toMatch(
-      /function\s+calmFailure[\s\S]{0,200}status:\s*200/,
-    );
+    expect(src).toMatch(/function\s+calmFailure[\s\S]{0,200}status:\s*200/);
+  });
+
+  it("returns the server-resolved plan identity with successful credit context", () => {
+    expect(src).toContain("plan_id: spendObj.plan_id");
   });
 });
 
@@ -88,6 +105,23 @@ describe("shared adapter — adaptCreditedAiResponse", () => {
     if (out.ok === false) {
       expect(out.reason).toBe("credit_denied");
       expect(out.credit).toEqual(credit);
+    }
+  });
+
+  it("downgrades a missing or unowned grow scope to generic recovery, never a false upsell", () => {
+    for (const reason of ["grow_id_required_for_plan", "grow_not_owned"]) {
+      const out = adaptCreditedAiResponse({
+        ok: false,
+        reason: "credit_denied",
+        credit: {
+          ok: false,
+          status: "invalid",
+          reason,
+          scope: "per_grow",
+          plan_id: "free",
+        },
+      });
+      expect(out).toEqual({ ok: false, reason: "invalid" });
     }
   });
 
@@ -119,6 +153,13 @@ describe("shared adapter — adaptCreditedAiResponse", () => {
     if (out.ok === false) expect(out.reason).toBe("invalid");
   });
 
+  it.each(["result_pending", "result_recording_failed"] as const)(
+    "passes the AI Doctor replay outcome %s through without credit/paywall coercion",
+    (reason) => {
+      expect(adaptCreditedAiResponse({ ok: false, reason })).toEqual({ ok: false, reason });
+    },
+  );
+
   it("preserves credit on upstream_credit_exhausted when server included one", () => {
     const credit = { ok: false, status: "denied", scope: "per_month" };
     const out = adaptCreditedAiResponse({
@@ -143,9 +184,11 @@ describe("shared adapter — adaptCreditedAiResponse", () => {
       "shape",
       "credit_denied",
       "upstream_credit_exhausted",
+      "result_pending",
+      "result_recording_failed",
     ];
     // Compile-time assertion; runtime sanity:
-    expect(accepted.length).toBe(9);
+    expect(accepted.length).toBe(11);
   });
 });
 
@@ -166,9 +209,7 @@ describe("Coach client — credit transport wiring", () => {
   });
 
   it("credit_denied path sets denial state and short-circuits", () => {
-    expect(src).toMatch(
-      /outcome\.reason\s*===\s*"credit_denied"[\s\S]{0,200}setCreditDenial\(/,
-    );
+    expect(src).toMatch(/outcome\.reason\s*===\s*"credit_denied"[\s\S]{0,200}setCreditDenial\(/);
   });
 
   it("upstream_credit_exhausted sets a degraded state (no paywall)", () => {
@@ -176,16 +217,13 @@ describe("Coach client — credit transport wiring", () => {
       /outcome\.reason\s*===\s*"upstream_credit_exhausted"[\s\S]{0,200}setUpstreamCreditExhausted\(\s*true\s*\)/,
     );
     // Render block exists and is not the paywall/credit-limit notice.
-    expect(src).toMatch(
-      /data-testid=["']coach-upstream-credit-exhausted-notice["']/,
-    );
+    expect(src).toMatch(/data-testid=["']coach-upstream-credit-exhausted-notice["']/);
   });
 
   it("upstream_credit_exhausted render does not mount AiCreditLimitNotice", () => {
     const block =
-      src
-        .split('data-testid="coach-upstream-credit-exhausted-notice"')[1]
-        ?.split("</div>")[0] ?? "";
+      src.split('data-testid="coach-upstream-credit-exhausted-notice"')[1]?.split("</div>")[0] ??
+      "";
     expect(block).not.toMatch(/AiCreditLimitNotice/);
     // No upsell/CTA language inside the degraded notice.
     expect(block).not.toMatch(/upgrade|add credits|buy|subscribe/i);

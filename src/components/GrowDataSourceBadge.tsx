@@ -23,6 +23,7 @@ const VARIANT_BY_LABEL: Record<
 > = {
   Live: "default",
   Manual: "secondary",
+  "CSV history": "outline",
   Simulated: "outline",
   Demo: "outline",
   Stale: "destructive",
@@ -36,8 +37,7 @@ export default function GrowDataSourceBadge({
   className,
   alwaysShow = true,
 }: Props) {
-  const c =
-    classification ?? classifyGrowDataSource(input ?? null, options ?? {});
+  const c = classification ?? classifyGrowDataSource(input ?? null, options ?? {});
   if (!alwaysShow && !c.shouldDisplayBadge) return null;
   return (
     <Badge

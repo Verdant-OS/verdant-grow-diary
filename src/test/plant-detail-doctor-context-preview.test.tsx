@@ -17,6 +17,21 @@ vi.mock("@/hooks/usePlantRecentActivity", () => ({
   usePlantRecentActivity: (id: string | null | undefined) => useRecentMock(id),
 }));
 
+// The launch dialog reads learning-loop timeline memory via TanStack Query;
+// mock the hook (same idiom as plant-detail-doctor-launch-dialog.test.tsx)
+// so these presentation tests need no QueryClientProvider.
+vi.mock("@/hooks/useTimelineMemory", () => ({
+  useTimelineMemory: () => ({ items: [] }),
+  TIMELINE_MEMORY_DEFAULT_LIMIT: 100,
+}));
+
+vi.mock("@/hooks/useLogAiDoctorReadinessToDiary", () => ({
+  useLogAiDoctorReadinessToDiary: () => ({
+    log: vi.fn().mockResolvedValue({ ok: true }),
+    logging: false,
+  }),
+}));
+
 import {
   buildPlantDetailDoctorContextPreview,
   DOCTOR_CONTEXT_HELPER_COPY,

@@ -3,7 +3,9 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const repoRoot = resolve(__dirname, "..", "..");
-const runbookRelativePath = "docs/integrations/ecowitt-pc-dry-run-runbook.md";
+const runbookRelativePath = "docs/ecowitt-live-soil-bridge.md";
+const canonicalDryRunCommand =
+  "bun run scripts/ecowitt-live-soil-bridge.ts --dry-run --once";
 const checklistRelativePath = "scripts/dev/print-ecowitt-pc-checklist.ts";
 const packageJsonPath = resolve(repoRoot, "package.json");
 const runbookPath = resolve(repoRoot, runbookRelativePath);
@@ -28,11 +30,11 @@ describe("Ecowitt PC checklist script", () => {
     );
   });
 
-  it("points operators to the canonical runbook without asserting old PR #48 content", () => {
+  it("points operators to the canonical live-bridge runbook", () => {
     expect(checklist).toContain(runbookRelativePath);
     expect(existsSync(runbookPath)).toBe(true);
-    expect(runbook).toMatch(/EcoWitt PC dry-run runbook/i);
-    expect(runbook).toMatch(/MQTT Explorer/i);
+    expect(runbook).toMatch(/EcoWitt Live Soil Bridge/i);
+    expect(runbook).toMatch(/Mosquitto/i);
     expect(runbook).toMatch(/dry-run/i);
   });
 
@@ -40,7 +42,10 @@ describe("Ecowitt PC checklist script", () => {
     expect(checklist).toMatch(/Ecowitt gateway[\s\S]*local PC bridge/i);
     expect(checklist).toMatch(/Mosquitto/i);
     expect(checklist).toMatch(/MQTT Explorer[\s\S]*payload/i);
-    expect(checklist).toMatch(/Verdant MQTT dry-run/i);
+    expect(checklist).toMatch(/VERDANT_TENT_ID[\s\S]*ECOWITT_SOIL_CHANNEL_MAP_JSON[\s\S]*same one tent/i);
+    expect(checklist).toContain(canonicalDryRunCommand);
+    expect(checklist).not.toMatch(/dev:ecowitt-mqtt:dry-run/);
+    expect(checklist).toMatch(/Verdant one-message dry-run/i);
     expect(checklist).toMatch(/Only consider live send after a clean dry-run/i);
     expect(checklist).toMatch(/source and freshness labels/i);
   });

@@ -16,10 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import ManualSnapshotTimelineCard from "@/components/ManualSnapshotTimelineCard";
 import TimelineFilterBar from "@/components/TimelineFilterBar";
-import {
-  useTimelineMemory,
-  type TimelineMemoryScope,
-} from "@/hooks/useTimelineMemory";
+import { useTimelineMemory, type TimelineMemoryScope } from "@/hooks/useTimelineMemory";
 import {
   filterTimelineMemoryItems,
   type TimelineFilterKey,
@@ -40,12 +37,18 @@ import {
 } from "@/lib/earlyStageTimelineViewModel";
 
 type Props =
-  | { scope: "plant"; plantId: string | null | undefined }
+  | {
+      scope: "plant";
+      plantId: string | null | undefined;
+      tentId?: string | null | undefined;
+    }
   | { scope: "tent"; tentId: string | null | undefined };
 
 function toScope(props: Props): TimelineMemoryScope | null {
   if (props.scope === "plant") {
-    return props.plantId ? { kind: "plant", plantId: props.plantId } : null;
+    return props.plantId
+      ? { kind: "plant", plantId: props.plantId, tentId: props.tentId ?? null }
+      : null;
   }
   return props.tentId ? { kind: "tent", tentId: props.tentId } : null;
 }
@@ -100,9 +103,7 @@ function DiaryItemRow({ item }: { item: Extract<TimelineMemoryItem, { kind: "dia
           {formatSnapshotTimestamp(item.occurredAt)}
         </time>
       </div>
-      {item.note && (
-        <p className="mt-1.5 text-sm text-foreground/90 break-words">{item.note}</p>
-      )}
+      {item.note && <p className="mt-1.5 text-sm text-foreground/90 break-words">{item.note}</p>}
 
       {item.earlyStage && (
         <div
@@ -124,8 +125,7 @@ function DiaryItemRow({ item }: { item: Extract<TimelineMemoryItem, { kind: "dia
               className="text-[10px]"
               data-testid="timeline-diary-early-stage-milestone"
             >
-              Milestone:{" "}
-              {item.earlyStage.milestoneLabel ?? EARLY_STAGE_MILESTONE_UNKNOWN_LABEL}
+              Milestone: {item.earlyStage.milestoneLabel ?? EARLY_STAGE_MILESTONE_UNKNOWN_LABEL}
             </Badge>
           )}
           {(item.earlyStage.vigorLabel || item.earlyStage.vigorUnknown) && (
@@ -204,10 +204,7 @@ function DiaryItemRow({ item }: { item: Extract<TimelineMemoryItem, { kind: "dia
             />
           ))}
           {photoVm.moreCount > 0 && (
-            <span
-              data-testid="timeline-diary-photo-more"
-              className="text-xs text-muted-foreground"
-            >
+            <span data-testid="timeline-diary-photo-more" className="text-xs text-muted-foreground">
               +{photoVm.moreCount} more
             </span>
           )}
@@ -219,9 +216,7 @@ function DiaryItemRow({ item }: { item: Extract<TimelineMemoryItem, { kind: "dia
   );
 }
 
-
-export const AI_DOCTOR_EVIDENCE_AUDIT_TITLE =
-  "AI Doctor evaluated sensor evidence";
+export const AI_DOCTOR_EVIDENCE_AUDIT_TITLE = "AI Doctor evaluated sensor evidence";
 
 export const AI_DOCTOR_EVIDENCE_AUDIT_COPY: Record<
   Extract<TimelineMemoryItem, { kind: "ai_doctor_sensor_evidence_audit" }>["status"],
@@ -266,8 +261,8 @@ function AiDoctorEvidenceAuditRow({
       </p>
       <p className="mt-1 text-xs text-muted-foreground">
         Status: {item.status}
-        {item.reasonCode ? ` · Reason: ${item.reasonCode}` : ""} · Healthy
-        evidence: {item.countsAsHealthyEvidence ? "yes" : "no"}
+        {item.reasonCode ? ` · Reason: ${item.reasonCode}` : ""} · Healthy evidence:{" "}
+        {item.countsAsHealthyEvidence ? "yes" : "no"}
       </p>
       <p className="mt-1 text-xs text-foreground/80">
         {AI_DOCTOR_EVIDENCE_AUDIT_COPY[item.status]}
@@ -276,13 +271,47 @@ function AiDoctorEvidenceAuditRow({
   );
 }
 
+function LinkedEvidenceUnavailableNotice({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div
+      role="status"
+      data-testid="timeline-memory-linked-evidence-unavailable"
+      className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm space-y-2"
+    >
+      <p className="text-foreground">Linked Quick Log sensor evidence could not be verified.</p>
+      <p className="text-muted-foreground">
+        Your saved history is unchanged. Retry the check; the linked event may no longer be
+        accessible if this remains unavailable.
+      </p>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="text-xs px-3 min-h-11 inline-flex items-center rounded-md border border-border/60 hover:bg-secondary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring touch-manipulation"
+      >
+        Retry
+      </button>
+    </div>
+  );
+}
+
 export default function TimelineMemorySection(props: Props) {
   const scope = toScope(props);
-  const { items, isLoading, isError, refetch } = useTimelineMemory(scope);
+  const { items, displayItems, companionEvidenceUnavailable, isLoading, isError, refetch } =
+    useTimelineMemory(scope);
+  // `items` is the complete AI/readiness evidence feed. The visible timeline
+  // uses its explicit deduped projection so an exact-linked Quick Log
+  // companion is rendered once, by QuickLogGroupedTimelineSection.
+  const timelineDisplayItems = displayItems ?? items;
   const [filter, setFilter] = useState<TimelineFilterKey>(TIMELINE_FILTER_RESET_KEY);
 
-  const chips = useMemo(() => buildTimelineFilterChips(items, filter), [items, filter]);
-  const visible = useMemo(() => filterTimelineMemoryItems(items, filter), [items, filter]);
+  const chips = useMemo(
+    () => buildTimelineFilterChips(timelineDisplayItems, filter),
+    [timelineDisplayItems, filter],
+  );
+  const visible = useMemo(
+    () => filterTimelineMemoryItems(timelineDisplayItems, filter),
+    [timelineDisplayItems, filter],
+  );
   const dayGroups = useMemo(() => buildTimelineDayGroups(visible), [visible]);
 
   return (
@@ -297,10 +326,7 @@ export default function TimelineMemorySection(props: Props) {
       </CardHeader>
       <CardContent className="space-y-3">
         {scope === null ? (
-          <p
-            className="text-sm text-muted-foreground"
-            data-testid="timeline-memory-no-scope"
-          >
+          <p className="text-sm text-muted-foreground" data-testid="timeline-memory-no-scope">
             Open a {props.scope} to see its timeline.
           </p>
         ) : isLoading ? (
@@ -326,6 +352,8 @@ export default function TimelineMemorySection(props: Props) {
               Retry
             </button>
           </div>
+        ) : items.length === 0 && companionEvidenceUnavailable ? (
+          <LinkedEvidenceUnavailableNotice onRetry={refetch} />
         ) : items.length === 0 ? (
           <div
             data-testid="timeline-memory-empty"
@@ -333,12 +361,23 @@ export default function TimelineMemorySection(props: Props) {
           >
             <p className="text-foreground">No plant history yet.</p>
             <p className="text-muted-foreground">
-              Use Quick Log to record an observation, watering,
-              feeding, photo, or environment check.
+              Use Quick Log to record an observation, watering, feeding, photo, or environment
+              check.
+            </p>
+          </div>
+        ) : timelineDisplayItems.length === 0 ? (
+          <div
+            data-testid="timeline-memory-linked-evidence-only"
+            className="rounded-md border border-border/40 bg-muted/30 p-3 text-sm space-y-1"
+          >
+            <p className="text-foreground">No additional Timeline Memory entries.</p>
+            <p className="text-muted-foreground">
+              Linked Quick Log sensor evidence stays with its Quick Log event.
             </p>
           </div>
         ) : (
           <>
+            {companionEvidenceUnavailable && <LinkedEvidenceUnavailableNotice onRetry={refetch} />}
             <TimelineFilterBar
               chips={chips}
               selected={filter}

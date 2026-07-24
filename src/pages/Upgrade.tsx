@@ -62,6 +62,8 @@ import PhenoTrackerPreviewCard from "@/components/PhenoTrackerPreviewCard";
 import { logsPath } from "@/lib/routes";
 import { resolvePaddleConfig, unavailableMessage, type PaddleConfig } from "@/lib/paddleConfig";
 import { sanitizeCheckoutReturnTo } from "@/lib/checkoutReturnTo";
+import { usePaddleCheckout } from "@/hooks/usePaddleCheckout";
+import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 
 // --- Paddle overlay typing (loose — we only call a couple of methods). -------
 interface PaddleCheckoutOpenPayload {
@@ -270,6 +272,7 @@ interface TierCardProps {
   tier: PricingTier;
   currentPlanId: string | null;
   currentPlanKnown: boolean;
+  planVerificationFailed: boolean;
   paddleReady: boolean;
   paddleUnavailableReason: string | null;
   onCheckout: (tier: PricingTier) => void;
@@ -280,6 +283,7 @@ function TierCard({
   tier,
   currentPlanId,
   currentPlanKnown,
+  planVerificationFailed,
   paddleReady,
   paddleUnavailableReason,
   onCheckout,
@@ -294,7 +298,11 @@ function TierCard({
   let ctaHint: string | null = null;
   let onClick: () => void = () => onFreeStart();
 
-  if (tier.billingPeriod === "free") {
+  if (planVerificationFailed) {
+    ctaLabel = "Plan check unavailable";
+    ctaDisabled = true;
+    ctaHint = "Retry your plan check before choosing a tier.";
+  } else if (tier.billingPeriod === "free") {
     ctaLabel = isCurrent ? "Current plan" : "Get started";
     ctaDisabled = isCurrent;
   } else if (isCurrent) {
@@ -614,6 +622,10 @@ export default function Upgrade() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
+  useEffect(() => {
+    trackFunnelEvent("paywall_viewed", { surface: "upgrade" });
+  }, []);
+
   const paddleUnavailableReason = paddleConfig.available
     ? null
     : unavailableMessage(paddleConfig.reason ?? "missing_environment");
@@ -625,9 +637,14 @@ export default function Upgrade() {
     paddle,
     retry: retryPaddle,
   } = usePaddle(paddleConfig);
-  const { loading: entLoading, entitlement } = useMyEntitlements();
+  const {
+    loading: entLoading,
+    lookupFailed: entitlementLookupFailed,
+    entitlement,
+    refetch: refetchEntitlement,
+  } = useMyEntitlements();
 
-  const currentPlanKnown = !entLoading && !!entitlement?.displayPlanId;
+  const currentPlanKnown = !entLoading && !entitlementLookupFailed && !!entitlement?.displayPlanId;
   const currentPlanId = currentPlanKnown ? (entitlement.displayPlanId as string) : null;
 
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
@@ -639,6 +656,8 @@ export default function Upgrade() {
     setConfirmState({ tier });
   };
 
+  const { openCheckout: canonicalOpenCheckout } = usePaddleCheckout();
+
   const handleConfirm = () => {
     const tier = confirmState?.tier;
     setConfirmState(null);
@@ -648,32 +667,25 @@ export default function Upgrade() {
       toast.error("Checkout is not available for this plan yet.");
       return;
     }
-    if (!paddleConfig.available || !paddle?.Checkout) {
+    if (!paddleConfig.available) {
       toast.error("Checkout is not ready yet.");
       return;
     }
-    try {
-      // Forward a same-origin returnTo (e.g. /upgrade?returnTo=/pheno-hunts/new)
-      // into Paddle's successUrl so CheckoutSuccess can round-trip the buyer
-      // back to the gated surface once entitlement is confirmed. Raw query
-      // value is sanitized first — unsafe values are dropped, never forwarded,
-      // and no customer/subscription IDs are ever placed in the URL.
-      const safeReturnTo = sanitizeCheckoutReturnTo(searchParams.get("returnTo"));
-      const successBase = `${window.location.origin}/checkout/success`;
-      const successUrl = safeReturnTo
-        ? `${successBase}?returnTo=${encodeURIComponent(safeReturnTo)}`
-        : successBase;
-      paddle.Checkout.open({
-        items: [{ priceId: tier.paddlePriceId, quantity: 1 }],
-        settings: { successUrl },
-        successCallback: () => {
-          toast.success("Checkout complete. Your plan will update once confirmed.");
-        },
-        closeCallback: () => {},
-      });
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Checkout failed to open.");
-    }
+    // M1 (audit fix): route through the canonical usePaddleCheckout so
+    // cancel events go through the shared `checkoutOverlaySession` router
+    // (which navigates to /checkout/cancel) and the returnTo is persisted
+    // by `saveCheckoutReturnTo` for L5. The previous local `paddle.Checkout.open`
+    // path forgot to register the overlay session, so a dismissed overlay
+    // silently left the buyer on /upgrade with no signal.
+    const safeReturnTo = sanitizeCheckoutReturnTo(searchParams.get("returnTo"));
+    const successBase = `${window.location.origin}/checkout/success`;
+    const successUrl = safeReturnTo
+      ? `${successBase}?returnTo=${encodeURIComponent(safeReturnTo)}`
+      : successBase;
+    void canonicalOpenCheckout({
+      priceId: tier.paddlePriceId,
+      successUrl,
+    });
   };
 
   return (
@@ -692,6 +704,25 @@ export default function Upgrade() {
           >
             <Loader2 className="h-3 w-3 animate-spin" /> Loading your current plan…
           </p>
+        )}
+        {!entLoading && entitlementLookupFailed && (
+          <div
+            className="mt-3 text-sm text-muted-foreground"
+            data-testid="upgrade-plan-verification-failed"
+            role="status"
+          >
+            <p>We couldn&apos;t verify your current plan. No tier is marked as current.</p>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="mt-1"
+              data-testid="upgrade-plan-verification-retry"
+              onClick={() => void refetchEntitlement()}
+            >
+              Retry plan check
+            </Button>
+          </div>
         )}
       </header>
 
@@ -715,7 +746,7 @@ export default function Upgrade() {
 
       <section
         aria-label="Pricing tiers"
-        className="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-4"
+        className="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-3"
       >
         {PRICING_TIERS.map((tier) => (
           <TierCard
@@ -723,6 +754,7 @@ export default function Upgrade() {
             tier={tier}
             currentPlanId={currentPlanId}
             currentPlanKnown={currentPlanKnown}
+            planVerificationFailed={entitlementLookupFailed}
             paddleReady={paddleReady}
             paddleUnavailableReason={paddleUnavailableReason}
             onCheckout={openConfirm}
@@ -738,7 +770,6 @@ export default function Upgrade() {
       </section>
 
       <UpgradeFaq />
-
 
       <p className="mt-12 text-center text-xs text-muted-foreground">
         New to Verdant?{" "}

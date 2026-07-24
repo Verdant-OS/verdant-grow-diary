@@ -29,6 +29,8 @@ export interface TimelineSensorSourceBadge {
   label: string;
   /** Short explainer used as `title=` on the chip. */
   description: string;
+  /** Whether this provenance can support stage/health interpretation. */
+  canAssessStage: boolean;
 }
 
 export interface ClassifyTimelineSensorSourceInput {
@@ -42,11 +44,14 @@ export interface ClassifyTimelineSensorSourceInput {
    * Must be one of the allowed kinds. Defaults to "invalid".
    */
   fallback?: TimelineSensorSourceKind;
+  /**
+   * Persisted diary snapshots cannot carry the raw row evidence needed to
+   * corroborate a historical `live` claim. They therefore fail closed.
+   */
+  context?: "direct" | "persisted_snapshot";
 }
 
-const ALLOWED: ReadonlySet<TimelineSensorSourceKind> = new Set(
-  CANONICAL_SENSOR_SOURCES,
-);
+const ALLOWED: ReadonlySet<TimelineSensorSourceKind> = new Set(CANONICAL_SENSOR_SOURCES);
 
 const LABELS: Record<TimelineSensorSourceKind, string> = {
   live: "Source: live",
@@ -73,7 +78,8 @@ function normalize(raw: string | null | undefined): TimelineSensorSourceKind | n
   if (v === "live" || v === "sensor" || v === "supabase") return "live";
   if (v === "manual" || v === "user" || v === "entry" || v === "log") return "manual";
   if (v === "csv") return "csv";
-  if (v === "demo" || v === "mock" || v === "fake" || v === "sample" || v === "fixture") return "demo";
+  if (v === "demo" || v === "mock" || v === "fake" || v === "sample" || v === "fixture")
+    return "demo";
   if (v === "stale") return "stale";
   if (v === "invalid") return "invalid";
   return null;
@@ -97,7 +103,12 @@ export function classifyTimelineSensorSource(
     return now - ts > staleMs;
   })();
 
-  let kind: TimelineSensorSourceKind = rawNormalized ?? fallback;
+  const hasRawSource = typeof input.rawSource === "string" && input.rawSource.trim().length > 0;
+  let kind: TimelineSensorSourceKind = rawNormalized ?? (hasRawSource ? "invalid" : fallback);
+
+  if (input.context === "persisted_snapshot" && kind === "live") {
+    kind = "invalid";
+  }
 
   // Stale freshness rule only downgrades live readings — manual / csv / demo
   // remain explicitly labeled.
@@ -109,6 +120,7 @@ export function classifyTimelineSensorSource(
     kind,
     label: LABELS[kind],
     description: DESCRIPTIONS[kind],
+    canAssessStage: kind === "live" || kind === "manual" || kind === "csv",
   };
 }
 

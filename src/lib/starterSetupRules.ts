@@ -21,12 +21,11 @@ export const STARTER_TENT_NAME = "Starter Tent";
 export const STARTER_PLANT_NAME = "Sample Plant";
 
 /** Copy shown next to the button in Onboarding. Kept here so tests can pin it. */
-export const STARTER_SETUP_BUTTON_LABEL =
-  "Skip setup — try Quick Log on a sample plant";
+export const STARTER_SETUP_BUTTON_LABEL = "Skip setup — try Quick Log on a sample plant";
 export const STARTER_SETUP_HELPER_COPY =
   "Verdant will create an editable starter Grow, Tent, and Plant so you can make your first real Quick Log now. No fake logs or sensor readings are added.";
 export const STARTER_SETUP_ERROR_COPY =
-  "We couldn't finish creating your starter setup. Nothing was partially applied — please try again.";
+  "We couldn't finish the starter setup. Some starter rows may already exist; retry safely to reuse them and continue.";
 
 /** A subset of grow/tent/plant shape the service needs. Owner-scoped by RLS. */
 export interface StarterOwnedRow {
@@ -66,9 +65,7 @@ export function findStarterRowByName<T extends StarterOwnedRow>(
  * Mirrors the shape AppShell's `verdant:open-quicklog` listener already
  * consumes, so no new event contract is introduced.
  */
-export function buildStarterQuickLogPrefill(
-  result: StarterSetupResult,
-): PlantQuickLogPrefill {
+export function buildStarterQuickLogPrefill(result: StarterSetupResult): PlantQuickLogPrefill {
   return {
     plantId: result.plantId,
     plantName: STARTER_PLANT_NAME,

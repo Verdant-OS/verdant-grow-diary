@@ -1,8 +1,9 @@
 /**
  * diaryCalendarViewModel — pure helpers for the read-only diary calendar view.
  *
- * Groups watering, feeding, and diagnosis (AI Doctor review) entries by
- * calendar date for a compact mobile-first month/week list.
+ * Groups watering, feeding, training, diagnosis (AI Doctor review), and
+ * environment-check entries by calendar date for a compact mobile-first
+ * month/week list.
  *
  * Safety:
  *  - Pure: no I/O, no network, no model calls, no Action Queue writes.
@@ -21,16 +22,19 @@ import {
   ENVIRONMENT_CHECK_TIMELINE_SOURCE_LABEL,
   type EnvironmentCheckTimelineRawEntry,
 } from "@/lib/environmentCheckTimelineViewModel";
+import { TRAINING_INTENSITIES, TRAINING_TECHNIQUES } from "@/lib/quickLogTypedEventPayloadRules";
 
 export type DiaryCalendarEventKind =
   | "watering"
   | "feeding"
+  | "training"
   | "diagnosis"
   | "environment";
 
 const ALLOWED_KINDS: ReadonlySet<string> = new Set([
   "watering",
   "feeding",
+  "training",
   "diagnosis",
   "ai_doctor_review",
   "environment",
@@ -49,14 +53,14 @@ function normalizeKind(raw: unknown): DiaryCalendarEventKind | null {
 export const DIARY_CALENDAR_KIND_LABEL: Record<DiaryCalendarEventKind, string> = {
   watering: "Watering",
   feeding: "Feeding",
+  training: "Training",
   diagnosis: "Diagnosis",
   environment: "Environment Check",
 };
 
 export const DIARY_CALENDAR_EMPTY_TITLE =
-  "No watering, feeding, or diagnosis events logged for this period.";
-export const DIARY_CALENDAR_EMPTY_HINT =
-  "Use Quick Log to add your next plant event.";
+  "No watering, feeding, training, diagnosis, or environment check events logged for this period.";
+export const DIARY_CALENDAR_EMPTY_HINT = "Use Quick Log to add your next plant event.";
 
 export type DiaryCalendarFilter = "all" | DiaryCalendarEventKind;
 
@@ -73,10 +77,10 @@ export const DIARY_CALENDAR_FILTERS: ReadonlyArray<{
   { value: "all", label: "All" },
   { value: "watering", label: "Watering" },
   { value: "feeding", label: "Feeding" },
+  { value: "training", label: "Training" },
   { value: "diagnosis", label: "Diagnosis" },
   { value: "environment", label: "Environment Check" },
 ];
-
 
 /**
  * Compute per-filter event counts from the full unfiltered dataset.
@@ -90,25 +94,26 @@ export function computeDiaryCalendarFilterCounts(
   const counts: Record<DiaryCalendarEventKind, number> = {
     watering: 0,
     feeding: 0,
+    training: 0,
     diagnosis: 0,
     environment: 0,
   };
   for (const g of groups) {
     counts.watering += g.counts.watering;
     counts.feeding += g.counts.feeding;
+    counts.training += g.counts.training;
     counts.diagnosis += g.counts.diagnosis;
     counts.environment += g.counts.environment;
   }
   return {
-    all: counts.watering + counts.feeding + counts.diagnosis + counts.environment,
+    all: counts.watering + counts.feeding + counts.training + counts.diagnosis + counts.environment,
     watering: counts.watering,
     feeding: counts.feeding,
+    training: counts.training,
     diagnosis: counts.diagnosis,
     environment: counts.environment,
   };
 }
-
-
 
 /**
  * Filter pre-built calendar day groups by event kind. Returns a new array
@@ -127,6 +132,7 @@ export function filterDiaryCalendarGroups(
     const counts: Record<DiaryCalendarEventKind, number> = {
       watering: 0,
       feeding: 0,
+      training: 0,
       diagnosis: 0,
       environment: 0,
     };
@@ -141,10 +147,10 @@ export function filterDiaryCalendarGroups(
 const FILTER_EMPTY_COPY: Record<DiaryCalendarEventKind, string> = {
   watering: "No watering events logged for this period.",
   feeding: "No feeding events logged for this period.",
+  training: "No training events logged for this period.",
   diagnosis: "No diagnosis events logged for this period.",
   environment: "No environment checks logged for this period.",
 };
-
 
 /** Filter-aware empty title. "all" preserves the original copy. */
 export function diaryCalendarEmptyTitleFor(filter: DiaryCalendarFilter): string {
@@ -156,6 +162,12 @@ export interface DiaryCalendarRawEntry {
   id: string;
   entry_at?: string | null;
   occurred_at?: string | null;
+  /**
+   * Optional manual grow stage recorded with the entry. Only the calendar's
+   * four explicit color stages are carried into the display model; unfamiliar
+   * values deliberately remain neutral rather than being assigned a color.
+   */
+  stage?: string | null;
   /** Optional explicit kind; otherwise read from details.event_type. */
   event_type?: string | null;
   note?: string | null;
@@ -172,6 +184,11 @@ export interface DiaryCalendarEvent {
   dateKey: string;
   /** Optional safe plant name pulled from a vetted field. */
   plantName: string | null;
+  /**
+   * Manual stage used only for an optional calendar color treatment. This is
+   * not a sensor signal, recommendation, or automated state transition.
+   */
+  stage: "seedling" | "veg" | "flower" | "drying" | null;
   /** Trimmed, length-capped note snippet — never raw details. */
   noteSnippet: string | null;
   /** Pre-computed, allowlisted detail lines for the expanded view. */
@@ -195,7 +212,6 @@ export interface DiaryCalendarEventDetails {
   /** Calm fallback when there are no fields, no preview, and no note. */
   fallback: string | null;
 }
-
 
 export interface DiaryCalendarDayGroup {
   /** YYYY-MM-DD */
@@ -223,6 +239,13 @@ function safePlantName(details: unknown): string | null {
   return trimmed;
 }
 
+function safeCalendarStage(value: unknown): "seedling" | "veg" | "flower" | "drying" | null {
+  if (value === "seedling" || value === "veg" || value === "flower" || value === "drying") {
+    return value;
+  }
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // Expanded-detail helpers (allowlisted, presenter-safe).
 // ---------------------------------------------------------------------------
@@ -234,10 +257,7 @@ function pickRecord(details: unknown): Record<string, unknown> | null {
   return details as Record<string, unknown>;
 }
 
-function pickFirstString(
-  d: Record<string, unknown>,
-  keys: readonly string[],
-): string | null {
+function pickFirstString(d: Record<string, unknown>, keys: readonly string[]): string | null {
   for (const k of keys) {
     const v = d[k];
     if (typeof v === "string") {
@@ -248,10 +268,7 @@ function pickFirstString(
   return null;
 }
 
-function pickFirstFiniteNumber(
-  d: Record<string, unknown>,
-  keys: readonly string[],
-): number | null {
+function pickFirstFiniteNumber(d: Record<string, unknown>, keys: readonly string[]): number | null {
   for (const k of keys) {
     const v = d[k];
     if (typeof v === "number" && Number.isFinite(v)) return v;
@@ -316,6 +333,47 @@ function buildFeedingFields(d: Record<string, unknown>): DiaryCalendarEventDispl
   return fields;
 }
 
+const TRAINING_TECHNIQUE_LABELS: Readonly<Record<string, string>> = {
+  lst: "Low-stress training",
+  topping: "Topping",
+  fim: "FIM",
+  defoliation: "Defoliation",
+  supercropping: "Supercropping",
+  scrog: "SCROG",
+  manifold: "Manifold",
+  other: "Other",
+};
+
+const TRAINING_INTENSITY_LABELS: Readonly<Record<string, string>> = {
+  light: "Light",
+  medium: "Medium",
+  heavy: "Heavy",
+};
+
+function buildTrainingFields(d: Record<string, unknown>): DiaryCalendarEventDisplayField[] {
+  const fields: DiaryCalendarEventDisplayField[] = [];
+  const declaredTechnique = pickFirstString(d, ["technique"]);
+  const subtype = pickFirstString(d, ["subtype"]);
+  const technique = declaredTechnique ?? (subtype === "defoliation" ? "defoliation" : null);
+  if (technique && TRAINING_TECHNIQUES.has(technique)) {
+    const label = TRAINING_TECHNIQUE_LABELS[technique] ?? null;
+    if (label) fields.push({ label: "Technique", value: label });
+  }
+
+  const intensity = pickFirstString(d, ["intensity"]);
+  if (intensity && TRAINING_INTENSITIES.has(intensity)) {
+    const label = TRAINING_INTENSITY_LABELS[intensity] ?? null;
+    if (label) fields.push({ label: "Intensity", value: label });
+  }
+
+  const affectedNodes = pickFirstFiniteNumber(d, ["affected_nodes", "affectedNodes"]);
+  if (affectedNodes != null && Number.isInteger(affectedNodes) && affectedNodes >= 0) {
+    fields.push({ label: "Affected nodes", value: String(affectedNodes) });
+  }
+
+  return fields;
+}
+
 const DIAGNOSIS_SEVERITY_LABELS: Record<string, string> = {
   low: "Low",
   medium: "Medium",
@@ -354,6 +412,7 @@ function buildDiagnosisFields(d: Record<string, unknown>): DiaryCalendarEventDis
 const DETAIL_SECTION_LABEL: Record<DiaryCalendarEventKind, string> = {
   watering: "Watering details",
   feeding: "Feeding details",
+  training: "Training details",
   diagnosis: "Diagnosis details",
   environment: "Environment Check details",
 };
@@ -361,17 +420,13 @@ const DETAIL_SECTION_LABEL: Record<DiaryCalendarEventKind, string> = {
 const ENVIRONMENT_CHECK_NOT_LIVE_SUBTITLE =
   "Quick Log environment check — not live sensor telemetry.";
 
-export const ENVIRONMENT_CHECK_NO_VALUES_COPY =
-  "No environment values captured.";
+export const ENVIRONMENT_CHECK_NO_VALUES_COPY = "No environment values captured.";
 
-const DIARY_CALENDAR_EMPTY_DETAILS_FALLBACK =
-  "No extra details saved for this entry.";
+const DIARY_CALENDAR_EMPTY_DETAILS_FALLBACK = "No extra details saved for this entry.";
 
 export const DIARY_CALENDAR_DETAILS_EMPTY = DIARY_CALENDAR_EMPTY_DETAILS_FALLBACK;
 
-function buildEnvironmentFields(
-  rawEntry: DiaryCalendarRawEntry,
-): DiaryCalendarEventDisplayField[] {
+function buildEnvironmentFields(rawEntry: DiaryCalendarRawEntry): DiaryCalendarEventDisplayField[] {
   // Delegate parsing to the existing environment-check timeline VM so we
   // never duplicate envelope parsing logic inside the calendar layer.
   const envEntry: EnvironmentCheckTimelineRawEntry = {
@@ -418,7 +473,8 @@ function buildEventDetails(
         });
         if (preview.visible) ecPreview = preview;
       }
-    } else if (kind === "diagnosis") fields = buildDiagnosisFields(d);
+    } else if (kind === "training") fields = buildTrainingFields(d);
+    else if (kind === "diagnosis") fields = buildDiagnosisFields(d);
   }
 
   if (kind !== "environment") {
@@ -434,10 +490,6 @@ function buildEventDetails(
     fallback,
   };
 }
-
-
-
-
 
 function extractKind(entry: DiaryCalendarRawEntry): DiaryCalendarEventKind | null {
   const direct = normalizeKind(entry.event_type);
@@ -463,7 +515,7 @@ function dateKeyUtc(iso: string): string {
 /**
  * Build the read-only calendar view-model. Pure & deterministic.
  *
- * - Filters to watering / feeding / diagnosis only.
+ * - Filters to watering / feeding / training / diagnosis / environment only.
  * - Groups by UTC calendar date (YYYY-MM-DD).
  * - Sorts groups newest-first, events within a day newest-first,
  *   stable-tiebreaks by id.
@@ -489,6 +541,7 @@ export function buildDiaryCalendarViewModel(
       occurredAt: iso,
       dateKey: dateKeyUtc(iso),
       plantName: safePlantName(raw.details),
+      stage: safeCalendarStage(raw.stage),
       noteSnippet,
       details: buildEventDetails(kind, raw, noteSnippet),
     });
@@ -511,6 +564,7 @@ export function buildDiaryCalendarViewModel(
     const counts: Record<DiaryCalendarEventKind, number> = {
       watering: 0,
       feeding: 0,
+      training: 0,
       diagnosis: 0,
       environment: 0,
     };
@@ -537,6 +591,7 @@ export function summarizeDiaryCalendar(
   const counts: Record<DiaryCalendarEventKind, number> = {
     watering: 0,
     feeding: 0,
+    training: 0,
     diagnosis: 0,
     environment: 0,
   };
@@ -545,12 +600,12 @@ export function summarizeDiaryCalendar(
     total += g.events.length;
     counts.watering += g.counts.watering;
     counts.feeding += g.counts.feeding;
+    counts.training += g.counts.training;
     counts.diagnosis += g.counts.diagnosis;
     counts.environment += g.counts.environment;
   }
   return { totalEvents: total, totalDays: groups.length, counts };
 }
-
 
 // ---------------------------------------------------------------------------
 // Month navigation helpers (pure & deterministic).
@@ -562,13 +617,10 @@ export function monthKeyFromDateKey(dateKey: string): string {
 }
 
 /** Unique month keys present in groups, sorted newest-first. */
-export function listDiaryCalendarMonthKeys(
-  groups: readonly DiaryCalendarDayGroup[],
-): string[] {
+export function listDiaryCalendarMonthKeys(groups: readonly DiaryCalendarDayGroup[]): string[] {
   const set = new Set<string>();
   for (const g of groups) set.add(monthKeyFromDateKey(g.dateKey));
   return [...set].sort((a, b) => (a > b ? -1 : a < b ? 1 : 0));
-
 }
 
 /**
@@ -626,7 +678,7 @@ export function diaryCalendarMonthEmptyTitle(
   if (!monthKey) return diaryCalendarEmptyTitleFor(filter);
   const label = formatDiaryCalendarMonthLabel(monthKey);
   if (filter === "all") {
-    return `No watering, feeding, or diagnosis events logged for ${label}.`;
+    return `No watering, feeding, training, diagnosis, or environment check events logged for ${label}.`;
   }
   return `No ${filter} events logged for ${label}.`;
 }
@@ -652,5 +704,3 @@ export function newestMatchingDateKeyInMonth(
   const filtered = filterDiaryCalendarGroups(scoped, filter);
   return filtered[0]?.dateKey ?? null;
 }
-
-

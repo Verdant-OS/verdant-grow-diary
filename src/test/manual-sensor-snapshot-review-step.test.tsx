@@ -197,7 +197,7 @@ describe("Daily Check sensor route — static safety guarantees", () => {
 
   it("preserves plant/tent context: sensor focus gated on tent assignment", () => {
     expect(page).toMatch(/methodHint === "sensor"/);
-    expect(page).toMatch(/plantResolution\.plant\.tent_id/);
+    expect(page).toMatch(/methodHint === "sensor" && routePlant && routeTentId/);
   });
 
   it("no auto-submit on the sensor route", () => {

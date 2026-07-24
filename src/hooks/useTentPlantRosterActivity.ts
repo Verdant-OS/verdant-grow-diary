@@ -21,6 +21,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 import { buildPlantRecentActivity } from "@/lib/plantRecentActivityRules";
 import { buildPlantDetailHarvestWatchCardViewModel } from "@/lib/plantDetailHarvestWatchCardViewModel";
+import { isHarvestWatchEligible } from "@/lib/harvestWatchEligibilityRules";
 
 export const TENT_PLANT_ROSTER_ACTIVITY_LIMIT = 10;
 
@@ -31,6 +32,9 @@ export interface TentPlantRosterActivityPlant {
   stage?: string | null;
   startedAt?: string | null;
   photo?: string | null;
+  isArchived?: boolean | null;
+  archivedAt?: string | null;
+  mergedIntoPlantId?: string | null;
 }
 
 export interface TentPlantRosterActivityEntry {
@@ -64,14 +68,21 @@ export function useTentPlantRosterActivity(
   plants: ReadonlyArray<TentPlantRosterActivityPlant> | null | undefined,
 ): UseTentPlantRosterActivityResult {
   // Stable, de-duplicated id list so the hook count stays stable per render.
-  const safePlants = Array.isArray(plants) ? plants : [];
-  const ids = Array.from(
-    new Set(
-      safePlants
-        .map((p) => (typeof p?.id === "string" ? p.id : null))
-        .filter((v): v is string => !!v),
-    ),
-  ).sort();
+  const safePlants = useMemo(
+    () => (Array.isArray(plants) ? plants : []),
+    [plants],
+  );
+  const ids = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          safePlants
+            .map((p) => (typeof p?.id === "string" ? p.id : null))
+            .filter((v): v is string => !!v),
+        ),
+      ).sort(),
+    [safePlants],
+  );
 
   const results = useQueries({
     queries: ids.map((plantId) => ({
@@ -92,7 +103,6 @@ export function useTentPlantRosterActivity(
       },
     })),
   });
-
   const byPlantId = useMemo<Record<string, TentPlantRosterActivityEntry>>(() => {
     const out: Record<string, TentPlantRosterActivityEntry> = {};
     for (const plant of safePlants) {
@@ -129,22 +139,31 @@ export function useTentPlantRosterActivity(
           : null) ?? null;
 
       let harvestWatchPublicState: string | null = null;
-      try {
-        const card = buildPlantDetailHarvestWatchCardViewModel({
-          plant: {
-            id,
-            name: plant.name ?? "Unnamed plant",
-            strain: plant.strain ?? null,
-            stage: plant.stage ?? null,
-            startedAt: plant.startedAt ?? null,
-            photo: plant.photo ?? null,
-          },
-          recentActivityRows: rows,
-          hasPlantPhoto: !!plant.photo,
-        });
-        harvestWatchPublicState = card.v0ReadinessState ?? null;
-      } catch {
-        harvestWatchPublicState = null;
+      if (
+        isHarvestWatchEligible({
+          stage: plant.stage,
+          isArchived: plant.isArchived,
+          archivedAt: plant.archivedAt,
+          mergedIntoPlantId: plant.mergedIntoPlantId,
+        })
+      ) {
+        try {
+          const card = buildPlantDetailHarvestWatchCardViewModel({
+            plant: {
+              id,
+              name: plant.name ?? "Unnamed plant",
+              strain: plant.strain ?? null,
+              stage: plant.stage ?? null,
+              startedAt: plant.startedAt ?? null,
+              photo: plant.photo ?? null,
+            },
+            recentActivityRows: rows,
+            hasPlantPhoto: !!plant.photo,
+          });
+          harvestWatchPublicState = card.v0ReadinessState ?? null;
+        } catch {
+          harvestWatchPublicState = null;
+        }
       }
 
       out[id] = {
@@ -157,15 +176,7 @@ export function useTentPlantRosterActivity(
       };
     }
     return out;
-    // results identity changes on every render; depend on a stable signature
-    // of statuses + data references via JSON length so consumers re-render
-    // only when something actually changed.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    ids.join("|"),
-    results.map((r) => r.dataUpdatedAt ?? 0).join("|"),
-    safePlants,
-  ]);
+  }, [ids, results, safePlants]);
 
   return {
     byPlantId,

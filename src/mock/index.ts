@@ -31,6 +31,8 @@ export interface Plant {
   medium?: string | null;
   /** Container / pot size when recorded on the plant profile (e.g. "3 gal"). */
   potSize?: string | null;
+  /** Declared plant type: autoflower | photoperiod | unknown. Never inferred. */
+  plantType?: string | null;
 }
 
 /**
@@ -63,6 +65,8 @@ export type SensorReadingHealthStatus =
   | "needs_review"
   | "no_data";
 
+export type SensorReadingMetricKey = "temp" | "rh" | "vpd" | "co2" | "soil" | "ppfd";
+
 export interface SensorReading {
   ts: string;
   tentId: string;
@@ -77,6 +81,12 @@ export interface SensorReading {
    * wattage, or device state.
    */
   ppfd?: number | null;
+  /**
+   * Metrics physically present in the source snapshot. Older mock fixtures
+   * omit this field and are treated as complete legacy snapshots; DB adapters
+   * always populate it so compatibility zeroes can never become evidence.
+   */
+  observedMetrics?: SensorReadingMetricKey[];
   /** Provenance label. Demo data must always carry "demo". */
   source: SensorReadingSource;
   /**

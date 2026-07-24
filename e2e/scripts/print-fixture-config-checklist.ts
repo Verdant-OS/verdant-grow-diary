@@ -10,10 +10,7 @@
  *   - prints NAMES and instructions only
  */
 
-const REQUIRED_SECRETS = [
-  "E2E_TEST_EMAIL",
-  "E2E_TEST_PASSWORD",
-] as const;
+const REQUIRED_SECRETS = ["E2E_TEST_EMAIL", "E2E_TEST_PASSWORD"] as const;
 
 const REQUIRED_VARS = [
   "E2E_BASE_URL",
@@ -25,7 +22,7 @@ const REQUIRED_VARS = [
 
 const OPTIONAL_VARS = [
   "E2E_FIXTURE_EXPECTED_GROW_NAME",
-  "E2E_GROW_2_PLANT_NAME",
+  "E2E_GROW_1_SECOND_PLANT_NAME",
   "E2E_FIXTURE_EXPECTED_ACCOUNT_HINT",
   "E2E_ALLOW_FIXTURE_BOOTSTRAP",
 ] as const;
@@ -57,7 +54,7 @@ push("       b. Name the tent exactly 'E2E Test Tent'.");
 push("       c. Open that tent and Add Plant.");
 push("       d. Name the plant exactly 'E2E Test Plant'.");
 push("       e. Copy the plant detail URL into vars.E2E_GROW_1_PLANT_URL.");
-push("       f. (optional) Second plant: '505 Headbanger'.");
+push("       f. (optional) second plant in the same tent/grow: 'E2E Test Plant 2'.");
 push("       g. (optional/future) Grow: 'E2E Test Grow' — only if the UI");
 push("          visibly exposes a grow name or selector.");
 push("  3. The plant URL must NOT point at verdantgrowdiary.com or any");

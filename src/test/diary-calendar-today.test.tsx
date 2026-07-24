@@ -101,7 +101,7 @@ describe("DiaryCalendarSection — Today button", () => {
       /September 2026/,
     );
     expect(screen.getByTestId("diary-calendar-empty")).toHaveTextContent(
-      /No watering, feeding, or diagnosis events logged for September 2026\./,
+      /No watering, feeding, training, diagnosis, or environment check events logged for September 2026\./,
     );
     expect(screen.queryAllByTestId("diary-calendar-event").length).toBe(0);
   });

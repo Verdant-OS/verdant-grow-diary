@@ -9,17 +9,15 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { readDesktopGrowerNavigationSource } from "@/test/utils/growerNavigationSource";
 
 const ROOT = resolve(__dirname, "../..");
 const DASH = readFileSync(resolve(ROOT, "src/pages/Dashboard.tsx"), "utf8");
 const APP = readFileSync(resolve(ROOT, "src/App.tsx"), "utf8");
-const SIDEBAR = readFileSync(resolve(ROOT, "src/components/AppSidebar.tsx"), "utf8");
+const SIDEBAR = readDesktopGrowerNavigationSource();
 const GROW_DETAIL = readFileSync(resolve(ROOT, "src/pages/GrowDetail.tsx"), "utf8");
 const GRM = readFileSync(resolve(ROOT, "src/pages/GrowRoomMode.tsx"), "utf8");
-const SRC_LABEL_RULES = readFileSync(
-  resolve(ROOT, "src/lib/sensorSourceLabelRules.ts"),
-  "utf8",
-);
+const SRC_LABEL_RULES = readFileSync(resolve(ROOT, "src/lib/sensorSourceLabelRules.ts"), "utf8");
 
 describe("Dashboard Environment Snapshot · empty / stale / invalid states", () => {
   it("renders an honest empty title when there is no latest reading", () => {
@@ -40,15 +38,13 @@ describe("Dashboard Environment Snapshot · empty / stale / invalid states", () 
   });
 
   it("stale/invalid status banner is rendered above the snapshot grid", () => {
-    expect(DASH).toContain(
-      'data-testid="dashboard-environment-snapshot-status-banner"',
-    );
+    expect(DASH).toContain('data-testid="dashboard-environment-snapshot-status-banner"');
     expect(DASH).toMatch(/Latest reading is stale/);
     expect(DASH).toMatch(/Latest reading looks invalid/);
   });
 
-  it("uses evaluateSensorQuality + isStale to drive the banner (no JSX-local thresholds)", () => {
-    expect(DASH).toMatch(/evaluateSensorQuality\s*\(/);
+  it("uses source-aware Dashboard quality + isStale to drive the banner (no JSX-local thresholds)", () => {
+    expect(DASH).toMatch(/evaluateDashboardSensorQuality\s*\(/);
     expect(DASH).toMatch(/isStale\s*\(/);
     // No inline 30-minute or millisecond freshness thresholds in JSX.
     expect(DASH).not.toMatch(/30\s*\*\s*60\s*\*\s*1000/);

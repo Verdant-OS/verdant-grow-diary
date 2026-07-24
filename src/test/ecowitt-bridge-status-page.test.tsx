@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { BrowserRouter } from "react-router-dom";
 import EcowittBridgeStatus from "@/pages/EcowittBridgeStatus";
+import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
 
 // IMPORTANT: return a STABLE object/toast identity. The real useToast hook
 // memoizes `toast`; a mock that returns a fresh `{ toast: vi.fn() }` on every
@@ -41,7 +42,7 @@ const VALID_REPORT = JSON.stringify({
 
 describe("EcowittBridgeStatus page", () => {
   beforeEach(() => {
-    window.localStorage.clear();
+    clearLocalStorageForTest();
   });
 
   it("renders empty state when no attempts exist", () => {

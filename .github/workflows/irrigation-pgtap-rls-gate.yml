@@ -1,0 +1,369 @@
+name: Irrigation pgTAP + Harness Typecheck
+
+# Required PR gate for RLS/ACL regressions on irrigation-evidence trust boundary.
+#
+# Runs on every PR:
+#   1. Boots a disposable local Supabase stack (loopback only; never touches
+#      the hosted project ref knkwiiywfkbqznbxwqfh).
+#   2. Applies migrations + supabase/seed.sql (production GRANT parity).
+#   3. Executes the pgTAP feeding and watering suites via psql.
+#   4. Runs `tsgo --noEmit` on the runtime harness sources to catch harness
+#      drift before the disposable-stack lane can be scheduled.
+#
+# This lane is deliberately narrow: it does NOT execute the runtime harness
+# (that lives in security-db-local.yml / the manual disposable-stack lane).
+# It exists to catch pgTAP + harness-source regressions on every PR.
+
+on:
+  pull_request:
+    branches: [main, verdant-grow-diary]
+    # NOTE: top-level `paths:` intentionally removed. Path filtering is
+    # now done inside the workflow by the `changes` job (dorny/paths-filter),
+    # which authoritatively decides whether the pgTAP + typecheck jobs
+    # execute based on the PR's actual diff. This has two advantages:
+    #   1. Works when a PR touches irrigation files alongside unrelated
+    #      dirs — the filter reads the true changed-file set, not the
+    #      trigger's coarse path predicate.
+    #   2. Keeps this workflow as a stable required check for branch
+    #      protection: it always runs and reports a status, but the
+    #      expensive jobs no-op when no irrigation surface changed.
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Filter dry-run: print matched irrigation allowlist files and skip pgTAP + typecheck jobs."
+        type: boolean
+        required: false
+        default: false
+
+concurrency:
+  group: irrigation-pgtap-rls-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Cheap gate — reads the PR diff and emits `irrigation=true|false`.
+  # Both real jobs `needs: changes` and skip themselves when false.
+  changes:
+    name: detect irrigation-scoped changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      irrigation: ${{ steps.filter.outputs.irrigation }}
+      dry_run: ${{ steps.dry-run.outputs.dry_run }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Filter changed files
+        id: filter
+        # dorny/paths-filter v3.0.2 — pinned by commit SHA.
+        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+        with:
+          # On workflow_dispatch there is no diff to inspect; force-run
+          # by setting the output to 'true' via the fallback below.
+          predicate-quantifier: "some"
+          # Emit newline-separated matched file list on `<filter>_files`
+          # so the debug step below can print exactly what triggered the gate.
+          list-files: shell
+          filters: |
+            irrigation:
+              # Explicit allowlist of irrigation-scoped migration files.
+              # New irrigation migrations MUST be added here AND to the
+              # required-migrations manifest so this gate runs against them.
+              - "supabase/migrations/20260703093500_harden_quicklog_save_event_grants.sql"
+              - "supabase/migrations/20260707130000_quicklog_save_event_trust_boundary_hardening.sql"
+              - "supabase/migrations/20260707220000_quicklog_save_event_atomic_idempotency_v2.sql"
+              - "supabase/migrations/20260709160000_quicklog_save_manual_idempotency.sql"
+              - "supabase/migrations/20260720160000_quicklog_save_event_irrigation_boundary_hardening.sql"
+              # Irrigation event-table DML revoke migration (UUID-named).
+              - "supabase/migrations/20260722062644_8cdef271-abf0-4d82-9eca-970a91b6c547.sql"
+              # Contract-migrations lane.
+              - "supabase/contract-migrations/quicklog_save_manual_revoke_anon_execute.sql"
+              # pgTAP suites + prod-parity seed.
+              - "supabase/tests/create_feeding_event.sql"
+              - "supabase/tests/create_watering_event.sql"
+              - "supabase/seed.sql"
+              # Runtime harness sources typechecked by this gate. Explicit
+              # allowlist — new irrigation harnesses MUST be added here or
+              # the gate will silently skip on PRs that only touch them.
+              - "scripts/run-irrigation-evidence-rls-harness.ts"
+              - "scripts/run-irrigation-integrity-suite.mjs"
+              - "scripts/run-create-feeding-event-rls-harness.ts"
+              - "scripts/run-quicklog-save-event-rls-harness.ts"
+              - "scripts/run-quicklog-save-manual-rls-harness.ts"
+              - "scripts/run-quicklog-rpc-rls-harnesses.ts"
+              - "scripts/run-quicklog-typed-payloads-harness.ts"
+              # The workflow itself — any change here re-runs the full gate.
+              - ".github/workflows/irrigation-pgtap-rls-gate.yml"
+
+      - name: Resolve dry-run mode
+        id: dry-run
+        env:
+          EVENT: ${{ github.event_name }}
+          DISPATCH_DRY_RUN: ${{ github.event.inputs.dry_run }}
+          # PR label allowlist — apply `ci:dry-run-irrigation` to a PR to
+          # exercise the filter/allowlist summary without booting Postgres
+          # or running the harness typecheck.
+          PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: |
+          set -eo pipefail
+          DRY_RUN=false
+          if [ "$EVENT" = "workflow_dispatch" ] && [ "$DISPATCH_DRY_RUN" = "true" ]; then
+            DRY_RUN=true
+          elif [ "$EVENT" = "pull_request" ] && echo "$PR_LABELS" | grep -q '"ci:dry-run-irrigation"'; then
+            DRY_RUN=true
+          fi
+          echo "dry_run=$DRY_RUN" >> "$GITHUB_OUTPUT"
+
+      - name: Report filter decision
+        env:
+          IRRIGATION: ${{ steps.filter.outputs.irrigation }}
+          IRRIGATION_FILES: ${{ steps.filter.outputs.irrigation_files }}
+          EVENT: ${{ github.event_name }}
+          DRY_RUN: ${{ steps.dry-run.outputs.dry_run }}
+        run: |
+          {
+            echo "## Irrigation change-detection"
+            echo ""
+            echo "- Event: \`$EVENT\`"
+            echo "- Irrigation surface changed: \`$IRRIGATION\`"
+            if [ "$DRY_RUN" = "true" ]; then
+              echo "- **Dry-run mode** → pgTAP + typecheck jobs will skip."
+              if [ "$EVENT" = "pull_request" ]; then
+                echo "  (triggered by PR label \`ci:dry-run-irrigation\`)"
+              fi
+            elif [ "$EVENT" = "workflow_dispatch" ]; then
+              echo "- Manual dispatch → downstream jobs always run."
+            elif [ "$IRRIGATION" = "true" ]; then
+              echo "- Downstream jobs will run."
+            else
+              echo "- Downstream jobs will skip (no-op success)."
+            fi
+            echo ""
+            echo "### Matched files"
+            if [ -n "$IRRIGATION_FILES" ]; then
+              echo ""
+              echo '```'
+              for f in $IRRIGATION_FILES; do
+                echo "$f"
+              done
+              echo '```'
+            else
+              echo ""
+              echo "_No PR-diff files matched the irrigation filter._"
+            fi
+            if [ "$DRY_RUN" = "true" ]; then
+              echo ""
+              echo "### Full irrigation allowlist (dry-run)"
+              echo ""
+              echo "Files declared in the \`irrigation\` paths-filter, with repo-presence check:"
+              echo ""
+              echo '```'
+              # Keep in sync with the paths-filter above.
+              ALLOWLIST=(
+                "supabase/migrations/20260703093500_harden_quicklog_save_event_grants.sql"
+                "supabase/migrations/20260707130000_quicklog_save_event_trust_boundary_hardening.sql"
+                "supabase/migrations/20260707220000_quicklog_save_event_atomic_idempotency_v2.sql"
+                "supabase/migrations/20260709160000_quicklog_save_manual_idempotency.sql"
+                "supabase/migrations/20260720160000_quicklog_save_event_irrigation_boundary_hardening.sql"
+                "supabase/migrations/20260722062644_8cdef271-abf0-4d82-9eca-970a91b6c547.sql"
+                "supabase/contract-migrations/quicklog_save_manual_revoke_anon_execute.sql"
+                "supabase/tests/create_feeding_event.sql"
+                "supabase/tests/create_watering_event.sql"
+                "supabase/seed.sql"
+                "scripts/run-irrigation-evidence-rls-harness.ts"
+                "scripts/run-irrigation-integrity-suite.mjs"
+                "scripts/run-create-feeding-event-rls-harness.ts"
+                "scripts/run-quicklog-save-event-rls-harness.ts"
+                "scripts/run-quicklog-save-manual-rls-harness.ts"
+                "scripts/run-quicklog-rpc-rls-harnesses.ts"
+                "scripts/run-quicklog-typed-payloads-harness.ts"
+                ".github/workflows/irrigation-pgtap-rls-gate.yml"
+              )
+              for f in "${ALLOWLIST[@]}"; do
+                if [ -e "$f" ]; then
+                  echo "present  $f"
+                else
+                  echo "MISSING  $f"
+                fi
+              done
+              echo '```'
+              echo ""
+              echo "_Dry-run does not execute pgTAP suites or the harness typecheck._"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  harness-typecheck:
+    name: harness typecheck (tsgo --noEmit)
+    needs: changes
+    if: >-
+      (needs.changes.outputs.irrigation == 'true' || github.event_name == 'workflow_dispatch')
+      && needs.changes.outputs.dry_run != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Cache Bun install cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck (full project — includes irrigation harnesses)
+        # tsgo is a stop-ship gate. Full-project noEmit catches any
+        # harness drift; scoping to specific files would miss shared
+        # type surface changes.
+        run: bunx tsgo --noEmit
+
+  pgtap-irrigation:
+    name: pgTAP irrigation (feeding + watering)
+    needs: changes
+    if: >-
+      (needs.changes.outputs.irrigation == 'true' || github.event_name == 'workflow_dispatch')
+      && needs.changes.outputs.dry_run != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      # Cache the apt archive for postgresql-client. Restore-only pattern:
+      # the install step still runs `apt-get update && install`, so the
+      # resolved version is identical to an uncached run — the cache only
+      # skips the .deb download when the exact version is already present.
+      - name: Cache apt archives (postgresql-client)
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: /var/cache/apt/archives
+          key: ${{ runner.os }}-apt-postgresql-client-v1
+          restore-keys: |
+            ${{ runner.os }}-apt-postgresql-client-
+
+      - name: Install psql client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends postgresql-client
+
+      # Cache the Supabase CLI's own state dir (config templates, function
+      # bundle cache). Does NOT include Docker image layers or the local
+      # DB state under supabase/.branches — those are intentionally left
+      # ephemeral so `supabase db reset` runs against a truly fresh stack.
+      - name: Cache Supabase CLI state
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.supabase
+          key: ${{ runner.os }}-supabase-cli-2.109.1-${{ hashFiles('supabase/config.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-supabase-cli-2.109.1-
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf # v1
+        with:
+          # Pinned deliberately — "latest" rate-limits on shared runners.
+          version: 2.109.1
+
+      - name: Start local Supabase (disposable, loopback only)
+        id: supabase-start
+        run: |
+          set -eo pipefail
+          supabase start --workdir . 2>&1 | tee supabase-start.log
+
+      - name: Export local Supabase DB URL
+        id: supabase-env
+        run: |
+          set -eo pipefail
+          DB_URL="$(supabase status -o json | jq -r '.DB_URL // .db_url // empty')"
+          if [ -z "$DB_URL" ]; then
+            echo "BLOCKED: local Supabase did not expose DB_URL." >&2
+            exit 2
+          fi
+          # Loopback guard — refuse anything that isn't localhost.
+          HOST="$(echo "$DB_URL" | awk -F'[@:/]' '{print $4}')"
+          case "$HOST" in
+            localhost|127.0.0.1|::1) ;;
+            *)
+              echo "BLOCKED: refusing non-loopback DB host '$HOST'." >&2
+              exit 2
+              ;;
+          esac
+          echo "::add-mask::$DB_URL"
+          echo "SUPABASE_DB_URL=$DB_URL" >> "$GITHUB_ENV"
+
+      - name: Apply migrations + prod-parity seed
+        # NOT --no-seed: supabase/seed.sql restores the production GRANT
+        # baseline that fresh local stacks (hardened default ACL) omit.
+        # Without it, pgTAP ACL-matrix assertions read the wrong ground
+        # truth and false-flag drift.
+        run: |
+          set -o pipefail
+          supabase db reset 2>&1 | tee supabase-db-reset.log
+
+      - name: pgTAP — create_feeding_event
+        id: pgtap-feeding
+        run: |
+          set -o pipefail
+          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 \
+            -f supabase/tests/create_feeding_event.sql 2>&1 \
+            | tee pgtap-feeding.log
+
+      - name: pgTAP — create_watering_event
+        id: pgtap-watering
+        run: |
+          set -o pipefail
+          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 \
+            -f supabase/tests/create_watering_event.sql 2>&1 \
+            | tee pgtap-watering.log
+
+      - name: Upload failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: irrigation-pgtap-rls-gate-logs
+          path: |
+            supabase-start.log
+            supabase-db-reset.log
+            pgtap-feeding.log
+            pgtap-watering.log
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Write job summary
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          {
+            echo "## Irrigation pgTAP + Harness Typecheck"
+            echo ""
+            case "$JOB_STATUS" in
+              success) echo "**Status:** passed" ;;
+              failure) echo "**Status:** failed" ;;
+              cancelled) echo "**Status:** cancelled" ;;
+              *) echo "**Status:** $JOB_STATUS" ;;
+            esac
+            echo ""
+            echo "**Suites:**"
+            echo "- \`supabase/tests/create_feeding_event.sql\`"
+            echo "- \`supabase/tests/create_watering_event.sql\`"
+            echo ""
+            echo "**Artifact:** \`irrigation-pgtap-rls-gate-logs\` (failure only, 14d)"
+            echo ""
+            echo "**Run:** ${RUN_URL}"
+            echo ""
+            echo "_Summary contains no secrets, service-role values, JWTs, or DB URLs._"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Stop local Supabase
+        if: always()
+        run: supabase stop --no-backup || true

@@ -30,6 +30,7 @@ vi.mock("@/integrations/supabase/client", () => {
     const q: Record<string, unknown> = {};
     q.select = () => q;
     q.eq = () => q;
+    q.not = () => q;
     q.in = () => q;
     q.or = () => q;
     q.order = () => q;
@@ -52,9 +53,7 @@ beforeEach(() => {
   };
 });
 
-function renderSection(
-  props: Parameters<typeof QuickLogGroupedTimelineSection>[0],
-) {
+function renderSection(props: Parameters<typeof QuickLogGroupedTimelineSection>[0]) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
@@ -130,9 +129,7 @@ describe("Grouped Timeline Review Panel — trigger visibility", () => {
     renderSection({ scope: "plant", plantId: PLANT, tentId: TENT });
     await waitFor(() => screen.getByTestId("quick-log-grouped-timeline-list"));
     const card = screen.getByTestId("quick-log-grouped-card");
-    expect(
-      within(card).getByTestId("quick-log-grouped-review-trigger").textContent,
-    ).toBe(OPEN);
+    expect(within(card).getByTestId("quick-log-grouped-review-trigger").textContent).toBe(OPEN);
   });
 
   it("grouped Note card renders 'Review details'", async () => {
@@ -143,18 +140,14 @@ describe("Grouped Timeline Review Panel — trigger visibility", () => {
     renderSection({ scope: "plant", plantId: PLANT, tentId: TENT });
     await waitFor(() => screen.getByTestId("quick-log-grouped-timeline-list"));
     const card = screen.getByTestId("quick-log-grouped-card");
-    expect(
-      within(card).getByTestId("quick-log-grouped-review-trigger").textContent,
-    ).toBe(OPEN);
+    expect(within(card).getByTestId("quick-log-grouped-review-trigger").textContent).toBe(OPEN);
   });
 
   it("standalone environment cards have no review trigger", async () => {
     nextRows = [env("eS", "2026-05-03T10:00:00.000Z", { humidity_pct: 55 })];
     renderSection({ scope: "plant", plantId: PLANT, tentId: TENT });
     await waitFor(() => screen.getByTestId("quick-log-grouped-timeline-list"));
-    expect(
-      screen.queryByTestId("quick-log-grouped-review-trigger"),
-    ).toBeNull();
+    expect(screen.queryByTestId("quick-log-grouped-review-trigger")).toBeNull();
   });
 
   it("ambiguous/unpaired actions have no review trigger", async () => {
@@ -165,9 +158,7 @@ describe("Grouped Timeline Review Panel — trigger visibility", () => {
     ];
     renderSection({ scope: "plant", plantId: PLANT, tentId: TENT });
     await waitFor(() => screen.getByTestId("quick-log-grouped-timeline-list"));
-    expect(
-      screen.queryAllByTestId("quick-log-grouped-review-trigger"),
-    ).toHaveLength(0);
+    expect(screen.queryAllByTestId("quick-log-grouped-review-trigger")).toHaveLength(0);
   });
 });
 
@@ -180,27 +171,20 @@ describe("Grouped Timeline Review Panel — open / close", () => {
     renderSection({ scope: "plant", plantId: PLANT, tentId: TENT });
     await waitFor(() => screen.getByTestId("quick-log-grouped-timeline-list"));
     const card = screen.getByTestId("quick-log-grouped-card");
-    fireEvent.click(
-      within(card).getByTestId("quick-log-grouped-review-trigger"),
-    );
+    fireEvent.click(within(card).getByTestId("quick-log-grouped-review-trigger"));
     const panel = within(card).getByTestId("quick-log-grouped-review-panel");
     expect(panel).toBeInTheDocument();
     expect(card.getAttribute("data-review-open")).toBe("true");
-    expect(
-      within(panel).getByTestId("quick-log-grouped-review-panel-title")
-        .textContent,
-    ).toBe("Grouped timeline details");
+    expect(within(panel).getByTestId("quick-log-grouped-review-panel-title").textContent).toBe(
+      "Grouped timeline details",
+    );
     expect(
       within(panel).getByTestId("quick-log-grouped-review-action-section"),
     ).toBeInTheDocument();
     expect(
-      within(panel).getByTestId(
-        "quick-log-grouped-review-environment-section",
-      ),
+      within(panel).getByTestId("quick-log-grouped-review-environment-section"),
     ).toBeInTheDocument();
-    expect(
-      within(card).getByTestId("quick-log-grouped-review-trigger").textContent,
-    ).toBe(CLOSE);
+    expect(within(card).getByTestId("quick-log-grouped-review-trigger").textContent).toBe(CLOSE);
   });
 
   it("Water panel shows action kind, occurred_at, Manual source, volume", async () => {
@@ -212,22 +196,17 @@ describe("Grouped Timeline Review Panel — open / close", () => {
     await waitFor(() => screen.getByTestId("quick-log-grouped-timeline-list"));
     fireEvent.click(screen.getByTestId("quick-log-grouped-review-trigger"));
     const panel = screen.getByTestId("quick-log-grouped-review-panel");
+    expect(within(panel).getByTestId("quick-log-grouped-review-action-kind").textContent).toBe(
+      "Water",
+    );
+    expect(within(panel).getByTestId("quick-log-grouped-review-action-source").textContent).toBe(
+      "Manual",
+    );
     expect(
-      within(panel).getByTestId("quick-log-grouped-review-action-kind")
-        .textContent,
-    ).toBe("Water");
-    expect(
-      within(panel).getByTestId("quick-log-grouped-review-action-source")
-        .textContent,
-    ).toBe("Manual");
-    expect(
-      within(panel).getByTestId(
-        "quick-log-grouped-review-action-occurred-at",
-      ).textContent,
+      within(panel).getByTestId("quick-log-grouped-review-action-occurred-at").textContent,
     ).toBe("2026-05-06T10:00:00.000Z");
     expect(
-      within(panel).getByTestId("quick-log-grouped-review-action-volume")
-        .textContent,
+      within(panel).getByTestId("quick-log-grouped-review-action-volume").textContent,
     ).toContain("500");
   });
 
@@ -240,17 +219,13 @@ describe("Grouped Timeline Review Panel — open / close", () => {
     await waitFor(() => screen.getByTestId("quick-log-grouped-timeline-list"));
     fireEvent.click(screen.getByTestId("quick-log-grouped-review-trigger"));
     const panel = screen.getByTestId("quick-log-grouped-review-panel");
-    expect(
-      within(panel).getByTestId("quick-log-grouped-review-action-kind")
-        .textContent,
-    ).toBe("Note");
-    expect(
-      within(panel).getByTestId("quick-log-grouped-review-action-note")
-        .textContent,
-    ).toBe("Top dressed.");
-    expect(
-      within(panel).queryByTestId("quick-log-grouped-review-action-volume"),
-    ).toBeNull();
+    expect(within(panel).getByTestId("quick-log-grouped-review-action-kind").textContent).toBe(
+      "Note",
+    );
+    expect(within(panel).getByTestId("quick-log-grouped-review-action-note").textContent).toBe(
+      "Top dressed.",
+    );
+    expect(within(panel).queryByTestId("quick-log-grouped-review-action-volume")).toBeNull();
   });
 
   it("env section renders snapshot card with Manual source label", async () => {
@@ -262,16 +237,11 @@ describe("Grouped Timeline Review Panel — open / close", () => {
     await waitFor(() => screen.getByTestId("quick-log-grouped-timeline-list"));
     fireEvent.click(screen.getByTestId("quick-log-grouped-review-trigger"));
     const panel = screen.getByTestId("quick-log-grouped-review-panel");
-    const envSection = within(panel).getByTestId(
-      "quick-log-grouped-review-environment-section",
+    const envSection = within(panel).getByTestId("quick-log-grouped-review-environment-section");
+    const snapshot = within(envSection).getByTestId("manual-snapshot-timeline-card");
+    expect(within(snapshot).getByTestId("manual-snapshot-timeline-card-source").textContent).toBe(
+      "Manual",
     );
-    const snapshot = within(envSection).getByTestId(
-      "manual-snapshot-timeline-card",
-    );
-    expect(
-      within(snapshot).getByTestId("manual-snapshot-timeline-card-source")
-        .textContent,
-    ).toBe("Manual");
   });
 
   it("invalid/warning telemetry status remains visible inside the panel", async () => {
@@ -296,13 +266,9 @@ describe("Grouped Timeline Review Panel — open / close", () => {
     await waitFor(() => screen.getByTestId("quick-log-grouped-timeline-list"));
     const trigger = screen.getByTestId("quick-log-grouped-review-trigger");
     fireEvent.click(trigger);
-    expect(
-      screen.getByTestId("quick-log-grouped-review-panel"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("quick-log-grouped-review-panel")).toBeInTheDocument();
     fireEvent.click(trigger);
-    expect(
-      screen.queryByTestId("quick-log-grouped-review-panel"),
-    ).toBeNull();
+    expect(screen.queryByTestId("quick-log-grouped-review-panel")).toBeNull();
     expect(trigger.textContent).toBe(OPEN);
   });
 });

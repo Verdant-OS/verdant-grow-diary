@@ -4,8 +4,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { render, screen, fireEvent } from "@testing-library/react";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 
@@ -32,6 +32,32 @@ function renderWithProviders(ui: ReactElement) {
   return render(
     <QueryClientProvider client={client}>
       <MemoryRouter>{ui}</MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
+/** Exposes the current router location for URL-behavior assertions. */
+function LocationProbe() {
+  const location = useLocation();
+  return (
+    <div data-testid="location-probe">
+      {location.pathname}
+      {location.search}
+    </div>
+  );
+}
+
+/** Same providers as renderWithProviders, but at an explicit initial URL. */
+function renderWithProvidersAt(ui: ReactElement, initialPath: string) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+  });
+  return render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter initialEntries={[initialPath]}>
+        {ui}
+        <LocationProbe />
+      </MemoryRouter>
     </QueryClientProvider>,
   );
 }
@@ -94,6 +120,68 @@ describe("AiDoctorSessionsIndex — render", () => {
   it("renders empty state when there are no sessions", async () => {
     renderWithProviders(<AiDoctorSessionsIndex />);
     expect(await screen.findByTestId("ai-doctor-sessions-index-empty")).toBeTruthy();
+  });
+});
+
+describe("AiDoctorSessionsIndex — ?view=ledger backward-compatible URL behavior", () => {
+  it("default (no view param) renders the existing history view, not the ledger", async () => {
+    renderWithProvidersAt(<AiDoctorSessionsIndex />, "/doctor/sessions");
+    expect(await screen.findByTestId("ai-doctor-sessions-index-page")).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-sessions-index-filters")).toBeTruthy();
+    expect(screen.queryByTestId("ai-doctor-session-integrity-ledger")).toBeNull();
+  });
+
+  it("?view=ledger renders the ledger and hides the history filters/list", async () => {
+    renderWithProvidersAt(<AiDoctorSessionsIndex />, "/doctor/sessions?view=ledger");
+    expect(await screen.findByTestId("ai-doctor-session-integrity-ledger")).toBeTruthy();
+    expect(screen.queryByTestId("ai-doctor-sessions-index-filters")).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-sessions-index-list")).toBeNull();
+  });
+
+  it("an unrecognized ?view value falls back to the default history view", async () => {
+    renderWithProvidersAt(<AiDoctorSessionsIndex />, "/doctor/sessions?view=bogus");
+    expect(await screen.findByTestId("ai-doctor-sessions-index-filters")).toBeTruthy();
+    expect(screen.queryByTestId("ai-doctor-session-integrity-ledger")).toBeNull();
+  });
+
+  it("preserves all existing filters, saved-view params, and page when entering ledger mode", async () => {
+    renderWithProvidersAt(
+      <AiDoctorSessionsIndex />,
+      "/doctor/sessions?risk=high&hasActions=yes&page=2",
+    );
+    await screen.findByTestId("ai-doctor-sessions-index-page");
+    fireEvent.click(screen.getByTestId("ai-doctor-sessions-index-view-switch-ledger"));
+    await screen.findByTestId("ai-doctor-session-integrity-ledger");
+    const probe = screen.getByTestId("location-probe");
+    expect(probe.textContent).toContain("view=ledger");
+    expect(probe.textContent).toContain("risk=high");
+    expect(probe.textContent).toContain("hasActions=yes");
+    expect(probe.textContent).toContain("page=2");
+  });
+
+  it("switching back to history removes ONLY the view param, keeping unrelated params intact", async () => {
+    renderWithProvidersAt(
+      <AiDoctorSessionsIndex />,
+      "/doctor/sessions?view=ledger&risk=high&customUnknownParam=keep-me",
+    );
+    await screen.findByTestId("ai-doctor-session-integrity-ledger");
+    fireEvent.click(screen.getByTestId("ai-doctor-sessions-index-view-switch-history"));
+    await screen.findByTestId("ai-doctor-sessions-index-filters");
+    const probe = screen.getByTestId("location-probe");
+    expect(probe.textContent).not.toContain("view=");
+    expect(probe.textContent).toContain("risk=high");
+    expect(probe.textContent).toContain("customUnknownParam=keep-me");
+  });
+
+  it("the view-switch controls reflect the current mode via aria-pressed", async () => {
+    renderWithProvidersAt(<AiDoctorSessionsIndex />, "/doctor/sessions?view=ledger");
+    await screen.findByTestId("ai-doctor-session-integrity-ledger");
+    expect(
+      screen.getByTestId("ai-doctor-sessions-index-view-switch-ledger").getAttribute("aria-pressed"),
+    ).toBe("true");
+    expect(
+      screen.getByTestId("ai-doctor-sessions-index-view-switch-history").getAttribute("aria-pressed"),
+    ).toBe("false");
   });
 });
 

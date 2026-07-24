@@ -143,6 +143,78 @@ describe("EcowittLatestSnapshotCard — proof card behavior", () => {
     expect(screen.getByTestId("ecowitt-transport").textContent).toBe("Transport: mqtt_local_test");
   });
 
+  it("labels a confidence=test Windows-listener reading as degraded Demo data", async () => {
+    rowsMock = [
+      ecowittRow({
+        source: "live",
+        raw_payload: {
+          vendor: "ecowitt_windows_testbench",
+          captured_at: FRESH_AT,
+          metrics: { temp_f: 78.6, humidity_pct: 56.2 },
+          metadata: {
+            confidence: "test",
+            verdant_source: "live",
+          },
+        },
+      }),
+    ];
+    render(<EcowittLatestSnapshotCard tentId={TENT_A} now={NOW} />, {
+      wrapper: wrap(),
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId("ecowitt-source-badge")).toHaveTextContent("Demo"),
+    );
+    expect(screen.getByTestId("snapshot-sensor-source-badge")).toHaveTextContent("Demo data");
+    expect(screen.getByTestId("snapshot-sensor-source-badge")).toHaveAttribute(
+      "data-source",
+      "demo",
+    );
+    expect(screen.getByTestId("snapshot-sensor-source-badge")).toHaveAttribute(
+      "data-degraded",
+      "true",
+    );
+    expect(screen.queryByText(/^Live$/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Ecowitt$/)).not.toBeInTheDocument();
+  });
+
+  it("keeps a physical Windows-listener reading live when preserved source and gateway markers agree", async () => {
+    rowsMock = [
+      ecowittRow({
+        source: "live",
+        raw_payload: {
+          vendor: "ecowitt_windows_testbench",
+          captured_at: FRESH_AT,
+          metrics: { temp_f: 78.6, humidity_pct: 56.2 },
+          metadata: {
+            reported_verdant_source: "live",
+            raw_payload: {
+              stationtype: "GW2000A_V3.2.4",
+              model: "GW2000A",
+              dateutc: "2026-06-04 12:20:00",
+            },
+          },
+        },
+      }),
+    ];
+    render(<EcowittLatestSnapshotCard tentId={TENT_A} now={NOW} />, {
+      wrapper: wrap(),
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId("ecowitt-source-badge")).toHaveTextContent("Ecowitt"),
+    );
+    expect(screen.getByTestId("snapshot-sensor-source-badge")).toHaveTextContent("Ecowitt");
+    expect(screen.getByTestId("snapshot-sensor-source-badge")).toHaveAttribute(
+      "data-source",
+      "live",
+    );
+    expect(screen.getByTestId("snapshot-sensor-source-badge")).toHaveAttribute(
+      "data-degraded",
+      "false",
+    );
+  });
+
   it("displays stale/fresh status using existing logic", async () => {
     rowsMock = [
       ecowittRow({
@@ -164,6 +236,42 @@ describe("EcowittLatestSnapshotCard — proof card behavior", () => {
     expect(screen.getByTestId("ecowitt-snapshot-freshness").textContent).toBe("stale");
     expect(screen.getByTestId("ecowitt-source-badge").textContent).toBe("Stale");
   });
+
+  it.each([
+    ["missing", null],
+    ["unknown", "webhook"],
+    ["invalid", "invalid"],
+  ] as const)(
+    "renders %s provenance as Invalid / Unavailable and withholds Derived VPD",
+    async (_case, source) => {
+      rowsMock = [
+        ecowittRow({
+          source,
+          raw_payload: {
+            vendor: "ecowitt",
+            temp1f: 77,
+            humidity1: 55,
+            dateutc: FRESH_AT,
+          },
+        }),
+      ];
+
+      render(<EcowittLatestSnapshotCard tentId={TENT_A} now={NOW} />, {
+        wrapper: wrap(),
+      });
+
+      await waitFor(() =>
+        expect(screen.getByTestId("ecowitt-snapshot-unavailable")).toHaveTextContent(
+          "Invalid / Unavailable",
+        ),
+      );
+      expect(screen.getByTestId("ecowitt-source-badge")).toHaveTextContent("Invalid");
+      expect(screen.getByTestId("ecowitt-metric-vpd_kpa")).toHaveTextContent(
+        "Unavailable",
+      );
+      expect(screen.queryByText(/^Ecowitt$/)).not.toBeInTheDocument();
+    },
+  );
 
   it("shows tent name when provided", async () => {
     rowsMock = [ecowittRow({})];

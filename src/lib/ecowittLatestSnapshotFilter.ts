@@ -17,6 +17,7 @@ import {
   type EcowittCandidate,
   type EcowittSnapshotViewModel,
 } from "@/lib/ecowittReadingViewModel";
+import { isSensorTestbenchRow } from "@/lib/sensorTestbenchIndicatorRules";
 import type { SensorReadingSource } from "@/mock";
 
 /** Minimal shape we need from a `sensor_readings` row. */
@@ -37,25 +38,21 @@ export interface EcowittLatestSnapshotFilter {
   plantId?: string | null;
 }
 
-/** Sources we trust as EcoWitt-derived. Vendor lineage may also live in
- *  `raw_payload.vendor`. */
-const ECOWITT_SOURCES = new Set<string>(["ecowitt", "live", "manual"]);
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
 
 function readString(value: unknown): string | null {
-  return typeof value === "string" && value.trim().length > 0
-    ? value.trim()
-    : null;
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 }
 
-function readFiniteMetric(
-  metrics: Record<string, unknown>,
-  key: string,
-): number | null {
+function readFiniteMetric(metrics: Record<string, unknown>, key: string): number | null {
   const raw = metrics[key];
+  // Number(null), Number(undefined-like blanks), and Number("   ") can look
+  // like real zeroes. Preserve missingness before numeric coercion so absent
+  // EcoWitt values never become sensor evidence.
+  if (raw === null || raw === undefined) return null;
+  if (typeof raw === "string" && raw.trim().length === 0) return null;
   const value = typeof raw === "number" ? raw : Number(raw);
   return Number.isFinite(value) ? value : null;
 }
@@ -96,15 +93,30 @@ function isEcowittRow(row: EcowittSensorReadingRow): boolean {
   return false;
 }
 
-function resolveCandidateSource(
-  row: EcowittSensorReadingRow,
-): SensorReadingSource {
+function resolveCandidateSource(row: EcowittSensorReadingRow): SensorReadingSource {
   const src = (row.source ?? "").trim().toLowerCase();
-  if (src === "manual") return "manual";
-  if (src === "demo") return "demo";
-  // Treat all listener-tagged EcoWitt rows as "live" candidates; the
-  // view-model will demote stale ones to "stale" via freshness.
-  return "live";
+
+  // Diagnostic lineage is a provenance fence, not a fallback label. It must
+  // run before every canonical source return so a testbench packet persisted
+  // as manual/csv/stale cannot bypass the shared detector. The detector keeps
+  // its explicit physical-gateway exception for legitimate listener traffic.
+  if (isSensorTestbenchRow(row)) return "demo";
+
+  // Persisted canonical provenance is authoritative. In particular, vendor
+  // lineage must never promote CSV, stale, or invalid history to live.
+  if (src === "manual" || src === "csv" || src === "demo" || src === "stale" || src === "invalid") {
+    return src;
+  }
+
+  // `source="ecowitt"` is the legacy bridge contract still emitted by the
+  // existing EcoWitt adapters and ingest proof paths. It is accepted as live
+  // only because the row already passed the EcoWitt-lineage filter above.
+  if (src === "live" || src === "ecowitt") return "live";
+
+  // Missing and unrecognized provenance fails closed. Raw payload vendor
+  // metadata may establish EcoWitt lineage, but it cannot establish live
+  // trust on its own.
+  return "invalid";
 }
 
 function buildCandidatePayload(
@@ -151,9 +163,7 @@ function buildCandidatePayload(
 
   const metadata = isRecord(raw.metadata) ? raw.metadata : null;
   const capturedAt =
-    readString(raw.captured_at) ??
-    readString(row.captured_at) ??
-    readString(row.ts);
+    readString(raw.captured_at) ?? readString(row.captured_at) ?? readString(row.ts);
   if (capturedAt) next.dateutc = capturedAt;
 
   const transport =

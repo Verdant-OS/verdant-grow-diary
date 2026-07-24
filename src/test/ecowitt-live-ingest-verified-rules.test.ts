@@ -17,6 +17,7 @@ import type {
   LocalForwardingFetchState,
   LocalForwardingStatus,
 } from "@/lib/ecowittLocalForwardingStatus";
+import { normalizeLocalForwardingStatus } from "@/lib/ecowittLocalForwardingStatus";
 
 const NOW_MS = Date.parse("2026-06-17T12:00:00.000Z");
 const FRESH = "2026-06-17T11:55:00.000Z"; // 5m ago
@@ -52,6 +53,7 @@ function baseStatus(over: Partial<LocalForwardingStatus> = {}): LocalForwardingS
     latest_metrics: {
       source: "live",
       vendor: "ecowitt_windows_testbench",
+      physical_gateway_evidence: true,
       captured_at: FRESH,
       metric_keys: ["temp_f", "humidity_percent", "soil_moisture_pct"],
     },
@@ -96,6 +98,92 @@ describe("classifyLiveIngestVerifiedMarker", () => {
     expect(m.show).toBe(false);
   });
 
+  it("testbench transport success never verifies physical sensor ingest", () => {
+    const m = classifyLiveIngestVerifiedMarker(
+      ready({
+        latest_metrics: {
+          source: "demo",
+          vendor: "ecowitt_windows_testbench",
+          physical_gateway_evidence: false,
+          captured_at: FRESH,
+          metric_keys: ["temp_f", "humidity_percent"],
+        },
+      }),
+      NOW_MS,
+    );
+    expect(m.state).toBe("testbench");
+    expect(m.tone).toBe("neutral");
+    expect(m.title).toMatch(/testbench packet received/i);
+    expect(m.detail).toMatch(/cannot verify real EcoWitt sensor ingest/i);
+    assertNoSecrets(m);
+  });
+
+  it("confidence=test also blocks the verified marker", () => {
+    const m = classifyLiveIngestVerifiedMarker(
+      ready({
+        latest_metrics: {
+          source: "live",
+          vendor: "ecowitt",
+          confidence: "test",
+          physical_gateway_evidence: true,
+          captured_at: FRESH,
+          metric_keys: ["temp_f"],
+        },
+      }),
+      NOW_MS,
+    );
+    expect(m.state).toBe("testbench");
+  });
+
+  it.each(["header", "environment"])(
+    "%s source=live opt-in without physical evidence remains testbench",
+    () => {
+      const m = classifyLiveIngestVerifiedMarker(
+        ready({
+          latest_metrics: {
+            source: "live",
+            vendor: "ecowitt_windows_testbench",
+            physical_gateway_evidence: false,
+            captured_at: FRESH,
+            metric_keys: ["temp_f"],
+          },
+        }),
+        NOW_MS,
+      );
+      expect(m.state).toBe("testbench");
+      expect(m.title).toMatch(/testbench packet received/i);
+      expect(m.tone).toBe("neutral");
+    },
+  );
+
+  it("normalizes listener physical evidence as exact-true and fails closed when missing", () => {
+    const physical = normalizeLocalForwardingStatus({
+      latest_metrics: {
+        source: "live",
+        vendor: "ecowitt_windows_testbench",
+        physical_gateway_evidence: true,
+        captured_at: FRESH,
+        metrics: { temp_f: 75 },
+      },
+    });
+    expect(physical.latest_metrics?.physical_gateway_evidence).toBe(true);
+
+    const legacy = normalizeLocalForwardingStatus({
+      latest_metrics: {
+        source: "live",
+        vendor: "ecowitt_windows_testbench",
+        captured_at: FRESH,
+        metrics: { temp_f: 75 },
+      },
+    });
+    expect(legacy.latest_metrics?.physical_gateway_evidence).toBe(false);
+    const marker = classifyLiveIngestVerifiedMarker(
+      ready({ latest_metrics: legacy.latest_metrics }),
+      NOW_MS,
+    );
+    expect(marker.state).toBe("testbench");
+  });
+
   it("offline: bridge unreachable", () => {
     const m = classifyLiveIngestVerifiedMarker(
       { state: "offline", reason: "local_bridge_unreachable" },
@@ -107,10 +195,7 @@ describe("classifyLiveIngestVerifiedMarker", () => {
   });
 
   it("not_ready: forwarding_ready=false", () => {
-    const m = classifyLiveIngestVerifiedMarker(
-      ready({ forwarding_ready: false }),
-      NOW_MS,
-    );
+    const m = classifyLiveIngestVerifiedMarker(ready({ forwarding_ready: false }), NOW_MS);
     expect(m.state).toBe("not_ready");
   });
 
@@ -143,10 +228,7 @@ describe("classifyLiveIngestVerifiedMarker", () => {
   });
 
   it("waiting: latest_metrics missing", () => {
-    const m = classifyLiveIngestVerifiedMarker(
-      ready({ latest_metrics: null }),
-      NOW_MS,
-    );
+    const m = classifyLiveIngestVerifiedMarker(ready({ latest_metrics: null }), NOW_MS);
     expect(m.state).toBe("waiting_for_first_reading");
   });
 
@@ -156,6 +238,7 @@ describe("classifyLiveIngestVerifiedMarker", () => {
         latest_metrics: {
           source: "live",
           vendor: "ecowitt_windows_testbench",
+          physical_gateway_evidence: true,
           captured_at: STALE,
           metric_keys: ["temp_f"],
         },
@@ -174,7 +257,8 @@ describe("classifyLiveIngestVerifiedMarker", () => {
         ready({
           latest_metrics: {
             source: src,
-            vendor: "ecowitt_windows_testbench",
+            vendor: "ecowitt",
+            physical_gateway_evidence: true,
             captured_at: FRESH,
             metric_keys: ["temp_f"],
           },
@@ -187,10 +271,7 @@ describe("classifyLiveIngestVerifiedMarker", () => {
   );
 
   it("rejects 200-but-non-200 last_forward_status (e.g. 204)", () => {
-    const m = classifyLiveIngestVerifiedMarker(
-      ready({ last_forward_status: 204 }),
-      NOW_MS,
-    );
+    const m = classifyLiveIngestVerifiedMarker(ready({ last_forward_status: 204 }), NOW_MS);
     expect(m.state).toBe("failed");
   });
 

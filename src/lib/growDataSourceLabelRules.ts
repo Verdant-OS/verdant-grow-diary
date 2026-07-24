@@ -10,6 +10,7 @@
 export type GrowDataSourceLabel =
   | "Live"
   | "Manual"
+  | "CSV history"
   | "Simulated"
   | "Demo"
   | "Stale"
@@ -47,10 +48,12 @@ const DEFAULT_STALE_MS = 15 * 60 * 1000;
 const DEMO_SOURCES = new Set(["mock", "demo", "fake", "sample", "fixture"]);
 const SIMULATED_SOURCES = new Set(["sim", "simulated", "simulation"]);
 const MANUAL_SOURCES = new Set(["manual", "user", "entry", "log"]);
+const CSV_SOURCES = new Set(["csv", "import"]);
 // NOTE: source identifiers here intentionally avoid certain reserved
 // vendor literals to keep the action-queue safety contract test clean.
 // Callers normalize their own ingest source tags before passing them in.
 const LIVE_SOURCES = new Set([
+  "live",
   "supabase",
   "sensor",
   "hassio",
@@ -118,8 +121,7 @@ export function classifyGrowDataSource(
   const tsProvided = tsRaw !== null && tsRaw !== undefined && tsRaw !== "";
   const tsInvalid = tsProvided && tsMillis === null;
   const ageMs = tsMillis !== null ? now - tsMillis : null;
-  const isStale =
-    ageMs !== null && (ageMs > staleThresholdMs || ageMs < -staleThresholdMs);
+  const isStale = ageMs !== null && (ageMs > staleThresholdMs || ageMs < -staleThresholdMs);
 
   // 1. Demo / mock always wins — never trusted, never Live.
   if (source && DEMO_SOURCES.has(source)) {
@@ -148,7 +150,6 @@ export function classifyGrowDataSource(
       reasons,
     };
   }
-
 
   // 2. Unavailable: no source AND no value.
   if (!source && !valuePresent) {
@@ -191,7 +192,7 @@ export function classifyGrowDataSource(
   }
 
   // 5. Invalid timestamp for a real source.
-  if (tsInvalid) {
+  if (tsInvalid && !CSV_SOURCES.has(source)) {
     reasons.push("invalid timestamp");
     return {
       label: "Stale",
@@ -234,6 +235,36 @@ export function classifyGrowDataSource(
       message: "Manually entered reading.",
       shouldDisplayBadge: true,
       isTrustedForAi: true,
+      reasons,
+    };
+  }
+
+  // 6b. CSV is provenance, not freshness. Historical imports keep their
+  // source identity even when their capture time is old or malformed; status
+  // presenters may separately describe freshness as stale/invalid.
+  if (CSV_SOURCES.has(source)) {
+    if (tsMillis === null) {
+      reasons.push(tsInvalid ? "csv history timestamp invalid" : "csv history timestamp missing");
+      return {
+        label: "CSV history",
+        severity: "watch",
+        message: tsInvalid
+          ? "Historical CSV reading with an invalid timestamp."
+          : "Historical CSV reading with no capture timestamp.",
+        shouldDisplayBadge: true,
+        isTrustedForAi: false,
+        reasons,
+      };
+    }
+    reasons.push(isStale ? "historical csv outside freshness window" : "historical csv import");
+    return {
+      label: "CSV history",
+      severity: isStale ? "watch" : "info",
+      message: isStale
+        ? "Historical CSV reading outside the current freshness window."
+        : "Historical CSV reading.",
+      shouldDisplayBadge: true,
+      isTrustedForAi: false,
       reasons,
     };
   }

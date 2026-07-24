@@ -9,7 +9,7 @@
  * Steps that cannot be safely inferred render as
  * "Needs operator confirmation".
  */
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import PageHeader from "@/components/PageHeader";
@@ -107,6 +107,15 @@ export default function OneTentLiveProof() {
       }, 400);
     }
   }, [queryClient, reloadAlerts]);
+
+  // Clear the pending refresh timer on unmount — without this the 400ms
+  // callback fires setState into a torn-down tree (and, in vitest, into a
+  // torn-down jsdom environment, failing an otherwise-green shard).
+  useEffect(() => {
+    return () => {
+      if (refreshTimer.current) clearTimeout(refreshTimer.current);
+    };
+  }, []);
 
   const matchingAlertId = alerts.length === 1 ? alerts[0].id : null;
 

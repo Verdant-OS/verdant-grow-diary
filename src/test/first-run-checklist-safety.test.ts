@@ -54,8 +54,9 @@ describe("FirstRunChecklist safety", () => {
     expect(allCopy).not.toMatch(/\bconfirmed diagnosis\b/i);
   });
 
-  it("is mounted on the authenticated Dashboard", () => {
+  it("mounts only the canonical onboarding checklist on the authenticated Dashboard", () => {
     const dash = read("pages/Dashboard.tsx");
-    expect(dash).toMatch(/FirstRunChecklist/);
+    expect(dash).toMatch(/OnboardingChecklistCard/);
+    expect(dash).not.toMatch(/FirstRunChecklist/);
   });
 });

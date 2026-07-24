@@ -28,32 +28,28 @@ export const CSV_PREVIEW_WARNING_COPY: Record<FlagCode, WarningExplanation> = {
     title: "pH value outside realistic range",
     whyItMatters:
       "This pH value is outside a realistic cultivation range, so it likely reflects a unit or calibration issue rather than a true reading.",
-    suggestedFix:
-      "Confirm units, calibration, and whether the column is actually pH.",
+    suggestedFix: "Confirm units, calibration, and whether the column is actually pH.",
     severity: "error",
   },
   ec_unit_ambiguous: {
     title: "EC unit looks ambiguous",
     whyItMatters:
       "This column may be ppm/TDS or µS/cm, but Verdant expects mS/cm for EC. Mixed units will misrepresent feed strength.",
-    suggestedFix:
-      "Confirm the export unit and map only mS/cm values to EC.",
+    suggestedFix: "Confirm the export unit and map only mS/cm values to EC.",
     severity: "warn",
   },
   lux_not_ppfd: {
     title: "Lux is not PPFD",
     whyItMatters:
       "Lux is illuminance, not measured photosynthetic light. Verdant does not treat lux as measured PPFD.",
-    suggestedFix:
-      "Use measured PPFD/PAR data if available, or leave this column unmapped.",
+    suggestedFix: "Use measured PPFD/PAR data if available, or leave this column unmapped.",
     severity: "warn",
   },
   temp_unit_ambiguous: {
     title: "Temperature unit looks ambiguous",
     whyItMatters:
       "This value looks like °F but the column/mapping expects °C, or vice versa. Wrong units will skew VPD and stage targets.",
-    suggestedFix:
-      "Confirm whether the export uses Fahrenheit or Celsius and re-map if needed.",
+    suggestedFix: "Confirm whether the export uses Fahrenheit or Celsius and re-map if needed.",
     severity: "warn",
   },
   vwc_stuck: {
@@ -70,5 +66,5 @@ export function explainFlag(code: FlagCode): WarningExplanation {
   return CSV_PREVIEW_WARNING_COPY[code];
 }
 
-export const FUTURE_DIARY_CONVERSION_COPY =
-  "Convert to diary entries — coming later. Import to diary will be built as a separate approval-required flow." as const;
+export const CSV_PREVIEW_SIGNUP_HANDOFF_COPY =
+  "Your file stays on this device. After signup, create a grow and tent, then choose and confirm the CSV again in Sensor Data." as const;

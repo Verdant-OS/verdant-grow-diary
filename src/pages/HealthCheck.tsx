@@ -131,7 +131,10 @@ export default function HealthCheck() {
         const count = result.data?.length ?? 0;
         update(id, {
           status: count === 0 ? "warn" : "ok",
-          detail: count === 0 ? "No rows returned (empty or scoped out)." : `Loaded ${count} row${count === 1 ? "" : "s"}.`,
+          detail:
+            count === 0
+              ? "No rows returned (empty or scoped out)."
+              : `Loaded ${count} row${count === 1 ? "" : "s"}.`,
           durationMs,
         });
       } catch {
@@ -166,16 +169,16 @@ export default function HealthCheck() {
         : "ok";
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-8 space-y-6">
+    <div className="mx-auto max-w-3xl px-4 py-8 space-y-6">
       <header className="space-y-2">
         <h1 className="text-2xl font-semibold tracking-tight">Health check</h1>
         <p className="text-sm text-muted-foreground">
-          Read-only. Verifies your session, data reads, and diary timeline loading.
-          No writes, no AI calls, no Action Queue changes.
+          Read-only. Verifies your session, data reads, and diary timeline loading. No writes, no AI
+          calls, no Action Queue changes.
         </p>
       </header>
 
-      <div className="flex items-center gap-3">
+      <div className="flex min-w-0 flex-wrap items-center gap-3">
         <span
           role="status"
           aria-live="polite"
@@ -205,7 +208,7 @@ export default function HealthCheck() {
           {running ? "Running…" : "Re-run checks"}
         </Button>
         {ranAt && (
-          <span className="text-xs text-muted-foreground">
+          <span className="min-w-0 break-words text-xs text-muted-foreground">
             Last run {new Date(ranAt).toLocaleTimeString()}
           </span>
         )}
@@ -245,6 +248,6 @@ export default function HealthCheck() {
           </li>
         ))}
       </ul>
-    </main>
+    </div>
   );
 }

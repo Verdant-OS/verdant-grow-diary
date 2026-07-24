@@ -8,18 +8,12 @@ import SensorCsvPreview from "@/pages/SensorCsvPreview";
  * Static safety guard: page, panel, and rules must not contain any I/O,
  * write, AI, alert, action-queue, or device-control surfaces.
  */
-const PAGE_SRC = readFileSync(
-  resolve(__dirname, "../pages/SensorCsvPreview.tsx"),
-  "utf8",
-);
+const PAGE_SRC = readFileSync(resolve(__dirname, "../pages/SensorCsvPreview.tsx"), "utf8");
 const PANEL_SRC = readFileSync(
   resolve(__dirname, "../components/CsvSensorPreviewPanel.tsx"),
   "utf8",
 );
-const RULES_SRC = readFileSync(
-  resolve(__dirname, "../lib/csvSensorPreviewRules.ts"),
-  "utf8",
-);
+const RULES_SRC = readFileSync(resolve(__dirname, "../lib/csvSensorPreviewRules.ts"), "utf8");
 
 describe("SensorCsvPreview — static safety", () => {
   const FORBIDDEN: RegExp[] = [
@@ -46,9 +40,12 @@ describe("SensorCsvPreview — static safety", () => {
 
 describe("SensorCsvPreview — UI", () => {
   beforeEach(() => {
-    vi.stubGlobal("fetch", vi.fn(() => {
-      throw new Error("fetch must not be called from CSV preview");
-    }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => {
+        throw new Error("fetch must not be called from CSV preview");
+      }),
+    );
   });
 
   function makeFile(text: string, name = "sample.csv", type = "text/csv") {
@@ -68,6 +65,18 @@ describe("SensorCsvPreview — UI", () => {
     expect(banner).toHaveTextContent(/preview only/i);
     expect(banner).toHaveTextContent(/not live data/i);
     expect(banner).toHaveTextContent(/no automation/i);
+  });
+
+  it("marks the thin preview utility noindex with a clean canonical", () => {
+    render(<SensorCsvPreview />);
+    expect(document.head.querySelector('meta[name="robots"]')).toHaveAttribute(
+      "content",
+      "noindex, follow",
+    );
+    expect(document.head.querySelector('link[rel="canonical"]')).toHaveAttribute(
+      "href",
+      "https://verdantgrowdiary.com/sensors/csv-preview",
+    );
   });
 
   it("parses a dropped CSV, shows source=csv, status, and mapping", async () => {
@@ -116,8 +125,7 @@ describe("SensorCsvPreview — UI", () => {
 
   it("download report triggers a local Blob/object URL (no network)", async () => {
     render(<SensorCsvPreview />);
-    const csv =
-      "timestamp,temperature\n2026-06-01T10:00,24.1\n2026-06-01T11:00,24.5\n";
+    const csv = "timestamp,temperature\n2026-06-01T10:00,24.1\n2026-06-01T11:00,24.5\n";
     dropFile(makeFile(csv));
 
     await waitFor(() => {
@@ -125,17 +133,14 @@ describe("SensorCsvPreview — UI", () => {
     });
 
     // jsdom does not implement URL.createObjectURL/revokeObjectURL by default.
-    (URL as unknown as { createObjectURL?: (b: Blob) => string }).createObjectURL =
-      (() => "blob:mock") as (b: Blob) => string;
-    (URL as unknown as { revokeObjectURL?: (s: string) => void }).revokeObjectURL =
-      (() => {}) as (s: string) => void;
-    const createSpy = vi
-      .spyOn(URL, "createObjectURL")
-      .mockReturnValue("blob:mock");
+    (URL as unknown as { createObjectURL?: (b: Blob) => string }).createObjectURL = (() =>
+      "blob:mock") as (b: Blob) => string;
+    (URL as unknown as { revokeObjectURL?: (s: string) => void }).revokeObjectURL = (() => {}) as (
+      s: string,
+    ) => void;
+    const createSpy = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:mock");
     const revokeSpy = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
-    const clickSpy = vi
-      .spyOn(HTMLAnchorElement.prototype, "click")
-      .mockImplementation(() => {});
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
 
     fireEvent.click(screen.getByTestId("csv-preview-download-report"));
 
@@ -157,13 +162,9 @@ describe("SensorCsvPreview — UI", () => {
     dropFile(makeFile(csv));
 
     await waitFor(() => {
-      expect(
-        screen.getByTestId("csv-preview-override-trigger-timestamp"),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId("csv-preview-override-trigger-timestamp")).toBeInTheDocument();
     });
-    expect(
-      screen.getByTestId("csv-preview-override-trigger-temperature"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("csv-preview-override-trigger-temperature")).toBeInTheDocument();
   });
 
   it("renders timeline controls (window + sampling)", async () => {

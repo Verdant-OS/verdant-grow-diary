@@ -39,6 +39,14 @@ export interface TimelineEvidenceFilterInput {
    * is in the set are kept. Non-sensor entries are hidden.
    */
   sensorSources?: ReadonlyArray<TimelineSensorSourceKind> | null;
+  /**
+   * Inclusive ISO date bounds (YYYY-MM-DD) compared against the UTC day
+   * of `entry_at` (its ISO date slice). Malformed values are ignored as
+   * "no constraint"; rows without a parseable `entry_at` are hidden while
+   * a bound is active, because their day is unknowable — never guessed.
+   */
+  startDate?: string | null;
+  endDate?: string | null;
 }
 
 const TIMELINE_FILTER_STALE_MS = 30 * 60 * 1000;
@@ -70,10 +78,30 @@ export function deriveTimelineRowSensorSource(
     staleMs: options.staleMs ?? TIMELINE_FILTER_STALE_MS,
     now: options.now,
     fallback: "manual",
+    context: "persisted_snapshot",
   }).kind;
 }
 
 const SAFE_DETAIL_TEXT_KEYS = ["plant_name", "stage"] as const;
+
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * True when `value` is a plain ISO calendar date (YYYY-MM-DD). Used for
+ * URL-provided date-range filter values; anything else is treated as
+ * "no constraint" rather than guessed at.
+ */
+export function isTimelineDateFilterValue(value: string | null | undefined): value is string {
+  return typeof value === "string" && ISO_DATE_RE.test(value);
+}
+
+/** The UTC day (YYYY-MM-DD) of an `entry_at` ISO timestamp, or null. */
+function rowUtcDay(row: TimelineEvidenceRow): string | null {
+  const at = row.entry_at;
+  if (typeof at !== "string" || at.length < 10) return null;
+  const day = at.slice(0, 10);
+  return ISO_DATE_RE.test(day) ? day : null;
+}
 
 function normalize(v: unknown): string {
   return typeof v === "string" ? v.trim().toLowerCase() : "";
@@ -133,6 +161,15 @@ export function timelineEvidenceRowMatches(
     if (!input.sensorSources.includes(kind)) return false;
   }
 
+  const start = isTimelineDateFilterValue(input.startDate) ? input.startDate : null;
+  const end = isTimelineDateFilterValue(input.endDate) ? input.endDate : null;
+  if (start !== null || end !== null) {
+    const day = rowUtcDay(row);
+    if (day === null) return false;
+    if (start !== null && day < start) return false;
+    if (end !== null && day > end) return false;
+  }
+
   return true;
 }
 
@@ -149,7 +186,9 @@ export function filterTimelineEvidenceRows<T extends TimelineEvidenceRow>(
   const noTent = !input.tentId || input.tentId.trim() === "";
   const noType = !input.eventType || input.eventType.trim() === "";
   const noSrc = !Array.isArray(input.sensorSources) || input.sensorSources.length === 0;
-  if (noQuery && noPlant && noTent && noType && noSrc) return [...rows];
+  const noDates =
+    !isTimelineDateFilterValue(input.startDate) && !isTimelineDateFilterValue(input.endDate);
+  if (noQuery && noPlant && noTent && noType && noSrc && noDates) return [...rows];
   return rows.filter((r) => timelineEvidenceRowMatches(r, input));
 }
 
@@ -173,9 +212,7 @@ export function deriveTimelinePlantOptions(
     if (id === "") continue;
     const name = (r.details ?? {})["plant_name"];
     const label =
-      typeof name === "string" && name.trim() !== ""
-        ? name.trim()
-        : `Plant ${id.slice(0, 6)}`;
+      typeof name === "string" && name.trim() !== "" ? name.trim() : `Plant ${id.slice(0, 6)}`;
     const cur = m.get(id);
     if (cur) cur.count += 1;
     else m.set(id, { label, count: 1 });
@@ -199,9 +236,7 @@ export function deriveTimelineTentOptions(
     if (id === "") continue;
     const name = nameById?.get(id);
     const label =
-      typeof name === "string" && name.trim() !== ""
-        ? name.trim()
-        : `Tent ${id.slice(0, 6)}`;
+      typeof name === "string" && name.trim() !== "" ? name.trim() : `Tent ${id.slice(0, 6)}`;
     const cur = m.get(id);
     if (cur) cur.count += 1;
     else m.set(id, { label, count: 1 });
@@ -229,18 +264,17 @@ export function deriveTimelineEventTypeOptions(
     .sort((a, b) => a.label.localeCompare(b.label));
 }
 
-export function isTimelineEvidenceFilterActive(
-  input: TimelineEvidenceFilterInput,
-): boolean {
+export function isTimelineEvidenceFilterActive(input: TimelineEvidenceFilterInput): boolean {
   if (normalize(input.query) !== "") return true;
   if (input.plantId && input.plantId.trim() !== "") return true;
   if (input.tentId && input.tentId.trim() !== "") return true;
   if (input.eventType && input.eventType.trim() !== "") return true;
   if (Array.isArray(input.sensorSources) && input.sensorSources.length > 0) return true;
+  if (isTimelineDateFilterValue(input.startDate)) return true;
+  if (isTimelineDateFilterValue(input.endDate)) return true;
   return false;
 }
 
 export const TIMELINE_EVIDENCE_SEARCH_PLACEHOLDER = "Search timeline";
 export const TIMELINE_EVIDENCE_EMPTY_TITLE = "No matches";
-export const TIMELINE_EVIDENCE_EMPTY_DESC =
-  "No timeline entries match these filters.";
+export const TIMELINE_EVIDENCE_EMPTY_DESC = "No timeline entries match these filters.";

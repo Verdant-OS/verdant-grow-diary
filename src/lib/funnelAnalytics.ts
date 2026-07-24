@@ -1,0 +1,128 @@
+/**
+ * Funnel analytics — the growth-calendar conversion events:
+ *
+ *   Shared setup: signup → grow_created → tent_created → plant_created
+ *   Diary activation branch: quick_log_saved → AI Doctor / paid events
+ *   CSV acquisition branch: csv_history_onboarding_ready →
+ *     csv_import_started → csv_import_completed →
+ *     csv_history_ai_doctor_clicked → AI Doctor / paid events
+ *
+ * Quick Log and CSV history are independent activation paths. The event list
+ * below is a closed catalog, not a requirement that a grower traverse every
+ * event in order.
+ *
+ * Historical reviews additionally emit historical_ai_review_started as a
+ * companion marker; standard reviews do not pass through that branch.
+ *
+ * Design constraints (grower-privacy first):
+ *  - Fire-and-forget: never throws, never blocks a save/checkout path,
+ *    no-ops when gtag is absent (ad blockers, tests, SSR-like envs).
+ *  - Structural param allowlist: only the keys below, only primitive
+ *    values, and string values must be short enum-like tokens — free
+ *    text (notes, nicknames, emails) cannot pass through this module.
+ *  - No user ids, plant ids, or any row identifiers, ever.
+ *  - Every event is mirrored onto the existing `verdant:analytics`
+ *    CustomEvent bridge (see pricingAnalytics.ts) so a future provider
+ *    can subscribe without touching the call sites.
+ */
+
+import { PRICING_ANALYTICS_EVENT } from "@/lib/pricingAnalytics";
+
+export const FUNNEL_EVENTS = [
+  "signup",
+  "grow_created",
+  "tent_created",
+  "plant_created",
+  "quick_log_saved",
+  "csv_history_onboarding_ready",
+  "csv_import_started",
+  "csv_import_completed",
+  "csv_history_ai_doctor_clicked",
+  "ai_doctor_review_started",
+  "historical_ai_review_started",
+  "ai_doctor_result_received",
+  "ai_doctor_session_saved",
+  "paywall_viewed",
+  "paywall_cta_clicked",
+  "checkout_started",
+  "subscription_activated",
+  "checkout_return_completed",
+] as const;
+
+export type FunnelEventName = (typeof FUNNEL_EVENTS)[number];
+
+/**
+ * The only param keys that ever reach the tracker. Everything else is
+ * dropped silently — call sites cannot widen this surface by accident.
+ */
+export const FUNNEL_PARAM_KEYS = [
+  /** Privacy-safe funnel surface enum; never a route, ID, or grower input. */
+  "surface",
+  /** Plan slug the grower acted on (enum like "pro-monthly"), never input. */
+  "plan",
+  /** Signup method (e.g. "email"). */
+  "method",
+  /** Privacy-safe Quick Log success enum; never grower content. */
+  "event_type",
+  /** csv_import_completed inserted-row count. */
+  "rows",
+] as const;
+
+type FunnelParamKey = (typeof FUNNEL_PARAM_KEYS)[number];
+
+export type FunnelEventParams = Partial<Record<FunnelParamKey, string | number | boolean>>;
+
+/**
+ * Enum-like strings only: short, no whitespace. Anything that looks like
+ * free text is dropped rather than truncated — a partial note is still a
+ * leak.
+ */
+const MAX_STRING_PARAM_LENGTH = 32;
+
+export function sanitizeFunnelParams(
+  params?: FunnelEventParams,
+): Record<string, string | number | boolean> {
+  const out: Record<string, string | number | boolean> = {};
+  if (!params) return out;
+  for (const key of FUNNEL_PARAM_KEYS) {
+    const value = params[key];
+    if (value === undefined || value === null) continue;
+    if (typeof value === "number") {
+      if (Number.isFinite(value)) out[key] = value;
+      continue;
+    }
+    if (typeof value === "boolean") {
+      out[key] = value;
+      continue;
+    }
+    if (
+      typeof value === "string" &&
+      value.length > 0 &&
+      value.length <= MAX_STRING_PARAM_LENGTH &&
+      !/\s/.test(value)
+    ) {
+      out[key] = value;
+    }
+  }
+  return out;
+}
+
+export function trackFunnelEvent(name: FunnelEventName, params?: FunnelEventParams): void {
+  if (typeof window === "undefined") return;
+  const safe = sanitizeFunnelParams(params);
+  try {
+    const g = (window as { gtag?: (...args: unknown[]) => void }).gtag;
+    if (typeof g === "function") g("event", name, safe);
+  } catch {
+    // Analytics must never break the product.
+  }
+  try {
+    window.dispatchEvent(
+      new CustomEvent(PRICING_ANALYTICS_EVENT, {
+        detail: { name, props: safe },
+      }),
+    );
+  } catch {
+    // Same.
+  }
+}

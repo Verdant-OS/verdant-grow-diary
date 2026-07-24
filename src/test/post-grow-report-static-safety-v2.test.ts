@@ -122,9 +122,8 @@ describe("Post-Grow Report — full-path static safety v2", () => {
     }
   });
 
-  it("never leaks raw payloads, service-role keys, bridge tokens, or api tokens in executable code", () => {
+  it("never exposes raw payloads, service-role keys, bridge tokens, or api tokens", () => {
     const FORBIDDEN_SECRETS = [
-      "raw_payload",
       "service_role",
       "service-role",
       "sb_secret",
@@ -137,9 +136,7 @@ describe("Post-Grow Report — full-path static safety v2", () => {
     // documentation ("Never accepts raw_payload, service-role keys, ...")
     // doesn't trip the secret scan. We care about runtime code.
     const stripComments = (s: string) =>
-      s
-        .replace(/\/\*[\s\S]*?\*\//g, "")
-        .replace(/^\s*\/\/.*$/gm, "");
+      s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
     for (const s of SOURCES) {
       const lower = stripComments(s.body).toLowerCase();
       for (const term of FORBIDDEN_SECRETS) {
@@ -149,6 +146,14 @@ describe("Post-Grow Report — full-path static safety v2", () => {
         ).toBe(false);
       }
     }
+    // The pure report builder accepts raw lineage only to run the shared
+    // diagnostic classifier. Presenter/print files must never reference it.
+    for (const s of SOURCES.filter(
+      (source) => source.path !== "src/lib/postGrowLearningReportRules.ts",
+    )) {
+      expect(stripComments(s.body).toLowerCase()).not.toContain("raw_payload");
+    }
+    expect(read("src/lib/postGrowLearningReportRules.ts")).toContain("withoutDiagnosticSensorRows");
   });
 
   it("pins the approved guardrail negation copy is actually present", () => {

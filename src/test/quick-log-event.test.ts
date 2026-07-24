@@ -25,6 +25,7 @@ const state = {
     error: null,
   } as Result,
   snapshotRpc: { data: null, error: null } as Result,
+  sensorRows: { data: [], error: null } as Result,
 };
 
 const rpcSpy = vi.fn();
@@ -34,9 +35,16 @@ vi.mock("@/integrations/supabase/client", () => ({
     rpc: (fn: string, args: Record<string, unknown>) => {
       rpcSpy(fn, args);
       if (fn === "quicklog_save_event") return Promise.resolve(state.saveRpc);
-      if (fn === "get_latest_tent_sensor_snapshot")
-        return Promise.resolve(state.snapshotRpc);
+      if (fn === "get_latest_tent_sensor_snapshot") return Promise.resolve(state.snapshotRpc);
       return Promise.resolve({ data: null, error: null });
+    },
+    from: () => {
+      const builder: Record<string, unknown> = {};
+      for (const method of ["select", "eq", "gte", "lte", "order"]) {
+        builder[method] = () => builder;
+      }
+      builder.limit = () => Promise.resolve(state.sensorRows);
+      return builder;
     },
   },
 }));
@@ -58,6 +66,7 @@ beforeEach(() => {
     error: null,
   };
   state.snapshotRpc = { data: null, error: null };
+  state.sensorRows = { data: [], error: null };
 });
 
 describe("createQuickLogEvent — RPC contract", () => {
@@ -131,9 +140,9 @@ describe("createQuickLogEvent — RPC contract", () => {
       data: { ok: false, reason: "invalid_event_type" },
       error: null,
     };
-    await expect(
-      createQuickLogEvent({ ...baseInput, eventType: "observe" }),
-    ).rejects.toThrow(/invalid_event_type/);
+    await expect(createQuickLogEvent({ ...baseInput, eventType: "observe" })).rejects.toThrow(
+      /invalid_event_type/,
+    );
   });
 
   it("note-style idempotency replay still returns the original event id", async () => {
@@ -152,9 +161,7 @@ describe("createQuickLogEvent — RPC contract", () => {
 
   it("does not fetch or send a snapshot when tentId is absent", async () => {
     await createQuickLogEvent({ ...baseInput, eventType: "observe" });
-    expect(
-      rpcSpy.mock.calls.some((c) => c[0] === "get_latest_tent_sensor_snapshot"),
-    ).toBe(false);
+    expect(rpcSpy.mock.calls.some((c) => c[0] === "get_latest_tent_sensor_snapshot")).toBe(false);
     expect(getSaveCall()?.p_sensor_snapshot).toBeNull();
   });
 
@@ -180,6 +187,29 @@ describe("createQuickLogEvent — RPC contract", () => {
         soil_ec: null,
         ppfd: null,
       },
+      error: null,
+    };
+    state.sensorRows = {
+      data: [
+        {
+          id: "temperature",
+          metric: "temperature_c",
+          value: 24.3,
+          quality: "ok",
+          source: "csv",
+          captured_at: "2026-06-09T12:00:00Z",
+          raw_payload: {},
+        },
+        {
+          id: "humidity",
+          metric: "humidity_pct",
+          value: 55,
+          quality: "ok",
+          source: "csv",
+          captured_at: "2026-06-09T12:00:00Z",
+          raw_payload: {},
+        },
+      ],
       error: null,
     };
     await createQuickLogEvent({
@@ -215,9 +245,9 @@ describe("createQuickLogEvent — RPC contract", () => {
       data: { ok: false, reason: "not_authenticated" },
       error: null,
     };
-    await expect(
-      createQuickLogEvent({ ...baseInput, eventType: "note" }),
-    ).rejects.toThrow("Not authenticated");
+    await expect(createQuickLogEvent({ ...baseInput, eventType: "note" })).rejects.toThrow(
+      "Not authenticated",
+    );
   });
 
   it("translates grow_not_owned reason", async () => {
@@ -225,9 +255,9 @@ describe("createQuickLogEvent — RPC contract", () => {
       data: { ok: false, reason: "grow_not_owned" },
       error: null,
     };
-    await expect(
-      createQuickLogEvent({ ...baseInput, eventType: "note" }),
-    ).rejects.toThrow("Grow not found or not owned by current user");
+    await expect(createQuickLogEvent({ ...baseInput, eventType: "note" })).rejects.toThrow(
+      "Grow not found or not owned by current user",
+    );
   });
 
   it("translates plant_not_in_grow reason", async () => {
@@ -273,8 +303,8 @@ describe("createQuickLogEvent — RPC contract", () => {
 
   it("surfaces the underlying error message when the RPC errors out", async () => {
     state.saveRpc = { data: null, error: { message: "db down" } };
-    await expect(
-      createQuickLogEvent({ ...baseInput, eventType: "note" }),
-    ).rejects.toThrow("Failed to save quick log: db down");
+    await expect(createQuickLogEvent({ ...baseInput, eventType: "note" })).rejects.toThrow(
+      "Failed to save quick log: db down",
+    );
   });
 });

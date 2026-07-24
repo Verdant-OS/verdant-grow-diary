@@ -16,10 +16,7 @@ const old = new Date(NOW - 60 * 60_000).toISOString();
 
 const ROOT = resolve(__dirname, "../..");
 const SENSORS = readFileSync(resolve(ROOT, "src/pages/Sensors.tsx"), "utf8");
-const BADGE = readFileSync(
-  resolve(ROOT, "src/components/GrowDataSourceBadge.tsx"),
-  "utf8",
-);
+const BADGE = readFileSync(resolve(ROOT, "src/components/GrowDataSourceBadge.tsx"), "utf8");
 
 describe("GrowDataSourceBadge", () => {
   it("renders Live for fresh real-source reading", () => {
@@ -53,20 +50,24 @@ describe("GrowDataSourceBadge", () => {
         options={{ now: NOW }}
       />,
     );
-    expect(screen.getByTestId("grow-data-source-badge")).toHaveTextContent(
-      "Stale",
+    expect(screen.getByTestId("grow-data-source-badge")).toHaveTextContent("Stale");
+  });
+
+  it("renders old imports as CSV history without promoting freshness", () => {
+    render(
+      <GrowDataSourceBadge
+        input={{ source: "csv", value: 1, timestamp: old }}
+        options={{ now: NOW }}
+      />,
     );
+    const badge = screen.getByTestId("grow-data-source-badge");
+    expect(badge).toHaveTextContent("CSV history");
+    expect(badge.getAttribute("data-label")).toBe("CSV history");
   });
 
   it("renders Unavailable for missing reading", () => {
-    render(
-      <GrowDataSourceBadge
-        input={{ source: null, value: null, timestamp: null }}
-      />,
-    );
-    expect(screen.getByTestId("grow-data-source-badge")).toHaveTextContent(
-      "Unavailable",
-    );
+    render(<GrowDataSourceBadge input={{ source: null, value: null, timestamp: null }} />);
+    expect(screen.getByTestId("grow-data-source-badge")).toHaveTextContent("Unavailable");
   });
 
   it("hides badge for Live when alwaysShow=false", () => {
@@ -84,17 +85,14 @@ describe("GrowDataSourceBadge", () => {
 describe("Sensors page wiring (source contract)", () => {
   it("imports the badge and the rule helper", () => {
     expect(SENSORS).toMatch(/from\s+["']@\/components\/GrowDataSourceBadge["']/);
-    expect(SENSORS).toMatch(
-      /from\s+["']@\/lib\/growDataSourceLabelRules["']/,
-    );
+    expect(SENSORS).toMatch(/from\s+["']@\/lib\/growDataSourceLabelRules["']/);
   });
 
-  it("labels current mock-backed readings as demo (not live) when the real source is missing", () => {
-    // AUD-003: the page now classifies on the real reading's source when
-    // present, and falls back to "demo" only when none is known. It must
-    // never hard-label live/supabase/sensor when the data is mock.
-    expect(SENSORS).toMatch(/["']demo["']/);
-    expect(SENSORS).not.toMatch(/source:\s*["'](live|supabase|sensor)["']/);
+  it("keeps missing authenticated provenance unavailable instead of inventing demo or live", () => {
+    expect(SENSORS).toMatch(/const latestSourceRaw/);
+    expect(SENSORS).toMatch(/\{ source: null, value: null, timestamp: null \}/);
+    expect(SENSORS).not.toMatch(/fallback:\s*["']demo["']/);
+    expect(SENSORS).not.toMatch(/source:\s*["'](demo|live|supabase|sensor)["']/);
   });
 
   it("renders GrowDataSourceBadge near readings", () => {
@@ -113,9 +111,7 @@ describe("Sensors page wiring (source contract)", () => {
 
   it("does not introduce writes, service_role, or external-control surface", () => {
     expect(SENSORS).not.toMatch(/service_role/);
-    expect(SENSORS).not.toMatch(
-      /\.(insert|update|delete|upsert)\s*\(/,
-    );
+    expect(SENSORS).not.toMatch(/\.(insert|update|delete|upsert)\s*\(/);
     expect(SENSORS).not.toMatch(
       /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|relay|actuator|webhook/i,
     );

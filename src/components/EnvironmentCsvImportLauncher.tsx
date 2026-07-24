@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 import { FileUp } from "lucide-react";
+import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 
 import { EnvironmentCsvImportModal } from "@/components/EnvironmentCsvImportModal";
 import {
@@ -34,6 +35,8 @@ import {
   type ExistingKeysQueryScope,
 } from "@/lib/csv-import/sensorReadingsBatchInsert";
 import type { ParsedEnvironmentRow } from "@/lib/csvParser";
+import { sensorsPath, tentDetailPath } from "@/lib/routes";
+import { IMPORTED_SENSOR_HISTORY_ANCHOR_ID } from "@/lib/importedSensorHistoryViewModel";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 
@@ -111,6 +114,23 @@ export function EnvironmentCsvImportLauncher(props: EnvironmentCsvImportLauncher
 
   const ready = !!user?.id && !!growId && !!tentId;
 
+  const handleOpen = useCallback(() => {
+    trackFunnelEvent("csv_import_started");
+    setOpen(true);
+  }, []);
+
+  // Imported history is rendered on Tent Detail, so the completion link
+  // targets that exact anchored section. Plant context is chosen explicitly
+  // after the grower sees the history; Verdant never infers a plant from the
+  // file or auto-runs AI Doctor.
+  const viewHistoryHref = tentId
+    ? `${tentDetailPath(tentId)}#${IMPORTED_SENSOR_HISTORY_ANCHOR_ID}`
+    : null;
+  // Current-condition handoff stays on the existing manual sensor form.
+  // The grower still enters, reviews, and confirms every value; this link
+  // performs no write and never invokes AI Doctor by itself.
+  const addCurrentReadingHref = growId ? `${sensorsPath(growId)}#manual-reading` : null;
+
   const handleConfirm = useCallback(
     async (rows: readonly ParsedEnvironmentRow[]) => {
       if (!user?.id || !growId || !tentId) {
@@ -137,6 +157,8 @@ export function EnvironmentCsvImportLauncher(props: EnvironmentCsvImportLauncher
             ? `${res.insertedCount} reading(s) added as CSV context. Skipped ${res.duplicateCount} duplicate reading(s) already in Verdant.`
             : `${res.insertedCount} reading(s) added as CSV context.`;
         toast({ title: "CSV history imported", description });
+        trackFunnelEvent("csv_import_completed", { rows: res.insertedCount });
+        qc.invalidateQueries({ queryKey: ["grow", "sensors"] });
         qc.invalidateQueries({ queryKey: ["sensor_readings"] });
         qc.invalidateQueries({ queryKey: ["csv-timeline-context"] });
         if (typeof window !== "undefined") {
@@ -165,13 +187,19 @@ export function EnvironmentCsvImportLauncher(props: EnvironmentCsvImportLauncher
         <Button
           variant="outline"
           size="sm"
-          onClick={() => setOpen(true)}
+          onClick={handleOpen}
           data-testid={`${testIdPrefix}-button`}
           className="gap-1.5"
         >
           <FileUp className="h-3.5 w-3.5" /> Import CSV
         </Button>
-        <EnvironmentCsvImportModal open={open} onOpenChange={setOpen} onConfirm={handleConfirm} />
+        <EnvironmentCsvImportModal
+          open={open}
+          onOpenChange={setOpen}
+          onConfirm={handleConfirm}
+          viewHistoryHref={viewHistoryHref}
+          addCurrentReadingHref={addCurrentReadingHref}
+        />
       </>
     );
   }
@@ -192,11 +220,17 @@ export function EnvironmentCsvImportLauncher(props: EnvironmentCsvImportLauncher
         Data is read-only and source-tagged as CSV.
       </p>
       <div className="mt-3">
-        <Button onClick={() => setOpen(true)} data-testid={`${testIdPrefix}-button`}>
+        <Button onClick={handleOpen} data-testid={`${testIdPrefix}-button`}>
           {label}
         </Button>
       </div>
-      <EnvironmentCsvImportModal open={open} onOpenChange={setOpen} onConfirm={handleConfirm} />
+      <EnvironmentCsvImportModal
+        open={open}
+        onOpenChange={setOpen}
+        onConfirm={handleConfirm}
+        viewHistoryHref={viewHistoryHref}
+        addCurrentReadingHref={addCurrentReadingHref}
+      />
     </section>
   );
 }

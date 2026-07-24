@@ -59,6 +59,7 @@ function renderAt(state: Partial<UsePhenoHuntWorkspaceState>) {
     decisionHistoryByPlant: {},
     sexByPlant: {},
     reversedPlantIds: new Set<string>(),
+    clonedPlantIds: new Set<string>(),
     smokeByPlant: {},
     labByKey: {},
     error: null,

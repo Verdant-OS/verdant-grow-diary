@@ -29,10 +29,18 @@ describe("PhenoHuntNew write-path guard", () => {
   it("Pro entitlement allows createPhenoHunt", async () => {
     const e = resolveEntitlements(
       {
-        id: "r", user_id: "u", plan_id: "pro_monthly", status: "active",
-        provider: "paddle", provider_customer_id: null, provider_subscription_id: null,
-        current_period_end: "2027-01-01Z", cancel_at_period_end: false,
-        founder_number: null, created_at: "", updated_at: "",
+        id: "r",
+        user_id: "u",
+        plan_id: "pro_monthly",
+        status: "active",
+        provider: "paddle",
+        provider_customer_id: null,
+        provider_subscription_id: null,
+        current_period_end: "2027-01-01Z",
+        cancel_at_period_end: false,
+        founder_number: null,
+        created_at: "",
+        updated_at: "",
       },
       new Date("2026-08-01Z"),
     );
@@ -41,13 +49,45 @@ describe("PhenoHuntNew write-path guard", () => {
     expect(createPhenoHunt).toHaveBeenCalledTimes(1);
   });
 
-  it("Canceled Pro blocks createPhenoHunt (write-forbidden)", async () => {
+  it("Canceled Pro keeps write access through the paid-through end", async () => {
     const e = resolveEntitlements(
       {
-        id: "r", user_id: "u", plan_id: "pro_monthly", status: "canceled",
-        provider: "paddle", provider_customer_id: null, provider_subscription_id: null,
-        current_period_end: "2027-01-01Z", cancel_at_period_end: false,
-        founder_number: null, created_at: "", updated_at: "",
+        id: "r",
+        user_id: "u",
+        plan_id: "pro_monthly",
+        status: "canceled",
+        provider: "paddle",
+        provider_customer_id: null,
+        provider_subscription_id: null,
+        current_period_end: "2027-01-01Z",
+        cancel_at_period_end: false,
+        founder_number: null,
+        created_at: "",
+        updated_at: "",
+      },
+      new Date("2026-08-01Z"),
+    );
+    createPhenoHunt.mockClear();
+    const out = await simulateOnSave(e);
+    expect(out).toBe("ran");
+    expect(createPhenoHunt).toHaveBeenCalledTimes(1);
+  });
+
+  it("Canceled Pro blocks createPhenoHunt after its paid-through end", async () => {
+    const e = resolveEntitlements(
+      {
+        id: "r",
+        user_id: "u",
+        plan_id: "pro_monthly",
+        status: "canceled",
+        provider: "paddle",
+        provider_customer_id: null,
+        provider_subscription_id: null,
+        current_period_end: "2026-07-01Z",
+        cancel_at_period_end: false,
+        founder_number: null,
+        created_at: "",
+        updated_at: "",
       },
       new Date("2026-08-01Z"),
     );

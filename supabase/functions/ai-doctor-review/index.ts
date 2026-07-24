@@ -1,25 +1,63 @@
-// ai-doctor-review — first live AI review slice. Server-side validated,
-// non-persistent. Never returns raw model text. Fails closed.
+// ai-doctor-review — first live AI review slice. Server-side validated.
+// Never returns raw model text. A private completion fact is recorded only
+// after a fresh response passes the contract. Fails closed.
 //
 // Hard constraints:
-//  - No DB writes beyond the ai_credit_spends ledger via ai_credit_spend /
-//    ai_credit_refund RPCs (S2). No ai_doctor_sessions / alerts /
-//    action_queue / sensor_readings writes. No equipment / device control.
+//  - No direct DB writes. Credit spending/refunds, atomic result/receipt finalization,
+//    and one protected fresh-review completion RPC are the only persistence.
+//    No ai_doctor_sessions / alerts / action_queue / sensor_readings writes.
+//    No equipment / device control.
 //  - LOVABLE_API_KEY stays server-only. Never echoed to client.
 //  - Response is always { ok: true, result, credit? } or
 //    { ok: false, reason, credit? }.
 //  - Model tier + weight are decided SERVER-SIDE. Client cannot self-discount.
 //  - Logs include only safe status/reason codes — never raw model text,
 //    full packets, secrets, tokens, or unvalidated AI output.
+//
+// Deployment order is mandatory:
+// 0. Drain old ai-doctor-review Edge traffic before the receipt migration; a
+//    stale build can otherwise create a cache-only result with no receipt.
+// 1. Provision server-only AI_DOCTOR_RECEIPT_HMAC_KEY (32+ UTF-8 bytes) and
+//    set AI_DOCTOR_RECEIPT_HMAC_KEY_ID configuration; rotate them together.
+// 2. Apply 20260719043000_ai_credit_result_cache.sql, then
+//    20260719180000_ai_doctor_review_evidence_receipts.sql.
+// Apply both migrations before deploying this function.
+// 3. Deploy this function, then publish the client with optional session/collection metadata.
+// Reopen traffic only after the new finalizer smoke passes; do not roll back to
+// a pre-receipt Edge build without a deliberate compatibility procedure.
+// Legacy cache-only replays remain valid, but this function never backfills
+// them with new context because idempotency does not bind the old packet.
+
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { validateAiDoctorReviewResult } from "./contract.ts";
-import { buildAiDoctorPromptMessages } from "../../../src/lib/aiDoctorPromptAssembly.ts";
+// All src/lib touch-points routed through _shared/ shims. See
+// _shared/unionEntitlementLookup.ts for the re-export convention: this
+// function must not import from ../../../src/lib (any depth) directly.
+// (Do not write the glob form here — a "/" + "*" sequence inside a line
+// comment opens a phantom block for the naive comment-strippers used by
+// the static boundary tests, swallowing real code between comments.)
+import { buildAiDoctorPromptMessages } from "../_shared/aiDoctorPromptAssembly.ts";
+import { parseAiDoctorReviewRequestEnvelope } from "../_shared/aiDoctorReviewRequestTransportRules.ts";
+import { validateAndNormalizeAiDoctorReviewRequestPacket } from "../_shared/aiDoctorReviewRequestPacketValidationRules.ts";
+import {
+  buildAiDoctorReviewEvidenceReceiptSnapshot,
+  isAiDoctorReviewEvidenceAcceptanceCoherentWithPacket,
+  isAiDoctorReviewEvidenceReceiptSnapshot,
+  normalizeAiDoctorReviewEvidenceAcceptance,
+} from "../_shared/aiDoctorReviewEvidenceReceiptRules.ts";
+import {
+  classifyAiDoctorCreditSpend,
+  isConfirmedAiDoctorCreditRefund,
+  parseAiDoctorResultAttachment,
+} from "../_shared/aiDoctorCreditReplayRules.ts";
+import { resolveRequiredServerBillingEnvironment } from "../_shared/unionEntitlementLookup.ts";
+import { isMissingAiCreditRpcOverload } from "../_shared/aiCreditRpcCompatibility.ts";
 // Measurement-only cost wiring. Pure helpers; no persistence, no I/O.
 import {
   attachProviderResponseUsageToAiDoctorPromptMeasurement,
   buildAiDoctorPromptMeasurement,
-} from "../../../src/lib/cost/index.ts";
+} from "../_shared/cost.ts";
 
 const TIMEOUT_MS = 25_000;
 const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
@@ -27,6 +65,12 @@ const MODEL = "google/gemini-3-flash-preview";
 // S2: server-pinned tier/feature. Escalation is deferred.
 const FEATURE = "ai_doctor_review";
 const MODEL_TIER = "standard";
+const COMPLETION_WRITE_TIMEOUT_MS = 1_500;
+const RESULT_PERSISTENCE_TIMEOUT_MS = 3_000;
+const TOOL_SCHEMA_VERSION = "ai-doctor-review-tool-v1";
+const PROMPT_CONTRACT_VERSION = "ai-doctor-review-prompt-v1";
+const RECEIPT_HMAC_SECRET_ENV = "AI_DOCTOR_RECEIPT_HMAC_KEY";
+const RECEIPT_HMAC_KEY_ID_ENV = "AI_DOCTOR_RECEIPT_HMAC_KEY_ID";
 
 // Base system prompt is composed inside buildAiDoctorPromptMessages so
 // imported CSV/XLSX history guidance and missing-live-readings notes can
@@ -88,13 +132,113 @@ function safeOk(result: unknown, credit?: Record<string, unknown>): Response {
 }
 
 function isUuid(s: unknown): s is string {
-  return typeof s === "string" &&
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+  return (
+    typeof s === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)
+  );
 }
 
-function readPacketField(packet: unknown, key: string): unknown {
-  if (!packet || typeof packet !== "object") return undefined;
-  return (packet as Record<string, unknown>)[key];
+function isReceiptHmacKeyId(value: unknown): value is string {
+  return typeof value === "string" && /^[A-Za-z0-9._:-]{1,80}$/.test(value);
+}
+
+/**
+ * Computes a server-keyed integrity HMAC over the exact outbound request frame.
+ * Neither the prompt text nor the HMAC secret is returned, stored in browser
+ * rows, or logged. The HMAC is not used to authorize, price, or select a model.
+ */
+async function signAiDoctorPrompt(
+  prompt: ReturnType<typeof buildAiDoctorPromptMessages>,
+  secret: string,
+): Promise<string> {
+  const frame = JSON.stringify({
+    version: PROMPT_CONTRACT_VERSION,
+    model: MODEL,
+    messages: [
+      { role: "system", content: prompt.system },
+      { role: "user", content: prompt.user },
+    ],
+    tools: [TOOL_SCHEMA],
+    tool_choice: { type: "function", function: { name: "submit_ai_doctor_review" } },
+  });
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(frame));
+  const hex = Array.from(new Uint8Array(signature), (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("");
+  return `hmac-sha256:${hex}`;
+}
+async function settleResultPersistence<T>(operation: PromiseLike<T>): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      Promise.resolve(operation),
+      new Promise<never>((_resolve, reject) => {
+        timeoutId = setTimeout(
+          () => reject(new Error("result_persistence_timeout")),
+          RESULT_PERSISTENCE_TIMEOUT_MS,
+        );
+      }),
+    ]);
+  } finally {
+    if (timeoutId !== undefined) clearTimeout(timeoutId);
+  }
+}
+
+/**
+ * Records only the fact that a freshly generated, contract-validated review
+ * completed. It deliberately runs after the provider/result boundary and
+ * never changes the grower's response if measurement storage is unavailable.
+ */
+async function recordFreshAiDoctorReviewCompletion(userId: string, spendId: string): Promise<void> {
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  if (!serviceRoleKey || !supabaseUrl) {
+    console.log("ai-doctor-review completion=unavailable");
+    return;
+  }
+
+  try {
+    const serviceSupabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const { data, error } = await Promise.race([
+        serviceSupabase.rpc("record_ai_doctor_review_completion", {
+          p_spend_id: spendId,
+          p_expected_user_id: userId,
+        }),
+        new Promise<never>((_resolve, reject) => {
+          timeoutId = setTimeout(
+            () => reject(new Error("completion_timeout")),
+            COMPLETION_WRITE_TIMEOUT_MS,
+          );
+        }),
+      ]);
+      if (
+        error ||
+        !data ||
+        typeof data !== "object" ||
+        (data as Record<string, unknown>).ok !== true
+      ) {
+        console.log("ai-doctor-review completion=not_recorded");
+        return;
+      }
+      console.log("ai-doctor-review completion=recorded");
+    } finally {
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
+    }
+  } catch {
+    console.log("ai-doctor-review completion=not_recorded");
+  }
 }
 
 Deno.serve(async (req) => {
@@ -105,6 +249,10 @@ Deno.serve(async (req) => {
     return calmFailure("http");
   }
 
+  // Once a spend RPC begins, any unexpected failure is ambiguous: the database
+  // may have committed even if this invocation did not receive the response.
+  // Preserve the same logical request key so replay can resolve it safely.
+  let creditSpendMayExist = false;
   try {
     const auth = req.headers.get("Authorization");
     if (!auth) return calmFailure("http");
@@ -115,6 +263,28 @@ Deno.serve(async (req) => {
     );
     const { data: u } = await supabase.auth.getUser();
     if (!u?.user) return calmFailure("http");
+    const userId = u.user.id;
+
+    const receiptHmacSecret = Deno.env.get(RECEIPT_HMAC_SECRET_ENV);
+    const receiptHmacKeyId = Deno.env.get(RECEIPT_HMAC_KEY_ID_ENV);
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const billingEnvironmentResolution = resolveRequiredServerBillingEnvironment();
+    if (
+      !serviceRoleKey ||
+      !supabaseUrl ||
+      !billingEnvironmentResolution.ok ||
+      !receiptHmacSecret ||
+      new TextEncoder().encode(receiptHmacSecret).byteLength < 32 ||
+      !isReceiptHmacKeyId(receiptHmacKeyId)
+    ) {
+      console.log("ai-doctor-review status=config_missing");
+      return calmFailure("config");
+    }
+    const creditSupabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const billingEnvironment = billingEnvironmentResolution.environment;
 
     const apiKey = Deno.env.get("LOVABLE_API_KEY");
     if (!apiKey) {
@@ -122,84 +292,218 @@ Deno.serve(async (req) => {
       return calmFailure("config");
     }
 
-    let packet: unknown;
+    let requestBody: unknown;
     try {
-      packet = await req.json();
+      requestBody = await req.json();
     } catch {
       return calmFailure("parse");
     }
-    if (!packet || typeof packet !== "object") {
+    const request = parseAiDoctorReviewRequestEnvelope(requestBody);
+    if (!request) {
+      return calmFailure("shape");
+    }
+    // Validate the complete model-context schema before the first credit RPC.
+    // Reconstruction drops unknown/prototype keys and bounds every promptable
+    // string, array, and number; malformed packets fail without a spend.
+    const validatedPacket = validateAndNormalizeAiDoctorReviewRequestPacket(request.packet);
+    if (!validatedPacket) {
       return calmFailure("shape");
     }
 
-    // S2: server resolves grow scope from client-supplied grow_id (validated as
-    // UUID; ownership is re-verified inside ai_credit_spend). Client may
-    // supply idempotency_key for safe retries; we generate one otherwise.
-    const rawGrowId = readPacketField(packet, "grow_id") ??
-      readPacketField(packet, "growId");
-    const growId = isUuid(rawGrowId) ? rawGrowId : null;
-    const rawKey = readPacketField(packet, "idempotency_key") ??
-      readPacketField(packet, "idempotencyKey");
-    const idempotencyKey = (typeof rawKey === "string" &&
-        rawKey.length >= 8 && rawKey.length <= 200)
-      ? rawKey
-      : crypto.randomUUID();
+    // Server resolves grow scope from an untrusted transport envelope; the
+    // atomic credit RPC re-checks ownership. `request.packet` is deliberately
+    // separate; only its validated reconstruction may enter prompt assembly.
+    const growId = isUuid(request.growId) ? request.growId.toLowerCase() : null;
+    if (!isUuid(request.idempotencyKey)) {
+      return calmFailure("shape");
+    }
+    const idempotencyKey = request.idempotencyKey;
 
+    const rawSessionId = request.sessionId;
+    const sessionId =
+      rawSessionId === undefined || rawSessionId === null
+        ? null
+        : isUuid(rawSessionId)
+          ? rawSessionId.toLowerCase()
+          : null;
+    if (rawSessionId !== undefined && rawSessionId !== null && sessionId === null) {
+      return calmFailure("shape");
+    }
+
+    const rawEvidenceAcceptance = request.evidenceAcceptance;
+    const evidenceAcceptance =
+      rawEvidenceAcceptance === undefined
+        ? null
+        : normalizeAiDoctorReviewEvidenceAcceptance(rawEvidenceAcceptance);
+    if (
+      rawEvidenceAcceptance !== undefined &&
+      (!evidenceAcceptance ||
+        !isAiDoctorReviewEvidenceAcceptanceCoherentWithPacket(validatedPacket, evidenceAcceptance))
+    ) {
+      return calmFailure("shape");
+    }
+
+    const evidenceReceipt = buildAiDoctorReviewEvidenceReceiptSnapshot({
+      packet: validatedPacket,
+      clientCollectionDecision: evidenceAcceptance,
+    });
+    if (!evidenceReceipt || !isAiDoctorReviewEvidenceReceiptSnapshot(evidenceReceipt)) {
+      return calmFailure("shape");
+    }
+
+    const promptMessages = buildAiDoctorPromptMessages(validatedPacket);
+    let promptHmac: string;
+    try {
+      promptHmac = await signAiDoctorPrompt(promptMessages, receiptHmacSecret);
+    } catch {
+      console.log("ai-doctor-review status=prompt_hmac_unavailable");
+      return calmFailure("config");
+    }
     // ---- ai_credit_spend (atomic check-and-spend) ---------------------------
-    const { data: spend, error: spendErr } = await supabase.rpc(
-      "ai_credit_spend",
-      {
+    creditSpendMayExist = true;
+    let spendResponse = await creditSupabase.rpc("ai_credit_spend", {
+      p_user_id: userId,
+      p_billing_environment: billingEnvironment,
+      p_feature: FEATURE,
+      p_grow_id: growId,
+      p_model_tier: MODEL_TIER,
+      p_idempotency_key: idempotencyKey,
+      p_result: null,
+    });
+    // Spend-overload compatibility only: if an older database lacks the
+    // service-only spend signature, and only for that exact missing-overload
+    // error, use the still-authorized legacy user-scoped spend RPC. The result
+    // result-cache/receipt migrations remain hard deployment prerequisites. Permission,
+    // timeout, validation, and other database errors always fail closed.
+    if (isMissingAiCreditRpcOverload(spendResponse.error, "ai_credit_spend", "p_user_id")) {
+      spendResponse = await supabase.rpc("ai_credit_spend", {
         p_feature: FEATURE,
         p_grow_id: growId,
         p_model_tier: MODEL_TIER,
         p_idempotency_key: idempotencyKey,
         p_result: null,
-      },
-    );
+      });
+    }
+    const { data: spend, error: spendErr } = spendResponse;
     if (spendErr || !spend || typeof spend !== "object") {
       console.log(`ai-doctor-review status=credit_rpc_error`);
       return calmFailure("credit_rpc");
     }
     const spendObj = spend as Record<string, unknown>;
-    if (spendObj.ok !== true) {
-      console.log(
-        `ai-doctor-review status=credit_denied reason=${String(spendObj.reason ?? "")}`,
-      );
+
+    type RefundOutcome = "confirmed" | "unconfirmed";
+
+    async function refund(spendId: string | null, reason: string): Promise<RefundOutcome> {
+      if (!spendId) return "unconfirmed";
+      const refundKey = `refund:${spendId}`;
+      try {
+        let refundResponse = await settleResultPersistence(
+          creditSupabase.rpc("ai_credit_refund", {
+            p_expected_user_id: userId,
+            p_spend_id: spendId,
+            p_idempotency_key: refundKey,
+            p_reason: reason,
+          }),
+        );
+        if (
+          isMissingAiCreditRpcOverload(
+            refundResponse.error,
+            "ai_credit_refund",
+            "p_expected_user_id",
+          )
+        ) {
+          refundResponse = await settleResultPersistence(
+            supabase.rpc("ai_credit_refund", {
+              p_spend_id: spendId,
+              p_idempotency_key: refundKey,
+              p_reason: reason,
+            }),
+          );
+        }
+        if (!refundResponse.error && isConfirmedAiDoctorCreditRefund(refundResponse.data)) {
+          console.log("ai-doctor-review refund=confirmed");
+          return "confirmed";
+        }
+      } catch {
+        // The outcome is intentionally ambiguous; a retry must keep the same
+        // request key until the credit ledger resolves it.
+      }
+      console.log("ai-doctor-review refund=unconfirmed");
+      return "unconfirmed";
+    }
+
+    async function failureAfterRefund(
+      spendId: string | null,
+      refundReason: string,
+      terminalReason: string,
+    ): Promise<Response> {
+      const outcome = await refund(spendId, refundReason);
+      return calmFailure(outcome === "confirmed" ? terminalReason : "result_pending");
+    }
+
+    const spendDecision = classifyAiDoctorCreditSpend(spendObj, Date.now());
+    if (spendDecision.kind === "refunded") {
+      console.log("ai-doctor-review status=result_recording_failed");
+      return calmFailure("result_recording_failed");
+    }
+    if (spendDecision.kind === "denied") {
+      console.log("ai-doctor-review status=credit_denied");
       return calmFailure("credit_denied", { credit: spendObj });
     }
-    // Replayed prior result → return cached result without calling the model.
-    if (spendObj.status === "replayed" && spendObj.result) {
-      const cached = validateAiDoctorReviewResult(spendObj.result);
+    if (spendDecision.kind === "conflict") {
+      console.log("ai-doctor-review status=idempotency_conflict");
+      return calmFailure("invalid");
+    }
+    if (spendDecision.kind === "invalid") {
+      console.log("ai-doctor-review status=credit_status_invalid");
+      return calmFailure("credit_rpc");
+    }
+
+    // Keep this edge's pinned review scope authoritative before accepting a
+    // replay or spending result from either rollout-compatible RPC shape.
+    if (
+      spendObj.feature !== FEATURE ||
+      spendObj.model_tier !== MODEL_TIER ||
+      spendObj.grow_id !== growId
+    ) {
+      console.log("ai-doctor-review status=credit_scope_mismatch");
+      return calmFailure("credit_rpc");
+    }
+
+    if (spendDecision.kind === "pending") {
+      console.log("ai-doctor-review status=result_pending");
+      return calmFailure("result_pending");
+    }
+    if (spendDecision.kind === "stale") {
+      console.log("ai-doctor-review status=stale_resultless_replay");
+      return failureAfterRefund(
+        spendDecision.spendId,
+        "stale_resultless_replay",
+        "result_recording_failed",
+      );
+    }
+    if (spendDecision.kind === "cached") {
+      const cached = validateAiDoctorReviewResult(spendDecision.result);
       if (cached.ok) {
         console.log("ai-doctor-review status=ok_replayed");
         return safeOk(cached.result, { replayed: true });
       }
-      // Cached result corrupt; fall through to fresh model call. The spend
-      // row is already recorded so we do not double-charge.
+      console.log("ai-doctor-review status=cached_result_invalid");
+      return failureAfterRefund(
+        spendDecision.spendId,
+        "cached_result_invalid",
+        "result_recording_failed",
+      );
     }
 
-    const spendId = typeof spendObj.spend_id === "string" ? spendObj.spend_id : null;
-    const refundKey = "refund:" + (spendId ?? idempotencyKey);
-
-    async function refund(reason: string): Promise<void> {
-      if (!spendId) return;
-      try {
-        await supabase.rpc("ai_credit_refund", {
-          p_spend_id: spendId,
-          p_idempotency_key: refundKey,
-          p_reason: reason,
-        });
-      } catch {
-        console.log("ai-doctor-review status=refund_failed");
-      }
-    }
+    const spendId = spendDecision.spendId;
 
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
     // Build the prompt once so the assembled text can feed both the upstream
     // call AND an in-memory cost measurement. Measurement is local-only;
     // never persisted, logged, or returned to the client.
-    const promptMessages = buildAiDoctorPromptMessages(packet);
+
     const promptMeasurement = buildAiDoctorPromptMeasurement({
       promptName: FEATURE,
       recordedAt: new Date().toISOString(),
@@ -229,17 +533,19 @@ Deno.serve(async (req) => {
       });
     } catch {
       console.log("ai-doctor-review status=timeout_or_network");
-      await refund("upstream_timeout");
-      return calmFailure("timeout");
+      return failureAfterRefund(spendId, "upstream_timeout", "timeout");
     } finally {
       clearTimeout(timer);
     }
 
     if (!upstream.ok) {
       console.log(`ai-doctor-review status=http_${upstream.status}`);
-      try { await upstream.text(); } catch { /* ignore */ }
-      await refund(`upstream_http_${upstream.status}`);
-      return calmFailure("http");
+      try {
+        await upstream.text();
+      } catch {
+        /* ignore */
+      }
+      return failureAfterRefund(spendId, `upstream_http_${upstream.status}`, "http");
     }
 
     let payload: unknown;
@@ -247,55 +553,91 @@ Deno.serve(async (req) => {
       payload = await upstream.json();
     } catch {
       console.log("ai-doctor-review status=parse_error");
-      await refund("upstream_parse");
-      return calmFailure("parse");
+      return failureAfterRefund(spendId, "upstream_parse", "parse");
     }
 
     // Provider response boundary: attach provider-reported token usage to the
     // in-memory prompt measurement. Pure, immutable; never persisted, never
     // logged, never returned. Raw `payload` is NOT stored anywhere downstream.
-    const measurementWithProviderUsage =
-      attachProviderResponseUsageToAiDoctorPromptMeasurement(
-        promptMeasurement,
-        payload,
-      );
+    const measurementWithProviderUsage = attachProviderResponseUsageToAiDoctorPromptMeasurement(
+      promptMeasurement,
+      payload,
+    );
     // Reference the result so future safe consumers (none yet) can extend
     // this boundary without changing the call site. No persistence here.
     void measurementWithProviderUsage;
 
-
-
     const toolArgsStr = readToolArguments(payload);
     if (!toolArgsStr) {
       console.log("ai-doctor-review status=empty");
-      await refund("upstream_empty");
-      return calmFailure("empty");
+      return failureAfterRefund(spendId, "upstream_empty", "empty");
     }
     let candidate: unknown;
     try {
       candidate = JSON.parse(toolArgsStr);
     } catch {
       console.log("ai-doctor-review status=parse_error");
-      await refund("upstream_parse");
-      return calmFailure("parse");
+      return failureAfterRefund(spendId, "upstream_parse", "parse");
     }
 
     const v = validateAiDoctorReviewResult(candidate);
     if (v.ok === false) {
-      console.log(`ai-doctor-review status=invalid reason=${v.reason}`);
-      await refund(`invalid_${v.reason}`);
-      return calmFailure("invalid");
+      console.log("ai-doctor-review status=invalid");
+      return failureAfterRefund(spendId, `invalid_${v.reason}`, "invalid");
     }
 
+    let finalization: ReturnType<typeof parseAiDoctorResultAttachment> = "ambiguous";
+    try {
+      const finalizationResponse = await settleResultPersistence(
+        creditSupabase.rpc("ai_doctor_finalize_review", {
+          p_expected_user_id: userId,
+          p_spend_id: spendId,
+          p_result: v.result,
+          p_evidence: evidenceReceipt,
+          p_prompt_hmac_sha256: promptHmac,
+          p_prompt_hmac_key_id: receiptHmacKeyId,
+          p_model_id: MODEL,
+          p_tool_schema_version: TOOL_SCHEMA_VERSION,
+          p_prompt_contract_version: PROMPT_CONTRACT_VERSION,
+          p_session_id: sessionId,
+        }),
+      );
+      if (!finalizationResponse.error) {
+        finalization = parseAiDoctorResultAttachment(finalizationResponse.data);
+      }
+    } catch {
+      // Timeout/transport ambiguity must preserve the spend and request key.
+      // A same-key retry can then recover a fully committed atomic pair.
+    }
+    if (finalization === "ambiguous") {
+      console.log("ai-doctor-review status=result_finalization_pending");
+      return calmFailure("result_pending");
+    }
+    if (finalization === "rejected") {
+      // An explicit RPC rejection completed without accepting the atomic pair.
+      // Unlike a timeout, it can safely receive the normal idempotent refund.
+      console.log("ai-doctor-review status=result_finalization_rejected");
+      return failureAfterRefund(spendId, "result_finalization_rejected", "result_recording_failed");
+    }
+
+    if (finalization === "recorded") {
+      // Fresh atomic finalization only: cached spend replays and idempotent
+      // finalizer replays must not increment completion measurement.
+      await recordFreshAiDoctorReviewCompletion(userId, spendId);
+    }
     console.log("ai-doctor-review status=ok");
     return safeOk(v.result, {
       remaining: spendObj.remaining,
       scope: spendObj.scope,
       scope_limit: spendObj.scope_limit,
+      plan_id: spendObj.plan_id,
+      // Purchased pack balance (PR2 return field) so the badge can show it
+      // instead of reading "0 left" after a pack-funded review.
+      pack_balance: spendObj.pack_balance,
     });
   } catch {
     console.log("ai-doctor-review status=unexpected");
-    return calmFailure("http");
+    return calmFailure(creditSpendMayExist ? "result_pending" : "http");
   }
 });
 

@@ -24,6 +24,10 @@ import {
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 import type { ManualSensorLog } from "@/lib/manualSensorChronologyDeltaRules";
 import type { PlantRowLike } from "@/lib/aiDoctorContextCompiler";
+import {
+  QUICK_LOG_V2_OPEN_EVENT,
+  buildQuickLogV2OpenIntent,
+} from "@/lib/quickLogV2OpenIntent";
 
 export interface PlantDetailAiDoctorContextReadinessMountProps {
   plantId: string;
@@ -32,6 +36,8 @@ export interface PlantDetailAiDoctorContextReadinessMountProps {
   plantName?: string | null;
   strain?: string | null;
   stage?: string | null;
+  /** Declared plant type (autoflower / photoperiod / unknown). Never inferred. */
+  plantType?: string | null;
   /**
    * Optional pass-through for growing medium. The Plant Detail data
    * source (`useGrowPlant` / `plants` table) does NOT yet expose this
@@ -74,6 +80,7 @@ export default function PlantDetailAiDoctorContextReadinessMount({
   stage,
   medium,
   potSize,
+  plantType,
 }: PlantDetailAiDoctorContextReadinessMountProps) {
   const recentActivity = usePlantRecentActivity(plantId);
   const manualLogs = usePlantManualSensorLogs(plantId);
@@ -93,8 +100,9 @@ export default function PlantDetailAiDoctorContextReadinessMount({
       // No inference: undefined stays unknown on the context payload.
       medium: medium ?? null,
       pot_size: potSize ?? null,
+      plant_type: plantType ?? null,
     }),
-    [plantId, plantName, strain, stage, growId, tentId, medium, potSize],
+    [plantId, plantName, strain, stage, growId, tentId, medium, potSize, plantType],
   );
 
   const built = useMemo(() => {
@@ -142,6 +150,13 @@ export default function PlantDetailAiDoctorContextReadinessMount({
     [],
   );
 
+  const openStructuredWater = useCallback(() => {
+    if (typeof window === "undefined") return;
+    const intent = buildQuickLogV2OpenIntent({ plantId, tentId, action: "water" });
+    if (!intent) return;
+    window.dispatchEvent(new CustomEvent(QUICK_LOG_V2_OPEN_EVENT, { detail: intent }));
+  }, [plantId, tentId]);
+
   if (!plantId) {
     return (
       <FallbackShell
@@ -180,6 +195,7 @@ export default function PlantDetailAiDoctorContextReadinessMount({
             tentId,
           })
       : undefined;
+  const safeOpenStructuredWater = growId && tentId ? openStructuredWater : undefined;
 
   return (
     <div
@@ -192,7 +208,7 @@ export default function PlantDetailAiDoctorContextReadinessMount({
         quickActions={{
           // Watering / Feeding route into the existing QuickLog prefill
           // surface; the grower still confirms and saves. No writes here.
-          onAddWatering: safeOpenQuickLog,
+          onAddWatering: safeOpenStructuredWater,
           onAddFeeding: safeOpenQuickLog,
           // Fast Add Photo and Add Sensor Snapshot have no safe single-
           // tap entry yet — leave undefined so the panel renders them

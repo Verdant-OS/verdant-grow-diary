@@ -14,6 +14,7 @@ const REQUIRED_NEVER = [
   "https://verdantgrowdiary.com/welcome",
   "https://verdantgrowdiary.com/pricing",
   "https://verdantgrowdiary.com/hardware-integrations",
+  "https://verdantgrowdiary.com/guides/cronk-nutrients-grow-diary",
   "https://verdantgrowdiary.com/sitemap.xml",
   "https://verdantgrowdiary.com/robots.txt",
 ];

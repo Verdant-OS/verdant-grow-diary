@@ -18,6 +18,10 @@ import {
 import { phenoDb } from "@/integrations/supabase/phenoTables";
 import type { PhenoCandidateInput } from "@/lib/phenoComparisonViewModel";
 import { listLatestSexObservationsForHunt } from "@/lib/phenoSexObservationService";
+import {
+  sanitizeBreedingObjectiveTargets,
+  type BreedingObjectiveTarget,
+} from "@/lib/phenoBreedingObjectiveRules";
 
 export interface PhenoHuntSummary {
   id: string;
@@ -29,11 +33,64 @@ export interface PhenoHuntSummary {
   evidenceGoals?: string[];
   notes?: string | null;
   setupCompletedAt?: string | null;
+  /** Grower-authored target trait axes + acceptance thresholds. Re-sanitized
+   * on every read (defense in depth against a stale or manually-edited row). */
+  breedingObjective?: BreedingObjectiveTarget[];
 }
 
 export type LoadPhenoHuntCandidatesResult =
   | { ok: true; hunt: PhenoHuntSummary; candidates: PhenoCandidateInput[] }
   | { ok: false; error: string };
+
+export interface PhenoHuntListItem {
+  id: string;
+  name: string;
+  createdAt: string | null;
+  setupCompletedAt: string | null;
+  candidateCount: number;
+}
+
+interface PhenoHuntListRow {
+  readonly id: string;
+  readonly name: string | null;
+  readonly created_at: string | null;
+  readonly setup_completed_at: string | null;
+  readonly plants: readonly { readonly count: number | null }[] | null;
+}
+
+function activeCandidateCount(row: PhenoHuntListRow): number {
+  const count = row.plants?.[0]?.count;
+  if (typeof count !== "number" || !Number.isSafeInteger(count) || count < 0) {
+    throw new Error("Could not determine pheno hunt candidate counts.");
+  }
+  return count;
+}
+
+/**
+ * List the signed-in grower's pheno hunts, newest first, for the hunts
+ * index. RLS scopes to the owner; a bounded read (hunts accumulate over
+ * time). Candidate counts are exact server-side aggregates over each hunt's
+ * non-archived plants, embedded in the same bounded request — no row scan,
+ * 5,000-row truncation, or per-hunt N+1. Resolved query/count errors throw so
+ * the index renders its honest error state instead of a false empty list or
+ * zero candidate count.
+ */
+export async function listPhenoHuntsForOwner(): Promise<PhenoHuntListItem[]> {
+  const { data, error } = await supabase
+    .from("pheno_hunts")
+    .select("id, name, created_at, setup_completed_at, plants(count)")
+    .eq("plants.is_archived", false)
+    .order("created_at", { ascending: false })
+    .limit(200);
+  if (error || !data) throw new Error("Could not load pheno hunts.");
+  return (data as PhenoHuntListRow[]).map((row) => ({
+    id: row.id,
+    name: row.name ?? "Untitled hunt",
+    createdAt: row.created_at ?? null,
+    setupCompletedAt: row.setup_completed_at ?? null,
+    candidateCount: activeCandidateCount(row),
+  }));
+}
 
 /** Load a hunt and its (non-archived) candidate plants, mapped for comparison. */
 export async function loadPhenoHuntCandidates(
@@ -61,7 +118,7 @@ export async function loadPhenoHuntCandidates(
   const { data: plantRows, error: plantsError } = await phenoDb
     .from("plants")
     .select(
-      "id, name, candidate_label, candidate_number, strain, stage, grow_id, tent_id, photo_url, is_archived",
+      "id, name, candidate_label, candidate_number, strain, stage, plant_type, grow_id, tent_id, photo_url, is_archived",
     )
     .eq("pheno_hunt_id", id)
     .eq("is_archived", false);
@@ -114,6 +171,9 @@ function mapHuntSummary(huntRow: {
   const notes = typeof huntRow.notes === "string" ? huntRow.notes : null;
   const setupCompletedAt =
     typeof huntRow.setup_completed_at === "string" ? huntRow.setup_completed_at : null;
+  const breedingObjective = sanitizeBreedingObjectiveTargets(
+    Array.isArray(huntRow.breeding_objective) ? (huntRow.breeding_objective as unknown[]) : null,
+  );
   return {
     id: huntRow.id,
     name: huntRow.name,
@@ -122,6 +182,7 @@ function mapHuntSummary(huntRow: {
     evidenceGoals,
     notes,
     setupCompletedAt,
+    breedingObjective,
   };
 }
 
@@ -356,7 +417,7 @@ export async function loadPhenoHuntCandidatePage(
   let query = phenoDb
     .from("plants")
     .select(
-      "id, name, candidate_label, candidate_number, strain, stage, grow_id, tent_id, photo_url, is_archived",
+      "id, name, candidate_label, candidate_number, strain, stage, plant_type, grow_id, tent_id, photo_url, is_archived",
       { count: "exact" },
     )
     .eq("pheno_hunt_id", id)

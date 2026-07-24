@@ -4,6 +4,10 @@ import { join } from "node:path";
 
 const files = [
   "src/lib/quickLogV2Rules.ts",
+  // In the v2 import closure since quickLogV2Rules reuses its canonical
+  // archived/merged predicate — scan it too so a later edit cannot smuggle
+  // banned surface in through the import (same evasion class as PR #259).
+  "src/lib/quickLogPlantOptionRules.ts",
   "src/lib/quickLogV2SavePayload.ts",
   "src/hooks/useQuickLogV2Save.ts",
   "src/components/QuickLogV2Sheet.tsx",

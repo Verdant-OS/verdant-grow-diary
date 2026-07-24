@@ -86,6 +86,9 @@ vi.mock("@/integrations/supabase/client", () => {
     const q: Record<string, unknown> = {};
     q.select = () => q;
     q.eq = () => q;
+    q.not = () => q;
+    q.in = () => q;
+    q.or = () => q;
     q.order = () => q;
     q.limit = () => Promise.resolve(nextResponse);
     return q;
@@ -113,12 +116,8 @@ describe("TimelineMemorySection", () => {
     await waitFor(() =>
       expect(screen.getByTestId("timeline-memory-day-groups")).toBeInTheDocument(),
     );
-    expect(
-      screen.getAllByTestId("manual-snapshot-timeline-card"),
-    ).toHaveLength(2);
-    expect(
-      screen.getAllByTestId("timeline-memory-diary-item").length,
-    ).toBeGreaterThanOrEqual(3);
+    expect(screen.getAllByTestId("manual-snapshot-timeline-card")).toHaveLength(2);
+    expect(screen.getAllByTestId("timeline-memory-diary-item").length).toBeGreaterThanOrEqual(3);
   });
 
   it("filters to manual snapshots only", async () => {
@@ -150,9 +149,7 @@ describe("TimelineMemorySection", () => {
     // filter that has no chip by clicking warnings? Not present either.
     // Click manual_sensor_snapshot then synthesize a hidden filter via
     // a chip whose count is 0 — we instead assert the chip is absent.
-    expect(
-      screen.queryByTestId("timeline-filter-chip-watering"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("timeline-filter-chip-watering")).not.toBeInTheDocument();
   });
 
   it("offers a 'Show all' reset that returns to 'All'", async () => {
@@ -162,17 +159,15 @@ describe("TimelineMemorySection", () => {
     fireEvent.click(screen.getByTestId("timeline-filter-chip-watering"));
     const reset = screen.getByTestId("timeline-filter-reset");
     fireEvent.click(reset);
-    expect(
-      screen.getByTestId("timeline-filter-chip-all").getAttribute("data-selected"),
-    ).toBe("true");
+    expect(screen.getByTestId("timeline-filter-chip-all").getAttribute("data-selected")).toBe(
+      "true",
+    );
   });
 
   it("renders a calm error notice when the read fails (diary panels elsewhere remain)", async () => {
     nextResponse = { data: null, error: new Error("boom") };
     renderSection({ scope: "tent", tentId: "tent-1" });
-    await waitFor(() =>
-      expect(screen.getByTestId("timeline-memory-error")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByTestId("timeline-memory-error")).toBeInTheDocument());
     const text = screen.getByTestId("timeline-memory-error").textContent ?? "";
     expect(text.toLowerCase()).not.toMatch(/\blive\b/);
   });
@@ -180,17 +175,14 @@ describe("TimelineMemorySection", () => {
   it("renders the section-level empty state when there are no events", async () => {
     nextResponse = { data: [], error: null };
     renderSection({ scope: "plant", plantId: "plant-1" });
-    await waitFor(() =>
-      expect(screen.getByTestId("timeline-memory-empty")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByTestId("timeline-memory-empty")).toBeInTheDocument());
   });
 
   it("never shows live/synced/connected/imported wording", async () => {
     nextResponse = { data: ROWS, error: null };
     renderSection({ scope: "plant", plantId: "plant-1" });
     await waitFor(() => screen.getByTestId("timeline-memory-day-groups"));
-    const text =
-      screen.getByTestId("timeline-memory-section").textContent?.toLowerCase() ?? "";
+    const text = screen.getByTestId("timeline-memory-section").textContent?.toLowerCase() ?? "";
     expect(text).not.toMatch(/\blive\b/);
     expect(text).not.toMatch(/\bsynced\b/);
     expect(text).not.toMatch(/\bconnected\b/);

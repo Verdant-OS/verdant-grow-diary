@@ -13,6 +13,10 @@
 import { describe, it, expect } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import {
+  readDesktopGrowerNavigationSource,
+  readMobileGrowerNavigationSource,
+} from "@/test/utils/growerNavigationSource";
 
 const ROOT = resolve(__dirname, "../..");
 const read = (p: string) =>
@@ -21,8 +25,8 @@ const read = (p: string) =>
 const TENT_DETAIL = read("src/pages/TentDetail.tsx");
 const DIALOG = read("src/components/AddExistingPlantDialog.tsx");
 const APP = read("src/App.tsx");
-const SIDEBAR = read("src/components/AppSidebar.tsx");
-const MOBILE_NAV = read("src/components/MobileNav.tsx");
+const SIDEBAR = readDesktopGrowerNavigationSource();
+const MOBILE_NAV = readMobileGrowerNavigationSource();
 
 describe("TentDetail · Add Existing Plant CTA", () => {
   it("renders both 'Add Plant to This Tent' and 'Add Existing Plant'", () => {
@@ -31,9 +35,7 @@ describe("TentDetail · Add Existing Plant CTA", () => {
   });
 
   it("imports AddExistingPlantDialog from components", () => {
-    expect(TENT_DETAIL).toMatch(
-      /from\s+["']@\/components\/AddExistingPlantDialog["']/,
-    );
+    expect(TENT_DETAIL).toMatch(/from\s+["']@\/components\/AddExistingPlantDialog["']/);
   });
 
   it("empty state offers Add Existing Plant alongside create-new", () => {
@@ -113,9 +115,7 @@ describe("AddExistingPlantDialog · query + write semantics", () => {
     }
     expect(DIALOG).not.toContain("service_role");
     expect(DIALOG).not.toContain("device_command");
-    expect(DIALOG).not.toMatch(
-      /mqtt|home[\s_-]?assistant|relay|actuator|webhook/i,
-    );
+    expect(DIALOG).not.toMatch(/mqtt|home[\s_-]?assistant|relay|actuator|webhook/i);
   });
 
   it("does not write to any table other than plants", () => {
@@ -155,14 +155,7 @@ describe("Cameras removal · navigation + route", () => {
   });
 
   it("core Grow Operation routes remain intact", () => {
-    for (const path of [
-      "/tents",
-      "/plants",
-      "/alerts",
-      "/actions",
-      "/doctor",
-      "/logs",
-    ]) {
+    for (const path of ["/tents", "/plants", "/alerts", "/actions", "/doctor", "/logs"]) {
       expect(APP).toContain(`path="${path}"`);
     }
   });

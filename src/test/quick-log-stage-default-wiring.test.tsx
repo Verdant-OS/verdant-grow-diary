@@ -51,7 +51,7 @@ vi.mock("@/store/grows", () => ({
 }));
 vi.mock("@/hooks/use-plants", () => ({ usePlants: () => ({ data: plantsData }) }));
 vi.mock("@/hooks/use-tents", () => ({
-  useTents: () => ({ data: [{ id: "t1", name: "Tent 1" }] }),
+  useTents: () => ({ data: [{ id: "t1", name: "Tent 1", grow_id: "g1" }] }),
 }));
 vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn(), message: vi.fn() },
@@ -87,12 +87,16 @@ afterEach(() => cleanup());
 
 describe("QuickLog stage defaulting — plant stage reaches the Select", () => {
   it("a flowering plant opens the form showing Flowering (not Vegetative)", () => {
-    // Single scoped plant → auto-selected; its stage must win over the veg grow.
+    // Explicitly routed plant stage must win over the veg grow.
     growState.stage = "veg";
     plantsData = [
       { id: "p1", name: "Zkittlez", strain: "ZK", tent_id: "t1", grow_id: "g1", stage: "flower" },
     ];
-    renderQL({ open: true, onOpenChange: () => {} });
+    renderQL({
+      open: true,
+      onOpenChange: () => {},
+      prefill: { plantId: "p1", growId: "g1", tentId: "t1" },
+    });
     expect(stageText()).toMatch(/Flowering/);
     expect(stageText()).not.toMatch(/Vegetative/);
   });
@@ -102,7 +106,11 @@ describe("QuickLog stage defaulting — plant stage reaches the Select", () => {
     plantsData = [
       { id: "p1", name: "Zkittlez", strain: "ZK", tent_id: "t1", grow_id: "g1" }, // no stage
     ];
-    renderQL({ open: true, onOpenChange: () => {} });
+    renderQL({
+      open: true,
+      onOpenChange: () => {},
+      prefill: { plantId: "p1", growId: "g1", tentId: "t1" },
+    });
     expect(stageText()).toMatch(/Flowering/);
   });
 
@@ -112,7 +120,11 @@ describe("QuickLog stage defaulting — plant stage reaches the Select", () => {
     plantsData = [
       { id: "p1", name: "Runtz", strain: "RZ", tent_id: "t1", grow_id: "g1", stage: "cure" },
     ];
-    renderQL({ open: true, onOpenChange: () => {} });
+    renderQL({
+      open: true,
+      onOpenChange: () => {},
+      prefill: { plantId: "p1", growId: "g1", tentId: "t1" },
+    });
     expect(stageText()).toMatch(/Drying \/ Curing/);
     expect(stageText()).not.toMatch(/Vegetative/);
   });
@@ -120,7 +132,11 @@ describe("QuickLog stage defaulting — plant stage reaches the Select", () => {
   it("unknown context shows the blank placeholder — NOT Vegetative", () => {
     growState.stage = null; // neither plant nor grow stage known
     plantsData = [{ id: "p1", name: "Mystery", strain: "??", tent_id: "t1", grow_id: "g1" }];
-    renderQL({ open: true, onOpenChange: () => {} });
+    renderQL({
+      open: true,
+      onOpenChange: () => {},
+      prefill: { plantId: "p1", growId: "g1", tentId: "t1" },
+    });
     const txt = stageText();
     expect(txt).not.toMatch(/Vegetative/);
     // Placeholder, not a real stage label.
@@ -137,7 +153,11 @@ describe("QuickLog stage defaulting — grow writeback is gated on manual edit",
     plantsData = [
       { id: "p1", name: "Zkittlez", strain: "ZK", tent_id: "t1", grow_id: "g1", stage: "flower" },
     ];
-    renderQL({ open: true, onOpenChange: () => {}, prefill: { plantId: "p1", growId: "g1" } });
+    renderQL({
+      open: true,
+      onOpenChange: () => {},
+      prefill: { plantId: "p1", growId: "g1", tentId: "t1" },
+    });
 
     // Confirm the form did default to the plant's (differing) stage.
     expect(stageText()).toMatch(/Flowering/);

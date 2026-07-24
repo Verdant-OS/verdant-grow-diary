@@ -16,6 +16,7 @@ import type {
   LocalForwardingStatus,
 } from "@/lib/ecowittLocalForwardingStatus";
 import { STALE_THRESHOLD_MS } from "@/lib/sensorReadingNormalizationRules";
+import { isSensorTestbenchProvenance } from "@/lib/sensorTestbenchIndicatorRules";
 
 export type LiveIngestVerifiedState =
   | "loading"
@@ -23,6 +24,7 @@ export type LiveIngestVerifiedState =
   | "not_ready"
   | "waiting_for_first_reading"
   | "failed"
+  | "testbench"
   | "non_live_source"
   | "stale"
   | "verified";
@@ -130,6 +132,28 @@ export function classifyLiveIngestVerifiedMarker(
 
   const source = (s.latest_metrics.source ?? "").trim().toLowerCase() || null;
   const capturedAt = s.latest_metrics.captured_at;
+  const physicalGatewayEvidence = s.latest_metrics.physical_gateway_evidence === true;
+
+  if (
+    !physicalGatewayEvidence ||
+    isSensorTestbenchProvenance({
+      vendor: s.latest_metrics.vendor,
+      confidence: s.latest_metrics.confidence,
+      verdantSource: source,
+      physicalGatewayEvidence,
+    })
+  ) {
+    return {
+      show: true,
+      state: "testbench",
+      title: "Testbench packet received",
+      detail:
+        "The diagnostic path responded, but a test packet cannot verify real EcoWitt sensor ingest. Send one physical bridge reading next.",
+      source,
+      capturedAt,
+      tone: "neutral",
+    };
+  }
 
   if (source !== "live") {
     return {

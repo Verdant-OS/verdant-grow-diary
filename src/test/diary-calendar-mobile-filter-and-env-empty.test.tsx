@@ -21,9 +21,9 @@ const MIXED_NO_ENV = [
 ];
 
 describe("Diary Calendar — mobile filter chip bar", () => {
-  it("renders all 5 chips including Environment Check", () => {
+  it("renders all 6 chips including Training and Environment Check", () => {
     render(<DiaryCalendarSection rawEntries={MIXED_NO_ENV} />);
-    for (const v of ["all", "watering", "feeding", "diagnosis", "environment"]) {
+    for (const v of ["all", "watering", "feeding", "training", "diagnosis", "environment"]) {
       expect(
         screen.getByTestId(`diary-calendar-filter-${v}`),
       ).toBeInTheDocument();

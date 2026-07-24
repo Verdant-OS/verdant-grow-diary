@@ -76,6 +76,9 @@ export const AI_DOCTOR_MISSING_INFO_EXAMPLES: ReadonlyArray<string> = [
   "Photo-only evidence with no environmental readings",
   "Unknown medium or growth stage",
   "Missing recent feeding information",
+  "Unknown pot size or reservoir volume",
+  "No stated grow target for the current stage",
+  "No plant history to compare earlier stress or recovery",
 ];
 
 export default function HowAiDoctorWorks() {
@@ -207,6 +210,9 @@ export default function HowAiDoctorWorks() {
         <section className="mt-12 rounded-lg border border-border/60 p-5">
           <h2 className="font-display text-lg font-semibold">Keep exploring</h2>
           <div className="mt-4 flex flex-wrap gap-3">
+            <Link to="/ai-doctor-readiness-check">
+              <Button size="sm">Check your context</Button>
+            </Link>
             <Link to="/guides">
               <Button variant="outline" size="sm">
                 Read the grower guides

@@ -10,6 +10,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import PlantDetailAiDoctorReadinessGate from "@/components/PlantDetailAiDoctorReadinessGate";
+import type { RootZoneObservationV1 } from "@/lib/rootZoneObservationRules";
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
@@ -37,11 +38,42 @@ vi.mock("@/hooks/useTimelineMemory", () => ({
   TIMELINE_MEMORY_DEFAULT_LIMIT: 60,
   useTimelineMemory: () => ({ items: mockTimelineItems, isLoading: false }),
 }));
+// Stub the root-zone observations hook the same way; settled (not loading,
+// not fetching, no error) so the gate consumes the observations directly.
+let mockRootZoneObservations: RootZoneObservationV1[] = [];
+vi.mock("@/hooks/useRootZoneObservations", () => ({
+  useRootZoneObservations: () => ({
+    observations: mockRootZoneObservations,
+    isLoading: false,
+    isFetching: false,
+    isError: false,
+  }),
+}));
+
+const manualWateringObservation = (occurredAt: string): RootZoneObservationV1 => ({
+  occurredAt,
+  eventType: "watering",
+  source: "manual",
+  metrics: {
+    schemaVersion: 1,
+    volumeMl: 500,
+    inputPh: 5.9,
+    inputEcMsCm: 1.2,
+    outputEcMsCm: null,
+    runoffMl: 50,
+    runoffPh: 6,
+    runoffEcMsCm: 1.6,
+    waterTempC: 21,
+    nutrientLine: null,
+    products: [],
+  },
+});
 
 const PLANT = {
   id: "p1",
   name: "Plant A",
   strain: "NL Auto",
+  plantType: "autoflower",
   stage: "veg",
   medium: "soil",
   photo: "/photo.jpg",
@@ -65,6 +97,7 @@ const renderGate = (
 
 beforeEach(() => {
   mockTimelineItems = [];
+  mockRootZoneObservations = [];
 });
 
 describe("PlantDetailAiDoctorReadinessGate — render", () => {
@@ -73,21 +106,19 @@ describe("PlantDetailAiDoctorReadinessGate — render", () => {
     renderGate();
     const gate = screen.getByTestId("plant-ai-doctor-readiness-gate");
     expect(gate.getAttribute("data-readiness")).toBe("insufficient");
-    expect(
-      screen.getByTestId("plant-ai-doctor-readiness-gate-message").textContent,
-    ).toBe("More context needed before AI Doctor should give confident guidance.");
-    const primary = screen.getByTestId(
-      "ai-doctor-readiness-gate-primary-add-context",
+    expect(screen.getByTestId("plant-ai-doctor-readiness-gate-message").textContent).toBe(
+      "More context needed before AI Doctor should give confident guidance.",
     );
+    const primary = screen.getByTestId("ai-doctor-readiness-gate-primary-add-context");
     expect(primary.textContent).toBe("Add missing context");
     expect(primary.getAttribute("data-action-kind")).toBe("focus_anchor");
-    expect(primary.getAttribute("data-anchor-id")).toBe(
-      "plant-ai-doctor-context-panel",
-    );
+    expect(primary.getAttribute("data-anchor-id")).toBe("plant-ai-doctor-context-panel");
   });
 
   it("strong: shows ready copy + cautious review primary + hides quick actions", () => {
-    // Two recent notes + a fresh manual snapshot card and photo present.
+    // Two recent notes + a fresh manual snapshot card and photo present,
+    // plus a known plant type and recent root-zone history (both required
+    // for "strong" under the autoflower/photoperiod plan).
     mockTimelineItems = [
       {
         kind: "manual_sensor_snapshot",
@@ -97,27 +128,22 @@ describe("PlantDetailAiDoctorReadinessGate — render", () => {
       { kind: "diary_entry", occurredAt: ago(12 * HOUR), entryType: "watering" },
       { kind: "diary_entry", occurredAt: ago(36 * HOUR), entryType: "note" },
     ];
+    mockRootZoneObservations = [manualWateringObservation(ago(10 * HOUR))];
     renderGate();
     const gate = screen.getByTestId("plant-ai-doctor-readiness-gate");
     expect(gate.getAttribute("data-readiness")).toBe("strong");
-    expect(
-      screen.getByTestId("plant-ai-doctor-readiness-gate-message").textContent,
-    ).toBe("Ready for a cautious AI Doctor review.");
-    expect(
-      screen.getByTestId("ai-doctor-readiness-gate-primary-open-review"),
-    ).toBeTruthy();
+    expect(screen.getByTestId("plant-ai-doctor-readiness-gate-message").textContent).toBe(
+      "Ready for a cautious AI Doctor review.",
+    );
+    expect(screen.getByTestId("ai-doctor-readiness-gate-primary-open-review")).toBeTruthy();
     // Quick actions hidden in strong.
-    expect(
-      screen.queryByTestId("plant-ai-doctor-readiness-gate-quick-actions"),
-    ).toBeNull();
+    expect(screen.queryByTestId("plant-ai-doctor-readiness-gate-quick-actions")).toBeNull();
   });
 
   it("preserves plant/grow/tent scope in quick-action event payloads", () => {
     mockTimelineItems = [];
     renderGate();
-    const addNote = screen.getByTestId(
-      "ai-doctor-context-quick-action-add-recent-log",
-    );
+    const addNote = screen.getByTestId("ai-doctor-context-quick-action-add-recent-log");
     // The quick-action button must exist; scoping is enforced by the
     // quick-actions view-model whose own tests cover payload contents.
     expect(addNote).toBeTruthy();

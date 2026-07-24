@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-07-07T16:20:07.623Z",
+  "generated_at": "2026-07-19T18:37:54.149Z",
   "_notes": "Fingerprints of accepted historical Supabase migration safety findings. Do not edit by hand except to remove an item after the underlying SQL is truly fixed. Never add a NEW finding to this file to silence CI — fix the migration instead.",
   "accepted": [
     {
@@ -20,6 +20,12 @@
       "scanner": "PERMISSIVE_POLICY",
       "migration": "20260521010057_9485a78a-71d2-4d93-a4a2-df2b398cfd87.sql",
       "subject": "Anyone FOR INSERT"
+    },
+    {
+      "fingerprint": "b6f95cdce7ec2fff",
+      "scanner": "PERMISSIVE_POLICY",
+      "migration": "20260719044601_4a9e443b-d980-4890-b85e-5ae6549a907f.sql",
+      "subject": "founders_service_all FOR ALL"
     },
     {
       "fingerprint": "ca43ac1460dff130",

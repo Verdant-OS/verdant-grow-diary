@@ -21,6 +21,7 @@
  */
 
 import { plantDetailPath } from "@/lib/routes";
+import { isHarvestWatchEligible } from "@/lib/harvestWatchEligibilityRules";
 
 export type TentPlantRosterStage =
   | "seedling"
@@ -76,8 +77,9 @@ export interface TentPlantRosterRow {
   latestLogAt: string | null;
   hasRecentPhoto: boolean;
   harvestWatchPublicState: string | null;
-  /** Always provided — falls back to canonical Harvest Watch handoff copy. */
-  harvestWatchFallbackCopy: string;
+  harvestWatchAvailable: boolean;
+  /** Present only when Harvest Watch is eligible for this plant. */
+  harvestWatchFallbackCopy: string | null;
   plantDetailHref: string;
 }
 
@@ -255,6 +257,11 @@ export function buildTentPlantRosterViewModel(
     }
     if (!includeArchived && isArchived) continue;
 
+    const harvestWatchAvailable = isHarvestWatchEligible({
+      stage: raw.stage,
+      isArchived,
+    });
+
     rows.push({
       id,
       name: normalizeString(raw.name) ?? "Unnamed plant",
@@ -263,8 +270,13 @@ export function buildTentPlantRosterViewModel(
       isArchived,
       latestLogAt: normalizeString(raw.latestLogAt),
       hasRecentPhoto: raw.hasRecentPhoto === true,
-      harvestWatchPublicState: normalizeString(raw.harvestWatchPublicState),
-      harvestWatchFallbackCopy: TENT_PLANT_ROSTER_HARVEST_WATCH_FALLBACK_COPY,
+      harvestWatchPublicState: harvestWatchAvailable
+        ? normalizeString(raw.harvestWatchPublicState)
+        : null,
+      harvestWatchAvailable,
+      harvestWatchFallbackCopy: harvestWatchAvailable
+        ? TENT_PLANT_ROSTER_HARVEST_WATCH_FALLBACK_COPY
+        : null,
       plantDetailHref: plantDetailPath(id),
     });
   }

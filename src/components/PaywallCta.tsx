@@ -22,23 +22,31 @@ export interface PaywallCtaProps {
   "data-testid"?: string;
   /** Optional extra className for layout (no design overrides expected). */
   className?: string;
+  /**
+   * Optional explicit primary-CTA intent callback. This stays presentation
+   * only: callers may use it for privacy-safe client analytics, but it never
+   * performs checkout or changes entitlement behavior. Callback errors cannot
+   * prevent navigation to the prepared CTA href.
+   */
+  onPrimaryCtaClick?: () => void;
 }
 
-export default function PaywallCta({
-  vm,
-  className,
-  ...rest
-}: PaywallCtaProps) {
+export default function PaywallCta({ vm, className, onPrimaryCtaClick, ...rest }: PaywallCtaProps) {
   const testId = rest["data-testid"] ?? "paywall-cta";
+
+  function handlePrimaryCtaClick() {
+    try {
+      onPrimaryCtaClick?.();
+    } catch {
+      // A non-authoritative analytics seam must never block navigation.
+    }
+  }
 
   return (
     <section
       data-testid={testId}
       aria-labelledby={`${testId}-title`}
-      className={
-        "rounded-xl border border-border/60 bg-card/40 p-6 text-left " +
-        (className ?? "")
-      }
+      className={"rounded-xl border border-border/60 bg-card/40 p-6 text-left " + (className ?? "")}
     >
       <p
         className="text-xs uppercase tracking-widest text-primary font-medium"
@@ -46,27 +54,18 @@ export default function PaywallCta({
       >
         {vm.requiredPlanLabel}
       </p>
-      <h2
-        id={`${testId}-title`}
-        className="mt-2 font-display text-xl font-semibold tracking-tight"
-      >
+      <h2 id={`${testId}-title`} className="mt-2 font-display text-xl font-semibold tracking-tight">
         {vm.title}
       </h2>
       <p className="mt-3 text-sm text-muted-foreground">{vm.description}</p>
 
       {vm.currentPlanLabel ? (
-        <p
-          className="mt-2 text-xs text-muted-foreground"
-          data-testid={`${testId}-current-plan`}
-        >
+        <p className="mt-2 text-xs text-muted-foreground" data-testid={`${testId}-current-plan`}>
           Current plan: {vm.currentPlanLabel}
         </p>
       ) : null}
 
-      <ul
-        className="mt-4 space-y-2 text-sm"
-        data-testid={`${testId}-bullets`}
-      >
+      <ul className="mt-4 space-y-2 text-sm" data-testid={`${testId}-bullets`}>
         {vm.unlockBullets.map((bullet) => (
           <li key={bullet} className="flex items-start gap-2">
             <span
@@ -79,16 +78,13 @@ export default function PaywallCta({
       </ul>
 
       {vm.secondaryCopy ? (
-        <p
-          className="mt-4 text-sm text-muted-foreground"
-          data-testid={`${testId}-secondary`}
-        >
+        <p className="mt-4 text-sm text-muted-foreground" data-testid={`${testId}-secondary`}>
           {vm.secondaryCopy}
         </p>
       ) : null}
 
       <div className="mt-5">
-        <Link to={vm.primaryCtaHref} data-testid={`${testId}-link`}>
+        <Link to={vm.primaryCtaHref} data-testid={`${testId}-link`} onClick={handlePrimaryCtaClick}>
           <Button size="lg">{vm.primaryCtaLabel}</Button>
         </Link>
       </div>

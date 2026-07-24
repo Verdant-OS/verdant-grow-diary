@@ -89,6 +89,24 @@ async function mockSignedInSupabase(page: Page) {
   );
 }
 
+// The signed-in agreement re-consent gate renders as a blocking modal for
+// accounts with no recorded consent rows — which describes the mocked user
+// (the /rest/v1/ catch-all returns [] for user_agreement_acceptances), so
+// the gate always appears here and swallows all pointer events. Accept it
+// before interacting; the acceptance write is absorbed by the same
+// catch-all. Same helper as the Quick Log smoke.
+async function acceptReconsentGateIfShown(page: Page) {
+  const gate = page.getByTestId("agreement-reconsent-gate");
+  const shown = await gate
+    .waitFor({ state: "visible", timeout: 5_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!shown) return;
+  await gate.locator("#reconsent-accept").click();
+  await gate.getByRole("button", { name: /accept and continue/i }).click();
+  await gate.waitFor({ state: "hidden", timeout: 15_000 });
+}
+
 const SECRET_PATTERNS: Array<{ label: string; re: RegExp }> = [
   { label: "JWT", re: /eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}/ },
   { label: "bearer", re: /bearer\s+[A-Za-z0-9._-]{10,}/i },
@@ -111,6 +129,7 @@ test.describe("Agent Integrations settings smoke (mocked, 1280x800)", () => {
     page,
   }) => {
     await page.goto("/settings/agent-integrations");
+    await acceptReconsentGateIfShown(page);
 
     await expect(page.getByTestId("manifest-identity")).toBeVisible();
     await expect(page.getByTestId("manifest-version")).toBeVisible();
@@ -140,16 +159,16 @@ test.describe("Agent Integrations settings smoke (mocked, 1280x800)", () => {
     await expect(manifestLink).toHaveAttribute("target", "_blank");
     await expect(manifestLink).toHaveAttribute("rel", /noopener/);
 
-    // Verify tool access section + default not_checked panel.
+    // Verify tool access section: no harness exists in this build, so the
+    // panel declares harness_unavailable statically and renders an
+    // "Unavailable in this build" badge in place of a Verify button —
+    // no clickable dead end, and never authorized without a harness.
     await expect(page.getByTestId("verify-tool-access")).toBeVisible();
     const panel = page.getByTestId("verify-tool-access-result");
-    await expect(panel).toHaveAttribute("data-status", "not_checked");
-    await expect(page.getByTestId("verify-tool-checked")).toContainText("list_grows");
-
-    // After clicking Verify with the default browser harness, we get
-    // harness_unavailable — never authorized without a harness.
-    await page.getByTestId("verify-tool-access-button").click();
     await expect(panel).toHaveAttribute("data-status", "harness_unavailable");
+    await expect(page.getByTestId("verify-tool-checked")).toContainText("list_grows");
+    await expect(page.getByTestId("verify-harness-unavailable-badge")).toBeVisible();
+    await expect(page.getByTestId("verify-tool-access-button")).toHaveCount(0);
     await expect(page.getByTestId("verify-next-step")).toContainText(/configured local harness/i);
 
     // Manifest summary modal opens + shows safe projection.

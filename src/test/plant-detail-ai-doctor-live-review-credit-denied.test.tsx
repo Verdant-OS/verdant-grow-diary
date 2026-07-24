@@ -1,13 +1,31 @@
 /**
- * Mount test: PlantDetailAiDoctorLiveReview renders AiCreditLimitNotice
- * (not the generic failure pane) when the adapter returns credit_denied.
+ * Regression: PlantDetailAiDoctorLiveReview restores the Free-only upgrade
+ * path at a server-confirmed AI Doctor credit denial. Paid/founder/unknown
+ * denials remain plan-neutral and never expose an upgrade CTA.
  */
-import { describe, it, expect, vi } from "vitest";
+import { beforeEach, describe, it, expect, vi } from "vitest";
 import { render as rtlRender, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import type { ReactElement } from "react";
 import type { TimelineMemoryItem } from "@/lib/timelineFilterRules";
+
+const { trackFunnelEvent } = vi.hoisted(() => ({
+  trackFunnelEvent: vi.fn(),
+}));
+
+const entitlementState = vi.hoisted(() => ({
+  lookupFailed: false,
+  current: {
+    displayPlanId: "free",
+    effectivePlanId: "free",
+    status: "unknown",
+    isActive: false,
+    capabilities: {},
+    degraded: false,
+    degradedReason: null as string | null,
+  },
+}));
 
 function render(ui: ReactElement) {
   const client = new QueryClient({
@@ -36,17 +54,13 @@ vi.mock("@/hooks/useTimelineMemory", () => ({
 vi.mock("@/hooks/useMyEntitlements", () => ({
   useMyEntitlements: () => ({
     loading: false,
-    entitlement: {
-      displayPlanId: "free",
-      effectivePlanId: "free",
-      status: "unknown",
-      isActive: false,
-      capabilities: {},
-      degraded: false,
-      degradedReason: null,
-    },
+    lookupFailed: entitlementState.lookupFailed,
+    entitlement: entitlementState.current,
+    refetch: async () => undefined,
   }),
 }));
+
+vi.mock("@/lib/funnelAnalytics", () => ({ trackFunnelEvent }));
 
 import PlantDetailAiDoctorLiveReview from "@/components/PlantDetailAiDoctorLiveReview";
 
@@ -79,9 +93,22 @@ function strongTimeline(): TimelineMemoryItem[] {
 }
 
 describe("PlantDetailAiDoctorLiveReview — credit_denied branch", () => {
-  it("renders AiCreditLimitNotice instead of generic failure pane", async () => {
-    itemsRef.current = strongTimeline();
-    const invoke = vi.fn().mockResolvedValue({
+  beforeEach(() => {
+    trackFunnelEvent.mockClear();
+    entitlementState.lookupFailed = false;
+    entitlementState.current = {
+      displayPlanId: "free",
+      effectivePlanId: "free",
+      status: "unknown",
+      isActive: false,
+      capabilities: {},
+      degraded: false,
+      degradedReason: null,
+    };
+  });
+
+  function denial(planId: string | null) {
+    return {
       data: {
         ok: false,
         reason: "credit_denied",
@@ -89,29 +116,127 @@ describe("PlantDetailAiDoctorLiveReview — credit_denied branch", () => {
           ok: false,
           status: "denied",
           reason: "limit_reached",
-          scope: "per_grow",
+          scope: planId === "free" ? "per_grow" : "per_month",
           scope_used: 3,
           scope_limit: 3,
           remaining: 0,
-          plan_id: "free",
+          plan_id: planId,
         },
       },
       error: null,
-    });
+    };
+  }
+
+  async function mountAndDeny(planId: string | null) {
+    itemsRef.current = strongTimeline();
+    const invoke = vi.fn().mockResolvedValue(denial(planId));
     render(
       <PlantDetailAiDoctorLiveReview
         plantId="p1"
         plant={strongPlant}
+        tentId="tent-1"
         invoke={invoke}
       />,
     );
     fireEvent.click(await screen.findByTestId("plant-ai-doctor-live-review-start"));
     await waitFor(() =>
-      expect(
-        screen.getByTestId("plant-ai-doctor-live-review-credit-denied"),
-      ).toBeTruthy(),
+      expect(screen.getByTestId("plant-ai-doctor-live-review-credit-denied")).toBeTruthy(),
     );
+    expect(screen.queryByTestId("plant-ai-doctor-live-review-retry")).toBeNull();
+    expect(screen.queryByTestId("plant-ai-doctor-post-value-upgrade")).toBeNull();
+  }
+
+  it("offers Free growers a return-safe pricing CTA and records the funnel view", async () => {
+    await mountAndDeny("free");
+    expect(screen.getByTestId("plant-ai-doctor-live-review-credit-denied")).toHaveAttribute(
+      "data-kind",
+      "upsell",
+    );
+    expect(
+      screen.getByTestId("plant-ai-doctor-live-review-credit-denied-paywall-link"),
+    ).toHaveAttribute(
+      "href",
+      "/pricing?returnTo=%2Fplants%2Fp1%3FtentId%3Dtent-1%23plant-ai-doctor-review",
+    );
+    expect(trackFunnelEvent.mock.calls.filter(([name]) => name === "paywall_viewed")).toHaveLength(
+      1,
+    );
+    expect(trackFunnelEvent).toHaveBeenCalledWith("paywall_viewed", {
+      surface: "ai_doctor_limit",
+    });
+    expect(trackFunnelEvent).not.toHaveBeenCalledWith("paywall_cta_clicked", expect.anything());
+    fireEvent.click(screen.getByTestId("plant-ai-doctor-live-review-credit-denied-paywall-link"));
+    expect(
+      trackFunnelEvent.mock.calls.filter(([name]) => name === "paywall_cta_clicked"),
+    ).toHaveLength(1);
+    expect(trackFunnelEvent).toHaveBeenCalledWith("paywall_cta_clicked", {
+      surface: "ai_doctor_limit",
+    });
     // Generic failure pane must NOT render.
     expect(screen.queryByTestId("plant-ai-doctor-live-review-failure")).toBeNull();
   });
+
+  it("keeps the denial plan-neutral when the defensive viewer plan check failed", async () => {
+    entitlementState.lookupFailed = true;
+    await mountAndDeny("free");
+
+    expect(screen.getByTestId("plant-ai-doctor-live-review-credit-denied")).toHaveAttribute(
+      "data-kind",
+      "unknown",
+    );
+    expect(
+      screen.queryByTestId("plant-ai-doctor-live-review-credit-denied-paywall-link"),
+    ).toBeNull();
+    expect(trackFunnelEvent).not.toHaveBeenCalled();
+  });
+
+  it("offers a lapsed Pro grower the same return-safe reactivation path", async () => {
+    entitlementState.current = {
+      displayPlanId: "pro_monthly",
+      effectivePlanId: "free",
+      status: "expired",
+      isActive: false,
+      capabilities: {},
+      degraded: true,
+      degradedReason: "expired",
+    };
+
+    await mountAndDeny("free");
+
+    expect(screen.getByTestId("plant-ai-doctor-live-review-credit-denied")).toHaveAttribute(
+      "data-kind",
+      "upsell",
+    );
+    expect(
+      screen.getByTestId("plant-ai-doctor-live-review-credit-denied-paywall-link"),
+    ).toHaveAttribute(
+      "href",
+      "/pricing?returnTo=%2Fplants%2Fp1%3FtentId%3Dtent-1%23plant-ai-doctor-review",
+    );
+    expect(trackFunnelEvent.mock.calls.filter(([name]) => name === "paywall_viewed")).toHaveLength(
+      1,
+    );
+    expect(trackFunnelEvent).toHaveBeenCalledWith("paywall_viewed", {
+      surface: "ai_doctor_limit",
+    });
+  });
+
+  it.each(["pro_monthly", "founder_lifetime", null])(
+    "keeps a %s denial plan-neutral with no pricing CTA",
+    async (planId) => {
+      await mountAndDeny(planId);
+      expect(screen.getByTestId("plant-ai-doctor-live-review-credit-denied")).not.toHaveAttribute(
+        "data-kind",
+        "upsell",
+      );
+      expect(
+        screen.queryByTestId("plant-ai-doctor-live-review-credit-denied-paywall-link"),
+      ).toBeNull();
+      expect(trackFunnelEvent).not.toHaveBeenCalledWith("paywall_viewed", expect.anything());
+      expect(trackFunnelEvent).not.toHaveBeenCalledWith("paywall_cta_clicked", expect.anything());
+      expect(trackFunnelEvent).toHaveBeenCalledWith("ai_doctor_review_started", {
+        surface: "standard",
+      });
+    },
+  );
 });

@@ -1,8 +1,8 @@
 # Verdant Security Checklist
 
-Production deployment: https://verdantgrowdiary.com — only the `/welcome`
-landing route is public; all other routes require authentication.
-
+Production deployment: https://verdantgrowdiary.com — signed-out `/` and
+`/welcome` render the public landing. Signed-in `/` renders the authenticated
+Dashboard; all other product routes require authentication.
 
 Use this checklist for every Verdant PR that touches data access, auth, AI,
 Action Queue, sensors, device control, or migrations. It complements

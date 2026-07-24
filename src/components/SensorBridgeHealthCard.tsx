@@ -1,9 +1,12 @@
 import { Radio } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useSensorBridgeHealth } from "@/hooks/useSensorBridgeHealth";
-import type {
-  SensorBridgeHealthState,
-  SensorBridgeHealthViewModel,
+import {
+  reconcileSensorBridgeHealthWithReadings,
+  type SensorBridgeHealthState,
+  type SensorBridgeHealthViewModel,
+  type SensorBridgeReadingEvidenceRowLike,
+  type SensorBridgeReadingEvidenceStatus,
 } from "@/lib/sensorBridgeHealthViewModel";
 
 /**
@@ -40,16 +43,34 @@ function formatIso(iso: string | null): string | null {
 export interface SensorBridgeHealthCardProps {
   /** Optional injected view model (tests). When omitted, hook is used. */
   viewModel?: SensorBridgeHealthViewModel;
+  /** Provenance-bearing rows already loaded for the selected tent. */
+  sensorReadings?: ReadonlyArray<SensorBridgeReadingEvidenceRowLike>;
+  sensorReadingsStatus?: SensorBridgeReadingEvidenceStatus;
+  /** Injectable evidence clock/window for deterministic tests. */
+  evidenceNow?: Date;
+  evidenceLiveWindowMs?: number;
   className?: string;
 }
 
 export default function SensorBridgeHealthCard({
   viewModel,
+  sensorReadings,
+  sensorReadingsStatus,
+  evidenceNow,
+  evidenceLiveWindowMs,
   className,
 }: SensorBridgeHealthCardProps) {
   const query = useSensorBridgeHealth();
   const isLoading = !viewModel && query.isLoading;
-  const vm = viewModel ?? query.data ?? null;
+  const auditVm = viewModel ?? query.data ?? null;
+  const vm = auditVm
+    ? reconcileSensorBridgeHealthWithReadings(auditVm, {
+        rows: sensorReadings,
+        status: sensorReadingsStatus,
+        now: evidenceNow,
+        liveWindowMs: evidenceLiveWindowMs,
+      })
+    : null;
 
   return (
     <div
@@ -75,32 +96,24 @@ export default function SensorBridgeHealthCard({
         className="text-xs text-muted-foreground mb-3"
         data-testid="sensor-bridge-health-disclosure"
       >
-        {vm?.controlDisclosure ?? "No device control."} Readings are observed
-        only — bridge intake never executes equipment changes.
+        {vm?.controlDisclosure ?? "No device control."} Readings are observed only — bridge intake
+        never executes equipment changes.
       </p>
 
       {isLoading ? (
         <div className="text-sm text-muted-foreground">Loading…</div>
       ) : !vm ? (
-        <div className="text-sm text-muted-foreground">
-          Bridge status unavailable.
-        </div>
+        <div className="text-sm text-muted-foreground">Bridge status unavailable.</div>
       ) : (
         <div className="space-y-2 text-sm">
-          <div
-            className="text-foreground"
-            data-testid="sensor-bridge-health-message"
-          >
+          <div className="text-foreground" data-testid="sensor-bridge-health-message">
             {vm.message}
           </div>
 
           {vm.bridgeName && (
             <div className="text-xs text-muted-foreground">
               Bridge:{" "}
-              <span
-                className="font-medium text-foreground"
-                data-testid="sensor-bridge-health-name"
-              >
+              <span className="font-medium text-foreground" data-testid="sensor-bridge-health-name">
                 {vm.bridgeName}
               </span>
             </div>
@@ -109,10 +122,7 @@ export default function SensorBridgeHealthCard({
           {vm.sourceLabel && (
             <div className="text-xs text-muted-foreground">
               Source:{" "}
-              <span
-                className="font-mono text-foreground"
-                data-testid="sensor-bridge-health-source"
-              >
+              <span className="font-mono text-foreground" data-testid="sensor-bridge-health-source">
                 {vm.sourceLabel}
               </span>
             </div>
@@ -141,10 +151,7 @@ export default function SensorBridgeHealthCard({
               className="text-xs text-muted-foreground"
               data-testid="sensor-bridge-health-reason"
             >
-              Reason:{" "}
-              <code className="font-mono text-foreground">
-                {vm.latestReasonCode}
-              </code>
+              Reason: <code className="font-mono text-foreground">{vm.latestReasonCode}</code>
             </div>
           )}
         </div>

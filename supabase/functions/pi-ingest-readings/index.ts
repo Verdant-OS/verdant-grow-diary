@@ -40,12 +40,12 @@ import {
   buildMethodNotAllowedResponseBody,
   buildSecretResolverNotImplementedResponseBody,
   buildUnauthorizedResponseBody,
-} from "../../../src/lib/piIngestFailClosedResponses.ts";
+} from "../_shared/lib/lib/piIngestFailClosedResponses.ts";
 import {
   type BridgeAuthRequest,
   type BridgeCredential,
   verifyBridgeRequest,
-} from "../../../src/lib/piIngestAuthRules.ts";
+} from "../_shared/lib/lib/piIngestAuthRules.ts";
 import {
   loadBridgeCredentialRow,
   type PiIngestBridgeCredentialLookupClient,
@@ -56,15 +56,15 @@ import {
   resolveBridgeSecret,
 } from "./secretResolver.ts";
 import { loadTentOwnerUserId } from "./tentOwnerLookup.ts";
-import { evaluateBridgeAuthorization } from "../../../src/lib/piIngestBridgeAuthorizationRules.ts";
-import type { BridgeCredentialMetadata } from "../../../src/lib/piIngestBridgeCredentialMetadataResolver.ts";
+import { evaluateBridgeAuthorization } from "../_shared/lib/lib/piIngestBridgeAuthorizationRules.ts";
+import type { BridgeCredentialMetadata } from "../_shared/lib/lib/piIngestBridgeCredentialMetadataResolver.ts";
 import {
   toExternalSensorIngestPayload,
   validatePiIngestRequestEnvelope,
-} from "../../../src/lib/piIngestRequestRules.ts";
-import { normalizeIngestPayload } from "../../../src/lib/sensorIngestNormalizationRules.ts";
-import { deriveBatchIdempotencyKeys } from "../../../src/lib/piIngestBridgeRules.ts";
-import { buildPiIngestCommitPlan } from "../../../src/lib/piIngestCommitPlan.ts";
+} from "../_shared/lib/lib/piIngestRequestRules.ts";
+import { normalizeIngestPayload } from "../_shared/lib/lib/sensorIngestNormalizationRules.ts";
+import { deriveBatchIdempotencyKeys } from "../_shared/lib/lib/piIngestBridgeRules.ts";
+import { buildPiIngestCommitPlan } from "../_shared/lib/lib/piIngestCommitPlan.ts";
 import {
   loadExistingPiIngestIdempotencyKeys,
   type PiIngestIdempotencyLookupClient,

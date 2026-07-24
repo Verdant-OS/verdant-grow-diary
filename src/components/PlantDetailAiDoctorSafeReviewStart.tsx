@@ -10,41 +10,55 @@
  */
 import { useMemo, useState } from "react";
 import { useTimelineMemory, TIMELINE_MEMORY_DEFAULT_LIMIT } from "@/hooks/useTimelineMemory";
+import { useRootZoneObservations } from "@/hooks/useRootZoneObservations";
 import {
   evaluateAiDoctorContextFromSources,
   type AiDoctorContextPlantSource,
 } from "@/lib/aiDoctorContextViewModel";
 import {
-  buildAiDoctorSafeReviewStart,
-} from "@/lib/aiDoctorSafeReviewStartViewModel";
+  buildAiDoctorRootZoneReadinessScope,
+  selectSettledAiDoctorRootZoneObservations,
+} from "@/lib/aiDoctorRootZoneReadinessScopeRules";
+import { ROOT_ZONE_OBSERVATION_CAP } from "@/lib/rootZoneObservationRules";
+import { buildAiDoctorSafeReviewStart } from "@/lib/aiDoctorSafeReviewStartViewModel";
 
 export interface PlantDetailAiDoctorSafeReviewStartProps {
   plantId: string;
-  plant: AiDoctorContextPlantSource | null;
+  plant:
+    | (AiDoctorContextPlantSource & {
+        growId?: string | null;
+        tentId?: string | null;
+      })
+    | null;
 }
 
 export default function PlantDetailAiDoctorSafeReviewStart({
   plantId,
   plant,
 }: PlantDetailAiDoctorSafeReviewStartProps) {
-  const { items } = useTimelineMemory(
-    { kind: "plant", plantId },
+  const { items: evidenceItems } = useTimelineMemory(
+    { kind: "plant", plantId, tentId: plant?.tentId ?? null },
     TIMELINE_MEMORY_DEFAULT_LIMIT,
   );
+  const rootZoneScope = buildAiDoctorRootZoneReadinessScope({
+    plantId,
+    tentId: plant?.tentId,
+    growId: plant?.growId,
+  });
+  const rootZoneHistory = useRootZoneObservations(rootZoneScope, ROOT_ZONE_OBSERVATION_CAP);
+  const rootZoneObservations = selectSettledAiDoctorRootZoneObservations(rootZoneHistory);
 
   const result = useMemo(
     () =>
       evaluateAiDoctorContextFromSources({
         plant,
-        timelineItems: items,
+        timelineItems: evidenceItems,
+        rootZoneObservations,
       }),
-    [plant, items],
+    [plant, evidenceItems, rootZoneObservations],
   );
 
-  const view = useMemo(
-    () => buildAiDoctorSafeReviewStart(result),
-    [result],
-  );
+  const view = useMemo(() => buildAiDoctorSafeReviewStart(result), [result]);
 
   const [open, setOpen] = useState(false);
 
@@ -124,21 +138,15 @@ export default function PlantDetailAiDoctorSafeReviewStart({
           <dl className="grid grid-cols-1 gap-1 text-xs">
             <div data-testid="plant-ai-doctor-safe-review-timeline-summary">
               <dt className="font-semibold inline">Timeline: </dt>
-              <dd className="inline text-muted-foreground">
-                {prep.timelineSummary}
-              </dd>
+              <dd className="inline text-muted-foreground">{prep.timelineSummary}</dd>
             </div>
             <div data-testid="plant-ai-doctor-safe-review-snapshot-summary">
               <dt className="font-semibold inline">Sensor snapshots: </dt>
-              <dd className="inline text-muted-foreground">
-                {prep.snapshotSummary}
-              </dd>
+              <dd className="inline text-muted-foreground">{prep.snapshotSummary}</dd>
             </div>
             <div data-testid="plant-ai-doctor-safe-review-warnings-summary">
               <dt className="font-semibold inline">Warnings: </dt>
-              <dd className="inline text-muted-foreground">
-                {prep.warningsSummary}
-              </dd>
+              <dd className="inline text-muted-foreground">{prep.warningsSummary}</dd>
             </div>
           </dl>
 

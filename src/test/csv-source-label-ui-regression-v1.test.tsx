@@ -187,7 +187,10 @@ describe("CSV Source-Label UI Regression v1 — done phase keeps CSV label", () 
     const text = (done.textContent ?? "").toLowerCase();
     expect(text).toContain("csv");
     expect(text).toMatch(/csv reading/);
-    expect(text).not.toMatch(/\blive\b/);
+    // The done note deliberately says "not live telemetry" — a negation,
+    // not a live claim. Strip that exact phrase, then keep banning any
+    // other live wording.
+    expect(text.replace(/not live telemetry/g, "")).not.toMatch(/\blive\b/);
     expect(onConfirm).toHaveBeenCalledTimes(1);
     cleanup();
   });

@@ -162,7 +162,8 @@ describe("Static safety · Plants quick-action wiring", () => {
 
   it("does not auto-submit from quick actions", () => {
     expect(CODE).not.toMatch(/quick[\s\S]{0,80}\.insert\(/i);
-    expect(CODE).not.toMatch(/dispatchEvent\(/);
+    expect(CODE).not.toMatch(/requestSubmit\(/);
+    expect(CODE).not.toMatch(/dispatchEvent\(\s*new\s+Event\(["']submit["']/);
   });
 
   it("avoids forbidden user-facing wording", () => {

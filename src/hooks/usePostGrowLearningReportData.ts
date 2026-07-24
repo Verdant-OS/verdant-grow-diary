@@ -31,7 +31,9 @@ export interface UsePostGrowLearningReportDataResult {
   error: string | null;
   reload: () => Promise<void>;
   saveLesson: (lesson: string) => Promise<{ ok: true } | { ok: false; message: string }>;
-  applyLessonToNextGrow: (lesson: string) => Promise<{ ok: true; actionId: string | null } | { ok: false; message: string }>;
+  applyLessonToNextGrow: (
+    lesson: string,
+  ) => Promise<{ ok: true; actionId: string | null } | { ok: false; message: string }>;
 }
 
 async function signPhotoUrls(rows: PostGrowDiaryLike[]): Promise<PostGrowDiaryLike[]> {
@@ -99,10 +101,12 @@ export function usePostGrowLearningReportData(
         tentIds.length > 0
           ? supabase
               .from("sensor_readings")
-              .select("metric,value,ts,source")
+              .select("id,metric,value,ts,captured_at,source,raw_payload")
               .in("tent_id", tentIds)
               .in("metric", ["temperature_c", "humidity_pct", "vpd_kpa"])
+              .order("captured_at", { ascending: true, nullsFirst: false })
               .order("ts", { ascending: true })
+              .order("id", { ascending: true })
               .limit(1000)
           : Promise.resolve({ data: [], error: null } as { data: unknown[]; error: null }),
         supabase

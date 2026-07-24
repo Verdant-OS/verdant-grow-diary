@@ -33,24 +33,11 @@ import {
 
 export interface StarterSetupDataAccess {
   listOwnedGrows(userId: string): Promise<ReadonlyArray<StarterOwnedRow>>;
-  listOwnedTents(
-    userId: string,
-    growId: string,
-  ): Promise<ReadonlyArray<StarterOwnedRow>>;
-  listOwnedPlants(
-    userId: string,
-    tentId: string,
-  ): Promise<ReadonlyArray<StarterOwnedRow>>;
+  listOwnedTents(userId: string, growId: string): Promise<ReadonlyArray<StarterOwnedRow>>;
+  listOwnedPlants(userId: string, tentId: string): Promise<ReadonlyArray<StarterOwnedRow>>;
   createStarterGrow(userId: string): Promise<StarterOwnedRow>;
-  createStarterTent(
-    userId: string,
-    growId: string,
-  ): Promise<StarterOwnedRow>;
-  createStarterPlant(
-    userId: string,
-    growId: string,
-    tentId: string,
-  ): Promise<StarterOwnedRow>;
+  createStarterTent(userId: string, growId: string): Promise<StarterOwnedRow>;
+  createStarterPlant(userId: string, growId: string, tentId: string): Promise<StarterOwnedRow>;
 }
 
 export class StarterSetupError extends Error {
@@ -63,9 +50,28 @@ export class StarterSetupError extends Error {
   }
 }
 
+export type StarterSetupCreatedEntity = "grow" | "tent" | "plant";
+
+export interface StarterSetupCallbacks {
+  /**
+   * Fires immediately after each durable create succeeds. Callback failures
+   * are ignored so analytics can never break or roll back starter setup.
+   */
+  onCreated?: (entity: StarterSetupCreatedEntity) => void;
+}
+
+function notifyCreated(callbacks: StarterSetupCallbacks, entity: StarterSetupCreatedEntity): void {
+  try {
+    callbacks.onCreated?.(entity);
+  } catch {
+    // The row already exists. Observability must remain fire-and-forget.
+  }
+}
+
 export async function runStarterSetup(
   userId: string | null | undefined,
   db: StarterSetupDataAccess,
+  callbacks: StarterSetupCallbacks = {},
 ): Promise<StarterSetupResult> {
   if (!userId) {
     throw new StarterSetupError("Not signed in.", "auth");
@@ -83,6 +89,7 @@ export async function runStarterSetup(
     try {
       const created = await db.createStarterGrow(userId);
       growId = created.id;
+      notifyCreated(callbacks, "grow");
     } catch (err) {
       throw new StarterSetupError(
         err instanceof Error ? err.message : "Failed to create starter grow.",
@@ -103,6 +110,7 @@ export async function runStarterSetup(
     try {
       const created = await db.createStarterTent(userId, growId);
       tentId = created.id;
+      notifyCreated(callbacks, "tent");
     } catch (err) {
       throw new StarterSetupError(
         err instanceof Error ? err.message : "Failed to create starter tent.",
@@ -123,6 +131,7 @@ export async function runStarterSetup(
     try {
       const created = await db.createStarterPlant(userId, growId, tentId);
       plantId = created.id;
+      notifyCreated(callbacks, "plant");
     } catch (err) {
       throw new StarterSetupError(
         err instanceof Error ? err.message : "Failed to create starter plant.",

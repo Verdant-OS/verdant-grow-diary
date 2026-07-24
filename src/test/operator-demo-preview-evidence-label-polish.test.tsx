@@ -13,6 +13,10 @@ vi.mock("@/hooks/useHasRole", () => ({
   useHasRole: () => ({ status: "granted", granted: true, error: null }),
 }));
 
+vi.mock("@/hooks/useOperatorAccountReadModels", () => ({
+  useOperatorAccountReadModels: () => ({ status: "no_grow" }),
+}));
+
 import OperatorDemoPreview from "@/pages/OperatorDemoPreview";
 import { buildOperatorDemoPreviewViewModel } from "@/lib/operatorDemoPreviewViewModel";
 import { loadDemoEvidenceChainFixture } from "@/lib/demoEvidenceChainFixture";
@@ -43,9 +47,7 @@ describe("OperatorDemoPreview evidence label polish", () => {
     renderPage();
     expect(document.body.textContent ?? "").not.toContain(RAW_FIXTURE_ID);
     // Also: the legacy "sensor_snapshot demo_reading_vpd_001" pair must not appear.
-    expect(document.body.textContent ?? "").not.toMatch(
-      /sensor_snapshot\s+demo_reading_vpd_001/i,
-    );
+    expect(document.body.textContent ?? "").not.toMatch(/sensor_snapshot\s+demo_reading_vpd_001/i);
   });
 
   it("still keeps the Demo source badge visible on linked items", () => {
@@ -72,9 +74,7 @@ describe("OperatorDemoPreview evidence label polish", () => {
     expect(vm.evidenceDisplayLabels[fx.reading.id]).toBe(HUMAN_LABEL);
     // Refs unchanged — same as raw fixture loader output.
     expect(vm.alert.evidenceRefs).toEqual(fx.alert.originating_timeline_events);
-    expect(vm.action.evidenceRefs).toEqual(
-      fx.action.originating_timeline_events,
-    );
+    expect(vm.action.evidenceRefs).toEqual(fx.action.originating_timeline_events);
     expect(vm.alert.evidenceRefs[0].id).toBe(fx.reading.id);
   });
 });

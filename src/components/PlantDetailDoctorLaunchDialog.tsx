@@ -10,9 +10,8 @@
  *   - Trigger renders the "Ask Doctor" button.
  *   - Opening the dialog shows a deterministic Available / Missing /
  *     Stale summary of context AI Doctor would have for this plant.
- *   - "Continue to AI Doctor" routes to /doctor with the plant context
- *     as a query parameter (existing /doctor route ignores unknown
- *     params safely).
+ *   - "Continue to AI Doctor" routes to the existing scoped Plant Detail
+ *     review anchor, where the loaded plant/grow/tent context is preserved.
  *   - "Add context first" dispatches the existing
  *     `verdant:open-quicklog` event so the grower can add notes/photo
  *     /sensor data without leaving the page.
@@ -21,7 +20,7 @@
  * automation or hardware control. No IDs, tokens, raw payloads,
  * storage paths, or provenance markers are rendered.
  */
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
   Stethoscope,
@@ -30,7 +29,9 @@ import {
   MinusCircle,
   Clock,
   Plus,
+  BookText,
 } from "lucide-react";
+import { useLogAiDoctorReadinessToDiary } from "@/hooks/useLogAiDoctorReadinessToDiary";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -44,6 +45,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
+import { useTimelineMemory, TIMELINE_MEMORY_DEFAULT_LIMIT } from "@/hooks/useTimelineMemory";
 import { buildPlantRecentActivity } from "@/lib/plantRecentActivityRules";
 import {
   buildPlantDetailDoctorContextPreview,
@@ -54,6 +56,14 @@ import {
   buildPlantDetailDoctorAddContextRoute,
   ADD_CONTEXT_HELPER_COPY,
 } from "@/lib/plantDetailDoctorAddContextRouter";
+import { evaluateAiDoctorContextFromSources } from "@/lib/aiDoctorContextViewModel";
+import {
+  buildAiDoctorReadinessGate,
+  buildAiDoctorReadinessBlockedExplanation,
+  AI_DOCTOR_READINESS_GATE_ADD_CONTEXT_LABEL,
+} from "@/lib/aiDoctorReadinessGateViewModel";
+import { buildAiDoctorSnapshotStalenessExplanation } from "@/lib/aiDoctorSnapshotStalenessExplanationViewModel";
+import { buildPlantAiDoctorReviewPath } from "@/lib/aiDoctorEntryRules";
 
 interface Props {
   plantId: string | null | undefined;
@@ -100,11 +110,14 @@ function stateLabel(state: DoctorContextItemState): string {
 }
 
 function SummaryRow({ item }: { item: DoctorContextItem }) {
+  // State icons are aria-hidden and the badge is visual-only, so the row
+  // itself carries the "label: state" coupling for screen readers.
   return (
     <li
       className="flex items-center justify-between gap-2 rounded-md border border-border/40 bg-background/30 px-2.5 py-1.5"
       data-testid={`plant-detail-doctor-launch-item-${item.kind}`}
       data-state={item.state}
+      aria-label={`${item.label}: ${stateLabel(item.state)}`}
     >
       <div className="min-w-0 flex items-center gap-2">
         {stateIcon(item.state)}
@@ -134,7 +147,16 @@ export default function PlantDetailDoctorLaunchDialog({
   now,
 }: Props) {
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    setOpen(false);
+  }, [plantId]);
+
   const { data: rawRows } = usePlantRecentActivity(plantId);
+  const { items: evidenceItems } = useTimelineMemory(
+    plantId ? { kind: "plant", plantId, tentId: tentId ?? null } : null,
+    TIMELINE_MEMORY_DEFAULT_LIMIT,
+  );
 
   const preview = useMemo(() => {
     const rows = buildPlantRecentActivity(rawRows ?? [], {
@@ -150,6 +172,34 @@ export default function PlantDetailDoctorLaunchDialog({
       now: now ?? new Date(),
     });
   }, [rawRows, plantId, stage, hasPlantPhoto, openAlertsCount, pendingActionsCount, now]);
+
+  const readinessResult = useMemo(
+    () =>
+      evaluateAiDoctorContextFromSources({
+        plant: plantId
+          ? {
+              id: plantId,
+              name: plantName ?? null,
+              stage: stage ?? null,
+              hasPlantPhoto: !!hasPlantPhoto,
+            }
+          : null,
+        timelineItems: evidenceItems,
+        now: now ? now.getTime() : undefined,
+      }),
+    [plantId, plantName, stage, hasPlantPhoto, evidenceItems, now],
+  );
+
+  const gate = useMemo(
+    () =>
+      buildAiDoctorReadinessGate({
+        readiness: readinessResult.readiness,
+        hasSafeAiDoctorFlow: true,
+      }),
+    [readinessResult.readiness],
+  );
+
+  const blocked = readinessResult.readiness === "insufficient";
 
   const addContextDecision = useMemo(() => {
     const stateOf = (kind: DoctorContextItem["kind"]): DoctorContextItemState | null =>
@@ -167,6 +217,66 @@ export default function PlantDetailDoctorLaunchDialog({
     });
   }, [preview.items, plantId, plantName, growId, tentId, tentName]);
 
+  const blockedExplanation = useMemo(
+    () =>
+      buildAiDoctorReadinessBlockedExplanation({
+        readiness: readinessResult.readiness,
+        missing: readinessResult.missing,
+        nextActionLabel:
+          addContextDecision.kind !== "none"
+            ? addContextDecision.label
+            : AI_DOCTOR_READINESS_GATE_ADD_CONTEXT_LABEL,
+      }),
+    [readinessResult.readiness, readinessResult.missing, addContextDecision],
+  );
+
+  const snapshotStaleness = useMemo(() => {
+    const nowMs = now ? now.getTime() : Date.now();
+    const fmt = (iso: string) => {
+      const d = new Date(iso);
+      if (!Number.isFinite(d.getTime())) return iso;
+      try {
+        return d.toLocaleString(undefined, {
+          dateStyle: "medium",
+          timeStyle: "short",
+        });
+      } catch {
+        return d.toISOString();
+      }
+    };
+    return buildAiDoctorSnapshotStalenessExplanation({
+      latestSnapshotAtIso: readinessResult.latest.manualSnapshotAt,
+      now: nowMs,
+      formatDateTime: fmt,
+    });
+  }, [readinessResult.latest.manualSnapshotAt, now]);
+
+  const { log: logReadiness, logging } = useLogAiDoctorReadinessToDiary();
+  const canLogReadiness = typeof growId === "string" && growId.trim().length > 0;
+
+  const handleLogReadinessToDiary = useCallback(() => {
+    if (!canLogReadiness || !plantId) return;
+    void logReadiness({
+      readiness: readinessResult.readiness,
+      latestSnapshotAtIso: readinessResult.latest.manualSnapshotAt,
+      blockingCodes: blockedExplanation.blockingCodes,
+      growId,
+      plantId,
+      tentId: tentId ?? null,
+      now: now ? now.getTime() : undefined,
+    });
+  }, [
+    canLogReadiness,
+    plantId,
+    readinessResult.readiness,
+    readinessResult.latest.manualSnapshotAt,
+    blockedExplanation.blockingCodes,
+    growId,
+    tentId,
+    now,
+    logReadiness,
+  ]);
+
   const handleAddContext = useCallback(() => {
     if (typeof window !== "undefined" && addContextDecision.quickLogEvent) {
       window.dispatchEvent(
@@ -182,7 +292,7 @@ export default function PlantDetailDoctorLaunchDialog({
 
   if (!plantId) return null;
 
-  const doctorHref = `/doctor?plantId=${encodeURIComponent(plantId)}`;
+  const plantReviewHref = buildPlantAiDoctorReviewPath({ plantId, tentId }) ?? "/doctor";
   const missingOrStale = preview.missingCount + preview.staleCount;
   const summaryNote =
     missingOrStale === 0
@@ -203,18 +313,13 @@ export default function PlantDetailDoctorLaunchDialog({
           <ArrowRight className="h-3.5 w-3.5" />
         </Button>
       </DialogTrigger>
-      <DialogContent
-        className="sm:max-w-md"
-        data-testid={DIALOG_TEST_ID}
-      >
+      <DialogContent className="sm:max-w-md" data-testid={DIALOG_TEST_ID}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base">
             <Stethoscope className="h-4 w-4 text-[hsl(var(--info))]" aria-hidden="true" />
             Doctor context summary
           </DialogTitle>
-          <DialogDescription className="text-xs">
-            {DOCTOR_LAUNCH_HELPER_LINES[0]}
-          </DialogDescription>
+          <DialogDescription className="text-xs">{DOCTOR_LAUNCH_HELPER_LINES[0]}</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3">
@@ -231,6 +336,7 @@ export default function PlantDetailDoctorLaunchDialog({
           <ul
             className="space-y-1.5"
             data-testid="plant-detail-doctor-launch-list"
+            aria-label="AI Doctor context readiness"
           >
             {preview.items.map((it) => (
               <SummaryRow key={it.kind} item={it} />
@@ -245,9 +351,107 @@ export default function PlantDetailDoctorLaunchDialog({
           <p className="text-xs text-muted-foreground leading-snug">
             {DOCTOR_LAUNCH_HELPER_LINES[1]}
           </p>
+          <p
+            className={
+              blocked
+                ? "text-xs text-amber-300 leading-snug font-medium"
+                : "text-xs text-muted-foreground leading-snug"
+            }
+            id="plant-detail-doctor-launch-readiness-notice"
+            data-testid="plant-detail-doctor-launch-readiness-notice"
+            data-readiness={readinessResult.readiness}
+            role="status"
+            aria-live="polite"
+          >
+            {gate.message}
+          </p>
+          {blocked && blockedExplanation.sentence ? (
+            <section
+              className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 space-y-1"
+              data-testid="plant-detail-doctor-launch-blocked-explanation"
+              role="status"
+              aria-live="polite"
+              aria-labelledby="plant-detail-doctor-launch-blocked-heading"
+            >
+              <h3 id="plant-detail-doctor-launch-blocked-heading" className="sr-only">
+                AI Doctor blocked: insufficient context
+              </h3>
+              <p
+                className="text-xs text-amber-200 leading-snug"
+                id="plant-detail-doctor-launch-blocked-sentence"
+                data-testid="plant-detail-doctor-launch-blocked-sentence"
+              >
+                {blockedExplanation.sentence}
+              </p>
+              {blockedExplanation.blockingLabels.length > 0 ? (
+                <ul
+                  className="list-disc pl-4 text-xs text-amber-100/90 space-y-0.5"
+                  data-testid="plant-detail-doctor-launch-blocked-list"
+                  aria-label="Reasons AI Doctor is blocked"
+                >
+                  {blockedExplanation.blockingCodes.map((code, i) => (
+                    <li key={code} data-blocking-code={code}>
+                      {blockedExplanation.blockingLabels[i]}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </section>
+          ) : null}
+          {snapshotStaleness.isStale ? (
+            <section
+              className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 space-y-1"
+              data-testid="plant-detail-doctor-launch-snapshot-stale-explanation"
+              data-cutoff-at={snapshotStaleness.cutoffAtIso}
+              data-snapshot-at={snapshotStaleness.snapshotAtIso ?? ""}
+              role="status"
+              aria-live="polite"
+              aria-labelledby="plant-detail-doctor-launch-snapshot-stale-heading"
+            >
+              <h3 id="plant-detail-doctor-launch-snapshot-stale-heading" className="sr-only">
+                Manual sensor snapshot is stale
+              </h3>
+              <p
+                className="text-xs text-amber-200 leading-snug"
+                data-testid="plant-detail-doctor-launch-snapshot-stale-sentence"
+              >
+                {snapshotStaleness.sentence}
+              </p>
+            </section>
+          ) : null}
         </div>
 
-        <DialogFooter className="gap-2 sm:gap-2 flex-col sm:flex-row">
+        <DialogFooter
+          className="gap-2 sm:gap-2 flex-col sm:flex-row"
+          data-testid="plant-detail-doctor-launch-footer"
+          data-readiness={readinessResult.readiness}
+        >
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="gap-1"
+            onClick={handleLogReadinessToDiary}
+            disabled={!canLogReadiness || logging}
+            aria-disabled={!canLogReadiness || logging}
+            title={
+              canLogReadiness
+                ? "Record this readiness check as a diary entry"
+                : "A grow is required to log readiness"
+            }
+            data-testid="plant-detail-doctor-launch-log-readiness-to-diary"
+            data-readiness={readinessResult.readiness}
+            data-snapshot-freshness={
+              snapshotStaleness.isStale
+                ? "stale"
+                : readinessResult.latest.manualSnapshotAt
+                  ? "fresh"
+                  : "missing"
+            }
+          >
+            <BookText className="h-3.5 w-3.5" />
+            {logging ? "Logging…" : "Log readiness to diary"}
+          </Button>
           {addContextDecision.kind !== "none" &&
             (addContextDecision.to ? (
               <Button
@@ -279,16 +483,41 @@ export default function PlantDetailDoctorLaunchDialog({
                 <Plus className="h-3.5 w-3.5" /> {addContextDecision.label}
               </Button>
             ))}
-          <Button
-            asChild
-            size="sm"
-            className="gap-1"
-            data-testid="plant-detail-doctor-launch-continue"
-          >
-            <Link to={doctorHref} aria-label="Continue to AI Doctor with plant context">
+          {blocked ? (
+            <Button
+              type="button"
+              size="sm"
+              className="gap-1"
+              disabled
+              aria-disabled="true"
+              title={gate.message}
+              aria-describedby={
+                blockedExplanation.sentence
+                  ? "plant-detail-doctor-launch-readiness-notice plant-detail-doctor-launch-blocked-sentence"
+                  : "plant-detail-doctor-launch-readiness-notice"
+              }
+              data-testid="plant-detail-doctor-launch-continue-blocked"
+              data-readiness={readinessResult.readiness}
+            >
               Continue to AI Doctor <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
-          </Button>
+            </Button>
+          ) : (
+            <Button
+              asChild
+              size="sm"
+              className="gap-1"
+              data-testid="plant-detail-doctor-launch-continue"
+              data-readiness={readinessResult.readiness}
+            >
+              <Link
+                to={plantReviewHref}
+                aria-label="Continue to AI Doctor with plant context"
+                onClick={() => setOpen(false)}
+              >
+                Continue to AI Doctor <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

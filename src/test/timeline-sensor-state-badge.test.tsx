@@ -10,10 +10,17 @@
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
-import { render, screen } from "@testing-library/react";
+import { render as rtlRender, screen } from "@testing-library/react";
+import type { ReactElement } from "react";
+import { MemoryRouter } from "react-router-dom";
 import { sensorSnapshotBadge, toTimelineItem } from "@/lib/growDiaryTimelineRules";
 import { normalizeDiaryEntry } from "@/lib/diaryEntryRules";
 import DiaryEntryBadges from "@/components/DiaryEntryBadges";
+
+// DiaryEntryBadges now renders DiaryEntryFaqLink (a react-router <Link>),
+// so every render needs a Router. Shadowing `render` keeps call sites
+// unchanged.
+const render = (ui: ReactElement) => rtlRender(ui, { wrapper: MemoryRouter });
 
 const NOW = 1_700_000_000_000;
 const iso = (offset: number) => new Date(NOW + offset).toISOString();

@@ -37,41 +37,48 @@ describe("Timeline One-Tent Loop next-step card wiring", () => {
         testId="timeline-one-tent-loop-next-step-card"
       />,
     );
+    expect(screen.getByTestId("timeline-one-tent-loop-next-step-card-cta")).toHaveTextContent(
+      /Review sensor snapshot/i,
+    );
+  });
+
+  it("carries a selected Timeline tent to Sensors without exposing it as copy", () => {
+    const tentId = "00000000-0000-4000-8000-00000000000a";
+    renderCard(
+      <OneTentLoopNextStepCard
+        current="timeline"
+        ids={{ growId: "g1", tentId }}
+        testId="timeline-one-tent-loop-next-step-card"
+      />,
+    );
+
+    const cta = screen.getByTestId("timeline-one-tent-loop-next-step-card-cta");
+    const anchor = cta.tagName === "A" ? cta : cta.querySelector("a");
+    expect(anchor?.getAttribute("href")).toBe(`/sensors?tentId=${tentId}`);
     expect(
-      screen.getByTestId("timeline-one-tent-loop-next-step-card-cta"),
-    ).toHaveTextContent(/Review sensor snapshot/i);
+      screen.getByTestId("timeline-one-tent-loop-next-step-card").textContent ?? "",
+    ).not.toContain(tentId);
   });
 
   it("renders the Sensor Snapshot helper copy", () => {
     renderCard(
-      <OneTentLoopNextStepCard
-        current="timeline"
-        testId="timeline-one-tent-loop-next-step-card"
-      />,
+      <OneTentLoopNextStepCard current="timeline" testId="timeline-one-tent-loop-next-step-card" />,
     );
-    expect(
-      screen.getByTestId("timeline-one-tent-loop-next-step-card-helper"),
-    ).toHaveTextContent(
+    expect(screen.getByTestId("timeline-one-tent-loop-next-step-card-helper")).toHaveTextContent(
       /Open Sensor Snapshot from Timeline to cross-check telemetry and proceed\./,
     );
   });
 
   it("does not call fetch", () => {
     renderCard(
-      <OneTentLoopNextStepCard
-        current="timeline"
-        testId="timeline-one-tent-loop-next-step-card"
-      />,
+      <OneTentLoopNextStepCard current="timeline" testId="timeline-one-tent-loop-next-step-card" />,
     );
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it("does not introduce device-control or automation wording", () => {
     renderCard(
-      <OneTentLoopNextStepCard
-        current="timeline"
-        testId="timeline-one-tent-loop-next-step-card"
-      />,
+      <OneTentLoopNextStepCard current="timeline" testId="timeline-one-tent-loop-next-step-card" />,
     );
     const text = (
       screen.getByTestId("timeline-one-tent-loop-next-step-card").textContent ?? ""
@@ -94,8 +101,11 @@ describe("Timeline One-Tent Loop next-step card wiring", () => {
   it("Timeline source imports the card and renders it near the top", async () => {
     const fs = await import("node:fs/promises");
     const src = await fs.readFile("src/pages/Timeline.tsx", "utf8");
-    expect(src).toContain('import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard"');
+    expect(src).toContain(
+      'import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard"',
+    );
     expect(src).toContain('current="timeline"');
+    expect(src).toContain("tentId: tentFilter || null");
     expect(src).toContain('testId="timeline-one-tent-loop-next-step-card"');
   });
 });

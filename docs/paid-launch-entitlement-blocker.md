@@ -193,3 +193,16 @@ Rules:
   the widget — they are presentation-only.
 - `PremiumLiveSensorGate` is fail-closed: any non-allowed state
   (loading, denied, invalid_request, network_error) hides children.
+
+## Server-validated report features (additions)
+
+The `premium-export-entitlement` edge function also validates these
+report feature strings (same fail-closed contract, same
+`advancedExports` capability, scope-checked `grow_id` +
+`start_date`/`end_date` where supplied):
+
+- `diary_range_report` — the date-range diary report page
+  (`/reports/diary-range`, Print / Save PDF). SERVER-VALIDATED.
+- `post_grow_report` — the Post-Grow Learning Report page
+  (`/reports/post-grow/:growId`). SERVER-VALIDATED. Closes the launch
+  gap where pricing sold this report as Pro while the page was ungated.

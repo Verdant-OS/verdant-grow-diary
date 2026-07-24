@@ -15,46 +15,64 @@
  *  - Preserves the canonical AI Doctor required output structure.
  */
 
-import type { PlantContextPayload } from "./aiDoctorContextCompiler";
+import { sanitizeAiDoctorPromptText } from "./aiDoctorPromptVocabularyRules";
 
 /** Canonical AI Doctor required-output sections (rendered verbatim). */
-export const AI_DOCTOR_REQUIRED_OUTPUT_SECTIONS: readonly string[] =
-  Object.freeze([
-    "Summary",
-    "Likely issue",
-    "Confidence",
-    "Evidence",
-    "Missing information",
-    "Possible causes",
-    "Immediate action",
-    "What not to do",
-    "24-hour follow-up",
-    "3-day recovery plan",
-    "Risk level",
-    "Action Queue suggestion, if appropriate",
-  ]);
+export const AI_DOCTOR_REQUIRED_OUTPUT_SECTIONS: readonly string[] = Object.freeze([
+  "Summary",
+  "Likely issue",
+  "Confidence",
+  "Evidence",
+  "Missing information",
+  "Possible causes",
+  "Immediate action",
+  "What not to do",
+  "24-hour follow-up",
+  "3-day recovery plan",
+  "Risk level",
+  "Action Queue suggestion, if appropriate",
+]);
 
-/** Verbatim caveat strings AI Doctor prompts must include. */
+/**
+ * Verbatim caveat strings AI Doctor prompts must include.
+ *
+ * Every string pushed into the fragment's `guidance` array is rendered
+ * as an explicit rule list in the system prompt, and models restate
+ * rules in their responses (e.g. in "What not to do"). The result
+ * contract rejects any response containing its banned words, so every
+ * guidance string and model-facing label here must stay inside the
+ * validator's vocabulary. Authoritative context retains its original
+ * source-truth wording outside this prompt boundary. The echo-safety
+ * tests enforce the model-facing contract per key and assembled prompt.
+ */
 export const IMPORTED_HISTORY_PROMPT_STRINGS = Object.freeze({
-  sectionLabel: "Imported sensor history",
+  sectionLabel: "Historical sensor context",
   notLiveCaveat:
-    "Imported sensor history is historical context only. Do not treat it as live telemetry.",
+    "The historical sensor data in this request is background context only. Do not treat it as current telemetry.",
   notProofOfCurrent:
-    "Imported history may show trends but is not proof of current conditions.",
-  noAlertsFromHistoryAlone:
-    "Do not create or recommend alerts solely from imported history.",
+    "Historical sensor data may show trends but is not proof of current conditions.",
+  noAlertsFromHistoryAlone: "Do not create or recommend alerts solely from historical sensor data.",
   noActionQueueFromHistoryAlone:
-    "Do not create or recommend Action Queue items solely from imported history.",
+    "Do not create or recommend Action Queue items solely from historical sensor data.",
   notHealthyFromHistoryAlone:
-    "Do not state that the current environment is healthy based only on imported history.",
+    "Do not state that the current environment is healthy based only on historical sensor data.",
   evidenceSeparation:
-    "In Evidence, clearly distinguish 'Current evidence' from 'Imported historical context'.",
+    "In Evidence, clearly distinguish 'Current evidence' from 'Historical context'.",
   missingLiveReadings:
-    "Current/live sensor readings are missing or unavailable. State this clearly in Missing information.",
+    "Current sensor readings are missing or unavailable. State this clearly in Missing information.",
   missingInfoIncludeLive:
-    "In Missing information, include 'live sensor readings' when current/live readings are absent.",
+    "In Missing information, include 'current sensor readings' when no current reading is available.",
+  // Positive vocabulary steering only — naming the banned words here
+  // would put them in front of the model as restatable text.
+  validatorSafeVocabulary:
+    "Response wording: refer to telemetry as 'current sensor readings' or as 'historical context'. Hedge findings with 'likely', 'appears', or 'suggests' rather than absolute claims of certainty, cure, or guarantee, and do not assert device connectivity or data-sync status.",
+  // Confidence levels named here must be members of the result contract's
+  // accepted enum (low | medium | high) — 'moderate' would be rejected
+  // with confidence_enum. The model tends to echo this string when
+  // explaining its capped confidence, so it must also stay free of
+  // validator-banned words ('imported' → 'historical sensor context').
   confidenceCap:
-    "If only imported history is available (no current/live sensor readings), cap Confidence at 'low' or 'moderate' — never 'high'.",
+    "If only historical sensor context is available (no current sensor readings), cap Confidence at 'low' or 'medium' — never 'high'.",
 });
 
 export interface ImportedHistoryPromptFragment {
@@ -66,35 +84,66 @@ export interface ImportedHistoryPromptFragment {
   missingLiveReadingsBlock: string | null;
 }
 
-function formatVendors(
-  vendors: PlantContextPayload["imported_sensor_history"] extends infer T
-    ? T extends { vendors: infer V }
-      ? V
-      : never
-    : never,
-): string {
-  const list = (vendors as ReadonlyArray<{ vendorLabel: string; count: number }>) ?? [];
-  if (list.length === 0) return "unknown vendor";
-  return list.map((v) => `${v.vendorLabel} (${v.count})`).join(", ");
+export interface AiDoctorImportedHistoryPromptContext {
+  imported_sensor_history?: unknown;
+  missingLiveSensorReadings?: unknown;
 }
 
-function formatMetrics(
-  metrics: ReadonlyArray<{
-    metric: string;
-    unit: string | null;
-    count: number;
-    min: number;
-    max: number;
-    avg: number;
-  }>,
-): string {
-  if (metrics.length === 0) return "no metric summaries";
-  return metrics
-    .map(
-      (m) =>
-        `${m.metric}${m.unit ? ` (${m.unit})` : ""}: min=${m.min}, max=${m.max}, avg=${m.avg}, n=${m.count}`,
-    )
-    .join("; ");
+function asPlainRecord(value: unknown): Record<string, unknown> | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function promptString(value: unknown, fallback: string): string {
+  return typeof value === "string" ? sanitizeAiDoctorPromptText(value) : fallback;
+}
+
+function promptCount(value: unknown): number | "unknown" {
+  return Number.isSafeInteger(value) && (value as number) >= 0 ? (value as number) : "unknown";
+}
+
+function formatVendors(vendors: unknown): string {
+  if (!Array.isArray(vendors)) return "unknown vendor";
+  const formatted: string[] = [];
+  for (const item of vendors) {
+    const vendor = asPlainRecord(item);
+    if (!vendor || typeof vendor.vendorLabel !== "string") continue;
+    const count = promptCount(vendor.count);
+    if (count === "unknown") continue;
+    formatted.push(`${sanitizeAiDoctorPromptText(vendor.vendorLabel)} (${count})`);
+  }
+  return formatted.length > 0 ? formatted.join(", ") : "unknown vendor";
+}
+
+function formatMetrics(metrics: unknown): string {
+  if (!Array.isArray(metrics)) return "no metric summaries";
+  const formatted: string[] = [];
+  for (const item of metrics) {
+    const metric = asPlainRecord(item);
+    if (!metric || typeof metric.metric !== "string") continue;
+    const unit =
+      metric.unit === null ? null : typeof metric.unit === "string" ? metric.unit : undefined;
+    const count = promptCount(metric.count);
+    if (
+      unit === undefined ||
+      count === "unknown" ||
+      typeof metric.min !== "number" ||
+      !Number.isFinite(metric.min) ||
+      typeof metric.max !== "number" ||
+      !Number.isFinite(metric.max) ||
+      typeof metric.avg !== "number" ||
+      !Number.isFinite(metric.avg)
+    ) {
+      continue;
+    }
+    formatted.push(
+      `${sanitizeAiDoctorPromptText(metric.metric)}${unit ? ` (${sanitizeAiDoctorPromptText(unit)})` : ""}: min=${metric.min}, max=${metric.max}, avg=${metric.avg}, n=${count}`,
+    );
+  }
+  return formatted.length > 0 ? formatted.join("; ") : "no metric summaries";
 }
 
 /**
@@ -103,17 +152,15 @@ function formatMetrics(
  * Returns empty/null blocks when neither condition applies.
  */
 export function buildAiDoctorImportedHistoryPromptFragment(
-  ctx: Pick<
-    PlantContextPayload,
-    "imported_sensor_history" | "missingLiveSensorReadings"
-  >,
+  ctx: AiDoctorImportedHistoryPromptContext,
 ): ImportedHistoryPromptFragment {
   const guidance: string[] = [];
   const s = IMPORTED_HISTORY_PROMPT_STRINGS;
+  const importedHistory = asPlainRecord(ctx?.imported_sensor_history);
 
   let importedHistoryBlock: string | null = null;
-  if (ctx.imported_sensor_history) {
-    const h = ctx.imported_sensor_history;
+  if (importedHistory) {
+    const h = importedHistory;
     guidance.push(
       s.notLiveCaveat,
       s.notProofOfCurrent,
@@ -122,33 +169,37 @@ export function buildAiDoctorImportedHistoryPromptFragment(
       s.noAlertsFromHistoryAlone,
       s.noActionQueueFromHistoryAlone,
     );
-    const dateRange = h.dateRange
-      ? `${h.dateRange.earliest} → ${h.dateRange.latest}`
-      : "unknown";
+    const range = asPlainRecord(h.dateRange);
+    const dateRange =
+      range && typeof range.earliest === "string" && typeof range.latest === "string"
+        ? `${sanitizeAiDoctorPromptText(range.earliest)} → ${sanitizeAiDoctorPromptText(range.latest)}`
+        : "unknown";
     importedHistoryBlock = [
       `[${s.sectionLabel}]`,
-      `Source label: ${h.historicalLabel}`,
-      `Caveat: ${h.notForLiveDiagnosis}`,
-      `Vendors: ${formatVendors(h.vendors as never)}`,
+      `Source label: ${promptString(h.historicalLabel, "unknown history")}`,
+      `Caveat: ${promptString(h.notForLiveDiagnosis, "Historical context is not current telemetry.")}`,
+      `Vendors: ${formatVendors(h.vendors)}`,
       `Date range: ${dateRange}`,
-      `Total readings: ${h.totalReadings}`,
-      `Suspicious flags: ${h.suspiciousFlagCount}`,
+      `Total readings: ${promptCount(h.totalReadings)}`,
+      `Excluded quality rows: ${promptCount(h.excludedQualityCount)}`,
+      `Suspicious flags: ${promptCount(h.suspiciousFlagCount)}`,
       `Metric summaries: ${formatMetrics(h.metrics)}`,
     ].join("\n");
   }
 
   let missingLiveReadingsBlock: string | null = null;
-  if (ctx.missingLiveSensorReadings) {
+  if (ctx?.missingLiveSensorReadings === true) {
     guidance.push(s.missingLiveReadings, s.missingInfoIncludeLive);
-    if (ctx.imported_sensor_history) {
+    if (importedHistory) {
       guidance.push(s.confidenceCap);
     }
-    missingLiveReadingsBlock =
-      "[Missing live readings] " + s.missingLiveReadings;
+    missingLiveReadingsBlock = "[Missing current sensor readings] " + s.missingLiveReadings;
   }
 
-  // Always reinforce required output structure (kept as one line).
+  // Always reinforce validator-safe response vocabulary and the required
+  // output structure (kept as single lines).
   if (guidance.length > 0) {
+    guidance.push(s.validatorSafeVocabulary);
     guidance.push(
       "Preserve the AI Doctor required output structure: " +
         AI_DOCTOR_REQUIRED_OUTPUT_SECTIONS.join(" | "),

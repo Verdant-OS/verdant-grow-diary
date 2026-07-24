@@ -10,12 +10,16 @@ import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { more } from "@/components/MobileNav";
+import {
+  readDesktopGrowerNavigationSource,
+  readMobileGrowerNavigationSource,
+} from "@/test/utils/growerNavigationSource";
 
 const ROOT = resolve(__dirname, "../..");
 const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
 
-const SIDEBAR = read("src/components/AppSidebar.tsx");
-const MOBILE = read("src/components/MobileNav.tsx");
+const SIDEBAR = readDesktopGrowerNavigationSource();
+const MOBILE = readMobileGrowerNavigationSource();
 const QUICKLOG = read("src/components/QuickLog.tsx");
 const PLANTS = read("src/pages/Plants.tsx");
 const TENTS = read("src/pages/Tents.tsx");
@@ -60,23 +64,26 @@ describe("Primary navigation: Tents and Plants are emphasized", () => {
     expect(DASHBOARD).toMatch(/timelinePath\(scopedGrowId\)/);
     // Import must include timelinePath, not logsPath.
     expect(DASHBOARD).toMatch(/from\s+["']@\/lib\/routes["'][\s\S]{0,400}/);
-    const importLine = DASHBOARD.match(/import\s*\{[^}]*\}\s*from\s*["']@\/lib\/routes["']/)?.[0] ?? "";
+    const importLine =
+      DASHBOARD.match(/import\s*\{[^}]*\}\s*from\s*["']@\/lib\/routes["']/)?.[0] ?? "";
     expect(importLine).toContain("timelinePath");
     expect(importLine).not.toContain("logsPath");
   });
 
-  it("AppSidebar moves 'Grows' index under Archive as 'Harvest Archive'", () => {
-    expect(SIDEBAR).toContain('"Harvest Archive"');
+  it("AppSidebar labels the /grows index as 'My Grows' (was 'Harvest Archive', which misrepresented the active-grows list)", () => {
+    expect(SIDEBAR).toContain('"My Grows"');
     expect(SIDEBAR).not.toMatch(/label:\s*"Grows"/);
+    expect(SIDEBAR).not.toContain('"Harvest Archive"');
   });
 
-  it("MobileNav primary tabs put Tents before Plants and rename Grows", () => {
+  it("MobileNav primary tabs put Tents before Plants and label /grows as 'My Grows'", () => {
     const tIdx = MOBILE.indexOf('label: "Tents"');
     const pIdx = MOBILE.indexOf('label: "Plants"');
     expect(tIdx).toBeGreaterThan(-1);
     expect(pIdx).toBeGreaterThan(tIdx);
     expect(MOBILE).not.toMatch(/label:\s*"Grows"/);
-    expect(MOBILE).toContain('"Harvest Archive"');
+    expect(MOBILE).toContain('"My Grows"');
+    expect(MOBILE).not.toContain('"Harvest Archive"');
   });
 });
 

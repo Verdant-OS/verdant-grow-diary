@@ -44,6 +44,7 @@ import {
   type AiDoctorDraft,
   type AiDoctorResult,
 } from "./aiDoctorSafetyRules";
+import { normalizePlantType } from "./plantTypeRules";
 
 // ---------------------------------------------------------------------------
 // Phase 1 re-exports (new, additive)
@@ -662,6 +663,12 @@ export async function generateMultimodalDiagnosisPhase1(
   }
   if (!context.stage) {
     missing_information.push("Plant stage is not recorded.");
+  }
+  // Kept in lockstep with applyAiDoctorSafetyRules — the multimodal path
+  // builds its own missing_information list (see the duplicate-list note in
+  // the safety rules).
+  if (normalizePlantType(context.plant_type ?? null) === "unknown") {
+    missing_information.push("Plant type (autoflower or photoperiod) is not recorded.");
   }
 
   const confidence =

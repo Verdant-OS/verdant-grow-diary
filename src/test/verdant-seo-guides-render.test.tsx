@@ -9,7 +9,7 @@
  * No Supabase, no network, no AI, no device control.
  */
 import { describe, it, expect, afterEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, cleanup, waitFor, fireEvent } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import GuidesIndex from "@/pages/GuidesIndex";
 import GuidePage from "@/pages/GuidePage";
@@ -63,7 +63,7 @@ describe("/guides hub — public render", () => {
 
   it("emits canonical, title, description, OG and Twitter metadata", () => {
     renderAt("/guides");
-    expect(document.title).toContain("Verdant Grower Guides");
+    expect(document.title).toContain("Grower Guides");
     expect(readMeta('meta[name="description"]')).toMatch(
       /source-labeled sensor data/i,
     );
@@ -75,13 +75,13 @@ describe("/guides hub — public render", () => {
       "https://verdantgrowdiary.com/guides",
     );
     expect(readMeta('meta[property="og:title"]')).toContain(
-      "Verdant Grower Guides",
+      "Grower Guides",
     );
     expect(readMeta('meta[property="og:description"]')).toBeTruthy();
     expect(readMeta('meta[property="og:type"]')).toBe("website");
     expect(readMeta('meta[name="twitter:card"]')).toBe("summary_large_image");
     expect(readMeta('meta[name="twitter:title"]')).toContain(
-      "Verdant Grower Guides",
+      "Grower Guides",
     );
   });
 
@@ -175,5 +175,64 @@ describe("/guides/:slug detail — public render", () => {
     renderAt("/guides/grow-diary-app");
     // FAQ heading is present.
     expect(screen.getByText(/Common questions/i)).toBeTruthy();
+  });
+
+  it("moves keyboard focus to the deep-linked FAQ accordion item", async () => {
+    renderAt("/guides/cannabis-plant-care#faq-2");
+    const target = document.getElementById("faq-2");
+    expect(target).toBeTruthy();
+    expect(target?.getAttribute("tabindex")).toBe("-1");
+    await waitFor(() => expect(document.activeElement).toBe(target), {
+      timeout: 300,
+    });
+  });
+
+  it("keeps the FAQ highlight until the user manually closes it", async () => {
+    renderAt("/guides/cannabis-plant-care#faq-2");
+    const target = document.getElementById("faq-2");
+    await waitFor(() => expect(target).toHaveAttribute("data-highlighted", "true"), {
+      timeout: 300,
+    });
+    // Wait longer than the old auto-fade timer (2600ms) to confirm the
+    // highlight is now driven by user action, not a timeout.
+    await new Promise((r) => window.setTimeout(r, 3000));
+    expect(target).toHaveAttribute("data-highlighted", "true");
+
+    // Manually collapse the accordion item to dismiss the highlight.
+    const trigger = target?.querySelector("button");
+    expect(trigger).toBeTruthy();
+    fireEvent.click(trigger!);
+    await waitFor(() =>
+      expect(target).not.toHaveAttribute("data-highlighted", "true"),
+    );
+  });
+
+  it("honors prefers-reduced-motion and still highlights the deep-linked item", async () => {
+    const originalMatchMedia = window.matchMedia;
+    window.matchMedia = (query: string) =>
+      ({
+        matches: query === "(prefers-reduced-motion: reduce)",
+        media: query,
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      } as unknown as MediaQueryList);
+
+    try {
+      renderAt("/guides/cannabis-plant-care#faq-2");
+      const target = document.getElementById("faq-2");
+      await waitFor(() => expect(target).toHaveAttribute("data-highlighted", "true"), {
+        timeout: 300,
+      });
+      // The highlight classes should use motion-safe variants, leaving the
+      // visual state immediately present without a transition animation.
+      expect(target?.className).toContain("motion-safe:transition-colors");
+      expect(target?.className).not.toContain("transition-colors duration-500");
+    } finally {
+      window.matchMedia = originalMatchMedia;
+    }
   });
 });

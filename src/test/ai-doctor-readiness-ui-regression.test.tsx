@@ -204,17 +204,24 @@ describe("AI Doctor Readiness UI — evidence section header ordering", () => {
   });
 
   it("omits QuickActions/Limitations/Missing headers on a strong-context panel", () => {
-    const context = buildReadinessContext({
-      growEvents: [
-        { occurred_at: ago(12 * HOUR), event_type: "watering", source: "manual" },
-        { occurred_at: ago(8 * HOUR), event_type: "feeding", source: "manual" },
-        { occurred_at: ago(4 * HOUR), event_type: "photo", source: "manual" },
-      ],
-      sensorReadings: [
-        buildReadingForSource("live"),
-        buildReadingForSource("live", { metric: "humidity_pct", value: 55 }),
-      ],
-    });
+    const context = {
+      ...buildReadinessContext({
+        growEvents: [
+          { occurred_at: ago(12 * HOUR), event_type: "watering", source: "manual" },
+          { occurred_at: ago(8 * HOUR), event_type: "feeding", source: "manual" },
+          { occurred_at: ago(4 * HOUR), event_type: "photo", source: "manual" },
+        ],
+        sensorReadings: [
+          buildReadingForSource("live"),
+          buildReadingForSource("live", { metric: "humidity_pct", value: 55 }),
+        ],
+      }),
+      // Strong readiness now also requires a known plant type and recent
+      // root-zone history (autoflower/photoperiod plan, 2026-07-21). Supply
+      // both on the compiled context so this fixture stays strong.
+      plant_type: "photoperiod" as const,
+      recent_root_zone_observation_count: 1,
+    };
     render(<AiDoctorContextReadinessPanel context={context} openAlertsCount={0} />);
     const panel = screen.getByTestId("ai-doctor-context-readiness-panel");
     const headers = Array.from(panel.querySelectorAll("h2, h3")).map(
@@ -373,7 +380,6 @@ const QUICK_ACTION_DETAIL_BANNED_KEYS = [
   "command",
   "execute",
   "automation",
-  "action",
   "action_queue",
   "insert",
   "update",
@@ -389,7 +395,7 @@ const QUICK_ACTION_DETAIL_BANNED_KEYS = [
 ] as const;
 
 describe("AI Doctor Readiness UI — quick-action safety (mount)", () => {
-  it("dispatches verdant:open-quicklog CustomEvent with safe identifiers only on Add Watering", () => {
+  it("dispatches the closed typed V2 Water intent with exact plant target on Add Watering", () => {
     recentActivityState = { data: [], isLoading: false };
     manualLogsState = { data: [], isLoading: false };
 
@@ -403,7 +409,7 @@ describe("AI Doctor Readiness UI — quick-action safety (mount)", () => {
     const handler = (e: Event) => {
       events.push(e as CustomEvent);
     };
-    window.addEventListener(PLANT_QUICKLOG_PREFILL_EVENT, handler);
+    window.addEventListener("verdant:open-quicklog-v2", handler);
 
     try {
       render(
@@ -421,7 +427,7 @@ describe("AI Doctor Readiness UI — quick-action safety (mount)", () => {
       expect(button.disabled).toBe(false);
       fireEvent.click(button);
     } finally {
-      window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, handler);
+      window.removeEventListener("verdant:open-quicklog-v2", handler);
       localStorageSetSpy.mockRestore();
       sessionStorageSetSpy.mockRestore();
     }
@@ -429,12 +435,12 @@ describe("AI Doctor Readiness UI — quick-action safety (mount)", () => {
     expect(events).toHaveLength(1);
     const evt = events[0];
     expect(evt).toBeInstanceOf(CustomEvent);
-    expect(evt.type).toBe("verdant:open-quicklog");
+    expect(evt.type).toBe("verdant:open-quicklog-v2");
 
     const detail = (evt.detail ?? {}) as Record<string, unknown>;
     const detailKeys = Object.keys(detail).sort();
-    expect(detailKeys).toEqual(["growId", "plantId", "tentId"]);
-    expect(detail).toEqual({ plantId: "p1", growId: "g1", tentId: "t1" });
+    expect(detailKeys).toEqual(["action", "targetKey"]);
+    expect(detail).toEqual({ targetKey: "plant:p1", action: "water" });
 
     // No banned write/command/device tokens anywhere in the payload keys
     // or stringified values.

@@ -21,8 +21,38 @@ import {
   IMPORTED_SENSOR_HISTORY_NOT_LIVE_COPY,
   IMPORTED_SENSOR_HISTORY_SOURCE,
   buildImportedSensorHistoryViewModel,
+  resolveImportedSensorHistoryReadStatus,
   type ImportedSensorHistoryInputRow,
 } from "@/lib/importedSensorHistoryViewModel";
+
+describe("resolveImportedSensorHistoryReadStatus", () => {
+  it("keeps cached-empty refetches in loading instead of established empty", () => {
+    expect(
+      resolveImportedSensorHistoryReadStatus({
+        isError: false,
+        isFetching: true,
+        hasRows: false,
+      }),
+    ).toBe("loading");
+  });
+
+  it("keeps cached rows visible during refresh and reports failures honestly", () => {
+    expect(
+      resolveImportedSensorHistoryReadStatus({
+        isError: false,
+        isFetching: true,
+        hasRows: true,
+      }),
+    ).toBe("success");
+    expect(
+      resolveImportedSensorHistoryReadStatus({
+        isError: true,
+        isFetching: true,
+        hasRows: false,
+      }),
+    ).toBe("error");
+  });
+});
 
 function row(
   overrides: Partial<ImportedSensorHistoryInputRow>,
@@ -60,17 +90,22 @@ describe("buildImportedSensorHistoryViewModel — empty + summary", () => {
     expect(vm.isEmpty).toBe(true);
   });
 
-  it("only includes source === 'csv' rows in the summary and table", () => {
+  it("only includes explicitly permitted CSV source rows in the summary and table", () => {
     const vm = buildImportedSensorHistoryViewModel({
       readings: [
         row({ source: "csv", metric: "temperature_c" }),
+        row({ source: "csv_import_ac_infinity", metric: "co2_ppm" }),
         row({ source: "live", metric: "humidity_pct" }),
         row({ source: "csv", metric: "humidity_pct", captured_at: "2026-06-01T01:00:00Z" }),
       ],
     });
-    expect(vm.totalCount).toBe(2);
-    expect(vm.metrics).toEqual(["humidity_pct", "temperature_c"]);
-    expect(vm.recentRows.every((r) => ["temperature_c", "humidity_pct"].includes(r.metric))).toBe(true);
+    expect(vm.totalCount).toBe(3);
+    expect(vm.metrics).toEqual(["co2_ppm", "humidity_pct", "temperature_c"]);
+    expect(
+      vm.recentRows.every((r) =>
+        ["temperature_c", "humidity_pct", "co2_ppm"].includes(r.metric),
+      ),
+    ).toBe(true);
   });
 
   it("computes earliest/latest captured_at across CSV rows (UTC ISO)", () => {

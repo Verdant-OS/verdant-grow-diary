@@ -5,9 +5,7 @@ import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import DashboardSensorHealthSummary from "@/components/DashboardSensorHealthSummary";
-import {
-  buildDashboardSensorHealthSummary,
-} from "@/lib/dashboardSensorHealthViewModel";
+import { buildDashboardSensorHealthSummary } from "@/lib/dashboardSensorHealthViewModel";
 import { EMPTY_SNAPSHOT } from "@/lib/sensorSnapshot";
 import type { SnapshotState } from "@/hooks/useLatestSensorSnapshot";
 
@@ -41,15 +39,9 @@ const fresh = (): SnapshotState => ({
 describe("DashboardSensorHealthSummary", () => {
   it("renders Sensor Health summary card with status pill", () => {
     renderSummary(fresh());
-    expect(
-      screen.getByTestId("dashboard-sensor-health-summary"),
-    ).toBeInTheDocument();
-    expect(screen.getByTestId("sensor-health-status-pill")).toHaveTextContent(
-      /Healthy/i,
-    );
-    expect(screen.getByTestId("sensor-health-source-label")).toHaveTextContent(
-      /Live/,
-    );
+    expect(screen.getByTestId("dashboard-sensor-health-summary")).toBeInTheDocument();
+    expect(screen.getByTestId("sensor-health-status-pill")).toHaveTextContent(/Healthy/i);
+    expect(screen.getByTestId("sensor-health-source-label")).toHaveTextContent(/Live/);
   });
 
   it("does not render fake values while loading", () => {
@@ -63,15 +55,12 @@ describe("DashboardSensorHealthSummary", () => {
 
   it("never renders missing data as healthy", () => {
     renderSummary({ status: "unavailable", snapshot: EMPTY_SNAPSHOT });
-    expect(
-      screen.getByTestId("sensor-health-status-pill"),
-    ).toHaveAttribute("data-status", "missing");
-    expect(
-      screen.queryByText(/Healthy/i),
-    ).not.toBeInTheDocument();
-    expect(screen.getByTestId("sensor-health-source-label")).toHaveTextContent(
-      /Unknown/,
+    expect(screen.getByTestId("sensor-health-status-pill")).toHaveAttribute(
+      "data-status",
+      "missing",
     );
+    expect(screen.queryByText(/Healthy/i)).not.toBeInTheDocument();
+    expect(screen.getByTestId("sensor-health-source-label")).toHaveTextContent(/Unknown/);
   });
 
   it("renders Stale label honestly for old reading even when source==live", () => {
@@ -86,12 +75,8 @@ describe("DashboardSensorHealthSummary", () => {
         vpd: 1.1,
       },
     });
-    expect(
-      screen.getByTestId("sensor-health-status-pill"),
-    ).toHaveAttribute("data-status", "stale");
-    expect(screen.getByTestId("sensor-health-source-label")).toHaveTextContent(
-      /Stale/,
-    );
+    expect(screen.getByTestId("sensor-health-status-pill")).toHaveAttribute("data-status", "stale");
+    expect(screen.getByTestId("sensor-health-source-label")).toHaveTextContent(/Stale/);
   });
 
   it("renders Invalid label for suspicious readings", () => {
@@ -106,18 +91,18 @@ describe("DashboardSensorHealthSummary", () => {
         vpd: 1.1,
       },
     });
-    expect(
-      screen.getByTestId("sensor-health-status-pill"),
-    ).toHaveAttribute("data-status", "invalid");
-    expect(screen.getByTestId("sensor-health-suspicious")).toHaveTextContent(
-      /rh/,
+    expect(screen.getByTestId("sensor-health-status-pill")).toHaveAttribute(
+      "data-status",
+      "invalid",
     );
+    expect(screen.getByTestId("sensor-health-suspicious")).toHaveTextContent(/rh/);
   });
 
   it("preserves Manual/CSV/Demo source labels (never Live)", () => {
     for (const [source, expected] of [
       ["manual", "Manual"],
       ["diary", "Manual"],
+      ["csv", "CSV"],
       ["sim", "Demo"],
     ] as const) {
       const { unmount } = renderSummary({
@@ -134,21 +119,32 @@ describe("DashboardSensorHealthSummary", () => {
       expect(screen.getByTestId("sensor-health-source-label")).toHaveTextContent(
         new RegExp(expected),
       );
-      expect(
-        screen.queryByText(/Source: Live/),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/Source: Live/)).not.toBeInTheDocument();
       unmount();
     }
   });
 
+  it("renders unverified plausible values as Watch, never Healthy", () => {
+    renderSummary({
+      status: "ok",
+      snapshot: {
+        ...EMPTY_SNAPSHOT,
+        source: "unverified",
+        ts: new Date(NOW - 60_000).toISOString(),
+        temp: 24,
+        rh: 55,
+        vpd: 1.1,
+      },
+    });
+    const pill = screen.getByTestId("sensor-health-status-pill");
+    expect(pill).toHaveAttribute("data-status", "watch");
+    expect(pill).not.toHaveTextContent(/^Healthy$/i);
+  });
+
   it("renders Safe by Design read-only note", () => {
     renderSummary(fresh());
-    expect(
-      screen.getByTestId("sensor-health-safe-by-design"),
-    ).toHaveTextContent(/Safe by Design/);
-    expect(
-      screen.getByTestId("sensor-health-safe-by-design"),
-    ).toHaveTextContent(/Read-only/);
+    expect(screen.getByTestId("sensor-health-safe-by-design")).toHaveTextContent(/Safe by Design/);
+    expect(screen.getByTestId("sensor-health-safe-by-design")).toHaveTextContent(/Read-only/);
   });
 
   it("shows calm empty-alerts copy with guidance when activeAlertCount=0", () => {
@@ -161,8 +157,6 @@ describe("DashboardSensorHealthSummary", () => {
 
   it("hides empty-alerts block when there are active alerts", () => {
     renderSummary(fresh(), 3);
-    expect(
-      screen.queryByTestId("sensor-health-empty-alerts"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("sensor-health-empty-alerts")).not.toBeInTheDocument();
   });
 });

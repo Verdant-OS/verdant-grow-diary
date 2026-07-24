@@ -106,6 +106,7 @@ const DEFAULT_URLS = [
   "https://verdantgrowdiary.com/welcome",
   "https://verdantgrowdiary.com/pricing",
   "https://verdantgrowdiary.com/hardware-integrations",
+  "https://verdantgrowdiary.com/guides/cronk-nutrients-grow-diary",
 ];
 const HARD_CAP = 50;
 

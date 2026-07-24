@@ -106,6 +106,27 @@ const KNOWN_DETAIL_KEYS = new Set([
   "sensorSnapshot",
   "remind_at",
   "remindAt",
+  // Consumed as the row's eventType fallback (diary_entries has no event_type
+  // column; quick-log companions carry the type inside details) — not an extra.
+  "event_type",
+  "eventType",
+]);
+
+/**
+ * Server-validated quicklog_save_event types (the RPC's own allow-list). Only
+ * these may be recovered from details.event_type as the row's eventType —
+ * machine markers (action_followup, quicklog_photo_attachment, …) stay on the
+ * "note" default so raw codes never surface as type badges.
+ */
+const QUICK_LOG_DETAILS_EVENT_TYPES = new Set([
+  "observation",
+  "watering",
+  "feeding",
+  "photo",
+  "environment",
+  "training",
+  "harvest",
+  "cure_check",
 ]);
 
 function isFiniteNumber(v: unknown): v is number {
@@ -403,8 +424,32 @@ export function normalizeDiaryEntry(
   const plantId = nonBlankString(pickFirst(r.plant_id, r.plantId));
   const tentId = nonBlankString(pickFirst(r.tent_id, r.tentId));
   const stage = nonBlankString(pickFirst(r.stage, r.plant_stage, r.plantStage));
+  // Parse details once, up front: quick-log companion rows carry their type
+  // INSIDE details (diary_entries has no event_type column), so the type
+  // derivation below needs it as a trailing fallback. Top-level keys stay
+  // first in pickFirst, so rows with a real top-level type are unaffected.
+  // The fallback is gated to the server-validated quick-log event allow-list:
+  // machine markers like "action_followup" / "quicklog_photo_attachment" keep
+  // today's "note" default rather than leaking raw codes into type badges.
+  const detailsParsed = safeParseDetails(r.details, warnings);
+  const dv = detailsParsed.value;
+  const detailsEventTypeCandidate = nonBlankString(
+    pickFirst(dv?.event_type, dv?.eventType),
+  );
+  const detailsEventType =
+    detailsEventTypeCandidate !== null &&
+    QUICK_LOG_DETAILS_EVENT_TYPES.has(detailsEventTypeCandidate)
+      ? detailsEventTypeCandidate
+      : null;
   const eventTypeRaw = nonBlankString(
-    pickFirst(r.entry_type, r.entryType, r.event_type, r.eventType, r.type),
+    pickFirst(
+      r.entry_type,
+      r.entryType,
+      r.event_type,
+      r.eventType,
+      r.type,
+      detailsEventType,
+    ),
   );
   const eventType = eventTypeRaw ?? "note";
   if (!eventTypeRaw) warnings.push("event-type:missing");
@@ -440,7 +485,8 @@ export function normalizeDiaryEntry(
   }
 
   // Details ---------------------------------------------------------------
-  const detailsParsed = safeParseDetails(r.details, warnings);
+  // (detailsParsed was hoisted above the eventType derivation — reuse it here
+  // so details warnings are pushed exactly once.)
   const details: NormalizedDiaryDetails = {};
   if (detailsParsed.value) {
     const d = detailsParsed.value;

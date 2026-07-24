@@ -50,6 +50,12 @@ async function mockAuth(page: Page) {
       body: JSON.stringify({}),
     });
   });
+  await page.route(/\/rest\/v1\//, (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: "[]" }),
+  );
+  await page.route(/\/functions\/v1\//, (route) =>
+    route.fulfill({ status: 404, contentType: "application/json", body: "{}" }),
+  );
 }
 
 async function signInWith(page: Page, redirectTo: string | null) {
@@ -66,12 +72,30 @@ test.describe("Auth redirect safety (mocked)", () => {
   });
 
   test("safe internal redirectTo is honored after sign-in", async ({ page, baseURL }) => {
-    await signInWith(page, "/dashboard");
-    await page.waitForURL((u) => u.pathname === "/dashboard" || u.pathname === "/", {
+    // Must be a route from appRouteManifest: /auth only restores return-to
+    // paths the app actually mounts (deep-link return-to, open-redirect safe).
+    await signInWith(page, "/plants");
+    await page.waitForURL((u) => u.pathname === "/plants", {
       timeout: 8000,
     });
     const origin = new URL(page.url()).origin;
     expect(origin).toBe(new URL(baseURL!).origin);
+  });
+
+  test("authenticated Dashboard alias is restored with grow scope intact", async ({
+    page,
+    baseURL,
+  }) => {
+    await signInWith(page, "/dashboard?growId=grow-1");
+    await page.waitForURL(
+      (u) => u.pathname === "/dashboard" && u.searchParams.get("growId") === "grow-1",
+      { timeout: 8000 },
+    );
+    const url = new URL(page.url());
+    expect(url.origin).toBe(new URL(baseURL!).origin);
+    expect(url.pathname).toBe("/dashboard");
+    expect(url.searchParams.get("growId")).toBe("grow-1");
+    await expect(page.getByText("Oops! Page not found")).toHaveCount(0);
   });
 
   test("off-origin redirectTo is ignored — stays on app origin", async ({ page, baseURL }) => {
@@ -103,10 +127,7 @@ test.describe("Auth redirect safety (mocked)", () => {
     expect(new URL(page.url()).origin).toBe(new URL(baseURL!).origin);
   });
 
-  test("backslash variant /\\evil falls back to safe internal path", async ({
-    page,
-    baseURL,
-  }) => {
+  test("backslash variant /\\evil falls back to safe internal path", async ({ page, baseURL }) => {
     await signInWith(page, "/\\evil");
     await page.waitForTimeout(800);
     expect(new URL(page.url()).origin).toBe(new URL(baseURL!).origin);
@@ -147,7 +168,10 @@ test.describe("Auth redirect safety (mocked)", () => {
     );
     await page.goto("/reset-password?redirectTo=https://evil.example");
     const newPwd = page.getByLabel(/^new password$/i);
-    const ready = await newPwd.waitFor({ timeout: 5000 }).then(() => true).catch(() => false);
+    const ready = await newPwd
+      .waitFor({ timeout: 5000 })
+      .then(() => true)
+      .catch(() => false);
     test.skip(!ready, "Reset form did not render with synthetic session.");
     await newPwd.fill("verdantnoop1");
     await page.getByLabel(/^confirm new password$/i).fill("verdantnoop1");

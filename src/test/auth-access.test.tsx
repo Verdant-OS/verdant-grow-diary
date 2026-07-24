@@ -63,9 +63,11 @@ describe("Auth page essentials", () => {
 
   it("renders product positioning copy", () => {
     renderAuth();
-    expect(
-      screen.getByText(/plant memory\. sensor truth\. better decisions\./i),
-    ).toBeInTheDocument();
+    // Deliberate restructure: the tagline became the "What Verdant stands for"
+    // chip list. Exact strings avoid colliding with the header sentence.
+    expect(screen.getByText("Plant memory")).toBeInTheDocument();
+    expect(screen.getByText("Sensor truth")).toBeInTheDocument();
+    expect(screen.getByText("Grower-approved action")).toBeInTheDocument();
   });
 
   it("sign-in form has accessible email and password labels", () => {

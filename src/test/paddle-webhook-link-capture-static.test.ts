@@ -56,7 +56,7 @@ describe("paddle webhook billing customer link capture", () => {
 
   it("keeps raw-body signature verification before JSON parsing, processing, and link capture", () => {
     const rawIdx = WEBHOOK_SRC.indexOf("req.text()");
-    const verifyIdx = WEBHOOK_SRC.indexOf("constantTimeEqual(expected, parsed.h1)");
+    const verifyIdx = WEBHOOK_SRC.indexOf("await verifyPaddleWebhookSignature(");
     const parseIdx = WEBHOOK_SRC.indexOf("JSON.parse(rawBody)");
     const eventInsertIdx = WEBHOOK_SRC.indexOf('.from("paddle_events").insert');
     const processingIdx = WEBHOOK_SRC.indexOf("recordProcessing(supabase, recordedEvent)");

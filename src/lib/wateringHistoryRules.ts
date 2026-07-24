@@ -7,12 +7,17 @@
  * the Watering History panel — the presenter component MUST consume the
  * output of this module and MUST NOT reach into raw `details` JSON.
  */
-import type {
-  NormalizedDiaryEntry,
-} from "./diaryEntryRules";
+import type { NormalizedDiaryEntry } from "./diaryEntryRules";
+import {
+  normalizeRootZoneSource,
+  rootZoneSourceLabel,
+  type RootZoneSource,
+} from "./rootZoneObservationRules";
 
 export interface WateringHistoryRow {
   id: string;
+  /** Exact global Timeline anchor for structured grow_events rows only. */
+  timelineAnchorId: string | null;
   /** ISO string when valid, otherwise null. Never an epoch-0 fabrication. */
   occurredAt: string | null;
   occurredAtLabel: string;
@@ -26,6 +31,9 @@ export interface WateringHistoryRow {
   runoffPh: number | null;
   runoffEc: number | null;
   runoffTds: number | null;
+  waterTempC: number | null;
+  source: RootZoneSource;
+  sourceLabel: string;
   notePreview: string;
   /** Combined warnings from the normalizer + any range checks below. */
   warnings: string[];
@@ -54,9 +62,16 @@ function pickNumber(v: unknown): number | null {
 function pickRunoffMl(entry: NormalizedDiaryEntry): number | null {
   const extras = entry.details.extras;
   if (!extras) return null;
+  return pickNumber(extras.runoff_ml) ?? pickNumber(extras.runoffMl) ?? null;
+}
+
+function pickWaterTempC(entry: NormalizedDiaryEntry): number | null {
+  const extras = entry.details.extras;
+  if (!extras) return null;
   return (
-    pickNumber(extras.runoff_ml) ??
-    pickNumber(extras.runoffMl) ??
+    pickNumber(extras.water_temp_c) ??
+    pickNumber(extras.waterTempC) ??
+    pickNumber(extras.waterTempCelsius) ??
     null
   );
 }
@@ -74,6 +89,7 @@ function rangeWarnings(row: {
   runoffMl: number | null;
   runoffPh: number | null;
   runoffEc: number | null;
+  waterTempC: number | null;
 }): string[] {
   const w: string[] = [];
   if (row.volumeMl !== null && row.volumeMl <= 0) {
@@ -82,8 +98,8 @@ function rangeWarnings(row: {
   if (row.ph !== null && (row.ph < 0 || row.ph > 14)) {
     w.push("ph out of range");
   }
-  if (row.ec !== null && row.ec < 0) {
-    w.push("ec_ms_cm < 0");
+  if (row.ec !== null && (row.ec < 0 || row.ec > 10)) {
+    w.push("ec_ms_cm out of range");
   }
   if (row.runoffMl !== null && row.runoffMl < 0) {
     w.push("runoff_ml < 0");
@@ -91,14 +107,20 @@ function rangeWarnings(row: {
   if (row.runoffPh !== null && (row.runoffPh < 0 || row.runoffPh > 14)) {
     w.push("runoff_ph out of range");
   }
-  if (row.runoffEc !== null && row.runoffEc < 0) {
-    w.push("runoff_ec < 0");
+  if (row.runoffEc !== null && (row.runoffEc < 0 || row.runoffEc > 10)) {
+    w.push("runoff_ec out of range");
+  }
+  if (row.waterTempC !== null && (row.waterTempC < -10 || row.waterTempC > 60)) {
+    w.push("water_temp_c out of range");
   }
   return w;
 }
 
 function isWateringEntry(entry: NormalizedDiaryEntry): boolean {
   if (entry.eventType === "watering") return true;
+  // Feeding rows also carry a solution volume. Do not let that shared
+  // measurement make them appear in Watering History.
+  if (entry.eventType === "feeding" || entry.eventType === "feed") return false;
   // Some legacy entries lack an event_type but carry a watering amount.
   if (entry.details.wateringAmountMl !== undefined) return true;
   return false;
@@ -106,9 +128,7 @@ function isWateringEntry(entry: NormalizedDiaryEntry): boolean {
 
 function toRow(entry: NormalizedDiaryEntry): WateringHistoryRow {
   const volumeMl =
-    entry.details.wateringAmountMl !== undefined
-      ? entry.details.wateringAmountMl
-      : null;
+    entry.details.wateringAmountMl !== undefined ? entry.details.wateringAmountMl : null;
   const ph = entry.details.ph ?? null;
   const ec = entry.details.ec ?? null;
   const tds = entry.details.tds ?? null;
@@ -116,6 +136,7 @@ function toRow(entry: NormalizedDiaryEntry): WateringHistoryRow {
   const runoffPh = entry.details.runoffPh ?? null;
   const runoffEc = entry.details.runoffEc ?? null;
   const runoffTds = entry.details.runoffTds ?? null;
+  const waterTempC = pickWaterTempC(entry);
 
   const extra = rangeWarnings({
     volumeMl,
@@ -124,7 +145,13 @@ function toRow(entry: NormalizedDiaryEntry): WateringHistoryRow {
     runoffMl,
     runoffPh,
     runoffEc,
+    waterTempC,
   });
+  if (entry.details.extras?.root_zone_status === "unavailable") {
+    extra.push("Structured measurements unavailable");
+  } else if (entry.details.extras?.root_zone_status === "partial") {
+    extra.push("Some structured measurements were omitted as invalid");
+  }
 
   // Dedupe while preserving first-seen order.
   const seen = new Set<string>();
@@ -136,8 +163,14 @@ function toRow(entry: NormalizedDiaryEntry): WateringHistoryRow {
     }
   }
 
+  const source = normalizeRootZoneSource(entry.details.extras?.source);
   return {
     id: entry.id,
+    timelineAnchorId:
+      entry.details.extras?.root_zone_status === "available" ||
+      entry.details.extras?.root_zone_status === "partial"
+        ? `timeline-entry-${entry.id}`
+        : null,
     occurredAt: entry.createdAt,
     occurredAtLabel: entry.createdAtLabel,
     plantId: entry.plantId,
@@ -150,6 +183,9 @@ function toRow(entry: NormalizedDiaryEntry): WateringHistoryRow {
     runoffPh,
     runoffEc,
     runoffTds,
+    waterTempC,
+    source,
+    sourceLabel: rootZoneSourceLabel(source),
     notePreview: previewNote(entry.note),
     warnings,
   };
@@ -161,10 +197,7 @@ function toRow(entry: NormalizedDiaryEntry): WateringHistoryRow {
  *   2. Entries without a valid timestamp come last, sorted by id asc for
  *      stable output regardless of input order.
  */
-function compareNewestFirst(
-  a: WateringHistoryRow,
-  b: WateringHistoryRow,
-): number {
+function compareNewestFirst(a: WateringHistoryRow, b: WateringHistoryRow): number {
   const aHas = a.occurredAt !== null;
   const bHas = b.occurredAt !== null;
   if (aHas && bHas) {

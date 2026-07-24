@@ -16,9 +16,9 @@
  *  - Never stores raw PASSKEY/MAC/token/auth fields in `raw_payload`. Only
  *    the safe fingerprint and per-channel mapping context.
  *  - Never emits alerts, Action Queue items, AI calls, or device-control
- *    commands. Never marks data as "live" beyond `source = 'ecowitt'` (the
- *    existing source label — Verdant's freshness/suspicion layer decides
- *    "live" vs "stale" downstream).
+ *    commands. Routed rows retain the EcoWitt transport label until the
+ *    direct handler has rejected invalid/future/stale gateway timestamps.
+ *    `buildEcoWittStoredRows` is the sole final-storage canonicalizer.
  *  - Never fans out across tents the caller does not own. The router rejects
  *    mismatched fingerprints; callers MUST also pre-filter tents to the
  *    authenticated principal.
@@ -38,9 +38,7 @@ export type EcoWittRoutedMetric =
   | "soil_moisture_pct"
   | "vpd_kpa";
 
-export type EcoWittTimestampSource =
-  | "ecowitt_dateutc"
-  | "server_received_at";
+export type EcoWittTimestampSource = "ecowitt_dateutc" | "server_received_at";
 
 export interface EcoWittRoutedRawPayload {
   provider: "ecowitt";
@@ -80,6 +78,23 @@ export interface EcoWittRoutedRow {
   raw_payload: EcoWittRoutedRawPayload;
 }
 
+export interface EcoWittStoredRawPayload extends EcoWittRoutedRawPayload {
+  /** Vendor lineage only; never used for auth, ownership, or freshness. */
+  vendor: "ecowitt";
+  metadata: {
+    /** Direct EcoWitt custom-upload transport lineage. */
+    transport_source: "ecowitt";
+    /** Canonical stored sensor-truth mirror. */
+    verdant_source: "live";
+  };
+}
+
+/** Final sensor_readings shape after the handler proves timestamp freshness. */
+export interface EcoWittStoredRow extends Omit<EcoWittRoutedRow, "source" | "raw_payload"> {
+  source: "live";
+  raw_payload: EcoWittStoredRawPayload;
+}
+
 export interface EcoWittRoutedBuildSummary {
   accepted: boolean;
   rows_built: number;
@@ -110,6 +125,29 @@ export interface EcoWittRoutedBuildInput {
 export interface EcoWittRoutedBuildResult {
   rows: EcoWittRoutedRow[];
   summary: EcoWittRoutedBuildSummary;
+}
+
+/**
+ * Convert freshness-approved direct EcoWitt rows to Verdant's canonical
+ * storage contract. The handler MUST call this only after rejecting missing,
+ * malformed, future, and stale gateway timestamps.
+ *
+ * EcoWitt remains explicit vendor/transport lineage in `raw_payload`; it is
+ * never stored as the top-level sensor-truth source.
+ */
+export function buildEcoWittStoredRows(rows: readonly EcoWittRoutedRow[]): EcoWittStoredRow[] {
+  return rows.map((row) => ({
+    ...row,
+    source: "live",
+    raw_payload: {
+      ...row.raw_payload,
+      vendor: "ecowitt",
+      metadata: {
+        transport_source: "ecowitt",
+        verdant_source: "live",
+      },
+    },
+  }));
 }
 
 /** Lowercase a value for raw_value storage. Caps at 64 chars defensively. */
@@ -144,15 +182,10 @@ export const ECOWITT_DATEUTC_FUTURE_SKEW_MS = 24 * 60 * 60 * 1000;
  *
  * `now` is injectable for deterministic tests.
  */
-export function parseEcoWittDateUtc(
-  raw: unknown,
-  now: Date = new Date(),
-): string | null {
+export function parseEcoWittDateUtc(raw: unknown, now: Date = new Date()): string | null {
   if (typeof raw !== "string") return null;
   const trimmed = raw.trim();
-  const m = trimmed.match(
-    /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})$/,
-  );
+  const m = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})$/);
   if (!m) return null;
   const [, y, mo, d, h, mi, s] = m;
   const iso = `${y}-${mo}-${d}T${h}:${mi}:${s}.000Z`;
@@ -170,10 +203,7 @@ export function parseEcoWittDateUtc(
   return iso;
 }
 
-
-export function buildEcoWittRoutedRows(
-  input: EcoWittRoutedBuildInput,
-): EcoWittRoutedBuildResult {
+export function buildEcoWittRoutedRows(input: EcoWittRoutedBuildInput): EcoWittRoutedBuildResult {
   const router: EcoWittRouterResult = routeEcoWittPayloadToTents({
     payload: input.payload,
     eligibleTents: input.eligibleTents,
@@ -212,8 +242,7 @@ export function buildEcoWittRoutedRows(
         continue;
       }
 
-      const mappingType: "air" | "soil" =
-        r.metric === "soil_moisture_pct" ? "soil" : "air";
+      const mappingType: "air" | "soil" = r.metric === "soil_moisture_pct" ? "soil" : "air";
 
       rows.push({
         user_id: input.userId,
@@ -230,9 +259,7 @@ export function buildEcoWittRoutedRows(
           raw_key: r.source_channel_key,
           raw_value: safeRawValue(lowerPayload[r.source_channel_key]),
           passkey_fingerprint: fingerprint as string,
-          ...(input.timestampSource
-            ? { timestamp_source: input.timestampSource }
-            : {}),
+          ...(input.timestampSource ? { timestamp_source: input.timestampSource } : {}),
         },
       });
       groupRowCount += 1;
@@ -275,9 +302,7 @@ export function buildEcoWittRoutedRows(
             slot.temperature_c.source_channel_key,
             slot.humidity_pct.source_channel_key,
           ],
-          ...(input.timestampSource
-            ? { timestamp_source: input.timestampSource }
-            : {}),
+          ...(input.timestampSource ? { timestamp_source: input.timestampSource } : {}),
         },
       });
       groupRowCount += 1;

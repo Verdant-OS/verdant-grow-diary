@@ -48,10 +48,10 @@ The MQTT live-monitoring path must identify itself as:
 }
 ```
 
-Note: the gateway custom-upload/webhook path uses the back-compat source
-label `ecowitt` by design (see
-[`ecowitt-sensor-truth-taxonomy.md`](./ecowitt-sensor-truth-taxonomy.md)).
-Neither path may ever masquerade as anything other than what it is.
+The direct gateway custom-upload path also stores canonical `source = live`;
+it is distinguished from MQTT by
+`raw_payload.metadata.transport_source = "ecowitt"`. Neither path may
+masquerade as the other.
 
 ## Expected UI proof
 
@@ -115,12 +115,12 @@ captured_at      = current real timestamp
 
 Path distinction — record which path the result actually proves:
 
-| Result                                                           | Meaning                                                                    |
-| ---------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| `source = live`, `vendor = ecowitt`, `transport_source = mqtt`   | Bridge/MQTT path proven                                                    |
-| `source = ecowitt`                                               | Direct EcoWitt gateway/custom-upload path proven, not the MQTT bridge path |
-| Stored row later changes to `stale`                              | Not expected                                                               |
-| UI/read model later shows stale from unchanged `captured_at` age | Expected                                                                   |
+| Result                                                            | Meaning                                                                    |
+| ----------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `source = live`, `vendor = ecowitt`, `transport_source = mqtt`    | Bridge/MQTT path proven                                                    |
+| `source = live`, `vendor = ecowitt`, `transport_source = ecowitt` | Direct EcoWitt gateway/custom-upload path proven, not the MQTT bridge path |
+| Stored row later changes to `stale`                               | Not expected                                                               |
+| UI/read model later shows stale from unchanged `captured_at` age  | Expected                                                                   |
 
 ### Dedupe proof procedure
 

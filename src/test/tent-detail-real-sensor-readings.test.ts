@@ -9,10 +9,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
-import {
-  buildTentSensorChartSeries,
-  buildTentSensorHeaderView,
-} from "@/lib/tentSensorChartRules";
+import { buildTentSensorChartSeries, buildTentSensorHeaderView } from "@/lib/tentSensorChartRules";
 
 const ROOT = resolve(__dirname, "../..");
 const read = (p: string) =>
@@ -23,15 +20,41 @@ const RULES = read("src/lib/tentSensorChartRules.ts");
 
 describe("TentDetail · real sensor readings", () => {
   it("does not import useSensorReadings from useMockData", () => {
-    expect(TENT_DETAIL).not.toMatch(
-      /from\s+["']@\/hooks\/useMockData["']/,
-    );
+    expect(TENT_DETAIL).not.toMatch(/from\s+["']@\/hooks\/useMockData["']/);
   });
 
   it("imports the real sensor_readings hook", () => {
+    expect(TENT_DETAIL).toMatch(/from\s+["']@\/hooks\/use-sensor-readings["']/);
+  });
+
+  it("uses the dedicated imported-history result instead of filtering the mixed sensor window", () => {
+    expect(TENT_DETAIL).toMatch(/from\s+["']@\/hooks\/useImportedSensorHistory["']/);
+    expect(TENT_DETAIL).toMatch(/useImportedSensorHistory\(id\)/);
     expect(TENT_DETAIL).toMatch(
-      /from\s+["']@\/hooks\/use-sensor-readings["']/,
+      /<ImportedSensorHistoryPanel[\s\S]*?readings=\{importedHistory\.data\s*\?\?\s*\[\]\}/,
     );
+    expect(TENT_DETAIL).not.toMatch(/<ImportedSensorHistoryPanel[^>]*readings=\{readings\}/);
+  });
+
+  it("passes explicit imported-history loading and error truth to the panel", () => {
+    expect(TENT_DETAIL).toMatch(/resolveImportedSensorHistoryReadStatus/);
+    expect(TENT_DETAIL).toMatch(/importedHistory\.isFetching/);
+    expect(TENT_DETAIL).toMatch(/importedHistory\.isError/);
+    expect(TENT_DETAIL).toMatch(/importedHistory\.refetch/);
+  });
+
+  it("passes active-plant loading/error truth without inferring the first plant", () => {
+    expect(TENT_DETAIL).toMatch(
+      /const\s+\{[\s\S]*?data:\s*activePlants\s*=\s*\[\],[\s\S]*?isFetching:\s*activePlantsIsFetching,[\s\S]*?isError:\s*activePlantsIsError,[\s\S]*?\}\s*=\s*useGrowPlants\(id\)/,
+    );
+    const panelStart = TENT_DETAIL.indexOf("<ImportedSensorHistoryPanel");
+    const panelEnd = TENT_DETAIL.indexOf("/>", panelStart);
+    const panel = TENT_DETAIL.slice(panelStart, panelEnd);
+    expect(panel).toContain("plants={activePlants}");
+    expect(panel).toContain("resolveImportedHistoryHandoffReadStatus");
+    expect(panel).toContain("isError: activePlantsIsError");
+    expect(panel).toContain("isFetching: activePlantsIsFetching");
+    expect(panel).not.toContain("activePlants[0]");
   });
 
   it("uses the pure chart rules helper", () => {
@@ -54,7 +77,6 @@ describe("TentDetail · real sensor readings", () => {
       "service_role",
       "mqtt",
       "home_assistant",
-      "pi_bridge",
       "actuator",
       "device_command",
       "autopilot",
@@ -66,6 +88,9 @@ describe("TentDetail · real sensor readings", () => {
       expect(TENT_DETAIL).not.toContain(needle);
       expect(RULES).not.toContain(needle);
     }
+    // `pi_bridge` is a legacy read-side provenance label, not device control.
+    // Its narrow compatibility path must remain presentation-only.
+    expect(RULES).toContain("pi_bridge");
   });
 });
 
@@ -88,12 +113,76 @@ describe("buildTentSensorChartSeries", () => {
     ]);
   });
 
+  it("keeps CSV observations distinct when their import ts is shared", () => {
+    const importedAt = "2026-07-18T12:00:00Z";
+    const out = buildTentSensorChartSeries([
+      {
+        ts: importedAt,
+        captured_at: "2025-01-01T10:00:00Z",
+        metric: "temperature_c",
+        value: 20,
+        source: "csv",
+      },
+      {
+        ts: importedAt,
+        captured_at: "2025-01-01T11:00:00Z",
+        metric: "temperature_c",
+        value: 24,
+        source: "csv",
+      },
+    ]);
+
+    expect(out).toEqual([
+      { ts: "2025-01-01T10:00:00Z", temp: 20, rh: null, vpd: null, co2: null, soil: null },
+      { ts: "2025-01-01T11:00:00Z", temp: 24, rh: null, vpd: null, co2: null, soil: null },
+    ]);
+  });
+
   it("ignores unknown metrics and non-finite values, does not invent data", () => {
     const rows = [
       { ts: "2025-01-01T00:00:00Z", metric: "weird_metric", value: 1, source: "live" },
       { ts: "2025-01-01T00:00:00Z", metric: "temperature_c", value: "nope", source: "live" },
     ];
     expect(buildTentSensorChartSeries(rows)).toEqual([]);
+  });
+
+  it("plots physical gateway evidence but not diagnostics or canonical non-evidence", () => {
+    const rows = [
+      {
+        ts: "2025-01-01T00:00:00Z",
+        metric: "temperature_c",
+        value: 99,
+        source: "live",
+        raw_payload: {
+          vendor: "ecowitt_windows_testbench",
+          metadata: { confidence: "test" },
+        },
+      },
+      {
+        ts: "2025-01-02T00:00:00Z",
+        metric: "temperature_c",
+        value: 24,
+        source: "live",
+        raw_payload: {
+          vendor: "ecowitt_windows_testbench",
+          metadata: {
+            reported_verdant_source: "live",
+            raw_payload: {
+              PASSKEY: "redacted",
+              stationtype: "GW2000A",
+              dateutc: "2025-01-02 00:00:00",
+            },
+          },
+        },
+      },
+      { ts: "2025-01-03T00:00:00Z", metric: "temperature_c", value: 30, source: "demo" },
+      { ts: "2025-01-04T00:00:00Z", metric: "temperature_c", value: 31, source: "stale" },
+      { ts: "2025-01-05T00:00:00Z", metric: "temperature_c", value: 32, source: "invalid" },
+    ];
+
+    expect(buildTentSensorChartSeries(rows)).toEqual([
+      { ts: "2025-01-02T00:00:00Z", temp: 24, rh: null, vpd: null, co2: null, soil: null },
+    ]);
   });
 });
 
@@ -107,12 +196,51 @@ describe("buildTentSensorHeaderView", () => {
   it("marks readings as stale past the threshold and exposes a source label", () => {
     const now = Date.UTC(2025, 0, 2, 0, 0, 0);
     const oldTs = new Date(now - 2 * 60 * 60 * 1000).toISOString();
-    const rows = [
-      { ts: oldTs, metric: "temperature_c", value: 23, source: "live" },
-    ];
+    const rows = [{ ts: oldTs, metric: "temperature_c", value: 23, source: "live" }];
     const v = buildTentSensorHeaderView(rows, now);
     expect(v.hasReadings).toBe(true);
     expect(v.stale).toBe(true);
+    expect(v.sourceLabel).toBe("Live sensor");
+  });
+
+  it("uses the latest eligible physical row instead of a newer diagnostic row", () => {
+    const now = Date.parse("2025-01-03T00:05:00Z");
+    const v = buildTentSensorHeaderView(
+      [
+        {
+          ts: "2025-01-03T00:04:00Z",
+          metric: "temperature_c",
+          value: 99,
+          source: "live",
+          raw_payload: {
+            vendor: "ecowitt_windows_testbench",
+            metadata: { confidence: "demo" },
+          },
+        },
+        {
+          ts: "2025-01-03T00:03:00Z",
+          metric: "temperature_c",
+          value: 23,
+          source: "live",
+          raw_payload: {
+            vendor: "ecowitt_windows_testbench",
+            metadata: {
+              reported_verdant_source: "live",
+              raw_payload: {
+                PASSKEY: "redacted",
+                stationtype: "GW2000A",
+                dateutc: "2025-01-03 00:03:00",
+              },
+            },
+          },
+        },
+      ],
+      now,
+    );
+
+    expect(v.hasReadings).toBe(true);
+    expect(v.capturedAt).toBe("2025-01-03T00:03:00Z");
+    expect(v.snapshot?.temp).toBe(23);
     expect(v.sourceLabel).toBe("Live sensor");
   });
 });

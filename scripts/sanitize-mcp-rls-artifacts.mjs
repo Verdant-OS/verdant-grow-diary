@@ -4,26 +4,125 @@
  *
  * Rewrites every file in the given directory (default:
  * artifacts/mcp-local-rls) in place, redacting token/secret-like content
- * before the workflow uploads it. Mirrors the redaction rules in
- * src/test/helpers/mcpRlsHarnessOps.ts:
+ * before the workflow uploads it. The workflow also uploads the raw
+ * vitest-output.log on failure, and a failing leakage assertion prints
+ * the received payload verbatim — so this mirrors the sensitive-key
+ * rules in src/test/mcp-local-rls-integration.test.ts for free text,
+ * not just bare token formats:
  *   - JWT-like strings
  *   - Bearer tokens
  *   - Supabase sb_secret_/sb_publishable_ key formats
+ *   - refresh/access/bridge token and client-secret key/value pairs
+ *     (`refresh_token=xyz`, `"client_secret": "…"`)
+ *   - authorization/cookie/api-key header values (redacted to
+ *     end-of-line — over-redacting a header line is fail-safe)
+ *   - raw_payload values
  *   - live values of LOCAL_SUPABASE_* / SUPABASE_* key env vars
  *
  * Node built-ins only. Never fails the job: sanitization problems must
  * not mask the original test failure — but a file it cannot sanitize is
  * deleted rather than uploaded raw.
+ *
+ * Exports sanitizeText() so the redaction rules are unit-tested directly
+ * (src/test/mcp-rls-artifact-sanitizer.test.ts); the directory rewrite
+ * only runs when invoked as a CLI.
  */
 import { readdirSync, readFileSync, writeFileSync, rmSync, existsSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 
-const REDACTED = "[REDACTED]";
-const RULES = [
+export const REDACTED = "[REDACTED]";
+
+/** Bare secret formats, redacted wherever they appear. */
+const BARE_SECRET_RULES = [
   /eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{4,}/g,
   /bearer\s+[A-Za-z0-9._~+/=-]{12,}/gi,
   /sb_(secret|publishable)_[A-Za-z0-9_-]{8,}/g,
 ];
+
+/**
+ * Sensitive key/value pairs in free text. Keeps the key visible (useful
+ * when debugging what leaked) and redacts only the value. Values may be
+ * quoted JSON strings or bare `key=value` / `key: value` forms.
+ */
+const QUOTED_OR_BARE_VALUE = /"(?:[^"\\]|\\.)*"|'[^'\r\n]*'|[^\s,;&)}\]]+/;
+const KEYED_VALUE_RULES = [
+  // refresh_token / access_token / bridge_token / bridge-token …
+  new RegExp(
+    `("?(?:refresh|access|bridge)[_-]?token"?\\s*[:=]\\s*)(${QUOTED_OR_BARE_VALUE.source})`,
+    "gi",
+  ),
+  // client_secret / client-secret
+  new RegExp(`("?client[_-]?secret"?\\s*[:=]\\s*)(${QUOTED_OR_BARE_VALUE.source})`, "gi"),
+];
+
+/**
+ * raw_payload values need their own pass: vitest failure diffs
+ * pretty-print objects across MANY lines ("raw_payload": Object { … }),
+ * and a regex cannot bound nested braces — a to-end-of-line rule leaks
+ * every line after the first. Scan forward from the opener balancing
+ * {}/[] while skipping quoted strings; a truncated (never-balanced)
+ * block redacts to end of input — over-redaction is fail-safe.
+ */
+const RAW_PAYLOAD_KEY = /"?raw_payload"?\s*[:=]\s*(?:Object\s*|Array\s*)?/gi;
+const SIMPLE_VALUE = new RegExp(`^(?:${QUOTED_OR_BARE_VALUE.source})`);
+
+function scanBalancedEnd(text, openIdx) {
+  let depth = 0;
+  let inString = null;
+  for (let i = openIdx; i < text.length; i++) {
+    const ch = text[i];
+    if (inString) {
+      if (ch === "\\") i += 1;
+      else if (ch === inString) inString = null;
+      continue;
+    }
+    if (ch === '"' || ch === "'") inString = ch;
+    else if (ch === "{" || ch === "[") depth += 1;
+    else if (ch === "}" || ch === "]") {
+      depth -= 1;
+      if (depth <= 0) return i + 1;
+    }
+  }
+  return text.length;
+}
+
+function redactRawPayloadValues(text) {
+  let out = "";
+  let last = 0;
+  for (const m of text.matchAll(RAW_PAYLOAD_KEY)) {
+    if (m.index < last) continue; // key inside an already-redacted block
+    const valueStart = m.index + m[0].length;
+    const next = text[valueStart];
+    let end;
+    if (next === "{" || next === "[") {
+      end = scanBalancedEnd(text, valueStart);
+    } else {
+      const simple = SIMPLE_VALUE.exec(text.slice(valueStart));
+      end = valueStart + (simple ? simple[0].length : 0);
+    }
+    out += text.slice(last, valueStart) + REDACTED;
+    last = end;
+  }
+  return out + text.slice(last);
+}
+
+/** Header-style lines: redact everything after the separator. */
+const HEADER_VALUE_RULES = [
+  /(["']?(?:authorization|proxy-authorization|x-api-key|api[_-]?key|cookie|set-cookie)["']?\s*[:=]\s*)[^\r\n]+/gi,
+];
+
+export function sanitizeText(text, extraSecrets = []) {
+  // raw_payload blocks first, on pristine text, so balanced-brace
+  // scanning is never confused by other rules' replacements.
+  let out = redactRawPayloadValues(text);
+  for (const secret of extraSecrets) out = out.split(secret).join(REDACTED);
+  for (const re of BARE_SECRET_RULES) out = out.replace(re, REDACTED);
+  for (const re of HEADER_VALUE_RULES) out = out.replace(re, `$1${REDACTED}`);
+  for (const re of KEYED_VALUE_RULES) out = out.replace(re, `$1${REDACTED}`);
+  return out;
+}
+
 const SENSITIVE_ENV_NAMES = [
   "LOCAL_SUPABASE_ANON_KEY",
   "LOCAL_SUPABASE_SERVICE_ROLE_KEY",
@@ -32,34 +131,40 @@ const SENSITIVE_ENV_NAMES = [
   "SUPABASE_SERVICE_ROLE_KEY",
 ];
 
-const dir = process.argv[2] || "artifacts/mcp-local-rls";
-if (!existsSync(dir)) {
-  console.log(`sanitize-mcp-rls-artifacts: nothing to do (${dir} missing)`);
-  process.exit(0);
-}
+function main() {
+  const dir = process.argv[2] || "artifacts/mcp-local-rls";
+  if (!existsSync(dir)) {
+    console.log(`sanitize-mcp-rls-artifacts: nothing to do (${dir} missing)`);
+    return;
+  }
 
-const envSecrets = SENSITIVE_ENV_NAMES.map((n) => process.env[n]).filter(
-  (v) => typeof v === "string" && v.length >= 8,
-);
+  const envSecrets = SENSITIVE_ENV_NAMES.map((n) => process.env[n]).filter(
+    (v) => typeof v === "string" && v.length >= 8,
+  );
 
-let sanitized = 0;
-for (const name of readdirSync(dir)) {
-  const file = join(dir, name);
-  if (!statSync(file).isFile()) continue;
-  try {
-    let text = readFileSync(file, "utf8");
-    for (const secret of envSecrets) text = text.split(secret).join(REDACTED);
-    for (const re of RULES) text = text.replace(re, REDACTED);
-    writeFileSync(file, text, "utf8");
-    sanitized += 1;
-  } catch {
-    // Never upload a file we could not sanitize.
+  let sanitized = 0;
+  for (const name of readdirSync(dir)) {
+    const file = join(dir, name);
+    if (!statSync(file).isFile()) continue;
     try {
-      rmSync(file, { force: true });
-      console.log(`sanitize-mcp-rls-artifacts: removed unsanitizable file ${name}`);
+      const text = readFileSync(file, "utf8");
+      writeFileSync(file, sanitizeText(text, envSecrets), "utf8");
+      sanitized += 1;
     } catch {
-      /* best effort */
+      // Never upload a file we could not sanitize.
+      try {
+        rmSync(file, { force: true });
+        console.log(`sanitize-mcp-rls-artifacts: removed unsanitizable file ${name}`);
+      } catch {
+        /* best effort */
+      }
     }
   }
+  console.log(`sanitize-mcp-rls-artifacts: sanitized ${sanitized} file(s) in ${dir}`);
 }
-console.log(`sanitize-mcp-rls-artifacts: sanitized ${sanitized} file(s) in ${dir}`);
+
+// Run the directory rewrite only when executed directly (CLI), never on
+// import from the unit tests.
+if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
+  main();
+}

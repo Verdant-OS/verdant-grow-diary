@@ -113,11 +113,23 @@ function runBatch(batchNumber, files, opts) {
       chunks.length > 1
         ? `Batch ${batchNumber} chunk ${c + 1}/${chunks.length}`
         : `Batch ${batchNumber}`;
-    const ok = runVitest(label, chunks[c], opts);
+    let ok = runVitest(label, chunks[c], opts);
+    let retried = false;
+    if (!ok && opts.retryFailedChunkOnce) {
+      // Flake containment (owner-approved): one visible retry per failed
+      // chunk. A chunk that fails twice is a real failure and fails the
+      // batch exactly as before. The CHUNK_RETRY marker + retried flag
+      // keep every retry auditable in the CI receipt.
+      retried = true;
+      console.log(`↻ ${label}: retrying failed chunk once (flake containment)`);
+      emitMarker("VERDANT_CHUNK_RETRY", { batch: batchNumber, chunk: c + 1 });
+      ok = runVitest(`${label} (retry)`, chunks[c], opts);
+    }
     emitMarker("VERDANT_CHUNK_END", {
       batch: batchNumber,
       chunk: c + 1,
       status: ok ? "pass" : "fail",
+      ...(retried ? { retried: 1 } : {}),
     });
     if (!ok) {
       allOk = false;

@@ -15,10 +15,7 @@ import {
   VERDANT_LOOP,
 } from "@/constants/verdantPositioningCopy";
 
-const LANDING = readFileSync(
-  resolve(__dirname, "..", "pages/Landing.tsx"),
-  "utf8",
-);
+const LANDING = readFileSync(resolve(__dirname, "..", "pages/Landing.tsx"), "utf8");
 
 describe("Verdant positioning copy constants", () => {
   it("hero uses the strong grower-facing headline", () => {
@@ -38,9 +35,10 @@ describe("Verdant positioning copy constants", () => {
     );
   });
 
-  it("exposes primary Start Free and secondary Explore Demo CTAs", () => {
+  it("exposes signup, pricing, and honest product-discovery CTAs", () => {
     expect(VERDANT_HERO.primaryCtaLabel).toBe("Start Free");
-    expect(VERDANT_HERO.secondaryCtaLabel).toBe("Explore Demo");
+    expect(VERDANT_HERO.pricingCtaLabel).toBe("See Pro & Founder plans");
+    expect(VERDANT_HERO.secondaryCtaLabel).toBe("Take the 60-second tour");
   });
 
   it("ships all five ranked value drivers in order", () => {
@@ -97,7 +95,11 @@ describe("Landing page renders the polished positioning", () => {
   });
 
   it("wires the primary CTA to /auth and the secondary CTA to the loop anchor", () => {
-    expect(LANDING).toMatch(/to="\/auth"/);
+    // Sign-in CTAs use the computed signInPath: plain "/auth" unless a
+    // manifest-validated deep-link redirectTo is being forwarded
+    // (see auth-deep-link-return-to.test.ts).
+    expect(LANDING).toMatch(/to=\{signInPath\}/);
+    expect(LANDING).toMatch(/const signInPath = returnTo \? [\s\S]{0,80}: "\/auth"/);
     expect(LANDING).toMatch(/href="#loop"/);
     // /demo is not primary-marketed here; App.tsx redirects it to /welcome.
     expect(LANDING).not.toMatch(/to="\/demo"/);

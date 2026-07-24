@@ -17,6 +17,11 @@ function wrap(children: ReactNode) {
 }
 
 describe("MobileNav primary tabs", () => {
+  it("labels the primary navigation landmark", () => {
+    render(wrap(<MobileNav />));
+    expect(screen.getByRole("navigation", { name: "Primary navigation" })).toBeInTheDocument();
+  });
+
   it("renders the canonical primary tabs", () => {
     render(wrap(<MobileNav />));
     expect(screen.getByText("Home")).toBeInTheDocument();
@@ -30,7 +35,38 @@ describe("MobileNav primary tabs", () => {
 });
 
 describe("MobileNav More sheet — Slice 4 grouping", () => {
-  it("renders groups in order: Daily → Insight → Advanced → Account with canonical labels and routes", async () => {
+  it("keeps destinations scrollable inside a viewport-bounded sheet on short mobile screens", async () => {
+    render(wrap(<MobileNav />));
+
+    await act(async () => {
+      screen.getByText("More").click();
+    });
+
+    const sheet = await screen.findByTestId("mobile-more-sheet");
+    const scrollRegion = screen.getByRole("region", {
+      name: "More navigation destinations",
+    });
+
+    expect(sheet).toHaveClass(
+      "flex",
+      "max-h-[calc(100dvh-0.75rem)]",
+      "flex-col",
+      "overflow-hidden",
+    );
+    expect(scrollRegion).toHaveClass(
+      "mt-4",
+      "min-h-0",
+      "flex-1",
+      "overflow-y-auto",
+      "overscroll-contain",
+      "pb-[calc(1.5rem+env(safe-area-inset-bottom))]",
+    );
+    expect(scrollRegion).toHaveAttribute("tabindex", "0");
+    expect(screen.getByText("Choose a Verdant destination.")).toHaveClass("sr-only");
+    expect(within(scrollRegion).getByText("Invite a Grower")).toBeInTheDocument();
+  });
+
+  it("renders core destinations before a dedicated Labs group with canonical labels and routes", async () => {
     render(wrap(<MobileNav />));
 
     await act(async () => {
@@ -43,7 +79,7 @@ describe("MobileNav More sheet — Slice 4 grouping", () => {
 
     // Group order
     const groupHeadings = screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
-    expect(groupHeadings).toEqual(["Daily", "Insight", "Advanced", "Account"]);
+    expect(groupHeadings).toEqual(["Cultivation", "Daily", "Insight", "Labs", "Account"]);
 
     // Each group contains the expected labels + route targets
     const expectations: Record<string, Array<[string, string]>> = {
@@ -55,12 +91,21 @@ describe("MobileNav More sheet — Slice 4 grouping", () => {
       Insight: [
         ["Sensors", "/sensors"],
         ["AI Doctor", "/doctor"],
-      ],
-      Advanced: [
         ["Reports", "/reports"],
-        ["Harvest Archive", "/grows"],
       ],
-      Account: [["Settings", "/settings"]],
+      Cultivation: [["My Grows", "/grows"]],
+      Labs: [
+        ["Pheno Hunt", "/pheno-hunts"],
+        ["Breeding Programs", "/breeding"],
+        ["Lineage Repair", "/grow-lineage"],
+        ["Agent Integrations", "/settings/agent-integrations"],
+        ["AI Sessions", "/doctor/sessions"],
+        ["Genetics", "/genetics"],
+      ],
+      Account: [
+        ["Settings", "/settings"],
+        ["Invite a Grower", "/invite"],
+      ],
     };
 
     for (const [heading, items] of Object.entries(expectations)) {
@@ -70,6 +115,19 @@ describe("MobileNav More sheet — Slice 4 grouping", () => {
         expect(link).toHaveAttribute("href", href);
       }
     }
+  });
+
+  it("does not publicly link Customer publishing before its Phase 4 proof gate", async () => {
+    render(wrap(<MobileNav />));
+    await act(async () => {
+      screen.getByText("More").click();
+    });
+
+    const region = await screen.findByRole("region", {
+      name: "More navigation destinations",
+    });
+    expect(within(region).queryByText(/customer publishing/i)).toBeNull();
+    expect(within(region).queryByRole("link", { name: /customer/i })).toBeNull();
   });
 
   it("does not expose old labels in the More sheet", async () => {

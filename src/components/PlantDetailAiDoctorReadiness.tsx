@@ -8,11 +8,10 @@
  * never promises diagnosis certainty and never implies a single photo
  * is sufficient.
  *
- * Sensor evidence is sourced from the REAL intake classification via
- * `useSensorBridgeHealth()` → `classificationFromStatusResult()` and
- * passed to the readiness builder. The legacy timeline presence boolean
- * is NOT promoted into a synthesized `usable` Classification — only the
- * real contract classifier can grant healthy evidence.
+ * Sensor evidence is sourced from provenance-aware current tent rows. The
+ * coarse bridge audit may preserve a stale/invalid explanation, but cannot
+ * grant `usable` because it cannot distinguish a test packet from a physical
+ * sensor. The legacy timeline presence boolean is never promoted to usable.
  */
 import { useMemo } from "react";
 import {
@@ -41,6 +40,15 @@ import {
 } from "@/lib/sensorSnapshotStatusContract";
 import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
 import { useSensorBridgeHealth } from "@/hooks/useSensorBridgeHealth";
+import { useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
+import {
+  AI_DOCTOR_CURRENT_SENSOR_ROW_CAP,
+  AI_DOCTOR_CURRENT_SENSOR_SOURCES,
+  classifyAiDoctorCurrentSensorEvidence,
+  selectAiDoctorSensorEvidenceClassification,
+} from "@/lib/aiDoctorCurrentSensorSnapshotRules";
+import { isUuid } from "@/lib/isUuid";
+import { buildPlantAiDoctorReviewPath } from "@/lib/aiDoctorEntryRules";
 import { buildPlantRecentActivity } from "@/lib/plantRecentActivityRules";
 import { classifyTimelineEntry } from "@/lib/timelineEntryClassification";
 import { Button } from "@/components/ui/button";
@@ -49,9 +57,12 @@ import { Badge } from "@/components/ui/badge";
 interface PlantDetailAiDoctorReadinessProps {
   plantId: string | null | undefined;
   growId?: string | null;
+  tentId?: string | null;
   stage?: string | null;
   hasPlantPhoto?: boolean;
 }
+
+const NO_CURRENT_SENSOR_ROWS: never[] = [];
 
 const HEADING_ID = "plant-detail-ai-doctor-readiness-heading";
 const CARD_TEST_ID = "plant-detail-ai-doctor-readiness-card";
@@ -168,28 +179,49 @@ function nextActionForStatus(status: SnapshotStatus | null): NextAction | null {
 export default function PlantDetailAiDoctorReadiness({
   plantId,
   growId,
+  tentId,
   stage,
   hasPlantPhoto = false,
 }: PlantDetailAiDoctorReadinessProps) {
   const { data: rawRows, isLoading } = usePlantRecentActivity(plantId ?? null);
   const { data: bridgeHealth } = useSensorBridgeHealth();
+  const {
+    byTent: currentReadingsByTent,
+    statusByTent: currentSensorStatusByTent,
+    refetch: refetchCurrentSensorRows,
+  } = useSensorReadingsByTents(
+    isUuid(tentId) ? [tentId] : [],
+    AI_DOCTOR_CURRENT_SENSOR_ROW_CAP,
+    AI_DOCTOR_CURRENT_SENSOR_SOURCES,
+  );
+  const currentSensorStatus = isUuid(tentId)
+    ? (currentSensorStatusByTent[tentId] ?? "loading")
+    : "success";
+  const currentSensorLoading = currentSensorStatus === "loading";
+  const currentSensorError =
+    currentSensorStatus === "error" || currentSensorStatus === "refresh_error";
+  const currentSensorRows =
+    tentId && !currentSensorError
+      ? (currentReadingsByTent[tentId] ?? NO_CURRENT_SENSOR_ROWS)
+      : NO_CURRENT_SENSOR_ROWS;
 
   const signals = useMemo(() => {
     return deriveSignals(plantId, hasPlantPhoto, rawRows ?? []);
   }, [plantId, hasPlantPhoto, rawRows]);
 
-  // Source the REAL intake classification from the bridge health view-model.
-  // Presence in the timeline NEVER produces a `usable` Classification — only
-  // the shared contract classifier can. When no bridge data is available,
-  // we pass null and the readiness builder treats sensor evidence as
-  // `no_data`.
+  // Row-level current evidence is the only source allowed to grant usable.
+  // Audit counts may preserve a cautionary/unsafe state, but a coarse audit
+  // `usable` result cannot override row-level no-data/testbench filtering.
   const sensorSnapshot = useMemo<Classification | null>(() => {
-    if (!bridgeHealth) return null;
-    return classificationFromStatusResult({
-      status: bridgeHealth.status,
-      reasonCode: bridgeHealth.latestReasonCode,
-    });
-  }, [bridgeHealth]);
+    const current = classifyAiDoctorCurrentSensorEvidence(currentSensorRows);
+    const audit = bridgeHealth
+      ? classificationFromStatusResult({
+          status: bridgeHealth.status,
+          reasonCode: bridgeHealth.latestReasonCode,
+        })
+      : null;
+    return selectAiDoctorSensorEvidenceClassification(current, audit);
+  }, [bridgeHealth, currentSensorRows]);
 
   const result = useMemo(() => {
     return buildPlantDetailAiDoctorReadiness({
@@ -199,9 +231,7 @@ export default function PlantDetailAiDoctorReadiness({
     });
   }, [stage, signals, sensorSnapshot]);
 
-  const doctorHref = plantId
-    ? `/doctor?plantId=${encodeURIComponent(plantId)}`
-    : "/doctor";
+  const doctorHref = buildPlantAiDoctorReviewPath({ plantId, tentId }) ?? "/doctor";
 
   const sensor = result.sensorEvidence;
   const nextAction = nextActionForStatus(sensor.status);
@@ -220,7 +250,7 @@ export default function PlantDetailAiDoctorReadiness({
           <Stethoscope className="h-3.5 w-3.5 text-primary" />
           AI Doctor readiness
         </h2>
-        {!isLoading && (
+        {!isLoading && !currentSensorLoading && !currentSensorError && (
           <Badge
             variant="outline"
             className={`text-[10px] uppercase tracking-wide ${levelBadgeClass(result.level)}`}
@@ -232,7 +262,7 @@ export default function PlantDetailAiDoctorReadiness({
         )}
       </header>
 
-      {isLoading ? (
+      {isLoading || currentSensorLoading ? (
         <div
           data-testid="plant-detail-ai-doctor-readiness-loading"
           role="status"
@@ -242,6 +272,50 @@ export default function PlantDetailAiDoctorReadiness({
           <div className="h-8 rounded-lg bg-secondary/40 animate-pulse" aria-hidden />
           <div className="h-4 rounded-lg bg-secondary/40 animate-pulse w-3/4" aria-hidden />
           <span className="sr-only">Loading AI Doctor readiness…</span>
+        </div>
+      ) : currentSensorError ? (
+        <div
+          data-testid="plant-detail-ai-doctor-readiness-sensor-error"
+          role="alert"
+          className="space-y-2"
+        >
+          <div className="flex items-start gap-2">
+            <ShieldAlert className="h-4 w-4 text-destructive mt-0.5" aria-hidden="true" />
+            <div>
+              <p className="text-sm font-medium text-foreground/90">
+                Current sensor evidence unavailable
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Verdant could not load this tent&apos;s current sensor rows, so it will not treat
+                the result as an empty snapshot.
+              </p>
+            </div>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-7"
+            data-testid="plant-detail-ai-doctor-readiness-sensor-error-retry"
+            onClick={() => {
+              void refetchCurrentSensorRows();
+            }}
+          >
+            Try sensor read again
+          </Button>
+          {plantId ? (
+            <Button
+              asChild
+              size="sm"
+              variant="outline"
+              className="h-7 gap-1"
+              data-testid="plant-detail-ai-doctor-readiness-history-only-cta"
+            >
+              <Link to={doctorHref}>
+                Ask Doctor with available history <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </Button>
+          ) : null}
         </div>
       ) : (
         <div className="space-y-2">
@@ -264,17 +338,17 @@ export default function PlantDetailAiDoctorReadiness({
           </div>
 
           {result.missing.length > 0 && (
-            <ul
-              data-testid="plant-detail-ai-doctor-readiness-missing-list"
-              className="space-y-1"
-            >
+            <ul data-testid="plant-detail-ai-doctor-readiness-missing-list" className="space-y-1">
               {result.missing.map((m) => (
                 <li
                   key={m.kind}
                   data-testid={`plant-detail-ai-doctor-readiness-missing-${m.kind}`}
                   className="flex items-center gap-2 text-xs text-muted-foreground"
                 >
-                  <span className="h-1 w-1 rounded-full bg-muted-foreground/60" aria-hidden="true" />
+                  <span
+                    className="h-1 w-1 rounded-full bg-muted-foreground/60"
+                    aria-hidden="true"
+                  />
                   {m.label}
                 </li>
               ))}
@@ -305,10 +379,12 @@ export default function PlantDetailAiDoctorReadiness({
             </div>
             <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
               <span data-testid="plant-detail-ai-doctor-sensor-evidence-status">
-                status: <span className="font-mono text-foreground/80">{sensor.status ?? "unknown"}</span>
+                status:{" "}
+                <span className="font-mono text-foreground/80">{sensor.status ?? "unknown"}</span>
               </span>
               <span data-testid="plant-detail-ai-doctor-sensor-evidence-reason">
-                reason: <span className="font-mono text-foreground/80">{sensor.reason ?? "unknown"}</span>
+                reason:{" "}
+                <span className="font-mono text-foreground/80">{sensor.reason ?? "unknown"}</span>
               </span>
               <span data-testid="plant-detail-ai-doctor-sensor-evidence-healthy">
                 healthy evidence:{" "}

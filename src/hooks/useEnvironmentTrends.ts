@@ -51,55 +51,67 @@ export function useEnvironmentTrends(
       if (tentIds.length > 0) {
         const { data, error } = await supabase
           .from("sensor_readings")
-          .select("ts,metric,value,source,tent_id")
+          .select("ts,captured_at,metric,value,source,tent_id,raw_payload")
           .in("tent_id", tentIds)
           .in("metric", ["temperature_c", "humidity_pct", "vpd_kpa"])
-          .gte("ts", since)
+          // Current-window filtering uses physical observation time. Legacy
+          // rows without `captured_at` retain their established `ts` fallback.
+          .or(`captured_at.gte.${since},and(captured_at.is.null,ts.gte.${since})`)
+          .order("captured_at", { ascending: false, nullsFirst: false })
           .order("ts", { ascending: false })
           .limit(500);
         if (!error && data && data.length > 0) {
           const samples = samplesFromReadings(
             data.map((r) => ({
               ts: r.ts,
+              captured_at: (r as { captured_at?: string | null }).captured_at ?? null,
               metric: r.metric,
               value: r.value as number | string | null,
               source: r.source as string | null,
               tent_id: r.tent_id as string | null,
+              raw_payload: r.raw_payload,
             })),
           );
-          const windowed = selectWindow(samples);
-          setState({
-            status: "ok",
-            trends: computeEnvironmentTrends(windowed),
-          });
-          return;
-        }
-        if (!error && (!data || data.length === 0)) {
-          // Try a broader fetch without the time window so we can fall back
-          // to "latest 20 readings" if no 24h data exists.
-          const { data: any20, error: err20 } = await supabase
-            .from("sensor_readings")
-            .select("ts,metric,value,source,tent_id")
-            .in("tent_id", tentIds)
-            .in("metric", ["temperature_c", "humidity_pct", "vpd_kpa"])
-            .order("ts", { ascending: false })
-            .limit(60);
-          if (!err20 && any20 && any20.length > 0) {
-            const samples = samplesFromReadings(
-              any20.map((r) => ({
-                ts: r.ts,
-                metric: r.metric,
-                value: r.value as number | string | null,
-                source: r.source as string | null,
-                tent_id: r.tent_id as string | null,
-              })),
-            );
+          if (samples.length > 0) {
             const windowed = selectWindow(samples);
             setState({
               status: "ok",
               trends: computeEnvironmentTrends(windowed),
             });
             return;
+          }
+        }
+        if (!error && (!data || data.length === 0)) {
+          // Try a broader fetch without the time window so we can fall back
+          // to "latest 20 readings" if no 24h data exists.
+          const { data: any20, error: err20 } = await supabase
+            .from("sensor_readings")
+            .select("ts,captured_at,metric,value,source,tent_id,raw_payload")
+            .in("tent_id", tentIds)
+            .in("metric", ["temperature_c", "humidity_pct", "vpd_kpa"])
+            .order("captured_at", { ascending: false, nullsFirst: false })
+            .order("ts", { ascending: false })
+            .limit(60);
+          if (!err20 && any20 && any20.length > 0) {
+            const samples = samplesFromReadings(
+              any20.map((r) => ({
+                ts: r.ts,
+                captured_at: (r as { captured_at?: string | null }).captured_at ?? null,
+                metric: r.metric,
+                value: r.value as number | string | null,
+                source: r.source as string | null,
+                tent_id: r.tent_id as string | null,
+                raw_payload: r.raw_payload,
+              })),
+            );
+            if (samples.length > 0) {
+              const windowed = selectWindow(samples);
+              setState({
+                status: "ok",
+                trends: computeEnvironmentTrends(windowed),
+              });
+              return;
+            }
           }
         }
       }

@@ -26,6 +26,7 @@ import type {
 } from "@/lib/timelineFilterRules";
 import { evaluateAiDoctorContextFromSources } from "@/lib/aiDoctorContextViewModel";
 import { buildAiDoctorContextQuickActions } from "@/lib/aiDoctorContextQuickActionsViewModel";
+import type { RootZoneObservationV1 } from "@/lib/rootZoneObservationRules";
 
 const NOW = Date.UTC(2026, 5, 2, 12, 0, 0);
 const HOUR_MS = 3_600_000;
@@ -60,6 +61,34 @@ function plantWithStage() {
     stage: "veg",
     medium: "coco",
     hasPlantPhoto: true,
+    plantType: "photoperiod",
+  };
+}
+
+/**
+ * One recent settled root-zone observation so the new "root-zone-history"
+ * gate is satisfied and the sibling environment event stays the variable
+ * under test. Timestamp is distinct from the diary fixtures so the
+ * same-instant companion dedupe never collapses it into them.
+ */
+function recentRootZoneObservation(): RootZoneObservationV1 {
+  return {
+    occurredAt: isoAt(5 * HOUR_MS),
+    eventType: "watering",
+    source: "manual",
+    metrics: {
+      schemaVersion: 1,
+      volumeMl: 500,
+      inputPh: 6.0,
+      inputEcMsCm: 1.2,
+      outputEcMsCm: null,
+      runoffMl: 50,
+      runoffPh: 6.1,
+      runoffEcMsCm: 1.4,
+      waterTempC: 21,
+      nutrientLine: null,
+      products: [],
+    },
   };
 }
 
@@ -100,6 +129,7 @@ describe("QuickLog v2 environment row → AI Doctor context readiness", () => {
     const r = evaluateAiDoctorContextFromSources({
       plant: plantWithStage(),
       timelineItems: timelineWithActivity([snap!]),
+      rootZoneObservations: [recentRootZoneObservation()],
       now: NOW,
     });
     expect(r.missing).not.toContain("recent-manual-sensor-snapshot");
@@ -113,6 +143,7 @@ describe("QuickLog v2 environment row → AI Doctor context readiness", () => {
     const ctx = evaluateAiDoctorContextFromSources({
       plant: plantWithStage(),
       timelineItems: timelineWithActivity([snap]),
+      rootZoneObservations: [recentRootZoneObservation()],
       now: NOW,
     });
     const actions = buildAiDoctorContextQuickActions({ missing: ctx.missing, plantId: PLANT_ID });
@@ -126,6 +157,7 @@ describe("QuickLog v2 environment row → AI Doctor context readiness", () => {
     const r = evaluateAiDoctorContextFromSources({
       plant: plantWithStage(),
       timelineItems: timelineWithActivity([snap]),
+      rootZoneObservations: [recentRootZoneObservation()],
       now: NOW,
     });
     expect(r.missing).toContain("recent-manual-sensor-snapshot");

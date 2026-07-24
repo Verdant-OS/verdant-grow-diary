@@ -11,9 +11,93 @@ on:
   merge_group:
 
 jobs:
+  # Preflight: verify the edge shared-lib mirror
+  # (`supabase/functions/_shared/lib` + `.sync-manifest.json`) is in sync
+  # with `src/` BEFORE the heavy `test` job runs. Fails fast with exact
+  # drift details (per-file expected-vs-actual sha256) so a stale mirror
+  # doesn't burn a 45-minute build slot to surface the same failure.
+  # `test` gates on this via `needs: edge-shared-sync-preflight` — if the
+  # mirror drifts, install/lint/typecheck/tests/build never start.
+  edge-shared-sync-preflight:
+    name: Preflight — edge shared-lib mirror in sync
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write         # notify-edge-shared-drift.mjs opens/updates a tracking issue
+      pull-requests: write  # notify-edge-shared-drift.mjs posts a PR comment on drift
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+
+      # Guard 1: no edge function may import `../../../src/lib/*`. Cheap
+      # static scan — runs first so an obvious violation is reported
+      # without paying for the sync check.
+      - name: No src/lib imports from supabase/functions
+        run: node scripts/check-no-src-lib-imports.mjs
+
+      # Guard 2: committed mirror files + .sync-manifest.json must match
+      # what sync-edge-shared.mjs would generate right now. `--check-only`
+      # forces the wrapper to fail closed (no auto-fix in CI), matching
+      # the local prebuild's fail-closed CI behavior. `id: verify-mirror`
+      # lets the follow-up steps detect drift without swallowing the
+      # non-zero exit.
+      - name: Verify edge shared-lib mirror is in sync
+        id: verify-mirror
+        run: node scripts/verify-edge-shared-in-sync.mjs --check-only
+
+      # On drift, print the per-file expected-vs-actual sha256 table and
+      # the offending .sync-manifest.json entries directly into the job
+      # log so the failure is diagnosable without downloading artifacts.
+      - name: Print exact drift details (per-file sha256 diff)
+        if: always() && steps.verify-mirror.outcome == 'failure'
+        run: |
+          echo "::group::Edge shared-lib drift — expected vs actual"
+          node scripts/report-edge-shared-drift.mjs || true
+          echo "::endgroup::"
+          echo ""
+          echo "::error title=Edge shared-lib mirror out of sync::Run \`bun run sync-edge-shared\` locally, commit the regenerated files under supabase/functions/_shared/lib and .sync-manifest.json, and push."
+
+      # Persist the human-readable drift report as an artifact for
+      # deeper inspection (matches the standalone edge-shared-sync
+      # workflow's artifact contract so downstream tooling doesn't
+      # need to know which workflow produced it).
+      - name: Upload drift report artifact
+        if: always() && steps.verify-mirror.outcome == 'failure'
+        env:
+          DRIFT_REPORT_OUT: edge-shared-drift-report.md
+        run: node scripts/report-edge-shared-drift.mjs > /dev/null || true
+
+      - name: Upload drift report
+        if: always() && steps.verify-mirror.outcome == 'failure'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: edge-shared-drift-report-ci-preflight
+          path: edge-shared-drift-report.md
+          if-no-files-found: ignore
+          retention-days: 14
+
+      # Immediate GitHub notification (issue on push, PR comment on PRs)
+      # so drift is visible without waiting for the next build. Uses the
+      # workflow's GITHUB_TOKEN — no PAT required. Always exits 0; a
+      # failed notification must not mask the drift failure above.
+      - name: Notify on drift (PR comment or tracking issue)
+        if: always() && steps.verify-mirror.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DRIFT_REPORT_PATH: edge-shared-drift-report.md
+        run: node scripts/notify-edge-shared-drift.mjs
+
   test:
     name: Lint, typecheck, test, build
+    needs: edge-shared-sync-preflight
     runs-on: ubuntu-latest
+
     # This job runs the entire src/test vitest suite in one process (see the
     # monolithic full-suite step below); 20 minutes was sized before the
     # suite grew. 45 gives honest headroom so a timeout means "stuck", not
@@ -26,7 +110,7 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
-          bun-version: latest
+          bun-version: 1.3.14
 
       - name: Cache
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
@@ -316,7 +400,44 @@ jobs:
           if-no-files-found: warn
 
       - name: Build
+        id: prod_build
         run: bun run build
+
+      # Downloadable build-summary artifact — always runs so failures
+      # produce evidence too. Captures commit SHA, validator outcomes,
+      # edge-shared drift status (re-checked at summary time), Node/Bun
+      # versions, and dist size. No secrets, env dumps, or PII. See
+      # scripts/generate-build-summary.mjs.
+      - name: Generate build summary
+        if: always()
+        env:
+          OUT_DIR: artifacts/build-summary
+          BUILD_SUMMARY_TRIGGER: ${{ github.event_name }}
+          # Compact JSON — each entry is a stage this job already ran.
+          # Results reflect the recorded step outcomes so the artifact
+          # matches the actual pipeline verdict.
+          BUILD_SUMMARY_VALIDATORS: >-
+            [
+              {"name":"edge-shared-preflight","result":"pass","detail":"gated by needs: edge-shared-sync-preflight"},
+              {"name":"lint","result":"pass"},
+              {"name":"typecheck","result":"pass"},
+              {"name":"static-safety-scans","result":"pass"},
+              {"name":"sensor-safety","result":"pass"},
+              {"name":"ai-doctor-output-evaluation","result":"pass"},
+              {"name":"scanner-guardrail-timeout-sentinel","result":"pass"},
+              {"name":"ecowitt-bridge-ci","result":"${{ steps.ecowitt_bridge_ci.outcome }}"},
+              {"name":"production-build","result":"${{ steps.prod_build.outcome }}"}
+            ]
+        run: node scripts/generate-build-summary.mjs
+
+      - name: Upload build summary artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: build-summary-${{ github.event.pull_request.head.sha || github.sha }}
+          path: artifacts/build-summary/
+          if-no-files-found: error
+          retention-days: 30
 
   # Dedicated legal SEO regression gate.
   #
@@ -344,7 +465,7 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
-          bun-version: latest
+          bun-version: 1.3.14
 
       - name: Cache Bun install
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
@@ -423,7 +544,7 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
-          bun-version: latest
+          bun-version: 1.3.14
 
       - name: Cache
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5

@@ -14,10 +14,12 @@ import {
   listClonesForKeepers,
   recordCross,
   listCrossesForHunt,
+  updateKeeperStabilityRuns,
   type KeeperRow,
   type CloneRow,
   type CrossRow,
 } from "@/lib/phenoKeepersService";
+import type { StabilityRun } from "@/lib/phenoStabilityRunRules";
 import {
   recordReversal,
   listReversalsForKeepers,
@@ -56,6 +58,11 @@ export interface UsePhenoKeepersState {
   addKeeperClone: (keeperId: string, cloneLabel: string) => Promise<boolean>;
   /** Record a reversal on a keeper (append-only). */
   markReversed: (keeperId: string, method: string) => Promise<boolean>;
+  /**
+   * Replace a keeper's stability-run ledger (the grower edits the whole set:
+   * add a grow-out, remove one). Sanitized + RLS-scoped in the service.
+   */
+  saveStabilityRuns: (keeperId: string, runs: readonly StabilityRun[]) => Promise<boolean>;
   /**
    * Record a cross. Pass a distinct maleKeeperId for a two-parent cross, or
    * null to self (S1) the female keeper. With no `options` the service
@@ -197,6 +204,21 @@ export function usePhenoKeepers(huntId: string | null | undefined): UsePhenoKeep
     [reload],
   );
 
+  const saveStabilityRuns = useCallback(
+    async (keeperId: string, runs: readonly StabilityRun[]) => {
+      setSaving(true);
+      const res = await updateKeeperStabilityRuns({ keeperId, runs });
+      setSaving(false);
+      if (res.ok === true) {
+        reload();
+        return true;
+      }
+      setError(res.error);
+      return false;
+    },
+    [reload],
+  );
+
   const saveCross = useCallback(
     async (
       femaleKeeperId: string,
@@ -243,6 +265,7 @@ export function usePhenoKeepers(huntId: string | null | undefined): UsePhenoKeep
     promoteToKeeper,
     addKeeperClone,
     markReversed,
+    saveStabilityRuns,
     saveCross,
   };
 }

@@ -14,6 +14,13 @@ export function isSupportedBreedingEventType(eventType: string): eventType is Br
   return SUPPORTED_BREEDING_EVENT_TYPES.includes(eventType as BreedingEventType);
 }
 
+export interface OriginatingTimelineEventRef {
+  id: string;
+  type: string;
+  source: string;
+  occurred_at: string;
+}
+
 export interface BreedingActionQueuePayload {
   grow_id: string;
   plant_id?: string | null;
@@ -25,6 +32,7 @@ export interface BreedingActionQueuePayload {
   reason: string;
   risk_level: string;
   suggested_change: string;
+  originating_timeline_events?: OriginatingTimelineEventRef[];
 }
 
 function toBreedingEventLike(event: BreedingEvent): BreedingEventLike {
@@ -75,6 +83,20 @@ export function buildBreedingActionQueuePayloads(
       suggested_change: `${suggestion.title} — by ${dueLabel}`,
       reason: `${suggestion.reason} [event:${event.id}]`,
       risk_level: suggestion.risk_level,
+      // Privacy-safe back-reference: only id, type, source, occurred_at —
+      // no raw notes, no user_id, no device data, no secret-like fields.
+      // Mirrors the browser copy (src/lib/genetics/breedingActionQueue.ts) so
+      // the /breeding/new production write path (create-breeding-suggestions)
+      // links each follow-up back to its originating timeline event —
+      // adaptActionQueueRowsToBreedingCycleTimelinePoints skips rows without it.
+      originating_timeline_events: [
+        {
+          id: event.id,
+          type: event.type,
+          source: "manual",
+          occurred_at: event.occurred_at,
+        },
+      ],
     };
   });
 }

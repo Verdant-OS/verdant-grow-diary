@@ -10,6 +10,18 @@ import { render, screen, fireEvent, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import Pricing from "@/pages/Pricing";
 
+vi.mock("@/hooks/usePaddleCheckout", () => ({
+  usePaddleCheckout: () => ({
+    openCheckout: vi.fn(),
+    loading: false,
+    environment: "sandbox",
+    unavailable: false,
+    unavailableMessage: null,
+    blockedReason: null,
+    dismissBlocked: vi.fn(),
+  }),
+}));
+
 vi.mock("@/lib/pricingAnalytics", () => ({
   trackPricingEvent: vi.fn(),
   PRICING_ANALYTICS_EVENT: "verdant:analytics",
@@ -41,9 +53,9 @@ function renderPricing() {
 describe("Pricing — proof polish copy", () => {
   it("hero shows the protect-grow-history line", () => {
     renderPricing();
-    expect(
-      screen.getByRole("heading", { level: 1 }).textContent ?? "",
-    ).toContain("Protect your grow history");
+    expect(screen.getByRole("heading", { level: 1 }).textContent ?? "").toContain(
+      "Protect your grow history",
+    );
   });
 
   it("renders the Plant memory. Sensor truth. tagline", () => {
@@ -84,11 +96,11 @@ describe("Pricing — proof polish copy", () => {
     expect(free.textContent).toContain("CSV sensor import");
   });
 
-  it("Founder Lifetime shows $129 and first 75 limit", () => {
+  it("Founder Lifetime shows $129 and first 100 limit", () => {
     renderPricing();
     const founder = screen.getByTestId("pricing-card-founder");
     expect(founder.textContent).toContain("$129");
-    expect(founder.textContent).toContain("75");
+    expect(founder.textContent).toContain("First 100 only");
   });
 
   it("CSV proof copy never calls CSV live", () => {
@@ -150,12 +162,23 @@ describe("Pricing — proof polish copy", () => {
     expect(text.toLowerCase()).toContain("alerts");
   });
 
-  it("Pricing FAQ v1.1 — checkout sandbox honesty FAQ renders", () => {
+  it("Pricing FAQ v1.1 — checkout honesty FAQ renders (environment-agnostic)", () => {
+    // The old copy described the retired /upgrade sandbox placeholder and
+    // became false in both directions once real checkout shipped: this FAQ
+    // must stay true in sandbox AND live, so it pins the mechanism (Paddle
+    // charges, server verifies, page never self-grants) instead of an
+    // environment state.
     renderPricing();
-    const text = openFaqAndGetText("pricing-faq-checkout-sandbox");
+    expect(screen.getByTestId("pricing-checkout-trust")).toHaveAttribute(
+      "data-checkout-state",
+      "sandbox",
+    );
+    const text = openFaqAndGetText("pricing-faq-checkout-status");
     expect(text).toContain("Is checkout live?");
-    expect(text.toLowerCase()).toContain("sandbox preview");
-    expect(text.toLowerCase()).toContain("no live charge");
+    expect(text.toLowerCase()).toContain("paddle");
+    expect(text.toLowerCase()).toContain("server-side");
+    expect(text.toLowerCase()).toContain("never charge you or grant access");
+    expect(text.toLowerCase()).toContain("nothing is charged");
   });
 });
 

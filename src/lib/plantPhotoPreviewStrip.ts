@@ -31,6 +31,16 @@ export interface PlantPhotoStripItem {
   altText: string;
 }
 
+/**
+ * Internal-only extension used by an authenticated Plant Detail interaction
+ * surface. `sourcePhotoId` must never be rendered or passed into user-facing
+ * copy. The public `buildPlantPhotoStripItems` projection below intentionally
+ * omits it.
+ */
+export interface PlantPhotoStripSourceItem extends PlantPhotoStripItem {
+  sourcePhotoId: string;
+}
+
 export interface PlantPhotoStripInput {
   plantId: string | null | undefined;
   rows: readonly PhotoHistoryRow[] | null | undefined;
@@ -39,7 +49,8 @@ export interface PlantPhotoStripInput {
 }
 
 function clampLimit(n: number | undefined): number {
-  const v = typeof n === "number" && Number.isFinite(n) ? Math.floor(n) : PLANT_PHOTO_STRIP_DEFAULT_LIMIT;
+  const v =
+    typeof n === "number" && Number.isFinite(n) ? Math.floor(n) : PLANT_PHOTO_STRIP_DEFAULT_LIMIT;
   if (v < PLANT_PHOTO_STRIP_MIN_LIMIT) return PLANT_PHOTO_STRIP_MIN_LIMIT;
   if (v > PLANT_PHOTO_STRIP_MAX_LIMIT) return PLANT_PHOTO_STRIP_MAX_LIMIT;
   return v;
@@ -87,19 +98,20 @@ function deriveAltText(dateLabel: string): string {
  * Rows with no valid thumbnail URL are skipped so the strip never renders
  * a broken or warning-only tile.
  */
-export function buildPlantPhotoStripItems(
+export function buildPlantPhotoStripItemsWithSource(
   input: PlantPhotoStripInput,
-): PlantPhotoStripItem[] {
+): PlantPhotoStripSourceItem[] {
   const plantId = (input.plantId ?? "").trim();
   if (!plantId) return [];
   const limit = clampLimit(input.limit);
   const rows = input.rows ?? [];
-  const out: PlantPhotoStripItem[] = [];
+  const out: PlantPhotoStripSourceItem[] = [];
   for (const r of rows) {
     if (r.plantId !== plantId) continue;
     if (!r.photoUrl) continue;
     const dateLabel = formatDateLabel(r.occurredAt, r.occurredAtLabel);
     out.push({
+      sourcePhotoId: r.id,
       key: out.length.toString(),
       thumbnailUrl: r.photoUrl,
       dateLabel,
@@ -109,4 +121,14 @@ export function buildPlantPhotoStripItems(
     if (out.length >= limit) break;
   }
   return out;
+}
+
+/**
+ * Public display projection for the photo strip. It intentionally removes
+ * private source diary ids before returning data to generic presenters.
+ */
+export function buildPlantPhotoStripItems(input: PlantPhotoStripInput): PlantPhotoStripItem[] {
+  return buildPlantPhotoStripItemsWithSource(input).map(
+    ({ sourcePhotoId: _sourcePhotoId, ...item }) => item,
+  );
 }

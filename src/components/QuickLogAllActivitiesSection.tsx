@@ -12,9 +12,8 @@
  * src/constants/*.
  *
  * Safety fences:
- *   - Harvest is visible-but-disabled; click never opens a form, never
- *     calls an RPC, never dispatches verdant:entry-created, never adds
- *     a saved item.
+ *   - Harvest is stage-gated in the picker and re-checked immediately
+ *     before save. Missing, stale, or ineligible context never reaches RPC.
  *   - Manual sensor snapshot is intentionally deferred to the existing
  *     ManualSensorReadingCard path — this section shows the shared
  *     safety copy and links out; it does NOT persist a reading itself.
@@ -24,45 +23,84 @@
  *   - No recommendation, no health inference, no "safe to feed / train
  *     / defoliate", no harvest readiness, no diagnosis language.
  */
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import QuickLogActivityPicker from "@/components/QuickLogActivityPicker";
 import { useQuickLogActivitySave } from "@/hooks/useQuickLogActivitySave";
+import { useAuth } from "@/store/auth";
+import { supabase } from "@/integrations/supabase/client";
+import { createQuickLogPhotoDiaryEntry } from "@/lib/quickLogPhotoDiaryEntry";
+import { validatePlantProfilePhotoFile } from "@/lib/plantProfilePhotoFileRules";
+import { dispatchQuickLogV2EntryCreated } from "@/lib/quickLogV2EntryCreatedEvent";
+import { trackQuickLogSuccess } from "@/lib/quickLogSuccessTelemetry";
 import {
   QUICK_LOG_ACTIVITY_DEFINITIONS,
-  QUICK_LOG_HARVEST_DISABLED_REASON,
   QUICK_LOG_WEIGHT_UNITS,
   type QuickLogActivityDefinition,
   type QuickLogActivityId,
   type QuickLogWeightUnit,
 } from "@/constants/quickLogActivityTypes";
+import { buildHarvestDetailsPayload, validateHarvestWeightInput } from "@/lib/harvestDetailsRules";
 import {
-  buildHarvestDetailsPayload,
-  validateHarvestWeightInput,
-} from "@/lib/harvestDetailsRules";
+  getQuickLogActivityDetailFields,
+  sanitizeQuickLogActivityDetails,
+  validateQuickLogDetailNumberInput,
+  QUICK_LOG_DETAIL_TEXT_MAX,
+} from "@/lib/quickLogActivityDetailFields";
 import {
   buildDailyCheckSavedItems,
   type DailyCheckSavedItem,
   type DailyCheckSavedSource,
 } from "@/lib/dailyCheckPostSubmitRules";
+import {
+  bindQuickLogActivityDraft,
+  buildQuickLogTargetIdentity,
+  buildQuickLogTargetKey,
+  evaluateQuickLogActivityAvailability,
+  evaluateQuickLogPrePersistenceGate,
+  QUICK_LOG_HARVEST_STAGE_DISABLED_REASON,
+  type QuickLogActivityDraftBinding,
+} from "@/lib/quickLogActivityRules";
+import {
+  QUICK_LOG_V2_OPEN_EVENT,
+  buildQuickLogV2OpenIntent,
+} from "@/lib/quickLogV2OpenIntent";
 
 export interface QuickLogAllActivitiesSectionProps {
   growId: string | null | undefined;
   tentId?: string | null;
   plantId?: string | null;
+  /** Current selected-plant stage. Harvest fails closed when this is missing. */
+  plantStage?: unknown;
   /** Optional heading override for the section. */
   heading?: string;
   /** Optional testid prefix. Defaults to "quick-log-all-activities". */
   testIdPrefix?: string;
+  /** Parent-owned synchronous guard shared with the canonical Quick Log form. */
+  onSaveStart?: (target: QuickLogAllActivitiesSaveTarget) => boolean;
+  /** Releases the parent-owned guard after either success or failure. */
+  onSaveEnd?: () => void;
+  /** Presenter lock while either the parent or this section owns the guard. */
+  saveBlocked?: boolean;
+  /** Reads the same parent-owned synchronous guard used to acquire a save. */
+  isSaveBlocked?: () => boolean;
+  /** Parent-owned close/reset seam used before handing Water to Quick Log v2. */
+  onBeforeStructuredWaterOpen?: () => void;
+  /** Caller-owned fail-closed reason that must prevent every persistence path. */
+  externalPersistenceBlockReason?: string | null;
+}
+
+export interface QuickLogAllActivitiesSaveTarget {
+  readonly growId: string;
+  readonly tentId: string | null;
+  readonly plantId: string | null;
 }
 
 /** Map a QuickLogActivityId to the "What was saved" DailyCheck source. */
-function toSavedSource(
-  id: QuickLogActivityId,
-): DailyCheckSavedSource | null {
+function toSavedSource(id: QuickLogActivityId): DailyCheckSavedSource | null {
   switch (id) {
     case "note":
       return "note";
@@ -101,27 +139,75 @@ interface SavedRecord {
   id: string;
   activityId: QuickLogActivityId;
   item: DailyCheckSavedItem;
+  target: QuickLogAllActivitiesSaveTarget;
 }
 
 export default function QuickLogAllActivitiesSection({
   growId,
   tentId = null,
   plantId = null,
+  plantStage = null,
   heading = "All quick actions",
   testIdPrefix = "quick-log-all-activities",
+  onSaveStart,
+  onSaveEnd,
+  saveBlocked = false,
+  isSaveBlocked,
+  onBeforeStructuredWaterOpen,
+  externalPersistenceBlockReason = null,
 }: QuickLogAllActivitiesSectionProps) {
-  const [selected, setSelected] = useState<QuickLogActivityDefinition | null>(
-    null,
+  const currentTarget = useMemo(
+    () => buildQuickLogTargetIdentity({ growId, tentId, plantId }),
+    [growId, plantId, tentId],
   );
+  const currentTargetKey = useMemo(
+    () => buildQuickLogTargetKey(currentTarget),
+    [currentTarget],
+  );
+  const previousTargetKeyRef = useRef(currentTargetKey);
+  const [selectedDraft, setSelectedDraft] =
+    useState<QuickLogActivityDraftBinding | null>(null);
+  const selected = selectedDraft
+    ? QUICK_LOG_ACTIVITY_DEFINITIONS[selectedDraft.activityId]
+    : null;
   const [note, setNote] = useState("");
   const [harvestWet, setHarvestWet] = useState("");
   const [harvestDry, setHarvestDry] = useState("");
   const [harvestUnit, setHarvestUnit] = useState<QuickLogWeightUnit>("g");
+  // Generic per-activity structured detail values (e.g. training technique),
+  // keyed by field spec key. Sanitized before persistence.
+  const [detailValues, setDetailValues] = useState<Record<string, string>>({});
+  // Photo activity: a real image is REQUIRED before Save — a photo entry with
+  // no image must never be confirmable. Uploaded to the private diary-photos
+  // bucket; the diary row's photo_url column carries the bare storage path.
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const photoDiaryInFlightRef = useRef(false);
+  const { user } = useAuth();
   const [saved, setSaved] = useState<SavedRecord[]>([]);
   const [errorReason, setErrorReason] = useState<string | null>(null);
-  const [errorForActivity, setErrorForActivity] =
-    useState<QuickLogActivityId | null>(null);
+  const [errorForActivity, setErrorForActivity] = useState<QuickLogActivityId | null>(null);
+  const [structuredWaterError, setStructuredWaterError] = useState<string | null>(null);
   const { save, saving } = useQuickLogActivitySave();
+  const localSaveInFlightRef = useRef(false);
+
+  useEffect(() => {
+    if (previousTargetKeyRef.current === currentTargetKey) return;
+    previousTargetKeyRef.current = currentTargetKey;
+
+    // Drafts and receipts are target-specific. Never carry plant A's state
+    // into plant B's Quick Log surface.
+    setSelectedDraft(null);
+    setNote("");
+    setHarvestWet("");
+    setHarvestDry("");
+    setHarvestUnit("g");
+    setDetailValues({});
+    setPhotoFile(null);
+    setErrorReason(null);
+    setErrorForActivity(null);
+    setStructuredWaterError(null);
+    setSaved([]);
+  }, [currentTargetKey]);
 
   const canPersistManualSensor = false; // Deferred to ManualSensorReadingCard.
 
@@ -135,7 +221,25 @@ export default function QuickLogAllActivitiesSection({
   );
   const harvestWeightsInvalid =
     !harvestWetValidation.ok || !harvestDryValidation.ok;
-
+  // Blocking validation for number detail fields (e.g. manual env readings):
+  // an out-of-band value must stop the save with an inline error — never be
+  // silently dropped while the grower sees a success receipt.
+  const detailNumberValidations = useMemo(() => {
+    if (!selected) return [] as { key: string; ok: boolean; error: string | null }[];
+    return getQuickLogActivityDetailFields(selected.id)
+      .filter((f) => f.kind === "number")
+      .map((f) => ({ key: f.key, ...validateQuickLogDetailNumberInput(f, detailValues[f.key]) }));
+  }, [selected, detailValues]);
+  const detailNumbersInvalid = detailNumberValidations.some((v) => !v.ok);
+  const firstDetailNumberError =
+    detailNumberValidations.find((v) => !v.ok)?.error ?? null;
+  const selectedAvailability = useMemo(
+    () =>
+      selected
+        ? evaluateQuickLogActivityAvailability(selected.id, plantStage)
+        : null,
+    [plantStage, selected],
+  );
 
   const requiresNote = useMemo(() => {
     if (!selected) return false;
@@ -149,28 +253,84 @@ export default function QuickLogAllActivitiesSection({
     );
   }, [selected]);
 
-  const handleSelect = useCallback((a: QuickLogActivityDefinition) => {
-    setErrorReason(null);
-    setErrorForActivity(null);
-    setSelected(a);
-    setNote("");
-    setHarvestWet("");
-    setHarvestDry("");
-    setHarvestUnit("g");
-  }, []);
+  const mutationBlocked = saving || saveBlocked;
+  const isMutationBlocked = useCallback(
+    () =>
+      mutationBlocked || (onSaveStart ? isSaveBlocked?.() === true : localSaveInFlightRef.current),
+    [isSaveBlocked, mutationBlocked, onSaveStart],
+  );
+
+  const handleSelect = useCallback(
+    (a: QuickLogActivityDefinition) => {
+      if (isMutationBlocked()) return;
+      setErrorReason(null);
+      setErrorForActivity(null);
+      setStructuredWaterError(null);
+      if (a.id === "watering") {
+        if (externalPersistenceBlockReason) {
+          setStructuredWaterError(externalPersistenceBlockReason);
+          return;
+        }
+        if (!growId) {
+          setStructuredWaterError("Missing grow context. Nothing opened.");
+          return;
+        }
+        const intent = buildQuickLogV2OpenIntent({ plantId, tentId, action: "water" });
+        if (!intent || typeof window === "undefined") {
+          setStructuredWaterError("Choose a plant or tent before logging Water.");
+          return;
+        }
+        onBeforeStructuredWaterOpen?.();
+        window.dispatchEvent(new CustomEvent(QUICK_LOG_V2_OPEN_EVENT, { detail: intent }));
+        return;
+      }
+      setSelectedDraft(bindQuickLogActivityDraft(a.id, currentTarget));
+      setNote("");
+      setHarvestWet("");
+      setHarvestDry("");
+      setHarvestUnit("g");
+      setDetailValues({});
+      setPhotoFile(null);
+    },
+    [
+      currentTarget,
+      externalPersistenceBlockReason,
+      growId,
+      isMutationBlocked,
+      onBeforeStructuredWaterOpen,
+      plantId,
+      tentId,
+    ],
+  );
 
   const handleSave = useCallback(async () => {
-    if (!selected) return;
-    if (!growId) {
-      setErrorReason("Missing grow context. Nothing saved.");
+    if (isMutationBlocked()) return;
+    if (externalPersistenceBlockReason) {
+      setErrorReason(externalPersistenceBlockReason);
+      setErrorForActivity(selected?.id ?? null);
+      return;
+    }
+    if (!selected || !selectedDraft) return;
+    // Re-evaluate against CURRENT context immediately before persistence.
+    // This is independent of the picker/reset effect so a stale selection
+    // cannot write after the grow, tent, plant, or stage changes.
+    const persistenceGate = evaluateQuickLogPrePersistenceGate({
+      activityId: selected.id,
+      currentPlantStage: plantStage,
+      selectedTarget: selectedDraft.target,
+      currentTarget,
+    });
+    if (!persistenceGate.allowed) {
+      setErrorReason(
+        persistenceGate.blockedReason ??
+          selected.disabledReason ??
+          "This activity is not available.",
+      );
       setErrorForActivity(selected.id);
       return;
     }
-    // Disabled activities must never reach RPC.
-    if (!selected.enabled) {
-      setErrorReason(
-        selected.disabledReason ?? QUICK_LOG_HARVEST_DISABLED_REASON,
-      );
+    if (!growId) {
+      setErrorReason("Missing grow context. Nothing saved.");
       setErrorForActivity(selected.id);
       return;
     }
@@ -195,6 +355,13 @@ export default function QuickLogAllActivitiesSection({
           harvestDryValidation.error ??
           "Fix harvest weight fields before saving.",
       );
+      setErrorForActivity(selected.id);
+      return;
+    }
+    // Out-of-band number detail (e.g. manual temp/RH) blocks the save so the
+    // grower's entry is corrected, not discarded behind a success receipt.
+    if (detailNumbersInvalid) {
+      setErrorReason(firstDetailNumberError ?? "Fix the highlighted field before saving.");
       setErrorForActivity(selected.id);
       return;
     }
@@ -223,61 +390,182 @@ export default function QuickLogAllActivitiesSection({
       }
     }
 
-    const idempotencyKey = newIdempotencyKey(selected.id);
-    const result = await save({
-      activityId: selected.id,
+    // Generic structured activity detail (e.g. training technique). Sanitized
+    // to the closed spec — out-of-set, blank, reserved-identity, and over-long
+    // values are dropped, never persisted.
+    const activityDetails = sanitizeQuickLogActivityDetails(selected.id, detailValues);
+    if (activityDetails) {
+      Object.assign(extraDetails, activityDetails);
+    }
+
+    const capturedTarget = Object.freeze({
       growId,
       tentId: tentId ?? null,
       plantId: plantId ?? null,
-      note: note.trim().length > 0 ? note.trim() : null,
-      idempotencyKey,
-      extraDetails:
-        Object.keys(extraDetails).length > 0 ? extraDetails : null,
     });
+    const acquired = onSaveStart ? onSaveStart(capturedTarget) : !localSaveInFlightRef.current;
+    if (!acquired) return;
+    if (!onSaveStart) localSaveInFlightRef.current = true;
 
-    if (!result.ok) {
-      setErrorReason(
-        result.reason === "save_failed"
-          ? "Save failed. Nothing was saved."
-          : result.disabledReason ?? "Save was refused.",
-      );
-      setErrorForActivity(selected.id);
-      return;
-    }
+    try {
+      const idempotencyKey = newIdempotencyKey(selected.id);
+      if (selected.id === "photo") {
+        // Photo goes diary-only through the proven QuickLog photo-attachment
+        // path (upload to the private diary-photos bucket, then one
+        // diary_entries row whose photo_url COLUMN carries the bare storage
+        // path — the only shape Timeline signs and renders). The event-route
+        // RPC is a dead end here: it stores p_photo_url only inside details,
+        // which no photo surface reads, so it would confirm an invisible photo.
+        if (!user) {
+          setErrorReason("Sign in to attach photos.");
+          setErrorForActivity(selected.id);
+          return;
+        }
+        if (!photoFile) {
+          setErrorReason("Choose a photo before saving.");
+          setErrorForActivity(selected.id);
+          return;
+        }
+        if (photoDiaryInFlightRef.current) return;
+        photoDiaryInFlightRef.current = true;
+        // Tracks a successful upload so a LATER rejection (e.g. the diary
+        // insert dying mid-network) can clean up the orphaned object.
+        let uploadedPath: string | null = null;
+        try {
+          const ext = (photoFile.name.split(".").pop() || "jpg").toLowerCase();
+          // RLS: the first path segment MUST be the uploader's auth.uid().
+          const path = `${user.id}/${capturedTarget.growId}/${Date.now()}.${ext}`;
+          const { error: uploadError } = await supabase.storage
+            .from("diary-photos")
+            .upload(path, photoFile, { contentType: photoFile.type, upsert: false });
+          if (uploadError) {
+            setErrorReason(`Photo upload failed: ${uploadError.message}`);
+            setErrorForActivity(selected.id);
+            return;
+          }
+          uploadedPath = path;
+          // Structured photo detail (subject/caption) rides the same diary row.
+          const photoExtraDetails: Record<string, string> = {};
+          for (const [k, v] of Object.entries(extraDetails)) {
+            if (typeof v === "string") photoExtraDetails[k] = v;
+          }
+          const entryResult = await createQuickLogPhotoDiaryEntry({
+            growId: capturedTarget.growId,
+            tentId: capturedTarget.tentId,
+            plantId: capturedTarget.plantId,
+            photoPath: path,
+            noteRaw: note,
+            action: "photo",
+            // Displayable type: the standalone Photo activity badges as Photo
+            // on Timeline/Recent Activity (allow-listed), unlike the V2-sheet
+            // attachment marker the plant-memory episodes key on.
+            eventType: "photo",
+            extraDetails:
+              Object.keys(photoExtraDetails).length > 0 ? photoExtraDetails : null,
+          });
+          if (!entryResult.ok) {
+            // (strictNullChecks is off in this app config, so cast the failure
+            // branch explicitly rather than relying on discriminant narrowing.)
+            const failure = entryResult as { ok: false; message: string };
+            // Best-effort orphan cleanup; the entry is the source of truth.
+            try {
+              await supabase.storage.from("diary-photos").remove([path]);
+            } catch {
+              // Swallow — an orphaned object is harmless next to a false receipt.
+            }
+            setErrorReason(failure.message);
+            setErrorForActivity(selected.id);
+            return;
+          }
+          // Replicate the orchestration save() provides on the RPC path:
+          // timeline refresh + funnel telemetry, only after confirmed success.
+          dispatchQuickLogV2EntryCreated({
+            createdAt: new Date().toISOString(),
+            growEventId: null,
+            source: "quick_log_v2",
+          });
+          trackQuickLogSuccess("photo", { reused: false });
+        } catch {
+          // A REJECTED promise (network interruption) must never escape the
+          // click handler as a silent nothing: surface the failure and clean
+          // up an already-uploaded object so no orphan is left behind.
+          if (uploadedPath) {
+            try {
+              await supabase.storage.from("diary-photos").remove([uploadedPath]);
+            } catch {
+              // Best-effort only.
+            }
+          }
+          setErrorReason("Photo save failed. Nothing was saved.");
+          setErrorForActivity(selected.id);
+          return;
+        } finally {
+          photoDiaryInFlightRef.current = false;
+        }
+      } else {
+        const result = await save({
+          activityId: selected.id,
+          growId: capturedTarget.growId,
+          tentId: capturedTarget.tentId,
+          plantId: capturedTarget.plantId,
+          note: note.trim().length > 0 ? note.trim() : null,
+          idempotencyKey,
+          extraDetails: Object.keys(extraDetails).length > 0 ? extraDetails : null,
+        });
 
-    // Success path — build saved-item using the SHARED helper so no
-    // local label array can drift out of sync.
-    const source = toSavedSource(selected.id);
-    if (source) {
-      const items = buildDailyCheckSavedItems({
-        source,
-        submittedAt: Date.now(),
-        harvestDetails:
-          source === "harvest" ? harvestDetailsForBreakdown : null,
-      });
-      if (items.length > 0) {
-        setSaved((prev) => [
-          ...prev,
-          {
-            id: `${idempotencyKey}-saved`,
-            activityId: selected.id,
-            item: items[0],
-          },
-        ]);
+        if (!result.ok) {
+          setErrorReason(
+            result.reason === "save_failed"
+              ? "Save failed. Nothing was saved."
+              : (result.disabledReason ?? "Save was refused."),
+          );
+          setErrorForActivity(selected.id);
+          return;
+        }
       }
+
+      // Success path — build saved-item using the SHARED helper so no
+      // local label array can drift out of sync.
+      const source = toSavedSource(selected.id);
+      if (source) {
+        const items = buildDailyCheckSavedItems({
+          source,
+          submittedAt: Date.now(),
+          harvestDetails: source === "harvest" ? harvestDetailsForBreakdown : null,
+        });
+        if (items.length > 0) {
+          setSaved((prev) => [
+            ...prev,
+            {
+              id: `${idempotencyKey}-saved`,
+              activityId: selected.id,
+              item: items[0],
+              target: capturedTarget,
+            },
+          ]);
+        }
+      }
+      setNote("");
+      setHarvestWet("");
+      setHarvestDry("");
+      setHarvestUnit("g");
+      setDetailValues({});
+      setPhotoFile(null);
+      setSelectedDraft(null);
+      setErrorReason(null);
+      setErrorForActivity(null);
+    } finally {
+      if (onSaveStart) onSaveEnd?.();
+      else localSaveInFlightRef.current = false;
     }
-    setNote("");
-    setHarvestWet("");
-    setHarvestDry("");
-    setHarvestUnit("g");
-    setSelected(null);
-    setErrorReason(null);
-    setErrorForActivity(null);
   }, [
     selected,
+    selectedDraft,
+    currentTarget,
     growId,
     tentId,
     plantId,
+    plantStage,
     note,
     requiresNote,
     save,
@@ -288,6 +576,15 @@ export default function QuickLogAllActivitiesSection({
     harvestWeightsInvalid,
     harvestWetValidation,
     harvestDryValidation,
+    detailValues,
+    detailNumbersInvalid,
+    firstDetailNumberError,
+    user,
+    photoFile,
+    onSaveStart,
+    onSaveEnd,
+    isMutationBlocked,
+    externalPersistenceBlockReason,
   ]);
 
   const noContext = !growId;
@@ -318,11 +615,34 @@ export default function QuickLogAllActivitiesSection({
         </p>
       )}
 
+      {externalPersistenceBlockReason && (
+        <p
+          role="status"
+          aria-live="polite"
+          className="rounded-lg border border-border/60 bg-secondary/30 p-2.5 text-xs text-muted-foreground"
+          data-testid={`${testIdPrefix}-persistence-block`}
+        >
+          {externalPersistenceBlockReason}
+        </p>
+      )}
+
       <QuickLogActivityPicker
         onSelect={handleSelect}
+        disabled={mutationBlocked}
         selectedId={selected?.id ?? null}
+        plantStage={plantStage}
         testIdPrefix={`${testIdPrefix}-picker`}
       />
+
+      {structuredWaterError && (
+        <p
+          role="alert"
+          className="text-xs text-destructive"
+          data-testid={`${testIdPrefix}-structured-water-error`}
+        >
+          {structuredWaterError}
+        </p>
+      )}
 
       {selected && selected.enabled && (
         <div
@@ -332,24 +652,159 @@ export default function QuickLogAllActivitiesSection({
         >
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <p className="text-xs font-medium">{selected.label}</p>
-            <p className="text-[11px] text-muted-foreground">
-              {selected.safetyNote}
-            </p>
+            <p className="text-[11px] text-muted-foreground">{selected.safetyNote}</p>
           </div>
+
+          {selected.id === "harvest" && selectedAvailability?.disabled && (
+            <p
+              role="note"
+              className="text-xs text-muted-foreground"
+              data-testid={`${testIdPrefix}-harvest-stage-blocked`}
+            >
+              {selectedAvailability.disabledReason ??
+                QUICK_LOG_HARVEST_STAGE_DISABLED_REASON}
+            </p>
+          )}
+
+          {getQuickLogActivityDetailFields(selected.id).length > 0 && (
+            <div
+              className="grid grid-cols-1 sm:grid-cols-2 gap-2"
+              data-testid={`${testIdPrefix}-detail-fields`}
+            >
+              {getQuickLogActivityDetailFields(selected.id).map((field) => (
+                <div key={field.key} className="space-y-1">
+                  <Label
+                    htmlFor={`${testIdPrefix}-detail-${field.key}`}
+                    className="text-[11px] text-muted-foreground"
+                  >
+                    {field.label}
+                    {field.unit ? ` (${field.unit})` : ""} (optional)
+                  </Label>
+                  {field.kind === "select" ? (
+                    <select
+                      id={`${testIdPrefix}-detail-${field.key}`}
+                      data-testid={`${testIdPrefix}-detail-${field.key}`}
+                      value={detailValues[field.key] ?? ""}
+                      onChange={(e) => {
+                        if (isMutationBlocked()) return;
+                        const v = e.target.value;
+                        setDetailValues((prev) => ({ ...prev, [field.key]: v }));
+                      }}
+                      disabled={mutationBlocked}
+                      className="w-full text-sm h-9 rounded-md border border-input bg-background px-2"
+                    >
+                      <option value="">Not recorded</option>
+                      {(field.options ?? []).map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <>
+                      <Input
+                        id={`${testIdPrefix}-detail-${field.key}`}
+                        data-testid={`${testIdPrefix}-detail-${field.key}`}
+                        value={detailValues[field.key] ?? ""}
+                        onChange={(e) => {
+                          if (isMutationBlocked()) return;
+                          const v = e.target.value;
+                          setDetailValues((prev) => ({ ...prev, [field.key]: v }));
+                        }}
+                        disabled={mutationBlocked}
+                        inputMode={field.kind === "number" ? "decimal" : undefined}
+                        // Text detail is capped at the persistence limit IN the
+                        // input, so nothing a grower types is ever silently
+                        // truncated behind a success receipt.
+                        maxLength={field.kind === "text" ? QUICK_LOG_DETAIL_TEXT_MAX : undefined}
+                        aria-invalid={
+                          field.kind === "number"
+                            ? !(detailNumberValidations.find((v) => v.key === field.key)?.ok ?? true)
+                            : undefined
+                        }
+                        placeholder={field.placeholder}
+                        className="text-sm"
+                      />
+                      {field.kind === "number" &&
+                        (() => {
+                          const v = detailNumberValidations.find((x) => x.key === field.key);
+                          return v && !v.ok ? (
+                            <p
+                              role="alert"
+                              className="text-[11px] text-destructive"
+                              data-testid={`${testIdPrefix}-detail-${field.key}-error`}
+                            >
+                              {v.error}
+                            </p>
+                          ) : null;
+                        })()}
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {selected.id === "photo" && (
+            <div className="space-y-1" data-testid={`${testIdPrefix}-photo-picker`}>
+              <Label
+                htmlFor={`${testIdPrefix}-photo-file`}
+                className="text-[11px] text-muted-foreground"
+              >
+                Photo (required)
+              </Label>
+              <Input
+                id={`${testIdPrefix}-photo-file`}
+                data-testid={`${testIdPrefix}-photo-file`}
+                type="file"
+                accept="image/*"
+                disabled={mutationBlocked}
+                onChange={(e) => {
+                  if (isMutationBlocked()) return;
+                  const file = e.target.files?.[0] ?? null;
+                  if (!file) {
+                    setPhotoFile(null);
+                    return;
+                  }
+                  const check = validatePlantProfilePhotoFile(file);
+                  if (!check.ok) {
+                    const failure = check as { ok: false; message: string };
+                    setPhotoFile(null);
+                    setErrorReason(failure.message);
+                    setErrorForActivity("photo");
+                    return;
+                  }
+                  setErrorReason(null);
+                  setErrorForActivity(null);
+                  setPhotoFile(file);
+                }}
+                className="text-sm"
+              />
+              {photoFile ? (
+                <p
+                  className="text-[11px] text-muted-foreground"
+                  data-testid={`${testIdPrefix}-photo-selected`}
+                >
+                  Selected: {photoFile.name}
+                </p>
+              ) : (
+                <p className="text-[11px] text-muted-foreground">
+                  A photo entry needs an actual image — Save stays disabled until one is chosen.
+                </p>
+              )}
+            </div>
+          )}
 
           {selected.id === "manual_sensor_snapshot" ? (
             <p
               className="text-xs text-muted-foreground"
               data-testid={`${testIdPrefix}-manual-sensor-hint`}
             >
-              Use the Manual Sensor Snapshot card on this page to record a
-              reading. Manual snapshots stay labeled manual, not live.
+              Use the Manual Sensor Snapshot card on this page to record a reading. Manual snapshots
+              stay labeled manual, not live.
             </p>
           ) : selected.id === "harvest" ? (
-            <div
-              className="space-y-2"
-              data-testid={`${testIdPrefix}-harvest-fields`}
-            >
+            <div className="space-y-2" data-testid={`${testIdPrefix}-harvest-fields`}>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <div className="space-y-1">
                   <Label
@@ -362,7 +817,11 @@ export default function QuickLogAllActivitiesSection({
                     id={`${testIdPrefix}-harvest-wet`}
                     data-testid={`${testIdPrefix}-harvest-wet`}
                     value={harvestWet}
-                    onChange={(e) => setHarvestWet(e.target.value)}
+                    onChange={(e) => {
+                      if (isMutationBlocked()) return;
+                      setHarvestWet(e.target.value);
+                    }}
+                    disabled={mutationBlocked}
                     inputMode="decimal"
                     placeholder="e.g. 120"
                     min={0}
@@ -390,7 +849,11 @@ export default function QuickLogAllActivitiesSection({
                     id={`${testIdPrefix}-harvest-dry`}
                     data-testid={`${testIdPrefix}-harvest-dry`}
                     value={harvestDry}
-                    onChange={(e) => setHarvestDry(e.target.value)}
+                    onChange={(e) => {
+                      if (isMutationBlocked()) return;
+                      setHarvestDry(e.target.value);
+                    }}
+                    disabled={mutationBlocked}
                     inputMode="decimal"
                     placeholder="e.g. 22"
                     min={0}
@@ -418,9 +881,11 @@ export default function QuickLogAllActivitiesSection({
                     id={`${testIdPrefix}-harvest-unit`}
                     data-testid={`${testIdPrefix}-harvest-unit`}
                     value={harvestUnit}
-                    onChange={(e) =>
-                      setHarvestUnit(e.target.value as QuickLogWeightUnit)
-                    }
+                    onChange={(e) => {
+                      if (isMutationBlocked()) return;
+                      setHarvestUnit(e.target.value as QuickLogWeightUnit);
+                    }}
+                    disabled={mutationBlocked}
                     className="w-full text-sm h-9 rounded-md border border-input bg-background px-2"
                   >
                     {QUICK_LOG_WEIGHT_UNITS.map((u) => (
@@ -442,7 +907,11 @@ export default function QuickLogAllActivitiesSection({
                   id={`${testIdPrefix}-note`}
                   data-testid={`${testIdPrefix}-note`}
                   value={note}
-                  onChange={(e) => setNote(e.target.value)}
+                  onChange={(e) => {
+                    if (isMutationBlocked()) return;
+                    setNote(e.target.value);
+                  }}
+                  disabled={mutationBlocked}
                   placeholder="Removed main cola, lower branches…"
                   className="min-h-[64px] text-sm"
                 />
@@ -450,17 +919,18 @@ export default function QuickLogAllActivitiesSection({
             </div>
           ) : requiresNote ? (
             <div className="space-y-1">
-              <Label
-                htmlFor={`${testIdPrefix}-note`}
-                className="text-[11px] text-muted-foreground"
-              >
+              <Label htmlFor={`${testIdPrefix}-note`} className="text-[11px] text-muted-foreground">
                 Note
               </Label>
               <Textarea
                 id={`${testIdPrefix}-note`}
                 data-testid={`${testIdPrefix}-note`}
                 value={note}
-                onChange={(e) => setNote(e.target.value)}
+                onChange={(e) => {
+                  if (isMutationBlocked()) return;
+                  setNote(e.target.value);
+                }}
+                disabled={mutationBlocked}
                 placeholder="Short observation…"
                 className="min-h-[64px] text-sm"
               />
@@ -477,11 +947,15 @@ export default function QuickLogAllActivitiesSection({
               size="sm"
               onClick={handleSave}
               disabled={
-                saving ||
+                mutationBlocked ||
+                !!externalPersistenceBlockReason ||
                 noContext ||
+                selectedAvailability?.disabled ||
                 selected.id === "manual_sensor_snapshot" ||
                 (requiresNote && note.trim().length === 0) ||
-                (selected.id === "harvest" && harvestWeightsInvalid)
+                (selected.id === "harvest" && harvestWeightsInvalid) ||
+                (selected.id === "photo" && !photoFile) ||
+                detailNumbersInvalid
               }
               data-testid={`${testIdPrefix}-save`}
             >
@@ -492,11 +966,13 @@ export default function QuickLogAllActivitiesSection({
               size="sm"
               variant="ghost"
               onClick={() => {
-                setSelected(null);
+                if (isMutationBlocked()) return;
+                setSelectedDraft(null);
                 setNote("");
                 setErrorReason(null);
                 setErrorForActivity(null);
               }}
+              disabled={mutationBlocked}
               data-testid={`${testIdPrefix}-cancel`}
             >
               Cancel
@@ -521,9 +997,7 @@ export default function QuickLogAllActivitiesSection({
           data-testid={`${testIdPrefix}-saved`}
           aria-live="polite"
         >
-          <p className="text-[11px] uppercase tracking-wide text-primary/80">
-            What was saved
-          </p>
+          <p className="text-[11px] uppercase tracking-wide text-primary/80">What was saved</p>
           <ul className="text-xs space-y-0.5">
             {saved.map((s) => (
               <li
@@ -531,6 +1005,9 @@ export default function QuickLogAllActivitiesSection({
                 data-testid={`${testIdPrefix}-saved-item`}
                 data-saved-activity-id={s.activityId}
                 data-saved-key={s.item.key}
+                data-target-grow-id={s.target.growId}
+                data-target-tent-id={s.target.tentId ?? undefined}
+                data-target-plant-id={s.target.plantId ?? undefined}
               >
                 {s.item.label}
               </li>

@@ -239,6 +239,53 @@ describe("normalizeDiaryEntries", () => {
     expect(JSON.stringify(a)).toBe(JSON.stringify(b));
   });
 
+  it("recovers eventType from details.event_type for quick-log companion rows (no top-level type)", () => {
+    // The quicklog_save_event diary mirror carries its server-validated type
+    // inside details (the table has no event_type column). Without this
+    // fallback a Training save renders a "Note" badge.
+    const [e] = normalizeDiaryEntries({
+      rawEntries: [
+        baseRow({
+          entry_type: undefined,
+          details: { event_type: "training", technique: "topping" },
+        }),
+      ],
+    });
+    expect(e.eventType).toBe("training");
+    expect(e.warnings).not.toContain("event-type:missing");
+    // Consumed as the type — never duplicated into extras.
+    expect(e.details.extras ?? {}).not.toHaveProperty("event_type");
+  });
+
+  it("keeps top-level entry_type authoritative over details.event_type", () => {
+    const [e] = normalizeDiaryEntries({
+      rawEntries: [
+        baseRow({ entry_type: "water", details: { event_type: "training" } }),
+      ],
+    });
+    expect(e.eventType).toBe("water");
+  });
+
+  it("ignores non-allow-listed details.event_type (machine markers stay on the note default)", () => {
+    // action_followup / quicklog_photo_attachment etc. must never surface as
+    // raw type badges.
+    const [e] = normalizeDiaryEntries({
+      rawEntries: [
+        baseRow({
+          entry_type: undefined,
+          details: { event_type: "quicklog_photo_attachment" },
+        }),
+      ],
+    });
+    expect(e.eventType).toBe("note");
+    const [f] = normalizeDiaryEntries({
+      rawEntries: [
+        baseRow({ entry_type: undefined, details: { event_type: "action_followup" } }),
+      ],
+    });
+    expect(f.eventType).toBe("note");
+  });
+
   it("does not leak raw payload values into warning messages", () => {
     const [e] = normalizeDiaryEntries({
       rawEntries: [

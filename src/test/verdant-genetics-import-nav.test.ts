@@ -17,10 +17,11 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { readDesktopGrowerNavigationSource } from "@/test/utils/growerNavigationSource";
 
 const diagnosticsSource = readFileSync(resolve(process.cwd(), "src/pages/Diagnostics.tsx"), "utf8");
 const appSource = readFileSync(resolve(process.cwd(), "src/App.tsx"), "utf8");
-const sidebarSource = readFileSync(resolve(process.cwd(), "src/components/AppSidebar.tsx"), "utf8");
+const sidebarSource = readDesktopGrowerNavigationSource();
 
 describe("operator nav: Genetics XLSX Import (removed)", () => {
   it("Diagnostics does not advertise the removed genetics-import route", () => {

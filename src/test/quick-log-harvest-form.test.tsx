@@ -25,11 +25,15 @@ function mount() {
       growId="g1"
       tentId="t1"
       plantId="p1"
+      plantStage="flower"
     />,
   );
 }
 
 function selectHarvest() {
+  fireEvent.click(
+    screen.getByRole("button", { name: "More activity types" }),
+  );
   fireEvent.click(
     screen.getByTestId("quick-log-all-activities-picker-harvest"),
   );
@@ -110,6 +114,7 @@ describe("Harvest Quick Log form", () => {
     expect(args.p_note).toBe("Removed main cola");
     expect(args.p_details).toEqual({
       harvest: { wetWeight: "120", weightUnit: "g" },
+      event_type: "harvest",
     });
 
     await waitFor(() => expect(events.length).toBe(1));
@@ -156,6 +161,8 @@ describe("Harvest Quick Log form", () => {
     const args = rpcMock.mock.calls[0][1] as Record<string, unknown>;
     expect(args.p_event_type).toBe("harvest");
     expect(args.p_note).toBe("Just a note");
-    expect(args.p_details).toBeNull();
+    // No harvest weights → no harvest envelope; only the diary event_type
+    // stamp remains (badge recovery on the plant-scoped read layer).
+    expect(args.p_details).toEqual({ event_type: "harvest" });
   });
 });

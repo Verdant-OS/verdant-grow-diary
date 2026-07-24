@@ -28,7 +28,9 @@ describe("classifyTimelineSensorSource", () => {
   });
 
   it("never renders missing source as live; uses fallback", () => {
-    expect(classifyTimelineSensorSource({ rawSource: null, fallback: "manual" }).kind).toBe("manual");
+    expect(classifyTimelineSensorSource({ rawSource: null, fallback: "manual" }).kind).toBe(
+      "manual",
+    );
     expect(classifyTimelineSensorSource({ rawSource: "" }).kind).toBe("invalid");
     expect(classifyTimelineSensorSource({ rawSource: "totally-bogus" }).kind).toBe("invalid");
   });
@@ -55,6 +57,35 @@ describe("classifyTimelineSensorSource", () => {
 
   it("treats unrecognized fallback as invalid", () => {
     // @ts-expect-error guard
-    expect(classifyTimelineSensorSource({ rawSource: null, fallback: "bogus" }).kind).toBe("invalid");
+    expect(classifyTimelineSensorSource({ rawSource: null, fallback: "bogus" }).kind).toBe(
+      "invalid",
+    );
+  });
+
+  it("fails an uncorroborated persisted live snapshot closed", () => {
+    const result = classifyTimelineSensorSource({
+      rawSource: "live",
+      fallback: "manual",
+      context: "persisted_snapshot",
+    });
+
+    expect(result.kind).toBe("invalid");
+    expect(result.canAssessStage).toBe(false);
+  });
+
+  it("allows persisted manual context to support a stage assessment", () => {
+    const result = classifyTimelineSensorSource({
+      rawSource: "manual",
+      context: "persisted_snapshot",
+    });
+
+    expect(result.kind).toBe("manual");
+    expect(result.canAssessStage).toBe(true);
+  });
+
+  it("does not apply the manual fallback to an explicit unknown source", () => {
+    expect(classifyTimelineSensorSource({ rawSource: "unknown", fallback: "manual" }).kind).toBe(
+      "invalid",
+    );
   });
 });

@@ -12,6 +12,7 @@ import {
   bandForConfidence,
   isLikelyAutoflower,
   AUTOFLOWER_NEVER_DO,
+  UNKNOWN_TYPE_NEVER_DO,
   NEVER_DO_BASELINE,
   type AiDoctorDraft,
 } from "../lib/aiDoctorSafetyRules";
@@ -260,5 +261,102 @@ describe("static safety: aiDoctorSafetyRules.ts has no I/O", () => {
     expect(src).not.toMatch(/\bfetch\s*\(/);
     expect(src).not.toMatch(/XMLHttpRequest/);
     expect(src).not.toMatch(/action_queue.*insert|insert.*action_queue/i);
+  });
+});
+
+describe("plant-type-aware low-stress baseline (autoflower/photoperiod plan, 2026-07-21)", () => {
+  const typedContext = (plant_type: string | null, name = "Plant 1"): AiDoctorContext =>
+    compileAiDoctorContextFromRows({
+      plant: {
+        id: "p1",
+        tent_id: "t1",
+        grow_id: "g1",
+        stage: "flower",
+        strain: "Northern Lights",
+        name,
+        plant_type,
+      },
+      growEvents: [
+        { occurred_at: iso(2 * 24 * 60 * 60 * 1000), event_type: "watering", source: "manual" },
+      ],
+      sensorReadings: [
+        { metric: "temperature_c", value: 24, captured_at: iso(60 * 60 * 1000), source: "live" },
+      ],
+      now: NOW,
+    });
+
+  it("unknown type gets the unverified-type prohibitions + missing line", () => {
+    const r = applyAiDoctorSafetyRules(baseDraft(), typedContext(null));
+    for (const line of UNKNOWN_TYPE_NEVER_DO) expect(r.what_not_to_do).toContain(line);
+    expect(r.applied_safety_rules).toContain("unknown_type_low_stress_baseline");
+    expect(r.missing_information).toContain(
+      "Plant type (autoflower or photoperiod) is not recorded.",
+    );
+    // Not mislabeled as an autoflower — the wording stays type-neutral.
+    for (const line of AUTOFLOWER_NEVER_DO) expect(r.what_not_to_do).not.toContain(line);
+  });
+
+  it("declared photoperiod (no auto name signal) escapes both low-stress lists", () => {
+    const r = applyAiDoctorSafetyRules(baseDraft(), typedContext("photoperiod"));
+    for (const line of [...AUTOFLOWER_NEVER_DO, ...UNKNOWN_TYPE_NEVER_DO]) {
+      expect(r.what_not_to_do).not.toContain(line);
+    }
+    expect(r.applied_safety_rules).not.toContain("unknown_type_low_stress_baseline");
+    expect(r.applied_safety_rules).not.toContain("autoflower_block_heavy_stress_recovery");
+    expect(r.missing_information).not.toContain(
+      "Plant type (autoflower or photoperiod) is not recorded.",
+    );
+  });
+
+  it("declared autoflower wins even without an auto name", () => {
+    const r = applyAiDoctorSafetyRules(baseDraft(), typedContext("autoflower"));
+    for (const line of AUTOFLOWER_NEVER_DO) expect(r.what_not_to_do).toContain(line);
+    expect(r.applied_safety_rules).toContain("autoflower_block_heavy_stress_recovery");
+  });
+
+  it("declared photoperiod with an auto-name still gets autoflower caution (heuristic safety net)", () => {
+    const r = applyAiDoctorSafetyRules(baseDraft(), typedContext("photoperiod", "Auto Gelato"));
+    for (const line of AUTOFLOWER_NEVER_DO) expect(r.what_not_to_do).toContain(line);
+    expect(r.applied_safety_rules).toContain("autoflower_block_heavy_stress_recovery");
+  });
+});
+
+describe("feed/taper language requires root-zone evidence (2026-07-21)", () => {
+  const feedDraft = (): AiDoctorDraft => ({
+    ...baseDraft(),
+    immediate_action: "Increase the feed EC slightly and observe.",
+    recovery_plan_3_day: "Taper nutrients over three days.",
+  });
+
+  it("with no root-zone history, feed/taper wording is replaced and the gap is surfaced", () => {
+    const ctx = richContext(); // recent_root_zone_observation_count absent → 0
+    const r = applyAiDoctorSafetyRules(feedDraft(), ctx);
+    expect(r.immediate_action).toBe(
+      "Log root-zone observations (dry-back, pot weight, runoff) before any feed or watering change.",
+    );
+    expect(r.recovery_plan_3_day).toMatch(/Log root-zone observations/);
+    expect(r.applied_safety_rules).toContain("feed_language_requires_root_zone_history");
+    expect(r.missing_information).toContain(
+      "No root-zone history (dry-back, runoff, pot weight) recorded — feed guidance withheld.",
+    );
+  });
+
+  it("with root-zone history, feed wording is kept and the history is named in Evidence", () => {
+    const ctx: AiDoctorContext = {
+      ...richContext(),
+      recent_root_zone_observation_count: 2,
+    };
+    const r = applyAiDoctorSafetyRules(feedDraft(), ctx);
+    expect(r.immediate_action).toBe("Increase the feed EC slightly and observe.");
+    expect(r.evidence).toContain(
+      "Root-zone history: 2 recent observation(s) (dry-back / runoff / pot weight).",
+    );
+    expect(r.applied_safety_rules).not.toContain("feed_language_requires_root_zone_history");
+  });
+
+  it("non-feed wording is untouched by the root-zone gate", () => {
+    const r = applyAiDoctorSafetyRules(baseDraft(), richContext());
+    expect(r.immediate_action).toBe("Observe and re-check.");
+    expect(r.follow_up_24h).toBe("follow");
   });
 });

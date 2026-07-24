@@ -122,6 +122,16 @@ describe("runFastPath — orchestration", () => {
     for (const l of NEXT_DRY_RUN_LINES) expect(logs).toContain(l);
   });
 
+  it("points the successful path at the one-tent multi-probe bridge", () => {
+    expect(NEXT_DRY_RUN_COMMAND).toBe(
+      "bun run scripts/ecowitt-live-soil-bridge.ts --dry-run --once",
+    );
+    expect(NEXT_DRY_RUN_LINES).toContain(
+      "Set VERDANT_TENT_ID and ECOWITT_SOIL_CHANNEL_MAP_JSON for the same one tent.",
+    );
+    expect(NEXT_DRY_RUN_COMMAND).not.toContain("dev:ecowitt-mqtt");
+  });
+
   it("--write-launchers writes launchers only under tmp/ecowitt-windows/", async () => {
     const { deps } = makeDeps(async () => ({ ok: true, reason: "ok" }));
     const writeLaunchersFn = vi.fn(() => ({

@@ -27,7 +27,9 @@ describe("AddExistingPlantDialog · categorization + move semantics", () => {
 
   it("shows plants already in the current tent as disabled (not assignable)", () => {
     expect(DIALOG).toContain("Already in this tent");
-    expect(DIALOG).toMatch(/value=\{p\.id\}[\s\S]{0,80}disabled[\s\S]{0,200}add-existing-plant-option-current/);
+    expect(DIALOG).toMatch(
+      /value=\{p\.id\}[\s\S]{0,80}disabled[\s\S]{0,200}add-existing-plant-option-current/,
+    );
   });
 
   it("categorizes client-side from a single same-grow query", () => {
@@ -79,7 +81,9 @@ describe("AddExistingPlantDialog · categorization + move semantics", () => {
   });
 
   it("contains no automation / device-control / pi-ingest transport strings", () => {
-    expect(DIALOG).not.toMatch(/mqtt|home[\s_-]?assistant|relay|actuator|webhook|device_command|service_role/i);
+    expect(DIALOG).not.toMatch(
+      /mqtt|home[\s_-]?assistant|relay|actuator|webhook|device_command|service_role/i,
+    );
   });
 });
 
@@ -105,7 +109,21 @@ function navOrder(text: string, paths: string[]): number[] {
   return paths.map((p) => text.indexOf(`to: "${p}"`));
 }
 
-describe("Navigation order · Tents above Plants (workspace-first)", () => {
+describe("Navigation order · Grows above Tents above Plants (workspace-first)", () => {
+  it("puts My Grows at the top of Cultivation in both navigation surfaces", () => {
+    const [sidebarGrows, sidebarTents] = navOrder(SIDEBAR, ["/grows", "/tents"]);
+    const mobileCultivation = MOBILE_NAV.indexOf('heading: "Cultivation"');
+    const mobileGrows = MOBILE_NAV.indexOf('to: "/grows"');
+    const mobileDaily = MOBILE_NAV.indexOf('heading: "Daily"');
+
+    expect(sidebarGrows).toBeGreaterThan(-1);
+    expect(sidebarGrows).toBeLessThan(sidebarTents);
+    expect(mobileCultivation).toBeGreaterThan(-1);
+    expect(mobileGrows).toBeGreaterThan(-1);
+    expect(mobileGrows).toBeGreaterThan(mobileCultivation);
+    expect(mobileGrows).toBeLessThan(mobileDaily);
+  });
+
   it("AppSidebar lists Tents before Plants", () => {
     const [tents, plants] = navOrder(SIDEBAR, ["/tents", "/plants"]);
     expect(tents).toBeGreaterThan(-1);

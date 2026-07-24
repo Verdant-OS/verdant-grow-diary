@@ -1,0 +1,50 @@
+name: edge-shared-sync
+
+on:
+  pull_request:
+    # Run on every PR — do not path-filter. A PR that only touches
+    # unrelated files can still regress edge-function imports (e.g. a
+    # merge of stale mirror state), so the gate must always run.
+  push:
+    branches: [main]
+
+
+jobs:
+  verify:
+    name: Verify _shared/lib mirror is in sync
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write         # notify-edge-shared-drift.mjs opens/updates a tracking issue
+      pull-requests: write  # notify-edge-shared-drift.mjs posts a PR comment on drift
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+      - name: Fail on any ../../../src/lib import in supabase/functions/*/index.ts
+        run: node scripts/check-no-src-lib-imports.mjs
+      - name: Verify committed edge shared-lib mirror matches src/ (with PR annotations)
+        id: verify-mirror
+        run: node scripts/annotate-edge-shared-drift.mjs
+      - name: Human-readable drift report (expected vs actual sha256)
+        if: always() && steps.verify-mirror.outcome == 'failure'
+        env:
+          DRIFT_REPORT_OUT: edge-shared-drift-report.md
+        run: node scripts/report-edge-shared-drift.mjs
+      - name: Upload drift report artifact
+        if: always() && steps.verify-mirror.outcome == 'failure'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: edge-shared-drift-report
+          path: edge-shared-drift-report.md
+          if-no-files-found: ignore
+      # Immediate GitHub notification so drift is visible before the
+      # next build. Posts a PR comment on pull_request events, otherwise
+      # opens/updates a single tracking issue. Always exits 0.
+      - name: Notify on drift (PR comment or tracking issue)
+        if: always() && steps.verify-mirror.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DRIFT_REPORT_PATH: edge-shared-drift-report.md
+        run: node scripts/notify-edge-shared-drift.mjs

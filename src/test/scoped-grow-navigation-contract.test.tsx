@@ -74,7 +74,9 @@ describe("scoped-grow navigation contract — clear-filter targets", () => {
     expect(TENTS).toMatch(/clearHref=\{tentsPath\(\)\}/);
   });
   it("Timeline/Logs clears via logsPath()/timelinePath() based on route", () => {
-    expect(TIMELINE).toMatch(/clearTo\s*=\s*isLogsRoute\s*\?\s*logsPath\(\)\s*:\s*timelinePath\(\)/);
+    expect(TIMELINE).toMatch(
+      /clearTo\s*=\s*isLogsRoute\s*\?\s*logsPath\(\)\s*:\s*timelinePath\(\)/,
+    );
     expect(TIMELINE).toMatch(/clearHref=\{clearTo\}/);
   });
   it("ActionQueue clears to /actions via actionsPath()", () => {
@@ -130,10 +132,10 @@ describe("scoped-grow navigation contract — create defaults remain grow-aware"
     expect(TIMELINE).toMatch(/setActiveGrowId\(urlGrowId\)/);
   });
   it("Plants passes validGrowId into CreatePlantDialog defaultGrowId", () => {
-    expect(PLANTS).toMatch(/<CreatePlantDialog\s+defaultGrowId=\{validGrowId\}\s*\/>/);
+    expect(PLANTS).toMatch(/<CreatePlantDialog\b[\s\S]*?defaultGrowId=\{validGrowId\}/);
   });
   it("Tents passes validGrowId into CreateTentDialog defaultGrowId", () => {
-    expect(TENTS).toMatch(/<CreateTentDialog\s+defaultGrowId=\{validGrowId\}\s*\/>/);
+    expect(TENTS).toMatch(/<CreateTentDialog\b[\s\S]*?defaultGrowId=\{validGrowId\}/);
   });
 });
 
@@ -148,7 +150,9 @@ describe("scoped-grow navigation contract — safe surface", () => {
   });
   it("no device-control strings introduced", () => {
     for (const src of SAFE) {
-      expect(src).not.toMatch(/mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|webhook|\brelay\b|\bactuator\b/i);
+      expect(src).not.toMatch(
+        /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|webhook|\brelay\b|\bactuator\b/i,
+      );
     }
   });
   it("no service_role introduced", () => {

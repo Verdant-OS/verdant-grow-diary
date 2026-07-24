@@ -168,30 +168,21 @@ describe("AgentIntegrations page", () => {
     }
   });
 
-  it("renders the Verify tool access button + not_checked panel by default", () => {
+  it("renders a static harness_unavailable panel (no button) by default", () => {
+    // The production default harness can never run a probe, so the page
+    // renders a non-interactive unavailable status instead of a Verify
+    // button whose only reachable answer is 'harness unavailable'.
     renderAgentIntegrations();
-    expect(screen.getByTestId("verify-tool-access-button")).toBeTruthy();
+    expect(screen.queryByTestId("verify-tool-access-button")).toBeNull();
+    expect(screen.getByTestId("verify-harness-unavailable-badge")).toBeTruthy();
     const panel = screen.getByTestId("verify-tool-access-result");
-    expect(panel.getAttribute("data-status")).toBe("not_checked");
-    expect(screen.getByTestId("verify-label").textContent).toMatch(/not checked/i);
+    expect(panel.getAttribute("data-status")).toBe("harness_unavailable");
+    expect(screen.getByTestId("verify-label").textContent).toMatch(
+      /harness unavailable/i,
+    );
     expect(screen.getByTestId("verify-tool-checked").textContent).toMatch(
       /list_grows/,
     );
-    expect(screen.getByTestId("verify-next-step").textContent).toMatch(
-      /run verify tool access after connecting an agent/i,
-    );
-  });
-
-  it("shows harness_unavailable after clicking Verify with the default browser harness", async () => {
-    renderAgentIntegrations();
-    fireEvent.click(screen.getByTestId("verify-tool-access-button"));
-    await waitFor(() => {
-      expect(
-        screen
-          .getByTestId("verify-tool-access-result")
-          .getAttribute("data-status"),
-      ).toBe("harness_unavailable");
-    });
     expect(screen.getByTestId("verify-next-step").textContent).toMatch(
       /configured local harness/i,
     );

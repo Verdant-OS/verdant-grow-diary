@@ -40,14 +40,9 @@ import {
   resolveServerBillingEnvironment,
 } from "../_shared/unionEntitlementLookup.ts";
 
+const ALLOWED_SURFACES = new Set<string>(["live_sensor_stream", "live_sensor_dashboard_widget"]);
 
-const ALLOWED_SURFACES = new Set<string>([
-  "live_sensor_stream",
-  "live_sensor_dashboard_widget",
-]);
-
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function json(status: number, body: Record<string, unknown>): Response {
   return new Response(JSON.stringify(body), {
@@ -147,58 +142,71 @@ Deno.serve(async (req) => {
     return json(401, { ok: false, reason: "not_authenticated" });
   }
 
-  // Server-authoritative: NEVER trust client-supplied billing_env.
-  const expectedBillingEnvironment = resolveServerBillingEnvironment();
-  const { entitlement, lookupFailed } = await loadUnionEntitlement(
-    supabase,
-    expectedBillingEnvironment,
-    new Date(),
-  );
+  // Wrap the entitlement lookup + ownership checks so a thrown exception
+  // (network hiccup, RLS surfaced as throw, resolver bug) becomes a structured,
+  // fail-closed 500 response instead of an unhandled exception.
+  try {
+    // Server-authoritative: NEVER trust client-supplied billing_env.
+    const expectedBillingEnvironment = resolveServerBillingEnvironment();
+    const { entitlement, lookupFailed } = await loadUnionEntitlement(
+      supabase,
+      expectedBillingEnvironment,
+      new Date(),
+    );
 
-  if (lookupFailed) {
-    return json(403, {
-      ok: false,
-      reason: "entitlement_lookup_failed",
-      surface,
-    });
-  }
+    if (lookupFailed) {
+      return json(403, {
+        ok: false,
+        reason: "entitlement_lookup_failed",
+        surface,
+      });
+    }
 
-  if (entitlement.capabilities.liveSensors !== true) {
-    return json(403, {
-      ok: false,
-      reason: "upgrade_required",
+    if (entitlement.capabilities.liveSensors !== true) {
+      return json(403, {
+        ok: false,
+        reason: "upgrade_required",
+        surface,
+        display_plan_id: entitlement.displayPlanId,
+        effective_plan_id: entitlement.effectivePlanId,
+        source: entitlement.source,
+      });
+    }
+
+    async function ownsRow(table: string, id: string): Promise<boolean> {
+      const { data, error } = await supabase.from(table).select("id").eq("id", id).maybeSingle();
+      if (error) return false;
+      return !!data;
+    }
+    if (grow_id && !(await ownsRow("grows", grow_id))) {
+      return json(403, { ok: false, reason: "scope_denied", surface });
+    }
+    if (tent_id && !(await ownsRow("tents", tent_id))) {
+      return json(403, { ok: false, reason: "scope_denied", surface });
+    }
+    if (plant_id && !(await ownsRow("plants", plant_id))) {
+      return json(403, { ok: false, reason: "scope_denied", surface });
+    }
+
+    return json(200, {
+      ok: true,
       surface,
       display_plan_id: entitlement.displayPlanId,
       effective_plan_id: entitlement.effectivePlanId,
       source: entitlement.source,
+      capabilities: { liveSensors: true },
+    });
+  } catch (err) {
+    // Log full detail server-side for debugging; never leak stack to client.
+    console.error("live-sensor-entitlement unhandled exception", {
+      message: err instanceof Error ? err.message : String(err),
+      stack: err instanceof Error ? err.stack : undefined,
+      surface,
+    });
+    return json(500, {
+      ok: false,
+      reason: "entitlement_check_failed",
+      surface,
     });
   }
-
-  async function ownsRow(table: string, id: string): Promise<boolean> {
-    const { data, error } = await supabase
-      .from(table)
-      .select("id")
-      .eq("id", id)
-      .maybeSingle();
-    if (error) return false;
-    return !!data;
-  }
-  if (grow_id && !(await ownsRow("grows", grow_id))) {
-    return json(403, { ok: false, reason: "scope_denied", surface });
-  }
-  if (tent_id && !(await ownsRow("tents", tent_id))) {
-    return json(403, { ok: false, reason: "scope_denied", surface });
-  }
-  if (plant_id && !(await ownsRow("plants", plant_id))) {
-    return json(403, { ok: false, reason: "scope_denied", surface });
-  }
-
-  return json(200, {
-    ok: true,
-    surface,
-    display_plan_id: entitlement.displayPlanId,
-    effective_plan_id: entitlement.effectivePlanId,
-    source: entitlement.source,
-    capabilities: { liveSensors: true },
-  });
 });

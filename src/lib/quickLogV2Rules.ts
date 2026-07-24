@@ -3,6 +3,8 @@
  * No I/O, no JSX, deterministic.
  */
 
+import { isInactiveQuickLogPlant } from "./quickLogPlantOptionRules";
+
 export type QuickLogV2TargetType = "tent" | "plant";
 export type QuickLogV2Action = "water" | "note" | "feed";
 
@@ -20,6 +22,8 @@ export interface PlantLike {
   tent_id: string | null;
   grow_id: string | null;
   is_archived?: boolean;
+  archived_at?: string | null;
+  merged_into_plant_id?: string | null;
 }
 export interface TentLike {
   id: string;
@@ -45,8 +49,10 @@ export function buildQuickLogV2TargetOptions(
     });
   }
   for (const p of plants) {
-    if (p?.is_archived) continue;
+    // Canonical Quick Log rule (shared with the v1 picker): archived,
+    // soft-archived (archived_at), and merged plants are never targets.
     if (!p?.id) continue;
+    if (isInactiveQuickLogPlant(p)) continue;
     out.push({
       type: "plant",
       id: p.id,
@@ -97,6 +103,16 @@ export function resolveQuickLogV2Target(
     plantId: null,
     growId: match.growId ?? null,
   };
+}
+
+/**
+ * A missing selection is an incomplete draft; a selection that no longer
+ * exists is stale context and must keep persistence controls fail-closed.
+ */
+export function isStaleQuickLogV2TargetSelection(
+  resolved: ResolvedQuickLogV2Target,
+): boolean {
+  return resolved.ok === false && resolved.reason === "selection_not_found";
 }
 
 export interface QuickLogV2FormState {

@@ -23,7 +23,7 @@ describe("/ai-doctor redirect alias", () => {
   });
 
   it("App.tsx still mounts canonical /doctor route", () => {
-    expect(APP_TSX).toMatch(/path="\/doctor"\s+element=\{<Coach\s*\/>\}/);
+    expect(APP_TSX).toMatch(/path="\/doctor"\s+element=\{<AiDoctorStart\s*\/>\}/);
   });
 
   it("appRouteManifest records /ai-doctor as redirect", () => {

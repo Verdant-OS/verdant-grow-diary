@@ -9,8 +9,8 @@
  *    env secrets are referenced.
  *  - Demo / manual / live / stale / invalid data is never described as
  *    healthy or auto-actionable.
- *  - Operator Mode `?operator=1` is described as a URL surface gate,
- *    NOT a role or capability gate.
+ *  - Operator Mode `?operator=1` requests the diagnostic surface, but a
+ *    server-verified operator role is required before it renders.
  *
  * Route sequence matches the real app navigation (sidebar) — there is
  * no standalone "Grow" page in the user-facing nav; the operator starts
@@ -60,7 +60,7 @@ const SAFETY_SUMMARY: readonly string[] = Object.freeze([
   "Read-only walkthrough.",
   "Verdant suggests; growers approve.",
   "No device control or automation is performed.",
-  "Operator Mode uses ?operator=1 as a URL surface gate; data access is still enforced by RLS.",
+  "Operator Mode requires a server-verified operator role; ?operator=1 only requests the diagnostic surface.",
   "Demo, manual, live, stale, and invalid data are clearly labeled. Missing or blocked proof is never treated as positive.",
 ]);
 
@@ -146,7 +146,7 @@ const STEPS: readonly DemoProofWalkthroughStep[] = Object.freeze([
       "Operator panel shows EcoWitt row-level proof status and ingest-audit counts. Blocked or error states show calm copy and never imply healthy.",
     href: "/sensors?operator=1",
     safetyNote:
-      "Operator Mode uses ?operator=1 as a URL surface gate; RLS still enforces access. Narrow column allowlist; no raw payloads, owning auth ids, or bridge tokens rendered.",
+      "A server-verified operator role is required in addition to ?operator=1. RLS still enforces data access; no raw payloads, owning auth ids, or bridge tokens are rendered.",
     statusKind: "operator_only",
   },
   {
@@ -221,7 +221,7 @@ const WHAT_THIS_DOES_NOT_PROVE: readonly string[] = Object.freeze([
   "It does not prove ingestion uptime outside the current proof window.",
   "It does not prove AI Doctor diagnoses; AI output remains advisory and must be confirmed by the grower.",
   "It does not authorize any automation or device control — none is performed by Verdant.",
-  "It does not widen RLS or grant operator privileges; ?operator=1 is only a URL surface gate.",
+  "It does not widen RLS or grant operator privileges; ?operator=1 cannot bypass the server-verified operator-role gate.",
 ]);
 
 export function buildDemoProofWalkthroughViewModel(): DemoProofWalkthroughViewModel {

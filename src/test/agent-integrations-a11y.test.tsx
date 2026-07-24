@@ -101,7 +101,9 @@ describe("Connect-an-agent checklist — keyboard navigation", () => {
       "mcp-manifest-link",
       "copy-connection-details",
       "open-manifest-summary-modal",
-      "verify-tool-access-button",
+      // verify-tool-access-button is intentionally absent: with the
+      // production default harness the verify panel is a static
+      // non-interactive status (see AgentIntegrations verifyHarness).
       ...CHECKLIST_TAB_ORDER,
     ];
     let cursor = 0;

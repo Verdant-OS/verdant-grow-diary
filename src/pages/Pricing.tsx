@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { resolvePricingPlanPreselect } from "@/lib/pricingPlanPreselect";
 import { usePageSeo } from "@/hooks/usePageSeo";
@@ -19,12 +19,16 @@ import {
 import { Button } from "@/components/ui/button";
 import BrandLogo from "@/components/BrandLogo";
 import PricingCard from "@/components/pricing/PricingCard";
+import SubscriberInterestForm from "@/components/SubscriberInterestForm";
 import {
   PRICING,
   AI_CREDIT_EXPLAINER,
+  CREDIT_PACKS,
   TRUST_STRIP,
   PRO_MONTHLY_PRICE_USD,
   PRO_ANNUAL_PRICE_USD,
+  CRAFT_MONTHLY_PRICE_USD,
+  CRAFT_ANNUAL_PRICE_USD,
   FOUNDER_LIFETIME_PRICE_USD,
   FOUNDER_LIFETIME_LIMIT,
 } from "@/constants/pricing";
@@ -34,38 +38,114 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { trackPricingEvent } from "@/lib/pricingAnalytics";
+import { trackPricingEvent, type PricingAnalyticsName } from "@/lib/pricingAnalytics";
+import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 import { VERDANT_PRICING_FAQ_ADDITIONS } from "@/constants/verdantSeoCopy";
 import { usePaddleCheckout } from "@/hooks/usePaddleCheckout";
-
+import type { SubscriberInterestPlanId } from "@/lib/subscriberInterestRules";
+import {
+  resolvePaidAcquisitionSource,
+  resolvePaidInterestLeadSource,
+} from "@/lib/paidAcquisitionAttributionRules";
+import { buildAttributedSignupPath } from "@/lib/signupAcquisitionRules";
+import { buildCheckoutTrustCopy } from "@/lib/checkoutTrustCopyRules";
+import { useFounderSlotsRemaining } from "@/hooks/useFounderSlotsRemaining";
 
 type BillingPeriod = "monthly" | "annual";
 
 type Cell = boolean | string;
-type Row = { label: string; free: Cell; pro: Cell; founder: Cell };
+type Row = { label: string; free: Cell; pro: Cell; craft: Cell; founder: Cell };
 
 const COMPARISON_ROWS: Row[] = [
   {
     label: "Best for",
     free: "Starting a grow diary",
     pro: "Active growers who want sync, history & exports",
+    craft: "Craft growers dialing in every run against an SOP",
     founder: "Early supporters who want lifetime Pro access",
   },
-  { label: "Price", free: "$0", pro: "See toggle above", founder: "$129 one-time" },
-  { label: "Plant profiles & grow diary", free: true, pro: true, founder: true },
-  { label: "Photo logs", free: true, pro: true, founder: true },
-  { label: "Manual sensor snapshots", free: true, pro: true, founder: true },
-  { label: "Timeline history", free: "Basic", pro: "Extended", founder: "Extended" },
-  { label: "Cloud sync & automatic backups", free: false, pro: true, founder: true },
-  { label: "Multi-tent support", free: false, pro: true, founder: true },
-  { label: "Exports", free: "Limited", pro: "Advanced", founder: "Advanced" },
-  { label: "Post-Grow Learning Report (Print / Save PDF)", free: false, pro: true, founder: true },
-  { label: "CSV sensor import (source-labeled)", free: true, pro: true, founder: true },
-  { label: "Sensor snapshot history", free: false, pro: true, founder: true },
-  { label: "Better timeline filtering", free: false, pro: true, founder: true },
-  { label: "Priority support", free: false, pro: true, founder: true },
-  { label: "Future Pro features as they stabilize", free: false, pro: true, founder: true },
-  { label: "Founder badge / early-supporter access", free: false, pro: false, founder: true },
+  {
+    label: "Price",
+    free: "$0",
+    pro: "See toggle above",
+    craft: "See toggle above",
+    founder: "$129 one-time",
+  },
+  {
+    label: "AI Doctor credits",
+    free: "3 / grow",
+    pro: "100 / month",
+    craft: "300 / month",
+    founder: "100 / month",
+  },
+  {
+    // Label intentionally drops the "Pro" prefix used by the product name
+    // (PRICING.craft: "Pro Blueprint"): in a table with a Pro column, a row
+    // called "Pro Blueprint" marked "Not included" under Pro reads as a
+    // contradiction. The capability is Craft + Founder only.
+    label: "Blueprint (live SOP scoring)",
+    free: false,
+    pro: false,
+    craft: true,
+    founder: true,
+  },
+  { label: "Plant profiles & grow diary", free: true, pro: true, craft: true, founder: true },
+  { label: "Photo logs", free: true, pro: true, craft: true, founder: true },
+  { label: "Manual sensor snapshots", free: true, pro: true, craft: true, founder: true },
+  {
+    label: "Timeline history",
+    free: "Basic",
+    pro: "Extended",
+    craft: "Extended",
+    founder: "Extended",
+  },
+  {
+    label: "Cultivation calendar (history-aware)",
+    free: true,
+    pro: true,
+    craft: true,
+    founder: true,
+  },
+  {
+    label: "Date-range diary report (Print / Save PDF)",
+    free: false,
+    pro: true,
+    craft: true,
+    founder: true,
+  },
+  { label: "Multi-tent support", free: false, pro: true, craft: true, founder: true },
+  { label: "Exports", free: "Limited", pro: "Advanced", craft: "Advanced", founder: "Advanced" },
+  {
+    label: "Post-Grow Learning Report (Print / Save PDF)",
+    free: false,
+    pro: true,
+    craft: true,
+    founder: true,
+  },
+  {
+    label: "CSV sensor import (source-labeled)",
+    free: true,
+    pro: true,
+    craft: true,
+    founder: true,
+  },
+  { label: "Sensor snapshot history", free: false, pro: true, craft: true, founder: true },
+  { label: "Better timeline filtering", free: false, pro: true, craft: true, founder: true },
+  { label: "Priority support", free: false, pro: true, craft: true, founder: true },
+  {
+    label: "Future Pro features as they stabilize",
+    free: false,
+    pro: true,
+    craft: true,
+    founder: true,
+  },
+  {
+    label: "Founder badge / early-supporter access",
+    free: false,
+    pro: false,
+    craft: false,
+    founder: true,
+  },
 ];
 
 export default function Pricing() {
@@ -74,32 +154,124 @@ export default function Pricing() {
   // Legacy `/billing/:plan` redirects here with this exact contract.
   // NEVER auto-opens Paddle — the grower must click a Pricing CTA.
   const preselect = resolvePricingPlanPreselect(searchParams.get("plan"));
-  const [billing, setBilling] = useState<BillingPeriod>(
-    preselect.billing ?? "annual",
+  const paidInterestLeadSource = resolvePaidInterestLeadSource(searchParams);
+  const freeSignupPath = buildAttributedSignupPath({
+    source: resolvePaidAcquisitionSource(searchParams) ?? "pricing_page",
+  });
+  const [billing, setBilling] = useState<BillingPeriod>(preselect.billing ?? "annual");
+  const [interestPlan, setInterestPlan] = useState<SubscriberInterestPlanId>(
+    preselect.plan ?? (preselect.billing === "monthly" ? "pro_monthly" : "pro_annual"),
   );
-  const { openCheckout, loading: checkoutLoading } = usePaddleCheckout();
+  const lastCheckoutPlanRef = useRef<SubscriberInterestPlanId>(interestPlan);
+  const [recoveryRequested, setRecoveryRequested] = useState(false);
+  const recoveryRef = useRef<HTMLElement>(null);
+  const {
+    openCheckout,
+    loading: checkoutLoading,
+    environment: checkoutEnvironment,
+    unavailableMessage,
+    blockedReason,
+  } = usePaddleCheckout();
+  const checkoutRecoveryReason = blockedReason ?? unavailableMessage;
+  const checkoutTrustCopy = buildCheckoutTrustCopy({
+    environment: checkoutEnvironment,
+    blocked: Boolean(checkoutRecoveryReason),
+  });
+  const founderSlots = useFounderSlotsRemaining();
+  const founderSoldOut = founderSlots.status === "ready" && founderSlots.soldOut;
 
+  function handlePaidIntent(
+    planId: SubscriberInterestPlanId,
+    eventName: PricingAnalyticsName,
+    source: string,
+  ) {
+    lastCheckoutPlanRef.current = planId;
+    setInterestPlan(planId);
+    setRecoveryRequested(true);
+    trackPricingEvent(eventName, { source });
+    if (checkoutRecoveryReason) {
+      trackPricingEvent("pricing_checkout_blocked", {
+        plan: planId,
+        source,
+        reason: blockedReason ? "runtime_failure" : "environment_unavailable",
+      });
+      return;
+    }
+    void openCheckout({ priceId: planId });
+  }
 
+  // One-time AI credit-pack checkout. Packs are not plans, so this bypasses the
+  // plan-intent state and opens checkout for the pack SKU directly. Same
+  // canonical checkout hook — this stays inside Pricing.tsx (checkout ownership).
+  function handleBuyPack(sku: string) {
+    trackPricingEvent("pricing_cta_credit_pack_clicked", { source: "credit_pack", plan: sku });
+    if (checkoutRecoveryReason) {
+      trackPricingEvent("pricing_checkout_blocked", {
+        plan: sku,
+        source: "credit_pack",
+        reason: blockedReason ? "runtime_failure" : "environment_unavailable",
+      });
+      return;
+    }
+    void openCheckout({ priceId: sku });
+  }
   usePageSeo({
     title: "Pricing — Free, Pro & Founder Lifetime | Verdant Grow Diary",
     description:
-      "Free grow diary forever. Pro adds cloud sync, multi-tent support, sensor history and exports. Founder Lifetime is a one-time plan for early supporters.",
+      "Free grow diary forever. Pro adds multi-tent support, sensor history and advanced exports. Founder Lifetime is a one-time plan for early supporters.",
     path: "/pricing",
   });
 
   useEffect(() => {
     trackPricingEvent("pricing_page_view");
+    trackFunnelEvent("paywall_viewed", { surface: "pricing" });
   }, []);
 
   useEffect(() => {
+    if (!blockedReason) return;
+    trackPricingEvent("pricing_checkout_blocked", {
+      plan: lastCheckoutPlanRef.current,
+      reason: "runtime_failure",
+    });
+  }, [blockedReason]);
+
+  useEffect(() => {
+    if (!checkoutRecoveryReason || !recoveryRequested) return;
+    recoveryRef.current?.focus();
+    recoveryRef.current?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+  }, [checkoutRecoveryReason, recoveryRequested]);
+
+  useEffect(() => {
     const faqEntries: Array<[string, string]> = [
-      ["Who owns the grow data I put into Verdant?", "You do. Your grow logs, photos, and sensor snapshots are yours. Verdant does not sell your data and does not share it with advertisers. Pro includes advanced exports so you can take your full grow history with you whenever you want."],
-      ["Is the Free tier really free?", "Yes. Plant profiles, the basic grow diary, photo logs, manual notes, the basic timeline, and manual sensor entries are all included on Free. You can run a real grow on Free without paying."],
-      ["What do I actually get with Pro?", "Cloud sync, automatic backups, multi-tent support, advanced exports, sensor snapshot history, longer grow history, better timeline filtering, priority support, and early access to advanced grow reports."],
-      ["How does the Founder Lifetime Offer work?", `$${FOUNDER_LIFETIME_PRICE_USD} once. You get full Pro access for the life of the product. This is a limited early-supporter offer, limited to the first ${FOUNDER_LIFETIME_LIMIT} buyers.`],
-      ["Do I need specific hardware?", "No. Verdant is hardware-neutral. You can log everything manually, import CSVs, or connect sensors over webhook, MQTT, ESP32, or a Raspberry Pi bridge."],
-      ["Does Verdant control my equipment or grow for me?", "No. Verdant does not control fans, lights, pumps, heaters, or other equipment. AI insights are suggestions only, and every Action Queue item is grower-approved."],
-      ["Can I cancel anytime?", "Yes. Pro Monthly and Pro Annual can be canceled at any time. Your grow history stays on your account with read-only access to your logs."],
+      [
+        "Who owns the grow data I put into Verdant?",
+        "You do. Your grow logs, photos, and sensor snapshots are yours. Verdant does not sell your data and does not share it with advertisers. Pro includes advanced exports so you can take your full grow history with you whenever you want.",
+      ],
+      [
+        "Is the Free tier really free?",
+        "Yes. Plant profiles, the basic grow diary, photo logs, manual notes, the basic timeline, and manual sensor entries are all included on Free. You can run a real grow on Free without paying.",
+      ],
+      [
+        "What do I actually get with Pro?",
+        "Multi-tent support, advanced exports including date-range diary reports, sensor snapshot history, longer grow history, advanced timeline filtering, priority support, and early access to advanced grow reports.",
+      ],
+      [
+        "How does the Founder Lifetime Offer work?",
+        `$${FOUNDER_LIFETIME_PRICE_USD} once. You get full Pro access for the life of the product. This is a limited early-supporter offer, limited to the first ${FOUNDER_LIFETIME_LIMIT} buyers.`,
+      ],
+      [
+        "Do I need specific hardware?",
+        "No. Verdant is hardware-neutral. You can log everything manually, import CSVs, or connect sensors over webhook, MQTT, ESP32, or a Raspberry Pi bridge.",
+      ],
+      [
+        "Does Verdant control my equipment or grow for me?",
+        "No. Verdant does not control fans, lights, pumps, heaters, or other equipment. AI insights are suggestions only, and every Action Queue item is grower-approved.",
+      ],
+      [
+        "Can I cancel anytime?",
+        "Yes. Pro Monthly and Pro Annual can be canceled at any time. Your grow history stays on your account with read-only access to your logs.",
+      ],
+      [checkoutTrustCopy.faqQuestion, checkoutTrustCopy.faqAnswer],
       ...VERDANT_PRICING_FAQ_ADDITIONS.map(
         (entry) => [entry.question, entry.answer] as [string, string],
       ),
@@ -119,11 +291,26 @@ export default function Pricing() {
         {
           "@type": "Product",
           name: "Verdant Pro",
-          description: "Cloud sync, multi-tent grow memory, 100 AI Doctor credits/month, advanced exports, and sensor snapshot history.",
+          description:
+            "Multi-tent grow memory, 100 AI Doctor credits/month, advanced exports, and sensor snapshot history.",
           brand: { "@type": "Brand", name: "Verdant Grow Diary" },
           offers: [
-            { "@type": "Offer", price: String(PRO_MONTHLY_PRICE_USD), priceCurrency: "USD", url: "https://verdantgrowdiary.com/pricing", availability: "https://schema.org/InStock", category: "Monthly subscription" },
-            { "@type": "Offer", price: String(PRO_ANNUAL_PRICE_USD), priceCurrency: "USD", url: "https://verdantgrowdiary.com/pricing", availability: "https://schema.org/InStock", category: "Annual subscription" },
+            {
+              "@type": "Offer",
+              price: String(PRO_MONTHLY_PRICE_USD),
+              priceCurrency: "USD",
+              url: "https://verdantgrowdiary.com/pricing",
+              availability: "https://schema.org/InStock",
+              category: "Monthly subscription",
+            },
+            {
+              "@type": "Offer",
+              price: String(PRO_ANNUAL_PRICE_USD),
+              priceCurrency: "USD",
+              url: "https://verdantgrowdiary.com/pricing",
+              availability: "https://schema.org/InStock",
+              category: "Annual subscription",
+            },
           ],
         },
         {
@@ -154,8 +341,7 @@ export default function Pricing() {
     return () => {
       for (const n of nodes) n.remove();
     };
-  }, []);
-
+  }, [checkoutTrustCopy.faqAnswer, checkoutTrustCopy.faqQuestion]);
 
   const proPrice = billing === "annual" ? `$${PRO_ANNUAL_PRICE_USD}` : `$${PRO_MONTHLY_PRICE_USD}`;
   const proCadence = billing === "annual" ? "/ year" : "/ month";
@@ -163,6 +349,14 @@ export default function Pricing() {
     billing === "annual"
       ? `~${PRICING.pro.annualSavingsPercent}% savings vs. monthly`
       : `Or $${PRO_ANNUAL_PRICE_USD}/year — save ~${PRICING.pro.annualSavingsPercent}%`;
+
+  const craftPrice =
+    billing === "annual" ? `$${CRAFT_ANNUAL_PRICE_USD}` : `$${CRAFT_MONTHLY_PRICE_USD}`;
+  const craftCadence = billing === "annual" ? "/ year" : "/ month";
+  const craftFootnote =
+    billing === "annual"
+      ? `~${PRICING.craft.annualSavingsPercent}% savings vs. monthly`
+      : `Or $${CRAFT_ANNUAL_PRICE_USD}/year — save ~${PRICING.craft.annualSavingsPercent}%`;
 
   return (
     <main
@@ -215,13 +409,12 @@ export default function Pricing() {
           role="switch"
           aria-checked={billing === "annual"}
           aria-label="Toggle annual billing"
-          onClick={() =>
-            setBilling((prev) => {
-              const next = prev === "annual" ? "monthly" : "annual";
-              trackPricingEvent("pricing_billing_toggle", { period: next });
-              return next;
-            })
-          }
+          onClick={() => {
+            const next = billing === "annual" ? "monthly" : "annual";
+            setBilling(next);
+            setInterestPlan(next === "annual" ? "pro_annual" : "pro_monthly");
+            trackPricingEvent("pricing_billing_toggle", { period: next });
+          }}
           className="relative inline-flex h-7 w-12 items-center rounded-full border border-border/60 bg-secondary transition-colors"
         >
           <span
@@ -241,8 +434,25 @@ export default function Pricing() {
         </span>
       </section>
 
+      <section className="px-6 pb-8 max-w-3xl mx-auto" aria-label="Checkout status">
+        <div
+          data-testid="pricing-checkout-trust"
+          data-checkout-state={checkoutTrustCopy.state}
+          className="flex items-start gap-3 rounded-xl border border-border/60 bg-card/35 px-4 py-3"
+          aria-live="polite"
+        >
+          <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+          <div>
+            <p className="text-sm font-medium text-foreground">{checkoutTrustCopy.label}</p>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              {checkoutTrustCopy.summary}
+            </p>
+          </div>
+        </div>
+      </section>
+
       {/* Pricing tier cards */}
-      <section className="px-6 pb-10 max-w-6xl mx-auto grid gap-8 md:gap-6 md:grid-cols-3">
+      <section className="px-6 pb-10 max-w-6xl mx-auto grid gap-8 md:gap-6 md:grid-cols-2 xl:grid-cols-4">
         {/* Free */}
         <PricingCard
           testId="pricing-card-free"
@@ -253,11 +463,11 @@ export default function Pricing() {
           description={PRICING.free.description}
           features={PRICING.free.features}
           cta={
-            <Link to="/auth" className="block">
+            <Link to={freeSignupPath} className="block">
               <Button
                 size="lg"
                 variant="outline"
-                className="w-full"
+                className="w-full h-auto min-h-11 whitespace-normal"
                 onClick={() => trackPricingEvent("pricing_cta_free_clicked")}
               >
                 Start Free
@@ -281,26 +491,78 @@ export default function Pricing() {
           cta={
             <Button
               size="lg"
-              className="w-full"
+              // h-auto + whitespace-normal: the priced label ("Upgrade to
+              // Pro — $99/ year") must wrap instead of forcing the card
+              // wider than a ≤390px viewport (Button defaults to nowrap).
+              className="w-full h-auto min-h-11 whitespace-normal"
               disabled={checkoutLoading}
               data-testid={
-                billing === "annual"
-                  ? "pricing-cta-pro-annual"
-                  : "pricing-cta-pro-monthly"
+                billing === "annual" ? "pricing-cta-pro-annual" : "pricing-cta-pro-monthly"
               }
               onClick={() => {
-                const priceId =
-                  billing === "annual" ? "pro_annual" : "pro_monthly";
-                trackPricingEvent(
+                const priceId = billing === "annual" ? "pro_annual" : "pro_monthly";
+                handlePaidIntent(
+                  priceId,
                   billing === "annual"
                     ? "pricing_cta_pro_annual_clicked"
                     : "pricing_cta_pro_monthly_clicked",
+                  "plan_card",
                 );
-                void openCheckout({ priceId });
               }}
             >
-              Upgrade to Pro — {proPrice}
-              {proCadence}
+              {checkoutRecoveryReason ? (
+                "Join the Pro launch list"
+              ) : (
+                <>
+                  Upgrade to Pro — {proPrice}
+                  {proCadence}
+                </>
+              )}
+            </Button>
+          }
+        />
+
+        {/* Craft */}
+        <PricingCard
+          testId="pricing-card-craft"
+          name={PRICING.craft.name}
+          subtitle={PRICING.craft.subtitle}
+          price={craftPrice}
+          cadence={craftCadence}
+          description={PRICING.craft.description}
+          features={PRICING.craft.features}
+          badge={PRICING.craft.badge}
+          footnote={craftFootnote}
+          cta={
+            <Button
+              size="lg"
+              // Same wrap-safety class set as the other priced CTAs: the
+              // label ("Upgrade to Craft — $249/ year") must wrap rather
+              // than force the card wider than a ≤390px viewport.
+              className="w-full h-auto min-h-11 whitespace-normal"
+              disabled={checkoutLoading}
+              data-testid={
+                billing === "annual" ? "pricing-cta-craft-annual" : "pricing-cta-craft-monthly"
+              }
+              onClick={() => {
+                const priceId = billing === "annual" ? "craft_annual" : "craft_monthly";
+                handlePaidIntent(
+                  priceId,
+                  billing === "annual"
+                    ? "pricing_cta_craft_annual_clicked"
+                    : "pricing_cta_craft_monthly_clicked",
+                  "plan_card",
+                );
+              }}
+            >
+              {checkoutRecoveryReason ? (
+                "Join the Craft launch list"
+              ) : (
+                <>
+                  Upgrade to Craft — {craftPrice}
+                  {craftCadence}
+                </>
+              )}
             </Button>
           }
         />
@@ -314,25 +576,64 @@ export default function Pricing() {
           cadence={` ${PRICING.founder.cadence}`}
           description={PRICING.founder.description}
           features={PRICING.founder.features}
-          badge={PRICING.founder.badge}
-          footnote={`Founder Lifetime is limited; availability may close manually when the first ${PRICING.founder.limit} are claimed.`}
+          badge={
+            founderSlots.status === "ready" && founderSlots.claimed !== null
+              ? `${founderSlots.claimed} of ${founderSlots.total} claimed`
+              : PRICING.founder.badge
+          }
+          footnote={
+            founderSoldOut
+              ? "Founder Lifetime is currently sold out. Additional slots may open if a purchase is refunded."
+              : `Founder Lifetime is limited; availability may close manually when the first ${PRICING.founder.limit} are claimed.`
+          }
           cta={
             <Button
               size="lg"
-              className="w-full"
-              disabled={checkoutLoading}
+              className="w-full h-auto min-h-11 whitespace-normal"
+              disabled={checkoutLoading || founderSoldOut}
               data-testid="pricing-cta-founder-lifetime"
+              data-founder-remaining={founderSlots.remaining ?? ""}
               onClick={() => {
-                trackPricingEvent("pricing_cta_founder_lifetime_clicked");
-                void openCheckout({ priceId: "founder_lifetime" });
+                handlePaidIntent(
+                  "founder_lifetime",
+                  "pricing_cta_founder_lifetime_clicked",
+                  "plan_card",
+                );
               }}
             >
-              Claim Founder Lifetime — ${PRICING.founder.price}
+              {founderSoldOut
+                ? "Founder Lifetime sold out"
+                : checkoutRecoveryReason
+                  ? "Join the Founder launch list"
+                  : `Claim Founder Lifetime — $${PRICING.founder.price}`}
             </Button>
           }
         />
-
       </section>
+
+      {checkoutRecoveryReason && (
+        <section
+          ref={recoveryRef}
+          id="subscriber-interest"
+          tabIndex={-1}
+          aria-label="Paid plan launch list"
+          data-testid="pricing-checkout-recovery"
+          className="px-6 pb-12 max-w-3xl mx-auto"
+        >
+          <div className="rounded-2xl border border-primary/35 bg-card/40 p-6 md:p-8">
+            <p className="text-xs font-semibold uppercase tracking-widest text-primary">
+              Paid plan update
+            </p>
+            <h2 className="mt-2 font-display text-2xl font-semibold">
+              Checkout isn't ready here yet. Get one launch email.
+            </h2>
+            <p className="mt-3 text-sm text-muted-foreground">{checkoutRecoveryReason}</p>
+            <div className="mt-5">
+              <SubscriberInterestForm planId={interestPlan} leadSource={paidInterestLeadSource} />
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* AI Credit explainer */}
       <section className="px-6 pb-12 max-w-4xl mx-auto">
@@ -350,6 +651,46 @@ export default function Pricing() {
             ))}
           </ul>
           <p className="mt-4 text-xs text-muted-foreground italic">{AI_CREDIT_EXPLAINER.note}</p>
+        </div>
+      </section>
+
+      {/* Top up AI Doctor credits — one-time packs (the canonical checkout
+          surface for the out-of-credits buy-CTA elsewhere in the app). */}
+      <section
+        id="buy-credits"
+        data-testid="pricing-credit-packs"
+        className="px-6 pb-12 max-w-4xl mx-auto scroll-mt-24"
+      >
+        <h2 className="font-display text-2xl md:text-3xl font-semibold text-center">
+          Top up AI Doctor credits
+        </h2>
+        <p className="mt-3 text-sm text-muted-foreground text-center max-w-2xl mx-auto">
+          Out of monthly credits? Buy a one-time pack. Packs never expire and are spent only after
+          your included monthly allowance.
+        </p>
+        <div className="mt-8 grid gap-6 sm:grid-cols-2">
+          {CREDIT_PACKS.map((pack) => (
+            <div
+              key={pack.sku}
+              data-testid={`pricing-credit-pack-${pack.sku}`}
+              className="rounded-2xl border border-border/60 bg-card/40 backdrop-blur p-6 flex flex-col items-start min-w-0"
+            >
+              <p className="text-3xl md:text-4xl font-display font-bold">{pack.credits}</p>
+              <p className="text-sm text-muted-foreground">AI Doctor credits</p>
+              <p className="mt-3 text-2xl font-display font-semibold">${pack.priceUsd}</p>
+              <Button
+                size="lg"
+                className="mt-5 w-full h-auto min-h-11 whitespace-normal"
+                disabled={checkoutLoading}
+                data-testid={`pricing-cta-${pack.sku}`}
+                onClick={() => handleBuyPack(pack.sku)}
+              >
+                {checkoutRecoveryReason
+                  ? "Checkout unavailable"
+                  : `Buy ${pack.credits} credits — $${pack.priceUsd}`}
+              </Button>
+            </div>
+          ))}
         </div>
       </section>
 
@@ -422,42 +763,60 @@ export default function Pricing() {
               countdown gimmicks — when the first {FOUNDER_LIFETIME_LIMIT} are claimed, the offer
               ends.
             </p>
+            <Link
+              to="/founder"
+              className="mt-3 inline-flex text-sm font-medium text-primary underline underline-offset-4"
+              onClick={() =>
+                trackPricingEvent("pricing_founder_details_clicked", {
+                  source: "highlight_band",
+                })
+              }
+            >
+              See exactly what Founder includes
+            </Link>
           </div>
           <Button
             size="lg"
             className="shrink-0"
-            disabled={checkoutLoading}
+            disabled={checkoutLoading || founderSoldOut}
+            data-testid="pricing-cta-founder-highlight"
             onClick={() => {
-              trackPricingEvent("pricing_cta_founder_lifetime_clicked", {
-                source: "highlight_band",
-              });
-              void openCheckout({ priceId: "founder_lifetime" });
+              handlePaidIntent(
+                "founder_lifetime",
+                "pricing_cta_founder_lifetime_clicked",
+                "highlight_band",
+              );
             }}
           >
-            Claim Founder Lifetime
+            {founderSoldOut
+              ? "Founder Lifetime sold out"
+              : checkoutRecoveryReason
+                ? "Join the Founder launch list"
+                : "Claim Founder Lifetime"}
           </Button>
-
         </div>
       </section>
 
       {/* Comparison table */}
       <section className="px-6 py-12 max-w-5xl mx-auto">
         <h2 className="font-display text-2xl md:text-3xl font-semibold text-center">
-          Compare Free, Pro, and Founder Lifetime
+          Compare Free, Pro, Craft, and Founder Lifetime
         </h2>
         <p className="mt-3 text-sm text-muted-foreground text-center max-w-2xl mx-auto">
-          Free is genuinely useful for starting a grow diary. Pro adds cloud sync, deeper history,
-          and multi-tent support. Founder Lifetime is a limited early-supporter offer that includes
-          full Pro access.
+          Free is genuinely useful for starting a grow diary. Pro adds deeper history, advanced
+          exports, and multi-tent support. Craft adds the live Pro Blueprint that scores every
+          reading against your per-stage SOP. Founder Lifetime is a limited early-supporter offer
+          that includes full Pro access and the Pro Blueprint.
         </p>
 
         <div className="mt-8 overflow-x-auto rounded-xl border border-border/60">
-          <table className="w-full min-w-[640px] text-sm" data-testid="pricing-comparison-table">
+          <table className="w-full min-w-[760px] text-sm" data-testid="pricing-comparison-table">
             <thead className="bg-secondary/40 text-muted-foreground">
               <tr>
                 <th className="text-left font-medium px-4 py-3">Feature</th>
                 <th className="text-center font-medium px-4 py-3">Free</th>
                 <th className="text-center font-medium px-4 py-3 text-primary">Pro</th>
+                <th className="text-center font-medium px-4 py-3 text-primary">Craft</th>
                 <th className="text-center font-medium px-4 py-3 text-primary">Founder Lifetime</th>
               </tr>
             </thead>
@@ -472,6 +831,9 @@ export default function Pricing() {
                     <CellValue value={row.pro} accent />
                   </td>
                   <td className="px-4 py-3 text-center">
+                    <CellValue value={row.craft} accent />
+                  </td>
+                  <td className="px-4 py-3 text-center">
                     <CellValue value={row.founder} accent />
                   </td>
                 </tr>
@@ -480,7 +842,7 @@ export default function Pricing() {
           </table>
         </div>
         <p className="mt-3 text-xs text-muted-foreground text-center sm:hidden">
-          Swipe to compare all three plans →
+          Swipe to compare all four plans →
         </p>
       </section>
 
@@ -540,9 +902,10 @@ export default function Pricing() {
           <AccordionItem value="pro-what">
             <AccordionTrigger>What do I actually get with Pro?</AccordionTrigger>
             <AccordionContent className="text-muted-foreground">
-              Cloud sync, automatic backups, multi-tent support, advanced exports, sensor snapshot
-              history, longer grow history, better timeline filtering, priority support, and early
-              access to advanced grow reports. Pro features ship over time, only as they stabilize.
+              Multi-tent support, advanced exports including date-range diary reports, sensor
+              snapshot history, longer grow history, advanced timeline filtering, priority support,
+              and early access to advanced grow reports. Pro features ship over time, only as they
+              stabilize.
             </AccordionContent>
           </AccordionItem>
 
@@ -618,11 +981,10 @@ export default function Pricing() {
             </AccordionContent>
           </AccordionItem>
 
-          <AccordionItem value="checkout-sandbox" data-testid="pricing-faq-checkout-sandbox">
-            <AccordionTrigger>Is checkout live?</AccordionTrigger>
+          <AccordionItem value="checkout-status" data-testid="pricing-faq-checkout-status">
+            <AccordionTrigger>{checkoutTrustCopy.faqQuestion}</AccordionTrigger>
             <AccordionContent className="text-muted-foreground">
-              If you reach the billing placeholder, checkout is in sandbox preview and no live
-              charge is made from that page.
+              {checkoutTrustCopy.faqAnswer}
             </AccordionContent>
           </AccordionItem>
 
@@ -633,9 +995,7 @@ export default function Pricing() {
               data-testid={`pricing-faq-grower-${i}`}
             >
               <AccordionTrigger>{entry.question}</AccordionTrigger>
-              <AccordionContent className="text-muted-foreground">
-                {entry.answer}
-              </AccordionContent>
+              <AccordionContent className="text-muted-foreground">{entry.answer}</AccordionContent>
             </AccordionItem>
           ))}
         </Accordion>
@@ -651,7 +1011,7 @@ export default function Pricing() {
           history backed up, synced, and easy to revisit.
         </p>
         <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-          <Link to="/auth">
+          <Link to={freeSignupPath}>
             <Button
               size="lg"
               variant="outline"
@@ -664,15 +1024,11 @@ export default function Pricing() {
             size="lg"
             disabled={checkoutLoading}
             onClick={() => {
-              trackPricingEvent("pricing_cta_pro_monthly_clicked", {
-                source: "footer",
-              });
-              void openCheckout({ priceId: "pro_monthly" });
+              handlePaidIntent("pro_monthly", "pricing_cta_pro_monthly_clicked", "footer");
             }}
           >
-            Upgrade to Pro
+            {checkoutRecoveryReason ? "Join the Pro launch list" : "Upgrade to Pro"}
           </Button>
-
         </div>
       </section>
 
@@ -683,17 +1039,21 @@ export default function Pricing() {
             verdantgrowdiary.com
           </a>
         </p>
-        <p>
-          Software only. We do not sell cannabis, seeds, or cultivation equipment.
-        </p>
+        <p>Software only. We do not sell cannabis, seeds, or cultivation equipment.</p>
         <nav aria-label="Legal" className="flex flex-wrap justify-center gap-x-4 gap-y-1">
-          <Link to="/terms" className="hover:text-foreground">Terms of Service</Link>
-          <Link to="/privacy" className="hover:text-foreground">Privacy Policy</Link>
-          <Link to="/refund" className="hover:text-foreground">Refund Policy</Link>
+          <Link to="/terms" className="hover:text-foreground">
+            Terms of Service
+          </Link>
+          <Link to="/privacy" className="hover:text-foreground">
+            Privacy Policy
+          </Link>
+          <Link to="/refund" className="hover:text-foreground">
+            Refund Policy
+          </Link>
         </nav>
         <p className="text-xs">
-          Operated by Matthew Tyler Cheek. Payments processed by Paddle.com as
-          Merchant of Record. 30-day money-back guarantee.
+          Operated by Matthew Tyler Cheek. Payments processed by Paddle.com as Merchant of Record.
+          30-day money-back guarantee.
         </p>
       </footer>
     </main>

@@ -7,37 +7,53 @@
 // Safety contract (stop-ship if violated):
 //   - Read-only. NEVER triggers alerts, Action Queue, AI, automation, or
 //     device control.
-//   - Authentication MUST be a Verdant bridge token (vbt_...) or a Supabase
-//     Auth JWT. The EcoWitt PASSKEY is ONLY used as a one-way fingerprint
+//   - Authentication MUST be a Verdant bridge token (vbt_...). Ordinary user
+//     JWTs cannot create trusted live telemetry. The EcoWitt PASSKEY is ONLY
+//     used as a one-way fingerprint
 //     to identify which gateway sent the payload; it is NEVER an auth
 //     factor and NEVER trusted to map to a user.
-//   - For bridge tokens, eligible tents are restricted to the bridge's
+//   - Eligible tents are restricted to the bridge's
 //     tent scope (defense in depth — a compromised gateway cannot fan out
 //     to other tents the user owns).
-//   - For JWT callers, eligible tents are all tents the JWT user owns
-//     whose `hardware_config.ecowitt` is configured.
 //   - Caller-supplied `user_id` is ignored; user_id is stamped from auth.
 //   - Vendor credentials (passkey, MAC, application_key, token, …) are
 //     stripped before any `raw_payload` is built. Only the safe
 //     fingerprint and per-channel mapping context are persisted.
-//   - All readings are tagged `source = 'ecowitt'` so Verdant-side rules
-//     can apply EcoWitt-specific freshness/suspicion logic. We do NOT
-//     introduce a new `ecowitt_live` source label.
+//   - Freshness-approved readings persist with canonical `source = 'live'`.
+//     EcoWitt vendor/transport lineage stays explicit in `raw_payload`; we
+//     never introduce an `ecowitt_live` source label.
 //   - Failures that are not authentication failures (missing PASSKEY,
 //     unknown fingerprint, no eligible tent for any channel) return
 //     200 with `{ accepted: false, inserted: 0 }` so the gateway does not
 //     retry-storm.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { authenticateBearer, type AuthResult } from "../_shared/sensorIngestAuth.ts";
+import { authenticateBearer } from "../_shared/sensorIngestAuth.ts";
+import { classifyIngestTimestampFreshness } from "../_shared/sensorIngestFreshness.ts";
 import { computeEcoWittPasskeyFingerprint } from "../_shared/ecowittPasskeyFingerprint.ts";
 import {
   buildEcoWittRoutedRows,
+  buildEcoWittStoredRows,
   parseEcoWittDateUtc,
-  type EcoWittRoutedRow,
+  type EcoWittStoredRow,
   type EcoWittTimestampSource,
 } from "../_shared/ecowittRoutedRowBuilder.ts";
 import type { EcoWittRouterEligibleTent } from "../_shared/ecowittChannelTentRouter.ts";
+
+export interface EcoWittIngestAdminClient {
+  // Supabase's generated query-builder type resolves untyped Edge schemas to
+  // `never`; the handler intentionally exposes only these two runtime methods.
+  // deno-lint-ignore no-explicit-any
+  from(table: string): any;
+  rpc(name: string, args: Record<string, unknown>): PromiseLike<unknown>;
+}
+
+export interface EcoWittIngestHandlerDeps {
+  /** Test-only seam. Production resolves the service client from Deno env. */
+  admin?: EcoWittIngestAdminClient;
+  /** One request clock shared by auth and gateway timestamp validation. */
+  now?: () => Date;
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -52,9 +68,6 @@ function json(body: unknown, status: number) {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 }
-
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Fields we will NEVER echo, persist, or log raw. Mirrors the credential
 // list inside `ecowittPayloadAdapter` plus client-supplied id fields.
@@ -74,9 +87,7 @@ const CREDENTIAL_LIKE_KEYS = new Set([
   "tent_id",
 ]);
 
-async function parsePayload(
-  req: Request,
-): Promise<Record<string, unknown> | null> {
+async function parsePayload(req: Request): Promise<Record<string, unknown> | null> {
   if (req.method === "GET") {
     const url = new URL(req.url);
     const out: Record<string, unknown> = {};
@@ -100,8 +111,7 @@ async function parsePayload(
     ) {
       const form = await req.formData();
       const out: Record<string, unknown> = {};
-      for (const [k, v] of form.entries())
-        out[k] = typeof v === "string" ? v : null;
+      for (const [k, v] of form.entries()) out[k] = typeof v === "string" ? v : null;
       return out;
     }
     const text = await req.text();
@@ -122,20 +132,25 @@ async function parsePayload(
   }
 }
 
-/** Extract the raw PASSKEY (case-insensitive) before sanitization. */
-function extractRawPasskey(payload: Record<string, unknown>): string | null {
+function extractPayloadValueCaseInsensitive(
+  payload: Record<string, unknown>,
+  wantedKey: string,
+): unknown {
+  const wanted = wantedKey.toLowerCase();
   for (const [k, v] of Object.entries(payload)) {
-    if (k.toLowerCase() === "passkey" && typeof v === "string" && v.length > 0) {
-      return v;
-    }
+    if (k.toLowerCase() === wanted) return v;
   }
   return null;
 }
 
+/** Extract the raw PASSKEY (case-insensitive) before sanitization. */
+function extractRawPasskey(payload: Record<string, unknown>): string | null {
+  const value = extractPayloadValueCaseInsensitive(payload, "passkey");
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
 /** Strip credential-like keys before passing into the router. */
-function sanitizePayload(
-  payload: Record<string, unknown>,
-): Record<string, unknown> {
+function sanitizePayload(payload: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(payload)) {
     if (CREDENTIAL_LIKE_KEYS.has(k.toLowerCase())) continue;
@@ -149,9 +164,7 @@ interface TentHardwareConfigRow {
   hardware_config: unknown;
 }
 
-function parseEligibleTents(
-  rows: TentHardwareConfigRow[],
-): EcoWittRouterEligibleTent[] {
+function parseEligibleTents(rows: TentHardwareConfigRow[]): EcoWittRouterEligibleTent[] {
   const out: EcoWittRouterEligibleTent[] = [];
   for (const row of rows) {
     const hc = row.hardware_config;
@@ -178,36 +191,38 @@ function parseEligibleTents(
   return out;
 }
 
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS")
-    return new Response("ok", { headers: corsHeaders });
+export async function handleEcoWittIngestRequest(
+  req: Request,
+  deps: EcoWittIngestHandlerDeps = {},
+): Promise<Response> {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST" && req.method !== "GET") {
     return json({ error: "method_not_allowed" }, 405);
   }
 
   const authHeader = req.headers.get("Authorization");
-  if (!authHeader?.startsWith("Bearer "))
-    return json({ error: "unauthorized" }, 401);
+  if (!authHeader?.startsWith("Bearer ")) return json({ error: "unauthorized" }, 401);
   const rawToken = authHeader.replace("Bearer ", "");
 
-  const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-  const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
-  const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    return json({ error: "server_misconfigured" }, 503);
+  let admin = deps.admin;
+  if (!admin) {
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      return json({ error: "server_misconfigured" }, 503);
+    }
+    admin = createClient(
+      SUPABASE_URL,
+      SUPABASE_SERVICE_ROLE_KEY,
+    ) as unknown as EcoWittIngestAdminClient;
   }
-
-  const admin = SUPABASE_SERVICE_ROLE_KEY
-    ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
-    : null;
-  const anonForJwt = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    global: { headers: { Authorization: `Bearer ${rawToken}` } },
-  });
+  const requestNow = deps.now?.() ?? new Date();
 
   const authRes = await authenticateBearer(rawToken, {
-    serviceKeyAvailable: !!admin,
+    serviceKeyAvailable: true,
+    allowJwt: false,
+    now: () => requestNow.getTime(),
     lookupBridgeToken: async (hash) => {
-      if (!admin) return { data: null, error: { message: "no admin" } };
       const r = await admin
         .from("bridge_tokens")
         .select("id, user_id, tent_id, expires_at, revoked_at")
@@ -218,41 +233,25 @@ Deno.serve(async (req) => {
         error: r.error ? { message: r.error.message } : null,
       };
     },
-    verifyJwtClaims: async (token) => {
-      const { data } = await anonForJwt.auth.getClaims(token);
-      return { sub: (data?.claims?.sub as string | undefined) ?? null };
-    },
+    verifyJwtClaims: async () => ({ sub: null }),
   });
   if (!authRes.ok) {
     const status =
-      authRes.error === "server_misconfigured" ||
-      authRes.error === "auth_lookup_failed"
-        ? 503
-        : 401;
+      authRes.error === "bridge_required"
+        ? 403
+        : authRes.error === "server_misconfigured" || authRes.error === "auth_lookup_failed"
+          ? 503
+          : 401;
     return json({ error: authRes.error }, status);
   }
-  const auth: AuthResult = authRes.auth;
-
-  // For bridge auth, restrict the eligible-tent search to the bridge's tent
-  // scope. For JWT auth, optionally accept a tent_id hint but otherwise
-  // consider all the user's configured tents. We NEVER trust a tent_id
-  // from the EcoWitt payload itself.
-  let scopedTentId: string | null = null;
-  if (auth.kind === "bridge") {
-    scopedTentId = auth.tentScope;
-  } else {
-    const url = new URL(req.url);
-    const hinted =
-      url.searchParams.get("tent_id") ??
-      req.headers.get("X-Verdant-Tent-Id") ??
-      null;
-    if (hinted) {
-      if (!UUID_RE.test(hinted)) {
-        return json({ error: "tent_id_invalid" }, 400);
-      }
-      scopedTentId = hinted;
-    }
+  if (authRes.auth.kind !== "bridge") {
+    return json({ error: "bridge_required" }, 403);
   }
+  const auth = authRes.auth;
+
+  // The authenticated bridge token is the only tent-routing authority.
+  // Query parameters, headers, and payload fields cannot widen this scope.
+  const scopedTentId = auth.tentScope;
 
   const payload = await parsePayload(req);
   if (!payload) return json({ error: "invalid_payload" }, 400);
@@ -264,11 +263,9 @@ Deno.serve(async (req) => {
   // Sanitize before anything else uses the payload.
   const safePayload = sanitizePayload(payload);
 
-  // Look up eligible tents. Use admin client for bridge auth (RLS-equivalent
-  // is enforced by the tent_id filter we just locked down); use the
-  // user-scoped anon client for JWT callers (RLS enforces ownership).
-  const reader = auth.kind === "bridge" && admin ? admin : anonForJwt;
-  let tentQuery = reader
+  // The service client is restricted by both server-resolved user_id and the
+  // bridge token's tent scope before any configured channel is considered.
+  let tentQuery = admin
     .from("tents")
     .select("id, hardware_config")
     .eq("user_id", auth.userId)
@@ -282,30 +279,55 @@ Deno.serve(async (req) => {
     console.error("[ecowitt-ingest] tent_lookup_failed", {
       auth_kind: auth.kind,
     });
+    return json({ ok: true, accepted: false, inserted: 0, reason: "tent_lookup_failed" }, 200);
+  }
+
+  const eligibleTents = parseEligibleTents((tentRows ?? []) as TentHardwareConfigRow[]);
+
+  // Trusted live telemetry must carry a valid gateway event time. Never
+  // substitute server receive time: that would make stale replays look fresh
+  // and evade the captured_at-based dedupe key.
+  const receivedAt = requestNow;
+  const dateutcRaw = extractPayloadValueCaseInsensitive(payload, "dateutc");
+  const parsedDateUtc = parseEcoWittDateUtc(dateutcRaw, receivedAt);
+  if (!parsedDateUtc) {
     return json(
-      { ok: true, accepted: false, inserted: 0, reason: "tent_lookup_failed" },
+      {
+        ok: true,
+        accepted: false,
+        inserted: 0,
+        reason: "timestamp_invalid",
+        auth: auth.kind,
+      },
       200,
     );
   }
-
-  const eligibleTents = parseEligibleTents(
-    (tentRows ?? []) as TentHardwareConfigRow[],
-  );
-
-  // Prefer the gateway-provided `dateutc` (parsed strictly as UTC) so that
-  // an idempotent retry of the same payload lands on the same captured_at
-  // and is rejected by the `sensor_readings_dedupe_uidx` partial unique
-  // index. Fall back to server receive time when dateutc is missing or
-  // malformed, and always stamp `timestamp_source` honestly so downstream
-  // never confuses server time with gateway time.
-  const dateutcRaw = (payload as Record<string, unknown>)["dateutc"]
-    ?? (payload as Record<string, unknown>)["DATEUTC"]
-    ?? null;
-  const parsedDateUtc = parseEcoWittDateUtc(dateutcRaw);
-  const capturedAt = parsedDateUtc ?? new Date().toISOString();
-  const timestampSource: EcoWittTimestampSource = parsedDateUtc
-    ? "ecowitt_dateutc"
-    : "server_received_at";
+  if (Date.parse(parsedDateUtc) > receivedAt.getTime() + 5 * 60_000) {
+    return json(
+      {
+        ok: true,
+        accepted: false,
+        inserted: 0,
+        reason: "timestamp_future",
+        auth: auth.kind,
+      },
+      200,
+    );
+  }
+  if (classifyIngestTimestampFreshness(parsedDateUtc, { now: receivedAt }) === "stale") {
+    return json(
+      {
+        ok: true,
+        accepted: false,
+        inserted: 0,
+        reason: "timestamp_stale",
+        auth: auth.kind,
+      },
+      200,
+    );
+  }
+  const capturedAt = parsedDateUtc;
+  const timestampSource: EcoWittTimestampSource = "ecowitt_dateutc";
 
   const { rows, summary } = buildEcoWittRoutedRows({
     userId: auth.userId,
@@ -332,10 +354,11 @@ Deno.serve(async (req) => {
     );
   }
 
-  const writer = auth.kind === "bridge" ? admin! : anonForJwt;
-  const insertRows: EcoWittRoutedRow[] = rows;
+  // Timestamp freshness is proven above. Canonicalize only at this final
+  // server-side storage boundary so stale packets can never become live.
+  const insertRows: EcoWittStoredRow[] = buildEcoWittStoredRows(rows);
 
-  const { data: upserted, error: insErr } = await writer
+  const { data: upserted, error: insErr } = await admin
     .from("sensor_readings")
     .upsert(insertRows, {
       onConflict: "user_id,tent_id,source,metric,captured_at",
@@ -352,7 +375,7 @@ Deno.serve(async (req) => {
   }
 
   const inserted = upserted?.length ?? 0;
-  if (auth.kind === "bridge" && admin && inserted > 0) {
+  if (inserted > 0) {
     await admin.rpc("bump_bridge_token_usage", {
       p_id: auth.tokenId,
       p_inserted: inserted,
@@ -371,4 +394,9 @@ Deno.serve(async (req) => {
     },
     200,
   );
-});
+}
+
+// Importing this module from Deno tests must never bind a listener.
+if (import.meta.main) {
+  Deno.serve((req) => handleEcoWittIngestRequest(req));
+}

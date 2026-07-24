@@ -22,6 +22,17 @@ import { ACTION_FOLLOWUP_OUTCOMES } from "../lib/actionFollowUpEvidenceRules";
 import { actionFollowUpOutcomeLabel } from "../lib/actionFollowUpEvidenceViewModel";
 
 const T0 = "2026-07-01T12:00:00Z";
+const PHYSICAL_WINDOWS_PAYLOAD = {
+  vendor: "ecowitt_windows_testbench",
+  metadata: {
+    reported_verdant_source: "live",
+    raw_payload: {
+      stationtype: "GW2000A_V3.2.4",
+      model: "GW2000A",
+      dateutc: "2026-07-02 11:00:00",
+    },
+  },
+};
 
 function action(over: Partial<ActionResponseActionRowInput> = {}): ActionResponseActionRowInput {
   return {
@@ -198,9 +209,7 @@ describe("buildActionResponseMemories — rejection rules", () => {
 
   it("8b. invalid observed_at falls back to a valid entry_at", () => {
     const memories = buildActionResponseMemories({
-      responseRows: [
-        responseRow({ detailsOver: { observed_at: "garbage" } }),
-      ],
+      responseRows: [responseRow({ detailsOver: { observed_at: "garbage" } })],
       actions: [action()],
       sensorRows: [],
     });
@@ -225,21 +234,14 @@ describe("ordering, dedup, duplicates", () => {
         detailsOver: { action_queue_id: "act-3", observed_at: "2026-07-04T10:00:00Z" },
       }),
     ];
-    const actions = [
-      action({ id: "act-1" }),
-      action({ id: "act-2" }),
-      action({ id: "act-3" }),
-    ];
+    const actions = [action({ id: "act-1" }), action({ id: "act-2" }), action({ id: "act-3" })];
     const memories = buildActionResponseMemories({ responseRows: rows, actions, sensorRows: [] });
     expect(memories.map((m) => m.actionId)).toEqual(["act-3", "act-1", "act-2"]);
   });
 
   it("10. deterministic deduplication — earliest row id wins", () => {
     const memories = buildActionResponseMemories({
-      responseRows: [
-        responseRow({ id: "row-2" }),
-        responseRow({ id: "row-1" }),
-      ],
+      responseRows: [responseRow({ id: "row-2" }), responseRow({ id: "row-1" })],
       actions: [action()],
       sensorRows: [],
     });
@@ -403,6 +405,60 @@ describe("determinism and truth boundary", () => {
       ],
     });
     expect(live[0].sensor.trustState).toBe("trusted");
+  });
+
+  it("canonical-live Windows diagnostics remain demo-backed, never trusted", () => {
+    const memories = buildActionResponseMemories({
+      responseRows: [responseRow({ detailsOver: { sensor_snapshot_id: "snap-1" } })],
+      actions: [action()],
+      sensorRows: [
+        {
+          id: "snap-1",
+          tent_id: "tent-1",
+          source: "live",
+          captured_at: "2026-07-02T11:00:00Z",
+          raw_payload: {
+            vendor: "ecowitt_windows_testbench",
+            metadata: { confidence: "test", verdant_source: "live" },
+          },
+        },
+      ],
+    });
+    expect(memories[0].sensor.trustState).toBe("demo");
+  });
+
+  it("legacy top-level Windows source rows missing provenance fail closed", () => {
+    const memories = buildActionResponseMemories({
+      responseRows: [responseRow({ detailsOver: { sensor_snapshot_id: "snap-1" } })],
+      actions: [action()],
+      sensorRows: [
+        {
+          id: "snap-1",
+          tent_id: "tent-1",
+          source: "ecowitt_windows_testbench",
+          captured_at: "2026-07-02T11:00:00Z",
+          raw_payload: null,
+        },
+      ],
+    });
+    expect(memories[0].sensor.trustState).toBe("demo");
+  });
+
+  it("physical Windows gateway evidence remains trusted", () => {
+    const memories = buildActionResponseMemories({
+      responseRows: [responseRow({ detailsOver: { sensor_snapshot_id: "snap-1" } })],
+      actions: [action()],
+      sensorRows: [
+        {
+          id: "snap-1",
+          tent_id: "tent-1",
+          source: "live",
+          captured_at: "2026-07-02T11:00:00Z",
+          raw_payload: PHYSICAL_WINDOWS_PAYLOAD,
+        },
+      ],
+    });
+    expect(memories[0].sensor.trustState).toBe("trusted");
   });
 
   it("sensor with unparseable captured_at is invalid regardless of source", () => {

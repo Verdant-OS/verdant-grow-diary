@@ -5,8 +5,8 @@
  * shell around `adaptEcoWittPayloadToBridgeInput`. These tests pin down the
  * row shape it persists to `sensor_readings` and the safety guarantees that
  * must hold every release: credentials never reach the DB, vendor lineage
- * stays in raw_payload, source is always "ecowitt", and bad telemetry never
- * gets classified as healthy.
+ * stays in raw_payload, fresh direct rows become canonical `source="live"`,
+ * and bad telemetry never gets classified as healthy.
  *
  * Pure unit tests — no network, no Deno, no Supabase. Runs in Vitest.
  */
@@ -35,9 +35,7 @@ function buildRows(payload: Record<string, unknown>) {
     return { ok: false as const, adapter };
   }
   const capturedAt =
-    typeof adapter.input.captured_at === "string"
-      ? adapter.input.captured_at
-      : NOW;
+    typeof adapter.input.captured_at === "string" ? adapter.input.captured_at : NOW;
   const rows = readings.map((r) => ({
     user_id: USER,
     tent_id: TENT,
@@ -162,15 +160,22 @@ describe("EcoWitt ingest endpoint: source code safety scan", () => {
     expect(authIdx).toBeLessThan(parseIdx);
   });
 
-  it("validates a hinted tent_id when present (no tent_id is OK — JWT scans owned tents)", () => {
-    // Option C wiring: bridge auth scopes to the bridge tent_id; JWT auth
-    // either accepts a hinted ?tent_id=… (validated as UUID) or scans all
-    // owned tents with hardware_config set. The old "tent_id_required"
-    // hard-block was removed because Option C fans channels across the
-    // caller's tents.
-    expect(src).toContain('"tent_id_invalid"');
-    expect(src).not.toContain('"tent_id_required"');
-    expect(src).not.toContain('"forbidden_tent"');
+  it("uses only the bridge token tent scope for routing", () => {
+    expect(src).toMatch(/allowJwt:\s*false/);
+    expect(src).toMatch(/const scopedTentId = auth\.tentScope/);
+    expect(src).toMatch(/\.eq\("id", scopedTentId\)/);
+    expect(src).not.toContain('"tent_id_invalid"');
+    expect(src).not.toMatch(/searchParams\.get\("tent_id"\)/);
+  });
+
+  it("rejects already-stale gateway timestamps before building or writing rows", () => {
+    const staleIdx = src.indexOf('reason: "timestamp_stale"');
+    const buildIdx = src.indexOf("buildEcoWittRoutedRows({");
+    const upsertIdx = src.indexOf(".upsert(insertRows");
+    expect(src).toContain("classifyIngestTimestampFreshness");
+    expect(staleIdx).toBeGreaterThan(-1);
+    expect(buildIdx).toBeGreaterThan(staleIdx);
+    expect(upsertIdx).toBeGreaterThan(staleIdx);
   });
 
   it("never writes to alerts or action_queue and never calls device control", () => {
@@ -179,12 +184,13 @@ describe("EcoWitt ingest endpoint: source code safety scan", () => {
     expect(src).not.toMatch(/device[_-]?control/i);
   });
 
-  it("tags all readings with source='ecowitt' via the routed-row builder", () => {
-    // The literal `source: "ecowitt"` lives in src/lib/ecowittRoutedRowBuilder.ts
-    // now. The edge function just forwards those rows. Assert the wiring
-    // import + that no other source label is introduced.
-    expect(src).toContain('buildEcoWittRoutedRows');
-    expect(src).toContain('ecowittRoutedRowBuilder');
+  it("canonicalizes freshness-approved routed rows to source='live' before upsert", () => {
+    expect(src).toContain("buildEcoWittRoutedRows");
+    expect(src).toContain("buildEcoWittStoredRows");
+    expect(src).toContain("ecowittRoutedRowBuilder");
+    expect(src.indexOf("buildEcoWittStoredRows(rows)")).toBeLessThan(
+      src.indexOf(".upsert(insertRows"),
+    );
     expect(src).not.toMatch(/source:\s*"ecowitt_live"/);
     expect(src).not.toMatch(/source:\s*"ecowitt_(?!$)/); // no ecowitt_*
   });

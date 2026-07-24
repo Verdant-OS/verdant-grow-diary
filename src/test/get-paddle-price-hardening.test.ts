@@ -19,7 +19,10 @@ const stripped = SRC.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]
 
 describe("get-paddle-price — paid plan allowlist", () => {
   it("accepts exactly pro_monthly, pro_annual, founder_lifetime", () => {
-    expect(SRC).toMatch(/PAID_PLAN_ALLOWLIST[\s\S]{0,120}'pro_monthly',\s*'pro_annual',\s*'founder_lifetime',/);
+    // Quote-agnostic: prettier normalizes edge functions to double quotes.
+    expect(SRC).toMatch(
+      /PAID_PLAN_ALLOWLIST[\s\S]{0,120}["']pro_monthly["'],\s*["']pro_annual["'],\s*["']founder_lifetime["'],/,
+    );
     expect(SRC).toMatch(/PAID_PLAN_ALLOWLIST\.has\(requested\)/);
     // Fail-closed branch for anything outside the allowlist.
     expect(SRC).toMatch(/unknown_plan/);
@@ -47,24 +50,27 @@ describe("get-paddle-price — server-controlled environment", () => {
     expect(stripped).not.toMatch(/body\??\.environment/);
   });
 
-  it("rejects a live environment until the approved live-enable change lands", () => {
-    // The webhook and both reconciliation RPCs are sandbox-only; a live price
-    // would let a real charge settle with no entitlement path.
-    expect(stripped).toMatch(/if \(environment === 'live'\)/);
-    expect(SRC).toMatch(/live_billing_not_enabled/);
+  it("H1 (audit fix): the blanket live_billing_not_enabled 409 is removed so live checkout can settle", () => {
+    // The Lovable webhook path (payments-webhook + allocate_lovable_founder_lifetime)
+    // now handles both environments and enforces the founder cap atomically,
+    // so the previous blanket live refusal is no longer correct.
+    expect(stripped).not.toMatch(/if \(environment === 'live'\)/);
+    expect(SRC).not.toMatch(/live_billing_not_enabled/);
   });
+
 });
 
 describe("get-paddle-price — founder sold-out pre-check (before payment)", () => {
   it("founder_lifetime availability is checked via the aggregate RPC before any price is returned", () => {
-    expect(SRC).toMatch(/requested === 'founder_lifetime'/);
-    expect(SRC).toMatch(/supabase\.rpc\(\s*'founder_lifetime_slots_remaining',?\s*\)/);
+    // Quote-agnostic: prettier normalizes edge functions to double quotes.
+    expect(SRC).toMatch(/requested === ["']founder_lifetime["']/);
+    expect(SRC).toMatch(/supabase\.rpc\(\s*["']founder_lifetime_slots_remaining["'],?\s*\)/);
     expect(SRC).toMatch(/plan_sold_out/);
   });
 
   it("fails closed: RPC error blocks checkout, and a non-number or <=0 count is sold out", () => {
     expect(stripped).toMatch(/if \(capError\) \{/);
-    expect(stripped).toMatch(/typeof remaining !== 'number' \|\| remaining <= 0/);
+    expect(stripped).toMatch(/typeof remaining !== ["']number["'] \|\| remaining <= 0/);
     // The pre-check happens BEFORE the gateway price fetch in source order,
     // so a sold-out founder plan can never reach checkout pricing at all.
     const soldOutIdx = stripped.indexOf("plan_sold_out");

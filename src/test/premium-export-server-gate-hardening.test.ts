@@ -138,6 +138,56 @@ describe("hook runtime — typed state classification", () => {
     expect(r.state).toBe("network_error");
   });
 
+  it("does not infer upgrade_required from an unstructured invoke error", async () => {
+    vi.doMock("@/integrations/supabase/client", () => ({
+      supabase: {
+        functions: {
+          invoke: vi.fn(async () => ({
+            data: null,
+            error: { context: { status: 500 } },
+          })),
+        },
+      },
+    }));
+    const mod = await import("@/hooks/usePremiumExportServerGate");
+    const r = await mod.checkPremiumExportEntitlement("ai_doctor_report");
+    expect(r.ok).toBe(false);
+    expect(r.state).toBe("network_error");
+    expect(r.reason).toBe("network_error");
+  });
+
+  it("does not infer upgrade_required from an empty successful response", async () => {
+    vi.doMock("@/integrations/supabase/client", () => ({
+      supabase: {
+        functions: {
+          invoke: vi.fn(async () => ({ data: null, error: null })),
+        },
+      },
+    }));
+    const mod = await import("@/hooks/usePremiumExportServerGate");
+    const r = await mod.checkPremiumExportEntitlement("ai_doctor_report");
+    expect(r.ok).toBe(false);
+    expect(r.state).toBe("network_error");
+    expect(r.reason).toBe("network_error");
+  });
+
+  it("classifies entitlement lookup failure separately from upgrade denial", async () => {
+    vi.doMock("@/integrations/supabase/client", () => ({
+      supabase: {
+        functions: {
+          invoke: vi.fn(async () => ({
+            data: { ok: false, reason: "entitlement_lookup_failed" },
+            error: { context: { status: 403 } },
+          })),
+        },
+      },
+    }));
+    const mod = await import("@/hooks/usePremiumExportServerGate");
+    const r = await mod.checkPremiumExportEntitlement("ai_doctor_report");
+    expect(r.ok).toBe(false);
+    expect(r.state).toBe("verification_failed");
+  });
+
   it("returns allowed on ok:true server response", async () => {
     vi.doMock("@/integrations/supabase/client", () => ({
       supabase: {

@@ -20,9 +20,7 @@ import {
   buildRecentSensorSnapshotHistory,
   RECENT_HISTORY_MAX_LIMIT,
 } from "@/lib/recentSensorSnapshotHistoryRules";
-import {
-  buildPlantTentEnvironmentView,
-} from "@/lib/plantTentEnvironmentRules";
+import { buildPlantTentEnvironmentView } from "@/lib/plantTentEnvironmentRules";
 import { SOURCE_LABEL } from "@/lib/sensorSnapshot";
 
 const NOW = new Date("2026-05-24T12:00:00Z").getTime();
@@ -32,8 +30,9 @@ function row(
   metric: string,
   value: number | null,
   source: string | null,
+  raw_payload?: unknown,
 ) {
-  return { ts, metric, value, source };
+  return { ts, metric, value, source, raw_payload };
 }
 
 describe("buildRecentSensorSnapshotHistory", () => {
@@ -78,6 +77,48 @@ describe("buildRecentSensorSnapshotHistory", () => {
     expect(SOURCE_LABEL[out[0].source]).not.toBe("Live sensor");
   });
 
+  it.each(["test", "demo"])("keeps confidence=%s Windows diagnostics non-live", (confidence) => {
+    const rows = [
+      row("2026-05-24T11:00:00Z", "temperature_c", 24, "live", {
+        vendor: "ecowitt_windows_testbench",
+        metadata: { confidence, verdant_source: "live" },
+      }),
+    ];
+    const out = buildRecentSensorSnapshotHistory(rows, { now: NOW });
+    expect(out[0].source).toBe("unverified");
+    expect(SOURCE_LABEL[out[0].source]).not.toBe("Live sensor");
+  });
+
+  it("keeps a canonical-live mirror non-live without preserved physical gateway evidence", () => {
+    const rows = [
+      row("2026-05-24T11:00:00Z", "temperature_c", 24, "live", {
+        vendor: "ecowitt_windows_testbench",
+        metadata: { verdant_source: "live" },
+      }),
+    ];
+    const out = buildRecentSensorSnapshotHistory(rows, { now: NOW });
+    expect(out[0].source).toBe("unverified");
+    expect(SOURCE_LABEL[out[0].source]).toBe("Unverified source");
+  });
+
+  it("labels a physical Windows gateway packet live with preserved source and markers", () => {
+    const rows = [
+      row("2026-05-24T11:00:00Z", "temperature_c", 24, "live", {
+        vendor: "ecowitt_windows_testbench",
+        metadata: {
+          reported_verdant_source: "live",
+          raw_payload: {
+            stationtype: "GW2000A_V3.2.4",
+            dateutc: "2026-05-24 11:00:00",
+          },
+        },
+      }),
+    ];
+    const out = buildRecentSensorSnapshotHistory(rows, { now: NOW });
+    expect(out[0].source).toBe("live");
+    expect(SOURCE_LABEL[out[0].source]).toBe("Live sensor");
+  });
+
   it("flags stale rows", () => {
     const stale = new Date(NOW - 60 * 60 * 1000).toISOString();
     const fresh = new Date(NOW - 60 * 1000).toISOString();
@@ -104,12 +145,7 @@ describe("buildRecentSensorSnapshotHistory", () => {
 
   it("caps result at the max history limit", () => {
     const rows = Array.from({ length: 12 }, (_, i) =>
-      row(
-        new Date(NOW - i * 60 * 1000).toISOString(),
-        "temperature_c",
-        20 + i,
-        "manual",
-      ),
+      row(new Date(NOW - i * 60 * 1000).toISOString(), "temperature_c", 20 + i, "manual"),
     );
     const out = buildRecentSensorSnapshotHistory(rows, { now: NOW });
     expect(out.length).toBeLessThanOrEqual(RECENT_HISTORY_MAX_LIMIT);
@@ -146,9 +182,7 @@ describe("Static safety — recentSensorSnapshotHistoryRules.ts", () => {
     "utf8",
   );
   // Strip block + line comments so safety check matches actual code only.
-  const src = raw
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/^\s*\/\/.*$/gm, "");
+  const src = raw.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
   it.each([
     "webhook",
     "action_queue",

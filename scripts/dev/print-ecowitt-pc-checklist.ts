@@ -7,7 +7,9 @@
  * files.
  */
 
-const runbookPath = "docs/integrations/ecowitt-pc-dry-run-runbook.md";
+const runbookPath = "docs/ecowitt-live-soil-bridge.md";
+const canonicalDryRunCommand =
+  "bun run scripts/ecowitt-live-soil-bridge.ts --dry-run --once";
 
 const checklist = [
   "Verdant - Ecowitt PC dry-run checklist",
@@ -24,13 +26,14 @@ const checklist = [
   "1. Confirm the Ecowitt gateway is posting to the local PC bridge.",
   "2. Confirm Mosquitto is receiving the local publish.",
   "3. Confirm MQTT Explorer sees payloads on the Ecowitt topic.",
-  "4. Run the Verdant MQTT dry-run before any live send.",
-  "5. Review the redacted dry-run report for fresh and valid readings.",
-  "6. Only consider live send after a clean dry-run review.",
-  "7. Verify Verdant source and freshness labels afterward.",
+  "4. Set VERDANT_TENT_ID and ECOWITT_SOIL_CHANNEL_MAP_JSON for the same one tent.",
+  "5. Run the Verdant one-message dry-run before any live send.",
+  "6. Review the redacted dry-run output for fresh and valid readings.",
+  "7. Only consider live send after a clean dry-run review.",
+  "8. Verify Verdant source and freshness labels afterward.",
   "",
   "Dry-run command:",
-  "bun run dev:ecowitt-mqtt:dry-run -- --once --write-report",
+  canonicalDryRunCommand,
   "",
   "Live-send gate:",
   "- Do not run live send until the dry-run report is clean.",
@@ -56,7 +59,8 @@ const checklist = [
   "Expected local PC checks:",
   "- Ecowitt gateway posts locally to the PC bridge.",
   "- MQTT Explorer can inspect the Ecowitt payload stream.",
-  "- Verdant dry-run reports redacted evidence before live send is considered.",
+  "- Verdant's one-message dry-run prints redacted evidence before live send is considered.",
+  "- Every mapped soil channel belongs to the same one tent as VERDANT_TENT_ID.",
   "- Bad, stale, invalid, or unknown telemetry is never treated as healthy live context.",
 ].join("\n");
 

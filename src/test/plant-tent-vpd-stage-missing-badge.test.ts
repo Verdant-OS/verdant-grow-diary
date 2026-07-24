@@ -2,16 +2,11 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import { resolve } from "path";
 
-const SRC = readFileSync(
-  resolve(__dirname, "../components/PlantTentEnvironmentPanel.tsx"),
-  "utf8",
-);
+const SRC = readFileSync(resolve(__dirname, "../components/PlantTentEnvironmentPanel.tsx"), "utf8");
 
 describe("PlantTentEnvironmentPanel VPD stage-missing info badge", () => {
   it("still imports the canonical stage-aware VPD helper", () => {
-    expect(SRC).toMatch(
-      /classifyVpdAgainstStage[\s\S]*from\s+["']@\/lib\/vpdStageTargetRules["']/,
-    );
+    expect(SRC).toMatch(/classifyVpdAgainstStage[\s\S]*from\s+["']@\/lib\/vpdStageTargetRules["']/);
   });
 
   it("uses the shared VpdStageMissingBadge component", () => {
@@ -23,9 +18,9 @@ describe("PlantTentEnvironmentPanel VPD stage-missing info badge", () => {
     );
   });
 
-  it("gates the badge on a present VPD value and unknown-normalized plant stage", () => {
+  it("gates the badge on trusted VPD evidence and an unknown-normalized plant stage", () => {
     expect(SRC).toMatch(
-      /snap\?\.vpd\s*!==\s*null\s*&&\s*snap\?\.vpd\s*!==\s*undefined\s*&&\s*normalizeVpdStage\(plantStage\)\s*===\s*"unknown"\s*&&\s*\(\s*<VpdStageMissingBadge[\s\S]*?plant-tent-vpd-stage-missing-badge/,
+      /snap\?\.vpd\s*!==\s*null\s*&&\s*snap\?\.vpd\s*!==\s*undefined\s*&&\s*view\.canAssessStage\s*&&\s*normalizeVpdStage\(plantStage\)\s*===\s*"unknown"\s*&&\s*\(\s*<VpdStageMissingBadge[\s\S]*?plant-tent-vpd-stage-missing-badge/,
     );
   });
 

@@ -5,6 +5,8 @@
  */
 
 import type { QuickLogV2Action, ResolvedQuickLogV2Target } from "./quickLogV2Rules";
+import { isTemperatureValid, isHumidityValid, isVpdValid } from "./sensorReadingNormalizationRules";
+import { normalizeQuickLogStage } from "./quickLogStageDefaultRules";
 
 export interface QuickLogV2SavePayload {
   p_target_type: "tent" | "plant";
@@ -17,6 +19,12 @@ export interface QuickLogV2SavePayload {
   p_vpd_kpa: number | null;
   p_occurred_at: string | null;
   p_details?: Record<string, unknown> | null;
+  /**
+   * Canonical stage tag persisted onto the diary companion (audit fix #2).
+   * Normalized client-side; the RPC soft-validates again and a non-null
+   * stage earns the diary row even without structured details.
+   */
+  p_stage?: string | null;
   /**
    * Server-side idempotency key (8..200 chars). One key per logical
    * submission: retries of the same submission MUST reuse the key so
@@ -35,6 +43,8 @@ export interface BuildQuickLogV2PayloadInput {
   vpdKpa: string;
   occurredAt?: string | null;
   details?: Record<string, unknown> | null;
+  /** Stage tag; normalized here — unknown/blank values are simply omitted. */
+  stage?: string | null;
   idempotencyKey: string;
 }
 
@@ -84,8 +94,19 @@ export function buildQuickLogV2SavePayload(input: BuildQuickLogV2PayloadInput): 
   if (t === "invalid" || h === "invalid" || v === "invalid") {
     return { ok: false, reason: "invalid_sensor_value" };
   }
-  if (h !== null && (h < 0 || h > 100)) {
+  // Reconcile plausibility onto the single canonical band shared with v1 and
+  // the server trigger (temperature -10..60°C, humidity 0..100, VPD 0..10 kPa;
+  // null = not provided). Reusing the shared guards keeps a fat-fingered
+  // temperature or a physically impossible VPD out of the permanent diary
+  // entry, and stops this bound from drifting from the rest of the pipeline.
+  if (!isTemperatureValid(t)) {
+    return { ok: false, reason: "temperature_out_of_range" };
+  }
+  if (!isHumidityValid(h)) {
     return { ok: false, reason: "humidity_out_of_range" };
+  }
+  if (!isVpdValid(v)) {
+    return { ok: false, reason: "vpd_out_of_range" };
   }
 
   const note = (input.note ?? "").trim();
@@ -102,6 +123,10 @@ export function buildQuickLogV2SavePayload(input: BuildQuickLogV2PayloadInput): 
       p_vpd_kpa: v,
       p_occurred_at: input.occurredAt ?? null,
       ...(input.details ? { p_details: input.details } : {}),
+      ...((): { p_stage?: string } => {
+        const stage = normalizeQuickLogStage(input.stage ?? "");
+        return stage ? { p_stage: stage } : {};
+      })(),
       p_idempotency_key: idempotencyKey,
     },
   };

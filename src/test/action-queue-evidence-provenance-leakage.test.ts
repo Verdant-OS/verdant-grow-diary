@@ -71,13 +71,10 @@ const NOISY_INPUT = {
   raw_payload: { secret: "PRIVATE_API_KEY=sk_live_51AbCdEfGhIjKlMnOpQrStUv" },
   service_role_key: "service_role:Bearer eyJhbGciOiJIUzI1NiJ9.payload.sig",
   bridge_token: "Bearer eyJhbGciOiJIUzI1NiJ9.payload.sig",
-  device_command:
-    "turn on equipment; pump.on; dose(5ml); mqtt://broker.example.com:1883",
+  device_command: "turn on equipment; pump.on; dose(5ml); mqtt://broker.example.com:1883",
 } as unknown as Parameters<typeof buildActionEvidenceViewModel>[0];
 
-function vmRenderedStrings(
-  vm: ReturnType<typeof buildActionEvidenceViewModel>,
-): string {
+function vmRenderedStrings(vm: ReturnType<typeof buildActionEvidenceViewModel>): string {
   return [
     vm.originLabel,
     vm.sourceLabel,
@@ -169,7 +166,8 @@ describe("ActionQueue.tsx — row evidence/provenance static leakage scan", () =
   it("EvidenceStatusBadge only renders sanitized vm.* fields", () => {
     const start = ACTION_QUEUE_SRC.indexOf("function EvidenceStatusBadge(");
     expect(start).toBeGreaterThan(-1);
-    const end = ACTION_QUEUE_SRC.indexOf("\n}\n", start);
+    const end = ACTION_QUEUE_SRC.indexOf("const TRACE_BADGE_VARIANT", start);
+    expect(end).toBeGreaterThan(start);
     const block = ACTION_QUEUE_SRC.slice(start, end);
 
     // Whitelist: only vm.rowEvidenceStatus* fields are read.

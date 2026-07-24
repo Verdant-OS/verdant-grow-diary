@@ -4,7 +4,7 @@
  * Validates:
  *  - Dashboard imports and uses EcowittLatestSnapshotCard with tentSelection.
  *  - TentDetail imports and uses EcowittLatestSnapshotCard with id.
- *  - Audit link points to /sensors/ecowitt-audit.
+ *  - Grower card links to normal sensor history, never operator audit.
  *  - Source-code safety (no forbidden patterns).
  *
  * Read-only. No writes, no automation, no device control.
@@ -147,10 +147,10 @@ describe("TentDetail EcoWitt wiring — source code", () => {
 
 // ---------------------------------------------------------------------------
 // Card render tests (behavior already validated at card level; re-exercise
-// here to confirm the audit link and that the card still works as wired).
+// here to confirm the grower-safe history link and that the card still works).
 // ---------------------------------------------------------------------------
-describe("EcowittLatestSnapshotCard — audit link and behavior", () => {
-  it("renders audit link pointing to /sensors/ecowitt-audit", async () => {
+describe("EcowittLatestSnapshotCard — grower link and behavior", () => {
+  it("links normal growers to sensor history, never the operator audit", async () => {
     rowsMock = [ecowittRow({})];
     render(
       <MemoryRouter>
@@ -159,14 +159,15 @@ describe("EcowittLatestSnapshotCard — audit link and behavior", () => {
       { wrapper: wrap() },
     );
     await waitFor(() =>
-      expect(screen.getByTestId("ecowitt-audit-link")).toBeInTheDocument(),
+      expect(screen.getByTestId("ecowitt-sensors-link")).toBeInTheDocument(),
     );
-    const link = screen.getByTestId("ecowitt-audit-link");
-    expect(link.getAttribute("href")).toBe("/sensors/ecowitt-audit");
-    expect(link.textContent).toBe("View EcoWitt ingest audit");
+    const link = screen.getByTestId("ecowitt-sensors-link");
+    expect(link.getAttribute("href")).toBe("/sensors");
+    expect(link.textContent).toBe("View sensor history");
+    expect(screen.queryByTestId("ecowitt-audit-link")).toBeNull();
   });
 
-  it("empty state still renders with audit link visible", async () => {
+  it("empty state still renders with the grower-safe history link visible", async () => {
     rowsMock = [];
     render(
       <MemoryRouter>
@@ -177,7 +178,7 @@ describe("EcowittLatestSnapshotCard — audit link and behavior", () => {
     await waitFor(() =>
       expect(screen.getByTestId("ecowitt-snapshot-empty")).toBeInTheDocument(),
     );
-    expect(screen.getByTestId("ecowitt-audit-link")).toBeInTheDocument();
+    expect(screen.getByTestId("ecowitt-sensors-link")).toBeInTheDocument();
   });
 
   it("stale reading renders Stale badge, not Live", async () => {

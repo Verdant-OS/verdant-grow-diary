@@ -2,7 +2,7 @@
  * Plant Detail Harvest Watch card tests.
  *
  * Covers the pure Plant Detail adapter, the read-only card renderer, Plant
- * Detail wiring via the existing What's Missing mount point, and safety
+ * Detail wiring via the single page-level mount point, and safety
  * guardrails. Harvest Watch remains advisory-only and does not call AI, write
  * alerts/actions, or control devices.
  */
@@ -33,6 +33,7 @@ const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
 const CARD = read("src/components/PlantDetailHarvestWatchCard.tsx");
 const VM = read("src/lib/plantDetailHarvestWatchCardViewModel.ts");
 const WHATS_MISSING = read("src/components/PlantDetailWhatsMissing.tsx");
+const PLANT_DETAIL = read("src/pages/PlantDetail.tsx");
 
 const plant = {
   id: "p1",
@@ -106,6 +107,22 @@ describe("PlantDetailHarvestWatchCard", () => {
     expect(screen.getByTestId("plant-detail-harvest-watch-card-loading")).toBeTruthy();
   });
 
+  it.each(["seedling", "veg", "flush", "harvest", "cure", null])(
+    "renders no Harvest Watch surface for ineligible stage %s",
+    (stage) => {
+      mocks.useGrowPlant.mockReturnValue({
+        data: { ...plant, stage },
+        isLoading: false,
+      });
+
+      const { container } = render(
+        <PlantDetailHarvestWatchCard plantId="p1" hasPlantPhoto />,
+      );
+
+      expect(container).toBeEmptyDOMElement();
+    },
+  );
+
   it("renders nothing without a plant id", () => {
     const { container } = render(<PlantDetailHarvestWatchCard plantId={null} />);
     expect(container.textContent).toBe("");
@@ -113,9 +130,10 @@ describe("PlantDetailHarvestWatchCard", () => {
 });
 
 describe("Plant Detail wiring", () => {
-  it("mounts Harvest Watch through the existing PlantDetailWhatsMissing slot", () => {
-    expect(WHATS_MISSING).toContain("PlantDetailHarvestWatchCard");
-    expect(WHATS_MISSING).toMatch(/PlantDetailHarvestWatchCard[\s\S]{0,120}plantId=\{plantId\}/);
+  it("mounts Harvest Watch once at page level, outside What's Missing", () => {
+    expect(PLANT_DETAIL.match(/<PlantDetailHarvestWatchCard\b/g)).toHaveLength(1);
+    expect(PLANT_DETAIL).toMatch(/PlantDetailHarvestWatchCard[\s\S]{0,180}plantId=\{plant\.id\}/);
+    expect(WHATS_MISSING).not.toContain("PlantDetailHarvestWatchCard");
   });
 });
 

@@ -44,11 +44,15 @@ const sanitized = validateAndSanitizeDiagnosis({
   ],
 }).diagnosis!;
 
+const SESSION_ID = "22222222-2222-4222-8222-222222222222";
+const OTHER_SESSION_ID = "33333333-3333-4333-8333-333333333333";
+
 function makeClient(insertImpl: (row: unknown) => unknown) {
-  const single = vi.fn(async () => insertImpl(undefined));
+  let insertedRow: unknown;
+  const single = vi.fn(async () => insertImpl(insertedRow));
   const select = vi.fn(() => ({ single }));
   const insert = vi.fn((row: unknown) => {
-    insertImpl(row);
+    insertedRow = row;
     return { select };
   });
   const from = vi.fn((_table: string) => ({ insert }));
@@ -63,6 +67,16 @@ describe("buildAiDoctorSessionInsert", () => {
       diagnosis: sanitized,
     });
     expect(Object.keys(row)).not.toContain("user_id");
+  });
+
+  it("includes a supplied stable session id without generating one in the pure builder", () => {
+    const row = buildAiDoctorSessionInsert({
+      sessionId: SESSION_ID,
+      growId: "g1",
+      analysis: { summary: "s" },
+      diagnosis: sanitized,
+    });
+    expect(row.id).toBe(SESSION_ID);
   });
 
   it("persists the sanitized diagnosis and snapshot suggested actions", () => {
@@ -128,21 +142,41 @@ describe("persistAiDoctorSession", () => {
     let captured: unknown = null;
     const client = makeClient((row) => {
       if (row !== undefined) captured = row;
-      return { data: { id: "row-1" }, error: null };
+      return { data: { id: SESSION_ID }, error: null };
     });
     const res = await persistAiDoctorSession(client as never, {
+      sessionId: SESSION_ID,
       growId: "g1",
       analysis: { summary: "s" },
       diagnosis: sanitized,
     });
-    expect(res).toEqual({ ok: true, id: "row-1" });
+    expect(res).toEqual({ ok: true, id: SESSION_ID });
     expect(client._calls.from).toHaveBeenCalledWith("ai_doctor_sessions");
     expect((captured as Record<string, unknown>).user_id).toBeUndefined();
   });
 
+  it("canonicalizes an uppercase client UUID before insert and comparison", async () => {
+    let captured: unknown = null;
+    const client = makeClient((row) => {
+      captured = row;
+      return { data: { id: SESSION_ID }, error: null };
+    });
+
+    const res = await persistAiDoctorSession(client as never, {
+      sessionId: SESSION_ID.toUpperCase(),
+      growId: "g1",
+      analysis: { summary: "s" },
+      diagnosis: sanitized,
+    });
+
+    expect(res).toEqual({ ok: true, id: SESSION_ID });
+    expect((captured as Record<string, unknown>).id).toBe(SESSION_ID);
+  });
+
   it("never writes to action_queue (snapshot-only persistence)", async () => {
-    const client = makeClient(() => ({ data: { id: "row-2" }, error: null }));
+    const client = makeClient(() => ({ data: { id: SESSION_ID }, error: null }));
     await persistAiDoctorSession(client as never, {
+      sessionId: SESSION_ID,
       growId: "g1",
       analysis: { summary: "s" },
       diagnosis: sanitized,
@@ -157,14 +191,39 @@ describe("persistAiDoctorSession", () => {
   it("returns a structured error instead of throwing (non-blocking)", async () => {
     const client = makeClient(() => ({
       data: null,
-      error: { message: "rls violated" },
+      error: {
+        code: "42501",
+        message: "rls violated",
+        details: "row 11111111-1111-4111-8111-111111111111",
+        hint: "authenticate grower@example.com",
+      },
     }));
     const res = await persistAiDoctorSession(client as never, {
       growId: "g1",
       analysis: { summary: "s" },
       diagnosis: sanitized,
     });
-    expect(res).toEqual({ ok: false, error: "rls violated" });
+    expect(res).toMatchObject({
+      ok: false,
+      error: "AI Doctor history save was blocked by its ownership policy.",
+      diagnostic: {
+        stage: "insert",
+        category: "rls",
+        code: "42501",
+        authResolution: "unavailable",
+        scope: {
+          hasGrowScope: true,
+          hasTentScope: false,
+          hasPlantScope: false,
+        },
+      },
+    });
+    if (res.ok === false) {
+      expect(res.diagnostic.safeDetails).toBeNull();
+      expect(res.diagnostic.safeHint).toBeNull();
+      expect(JSON.stringify(res.diagnostic)).not.toContain("11111111-1111-4111-8111-111111111111");
+      expect(JSON.stringify(res.diagnostic)).not.toContain("grower@example.com");
+    }
   });
 
   it("refuses to persist when there is nothing to snapshot", async () => {
@@ -175,15 +234,160 @@ describe("persistAiDoctorSession", () => {
       diagnosis: null,
     });
     expect(res.ok).toBe(false);
+    if (res.ok === false) {
+      expect(res.diagnostic.category).toBe("validation");
+      expect(res.diagnostic.stage).toBe("validation");
+    }
     expect(client._calls.insert).not.toHaveBeenCalled();
+  });
+
+  it("captures authenticated ownership lookup context without exposing the user id", async () => {
+    const getUser = vi.fn().mockResolvedValue({
+      data: { user: { id: "11111111-1111-4111-8111-111111111111" } },
+    });
+    const client = {
+      ...makeClient(() => ({
+        data: null,
+        error: { code: "23503", message: "owned scope missing" },
+      })),
+      auth: { getUser },
+    };
+
+    const res = await persistAiDoctorSession(client as never, {
+      growId: "g1",
+      tentId: "t1",
+      plantId: "p1",
+      analysis: { summary: "s" },
+      diagnosis: sanitized,
+    });
+
+    expect(getUser).toHaveBeenCalledTimes(1);
+    expect(res).toMatchObject({
+      ok: false,
+      diagnostic: {
+        category: "constraint",
+        authResolution: "resolved",
+        scope: {
+          hasGrowScope: true,
+          hasTentScope: true,
+          hasPlantScope: true,
+        },
+      },
+    });
+    expect(JSON.stringify(res)).not.toContain("11111111-1111-4111-8111-111111111111");
+  });
+
+  it("treats a retry conflict as success only after owner-scoped id confirmation", async () => {
+    const insertSingle = vi.fn().mockResolvedValue({
+      data: null,
+      error: { code: "23505", message: "duplicate key value violates unique constraint" },
+    });
+    const insert = vi.fn(() => ({ select: () => ({ single: insertSingle }) }));
+    const maybeSingle = vi.fn().mockResolvedValue({
+      data: { id: SESSION_ID },
+      error: null,
+    });
+    const from = vi
+      .fn()
+      .mockReturnValueOnce({ insert })
+      .mockReturnValueOnce({
+        select: () => ({ eq: () => ({ maybeSingle }) }),
+      });
+
+    const res = await persistAiDoctorSession({ from } as never, {
+      sessionId: SESSION_ID,
+      growId: "g1",
+      analysis: { summary: "s" },
+      diagnosis: sanitized,
+    });
+
+    expect(res).toEqual({ ok: true, id: SESSION_ID });
+    expect(from).toHaveBeenCalledTimes(2);
+    expect(maybeSingle).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not claim a duplicate conflict succeeded when owner-scoped confirmation fails", async () => {
+    const insert = vi.fn(() => ({
+      select: () => ({
+        single: vi.fn().mockResolvedValue({
+          data: null,
+          error: { code: "23505", message: "duplicate key" },
+        }),
+      }),
+    }));
+    const from = vi
+      .fn()
+      .mockReturnValueOnce({ insert })
+      .mockReturnValueOnce({
+        select: () => ({
+          eq: () => ({ maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }) }),
+        }),
+      });
+
+    const res = await persistAiDoctorSession({ from } as never, {
+      sessionId: SESSION_ID,
+      growId: "g1",
+      analysis: { summary: "s" },
+      diagnosis: sanitized,
+    });
+
+    expect(res).toMatchObject({
+      ok: false,
+      diagnostic: { category: "constraint", code: "23505" },
+    });
+  });
+
+  it.each([
+    ["missing", null],
+    ["mismatched", OTHER_SESSION_ID],
+  ] as const)("fails closed when the returned session id is %s", async (_label, returnedId) => {
+    const client = makeClient(() => ({
+      data: returnedId === null ? {} : { id: returnedId },
+      error: null,
+    }));
+    const res = await persistAiDoctorSession(client as never, {
+      sessionId: SESSION_ID,
+      growId: "g1",
+      analysis: { summary: "s" },
+      diagnosis: sanitized,
+    });
+
+    expect(res).toMatchObject({
+      ok: false,
+      error: "AI Doctor history save failed at the database insert.",
+      diagnostic: { stage: "insert", category: "insert" },
+    });
+  });
+
+  it("records a returned auth lookup error as lookup_failed", async () => {
+    const getUser = vi.fn().mockResolvedValue({
+      data: { user: null },
+      error: { message: "auth unavailable" },
+    });
+    const client = {
+      ...makeClient(() => ({
+        data: null,
+        error: { code: "42501", message: "permission denied for table" },
+      })),
+      auth: { getUser },
+    };
+
+    const res = await persistAiDoctorSession(client as never, {
+      sessionId: SESSION_ID,
+      growId: "g1",
+      analysis: { summary: "s" },
+      diagnosis: sanitized,
+    });
+
+    expect(res).toMatchObject({
+      ok: false,
+      diagnostic: { category: "permission", authResolution: "lookup_failed" },
+    });
   });
 });
 
 describe("static safety", () => {
-  const src = readFileSync(
-    resolve(__dirname, "../lib/aiDoctorSessionPersistence.ts"),
-    "utf8",
-  );
+  const src = readFileSync(resolve(__dirname, "../lib/aiDoctorSessionPersistence.ts"), "utf8");
 
   it("does not reference service_role", () => {
     expect(src.toLowerCase()).not.toContain("service_role");
@@ -195,14 +399,7 @@ describe("static safety", () => {
   });
 
   it("contains no automation/device-control strings", () => {
-    const banned = [
-      "mqtt",
-      "auto-execute",
-      "actuate",
-      "device.command",
-      "relay.on",
-      "relay.off",
-    ];
+    const banned = ["mqtt", "auto-execute", "actuate", "device.command", "relay.on", "relay.off"];
     for (const tok of banned) {
       expect(src.toLowerCase()).not.toContain(tok);
     }

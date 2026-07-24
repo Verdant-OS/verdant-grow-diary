@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useGrows } from "@/store/grows";
 import { useAuth } from "@/store/auth";
 
@@ -7,37 +7,92 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Sprout, Check, Trash2, Loader2, AlertCircle } from "lucide-react";
+import PageHeader from "@/components/PageHeader";
 import { GROW_TYPES, STAGES, growTypeLabel, stageLabel } from "@/lib/grow";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import { useMyEntitlements } from "@/hooks/useMyEntitlements";
+import { evaluateGrowCreationGate, FREE_TIER_UPGRADE_PATH } from "@/lib/entitlements/freeTierGates";
+import { trackFunnelEvent } from "@/lib/funnelAnalytics";
+import {
+  buildConnectedActivationRoutes,
+  isOneTentActivationIntent,
+} from "@/lib/connectedOneTentActivationRules";
 
 export default function Grows() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const activationIntent = isOneTentActivationIntent(searchParams.get("intent"));
   const { user } = useAuth();
   const { grows, activeGrowId, setActiveGrowId, refresh, loading, error } = useGrows();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(activationIntent);
   const [form, setForm] = useState({ name: "", grow_type: "tent", stage: "seedling", notes: "" });
   const [busy, setBusy] = useState(false);
+
+  // Free-tier grow gate. The grows store already returns only non-archived
+  // rows, so its length IS the active-grow count. Fails open while the
+  // entitlement resolver is loading — the gate is UX honesty, and a paying
+  // grower must never be blocked by a resolver hiccup.
+  const {
+    loading: entLoading,
+    lookupFailed: entitlementLookupFailed,
+    entitlement,
+  } = useMyEntitlements();
+  const growGate = evaluateGrowCreationGate(
+    entLoading || entitlementLookupFailed ? null : entitlement.capabilities,
+    grows.length,
+  );
 
   async function create(e: React.FormEvent) {
     e.preventDefault();
     if (!user) return;
+    if (!growGate.allowed) {
+      toast.error(growGate.blockedCopy);
+      return;
+    }
     setBusy(true);
-    const { data, error } = await supabase.from("grows").insert({
-      user_id: user.id, name: form.name.trim(), grow_type: form.grow_type, stage: form.stage,
-      notes: form.notes.trim() || null,
-    }).select().single();
+    const { data, error } = await supabase
+      .from("grows")
+      .insert({
+        user_id: user.id,
+        name: form.name.trim(),
+        grow_type: form.grow_type,
+        stage: form.stage,
+        notes: form.notes.trim() || null,
+      })
+      .select()
+      .single();
     setBusy(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    trackFunnelEvent("grow_created");
     toast.success("Grow created");
     await refresh();
     if (data) setActiveGrowId(data.id);
     setOpen(false);
     setForm({ name: "", grow_type: "tent", stage: "seedling", notes: "" });
+    if (data && activationIntent) {
+      navigate(
+        buildConnectedActivationRoutes({
+          growId: data.id,
+          tentId: null,
+          plantId: null,
+        }).addTent,
+      );
+    }
   }
 
   async function archive(id: string) {
@@ -48,24 +103,44 @@ export default function Grows() {
   }
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-5">
-        <h1 className="text-2xl font-display font-bold">My Grows</h1>
-        <Button onClick={() => setOpen(true)} size="sm" className="gradient-leaf text-primary-foreground gap-1">
-          <Plus className="h-4 w-4" />New
-        </Button>
-      </div>
+    <div className="min-w-0">
+      <PageHeader
+        title="My Grows"
+        eyebrow="Cultivation"
+        description="Follow each grow from seed or clone through harvest without losing the why."
+        icon={<Sprout className="size-5" />}
+        actions={
+          <Button
+            onClick={() => setOpen(true)}
+            size="sm"
+            className="w-full gradient-leaf text-primary-foreground sm:w-auto"
+            disabled={!growGate.allowed}
+            data-testid="grows-new-button"
+          >
+            <Plus data-icon="inline-start" />
+            New grow
+          </Button>
+        }
+      />
+
+      {!growGate.allowed && (
+        <p
+          className="mb-4 rounded-xl border border-border/60 bg-muted/40 px-3 py-2 text-xs text-muted-foreground"
+          data-testid="grow-create-gate-notice"
+        >
+          {growGate.blockedCopy}{" "}
+          <Link to={FREE_TIER_UPGRADE_PATH} className="underline underline-offset-2">
+            See plans
+          </Link>
+        </p>
+      )}
 
       {loading ? (
         <div className="py-16 text-center text-muted-foreground" data-testid="grows-loading">
           <Loader2 className="h-5 w-5 animate-spin mx-auto" />
         </div>
       ) : error ? (
-        <div
-          className="glass rounded-2xl p-6 text-center"
-          role="alert"
-          data-testid="grows-error"
-        >
+        <div className="glass rounded-2xl p-6 text-center" role="alert" data-testid="grows-error">
           <AlertCircle className="h-5 w-5 text-destructive mx-auto mb-2" />
           <p className="font-semibold">Unable to load grows.</p>
           <p className="text-xs text-muted-foreground mt-1">Please try again later.</p>
@@ -76,37 +151,50 @@ export default function Grows() {
             <Sprout className="h-7 w-7 text-primary" />
           </div>
           <h2 className="font-display text-lg font-semibold">No grows yet.</h2>
-          <p className="text-sm text-muted-foreground mt-1 mb-4">Create your first grow to start logging.</p>
-          <Button onClick={() => setOpen(true)} className="gradient-leaf text-primary-foreground">Create grow</Button>
+          <p className="text-sm text-muted-foreground mt-1 mb-4">
+            Create your first grow to start logging.
+          </p>
+          <Button onClick={() => setOpen(true)} className="gradient-leaf text-primary-foreground">
+            Create grow
+          </Button>
         </div>
       ) : (
-        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3" data-testid="grows-list">
+        <ul
+          className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
+          data-testid="grows-list"
+        >
           {grows.map((g) => (
             <li
               key={g.id}
-              className={`glass rounded-2xl p-0 overflow-hidden ${g.id === activeGrowId ? "border-primary/60" : ""}`}
+              className={`group overflow-hidden rounded-3xl border bg-card/65 shadow-card backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-elevated ${g.id === activeGrowId ? "border-primary/60" : "border-border/60"}`}
             >
               <Link
                 to={`/grows/${g.id}`}
-                className="block p-4 hover:bg-secondary/20 transition-colors"
+                className="block p-5 transition-colors hover:bg-secondary/20"
                 data-testid="grow-card-link"
               >
                 <div className="flex items-center gap-2 flex-wrap mb-1">
                   <span className="font-semibold">{g.name}</span>
                   {g.id === activeGrowId && (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/20 text-primary">active</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/20 text-primary">
+                      active
+                    </span>
                   )}
                   {g.is_archived && (
-                    <Badge variant="outline" className="text-[10px]">archived</Badge>
+                    <Badge variant="outline" className="text-[10px]">
+                      archived
+                    </Badge>
                   )}
-                  <Badge variant="outline" className="uppercase text-[10px]">{stageLabel(g.stage)}</Badge>
-                  <Badge variant="outline" className="text-[10px]">{growTypeLabel(g.grow_type)}</Badge>
+                  <Badge variant="outline" className="uppercase text-[10px]">
+                    {stageLabel(g.stage)}
+                  </Badge>
+                  <Badge variant="outline" className="text-[10px]">
+                    {growTypeLabel(g.grow_type)}
+                  </Badge>
                 </div>
                 <div className="text-xs text-muted-foreground">
                   Started {format(new Date(g.started_at), "MMM d, yyyy")}
-                  {g.updated_at && (
-                    <> · Updated {format(new Date(g.updated_at), "MMM d, yyyy")}</>
-                  )}
+                  {g.updated_at && <> · Updated {format(new Date(g.updated_at), "MMM d, yyyy")}</>}
                 </div>
                 {g.notes && (
                   <p className="text-xs mt-2 text-muted-foreground line-clamp-2">{g.notes}</p>
@@ -141,32 +229,71 @@ export default function Grows() {
         </ul>
       )}
 
-
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="glass max-w-md">
-          <DialogHeader><DialogTitle className="font-display">New grow</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle className="font-display">New grow</DialogTitle>
+          </DialogHeader>
           <form onSubmit={create} className="grid gap-3">
-            <div><Label>Name</Label><Input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Tent #1, Backyard, Mothers…" /></div>
+            <div>
+              <Label>Name</Label>
+              <Input
+                required
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                placeholder="Tent #1, Backyard, Mothers…"
+              />
+            </div>
             <div className="grid grid-cols-2 gap-2">
-              <div><Label>Type</Label>
-                <Select value={form.grow_type} onValueChange={(v) => setForm({ ...form, grow_type: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{GROW_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
+              <div>
+                <Label>Type</Label>
+                <Select
+                  value={form.grow_type}
+                  onValueChange={(v) => setForm({ ...form, grow_type: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {GROW_TYPES.map((t) => (
+                      <SelectItem key={t.value} value={t.value}>
+                        {t.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
                 </Select>
               </div>
-              <div><Label>Stage</Label>
+              <div>
+                <Label>Stage</Label>
                 <Select value={form.stage} onValueChange={(v) => setForm({ ...form, stage: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{STAGES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STAGES.map((s) => (
+                      <SelectItem key={s.value} value={s.value}>
+                        {s.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
                 </Select>
               </div>
             </div>
-            <div><Label>Notes (optional)</Label><Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Strain, lighting, medium…" rows={2} /></div>
-            <Button disabled={busy} className="gradient-leaf text-primary-foreground">Create grow</Button>
+            <div>
+              <Label>Notes (optional)</Label>
+              <Textarea
+                value={form.notes}
+                onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                placeholder="Strain, lighting, medium…"
+                rows={2}
+              />
+            </div>
+            <Button disabled={busy} className="gradient-leaf text-primary-foreground">
+              Create grow
+            </Button>
           </form>
         </DialogContent>
       </Dialog>
-
     </div>
   );
 }

@@ -17,6 +17,7 @@ const strongPlant = {
   stage: "veg",
   medium: "Coco",
   hasPlantPhoto: true,
+  plantType: "photoperiod",
 };
 
 describe("evaluateAiDoctorContext", () => {
@@ -77,7 +78,50 @@ describe("evaluateAiDoctorContext", () => {
     expect(r.evidence).not.toContain("fresh-manual-sensor-snapshot");
   });
 
-  it("is strong with profile, stage, activity, fresh snapshot, and photo", () => {
+  it("is strong with profile, stage, type, activity, fresh snapshot, photo, and root-zone", () => {
+    const r = evaluateAiDoctorContext({
+      plant: strongPlant,
+      recentEvents: [
+        { at: iso(-HOUR), category: "watering" },
+        { at: iso(-2 * HOUR), category: "notes" },
+      ],
+      recentManualSnapshots: [{ at: iso(-2 * HOUR), severity: "ok" }],
+      recentRootZoneObservations: 1,
+      now: NOW,
+    });
+    expect(r.readiness).toBe("strong");
+    expect(r.evidence).toEqual(
+      expect.arrayContaining([
+        "plant-profile",
+        "stage",
+        "strain",
+        "plant-type",
+        "root-zone-history",
+        "recent-timeline-activity",
+        "recent-manual-sensor-snapshot",
+        "fresh-manual-sensor-snapshot",
+      ]),
+    );
+    expect(r.safeNextStep).toMatch(/cautious AI Doctor review/);
+  });
+
+  it("is never strong with an unknown plant type — drops to partial and lists plant-type", () => {
+    const r = evaluateAiDoctorContext({
+      plant: { ...strongPlant, plantType: null },
+      recentEvents: [
+        { at: iso(-HOUR), category: "watering" },
+        { at: iso(-2 * HOUR), category: "notes" },
+      ],
+      recentManualSnapshots: [{ at: iso(-2 * HOUR), severity: "ok" }],
+      recentRootZoneObservations: 1,
+      now: NOW,
+    });
+    expect(r.readiness).toBe("partial");
+    expect(r.missing).toContain("plant-type");
+    expect(r.evidence).not.toContain("plant-type");
+  });
+
+  it("is never strong without root-zone history — drops to partial and lists root-zone-history", () => {
     const r = evaluateAiDoctorContext({
       plant: strongPlant,
       recentEvents: [
@@ -87,18 +131,8 @@ describe("evaluateAiDoctorContext", () => {
       recentManualSnapshots: [{ at: iso(-2 * HOUR), severity: "ok" }],
       now: NOW,
     });
-    expect(r.readiness).toBe("strong");
-    expect(r.evidence).toEqual(
-      expect.arrayContaining([
-        "plant-profile",
-        "stage",
-        "strain",
-        "recent-timeline-activity",
-        "recent-manual-sensor-snapshot",
-        "fresh-manual-sensor-snapshot",
-      ]),
-    );
-    expect(r.safeNextStep).toMatch(/cautious AI Doctor review/);
+    expect(r.readiness).toBe("partial");
+    expect(r.missing).toContain("root-zone-history");
   });
 
   it("ignores events older than the 7d window", () => {

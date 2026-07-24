@@ -3,6 +3,10 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { getRoutesByAccess } from "@/lib/appRouteManifest";
+import {
+  readDesktopGrowerNavigationSource,
+  readMobileGrowerNavigationSource,
+} from "@/test/utils/growerNavigationSource";
 
 const read = (path: string) => readFileSync(resolve(process.cwd(), path), "utf8");
 
@@ -10,14 +14,16 @@ const ROUTE = "/operator/post-grow-reflection-dry-run";
 const SUMMARY = read("src/lib/ai/postGrowReflectionCandidateValidationSummary.ts");
 const COMPONENT = read("src/components/PostGrowReflectionCandidatePasteValidator.tsx");
 const DOCS = read("docs/post-grow-reflection-phase2k.md");
-const SIDEBAR = read("src/components/AppSidebar.tsx");
-const MOBILE_NAV = read("src/components/MobileNav.tsx");
+const SIDEBAR = readDesktopGrowerNavigationSource();
+const MOBILE_NAV = readMobileGrowerNavigationSource();
 
 describe("Post-Grow Reflection candidate validation summary static safety", () => {
   it("keeps the summary local and free of runtime/persistence surfaces", () => {
     const all = [SUMMARY, COMPONENT, DOCS].join("\n");
 
-    expect(all).not.toMatch(/functions\.invoke|fetch\(|axios|XMLHttpRequest|EventSource|WebSocket/i);
+    expect(all).not.toMatch(
+      /functions\.invoke|fetch\(|axios|XMLHttpRequest|EventSource|WebSocket/i,
+    );
     expect(all).not.toMatch(/create table|alter table|enable row level security/i);
     expect(all).not.toMatch(/from\("action_queue"\)|\.insert\(|\.update\(|\.delete\(/i);
     expect(all).not.toMatch(/target_device|raw_payload|service_role|bridge_token/i);

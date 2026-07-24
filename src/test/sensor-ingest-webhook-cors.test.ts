@@ -55,7 +55,7 @@ describe("sensor-ingest-webhook CORS contract", () => {
   });
 
   it("declares Vary: Origin so caches do not poison cross-origin responses", () => {
-    expect(SRC).toMatch(/["']Vary["']\s*:\s*["']Origin["']/);
+    expect(SRC).toMatch(/(?:["']Vary["']|\bVary)\s*:\s*["']Origin["']/);
   });
 
   it("allows POST and OPTIONS only", () => {
@@ -75,7 +75,7 @@ describe("sensor-ingest-webhook CORS contract", () => {
   });
 
   it("wraps the handler in try/catch so unexpected errors still return CORS headers", () => {
-    expect(SRC).toMatch(/try\s*\{\s*return await handle\(req\)/);
+    expect(SRC).toMatch(/try\s*\{\s*return await handle\(req,\s*deps\)/);
     expect(SRC).toMatch(/catch[^}]*json\(req,\s*\{\s*error:\s*["']internal_error["']/);
   });
 

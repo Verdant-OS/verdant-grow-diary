@@ -15,6 +15,11 @@
  */
 
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "./plantQuickLogPrefillRules";
+import {
+  QUICK_LOG_V2_OPEN_EVENT,
+  buildQuickLogV2OpenIntent,
+  type QuickLogV2OpenIntent,
+} from "./quickLogV2OpenIntent";
 
 export type FastAddActionId =
   | "diary_note"
@@ -97,10 +102,16 @@ export interface FastAddNeedsContextIntent {
   message: typeof FAST_ADD_NO_CONTEXT_COPY;
   ctas: typeof FAST_ADD_PICKER_CTAS;
 }
+export interface FastAddOpenQuickLogV2Intent {
+  kind: "open-quicklog-v2";
+  eventName: typeof QUICK_LOG_V2_OPEN_EVENT;
+  detail: QuickLogV2OpenIntent;
+}
 
 export type FastAddIntent =
   | FastAddNavigateIntent
   | FastAddOpenQuickLogIntent
+  | FastAddOpenQuickLogV2Intent
   | FastAddNeedsContextIntent;
 
 function hasContext(ctx: FastAddSelectionContext | null | undefined): boolean {
@@ -151,6 +162,21 @@ export function resolveFastAddIntent(
     return { kind: "navigate", to };
   }
 
+  if (def.id === "watering") {
+    const detail = buildQuickLogV2OpenIntent({
+      plantId: context.plantId,
+      tentId: context.tentId,
+      action: "water",
+    });
+    return detail
+      ? { kind: "open-quicklog-v2", eventName: QUICK_LOG_V2_OPEN_EVENT, detail }
+      : {
+          kind: "needs-context",
+          message: FAST_ADD_NO_CONTEXT_COPY,
+          ctas: FAST_ADD_PICKER_CTAS,
+        };
+  }
+
   const defaults = buildFastAddTimestampDefaults(actionId, options.now);
 
   return {
@@ -176,7 +202,9 @@ export function resolveFastAddIntent(
  *
  * Rules:
  *  - All logging presets set `occurred_at = now`.
- *  - Environment additionally sets `captured_at = now`.
+ *  - Environment and Training additionally set `captured_at = now` — both
+ *    represent an event happening in the tent at the moment of capture,
+ *    so the two timestamps line up for consistent timeline sorting.
  *  - Diagnosis is navigation-only and returns {}.
  */
 export function buildFastAddTimestampDefaults(
@@ -185,7 +213,7 @@ export function buildFastAddTimestampDefaults(
 ): FastAddTimestampDefaults {
   if (actionId === "diagnosis") return {};
   const iso = now().toISOString();
-  if (actionId === "environment") {
+  if (actionId === "environment" || actionId === "training") {
     return { occurred_at: iso, captured_at: iso };
   }
   return { occurred_at: iso };

@@ -67,20 +67,41 @@ describe("mergeTimelineSources", () => {
           note: "diary mirror",
         },
       ],
-      growEvents: [
-        { id: "g1", occurred_at: T("2026-06-01T10:00:00Z"), note: "canonical" },
-      ],
+      growEvents: [{ id: "g1", occurred_at: T("2026-06-01T10:00:00Z"), note: "canonical" }],
     });
     expect(out).toHaveLength(1);
     expect(out[0].source_table).toBe("grow_events");
     expect(out[0].note).toBe("canonical");
   });
 
-  it("preserves legacy diary-only rows (no grow_events present)", () => {
+  it("logical dedup: recognizes the linked_grow_event_id emitted by the current writer", () => {
     const out = mergeTimelineSources({
       diaryEntries: [
-        { id: "d1", entry_at: T("2026-06-01T10:00:00Z"), note: "legacy" },
+        {
+          id: "d-current-writer-mirror",
+          entry_at: T("2026-06-01T10:00:00Z"),
+          details: { linked_grow_event_id: "g-current-writer" },
+        },
       ],
+      growEvents: [
+        {
+          id: "g-current-writer",
+          occurred_at: T("2026-06-01T10:00:00Z"),
+          note: "canonical",
+        },
+      ],
+    });
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({
+      source_table: "grow_events",
+      source_id: "g-current-writer",
+      note: "canonical",
+    });
+  });
+
+  it("preserves legacy diary-only rows (no grow_events present)", () => {
+    const out = mergeTimelineSources({
+      diaryEntries: [{ id: "d1", entry_at: T("2026-06-01T10:00:00Z"), note: "legacy" }],
       growEvents: [],
     });
     expect(out).toHaveLength(1);
@@ -141,9 +162,7 @@ describe("mergeTimelineSources", () => {
         { id: "d1", entry_at: T("2026-06-01T10:00:00Z") },
         { id: "d2", entry_at: T("2026-06-01T09:00:00Z") },
       ],
-      growEvents: [
-        { id: "g1", occurred_at: T("2026-06-01T10:00:00Z") },
-      ],
+      growEvents: [{ id: "g1", occurred_at: T("2026-06-01T10:00:00Z") }],
     };
     const a = mergeTimelineSources(input);
     const b = mergeTimelineSources(input);

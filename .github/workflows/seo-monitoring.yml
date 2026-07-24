@@ -63,7 +63,7 @@ jobs:
       - name: SEO allowlist — list expired entries
         run: node scripts/seo/gsc-inspect-urls.mjs --list-expired-entries --allowlist config/seo-allowlist.json
       - name: SEO allowlist dry-run (no GSC calls; fails on expired entries)
-        run: node scripts/seo/gsc-inspect-urls.mjs --dry-run-allowlist --urls "https://verdantgrowdiary.com/,https://verdantgrowdiary.com/welcome,https://verdantgrowdiary.com/pricing,https://verdantgrowdiary.com/hardware-integrations" --allowlist config/seo-allowlist.json --previous-dir artifacts/seo/previous
+        run: node scripts/seo/gsc-inspect-urls.mjs --dry-run-allowlist --urls "https://verdantgrowdiary.com/,https://verdantgrowdiary.com/welcome,https://verdantgrowdiary.com/pricing,https://verdantgrowdiary.com/hardware-integrations,https://verdantgrowdiary.com/guides/cronk-nutrients-grow-diary" --allowlist config/seo-allowlist.json --previous-dir artifacts/seo/previous
       - name: SEO regression-only check (no GSC calls)
         run: node scripts/seo/verify-last-gsc-finding.mjs --fail-only-previously-resolved-expired --previous artifacts/seo/previous/gsc-last-finding-verification.json
       - name: GSC OAuth configured?

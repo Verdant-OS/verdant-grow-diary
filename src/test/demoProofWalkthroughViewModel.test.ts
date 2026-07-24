@@ -77,7 +77,7 @@ describe("demoProofWalkthroughViewModel", () => {
     expect(operatorSteps.length).toBeGreaterThanOrEqual(1);
     for (const s of operatorSteps) {
       expect(s.statusKind).toBe("operator_only");
-      expect(s.safetyNote).toMatch(/URL surface gate/i);
+      expect(s.safetyNote).toMatch(/server-verified operator role/i);
     }
   });
 
@@ -100,9 +100,9 @@ describe("demoProofWalkthroughViewModel", () => {
   });
 
 
-  it("safety summary calls out URL surface gate, no automation, no device control", () => {
+  it("safety summary calls out the verified role gate, no automation, no device control", () => {
     const joined = vm.safetySummary.join(" ");
-    expect(joined).toMatch(/URL surface gate/i);
+    expect(joined).toMatch(/server-verified operator role/i);
     expect(joined).toMatch(/no device control or automation/i);
     expect(joined).toMatch(/Verdant suggests; growers approve/i);
     expect(joined).toMatch(/Read-only walkthrough/i);

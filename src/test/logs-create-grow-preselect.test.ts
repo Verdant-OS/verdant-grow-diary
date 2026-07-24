@@ -29,7 +29,12 @@ describe("Logs — preselect grow on create from /logs?growId=…", () => {
 
   it("QuickLog defaults its grow dropdown to the active grow from the store", () => {
     expect(QUICKLOG).toMatch(/useGrows\(\)/);
-    expect(QUICKLOG).toMatch(/value=\{activeGrowId\s*\?\?\s*""\}/);
+    // The grow <Select> binds to a derived value that falls back to the active
+    // grow from the store (during normal editing inFlightSaveContext is null,
+    // so displayedGrowId === activeGrowId ?? ""). Guard both halves so the
+    // preselect intent still fails if the activeGrowId fallback is removed.
+    expect(QUICKLOG).toMatch(/value=\{displayedGrowId\}/);
+    expect(QUICKLOG).toMatch(/displayedGrowId\s*=[^\n]*activeGrowId\s*\?\?\s*""/);
   });
 
   it("QuickLog enumerates only RLS-loaded grows from the store", () => {

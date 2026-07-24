@@ -39,7 +39,9 @@ describe("Action Queue manual refresh button structure", () => {
 
   it("uses RefreshCw icon from lucide-react", () => {
     expect(SRC).toContain("RefreshCw");
-    expect(SRC).toMatch(/import.*RefreshCw.*from "lucide-react"/);
+    const lucideImport = SRC.match(/import\s*\{([^}]*)\}\s*from\s*"lucide-react";/)?.[1];
+    expect(lucideImport).toBeDefined();
+    expect(lucideImport).toMatch(/\bRefreshCw\b/);
   });
 
   it("button has visible label 'Refresh'", () => {

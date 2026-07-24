@@ -238,17 +238,26 @@ describe("AI Doctor Readiness UI v1.4 — mobile viewport regression (DOM order 
   it("strong context: header order is deterministic on mobile width and omits Limitations/Missing", () => {
     const HOUR = READINESS_FIXTURE_HOUR_MS;
     const ago = readinessFixtureAgo;
-    const context = buildReadinessContext({
-      growEvents: [
-        { occurred_at: ago(12 * HOUR), event_type: "watering", source: "manual" },
-        { occurred_at: ago(8 * HOUR), event_type: "feeding", source: "manual" },
-        { occurred_at: ago(4 * HOUR), event_type: "photo", source: "manual" },
-      ],
-      sensorReadings: [
-        buildReadingForSource("live"),
-        buildReadingForSource("live", { metric: "humidity_pct", value: 55 }),
-      ],
-    });
+    // Strong readiness now also requires a known plant type and recent
+    // root-zone history (autoflower/photoperiod gate, 2026-07-21). This
+    // panel consumes a pre-compiled AiDoctorContext, so both fields are
+    // supplied on the compiled payload directly — the row compiler does
+    // not derive them from grow-event rows.
+    const context = {
+      ...buildReadinessContext({
+        growEvents: [
+          { occurred_at: ago(12 * HOUR), event_type: "watering", source: "manual" },
+          { occurred_at: ago(8 * HOUR), event_type: "feeding", source: "manual" },
+          { occurred_at: ago(4 * HOUR), event_type: "photo", source: "manual" },
+        ],
+        sensorReadings: [
+          buildReadingForSource("live"),
+          buildReadingForSource("live", { metric: "humidity_pct", value: 55 }),
+        ],
+      }),
+      plant_type: "photoperiod" as const,
+      recent_root_zone_observation_count: 1,
+    };
     render(<AiDoctorContextReadinessPanel context={context} openAlertsCount={0} />);
     const panel = screen.getByTestId("ai-doctor-context-readiness-panel");
     const headers = Array.from(panel.querySelectorAll("h2, h3")).map((h) =>

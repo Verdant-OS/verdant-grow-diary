@@ -17,10 +17,27 @@
  */
 
 import { getCsvVendorLineage } from "@/lib/sensorReadingVendorLineage";
+import {
+  AI_DOCTOR_CSV_HISTORY_LABEL,
+  AI_DOCTOR_CSV_HISTORY_NOT_LIVE_NOTE,
+} from "@/constants/aiDoctorImportedHistory";
 
-export const AI_DOCTOR_CSV_HISTORY_LABEL = "CSV history";
-export const AI_DOCTOR_CSV_HISTORY_NOT_LIVE_NOTE =
-  "This is imported CSV history, not live telemetry. Do not diagnose from CSV history alone.";
+export { AI_DOCTOR_CSV_HISTORY_LABEL, AI_DOCTOR_CSV_HISTORY_NOT_LIVE_NOTE };
+
+/**
+ * Explicit database source labels that may enter AI Doctor's imported-history
+ * summary. Canonical imports use `csv`; the `csv_import_*` values are the
+ * bounded legacy sources emitted by the existing AC Infinity/TrolMaster
+ * importer. Raw payload flags never override an explicit non-CSV source.
+ */
+export const AI_DOCTOR_CSV_HISTORY_SOURCES = Object.freeze([
+  "csv",
+  "csv_import_ac_infinity",
+  "csv_import_trolmaster",
+  "csv_import_other",
+] as const);
+
+const AI_DOCTOR_CSV_HISTORY_SOURCE_SET = new Set<string>(AI_DOCTOR_CSV_HISTORY_SOURCES);
 
 /** Vendor display names AI Doctor is allowed to surface. */
 const VERDANT_XLSX_LABEL = "Verdant Genetics XLSX";
@@ -32,6 +49,7 @@ export interface CsvHistorySensorRowLike {
   captured_at?: string | null;
   ts?: string | null;
   source?: string | null;
+  quality?: string | null;
   raw_payload?: unknown;
 }
 
@@ -63,17 +81,19 @@ export interface AiDoctorCsvHistoryContext {
   dateRange: { earliest: string; latest: string } | null;
   vendors: readonly CsvHistoryVendorSummary[];
   metrics: readonly CsvHistoryMetricSummary[];
+  /** Explicit non-ok/unknown-quality rows excluded from metric evidence. */
+  excludedQualityCount: number;
   suspiciousFlagCount: number;
 }
 
 function asRecord(v: unknown): Record<string, unknown> | null {
-  return v && typeof v === "object" && !Array.isArray(v)
-    ? (v as Record<string, unknown>)
-    : null;
+  return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
 }
 
 function toFiniteNumber(v: unknown): number | null {
   if (v === null || v === undefined) return null;
+  if (typeof v !== "number" && typeof v !== "string") return null;
+  if (typeof v === "string" && v.trim().length === 0) return null;
   const n = typeof v === "number" ? v : Number(v);
   return Number.isFinite(n) ? n : null;
 }
@@ -94,9 +114,7 @@ function vendorLabelFor(row: CsvHistorySensorRowLike): {
   // that the shared lineage helper does not enumerate (vendor-neutral file).
   const payload = asRecord(row.raw_payload);
   const sourceApp =
-    typeof payload?.source_app === "string"
-      ? payload.source_app.trim().toLowerCase()
-      : "";
+    typeof payload?.source_app === "string" ? payload.source_app.trim().toLowerCase() : "";
   if (sourceApp === "verdant_genetics_xlsx") {
     return {
       sourceApp: "verdant_genetics_xlsx",
@@ -115,10 +133,131 @@ function isSuspicious(row: CsvHistorySensorRowLike): boolean {
   return false;
 }
 
-function isCsvRow(row: CsvHistorySensorRowLike): boolean {
-  if (row.source === "csv") return true;
-  const payload = asRecord(row.raw_payload);
-  return payload?.csv_import === true;
+function capturedAtText(row: CsvHistorySensorRowLike): string {
+  return typeof row.captured_at === "string"
+    ? row.captured_at
+    : typeof row.ts === "string"
+      ? row.ts
+      : "";
+}
+
+function compareText(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+function nullableTextKey(value: unknown): string {
+  return typeof value === "string" ? `string:${value}` : "null:";
+}
+
+/**
+ * True only for rows whose explicit source is one of the supported imported
+ * history labels. Manual, demo, live, stale, invalid, unknown, and missing
+ * sources are never reinterpreted from untrusted raw_payload flags.
+ */
+export function isCsvHistoryRow(row: CsvHistorySensorRowLike): boolean {
+  const source = typeof row.source === "string" ? row.source.trim().toLowerCase() : "";
+  return AI_DOCTOR_CSV_HISTORY_SOURCE_SET.has(source);
+}
+
+/**
+ * Imported rows may predate the quality column, so missing/null quality stays
+ * backward-compatible. Any explicit value must be the canonical `ok`; stale,
+ * degraded, invalid, blank, and unknown values fail closed as evidence.
+ */
+export function isUsableCsvHistoryObservationQuality(row: CsvHistorySensorRowLike): boolean {
+  if (row.quality === null || row.quality === undefined) return true;
+  return typeof row.quality === "string" && row.quality.trim().toLowerCase() === "ok";
+}
+
+const isCsvRow = isCsvHistoryRow;
+
+/**
+ * Total ordering over every row field that can change the bounded summary.
+ * Rows that still compare equal are summary-equivalent, so stable-sort input
+ * order cannot change the AI Doctor packet.
+ */
+export function compareCsvHistoryRowsForBoundedSummary(
+  a: CsvHistorySensorRowLike,
+  b: CsvHistorySensorRowLike,
+): number {
+  const atA = capturedAtText(a);
+  const atB = capturedAtText(b);
+  const timeA = Date.parse(atA) || 0;
+  const timeB = Date.parse(atB) || 0;
+  if (timeA !== timeB) return timeB - timeA;
+
+  const timestampTextOrder = compareText(atA, atB);
+  if (timestampTextOrder !== 0) return timestampTextOrder;
+
+  const metricOrder = compareText(
+    typeof a.metric === "string" ? a.metric : "",
+    typeof b.metric === "string" ? b.metric : "",
+  );
+  if (metricOrder !== 0) return metricOrder;
+
+  const valueA = toFiniteNumber(a.value);
+  const valueB = toFiniteNumber(b.value);
+  if (valueA === null && valueB !== null) return 1;
+  if (valueA !== null && valueB === null) return -1;
+  if (valueA !== null && valueB !== null && valueA !== valueB) {
+    return valueA - valueB;
+  }
+
+  const unitOrder = compareText(nullableTextKey(a.unit), nullableTextKey(b.unit));
+  if (unitOrder !== 0) return unitOrder;
+
+  const qualityOrder = compareText(nullableTextKey(a.quality), nullableTextKey(b.quality));
+  if (qualityOrder !== 0) return qualityOrder;
+
+  const vendorOrder = compareText(
+    vendorLabelFor(a)?.sourceApp ?? "",
+    vendorLabelFor(b)?.sourceApp ?? "",
+  );
+  if (vendorOrder !== 0) return vendorOrder;
+
+  return Number(isSuspicious(a)) - Number(isSuspicious(b));
+}
+
+export interface CsvHistoryEligibilityEvidence {
+  validObservationCount: number;
+  distinctObservationTimestampCount: number;
+}
+
+/**
+ * Count only the exact bounded CSV observations that are safe to use for the
+ * historical-review gate. Date range metadata and rejected rows cannot make a
+ * single valid timestamp look longitudinal.
+ */
+export function summarizeCsvHistoryEligibilityEvidence(
+  rows: ReadonlyArray<CsvHistorySensorRowLike> | null | undefined,
+  limit: number,
+): CsvHistoryEligibilityEvidence {
+  const normalizedLimit = Number.isFinite(limit) ? Math.max(0, Math.floor(limit)) : 0;
+  if (!Array.isArray(rows) || rows.length === 0 || normalizedLimit === 0) {
+    return { validObservationCount: 0, distinctObservationTimestampCount: 0 };
+  }
+
+  const bounded = rows
+    .filter((row) => !!row && isCsvHistoryRow(row))
+    .sort(compareCsvHistoryRowsForBoundedSummary)
+    .slice(0, normalizedLimit);
+  const timestamps = new Set<number>();
+  let validObservationCount = 0;
+
+  for (const row of bounded) {
+    if (!isUsableCsvHistoryObservationQuality(row)) continue;
+    if (typeof row.metric !== "string" || row.metric.trim().length === 0) continue;
+    if (toFiniteNumber(row.value) === null) continue;
+    const timestampMs = Date.parse(capturedAtText(row));
+    if (!Number.isFinite(timestampMs)) continue;
+    validObservationCount += 1;
+    timestamps.add(timestampMs);
+  }
+
+  return {
+    validObservationCount,
+    distinctObservationTimestampCount: timestamps.size,
+  };
 }
 
 function round3(n: number): number {
@@ -144,6 +283,7 @@ export function buildAiDoctorCsvHistoryContext(
     dateRange: null,
     vendors: Object.freeze([]),
     metrics: Object.freeze([]),
+    excludedQualityCount: 0,
     suspiciousFlagCount: 0,
   };
   const rows = Array.isArray(input?.rows) ? input.rows : [];
@@ -151,19 +291,14 @@ export function buildAiDoctorCsvHistoryContext(
 
   let total = 0;
   let suspicious = 0;
+  let excludedQuality = 0;
   let earliestMs = Number.POSITIVE_INFINITY;
   let latestMs = Number.NEGATIVE_INFINITY;
   let earliestIso: string | null = null;
   let latestIso: string | null = null;
 
-  const vendorCounts = new Map<
-    string,
-    { sourceApp: string; vendorLabel: string; count: number }
-  >();
-  const metricAccum = new Map<
-    string,
-    { metric: string; unit: string | null; values: number[] }
-  >();
+  const vendorCounts = new Map<string, { sourceApp: string; vendorLabel: string; count: number }>();
+  const metricAccum = new Map<string, { metric: string; unit: string | null; values: number[] }>();
 
   for (const row of rows) {
     if (!row || !isCsvRow(row)) continue;
@@ -186,7 +321,8 @@ export function buildAiDoctorCsvHistoryContext(
       latestMs = t;
       latestIso = capturedAt;
     }
-    if (isSuspicious(row)) suspicious += 1;
+    const usableQuality = isUsableCsvHistoryObservationQuality(row);
+    if (isSuspicious(row) || !usableQuality) suspicious += 1;
 
     const vendor = vendorLabelFor(row);
     if (vendor) {
@@ -195,7 +331,12 @@ export function buildAiDoctorCsvHistoryContext(
       else vendorCounts.set(vendor.sourceApp, { ...vendor, count: 1 });
     }
 
-    const metric = typeof row.metric === "string" ? row.metric : null;
+    if (!usableQuality) {
+      excludedQuality += 1;
+      continue;
+    }
+
+    const metric = typeof row.metric === "string" ? row.metric.trim() : null;
     const value = toFiniteNumber(row.value);
     if (metric && value !== null) {
       const bucket = metricAccum.get(metric);
@@ -214,11 +355,7 @@ export function buildAiDoctorCsvHistoryContext(
   const vendors: CsvHistoryVendorSummary[] = [...vendorCounts.values()].sort(
     (a, b) =>
       b.count - a.count ||
-      (a.vendorLabel < b.vendorLabel
-        ? -1
-        : a.vendorLabel > b.vendorLabel
-          ? 1
-          : 0),
+      (a.vendorLabel < b.vendorLabel ? -1 : a.vendorLabel > b.vendorLabel ? 1 : 0),
   );
 
   const metrics: CsvHistoryMetricSummary[] = [...metricAccum.values()]
@@ -240,12 +377,10 @@ export function buildAiDoctorCsvHistoryContext(
     historicalLabel: AI_DOCTOR_CSV_HISTORY_LABEL,
     notForLiveDiagnosis: AI_DOCTOR_CSV_HISTORY_NOT_LIVE_NOTE,
     totalReadings: total,
-    dateRange:
-      earliestIso && latestIso
-        ? { earliest: earliestIso, latest: latestIso }
-        : null,
+    dateRange: earliestIso && latestIso ? { earliest: earliestIso, latest: latestIso } : null,
     vendors: Object.freeze(vendors),
     metrics: Object.freeze(metrics),
+    excludedQualityCount: excludedQuality,
     suspiciousFlagCount: suspicious,
   };
 }

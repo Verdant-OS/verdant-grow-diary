@@ -38,6 +38,14 @@ describe("App route manifest sync", () => {
   it("flags no best-effort access-group mismatches", () => {
     expect(findAccessGroupMismatches()).toEqual([]);
   });
+
+  it("mounts both scoped aliases with their intentional access contracts", () => {
+    const mounted = extractMountedAppRoutePaths();
+    expect(mounted).toContain("/dashboard");
+    expect(mounted).toContain("/logs");
+    expect(APP_ROUTES.find((route) => route.path === "/dashboard")?.access).toBe("auth");
+    expect(APP_ROUTES.find((route) => route.path === "/logs")?.access).toBe("redirect");
+  });
 });
 
 describe("Operator route surface", () => {
@@ -51,10 +59,7 @@ describe("Operator route surface", () => {
   it("every mounted /operator/* route is gated as operator or internal", () => {
     const mountedOps = new Set(getMountedOperatorPaths());
     const offenders = APP_ROUTES.filter(
-      (r) =>
-        mountedOps.has(r.path) &&
-        r.access !== "operator" &&
-        r.access !== "internal",
+      (r) => mountedOps.has(r.path) && r.access !== "operator" && r.access !== "internal",
     ).map((r) => ({ path: r.path, access: r.access }));
     expect(offenders).toEqual([]);
   });
@@ -62,9 +67,7 @@ describe("Operator route surface", () => {
   it("explicitly covers /operator/one-tent-proof-record", () => {
     const mounted = extractMountedAppRoutePaths();
     expect(mounted).toContain("/operator/one-tent-proof-record");
-    const entry = APP_ROUTES.find(
-      (r) => r.path === "/operator/one-tent-proof-record",
-    );
+    const entry = APP_ROUTES.find((r) => r.path === "/operator/one-tent-proof-record");
     expect(entry).toBeDefined();
     expect(entry?.access).toBe("operator");
   });
@@ -86,11 +89,16 @@ describe("Public SEO route surface", () => {
    */
   const PUBLIC_SEO_PATH_PATTERNS: ReadonlyArray<RegExp> = [
     /^\/guides(\/.*)?$/,
+    /^\/founder$/,
     /^\/welcome$/,
     /^\/pricing$/,
     /^\/hardware-integrations$/,
+    /^\/partners\/csv-preview$/,
+    /^\/sensors\/csv-preview$/,
     /^\/how-ai-doctor-works$/,
+    /^\/tools(\/.*)?$/,
     /^\/customer\/.+$/,
+    /^\/quick-log$/,
   ];
 
   function isPublicSeoPath(p: string): boolean {
@@ -100,9 +108,7 @@ describe("Public SEO route surface", () => {
   it("every mounted public SEO route exists in the manifest", () => {
     const mounted = extractMountedAppRoutePaths();
     const manifestSet = new Set(APP_ROUTES.map((r) => r.path));
-    const missing = mounted
-      .filter(isPublicSeoPath)
-      .filter((p) => !manifestSet.has(p));
+    const missing = mounted.filter(isPublicSeoPath).filter((p) => !manifestSet.has(p));
     expect(missing).toEqual([]);
   });
 
@@ -120,5 +126,18 @@ describe("Public SEO route surface", () => {
       expect(entry?.access).toBe("public");
     }
   });
-});
 
+  it("explicitly covers /quick-log as public (acquisition-cluster contract)", () => {
+    const entry = APP_ROUTES.find((r) => r.path === "/quick-log");
+    expect(entry, "manifest entry for /quick-log").toBeDefined();
+    expect(entry?.access).toBe("public");
+  });
+
+  it("explicitly covers both browser-local CSV preview routes as public", () => {
+    for (const path of ["/partners/csv-preview", "/sensors/csv-preview"]) {
+      const entry = APP_ROUTES.find((route) => route.path === path);
+      expect(entry, `manifest entry for ${path}`).toBeDefined();
+      expect(entry?.access).toBe("public");
+    }
+  });
+});

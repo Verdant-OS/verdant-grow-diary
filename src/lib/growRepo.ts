@@ -5,25 +5,17 @@ import { supabase } from "@/integrations/supabase/client";
 import type { SensorReadingInsert } from "@/lib/db";
 import type { Tent, Plant, SensorReading } from "@/mock";
 import { mapTentRow, mapPlantRow, groupSensorReadingRows } from "./growAdapters";
+import { buildGrowScopedPlantsOrFilter } from "./growAttributionRules";
+import { isUuid } from "./isUuid";
+import { filterValidPlantRows, validatePlantRowResponse } from "./plantPayloadValidation";
 
 function fail(scope: string, error: { message?: string } | null): never {
   throw new Error(`growRepo.${scope}: ${error?.message ?? "unknown error"}`);
 }
 
-// Guard against legacy/mock string ids (e.g. "t1", "p1") which would cause
-// Postgres uuid columns to 400. When a non-UUID is passed, repo callers
-// short-circuit and let the useGrowData fallback layer serve mock data.
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const isUuid = (v: string | undefined | null): v is string =>
-  !!v && UUID_RE.test(v);
-
 export async function fetchTents(growId?: string): Promise<Tent[]> {
   if (growId !== undefined && !isUuid(growId)) return [];
-  let q = supabase
-    .from("tents")
-    .select("*")
-    .eq("is_archived", false);
+  let q = supabase.from("tents").select("*").eq("is_archived", false);
   if (growId) q = q.eq("grow_id", growId);
   const { data, error } = await q.order("created_at", { ascending: false });
   if (error) fail("fetchTents", error);
@@ -50,38 +42,66 @@ export async function fetchPlants(
   growId?: string,
   opts: FetchPlantsOptions = {},
 ): Promise<Plant[]> {
-  // Non-UUID tentId (e.g. mock "t1") would 400 against a uuid column.
-  // Return empty so the hook falls back to mock-filtered plants.
+  // Non-UUID tentId (e.g. legacy mock "t1") would 400 against a UUID column.
+  // Return an honest empty list without querying or substituting fixtures.
   if (tentId !== undefined && !isUuid(tentId)) return [];
   if (growId !== undefined && !isUuid(growId)) return [];
   let q = supabase.from("plants").select("*");
   if (!opts.includeArchived) q = q.eq("is_archived", false);
   if (tentId) q = q.eq("tent_id", tentId);
-  if (growId) q = q.eq("grow_id", growId);
+  if (growId && !tentId) {
+    // BUG-A: resolve the grow's plants through tent rollup too, so plants
+    // whose own grow_id is null but whose tent belongs to the grow don't
+    // vanish from grow-scoped views. Tent-fetch failure degrades to the
+    // legacy own-grow_id filter (never a silent empty grid).
+    const { data: tents } = await supabase.from("tents").select("id").eq("grow_id", growId);
+    q = q.or(
+      buildGrowScopedPlantsOrFilter(growId, (tents ?? []).map((t: { id: string }) => t.id)),
+    );
+  } else if (growId) {
+    q = q.eq("grow_id", growId);
+  }
   const { data, error } = await q.order("created_at", { ascending: false });
   if (error) fail("fetchPlants", error);
-  return (data ?? []).map(mapPlantRow);
+  const { valid, rejected } = filterValidPlantRows(data ?? []);
+  if (rejected > 0 && typeof console !== "undefined") {
+    console.warn(`growRepo.fetchPlants: dropped ${rejected} malformed plant row(s)`);
+  }
+  return valid.map(mapPlantRow);
 }
 
 export async function fetchPlant(id: string): Promise<Plant | null> {
   if (!isUuid(id)) return null;
   const { data, error } = await supabase.from("plants").select("*").eq("id", id).maybeSingle();
   if (error) fail("fetchPlant", error);
-  return data ? mapPlantRow(data) : null;
+  if (!data) return null;
+  const guard = validatePlantRowResponse(data);
+  if (!guard.ok || !guard.value) {
+    throw new Error(
+      `growRepo.fetchPlant: plant row failed validation (${guard.errors.join("; ")})`,
+    );
+  }
+  return mapPlantRow(guard.value);
 }
 
-export async function fetchSensorReadings(tentId?: string): Promise<SensorReading[]> {
+export async function fetchSensorReadings(tentId?: string | null): Promise<SensorReading[]> {
+  // `undefined` is the intentional aggregate read. `null` explicitly means
+  // the caller has no selected tent and must fail closed without a query.
+  if (tentId === null) return [];
   if (tentId !== undefined && !isUuid(tentId)) return [];
   let q = supabase.from("sensor_readings").select("*");
   if (tentId) q = q.eq("tent_id", tentId);
-  const { data, error } = await q.order("ts", { ascending: false }).limit(2000);
+  const { data, error } = await q
+    // Actual observation time leads: imported CSV rows preserve historical
+    // `captured_at` while `ts` can be one shared import time.
+    .order("captured_at", { ascending: false, nullsFirst: false })
+    .order("ts", { ascending: false })
+    .limit(2000);
   if (error) fail("fetchSensorReadings", error);
   return groupSensorReadingRows(data ?? []);
 }
 
-export async function insertSensorReading(
-  row: SensorReadingInsert,
-): Promise<void> {
+export async function insertSensorReading(row: SensorReadingInsert): Promise<void> {
   const { error } = await supabase.from("sensor_readings").insert(row);
   if (error) fail("insertSensorReading", error);
 }
@@ -96,9 +116,7 @@ export async function insertSensorReading(
  * action_queue, devices, or any other table. Does not derive snapshots or
  * alerts as a side effect.
  */
-export async function insertSensorReadingsBatch(
-  rows: SensorReadingInsert[],
-): Promise<void> {
+export async function insertSensorReadingsBatch(rows: SensorReadingInsert[]): Promise<void> {
   if (!rows || rows.length === 0) return;
   const { error } = await supabase.from("sensor_readings").insert(rows);
   if (error) fail("insertSensorReadingsBatch", error);

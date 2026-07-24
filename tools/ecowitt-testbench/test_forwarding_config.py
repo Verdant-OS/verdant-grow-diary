@@ -228,6 +228,34 @@ class ForwardedPayloadContractTests(unittest.TestCase):
         # Verdant local source label preserved as lineage, never sent as `source`
         self.assertEqual(payload["metadata"]["verdant_source"], "live")
 
+    def test_replay_uses_stable_idempotency_key_from_fingerprint_inputs(self):
+        reading = {
+            "captured_at": "2026-06-17T05:40:30Z",
+            "source": "live",
+            "vendor": "ecowitt_windows_testbench",
+            "metrics": {
+                "temp_f": 80.0,
+                "humidity_percent": 58.0,
+            },
+            "metadata": {
+                "raw_payload": {
+                    "dateutc": "2026-06-17 05:40:30",
+                    "tempf": "80.0",
+                    "humidity": "58",
+                }
+            },
+        }
+
+        first_result, first_request = self._send(reading)
+        second_result, second_request = self._send(reading)
+
+        first_key = first_request["headers"]["Idempotency-Key"]
+        second_key = second_request["headers"]["Idempotency-Key"]
+        self.assertEqual(first_key, second_key)
+        self.assertEqual(first_result["idempotency_key"], first_key)
+        self.assertEqual(second_result["idempotency_key"], second_key)
+        self.assertRegex(first_key, r"^ecowitt-[0-9a-f]{64}$")
+
     def test_passkey_is_stripped_from_forwarded_raw_payload(self):
         reading = {
             "captured_at": "2026-06-17T05:40:30Z",
@@ -237,6 +265,7 @@ class ForwardedPayloadContractTests(unittest.TestCase):
                 "raw_payload": {
                     "PASSKEY": "SECRETDEVICEAUTH123",
                     "passkey": "alt-secret",
+                    "MAC": "AA:BB:CC:DD:EE:FF",
                     "tempf": 70.0,
                     "stationtype": "GW1200B_V1.4.7",
                 }
@@ -248,6 +277,7 @@ class ForwardedPayloadContractTests(unittest.TestCase):
         self.assertNotIn("PASSKEY", raw)
         self.assertNotIn("passkey", raw)
         self.assertNotIn("Passkey", raw)
+        self.assertNotIn("MAC", raw)
         self.assertIn("tempf", raw)
         self.assertIn("stationtype", raw)
         # And the literal secret string must not appear anywhere in the body
@@ -255,6 +285,7 @@ class ForwardedPayloadContractTests(unittest.TestCase):
         body_text = _json.dumps(payload)
         self.assertNotIn("SECRETDEVICEAUTH123", body_text)
         self.assertNotIn("alt-secret", body_text)
+        self.assertNotIn("AA:BB:CC:DD:EE:FF", body_text)
 
 
 class ForwardErrorSanitizationTests(unittest.TestCase):
@@ -349,6 +380,7 @@ class ForwardErrorSanitizationTests(unittest.TestCase):
             ("tent_lookup_failed", "tent_lookup_failed"),
             ("insert_failed", "storage_insert_failed"),
             ("unauthorized", "auth_failed"),
+            ("bridge_required", "bridge_required"),
             ("token_revoked", "token_revoked"),
             ("token_expired", "token_expired"),
             ("auth_lookup_failed", "auth_lookup_failed"),

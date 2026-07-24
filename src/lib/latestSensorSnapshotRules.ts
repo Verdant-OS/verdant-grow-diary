@@ -14,15 +14,14 @@
  *  - No fake live / demo fallback.
  */
 
+import { withoutDiagnosticSensorRows } from "@/lib/sensorProvenanceFenceRules";
+
 export const SENSOR_FRESH_WINDOW_MINUTES = 15;
 export const SENSOR_FUTURE_SKEW_LIMIT_MINUTES = 5;
+/** Metrics outside this window are not one coherent sensor snapshot. */
+const SENSOR_SNAPSHOT_COHERENCE_MS = 5 * 60 * 1000;
 
-export type SensorSnapshotStatus =
-  | "fresh_live"
-  | "fresh_non_live"
-  | "stale"
-  | "invalid"
-  | "empty";
+export type SensorSnapshotStatus = "fresh_live" | "fresh_non_live" | "stale" | "invalid" | "empty";
 
 export type SensorSnapshotFreshness = "fresh" | "stale" | "invalid" | "unknown";
 
@@ -33,10 +32,7 @@ export type SensorMetricKey =
   | "soil_moisture_pct"
   | "co2_ppm";
 
-export const REQUIRED_SNAPSHOT_METRICS: readonly SensorMetricKey[] = [
-  "temp_f",
-  "humidity_pct",
-];
+export const REQUIRED_SNAPSHOT_METRICS: readonly SensorMetricKey[] = ["temp_f", "humidity_pct"];
 
 export const OPTIONAL_SNAPSHOT_METRICS: readonly SensorMetricKey[] = [
   "vpd_kpa",
@@ -157,10 +153,108 @@ function mapRawMetricKey(
   }
 }
 
-export function evaluateMetric(
-  key: SensorMetricKey,
-  value: number | null,
-): SensorMetricEvaluation {
+interface TimestampedSensorRow {
+  row: RawSensorRow;
+  capturedAtMs: number;
+  createdAtMs: number;
+  inputIndex: number;
+}
+
+function effectiveCapturedAt(row: RawSensorRow): { raw: string; ms: number } | null {
+  for (const candidate of [row.captured_at, row.ts]) {
+    if (typeof candidate !== "string" || candidate.trim().length === 0) continue;
+    const ms = Date.parse(candidate);
+    if (Number.isFinite(ms)) return { raw: candidate, ms };
+  }
+  return null;
+}
+
+function normalizedSource(source: unknown): string {
+  return typeof source === "string" ? source.trim().toLowerCase() : "";
+}
+
+function compareSnapshotRowsNewestFirst(a: TimestampedSensorRow, b: TimestampedSensorRow): number {
+  if (a.capturedAtMs !== b.capturedAtMs) return b.capturedAtMs - a.capturedAtMs;
+  if (a.createdAtMs !== b.createdAtMs) return b.createdAtMs - a.createdAtMs;
+  const aId = String(a.row.id ?? "");
+  const bId = String(b.row.id ?? "");
+  if (aId !== bId) return aId < bId ? 1 : -1;
+  return a.inputIndex - b.inputIndex;
+}
+
+/**
+ * Select one deterministic, source-coherent snapshot cohort.
+ *
+ * Raw payload is retained only long enough for the shared provenance fence.
+ * Diagnostic rows are removed before the anchor is selected, so a canonical
+ * `source=live` label can never promote Windows testbench traffic. The
+ * returned rows are internal inputs to the redacted snapshot projection;
+ * `raw_payload` is never copied to `SensorSnapshot` or its save payload.
+ */
+function selectSensorSnapshotCohort(
+  rows: readonly RawSensorRow[] | null | undefined,
+): RawSensorRow[] {
+  const input = Array.isArray(rows) ? rows : [];
+  const candidates = withoutDiagnosticSensorRows(input)
+    .map((row, inputIndex): TimestampedSensorRow | null => {
+      const metric = typeof row.metric === "string" ? row.metric : "";
+      const value = toFiniteNumber(row.value);
+      const mapped = value === null ? null : mapRawMetricKey(metric, value);
+      const capturedAt = effectiveCapturedAt(row);
+      if (!mapped?.key || !capturedAt) return null;
+      const createdAtMs = Date.parse(row.created_at ?? "");
+      return {
+        row,
+        capturedAtMs: capturedAt.ms,
+        createdAtMs: Number.isFinite(createdAtMs) ? createdAtMs : -Infinity,
+        inputIndex,
+      };
+    })
+    .filter((candidate): candidate is TimestampedSensorRow => candidate !== null)
+    .sort(compareSnapshotRowsNewestFirst);
+
+  const anchor = candidates[0];
+  if (!anchor) return [];
+  const anchorSource = normalizedSource(anchor.row.source);
+
+  return candidates
+    .filter(
+      (candidate) =>
+        normalizedSource(candidate.row.source) === anchorSource &&
+        anchor.capturedAtMs - candidate.capturedAtMs <= SENSOR_SNAPSHOT_COHERENCE_MS,
+    )
+    .map((candidate) => candidate.row);
+}
+
+/** Row shape safe to retain in the client query cache after classification. */
+export type SensorSnapshotCacheRow = Omit<RawSensorRow, "raw_payload">;
+
+/**
+ * Classify and redact acquisition rows before they enter React Query's cache.
+ * Keeping the safe long-format fields lets freshness be recomputed whenever
+ * Quick Log renders instead of freezing a `fresh_live` verdict at fetch time.
+ */
+export function prepareSensorSnapshotRowsForCache(
+  rows: readonly RawSensorRow[] | null | undefined,
+): SensorSnapshotCacheRow[] {
+  return selectSensorSnapshotCohort(rows).map((row) => ({
+    id: row.id,
+    tent_id: row.tent_id,
+    metric: row.metric,
+    value: row.value,
+    // A legacy listener row can retain the transport vendor in `source`.
+    // Reaching this point proves its raw payload carried the physical-gateway
+    // exception, so preserve that trust verdict after redaction as canonical
+    // live rather than forcing later consumers to retain raw provenance.
+    source: normalizedSource(row.source) === "ecowitt_windows_testbench" ? "live" : row.source,
+    quality: row.quality,
+    captured_at: row.captured_at,
+    ts: row.ts,
+    created_at: row.created_at,
+  }));
+}
+
+export function evaluateMetric(key: SensorMetricKey, value: number | null): SensorMetricEvaluation {
   if (value === null || !Number.isFinite(value)) {
     return { value: null, valid: false, warn: false, reason: null };
   }
@@ -200,11 +294,7 @@ export function evaluateMetric(
         value,
         valid,
         warn,
-        reason: !valid
-          ? "VPD outside 0–5 kPa."
-          : warn
-            ? "VPD at edge (≤0 or >3 kPa)."
-            : null,
+        reason: !valid ? "VPD outside 0–5 kPa." : warn ? "VPD at edge (≤0 or >3 kPa)." : null,
       };
     }
     case "soil_moisture_pct": {
@@ -333,7 +423,8 @@ export function buildSensorSnapshot(
   options: BuildSnapshotOptions = {},
 ): SensorSnapshot {
   const now = options.now ?? new Date();
-  if (!Array.isArray(rows) || rows.length === 0) {
+  const cohort = selectSensorSnapshotCohort(rows);
+  if (cohort.length === 0) {
     return {
       ...EMPTY_SENSOR_SNAPSHOT,
       metrics: { ...EMPTY_METRICS },
@@ -351,22 +442,16 @@ export function buildSensorSnapshot(
   let freshestSource: string | null = null;
   let freshestId: string | null = null;
 
-  for (const row of rows) {
+  for (const row of cohort) {
     if (!row || typeof row !== "object") continue;
-    const rawMetric =
-      typeof row.metric === "string" ? row.metric : null;
+    const rawMetric = typeof row.metric === "string" ? row.metric : null;
     if (!rawMetric) continue;
     const value = toFiniteNumber(row.value);
     if (value === null) continue;
     const mapped = mapRawMetricKey(rawMetric, value);
     if (!mapped.key) continue;
 
-    const captured =
-      typeof row.captured_at === "string" && row.captured_at.length > 0
-        ? row.captured_at
-        : typeof row.ts === "string" && row.ts.length > 0
-          ? row.ts
-          : null;
+    const captured = effectiveCapturedAt(row)?.raw ?? null;
 
     // Take the latest value per metric (rows arrive newest-first).
     if (metricValues[mapped.key] === null) {
@@ -379,13 +464,8 @@ export function buildSensorSnapshot(
         freshestT = t;
         freshestCapturedAt = captured;
         freshestSource =
-          typeof row.source === "string" && row.source.length > 0
-            ? row.source
-            : freshestSource;
-        freshestId =
-          typeof row.id === "string" && row.id.length > 0
-            ? row.id
-            : freshestId;
+          typeof row.source === "string" && row.source.length > 0 ? row.source : freshestSource;
+        freshestId = typeof row.id === "string" && row.id.length > 0 ? row.id : freshestId;
       }
     }
   }
@@ -394,10 +474,7 @@ export function buildSensorSnapshot(
     temp_f: evaluateMetric("temp_f", metricValues.temp_f),
     humidity_pct: evaluateMetric("humidity_pct", metricValues.humidity_pct),
     vpd_kpa: evaluateMetric("vpd_kpa", metricValues.vpd_kpa),
-    soil_moisture_pct: evaluateMetric(
-      "soil_moisture_pct",
-      metricValues.soil_moisture_pct,
-    ),
+    soil_moisture_pct: evaluateMetric("soil_moisture_pct", metricValues.soil_moisture_pct),
     co2_ppm: evaluateMetric("co2_ppm", metricValues.co2_ppm),
   };
 
@@ -418,12 +495,8 @@ export function buildSensorSnapshot(
   // Required-metric validity: if any present required metric is invalid,
   // the snapshot is invalid. Missing required metrics simply downgrade
   // usability — they never inflate to healthy.
-  const requiredPresent = REQUIRED_SNAPSHOT_METRICS.filter(
-    (k) => metricValues[k] !== null,
-  );
-  const requiredInvalid = requiredPresent.some(
-    (k) => !metricDetails[k].valid,
-  );
+  const requiredPresent = REQUIRED_SNAPSHOT_METRICS.filter((k) => metricValues[k] !== null);
+  const requiredInvalid = requiredPresent.some((k) => !metricDetails[k].valid);
 
   const freshness = classifyFreshness(freshestCapturedAt, now);
   const ageMinutes = freshness.ageMinutes;
@@ -446,10 +519,7 @@ export function buildSensorSnapshot(
   const badge_label = buildBadgeLabel(status, freshestSource, ageMinutes);
 
   const usable =
-    status !== "invalid" &&
-    status !== "empty" &&
-    requiredPresent.length > 0 &&
-    !requiredInvalid;
+    status !== "invalid" && status !== "empty" && requiredPresent.length > 0 && !requiredInvalid;
 
   return {
     sensor_snapshot_id: freshestId,
@@ -458,8 +528,7 @@ export function buildSensorSnapshot(
     age_minutes: ageMinutes,
     source: freshestSource,
     confidence:
-      typeof options.confidence === "number" &&
-      Number.isFinite(options.confidence)
+      typeof options.confidence === "number" && Number.isFinite(options.confidence)
         ? options.confidence
         : null,
     freshness: freshness.freshness,
@@ -545,9 +614,6 @@ export function resolveLatestSensorSnapshot(
  * exact `details.sensor` shape Quick Log persists. Returns null when the
  * snapshot is not safe to attach.
  */
-export function buildSensorSnapshotSavePayload(
-  snapshot: SensorSnapshot | null | undefined,
-) {
+export function buildSensorSnapshotSavePayload(snapshot: SensorSnapshot | null | undefined) {
   return buildSensorSnapshotDetails(snapshot, true);
 }
-

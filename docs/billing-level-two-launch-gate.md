@@ -20,19 +20,33 @@ slice approves it.
 
 ## Current Billing Chain
 
-1. Paddle webhook verifies the raw-body signature before parsing.
-2. Events are recorded idempotently in `paddle_events`.
-3. Processing decisions are recorded in `paddle_event_processing`.
-4. Customer/user attribution is captured in `billing_customer_links`.
-5. Subscription updater writes are performed only through reviewed RPC
-   boundaries (no direct webhook writes to `billing_subscriptions`).
-6. Subscription updater results are audited in
-   `billing_subscription_update_audit` via the audited wrapper RPC.
-7. Operator can view sanitized updater audit results through the operator
-   audit RPC and page.
-8. Retention purge for the audit table is service-role-only.
-9. Operator can view sanitized entitlement resolution audit results through
-   the operator entitlement resolution RPC and page.
+**Canonical entitlement chain (Lovable lane, since 2026-07-16):**
+
+1. `payments-webhook` verifies the Paddle signature via the shared helper.
+2. Events are recorded idempotently in `lovable_paddle_events`
+   (unique on `paddle_event_id`; 23505 = duplicate no-op).
+3. Recurring subscription events upsert `public.subscriptions` directly
+   (service role, keyed on `paddle_subscription_id`).
+4. Founder Lifetime purchases go through `allocate_lovable_founder_lifetime`
+   (advisory-locked, cap-enforced, atomic).
+5. `has_pheno_tracker_entitlement` and `ai_credit_spend` read entitlement
+   only from `public.subscriptions` where `environment='live'`.
+
+**Audit-only chain (legacy BYO lane, retained for operator visibility):**
+
+6. `paddle-webhook` (sandbox-only) verifies the raw-body signature before
+   parsing and records events in `paddle_events`.
+7. Processing decisions are recorded in `paddle_event_processing`.
+8. Customer/user attribution is captured in `billing_customer_links`.
+9. Subscription updater writes to `billing_subscriptions` only through
+   reviewed RPC boundaries (audited in `billing_subscription_update_audit`).
+10. Retention purge for the audit table is service-role-only.
+11. Operator surfaces (`/operator/paddle-processing`,
+    `/operator/billing-subscription-updates`,
+    `/operator/billing-entitlement-resolution`) read from these tables.
+
+**Note:** rows written to `billing_subscriptions` no longer grant
+entitlement. New paid access must arrive through the Lovable lane.
 
 ## Required Green Checks Before Live Mode
 

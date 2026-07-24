@@ -16,10 +16,12 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { dashboardPath } from "@/lib/routes";
 import { buildSwitcherTarget } from "@/components/GrowBreadcrumbs";
+import { APP_ROUTES } from "@/lib/appRouteManifest";
 
 const ROOT = resolve(__dirname, "../..");
 const DASHBOARD = readFileSync(resolve(ROOT, "src/pages/Dashboard.tsx"), "utf8");
 const GROW_DETAIL = readFileSync(resolve(ROOT, "src/pages/GrowDetail.tsx"), "utf8");
+const APP = readFileSync(resolve(ROOT, "src/App.tsx"), "utf8");
 
 const AI_COACH_CALL = /["'`]ai-coach["'`]|functions\/ai-coach|ai_coach/;
 const DEVICE_SURFACE = /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|\brelay\b|\bactuator\b/i;
@@ -34,6 +36,12 @@ describe("dashboardPath helper", () => {
   });
   it("is wired into GrowBreadcrumbs switcher for section=dashboard", () => {
     expect(buildSwitcherTarget("dashboard", "g2")).toBe("/dashboard?growId=g2");
+  });
+  it("is mounted as an authenticated Dashboard route", () => {
+    expect(APP).toMatch(/<Route path="\/dashboard" element=\{<Dashboard \/>\} \/>/);
+    expect(APP_ROUTES.find((route) => route.path === "/dashboard")).toMatchObject({
+      access: "auth",
+    });
   });
 });
 

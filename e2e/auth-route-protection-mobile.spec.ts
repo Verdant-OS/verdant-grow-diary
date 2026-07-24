@@ -19,6 +19,8 @@ const PRIVATE_TABLES = [
   "action_queue",
 ];
 
+const PROTECTED_TABLES = [...PRIVATE_TABLES, "pheno_hunts", "pheno_keepers"];
+
 // Representative protected/operator/internal mobile coverage. Kept in sync
 // with src/lib/appRouteManifest.ts via src/test/operator-route-mobile-coverage.test.ts.
 // IMPORTANT: every operator + internal route in APP_ROUTES must be listed here.
@@ -29,6 +31,7 @@ const PROTECTED_MOBILE_ROUTES: string[] = [
   "/operator/ai-doctor-phase1",
   "/operator/billing-entitlement-resolution",
   "/operator/billing-subscription-updates",
+  "/operator/credits-audit",
   "/operator/ecowitt",
   "/operator/ecowitt-bridge-status",
   "/operator/ecowitt-bridge-debug",
@@ -42,6 +45,8 @@ const PROTECTED_MOBILE_ROUTES: string[] = [
   "/operator/paddle-processing-audit",
   "/operator/post-grow-reflection-dry-run",
   "/operator/release-readiness",
+  "/operator/subscriber-growth",
+  "/operator/support-inbox",
   "/operator/demo-preview",
 
   "/pi-ingest-status",
@@ -57,29 +62,47 @@ const PROTECTED_MOBILE_ROUTES: string[] = [
   "/leads",
   "/one-tent-loop-proof",
   // representative auth-gated surfaces
-  "/",
   "/actions",
   "/sensors",
   "/settings",
   // write-capable pheno hunt surfaces — moved behind the auth gate
+  "/pheno-hunts",
+  "/pheno-hunts/new",
   "/pheno-hunts/:id/workspace",
   "/pheno-hunts/:id/keepers",
 ];
 
 const PUBLIC_MOBILE_ROUTES: string[] = [
+  "/",
   "/welcome",
   "/pricing",
   "/hardware-integrations",
   "/guides",
   "/guides/:slug",
+  "/guides/grow-stage-care-guide",
+  "/cultivars",
+  // Template entry satisfies the manifest coverage guard; ":slug" resolves
+  // to the unknown-slug redirect, so also exercise a real detail page.
+  "/cultivars/:slug",
+  "/cultivars/oreoz",
+  "/ai-doctor-readiness-check",
+  "/founder",
   "/how-ai-doctor-works",
   "/partners/csv-preview",
+  "/sensors/csv-preview",
   "/customer/:shareId",
+  "/customer/:shareId/cannabis-care",
   // Read-only Pheno Comparison preview: public, fixture-only, mounted outside
   // AuthProvider/GrowsProvider/AppShell — must render signed-out on mobile with
   // zero private-table fetches.
   "/pheno-comparison",
   "/pheno-hunts/:id/compare",
+  // Read-only per-hunt showcase (pack → contenders → fight → cure → family
+  // tree): public + RLS-scoped, gated so it fetches nothing signed-out and
+  // renders the demo fallback. Plus the fixture-only /internal walkthrough
+  // (no Supabase at all).
+  "/pheno-hunts/:id/showcase",
+  "/internal/pheno-hunt-demo",
   "/.lovable/oauth/consent",
   "/breeder-beta",
   "/creator-beta",
@@ -91,6 +114,28 @@ const PUBLIC_MOBILE_ROUTES: string[] = [
   "/terms",
   "/privacy",
   "/refund",
+  // Public support pages (feedback + contact): static forms mounted outside
+  // AppShell — must render signed-out with zero private-table fetches.
+  "/contact",
+  "/feedback",
+  "/tools/vpd-calculator",
+  // Public MCP API reference docs page: static content only, no Supabase
+  // fetch — must render signed-out with zero private-table fetches.
+  "/docs/mcp-api",
+  // Public 30-second Quick Log starter: local draft only, mounted outside
+  // AppShell — must render signed-out with zero private-table fetches.
+  "/quick-log",
+];
+
+// Internal fixture-only demo surfaces DELIBERATELY mounted OUTSIDE AppShell
+// (see App.tsx comments): they render signed-out by design so the read-only
+// E2E guards can exercise them without a session. Their safety contract is
+// not "redirects to /auth" but "renders fixture content with ZERO private
+// REST hits". Do NOT add real operator/internal pages here — the vitest
+// coverage guardrail pins this list to exactly these two routes.
+const UNAUTH_FIXTURE_ROUTES: string[] = [
+  "/internal/contextual-pheno-comparison-demo",
+  "/internal/demo-proof-walkthrough",
 ];
 
 async function mockAllSupabase(page: Page, opts: { signedIn?: boolean } = {}) {
@@ -161,19 +206,33 @@ test.use({
 });
 
 test.describe("Auth route-protection MOBILE (mocked, 390x844)", () => {
+  test.beforeAll(async ({ browser, baseURL }, testInfo) => {
+    // Vite's first browser-driven module graph compile can exceed the normal
+    // assertion budget on a cold Windows checkout. Warm the mocked app once;
+    // every actual route test keeps the standard 60-second timeout.
+    testInfo.setTimeout(120_000);
+    const page = await browser.newPage({ baseURL });
+    try {
+      await mockAllSupabase(page);
+      await page.goto("/welcome", { waitUntil: "domcontentloaded", timeout: 110_000 });
+    } finally {
+      await page.close();
+    }
+  });
+
   test.beforeEach(async ({ page }) => {
     await mockAllSupabase(page);
   });
 
   for (const path of PROTECTED_MOBILE_ROUTES) {
-    test(`mobile signed-out → ${path} redirects to /auth and makes no private REST hits`, async ({
+    test(`mobile signed-out → ${path} redirects to /welcome and makes no private REST hits`, async ({
       page,
       baseURL,
     }) => {
       const privateHits: string[] = [];
       await page.route(/\/rest\/v1\//, (route, req) => {
         const u = req.url();
-        if (PRIVATE_TABLES.some((t) => u.includes(`/rest/v1/${t}`))) {
+        if (PROTECTED_TABLES.some((t) => u.includes(`/rest/v1/${t}`))) {
           privateHits.push(u);
         }
         return route.fulfill({
@@ -187,7 +246,7 @@ test.describe("Auth route-protection MOBILE (mocked, 390x844)", () => {
       // flake). Use domcontentloaded for the navigation and a polling URL
       // assertion for the auth-gate redirect with a generous timeout.
       await page.goto(path, { waitUntil: "domcontentloaded" });
-      await expect(page).toHaveURL(/\/auth(\?|$)/, { timeout: 20_000 });
+      await expect(page).toHaveURL(/\/welcome(\?|$)/, { timeout: 20_000 });
       const url = new URL(page.url());
       expect(url.origin).toBe(new URL(baseURL!).origin);
       const redirectTo = url.searchParams.get("redirectTo");
@@ -201,8 +260,17 @@ test.describe("Auth route-protection MOBILE (mocked, 390x844)", () => {
         `Private-table hits while signed out (mobile, ${path}): ${privateHits.join(", ")}`,
       ).toHaveLength(0);
       const body = ((await page.locator("body").textContent()) ?? "").toLowerCase();
+      expect(body).not.toContain("page not found");
       expect(body).not.toContain("live reading");
       expect(body).not.toContain("latest sensor:");
+      if (path === "/partners/csv-preview") {
+        await expect(
+          page.getByRole("heading", { name: /turn hardware exports into plant memory/i }),
+        ).toBeVisible();
+      }
+      if (path === "/sensors/csv-preview") {
+        await expect(page.getByRole("heading", { name: /csv sensor preview/i })).toBeVisible();
+      }
       for (const word of ["Tent 1", "Plant 1", "Diary"]) {
         expect(body).not.toContain(`${word.toLowerCase()} for owner`);
       }

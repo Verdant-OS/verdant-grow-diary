@@ -48,4 +48,34 @@ describe("edge breeding action_queue payloads (_shared)", () => {
       expect(p.action_type).toBe("breeding_follow_up");
     }
   });
+
+  it("links each follow-up back to its originating timeline event (privacy-safe ref)", () => {
+    // The production write path (create-breeding-suggestions) uses THIS copy.
+    // Without the ref, adaptActionQueueRowsToBreedingCycleTimelinePoints skips
+    // every breeding follow-up row. Mirrors the browser copy's back-reference.
+    const event: BreedingEvent = {
+      id: "ev_edge_3",
+      type: "cross_harvest",
+      occurred_at: "2026-06-20T12:00:00Z",
+    };
+    const payloads = buildBreedingActionQueuePayloads(event, "grow_1", "plant_1", "tent_1");
+    expect(payloads.length).toBeGreaterThan(0);
+    for (const p of payloads) {
+      expect(p.originating_timeline_events).toEqual([
+        {
+          id: "ev_edge_3",
+          type: "cross_harvest",
+          source: "manual",
+          occurred_at: "2026-06-20T12:00:00Z",
+        },
+      ]);
+      // Privacy envelope: only id/type/source/occurred_at — no leaked fields.
+      expect(Object.keys(p.originating_timeline_events![0]).sort()).toEqual([
+        "id",
+        "occurred_at",
+        "source",
+        "type",
+      ]);
+    }
+  });
 });

@@ -67,8 +67,12 @@ describe("quicklog_save_manual idempotency contract (migration)", () => {
   });
 
   it("drops the old signature exactly (no ambiguous overload pair)", () => {
+    // The parameter list grows over time (…, jsonb → +p_idempotency_key →
+    // +p_stage). Whatever the latest migration is, it must drop the exact
+    // immediately-prior signature: the shared 10-arg prefix plus zero or
+    // more appended text parameters.
     expect(sql).toMatch(
-      /DROP FUNCTION IF EXISTS public\.quicklog_save_manual\(\s*text, uuid, text, numeric, text, numeric, numeric, numeric, timestamptz, jsonb\s*\)/,
+      /DROP FUNCTION IF EXISTS public\.quicklog_save_manual\(\s*text, uuid, text, numeric, text, numeric, numeric, numeric, timestamptz, jsonb(?:, text)*\s*\)/,
     );
   });
 });
@@ -87,10 +91,14 @@ describe("quicklog_save_manual idempotency contract (client threading)", () => {
     expect(SHEET).toMatch(/idempotencyKey: saveIdempotencyKeyRef\.current/);
   });
 
-  it("sheet rotates the key only on submission completion, never mid-retry", () => {
-    // Two rotation sites: full success block + "Log another".
+  it("sheet rotates the shared key only on completed logical submissions", () => {
+    // Three intentional sites: structured-feed success, manual-log success,
+    // and the grower's explicit "Log another" reset.
     const rotations = SHEET.match(/saveIdempotencyKeyRef\.current = newQuickLogSaveKey\(\)/g) ?? [];
-    expect(rotations).toHaveLength(2);
+    expect(rotations).toHaveLength(3);
+    expect(SHEET).toMatch(
+      /trackQuickLogSuccess\("feed", \{ reused: result\.reused \}\);[\s\S]{0,300}saveIdempotencyKeyRef\.current = newQuickLogSaveKey\(\)/,
+    );
   });
 
   it("companion-media failure is partial success — the save flow no longer aborts", () => {

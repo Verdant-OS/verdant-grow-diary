@@ -39,6 +39,7 @@ vi.mock("@/integrations/supabase/client", () => {
     const q: Record<string, unknown> = {};
     q.select = () => q;
     q.eq = () => q;
+    q.not = () => q;
     q.in = () => q;
     q.or = () => q;
     q.order = () => q;
@@ -55,11 +56,7 @@ function renderSection() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
-      <QuickLogGroupedTimelineSection
-        scope="plant"
-        plantId={PLANT}
-        tentId={TENT}
-      />
+      <QuickLogGroupedTimelineSection scope="plant" plantId={PLANT} tentId={TENT} />
     </QueryClientProvider>,
   );
 }
@@ -122,8 +119,7 @@ describe("QuickLog timeline — missing snapshot visibility", () => {
     await waitFor(() => screen.getByTestId("quick-log-grouped-timeline-list"));
     const card = screen.getByTestId("quick-log-grouped-card");
     expect(card.getAttribute("data-entry-kind")).toBe("grouped");
-    expect(screen.queryByTestId("quick-log-grouped-action-missing-snapshot"))
-      .toBeNull();
+    expect(screen.queryByTestId("quick-log-grouped-action-missing-snapshot")).toBeNull();
     // Snapshot card itself remains visible.
     expect(screen.getByTestId("manual-snapshot-timeline-card")).toBeTruthy();
   });

@@ -29,14 +29,17 @@ vi.mock("@/hooks/usePlantManualSensorHistory", () => ({
 
 import PlantDetailTimelineEvidenceReadinessLaunch from "@/components/PlantDetailTimelineEvidenceReadinessLaunch";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
+import { QUICK_LOG_V2_OPEN_EVENT } from "@/lib/quickLogV2OpenIntent";
 
 const fetchSpy = vi.spyOn(globalThis, "fetch" as never);
 
-function renderLaunch(overrides: {
-  hasPhoto?: boolean;
-  activity?: ReadonlyArray<Record<string, unknown>>;
-  manualLogs?: ReadonlyArray<Record<string, unknown>>;
-} = {}) {
+function renderLaunch(
+  overrides: {
+    hasPhoto?: boolean;
+    activity?: ReadonlyArray<Record<string, unknown>>;
+    manualLogs?: ReadonlyArray<Record<string, unknown>>;
+  } = {},
+) {
   recentActivityMock.mockReturnValue({
     data: overrides.activity ?? [],
     isLoading: false,
@@ -72,9 +75,7 @@ describe("PlantDetailTimelineEvidenceReadinessLaunch — mount", () => {
     expect(
       screen.getByTestId("plant-detail-timeline-evidence-readiness-launch"),
     ).toBeInTheDocument();
-    expect(
-      screen.getByTestId("timeline-evidence-readiness-panel"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("timeline-evidence-readiness-panel")).toBeInTheDocument();
   });
 
   it("does not call fetch when rendered", () => {
@@ -87,27 +88,27 @@ describe("PlantDetailTimelineEvidenceReadinessLaunch — operator actions", () =
   it("shows Fast Add Photo when photo is missing", () => {
     renderLaunch({ hasPhoto: false });
     expect(
-      screen.getByTestId(
-        "plant-detail-timeline-evidence-readiness-launch-action-add-photo",
-      ),
+      screen.getByTestId("plant-detail-timeline-evidence-readiness-launch-action-add-photo"),
     ).toBeInTheDocument();
   });
 
   it("shows Add Watering when watering history is missing", () => {
     renderLaunch();
-    expect(
-      screen.getByTestId(
-        "plant-detail-timeline-evidence-readiness-launch-action-add-watering",
-      ),
-    ).toBeInTheDocument();
+    const action = screen.getByTestId(
+      "plant-detail-timeline-evidence-readiness-launch-action-add-watering",
+    );
+    expect(action).toBeInTheDocument();
+    expect(action).toHaveAttribute(
+      "title",
+      "Add recent watering history so AI Doctor can review irrigation frequency and root-zone stress.",
+    );
+    expect(action.getAttribute("title")).not.toMatch(/dryback/i);
   });
 
   it("shows Add Feeding when feeding history is missing", () => {
     renderLaunch();
     expect(
-      screen.getByTestId(
-        "plant-detail-timeline-evidence-readiness-launch-action-add-feeding",
-      ),
+      screen.getByTestId("plant-detail-timeline-evidence-readiness-launch-action-add-feeding"),
     ).toBeInTheDocument();
   });
 
@@ -128,9 +129,7 @@ describe("PlantDetailTimelineEvidenceReadinessLaunch — operator actions", () =
     window.addEventListener(PLANT_QUICKLOG_PREFILL_EVENT, handler);
 
     fireEvent.click(
-      screen.getByTestId(
-        "plant-detail-timeline-evidence-readiness-launch-action-add-photo",
-      ),
+      screen.getByTestId("plant-detail-timeline-evidence-readiness-launch-action-add-photo"),
     );
     window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, handler);
 
@@ -139,46 +138,42 @@ describe("PlantDetailTimelineEvidenceReadinessLaunch — operator actions", () =
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it("Add Watering / Add Feeding dispatch events only — no fetch, no record writes", () => {
+  it("Add Watering dispatches exact typed V2 target while Feeding keeps the legacy event", () => {
     renderLaunch();
-    const events: CustomEvent[] = [];
-    const handler = (e: Event) => events.push(e as CustomEvent);
-    window.addEventListener(PLANT_QUICKLOG_PREFILL_EVENT, handler);
+    const waterEvents: CustomEvent[] = [];
+    const legacyEvents: CustomEvent[] = [];
+    const waterHandler = (e: Event) => waterEvents.push(e as CustomEvent);
+    const legacyHandler = (e: Event) => legacyEvents.push(e as CustomEvent);
+    window.addEventListener(QUICK_LOG_V2_OPEN_EVENT, waterHandler);
+    window.addEventListener(PLANT_QUICKLOG_PREFILL_EVENT, legacyHandler);
 
     fireEvent.click(
-      screen.getByTestId(
-        "plant-detail-timeline-evidence-readiness-launch-action-add-watering",
-      ),
+      screen.getByTestId("plant-detail-timeline-evidence-readiness-launch-action-add-watering"),
     );
     fireEvent.click(
-      screen.getByTestId(
-        "plant-detail-timeline-evidence-readiness-launch-action-add-feeding",
-      ),
+      screen.getByTestId("plant-detail-timeline-evidence-readiness-launch-action-add-feeding"),
     );
-    window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, handler);
+    window.removeEventListener(QUICK_LOG_V2_OPEN_EVENT, waterHandler);
+    window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, legacyHandler);
 
-    expect(events).toHaveLength(2);
-    expect(events[0].detail).toMatchObject({ eventType: "watering" });
-    expect(events[1].detail).toMatchObject({ eventType: "feeding" });
+    expect(waterEvents).toHaveLength(1);
+    expect(waterEvents[0].detail).toEqual({ targetKey: "plant:p1", action: "water" });
+    expect(legacyEvents).toHaveLength(1);
+    expect(legacyEvents[0].detail).toMatchObject({ eventType: "feeding" });
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it("hides photo button when a recent photo is already attached", () => {
     renderLaunch({ hasPhoto: true });
     expect(
-      screen.queryByTestId(
-        "plant-detail-timeline-evidence-readiness-launch-action-add-photo",
-      ),
+      screen.queryByTestId("plant-detail-timeline-evidence-readiness-launch-action-add-photo"),
     ).toBeNull();
   });
 });
 
 describe("PlantDetailTimelineEvidenceReadinessLaunch — static safety", () => {
   const source = readFileSync(
-    resolve(
-      __dirname,
-      "../components/PlantDetailTimelineEvidenceReadinessLaunch.tsx",
-    ),
+    resolve(__dirname, "../components/PlantDetailTimelineEvidenceReadinessLaunch.tsx"),
     "utf8",
   );
 

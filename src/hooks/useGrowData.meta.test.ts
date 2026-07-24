@@ -37,36 +37,38 @@ beforeEach(() => {
 });
 
 describe("useGrowData source metadata", () => {
-  it("marks real supabase rows as supabase / not demo", async () => {
+  it("marks real Supabase rows as Supabase / not demo", async () => {
     vi.mocked(repo.fetchTents).mockResolvedValue([{ ...tents[0], id: "live-1", name: "Live" }]);
     const { result } = renderHook(() => useGrowTents(), { wrapper: wrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     const meta = getGrowDataMeta(["grow", "tents", "all"]);
     expect(meta.dataSource).toBe("supabase");
     expect(meta.isDemoData).toBe(false);
-    expect(meta.sourceReason).toBe("live:rows");
+    expect(meta.sourceReason).toBe("supabase:rows");
   });
 
-  it("marks empty supabase + mock fallback as mock / demo", async () => {
+  it("marks an empty Supabase tent result unavailable without demo substitution", async () => {
     vi.mocked(repo.fetchTents).mockResolvedValue([]);
     const { result } = renderHook(() => useGrowTents(), { wrapper: wrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     const meta = getGrowDataMeta(["grow", "tents", "all"]);
-    expect(meta.dataSource).toBe("mock");
-    expect(meta.isDemoData).toBe(true);
-    expect(meta.sourceReason).toBe("fallback:empty");
+    expect(result.current.data).toEqual([]);
+    expect(meta.dataSource).toBe("unavailable");
+    expect(meta.isDemoData).toBe(false);
+    expect(meta.sourceReason).toBe("no-rows");
   });
 
-  it("marks supabase error + mock fallback as mock / demo with error reason", async () => {
+  it("marks a failed Supabase plant result unavailable and does not leak the error", async () => {
     vi.mocked(repo.fetchPlants).mockRejectedValue(new Error("secret token leaked details"));
     const { result } = renderHook(() => useGrowPlants("t1"), {
       wrapper: wrapper(),
     });
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    await waitFor(() => expect(result.current.isError).toBe(true));
     const meta = getGrowDataMeta(["grow", "plants", "t1", "all"]);
-    expect(meta.dataSource).toBe("mock");
-    expect(meta.isDemoData).toBe(true);
-    expect(meta.sourceReason).toBe("fallback:error");
+    expect(result.current.data).toBeUndefined();
+    expect(meta.dataSource).toBe("unavailable");
+    expect(meta.isDemoData).toBe(false);
+    expect(meta.sourceReason).toBe("fetch-error");
     // Must NOT leak raw error message.
     expect(meta.sourceReason).not.toMatch(/secret|leaked|token/i);
   });
@@ -93,6 +95,11 @@ describe("useGrowData source metadata", () => {
     await waitFor(() => expect(b.result.current.isSuccess).toBe(true));
     const m2 = getGrowDataMeta(["grow", "tents", "g1"]);
     expect(m1).toEqual(m2);
+    expect(m1).toEqual({
+      isDemoData: false,
+      dataSource: "unavailable",
+      sourceReason: "no-rows",
+    });
   });
 
   it("getGrowDataMeta returns a safe default for unknown keys", () => {
@@ -109,14 +116,14 @@ describe("combineGrowDataMeta", () => {
     const one = {
       isDemoData: false,
       dataSource: "supabase" as const,
-      sourceReason: "live:rows",
+      sourceReason: "supabase:rows",
     };
     expect(combineGrowDataMeta([one, { ...one }])).toEqual(one);
   });
 
   it("marks mixed when supabase and mock are both present", () => {
     const out = combineGrowDataMeta([
-      { isDemoData: false, dataSource: "supabase", sourceReason: "live:rows" },
+      { isDemoData: false, dataSource: "supabase", sourceReason: "supabase:rows" },
       { isDemoData: true, dataSource: "mock", sourceReason: "fallback:empty" },
     ]);
     expect(out.dataSource).toBe("mixed");
@@ -135,7 +142,11 @@ describe("combineGrowDataMeta", () => {
 
   it("is deterministic", () => {
     const input = [
-      { isDemoData: false, dataSource: "supabase" as const, sourceReason: "live:rows" },
+      {
+        isDemoData: false,
+        dataSource: "supabase" as const,
+        sourceReason: "supabase:rows",
+      },
       { isDemoData: true, dataSource: "mock" as const, sourceReason: "fallback:empty" },
     ];
     expect(combineGrowDataMeta(input)).toEqual(combineGrowDataMeta(input));

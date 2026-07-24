@@ -1,6 +1,6 @@
 /**
- * Integration-style test for the Tent Detail → EcoWitt audit link and the
- * audit page's URL-driven tent selection.
+ * Integration-style test for the grower-safe EcoWitt card link and the
+ * operator audit page's URL-driven tent selection.
  *
  * Avoids spinning up the whole TentDetail page; uses EcowittLatestSnapshotCard
  * + the audit page directly with seeded tents.
@@ -70,35 +70,31 @@ function renderAuditAt(initialPath: string) {
   );
 }
 
-describe("Tent Detail → EcoWitt audit link", () => {
+describe("EcoWitt grower card link", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("includes the current tent id in the deep-link href", () => {
-    // Tent Detail opts into the scoped audit deep-link via
-    // `auditHrefMode="tent-detail"`. The Dashboard card stays on the safe
-    // default "dashboard" mode so no raw tent UUID is leaked in the bare
-    // dashboard surface (covered by ecowitt-dashboard-tent-card.test.tsx).
+  it("opens normal sensor history without exposing an operator route or tent id", () => {
     render(
       <MemoryRouter>
-        <EcowittLatestSnapshotCard tentId={FLOWER_TENT} auditHrefMode="tent-detail" />
+        <EcowittLatestSnapshotCard tentId={FLOWER_TENT} />
       </MemoryRouter>,
     );
-    const link = screen.getByTestId("ecowitt-audit-link") as HTMLAnchorElement;
-    expect(link.getAttribute("href")).toBe(
-      `/sensors/ecowitt-audit?tentId=${FLOWER_TENT}`,
-    );
+    const link = screen.getByTestId("ecowitt-sensors-link") as HTMLAnchorElement;
+    expect(link.getAttribute("href")).toBe("/sensors");
+    expect(link.getAttribute("href")).not.toContain(FLOWER_TENT);
+    expect(screen.queryByTestId("ecowitt-audit-link")).toBeNull();
   });
 
-  it("falls back to the bare audit path when no tent context is available", () => {
+  it("keeps the same safe sensor-history target without tent context", () => {
     render(
       <MemoryRouter>
-        <EcowittLatestSnapshotCard tentId={null} auditHrefMode="tent-detail" />
+        <EcowittLatestSnapshotCard tentId={null} />
       </MemoryRouter>,
     );
-    const link = screen.getByTestId("ecowitt-audit-link") as HTMLAnchorElement;
-    expect(link.getAttribute("href")).toBe("/sensors/ecowitt-audit");
+    const link = screen.getByTestId("ecowitt-sensors-link") as HTMLAnchorElement;
+    expect(link.getAttribute("href")).toBe("/sensors");
   });
 });
 

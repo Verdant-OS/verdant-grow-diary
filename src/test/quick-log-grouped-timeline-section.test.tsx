@@ -33,6 +33,7 @@ vi.mock("@/integrations/supabase/client", () => {
     const q: Record<string, unknown> = {};
     q.select = () => q;
     q.eq = () => q;
+    q.not = () => q;
     q.in = () => q;
     q.or = () => q;
     q.order = () => q;
@@ -122,9 +123,7 @@ describe("QuickLogGroupedTimelineSection — plant scope", () => {
     expect(cards[0].getAttribute("data-action-id")).toBe("w1");
     expect(cards[0].getAttribute("data-environment-id")).toBe("e1");
     // Manual source label visible.
-    expect(screen.getByTestId("quick-log-grouped-action-source").textContent).toBe(
-      "Manual",
-    );
+    expect(screen.getByTestId("quick-log-grouped-action-source").textContent).toBe("Manual");
     // Inner snapshot card present (env not standalone).
     expect(screen.getAllByTestId("manual-snapshot-timeline-card")).toHaveLength(1);
   });
@@ -141,9 +140,7 @@ describe("QuickLogGroupedTimelineSection — plant scope", () => {
     const cards = screen.getAllByTestId("quick-log-grouped-card");
     expect(cards).toHaveLength(1);
     expect(cards[0].getAttribute("data-entry-kind")).toBe("grouped");
-    expect(screen.getByTestId("quick-log-grouped-action-title").textContent).toBe(
-      "Note",
-    );
+    expect(screen.getByTestId("quick-log-grouped-action-title").textContent).toBe("Note");
   });
 
   it("grouped env event does not also render standalone", async () => {
@@ -223,8 +220,7 @@ describe("QuickLogGroupedTimelineSection — plant scope", () => {
     renderSection({ scope: "plant", plantId: PLANT, tentId: TENT });
     await waitFor(() => screen.getByTestId("quick-log-grouped-timeline-list"));
     const text =
-      screen.getByTestId("quick-log-grouped-timeline-section").textContent?.toLowerCase() ??
-      "";
+      screen.getByTestId("quick-log-grouped-timeline-section").textContent?.toLowerCase() ?? "";
     expect(text).not.toMatch(/\blive\b/);
     expect(text).not.toMatch(/\bsynced\b/);
     expect(text).not.toMatch(/\bconnected\b/);

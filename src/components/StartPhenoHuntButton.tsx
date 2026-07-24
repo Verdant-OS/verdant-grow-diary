@@ -15,14 +15,15 @@ interface Props {
  * Deep-link to /pheno-hunts/new pre-scoped to the current grow (and tent
  * when present). Only rendered for authenticated users.
  *
- * Pheno Tracker is a Pro feature: non-entitled users see the same CTA but
- * are routed to /upgrade instead of a page that will show the upgrade gate.
+ * Pheno Tracker is a Pro feature: verified non-entitled users see the same
+ * CTA but are routed to pricing. Unresolved or failed plan checks route to
+ * the central gate so an unverifiable plan is never presented as Free.
  * Presenter only — the authoritative check lives at the route gate and in
  * the write handler.
  */
 export default function StartPhenoHuntButton({ growId, tentId, className }: Props) {
   const { user } = useAuth();
-  const { entitlement, loading } = useMyEntitlements();
+  const { entitlement, loading, lookupFailed } = useMyEntitlements();
   if (!user || !growId) return null;
 
   const entitled = !loading && canUseFeature(entitlement, "pheno_tracker");
@@ -34,10 +35,15 @@ export default function StartPhenoHuntButton({ growId, tentId, className }: Prop
   // returnTo — post-checkout, /checkout/success round-trips the buyer to
   // /pheno-hunts/new with growId/tentId intact.
   const target = `/pheno-hunts/new?${params.toString()}`;
-  const href = entitled
-    ? target
-    : `/pricing?returnTo=${encodeURIComponent(target)}`;
-  const label = entitled ? "Start Pheno Hunt" : "Start Pheno Hunt (Pro)";
+  const href =
+    entitled || loading || lookupFailed
+      ? target
+      : `/pricing?returnTo=${encodeURIComponent(target)}`;
+  const label = entitled
+    ? "Start Pheno Hunt"
+    : loading || lookupFailed
+      ? "Check Pheno Hunt access"
+      : "Start Pheno Hunt (Pro)";
 
   return (
     <Button

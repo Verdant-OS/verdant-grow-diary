@@ -8,10 +8,8 @@
  *
  * Rules (see project knowledge):
  *  - Only activities that map to existing safe persistence paths are
- *    marked `enabled: true`. Harvest is intentionally disabled here
- *    because the DB validator (`validate_grow_event`) does not include
- *    'harvest' and quicklog_save_event/quicklog_save_manual do not
- *    accept it. Enabling Harvest requires a separate v1b backend slice.
+ *    marked `enabled: true`. Contextual constraints such as Harvest stage
+ *    eligibility live in pure rules and are re-checked before persistence.
  *  - Safety copy is centralized here so JSX presenters cannot drift
  *    into recommendation/diagnosis language.
  *  - Defoliation persists as `event_type: "training"` with a
@@ -69,20 +67,18 @@ export interface QuickLogHarvestDetails {
 
 /**
  * Save route kind — describes which existing safe persistence path an
- * activity uses. `none` means the activity has no save path in this
- * slice (Harvest until v1b).
+ * activity uses. `none` means the activity has no safe save path.
  */
 export type QuickLogSaveRouteKind =
   | "manual_note"
-  | "manual_water"
+  | "structured_water"
   | "event"
   | "manual_sensor_reading"
   | "none";
 
 /**
  * Server-side event_type value used with `quicklog_save_event`.
- * Constrained to values the DB validator currently accepts:
- *   watering | feeding | training | observation | photo | environment
+ * Constrained to values the DB validator currently accepts.
  */
 export type QuickLogEventTypeValue =
   | "watering"
@@ -111,18 +107,15 @@ export interface QuickLogActivityDefinition {
   timelineLabel: string;
   /** "What was saved" breakdown label. */
   savedBreakdownLabel: string;
-  /** Whether this activity can be saved in v1a. */
+  /** Whether this activity has a supported persistence route. */
   enabled: boolean;
   /** Grower-facing reason when disabled. Present iff enabled=false. */
   disabledReason?: string;
 }
 
-export const QUICK_LOG_HARVEST_DISABLED_REASON =
-  "Harvest logging requires a backend update before it can be saved safely.";
-
 /**
- * Shown when the client is on v1b but the RPC still rejects harvest
- * (out-of-date backend). Distinct from the v1a disabled-reason above.
+ * Shown when an eligible Harvest save reaches an out-of-date backend that
+ * still rejects the event type.
  */
 export const QUICK_LOG_HARVEST_BACKEND_UNAVAILABLE_REASON =
   "Harvest logging is not enabled on this backend yet.";
@@ -156,7 +149,7 @@ export const QUICK_LOG_ACTIVITY_DEFINITIONS: Readonly<
     label: "Watering",
     description: "Record a watering event.",
     safetyNote: "Record what you watered. This log is not an irrigation recommendation.",
-    saveRoute: "manual_water",
+    saveRoute: "structured_water",
     timelineLabel: "Watering",
     savedBreakdownLabel: "Watering",
     enabled: true,

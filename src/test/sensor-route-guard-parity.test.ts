@@ -11,8 +11,8 @@
 //  - Every `/sensors/*` route mounted inside the operator block must be
 //    declared `access: "operator"` in the manifest (or appear in the
 //    documented exception set with a written justification).
-//  - Grower-facing `/sensors/*` routes (manifest `access: "auth"`) must NOT
-//    leak into the operator block.
+//  - Authenticated and public grower-facing `/sensors/*` routes must NOT leak
+//    into the operator block, and each access class must be documented.
 //
 // Static source test only. No runtime, no DB writes, no Supabase calls.
 import { describe, it, expect } from "vitest";
@@ -80,7 +80,17 @@ const PATHS_OUTSIDE_OPERATOR_BLOCK = new Set(collectPaths(OUTSIDE_OPERATOR));
  * grower-facing `/sensors/*` route requires adding it here AND keeping it
  * manifest `access: "auth"` (never `"operator"`).
  */
-const GROWER_FACING_SENSOR_ROUTES = new Set<string>(["/sensors"]);
+const AUTHENTICATED_GROWER_FACING_SENSOR_ROUTES = new Set<string>(["/sensors"]);
+
+/**
+ * Documented public `/sensors/*` routes intentionally mounted outside the
+ * authenticated AppShell and <RequireOperatorRole />.
+ *
+ * These routes must remain browser-local and read-only. Adding a new public
+ * `/sensors/*` route requires adding it here and keeping its manifest access
+ * explicitly `"public"`.
+ */
+const PUBLIC_SENSOR_ROUTES = new Set<string>(["/sensors/csv-preview"]);
 
 /**
  * Documented operator/debug sensor exception list. Empty by design:
@@ -144,12 +154,19 @@ describe("Verdant Sensor Route Guard Regression v1 — generalized /sensors/* pa
         expect(PATHS_IN_OPERATOR_BLOCK.has(r.path)).toBe(true);
         expect(PATHS_OUTSIDE_OPERATOR_BLOCK.has(r.path)).toBe(false);
       });
+    } else if (r.access === "auth") {
+      it(`${r.path} (manifest=${r.access}) is NOT inside the operator block`, () => {
+        expect(PATHS_IN_OPERATOR_BLOCK.has(r.path)).toBe(false);
+      });
+      it(`${r.path} (manifest=${r.access}) is a documented authenticated grower-facing sensor route`, () => {
+        expect(AUTHENTICATED_GROWER_FACING_SENSOR_ROUTES.has(r.path)).toBe(true);
+      });
     } else {
       it(`${r.path} (manifest=${r.access}) is NOT inside the operator block`, () => {
         expect(PATHS_IN_OPERATOR_BLOCK.has(r.path)).toBe(false);
       });
-      it(`${r.path} (manifest=${r.access}) is a documented grower-facing sensor route`, () => {
-        expect(GROWER_FACING_SENSOR_ROUTES.has(r.path)).toBe(true);
+      it(`${r.path} (manifest=${r.access}) is a documented public sensor route`, () => {
+        expect(PUBLIC_SENSOR_ROUTES.has(r.path)).toBe(true);
       });
     }
   }

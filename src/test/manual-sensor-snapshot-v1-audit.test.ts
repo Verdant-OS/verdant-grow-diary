@@ -27,16 +27,17 @@ const ROOT = join(process.cwd(), "src");
 const read = (rel: string) => readFileSync(join(ROOT, rel), "utf8");
 
 describe("Manual Sensor Snapshot v1 — entry + VPD", () => {
-  it("(1+2) saves valid temp/humidity with deterministic computed VPD", () => {
+  it("(1+2) saves valid temp/humidity while keeping air VPD preview-only", () => {
     const v = validateManualEntry({ airTempF: "77", humidityPct: "55" });
     expect(v.ok).toBe(true);
     const vpdRow = v.metrics.find((m) => m.metric === "vpd_kpa");
-    expect(vpdRow?.derived).toBe(true);
+    expect(vpdRow).toBeUndefined();
+    expect(v.warnings.join(" ")).toMatch(/air vpd estimate.*not saved/i);
     // Deterministic: identical inputs → identical output across calls.
     const a = computeVpdKpa(fahrenheitToCelsius(77), 55);
     const b = computeVpdKpa(fahrenheitToCelsius(77), 55);
     expect(a).toBe(b);
-    expect(vpdRow?.value).toBe(a);
+    expect(a).toBeGreaterThan(0);
   });
 
   it("(3) rejects impossible humidity values", () => {

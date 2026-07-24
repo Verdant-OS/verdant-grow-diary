@@ -44,6 +44,13 @@ export interface PhenoComparisonViewProps {
    * signal (data-attr) for nested surfaces added later.
    */
   readonly allowConclusions?: boolean;
+  /**
+   * Heading element for the "Pheno Comparison" title. Defaults to "h1"
+   * (this view is the page). Pages that embed the view under their own H1
+   * (e.g. /pheno-expression-showcase) pass "h2" so each page keeps exactly
+   * one H1.
+   */
+  readonly headingLevel?: "h1" | "h2";
 }
 
 function toneClass(view: PhenoSensorSnapshotView): string {
@@ -422,7 +429,9 @@ export default function PhenoComparisonView({
   mode,
   huntName,
   allowConclusions = true,
+  headingLevel = "h1",
 }: PhenoComparisonViewProps) {
+  const HeadingTag = headingLevel;
   const view = useMemo(() => buildPhenoComparisonView(inputs ?? []), [inputs]);
 
   const expressionById = useMemo(() => {
@@ -457,9 +466,9 @@ export default function PhenoComparisonView({
     >
       <header className="space-y-2">
         <div className="flex flex-wrap items-center gap-2">
-          <h1 id="pheno-comparison-heading" className="text-2xl font-semibold">
+          <HeadingTag id="pheno-comparison-heading" className="text-2xl font-semibold">
             Pheno Comparison
-          </h1>
+          </HeadingTag>
           <span
             data-testid="pheno-comparison-read-only-badge"
             role="status"

@@ -4,10 +4,7 @@ import { resolve } from "node:path";
 import { render, screen, within } from "@testing-library/react";
 
 import FeedingHistoryPanel from "@/components/FeedingHistoryPanel";
-import {
-  normalizeDiaryEntries,
-  type NormalizedDiaryEntry,
-} from "@/lib/diaryEntryRules";
+import { normalizeDiaryEntries, type NormalizedDiaryEntry } from "@/lib/diaryEntryRules";
 import { buildFeedingHistory } from "@/lib/feedingHistoryRules";
 
 function feeding(id: string, details: Record<string, unknown>) {
@@ -21,7 +18,7 @@ function feeding(id: string, details: Record<string, unknown>) {
     entry_type: "feeding",
     note: "",
     photo_url: null,
-    details,
+    details: { source: "manual", ...details },
   };
 }
 
@@ -44,35 +41,25 @@ function normalize(raw: unknown[]): NormalizedDiaryEntry[] {
 
 describe("feedingHistoryRules — waterTempC extraction", () => {
   it("reads water_temp_c from extras and tags source as manual", () => {
-    const [row] = buildFeedingHistory(
-      normalize([feeding("f1", { ec: 1.8, water_temp_c: 22 })]),
-    );
+    const [row] = buildFeedingHistory(normalize([feeding("f1", { ec: 1.8, water_temp_c: 22 })]));
     expect(row.waterTempC).toBe(22);
-    expect(row.sourceLabel).toBe("manual");
+    expect(row.sourceLabel).toBe("Manual log");
   });
 
   it("supports camelCase waterTempC variant", () => {
-    const [row] = buildFeedingHistory(
-      normalize([feeding("f2", { ec: 1.8, waterTempC: 19 })]),
-    );
+    const [row] = buildFeedingHistory(normalize([feeding("f2", { ec: 1.8, waterTempC: 19 })]));
     expect(row.waterTempC).toBe(19);
   });
 
   it("returns null when extras has no water temp", () => {
-    const [row] = buildFeedingHistory(
-      normalize([feeding("f3", { ec: 1.8 })]),
-    );
+    const [row] = buildFeedingHistory(normalize([feeding("f3", { ec: 1.8 })]));
     expect(row.waterTempC).toBeNull();
   });
 });
 
 describe("FeedingHistoryPanel — EC @25°C preview rendering", () => {
   it("shows EC @25°C preview + 'Not stored' for safe feeding entry", () => {
-    render(
-      <FeedingHistoryPanel
-        rawEntries={[feeding("f-safe", { ec: 1.8, water_temp_c: 28 })]}
-      />,
-    );
+    render(<FeedingHistoryPanel rawEntries={[feeding("f-safe", { ec: 1.8, water_temp_c: 28 })]} />);
     const block = screen.getByTestId("feeding-history-ec-compensation-f-safe");
     expect(block).toHaveAttribute("data-tone", "ok");
     expect(within(block).getByText(/EC @25°C preview/)).toBeInTheDocument();
@@ -81,34 +68,18 @@ describe("FeedingHistoryPanel — EC @25°C preview rendering", () => {
   });
 
   it("shows Fahrenheit-first water temp chip", () => {
-    render(
-      <FeedingHistoryPanel
-        rawEntries={[feeding("f-temp", { ec: 1.8, water_temp_c: 20 })]}
-      />,
-    );
+    render(<FeedingHistoryPanel rawEntries={[feeding("f-temp", { ec: 1.8, water_temp_c: 20 })]} />);
     expect(screen.getByText(/68°F \/ 20°C/)).toBeInTheDocument();
   });
 
   it("hides preview when EC is missing", () => {
-    render(
-      <FeedingHistoryPanel
-        rawEntries={[feeding("f-no-ec", { water_temp_c: 22 })]}
-      />,
-    );
-    expect(
-      screen.queryByTestId("feeding-history-ec-compensation-f-no-ec"),
-    ).toBeNull();
+    render(<FeedingHistoryPanel rawEntries={[feeding("f-no-ec", { water_temp_c: 22 })]} />);
+    expect(screen.queryByTestId("feeding-history-ec-compensation-f-no-ec")).toBeNull();
   });
 
   it("hides preview when water temperature is missing", () => {
-    render(
-      <FeedingHistoryPanel
-        rawEntries={[feeding("f-no-temp", { ec: 1.8 })]}
-      />,
-    );
-    expect(
-      screen.queryByTestId("feeding-history-ec-compensation-f-no-temp"),
-    ).toBeNull();
+    render(<FeedingHistoryPanel rawEntries={[feeding("f-no-temp", { ec: 1.8 })]} />);
+    expect(screen.queryByTestId("feeding-history-ec-compensation-f-no-temp")).toBeNull();
   });
 
   it("hides preview when EC is out of plausible range (rejected upstream by diary normalizer)", () => {
@@ -116,32 +87,22 @@ describe("FeedingHistoryPanel — EC @25°C preview rendering", () => {
     // so unit-mismatched historical rows simply produce no preview block
     // rather than a "Needs unit review" badge in the timeline.
     render(
-      <FeedingHistoryPanel
-        rawEntries={[feeding("f-bad-ec", { ec: 1800, water_temp_c: 22 })]}
-      />,
+      <FeedingHistoryPanel rawEntries={[feeding("f-bad-ec", { ec: 1800, water_temp_c: 22 })]} />,
     );
-    expect(
-      screen.queryByTestId("feeding-history-ec-compensation-f-bad-ec"),
-    ).toBeNull();
+    expect(screen.queryByTestId("feeding-history-ec-compensation-f-bad-ec")).toBeNull();
   });
 
   it("flags suspicious water temperature as Needs unit review", () => {
     render(
-      <FeedingHistoryPanel
-        rawEntries={[feeding("f-bad-temp", { ec: 1.8, water_temp_c: 78 })]}
-      />,
+      <FeedingHistoryPanel rawEntries={[feeding("f-bad-temp", { ec: 1.8, water_temp_c: 78 })]} />,
     );
-    const block = screen.getByTestId(
-      "feeding-history-ec-compensation-f-bad-temp",
-    );
+    const block = screen.getByTestId("feeding-history-ec-compensation-f-bad-temp");
     expect(block).toHaveAttribute("data-tone", "review");
   });
 
   it("does not render preview for non-feeding entries", () => {
     render(<FeedingHistoryPanel rawEntries={[observationEntry]} />);
-    expect(
-      screen.queryByText(/EC @25°C preview/),
-    ).toBeNull();
+    expect(screen.queryByText(/EC @25°C preview/)).toBeNull();
   });
 
   it("never leaks raw_payload, service_role, Bearer tokens, or private keys", () => {
@@ -172,18 +133,12 @@ describe("FeedingHistoryPanel — EC @25°C preview rendering", () => {
 
 describe("feeding history EC preview — static safety", () => {
   it("module imports no Supabase / network / cron surfaces", () => {
-    const ruleSrc = readFileSync(
-      resolve(process.cwd(), "src/lib/feedingHistoryRules.ts"),
-      "utf8",
-    );
+    const ruleSrc = readFileSync(resolve(process.cwd(), "src/lib/feedingHistoryRules.ts"), "utf8");
     const panelSrc = readFileSync(
       resolve(process.cwd(), "src/components/FeedingHistoryPanel.tsx"),
       "utf8",
     );
-    const tempSrc = readFileSync(
-      resolve(process.cwd(), "src/lib/temperatureDisplay.ts"),
-      "utf8",
-    );
+    const tempSrc = readFileSync(resolve(process.cwd(), "src/lib/temperatureDisplay.ts"), "utf8");
     for (const src of [ruleSrc, panelSrc, tempSrc]) {
       expect(src).not.toMatch(/from\s+["']@\/integrations\/supabase/);
       expect(src).not.toMatch(/supabase-js/);

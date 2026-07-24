@@ -44,7 +44,9 @@ describe("filterDiaryCalendarGroups", () => {
     expect(diaryCalendarEmptyTitleFor("watering")).toMatch(/No watering events/);
     expect(diaryCalendarEmptyTitleFor("feeding")).toMatch(/No feeding events/);
     expect(diaryCalendarEmptyTitleFor("diagnosis")).toMatch(/No diagnosis events/);
-    expect(diaryCalendarEmptyTitleFor("all")).toMatch(/watering, feeding, or diagnosis/);
+    expect(diaryCalendarEmptyTitleFor("all")).toMatch(
+      /watering, feeding, training, diagnosis, or environment check/,
+    );
   });
 
   it("exposes all filter buttons including environment", () => {
@@ -52,6 +54,7 @@ describe("filterDiaryCalendarGroups", () => {
       "all",
       "watering",
       "feeding",
+      "training",
       "diagnosis",
       "environment",
     ]);

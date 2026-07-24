@@ -9,10 +9,13 @@ vi.mock("@/hooks/useHasRole", () => ({
   useHasRole: () => ({ status: "granted", granted: true, error: null }),
 }));
 
+vi.mock("@/hooks/useOperatorAccountReadModels", () => ({
+  useOperatorAccountReadModels: () => ({ status: "no_grow" }),
+}));
+
 import OperatorDemoPreview from "@/pages/OperatorDemoPreview";
 
-const UUID_RE =
-  /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 
 function renderPage() {
   return render(
@@ -51,12 +54,10 @@ describe("OperatorDemoPreview", () => {
   it("renders action section with forwarded evidence badges + pending approval", () => {
     renderPage();
     const action = screen.getByTestId("operator-demo-preview-action");
-    expect(
-      within(action).getByTestId("operator-demo-preview-action-status").textContent,
-    ).toMatch(/pending approval/i);
-    expect(
-      within(action).getByTestId("evidence-linkage-badges"),
-    ).toBeInTheDocument();
+    expect(within(action).getByTestId("operator-demo-preview-action-status").textContent).toMatch(
+      /pending approval/i,
+    );
+    expect(within(action).getByTestId("evidence-linkage-badges")).toBeInTheDocument();
   });
 
   it("renders post-grow eligibility section", () => {
@@ -71,8 +72,7 @@ describe("OperatorDemoPreview", () => {
     const header = screen.getByTestId("operator-demo-preview");
     // The walkthrough must not surface raw UUID-shaped strings as labels.
     // (Evidence refs themselves are short fixture ids, not UUIDs.)
-    const headerText =
-      header.querySelector("header")?.textContent ?? "";
+    const headerText = header.querySelector("header")?.textContent ?? "";
     expect(UUID_RE.test(headerText)).toBe(false);
   });
 

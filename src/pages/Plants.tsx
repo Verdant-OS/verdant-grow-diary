@@ -1,6 +1,19 @@
-import { Link } from "react-router-dom";
-import { Sprout, Filter, Archive, GitMerge, Search, CheckCircle2, Circle, ArrowRight, Sparkles, Gauge } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import {
+  Sprout,
+  Filter,
+  Archive,
+  GitMerge,
+  Search,
+  CheckCircle2,
+  Circle,
+  ArrowRight,
+  Sparkles,
+  Gauge,
+  AlertTriangle,
+  LoaderCircle,
+} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/PageHeader";
 import StageBadge from "@/components/StageBadge";
 import EmptyState from "@/components/EmptyState";
@@ -8,17 +21,20 @@ import CreatePlantDialog from "@/components/CreatePlantDialog";
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import GrowDataSourceDisclosure from "@/components/GrowDataSourceDisclosure";
+import GrowDataLoadError, { GrowDataLoadingState } from "@/components/GrowDataLoadError";
 import PlantPhoto from "@/components/PlantPhoto";
 import PlantCardActionsMenu from "@/components/PlantCardActionsMenu";
 import InfoPopover, { HELP_COPY } from "@/components/InfoPopover";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useGrowPlants, useGrowTents, getGrowDataMeta } from "@/hooks/useGrowData";
+import { useAuth } from "@/store/auth";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { useGrows } from "@/store/grows";
 import { useDiaryEntries } from "@/hooks/use-diary-entries";
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
-import { plantDetailPath, plantsPath } from "@/lib/routes";
+import { dashboardPath, plantDetailPath, plantsPath } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import {
   filterVisiblePlants,
@@ -27,17 +43,41 @@ import {
   isArchivedPlant,
   isMergedPlant,
 } from "@/lib/archivedPlantVisibilityRules";
+import { buildTentGrowIndex } from "@/lib/growAttributionRules";
 import {
   buildGrowFilterOptions,
+  filterPlantsByGrow,
   filterPlantsBySearch,
   summarizePlantsPageFilters,
   formatPlantsPageFilterSummary,
   plantsPageEmptyStateCopy,
+  UNASSIGNED_GROW_FILTER_ID,
+  UNASSIGNED_GROW_OPTION_NAME,
 } from "@/lib/plantsPageFilterRules";
-import { buildPlantsTentFilterChips } from "@/lib/plantsTentFilterChipsRules";
+import {
+  buildPlantsTentFilterChips,
+  filterPlantsByTentChip,
+} from "@/lib/plantsTentFilterChipsRules";
 import { buildDashboardDailyGrowCheckPanel } from "@/lib/dashboardDailyGrowCheckPanelRules";
 import { buildDailyCheckEntryHref } from "@/lib/dailyCheckPostSubmitRules";
-import { useNavigate } from "react-router-dom";
+import {
+  classifyPlantsScopeState,
+  classifyPlantsPageAsyncState,
+  PLANTS_SUPPLEMENTAL_QUERY_LABELS,
+  resolvePlantsTentFilter,
+  selectCurrentPlantsQueryData,
+  snapshotPlantsQuery,
+  type PlantsSupplementalQueryKey,
+} from "@/lib/plantsPageAsyncStateRules";
+import { isOneTentActivationIntent } from "@/lib/connectedOneTentActivationRules";
+import {
+  buildPlantQuickLogPrefill,
+  PLANT_QUICKLOG_PREFILL_EVENT,
+} from "@/lib/plantQuickLogPrefillRules";
+
+// Stable fail-closed fallback for unset/placeholder query data. Keeping this
+// outside render prevents false dependency changes in the derived view models.
+const EMPTY_QUERY_ROWS: never[] = [];
 
 function formatPlantHealthLabel(health: string | null | undefined): string {
   return `Plant health: ${health ?? "unknown"}`;
@@ -48,32 +88,92 @@ function formatPlantHealthAriaLabel(health: string | null | undefined): string {
 }
 
 export default function Plants() {
+  const [searchParams] = useSearchParams();
+  const { user } = useAuth();
   const { urlGrowId, scopedGrowName, isValidScopedGrow, backHref } = useScopedGrow();
   const navigate = useNavigate();
-  const { grows } = useGrows();
+  const {
+    grows,
+    loading: growsLoading = false,
+    error: growsError = null,
+    refresh: refreshGrows,
+  } = useGrows();
   const validGrowId = isValidScopedGrow ? urlGrowId ?? undefined : undefined;
+  const scopeState = classifyPlantsScopeState({
+    hasRequestedGrow: !!urlGrowId,
+    isLoading: growsLoading,
+    hasError: !!growsError,
+    isValid: isValidScopedGrow,
+  });
   const [showArchived, setShowArchived] = useState(false);
   const [search, setSearch] = useState("");
-  const { data: activePlants = [] } = useGrowPlants(undefined, urlGrowId ?? undefined);
-  const { data: allPlants = [] } = useGrowPlants(
-    undefined,
-    urlGrowId ?? undefined,
-    { includeArchived: true },
-  );
+  const activePlantsQuery = useGrowPlants(undefined, urlGrowId ?? undefined);
+  const allPlantsQuery = useGrowPlants(undefined, urlGrowId ?? undefined, {
+    includeArchived: true,
+  });
   // Cross-grow plant list (for grow-filter option counts). Scoped to active
   // (non-archived/merged) plants — the grow filter intentionally only counts
   // plants growers normally work with.
-  const { data: allGrowsActivePlants = [] } = useGrowPlants(undefined, undefined);
-  const { data: tents = [] } = useGrowTents(urlGrowId ?? undefined);
-  const { data: rawDiary = [] } = useDiaryEntries();
-  const { data: rawReadings = [] } = useSensorReadings(undefined, 500);
-  const plantsMeta = getGrowDataMeta(["grow", "plants", "all", urlGrowId ?? "all"]);
-  const tentsMeta = getGrowDataMeta(["grow", "tents", urlGrowId ?? "all"]);
+  const workspacePlantsQuery = useGrowPlants(undefined, undefined);
+  const tentsQuery = useGrowTents(urlGrowId ?? undefined);
+  const diaryQuery = useDiaryEntries();
+  const sensorReadingsQuery = useSensorReadings(undefined, 500);
+  const activePlants = selectCurrentPlantsQueryData(activePlantsQuery) ?? EMPTY_QUERY_ROWS;
+  const allPlants = selectCurrentPlantsQueryData(allPlantsQuery) ?? EMPTY_QUERY_ROWS;
+  const allGrowsActivePlants =
+    selectCurrentPlantsQueryData(workspacePlantsQuery) ?? EMPTY_QUERY_ROWS;
+  const tents = selectCurrentPlantsQueryData(tentsQuery) ?? EMPTY_QUERY_ROWS;
+  const rawDiary = selectCurrentPlantsQueryData(diaryQuery) ?? EMPTY_QUERY_ROWS;
+  const rawReadings = selectCurrentPlantsQueryData(sensorReadingsQuery) ?? EMPTY_QUERY_ROWS;
+  // One-tent onboarding activation handoff (feat #367): when arriving with the
+  // activation intent and a tent that resolves inside the scoped grow, the
+  // create dialog opens pre-scoped to that tent.
+  const requestedActivationTentId = searchParams.get("tentId");
+  const activationTent =
+    validGrowId && isOneTentActivationIntent(searchParams.get("intent"))
+      ? (tents.find(
+          (tent) => tent.id === requestedActivationTentId && tent.growId === validGrowId,
+        ) ?? null)
+      : null;
+  const activationIntent = !!activationTent;
+  const plantsAsyncState = classifyPlantsPageAsyncState({
+    primary: snapshotPlantsQuery(allPlantsQuery),
+    supplemental: [
+      { key: "active", query: snapshotPlantsQuery(activePlantsQuery) },
+      { key: "workspace", query: snapshotPlantsQuery(workspacePlantsQuery) },
+      { key: "tents", query: snapshotPlantsQuery(tentsQuery) },
+      { key: "diary", query: snapshotPlantsQuery(diaryQuery) },
+      { key: "sensors", query: snapshotPlantsQuery(sensorReadingsQuery) },
+    ],
+  });
+  // Daily-check evidence stays fail-closed (sensor-truth hardening): when the
+  // diary or sensor reads error or are still loading, daily-check status is
+  // withheld rather than assumed empty.
+  const dailyCheckEvidenceError = diaryQuery.isError || sensorReadingsQuery.isError;
+  const dailyCheckEvidenceLoading = diaryQuery.isLoading || sensorReadingsQuery.isLoading;
+  const dailyCheckEvidenceReady = !dailyCheckEvidenceError && !dailyCheckEvidenceLoading;
+  const plantsMeta = getGrowDataMeta(["grow", "plants", "all", urlGrowId ?? "all"], user?.id);
+  const tentsMeta = getGrowDataMeta(["grow", "tents", urlGrowId ?? "all"], user?.id);
   const [tentFilter, setTentFilter] = useState<string>("all");
+  // Unassigned grow bucket: plants.grow_id is nullable, and there is no real
+  // grow id to route to, so the sentinel selection lives in component state
+  // while the URL stays unscoped (all-grows query).
+  const [showUnassignedOnly, setShowUnassignedOnly] = useState(false);
+
+  // The state reset keeps the visible selection canonical after navigation;
+  // effectiveTentFilter already fails closed during the first new-scope render.
+  useEffect(() => {
+    setTentFilter("all");
+    // A real grow scope always clears the display-side unassigned bucket.
+    if (urlGrowId) setShowUnassignedOnly(false);
+  }, [urlGrowId]);
 
   // Daily Grow Check: derive checked-today per plant using the same rules
   // module Dashboard and Plant Detail use. Read-only; never invents state.
   const dailyCheckByPlant = useMemo(() => {
+    if (!dailyCheckEvidenceReady) {
+      return new Map<string, { checkedToday: boolean; methodLabel: string | null }>();
+    }
     const panel = buildDashboardDailyGrowCheckPanel({
       now: new Date(),
       scopedGrowId: urlGrowId ?? null,
@@ -106,73 +206,241 @@ export default function Plants() {
     for (const row of panel.rows)
       map.set(row.plantId, { checkedToday: row.checkedToday, methodLabel: row.methodLabel });
     return map;
-  }, [allPlants, tents, rawReadings, rawDiary, urlGrowId]);
+  }, [allPlants, tents, rawReadings, rawDiary, urlGrowId, dailyCheckEvidenceReady]);
+
+  // Tent → grow rollup index (BUG-A): resolves a plant's grow through its
+  // tent when the plant's own grow_id is null, so tent-owned plants count
+  // under their grow instead of "Unassigned". Built from the tents the page
+  // already loads for chips.
+  const tentGrowById = useMemo(
+    () => buildTentGrowIndex(tents.map((t) => ({ id: t.id, growId: t.growId ?? null }))),
+    [tents],
+  );
 
   // Grow filter — sourced from the workspace grows list + active plants.
   const growFilterOptions = useMemo(
-    () => buildGrowFilterOptions(grows, allGrowsActivePlants),
-    [grows, allGrowsActivePlants],
+    () => buildGrowFilterOptions(grows, allGrowsActivePlants, tentGrowById),
+    [grows, allGrowsActivePlants, tentGrowById],
   );
 
-  const hasArchived = shouldShowArchivedToggle(allPlants);
-  const archivedCount = allPlants.filter(
+  // Grow scope: real grows are scoped server-side via urlGrowId; the
+  // unassigned bucket is display-side only, so it is applied here before
+  // every consumer (chips, grid, summary) reads the list.
+  const growScopedPlants = showUnassignedOnly
+    ? filterPlantsByGrow(allPlants, UNASSIGNED_GROW_FILTER_ID, tentGrowById)
+    : allPlants;
+
+  const hasArchived = shouldShowArchivedToggle(growScopedPlants);
+  const archivedCount = growScopedPlants.filter(
     (p) => isArchivedPlant(p) || isMergedPlant(p),
   ).length;
-
-  // Pipeline: archived visibility → grow scope (already in query) →
-  // tent tab → plant search. Each step is independent and labeled in the UI.
-  const visibleAfterArchive = filterVisiblePlants(allPlants, { showArchived });
-  const visibleAfterTent =
-    tentFilter === "all"
-      ? visibleAfterArchive
-      : visibleAfterArchive.filter((p) => p.tentId === tentFilter);
-  const filtered = filterPlantsBySearch(visibleAfterTent, search, tents);
 
   // Filter chips — counts MUST match what the grid will render under the
   // currently-applied archived + search filters (AUD-005). Tent buckets
   // are derived from the same post-archive + post-search set the grid
-  // uses, so chip totals and visible card counts always agree.
-  const filterEntries = buildPlantsTentFilterChips(allPlants, tents, {
+  // uses, so chip totals and visible card counts always agree. Built
+  // before the tent selection is reconciled so the "No tent" sentinel
+  // chip is a valid selection exactly while it is rendered.
+  const filterEntries = buildPlantsTentFilterChips(growScopedPlants, tents, {
     showArchived,
     search,
   });
+  const effectiveTentFilter = resolvePlantsTentFilter(
+    tentFilter,
+    filterEntries.filter((chip) => chip.id !== "all").map((chip) => chip.id),
+  );
+
+  // Pipeline: archived visibility → grow scope (query or unassigned bucket,
+  // already applied above) → tent chip → plant search. Each step is
+  // independent and labeled in the UI.
+  const visibleAfterArchive = filterVisiblePlants(growScopedPlants, { showArchived });
+  const visibleAfterTent = filterPlantsByTentChip(visibleAfterArchive, effectiveTentFilter);
+  const filtered = filterPlantsBySearch(visibleAfterTent, search, tents);
 
   // Filter summary — counts only active plants under the current grow scope.
-  const summary = summarizePlantsPageFilters(allPlants, {
-    selectedGrowId: urlGrowId,
-    selectedGrowName: scopedGrowName,
+  const summary = summarizePlantsPageFilters(growScopedPlants, {
+    selectedGrowId: showUnassignedOnly ? UNASSIGNED_GROW_FILTER_ID : urlGrowId,
+    selectedGrowName: showUnassignedOnly ? UNASSIGNED_GROW_OPTION_NAME : scopedGrowName,
     search,
   });
   const summaryLine = formatPlantsPageFilterSummary(summary);
 
   const emptyCopy = plantsPageEmptyStateCopy(filtered.length, {
-    selectedGrowId: urlGrowId,
-    selectedGrowName: scopedGrowName,
+    selectedGrowId: showUnassignedOnly ? UNASSIGNED_GROW_FILTER_ID : urlGrowId,
+    selectedGrowName: showUnassignedOnly ? UNASSIGNED_GROW_OPTION_NAME : scopedGrowName,
     search,
   });
 
   const handleGrowFilterChange = (value: string) => {
+    // Sentinel → display-side unassigned bucket; there is no grow id to
+    // route to, so the URL clears to the unscoped (all-grows) query.
+    setShowUnassignedOnly(value === UNASSIGNED_GROW_FILTER_ID);
+    // Every grow-scope change restarts the tent selection at "all" — the
+    // URL effect only covers changes that actually move urlGrowId.
+    setTentFilter("all");
     // "" → All grows (clear scope).
-    navigate(value ? plantsPath(value) : plantsPath());
+    navigate(value && value !== UNASSIGNED_GROW_FILTER_ID ? plantsPath(value) : plantsPath());
   };
 
-  return (
-    <div>
-      <GrowBreadcrumbs growId={urlGrowId} growName={scopedGrowName} current="Plants" section="plants" />
+  const pageLead = (
+    <>
+      <GrowBreadcrumbs
+        growId={urlGrowId}
+        growName={scopedGrowName}
+        current="Plants"
+        section="plants"
+      />
       <PageHeader
         title="Plants"
         description="Every plant you're tracking, across every tent."
         icon={<Sprout className="h-5 w-5" />}
-        actions={<CreatePlantDialog defaultGrowId={validGrowId} />}
+        actions={
+          scopeState === "unscoped" || scopeState === "valid" ? (
+            <CreatePlantDialog
+              key={activationIntent ? "one-tent-activation" : "standard-create"}
+              defaultGrowId={validGrowId}
+              defaultTentId={activationTent?.id}
+              requireTent={activationIntent}
+              initiallyOpen={activationIntent}
+              onCreated={
+                activationIntent && validGrowId && activationTent
+                  ? (plant) => {
+                      const prefill = buildPlantQuickLogPrefill({
+                        plantId: plant.id,
+                        plantName: plant.name,
+                        growId: validGrowId,
+                        tentId: activationTent.id,
+                        tentName: activationTent.name,
+                      });
+                      navigate(dashboardPath(validGrowId));
+                      if (prefill && typeof window !== "undefined") {
+                        window.dispatchEvent(
+                          new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, {
+                            detail: prefill,
+                          }),
+                        );
+                      }
+                    }
+                  : undefined
+              }
+            />
+          ) : null
+        }
       />
+    </>
+  );
+
+  const renderLoading = (reason: "scope" | "plants") => (
+    <div>
+      {pageLead}
+      <div
+        role="status"
+        aria-live="polite"
+        aria-busy="true"
+        data-testid="plants-loading"
+        data-loading-reason={reason}
+        className="glass rounded-2xl min-h-48 p-6 flex items-center justify-center text-center"
+      >
+        <div className="space-y-2">
+          <LoaderCircle className="h-6 w-6 animate-spin text-primary mx-auto" aria-hidden="true" />
+          <p className="font-medium">Loading plants…</p>
+          <p className="text-sm text-muted-foreground">
+            {reason === "scope"
+              ? "Confirming the selected grow before enabling plant actions."
+              : "Confirming the selected grow before showing plant records."}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+
+  if (scopeState === "loading") return renderLoading("scope");
+
+  if (scopeState === "error") {
+    return (
+      <div>
+        {pageLead}
+        <EmptyState
+          icon={<AlertTriangle className="h-6 w-6" />}
+          title="Grow scope unavailable"
+          description="We couldn't verify the selected grow. Plant actions stay disabled until that grow is confirmed."
+          action={
+            typeof refreshGrows === "function" ? (
+              <Button
+                type="button"
+                variant="outline"
+                data-testid="plants-retry-scope"
+                onClick={() => void refreshGrows()}
+              >
+                Retry grow scope
+              </Button>
+            ) : undefined
+          }
+        />
+      </div>
+    );
+  }
+
+  if (scopeState === "invalid") {
+    return (
+      <div>
+        {pageLead}
+        <EmptyState
+          icon={<AlertTriangle className="h-6 w-6" />}
+          title="Grow unavailable"
+          description="This grow could not be found in your account. No other grow was selected in its place."
+          action={
+            <Button asChild variant="outline">
+              <Link to={plantsPath()}>View all plants</Link>
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
+
+  if (plantsAsyncState.kind === "loading") return renderLoading("plants");
+
+  if (plantsAsyncState.kind === "error") {
+    return (
+      <div>
+        {pageLead}
+        <EmptyState
+          icon={<AlertTriangle className="h-6 w-6" />}
+          title="Plants unavailable"
+          description="We couldn't confirm your plant records. Nothing has been changed; try this plant-list request again."
+          action={
+            <Button
+              type="button"
+              variant="outline"
+              data-testid="plants-retry-primary"
+              aria-label="Retry plant list"
+              onClick={() => void allPlantsQuery.refetch()}
+            >
+              Retry plant list
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
+
+  const supplementalRefetch: Record<PlantsSupplementalQueryKey, () => unknown> = {
+    active: activePlantsQuery.refetch,
+    workspace: workspacePlantsQuery.refetch,
+    tents: tentsQuery.refetch,
+    diary: diaryQuery.refetch,
+    sensors: sensorReadingsQuery.refetch,
+  };
+
+  return (
+    <div>
+      {pageLead}
 
       {/* Grow filter + plant search row — the two controls are deliberately
           labeled separately so the grow filter is not mistaken for a plant
           picker. */}
-      <div
-        className="mb-3 grid gap-3 sm:grid-cols-2"
-        data-testid="plants-filter-controls"
-      >
+      <div className="mb-3 grid gap-3 sm:grid-cols-2" data-testid="plants-filter-controls">
         <div data-testid="plants-grow-filter">
           <label
             htmlFor="plants-grow-filter-select"
@@ -189,7 +457,7 @@ export default function Plants() {
             id="plants-grow-filter-select"
             data-testid="plants-grow-filter-select"
             aria-label="Filter plants by grow"
-            value={urlGrowId ?? ""}
+            value={showUnassignedOnly ? UNASSIGNED_GROW_FILTER_ID : (urlGrowId ?? "")}
             onChange={(e) => handleGrowFilterChange(e.target.value)}
             className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
           >
@@ -241,10 +509,7 @@ export default function Plants() {
       >
         <span data-testid="plants-filter-summary">{summaryLine}</span>
         {summary.archivedHiddenCount > 0 && !showArchived && (
-          <span
-            className="text-muted-foreground/80"
-            data-testid="plants-archived-hidden-note"
-          >
+          <span className="text-muted-foreground/80" data-testid="plants-archived-hidden-note">
             · {summary.archivedHiddenCount} archived/merged hidden
           </span>
         )}
@@ -272,6 +537,110 @@ export default function Plants() {
         testId="plants-data-source-disclosure"
       />
 
+      {plantsAsyncState.kind === "limited" && allPlants.length > 0 && (
+        <section
+          role="status"
+          data-testid="plants-limited-data"
+          className="mb-4 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3"
+        >
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" aria-hidden="true" />
+            <div className="min-w-0 flex-1">
+              <h2 className="text-sm font-medium">Some plant details are limited</h2>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Confirmed plant cards stay visible. Missing tent or check details are not inferred.
+              </p>
+              <ul className="mt-2 space-y-1.5 text-xs">
+                {plantsAsyncState.primaryRefreshFailed && (
+                  <li
+                    data-testid="plants-primary-refresh-error"
+                    className="flex flex-wrap items-center justify-between gap-2"
+                  >
+                    <span>Plant list refresh unavailable.</span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      data-testid="plants-retry-primary"
+                      aria-label="Retry plant list refresh"
+                      onClick={() => void allPlantsQuery.refetch()}
+                    >
+                      Retry
+                    </Button>
+                  </li>
+                )}
+                {plantsAsyncState.failedSupplementalKeys.map((key) => (
+                  <li
+                    key={key}
+                    data-testid={`plants-supplemental-error-${key}`}
+                    className="flex flex-wrap items-center justify-between gap-2"
+                  >
+                    <span>{PLANTS_SUPPLEMENTAL_QUERY_LABELS[key]} unavailable.</span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      data-testid={`plants-retry-${key}`}
+                      aria-label={`Retry ${PLANTS_SUPPLEMENTAL_QUERY_LABELS[key].toLowerCase()}`}
+                      onClick={() => void supplementalRefetch[key]()}
+                    >
+                      Retry
+                    </Button>
+                  </li>
+                ))}
+                {plantsAsyncState.staleSupplementalKeys.map((key) => (
+                  <li
+                    key={key}
+                    data-testid={`plants-supplemental-stale-${key}`}
+                    className="flex flex-wrap items-center justify-between gap-2"
+                  >
+                    <span>
+                      {PLANTS_SUPPLEMENTAL_QUERY_LABELS[key]} refresh failed; showing last loaded
+                      data.
+                    </span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      data-testid={`plants-retry-${key}`}
+                      aria-label={`Retry ${PLANTS_SUPPLEMENTAL_QUERY_LABELS[key].toLowerCase()}`}
+                      onClick={() => void supplementalRefetch[key]()}
+                    >
+                      Retry
+                    </Button>
+                  </li>
+                ))}
+                {plantsAsyncState.pendingSupplementalKeys.map((key) => (
+                  <li
+                    key={key}
+                    data-testid={`plants-supplemental-pending-${key}`}
+                    className="text-muted-foreground"
+                  >
+                    {PLANTS_SUPPLEMENTAL_QUERY_LABELS[key]} still loading.
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {dailyCheckEvidenceError ? (
+        <GrowDataLoadError
+          resource="Daily check evidence"
+          testId="plants-daily-check-evidence-error"
+          message="Verdant could not load recent observations, so daily check status is unavailable rather than assumed empty."
+          onRetry={() => {
+            void Promise.all([diaryQuery.refetch(), sensorReadingsQuery.refetch()]);
+          }}
+        />
+      ) : dailyCheckEvidenceLoading ? (
+        <GrowDataLoadingState
+          resource="Daily check evidence"
+          testId="plants-daily-check-evidence-loading"
+        />
+      ) : null}
+
       {/* Contextual help cluster — click/tap popovers, never hover-only. */}
       <div
         className="mb-4 flex items-center gap-1.5 text-[11px] text-muted-foreground flex-wrap"
@@ -293,16 +662,8 @@ export default function Plants() {
           body={HELP_COPY.simulatedData}
           testKey="plants-simulated-data"
         />
-        <InfoPopover
-          title="Stale data"
-          body={HELP_COPY.staleData}
-          testKey="plants-stale-data"
-        />
-        <InfoPopover
-          title="Mixed data"
-          body={HELP_COPY.mixedData}
-          testKey="plants-mixed-data"
-        />
+        <InfoPopover title="Stale data" body={HELP_COPY.staleData} testKey="plants-stale-data" />
+        <InfoPopover title="Mixed data" body={HELP_COPY.mixedData} testKey="plants-mixed-data" />
         <InfoPopover
           title="Archived / merged plants"
           body={HELP_COPY.archivedMergedPlants}
@@ -320,7 +681,7 @@ export default function Plants() {
             data-count={t.count}
             className={cn(
               "text-xs px-2.5 py-1 rounded-full border transition",
-              tentFilter === t.id
+              effectiveTentFilter === t.id
                 ? "bg-primary text-primary-foreground border-primary"
                 : "bg-secondary/50 border-border/50 hover:bg-secondary",
             )}
@@ -378,8 +739,9 @@ export default function Plants() {
             const isInactive = archivedLabel.kind !== "active";
             const dailyCheckEntry = dailyCheckByPlant.get(p.id);
             const checkedToday = !isInactive && dailyCheckEntry?.checkedToday === true;
-            const showDailyCheckBadge = !isInactive && dailyCheckByPlant.has(p.id);
-            const methodLabel = checkedToday ? dailyCheckEntry?.methodLabel ?? null : null;
+            const showDailyCheckBadge =
+              !isInactive && dailyCheckEvidenceReady && dailyCheckByPlant.has(p.id);
+            const methodLabel = checkedToday ? (dailyCheckEntry?.methodLabel ?? null) : null;
             return (
               <div key={p.id} className="relative animate-fade-in">
                 <Link
@@ -476,11 +838,21 @@ export default function Plants() {
                           data-testid="plant-card-daily-check-action-note"
                           data-method="note"
                           aria-label={`Add note for ${p.name}`}
-                          data-href={buildDailyCheckEntryHref({ plantId: p.id, source: "plants", method: "note" })}
+                          data-href={buildDailyCheckEntryHref({
+                            plantId: p.id,
+                            source: "plants",
+                            method: "note",
+                          })}
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            navigate(buildDailyCheckEntryHref({ plantId: p.id, source: "plants", method: "note" }));
+                            navigate(
+                              buildDailyCheckEntryHref({
+                                plantId: p.id,
+                                source: "plants",
+                                method: "note",
+                              }),
+                            );
                           }}
                           className="inline-flex items-center gap-1 rounded-md border border-border bg-background/40 text-[10px] px-2 py-1 hover:bg-accent transition"
                         >
@@ -491,11 +863,21 @@ export default function Plants() {
                           data-testid="plant-card-daily-check-action-sensor"
                           data-method="sensor"
                           aria-label={`Add sensor snapshot for ${p.name}`}
-                          data-href={buildDailyCheckEntryHref({ plantId: p.id, source: "plants", method: "sensor" })}
+                          data-href={buildDailyCheckEntryHref({
+                            plantId: p.id,
+                            source: "plants",
+                            method: "sensor",
+                          })}
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            navigate(buildDailyCheckEntryHref({ plantId: p.id, source: "plants", method: "sensor" }));
+                            navigate(
+                              buildDailyCheckEntryHref({
+                                plantId: p.id,
+                                source: "plants",
+                                method: "sensor",
+                              }),
+                            );
                           }}
                           className="inline-flex items-center gap-1 rounded-md border border-border bg-background/40 text-[10px] px-2 py-1 hover:bg-accent transition"
                         >

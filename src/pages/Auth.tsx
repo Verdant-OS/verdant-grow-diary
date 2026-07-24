@@ -32,9 +32,17 @@ import {
   RESEND_VERIFICATION_GENERIC_SUCCESS,
   RESEND_VERIFICATION_GENERIC_FAILURE,
 } from "@/lib/authErrorRules";
-import { sanitizeAuthRedirect } from "@/lib/authRedirectRules";
+import { resolveKnownRouteReturnTo } from "@/lib/authRedirectRules";
+import {
+  buildSignupEmailRedirectUrl,
+  buildSignupUserMetadata,
+  resolveSignupAcquisitionSource,
+} from "@/lib/signupAcquisitionRules";
+import { trackPricingEvent } from "@/lib/pricingAnalytics";
+import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 import { getStartScreenChoice, routeForStartScreen } from "@/lib/startScreenPreferences";
 import { buildAcceptanceRows } from "@/lib/agreementConsent";
+import { resolveSignupCompletionDisposition } from "@/lib/signupCompletionRules";
 import {
   DEFAULT_VERIFICATION_COOLDOWN_MS,
   VERIFICATION_COOLDOWN_HINT,
@@ -48,6 +56,20 @@ import {
   getAuthTabTriggerClassName,
   type AuthMode,
 } from "@/lib/authModeTabRules";
+import { lovable } from "@/integrations/lovable/index";
+import {
+  clearPendingOAuthSignupAcquisition,
+  savePendingOAuthSignupAcquisition,
+} from "@/lib/oauthSignupAcquisitionRules";
+import { buildSignupReferralMetadata, resolveReferralCode } from "@/lib/referralCaptureRules";
+import {
+  clearPendingOAuthReferral,
+  savePendingOAuthReferral,
+} from "@/lib/oauthReferralCaptureRules";
+import {
+  clearPendingOAuthPostAuthRedirect,
+  savePendingOAuthPostAuthRedirect,
+} from "@/lib/oauthPostAuthRedirectRules";
 
 export default function Auth() {
   usePageSeo({
@@ -61,10 +83,16 @@ export default function Auth() {
   const nav = useNavigate();
   const [search] = useSearchParams();
   const explicitRedirect = useMemo(() => {
-    const raw = search.get("redirectTo");
-    return raw ? sanitizeAuthRedirect(raw) : null;
+    // Manifest-validated: only same-origin paths the app actually mounts are
+    // restored after sign-in (deep-link return-to; open-redirect safe).
+    return resolveKnownRouteReturnTo(search.get("redirectTo"));
   }, [search]);
   const redirectTo = explicitRedirect ?? "/";
+  const signupSource = useMemo(() => resolveSignupAcquisitionSource(search), [search]);
+  const signupUserMetadata = useMemo(() => buildSignupUserMetadata(search), [search]);
+  // Referral claim (?ref=<code>) — attribution-only ride-along; the grant is
+  // server-gated on email confirmation (see referralCaptureRules).
+  const referralMetadata = useMemo(() => buildSignupReferralMetadata(search), [search]);
   const initialMode: AuthMode = (() => {
     const raw = search.get("mode");
     if (raw === "signup" || raw === "forgot" || raw === "signin") return raw;
@@ -90,6 +118,62 @@ export default function Auth() {
   const [consentAccepted, setConsentAccepted] = useState(false);
   const [consentError, setConsentError] = useState<string | null>(null);
   const [marketingOptIn, setMarketingOptIn] = useState(false);
+  const [googleBusy, setGoogleBusy] = useState(false);
+  const [googleError, setGoogleError] = useState<string | null>(null);
+
+  async function signInWithGoogle() {
+    if (googleBusy) return;
+    const shouldRecordSignupSource = mode === "signup" && signupSource !== null;
+    if (shouldRecordSignupSource) {
+      savePendingOAuthSignupAcquisition(signupSource);
+    } else {
+      clearPendingOAuthSignupAcquisition();
+    }
+    // Referral bridge: options.data does not round-trip managed OAuth, so the
+    // sanitized ?ref code rides sessionStorage to the post-session redeem
+    // flush. Saved in any mode (a new referee may land on the signin tab);
+    // the server's fresh-attribution age gate makes stray saves harmless.
+    const oauthReferralCode = resolveReferralCode(search);
+    if (oauthReferralCode) {
+      savePendingOAuthReferral(oauthReferralCode);
+    } else {
+      clearPendingOAuthReferral();
+    }
+    // Google returns to the configured public origin. The helper preserves
+    // only Verdant's fixed CSV onboarding target for the post-OAuth root
+    // handoff; all other destinations are intentionally not persisted.
+    if (explicitRedirect) {
+      savePendingOAuthPostAuthRedirect(explicitRedirect);
+    } else {
+      clearPendingOAuthPostAuthRedirect();
+    }
+    setGoogleBusy(true);
+    setGoogleError(null);
+    try {
+      // redirect_uri MUST be a same-origin public URL, not a protected route.
+      // The fixed CSV onboarding intent is applied after Supabase reports a
+      // session; other return paths keep their existing non-OAuth behavior.
+      const result = await lovable.auth.signInWithOAuth("google", {
+        redirect_uri: window.location.origin,
+      });
+      if (result.error) {
+        if (shouldRecordSignupSource) clearPendingOAuthSignupAcquisition();
+        clearPendingOAuthPostAuthRedirect();
+        setGoogleError("Google sign-in didn't complete. Please try again.");
+        return;
+      }
+      if (result.redirected) return; // browser redirects to Google
+      // Tokens returned and session set — route to intended destination.
+      clearPendingOAuthPostAuthRedirect();
+      nav(postSignInTarget(), { replace: true });
+    } catch {
+      if (shouldRecordSignupSource) clearPendingOAuthSignupAcquisition();
+      clearPendingOAuthPostAuthRedirect();
+      setGoogleError("Google sign-in didn't complete. Please try again.");
+    } finally {
+      setGoogleBusy(false);
+    }
+  }
 
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotError, setForgotError] = useState<string | null>(null);
@@ -116,6 +200,11 @@ export default function Auth() {
     if (user) nav(postSignInTarget(), { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, nav]);
+
+  useEffect(() => {
+    if (mode !== "signup") return;
+    trackPricingEvent("signup_page_view", { source: signupSource ?? "direct" });
+  }, [mode, signupSource]);
 
   // While a verification-resend cooldown is active, tick once a second so
   // the countdown label updates and the button re-enables on its own.
@@ -241,13 +330,25 @@ export default function Auth() {
       return;
     }
     setBusy(true);
+    trackPricingEvent("signup_started", { source: signupSource ?? "direct" });
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { emailRedirectTo: window.location.origin },
+      options: {
+        emailRedirectTo: buildSignupEmailRedirectUrl(window.location.origin, explicitRedirect),
+        // Analytics-only first touch. raw_user_meta_data is user-editable and
+        // must never be used for roles, billing, credits, or entitlements.
+        // The explicit boolean opt-in is copied by the auth trigger so it also
+        // survives confirmation-required signups that have no session yet.
+        data: { ...signupUserMetadata, ...referralMetadata, marketing_opt_in: marketingOptIn },
+      },
     });
     if (error) {
       setBusy(false);
+      trackPricingEvent("signup_failed", {
+        source: signupSource ?? "direct",
+        reason: "auth_rejected",
+      });
       setSignUpError(sanitizeAuthError("signUp", error));
       signUpEmailRef.current?.focus();
       return;
@@ -257,7 +358,11 @@ export default function Auth() {
     // session yet, in which case the insert is skipped and the re-consent
     // gate will prompt on first authenticated load. Signup itself must not
     // fail on a consent-log write error.
-    if (data.user?.id) {
+    // Confirmation-required signups have a user id but no authenticated
+    // session, so protected writes would only add RLS-denied round trips before
+    // the inbox prompt appears. The auth trigger already copied the explicit
+    // marketing choice from metadata; the write below is a session-path backup.
+    if (data?.user?.id && data.session) {
       try {
         const rows = buildAcceptanceRows(data.user.id).map((r) => ({
           ...r,
@@ -288,7 +393,19 @@ export default function Auth() {
       }
     }
     setBusy(false);
-    setSignUpSuccess("Welcome to Verdant. Check your inbox if confirmation is required.");
+    trackPricingEvent("signup_completed", { source: signupSource ?? "direct" });
+    trackFunnelEvent("signup", { method: "email" });
+    setPassword("");
+    if (resolveSignupCompletionDisposition(data) === "verification_required") {
+      trackPricingEvent("signup_verification_required", {
+        source: signupSource ?? "direct",
+      });
+      setSignUpSuccess(
+        "Account created. Check your inbox and open the verification link to continue.",
+      );
+      return;
+    }
+    setSignUpSuccess("Welcome to Verdant. Your account is ready.");
     nav(postSignInTarget(), { replace: true });
   }
 
@@ -537,6 +654,32 @@ export default function Auth() {
                   ) : null}
                 </div>
               </form>
+              <div className="relative my-4" aria-hidden="true">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-border/50" />
+                </div>
+                <div className="relative flex justify-center">
+                  <span className="bg-background px-2 text-[11px] uppercase tracking-widest text-muted-foreground">
+                    Or
+                  </span>
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={signInWithGoogle}
+                disabled={googleBusy}
+                aria-busy={googleBusy}
+                data-testid="auth-google-signin"
+                className="w-full"
+              >
+                {googleBusy ? "Opening Google…" : "Continue with Google"}
+              </Button>
+              {googleError ? (
+                <AuthInlineMessage role="alert" tone="error">
+                  {googleError}
+                </AuthInlineMessage>
+              ) : null}
             </TabsContent>
 
             <TabsContent value="signup">
@@ -658,13 +801,43 @@ export default function Auth() {
                 ) : null}
                 <Button
                   type="submit"
-                  disabled={busy}
+                  disabled={busy || !!signUpSuccess}
                   aria-busy={busy}
                   className="gradient-leaf text-primary-foreground"
                 >
-                  {busy ? "Creating account…" : "Create account"}
+                  {busy
+                    ? "Creating account…"
+                    : signUpSuccess
+                      ? "Account created"
+                      : "Create account"}
                 </Button>
               </form>
+              <div className="relative my-4" aria-hidden="true">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-border/50" />
+                </div>
+                <div className="relative flex justify-center">
+                  <span className="bg-background px-2 text-[11px] uppercase tracking-widest text-muted-foreground">
+                    Or
+                  </span>
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={signInWithGoogle}
+                disabled={googleBusy}
+                aria-busy={googleBusy}
+                data-testid="auth-google-signup"
+                className="w-full"
+              >
+                {googleBusy ? "Opening Google…" : "Continue with Google"}
+              </Button>
+              {googleError ? (
+                <AuthInlineMessage role="alert" tone="error">
+                  {googleError}
+                </AuthInlineMessage>
+              ) : null}
             </TabsContent>
 
             <TabsContent value="forgot">

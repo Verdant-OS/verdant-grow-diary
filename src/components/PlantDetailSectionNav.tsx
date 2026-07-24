@@ -10,6 +10,7 @@ import {
   type PlantDetailSectionEntry,
   type PlantDetailSectionAnchorsInput,
 } from "@/lib/plantDetailSectionAnchors";
+import type { PlantDetailRevealAndNavigate } from "@/hooks/usePlantDetailDisclosureNavigation";
 
 const FOCUS_CLASSES =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
@@ -18,7 +19,10 @@ function scrollToAnchor(targetId: string) {
   if (typeof document === "undefined") return;
   const el = document.getElementById(targetId);
   if (!el) return;
-  el.scrollIntoView({ behavior: "smooth", block: "start" });
+  // "center" keeps the target near the middle of the viewport instead of
+  // snapping the page all the way down when the target sits near the
+  // bottom of a long page (the "jarring auto-scroll to bottom" report).
+  el.scrollIntoView({ behavior: "smooth", block: "center" });
   if (!el.hasAttribute("tabindex")) el.setAttribute("tabindex", "-1");
   (el as HTMLElement).focus({ preventScroll: true });
 }
@@ -30,10 +34,13 @@ function ariaLabelFor(entry: PlantDetailSectionEntry): string {
   return `Jump to ${entry.label} section`;
 }
 
-function renderEntry(entry: PlantDetailSectionEntry) {
+function renderEntry(
+  entry: PlantDetailSectionEntry,
+  onRevealAndNavigate?: PlantDetailRevealAndNavigate,
+) {
   if (entry.disabled) {
     return (
-      <div key={entry.kind} className="flex flex-col gap-0.5 shrink-0">
+      <div key={entry.kind} className="flex min-w-0 max-w-full flex-col gap-0.5">
         <Button
           type="button"
           size="sm"
@@ -42,7 +49,7 @@ function renderEntry(entry: PlantDetailSectionEntry) {
           aria-disabled="true"
           aria-label={ariaLabelFor(entry)}
           data-testid={entry.testId}
-          className={`${FOCUS_CLASSES} opacity-60 cursor-not-allowed`}
+          className={`${FOCUS_CLASSES} min-h-11 min-w-0 max-w-full whitespace-normal px-3 text-xs rounded-xl opacity-60 cursor-not-allowed`}
         >
           {entry.label}
         </Button>
@@ -62,29 +69,44 @@ function renderEntry(entry: PlantDetailSectionEntry) {
       key={entry.kind}
       type="button"
       size="sm"
-      variant="ghost"
-      className={`shrink-0 ${FOCUS_CLASSES}`}
+      variant="outline"
+      className={`min-h-11 min-w-0 max-w-full whitespace-normal px-3 text-xs rounded-xl ${FOCUS_CLASSES}`}
       data-testid={entry.testId}
       aria-label={ariaLabelFor(entry)}
-      onClick={() => scrollToAnchor(entry.anchorId)}
+      onClick={() =>
+        onRevealAndNavigate ? onRevealAndNavigate(entry.anchorId) : scrollToAnchor(entry.anchorId)
+      }
     >
       {entry.label}
     </Button>
   );
 }
 
-export default function PlantDetailSectionNav(
-  props: PlantDetailSectionAnchorsInput,
-) {
-  const entries = buildPlantDetailSectionAnchors(props);
+type PlantDetailSectionNavProps = PlantDetailSectionAnchorsInput & {
+  onRevealAndNavigate?: PlantDetailRevealAndNavigate;
+};
+
+export default function PlantDetailSectionNav({
+  onRevealAndNavigate,
+  ...input
+}: PlantDetailSectionNavProps) {
+  const entries = buildPlantDetailSectionAnchors(input);
   return (
     <nav
       aria-label="Plant Detail section jump links"
       data-testid="plant-detail-section-nav"
-      className="my-3 -mx-1 overflow-x-auto"
+      className="my-3 min-w-0"
     >
-      <div className="flex items-start gap-1 px-1">
-        {entries.map(renderEntry)}
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
+        <span
+          aria-hidden="true"
+          className="shrink-0 text-[11px] uppercase tracking-wider text-muted-foreground"
+        >
+          Jump to
+        </span>
+        <div className="flex min-w-0 flex-1 flex-wrap items-start gap-1.5">
+          {entries.map((entry) => renderEntry(entry, onRevealAndNavigate))}
+        </div>
       </div>
     </nav>
   );

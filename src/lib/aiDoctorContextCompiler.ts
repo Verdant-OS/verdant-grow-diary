@@ -30,24 +30,67 @@ import {
   type EnvironmentCheckEventInput,
 } from "./aiDoctorEnvironmentCheckRules";
 import type { AiDoctorSensorContext } from "./aiDoctorSensorContextRules";
+import { normalizePlantType, type PlantType } from "./plantTypeRules";
 import {
   buildAiDoctorCsvHistoryContext,
   type AiDoctorCsvHistoryContext,
+  type CsvHistorySensorRowLike,
 } from "./aiDoctorCsvHistoryContextRules";
 import {
   buildEarlyStageAiDoctorContext,
   type EarlyStageAiDoctorContext,
 } from "./earlyStageAiDoctorContextRules";
-
+import { isSensorTestbenchRow } from "./sensorTestbenchIndicatorRules";
+import {
+  AI_DOCTOR_IMPORTED_SENSOR_HISTORY_GUIDANCE,
+  AI_DOCTOR_IMPORTED_SENSOR_HISTORY_SECTION_LABEL,
+} from "@/constants/aiDoctorImportedHistory";
 
 /** Section label rendered for imported CSV/XLSX sensor history. */
-export const AI_DOCTOR_IMPORTED_SENSOR_HISTORY_SECTION_LABEL =
-  "Imported sensor history";
+export { AI_DOCTOR_IMPORTED_SENSOR_HISTORY_SECTION_LABEL };
 
 export interface ImportedSensorHistorySection extends AiDoctorCsvHistoryContext {
   sectionLabel: typeof AI_DOCTOR_IMPORTED_SENSOR_HISTORY_SECTION_LABEL;
   /** Cautionary guidance the AI Doctor consumer renders verbatim. */
   guidance: readonly string[];
+}
+
+/**
+ * Build the imported-sensor-history section from raw reading rows.
+ * Sanitized + bounded: only rows explicitly identified as CSV history
+ * contribute (via the shared summarizer's own rule), and the output
+ * carries derived aggregates only — never raw rows, raw_payload,
+ * filenames, or identifiers. Returns null when no CSV rows contribute.
+ *
+ * Exported so the AI Doctor review request packet can attach the exact
+ * same section shape the row compiler produces (single source of truth;
+ * the shared prompt assembly reads either without translation).
+ */
+/**
+ * True only when a snapshot annotation carries FRESH live-source
+ * provenance. Manual, CSV, demo, stale, invalid, and unknown sources
+ * never satisfy it — mirroring `classifySource`'s live vocabulary — so
+ * consumers can derive an honest missing-live-readings signal without
+ * restating source labels. Lives here (not in the request packet) so
+ * the live-review static-safety scanner can keep banning live-labeling
+ * literals from packet copy.
+ */
+export function isFreshLiveSnapshotAnnotation(
+  annotation: { source: string; stale: boolean } | null | undefined,
+): boolean {
+  return !!annotation && annotation.source === "live" && annotation.stale === false;
+}
+
+export function buildImportedSensorHistorySection(
+  rows: ReadonlyArray<CsvHistorySensorRowLike> | null | undefined,
+): ImportedSensorHistorySection | null {
+  const csvHistory = buildAiDoctorCsvHistoryContext({ rows: rows ?? [] });
+  if (!csvHistory.hasCsvHistory) return null;
+  return {
+    ...csvHistory,
+    sectionLabel: AI_DOCTOR_IMPORTED_SENSOR_HISTORY_SECTION_LABEL,
+    guidance: AI_DOCTOR_IMPORTED_SENSOR_HISTORY_GUIDANCE,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -78,20 +121,15 @@ export function compileAiDoctorContext(
   input: CompileAiDoctorContextInput,
 ): CompiledAiDoctorContext {
   const sensor = input.sensorContext ?? null;
-  const selection = selectBestEnvironmentCheckEvent(
-    input.environmentCheckEvents ?? [],
-  );
-  const environmentCheck = buildAiDoctorEnvironmentCheckContext(
-    selection.selected,
-  );
+  const selection = selectBestEnvironmentCheckEvent(input.environmentCheckEvents ?? []);
+  const environmentCheck = buildAiDoctorEnvironmentCheckContext(selection.selected);
 
   const combined: string[] = [];
   const push = (n: string) => {
     if (!combined.includes(n)) combined.push(n);
   };
   if (sensor) for (const n of sensor.safetyNotes) push(n);
-  if (environmentCheck.kind === "present")
-    for (const n of environmentCheck.safetyNotes) push(n);
+  if (environmentCheck.kind === "present") for (const n of environmentCheck.safetyNotes) push(n);
   if (selection.isFallback && environmentCheck.kind === "present") {
     push(
       "Selected Environment Check is a weak fallback — no accepted required metric. Treat as untrusted.",
@@ -99,8 +137,7 @@ export function compileAiDoctorContext(
   }
 
   const hasAnyEvidence =
-    (sensor !== null && sensor.usableMetrics.length > 0) ||
-    environmentCheck.kind === "present";
+    (sensor !== null && sensor.usableMetrics.length > 0) || environmentCheck.kind === "present";
 
   return {
     sensor,
@@ -115,15 +152,7 @@ export function compileAiDoctorContext(
 // Layer 2 — Phase 1 row-based plant context compiler.
 // ---------------------------------------------------------------------------
 
-
-
-export type SensorSourceTag =
-  | "live"
-  | "manual"
-  | "csv"
-  | "demo"
-  | "stale"
-  | "invalid";
+export type SensorSourceTag = "live" | "manual" | "csv" | "demo" | "stale" | "invalid";
 
 export const SENSOR_SOURCE_ORDER: readonly SensorSourceTag[] = Object.freeze([
   "live",
@@ -180,6 +209,20 @@ export interface PlantContextPayload {
    * row. Null when missing, empty, or blank. Never inferred.
    */
   pot_size: string | null;
+  /**
+   * Declared plant type from the plant row, normalized to the canonical
+   * vocabulary (autoflower | photoperiod | unknown). Absent, blank, or
+   * unrecognized values are "unknown" — never a silent photoperiod default,
+   * and never inferred from strain text (the isLikelyAutoflower name
+   * heuristic stays a separate safety net on top).
+   */
+  plant_type?: PlantType;
+  /**
+   * Count of recent settled root-zone observations (dry-back, runoff, pot
+   * weight) available as evidence. Absent or 0 = none — the safety rules
+   * withhold feed/taper language until root-zone history exists.
+   */
+  recent_root_zone_observation_count?: number;
   recent_grow_events: readonly RecentGrowEvent[];
   recentSensorReadings: readonly RecentSensorReading[];
   sensor_groups: readonly SensorSourceGroup[];
@@ -191,8 +234,6 @@ export interface PlantContextPayload {
   missingLiveSensorReadings: boolean;
   early_stage_memory: EarlyStageAiDoctorContext | null;
 }
-
-
 
 // ---------------------------------------------------------------------------
 // Row shapes (intentionally permissive — caller supplies whatever they have).
@@ -216,6 +257,8 @@ export interface PlantRowLike {
    * compiler only normalizes whitespace and rejects blanks.
    */
   pot_size?: string | null;
+  /** Declared plant type (autoflower / photoperiod / unknown). Never inferred. */
+  plant_type?: string | null;
 }
 
 export interface GrowEventRowLike {
@@ -226,7 +269,6 @@ export interface GrowEventRowLike {
   /** Free-form details JSON — may carry an `early_stage` envelope. */
   details?: unknown;
 }
-
 
 export interface SensorReadingRowLike {
   metric?: string | null;
@@ -257,6 +299,11 @@ function classifySource(row: SensorReadingRowLike): SensorSourceTag {
   if (stateLike === "demo") return "demo";
   if (stateLike === "manual") return "manual";
   if (stateLike === "csv") return "csv";
+  // A successful testbench transport is intentionally stored with canonical
+  // source=live, but its preserved provenance is diagnostic—not plant truth.
+  // Keep it visible in the non-trustworthy demo bucket and out of live
+  // averages/readiness.
+  if (isSensorTestbenchRow(row)) return "demo";
   const rawSource = row.source;
   // Missing / blank source must never be trusted as live telemetry.
   if (rawSource === null || rawSource === undefined) return "invalid";
@@ -266,8 +313,7 @@ function classifySource(row: SensorReadingRowLike): SensorSourceTag {
   if (source === "stale") return "stale";
   if (source === "demo" || source === "demo_fixture") return "demo";
   if (source === "manual" || source === "manual_snapshot") return "manual";
-  if (source === "csv" || source === "csv_import" || source === "import")
-    return "csv";
+  if (source === "csv" || source === "csv_import" || source === "import") return "csv";
   // Known live-sensor vendor identifiers. Anything else is untrusted and
   // is bucketed as "invalid" so unrecognized telemetry never folds into
   // the live / healthy view of the plant.
@@ -422,27 +468,13 @@ export function compilePlantContextFromRows(
   }
   if (averages_7d.vpd_kpa !== null) {
     if (averages_7d.vpd_kpa < 0.6 || averages_7d.vpd_kpa > 1.6) {
-      notable_deviations.push(
-        `7d average VPD ${averages_7d.vpd_kpa} kPa outside 0.6–1.6 kPa band`,
-      );
+      notable_deviations.push(`7d average VPD ${averages_7d.vpd_kpa} kPa outside 0.6–1.6 kPa band`);
     }
   }
 
   // ----- imported CSV/XLSX sensor history (read-only, never live) -----
-  const csvHistory = buildAiDoctorCsvHistoryContext({
-    rows: input.sensorReadings ?? [],
-  });
   const imported_sensor_history: ImportedSensorHistorySection | null =
-    csvHistory.hasCsvHistory
-      ? {
-          ...csvHistory,
-          sectionLabel: AI_DOCTOR_IMPORTED_SENSOR_HISTORY_SECTION_LABEL,
-          guidance: Object.freeze([
-            csvHistory.notForLiveDiagnosis,
-            "Imported history may show trends but is not proof of current conditions.",
-          ]),
-        }
-      : null;
+    buildImportedSensorHistorySection(input.sensorReadings ?? []);
 
   // Live-sensor presence is computed from the trustworthy "live" bucket
   // only. CSV/manual/demo/stale/invalid never satisfy live-availability.
@@ -455,8 +487,9 @@ export function compilePlantContextFromRows(
     diaryRows: input.growEvents ?? [],
     hasRecentSensorSnapshot: hasLiveSensorReadings,
   });
-  const early_stage_memory: EarlyStageAiDoctorContext | null =
-    earlyStage.hasEarlyStageMemory ? earlyStage : null;
+  const early_stage_memory: EarlyStageAiDoctorContext | null = earlyStage.hasEarlyStageMemory
+    ? earlyStage
+    : null;
 
   // Medium / pot size carried directly from the plant row. Whitespace-
   // normalized; blank / non-string inputs collapse to null. Never inferred.
@@ -472,6 +505,7 @@ export function compilePlantContextFromRows(
     stage: plant?.stage ?? plant?.growth_stage ?? null,
     medium,
     pot_size,
+    plant_type: normalizePlantType(plant?.plant_type),
     recent_grow_events: Object.freeze(recent_grow_events),
     recentSensorReadings: Object.freeze(recentSensorReadings),
     sensor_groups: Object.freeze(sensor_groups),
@@ -483,12 +517,10 @@ export function compilePlantContextFromRows(
     missingLiveSensorReadings: !hasLiveSensorReadings,
     early_stage_memory,
   };
-
 }
 
 function bucketAverages(rows: readonly RecentSensorReading[]): SensorRollingAverages {
-  const pick = (metric: string) =>
-    rows.filter((r) => r.metric === metric).map((r) => r.value);
+  const pick = (metric: string) => rows.filter((r) => r.metric === metric).map((r) => r.value);
   return {
     temperature_c: avg(pick("temperature_c")),
     humidity_pct: avg(pick("humidity_pct")),

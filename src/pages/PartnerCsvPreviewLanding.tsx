@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { usePageSeo } from "@/hooks/usePageSeo";
 
 /**
  * PartnerCsvPreviewLanding — static partner-facing explainer for the
@@ -9,6 +10,14 @@ import { Button } from "@/components/ui/button";
  * no AI, no Action Queue or alerts writes.
  */
 export default function PartnerCsvPreviewLanding() {
+  usePageSeo({
+    title: "Partner CSV Preview | Verdant Grow Diary",
+    description:
+      "A read-only, browser-local preview for sensor and controller CSV exports. No upload, save, automation, or device control.",
+    path: "/partners/csv-preview",
+    noindex: true,
+  });
+
   return (
     <main
       data-testid="partner-csv-preview-landing"
@@ -19,10 +28,9 @@ export default function PartnerCsvPreviewLanding() {
           Turn hardware exports into plant memory — read-only.
         </h1>
         <p className="text-muted-foreground">
-          Verdant accepts a CSV or TSV export from your sensors, controllers,
-          or data logger and shows how it would map into a grower's plant
-          memory — without saving, syncing, writing back, or controlling a
-          single device.
+          Verdant accepts a CSV or TSV export from your sensors, controllers, or data logger and
+          shows how it would map into a grower's plant memory — without saving, syncing, writing
+          back, or controlling a single device.
         </p>
         <div className="flex flex-wrap gap-2 pt-2">
           <Button asChild>
@@ -41,7 +49,9 @@ export default function PartnerCsvPreviewLanding() {
           <li>Upload a CSV or TSV export from any sensor or controller.</li>
           <li>Verdant detects the headers in your browser.</li>
           <li>Verdant proposes mappings to canonical fields.</li>
-          <li>Verdant flags suspicious readings (stuck humidity, lux vs PPFD, EC units, pH range).</li>
+          <li>
+            Verdant flags suspicious readings (stuck humidity, lux vs PPFD, EC units, pH range).
+          </li>
           <li>Verdant previews a timeline from the rows.</li>
           <li>Verdant generates a local JSON report you can download and share.</li>
         </ol>

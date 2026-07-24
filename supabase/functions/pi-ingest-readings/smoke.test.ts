@@ -25,7 +25,7 @@ import { assert, assertEquals } from "https://deno.land/std@0.224.0/assert/mod.t
 import {
   buildSigningString,
   computeHmacSha256Hex,
-} from "../../../src/lib/piIngestAuthRules.ts";
+} from "../_shared/lib/lib/piIngestAuthRules.ts";
 
 const REQUIRED_ENV = [
   "PI_INGEST_SMOKE_FUNCTION_URL",

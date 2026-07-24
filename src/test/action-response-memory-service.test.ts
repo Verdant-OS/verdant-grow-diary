@@ -4,7 +4,7 @@
  * Uses an injected fake client that records every call. Proves: owner/RLS
  * query shape, batched action lookup, no N+1, missing related action,
  * missing photo/sensor objects, query failure, legacy rows, no write
- * methods invoked, and no raw_payload selected.
+ * methods invoked, and provenance-only raw_payload handling.
  */
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
@@ -135,14 +135,24 @@ const ACTION_ROW = {
 
 describe("query shape (owner/RLS-scoped)", () => {
   it("1. scopes the diary read by grow (and plant when given) with a bounded limit", async () => {
-    const { client, queries } = makeFakeClient({ diaryRows: [RESPONSE_ROW], actionRows: [ACTION_ROW] });
-    await loadActionResponseMemories({ growId: "grow-1", plantId: "plant-1" }, { supabase: client });
+    const { client, queries } = makeFakeClient({
+      diaryRows: [RESPONSE_ROW],
+      actionRows: [ACTION_ROW],
+    });
+    await loadActionResponseMemories(
+      { growId: "grow-1", plantId: "plant-1" },
+      { supabase: client },
+    );
     const diary = queries.find((q) => q.table === "diary_entries")!;
     expect(diary.filters).toContainEqual(["eq:grow_id", "grow-1"]);
     expect(diary.filters).toContainEqual(["eq:plant_id", "plant-1"]);
-    expect(diary.filters.some(([k, v]) =>
-      k === "contains:details" && (v as { event_type?: string }).event_type === "action_followup",
-    )).toBe(true);
+    expect(
+      diary.filters.some(
+        ([k, v]) =>
+          k === "contains:details" &&
+          (v as { event_type?: string }).event_type === "action_followup",
+      ),
+    ).toBe(true);
     expect(diary.limit).toBe(RESPONSE_ROW_LIMIT);
     // Owner identity is never a client-supplied filter — RLS owns it.
     expect(diary.filters.some(([k]) => k.includes("user_id"))).toBe(false);
@@ -151,7 +161,11 @@ describe("query shape (owner/RLS-scoped)", () => {
   it("2. batches the action lookup with one .in() query", async () => {
     const rows = [
       RESPONSE_ROW,
-      { ...RESPONSE_ROW, id: "row-2", details: { ...RESPONSE_ROW.details, action_queue_id: "act-2", sensor_snapshot_id: null } },
+      {
+        ...RESPONSE_ROW,
+        id: "row-2",
+        details: { ...RESPONSE_ROW.details, action_queue_id: "act-2", sensor_snapshot_id: null },
+      },
     ];
     const { client, queries } = makeFakeClient({
       diaryRows: rows,
@@ -169,10 +183,18 @@ describe("query shape (owner/RLS-scoped)", () => {
     const many = Array.from({ length: 20 }, (_, i) => ({
       ...RESPONSE_ROW,
       id: `row-${i}`,
-      details: { ...RESPONSE_ROW.details, action_queue_id: `act-${i}`, sensor_snapshot_id: `snap-${i}` },
+      details: {
+        ...RESPONSE_ROW.details,
+        action_queue_id: `act-${i}`,
+        sensor_snapshot_id: `snap-${i}`,
+      },
     }));
     const actions = Array.from({ length: 20 }, (_, i) => ({ ...ACTION_ROW, id: `act-${i}` }));
-    const { client, queries } = makeFakeClient({ diaryRows: many, actionRows: actions, sensorRows: [] });
+    const { client, queries } = makeFakeClient({
+      diaryRows: many,
+      actionRows: actions,
+      sensorRows: [],
+    });
     await loadActionResponseMemories({ growId: "grow-1" }, { supabase: client });
     // 1 diary + 1 action + 1 sensor — never per-row.
     expect(queries).toHaveLength(3);
@@ -187,7 +209,11 @@ describe("query shape (owner/RLS-scoped)", () => {
   it("5. missing photo object is a rules-layer concern — malformed refs degrade, load ok", async () => {
     const row = {
       ...RESPONSE_ROW,
-      details: { ...RESPONSE_ROW.details, photo_reference: "blob:not-durable", sensor_snapshot_id: null },
+      details: {
+        ...RESPONSE_ROW.details,
+        photo_reference: "blob:not-durable",
+        sensor_snapshot_id: null,
+      },
     };
     const { client } = makeFakeClient({ diaryRows: [row], actionRows: [ACTION_ROW] });
     const result = await loadActionResponseMemories({ growId: "grow-1" }, { supabase: client });
@@ -198,7 +224,11 @@ describe("query shape (owner/RLS-scoped)", () => {
   });
 
   it("6. missing sensor snapshot row → unavailable evidence, outcome preserved", async () => {
-    const { client } = makeFakeClient({ diaryRows: [RESPONSE_ROW], actionRows: [ACTION_ROW], sensorRows: [] });
+    const { client } = makeFakeClient({
+      diaryRows: [RESPONSE_ROW],
+      actionRows: [ACTION_ROW],
+      sensorRows: [],
+    });
     const result = await loadActionResponseMemories({ growId: "grow-1" }, { supabase: client });
     expect(result.status).toBe("ok");
     if (result.status !== "ok") return;
@@ -221,11 +251,13 @@ describe("query shape (owner/RLS-scoped)", () => {
 
   it("7. diary or action query failure → sanitized failure result", async () => {
     const failed = makeFakeClient({ failDiary: true });
-    expect(await loadActionResponseMemories({ growId: "grow-1" }, { supabase: failed.client }))
-      .toEqual({ status: "failed", reason: "query_failed" });
+    expect(
+      await loadActionResponseMemories({ growId: "grow-1" }, { supabase: failed.client }),
+    ).toEqual({ status: "failed", reason: "query_failed" });
     const failedActions = makeFakeClient({ diaryRows: [RESPONSE_ROW], failActions: true });
-    expect(await loadActionResponseMemories({ growId: "grow-1" }, { supabase: failedActions.client }))
-      .toEqual({ status: "failed", reason: "query_failed" });
+    expect(
+      await loadActionResponseMemories({ growId: "grow-1" }, { supabase: failedActions.client }),
+    ).toEqual({ status: "failed", reason: "query_failed" });
   });
 
   it("8. legacy marker rows load fine and produce no canonical memory", async () => {
@@ -252,21 +284,26 @@ describe("query shape (owner/RLS-scoped)", () => {
     const { client, writes } = makeFakeClient({
       diaryRows: [RESPONSE_ROW],
       actionRows: [ACTION_ROW],
-      sensorRows: [{ id: "snap-1", tent_id: "tent-1", source: "manual", captured_at: "2026-07-02T11:00:00Z" }],
+      sensorRows: [
+        { id: "snap-1", tent_id: "tent-1", source: "manual", captured_at: "2026-07-02T11:00:00Z" },
+      ],
     });
     await loadActionResponseMemories({ growId: "grow-1" }, { supabase: client });
     expect(writes).toEqual([]);
   });
 
-  it("10. no raw_payload (or any secret column) is selected", async () => {
+  it("10. raw_payload is selected only for sensor provenance (no secret columns)", async () => {
     const { client, queries } = makeFakeClient({
       diaryRows: [RESPONSE_ROW],
       actionRows: [ACTION_ROW],
-      sensorRows: [{ id: "snap-1", tent_id: "tent-1", source: "manual", captured_at: "2026-07-02T11:00:00Z" }],
+      sensorRows: [
+        { id: "snap-1", tent_id: "tent-1", source: "manual", captured_at: "2026-07-02T11:00:00Z" },
+      ],
     });
     await loadActionResponseMemories({ growId: "grow-1" }, { supabase: client });
     for (const q of queries) {
-      expect(q.select).not.toContain("raw_payload");
+      if (q.table === "sensor_readings") expect(q.select).toContain("raw_payload");
+      else expect(q.select).not.toContain("raw_payload");
       expect(q.select).not.toContain("*");
       expect(q.select.toLowerCase()).not.toMatch(/token|secret|service_role/);
     }
@@ -274,10 +311,7 @@ describe("query shape (owner/RLS-scoped)", () => {
 });
 
 describe("static read-only contract", () => {
-  const SRC = readFileSync(
-    resolve(__dirname, "../lib/actionResponseMemoryService.ts"),
-    "utf8",
-  );
+  const SRC = readFileSync(resolve(__dirname, "../lib/actionResponseMemoryService.ts"), "utf8");
   it("contains no write/RPC/storage/Edge/AI surfaces", () => {
     expect(SRC).not.toMatch(/\.insert\(|\.update\(|\.delete\(|\bupsert\(/);
     expect(SRC).not.toMatch(/\.rpc\(/);
@@ -285,7 +319,8 @@ describe("static read-only contract", () => {
     expect(SRC).not.toMatch(/storage\.(from|upload)/);
     expect(SRC).not.toMatch(/openai|anthropic|gemini/i);
     expect(SRC).not.toMatch(/service_role/i);
-    expect(SRC).not.toMatch(/raw_payload/);
+    expect(SRC).toMatch(/\.from\("sensor_readings"\)[\s\S]{0,160}raw_payload/);
+    expect(SRC).toMatch(/raw_payload[\s\S]{0,120}never copied/i);
     expect(SRC).not.toMatch(/user_id\s*[:=]/);
   });
 });

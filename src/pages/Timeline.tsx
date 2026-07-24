@@ -1,14 +1,16 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import PageHeader from "@/components/PageHeader";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import { supabase } from "@/integrations/supabase/client";
 import { useGrows } from "@/store/grows";
 import { useAuth } from "@/store/auth";
+import { stripBackPointerTokens } from "@/lib/actionQueueProvenanceRules";
 import { STAGES, stageLabel } from "@/lib/grow";
+import { normalizeQuickLogStage } from "@/lib/quickLogStageDefaultRules";
 import { format, formatDistanceToNow } from "date-fns";
 import {
   Sprout,
   Image as ImageIcon,
-  Loader2,
   Camera,
   FileText,
   FlaskConical,
@@ -18,7 +20,12 @@ import {
   Gauge,
   Bell,
   ListChecks,
+  ClipboardCheck,
 } from "lucide-react";
+import { isActionResponseCandidateDetails } from "@/lib/actionResponseMemoryRules";
+import { buildActionResponseMemoryCardViewModel } from "@/lib/actionResponseMemoryViewModel";
+import { useActionResponseMemory } from "@/hooks/useActionResponseMemory";
+import ActionResponseMemoryCard from "@/components/ActionResponseMemoryCard";
 import { Button } from "@/components/ui/button";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import {
@@ -31,10 +38,13 @@ import {
 import EntryEditDialog from "@/components/EntryEditDialog";
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
+import GrowDataLoadError, { GrowDataLoadingState } from "@/components/GrowDataLoadError";
 import DiaryEntryBadges from "@/components/DiaryEntryBadges";
 import EnvironmentCheckTimelineBadge from "@/components/EnvironmentCheckTimelineBadge";
 import EnvironmentCheckSnapshotLinkButton from "@/components/EnvironmentCheckSnapshotLinkButton";
 import AiDoctorCheckInTimelineBadge from "@/components/AiDoctorCheckInTimelineBadge";
+import AiDoctorReadinessTimelineBadge from "@/components/AiDoctorReadinessTimelineBadge";
+import { isAiDoctorReadinessCheckEvent } from "@/lib/aiDoctorReadinessTimelineBadge";
 import {
   buildEnvironmentCheckDiaryViewModel,
   isEnvironmentCheckKind,
@@ -50,36 +60,68 @@ import {
 } from "@/components/QuickLogHistoryPanels";
 import DiaryCalendarSection from "@/components/DiaryCalendarSection";
 import { hasManualHandheldReadings } from "@/lib/quickLogHistoryRules";
-import { stripBackPointerTokens } from "@/lib/actionQueueProvenanceRules";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
-import { actionDetailPath, alertDetailPath, logsPath, timelinePath } from "@/lib/routes";
+import {
+  actionDetailPath,
+  alertDetailPath,
+  growLearningPath,
+  logsPath,
+  timelinePath,
+} from "@/lib/routes";
+import {
+  DECISION_LABELS,
+  RUN_LEARNING_DECISION_EVENT_TYPE,
+  isNextRunDecision,
+} from "@/lib/plantMemoryEpisodeRules";
 
 import {
   buildEnvironmentSummaryReportUrl,
   defaultEnvironmentSummaryRange,
 } from "@/lib/environmentSummaryNavigationRules";
+import {
+  buildDiaryRangeReportUrl,
+  defaultDiaryRangeReportRange,
+} from "@/lib/diaryRangeReportNavigationRules";
 import TimelineCsvContextPanel from "@/components/TimelineCsvContextPanel";
 import PhenoHuntTimelineSection from "@/components/PhenoHuntTimelineSection";
 import { cn } from "@/lib/utils";
 import { getEventType } from "@/lib/diary";
 import { buildGrowDiaryTimeline } from "@/lib/growDiaryTimelineRules";
 import { MEASUREMENT_DETAIL_KEYS } from "@/lib/timelineEntryClassification";
+import {
+  describeQuickLogDetailsFromExtras,
+  QUICK_LOG_DETAIL_FIELD_KEYS,
+  type QuickLogDetailDisplayLine,
+} from "@/lib/quickLogActivityDetailFields";
 import { classifyVpdAgainstStage } from "@/lib/vpdStageTargetRules";
 import {
   mapGrowEventsToRecentRawEntries,
   type GrowEventRowForRecent,
 } from "@/lib/growEventToDiaryRawEntry";
+import { ROOT_ZONE_GROW_EVENT_SELECT } from "@/lib/rootZoneObservationRules";
 import { mergeTimelineSources } from "@/lib/timelineMergeRules";
 import {
   deriveTimelineEventTypeOptions,
   deriveTimelinePlantOptions,
   deriveTimelineTentOptions,
   filterTimelineEvidenceRows,
+  isTimelineDateFilterValue,
   isTimelineEvidenceFilterActive,
   TIMELINE_EVIDENCE_EMPTY_DESC,
   TIMELINE_EVIDENCE_EMPTY_TITLE,
   TIMELINE_EVIDENCE_SEARCH_PLACEHOLDER,
 } from "@/lib/timelineEvidenceFilterRules";
+import {
+  buildMissingActionCopy,
+  findNewestEntryIdForCategory,
+  findNextMissingAction,
+  MISSING_ACTION_DISCLAIMER_COPY,
+  MISSING_ACTION_NOT_ENOUGH_HISTORY_COPY,
+  MISSING_ACTION_NOTHING_MISSING_COPY,
+  type MissingActionResult,
+} from "@/lib/timelineMissingActionRules";
+import { useMyEntitlements } from "@/hooks/useMyEntitlements";
+import { canUseFeature } from "@/lib/featureEntitlements";
 import {
   buildTimelinePhotoLightboxList,
   findTimelinePhotoIndexById,
@@ -130,8 +172,22 @@ import {
 import { buildCopyableTraceLinkFromDiaryDetails } from "@/lib/actionQueueTraceLinkCopyRules";
 import CopyTraceLinkButton from "@/components/CopyTraceLinkButton";
 import { useTimelineHighlightAutoScroll } from "@/lib/useTimelineHighlightAutoScroll";
+import { useTimelineHashAnchorHandoff } from "@/hooks/useTimelineHashAnchorHandoff";
+import {
+  buildTimelinePageReadKey,
+  buildTimelinePageReadView,
+  hasTimelineRequiredReadError,
+  mergeTimelinePartialSources,
+  type TimelineCoreReadState,
+  type TimelineSupplementalReadSource,
+} from "@/lib/timelinePageReadStateRules";
 
 const TIMELINE_SNAPSHOT_STALE_MS = 30 * 60 * 1000;
+
+// URL query params mirroring the Pro date-range filter, matching the
+// ?start/?end convention of the environment summary report.
+const TIMELINE_START_DATE_PARAM = "start";
+const TIMELINE_END_DATE_PARAM = "end";
 
 interface Entry {
   id: string;
@@ -182,7 +238,7 @@ interface AlertEventRow {
   } | null;
 }
 
-type EventFilter = "all" | "photo" | "note" | "measurement" | "followup";
+type EventFilter = "all" | "photo" | "note" | "measurement" | "followup" | "actionresponse";
 
 function entryKinds(e: Entry): EventFilter[] {
   const kinds: EventFilter[] = ["note"];
@@ -197,25 +253,59 @@ function entryKinds(e: Entry): EventFilter[] {
     e.details && typeof (e.details as Record<string, unknown>).event_type === "string"
       ? ((e.details as Record<string, unknown>).event_type as string)
       : null;
-  if (eventType === "action_followup") kinds.push("followup");
+  // Follow-up / outcome / next-run-decision rows all live under the
+  // "Follow-ups" filter so the learning-loop trio stays together.
+  if (
+    eventType === "action_followup" ||
+    eventType === "action_outcome" ||
+    eventType === "run_learning_decision"
+  ) {
+    kinds.push("followup");
+  }
+  // Grower-recorded responses (Slice 4c evidence rows with an explicit
+  // outcome) additionally surface under the "Action responses" filter.
+  // The predicate is the canonical rules module's — no rule tables in JSX.
+  if (isActionResponseCandidateDetails(e.details as Record<string, unknown> | null)) {
+    kinds.push("actionresponse");
+  }
   return kinds;
 }
 
 export default function Timeline() {
-  const { user } = useAuth();
+  const authUser = useAuth().user;
+  // Keep the read callback keyed to a stable primitive. Auth providers and
+  // test adapters may return an equivalent user object with a new identity on
+  // render; depending on that object would retrigger the Timeline loader.
+  const user = authUser?.id ?? null;
   const {
-    activeGrow,
+    activeGrow: storeActiveGrow,
     activeGrowId: storeGrowId,
     grows,
     loading: growsLoading,
+    error: growsError,
+    refresh: refreshGrows,
     setActiveGrowId,
   } = useGrows();
+  const ownerId = user;
 
-  const { pathname } = useLocation();
+  const { pathname, hash } = useLocation();
   // Shared URL `?growId=` resolution. urlGrowId is preserved as the source of truth
   // for filter precedence; scopedGrowName/backHref come from the same hook.
-  const { urlGrowId, scopedGrowName, backHref } = useScopedGrow();
-  const activeGrowId = urlGrowId ?? storeGrowId;
+  const {
+    urlGrowId: rawUrlGrowId,
+    scopedGrow,
+    scopedGrowName,
+    isValidScopedGrow,
+    backHref,
+  } = useScopedGrow();
+  // Treat a blank query value as absent. This keeps `/timeline?growId=` on the
+  // active grow instead of creating a scope/read-key disagreement that can
+  // leave the page waiting forever.
+  const urlGrowId = rawUrlGrowId?.trim() || null;
+  const hasInvalidScope = Boolean(urlGrowId) && !isValidScopedGrow;
+  const preferredGrowId = urlGrowId ?? storeGrowId;
+  const activeGrowId = hasInvalidScope ? null : preferredGrowId;
+  const activeGrow = urlGrowId ? (isValidScopedGrow ? scopedGrow : null) : storeActiveGrow;
   const isLogsRoute = pathname.startsWith("/logs");
   const scopeLabel = isLogsRoute ? "logs" : "timeline";
   const clearTo = isLogsRoute ? logsPath() : timelinePath();
@@ -229,17 +319,32 @@ export default function Timeline() {
     if (urlGrowId !== storeGrowId) setActiveGrowId(urlGrowId);
   }, [urlGrowId, grows, storeGrowId, setActiveGrowId]);
   const [entries, setEntries] = useState<Entry[]>([]);
+  // Keyset pagination (audit M1): the diary is unbounded but the page used
+  // to silently cap at the newest 100 rows and report "Showing 100 of 100".
+  const [entriesTotal, setEntriesTotal] = useState<number | null>(null);
+  const [loadingOlder, setLoadingOlder] = useState(false);
   const [growEvents, setGrowEvents] = useState<GrowEventRowForRecent[]>([]);
   const [actionEvents, setActionEvents] = useState<ActionQueueEvent[]>([]);
   const [alertEvents, setAlertEvents] = useState<AlertEventRow[]>([]);
 
   const [loading, setLoading] = useState(true);
+  const [coreRead, setCoreRead] = useState<TimelineCoreReadState>({ status: "idle" });
+  const [partialReadSources, setPartialReadSources] = useState<TimelineSupplementalReadSource[]>(
+    [],
+  );
+  const [supplementalLoading, setSupplementalLoading] = useState(false);
+  const [loadOlderError, setLoadOlderError] = useState(false);
+  const readRequestIdRef = useRef(0);
   const [stageFilter, setStageFilter] = useState<string>("all");
   const [eventFilter, setEventFilter] = useState<EventFilter>("all");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [plantFilter, setPlantFilter] = useState("");
   const [tentFilter, setTentFilter] = useState("");
+  // Seed plant/tent filters from URL on mount so deep links from Quick
+  // Log → /timeline?growId=&plantId=&tentId= land on the right scope.
+  // One-shot seed; later user edits remain authoritative.
+  const [didSeedScopeFilters, setDidSeedScopeFilters] = useState(false);
   const [eventTypeFilter, setEventTypeFilter] = useState("");
   const [lightboxPhotoId, setLightboxPhotoId] = useState<string | null>(null);
   const [detailEntryId, setDetailEntryId] = useState<string | null>(null);
@@ -283,97 +388,390 @@ export default function Timeline() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sensorSourceFilter]);
 
-  async function load() {
+  // Pro date-range filter (advanced timeline filtering). Client hint via
+  // canUseFeature — presentation-only convenience over the grower's own
+  // already-authorized diary rows, so no server gate is involved.
+  const {
+    entitlement,
+    loading: entitlementLoading,
+    lookupFailed,
+    refetch: refetchEntitlement,
+  } = useMyEntitlements();
+  const advancedTimelineUnlocked =
+    !entitlementLoading &&
+    !lookupFailed &&
+    canUseFeature(entitlement, "advanced_timeline_filters");
+  const [startDateFilter, setStartDateFilter] = useState<string>(() => {
+    const v = searchParams.get(TIMELINE_START_DATE_PARAM);
+    return isTimelineDateFilterValue(v) ? v : "";
+  });
+  const [endDateFilter, setEndDateFilter] = useState<string>(() => {
+    const v = searchParams.get(TIMELINE_END_DATE_PARAM);
+    return isTimelineDateFilterValue(v) ? v : "";
+  });
+  const [missingAction, setMissingAction] = useState<MissingActionResult | null>(null);
+
+  // Push date-range state → URL whenever it diverges (mirrors the
+  // sensorSources param sync above).
+  useEffect(() => {
+    const urlStart = searchParams.get(TIMELINE_START_DATE_PARAM) ?? "";
+    const urlEnd = searchParams.get(TIMELINE_END_DATE_PARAM) ?? "";
+    if (urlStart === startDateFilter && urlEnd === endDateFilter) return;
+    const next = new URLSearchParams(searchParams);
+    if (isTimelineDateFilterValue(startDateFilter))
+      next.set(TIMELINE_START_DATE_PARAM, startDateFilter);
+    else next.delete(TIMELINE_START_DATE_PARAM);
+    if (isTimelineDateFilterValue(endDateFilter)) next.set(TIMELINE_END_DATE_PARAM, endDateFilter);
+    else next.delete(TIMELINE_END_DATE_PARAM);
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startDateFilter, endDateFilter]);
+
+  // Applied bounds: only when the Pro gate is open and values are valid
+  // ISO dates. An inverted range applies nothing (honest no-op + notice).
+  const appliedStartDate =
+    advancedTimelineUnlocked && isTimelineDateFilterValue(startDateFilter) ? startDateFilter : null;
+  const appliedEndDate =
+    advancedTimelineUnlocked && isTimelineDateFilterValue(endDateFilter) ? endDateFilter : null;
+  const dateRangeInvalid =
+    appliedStartDate !== null && appliedEndDate !== null && appliedStartDate > appliedEndDate;
+  const effectiveStartDate = dateRangeInvalid ? null : appliedStartDate;
+  const effectiveEndDate = dateRangeInvalid ? null : appliedEndDate;
+  const activeReadKey = buildTimelinePageReadKey({
+    ownerId,
+    growId: activeGrowId,
+    startDate: effectiveStartDate,
+    endDate: effectiveEndDate,
+  });
+  const activeReadKeyRef = useRef(activeReadKey);
+  activeReadKeyRef.current = activeReadKey;
+
+  // One-shot seed of plant/tent filters from URL params written by the
+  // Quick Log → Timeline continuity link. Never overwrites later edits.
+  useEffect(() => {
+    if (didSeedScopeFilters) return;
+    const seededPlant = searchParams.get("plantId");
+    const seededTent = searchParams.get("tentId");
+    if (seededPlant && !plantFilter) setPlantFilter(seededPlant);
+    if (seededTent && !tentFilter) setTentFilter(seededTent);
+    if (seededPlant || seededTent) setDidSeedScopeFilters(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  const load = useCallback(async () => {
+    const requestId = ++readRequestIdRef.current;
     if (!user || !activeGrowId) {
       setEntries([]);
+      setEntriesTotal(null);
       setGrowEvents([]);
       setActionEvents([]);
       setAlertEvents([]);
+      setPartialReadSources([]);
+      setSupplementalLoading(false);
+      setCoreRead({ status: "idle" });
+      setLoadOlderError(false);
       setLoading(false);
       return;
     }
 
-    setLoading(true);
-    const { data } = await supabase
-      .from("diary_entries")
-      .select("id,note,photo_url,stage,details,entry_at,plant_id,tent_id")
-      .eq("grow_id", activeGrowId)
-      .order("entry_at", { ascending: false })
-      .limit(100);
-    const rows = (data as Entry[]) || [];
-    const paths = rows
-      .map((r) => r.photo_url)
-      .filter((p): p is string => !!p && !p.startsWith("http"));
-    if (paths.length) {
-      const { data: signed } = await supabase.storage
-        .from("diary-photos")
-        .createSignedUrls(paths, 3600);
-      const map = new Map((signed || []).map((s) => [s.path as string, s.signedUrl]));
-      rows.forEach((r) => {
-        if (r.photo_url && map.has(r.photo_url)) r.photo_url = map.get(r.photo_url)!;
-      });
+    // Defensive fail-closed guard. The read-key builder only returns null when
+    // owner/grow identity is incomplete, but keep that invariant explicit at
+    // the network boundary instead of ever issuing an unscoped read.
+    if (!activeReadKey) {
+      setEntries([]);
+      setEntriesTotal(null);
+      setGrowEvents([]);
+      setActionEvents([]);
+      setAlertEvents([]);
+      setPartialReadSources([]);
+      setSupplementalLoading(false);
+      setCoreRead({ status: "idle" });
+      setLoadOlderError(false);
+      setLoading(false);
+      return;
     }
-    setEntries(rows);
 
-    // Quick Log v2 manual saves land in `grow_events`, not `diary_entries`.
-    // Fetch them in parallel for the Recent Quick Logs panel so newly
-    // saved entries appear at the top instead of being invisible until
-    // the legacy diary writer is exercised. RLS scopes to owner.
-    const { data: geData } = await supabase
-      .from("grow_events")
-      .select("id,grow_id,plant_id,tent_id,event_type,occurred_at,note,source,is_deleted")
-      .eq("grow_id", activeGrowId)
-      .eq("is_deleted", false)
-      .order("occurred_at", { ascending: false })
-      .limit(100);
-    setGrowEvents((geData as unknown as GrowEventRowForRecent[]) || []);
+    const requestedReadKey = activeReadKey;
+    const isCurrentRequest = () =>
+      requestId === readRequestIdRef.current && activeReadKeyRef.current === requestedReadKey;
 
-    // Action Queue events for this grow (read-only audit trail).
-    // RLS ensures only the owner sees their events.
-    const { data: aqe } = await supabase
-      .from("action_queue_events")
-      .select(
-        "id,action_queue_id,event_type,previous_status,new_status,note,created_at,action:action_queue(suggested_change,reason)",
-      )
-      .eq("grow_id", activeGrowId)
-      .order("created_at", { ascending: false })
-      .limit(50);
-    setActionEvents((aqe as unknown as ActionQueueEvent[]) || []);
+    setLoading(true);
+    setLoadingOlder(false);
+    setCoreRead({ status: "loading", readKey: requestedReadKey });
+    setPartialReadSources([]);
+    setSupplementalLoading(true);
+    setLoadOlderError(false);
 
-    // Alert events for this grow (read-only audit trail). Joins parent alert
-    // for title/severity/metric/status. RLS enforces owner-only visibility.
-    const { data: ale } = await supabase
-      .from("alert_events")
-      .select(
-        "id,alert_id,event_type,previous_status,new_status,note,created_at,alert:alerts(title,severity,metric,status)",
-      )
-      .eq("grow_id", activeGrowId)
-      .order("created_at", { ascending: false })
-      .limit(50);
-    setAlertEvents((ale as unknown as AlertEventRow[]) || []);
+    try {
+      // `diary_entries` and `grow_events` are the two authoritative core
+      // Timeline sources. Stage both locally and commit them atomically only
+      // after both reads succeed for the same owner/grow/range key.
+      let entriesQuery = supabase
+        .from("diary_entries")
+        .select("id,note,photo_url,stage,details,entry_at,plant_id,tent_id", {
+          count: "exact",
+        })
+        .eq("grow_id", activeGrowId)
+        .order("entry_at", { ascending: false })
+        .limit(100);
+      if (effectiveStartDate)
+        entriesQuery = entriesQuery.gte("entry_at", `${effectiveStartDate}T00:00:00.000Z`);
+      if (effectiveEndDate)
+        entriesQuery = entriesQuery.lte("entry_at", `${effectiveEndDate}T23:59:59.999Z`);
+      const entriesResult = await entriesQuery;
+      if (!isCurrentRequest()) return;
+      if (hasTimelineRequiredReadError(entriesResult)) throw entriesResult.error;
 
-    setLoading(false);
+      const rows = (entriesResult.data as Entry[]).map((row) => ({ ...row }));
+      const privatePhotoPathById = new Map<string, string>();
+      const coreRows = rows.map((row) => {
+        if (!row.photo_url || row.photo_url.startsWith("http")) return row;
+        privatePhotoPathById.set(row.id, row.photo_url);
+        return { ...row, photo_url: null };
+      });
+      const paths = [...new Set(privatePhotoPathById.values())];
+
+      let growEventsQuery = supabase
+        .from("grow_events")
+        .select(ROOT_ZONE_GROW_EVENT_SELECT)
+        .eq("grow_id", activeGrowId)
+        .eq("is_deleted", false)
+        .order("occurred_at", { ascending: false })
+        .limit(100);
+      if (effectiveStartDate)
+        growEventsQuery = growEventsQuery.gte("occurred_at", `${effectiveStartDate}T00:00:00.000Z`);
+      if (effectiveEndDate)
+        growEventsQuery = growEventsQuery.lte("occurred_at", `${effectiveEndDate}T23:59:59.999Z`);
+      const growEventsResult = await growEventsQuery;
+      if (!isCurrentRequest()) return;
+      if (hasTimelineRequiredReadError(growEventsResult)) throw growEventsResult.error;
+      const nextGrowEvents = growEventsResult.data as unknown as GrowEventRowForRecent[];
+
+      // Core plant memory is confirmed for the exact active scope. Make it
+      // visible immediately; photos/action/alert context continues separately
+      // and is never allowed to hold the diary or watering history hostage.
+      setEntries(coreRows);
+      setEntriesTotal(typeof entriesResult.count === "number" ? entriesResult.count : null);
+      setGrowEvents(nextGrowEvents);
+      setActionEvents([]);
+      setAlertEvents([]);
+      setPartialReadSources([]);
+      setCoreRead({ status: "success", readKey: requestedReadKey });
+      setLoading(false);
+
+      const markPartial = (source: TimelineSupplementalReadSource) => {
+        if (!isCurrentRequest()) return;
+        setPartialReadSources((current) => mergeTimelinePartialSources(current, [source]));
+      };
+
+      const supplementalTasks: Promise<void>[] = [];
+      if (paths.length > 0) {
+        supplementalTasks.push(
+          (async () => {
+            try {
+              const signedResult = await supabase.storage
+                .from("diary-photos")
+                .createSignedUrls(paths, 3600);
+              if (!isCurrentRequest()) return;
+              const signedMap = new Map(
+                (signedResult.data ?? [])
+                  .filter((item) => typeof item.signedUrl === "string" && item.signedUrl.length > 0)
+                  .map((item) => [item.path as string, item.signedUrl]),
+              );
+              if (signedResult.error || paths.some((path) => !signedMap.has(path))) {
+                markPartial("diary_photos");
+              }
+              setEntries((current) =>
+                current.map((row) => {
+                  const privatePath = privatePhotoPathById.get(row.id);
+                  return privatePath
+                    ? { ...row, photo_url: signedMap.get(privatePath) ?? null }
+                    : row;
+                }),
+              );
+            } catch {
+              markPartial("diary_photos");
+            }
+          })(),
+        );
+      }
+
+      // Action and alert audit rows enrich a valid core timeline. Their
+      // failure is disclosed as partial history instead of erasing diary and
+      // Quick Log evidence or pretending the auxiliary source was empty.
+      supplementalTasks.push(
+        (async () => {
+          try {
+            const actionResult = await supabase
+              .from("action_queue_events")
+              .select(
+                "id,action_queue_id,event_type,previous_status,new_status,note,created_at,action:action_queue(suggested_change,reason)",
+              )
+              .eq("grow_id", activeGrowId)
+              .order("created_at", { ascending: false })
+              .limit(50);
+            if (!isCurrentRequest()) return;
+            if (actionResult.error || !Array.isArray(actionResult.data)) {
+              markPartial("action_queue_events");
+            } else {
+              setActionEvents(actionResult.data as unknown as ActionQueueEvent[]);
+            }
+          } catch {
+            markPartial("action_queue_events");
+          }
+        })(),
+        (async () => {
+          try {
+            const alertResult = await supabase
+              .from("alert_events")
+              .select(
+                "id,alert_id,event_type,previous_status,new_status,note,created_at,alert:alerts(title,severity,metric,status)",
+              )
+              .eq("grow_id", activeGrowId)
+              .order("created_at", { ascending: false })
+              .limit(50);
+            if (!isCurrentRequest()) return;
+            if (alertResult.error || !Array.isArray(alertResult.data)) {
+              markPartial("alert_events");
+            } else {
+              setAlertEvents(alertResult.data as unknown as AlertEventRow[]);
+            }
+          } catch {
+            markPartial("alert_events");
+          }
+        })(),
+      );
+
+      await Promise.all(supplementalTasks);
+      if (isCurrentRequest()) setSupplementalLoading(false);
+    } catch {
+      if (!isCurrentRequest()) return;
+      setPartialReadSources([]);
+      setSupplementalLoading(false);
+      setCoreRead({ status: "error", readKey: requestedReadKey });
+      setLoading(false);
+    }
+  }, [activeGrowId, activeReadKey, effectiveEndDate, effectiveStartDate, user]);
+
+  /**
+   * Keyset "Load older" — fetches the next page strictly before the oldest
+   * loaded entry_at. Read-only, owner-scoped by RLS, same signing pass as
+   * the initial page for storage photo paths.
+   */
+  async function loadOlder() {
+    if (
+      !activeGrowId ||
+      !activeReadKey ||
+      coreRead.status !== "success" ||
+      coreRead.readKey !== activeReadKey ||
+      loadingOlder ||
+      entries.length === 0
+    )
+      return;
+    const cursor = entries[entries.length - 1]?.entry_at;
+    if (!cursor) return;
+    const requestedGrowId = activeGrowId;
+    const requestedReadKey = activeReadKey;
+    const pageRequestId = readRequestIdRef.current;
+    const isCurrentPage = () =>
+      pageRequestId === readRequestIdRef.current && activeReadKeyRef.current === requestedReadKey;
+    setLoadingOlder(true);
+    setLoadOlderError(false);
+    try {
+      // Keyset page stays inside the applied date bounds so pagination
+      // never walks out of the filtered range.
+      let olderQuery = supabase
+        .from("diary_entries")
+        .select("id,note,photo_url,stage,details,entry_at,plant_id,tent_id")
+        .eq("grow_id", requestedGrowId)
+        .lt("entry_at", cursor)
+        .order("entry_at", { ascending: false })
+        .limit(100);
+      if (effectiveStartDate)
+        olderQuery = olderQuery.gte("entry_at", `${effectiveStartDate}T00:00:00.000Z`);
+      if (effectiveEndDate)
+        olderQuery = olderQuery.lte("entry_at", `${effectiveEndDate}T23:59:59.999Z`);
+      const olderResult = await olderQuery;
+      if (!isCurrentPage()) return;
+      if (hasTimelineRequiredReadError(olderResult)) throw olderResult.error;
+      const older = ((olderResult.data as Entry[] | null) ?? []).map((row) => ({ ...row }));
+      const paths = older
+        .map((r) => r.photo_url)
+        .filter((p): p is string => !!p && !p.startsWith("http"));
+      if (paths.length) {
+        try {
+          const signedResult = await supabase.storage
+            .from("diary-photos")
+            .createSignedUrls(paths, 3600);
+          if (!isCurrentPage()) return;
+          const signedMap = new Map(
+            (signedResult.data ?? [])
+              .filter((item) => typeof item.signedUrl === "string" && item.signedUrl.length > 0)
+              .map((item) => [item.path as string, item.signedUrl]),
+          );
+          if (signedResult.error || paths.some((path) => !signedMap.has(path))) {
+            setPartialReadSources((current) =>
+              mergeTimelinePartialSources(current, ["diary_photos"]),
+            );
+          }
+          older.forEach((row) => {
+            if (!row.photo_url || row.photo_url.startsWith("http")) return;
+            row.photo_url = signedMap.get(row.photo_url) ?? null;
+          });
+        } catch {
+          if (!isCurrentPage()) return;
+          setPartialReadSources((current) =>
+            mergeTimelinePartialSources(current, ["diary_photos"]),
+          );
+          older.forEach((row) => {
+            if (row.photo_url && !row.photo_url.startsWith("http")) row.photo_url = null;
+          });
+        }
+      }
+      if (isCurrentPage() && older.length) {
+        setEntries((prev) => {
+          const seen = new Set(prev.map((e) => e.id));
+          return [...prev, ...older.filter((e) => !seen.has(e.id))];
+        });
+      }
+    } catch {
+      if (isCurrentPage()) setLoadOlderError(true);
+    } finally {
+      if (isCurrentPage()) setLoadingOlder(false);
+    }
   }
 
   useEffect(() => {
     load();
-  }, [activeGrowId, user]);
+  }, [load]);
   useEffect(() => {
     const h = () => load();
     window.addEventListener("verdant:entry-created", h);
     return () => window.removeEventListener("verdant:entry-created", h);
-  });
+  }, [load]);
 
   const stageCounts = useMemo(() => {
     const m: Record<string, number> = {};
     entries.forEach((e) => {
-      if (e.stage) m[e.stage] = (m[e.stage] || 0) + 1;
+      const stage = normalizeQuickLogStage(e.stage);
+      if (stage) m[stage] = (m[stage] || 0) + 1;
     });
     return m;
   }, [entries]);
+  const stageTaggedEntryCount = STAGES.reduce(
+    (total, stage) => total + (stageCounts[stage.value] || 0),
+    0,
+  );
 
   const eventCounts = useMemo(() => {
-    const m = { all: entries.length, photo: 0, note: 0, measurement: 0, followup: 0 };
+    const m = {
+      all: entries.length,
+      photo: 0,
+      note: 0,
+      measurement: 0,
+      followup: 0,
+      actionresponse: 0,
+    };
     entries.forEach((e) =>
       entryKinds(e).forEach((k) => {
         m[k] = (m[k] || 0) + 1;
@@ -381,6 +779,25 @@ export default function Timeline() {
     );
     return m;
   }, [entries]);
+
+  // Canonical Action Response Memory (read-only). One grower response renders
+  // as ONE compact card inside its own evidence row — never an extra event.
+  // A failed load keeps the core diary visible and joins the explicit partial
+  // history warning rather than pretending there are no responses.
+  const { state: actionResponseState, reload: reloadActionResponseMemory } =
+    useActionResponseMemory({ growId: activeGrowId });
+  const actionResponseCardByRowId = useMemo(() => {
+    const map = new Map<
+      string,
+      NonNullable<ReturnType<typeof buildActionResponseMemoryCardViewModel>>
+    >();
+    if (actionResponseState.status !== "ok") return map;
+    for (const memory of actionResponseState.memories) {
+      const vm = buildActionResponseMemoryCardViewModel({ memory });
+      if (vm) map.set(memory.response.rowId, vm);
+    }
+    return map;
+  }, [actionResponseState]);
 
   const plantOptions = useMemo(() => deriveTimelinePlantOptions(entries), [entries]);
   const tentOptions = useMemo(() => deriveTimelineTentOptions(entries), [entries]);
@@ -392,12 +809,14 @@ export default function Timeline() {
     tentId: tentFilter,
     eventType: eventTypeFilter,
     sensorSources: sensorSourceFilter,
+    startDate: effectiveStartDate,
+    endDate: effectiveEndDate,
   };
   const evidenceActive = isTimelineEvidenceFilterActive(evidenceFilterInput);
 
   const filtered = useMemo(() => {
     const afterStageEvent = entries.filter((e) => {
-      if (stageFilter !== "all" && e.stage !== stageFilter) return false;
+      if (stageFilter !== "all" && normalizeQuickLogStage(e.stage) !== stageFilter) return false;
       if (eventFilter !== "all" && !entryKinds(e).includes(eventFilter)) return false;
       return true;
     });
@@ -411,6 +830,8 @@ export default function Timeline() {
     tentFilter,
     eventTypeFilter,
     sensorSourceFilter,
+    effectiveStartDate,
+    effectiveEndDate,
   ]);
 
   function clearEvidenceFilters() {
@@ -419,6 +840,28 @@ export default function Timeline() {
     setTentFilter("");
     setEventTypeFilter("");
     setSensorSourceFilter([]);
+    setStartDateFilter("");
+    setEndDateFilter("");
+  }
+
+  // "Next missing action": infer per-category logging rhythm from the
+  // merged diary + Quick Log rows and surface the category most behind
+  // its own logged rhythm. Suggestion-only — the grower decides; Verdant
+  // only points at the grower's own history.
+  function handleFindMissingAction() {
+    const result = findNextMissingAction(recentLaneRawEntries, new Date());
+    setMissingAction(result);
+    if (result.status === "found") {
+      const targetId = findNewestEntryIdForCategory(entries, result.suggestion.category);
+      if (targetId && typeof document !== "undefined") {
+        const node = document.getElementById(`timeline-entry-${targetId}`);
+        const prefersReduced =
+          typeof window !== "undefined" &&
+          typeof window.matchMedia === "function" &&
+          window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        node?.scrollIntoView({ behavior: prefersReduced ? "auto" : "smooth", block: "center" });
+      }
+    }
   }
 
   function toggleSensorSource(kind: TimelineSensorSourceKind) {
@@ -445,6 +888,11 @@ export default function Timeline() {
   // never steal focus.
   useTimelineHighlightAutoScroll(highlight, filtered);
 
+  // Browser fragment scrolling can run before async diary / grow-event rows
+  // mount. Complete that handoff once the load settles; the hook is one-shot
+  // per entry fragment and leaves no timers or observers behind.
+  useTimelineHashAnchorHandoff(hash, !loading);
+
   // Merge `grow_events` (Quick Log v2 manual saves) and `diary_entries`
   // through the tested `mergeTimelineSources` helper so the Recent Quick
   // Logs panel receives a deterministic, deduplicated, newest-first
@@ -464,6 +912,10 @@ export default function Timeline() {
         details && typeof details["grow_event_id"] === "string"
           ? (details["grow_event_id"] as string)
           : null;
+      const linked_grow_event_id =
+        details && typeof details["linked_grow_event_id"] === "string"
+          ? (details["linked_grow_event_id"] as string)
+          : null;
       return {
         id: e.id,
         entry_at: e.entry_at,
@@ -474,6 +926,7 @@ export default function Timeline() {
         photo_url: e.photo_url,
         details,
         grow_event_id,
+        linked_grow_event_id,
       };
     });
     const merged = mergeTimelineSources({
@@ -532,16 +985,53 @@ export default function Timeline() {
     return groups;
   }, [filtered]);
 
-  const currentStageIdx = STAGES.findIndex((s) => s.value === activeGrow?.stage);
+  const currentStage = normalizeQuickLogStage(activeGrow?.stage);
+  const currentStageIdx = STAGES.findIndex((s) => s.value === currentStage);
+  const pageReadView = buildTimelinePageReadView({
+    growsLoading,
+    growsError,
+    growCount: grows.length,
+    hasInvalidScope,
+    activeReadKey,
+    coreRead,
+    evidenceCount: recentLaneRawEntries.length,
+    supplementalLoading,
+    partialSources: partialReadSources,
+  });
 
-  if (growsLoading)
+  if (pageReadView.kind === "loading")
     return (
-      <Center>
-        <Loader2 className="h-5 w-5 animate-spin" />
-      </Center>
+      <div>
+        <GrowBreadcrumbs
+          growId={urlGrowId}
+          growName={scopedGrowName}
+          current={isLogsRoute ? "Logs" : "Timeline"}
+          section={isLogsRoute ? "logs" : "timeline"}
+        />
+        <GrowDataLoadingState resource="Timeline" testId="timeline-read-loading" />
+      </div>
     );
 
-  if (grows.length === 0) {
+  if (pageReadView.kind === "grows_error") {
+    return (
+      <div>
+        <GrowBreadcrumbs
+          growId={urlGrowId}
+          growName={scopedGrowName}
+          current={isLogsRoute ? "Logs" : "Timeline"}
+          section={isLogsRoute ? "logs" : "timeline"}
+        />
+        <GrowDataLoadError
+          resource="Grow list"
+          testId="timeline-grow-data-error"
+          message="We couldn't verify your grows. This is not a confirmed first-grow state. Try the read again."
+          onRetry={() => void refreshGrows()}
+        />
+      </div>
+    );
+  }
+
+  if (pageReadView.kind === "no_grows") {
     return (
       <Empty
         title="Start your first grow"
@@ -555,6 +1045,47 @@ export default function Timeline() {
     );
   }
 
+  if (pageReadView.kind === "scope_error") {
+    return (
+      <div data-testid="timeline-scope-error">
+        <GrowBreadcrumbs
+          growId={null}
+          growName={null}
+          current={isLogsRoute ? "Logs" : "Timeline"}
+          section={isLogsRoute ? "logs" : "timeline"}
+        />
+        <Empty
+          title="Grow not available"
+          desc="This link does not match a grow available to your account. Choose a current grow before reviewing its history."
+          cta={
+            <Button asChild variant="outline">
+              <Link to={clearTo}>View your {scopeLabel}</Link>
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
+
+  if (pageReadView.kind === "timeline_error") {
+    return (
+      <div>
+        <GrowBreadcrumbs
+          growId={urlGrowId}
+          growName={scopedGrowName}
+          current={isLogsRoute ? "Logs" : "Timeline"}
+          section={isLogsRoute ? "logs" : "timeline"}
+        />
+        <GrowDataLoadError
+          resource="Timeline"
+          testId="timeline-read-error"
+          message="We couldn't load the complete timeline. This is not a confirmed empty history. Try the read again."
+          onRetry={() => void load()}
+        />
+      </div>
+    );
+  }
+
   return (
     <div>
       <GrowBreadcrumbs
@@ -564,24 +1095,71 @@ export default function Timeline() {
         section={isLogsRoute ? "logs" : "timeline"}
       />
 
-      <OneTentLoopNextStepCard
-        current="timeline"
-        ids={{ growId: activeGrowId ?? null }}
-        testId="timeline-one-tent-loop-next-step-card"
-        className="mb-3"
-      />
+      {pageReadView.showSensorsNextStep && (
+        <OneTentLoopNextStepCard
+          current="timeline"
+          ids={{ growId: activeGrowId ?? null, tentId: tentFilter || null }}
+          testId="timeline-one-tent-loop-next-step-card"
+          className="mb-3"
+        />
+      )}
 
-      {activeGrow && (
-        <div className="mb-5">
-          <h1 className="text-2xl font-display font-bold">{activeGrow.name}</h1>
-          <p className="text-sm text-muted-foreground">
-            {stageLabel(activeGrow.stage)} · day{" "}
-            {Math.max(
-              1,
-              Math.floor((Date.now() - new Date(activeGrow.started_at).getTime()) / 86400000),
-            )}
+      {pageReadView.showSupplementalLoading && (
+        <div
+          className="glass mb-4 rounded-2xl border border-border/50 p-4"
+          role="status"
+          data-testid="timeline-linked-context-loading"
+        >
+          <p className="font-medium">Loading linked timeline context</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Your diary and Quick Log history are ready. Available linked context is still loading.
           </p>
         </div>
+      )}
+
+      {(pageReadView.partialSources.length > 0 || actionResponseState.status === "unavailable") && (
+        <div
+          className="glass mb-4 rounded-2xl border border-amber-500/30 p-4"
+          role="alert"
+          data-testid="timeline-partial-read-warning"
+        >
+          <p className="font-medium">Some linked timeline context is unavailable</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            The diary and Quick Log history shown below loaded successfully, but this view is
+            incomplete. No missing source is being treated as empty.
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="mt-3"
+            data-testid="timeline-partial-read-retry"
+            onClick={() => {
+              void load();
+              if (actionResponseState.status === "unavailable") reloadActionResponseMemory();
+            }}
+          >
+            Try again
+          </Button>
+        </div>
+      )}
+
+      {activeGrow && (
+        <PageHeader
+          eyebrow={isLogsRoute ? "Grow log" : "Grow timeline"}
+          title={activeGrow.name}
+          description="Trace observations, evidence, and decisions across this grow."
+          icon={<Sprout className="size-5" aria-hidden="true" />}
+          meta={
+            <span className="text-sm text-muted-foreground">
+              {stageLabel(activeGrow.stage)} · day{" "}
+              {Math.max(
+                1,
+                Math.floor((Date.now() - new Date(activeGrow.started_at).getTime()) / 86400000),
+              )}
+            </span>
+          }
+        />
       )}
 
       {/* Stage progression */}
@@ -591,43 +1169,65 @@ export default function Timeline() {
             <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Stage progression
             </h2>
-            <span className="text-[11px] text-muted-foreground">
-              {entries.length} {entries.length === 1 ? "entry" : "entries"}
+            <span
+              className="text-[11px] text-muted-foreground"
+              data-testid="timeline-stage-tagged-count"
+            >
+              {stageTaggedEntryCount} stage-tagged {stageTaggedEntryCount === 1 ? "log" : "logs"}
             </span>
           </div>
-          <ol className="grid grid-cols-6 gap-1.5">
-            {STAGES.map((s, i) => {
-              const count = stageCounts[s.value] || 0;
-              const isCurrent = i === currentStageIdx;
-              const isPast = currentStageIdx >= 0 && i < currentStageIdx;
-              return (
-                <li key={s.value} className="flex flex-col items-center gap-1.5">
-                  <div
-                    className={cn(
-                      "h-7 w-7 rounded-full flex items-center justify-center text-[11px] font-semibold border transition",
-                      isCurrent &&
-                        "bg-primary text-primary-foreground border-primary shadow-sm shadow-primary/30",
-                      isPast && "bg-primary/20 text-primary border-primary/40",
-                      !isCurrent &&
-                        !isPast &&
-                        "bg-secondary/50 text-muted-foreground border-border/50",
-                    )}
+          <div
+            aria-label="Grow stage progression"
+            className="-mx-1 overflow-x-auto px-1 pb-1 scrollbar-thin"
+            data-testid="timeline-stage-progression-scroll"
+            tabIndex={0}
+          >
+            <ol className="grid min-w-[34rem] grid-cols-6 gap-2">
+              {STAGES.map((s, i) => {
+                const count = stageCounts[s.value] || 0;
+                const isCurrent = i === currentStageIdx;
+                const isPast = currentStageIdx >= 0 && i < currentStageIdx;
+                return (
+                  <li
+                    key={s.value}
+                    aria-current={isCurrent ? "step" : undefined}
+                    className="flex flex-col items-center gap-1.5"
                   >
-                    {isPast ? <Check className="h-3.5 w-3.5" /> : i + 1}
-                  </div>
-                  <span
-                    className={cn(
-                      "text-[10px] leading-tight text-center",
-                      isCurrent ? "text-foreground font-medium" : "text-muted-foreground",
-                    )}
-                  >
-                    {s.label}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground">{count}</span>
-                </li>
-              );
-            })}
-          </ol>
+                    <div
+                      className={cn(
+                        "h-7 w-7 rounded-full flex items-center justify-center text-[11px] font-semibold border transition",
+                        isCurrent &&
+                          "bg-primary text-primary-foreground border-primary shadow-sm shadow-primary/30",
+                        isPast && "bg-primary/20 text-primary border-primary/40",
+                        !isCurrent &&
+                          !isPast &&
+                          "bg-secondary/50 text-muted-foreground border-border/50",
+                      )}
+                    >
+                      {isPast ? <Check className="h-3.5 w-3.5" /> : i + 1}
+                    </div>
+                    <span
+                      className={cn(
+                        "text-[10px] leading-tight text-center",
+                        isCurrent ? "text-foreground font-medium" : "text-muted-foreground",
+                      )}
+                    >
+                      {s.label}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">{count}</span>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+          {growEvents.length > 0 && (
+            <p
+              className="mt-3 text-[11px] text-muted-foreground"
+              data-testid="timeline-unstaged-quick-log-note"
+            >
+              Quick Log events without a stored stage stay visible in the history panels below.
+            </p>
+          )}
         </div>
       )}
 
@@ -719,6 +1319,107 @@ export default function Timeline() {
             Clear filters
           </Button>
         </div>
+        {/* Pro advanced filtering: inclusive date range + next-missing-action jump. */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+            Date range
+          </span>
+          <input
+            type="date"
+            value={startDateFilter}
+            onChange={(e) => setStartDateFilter(e.target.value)}
+            disabled={!advancedTimelineUnlocked}
+            aria-label="Filter from date"
+            data-testid="timeline-start-date"
+            className="rounded-md border border-border/50 bg-background/60 px-2 py-1 text-sm disabled:opacity-50"
+          />
+          <span className="text-xs text-muted-foreground">to</span>
+          <input
+            type="date"
+            value={endDateFilter}
+            onChange={(e) => setEndDateFilter(e.target.value)}
+            disabled={!advancedTimelineUnlocked}
+            aria-label="Filter to date"
+            data-testid="timeline-end-date"
+            className="rounded-md border border-border/50 bg-background/60 px-2 py-1 text-sm disabled:opacity-50"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleFindMissingAction}
+            disabled={!advancedTimelineUnlocked}
+            data-testid="timeline-next-missing-action"
+            aria-label="Jump to next missing action"
+          >
+            Next missing action
+          </Button>
+        </div>
+        {dateRangeInvalid && (
+          <p className="text-xs text-destructive" data-testid="timeline-date-range-error">
+            Start date must be on or before end date. The range is not applied until it is.
+          </p>
+        )}
+        {entitlementLoading && (
+          <p className="text-[11px] text-muted-foreground" role="status">
+            Checking Advanced timeline filtering access…
+          </p>
+        )}
+        {lookupFailed && !entitlementLoading && (
+          <div
+            className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground"
+            data-testid="timeline-advanced-filters-verification-failed"
+            role="status"
+          >
+            <span>We couldn't verify Advanced timeline filtering access right now.</span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => void refetchEntitlement()}
+              data-testid="timeline-advanced-filters-retry"
+            >
+              Retry plan check
+            </Button>
+          </div>
+        )}
+        {!advancedTimelineUnlocked && !entitlementLoading && !lookupFailed && (
+          <p
+            className="text-[11px] text-muted-foreground"
+            data-testid="timeline-advanced-filters-locked"
+          >
+            Date-range filtering and the next-missing-action jump are part of Advanced timeline
+            filtering, a Pro feature.{" "}
+            <Link to="/pricing" className="text-primary hover:underline">
+              See plans
+            </Link>
+          </p>
+        )}
+        {missingAction && (
+          <div
+            role="status"
+            data-testid="timeline-missing-action-banner"
+            className="rounded-xl border border-border/50 bg-secondary/30 p-3 space-y-1"
+          >
+            <p className="text-sm">
+              {missingAction.status === "found"
+                ? buildMissingActionCopy(missingAction.suggestion)
+                : missingAction.status === "nothing_missing"
+                  ? MISSING_ACTION_NOTHING_MISSING_COPY
+                  : MISSING_ACTION_NOT_ENOUGH_HISTORY_COPY}
+            </p>
+            <p className="text-[11px] text-muted-foreground">{MISSING_ACTION_DISCLAIMER_COPY}</p>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setMissingAction(null)}
+              data-testid="timeline-missing-action-dismiss"
+            >
+              Dismiss
+            </Button>
+          </div>
+        )}
         <div
           className="flex flex-wrap items-center gap-1.5"
           data-testid="timeline-sensor-source-filter"
@@ -754,8 +1455,55 @@ export default function Timeline() {
           data-testid="timeline-results-count"
           aria-live="polite"
         >
-          Showing {filtered.length} of {entries.length} {entries.length === 1 ? "entry" : "entries"}
+          Detailed diary: showing {filtered.length} of {entriesTotal ?? entries.length}{" "}
+          {(entriesTotal ?? entries.length) === 1 ? "entry" : "entries"}
+          {entriesTotal !== null && entriesTotal > entries.length
+            ? ` (${entries.length} loaded)`
+            : ""}
+          {growEvents.length > 0
+            ? " · Quick Log activity appears in the history panels below."
+            : ""}
         </p>
+        {/* Guard against the scope-switch race: while a grow reload is in
+            flight the previous grow's entries (and cursor) are still in
+            state, so pagination must stay hidden until the new page lands. */}
+        {!loading &&
+          entries.length > 0 &&
+          entriesTotal !== null &&
+          entriesTotal > entries.length && (
+            <button
+              type="button"
+              data-testid="timeline-load-older"
+              className="text-xs underline text-muted-foreground hover:text-foreground disabled:opacity-50"
+              onClick={() => void loadOlder()}
+              disabled={loadingOlder}
+            >
+              {loadingOlder
+                ? "Loading older entries…"
+                : `Load older entries (${entriesTotal - entries.length} more)`}
+            </button>
+          )}
+        {loadOlderError && (
+          <div
+            className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm"
+            role="alert"
+            data-testid="timeline-load-older-error"
+          >
+            <p>
+              Older timeline history could not be loaded. The entries already shown are unchanged.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="mt-2"
+              data-testid="timeline-load-older-retry"
+              onClick={() => void loadOlder()}
+            >
+              Try again
+            </Button>
+          </div>
+        )}
         {highlight &&
           highlightIsMissingFromList(filtered, highlight) &&
           (() => {
@@ -888,10 +1636,33 @@ export default function Timeline() {
             icon={<Check className="h-3 w-3" />}
             count={eventCounts.followup}
           />
+          <FilterChip
+            active={eventFilter === "actionresponse"}
+            onClick={() => setEventFilter("actionresponse")}
+            label="Action responses"
+            icon={<ClipboardCheck className="h-3 w-3" />}
+            count={eventCounts.actionresponse}
+          />
         </div>
       </div>
 
       <div className="mb-4 flex items-center justify-end gap-2 flex-wrap">
+        <Link
+          to={(() => {
+            // One-tap report entry: carry the active grow and, when the
+            // Pro date-range filter is applied, the exact filtered range.
+            const range =
+              effectiveStartDate && effectiveEndDate
+                ? { startDate: effectiveStartDate, endDate: effectiveEndDate }
+                : defaultDiaryRangeReportRange();
+            return buildDiaryRangeReportUrl({ growId: activeGrowId, ...range });
+          })()}
+          className="inline-flex items-center gap-1 rounded-md border border-border/50 bg-secondary/40 px-3 py-1.5 text-xs font-medium hover:bg-secondary/60"
+          data-testid="timeline-range-report-link"
+          aria-label="Open date-range diary report"
+        >
+          Range report (PDF)
+        </Link>
         <Link
           to={buildEnvironmentSummaryReportUrl(defaultEnvironmentSummaryRange())}
           className="hidden sm:inline-flex items-center gap-1 rounded-md border border-border/50 bg-secondary/40 px-3 py-1.5 text-xs font-medium hover:bg-secondary/60"
@@ -924,15 +1695,18 @@ export default function Timeline() {
       </div>
 
       <div className="mt-4">
-        <DiaryCalendarSection rawEntries={entries} />
+        <DiaryCalendarSection
+          rawEntries={recentLaneRawEntries}
+          activeStage={activeGrow?.stage ?? null}
+        />
       </div>
 
       <div className="mt-4">
-        <WateringHistoryPanel rawEntries={entries} limit={20} />
+        <WateringHistoryPanel rawEntries={recentLaneRawEntries} limit={20} />
       </div>
 
       <div className="mt-4">
-        <FeedingHistoryPanel rawEntries={entries} limit={20} />
+        <FeedingHistoryPanel rawEntries={recentLaneRawEntries} limit={20} />
       </div>
 
       <div className="mt-4">
@@ -956,13 +1730,9 @@ export default function Timeline() {
         <AlertEventsSection events={alertEvents} />
       </div>
 
-      {loading ? (
-        <Center>
-          <Loader2 className="h-5 w-5 animate-spin" />
-        </Center>
-      ) : entries.length === 0 ? (
+      {pageReadView.kind === "ready_empty" ? (
         <Empty title="No entries yet" desc="Tap the + button to log your first photo and note." />
-      ) : filtered.length === 0 ? (
+      ) : entries.length === 0 ? null : filtered.length === 0 ? (
         <Empty
           title={evidenceActive ? TIMELINE_EVIDENCE_EMPTY_TITLE : "No matching entries"}
           desc={
@@ -1075,6 +1845,22 @@ export default function Timeline() {
                               }
                             | undefined;
                           const remindAt = e.details?.remind_at as string | undefined;
+                          const eventTypeValue =
+                            (e.details?.event_type as string | undefined) ?? null;
+                          // Learning-loop rows (follow-up / outcome / decision) carry join
+                          // ids (action_queue_id, *_entry_id, source_alert_id) that must
+                          // never render as raw chips. Skip the denylist chip loop for them
+                          // entirely and surface only friendly, id-free rows + back-links.
+                          const isLearningLoopEvent =
+                            eventTypeValue === "action_followup" ||
+                            eventTypeValue === "action_outcome" ||
+                            eventTypeValue === RUN_LEARNING_DECISION_EVENT_TYPE;
+                          // Readiness-check rows carry machine fields
+                          // (kind, readiness, allowed, snapshot_*,
+                          // blocking_codes, checked_at) that must never
+                          // render as raw chips — the dedicated badge
+                          // below presents them instead.
+                          const isReadinessCheckEvent = isAiDoctorReadinessCheckEvent(e);
                           const HIDDEN = [
                             "event_type",
                             "plant_id",
@@ -1084,9 +1870,45 @@ export default function Timeline() {
                             "sensor_snapshot",
                             "remind_at",
                           ];
-                          const extra = Object.entries(e.details || {}).filter(
-                            ([k]) => !HIDDEN.includes(k),
-                          );
+                          // Structured Quick Log detail renders as labeled
+                          // chips (below) instead of raw machine codes.
+                          const detailLines: readonly QuickLogDetailDisplayLine[] =
+                            isLearningLoopEvent || isReadinessCheckEvent
+                              ? []
+                              : describeQuickLogDetailsFromExtras(e.details);
+                          // Exclude the FULL structured-key set (not just
+                          // rendered lines): a present-but-invalid structured
+                          // value yields no labeled line and must still never
+                          // fall through as a raw chip.
+                          const extra = isLearningLoopEvent
+                            ? []
+                            : isReadinessCheckEvent
+                              ? []
+                              : Object.entries(e.details || {}).filter(
+                                  ([k]) =>
+                                    !HIDDEN.includes(k) && !QUICK_LOG_DETAIL_FIELD_KEYS.has(k),
+                                );
+                          const loopActionId =
+                            isLearningLoopEvent && typeof e.details?.action_queue_id === "string"
+                              ? (e.details.action_queue_id as string)
+                              : null;
+                          const loopOutcomeStatus =
+                            eventTypeValue === "action_outcome" &&
+                            typeof e.details?.outcome_status === "string"
+                              ? (e.details.outcome_status as string)
+                              : null;
+                          const loopDecisionRaw =
+                            eventTypeValue === RUN_LEARNING_DECISION_EVENT_TYPE
+                              ? e.details?.decision
+                              : null;
+                          const loopDecisionLabel = isNextRunDecision(loopDecisionRaw)
+                            ? DECISION_LABELS[loopDecisionRaw]
+                            : null;
+                          const loopEntryGrowId = (e as { grow_id?: unknown }).grow_id;
+                          const loopGrowId =
+                            (typeof loopEntryGrowId === "string" && loopEntryGrowId) ||
+                            activeGrowId ||
+                            null;
                           return (
                             <>
                               <div className="flex items-center gap-2 mb-2 text-xs text-muted-foreground flex-wrap">
@@ -1126,7 +1948,7 @@ export default function Timeline() {
                                 </button>
                                 <DiaryEntryRemoveButton
                                   entry={{ id: e.id, photoUrl: e.photo_url, kind: "diary" }}
-                                  viewer={{ currentUserId: user?.id ?? null }}
+                                  viewer={{ currentUserId: user }}
                                   plantName={plantName}
                                   plantId={e.plant_id ?? null}
                                   tentId={e.tent_id ?? null}
@@ -1137,6 +1959,63 @@ export default function Timeline() {
                                 />
                               </div>
                               <p className="text-sm whitespace-pre-wrap">{e.note}</p>
+                              {(() => {
+                                // Compact canonical "Action response" card for
+                                // grower-recorded evidence rows. Rendered inside
+                                // the row itself — the raw row never duplicates
+                                // into a second event. The existing pinned
+                                // "View original action" link below serves as
+                                // the card's action link on this surface.
+                                const responseVm = actionResponseCardByRowId.get(e.id);
+                                return responseVm ? (
+                                  <div className="mt-2">
+                                    <ActionResponseMemoryCard
+                                      viewModel={responseVm}
+                                      variant="compact"
+                                      showActionLink={false}
+                                    />
+                                  </div>
+                                ) : null;
+                              })()}
+                              {isLearningLoopEvent && (loopOutcomeStatus || loopDecisionLabel) && (
+                                <div className="mt-1 flex flex-wrap gap-1.5">
+                                  {loopOutcomeStatus && (
+                                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-teal-500/10 border border-teal-500/30 text-teal-300">
+                                      Grower response: {loopOutcomeStatus.replace(/_/g, " ")}
+                                    </span>
+                                  )}
+                                  {loopDecisionLabel && (
+                                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-purple-500/10 border border-purple-500/30 text-purple-300">
+                                      {loopDecisionLabel}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                              {isLearningLoopEvent && (loopActionId || loopGrowId) && (
+                                <div className="mt-2 flex flex-wrap items-center gap-3">
+                                  {loopActionId && (
+                                    <Link
+                                      to={actionDetailPath(loopActionId)}
+                                      data-testid="timeline-view-original-action"
+                                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                                      onClick={(ev) => ev.stopPropagation()}
+                                    >
+                                      <ListChecks className="h-3 w-3" aria-hidden />
+                                      View original action
+                                    </Link>
+                                  )}
+                                  {loopGrowId && (
+                                    <Link
+                                      to={growLearningPath(loopGrowId)}
+                                      data-testid="timeline-view-learning-episode"
+                                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                                      onClick={(ev) => ev.stopPropagation()}
+                                    >
+                                      View full learning episode
+                                    </Link>
+                                  )}
+                                </div>
+                              )}
                               {(() => {
                                 const actionsReturn = backToActions.wasProvided
                                   ? backToActions.href
@@ -1201,6 +2080,7 @@ export default function Timeline() {
                                     staleMs: TIMELINE_SNAPSHOT_STALE_MS,
                                     // Quick Log sensor_snapshot is intrinsically grower-entered.
                                     fallback: "manual",
+                                    context: "persisted_snapshot",
                                   });
                                   return (
                                     <div
@@ -1223,7 +2103,7 @@ export default function Timeline() {
                                       {sensor.soil != null && (
                                         <SnapChip>Soil {sensor.soil}%</SnapChip>
                                       )}
-                                      {sensor.vpd != null && (
+                                      {sensor.vpd != null && sourceBadge.canAssessStage && (
                                         <span
                                           className="text-[11px] text-muted-foreground"
                                           data-testid="timeline-vpd-stage-hint"
@@ -1234,6 +2114,24 @@ export default function Timeline() {
                                     </div>
                                   );
                                 })()}
+                              {detailLines.length > 0 && (
+                                <div
+                                  className="mt-2 flex flex-wrap gap-1.5"
+                                  data-testid="timeline-entry-detail-lines"
+                                >
+                                  {/* No `capitalize`: spec labels/values are
+                                      already grower-facing copy. */}
+                                  {detailLines.map((line) => (
+                                    <span
+                                      key={line.key}
+                                      data-testid={`timeline-entry-detail-${line.key}`}
+                                      className="text-[11px] px-2 py-0.5 rounded-full bg-secondary/60 border border-border/40"
+                                    >
+                                      {line.label}: {line.value}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
                               {extra.length > 0 && (
                                 <div className="mt-2 flex flex-wrap gap-1.5">
                                   {extra.map(([k, v]) => (
@@ -1251,6 +2149,7 @@ export default function Timeline() {
                                 return ni ? <DiaryEntryBadges item={ni} /> : null;
                               })()}
                               <AiDoctorCheckInTimelineBadge event={e} />
+                              <AiDoctorReadinessTimelineBadge event={e} />
                               {(() => {
                                 const kindValue =
                                   (e.details?.event_type as string | undefined) ?? null;
@@ -1407,9 +2306,6 @@ function FilterChip({
   );
 }
 
-function Center({ children }: { children: React.ReactNode }) {
-  return <div className="py-20 flex justify-center text-muted-foreground">{children}</div>;
-}
 function Empty({ title, desc, cta }: { title: string; desc: string; cta?: React.ReactNode }) {
   return (
     <div className="py-16 text-center">

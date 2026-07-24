@@ -78,7 +78,9 @@ describe("Dashboard wires the zero-tent empty state", () => {
   });
 
   it("still keeps the established-user environment surfaces in the else branch", () => {
-    expect(DASH_EXEC).toMatch(/Tent A · 7-day environment/);
+    // Trunk replaced the hardcoded "Tent A" heading with the selected tent's
+    // name; the pin follows the source truthfully.
+    expect(DASH_EXEC).toMatch(/\{chartTentName\} · 7-day environment/);
     expect(DASH_EXEC).toMatch(/Environment strip/);
     expect(DASH_EXEC).toMatch(/dashboard-stability-rollup/);
   });

@@ -6,7 +6,7 @@
  *
  * Pure. No I/O. No React.
  */
-import { EC_PLAUSIBLE_MAX } from "@/lib/ecUnits";
+import { EC_PLAUSIBLE_MAX } from "./ecUnits";
 import { type EcUnit } from "@/constants/units";
 
 export type Severity = "info" | "warning";

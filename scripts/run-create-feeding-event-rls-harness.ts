@@ -2,9 +2,12 @@
 /**
  * Runtime trust-boundary harness for public.create_feeding_event.
  *
- * Mirrors run-quicklog-save-manual-rls-harness.ts. service_role is used
- * ONLY for seed, read-back, and teardown; every authorization assertion
- * goes through anon-key + signed-in JWT.
+ * Post-2026-07-22 irrigation evidence trust-boundary revoke, the legacy
+ * create_feeding_event RPC is SERVER-ONLY: EXECUTE is revoked from anon and
+ * authenticated. This harness now proves the RPC is denied to signed-in and
+ * anon callers, and that direct DML into feeding_events / grow_events from
+ * an authenticated client is also denied. service_role is used ONLY for seed
+ * and teardown; every authorization assertion goes through anon-key JWT.
  *
  * Required env (exits 2 if any is missing):
  *   SUPABASE_URL
@@ -34,9 +37,7 @@ for (const [k, v] of [
 
 const STAMP = Date.now();
 const EMAIL_A = `feeding-rls-a-${STAMP}@verdant.test`;
-const EMAIL_B = `feeding-rls-b-${STAMP}@verdant.test`;
 const PASS_A = crypto.randomUUID();
-const PASS_B = crypto.randomUUID();
 
 const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false },
@@ -54,11 +55,25 @@ function check(name: string, ok: boolean, detail?: string) {
   }
 }
 
+function isDenied(err: { code?: string; message?: string } | null | undefined): boolean {
+  if (!err) return false;
+  const m = (err.message ?? "").toLowerCase();
+  const c = err.code ?? "";
+  return (
+    c === "42501" || // insufficient_privilege
+    c === "PGRST202" || // function not exposed
+    c === "PGRST301" ||
+    m.includes("permission denied") ||
+    m.includes("not allowed") ||
+    m.includes("insufficient") ||
+    m.includes("does not exist") ||
+    m.includes("no function matches") ||
+    m.includes("could not find the function")
+  );
+}
+
 async function recreateUser(email: string, password: string): Promise<string> {
-  const { data: list } = await admin.auth.admin.listUsers({
-    page: 1,
-    perPage: 200,
-  });
+  const { data: list } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
   const prior = list?.users?.find((u) => u.email === email);
   if (prior) await admin.auth.admin.deleteUser(prior.id);
   const { data, error } = await admin.auth.admin.createUser({
@@ -66,8 +81,7 @@ async function recreateUser(email: string, password: string): Promise<string> {
     password,
     email_confirm: true,
   });
-  if (error || !data.user)
-    throw new Error(`createUser ${email}: ${error?.message}`);
+  if (error || !data.user) throw new Error(`createUser ${email}: ${error?.message}`);
   return data.user.id;
 }
 
@@ -101,7 +115,11 @@ async function seedGrowTentPlant(userId: string) {
     })
     .select("id")
     .single();
-  return { growId: grow!.id as string, tentId: tent!.id as string, plantId: plant!.id as string };
+  return {
+    growId: grow!.id as string,
+    tentId: tent!.id as string,
+    plantId: plant!.id as string,
+  };
 }
 
 async function cleanupUser(userId: string) {
@@ -117,20 +135,17 @@ async function rpcCreateFeeding(client: SupabaseClient, args: Record<string, unk
 }
 
 async function main() {
-  console.log("create_feeding_event RLS harness");
+  console.log("create_feeding_event RLS harness (denial-expected)");
   const userA = await recreateUser(EMAIL_A, PASS_A);
-  const userB = await recreateUser(EMAIL_B, PASS_B);
   const seedA = await seedGrowTentPlant(userA);
-  const seedB = await seedGrowTentPlant(userB);
   const cA = await signedInClient(EMAIL_A, PASS_A);
-  const cB = await signedInClient(EMAIL_B, PASS_B);
   const cAnon = createClient(SUPABASE_URL, ANON_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
   try {
-    // 1. Happy path — owner can call.
-    const ok = await rpcCreateFeeding(cA, {
+    // 1. Authenticated RPC call is DENIED (EXECUTE revoked 2026-07-22).
+    const authedRpc = await rpcCreateFeeding(cA, {
       _grow_id: seedA.growId,
       _line_id: "default",
       _products: [{ sku: "veg-A", ml: 5 }],
@@ -139,140 +154,88 @@ async function main() {
       _ph: 6.1,
       _ec_in: 1.4,
     });
-    check("owner can call create_feeding_event", !ok.error && typeof ok.data === "string", ok.error?.message);
-    const newEventId = ok.data as string;
+    check(
+      "authenticated cannot call legacy create_feeding_event (EXECUTE revoked)",
+      isDenied(authedRpc.error),
+      authedRpc.error?.message ?? "expected denial, got success",
+    );
 
-    // 2 + 3. grow_events + feeding_events rows exist.
-    const { data: ge } = await admin
-      .from("grow_events")
-      .select("id, event_type, source, user_id")
-      .eq("id", newEventId)
-      .single();
-    check("grow_events row created (feeding, manual, owner)",
-      !!ge && ge.event_type === "feeding" && ge.source === "manual" && ge.user_id === userA);
-    const { data: fe } = await admin
-      .from("feeding_events")
-      .select("event_id, user_id, line_id, products")
-      .eq("event_id", newEventId)
-      .single();
-    check("feeding_events detail row created with same event_id and owner",
-      !!fe && fe.user_id === userA && fe.line_id === "default" && Array.isArray(fe.products));
-
-    // 4. Cascade delete.
-    await admin.from("grow_events").delete().eq("id", newEventId);
-    const { data: feAfter } = await admin
-      .from("feeding_events")
-      .select("event_id")
-      .eq("event_id", newEventId);
-    check("cascade delete removes feeding_events row",
-      Array.isArray(feAfter) && feAfter.length === 0);
-
-    // 5. Anon cannot call.
-    const anonRes = await rpcCreateFeeding(cAnon, {
+    // 2. Anon RPC call is DENIED.
+    const anonRpc = await rpcCreateFeeding(cAnon, {
       _grow_id: seedA.growId,
       _line_id: "default",
       _products: [],
     });
-    check("anon cannot call create_feeding_event", !!anonRes.error,
-      anonRes.error ? undefined : "expected error");
+    check(
+      "anon cannot call legacy create_feeding_event",
+      isDenied(anonRpc.error),
+      anonRpc.error?.message ?? "expected denial, got success",
+    );
 
-    // 6. Cross-user grow rejected.
-    const crossGrow = await rpcCreateFeeding(cA, {
-      _grow_id: seedB.growId,
-      _line_id: "default",
-      _products: [],
+    // 3. Authenticated direct INSERT into feeding_events is DENIED
+    //    (INSERT revoked from authenticated on the three event tables).
+    const directFeeding = await cA.from("feeding_events").insert({
+      event_id: crypto.randomUUID(),
+      user_id: userA,
+      line_id: "x",
+      products: [],
     });
-    check("user A cannot feed user B's grow",
-      !!crossGrow.error && /grow not found/.test(crossGrow.error.message),
-      crossGrow.error?.message);
+    check(
+      "authenticated cannot direct-insert into feeding_events",
+      isDenied(directFeeding.error),
+      directFeeding.error?.message ?? "expected denial, got success",
+    );
 
-    // 7. Cross-user tent rejected.
-    const crossTent = await rpcCreateFeeding(cA, {
+    // 4. Authenticated direct INSERT into grow_events is DENIED.
+    const directGrow = await cA.from("grow_events").insert({
+      user_id: userA,
+      grow_id: seedA.growId,
+      tent_id: seedA.tentId,
+      event_type: "feeding",
+      source: "manual",
+    });
+    check(
+      "authenticated cannot direct-insert into grow_events",
+      isDenied(directGrow.error),
+      directGrow.error?.message ?? "expected denial, got success",
+    );
+
+    // 5. Authenticated direct INSERT into watering_events is DENIED.
+    const directWatering = await cA.from("watering_events").insert({
+      event_id: crypto.randomUUID(),
+      user_id: userA,
+      volume_ml: 100,
+    });
+    check(
+      "authenticated cannot direct-insert into watering_events",
+      isDenied(directWatering.error),
+      directWatering.error?.message ?? "expected denial, got success",
+    );
+
+    // 6. SELECT on own feeding_events remains available (preserved by the
+    //    trust-boundary revoke).
+    const readOwn = await cA.from("feeding_events").select("event_id").limit(1);
+    check(
+      "authenticated retains SELECT on feeding_events",
+      readOwn.error === null,
+      readOwn.error?.message,
+    );
+
+    // 7. service_role can still call create_feeding_event (server writers).
+    const svcRpc = await rpcCreateFeeding(admin, {
       _grow_id: seedA.growId,
       _line_id: "default",
-      _products: [],
-      _tent_id: seedB.tentId,
-    });
-    check("user A cannot reference user B's tent",
-      !!crossTent.error && /tent not found/.test(crossTent.error.message),
-      crossTent.error?.message);
-
-    // 8. Cross-user plant rejected.
-    const crossPlant = await rpcCreateFeeding(cA, {
-      _grow_id: seedA.growId,
-      _line_id: "default",
-      _products: [],
-      _plant_id: seedB.plantId,
-    });
-    check("user A cannot reference user B's plant",
-      !!crossPlant.error && /plant not found/.test(crossPlant.error.message),
-      crossPlant.error?.message);
-
-    // 9. plant/tent mismatch rejected (B's plant pretended to be in A's tent).
-    // Use A's plant with a tent owned by A but not its assignment.
-    const { data: extraTent } = await admin
-      .from("tents")
-      .insert({ user_id: userA, grow_id: seedA.growId, name: `t2-${STAMP}` })
-      .select("id")
-      .single();
-    const mismatch = await rpcCreateFeeding(cA, {
-      _grow_id: seedA.growId,
-      _line_id: "default",
-      _products: [],
-      _tent_id: extraTent!.id,
+      _products: [{ sku: "veg-A", ml: 1 }],
+      _tent_id: seedA.tentId,
       _plant_id: seedA.plantId,
     });
-    check("plant/tent mismatch is rejected",
-      !!mismatch.error && /not assigned to the provided tent/.test(mismatch.error.message),
-      mismatch.error?.message);
-
-    // 10. Non-array products rejected.
-    const badProducts = await rpcCreateFeeding(cA, {
-      _grow_id: seedA.growId,
-      _line_id: "default",
-      _products: { not: "array" } as unknown,
-    });
-    check("non-array products rejected",
-      !!badProducts.error && /products must be a jsonb array/.test(badProducts.error.message),
-      badProducts.error?.message);
-
-    // 11. Direct client INSERT into feeding_events for another user is rejected.
-    const directInsertOther = await cA
-      .from("feeding_events")
-      .insert({
-        event_id: crypto.randomUUID(),
-        user_id: userB,
-        line_id: "x",
-        products: [],
-      });
-    check("direct insert spoofing other user is rejected",
-      !!directInsertOther.error,
-      directInsertOther.error?.message);
-
-    // 12. Direct update of another user's row is rejected (no row visible).
-    // Create one as user B then have A try to update.
-    const okB = await rpcCreateFeeding(cB, {
-      _grow_id: seedB.growId,
-      _line_id: "default",
-      _products: [],
-    });
-    if (!okB.error && typeof okB.data === "string") {
-      const upd = await cA
-        .from("feeding_events")
-        .update({ line_id: "hax" })
-        .eq("event_id", okB.data);
-      check("user A cannot update user B's feeding_events row",
-        !upd.error ? false : true);
-      const del = await cA
-        .from("feeding_events")
-        .delete()
-        .eq("event_id", okB.data);
-      check("user A cannot delete user B's feeding_events row",
-        !del.error ? false : true);
-    }
+    check(
+      "service_role can still call create_feeding_event",
+      !svcRpc.error && typeof svcRpc.data === "string",
+      svcRpc.error?.message,
+    );
   } finally {
     await cleanupUser(userA);
-    await cleanupUser(userB);
   }
 
   console.log(`\nresult: ${pass} passed, ${fail} failed`);
@@ -283,3 +246,4 @@ main().catch((e) => {
   console.error(e);
   process.exit(1);
 });
+

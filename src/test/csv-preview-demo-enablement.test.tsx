@@ -49,9 +49,9 @@ describe("CsvPreviewRecordingGuide", () => {
   it("contains the 90-second demo close line", () => {
     render(<CsvPreviewRecordingGuide />);
     fireEvent.click(screen.getByTestId("csv-preview-recording-toggle"));
-    expect(
-      screen.getByTestId("csv-preview-recording-close-line"),
-    ).toHaveTextContent(RECORDING_CLOSE_LINE);
+    expect(screen.getByTestId("csv-preview-recording-close-line")).toHaveTextContent(
+      RECORDING_CLOSE_LINE,
+    );
     expect(RECORDING_CLOSE_LINE).toMatch(/no api access/i);
     expect(RECORDING_CLOSE_LINE).toMatch(/no write-back/i);
     expect(RECORDING_CLOSE_LINE).toMatch(/no device control/i);
@@ -82,6 +82,18 @@ describe("PartnerCsvPreviewLanding", () => {
     renderPage();
     const cta = screen.getByTestId("partner-csv-preview-cta");
     expect(cta).toHaveAttribute("href", "/sensors/csv-preview");
+  });
+
+  it("marks the thin partner utility noindex with a clean canonical", () => {
+    renderPage();
+    expect(document.head.querySelector('meta[name="robots"]')).toHaveAttribute(
+      "content",
+      "noindex, follow",
+    );
+    expect(document.head.querySelector('link[rel="canonical"]')).toHaveAttribute(
+      "href",
+      "https://verdantgrowdiary.com/partners/csv-preview",
+    );
   });
 
   it("does not contain save/import/sync/write-back claims about the preview", () => {

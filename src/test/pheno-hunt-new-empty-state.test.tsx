@@ -56,7 +56,10 @@ vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
-function mockData(plants: { id: string; name: string; strain: string | null; tent_id: string | null }[]) {
+function mockData(
+  plants: { id: string; name: string; strain: string | null; tent_id: string | null }[],
+  tents: { id: string }[] = [],
+) {
   fromMock.mockImplementation((table: string) => {
     if (table === "grows") {
       return {
@@ -70,10 +73,22 @@ function mockData(plants: { id: string; name: string; strain: string | null; ten
         }),
       };
     }
+    // BUG-A grow attribution: the page now resolves the grow's tent ids
+    // first so orphan-attributed plants can appear as candidates.
+    if (table === "tents") {
+      const builder = {
+        select: () => builder,
+        eq: () => builder,
+        then: (res: (v: unknown) => unknown) =>
+          Promise.resolve({ data: tents, error: null }).then(res),
+      } as unknown as PromiseLike<unknown> & Record<string, unknown>;
+      return builder;
+    }
     if (table === "plants") {
       const builder = {
         select: () => builder,
         eq: () => builder,
+        or: () => builder,
         then: (res: (v: unknown) => unknown) =>
           Promise.resolve({ data: plants, error: null }).then(res),
       } as unknown as PromiseLike<unknown> & Record<string, unknown>;

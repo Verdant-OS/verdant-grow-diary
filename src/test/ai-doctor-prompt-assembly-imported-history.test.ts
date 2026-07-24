@@ -20,19 +20,26 @@ const baseImportedHistory = {
     earliest: "2026-05-01T00:00:00.000Z",
     latest: "2026-05-07T00:00:00.000Z",
   },
-  vendors: [{ sourceApp: "verdant_genetics_xlsx", vendorLabel: "Verdant Genetics XLSX", count: 12 }],
-  metrics: [
-    { metric: "temp", unit: "C", count: 12, min: 20, max: 26, avg: 23.5 },
+  vendors: [
+    { sourceApp: "verdant_genetics_xlsx", vendorLabel: "Verdant Genetics XLSX", count: 12 },
   ],
+  metrics: [{ metric: "temp", unit: "C", count: 12, min: 20, max: 26, avg: 23.5 }],
+  excludedQualityCount: 0,
   suspiciousFlagCount: 0,
 };
 
 describe("buildAiDoctorPromptMessages — imported-history injection", () => {
   it("returns base system prompt and JSON packet user prompt when no history / live readings", () => {
-    const out = buildAiDoctorPromptMessages({ grow_id: "g1" });
+    const growId = "11111111-1111-4111-8111-111111111111";
+    const idempotencyKey = "request-key-123";
+    const out = buildAiDoctorPromptMessages({
+      grow_id: growId,
+      idempotency_key: idempotencyKey,
+    });
     expect(out.system).toContain(AI_DOCTOR_BASE_SYSTEM_PROMPT);
     expect(out.user).toContain("Grower context packet (JSON):");
-    expect(out.user).toContain('"grow_id":"g1"');
+    expect(out.user).not.toContain(growId);
+    expect(out.user).not.toContain(idempotencyKey);
     expect(out.importedHistoryBlock).toBeNull();
     expect(out.missingLiveReadingsBlock).toBeNull();
     expect(out.guidance).toEqual([]);
@@ -42,6 +49,23 @@ describe("buildAiDoctorPromptMessages — imported-history injection", () => {
     }
   });
 
+  it("redacts operational scope fields even when a caller nests them in context", () => {
+    const outerGrowId = "11111111-1111-4111-8111-111111111111";
+    const injectedGrowId = "22222222-2222-4222-8222-222222222222";
+    const idempotencyKey = "request-key-123";
+    const out = buildAiDoctorPromptMessages({
+      grow_id: outerGrowId,
+      plant: {
+        growId: injectedGrowId,
+        sensorHistory: [{ idempotencyKey }],
+      },
+    });
+
+    expect(out.user).not.toContain(outerGrowId);
+    expect(out.user).not.toContain(injectedGrowId);
+    expect(out.user).not.toContain(idempotencyKey);
+  });
+
   it("injects imported-history guidance and block when packet has imported_sensor_history", () => {
     const out = buildAiDoctorPromptMessages({
       grow_id: "g1",
@@ -49,9 +73,10 @@ describe("buildAiDoctorPromptMessages — imported-history injection", () => {
       missingLiveSensorReadings: false,
     });
     expect(out.importedHistoryBlock).not.toBeNull();
-    expect(out.user).toContain("[Imported sensor history]");
+    expect(out.user).toContain("[Historical sensor context]");
     expect(out.user).toContain("Verdant Genetics XLSX");
     expect(out.user).toContain("Date range:");
+    expect(out.user).toContain("Excluded quality rows: 0");
     expect(out.system).toContain(IMPORTED_HISTORY_PROMPT_STRINGS.notLiveCaveat);
     expect(out.system).toContain(IMPORTED_HISTORY_PROMPT_STRINGS.notProofOfCurrent);
     expect(out.system).toContain(IMPORTED_HISTORY_PROMPT_STRINGS.notHealthyFromHistoryAlone);
@@ -64,7 +89,7 @@ describe("buildAiDoctorPromptMessages — imported-history injection", () => {
       missingLiveSensorReadings: true,
     });
     expect(out.missingLiveReadingsBlock).not.toBeNull();
-    expect(out.user).toContain("[Missing live readings]");
+    expect(out.user).toContain("[Missing current sensor readings]");
     expect(out.system).toContain(IMPORTED_HISTORY_PROMPT_STRINGS.missingLiveReadings);
     expect(out.system).toContain(IMPORTED_HISTORY_PROMPT_STRINGS.missingInfoIncludeLive);
   });
@@ -124,11 +149,23 @@ describe("buildAiDoctorPromptMessages — imported-history injection", () => {
     expect(out.missingLiveReadingsBlock).toBeNull();
   });
 
+  it("fails safely inside prompt formatting when history arrays are malformed", () => {
+    const malformedHistory = {
+      ...baseImportedHistory,
+      vendors: {},
+      metrics: {},
+    };
+
+    expect(() =>
+      buildAiDoctorPromptMessages({ imported_sensor_history: malformedHistory }),
+    ).not.toThrow();
+    const out = buildAiDoctorPromptMessages({ imported_sensor_history: malformedHistory });
+    expect(out.importedHistoryBlock).toContain("Vendors: unknown vendor");
+    expect(out.importedHistoryBlock).toContain("Metric summaries: no metric summaries");
+  });
+
   it("static guard: edge function uses helper and contains no new Supabase write / schema / device-control calls", () => {
-    const path = resolve(
-      process.cwd(),
-      "supabase/functions/ai-doctor-review/index.ts",
-    );
+    const path = resolve(process.cwd(), "supabase/functions/ai-doctor-review/index.ts");
     const src = readFileSync(path, "utf8");
     expect(src).toContain("buildAiDoctorPromptMessages");
     // No new sensor_readings / alerts / action_queue writes added.

@@ -73,11 +73,17 @@ describe("Post-Grow Learning Report safety", () => {
     expect(RULES).toContain("Grower approval required");
   });
 
-  it("keeps report data adapter narrow and avoids unsafe payload selection", () => {
+  it("keeps report data adapter narrow and uses raw lineage only for classification", () => {
     expect(HOOK).toContain('from("grows")');
     expect(HOOK).toContain('from("diary_entries")');
     expect(HOOK).toContain('from("sensor_readings")');
     expect(HOOK).toContain('from("action_queue")');
-    expect(HOOK).not.toMatch(/raw_payload|bridge_tokens/i);
+    expect(HOOK).toContain('.select("id,metric,value,ts,captured_at,source,raw_payload")');
+    expect(HOOK).toContain('.order("captured_at", { ascending: true, nullsFirst: false })');
+    expect(HOOK).toContain('.order("ts", { ascending: true })');
+    expect(HOOK).toContain('.order("id", { ascending: true })');
+    expect(RULES).toContain("withoutDiagnosticSensorRows");
+    expect(PAGE + CARDS).not.toMatch(/raw_payload|bridge_tokens/i);
+    expect(HOOK).not.toMatch(/bridge_tokens/i);
   });
 });

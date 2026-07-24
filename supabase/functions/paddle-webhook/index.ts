@@ -1,5 +1,18 @@
-// Paddle webhook receiver — SANDBOX ONLY.
+// Paddle webhook receiver — LEGACY BYO ("bring-your-own-key") STACK · SANDBOX ONLY.
 //
+// M2 (audit fix): this file is NOT the canonical Lovable Stack A webhook.
+// The active production sink is `supabase/functions/payments-webhook/`,
+// which is what Lovable's built-in Paddle registration points at (env=live
+// and env=sandbox both route there). This BYO handler stays behind because
+// the operator audit surfaces (OperatorPaddleProcessingAudit,
+// OperatorBillingSubscriptionUpdateAudit,
+// OperatorBillingEntitlementResolutionAudit) still read from the
+// `paddle_events` / `paddle_event_processing` / `billing_subscriptions`
+// tables it maintains. It is deliberately sandbox-only — a live payload
+// arriving here would be refused by the environment gate below, since no
+// registered live endpoint routes into this function.
+//
+
 // Responsibilities:
 //   1. Read the RAW request body (signature verification requires the exact
 //      bytes Paddle signed; do NOT JSON.parse before verifying).
@@ -27,7 +40,7 @@ import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supa
 import {
   buildBillingCustomerLinkCapturePlan,
   type BillingCustomerLinkInsertPayload,
-} from "../../../src/lib/billingCustomerLinkCaptureRules.ts";
+} from "../_shared/lib/lib/billingCustomerLinkCaptureRules.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -146,6 +159,21 @@ import {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+/**
+ * Webhook payloads are untrusted even when signed: a non-parseable
+ * occurred_at string would poison the timestamptz insert for the processing
+ * row (and its error-fallback row, which is built through the same path),
+ * leaving the event recorded with no processing/audit outcome. Normalize to a
+ * canonical ISO string, or NULL — NULL simply skips the ordering guard, which
+ * is the documented legacy behavior.
+ */
+function normalizeProviderTimestamp(value: string | null): string | null {
+  if (!value) return null;
+  const parsed = Date.parse(value);
+  if (Number.isNaN(parsed)) return null;
+  return new Date(parsed).toISOString();
 }
 
 function readString(value: unknown): string | null {
@@ -295,7 +323,7 @@ function baseProcessingPayload(
     current_period_end: null,
     cancel_at_period_end: false,
     is_founder_candidate: false,
-    occurred_at: readString(row.payload?.occurred_at) ?? null,
+    occurred_at: normalizeProviderTimestamp(readString(row.payload?.occurred_at)),
     details,
   };
 }
@@ -564,6 +592,24 @@ async function applyPaddleSubscriptionUpdate(
   if (error) {
     console.error("paddle-webhook subscription_update_failed", error);
     return { status: "failed", reason: "subscription_update_failed" };
+  }
+
+  // The RPCs never raise: SQL exceptions are swallowed and surfaced as
+  // status:'failed' in the returned jsonb (update_failed /
+  // founder_allocation_failed). That class is transient — treat it as a
+  // webhook FAILURE (HTTP 500) so Paddle retries; acking it would mean a paid
+  // event with no entitlement written and no retry. Deliberate policy
+  // refusals ('blocked' / 'not_found') and noops stay acked: they are
+  // deterministic, retrying cannot change them, and the processing/audit rows
+  // carry the reason for the operator.
+  const rpcStatus = isRecord(data) && typeof data.status === "string" ? data.status : null;
+  if (rpcStatus === "failed") {
+    console.error("paddle-webhook subscription_update_rpc_failed", {
+      rpcName,
+      status: rpcStatus,
+      reason: isRecord(data) && typeof data.reason === "string" ? data.reason : null,
+    });
+    return { status: "failed", reason: "subscription_update_rpc_failed" };
   }
 
   return { status: "attempted", result: data };

@@ -32,7 +32,7 @@ export function BreedingLogContainer({ activeGrowId, plants, onCreated, onCancel
       const selectedPlant = plants.find((p) => p.id === data.plantId);
       const details = (data.details ?? {}) as Record<string, string>;
 
-      const { data: rpcData, error: rpcError } = await supabase.rpc("breeding_log_save_event", {
+      const { data: rpcData, error: rpcError } = await (supabase.rpc as any)("breeding_log_save_event", {
         p_grow_id: activeGrowId,
         p_plant_id: data.plantId,
         p_event_type: data.subType,

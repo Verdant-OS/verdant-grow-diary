@@ -94,6 +94,17 @@ describe("environmentStabilityRules.computeEnvironmentStability", () => {
     );
   });
 
+  it("unavailable message names the evidence class and the derived-VPD exclusion", () => {
+    // No directly measured VPD series → unavailable, and the copy must say
+    // which evidence class is missing instead of the ambiguous "no usable
+    // VPD readings" that contradicted the derived VPD estimate shown nearby.
+    const r = computeEnvironmentStability([], { stage: "veg", now: NOW });
+    expect(r.status).toBe("unavailable");
+    expect(r.message).toBe(
+      "No directly measured VPD readings in the recent window. Derived VPD (calculated from temperature and humidity) is shown on the VPD card but is not used for stability tracking.",
+    );
+  });
+
   it("returns stage_unknown when stage is null", () => {
     const readings = readingsEveryHour(Array(10).fill(1.0), {
       startHoursAgo: 9,

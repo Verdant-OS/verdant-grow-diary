@@ -7,9 +7,7 @@ function readSource(rel: string): string {
 }
 
 function stripSourceComments(source: string): string {
-  return source
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/(^|\s)\/\/.*$/gm, "$1");
+  return source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|\s)\/\/.*$/gm, "$1");
 }
 
 const GROW_DETAIL = readSource("src/pages/GrowDetail.tsx");
@@ -34,8 +32,8 @@ describe("grow detail internal id privacy", () => {
   });
 
   it("keeps grow id only for routing and child component props", () => {
-    expect(GROW_DETAIL).toMatch(/GrowBreadcrumbs growId=\{grow\.id\}/);
-    expect(GROW_DETAIL).toMatch(/StartPhenoHuntButton growId=\{grow\.id\}/);
+    expect(GROW_DETAIL).toMatch(/GrowBreadcrumbs[\s\S]{0,160}growId=\{grow\.id\}/);
+    expect(GROW_DETAIL).toMatch(/StartPhenoHuntButton[\s\S]{0,160}growId=\{grow\.id\}/);
     expect(GROW_DETAIL).toMatch(/logsPath\(growId\)/);
     expect(GROW_DETAIL).toMatch(/plantsPath\(growId\)/);
     expect(GROW_DETAIL).toMatch(/tentsPath\(growId\)/);

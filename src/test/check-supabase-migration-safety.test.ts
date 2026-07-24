@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { execFileSync } from "node:child_process";
-import { writeFileSync, mkdtempSync, mkdirSync, rmSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdtempSync, mkdirSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -29,11 +29,8 @@ function makeSandbox(files: Record<string, string>) {
   }
   // Shim script: import the real one but override its constants via env.
   // Simpler: copy the script and rewrite REPO_ROOT to the sandbox.
-  const src = execFileSync("cat", [SCRIPT], { encoding: "utf8" });
-  const patched = src.replace(
-    /const REPO_ROOT = .*;/,
-    `const REPO_ROOT = ${JSON.stringify(dir)};`,
-  );
+  const src = readFileSync(SCRIPT, "utf8");
+  const patched = src.replace(/const REPO_ROOT = .*;/, `const REPO_ROOT = ${JSON.stringify(dir)};`);
   const scriptPath = join(dir, "scripts", "check.mjs");
   writeFileSync(scriptPath, patched);
   return { dir, scriptPath };

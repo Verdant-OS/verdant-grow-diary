@@ -3,8 +3,29 @@
  *
  * Read-only. RLS-scoped through the caller's OAuth token. sensor_readings
  * is long-format (one row per tent/metric/timestamp), so a snapshot is the
- * latest row per metric. Preserves `source` and `quality` labels verbatim
- * so agents can never treat degraded/stale/invalid data as current.
+ * latest row per metric, queried per metric: a single global ORDER BY +
+ * LIMIT would let one bursty metric push another metric's latest row out
+ * of the scan window and silently drop it from the snapshot.
+ *
+ * "Latest" means COALESCE(captured_at, ts) DESC — capture time when the
+ * ingest path recorded one, ingest time for legacy null-captured rows.
+ * PostgREST cannot order by that expression, and captured_at DESC NULLS
+ * LAST alone would rank every captured row above every legacy row
+ * regardless of recency. So each metric fetches two candidates — the
+ * newest captured row (max captured_at) and the newest legacy row (max
+ * ts among captured_at IS NULL); the true coalesce-winner is always one
+ * of the two. Ties break by ts DESC, created_at DESC (the app loader's
+ * convention, src/hooks/useLatestSensorSnapshot.ts), then id DESC so
+ * equal timestamps can never flip the snapshot between calls.
+ *
+ * Preserves `source` and `quality` labels verbatim, then derives response-time
+ * freshness from the effective capture timestamp. Raw provenance is selected
+ * only long enough to exclude diagnostic-only Windows testbench rows, then is
+ * stripped before tool content is assembled. Trust follows the
+ * canonical SENSOR TRUTH contract: only quality `ok` + source `live` +
+ * response-time freshness `fresh` counts as current live data;
+ * manual stays manual, csv stays csv, demo stays demo, and
+ * sim/stale/invalid/unknown labels are never live.
  * Never returns `raw_payload`.
  *
  * Verifies tent ownership first: tents policies are strictly owner-scoped,
@@ -13,32 +34,38 @@
  */
 import { defineTool } from "@lovable.dev/mcp-js";
 import { z } from "zod";
+import {
+  getLatestSensorSnapshotForOwnedTent,
+  selectLatestMcpSensorReadings,
+  type McpSensorQueryRow,
+  type McpSensorReading,
+} from "../../operatorAccountReadModels";
 import { supabaseForUser, unauthenticated } from "./_supabase";
 
-/** Newest rows to scan when reducing to one reading per metric. */
-const SCAN_LIMIT = 50;
-
-interface SensorRow {
-  id: string;
-  tent_id: string;
-  metric: string;
-  value: number;
-  quality: string;
-  source: string;
-  ts: string;
-  captured_at: string | null;
-}
+export { selectLatestMcpSensorReadings };
+export type { McpSensorQueryRow, McpSensorReading };
 
 export default defineTool({
   name: "get_latest_sensor_snapshot",
   title: "Get latest sensor snapshot",
   description:
     "Fetch the most recent sensor reading per metric (temperature_c, " +
-    "humidity_pct, vpd_kpa, co2_ppm, soil_moisture_pct) for one of the " +
-    "signed-in grower's own tents. Every reading includes its `source` " +
-    "label (manual/pi_bridge/sim) and `quality` label " +
-    "(ok/degraded/stale/invalid). Never treat readings with quality " +
-    "other than `ok`, or source `sim`, as current live data. Read-only.",
+    "humidity_pct, vpd_kpa, co2_ppm, soil_moisture_pct, soil_temp_c, ph, " +
+    "ec, ppfd) for one of the signed-in grower's own tents, ordered by " +
+    "capture time (captured_at, falling back to ingest time). Every " +
+    "reading keeps its `source` and `quality` labels verbatim and adds a " +
+    "response-time `freshness` field (`fresh`, `stale`, or `invalid`) plus " +
+    "`current_live`. `quality` " +
+    "is one of ok/degraded/stale/invalid. Canonical `source` labels are " +
+    "exactly live/manual/csv/demo/stale/invalid, where `live` means " +
+    "fresh validated connected telemetry; legacy rows may carry other " +
+    "ingest labels such as sim or vendor bridge names. Treat a reading " +
+    "as current live telemetry ONLY when `current_live` is true: quality " +
+    "must be `ok`, source must be `live`, and freshness must be `fresh`. " +
+    "Every other source, quality, or freshness state keeps its label " +
+    "and is never live: manual stays manual, csv stays csv, demo stays " +
+    "demo, and sim, stale, invalid, or unknown labels are never current " +
+    "or healthy. Read-only.",
   inputSchema: {
     tentId: z.string().uuid().describe("Tent id to fetch the latest readings for."),
   },
@@ -46,61 +73,39 @@ export default defineTool({
   handler: async ({ tentId }, ctx) => {
     if (!ctx.isAuthenticated()) return unauthenticated();
     const supabase = supabaseForUser(ctx);
-    const { data: tent, error: tentError } = await supabase
-      .from("tents")
-      .select("id,name")
-      .eq("id", tentId)
-      .maybeSingle();
-    if (tentError) {
+    const result = await getLatestSensorSnapshotForOwnedTent(supabase, tentId);
+    if (result.ok === false) {
       return {
-        content: [{ type: "text", text: `Error: ${tentError.message}` }],
+        content: [
+          {
+            type: "text",
+            text: result.reason === "unavailable" ? `Error: ${result.message}` : result.message,
+          },
+        ],
         isError: true,
       };
     }
-    if (!tent) {
-      return {
-        content: [{ type: "text", text: "Tent not found for the signed-in grower." }],
-        isError: true,
-      };
-    }
-    const { data, error } = await supabase
-      .from("sensor_readings")
-      .select("id,tent_id,metric,value,quality,source,ts,captured_at")
-      .eq("tent_id", tentId)
-      .order("ts", { ascending: false })
-      .limit(SCAN_LIMIT);
-    if (error) {
-      return {
-        content: [{ type: "text", text: `Error: ${error.message}` }],
-        isError: true,
-      };
-    }
-    const rows = (data ?? []) as SensorRow[];
-    if (rows.length === 0) {
+    if (!result.data.snapshot) {
       return {
         content: [{ type: "text", text: "No sensor readings found for that tent." }],
         structuredContent: { snapshot: null },
       };
     }
-    // Rows arrive newest-first; keep the first row seen per metric.
-    const readings: Record<string, SensorRow> = {};
-    for (const row of rows) {
-      if (!(row.metric in readings)) readings[row.metric] = row;
-    }
+    const { readings } = result.data.snapshot;
     const summary = Object.values(readings)
       .map(
         (r) =>
-          `${r.metric}=${r.value} (source: ${r.source}, quality: ${r.quality}, at: ${r.captured_at ?? r.ts})`,
+          `${r.metric}=${r.value} (source: ${r.source}, quality: ${r.quality}, freshness: ${r.freshness}, current_live: ${r.current_live}, at: ${r.captured_at ?? r.ts})`,
       )
       .join("\n");
     return {
       content: [
         {
           type: "text",
-          text: `Latest readings for tent "${tent.name}":\n${summary}`,
+          text: `Latest readings for tent "${result.data.tent.name}":\n${summary}`,
         },
       ],
-      structuredContent: { snapshot: { tentId, readings } },
+      structuredContent: { snapshot: result.data.snapshot },
     };
   },
 });

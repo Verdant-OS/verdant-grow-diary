@@ -65,7 +65,9 @@ describe("TentPlantRosterPanel", () => {
   it("renders Harvest Watch fallback when no public state present", () => {
     const vm = buildTentPlantRosterViewModel({
       tentId: "t1",
-      plants: [{ id: "p1", name: "Alpha", tentId: "t1" }],
+      plants: [
+        { id: "p1", name: "Alpha", stage: "flower", tentId: "t1" },
+      ],
     });
     wrap(<TentPlantRosterPanel viewModel={vm} />);
     expect(
@@ -116,6 +118,7 @@ describe("TentPlantRosterPanel", () => {
         {
           id: "p1",
           name: "Alpha",
+          stage: "flower",
           tentId: "t1",
           harvestWatchPublicState: "watch_window",
         },
@@ -140,6 +143,7 @@ describe("TentPlantRosterPanel", () => {
       plants: states.map((s, i) => ({
         id: `p${i}`,
         name: `Plant ${i}`,
+        stage: "flower" as const,
         tentId: "t1",
         harvestWatchPublicState: s,
       })),

@@ -21,8 +21,12 @@ describe("Sensors page — Sensor bridge status tile", () => {
     );
   });
 
-  it("mounts <SensorBridgeHealthCard /> in the Sensors page tree", () => {
-    expect(PAGE).toMatch(/<SensorBridgeHealthCard\s*\/>/);
+  it("mounts SensorBridgeHealthCard with selected-tent row evidence and query status", () => {
+    expect(PAGE).toMatch(/<SensorBridgeHealthCard\b/);
+    expect(PAGE).toContain("sensorReadings={defaultManualTentId ? trendReadings : []}");
+    expect(PAGE).toContain(
+      'sensorReadingsStatus={defaultManualTentId ? trendReadingsStatus : "success"}',
+    );
   });
 
   it("never inlines raw bridge intake fields directly in the page JSX", () => {

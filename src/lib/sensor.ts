@@ -16,16 +16,13 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   buildSensorSnapshot,
   EMPTY_SENSOR_SNAPSHOT,
+  prepareSensorSnapshotRowsForCache,
   type RawSensorRow,
   type SensorSnapshot,
+  type SensorSnapshotCacheRow,
 } from "@/lib/latestSensorSnapshotRules";
 
-export type LatestTentSensorSnapshotStatus =
-  | "idle"
-  | "loading"
-  | "ready"
-  | "empty"
-  | "error";
+export type LatestTentSensorSnapshotStatus = "idle" | "loading" | "ready" | "empty" | "error";
 
 export interface LatestTentSensorSnapshotState {
   status: LatestTentSensorSnapshotStatus;
@@ -66,26 +63,26 @@ export function latestTentSensorSnapshotQueryKey(
 export function useLatestTentSensorSnapshot(
   tentId: string | null | undefined,
 ): LatestTentSensorSnapshotState {
-  const enabled =
-    typeof tentId === "string" && tentId.length > 0;
+  const enabled = typeof tentId === "string" && tentId.length > 0;
 
   const queryClient = useQueryClient();
 
-  const query = useQuery<RawSensorRow[]>({
+  const query = useQuery<SensorSnapshotCacheRow[]>({
     queryKey: latestTentSensorSnapshotQueryKey(tentId),
     enabled,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("sensor_readings")
-        .select(
-          "id,tent_id,metric,value,source,quality,captured_at,ts,created_at,raw_payload",
-        )
+        .select("id,tent_id,metric,value,source,quality,captured_at,ts,created_at,raw_payload")
         .eq("tent_id", tentId as string)
         .order("captured_at", { ascending: false, nullsFirst: false })
         .order("created_at", { ascending: false })
         .limit(ROW_FETCH_LIMIT);
       if (error) throw new Error("latest_tent_snapshot_failed");
-      return (data ?? []) as RawSensorRow[];
+      // Keep raw_payload only inside this acquisition boundary. The pure
+      // builder uses it to reject diagnostic/testbench provenance, selects
+      // one coherent cohort, and returns a redacted snapshot for the cache.
+      return prepareSensorSnapshotRowsForCache((data ?? []) as RawSensorRow[]);
     },
     staleTime: 1000 * 25,
     gcTime: 1000 * 60 * 5,
@@ -148,16 +145,11 @@ export function useLatestTentSensorSnapshot(
   }, [enabled, tentId, queryClient]);
 
   const lastUpdatedAt =
-    enabled && query.dataUpdatedAt && query.dataUpdatedAt > 0
-      ? query.dataUpdatedAt
-      : null;
+    enabled && query.dataUpdatedAt && query.dataUpdatedAt > 0 ? query.dataUpdatedAt : null;
 
-  if (!enabled)
-    return { status: "idle", snapshot: EMPTY_SENSOR_SNAPSHOT, lastUpdatedAt: null };
-  if (query.isLoading)
-    return { status: "loading", snapshot: EMPTY_SENSOR_SNAPSHOT, lastUpdatedAt };
-  if (query.isError)
-    return { status: "error", snapshot: EMPTY_SENSOR_SNAPSHOT, lastUpdatedAt };
+  if (!enabled) return { status: "idle", snapshot: EMPTY_SENSOR_SNAPSHOT, lastUpdatedAt: null };
+  if (query.isLoading) return { status: "loading", snapshot: EMPTY_SENSOR_SNAPSHOT, lastUpdatedAt };
+  if (query.isError) return { status: "error", snapshot: EMPTY_SENSOR_SNAPSHOT, lastUpdatedAt };
   const rows = query.data ?? [];
   if (rows.length === 0) {
     return {

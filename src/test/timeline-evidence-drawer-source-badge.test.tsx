@@ -24,7 +24,9 @@ function vmFromDetails(details: Record<string, unknown>) {
 describe("TimelineEvidenceDetailDrawer source badge", () => {
   for (const [src, expectedKind] of [
     ["manual", "manual"],
-    ["live", "live"],
+    // Persisted diary snapshots do not retain raw evidence capable of
+    // corroborating a legacy `live` claim, so the drawer fails it closed.
+    ["live", "invalid"],
     ["csv", "csv"],
     ["demo", "demo"],
     ["invalid", "invalid"],

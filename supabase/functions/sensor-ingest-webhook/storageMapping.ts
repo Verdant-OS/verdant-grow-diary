@@ -7,6 +7,13 @@
 // source — it lives in `raw_payload` as `vendor` + `transport_source` so
 // auth, ownership, and routing never trust it.
 
+import {
+  classifyIngestTimestampFreshness,
+  LIVE_INGEST_FRESHNESS_WINDOW_MS,
+} from "../_shared/sensorIngestFreshness.ts";
+
+export { LIVE_INGEST_FRESHNESS_WINDOW_MS };
+
 /** Allow-listed canonical stored sources for sensor_readings.source. */
 export const CANONICAL_STORED_SOURCES = [
   "live",
@@ -16,17 +23,47 @@ export const CANONICAL_STORED_SOURCES = [
   "stale",
   "invalid",
 ] as const;
-export type CanonicalStoredSource =
-  (typeof CANONICAL_STORED_SOURCES)[number];
+export type CanonicalStoredSource = (typeof CANONICAL_STORED_SOURCES)[number];
+
+const WINDOWS_TESTBENCH_VENDOR = "ecowitt_windows_testbench";
+const FORWARDED_GATEWAY_MARKERS = new Set([
+  "stationtype",
+  "model",
+  "dateutc",
+  "freq",
+  "runtime",
+  "wh65batt",
+  "wh25batt",
+]);
+
+function isPhysicallyProvenWindowsPacket(input: {
+  vendor: unknown;
+  reportedSource: string | null;
+  metadata: Record<string, unknown>;
+}): boolean {
+  if (
+    typeof input.vendor !== "string" ||
+    input.vendor.trim().toLowerCase() !== WINDOWS_TESTBENCH_VENDOR ||
+    input.reportedSource !== "live"
+  ) {
+    return false;
+  }
+  const nested = input.metadata.raw_payload;
+  if (!nested || typeof nested !== "object") return false;
+  const markerCount = Object.keys(nested as Record<string, unknown>).filter((key) =>
+    FORWARDED_GATEWAY_MARKERS.has(key.trim().toLowerCase()),
+  ).length;
+  return markerCount >= 2;
+}
 
 /**
  * Map an incoming transport/vendor source label to a canonical stored
  * source. Transport labels (e.g. "ecowitt", "mqtt", "webhook") are not
  * stored verbatim — they collapse to "live" because they describe how the
  * reading arrived, not its telemetry-truth state. Already-canonical
- * labels pass through unchanged. Unknown inputs default to "live" so the
- * row is never quarantined accidentally; per-row quality classification
- * is the source of truth for stale/invalid.
+ * labels pass through unchanged. Unknown inputs default to the transport
+ * candidate "live" for backwards compatibility, but `buildStoredRow`
+ * independently re-derives captured-at freshness before persistence.
  */
 export function mapStoredSourceForTransport(
   incoming: string | null | undefined,
@@ -42,38 +79,97 @@ export function mapStoredSourceForTransport(
 
 /**
  * Build the per-row insert payload for `sensor_readings`. Remaps the
- * normalized transport source to canonical, folds the original transport
- * label and Idempotency-Key into `raw_payload`, and stamps user_id from
- * the authenticated identity (never from the request body).
+ * normalized transport source to canonical, narrows explicit diagnostic
+ * evidence to demo/stale/invalid, folds the original transport label and
+ * Idempotency-Key into `raw_payload`, and stamps user_id from the
+ * authenticated identity (never from the request body).
  */
 export function buildStoredRow<R extends Record<string, unknown>>(args: {
   row: R;
   userId: string;
   idempotencyKey: string | null;
+  now?: Date;
+  freshnessWindowMs?: number;
 }): R & {
   user_id: string;
   source: CanonicalStoredSource;
+  quality: unknown;
   raw_payload: Record<string, unknown>;
 } {
-  const { row, userId, idempotencyKey } = args;
-  const incomingSource =
-    typeof row.source === "string" ? (row.source as string) : null;
-  const storedSource = mapStoredSourceForTransport(incomingSource);
+  const { row, userId, idempotencyKey, now, freshnessWindowMs } = args;
+  const incomingSource = typeof row.source === "string" ? (row.source as string) : null;
   const baseRaw =
-    (row.raw_payload && typeof row.raw_payload === "object"
+    row.raw_payload && typeof row.raw_payload === "object"
       ? (row.raw_payload as Record<string, unknown>)
-      : {});
+      : {};
   const baseMeta =
-    (baseRaw.metadata && typeof baseRaw.metadata === "object"
+    baseRaw.metadata && typeof baseRaw.metadata === "object"
       ? (baseRaw.metadata as Record<string, unknown>)
-      : {});
+      : {};
+  const reportedVerdantSource =
+    typeof baseMeta.verdant_source === "string" && baseMeta.verdant_source.trim().length > 0
+      ? baseMeta.verdant_source.trim().toLowerCase()
+      : null;
+  const reportedConfidence =
+    typeof baseMeta.confidence === "string" ? baseMeta.confidence.trim().toLowerCase() : null;
+  const transportStoredSource = mapStoredSourceForTransport(incomingSource);
+  const isWindowsTestbenchTransport =
+    typeof baseRaw.vendor === "string" &&
+    baseRaw.vendor.trim().toLowerCase() === WINDOWS_TESTBENCH_VENDOR;
+  const hasPhysicalWindowsEvidence = isPhysicallyProvenWindowsPacket({
+    vendor: baseRaw.vendor,
+    reportedSource: reportedVerdantSource,
+    metadata: baseMeta,
+  });
+  // A successful diagnostic transport is not physical telemetry. Preserve
+  // the transport lineage, but downgrade explicit test/demo evidence at the
+  // storage boundary so every downstream reader sees an honest canonical
+  // source even if it does not inspect raw provenance. Other listener states
+  // may also narrow a transport-derived live claim; `live` can never promote
+  // a transport that was already canonicalized to a non-live source.
+  const provenanceSource: CanonicalStoredSource =
+    reportedConfidence === "test" || reportedConfidence === "demo"
+      ? "demo"
+      : reportedVerdantSource === "demo" ||
+          reportedVerdantSource === "stale" ||
+          reportedVerdantSource === "invalid"
+        ? reportedVerdantSource
+        : isWindowsTestbenchTransport && !hasPhysicalWindowsEvidence
+          ? "demo"
+          : transportStoredSource;
+  // A bridge can prove where a reading came from, but not that an old packet
+  // is current. Re-derive freshness from the server clock at the final storage
+  // boundary so delayed/replayed packets cannot land as live + healthy even
+  // when caller metadata claims `verdant_source: live`.
+  const isStaleAtIngest =
+    provenanceSource === "live" &&
+    classifyIngestTimestampFreshness(row.captured_at, {
+      now,
+      freshnessWindowMs,
+    }) === "stale";
+  const storedSource: CanonicalStoredSource = isStaleAtIngest ? "stale" : provenanceSource;
+  // Keep the quality fence independent of how `stale` was derived. Listener
+  // provenance may already narrow a packet to stale before it reaches this
+  // boundary, while server-clock freshness can narrow an otherwise-live
+  // packet here. Neither route may persist the contradictory stale + ok pair.
+  const storedQuality = storedSource === "stale" ? "stale" : row.quality;
+  // Never accept the preservation field directly from an untrusted caller.
+  // It is derived only from the listener's original `verdant_source` value
+  // captured above, then written by this server-side storage boundary.
+  const nextMetadata: Record<string, unknown> = { ...baseMeta };
+  delete nextMetadata.reported_verdant_source;
+  nextMetadata.transport_source = incomingSource ?? null;
+  // Canonical DB mirror. This is not the listener's original truth label.
+  nextMetadata.verdant_source = storedSource;
+  if (reportedVerdantSource) {
+    // Preserve the listener's pre-storage live/demo decision separately so
+    // downstream sensor-truth rules never mistake the canonical mirror for
+    // physical gateway proof.
+    nextMetadata.reported_verdant_source = reportedVerdantSource;
+  }
   const nextRaw: Record<string, unknown> = {
     ...baseRaw,
-    metadata: {
-      ...baseMeta,
-      transport_source: incomingSource ?? null,
-      verdant_source: storedSource,
-    },
+    metadata: nextMetadata,
   };
   if (incomingSource && !nextRaw.vendor) {
     // Preserve transport label as vendor lineage when caller didn't supply
@@ -87,6 +183,7 @@ export function buildStoredRow<R extends Record<string, unknown>>(args: {
     ...row,
     user_id: userId,
     source: storedSource,
+    quality: storedQuality,
     raw_payload: nextRaw,
   };
 }

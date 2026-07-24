@@ -9,10 +9,13 @@ export type PlanId =
   | "free"
   | "pro_monthly"
   | "pro_annual"
+  | "craft_monthly"
+  | "craft_annual"
   | "founder_lifetime";
 
 export type SubscriptionStatus =
   | "active"
+  | "trialing"
   | "past_due"
   | "canceled"
   | "paused"
@@ -29,7 +32,7 @@ export interface BillingSubscriptionRow {
   id: string;
   user_id: string;
   plan_id: string; // intentionally widened — resolver re-validates against PlanId.
-  status: string;  // intentionally widened — resolver re-validates against SubscriptionStatus.
+  status: string; // intentionally widened — resolver re-validates against SubscriptionStatus.
   provider: BillingProvider | null;
   provider_customer_id: string | null;
   provider_subscription_id: string | null;
@@ -41,14 +44,16 @@ export interface BillingSubscriptionRow {
 }
 
 export interface Capabilities {
-  maxActiveGrows: number | null;     // null = unlimited
-  aiCreditsPerGrow: number | null;   // free "taste"; null = n/a (uses monthly)
-  aiMonthlyCredits: number;          // monthly bucket; 0 for free; HARD-PINNED for founder.
+  maxActiveGrows: number | null; // null = unlimited
+  aiCreditsPerGrow: number | null; // free "taste"; null = n/a (uses monthly)
+  aiMonthlyCredits: number; // monthly bucket; 0 for free; HARD-PINNED for founder.
   liveSensors: boolean;
   advancedExports: boolean;
   multiTent: boolean;
-  sensorHistoryDays: number | null;  // null = unlimited
+  sensorHistoryDays: number | null; // null = unlimited
   prioritySupport: boolean;
+  /** Pro Blueprint overlay (per-stage SOP scoring). Craft-exclusive + Founder. */
+  blueprint: boolean;
 }
 
 /**
@@ -58,7 +63,9 @@ export interface Capabilities {
  * effective plan has degraded to free (e.g. paused → caps=free, displayed=pro).
  *
  * `degraded` is true when the row was present but could not be honored
- * (unknown plan, unknown status, expired, canceled, past_due, paused).
+ * (unknown plan, unknown status, expired, paused, or canceled after its
+ * paid-through period). `past_due` retains paid capabilities during Paddle
+ * dunning, and a canceled row remains entitled until its period ends.
  */
 export interface ResolvedEntitlement {
   effectivePlanId: PlanId;
@@ -90,9 +97,5 @@ export interface ResolvedEntitlement {
    * leaking raw provider IDs. Optional for back-compat with existing
    * single-row callers of resolveEntitlements().
    */
-  source?:
-    | "free"
-    | "byo_paddle"
-    | "lovable_paddle_subscription"
-    | "lovable_paddle_lifetime";
+  source?: "free" | "byo_paddle" | "lovable_paddle_subscription" | "lovable_paddle_lifetime";
 }

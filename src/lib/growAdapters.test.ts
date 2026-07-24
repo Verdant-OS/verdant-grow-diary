@@ -43,6 +43,7 @@ const plantRow = {
   medium: null,
   pot_size: null,
   pheno_hunt_id: null,
+  plant_type: "unknown",
   candidate_label: null,
   created_at: "2026-02-10T00:00:00Z",
   updated_at: "2026-05-01T00:00:00Z",
@@ -94,8 +95,6 @@ describe("mapTentRow", () => {
   });
 });
 
-
-
 describe("mapPlantRow", () => {
   it("maps a valid plant row", () => {
     const p = mapPlantRow(plantRow);
@@ -113,6 +112,7 @@ describe("mapPlantRow", () => {
       isArchived: false,
       medium: null,
       potSize: null,
+      plantType: "unknown",
     });
   });
   it("defaults null tent_id, strain, photo, note, and invalid health", () => {
@@ -161,6 +161,37 @@ describe("mapPlantRow", () => {
     expect(p.medium).toBeNull();
     expect(p.potSize).toBeNull();
   });
+
+  describe("plantType fallback (never a silent photoperiod default)", () => {
+    it("defaults to 'unknown' when plant_type is missing from the row", () => {
+      const { plant_type: _omit, ...rowWithoutType } = plantRow;
+      void _omit;
+      const p = mapPlantRow(rowWithoutType as unknown as typeof plantRow);
+      expect(p.plantType).toBe("unknown");
+    });
+    it("defaults to 'unknown' when plant_type is null", () => {
+      const p = mapPlantRow({ ...plantRow, plant_type: null as unknown as string });
+      expect(p.plantType).toBe("unknown");
+    });
+    it("defaults to 'unknown' when plant_type is blank or whitespace", () => {
+      expect(mapPlantRow({ ...plantRow, plant_type: "" as unknown as string }).plantType).toBe(
+        "unknown",
+      );
+      expect(mapPlantRow({ ...plantRow, plant_type: "   " as unknown as string }).plantType).toBe(
+        "unknown",
+      );
+    });
+    it("defaults to 'unknown' for unrecognized values (never silently photoperiod)", () => {
+      const p = mapPlantRow({ ...plantRow, plant_type: "sativa" as unknown as string });
+      expect(p.plantType).toBe("unknown");
+    });
+    it("preserves declared autoflower and photoperiod, normalizing synonyms/case", () => {
+      expect(mapPlantRow({ ...plantRow, plant_type: "autoflower" }).plantType).toBe("autoflower");
+      expect(mapPlantRow({ ...plantRow, plant_type: "AUTO" }).plantType).toBe("autoflower");
+      expect(mapPlantRow({ ...plantRow, plant_type: "photoperiod" }).plantType).toBe("photoperiod");
+      expect(mapPlantRow({ ...plantRow, plant_type: "Photo" }).plantType).toBe("photoperiod");
+    });
+  });
 });
 
 describe("mapSensorReadingRow", () => {
@@ -196,6 +227,14 @@ describe("mapSensorReadingRow", () => {
     expect(mapSensorReadingRow({ ...base, metric: "soil_moisture_pct", value: 40 })).toMatchObject({
       soil: 40,
     });
+    expect(mapSensorReadingRow({ ...base, metric: "ppfd", value: 640 })).toMatchObject({
+      ppfd: 640,
+      observedMetrics: ["ppfd"],
+    });
+    expect(mapSensorReadingRow({ ...base, metric: "ppfd_umol_m2_s", value: 650 })).toMatchObject({
+      ppfd: 650,
+      observedMetrics: ["ppfd"],
+    });
   });
   it("preserves ts and tentId", () => {
     const r = mapSensorReadingRow({ ...base, metric: "temperature_c", value: 22 });
@@ -204,7 +243,59 @@ describe("mapSensorReadingRow", () => {
   });
   it("treats unknown metric as zero values", () => {
     const r = mapSensorReadingRow({ ...base, metric: "unknown", value: 99 });
-    expect(r).toMatchObject({ temp: 0, rh: 0, vpd: 0, co2: 0, soil: 0 });
+    expect(r).toMatchObject({
+      temp: 0,
+      rh: 0,
+      vpd: 0,
+      co2: 0,
+      soil: 0,
+      observedMetrics: [],
+    });
+  });
+  it.each([null, undefined, "", "   "])(
+    "rejects absent or blank metric value %j instead of coercing it to zero",
+    (value) => {
+      const r = mapSensorReadingRow({
+        ...base,
+        metric: "temperature_c",
+        value: value as never,
+      });
+      expect(r.temp).toBe(0);
+      expect(r.observedMetrics).toEqual([]);
+    },
+  );
+
+  it("lets persisted quality downgrade fresh live rows", () => {
+    const now = new Date("2026-05-01T12:01:00Z");
+    expect(
+      mapSensorReadingRow(
+        { ...base, source: "live", quality: "invalid", metric: "temperature_c", value: 24 },
+        now,
+      ).status,
+    ).toBe("invalid");
+    expect(
+      mapSensorReadingRow(
+        { ...base, source: "live", quality: "stale", metric: "temperature_c", value: 24 },
+        now,
+      ).status,
+    ).toBe("stale");
+    for (const quality of ["degraded", "unknown"]) {
+      expect(
+        mapSensorReadingRow(
+          { ...base, source: "live", quality, metric: "temperature_c", value: 24 },
+          now,
+        ).status,
+      ).toBe("needs_review");
+    }
+  });
+
+  it("keeps CSV provenance when freshness separately becomes stale", () => {
+    const reading = mapSensorReadingRow(
+      { ...base, source: "csv", metric: "temperature_c", value: 24 },
+      new Date("2026-05-03T12:00:00Z"),
+    );
+    expect(reading.source).toBe("csv");
+    expect(reading.status).toBe("stale");
   });
 });
 
@@ -237,7 +328,16 @@ describe("groupSensorReadingRows", () => {
       row("t1", ts, "soil_moisture_pct", 40),
     ]);
     expect(out).toHaveLength(1);
-    expect(out[0]).toMatchObject({ ts, tentId: "t1", temp: 24, rh: 55, vpd: 1.2, co2: 800, soil: 40 });
+    expect(out[0]).toMatchObject({
+      ts,
+      tentId: "t1",
+      temp: 24,
+      rh: 55,
+      vpd: 1.2,
+      co2: 800,
+      soil: 40,
+    });
+    expect(out[0].observedMetrics).toEqual(["temp", "rh", "vpd", "co2", "soil"]);
     expect(out[0].source).toBe("manual");
     expect(out[0].capturedAt).toBeDefined();
     expect(out[0].status).toBeDefined();
@@ -255,9 +355,52 @@ describe("groupSensorReadingRows", () => {
     expect(out[1].ts).toBe(older);
   });
 
-  it("does not crash on sparse metrics; missing default to 0", () => {
+  it("keeps distinct CSV observations separate when one import gives every row the same ts", () => {
+    const importedAt = "2026-07-18T12:00:00Z";
+    const olderCapturedAt = "2025-01-01T10:00:00Z";
+    const newerCapturedAt = "2025-01-01T11:00:00Z";
+    const out = groupSensorReadingRows(
+      [
+        {
+          ...row("t1", importedAt, "temperature_c", 20, "older-temp"),
+          source: "csv",
+          captured_at: olderCapturedAt,
+        },
+        {
+          ...row("t1", importedAt, "humidity_pct", 55, "older-rh"),
+          source: "csv",
+          captured_at: olderCapturedAt,
+        },
+        {
+          ...row("t1", importedAt, "temperature_c", 24, "newer-temp"),
+          source: "csv",
+          captured_at: newerCapturedAt,
+        },
+        {
+          ...row("t1", importedAt, "humidity_pct", 52, "newer-rh"),
+          source: "csv",
+          captured_at: newerCapturedAt,
+        },
+      ],
+      new Date("2026-07-18T12:01:00Z"),
+    );
+
+    expect(out).toHaveLength(2);
+    expect(out.map((reading) => reading.capturedAt)).toEqual([newerCapturedAt, olderCapturedAt]);
+    expect(out[0]).toMatchObject({ temp: 24, rh: 52, source: "csv", status: "stale" });
+    expect(out[1]).toMatchObject({ temp: 20, rh: 55, source: "csv", status: "stale" });
+  });
+
+  it("preserves sparse-metric truth alongside legacy compatibility zeroes", () => {
     const out = groupSensorReadingRows([row("t1", "2026-05-01T12:00:00Z", "temperature_c", 22)]);
-    expect(out[0]).toMatchObject({ temp: 22, rh: 0, vpd: 0, co2: 0, soil: 0 });
+    expect(out[0]).toMatchObject({
+      temp: 22,
+      rh: 0,
+      vpd: 0,
+      co2: 0,
+      soil: 0,
+      observedMetrics: ["temp"],
+    });
   });
 
   it("does not merge rows from different tents at the same ts", () => {
@@ -274,6 +417,47 @@ describe("groupSensorReadingRows", () => {
   it("returns [] for empty input", () => {
     expect(groupSensorReadingRows([])).toEqual([]);
   });
+
+  it("uses the least-trusted persisted quality across every grouped metric", () => {
+    const ts = "2026-05-01T12:00:00Z";
+    const ok = { ...row("t1", ts, "temperature_c", 24), source: "live", quality: "ok" };
+    const stale = { ...row("t1", ts, "humidity_pct", 55), source: "live", quality: "stale" };
+    const invalid = { ...row("t1", ts, "vpd_kpa", 1.2), source: "live", quality: "invalid" };
+    const now = new Date("2026-05-01T12:01:00Z");
+
+    expect(groupSensorReadingRows([ok, stale, invalid], now)[0].status).toBe("invalid");
+    expect(groupSensorReadingRows([invalid, stale, ok], now)[0].status).toBe("invalid");
+    expect(groupSensorReadingRows([ok, stale], now)[0].status).toBe("stale");
+  });
+
+  it.each([
+    ["manual", "manual"],
+    ["csv", "csv"],
+  ] as const)(
+    "uses least-trusted %s provenance for a mixed same-time live group in either order",
+    (untrustedSource, expectedSource) => {
+      const ts = "2026-05-01T12:00:00Z";
+      const now = new Date("2026-05-01T12:01:00Z");
+      const live = {
+        ...row("t1", ts, "temperature_c", 24),
+        source: "live",
+        quality: "ok",
+      };
+      const nonLive = {
+        ...row("t1", ts, "humidity_pct", 55),
+        source: untrustedSource,
+        quality: "ok",
+      };
+
+      const forward = groupSensorReadingRows([live, nonLive], now)[0];
+      const reversed = groupSensorReadingRows([nonLive, live], now)[0];
+
+      expect(forward.source).toBe(expectedSource);
+      expect(reversed.source).toBe(expectedSource);
+      expect(forward.source).not.toBe("live");
+      expect(reversed.source).not.toBe("live");
+    },
+  );
 });
 
 describe("mock data immutability", () => {

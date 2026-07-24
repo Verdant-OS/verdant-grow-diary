@@ -22,6 +22,14 @@ vi.mock("@/hooks/useTimelineMemory", () => ({
   useTimelineMemory: () => ({ items: [], isLoading: false }),
   TIMELINE_MEMORY_DEFAULT_LIMIT: 25,
 }));
+vi.mock("@/hooks/useRootZoneObservations", () => ({
+  useRootZoneObservations: () => ({
+    observations: [],
+    isLoading: false,
+    isFetching: false,
+    isError: false,
+  }),
+}));
 
 describe("PlantDetailAiDoctorContextPanel — quick actions", () => {
   it("renders quick actions for supported missing context with preserved plant scope", () => {
@@ -48,9 +56,7 @@ describe("PlantDetailAiDoctorContextPanel — quick actions", () => {
       edit.getAttribute("href") ?? edit.querySelector("a")?.getAttribute("href") ?? "";
     expect(editHref).toContain("/plants/p1");
 
-    const snap = screen.getByTestId(
-      "ai-doctor-context-quick-action-add-manual-sensor-snapshot",
-    );
+    const snap = screen.getByTestId("ai-doctor-context-quick-action-add-manual-sensor-snapshot");
     const snapHref =
       snap.getAttribute("href") ?? snap.querySelector("a")?.getAttribute("href") ?? "";
     expect(snapHref).toMatch(/\/sensors/);
@@ -84,7 +90,8 @@ describe("PlantDetailAiDoctorContextPanel — quick actions", () => {
         />
       </MemoryRouter>,
     );
-    expect(screen.getByTestId("plant-ai-doctor-context-no-warning").textContent)
-      .toContain("No warning context found.");
+    expect(screen.getByTestId("plant-ai-doctor-context-no-warning").textContent).toContain(
+      "No warning context found.",
+    );
   });
 });

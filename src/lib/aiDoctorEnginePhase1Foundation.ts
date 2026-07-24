@@ -26,18 +26,14 @@
  *   - Never emits executable device commands in `action_queue_suggestion`.
  */
 
+import { isDiagnosticSensorProvenanceRow } from "./sensorProvenanceFenceRules";
+
 // ---------------------------------------------------------------------------
 // Source labels
 // ---------------------------------------------------------------------------
 
 /** Canonical sensor source labels accepted by this engine. */
-export type AiDoctorSensorSource =
-  | "live"
-  | "manual"
-  | "csv"
-  | "demo"
-  | "stale"
-  | "invalid";
+export type AiDoctorSensorSource = "live" | "manual" | "csv" | "demo" | "stale" | "invalid";
 
 export const AI_DOCTOR_SENSOR_SOURCES: readonly AiDoctorSensorSource[] = [
   "live",
@@ -49,16 +45,10 @@ export const AI_DOCTOR_SENSOR_SOURCES: readonly AiDoctorSensorSource[] = [
 ] as const;
 
 /** Sources the engine considers as trustworthy live-ish telemetry. */
-const TRUSTWORTHY_SOURCES: ReadonlySet<AiDoctorSensorSource> = new Set([
-  "live",
-  "manual",
-]);
+const TRUSTWORTHY_SOURCES: ReadonlySet<AiDoctorSensorSource> = new Set(["live", "manual"]);
 
 /** Sources the engine never treats as healthy current readings. */
-const UNHEALTHY_SOURCES: ReadonlySet<AiDoctorSensorSource> = new Set([
-  "stale",
-  "invalid",
-]);
+const UNHEALTHY_SOURCES: ReadonlySet<AiDoctorSensorSource> = new Set(["stale", "invalid"]);
 
 // ---------------------------------------------------------------------------
 // Vision observation (stubbed)
@@ -221,6 +211,8 @@ export interface CompileAiDoctorContextRow_SensorReading {
   value: number | null;
   captured_at: string;
   source: AiDoctorSensorSource | string;
+  /** Classification-only lineage; never copied into the compiled payload. */
+  raw_payload?: unknown;
 }
 
 export interface CompileAiDoctorContextPayloadFromRowsInput {
@@ -254,7 +246,6 @@ export const AI_DOCTOR_SENSOR_STALENESS_WINDOW_MS =
   AI_DOCTOR_SENSOR_STALENESS_WINDOW_HOURS * 60 * 60 * 1000;
 /** Internal alias kept for readability in the compiler. */
 const SENSOR_FRESH_MAX_AGE_MS = AI_DOCTOR_SENSOR_STALENESS_WINDOW_MS;
-
 
 function parseTime(iso: string): number | null {
   const t = Date.parse(iso);
@@ -361,6 +352,7 @@ export function compileAiDoctorContextPayloadFromRows(
   const normalized: Normalized[] = [];
   for (const r of input.sensorReadings ?? []) {
     if (!r || typeof r.captured_at !== "string") continue;
+    if (isDiagnosticSensorProvenanceRow(r)) continue;
     const t = parseTime(r.captured_at);
     if (t === null || !isWithin(SENSOR_WINDOW_DAYS, t, nowMs)) continue;
     const metric = (METRIC_KEYS as readonly string[]).includes(r.metric as string)
@@ -379,7 +371,12 @@ export function compileAiDoctorContextPayloadFromRows(
   }
   // Stable sort: newest first, tiebreak by source enum order then captured_at.
   const sourceOrder: Record<AiDoctorSensorSource, number> = {
-    live: 0, manual: 1, csv: 2, demo: 3, stale: 4, invalid: 5,
+    live: 0,
+    manual: 1,
+    csv: 2,
+    demo: 3,
+    stale: 4,
+    invalid: 5,
   };
   normalized.sort((a, b) => {
     if (b.capturedMs !== a.capturedMs) return b.capturedMs - a.capturedMs;
@@ -407,10 +404,8 @@ export function compileAiDoctorContextPayloadFromRows(
     const latest = forMetric[0]!;
     const isInvalid = latest.source === "invalid";
     const ageMs = nowMs - latest.capturedMs;
-    const isStale =
-      latest.source === "stale" || ageMs > SENSOR_FRESH_MAX_AGE_MS;
-    const isDegraded =
-      !TRUSTWORTHY_SOURCES.has(latest.source) || isStale || isInvalid;
+    const isStale = latest.source === "stale" || ageMs > SENSOR_FRESH_MAX_AGE_MS;
+    const isDegraded = !TRUSTWORTHY_SOURCES.has(latest.source) || isStale || isInvalid;
     return {
       metric,
       latest_value: isInvalid ? null : latest.value,
@@ -428,9 +423,10 @@ export function compileAiDoctorContextPayloadFromRows(
   for (const n of normalized) {
     counts.set(n.source, (counts.get(n.source) ?? 0) + 1);
   }
-  const source_breakdown: AiDoctorSourceBreakdown[] = AI_DOCTOR_SENSOR_SOURCES
-    .map((source) => ({ source, reading_count_7d: counts.get(source) ?? 0 }))
-    .filter((b) => b.reading_count_7d > 0);
+  const source_breakdown: AiDoctorSourceBreakdown[] = AI_DOCTOR_SENSOR_SOURCES.map((source) => ({
+    source,
+    reading_count_7d: counts.get(source) ?? 0,
+  })).filter((b) => b.reading_count_7d > 0);
 
   // ---- Missing context (deterministic order) ----------------------------
   const missing_context: string[] = [];
@@ -442,7 +438,10 @@ export function compileAiDoctorContextPayloadFromRows(
   if (recent_logs.length === 0) missing_context.push("recent diary entries (14d)");
   if (recent_photos_count === 0) missing_context.push("recent photo (14d)");
   const hasTrustworthyReading = sensor_summary.some(
-    (m) => m.latest_source !== null && !m.is_invalid && !m.is_stale &&
+    (m) =>
+      m.latest_source !== null &&
+      !m.is_invalid &&
+      !m.is_stale &&
       TRUSTWORTHY_SOURCES.has(m.latest_source),
   );
   if (!hasTrustworthyReading) {
@@ -450,17 +449,13 @@ export function compileAiDoctorContextPayloadFromRows(
   }
 
   // ---- Trust level ------------------------------------------------------
-  const hasPlantContext = !!plant && !!plant.id &&
-    !!nonEmptyString(plant.stage);
+  const hasPlantContext = !!plant && !!plant.id && !!nonEmptyString(plant.stage);
   const hasRecentLogs = recent_logs.length > 0;
   const hasRecentPhoto = recent_photos_count > 0;
   let context_trust_level: AiDoctorContextTrustLevel;
   if (hasPlantContext && hasRecentLogs && hasRecentPhoto && hasTrustworthyReading) {
     context_trust_level = "high";
-  } else if (
-    hasPlantContext &&
-    (hasRecentLogs || hasRecentPhoto || hasTrustworthyReading)
-  ) {
+  } else if (hasPlantContext && (hasRecentLogs || hasRecentPhoto || hasTrustworthyReading)) {
     context_trust_level = "medium";
   } else {
     context_trust_level = "low";
@@ -500,8 +495,6 @@ export function compileAiDoctorContextFromRows(
 ): AiDoctorContextPayload {
   return compileAiDoctorContextPayloadFromRows(input);
 }
-
-
 
 // ---------------------------------------------------------------------------
 // Stubbed executor
@@ -546,9 +539,7 @@ export async function executeAiDoctorEngine(
     evidence.push(`${ctx.recent_photos_count} photo(s) in last 14 days`);
   }
   for (const b of ctx.source_breakdown) {
-    evidence.push(
-      `Sensor source ${b.source}: ${b.reading_count_7d} reading(s) in last 7 days`,
-    );
+    evidence.push(`Sensor source ${b.source}: ${b.reading_count_7d} reading(s) in last 7 days`);
   }
   const degradedMetrics = ctx.sensor_summary.filter((m) => m.is_degraded);
   for (const m of degradedMetrics) {
@@ -559,9 +550,7 @@ export async function executeAiDoctorEngine(
     }
   }
   if (options?.vision) {
-    evidence.push(
-      `Vision pass: quality=${options.vision.image_quality_score.toFixed(2)}`,
-    );
+    evidence.push(`Vision pass: quality=${options.vision.image_quality_score.toFixed(2)}`);
   }
 
   const missing_information: string[] = [...ctx.missing_context];
@@ -574,14 +563,10 @@ export async function executeAiDoctorEngine(
     );
   }
   if (ctx.recent_watering_events === 0 && ctx.recent_feeding_events === 0) {
-    possible_causes.push(
-      "No recent watering/feeding logged — actual root-zone state is unknown.",
-    );
+    possible_causes.push("No recent watering/feeding logged — actual root-zone state is unknown.");
   }
   if (possible_causes.length === 0) {
-    possible_causes.push(
-      "Insufficient evidence to enumerate likely causes; observe and re-check.",
-    );
+    possible_causes.push("Insufficient evidence to enumerate likely causes; observe and re-check.");
   }
 
   const confidence: AiDoctorConfidenceLevel =
@@ -616,17 +601,14 @@ export async function executeAiDoctorEngine(
 
   // Risk level: stale/invalid telemetry escalates to medium; otherwise low.
   // (Typed wider than the current branches so future logic may emit "high".)
-  const risk_level: AiDoctorRiskLevel = degradedMetrics.some(
-    (m) => m.is_invalid || m.is_stale,
-  )
+  const risk_level: AiDoctorRiskLevel = degradedMetrics.some((m) => m.is_invalid || m.is_stale)
     ? ("medium" as AiDoctorRiskLevel)
     : ("low" as AiDoctorRiskLevel);
 
   // Action Queue suggestion — strict guard: only medium/high risk AND enough
   // context; never an executable command; always approval-required.
   let action_queue_suggestion: AiDoctorActionQueueSuggestion | null = null;
-  const isElevatedRisk: boolean =
-    risk_level === "medium" || risk_level === "high";
+  const isElevatedRisk: boolean = risk_level === "medium" || risk_level === "high";
   if (isElevatedRisk && confidence !== "low") {
     action_queue_suggestion = {
       title: "Review sensor freshness and capture a fresh manual snapshot",
@@ -646,8 +628,7 @@ export async function executeAiDoctorEngine(
     evidence,
     missing_information,
     possible_causes,
-    immediate_action:
-      "Observe and re-check. Do not change inputs based on this output.",
+    immediate_action: "Observe and re-check. Do not change inputs based on this output.",
     what_not_to_do,
     follow_up_24h:
       "Re-confirm sensor freshness and source labels; log one fresh manual snapshot if no live readings are present.",

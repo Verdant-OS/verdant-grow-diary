@@ -79,4 +79,10 @@ describe("pheno hunt slice — static safety", () => {
       expect(src.toLowerCase(), path).not.toMatch(/public mode/);
     }
   });
+
+  it("does not route loading or unverifiable Pheno access to pricing", () => {
+    const src = sources["src/components/StartPhenoHuntButton.tsx"];
+    expect(src).toMatch(/lookupFailed/);
+    expect(src).toMatch(/entitled \|\| loading \|\| lookupFailed\s*\? target/);
+  });
 });

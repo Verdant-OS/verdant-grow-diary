@@ -321,7 +321,12 @@ export default function BetaLanding({ variant, copy, currentSearch }: BetaLandin
             </ul>
             <div className="pt-2">
               {feedbackUrl ? (
-                <Button asChild size="lg" variant="secondary" className="min-h-11">
+                <Button
+                  asChild
+                  size="lg"
+                  variant="secondary"
+                  className="min-h-11 max-w-full h-auto whitespace-normal text-center leading-tight"
+                >
                   <a
                     href={feedbackUrl}
                     target="_blank"
@@ -338,7 +343,7 @@ export default function BetaLanding({ variant, copy, currentSearch }: BetaLandin
                   variant="secondary"
                   disabled
                   aria-disabled="true"
-                  className="min-h-11"
+                  className="min-h-11 max-w-full h-auto whitespace-normal text-center leading-tight"
                   data-testid={`${testIdRoot}-feedback-cta-disabled`}
                 >
                   {feedbackLabel}

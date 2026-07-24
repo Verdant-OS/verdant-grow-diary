@@ -19,14 +19,26 @@ import type { BillingSubscriptionRow } from "@/lib/entitlements/types";
 
 const NOW = new Date("2026-08-01T00:00:00Z");
 const entMode = vi.hoisted(() => ({
-  current: "pro" as "pro" | "founder" | "free" | "canceled",
+  current: "pro" as "pro" | "founder" | "free" | "canceled" | "error",
+}));
+
+const toastMock = vi.hoisted(() => ({
+  success: vi.fn(),
+  error: vi.fn(),
 }));
 
 const createPhenoHuntMock = vi.hoisted(() =>
-  vi.fn(async (_input: { growId: string; plantIds: string[]; name: string; tentId?: string | null }) => ({
-    huntId: "hunt-1",
-    taggedPlantIds: ["p1", "p2"],
-  })),
+  vi.fn(
+    async (_input: {
+      growId: string;
+      plantIds: string[];
+      name: string;
+      tentId?: string | null;
+    }) => ({
+      huntId: "hunt-1",
+      taggedPlantIds: ["p1", "p2"],
+    }),
+  ),
 );
 
 const supabaseMock = vi.hoisted(() => {
@@ -40,6 +52,9 @@ const supabaseMock = vi.hoisted(() => {
     const chain: any = {
       select: () => chain,
       eq: () => chain,
+      // BUG-A grow attribution: candidates load via .or(grow_id OR tent_id in
+      // the grow's tents) after a tents-id lookup.
+      or: () => chain,
       maybeSingle: async () => ({
         data: table === "grows" ? growRow : null,
         error: null,
@@ -68,19 +83,30 @@ vi.mock("@/store/auth", () => ({
 vi.mock("@/hooks/useMyEntitlements", () => ({
   useMyEntitlements: () => {
     const base: BillingSubscriptionRow = {
-      id: "r", user_id: "u1",
-      plan_id: "pro_monthly", status: "active",
+      id: "r",
+      user_id: "u1",
+      plan_id: "pro_monthly",
+      status: "active",
       provider: "paddle",
-      provider_customer_id: null, provider_subscription_id: null,
-      current_period_end: "2027-01-01T00:00:00Z", cancel_at_period_end: false,
-      founder_number: null, created_at: "", updated_at: "",
+      provider_customer_id: null,
+      provider_subscription_id: null,
+      current_period_end: "2027-01-01T00:00:00Z",
+      cancel_at_period_end: false,
+      founder_number: null,
+      created_at: "",
+      updated_at: "",
     };
     let row: BillingSubscriptionRow | null = null;
     if (entMode.current === "pro") row = base;
-    if (entMode.current === "founder") row = { ...base, plan_id: "founder_lifetime" };
-    if (entMode.current === "canceled") row = { ...base, status: "canceled" };
+    if (entMode.current === "founder") {
+      row = { ...base, plan_id: "founder_lifetime", current_period_end: null };
+    }
+    if (entMode.current === "canceled") {
+      row = { ...base, status: "canceled", current_period_end: "2026-07-01T00:00:00Z" };
+    }
     return {
       loading: false,
+      lookupFailed: entMode.current === "error",
       entitlement: resolveEntitlements(row, NOW),
       refetch: async () => {},
     };
@@ -88,9 +114,8 @@ vi.mock("@/hooks/useMyEntitlements", () => ({
 }));
 
 vi.mock("@/lib/phenoHuntService", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/phenoHuntService")>(
-    "@/lib/phenoHuntService",
-  );
+  const actual =
+    await vi.importActual<typeof import("@/lib/phenoHuntService")>("@/lib/phenoHuntService");
   return {
     ...actual,
     createPhenoHunt: createPhenoHuntMock,
@@ -98,7 +123,7 @@ vi.mock("@/lib/phenoHuntService", async () => {
 });
 
 vi.mock("sonner", () => ({
-  toast: { success: vi.fn(), error: vi.fn() },
+  toast: toastMock,
 }));
 
 import PhenoHuntNew from "@/pages/PhenoHuntNew";
@@ -126,14 +151,14 @@ describe("PhenoHuntNew onboarding flow", () => {
   beforeEach(() => {
     cleanup();
     createPhenoHuntMock.mockClear();
+    toastMock.success.mockClear();
+    toastMock.error.mockClear();
   });
 
   it("Pro user sees the stepper starting on the basics step", async () => {
     entMode.current = "pro";
     renderPage();
-    await waitFor(() =>
-      expect(screen.getByTestId("pheno-hunt-onboarding")).toBeDefined(),
-    );
+    await waitFor(() => expect(screen.getByTestId("pheno-hunt-onboarding")).toBeDefined());
     expect(screen.getByTestId("pheno-onboarding-stepper")).toBeDefined();
     expect(screen.getByTestId("pheno-step-basics")).toBeDefined();
     const body = document.body.textContent ?? "";
@@ -143,9 +168,7 @@ describe("PhenoHuntNew onboarding flow", () => {
   it("Founder Lifetime user sees the same flow", async () => {
     entMode.current = "founder";
     renderPage();
-    await waitFor(() =>
-      expect(screen.getByTestId("pheno-hunt-onboarding")).toBeDefined(),
-    );
+    await waitFor(() => expect(screen.getByTestId("pheno-hunt-onboarding")).toBeDefined());
     expect(screen.getByTestId("pheno-onboarding-stepper")).toBeDefined();
   });
 
@@ -162,9 +185,7 @@ describe("PhenoHuntNew onboarding flow", () => {
     expect(screen.getByTestId("ph-toggle-p3")).toBeDefined();
     // 0 → 1 → tracking only
     fireEvent.click(screen.getByTestId("ph-toggle-p1"));
-    expect(screen.getByTestId("pheno-candidate-status").textContent).toMatch(
-      /tracking only/i,
-    );
+    expect(screen.getByTestId("pheno-candidate-status").textContent).toMatch(/tracking only/i);
     // 2 → comparison-eligible
     fireEvent.click(screen.getByTestId("ph-toggle-p2"));
     expect(screen.getByTestId("pheno-candidate-status").textContent).toMatch(
@@ -254,6 +275,24 @@ describe("PhenoHuntNew onboarding flow", () => {
     fireEvent.click(screen.getByTestId("ph-save-btn"));
     // Even if the button were clickable, canWriteFeatureData blocks the call.
     await new Promise((r) => setTimeout(r, 0));
+    expect(createPhenoHuntMock).not.toHaveBeenCalled();
+  });
+
+  it("does not call a failed plan check an upgrade requirement", async () => {
+    entMode.current = "pro";
+    renderPage();
+    await waitFor(() => screen.getByTestId("pheno-onboarding-stepper"));
+    fireEvent.click(screen.getByTestId("pheno-onboarding-stepper-step-candidates"));
+    fireEvent.click(screen.getByTestId("ph-toggle-p1"));
+    fireEvent.click(screen.getByTestId("ph-toggle-p2"));
+
+    entMode.current = "error";
+    fireEvent.click(screen.getByTestId("pheno-onboarding-stepper-step-checklist"));
+    fireEvent.click(screen.getByTestId("ph-save-btn"));
+
+    await waitFor(() => expect(toastMock.error).toHaveBeenCalledTimes(1));
+    expect(toastMock.error.mock.calls[0]?.[0]).toMatch(/couldn't verify pheno tracker access/i);
+    expect(toastMock.error.mock.calls[0]?.[0]).not.toMatch(/upgrade/i);
     expect(createPhenoHuntMock).not.toHaveBeenCalled();
   });
 });

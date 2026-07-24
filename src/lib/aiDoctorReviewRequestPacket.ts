@@ -19,10 +19,42 @@ import {
   type AiSensorSnapshotSource as AiCoachSnapshotSource,
   type AiSensorSnapshotTrust as AiCoachSnapshotTrust,
 } from "@/lib/aiSensorSnapshotContextRules";
+import {
+  buildImportedSensorHistorySection,
+  isFreshLiveSnapshotAnnotation,
+  type ImportedSensorHistorySection,
+} from "@/lib/aiDoctorContextCompiler";
+import {
+  compareCsvHistoryRowsForBoundedSummary,
+  isCsvHistoryRow,
+  type CsvHistorySensorRowLike,
+} from "@/lib/aiDoctorCsvHistoryContextRules";
+import {
+  buildAiDoctorCurrentSensorSnapshot,
+  type AiDoctorCurrentSensorRowLike,
+} from "@/lib/aiDoctorCurrentSensorSnapshotRules";
+import {
+  ROOT_ZONE_OBSERVATION_CAP,
+  sortAndBoundRootZoneObservations,
+  type RootZoneInvalidField,
+  type RootZoneObservationV1,
+  type RootZoneSource,
+} from "@/lib/rootZoneObservationRules";
+import type {
+  RootZoneDrainageObservation,
+  RootZoneMediumSurface,
+  RootZonePotWeightFeel,
+} from "@/lib/rootZoneManualObservationRules";
 
 export const AI_DOCTOR_REVIEW_PACKET_EVENT_CAP = 20;
+/**
+ * Hard cap on how many CSV-history rows may feed the sanitized summary.
+ * Matches the per-tent sensor hook's default fetch window so the packet
+ * can never aggregate more history than the read path already bounds.
+ */
+export const AI_DOCTOR_REVIEW_PACKET_CSV_ROW_CAP = 200;
+export const AI_DOCTOR_REVIEW_PACKET_ROOT_ZONE_CAP = ROOT_ZONE_OBSERVATION_CAP;
 export const AI_DOCTOR_REVIEW_PACKET_SCHEMA_VERSION = 1 as const;
-
 
 export interface AiDoctorReviewRequestPlantProfile {
   strain: string | null;
@@ -58,6 +90,45 @@ export interface AiDoctorReviewRequestSnapshotAnnotation {
   missingInformationHints: string[];
 }
 
+export interface AiDoctorReviewRequestRootZoneProduct {
+  name: string;
+  amount: number | null;
+  unit: string | null;
+}
+
+/**
+ * Bounded grower-authored root-zone context captured with a typed watering
+ * event. These categorical labels are observations only: they are never
+ * sensor readings, measured dryback, or a watering instruction.
+ */
+export interface AiDoctorReviewRequestRootZoneManualObservation {
+  observedAt: string;
+  source: "manual";
+  advisoryOnly: true;
+  potWeightFeel: RootZonePotWeightFeel | null;
+  mediumSurface: RootZoneMediumSurface | null;
+  drainage: RootZoneDrainageObservation | null;
+}
+
+export interface AiDoctorReviewRequestRootZoneObservation {
+  at: string;
+  eventType: "watering" | "feeding";
+  source: RootZoneSource;
+  volumeMl: number | null;
+  inputPh: number | null;
+  inputEcMsCm: number | null;
+  outputEcMsCm: number | null;
+  runoffMl: number | null;
+  runoffPh: number | null;
+  runoffEcMsCm: number | null;
+  waterTempC: number | null;
+  nutrientLine: string | null;
+  products: AiDoctorReviewRequestRootZoneProduct[];
+  /** Optional for packet compatibility with older saved root-zone rows. */
+  manualObservation?: AiDoctorReviewRequestRootZoneManualObservation;
+  invalidFields?: RootZoneInvalidField[];
+}
+
 export interface AiDoctorReviewRequestPacket {
   schemaVersion: typeof AI_DOCTOR_REVIEW_PACKET_SCHEMA_VERSION;
   plant: AiDoctorReviewRequestPlantProfile;
@@ -67,6 +138,12 @@ export interface AiDoctorReviewRequestPacket {
     missing: string[];
   };
   recentEvents: AiDoctorReviewRequestEvent[];
+  /**
+   * Additive, bounded grower-recorded watering/feeding measurements from
+   * the existing typed event tables. Operational/database identifiers and
+   * raw payloads are never included. Optional for packet back-compat.
+   */
+  recentRootZoneObservations?: AiDoctorReviewRequestRootZoneObservation[];
   recentSensorSnapshot: AiDoctorReviewRequestSnapshot | null;
   /**
    * Additive: source-aware annotation built from the same shared helper
@@ -75,9 +152,25 @@ export interface AiDoctorReviewRequestPacket {
    * safety notes, and never relabels.
    */
   recentSensorSnapshotAnnotation?: AiDoctorReviewRequestSnapshotAnnotation | null;
+  /**
+   * Additive: sanitized summary of imported CSV/XLSX sensor history for
+   * the plant's tent. Bounded, derived aggregates only — never raw rows,
+   * raw_payload, filenames, secrets, or database identifiers. Optional
+   * so older packets/fixtures stay valid. Field name intentionally
+   * matches PlantContextPayload so the shared server-side prompt
+   * assembly (`buildAiDoctorPromptMessages`) reads it without
+   * translation and applies its historical-not-live guidance.
+   */
+  imported_sensor_history?: ImportedSensorHistorySection | null;
+  /**
+   * Additive safety signal: true when the packet carries no fresh
+   * live-source sensor snapshot. Manual, CSV, demo, stale, and invalid
+   * readings never count as live (mirrors the context compiler's
+   * semantics), so AI Doctor is told to request fresh context whenever
+   * current conditions matter. Optional for back-compat.
+   */
+  missingLiveSensorReadings?: boolean;
 }
-
-
 
 export interface BuildAiDoctorReviewPacketArgs {
   plant: (AiDoctorContextPlantSource & { potSize?: string | null }) | null;
@@ -85,8 +178,32 @@ export interface BuildAiDoctorReviewPacketArgs {
   context: AiDoctorContextResult;
   /** Injectable clock for deterministic staleness annotation. */
   now?: Date;
+  /**
+   * Optional sensor-history rows for the plant's tent (already bounded
+   * by the caller's fetch window). Only rows the shared CSV rule
+   * explicitly identifies as imported history contribute; manual, demo,
+   * live, stale, and invalid rows are ignored here — never reinterpreted.
+   * Raw rows never leave this builder: only the sanitized summary enters
+   * the packet.
+   */
+  csvHistoryRows?: ReadonlyArray<CsvHistorySensorRowLike> | null;
+  /**
+   * Optional recent tent rows from the canonical current-source read.
+   * Only source=live/manual rows can contribute, and the pure projection
+   * strips raw payloads, ids, device metadata, and incoherent old values.
+   */
+  currentSensorRows?: ReadonlyArray<AiDoctorCurrentSensorRowLike> | null;
+  /**
+   * Optional caller-supplied live-telemetry signal (e.g. a "usable"
+   * sensor-bridge health classification). Only an explicit `true`
+   * clears the missing-live flag — manual snapshots, CSV history, and
+   * unknown/absent signals never do. Downgrade-only, mirroring the
+   * compiler's live vocabulary.
+   */
+  hasFreshLiveSensorReadings?: boolean | null;
+  /** Existing typed watering/feeding rows, already RLS-scoped by caller. */
+  rootZoneObservations?: readonly RootZoneObservationV1[] | null;
 }
-
 
 function cleanStringOrNull(v: unknown): string | null {
   if (typeof v !== "string") return null;
@@ -102,7 +219,6 @@ function pickEventCategory(item: TimelineMemoryItem): string {
   }
   return "other";
 }
-
 
 function pickMostRecentSnapshotItem(
   items: readonly TimelineMemoryItem[],
@@ -177,6 +293,45 @@ export function buildAiDoctorReviewRequestPacket(
     recentEvents.push({ at, category: pickEventCategory(it) });
   }
 
+  const recentRootZoneObservations: AiDoctorReviewRequestRootZoneObservation[] =
+    sortAndBoundRootZoneObservations(
+      args.rootZoneObservations,
+      AI_DOCTOR_REVIEW_PACKET_ROOT_ZONE_CAP,
+    ).map((observation) => ({
+      at: observation.occurredAt,
+      eventType: observation.eventType,
+      source: observation.source,
+      volumeMl: observation.metrics.volumeMl,
+      inputPh: observation.metrics.inputPh,
+      inputEcMsCm: observation.metrics.inputEcMsCm,
+      outputEcMsCm: observation.metrics.outputEcMsCm,
+      runoffMl: observation.metrics.runoffMl,
+      runoffPh: observation.metrics.runoffPh,
+      runoffEcMsCm: observation.metrics.runoffEcMsCm,
+      waterTempC: observation.metrics.waterTempC,
+      nutrientLine: observation.metrics.nutrientLine,
+      products: observation.metrics.products.map((product) => ({
+        name: product.name,
+        amount: product.amount,
+        unit: product.unit,
+      })),
+      ...(observation.manualObservation
+        ? {
+            manualObservation: {
+              observedAt: observation.manualObservation.observedAt,
+              source: "manual" as const,
+              advisoryOnly: true as const,
+              potWeightFeel: observation.manualObservation.potWeightFeel ?? null,
+              mediumSurface: observation.manualObservation.mediumSurface ?? null,
+              drainage: observation.manualObservation.drainage ?? null,
+            },
+          }
+        : {}),
+      ...(observation.invalidFields && observation.invalidFields.length > 0
+        ? { invalidFields: [...observation.invalidFields] }
+        : {}),
+    }));
+
   const latest = pickMostRecentSnapshotItem(sorted);
   let recentSensorSnapshot: AiDoctorReviewRequestSnapshot | null = null;
   let recentSensorSnapshotAnnotation: AiDoctorReviewRequestSnapshotAnnotation | null = null;
@@ -200,6 +355,52 @@ export function buildAiDoctorReviewRequestPacket(
     recentSensorSnapshotAnnotation = buildAnnotationFromCard(latest.card, args.now);
   }
 
+  // Direct current sensor truth from the plant's assigned tent. Prefer it
+  // only when it is at least as recent as a diary-attached manual snapshot;
+  // otherwise preserve the newer diary evidence. Source and plausibility
+  // decisions live in the pure helper, never in React.
+  const currentSnapshot = buildAiDoctorCurrentSensorSnapshot(args.currentSensorRows, {
+    now: args.now,
+  });
+  const timelineSnapshotMs = recentSensorSnapshot
+    ? Date.parse(recentSensorSnapshot.capturedAt)
+    : Number.NEGATIVE_INFINITY;
+  const currentSnapshotMs = currentSnapshot
+    ? Date.parse(currentSnapshot.capturedAt)
+    : Number.NEGATIVE_INFINITY;
+  if (currentSnapshot && currentSnapshotMs >= timelineSnapshotMs) {
+    recentSensorSnapshot = {
+      capturedAt: currentSnapshot.capturedAt,
+      severity: currentSnapshot.severity,
+      readings: [...currentSnapshot.readings],
+    };
+    recentSensorSnapshotAnnotation = {
+      ...currentSnapshot.annotation,
+      safetyNotes: [...currentSnapshot.annotation.safetyNotes],
+      missingInformationHints: [...currentSnapshot.annotation.missingInformationHints],
+    };
+  }
+
+  // ---- imported CSV history (sanitized, bounded, deterministic) ----
+  // Filter first so non-CSV rows can never consume the cap; then sort
+  // newest-first with summary-complete tie-breakers so shuffled inputs
+  // always produce the same bounded evidence packet.
+  const csvRows = (args.csvHistoryRows ?? []).filter((r) => !!r && isCsvHistoryRow(r));
+  const csvSorted = [...csvRows].sort(compareCsvHistoryRowsForBoundedSummary);
+  const imported_sensor_history = buildImportedSensorHistorySection(
+    csvSorted.slice(0, AI_DOCTOR_REVIEW_PACKET_CSV_ROW_CAP),
+  );
+
+  // Live-availability mirrors the context compiler: a fresh snapshot whose
+  // provenance resolved to "live", or an explicit caller live-telemetry
+  // signal (fresh bridge ingest), counts. Manual/CSV/demo/stale/invalid
+  // never satisfy it, so the prompt always requests fresh context when
+  // current conditions matter.
+  const missingLiveSensorReadings = !(
+    isFreshLiveSnapshotAnnotation(recentSensorSnapshotAnnotation) ||
+    args.hasFreshLiveSensorReadings === true
+  );
+
   return {
     schemaVersion: AI_DOCTOR_REVIEW_PACKET_SCHEMA_VERSION,
     plant: {
@@ -214,8 +415,10 @@ export function buildAiDoctorReviewRequestPacket(
       missing: [...args.context.missing],
     },
     recentEvents,
+    ...(recentRootZoneObservations.length > 0 ? { recentRootZoneObservations } : {}),
     recentSensorSnapshot,
     recentSensorSnapshotAnnotation,
+    imported_sensor_history,
+    missingLiveSensorReadings,
   };
 }
-

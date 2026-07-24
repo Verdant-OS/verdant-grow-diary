@@ -29,25 +29,25 @@ describe("deriveTimelineRowSensorSource", () => {
     expect(deriveTimelineRowSensorSource(row("b", null))).toBeNull();
   });
 
-  it("returns canonical kind for sensor_snapshot", () => {
+  it("fails an uncorroborated persisted live snapshot closed", () => {
     expect(
       deriveTimelineRowSensorSource(
         row("a", { sensor_snapshot: { source: "live", ts: "2025-06-01T11:59:50Z" } }),
         { now: NOW, staleMs: 60_000 },
       ),
-    ).toBe("live");
-    expect(
-      deriveTimelineRowSensorSource(row("b", { sensor_snapshot: { source: "csv" } })),
-    ).toBe("csv");
+    ).toBe("invalid");
+    expect(deriveTimelineRowSensorSource(row("b", { sensor_snapshot: { source: "csv" } }))).toBe(
+      "csv",
+    );
   });
 
   it("falls back to manual for Quick Log snapshots without source", () => {
-    expect(
-      deriveTimelineRowSensorSource(row("a", { sensor_snapshot: { temp: 22 } })),
-    ).toBe("manual");
+    expect(deriveTimelineRowSensorSource(row("a", { sensor_snapshot: { temp: 22 } }))).toBe(
+      "manual",
+    );
   });
 
-  it("downgrades stale live snapshots to stale", () => {
+  it("keeps an old uncorroborated live snapshot invalid rather than stale-live", () => {
     expect(
       deriveTimelineRowSensorSource(
         row("a", {
@@ -55,7 +55,7 @@ describe("deriveTimelineRowSensorSource", () => {
         }),
         { now: NOW, staleMs: 60_000 },
       ),
-    ).toBe("stale");
+    ).toBe("invalid");
   });
 });
 
@@ -77,7 +77,7 @@ describe("filterTimelineEvidenceRows + sensorSources", () => {
 
   it("filters to a single kind and hides non-sensor entries", () => {
     const out = filterTimelineEvidenceRows(rows, { sensorSources: ["live"] });
-    expect(out.map((r) => r.id)).toEqual(["live"]);
+    expect(out.map((r) => r.id)).toEqual([]);
   });
 
   it("supports multi-select OR semantics across selected kinds", () => {
@@ -87,7 +87,7 @@ describe("filterTimelineEvidenceRows + sensorSources", () => {
 
   it("invalid filter matches explicit invalid source", () => {
     const out = filterTimelineEvidenceRows(rows, { sensorSources: ["invalid"] });
-    expect(out.map((r) => r.id)).toEqual(["invalid"]);
+    expect(out.map((r) => r.id)).toEqual(["live", "invalid"]);
   });
 
   it("empty filter array returns all rows unchanged", () => {

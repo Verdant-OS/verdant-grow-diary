@@ -19,6 +19,11 @@ import {
   IMPORTED_HISTORY_PROMPT_STRINGS,
   AI_DOCTOR_REQUIRED_OUTPUT_SECTIONS,
 } from "./aiDoctorImportedHistoryPromptRules";
+import {
+  buildValidatorSafeAiDoctorPromptValue,
+  sanitizeAiDoctorPromptText,
+} from "./aiDoctorPromptVocabularyRules";
+import { stripAiDoctorReviewRequestTransportFields } from "./aiDoctorReviewRequestTransportRules";
 
 export const AI_DOCTOR_BASE_SYSTEM_PROMPT =
   "You are a cautious cannabis grow assistant. Reply ONLY through the " +
@@ -29,6 +34,15 @@ export const AI_DOCTOR_BASE_SYSTEM_PROMPT =
   "advisory phrasing such as 'Avoid…' or 'Do not…' for cautions. Keep all " +
   "arrays to at most 12 items and at most one short sentence per item.";
 
+export const AI_DOCTOR_ROOT_ZONE_SAFETY_GUIDANCE = Object.freeze([
+  "Treat root-zone entries as grower-recorded historical observations, not prescribed targets.",
+  "Use repeated measurements and plant response as context; state when runoff or follow-up evidence is missing.",
+  "Treat manualObservation labels as grower-recorded categorical context, not sensor readings or measured dryback.",
+  "A single light-pot, dry-surface, or drainage label does not establish a watering target or schedule.",
+  "Treat invalidFields as omitted measurements and name them under Missing information.",
+  "Do not recommend aggressive irrigation or nutrient changes from a single root-zone entry.",
+]);
+
 export interface AiDoctorPromptMessages {
   system: string;
   user: string;
@@ -38,9 +52,7 @@ export interface AiDoctorPromptMessages {
 }
 
 function asRecord(v: unknown): Record<string, unknown> | null {
-  return v && typeof v === "object" && !Array.isArray(v)
-    ? (v as Record<string, unknown>)
-    : null;
+  return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
 }
 
 /**
@@ -51,25 +63,36 @@ function asRecord(v: unknown): Record<string, unknown> | null {
  * `missingLiveSensorReadings`, the corresponding safety guidance and
  * historical-context blocks are appended.
  */
-export function buildAiDoctorPromptMessages(
-  packet: unknown,
-): AiDoctorPromptMessages {
+export function buildAiDoctorPromptMessages(packet: unknown): AiDoctorPromptMessages {
   const rec = asRecord(packet);
-  const imported_sensor_history = (rec?.imported_sensor_history ?? null) as
-    | Parameters<typeof buildAiDoctorImportedHistoryPromptFragment>[0]["imported_sensor_history"]
-    | null;
+  const imported_sensor_history = rec?.imported_sensor_history ?? null;
   const missingLiveSensorReadings = rec?.missingLiveSensorReadings === true;
+  const hasRootZoneObservations =
+    Array.isArray(rec?.recentRootZoneObservations) && rec.recentRootZoneObservations.length > 0;
 
   const fragment = buildAiDoctorImportedHistoryPromptFragment({
     imported_sensor_history,
     missingLiveSensorReadings,
   });
+  const guidance = Object.freeze(fragment.guidance.map(sanitizeAiDoctorPromptText));
+  // Scope and idempotency fields are operational transport metadata, not
+  // grower context. Defense in depth: omit them here even if an Edge caller
+  // accidentally passes a flat legacy request to prompt assembly.
+  const safePacket = buildValidatorSafeAiDoctorPromptValue(
+    stripAiDoctorReviewRequestTransportFields(packet ?? null),
+  );
 
   const systemSections: string[] = [AI_DOCTOR_BASE_SYSTEM_PROMPT];
-  if (fragment.guidance.length > 0) {
+  if (guidance.length > 0) {
     systemSections.push(
-      "Imported sensor history safety rules:",
-      ...fragment.guidance.map((g) => `- ${g}`),
+      "Historical sensor context safety rules:",
+      ...guidance.map((g) => `- ${g}`),
+    );
+  }
+  if (hasRootZoneObservations) {
+    systemSections.push(
+      "Root-zone context safety rules:",
+      ...AI_DOCTOR_ROOT_ZONE_SAFETY_GUIDANCE.map((rule) => `- ${rule}`),
     );
   }
   systemSections.push(
@@ -77,10 +100,7 @@ export function buildAiDoctorPromptMessages(
       AI_DOCTOR_REQUIRED_OUTPUT_SECTIONS.join(" | "),
   );
 
-  const userSections: string[] = [
-    "Grower context packet (JSON):",
-    JSON.stringify(packet ?? null),
-  ];
+  const userSections: string[] = ["Grower context packet (JSON):", JSON.stringify(safePacket)];
   if (fragment.importedHistoryBlock) {
     userSections.push("", fragment.importedHistoryBlock);
   }
@@ -89,11 +109,15 @@ export function buildAiDoctorPromptMessages(
   }
 
   return {
-    system: systemSections.join("\n"),
-    user: userSections.join("\n"),
-    guidance: fragment.guidance,
-    importedHistoryBlock: fragment.importedHistoryBlock,
-    missingLiveReadingsBlock: fragment.missingLiveReadingsBlock,
+    system: sanitizeAiDoctorPromptText(systemSections.join("\n")),
+    user: sanitizeAiDoctorPromptText(userSections.join("\n")),
+    guidance,
+    importedHistoryBlock: fragment.importedHistoryBlock
+      ? sanitizeAiDoctorPromptText(fragment.importedHistoryBlock)
+      : null,
+    missingLiveReadingsBlock: fragment.missingLiveReadingsBlock
+      ? sanitizeAiDoctorPromptText(fragment.missingLiveReadingsBlock)
+      : null,
   };
 }
 

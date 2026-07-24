@@ -25,7 +25,8 @@ describe("DemoProofWalkthrough — read-only banner", () => {
     expect(text).toMatch(/create alerts/i);
     expect(text).toMatch(/approve actions/i);
     expect(text).toMatch(/control devices/i);
-    expect(text).toMatch(/URL surface gate/i);
+    expect(text).toMatch(/server-verified operator role/i);
+    expect(text).toMatch(/only requests the diagnostic surface/i);
     expect(text).toMatch(/RLS/);
   });
 

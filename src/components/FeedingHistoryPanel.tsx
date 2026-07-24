@@ -1,14 +1,8 @@
 import { useMemo } from "react";
 import { Leaf, AlertTriangle } from "lucide-react";
 
-import {
-  normalizeDiaryEntries,
-  type NormalizeDiaryInput,
-} from "@/lib/diaryEntryRules";
-import {
-  buildFeedingHistory,
-  type FeedingHistoryRow,
-} from "@/lib/feedingHistoryRules";
+import { normalizeDiaryEntries, type NormalizeDiaryInput } from "@/lib/diaryEntryRules";
+import { buildFeedingHistory, type FeedingHistoryRow } from "@/lib/feedingHistoryRules";
 import {
   buildEcCompensationPreview,
   EC_COMPENSATION_PREVIEW_DISCLAIMER,
@@ -61,12 +55,23 @@ function MetricChip({ label, value }: { label: string; value: string }) {
 
 function Row({ row }: { row: FeedingHistoryRow }) {
   return (
-    <li className="rounded-xl border border-border/40 bg-card/40 p-3 animate-fade-in">
+    <li
+      id={row.timelineAnchorId ?? undefined}
+      className="rounded-xl border border-border/40 bg-card/40 p-3 animate-fade-in scroll-mt-24"
+    >
       <div className="flex items-center justify-between gap-2 mb-2">
         <div className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
           <Leaf className="h-3.5 w-3.5 text-primary" />
           <span className="text-foreground/90 font-medium">
             {fmtDate(row.occurredAt, row.occurredAtLabel)}
+          </span>
+          <span
+            className="rounded-full border border-border/50 bg-secondary/40 px-2 py-0.5 text-[11px]"
+            data-testid="feeding-history-source"
+            data-source={row.source}
+            title="Log provenance — not live sensor data"
+          >
+            {row.sourceLabel}
           </span>
         </div>
         {row.warnings.length > 0 && (
@@ -75,9 +80,7 @@ function Row({ row }: { row: FeedingHistoryRow }) {
             title={row.warnings.join(" · ")}
           >
             <AlertTriangle className="h-3 w-3" />
-            {row.warnings.length === 1
-              ? "1 warning"
-              : `${row.warnings.length} warnings`}
+            {row.warnings.length === 1 ? "1 warning" : `${row.warnings.length} warnings`}
           </span>
         )}
       </div>
@@ -85,27 +88,22 @@ function Row({ row }: { row: FeedingHistoryRow }) {
       <div className="flex flex-wrap gap-1.5 mb-2">
         <MetricChip label="Volume" value={fmtNumber(row.volumeMl, { suffix: "ml" })} />
         <MetricChip label="pH" value={fmtNumber(row.ph)} />
-        <MetricChip label="EC" value={fmtNumber(row.ec, { suffix: "mS/cm" })} />
+        <MetricChip label="Input EC" value={fmtNumber(row.ec, { suffix: "mS/cm" })} />
+        {row.outputEc !== null && (
+          <MetricChip label="Output EC" value={fmtNumber(row.outputEc, { suffix: "mS/cm" })} />
+        )}
         {row.tds !== null && (
           <MetricChip label="TDS" value={fmtNumber(row.tds, { suffix: "ppm" })} />
         )}
+        <MetricChip label="Runoff" value={fmtNumber(row.runoffMl, { suffix: "ml" })} />
         <MetricChip label="Runoff pH" value={fmtNumber(row.runoffPh)} />
-        <MetricChip
-          label="Runoff EC"
-          value={fmtNumber(row.runoffEc, { suffix: "mS/cm" })}
-        />
+        <MetricChip label="Runoff EC" value={fmtNumber(row.runoffEc, { suffix: "mS/cm" })} />
         {row.runoffTds !== null && (
-          <MetricChip
-            label="Runoff TDS"
-            value={fmtNumber(row.runoffTds, { suffix: "ppm" })}
-          />
+          <MetricChip label="Runoff TDS" value={fmtNumber(row.runoffTds, { suffix: "ppm" })} />
         )}
         {row.recipe && <MetricChip label="Recipe" value={row.recipe} />}
         {formatTempDualF(row.waterTempC).display && (
-          <MetricChip
-            label="Water"
-            value={formatTempDualF(row.waterTempC).display as string}
-          />
+          <MetricChip label="Water" value={formatTempDualF(row.waterTempC).display as string} />
         )}
       </div>
 
@@ -131,18 +129,13 @@ function Row({ row }: { row: FeedingHistoryRow }) {
       )}
 
       {row.notePreview && (
-        <p className="text-sm text-foreground/80 whitespace-pre-wrap">
-          {row.notePreview}
-        </p>
+        <p className="text-sm text-foreground/80 whitespace-pre-wrap">{row.notePreview}</p>
       )}
 
       {row.warnings.length > 0 && (
         <ul className="mt-2 space-y-0.5">
           {row.warnings.map((w, i) => (
-            <li
-              key={`${row.id}-w-${i}`}
-              className="text-[11px] text-yellow-300/90"
-            >
+            <li key={`${row.id}-w-${i}`} className="text-[11px] text-yellow-300/90">
               · {w}
             </li>
           ))}
@@ -165,8 +158,7 @@ export default function FeedingHistoryPanel({
       const r = (raw ?? {}) as Record<string, unknown>;
       if (r.entry_type || r.entryType || r.event_type || r.eventType) return r;
       const det = (r.details ?? null) as Record<string, unknown> | null;
-      const liftedType =
-        det && typeof det === "object" ? det.event_type : undefined;
+      const liftedType = det && typeof det === "object" ? det.event_type : undefined;
       return typeof liftedType === "string" && liftedType.length > 0
         ? { ...r, entry_type: liftedType }
         : r;
@@ -177,21 +169,14 @@ export default function FeedingHistoryPanel({
   }, [rawEntries, limit]);
 
   return (
-    <section
-      className={"glass rounded-2xl p-4 " + (className ?? "")}
-      aria-label="Feeding history"
-    >
+    <section className={"glass rounded-2xl p-4 " + (className ?? "")} aria-label="Feeding history">
       <header className="flex items-center justify-between mb-3">
         <h2 className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           <Leaf className="h-3.5 w-3.5 text-primary" />
           Feeding history
         </h2>
         <span className="text-[11px] text-muted-foreground">
-          {rows.length === 0
-            ? "0"
-            : rows.length === 1
-              ? "1 entry"
-              : `${rows.length} entries`}
+          {rows.length === 0 ? "0" : rows.length === 1 ? "1 entry" : `${rows.length} entries`}
         </span>
       </header>
 
@@ -218,7 +203,7 @@ function EcCompensationPreview({ row }: { row: FeedingHistoryRow }) {
   const preview = buildEcCompensationPreview({
     ec: row.ec,
     waterTempC: row.waterTempC,
-    sourceLabel: row.sourceLabel,
+    sourceLabel: row.source,
   });
   if (!preview.visible) return null;
   const toneClass =

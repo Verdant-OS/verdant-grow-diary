@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   AlertTriangle,
@@ -61,7 +61,10 @@ import {
   MANUAL_SENSOR_TRUTH_NOT_DIAGNOSIS_LINE,
   MANUAL_SENSOR_TRUTH_MISSING_READINGS_LINE,
 } from "@/constants/manualSensorTruthCopy";
-import type { ManualCorrectionContext } from "@/lib/manualSensorCorrectionContext";
+import {
+  encodeManualCorrectionHash,
+  type ManualCorrectionContext,
+} from "@/lib/manualSensorCorrectionContext";
 import { insertManualSensorReadingReturningId } from "@/lib/insertManualSensorReadingReturningId";
 import { insertManualSnapshotEdit } from "@/hooks/useInsertManualSnapshotEdit";
 import { formatSnapshotTimestamp } from "@/lib/dateFormat";
@@ -103,6 +106,8 @@ const EMPTY: ManualEntryInput = {
   ppfd: "",
 };
 
+const STANDARD_TARGET_CONTEXT = "manual-reading-standard";
+
 function correctionToPrefill(ctx: ManualCorrectionContext | null | undefined): ManualEntryInput {
   if (!ctx) return EMPTY;
   const v = ctx.originalValues;
@@ -127,9 +132,11 @@ export default function ManualSensorReadingCard({
   onSaved,
   correction,
 }: Props) {
-  const [tentId, setTentId] = useState<string>(
-    correction?.tentId ?? defaultTentId ?? tents[0]?.id ?? "",
-  );
+  const initialTentId = correction?.tentId ?? defaultTentId ?? tents[0]?.id ?? "";
+  const correctionIdentity = correction
+    ? encodeManualCorrectionHash(correction)
+    : STANDARD_TARGET_CONTEXT;
+  const [tentId, setTentId] = useState<string>(initialTentId);
   const [form, setForm] = useState<ManualEntryInput>(() => correctionToPrefill(correction));
   const [devicePreset, setDevicePreset] = useState<string>("none");
   const [deviceCustom, setDeviceCustom] = useState<string>("");
@@ -137,6 +144,33 @@ export default function ManualSensorReadingCard({
   const [lastSaved, setLastSaved] = useState<LastSavedConfirmation | null>(null);
   const insert = useInsertSensorReading();
   const isCorrection = !!correction;
+  const tentIdRef = useRef(tentId);
+  const targetContextRef = useRef(`${initialTentId}\n${correctionIdentity}`);
+  const interactionRevisionRef = useRef(0);
+  const saveInFlightRef = useRef(false);
+
+  const changeTentTarget = useCallback(
+    (nextTentId: string, nextForm: ManualEntryInput, nextContext = STANDARD_TARGET_CONTEXT) => {
+      const nextTargetContext = `${nextTentId}\n${nextContext}`;
+      if (targetContextRef.current === nextTargetContext) return;
+      targetContextRef.current = nextTargetContext;
+      tentIdRef.current = nextTentId;
+      interactionRevisionRef.current += 1;
+      setTentId(nextTentId);
+      setForm(nextForm);
+      setDevicePreset("none");
+      setDeviceCustom("");
+      setReviewOpen(false);
+      setLastSaved(null);
+    },
+    [],
+  );
+
+  useEffect(() => {
+    const nextTentId = correction?.tentId ?? defaultTentId;
+    if (!nextTentId) return;
+    changeTentTarget(nextTentId, correctionToPrefill(correction), correctionIdentity);
+  }, [changeTentTarget, correction, correctionIdentity, defaultTentId]);
 
   const devicePresets = useMemo(() => getManualSensorDeviceOptions(), []);
   const deviceNote = useMemo(() => {
@@ -183,15 +217,15 @@ export default function ManualSensorReadingCard({
     });
   }, [form, tentId]);
 
-  // Entered vs derived VPD comparison. Uses only sanitized numeric metrics —
+  // Entered VPD vs air-VPD estimate. Uses only sanitized numeric metrics —
   // never relabels source. If the grower entered a VPD that disagrees with
-  // temp/RH-derived VPD by more than `VPD_CONFLICT_THRESHOLD_KPA`, the
+  // the temp/RH air estimate by more than `VPD_CONFLICT_THRESHOLD_KPA`, the
   // validator returns a warn hint on `vpdKpa`; we surface it inline.
   //
   // We only treat VPD as "entered" when the grower literally typed one in
-  // the VPD field (form.vpdKpa is a non-empty string). Auto-derived VPD
-  // that appears in validation.metrics from temp+RH must NOT be treated as
-  // entered — that would suppress the derived display and mask conflicts.
+  // the VPD field (form.vpdKpa is a non-empty string). A temp/RH air estimate
+  // must NOT be treated as entered or persisted — that would suppress the
+  // comparison and falsely upgrade its measurement basis.
   const fieldValidation = useMemo(() => {
     const fields: {
       temperatureC?: number;
@@ -216,7 +250,7 @@ export default function ManualSensorReadingCard({
   const enteredVpd =
     fieldValidation.derivedVpd.kind === "entered" ? fieldValidation.derivedVpd.vpdKpa : null;
   const derivedVpdFromTempRh = useMemo(() => {
-    // Compute derived VPD independently so we can render entered vs derived
+    // Compute the air estimate independently so we can render entered vs estimate
     // side-by-side even when the grower typed a VPD.
     const t = validation.metrics.find((m) => m.metric === "temperature_c");
     const h = validation.metrics.find((m) => m.metric === "humidity_pct");
@@ -234,6 +268,7 @@ export default function ManualSensorReadingCard({
   );
 
   function update<K extends keyof ManualEntryInput>(key: K, value: string) {
+    interactionRevisionRef.current += 1;
     setForm((f) => ({ ...f, [key]: value }));
     // Any edit invalidates a previously-shown review prompt so it must be
     // re-triggered on the next save attempt against the new values.
@@ -243,19 +278,38 @@ export default function ManualSensorReadingCard({
     if (lastSaved) setLastSaved(null);
   }
 
+  function updateDevicePreset(value: string) {
+    interactionRevisionRef.current += 1;
+    setDevicePreset(value);
+    if (reviewOpen) setReviewOpen(false);
+    if (lastSaved) setLastSaved(null);
+  }
+
+  function updateDeviceCustom(value: string) {
+    interactionRevisionRef.current += 1;
+    setDeviceCustom(value);
+    if (reviewOpen) setReviewOpen(false);
+    if (lastSaved) setLastSaved(null);
+  }
+
   async function doSave() {
     // Belt-and-suspenders: even though Save buttons are disabled while
     // pending, guard against a second concurrent call from any path.
-    if (insert.isPending) return;
+    if (insert.isPending || saveInFlightRef.current) return;
+    saveInFlightRef.current = true;
+    const submissionTentId = tentId;
+    const submissionTargetContext = targetContextRef.current;
+    const submissionRevision = interactionRevisionRef.current;
+    const submissionCorrection = correction;
     const capturedMetrics = validation.metrics;
     const payloads = buildManualReadingPayloads({
-      tentId,
+      tentId: submissionTentId,
       metrics: capturedMetrics,
       deviceNote,
     });
     try {
       let auditWarnings = 0;
-      if (isCorrection && correction) {
+      if (submissionCorrection) {
         // Correction save path — never touches the original row. For each
         // metric we insert a NEW manual sensor_readings row (source stays
         // MANUAL), then, when we have both the ORIGINAL reading id AND
@@ -266,8 +320,8 @@ export default function ManualSensorReadingCard({
         // succeeds, we surface a warning but keep the replacement.
         for (const p of payloads) {
           const metric = p.metric as ManualMetric;
-          const origId = correction.originalReadingIds[metric];
-          const origValue = correction.originalValues[metric];
+          const origId = submissionCorrection.originalReadingIds[metric];
+          const origValue = submissionCorrection.originalValues[metric];
           const changed =
             typeof origValue === "number" ? Math.abs(origValue - p.value) > 1e-9 : true;
 
@@ -286,7 +340,7 @@ export default function ManualSensorReadingCard({
             await insertManualSnapshotEdit({
               original_reading_id: origId,
               replacement_reading_id: replacement.id,
-              tent_id: tentId,
+              tent_id: submissionTentId,
               plant_id: null,
               original: { source: "manual", [metric]: origValue as number },
               replacement: { source: "manual", [metric]: p.value },
@@ -314,15 +368,21 @@ export default function ManualSensorReadingCard({
         );
       }
       onSaved?.({
-        tentId,
+        tentId: submissionTentId,
         metricsSaved: payloads.length,
         createdAt,
       });
-      setLastSaved({ line: successLine, capturedAt: createdAt, tentId });
-      setForm(EMPTY);
-      setDevicePreset("none");
-      setDeviceCustom("");
-      setReviewOpen(false);
+      const submissionStillOwnsDraft =
+        targetContextRef.current === submissionTargetContext &&
+        tentIdRef.current === submissionTentId &&
+        interactionRevisionRef.current === submissionRevision;
+      if (submissionStillOwnsDraft) {
+        setLastSaved({ line: successLine, capturedAt: createdAt, tentId: submissionTentId });
+        setForm(EMPTY);
+        setDevicePreset("none");
+        setDeviceCustom("");
+        setReviewOpen(false);
+      }
     } catch (err) {
       // Preserve entered values (we don't clear the form on failure) and
       // surface a safe operator-facing error. Never echo raw internals.
@@ -331,6 +391,8 @@ export default function ManualSensorReadingCard({
       // Developer-safe diagnostic: console only, not in UI.
 
       console.warn("[manual-sensor-save] failed");
+    } finally {
+      saveInFlightRef.current = false;
     }
   }
 
@@ -427,7 +489,11 @@ export default function ManualSensorReadingCard({
                 <Label htmlFor="manual-reading-tent" className="text-xs">
                   Tent
                 </Label>
-                <Select value={tentId} onValueChange={setTentId}>
+                <Select
+                  value={tentId}
+                  onValueChange={(nextTentId) => changeTentTarget(nextTentId, EMPTY)}
+                  disabled={isCorrection || insert.isPending}
+                >
                   <SelectTrigger id="manual-reading-tent" data-testid="manual-reading-tent-select">
                     <SelectValue placeholder="Select tent" />
                   </SelectTrigger>
@@ -453,7 +519,7 @@ export default function ManualSensorReadingCard({
               <Label htmlFor="manual-reading-device" className="text-xs">
                 Reading source / device <span className="text-muted-foreground">(optional)</span>
               </Label>
-              <Select value={devicePreset} onValueChange={setDevicePreset}>
+              <Select value={devicePreset} onValueChange={updateDevicePreset}>
                 <SelectTrigger
                   id="manual-reading-device"
                   data-testid="manual-reading-device-select"
@@ -483,7 +549,7 @@ export default function ManualSensorReadingCard({
                   id="manual-reading-device-custom"
                   data-testid="manual-reading-device-custom"
                   value={deviceCustom}
-                  onChange={(e) => setDeviceCustom(e.target.value)}
+                  onChange={(e) => updateDeviceCustom(e.target.value)}
                   maxLength={MAX_MANUAL_DEVICE_NOTE_LEN}
                   placeholder="e.g. SensorPush HT.w"
                   className="mt-1"
@@ -529,7 +595,7 @@ export default function ManualSensorReadingCard({
                 unit="kPa"
                 value={form.vpdKpa as string}
                 onChange={(v) => update("vpdKpa", v)}
-                placeholder="auto from temp + RH"
+                placeholder="enter measured VPD (optional)"
               />
             </Section>
 
@@ -577,7 +643,8 @@ export default function ManualSensorReadingCard({
                 className="text-[11px] text-muted-foreground"
                 data-testid="manual-reading-derived-vpd-hint"
               >
-                Saved as the VPD value unless you enter one.
+                Air estimate only — not saved as verified VPD. Enter a measured VPD only when its
+                basis is known.
               </p>
             )}
 
@@ -601,7 +668,7 @@ export default function ManualSensorReadingCard({
                     data-testid="manual-reading-vpd-derived"
                     data-value={derivedVpdFromTempRh ?? ""}
                   >
-                    <span className="text-muted-foreground">Derived VPD (temp + RH):</span>{" "}
+                    <span className="text-muted-foreground">Air VPD estimate (temp + RH):</span>{" "}
                     {derivedVpdFromTempRh !== null ? `${derivedVpdFromTempRh.toFixed(2)} kPa` : "—"}
                   </span>
                 </div>
@@ -615,8 +682,9 @@ export default function ManualSensorReadingCard({
                   </p>
                 )}
                 <p className="mt-1 text-[10px] text-muted-foreground">
-                  Manual entry — derived VPD never relabels this reading as live. Conflict
-                  threshold: {VPD_CONFLICT_THRESHOLD_KPA.toFixed(2)} kPa.
+                  Manual entry — the air estimate is preview-only, is not saved as verified VPD, and
+                  never relabels this reading as live. Conflict threshold:{" "}
+                  {VPD_CONFLICT_THRESHOLD_KPA.toFixed(2)} kPa.
                 </p>
               </div>
             )}

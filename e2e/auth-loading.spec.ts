@@ -117,6 +117,9 @@ test.describe("Auth loading/disabled smoke (mocked)", () => {
     await page.getByRole("tab", { name: /create account/i }).click();
     await page.getByLabel(/^email$/i).fill(SAFE_EMAIL);
     await page.getByLabel(/^password$/i).fill(SAFE_PWD);
+    // Signup is consent-gated: without accepting the ToS/Privacy checkbox the
+    // submit early-returns and the loading state never appears.
+    await page.getByRole("checkbox", { name: /terms of service/i }).click();
 
     const button = page.getByRole("button", { name: /^create account$/i });
     await button.click();

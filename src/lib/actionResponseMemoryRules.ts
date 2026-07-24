@@ -22,17 +22,14 @@
  *    NOT response memories; they stay with their existing legacy presenters.
  */
 
-import {
-  ACTION_FOLLOWUP_EVENT_TYPE,
-} from "@/lib/actionFollowupRules";
-import {
-  type ActionFollowUpOutcome,
-} from "@/lib/actionFollowUpEvidenceRules";
+import { ACTION_FOLLOWUP_EVENT_TYPE } from "@/lib/actionFollowupRules";
+import { type ActionFollowUpOutcome } from "@/lib/actionFollowUpEvidenceRules";
 import {
   actionFollowUpOutcomeLabel,
   isActionFollowUpOutcome,
 } from "@/lib/actionFollowUpEvidenceViewModel";
 import { normalizeSensorSource } from "@/lib/sensor/sensorSourceRules";
+import { isDiagnosticSensorProvenanceRow } from "@/lib/sensorProvenanceFenceRules";
 
 // ---------------------------------------------------------------------------
 // Shared copy (single source for all three surfaces)
@@ -152,6 +149,8 @@ export interface ActionResponseSensorRowInput {
   readonly tent_id?: string | null;
   readonly source?: string | null;
   readonly captured_at?: string | null;
+  /** Opaque provenance envelope used only to prevent diagnostic promotion. */
+  readonly raw_payload?: unknown;
 }
 
 export interface BuildActionResponseMemoriesInput {
@@ -194,9 +193,9 @@ export function isActionResponseCandidateDetails(
 }
 
 /** Filter already-loaded diary rows down to canonical response candidates. */
-export function collectActionResponseCandidateRows<
-  T extends ActionResponseDiaryRowInput,
->(rows: readonly T[] | null | undefined): T[] {
+export function collectActionResponseCandidateRows<T extends ActionResponseDiaryRowInput>(
+  rows: readonly T[] | null | undefined,
+): T[] {
   if (!Array.isArray(rows)) return [];
   return rows.filter((r) => r && isActionResponseCandidateDetails(r.details ?? null));
 }
@@ -211,10 +210,7 @@ function parseEpochMs(value: string | null | undefined): number | null {
   return Number.isFinite(t) ? t : null;
 }
 
-function scopeLevel(
-  plantId: string | null,
-  tentId: string | null,
-): ActionResponseScopeLevel {
+function scopeLevel(plantId: string | null, tentId: string | null): ActionResponseScopeLevel {
   if (plantId) return "plant";
   if (tentId) return "tent";
   return "grow";
@@ -237,9 +233,11 @@ function classifyPhotoReference(reference: string | null): ActionResponsePhotoSt
   return "available";
 }
 
-function classifySensorTrust(
-  row: ActionResponseSensorRowInput,
-): ActionResponseSensorTrustState {
+function classifySensorTrust(row: ActionResponseSensorRowInput): ActionResponseSensorTrustState {
+  // Store-level `source = live` only proves accepted transport. The shared
+  // provenance fence distinguishes Windows diagnostics from physical gateway
+  // packets. Diagnostic evidence stays demo-backed historical context.
+  if (isDiagnosticSensorProvenanceRow(row)) return "demo";
   const raw = typeof row.source === "string" ? row.source.trim().toLowerCase() : "";
   if (raw.length === 0) return "invalid";
   const normalized = normalizeSensorSource(raw);
@@ -271,9 +269,7 @@ interface CandidateProjection {
   readonly recordedAt: string;
 }
 
-function projectCandidate(
-  row: ActionResponseDiaryRowInput,
-): CandidateProjection | null {
+function projectCandidate(row: ActionResponseDiaryRowInput): CandidateProjection | null {
   const details = row.details ?? null;
   const actionId = detailString(details, "action_queue_id");
   if (!actionId) return null;
@@ -407,8 +403,7 @@ export function buildActionResponseMemories(
           snapshotId: sensorSnapshotId,
           capturedAt: capturedMs !== null ? (row.captured_at as string) : null,
           source: typeof row.source === "string" ? row.source : null,
-          trustState:
-            capturedMs === null ? "invalid" : classifySensorTrust(row),
+          trustState: capturedMs === null ? "invalid" : classifySensorTrust(row),
         };
       }
     }

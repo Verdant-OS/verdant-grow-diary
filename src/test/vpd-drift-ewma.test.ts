@@ -210,8 +210,16 @@ describe("Static safety — vpdDriftRules + AI Doctor wiring", () => {
 
   it("no ingest/bridge edge function fetches vpd_targets or custom user bands", () => {
     const fnDir = resolve(ROOT, "supabase/functions");
+    // The generated src/lib mirror (supabase/functions/_shared/lib/**, synced
+    // by scripts/sync-edge-shared.mjs and drift-gated byte-for-byte against
+    // src/**) legitimately contains vpd_targets mentions — generated DB types
+    // and the pure vpdDriftRules twin this very suite covers on the src side.
+    // Excluding the mirror ROOT keeps the scan aimed at hand-written function
+    // code (index.ts entrypoints and hand-written _shared shims).
+    const mirrorRoot = join(fnDir, "_shared", "lib");
     const offenders: string[] = [];
     function walk(d: string) {
+      if (d === mirrorRoot) return;
       let entries: string[] = [];
       try {
         entries = readdirSync(d);

@@ -1,9 +1,13 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { clearLocalStorageForTest, setLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
+import {
+  clearLocalStorageForTest,
+  setLocalStorageItemForTest,
+} from "./helpers/localStorageTestHelper";
 import {
   DEFAULT_START_SCREEN,
   START_SCREEN_OPTIONS,
   clearStartScreenChoice,
+  consumeQuickLogStartIntent,
   getStartScreenChoice,
   routeForStartScreen,
   setStartScreenChoice,
@@ -62,10 +66,19 @@ describe("startScreenPreferences", () => {
       expect(r.startsWith("//")).toBe(false);
       expect(r).not.toMatch(/^https?:/);
     }
-    expect(routeForStartScreen("quickLog")).toBe("/");
+    expect(routeForStartScreen("quickLog")).toBe("/dashboard?open=quick-log");
     expect(routeForStartScreen("timeline")).toBe("/timeline");
     expect(routeForStartScreen("dashboard")).toBe("/");
     expect(routeForStartScreen("onboarding")).toBe("/onboarding");
     expect(routeForStartScreen("welcome")).toBe("/welcome");
+  });
+
+  it("consumes the one-shot Quick Log intent and preserves unrelated query params", () => {
+    expect(consumeQuickLogStartIntent("?open=quick-log")).toBe("");
+    expect(consumeQuickLogStartIntent("?grow=recent&open=quick-log&utm=owned")).toBe(
+      "?grow=recent&utm=owned",
+    );
+    expect(consumeQuickLogStartIntent("?open=dashboard")).toBeNull();
+    expect(consumeQuickLogStartIntent("")).toBeNull();
   });
 });

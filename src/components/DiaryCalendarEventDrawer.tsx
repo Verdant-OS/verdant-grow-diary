@@ -1,7 +1,15 @@
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { X } from "lucide-react";
 import {
   DIARY_CALENDAR_DRAWER_CLOSE_LABEL,
+  DIARY_CALENDAR_DRAWER_DESCRIPTION,
   type DiaryCalendarEventDrawerViewModel,
 } from "@/lib/diaryCalendarEventDrawerViewModel";
 
@@ -32,6 +40,9 @@ export default function DiaryCalendarEventDrawer({
                   <SheetTitle className="text-base">
                     {model.title}
                   </SheetTitle>
+                  <SheetDescription className="sr-only">
+                    {DIARY_CALENDAR_DRAWER_DESCRIPTION}
+                  </SheetDescription>
                   <p className="text-[11px] text-muted-foreground mt-0.5">
                     {new Date(model.occurredAtIso).toLocaleString(undefined, {
                       weekday: "short",

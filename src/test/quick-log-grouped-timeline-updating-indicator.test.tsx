@@ -30,6 +30,7 @@ function buildQueryStub(resolveNow: () => Promise<unknown[]>) {
   const passthrough = () => builder;
   builder.select = passthrough;
   builder.eq = passthrough;
+  builder.not = passthrough;
   builder.in = passthrough;
   builder.or = passthrough;
   builder.order = passthrough;
@@ -44,12 +45,17 @@ beforeEach(() => {
 describe("QuickLogGroupedTimelineSection — updating indicator", () => {
   it("shows the calm updating label while a post-save refetch is in flight", async () => {
     // Mount order:
-    //   1) grow_events (main)         → resolve immediately
-    //   2) diary_entries (AI Doctor)  → resolve immediately
-    //   3) grow_events refetch        → held pending so we can assert the
-    //      "Updating QuickLog timeline…" indicator
+    //   1) grow_events (main action/environment spine)
+    //   2) diary_entries (linked companions)
+    //   3) grow_events (linked companion parents)
+    //   4) diary_entries (AI Doctor/Pheno enrichment)
+    // The first call after invalidation is the main-spine refetch. Hold that
+    // one pending so the visible updating indicator can be asserted while the
+    // two companion reads resolve normally.
     let pendingResolve: ((v: unknown[]) => void) | null = null;
     fromMock
+      .mockImplementationOnce(() => buildQueryStub(() => Promise.resolve([])))
+      .mockImplementationOnce(() => buildQueryStub(() => Promise.resolve([])))
       .mockImplementationOnce(() => buildQueryStub(() => Promise.resolve([])))
       .mockImplementationOnce(() => buildQueryStub(() => Promise.resolve([])))
       .mockImplementationOnce(() =>
@@ -61,34 +67,22 @@ describe("QuickLogGroupedTimelineSection — updating indicator", () => {
         ),
       );
     // Any further `from()` calls resolve to empty (defensive).
-    fromMock.mockImplementation(() =>
-      buildQueryStub(() => Promise.resolve([])),
-    );
-
-
+    fromMock.mockImplementation(() => buildQueryStub(() => Promise.resolve([])));
 
     const client = new QueryClient({
       defaultOptions: { queries: { retry: false, gcTime: 0 } },
     });
     render(
       <QueryClientProvider client={client}>
-        <QuickLogGroupedTimelineSection
-          scope="plant"
-          plantId="plant-1"
-          tentId="tent-1"
-        />
+        <QuickLogGroupedTimelineSection scope="plant" plantId="plant-1" tentId="tent-1" />
       </QueryClientProvider>,
     );
 
     // After initial load, indicator is not shown.
     await waitFor(() =>
-      expect(
-        screen.queryByTestId("quick-log-grouped-timeline-loading"),
-      ).not.toBeInTheDocument(),
+      expect(screen.queryByTestId("quick-log-grouped-timeline-loading")).not.toBeInTheDocument(),
     );
-    expect(
-      screen.queryByTestId("quick-log-grouped-timeline-updating"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("quick-log-grouped-timeline-updating")).not.toBeInTheDocument();
 
     // Invalidate the grouped timeline → triggers refetch which we hold pending.
     // Do NOT await: invalidateQueries resolves only after refetch settles.
@@ -100,13 +94,11 @@ describe("QuickLogGroupedTimelineSection — updating indicator", () => {
 
     // Updating indicator should now be visible.
     await waitFor(() =>
-      expect(
-        screen.getByTestId("quick-log-grouped-timeline-updating"),
-      ).toBeInTheDocument(),
+      expect(screen.getByTestId("quick-log-grouped-timeline-updating")).toBeInTheDocument(),
     );
-    expect(
-      screen.getByTestId("quick-log-grouped-timeline-updating").textContent,
-    ).toBe(QUICK_LOG_GROUPED_TIMELINE_UPDATING_LABEL);
+    expect(screen.getByTestId("quick-log-grouped-timeline-updating").textContent).toBe(
+      QUICK_LOG_GROUPED_TIMELINE_UPDATING_LABEL,
+    );
 
     // Resolve the pending refetch — indicator clears.
     await act(async () => {
@@ -114,9 +106,7 @@ describe("QuickLogGroupedTimelineSection — updating indicator", () => {
       await Promise.resolve();
     });
     await waitFor(() =>
-      expect(
-        screen.queryByTestId("quick-log-grouped-timeline-updating"),
-      ).not.toBeInTheDocument(),
+      expect(screen.queryByTestId("quick-log-grouped-timeline-updating")).not.toBeInTheDocument(),
     );
   });
 
@@ -127,23 +117,16 @@ describe("QuickLogGroupedTimelineSection — updating indicator", () => {
     });
     render(
       <QueryClientProvider client={client}>
-        <QuickLogGroupedTimelineSection
-          scope="tent"
-          tentId="tent-1"
-        />
+        <QuickLogGroupedTimelineSection scope="tent" tentId="tent-1" />
       </QueryClientProvider>,
     );
     await waitFor(() =>
-      expect(
-        screen.queryByTestId("quick-log-grouped-timeline-loading"),
-      ).not.toBeInTheDocument(),
+      expect(screen.queryByTestId("quick-log-grouped-timeline-loading")).not.toBeInTheDocument(),
     );
     // Invalidate an unrelated key.
     await act(async () => {
       await client.invalidateQueries({ queryKey: ["dashboard_memory"] });
     });
-    expect(
-      screen.queryByTestId("quick-log-grouped-timeline-updating"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("quick-log-grouped-timeline-updating")).not.toBeInTheDocument();
   });
 });

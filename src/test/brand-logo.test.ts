@@ -53,6 +53,14 @@ describe("BrandLogo component", () => {
     expect(BRAND).toMatch(/height=\{px\}/);
   });
 
+  it("keeps the public-header brand name on one line", () => {
+    expect(BRAND).toMatch(/whitespace-nowrap[^"`]*font-display/);
+  });
+
+  it("compacts to the logo mark below 380px instead of overflowing public headers", () => {
+    expect(BRAND).toMatch(/hidden\s+min-\[380px\]:inline\s+whitespace-nowrap/);
+  });
+
   it("leaves a TODO for a simplified favicon variant", () => {
     expect(BRAND).toMatch(/TODO\(favicon\)/);
   });

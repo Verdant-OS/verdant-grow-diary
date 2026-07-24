@@ -24,7 +24,12 @@ describe("adaptCreditedAiResponse — success credit passthrough (S3.1)", () => 
     const out = adaptCreditedAiResponse({
       ok: true,
       result: validResult(),
-      credit: { remaining: 97, scope: "per_month", scope_limit: 100 },
+      credit: {
+        remaining: 97,
+        scope: "per_month",
+        scope_limit: 100,
+        plan_id: "pro_monthly",
+      },
     });
     expect(out.ok).toBe(true);
     if (out.ok) {
@@ -32,6 +37,7 @@ describe("adaptCreditedAiResponse — success credit passthrough (S3.1)", () => 
         remaining: 97,
         scope: "per_month",
         scope_limit: 100,
+        plan_id: "pro_monthly",
       });
     }
   });

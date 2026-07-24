@@ -108,7 +108,7 @@ export default function Reports() {
   return (
     <div className="max-w-4xl mx-auto" data-testid="reports-page">
       <PageHeader
-        title="Grow Learning Hub"
+        title="Reports"
         description={REPORTS_HUB_SUBTITLE_COPY}
         icon={<LineChart className="h-5 w-5" />}
       />

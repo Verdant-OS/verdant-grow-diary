@@ -14,8 +14,7 @@ export const PRICING = {
     cadence: "forever",
     highlighted: false,
     badge: undefined as string | undefined,
-    description:
-      "Start free. Build your grow diary and see if Verdant fits your workflow.",
+    description: "Start free. Build your grow diary and see if Verdant fits your workflow.",
     features: [
       "1 active grow",
       "Historical logs kept forever",
@@ -23,6 +22,7 @@ export const PRICING = {
       "Manual sensor entries",
       "CSV sensor import",
       "Plant diary and timeline",
+      "Cultivation calendar (history-aware)",
       "Basic photo logs",
     ],
   },
@@ -37,19 +37,40 @@ export const PRICING = {
     highlighted: true,
     badge: "Most Popular",
     annualSavingsPercent: 31,
-    description:
-      "Upgrade when Verdant becomes your real grow memory system.",
+    description: "Upgrade when Verdant becomes your real grow memory system.",
     features: [
       "Unlimited grows",
       "100 AI Doctor credits / month",
       "Multi-tent grow memory",
       "Post-Grow Learning Report (Print / Save PDF)",
+      "Date-range diary report (Print / Save PDF)",
       "Read-only sensor integrations when available",
       "Full Action Queue (approval-required)",
       "Advanced timeline filtering",
       "Sensor snapshot history",
       "Priority support",
       "Export / backups",
+    ],
+  },
+  craft: {
+    name: "Craft",
+    slug: "craft",
+    subtitle: "Craft Grower",
+    monthlyPrice: 29,
+    annualPrice: 249,
+    cadenceMonthly: "/ month",
+    cadenceAnnual: "/ year",
+    highlighted: false,
+    badge: "For craft growers" as string | undefined,
+    annualSavingsPercent: 28,
+    description:
+      "For craft growers dialing in every run — the live Blueprint scores each reading against your SOP.",
+    features: [
+      "Everything in Pro",
+      "Pro Blueprint: live per-stage SOP scoring",
+      "300 AI Doctor credits / month",
+      "Per-stage VPD, temperature, humidity, EC, pH and light bands",
+      "Day/night-aware temperature targets",
     ],
   },
   founder: {
@@ -59,8 +80,8 @@ export const PRICING = {
     price: 129,
     cadence: "one-time",
     highlighted: false,
-    limit: 75,
-    badge: "First 75 only",
+    limit: 100,
+    badge: "First 100 only",
     description:
       "A limited early-supporter offer. Pay once and get full Pro access for the life of the product.",
     features: [
@@ -78,22 +99,32 @@ export const AI_CREDIT_EXPLAINER = {
     "1 standard AI Doctor analysis = 1 credit",
     "Advanced / escalated review may use more credits",
     "Free users can upgrade when credits are used",
-    "Pro and Lifetime users can buy credit packs later if needed",
+    "Pro, Craft and Founder members can buy one-time credit packs when they need more",
   ],
-  note: "Credit purchase logic is not yet implemented.",
+  note: "Included AI Doctor credits work today: Free includes 3 per grow; Pro and Founder include 100 per month; Craft includes 300. Out of monthly credits? A one-time AI credit pack tops you up (50 for $9, 150 for $19) — packs never expire and are spent only after your monthly allowance.",
 } as const;
+
+/**
+ * One-time AI credit packs. Server-authoritative: each `sku` is the Paddle
+ * price external id that get-paddle-price resolves and the payments-webhook
+ * grants credits for (public.ai_credit_grants). Packs are NOT plans — they add
+ * to a per-user balance spent only after the monthly allowance is used.
+ */
+export const CREDIT_PACKS = [
+  { sku: "credit_pack_50", credits: 50, priceUsd: 9 },
+  { sku: "credit_pack_150", credits: 150, priceUsd: 19 },
+] as const;
+
+export type CreditPackSku = (typeof CREDIT_PACKS)[number]["sku"];
 
 export const TRUST_STRIP = {
   label: "Safe by Design",
-  items: [
-    "Read-only",
-    "Honest data labels",
-    "Your history is always yours",
-    "No blind automation",
-  ],
+  items: ["Read-only", "Honest data labels", "Your history is always yours", "No blind automation"],
 } as const;
 
 export const FOUNDER_LIFETIME_LIMIT = PRICING.founder.limit;
 export const FOUNDER_LIFETIME_PRICE_USD = PRICING.founder.price;
 export const PRO_MONTHLY_PRICE_USD = PRICING.pro.monthlyPrice;
 export const PRO_ANNUAL_PRICE_USD = PRICING.pro.annualPrice;
+export const CRAFT_MONTHLY_PRICE_USD = PRICING.craft.monthlyPrice;
+export const CRAFT_ANNUAL_PRICE_USD = PRICING.craft.annualPrice;

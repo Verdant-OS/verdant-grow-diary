@@ -2,13 +2,13 @@
  * importedSensorHistoryViewModel
  *
  * Pure read-only view model for the Tent Detail "Imported sensor history"
- * panel. Given the tent's loaded sensor readings, it filters to the
- * CSV-imported subset and summarizes count / earliest / latest / metrics
+ * panel. Given the tent's dedicated imported-history rows, it keeps only the
+ * explicit, bounded CSV source allowlist and summarizes count / earliest / latest / metrics
  * plus a capped list of safe display rows. Supports a local, read-only
  * metric filter (no query params, no new fetches).
  *
  * Safety contract:
- *   - Only rows with `source === "csv"` are surfaced.
+ *   - Only rows with an explicitly permitted CSV source are surfaced.
  *   - `raw_payload` is NEVER read, returned, or referenced.
  *   - No automation, no alerts, no Action Queue, no AI calls.
  *   - Deterministic ordering (captured_at desc, ties broken by metric asc).
@@ -16,13 +16,29 @@
  *     additional transforms.
  */
 
+import { isCsvHistoryRow } from "@/lib/aiDoctorCsvHistoryContextRules";
+
 export const IMPORTED_SENSOR_HISTORY_SOURCE = "csv" as const;
 export const IMPORTED_SENSOR_HISTORY_DEFAULT_LIMIT = 25;
 export const IMPORTED_SENSOR_HISTORY_ALL_METRICS = "all" as const;
 
-export type ImportedSensorHistoryMetricFilter =
-  | typeof IMPORTED_SENSOR_HISTORY_ALL_METRICS
-  | string;
+export type ImportedSensorHistoryMetricFilter = typeof IMPORTED_SENSOR_HISTORY_ALL_METRICS | string;
+
+export type ImportedSensorHistoryReadStatus = "loading" | "error" | "success";
+
+/**
+ * Keep a cached-empty refetch distinct from an established empty result.
+ * Existing non-empty history remains visible while React Query refreshes it.
+ */
+export function resolveImportedSensorHistoryReadStatus(input: {
+  isError: boolean;
+  isFetching: boolean;
+  hasRows: boolean;
+}): ImportedSensorHistoryReadStatus {
+  if (input.isError) return "error";
+  if (input.isFetching && !input.hasRows) return "loading";
+  return "success";
+}
 
 export interface ImportedSensorHistoryInputRow {
   tent_id: string | null;
@@ -34,6 +50,8 @@ export interface ImportedSensorHistoryInputRow {
   captured_at?: string | null;
   created_at?: string | null;
   value?: number | null;
+  /** Optional validity flag used by historical-review eligibility. */
+  quality?: string | null;
   // NOTE: raw_payload is intentionally NOT in this input shape.
 }
 
@@ -94,13 +112,8 @@ export function buildImportedSensorHistoryViewModel(args: {
   limit?: number;
   selectedMetric?: ImportedSensorHistoryMetricFilter | null;
 }): ImportedSensorHistoryViewModel {
-  const limit = Math.max(
-    1,
-    Math.floor(args.limit ?? IMPORTED_SENSOR_HISTORY_DEFAULT_LIMIT),
-  );
-  const csvRows = (args.readings ?? []).filter(
-    (r) => r && r.source === IMPORTED_SENSOR_HISTORY_SOURCE,
-  );
+  const limit = Math.max(1, Math.floor(args.limit ?? IMPORTED_SENSOR_HISTORY_DEFAULT_LIMIT));
+  const csvRows = (args.readings ?? []).filter((r) => r && isCsvHistoryRow(r));
 
   if (csvRows.length === 0) {
     return {

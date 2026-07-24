@@ -7,7 +7,7 @@ through one endpoint:
 
 ```
 POST  /functions/v1/sensor-ingest-webhook
-Authorization: Bearer <supabase_auth_jwt>
+Authorization: Bearer <vbt_tent_scoped_bridge_token>
 Content-Type:  application/json
 ```
 
@@ -45,23 +45,24 @@ Content-Type:  application/json
 
 ### Required fields
 
-- `tent_id` (uuid) — must be a tent owned by the authenticated user.
+- `tent_id` (uuid) — must match the tent owned and scoped by the verified
+  bridge token.
 - `source` — must be one of the allowed labels in §3.
 - `captured_at` (ISO 8601) — rejected if more than 5 minutes in the future.
 - `metrics` — must contain **at least one** valid metric.
 
 ### Metric aliases (input → canonical)
 
-| Input alias                       | Canonical metric  | Valid range  |
-|-----------------------------------|-------------------|--------------|
-| `temp_c` / `temperature_c`        | `temperature_c`   | −10..60 °C   |
-| `temp_f`                          | `temperature_c`   | 14..140 °F   |
-| `humidity_pct` / `humidity_percent` | `humidity_pct`  | 0..100 %     |
-| `vpd_kpa`                         | `vpd_kpa`         | 0..5 kPa     |
-| `co2_ppm`                         | `co2_ppm`         | 250..5000    |
-| `ph`                              | `ph`              | 3..10        |
-| `ec` / `ec_ms_cm`                 | `ec`              | 0..10 mS/cm  |
-| `ppfd`                            | `ppfd`            | 0..2500 µmol |
+| Input alias                         | Canonical metric | Valid range  |
+| ----------------------------------- | ---------------- | ------------ |
+| `temp_c` / `temperature_c`          | `temperature_c`  | −10..60 °C   |
+| `temp_f`                            | `temperature_c`  | 14..140 °F   |
+| `humidity_pct` / `humidity_percent` | `humidity_pct`   | 0..100 %     |
+| `vpd_kpa`                           | `vpd_kpa`        | 0..5 kPa     |
+| `co2_ppm`                           | `co2_ppm`        | 250..5000    |
+| `ph`                                | `ph`             | 3..10        |
+| `ec` / `ec_ms_cm`                   | `ec`             | 0..10 mS/cm  |
+| `ppfd`                              | `ppfd`           | 0..2500 µmol |
 
 - Empty / null / blank values are **silently omitted** — they are never persisted as `0`.
 - Out-of-range values are **rejected per-metric** and echoed in the response's `rejected[]`.
@@ -81,24 +82,27 @@ Content-Type:  application/json
 
 - `200` — at least one row inserted (or all rows were duplicates).
 - `400` — payload structurally invalid or no valid metrics.
-- `401` — missing/invalid bearer token.
-- `403` — tent does not belong to the authenticated user.
+- `401` — missing/invalid bridge bearer token.
+- `403` — bridge token required or token is not scoped to the payload tent.
 
 ---
 
 ## 2. Auth & ownership
 
-- Bearer **must** be a Supabase Auth JWT for the user who owns the tent.
-- The endpoint **ignores** any `user_id` in the request body. The DB column
-  defaults to `auth.uid()`; RLS enforces ownership.
-- Tent ownership is verified server-side before insert (clear `403` instead
-  of a generic insert failure).
-- No service-role key is used in this function.
+- Bearer **must** be a server-minted, tent-scoped Verdant bridge token.
+  Ordinary user JWTs receive `403 bridge_required` and cannot create live
+  provenance.
+- The endpoint **ignores** any `user_id` in the request body and stamps the
+  server-resolved bridge-token owner.
+- The bridge token's tent scope is verified before insert (clear `403`
+  instead of a generic insert failure).
+- The service role is used only inside the Edge Function after bridge-token
+  validation; it is never returned to or stored by the bridge client.
 
 > **Direct ESP32 → webhook**: V1 expects a small bridge (Pi / Node-RED /
 > Home Assistant / custom script) running on a user-owned host to hold the
-> JWT and refresh it. Long-lived per-tent programmatic tokens are a
-> deliberate **V1.5** follow-up — they require new schema and review.
+> revocable tent-scoped bridge token. Do not embed app sessions or server
+> keys in device firmware.
 
 ---
 
@@ -143,29 +147,34 @@ is preserved verbatim on the inserted row.
 The Plant/Tent sensor timeline renders every reading with a visible badge
 derived from `source`:
 
-| `source`                  | Badge              |
-|---------------------------|--------------------|
-| `manual`                  | Manual reading     |
-| `webhook_generic`         | Webhook            |
-| `pi_bridge`               | Pi bridge          |
-| `node_red_bridge`         | Node-RED bridge    |
-| `esp32_arduino` / `esp32_arduino_sht31` | ESP32 |
-| `esp32_esphome`           | ESPHome            |
-| `esp32_mqtt_bridge`       | MQTT bridge        |
-| `home_assistant_bridge` / `ha_forwarded` | Home Assistant |
+| `source`                                 | Badge           |
+| ---------------------------------------- | --------------- |
+| `manual`                                 | Manual reading  |
+| `webhook_generic`                        | Webhook         |
+| `pi_bridge`                              | Pi bridge       |
+| `node_red_bridge`                        | Node-RED bridge |
+| `esp32_arduino` / `esp32_arduino_sht31`  | ESP32           |
+| `esp32_esphome`                          | ESPHome         |
+| `esp32_mqtt_bridge`                      | MQTT bridge     |
+| `home_assistant_bridge` / `ha_forwarded` | Home Assistant  |
 
-Stale readings (no fresh row within the freshness window per tent/source)
-are visually distinguished. Readings are **never** labeled "live" unless
-the source and freshness support that claim.
+Stale readings are distinguished at both boundaries: packets already older
+than 30 minutes receive a non-retryable 2xx acknowledgement with
+`accepted: false` and `reason: "timestamp_stale"` and are not written. Read
+models re-derive freshness as stored rows age. Readings are **never** presented
+as current live telemetry unless provenance, quality, and freshness all agree.
 
 ---
 
 ## 5. Example: ESP32 (Arduino) direct POST
 
+`bridgeToken` below is a server-minted, tent-scoped `vbt_…` token loaded
+from secure device storage. An app-session JWT is not accepted.
+
 ```cpp
 HTTPClient http;
 http.begin("https://<project>.functions.supabase.co/sensor-ingest-webhook");
-http.addHeader("Authorization", "Bearer " + jwt);
+http.addHeader("Authorization", "Bearer " + bridgeToken);
 http.addHeader("Content-Type", "application/json");
 String body = "{\"tent_id\":\"...\",\"source\":\"esp32_arduino_sht31\","
               "\"captured_at\":\"2026-05-26T20:00:00Z\","
@@ -186,15 +195,15 @@ interval:
       - http_request.post:
           url: https://<project>.functions.supabase.co/sensor-ingest-webhook
           headers:
-            Authorization: !secret verdant_jwt
+            Authorization: !secret verdant_bridge_token
             Content-Type: application/json
           json:
             tent_id: !secret tent_id
             source: esp32_esphome
             captured_at: !lambda 'return id(sntp_time).now().strftime("%Y-%m-%dT%H:%M:%SZ");'
             metrics:
-              temp_c: !lambda 'return id(sht_temp).state;'
-              humidity_pct: !lambda 'return id(sht_hum).state;'
+              temp_c: !lambda "return id(sht_temp).state;"
+              humidity_pct: !lambda "return id(sht_hum).state;"
             metadata:
               device_id: canopy-esp-1
 ```
@@ -208,7 +217,7 @@ rest_command:
     url: https://<project>.functions.supabase.co/sensor-ingest-webhook
     method: post
     headers:
-      Authorization: !secret verdant_jwt
+      Authorization: !secret verdant_bridge_token
       Content-Type: application/json
     payload: >-
       {
@@ -237,7 +246,7 @@ rest_command:
     url: https://<project>.functions.supabase.co/sensor-ingest-webhook
     method: post
     headers:
-      Authorization: !secret verdant_jwt
+      Authorization: !secret verdant_bridge_token
       Content-Type: application/json
     payload: >-
       {
@@ -287,7 +296,7 @@ forwards it to the webhook, set `source: "mqtt"` (the transport) and
 
 ```json
 POST /sensor-ingest-webhook
-Authorization: Bearer <jwt-or-vbt-token>
+Authorization: Bearer <vbt_tent_scoped_bridge_token>
 Content-Type: application/json
 
 {
@@ -304,9 +313,9 @@ Content-Type: application/json
 ```
 
 The persisted row has `source = "mqtt"` and `raw_payload.vendor =
-"ecowitt"`. Authorization is decided entirely by the bearer token; vendor
-is never consulted for ownership or routing.
-
+"ecowitt"`. Authorization is decided entirely by the verified tent-scoped
+bridge token; vendor is never consulted for ownership or routing. Ordinary
+user JWTs are rejected with `bridge_required`.
 
 ---
 
@@ -322,7 +331,8 @@ is safe; a payload mutated between retries will be treated as a new reading.
 
 ## 10. Known limitations
 
-- No long-lived per-tent ingest tokens yet (V1.5).
+- Live ingest requires revocable, server-minted, tent-scoped bridge tokens;
+  app-session JWTs are not accepted by the webhook.
 - No DB-level idempotency key — request-level dedupe only.
 - No staleness backfill table; staleness is derived on read.
 - No MQTT subscriber inside the edge function — bridge pattern required.

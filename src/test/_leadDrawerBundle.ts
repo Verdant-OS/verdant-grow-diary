@@ -17,6 +17,7 @@ const DRAWER_FILES = [
   "components/LeadDetailDrawer.tsx",
   "components/LeadDetailHeader.tsx",
   "components/LeadDetailContactSection.tsx",
+  "components/LeadConversionOutreachPanel.tsx",
   "components/LeadDetailMetadataSection.tsx",
   "components/LeadDetailIntelligenceSection.tsx",
 ];

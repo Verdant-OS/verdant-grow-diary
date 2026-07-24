@@ -12,11 +12,13 @@ import { resolve } from "node:path";
 import { stripSourceComments } from "@/test/utils/stripSourceComments";
 
 const ROOT = resolve(__dirname, "../..");
-const read = (p: string) =>
-  stripSourceComments(readFileSync(resolve(ROOT, p), "utf8"));
+const readRaw = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
+const read = (p: string) => stripSourceComments(readFileSync(resolve(ROOT, p), "utf8"));
 
 const FRONTEND_FILES = [
+  "src/lib/aiDoctorReviewEligibilityRules.ts",
   "src/lib/aiDoctorReviewRequestPacket.ts",
+  "src/lib/aiDoctorReviewRequestTransportRules.ts",
   "src/lib/aiCreditedResponseAdapter.ts",
   "src/hooks/useAiDoctorLiveReview.ts",
   "src/components/PlantDetailAiDoctorLiveReview.tsx",
@@ -57,9 +59,7 @@ describe("ai doctor live review — frontend static safety", () => {
     it(`${path}: no banned wording / device-control imperatives in copy`, () => {
       expect(src).not.toMatch(/\b(confirmed|certain|cured|guaranteed)\b/i);
       expect(src).not.toMatch(/['"](live|synced|connected|imported)['"]/);
-      expect(src).not.toMatch(
-        /\b(turn on|switch off|power the|toggle the)\b/i,
-      );
+      expect(src).not.toMatch(/\b(turn on|switch off|power the|toggle the)\b/i);
     });
 
     it(`${path}: never logs raw packets, responses, or secrets`, () => {
@@ -73,24 +73,89 @@ describe("ai doctor live review — edge static safety", () => {
   for (const path of EDGE_FILES) {
     const src = read(path);
 
-    it(`${path}: no DB writes; only approved credit-metering RPCs`, () => {
+    it(`${path}: no DB writes; only approved credit and fresh-completion RPCs`, () => {
       expect(src).not.toMatch(/\.insert\(/);
       expect(src).not.toMatch(/\.upsert\(/);
       expect(src).not.toMatch(/\.update\(/);
       expect(src).not.toMatch(/\.delete\(/);
-      // RPC allow-list: live-review edge may ONLY call the approved
-      // credit-metering RPCs (atomic spend + matching refund on
-      // upstream failure). Mirrors the allow-list pattern enforced for
-      // ai-coach in action-queue-safety.test.ts.
-      const APPROVED_RPCS = new Set(["ai_credit_spend", "ai_credit_refund"]);
-      const rpcCalls = [
-        ...src.matchAll(/\.rpc\s*\(\s*["'`]([a-zA-Z0-9_]+)["'`]/g),
-      ].map((m) => m[1]);
+      // RPC allow-list: live-review edge may only call atomic credit spend,
+      // matching refund, immutable result attachment, and the service-only
+      // completion recorder after a fresh validated result.
+      const APPROVED_RPCS = new Set([
+        "ai_credit_spend",
+        "ai_credit_refund",
+        "ai_doctor_finalize_review",
+        "record_ai_doctor_review_completion",
+      ]);
+      const rpcCalls = [...src.matchAll(/\.rpc\s*\(\s*["'`]([a-zA-Z0-9_]+)["'`]/g)].map(
+        (m) => m[1],
+      );
       for (const name of rpcCalls) {
         expect(
           APPROVED_RPCS.has(name),
-          `${path} called unapproved RPC: ${name}. Only credit-metering RPCs are allowed.`,
+          `${path} called unapproved RPC: ${name}. Only credit and protected completion RPCs are allowed.`,
         ).toBe(true);
+      }
+
+      if (path.endsWith("index.ts")) {
+        expect(src).toMatch(/SUPABASE_SERVICE_ROLE_KEY/);
+        const validationIndex = src.indexOf("const v = validateAiDoctorReviewResult(candidate)");
+        const completionCallIndex = src.lastIndexOf(
+          "recordFreshAiDoctorReviewCompletion(userId, spendId)",
+        );
+        const finalizationIndex = src.indexOf('.rpc("ai_doctor_finalize_review"');
+        expect(finalizationIndex).toBeGreaterThan(validationIndex);
+        expect(completionCallIndex).toBeGreaterThan(finalizationIndex);
+        expect(src).toContain('if (finalization === "recorded")');
+        const replayStart = src.indexOf("const spendDecision = classifyAiDoctorCreditSpend");
+        const replayEnd = src.indexOf("const spendId = spendDecision.spendId", replayStart);
+        expect(replayStart).toBeGreaterThanOrEqual(0);
+        expect(replayEnd).toBeGreaterThan(replayStart);
+        expect(src.slice(replayStart, replayEnd)).not.toContain(
+          "recordFreshAiDoctorReviewCompletion",
+        );
+        expect(src.slice(replayStart, replayEnd)).toContain('return calmFailure("result_pending")');
+        const scopeStart = src.indexOf("spendObj.feature !== FEATURE");
+        const pendingStart = src.indexOf('if (spendDecision.kind === "pending")');
+        expect(scopeStart).toBeGreaterThan(replayStart);
+        expect(src.slice(scopeStart, pendingStart)).toContain("spendObj.grow_id !== growId");
+        expect(src).toContain("parseAiDoctorReviewRequestEnvelope");
+        expect(src).toContain("validateAndNormalizeAiDoctorReviewRequestPacket");
+        const packetValidationIndex = src.indexOf(
+          "const validatedPacket = validateAndNormalizeAiDoctorReviewRequestPacket(request.packet)",
+        );
+        const firstCreditSpendIndex = src.indexOf('.rpc("ai_credit_spend"');
+        expect(packetValidationIndex).toBeGreaterThanOrEqual(0);
+        expect(firstCreditSpendIndex).toBeGreaterThan(packetValidationIndex);
+        expect(src.slice(packetValidationIndex, firstCreditSpendIndex)).toContain(
+          'return calmFailure("shape")',
+        );
+        const keyValidationIndex = src.indexOf("if (!isUuid(request.idempotencyKey))");
+        expect(keyValidationIndex).toBeGreaterThan(packetValidationIndex);
+        expect(keyValidationIndex).toBeLessThan(firstCreditSpendIndex);
+        expect(src).not.toContain("crypto.randomUUID()");
+        expect(src).toContain("buildAiDoctorPromptMessages(validatedPacket)");
+        expect(src).not.toContain("buildAiDoctorPromptMessages(request.packet)");
+        expect(src).not.toContain("buildAiDoctorPromptMessages(requestBody)");
+        const ambiguousFinalization = src.indexOf('if (finalization === "ambiguous")');
+        const rejectedFinalization = src.indexOf('if (finalization === "rejected")');
+        expect(ambiguousFinalization).toBeGreaterThan(finalizationIndex);
+        expect(rejectedFinalization).toBeGreaterThan(ambiguousFinalization);
+        expect(src.slice(ambiguousFinalization, rejectedFinalization)).toContain(
+          'return calmFailure("result_pending")',
+        );
+        expect(src.slice(ambiguousFinalization, rejectedFinalization)).not.toContain(
+          "failureAfterRefund",
+        );
+        expect(src.slice(rejectedFinalization, completionCallIndex)).toContain(
+          "failureAfterRefund",
+        );
+        expect(src.slice(rejectedFinalization, completionCallIndex)).toContain(
+          '"result_finalization_rejected"',
+        );
+        expect(src.slice(rejectedFinalization, completionCallIndex)).not.toContain(
+          'return calmFailure("result_pending")',
+        );
       }
       for (const re of [
         /action_queue/i,
@@ -127,4 +192,19 @@ describe("ai doctor live review — edge static safety", () => {
       }
     });
   }
+
+  it("requires the result-cache migration before deploying the AI Doctor Edge", () => {
+    const raw = readRaw("supabase/functions/ai-doctor-review/index.ts");
+    const src = stripSourceComments(raw);
+    expect(raw).toContain("20260719043000_ai_credit_result_cache.sql");
+    expect(raw).toContain("20260719180000_ai_doctor_review_evidence_receipts.sql");
+    expect(raw.indexOf("20260719043000_ai_credit_result_cache.sql")).toBeLessThan(
+      raw.indexOf("20260719180000_ai_doctor_review_evidence_receipts.sql"),
+    );
+    expect(raw.indexOf("20260719180000_ai_doctor_review_evidence_receipts.sql")).toBeLessThan(
+      raw.indexOf("Deploy this function"),
+    );
+    expect(src.match(/\.rpc\s*\(\s*["']ai_doctor_finalize_review["']/g) ?? []).toHaveLength(1);
+    expect(src).not.toMatch(/\.rpc\s*\(\s*["']ai_credit_attach_result["']/);
+  });
 });

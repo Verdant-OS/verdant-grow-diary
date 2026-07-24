@@ -17,12 +17,7 @@ const ROOT = resolve(__dirname, "../..");
 const CREATE_TENT = readFileSync(resolve(ROOT, "src/components/CreateTentDialog.tsx"), "utf8");
 const CREATE_PLANT = readFileSync(resolve(ROOT, "src/components/CreatePlantDialog.tsx"), "utf8");
 
-const FORBIDDEN_CLAIMS = [
-  "autopilot",
-  "ai grows for you",
-  "guaranteed yield",
-  "fake live data",
-];
+const FORBIDDEN_CLAIMS = ["autopilot", "ai grows for you", "guaranteed yield", "fake live data"];
 
 const FORBIDDEN_SURFACES = [
   "action_queue",
@@ -44,11 +39,10 @@ describe("CreateTentDialog — first-run simplification", () => {
     expect(CREATE_TENT).toMatch(/<Input\s+required[\s\S]*?placeholder="Tent #1"/);
   });
 
-
   it("shows 'Enrich later' guidance copy", () => {
     expect(CREATE_TENT).toMatch(/Start simple\./);
     expect(CREATE_TENT).toMatch(/add size, brand, and stage later/);
-    expect(CREATE_TENT).toMatch(/Verdant works best once your first plant memory exists\./);
+    expect(CREATE_TENT).toMatch(/Verdant works best once your first\s+plant memory exists\./);
   });
 
   it("marks optional fields as optional in the UI", () => {
@@ -116,7 +110,7 @@ describe("CreatePlantDialog — first-run simplification", () => {
   it("shows 'Enrich later' guidance copy", () => {
     expect(CREATE_PLANT).toMatch(/Start simple\./);
     expect(CREATE_PLANT).toMatch(/add genetics, medium, dates, and notes later/);
-    expect(CREATE_PLANT).toMatch(/Verdant works best once your first plant memory exists\./);
+    expect(CREATE_PLANT).toMatch(/Verdant works best\s+once your first plant memory exists\./);
   });
 
   it("collapses optional enrichment fields into a disclosure", () => {
@@ -132,7 +126,7 @@ describe("CreatePlantDialog — first-run simplification", () => {
 
   it("preserves existing richer fields (health, started_at, tent picker) for editing", () => {
     expect(CREATE_PLANT).toMatch(/Health/);
-    expect(CREATE_PLANT).toMatch(/Tent \(optional\)/);
+    expect(CREATE_PLANT).toMatch(/Tent\{requireTent \? "" : " \(optional\)"\}/);
     expect(CREATE_PLANT).toMatch(/Add new tent/);
   });
 

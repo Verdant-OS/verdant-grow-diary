@@ -42,6 +42,7 @@ vi.mock("@/integrations/supabase/client", () => {
     const q: Record<string, unknown> = {};
     q.select = () => q;
     q.eq = () => q;
+    q.not = () => q;
     q.in = () => q;
     q.or = () => q;
     q.order = () => q;
@@ -51,9 +52,7 @@ vi.mock("@/integrations/supabase/client", () => {
   return { supabase: { from: () => makeQuery() } };
 });
 
-function renderSection(
-  props: Parameters<typeof QuickLogGroupedTimelineSection>[0],
-) {
+function renderSection(props: Parameters<typeof QuickLogGroupedTimelineSection>[0]) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
@@ -149,25 +148,13 @@ describe("QuickLogGroupedTimelineSection — filter chips", () => {
   it("renders All/Water/Note/Environment chips", async () => {
     nextRows = [water("w1", "2026-03-01T10:00:00.000Z")];
     renderSection({ scope: "plant", plantId: PLANT, tentId: TENT });
-    await waitFor(() =>
-      screen.getByTestId("quick-log-grouped-timeline-list"),
-    );
+    await waitFor(() => screen.getByTestId("quick-log-grouped-timeline-list"));
+    expect(screen.getByTestId("quick-log-grouped-timeline-filter-all")).toBeInTheDocument();
+    expect(screen.getByTestId("quick-log-grouped-timeline-filter-water")).toBeInTheDocument();
+    expect(screen.getByTestId("quick-log-grouped-timeline-filter-note")).toBeInTheDocument();
+    expect(screen.getByTestId("quick-log-grouped-timeline-filter-environment")).toBeInTheDocument();
     expect(
-      screen.getByTestId("quick-log-grouped-timeline-filter-all"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByTestId("quick-log-grouped-timeline-filter-water"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByTestId("quick-log-grouped-timeline-filter-note"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByTestId("quick-log-grouped-timeline-filter-environment"),
-    ).toBeInTheDocument();
-    expect(
-      screen
-        .getByTestId("quick-log-grouped-timeline-filter-all")
-        .getAttribute("aria-pressed"),
+      screen.getByTestId("quick-log-grouped-timeline-filter-all").getAttribute("aria-pressed"),
     ).toBe("true");
   });
 
@@ -178,12 +165,8 @@ describe("QuickLogGroupedTimelineSection — filter chips", () => {
       env("e1", "2026-03-01T12:00:00.000Z", { humidity_pct: 55 }),
     ];
     renderSection({ scope: "plant", plantId: PLANT, tentId: TENT });
-    await waitFor(() =>
-      screen.getByTestId("quick-log-grouped-timeline-list"),
-    );
-    fireEvent.click(
-      screen.getByTestId("quick-log-grouped-timeline-filter-water"),
-    );
+    await waitFor(() => screen.getByTestId("quick-log-grouped-timeline-list"));
+    fireEvent.click(screen.getByTestId("quick-log-grouped-timeline-filter-water"));
     const cards = screen.getAllByTestId("quick-log-grouped-card");
     expect(cards).toHaveLength(1);
     expect(cards[0].getAttribute("data-action-id")).toBe("w1");
@@ -196,12 +179,8 @@ describe("QuickLogGroupedTimelineSection — filter chips", () => {
       env("e1", "2026-03-01T12:00:00.000Z", { humidity_pct: 55 }),
     ];
     renderSection({ scope: "plant", plantId: PLANT, tentId: TENT });
-    await waitFor(() =>
-      screen.getByTestId("quick-log-grouped-timeline-list"),
-    );
-    fireEvent.click(
-      screen.getByTestId("quick-log-grouped-timeline-filter-note"),
-    );
+    await waitFor(() => screen.getByTestId("quick-log-grouped-timeline-list"));
+    fireEvent.click(screen.getByTestId("quick-log-grouped-timeline-filter-note"));
     const cards = screen.getAllByTestId("quick-log-grouped-card");
     expect(cards).toHaveLength(1);
     expect(cards[0].getAttribute("data-action-id")).toBe("n1");
@@ -218,12 +197,8 @@ describe("QuickLogGroupedTimelineSection — filter chips", () => {
       note("nLone", "2026-03-02T13:00:00.000Z"),
     ];
     renderSection({ scope: "plant", plantId: PLANT, tentId: TENT });
-    await waitFor(() =>
-      screen.getByTestId("quick-log-grouped-timeline-list"),
-    );
-    fireEvent.click(
-      screen.getByTestId("quick-log-grouped-timeline-filter-environment"),
-    );
+    await waitFor(() => screen.getByTestId("quick-log-grouped-timeline-list"));
+    fireEvent.click(screen.getByTestId("quick-log-grouped-timeline-filter-environment"));
     const cards = screen.getAllByTestId("quick-log-grouped-card");
     const kinds = cards.map((c) => c.getAttribute("data-entry-kind")).sort();
     expect(kinds).toEqual(["environment", "grouped"]);
@@ -236,9 +211,7 @@ describe("QuickLogGroupedTimelineSection — filter chips", () => {
       env("eS", "2026-03-03T12:00:00.000Z", { humidity_pct: 60 }),
     ];
     renderSection({ scope: "plant", plantId: PLANT, tentId: TENT });
-    await waitFor(() =>
-      screen.getByTestId("quick-log-grouped-timeline-list"),
-    );
+    await waitFor(() => screen.getByTestId("quick-log-grouped-timeline-list"));
     const cards = screen.getAllByTestId("quick-log-grouped-card");
     expect(cards.length).toBe(3);
   });
@@ -248,9 +221,7 @@ describe("QuickLogGroupedTimelineSection — empty states", () => {
   it("overall empty state renders text + Create Quick Log button", async () => {
     nextRows = [];
     renderSection({ scope: "plant", plantId: PLANT, tentId: TENT });
-    await waitFor(() =>
-      screen.getByTestId("quick-log-grouped-timeline-empty"),
-    );
+    await waitFor(() => screen.getByTestId("quick-log-grouped-timeline-empty"));
     const empty = screen.getByTestId("quick-log-grouped-timeline-empty");
     expect(empty.textContent).toContain("No QuickLog entries yet.");
     const btn = screen.getByTestId("quick-log-grouped-timeline-create-button");
@@ -260,12 +231,8 @@ describe("QuickLogGroupedTimelineSection — empty states", () => {
   it("clicking Create Quick Log opens the sheet without submitting", async () => {
     nextRows = [];
     renderSection({ scope: "plant", plantId: PLANT, tentId: TENT });
-    await waitFor(() =>
-      screen.getByTestId("quick-log-grouped-timeline-empty"),
-    );
-    fireEvent.click(
-      screen.getByTestId("quick-log-grouped-timeline-create-button"),
-    );
+    await waitFor(() => screen.getByTestId("quick-log-grouped-timeline-empty"));
+    fireEvent.click(screen.getByTestId("quick-log-grouped-timeline-create-button"));
     // Sheet uses role="dialog" via Radix; just confirm something dialog-like surfaced.
     await waitFor(() => {
       const dialogs = screen.queryAllByRole("dialog");
@@ -279,15 +246,9 @@ describe("QuickLogGroupedTimelineSection — empty states", () => {
   it("filtered empty state renders the correct copy", async () => {
     nextRows = [water("w1", "2026-03-04T10:00:00.000Z")];
     renderSection({ scope: "plant", plantId: PLANT, tentId: TENT });
-    await waitFor(() =>
-      screen.getByTestId("quick-log-grouped-timeline-list"),
-    );
-    fireEvent.click(
-      screen.getByTestId("quick-log-grouped-timeline-filter-note"),
-    );
-    const msg = await screen.findByTestId(
-      "quick-log-grouped-timeline-empty-filtered",
-    );
+    await waitFor(() => screen.getByTestId("quick-log-grouped-timeline-list"));
+    fireEvent.click(screen.getByTestId("quick-log-grouped-timeline-filter-note"));
+    const msg = await screen.findByTestId("quick-log-grouped-timeline-empty-filtered");
     expect(msg.textContent).toBe("No QuickLog entries match this filter.");
   });
 });
@@ -296,14 +257,10 @@ describe("QuickLogGroupedTimelineSection — source labels", () => {
   it("real manual cards render the Manual badge and no Demo badge", async () => {
     nextRows = [water("w1", "2026-03-05T10:00:00.000Z")];
     renderSection({ scope: "plant", plantId: PLANT, tentId: TENT });
-    await waitFor(() =>
-      screen.getByTestId("quick-log-grouped-timeline-list"),
-    );
+    await waitFor(() => screen.getByTestId("quick-log-grouped-timeline-list"));
     const badge = screen.getByTestId("quick-log-grouped-action-source");
     expect(badge.textContent).toBe("Manual");
-    expect(
-      screen.queryByTestId("quick-log-grouped-action-demo-source"),
-    ).toBeNull();
+    expect(screen.queryByTestId("quick-log-grouped-action-demo-source")).toBeNull();
     const card = screen.getByTestId("quick-log-grouped-card");
     expect(card.getAttribute("data-demo")).toBe("false");
   });
@@ -319,19 +276,13 @@ describe("QuickLogGroupedTimelineSection — source labels", () => {
         demoActionEntry("sample", "note", "sample-n"),
       ],
     });
-    await waitFor(() =>
-      screen.getByTestId("quick-log-grouped-timeline-list"),
-    );
-    const demoBadges = screen.getAllByTestId(
-      "quick-log-grouped-action-demo-source",
-    );
+    await waitFor(() => screen.getByTestId("quick-log-grouped-timeline-list"));
+    const demoBadges = screen.getAllByTestId("quick-log-grouped-action-demo-source");
     const texts = demoBadges.map((b) => b.textContent);
     expect(texts).toContain("Demo data");
     expect(texts).toContain("Sample timeline entry");
     // No plain "Manual" badge present for any of the demo cards.
-    expect(
-      screen.queryAllByTestId("quick-log-grouped-action-source"),
-    ).toHaveLength(0);
+    expect(screen.queryAllByTestId("quick-log-grouped-action-source")).toHaveLength(0);
     const cards = screen.getAllByTestId("quick-log-grouped-card");
     for (const c of cards) {
       expect(c.getAttribute("data-demo")).toBe("true");
@@ -349,17 +300,11 @@ describe("QuickLogGroupedTimelineSection — source labels", () => {
         demoActionEntry("sample", "note", "sample-n"),
       ],
     });
-    await waitFor(() =>
-      screen.getByTestId("quick-log-grouped-timeline-list"),
-    );
-    fireEvent.click(
-      screen.getByTestId("quick-log-grouped-timeline-filter-water"),
-    );
+    await waitFor(() => screen.getByTestId("quick-log-grouped-timeline-list"));
+    fireEvent.click(screen.getByTestId("quick-log-grouped-timeline-filter-water"));
     const cards = screen.getAllByTestId("quick-log-grouped-card");
     expect(cards).toHaveLength(1);
-    const badge = within(cards[0]).getByTestId(
-      "quick-log-grouped-action-demo-source",
-    );
+    const badge = within(cards[0]).getByTestId("quick-log-grouped-action-demo-source");
     expect(badge.textContent).toBe("Demo data");
   });
 });

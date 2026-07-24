@@ -13,13 +13,13 @@
  * Pricing CTA. This helper is presenter-only.
  */
 
-import type { PlanId } from "@/lib/entitlements/types";
-
 export type PricingBillingPeriod = "monthly" | "annual";
 
 export type PricingPreselectPlan =
   | "pro_monthly"
   | "pro_annual"
+  | "craft_monthly"
+  | "craft_annual"
   | "founder_lifetime";
 
 export interface PricingPlanPreselect {
@@ -37,20 +37,22 @@ export interface PricingPlanPreselect {
  * Allowlist of accepted `?plan=` values (canonical underscore PlanIds only).
  * Unknown / free / paid-adjacent values fall through to "no preselect".
  */
-const PLAN_PARAM_MAP: Readonly<Record<string, PricingPreselectPlan>> =
-  Object.freeze({
-    pro_monthly: "pro_monthly",
-    pro_annual: "pro_annual",
-    founder_lifetime: "founder_lifetime",
-  });
-
-const BILLING_FOR_PLAN: Readonly<
-  Record<PricingPreselectPlan, PricingBillingPeriod | null>
-> = Object.freeze({
-  pro_monthly: "monthly",
-  pro_annual: "annual",
-  founder_lifetime: null,
+const PLAN_PARAM_MAP: Readonly<Record<string, PricingPreselectPlan>> = Object.freeze({
+  pro_monthly: "pro_monthly",
+  pro_annual: "pro_annual",
+  craft_monthly: "craft_monthly",
+  craft_annual: "craft_annual",
+  founder_lifetime: "founder_lifetime",
 });
+
+const BILLING_FOR_PLAN: Readonly<Record<PricingPreselectPlan, PricingBillingPeriod | null>> =
+  Object.freeze({
+    pro_monthly: "monthly",
+    pro_annual: "annual",
+    craft_monthly: "monthly",
+    craft_annual: "annual",
+    founder_lifetime: null,
+  });
 
 export function resolvePricingPlanPreselect(
   planParam: string | null | undefined,
@@ -63,11 +65,13 @@ export function resolvePricingPlanPreselect(
   return { plan, billing: plan ? BILLING_FOR_PLAN[plan] : null };
 }
 
-/** Type-guard used by tests / callers that want narrowed PlanId typing. */
-export function isPreselectPlanId(value: unknown): value is PlanId {
+/** Type-guard used by tests / callers that need the paid preselect subset. */
+export function isPreselectPlanId(value: unknown): value is PricingPreselectPlan {
   return (
     value === "pro_monthly" ||
     value === "pro_annual" ||
+    value === "craft_monthly" ||
+    value === "craft_annual" ||
     value === "founder_lifetime"
   );
 }

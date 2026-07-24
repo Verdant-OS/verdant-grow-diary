@@ -43,6 +43,11 @@ describe("public landing page", () => {
     expect(APP).toMatch(/import\(\s*["']\.\/pages\/Landing["']\s*\)/);
   });
 
+  it("registers the apex through a session-aware public entry boundary", () => {
+    expect(APP).toMatch(/path="\/"\s+element=\{<RootEntry\s*\/>\}/);
+    expect(APP).toMatch(/import RootEntry from ["']@\/components\/RootEntry["']/);
+  });
+
   it("landing copy explains the product safely (Grow Diary / Grow OS)", () => {
     expect(LANDING).toMatch(/Verdant Grow Diary/);
     expect(LANDING).toMatch(/Grow OS/);

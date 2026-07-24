@@ -19,6 +19,7 @@ import {
 const STATUS_LABEL: Record<SensorSourceStatus, string> = {
   active: "active",
   stale: "stale",
+  diagnostic: "diagnostic only",
   no_recent_data: "no recent data",
 };
 
@@ -41,11 +42,12 @@ export default function TentSensorSourceHealthCard({ tentId }: { tentId: string 
       <p className="text-sm text-muted-foreground mb-3" data-testid="sensor-source-health-helper">
         Per-source freshness for this tent. <strong className="text-foreground">Active</strong>,{" "}
         <strong className="text-foreground">stale</strong>, and{" "}
-        <strong className="text-foreground">no recent data</strong> describe the source
-        connection only — not the plant or environment. A source is marked stale after{" "}
-        {SENSOR_SOURCE_STALE_MINUTES} minutes without a new reading; the last value is
-        kept but flagged so you know it may be out of date. A stale source does not
-        mean the tent is unhealthy — check Sensors or AI Doctor for that.
+        <strong className="text-foreground">no recent data</strong> describe the source connection
+        only — not the plant or environment. A source is marked stale after{" "}
+        {SENSOR_SOURCE_STALE_MINUTES} minutes without a new reading; the last value is kept but
+        flagged so you know it may be out of date. A stale source does not mean the tent is
+        unhealthy — check Sensors or AI Doctor for that. Diagnostic-only packets are labeled
+        separately and never count as an active physical source.
       </p>
 
       {isLoading ? (
@@ -74,7 +76,10 @@ export default function TentSensorSourceHealthCard({ tentId }: { tentId: string 
                   <span>
                     {formatSourceAge(s.ageMinutes)}
                     {s.lastReceivedAt && (
-                      <span className="ml-1 opacity-70" title={new Date(s.lastReceivedAt).toLocaleString()}>
+                      <span
+                        className="ml-1 opacity-70"
+                        title={new Date(s.lastReceivedAt).toLocaleString()}
+                      >
                         · {new Date(s.lastReceivedAt).toLocaleTimeString()}
                       </span>
                     )}
@@ -82,7 +87,8 @@ export default function TentSensorSourceHealthCard({ tentId }: { tentId: string 
                 </div>
                 {s.metrics.length > 0 && (
                   <div className="text-xs text-muted-foreground font-mono truncate">
-                    {s.readingCount} reading{s.readingCount === 1 ? "" : "s"} · {s.metrics.join(", ")}
+                    {s.readingCount} reading{s.readingCount === 1 ? "" : "s"} ·{" "}
+                    {s.metrics.join(", ")}
                   </div>
                 )}
               </div>

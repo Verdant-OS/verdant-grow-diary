@@ -33,8 +33,11 @@ const SITES: { file: string; gate: RegExp }[] = [
     gate: /normalizeVpdStage\(plantStage\)\s*===\s*"unknown"/,
   },
   {
+    // Live audit #14: the Dashboard's alert/threshold stage now comes from
+    // resolveAlertContextStage (grow row + the grow's tents), so the badge
+    // gate reads the shared resolved value instead of raw grows.stage.
     file: "src/pages/Dashboard.tsx",
-    gate: /normalizeVpdStage\(scopedGrow\?\.stage\)\s*===\s*"unknown"/,
+    gate: /normalizeVpdStage\(alertContextStage\)\s*===\s*"unknown"/,
   },
 ];
 
@@ -128,6 +131,7 @@ describe("normalizeVpdStage classifies adapter output correctly", () => {
       medium: null,
       pot_size: null,
       pheno_hunt_id: null,
+      plant_type: "unknown",
       candidate_label: null,
       created_at: "x",
       updated_at: "x",

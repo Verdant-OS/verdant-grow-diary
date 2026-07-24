@@ -41,16 +41,23 @@ function currentHostname(): string | null {
 /**
  * Legacy helper: kept because `useMyEntitlements` compares this value against
  * the `environment` column on billing rows, which is only ever `'sandbox'`
- * or `'live'`. Falls back to `'live'` when the token is unclassifiable so
- * live billing rows still resolve after publish.
+ * or `'live'`.
+ *
+ * H5 (audit fix): the previous "unknown → live" fallback could strand a
+ * re-entitled buyer on preview builds with a missing or malformed token
+ * (the query would filter for `environment='live'` while the webhook wrote
+ * `environment='sandbox'`). We now fall back to `'sandbox'` — safe in
+ * preview (matches sandbox webhook writes), and irrelevant in production
+ * because `.env.production` ships a well-formed `live_` token by
+ * construction. Live remains only for explicitly `live_`-prefixed tokens.
  *
  * DO NOT use this to gate checkout — use `resolvePaddleCheckout()` instead,
  * which fails closed on loopback + live and on malformed tokens.
  */
 export function getPaddleEnvironment(): "sandbox" | "live" {
-  const cls = classifyPaddleToken(clientToken);
-  return cls === "sandbox" ? "sandbox" : "live";
+  return classifyPaddleToken(clientToken) === "live" ? "live" : "sandbox";
 }
+
 
 /**
  * Slice A — deterministic checkout gate. Returns `'sandbox' | 'live' |

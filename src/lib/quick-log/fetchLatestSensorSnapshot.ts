@@ -2,21 +2,22 @@
  * fetchLatestSensorSnapshot — reusable RPC wrapper for
  * public.get_latest_tent_sensor_snapshot.
  *
- * Transforms the flat JSONB returned by Postgres into the canonical
- * { source, captured_at, metrics } shape consumed by Quick Log and
- * AI Doctor context compilers.
+ * The RPC remains the read/ownership + four-hour availability gate. Its flat
+ * JSONB cannot safely carry per-row provenance, so the corresponding
+ * long-format rows are selected with raw_payload and passed through the pure
+ * provenance fence before a snapshot is returned.
  */
 import { supabase } from "@/integrations/supabase/client";
 import type { QuickLogSensorSnapshot } from "./createQuickLogEvent";
+import {
+  acquireQuickLogSensorSnapshot,
+  type QuickLogSensorAcquisitionRow,
+} from "./quickLogSensorSnapshotAcquisitionRules";
 
-const SNAPSHOT_METRIC_KEYS = [
-  "temperature",
-  "humidity",
-  "vpd",
-  "soil_temp",
-  "soil_ec",
-  "ppfd",
-] as const;
+const QUICK_LOG_SENSOR_ROW_COLUMNS =
+  "id,metric,value,quality,source,captured_at,ts,created_at,raw_payload";
+const QUICK_LOG_SENSOR_LOOKBACK_MS = 4 * 60 * 60 * 1000;
+const QUICK_LOG_SENSOR_ROW_LIMIT = 200;
 
 export async function fetchLatestSensorSnapshot(
   tentId: string,
@@ -28,20 +29,22 @@ export async function fetchLatestSensorSnapshot(
   if (error || !data) return null;
 
   const raw = data as Record<string, unknown>;
+  const capturedAt = typeof raw.captured_at === "string" ? raw.captured_at : null;
+  const capturedAtMs = capturedAt ? Date.parse(capturedAt) : NaN;
+  if (!capturedAt || !Number.isFinite(capturedAtMs)) return null;
 
-  const source = typeof raw.source === "string" ? raw.source : null;
-  const captured_at =
-    typeof raw.captured_at === "string" ? raw.captured_at : null;
+  const lowerBound = new Date(capturedAtMs - QUICK_LOG_SENSOR_LOOKBACK_MS).toISOString();
+  const { data: rows, error: rowsError } = await supabase
+    .from("sensor_readings")
+    .select(QUICK_LOG_SENSOR_ROW_COLUMNS)
+    .eq("tent_id", tentId)
+    .gte("captured_at", lowerBound)
+    .lte("captured_at", capturedAt)
+    .order("captured_at", { ascending: false })
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(QUICK_LOG_SENSOR_ROW_LIMIT);
 
-  const metrics: Record<string, number> = {};
-  for (const key of SNAPSHOT_METRIC_KEYS) {
-    const val = raw[key];
-    if (typeof val === "number" && Number.isFinite(val)) {
-      metrics[key] = val;
-    }
-  }
-
-  if (Object.keys(metrics).length === 0) return null;
-
-  return { source, captured_at, metrics };
+  if (rowsError || !Array.isArray(rows)) return null;
+  return acquireQuickLogSensorSnapshot(rows as unknown as QuickLogSensorAcquisitionRow[]).snapshot;
 }

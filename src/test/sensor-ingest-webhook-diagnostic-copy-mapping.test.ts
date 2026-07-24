@@ -14,6 +14,7 @@ import {
 
 const EXPECTED_CODES = [
   "unauthorized",
+  "bridge_required",
   "token_revoked",
   "token_expired",
   "server_misconfigured",
@@ -57,6 +58,16 @@ describe("classifySensorIngestTestResult — copy/category coverage", () => {
     expect(r.detail).toContain("invalid_payload");
   });
 
+  it("403 bridge_required is an auth problem, not a tent mismatch", () => {
+    const r = classifySensorIngestTestResult({
+      status: 403,
+      body: { error: "bridge_required" },
+    });
+    expect(r.category).toBe("auth_problem");
+    expect(r.headline.toLowerCase()).toContain("bridge token required");
+    expect(r.detail.toLowerCase()).toContain("ordinary app session");
+  });
+
   it("503 server_misconfigured does not leak Bearer/secret strings", () => {
     const r = classifySensorIngestTestResult({
       status: 503,
@@ -95,7 +106,6 @@ describe("classifySensorIngestTestResult — copy/category coverage", () => {
     expect(r.detail.toLowerCase()).toContain("new active bridge token");
   });
 });
-
 
 describe("classifier reason sanitization — never echoes token-shaped strings", () => {
   const cases: Array<{ name: string; reason: string }> = [

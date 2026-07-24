@@ -44,7 +44,7 @@ describe("ecowitt windows launchers — generated content safety", () => {
       "01-watch-mqtt.cmd",
       "02-start-http-bridge.cmd",
       "03-test-http-bridge.cmd",
-      "04-run-mqtt-dry-run.cmd",
+      "04-run-verdant-dry-run.cmd",
       "README.txt",
     ]);
   });
@@ -84,7 +84,7 @@ describe("ecowitt windows launchers — generated content safety", () => {
 
   it("repo-command launchers begin with cd /d <repo-root> so they work from anywhere", () => {
     expect(launchers["02-start-http-bridge.cmd"]).toMatch(/^@echo off\r\nchcp 65001 >nul\r\ncd \/d "C:\\repo"/);
-    expect(launchers["04-run-mqtt-dry-run.cmd"]).toMatch(/^@echo off\r\nchcp 65001 >nul\r\ncd \/d "C:\\repo"/);
+    expect(launchers["04-run-verdant-dry-run.cmd"]).toMatch(/^@echo off\r\nchcp 65001 >nul\r\ncd \/d "C:\\repo"/);
   });
 
   it("test launcher clearly labels FAKE LOCAL TEST PAYLOAD", () => {

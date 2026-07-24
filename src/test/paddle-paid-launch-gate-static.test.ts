@@ -14,6 +14,9 @@ const VERIFIER = read("supabase/functions/paddle-webhook/verifyPaddleSignature.t
 const MIGRATION = read(
   "supabase/migrations/20260714230000_paddle_paid_launch_ordering_and_founder.sql",
 );
+const HARDENING = read(
+  "supabase/migrations/20260715001000_paddle_paid_launch_review_hardening.sql",
+);
 
 describe("webhook verification — replay bounds + rotation enforced at runtime", () => {
   it("routes through verifyPaddleWebhookSignature with explicit bounds", () => {
@@ -38,11 +41,24 @@ describe("webhook verification — replay bounds + rotation enforced at runtime"
 });
 
 describe("ordering hardening — older events cannot overwrite newer state", () => {
-  it("processing rows carry provider occurred_at", () => {
+  it("processing rows carry provider occurred_at, NORMALIZED before insert", () => {
     expect(MIGRATION).toMatch(
       /ALTER TABLE public\.paddle_event_processing\s+ADD COLUMN IF NOT EXISTS occurred_at timestamptz/,
     );
-    expect(WEBHOOK).toMatch(/occurred_at: readString\(row\.payload\?\.occurred_at\) \?\? null/);
+    // A signed payload with a garbage occurred_at string must not poison the
+    // timestamptz insert (and its error-fallback row): non-parseable → NULL.
+    expect(WEBHOOK).toMatch(
+      /occurred_at: normalizeProviderTimestamp\(readString\(row\.payload\?\.occurred_at\)\)/,
+    );
+    expect(WEBHOOK).toMatch(/function normalizeProviderTimestamp\(value: string \| null\): string \| null/);
+    expect(WEBHOOK).toMatch(/if \(Number\.isNaN\(parsed\)\) return null;/);
+  });
+
+  it("an RPC-returned status:'failed' fails the webhook so Paddle retries", () => {
+    // Both SQL mutators swallow exceptions into status:'failed'. Acking that
+    // would drop a paid event with no entitlement and no retry.
+    expect(WEBHOOK).toMatch(/if \(rpcStatus === "failed"\)/);
+    expect(WEBHOOK).toMatch(/subscription_update_rpc_failed/);
   });
 
   it("the updater blocks stale ordering for ALL statuses and maintains the watermark", () => {
@@ -140,6 +156,57 @@ describe("founder lifetime — one-time, atomic, capped, idempotent", () => {
   it("founder allocation stays sandbox-only until live is explicitly approved", () => {
     const founderFn = MIGRATION.slice(MIGRATION.indexOf("allocate_founder_lifetime("));
     expect(founderFn).toMatch(/v_processing\.environment <> 'sandbox' OR v_event\.environment <> 'sandbox'/);
+  });
+});
+
+describe("review-hardening migration — supersedes, never edits, the merged gate", () => {
+  it("founder allocation takes the advisory lock BEFORE the existing-row read", () => {
+    // Same-buyer duplicate races must converge on the already_founder noop,
+    // never a unique-violation 'failed' that forces a pointless retry.
+    const lockIdx = HARDENING.indexOf("pg_advisory_xact_lock");
+    const existingReadIdx = HARDENING.indexOf("SELECT * INTO v_existing FROM public.billing_subscriptions");
+    const noopIdx = HARDENING.indexOf("'already_founder'");
+    expect(lockIdx).toBeGreaterThan(-1);
+    expect(existingReadIdx).toBeGreaterThan(-1);
+    expect(lockIdx).toBeLessThan(existingReadIdx);
+    expect(existingReadIdx).toBeLessThan(noopIdx);
+    // The redefined function keeps the service_role-only posture.
+    expect(HARDENING).toContain("REVOKE ALL ON FUNCTION public.allocate_founder_lifetime(uuid) FROM authenticated;");
+    expect(HARDENING).toContain("GRANT EXECUTE ON FUNCTION public.allocate_founder_lifetime(uuid) TO service_role;");
+    // Every guard from the gate version is preserved in the redefinition.
+    for (const reason of [
+      "event_not_verified",
+      "environment_not_allowed",
+      "founder_requires_completed_transaction",
+      "missing_verified_customer_link",
+      "already_founder",
+      "founder_cap_reached",
+    ]) {
+      expect(HARDENING).toContain(reason);
+    }
+  });
+
+  it("the append-only trigger permits ONLY null-only FK maintenance", () => {
+    // processing_id / user_id are ON DELETE SET NULL: PostgreSQL applies that
+    // as an UPDATE here, which must not be blocked — but nothing else may be.
+    expect(HARDENING).toMatch(/NEW\.user_id IS DISTINCT FROM OLD\.user_id OR NEW\.processing_id IS DISTINCT FROM OLD\.processing_id/);
+    expect(HARDENING).toMatch(/NEW\.result_status IS NOT DISTINCT FROM OLD\.result_status/);
+    expect(HARDENING).toMatch(/NEW\.created_at IS NOT DISTINCT FROM OLD\.created_at/);
+    expect(HARDENING).toMatch(/billing_subscription_update_audit is append-only/);
+  });
+
+  it("direct audit destruction is revoked even for service_role", () => {
+    expect(HARDENING).toContain(
+      "REVOKE DELETE, TRUNCATE ON TABLE public.billing_subscription_update_audit FROM service_role;",
+    );
+    // Retention stays exclusively on the reviewed SECURITY DEFINER purge RPC.
+    expect(HARDENING).toMatch(/purge_billing_subscription_update_audit/);
+  });
+
+  it("the hardening migration keeps the sandbox-only launch posture", () => {
+    const stripped = HARDENING.replace(/--[^\n]*/g, "");
+    expect(stripped).not.toMatch(/=\s*'live'/);
+    expect(stripped).toMatch(/<> 'sandbox'/);
   });
 });
 

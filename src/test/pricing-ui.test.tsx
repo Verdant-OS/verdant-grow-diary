@@ -28,7 +28,7 @@ function renderPricing() {
   return render(
     <BrowserRouter>
       <Pricing />
-    </BrowserRouter>
+    </BrowserRouter>,
   );
 }
 
@@ -140,8 +140,8 @@ describe("Pricing constants completeness", () => {
     expect(PRICING.pro.monthlyPrice).toBe(12);
   });
 
-  it("Founder limit is 75 and price is 129", () => {
-    expect(PRICING.founder.limit).toBe(75);
+  it("Founder limit is 100 and price is 129", () => {
+    expect(PRICING.founder.limit).toBe(100);
     expect(PRICING.founder.price).toBe(129);
   });
 

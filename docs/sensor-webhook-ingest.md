@@ -12,7 +12,7 @@
 See [`v1-sensor-ingest.md`](./v1-sensor-ingest.md) for:
 
 - Endpoint purpose and full payload contract
-- Auth model (Supabase Auth JWT, no client-trusted `user_id`)
+- Auth model (tent-scoped bridge token, no client-trusted `user_id`)
 - Allowed `source` labels (`webhook_generic`, `pi_bridge`,
   `node_red_bridge`, `esp32_*`, `home_assistant_bridge`, …)
 - Validation ranges (temp, humidity, VPD, pH, EC, CO₂, PPFD)

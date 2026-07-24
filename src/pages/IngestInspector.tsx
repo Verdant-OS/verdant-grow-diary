@@ -1,6 +1,6 @@
 /**
  * Ingest Inspector — read-only operator/grower surface for recent
- * sensor webhook readings.
+ * sensor observations.
  *
  * Safety:
  *  - Read-only. No writes, no edits, no resend/replay, no delete.
@@ -28,6 +28,7 @@ import {
   extractVendorLineage,
   filterInspectorReadings,
   inspectorSourceLabel,
+  resolveInspectorSourcePresentation,
   redactRawPayload,
   type InspectorReadingLike,
 } from "@/lib/ingestInspectorRules";
@@ -50,13 +51,14 @@ function ReadingRow({
   const [open, setOpen] = useState(false);
   const vendor = extractVendorLineage(reading.raw_payload);
   const capturedAt = reading.captured_at ?? reading.ts;
-  const sourceLabel = inspectorSourceLabel(reading.source);
+  const sourcePresentation = resolveInspectorSourcePresentation(reading);
 
   return (
     <li
       data-testid="ingest-inspector-row"
       data-source={reading.source}
       data-vendor={vendor ?? ""}
+      data-diagnostic={sourcePresentation.diagnostic ? "true" : "false"}
       className="rounded-xl border bg-card/40 p-3 text-sm"
     >
       <div className="flex flex-wrap items-center gap-2">
@@ -71,7 +73,7 @@ function ReadingRow({
           variant="secondary"
           className="uppercase tracking-wide"
         >
-          {sourceLabel}
+          {sourcePresentation.label}
         </Badge>
         {vendor && (
           <Badge
@@ -83,25 +85,18 @@ function ReadingRow({
           </Badge>
         )}
         {reading.quality && reading.quality !== "ok" && (
-          <Badge
-            data-testid="ingest-inspector-quality-badge"
-            variant="destructive"
-          >
+          <Badge data-testid="ingest-inspector-quality-badge" variant="destructive">
             {reading.quality}
           </Badge>
         )}
-        {tentName && (
-          <span className="text-xs text-muted-foreground">{tentName}</span>
-        )}
+        {tentName && <span className="text-xs text-muted-foreground">{tentName}</span>}
       </div>
 
       <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <span className="text-xs font-medium uppercase text-muted-foreground">
           {reading.metric}
         </span>
-        <span className="font-display text-base">
-          {formatValue(reading.metric, reading.value)}
-        </span>
+        <span className="font-display text-base">{formatValue(reading.metric, reading.value)}</span>
       </div>
 
       <div className="mt-2">
@@ -168,7 +163,7 @@ export default function IngestInspector() {
     <div className="space-y-4">
       <PageHeader
         title="Ingest Inspector"
-        description="Read-only view of recent sensor webhook readings."
+        description="Read-only view of sensor observations captured within the last seven days."
       />
 
       <Card data-testid="ingest-inspector-disclosure">
@@ -237,20 +232,13 @@ export default function IngestInspector() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Recent readings</CardTitle>
+          <CardTitle className="text-base">Recent sensor observations</CardTitle>
         </CardHeader>
         <CardContent>
           {query.isLoading && (
-            <div
-              data-testid="ingest-inspector-loading"
-              className="space-y-2"
-              aria-busy="true"
-            >
+            <div data-testid="ingest-inspector-loading" className="space-y-2" aria-busy="true">
               {[0, 1, 2].map((i) => (
-                <div
-                  key={i}
-                  className="h-16 animate-pulse rounded-xl bg-muted/40"
-                />
+                <div key={i} className="h-16 animate-pulse rounded-xl bg-muted/40" />
               ))}
             </div>
           )}
@@ -259,7 +247,7 @@ export default function IngestInspector() {
               data-testid="ingest-inspector-error"
               className="rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-sm"
             >
-              <p>Couldn’t load recent readings.</p>
+              <p>Couldn’t load recent sensor observations.</p>
               <Button
                 variant="outline"
                 size="sm"
@@ -273,20 +261,17 @@ export default function IngestInspector() {
           )}
           {!query.isLoading && !query.error && filtered.length === 0 && (
             <EmptyState
-              title="No recent ingest readings."
-              description="Once a bridge sends readings, they will appear here."
+              title="No recent sensor observations."
+              description="Recent means captured in the last seven days; legacy rows without capture time use their recorded timestamp."
             />
           )}
           {!query.isLoading && !query.error && filtered.length > 0 && (
-            <ul
-              data-testid="ingest-inspector-list"
-              className="space-y-2"
-            >
+            <ul data-testid="ingest-inspector-list" className="space-y-2">
               {filtered.map((r) => (
                 <ReadingRow
                   key={r.id}
                   reading={r}
-                  tentName={r.tent_id ? tentNames[r.tent_id] ?? null : null}
+                  tentName={r.tent_id ? (tentNames[r.tent_id] ?? null) : null}
                 />
               ))}
             </ul>

@@ -116,21 +116,50 @@ describe("ecowitt windows testbench — source labeling rules", () => {
 
   it("declares EcoWitt gateway marker fields used to detect real uploads", () => {
     expect(py).toMatch(/ECOWITT_GATEWAY_MARKERS/);
-    for (const marker of ["passkey", "stationtype", "model", "dateutc"]) {
+    for (const marker of ["stationtype", "model", "dateutc", "freq"]) {
       expect(py).toMatch(new RegExp(`"${marker}"`));
     }
+    const markerBlock = py.split("ECOWITT_GATEWAY_MARKERS = {")[1]?.split("}")[0] ?? "";
+    expect(markerBlock).not.toMatch(/"passkey"/);
   });
 
-  it("resolve_source accepts payload + remote_addr (not just headers)", () => {
+  it("validates gateway time once per request before resolving source", () => {
     expect(py).toMatch(
       /def\s+resolve_source\s*\([\s\S]*?payload[\s\S]*?remote_addr[\s\S]*?\)\s*->\s*str/,
     );
-    expect(py).toMatch(/resolve_source\(payload=raw,\s*remote_addr=request\.remote_addr\)/);
+    expect(py).toMatch(/gateway_captured_at\s*=\s*validate_ecowitt_dateutc/);
+    expect(py).toMatch(
+      /_resolve_source_from_validated\([\s\S]*?payload=raw[\s\S]*?remote_addr=request\.remote_addr[\s\S]*?canonical_gateway_time=gateway_captured_at/,
+    );
   });
 
-  it("non-loopback gateway uploads are normalized to live", () => {
-    expect(py).toMatch(/is_lan[\s\S]{0,120}looks_gateway/);
-    expect(py).toMatch(/return\s+"live"/);
+  it("non-loopback gateway uploads are fresh-live or stale from captured_at age", () => {
+    const physicalEvidenceBlock =
+      py.split("def _has_physical_gateway_evidence_from_validated")[1]?.split("\ndef ")[0] ?? "";
+    expect(physicalEvidenceBlock).toMatch(/not\s+_is_loopback_source_addr/);
+    expect(physicalEvidenceBlock).toMatch(/looks_like_ecowitt_gateway/);
+    expect(py).toMatch(/is_ecowitt_dateutc_stale/);
+    expect(py).toMatch(/return\s+"stale"\s+if\s+stale_gateway_evidence\s+else\s+"live"/);
+  });
+
+  it("physical proof is listener-computed separately from header/env live opt-in", () => {
+    expect(py).toMatch(/"physical_gateway_evidence":\s*physical_gateway_evidence/);
+    expect(py).toMatch(/"physical_gateway_evidence":\s*latest\["physical_gateway_evidence"\]/);
+    expect(py).not.toMatch(
+      /physical_gateway_evidence\s*=\s*(?:request\.headers|os\.environ|raw\.get)/,
+    );
+    expect(py).toMatch(
+      /if\s+header_mode\s*==\s*"live"\s+or\s+env_mode\s*==\s*"live":\s*\r?\n\s*return\s+"demo"/,
+    );
+  });
+
+  it("accepts the configured uppercase and canonical lowercase upload paths", () => {
+    expect(py).toMatch(
+      /@app\.route\("\/ecowitt",\s*methods=\["GET",\s*"POST"\],\s*strict_slashes=False\)/,
+    );
+    expect(py).toMatch(
+      /@app\.route\("\/ECOWITT",\s*methods=\["GET",\s*"POST"\],\s*strict_slashes=False\)/,
+    );
   });
 
   it("unknown payload source labels normalize to invalid, never live", () => {
@@ -1359,6 +1388,7 @@ describe("ecowitt windows testbench — retry/backoff + error report", () => {
     for (const cls of [
       "invalid_payload",
       "unauthorized",
+      "bridge_required",
       "forbidden_tent",
       "tent_lookup_failed",
       "insert_failed",

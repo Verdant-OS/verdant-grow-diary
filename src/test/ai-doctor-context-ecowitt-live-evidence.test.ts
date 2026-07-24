@@ -26,13 +26,23 @@ const STALE = "2026-06-09T00:00:00.000Z"; // > 7 days old
 const ECOWITT_RAW = {
   vendor: "ecowitt_windows_testbench",
   transport_source: "ecowitt",
+  metadata: {
+    reported_verdant_source: "live",
+    raw_payload: {
+      stationtype: "GW2000A_V3.2.4",
+      model: "GW2000A",
+      dateutc: "2026-06-17 11:59:40",
+    },
+  },
 };
 
-function liveEcowittRow(
-  metric: string,
-  value: number,
-  capturedAt = FRESH,
-): SensorReadingRowLike {
+const ECOWITT_TESTBENCH_RAW = {
+  vendor: "ecowitt_windows_testbench",
+  transport_source: "ecowitt",
+  metadata: { confidence: "test" },
+};
+
+function liveEcowittRow(metric: string, value: number, capturedAt = FRESH): SensorReadingRowLike {
   return {
     metric,
     value,
@@ -87,6 +97,26 @@ describe("AI Doctor context — canonical source=live EcoWitt rows", () => {
     expect(ctx.averages_7d.temperature_c).toBeNull();
   });
 
+  it("keeps canonical-live testbench packets out of trustworthy AI evidence", () => {
+    const ctx = compilePlantContextFromRows({
+      plant: PLANT,
+      growEvents: [],
+      sensorReadings: [
+        {
+          ...liveEcowittRow("temperature_c", 27.2),
+          raw_payload: ECOWITT_TESTBENCH_RAW,
+        },
+      ],
+      now: NOW,
+    });
+    expect(ctx.hasLiveSensorReadings).toBe(false);
+    expect(ctx.missingLiveSensorReadings).toBe(true);
+    expect(ctx.averages_7d.temperature_c).toBeNull();
+    expect(ctx.sensor_groups).toEqual([
+      expect.objectContaining({ source: "demo", sample_count: 1 }),
+    ]);
+  });
+
   it("never classifies explicit state='stale' or 'invalid' rows as live/healthy", () => {
     const ctx = compilePlantContextFromRows({
       plant: PLANT,
@@ -98,10 +128,7 @@ describe("AI Doctor context — canonical source=live EcoWitt rows", () => {
       now: NOW,
     });
     expect(ctx.hasLiveSensorReadings).toBe(false);
-    expect(ctx.sensor_groups.map((g) => g.source).sort()).toEqual([
-      "invalid",
-      "stale",
-    ]);
+    expect(ctx.sensor_groups.map((g) => g.source).sort()).toEqual(["invalid", "stale"]);
     // averages_7d uses only trustworthy (live + manual)
     expect(ctx.averages_7d.temperature_c).toBeNull();
     expect(ctx.averages_7d.humidity_pct).toBeNull();
@@ -134,10 +161,7 @@ describe("AI Doctor context — canonical source=live EcoWitt rows", () => {
           note: "watered 1L",
         },
       ],
-      sensorReadings: [
-        liveEcowittRow("temperature_c", 27.2),
-        liveEcowittRow("humidity_pct", 47),
-      ],
+      sensorReadings: [liveEcowittRow("temperature_c", 27.2), liveEcowittRow("humidity_pct", 47)],
       now: NOW,
     });
     const view = buildAiDoctorReadinessView({
@@ -179,10 +203,7 @@ describe("AI Doctor EcoWitt evidence — safety / no-write / no-AI scan", () => 
     for (const f of files) {
       const src = readFileSync(join(process.cwd(), f), "utf8");
       for (const forbidden of FORBIDDEN) {
-        expect(
-          src.includes(forbidden),
-          `${f} must not contain "${forbidden}"`,
-        ).toBe(false);
+        expect(src.includes(forbidden), `${f} must not contain "${forbidden}"`).toBe(false);
       }
     }
   });

@@ -1,7 +1,13 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { buildAiSensorSnapshotContext } from "./sensorSnapshotContextRules.ts";
-import { pickLatestSensorSnapshotByCapturedAt } from "./latestSensorSnapshot.ts";
+import {
+  resolveQuickLogSensorSnapshotForAi,
+  type QuickLogSensorAcquisitionRow,
+} from "../_shared/lib/lib/quick-log/quickLogSensorSnapshotAcquisitionRules.ts";
+import { buildAiSensorSnapshotContext } from "../_shared/lib/lib/aiSensorSnapshotContextRules.ts";
+import { pickLatestSensorSnapshotEvidenceByCapturedAt } from "../_shared/lib/lib/aiCoachLatestSensorSnapshot.ts";
+import { resolveRequiredServerBillingEnvironment } from "../_shared/unionEntitlementLookup.ts";
+import { isMissingAiCreditRpcOverload } from "../_shared/aiCreditRpcCompatibility.ts";
 
 type Mode = "diagnose" | "next_steps";
 interface Body {
@@ -21,6 +27,35 @@ interface DiaryRow {
   plant_id: string | null;
   tent_id: string | null;
   details: Record<string, unknown> | null;
+}
+
+const QUICK_LOG_SENSOR_PROVENANCE_LOOKBACK_MS = 4 * 60 * 60 * 1000;
+const QUICK_LOG_SENSOR_PROVENANCE_ROW_LIMIT = 200;
+const QUICK_LOG_SENSOR_PROVENANCE_COLUMNS =
+  "id,metric,value,quality,source,captured_at,ts,created_at,raw_payload";
+
+function asObject(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function isNestedQuickLogSnapshot(snapshot: unknown): boolean {
+  const object = asObject(snapshot);
+  return asObject(object?.metrics) !== null;
+}
+
+function isDeclaredLiveSnapshot(snapshot: unknown): boolean {
+  const source = asObject(snapshot)?.source;
+  return typeof source === "string" && source.trim().toLowerCase() === "live";
+}
+
+function capturedAtMs(snapshot: unknown): number | null {
+  const object = asObject(snapshot);
+  const raw = object?.captured_at;
+  if (typeof raw !== "string" || raw.trim() === "") return null;
+  const ms = Date.parse(raw);
+  return Number.isFinite(ms) ? ms : null;
 }
 
 // S2: server-pinned tier/feature. Escalation is deferred.
@@ -44,8 +79,10 @@ const EMPTY_ANALYSIS = {
 };
 
 function isUuid(s: unknown): s is string {
-  return typeof s === "string" &&
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+  return (
+    typeof s === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)
+  );
 }
 
 Deno.serve(async (req) => {
@@ -60,6 +97,18 @@ Deno.serve(async (req) => {
     );
     const { data: u } = await supabase.auth.getUser();
     if (!u?.user) return json({ error: "unauthorized" }, 401);
+    const userId = u.user.id;
+
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const creditSupabaseUrl = Deno.env.get("SUPABASE_URL");
+    const billingEnvironmentResolution = resolveRequiredServerBillingEnvironment();
+    if (!serviceRoleKey || !creditSupabaseUrl || !billingEnvironmentResolution.ok) {
+      return json({ error: "AI not configured" }, 500);
+    }
+    const creditSupabase = createClient(creditSupabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const billingEnvironment = billingEnvironmentResolution.environment;
 
     const body = (await req.json()) as Body;
     const lovableKey = Deno.env.get("LOVABLE_API_KEY");
@@ -67,37 +116,93 @@ Deno.serve(async (req) => {
 
     // ---- S2: ai_credit_spend (atomic check-and-spend) -----------------------
     const growId = isUuid(body.growId) ? body.growId : null;
-    const idempotencyKey = (typeof body.idempotencyKey === "string" &&
-        body.idempotencyKey.length >= 8 && body.idempotencyKey.length <= 200)
-      ? body.idempotencyKey
-      : crypto.randomUUID();
+    const idempotencyKey =
+      typeof body.idempotencyKey === "string" &&
+      body.idempotencyKey.length >= 8 &&
+      body.idempotencyKey.length <= 200
+        ? body.idempotencyKey
+        : crypto.randomUUID();
 
-    const { data: spend, error: spendErr } = await supabase.rpc("ai_credit_spend", {
+    let spendResponse = await creditSupabase.rpc("ai_credit_spend", {
+      p_user_id: userId,
+      p_billing_environment: billingEnvironment,
       p_feature: FEATURE,
       p_grow_id: growId,
       p_model_tier: MODEL_TIER,
       p_idempotency_key: idempotencyKey,
       p_result: null,
     });
+    if (isMissingAiCreditRpcOverload(spendResponse.error, "ai_credit_spend", "p_user_id")) {
+      spendResponse = await supabase.rpc("ai_credit_spend", {
+        p_feature: FEATURE,
+        p_grow_id: growId,
+        p_model_tier: MODEL_TIER,
+        p_idempotency_key: idempotencyKey,
+        p_result: null,
+      });
+    }
+    const { data: spend, error: spendErr } = spendResponse;
     if (spendErr || !spend || typeof spend !== "object") {
       console.log("ai-coach status=credit_rpc_error");
       return json({ error: "credit_rpc" }, 500);
     }
     const spendObj = spend as Record<string, unknown>;
+    if (spendObj.ok !== true && spendObj.status !== "denied") {
+      // A refunded or context-conflicting idempotency replay is terminal, but
+      // it is not a quota denial. Keep it out of the paywall path.
+      console.log(
+        `ai-coach status=credit_invalid http=200 reason=${String(spendObj.reason ?? "")}`,
+      );
+      return json({ ok: false, reason: "invalid" }, 200);
+    }
     if (spendObj.ok !== true) {
       console.log(`ai-coach status=credit_denied http=200 reason=${String(spendObj.reason ?? "")}`);
       return json({ ok: false, reason: "credit_denied", credit: spendObj }, 200);
+    }
+    if (spendObj.feature !== FEATURE || spendObj.model_tier !== MODEL_TIER) {
+      console.log("ai-coach status=credit_scope_mismatch");
+      return json({ ok: false, reason: "invalid" }, 200);
+    }
+    if (spendObj.status === "replayed") {
+      console.log("ai-coach status=replay_result_unavailable");
+      return json({ ok: false, reason: "invalid" }, 200);
+    }
+    if (spendObj.status !== "spent") {
+      console.log("ai-coach status=credit_status_invalid");
+      return json({ error: "credit_rpc" }, 500);
     }
     const spendId = typeof spendObj.spend_id === "string" ? spendObj.spend_id : null;
     const refundKey = "refund:" + (spendId ?? idempotencyKey);
     const refund = async (reason: string) => {
       if (!spendId) return;
       try {
-        await supabase.rpc("ai_credit_refund", {
+        let refundResponse = await creditSupabase.rpc("ai_credit_refund", {
+          p_expected_user_id: userId,
           p_spend_id: spendId,
           p_idempotency_key: refundKey,
           p_reason: reason,
         });
+        if (
+          isMissingAiCreditRpcOverload(
+            refundResponse.error,
+            "ai_credit_refund",
+            "p_expected_user_id",
+          )
+        ) {
+          refundResponse = await supabase.rpc("ai_credit_refund", {
+            p_spend_id: spendId,
+            p_idempotency_key: refundKey,
+            p_reason: reason,
+          });
+        }
+        if (
+          refundResponse.error ||
+          !refundResponse.data ||
+          typeof refundResponse.data !== "object" ||
+          (refundResponse.data as Record<string, unknown>).ok !== true
+        ) {
+          console.log("ai-coach status=refund_failed");
+        }
       } catch {
         console.log("ai-coach status=refund_failed");
       }
@@ -111,7 +216,11 @@ Deno.serve(async (req) => {
     let latestSnapshot: Record<string, unknown> | null = null;
 
     if (body.growId) {
-      const { data: g } = await supabase.from("grows").select("*").eq("id", body.growId).maybeSingle();
+      const { data: g } = await supabase
+        .from("grows")
+        .select("*")
+        .eq("id", body.growId)
+        .maybeSingle();
       grow = g;
 
       const { data: e } = await supabase
@@ -127,19 +236,56 @@ Deno.serve(async (req) => {
 
       if (plantIds.length) {
         const { data: p } = await supabase
-          .from("plants").select("id,name,strain,stage,health,medium,pot_size").in("id", plantIds);
+          .from("plants")
+          .select("id,name,strain,stage,health,medium,pot_size")
+          .in("id", plantIds);
         (p ?? []).forEach((row: Record<string, unknown>) => plantsById.set(row.id as string, row));
       }
       if (tentIds.length) {
         const { data: t } = await supabase
-          .from("tents").select("id,name,stage,size").in("id", tentIds);
+          .from("tents")
+          .select("id,name,stage,size")
+          .in("id", tentIds);
         (t ?? []).forEach((row: Record<string, unknown>) => tentsById.set(row.id as string, row));
       }
 
-      // Select the freshest snapshot by its own captured_at (not by
-      // diary entry_at order). Missing/invalid timestamps cannot
-      // outrank a valid current reading.
-      latestSnapshot = pickLatestSensorSnapshotByCapturedAt(entries);
+      // Select the freshest snapshot by its own captured_at (not by diary
+      // entry_at order). Quick Log's legacy flat RPC discarded per-row raw
+      // lineage, so nested live snapshots are corroborated against the
+      // corresponding RLS-scoped sensor rows before they can raise AI trust.
+      const selected = pickLatestSensorSnapshotEvidenceByCapturedAt(entries);
+      if (selected) {
+        let provenanceRows: QuickLogSensorAcquisitionRow[] | null = null;
+        const selectedCapturedMs = capturedAtMs(selected.snapshot);
+        if (
+          isNestedQuickLogSnapshot(selected.snapshot) &&
+          isDeclaredLiveSnapshot(selected.snapshot) &&
+          selected.tentId &&
+          selectedCapturedMs !== null
+        ) {
+          const capturedAt = new Date(selectedCapturedMs).toISOString();
+          const lowerBound = new Date(
+            selectedCapturedMs - QUICK_LOG_SENSOR_PROVENANCE_LOOKBACK_MS,
+          ).toISOString();
+          const { data: sensorRows, error: sensorRowsError } = await supabase
+            .from("sensor_readings")
+            .select(QUICK_LOG_SENSOR_PROVENANCE_COLUMNS)
+            .eq("tent_id", selected.tentId)
+            .gte("captured_at", lowerBound)
+            .lte("captured_at", capturedAt)
+            .order("captured_at", { ascending: false })
+            .order("created_at", { ascending: false })
+            .order("id", { ascending: false })
+            .limit(QUICK_LOG_SENSOR_PROVENANCE_ROW_LIMIT);
+          if (!sensorRowsError && Array.isArray(sensorRows)) {
+            provenanceRows = sensorRows as QuickLogSensorAcquisitionRow[];
+          }
+        }
+        latestSnapshot = resolveQuickLogSensorSnapshotForAi(
+          selected.snapshot,
+          provenanceRows,
+        ) as Record<string, unknown>;
+      }
     }
 
     const sparse = entries.length < 2;
@@ -154,7 +300,9 @@ Deno.serve(async (req) => {
     // --- build structured context block ---
     const ctxLines: string[] = [];
     if (grow) {
-      ctxLines.push(`GROW: ${grow.name} | type=${grow.grow_type} | stage=${grow.stage} | started=${grow.started_at}`);
+      ctxLines.push(
+        `GROW: ${grow.name} | type=${grow.grow_type} | stage=${grow.stage} | started=${grow.started_at}`,
+      );
     }
     const snapshotCtx = buildAiSensorSnapshotContext(latestSnapshot);
     ctxLines.push(snapshotCtx.annotationLine);
@@ -304,16 +452,19 @@ Rules for diagnosis (structured view, approval-first):
     const data = await r.json();
     const raw = data.choices?.[0]?.message?.content ?? "{}";
     let parsed: Record<string, unknown> = {};
-    try { parsed = JSON.parse(raw); }
-    catch { parsed = {}; }
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      parsed = {};
+    }
 
     // Backward-compatible: the legacy free-text shape lived at the top level.
     // The new prompt nests it under `analysis`. Fall back to top-level if the
     // model returned the legacy shape.
     const analysis =
-      (parsed.analysis && typeof parsed.analysis === "object")
-        ? parsed.analysis as Record<string, unknown>
-        : (parsed.summary || parsed.recommended_actions)
+      parsed.analysis && typeof parsed.analysis === "object"
+        ? (parsed.analysis as Record<string, unknown>)
+        : parsed.summary || parsed.recommended_actions
           ? parsed
           : { ...EMPTY_ANALYSIS, summary: "AI returned unparseable output.", confidence: "low" };
 
@@ -321,9 +472,7 @@ Rules for diagnosis (structured view, approval-first):
     // src/lib/aiDoctorDiagnosisRules.ts). Pass through raw and let the client
     // run validateAndSanitizeDiagnosis — this function never runs actions.
     const diagnosis =
-      (parsed.diagnosis && typeof parsed.diagnosis === "object")
-        ? parsed.diagnosis
-        : null;
+      parsed.diagnosis && typeof parsed.diagnosis === "object" ? parsed.diagnosis : null;
 
     return json({
       analysis,

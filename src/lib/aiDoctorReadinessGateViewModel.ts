@@ -114,3 +114,87 @@ export function buildAiDoctorReadinessGate(
       };
   }
 }
+
+// ---------------------------------------------------------------------------
+// Blocked-explanation helper
+// ---------------------------------------------------------------------------
+
+/**
+ * The three evidence categories that can actually BLOCK diagnosis
+ * (readiness = "insufficient") per `aiDoctorContextRules`:
+ *   - `plant-profile`               → no plant profile at all
+ *   - `recent-timeline-activity`    → no recent notes/watering/feeding/photos
+ *   - `recent-manual-sensor-snapshot` → no recent manual sensor snapshot
+ * Soft misses (strain/stage/medium/plant-photo) never block on their own.
+ */
+export const AI_DOCTOR_READINESS_BLOCKING_CODES = Object.freeze([
+  "plant-profile",
+  "recent-timeline-activity",
+  "recent-manual-sensor-snapshot",
+] as const);
+
+export type AiDoctorReadinessBlockingCode =
+  (typeof AI_DOCTOR_READINESS_BLOCKING_CODES)[number];
+
+const BLOCKING_LABEL: Record<AiDoctorReadinessBlockingCode, string> =
+  Object.freeze({
+    "plant-profile": "a plant profile",
+    "recent-timeline-activity":
+      "a recent note, watering, feeding, or photo (last 7 days)",
+    "recent-manual-sensor-snapshot":
+      "a recent manual sensor snapshot (last 7 days)",
+  });
+
+export interface AiDoctorReadinessBlockedExplanation {
+  /** Ordered blocking category codes that are actually missing. */
+  blockingCodes: AiDoctorReadinessBlockingCode[];
+  /** Short labels — safe for lists and inline sentences. */
+  blockingLabels: string[];
+  /** Full user-facing sentence naming the miss + the exact next button. */
+  sentence: string;
+}
+
+export interface BuildAiDoctorReadinessBlockedExplanationArgs {
+  readiness: AiDoctorContextReadiness;
+  missing: readonly string[];
+  /** Exact label of the CTA the grower should press next. */
+  nextActionLabel: string;
+}
+
+/**
+ * Deterministic, presenter-free copy for the blocked state that names
+ * the exact missing evidence category AND the exact button to press.
+ * Returns an empty result when readiness is not "insufficient".
+ */
+export function buildAiDoctorReadinessBlockedExplanation(
+  args: BuildAiDoctorReadinessBlockedExplanationArgs,
+): AiDoctorReadinessBlockedExplanation {
+  if (args.readiness !== "insufficient") {
+    return { blockingCodes: [], blockingLabels: [], sentence: "" };
+  }
+  const missingSet = new Set(args.missing);
+  const codes: AiDoctorReadinessBlockingCode[] =
+    AI_DOCTOR_READINESS_BLOCKING_CODES.filter((c) => missingSet.has(c));
+  const labels = codes.map((c) => BLOCKING_LABEL[c]);
+
+  const label = args.nextActionLabel.trim();
+  const cta = label.length > 0 ? label : AI_DOCTOR_READINESS_GATE_ADD_CONTEXT_LABEL;
+
+  let joined: string;
+  if (labels.length === 0) {
+    // Defensive: insufficient without any recognized blocking code.
+    joined = "more context";
+  } else if (labels.length === 1) {
+    joined = labels[0];
+  } else if (labels.length === 2) {
+    joined = `${labels[0]} and ${labels[1]}`;
+  } else {
+    joined = `${labels.slice(0, -1).join(", ")}, and ${labels[labels.length - 1]}`;
+  }
+
+  return {
+    blockingCodes: codes,
+    blockingLabels: labels,
+    sentence: `AI Doctor is blocked until you add ${joined}. Tap "${cta}" to add it now.`,
+  };
+}

@@ -2,21 +2,22 @@
  * Tents list — stage-aware VPD wiring.
  *
  * Asserts that the legacy hardcoded `vpd > 1.6 || vpd < 0.6` thresholds are
- * gone and that classification flows through `classifyVpdAgainstStage` with
- * the tent's own stage. Also static safety: no alerts/action_queue writes,
- * no service_role, no automation/device-control strings.
+ * gone and that classification flows through the shared Dashboard-strip
+ * presenter (`buildTentSnapshotView`), which routes VPD through the
+ * canonical `classifyVpdAgainstStage` with the tent's own stage. Also
+ * static safety: no alerts/action_queue writes, no service_role, no
+ * automation/device-control strings.
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import {
-  classifyVpdAgainstStage,
-  vpdMetricChipStatus,
-} from "@/lib/vpdStageTargetRules";
+import { classifyVpdAgainstStage, vpdMetricChipStatus } from "@/lib/vpdStageTargetRules";
 
-const TENTS_SRC = readFileSync(
-  resolve(__dirname, "../pages/Tents.tsx"),
+const TENTS_SRC = readFileSync(resolve(__dirname, "../pages/Tents.tsx"), "utf8");
+
+const SNAPSHOT_VM_SRC = readFileSync(
+  resolve(__dirname, "../lib/dashboardEnvironmentSnapshotViewModel.ts"),
   "utf8",
 );
 
@@ -26,16 +27,25 @@ describe("Tents list — VPD threshold cleanup", () => {
     expect(TENTS_SRC).not.toMatch(/vpd\s*<\s*0\.6/);
   });
 
-  it("imports the canonical stage-aware helpers", () => {
-    expect(TENTS_SRC).toMatch(/classifyVpdAgainstStage/);
-    expect(TENTS_SRC).toMatch(/vpdMetricChipStatus/);
-    expect(TENTS_SRC).toMatch(
-      /from\s+["']@\/lib\/vpdStageTargetRules["']/,
+  it("classifies VPD through the shared presenter, keeping the canonical stage helper", () => {
+    expect(TENTS_SRC).toMatch(/buildTentSnapshotView/);
+    expect(TENTS_SRC).toMatch(/normalizeVpdStage/);
+    expect(TENTS_SRC).toMatch(/from\s+["']@\/lib\/vpdStageTargetRules["']/);
+    // The presenter itself must route VPD through the canonical classifier
+    // (stageAwareVpdTargets is the deprecated re-export shim of
+    // vpdStageTargetRules).
+    expect(SNAPSHOT_VM_SRC).toMatch(/classifyVpdAgainstStage/);
+    expect(SNAPSHOT_VM_SRC).toMatch(/vpdMetricChipStatus/);
+    expect(SNAPSHOT_VM_SRC).toMatch(
+      /from\s+["']@\/lib\/(stageAwareVpdTargets|vpdStageTargetRules)["']/,
     );
   });
 
-  it("passes the tent's stage into the classifier", () => {
-    expect(TENTS_SRC).toMatch(/classifyVpdAgainstStage\(\s*\{[^}]*stage:\s*t\.stage/);
+  it("passes the tent's stage into the presenter", () => {
+    expect(TENTS_SRC).toMatch(
+      /buildTentSnapshotView\(\s*\(readingsByTent\[t\.id\][\s\S]*?t\.stage/,
+    );
+    expect(SNAPSHOT_VM_SRC).toMatch(/classifyVpdAgainstStage\(\s*\{[^}]*stage/);
   });
 });
 

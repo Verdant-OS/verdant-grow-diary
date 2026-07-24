@@ -8,8 +8,8 @@
  *    manifest explicitly marks `public` (or a real public/ static asset).
  *  - No internal link points at a missing route or a protected surface.
  *  - Clicking guide-family links keeps the user on public guide content.
- *  - Clicking /welcome and the Customer Guide link navigates to those
- *    public paths — never to /auth.
+ *  - Public guide presenters do not promote the backend-placeholder
+ *    Customer Guide share path.
  *  - Rendered copy + head metadata carry no device-control/autopilot
  *    promises and no compliance-tool (Metrc/seed-to-sale) positioning.
  *
@@ -174,12 +174,14 @@ describe("/guides internal links resolve to explicitly-public routes", () => {
     });
   }
 
-  it("guide-family slugs linked from /guides all exist in shared constants", () => {
+  it("guide-family slugs linked from /guides all exist in shared constants or known custom guide pages", () => {
     const { container } = renderGuides("/guides");
     const { internal } = collectLinks(container);
     const guideLinks = internal.filter((h) => /^\/guides\/[^/]+$/.test(h));
-    expect(guideLinks.length).toBe(VERDANT_GUIDE_SLUGS.length);
+    const CUSTOM_GUIDE_PATHS = ["/guides/grow-stage-care-guide"];
+    expect(guideLinks.length).toBe(VERDANT_GUIDE_SLUGS.length + CUSTOM_GUIDE_PATHS.length);
     for (const href of guideLinks) {
+      if (CUSTOM_GUIDE_PATHS.includes(href)) continue;
       const slug = href.replace("/guides/", "");
       expect(VERDANT_GUIDE_SLUGS).toContain(slug);
     }
@@ -216,17 +218,17 @@ describe("/guides click-through stays on public content", () => {
     expect(screen.getByTestId("location-probe")).toHaveTextContent("/welcome");
   });
 
-  it("clicking the Customer Guide link navigates to its public path — never to /auth", () => {
-    const { container } = renderGuides(`/guides/${VERDANT_GUIDE_SLUGS[0]}`);
-    const link = container.querySelector<HTMLAnchorElement>(
-      `a[href="${VERDANT_CUSTOMER_GUIDE_PATH}"]`,
-    );
-    expect(link).toBeTruthy();
-    fireEvent.click(link!);
-    expect(screen.getByTestId("location-probe")).toHaveTextContent(VERDANT_CUSTOMER_GUIDE_PATH);
-  });
+  for (const path of ALL_GUIDE_PATHS) {
+    it(`${path}: does not render a Customer Guide placeholder CTA`, () => {
+      const { container } = renderGuides(path);
+      expect(
+        container.querySelector<HTMLAnchorElement>(`a[href="${VERDANT_CUSTOMER_GUIDE_PATH}"]`),
+      ).toBeNull();
+      expect(container.textContent).not.toMatch(/start with the customer guide/i);
+    });
+  }
 
-  it("/welcome and the Customer Guide path are explicitly public in the manifest", () => {
+  it("preserves the Customer Guide backend route without promoting it", () => {
     expect(manifestEntryFor("/welcome")?.access).toBe("public");
     expect(manifestEntryFor(VERDANT_CUSTOMER_GUIDE_PATH)?.access).toBe("public");
     expect(manifestEntryFor("/pricing")?.access).toBe("public");

@@ -25,15 +25,9 @@ const RULES_SRC = readFileSync(
 describe("ManualSensorTrendChart — chart surface", () => {
   it("renders title and context copy", () => {
     render(<ManualSensorTrendChart readings={[]} />);
-    expect(
-      screen.getByText("PPFD and environment context"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/Compare recent manual light readings/i),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/not an automated diagnosis/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText("PPFD and environment context")).toBeInTheDocument();
+    expect(screen.getByText(/Compare recent manual light readings/i)).toBeInTheDocument();
+    expect(screen.getByText(/not an automated diagnosis/i)).toBeInTheDocument();
   });
 
   it("renders the no-PPFD empty state when no readings", () => {
@@ -93,12 +87,39 @@ describe("ManualSensorTrendChart — chart surface", () => {
       />,
     );
     const flagged = screen.getByTestId("manual-sensor-trend-chart-flagged");
-    const items = within(flagged).getAllByTestId(
-      "manual-sensor-trend-chart-flagged-item",
-    );
+    const items = within(flagged).getAllByTestId("manual-sensor-trend-chart-flagged-item");
     expect(items).toHaveLength(2);
     const sources = items.map((i) => i.getAttribute("data-source")).sort();
     expect(sources).toEqual(["invalid", "stale"]);
+  });
+
+  it("does not render diagnostic provenance or its raw payload", () => {
+    render(
+      <ManualSensorTrendChart
+        readings={[
+          {
+            ts: "2026-06-20T10:00:00Z",
+            metric: "ppfd",
+            value: 999,
+            source: "live",
+            raw_payload: {
+              vendor: "ecowitt_windows_testbench",
+              metadata: {
+                confidence: "test",
+                secret: "never-render-this-secret",
+              },
+            },
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByTestId("manual-sensor-trend-chart-empty")).toHaveAttribute(
+      "data-state",
+      "no_ppfd",
+    );
+    expect(screen.queryByText(/999/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/never-render-this-secret/)).not.toBeInTheDocument();
   });
 });
 
@@ -130,10 +151,18 @@ describe("ManualSensorTrendChart — static safety", () => {
     it(`component does not reference ${label} (${token})`, () => {
       expect(COMPONENT_SRC.toLowerCase()).not.toContain(token.toLowerCase());
     });
-    it(`view-model does not reference ${label} (${token})`, () => {
-      expect(RULES_SRC.toLowerCase()).not.toContain(token.toLowerCase());
-    });
+    if (token !== "raw_payload") {
+      it(`view-model does not reference ${label} (${token})`, () => {
+        expect(RULES_SRC.toLowerCase()).not.toContain(token.toLowerCase());
+      });
+    }
   }
+
+  it("keeps raw payload references classification-only in the view-model", () => {
+    expect(RULES_SRC).toMatch(/isDiagnosticSensorProvenanceRow/);
+    expect(RULES_SRC).toMatch(/raw_payload:\s*row\.raw_payload/);
+    expect(COMPONENT_SRC).not.toMatch(/raw_payload/i);
+  });
 
   it("calm copy: forbids 'ideal' / 'healthy' / 'fix' / 'auto-adjust' / 'control lights'", () => {
     const banned = ["ideal", "healthy", "auto-adjust", "control lights"];

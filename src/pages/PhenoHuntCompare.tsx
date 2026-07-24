@@ -14,6 +14,7 @@
  */
 import { useMemo } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
+import { timelinePath } from "@/lib/routes";
 import PhenoComparisonView from "@/components/PhenoComparisonView";
 import { usePhenoHuntCandidates } from "@/hooks/usePhenoHuntCandidates";
 import { derivePhenoCompareReadinessFromCandidates } from "@/lib/phenoComparisonActionState";
@@ -29,7 +30,7 @@ import { phenoCandidateDisplayLabel } from "@/lib/phenoCandidateIdentity";
 export default function PhenoHuntCompare() {
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
-  const { status, hunt, candidates, error } = usePhenoHuntCandidates(id);
+  const { status, hunt, candidates, error, reload } = usePhenoHuntCandidates(id);
 
   // Grower-selected cohort (deep-linked from the workspace). Hunt isolation:
   // requested ids are intersected with THIS hunt's own candidates, so an id
@@ -83,15 +84,50 @@ export default function PhenoHuntCompare() {
   }
 
   if (status === "error") {
+    // Standard error state: primary heading + retry + a way back. The page
+    // stays read-only; retry only re-runs the RLS-scoped SELECT.
+    const errorWorkspaceHref = id ? `/pheno-hunts/${id}/workspace` : null;
     return (
       <main
         data-testid="pheno-hunt-compare-error"
         role="alert"
-        className="container mx-auto max-w-6xl px-4 py-6"
+        className="container mx-auto max-w-xl px-4 py-10"
       >
-        <p className="text-sm text-muted-foreground">
-          {error ?? "Could not load this pheno hunt."}
-        </p>
+        <div className="rounded-2xl border border-border bg-card/40 p-6 text-center">
+          <h1 className="text-lg font-semibold mb-2">Couldn't load this pheno hunt</h1>
+          <p
+            className="text-sm text-muted-foreground mb-4"
+            data-testid="pheno-hunt-compare-error-message"
+          >
+            {error ?? "Could not load this pheno hunt."}
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={() => reload()}
+              className="inline-flex items-center justify-center min-h-11 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90"
+              data-testid="pheno-hunt-compare-error-retry"
+            >
+              Retry
+            </button>
+            {errorWorkspaceHref ? (
+              <Link
+                to={errorWorkspaceHref}
+                className="text-sm underline underline-offset-2"
+                data-testid="pheno-hunt-compare-error-workspace-link"
+              >
+                Back to hunt workspace
+              </Link>
+            ) : null}
+            <Link
+              to={timelinePath()}
+              className="text-sm underline underline-offset-2"
+              data-testid="pheno-hunt-compare-error-timeline-link"
+            >
+              Go to Timeline
+            </Link>
+          </div>
+        </div>
       </main>
     );
   }

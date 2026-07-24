@@ -2,10 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import {
-  normalizeDiaryEntries,
-  type NormalizedDiaryEntry,
-} from "@/lib/diaryEntryRules";
+import { normalizeDiaryEntries, type NormalizedDiaryEntry } from "@/lib/diaryEntryRules";
 import { buildWateringHistory } from "@/lib/wateringHistoryRules";
 import { typedWateringWriteEnabled } from "@/lib/featureFlags";
 import { findMatches } from "./testFileSearchRules";
@@ -15,7 +12,6 @@ import { findMatches } from "./testFileSearchRules";
 // allowlist, or assertion is changed.
 import { installScannerGuardrail } from "./support/scannerGuardrailHarness";
 installScannerGuardrail({ file: __filename });
-
 
 const REPO_ROOT = process.cwd();
 
@@ -40,6 +36,8 @@ const validWatering = {
     runoff_ph: 6.1,
     runoff_ec: 1.6,
     runoff_ml: 60,
+    water_temp_c: 20.5,
+    source: "manual",
   },
 };
 
@@ -57,6 +55,9 @@ describe("buildWateringHistory", () => {
     expect(r.runoffMl).toBe(60);
     expect(r.runoffPh).toBe(6.1);
     expect(r.runoffEc).toBe(1.6);
+    expect(r.waterTempC).toBe(20.5);
+    expect(r.source).toBe("manual");
+    expect(r.sourceLabel).toBe("Manual log");
     expect(r.notePreview).toContain("Watered");
     expect(r.warnings).toEqual([]);
     expect(r.occurredAt).toBe("2025-05-10T12:00:00.000Z");
@@ -121,6 +122,17 @@ describe("buildWateringHistory", () => {
     expect(rows[0].warnings.join("|")).toMatch(/ec/i);
   });
 
+  it("flags implausible legacy water temperature", () => {
+    const e = {
+      ...validWatering,
+      id: "water-temp-range",
+      details: { ...validWatering.details, water_temp_c: 99 },
+    };
+    const [row] = buildWateringHistory(normalize([e]));
+    expect(row.waterTempC).toBe(99);
+    expect(row.warnings).toContain("water_temp_c out of range");
+  });
+
   it("invalid volume appears as a warning", () => {
     const e = {
       ...validWatering,
@@ -153,6 +165,17 @@ describe("buildWateringHistory", () => {
     const rows = buildWateringHistory(normalize([bad, good]));
     expect(rows.map((r) => r.id)).toEqual(["y", "z"]);
   });
+
+  it("keeps missing provenance explicit instead of inventing manual or live", () => {
+    const legacy = {
+      ...validWatering,
+      id: "legacy-source",
+      details: { watering_amount_ml: 500 },
+    };
+    const [row] = buildWateringHistory(normalize([legacy]));
+    expect(row.source).toBe("unknown");
+    expect(row.sourceLabel).toBe("Source unavailable");
+  });
 });
 
 describe("WateringHistoryPanel runtime safety", () => {
@@ -171,10 +194,7 @@ describe("WateringHistoryPanel runtime safety", () => {
   });
 
   it("WateringHistoryPanel does not read raw diary details JSON", () => {
-    const src = readFileSync(
-      resolve(REPO_ROOT, "src/components/WateringHistoryPanel.tsx"),
-      "utf8",
-    );
+    const src = readFileSync(resolve(REPO_ROOT, "src/components/WateringHistoryPanel.tsx"), "utf8");
     // The presenter must consume WateringHistoryRow from the rules layer,
     // never reach into raw `details` blobs.
     expect(src).not.toMatch(/\.details\?\./);
@@ -186,5 +206,6 @@ describe("WateringHistoryPanel runtime safety", () => {
     expect(src).not.toMatch(/\.upsert\s*\(/);
     expect(src).not.toMatch(/create_watering_event/);
     expect(src).not.toMatch(/service_role/i);
+    expect(src).toContain("Log provenance — not live sensor data");
   });
 });

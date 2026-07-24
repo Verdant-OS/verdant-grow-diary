@@ -27,6 +27,12 @@ export const sensorsPath = (growId?: string | null): string => withGrowId("/sens
 export const postGrowLearningReportPath = (growId: string): string =>
   `/reports/post-grow/${encodeURIComponent(growId)}`;
 
+export const diaryRangeReportPath = (): string => "/reports/diary-range";
+
+export const phenoHuntsPath = (): string => "/pheno-hunts";
+export const phenoHuntWorkspacePath = (huntId: string): string =>
+  `/pheno-hunts/${encodeURIComponent(huntId)}/workspace`;
+
 export const actionDetailPath = (actionId: string): string =>
   `/actions/${encodeURIComponent(actionId)}`;
 
@@ -91,3 +97,22 @@ export const tentDetailPath = (tentId: string): string =>
 
 export const aiDoctorSessionDetailPath = (sessionId: string): string =>
   `/doctor/sessions/${encodeURIComponent(sessionId)}`;
+
+// --- Genetics & Propagation Traceability ---
+export const geneticsLibraryPath = (): string => "/genetics";
+
+export const geneticsAccessionDetailPath = (accessionId: string): string =>
+  `/genetics/accessions/${encodeURIComponent(accessionId)}`;
+
+export const geneticsBatchDetailPath = (batchId: string): string =>
+  `/genetics/batches/${encodeURIComponent(batchId)}`;
+
+export type GeneticsTraceKind = "accession" | "batch" | "plant" | "keeper" | "clone" | "cross";
+
+export const geneticsTracePath = (kind: GeneticsTraceKind, subjectId: string): string =>
+  `/genetics/trace/${kind}/${encodeURIComponent(subjectId)}`;
+
+export const geneticsHealthHistoryPath = (
+  kind: "accession" | "batch" | "plant",
+  subjectId: string,
+): string => `/genetics/health/${kind}/${encodeURIComponent(subjectId)}`;

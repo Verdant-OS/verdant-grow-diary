@@ -95,7 +95,7 @@ describe("ai-coach — output safety contract", () => {
     // (The literal lives in the sibling pure helper since the source-aware
     // annotation slice.)
     const HELPER = readFileSync(
-      resolve(__dirname, "../../supabase/functions/ai-coach/sensorSnapshotContext.ts"),
+      resolve(__dirname, "../../src/lib/aiCoachSensorSnapshotContext.ts"),
       "utf8",
     );
     expect(CODE + HELPER).toMatch(/LATEST_SENSOR_SNAPSHOT:\s*none/);

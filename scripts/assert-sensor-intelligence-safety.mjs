@@ -132,7 +132,13 @@ export function scanContent(relPath, content) {
   const hasContractMarker = content.includes(SAFETY_CONTRACT_MARKER);
   const codeOnly = stripComments(content);
 
-  const FRONTEND_PRIVATE_ALLOWLIST = ["src/lib/proofReportRedactionRules.ts"];
+  const FRONTEND_PRIVATE_ALLOWLIST = [
+    "src/lib/proofReportRedactionRules.ts",
+    // Same legitimate denylist pattern: releaseReceiptParserContract.ts lists
+    // the token in RELEASE_RECEIPT_UNSAFE_SUBSTRINGS to REJECT secret-like
+    // receipt fields. It never reads or uses the env value.
+    "src/lib/releaseReceiptParserContract.ts",
+  ];
   const isFrontendPrivateAllowlisted = FRONTEND_PRIVATE_ALLOWLIST.some((p) =>
     relPath.replace(/\\/g, "/").endsWith(p),
   );

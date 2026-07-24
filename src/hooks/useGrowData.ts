@@ -1,16 +1,11 @@
-// React Query hooks for Phase 1 Supabase-backed grow data.
-// Falls back to mock data on Supabase error, null/undefined data, or empty
-// initial result so the UI stays predictable during the live-data transition.
+// React Query hooks for Supabase-backed grow data.
 //
-// The fallback is NOT silent: every query records explicit source metadata
-// (see GrowDataSourceMeta) so consuming pages can label demo/mock data
-// honestly via growDataSourceLabelRules + GrowDataSourceBadge.
-//
-// Naming mirrors useMockData.ts (useTents -> useGrowTents, etc.) to keep a
-// later 1:1 page migration mechanical. Query keys are namespaced under
-// ["grow", ...] to avoid clashing with the existing useMockData cache.
+// These hooks are used by authenticated grower surfaces, so an empty or failed
+// database read must stay honest: empty reads return an empty/null value and
+// failed tent/plant reads remain React Query errors. Mock fixtures live behind
+// the separate, explicit useMockData surface and are never injected here.
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
-import { tents, plants, type Tent, type Plant, type SensorReading } from "@/mock";
+import type { Tent, Plant, SensorReading } from "@/mock";
 import {
   fetchTents,
   fetchTent,
@@ -18,6 +13,8 @@ import {
   fetchPlant,
   fetchSensorReadings,
 } from "@/lib/growRepo";
+import { buildPrivateGrowQueryKey } from "@/lib/growDataQueryKeyRules";
+import { useAuth } from "@/store/auth";
 
 // ---------------------------------------------------------------------------
 // Source metadata
@@ -44,18 +41,37 @@ function metaKey(parts: readonly unknown[]): string {
 
 const metaStore = new Map<string, GrowDataSourceMeta>();
 
-function recordMeta(key: readonly unknown[], meta: GrowDataSourceMeta): void {
-  metaStore.set(metaKey(key), meta);
+/**
+ * Source disclosure is private account state just like the React Query rows
+ * that produced it. Keep the owner in the metadata key so a late request
+ * from a previous session cannot relabel the next grower's UI after a cache
+ * clear. The owner is cache identity only; RLS remains the read authority.
+ */
+function privateMetaKey(
+  ownerId: string | null | undefined,
+  key: readonly unknown[],
+): readonly unknown[] {
+  const parts = key[0] === "grow" ? key.slice(1) : key;
+  return buildPrivateGrowQueryKey(ownerId, parts);
 }
 
-export function getGrowDataMeta(key: readonly unknown[]): GrowDataSourceMeta {
-  return metaStore.get(metaKey(key)) ?? DEFAULT_GROW_DATA_META;
+function recordMeta(
+  ownerId: string | null | undefined,
+  key: readonly unknown[],
+  meta: GrowDataSourceMeta,
+): void {
+  metaStore.set(metaKey(privateMetaKey(ownerId, key)), meta);
+}
+
+export function getGrowDataMeta(
+  key: readonly unknown[],
+  ownerId: string | null | undefined = null,
+): GrowDataSourceMeta {
+  return metaStore.get(metaKey(privateMetaKey(ownerId, key))) ?? DEFAULT_GROW_DATA_META;
 }
 
 /** Combine multiple section metas into a single status. Pure + deterministic. */
-export function combineGrowDataMeta(
-  metas: readonly GrowDataSourceMeta[],
-): GrowDataSourceMeta {
+export function combineGrowDataMeta(metas: readonly GrowDataSourceMeta[]): GrowDataSourceMeta {
   if (metas.length === 0) return DEFAULT_GROW_DATA_META;
   const sources = new Set(metas.map((m) => m.dataSource));
   if (sources.size === 1) {
@@ -79,99 +95,119 @@ export function combineGrowDataMeta(
   };
 }
 
-/** Test helper. Not for UI consumption. */
+/**
+ * Legacy test diagnostic. Counts honest empty/error outcomes, never mock
+ * substitution.
+ */
 export const __growDataFallbacks = { count: 0, lastReason: "" as string };
-export function __resetGrowDataMeta(): void {
+/** Clear private source-disclosure state when the authenticated owner changes. */
+export function clearGrowDataMeta(): void {
   metaStore.clear();
   __growDataFallbacks.count = 0;
   __growDataFallbacks.lastReason = "";
 }
 
-function fellBack(reason: string) {
+/** Legacy test alias. */
+export function __resetGrowDataMeta(): void {
+  clearGrowDataMeta();
+}
+
+function recordUnavailableOutcome(reason: string) {
   __growDataFallbacks.count += 1;
   __growDataFallbacks.lastReason = reason;
 }
 
 // ---------------------------------------------------------------------------
-// withFallback
+// Source-aware query boundary
 // ---------------------------------------------------------------------------
 
-async function withFallback<T>(
-  scope: string,
-  key: readonly unknown[],
-  run: () => Promise<T>,
-  fallback: () => T,
-  isEmpty: (v: T) => boolean,
-): Promise<T> {
+interface WithSourceMetaOptions<T> {
+  scope: string;
+  ownerId: string | null | undefined;
+  key: readonly unknown[];
+  run: () => Promise<T>;
+  emptyValue: () => T;
+  isEmpty: (v: T) => boolean;
+}
+
+async function withSourceMeta<T>({
+  scope,
+  ownerId,
+  key,
+  run,
+  emptyValue,
+  isEmpty,
+}: WithSourceMetaOptions<T>): Promise<T> {
   try {
     const result = await run();
     if (result == null || isEmpty(result)) {
-      fellBack(`${scope}:empty`);
-      const fb = fallback();
-      const fbEmpty = fb == null || isEmpty(fb);
-      recordMeta(key, {
-        isDemoData: !fbEmpty,
-        dataSource: fbEmpty ? "unavailable" : "mock",
-        sourceReason: fbEmpty ? "no-rows" : "fallback:empty",
+      recordUnavailableOutcome(`${scope}:empty`);
+      recordMeta(ownerId, key, {
+        isDemoData: false,
+        dataSource: "unavailable",
+        sourceReason: "no-rows",
       });
-      return fb;
+      return result == null ? emptyValue() : result;
     }
-    recordMeta(key, {
+    recordMeta(ownerId, key, {
       isDemoData: false,
       dataSource: "supabase",
-      sourceReason: "live:rows",
+      sourceReason: "supabase:rows",
     });
     return result;
   } catch (err) {
-    // Never leak raw error contents into UI-safe metadata.
-    fellBack(`${scope}:error:${(err as Error)?.message ?? "unknown"}`);
-    const fb = fallback();
-    const fbEmpty = fb == null || isEmpty(fb);
-    recordMeta(key, {
-      isDemoData: !fbEmpty,
-      dataSource: fbEmpty ? "unavailable" : "mock",
-      sourceReason: fbEmpty ? "fallback:error:no-rows" : "fallback:error",
+    // Never leak raw error contents into UI-safe metadata or diagnostics.
+    recordUnavailableOutcome(`${scope}:error`);
+    recordMeta(ownerId, key, {
+      isDemoData: false,
+      dataSource: "unavailable",
+      sourceReason: "fetch-error",
     });
-    return fb;
+    throw err;
   }
 }
 
-const isArrEmpty = <T,>(v: T[]) => v.length === 0;
-const never = <T,>(_v: T) => false;
-const isNullish = <T,>(v: T) => v == null;
+const isArrEmpty = <T>(v: T[]) => v.length === 0;
+const isNullish = <T>(v: T) => v == null;
 
 // ---------------------------------------------------------------------------
 // Query hooks
 // ---------------------------------------------------------------------------
 
 export function useGrowTents(growId?: string): UseQueryResult<Tent[]> {
+  const ownerId = useAuth().user?.id ?? null;
   const key = ["grow", "tents", growId ?? "all"] as const;
   return useQuery({
-    queryKey: [...key],
+    queryKey: buildPrivateGrowQueryKey(ownerId, ["tents", growId ?? "all"]),
+    retry: false,
     queryFn: () =>
-      withFallback(
-        "tents",
+      withSourceMeta({
+        scope: "tents",
+        ownerId,
         key,
-        () => fetchTents(growId),
-        () => (growId ? tents.filter((t) => t.growId === growId) : tents),
-        isArrEmpty,
-      ),
+        run: () => fetchTents(growId),
+        emptyValue: () => [] as Tent[],
+        isEmpty: isArrEmpty,
+      }),
   });
 }
 
 export function useGrowTent(id?: string): UseQueryResult<Tent | null> {
+  const ownerId = useAuth().user?.id ?? null;
   const key = ["grow", "tent", id ?? null] as const;
   return useQuery({
-    queryKey: [...key],
+    queryKey: buildPrivateGrowQueryKey(ownerId, ["tent", id ?? null]),
     enabled: !!id,
+    retry: false,
     queryFn: () =>
-      withFallback(
-        "tent",
+      withSourceMeta({
+        scope: "tent",
+        ownerId,
         key,
-        () => fetchTent(id as string),
-        () => tents.find((t) => t.id === id) ?? null,
-        isNullish,
-      ),
+        run: () => fetchTent(id as string),
+        emptyValue: () => null,
+        isEmpty: isNullish,
+      }),
   });
 }
 
@@ -185,6 +221,7 @@ export function useGrowPlants(
   growId?: string,
   opts: UseGrowPlantsOptions = {},
 ): UseQueryResult<Plant[]> {
+  const ownerId = useAuth().user?.id ?? null;
   const includeArchived = !!opts.includeArchived;
   const key = (
     includeArchived
@@ -192,37 +229,41 @@ export function useGrowPlants(
       : ["grow", "plants", tentId ?? "all", growId ?? "all"]
   ) as readonly unknown[];
   return useQuery({
-    queryKey: [...key],
+    queryKey: buildPrivateGrowQueryKey(ownerId, [
+      "plants",
+      tentId ?? "all",
+      growId ?? "all",
+      ...(includeArchived ? ["with-archived"] : []),
+    ]),
+    retry: false,
     queryFn: () =>
-      withFallback(
-        "plants",
+      withSourceMeta({
+        scope: "plants",
+        ownerId,
         key,
-        () => fetchPlants(tentId, growId, { includeArchived }),
-        () => {
-          let list = plants;
-          if (tentId) list = list.filter((p) => p.tentId === tentId);
-          if (growId) list = list.filter((p) => p.growId === growId);
-          if (!includeArchived) list = list.filter((p) => !p.isArchived);
-          return list;
-        },
-        isArrEmpty,
-      ),
+        run: () => fetchPlants(tentId, growId, { includeArchived }),
+        emptyValue: () => [] as Plant[],
+        isEmpty: isArrEmpty,
+      }),
   });
 }
 
 export function useGrowPlant(id?: string): UseQueryResult<Plant | null> {
+  const ownerId = useAuth().user?.id ?? null;
   const key = ["grow", "plant", id ?? null] as const;
   return useQuery({
-    queryKey: [...key],
+    queryKey: buildPrivateGrowQueryKey(ownerId, ["plant", id ?? null]),
     enabled: !!id,
+    retry: false,
     queryFn: () =>
-      withFallback(
-        "plant",
+      withSourceMeta({
+        scope: "plant",
+        ownerId,
         key,
-        () => fetchPlant(id as string),
-        () => plants.find((p) => p.id === id) ?? null,
-        isNullish,
-      ),
+        run: () => fetchPlant(id as string),
+        emptyValue: () => null,
+        isEmpty: isNullish,
+      }),
   });
 }
 
@@ -237,19 +278,26 @@ export function useGrowPlant(id?: string): UseQueryResult<Plant | null> {
  * their original `source` label — those are real data, not mock, and
  * are unaffected.
  */
-export function useGrowSensorReadings(tentId?: string): UseQueryResult<SensorReading[]> {
-  const key = ["grow", "sensors", tentId ?? "all"] as const;
+export function useGrowSensorReadings(tentId?: string | null): UseQueryResult<SensorReading[]> {
+  const ownerId = useAuth().user?.id ?? null;
+  const scopeKey = tentId === null ? "none" : (tentId ?? "all");
+  const key = ["grow", "sensors", scopeKey] as const;
   return useQuery({
-    queryKey: [...key],
+    queryKey: buildPrivateGrowQueryKey(ownerId, ["sensors", scopeKey]),
+    // `undefined` is the intentional all-tents aggregate used by Coach.
+    // `null` is an explicit no-scope sentinel used while Sensors has no
+    // selected tent, and must never fetch or reuse aggregate data.
+    enabled: tentId !== null,
+    retry: false,
     queryFn: () =>
-      withFallback(
-        "sensors",
+      withSourceMeta({
+        scope: "sensors",
+        ownerId,
         key,
-        () => fetchSensorReadings(tentId),
+        run: () => fetchSensorReadings(tentId),
         // Honest empty state — no mock/demo fallback for grower sensor UI.
-        () => [] as SensorReading[],
-        isArrEmpty,
-      ),
+        emptyValue: () => [] as SensorReading[],
+        isEmpty: isArrEmpty,
+      }),
   });
 }
-

@@ -25,7 +25,7 @@ import {
   assignPhenoCandidateNumber,
   type AssignCandidateNumberResult,
 } from "@/lib/phenoCandidateNumberService";
-import { listKeepersForHunt } from "@/lib/phenoKeepersService";
+import { listClonesForKeepers, listKeepersForHunt } from "@/lib/phenoKeepersService";
 import { listReversedKeeperIdsForKeepers } from "@/lib/phenoReversalsService";
 import {
   upsertCandidateScore,
@@ -120,6 +120,13 @@ export interface UsePhenoHuntWorkspaceState {
    * Used to suppress the herm/cull nudge on a reversed female (pollen expected).
    */
   reversedPlantIds: Set<string>;
+  /**
+   * Source-plant ids of candidates with at least one recorded clone (via
+   * their keeper's pheno_keeper_clones rows). Drives the clone-insurance
+   * banner and the clone_readiness evidence goal. Records only — Verdant
+   * never takes or culls a clone for anyone.
+   */
+  clonedPlantIds: Set<string>;
   /** Post-cure smoke test per plant. */
   smokeByPlant: Record<string, SmokeTestRow>;
   /** Lab results keyed "plantId:source". */
@@ -208,6 +215,7 @@ export function usePhenoHuntWorkspace(
   >({});
   const [sexByPlant, setSexByPlant] = useState<Record<string, SexObservationRow>>({});
   const [reversedPlantIds, setReversedPlantIds] = useState<Set<string>>(new Set());
+  const [clonedPlantIds, setClonedPlantIds] = useState<Set<string>>(new Set());
   const [smokeByPlant, setSmokeByPlant] = useState<Record<string, SmokeTestRow>>({});
   const [labByKey, setLabByKey] = useState<Record<string, LabResultRow>>({});
   const [error, setError] = useState<string | null>(null);
@@ -258,9 +266,12 @@ export function usePhenoHuntWorkspace(
         listKeepersForHunt(id),
       ]);
       if (cancelled || reqId !== requestRef.current) return;
-      const reversedKeeperIds = new Set(
-        await listReversedKeeperIdsForKeepers(keepers.map((k) => k.id)),
-      );
+      const keeperIds = keepers.map((k) => k.id);
+      const [reversedKeeperIdList, cloneRows] = await Promise.all([
+        listReversedKeeperIdsForKeepers(keeperIds),
+        listClonesForKeepers(keeperIds),
+      ]);
+      const reversedKeeperIds = new Set(reversedKeeperIdList);
       if (cancelled || reqId !== requestRef.current) return;
       pageRef.current = 0;
       setHunt(summaryRes.hunt);
@@ -274,6 +285,11 @@ export function usePhenoHuntWorkspace(
       setLabByKey(labs);
       setReversedPlantIds(
         new Set(keepers.filter((k) => reversedKeeperIds.has(k.id)).map((k) => k.sourcePlantId)),
+      );
+      // A candidate is clone-insured when its keeper has >=1 recorded clone.
+      const clonedKeeperIds = new Set(cloneRows.map((c) => c.keeperId));
+      setClonedPlantIds(
+        new Set(keepers.filter((k) => clonedKeeperIds.has(k.id)).map((k) => k.sourcePlantId)),
       );
       setStatus("ok");
     })().catch(() => {
@@ -606,6 +622,7 @@ export function usePhenoHuntWorkspace(
     decisionHistoryByPlant,
     sexByPlant,
     reversedPlantIds,
+    clonedPlantIds,
     smokeByPlant,
     labByKey,
     error,

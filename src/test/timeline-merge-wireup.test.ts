@@ -22,23 +22,16 @@ import { resolve } from "node:path";
 
 import { mergeTimelineSources } from "@/lib/timelineMergeRules";
 
-const TIMELINE_SRC = readFileSync(
-  resolve(__dirname, "../pages/Timeline.tsx"),
-  "utf8",
-);
+const TIMELINE_SRC = readFileSync(resolve(__dirname, "../pages/Timeline.tsx"), "utf8");
 
 describe("Timeline.tsx — mergeTimelineSources wire-up", () => {
   it("imports mergeTimelineSources from the rules layer", () => {
-    expect(TIMELINE_SRC).toMatch(
-      /from\s+["']@\/lib\/timelineMergeRules["']/,
-    );
+    expect(TIMELINE_SRC).toMatch(/from\s+["']@\/lib\/timelineMergeRules["']/);
     expect(TIMELINE_SRC).toMatch(/\bmergeTimelineSources\b/);
   });
 
   it("invokes mergeTimelineSources with both diaryEntries and growEvents", () => {
-    const call = TIMELINE_SRC.match(
-      /mergeTimelineSources\s*\(\s*\{[\s\S]*?\}\s*\)/,
-    );
+    const call = TIMELINE_SRC.match(/mergeTimelineSources\s*\(\s*\{[\s\S]*?\}\s*\)/);
     expect(call).not.toBeNull();
     const body = call![0];
     expect(body).toMatch(/diaryEntries\s*:/);
@@ -56,14 +49,33 @@ describe("Timeline.tsx — mergeTimelineSources wire-up", () => {
 
   it("preserves the verdant:entry-created refresh listener", () => {
     expect(TIMELINE_SRC).toMatch(/verdant:entry-created/);
-    expect(TIMELINE_SRC).toMatch(
-      /addEventListener\(\s*["']verdant:entry-created["']/,
-    );
+    expect(TIMELINE_SRC).toMatch(/addEventListener\(\s*["']verdant:entry-created["']/);
   });
 
   it("still fetches both diary_entries and grow_events from supabase", () => {
     expect(TIMELINE_SRC).toMatch(/from\(\s*["']diary_entries["']\s*\)/);
     expect(TIMELINE_SRC).toMatch(/from\(\s*["']grow_events["']\s*\)/);
+  });
+
+  it("uses the shared allowlisted root-zone projection for grow_events", () => {
+    expect(TIMELINE_SRC).toMatch(
+      /import\s*\{\s*ROOT_ZONE_GROW_EVENT_SELECT\s*\}\s*from\s*["']@\/lib\/rootZoneObservationRules["']/,
+    );
+    expect(TIMELINE_SRC).toMatch(/\.select\(ROOT_ZONE_GROW_EVENT_SELECT\)/);
+  });
+
+  it("applies the active date bounds to the typed grow_events query", () => {
+    expect(TIMELINE_SRC).toMatch(
+      /growEventsQuery\s*=\s*growEventsQuery\.gte\(\s*["']occurred_at["']/,
+    );
+    expect(TIMELINE_SRC).toMatch(
+      /growEventsQuery\s*=\s*growEventsQuery\.lte\(\s*["']occurred_at["']/,
+    );
+  });
+
+  it("feeds the merged read stream into both root-zone history panels", () => {
+    expect(TIMELINE_SRC).toMatch(/<WateringHistoryPanel\s+rawEntries=\{recentLaneRawEntries\}/);
+    expect(TIMELINE_SRC).toMatch(/<FeedingHistoryPanel\s+rawEntries=\{recentLaneRawEntries\}/);
   });
 });
 
@@ -123,9 +135,7 @@ describe("mergeTimelineSources — Timeline integration contract", () => {
           grow_event_id: "g1",
         },
       ],
-      growEvents: [
-        { id: "g1", occurred_at: "2026-06-19T12:00:00Z" },
-      ],
+      growEvents: [{ id: "g1", occurred_at: "2026-06-19T12:00:00Z" }],
     });
     expect(out).toHaveLength(1);
     expect(out[0].source_table).toBe("grow_events");
@@ -136,7 +146,9 @@ describe("mergeTimelineSources — Timeline integration contract", () => {
     expect(() =>
       mergeTimelineSources({
         diaryEntries: [{ id: "d1" }],
-        growEvents: [{ id: "g1" } as Parameters<typeof mergeTimelineSources>[0]["growEvents"][number]],
+        growEvents: [
+          { id: "g1" } as Parameters<typeof mergeTimelineSources>[0]["growEvents"][number],
+        ],
       }),
     ).not.toThrow();
   });

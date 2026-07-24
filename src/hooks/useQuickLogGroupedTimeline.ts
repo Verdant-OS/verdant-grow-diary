@@ -37,12 +37,30 @@ import {
   PHENO_EVIDENCE_RECEIPT_KIND,
   type RawPhenoEvidenceDiaryRow,
 } from "@/lib/phenoEvidenceCaptureRules";
+import {
+  attachQuickLogCompanionSnapshots,
+  type QuickLogCompanionSnapshotDiaryRow,
+} from "@/lib/quickLogCompanionSnapshotReadModel";
 
 export const QUICK_LOG_GROUPED_TIMELINE_DEFAULT_LIMIT = 200;
 
 export type QuickLogGroupedTimelineScope =
   | { kind: "plant"; plantId: string; tentId: string | null }
   | { kind: "tent"; tentId: string };
+
+export function buildQuickLogGroupedTimelineQueryKey(
+  scope: QuickLogGroupedTimelineScope | null,
+  limit: number = QUICK_LOG_GROUPED_TIMELINE_DEFAULT_LIMIT,
+) {
+  return [
+    "quick_log_grouped_timeline",
+    scope?.kind ?? "none",
+    scope?.kind === "plant" ? scope.plantId : null,
+    scope?.kind === "plant" ? scope.tentId : null,
+    scope?.kind === "tent" ? scope.tentId : null,
+    limit,
+  ] as const;
+}
 
 const SELECT =
   "id, plant_id, tent_id, occurred_at, event_type, source, note, is_deleted, watering_events ( volume_ml ), environment_events ( temperature_c, humidity_pct, vpd_kpa )";
@@ -110,6 +128,58 @@ async function fetchTimelineDiaryRows(
   return (data ?? []) as unknown as TimelineDiaryRow[];
 }
 
+/**
+ * Read the Quick Log companion rows that can carry an exactly-linked manual
+ * sensor snapshot. This remains a separate best-effort query so receipt
+ * enrichment and the primary grow-event timeline keep their existing limits
+ * and failure behavior.
+ */
+async function fetchQuickLogCompanionRows(
+  scope: QuickLogGroupedTimelineScope,
+  limit: number,
+): Promise<QuickLogCompanionSnapshotDiaryRow[]> {
+  let q = supabase
+    .from("diary_entries")
+    .select(DIARY_SELECT)
+    .not("details->>linked_grow_event_id" as never, "is", null);
+
+  if (scope.kind === "plant") {
+    q =
+      scope.tentId && scope.tentId.length > 0
+        ? q.or(`plant_id.eq.${scope.plantId},and(plant_id.is.null,tent_id.eq.${scope.tentId})`)
+        : q.eq("plant_id", scope.plantId);
+  } else {
+    q = q.eq("tent_id", scope.tentId);
+  }
+
+  const { data, error } = await q.order("entry_at", { ascending: false }).limit(limit);
+  if (error) return [];
+  return (data ?? []) as unknown as QuickLogCompanionSnapshotDiaryRow[];
+}
+
+async function fetchQuickLogCompanionParentRows(
+  scope: QuickLogGroupedTimelineScope,
+  limit: number,
+): Promise<RawGrowEventRow[]> {
+  let q = supabase
+    .from("grow_events")
+    .select("id, plant_id, tent_id, occurred_at, event_type, source, note, is_deleted")
+    .eq("source", "manual")
+    .eq("is_deleted", false)
+    .in("event_type", ["watering", "observation"]);
+  if (scope.kind === "plant") {
+    q =
+      scope.tentId && scope.tentId.length > 0
+        ? q.or(`plant_id.eq.${scope.plantId},and(plant_id.is.null,tent_id.eq.${scope.tentId})`)
+        : q.eq("plant_id", scope.plantId);
+  } else {
+    q = q.eq("tent_id", scope.tentId);
+  }
+  const { data, error } = await q.order("occurred_at", { ascending: false }).limit(limit);
+  if (error) return [];
+  return (data ?? []) as unknown as RawGrowEventRow[];
+}
+
 export interface UseQuickLogGroupedTimelineResult {
   entries: QuickLogTimelineEntry[];
   isLoading: boolean;
@@ -118,24 +188,25 @@ export interface UseQuickLogGroupedTimelineResult {
   error: unknown;
 }
 
-export function useQuickLogGroupedTimeline(
+export function buildQuickLogGroupedTimelineQueryOptions(
   scope: QuickLogGroupedTimelineScope | null,
   limit: number = QUICK_LOG_GROUPED_TIMELINE_DEFAULT_LIMIT,
-): UseQuickLogGroupedTimelineResult {
-  const query = useQuery({
-    queryKey: [
-      "quick_log_grouped_timeline",
-      scope?.kind ?? "none",
-      scope?.kind === "plant" ? scope.plantId : null,
-      scope?.kind === "plant" ? scope.tentId : null,
-      scope?.kind === "tent" ? scope.tentId : null,
-      limit,
-    ],
+) {
+  return {
+    queryKey: buildQuickLogGroupedTimelineQueryKey(scope, limit),
     enabled: scope !== null,
     queryFn: async (): Promise<QuickLogTimelineEntry[]> => {
       if (!scope) return [];
-      const rows = await fetchRows(scope, limit);
+      // Fetch the action spine and its exactly-linked companion rows together
+      // under the established timeline query key. A save invalidation then
+      // refreshes both atomically, avoiding a transient false "No snapshot".
+      const [rows, companionRows, companionParentRows] = await Promise.all([
+        fetchRows(scope, limit),
+        fetchQuickLogCompanionRows(scope, limit),
+        fetchQuickLogCompanionParentRows(scope, limit),
+      ]);
       const { actions, environmentRows } = partitionQuickLogRows(rows);
+      const { actions: companionParentActions } = partitionQuickLogRows(companionParentRows);
       const vmScope =
         scope.kind === "plant"
           ? ({
@@ -144,13 +215,26 @@ export function useQuickLogGroupedTimeline(
               tentId: scope.tentId,
             } as QuickLogV2SnapshotScope)
           : ({ kind: "tent", tentId: scope.tentId } as QuickLogV2SnapshotScope);
-      return groupQuickLogTimelineEntries({
+      const groupedEntries = groupQuickLogTimelineEntries({
         actions,
         environmentRows,
         scope: vmScope,
       });
+      return attachQuickLogCompanionSnapshots(
+        groupedEntries,
+        companionRows,
+        vmScope,
+        companionParentActions,
+      ).entries;
     },
-  });
+  };
+}
+
+export function useQuickLogGroupedTimeline(
+  scope: QuickLogGroupedTimelineScope | null,
+  limit: number = QUICK_LOG_GROUPED_TIMELINE_DEFAULT_LIMIT,
+): UseQuickLogGroupedTimelineResult {
+  const query = useQuery(buildQuickLogGroupedTimelineQueryOptions(scope, limit));
 
   // Read-only diary evidence enrichment runs as a separate query so that:
   //  - the primary timeline still renders if diary enrichment fails;

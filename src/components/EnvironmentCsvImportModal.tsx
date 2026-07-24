@@ -11,6 +11,7 @@
  *  - Cancel never inserts.
  */
 import { useCallback, useRef, useState } from "react";
+import { Link, useInRouterContext } from "react-router-dom";
 import {
   Dialog,
   DialogContent,
@@ -34,7 +35,11 @@ import {
 import { parseEnvironmentCSV, type ParsedEnvironmentRow } from "@/lib/csvParser";
 import {
   CSV_IMPORT_DESCRIPTION,
+  CSV_IMPORT_ADD_CURRENT_READING_LABEL,
+  CSV_IMPORT_CONFIRM_LABEL,
+  CSV_IMPORT_HISTORICAL_CONTEXT_NOTE,
   CSV_IMPORT_READING_COPY,
+  CSV_IMPORT_VIEW_HISTORY_LABEL,
   formatCsvPreviewRow,
 } from "@/lib/environmentCsvPreviewCopyRules";
 
@@ -48,6 +53,19 @@ export interface EnvironmentCsvImportModalProps {
     duplicateCount?: number;
     error: string | null;
   }>;
+  /**
+   * Optional post-import handoff destination supplied by the launcher
+   * from its own trusted context (assigned plant, else selected tent).
+   * Pure navigation — the CTA never runs AI Doctor, never creates
+   * alerts or Action Queue items, and is omitted entirely when the
+   * launcher has no trustworthy target.
+   */
+  viewHistoryHref?: string | null;
+  /**
+   * Optional trusted route to Verdant's existing manual sensor form.
+   * Navigation only: it does not save a reading or invoke AI Doctor.
+   */
+  addCurrentReadingHref?: string | null;
 }
 
 const ERROR_COPY: Record<string, string> = {
@@ -59,7 +77,17 @@ const ERROR_COPY: Record<string, string> = {
 };
 
 export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps) {
-  const { open, onOpenChange, onConfirm } = props;
+  const {
+    open,
+    onOpenChange,
+    onConfirm,
+    viewHistoryHref = null,
+    addCurrentReadingHref = null,
+  } = props;
+  // The handoff CTA is a router Link; render it only when a Router is
+  // actually mounted so bare mounts (tests, storybook-style harnesses)
+  // degrade to the Close-only footer instead of crashing.
+  const inRouter = useInRouterContext();
   const [state, setState] = useState<ImportState>(INITIAL_IMPORT_STATE);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -203,7 +231,7 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
                 Cancel
               </Button>
               <Button onClick={handleConfirm} data-testid="csv-import-confirm">
-                Confirm &amp; View on Timeline
+                {CSV_IMPORT_CONFIRM_LABEL}
               </Button>
             </DialogFooter>
           </div>
@@ -220,7 +248,24 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
             <p className="text-sm">
               {buildCsvImportDoneMessage(state.insertedCount, state.duplicateCount)}
             </p>
+            <p className="text-xs text-muted-foreground" data-testid="csv-import-historical-note">
+              {CSV_IMPORT_HISTORICAL_CONTEXT_NOTE}
+            </p>
             <DialogFooter>
+              {addCurrentReadingHref && inRouter ? (
+                <Button asChild data-testid="csv-import-add-current-reading">
+                  <Link to={addCurrentReadingHref} onClick={handleClose}>
+                    {CSV_IMPORT_ADD_CURRENT_READING_LABEL}
+                  </Link>
+                </Button>
+              ) : null}
+              {viewHistoryHref && inRouter ? (
+                <Button asChild variant="secondary" data-testid="csv-import-view-history">
+                  <Link to={viewHistoryHref} onClick={handleClose}>
+                    {CSV_IMPORT_VIEW_HISTORY_LABEL}
+                  </Link>
+                </Button>
+              ) : null}
               <Button onClick={handleClose}>Close</Button>
             </DialogFooter>
           </div>

@@ -20,17 +20,18 @@ vi.mock("react-router-dom", () => ({
     to: string;
     children: React.ReactNode;
     [k: string]: unknown;
-  }) =>
-    React.createElement(
-      "a",
-      { href: typeof to === "string" ? to : "", ...rest },
-      children,
-    ),
+  }) => React.createElement("a", { href: typeof to === "string" ? to : "", ...rest }, children),
 }));
 
 const useDiaryEntriesMock = vi.fn();
 vi.mock("@/hooks/use-diary-entries", () => ({
   useDiaryEntries: () => useDiaryEntriesMock(),
+}));
+
+const useDiaryPhotoDisplayRowsMock = vi.fn();
+vi.mock("@/hooks/useDiaryPhotoDisplayRows", () => ({
+  useDiaryPhotoDisplayRows: (rows: unknown[] | null | undefined) =>
+    useDiaryPhotoDisplayRowsMock(rows),
 }));
 
 import {
@@ -42,14 +43,8 @@ import type { PhotoHistoryRow } from "@/lib/photoHistoryRules";
 import PlantDetailPhotoStrip from "@/components/PlantDetailPhotoStrip";
 
 const ROOT = resolve(__dirname, "../..");
-const HELPER = readFileSync(
-  resolve(ROOT, "src/lib/plantPhotoPreviewStrip.ts"),
-  "utf8",
-);
-const COMPONENT = readFileSync(
-  resolve(ROOT, "src/components/PlantDetailPhotoStrip.tsx"),
-  "utf8",
-);
+const HELPER = readFileSync(resolve(ROOT, "src/lib/plantPhotoPreviewStrip.ts"), "utf8");
+const COMPONENT = readFileSync(resolve(ROOT, "src/components/PlantDetailPhotoStrip.tsx"), "utf8");
 const PAGE = readFileSync(resolve(ROOT, "src/pages/PlantDetail.tsx"), "utf8");
 
 const FORBIDDEN = [
@@ -90,21 +85,14 @@ function row(partial: Partial<PhotoHistoryRow>): PhotoHistoryRow {
 
 describe("buildPlantPhotoStripItems", () => {
   it("returns empty when plantId missing", () => {
-    expect(
-      buildPlantPhotoStripItems({ plantId: null, rows: [row({})] }),
-    ).toEqual([]);
-    expect(
-      buildPlantPhotoStripItems({ plantId: "  ", rows: [row({})] }),
-    ).toEqual([]);
+    expect(buildPlantPhotoStripItems({ plantId: null, rows: [row({})] })).toEqual([]);
+    expect(buildPlantPhotoStripItems({ plantId: "  ", rows: [row({})] })).toEqual([]);
   });
 
   it("filters by plantId exact match", () => {
     const items = buildPlantPhotoStripItems({
       plantId: "p1",
-      rows: [
-        row({ id: "a", plantId: "p1" }),
-        row({ id: "b", plantId: "p2" }),
-      ],
+      rows: [row({ id: "a", plantId: "p1" }), row({ id: "b", plantId: "p2" })],
     });
     expect(items).toHaveLength(1);
     expect(items[0].thumbnailUrl).toBe("https://example.com/img.jpg");
@@ -151,15 +139,13 @@ describe("buildPlantPhotoStripItems", () => {
         photoUrl: `https://example.com/${i}.jpg`,
       }),
     );
-    expect(
-      buildPlantPhotoStripItems({ plantId: "p1", rows: many }),
-    ).toHaveLength(PLANT_PHOTO_STRIP_DEFAULT_LIMIT);
-    expect(
-      buildPlantPhotoStripItems({ plantId: "p1", rows: many, limit: 1 }),
-    ).toHaveLength(3);
-    expect(
-      buildPlantPhotoStripItems({ plantId: "p1", rows: many, limit: 99 }),
-    ).toHaveLength(PLANT_PHOTO_STRIP_MAX_LIMIT);
+    expect(buildPlantPhotoStripItems({ plantId: "p1", rows: many })).toHaveLength(
+      PLANT_PHOTO_STRIP_DEFAULT_LIMIT,
+    );
+    expect(buildPlantPhotoStripItems({ plantId: "p1", rows: many, limit: 1 })).toHaveLength(3);
+    expect(buildPlantPhotoStripItems({ plantId: "p1", rows: many, limit: 99 })).toHaveLength(
+      PLANT_PHOTO_STRIP_MAX_LIMIT,
+    );
   });
 
   it("derives alt text including date label, with fallback", () => {
@@ -209,6 +195,13 @@ describe("buildPlantPhotoStripItems", () => {
 describe("PlantDetailPhotoStrip render", () => {
   beforeEach(() => {
     useDiaryEntriesMock.mockReset();
+    useDiaryPhotoDisplayRowsMock.mockReset();
+    useDiaryPhotoDisplayRowsMock.mockImplementation((rows: unknown[] | null | undefined) => ({
+      rows: rows ?? [],
+      isResolvingPrivatePhotos: false,
+      hasPrivatePhotoError: false,
+      hasPhotoReference: false,
+    }));
   });
 
   it("renders heading", () => {
@@ -230,9 +223,7 @@ describe("PlantDetailPhotoStrip render", () => {
       refetch: vi.fn(),
     });
     render(<PlantDetailPhotoStrip plantId="p1" growId={null} />);
-    expect(
-      screen.getByTestId("plant-detail-photo-strip-loading"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("plant-detail-photo-strip-loading")).toBeInTheDocument();
   });
 
   it("renders empty state copy", () => {
@@ -296,6 +287,36 @@ describe("PlantDetailPhotoStrip render", () => {
     }
   });
 
+  it("opens a parent-owned grower review flow without exposing the source diary id", () => {
+    const onReviewPhoto = vi.fn();
+    useDiaryEntriesMock.mockReturnValue({
+      data: [
+        {
+          id: "photo-diary-entry-private",
+          plant_id: "p1",
+          entry_at: "2026-05-30T10:00:00.000Z",
+          entry_type: "photo",
+          photo_url: "https://example.com/review.jpg",
+          note: "",
+        },
+      ],
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    const { container } = render(
+      <PlantDetailPhotoStrip plantId="p1" growId="g1" onReviewPhoto={onReviewPhoto} />,
+    );
+
+    fireEvent.click(screen.getByTestId("plant-detail-photo-strip-review"));
+    expect(onReviewPhoto).toHaveBeenCalledWith({
+      photoId: "photo-diary-entry-private",
+      dateLabel: expect.any(String),
+      latestReview: null,
+    });
+    expect(container.textContent ?? "").not.toContain("photo-diary-entry-private");
+  });
+
   it("upload CTA invokes onUploadPhoto and does NOT navigate to /logs", () => {
     useDiaryEntriesMock.mockReturnValue({
       data: [],
@@ -304,13 +325,7 @@ describe("PlantDetailPhotoStrip render", () => {
       refetch: vi.fn(),
     });
     const onUploadPhoto = vi.fn();
-    render(
-      <PlantDetailPhotoStrip
-        plantId="p1"
-        growId="g1"
-        onUploadPhoto={onUploadPhoto}
-      />,
-    );
+    render(<PlantDetailPhotoStrip plantId="p1" growId="g1" onUploadPhoto={onUploadPhoto} />);
     const btn = screen.getByTestId("plant-detail-photo-strip-upload");
     // No anchor / href when handler is provided — must stay on Plant Detail.
     expect(btn.tagName.toLowerCase()).toBe("button");
@@ -326,13 +341,7 @@ describe("PlantDetailPhotoStrip render", () => {
       isError: false,
       refetch: vi.fn(),
     });
-    render(
-      <PlantDetailPhotoStrip
-        plantId="p1"
-        growId="g1"
-        onUploadPhoto={vi.fn()}
-      />,
-    );
+    render(<PlantDetailPhotoStrip plantId="p1" growId="g1" onUploadPhoto={vi.fn()} />);
     const btn = screen.getByTestId("plant-detail-photo-strip-upload");
     expect(btn.textContent ?? "").toMatch(/Add photo log/i);
     expect(btn.textContent ?? "").not.toMatch(/Upload photo/i);
@@ -360,9 +369,7 @@ describe("PlantDetailPhotoStrip render", () => {
       refetch: vi.fn(),
     });
     render(<PlantDetailPhotoStrip plantId={null} growId={null} />);
-    const btn = screen.getByTestId(
-      "plant-detail-photo-strip-upload-disabled",
-    );
+    const btn = screen.getByTestId("plant-detail-photo-strip-upload-disabled");
     expect(btn).toBeDisabled();
   });
 
@@ -388,9 +395,7 @@ describe("PlantDetailPhotoStrip render", () => {
       isError: false,
       refetch: vi.fn(),
     });
-    const { container } = render(
-      <PlantDetailPhotoStrip plantId="p1" growId={null} />,
-    );
+    const { container } = render(<PlantDetailPhotoStrip plantId="p1" growId={null} />);
     const text = container.textContent ?? "";
     expect(text).not.toContain("diary-uuid-1234");
     expect(text).not.toContain("user-uuid-5678");

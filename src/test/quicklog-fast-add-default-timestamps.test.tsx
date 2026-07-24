@@ -20,7 +20,6 @@ describe("buildFastAddTimestampDefaults", () => {
     ["diary_note"],
     ["watering"],
     ["feeding"],
-    ["training"],
     ["photo"],
     ["harvest"],
   ] as const)("defaults occurred_at to now for %s", (id) => {
@@ -29,11 +28,14 @@ describe("buildFastAddTimestampDefaults", () => {
     expect(d.captured_at).toBeUndefined();
   });
 
-  it("Environment defaults both captured_at and occurred_at", () => {
-    const d = buildFastAddTimestampDefaults("environment", now);
-    expect(d.occurred_at).toBe(FIXED.toISOString());
-    expect(d.captured_at).toBe(FIXED.toISOString());
-  });
+  it.each([["environment"], ["training"]] as const)(
+    "defaults both captured_at and occurred_at for %s",
+    (id) => {
+      const d = buildFastAddTimestampDefaults(id, now);
+      expect(d.occurred_at).toBe(FIXED.toISOString());
+      expect(d.captured_at).toBe(FIXED.toISOString());
+    },
+  );
 
   it("Diagnosis returns no timestamps (navigation-only)", () => {
     expect(buildFastAddTimestampDefaults("diagnosis", now)).toEqual({});
@@ -43,11 +45,12 @@ describe("buildFastAddTimestampDefaults", () => {
 describe("resolveFastAddIntent — defaults flow into Quick Log prefill", () => {
   const ctx = { plantId: "p1", tentId: null, growId: "g1" };
 
-  it("includes occurred_at in prefill for watering", () => {
+  it("routes watering through the closed V2 intent without legacy timestamps", () => {
     const intent = resolveFastAddIntent("watering", ctx, { now });
-    expect(intent.kind).toBe("open-quicklog");
-    if (intent.kind === "open-quicklog") {
-      expect(intent.prefill.occurred_at).toBe(FIXED.toISOString());
+    expect(intent.kind).toBe("open-quicklog-v2");
+    if (intent.kind === "open-quicklog-v2") {
+      expect(intent.detail).toEqual({ targetKey: "plant:p1", action: "water" });
+      expect(intent.detail).not.toHaveProperty("occurred_at");
     }
   });
 

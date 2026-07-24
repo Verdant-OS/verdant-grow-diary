@@ -16,6 +16,7 @@ import { buildDiaryCalendarViewModel } from "@/lib/diaryCalendarViewModel";
 import {
   buildDiaryCalendarEventDrawerViewModel,
   DIARY_CALENDAR_DRAWER_CLOSE_LABEL,
+  DIARY_CALENDAR_DRAWER_DESCRIPTION,
   DIARY_CALENDAR_DRAWER_VIEW_LABEL,
   DIARY_CALENDAR_DRAWER_PHOTO_EMPTY,
   DIARY_CALENDAR_DRAWER_SENSOR_EMPTY,
@@ -29,7 +30,9 @@ function firstEvent(raw: Parameters<typeof buildDiaryCalendarViewModel>[0]) {
   return buildDiaryCalendarViewModel(raw)[0].events[0];
 }
 
-function openFirstDrawer(rawEntries: any) {
+function openFirstDrawer(
+  rawEntries: Parameters<typeof buildDiaryCalendarViewModel>[0],
+) {
   render(<DiaryCalendarSection rawEntries={rawEntries} />);
   const btns = screen.getAllByRole("button", {
     name: DIARY_CALENDAR_DRAWER_VIEW_LABEL,
@@ -252,6 +255,8 @@ describe("DiaryCalendarSection — event drawer UI", () => {
     ]);
     const drawer = screen.getByTestId("diary-calendar-event-drawer");
     expect(drawer).toBeInTheDocument();
+    expect(drawer).toHaveAttribute("aria-describedby");
+    expect(within(drawer).getByText(DIARY_CALENDAR_DRAWER_DESCRIPTION)).toHaveClass("sr-only");
     expect(within(drawer).getByText("Watering")).toBeInTheDocument();
     expect(within(drawer).getByText("Summary")).toBeInTheDocument();
     expect(within(drawer).getByText("Measurements")).toBeInTheDocument();

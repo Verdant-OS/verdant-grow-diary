@@ -226,6 +226,14 @@ function renderIndex(client: QueryClient, initialPath = "/doctor/sessions") {
   );
 }
 
+// ActionDetail resolves its row through async effects that can exceed
+// testing-library's 1s findBy default AND vitest's 5s per-test timeout on
+// loaded shared CI runners (observed repeatedly across full-suite batches;
+// passes locally in seconds). Raise the per-test budget for this file and
+// give the async-load awaits a generous findBy timeout beneath it.
+vi.setConfig({ testTimeout: 60_000 });
+const FIND_TIMEOUT = { timeout: 30_000 };
+
 beforeEach(() => {
   sessionRows = [makeRow(SESSION_ID), makeRow(OTHER_ID)];
   reviewRows = [];
@@ -293,7 +301,7 @@ describe("AI Doctor review workflow — end-to-end regression", () => {
       // state survives the navigation.
       cleanup();
       renderIndex(client);
-      await screen.findByTestId("ai-doctor-sessions-index-list");
+      await screen.findByTestId("ai-doctor-sessions-index-list", undefined, FIND_TIMEOUT);
 
       // 7: The needs_follow_up chip appears on the session's row.
       await waitFor(() => {
@@ -317,6 +325,8 @@ describe("AI Doctor review workflow — end-to-end regression", () => {
       // 8: reviewStatus=needs_follow_up filter includes our session.
       const reviewFilter = (await screen.findByTestId(
         "ai-doctor-sessions-index-filter-review-status",
+      undefined,
+      FIND_TIMEOUT,
       )) as HTMLSelectElement;
       fireEvent.change(reviewFilter, { target: { value: "needs_follow_up" } });
       await waitFor(() => {
@@ -339,6 +349,8 @@ describe("AI Doctor review workflow — end-to-end regression", () => {
       });
       const savedSelect = (await screen.findByTestId(
         "ai-doctor-sessions-saved-views-select",
+      undefined,
+      FIND_TIMEOUT,
       )) as HTMLSelectElement;
       expect(savedSelect.value).toBe(BUILTIN_SAVED_VIEW_NEEDS_FOLLOW_UP_ID);
       await waitFor(() => {
@@ -375,7 +387,7 @@ describe("AI Doctor review workflow — end-to-end regression", () => {
       // 14+15: Index no longer shows needs_follow_up chip; filter excludes it.
       cleanup();
       renderIndex(client);
-      await screen.findByTestId("ai-doctor-sessions-index-list");
+      await screen.findByTestId("ai-doctor-sessions-index-list", undefined, FIND_TIMEOUT);
       await waitFor(() => {
         const chips = screen.queryAllByTestId(
           "ai-doctor-sessions-index-review-status-chip",
@@ -394,6 +406,8 @@ describe("AI Doctor review workflow — end-to-end regression", () => {
 
       const reviewFilter2 = (await screen.findByTestId(
         "ai-doctor-sessions-index-filter-review-status",
+      undefined,
+      FIND_TIMEOUT,
       )) as HTMLSelectElement;
       fireEvent.change(reviewFilter2, {
         target: { value: "needs_follow_up" },

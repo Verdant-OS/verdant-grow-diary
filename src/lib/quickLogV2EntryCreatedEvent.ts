@@ -23,17 +23,13 @@ export interface QuickLogV2EntryCreatedDetail {
   /** Saved grow_events row id when the save returned one; null otherwise. */
   growEventId: string | null;
   /** Sub-source so listeners can distinguish v2 branches if useful. */
-  source: "quick_log_v2" | "quick_log_v2_feed";
+  source: "quick_log_v2" | "quick_log_v2_water" | "quick_log_v2_feed";
 }
 
-export function dispatchQuickLogV2EntryCreated(
-  detail: QuickLogV2EntryCreatedDetail,
-): boolean {
+export function dispatchQuickLogV2EntryCreated(detail: QuickLogV2EntryCreatedDetail): boolean {
   if (typeof window === "undefined" || typeof window.dispatchEvent !== "function") {
     return false;
   }
-  window.dispatchEvent(
-    new CustomEvent(QUICK_LOG_V2_ENTRY_CREATED_EVENT, { detail }),
-  );
+  window.dispatchEvent(new CustomEvent(QUICK_LOG_V2_ENTRY_CREATED_EVENT, { detail }));
   return true;
 }

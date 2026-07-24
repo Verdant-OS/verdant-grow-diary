@@ -1,8 +1,5 @@
 import { test, expect } from "./lib/authedTest";
-import {
-  validateFixtureEnv,
-  pageTextMatchesFixture,
-} from "./lib/fixtureSafety";
+import { validateQuickLogFixturePage } from "./lib/fixtureSafety";
 
 /**
  * Disposable E2E fixture safety check.
@@ -23,48 +20,16 @@ test("disposable E2E fixture is configured and visible on the target plant page"
   const env = {
     E2E_FIXTURE_MODE: process.env.E2E_FIXTURE_MODE,
     E2E_GROW_1_PLANT_URL: process.env.E2E_GROW_1_PLANT_URL,
-    E2E_FIXTURE_EXPECTED_GROW_NAME:
-      process.env.E2E_FIXTURE_EXPECTED_GROW_NAME,
-    E2E_FIXTURE_EXPECTED_TENT_NAME:
-      process.env.E2E_FIXTURE_EXPECTED_TENT_NAME,
-    E2E_FIXTURE_EXPECTED_PLANT_NAME:
-      process.env.E2E_FIXTURE_EXPECTED_PLANT_NAME,
+    E2E_FIXTURE_EXPECTED_GROW_NAME: process.env.E2E_FIXTURE_EXPECTED_GROW_NAME,
+    E2E_FIXTURE_EXPECTED_TENT_NAME: process.env.E2E_FIXTURE_EXPECTED_TENT_NAME,
+    E2E_FIXTURE_EXPECTED_PLANT_NAME: process.env.E2E_FIXTURE_EXPECTED_PLANT_NAME,
+    E2E_FIXTURE_EXPECTED_ACCOUNT_HINT: process.env.E2E_FIXTURE_EXPECTED_ACCOUNT_HINT,
   };
-
-  const envCheck = validateFixtureEnv(env);
-  expect(
-    envCheck.ok,
-    `Fixture env validation failed:\n - ${envCheck.errors.join("\n - ")}`,
-  ).toBe(true);
 
   await page.goto(env.E2E_GROW_1_PLANT_URL!);
 
   // Confirm we are not bounced back to /auth.
-  await expect
-    .poll(() => page.url(), { timeout: 20_000 })
-    .not.toContain("/auth");
+  await expect.poll(() => page.url(), { timeout: 20_000 }).not.toContain("/auth");
 
-  // The plant page fetches its data asynchronously (it first renders a
-  // "Loading plant" status). Wait for the expected plant name to actually
-  // render before reading page text, otherwise this check asserts against
-  // the loading skeleton and false-negatives a perfectly good fixture.
-  await expect(
-    page.getByText(envCheck.expected.plant, { exact: false }).first(),
-  ).toBeVisible({ timeout: 20_000 });
-
-  // The "Current Tent" context card hydrates from a separate fetch after
-  // the plant header renders — wait for the tent name too, or the text
-  // snapshot below races the card and false-negatives the tent check.
-  await expect(
-    page.getByText(envCheck.expected.tent, { exact: false }).first(),
-  ).toBeVisible({ timeout: 20_000 });
-
-  const bodyText = (await page.locator("body").innerText()).slice(0, 50_000);
-  const pageCheck = pageTextMatchesFixture(bodyText, envCheck.expected, {
-    accountHint: process.env.E2E_FIXTURE_EXPECTED_ACCOUNT_HINT,
-  });
-  expect(
-    pageCheck.ok,
-    `Target page does not look like a disposable E2E fixture:\n - ${pageCheck.errors.join("\n - ")}`,
-  ).toBe(true);
+  await validateQuickLogFixturePage(page, env);
 });

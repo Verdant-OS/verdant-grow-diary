@@ -1,16 +1,29 @@
 /**
- * Upgrade page — returnTo → Paddle successUrl forwarding.
+ * Upgrade page — returnTo → checkout successUrl forwarding.
  *
- * Proves the Paddle checkout `settings.successUrl` carries a sanitized
- * returnTo when present, drops unsafe values, and preserves the default
- * (no returnTo) URL otherwise. Guards against open-redirect / customer-id
- * leakage into the checkout URL.
+ * Proves the successUrl handed to the canonical checkout hook carries a
+ * sanitized returnTo when present, drops unsafe values, and preserves the
+ * default (no returnTo) URL otherwise. Guards against open-redirect /
+ * customer-id leakage into the checkout URL.
+ *
+ * Trunk routed Upgrade's confirm through usePaddleCheckout (M1 audit fix)
+ * instead of a local paddle.Checkout.open call, so the assertion seam is
+ * the hook's openCheckout options; window.Paddle stays stubbed only to
+ * satisfy the page's readiness interlocks.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 const paddleMock = vi.hoisted(() => ({ checkoutOpen: vi.fn() }));
+const canonicalCheckout = vi.hoisted(() => ({ openCheckout: vi.fn() }));
+
+vi.mock("@/hooks/usePaddleCheckout", () => ({
+  usePaddleCheckout: () => ({
+    openCheckout: canonicalCheckout.openCheckout,
+    loading: false,
+  }),
+}));
 
 vi.mock("@/lib/paddleConfig", async () => {
   const actual =
@@ -50,6 +63,7 @@ function renderPage(initialEntry: string) {
 
 beforeEach(() => {
   paddleMock.checkoutOpen.mockReset();
+  canonicalCheckout.openCheckout.mockReset();
   for (const t of PRICING_TIERS) {
     if (t.id === "pro_monthly") t.paddlePriceId = "pri_pro_month";
     if (t.id === "pro_annual") t.paddlePriceId = "pri_pro_annual";
@@ -72,55 +86,59 @@ function confirmCheckout() {
   fireEvent.click(screen.getByTestId("checkout-confirm-continue"));
 }
 
-describe("Upgrade → Paddle successUrl returnTo forwarding", () => {
-  it("forwards a safe returnTo into settings.successUrl (URL-encoded)", () => {
+function openedSuccessUrl(): string {
+  expect(canonicalCheckout.openCheckout).toHaveBeenCalledTimes(1);
+  const options = canonicalCheckout.openCheckout.mock.calls[0][0];
+  return options?.successUrl ?? "";
+}
+
+describe("Upgrade → checkout successUrl returnTo forwarding", () => {
+  it("forwards a safe returnTo into the checkout successUrl (URL-encoded)", () => {
     renderPage("/upgrade?returnTo=/pheno-hunts/new");
     confirmCheckout();
-    expect(paddleMock.checkoutOpen).toHaveBeenCalledTimes(1);
-    const payload = paddleMock.checkoutOpen.mock.calls[0][0];
-    expect(payload.settings?.successUrl).toContain("/checkout/success");
-    expect(payload.settings?.successUrl).toContain(
-      `returnTo=${encodeURIComponent("/pheno-hunts/new")}`,
-    );
+    const url = openedSuccessUrl();
+    expect(url).toContain("/checkout/success");
+    expect(url).toContain(`returnTo=${encodeURIComponent("/pheno-hunts/new")}`);
+    // The page must never bypass the canonical hook with a direct open.
+    expect(paddleMock.checkoutOpen).not.toHaveBeenCalled();
   });
 
   it("drops external-URL returnTo — successUrl falls back to bare /checkout/success", () => {
     renderPage("/upgrade?returnTo=https://evil.example/pwn");
     confirmCheckout();
-    const payload = paddleMock.checkoutOpen.mock.calls[0][0];
-    expect(payload.settings?.successUrl).toMatch(/\/checkout\/success$/);
-    expect(payload.settings?.successUrl).not.toContain("evil.example");
+    const url = openedSuccessUrl();
+    expect(url).toMatch(/\/checkout\/success$/);
+    expect(url).not.toContain("evil.example");
   });
 
   it("drops protocol-relative returnTo", () => {
     renderPage("/upgrade?returnTo=//evil.example/pwn");
     confirmCheckout();
-    const payload = paddleMock.checkoutOpen.mock.calls[0][0];
-    expect(payload.settings?.successUrl).not.toContain("evil.example");
-    expect(payload.settings?.successUrl).toMatch(/\/checkout\/success$/);
+    const url = openedSuccessUrl();
+    expect(url).not.toContain("evil.example");
+    expect(url).toMatch(/\/checkout\/success$/);
   });
 
   it("drops javascript: returnTo", () => {
     renderPage("/upgrade?returnTo=javascript:alert(1)");
     confirmCheckout();
-    const payload = paddleMock.checkoutOpen.mock.calls[0][0];
-    expect(payload.settings?.successUrl).not.toContain("javascript");
-    expect(payload.settings?.successUrl).toMatch(/\/checkout\/success$/);
+    const url = openedSuccessUrl();
+    expect(url).not.toContain("javascript");
+    expect(url).toMatch(/\/checkout\/success$/);
   });
 
   it("omits returnTo entirely when the query param is missing", () => {
     renderPage("/upgrade");
     confirmCheckout();
-    const payload = paddleMock.checkoutOpen.mock.calls[0][0];
-    expect(payload.settings?.successUrl).toMatch(/\/checkout\/success$/);
-    expect(payload.settings?.successUrl).not.toContain("returnTo");
+    const url = openedSuccessUrl();
+    expect(url).toMatch(/\/checkout\/success$/);
+    expect(url).not.toContain("returnTo");
   });
 
   it("never leaks customer/subscription identifiers into successUrl", () => {
     renderPage("/upgrade?returnTo=/pheno-hunts/new");
     confirmCheckout();
-    const payload = paddleMock.checkoutOpen.mock.calls[0][0];
-    const url: string = payload.settings?.successUrl ?? "";
+    const url = openedSuccessUrl();
     expect(url).not.toMatch(/ctm_|sub_|txn_|paddle_customer_id|paddle_subscription_id/i);
   });
 });

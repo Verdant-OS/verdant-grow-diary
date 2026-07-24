@@ -16,7 +16,9 @@ export type AiDoctorContextQuickActionKind =
   | "update_plant_profile"
   | "add_recent_log"
   | "add_manual_sensor_snapshot"
+  | "capture_new_snapshot"
   | "add_plant_photo";
+
 
 export interface AiDoctorContextQuickActionLinkTarget {
   kind: "link";
@@ -39,9 +41,11 @@ export interface AiDoctorContextQuickLogEventPayload {
   growId: string | null;
   tentId: string | null;
   tentName: string | null;
-  eventType: "observation";
+  eventType: "observation" | "environment";
   suggestSnapshot: boolean;
 }
+
+
 
 export interface AiDoctorContextQuickAction {
   kind: AiDoctorContextQuickActionKind;
@@ -55,6 +59,8 @@ export interface AiDoctorContextQuickAction {
   testId: string;
 }
 
+export type AiDoctorSnapshotFreshnessTrigger = "fresh" | "stale" | "missing";
+
 export interface BuildAiDoctorContextQuickActionsArgs {
   missing: readonly string[];
   plantId?: string | null;
@@ -62,12 +68,20 @@ export interface BuildAiDoctorContextQuickActionsArgs {
   growId?: string | null;
   tentId?: string | null;
   tentName?: string | null;
+  /**
+   * Freshness state of the latest manual sensor snapshot. When "stale"
+   * or "missing", a "Capture new snapshot" quick action is appended
+   * that opens the Environment Check Quick Log prefilled with plant
+   * / tent identity context (no sensor values are pre-filled).
+   */
+  snapshotFreshnessState?: AiDoctorSnapshotFreshnessTrigger;
 }
 
 const QUICK_ACTION_LABELS: Record<AiDoctorContextQuickActionKind, string> = {
   update_plant_profile: "Edit plant details",
   add_recent_log: "Add note",
   add_manual_sensor_snapshot: "Add sensor snapshot",
+  capture_new_snapshot: "Capture new snapshot",
   add_plant_photo: "Add photo",
 };
 
@@ -93,11 +107,14 @@ const ACTION_ORDER: AiDoctorContextQuickActionKind[] = [
   "update_plant_profile",
   "add_recent_log",
   "add_manual_sensor_snapshot",
+  "capture_new_snapshot",
   "add_plant_photo",
 ];
 
+
 function quickLogPayload(
   args: BuildAiDoctorContextQuickActionsArgs,
+  eventType: "observation" | "environment" = "observation",
 ): AiDoctorContextQuickLogEventPayload | null {
   if (!args.plantId) return null;
   return {
@@ -106,10 +123,11 @@ function quickLogPayload(
     growId: args.growId ?? null,
     tentId: args.tentId ?? null,
     tentName: args.tentName ?? null,
-    eventType: "observation",
+    eventType,
     suggestSnapshot: true,
   };
 }
+
 
 function buildAction(
   kind: AiDoctorContextQuickActionKind,
@@ -161,8 +179,27 @@ function buildAction(
         testId,
       };
     }
+    case "capture_new_snapshot": {
+      const payload = quickLogPayload(args, "environment");
+      return {
+        kind,
+        label: QUICK_ACTION_LABELS[kind],
+        satisfies,
+        target: {
+          kind: "event",
+          eventName: PLANT_QUICKLOG_PREFILL_EVENT,
+          payload,
+        },
+        disabled: !args.plantId,
+        disabledReason: args.plantId
+          ? undefined
+          : "Plant context is not loaded yet.",
+        testId,
+      };
+    }
   }
 }
+
 
 /**
  * Build the deterministic list of quick actions that address the given
@@ -180,6 +217,18 @@ export function buildAiDoctorContextQuickActions(
     if (!prev.includes(code)) prev.push(code);
     bucket.set(kind, prev);
   }
+  // "Capture new snapshot" is triggered by freshness state (stale /
+  // missing), independent of the 7-day missing-context code. Tagged
+  // with a synthetic satisfies code so downstream tests/analytics can
+  // distinguish it from the 7-day surface.
+  if (
+    args.snapshotFreshnessState === "stale" ||
+    args.snapshotFreshnessState === "missing"
+  ) {
+    bucket.set("capture_new_snapshot", [
+      `snapshot-freshness-${args.snapshotFreshnessState}`,
+    ]);
+  }
   const out: AiDoctorContextQuickAction[] = [];
   for (const kind of ACTION_ORDER) {
     const codes = bucket.get(kind);
@@ -188,6 +237,7 @@ export function buildAiDoctorContextQuickActions(
   }
   return out;
 }
+
 
 /** Calm, non-actionable copy when no warning context exists. */
 export const AI_DOCTOR_NO_WARNING_CONTEXT_COPY = "No warning context found.";

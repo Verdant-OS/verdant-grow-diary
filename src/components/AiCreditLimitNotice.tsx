@@ -4,6 +4,7 @@
  * kind (which itself branches on the server-supplied credit.plan_id).
  * No fetching, no entitlements logic.
  */
+import { Link } from "react-router-dom";
 import PaywallCta from "@/components/PaywallCta";
 import {
   buildAiCreditLimitNoticeViewModel,
@@ -17,6 +18,19 @@ export interface AiCreditLimitNoticeProps {
   currentPlanLabel?: string;
   /** Defaults to "doctor". Pass "coach" for AI Coach surface copy. */
   surface?: AiCreditLimitNoticeSurface;
+  /** Optional same-origin route to restore after a confirmed checkout. */
+  returnTo?: string | null;
+  /**
+   * Optional explicit intent callback for the rendered Free-plan CTA only.
+   * It is intentionally never attached to paid/founder/unknown notices.
+   */
+  onUpsellCtaClick?: () => void;
+  /**
+   * Optional analytics-intent callback for the paid "wait" notice's
+   * buy-a-credit-pack link. Navigation happens via the Link regardless; this is
+   * a privacy-safe funnel hook only, never a checkout.
+   */
+  onBuyCreditsClick?: () => void;
   "data-testid"?: string;
 }
 
@@ -24,20 +38,24 @@ export default function AiCreditLimitNotice({
   credit,
   currentPlanLabel,
   surface,
+  returnTo,
+  onUpsellCtaClick,
+  onBuyCreditsClick,
   ...rest
 }: AiCreditLimitNoticeProps) {
   const testId = rest["data-testid"] ?? "ai-credit-limit-notice";
   // Defensive client-side bypass: founder/paid viewers never see the
   // upsell prompt even if the server denial mis-tagged plan_id="free".
   // Server usage logging is unaffected — this only changes notice copy.
-  const { entitlement } = useMyEntitlements();
+  const { entitlement, lookupFailed } = useMyEntitlements();
   const vm = buildAiCreditLimitNoticeViewModel({
     credit,
     currentPlanLabel,
     surface,
+    returnTo,
     viewerEntitlement: entitlement,
+    viewerEntitlementVerified: !lookupFailed,
   });
-
 
   if (vm.kind === "upsell" && vm.paywallVm) {
     return (
@@ -48,10 +66,7 @@ export default function AiCreditLimitNotice({
         className="space-y-3"
       >
         <header>
-          <h3
-            id={`${testId}-title`}
-            className="text-base font-semibold tracking-tight"
-          >
+          <h3 id={`${testId}-title`} className="text-base font-semibold tracking-tight">
             {vm.title}
           </h3>
           <p className="mt-1 text-sm text-muted-foreground">{vm.body}</p>
@@ -59,6 +74,7 @@ export default function AiCreditLimitNotice({
         <PaywallCta
           vm={vm.paywallVm}
           data-testid={`${testId}-paywall`}
+          onPrimaryCtaClick={onUpsellCtaClick}
         />
       </section>
     );
@@ -71,13 +87,20 @@ export default function AiCreditLimitNotice({
       aria-labelledby={`${testId}-title`}
       className="rounded-xl border border-border/60 bg-card/40 p-4"
     >
-      <h3
-        id={`${testId}-title`}
-        className="text-base font-semibold tracking-tight"
-      >
+      <h3 id={`${testId}-title`} className="text-base font-semibold tracking-tight">
         {vm.title}
       </h3>
       <p className="mt-2 text-sm text-muted-foreground">{vm.body}</p>
+      {vm.kind === "wait" ? (
+        <Link
+          to="/pricing#buy-credits"
+          data-testid={`${testId}-buy-credits`}
+          className="mt-3 inline-flex text-sm font-medium text-primary underline underline-offset-4"
+          onClick={onBuyCreditsClick}
+        >
+          Need more now? Buy a one-time credit pack
+        </Link>
+      ) : null}
     </section>
   );
 }

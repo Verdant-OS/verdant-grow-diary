@@ -50,6 +50,17 @@ vi.mock("@/integrations/supabase/client", () => {
     chain.maybeSingle = async () => result;
     return chain;
   };
+  // The subscriptions read is a windowed list query awaited directly (no
+  // maybeSingle), so its chain must be a thenable resolving { data: rows[] }.
+  const makeListChain = (result: QueryResult) => {
+    const chain: Record<string, unknown> = {};
+    chain.select = () => chain;
+    chain.eq = () => chain;
+    chain.order = () => chain;
+    chain.limit = () => chain;
+    chain.then = (resolve: (v: QueryResult) => void) => resolve(result);
+    return chain;
+  };
   return {
     supabase: {
       from: (table: string) => {
@@ -57,7 +68,13 @@ vi.mock("@/integrations/supabase/client", () => {
         if (table === "user_roles") return makeChain(currentPlan.value.roles);
         // Phase 2b: hook also reads public.subscriptions (Lovable Paddle sink).
         // Default to empty; tests can override via currentPlan.value.lovable.
-        if (table === "subscriptions") return makeChain((currentPlan.value as unknown as {lovable?: QueryResult}).lovable ?? { data: null, error: null });
+        if (table === "subscriptions")
+          return makeListChain(
+            (currentPlan.value as unknown as { lovable?: QueryResult }).lovable ?? {
+              data: [],
+              error: null,
+            },
+          );
         return makeChain({ data: null, error: null });
       },
     },

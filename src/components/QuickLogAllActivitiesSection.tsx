@@ -51,6 +51,11 @@ import {
   QUICK_LOG_DETAIL_TEXT_MAX,
 } from "@/lib/quickLogActivityDetailFields";
 import {
+  buildQuickLogSubmissionTimestamps,
+  seedLoggedAtIso,
+  validateOccurredAtInput,
+} from "@/lib/quickLogTimestampRules";
+import {
   buildDailyCheckSavedItems,
   type DailyCheckSavedItem,
   type DailyCheckSavedSource,
@@ -91,6 +96,23 @@ export interface QuickLogAllActivitiesSectionProps {
   onBeforeStructuredWaterOpen?: () => void;
   /** Caller-owned fail-closed reason that must prevent every persistence path. */
   externalPersistenceBlockReason?: string | null;
+  /**
+   * "Captured" seed from the launching surface (Fast Add preset click).
+   * When absent, the section seeds its own form-open time.
+   */
+  defaultLoggedAtIso?: string | null;
+  /**
+   * Display-only label of the current target (e.g. "Blue Dream · Tent 2").
+   * Renders as a chip on the capture form so the grower always sees what
+   * they are logging against.
+   */
+  targetLabel?: string | null;
+  /**
+   * Parent-owned retarget affordance (the parent owns target selection).
+   * When provided, the chip shows a "Change" action that invokes it —
+   * timestamps in this section survive the change (see target-change effect).
+   */
+  onRequestTargetChange?: (() => void) | null;
 }
 
 export interface QuickLogAllActivitiesSaveTarget {
@@ -155,6 +177,9 @@ export default function QuickLogAllActivitiesSection({
   isSaveBlocked,
   onBeforeStructuredWaterOpen,
   externalPersistenceBlockReason = null,
+  defaultLoggedAtIso = null,
+  targetLabel = null,
+  onRequestTargetChange = null,
 }: QuickLogAllActivitiesSectionProps) {
   const currentTarget = useMemo(
     () => buildQuickLogTargetIdentity({ growId, tentId, plantId }),
@@ -177,6 +202,13 @@ export default function QuickLogAllActivitiesSection({
   // Generic per-activity structured detail values (e.g. training technique),
   // keyed by field spec key. Sanitized before persistence.
   const [detailValues, setDetailValues] = useState<Record<string, string>>({});
+  // Dual timestamps (founder-locked model): occurredAtLocal = backdatable
+  // "when it happened" (datetime-local; blank = "now" → server stamps commit
+  // time); loggedAtIso = "Captured" — seeded when the activity form OPENS,
+  // overridable, persisted as details.logged_at (the report/calendar grouping
+  // key). Both are frozen at submit beside the idempotency key (#317 hash).
+  const [occurredAtLocal, setOccurredAtLocal] = useState("");
+  const [loggedAtIso, setLoggedAtIso] = useState("");
   // Photo activity: a real image is REQUIRED before Save — a photo entry with
   // no image must never be confirmable. Uploaded to the private diary-photos
   // bucket; the diary row's photo_url column carries the bare storage path.
@@ -196,17 +228,30 @@ export default function QuickLogAllActivitiesSection({
 
     // Drafts and receipts are target-specific. Never carry plant A's state
     // into plant B's Quick Log surface.
-    setSelectedDraft(null);
+    // Retarget continuity: REBIND an open draft to the new target instead of
+    // discarding it — the pre-persistence gate re-checks draft-vs-current
+    // target at save time, so a rebound draft stays fail-closed while the
+    // grower keeps their place (and the chip shows the new target).
+    setSelectedDraft((prev) =>
+      prev ? bindQuickLogActivityDraft(prev.activityId, currentTarget) : null,
+    );
     setNote("");
     setHarvestWet("");
     setHarvestDry("");
     setHarvestUnit("g");
     setDetailValues({});
+    // Deliberately NOT resetting occurredAtLocal / loggedAtIso here: the
+    // dual timestamps are grower record-keeping (when it happened / when it
+    // was captured), not target-bound state — retargeting mid-entry must
+    // never lose them. Content fields above still reset fail-closed so a
+    // note about plant A can never silently save against plant B.
     setPhotoFile(null);
     setErrorReason(null);
     setErrorForActivity(null);
     setStructuredWaterError(null);
     setSaved([]);
+    // currentTarget is stable per currentTargetKey (memo of the same inputs).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentTargetKey]);
 
   const canPersistManualSensor = false; // Deferred to ManualSensorReadingCard.
@@ -233,6 +278,12 @@ export default function QuickLogAllActivitiesSection({
   const detailNumbersInvalid = detailNumberValidations.some((v) => !v.ok);
   const firstDetailNumberError =
     detailNumberValidations.find((v) => !v.ok)?.error ?? null;
+  // Blocking gate for the backdatable happened-at field (unparseable or
+  // future values must block, never silently reinterpret).
+  const occurredAtValidation = useMemo(
+    () => validateOccurredAtInput(occurredAtLocal, Date.now()),
+    [occurredAtLocal],
+  );
   const selectedAvailability = useMemo(
     () =>
       selected
@@ -290,10 +341,15 @@ export default function QuickLogAllActivitiesSection({
       setHarvestDry("");
       setHarvestUnit("g");
       setDetailValues({});
+      setOccurredAtLocal("");
+      // "Captured" seeds from the launcher click when provided (Fast Add),
+      // else at the moment the capture surface opens.
+      setLoggedAtIso(defaultLoggedAtIso ?? seedLoggedAtIso(Date.now()));
       setPhotoFile(null);
     },
     [
       currentTarget,
+      defaultLoggedAtIso,
       externalPersistenceBlockReason,
       growId,
       isMutationBlocked,
@@ -365,6 +421,11 @@ export default function QuickLogAllActivitiesSection({
       setErrorForActivity(selected.id);
       return;
     }
+    if (!occurredAtValidation.ok) {
+      setErrorReason(occurredAtValidation.error ?? "Fix the happened-at field before saving.");
+      setErrorForActivity(selected.id);
+      return;
+    }
 
     // Harvest optional weight details — sanitized in the shared rules
     // module. Empty / invalid / negative values are dropped, never sent.
@@ -409,6 +470,13 @@ export default function QuickLogAllActivitiesSection({
 
     try {
       const idempotencyKey = newIdempotencyKey(selected.id);
+      // Freeze BOTH timestamps once per logical submission, beside the key
+      // (#317: the event route hashes p_occurred_at + p_details for dedupe).
+      const submissionTimestamps = buildQuickLogSubmissionTimestamps({
+        loggedAtRaw: loggedAtIso,
+        occurredAtRaw: occurredAtLocal,
+        now: Date.now(),
+      });
       if (selected.id === "photo") {
         // Photo goes diary-only through the proven QuickLog photo-attachment
         // path (upload to the private diary-photos bucket, then one
@@ -449,12 +517,21 @@ export default function QuickLogAllActivitiesSection({
           for (const [k, v] of Object.entries(extraDetails)) {
             if (typeof v === "string") photoExtraDetails[k] = v;
           }
+          photoExtraDetails.logged_at = submissionTimestamps.loggedAtIso;
           const entryResult = await createQuickLogPhotoDiaryEntry({
             growId: capturedTarget.growId,
             tentId: capturedTarget.tentId,
             plantId: capturedTarget.plantId,
             photoPath: path,
-            noteRaw: note,
+            // Photo History derives its gallery caption from entry.note —
+            // when the grower typed no note, the structured caption stands in
+            // so their entered text is never invisible (Codex F13).
+            noteRaw:
+              note.trim() !== ""
+                ? note
+                : typeof extraDetails.caption === "string"
+                  ? extraDetails.caption
+                  : "",
             action: "photo",
             // Displayable type: the standalone Photo activity badges as Photo
             // on Timeline/Recent Activity (allow-listed), unlike the V2-sheet
@@ -462,6 +539,9 @@ export default function QuickLogAllActivitiesSection({
             eventType: "photo",
             extraDetails:
               Object.keys(photoExtraDetails).length > 0 ? photoExtraDetails : null,
+            // entry_at honors a backdated happened-at; defaults to now.
+            now: () =>
+              new Date(submissionTimestamps.occurredAtIso ?? Date.now()),
           });
           if (!entryResult.ok) {
             // (strictNullChecks is off in this app config, so cast the failure
@@ -486,17 +566,15 @@ export default function QuickLogAllActivitiesSection({
           });
           trackQuickLogSuccess("photo", { reused: false });
         } catch {
-          // A REJECTED promise (network interruption) must never escape the
-          // click handler as a silent nothing: surface the failure and clean
-          // up an already-uploaded object so no orphan is left behind.
-          if (uploadedPath) {
-            try {
-              await supabase.storage.from("diary-photos").remove([uploadedPath]);
-            } catch {
-              // Best-effort only.
-            }
-          }
-          setErrorReason("Photo save failed. Nothing was saved.");
+          // A REJECTED promise is AMBIGUOUS (Codex F12): the insert may have
+          // committed with only its response lost — deleting the upload here
+          // could leave a real diary row pointing at a removed image, and a
+          // "nothing was saved" message would invite a duplicate retry.
+          // Mirror the V2 sheet: surface uncertainty, keep the object, and
+          // let removal happen ONLY on the confirmed {ok:false} path above.
+          setErrorReason(
+            "Could not confirm the photo attachment; it may still appear in history.",
+          );
           setErrorForActivity(selected.id);
           return;
         } finally {
@@ -511,6 +589,8 @@ export default function QuickLogAllActivitiesSection({
           note: note.trim().length > 0 ? note.trim() : null,
           idempotencyKey,
           extraDetails: Object.keys(extraDetails).length > 0 ? extraDetails : null,
+          occurredAt: submissionTimestamps.occurredAtIso,
+          loggedAt: submissionTimestamps.loggedAtIso,
         });
 
         if (!result.ok) {
@@ -550,6 +630,8 @@ export default function QuickLogAllActivitiesSection({
       setHarvestDry("");
       setHarvestUnit("g");
       setDetailValues({});
+      setOccurredAtLocal("");
+      setLoggedAtIso("");
       setPhotoFile(null);
       setSelectedDraft(null);
       setErrorReason(null);
@@ -579,6 +661,9 @@ export default function QuickLogAllActivitiesSection({
     detailValues,
     detailNumbersInvalid,
     firstDetailNumberError,
+    occurredAtValidation,
+    occurredAtLocal,
+    loggedAtIso,
     user,
     photoFile,
     onSaveStart,
@@ -654,6 +739,31 @@ export default function QuickLogAllActivitiesSection({
             <p className="text-xs font-medium">{selected.label}</p>
             <p className="text-[11px] text-muted-foreground">{selected.safetyNote}</p>
           </div>
+
+          {targetLabel && (
+            <div
+              className="flex items-center gap-2 flex-wrap"
+              data-testid={`${testIdPrefix}-target-chip`}
+            >
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-border/50 bg-secondary/40 px-2.5 py-0.5 text-[11px]">
+                Logging against: <span className="font-medium">{targetLabel}</span>
+              </span>
+              {onRequestTargetChange && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isMutationBlocked()) return;
+                    onRequestTargetChange();
+                  }}
+                  disabled={mutationBlocked}
+                  className="text-[11px] underline text-muted-foreground hover:text-foreground disabled:opacity-50"
+                  data-testid={`${testIdPrefix}-target-chip-change`}
+                >
+                  Change (keeps your timestamps)
+                </button>
+              )}
+            </div>
+          )}
 
           {selected.id === "harvest" && selectedAvailability?.disabled && (
             <p
@@ -742,6 +852,78 @@ export default function QuickLogAllActivitiesSection({
                   )}
                 </div>
               ))}
+            </div>
+          )}
+
+          {selected.id === "training" && (
+            <div
+              className="grid grid-cols-1 sm:grid-cols-2 gap-2"
+              data-testid={`${testIdPrefix}-timestamps`}
+            >
+              <div className="space-y-1">
+                <Label
+                  htmlFor={`${testIdPrefix}-occurred-at`}
+                  className="text-[11px] text-muted-foreground"
+                >
+                  Happened at (optional — blank means now)
+                </Label>
+                <Input
+                  id={`${testIdPrefix}-occurred-at`}
+                  data-testid={`${testIdPrefix}-occurred-at`}
+                  type="datetime-local"
+                  value={occurredAtLocal}
+                  onChange={(e) => {
+                    if (isMutationBlocked()) return;
+                    setOccurredAtLocal(e.target.value);
+                  }}
+                  disabled={mutationBlocked}
+                  aria-invalid={!occurredAtValidation.ok}
+                  className="text-sm"
+                />
+                {occurredAtValidation.error && (
+                  <p
+                    role="alert"
+                    className="text-[11px] text-destructive"
+                    data-testid={`${testIdPrefix}-occurred-at-error`}
+                  >
+                    {occurredAtValidation.error}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-1">
+                <Label
+                  htmlFor={`${testIdPrefix}-logged-at`}
+                  className="text-[11px] text-muted-foreground"
+                >
+                  Captured (when you logged this)
+                </Label>
+                <Input
+                  id={`${testIdPrefix}-logged-at`}
+                  data-testid={`${testIdPrefix}-logged-at`}
+                  type="datetime-local"
+                  // Seeded at form open as ISO; datetime-local wants the
+                  // local wall-clock minute slice — derive it for display and
+                  // store the grower's override back as the raw local string
+                  // (the freeze point converts faithfully at submit).
+                  value={
+                    loggedAtIso.includes("T") && loggedAtIso.endsWith("Z")
+                      ? (() => {
+                          const d = new Date(loggedAtIso);
+                          const pad = (n: number) => String(n).padStart(2, "0");
+                          return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(
+                            d.getDate(),
+                          )}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                        })()
+                      : loggedAtIso
+                  }
+                  onChange={(e) => {
+                    if (isMutationBlocked()) return;
+                    setLoggedAtIso(e.target.value);
+                  }}
+                  disabled={mutationBlocked}
+                  className="text-sm"
+                />
+              </div>
             </div>
           )}
 
@@ -955,7 +1137,8 @@ export default function QuickLogAllActivitiesSection({
                 (requiresNote && note.trim().length === 0) ||
                 (selected.id === "harvest" && harvestWeightsInvalid) ||
                 (selected.id === "photo" && !photoFile) ||
-                detailNumbersInvalid
+                detailNumbersInvalid ||
+                !occurredAtValidation.ok
               }
               data-testid={`${testIdPrefix}-save`}
             >

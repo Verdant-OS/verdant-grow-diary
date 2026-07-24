@@ -293,6 +293,10 @@ export const QUICK_LOG_DETAIL_FIELD_KEYS: ReadonlySet<string> = new Set([
   // Written by useQuickLogActivitySave's metadata fence (e.g. "defoliation",
   // "issue"); machine routing data, never useful as a raw chip.
   "subtype",
+  // Dual-timestamp keys on quick-log companions: consumed by the
+  // observation-time resolver / read layers, never raw chips.
+  "logged_at",
+  "event_type",
 ]);
 
 function optionLabel(spec: QuickLogDetailFieldSpec, value: string): string | null {

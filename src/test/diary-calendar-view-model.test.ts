@@ -298,3 +298,30 @@ describe("diary calendar static safety", () => {
     expect(serialized).not.toMatch(/uid_hidden/);
   });
 });
+
+
+describe("Captured (logged_at) grouping", () => {
+  it("buckets a diary entry by details.logged_at when present, not entry_at", () => {
+    const groups = buildDiaryCalendarViewModel([
+      {
+        id: "e1",
+        entry_at: "2026-07-24T02:00:00Z",
+        event_type: "training",
+        details: { logged_at: "2026-07-22T21:00:00Z" },
+      },
+    ]);
+    expect(groups.map((g) => g.dateKey)).toEqual(["2026-07-22"]);
+  });
+
+  it("falls back to entry_at when logged_at is junk", () => {
+    const groups = buildDiaryCalendarViewModel([
+      {
+        id: "e2",
+        entry_at: "2026-07-24T02:00:00Z",
+        event_type: "watering",
+        details: { logged_at: "not-a-date" },
+      },
+    ]);
+    expect(groups.map((g) => g.dateKey)).toEqual(["2026-07-24"]);
+  });
+});

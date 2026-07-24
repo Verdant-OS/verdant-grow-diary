@@ -16,6 +16,7 @@ import {
   buildEcCompensationPreview,
   type EcCompensationPreviewModel,
 } from "@/lib/ecCompensationPreviewViewModel";
+import { resolveDiaryEntryObservationTime } from "@/lib/quickLogTimestampRules";
 import type { EcUnit } from "@/constants/units";
 import {
   buildEnvironmentCheckTimelineViewModel,
@@ -530,7 +531,9 @@ export function buildDiaryCalendarViewModel(
     if (!raw || typeof raw.id !== "string" || !raw.id) continue;
     const kind = extractKind(raw);
     if (!kind) continue;
-    const iso = toIso(raw.entry_at ?? raw.occurred_at ?? null);
+    // "Captured" grouping: prefer details.logged_at (when the grower logged
+    // it) with entry_at/occurred_at fallback — resolver never invents.
+    const iso = toIso(resolveDiaryEntryObservationTime(raw) ?? null);
     if (!iso) continue;
 
     const noteSnippet = safeNote(raw.note);

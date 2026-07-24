@@ -289,7 +289,9 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     expect(screen.queryByTestId("quick-log-all-activities-saved-item")).toBeNull();
   });
 
-  it("Photo insert REJECTION surfaces an error and removes the orphaned upload", async () => {
+  it("Photo insert REJECTION is treated as AMBIGUOUS: uncertainty copy, upload KEPT", async () => {
+    // A rejected insert may have committed with only its response lost —
+    // removing the upload could orphan a real row's image (Codex F12).
     diaryInsertMock.mockImplementationOnce(async () => {
       throw new Error("network interrupted");
     });
@@ -304,12 +306,49 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
 
     await waitFor(() =>
       expect(screen.getByTestId("quick-log-all-activities-error")).toHaveTextContent(
-        /photo save failed/i,
+        /could not confirm the photo attachment/i,
       ),
     );
-    // The uploaded object is cleaned up, and no success artifacts appear.
+    expect(storageRemoveMock).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("quick-log-all-activities-saved-item")).toBeNull();
+  });
+
+  it("Photo confirmed insert FAILURE ({ok:false}) removes the orphaned upload", async () => {
+    diaryInsertMock.mockImplementationOnce(async () => ({
+      error: { message: "row rejected" },
+    }));
+    mountSection();
+    selectActivity("photo");
+    await screen.findByTestId("quick-log-all-activities-form");
+    const file = new File(["img-bytes"], "bud.jpg", { type: "image/jpeg" });
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-photo-file"), {
+      target: { files: [file] },
+    });
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
+
     await waitFor(() => expect(storageRemoveMock).toHaveBeenCalledTimes(1));
     expect(screen.queryByTestId("quick-log-all-activities-saved-item")).toBeNull();
+  });
+
+  it("Photo caption stands in as the diary note when no note was typed (Photo History)", async () => {
+    mountSection();
+    selectActivity("photo");
+    await screen.findByTestId("quick-log-all-activities-form");
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-detail-caption"), {
+      target: { value: "day 40 canopy" },
+    });
+    const file = new File(["img-bytes"], "bud.jpg", { type: "image/jpeg" });
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-photo-file"), {
+      target: { files: [file] },
+    });
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
+
+    await waitFor(() => expect(diaryInsertMock).toHaveBeenCalledTimes(1));
+    const [, row] = diaryInsertMock.mock.calls[0] as unknown as [
+      string,
+      Record<string, unknown>,
+    ];
+    expect(row.note).toBe("day 40 canopy");
   });
 
   it("Issue/Observation → quicklog_save_event carries observed sign + location (never a cause)", async () => {
@@ -392,6 +431,121 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
     expect(rpcMock).not.toHaveBeenCalled();
     expect(screen.queryByTestId("quick-log-all-activities-saved-item")).toBeNull();
+  });
+
+  it("Training backdate: happened-at forwards as p_occurred_at; Captured rides details.logged_at", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: { ok: true, grow_event_id: "e-ts" },
+      error: null,
+    });
+    mountSection();
+    selectActivity("training");
+    await screen.findByTestId("quick-log-all-activities-form");
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-occurred-at"), {
+      target: { value: "2026-07-20T09:30" },
+    });
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-note"), {
+      target: { value: "topped three days ago, logging now" },
+    });
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
+
+    await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(1));
+    const [, args] = rpcMock.mock.calls[0];
+    // Backdated moment converts via the local clock (tz-naive datetime-local).
+    expect(args.p_occurred_at).toBe(new Date("2026-07-20T09:30").toISOString());
+    // "Captured" (form-open seed) persists for report/calendar grouping.
+    expect(typeof args.p_details.logged_at).toBe("string");
+    expect(Number.isFinite(Date.parse(args.p_details.logged_at))).toBe(true);
+  });
+
+  it("Training blank happened-at sends null so the server stamps commit time (today's behavior)", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: { ok: true, grow_event_id: "e-ts2" },
+      error: null,
+    });
+    mountSection();
+    await saveWithNote("training", "just now");
+    await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(1));
+    const [, args] = rpcMock.mock.calls[0];
+    expect(args.p_occurred_at).toBeNull();
+  });
+
+  it("Training future happened-at BLOCKS the save with an inline error (no RPC)", async () => {
+    mountSection();
+    selectActivity("training");
+    await screen.findByTestId("quick-log-all-activities-form");
+    const future = new Date(Date.now() + 60 * 60 * 1000);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const futureLocal = `${future.getFullYear()}-${pad(future.getMonth() + 1)}-${pad(
+      future.getDate(),
+    )}T${pad(future.getHours())}:${pad(future.getMinutes())}`;
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-occurred-at"), {
+      target: { value: futureLocal },
+    });
+    expect(
+      screen.getByTestId("quick-log-all-activities-occurred-at-error"),
+    ).toHaveTextContent(/future/i);
+    expect(screen.getByTestId("quick-log-all-activities-save")).toBeDisabled();
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+
+  it("mid-open retarget: timestamps survive, draft resets, save binds the NEW target", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: { ok: true, grow_event_id: "e-retarget" },
+      error: null,
+    });
+    const view = mountSection({ targetLabel: "Plant A · Tent 1" });
+    selectActivity("training");
+    await screen.findByTestId("quick-log-all-activities-form");
+    // Chip shows the current target with the timestamp-preserving change affordance.
+    expect(screen.getByTestId("quick-log-all-activities-target-chip")).toHaveTextContent(
+      /plant a · tent 1/i,
+    );
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-occurred-at"), {
+      target: { value: "2026-07-20T09:30" },
+    });
+
+    // Parent retargets (plant swap) mid-open — the fail-closed effect must
+    // reset the draft selection but PRESERVE the grower's timestamps.
+    view.rerender(
+      <QuickLogAllActivitiesSection
+        growId={GROW}
+        tentId={TENT}
+        plantId="plant-2"
+        plantStage="flower"
+        targetLabel="Plant B · Tent 1"
+      />,
+    );
+    // The draft REBINDS to the new target — the form stays open (content
+    // fields reset fail-closed; the pre-persistence gate re-checks at save).
+    expect(screen.getByTestId("quick-log-all-activities-form")).toBeInTheDocument();
+    // Timestamps survived the retarget.
+    expect(screen.getByTestId("quick-log-all-activities-occurred-at")).toHaveValue(
+      "2026-07-20T09:30",
+    );
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-note"), {
+      target: { value: "after retarget" },
+    });
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
+    await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(1));
+    const [, args] = rpcMock.mock.calls[0];
+    // The save binds the NEW plant and keeps the preserved backdate.
+    expect(args.p_plant_id).toBe("plant-2");
+    expect(args.p_occurred_at).toBe(new Date("2026-07-20T09:30").toISOString());
+  });
+
+  it("Fast Add prefill seed: defaultLoggedAtIso flows into details.logged_at", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: { ok: true, grow_event_id: "e-seed" },
+      error: null,
+    });
+    const SEED = "2026-07-24T05:00:00.000Z";
+    mountSection({ defaultLoggedAtIso: SEED });
+    await saveWithNote("training", "seeded from fast add");
+    await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(1));
+    const [, args] = rpcMock.mock.calls[0];
+    expect(args.p_details.logged_at).toBe(SEED);
   });
 
   it("Training drops an unchosen (blank) technique — no technique key in p_details", async () => {
@@ -485,7 +639,10 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     expect(args.p_event_type).toBe("training");
     // The diary companion carries its type inside details (badge recovery);
     // no subtype/technique for plain training with nothing chosen.
-    expect(args.p_details).toEqual({ event_type: "training" });
+    expect(args.p_details).toEqual({
+      event_type: "training",
+      logged_at: expect.any(String),
+    });
   });
 
   it("Defoliation → event_type=training + details.subtype=defoliation (fence)", async () => {
@@ -502,6 +659,7 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
       subtype: "defoliation",
       technique: "defoliation",
       event_type: "training",
+      logged_at: expect.any(String),
     });
   });
 
@@ -533,7 +691,11 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     await saveWithNote("issue_observation", "yellowing on fan leaf");
     const [, args] = rpcMock.mock.calls[0];
     expect(args.p_event_type).toBe("observation");
-    expect(args.p_details).toEqual({ subtype: "issue", event_type: "observation" });
+    expect(args.p_details).toEqual({
+      subtype: "issue",
+      event_type: "observation",
+      logged_at: expect.any(String),
+    });
   });
 });
 
@@ -794,6 +956,7 @@ describe("QuickLogAllActivitiesSection — Harvest v1b.next hardening", () => {
     expect(args.p_details).toEqual({
       harvest: { wetWeight: "12.5", dryWeight: "3.25", weightUnit: "g" },
       event_type: "harvest",
+      logged_at: expect.any(String),
     });
     const items = await screen.findAllByTestId(
       "quick-log-all-activities-saved-item",

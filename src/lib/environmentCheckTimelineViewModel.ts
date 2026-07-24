@@ -15,6 +15,8 @@
  *     parses note text aggressively.
  */
 
+import { resolveDiaryEntryObservationTime } from "@/lib/quickLogTimestampRules";
+
 export const ENVIRONMENT_CHECK_TIMELINE_TITLE = "Environment check" as const;
 export const ENVIRONMENT_CHECK_TIMELINE_SOURCE_LABEL =
   "Quick Log environment check — not live sensor telemetry" as const;
@@ -167,7 +169,9 @@ export function buildEnvironmentCheckTimelineViewModel(
     if (!isEnvironmentCheckTimelineEntry(raw)) return null;
     const id = asString(raw.id);
     if (!id) return null;
-    const occurredAt = toIso(raw.entry_at ?? raw.occurred_at);
+    const occurredAt = toIso(
+      resolveDiaryEntryObservationTime(raw) ?? raw.entry_at ?? raw.occurred_at,
+    );
     if (!occurredAt) return null;
 
     const envelope = pickEnvelope(raw.details);

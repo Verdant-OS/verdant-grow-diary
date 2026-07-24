@@ -70,7 +70,9 @@ function toRow(
   return {
     id: entry.id,
     eventType: entry.eventType,
-    occurredAt: entry.createdAt,
+    // Display ordering prefers the grower's "Captured" moment when stamped;
+    // createdAt itself stays untouched upstream (dayOfGrow math depends on it).
+    occurredAt: entry.loggedAt ?? entry.createdAt,
     occurredAtLabel: entry.createdAtLabel,
     notePreview: previewNote(split.body),
     plantId: entry.plantId,

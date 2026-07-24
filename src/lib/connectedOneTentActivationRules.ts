@@ -6,6 +6,14 @@
  * constrained by the signed-in grower's RLS-scoped reads.
  */
 import { QUICK_LOG_ACTIVITY_LIST } from "@/constants/quickLogActivityTypes";
+
+/** details.logged_at when present and parseable — never invented. */
+function diaryLoggedAt(row: { details?: unknown }): string | null {
+  const d = row.details;
+  if (!d || typeof d !== "object" || Array.isArray(d)) return null;
+  const v = (d as Record<string, unknown>).logged_at;
+  return typeof v === "string" && Number.isFinite(Date.parse(v)) ? v : null;
+}
 import { countManualSnapshotQuickLogEvidence } from "@/lib/onboardingSensorActivationRules";
 import { buildSensorsTentRouteHref, SENSORS_TENT_ROUTE } from "@/lib/sensorRouteTentIntentRules";
 
@@ -428,7 +436,12 @@ export function summarizeConnectedActivationEvidence(
     // pre-filtered grow-event list in a future refactor.
     if (links.some((link) => eligibleGrowEventIds.has(link))) continue;
 
-    const timestamp = parseTimestamp(row.entry_at, row.created_at);
+    // Prefer the grower's "Captured" moment (details.logged_at) when the
+    // writer stamped one; entry_at/created_at remain the fallback chain.
+    const timestamp = parseTimestamp(
+      diaryLoggedAt(row) ?? row.entry_at,
+      row.created_at,
+    );
     if (!timestamp) continue;
     candidates.push({
       key: `diary_entries:${id}`,
@@ -558,7 +571,12 @@ export function dedupeMergedManualGrowActivityRows<
     // that parent is deleted or outside the fetched window, the diary copy
     // must not resurrect it as a second activity.
     if (diaryLinks(row).length > 0) continue;
-    const timestamp = parseTimestamp(row.entry_at, row.created_at);
+    // Prefer the grower's "Captured" moment (details.logged_at) when the
+    // writer stamped one; entry_at/created_at remain the fallback chain.
+    const timestamp = parseTimestamp(
+      diaryLoggedAt(row) ?? row.entry_at,
+      row.created_at,
+    );
     if (!timestamp) continue;
     if (hasSince && timestamp.epochMs < sinceMs) continue;
     if (spinePairKeys.has(pairKey(row.plant_id, timestamp.epochMs))) continue;

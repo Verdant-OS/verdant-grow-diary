@@ -343,6 +343,7 @@ describe("detail spec invariants", () => {
       "checkType",
       "environment_check",
       "subtype",
+      "logged_at",
     ]) {
       expect(QUICK_LOG_DETAIL_FIELD_KEYS.has(k), `missing exclusion key: ${k}`).toBe(true);
     }

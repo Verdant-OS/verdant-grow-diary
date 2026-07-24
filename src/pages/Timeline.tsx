@@ -99,7 +99,7 @@ import {
   type GrowEventRowForRecent,
 } from "@/lib/growEventToDiaryRawEntry";
 import { ROOT_ZONE_GROW_EVENT_SELECT } from "@/lib/rootZoneObservationRules";
-import { mergeTimelineSources } from "@/lib/timelineMergeRules";
+import { planRecentLaneRawEntries } from "@/lib/timelineMergeRules";
 import {
   deriveTimelineEventTypeOptions,
   deriveTimelinePlantOptions,
@@ -894,9 +894,9 @@ export default function Timeline() {
   useTimelineHashAnchorHandoff(hash, !loading);
 
   // Merge `grow_events` (Quick Log v2 manual saves) and `diary_entries`
-  // through the tested `mergeTimelineSources` helper so the Recent Quick
-  // Logs panel receives a deterministic, deduplicated, newest-first
-  // stream. The helper enforces:
+  // through the tested `planRecentLaneRawEntries` planner (wraps
+  // `mergeTimelineSources`) so the Recent Quick Logs panel receives a
+  // deterministic, deduplicated, newest-first stream. The planner enforces:
   //   - exact-duplicate dedup by (source_table, source_id)
   //   - logical dedup when a diary row mirrors a grow_event via
   //     `details.grow_event_id`
@@ -929,7 +929,7 @@ export default function Timeline() {
         linked_grow_event_id,
       };
     });
-    const merged = mergeTimelineSources({
+    const decisions = planRecentLaneRawEntries({
       diaryEntries: diaryInputs,
       growEvents,
     });
@@ -938,13 +938,22 @@ export default function Timeline() {
       mapGrowEventsToRecentRawEntries(growEvents).map((r) => [r.id, r] as const),
     );
     const out: Array<Entry | ReturnType<typeof mapGrowEventsToRecentRawEntries>[number]> = [];
-    for (const m of merged) {
-      if (m.source_table === "diary_entries") {
-        const e = diaryById.get(m.source_id);
+    for (const d of decisions) {
+      if (d.source_table === "diary_entries") {
+        const e = diaryById.get(d.source_id);
         if (e) out.push(e);
       } else {
-        const g = growMappedById.get(m.source_id);
-        if (g) out.push(g);
+        const g = growMappedById.get(d.source_id);
+        if (!g) continue;
+        // Re-inject the mirror-inherited "Captured" moment the grow→raw
+        // mapper cannot carry (no details column), so downstream calendar /
+        // detailed-history grouping buckets by Captured while entry_at stays
+        // the true "when it happened". See planRecentLaneRawEntries.
+        if (d.inheritedLoggedAt) {
+          out.push({ ...g, details: { ...g.details, logged_at: d.inheritedLoggedAt } });
+        } else {
+          out.push(g);
+        }
       }
     }
     return out;

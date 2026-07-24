@@ -121,7 +121,17 @@ export default function AppShell({ children }: { children?: ReactNode }) {
   useEffect(() => {
     function onOpen(e: Event) {
       const detail = (e as CustomEvent<QuickLogPrefill>).detail ?? null;
-      setPrefill(detail);
+      // Centralized "Captured" seed: EVERY legacy quick-log launcher
+      // (dashboard shortcuts, plant/tent tray + roster actions, HyperLog,
+      // GlobalSearch shortcuts, Fast Add presets) flows through this one
+      // listener, so stamping logged_at here — only when the dispatcher did
+      // not carry its own — gives all entry points the click moment
+      // uniformly without touching each dispatcher.
+      const seeded =
+        detail && !detail.logged_at
+          ? { ...detail, logged_at: new Date().toISOString() }
+          : detail;
+      setPrefill(seeded);
       setOpenLog(true);
     }
     window.addEventListener(PLANT_QUICKLOG_PREFILL_EVENT, onOpen as EventListener);
@@ -325,6 +335,7 @@ export default function AppShell({ children }: { children?: ReactNode }) {
           }}
           defaultTargetKey={structuredOpenIntent?.targetKey ?? mobileQuickLogTarget}
           defaultAction={structuredOpenIntent?.action ?? "note"}
+          defaultLoggedAtIso={structuredOpenIntent?.loggedAt ?? null}
         />
 
         <GlobalSearchDialog open={searchOpen} onOpenChange={setSearchOpen} />

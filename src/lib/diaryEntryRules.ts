@@ -56,6 +56,12 @@ export interface NormalizedDiaryEntry {
   tentId: string | null;
   stage: string | null;
   eventType: string;
+  /**
+   * "Captured" moment (details.logged_at) when present and parseable —
+   * report/calendar/panel surfaces prefer it for display ordering. Never
+   * invented; null when the writer stamped none.
+   */
+  loggedAt: string | null;
   note: string;
   photoUrl: string | null;
   createdAt: string | null; // ISO if valid, else null
@@ -110,6 +116,10 @@ const KNOWN_DETAIL_KEYS = new Set([
   // column; quick-log companions carry the type inside details) — not an extra.
   "event_type",
   "eventType",
+  // "Captured" timestamp (when the grower logged the entry) — consumed by the
+  // observation-time resolver for report/calendar grouping, never an extra.
+  "logged_at",
+  "loggedAt",
 ]);
 
 /**
@@ -454,6 +464,12 @@ export function normalizeDiaryEntry(
   const eventType = eventTypeRaw ?? "note";
   if (!eventTypeRaw) warnings.push("event-type:missing");
 
+  const loggedAtCandidate = nonBlankString(pickFirst(dv?.logged_at, dv?.loggedAt));
+  const loggedAt =
+    loggedAtCandidate !== null && Number.isFinite(Date.parse(loggedAtCandidate))
+      ? loggedAtCandidate
+      : null;
+
   const note = nonBlankString(pickFirst(r.note, r.body, r.text)) ?? "";
 
   const photoUrl = nonBlankString(pickFirst(r.photo_url, r.photoUrl));
@@ -557,6 +573,7 @@ export function normalizeDiaryEntry(
     tentId,
     stage,
     eventType,
+    loggedAt,
     note,
     photoUrl,
     createdAt,

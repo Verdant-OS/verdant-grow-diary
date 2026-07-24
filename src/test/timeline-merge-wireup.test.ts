@@ -24,19 +24,27 @@ import { mergeTimelineSources } from "@/lib/timelineMergeRules";
 
 const TIMELINE_SRC = readFileSync(resolve(__dirname, "../pages/Timeline.tsx"), "utf8");
 
-describe("Timeline.tsx — mergeTimelineSources wire-up", () => {
-  it("imports mergeTimelineSources from the rules layer", () => {
+describe("Timeline.tsx — planRecentLaneRawEntries wire-up", () => {
+  it("imports the merge planner from the rules layer", () => {
     expect(TIMELINE_SRC).toMatch(/from\s+["']@\/lib\/timelineMergeRules["']/);
-    expect(TIMELINE_SRC).toMatch(/\bmergeTimelineSources\b/);
+    expect(TIMELINE_SRC).toMatch(/\bplanRecentLaneRawEntries\b/);
   });
 
-  it("invokes mergeTimelineSources with both diaryEntries and growEvents", () => {
-    const call = TIMELINE_SRC.match(/mergeTimelineSources\s*\(\s*\{[\s\S]*?\}\s*\)/);
+  it("invokes planRecentLaneRawEntries with both diaryEntries and growEvents", () => {
+    const call = TIMELINE_SRC.match(/planRecentLaneRawEntries\s*\(\s*\{[\s\S]*?\}\s*\)/);
     expect(call).not.toBeNull();
     const body = call![0];
     expect(body).toMatch(/diaryEntries\s*:/);
     // Object shorthand `growEvents,` or explicit `growEvents:` both acceptable.
     expect(body).toMatch(/\bgrowEvents\b\s*[:,}]/);
+  });
+
+  it("re-injects the mirror-inherited Captured moment as details.logged_at", () => {
+    // Guards the recent-lane bug: the grow→raw mapper drops details, so the
+    // planner's inheritedLoggedAt must be folded back into the pushed entry
+    // or calendar/detailed-history grouping silently falls back to occurred_at.
+    expect(TIMELINE_SRC).toMatch(/d\.inheritedLoggedAt/);
+    expect(TIMELINE_SRC).toMatch(/logged_at:\s*d\.inheritedLoggedAt/);
   });
 
   it("no longer uses the ad-hoc `[...entries, ...mapGrowEventsToRecentRawEntries(growEvents)]` concat", () => {
@@ -151,5 +159,112 @@ describe("mergeTimelineSources — Timeline integration contract", () => {
         ],
       }),
     ).not.toThrow();
+  });
+});
+
+
+describe("Captured (logged_at) mirror-inherit", () => {
+  it("the kept grow_events spine row inherits its diary mirror's logged_at ordering", async () => {
+    const { mergeTimelineSources } = await import("@/lib/timelineMergeRules");
+    const merged = mergeTimelineSources({
+      growEvents: [
+        { id: "ge-1", occurred_at: "2026-07-24T02:00:00.000Z", event_type: "training" },
+      ],
+      diaryEntries: [
+        {
+          id: "d-1",
+          entry_at: "2026-07-24T02:00:01.000Z",
+          details: { linked_grow_event_id: "ge-1", logged_at: "2026-07-22T21:00:00.000Z" },
+        },
+      ],
+    });
+    // Dedup keeps the spine row; it must carry the mirror's Captured moment.
+    expect(merged).toHaveLength(1);
+    expect(merged[0].source_table).toBe("grow_events");
+    expect(merged[0].occurred_at).toBe("2026-07-22T21:00:00.000Z");
+  });
+
+  it("a diary row with logged_at orders by it directly", async () => {
+    const { mergeTimelineSources } = await import("@/lib/timelineMergeRules");
+    const merged = mergeTimelineSources({
+      growEvents: [],
+      diaryEntries: [
+        {
+          id: "d-2",
+          entry_at: "2026-07-24T02:00:00.000Z",
+          details: { logged_at: "2026-07-20T10:00:00.000Z" },
+        },
+      ],
+    });
+    expect(merged[0].occurred_at).toBe("2026-07-20T10:00:00.000Z");
+  });
+});
+
+describe("planRecentLaneRawEntries — recent-lane Captured re-injection", () => {
+  it("surfaces the inherited Captured moment for a mirror-linked grow_events row", async () => {
+    // The exact recent-lane bug: a Quick Log training save creates a
+    // grow_events spine (occurred_at = when it happened, backdated) plus a
+    // diary mirror carrying details.logged_at (when it was captured). The
+    // planner must tell the recent lane to re-inject that Captured moment so
+    // the calendar buckets by it.
+    const { planRecentLaneRawEntries } = await import("@/lib/timelineMergeRules");
+    const decisions = planRecentLaneRawEntries({
+      growEvents: [
+        { id: "ge-1", occurred_at: "2026-07-20T14:30:00.000Z", event_type: "training" },
+      ],
+      diaryEntries: [
+        {
+          id: "d-1",
+          entry_at: "2026-07-24T01:39:34.218Z",
+          details: { linked_grow_event_id: "ge-1", logged_at: "2026-07-24T01:39:34.218Z" },
+        },
+      ],
+    });
+    expect(decisions).toHaveLength(1);
+    expect(decisions[0].source_table).toBe("grow_events");
+    expect(decisions[0].source_id).toBe("ge-1");
+    expect(decisions[0].inheritedLoggedAt).toBe("2026-07-24T01:39:34.218Z");
+  });
+
+  it("leaves inheritedLoggedAt null for a grow_events row with no Captured mirror", async () => {
+    const { planRecentLaneRawEntries } = await import("@/lib/timelineMergeRules");
+    const decisions = planRecentLaneRawEntries({
+      growEvents: [
+        { id: "ge-2", occurred_at: "2026-07-19T12:00:00.000Z", event_type: "watering" },
+      ],
+      diaryEntries: [],
+    });
+    expect(decisions).toHaveLength(1);
+    expect(decisions[0].source_table).toBe("grow_events");
+    expect(decisions[0].inheritedLoggedAt).toBeNull();
+  });
+
+  it("leaves inheritedLoggedAt null when the mirror's logged_at equals occurred_at", async () => {
+    const { planRecentLaneRawEntries } = await import("@/lib/timelineMergeRules");
+    const decisions = planRecentLaneRawEntries({
+      growEvents: [
+        { id: "ge-3", occurred_at: "2026-07-19T12:00:00.000Z", event_type: "feeding" },
+      ],
+      diaryEntries: [
+        {
+          id: "d-3",
+          entry_at: "2026-07-19T12:00:00.000Z",
+          details: { linked_grow_event_id: "ge-3", logged_at: "2026-07-19T12:00:00.000Z" },
+        },
+      ],
+    });
+    expect(decisions[0].inheritedLoggedAt).toBeNull();
+  });
+
+  it("carries diary-only rows through untouched", async () => {
+    const { planRecentLaneRawEntries } = await import("@/lib/timelineMergeRules");
+    const decisions = planRecentLaneRawEntries({
+      growEvents: [],
+      diaryEntries: [{ id: "d-solo", entry_at: "2026-07-18T09:00:00.000Z" }],
+    });
+    expect(decisions).toHaveLength(1);
+    expect(decisions[0].source_table).toBe("diary_entries");
+    expect(decisions[0].source_id).toBe("d-solo");
+    expect(decisions[0].inheritedLoggedAt).toBeNull();
   });
 });

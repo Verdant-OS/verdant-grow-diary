@@ -146,6 +146,8 @@ describe("Quick Log preset menu — event wiring", () => {
     expect(onDispatchEvent).toHaveBeenCalledWith(QUICK_LOG_V2_OPEN_EVENT, {
       targetKey: "plant:p1",
       action: "water",
+      // "Captured" seed from the preset click — the report/calendar grouping key.
+      loggedAt: expect.any(String),
     });
   });
 

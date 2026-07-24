@@ -43,6 +43,19 @@ export interface QuickLogActivitySaveInput {
   extraDetails?: Record<string, unknown> | null;
   /** Watering volume in ml, forwarded to the manual water route only. */
   volumeMl?: number | null;
+  /**
+   * Backdatable "when it happened" ISO timestamp → p_occurred_at on both
+   * routes. Null/omitted = "now" (server COALESCE stamps commit time).
+   * MUST be frozen with the idempotency key (#317: the event route hashes
+   * p_occurred_at into its dedupe request hash).
+   */
+  occurredAt?: string | null;
+  /**
+   * "Captured" ISO timestamp — when the grower recorded the entry (seeded at
+   * Fast Add open). Persisted as details.logged_at on the diary companion;
+   * report/calendar surfaces group by it. Frozen with the key like occurredAt.
+   */
+  loggedAt?: string | null;
 }
 
 export type QuickLogActivitySaveReason =
@@ -125,6 +138,9 @@ export function useQuickLogActivitySave() {
           const manualDetails: Record<string, unknown> = {
             ...(input.extraDetails ?? {}),
           };
+          // "Captured" timestamp — the report/calendar grouping key. Rides
+          // the diary companion's details (pass-through seam).
+          if (input.loggedAt) manualDetails.logged_at = input.loggedAt;
           const manualIdempotencyKey =
             input.idempotencyKey &&
             input.idempotencyKey.length >= 8 &&
@@ -143,7 +159,7 @@ export function useQuickLogActivitySave() {
               p_temperature_c: null,
               p_humidity_pct: null,
               p_vpd_kpa: null,
-              p_occurred_at: null,
+              p_occurred_at: input.occurredAt ?? null,
               ...(Object.keys(manualDetails).length > 0
                 ? { p_details: manualDetails }
                 : {}),
@@ -191,6 +207,9 @@ export function useQuickLogActivitySave() {
           // authoritatively; this client copy covers rows saved before that
           // migration is applied to prod.
           details.event_type = plan.eventType;
+          // "Captured" timestamp for report/calendar grouping. Part of the
+          // p_details idempotency hash — caller freezes it with the key (#317).
+          if (input.loggedAt) details.logged_at = input.loggedAt;
           const { data, error: rpcErr } = await supabase.rpc(
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             "quicklog_save_event" as any,
@@ -203,7 +222,7 @@ export function useQuickLogActivitySave() {
               p_note: input.note ?? null,
               p_photo_url: input.photoUrl ?? null,
               p_sensor_snapshot: null,
-              p_occurred_at: null,
+              p_occurred_at: input.occurredAt ?? null,
               p_details: Object.keys(details).length > 0 ? details : null,
             } as unknown as Record<string, unknown>,
           );

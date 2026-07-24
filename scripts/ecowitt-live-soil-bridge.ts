@@ -306,6 +306,12 @@ export const CONFIG_ERROR_FIX_HINTS: Record<string, string> = {
     "Install the mqtt client in the environment running the bridge: `bun add mqtt` (or `npm i mqtt`).",
   channel_map_parse_error:
     "ECOWITT_SOIL_CHANNEL_MAP_JSON could not be parsed. Ensure it is single-line valid JSON with no trailing commas, then re-run `config validate`.",
+  out_flag_requires_dry_run:
+    "--out=<path> writes the redacted config_effective envelope, which is only produced by --dry-run. Add --dry-run or drop --out.",
+  out_flag_missing_value:
+    "--out needs a file path, e.g. `--out=./config-effective.json` or `--out ./config-effective.json`.",
+  out_write_failed:
+    "Could not write the redacted config_effective envelope to the given --out path. Check the directory exists and is writable, then re-run.",
 };
 
 export function fixHintForCode(code: string): string {
@@ -533,6 +539,51 @@ export function buildConfigDebugEnvelope(
   };
 }
 
+/**
+ * Pure parser for `--out=<path>` / `--out <path>` on `config validate`.
+ * Returns `{ path: null }` when the flag is absent so callers can skip
+ * the export step. Returns an error object with a stable machine-readable
+ * code when the flag is present but malformed (empty value, missing
+ * following argument). Never touches the filesystem.
+ */
+export function parseOutFlag(
+  args: string[],
+): { path: string | null; error?: { code: string; message: string } } {
+  let path: string | null = null;
+  for (let i = 0; i < args.length; i += 1) {
+    const a = args[i];
+    if (a === "--out") {
+      const next = args[i + 1];
+      if (next === undefined || next.startsWith("--") || next === "") {
+        return {
+          path: null,
+          error: {
+            code: "out_flag_missing_value",
+            message: "--out requires a file path (e.g. --out=./config-effective.json)",
+          },
+        };
+      }
+      path = next;
+      i += 1;
+      continue;
+    }
+    if (a.startsWith("--out=")) {
+      const value = a.slice("--out=".length);
+      if (value === "") {
+        return {
+          path: null,
+          error: {
+            code: "out_flag_missing_value",
+            message: "--out= must be followed by a file path",
+          },
+        };
+      }
+      path = value;
+    }
+  }
+  return { path };
+}
+
 async function runCli(): Promise<void> {
   const emitConfigError = (
     code: string,
@@ -586,6 +637,26 @@ async function runCli(): Promise<void> {
     const includeFixHints = rest.includes("--fix-hints");
     const dryRun = rest.includes("--dry-run");
     const debug = rest.includes("--debug");
+    const outFlag = parseOutFlag(rest);
+
+    // Flag-shape errors are surfaced before running the (potentially slow)
+    // validator so operators get a fast, deterministic exit code. The
+    // `--out` companion-flag rules are contractual — enforce them here.
+    if (outFlag.error) {
+      const hint = includeFixHints ? fixHintForCode(outFlag.error.code) : undefined;
+      emitConfigError(outFlag.error.code, outFlag.error.message, hint);
+      process.exit(2);
+      return;
+    }
+    if (outFlag.path !== null && !dryRun) {
+      const message =
+        "--out=<path> only writes the redacted config_effective envelope when --dry-run is also passed";
+      const hint = includeFixHints ? fixHintForCode("out_flag_requires_dry_run") : undefined;
+      emitConfigError("out_flag_requires_dry_run", message, hint);
+      process.exit(2);
+      return;
+    }
+
     const res = runConfigValidate(process.env, { includeFixHints });
     if (res.ok) {
       // eslint-disable-next-line no-console
@@ -606,8 +677,38 @@ async function runCli(): Promise<void> {
       }
       if (dryRun) {
         const effective = buildRedactedEffectiveConfig(process.env, process.argv);
+        const serialized = JSON.stringify(effective);
         // eslint-disable-next-line no-console
-        console.log(JSON.stringify(effective));
+        console.log(serialized);
+        if (outFlag.path !== null) {
+          // Write the already-redacted envelope. Trailing newline so the
+          // file is a clean single-line JSONL record and plays nicely with
+          // `jq`, `tail`, and text editors.
+          try {
+            const { writeFileSync } = await import("node:fs");
+            const { resolve: resolvePath } = await import("node:path");
+            const absPath = resolvePath(outFlag.path);
+            writeFileSync(absPath, `${serialized}\n`, { encoding: "utf8" });
+            // eslint-disable-next-line no-console
+            console.log(
+              JSON.stringify({
+                event: "config_effective_written",
+                check: "ecowitt-bridge",
+                path: absPath,
+                bytes: Buffer.byteLength(serialized, "utf8") + 1,
+              }),
+            );
+          } catch (e) {
+            const message =
+              e instanceof Error
+                ? `failed to write --out path: ${e.message}`
+                : "failed to write --out path";
+            const hint = includeFixHints ? fixHintForCode("out_write_failed") : undefined;
+            emitConfigError("out_write_failed", message, hint);
+            process.exit(2);
+            return;
+          }
+        }
       }
       process.exit(0);
       return;

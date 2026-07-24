@@ -13,7 +13,14 @@
  * never echoes tent UUIDs or bridge tokens beyond checking for their absence.
  */
 import { spawnSync } from "node:child_process";
-import { readFileSync, readdirSync, existsSync } from "node:fs";
+import {
+  readFileSync,
+  readdirSync,
+  existsSync,
+  mkdtempSync,
+  rmSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 const REPO = resolve(new URL("..", import.meta.url).pathname);
@@ -37,7 +44,7 @@ function loadEnvFile(path) {
   return out;
 }
 
-function runDryRun(env) {
+function runDryRun(env, extraArgs = []) {
   const cleanEnv = {
     PATH: process.env.PATH ?? "",
     HOME: process.env.HOME ?? "",
@@ -45,7 +52,7 @@ function runDryRun(env) {
   };
   const r = spawnSync(
     "bun",
-    ["run", BRIDGE, "config", "validate", "--dry-run"],
+    ["run", BRIDGE, "config", "validate", "--dry-run", ...extraArgs],
     { encoding: "utf8", env: cleanEnv, timeout: 20_000 },
   );
   return { status: r.status, stdout: r.stdout ?? "", stderr: r.stderr ?? "" };
@@ -138,6 +145,85 @@ for (const file of files) {
     leaked.length === 0,
     leaked.length ? `leaked=${leaked.length} value(s)` : "",
   );
+}
+
+// ---- `--out=<path>` round-trip contract -------------------------------------
+// Uses the first example env file. Locks in that the on-disk envelope
+// exactly matches the stdout envelope, ends with a newline, contains no
+// raw secrets, and that a receipt event is emitted.
+console.log(`\n[dry-run --out] round-trip on ${files[0]}`);
+{
+  const env = loadEnvFile(join(EXAMPLES_DIR, files[0]));
+  const tmp = mkdtempSync(join(tmpdir(), "ecowitt-out-ci-"));
+  const outPath = join(tmp, "config-effective.json");
+  try {
+    const r = runDryRun(env, [`--out=${outPath}`]);
+    const envs = jsonLines(r.stdout);
+    const eff = envs.find((e) => e.event === "config_effective");
+    const written = envs.find((e) => e.event === "config_effective_written");
+
+    check("exit 0", r.status === 0, `status=${r.status}`);
+    check("stdout has config_effective_written receipt", !!written);
+    check(
+      "receipt points at absolute --out path",
+      written?.path === resolve(outPath),
+      `got=${written?.path}`,
+    );
+    check("file exists on disk", existsSync(outPath));
+
+    if (existsSync(outPath)) {
+      const fileText = readFileSync(outPath, "utf8");
+      check("file ends with newline", fileText.endsWith("\n"));
+      let parsed = null;
+      try { parsed = JSON.parse(fileText.trim()); } catch { /* handled below */ }
+      check("file is valid JSON", parsed !== null);
+      check(
+        "file matches stdout config_effective envelope exactly",
+        parsed !== null && JSON.stringify(parsed) === JSON.stringify(eff),
+      );
+      const leaked = collectSecrets(env).filter((s) => fileText.includes(s));
+      check(
+        "no raw secret leaked in file",
+        leaked.length === 0,
+        leaked.length ? `leaked=${leaked.length} value(s)` : "",
+      );
+    }
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
+// ---- `--out` companion-flag error contract ----------------------------------
+// `--out` without `--dry-run` must exit 2 with a stable code and must NOT
+// touch the filesystem.
+console.log("\n[--out without --dry-run] rejects with out_flag_requires_dry_run");
+{
+  const env = loadEnvFile(join(EXAMPLES_DIR, files[0]));
+  const tmp = mkdtempSync(join(tmpdir(), "ecowitt-out-neg-"));
+  const outPath = join(tmp, "should-not-be-written.json");
+  try {
+    const cleanEnv = { PATH: process.env.PATH ?? "", HOME: process.env.HOME ?? "", ...env };
+    const r = spawnSync(
+      "bun",
+      ["run", BRIDGE, "config", "validate", `--out=${outPath}`],
+      { encoding: "utf8", env: cleanEnv, timeout: 20_000 },
+    );
+    const errLine = (r.stderr ?? "")
+      .split(/\r?\n/)
+      .filter((l) => l.trim().startsWith("{"))
+      .pop();
+    const errEnv = errLine ? JSON.parse(errLine) : null;
+    check("exit 2", r.status === 2, `status=${r.status}`);
+    check("stderr has config_error event", errEnv?.event === "config_error");
+    check(
+      "code === out_flag_requires_dry_run",
+      errEnv?.code === "out_flag_requires_dry_run",
+      `got code=${errEnv?.code}`,
+    );
+    check("file was NOT written", !existsSync(outPath));
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
 }
 
 console.log("");

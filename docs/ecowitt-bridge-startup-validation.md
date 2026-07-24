@@ -170,6 +170,36 @@ Redaction rules (see `buildRedactedEffectiveConfig`):
 On failure, `--dry-run` is suppressed and only the standard
 `config_error` envelope is emitted, exit 2.
 
+#### `--out=<path>` (export the redacted envelope)
+
+Combine with `--dry-run` to also **write** the redacted `config_effective`
+envelope to a file for later inspection (e.g. bug reports, ops runbooks):
+
+```bash
+bun run scripts/ecowitt-live-soil-bridge.ts config validate \
+  --dry-run --out=./config-effective.json
+```
+
+- Accepts both `--out=<path>` and `--out <path>`.
+- Writes exactly the same redacted envelope that goes to stdout (plus a
+  trailing newline, so the file is a clean single-line JSONL record).
+- On success, stdout gains a receipt envelope:
+  ```json
+  {"event":"config_effective_written","check":"ecowitt-bridge","path":"/abs/path/config-effective.json","bytes":555}
+  ```
+- Redaction rules above still apply — the file is safe to paste into
+  bug reports.
+
+Failure modes (all exit `2`, all with stable machine-readable codes):
+
+| Code                        | When                                                       |
+| --------------------------- | ---------------------------------------------------------- |
+| `out_flag_requires_dry_run` | `--out` passed without `--dry-run`.                        |
+| `out_flag_missing_value`    | `--out=` (empty) or trailing `--out` with nothing after.   |
+| `out_write_failed`          | Filesystem write failed (missing directory, permissions).  |
+
+
+
 ### `--debug`
 
 Pass `--debug` to `config validate` to additionally print a focused,

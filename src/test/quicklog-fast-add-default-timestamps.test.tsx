@@ -20,7 +20,6 @@ describe("buildFastAddTimestampDefaults", () => {
     ["diary_note"],
     ["watering"],
     ["feeding"],
-    ["training"],
     ["photo"],
     ["harvest"],
   ] as const)("defaults occurred_at to now for %s", (id) => {
@@ -29,11 +28,14 @@ describe("buildFastAddTimestampDefaults", () => {
     expect(d.captured_at).toBeUndefined();
   });
 
-  it("Environment defaults both captured_at and occurred_at", () => {
-    const d = buildFastAddTimestampDefaults("environment", now);
-    expect(d.occurred_at).toBe(FIXED.toISOString());
-    expect(d.captured_at).toBe(FIXED.toISOString());
-  });
+  it.each([["environment"], ["training"]] as const)(
+    "defaults both captured_at and occurred_at for %s",
+    (id) => {
+      const d = buildFastAddTimestampDefaults(id, now);
+      expect(d.occurred_at).toBe(FIXED.toISOString());
+      expect(d.captured_at).toBe(FIXED.toISOString());
+    },
+  );
 
   it("Diagnosis returns no timestamps (navigation-only)", () => {
     expect(buildFastAddTimestampDefaults("diagnosis", now)).toEqual({});

@@ -30,6 +30,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import QuickLogActivityPicker from "@/components/QuickLogActivityPicker";
 import { useQuickLogActivitySave } from "@/hooks/useQuickLogActivitySave";
+import { useAuth } from "@/store/auth";
+import { supabase } from "@/integrations/supabase/client";
+import { createQuickLogPhotoDiaryEntry } from "@/lib/quickLogPhotoDiaryEntry";
+import { validatePlantProfilePhotoFile } from "@/lib/plantProfilePhotoFileRules";
+import { dispatchQuickLogV2EntryCreated } from "@/lib/quickLogV2EntryCreatedEvent";
+import { trackQuickLogSuccess } from "@/lib/quickLogSuccessTelemetry";
 import {
   QUICK_LOG_ACTIVITY_DEFINITIONS,
   QUICK_LOG_WEIGHT_UNITS,
@@ -38,6 +44,12 @@ import {
   type QuickLogWeightUnit,
 } from "@/constants/quickLogActivityTypes";
 import { buildHarvestDetailsPayload, validateHarvestWeightInput } from "@/lib/harvestDetailsRules";
+import {
+  getQuickLogActivityDetailFields,
+  sanitizeQuickLogActivityDetails,
+  validateQuickLogDetailNumberInput,
+  QUICK_LOG_DETAIL_TEXT_MAX,
+} from "@/lib/quickLogActivityDetailFields";
 import {
   buildDailyCheckSavedItems,
   type DailyCheckSavedItem,
@@ -162,6 +174,15 @@ export default function QuickLogAllActivitiesSection({
   const [harvestWet, setHarvestWet] = useState("");
   const [harvestDry, setHarvestDry] = useState("");
   const [harvestUnit, setHarvestUnit] = useState<QuickLogWeightUnit>("g");
+  // Generic per-activity structured detail values (e.g. training technique),
+  // keyed by field spec key. Sanitized before persistence.
+  const [detailValues, setDetailValues] = useState<Record<string, string>>({});
+  // Photo activity: a real image is REQUIRED before Save — a photo entry with
+  // no image must never be confirmable. Uploaded to the private diary-photos
+  // bucket; the diary row's photo_url column carries the bare storage path.
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const photoDiaryInFlightRef = useRef(false);
+  const { user } = useAuth();
   const [saved, setSaved] = useState<SavedRecord[]>([]);
   const [errorReason, setErrorReason] = useState<string | null>(null);
   const [errorForActivity, setErrorForActivity] = useState<QuickLogActivityId | null>(null);
@@ -180,6 +201,8 @@ export default function QuickLogAllActivitiesSection({
     setHarvestWet("");
     setHarvestDry("");
     setHarvestUnit("g");
+    setDetailValues({});
+    setPhotoFile(null);
     setErrorReason(null);
     setErrorForActivity(null);
     setStructuredWaterError(null);
@@ -198,6 +221,18 @@ export default function QuickLogAllActivitiesSection({
   );
   const harvestWeightsInvalid =
     !harvestWetValidation.ok || !harvestDryValidation.ok;
+  // Blocking validation for number detail fields (e.g. manual env readings):
+  // an out-of-band value must stop the save with an inline error — never be
+  // silently dropped while the grower sees a success receipt.
+  const detailNumberValidations = useMemo(() => {
+    if (!selected) return [] as { key: string; ok: boolean; error: string | null }[];
+    return getQuickLogActivityDetailFields(selected.id)
+      .filter((f) => f.kind === "number")
+      .map((f) => ({ key: f.key, ...validateQuickLogDetailNumberInput(f, detailValues[f.key]) }));
+  }, [selected, detailValues]);
+  const detailNumbersInvalid = detailNumberValidations.some((v) => !v.ok);
+  const firstDetailNumberError =
+    detailNumberValidations.find((v) => !v.ok)?.error ?? null;
   const selectedAvailability = useMemo(
     () =>
       selected
@@ -254,6 +289,8 @@ export default function QuickLogAllActivitiesSection({
       setHarvestWet("");
       setHarvestDry("");
       setHarvestUnit("g");
+      setDetailValues({});
+      setPhotoFile(null);
     },
     [
       currentTarget,
@@ -321,6 +358,13 @@ export default function QuickLogAllActivitiesSection({
       setErrorForActivity(selected.id);
       return;
     }
+    // Out-of-band number detail (e.g. manual temp/RH) blocks the save so the
+    // grower's entry is corrected, not discarded behind a success receipt.
+    if (detailNumbersInvalid) {
+      setErrorReason(firstDetailNumberError ?? "Fix the highlighted field before saving.");
+      setErrorForActivity(selected.id);
+      return;
+    }
 
     // Harvest optional weight details — sanitized in the shared rules
     // module. Empty / invalid / negative values are dropped, never sent.
@@ -346,6 +390,14 @@ export default function QuickLogAllActivitiesSection({
       }
     }
 
+    // Generic structured activity detail (e.g. training technique). Sanitized
+    // to the closed spec — out-of-set, blank, reserved-identity, and over-long
+    // values are dropped, never persisted.
+    const activityDetails = sanitizeQuickLogActivityDetails(selected.id, detailValues);
+    if (activityDetails) {
+      Object.assign(extraDetails, activityDetails);
+    }
+
     const capturedTarget = Object.freeze({
       growId,
       tentId: tentId ?? null,
@@ -357,24 +409,119 @@ export default function QuickLogAllActivitiesSection({
 
     try {
       const idempotencyKey = newIdempotencyKey(selected.id);
-      const result = await save({
-        activityId: selected.id,
-        growId: capturedTarget.growId,
-        tentId: capturedTarget.tentId,
-        plantId: capturedTarget.plantId,
-        note: note.trim().length > 0 ? note.trim() : null,
-        idempotencyKey,
-        extraDetails: Object.keys(extraDetails).length > 0 ? extraDetails : null,
-      });
+      if (selected.id === "photo") {
+        // Photo goes diary-only through the proven QuickLog photo-attachment
+        // path (upload to the private diary-photos bucket, then one
+        // diary_entries row whose photo_url COLUMN carries the bare storage
+        // path — the only shape Timeline signs and renders). The event-route
+        // RPC is a dead end here: it stores p_photo_url only inside details,
+        // which no photo surface reads, so it would confirm an invisible photo.
+        if (!user) {
+          setErrorReason("Sign in to attach photos.");
+          setErrorForActivity(selected.id);
+          return;
+        }
+        if (!photoFile) {
+          setErrorReason("Choose a photo before saving.");
+          setErrorForActivity(selected.id);
+          return;
+        }
+        if (photoDiaryInFlightRef.current) return;
+        photoDiaryInFlightRef.current = true;
+        // Tracks a successful upload so a LATER rejection (e.g. the diary
+        // insert dying mid-network) can clean up the orphaned object.
+        let uploadedPath: string | null = null;
+        try {
+          const ext = (photoFile.name.split(".").pop() || "jpg").toLowerCase();
+          // RLS: the first path segment MUST be the uploader's auth.uid().
+          const path = `${user.id}/${capturedTarget.growId}/${Date.now()}.${ext}`;
+          const { error: uploadError } = await supabase.storage
+            .from("diary-photos")
+            .upload(path, photoFile, { contentType: photoFile.type, upsert: false });
+          if (uploadError) {
+            setErrorReason(`Photo upload failed: ${uploadError.message}`);
+            setErrorForActivity(selected.id);
+            return;
+          }
+          uploadedPath = path;
+          // Structured photo detail (subject/caption) rides the same diary row.
+          const photoExtraDetails: Record<string, string> = {};
+          for (const [k, v] of Object.entries(extraDetails)) {
+            if (typeof v === "string") photoExtraDetails[k] = v;
+          }
+          const entryResult = await createQuickLogPhotoDiaryEntry({
+            growId: capturedTarget.growId,
+            tentId: capturedTarget.tentId,
+            plantId: capturedTarget.plantId,
+            photoPath: path,
+            noteRaw: note,
+            action: "photo",
+            // Displayable type: the standalone Photo activity badges as Photo
+            // on Timeline/Recent Activity (allow-listed), unlike the V2-sheet
+            // attachment marker the plant-memory episodes key on.
+            eventType: "photo",
+            extraDetails:
+              Object.keys(photoExtraDetails).length > 0 ? photoExtraDetails : null,
+          });
+          if (!entryResult.ok) {
+            // (strictNullChecks is off in this app config, so cast the failure
+            // branch explicitly rather than relying on discriminant narrowing.)
+            const failure = entryResult as { ok: false; message: string };
+            // Best-effort orphan cleanup; the entry is the source of truth.
+            try {
+              await supabase.storage.from("diary-photos").remove([path]);
+            } catch {
+              // Swallow — an orphaned object is harmless next to a false receipt.
+            }
+            setErrorReason(failure.message);
+            setErrorForActivity(selected.id);
+            return;
+          }
+          // Replicate the orchestration save() provides on the RPC path:
+          // timeline refresh + funnel telemetry, only after confirmed success.
+          dispatchQuickLogV2EntryCreated({
+            createdAt: new Date().toISOString(),
+            growEventId: null,
+            source: "quick_log_v2",
+          });
+          trackQuickLogSuccess("photo", { reused: false });
+        } catch {
+          // A REJECTED promise (network interruption) must never escape the
+          // click handler as a silent nothing: surface the failure and clean
+          // up an already-uploaded object so no orphan is left behind.
+          if (uploadedPath) {
+            try {
+              await supabase.storage.from("diary-photos").remove([uploadedPath]);
+            } catch {
+              // Best-effort only.
+            }
+          }
+          setErrorReason("Photo save failed. Nothing was saved.");
+          setErrorForActivity(selected.id);
+          return;
+        } finally {
+          photoDiaryInFlightRef.current = false;
+        }
+      } else {
+        const result = await save({
+          activityId: selected.id,
+          growId: capturedTarget.growId,
+          tentId: capturedTarget.tentId,
+          plantId: capturedTarget.plantId,
+          note: note.trim().length > 0 ? note.trim() : null,
+          idempotencyKey,
+          extraDetails: Object.keys(extraDetails).length > 0 ? extraDetails : null,
+        });
 
-      if (!result.ok) {
-        setErrorReason(
-          result.reason === "save_failed"
-            ? "Save failed. Nothing was saved."
-            : (result.disabledReason ?? "Save was refused."),
-        );
-        setErrorForActivity(selected.id);
-        return;
+        if (!result.ok) {
+          setErrorReason(
+            result.reason === "save_failed"
+              ? "Save failed. Nothing was saved."
+              : (result.disabledReason ?? "Save was refused."),
+          );
+          setErrorForActivity(selected.id);
+          return;
+        }
       }
 
       // Success path — build saved-item using the SHARED helper so no
@@ -402,6 +549,8 @@ export default function QuickLogAllActivitiesSection({
       setHarvestWet("");
       setHarvestDry("");
       setHarvestUnit("g");
+      setDetailValues({});
+      setPhotoFile(null);
       setSelectedDraft(null);
       setErrorReason(null);
       setErrorForActivity(null);
@@ -427,6 +576,11 @@ export default function QuickLogAllActivitiesSection({
     harvestWeightsInvalid,
     harvestWetValidation,
     harvestDryValidation,
+    detailValues,
+    detailNumbersInvalid,
+    firstDetailNumberError,
+    user,
+    photoFile,
     onSaveStart,
     onSaveEnd,
     isMutationBlocked,
@@ -510,6 +664,135 @@ export default function QuickLogAllActivitiesSection({
               {selectedAvailability.disabledReason ??
                 QUICK_LOG_HARVEST_STAGE_DISABLED_REASON}
             </p>
+          )}
+
+          {getQuickLogActivityDetailFields(selected.id).length > 0 && (
+            <div
+              className="grid grid-cols-1 sm:grid-cols-2 gap-2"
+              data-testid={`${testIdPrefix}-detail-fields`}
+            >
+              {getQuickLogActivityDetailFields(selected.id).map((field) => (
+                <div key={field.key} className="space-y-1">
+                  <Label
+                    htmlFor={`${testIdPrefix}-detail-${field.key}`}
+                    className="text-[11px] text-muted-foreground"
+                  >
+                    {field.label}
+                    {field.unit ? ` (${field.unit})` : ""} (optional)
+                  </Label>
+                  {field.kind === "select" ? (
+                    <select
+                      id={`${testIdPrefix}-detail-${field.key}`}
+                      data-testid={`${testIdPrefix}-detail-${field.key}`}
+                      value={detailValues[field.key] ?? ""}
+                      onChange={(e) => {
+                        if (isMutationBlocked()) return;
+                        const v = e.target.value;
+                        setDetailValues((prev) => ({ ...prev, [field.key]: v }));
+                      }}
+                      disabled={mutationBlocked}
+                      className="w-full text-sm h-9 rounded-md border border-input bg-background px-2"
+                    >
+                      <option value="">Not recorded</option>
+                      {(field.options ?? []).map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <>
+                      <Input
+                        id={`${testIdPrefix}-detail-${field.key}`}
+                        data-testid={`${testIdPrefix}-detail-${field.key}`}
+                        value={detailValues[field.key] ?? ""}
+                        onChange={(e) => {
+                          if (isMutationBlocked()) return;
+                          const v = e.target.value;
+                          setDetailValues((prev) => ({ ...prev, [field.key]: v }));
+                        }}
+                        disabled={mutationBlocked}
+                        inputMode={field.kind === "number" ? "decimal" : undefined}
+                        // Text detail is capped at the persistence limit IN the
+                        // input, so nothing a grower types is ever silently
+                        // truncated behind a success receipt.
+                        maxLength={field.kind === "text" ? QUICK_LOG_DETAIL_TEXT_MAX : undefined}
+                        aria-invalid={
+                          field.kind === "number"
+                            ? !(detailNumberValidations.find((v) => v.key === field.key)?.ok ?? true)
+                            : undefined
+                        }
+                        placeholder={field.placeholder}
+                        className="text-sm"
+                      />
+                      {field.kind === "number" &&
+                        (() => {
+                          const v = detailNumberValidations.find((x) => x.key === field.key);
+                          return v && !v.ok ? (
+                            <p
+                              role="alert"
+                              className="text-[11px] text-destructive"
+                              data-testid={`${testIdPrefix}-detail-${field.key}-error`}
+                            >
+                              {v.error}
+                            </p>
+                          ) : null;
+                        })()}
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {selected.id === "photo" && (
+            <div className="space-y-1" data-testid={`${testIdPrefix}-photo-picker`}>
+              <Label
+                htmlFor={`${testIdPrefix}-photo-file`}
+                className="text-[11px] text-muted-foreground"
+              >
+                Photo (required)
+              </Label>
+              <Input
+                id={`${testIdPrefix}-photo-file`}
+                data-testid={`${testIdPrefix}-photo-file`}
+                type="file"
+                accept="image/*"
+                disabled={mutationBlocked}
+                onChange={(e) => {
+                  if (isMutationBlocked()) return;
+                  const file = e.target.files?.[0] ?? null;
+                  if (!file) {
+                    setPhotoFile(null);
+                    return;
+                  }
+                  const check = validatePlantProfilePhotoFile(file);
+                  if (!check.ok) {
+                    const failure = check as { ok: false; message: string };
+                    setPhotoFile(null);
+                    setErrorReason(failure.message);
+                    setErrorForActivity("photo");
+                    return;
+                  }
+                  setErrorReason(null);
+                  setErrorForActivity(null);
+                  setPhotoFile(file);
+                }}
+                className="text-sm"
+              />
+              {photoFile ? (
+                <p
+                  className="text-[11px] text-muted-foreground"
+                  data-testid={`${testIdPrefix}-photo-selected`}
+                >
+                  Selected: {photoFile.name}
+                </p>
+              ) : (
+                <p className="text-[11px] text-muted-foreground">
+                  A photo entry needs an actual image — Save stays disabled until one is chosen.
+                </p>
+              )}
+            </div>
           )}
 
           {selected.id === "manual_sensor_snapshot" ? (
@@ -670,7 +953,9 @@ export default function QuickLogAllActivitiesSection({
                 selectedAvailability?.disabled ||
                 selected.id === "manual_sensor_snapshot" ||
                 (requiresNote && note.trim().length === 0) ||
-                (selected.id === "harvest" && harvestWeightsInvalid)
+                (selected.id === "harvest" && harvestWeightsInvalid) ||
+                (selected.id === "photo" && !photoFile) ||
+                detailNumbersInvalid
               }
               data-testid={`${testIdPrefix}-save`}
             >

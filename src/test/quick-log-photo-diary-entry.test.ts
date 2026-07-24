@@ -123,6 +123,50 @@ describe("createQuickLogPhotoDiaryEntry", () => {
 });
 
 describe("QuickLogV2Sheet static safety — photo diary extraction", () => {
+  it("merges optional extraDetails while the fixed identity keys always win", () => {
+    const row = buildQuickLogPhotoDiaryEntryRow({
+      growId: "g1",
+      tentId: null,
+      plantId: "p1",
+      photoPath: "u1/g1/1.jpg",
+      noteRaw: "day 40",
+      action: "photo",
+      extraDetails: {
+        subject: "buds",
+        caption: "day 40 flower",
+        // Attempted spoofs of the fixed envelope must lose:
+        event_type: "fake",
+        source: "live",
+      },
+      now: () => new Date("2026-07-23T00:00:00Z"),
+    });
+    expect(row.details).toEqual({
+      subject: "buds",
+      caption: "day 40 flower",
+      event_type: "quicklog_photo_attachment",
+      source: "manual",
+      attached_to_action: "photo",
+    });
+  });
+
+  it("eventType override gives standalone Photo saves a displayable type (default marker preserved)", () => {
+    const base = {
+      growId: "g1",
+      tentId: null,
+      plantId: "p1",
+      photoPath: "u1/g1/1.jpg",
+      noteRaw: "",
+      action: "photo",
+      now: () => new Date("2026-07-23T00:00:00Z"),
+    };
+    expect(buildQuickLogPhotoDiaryEntryRow(base).details.event_type).toBe(
+      "quicklog_photo_attachment",
+    );
+    expect(
+      buildQuickLogPhotoDiaryEntryRow({ ...base, eventType: "photo" }).details.event_type,
+    ).toBe("photo");
+  });
+
   it("QuickLogV2Sheet.tsx no longer contains a direct supabase.from(...) write", () => {
     const raw = readFileSync(
       join(process.cwd(), "src", "components", "QuickLogV2Sheet.tsx"),

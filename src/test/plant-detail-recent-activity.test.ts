@@ -186,6 +186,20 @@ describe("buildPlantRecentActivity (pure)", () => {
     expect(row.isManualEntry).toBe(true);
   });
 
+  it("keeps the Manual entry badge for typed quick-log companions via provenance markers", () => {
+    // Companions now normalize to their DISPLAY type (training/photo/...), so
+    // manual provenance must come from the writer's own markers.
+    const rows = buildPlantRecentActivity(
+      [
+        entry({ id: "a", event_type: "training", details: { quick_log_version: 2 } }),
+        entry({ id: "b", event_type: "photo", details: { source: "manual" } }),
+        entry({ id: "c", event_type: "watering", details: { grow_event_id: "ge-1" } }),
+      ],
+      { plantId: "p1", now: NOW },
+    );
+    for (const r of rows) expect(r.isManualEntry).toBe(true);
+  });
+
   it("does not flag non-quick_log entries as manual entries", () => {
     const rows = buildPlantRecentActivity(
       [

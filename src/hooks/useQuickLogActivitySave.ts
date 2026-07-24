@@ -182,6 +182,15 @@ export function useQuickLogActivitySave() {
             ...(input.extraDetails ?? {}),
           };
           if (plan.detailsSubtype) details.subtype = plan.detailsSubtype;
+          // Carry the event type on the diary companion too: diary_entries has
+          // no event_type column and the RPC's mirror INSERT omits it, so
+          // without this the plant-scoped read layer defaults the row to
+          // "note" (wrong badge for e.g. Training). details.event_type is the
+          // established diary convention (action_followup/action_outcome rows
+          // already use it). The server-side migration also stamps this
+          // authoritatively; this client copy covers rows saved before that
+          // migration is applied to prod.
+          details.event_type = plan.eventType;
           const { data, error: rpcErr } = await supabase.rpc(
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             "quicklog_save_event" as any,

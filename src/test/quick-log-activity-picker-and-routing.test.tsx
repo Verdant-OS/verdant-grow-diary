@@ -187,7 +187,7 @@ describe("useQuickLogActivitySave — routing", () => {
     const [name, payload] = rpcMock.mock.calls[0];
     expect(name).toBe("quicklog_save_event");
     expect(payload.p_event_type).toBe("training");
-    expect(payload.p_details).toEqual({ subtype: "defoliation" });
+    expect(payload.p_details).toEqual({ subtype: "defoliation", event_type: "training" });
   });
 
   it("Harvest saves via quicklog_save_event with event_type='harvest' and dispatches on success", async () => {

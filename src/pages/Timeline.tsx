@@ -88,6 +88,11 @@ import { cn } from "@/lib/utils";
 import { getEventType } from "@/lib/diary";
 import { buildGrowDiaryTimeline } from "@/lib/growDiaryTimelineRules";
 import { MEASUREMENT_DETAIL_KEYS } from "@/lib/timelineEntryClassification";
+import {
+  describeQuickLogDetailsFromExtras,
+  QUICK_LOG_DETAIL_FIELD_KEYS,
+  type QuickLogDetailDisplayLine,
+} from "@/lib/quickLogActivityDetailFields";
 import { classifyVpdAgainstStage } from "@/lib/vpdStageTargetRules";
 import {
   mapGrowEventsToRecentRawEntries,
@@ -1865,12 +1870,23 @@ export default function Timeline() {
                             "sensor_snapshot",
                             "remind_at",
                           ];
+                          // Structured Quick Log detail renders as labeled
+                          // chips (below) instead of raw machine codes.
+                          const detailLines: readonly QuickLogDetailDisplayLine[] =
+                            isLearningLoopEvent || isReadinessCheckEvent
+                              ? []
+                              : describeQuickLogDetailsFromExtras(e.details);
+                          // Exclude the FULL structured-key set (not just
+                          // rendered lines): a present-but-invalid structured
+                          // value yields no labeled line and must still never
+                          // fall through as a raw chip.
                           const extra = isLearningLoopEvent
                             ? []
                             : isReadinessCheckEvent
                               ? []
                               : Object.entries(e.details || {}).filter(
-                                  ([k]) => !HIDDEN.includes(k),
+                                  ([k]) =>
+                                    !HIDDEN.includes(k) && !QUICK_LOG_DETAIL_FIELD_KEYS.has(k),
                                 );
                           const loopActionId =
                             isLearningLoopEvent && typeof e.details?.action_queue_id === "string"
@@ -2098,6 +2114,24 @@ export default function Timeline() {
                                     </div>
                                   );
                                 })()}
+                              {detailLines.length > 0 && (
+                                <div
+                                  className="mt-2 flex flex-wrap gap-1.5"
+                                  data-testid="timeline-entry-detail-lines"
+                                >
+                                  {/* No `capitalize`: spec labels/values are
+                                      already grower-facing copy. */}
+                                  {detailLines.map((line) => (
+                                    <span
+                                      key={line.key}
+                                      data-testid={`timeline-entry-detail-${line.key}`}
+                                      className="text-[11px] px-2 py-0.5 rounded-full bg-secondary/60 border border-border/40"
+                                    >
+                                      {line.label}: {line.value}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
                               {extra.length > 0 && (
                                 <div className="mt-2 flex flex-wrap gap-1.5">
                                   {extra.map(([k, v]) => (

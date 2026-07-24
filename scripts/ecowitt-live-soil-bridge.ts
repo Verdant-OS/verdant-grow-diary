@@ -348,6 +348,92 @@ export function runConfigValidate(
   return { ok: true };
 }
 
+// ---- Redacted effective config (for `config validate --dry-run`) ----
+
+/** Mask a UUID to `********-****-****-****-XXXXXXXXXXXX`-style tail. */
+export function maskUuid(u: string | null | undefined): string | null {
+  if (!u) return null;
+  const s = String(u).trim();
+  if (!UUID_RE.test(s)) return "uuid:invalid";
+  return `uuid:…${s.slice(-4)}`;
+}
+
+/** Host of a URL, or null; never returns query, path, or credentials. */
+export function hostOnly(u: string | null | undefined): string | null {
+  if (!u) return null;
+  try {
+    const parsed = new URL(u);
+    return `${parsed.protocol}//${parsed.host}`;
+  } catch {
+    return "invalid_url";
+  }
+}
+
+export interface RedactedEffectiveConfig {
+  event: "config_effective";
+  check: "ecowitt-bridge";
+  tent_id: string | null;
+  plant_id: string | null;
+  ingest_url_host: string | null;
+  bridge_token: string;
+  mqtt: {
+    url_host: string | null;
+    topic: string;
+    username_present: boolean;
+    password_present: boolean;
+  };
+  channel_map: {
+    count: number;
+    channels: Array<{
+      channel: string;
+      tent_id: string | null;
+      plant_id: string | null;
+      label: string | null;
+    }>;
+  };
+  dry_run: boolean;
+  once: boolean;
+}
+
+/**
+ * Build a schema-validated, fully redacted view of the effective bridge
+ * config. Pure: no I/O, no mqtt import, no network. Never contains raw
+ * UUIDs, tokens, credentials, or URL paths. Safe to print to stdout or
+ * ship to CI artifacts.
+ */
+export function buildRedactedEffectiveConfig(
+  env: NodeJS.ProcessEnv,
+  argv: string[] = [],
+): RedactedEffectiveConfig {
+  const bridge = readBridgeEnv(env, argv);
+  const mqttUrl =
+    env.ECOWITT_MQTT_URL ??
+    `mqtt://${env.ECOWITT_MQTT_HOST ?? "127.0.0.1"}:${env.ECOWITT_MQTT_PORT ?? "1883"}`;
+  const channels = Object.entries(bridge.channelMap).map(([channel, m]) => ({
+    channel,
+    tent_id: maskUuid(m.tent_id ?? null),
+    plant_id: maskUuid(m.plant_id ?? null),
+    label: m.label ?? null,
+  }));
+  return {
+    event: "config_effective",
+    check: "ecowitt-bridge",
+    tent_id: maskUuid(bridge.defaultTentId),
+    plant_id: maskUuid(bridge.defaultPlantId),
+    ingest_url_host: hostOnly(bridge.ingestUrl),
+    bridge_token: maskBridgeToken(bridge.bridgeToken),
+    mqtt: {
+      url_host: hostOnly(mqttUrl),
+      topic: env.ECOWITT_MQTT_TOPIC ?? "ecowitt/grow",
+      username_present: !!(env.ECOWITT_MQTT_USERNAME ?? "").trim(),
+      password_present: !!(env.ECOWITT_MQTT_PASSWORD ?? "").trim(),
+    },
+    channel_map: { count: channels.length, channels },
+    dry_run: bridge.dryRun,
+    once: !!bridge.once,
+  };
+}
+
 async function runCli(): Promise<void> {
   const emitConfigError = (code: string, message: string, fix?: string): void => {
     // eslint-disable-next-line no-console

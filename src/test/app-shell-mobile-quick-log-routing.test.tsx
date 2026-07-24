@@ -39,8 +39,15 @@ vi.mock("@/components/SubscriptionPastDueBanner", () => ({
 vi.mock("@/components/GlobalSearchDialog", () => ({ default: () => null }));
 vi.mock("@/components/LegalFooterLinks", () => ({ default: () => null }));
 vi.mock("@/components/QuickLog", () => ({
-  default: ({ open }: { open: boolean }) =>
-    open ? <div data-testid="legacy-quick-log">Legacy Quick Log</div> : null,
+  default: ({ open, prefill }: { open: boolean; prefill?: { logged_at?: string | null } | null }) =>
+    open ? (
+      <div
+        data-testid="legacy-quick-log"
+        data-logged-at={prefill?.logged_at ?? ""}
+      >
+        Legacy Quick Log
+      </div>
+    ) : null,
 }));
 vi.mock("@/components/QuickLogV2Sheet", () => ({
   default: ({
@@ -343,5 +350,33 @@ describe("AppShell mobile Quick Log routing", () => {
       expect(screen.getByTestId("current-path")).toHaveTextContent(`/tents/${SECOND_TENT_ID}`),
     );
     expect(screen.queryByTestId("scoped-quick-log")).not.toBeInTheDocument();
+  });
+});
+
+
+describe("AppShell 'Captured' (logged_at) stamping — every legacy launcher", () => {
+  it("stamps logged_at = click moment when the dispatcher carried none (dashboard/tray parity)", async () => {
+    renderAt("/settings");
+    dispatchRuntimeEvent(
+      new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, {
+        detail: { plantId: "plant-x", eventType: "training" },
+      }),
+    );
+    const modal = await screen.findByTestId("legacy-quick-log");
+    const stamped = modal.getAttribute("data-logged-at") ?? "";
+    expect(stamped).not.toBe("");
+    expect(Number.isFinite(Date.parse(stamped))).toBe(true);
+  });
+
+  it("preserves a dispatcher-provided logged_at untouched (GlobalSearch / Fast Add path)", async () => {
+    renderAt("/settings");
+    const SEED = "2026-07-24T06:30:00.000Z";
+    dispatchRuntimeEvent(
+      new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, {
+        detail: { plantId: "plant-x", eventType: "training", logged_at: SEED },
+      }),
+    );
+    const modal = await screen.findByTestId("legacy-quick-log");
+    expect(modal.getAttribute("data-logged-at")).toBe(SEED);
   });
 });

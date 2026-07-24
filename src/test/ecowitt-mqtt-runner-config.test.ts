@@ -17,6 +17,7 @@ import { resolve } from "node:path";
 import {
   RUNNER_UPSTREAM_MODES,
   RunnerConfigError,
+  assertSingleTentHaMapping,
   resolveRunnerModeConfig,
   resolveUpstreamMode,
   validateHaMappingFile,
@@ -261,6 +262,68 @@ describe("ecowitt-mqtt-runner — HA_MQTT_MAPPING_PATH fail-closed rules", () =>
     );
     expect(readFile).toHaveBeenCalledTimes(1);
     expect(readFile).toHaveBeenCalledWith("/cfg/mapping.json");
+  });
+});
+
+describe("ecowitt-mqtt-runner — one-process/one-tent boundary", () => {
+  const singleTentMapping = validateHaMappingFile(JSON.parse(VALID_MAPPING_JSON), {
+    path: "/cfg/mapping.json",
+    requireStatestreamPrefix: false,
+  });
+
+  it("accepts a single-tent mapping and matching VERDANT_TENT_ID without mutation", () => {
+    const before = JSON.stringify(singleTentMapping);
+    expect(() =>
+      assertSingleTentHaMapping(
+        singleTentMapping,
+        "00000000-0000-0000-0000-0000000000aa",
+      ),
+    ).not.toThrow();
+    expect(JSON.stringify(singleTentMapping)).toBe(before);
+  });
+
+  it("rejects a mixed-tent mapping without leaking ids, entities, or paths", () => {
+    const mixed = {
+      ...singleTentMapping,
+      entities: [
+        ...singleTentMapping.entities,
+        {
+          ...singleTentMapping.entities[0],
+          entity_id: "sensor.second_tent_temperature",
+          tent_id: "00000000-0000-0000-0000-0000000000bb",
+        },
+      ],
+    };
+
+    let thrown: unknown;
+    try {
+      assertSingleTentHaMapping(mixed);
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(RunnerConfigError);
+    const message = (thrown as Error).message;
+    expect(message).toMatch(/one tent/i);
+    expect(message).not.toMatch(/00000000-|sensor\.|\/cfg\//);
+  });
+
+  it("rejects a configured tent mismatch without leaking either tent id", () => {
+    expect(() =>
+      assertSingleTentHaMapping(
+        singleTentMapping,
+        "00000000-0000-0000-0000-0000000000bb",
+      ),
+    ).toThrow(/must match VERDANT_TENT_ID/);
+
+    try {
+      assertSingleTentHaMapping(
+        singleTentMapping,
+        "00000000-0000-0000-0000-0000000000bb",
+      );
+    } catch (error) {
+      expect((error as Error).message).not.toMatch(/00000000-/);
+    }
   });
 });
 

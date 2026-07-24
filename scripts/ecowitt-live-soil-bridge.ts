@@ -637,6 +637,26 @@ async function runCli(): Promise<void> {
     const includeFixHints = rest.includes("--fix-hints");
     const dryRun = rest.includes("--dry-run");
     const debug = rest.includes("--debug");
+    const outFlag = parseOutFlag(rest);
+
+    // Flag-shape errors are surfaced before running the (potentially slow)
+    // validator so operators get a fast, deterministic exit code. The
+    // `--out` companion-flag rules are contractual — enforce them here.
+    if (outFlag.error) {
+      const hint = includeFixHints ? fixHintForCode(outFlag.error.code) : undefined;
+      emitConfigError(outFlag.error.code, outFlag.error.message, hint);
+      process.exit(2);
+      return;
+    }
+    if (outFlag.path !== null && !dryRun) {
+      const message =
+        "--out=<path> only writes the redacted config_effective envelope when --dry-run is also passed";
+      const hint = includeFixHints ? fixHintForCode("out_flag_requires_dry_run") : undefined;
+      emitConfigError("out_flag_requires_dry_run", message, hint);
+      process.exit(2);
+      return;
+    }
+
     const res = runConfigValidate(process.env, { includeFixHints });
     if (res.ok) {
       // eslint-disable-next-line no-console
@@ -657,8 +677,38 @@ async function runCli(): Promise<void> {
       }
       if (dryRun) {
         const effective = buildRedactedEffectiveConfig(process.env, process.argv);
+        const serialized = JSON.stringify(effective);
         // eslint-disable-next-line no-console
-        console.log(JSON.stringify(effective));
+        console.log(serialized);
+        if (outFlag.path !== null) {
+          // Write the already-redacted envelope. Trailing newline so the
+          // file is a clean single-line JSONL record and plays nicely with
+          // `jq`, `tail`, and text editors.
+          try {
+            const { writeFileSync } = await import("node:fs");
+            const { resolve: resolvePath } = await import("node:path");
+            const absPath = resolvePath(outFlag.path);
+            writeFileSync(absPath, `${serialized}\n`, { encoding: "utf8" });
+            // eslint-disable-next-line no-console
+            console.log(
+              JSON.stringify({
+                event: "config_effective_written",
+                check: "ecowitt-bridge",
+                path: absPath,
+                bytes: Buffer.byteLength(serialized, "utf8") + 1,
+              }),
+            );
+          } catch (e) {
+            const message =
+              e instanceof Error
+                ? `failed to write --out path: ${e.message}`
+                : "failed to write --out path";
+            const hint = includeFixHints ? fixHintForCode("out_write_failed") : undefined;
+            emitConfigError("out_write_failed", message, hint);
+            process.exit(2);
+            return;
+          }
+        }
       }
       process.exit(0);
       return;

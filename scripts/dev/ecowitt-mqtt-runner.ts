@@ -63,7 +63,6 @@
 import { readFileSync } from "node:fs";
 import {
   assertSingleTentHaMappingEntities,
-  EcowittBridgeConfigError,
 } from "../../src/lib/ecowittLiveSoilIngestRules";
 import {
   buildEcowittLocalTestPayload,

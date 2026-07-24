@@ -11,14 +11,13 @@
  *      zips would bake the disposable test account's Supabase bearer token
  *      into a public CI artifact.
  */
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const CI_KEYS = ["CI", "E2E_TEST_EMAIL", "PLAYWRIGHT_RETRIES", "E2E_BASE_URL"] as const;
 
 async function loadConfig() {
-  // Bust the module cache so env changes in each test are honored.
-  const url = new URL(`../../playwright.config.ts?t=${Date.now()}${Math.random()}`, import.meta.url).href;
-  const mod = await import(/* @vite-ignore */ url);
+  vi.resetModules();
+  const mod = await import("../../playwright.config");
   return mod.default as {
     retries: number;
     use: { trace: string; video: string; screenshot: string };

@@ -421,4 +421,8 @@ function main() {
   process.exit(failures === 0 ? 0 : 1);
 }
 
-main();
+// Only run as a CLI when invoked directly — tests import resolveBaseline.
+const invokedDirectly =
+  process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href;
+if (invokedDirectly) main();
+

@@ -150,5 +150,4 @@ describe("`config validate` CLI — stderr JSON envelope golden shape", () => {
     expect(serialized).not.toContain(TENT_B);
   });
 });
-  });
-});
+

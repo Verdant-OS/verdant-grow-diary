@@ -411,6 +411,50 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
 
+      - name: Build Playwright failure PR-comment body
+        id: build_pr_comment
+        if: always() && steps.e2e_config.outputs.should_run == 'true' && github.event_name == 'pull_request'
+        shell: bash
+        env:
+          TRACES_URL: ${{ steps.upload_playwright_traces.outputs.artifact-url }}
+          MEDIA_URL: ${{ steps.upload_playwright_media.outputs.artifact-url }}
+          REPORT_URL: ${{ steps.upload_playwright_report.outputs.artifact-url }}
+          BUNDLE_URL: ${{ steps.upload_smoke_bundle.outputs.artifact-url }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          # Regenerates the flake summary as a PR-comment body with direct
+          # links to the uploaded artifact bundles for both attempt 1 and
+          # retry1. `artifact-url` outputs are only populated by
+          # actions/upload-artifact@v4 AFTER the upload step runs, so this
+          # step must live after every upload_playwright_* step.
+          if [ ! -f "e2e/results/playwright-report.json" ]; then
+            echo "::notice::No Playwright JSON report — skipping PR comment."
+            echo "comment_ready=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          node scripts/summarize-playwright-flakes.mjs \
+            --report=e2e/results/playwright-report.json \
+            --pr-comment=e2e/results/playwright-flake-pr-comment.md \
+            --traces-url="${TRACES_URL}" \
+            --media-url="${MEDIA_URL}" \
+            --report-url="${REPORT_URL}" \
+            --bundle-url="${BUNDLE_URL}" \
+            --run-url="${RUN_URL}" \
+            > /dev/null \
+            || echo "::warning::PR-comment builder exited non-zero (see logs)"
+          if [ -s "e2e/results/playwright-flake-pr-comment.md" ]; then
+            echo "comment_ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "comment_ready=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Post Playwright failure artifacts PR comment
+        if: always() && steps.build_pr_comment.outputs.comment_ready == 'true'
+        uses: marocchino/sticky-pull-request-comment@773744901bac0e8cbb5a0dc842800d45e9b2b405 # v2
+        with:
+          header: verdant-playwright-flake-artifacts
+          path: e2e/results/playwright-flake-pr-comment.md
+
       - name: Write Quick Log smoke run summary
         if: always()
         shell: bash

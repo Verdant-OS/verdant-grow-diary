@@ -120,6 +120,24 @@ CI, supervisors, and log scrapers should key off the JSON envelope:
 The `code` field is stable API. New codes may be added; existing codes
 will not be renamed or repurposed without a version bump.
 
+### `--fix-hints`
+
+Pass `--fix-hints` to `config validate` to include a concise remedy in
+the envelope. Codes and messages are unchanged; a `fix` field is added
+on failure only. Success output is untouched.
+
+```bash
+bun run scripts/ecowitt-live-soil-bridge.ts config validate --fix-hints
+# on failure, stderr JSON becomes:
+# {"event":"config_error","code":"mixed_tent_channel_map",
+#  "message":"...","fix":"One bridge process = one tent. ..."}
+```
+
+The full code → fix mapping lives in
+`scripts/ecowitt-live-soil-bridge.ts` as `CONFIG_ERROR_FIX_HINTS` and
+mirrors the table in section 2.
+
+
 ## 5. Related files
 
 - Bridge script: `scripts/ecowitt-live-soil-bridge.ts`

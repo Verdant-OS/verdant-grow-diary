@@ -298,12 +298,12 @@ export function buildPrComment(
     return lines.join("\n");
   }
 
-  for (const t of noteworthy) {
+  const renderTest = (t) => {
     const relFile = t.file
       ? relative(cwd, resolve(cwd, t.file)) || t.file
       : "";
     const badge = t.isFlake ? "FLAKY" : "FAILED";
-    lines.push(`### ${badge} · ${t.title}`);
+    lines.push(`#### ${badge} · ${t.title}`);
     lines.push("");
     lines.push(
       `\`${relFile}\`${t.projectName ? ` · project \`${t.projectName}\`` : ""} · attempts: ${t.attempts} · retry count: ${t.retryCount}`,
@@ -333,7 +333,34 @@ export function buildPrComment(
       }
       lines.push("");
     }
+  };
+
+  if (failed.length > 0) {
+    lines.push(`### ❌ Failed (${failed.length})`);
+    lines.push("");
+    lines.push("_Tests that stayed red after all retries. Triage these first._");
+    lines.push("");
+    for (const t of failed) renderTest(t);
+  } else {
+    lines.push("### ❌ Failed (0)");
+    lines.push("");
+    lines.push("_No hard failures in this run._");
+    lines.push("");
   }
+
+  if (flakes.length > 0) {
+    lines.push(`### ⚠️ Flaky (${flakes.length})`);
+    lines.push("");
+    lines.push("_Failed on initial attempt but passed on retry. Investigate for stability, not correctness._");
+    lines.push("");
+    for (const t of flakes) renderTest(t);
+  } else {
+    lines.push("### ⚠️ Flaky (0)");
+    lines.push("");
+    lines.push("_No flakes in this run._");
+    lines.push("");
+  }
+
 
   return lines.join("\n");
 }

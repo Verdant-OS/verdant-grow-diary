@@ -406,6 +406,47 @@ function escapeCell(value) {
     .replace(/\r?\n/g, " ");
 }
 
+/**
+ * Build a traceability header for the GitHub Actions Job Summary. Pulls
+ * commit SHA, workflow, and Playwright browser/config metadata from the
+ * environment and the Playwright JSON report so a reader can identify
+ * exactly which commit + which browsers produced this run.
+ */
+export function buildTraceabilityHeader(report, env = process.env) {
+  const sha = env.GITHUB_SHA || "";
+  const shortSha = sha ? sha.slice(0, 7) : "";
+  const repo = env.GITHUB_REPOSITORY || "";
+  const runId = env.GITHUB_RUN_ID || "";
+  const attempt = env.GITHUB_RUN_ATTEMPT || "";
+  const server = env.GITHUB_SERVER_URL || "https://github.com";
+  const runUrl = repo && runId ? `${server}/${repo}/actions/runs/${runId}${attempt ? `/attempts/${attempt}` : ""}` : "";
+  const commitUrl = repo && sha ? `${server}/${repo}/commit/${sha}` : "";
+
+  const cfg = report?.config ?? {};
+  const projects = Array.isArray(cfg.projects) ? cfg.projects : [];
+  const projectRows = projects.map((p) => {
+    const use = p?.use ?? {};
+    const browser = use.defaultBrowserType || p?.metadata?.browserName || "unknown";
+    const viewport = use.viewport ? `${use.viewport.width}×${use.viewport.height}` : "default";
+    return `\`${p?.name ?? "(unnamed)"}\` → ${browser} · viewport ${viewport}`;
+  });
+
+  const lines = [];
+  lines.push("### Run traceability");
+  lines.push("");
+  lines.push("| Field | Value |");
+  lines.push("|-------|-------|");
+  if (env.GITHUB_WORKFLOW) lines.push(`| Workflow | \`${env.GITHUB_WORKFLOW}\`${env.GITHUB_JOB ? ` · job \`${env.GITHUB_JOB}\`` : ""} |`);
+  if (env.GITHUB_EVENT_NAME) lines.push(`| Trigger | \`${env.GITHUB_EVENT_NAME}\`${env.GITHUB_REF_NAME ? ` · ref \`${env.GITHUB_REF_NAME}\`` : ""}${env.GITHUB_ACTOR ? ` · actor \`${env.GITHUB_ACTOR}\`` : ""} |`);
+  if (sha) lines.push(`| Commit | ${commitUrl ? `[\`${shortSha}\`](${commitUrl})` : `\`${shortSha}\``} |`);
+  if (runUrl) lines.push(`| Run | [${runId}${attempt ? ` (attempt ${attempt})` : ""}](${runUrl}) |`);
+  if (typeof cfg.workers === "number") lines.push(`| Playwright workers | ${cfg.workers} |`);
+  if (typeof cfg.version === "string") lines.push(`| Playwright version | \`${cfg.version}\` |`);
+  if (projectRows.length) lines.push(`| Projects (${projectRows.length}) | ${projectRows.join("<br>")} |`);
+  lines.push("");
+  return lines.join("\n");
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const reportPath = resolve(process.cwd(), args.reportPath);

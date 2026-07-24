@@ -583,7 +583,7 @@ async function runCli(): Promise<void> {
     assertBridgeStartupSafe(env, process.env.ECOWITT_SOIL_CHANNEL_MAP_JSON ?? null);
   } catch (e) {
     if (e instanceof EcowittBridgeConfigError) {
-      emitConfigError(e.code, e.message);
+      emitConfigError(e.code, e.message, undefined, e.fields);
       process.exit(2);
       return;
     }

@@ -256,13 +256,30 @@ async function runCli(): Promise<void> {
     else fn(`[ecowitt-bridge] ${msg}`, redactForLog(extra));
   };
 
+  /**
+   * Emit a stable machine-readable error line so automation (CI runners,
+   * supervisors, log scrapers) can detect specific failure classes
+   * without parsing prose. Two lines are emitted to stderr:
+   *   1. Human-readable: `[ecowitt-bridge] config_error code=<code> message="..."`
+   *   2. JSON envelope:  `{"event":"config_error","code":"<code>","message":"..."}`
+   * Neither line ever contains tent IDs, tokens, or raw payload data.
+   */
+  const emitConfigError = (code: string, message: string): void => {
+    // eslint-disable-next-line no-console
+    console.error(
+      `[ecowitt-bridge] config_error code=${code} message=${JSON.stringify(message)}`,
+    );
+    // eslint-disable-next-line no-console
+    console.error(JSON.stringify({ event: "config_error", code, message }));
+  };
+
   if (!env.dryRun) {
     if (!env.ingestUrl) {
-      log("error", "missing VERDANT_INGEST_URL");
+      emitConfigError("missing_ingest_url", "missing VERDANT_INGEST_URL");
       process.exit(2);
     }
     if (!env.bridgeToken) {
-      log("error", "missing VERDANT_BRIDGE_TOKEN");
+      emitConfigError("missing_bridge_token", "missing VERDANT_BRIDGE_TOKEN");
       process.exit(2);
     }
   }
@@ -273,7 +290,7 @@ async function runCli(): Promise<void> {
     assertBridgeStartupSafe(env);
   } catch (e) {
     if (e instanceof EcowittBridgeConfigError) {
-      log("error", e.message);
+      emitConfigError(e.code, e.message);
       process.exit(2);
       return;
     }
@@ -302,10 +319,14 @@ async function runCli(): Promise<void> {
     const modName = ["m", "q", "t", "t"].join("");
     mqttMod = (await import(/* @vite-ignore */ modName)) as MqttLike;
   } catch {
-    log("error", "mqtt package not installed — run `bun add mqtt` locally");
+    emitConfigError(
+      "mqtt_package_missing",
+      "mqtt package not installed — run `bun add mqtt` locally",
+    );
     process.exit(2);
     return;
   }
+
 
   const url =
     process.env.ECOWITT_MQTT_URL ??

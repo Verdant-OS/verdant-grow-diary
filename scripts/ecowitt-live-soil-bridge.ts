@@ -487,6 +487,52 @@ export function buildRedactedEffectiveConfig(
   };
 }
 
+// ---- Focused debug view (for `config validate --debug`) ----
+
+export interface ConfigDebugEnvelope {
+  event: "config_debug";
+  check: "ecowitt-bridge";
+  /** Redacted (`uuid:…XXXX`) or `null` when unset. Never a raw UUID. */
+  tent_id: string | null;
+  channel_map: {
+    count: number;
+    /** Stable order: sorted by channel key so diffs across runs stay diff-friendly. */
+    channels: Array<{
+      channel: string;
+      tent_id: string | null;
+      plant_id: string | null;
+      label: string | null;
+    }>;
+  };
+}
+
+/**
+ * Build a focused, fully redacted view of the parsed tent ID + derived
+ * channel map for `config validate --debug`. Strict subset of
+ * {@link RedactedEffectiveConfig} — no tokens, no URLs, no MQTT metadata.
+ * Pure: no I/O, no mqtt import, no network. Safe for stdout and CI logs.
+ */
+export function buildConfigDebugEnvelope(
+  env: NodeJS.ProcessEnv,
+  argv: string[] = [],
+): ConfigDebugEnvelope {
+  const bridge = readBridgeEnv(env, argv);
+  const channels = Object.entries(bridge.channelMap)
+    .sort(([a], [b]) => a.localeCompare(b, "en", { numeric: true }))
+    .map(([channel, m]) => ({
+      channel,
+      tent_id: maskUuid(m.tent_id ?? null),
+      plant_id: maskUuid(m.plant_id ?? null),
+      label: m.label ?? null,
+    }));
+  return {
+    event: "config_debug",
+    check: "ecowitt-bridge",
+    tent_id: maskUuid(bridge.defaultTentId),
+    channel_map: { count: channels.length, channels },
+  };
+}
+
 async function runCli(): Promise<void> {
   const emitConfigError = (
     code: string,

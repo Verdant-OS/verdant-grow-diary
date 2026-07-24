@@ -11,6 +11,8 @@ import {
   maskBridgeToken,
   fullJitterBackoffMs,
   deriveBridgeVpdKpa,
+  assertSingleTentSoilChannelMap,
+  EcowittBridgeConfigError,
 } from "@/lib/ecowittLiveSoilIngestRules";
 import {
   handleMqttMessage,

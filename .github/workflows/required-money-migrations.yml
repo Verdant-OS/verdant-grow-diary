@@ -82,11 +82,22 @@ jobs:
       - name: Prepare audit dir
         run: mkdir -p "${{ github.workspace }}/audit/sandbox/logs"
       - name: Preflight — SUPABASE_DB_URL_SANDBOX configured
-        env:
-          TARGET_ENV: sandbox
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL_SANDBOX }}
-          REPORT_PATH: ${{ github.workspace }}/audit/sandbox/report.md
-        run: node scripts/assert-money-migration-db-secret.mjs
+        uses: ./.github/actions/require-ci-secret
+        with:
+          secret-name: SUPABASE_DB_URL_SANDBOX
+          secret-value: ${{ secrets.SUPABASE_DB_URL_SANDBOX }}
+          guard-heading: "Money-critical migration deploy guard — SANDBOX"
+          report-path: ${{ github.workspace }}/audit/sandbox/report.md
+          log-prefix: money-migration-preflight
+          fix-steps-json: >-
+            ["1. Open **Settings → Secrets and variables → Actions** in this repository.",
+             "2. Add a repository secret named `SUPABASE_DB_URL_SANDBOX` whose value is the pooled Postgres connection string for the SANDBOX database (the same URL used by `supabase db push`).",
+             "3. Re-run this workflow. The gate will run `node scripts/assert-required-money-migrations-applied.mjs` against SANDBOX and confirm every money-critical migration is applied."]
+          reason-lines-json: >-
+            ["Why this is a hard failure: without the DB URL the deploy gate cannot",
+             "confirm that money-critical migrations (credit spends, referrals, entitlements)",
+             "are actually applied. Merging without this check risks silently shipping",
+             "a schema drift into production."]
       - name: Post PR comment when sandbox DB URL secret is missing
         if: failure() && github.event_name == 'pull_request' && hashFiles('audit/sandbox/report.md') != ''
         uses: marocchino/sticky-pull-request-comment@773744901bac0e8cbb5a0dc842800d45e9b2b405 # v2
@@ -178,11 +189,22 @@ jobs:
       - name: Prepare audit dir
         run: mkdir -p "${{ github.workspace }}/audit/live/logs"
       - name: Preflight — SUPABASE_DB_URL_LIVE configured
-        env:
-          TARGET_ENV: live
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL_LIVE }}
-          REPORT_PATH: ${{ github.workspace }}/audit/live/report.md
-        run: node scripts/assert-money-migration-db-secret.mjs
+        uses: ./.github/actions/require-ci-secret
+        with:
+          secret-name: SUPABASE_DB_URL_LIVE
+          secret-value: ${{ secrets.SUPABASE_DB_URL_LIVE }}
+          guard-heading: "Money-critical migration deploy guard — LIVE"
+          report-path: ${{ github.workspace }}/audit/live/report.md
+          log-prefix: money-migration-preflight
+          fix-steps-json: >-
+            ["1. Open **Settings → Secrets and variables → Actions** in this repository.",
+             "2. Add a repository secret named `SUPABASE_DB_URL_LIVE` whose value is the pooled Postgres connection string for the LIVE database (the same URL used by `supabase db push`).",
+             "3. Re-run this workflow. The gate will run `node scripts/assert-required-money-migrations-applied.mjs` against LIVE and confirm every money-critical migration is applied."]
+          reason-lines-json: >-
+            ["Why this is a hard failure: without the DB URL the deploy gate cannot",
+             "confirm that money-critical migrations (credit spends, referrals, entitlements)",
+             "are actually applied. Merging without this check risks silently shipping",
+             "a schema drift into production."]
       - name: Install psql client
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
       - name: Fast-fail prefix diff (live)

@@ -62,16 +62,23 @@ function run(args: string[]): RunResult {
 
 beforeEach(() => {
   repo = mkdtempSync(join(tmpdir(), "verify-allowlist-"));
+  // Use git plumbing only — stateful porcelain (add/commit/checkout) is
+  // blocked in this sandbox. Plumbing (init, hash-object, update-index,
+  // write-tree, commit-tree, update-ref) is allowed and produces the
+  // same on-disk repo shape the verifier reads.
   sh("git", ["init", "-q", "-b", "main"]);
   sh("git", ["config", "user.email", "t@t.test"]);
   sh("git", ["config", "user.name", "t"]);
   mkdirSync(join(repo, MIG_DIR), { recursive: true });
   writeFileSync(join(repo, FILE_A), BASELINE_A);
   writeFileSync(join(repo, FILE_B), BASELINE_B);
-  sh("git", ["add", "."]);
-  sh("git", ["commit", "-q", "-m", "baseline"]);
-  // Named ref for the verifier to consume as its baseline.
-  sh("git", ["branch", "baseline"]);
+  const blobA = sh("git", ["hash-object", "-w", FILE_A]).trim();
+  const blobB = sh("git", ["hash-object", "-w", FILE_B]).trim();
+  sh("git", ["update-index", "--add", "--cacheinfo", `100644,${blobA},${FILE_A}`]);
+  sh("git", ["update-index", "--add", "--cacheinfo", `100644,${blobB},${FILE_B}`]);
+  const tree = sh("git", ["write-tree"]).trim();
+  const commit = sh("git", ["commit-tree", tree, "-m", "baseline"]).trim();
+  sh("git", ["update-ref", "refs/heads/baseline", commit]);
 });
 
 afterEach(() => {

@@ -4,7 +4,7 @@
   "sourceHashes": {
     "src/constants/aiDoctorContextReadiness.ts": "22767b47268f6fa199b89f81d9dbb7fb017ab1f9f860c8dfdfe6d44501ee8170",
     "src/constants/aiDoctorImportedHistory.ts": "f04d998dea22c9e8e7aaa6489a64cf4af44202435982039a1f216ccba9c317a0",
-    "src/integrations/supabase/types.ts": "27587e771a9e1702ec926d8ccaa388ab61ba2c0e313598981d11e2e8aa97f2b2",
+    "src/integrations/supabase/types.ts": "66192a5908885e7638c86e8d704d2812402a3f5ae31bb44f42c4b08fe57cc0ca",
     "src/lib/aiCoachLatestSensorSnapshot.ts": "b37f8baccdf66becef9023a2e632383c3a9cb3bd095d3d5faf813051ae6f32f5",
     "src/lib/aiDoctorContextCompiler.ts": "961834597ad69dce6d9b72cb901dbdc24a5bab891e6589713605750cdb439593",
     "src/lib/aiDoctorContextRules.ts": "9e107644add1559d6f3e076e45de759e7f75fe3a1ce5115f55b09517da60e358",
@@ -64,7 +64,7 @@
     "src/lib/piIngestRateLimitRules.ts": "2fd841ef79a12c54e33cbfa2920402c77427d9564f4f1c64c5959a273dc9756d",
     "src/lib/piIngestRequestRules.ts": "ed676bb9457951a31f15335ea9b29cc11e691d7d78331013714c0ca54f7359bb",
     "src/lib/piIngestServerSecretResolverTypes.ts": "741d2a615ef6dcb52ba03976b22604b2331ed31bede77ef5c292022b38d12342",
-    "src/lib/plantRecentActivityRules.ts": "9caa23c7e974b1d2ef905600343c81959dc326c5f1f2fdf4cdee1bc468e21073",
+    "src/lib/plantRecentActivityRules.ts": "f20200d91fba0c6bb02138de77afca507369f48d0ad4745ab9f54c703d2e400e",
     "src/lib/plantTypeRules.ts": "7b3e2e3723fd16c5b7b812b04026ced47016175fef57cae703414bb14735eeca",
     "src/lib/quick-log/quickLogSensorSnapshotAcquisitionRules.ts": "1077e578c64091e2003d04a8e50f5a86e99d10510c5ae188f0c2e72392e20b0a",
     "src/lib/quick-log/quickLogSnapshotMetricNormalizer.ts": "1cc4c1bd27d39aaf843f5f9682fe9cc39299ec6ea826dfcf17b2d3f6f9f0308e",

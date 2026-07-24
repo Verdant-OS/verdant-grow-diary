@@ -83,7 +83,7 @@ describe("Fast Add payload → diary EVENT_TYPES alignment", () => {
     const intent = resolveFastAddIntent("environment", ctx, { now });
     if (intent.kind !== "open-quicklog") throw new Error("expected open-quicklog");
     const keys = Object.keys(intent.prefill).sort();
-    // Environment is the only action that sets both occurred_at + captured_at.
+    // Environment and Training both set occurred_at + captured_at.
     expect(keys).toEqual([...PAYLOAD_KEYS].sort());
   });
 

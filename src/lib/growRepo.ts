@@ -63,7 +63,25 @@ export async function fetchPlants(
   }
   const { data, error } = await q.order("created_at", { ascending: false });
   if (error) fail("fetchPlants", error);
-  return (data ?? []).map(mapPlantRow);
+  const { valid, rejected } = filterValidPlantRows(data ?? []);
+  if (rejected > 0 && typeof console !== "undefined") {
+    console.warn(`growRepo.fetchPlants: dropped ${rejected} malformed plant row(s)`);
+  }
+  return valid.map(mapPlantRow);
+}
+
+export async function fetchPlant(id: string): Promise<Plant | null> {
+  if (!isUuid(id)) return null;
+  const { data, error } = await supabase.from("plants").select("*").eq("id", id).maybeSingle();
+  if (error) fail("fetchPlant", error);
+  if (!data) return null;
+  const guard = validatePlantRowResponse(data);
+  if (!guard.ok || !guard.value) {
+    throw new Error(
+      `growRepo.fetchPlant: plant row failed validation (${guard.errors.join("; ")})`,
+    );
+  }
+  return mapPlantRow(guard.value);
 }
 
 export async function fetchPlant(id: string): Promise<Plant | null> {

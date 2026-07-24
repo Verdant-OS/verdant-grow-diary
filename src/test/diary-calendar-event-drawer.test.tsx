@@ -121,6 +121,38 @@ describe("diaryCalendarEventDrawerViewModel — pure", () => {
     expect(model.measurements.ecPreview?.disclaimer).toMatch(/Not stored/i);
   });
 
+  it("labels water and air temp in the active display unit (fahrenheit)", () => {
+    const ev = firstEvent([
+      {
+        id: "f2",
+        entry_at: "2026-06-10T09:00:00Z",
+        event_type: "feeding",
+        details: {
+          nutrients: "GH 3-2-1",
+          ec: 1.6,
+          ec_unit: "mS/cm",
+          water_temp_c: 22,
+          temp_c: 24,
+        },
+      },
+    ]);
+    const model = buildDiaryCalendarEventDrawerViewModel(
+      ev,
+      { nutrients: "GH 3-2-1", ec: 1.6, ec_unit: "mS/cm", water_temp_c: 22, temp_c: 24 },
+      "fahrenheit",
+    );
+    expect(model.measurements.fields).toContainEqual({
+      label: "Water temp",
+      value: "71.6°F",
+    });
+    expect(model.measurements.fields).toContainEqual({
+      label: "Air temp",
+      value: "75.2°F",
+    });
+    // EC compensation science still runs on canonical Celsius, unaffected.
+    expect(model.measurements.ecPreview).not.toBeNull();
+  });
+
   it("environment-check style fields render safely when present", () => {
     const ev = firstEvent([
       {

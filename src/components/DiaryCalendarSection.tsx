@@ -48,6 +48,7 @@ import {
 } from "@/lib/diaryCalendarFilterPersistence";
 
 import { cn } from "@/lib/utils";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 
 export const ENVIRONMENT_CHECK_SHOW_DETAILS_LABEL = "Show details";
 export const ENVIRONMENT_CHECK_HIDE_DETAILS_LABEL = "Hide details";
@@ -115,7 +116,11 @@ export default function DiaryCalendarSection({
   // inject a precise instant. The history projector never reads ambient time.
   const internalNowRef = useRef(new Date());
   const calendarNow = now ?? internalNowRef.current;
-  const allGroups = useMemo(() => buildDiaryCalendarViewModel(rawEntries ?? []), [rawEntries]);
+  const temperatureUnit = useTemperatureUnitPreference();
+  const allGroups = useMemo(
+    () => buildDiaryCalendarViewModel(rawEntries ?? [], temperatureUnit),
+    [rawEntries, temperatureUnit],
+  );
   const historyFacts = useMemo<CultivationCalendarHistoryFact[]>(() => {
     const facts: CultivationCalendarHistoryFact[] = [];
     for (const group of allGroups) {
@@ -205,7 +210,13 @@ export default function DiaryCalendarSection({
   }, [rawEntries]);
   const [drawerEvent, setDrawerEvent] = useState<DiaryCalendarEventDrawerViewModel | null>(null);
   const openEventDrawer = (ev: DiaryCalendarEvent) => {
-    setDrawerEvent(buildDiaryCalendarEventDrawerViewModel(ev, rawDetailsById.get(ev.id) ?? null));
+    setDrawerEvent(
+      buildDiaryCalendarEventDrawerViewModel(
+        ev,
+        rawDetailsById.get(ev.id) ?? null,
+        temperatureUnit,
+      ),
+    );
   };
   const [openDay, setOpenDay] = useState<string | null>(visibleGroups[0]?.dateKey ?? null);
 

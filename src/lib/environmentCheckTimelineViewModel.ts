@@ -17,6 +17,7 @@
 
 import {
   celsiusToFahrenheit,
+  fahrenheitToCelsius,
   loadTemperatureUnitPreference,
   type TemperatureUnitPreference,
 } from "@/lib/temperatureUnitPreference";
@@ -129,11 +130,10 @@ function buildFields(
   const fields: EnvironmentCheckTimelineField[] = [];
 
   // Temp: prefer the canonical Celsius value when available; otherwise use
-  // the grower-entered Fahrenheit value. Display honors `tempUnit`:
-  //  - fahrenheit → °C values convert once at string-build time; °F values
-  //    render as-is (never double-converted).
-  //  - celsius → the legacy strings are preserved exactly (°C as-is; a
-  //    °F-only envelope still renders °F rather than silently converting).
+  // the grower-entered Fahrenheit value (legacy Quick Log shape). Either
+  // source converts exactly once, at string-build time, to match `tempUnit`
+  // — never double-converted, never left in the wrong unit just because the
+  // stored shape happened to be Fahrenheit-only.
   const tempC = asFiniteNumber(
     envelope.temp_c ?? envelope.tempC ?? envelope.air_temp_c,
   );
@@ -150,7 +150,14 @@ function buildFields(
           : `${tempC.toFixed(1)}°C`,
     });
   } else if (tempF != null) {
-    fields.push({ key: "temp", label: "Temp", value: `${tempF.toFixed(1)}°F` });
+    fields.push({
+      key: "temp",
+      label: "Temp",
+      value:
+        tempUnit === "celsius"
+          ? `${fahrenheitToCelsius(tempF).toFixed(1)}°C`
+          : `${tempF.toFixed(1)}°F`,
+    });
   }
 
   const rh = asFiniteNumber(

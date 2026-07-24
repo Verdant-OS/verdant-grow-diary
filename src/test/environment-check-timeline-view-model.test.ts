@@ -48,6 +48,34 @@ describe("environmentCheckTimelineViewModel", () => {
     expect(JSON.stringify(vm)).not.toMatch(/"status"\s*:\s*"live"/i);
   });
 
+  it("converts a legacy Fahrenheit-only entry to Celsius when the preference is celsius", () => {
+    const legacyFahrenheitOnly = {
+      id: "e-2",
+      entry_at: "2026-06-15T18:30:00.000Z",
+      event_type: "environment",
+      details: {
+        environment_check: { room_temp_f: 75.2, humidity_pct: 58 },
+      },
+    };
+    const vm = buildEnvironmentCheckTimelineViewModel(legacyFahrenheitOnly, "celsius")!;
+    const temp = vm.fields.find((f) => f.key === "temp");
+    expect(temp?.value).toBe("24.0°C");
+  });
+
+  it("keeps a legacy Fahrenheit-only entry in Fahrenheit under the fahrenheit preference", () => {
+    const legacyFahrenheitOnly = {
+      id: "e-3",
+      entry_at: "2026-06-15T18:30:00.000Z",
+      event_type: "environment",
+      details: {
+        environment_check: { room_temp_f: 75.2 },
+      },
+    };
+    const vm = buildEnvironmentCheckTimelineViewModel(legacyFahrenheitOnly, "fahrenheit")!;
+    const temp = vm.fields.find((f) => f.key === "temp");
+    expect(temp?.value).toBe("75.2°F");
+  });
+
   it("returns null for non-environment entries", () => {
     expect(
       buildEnvironmentCheckTimelineViewModel({

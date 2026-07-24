@@ -84,13 +84,6 @@ export async function fetchPlant(id: string): Promise<Plant | null> {
   return mapPlantRow(guard.value);
 }
 
-export async function fetchPlant(id: string): Promise<Plant | null> {
-  if (!isUuid(id)) return null;
-  const { data, error } = await supabase.from("plants").select("*").eq("id", id).maybeSingle();
-  if (error) fail("fetchPlant", error);
-  return data ? mapPlantRow(data) : null;
-}
-
 export async function fetchSensorReadings(tentId?: string | null): Promise<SensorReading[]> {
   // `undefined` is the intentional aggregate read. `null` explicitly means
   // the caller has no selected tent and must fail closed without a query.

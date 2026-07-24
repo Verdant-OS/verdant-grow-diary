@@ -598,14 +598,24 @@ export function validateEcowittSoilChannelMapJsonEnv(
 export function assertEcowittSoilChannelMapJsonEnv(raw: unknown): void {
   const res = validateEcowittSoilChannelMapJsonEnv(raw);
   if (res.ok) return;
-  const summary = res.errors
+  const capped = res.errors.slice(0, 20);
+  const summary = capped
     .slice(0, 5)
     .map((e) => `${e.path}: ${e.message}`)
     .join("; ");
   throw new EcowittBridgeConfigError(
     "invalid_channel_map_schema",
     `ECOWITT_SOIL_CHANNEL_MAP_JSON does not match ${ECOWITT_SOIL_CHANNEL_MAP_SCHEMA_ID} (${summary})`,
+    capped,
   );
+}
+
+/** Numeric comparator for soilmoistureN keys so soilmoisture10 > soilmoisture2. */
+function compareChannelKeys(a: string, b: string): number {
+  const na = Number((a.match(CHANNEL_KEY_RE)?.[1] ?? "0"));
+  const nb = Number((b.match(CHANNEL_KEY_RE)?.[1] ?? "0"));
+  if (na !== nb) return na - nb;
+  return a.localeCompare(b);
 }
 
 /**

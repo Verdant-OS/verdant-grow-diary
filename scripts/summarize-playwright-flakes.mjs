@@ -124,6 +124,22 @@ export function classifyTest(test) {
     }
   }
 
+  // Per-attempt breakdown for the PR-comment view: every attempt keeps its
+  // status + full attachment list (trace zip, screenshot, video), grouped by
+  // retry index so users can jump straight to the exact attempt's evidence.
+  const attemptResults = results.map((r) => ({
+    retry: r?.retry ?? 0,
+    status: String(r?.status ?? ""),
+    durationMs: typeof r?.duration === "number" ? r.duration : null,
+    attachments: (Array.isArray(r?.attachments) ? r.attachments : [])
+      .filter(Boolean)
+      .map((a) => ({
+        name: String(a.name ?? "attachment"),
+        contentType: String(a.contentType ?? ""),
+        path: a.path ? String(a.path) : "",
+      })),
+  }));
+
   return {
     file: test.file,
     title: test.title,
@@ -134,6 +150,7 @@ export function classifyTest(test) {
     failedAttemptCount: failedAttempts.length,
     isFlake,
     attachments,
+    attemptResults,
   };
 }
 

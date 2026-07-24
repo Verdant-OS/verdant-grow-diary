@@ -23,6 +23,10 @@ vi.mock("@/hooks/useRootZoneObservations", () => ({
 
 import { PlantBlueprintOverlaySection } from "@/components/PlantBlueprintOverlaySection";
 import { EMPTY_SNAPSHOT } from "@/lib/sensorSnapshot";
+import {
+  clearTemperatureUnitPreference,
+  saveTemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 
 function entitlement(blueprint: boolean, extra: Record<string, unknown> = {}) {
   return {
@@ -43,6 +47,7 @@ function renderSection() {
 }
 
 beforeEach(() => {
+  clearTemperatureUnitPreference();
   snapshotMock.mockReturnValue({ status: "ok", snapshot: EMPTY_SNAPSHOT });
   rootZoneMock.mockReturnValue({ observations: [] });
 });
@@ -77,7 +82,7 @@ describe("PlantBlueprintOverlaySection", () => {
     expect(screen.queryByTestId("pro-blueprint-overlay")).toBeNull();
   });
 
-  it("previews the stage's SOP target bands (conversion demo) above the paywall", () => {
+  it("previews the stage's SOP target bands (conversion demo) above the paywall, in the default Fahrenheit unit", () => {
     // Locked grower on a veg plant sees the real per-stage targets Craft scores
     // against — the paid value made concrete — with the paywall CTA beneath it.
     entitlementsMock.mockReturnValue(entitlement(false));
@@ -85,9 +90,17 @@ describe("PlantBlueprintOverlaySection", () => {
     expect(screen.getByTestId("pro-blueprint-locked")).toBeTruthy();
     expect(screen.getByTestId("pro-blueprint-teaser")).toBeTruthy();
     // veg temperature target, straight from the SOP band table.
-    expect(screen.getByTestId("pro-blueprint-teaser-row-tempC").textContent).toMatch(/°C/);
+    expect(screen.getByTestId("pro-blueprint-teaser-row-tempC").textContent).toMatch(/°F/);
     // The teaser never fetches or shows the grower's own readings (static bands).
     expect(screen.queryByTestId("pro-blueprint-overlay")).toBeNull();
+  });
+
+  it("previews the teaser's temperature band in Celsius when the preference is celsius", () => {
+    saveTemperatureUnitPreference("celsius");
+    entitlementsMock.mockReturnValue(entitlement(false));
+    renderSection();
+    expect(screen.getByTestId("pro-blueprint-teaser-row-tempC").textContent).toMatch(/°C/);
+    expect(screen.getByTestId("pro-blueprint-teaser-row-tempC").textContent).not.toMatch(/°F/);
   });
 
   it("renders the paywall when the entitlement lookup failed (fail closed)", () => {

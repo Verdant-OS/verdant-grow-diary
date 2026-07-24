@@ -32,6 +32,13 @@ on:
         description: "Playwright retry count per test (default 1 in CI). Increase to 2 or 3 for deeper flake triage."
         required: false
         default: "1"
+      pr_comment_on_flake_only:
+        description: "Suppress the sticky PR comment when there are no hard failures (flaky-only runs stay quiet)."
+        required: false
+        default: "true"
+        type: choice
+        options: ["true", "false"]
+
   push:
     branches: [verdant-grow-diary]
     paths:
@@ -425,6 +432,9 @@ jobs:
           REPORT_URL: ${{ steps.upload_playwright_report.outputs.artifact-url }}
           BUNDLE_URL: ${{ steps.upload_smoke_bundle.outputs.artifact-url }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          # Default: quiet on flaky-only runs. Overridable per manual dispatch.
+          # For push/PR events (no dispatch input), inputs.* is empty → defaults to "true".
+          PR_COMMENT_ON_FLAKE_ONLY: ${{ github.event.inputs.pr_comment_on_flake_only || 'true' }}
         run: |
           # Regenerates the flake summary as a PR-comment body with direct
           # links to the uploaded artifact bundles for both attempt 1 and
@@ -436,6 +446,11 @@ jobs:
             echo "comment_ready=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          QUIET_FLAG=""
+          if [ "${PR_COMMENT_ON_FLAKE_ONLY}" = "true" ]; then
+            QUIET_FLAG="--quiet-when-no-failed"
+            echo "::notice::pr_comment_on_flake_only=true → suppressing PR comment when there are no hard failures."
+          fi
           node scripts/summarize-playwright-flakes.mjs \
             --report=e2e/results/playwright-report.json \
             --pr-comment=e2e/results/playwright-flake-pr-comment.md \
@@ -444,12 +459,14 @@ jobs:
             --report-url="${REPORT_URL}" \
             --bundle-url="${BUNDLE_URL}" \
             --run-url="${RUN_URL}" \
+            ${QUIET_FLAG} \
             > /dev/null \
             || echo "::warning::PR-comment builder exited non-zero (see logs)"
           if [ -s "e2e/results/playwright-flake-pr-comment.md" ]; then
             echo "comment_ready=true" >> "$GITHUB_OUTPUT"
           else
             echo "comment_ready=false" >> "$GITHUB_OUTPUT"
+
           fi
 
       - name: Post Playwright failure artifacts PR comment

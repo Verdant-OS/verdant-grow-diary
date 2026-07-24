@@ -39,6 +39,7 @@ function parseArgs(argv) {
     bundleUrl: "",
     runUrl: "",
     failOnFlake: false,
+    quietWhenNoFailed: false,
   };
   for (const raw of argv) {
     if (raw.startsWith("--report=")) args.reportPath = raw.slice("--report=".length);
@@ -50,13 +51,15 @@ function parseArgs(argv) {
     else if (raw.startsWith("--bundle-url=")) args.bundleUrl = raw.slice("--bundle-url=".length);
     else if (raw.startsWith("--run-url=")) args.runUrl = raw.slice("--run-url=".length);
     else if (raw === "--fail-on-flake") args.failOnFlake = true;
+    else if (raw === "--quiet-when-no-failed") args.quietWhenNoFailed = true;
     else if (raw === "--help" || raw === "-h") {
       process.stdout.write(
-        "Usage: summarize-playwright-flakes.mjs --report=<path> [--out=<path>] [--pr-comment=<path>] [--traces-url=<url>] [--media-url=<url>] [--report-url=<url>] [--bundle-url=<url>] [--run-url=<url>] [--fail-on-flake]\n",
+        "Usage: summarize-playwright-flakes.mjs --report=<path> [--out=<path>] [--pr-comment=<path>] [--traces-url=<url>] [--media-url=<url>] [--report-url=<url>] [--bundle-url=<url>] [--run-url=<url>] [--fail-on-flake] [--quiet-when-no-failed]\n",
       );
       process.exit(0);
     }
   }
+
   return args;
 }
 
@@ -298,12 +301,12 @@ export function buildPrComment(
     return lines.join("\n");
   }
 
-  for (const t of noteworthy) {
+  const renderTest = (t) => {
     const relFile = t.file
       ? relative(cwd, resolve(cwd, t.file)) || t.file
       : "";
     const badge = t.isFlake ? "FLAKY" : "FAILED";
-    lines.push(`### ${badge} · ${t.title}`);
+    lines.push(`#### ${badge} · ${t.title}`);
     lines.push("");
     lines.push(
       `\`${relFile}\`${t.projectName ? ` · project \`${t.projectName}\`` : ""} · attempts: ${t.attempts} · retry count: ${t.retryCount}`,
@@ -333,7 +336,34 @@ export function buildPrComment(
       }
       lines.push("");
     }
+  };
+
+  if (failed.length > 0) {
+    lines.push(`### ❌ Failed (${failed.length})`);
+    lines.push("");
+    lines.push("_Tests that stayed red after all retries. Triage these first._");
+    lines.push("");
+    for (const t of failed) renderTest(t);
+  } else {
+    lines.push("### ❌ Failed (0)");
+    lines.push("");
+    lines.push("_No hard failures in this run._");
+    lines.push("");
   }
+
+  if (flakes.length > 0) {
+    lines.push(`### ⚠️ Flaky (${flakes.length})`);
+    lines.push("");
+    lines.push("_Failed on initial attempt but passed on retry. Investigate for stability, not correctness._");
+    lines.push("");
+    for (const t of flakes) renderTest(t);
+  } else {
+    lines.push("### ⚠️ Flaky (0)");
+    lines.push("");
+    lines.push("_No flakes in this run._");
+    lines.push("");
+  }
+
 
   return lines.join("\n");
 }
@@ -404,17 +434,25 @@ async function main() {
   }
 
   if (args.prCommentPath) {
-    const prBody = buildPrComment(report, {
-      tracesUrl: args.tracesUrl,
-      mediaUrl: args.mediaUrl,
-      reportUrl: args.reportUrl,
-      bundleUrl: args.bundleUrl,
-      runUrl: args.runUrl,
-    });
-    const prAbs = resolve(process.cwd(), args.prCommentPath);
-    mkdirSync(dirname(prAbs), { recursive: true });
-    writeFileSync(prAbs, `${prBody}\n`, "utf8");
+    const failedCount = counts.failed ?? 0;
+    if (args.quietWhenNoFailed && failedCount === 0) {
+      process.stderr.write(
+        `summarize-playwright-flakes: --quiet-when-no-failed set and failed=0 (flaky=${counts.flaky ?? 0}); skipping PR comment write to ${args.prCommentPath}\n`,
+      );
+    } else {
+      const prBody = buildPrComment(report, {
+        tracesUrl: args.tracesUrl,
+        mediaUrl: args.mediaUrl,
+        reportUrl: args.reportUrl,
+        bundleUrl: args.bundleUrl,
+        runUrl: args.runUrl,
+      });
+      const prAbs = resolve(process.cwd(), args.prCommentPath);
+      mkdirSync(dirname(prAbs), { recursive: true });
+      writeFileSync(prAbs, `${prBody}\n`, "utf8");
+    }
   }
+
 
   const stepSummary = process.env.GITHUB_STEP_SUMMARY;
   if (stepSummary) {

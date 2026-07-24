@@ -142,8 +142,8 @@ describe("--allow / --allow-file allowlist support", () => {
   });
 
   it("does not silence divergence on other files", () => {
-    writeFileSync(join(repo, FILE_A), "-- MUTATED A\n");
-    writeFileSync(join(repo, FILE_B), "-- MUTATED B\n");
+    writeFileSync(join(repo, FILE_A), "-- MUTATED A\nselect 42;\n");
+    writeFileSync(join(repo, FILE_B), "-- MUTATED B\nselect 43;\n");
     const r = run(["--json", `--allow=${FILE_A}:only A is intentional`]);
     expect(r.status).toBe(1);
     const parsed = JSON.parse(r.stdout);

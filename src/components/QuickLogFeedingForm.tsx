@@ -96,9 +96,10 @@ export default function QuickLogFeedingForm({
     onChange({ ...value, [ecKey]: pair.ec, [ppmKey]: pair.ppm });
   };
 
-  // The review summarizes what will be SAVED, and the viewmodel labels its
-  // temperature line "(°C)" — hand it the canonical-°C value.
-  const review = buildFeedingReview({ ...value, waterTempC: canonicalWaterTempC }, defaultsApplied);
+  // The review is a display surface: show the grower's own typed value in
+  // their active unit, not the canonical-°C conversion (that's only for
+  // the save payload and the EC-compensation preview below).
+  const review = buildFeedingReview(value, defaultsApplied, temperatureUnit);
 
   return (
     <div className="space-y-4" data-testid="qlv2-feeding-form">

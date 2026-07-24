@@ -3,6 +3,10 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import QuickLogV2Sheet from "@/components/QuickLogV2Sheet";
+import {
+  clearTemperatureUnitPreference,
+  saveTemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 
 const rpcMock = vi.fn();
 const wateringWriterMock = vi.fn();
@@ -124,6 +128,7 @@ function clickSave() {
 }
 
 beforeEach(() => {
+  clearTemperatureUnitPreference();
   rpcMock.mockReset();
   wateringWriterMock.mockReset();
   storageUpload.mockReset();
@@ -204,6 +209,10 @@ describe("QuickLogV2Sheet — structured watering", () => {
   });
 
   it("maps root-zone measurements, EC/PPM, manual observations, note, and manual air evidence", async () => {
+    // This test types raw values expecting celsius passthrough into the
+    // saved payload — pin the display unit explicitly rather than ride
+    // whatever the global default happens to be.
+    saveTemperatureUnitPreference("celsius");
     renderSheet();
     clickWater();
     enterVolume("750");

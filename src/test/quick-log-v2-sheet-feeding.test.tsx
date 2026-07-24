@@ -11,6 +11,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import QuickLogV2Sheet from "@/components/QuickLogV2Sheet";
+import { clearTemperatureUnitPreference, saveTemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 
 const rpcMock = vi.fn();
 const storageRemove = vi.fn().mockResolvedValue({ data: null, error: null });
@@ -99,6 +100,7 @@ function clickSave() {
 }
 
 beforeEach(() => {
+  clearTemperatureUnitPreference();
   rpcMock.mockReset();
   storageRemove.mockReset();
   storageUpload.mockReset();
@@ -198,6 +200,10 @@ describe("QuickLogV2Sheet — structured feeding", () => {
   });
 
   it("maps optional pH/EC/runoff/water-temp fields into the writer payload", async () => {
+    // Types a raw value expecting celsius passthrough into the writer
+    // payload — pin the display unit explicitly rather than ride whatever
+    // the global default happens to be.
+    saveTemperatureUnitPreference("celsius");
     writeFeedingMock.mockResolvedValue({ ok: true, eventId: "evt-2", reused: false });
     renderSheet("plant:plant-1");
     clickFeed();

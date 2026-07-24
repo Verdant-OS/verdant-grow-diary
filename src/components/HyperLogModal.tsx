@@ -431,7 +431,7 @@ export function HyperLogModal({
                 <div className="space-y-2.5" data-testid="hyperlog-env-fields">
                   <FieldRow>
                     <DemoInput
-                      placeholder="Temp (°C)"
+                      placeholder={`Temp (${temperatureUnitSymbol})`}
                       value={form.envTemp}
                       onChange={(v) => updateField("envTemp", v)}
                       aria-label="Environment temperature"

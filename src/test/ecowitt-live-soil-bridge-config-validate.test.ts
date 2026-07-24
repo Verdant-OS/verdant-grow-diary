@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { spawnSync } from "node:child_process";
-import { runConfigValidate } from "../../scripts/ecowitt-live-soil-bridge";
+import {
+  CONFIG_ERROR_FIX_HINTS,
+  renderErrorCatalog,
+  runConfigValidate,
+} from "../../scripts/ecowitt-live-soil-bridge";
 
 const TENT_A = "11111111-1111-4111-8111-111111111111";
 const TENT_B = "22222222-2222-4222-8222-222222222222";
@@ -125,7 +129,7 @@ describe("`config validate` CLI subcommand", () => {
   });
 });
 
-import { CONFIG_ERROR_FIX_HINTS, fixHintForCode } from "../../scripts/ecowitt-live-soil-bridge";
+import { fixHintForCode } from "../../scripts/ecowitt-live-soil-bridge";
 
 describe("runConfigValidate --fix-hints", () => {
   it("omits fix by default", () => {
@@ -268,5 +272,41 @@ describe("`config validate --dry-run` CLI", () => {
     expect(r.status).toBe(2);
     expect(r.stdout).not.toContain('"config_effective"');
     expect(r.stderr).toContain('"code":"missing_tent_id"');
+  });
+});
+
+describe("renderErrorCatalog (pure)", () => {
+  it("includes every code from CONFIG_ERROR_FIX_HINTS with its fix", () => {
+    const cat = renderErrorCatalog();
+    const codes = cat.envelope.errors.map((e) => e.code).sort();
+    expect(codes).toEqual(Object.keys(CONFIG_ERROR_FIX_HINTS).sort());
+    for (const { code, fix } of cat.envelope.errors) {
+      expect(fix).toBe(CONFIG_ERROR_FIX_HINTS[code]);
+      expect(cat.human).toContain(code);
+    }
+    expect(cat.envelope.event).toBe("config_error_catalog");
+    expect(cat.envelope.docs).toBe("docs/ecowitt-bridge-startup-validation.md");
+  });
+});
+
+describe("`config validate --help-errors` CLI", () => {
+  if (!bunAvailable()) {
+    it.skip("skipped — bun runtime not available", () => {});
+    return;
+  }
+
+  it("exits 0 and prints the catalog envelope, without running validation", () => {
+    const r = spawnSync(
+      "bun",
+      ["run", "scripts/ecowitt-live-soil-bridge.ts", "config", "validate", "--help-errors"],
+      { encoding: "utf8", env: { ...process.env, VERDANT_TENT_ID: undefined }, timeout: 15_000 },
+    );
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('"event":"config_error_catalog"');
+    expect(r.stdout).toContain("missing_tent_id");
+    expect(r.stdout).toContain("mixed_tent_channel_map");
+    expect(r.stdout).toContain("docs/ecowitt-bridge-startup-validation.md");
+    // No validation error emitted despite missing VERDANT_TENT_ID.
+    expect(r.stderr).not.toContain('"code":"missing_tent_id"');
   });
 });

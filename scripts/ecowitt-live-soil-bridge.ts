@@ -304,6 +304,46 @@ export function fixHintForCode(code: string): string {
   );
 }
 
+/**
+ * Renders the full error-code catalog used by `config validate --help-errors`.
+ * Returns both a human-readable listing and a machine-readable envelope so
+ * automation can pipe stdout through `tail -n1 | jq` to load it.
+ * Source of truth for entries: {@link CONFIG_ERROR_FIX_HINTS}. Full narrative
+ * remedies live in docs/ecowitt-bridge-startup-validation.md.
+ */
+export function renderErrorCatalog(): {
+  human: string;
+  envelope: {
+    event: "config_error_catalog";
+    check: "ecowitt-bridge";
+    docs: string;
+    errors: Array<{ code: string; fix: string }>;
+  };
+} {
+  const docs = "docs/ecowitt-bridge-startup-validation.md";
+  const entries = Object.keys(CONFIG_ERROR_FIX_HINTS)
+    .sort()
+    .map((code) => ({ code, fix: CONFIG_ERROR_FIX_HINTS[code] }));
+  const lines: string[] = [
+    "Ecowitt bridge — config validate error catalog",
+    `See ${docs} for the full narrative and end-to-end examples.`,
+    "",
+  ];
+  for (const { code, fix } of entries) {
+    lines.push(`- ${code}`);
+    lines.push(`    fix: ${fix}`);
+  }
+  return {
+    human: lines.join("\n"),
+    envelope: {
+      event: "config_error_catalog",
+      check: "ecowitt-bridge",
+      docs,
+      errors: entries,
+    },
+  };
+}
+
 export interface ConfigValidateOptions {
   includeFixHints?: boolean;
 }
@@ -460,8 +500,18 @@ async function runCli(): Promise<void> {
   // leaking tent UUIDs, tokens, or full URLs.
   const argv = process.argv.slice(2);
   if (argv[0] === "config" && argv[1] === "validate") {
-    const includeFixHints = argv.slice(2).includes("--fix-hints");
-    const dryRun = argv.slice(2).includes("--dry-run");
+    const rest = argv.slice(2);
+    if (rest.includes("--help-errors")) {
+      const catalog = renderErrorCatalog();
+      // eslint-disable-next-line no-console
+      console.log(catalog.human);
+      // eslint-disable-next-line no-console
+      console.log(JSON.stringify(catalog.envelope));
+      process.exit(0);
+      return;
+    }
+    const includeFixHints = rest.includes("--fix-hints");
+    const dryRun = rest.includes("--dry-run");
     const res = runConfigValidate(process.env, { includeFixHints });
     if (res.ok) {
       // eslint-disable-next-line no-console

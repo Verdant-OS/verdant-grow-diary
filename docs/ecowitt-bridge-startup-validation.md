@@ -170,6 +170,44 @@ Redaction rules (see `buildRedactedEffectiveConfig`):
 On failure, `--dry-run` is suppressed and only the standard
 `config_error` envelope is emitted, exit 2.
 
+### `--help-errors`
+
+Pass `--help-errors` to `config validate` to print the full error-code
+catalog (codes + concise remedies) without running any validation. This
+is the same catalog documented in §2 above and is safe to run with no
+env vars set — nothing is read from the environment beyond argv.
+
+```bash
+bun run scripts/ecowitt-live-soil-bridge.ts config validate --help-errors
+```
+
+Output is two blocks on stdout, exit code `0`:
+
+1. A human-readable listing (one code + `fix:` line per entry).
+2. A single JSON envelope:
+
+```json
+{
+  "event": "config_error_catalog",
+  "check": "ecowitt-bridge",
+  "docs": "docs/ecowitt-bridge-startup-validation.md",
+  "errors": [
+    { "code": "channel_map_parse_error", "fix": "…" },
+    { "code": "channel_map_tent_mismatch", "fix": "…" },
+    { "code": "invalid_channel_map_schema", "fix": "…" },
+    { "code": "invalid_tent_id", "fix": "…" },
+    { "code": "missing_bridge_token", "fix": "…" },
+    { "code": "missing_ingest_url", "fix": "…" },
+    { "code": "missing_tent_id", "fix": "…" },
+    { "code": "mixed_tent_channel_map", "fix": "…" },
+    { "code": "mqtt_package_missing", "fix": "…" },
+    { "code": "channel_map_parse_error", "fix": "…" }
+  ]
+}
+```
+
+Automation can pipe stdout through `tail -n1 | jq` to load the envelope.
+
 
 
 ## 5. Related files

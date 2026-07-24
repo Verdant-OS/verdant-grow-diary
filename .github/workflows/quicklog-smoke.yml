@@ -346,6 +346,20 @@ jobs:
             --out=e2e/results/playwright-flake-summary.md \
             || echo "::warning::flake summarizer exited non-zero (see logs)"
 
+      # Dedicated single-file upload of the flake summary markdown so
+      # reviewers can grab just the summary from the run's artifacts
+      # dropdown without downloading the full smoke bundle. The same file
+      # is also included in `quicklog-smoke-artifacts` below for archival.
+      - name: Upload flake summary markdown
+        id: upload_flake_summary
+        if: always() && steps.e2e_config.outputs.should_run == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: quicklog-flake-summary
+          path: e2e/results/playwright-flake-summary.md
+          retention-days: 30
+          if-no-files-found: warn
+
       - name: Upload smoke artifacts
         id: upload_smoke_bundle
         if: always() && steps.e2e_config.outputs.should_run == 'true'

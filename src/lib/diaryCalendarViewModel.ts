@@ -567,7 +567,7 @@ export function buildDiaryCalendarViewModel(
       plantName: safePlantName(raw.details),
       stage: safeCalendarStage(raw.stage),
       noteSnippet,
-      details: buildEventDetails(kind, raw, noteSnippet),
+      details: buildEventDetails(kind, raw, noteSnippet, tempUnit),
     });
   }
 

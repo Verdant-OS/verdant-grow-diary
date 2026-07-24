@@ -388,7 +388,9 @@ export function runConfigValidate(
     assertSingleTentSoilChannelMap(channelMap, tentId);
   } catch (e) {
     if (e instanceof EcowittBridgeConfigError) {
-      return withHint({ ok: false, code: e.code, message: e.message });
+      const base: ConfigValidateResult = { ok: false, code: e.code, message: e.message };
+      if (e.fields && e.fields.length > 0) base.fields = e.fields.map((f) => ({ ...f }));
+      return withHint(base);
     }
     return withHint({
       ok: false,

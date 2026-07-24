@@ -32,6 +32,13 @@ on:
         description: "Playwright retry count per test (default 1 in CI). Increase to 2 or 3 for deeper flake triage."
         required: false
         default: "1"
+      pr_comment_on_flake_only:
+        description: "Suppress the sticky PR comment when there are no hard failures (flaky-only runs stay quiet)."
+        required: false
+        default: "true"
+        type: choice
+        options: ["true", "false"]
+
   push:
     branches: [verdant-grow-diary]
     paths:

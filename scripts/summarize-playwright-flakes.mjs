@@ -516,7 +516,8 @@ async function main() {
         args.minFailed > 0 && counts.failed < args.minFailed
           ? `\n> _PR comment suppressed by \`--min-failed=${args.minFailed}\` (hard failures: ${counts.failed}). This Job Summary is unaffected._\n`
           : "";
-      writeFileSync(stepSummary, `${markdown}\n\n${jobSummary}${gate}\n`, {
+      const header = buildTraceabilityHeader(report);
+      writeFileSync(stepSummary, `${header}\n${markdown}\n\n${jobSummary}${gate}\n`, {
         flag: "a",
       });
     } catch (err) {

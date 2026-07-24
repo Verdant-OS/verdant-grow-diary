@@ -460,8 +460,18 @@ async function runCli(): Promise<void> {
   // leaking tent UUIDs, tokens, or full URLs.
   const argv = process.argv.slice(2);
   if (argv[0] === "config" && argv[1] === "validate") {
-    const includeFixHints = argv.slice(2).includes("--fix-hints");
-    const dryRun = argv.slice(2).includes("--dry-run");
+    const rest = argv.slice(2);
+    if (rest.includes("--help-errors")) {
+      const catalog = renderErrorCatalog();
+      // eslint-disable-next-line no-console
+      console.log(catalog.human);
+      // eslint-disable-next-line no-console
+      console.log(JSON.stringify(catalog.envelope));
+      process.exit(0);
+      return;
+    }
+    const includeFixHints = rest.includes("--fix-hints");
+    const dryRun = rest.includes("--dry-run");
     const res = runConfigValidate(process.env, { includeFixHints });
     if (res.ok) {
       // eslint-disable-next-line no-console

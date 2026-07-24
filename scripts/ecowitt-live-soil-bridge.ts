@@ -42,6 +42,7 @@ import {
   maskBridgeToken,
   fullJitterBackoffMs,
   assertSingleTentSoilChannelMap,
+  assertEcowittSoilChannelMapJsonEnv,
   EcowittBridgeConfigError,
   type CanonicalWebhookPayload,
   type EcowittSoilChannelMap,
@@ -52,8 +53,18 @@ import {
  * MQTT import, broker connection, subscription, or HTTP traffic. Throws
  * `EcowittBridgeConfigError` on violation; runCli converts that into a
  * calm non-zero exit. Kept exported so tests can drive it directly.
+ *
+ * Also validates the raw `ECOWITT_SOIL_CHANNEL_MAP_JSON` env value
+ * against the published JSON Schema so structural errors (unknown keys,
+ * non-UUID tent IDs, extra properties) are rejected at startup with
+ * code=invalid_channel_map_schema instead of being silently dropped by
+ * the tolerant parser.
  */
-export function assertBridgeStartupSafe(env: BridgeEnv): void {
+export function assertBridgeStartupSafe(
+  env: BridgeEnv,
+  rawChannelMapJson?: string | null,
+): void {
+  assertEcowittSoilChannelMapJsonEnv(rawChannelMapJson ?? null);
   assertSingleTentSoilChannelMap(env.channelMap, env.defaultTentId);
 }
 

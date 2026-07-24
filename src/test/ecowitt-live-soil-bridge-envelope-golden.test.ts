@@ -119,7 +119,7 @@ describe("`config validate` CLI — stderr JSON envelope golden shape", () => {
     expect(Object.keys(env).sort()).toEqual(["code", "event", "fix", "message"]);
   });
 
-  it("--fix-hints: mixed_tent_channel_map envelope preserves exact key set", () => {
+  it("--fix-hints: mixed_tent_channel_map envelope now includes fields[]", () => {
     const map = {
       soilmoisture1: { tent_id: TENT_A },
       soilmoisture2: { tent_id: TENT_B },
@@ -133,14 +133,22 @@ describe("`config validate` CLI — stderr JSON envelope golden shape", () => {
     );
     expect(r.status).toBe(2);
     const env = lastJsonLine(r.stderr) as Record<string, unknown>;
-    expect(Object.keys(env).sort()).toEqual(["code", "event", "fix", "message"]);
+    expect(Object.keys(env).sort()).toEqual(["code", "event", "fields", "fix", "message"]);
     expect(env.event).toBe("config_error");
     expect(env.code).toBe("mixed_tent_channel_map");
     expect(env.fix).toBe(CONFIG_ERROR_FIX_HINTS.mixed_tent_channel_map);
     expect(typeof env.message).toBe("string");
+    expect(env.fields).toEqual([
+      {
+        path: "$.soilmoisture2.tent_id",
+        message: "tent_id differs from tent_id used by other channels in the map",
+      },
+    ]);
     // Redaction: never leak raw UUIDs through the envelope.
     const serialized = JSON.stringify(env);
     expect(serialized).not.toContain(TENT_A);
     expect(serialized).not.toContain(TENT_B);
+  });
+});
   });
 });

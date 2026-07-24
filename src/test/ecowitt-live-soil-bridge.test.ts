@@ -653,7 +653,7 @@ describe("assertSingleTentSoilChannelMap — fail-closed single-tent guard", () 
   it("startup guard is invoked before any MQTT import or broker connect in runCli", async () => {
     const fs = await import("node:fs/promises");
     const src = await fs.readFile("scripts/ecowitt-live-soil-bridge.ts", "utf8");
-    const guardIdx = src.indexOf("assertBridgeStartupSafe(env)");
+    const guardIdx = src.indexOf("assertBridgeStartupSafe(env");
     const importIdx = src.indexOf('import(/* @vite-ignore */ modName)');
     const connectIdx = src.indexOf("mqttMod.connect(");
     expect(guardIdx).toBeGreaterThan(0);

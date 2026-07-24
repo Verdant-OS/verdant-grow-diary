@@ -403,6 +403,19 @@ async function main() {
     writeFileSync(outAbs, `${markdown}\n`, "utf8");
   }
 
+  if (args.prCommentPath) {
+    const prBody = buildPrComment(report, {
+      tracesUrl: args.tracesUrl,
+      mediaUrl: args.mediaUrl,
+      reportUrl: args.reportUrl,
+      bundleUrl: args.bundleUrl,
+      runUrl: args.runUrl,
+    });
+    const prAbs = resolve(process.cwd(), args.prCommentPath);
+    mkdirSync(dirname(prAbs), { recursive: true });
+    writeFileSync(prAbs, `${prBody}\n`, "utf8");
+  }
+
   const stepSummary = process.env.GITHUB_STEP_SUMMARY;
   if (stepSummary) {
     try {

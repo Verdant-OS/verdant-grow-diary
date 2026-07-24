@@ -539,6 +539,51 @@ export function buildConfigDebugEnvelope(
   };
 }
 
+/**
+ * Pure parser for `--out=<path>` / `--out <path>` on `config validate`.
+ * Returns `{ path: null }` when the flag is absent so callers can skip
+ * the export step. Returns an error object with a stable machine-readable
+ * code when the flag is present but malformed (empty value, missing
+ * following argument). Never touches the filesystem.
+ */
+export function parseOutFlag(
+  args: string[],
+): { path: string | null; error?: { code: string; message: string } } {
+  let path: string | null = null;
+  for (let i = 0; i < args.length; i += 1) {
+    const a = args[i];
+    if (a === "--out") {
+      const next = args[i + 1];
+      if (next === undefined || next.startsWith("--") || next === "") {
+        return {
+          path: null,
+          error: {
+            code: "out_flag_missing_value",
+            message: "--out requires a file path (e.g. --out=./config-effective.json)",
+          },
+        };
+      }
+      path = next;
+      i += 1;
+      continue;
+    }
+    if (a.startsWith("--out=")) {
+      const value = a.slice("--out=".length);
+      if (value === "") {
+        return {
+          path: null,
+          error: {
+            code: "out_flag_missing_value",
+            message: "--out= must be followed by a file path",
+          },
+        };
+      }
+      path = value;
+    }
+  }
+  return { path };
+}
+
 async function runCli(): Promise<void> {
   const emitConfigError = (
     code: string,

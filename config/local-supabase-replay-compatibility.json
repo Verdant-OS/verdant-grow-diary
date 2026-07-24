@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "hash_normalization": "utf8_lf",
+  "_notes": [
+    "Fresh local Supabase resets must preserve the immutable migration files in the repository.",
+    "The connected production project's recorded history contains each canonical migration below and does not contain the later Lovable duplicate.",
+    "The replay preparer verifies every SHA-256 before replacing only the duplicate copy inside a disposable workdir.",
+    "Do not add an entry merely to silence a reset failure. Prove the hosted migration-history relationship first."
+  ],
+  "compatibility_noops": [
+    {
+      "canonical_path": "supabase/migrations/20260721103000_ai_credit_grants.sql",
+      "canonical_sha256": "ad0b717b4ab3bd245067e1d669a7d5627641d0bfb65babcb16ef0dc85a3c0296",
+      "duplicate_path": "supabase/migrations/20260721182752_4fc51714-bc29-4044-9b91-180c065e997f.sql",
+      "duplicate_sha256": "0a99565b7967e34ea141dacd083d3df0e205fc3629318f6a149517776c602465",
+      "reason": "Production records 20260721103000; the later unrecorded file repeats the AI credit grant ledger and fails fresh replay with SQLSTATE 42P07."
+    },
+    {
+      "canonical_path": "supabase/migrations/20260721104000_ai_credit_spend_pack_overflow.sql",
+      "canonical_sha256": "131a74fd625028970628b246d07c9656ce1164baae50a3b67c7d4f993db71d24",
+      "duplicate_path": "supabase/migrations/20260721194118_d777533e-a1d4-4b36-a75e-ea7742e7cd6e.sql",
+      "duplicate_sha256": "86226c8948be10311ee476ba0072e8edee6a7050ab1fb2c1558bf957183237ac",
+      "reason": "Production records 20260721104000; the later unrecorded Lovable migration redefines the same AI credit allowance, spend, and refund functions."
+    },
+    {
+      "canonical_path": "supabase/migrations/20260721105000_ai_credit_grants_non_paddle_grants.sql",
+      "canonical_sha256": "a1ec4952e5ab9cf932553b999e9c602d4b068791c7bfcd26edf77c9aaf69a63a",
+      "duplicate_path": "supabase/migrations/20260721194154_9cf7d1a8-174a-44fd-ad49-8ca1fe2e41fb.sql",
+      "duplicate_sha256": "0af58a839f0e4859c9bde9902f2d5a5e5cb41d54ce87c3ed7599ed726b211f01",
+      "reason": "Production records 20260721105000; the later unrecorded Lovable migration repeats the non-Paddle grant schema and grant_lovable_credits function."
+    }
+  ]
+}

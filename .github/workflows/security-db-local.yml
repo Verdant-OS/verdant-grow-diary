@@ -60,12 +60,24 @@ jobs:
           # on 2026-07-09). Bump deliberately when a newer CLI is needed.
           version: 2.109.1
 
+      - name: Prepare immutable migration replay workspace
+        if: env.ENABLED == 'true'
+        run: |
+          set -eo pipefail
+          REPLAY_WORKDIR="${RUNNER_TEMP}/verdant-supabase-replay"
+          bun run test:local-supabase-replay
+          node scripts/prepare-local-supabase-replay.mjs \
+            --output="${REPLAY_WORKDIR}" \
+            --json \
+            | tee migration-replay-compatibility.json
+          echo "SUPABASE_REPLAY_WORKDIR=${REPLAY_WORKDIR}" >> "$GITHUB_ENV"
+
       - name: Start local Supabase
         if: env.ENABLED == 'true'
         id: supabase-start
         run: |
           set -eo pipefail
-          supabase start --workdir . 2>&1 | tee supabase-start.log
+          supabase start --workdir "$SUPABASE_REPLAY_WORKDIR" 2>&1 | tee supabase-start.log
           echo "started=true" >> "$GITHUB_OUTPUT"
 
       - name: Export local Supabase env
@@ -73,7 +85,7 @@ jobs:
         id: supabase-env
         run: |
           set -e
-          STATUS_JSON="$(supabase status -o json)"
+          STATUS_JSON="$(supabase status --workdir "$SUPABASE_REPLAY_WORKDIR" -o json)"
           SUPABASE_URL="$(echo "$STATUS_JSON" | jq -r '.API_URL // .api_url // empty')"
           SUPABASE_ANON_KEY="$(echo "$STATUS_JSON" | jq -r '.ANON_KEY // .anon_key // empty')"
           SUPABASE_SERVICE_ROLE_KEY="$(echo "$STATUS_JSON" | jq -r '.SERVICE_ROLE_KEY // .service_role_key // empty')"
@@ -98,7 +110,7 @@ jobs:
         # docs/security-regression-tests.md.
         run: |
           set -o pipefail
-          supabase db reset 2>&1 | tee supabase-db-reset.log
+          supabase db reset --workdir "$SUPABASE_REPLAY_WORKDIR" 2>&1 | tee supabase-db-reset.log
 
       - name: Profiles DB security
         if: env.ENABLED == 'true'
@@ -146,6 +158,8 @@ jobs:
           path: |
             supabase-start.log
             supabase-db-reset.log
+            migration-replay-compatibility.json
+            ${{ runner.temp }}/verdant-supabase-replay/local-supabase-replay-report.json
             profiles-db.log
             customer-mode-db.log
             subscriber-interest-db.log
@@ -181,6 +195,7 @@ jobs:
               esac
               echo ""
               echo "**Tests requested:**"
+              echo "- immutable migration replay compatibility verification"
               echo "- profiles DB security (\`test:profiles-db-security\`)"
               echo "- customer mode isolation (\`test:customer-mode-db-security\`)"
               echo "- subscriber interest RLS (\`test:subscriber-interest-db-security\`)"
@@ -191,6 +206,7 @@ jobs:
               echo "**Artifact:** \`security-db-local-artifacts\` (uploaded on failure only, 14-day retention)"
               echo ""
               echo "Artifact paths (when uploaded):"
+              echo "- \`migration-replay-compatibility.json\`, \`local-supabase-replay-report.json\`"
               echo "- \`profiles-db.log\`, \`customer-mode-db.log\`, \`subscriber-interest-db.log\`, \`ai-doctor-sessions-rls.log\`, \`security-db-local.log\`"
               echo "- \`supabase-start.log\`, \`supabase-db-reset.log\` (sanitized)"
               echo "- \`test-results/\`, \`artifacts/security-db/\` (if produced)"
@@ -207,4 +223,4 @@ jobs:
 
       - name: Stop local Supabase
         if: always() && env.ENABLED == 'true'
-        run: supabase stop --no-backup || true
+        run: supabase stop --workdir "$SUPABASE_REPLAY_WORKDIR" --no-backup || true

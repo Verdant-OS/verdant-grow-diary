@@ -529,6 +529,57 @@ export function assertSingleTentSoilChannelMap(
   }
 }
 
+/**
+ * Enforce "one bridge process → one tent" for any grower-supplied
+ * EcoWitt entity mapping that ships with per-entity `tent_id` routing
+ * (currently the Home Assistant / ecowitt2mqtt bridge mapping consumed
+ * by `scripts/dev/ecowitt-mqtt-runner.ts`). Structural on purpose — no
+ * HA type import — so it stays reusable for any future per-entity map.
+ *
+ * The pure Home Assistant adapter is intentionally multi-tent capable;
+ * this guard restricts only what a single bridge *process* may be
+ * configured to forward.
+ *
+ * Rules:
+ *   - Empty / missing entities → accepted (loader handles emptiness).
+ *   - All entities share one `tent_id` → accepted.
+ *   - Any two entities on different `tent_id`s → rejected.
+ *   - If `defaultTentId` is provided and the mapping's tent does not
+ *     match it → rejected.
+ *
+ * Does not mutate `entities`. Never echoes tent IDs, entity IDs,
+ * mapping paths, tokens, or file contents.
+ */
+export function assertSingleTentHaMappingEntities(
+  entities: ReadonlyArray<{ readonly tent_id?: unknown }> | null | undefined,
+  defaultTentId?: string | null,
+): void {
+  if (!entities || !Array.isArray(entities) || entities.length === 0) return;
+  const tents = new Set<string>();
+  for (const ent of entities) {
+    if (ent && typeof ent.tent_id === "string" && ent.tent_id) {
+      tents.add(ent.tent_id);
+    }
+  }
+  if (tents.size === 0) return;
+  if (tents.size > 1) {
+    throw new EcowittBridgeConfigError(
+      "mixed_tent_ha_mapping",
+      "EcoWitt HA bridge mapping must route every entity to one tent and match VERDANT_TENT_ID.",
+    );
+  }
+  const expected = typeof defaultTentId === "string" ? defaultTentId.trim() : "";
+  if (expected) {
+    const [only] = tents;
+    if (only !== expected) {
+      throw new EcowittBridgeConfigError(
+        "ha_mapping_tent_mismatch",
+        "EcoWitt HA bridge mapping must route every entity to one tent and match VERDANT_TENT_ID.",
+      );
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Redaction
 // ---------------------------------------------------------------------------

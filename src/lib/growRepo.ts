@@ -7,6 +7,7 @@ import type { Tent, Plant, SensorReading } from "@/mock";
 import { mapTentRow, mapPlantRow, groupSensorReadingRows } from "./growAdapters";
 import { buildGrowScopedPlantsOrFilter } from "./growAttributionRules";
 import { isUuid } from "./isUuid";
+import { filterValidPlantRows, validatePlantRowResponse } from "./plantPayloadValidation";
 
 function fail(scope: string, error: { message?: string } | null): never {
   throw new Error(`growRepo.${scope}: ${error?.message ?? "unknown error"}`);

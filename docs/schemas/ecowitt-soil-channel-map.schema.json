@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://verdantgrowdiary.com/schemas/ecowitt-soil-channel-map.schema.json",
+  "title": "ECOWITT_SOIL_CHANNEL_MAP_JSON",
+  "description": "Runtime config payload for the Verdant EcoWitt live soil bridge. Maps EcoWitt soilmoisture channel keys to a single Verdant tent (and optional plant + label). One bridge process → one tent → one bridge token is enforced separately at startup; this schema only validates shape and value ranges.",
+  "type": "object",
+  "additionalProperties": false,
+  "minProperties": 0,
+  "propertyNames": {
+    "pattern": "^soilmoisture([1-9]|[1-9][0-9])$"
+  },
+  "patternProperties": {
+    "^soilmoisture([1-9]|[1-9][0-9])$": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tent_id"],
+      "properties": {
+        "tent_id": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "description": "UUID of the tent this soil channel belongs to."
+        },
+        "plant_id": {
+          "type": ["string", "null"],
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "description": "Optional UUID of the plant this soil probe is inserted in."
+        },
+        "label": {
+          "type": ["string", "null"],
+          "maxLength": 120,
+          "description": "Optional human-readable label for operator logs."
+        }
+      }
+    }
+  }
+}

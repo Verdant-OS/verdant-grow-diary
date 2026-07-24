@@ -9,7 +9,7 @@ beforeEach(() => {
   try {
     clearLocalStorageForTest();
   } catch {
-    // ignore (SSR-like envs)
+    // ignore (storage genuinely unrecoverable)
   }
 });
 

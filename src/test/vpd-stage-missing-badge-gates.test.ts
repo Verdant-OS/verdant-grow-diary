@@ -131,6 +131,7 @@ describe("normalizeVpdStage classifies adapter output correctly", () => {
       medium: null,
       pot_size: null,
       pheno_hunt_id: null,
+      plant_type: "unknown",
       candidate_label: null,
       created_at: "x",
       updated_at: "x",

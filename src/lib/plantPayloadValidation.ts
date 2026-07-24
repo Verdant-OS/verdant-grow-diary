@@ -19,7 +19,8 @@ import { normalizePlantType, PLANT_TYPE_VALUES, type PlantType } from "@/lib/pla
 const STAGES = ["seedling", "veg", "flower", "flush", "harvest", "cure"] as const;
 const HEALTHS = ["healthy", "watch", "issue"] as const;
 
-const uuid = z.string().uuid();
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const uuid = z.string().regex(UUID_RE, "must be a UUID");
 
 /**
  * Outbound insert payload contract. Mirrors the plants-table NOT NULL/CHECK

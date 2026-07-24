@@ -53,9 +53,17 @@ export default defineConfig({
   retries: RETRIES,
   // The list reporter feeds CI logs; the html reporter produces the
   // playwright-report/ directory that the workflow's artifact guard requires
-  // and uploads. With tracing disabled on real-auth runs (see `use` below),
-  // the report contains only screenshots/videos — no network headers.
-  reporter: [["list"], ["html", { open: "never" }]],
+  // and uploads. The json reporter writes a machine-readable per-attempt
+  // report used by scripts/summarize-playwright-flakes.mjs to classify
+  // flakes (fail on attempt 1, pass on retry) and surface retry counts +
+  // artifact paths in the CI job summary. With tracing disabled on
+  // real-auth runs (see `use` below), the report contains only
+  // screenshots/videos — no network headers.
+  reporter: [
+    ["list"],
+    ["html", { open: "never" }],
+    ["json", { outputFile: "e2e/results/playwright-report.json" }],
+  ],
   use: {
     baseURL: BASE_URL,
     // Debugging artifacts kept only when a test fails (CI uploads them).

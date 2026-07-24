@@ -67,7 +67,6 @@ export default function QuickLogWateringForm({
   entryTemperatureUnit,
 }: Props) {
   const temperatureUnit = useTemperatureUnitPreference();
-  const temperatureUnitSymbol = getTemperatureUnitSymbol(temperatureUnit);
   // Display-side canonicalization only: the write seam converts from the
   // raw typed value itself (QuickLogV2Sheet), never from this derived copy,
   // so no value is ever converted twice. Uses the entry-pinned unit (when
@@ -94,8 +93,12 @@ export default function QuickLogWateringForm({
 
   // The review is a display surface: show the grower's own typed value in
   // their active unit, not the canonical-°C conversion (that's only for
-  // the save payload and the EC-compensation preview below).
-  const review = buildWateringReview(value, temperatureUnit);
+  // the save payload and the EC-compensation preview below). Uses the
+  // entry-pinned unit (when a draft is in progress) so the label never
+  // disagrees with what the write seam will actually save — mirrors
+  // canonicalWaterTempC above.
+  const entryTemperatureUnitSymbol = getTemperatureUnitSymbol(entryTemperatureUnit ?? temperatureUnit);
+  const review = buildWateringReview(value, entryTemperatureUnit ?? temperatureUnit);
 
   return (
     <div className="space-y-4" data-testid="qlv2-watering-form">
@@ -224,7 +227,7 @@ export default function QuickLogWateringForm({
             />
           </div>
           <div>
-            <Label htmlFor="qlv2-water-temp">Water temperature ({temperatureUnitSymbol})</Label>
+            <Label htmlFor="qlv2-water-temp">Water temperature ({entryTemperatureUnitSymbol})</Label>
             <Input
               id="qlv2-water-temp"
               inputMode="decimal"

@@ -35,6 +35,7 @@ import { cn } from "@/lib/utils";
 import { GeneticsBadge } from "@/components/GeneticsBadge";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import {
+  celsiusToFahrenheit,
   fahrenheitToCelsius,
   getTemperatureUnitSymbol,
   type TemperatureUnitPreference,
@@ -99,9 +100,12 @@ const ACTION_TILES: Array<{
   { id: "environment", label: "Env Check", icon: Gauge },
 ];
 
-// Hardcoded demo values — NOT live telemetry.
+// Hardcoded demo values — NOT live telemetry. Temp is stored canonically in
+// °C and formatted per the active temperatureUnit preference at render time
+// (see demoSnapshotTempDisplay) so it never mismatches the unit-aware Temp
+// input/preview shown lower in this same modal.
+const DEMO_SNAPSHOT_TEMP_C = 24.6;
 const DEMO_SNAPSHOT = {
-  temp: "24.6°C",
   rh: "58%",
   vpd: "1.12 kPa",
 };
@@ -160,6 +164,10 @@ export function HyperLogModal({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const temperatureUnit = useTemperatureUnitPreference();
   const temperatureUnitSymbol = getTemperatureUnitSymbol(temperatureUnit);
+  const demoSnapshotTempDisplay =
+    temperatureUnit === "celsius"
+      ? `${DEMO_SNAPSHOT_TEMP_C.toFixed(1)}°C`
+      : `${celsiusToFahrenheit(DEMO_SNAPSHOT_TEMP_C).toFixed(1)}°F`;
   // Pattern-A draft-input race guard: pins the ACTIVE temperatureUnit at the
   // moment the raw envTemp draft transitions from empty to non-empty, so a
   // live preference flip (e.g. from another tab) between typing and Commit
@@ -520,7 +528,7 @@ export function HyperLogModal({
                 </span>
               </div>
               <div className="grid grid-cols-3 gap-3">
-                <SnapshotCell icon={Thermometer} label="Temp" value={DEMO_SNAPSHOT.temp} />
+                <SnapshotCell icon={Thermometer} label="Temp" value={demoSnapshotTempDisplay} />
                 <SnapshotCell icon={Droplet} label="RH" value={DEMO_SNAPSHOT.rh} />
                 <SnapshotCell icon={Gauge} label="VPD" value={DEMO_SNAPSHOT.vpd} />
               </div>

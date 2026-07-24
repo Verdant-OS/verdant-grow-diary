@@ -673,4 +673,22 @@ describe("QuickLogV2Sheet — structured watering", () => {
     const payload = wateringWriterMock.mock.calls[0][0];
     expect(payload.water_temp_c).toBe(18);
   });
+
+  it("keeps the Water temperature label showing the pinned entry unit, not the live one, through a mid-draft preference flip", async () => {
+    // Codex round-5 finding: the save payload was already correctly pinned
+    // (see the test above), but the visible label still read the live unit —
+    // a grower who typed 18 meaning 18°C would see the field relabel itself
+    // to "(°F)" after a cross-tab flip even though 18°C is what gets saved.
+    saveTemperatureUnitPreference("celsius");
+    renderSheet();
+    clickWater();
+    fireEvent.change(screen.getByLabelText("Water temperature (°C)"), { target: { value: "18" } });
+
+    act(() => {
+      saveTemperatureUnitPreference("fahrenheit");
+    });
+
+    expect(screen.getByLabelText("Water temperature (°C)")).toBeTruthy();
+    expect(screen.queryByLabelText("Water temperature (°F)")).toBeNull();
+  });
 });

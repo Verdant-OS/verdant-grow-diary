@@ -373,4 +373,21 @@ describe("QuickLogV2Sheet — structured feeding", () => {
     const payload = writeFeedingMock.mock.calls[0][0];
     expect(payload.water_temp_c).toBe(18);
   });
+
+  it("keeps the feeding Water label showing the pinned entry unit, not the live one, through a mid-draft preference flip", async () => {
+    // Codex round-5 finding: the save payload was already correctly pinned
+    // (see the test above), but the visible label still read the live unit.
+    saveTemperatureUnitPreference("celsius");
+    renderSheet("plant:plant-1");
+    clickFeed();
+    fillRequiredFeedingFields();
+    fireEvent.change(screen.getByLabelText("Water (°C)"), { target: { value: "18" } });
+
+    act(() => {
+      saveTemperatureUnitPreference("fahrenheit");
+    });
+
+    expect(screen.getByLabelText("Water (°C)")).toBeTruthy();
+    expect(screen.queryByLabelText("Water (°F)")).toBeNull();
+  });
 });

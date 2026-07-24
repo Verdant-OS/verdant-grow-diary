@@ -154,3 +154,37 @@ describe("HyperLog environment temp draft — entry-unit pin race", () => {
     expect(note).not.toContain("Temp 77°C");
   });
 });
+
+describe("HyperLog demo Sensor Snapshot — unit-aware display", () => {
+  it("shows the demo snapshot temperature converted to the active unit, not a hardcoded °C string", () => {
+    // Codex round-5 finding: the demo Sensor Snapshot always showed the
+    // hardcoded "24.6°C" regardless of the active preference, mixing units on
+    // screen with the unit-aware Temp input/preview right below it.
+    render(
+      <MemoryRouter initialEntries={["/plants/p-77"]}>
+        <GlobalFastAddButton />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByTestId("global-fast-add-trigger"));
+    fireEvent.click(screen.getByTestId("global-fast-add-hyperlog-environment"));
+
+    // Default preference is fahrenheit (this branch's app-wide default): the
+    // canonical 24.6°C demo value must render converted, not raw.
+    expect(screen.getByText("76.3°F")).toBeTruthy();
+    expect(screen.queryByText("24.6°C")).toBeNull();
+  });
+
+  it("shows the demo snapshot temperature in °C when the preference is celsius", () => {
+    saveTemperatureUnitPreference("celsius");
+    render(
+      <MemoryRouter initialEntries={["/plants/p-77"]}>
+        <GlobalFastAddButton />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByTestId("global-fast-add-trigger"));
+    fireEvent.click(screen.getByTestId("global-fast-add-hyperlog-environment"));
+
+    expect(screen.getByText("24.6°C")).toBeTruthy();
+    expect(screen.queryByText("76.3°F")).toBeNull();
+  });
+});

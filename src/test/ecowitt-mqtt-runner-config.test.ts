@@ -283,12 +283,17 @@ describe("ecowitt-mqtt-runner — one-process/one-tent boundary", () => {
   });
 
   it("rejects a mixed-tent mapping without leaking ids, entities, or paths", () => {
-    const mixed = structuredClone(singleTentMapping);
-    mixed.entities.push({
-      ...mixed.entities[0],
-      entity_id: "sensor.second_tent_temperature",
-      tent_id: "00000000-0000-0000-0000-0000000000bb",
-    });
+    const mixed = {
+      ...singleTentMapping,
+      entities: [
+        ...singleTentMapping.entities,
+        {
+          ...singleTentMapping.entities[0],
+          entity_id: "sensor.second_tent_temperature",
+          tent_id: "00000000-0000-0000-0000-0000000000bb",
+        },
+      ],
+    };
 
     let thrown: unknown;
     try {

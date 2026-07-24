@@ -69,11 +69,11 @@ d("ecowitt-live-soil-bridge CLI — exit code contract", () => {
     const combined = `${r.stdout}\n${r.stderr}`;
     expect(combined).toMatch(/ecowitt-bridge/);
     expect(combined.toLowerCase()).toMatch(/single-tent|one tent|tent/);
-    // Never leaks tent UUIDs or channel identifiers in the error message.
+    // Never leaks tent UUIDs. Channel keys (soilmoistureN) ARE structural
+    // and intentionally surfaced via fields[] so operators can pinpoint
+    // the offending entry.
     expect(combined).not.toContain(TENT_A);
     expect(combined).not.toContain(TENT_B);
-    expect(combined).not.toContain("soilmoisture1");
-    expect(combined).not.toContain("soilmoisture2");
   });
 
   it("exits 2 when a channel tent_id disagrees with VERDANT_TENT_ID", () => {

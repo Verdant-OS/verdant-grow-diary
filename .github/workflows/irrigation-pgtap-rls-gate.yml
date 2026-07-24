@@ -224,7 +224,12 @@ jobs:
         # tsgo is a stop-ship gate. Full-project noEmit catches any
         # harness drift; scoping to specific files would miss shared
         # type surface changes.
-        run: bunx tsgo --noEmit
+        #
+        # `tsgo` is not an installable npm package on its own — it is the bin
+        # name shipped by @typescript/native-preview, which is not a repo
+        # devDependency. Bare `bunx tsgo` 404s against the registry; pin the
+        # real package explicitly so bunx installs the right thing on demand.
+        run: bunx --package=@typescript/native-preview tsgo --noEmit
 
   pgtap-irrigation:
     name: pgTAP irrigation (feeding + watering)

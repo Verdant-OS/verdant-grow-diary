@@ -551,3 +551,115 @@ describe("static safety", () => {
     }
   });
 });
+
+describe("assertSingleTentSoilChannelMap — fail-closed single-tent guard", () => {
+  const OTHER_TENT = "33333333-3333-3333-3333-333333333333";
+
+  it("accepts an empty map", () => {
+    expect(() => assertSingleTentSoilChannelMap({})).not.toThrow();
+    expect(() => assertSingleTentSoilChannelMap({}, TENT)).not.toThrow();
+  });
+
+  it("accepts one channel mapped to one tent", () => {
+    expect(() =>
+      assertSingleTentSoilChannelMap({ soilmoisture1: { tent_id: TENT } }),
+    ).not.toThrow();
+  });
+
+  it("accepts multiple channels all mapped to the same tent", () => {
+    expect(() =>
+      assertSingleTentSoilChannelMap({
+        soilmoisture1: { tent_id: TENT },
+        soilmoisture2: { tent_id: TENT, plant_id: null },
+        soilmoisture3: { tent_id: TENT },
+      }),
+    ).not.toThrow();
+  });
+
+  it("rejects channels mapped to different tents", () => {
+    expect(() =>
+      assertSingleTentSoilChannelMap({
+        soilmoisture1: { tent_id: TENT },
+        soilmoisture2: { tent_id: TENT_B },
+      }),
+    ).toThrow(EcowittBridgeConfigError);
+  });
+
+  it("accepts a single-tent map matching VERDANT_TENT_ID", () => {
+    expect(() =>
+      assertSingleTentSoilChannelMap(
+        { soilmoisture1: { tent_id: TENT }, soilmoisture2: { tent_id: TENT } },
+        TENT,
+      ),
+    ).not.toThrow();
+  });
+
+  it("rejects a single-tent map that does not match VERDANT_TENT_ID", () => {
+    expect(() =>
+      assertSingleTentSoilChannelMap(
+        { soilmoisture1: { tent_id: OTHER_TENT } },
+        TENT,
+      ),
+    ).toThrow(EcowittBridgeConfigError);
+  });
+
+  it("does not mutate the parsed map", () => {
+    const map = Object.freeze({
+      soilmoisture1: Object.freeze({ tent_id: TENT, plant_id: null, label: null }),
+    }) as unknown as Record<string, { tent_id: string }>;
+    const snapshot = JSON.stringify(map);
+    assertSingleTentSoilChannelMap(map, TENT);
+    expect(JSON.stringify(map)).toBe(snapshot);
+  });
+
+  it("rejection message contains no tent UUIDs, token-like strings, or raw map JSON", () => {
+    let caught: unknown = null;
+    try {
+      assertSingleTentSoilChannelMap(
+        {
+          soilmoisture1: { tent_id: TENT },
+          soilmoisture2: { tent_id: TENT_B },
+        },
+        TENT,
+      );
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toBeInstanceOf(EcowittBridgeConfigError);
+    const msg = (caught as Error).message;
+    expect(msg).not.toContain(TENT);
+    expect(msg).not.toContain(TENT_B);
+    expect(msg).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+    expect(msg).not.toMatch(/vbt_[A-Za-z0-9]/);
+    expect(msg).not.toContain("soilmoisture");
+    expect(msg).not.toContain("{");
+  });
+
+  it("assertBridgeStartupSafe delegates and throws for mixed-tent maps", () => {
+    const env = readBridgeEnv(
+      {
+        VERDANT_TENT_ID: TENT,
+        ECOWITT_SOIL_CHANNEL_MAP_JSON: JSON.stringify({
+          soilmoisture1: { tent_id: TENT },
+          soilmoisture2: { tent_id: TENT_B },
+        }),
+        ECOWITT_BRIDGE_DRY_RUN: "1",
+      } as NodeJS.ProcessEnv,
+      [],
+    );
+    expect(() => assertBridgeStartupSafe(env)).toThrow(EcowittBridgeConfigError);
+  });
+
+  it("startup guard is invoked before any MQTT import or broker connect in runCli", async () => {
+    const fs = await import("node:fs/promises");
+    const src = await fs.readFile("scripts/ecowitt-live-soil-bridge.ts", "utf8");
+    const guardIdx = src.indexOf("assertBridgeStartupSafe(env)");
+    const importIdx = src.indexOf('import(/* @vite-ignore */ modName)');
+    const connectIdx = src.indexOf("mqttMod.connect(");
+    expect(guardIdx).toBeGreaterThan(0);
+    expect(importIdx).toBeGreaterThan(0);
+    expect(connectIdx).toBeGreaterThan(0);
+    expect(guardIdx).toBeLessThan(importIdx);
+    expect(guardIdx).toBeLessThan(connectIdx);
+  });
+});

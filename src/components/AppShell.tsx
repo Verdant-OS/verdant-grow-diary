@@ -325,6 +325,7 @@ export default function AppShell({ children }: { children?: ReactNode }) {
           }}
           defaultTargetKey={structuredOpenIntent?.targetKey ?? mobileQuickLogTarget}
           defaultAction={structuredOpenIntent?.action ?? "note"}
+          defaultLoggedAtIso={structuredOpenIntent?.loggedAt ?? null}
         />
 
         <GlobalSearchDialog open={searchOpen} onOpenChange={setSearchOpen} />

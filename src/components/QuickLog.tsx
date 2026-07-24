@@ -152,6 +152,18 @@ export interface QuickLogPrefill {
   eventType?: string | null;
   suggestSnapshot?: boolean | null;
   /**
+   * Legacy Fast Add occurred-at seed. NOT consumed as a form default —
+   * "when it happened" stays blank-means-now (server stamps commit time)
+   * unless the grower backdates explicitly.
+   */
+  occurred_at?: string | null;
+  /**
+   * "Captured" seed — the moment the Fast Add preset was clicked. Consumed
+   * as the section's logged-at default and persisted as details.logged_at
+   * (the report/calendar grouping key).
+   */
+  logged_at?: string | null;
+  /**
    * Optional starter note text. Seeded into the Quick Log note field when
    * the user has not yet typed anything. The grower still reviews/edits
    * and confirms the save manually.
@@ -1305,6 +1317,7 @@ export default function QuickLog({
           }
           heading="All activity types"
           testIdPrefix="quick-log-dialog-all-activities"
+          defaultLoggedAtIso={prefill?.logged_at ?? null}
           onSaveStart={beginAllActivitiesSave}
           onSaveEnd={endAllActivitiesSave}
           saveBlocked={saveLocked}

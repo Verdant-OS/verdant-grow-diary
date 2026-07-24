@@ -96,6 +96,11 @@ export interface QuickLogAllActivitiesSectionProps {
   onBeforeStructuredWaterOpen?: () => void;
   /** Caller-owned fail-closed reason that must prevent every persistence path. */
   externalPersistenceBlockReason?: string | null;
+  /**
+   * "Captured" seed from the launching surface (Fast Add preset click).
+   * When absent, the section seeds its own form-open time.
+   */
+  defaultLoggedAtIso?: string | null;
 }
 
 export interface QuickLogAllActivitiesSaveTarget {
@@ -160,6 +165,7 @@ export default function QuickLogAllActivitiesSection({
   isSaveBlocked,
   onBeforeStructuredWaterOpen,
   externalPersistenceBlockReason = null,
+  defaultLoggedAtIso = null,
 }: QuickLogAllActivitiesSectionProps) {
   const currentTarget = useMemo(
     () => buildQuickLogTargetIdentity({ growId, tentId, plantId }),
@@ -311,12 +317,14 @@ export default function QuickLogAllActivitiesSection({
       setHarvestUnit("g");
       setDetailValues({});
       setOccurredAtLocal("");
-      // "Captured" seeds at the moment the capture surface opens.
-      setLoggedAtIso(seedLoggedAtIso(Date.now()));
+      // "Captured" seeds from the launcher click when provided (Fast Add),
+      // else at the moment the capture surface opens.
+      setLoggedAtIso(defaultLoggedAtIso ?? seedLoggedAtIso(Date.now()));
       setPhotoFile(null);
     },
     [
       currentTarget,
+      defaultLoggedAtIso,
       externalPersistenceBlockReason,
       growId,
       isMutationBlocked,

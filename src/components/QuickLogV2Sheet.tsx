@@ -110,6 +110,11 @@ interface Props {
   onOpenChange: (v: boolean) => void;
   defaultTargetKey?: string | null;
   defaultAction?: QuickLogV2Action;
+  /**
+   * "Captured" seed from the launching intent (Fast Add preset click).
+   * Persisted as details.logged_at; absent → save-time stamp.
+   */
+  defaultLoggedAtIso?: string | null;
 }
 
 interface QuickLogVideoMeta {
@@ -139,6 +144,7 @@ export default function QuickLogV2Sheet({
   onOpenChange,
   defaultTargetKey,
   defaultAction = "note",
+  defaultLoggedAtIso = null,
 }: Props) {
   const { user } = useAuth();
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
@@ -737,6 +743,10 @@ export default function QuickLogV2Sheet({
     }
 
     const occurredAt = new Date().toISOString();
+    // "Captured": the launcher-click seed when the intent carried one, else
+    // this save moment. Folded into details.logged_at below; the water path
+    // freezes it inside the locked submission so retries reuse it (#317).
+    const loggedAtIso = defaultLoggedAtIso ?? occurredAt;
     let maturityDetails: Record<string, unknown> | null = null;
     if (!pendingWateringSubmission) {
       const maturityEvidence = buildQuickLogMaturityEvidenceDetails({
@@ -767,7 +777,7 @@ export default function QuickLogV2Sheet({
         temperatureC: form.temperatureC,
         humidityPct: form.humidityPct,
         vpdKpa: form.vpdKpa,
-        baseDetails: maturityDetails,
+        baseDetails: { ...(maturityDetails ?? {}), logged_at: loggedAtIso },
       });
       if (mapped.ok !== true) {
         setLocalError(wateringFormReasonToHelper(mapped.reason));
@@ -857,7 +867,7 @@ export default function QuickLogV2Sheet({
         temperatureC: form.temperatureC,
         humidityPct: form.humidityPct,
         vpdKpa: form.vpdKpa,
-        details: maturityDetails,
+        details: { ...(maturityDetails ?? {}), logged_at: loggedAtIso },
         idempotencyKey: saveIdempotencyKeyRef.current,
       });
       if (built.ok !== true) {

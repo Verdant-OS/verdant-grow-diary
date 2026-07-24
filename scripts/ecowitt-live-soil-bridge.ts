@@ -487,6 +487,52 @@ export function buildRedactedEffectiveConfig(
   };
 }
 
+// ---- Focused debug view (for `config validate --debug`) ----
+
+export interface ConfigDebugEnvelope {
+  event: "config_debug";
+  check: "ecowitt-bridge";
+  /** Redacted (`uuid:…XXXX`) or `null` when unset. Never a raw UUID. */
+  tent_id: string | null;
+  channel_map: {
+    count: number;
+    /** Stable order: sorted by channel key so diffs across runs stay diff-friendly. */
+    channels: Array<{
+      channel: string;
+      tent_id: string | null;
+      plant_id: string | null;
+      label: string | null;
+    }>;
+  };
+}
+
+/**
+ * Build a focused, fully redacted view of the parsed tent ID + derived
+ * channel map for `config validate --debug`. Strict subset of
+ * {@link RedactedEffectiveConfig} — no tokens, no URLs, no MQTT metadata.
+ * Pure: no I/O, no mqtt import, no network. Safe for stdout and CI logs.
+ */
+export function buildConfigDebugEnvelope(
+  env: NodeJS.ProcessEnv,
+  argv: string[] = [],
+): ConfigDebugEnvelope {
+  const bridge = readBridgeEnv(env, argv);
+  const channels = Object.entries(bridge.channelMap)
+    .sort(([a], [b]) => a.localeCompare(b, "en", { numeric: true }))
+    .map(([channel, m]) => ({
+      channel,
+      tent_id: maskUuid(m.tent_id ?? null),
+      plant_id: maskUuid(m.plant_id ?? null),
+      label: m.label ?? null,
+    }));
+  return {
+    event: "config_debug",
+    check: "ecowitt-bridge",
+    tent_id: maskUuid(bridge.defaultTentId),
+    channel_map: { count: channels.length, channels },
+  };
+}
+
 async function runCli(): Promise<void> {
   const emitConfigError = (
     code: string,
@@ -516,12 +562,15 @@ async function runCli(): Promise<void> {
     console.error(JSON.stringify(envelope));
   };
 
-  // ---- `config validate [--fix-hints] [--dry-run]` subcommand ----
+  // ---- `config validate [--fix-hints] [--dry-run] [--debug]` subcommand ----
   // Runs the same assertions used at startup, exits 0 on success or 2
   // with a machine-readable error line on failure. Never imports mqtt.
-  // `--dry-run` additionally prints a schema-validated, redacted view
-  // of the effective config so operators can eyeball it without risk of
-  // leaking tent UUIDs, tokens, or full URLs.
+  // `--dry-run` additionally prints a schema-validated, redacted view of
+  // the full effective config. `--debug` prints a focused, redacted view
+  // of just the parsed tent ID + derived channel map — safer to paste
+  // into bug reports than the full effective config. Flags compose:
+  // passing both emits `config_ok`, then `config_debug`, then
+  // `config_effective` (in that order) on stdout.
   const argv = process.argv.slice(2);
   if (argv[0] === "config" && argv[1] === "validate") {
     const rest = argv.slice(2);
@@ -536,12 +585,25 @@ async function runCli(): Promise<void> {
     }
     const includeFixHints = rest.includes("--fix-hints");
     const dryRun = rest.includes("--dry-run");
+    const debug = rest.includes("--debug");
     const res = runConfigValidate(process.env, { includeFixHints });
     if (res.ok) {
       // eslint-disable-next-line no-console
       console.log(
         JSON.stringify({ event: "config_ok", check: "ecowitt-bridge" }),
       );
+      if (debug) {
+        const dbg = buildConfigDebugEnvelope(process.env, process.argv);
+        // Human-readable one-liner mirrors the redacted envelope; safe to
+        // paste into bug reports because tent_id is masked and no tokens
+        // or URLs are included.
+        // eslint-disable-next-line no-console
+        console.log(
+          `[ecowitt-bridge] config_debug tent_id=${dbg.tent_id ?? "null"} channels=${dbg.channel_map.count}`,
+        );
+        // eslint-disable-next-line no-console
+        console.log(JSON.stringify(dbg));
+      }
       if (dryRun) {
         const effective = buildRedactedEffectiveConfig(process.env, process.argv);
         // eslint-disable-next-line no-console

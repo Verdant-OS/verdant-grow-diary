@@ -170,6 +170,35 @@ Redaction rules (see `buildRedactedEffectiveConfig`):
 On failure, `--dry-run` is suppressed and only the standard
 `config_error` envelope is emitted, exit 2.
 
+### `--debug`
+
+Pass `--debug` to `config validate` to additionally print a focused,
+redacted view of just the parsed tent ID and derived channel map. This
+is a strict subset of `--dry-run` output — no tokens, no URLs, no MQTT
+metadata — so it is the safest artifact to paste into bug reports.
+
+```bash
+bun run scripts/ecowitt-live-soil-bridge.ts config validate --debug
+# stdout on success:
+# {"event":"config_ok","check":"ecowitt-bridge"}
+# [ecowitt-bridge] config_debug tent_id=uuid:…1111 channels=2
+# {"event":"config_debug","check":"ecowitt-bridge",
+#  "tent_id":"uuid:…1111",
+#  "channel_map":{"count":2,"channels":[
+#    {"channel":"soilmoisture1","tent_id":"uuid:…1111","plant_id":"uuid:…3333","label":"A"},
+#    {"channel":"soilmoisture2","tent_id":"uuid:…1111","plant_id":null,"label":null}]}}
+```
+
+Redaction: tent / plant UUIDs → `uuid:…XXXX`; `null` when unset. Channel
+keys are surfaced verbatim (they are structural, not sensitive) and
+sorted with natural numeric order for diff-friendly output.
+
+Flags compose: `--debug --dry-run` prints `config_ok`, then the
+`config_debug` block, then the full `config_effective` envelope, in that
+order. On failure, `--debug` is suppressed and only the standard
+`config_error` envelope is emitted, exit 2.
+
+
 ### `--help-errors`
 
 Pass `--help-errors` to `config validate` to print the full error-code

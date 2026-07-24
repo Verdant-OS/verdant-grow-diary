@@ -44,7 +44,7 @@ function loadEnvFile(path) {
   return out;
 }
 
-function runDryRun(env) {
+function runDryRun(env, extraArgs = []) {
   const cleanEnv = {
     PATH: process.env.PATH ?? "",
     HOME: process.env.HOME ?? "",
@@ -52,7 +52,7 @@ function runDryRun(env) {
   };
   const r = spawnSync(
     "bun",
-    ["run", BRIDGE, "config", "validate", "--dry-run"],
+    ["run", BRIDGE, "config", "validate", "--dry-run", ...extraArgs],
     { encoding: "utf8", env: cleanEnv, timeout: 20_000 },
   );
   return { status: r.status, stdout: r.stdout ?? "", stderr: r.stderr ?? "" };

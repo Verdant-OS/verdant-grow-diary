@@ -24,6 +24,7 @@ import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import CreateTentDialog from "@/components/CreateTentDialog";
+import { validatePlantInsertPayload } from "@/lib/plantPayloadValidation";
 
 const STAGES = [
   { value: "seedling", label: "Seedling" },

@@ -258,23 +258,51 @@ const isMain =
     ? (import.meta as unknown as { main?: boolean }).main === true
     : false;
 
-async function runCli(): Promise<void> {
-  const env = readBridgeEnv(process.env, process.argv);
-  const log = (level: "info" | "warn" | "error", msg: string, extra?: unknown) => {
-    // eslint-disable-next-line no-console
-    const fn = level === "error" ? console.error : level === "warn" ? console.warn : console.log;
-    if (extra === undefined) fn(`[ecowitt-bridge] ${msg}`);
-    else fn(`[ecowitt-bridge] ${msg}`, redactForLog(extra));
-  };
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-  /**
-   * Emit a stable machine-readable error line so automation (CI runners,
-   * supervisors, log scrapers) can detect specific failure classes
-   * without parsing prose. Two lines are emitted to stderr:
-   *   1. Human-readable: `[ecowitt-bridge] config_error code=<code> message="..."`
-   *   2. JSON envelope:  `{"event":"config_error","code":"<code>","message":"..."}`
-   * Neither line ever contains tent IDs, tokens, or raw payload data.
-   */
+export interface ConfigValidateResult {
+  ok: boolean;
+  code?: string;
+  message?: string;
+}
+
+/**
+ * Pure validator for the `config validate` subcommand. Checks
+ * VERDANT_TENT_ID and ECOWITT_SOIL_CHANNEL_MAP_JSON using the same
+ * assertions runCli uses at startup, and returns a stable
+ * machine-readable code on the first failure. Never touches the
+ * network, never imports mqtt, never echoes tent IDs or tokens.
+ */
+export function runConfigValidate(
+  env: NodeJS.ProcessEnv,
+): ConfigValidateResult {
+  const tentId = (env.VERDANT_TENT_ID ?? "").trim();
+  if (!tentId) {
+    return { ok: false, code: "missing_tent_id", message: "missing VERDANT_TENT_ID" };
+  }
+  if (!UUID_RE.test(tentId)) {
+    return { ok: false, code: "invalid_tent_id", message: "VERDANT_TENT_ID must be a UUID" };
+  }
+  const rawMap = env.ECOWITT_SOIL_CHANNEL_MAP_JSON ?? null;
+  try {
+    assertEcowittSoilChannelMapJsonEnv(rawMap);
+    const channelMap = parseEcowittSoilChannelMap(rawMap);
+    assertSingleTentSoilChannelMap(channelMap, tentId);
+  } catch (e) {
+    if (e instanceof EcowittBridgeConfigError) {
+      return { ok: false, code: e.code, message: e.message };
+    }
+    return {
+      ok: false,
+      code: "channel_map_parse_error",
+      message: (e as Error)?.message ?? "channel map parse error",
+    };
+  }
+  return { ok: true };
+}
+
+async function runCli(): Promise<void> {
   const emitConfigError = (code: string, message: string): void => {
     // eslint-disable-next-line no-console
     console.error(
@@ -283,6 +311,34 @@ async function runCli(): Promise<void> {
     // eslint-disable-next-line no-console
     console.error(JSON.stringify({ event: "config_error", code, message }));
   };
+
+  // ---- `config validate` subcommand ----
+  // Runs the same assertions used at startup, exits 0 on success or 2
+  // with a machine-readable error line on failure. Never imports mqtt.
+  const argv = process.argv.slice(2);
+  if (argv[0] === "config" && argv[1] === "validate") {
+    const res = runConfigValidate(process.env);
+    if (res.ok) {
+      // eslint-disable-next-line no-console
+      console.log(
+        JSON.stringify({ event: "config_ok", check: "ecowitt-bridge" }),
+      );
+      process.exit(0);
+      return;
+    }
+    emitConfigError(res.code!, res.message!);
+    process.exit(2);
+    return;
+  }
+
+  const env = readBridgeEnv(process.env, process.argv);
+  const log = (level: "info" | "warn" | "error", msg: string, extra?: unknown) => {
+    // eslint-disable-next-line no-console
+    const fn = level === "error" ? console.error : level === "warn" ? console.warn : console.log;
+    if (extra === undefined) fn(`[ecowitt-bridge] ${msg}`);
+    else fn(`[ecowitt-bridge] ${msg}`, redactForLog(extra));
+  };
+
 
   if (!env.dryRun) {
     if (!env.ingestUrl) {

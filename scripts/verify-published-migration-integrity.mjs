@@ -221,6 +221,13 @@ function main() {
     args.only ? p.includes(args.only) : true,
   );
 
+  // Allowlist: at most one reason per path (last spec wins if duplicated),
+  // and a "used" flag so we can report unjustified/unused entries.
+  const allowMap = new Map();
+  for (const entry of args.allow) {
+    allowMap.set(entry.path, { reason: entry.reason, used: false });
+  }
+
   const results = {
     baseline: args.baseline,
     checked: 0,
@@ -228,7 +235,17 @@ function main() {
     edited: [],
     deleted: [],
     noop_stubs: [],
+    allowlisted: [], // { path, kind: "edited"|"noop"|"deleted", reason, ... }
+    allowlist_unused: [],
     new_on_branch: [],
+  };
+
+  const markAllowlisted = (path, kind, entry) => {
+    const allow = allowMap.get(path);
+    if (!allow) return false;
+    allow.used = true;
+    results.allowlisted.push({ path, kind, reason: allow.reason, ...entry });
+    return true;
   };
 
   // Every migration on baseline must exist unchanged on the current tree.
@@ -238,7 +255,9 @@ function main() {
     const baselineBytes = baselineBlobBytes(args.baseline, path);
     const baselineHash = sha256Bytes(baselineBytes);
     if (!existsSync(abs)) {
-      results.deleted.push({ path, baseline_sha256: baselineHash });
+      if (!markAllowlisted(path, "deleted", { baseline_sha256: baselineHash })) {
+        results.deleted.push({ path, baseline_sha256: baselineHash });
+      }
       continue;
     }
     const currentBytes = readFileSync(abs);
@@ -254,7 +273,9 @@ function main() {
       baseline_bytes: baselineBytes.length,
       current_bytes: currentBytes.length,
     };
-    if (looksLikeNoop(currentBytes)) results.noop_stubs.push(entry);
+    const kind = looksLikeNoop(currentBytes) ? "noop" : "edited";
+    if (markAllowlisted(path, kind, entry)) continue;
+    if (kind === "noop") results.noop_stubs.push(entry);
     else results.edited.push(entry);
   }
 
@@ -281,8 +302,16 @@ function main() {
     }
   }
 
-  const failures =
+  // Any allow entry we never used is either stale (target now matches
+  // baseline again) or points at a path not on the baseline at all.
+  for (const [path, allow] of allowMap.entries()) {
+    if (!allow.used) results.allowlist_unused.push({ path, reason: allow.reason });
+  }
+
+  const realFailures =
     results.edited.length + results.deleted.length + results.noop_stubs.length;
+  const strictFailures = args.strictAllowlist ? results.allowlist_unused.length : 0;
+  const failures = realFailures + strictFailures;
 
   if (args.json) {
     // eslint-disable-next-line no-console
@@ -292,19 +321,15 @@ function main() {
     console.log(
       `\n[verify-published-migration-integrity] baseline=${args.baseline}`,
     );
-    // eslint-disable-next-line no-console
-    console.log(`  checked:        ${results.checked} published migrations`);
-    // eslint-disable-next-line no-console
-    console.log(`  matched:        ${results.matched.length}`);
-    // eslint-disable-next-line no-console
-    console.log(`  edited:         ${results.edited.length}`);
-    // eslint-disable-next-line no-console
-    console.log(`  no-op stubs:    ${results.noop_stubs.length}`);
-    // eslint-disable-next-line no-console
-    console.log(`  deleted:        ${results.deleted.length}`);
-    // eslint-disable-next-line no-console
+    console.log(`  checked:         ${results.checked} published migrations`);
+    console.log(`  matched:         ${results.matched.length}`);
+    console.log(`  edited:          ${results.edited.length}`);
+    console.log(`  no-op stubs:     ${results.noop_stubs.length}`);
+    console.log(`  deleted:         ${results.deleted.length}`);
+    console.log(`  allowlisted:     ${results.allowlisted.length}`);
+    console.log(`  allowlist unused:${results.allowlist_unused.length}`);
     console.log(
-      `  new on branch:  ${results.new_on_branch.length} (additive, ok)\n`,
+      `  new on branch:   ${results.new_on_branch.length} (additive, ok)\n`,
     );
     for (const e of results.edited) {
       console.log(
@@ -319,13 +344,25 @@ function main() {
     for (const e of results.deleted) {
       console.log(`  DELETED  ${e.path}`);
     }
+    for (const e of results.allowlisted) {
+      console.log(
+        `  ALLOWED  ${e.path} [${e.kind}] — reason: ${e.reason}`,
+      );
+    }
+    for (const e of results.allowlist_unused) {
+      console.log(
+        `  UNUSED   ${e.path} — allowlisted but current file matches baseline (or path not on baseline). Remove the --allow entry. Reason was: ${e.reason}`,
+      );
+    }
     for (const p of results.new_on_branch) {
       console.log(`  new      ${p}`);
     }
     console.log(
       failures === 0
-        ? "\nOK — every published migration matches baseline.\n"
-        : `\nFAIL — ${failures} published migration(s) diverge from baseline. Restore with:\n  git checkout ${args.baseline} -- <path>\n`,
+        ? "\nOK — every published migration matches baseline (or is explicitly allowlisted).\n"
+        : `\nFAIL — ${realFailures} unallowlisted divergence(s)` +
+            (strictFailures ? ` + ${strictFailures} unused allowlist entr(ies) under --strict-allowlist` : "") +
+            `. Restore with:\n  git checkout ${args.baseline} -- <path>\nOr, if the edit is intentional, add:\n  --allow=<path>:"<justification>"\n`,
     );
   }
 

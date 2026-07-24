@@ -212,6 +212,12 @@ describe("buildPrComment", () => {
     expect(body).toContain("actions/runs/1/artifacts/media");
     expect(body).toContain("actions/runs/1/artifacts/report");
     expect(body).toContain("actions/runs/1");
+    // Separated sections: Failed listed before Flaky so failures get scanned first.
+    const failedIdx = body.indexOf("### ❌ Failed (1)");
+    const flakyIdx = body.indexOf("### ⚠️ Flaky (1)");
+    expect(failedIdx).toBeGreaterThan(-1);
+    expect(flakyIdx).toBeGreaterThan(-1);
+    expect(failedIdx).toBeLessThan(flakyIdx);
     // Flaky test with BOTH attempts labeled
     expect(body).toContain("FLAKY · logs a watering event");
     expect(body).toContain("Attempt 1 (initial)");
@@ -223,6 +229,11 @@ describe("buildPrComment", () => {
     expect(body).toContain("video.webm");
     // Hard failure block for the second failing test
     expect(body).toContain("FAILED · logs environment reading");
+    // Failed test's block appears in the Failed section (before Flaky heading).
+    const failedTestIdx = body.indexOf("FAILED · logs environment reading");
+    expect(failedTestIdx).toBeGreaterThan(failedIdx);
+    expect(failedTestIdx).toBeLessThan(flakyIdx);
+
     // Bundle-hint deep links
     expect(body).toContain("[open in traces bundle]");
     expect(body).toContain("[open in media bundle]");

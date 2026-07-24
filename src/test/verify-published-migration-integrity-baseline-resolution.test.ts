@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-// @ts-expect-error - .mjs script has no types
 import { resolveBaseline } from "../../scripts/verify-published-migration-integrity.mjs";
 
 /**

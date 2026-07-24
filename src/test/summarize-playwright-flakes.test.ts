@@ -3,7 +3,6 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it, expect } from "vitest";
-// @ts-expect-error - .mjs script exports pure helpers without TypeScript declarations.
 import { buildSummary, classifyTest, buildPrComment, buildTraceabilityHeader } from "../../scripts/summarize-playwright-flakes.mjs";
 
 const flakyReport = {

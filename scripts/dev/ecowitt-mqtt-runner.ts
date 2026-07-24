@@ -316,6 +316,36 @@ export interface RunnerModeConfig {
 }
 
 /**
+ * Enforce the operator boundary shared by every EcoWitt bridge process:
+ * one process maps one tent, and an explicitly configured VERDANT_TENT_ID
+ * must agree with that mapping. The adapter remains capable of normalizing
+ * multiple tents; this guard belongs at the process boundary before I/O.
+ *
+ * Error messages deliberately omit tent ids, entity ids, and file paths.
+ */
+export function assertSingleTentHaMapping(
+  mapping: HaMqttMappingFile,
+  defaultTentId?: string | null,
+): void {
+  const mappedTentIds = new Set(mapping.entities.map((entity) => entity.tent_id));
+  if (mappedTentIds.size > 1) {
+    throw new RunnerConfigError(
+      "HA MQTT mapping must contain entities for one tent only.",
+    );
+  }
+
+  if (
+    isNonEmptyString(defaultTentId) &&
+    mappedTentIds.size === 1 &&
+    !mappedTentIds.has(defaultTentId)
+  ) {
+    throw new RunnerConfigError(
+      "HA MQTT mapping tent must match VERDANT_TENT_ID.",
+    );
+  }
+}
+
+/**
  * Resolve the full mode configuration from env. Fail-closed rules:
  *   - missing/invalid UPSTREAM_MODE → RunnerConfigError listing valid modes
  *   - ha_json / ha_statestream without HA_MQTT_MAPPING_PATH → RunnerConfigError
@@ -1098,6 +1128,9 @@ async function main(): Promise<void> {
   let modeConfig: RunnerModeConfig;
   try {
     modeConfig = resolveRunnerModeConfig(process.env);
+    if (modeConfig.mapping) {
+      assertSingleTentHaMapping(modeConfig.mapping, env.tentId);
+    }
   } catch (e) {
     // eslint-disable-next-line no-console
     console.error(

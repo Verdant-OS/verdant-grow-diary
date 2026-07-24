@@ -13,13 +13,15 @@ describe("Quick Log authenticated route target contract", () => {
     expect(SMOKE).toMatch(/report\.run\(3,\s*"Change the selected target tuple"/);
   });
 
-  it("registers the exact RPC observer before navigation and retains only p_target_id", () => {
+  it("registers the exact V1/V2 RPC observer before navigation and retains only a safe target id", () => {
     const observer = SMOKE.indexOf('page.on("request"');
     const navigation = SMOKE.indexOf("await page.goto(PLANT_URL!)");
     expect(observer).toBeGreaterThan(0);
     expect(observer).toBeLessThan(navigation);
     expect(SMOKE).toContain('endsWith("/rpc/quicklog_save_manual")');
+    expect(SMOKE).toContain('endsWith("/rpc/quicklog_save_event")');
     expect(SMOKE).toMatch(/body\.p_target_id/);
+    expect(SMOKE).toMatch(/body\.p_target_id\s*\?\?\s*body\.p_plant_id/);
     expect(SMOKE).toMatch(/observedRpcTargetId\s*=\s*candidate/);
     expect(SMOKE).not.toMatch(
       /(?:console\.log|writeFileSync)\([^\n]*(?:postData|requestBody|requestPayload|rawPayload)/,
@@ -31,10 +33,12 @@ describe("Quick Log authenticated route target contract", () => {
       /report\.run\(15,\s*"Save uses displayed target"[\s\S]*?(?=report\.run\(16,)/,
     );
     expect(step, "step 15 target assertion missing").toBeTruthy();
-    expect(step![0]).toContain('getAttribute("data-target-plant-id")');
+    expect(step![0]).toContain("if (!selectedTarget)");
+    expect(step![0]).toContain('getByTestId("qlv2-target-panel-plant-value")');
+    expect(step![0]).toContain("toHaveText(");
     expect(step![0]).toMatch(/expect\.poll\(\(\)\s*=>\s*observedRpcTargetId\)/);
-    expect(step![0]).toMatch(/toBe\(displayedTargetId\)/);
-    expect(step![0]).toContain('getByTestId("quick-log-save").click()');
+    expect(step![0]).toMatch(/toBe\(selectedTarget\.plantId\)/);
+    expect(step![0]).toContain('getByTestId("qlv2-save").click()');
   });
 
   it("never serializes intercepted request data into the smoke reports", () => {

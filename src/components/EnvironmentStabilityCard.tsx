@@ -1,9 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import {
-  STABILITY_STATUS_LABEL,
-  type StabilityResult,
-} from "@/lib/environmentStabilityRules";
+import { STABILITY_STATUS_LABEL, type StabilityResult } from "@/lib/environmentStabilityRules";
 import { deriveStabilityWhyContext } from "@/lib/stabilityWhyContext";
 
 /**
@@ -17,9 +14,7 @@ export interface EnvironmentStabilityCardProps {
   className?: string;
 }
 
-function statusBadgeClass(
-  status: StabilityResult["status"],
-): string {
+function statusBadgeClass(status: StabilityResult["status"]): string {
   switch (status) {
     case "stable":
       return "bg-secondary/30 text-foreground border-border";
@@ -49,9 +44,12 @@ export default function EnvironmentStabilityCard({
   const { status, last24h, last7d, sparse, message, stage } = result;
   const label = STABILITY_STATUS_LABEL[status];
   const inactive =
-    status === "stage_unknown" ||
-    status === "context_only" ||
-    status === "unavailable";
+    status === "stage_unknown" || status === "context_only" || status === "unavailable";
+  const hasOutsideEvidence =
+    (last24h.totalConsidered > 0 && last24h.outsideCount > 0) ||
+    (last7d.totalConsidered > 0 && last7d.outsideCount > 0);
+  const showsOutsideTargetHeading =
+    (status === "watch" || status === "unstable") && hasOutsideEvidence;
   const why = deriveStabilityWhyContext(stage);
   // Copy reconciliation: when the summary is inactive (unavailable /
   // stage_unknown / context_only) the stage band is reference context only.
@@ -66,15 +64,12 @@ export default function EnvironmentStabilityCard({
     <div
       data-testid={testId}
       role="status"
-      className={cn(
-        "glass rounded-2xl p-4 flex flex-col gap-3",
-        className,
-      )}
+      className={cn("glass rounded-2xl p-4 flex flex-col gap-3", className)}
     >
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2 flex-wrap">
           <h3 className="font-display font-semibold text-sm">
-            Outside VPD target
+            {showsOutsideTargetHeading ? "Outside VPD target" : "VPD stability"}
           </h3>
           <Badge
             variant="outline"
@@ -91,10 +86,7 @@ export default function EnvironmentStabilityCard({
         </div>
         <Badge
           variant="outline"
-          className={cn(
-            "text-[10px] uppercase",
-            statusBadgeClass(status),
-          )}
+          className={cn("text-[10px] uppercase", statusBadgeClass(status))}
           data-testid={`${testId}-status`}
         >
           {label}
@@ -109,12 +101,8 @@ export default function EnvironmentStabilityCard({
         {whyText}
       </p>
 
-
       {inactive ? (
-        <p
-          className="text-xs text-muted-foreground"
-          data-testid={`${testId}-inactive-note`}
-        >
+        <p className="text-xs text-muted-foreground" data-testid={`${testId}-inactive-note`}>
           {message ?? "Stability summary unavailable."}
         </p>
       ) : (
@@ -123,12 +111,8 @@ export default function EnvironmentStabilityCard({
             className="rounded-lg border border-border/40 bg-secondary/10 p-2"
             data-testid={`${testId}-window-24h`}
           >
-            <div className="text-[11px] uppercase text-muted-foreground">
-              Last 24h
-            </div>
-            <div className="font-display text-base">
-              {formatHours(last24h.hoursOutside)}
-            </div>
+            <div className="text-[11px] uppercase text-muted-foreground">Last 24h</div>
+            <div className="font-display text-base">{formatHours(last24h.hoursOutside)}</div>
             <div className="text-[11px] text-muted-foreground">
               {last24h.outsideCount}/{last24h.totalConsidered} readings outside
             </div>
@@ -137,12 +121,8 @@ export default function EnvironmentStabilityCard({
             className="rounded-lg border border-border/40 bg-secondary/10 p-2"
             data-testid={`${testId}-window-7d`}
           >
-            <div className="text-[11px] uppercase text-muted-foreground">
-              Last 7d
-            </div>
-            <div className="font-display text-base">
-              {formatHours(last7d.hoursOutside)}
-            </div>
+            <div className="text-[11px] uppercase text-muted-foreground">Last 7d</div>
+            <div className="font-display text-base">{formatHours(last7d.hoursOutside)}</div>
             <div className="text-[11px] text-muted-foreground">
               {last7d.outsideCount}/{last7d.totalConsidered} readings outside
             </div>
@@ -151,10 +131,7 @@ export default function EnvironmentStabilityCard({
       )}
 
       {sparse && !inactive && (
-        <p
-          className="text-[11px] text-muted-foreground"
-          data-testid={`${testId}-sparse-warning`}
-        >
+        <p className="text-[11px] text-muted-foreground" data-testid={`${testId}-sparse-warning`}>
           Limited data — stability estimate may be incomplete.
         </p>
       )}

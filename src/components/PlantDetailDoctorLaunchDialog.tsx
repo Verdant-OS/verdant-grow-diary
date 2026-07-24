@@ -20,7 +20,7 @@
  * automation or hardware control. No IDs, tokens, raw payloads,
  * storage paths, or provenance markers are rendered.
  */
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
   Stethoscope,
@@ -147,6 +147,11 @@ export default function PlantDetailDoctorLaunchDialog({
   now,
 }: Props) {
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    setOpen(false);
+  }, [plantId]);
+
   const { data: rawRows } = usePlantRecentActivity(plantId);
   const { items: evidenceItems } = useTimelineMemory(
     plantId ? { kind: "plant", plantId, tentId: tentId ?? null } : null,

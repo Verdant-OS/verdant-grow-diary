@@ -17,6 +17,11 @@ function wrap(children: ReactNode) {
 }
 
 describe("MobileNav primary tabs", () => {
+  it("labels the primary navigation landmark", () => {
+    render(wrap(<MobileNav />));
+    expect(screen.getByRole("navigation", { name: "Primary navigation" })).toBeInTheDocument();
+  });
+
   it("renders the canonical primary tabs", () => {
     render(wrap(<MobileNav />));
     expect(screen.getByText("Home")).toBeInTheDocument();

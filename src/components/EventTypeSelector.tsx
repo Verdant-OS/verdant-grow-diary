@@ -33,6 +33,8 @@ export interface EventTypeSelectorProps {
   testId?: string;
   /** Freeze selection while the owning form has an in-flight save. */
   disabled?: boolean;
+  /** Narrow public-starter compatibility path; ordinary Water stays hidden. */
+  allowLegacyWatering?: boolean;
 }
 
 export function EventTypeSelector({
@@ -42,6 +44,7 @@ export function EventTypeSelector({
   id,
   testId,
   disabled = false,
+  allowLegacyWatering = false,
 }: EventTypeSelectorProps) {
   return (
     <div>
@@ -53,7 +56,7 @@ export function EventTypeSelector({
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          {EVENT_TYPES.map((t) => {
+          {EVENT_TYPES.filter((t) => t.value !== "watering" || allowLegacyWatering).map((t) => {
             const supported = isSupportedLegacyEventType(t.value);
             return (
               <SelectItem key={t.value} value={t.value} disabled={!supported}>

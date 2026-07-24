@@ -112,9 +112,9 @@ const PLANT_NAME = "Verdant Test Plant";
 
 interface SupportedVariant {
   /** prefill.eventType value driving the Quick Log form. */
-  eventType: "observation" | "note" | "watering" | "environment";
+  eventType: "observation" | "note" | "environment";
   /** Word produced by QuickLog.savedVerb for this event type. */
-  verb: "observation" | "log" | "watering" | "environment check";
+  verb: "observation" | "log" | "environment check";
   /** Whether the variant needs a note in the textarea to clear validation. */
   requiresNote: boolean;
   /** Whether the variant needs a watering volume to clear validation. */
@@ -127,7 +127,6 @@ const SUPPORTED_VARIANTS: SupportedVariant[] = [
   // pick "observation" in the UI. We exercise "observation" + "watering"
   // here; the legacy unified save tests cover the "note" RPC mapping.
   { eventType: "observation", verb: "observation", requiresNote: true, requiresWateringVolume: false },
-  { eventType: "watering",    verb: "watering",    requiresNote: false, requiresWateringVolume: true },
   { eventType: "environment", verb: "environment check", requiresNote: true, requiresWateringVolume: false },
 ];
 

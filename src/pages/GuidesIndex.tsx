@@ -17,7 +17,6 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import {
-  VERDANT_CUSTOMER_GUIDE_PATH,
   VERDANT_GROWER_GUIDE_FAQ,
   VERDANT_GUIDES_BREADCRUMB_ITEMS,
   VERDANT_SEO_GUIDES,
@@ -154,10 +153,6 @@ export default function GuidesIndex() {
           Ready to start? See{" "}
           <Link to="/welcome" className="underline hover:text-foreground">
             what Verdant does
-          </Link>
-          ,{" "}
-          <Link to={VERDANT_CUSTOMER_GUIDE_PATH} className="underline hover:text-foreground">
-            start with the Customer Guide
           </Link>
           , or compare{" "}
           <Link to="/pricing" className="underline hover:text-foreground">

@@ -15,6 +15,15 @@ import { render, screen, fireEvent, within, waitFor } from "@testing-library/rea
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import QuickLog from "./QuickLog";
+import {
+  PUBLIC_QUICK_LOG_STARTER_DRAFT_KEY,
+  serializePublicQuickLogStarterDraft,
+  type PublicQuickLogStarterDraft,
+} from "@/lib/publicQuickLogStarterRules";
+
+// Radix Select scrolls the active option when its portal opens; jsdom does not
+// implement this layout-only browser method.
+Element.prototype.scrollIntoView ??= () => undefined;
 
 function renderWithClient(ui: ReactElement) {
   const client = new QueryClient({
@@ -90,6 +99,7 @@ beforeEach(() => {
   toastError.mockReset();
   toastSuccess.mockReset();
   toastMessage.mockReset();
+  window.localStorage.clear();
 });
 
 describe("QuickLog photo attach — disabled (no upload path)", () => {
@@ -124,6 +134,296 @@ describe("QuickLog photo attach — disabled (no upload path)", () => {
 });
 
 describe("QuickLog supported save · routes through quicklog_save_manual RPC", () => {
+  it("refuses an ordinary crafted Water prefill before any RPC", async () => {
+    renderWithClient(
+      <QuickLog
+        open={true}
+        onOpenChange={vi.fn()}
+        prefill={{
+          plantId: "plant-1",
+          growId: "grow-1",
+          tentId: "tent-1",
+          eventType: "watering",
+          wateringVolumeMl: 500,
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("quick-log-save"));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("quick-log-save-error")).toHaveTextContent(
+        /structured Water form/i,
+      ),
+    );
+    expect(saveMock).not.toHaveBeenCalled();
+    expect(insertMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      caseName: "stale revision",
+      storedDraftId: "water-draft-1",
+      storedUpdatedAt: "2026-07-20T12:05:00.000Z",
+      storedVolumeMl: 500,
+      handoffDraftId: "water-draft-1",
+      handoffUpdatedAt: "2026-07-20T12:00:00.000Z",
+      handoffVolumeMl: 500,
+    },
+    {
+      caseName: "replaced draft",
+      storedDraftId: "replacement-water-draft",
+      storedUpdatedAt: "2026-07-20T12:00:00.000Z",
+      storedVolumeMl: 500,
+      handoffDraftId: "water-draft-1",
+      handoffUpdatedAt: "2026-07-20T12:00:00.000Z",
+      handoffVolumeMl: 500,
+    },
+    {
+      caseName: "edited watering volume",
+      storedDraftId: "water-draft-1",
+      storedUpdatedAt: "2026-07-20T12:00:00.000Z",
+      storedVolumeMl: 750,
+      handoffDraftId: "water-draft-1",
+      handoffUpdatedAt: "2026-07-20T12:00:00.000Z",
+      handoffVolumeMl: 500,
+    },
+  ])(
+    "refuses a public-starter Water handoff with a $caseName before any RPC",
+    async ({
+      storedDraftId,
+      storedUpdatedAt,
+      storedVolumeMl,
+      handoffDraftId,
+      handoffUpdatedAt,
+      handoffVolumeMl,
+    }) => {
+      const storedDraft: PublicQuickLogStarterDraft = {
+        v: 1,
+        id: storedDraftId,
+        createdAt: "2026-07-20T11:55:00.000Z",
+        updatedAt: storedUpdatedAt,
+        plantNickname: "Test Plant",
+        stage: "veg",
+        logType: "watering",
+        note: "",
+        wateringVolumeMl: storedVolumeMl,
+        attribution: {},
+      };
+      const storedRaw = serializePublicQuickLogStarterDraft(storedDraft);
+      window.localStorage.setItem(PUBLIC_QUICK_LOG_STARTER_DRAFT_KEY, storedRaw);
+
+      renderWithClient(
+        <QuickLog
+          open={true}
+          onOpenChange={vi.fn()}
+          prefill={{
+            plantId: "plant-1",
+            growId: "grow-1",
+            tentId: "tent-1",
+            eventType: "watering",
+            wateringVolumeMl: handoffVolumeMl,
+            source: "public-starter",
+            publicStarterDraftId: handoffDraftId,
+            publicStarterDraftUpdatedAt: handoffUpdatedAt,
+          }}
+        />,
+      );
+
+      fireEvent.click(screen.getByTestId("quick-log-save"));
+
+      await waitFor(() =>
+        expect(screen.getByTestId("quick-log-save-error")).toHaveTextContent(
+          /structured Water form/i,
+        ),
+      );
+      expect(saveMock).not.toHaveBeenCalled();
+      expect(insertMock).not.toHaveBeenCalled();
+      expect(window.localStorage.getItem(PUBLIC_QUICK_LOG_STARTER_DRAFT_KEY)).toBe(
+        storedRaw,
+      );
+    },
+  );
+
+  it("keeps the narrow matching public-starter Water consume-on-success path", async () => {
+    const updatedAt = new Date().toISOString();
+    const draft: PublicQuickLogStarterDraft = {
+      v: 1,
+      id: "starter-water-1",
+      createdAt: updatedAt,
+      updatedAt,
+      plantNickname: "Test Plant",
+      stage: "veg",
+      logType: "watering",
+      note: "",
+      wateringVolumeMl: 500,
+      attribution: {},
+    };
+    window.localStorage.setItem(
+      PUBLIC_QUICK_LOG_STARTER_DRAFT_KEY,
+      serializePublicQuickLogStarterDraft(draft),
+    );
+    renderWithClient(
+      <QuickLog
+        open={true}
+        onOpenChange={vi.fn()}
+        prefill={{
+          plantId: "plant-1",
+          growId: "grow-1",
+          tentId: "tent-1",
+          eventType: "watering",
+          wateringVolumeMl: 500,
+          source: "public-starter",
+          publicStarterDraftId: draft.id,
+          publicStarterDraftUpdatedAt: draft.updatedAt,
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("quick-log-save"));
+
+    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
+    expect(saveMock.mock.calls[0][0]).toMatchObject({
+      p_action: "water",
+      p_volume_ml: 500,
+      p_target_id: "plant-1",
+    });
+    await waitFor(() =>
+      expect(window.localStorage.getItem(PUBLIC_QUICK_LOG_STARTER_DRAFT_KEY)).toBeNull(),
+    );
+  });
+
+  it("lets Log another start a fresh Observation after verified public-starter Water", async () => {
+    const updatedAt = new Date().toISOString();
+    const draft: PublicQuickLogStarterDraft = {
+      v: 1,
+      id: "starter-water-follow-up",
+      createdAt: updatedAt,
+      updatedAt,
+      plantNickname: "Test Plant",
+      stage: "veg",
+      logType: "watering",
+      note: "",
+      wateringVolumeMl: 500,
+      attribution: {},
+    };
+    window.localStorage.setItem(
+      PUBLIC_QUICK_LOG_STARTER_DRAFT_KEY,
+      serializePublicQuickLogStarterDraft(draft),
+    );
+    renderWithClient(
+      <QuickLog
+        open={true}
+        onOpenChange={vi.fn()}
+        prefill={{
+          plantId: "plant-1",
+          growId: "grow-1",
+          tentId: "tent-1",
+          eventType: "watering",
+          wateringVolumeMl: 500,
+          source: "public-starter",
+          publicStarterDraftId: draft.id,
+          publicStarterDraftUpdatedAt: draft.updatedAt,
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("quick-log-save"));
+    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(window.localStorage.getItem(PUBLIC_QUICK_LOG_STARTER_DRAFT_KEY)).toBeNull(),
+    );
+
+    fireEvent.click(await screen.findByTestId("quick-log-post-save-another"));
+    const dialog = screen.getByRole("dialog");
+    fireEvent.change(dialog.querySelector("textarea") as HTMLTextAreaElement, {
+      target: { value: "Observed healthy new growth" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: /save log/i }));
+
+    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(2));
+    expect(saveMock.mock.calls[1][0]).toMatchObject({
+      p_action: "note",
+      p_target_id: "plant-1",
+      p_note: "Observed healthy new growth",
+    });
+    expect(saveMock.mock.calls[1][1]).toEqual({ telemetryIntent: "observation" });
+    expect(window.localStorage.getItem(PUBLIC_QUICK_LOG_STARTER_DRAFT_KEY)).toBeNull();
+    expect(insertMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      caseName: "stale",
+      storedDraftId: "starter-water-stale",
+      storedUpdatedAt: new Date().toISOString(),
+      handoffDraftId: "starter-water-stale",
+      handoffUpdatedAt: "2026-07-20T01:00:00.000Z",
+    },
+    {
+      caseName: "replaced",
+      storedDraftId: "replacement-water-draft",
+      storedUpdatedAt: new Date().toISOString(),
+      handoffDraftId: "starter-water-replaced",
+      handoffUpdatedAt: new Date().toISOString(),
+    },
+  ])(
+    "lets a normal Observation save without consuming a $caseName Water draft",
+    async ({ storedDraftId, storedUpdatedAt, handoffDraftId, handoffUpdatedAt }) => {
+      const storedDraft: PublicQuickLogStarterDraft = {
+        v: 1,
+        id: storedDraftId,
+        createdAt: storedUpdatedAt,
+        updatedAt: storedUpdatedAt,
+        plantNickname: "Test Plant",
+        stage: "veg",
+        logType: "watering",
+        note: "",
+        wateringVolumeMl: 500,
+        attribution: {},
+      };
+      const storedRaw = serializePublicQuickLogStarterDraft(storedDraft);
+      window.localStorage.setItem(PUBLIC_QUICK_LOG_STARTER_DRAFT_KEY, storedRaw);
+      renderWithClient(
+        <QuickLog
+          open={true}
+          onOpenChange={vi.fn()}
+          prefill={{
+            plantId: "plant-1",
+            growId: "grow-1",
+            tentId: "tent-1",
+            eventType: "watering",
+            wateringVolumeMl: 500,
+            source: "public-starter",
+            publicStarterDraftId: handoffDraftId,
+            publicStarterDraftUpdatedAt: handoffUpdatedAt,
+          }}
+        />,
+      );
+
+      fireEvent.keyDown(screen.getByRole("combobox", { name: "Event" }), { key: "Enter" });
+      fireEvent.keyDown(await screen.findByRole("option", { name: "Observation" }), {
+        key: "Enter",
+      });
+      expect(screen.getByRole("combobox", { name: "Event" })).toHaveTextContent("Observation");
+      const dialog = screen.getByRole("dialog");
+      fireEvent.change(dialog.querySelector("textarea") as HTMLTextAreaElement, {
+        target: { value: "Normal observation after abandoning Water" },
+      });
+      fireEvent.click(within(dialog).getByRole("button", { name: /save log/i }));
+
+      await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
+      expect(saveMock.mock.calls[0][0]).toMatchObject({
+        p_action: "note",
+        p_target_id: "plant-1",
+        p_note: "Normal observation after abandoning Water",
+      });
+      expect(saveMock.mock.calls[0][1]).toEqual({ telemetryIntent: "observation" });
+      expect(window.localStorage.getItem(PUBLIC_QUICK_LOG_STARTER_DRAFT_KEY)).toBe(storedRaw);
+      expect(insertMock).not.toHaveBeenCalled();
+    },
+  );
+
   it("submits an observation with a note as p_action='note' and closes the dialog", async () => {
     const onOpenChange = vi.fn();
     const onCreated = vi.fn();

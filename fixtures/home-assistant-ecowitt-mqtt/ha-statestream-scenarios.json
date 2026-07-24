@@ -1,0 +1,145 @@
+{
+  "note": "Official HA MQTT Statestream separate-topic wire fixtures. Statestream fans each entity into individual sibling topics (<prefix>/<domain>/<object_id>/state, /last_updated, /last_changed, /<attribute_name>). There is NO wire-level /attributes JSON-blob topic. All ids and values are synthetic; no credentials or device identifiers appear here.",
+  "prefix": "verdant/ecowitt",
+  "scenarios": {
+    "separate_topics": {
+      "description": "Official separate-topic shape: state, last_updated, unit_of_measurement, and device_class arrive as four independent topic events.",
+      "parts": [
+        {
+          "topic": "verdant/ecowitt/sensor/flower_tent_temperature/state",
+          "payload": "78.6",
+          "retained": false,
+          "receivedAt": "2026-07-22T18:00:01.000Z"
+        },
+        {
+          "topic": "verdant/ecowitt/sensor/flower_tent_temperature/last_updated",
+          "payload": "\"2026-07-22T18:00:00.000Z\"",
+          "retained": false,
+          "receivedAt": "2026-07-22T18:00:01.005Z"
+        },
+        {
+          "topic": "verdant/ecowitt/sensor/flower_tent_temperature/unit_of_measurement",
+          "payload": "°F",
+          "retained": false,
+          "receivedAt": "2026-07-22T18:00:01.010Z"
+        },
+        {
+          "topic": "verdant/ecowitt/sensor/flower_tent_temperature/device_class",
+          "payload": "temperature",
+          "retained": false,
+          "receivedAt": "2026-07-22T18:00:01.015Z"
+        }
+      ]
+    },
+    "out_of_order": {
+      "description": "Same four topic events as separate_topics but arriving in reverse order. Assembly must produce an identical result.",
+      "parts": [
+        {
+          "topic": "verdant/ecowitt/sensor/flower_tent_temperature/device_class",
+          "payload": "temperature",
+          "retained": false,
+          "receivedAt": "2026-07-22T18:00:01.015Z"
+        },
+        {
+          "topic": "verdant/ecowitt/sensor/flower_tent_temperature/unit_of_measurement",
+          "payload": "°F",
+          "retained": false,
+          "receivedAt": "2026-07-22T18:00:01.010Z"
+        },
+        {
+          "topic": "verdant/ecowitt/sensor/flower_tent_temperature/last_updated",
+          "payload": "\"2026-07-22T18:00:00.000Z\"",
+          "retained": false,
+          "receivedAt": "2026-07-22T18:00:01.005Z"
+        },
+        {
+          "topic": "verdant/ecowitt/sensor/flower_tent_temperature/state",
+          "payload": "78.6",
+          "retained": false,
+          "receivedAt": "2026-07-22T18:00:01.000Z"
+        }
+      ]
+    },
+    "retained_state_without_timestamp": {
+      "description": "Broker-retained state with attribute topics but no last_updated/last_changed topic. Must classify invalid (retained_without_source_timestamp), never live.",
+      "parts": [
+        {
+          "topic": "verdant/ecowitt/sensor/flower_tent_temperature/state",
+          "payload": "71.2",
+          "retained": true,
+          "receivedAt": "2026-07-22T18:00:02.000Z"
+        },
+        {
+          "topic": "verdant/ecowitt/sensor/flower_tent_temperature/unit_of_measurement",
+          "payload": "°F",
+          "retained": true,
+          "receivedAt": "2026-07-22T18:00:02.005Z"
+        }
+      ]
+    },
+    "soil_channels_identical": {
+      "description": "Two soil-moisture channels reporting the identical value at the identical source timestamp. Their idempotency keys must NOT collide.",
+      "parts": [
+        {
+          "topic": "verdant/ecowitt/sensor/flower_tent_soil_1/state",
+          "payload": "41",
+          "retained": false,
+          "receivedAt": "2026-07-22T18:00:01.000Z"
+        },
+        {
+          "topic": "verdant/ecowitt/sensor/flower_tent_soil_1/last_updated",
+          "payload": "\"2026-07-22T18:00:00.000Z\"",
+          "retained": false,
+          "receivedAt": "2026-07-22T18:00:01.005Z"
+        },
+        {
+          "topic": "verdant/ecowitt/sensor/flower_tent_soil_1/unit_of_measurement",
+          "payload": "%",
+          "retained": false,
+          "receivedAt": "2026-07-22T18:00:01.010Z"
+        },
+        {
+          "topic": "verdant/ecowitt/sensor/flower_tent_soil_2/state",
+          "payload": "41",
+          "retained": false,
+          "receivedAt": "2026-07-22T18:00:01.020Z"
+        },
+        {
+          "topic": "verdant/ecowitt/sensor/flower_tent_soil_2/last_updated",
+          "payload": "\"2026-07-22T18:00:00.000Z\"",
+          "retained": false,
+          "receivedAt": "2026-07-22T18:00:01.025Z"
+        },
+        {
+          "topic": "verdant/ecowitt/sensor/flower_tent_soil_2/unit_of_measurement",
+          "payload": "%",
+          "retained": false,
+          "receivedAt": "2026-07-22T18:00:01.030Z"
+        }
+      ]
+    },
+    "separate_unit_c": {
+      "description": "Celsius entity: the separate unit_of_measurement topic must actually be consumed (25 °C normalizes to 77 °F).",
+      "parts": [
+        {
+          "topic": "verdant/ecowitt/sensor/flower_tent_temperature_c/state",
+          "payload": "25",
+          "retained": false,
+          "receivedAt": "2026-07-22T18:00:01.000Z"
+        },
+        {
+          "topic": "verdant/ecowitt/sensor/flower_tent_temperature_c/last_updated",
+          "payload": "\"2026-07-22T18:00:00.000Z\"",
+          "retained": false,
+          "receivedAt": "2026-07-22T18:00:01.005Z"
+        },
+        {
+          "topic": "verdant/ecowitt/sensor/flower_tent_temperature_c/unit_of_measurement",
+          "payload": "°C",
+          "retained": false,
+          "receivedAt": "2026-07-22T18:00:01.010Z"
+        }
+      ]
+    }
+  }
+}

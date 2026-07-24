@@ -37,6 +37,8 @@ const PGTAP_FILES = [
   "supabase/tests/create_feeding_event.sql",
   "supabase/tests/create_watering_event.sql",
 ];
+const AUTH_READY_TIMEOUT_MS = 60_000;
+const AUTH_READY_POLL_MS = 500;
 
 /**
  * @typedef {{ name: string; status: "PASS" | "FAIL" | "SKIP"; detail?: string; pins?: string[] }} StepResult
@@ -101,6 +103,30 @@ function resolveSupabaseCommand() {
     "[irrigation-integrity] required Supabase CLI not found via `supabase` or `bunx supabase`",
   );
   process.exit(2);
+}
+
+async function waitForAuthReady(apiUrl) {
+  const deadline = Date.now() + AUTH_READY_TIMEOUT_MS;
+  let attempts = 0;
+  let lastFailure = "health endpoint did not respond";
+
+  while (Date.now() < deadline) {
+    attempts += 1;
+    try {
+      const response = await fetch(`${apiUrl}/auth/v1/health`, {
+        signal: AbortSignal.timeout(2_000),
+      });
+      if (response.ok) return attempts;
+      lastFailure = `HTTP ${response.status}`;
+    } catch (error) {
+      lastFailure = error instanceof Error ? error.message : String(error);
+    }
+    await new Promise((resolveDelay) => setTimeout(resolveDelay, AUTH_READY_POLL_MS));
+  }
+
+  throw new Error(
+    `Supabase Auth was not ready within ${AUTH_READY_TIMEOUT_MS}ms (${lastFailure})`,
+  );
 }
 
 function runSupabase(args, opts = {}) {
@@ -247,6 +273,17 @@ const PSQL = resolvePsqlRunner();
     printSummaryAndExit(1);
   }
   ok("supabase db reset", "migrations + seed.sql applied");
+}
+
+// `supabase db reset` restarts GoTrue. The CLI may return before the Auth
+// listener is ready, which makes the first disposable-user creation look like
+// an irrigation failure. Gate on the real health endpoint instead of sleeping.
+try {
+  const attempts = await waitForAuthReady(apiUrl);
+  ok("Supabase Auth readiness", `healthy after ${attempts} probe(s)`);
+} catch (error) {
+  fail("Supabase Auth readiness", String(error?.message ?? error));
+  printSummaryAndExit(1);
 }
 
 // -- 3. runtime harness -----------------------------------------------------

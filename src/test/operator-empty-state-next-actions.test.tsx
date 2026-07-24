@@ -36,16 +36,10 @@ describe("Reports onboarding — next-action buttons", () => {
       </MemoryRouter>,
     );
     const addPlant = screen.getByTestId("reports-onboarding-link-add_plant");
-    const addSensor = screen.getByTestId(
-      "reports-onboarding-link-add_sensor_snapshot",
-    );
-    const reviewOutcome = screen.getByTestId(
-      "reports-onboarding-link-review_action_outcome",
-    );
+    const addSensor = screen.getByTestId("reports-onboarding-link-add_sensor_snapshot");
+    const reviewOutcome = screen.getByTestId("reports-onboarding-link-review_action_outcome");
 
-    expect(addPlant.getAttribute("href")).toBe(
-      `/plants?growId=${OPERATOR_DIARY_DATASET.grow.id}`,
-    );
+    expect(addPlant.getAttribute("href")).toBe(`/plants?growId=${OPERATOR_DIARY_DATASET.grow.id}`);
     expect(addSensor.getAttribute("href")).toBe("/sensors");
     expect(reviewOutcome.getAttribute("href")).toBe(
       `/actions?growId=${OPERATOR_DIARY_DATASET.grow.id}`,
@@ -102,7 +96,7 @@ describe("Global Quick Log — gated empty-state CTA navigation", () => {
       </MemoryRouter>,
     );
     fireEvent.click(screen.getByTestId("global-fast-add-trigger"));
-    fireEvent.click(screen.getByTestId("global-fast-add-action-watering"));
+    fireEvent.click(screen.getByTestId("global-fast-add-action-feeding"));
     expect(onDispatch).toHaveBeenCalledTimes(1);
     const [eventName, detail] = onDispatch.mock.calls[0];
     expect(eventName).toBe("verdant:open-quicklog");
@@ -112,7 +106,7 @@ describe("Global Quick Log — gated empty-state CTA navigation", () => {
       tentId: OPERATOR_DIARY_DATASET.tent.id,
       tentName: OPERATOR_DIARY_DATASET.tent.name,
       growId: OPERATOR_DIARY_DATASET.grow.id,
-      eventType: "watering",
+      eventType: "feeding",
     });
   });
 });

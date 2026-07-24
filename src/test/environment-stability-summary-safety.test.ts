@@ -72,8 +72,11 @@ describe("Environment Stability Summary v1 — safety + wiring", () => {
     expect(SENSORS_SRC).not.toMatch(/service_role|action_queue/);
   });
 
-  it("card copy includes the required labels", () => {
+  it("card copy includes honest neutral and evidence-backed labels", () => {
+    expect(CARD_SRC).toContain("VPD stability");
     expect(CARD_SRC).toContain("Outside VPD target");
+    expect(CARD_SRC).toMatch(/status\s*===\s*["']watch["']/);
+    expect(CARD_SRC).toMatch(/status\s*===\s*["']unstable["']/);
     expect(CARD_SRC).toContain("Last 24h");
     expect(CARD_SRC).toContain("Last 7d");
     expect(CARD_SRC).toContain("Stage-aware");

@@ -34,7 +34,10 @@ function specifiersOf(src: string): string[] {
 
 describe("edge functions: no direct src/lib reach", () => {
   const files = walk(FUNCTIONS).filter(
-    (f) => f.endsWith(".ts") && !f.startsWith(MIRROR + sep) && f !== MIRROR,
+    (f) =>
+      f.endsWith(".ts") &&
+      !f.startsWith(MIRROR + sep) &&
+      f !== MIRROR,
   );
 
   it("finds at least one edge-function .ts file", () => {

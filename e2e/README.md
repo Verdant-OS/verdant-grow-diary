@@ -430,6 +430,8 @@ protected branch changes later, update the workflow and this README together.
 - Expected paths:
   - `e2e/results/quicklog-smoke-report.json`
   - `e2e/results/quicklog-smoke-report.txt`
+  - `e2e/results/playwright-report.json`
+  - `e2e/results/playwright-flake-summary.md`
   - `playwright-report/`
   - `test-results/`
 
@@ -611,6 +613,8 @@ Where outputs appear:
   `quicklog-smoke-artifacts`. Expected paths inside:
   - `e2e/results/quicklog-smoke-report.json`
   - `e2e/results/quicklog-smoke-report.txt`
+  - `e2e/results/playwright-report.json`
+  - `e2e/results/playwright-flake-summary.md`
   - `playwright-report/`
   - `test-results/`
 

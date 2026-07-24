@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { AlertCircle, ArrowLeft, BookOpenCheck, ClipboardCheck, Loader2 } from "lucide-react";
+import PageHeader from "@/components/PageHeader";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -138,45 +141,60 @@ export default function BreedingProgramDetail() {
   }
 
   if (loading && !program) {
-    return <div className="container mx-auto max-w-3xl px-4 py-6 text-sm">Loading…</div>;
+    return (
+      <div
+        className="flex min-h-48 items-center justify-center rounded-3xl border border-border/60 bg-card/50 text-muted-foreground"
+        role="status"
+        aria-label="Loading breeding program"
+      >
+        <Loader2 className="size-5 animate-spin" aria-hidden="true" />
+      </div>
+    );
   }
   if (error) {
     return (
-      <div className="container mx-auto max-w-3xl px-4 py-6 text-sm text-destructive">
-        {error}
+      <div className="mx-auto min-w-0 max-w-5xl">
+        <Alert variant="destructive">
+          <AlertCircle className="size-4" aria-hidden="true" />
+          <AlertTitle>Unable to load this breeding program</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       </div>
     );
   }
   if (!program) return null;
 
   return (
-    <div className="container mx-auto max-w-3xl px-4 py-6 space-y-4">
-      <header className="space-y-1">
-        <div className="flex items-center gap-2">
-          <Link
-            to="/breeding"
-            className="text-xs text-muted-foreground hover:underline"
-          >
-            ← Programs
-          </Link>
-        </div>
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-semibold">{program.name}</h1>
-          <Badge variant="outline">{program.status}</Badge>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          {program.p1_maternal_label ?? "—"} × {program.p1_paternal_label ?? "—"}
-          {program.cross_pair_label ? ` · ${program.cross_pair_label}` : ""} · SOP{" "}
-          {program.sop_version}
-        </p>
-        {program.target_traits.length > 0 && (
-          <p className="text-xs text-muted-foreground">
-            Targets: {program.target_traits.join(", ")}
-          </p>
-        )}
-      </header>
+    <div className="mx-auto min-w-0 max-w-5xl">
+      <PageHeader
+        title={program.name}
+        eyebrow="Breeding program"
+        description={`${program.p1_maternal_label ?? "Unassigned maternal"} × ${program.p1_paternal_label ?? "Unassigned paternal"}${program.cross_pair_label ? ` · ${program.cross_pair_label}` : ""}`}
+        icon={<BookOpenCheck className="size-5" />}
+        meta={
+          <>
+            <Badge variant="outline" className="capitalize">
+              {program.status}
+            </Badge>
+            <Badge variant="outline">SOP {program.sop_version}</Badge>
+            {program.target_traits.length > 0 && (
+              <span className="text-xs text-muted-foreground">
+                Targets: {program.target_traits.join(", ")}
+              </span>
+            )}
+          </>
+        }
+        actions={
+          <Button asChild variant="outline" size="sm" className="w-full sm:w-auto">
+            <Link to="/breeding">
+              <ArrowLeft data-icon="inline-start" />
+              All programs
+            </Link>
+          </Button>
+        }
+      />
 
-      <div className="space-y-3">
+      <section className="space-y-3" aria-label="Breeding program steps">
         {steps.map((step) => {
           const stepEvidence = evidenceByStep.get(step.id) ?? [];
           const readiness = evaluateStepReadiness({
@@ -191,20 +209,19 @@ export default function BreedingProgramDetail() {
           return (
             <Card
               key={step.id}
-              className={isActive ? "border-primary" : undefined}
+              className={`overflow-hidden rounded-3xl border-border/60 bg-card/65 shadow-card backdrop-blur-xl ${isActive ? "border-primary/60 ring-1 ring-primary/15" : ""}`}
               data-testid={`step-${step.step_key}`}
             >
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center justify-between text-base">
-                  <span>
-                    <span className="text-muted-foreground text-xs mr-2">
+              <CardHeader className="gap-3 border-b border-border/60 p-4 sm:p-5">
+                <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
+                  <CardTitle className="min-w-0 break-words font-display text-lg capitalize">
+                    <span className="mr-2 text-xs font-medium normal-case text-muted-foreground">
                       Step {step.step_index + 1} · {step.generation_label}
                     </span>
-                    {(step.required_criteria as unknown as { key: string }[])
-                      .length > 0
+                    {(step.required_criteria as unknown as { key: string }[]).length > 0
                       ? step.step_key.replace(/_/g, " ")
                       : step.step_key}
-                  </span>
+                  </CardTitle>
                   <Badge
                     variant={
                       step.status === "complete"
@@ -213,36 +230,45 @@ export default function BreedingProgramDetail() {
                           ? "secondary"
                           : "outline"
                     }
+                    className="shrink-0 capitalize"
                   >
                     {step.status}
                   </Badge>
-                </CardTitle>
+                </div>
               </CardHeader>
-              <CardContent className="space-y-3 text-sm">
-                <p className="text-muted-foreground">{step.instruction_summary}</p>
+              <CardContent className="space-y-5 p-4 pt-4 sm:p-5 sm:pt-5">
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  {step.instruction_summary}
+                </p>
 
-                <div className="space-y-2">
-                  <div className="text-xs uppercase tracking-wide text-muted-foreground">
-                    Required criteria — {readiness.metRequired}/{readiness.totalRequired} met
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                    <span>Required criteria</span>
+                    <span aria-hidden="true">•</span>
+                    <span>
+                      {readiness.metRequired}/{readiness.totalRequired} met
+                    </span>
                   </div>
                   {step.required_criteria.map((c) => {
                     const met = step.criteria_met?.[c.key] === true;
                     const attached = stepEvidence.filter((e) => e.criterion_key === c.key);
+                    const evidenceSelectId = `${step.id}-${c.key}-evidence`;
                     return (
-                      <div key={c.key} className="rounded-md border p-3 space-y-2">
+                      <div
+                        key={c.key}
+                        className="space-y-3 rounded-2xl border border-border/70 bg-background/45 p-3.5 sm:p-4"
+                      >
                         <div className="flex items-start gap-2">
                           <Checkbox
                             id={`${step.id}-${c.key}`}
                             checked={met}
                             disabled={step.status === "complete"}
-                            onCheckedChange={(v) =>
-                              toggleCriterion(step, c.key, v === true)
-                            }
+                            onCheckedChange={(v) => toggleCriterion(step, c.key, v === true)}
                           />
-                          <div className="flex-1">
+                          <div className="min-w-0 flex-1">
                             <label
                               htmlFor={`${step.id}-${c.key}`}
-                              className="text-sm font-medium"
+                              className="cursor-pointer text-sm font-medium leading-relaxed"
                             >
                               {c.label}
                               {c.required && (
@@ -252,10 +278,10 @@ export default function BreedingProgramDetail() {
                               )}
                             </label>
                             {attached.length > 0 && (
-                              <ul className="mt-1 space-y-1 text-xs text-muted-foreground">
+                              <ul className="mt-2 space-y-1 text-xs leading-relaxed text-muted-foreground">
                                 {attached.map((a) => (
-                                  <li key={a.id}>
-                                    📓 {a.diary_entry_at?.slice(0, 10) ?? ""} —{" "}
+                                  <li key={a.id} className="break-words">
+                                    Evidence · {a.diary_entry_at?.slice(0, 10) ?? ""} —{" "}
                                     {a.diary_note?.slice(0, 80) ?? "(no note)"}
                                   </li>
                                 ))}
@@ -263,11 +289,15 @@ export default function BreedingProgramDetail() {
                             )}
                             {isActive && diary.length > 0 && (
                               <div className="mt-2">
-                                <label className="text-xs text-muted-foreground">
-                                  Link diary entry as evidence:
+                                <label
+                                  htmlFor={evidenceSelectId}
+                                  className="text-xs font-medium text-muted-foreground"
+                                >
+                                  Link diary entry as evidence
                                 </label>
                                 <select
-                                  className="mt-1 w-full rounded-md border bg-background px-2 py-1 text-xs"
+                                  id={evidenceSelectId}
+                                  className="mt-1 h-9 w-full rounded-md border border-input bg-background px-2 text-xs focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                                   defaultValue=""
                                   onChange={(e) => {
                                     if (e.target.value) {
@@ -293,8 +323,8 @@ export default function BreedingProgramDetail() {
                 </div>
 
                 {isActive && (
-                  <div className="flex items-center justify-between pt-2">
-                    <span className="text-xs text-muted-foreground">
+                  <div className="flex flex-col gap-3 border-t border-border/60 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                    <span className="text-xs leading-relaxed text-muted-foreground">
                       {readiness.readyToAdvance
                         ? "All required criteria met."
                         : `Missing: ${readiness.missing.join(", ") || "—"}`}
@@ -303,7 +333,9 @@ export default function BreedingProgramDetail() {
                       size="sm"
                       onClick={() => advance(step)}
                       disabled={!readiness.readyToAdvance}
+                      className="w-full gradient-leaf text-primary-foreground sm:w-auto"
                     >
+                      <ClipboardCheck data-icon="inline-start" />
                       Confirm & advance
                     </Button>
                   </div>
@@ -312,7 +344,7 @@ export default function BreedingProgramDetail() {
             </Card>
           );
         })}
-      </div>
+      </section>
     </div>
   );
 }

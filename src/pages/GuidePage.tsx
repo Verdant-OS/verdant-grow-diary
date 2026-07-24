@@ -17,7 +17,6 @@ import {
 } from "@/components/ui/accordion";
 import {
   findGuideBySlug,
-  VERDANT_CUSTOMER_GUIDE_PATH,
   VERDANT_GUIDES_BREADCRUMB_ITEMS,
   VERDANT_SEO_GUIDES,
   VERDANT_SITE_ORIGIN,
@@ -342,15 +341,6 @@ export default function GuidePage() {
                 See how Verdant works
               </Link>
             </li>
-            <li>
-              <Link
-                to={VERDANT_CUSTOMER_GUIDE_PATH}
-                className="underline hover:text-foreground text-muted-foreground"
-              >
-                Start with the Customer Guide
-              </Link>
-            </li>
-
             <li>
               <Link to="/pricing" className="underline hover:text-foreground text-muted-foreground">
                 Compare Free and Pro pricing

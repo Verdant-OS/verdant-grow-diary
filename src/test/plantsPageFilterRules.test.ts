@@ -18,6 +18,7 @@ import {
   plantsPageEmptyStateCopy,
   UNASSIGNED_GROW_FILTER_ID,
 } from "@/lib/plantsPageFilterRules";
+import { buildTentGrowIndex } from "@/lib/growAttributionRules";
 
 const grows = [
   { id: "g1", name: "Sour Diesel Auto" },
@@ -138,6 +139,49 @@ describe("filterPlantsByGrow", () => {
       filterPlantsByGrow(mixed, UNASSIGNED_GROW_FILTER_ID).length +
       grows.reduce((acc, g) => acc + filterPlantsByGrow(mixed, g.id).length, 0);
     expect(bucketed).toBe(mixed.length);
+  });
+});
+
+describe("grow attribution via tent index (BUG-A)", () => {
+  const tentGrowById = buildTentGrowIndex([
+    { id: "t1", growId: "g1" },
+    { id: "t-orphan", growId: null },
+  ]);
+  const mixedPlants = [
+    { id: "direct", name: "Direct", strain: "s", growId: "g1", tentId: "t1" },
+    // Tent rollup: null grow_id but the tent belongs to g1.
+    { id: "rollup", name: "Rollup", strain: "s", growId: null, tentId: "t1" },
+    // Orphaned tent: tent's grow is null → stays Unassigned (visible).
+    { id: "orphan", name: "Orphan", strain: "s", growId: null, tentId: "t-orphan" },
+    { id: "loose", name: "Loose", strain: "s", growId: null, tentId: null },
+  ];
+
+  it("buildGrowFilterOptions counts rollup plants under their resolved grow", () => {
+    const opts = buildGrowFilterOptions(grows, mixedPlants, tentGrowById);
+    expect(opts.find((o) => o.id === "g1")?.plantCount).toBe(2);
+    expect(opts.find((o) => o.id === UNASSIGNED_GROW_FILTER_ID)?.plantCount).toBe(2);
+    const all = opts.find((o) => o.id === "");
+    expect(
+      opts.filter((o) => o.id !== "").reduce((acc, o) => acc + o.plantCount, 0),
+    ).toBe(all?.plantCount);
+  });
+
+  it("filterPlantsByGrow includes rollup plants and shrinks Unassigned to match", () => {
+    expect(
+      filterPlantsByGrow(mixedPlants, "g1", tentGrowById).map((p) => p.id).sort(),
+    ).toEqual(["direct", "rollup"]);
+    expect(
+      filterPlantsByGrow(mixedPlants, UNASSIGNED_GROW_FILTER_ID, tentGrowById)
+        .map((p) => p.id)
+        .sort(),
+    ).toEqual(["loose", "orphan"]);
+  });
+
+  it("omitting the index preserves the legacy own-grow_id behavior", () => {
+    expect(filterPlantsByGrow(mixedPlants, "g1").map((p) => p.id)).toEqual(["direct"]);
+    expect(
+      filterPlantsByGrow(mixedPlants, UNASSIGNED_GROW_FILTER_ID).map((p) => p.id).sort(),
+    ).toEqual(["loose", "orphan", "rollup"]);
   });
 });
 

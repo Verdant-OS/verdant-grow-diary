@@ -80,7 +80,7 @@ export default function OperatorBillingEntitlementResolutionAudit() {
   const audit = auditQuery.data;
 
   return (
-    <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-4 md:p-6">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-4 md:p-6">
       <section className="space-y-2">
         <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           Operator Mode
@@ -254,6 +254,6 @@ export default function OperatorBillingEntitlementResolutionAudit() {
           </Card>
         </section>
       )}
-    </main>
+    </div>
   );
 }

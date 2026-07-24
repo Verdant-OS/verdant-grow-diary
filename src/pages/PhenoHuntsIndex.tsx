@@ -12,8 +12,9 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Loader2, Sprout } from "lucide-react";
+import { AlertCircle, ArrowUpRight, Loader2, Sprout } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import PageHeader from "@/components/PageHeader";
 import { listPhenoHuntsForOwner, type PhenoHuntListItem } from "@/lib/phenoHuntCandidatesService";
 import { listKeeperStabilityForOwner, type KeeperStabilityRow } from "@/lib/phenoKeepersService";
 import { buildStabilityDashboard } from "@/lib/phenoStabilityDashboardRules";
@@ -73,64 +74,79 @@ export default function PhenoHuntsIndex() {
   }, [hunts, keepers]);
 
   return (
-    <div className="max-w-3xl mx-auto p-4 space-y-4" data-testid="pheno-hunts-index">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-display font-bold">Pheno Hunt</h1>
-        <p className="text-sm text-muted-foreground">
-          Track candidates, score phenotypes against your own targets, and preserve keepers — one
-          hunt per grow.
-        </p>
-      </header>
+    <div className="mx-auto min-w-0 max-w-4xl" data-testid="pheno-hunts-index">
+      <PageHeader
+        title="Pheno Hunts"
+        eyebrow="Cultivar selection"
+        description="Track candidates, score phenotypes against your own targets, and preserve keepers — one hunt per grow."
+        icon={<Sprout className="size-5" />}
+      />
 
       {status === "ready" && <PhenoStabilityDashboard model={stabilityModel} />}
 
       {status === "loading" ? (
         <div
-          className="py-16 flex justify-center text-muted-foreground"
+          className="flex items-center justify-center rounded-3xl border border-border/60 bg-card/50 py-16 text-muted-foreground"
           data-testid="pheno-hunts-index-loading"
+          role="status"
+          aria-label="Loading pheno hunts"
         >
           <Loader2 className="h-5 w-5 animate-spin" />
         </div>
       ) : status === "error" ? (
-        <div className="glass rounded-2xl p-6 text-center" data-testid="pheno-hunts-index-error">
-          <p className="text-sm text-muted-foreground">
+        <div
+          className="rounded-3xl border border-destructive/25 bg-card/65 p-6 text-center shadow-card backdrop-blur-xl sm:p-8"
+          data-testid="pheno-hunts-index-error"
+          role="alert"
+        >
+          <AlertCircle className="mx-auto mb-3 size-5 text-destructive" aria-hidden="true" />
+          <p className="font-semibold text-foreground">Unable to load pheno hunts.</p>
+          <p className="mt-1 text-sm text-muted-foreground">
             Your pheno hunts could not be loaded right now. Try again in a moment.
           </p>
         </div>
       ) : hunts.length === 0 ? (
-        <div className="glass rounded-2xl p-8 text-center" data-testid="pheno-hunts-index-empty">
-          <div className="mx-auto h-14 w-14 rounded-2xl glass flex items-center justify-center mb-3">
-            <Sprout className="h-6 w-6 text-primary" />
+        <div
+          className="rounded-3xl border border-dashed border-border/80 bg-card/50 px-5 py-10 text-center shadow-card sm:px-8"
+          data-testid="pheno-hunts-index-empty"
+        >
+          <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary">
+            <Sprout className="size-6" aria-hidden="true" />
           </div>
           <h2 className="font-display text-lg font-semibold">No pheno hunts yet</h2>
-          <p className="text-sm text-muted-foreground mt-1 mb-4 max-w-sm mx-auto">
+          <p className="mx-auto mb-5 mt-1 max-w-md text-sm leading-relaxed text-muted-foreground">
             A pheno hunt starts from a grow. Open a grow and use “Start Pheno Hunt” on its timeline
             to begin tracking candidates.
           </p>
           <Button asChild className="gradient-leaf text-primary-foreground">
             <Link to="/grows" data-testid="pheno-hunts-index-empty-cta">
               Go to My Grows
+              <ArrowUpRight data-icon="inline-end" />
             </Link>
           </Button>
         </div>
       ) : (
-        <ul className="space-y-2" data-testid="pheno-hunts-index-list">
+        <ul className="grid gap-3 sm:grid-cols-2" data-testid="pheno-hunts-index-list">
           {hunts.map((h) => (
             <li key={h.id}>
               <Link
                 to={phenoHuntWorkspacePath(h.id)}
                 data-testid={`pheno-hunts-index-item-${h.id}`}
-                className="flex items-center justify-between gap-3 rounded-2xl border border-border/50 bg-secondary/30 px-4 py-3 hover:bg-secondary/50 transition"
+                className="group flex h-full items-center justify-between gap-4 rounded-3xl border border-border/60 bg-card/65 p-4 shadow-card transition-all hover:-translate-y-0.5 hover:border-primary/35 hover:bg-card hover:shadow-elevated sm:p-5"
               >
                 <div className="min-w-0">
-                  <p className="font-medium truncate">{h.name}</p>
-                  <p className="text-xs text-muted-foreground">
+                  <h2 className="truncate font-display font-semibold text-foreground">{h.name}</h2>
+                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                     {h.candidateCount} {h.candidateCount === 1 ? "candidate" : "candidates"}
                     {h.setupCompletedAt ? "" : " · setup in progress"}
                     {formatCreated(h.createdAt) ? ` · started ${formatCreated(h.createdAt)}` : ""}
                   </p>
                 </div>
-                <span className="text-sm text-primary shrink-0">Open →</span>
+                <ArrowUpRight
+                  className="size-4 shrink-0 text-primary transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
+                  aria-hidden="true"
+                />
+                <span className="sr-only">Open {h.name}</span>
               </Link>
             </li>
           ))}

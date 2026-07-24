@@ -68,6 +68,95 @@ tent separately with its own authorization.
 
 Probes without a mapping are **dropped** (we never invent routing).
 
+### Single-tent requirement (fail-closed)
+
+`VERDANT_TENT_ID` and `ECOWITT_SOIL_CHANNEL_MAP_JSON` together define the
+one tent this bridge process may forward to. The rule is:
+
+> **One bridge process → one tent → one bridge token.**
+
+The bridge validates this **before** loading `mqtt`, connecting to the
+broker, subscribing, or making any HTTPS request. If the configuration
+violates the rule, the process exits with code `2` and emits a
+machine-readable error on stderr (see [Error codes](#error-codes)).
+
+Contract:
+
+- `VERDANT_TENT_ID` must be a UUID and must equal the tent that the
+  active `VERDANT_BRIDGE_TOKEN` is scoped to.
+- Every entry in `ECOWITT_SOIL_CHANNEL_MAP_JSON` must set `tent_id` to
+  that same UUID. An empty or omitted map is accepted.
+- The map may still route probes to different **plants** within that one
+  tent via `plant_id` — multi-plant, single-tent is the intended shape.
+- To forward another tent, run a **separate bridge process** with its
+  own `VERDANT_TENT_ID`, `VERDANT_BRIDGE_TOKEN`, and channel map.
+
+#### Example — valid (single tent, two plants)
+
+```bash
+export VERDANT_TENT_ID="11111111-1111-1111-1111-111111111111"
+export ECOWITT_SOIL_CHANNEL_MAP_JSON='{
+  "soilmoisture1": {
+    "tent_id": "11111111-1111-1111-1111-111111111111",
+    "plant_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+    "label": "front_left_pot"
+  },
+  "soilmoisture2": {
+    "tent_id": "11111111-1111-1111-1111-111111111111",
+    "plant_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+    "label": "front_right_pot"
+  }
+}'
+```
+
+#### Example — rejected (two different tents in one map)
+
+```json
+{
+  "soilmoisture1": { "tent_id": "11111111-1111-1111-1111-111111111111" },
+  "soilmoisture2": { "tent_id": "22222222-2222-2222-2222-222222222222" }
+}
+```
+
+Exits `2` with `code=mixed_tent_channel_map`.
+
+#### Example — rejected (channel disagrees with `VERDANT_TENT_ID`)
+
+```bash
+VERDANT_TENT_ID="11111111-1111-1111-1111-111111111111"
+ECOWITT_SOIL_CHANNEL_MAP_JSON='{"soilmoisture1":{"tent_id":"22222222-2222-2222-2222-222222222222"}}'
+```
+
+Exits `2` with `code=channel_map_tent_mismatch`.
+
+#### Error codes
+
+The CLI emits two stderr lines per config failure so both humans and
+automation can react. Tent IDs, tokens, and raw payloads are never
+included in either line.
+
+Human-readable line:
+
+```
+[ecowitt-bridge] config_error code=<code> message="<safe message>"
+```
+
+JSON envelope (one line, easy to `grep`/`jq`):
+
+```json
+{"event":"config_error","code":"<code>","message":"<safe message>"}
+```
+
+| `code` | Meaning | Fix |
+| --- | --- | --- |
+| `mixed_tent_channel_map` | `ECOWITT_SOIL_CHANNEL_MAP_JSON` contains more than one distinct `tent_id`. | Split into one bridge process per tent. |
+| `channel_map_tent_mismatch` | A channel's `tent_id` does not match `VERDANT_TENT_ID`. | Use the token-scoped tent UUID in every entry. |
+| `missing_ingest_url` | Live mode without `VERDANT_INGEST_URL`. | Export the ingest URL or use `--dry-run`. |
+| `missing_bridge_token` | Live mode without `VERDANT_BRIDGE_TOKEN`. | Export the tent-scoped bridge token or use `--dry-run`. |
+| `mqtt_package_missing` | `mqtt` npm package not installed. | `bun add mqtt` on the host running the bridge. |
+
+
+
 ## Tonight's one-tent safe path
 
 The fastest safe path tonight is local: EcoWitt gateway → `ecowitt2mqtt`

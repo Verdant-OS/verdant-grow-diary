@@ -369,10 +369,18 @@ async function main() {
   }
   const sourceHashes = orderedObject(sourceHashEntries);
 
+  // Manifest key order must be platform-independent: collection order
+  // follows fs.readdir / import-graph traversal, which differs between
+  // filesystems (NTFS vs ext4), and the drift check compares serialized
+  // objects. Emit sorted so the same tree serializes identically anywhere.
+  const sortedSourceHashes = Object.fromEntries(
+    Object.entries(sourceHashes).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+  );
+
   const manifest = {
     generator: "scripts/sync-edge-shared.mjs",
     sourceCount: mirrorFiles.size,
-    sourceHashes,
+    sourceHashes: sortedSourceHashes,
   };
 
   if (CHECK) {

@@ -40,6 +40,17 @@ describe("evaluateManualSensorSnapshotQuality", () => {
     expect(r.canSupportActionSuggestionPreview).toBe(true);
   });
 
+  it("rejects a blank manual snapshot from current-decision support", () => {
+    const r = evaluateManualSensorSnapshotQuality(
+      { source: "manual", captured_at: recent },
+      { nowMs: NOW },
+    );
+
+    expect(r.quality).not.toBe("usable");
+    expect(r.canSupportAiDoctorCurrentContext).toBe(false);
+    expect(r.canSupportActionSuggestionPreview).toBe(false);
+  });
+
   it("csv reading is history-only and cannot support current decisions", () => {
     const r = evaluateManualSensorSnapshotQuality(
       { ...valid, source: "csv" },

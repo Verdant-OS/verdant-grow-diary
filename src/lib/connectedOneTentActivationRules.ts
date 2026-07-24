@@ -129,7 +129,7 @@ const MANUAL_GROW_EVENT_TYPES: ReadonlySet<string> = new Set(
     if (!activity.enabled) return [];
     if (activity.eventType) return [activity.eventType];
     if (activity.saveRoute === "manual_note") return ["observation"];
-    if (activity.saveRoute === "manual_water") return ["watering"];
+    if (activity.saveRoute === "structured_water") return ["watering"];
     return [];
   }),
 );

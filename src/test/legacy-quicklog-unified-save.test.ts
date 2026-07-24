@@ -4,6 +4,8 @@ import {
   buildLegacyQuickLogUnifiedPayload,
   isSupportedLegacyEventType,
   appendLegacyDetailsToNote,
+  isVerifiedPublicStarterWateringHandoff,
+  ORDINARY_LEGACY_WATERING_BLOCKED_COPY,
 } from "@/lib/legacyQuickLogUnifiedSave";
 
 const PLANT_ID = "11111111-1111-1111-1111-111111111111";
@@ -209,5 +211,140 @@ describe("legacyQuickLogUnifiedSave — static safety", () => {
     const src = await fs.readFile("src/components/QuickLog.tsx", "utf8");
     expect(src).not.toMatch(/\.from\(\s*["']diary_entries["']\s*\)\s*\.insert/);
     expect(src).not.toMatch(/\.from\(\s*["']grow_events["']\s*\)\s*\.insert/);
+  });
+});
+
+// Behavioral coverage for the fail-closed watering fence introduced by the
+// one-tent UI overhaul (#404). QuickLog.tsx blocks ordinary/crafted legacy
+// "watering" saves with ORDINARY_LEGACY_WATERING_BLOCKED_COPY and only lets a
+// watering prefill through when isVerifiedPublicStarterWateringHandoff() returns
+// true. Previously only a static string-presence check covered these symbols —
+// that would still pass even if the boolean were inverted or bypassed, silently
+// reopening the deprecated unvalidated legacy-watering write path. These tests
+// assert the actual gate logic so an inverted/loosened condition fails CI.
+describe("isVerifiedPublicStarterWateringHandoff — fail-closed watering fence", () => {
+  const DRAFT_ID = "starter-draft-abcdef";
+  const DRAFT_UPDATED_AT = "2026-07-23T12:00:00.000Z";
+
+  const validStoredDraft = {
+    v: 1,
+    id: DRAFT_ID,
+    updatedAt: DRAFT_UPDATED_AT,
+    logType: "watering",
+    wateringVolumeMl: 500,
+  };
+
+  const validPrefill = {
+    eventType: "watering",
+    source: "public-starter",
+    wateringVolumeMl: 500,
+    publicStarterDraftId: DRAFT_ID,
+    publicStarterDraftUpdatedAt: DRAFT_UPDATED_AT,
+  };
+
+  it("accepts a fully-matching public-starter watering handoff", () => {
+    expect(isVerifiedPublicStarterWateringHandoff(validPrefill, validStoredDraft)).toBe(true);
+  });
+
+  it("rejects a null prefill or null stored draft (fail closed)", () => {
+    expect(isVerifiedPublicStarterWateringHandoff(null, validStoredDraft)).toBe(false);
+    expect(isVerifiedPublicStarterWateringHandoff(undefined, validStoredDraft)).toBe(false);
+    expect(isVerifiedPublicStarterWateringHandoff(validPrefill, null)).toBe(false);
+    expect(isVerifiedPublicStarterWateringHandoff(validPrefill, undefined)).toBe(false);
+  });
+
+  it("rejects when the event type is not watering", () => {
+    expect(
+      isVerifiedPublicStarterWateringHandoff(
+        { ...validPrefill, eventType: "observation" },
+        validStoredDraft,
+      ),
+    ).toBe(false);
+  });
+
+  it("rejects an ordinary (non public-starter) watering source", () => {
+    expect(
+      isVerifiedPublicStarterWateringHandoff({ ...validPrefill, source: "manual" }, validStoredDraft),
+    ).toBe(false);
+    expect(
+      isVerifiedPublicStarterWateringHandoff(
+        { ...validPrefill, source: undefined },
+        validStoredDraft,
+      ),
+    ).toBe(false);
+  });
+
+  it("rejects a missing, empty, or mismatched opaque draft id", () => {
+    expect(
+      isVerifiedPublicStarterWateringHandoff(
+        { ...validPrefill, publicStarterDraftId: "" },
+        validStoredDraft,
+      ),
+    ).toBe(false);
+    expect(
+      isVerifiedPublicStarterWateringHandoff(
+        { ...validPrefill, publicStarterDraftId: undefined },
+        validStoredDraft,
+      ),
+    ).toBe(false);
+    expect(
+      isVerifiedPublicStarterWateringHandoff(
+        { ...validPrefill, publicStarterDraftId: "some-other-id" },
+        validStoredDraft,
+      ),
+    ).toBe(false);
+  });
+
+  it("rejects a missing or mismatched revision (updatedAt)", () => {
+    expect(
+      isVerifiedPublicStarterWateringHandoff(
+        { ...validPrefill, publicStarterDraftUpdatedAt: "" },
+        validStoredDraft,
+      ),
+    ).toBe(false);
+    expect(
+      isVerifiedPublicStarterWateringHandoff(
+        { ...validPrefill, publicStarterDraftUpdatedAt: "2026-07-23T13:00:00.000Z" },
+        validStoredDraft,
+      ),
+    ).toBe(false);
+  });
+
+  it("rejects a stored draft that is not a v1 watering draft", () => {
+    expect(
+      isVerifiedPublicStarterWateringHandoff(validPrefill, { ...validStoredDraft, v: 2 }),
+    ).toBe(false);
+    expect(
+      isVerifiedPublicStarterWateringHandoff(validPrefill, { ...validStoredDraft, logType: "note" }),
+    ).toBe(false);
+  });
+
+  it("rejects a non-positive, non-finite, or mismatched watering volume", () => {
+    expect(
+      isVerifiedPublicStarterWateringHandoff(validPrefill, { ...validStoredDraft, wateringVolumeMl: 0 }),
+    ).toBe(false);
+    expect(
+      isVerifiedPublicStarterWateringHandoff(validPrefill, {
+        ...validStoredDraft,
+        wateringVolumeMl: -50,
+      }),
+    ).toBe(false);
+    expect(
+      isVerifiedPublicStarterWateringHandoff(validPrefill, {
+        ...validStoredDraft,
+        wateringVolumeMl: Number.NaN,
+      }),
+    ).toBe(false);
+    // prefill volume must equal the stored draft volume
+    expect(
+      isVerifiedPublicStarterWateringHandoff(
+        { ...validPrefill, wateringVolumeMl: 750 },
+        validStoredDraft,
+      ),
+    ).toBe(false);
+  });
+
+  it("exposes stable blocked-copy that points growers to the structured Water form", () => {
+    expect(ORDINARY_LEGACY_WATERING_BLOCKED_COPY).toMatch(/structured Water form/i);
   });
 });

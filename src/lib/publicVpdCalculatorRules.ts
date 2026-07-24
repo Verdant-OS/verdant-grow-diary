@@ -1,4 +1,5 @@
-import { AIR_TEMP_MAX_C, AIR_TEMP_MIN_C, fahrenheitToCelsius, type TempUnit } from "@/lib/vpdRules";
+import { celsiusToFahrenheit, fahrenheitToCelsius } from "@/lib/temperatureUnits";
+import { AIR_TEMP_MAX_C, AIR_TEMP_MIN_C, type TempUnit } from "@/lib/vpdRules";
 import {
   evaluateVpdMeasurementTrust,
   type VpdMeasurementBasis,
@@ -60,6 +61,108 @@ export interface PublicVpdCalculatorResult {
 export interface PublicVpdStageOption {
   value: VpdStage;
   label: string;
+}
+
+export type PublicVpdTemperatureFieldValidity = "blank" | "valid" | "out_of_range" | "invalid";
+
+/**
+ * A public-calculator temperature field keeps its exact Celsius value apart
+ * from its rounded display string. Unit-only redisplays therefore never
+ * reparse rounded text or accumulate conversion drift.
+ */
+export interface PublicVpdTemperatureField {
+  displayValue: string;
+  rawInput: string;
+  canonicalC: number | null;
+  validity: PublicVpdTemperatureFieldValidity;
+}
+
+function temperatureValidity(canonicalC: number): PublicVpdTemperatureFieldValidity {
+  return canonicalC < AIR_TEMP_MIN_C || canonicalC > AIR_TEMP_MAX_C ? "out_of_range" : "valid";
+}
+
+function formatTemperatureDisplay(value: number): string {
+  const rounded = Number(value.toFixed(1));
+  return String(Object.is(rounded, -0) ? 0 : rounded);
+}
+
+export function parsePublicVpdTemperatureField(
+  rawInput: string,
+  unit: TempUnit,
+): PublicVpdTemperatureField {
+  const trimmed = rawInput.trim();
+  if (trimmed === "") {
+    return {
+      displayValue: "",
+      rawInput: "",
+      canonicalC: null,
+      validity: "blank",
+    };
+  }
+
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed)) {
+    return {
+      displayValue: "",
+      rawInput,
+      canonicalC: null,
+      validity: "invalid",
+    };
+  }
+
+  const canonicalC = unit === "F" ? fahrenheitToCelsius(parsed) : parsed;
+  return {
+    displayValue: rawInput,
+    rawInput,
+    canonicalC,
+    validity: temperatureValidity(canonicalC),
+  };
+}
+
+export function redisplayPublicVpdTemperatureField(
+  field: PublicVpdTemperatureField,
+  unit: TempUnit,
+): PublicVpdTemperatureField {
+  if (field.validity === "blank") {
+    return {
+      displayValue: "",
+      rawInput: "",
+      canonicalC: null,
+      validity: "blank",
+    };
+  }
+  if (field.canonicalC === null || !Number.isFinite(field.canonicalC)) {
+    return {
+      ...field,
+      displayValue: "",
+      canonicalC: null,
+      validity: "invalid",
+    };
+  }
+
+  const converted = unit === "F" ? celsiusToFahrenheit(field.canonicalC) : field.canonicalC;
+  if (!Number.isFinite(converted)) {
+    return {
+      ...field,
+      displayValue: "",
+      validity: "out_of_range",
+    };
+  }
+  const displayValue = formatTemperatureDisplay(converted);
+  return {
+    displayValue,
+    rawInput: displayValue,
+    canonicalC: field.canonicalC,
+    validity: temperatureValidity(field.canonicalC),
+  };
+}
+
+export function toPublicVpdTemperatureEvaluationValue(
+  field: PublicVpdTemperatureField,
+): number | null {
+  if (field.validity === "blank") return null;
+  if (field.validity === "invalid" || field.canonicalC === null) return Number.NaN;
+  return field.canonicalC;
 }
 
 export const PUBLIC_VPD_STAGE_OPTIONS: readonly PublicVpdStageOption[] = Object.freeze([
@@ -194,6 +297,33 @@ export function evaluatePublicVpdCalculator(
       classification: null,
       classificationLabel: "Relative humidity is not a valid number",
       interpretation: "Enter a finite relative humidity value.",
+    };
+  }
+
+  const leafTemperatureProvided = input.leafTemperature != null;
+  const leafTemperatureC =
+    leafTemperatureProvided && isFiniteNumber(input.leafTemperature)
+      ? input.temperatureUnit === "F"
+        ? fahrenheitToCelsius(input.leafTemperature)
+        : input.leafTemperature
+      : null;
+  if (
+    leafTemperatureProvided &&
+    (leafTemperatureC === null ||
+      leafTemperatureC < AIR_TEMP_MIN_C ||
+      leafTemperatureC > AIR_TEMP_MAX_C)
+  ) {
+    return {
+      ...base,
+      state: "invalid",
+      invalidReason: "invalid_temperature",
+      vpdKpa: null,
+      temperatureC:
+        input.temperatureUnit === "F" ? fahrenheitToCelsius(input.temperature) : input.temperature,
+      humidity: input.humidity,
+      classification: null,
+      classificationLabel: "Leaf temperature is invalid",
+      interpretation: `Enter a finite leaf temperature between ${AIR_TEMP_MIN_C}°C and ${AIR_TEMP_MAX_C}°C, or leave it blank.`,
     };
   }
 

@@ -16,6 +16,7 @@ import {
 } from "@/lib/sensorSnapshotStatusContract";
 import { isSensorTestbenchRow } from "@/lib/sensorTestbenchIndicatorRules";
 import { resolveSensorObservationTime } from "@/lib/sensorObservationTimeRules";
+import { normalizePlantType } from "@/lib/plantTypeRules";
 
 const VALID_SOURCES: readonly SensorReadingSource[] = [
   "live",
@@ -167,7 +168,7 @@ export function mapPlantRow(row: PlantRow): Plant {
     isArchived: Boolean(row.is_archived ?? false),
     medium: cleanPlantString(row.medium),
     potSize: cleanPlantString(row.pot_size),
-    plantType: cleanPlantString((row as { plant_type?: string | null }).plant_type),
+    plantType: normalizePlantType((row as { plant_type?: string | null }).plant_type ?? null),
   };
 }
 

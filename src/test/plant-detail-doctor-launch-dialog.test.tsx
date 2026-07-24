@@ -9,7 +9,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import React from "react";
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { render, screen, fireEvent, act, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 const useRecentMock = vi.fn();
@@ -125,6 +125,27 @@ describe("<PlantDetailDoctorLaunchDialog />", () => {
     expect(screen.getByText(DOCTOR_LAUNCH_HELPER_LINES[1])).toBeInTheDocument();
   });
 
+  it("closes its portal when the controlled plant identity changes", async () => {
+    const { rerender } = renderDialog({ plantId: "plant-a" });
+    fireEvent.click(screen.getByTestId("plant-detail-doctor-launch-trigger"));
+    expect(screen.getByTestId("plant-detail-doctor-launch-dialog")).toBeInTheDocument();
+
+    rerender(
+      <MemoryRouter>
+        <PlantDetailDoctorLaunchDialog
+          plantId="plant-b"
+          stage="veg"
+          hasPlantPhoto={false}
+          now={NOW}
+        />
+      </MemoryRouter>,
+    );
+    await waitFor(() => {
+      expect(screen.queryByTestId("plant-detail-doctor-launch-dialog")).toBeNull();
+    });
+    expect(screen.getByTestId("plant-detail-doctor-launch-trigger")).toBeInTheDocument();
+  });
+
   it("shows available/missing states in the summary", () => {
     renderDialog({ hasPlantPhoto: true });
     fireEvent.click(screen.getByTestId("plant-detail-doctor-launch-trigger"));
@@ -145,7 +166,14 @@ describe("<PlantDetailDoctorLaunchDialog />", () => {
   });
 
   const passingTimelineItems = () => [
-    { kind: "diary", key: "d1", occurredAt: FRESH, eventType: "watering", hasPhoto: false, note: null },
+    {
+      kind: "diary",
+      key: "d1",
+      occurredAt: FRESH,
+      eventType: "watering",
+      hasPhoto: false,
+      note: null,
+    },
     { kind: "diary", key: "d2", occurredAt: FRESH, eventType: "note", hasPhoto: false, note: "ok" },
   ];
 
@@ -154,9 +182,7 @@ describe("<PlantDetailDoctorLaunchDialog />", () => {
     renderDialog();
     fireEvent.click(screen.getByTestId("plant-detail-doctor-launch-trigger"));
     const cont = screen.getByTestId("plant-detail-doctor-launch-continue");
-    expect(cont.getAttribute("href")).toBe(
-      `/plants/p1#${PLANT_AI_DOCTOR_REVIEW_ANCHOR_ID}`,
-    );
+    expect(cont.getAttribute("href")).toBe(`/plants/p1#${PLANT_AI_DOCTOR_REVIEW_ANCHOR_ID}`);
     fireEvent.click(cont);
     expect(screen.queryByTestId("plant-detail-doctor-launch-dialog")).toBeNull();
   });
@@ -166,9 +192,7 @@ describe("<PlantDetailDoctorLaunchDialog />", () => {
     renderDialog({ plantId: "p 1/2" });
     fireEvent.click(screen.getByTestId("plant-detail-doctor-launch-trigger"));
     const cont = screen.getByTestId("plant-detail-doctor-launch-continue");
-    expect(cont.getAttribute("href")).toBe(
-      `/plants/p%201%2F2#${PLANT_AI_DOCTOR_REVIEW_ANCHOR_ID}`,
-    );
+    expect(cont.getAttribute("href")).toBe(`/plants/p%201%2F2#${PLANT_AI_DOCTOR_REVIEW_ANCHOR_ID}`);
   });
 
   it("Add context first dispatches the existing QuickLog event and closes the dialog", () => {
@@ -250,9 +274,7 @@ describe("<PlantDetailDoctorLaunchDialog />", () => {
     // Default beforeEach → empty timeline → insufficient readiness.
     renderDialog();
     fireEvent.click(screen.getByTestId("plant-detail-doctor-launch-trigger"));
-    const explanation = screen.getByTestId(
-      "plant-detail-doctor-launch-blocked-explanation",
-    );
+    const explanation = screen.getByTestId("plant-detail-doctor-launch-blocked-explanation");
     const sentence = screen.getByTestId("plant-detail-doctor-launch-blocked-sentence");
     // Explicitly names the missing categories that block diagnosis.
     expect(sentence.textContent).toMatch(/recent note, watering, feeding, or photo/);
@@ -266,10 +288,7 @@ describe("<PlantDetailDoctorLaunchDialog />", () => {
     const codes = Array.from(list.querySelectorAll("li")).map((li) =>
       li.getAttribute("data-blocking-code"),
     );
-    expect(codes).toEqual([
-      "recent-timeline-activity",
-      "recent-manual-sensor-snapshot",
-    ]);
+    expect(codes).toEqual(["recent-timeline-activity", "recent-manual-sensor-snapshot"]);
     expect(explanation.getAttribute("role")).toBe("status");
   });
 
@@ -278,13 +297,9 @@ describe("<PlantDetailDoctorLaunchDialog />", () => {
     renderDialog();
     fireEvent.click(screen.getByTestId("plant-detail-doctor-launch-trigger"));
     expect(screen.queryByTestId("plant-detail-doctor-launch-continue-blocked")).toBeNull();
-    expect(
-      screen.queryByTestId("plant-detail-doctor-launch-blocked-explanation"),
-    ).toBeNull();
+    expect(screen.queryByTestId("plant-detail-doctor-launch-blocked-explanation")).toBeNull();
     const cont = screen.getByTestId("plant-detail-doctor-launch-continue");
-    expect(cont.getAttribute("href")).toBe(
-      `/plants/p1#${PLANT_AI_DOCTOR_REVIEW_ANCHOR_ID}`,
-    );
+    expect(cont.getAttribute("href")).toBe(`/plants/p1#${PLANT_AI_DOCTOR_REVIEW_ANCHOR_ID}`);
     const notice = screen.getByTestId("plant-detail-doctor-launch-readiness-notice");
     expect(["partial", "strong"]).toContain(notice.getAttribute("data-readiness"));
   });

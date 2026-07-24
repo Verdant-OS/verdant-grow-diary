@@ -11,8 +11,15 @@ import React from "react";
 import { render, screen } from "@testing-library/react";
 
 vi.mock("react-router-dom", () => ({
-  Link: ({ to, children, ...rest }: { to: string; children: React.ReactNode; [k: string]: unknown }) =>
-    React.createElement("a", { href: typeof to === "string" ? to : "", ...rest }, children),
+  Link: ({
+    to,
+    children,
+    ...rest
+  }: {
+    to: string;
+    children: React.ReactNode;
+    [k: string]: unknown;
+  }) => React.createElement("a", { href: typeof to === "string" ? to : "", ...rest }, children),
 }));
 
 vi.mock("@/hooks/usePlantRecentActivity", () => ({
@@ -26,16 +33,14 @@ vi.mock("@/hooks/usePlantAssignedTentActions", () => ({
   usePlantAssignedTentActions: vi.fn(),
 }));
 
-import {
-  buildPlantQuickStatusView,
-  STAGE_UNKNOWN_LABEL,
-} from "@/lib/plantQuickStatusRules";
+import { buildPlantQuickStatusView, STAGE_UNKNOWN_LABEL } from "@/lib/plantQuickStatusRules";
 import type { RelativeTimelineItem } from "@/lib/relativeTimelineProjectionRules";
 
 import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
 import { usePlantAssignedTentAlerts } from "@/hooks/usePlantAssignedTentAlerts";
 import { usePlantAssignedTentActions } from "@/hooks/usePlantAssignedTentActions";
 import PlantQuickStatusStrip from "@/components/PlantQuickStatusStrip";
+import { PLANT_RELATIVE_TIMELINE_ANCHOR_ID } from "@/lib/plantDetailQuickActions";
 
 const mockEntries = usePlantRecentActivity as unknown as ReturnType<typeof vi.fn>;
 const mockAlerts = usePlantAssignedTentAlerts as unknown as ReturnType<typeof vi.fn>;
@@ -196,8 +201,6 @@ describe("buildPlantQuickStatusView — pure rules", () => {
   });
 });
 
-
-
 // ---------------------------------------------------------------------------
 // Render
 // ---------------------------------------------------------------------------
@@ -260,18 +263,12 @@ describe("PlantQuickStatusStrip — render", () => {
 
   it("renders 'Stage unknown' fallback when stage is missing", () => {
     setupHooks({ entries: [] });
-    render(
-      <PlantQuickStatusStrip
-        plantId={PLANT}
-        plantStartedAt={PLANT_STARTED}
-        stage={null}
-      />,
-    );
+    render(<PlantQuickStatusStrip plantId={PLANT} plantStartedAt={PLANT_STARTED} stage={null} />);
     const stage = screen.getByTestId("plant-quick-status-stage");
     expect(stage).toHaveTextContent(STAGE_UNKNOWN_LABEL);
-    expect(
-      screen.getByTestId("plant-quick-status-strip").getAttribute("data-stage-fallback"),
-    ).toBe("true");
+    expect(screen.getByTestId("plant-quick-status-strip").getAttribute("data-stage-fallback")).toBe(
+      "true",
+    );
   });
 
   it("renders alert + action counts when tent context provides them", () => {
@@ -291,12 +288,8 @@ describe("PlantQuickStatusStrip — render", () => {
         growId="grow-1"
       />,
     );
-    expect(screen.getByTestId("plant-quick-status-alerts")).toHaveTextContent(
-      "2 open alerts",
-    );
-    expect(screen.getByTestId("plant-quick-status-actions")).toHaveTextContent(
-      "1 pending action",
-    );
+    expect(screen.getByTestId("plant-quick-status-alerts")).toHaveTextContent("2 open alerts");
+    expect(screen.getByTestId("plant-quick-status-actions")).toHaveTextContent("1 pending action");
   });
 
   it("omits alert/action counts when no tent is assigned (counts unavailable)", () => {
@@ -343,11 +336,7 @@ describe("PlantQuickStatusStrip — render", () => {
   it("renders 'Last updated unknown' when entries exist with invalid timestamps", () => {
     setupHooks({ entries: [NOTE_ENTRY("e1", null)] });
     render(
-      <PlantQuickStatusStrip
-        plantId={PLANT}
-        plantStartedAt={PLANT_STARTED}
-        stage="vegetation"
-      />,
+      <PlantQuickStatusStrip plantId={PLANT} plantStartedAt={PLANT_STARTED} stage="vegetation" />,
     );
     expect(screen.getByTestId("plant-quick-status-last-update")).toHaveTextContent(
       "Last updated unknown",
@@ -375,7 +364,9 @@ describe("PlantQuickStatusStrip — render", () => {
     );
     const text = container.textContent ?? "";
     expect(text).not.toMatch(/uuid-secret/);
-    expect(text.toLowerCase()).not.toMatch(/user_id|token|bearer|raw_payload|provenance|service_role/);
+    expect(text.toLowerCase()).not.toMatch(
+      /user_id|token|bearer|raw_payload|provenance|service_role/,
+    );
   });
 });
 
@@ -535,9 +526,7 @@ describe("PlantQuickStatusStrip — loading / links / view-latest render", () =>
         growId="grow-1"
       />,
     );
-    expect(screen.getByTestId("plant-quick-status-alerts")).toHaveTextContent(
-      "No open alerts",
-    );
+    expect(screen.getByTestId("plant-quick-status-alerts")).toHaveTextContent("No open alerts");
     expect(screen.getByTestId("plant-quick-status-actions")).toHaveTextContent(
       "No pending actions",
     );
@@ -580,30 +569,26 @@ describe("PlantQuickStatusStrip — loading / links / view-latest render", () =>
     const alertsLink = screen.getByTestId("plant-quick-status-alerts-link");
     expect(alertsLink.getAttribute("data-disabled")).toBe("true");
     expect(alertsLink.getAttribute("aria-disabled")).toBe("true");
-    expect(
-      screen.getByTestId("plant-quick-status-alerts-link-reason").textContent,
-    ).toMatch(/grow/i);
+    expect(screen.getByTestId("plant-quick-status-alerts-link-reason").textContent).toMatch(
+      /grow/i,
+    );
     const actionsLink = screen.getByTestId("plant-quick-status-actions-link");
     expect(actionsLink.getAttribute("data-disabled")).toBe("true");
-    expect(
-      screen.getByTestId("plant-quick-status-actions-link-reason").textContent,
-    ).toMatch(/grow/i);
+    expect(screen.getByTestId("plant-quick-status-actions-link-reason").textContent).toMatch(
+      /grow/i,
+    );
   });
 
   it("'View latest entry' is disabled with helpful copy when timeline is empty", () => {
     setupHooks({ entries: [] });
     render(
-      <PlantQuickStatusStrip
-        plantId={PLANT}
-        plantStartedAt={PLANT_STARTED}
-        stage="vegetation"
-      />,
+      <PlantQuickStatusStrip plantId={PLANT} plantStartedAt={PLANT_STARTED} stage="vegetation" />,
     );
     const vl = screen.getByTestId("plant-quick-status-view-latest");
     expect(vl.getAttribute("data-disabled")).toBe("true");
-    expect(
-      screen.getByTestId("plant-quick-status-view-latest-reason").textContent,
-    ).toMatch(/quick log|photo|snapshot/i);
+    expect(screen.getByTestId("plant-quick-status-view-latest-reason").textContent).toMatch(
+      /quick log|photo|snapshot/i,
+    );
   });
 
   it("'View latest entry' click scrolls the newest timeline item into view", () => {
@@ -640,6 +625,51 @@ describe("PlantQuickStatusStrip — loading / links / view-latest render", () =>
 
     document.body.removeChild(target);
   });
+
+  it("hands a matching latest row to the disclosure coordinator", () => {
+    const newest = "coordinated-entry";
+    const reveal = vi.fn();
+    setupHooks({
+      entries: [NOTE_ENTRY(newest, "2026-05-31T00:00:00Z")],
+      alertRows: [],
+      actionRows: [],
+    });
+    const target = document.createElement("div");
+    target.setAttribute("data-item-id", newest);
+    target.scrollIntoView = vi.fn();
+    document.body.appendChild(target);
+
+    render(
+      <PlantQuickStatusStrip
+        plantId={PLANT}
+        plantStartedAt={PLANT_STARTED}
+        onRevealAndNavigate={reveal}
+      />,
+    );
+    screen.getByTestId("plant-quick-status-view-latest").click();
+    expect(reveal).toHaveBeenCalledWith(PLANT_RELATIVE_TIMELINE_ANCHOR_ID, target);
+    expect(target.scrollIntoView).not.toHaveBeenCalled();
+    document.body.removeChild(target);
+  });
+
+  it("still asks the coordinator to reveal History when the latest row is filtered from the DOM", () => {
+    const reveal = vi.fn();
+    setupHooks({
+      entries: [NOTE_ENTRY("filtered-entry", "2026-05-31T00:00:00Z")],
+      alertRows: [],
+      actionRows: [],
+    });
+
+    render(
+      <PlantQuickStatusStrip
+        plantId={PLANT}
+        plantStartedAt={PLANT_STARTED}
+        onRevealAndNavigate={reveal}
+      />,
+    );
+    screen.getByTestId("plant-quick-status-view-latest").click();
+    expect(reveal).toHaveBeenCalledWith(PLANT_RELATIVE_TIMELINE_ANCHOR_ID, null);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -675,9 +705,7 @@ describe("PlantQuickStatusStrip — accessibility", () => {
       />,
     );
     const link = screen.getByTestId("plant-quick-status-actions-link");
-    expect(link.getAttribute("aria-label")).toBe(
-      "View pending actions for this plant",
-    );
+    expect(link.getAttribute("aria-label")).toBe("View pending actions for this plant");
     expect(link.tagName).toBe("A");
   });
 
@@ -722,11 +750,7 @@ describe("PlantQuickStatusStrip — accessibility", () => {
       actionRows: [],
     });
     render(
-      <PlantQuickStatusStrip
-        plantId={PLANT}
-        plantStartedAt={PLANT_STARTED}
-        stage="vegetation"
-      />,
+      <PlantQuickStatusStrip plantId={PLANT} plantStartedAt={PLANT_STARTED} stage="vegetation" />,
     );
     const btn = screen.getByTestId("plant-quick-status-view-latest");
     // Native <button type="button"> handles Enter/Space per HTML spec.
@@ -753,11 +777,7 @@ describe("PlantQuickStatusStrip — accessibility", () => {
     document.body.appendChild(target);
 
     render(
-      <PlantQuickStatusStrip
-        plantId={PLANT}
-        plantStartedAt={PLANT_STARTED}
-        stage="vegetation"
-      />,
+      <PlantQuickStatusStrip plantId={PLANT} plantStartedAt={PLANT_STARTED} stage="vegetation" />,
     );
     const btn = screen.getByTestId("plant-quick-status-view-latest") as HTMLButtonElement;
 
@@ -779,11 +799,7 @@ describe("PlantQuickStatusStrip — accessibility", () => {
   it("disabled View latest entry renders a visible reason and is not focusable", () => {
     setupHooks({ entries: [] });
     render(
-      <PlantQuickStatusStrip
-        plantId={PLANT}
-        plantStartedAt={PLANT_STARTED}
-        stage="vegetation"
-      />,
+      <PlantQuickStatusStrip plantId={PLANT} plantStartedAt={PLANT_STARTED} stage="vegetation" />,
     );
     const vl = screen.getByTestId("plant-quick-status-view-latest");
     expect(vl.tagName).toBe("SPAN");
@@ -834,9 +850,6 @@ describe("plant-quick-status — accessibility safety scan", () => {
     );
   });
 });
-
-
-
 
 describe("plant-quick-status — static safety", () => {
   it("rules module is pure (no Supabase / RPC / writes / scheduling / device)", () => {

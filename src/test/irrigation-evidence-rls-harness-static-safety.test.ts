@@ -191,8 +191,10 @@ describe("irrigation evidence RLS harness — no device-control / automation / f
     // Helpers must exist and cover the PostgREST/Postgres error codes that
     // can masquerade as denial: 42883, PGRST202, PGRST203, /does not exist/,
     // /schema cache/, /no function matches/.
-    expect(src).toMatch(/isGenuinePermissionDenial\s*=/);
-    expect(src).toMatch(/isMissingFunction\s*=/);
+    // Accept either declaration form (const arrow or function declaration) —
+    // the contract is that the named helpers exist, not how they are bound.
+    expect(src).toMatch(/isGenuinePermissionDenial\s*[=(]/);
+    expect(src).toMatch(/isMissingFunction\s*[=(]/);
     expect(src).toMatch(/42883/);
     expect(src).toMatch(/PGRST202/);
     expect(src).toMatch(/schema cache/i);
@@ -410,6 +412,21 @@ describe("irrigation integrity runner — clean-start portability", () => {
     expect(integritySuiteSrc).toMatch(/db\[ _-\]\?url/i);
     expect(integritySuiteSrc).toMatch(/credentialLabel\.test\(line\)/);
   });
+
+  it("waits for the real Auth health endpoint after reset and before the runtime harness", () => {
+    const reset = integritySuiteSrc.indexOf('runSupabase(["db", "reset"]');
+    const readiness = integritySuiteSrc.indexOf("await waitForAuthReady(apiUrl)");
+    const healthEndpoint = integritySuiteSrc.indexOf("/auth/v1/health");
+    const harness = integritySuiteSrc.indexOf(
+      '["run", "scripts/run-irrigation-evidence-rls-harness.ts"',
+    );
+
+    expect(healthEndpoint).toBeGreaterThan(-1);
+    expect(readiness).toBeGreaterThan(reset);
+    expect(harness).toBeGreaterThan(readiness);
+    expect(integritySuiteSrc).toContain("AUTH_READY_TIMEOUT_MS = 60_000");
+    expect(integritySuiteSrc).toContain("AbortSignal.timeout(2_000)");
+  });
 });
 
 describe("irrigation harness typecheck — exact source coverage", () => {
@@ -419,6 +436,7 @@ describe("irrigation harness typecheck — exact source coverage", () => {
     "scripts/run-quicklog-save-event-rls-harness.ts",
     "scripts/run-quicklog-save-manual-rls-harness.ts",
     "scripts/run-quicklog-rpc-rls-harnesses.ts",
+    "scripts/run-quicklog-typed-payloads-harness.ts",
   ];
 
   it("uses a dedicated TypeScript project instead of src-only tsconfig.app.json", () => {

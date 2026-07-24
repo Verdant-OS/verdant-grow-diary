@@ -1330,7 +1330,8 @@ export default function PhenoHuntWorkspace() {
 
   return (
     <PhenoSamplingProvider>
-      <main
+      <section
+        aria-label="Pheno hunt workspace"
         data-testid="pheno-workspace"
         className="container mx-auto max-w-5xl space-y-4 px-4 py-6"
       >
@@ -1552,9 +1553,7 @@ export default function PhenoHuntWorkspace() {
                 }
                 className="ml-auto rounded border border-border bg-secondary px-2 py-1 text-xs font-medium disabled:opacity-50"
               >
-                {evidencePackets.status === "loading"
-                  ? "Preparing evidence…"
-                  : "Export loaded CSV"}
+                {evidencePackets.status === "loading" ? "Preparing evidence…" : "Export loaded CSV"}
               </button>
               {evidencePackets.status === "loading" ? (
                 <span
@@ -1697,7 +1696,7 @@ export default function PhenoHuntWorkspace() {
             candidateLabel: c.candidateLabel,
           }))}
         />
-      </main>
+      </section>
     </PhenoSamplingProvider>
   );
 }

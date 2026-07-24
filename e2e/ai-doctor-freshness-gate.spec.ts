@@ -352,6 +352,13 @@ function expectIsolatedReadOnlyTraffic(traffic: TrafficAudit) {
 
 async function openDoctorLaunchDialog(page: Page) {
   await page.goto(`/plants/${PLANT_ID}`, { waitUntil: "domcontentloaded" });
+  const aiDisclosureTrigger = page.getByTestId("plant-detail-disclosure-ai-trigger");
+  await expect(aiDisclosureTrigger).toBeVisible();
+  if ((await aiDisclosureTrigger.getAttribute("aria-expanded")) !== "true") {
+    await aiDisclosureTrigger.click();
+  }
+  await expect(page.getByTestId("plant-detail-disclosure-ai-content")).toBeVisible();
+
   const trigger = page.getByTestId("plant-detail-doctor-launch-trigger");
   await expect(trigger).toBeVisible();
   await expect(page.getByText("No real plants yet")).toHaveCount(0);

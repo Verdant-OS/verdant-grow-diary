@@ -31,6 +31,12 @@ function cell(ws: XLSX.WorkSheet, addr: string): string {
   return c.f ? `=${c.f}` : String(c.v ?? "");
 }
 
+function readWorkbook(path: string): XLSX.WorkBook {
+  // xlsx 0.20.x ESM does not auto-bind node:fs under Vitest, so its
+  // path-based readFile() reports a tracked workbook as inaccessible.
+  return XLSX.read(readFileSync(path));
+}
+
 function expectFormulaCell(
   ws: XLSX.WorkSheet,
   addr: string,
@@ -45,10 +51,6 @@ function expectFormulaCell(
         `  actual:   ${actual}`,
     );
   }
-}
-
-function readWorkbook(path: string): XLSX.WorkBook {
-  return XLSX.read(readFileSync(path), { type: "buffer" });
 }
 
 // Full row coverage: Seed has 5 generated data rows (blank template + 4 examples)
@@ -133,8 +135,7 @@ describe("v1.3 workbook formula snapshots — XLSX must match contract exactly",
     expect(seedHeaders).toEqual(SEED_PRODUCTION_HEADERS);
 
     const revWb = readWorkbook(REVIEW_XLSX);
-    const revWs =
-      revWb.Sheets[revWb.SheetNames.find((n) => n.startsWith("Commercial_Release_Review"))!];
+    const revWs = revWb.Sheets[revWb.SheetNames.find((n) => n.startsWith("Commercial_Release_Review"))!];
     const revHeaders = COMMERCIAL_REVIEW_HEADERS.map((_, i) => {
       const ref = XLSX.utils.encode_cell({ r: 0, c: i });
       return String(revWs[ref]?.v ?? "");

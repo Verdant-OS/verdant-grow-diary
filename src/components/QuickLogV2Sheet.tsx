@@ -29,6 +29,7 @@ import { useQuickLogV2Save } from "@/hooks/useQuickLogV2Save";
 
 import {
   buildQuickLogV2TargetOptions,
+  isStaleQuickLogV2TargetSelection,
   resolveQuickLogV2Target,
   EMPTY_QUICKLOG_V2_FORM,
   type QuickLogV2FormState,
@@ -108,6 +109,7 @@ interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   defaultTargetKey?: string | null;
+  defaultAction?: QuickLogV2Action;
 }
 
 interface QuickLogVideoMeta {
@@ -132,7 +134,12 @@ interface LockedWateringSubmission {
 
 const NOTE_LIMIT = 500;
 
-export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }: Props) {
+export default function QuickLogV2Sheet({
+  open,
+  onOpenChange,
+  defaultTargetKey,
+  defaultAction = "note",
+}: Props) {
   const { user } = useAuth();
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const libraryInputRef = useRef<HTMLInputElement | null>(null);
@@ -317,6 +324,7 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
   const contextBlocked = isLoadingContext || hasFetchError || hasNoTargets;
 
   const selectedTargetMissing = !contextBlocked && !form.selectedKey;
+  const selectedTargetStale = isStaleQuickLogV2TargetSelection(resolvedTarget);
   const noteLength = form.note.length;
   const volumeMissing = form.action === "water" && wateringForm.volumeMl.trim() === "";
   const showMaturityEvidence =
@@ -365,6 +373,7 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
       setForm({
         ...EMPTY_QUICKLOG_V2_FORM,
         selectedKey: defaultTargetKey ?? null,
+        action: defaultAction,
       });
       setFeedingForm(EMPTY_QUICKLOG_FEEDING_FORM);
       setWateringForm(EMPTY_QUICKLOG_WATERING_FORM);
@@ -383,7 +392,7 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
       saveIdempotencyKeyRef.current = newQuickLogSaveKey();
       resetPhotoSelection();
     }
-  }, [open, defaultTargetKey]);
+  }, [open, defaultTargetKey, defaultAction]);
 
   // One-shot prefill of the feeding form with last-used defaults. Runs only
   // when the Feed action is active, the form is still pristine, defaults
@@ -1658,7 +1667,8 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
                       feedingSaving ||
                       wateringSaving ||
                       videoChecking ||
-                      (contextBlocked && !wateringRetryPending)
+                      (contextBlocked && !wateringRetryPending) ||
+                      (selectedTargetStale && !wateringRetryPending)
                     }
                     aria-describedby="qlv2-save-helper"
                     data-testid="qlv2-save"

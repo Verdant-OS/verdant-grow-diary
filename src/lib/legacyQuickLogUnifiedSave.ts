@@ -23,6 +23,7 @@
  */
 
 import type { QuickLogV2SavePayload } from "./quickLogV2SavePayload";
+import { normalizeQuickLogStage } from "./quickLogStageDefaultRules";
 import type { buildSensorSnapshotSavePayload } from "./latestSensorSnapshotRules";
 import type { PhenoEvidenceReceiptDetails } from "./phenoEvidenceCaptureRules";
 
@@ -47,6 +48,54 @@ export function isSupportedLegacyEventType(value: string): value is SupportedLeg
 
 export const UNSUPPORTED_EVENT_TYPE_COPY =
   "Coming soon in the new Quick Log path. Use Water or Observation for now.";
+
+export const ORDINARY_LEGACY_WATERING_BLOCKED_COPY =
+  "Watering now uses the structured Water form. Choose Watering under All activity types to continue.";
+
+interface PublicStarterWateringPrefillLike {
+  eventType?: unknown;
+  source?: unknown;
+  wateringVolumeMl?: unknown;
+  publicStarterDraftId?: unknown;
+  publicStarterDraftUpdatedAt?: unknown;
+}
+
+interface PublicStarterWateringDraftLike {
+  v?: unknown;
+  id?: unknown;
+  updatedAt?: unknown;
+  logType?: unknown;
+  wateringVolumeMl?: unknown;
+}
+
+/**
+ * Narrow compatibility fence for the public starter's richer legacy handoff.
+ * Both opaque marker and exact revision must match the currently stored v1
+ * watering draft; ordinary/crafted Water state is rejected.
+ */
+export function isVerifiedPublicStarterWateringHandoff(
+  prefill: PublicStarterWateringPrefillLike | null | undefined,
+  storedDraft: PublicStarterWateringDraftLike | null | undefined,
+): boolean {
+  return !!(
+    prefill &&
+    storedDraft &&
+    prefill.eventType === "watering" &&
+    prefill.source === "public-starter" &&
+    typeof prefill.publicStarterDraftId === "string" &&
+    prefill.publicStarterDraftId.length > 0 &&
+    prefill.publicStarterDraftId === storedDraft.id &&
+    typeof prefill.publicStarterDraftUpdatedAt === "string" &&
+    prefill.publicStarterDraftUpdatedAt.length > 0 &&
+    prefill.publicStarterDraftUpdatedAt === storedDraft.updatedAt &&
+    storedDraft.v === 1 &&
+    storedDraft.logType === "watering" &&
+    typeof storedDraft.wateringVolumeMl === "number" &&
+    Number.isFinite(storedDraft.wateringVolumeMl) &&
+    storedDraft.wateringVolumeMl > 0 &&
+    prefill.wateringVolumeMl === storedDraft.wateringVolumeMl
+  );
+}
 
 import { type EcUnit } from "@/constants/units";
 
@@ -74,6 +123,12 @@ export interface LegacyQuickLogFormInput {
   plantId: string | null;
   plantTentId: string | null;
   details: LegacyQuickLogDetails;
+  /**
+   * Stage tag from the dialog's stage select (audit fix #2). Normalized in
+   * the builder; unknown/blank values are omitted so a bad stage never
+   * blocks a save.
+   */
+  stage?: string | null;
   /**
    * Optional redacted sensor envelope from buildSensorSnapshotSavePayload.
    * When non-null, emitted as `p_details: { sensor: ... }` on the RPC
@@ -183,6 +238,9 @@ export function buildLegacyQuickLogUnifiedPayload(
   }
   const detailsEnvelope: Record<string, unknown> | null =
     Object.keys(envelopeFields).length > 0 ? envelopeFields : null;
+  // Stage tag rides on every save; the RPC persists it onto the diary
+  // companion (and writes that companion for stage-only saves).
+  const stageTag = normalizeQuickLogStage(input.stage ?? "") || null;
 
   if (input.eventType === "watering") {
     const raw = trimStr(input.details.watering);
@@ -207,6 +265,7 @@ export function buildLegacyQuickLogUnifiedPayload(
         p_vpd_kpa: null,
         p_occurred_at: null,
         p_details: detailsEnvelope,
+        p_stage: stageTag,
         p_idempotency_key: input.idempotencyKey,
       },
     };
@@ -233,6 +292,7 @@ export function buildLegacyQuickLogUnifiedPayload(
       p_vpd_kpa: null,
       p_occurred_at: null,
       p_details: detailsEnvelope,
+      p_stage: stageTag,
       p_idempotency_key: input.idempotencyKey,
     },
   };

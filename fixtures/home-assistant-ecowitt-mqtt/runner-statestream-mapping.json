@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "bridge": "home_assistant",
+  "upstream_mode": "ha_core_ecowitt_push",
+  "statestream_topic_prefix": "verdant/ecowitt",
+  "entities": [
+    {
+      "entity_id": "sensor.flower_tent_temperature",
+      "metric": "air_temp_f",
+      "expected_unit": "°F",
+      "tent_id": "00000000-0000-0000-0000-0000000000aa",
+      "plant_id": null,
+      "channel": null
+    },
+    {
+      "entity_id": "sensor.flower_tent_temperature_c",
+      "metric": "air_temp_f",
+      "expected_unit": "°C",
+      "tent_id": "00000000-0000-0000-0000-0000000000aa",
+      "plant_id": null,
+      "channel": null
+    },
+    {
+      "entity_id": "sensor.flower_tent_soil_1",
+      "metric": "soil_moisture_pct",
+      "expected_unit": "%",
+      "tent_id": "00000000-0000-0000-0000-0000000000aa",
+      "plant_id": null,
+      "channel": "soil_1"
+    },
+    {
+      "entity_id": "sensor.flower_tent_soil_2",
+      "metric": "soil_moisture_pct",
+      "expected_unit": "%",
+      "tent_id": "00000000-0000-0000-0000-0000000000aa",
+      "plant_id": null,
+      "channel": "soil_2"
+    }
+  ]
+}

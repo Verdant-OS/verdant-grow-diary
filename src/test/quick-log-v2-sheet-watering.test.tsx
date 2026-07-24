@@ -84,19 +84,28 @@ vi.mock("sonner", () => ({
   },
 }));
 
-function renderSheet(defaultTargetKey = "plant:plant-1") {
+function renderSheet(
+  defaultTargetKey = "plant:plant-1",
+  defaultAction?: "note" | "water" | "feed",
+) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
   const onOpenChange = vi.fn();
   const renderTree = (open: boolean, targetKey = defaultTargetKey) => (
     <QueryClientProvider client={client}>
-      <QuickLogV2Sheet open={open} onOpenChange={onOpenChange} defaultTargetKey={targetKey} />
+      <QuickLogV2Sheet
+        open={open}
+        onOpenChange={onOpenChange}
+        defaultTargetKey={targetKey}
+        defaultAction={defaultAction}
+      />
     </QueryClientProvider>
   );
   const view = render(renderTree(true));
   return {
     onOpenChange,
+    unmount: view.unmount,
     rerenderOpen: (open: boolean, targetKey = defaultTargetKey) =>
       view.rerender(renderTree(open, targetKey)),
   };
@@ -146,6 +155,21 @@ beforeEach(() => {
 });
 
 describe("QuickLogV2Sheet — structured watering", () => {
+  it("opens directly on Water with the exact default target and fails closed for a stale target", () => {
+    const valid = renderSheet("plant:plant-1", "water");
+    expect(screen.getByTestId("qlv2-watering-form")).toBeInTheDocument();
+    expect(
+      screen.getByLabelText("Choose plant or tent for this Quick Log"),
+    ).toHaveTextContent("Plant · Plant 1");
+    expect(screen.getByTestId("qlv2-target-panel")).toHaveAttribute("data-scope", "plant");
+    valid.unmount();
+
+    renderSheet("plant:stale-plant", "water");
+    expect(screen.getByTestId("qlv2-watering-form")).toBeInTheDocument();
+    expect(screen.getByTestId("qlv2-save")).toBeDisabled();
+    expect(screen.queryByTestId("qlv2-target-panel")).not.toBeInTheDocument();
+  });
+
   it("shows the Water form only for Water and preserves the volume-only fast path", async () => {
     renderSheet();
     expect(screen.queryByTestId("qlv2-watering-form")).toBeNull();

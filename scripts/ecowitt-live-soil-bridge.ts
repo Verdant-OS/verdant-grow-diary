@@ -41,9 +41,32 @@ import {
   redactForLog,
   maskBridgeToken,
   fullJitterBackoffMs,
+  assertSingleTentSoilChannelMap,
+  assertEcowittSoilChannelMapJsonEnv,
+  EcowittBridgeConfigError,
   type CanonicalWebhookPayload,
   type EcowittSoilChannelMap,
 } from "../src/lib/ecowittLiveSoilIngestRules";
+
+/**
+ * Enforce "one bridge process → one tent → one bridge token" before any
+ * MQTT import, broker connection, subscription, or HTTP traffic. Throws
+ * `EcowittBridgeConfigError` on violation; runCli converts that into a
+ * calm non-zero exit. Kept exported so tests can drive it directly.
+ *
+ * Also validates the raw `ECOWITT_SOIL_CHANNEL_MAP_JSON` env value
+ * against the published JSON Schema so structural errors (unknown keys,
+ * non-UUID tent IDs, extra properties) are rejected at startup with
+ * code=invalid_channel_map_schema instead of being silently dropped by
+ * the tolerant parser.
+ */
+export function assertBridgeStartupSafe(
+  env: BridgeEnv,
+  rawChannelMapJson?: string | null,
+): void {
+  assertEcowittSoilChannelMapJsonEnv(rawChannelMapJson ?? null);
+  assertSingleTentSoilChannelMap(env.channelMap, env.defaultTentId);
+}
 
 // ---------- Pure bridge orchestration (testable, no I/O) ----------
 
@@ -235,7 +258,468 @@ const isMain =
     ? (import.meta as unknown as { main?: boolean }).main === true
     : false;
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export interface ConfigValidateFieldError {
+  path: string;
+  message: string;
+}
+
+export interface ConfigValidateResult {
+  ok: boolean;
+  code?: string;
+  message?: string;
+  /**
+   * Present only for failures that can be attributed to specific entries
+   * inside `ECOWITT_SOIL_CHANNEL_MAP_JSON`. Stable structural paths only
+   * (e.g. `$.soilmoisture2.tent_id`) — never contains raw UUIDs or tokens.
+   */
+  fields?: ConfigValidateFieldError[];
+  /** Present only when includeFixHints is true. Concise operator remedy. */
+  fix?: string;
+}
+
+/**
+ * Stable map from machine-readable error code → concise, human-readable
+ * remedy. Kept in this file (not localized, not templated) so that
+ * automation can also load and display them without pulling in the
+ * runtime. Codes must never be renamed; new codes may be added.
+ * See docs/ecowitt-bridge-startup-validation.md for the full catalog.
+ */
+export const CONFIG_ERROR_FIX_HINTS: Record<string, string> = {
+  missing_tent_id:
+    "Set VERDANT_TENT_ID=<tent-uuid> in your .env (copy the UUID from Verdant → Settings → Tents).",
+  invalid_tent_id:
+    "VERDANT_TENT_ID must be a full 8-4-4-4-12 UUID. Paste it exactly as shown in Verdant, no braces or quotes.",
+  invalid_channel_map_schema:
+    "ECOWITT_SOIL_CHANNEL_MAP_JSON must match docs/schemas/ecowitt-soil-channel-map.schema.json. Keys look like soilmoisture1..soilmoisture99 and every entry needs a UUID tent_id.",
+  mixed_tent_channel_map:
+    "One bridge process = one tent. Split channels across separate .env files (and separate bridge processes) so every tent_id in the map is identical.",
+  channel_map_tent_mismatch:
+    "Every channel's tent_id in ECOWITT_SOIL_CHANNEL_MAP_JSON must equal VERDANT_TENT_ID. Update one side so they match.",
+  missing_ingest_url:
+    "Set VERDANT_INGEST_URL to your project's sensor-ingest-webhook URL, or pass --dry-run for offline testing.",
+  missing_bridge_token:
+    "Mint a bridge token in Verdant → Settings → Bridge Tokens (scoped to this tent) and set VERDANT_BRIDGE_TOKEN=vbt_… . Never commit it.",
+  mqtt_package_missing:
+    "Install the mqtt client in the environment running the bridge: `bun add mqtt` (or `npm i mqtt`).",
+  channel_map_parse_error:
+    "ECOWITT_SOIL_CHANNEL_MAP_JSON could not be parsed. Ensure it is single-line valid JSON with no trailing commas, then re-run `config validate`.",
+  out_flag_requires_dry_run:
+    "--out=<path> writes the redacted config_effective envelope, which is only produced by --dry-run. Add --dry-run or drop --out.",
+  out_flag_missing_value:
+    "--out needs a file path, e.g. `--out=./config-effective.json` or `--out ./config-effective.json`.",
+  out_write_failed:
+    "Could not write the redacted config_effective envelope to the given --out path. Check the directory exists and is writable, then re-run.",
+};
+
+export function fixHintForCode(code: string): string {
+  return (
+    CONFIG_ERROR_FIX_HINTS[code] ??
+    "See docs/ecowitt-bridge-startup-validation.md for the full error catalog and remedies."
+  );
+}
+
+/**
+ * Renders the full error-code catalog used by `config validate --help-errors`.
+ * Returns both a human-readable listing and a machine-readable envelope so
+ * automation can pipe stdout through `tail -n1 | jq` to load it.
+ * Source of truth for entries: {@link CONFIG_ERROR_FIX_HINTS}. Full narrative
+ * remedies live in docs/ecowitt-bridge-startup-validation.md.
+ */
+export function renderErrorCatalog(): {
+  human: string;
+  envelope: {
+    event: "config_error_catalog";
+    check: "ecowitt-bridge";
+    docs: string;
+    errors: Array<{ code: string; fix: string }>;
+  };
+} {
+  const docs = "docs/ecowitt-bridge-startup-validation.md";
+  const entries = Object.keys(CONFIG_ERROR_FIX_HINTS)
+    .sort()
+    .map((code) => ({ code, fix: CONFIG_ERROR_FIX_HINTS[code] }));
+  const lines: string[] = [
+    "Ecowitt bridge — config validate error catalog",
+    `See ${docs} for the full narrative and end-to-end examples.`,
+    "",
+  ];
+  for (const { code, fix } of entries) {
+    lines.push(`- ${code}`);
+    lines.push(`    fix: ${fix}`);
+  }
+  return {
+    human: lines.join("\n"),
+    envelope: {
+      event: "config_error_catalog",
+      check: "ecowitt-bridge",
+      docs,
+      errors: entries,
+    },
+  };
+}
+
+export interface ConfigValidateOptions {
+  includeFixHints?: boolean;
+}
+
+/**
+ * Pure validator for the `config validate` subcommand. Checks
+ * VERDANT_TENT_ID and ECOWITT_SOIL_CHANNEL_MAP_JSON using the same
+ * assertions runCli uses at startup, and returns a stable
+ * machine-readable code on the first failure. Never touches the
+ * network, never imports mqtt, never echoes tent IDs or tokens.
+ */
+export function runConfigValidate(
+  env: NodeJS.ProcessEnv,
+  options: ConfigValidateOptions = {},
+): ConfigValidateResult {
+  const withHint = (r: ConfigValidateResult): ConfigValidateResult => {
+    if (!options.includeFixHints || r.ok || !r.code) return r;
+    return { ...r, fix: fixHintForCode(r.code) };
+  };
+  const tentId = (env.VERDANT_TENT_ID ?? "").trim();
+  if (!tentId) {
+    return withHint({ ok: false, code: "missing_tent_id", message: "missing VERDANT_TENT_ID" });
+  }
+  if (!UUID_RE.test(tentId)) {
+    return withHint({ ok: false, code: "invalid_tent_id", message: "VERDANT_TENT_ID must be a UUID" });
+  }
+  const rawMap = env.ECOWITT_SOIL_CHANNEL_MAP_JSON ?? null;
+  try {
+    assertEcowittSoilChannelMapJsonEnv(rawMap);
+    const channelMap = parseEcowittSoilChannelMap(rawMap);
+    assertSingleTentSoilChannelMap(channelMap, tentId);
+  } catch (e) {
+    if (e instanceof EcowittBridgeConfigError) {
+      const base: ConfigValidateResult = { ok: false, code: e.code, message: e.message };
+      if (e.fields && e.fields.length > 0) base.fields = e.fields.map((f) => ({ ...f }));
+      return withHint(base);
+    }
+    return withHint({
+      ok: false,
+      code: "channel_map_parse_error",
+      message: (e as Error)?.message ?? "channel map parse error",
+    });
+  }
+  return { ok: true };
+}
+
+// ---- Redacted effective config (for `config validate --dry-run`) ----
+
+/** Mask a UUID to `********-****-****-****-XXXXXXXXXXXX`-style tail. */
+export function maskUuid(u: string | null | undefined): string | null {
+  if (!u) return null;
+  const s = String(u).trim();
+  if (!UUID_RE.test(s)) return "uuid:invalid";
+  return `uuid:…${s.slice(-4)}`;
+}
+
+/** Host of a URL, or null; never returns query, path, or credentials. */
+export function hostOnly(u: string | null | undefined): string | null {
+  if (!u) return null;
+  try {
+    const parsed = new URL(u);
+    return `${parsed.protocol}//${parsed.host}`;
+  } catch {
+    return "invalid_url";
+  }
+}
+
+export interface RedactedEffectiveConfig {
+  event: "config_effective";
+  check: "ecowitt-bridge";
+  tent_id: string | null;
+  plant_id: string | null;
+  ingest_url_host: string | null;
+  bridge_token: string;
+  mqtt: {
+    url_host: string | null;
+    topic: string;
+    username_present: boolean;
+    password_present: boolean;
+  };
+  channel_map: {
+    count: number;
+    channels: Array<{
+      channel: string;
+      tent_id: string | null;
+      plant_id: string | null;
+      label: string | null;
+    }>;
+  };
+  dry_run: boolean;
+  once: boolean;
+}
+
+/**
+ * Build a schema-validated, fully redacted view of the effective bridge
+ * config. Pure: no I/O, no mqtt import, no network. Never contains raw
+ * UUIDs, tokens, credentials, or URL paths. Safe to print to stdout or
+ * ship to CI artifacts.
+ */
+export function buildRedactedEffectiveConfig(
+  env: NodeJS.ProcessEnv,
+  argv: string[] = [],
+): RedactedEffectiveConfig {
+  const bridge = readBridgeEnv(env, argv);
+  const mqttUrl =
+    env.ECOWITT_MQTT_URL ??
+    `mqtt://${env.ECOWITT_MQTT_HOST ?? "127.0.0.1"}:${env.ECOWITT_MQTT_PORT ?? "1883"}`;
+  const channels = Object.entries(bridge.channelMap).map(([channel, m]) => ({
+    channel,
+    tent_id: maskUuid(m.tent_id ?? null),
+    plant_id: maskUuid(m.plant_id ?? null),
+    label: m.label ?? null,
+  }));
+  return {
+    event: "config_effective",
+    check: "ecowitt-bridge",
+    tent_id: maskUuid(bridge.defaultTentId),
+    plant_id: maskUuid(bridge.defaultPlantId),
+    ingest_url_host: hostOnly(bridge.ingestUrl),
+    bridge_token: maskBridgeToken(bridge.bridgeToken),
+    mqtt: {
+      url_host: hostOnly(mqttUrl),
+      topic: env.ECOWITT_MQTT_TOPIC ?? "ecowitt/grow",
+      username_present: !!(env.ECOWITT_MQTT_USERNAME ?? "").trim(),
+      password_present: !!(env.ECOWITT_MQTT_PASSWORD ?? "").trim(),
+    },
+    channel_map: { count: channels.length, channels },
+    dry_run: bridge.dryRun,
+    once: !!bridge.once,
+  };
+}
+
+// ---- Focused debug view (for `config validate --debug`) ----
+
+export interface ConfigDebugEnvelope {
+  event: "config_debug";
+  check: "ecowitt-bridge";
+  /** Redacted (`uuid:…XXXX`) or `null` when unset. Never a raw UUID. */
+  tent_id: string | null;
+  channel_map: {
+    count: number;
+    /** Stable order: sorted by channel key so diffs across runs stay diff-friendly. */
+    channels: Array<{
+      channel: string;
+      tent_id: string | null;
+      plant_id: string | null;
+      label: string | null;
+    }>;
+  };
+}
+
+/**
+ * Build a focused, fully redacted view of the parsed tent ID + derived
+ * channel map for `config validate --debug`. Strict subset of
+ * {@link RedactedEffectiveConfig} — no tokens, no URLs, no MQTT metadata.
+ * Pure: no I/O, no mqtt import, no network. Safe for stdout and CI logs.
+ */
+export function buildConfigDebugEnvelope(
+  env: NodeJS.ProcessEnv,
+  argv: string[] = [],
+): ConfigDebugEnvelope {
+  const bridge = readBridgeEnv(env, argv);
+  const channels = Object.entries(bridge.channelMap)
+    .sort(([a], [b]) => a.localeCompare(b, "en", { numeric: true }))
+    .map(([channel, m]) => ({
+      channel,
+      tent_id: maskUuid(m.tent_id ?? null),
+      plant_id: maskUuid(m.plant_id ?? null),
+      label: m.label ?? null,
+    }));
+  return {
+    event: "config_debug",
+    check: "ecowitt-bridge",
+    tent_id: maskUuid(bridge.defaultTentId),
+    channel_map: { count: channels.length, channels },
+  };
+}
+
+/**
+ * Pure parser for `--out=<path>` / `--out <path>` on `config validate`.
+ * Returns `{ path: null }` when the flag is absent so callers can skip
+ * the export step. Returns an error object with a stable machine-readable
+ * code when the flag is present but malformed (empty value, missing
+ * following argument). Never touches the filesystem.
+ */
+export function parseOutFlag(
+  args: string[],
+): { path: string | null; error?: { code: string; message: string } } {
+  let path: string | null = null;
+  for (let i = 0; i < args.length; i += 1) {
+    const a = args[i];
+    if (a === "--out") {
+      const next = args[i + 1];
+      if (next === undefined || next.startsWith("--") || next === "") {
+        return {
+          path: null,
+          error: {
+            code: "out_flag_missing_value",
+            message: "--out requires a file path (e.g. --out=./config-effective.json)",
+          },
+        };
+      }
+      path = next;
+      i += 1;
+      continue;
+    }
+    if (a.startsWith("--out=")) {
+      const value = a.slice("--out=".length);
+      if (value === "") {
+        return {
+          path: null,
+          error: {
+            code: "out_flag_missing_value",
+            message: "--out= must be followed by a file path",
+          },
+        };
+      }
+      path = value;
+    }
+  }
+  return { path };
+}
+
 async function runCli(): Promise<void> {
+  const emitConfigError = (
+    code: string,
+    message: string,
+    fix?: string,
+    fields?: ConfigValidateFieldError[],
+  ): void => {
+    const hasFields = Array.isArray(fields) && fields.length > 0;
+    const fieldsSummary = hasFields
+      ? fields!
+          .slice(0, 5)
+          .map((f) => `${f.path}: ${f.message}`)
+          .join("; ")
+      : "";
+    // eslint-disable-next-line no-console
+    console.error(
+      `[ecowitt-bridge] config_error code=${code} message=${JSON.stringify(message)}${
+        fix ? ` fix=${JSON.stringify(fix)}` : ""
+      }${hasFields ? ` fields=${JSON.stringify(fieldsSummary)}` : ""}`,
+    );
+    // Envelope key order (stable for downstream jq consumers):
+    //   event, code, message, [fields], [fix]
+    const envelope: Record<string, unknown> = { event: "config_error", code, message };
+    if (hasFields) envelope.fields = fields;
+    if (fix) envelope.fix = fix;
+    // eslint-disable-next-line no-console
+    console.error(JSON.stringify(envelope));
+  };
+
+  // ---- `config validate [--fix-hints] [--dry-run] [--debug]` subcommand ----
+  // Runs the same assertions used at startup, exits 0 on success or 2
+  // with a machine-readable error line on failure. Never imports mqtt.
+  // `--dry-run` additionally prints a schema-validated, redacted view of
+  // the full effective config. `--debug` prints a focused, redacted view
+  // of just the parsed tent ID + derived channel map — safer to paste
+  // into bug reports than the full effective config. Flags compose:
+  // passing both emits `config_ok`, then `config_debug`, then
+  // `config_effective` (in that order) on stdout.
+  const argv = process.argv.slice(2);
+  if (argv[0] === "config" && argv[1] === "validate") {
+    const rest = argv.slice(2);
+    if (rest.includes("--help-errors")) {
+      const catalog = renderErrorCatalog();
+      // eslint-disable-next-line no-console
+      console.log(catalog.human);
+      // eslint-disable-next-line no-console
+      console.log(JSON.stringify(catalog.envelope));
+      process.exit(0);
+      return;
+    }
+    const includeFixHints = rest.includes("--fix-hints");
+    const dryRun = rest.includes("--dry-run");
+    const debug = rest.includes("--debug");
+    const outFlag = parseOutFlag(rest);
+
+    // Flag-shape errors are surfaced before running the (potentially slow)
+    // validator so operators get a fast, deterministic exit code. The
+    // `--out` companion-flag rules are contractual — enforce them here.
+    if (outFlag.error) {
+      const hint = includeFixHints ? fixHintForCode(outFlag.error.code) : undefined;
+      emitConfigError(outFlag.error.code, outFlag.error.message, hint);
+      process.exit(2);
+      return;
+    }
+    if (outFlag.path !== null && !dryRun) {
+      const message =
+        "--out=<path> only writes the redacted config_effective envelope when --dry-run is also passed";
+      const hint = includeFixHints ? fixHintForCode("out_flag_requires_dry_run") : undefined;
+      emitConfigError("out_flag_requires_dry_run", message, hint);
+      process.exit(2);
+      return;
+    }
+
+    const res = runConfigValidate(process.env, { includeFixHints });
+    if (res.ok) {
+      // eslint-disable-next-line no-console
+      console.log(
+        JSON.stringify({ event: "config_ok", check: "ecowitt-bridge" }),
+      );
+      if (debug) {
+        const dbg = buildConfigDebugEnvelope(process.env, process.argv);
+        // Human-readable one-liner mirrors the redacted envelope; safe to
+        // paste into bug reports because tent_id is masked and no tokens
+        // or URLs are included.
+        // eslint-disable-next-line no-console
+        console.log(
+          `[ecowitt-bridge] config_debug tent_id=${dbg.tent_id ?? "null"} channels=${dbg.channel_map.count}`,
+        );
+        // eslint-disable-next-line no-console
+        console.log(JSON.stringify(dbg));
+      }
+      if (dryRun) {
+        const effective = buildRedactedEffectiveConfig(process.env, process.argv);
+        const serialized = JSON.stringify(effective);
+        // eslint-disable-next-line no-console
+        console.log(serialized);
+        if (outFlag.path !== null) {
+          // Write the already-redacted envelope. Trailing newline so the
+          // file is a clean single-line JSONL record and plays nicely with
+          // `jq`, `tail`, and text editors.
+          try {
+            const { writeFileSync } = await import("node:fs");
+            const { resolve: resolvePath } = await import("node:path");
+            const absPath = resolvePath(outFlag.path);
+            writeFileSync(absPath, `${serialized}\n`, { encoding: "utf8" });
+            // eslint-disable-next-line no-console
+            console.log(
+              JSON.stringify({
+                event: "config_effective_written",
+                check: "ecowitt-bridge",
+                path: absPath,
+                bytes: Buffer.byteLength(serialized, "utf8") + 1,
+              }),
+            );
+          } catch (e) {
+            const message =
+              e instanceof Error
+                ? `failed to write --out path: ${e.message}`
+                : "failed to write --out path";
+            const hint = includeFixHints ? fixHintForCode("out_write_failed") : undefined;
+            emitConfigError("out_write_failed", message, hint);
+            process.exit(2);
+            return;
+          }
+        }
+      }
+      process.exit(0);
+      return;
+    }
+    emitConfigError(res.code!, res.message!, res.fix, res.fields);
+    process.exit(2);
+    return;
+  }
+
+
+
   const env = readBridgeEnv(process.env, process.argv);
   const log = (level: "info" | "warn" | "error", msg: string, extra?: unknown) => {
     // eslint-disable-next-line no-console
@@ -244,16 +728,31 @@ async function runCli(): Promise<void> {
     else fn(`[ecowitt-bridge] ${msg}`, redactForLog(extra));
   };
 
+
   if (!env.dryRun) {
     if (!env.ingestUrl) {
-      log("error", "missing VERDANT_INGEST_URL");
+      emitConfigError("missing_ingest_url", "missing VERDANT_INGEST_URL");
       process.exit(2);
     }
     if (!env.bridgeToken) {
-      log("error", "missing VERDANT_BRIDGE_TOKEN");
+      emitConfigError("missing_bridge_token", "missing VERDANT_BRIDGE_TOKEN");
       process.exit(2);
     }
   }
+
+  // Fail-closed single-tent enforcement — MUST run before any MQTT
+  // dynamic import, broker connection, subscription, or HTTP forward.
+  try {
+    assertBridgeStartupSafe(env, process.env.ECOWITT_SOIL_CHANNEL_MAP_JSON ?? null);
+  } catch (e) {
+    if (e instanceof EcowittBridgeConfigError) {
+      emitConfigError(e.code, e.message, undefined, e.fields);
+      process.exit(2);
+      return;
+    }
+    throw e;
+  }
+
   log("info", "starting", {
     dryRun: env.dryRun,
     once: env.once,
@@ -276,10 +775,14 @@ async function runCli(): Promise<void> {
     const modName = ["m", "q", "t", "t"].join("");
     mqttMod = (await import(/* @vite-ignore */ modName)) as MqttLike;
   } catch {
-    log("error", "mqtt package not installed — run `bun add mqtt` locally");
+    emitConfigError(
+      "mqtt_package_missing",
+      "mqtt package not installed — run `bun add mqtt` locally",
+    );
     process.exit(2);
     return;
   }
+
 
   const url =
     process.env.ECOWITT_MQTT_URL ??

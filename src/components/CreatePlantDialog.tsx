@@ -24,6 +24,7 @@ import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import CreateTentDialog from "@/components/CreateTentDialog";
+import { validatePlantInsertPayload } from "@/lib/plantPayloadValidation";
 
 const STAGES = [
   { value: "seedling", label: "Seedling" },
@@ -117,9 +118,16 @@ export default function CreatePlantDialog({
     }
     if (form.started_at) payload.started_at = new Date(form.started_at).toISOString();
 
+    const validation = validatePlantInsertPayload(payload);
+    if (!validation.ok || !validation.value) {
+      setBusy(false);
+      toast.error(validation.errors[0] ?? "Plant details are incomplete");
+      return;
+    }
+
     const { data, error } = await supabase
       .from("plants")
-      .insert(payload as never)
+      .insert(validation.value as never)
       .select("id, name")
       .single();
     setBusy(false);

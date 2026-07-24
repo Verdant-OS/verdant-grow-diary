@@ -1,0 +1,83 @@
+name: ecowitt-bridge-cli-suite
+
+# Runs the EcoWitt bridge CLI test suite plus a targeted typecheck on every
+# pull request that touches the bridge CLI, its rules module, its fixtures,
+# or any of its dedicated test files. This is the "unit + contract" gate that
+# complements `ecowitt-config-validate-contract.yml` (which runs the CLI as a
+# subprocess against frozen env fixtures).
+#
+# Path-filtered so unrelated PRs stay fast. Typecheck is a stop-ship gate —
+# no `continue-on-error`.
+
+on:
+  pull_request:
+    paths:
+      - "scripts/ecowitt-live-soil-bridge.ts"
+      - "scripts/dev/ecowitt-mqtt-runner.ts"
+      - "src/lib/ecowittLiveSoilIngestRules.ts"
+      - "src/lib/homeAssistantEcowittMqttAdapter.ts"
+      - "src/test/ecowitt-live-soil-bridge*.test.ts"
+      - "src/test/ecowitt-config-validate-field-paths.test.ts"
+      - "src/test/ecowitt-mqtt-runner-*.test.ts"
+      - "src/test/ecowitt-single-tent-ha-mapping.test.ts"
+      - "src/test/ecowitt-soil-channel-map-schema.test.ts"
+      - "fixtures/home-assistant-ecowitt-mqtt/**"
+      - "fixtures/ecowitt-bridge-config/**"
+      - "docs/schemas/ecowitt-soil-channel-map.schema.json"
+      - "examples/ecowitt-bridge/**"
+      - ".github/workflows/ecowitt-bridge-cli-suite.yml"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/ecowitt-live-soil-bridge.ts"
+      - "scripts/dev/ecowitt-mqtt-runner.ts"
+      - "src/lib/ecowittLiveSoilIngestRules.ts"
+      - "src/lib/homeAssistantEcowittMqttAdapter.ts"
+      - "src/test/ecowitt-live-soil-bridge*.test.ts"
+      - "src/test/ecowitt-config-validate-field-paths.test.ts"
+      - "src/test/ecowitt-mqtt-runner-*.test.ts"
+      - "src/test/ecowitt-single-tent-ha-mapping.test.ts"
+      - "src/test/ecowitt-soil-channel-map-schema.test.ts"
+      - "fixtures/home-assistant-ecowitt-mqtt/**"
+      - "fixtures/ecowitt-bridge-config/**"
+
+jobs:
+  bridge-cli-suite:
+    name: bridge CLI tests + typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # Stop-ship gate: typecheck must pass before tests are meaningful.
+      - name: Typecheck (tsgo --noEmit)
+        run: bunx tsgo --noEmit
+
+      # Targeted CLI + rules coverage. Kept batched into a single vitest run
+      # so failures surface with one exit code and one artifact.
+      - name: Bridge CLI test suite (vitest run, targeted)
+        run: |
+          bunx vitest run --reporter=dot \
+            src/test/ecowitt-live-soil-bridge.test.ts \
+            src/test/ecowitt-live-soil-bridge-config-validate.test.ts \
+            src/test/ecowitt-live-soil-bridge-envelope-golden.test.ts \
+            src/test/ecowitt-live-soil-bridge-error-codes.test.ts \
+            src/test/ecowitt-live-soil-bridge-exit-code.test.ts \
+            src/test/ecowitt-live-soil-bridge-docs.test.ts \
+            src/test/ecowitt-config-validate-field-paths.test.ts \
+            src/test/ecowitt-soil-channel-map-schema.test.ts \
+            src/test/ecowitt-single-tent-ha-mapping.test.ts \
+            src/test/ecowitt-mqtt-runner-config.test.ts \
+            src/test/ecowitt-mqtt-runner-exit-code.test.ts \
+            src/test/ecowitt-mqtt-runner-ha-modes.test.ts \
+            src/test/ecowitt-mqtt-runner-ha-vpd-freshness.test.ts \
+            src/test/ecowitt-mqtt-runner-safety.test.ts

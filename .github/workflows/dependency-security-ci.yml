@@ -27,6 +27,16 @@ jobs:
         with:
           bun-version: 1.3.14
 
+      # Cache Bun's global install cache. Keyed on the text lockfile so
+      # `bun install --frozen-lockfile` still resolves the same tree.
+      - name: Cache Bun install cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
       - name: Install dependencies (frozen lockfile)
         run: bun install --frozen-lockfile
 
@@ -54,6 +64,14 @@ jobs:
       # `--project` is a no-op when the project name doesn't exist in
       # playwright.config.ts; adjust the project name to match the repo's
       # smoke project as needed.
+      - name: Cache Playwright browsers
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
       - name: Install Playwright browsers (chromium only)
         run: bunx playwright install --with-deps chromium
 

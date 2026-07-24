@@ -3177,6 +3177,7 @@ export type Database = {
           name: string
           pheno_hunt_id: string | null
           photo_url: string | null
+          plant_type: string
           pot_size: string | null
           schema_version: number
           stage: string
@@ -3198,6 +3199,7 @@ export type Database = {
           name: string
           pheno_hunt_id?: string | null
           photo_url?: string | null
+          plant_type?: string
           pot_size?: string | null
           schema_version?: number
           stage?: string
@@ -3219,6 +3221,7 @@ export type Database = {
           name?: string
           pheno_hunt_id?: string | null
           photo_url?: string | null
+          plant_type?: string
           pot_size?: string | null
           schema_version?: number
           stage?: string
@@ -4630,6 +4633,7 @@ export type Database = {
           p_idempotency_key?: string
           p_note?: string
           p_occurred_at?: string
+          p_stage?: string
           p_target_id: string
           p_target_type: string
           p_temperature_c?: number
@@ -4653,6 +4657,24 @@ export type Database = {
           p_paddle_transaction_id: string
         }
         Returns: Json
+      }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
+      verdant_normalize_search_text: {
+        Args: { p_text: string }
+        Returns: string
+      }
+      verdant_search: {
+        Args: { max_results?: number; q: string }
+        Returns: {
+          entity_type: string
+          id: string
+          label: string
+          match_kind: string
+          rank: number
+          score: number
+          sublabel: string
+        }[]
       }
     }
     Enums: {

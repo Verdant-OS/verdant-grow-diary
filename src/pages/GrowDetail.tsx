@@ -15,16 +15,12 @@ import {
   SlidersHorizontal,
   FileDown,
   GraduationCap,
+  AlertTriangle,
 } from "lucide-react";
 import { exportGrowDiaryReportAsPdf } from "@/lib/growDiaryPdfExport";
 
 import { useGrowDetailData, type GrowOutcomesState } from "@/hooks/useGrowDetailData";
-import {
-  type CountValue,
-  type GrowStatus,
-  type StatusLevel,
-  formatCount,
-} from "@/lib/growStatus";
+import { type CountValue, type GrowStatus, type StatusLevel, formatCount } from "@/lib/growStatus";
 import {
   actionDetailPath,
   actionsPath,
@@ -45,48 +41,55 @@ import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import GrowTargetsEditor from "@/components/GrowTargetsEditor";
 import { GrowFollowUpReviewSection } from "@/components/GrowFollowUpReviewSection";
 
-
 /**
  * Read-only grow detail hub. Presentational only — all data loading +
  * derivation live in @/hooks/useGrowDetailData and @/lib/growStatus.
  * No writes. No ai-coach call. No device-control surface.
  */
 export default function GrowDetail() {
-  const { grow, growId, loading, notFound, error, counts, recent, status, outcomes, refetch } = useGrowDetailData();
+  const { grow, growId, loading, notFound, error, counts, recent, status, outcomes, refetch } =
+    useGrowDetailData();
   const [targetsEditorOpen, setTargetsEditorOpen] = useState(false);
-
 
   if (loading) {
     return (
       <div
-        className="flex items-center justify-center py-20 text-muted-foreground"
+        className="mx-auto flex min-h-56 max-w-2xl flex-col items-center justify-center gap-3 rounded-3xl border border-border/60 bg-card/70 px-6 py-16 text-center text-muted-foreground shadow-card backdrop-blur-xl"
         role="status"
         aria-busy="true"
         aria-label="Loading grow"
         data-testid="grow-detail-loading"
       >
         <Loader2 className="h-5 w-5 animate-spin" />
+        <p className="text-sm">Loading grow…</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="max-w-xl mx-auto" role="alert" data-testid="grow-detail-error">
+      <div className="mx-auto max-w-2xl" role="alert" data-testid="grow-detail-error">
         <BackLink />
-        <div className="glass rounded-2xl p-6 text-center">
-          <h1 className="text-lg font-semibold mb-2">Couldn't load this grow</h1>
-          <p className="text-sm text-muted-foreground mb-4">
+        <div className="relative overflow-hidden rounded-3xl border border-border/60 bg-card/70 p-8 text-center shadow-card backdrop-blur-xl">
+          <div aria-hidden="true" className="absolute inset-x-0 top-0 h-1 bg-destructive/70" />
+          <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-2xl border border-destructive/20 bg-destructive/10 text-destructive">
+            <AlertTriangle className="size-5" aria-hidden="true" />
+          </div>
+          <h1 className="mb-2 font-display text-xl font-bold tracking-tight">
+            Couldn't load this grow
+          </h1>
+          <p className="mx-auto mb-5 max-w-md text-sm text-muted-foreground">
             We hit a problem reaching your data. Check your connection and try again.
           </p>
-          <button
+          <Button
             type="button"
             onClick={() => refetch()}
             className="inline-flex items-center justify-center min-h-11 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90"
             data-testid="grow-detail-retry"
           >
+            <Loader2 className="size-4" aria-hidden="true" />
             Retry
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -94,11 +97,15 @@ export default function GrowDetail() {
 
   if (notFound || !grow) {
     return (
-      <div className="max-w-xl mx-auto" data-testid="grow-detail-not-found">
+      <div className="mx-auto max-w-2xl" data-testid="grow-detail-not-found">
         <BackLink />
-        <div className="glass rounded-2xl p-6 text-center">
-          <h1 className="text-lg font-semibold mb-2">Grow not found</h1>
-          <p className="text-sm text-muted-foreground">
+        <div className="relative overflow-hidden rounded-3xl border border-border/60 bg-card/70 p-8 text-center shadow-card backdrop-blur-xl">
+          <div aria-hidden="true" className="absolute inset-x-0 top-0 h-1 bg-primary/70" />
+          <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary">
+            <Leaf className="size-5" aria-hidden="true" />
+          </div>
+          <h1 className="mb-2 font-display text-xl font-bold tracking-tight">Grow not found</h1>
+          <p className="mx-auto max-w-md text-sm text-muted-foreground">
             This grow may have been removed, or you do not have access to it.
           </p>
         </div>
@@ -106,26 +113,39 @@ export default function GrowDetail() {
     );
   }
 
-  const showPostGrowReport = grow.is_archived || grow.stage === "harvest" || grow.stage === "drying";
+  const showPostGrowReport =
+    grow.is_archived || grow.stage === "harvest" || grow.stage === "drying";
 
   return (
-    <div className="max-w-3xl mx-auto">
-      <GrowBreadcrumbs growId={grow.id} growName={grow.name} current={grow.name} section="grow-detail" />
+    <div className="mx-auto max-w-5xl">
+      <GrowBreadcrumbs
+        growId={grow.id}
+        growName={grow.name}
+        current={grow.name}
+        section="grow-detail"
+      />
       <BackLink />
 
-
-      <header className="glass rounded-2xl p-4 mb-4">
+      <header className="relative mb-6 overflow-hidden rounded-3xl border border-border/60 bg-card/70 p-5 shadow-card backdrop-blur-xl">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-0 left-0 w-1 bg-primary/80"
+        />
         <div className="flex items-center gap-2 flex-wrap mb-2">
-          <Badge variant="outline" className="uppercase text-[10px]">{grow.stage}</Badge>
-          <Badge variant="outline" className="text-[10px]">{grow.grow_type}</Badge>
+          <Badge variant="outline" className="uppercase text-[10px]">
+            {grow.stage}
+          </Badge>
+          <Badge variant="outline" className="text-[10px]">
+            {grow.grow_type}
+          </Badge>
           {grow.is_archived && (
-            <Badge variant="outline" className="text-[10px]">archived</Badge>
+            <Badge variant="outline" className="text-[10px]">
+              archived
+            </Badge>
           )}
         </div>
-        <h1 className="text-xl font-display font-bold">{grow.name}</h1>
-        {grow.notes && (
-          <p className="text-sm text-muted-foreground mt-1">{grow.notes}</p>
-        )}
+        <h1 className="font-display text-2xl font-bold tracking-tight md:text-3xl">{grow.name}</h1>
+        {grow.notes && <p className="text-sm text-muted-foreground mt-1">{grow.notes}</p>}
 
         <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
           <Field label="Started" value={new Date(grow.started_at).toLocaleString()} />
@@ -165,9 +185,7 @@ export default function GrowDetail() {
                 recent: recent.status === "ok" ? recent.items : [],
               });
               if (result === "unavailable") {
-                toast.error(
-                  "Couldn't open the export window. Check popup blockers and try again.",
-                );
+                toast.error("Couldn't open the export window. Check popup blockers and try again.");
               } else {
                 toast.success("Grow diary export opened. Choose 'Save as PDF' to save.");
               }
@@ -178,8 +196,6 @@ export default function GrowDetail() {
           </Button>
         </div>
       </header>
-
-
 
       {/* One-Tent Loop continuity card. No specific tent is "selected"
           on the grow hub, so this intentionally renders the calm safe
@@ -315,10 +331,7 @@ export default function GrowDetail() {
 
       <GrowFollowUpReviewSection growId={grow.id} />
 
-      <ActionOutcomeLearningReport
-        report={outcomes.learning}
-        status={outcomes.status}
-      />
+      <ActionOutcomeLearningReport report={outcomes.learning} status={outcomes.status} />
 
       <GrowTargetsEditor
         open={targetsEditorOpen}
@@ -329,7 +342,6 @@ export default function GrowDetail() {
     </div>
   );
 }
-
 
 function RecentOutcomesCard({ outcomes }: { outcomes: GrowOutcomesState }) {
   const { status, summary, recent } = outcomes;
@@ -376,9 +388,7 @@ function RecentOutcomesCard({ outcomes }: { outcomes: GrowOutcomesState }) {
               {o.suggested_change && (
                 <p className="text-xs mt-1 text-foreground/80">{o.suggested_change}</p>
               )}
-              {o.note && (
-                <p className="text-xs mt-1 italic text-muted-foreground">{o.note}</p>
-              )}
+              {o.note && <p className="text-xs mt-1 italic text-muted-foreground">{o.note}</p>}
               <p className="text-[10px] mt-1 text-muted-foreground">
                 Grower-recorded · Recorded after follow-up
               </p>
@@ -426,9 +436,7 @@ function OutcomeChip({
       "bg-[hsl(var(--warning))]/15 text-[hsl(var(--warning))] border-[hsl(var(--warning))]/30",
   };
   return (
-    <span
-      className={`text-[11px] px-2 py-0.5 rounded-full border font-medium ${toneMap[tone]}`}
-    >
+    <span className={`text-[11px] px-2 py-0.5 rounded-full border font-medium ${toneMap[tone]}`}>
       {label}: {count}
     </span>
   );
@@ -470,15 +478,13 @@ function HubLink({
   countLabel: string;
 }) {
   return (
-    <Link
-      to={to}
-      className="glass rounded-2xl p-4 hover:bg-secondary/20 transition-colors block"
-    >
+    <Link to={to} className="glass rounded-2xl p-4 hover:bg-secondary/20 transition-colors block">
       <div className="flex items-center gap-2 mb-1 text-sm font-semibold">
         {icon}
         {title}
         <span className="ml-auto text-xs font-normal text-muted-foreground">
-          <span data-testid={`count-${countLabel.replace(/\s+/g, "-")}`}>{formatCount(count)}</span> {countLabel}
+          <span data-testid={`count-${countLabel.replace(/\s+/g, "-")}`}>{formatCount(count)}</span>{" "}
+          {countLabel}
         </span>
       </div>
       <p className="text-xs text-muted-foreground">{description}</p>
@@ -536,9 +542,7 @@ function GrowStatusCard({ status, growId }: { status: GrowStatus; growId: string
         </div>
         <div>
           <dt className="text-muted-foreground uppercase tracking-wider text-[10px]">Last diary</dt>
-          <dd>
-            {status.lastDiaryAt ? new Date(status.lastDiaryAt).toLocaleDateString() : "—"}
-          </dd>
+          <dd>{status.lastDiaryAt ? new Date(status.lastDiaryAt).toLocaleDateString() : "—"}</dd>
         </div>
       </dl>
       <div className="flex gap-3 mt-3 text-xs">

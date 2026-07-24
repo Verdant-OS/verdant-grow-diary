@@ -109,9 +109,17 @@ describe("buildGrowRoomQuickActionLinks", () => {
     });
   });
 
-  it("Watering preselects watering event type", () => {
-    expect(byKind.watering.quickLogPrefill?.eventType).toBe("watering");
-    expect(byKind.watering.quickLogPrefill?.tentId).toBe("tent-1");
+  it("Watering uses an exact structured Water intent", () => {
+    expect(byKind.watering.quickLogPrefill).toBeUndefined();
+    expect(byKind.watering.quickLogV2Intent).toEqual({
+      targetKey: "plant:plant-1",
+      action: "water",
+    });
+    const noPlant = buildGrowRoomQuickActionLinks({ tent, plantId: null });
+    expect(noPlant.find((l) => l.kind === "watering")?.quickLogV2Intent).toEqual({
+      targetKey: "tent:tent-1",
+      action: "water",
+    });
   });
 
   it("Feeding preselects feeding event type", () => {
@@ -206,6 +214,11 @@ describe("GrowRoomMode page · quick action wiring", () => {
     expect(PAGE).toMatch(/from\s+"@\/components\/QuickLog"/);
     expect(PAGE).toMatch(/openQuickLog\(/);
     expect(PAGE).toMatch(/<QuickLog\b/);
+  });
+
+  it("dispatches Watering through the typed V2 event instead of local legacy QuickLog", () => {
+    expect(PAGE).toContain("QUICK_LOG_V2_OPEN_EVENT");
+    expect(PAGE).toContain("quickLogV2Intent");
   });
 
   it("uses pure helpers (logic outside JSX)", () => {

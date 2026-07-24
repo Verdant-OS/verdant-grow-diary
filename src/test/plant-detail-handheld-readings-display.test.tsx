@@ -161,6 +161,40 @@ describe("PlantRecentActivityPanel hardware readings rendering", () => {
     expect(screen.queryByTestId("plant-recent-activity-hardware-readings")).toBeNull();
     expect(screen.getByText("all good")).toBeTruthy();
   });
+
+  it("renders a structured activity-detail badge from stored details (training technique)", async () => {
+    renderPanel([
+      {
+        id: "e1",
+        plant_id: "p1",
+        tent_id: "t",
+        event_type: "training",
+        note: "topped above 5th node",
+        entry_at: "2026-05-23T10:00:00Z",
+        details: { technique: "topping" },
+      },
+    ]);
+    const badge = await screen.findByTestId("plant-recent-activity-detail-technique");
+    expect(badge.textContent ?? "").toMatch(/Technique/);
+    expect(badge.textContent ?? "").toMatch(/Topping/);
+    // Original prose still readable alongside the structured detail.
+    expect(screen.getByText(/topped above 5th node/)).toBeTruthy();
+  });
+
+  it("shows no detail badge when the entry has no recognized detail field", () => {
+    renderPanel([
+      {
+        id: "e1",
+        plant_id: "p1",
+        tent_id: "t",
+        event_type: "note",
+        note: "just a note",
+        entry_at: "2026-05-23T10:00:00Z",
+        details: { unrelated: "x" },
+      },
+    ]);
+    expect(screen.queryByTestId("plant-recent-activity-detail-lines")).toBeNull();
+  });
 });
 
 describe("static safety guardrails", () => {

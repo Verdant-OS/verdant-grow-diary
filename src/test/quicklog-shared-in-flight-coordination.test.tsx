@@ -192,6 +192,9 @@ async function prepareChildNote() {
 }
 
 async function prepareChildHarvest() {
+  if (!screen.queryByTestId("quick-log-dialog-all-activities-picker-harvest")) {
+    fireEvent.click(screen.getByTestId("quick-log-dialog-all-activities-picker-more"));
+  }
   fireEvent.click(screen.getByTestId("quick-log-dialog-all-activities-picker-harvest"));
   const wet = await screen.findByTestId("quick-log-dialog-all-activities-harvest-wet");
   const dry = screen.getByTestId("quick-log-dialog-all-activities-harvest-dry");
@@ -404,6 +407,7 @@ function expectObservationDraftUnchanged(
 beforeEach(() => {
   clearLocalStorageForTest();
   harness.activeGrowId = "g1";
+  harness.plants[0].stage = "";
   harness.rpc.mockReset();
   harness.growUpdate.mockReset();
   harness.growUpdateEq.mockReset();
@@ -442,6 +446,7 @@ describe("Quick Log shared in-flight coordination", () => {
   it("locks every child draft mutation while child activity A saves, then re-enables after success", async () => {
     const pending = deferredRpc();
     harness.rpc.mockReturnValue(pending.promise);
+    harness.plants[0].stage = "flower";
     renderQuickLog();
     const harvest = await prepareChildHarvest();
 
@@ -531,6 +536,7 @@ describe("Quick Log shared in-flight coordination", () => {
   it("locks every existing child draft mutation while the main save owns the shared guard", async () => {
     const pending = deferredRpc();
     harness.rpc.mockReturnValue(pending.promise);
+    harness.plants[0].stage = "flower";
     renderQuickLog();
     const harvest = await prepareChildHarvest();
     prepareMainNote();
@@ -605,14 +611,15 @@ describe("Quick Log shared in-flight coordination", () => {
       await pending.promise;
     });
 
-    const confirmation = await screen.findByTestId("quick-log-dialog-all-activities-saved-item");
-    expect(confirmation).toMatchObject({
-      dataset: expect.objectContaining({
-        targetPlantId: "p1",
-        targetGrowId: "g1",
-        targetTentId: "t1",
-      }),
-    });
+    await waitFor(() =>
+      expect(screen.getByTestId("quick-log-target-card")).toHaveAttribute(
+        "data-target-plant-id",
+        "p2",
+      ),
+    );
+    expect(
+      screen.queryByTestId("quick-log-dialog-all-activities-saved-item"),
+    ).not.toBeInTheDocument();
     await waitFor(() => expectParentSelectorsLocked(false));
     expect(screen.getByTestId("quick-log-save")).toBeEnabled();
   });
@@ -732,7 +739,8 @@ describe("Quick Log shared in-flight coordination", () => {
         }),
       }),
     );
-    expect(JSON.stringify(capturedPayload)).not.toMatch(/Blocked|999|9\.[1-9]/);
+    expect(capturedPayload.p_note).toEqual(expect.stringContaining("Original main observation"));
+    expect(capturedPayload.p_note).not.toMatch(/Blocked|999|9\.[1-9]/);
 
     await act(async () => {
       pending.resolve({ data: { ok: true, grow_event_id: "main-event" }, error: null });

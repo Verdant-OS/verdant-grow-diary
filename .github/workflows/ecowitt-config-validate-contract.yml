@@ -1,0 +1,46 @@
+name: ecowitt-config-validate-contract
+
+# Locks in the stable machine-readable error codes and JSON envelope shape
+# emitted by `scripts/ecowitt-live-soil-bridge.ts config validate`. Runs the
+# CLI against the shipped .env.example (must succeed) and against a set of
+# frozen failing env fixtures (each must exit 2 with its expected code).
+#
+# Path-filtered so unrelated PRs stay fast.
+
+on:
+  pull_request:
+    paths:
+      - "scripts/ecowitt-live-soil-bridge.ts"
+      - "scripts/ci-ecowitt-config-validate-contract.mjs"
+      - "scripts/ci-ecowitt-config-validate-dry-run.mjs"
+      - "src/lib/ecowittLiveSoilIngestRules.ts"
+      - "examples/ecowitt-bridge/**"
+      - "fixtures/ecowitt-bridge-config/**"
+      - "docs/schemas/ecowitt-soil-channel-map.schema.json"
+      - ".github/workflows/ecowitt-config-validate-contract.yml"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/ecowitt-live-soil-bridge.ts"
+      - "scripts/ci-ecowitt-config-validate-contract.mjs"
+      - "scripts/ci-ecowitt-config-validate-dry-run.mjs"
+      - "src/lib/ecowittLiveSoilIngestRules.ts"
+      - "examples/ecowitt-bridge/**"
+      - "fixtures/ecowitt-bridge-config/**"
+      - "docs/schemas/ecowitt-soil-channel-map.schema.json"
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install deps
+        run: bun install --frozen-lockfile
+      - name: Run config validate contract
+        run: node scripts/ci-ecowitt-config-validate-contract.mjs
+      - name: Run config validate --dry-run contract (example envs)
+        run: node scripts/ci-ecowitt-config-validate-dry-run.mjs

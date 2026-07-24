@@ -18,8 +18,10 @@ describe("Dashboard VPD stage-missing info badge", () => {
   });
 
   it("computes vpdStageMissing from current VPD value and unknown-normalized stage", () => {
+    // Live audit #14: the stage is the shared resolveAlertContextStage
+    // output (grow row + the grow's tents), not raw scopedGrow?.stage.
     expect(SRC).toMatch(
-      /vpdStageMissing\s*=\s*\n?\s*snap\?\.vpd\s*!=\s*null\s*&&\s*normalizeVpdStage\(scopedGrow\?\.stage\)\s*===\s*"unknown"/,
+      /vpdStageMissing\s*=\s*\n?\s*snap\?\.vpd\s*!=\s*null\s*&&\s*normalizeVpdStage\(alertContextStage\)\s*===\s*"unknown"/,
     );
   });
 

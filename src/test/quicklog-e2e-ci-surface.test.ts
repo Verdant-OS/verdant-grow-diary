@@ -139,6 +139,8 @@ describe("Quick Log Playwright CI surface", () => {
     const expected = [
       "e2e/results/quicklog-smoke-report.json",
       "e2e/results/quicklog-smoke-report.txt",
+      "e2e/results/playwright-report.json",
+      "e2e/results/playwright-flake-summary.md",
       "playwright-report/",
       "test-results/",
     ];
@@ -227,6 +229,8 @@ describe("Quick Log Playwright CI surface", () => {
       "quicklog-smoke-artifacts",
       "e2e/results/quicklog-smoke-report.json",
       "e2e/results/quicklog-smoke-report.txt",
+      "e2e/results/playwright-report.json",
+      "e2e/results/playwright-flake-summary.md",
       "playwright-report/",
       "test-results/",
       "30 days",
@@ -736,6 +740,8 @@ describe("Quick Log Playwright CI surface", () => {
     expect(paths).toEqual([
       "e2e/results/quicklog-smoke-report.json",
       "e2e/results/quicklog-smoke-report.txt",
+      "e2e/results/playwright-report.json",
+      "e2e/results/playwright-flake-summary.md",
       "playwright-report/",
       "test-results/",
     ]);

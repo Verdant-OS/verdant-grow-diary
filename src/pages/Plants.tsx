@@ -43,6 +43,7 @@ import {
   isArchivedPlant,
   isMergedPlant,
 } from "@/lib/archivedPlantVisibilityRules";
+import { buildTentGrowIndex } from "@/lib/growAttributionRules";
 import {
   buildGrowFilterOptions,
   filterPlantsByGrow,
@@ -207,17 +208,26 @@ export default function Plants() {
     return map;
   }, [allPlants, tents, rawReadings, rawDiary, urlGrowId, dailyCheckEvidenceReady]);
 
+  // Tent → grow rollup index (BUG-A): resolves a plant's grow through its
+  // tent when the plant's own grow_id is null, so tent-owned plants count
+  // under their grow instead of "Unassigned". Built from the tents the page
+  // already loads for chips.
+  const tentGrowById = useMemo(
+    () => buildTentGrowIndex(tents.map((t) => ({ id: t.id, growId: t.growId ?? null }))),
+    [tents],
+  );
+
   // Grow filter — sourced from the workspace grows list + active plants.
   const growFilterOptions = useMemo(
-    () => buildGrowFilterOptions(grows, allGrowsActivePlants),
-    [grows, allGrowsActivePlants],
+    () => buildGrowFilterOptions(grows, allGrowsActivePlants, tentGrowById),
+    [grows, allGrowsActivePlants, tentGrowById],
   );
 
   // Grow scope: real grows are scoped server-side via urlGrowId; the
   // unassigned bucket is display-side only, so it is applied here before
   // every consumer (chips, grid, summary) reads the list.
   const growScopedPlants = showUnassignedOnly
-    ? filterPlantsByGrow(allPlants, UNASSIGNED_GROW_FILTER_ID)
+    ? filterPlantsByGrow(allPlants, UNASSIGNED_GROW_FILTER_ID, tentGrowById)
     : allPlants;
 
   const hasArchived = shouldShowArchivedToggle(growScopedPlants);

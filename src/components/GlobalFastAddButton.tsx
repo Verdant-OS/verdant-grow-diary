@@ -86,12 +86,13 @@ export default function GlobalFastAddButton({
         setOpen(false);
         return;
       }
-      // open-quicklog — dispatch the existing wired window event.
+      const detail = intent.kind === "open-quicklog-v2" ? intent.detail : intent.prefill;
+      // Logging handoff only. The destination form still owns explicit save.
       if (onDispatchEvent) {
-        onDispatchEvent(intent.eventName, intent.prefill);
+        onDispatchEvent(intent.eventName, detail);
       } else if (typeof window !== "undefined") {
         window.dispatchEvent(
-          new CustomEvent(intent.eventName, { detail: intent.prefill }),
+          new CustomEvent(intent.eventName, { detail }),
         );
       }
       setOpen(false);
@@ -158,7 +159,7 @@ export default function GlobalFastAddButton({
               HyperLog · demo
             </p>
             <div className="grid grid-cols-2 gap-1">
-              {(["water", "feed", "defoliate", "note", "environment"] as HyperLogAction[]).map((a) => (
+              {(["feed", "defoliate", "note", "environment"] as HyperLogAction[]).map((a) => (
                 <button
                   key={a}
                   type="button"

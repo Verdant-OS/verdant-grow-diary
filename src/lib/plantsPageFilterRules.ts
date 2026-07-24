@@ -11,7 +11,17 @@
  *
  * Read-only UI rules. No I/O, no writes, no device control, no privileged
  * access. Safe to use anywhere in the client.
+ *
+ * Grow attribution (BUG-A): when a `tentGrowById` index is supplied, a
+ * plant's grow resolves through growAttributionRules (own grow_id first,
+ * else the tent's grow_id) so plants under a grow's tents count under that
+ * grow instead of vanishing into "Unassigned". Without the index the legacy
+ * own-grow_id-only behavior is preserved.
  */
+import {
+  isGrowUnassigned,
+  resolvePlantGrowId,
+} from "@/lib/growAttributionRules";
 
 /**
  * Sentinel id for the "Unassigned" grow filter option. plants.grow_id is
@@ -75,9 +85,14 @@ function isInactive(p: MinimalPlant): boolean {
 /**
  * True when the plant belongs to no grow. The adapter maps a null grow_id
  * to null, but "" is treated the same defensively (tent ids map that way).
+ * With a tent index, a plant whose tent belongs to a grow is NOT unassigned
+ * (isGrowUnassigned); without one this reduces to the legacy !growId check.
  */
-function isUnassignedToGrow(p: MinimalPlant): boolean {
-  return !p.growId;
+function isUnassignedToGrow(
+  p: MinimalPlant,
+  tentGrowById?: ReadonlyMap<string, string | null>,
+): boolean {
+  return isGrowUnassigned(p, tentGrowById);
 }
 
 function pluralPlants(n: number): string {
@@ -94,16 +109,23 @@ function pluralPlants(n: number): string {
  * "Unassigned" option is appended under UNASSIGNED_GROW_FILTER_ID so the
  * per-option counts always sum to the "All grows" total. No unassigned
  * plants → no option.
+ *
+ * `tentGrowById` (optional) resolves attribution through the plant's tent
+ * (BUG-A): a plant with a null grow_id in a grow-owned tent counts under
+ * that grow, not "Unassigned". Omitted → legacy own-grow_id behavior.
  */
 export function buildGrowFilterOptions(
   grows: ReadonlyArray<MinimalGrow>,
   plants: ReadonlyArray<MinimalPlant>,
+  tentGrowById?: ReadonlyMap<string, string | null>,
 ): PlantsPageGrowOption[] {
   const activePlants = plants.filter((p) => !isInactive(p));
   const totalActive = activePlants.length;
 
   const perGrow: PlantsPageGrowOption[] = grows.map((g) => {
-    const count = activePlants.filter((p) => p.growId === g.id).length;
+    const count = activePlants.filter(
+      (p) => resolvePlantGrowId(p, tentGrowById) === g.id,
+    ).length;
     const name = g.name ?? "Untitled grow";
     return {
       id: g.id,
@@ -113,7 +135,9 @@ export function buildGrowFilterOptions(
     };
   });
 
-  const unassignedCount = activePlants.filter(isUnassignedToGrow).length;
+  const unassignedCount = activePlants.filter((p) =>
+    isUnassignedToGrow(p, tentGrowById),
+  ).length;
   const unassigned: PlantsPageGrowOption[] =
     unassignedCount > 0
       ? [
@@ -142,16 +166,21 @@ export function buildGrowFilterOptions(
  * Filter plants to those belonging to the selected grow. A null/empty
  * selectedGrowId means "All grows" — return the input untouched. The
  * UNASSIGNED_GROW_FILTER_ID sentinel selects plants with no grow at all.
+ *
+ * `tentGrowById` (optional) resolves attribution through the plant's tent
+ * (BUG-A) so tent-rollup plants match their resolved grow and leave the
+ * Unassigned bucket. Omitted → legacy own-grow_id behavior.
  */
 export function filterPlantsByGrow<T extends MinimalPlant>(
   plants: ReadonlyArray<T>,
   selectedGrowId: string | null,
+  tentGrowById?: ReadonlyMap<string, string | null>,
 ): T[] {
   if (!selectedGrowId) return [...plants];
   if (selectedGrowId === UNASSIGNED_GROW_FILTER_ID) {
-    return plants.filter(isUnassignedToGrow);
+    return plants.filter((p) => isUnassignedToGrow(p, tentGrowById));
   }
-  return plants.filter((p) => p.growId === selectedGrowId);
+  return plants.filter((p) => resolvePlantGrowId(p, tentGrowById) === selectedGrowId);
 }
 
 /**

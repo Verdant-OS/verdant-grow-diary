@@ -38,13 +38,21 @@ function StatusPill({ status }: { status: PaddleProcessingAuditStatus }) {
     failed: "border-destructive/40 bg-destructive/10 text-destructive",
   };
   return (
-    <span className={`inline-flex rounded-md border px-2 py-0.5 text-xs font-semibold ${cls[status]}`}>
+    <span
+      className={`inline-flex rounded-md border px-2 py-0.5 text-xs font-semibold ${cls[status]}`}
+    >
       {formatPaddleProcessingStatus(status)}
     </span>
   );
 }
 
-function LinkStatusPill({ status, label }: { status: BillingCustomerLinkAuditStatus; label: string }) {
+function LinkStatusPill({
+  status,
+  label,
+}: {
+  status: BillingCustomerLinkAuditStatus;
+  label: string;
+}) {
   const cls: Record<BillingCustomerLinkAuditStatus, string> = {
     linked: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
     pending_review: "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300",
@@ -52,7 +60,9 @@ function LinkStatusPill({ status, label }: { status: BillingCustomerLinkAuditSta
     inactive: "border-slate-500/40 bg-slate-500/10 text-slate-700 dark:text-slate-300",
   };
   return (
-    <span className={`inline-flex rounded-md border px-2 py-0.5 text-xs font-semibold ${cls[status]}`}>
+    <span
+      className={`inline-flex rounded-md border px-2 py-0.5 text-xs font-semibold ${cls[status]}`}
+    >
       {label}
     </span>
   );
@@ -107,7 +117,7 @@ export default function OperatorPaddleProcessingAudit() {
   const isRefreshing = auditQuery.isFetching || linkAuditQuery.isFetching;
 
   return (
-    <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-4 md:p-6">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-4 md:p-6">
       <section className="space-y-2">
         <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           Operator audit
@@ -118,9 +128,9 @@ export default function OperatorPaddleProcessingAudit() {
               Paddle processing audit
             </h1>
             <p className="max-w-3xl text-sm text-muted-foreground">
-              Read-only view of verified Paddle event processing and billing link capture. This surface shows
-              sanitized state only: no raw payload, no provider customer IDs, no subscription IDs, and no
-              entitlement writes.
+              Read-only view of verified Paddle event processing and billing link capture. This
+              surface shows sanitized state only: no raw payload, no provider customer IDs, no
+              subscription IDs, and no entitlement writes.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -130,9 +140,7 @@ export default function OperatorPaddleProcessingAudit() {
               </Link>
             </Button>
             <Button asChild type="button" variant="outline">
-              <Link to="/operator/billing-entitlement-resolution">
-                View entitlement resolution
-              </Link>
+              <Link to="/operator/billing-entitlement-resolution">View entitlement resolution</Link>
             </Button>
             <Button
               type="button"
@@ -151,7 +159,9 @@ export default function OperatorPaddleProcessingAudit() {
 
       {role.status === "loading" && (
         <Card>
-          <CardContent className="p-6 text-sm text-muted-foreground">Checking operator access…</CardContent>
+          <CardContent className="p-6 text-sm text-muted-foreground">
+            Checking operator access…
+          </CardContent>
         </Card>
       )}
 
@@ -159,7 +169,9 @@ export default function OperatorPaddleProcessingAudit() {
         <Card>
           <CardHeader>
             <CardTitle>Sign in required</CardTitle>
-            <CardDescription>Operator audit views require an authenticated operator session.</CardDescription>
+            <CardDescription>
+              Operator audit views require an authenticated operator session.
+            </CardDescription>
           </CardHeader>
         </Card>
       )}
@@ -169,7 +181,8 @@ export default function OperatorPaddleProcessingAudit() {
           <CardHeader>
             <CardTitle>Operator access required</CardTitle>
             <CardDescription>
-              This audit surface is hidden from non-operator accounts. No processing or link data was requested.
+              This audit surface is hidden from non-operator accounts. No processing or link data
+              was requested.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -207,7 +220,9 @@ export default function OperatorPaddleProcessingAudit() {
         <Card>
           <CardHeader>
             <CardTitle>Processing audit unavailable</CardTitle>
-            <CardDescription>{audit.reasonLabel ?? "Operator audit is not available."}</CardDescription>
+            <CardDescription>
+              {audit.reasonLabel ?? "Operator audit is not available."}
+            </CardDescription>
           </CardHeader>
         </Card>
       )}
@@ -216,7 +231,9 @@ export default function OperatorPaddleProcessingAudit() {
         <Card>
           <CardHeader>
             <CardTitle>Link audit unavailable</CardTitle>
-            <CardDescription>{linkAudit.reasonLabel ?? "Operator link audit is not available."}</CardDescription>
+            <CardDescription>
+              {linkAudit.reasonLabel ?? "Operator link audit is not available."}
+            </CardDescription>
           </CardHeader>
         </Card>
       )}
@@ -226,7 +243,8 @@ export default function OperatorPaddleProcessingAudit() {
           <div>
             <h2 className="text-xl font-semibold tracking-tight">Billing link capture</h2>
             <p className="text-sm text-muted-foreground">
-              Sanitized visibility into Paddle customer-link attribution. Raw provider identifiers are hidden.
+              Sanitized visibility into Paddle customer-link attribution. Raw provider identifiers
+              are hidden.
             </p>
           </div>
           <section className="grid gap-3 md:grid-cols-4" aria-label="Billing link counts">
@@ -235,7 +253,10 @@ export default function OperatorPaddleProcessingAudit() {
             <CountCard label="Pending review" value={linkAudit.counts.pendingReview} />
             <CountCard label="Blocked" value={linkAudit.counts.blocked} />
           </section>
-          <section className="grid gap-3 md:grid-cols-3" aria-label="Billing link confidence counts">
+          <section
+            className="grid gap-3 md:grid-cols-3"
+            aria-label="Billing link confidence counts"
+          >
             <CountCard label="Verified confidence" value={linkAudit.counts.verified} />
             <CountCard label="Review required" value={linkAudit.counts.reviewRequired} />
             <CountCard label="Blocked confidence" value={linkAudit.counts.blockedConfidence} />
@@ -245,8 +266,9 @@ export default function OperatorPaddleProcessingAudit() {
             <CardHeader>
               <CardTitle>Latest link rows</CardTitle>
               <CardDescription>
-                Showing up to {linkAudit.limit || ROW_LIMIT} sanitized rows. Provider IDs, customer IDs,
-                subscription IDs, checkout IDs, and event references are represented only as presence flags.
+                Showing up to {linkAudit.limit || ROW_LIMIT} sanitized rows. Provider IDs, customer
+                IDs, subscription IDs, checkout IDs, and event references are represented only as
+                presence flags.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -269,7 +291,10 @@ export default function OperatorPaddleProcessingAudit() {
                     </thead>
                     <tbody>
                       {linkAudit.latest.map((row, index) => (
-                        <tr key={`${row.createdAt ?? "link"}-${index}`} className="border-b last:border-0">
+                        <tr
+                          key={`${row.createdAt ?? "link"}-${index}`}
+                          className="border-b last:border-0"
+                        >
                           <td className="py-3 pr-3 font-mono text-xs text-muted-foreground">
                             {row.createdAt ?? "—"}
                           </td>
@@ -280,7 +305,10 @@ export default function OperatorPaddleProcessingAudit() {
                           <td className="py-3 pr-3">{row.linkSourceLabel}</td>
                           <td className="py-3 pr-3">{row.confidenceLabel}</td>
                           <td className="py-3 pr-3 text-xs text-muted-foreground">
-                            customer: {row.hasCustomerId ? "yes" : "no"} · subscription: {row.hasSubscriptionId ? "yes" : "no"} · checkout: {row.hasCheckoutId ? "yes" : "no"} · event: {row.hasEventReference ? "yes" : "no"}
+                            customer: {row.hasCustomerId ? "yes" : "no"} · subscription:{" "}
+                            {row.hasSubscriptionId ? "yes" : "no"} · checkout:{" "}
+                            {row.hasCheckoutId ? "yes" : "no"} · event:{" "}
+                            {row.hasEventReference ? "yes" : "no"}
                           </td>
                         </tr>
                       ))}
@@ -313,8 +341,8 @@ export default function OperatorPaddleProcessingAudit() {
             <CardHeader>
               <CardTitle>Latest processing rows</CardTitle>
               <CardDescription>
-                Showing up to {audit.limit || ROW_LIMIT} sanitized rows. Event IDs, provider IDs, details JSON,
-                and raw payload are intentionally hidden.
+                Showing up to {audit.limit || ROW_LIMIT} sanitized rows. Event IDs, provider IDs,
+                details JSON, and raw payload are intentionally hidden.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -338,7 +366,10 @@ export default function OperatorPaddleProcessingAudit() {
                     </thead>
                     <tbody>
                       {audit.latest.map((row, index) => (
-                        <tr key={`${row.processedAt ?? "row"}-${index}`} className="border-b last:border-0">
+                        <tr
+                          key={`${row.processedAt ?? "row"}-${index}`}
+                          className="border-b last:border-0"
+                        >
                           <td className="py-3 pr-3 font-mono text-xs text-muted-foreground">
                             {row.processedAt ?? "—"}
                           </td>
@@ -346,11 +377,15 @@ export default function OperatorPaddleProcessingAudit() {
                             <div>{row.eventType}</div>
                             <div className="text-muted-foreground">{row.environment}</div>
                           </td>
-                          <td className="py-3 pr-3"><StatusPill status={row.status} /></td>
+                          <td className="py-3 pr-3">
+                            <StatusPill status={row.status} />
+                          </td>
                           <td className="max-w-[260px] py-3 pr-3 text-muted-foreground">
                             {row.reasonLabel}
                           </td>
-                          <td className="py-3 pr-3">{formatPaddleProcessingPlan(row.candidatePlanId)}</td>
+                          <td className="py-3 pr-3">
+                            {formatPaddleProcessingPlan(row.candidatePlanId)}
+                          </td>
                           <td className="py-3 pr-3">{row.candidateStatus ?? "—"}</td>
                           <td className="py-3 pr-3 text-xs text-muted-foreground">
                             {row.isFounderCandidate ? "Founder candidate" : "—"}
@@ -366,6 +401,6 @@ export default function OperatorPaddleProcessingAudit() {
           </Card>
         </section>
       )}
-    </main>
+    </div>
   );
 }

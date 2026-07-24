@@ -1,11 +1,12 @@
 /**
- * End-to-end-ish user-flow tests for each HyperLog tile.
+ * End-to-end-ish user-flow tests for each supported HyperLog tile.
  *
  * Mounts GlobalFastAddButton + a stub Quick Log listener and verifies
  * that clicking each HyperLog tile + Commit fires the existing
  * `verdant:open-quicklog` event with the correct prefill shape.
  *
  * Hard assertions:
+ *  - Water is absent from HyperLog so it cannot reach the legacy handoff
  *  - existing event name used (no new write path)
  *  - eventType mapping is correct per tile
  *  - HyperLog demo snapshot values (24.6 / 58 / 1.12) never appear
@@ -55,12 +56,14 @@ function openTileAndCommit(tile: string) {
 }
 
 describe("HyperLog tile → Quick Log handoff e2e", () => {
-  it("water tile maps to eventType=watering and uses the existing event", () => {
-    openTileAndCommit("water");
-    expect(captured).toHaveLength(1);
-    expect(captured[0].name).toBe("verdant:open-quicklog");
-    expect(captured[0].detail.eventType).toBe("watering");
-    expect(captured[0].detail.source).toBe("hyperlog");
+  it("does not expose a HyperLog water tile", () => {
+    render(
+      <MemoryRouter initialEntries={["/plants/p-77"]}>
+        <GlobalFastAddButton />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByTestId("global-fast-add-trigger"));
+    expect(screen.queryByTestId("global-fast-add-hyperlog-water")).toBeNull();
   });
 
   it("feed tile maps to eventType=feeding", () => {
@@ -84,7 +87,7 @@ describe("HyperLog tile → Quick Log handoff e2e", () => {
   });
 
   it("never carries HyperLog demo snapshot values (24.6 / 58 / 1.12) and never labels live", () => {
-    openTileAndCommit("water");
+    openTileAndCommit("feed");
     const json = JSON.stringify(captured[0].detail);
     expect(json).not.toMatch(/24\.6/);
     expect(json).not.toMatch(/1\.12/);

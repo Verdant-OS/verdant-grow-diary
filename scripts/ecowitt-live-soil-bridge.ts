@@ -265,6 +265,47 @@ export interface ConfigValidateResult {
   ok: boolean;
   code?: string;
   message?: string;
+  /** Present only when includeFixHints is true. Concise operator remedy. */
+  fix?: string;
+}
+
+/**
+ * Stable map from machine-readable error code → concise, human-readable
+ * remedy. Kept in this file (not localized, not templated) so that
+ * automation can also load and display them without pulling in the
+ * runtime. Codes must never be renamed; new codes may be added.
+ * See docs/ecowitt-bridge-startup-validation.md for the full catalog.
+ */
+export const CONFIG_ERROR_FIX_HINTS: Record<string, string> = {
+  missing_tent_id:
+    "Set VERDANT_TENT_ID=<tent-uuid> in your .env (copy the UUID from Verdant → Settings → Tents).",
+  invalid_tent_id:
+    "VERDANT_TENT_ID must be a full 8-4-4-4-12 UUID. Paste it exactly as shown in Verdant, no braces or quotes.",
+  invalid_channel_map_schema:
+    "ECOWITT_SOIL_CHANNEL_MAP_JSON must match docs/schemas/ecowitt-soil-channel-map.schema.json. Keys look like soilmoisture1..soilmoisture99 and every entry needs a UUID tent_id.",
+  mixed_tent_channel_map:
+    "One bridge process = one tent. Split channels across separate .env files (and separate bridge processes) so every tent_id in the map is identical.",
+  channel_map_tent_mismatch:
+    "Every channel's tent_id in ECOWITT_SOIL_CHANNEL_MAP_JSON must equal VERDANT_TENT_ID. Update one side so they match.",
+  missing_ingest_url:
+    "Set VERDANT_INGEST_URL to your project's sensor-ingest-webhook URL, or pass --dry-run for offline testing.",
+  missing_bridge_token:
+    "Mint a bridge token in Verdant → Settings → Bridge Tokens (scoped to this tent) and set VERDANT_BRIDGE_TOKEN=vbt_… . Never commit it.",
+  mqtt_package_missing:
+    "Install the mqtt client in the environment running the bridge: `bun add mqtt` (or `npm i mqtt`).",
+  channel_map_parse_error:
+    "ECOWITT_SOIL_CHANNEL_MAP_JSON could not be parsed. Ensure it is single-line valid JSON with no trailing commas, then re-run `config validate`.",
+};
+
+export function fixHintForCode(code: string): string {
+  return (
+    CONFIG_ERROR_FIX_HINTS[code] ??
+    "See docs/ecowitt-bridge-startup-validation.md for the full error catalog and remedies."
+  );
+}
+
+export interface ConfigValidateOptions {
+  includeFixHints?: boolean;
 }
 
 /**
@@ -276,13 +317,18 @@ export interface ConfigValidateResult {
  */
 export function runConfigValidate(
   env: NodeJS.ProcessEnv,
+  options: ConfigValidateOptions = {},
 ): ConfigValidateResult {
+  const withHint = (r: ConfigValidateResult): ConfigValidateResult => {
+    if (!options.includeFixHints || r.ok || !r.code) return r;
+    return { ...r, fix: fixHintForCode(r.code) };
+  };
   const tentId = (env.VERDANT_TENT_ID ?? "").trim();
   if (!tentId) {
-    return { ok: false, code: "missing_tent_id", message: "missing VERDANT_TENT_ID" };
+    return withHint({ ok: false, code: "missing_tent_id", message: "missing VERDANT_TENT_ID" });
   }
   if (!UUID_RE.test(tentId)) {
-    return { ok: false, code: "invalid_tent_id", message: "VERDANT_TENT_ID must be a UUID" };
+    return withHint({ ok: false, code: "invalid_tent_id", message: "VERDANT_TENT_ID must be a UUID" });
   }
   const rawMap = env.ECOWITT_SOIL_CHANNEL_MAP_JSON ?? null;
   try {
@@ -291,33 +337,42 @@ export function runConfigValidate(
     assertSingleTentSoilChannelMap(channelMap, tentId);
   } catch (e) {
     if (e instanceof EcowittBridgeConfigError) {
-      return { ok: false, code: e.code, message: e.message };
+      return withHint({ ok: false, code: e.code, message: e.message });
     }
-    return {
+    return withHint({
       ok: false,
       code: "channel_map_parse_error",
       message: (e as Error)?.message ?? "channel map parse error",
-    };
+    });
   }
   return { ok: true };
 }
 
 async function runCli(): Promise<void> {
-  const emitConfigError = (code: string, message: string): void => {
+  const emitConfigError = (code: string, message: string, fix?: string): void => {
     // eslint-disable-next-line no-console
     console.error(
-      `[ecowitt-bridge] config_error code=${code} message=${JSON.stringify(message)}`,
+      `[ecowitt-bridge] config_error code=${code} message=${JSON.stringify(message)}${
+        fix ? ` fix=${JSON.stringify(fix)}` : ""
+      }`,
     );
     // eslint-disable-next-line no-console
-    console.error(JSON.stringify({ event: "config_error", code, message }));
+    console.error(
+      JSON.stringify(
+        fix
+          ? { event: "config_error", code, message, fix }
+          : { event: "config_error", code, message },
+      ),
+    );
   };
 
-  // ---- `config validate` subcommand ----
+  // ---- `config validate [--fix-hints]` subcommand ----
   // Runs the same assertions used at startup, exits 0 on success or 2
   // with a machine-readable error line on failure. Never imports mqtt.
   const argv = process.argv.slice(2);
   if (argv[0] === "config" && argv[1] === "validate") {
-    const res = runConfigValidate(process.env);
+    const includeFixHints = argv.slice(2).includes("--fix-hints");
+    const res = runConfigValidate(process.env, { includeFixHints });
     if (res.ok) {
       // eslint-disable-next-line no-console
       console.log(
@@ -326,10 +381,11 @@ async function runCli(): Promise<void> {
       process.exit(0);
       return;
     }
-    emitConfigError(res.code!, res.message!);
+    emitConfigError(res.code!, res.message!, res.fix);
     process.exit(2);
     return;
   }
+
 
   const env = readBridgeEnv(process.env, process.argv);
   const log = (level: "info" | "warn" | "error", msg: string, extra?: unknown) => {

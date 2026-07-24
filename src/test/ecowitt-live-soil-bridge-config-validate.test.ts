@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { spawnSync } from "node:child_process";
 import {
+  buildConfigDebugEnvelope,
   CONFIG_ERROR_FIX_HINTS,
   renderErrorCatalog,
   runConfigValidate,

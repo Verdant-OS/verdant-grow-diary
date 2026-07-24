@@ -1,13 +1,20 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import CultivarsIndex from "@/pages/CultivarsIndex";
 
 function renderIndex(entry = "/cultivars") {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+
   return render(
-    <MemoryRouter initialEntries={[entry]}>
-      <CultivarsIndex />
-    </MemoryRouter>,
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={[entry]}>
+        <CultivarsIndex />
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 
@@ -16,7 +23,9 @@ afterEach(cleanup);
 describe("Strain Reference Library V1 index", () => {
   it("shows the sample-data boundary and all ten profiles", () => {
     renderIndex();
-    expect(screen.getByRole("heading", { name: /source-backed cultivar profiles/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: /source-backed cultivar profiles/i }),
+    ).toBeInTheDocument();
     expect(screen.getByTestId("cultivar-sample-banner")).toHaveTextContent(
       /sample reference data/i,
     );

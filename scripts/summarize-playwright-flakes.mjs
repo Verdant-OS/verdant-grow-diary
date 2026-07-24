@@ -434,17 +434,25 @@ async function main() {
   }
 
   if (args.prCommentPath) {
-    const prBody = buildPrComment(report, {
-      tracesUrl: args.tracesUrl,
-      mediaUrl: args.mediaUrl,
-      reportUrl: args.reportUrl,
-      bundleUrl: args.bundleUrl,
-      runUrl: args.runUrl,
-    });
-    const prAbs = resolve(process.cwd(), args.prCommentPath);
-    mkdirSync(dirname(prAbs), { recursive: true });
-    writeFileSync(prAbs, `${prBody}\n`, "utf8");
+    const failedCount = counts.failed ?? 0;
+    if (args.quietWhenNoFailed && failedCount === 0) {
+      process.stderr.write(
+        `summarize-playwright-flakes: --quiet-when-no-failed set and failed=0 (flaky=${counts.flaky ?? 0}); skipping PR comment write to ${args.prCommentPath}\n`,
+      );
+    } else {
+      const prBody = buildPrComment(report, {
+        tracesUrl: args.tracesUrl,
+        mediaUrl: args.mediaUrl,
+        reportUrl: args.reportUrl,
+        bundleUrl: args.bundleUrl,
+        runUrl: args.runUrl,
+      });
+      const prAbs = resolve(process.cwd(), args.prCommentPath);
+      mkdirSync(dirname(prAbs), { recursive: true });
+      writeFileSync(prAbs, `${prBody}\n`, "utf8");
+    }
   }
+
 
   const stepSummary = process.env.GITHUB_STEP_SUMMARY;
   if (stepSummary) {

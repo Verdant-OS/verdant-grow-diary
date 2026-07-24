@@ -19,6 +19,7 @@ import {
   forwardWithBackoff,
   readBridgeEnv,
   shouldCompleteOnceBridge,
+  assertBridgeStartupSafe,
 } from "../../scripts/ecowitt-live-soil-bridge";
 
 const TENT = "11111111-1111-1111-1111-111111111111";

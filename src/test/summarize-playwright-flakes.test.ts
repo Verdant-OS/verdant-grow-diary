@@ -3,7 +3,13 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it, expect } from "vitest";
-import { buildSummary, classifyTest, buildPrComment, buildTraceabilityHeader } from "../../scripts/summarize-playwright-flakes.mjs";
+import {
+  buildSummary,
+  classifyTest,
+  buildPrComment,
+  buildTraceabilityHeader,
+  testKey,
+} from "../../scripts/summarize-playwright-flakes.mjs";
 
 const flakyReport = {
   suites: [
@@ -22,9 +28,21 @@ const flakyReport = {
                   retry: 0,
                   status: "failed",
                   attachments: [
-                    { name: "trace", contentType: "application/zip", path: "test-results/quicklog-watering-chromium-authed/trace.zip" },
-                    { name: "screenshot", contentType: "image/png", path: "test-results/quicklog-watering-chromium-authed/test-failed-1.png" },
-                    { name: "video", contentType: "video/webm", path: "test-results/quicklog-watering-chromium-authed/video.webm" },
+                    {
+                      name: "trace",
+                      contentType: "application/zip",
+                      path: "test-results/quicklog-watering-chromium-authed/trace.zip",
+                    },
+                    {
+                      name: "screenshot",
+                      contentType: "image/png",
+                      path: "test-results/quicklog-watering-chromium-authed/test-failed-1.png",
+                    },
+                    {
+                      name: "video",
+                      contentType: "video/webm",
+                      path: "test-results/quicklog-watering-chromium-authed/video.webm",
+                    },
                   ],
                 },
                 { retry: 1, status: "passed", attachments: [] },
@@ -142,7 +160,9 @@ describe("summarize-playwright-flakes", () => {
         {
           retry: 0,
           status: "failed",
-          attachments: [{ name: "trace", contentType: "application/zip", path: "test-results/a/trace.zip" }],
+          attachments: [
+            { name: "trace", contentType: "application/zip", path: "test-results/a/trace.zip" },
+          ],
         },
         { retry: 1, status: "passed", attachments: [{ name: "should-not-appear", path: "nope" }] },
       ],
@@ -263,7 +283,88 @@ describe("buildPrComment", () => {
       ],
     };
     const body = buildPrComment(clean, {});
-    expect(body).toContain("_No failed or flaky tests in this run — no per-attempt artifacts to link._");
+    expect(body).toContain(
+      "_No failed or flaky tests in this run — no per-attempt artifacts to link._",
+    );
+  });
+
+  it("emits a copy-pasteable playwright show-trace command under each trace attachment", () => {
+    const body = buildPrComment(flakyReport, {});
+    // path.relative uses the OS separator (backslash on Windows, forward
+    // slash in real CI on ubuntu-latest) — accept either.
+    expect(body).toMatch(
+      /bunx playwright show-trace "test-results[\\/]quicklog-watering-chromium-authed[\\/]trace\.zip"/,
+    );
+    // Screenshots/videos are not traces — no show-trace command for those.
+    const videoLineIdx = body.indexOf("video.webm");
+    const nextShowTraceIdx = body.indexOf("show-trace", videoLineIdx);
+    expect(nextShowTraceIdx === -1 || nextShowTraceIdx < videoLineIdx).toBe(true);
+  });
+
+  it("never emits a show-trace command when a run has no trace attachments (e.g. real-auth runs with tracing off)", () => {
+    const noTraceReport = {
+      suites: [
+        {
+          file: "e2e/quicklog.spec.ts",
+          specs: [
+            {
+              title: "logs a watering event",
+              tests: [
+                {
+                  projectName: "chromium-authed",
+                  status: "failed",
+                  results: [
+                    {
+                      retry: 0,
+                      status: "failed",
+                      attachments: [
+                        {
+                          name: "video",
+                          contentType: "video/webm",
+                          path: "test-results/a/video.webm",
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const body = buildPrComment(noTraceReport, {});
+    expect(body).not.toContain("show-trace");
+  });
+
+  it("links each test to its own dedicated artifact when perTestArtifacts has an entry for it", () => {
+    const flakyTest = classifyTest({
+      file: "e2e/quicklog.spec.ts",
+      title: "logs a watering event",
+      line: 12,
+      projectName: "chromium-authed",
+      status: "passed",
+      results: [
+        { retry: 0, status: "failed", attachments: [] },
+        { retry: 1, status: "passed", attachments: [] },
+      ],
+    });
+    const body = buildPrComment(flakyReport, {
+      perTestArtifacts: {
+        [testKey(flakyTest)]: {
+          name: "quicklog-pw-test-logs-a-watering-event-abc12345",
+          url: "https://github.com/o/r/actions/runs/1/artifacts/999",
+        },
+      },
+    });
+    expect(body).toContain("Download this test's artifacts");
+    expect(body).toContain("actions/runs/1/artifacts/999");
+    expect(body).toContain("quicklog-pw-test-logs-a-watering-event-abc12345");
+  });
+
+  it("omits the per-test artifact link when no entry exists for that test (backward compatible)", () => {
+    const body = buildPrComment(flakyReport, {});
+    expect(body).not.toContain("Download this test's artifacts");
   });
 });
 
@@ -314,7 +415,6 @@ describe("summarize-playwright-flakes CLI --min-failed gate", () => {
       },
     ],
   };
-
 
   const runCli = (report: unknown, minFailed: number) => {
     const dir = mkdtempSync(join(tmpdir(), "pw-flakes-"));
@@ -390,6 +490,93 @@ describe("summarize-playwright-flakes CLI --min-failed gate", () => {
     expect(summary).toContain("PR comment suppressed by `--min-failed=1`");
     rmSync(dir, { recursive: true, force: true });
   });
+
+  it("wires --per-test-artifacts into the comment body when the map file exists", () => {
+    const dir = mkdtempSync(join(tmpdir(), "pw-flakes-"));
+    const reportPath = join(dir, "report.json");
+    const commentPath = join(dir, "pr-comment.md");
+    const mapPath = join(dir, "per-test-artifacts.json");
+    writeFileSync(reportPath, JSON.stringify(hardFailedReport), "utf8");
+    writeFileSync(
+      mapPath,
+      JSON.stringify({
+        "e2e/quicklog.spec.ts::chromium-authed::12::logs a watering event": {
+          name: "quicklog-pw-test-abc",
+          url: "https://github.com/o/r/actions/runs/1/artifacts/42",
+        },
+      }),
+      "utf8",
+    );
+    execFileSync(
+      process.execPath,
+      [
+        "scripts/summarize-playwright-flakes.mjs",
+        `--report=${reportPath}`,
+        `--pr-comment=${commentPath}`,
+        `--per-test-artifacts=${mapPath}`,
+        "--min-failed=1",
+      ],
+      { stdio: "ignore" },
+    );
+    const body = readFileSync(commentPath, "utf8");
+    rmSync(dir, { recursive: true, force: true });
+    expect(body).toContain("actions/runs/1/artifacts/42");
+  });
+
+  it("does not crash when --per-test-artifacts points at a missing file", () => {
+    const dir = mkdtempSync(join(tmpdir(), "pw-flakes-"));
+    const reportPath = join(dir, "report.json");
+    const commentPath = join(dir, "pr-comment.md");
+    writeFileSync(reportPath, JSON.stringify(hardFailedReport), "utf8");
+    execFileSync(
+      process.execPath,
+      [
+        "scripts/summarize-playwright-flakes.mjs",
+        `--report=${reportPath}`,
+        `--pr-comment=${commentPath}`,
+        `--per-test-artifacts=${join(dir, "does-not-exist.json")}`,
+        "--min-failed=1",
+      ],
+      { stdio: "ignore" },
+    );
+    const written = existsSync(commentPath);
+    rmSync(dir, { recursive: true, force: true });
+    expect(written).toBe(true);
+  });
+
+  it("threads --per-test-artifacts into the Job Summary render too, not just the PR-comment file", () => {
+    const dir = mkdtempSync(join(tmpdir(), "pw-flakes-jobsum-pta-"));
+    const reportPath = join(dir, "report.json");
+    const commentPath = join(dir, "pr-comment.md");
+    const stepSummaryPath = join(dir, "step-summary.md");
+    const mapPath = join(dir, "per-test-artifacts.json");
+    writeFileSync(reportPath, JSON.stringify(hardFailedReport), "utf8");
+    writeFileSync(stepSummaryPath, "", "utf8");
+    writeFileSync(
+      mapPath,
+      JSON.stringify({
+        "e2e/quicklog.spec.ts::chromium-authed::12::logs a watering event": {
+          name: "quicklog-pw-test-abc",
+          url: "https://github.com/o/r/actions/runs/1/artifacts/777",
+        },
+      }),
+      "utf8",
+    );
+    execFileSync(
+      process.execPath,
+      [
+        "scripts/summarize-playwright-flakes.mjs",
+        `--report=${reportPath}`,
+        `--pr-comment=${commentPath}`,
+        `--per-test-artifacts=${mapPath}`,
+        "--min-failed=1",
+      ],
+      { stdio: "ignore", env: { ...process.env, GITHUB_STEP_SUMMARY: stepSummaryPath } },
+    );
+    const summary = readFileSync(stepSummaryPath, "utf8");
+    rmSync(dir, { recursive: true, force: true });
+    expect(summary).toContain("actions/runs/1/artifacts/777");
+  });
 });
 
 describe("buildTraceabilityHeader", () => {
@@ -398,7 +585,10 @@ describe("buildTraceabilityHeader", () => {
       version: "1.47.0",
       workers: 4,
       projects: [
-        { name: "chromium-authed", use: { defaultBrowserType: "chromium", viewport: { width: 1280, height: 720 } } },
+        {
+          name: "chromium-authed",
+          use: { defaultBrowserType: "chromium", viewport: { width: 1280, height: 720 } },
+        },
         { name: "firefox-guest", use: { defaultBrowserType: "firefox" } },
       ],
     },
@@ -438,4 +628,3 @@ describe("buildTraceabilityHeader", () => {
     expect(header).not.toContain("Commit |");
   });
 });
-

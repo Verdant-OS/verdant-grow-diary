@@ -38,27 +38,30 @@ function parseArgs(argv) {
     reportUrl: "",
     bundleUrl: "",
     runUrl: "",
+    perTestArtifactsPath: null,
     failOnFlake: false,
     minFailed: 0,
   };
   for (const raw of argv) {
     if (raw.startsWith("--report=")) args.reportPath = raw.slice("--report=".length);
     else if (raw.startsWith("--out=")) args.outPath = raw.slice("--out=".length);
-    else if (raw.startsWith("--pr-comment=")) args.prCommentPath = raw.slice("--pr-comment=".length);
+    else if (raw.startsWith("--pr-comment="))
+      args.prCommentPath = raw.slice("--pr-comment=".length);
     else if (raw.startsWith("--traces-url=")) args.tracesUrl = raw.slice("--traces-url=".length);
     else if (raw.startsWith("--media-url=")) args.mediaUrl = raw.slice("--media-url=".length);
     else if (raw.startsWith("--report-url=")) args.reportUrl = raw.slice("--report-url=".length);
     else if (raw.startsWith("--bundle-url=")) args.bundleUrl = raw.slice("--bundle-url=".length);
     else if (raw.startsWith("--run-url=")) args.runUrl = raw.slice("--run-url=".length);
+    else if (raw.startsWith("--per-test-artifacts="))
+      args.perTestArtifactsPath = raw.slice("--per-test-artifacts=".length);
     else if (raw === "--fail-on-flake") args.failOnFlake = true;
     else if (raw.startsWith("--min-failed=")) {
       const raw2 = raw.slice("--min-failed=".length).trim();
       const parsed = Number.parseInt(raw2, 10);
       args.minFailed = Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
-    }
-    else if (raw === "--help" || raw === "-h") {
+    } else if (raw === "--help" || raw === "-h") {
       process.stdout.write(
-        "Usage: summarize-playwright-flakes.mjs --report=<path> [--out=<path>] [--pr-comment=<path>] [--traces-url=<url>] [--media-url=<url>] [--report-url=<url>] [--bundle-url=<url>] [--run-url=<url>] [--fail-on-flake] [--min-failed=<N>]\n",
+        "Usage: summarize-playwright-flakes.mjs --report=<path> [--out=<path>] [--pr-comment=<path>] [--traces-url=<url>] [--media-url=<url>] [--report-url=<url>] [--bundle-url=<url>] [--run-url=<url>] [--per-test-artifacts=<path>] [--fail-on-flake] [--min-failed=<N>]\n",
       );
       process.exit(0);
     }
@@ -66,12 +69,25 @@ function parseArgs(argv) {
   return args;
 }
 
+/**
+ * Stable identifier for a test, shared with scripts/upload-per-test-artifacts.mjs
+ * so both scripts key the same test the same way without duplicating the
+ * derivation logic. Not a Playwright concept — purely for cross-script lookup.
+ *
+ * Includes the spec's line number: title text alone is not unique — the same
+ * leaf title can appear twice in one file+project (e.g. under two different
+ * `describe` blocks), and without `line` those two tests would collide onto
+ * the same key.
+ */
+export function testKey(t) {
+  return `${t.file ?? ""}::${t.projectName ?? ""}::${t.line ?? ""}::${t.title ?? ""}`;
+}
 
 /**
  * Walk the Playwright JSON report structure and collect every leaf test.
  * The shape is: report.suites[].suites[]*.specs[].tests[].results[].
  */
-function collectTests(report) {
+export function collectTests(report) {
   const out = [];
   const visitSuite = (suite, filePath) => {
     const currentFile = suite?.file || filePath || "";
@@ -103,18 +119,13 @@ function collectTests(report) {
  * honor Playwright's own `status: "flaky"` if it's already set on the test.
  */
 export function classifyTest(test) {
-  const results = [...test.results].sort(
-    (a, b) => (a?.retry ?? 0) - (b?.retry ?? 0),
-  );
+  const results = [...test.results].sort((a, b) => (a?.retry ?? 0) - (b?.retry ?? 0));
   const attempts = results.length;
-  const maxRetry = attempts === 0 ? 0 : results[results.length - 1]?.retry ?? 0;
+  const maxRetry = attempts === 0 ? 0 : (results[results.length - 1]?.retry ?? 0);
   const finalStatus = results[results.length - 1]?.status ?? test.status ?? "";
-  const failedAttempts = results.filter((r) =>
-    FAIL_STATUSES.has(String(r?.status ?? "")),
-  );
+  const failedAttempts = results.filter((r) => FAIL_STATUSES.has(String(r?.status ?? "")));
   const declaredFlaky = String(test.status ?? "").toLowerCase() === "flaky";
-  const passedAfterFailure =
-    finalStatus === "passed" && failedAttempts.length > 0;
+  const passedAfterFailure = finalStatus === "passed" && failedAttempts.length > 0;
   const isFlake = declaredFlaky || passedAfterFailure;
 
   const attachments = [];
@@ -138,18 +149,17 @@ export function classifyTest(test) {
     retry: r?.retry ?? 0,
     status: String(r?.status ?? ""),
     durationMs: typeof r?.duration === "number" ? r.duration : null,
-    attachments: (Array.isArray(r?.attachments) ? r.attachments : [])
-      .filter(Boolean)
-      .map((a) => ({
-        name: String(a.name ?? "attachment"),
-        contentType: String(a.contentType ?? ""),
-        path: a.path ? String(a.path) : "",
-      })),
+    attachments: (Array.isArray(r?.attachments) ? r.attachments : []).filter(Boolean).map((a) => ({
+      name: String(a.name ?? "attachment"),
+      contentType: String(a.contentType ?? ""),
+      path: a.path ? String(a.path) : "",
+    })),
   }));
 
   return {
     file: test.file,
     title: test.title,
+    line: test.line ?? null,
     projectName: test.projectName,
     finalStatus,
     attempts,
@@ -164,15 +174,9 @@ export function classifyTest(test) {
 export function buildSummary(report, { cwd = process.cwd() } = {}) {
   const tests = collectTests(report).map(classifyTest);
   const flakes = tests.filter((t) => t.isFlake);
-  const failed = tests.filter(
-    (t) => !t.isFlake && FAIL_STATUSES.has(t.finalStatus),
-  );
-  const passed = tests.filter(
-    (t) => !t.isFlake && t.finalStatus === "passed",
-  );
-  const skipped = tests.filter(
-    (t) => t.finalStatus === "skipped" || t.finalStatus === "",
-  );
+  const failed = tests.filter((t) => !t.isFlake && FAIL_STATUSES.has(t.finalStatus));
+  const passed = tests.filter((t) => !t.isFlake && t.finalStatus === "passed");
+  const skipped = tests.filter((t) => t.finalStatus === "skipped" || t.finalStatus === "");
 
   const lines = [];
   lines.push("## Playwright flake summary");
@@ -193,15 +197,11 @@ export function buildSummary(report, { cwd = process.cwd() } = {}) {
     lines.push("| # | Test | File | Project | Attempts | Retry count | Artifacts |");
     lines.push("|---|------|------|---------|----------|-------------|-----------|");
     flakes.forEach((f, i) => {
-      const relFile = f.file
-        ? relative(cwd, resolve(cwd, f.file)) || f.file
-        : "";
+      const relFile = f.file ? relative(cwd, resolve(cwd, f.file)) || f.file : "";
       const attachmentCell = f.attachments.length
         ? f.attachments
             .map((a) => {
-              const rel = a.path
-                ? relative(cwd, resolve(cwd, a.path)) || a.path
-                : "";
+              const rel = a.path ? relative(cwd, resolve(cwd, a.path)) || a.path : "";
               const label = `${a.name}${a.retry ? ` (retry${a.retry})` : ""}`;
               return rel ? `\`${rel}\` — ${label}` : label;
             })
@@ -218,9 +218,7 @@ export function buildSummary(report, { cwd = process.cwd() } = {}) {
     lines.push(`### Hard failures (${failed.length})`);
     lines.push("");
     for (const t of failed) {
-      const relFile = t.file
-        ? relative(cwd, resolve(cwd, t.file)) || t.file
-        : "";
+      const relFile = t.file ? relative(cwd, resolve(cwd, t.file)) || t.file : "";
       lines.push(`- **${t.title}** — \`${relFile}\` (${t.finalStatus})`);
     }
     lines.push("");
@@ -239,8 +237,7 @@ export function buildSummary(report, { cwd = process.cwd() } = {}) {
   };
 }
 
-const PR_COMMENT_MARKER =
-  "<!-- verdant:playwright-flake-pr-comment -- do not edit -->";
+const PR_COMMENT_MARKER = "<!-- verdant:playwright-flake-pr-comment -- do not edit -->";
 
 /**
  * Build the sticky PR comment body. Includes per-test, per-attempt
@@ -250,6 +247,11 @@ const PR_COMMENT_MARKER =
  *
  * GitHub artifact URLs point to the artifact zip — inside each zip, the
  * per-attempt file path is what's printed next to each attachment.
+ *
+ * `perTestArtifacts` (keyed by testKey()) is optional: when present for a
+ * test, its own dedicated artifact link is shown ahead of the shared
+ * traces/media bundle links, so a reader can download just that one test's
+ * evidence instead of the whole run's bundle.
  */
 export function buildPrComment(
   report,
@@ -260,13 +262,12 @@ export function buildPrComment(
     reportUrl = "",
     bundleUrl = "",
     runUrl = "",
+    perTestArtifacts = {},
   } = {},
 ) {
   const tests = collectTests(report).map(classifyTest);
   const flakes = tests.filter((t) => t.isFlake);
-  const failed = tests.filter(
-    (t) => !t.isFlake && FAIL_STATUSES.has(t.finalStatus),
-  );
+  const failed = tests.filter((t) => !t.isFlake && FAIL_STATUSES.has(t.finalStatus));
   const noteworthy = [...flakes, ...failed];
 
   const lines = [];
@@ -279,14 +280,10 @@ export function buildPrComment(
   lines.push("");
 
   const artifactLinks = [];
-  if (tracesUrl)
-    artifactLinks.push(`- [Traces bundle (\`*.zip\`)](${tracesUrl})`);
-  if (mediaUrl)
-    artifactLinks.push(`- [Media bundle (screenshots + videos)](${mediaUrl})`);
-  if (reportUrl)
-    artifactLinks.push(`- [Playwright HTML report](${reportUrl})`);
-  if (bundleUrl)
-    artifactLinks.push(`- [Full smoke artifact bundle](${bundleUrl})`);
+  if (tracesUrl) artifactLinks.push(`- [Traces bundle (\`*.zip\`)](${tracesUrl})`);
+  if (mediaUrl) artifactLinks.push(`- [Media bundle (screenshots + videos)](${mediaUrl})`);
+  if (reportUrl) artifactLinks.push(`- [Playwright HTML report](${reportUrl})`);
+  if (bundleUrl) artifactLinks.push(`- [Full smoke artifact bundle](${bundleUrl})`);
   if (runUrl) artifactLinks.push(`- [Workflow run](${runUrl})`);
   if (artifactLinks.length) {
     lines.push("### Artifact bundles for this run");
@@ -306,9 +303,7 @@ export function buildPrComment(
   }
 
   const renderTest = (t) => {
-    const relFile = t.file
-      ? relative(cwd, resolve(cwd, t.file)) || t.file
-      : "";
+    const relFile = t.file ? relative(cwd, resolve(cwd, t.file)) || t.file : "";
     const badge = t.isFlake ? "FLAKY" : "FAILED";
     lines.push(`#### ${badge} · ${t.title}`);
     lines.push("");
@@ -317,9 +312,16 @@ export function buildPrComment(
     );
     lines.push("");
 
+    const ownArtifact = perTestArtifacts[testKey(t)];
+    if (ownArtifact?.url) {
+      lines.push(
+        `📦 **[Download this test's artifacts](${ownArtifact.url})**${ownArtifact.name ? ` (\`${ownArtifact.name}\`)` : ""} — scoped to just this test, not the whole run.`,
+      );
+      lines.push("");
+    }
+
     for (const attempt of t.attemptResults) {
-      const label =
-        attempt.retry === 0 ? "Attempt 1 (initial)" : `Retry ${attempt.retry}`;
+      const label = attempt.retry === 0 ? "Attempt 1 (initial)" : `Retry ${attempt.retry}`;
       lines.push(`**${label} — status: \`${attempt.status || "unknown"}\`**`);
       if (attempt.attachments.length === 0) {
         lines.push("");
@@ -329,14 +331,22 @@ export function buildPrComment(
       }
       lines.push("");
       for (const a of attempt.attachments) {
-        const rel = a.path
-          ? relative(cwd, resolve(cwd, a.path)) || a.path
-          : "";
+        const rel = a.path ? relative(cwd, resolve(cwd, a.path)) || a.path : "";
         const kind = describeAttachmentKind(a);
         const bundleHint = bundleHintFor(a, { tracesUrl, mediaUrl });
         const pathCell = rel ? `\`${rel}\`` : "_(path unavailable)_";
         const link = bundleHint ? ` — [open in ${bundleHint.label}](${bundleHint.url})` : "";
         lines.push(`- ${kind}: ${pathCell}${link}`);
+        if (rel && isTraceAttachment(a)) {
+          lines.push("");
+          lines.push(
+            "  Open this exact trace after downloading the artifact above and extracting it:",
+          );
+          lines.push("");
+          lines.push("  ```bash");
+          lines.push(`  bunx playwright show-trace "${rel}"`);
+          lines.push("  ```");
+        }
       }
       lines.push("");
     }
@@ -358,7 +368,9 @@ export function buildPrComment(
   if (flakes.length > 0) {
     lines.push(`### ⚠️ Flaky (${flakes.length})`);
     lines.push("");
-    lines.push("_Failed on initial attempt but passed on retry. Investigate for stability, not correctness._");
+    lines.push(
+      "_Failed on initial attempt but passed on retry. Investigate for stability, not correctness._",
+    );
     lines.push("");
     for (const t of flakes) renderTest(t);
   } else {
@@ -368,24 +380,28 @@ export function buildPrComment(
     lines.push("");
   }
 
-
   return lines.join("\n");
+}
+
+function isTraceAttachment(a) {
+  const name = a.name?.toLowerCase() ?? "";
+  const ct = a.contentType?.toLowerCase() ?? "";
+  return name === "trace" || ct === "application/zip";
 }
 
 function describeAttachmentKind(a) {
   const name = a.name?.toLowerCase() ?? "";
   const ct = a.contentType?.toLowerCase() ?? "";
-  if (name === "trace" || ct === "application/zip") return "**trace**";
+  if (isTraceAttachment(a)) return "**trace**";
   if (name === "video" || ct.startsWith("video/")) return "**video**";
-  if (name.includes("screenshot") || ct.startsWith("image/"))
-    return "**screenshot**";
+  if (name.includes("screenshot") || ct.startsWith("image/")) return "**screenshot**";
   return `**${a.name || "attachment"}**`;
 }
 
 function bundleHintFor(a, { tracesUrl, mediaUrl }) {
   const ct = a.contentType?.toLowerCase() ?? "";
   const name = a.name?.toLowerCase() ?? "";
-  if ((name === "trace" || ct === "application/zip") && tracesUrl) {
+  if (isTraceAttachment(a) && tracesUrl) {
     return { label: "traces bundle", url: tracesUrl };
   }
   if (
@@ -419,7 +435,10 @@ export function buildTraceabilityHeader(report, env = process.env) {
   const runId = env.GITHUB_RUN_ID || "";
   const attempt = env.GITHUB_RUN_ATTEMPT || "";
   const server = env.GITHUB_SERVER_URL || "https://github.com";
-  const runUrl = repo && runId ? `${server}/${repo}/actions/runs/${runId}${attempt ? `/attempts/${attempt}` : ""}` : "";
+  const runUrl =
+    repo && runId
+      ? `${server}/${repo}/actions/runs/${runId}${attempt ? `/attempts/${attempt}` : ""}`
+      : "";
   const commitUrl = repo && sha ? `${server}/${repo}/commit/${sha}` : "";
 
   const cfg = report?.config ?? {};
@@ -436,13 +455,22 @@ export function buildTraceabilityHeader(report, env = process.env) {
   lines.push("");
   lines.push("| Field | Value |");
   lines.push("|-------|-------|");
-  if (env.GITHUB_WORKFLOW) lines.push(`| Workflow | \`${env.GITHUB_WORKFLOW}\`${env.GITHUB_JOB ? ` · job \`${env.GITHUB_JOB}\`` : ""} |`);
-  if (env.GITHUB_EVENT_NAME) lines.push(`| Trigger | \`${env.GITHUB_EVENT_NAME}\`${env.GITHUB_REF_NAME ? ` · ref \`${env.GITHUB_REF_NAME}\`` : ""}${env.GITHUB_ACTOR ? ` · actor \`${env.GITHUB_ACTOR}\`` : ""} |`);
-  if (sha) lines.push(`| Commit | ${commitUrl ? `[\`${shortSha}\`](${commitUrl})` : `\`${shortSha}\``} |`);
-  if (runUrl) lines.push(`| Run | [${runId}${attempt ? ` (attempt ${attempt})` : ""}](${runUrl}) |`);
+  if (env.GITHUB_WORKFLOW)
+    lines.push(
+      `| Workflow | \`${env.GITHUB_WORKFLOW}\`${env.GITHUB_JOB ? ` · job \`${env.GITHUB_JOB}\`` : ""} |`,
+    );
+  if (env.GITHUB_EVENT_NAME)
+    lines.push(
+      `| Trigger | \`${env.GITHUB_EVENT_NAME}\`${env.GITHUB_REF_NAME ? ` · ref \`${env.GITHUB_REF_NAME}\`` : ""}${env.GITHUB_ACTOR ? ` · actor \`${env.GITHUB_ACTOR}\`` : ""} |`,
+    );
+  if (sha)
+    lines.push(`| Commit | ${commitUrl ? `[\`${shortSha}\`](${commitUrl})` : `\`${shortSha}\``} |`);
+  if (runUrl)
+    lines.push(`| Run | [${runId}${attempt ? ` (attempt ${attempt})` : ""}](${runUrl}) |`);
   if (typeof cfg.workers === "number") lines.push(`| Playwright workers | ${cfg.workers} |`);
   if (typeof cfg.version === "string") lines.push(`| Playwright version | \`${cfg.version}\` |`);
-  if (projectRows.length) lines.push(`| Projects (${projectRows.length}) | ${projectRows.join("<br>")} |`);
+  if (projectRows.length)
+    lines.push(`| Projects (${projectRows.length}) | ${projectRows.join("<br>")} |`);
   lines.push("");
   return lines.join("\n");
 }
@@ -452,9 +480,7 @@ async function main() {
   const reportPath = resolve(process.cwd(), args.reportPath);
 
   if (!existsSync(reportPath)) {
-    process.stderr.write(
-      `summarize-playwright-flakes: report not found at ${args.reportPath}\n`,
-    );
+    process.stderr.write(`summarize-playwright-flakes: report not found at ${args.reportPath}\n`);
     process.exit(1);
   }
 
@@ -478,6 +504,27 @@ async function main() {
     writeFileSync(outAbs, `${markdown}\n`, "utf8");
   }
 
+  // Loaded once, above both buildPrComment call sites below (the PR-comment
+  // file and the Job Summary), so neither one silently omits per-test links
+  // just because it's the one that happened to be added second.
+  let perTestArtifacts = {};
+  if (args.perTestArtifactsPath) {
+    const mapAbs = resolve(process.cwd(), args.perTestArtifactsPath);
+    if (existsSync(mapAbs)) {
+      try {
+        perTestArtifacts = JSON.parse(readFileSync(mapAbs, "utf8"));
+      } catch (err) {
+        process.stderr.write(
+          `summarize-playwright-flakes: failed to parse --per-test-artifacts=${args.perTestArtifactsPath}: ${err instanceof Error ? err.message : String(err)}; continuing without per-test links.\n`,
+        );
+      }
+    } else {
+      process.stderr.write(
+        `summarize-playwright-flakes: --per-test-artifacts=${args.perTestArtifactsPath} not found; continuing without per-test links.\n`,
+      );
+    }
+  }
+
   if (args.prCommentPath) {
     if (args.minFailed > 0 && counts.failed < args.minFailed) {
       process.stderr.write(
@@ -490,13 +537,13 @@ async function main() {
         reportUrl: args.reportUrl,
         bundleUrl: args.bundleUrl,
         runUrl: args.runUrl,
+        perTestArtifacts,
       });
       const prAbs = resolve(process.cwd(), args.prCommentPath);
       mkdirSync(dirname(prAbs), { recursive: true });
       writeFileSync(prAbs, `${prBody}\n`, "utf8");
     }
   }
-
 
   // GitHub Actions Job Summary always gets the full failed/flaky breakdown
   // + top trace/media links, even when the PR comment is suppressed via
@@ -511,6 +558,7 @@ async function main() {
         reportUrl: args.reportUrl,
         bundleUrl: args.bundleUrl,
         runUrl: args.runUrl,
+        perTestArtifacts,
       });
       const gate =
         args.minFailed > 0 && counts.failed < args.minFailed
@@ -543,7 +591,7 @@ const isDirectRun =
 if (isDirectRun) {
   main().catch((err) => {
     process.stderr.write(
-      `summarize-playwright-flakes: unexpected error: ${err instanceof Error ? err.stack ?? err.message : String(err)}\n`,
+      `summarize-playwright-flakes: unexpected error: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}\n`,
     );
     process.exit(1);
   });

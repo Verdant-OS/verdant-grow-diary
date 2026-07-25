@@ -135,21 +135,17 @@ describe("Pricing blocked checkout — sanitized reason-code leak guard", () => 
     assertNoReasonTokensLeaked(container.innerHTML);
   });
 
-  it("guards against a hook regression that put a raw reason token into blockedReason", () => {
-    // Contract check: even if some future refactor accidentally routed the
-    // raw enum token into `blockedReason` (which the panel renders verbatim),
-    // this test will fail loudly rather than silently ship the leak.
-    currentBlockedReason = "price_not_configured";
-
-    const { container } = renderPricing();
-
-    // The panel *would* render this string — that is exactly the regression
-    // we want to catch. This assertion must fail if the leak ever happens.
-    for (const token of REASON_TOKENS) {
-      if (container.innerHTML.includes(token)) {
-        throw new Error(
-          `regression: raw reason token "${token}" reached the rendered DOM`,
-        );
+  it("only sources blockedReason from getPaddleCheckoutCatalogMessage — none of its outputs contain reason tokens", () => {
+    // Upstream contract check: the human copies produced by
+    // getPaddleCheckoutCatalogMessage must themselves be token-free. If a
+    // future edit inlines a token into the copy, the panel would render it.
+    for (const reason of CATALOG_REASONS) {
+      const copy = getPaddleCheckoutCatalogMessage(reason);
+      for (const token of REASON_TOKENS) {
+        expect(
+          copy,
+          `catalog message for "${reason}" contains reason token "${token}"`,
+        ).not.toContain(token);
       }
     }
     cleanup();

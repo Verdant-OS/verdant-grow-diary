@@ -144,6 +144,7 @@ import {
   type HarvestPhotoAngle,
   type HarvestPhotoLighting,
 } from "@/lib/harvestInspectionQuickLogPreviewRules";
+import type { QuickLogActivityId } from "@/constants/quickLogActivityTypes";
 
 export interface QuickLogPrefill {
   plantId?: string | null;
@@ -151,6 +152,12 @@ export interface QuickLogPrefill {
   growId?: string | null;
   tentId?: string | null;
   eventType?: string | null;
+  /**
+   * Shared Quick Log activity to select for a Fast Add handoff. Selection is
+   * presentation only; the canonical activity editor still validates and
+   * requires the grower to save explicitly.
+   */
+  activityId?: QuickLogActivityId | null;
   suggestSnapshot?: boolean | null;
   /**
    * Optional starter note text. Seeded into the Quick Log note field when
@@ -1334,11 +1341,10 @@ export default function QuickLog({
                   ? QUICK_LOG_TARGET_BLOCKED_COPY[editorTarget.reason]
                   : null
           }
-          plantStage={
-            (resolvedTargetPlant as { stage?: unknown } | null)?.stage ?? null
-          }
+          plantStage={(resolvedTargetPlant as { stage?: unknown } | null)?.stage ?? null}
           heading="All activity types"
           testIdPrefix="quick-log-dialog-all-activities"
+          requestedActivityId={prefill?.activityId ?? null}
           onSaveStart={beginAllActivitiesSave}
           onSaveEnd={endAllActivitiesSave}
           saveBlocked={saveLocked}

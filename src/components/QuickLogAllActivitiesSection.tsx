@@ -64,10 +64,7 @@ import {
   QUICK_LOG_HARVEST_STAGE_DISABLED_REASON,
   type QuickLogActivityDraftBinding,
 } from "@/lib/quickLogActivityRules";
-import {
-  QUICK_LOG_V2_OPEN_EVENT,
-  buildQuickLogV2OpenIntent,
-} from "@/lib/quickLogV2OpenIntent";
+import { QUICK_LOG_V2_OPEN_EVENT, buildQuickLogV2OpenIntent } from "@/lib/quickLogV2OpenIntent";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 
@@ -93,6 +90,11 @@ export interface QuickLogAllActivitiesSectionProps {
   onBeforeStructuredWaterOpen?: () => void;
   /** Caller-owned fail-closed reason that must prevent every persistence path. */
   externalPersistenceBlockReason?: string | null;
+  /**
+   * Optional grower-visible activity handoff. The editor is selected only;
+   * it never writes or bypasses availability checks.
+   */
+  requestedActivityId?: QuickLogActivityId | null;
 }
 
 export interface QuickLogAllActivitiesSaveTarget {
@@ -157,21 +159,16 @@ export default function QuickLogAllActivitiesSection({
   isSaveBlocked,
   onBeforeStructuredWaterOpen,
   externalPersistenceBlockReason = null,
+  requestedActivityId = null,
 }: QuickLogAllActivitiesSectionProps) {
   const currentTarget = useMemo(
     () => buildQuickLogTargetIdentity({ growId, tentId, plantId }),
     [growId, plantId, tentId],
   );
-  const currentTargetKey = useMemo(
-    () => buildQuickLogTargetKey(currentTarget),
-    [currentTarget],
-  );
+  const currentTargetKey = useMemo(() => buildQuickLogTargetKey(currentTarget), [currentTarget]);
   const previousTargetKeyRef = useRef(currentTargetKey);
-  const [selectedDraft, setSelectedDraft] =
-    useState<QuickLogActivityDraftBinding | null>(null);
-  const selected = selectedDraft
-    ? QUICK_LOG_ACTIVITY_DEFINITIONS[selectedDraft.activityId]
-    : null;
+  const [selectedDraft, setSelectedDraft] = useState<QuickLogActivityDraftBinding | null>(null);
+  const selected = selectedDraft ? QUICK_LOG_ACTIVITY_DEFINITIONS[selectedDraft.activityId] : null;
   const [note, setNote] = useState("");
   const [harvestWet, setHarvestWet] = useState("");
   const [harvestDry, setHarvestDry] = useState("");
@@ -201,6 +198,45 @@ export default function QuickLogAllActivitiesSection({
   // live preference).
   const envCheckTempEntryUnitRef = useRef<TemperatureUnitPreference | null>(null);
   const activeEnvCheckTempUnit = envCheckTempEntryUnitRef.current ?? temperatureUnit;
+  const requestedActivity =
+    typeof requestedActivityId === "string" &&
+    Object.prototype.hasOwnProperty.call(QUICK_LOG_ACTIVITY_DEFINITIONS, requestedActivityId)
+      ? requestedActivityId
+      : null;
+  const requestedActivityRequestKey = requestedActivity
+    ? `${currentTargetKey}:${requestedActivity}`
+    : null;
+  const appliedRequestedActivityKeyRef = useRef<string | null>(null);
+  const requestedActivityAvailability = useMemo(
+    () =>
+      requestedActivity
+        ? evaluateQuickLogActivityAvailability(requestedActivity, plantStage)
+        : null,
+    [plantStage, requestedActivity],
+  );
+
+  useEffect(() => {
+    if (!requestedActivity || !requestedActivityRequestKey) {
+      appliedRequestedActivityKeyRef.current = null;
+      return;
+    }
+    if (appliedRequestedActivityKeyRef.current === requestedActivityRequestKey) return;
+    appliedRequestedActivityKeyRef.current = requestedActivityRequestKey;
+
+    setErrorReason(null);
+    setErrorForActivity(null);
+    setStructuredWaterError(null);
+    if (requestedActivityAvailability?.disabled) {
+      setSelectedDraft(null);
+      return;
+    }
+    setSelectedDraft(bindQuickLogActivityDraft(requestedActivity, currentTarget));
+  }, [
+    currentTarget,
+    requestedActivity,
+    requestedActivityAvailability?.disabled,
+    requestedActivityRequestKey,
+  ]);
 
   useEffect(() => {
     if (previousTargetKeyRef.current === currentTargetKey) return;
@@ -224,16 +260,9 @@ export default function QuickLogAllActivitiesSection({
 
   const canPersistManualSensor = false; // Deferred to ManualSensorReadingCard.
 
-  const harvestWetValidation = useMemo(
-    () => validateHarvestWeightInput(harvestWet),
-    [harvestWet],
-  );
-  const harvestDryValidation = useMemo(
-    () => validateHarvestWeightInput(harvestDry),
-    [harvestDry],
-  );
-  const harvestWeightsInvalid =
-    !harvestWetValidation.ok || !harvestDryValidation.ok;
+  const harvestWetValidation = useMemo(() => validateHarvestWeightInput(harvestWet), [harvestWet]);
+  const harvestDryValidation = useMemo(() => validateHarvestWeightInput(harvestDry), [harvestDry]);
+  const harvestWeightsInvalid = !harvestWetValidation.ok || !harvestDryValidation.ok;
   // Blocking validation for number detail fields (e.g. manual env readings):
   // an out-of-band value must stop the save with an inline error — never be
   // silently dropped while the grower sees a success receipt.
@@ -244,13 +273,9 @@ export default function QuickLogAllActivitiesSection({
       .map((f) => ({ key: f.key, ...validateQuickLogDetailNumberInput(f, detailValues[f.key]) }));
   }, [selected, detailValues, activeEnvCheckTempUnit]);
   const detailNumbersInvalid = detailNumberValidations.some((v) => !v.ok);
-  const firstDetailNumberError =
-    detailNumberValidations.find((v) => !v.ok)?.error ?? null;
+  const firstDetailNumberError = detailNumberValidations.find((v) => !v.ok)?.error ?? null;
   const selectedAvailability = useMemo(
-    () =>
-      selected
-        ? evaluateQuickLogActivityAvailability(selected.id, plantStage)
-        : null,
+    () => (selected ? evaluateQuickLogActivityAvailability(selected.id, plantStage) : null),
     [plantStage, selected],
   );
 
@@ -480,8 +505,7 @@ export default function QuickLogAllActivitiesSection({
             // on Timeline/Recent Activity (allow-listed), unlike the V2-sheet
             // attachment marker the plant-memory episodes key on.
             eventType: "photo",
-            extraDetails:
-              Object.keys(photoExtraDetails).length > 0 ? photoExtraDetails : null,
+            extraDetails: Object.keys(photoExtraDetails).length > 0 ? photoExtraDetails : null,
           });
           if (!entryResult.ok) {
             // (strictNullChecks is off in this app config, so cast the failure
@@ -648,6 +672,16 @@ export default function QuickLogAllActivitiesSection({
         </p>
       )}
 
+      {requestedActivityAvailability?.disabled && (
+        <p
+          role="note"
+          className="text-xs text-muted-foreground"
+          data-testid={`${testIdPrefix}-requested-activity-blocked`}
+        >
+          {requestedActivityAvailability.disabledReason ?? "This activity is not available."}
+        </p>
+      )}
+
       <QuickLogActivityPicker
         onSelect={handleSelect}
         disabled={mutationBlocked}
@@ -683,8 +717,7 @@ export default function QuickLogAllActivitiesSection({
               className="text-xs text-muted-foreground"
               data-testid={`${testIdPrefix}-harvest-stage-blocked`}
             >
-              {selectedAvailability.disabledReason ??
-                QUICK_LOG_HARVEST_STAGE_DISABLED_REASON}
+              {selectedAvailability.disabledReason ?? QUICK_LOG_HARVEST_STAGE_DISABLED_REASON}
             </p>
           )}
 
@@ -755,7 +788,9 @@ export default function QuickLogAllActivitiesSection({
                         maxLength={field.kind === "text" ? QUICK_LOG_DETAIL_TEXT_MAX : undefined}
                         aria-invalid={
                           field.kind === "number"
-                            ? !(detailNumberValidations.find((v) => v.key === field.key)?.ok ?? true)
+                            ? !(
+                                detailNumberValidations.find((v) => v.key === field.key)?.ok ?? true
+                              )
                             : undefined
                         }
                         placeholder={field.placeholder}

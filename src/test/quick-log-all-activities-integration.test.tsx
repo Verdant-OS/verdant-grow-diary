@@ -88,8 +88,7 @@ function listenForEntryCreated() {
   window.addEventListener(QUICK_LOG_V2_ENTRY_CREATED_EVENT, handler);
   return {
     events: evts,
-    dispose: () =>
-      window.removeEventListener(QUICK_LOG_V2_ENTRY_CREATED_EVENT, handler),
+    dispose: () => window.removeEventListener(QUICK_LOG_V2_ENTRY_CREATED_EVENT, handler),
   };
 }
 
@@ -120,13 +119,27 @@ beforeEach(() => {
 });
 
 describe("QuickLogAllActivitiesSection — shared taxonomy", () => {
+  it("selects a requested supported activity without saving it", async () => {
+    mountSection({ requestedActivityId: "feeding" });
+    const form = await screen.findByTestId("quick-log-all-activities-form");
+    expect(form).toHaveAttribute("data-activity-id", "feeding");
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps a stage-blocked requested Harvest out of the save form", async () => {
+    mountSection({ requestedActivityId: "harvest", plantStage: "vegetative" });
+    expect(
+      await screen.findByTestId("quick-log-all-activities-requested-activity-blocked"),
+    ).toHaveTextContent(/flower, flush, or harvest stages/i);
+    expect(screen.queryByTestId("quick-log-all-activities-form")).toBeNull();
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+
   it("renders every supported activity from shared definitions after disclosure", () => {
     mountSection();
     revealAdditionalActivities();
     for (const def of Object.values(QUICK_LOG_ACTIVITY_DEFINITIONS)) {
-      expect(
-        screen.getByTestId(`quick-log-all-activities-picker-${def.id}`),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId(`quick-log-all-activities-picker-${def.id}`)).toBeInTheDocument();
     }
   });
 
@@ -136,9 +149,7 @@ describe("QuickLogAllActivitiesSection — shared taxonomy", () => {
     const btn = screen.getByTestId("quick-log-all-activities-picker-harvest");
     expect(btn).not.toBeDisabled();
     expect(
-      screen.queryByTestId(
-        "quick-log-all-activities-picker-harvest-disabled-reason",
-      ),
+      screen.queryByTestId("quick-log-all-activities-picker-harvest-disabled-reason"),
     ).toBeNull();
   });
 });
@@ -416,8 +427,8 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(1));
     const [, args] = rpcMock.mock.calls[0];
     // 75°F → (75-32)*5/9 = 23.888..., rounded to 2 decimals.
-    const stored = (args.p_details as { environment_check?: { temp_c?: number } })
-      .environment_check?.temp_c;
+    const stored = (args.p_details as { environment_check?: { temp_c?: number } }).environment_check
+      ?.temp_c;
     expect(stored).toBeCloseTo(23.89, 2);
     expect(stored).not.toBe(75);
   });
@@ -430,9 +441,9 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     fireEvent.change(screen.getByTestId("quick-log-all-activities-detail-temp_c"), {
       target: { value: "150" },
     });
-    expect(
-      screen.getByTestId("quick-log-all-activities-detail-temp_c-error"),
-    ).toHaveTextContent(/between 14 and 140/);
+    expect(screen.getByTestId("quick-log-all-activities-detail-temp_c-error")).toHaveTextContent(
+      /between 14 and 140/,
+    );
     expect(screen.getByTestId("quick-log-all-activities-save")).toBeDisabled();
     fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
     expect(rpcMock).not.toHaveBeenCalled();
@@ -615,9 +626,7 @@ describe("QuickLogAllActivitiesSection — Harvest v1b", () => {
     // Harvest must not be faked as observation or other type.
     expect(args.p_event_type).not.toBe("observation");
     await waitFor(() => expect(l.events.length).toBe(1));
-    const items = await screen.findAllByTestId(
-      "quick-log-all-activities-saved-item",
-    );
+    const items = await screen.findAllByTestId("quick-log-all-activities-saved-item");
     expect(items[0]).toHaveAttribute("data-saved-activity-id", "harvest");
     expect(items[0]).toHaveTextContent(/harvest/i);
     l.dispose();
@@ -630,9 +639,7 @@ describe("QuickLogAllActivitiesSection — Harvest v1b", () => {
     await saveWithNote("harvest", "x");
     await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(1));
     expect(l.events.length).toBe(0);
-    expect(
-      screen.queryByTestId("quick-log-all-activities-saved"),
-    ).toBeNull();
+    expect(screen.queryByTestId("quick-log-all-activities-saved")).toBeNull();
     l.dispose();
   });
 
@@ -642,9 +649,7 @@ describe("QuickLogAllActivitiesSection — Harvest v1b", () => {
     // Cancel without saving.
     const cancel = screen.queryByTestId("quick-log-all-activities-cancel");
     if (cancel) fireEvent.click(cancel);
-    expect(
-      screen.queryByTestId("quick-log-all-activities-saved"),
-    ).toBeNull();
+    expect(screen.queryByTestId("quick-log-all-activities-saved")).toBeNull();
     expect(rpcMock).not.toHaveBeenCalled();
   });
 
@@ -725,14 +730,12 @@ describe("QuickLogAllActivitiesSection — Harvest v1b.next hardening", () => {
     mountSection();
     selectActivity("harvest");
     await screen.findByTestId("quick-log-all-activities-harvest-fields");
-    fireEvent.change(
-      screen.getByTestId("quick-log-all-activities-harvest-wet"),
-      { target: { value: "120" } },
-    );
-    fireEvent.change(
-      screen.getByTestId("quick-log-all-activities-note"),
-      { target: { value: "cola down" } },
-    );
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-harvest-wet"), {
+      target: { value: "120" },
+    });
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-note"), {
+      target: { value: "cola down" },
+    });
     fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
 
     await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(1));
@@ -742,9 +745,7 @@ describe("QuickLogAllActivitiesSection — Harvest v1b.next hardening", () => {
     expect(args.p_event_type).toBe("harvest");
 
     const err = await screen.findByTestId("quick-log-all-activities-error");
-    expect(err.textContent?.toLowerCase()).toContain(
-      "not enabled on this backend yet",
-    );
+    expect(err.textContent?.toLowerCase()).toContain("not enabled on this backend yet");
     expect(l.events.length).toBe(0);
     expect(screen.queryByTestId("quick-log-all-activities-saved")).toBeNull();
     l.dispose();
@@ -758,19 +759,15 @@ describe("QuickLogAllActivitiesSection — Harvest v1b.next hardening", () => {
     mountSection();
     selectActivity("harvest");
     await screen.findByTestId("quick-log-all-activities-harvest-fields");
-    fireEvent.change(
-      screen.getByTestId("quick-log-all-activities-harvest-wet"),
-      { target: { value: "120" } },
-    );
-    fireEvent.change(
-      screen.getByTestId("quick-log-all-activities-harvest-dry"),
-      { target: { value: "32" } },
-    );
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-harvest-wet"), {
+      target: { value: "120" },
+    });
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-harvest-dry"), {
+      target: { value: "32" },
+    });
     fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
 
-    const items = await screen.findAllByTestId(
-      "quick-log-all-activities-saved-item",
-    );
+    const items = await screen.findAllByTestId("quick-log-all-activities-saved-item");
     const txt = items[0].textContent ?? "";
     expect(txt).toMatch(/harvest/i);
     expect(txt).toMatch(/wet\s*120\s*g/i);
@@ -786,16 +783,13 @@ describe("QuickLogAllActivitiesSection — Harvest v1b.next hardening", () => {
     mountSection();
     selectActivity("harvest");
     await screen.findByTestId("quick-log-all-activities-harvest-fields");
-    fireEvent.change(
-      screen.getByTestId("quick-log-all-activities-harvest-wet"),
-      { target: { value: "50" } },
-    );
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-harvest-wet"), {
+      target: { value: "50" },
+    });
     // dry left empty
     fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
 
-    const items = await screen.findAllByTestId(
-      "quick-log-all-activities-saved-item",
-    );
+    const items = await screen.findAllByTestId("quick-log-all-activities-saved-item");
     const txt = items[0].textContent ?? "";
     expect(txt).toMatch(/wet\s*50\s*g/i);
     expect(txt.toLowerCase()).not.toMatch(/\bdry\b/);
@@ -805,13 +799,10 @@ describe("QuickLogAllActivitiesSection — Harvest v1b.next hardening", () => {
     mountSection();
     selectActivity("harvest");
     await screen.findByTestId("quick-log-all-activities-harvest-fields");
-    fireEvent.change(
-      screen.getByTestId("quick-log-all-activities-harvest-wet"),
-      { target: { value: "-3" } },
-    );
-    const err = await screen.findByTestId(
-      "quick-log-all-activities-harvest-wet-error",
-    );
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-harvest-wet"), {
+      target: { value: "-3" },
+    });
+    const err = await screen.findByTestId("quick-log-all-activities-harvest-wet-error");
     expect(err.textContent).toMatch(/cannot be negative/i);
     expect(screen.getByTestId("quick-log-all-activities-save")).toBeDisabled();
     expect(rpcMock).not.toHaveBeenCalled();
@@ -821,13 +812,10 @@ describe("QuickLogAllActivitiesSection — Harvest v1b.next hardening", () => {
     mountSection();
     selectActivity("harvest");
     await screen.findByTestId("quick-log-all-activities-harvest-fields");
-    fireEvent.change(
-      screen.getByTestId("quick-log-all-activities-harvest-dry"),
-      { target: { value: "-1.5" } },
-    );
-    const err = await screen.findByTestId(
-      "quick-log-all-activities-harvest-dry-error",
-    );
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-harvest-dry"), {
+      target: { value: "-1.5" },
+    });
+    const err = await screen.findByTestId("quick-log-all-activities-harvest-dry-error");
     expect(err.textContent).toMatch(/cannot be negative/i);
     expect(screen.getByTestId("quick-log-all-activities-save")).toBeDisabled();
     expect(rpcMock).not.toHaveBeenCalled();
@@ -841,14 +829,12 @@ describe("QuickLogAllActivitiesSection — Harvest v1b.next hardening", () => {
     mountSection();
     selectActivity("harvest");
     await screen.findByTestId("quick-log-all-activities-harvest-fields");
-    fireEvent.change(
-      screen.getByTestId("quick-log-all-activities-harvest-wet"),
-      { target: { value: "12.5" } },
-    );
-    fireEvent.change(
-      screen.getByTestId("quick-log-all-activities-harvest-dry"),
-      { target: { value: "3.25" } },
-    );
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-harvest-wet"), {
+      target: { value: "12.5" },
+    });
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-harvest-dry"), {
+      target: { value: "3.25" },
+    });
     fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
 
     await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(1));
@@ -857,9 +843,7 @@ describe("QuickLogAllActivitiesSection — Harvest v1b.next hardening", () => {
       harvest: { wetWeight: "12.5", dryWeight: "3.25", weightUnit: "g" },
       event_type: "harvest",
     });
-    const items = await screen.findAllByTestId(
-      "quick-log-all-activities-saved-item",
-    );
+    const items = await screen.findAllByTestId("quick-log-all-activities-saved-item");
     expect(items[0].textContent).toMatch(/12\.5/);
     expect(items[0].textContent).toMatch(/3\.25/);
   });

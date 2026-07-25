@@ -12,10 +12,7 @@
  * regardless of which entry point invoked it.
  */
 import { describe, it, expect } from "vitest";
-import {
-  resolveFastAddIntent,
-  type FastAddSelectionContext,
-} from "../lib/fastAddActionRules";
+import { resolveFastAddIntent, type FastAddSelectionContext } from "../lib/fastAddActionRules";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "../lib/plantQuickLogPrefillRules";
 
 const FIXED = new Date("2026-07-24T09:00:00.000Z");
@@ -45,6 +42,7 @@ describe("Fast Add — Training prefill seeds occurred_at + captured_at", () => 
       if (intent.kind !== "open-quicklog") return;
       expect(intent.eventName).toBe(PLANT_QUICKLOG_PREFILL_EVENT);
       expect(intent.prefill.eventType).toBe("training");
+      expect(intent.prefill.activityId).toBe("training");
       expect(intent.prefill.occurred_at).toBe(FIXED.toISOString());
       expect(intent.prefill.captured_at).toBe(FIXED.toISOString());
     },

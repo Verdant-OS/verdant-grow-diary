@@ -96,9 +96,7 @@ describe("GlobalFastAddButton", () => {
     renderAt("/plants/p1");
     fireEvent.click(screen.getByTestId("global-fast-add-trigger"));
     for (const a of FAST_ADD_ACTIONS) {
-      expect(
-        screen.getByTestId(`global-fast-add-action-${a.id}`),
-      ).toBeTruthy();
+      expect(screen.getByTestId(`global-fast-add-action-${a.id}`)).toBeTruthy();
     }
   });
 
@@ -119,6 +117,7 @@ describe("GlobalFastAddButton", () => {
     const [eventName, detail] = onDispatchEvent.mock.calls[0];
     expect(eventName).toBe("verdant:open-quicklog");
     expect((detail as { eventType: string }).eventType).toBe("feeding");
+    expect((detail as { activityId: string }).activityId).toBe("feeding");
   });
 
   it("dispatches only the typed V2 event for Watering", () => {
@@ -144,10 +143,7 @@ describe("GlobalFastAddButton", () => {
 });
 
 describe("GlobalFastAddButton + fastAddActionRules — static safety", () => {
-  const SRC = [
-    "../components/GlobalFastAddButton.tsx",
-    "../lib/fastAddActionRules.ts",
-  ]
+  const SRC = ["../components/GlobalFastAddButton.tsx", "../lib/fastAddActionRules.ts"]
     .map((p) => readFileSync(resolve(__dirname, p), "utf8"))
     .join("\n");
 
@@ -251,8 +247,6 @@ describe("GlobalFastAddButton — mobile tap targets & a11y", () => {
     expect(trigger.getAttribute("aria-haspopup")).toBe("menu");
     fireEvent.click(trigger);
     expect(trigger.getAttribute("aria-expanded")).toBe("true");
-    expect(screen.getByTestId("global-fast-add-menu").getAttribute("role")).toBe(
-      "menu",
-    );
+    expect(screen.getByTestId("global-fast-add-menu").getAttribute("role")).toBe("menu");
   });
 });

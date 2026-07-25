@@ -125,6 +125,13 @@ const PUBLIC_MOBILE_ROUTES: string[] = [
   // Public 30-second Quick Log starter: local draft only, mounted outside
   // AppShell — must render signed-out with zero private-table fetches.
   "/quick-log",
+  // One-click email unsubscribe landing: mounted outside AppShell and
+  // authenticated solely by the ?token= from the email link, never a session,
+  // so it must render signed-out. Reached with no token here, which shows its
+  // missing-token state — that still satisfies this bucket's contract (stays
+  // on origin, zero private-table REST hits; it only ever calls
+  // /functions/v1/handle-email-unsubscribe, never /rest/v1/).
+  "/unsubscribe",
 ];
 
 // Internal fixture-only demo surfaces DELIBERATELY mounted OUTSIDE AppShell

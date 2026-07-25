@@ -732,6 +732,39 @@ jobs:
             playwright-report/
             test-results/
 
+      # Follow-up to the pinned "🧭 Playwright HTML report" section at the
+      # top of the Job Summary: the same `playwright-report/` tree is also
+      # packaged inside the `quicklog-smoke-artifacts` bundle. Surface that
+      # copy's artifact URL too so reviewers who already downloaded the
+      # bundle for other files (JSON report, TXT report, test-results/)
+      # don't need to grab the standalone HTML report artifact separately.
+      # `upload-artifact@v4`'s `artifact-url` output is only populated after
+      # the upload step runs, so this must live immediately after
+      # upload_smoke_bundle. Enrichment only — never fails the job.
+      - name: Link smoke bundle HTML report in Job Summary
+        if: always() && steps.e2e_config.outputs.should_run == 'true'
+        shell: bash
+        env:
+          SMOKE_BUNDLE_URL: ${{ steps.upload_smoke_bundle.outputs.artifact-url }}
+        run: |
+          {
+            echo ""
+            echo "### 🧭 Playwright HTML report (bundled copy)"
+            echo ""
+            if [ ! -d "playwright-report" ]; then
+              echo "**Status:** ❌ \`playwright-report/\` not produced — no bundled HTML report to link. See the pinned HTML report section at the top of this summary."
+            elif [ -n "${SMOKE_BUNDLE_URL}" ]; then
+              echo "The same \`playwright-report/\` tree is also included inside the smoke artifacts bundle:"
+              echo ""
+              echo "- [\`quicklog-smoke-artifacts\`](${SMOKE_BUNDLE_URL}) — unzip and open \`playwright-report/index.html\`"
+              echo ""
+              echo "_Prefer the pinned [\`quicklog-playwright-report\`](#user-content-playwright-html-report) artifact at the top of this summary if you only need the HTML report; use this bundle when you also want the JSON/TXT reports, the flake summary markdown, or \`test-results/\`._"
+            else
+              echo "**Status:** _Smoke bundle artifact URL unavailable — check the run's Artifacts dropdown for \`quicklog-smoke-artifacts\` and open \`playwright-report/index.html\` inside it._"
+            fi
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
 # Moved: Upload Playwright HTML report + Link in Job Summary now run
 # earlier (right before "Summarize Playwright flakes") so the HTML report
 # link is the FIRST section written to $GITHUB_STEP_SUMMARY and is

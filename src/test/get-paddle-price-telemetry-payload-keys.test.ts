@@ -35,8 +35,18 @@ const SOURCE = readFileSync(SOURCE_PATH, "utf8");
 function extractEmitterBody(source: string): string {
   const start = source.indexOf("function logCatalogUnavailable");
   expect(start, "logCatalogUnavailable emitter not found").toBeGreaterThan(-1);
-  // Grab a generous window; the emitter is ~40 lines.
-  return source.slice(start, start + 2000);
+  // Walk braces from the first `{` after the signature to the matching close.
+  const bodyStart = source.indexOf("{", start);
+  let depth = 0;
+  for (let i = bodyStart; i < source.length; i++) {
+    const ch = source[i];
+    if (ch === "{") depth++;
+    else if (ch === "}") {
+      depth--;
+      if (depth === 0) return source.slice(start, i + 1);
+    }
+  }
+  throw new Error("unterminated logCatalogUnavailable body");
 }
 
 function extractEmittedKeys(emitterBody: string): string[] {

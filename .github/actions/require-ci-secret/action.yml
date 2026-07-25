@@ -16,10 +16,10 @@ inputs:
     required: true
   secret-value:
     description: >
-      Value of the secret, injected by the caller as
-      `${{ secrets.<SECRET-NAME> }}`. Empty or whitespace-only counts as
-      missing. Composite actions cannot read `secrets.*` themselves, so
-      the caller MUST pass it in.
+      Value of the secret, injected explicitly by the caller from its
+      repository-secrets context. Empty or whitespace-only counts as missing.
+      Composite actions cannot read repository secrets themselves, so the
+      caller MUST pass the value in.
     required: true
   guard-heading:
     description: "Optional heading for logs + markdown report."

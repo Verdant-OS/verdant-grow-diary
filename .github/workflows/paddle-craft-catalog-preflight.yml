@@ -82,10 +82,22 @@ jobs:
           echo "rc=$RC" >> "$GITHUB_OUTPUT"
 
           # Whether the ONLY reason we could not verify is an absent API key.
-          # Recorded here, where the log is in hand, rather than re-derived
-          # later — and deliberately narrower than "rc == 2", which also
-          # covers a malformed --env invocation that must still fail.
-          if grep -qE '_API_KEY is not set' "$RUNNER_TEMP/craft-preflight.log"; then
+          #
+          # Two conditions, both required. "A key was missing" alone is NOT
+          # sufficient: with the sandbox key set and the live key absent, a
+          # real sandbox catalog failure is recorded and THEN the run exits 2
+          # on reaching live. Keying the exception off the message alone would
+          # wave that confirmed failure through as green — the exact
+          # false-green this exception was written to avoid creating.
+          #
+          # So it is also gated on the structured summary reporting zero
+          # failures. `fail=` comes from the script's own SUMMARY line, which
+          # counts results rather than log text.
+          FAILCOUNT=$(sed -nE 's/.*SUMMARY: pass=[0-9]+ fail=([0-9]+) skip=[0-9]+.*/\1/p' \
+            "$RUNNER_TEMP/craft-preflight.log" | tail -n1)
+          echo "failcount=${FAILCOUNT:-unknown}" >> "$GITHUB_OUTPUT"
+          if grep -qE '_API_KEY is not set' "$RUNNER_TEMP/craft-preflight.log" \
+             && [ "${FAILCOUNT:-}" = "0" ]; then
             echo "unconfigured=true" >> "$GITHUB_OUTPUT"
           else
             echo "unconfigured=false" >> "$GITHUB_OUTPUT"
@@ -106,8 +118,17 @@ jobs:
       # CANCELLED run — so a superseded run could still PATCH its stale
       # verdict on the way out. This runs on success and on failure, never on
       # cancellation.
+      #
+      # Same-repository head only. A fork PR gets a read-only GITHUB_TOKEN and
+      # no secrets, so `gh pr comment` / PATCH would 403 and red the run —
+      # turning the deliberately non-blocking "secrets absent" case into a
+      # hard failure for exactly the contributors who can least fix it. The
+      # step summary still carries the full result for those runs.
       - name: Comment Craft catalog failures on the PR
-        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        if: >-
+          ${{ !cancelled()
+            && github.event_name == 'pull_request'
+            && github.event.pull_request.head.repo.full_name == github.repository }}
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
@@ -197,8 +218,14 @@ jobs:
             "$MARKER" "$STATUS" "$TABLE" "$FIX" "${RC:-unknown}" "$RUN_URL")
 
           # Idempotent: patch the existing marker comment rather than stacking.
+          # Match on the marker AND the bot author. The marker alone is
+          # user-forgeable: anyone can post it before this workflow first
+          # runs, and the PATCH of another user's comment fails — permanently
+          # wedging the step for that PR. Restricting to our own bot means a
+          # planted marker is ignored and a fresh comment is posted instead.
           EXISTING=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
-            -q ".[] | select(.body | contains(\"$MARKER\")) | .id" | head -n1)
+            -q ".[] | select(.user.login == \"github-actions[bot]\")
+                    | select(.body | contains(\"$MARKER\")) | .id" | head -n1)
           if [ -n "$EXISTING" ]; then
             gh api --method PATCH "repos/$REPO/issues/comments/$EXISTING" -f body="$BODY" >/dev/null
             echo "Updated Craft catalog comment $EXISTING."

@@ -168,7 +168,11 @@ export function missingOnceLiveConfigKeys(env: {
  * `upstream_mode` field, which records HA-side provenance
  * (ha_core_ecowitt_push / ha_ecowitt_iot_poll / ...).
  */
-export const RUNNER_UPSTREAM_MODES = ["ecowitt_raw", "ha_json", "ha_statestream"] as const;
+export const RUNNER_UPSTREAM_MODES = [
+  "ecowitt_raw",
+  "ha_json",
+  "ha_statestream",
+] as const;
 export type RunnerUpstreamMode = (typeof RUNNER_UPSTREAM_MODES)[number];
 
 export class RunnerConfigError extends Error {
@@ -194,7 +198,9 @@ export function resolveUpstreamMode(env: NodeJS.ProcessEnv): RunnerUpstreamMode 
   }
   const mode = raw.trim();
   if (!(RUNNER_UPSTREAM_MODES as readonly string[]).includes(mode)) {
-    throw new RunnerConfigError(`UPSTREAM_MODE is not a valid mode (${VALID_MODES_HELP}).`);
+    throw new RunnerConfigError(
+      `UPSTREAM_MODE is not a valid mode (${VALID_MODES_HELP}).`,
+    );
   }
   return mode as RunnerUpstreamMode;
 }
@@ -243,10 +249,17 @@ export function validateHaMappingFile(
   if (!(HA_MAPPING_BRIDGES as readonly string[]).includes(m.bridge as string)) {
     fail(`bridge must be one of: ${HA_MAPPING_BRIDGES.join(", ")}`);
   }
-  if (!(HA_MAPPING_UPSTREAM_MODES as readonly string[]).includes(m.upstream_mode as string)) {
+  if (
+    !(HA_MAPPING_UPSTREAM_MODES as readonly string[]).includes(
+      m.upstream_mode as string,
+    )
+  ) {
     fail(`upstream_mode must be one of: ${HA_MAPPING_UPSTREAM_MODES.join(", ")}`);
   }
-  if (m.statestream_topic_prefix !== undefined && !isNonEmptyString(m.statestream_topic_prefix)) {
+  if (
+    m.statestream_topic_prefix !== undefined &&
+    !isNonEmptyString(m.statestream_topic_prefix)
+  ) {
     fail("statestream_topic_prefix must be a non-empty string when present");
   }
   if (opts.requireStatestreamPrefix && !isNonEmptyString(m.statestream_topic_prefix)) {
@@ -282,9 +295,13 @@ export function validateHaMappingFile(
     }
     if (
       ent.expected_unit !== undefined &&
-      !(HA_MAPPING_EXPECTED_UNITS as readonly string[]).includes(ent.expected_unit as string)
+      !(HA_MAPPING_EXPECTED_UNITS as readonly string[]).includes(
+        ent.expected_unit as string,
+      )
     ) {
-      fail(`entities[${i}].expected_unit must be one of: ${HA_MAPPING_EXPECTED_UNITS.join(", ")}`);
+      fail(
+        `entities[${i}].expected_unit must be one of: ${HA_MAPPING_EXPECTED_UNITS.join(", ")}`,
+      );
     }
   });
   return m as unknown as HaMqttMappingFile;
@@ -306,13 +323,17 @@ export function loadHaMappingFile(args: {
   try {
     text = read(args.path);
   } catch {
-    throw new RunnerConfigError(`HA_MQTT_MAPPING_PATH file could not be read: ${args.path}`);
+    throw new RunnerConfigError(
+      `HA_MQTT_MAPPING_PATH file could not be read: ${args.path}`,
+    );
   }
   let parsed: unknown;
   try {
     parsed = JSON.parse(text) as unknown;
   } catch {
-    throw new RunnerConfigError(`HA_MQTT_MAPPING_PATH file is not valid JSON: ${args.path}`);
+    throw new RunnerConfigError(
+      `HA_MQTT_MAPPING_PATH file is not valid JSON: ${args.path}`,
+    );
   }
   return validateHaMappingFile(parsed, {
     path: args.path,
@@ -340,7 +361,9 @@ export function assertSingleTentHaMapping(
 ): void {
   const mappedTentIds = new Set(mapping.entities.map((entity) => entity.tent_id));
   if (mappedTentIds.size > 1) {
-    throw new RunnerConfigError("HA MQTT mapping must contain entities for one tent only.");
+    throw new RunnerConfigError(
+      "HA MQTT mapping must contain entities for one tent only.",
+    );
   }
 
   if (
@@ -348,7 +371,9 @@ export function assertSingleTentHaMapping(
     mappedTentIds.size === 1 &&
     !mappedTentIds.has(defaultTentId)
   ) {
-    throw new RunnerConfigError("HA MQTT mapping tent must match VERDANT_TENT_ID.");
+    throw new RunnerConfigError(
+      "HA MQTT mapping tent must match VERDANT_TENT_ID.",
+    );
   }
 }
 
@@ -409,7 +434,10 @@ export interface HaDryRunState {
    * across channels or targets, and stale/invalid adapter results never
    * enter this cache.
    */
-  vpdPairCache: Map<string, { temp: HaMetricReading | null; rh: HaMetricReading | null }>;
+  vpdPairCache: Map<
+    string,
+    { temp: HaMetricReading | null; rh: HaMetricReading | null }
+  >;
   seenKeys: Set<string>;
 }
 
@@ -518,7 +546,11 @@ function classifyUnassembledStatestreamPart(
 }
 
 function haVpdPairIdentity(reading: HaMetricReading): string {
-  return JSON.stringify([reading.tent_id, reading.plant_id ?? null, reading.channel ?? null]);
+  return JSON.stringify([
+    reading.tent_id,
+    reading.plant_id ?? null,
+    reading.channel ?? null,
+  ]);
 }
 
 /**
@@ -568,7 +600,10 @@ function adapterResultToDryRunReport(args: {
 }): HaDryRunReport {
   const { state, result } = args;
   for (const reason of result.reasons) countReason(state, reason);
-  const readingsWithDerivedVpd = appendDerivedVpdReadings(state, result.readings);
+  const readingsWithDerivedVpd = appendDerivedVpdReadings(
+    state,
+    result.readings,
+  );
   const readings: HaDryRunReading[] = readingsWithDerivedVpd.map((r) => ({
     metric: r.metric,
     value: r.value,
@@ -718,7 +753,7 @@ function printHaDryRunReport(report: HaDryRunReport): void {
   if (report.outcome === "reading" || report.outcome === "rejected") {
     printReport(buildHaAttemptReport(report));
   }
-   
+  // eslint-disable-next-line no-console
   console.log("[ecowitt-mqtt-runner] ha dry-run detail", {
     mode: report.mode,
     dry_run: report.dry_run,
@@ -1008,14 +1043,14 @@ async function writeRedactedReport(
     await mkdir(path.dirname(out), { recursive: true });
     const payload = buildRedactedReportJson(report);
     await writeFile(out, JSON.stringify(payload, null, 2), "utf8");
-     
+    // eslint-disable-next-line no-console
     console.log(
       "[ecowitt-mqtt-runner] redacted report written to",
       out,
       "— paste into /operator/ecowitt-bridge-status",
     );
   } catch (e) {
-     
+    // eslint-disable-next-line no-console
     console.warn("[ecowitt-mqtt-runner] could not write redacted report:", e);
   }
 }
@@ -1042,7 +1077,7 @@ export function buildRedactedReportJson(
 
 function printReport(report: ReturnType<typeof buildIngestAttemptReport>): void {
   const e = report.evidence;
-   
+  // eslint-disable-next-line no-console
   console.log("[ecowitt-mqtt-runner] consumed MQTT message", {
     title: report.title,
     status: report.status,
@@ -1079,7 +1114,7 @@ async function connectMqttClient(env: RuntimeEnv): Promise<any> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     mqtt = await (Function("m", "return import(m)") as any)("mqtt");
   } catch {
-     
+    // eslint-disable-next-line no-console
     console.error(
       "[ecowitt-mqtt-runner] mqtt package not installed. Run `bun add mqtt` or use --dry-run --sample.",
     );
@@ -1106,7 +1141,7 @@ async function runHaDryRunLoop(
   flags: CliFlags,
 ): Promise<void> {
   if (flags.sample || flags.invalid) {
-     
+    // eslint-disable-next-line no-console
     console.error(
       "[ecowitt-mqtt-runner] --sample/--invalid build raw EcoWitt payloads and are ecowitt_raw-only. Refusing to start (fail closed).",
     );
@@ -1114,7 +1149,7 @@ async function runHaDryRunLoop(
     return;
   }
   if (flags.writeReport) {
-     
+    // eslint-disable-next-line no-console
     console.log(
       "[ecowitt-mqtt-runner] --write-report is ecowitt_raw-only; HA dry-run evidence is printed to stdout instead.",
     );
@@ -1123,35 +1158,38 @@ async function runHaDryRunLoop(
   const topic = haSubscribeTopic(config, env);
   const client = await connectMqttClient(env);
   client.on("connect", () => {
-     
+    // eslint-disable-next-line no-console
     console.log("[ecowitt-mqtt-runner] subscribed (ha dry-run)", topic);
     client.subscribe(topic);
   });
-  client.on("message", async (msgTopic: string, buf: Buffer, packet?: { retain?: boolean }) => {
-    const outcome = await handleIncomingMqttMessage({
-      topic: msgTopic,
-      payloadText: buf.toString("utf8"),
-      retained: packet?.retain === true,
-      config,
-      env,
-      flags,
-      haState,
-    });
-    if (
-      flags.once &&
-      outcome.kind === "ha_dry_run" &&
-      (outcome.report.outcome === "reading" || outcome.report.outcome === "rejected")
-    ) {
-      // Same honesty rule as the ecowitt_raw paths. HA modes never POST, so
-      // there is no write to misreport — but a one-shot HA inspection that
-      // could NOT normalise the entity has still failed at the one thing it
-      // was asked to do, so it must not exit 0. "buffered"/"ignored" do not
-      // reach here; those keep listening for the rest of a statestream set.
-      const code = onceExitCode(outcome.report.outcome === "reading" ? "dry_run" : "rejected");
-      client.end();
-      process.exit(code);
-    }
-  });
+  client.on(
+    "message",
+    async (msgTopic: string, buf: Buffer, packet?: { retain?: boolean }) => {
+      const outcome = await handleIncomingMqttMessage({
+        topic: msgTopic,
+        payloadText: buf.toString("utf8"),
+        retained: packet?.retain === true,
+        config,
+        env,
+        flags,
+        haState,
+      });
+      if (
+        flags.once &&
+        outcome.kind === "ha_dry_run" &&
+        (outcome.report.outcome === "reading" || outcome.report.outcome === "rejected")
+      ) {
+        // Same honesty rule as the ecowitt_raw paths. HA modes never POST, so
+        // there is no write to misreport — but a one-shot HA inspection that
+        // could NOT normalise the entity has still failed at the one thing it
+        // was asked to do, so it must not exit 0. "buffered"/"ignored" do not
+        // reach here; those keep listening for the rest of a statestream set.
+        const code = onceExitCode(outcome.report.outcome === "reading" ? "dry_run" : "rejected");
+        client.end();
+        process.exit(code);
+      }
+    },
+  );
 }
 
 async function main(): Promise<void> {
@@ -1165,7 +1203,7 @@ async function main(): Promise<void> {
       assertSingleTentHaMapping(modeConfig.mapping, env.tentId);
     }
   } catch (e) {
-     
+    // eslint-disable-next-line no-console
     console.error(
       "[ecowitt-mqtt-runner] configuration error — refusing to start (fail closed):",
       e instanceof Error ? e.message : String(e),
@@ -1175,7 +1213,7 @@ async function main(): Promise<void> {
   }
 
   if (modeConfig.upstreamMode !== "ecowitt_raw") {
-     
+    // eslint-disable-next-line no-console
     console.log("[ecowitt-mqtt-runner] startup", {
       upstream_mode: modeConfig.upstreamMode,
       mapping_path: modeConfig.mappingPath,
@@ -1202,7 +1240,7 @@ async function main(): Promise<void> {
     }
   }
 
-   
+  // eslint-disable-next-line no-console
   console.log("[ecowitt-mqtt-runner] startup", {
     upstream_mode: modeConfig.upstreamMode,
     dryRun: flags.dryRun,
@@ -1231,7 +1269,7 @@ async function main(): Promise<void> {
   const client = await connectMqttClient(env);
 
   client.on("connect", () => {
-     
+    // eslint-disable-next-line no-console
     console.log("[ecowitt-mqtt-runner] subscribed", env.mqttTopic);
     client.subscribe(env.mqttTopic);
   });

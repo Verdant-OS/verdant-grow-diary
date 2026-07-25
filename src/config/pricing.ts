@@ -446,7 +446,7 @@ export interface UpgradeFaqItem {
 export const UPGRADE_FAQ: UpgradeFaqItem[] = [
   {
     q: "How does billing work?",
-    a: "Pro is billed monthly or annually through Paddle, our payment processor. Prices shown are provisional placeholders while checkout is being finalized — no charge is made until you review and confirm inside Paddle.",
+    a: "Pro is billed monthly or annually through Paddle, our payment processor. Verdant shows the current plan and price before you leave for Paddle, and Paddle shows them again before payment. No charge is made until you review and confirm.",
   },
   {
     q: "Do I own my grow data?",

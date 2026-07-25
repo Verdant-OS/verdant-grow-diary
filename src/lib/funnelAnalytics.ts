@@ -46,6 +46,9 @@ export const FUNNEL_EVENTS = [
   "paywall_cta_clicked",
   "checkout_started",
   "checkout_catalog_unavailable",
+  "checkout_recovery_dismissed",
+  "checkout_recovery_choose_another_plan",
+  "checkout_recovery_retry",
   "subscription_activated",
   "checkout_return_completed",
 ] as const;

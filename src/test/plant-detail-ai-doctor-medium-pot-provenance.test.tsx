@@ -19,6 +19,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 
 import PlantDetailAiDoctorContextReadinessMount from "@/components/PlantDetailAiDoctorContextReadinessMount";
+import { AI_DOCTOR_UNKNOWN_PROVENANCE_COPY } from "@/lib/aiDoctorReadinessViewModel";
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
@@ -77,8 +78,8 @@ describe("PlantDetailAiDoctorContextReadinessMount — medium / pot size provena
     const pot = screen.getByTestId(
       "ai-doctor-context-readiness-panel-pot-size-unavailable",
     );
-    expect(medium.textContent).toMatch(/not available on this plant profile yet/);
-    expect(pot.textContent).toMatch(/not available on this plant profile yet/);
+    expect(medium.textContent).toContain(AI_DOCTOR_UNKNOWN_PROVENANCE_COPY.medium);
+    expect(pot.textContent).toContain(AI_DOCTOR_UNKNOWN_PROVENANCE_COPY.pot_size);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 

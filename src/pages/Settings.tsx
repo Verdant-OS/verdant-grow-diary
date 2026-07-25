@@ -43,6 +43,7 @@ import {
   saveTemperatureUnitPreference,
   clearTemperatureUnitPreference,
 } from "@/lib/temperatureUnitPreference";
+import { alertsPath } from "@/lib/routes";
 
 interface TileProps {
   name: string;
@@ -547,7 +548,7 @@ export default function Settings() {
             Review in-app alerts, severity, and status.
           </p>
           <Button asChild size="sm" data-testid="settings-alerts-link">
-            <Link to="/alerts">Open alerts</Link>
+            <Link to={alertsPath()}>Open alerts</Link>
           </Button>
         </Tile>
 

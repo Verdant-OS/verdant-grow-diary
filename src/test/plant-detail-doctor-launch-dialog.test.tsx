@@ -198,7 +198,7 @@ describe("<PlantDetailDoctorLaunchDialog />", () => {
   it("Add context first dispatches the existing QuickLog event and closes the dialog", () => {
     const listener = vi.fn();
     window.addEventListener("verdant:open-quicklog", listener);
-    renderDialog();
+    renderDialog({ growId: "g1", tentId: "t1" });
     fireEvent.click(screen.getByTestId("plant-detail-doctor-launch-trigger"));
     act(() => {
       fireEvent.click(screen.getByTestId("plant-detail-doctor-launch-add-context"));

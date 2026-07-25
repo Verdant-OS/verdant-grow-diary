@@ -39,7 +39,9 @@ describe("Action Queue last-updated timestamp state", () => {
 
   it("sets lastUpdatedAt only in the non-error branch of the fetch", () => {
     // The setter must sit inside the `else` (or after a guard), not unconditionally.
-    expect(SRC).toMatch(/if \(error\) \{\s*toast\.error\(error\.message\);\s*\} else \{\s*setLastUpdatedAt\(Date\.now\(\)\);/);
+    expect(SRC).toMatch(
+      /if \(error\) \{\s*toast\.error\(safeActionQueueFailureCopy\("load", error\)\);\s*\} else \{\s*setLastUpdatedAt\(Date\.now\(\)\);/,
+    );
   });
 
   it("does not unconditionally clear lastUpdatedAt on every load start", () => {

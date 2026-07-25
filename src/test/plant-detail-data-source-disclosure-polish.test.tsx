@@ -210,6 +210,24 @@ describe("PlantDetailDataSourceDisclosure · render", () => {
     ).toMatch(/entered by/i);
   });
 
+  it("REGRESSION: a real plant with no tent yet is Manual, never Demo", () => {
+    // Exact shape of PlantDetail.tsx's real usage for a freshly created
+    // plant with no tent assigned: plantMeta is real Supabase data,
+    // tentMeta is the untouched default ("unavailable") because
+    // plant?.tentId is null and no tent query ever runs. No snapshotSource
+    // either, matching a plant with no connected tent. Confirmed live: this
+    // exact combination rendered a "Demo / sample data — not live tent
+    // data" badge on a brand new, genuinely real plant.
+    render(<PlantDetailDataSourceDisclosure metas={[meta("supabase"), meta("unavailable")]} />);
+    const badge = screen.getByTestId("plant-detail-data-source-disclosure-badge");
+    expect(badge.getAttribute("data-label")).toBe("Manual");
+    expect(badge.getAttribute("data-label")).not.toBe("Demo");
+    expect(
+      screen.getByTestId("plant-detail-data-source-disclosure-description")
+        .textContent ?? "",
+    ).not.toMatch(/sample|simulated/i);
+  });
+
   it("renders Demo label and explicitly says not live tent data", () => {
     render(
       <PlantDetailDataSourceDisclosure metas={[meta("mock")]} />,

@@ -43,6 +43,16 @@
  *   --sample     Use a built-in fresh sample payload (no MQTT needed). ecowitt_raw only.
  *   --invalid    Use a built-in impossible sample payload (no MQTT needed). ecowitt_raw only.
  *
+ * Exit codes (a one-shot run's exit code is its PROOF, so it must never
+ * report a write that did not land as success — see onceExitCode):
+ *   0  the reading was accepted by ingest (HTTP 2xx), or the run was a
+ *      dry-run where nothing was attempted and the preview IS the output.
+ *   1  a live attempt was made and NOT accepted — rejected (4xx/5xx),
+ *      network_error, or unknown_response. Note `--invalid` is expected
+ *      to land here in live mode: that non-zero exit is the proof the
+ *      impossible payload was correctly refused.
+ *   2  configuration error — refused to start, nothing downstream ran.
+ *
  * Env:
  *   UPSTREAM_MODE        (required: ecowitt_raw | ha_json | ha_statestream)
  *   HA_MQTT_MAPPING_PATH (required for ha_json / ha_statestream)
@@ -846,6 +856,31 @@ interface HandleResult {
   status: string;
 }
 
+/**
+ * Map an ingest-attempt status onto a `--once` process exit code.
+ *
+ * A one-shot run exists to PROVE what happened to a single reading, so its
+ * exit code is the proof and must never present a write that did not land
+ * as success. Previously `--once` called `process.exit(0)` as soon as a
+ * message parsed, so a 4xx/5xx rejection, an auth failure, or an
+ * unreachable ingest URL all exited 0 — indistinguishable from an accepted
+ * reading in any script, CI step, or operator terminal.
+ *
+ * `posted` is deliberately NOT the signal: it is `resp !== null`, which is
+ * true for a rejection too (we got *a* response, just not a good one).
+ * `status` comes from buildIngestAttemptReport, which sets "accepted" only
+ * for HTTP 2xx.
+ *
+ *   accepted / dry_run                            -> 0
+ *   rejected / network_error / unknown_response    -> 1
+ *
+ * Exit 2 is reserved for fail-closed startup config errors, so the three
+ * cases stay distinguishable. Pure: no I/O, no process access.
+ */
+export function onceExitCode(status: string): 0 | 1 {
+  return status === "accepted" || status === "dry_run" ? 0 : 1;
+}
+
 async function handlePayload(
   payload: EcowittMqttPayload,
   env: RuntimeEnv,
@@ -1114,8 +1149,14 @@ async function runHaDryRunLoop(
         outcome.kind === "ha_dry_run" &&
         (outcome.report.outcome === "reading" || outcome.report.outcome === "rejected")
       ) {
+        // Same honesty rule as the ecowitt_raw paths. HA modes never POST, so
+        // there is no write to misreport — but a one-shot HA inspection that
+        // could NOT normalise the entity has still failed at the one thing it
+        // was asked to do, so it must not exit 0. "buffered"/"ignored" do not
+        // reach here; those keep listening for the rest of a statestream set.
+        const code = onceExitCode(outcome.report.outcome === "reading" ? "dry_run" : "rejected");
         client.end();
-        process.exit(0);
+        process.exit(code);
       }
     },
   );
@@ -1171,8 +1212,11 @@ async function main(): Promise<void> {
   });
 
   if (flags.sample || flags.invalid) {
-    await handlePayload(buildSamplePayload(flags.invalid), env, flags);
-    if (flags.once || flags.dryRun) return;
+    const sampleResult = await handlePayload(buildSamplePayload(flags.invalid), env, flags);
+    // Same honesty rule as the MQTT path below: a built-in sample that was
+    // sent live and rejected must not exit 0. `--invalid` is expected to
+    // exit 1 in live mode — that IS the proof it was refused.
+    if (flags.once || flags.dryRun) process.exit(onceExitCode(sampleResult.status));
   }
 
   // NOTE: dry-run without --sample now subscribes to MQTT and consumes a
@@ -1198,8 +1242,11 @@ async function main(): Promise<void> {
       haState: null,
     });
     if (flags.once && outcome.kind === "ecowitt_raw" && outcome.parsed) {
+      // Honest proof: exit non-zero when the reading was NOT accepted, so a
+      // rejection can never be read as a successful one-shot send.
+      const code = onceExitCode(outcome.result.status);
       client.end();
-      process.exit(0);
+      process.exit(code);
     }
   });
 }

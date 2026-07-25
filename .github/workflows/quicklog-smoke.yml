@@ -441,16 +441,39 @@ jobs:
 
             # Playwright writes an error-context.md next to each failing test's
             # trace under test-results/<test-folder>/. Surface up to 3 of them
-            # so the summary stays bounded.
+            # so the summary stays bounded. Each excerpt gets a stable HTML
+            # anchor (ectx-1, ectx-2, ...) so the follow-up step (which runs
+            # after the smoke bundle is uploaded and therefore knows the
+            # artifact URL) can link both back to the inline excerpt on this
+            # same page AND out to the downloadable bundle at the exact
+            # archive-relative path.
+            #
+            # We also persist the archive-relative paths to
+            # e2e/results/error-context-paths.txt so the follow-up step can
+            # rebuild the same list without re-globbing (test-results/ may be
+            # mutated by later steps).
+            ECTX_INDEX="e2e/results/error-context-paths.txt"
+            : > "${ECTX_INDEX}"
             if [ -d "test-results" ]; then
               # shellcheck disable=SC2044
               mapfile -t error_contexts < <(find test-results -maxdepth 4 -type f -name 'error-context.md' 2>/dev/null | sort | head -n 3)
+              ectx_n=0
               for ctx in "${error_contexts[@]}"; do
-                if tail_file "${ctx}" "Playwright error context — \`$(dirname "${ctx}" | sed 's|^test-results/||')\`" 60; then
+                ectx_n=$((ectx_n + 1))
+                anchor="ectx-${ectx_n}"
+                rel_dir="$(dirname "${ctx}" | sed 's|^test-results/||')"
+                # Persist "<anchor>\t<repo-relative path>" for the follow-up step.
+                printf '%s\t%s\n' "${anchor}" "${ctx}" >> "${ECTX_INDEX}"
+                # Emit the anchor immediately before the heading so
+                # `#ectx-N` links land on this excerpt.
+                echo ""
+                echo "<a id=\"${anchor}\"></a>"
+                if tail_file "${ctx}" "Playwright error context ${ectx_n} — \`${rel_dir}\`" 60; then
                   emitted_log=1
                 fi
               done
             fi
+
 
             if [ "${emitted_log}" -eq 0 ]; then
               echo ""
@@ -1026,7 +1049,58 @@ jobs:
             e2e/results/playwright-report.json
             e2e/results/playwright-flake-summary.md
             playwright-report/
-            test-results/
+
+      # After the smoke bundle is uploaded, emit direct links back to every
+      # `test-results/**/error-context.md` file that the failure-debug section
+      # excerpted inline. GitHub artifact URLs point at the whole zip, so each
+      # row provides: (1) the exact archive-relative path to unzip, (2) a
+      # "Download bundle" link scoped to the smoke bundle artifact, and
+      # (3) a "Jump to inline excerpt" link that uses the stable `#ectx-N`
+      # anchor emitted earlier in the same Job Summary. This makes clicking a
+      # referenced error-context land on either the exact inline tail or the
+      # exact file inside the downloadable bundle. Runs only when the failure
+      # section actually recorded any error-context files.
+      - name: Link error-context files in Job Summary
+        if: failure() && steps.failure_debug_summary.outputs.present == 'true'
+        shell: bash
+        env:
+          SMOKE_BUNDLE_URL: ${{ steps.upload_smoke_bundle.outputs.artifact-url }}
+          ARTIFACT_SUFFIX: ${{ env.ARTIFACT_SUFFIX }}
+        run: |
+          set +e
+          INDEX="e2e/results/error-context-paths.txt"
+          if [ ! -s "${INDEX}" ]; then
+            # Nothing to link — either no error-context.md files were present
+            # at failure time, or the failure-debug step didn't run. Stay
+            # silent rather than adding an empty section.
+            exit 0
+          fi
+          {
+            echo ""
+            echo "### 🔗 Error-context files — direct links"
+            echo ""
+            echo "Each row corresponds to a \`test-results/**/error-context.md\` excerpt shown inline in the **❌ Job failed — quick debug info** section above. Clicking **Jump to excerpt** scrolls to the tail on this page; **Download bundle** downloads the smoke bundle zip containing the file at the exact archive-relative path shown."
+            echo ""
+            echo "| # | Archive path (inside \`quicklog-smoke-artifacts-${ARTIFACT_SUFFIX}.zip\`) | Jump to excerpt | Download bundle |"
+            echo "| - | --- | --- | --- |"
+            while IFS=$'\t' read -r anchor rel_path; do
+              [ -z "${anchor}" ] && continue
+              n="${anchor#ectx-}"
+              if [ -n "${SMOKE_BUNDLE_URL}" ]; then
+                dl="[Download](${SMOKE_BUNDLE_URL})"
+              else
+                dl="_bundle URL unavailable — see Artifacts dropdown_"
+              fi
+              printf '| %s | `%s` | [Jump to excerpt](#%s) | %s |\n' \
+                "${n}" "${rel_path}" "${anchor}" "${dl}"
+            done < "${INDEX}"
+            echo ""
+            echo "> After downloading the bundle, extract it and open the archive path shown above. Example: \`unzip quicklog-smoke-artifacts-${ARTIFACT_SUFFIX}.zip\` then open the file at the listed path in any Markdown viewer."
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 0
+
+
 
       # Consolidated at-a-glance index of the three primary uploads for this
       # run (smoke bundle, standalone flake summary, standalone Playwright

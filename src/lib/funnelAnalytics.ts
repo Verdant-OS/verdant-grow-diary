@@ -27,6 +27,7 @@
  */
 
 import { PRICING_ANALYTICS_EVENT } from "@/lib/pricingAnalytics";
+import { enforceFunnelEventSchema } from "@/lib/funnelEventSchema";
 
 export const FUNNEL_EVENTS = [
   "signup",
@@ -131,7 +132,8 @@ export function sanitizeFunnelParams(
 
 export function trackFunnelEvent(name: FunnelEventName, params?: FunnelEventParams): void {
   if (typeof window === "undefined") return;
-  const safe = sanitizeFunnelParams(params);
+  const globallySafe = sanitizeFunnelParams(params);
+  const safe = enforceFunnelEventSchema(name, globallySafe);
   try {
     const g = (window as { gtag?: (...args: unknown[]) => void }).gtag;
     if (typeof g === "function") g("event", name, safe);

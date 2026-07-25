@@ -7,9 +7,16 @@
 // (`pri_...` internal ids, API response bodies, header dumps) is dropped
 // on the floor so a passing or errored line can't leak into a PR comment.
 //
+// Preferred input path: `--report <path>` reads the verifier's JSON
+// report (see scripts/verify-paddle-craft-catalog.ts `finalize()`) which
+// carries the same fields already-classified. `--log <path>` remains the
+// fallback for older CI runs / local ad-hoc invocations that don't emit
+// the report file — behaviour is identical when the log is well-formed.
+//
 // Callable as a CLI:
 //   node scripts/render-paddle-craft-preflight-comment.mjs \
-//     --log path/to/log --rc <exit-code> --event <pull_request|schedule|...> \
+//     [--report path/to/report.json | --log path/to/log] \
+//     --rc <exit-code> --event <pull_request|schedule|...> \
 //     [--out path/to/comment.md] [--json]
 //
 // Exit code is always 0 — this script only renders. The caller decides

@@ -660,7 +660,10 @@ jobs:
               echo ""
               echo "If neither artifact contains the file, it was never produced — jump to **How to (re)generate \`playwright-flake-summary.md\` locally** below."
               echo ""
+              echo "**Raw workflow logs for the skipped/failed upload:** [run #${GITHUB_RUN_NUMBER} attempt ${GITHUB_RUN_ATTEMPT}](${RUN_ATTEMPT_URL}) — expand the \`${GITHUB_JOB}\` job, then the \`Check flake summary presence\` step to see the gate decision, and the \`Upload playwright-flake-summary.md as artifact\` step to confirm it was skipped or errored. Full run page: [${GITHUB_WORKFLOW} #${GITHUB_RUN_NUMBER}](${RUN_URL})."
+              echo ""
             fi
+
             echo "**Expected path (in this workspace):** \`e2e/results/playwright-flake-summary.md\`"
             echo "**Uploaded artifact name (standalone):** \`quicklog-flake-summary-${ARTIFACT_SUFFIX}\` (single file: \`playwright-flake-summary.md\`)"
             echo "**Also archived inside:** \`quicklog-smoke-artifacts-${ARTIFACT_SUFFIX}\` bundle at \`e2e/results/playwright-flake-summary.md\` — alongside the source it was generated from, \`e2e/results/playwright-report.json\` (Playwright's own JSON reporter output; not uploaded as a standalone artifact)."

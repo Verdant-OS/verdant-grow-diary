@@ -14,20 +14,49 @@ accepts a client-supplied owner.
 
 ### Inputs (only)
 
-| Param            | Trusted? | Purpose                                                |
-|------------------|----------|--------------------------------------------------------|
-| `p_target_type`  | enum     | `'plant'` or `'tent'` — anything else returns a safe reason code |
-| `p_target_id`    | uuid     | The selected target row; ownership resolved via DB     |
-| `p_action`       | enum     | `'water'` or `'note'`                                  |
-| `p_volume_ml`    | numeric  | Required > 0 when action = `water`                     |
-| `p_note`         | text     | Optional free text, nullable                           |
-| `p_temperature_c`, `p_humidity_pct`, `p_vpd_kpa` | numeric | Optional manual sensor snapshot |
-| `p_occurred_at`  | tstz     | Optional; defaults to `now()`                          |
+| Param                                            | Trusted? | Purpose                                                                      |
+| ------------------------------------------------ | -------- | ---------------------------------------------------------------------------- |
+| `p_target_type`                                  | enum     | `'plant'` or `'tent'` — anything else returns a safe reason code             |
+| `p_target_id`                                    | uuid     | The selected target row; ownership resolved via DB                           |
+| `p_action`                                       | enum     | `'water'` or `'note'`                                                        |
+| `p_volume_ml`                                    | numeric  | Required > 0 when action = `water`                                           |
+| `p_note`                                         | text     | Optional free text, nullable                                                 |
+| `p_temperature_c`, `p_humidity_pct`, `p_vpd_kpa` | numeric  | Optional manual sensor snapshot                                              |
+| `p_occurred_at`                                  | tstz     | Optional; defaults to `now()`                                                |
+| `p_details`                                      | jsonb    | Optional object; `logged_at` must be a valid explicit-zone RFC3339 timestamp |
+| `p_idempotency_key`                              | text     | Optional stable retry key (8–200 characters when present)                    |
+| `p_stage`                                        | text     | Optional allow-listed cultivation stage                                      |
 
 There is **no** `p_user_id`, **no** `p_grow_id`, and **no** `p_tent_id`. The
 grow and tent are always resolved from the selected plant/tent row owned by
 `auth.uid()`. This makes mixed-boundary attacks (plant in grow B but client
 claims grow A) impossible by input shape.
+
+## Captured versus occurred time
+
+`logged_at` is capture/record time only. `grow_events.occurred_at` and
+`diary_entries.entry_at` remain the grower-reported occurrence time and may be
+backdated.
+
+- The two Quick Log wrappers validate one canonical `details.logged_at`, pass
+  it through a transaction-local trusted context, and persist it on the event
+  and diary mirror.
+- Direct compatibility writers do not have that trusted context. Their
+  `logged_at` is server-stamped at insertion; caller JSON, an explicit column
+  value, and occurrence time cannot supply capture time.
+- Historical diary JSON is accepted during the forward backfill only when it
+  parses and is within five minutes of the row's server `created_at`.
+  Otherwise, diary rows use `created_at`. Linked grow events inherit the
+  chosen diary capture; unmatched grow events use their own `created_at`.
+- An exact retry of a pre-migration event request may reuse its original row
+  even if its legacy `details.logged_at` is malformed or now too far in the
+  future. Legacy request-hash equality is checked before new field validation;
+  any changed payload still fails closed.
+- The event wrapper validates raw `p_details` before timestamp normalization.
+  Every valid JSON shape receives a compact, type-tagged internal request
+  fingerprint so changed and cross-shape retries conflict. Valid grower object
+  fields are reconstructed after the delegate returns; the fingerprint itself
+  never becomes grower-facing plant memory.
 
 ## Allowed safe reason codes
 
@@ -36,15 +65,19 @@ The RPC returns `jsonb` of shape `{ ok: boolean, reason?: text, ... }`. When
 the **only** strings the RPC may put in `reason`. Adding a new code requires
 updating this list and the regression tests in the same change.
 
-| Code                  | Meaning                                                   |
-|-----------------------|-----------------------------------------------------------|
-| `not_authenticated`   | `auth.uid()` is null                                      |
-| `invalid_target_type` | `p_target_type` not in (`plant`, `tent`)                  |
-| `missing_target_id`   | `p_target_id` is null                                     |
-| `unsupported_action`  | `p_action` not in (`water`, `note`)                       |
-| `invalid_volume`      | Water action with missing or non-positive `p_volume_ml`   |
-| `target_not_owned`    | Selected plant/tent does not belong to `auth.uid()`       |
-| `grow_not_owned`      | Defense-in-depth: resolved grow does not belong to caller |
+| Code                      | Meaning                                                               |
+| ------------------------- | --------------------------------------------------------------------- |
+| `not_authenticated`       | `auth.uid()` is null                                                  |
+| `invalid_target_type`     | `p_target_type` not in (`plant`, `tent`)                              |
+| `missing_target_id`       | `p_target_id` is null                                                 |
+| `unsupported_action`      | `p_action` not in (`water`, `note`)                                   |
+| `invalid_volume`          | Water action with missing or non-positive `p_volume_ml`               |
+| `invalid_details`         | `p_details` is present but is not a JSON object                       |
+| `invalid_idempotency_key` | Retry key is present but outside its length bounds                    |
+| `invalid_logged_at`       | Captured timestamp is malformed, impossible, or too far in the future |
+| `target_not_owned`        | Selected plant/tent does not belong to `auth.uid()`                   |
+| `grow_not_owned`          | Defense-in-depth: resolved grow does not belong to caller             |
+| `save_failed`             | Atomic persistence failed; no raw database error is exposed           |
 
 ### Reason-code rules
 
@@ -96,6 +129,11 @@ tests — fix the RPC or update this document and the test list together.
   mixed-boundary attacks are impossible by input shape.
 - `src/test/quicklog-save-manual-rpc-ci-script.test.ts` — confirms the
   targeted CI script and workflow job are wired.
+- `src/test/quicklog-dual-timestamp-foundation.test.ts` — safe legacy parsing,
+  owner/grow mirror correlation, timestamp parity, grants, and scope fences.
+- `scripts/run-quicklog-dual-timestamp-rls-harness.ts` — local-only runtime
+  proof for both RPC variants, retries, duplicate/spoofed mirrors, untouched
+  writers, malformed JSON, and anonymous grant denial.
 
 ## Targeted CI command
 
@@ -109,16 +147,14 @@ full suite.
 
 ## Integration harness status
 
-**BLOCKED.** This repo does not currently run a local Supabase/Postgres
-instance during CI (only `supabase/tests/permissions.sql` is provided for
-manual `psql` runs against a linked DB). Real RPC integration tests that
-exercise cross-user rejection with actual row counts are deferred until a
-test database harness exists. Smallest setup needed:
+`scripts/run-quicklog-dual-timestamp-rls-harness.ts` runs against the
+disposable local Supabase replay lane. It signs in two temporary users through
+the anonymous client boundary, exercises both RPCs, verifies persisted rows
+with the local administrative client, and tears every fixture down in
+`finally`. The harness refuses any non-loopback API host, so this test cannot
+write to a hosted project.
 
-1. Add `supabase start` to CI with a seeded test database.
-2. Add a Deno or `psql` harness that signs two JWTs (user A, user B), calls
-   the RPC, and asserts row counts in `grow_events` / `environment_events`.
-3. Move ownership rejection cases from static SQL inspection to live RPC
-   calls.
-
-Until then, the static SQL regression suite is the source of truth.
+The existing static SQL regressions remain required and complementary: runtime
+behavior proves the applied database contract, while static tests ensure the
+forward migration continues to encode safe parsing, deterministic same-owner
+correlation, fixed search paths, and authenticated-only grants.

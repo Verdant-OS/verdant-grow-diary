@@ -50,6 +50,7 @@ describe("event name contract", () => {
       "checkout_recovery_dismissed",
       "checkout_recovery_choose_another_plan",
       "checkout_recovery_retry",
+      "checkout_recovery_plan_slug_fallback",
       "subscription_activated",
       "checkout_return_completed",
     ]);
@@ -69,6 +70,7 @@ describe("event name contract", () => {
       "event_type",
       "rows",
       "reason",
+      "length_bucket",
     ]);
   });
 });

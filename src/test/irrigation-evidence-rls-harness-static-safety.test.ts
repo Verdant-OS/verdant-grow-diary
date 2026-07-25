@@ -102,6 +102,17 @@ describe("irrigation evidence RLS harness — service_role boundary", () => {
     const stripped = noComments.replace(/SUPABASE_SERVICE_ROLE_KEY/g, "");
     expect(stripped).not.toMatch(/service[_-]?role/i);
   });
+
+  it("seeds grower-owned fixtures through each authenticated owner", () => {
+    expect(src).toContain("async function seedId(\n  client: SupabaseClient,");
+    expect(src).not.toMatch(/admin\.from\(table\)\.insert/);
+    expect(src).toContain('seedId(ownerC, "grows"');
+    expect(src).toContain('seedId(ownerC, "tents"');
+    expect(src).toContain('seedId(ownerC, "plants"');
+    expect(src).toContain('seedId(strangerC, "grows"');
+    expect(src).toContain('seedId(strangerC, "tents"');
+    expect(src).toContain('seedId(strangerC, "plants"');
+  });
 });
 
 describe("irrigation evidence RLS harness — no device-control / automation / forbidden writes", () => {

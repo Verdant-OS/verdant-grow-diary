@@ -43,8 +43,13 @@ let entitlementMock: { isActive: boolean; effectivePlanId: string; displayPlanId
   effectivePlanId: "pro_monthly",
   displayPlanId: "pro_monthly",
 };
+const refetchEntitlementMock = vi.fn().mockResolvedValue(false);
 vi.mock("@/hooks/useMyEntitlements", () => ({
-  useMyEntitlements: () => ({ entitlement: entitlementMock, loading: false, refetch: vi.fn() }),
+  useMyEntitlements: () => ({
+    entitlement: entitlementMock,
+    loading: false,
+    refetch: refetchEntitlementMock,
+  }),
 }));
 
 import PhenoHuntWorkspace from "@/pages/PhenoHuntWorkspace";
@@ -58,7 +63,6 @@ vi.mock("@/hooks/usePhenoEvidencePackets", () => ({
     truncated: false,
   }),
 }));
-
 
 function candidate(id: string, overrides: Partial<PhenoCandidateInput> = {}): PhenoCandidateInput {
   return {
@@ -132,6 +136,7 @@ beforeEach(() => {
   hookMock.mockReset();
   assignMock.mockReset().mockResolvedValue({ ok: true, candidateNumber: 5 });
   loadNextPageMock.mockReset();
+  refetchEntitlementMock.mockReset().mockResolvedValue(false);
   entitlementMock = {
     isActive: true,
     effectivePlanId: "pro_monthly",
@@ -201,6 +206,93 @@ describe("owner-only candidate-number assignment", () => {
     const err = await screen.findByTestId("workspace-assign-number-error-p1");
     expect(err).toHaveTextContent(/already used by another candidate/i);
     expect(err).toHaveAttribute("role", "alert");
+  });
+
+  it("offers a plan re-check — never an upsell — when the denial is an entitlement one", async () => {
+    // This control is gated by canAssign, so reaching an entitlement rejection
+    // means the client thought the grower COULD write and the database
+    // disagreed: a stale/diverged plan read, not a known Free grower. Selling
+    // to them is unsafe — /pricing does not inspect the current entitlement
+    // before opening checkout, so an upsell could bill them a second time.
+    assignMock.mockResolvedValue({
+      ok: false,
+      reason: "entitlement",
+      error: "Assigning a candidate number needs an active Pheno Tracker Pro plan.",
+    });
+    renderWorkspace({ candidates: [candidate("p1")], totalCandidateCount: 1 });
+    fireEvent.change(screen.getByTestId("workspace-assign-number-input-p1"), {
+      target: { value: "5" },
+    });
+    fireEvent.click(screen.getByTestId("workspace-assign-number-save-p1"));
+    expect(await screen.findByTestId("workspace-assign-number-error-p1")).toHaveTextContent(
+      /active Pheno Tracker Pro plan/i,
+    );
+
+    const recheck = screen.getByTestId("workspace-assign-number-recheck-p1");
+    expect(recheck.textContent ?? "").toMatch(/re-check my plan/i);
+    // Must not route an already-entitled grower into a second checkout.
+    expect(recheck.getAttribute("href")).toBeNull();
+    const scope = screen.getByTestId("workspace-assign-number-p1");
+    expect(scope.querySelector('a[href*="/pricing"]')).toBeNull();
+    expect(scope.textContent ?? "").not.toMatch(/upgrade|trial/i);
+
+    fireEvent.click(recheck);
+    await waitFor(() => expect(refetchEntitlementMock).toHaveBeenCalled());
+  });
+
+  it("keeps the denial visible when the plan re-check itself fails", async () => {
+    // A failed lookup resolves the entitlement to Free for presentation, which
+    // flips canAssign off. Without care that silently swaps the control for
+    // "Unnumbered" and throws away an actionable server denial for a grower who
+    // is probably still paying. The failure must be reported, not swallowed.
+    assignMock.mockResolvedValue({
+      ok: false,
+      reason: "entitlement",
+      error: "Assigning a candidate number needs an active Pheno Tracker Pro plan.",
+    });
+    refetchEntitlementMock.mockImplementation(async () => {
+      entitlementMock = { isActive: false, effectivePlanId: "free", displayPlanId: "free" };
+      return true; // lookupFailed
+    });
+
+    renderWorkspace({ candidates: [candidate("p1")], totalCandidateCount: 1 });
+    fireEvent.change(screen.getByTestId("workspace-assign-number-input-p1"), {
+      target: { value: "5" },
+    });
+    fireEvent.click(screen.getByTestId("workspace-assign-number-save-p1"));
+    fireEvent.click(await screen.findByTestId("workspace-assign-number-recheck-p1"));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("workspace-assign-number-error-p1")).toHaveTextContent(
+        /couldn't verify your plan/i,
+      ),
+    );
+    // Still recoverable, and never silently downgraded to the read-only label.
+    expect(screen.getByTestId("workspace-assign-number-recheck-p1")).toBeInTheDocument();
+    expect(screen.queryByTestId("workspace-candidate-unnumbered-p1")).toBeNull();
+  });
+
+  it("never offers a remedy affordance for a transport failure", async () => {
+    // Regression guard: `network` is reached by any unclassified SQLSTATE, a
+    // thrown promise, or a 200 with an unusable row. A dropped connection is
+    // not an account problem and must not be presented as one.
+    assignMock.mockResolvedValue({
+      ok: false,
+      reason: "network",
+      error: "Couldn't save the number. Check your connection and try again.",
+    });
+    renderWorkspace({ candidates: [candidate("p1")], totalCandidateCount: 1 });
+    fireEvent.change(screen.getByTestId("workspace-assign-number-input-p1"), {
+      target: { value: "5" },
+    });
+    fireEvent.click(screen.getByTestId("workspace-assign-number-save-p1"));
+    expect(await screen.findByTestId("workspace-assign-number-error-p1")).toHaveTextContent(
+      /check your connection/i,
+    );
+    expect(screen.queryByTestId("workspace-assign-number-recheck-p1")).toBeNull();
+    expect(screen.getByTestId("workspace-assign-number-p1").textContent ?? "").not.toMatch(
+      /upgrade|trial|plan/i,
+    );
   });
 
   it("hides the assignment control from a non-Pro (read-only) viewer", () => {

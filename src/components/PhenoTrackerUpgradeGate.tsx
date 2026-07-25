@@ -4,10 +4,7 @@ import { Sprout } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { sanitizeCheckoutReturnTo } from "@/lib/checkoutReturnTo";
-import {
-  canUseFeature,
-  canReadExistingFeatureData,
-} from "@/lib/featureEntitlements";
+import { canUseFeature, canReadExistingFeatureData } from "@/lib/featureEntitlements";
 
 /**
  * PhenoTrackerUpgradeGate — presenter-only gate for Pheno Tracker surfaces.
@@ -107,8 +104,7 @@ export default function PhenoTrackerUpgradeGate({
           Plan check unavailable
         </h2>
         <p className="mt-3 text-sm text-muted-foreground">
-          We couldn&apos;t verify Pheno Tracker access right now. Your plan has
-          not changed.
+          We couldn&apos;t verify Pheno Tracker access right now. Your plan has not changed.
         </p>
         <Button
           type="button"
@@ -127,22 +123,16 @@ export default function PhenoTrackerUpgradeGate({
     return <>{children}</>;
   }
 
-  if (
-    allowReadOnly &&
-    canReadExistingFeatureData(entitlement, "pheno_tracker")
-  ) {
+  if (allowReadOnly && canReadExistingFeatureData(entitlement, "pheno_tracker")) {
     return (
       <div data-testid={`${testId}-readonly`}>
         <div
           data-testid={`${testId}-readonly-banner`}
           className="mb-4 rounded-md border border-border/60 bg-muted/40 p-3 text-sm text-muted-foreground"
         >
-          Your Pro plan is inactive. You can still view your existing Pheno
-          Tracker records. Resubscribe to create, edit, compare, or export.
-          <Link
-            to={upgradeHref}
-            className="ml-2 font-medium text-primary hover:underline"
-          >
+          Your Pro plan is inactive. You can still view your existing Pheno Tracker records.
+          Resubscribe to create, edit, compare, or export.
+          <Link to={upgradeHref} className="ml-2 font-medium text-primary hover:underline">
             Upgrade to Pro
           </Link>
         </div>
@@ -157,9 +147,7 @@ export default function PhenoTrackerUpgradeGate({
       aria-labelledby={`${testId}-title`}
       className="mx-auto mt-8 max-w-2xl rounded-xl border border-border/60 bg-card/40 p-6 text-left"
     >
-      <p className="text-xs uppercase tracking-widest text-primary font-medium">
-        Pro feature
-      </p>
+      <p className="text-xs uppercase tracking-widest text-primary font-medium">Pro feature</p>
       <h2
         id={`${testId}-title`}
         className="mt-2 flex items-center gap-2 font-display text-xl font-semibold tracking-tight"
@@ -168,12 +156,11 @@ export default function PhenoTrackerUpgradeGate({
         Pheno Tracker is a Pro feature.
       </h2>
       <p className="mt-3 text-sm text-muted-foreground">
-        Track candidate evidence, compare phenos, preserve keeper decisions,
-        and document post-cure results.
+        Track candidate evidence, compare phenos, preserve keeper decisions, and document post-cure
+        results.
       </p>
       <p className="mt-2 text-sm text-muted-foreground">
-        Use it to see what changed, what held up after cure, and what deserves
-        another run.
+        Use it to see what changed, what held up after cure, and what deserves another run.
       </p>
       <ul className="mt-4 space-y-2 text-sm" data-testid={`${testId}-bullets`}>
         {FEATURE_BULLETS.map((line) => (

@@ -633,6 +633,33 @@ export default function Pricing() {
               Checkout isn't ready here yet. Get one launch email.
             </h2>
             <p className="mt-3 text-sm text-muted-foreground">{checkoutRecoveryReason}</p>
+            {blockedReason && (
+              <div className="mt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  data-testid="pricing-checkout-choose-another-plan"
+                  onClick={() => {
+                    trackPricingEvent("pricing_checkout_blocked", {
+                      plan: lastCheckoutPlanRef.current,
+                      source: "choose_another_plan",
+                      reason: "recovery_dismissed",
+                    });
+                    dismissBlocked();
+                    setRecoveryRequested(false);
+                    const grid =
+                      typeof document !== "undefined"
+                        ? document.getElementById("pricing-plans")
+                        : null;
+                    grid?.scrollIntoView({ behavior: "smooth", block: "start" });
+                    (grid as HTMLElement | null)?.focus?.();
+                  }}
+                >
+                  Choose another plan
+                </Button>
+              </div>
+            )}
             <div className="mt-5">
               <SubscriberInterestForm planId={interestPlan} leadSource={paidInterestLeadSource} />
             </div>

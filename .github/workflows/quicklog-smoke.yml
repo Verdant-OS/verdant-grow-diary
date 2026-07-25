@@ -1052,12 +1052,23 @@ jobs:
             echo ""
 
             if [ -n "${TRACES_URL}" ]; then
+              echo "> ✅ **Trace artifact uploaded:** [\`quicklog-playwright-traces-${ARTIFACT_SUFFIX}\`](${TRACES_URL}) — direct download link ready."
+              echo ""
               echo "1. **Download the traces artifact:** [\`quicklog-playwright-traces-${ARTIFACT_SUFFIX}\`](${TRACES_URL}) — contains every \`test-results/**/trace.zip\` produced by this run (first attempt + retries)."
             elif [ -n "${SMOKE_BUNDLE_URL}" ]; then
-              echo "1. **Download the smoke bundle:** [\`quicklog-smoke-artifacts-${ARTIFACT_SUFFIX}\`](${SMOKE_BUNDLE_URL}) — traces live under \`test-results/**/trace.zip\` inside the bundle. _(Standalone \`quicklog-playwright-traces\` artifact URL was unavailable in this Job Summary.)_"
+              echo "> ⚠️ **Standalone trace artifact unavailable** — the \`quicklog-playwright-traces-${ARTIFACT_SUFFIX}\` upload was skipped or its URL was not exposed to this Job Summary. Use the smoke bundle below as the fallback (it contains the same \`test-results/**/trace.zip\` files)."
+              echo ""
+              echo "**Fallback download:** [\`quicklog-smoke-artifacts-${ARTIFACT_SUFFIX}\`](${SMOKE_BUNDLE_URL})"
+              echo ""
+              echo "1. **Download the smoke bundle:** [\`quicklog-smoke-artifacts-${ARTIFACT_SUFFIX}\`](${SMOKE_BUNDLE_URL}) — traces live under \`test-results/**/trace.zip\` inside the bundle."
             else
-              echo "1. **Download the traces artifact:** open this run's **Artifacts** dropdown and grab \`quicklog-playwright-traces-${ARTIFACT_SUFFIX}\` (or \`quicklog-smoke-artifacts-${ARTIFACT_SUFFIX}\` for the same files under \`test-results/**/trace.zip\`)."
+              echo "> ❌ **No trace artifact download link available in this Job Summary.** Both the standalone \`quicklog-playwright-traces-${ARTIFACT_SUFFIX}\` and the \`quicklog-smoke-artifacts-${ARTIFACT_SUFFIX}\` bundle uploads were skipped or failed to expose a URL. This usually means the Playwright step produced no \`test-results/**/trace.zip\` files (all tests passed on the first attempt with no retries), or the upload step failed — check the **Upload Playwright traces** and **Upload smoke bundle** steps in [this job's logs](${JOB_URL})."
+              echo ""
+              echo "**Manual download path:** open this run's **Artifacts** dropdown at the top of [the run page](${RUN_URL}) and look for \`quicklog-playwright-traces-${ARTIFACT_SUFFIX}\` (or \`quicklog-smoke-artifacts-${ARTIFACT_SUFFIX}\` for the same files under \`test-results/**/trace.zip\`). If neither artifact is listed there, no traces were produced by this run."
+              echo ""
+              echo "1. **Download the traces artifact:** open this run's **Artifacts** dropdown and grab \`quicklog-playwright-traces-${ARTIFACT_SUFFIX}\` (or \`quicklog-smoke-artifacts-${ARTIFACT_SUFFIX}\`)."
             fi
+
             echo "2. **Unzip the artifact locally** — copy-paste one of these commands from the folder where the zip landed:"
             echo ""
             echo "   \`\`\`bash"

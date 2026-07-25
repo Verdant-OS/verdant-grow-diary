@@ -586,8 +586,17 @@ jobs:
             # successful upload, so its presence here is a strong signal
             # that the download link is live. The fuller status/gate
             # explanation still follows for the skipped/missing cases.
+            # The run/job URLs are stable GitHub-provided identifiers, so we
+            # can always build them from env — no extra API call needed. The
+            # per-attempt URL points at the exact retry that produced the
+            # uploaded artifact, which is what a reviewer usually wants when
+            # cross-referencing a flake summary against raw step logs.
+            RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            RUN_ATTEMPT_URL="${RUN_URL}/attempts/${GITHUB_RUN_ATTEMPT}"
             if [ "${FLAKE_SUMMARY_PRESENT}" = "true" ] && [ -n "${FLAKE_SUMMARY_URL}" ]; then
               echo "**Download:** [\`quicklog-flake-summary-${ARTIFACT_SUFFIX}\`](${FLAKE_SUMMARY_URL}) — single-file artifact containing \`playwright-flake-summary.md\`."
+              echo ""
+              echo "**Raw workflow logs for this upload:** [run #${GITHUB_RUN_NUMBER} attempt ${GITHUB_RUN_ATTEMPT}](${RUN_ATTEMPT_URL}) — expand the \`${GITHUB_JOB}\` job, then the \`Upload playwright-flake-summary.md as artifact\` step for the exact upload output, or the \`Summarize Playwright flakes\` step for how the file was generated. Full run page: [${GITHUB_WORKFLOW} #${GITHUB_RUN_NUMBER}](${RUN_URL})."
               echo ""
             elif [ "${FLAKE_SUMMARY_PRESENT}" = "true" ]; then
               echo "**Download:** _Standalone artifact was uploaded, but its direct URL is unavailable in this Job Summary._"
@@ -597,6 +606,9 @@ jobs:
               echo "- **Artifact name:** \`quicklog-flake-summary-${ARTIFACT_SUFFIX}\`"
               echo "- **File inside the zip:** \`playwright-flake-summary.md\` (at the root of the archive)"
               echo ""
+              echo "**Raw workflow logs for this upload:** [run #${GITHUB_RUN_NUMBER} attempt ${GITHUB_RUN_ATTEMPT}](${RUN_ATTEMPT_URL}) — expand the \`${GITHUB_JOB}\` job, then the \`Upload playwright-flake-summary.md as artifact\` step. Full run page: [${GITHUB_WORKFLOW} #${GITHUB_RUN_NUMBER}](${RUN_URL})."
+              echo ""
+
             else
               echo "**Download:** _Standalone \`quicklog-flake-summary-${ARTIFACT_SUFFIX}\` artifact was **not uploaded** for this run (see the **Upload gate** breakdown below for the exact reason)._"
               echo ""

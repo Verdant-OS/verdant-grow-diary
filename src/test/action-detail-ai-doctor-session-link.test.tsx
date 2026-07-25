@@ -125,14 +125,6 @@ vi.mock("sonner", () => ({
   toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn(), message: vi.fn() },
 }));
 
-// ActionDetail resolves its row through async effects that can exceed
-// testing-library's 1s findBy default AND vitest's 5s per-test timeout on
-// loaded shared CI runners (observed repeatedly across full-suite batches;
-// passes locally in seconds). Raise the per-test budget for this file and
-// give the async-load awaits a generous findBy timeout beneath it.
-vi.setConfig({ testTimeout: 60_000 });
-const FIND_TIMEOUT = { timeout: 30_000 };
-
 beforeEach(() => {
   detailRow = AI_DOCTOR_ROW;
 });
@@ -150,9 +142,7 @@ function renderDetail(actionId = "aq-ai-1") {
 describe("ActionDetail header — Linked from AI Doctor affordance", () => {
   it("shows 'Linked from AI Doctor' on AI Doctor action with a valid session id", async () => {
     renderDetail();
-    const chip = await screen.findByTestId(
-      "action-detail-ai-doctor-session-header-link",
-    );
+    const chip = await screen.findByTestId("action-detail-ai-doctor-session-header-link");
     expect(chip.textContent ?? "").toMatch(/linked from ai doctor/i);
   });
 
@@ -161,65 +151,49 @@ describe("ActionDetail header — Linked from AI Doctor affordance", () => {
     // After unification there is exactly ONE header session link.
     const anchor = (await screen.findByTestId(
       "action-detail-ai-doctor-saved-session-link",
-      undefined,
-      FIND_TIMEOUT,
     )) as HTMLAnchorElement;
     expect(anchor.textContent ?? "").toBe("View saved AI Doctor session");
     expect(anchor.getAttribute("href")).toBe(aiDoctorSessionDetailPath("sess-abc"));
     // The legacy header anchor testid is removed.
-    expect(
-      screen.queryByTestId("action-detail-ai-doctor-session-header-link-anchor"),
-    ).toBeNull();
+    expect(screen.queryByTestId("action-detail-ai-doctor-session-header-link-anchor")).toBeNull();
   });
 
   it("does not render the affordance when AI Doctor row lacks a session id", async () => {
     detailRow = AI_DOCTOR_ROW_NO_SESSION;
     renderDetail("aq-ai-2");
-    await screen.findByText("Raise the light by 10 cm", undefined, FIND_TIMEOUT);
-    expect(
-      screen.queryByTestId("action-detail-ai-doctor-session-header-link"),
-    ).toBeNull();
-    expect(
-      screen.queryByTestId("action-detail-ai-doctor-saved-session-link"),
-    ).toBeNull();
+    await screen.findByText("Raise the light by 10 cm");
+    expect(screen.queryByTestId("action-detail-ai-doctor-session-header-link")).toBeNull();
+    expect(screen.queryByTestId("action-detail-ai-doctor-saved-session-link")).toBeNull();
   });
 
   it("does not render the affordance on non-AI-Doctor actions", async () => {
     detailRow = COACH_ROW;
     renderDetail("aq-coach-1");
-    await screen.findByText("Lower humidity to 55%", undefined, FIND_TIMEOUT);
-    expect(
-      screen.queryByTestId("action-detail-ai-doctor-session-header-link"),
-    ).toBeNull();
+    await screen.findByText("Lower humidity to 55%");
+    expect(screen.queryByTestId("action-detail-ai-doctor-session-header-link")).toBeNull();
   });
 
   it("preserves the existing 'Suggestion origin' panel for AI Doctor rows", async () => {
     renderDetail();
-    const panel = await screen.findByTestId("action-detail-ai-doctor-provenance", undefined, FIND_TIMEOUT);
+    const panel = await screen.findByTestId("action-detail-ai-doctor-provenance");
     expect(panel.textContent ?? "").toContain("Suggestion origin");
   });
 
   it("never leaks raw [session:<id>] token into the header chip", async () => {
     renderDetail();
-    const chip = await screen.findByTestId(
-      "action-detail-ai-doctor-session-header-link",
-    );
+    const chip = await screen.findByTestId("action-detail-ai-doctor-session-header-link");
     expect(chip.innerHTML).not.toContain("[session:");
   });
 
   it("does not render target_device inside the header chip", async () => {
     renderDetail();
-    const chip = await screen.findByTestId(
-      "action-detail-ai-doctor-session-header-link",
-    );
+    const chip = await screen.findByTestId("action-detail-ai-doctor-session-header-link");
     expect(chip.textContent ?? "").not.toContain("secret-device-name");
   });
 
   it("header chip copy does not imply execution / automation / device control", async () => {
     renderDetail();
-    const chip = await screen.findByTestId(
-      "action-detail-ai-doctor-session-header-link",
-    );
+    const chip = await screen.findByTestId("action-detail-ai-doctor-session-header-link");
     const txt = (chip.textContent ?? "").toLowerCase();
     for (const banned of [
       "auto-execute",
@@ -241,28 +215,17 @@ describe("ActionDetail header — Linked from AI Doctor affordance", () => {
 
 // --- Static safety scans ----------------------------------------------------
 
-const DETAIL_SRC = readFileSync(
-  resolve(__dirname, "../..", "src/pages/ActionDetail.tsx"),
-  "utf8",
-);
+const DETAIL_SRC = readFileSync(resolve(__dirname, "../..", "src/pages/ActionDetail.tsx"), "utf8");
 
 describe("ActionDetail header affordance — static safety", () => {
   it("introduces no new write paths into action_queue", () => {
     const lower = DETAIL_SRC.toLowerCase();
     expect(lower).not.toContain("functions.invoke");
     expect(lower).not.toContain("service_role");
-    expect(lower).not.toMatch(
-      /from\(["']action_queue["'][\s\S]{0,200}?\.upsert\(/,
-    );
-    expect(lower).not.toMatch(
-      /from\(["']action_queue["'][\s\S]{0,200}?\.delete\(/,
-    );
-    expect(lower).not.toMatch(
-      /from\(["']action_queue["'][\s\S]{0,200}?\.rpc\(/,
-    );
-    expect(lower).not.toMatch(
-      /from\(["']action_queue["'][\s\S]{0,200}?\.insert\(/,
-    );
+    expect(lower).not.toMatch(/from\(["']action_queue["'][\s\S]{0,200}?\.upsert\(/);
+    expect(lower).not.toMatch(/from\(["']action_queue["'][\s\S]{0,200}?\.delete\(/);
+    expect(lower).not.toMatch(/from\(["']action_queue["'][\s\S]{0,200}?\.rpc\(/);
+    expect(lower).not.toMatch(/from\(["']action_queue["'][\s\S]{0,200}?\.insert\(/);
   });
 
   it("uses the shared route helper for the session link", () => {

@@ -2,9 +2,9 @@
  * Pinned Supabase database identities for Verdant's remote schema gates.
  *
  * A secret name is not proof of where its connection string points. Every
- * remote database check must parse the URL and either prove that its encoded
- * project ref matches the selected environment or bind a generic shared-
- * pooler username to that pinned ref before psql is allowed to run.
+ * remote database check must parse the URL and either prove that its direct
+ * host matches the selected environment or bind every shared-pooler credential
+ * to that pinned ref before psql is allowed to run.
  */
 export const SUPABASE_DATABASE_TARGETS = Object.freeze({
   sandbox: Object.freeze({
@@ -20,7 +20,6 @@ export const SUPABASE_DATABASE_TARGETS = Object.freeze({
 const PROJECT_REF = /^[a-z0-9]{20}$/;
 const DIRECT_OR_DEDICATED_HOST = /^db\.([a-z0-9]{20})\.supabase\.co$/;
 const SHARED_SUPAVISOR_HOST = /^aws-\d+-[a-z0-9]+(?:-[a-z0-9]+)*\.pooler\.supabase\.com$/;
-const SHARED_SUPAVISOR_USER = /^postgres\.([a-z0-9]{20})$/;
 const ALLOWED_SSL_MODES = new Set(["require", "verify-ca", "verify-full"]);
 const SSL_MODE_STRENGTH = Object.freeze({
   require: 1,
@@ -81,8 +80,8 @@ function strongestRequestedSslMode(url) {
  * - Dedicated PgBouncer: db.<project-ref>.supabase.co:6543, user postgres
  * - Shared Supavisor session/transaction:
  *   aws-<n>-<region>.pooler.supabase.com:5432|6543,
- *   user postgres.<project-ref>, or generic user postgres that the gate later
- *   rewrites to the selected pinned project before opening a connection
+ *   source username ignored and rewritten to postgres.<pinned-project-ref>
+ *   before opening a connection
  *
  * The returned object contains no password or raw URL.
  */
@@ -153,14 +152,6 @@ export function parseSupabaseDatabaseUrl(databaseUrl) {
   }
 
   if (SHARED_SUPAVISOR_HOST.test(hostname)) {
-    const userMatch = SHARED_SUPAVISOR_USER.exec(username);
-    const requiresPinnedProjectBinding = username === "postgres";
-    if (!userMatch && !requiresPinnedProjectBinding) {
-      identityError(
-        "missing_supavisor_project_ref",
-        "Shared Supavisor URLs must use postgres or postgres.<project-ref> as the username.",
-      );
-    }
     if (port !== "5432" && port !== "6543") {
       identityError(
         "unexpected_supavisor_port",
@@ -169,11 +160,14 @@ export function parseSupabaseDatabaseUrl(databaseUrl) {
     }
 
     return Object.freeze({
-      projectRef: userMatch?.[1] ?? null,
+      // Shared Supavisor routing is selected by the username. Do not trust any
+      // routing identity supplied by a protected secret: the sanitizer below
+      // always replaces it with the project ref pinned by TARGET_ENV.
+      projectRef: null,
       connectionMode: port === "5432" ? "shared-supavisor-session" : "shared-supavisor-transaction",
       hostname,
       port: Number(port),
-      requiresPinnedProjectBinding,
+      requiresPinnedProjectBinding: true,
     });
   }
 
@@ -197,9 +191,9 @@ export function sanitizeSupabaseDatabaseUrlForPsql(databaseUrl, targetEnv) {
   const url = new URL(databaseUrl);
   const sslMode = strongestRequestedSslMode(url);
   if (identity.requiresPinnedProjectBinding) {
-    // A shared Supavisor host is multi-tenant; its username selects the
-    // project. Bind a generic Dashboard-style `postgres` username to the
-    // already-pinned target so the child process cannot route elsewhere.
+    // A shared Supavisor host is multi-tenant; its username selects both role
+    // and project. Treat the source URL as a password carrier only, and bind
+    // every shared credential to the already-pinned Verdant postgres target.
     url.username = `postgres.${identity.projectRef}`;
   }
   url.search = "";
@@ -223,9 +217,9 @@ export function databaseTargetForEnvironment(targetEnv) {
 }
 
 /**
- * Prove an encoded project ref or establish the project ref that a generic
- * shared-pooler URL must be bound to for the selected environment. Never
- * returns the raw URL or credentials.
+ * Prove a direct-host project ref or establish the project ref that every
+ * shared-pooler credential must be bound to for the selected environment.
+ * Never returns the raw URL or credentials.
  */
 export function assertSupabaseDatabaseTargetIdentity({ targetEnv, databaseUrl }) {
   const target = databaseTargetForEnvironment(targetEnv);

@@ -241,4 +241,124 @@ test.describe("Pricing checkout recovery (blocked state)", () => {
       expect(html.includes(token)).toBe(false);
     }
   });
+
+  test("recovery flows emit analytics with the sanitized plan slug and no internal metadata", async ({
+    page,
+  }) => {
+    // The CTA that opens the blocked state clicks Pro Monthly — the
+    // sanitized allowlist slug MUST be exactly this string on every
+    // recovery emission (both pricing and funnel channels).
+    const EXPECTED_PLAN_SLUG = "pro_monthly";
+
+    // Any of these strings appearing in the emitted event payload would
+    // mean internal plan metadata leaked into analytics: raw Paddle price
+    // ids, human labels, URLs, credentials, or the fallback token when
+    // it shouldn't be there.
+    const FORBIDDEN_METADATA_SUBSTRINGS = [
+      "pri_",
+      "Pro Monthly",
+      "Pro Annual",
+      "Craft Monthly",
+      "Craft Annual",
+      "Founder Lifetime",
+      "https://",
+      "http://",
+      "@",
+      "FAKE-ACCESS-TOKEN",
+      "FAKE-REFRESH-TOKEN",
+      FAKE_USER.id,
+      FAKE_USER.email,
+      "userId",
+      "user_id",
+      "access_token",
+    ];
+
+    // Only these keys are allowed on the pricing/funnel event payloads.
+    // Anything else means the analytics contract has drifted.
+    const ALLOWED_PROP_KEYS = new Set([
+      "item",
+      "period",
+      "plan",
+      "reason",
+      "source",
+      "surface",
+      "method",
+      "event_type",
+      "rows",
+    ]);
+
+    await openBlockedRecovery(page);
+
+    // --- Retry -----------------------------------------------------------
+    await page.getByTestId("pricing-checkout-retry").click();
+    await expect(page.getByTestId("pricing-checkout-retry")).toBeVisible();
+
+    // --- Choose another plan --------------------------------------------
+    await page.getByTestId("pricing-checkout-choose-another-plan").click();
+    await expect(page.getByTestId("pricing-checkout-recovery")).toHaveCount(0);
+
+    // Re-open the blocked state so Dismiss has a panel to close.
+    await openBlockedRecovery(page);
+
+    // --- Dismiss --------------------------------------------------------
+    await page.getByTestId("pricing-checkout-dismiss").click();
+    await expect(page.getByTestId("pricing-checkout-recovery")).toHaveCount(0);
+
+    const events = await readAnalyticsEvents(page);
+
+    const recoveryEventNames = [
+      "pricing_checkout_recovery_retry",
+      "checkout_recovery_retry",
+      "pricing_checkout_recovery_choose_another_plan",
+      "checkout_recovery_choose_another_plan",
+      "pricing_checkout_recovery_dismissed",
+      "checkout_recovery_dismissed",
+    ];
+
+    for (const name of recoveryEventNames) {
+      const matches = events.filter((event) => event.name === name);
+      expect(
+        matches.length,
+        `expected at least one "${name}" event, saw ${matches.length}. ` +
+          `all captured: ${events.map((e) => e.name).join(", ")}`,
+      ).toBeGreaterThan(0);
+
+      for (const match of matches) {
+        // Contract: plan slug is present, exact, and drawn from the
+        // shared paid-plan allowlist. Never "unknown_plan" for a click
+        // that originated from a real CTA.
+        expect(match.props, `"${name}" must carry props`).not.toBeNull();
+        const props = match.props ?? {};
+        expect(props.plan, `"${name}" must include sanitized plan slug`).toBe(
+          EXPECTED_PLAN_SLUG,
+        );
+
+        // Contract: no unknown keys. Every property has to belong to the
+        // sanctioned pricing/funnel key allowlist.
+        for (const key of Object.keys(props)) {
+          expect(
+            ALLOWED_PROP_KEYS.has(key),
+            `"${name}" carried disallowed prop key "${key}"`,
+          ).toBe(true);
+        }
+
+        // Contract: no internal reason tokens or internal metadata anywhere
+        // in the serialized payload.
+        const serialized = JSON.stringify(props);
+        for (const token of FORBIDDEN_REASON_TOKENS) {
+          expect(
+            serialized.toLowerCase().includes(token),
+            `"${name}" leaked internal reason token "${token}" in props ${serialized}`,
+          ).toBe(false);
+        }
+        for (const needle of FORBIDDEN_METADATA_SUBSTRINGS) {
+          expect(
+            serialized.includes(needle),
+            `"${name}" leaked internal metadata "${needle}" in props ${serialized}`,
+          ).toBe(false);
+        }
+      }
+    }
+  });
 });
+

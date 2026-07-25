@@ -132,7 +132,12 @@ async function main(): Promise<void> {
       const secretName = env === "sandbox" ? "PADDLE_SANDBOX_API_KEY" : "PADDLE_LIVE_API_KEY";
       console.error(`::error::${secretName} is not set — cannot verify ${env}.`);
       for (const id of REQUIRED_PLAN_IDS) {
-        results.push({ env, externalId: id, status: "skip", detail: `${secretName} not set` });
+        const detail = `${secretName} not set`;
+        results.push({ env, externalId: id, status: "skip", detail });
+        // Emit the `•` line too so the downstream comment renderer can
+        // list which (env, id) pairs are unverified — the SUMMARY skip
+        // count alone doesn't identify them.
+        console.log(`• [${env}] ${id} — ${detail}`);
       }
       // Missing API key for a requested env is a misconfiguration, not a
       // catalog failure — surface as exit 2.

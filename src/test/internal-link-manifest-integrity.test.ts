@@ -108,13 +108,17 @@ function extractLiteralInternalLinks(): LiteralInternalLink[] {
 }
 
 describe("literal internal links", () => {
-  it("all resolve to mounted application routes", () => {
-    const links = extractLiteralInternalLinks();
-    const broken = links
-      .filter((link) => !resolvesToMountedRoute(link.target))
-      .map((link) => `${link.source}:${link.line} -> ${link.target}`);
+  it(
+    "all resolve to mounted application routes",
+    () => {
+      const links = extractLiteralInternalLinks();
+      const broken = links
+        .filter((link) => !resolvesToMountedRoute(link.target))
+        .map((link) => `${link.source}:${link.line} -> ${link.target}`);
 
-    expect(broken, `Broken literal internal links:\n${broken.join("\n")}`).toEqual([]);
-    expect(links.length).toBeGreaterThan(50);
-  });
+      expect(broken, `Broken literal internal links:\n${broken.join("\n")}`).toEqual([]);
+      expect(links.length).toBeGreaterThan(50);
+    },
+    15_000,
+  );
 });

@@ -99,7 +99,7 @@ describe("has_pheno_tracker_entitlement anti-oracle guard", () => {
   });
 
   it("matches the customer status policy without accepting malformed paid rows", () => {
-    expect(sql).toContain("s.price_id IN ('pro_monthly','pro_annual')");
+    expect(sql).toContain("s.price_id IN ('pro_monthly','pro_annual','craft_monthly','craft_annual')");
     expect(sql).toContain("s.current_period_end IS NOT NULL");
     expect(sql).toContain("s.status IN ('active','trialing') AND s.current_period_end > now()");
     expect(sql).toContain("OR s.status = 'past_due'");

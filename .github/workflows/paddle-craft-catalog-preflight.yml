@@ -1,17 +1,20 @@
 name: Paddle Craft catalog preflight
 
 # Verifies that craft_monthly and craft_annual price external_ids exist
-# (and are active) in both Paddle sandbox and live before a change can be
-# merged or deployed. Read-only against the Paddle API.
+# (and are active) in both Paddle sandbox and live. Read-only against
+# the Paddle API. Split into two jobs by design:
 #
-# Fails the PR / deploy if either env is missing an entry — this is the
-# structural gate that prevents shipping Craft CTAs the catalog can't
-# fulfill (sandbox: blocks at price resolution; live: risks a charge with
-# no entitlement grant via payments-webhook's KNOWN_PRICE_IDS filter).
+#   verify (contents: read only)
+#     Checks out and executes PR-controlled code — including this
+#     workflow's own paths trigger (scripts/verify-paddle-craft-catalog.ts
+#     and this YAML). Anything with pull-requests: write in the same job
+#     could be exfiltrated by a modified script in a PR, so this job
+#     never holds write scope.
 #
-# Required repo secrets:
-#   PADDLE_SANDBOX_API_KEY   — Paddle sandbox API key (read scope suffices)
-#   PADDLE_LIVE_API_KEY      — Paddle live API key    (read scope suffices)
+#   report (pull-requests: write, NO checkout)
+#     Downloads the log artifact and posts / updates the sticky PR
+#     comment. It runs only the renderer script it downloads from the
+#     artifact and one github-script call — it never executes repo code.
 
 on:
   pull_request:
@@ -22,6 +25,7 @@ on:
       - "supabase/functions/get-paddle-price/**"
       - "supabase/functions/payments-webhook/**"
       - "scripts/verify-paddle-craft-catalog.ts"
+      - "scripts/render-paddle-craft-preflight-comment.mjs"
       - ".github/workflows/paddle-craft-catalog-preflight.yml"
   workflow_dispatch:
   schedule:
@@ -29,34 +33,201 @@ on:
     # surfaces within 24h instead of waiting for the next Craft PR.
     - cron: "17 8 * * *"
 
+# PR-keyed concurrency mirrors deployment-preview.yml. Nightly and
+# workflow_dispatch runs fall back to github.ref so they don't collide
+# with each other or with PR runs.
+concurrency:
+  group: paddle-craft-catalog-preflight-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
 jobs:
-  paddle-craft-catalog-preflight:
-    name: Paddle Craft catalog preflight
+  verify:
+    name: Verify Paddle Craft catalog
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # Explicit — the report job needs a token with pull-requests: write,
+    # so make it visible that THIS job does not.
+    permissions:
+      contents: read
+    outputs:
+      rc: ${{ steps.run.outputs.rc }}
+      fail_count: ${{ steps.run.outputs.fail_count }}
+      verdict_level: ${{ steps.render.outputs.verdict_level }}
+      should_fail: ${{ steps.render.outputs.should_fail }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: 1.3.14
-      - name: Verify Craft price catalog (sandbox + live)
+
+      - name: Prepare artifact dir
+        run: mkdir -p "$RUNNER_TEMP/craft-preflight"
+
+      - name: Run verifier
+        id: run
         env:
           PADDLE_SANDBOX_API_KEY: ${{ secrets.PADDLE_SANDBOX_API_KEY }}
           PADDLE_LIVE_API_KEY: ${{ secrets.PADDLE_LIVE_API_KEY }}
         run: |
           set +e
+          # Capture BOTH stdout and stderr: the key-unset branch writes
+          # its diagnostic to stderr and never produces a per-id line on
+          # stdout. Redirecting only stdout would let "no rows parsed"
+          # silently read as success downstream.
           bun run scripts/verify-paddle-craft-catalog.ts --env both \
-            | tee "$RUNNER_TEMP/craft-preflight.log"
-          RC=${PIPESTATUS[0]}
+            > "$RUNNER_TEMP/craft-preflight/log.txt" 2>&1
+          RC=$?
           set -e
+          cat "$RUNNER_TEMP/craft-preflight/log.txt"
+          FAIL_COUNT=$(grep -Eo 'fail=[0-9]+' "$RUNNER_TEMP/craft-preflight/log.txt" | tail -1 | cut -d= -f2 || true)
+          echo "rc=$RC" >> "$GITHUB_OUTPUT"
+          echo "fail_count=${FAIL_COUNT:-unknown}" >> "$GITHUB_OUTPUT"
+
+      - name: Render sticky comment + verdict
+        id: render
+        env:
+          RC: ${{ steps.run.outputs.rc }}
+          EVENT_NAME: ${{ github.event_name }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          node scripts/render-paddle-craft-preflight-comment.mjs \
+            --log "$RUNNER_TEMP/craft-preflight/log.txt" \
+            --rc "$RC" \
+            --event "$EVENT_NAME" \
+            --run-url "$RUN_URL" \
+            --artifact "paddle-craft-preflight-log" \
+            --out "$RUNNER_TEMP/craft-preflight/comment.md"
+          node scripts/render-paddle-craft-preflight-comment.mjs \
+            --log "$RUNNER_TEMP/craft-preflight/log.txt" \
+            --rc "$RC" \
+            --event "$EVENT_NAME" \
+            --json > "$RUNNER_TEMP/craft-preflight/verdict.json"
+          cat "$RUNNER_TEMP/craft-preflight/verdict.json"
+          LEVEL=$(node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(process.env.VJ,"utf8")).verdict.level)' \
+            VJ="$RUNNER_TEMP/craft-preflight/verdict.json" 2>/dev/null || echo unknown)
+          SHOULD_FAIL=$(node -e 'process.stdout.write(String(JSON.parse(require("fs").readFileSync(process.env.VJ,"utf8")).verdict.shouldFail))' \
+            VJ="$RUNNER_TEMP/craft-preflight/verdict.json" 2>/dev/null || echo true)
+          echo "verdict_level=$LEVEL" >> "$GITHUB_OUTPUT"
+          echo "should_fail=$SHOULD_FAIL" >> "$GITHUB_OUTPUT"
+
+      - name: Append to step summary
+        if: ${{ !cancelled() }}
+        run: |
           {
-            echo "### Paddle Craft catalog preflight"
+            cat "$RUNNER_TEMP/craft-preflight/comment.md" 2>/dev/null || echo "_no comment rendered_"
+            echo ""
+            echo "<details><summary>Full verifier log</summary>"
             echo ""
             echo '```'
-            cat "$RUNNER_TEMP/craft-preflight.log"
+            cat "$RUNNER_TEMP/craft-preflight/log.txt" 2>/dev/null || echo "(no log captured)"
             echo '```'
+            echo "</details>"
           } >> "$GITHUB_STEP_SUMMARY"
-          exit $RC
+
+      - name: Upload log + comment artifact
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: paddle-craft-preflight-log
+          path: ${{ runner.temp }}/craft-preflight
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Enforce verdict
+        if: ${{ !cancelled() }}
+        env:
+          SHOULD_FAIL: ${{ steps.render.outputs.should_fail }}
+          LEVEL: ${{ steps.render.outputs.verdict_level }}
+          RC: ${{ steps.run.outputs.rc }}
+        run: |
+          echo "Verifier rc=$RC verdict=$LEVEL should_fail=$SHOULD_FAIL"
+          if [ "$SHOULD_FAIL" = "true" ]; then
+            exit 1
+          fi
+
+  report:
+    name: Post preflight comment
+    needs: verify
+    # Only run on real PRs from the same repo — forks get a read-only
+    # token and no secrets, so a write attempt 403s and reds the run for
+    # contributors who can least fix it.
+    if: >-
+      ${{
+        !cancelled()
+        && github.event_name == 'pull_request'
+        && github.event.pull_request.head.repo.full_name == github.repository
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      # NOTE: no actions/checkout here on purpose. This job holds
+      # pull-requests: write; checking out would let PR-modified code
+      # execute with that scope.
+      - name: Download preflight artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: paddle-craft-preflight-log
+          path: preflight
+        continue-on-error: true
+
+      - name: Post or update sticky comment
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          script: |
+            const fs = require('fs');
+            const MARKER = '<!-- paddle-craft-catalog-preflight -->';
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+
+            // If the artifact is missing (verify job died before upload),
+            // do NOT return silently — a previous run's green comment
+            // would stand. Post an explicit "unverified" body.
+            let body;
+            try {
+              body = fs.readFileSync('preflight/comment.md', 'utf8');
+            } catch {
+              body = [
+                MARKER,
+                '### Paddle Craft catalog preflight',
+                '',
+                '❌ **Not verified.** The verify job did not produce a log artifact — check the workflow run for setup/checkout failure.',
+                '',
+                `[Workflow run](${runUrl})`,
+                '',
+              ].join('\n');
+            }
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              per_page: 100,
+            });
+
+            // Match on marker AND author login — the marker alone is
+            // user-forgeable and PATCHing another user's comment fails
+            // permanently, wedging this step for the PR.
+            const existing = comments.find(
+              (c) => c.user?.login === 'github-actions[bot]' && (c.body || '').includes(MARKER),
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                body,
+              });
+            }

@@ -34,6 +34,8 @@ import { resolveServerBillingEnvironment } from "../_shared/unionEntitlementLook
 const PAID_PLAN_ALLOWLIST: ReadonlySet<string> = new Set([
   "pro_monthly",
   "pro_annual",
+  "craft_monthly",
+  "craft_annual",
   "founder_lifetime",
   // One-time AI credit packs. These are purchasable price ids (SKU-recognition
   // seam) — NOT plans: they never enter planCatalog / KNOWN_PRICE_TO_PLAN, so a
@@ -54,6 +56,8 @@ const PAID_PLAN_ALLOWLIST: ReadonlySet<string> = new Set([
 const SERVER_PRICE_CONFIG: Readonly<Record<string, string>> = {
   pro_monthly: Deno.env.get("PADDLE_PRICE_PRO_MONTHLY") ?? "",
   pro_annual: Deno.env.get("PADDLE_PRICE_PRO_ANNUAL") ?? "",
+  craft_monthly: Deno.env.get("PADDLE_PRICE_CRAFT_MONTHLY") ?? "",
+  craft_annual: Deno.env.get("PADDLE_PRICE_CRAFT_ANNUAL") ?? "",
   founder_lifetime: Deno.env.get("PADDLE_PRICE_FOUNDER_LIFETIME") ?? "",
   credit_pack_50: Deno.env.get("PADDLE_PRICE_CREDIT_PACK_50") ?? "",
   credit_pack_150: Deno.env.get("PADDLE_PRICE_CREDIT_PACK_150") ?? "",

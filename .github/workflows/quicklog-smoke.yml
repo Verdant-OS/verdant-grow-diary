@@ -251,17 +251,33 @@ jobs:
       - name: Bootstrap disposable E2E fixture
         id: bootstrap_fixture
         if: steps.e2e_config.outputs.should_run == 'true' && vars.E2E_ALLOW_FIXTURE_BOOTSTRAP == 'true'
-        run: bun run e2e:bootstrap-fixture
+        shell: bash
+        run: |
+          # Tee combined stdout/stderr to a per-step log so the failure-debug
+          # summary can surface the last N lines under the failing step name.
+          # `set -o pipefail` ensures the real exit code propagates through tee.
+          set -o pipefail
+          mkdir -p e2e/results/step-logs
+          bun run e2e:bootstrap-fixture 2>&1 | tee e2e/results/step-logs/bootstrap_fixture.log
 
       - name: Verify disposable E2E fixture
         id: verify_fixture
         if: steps.e2e_config.outputs.should_run == 'true'
-        run: bun run e2e:verify-fixture
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p e2e/results/step-logs
+          bun run e2e:verify-fixture 2>&1 | tee e2e/results/step-logs/verify_fixture.log
 
       - name: Run Quick Log Playwright smoke
         id: quicklog_smoke
         if: steps.e2e_config.outputs.should_run == 'true' && steps.verify_fixture.outcome == 'success'
-        run: bun run e2e:quicklog-smoke
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p e2e/results/step-logs
+          bun run e2e:quicklog-smoke 2>&1 | tee e2e/results/step-logs/quicklog_smoke.log
+
 
       - name: Verify Quick Log smoke artifacts
         if: always() && steps.e2e_config.outputs.should_run == 'true'
@@ -320,17 +336,25 @@ jobs:
           # GITHUB_STEP_SUMMARY budget even on long failures.
           set +e
 
+          # Each tracked step tees its combined stdout/stderr to
+          # e2e/results/step-logs/<step_id>.log. When a step fails, we surface
+          # the last 50 lines of its log immediately under the step name so the
+          # first thing a reader sees in the Job Summary is the actual output
+          # that produced the failure.
           declare -a FAILED_STEPS=()
+          declare -a FAILED_LOGS=()
           add_failed() {
             local label="$1"
             local outcome="$2"
+            local log_path="$3"
             if [ "${outcome}" = "failure" ]; then
               FAILED_STEPS+=("${label} (outcome: ${outcome})")
+              FAILED_LOGS+=("${log_path}")
             fi
           }
-          add_failed "Bootstrap E2E fixture (\`bootstrap_fixture\`)" "${BOOTSTRAP_FIXTURE_OUTCOME}"
-          add_failed "Verify E2E fixture (\`verify_fixture\`)" "${VERIFY_FIXTURE_OUTCOME}"
-          add_failed "Run Quick Log Playwright smoke (\`quicklog_smoke\`)" "${QUICKLOG_SMOKE_OUTCOME}"
+          add_failed "Bootstrap E2E fixture (\`bootstrap_fixture\`)" "${BOOTSTRAP_FIXTURE_OUTCOME}" "e2e/results/step-logs/bootstrap_fixture.log"
+          add_failed "Verify E2E fixture (\`verify_fixture\`)" "${VERIFY_FIXTURE_OUTCOME}" "e2e/results/step-logs/verify_fixture.log"
+          add_failed "Run Quick Log Playwright smoke (\`quicklog_smoke\`)" "${QUICKLOG_SMOKE_OUTCOME}" "e2e/results/step-logs/quicklog_smoke.log"
 
           RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           ATTEMPT_URL="${RUN_URL}/attempts/${GITHUB_RUN_ATTEMPT}"
@@ -339,6 +363,32 @@ jobs:
           mkdir -p e2e/results
           DEBUG_MD="e2e/results/quicklog-failure-debug.md"
           : > "${DEBUG_MD}"
+
+          # Emit the last N lines of a per-step log inline under the step name.
+          # Cap at 12 KiB after the tail to keep the summary well under 1 MiB.
+          emit_step_log_tail() {
+            local log_path="$1"
+            local lines="${2:-50}"
+            if [ ! -f "${log_path}" ]; then
+              echo "  - _No captured log at \`${log_path}\` — the step failed before producing any output (or was skipped)._"
+              return
+            fi
+            local size
+            size="$(wc -c < "${log_path}" 2>/dev/null | tr -d ' \r\n')"
+            if [ -z "${size}" ] || [ "${size}" = "0" ]; then
+              echo "  - _Captured log at \`${log_path}\` is empty (0 bytes)._"
+              return
+            fi
+            echo ""
+            echo "  <details open><summary>Last ${lines} lines of <code>${log_path}</code> (${size} bytes total)</summary>"
+            echo ""
+            echo '  ```text'
+            tail -n "${lines}" "${log_path}" 2>/dev/null | head -c 12288 | sed 's/^/  /'
+            echo ""
+            echo '  ```'
+            echo ""
+            echo "  </details>"
+          }
 
           {
             echo ""
@@ -351,11 +401,13 @@ jobs:
             if [ "${#FAILED_STEPS[@]}" -eq 0 ]; then
               echo "_None of the tracked step IDs (\`bootstrap_fixture\`, \`verify_fixture\`, \`quicklog_smoke\`) reported \`outcome: failure\` at the point this summary ran. The failure is likely in an earlier setup step (checkout, dependency install, secret verification) or a later post-smoke step. Open the [job logs](${JOB_URL}) and look for the first red ✗ step._"
             else
-              for entry in "${FAILED_STEPS[@]}"; do
-                echo "- ${entry}"
+              for i in "${!FAILED_STEPS[@]}"; do
+                echo "- ${FAILED_STEPS[$i]}"
+                emit_step_log_tail "${FAILED_LOGS[$i]}" 50
               done
             fi
             echo ""
+
 
             tail_file() {
               local path="$1"

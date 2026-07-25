@@ -12,6 +12,7 @@ import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import { evaluateBootstrapGate } from "../../e2e/lib/fixtureBootstrap";
+import { readWorkflowYamlScalar } from "./helpers/yamlScalarText";
 
 const ROOT = path.resolve(__dirname, "../..");
 const read = (p: string) => fs.readFileSync(path.join(ROOT, p), "utf8").replace(/\r\n?/g, "\n");
@@ -196,8 +197,8 @@ describe("Workflow: bootstrap step + media expansion + summary", () => {
       );
       expect(block, `${id} retention 30`).toMatch(/retention-days:\s*30/);
       expect(block, `${id} warn`).toMatch(/if-no-files-found:\s*warn/);
-      expect(block, `${id} always() && should_run`).toMatch(
-        /if:\s*always\(\)\s*&&\s*steps\.e2e_config\.outputs\.should_run\s*==\s*'true'/,
+      expect(readWorkflowYamlScalar(block, "if"), `${id} always() && should_run`).toMatch(
+        /^always\(\)\s*&&\s*steps\.e2e_config\.outputs\.should_run\s*==\s*'true'/,
       );
     }
   });

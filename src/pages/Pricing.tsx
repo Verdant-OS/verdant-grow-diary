@@ -634,18 +634,38 @@ export default function Pricing() {
             </h2>
             <p className="mt-3 text-sm text-muted-foreground">{checkoutRecoveryReason}</p>
             {blockedReason && (
-              <div className="mt-4">
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  data-testid="pricing-checkout-retry"
+                  disabled={checkoutLoading}
+                  onClick={() => {
+                    const plan = lastCheckoutPlanRef.current;
+                    trackPricingEvent("pricing_checkout_recovery_retry", {
+                      plan,
+                      source: "recovery_panel",
+                    });
+                    trackFunnelEvent("checkout_recovery_retry", { plan });
+                    dismissBlocked();
+                    void openCheckout({ priceId: plan });
+                  }}
+                >
+                  Try again
+                </Button>
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   data-testid="pricing-checkout-choose-another-plan"
                   onClick={() => {
-                    trackPricingEvent("pricing_checkout_blocked", {
-                      plan: lastCheckoutPlanRef.current,
-                      source: "choose_another_plan",
-                      reason: "recovery_dismissed",
+                    const plan = lastCheckoutPlanRef.current;
+                    trackPricingEvent("pricing_checkout_recovery_choose_another_plan", {
+                      plan,
+                      source: "recovery_panel",
                     });
+                    trackFunnelEvent("checkout_recovery_choose_another_plan", { plan });
                     dismissBlocked();
                     setRecoveryRequested(false);
                     const grid =
@@ -657,6 +677,24 @@ export default function Pricing() {
                   }}
                 >
                   Choose another plan
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  data-testid="pricing-checkout-dismiss"
+                  onClick={() => {
+                    const plan = lastCheckoutPlanRef.current;
+                    trackPricingEvent("pricing_checkout_recovery_dismissed", {
+                      plan,
+                      source: "recovery_panel",
+                    });
+                    trackFunnelEvent("checkout_recovery_dismissed", { plan });
+                    dismissBlocked();
+                    setRecoveryRequested(false);
+                  }}
+                >
+                  Dismiss
                 </Button>
               </div>
             )}

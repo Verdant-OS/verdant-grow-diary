@@ -172,8 +172,12 @@ interface ScopeFixtures {
   plantId: string;
 }
 
-async function seedScopes(userId: string, label: string): Promise<ScopeFixtures> {
-  const { data: grow, error: growError } = await admin
+async function seedScopes(
+  owner: SupabaseClient,
+  userId: string,
+  label: string,
+): Promise<ScopeFixtures> {
+  const { data: grow, error: growError } = await owner
     .from("grows")
     .insert({ user_id: userId, name: `RLS grow ${label}` })
     .select("id")
@@ -182,7 +186,7 @@ async function seedScopes(userId: string, label: string): Promise<ScopeFixtures>
     throw new Error(`seed_grow_failed:${growError?.code ?? "unknown"}`);
   }
 
-  const { data: tent, error: tentError } = await admin
+  const { data: tent, error: tentError } = await owner
     .from("tents")
     .insert({
       user_id: userId,
@@ -195,7 +199,7 @@ async function seedScopes(userId: string, label: string): Promise<ScopeFixtures>
     throw new Error(`seed_tent_failed:${tentError?.code ?? "unknown"}`);
   }
 
-  const { data: plant, error: plantError } = await admin
+  const { data: plant, error: plantError } = await owner
     .from("plants")
     .insert({
       user_id: userId,
@@ -291,8 +295,8 @@ async function run(): Promise<void> {
     const anonymous = createClient(SUPABASE_URL, ANON_KEY, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
-    const scopeA = await seedScopes(uidA, "A");
-    const scopeB = await seedScopes(uidB, "B");
+    const scopeA = await seedScopes(ownerA, uidA, "A");
+    const scopeB = await seedScopes(ownerB, uidB, "B");
 
     const sessionAId = crypto.randomUUID();
     const sessionADefaultId = crypto.randomUUID();

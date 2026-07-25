@@ -397,12 +397,31 @@ jobs:
               echo "_No Playwright JSON report was produced for this run — flake classification skipped._"
               echo ""
             } >> "$GITHUB_STEP_SUMMARY"
+            echo "pw_counts_available=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           node scripts/summarize-playwright-flakes.mjs \
             --report=e2e/results/playwright-report.json \
             --out=e2e/results/playwright-flake-summary.md \
+            2> >(tee /tmp/summarize_flakes_stderr.txt >&2) \
             || echo "::warning::flake summarizer exited non-zero (see logs)"
+
+          # The script's own final stderr line is the single source of truth
+          # for these counts (`total=N passed=N failed=N flaky=N skipped=N`).
+          # Parsed here rather than re-derived from the JSON report so the
+          # counts shown in the Job Summary's gate explanation can never
+          # disagree with what actually decided whether the file is non-empty.
+          counts_line="$(grep -oE 'total=[0-9]+ passed=[0-9]+ failed=[0-9]+ flaky=[0-9]+ skipped=[0-9]+' /tmp/summarize_flakes_stderr.txt | tail -n1 || true)"
+          if [ -n "${counts_line}" ]; then
+            echo "pw_counts_available=true" >> "$GITHUB_OUTPUT"
+            for pair in ${counts_line}; do
+              key="${pair%%=*}"; val="${pair##*=}"
+              echo "pw_${key}=${val}" >> "$GITHUB_OUTPUT"
+            done
+          else
+            echo "::warning::Could not parse test counts from the flake summarizer's output."
+            echo "pw_counts_available=false" >> "$GITHUB_OUTPUT"
+          fi
 
       # Dedicated single-file upload of the flake summary markdown so
       # reviewers can grab just the summary from the run's artifacts
@@ -417,12 +436,42 @@ jobs:
         id: check_flake_summary
         if: always() && steps.e2e_config.outputs.should_run == 'true'
         shell: bash
+        env:
+          PW_COUNTS_AVAILABLE: ${{ steps.summarize_flakes.outputs.pw_counts_available }}
+          PW_FAILED: ${{ steps.summarize_flakes.outputs.pw_failed }}
+          PW_FLAKY: ${{ steps.summarize_flakes.outputs.pw_flaky }}
         run: |
           file="e2e/results/playwright-flake-summary.md"
-          if [ -s "${file}" ]; then
+
+          # `-s` (non-empty) does NOT distinguish "nothing to report" from
+          # "something to report": buildSummary() in summarize-playwright-flakes.mjs
+          # always writes a header + counts line + either the flake/failure
+          # tables or "_No flaky tests detected in this run._" — the file is
+          # non-empty on EVERY successful run, including a fully green one.
+          # Verified directly: a synthetic all-passing report still produces a
+          # non-empty file. Gating on `-s` alone would upload the dedicated
+          # artifact on every green run too, contradicting the intent that
+          # it's "only meaningful when there were failed or flaky tests".
+          #
+          # The real signal is the counts captured by the previous step. Fall
+          # back to file presence only when counts genuinely could not be
+          # parsed — and fail OPEN in that case (upload anyway): withholding
+          # possible evidence is worse than an occasional unnecessary artifact.
+          if [ "${PW_COUNTS_AVAILABLE}" = "true" ]; then
+            noteworthy=$(( ${PW_FAILED:-0} + ${PW_FLAKY:-0} ))
+            if [ -f "${file}" ] && [ "${noteworthy}" -gt 0 ]; then
+              echo "present=true" >> "$GITHUB_OUTPUT"
+              echo "reason=" >> "$GITHUB_OUTPUT"
+              echo "OK: ${PW_FAILED:-0} failed + ${PW_FLAKY:-0} flaky — uploading dedicated artifact."
+            else
+              echo "present=false" >> "$GITHUB_OUTPUT"
+              echo "reason=clean" >> "$GITHUB_OUTPUT"
+              echo "NOTE: 0 failed, 0 flaky — nothing worth a dedicated artifact."
+            fi
+          elif [ -s "${file}" ]; then
             echo "present=true" >> "$GITHUB_OUTPUT"
             echo "reason=" >> "$GITHUB_OUTPUT"
-            echo "OK: ${file} is present and non-empty."
+            echo "OK: ${file} is present and non-empty (counts unavailable — uploading to be safe)."
           elif [ -f "${file}" ]; then
             echo "present=false" >> "$GITHUB_OUTPUT"
             echo "reason=empty" >> "$GITHUB_OUTPUT"
@@ -458,6 +507,12 @@ jobs:
           FLAKE_SUMMARY_URL: ${{ steps.upload_flake_summary.outputs.artifact-url }}
           FLAKE_SUMMARY_PRESENT: ${{ steps.check_flake_summary.outputs.present }}
           FLAKE_SUMMARY_REASON: ${{ steps.check_flake_summary.outputs.reason }}
+          PW_COUNTS_AVAILABLE: ${{ steps.summarize_flakes.outputs.pw_counts_available }}
+          PW_TOTAL: ${{ steps.summarize_flakes.outputs.pw_total }}
+          PW_PASSED: ${{ steps.summarize_flakes.outputs.pw_passed }}
+          PW_FAILED: ${{ steps.summarize_flakes.outputs.pw_failed }}
+          PW_FLAKY: ${{ steps.summarize_flakes.outputs.pw_flaky }}
+          PW_SKIPPED: ${{ steps.summarize_flakes.outputs.pw_skipped }}
         run: |
           {
             echo ""
@@ -465,14 +520,32 @@ jobs:
             echo ""
             echo "**Expected path (in this workspace):** \`e2e/results/playwright-flake-summary.md\`"
             echo "**Uploaded artifact name:** \`quicklog-flake-summary\` (single file: \`playwright-flake-summary.md\`)"
-            echo "**Also archived inside:** \`quicklog-smoke-artifacts\` bundle, same relative path."
+            echo "**Also archived inside:** \`quicklog-smoke-artifacts\` bundle, same relative path — alongside the source it was generated from, \`e2e/results/playwright-report.json\` (Playwright's own JSON reporter output; not uploaded as a standalone artifact)."
+            echo ""
+            echo "#### Upload gate"
+            echo ""
+            if [ "${PW_COUNTS_AVAILABLE}" = "true" ]; then
+              echo "| total | passed | failed | flaky | skipped |"
+              echo "| ----- | ------ | ------ | ----- | ------- |"
+              echo "| ${PW_TOTAL:-?} | ${PW_PASSED:-?} | ${PW_FAILED:-?} | ${PW_FLAKY:-?} | ${PW_SKIPPED:-?} |"
+              echo ""
+              echo "**Gate rule:** upload the dedicated artifact only when \`failed + flaky > 0\`. This run: \`${PW_FAILED:-0} + ${PW_FLAKY:-0} = $(( ${PW_FAILED:-0} + ${PW_FLAKY:-0} ))\`."
+            else
+              echo "_Counts unavailable this run — the gate fell back to file-presence, which uploads unless the report was genuinely missing (see below)._"
+            fi
             echo ""
             if [ "${FLAKE_SUMMARY_PRESENT}" != "true" ]; then
-              if [ "${FLAKE_SUMMARY_REASON}" = "empty" ]; then
-                echo "**Status:** _No failed or flaky tests in this run — \`playwright-flake-summary.md\` was written but empty, so the dedicated \`quicklog-flake-summary\` artifact was skipped._"
-              else
-                echo "**Status:** _No failed or flaky tests in this run — \`playwright-flake-summary.md\` was not produced, so the dedicated \`quicklog-flake-summary\` artifact was skipped._"
-              fi
+              case "${FLAKE_SUMMARY_REASON}" in
+                clean)
+                  echo "**Status:** _0 failed, 0 flaky — dedicated \`quicklog-flake-summary\` artifact skipped. This is the expected outcome on a clean run, not a build error._"
+                  ;;
+                empty)
+                  echo "**Status:** _\`playwright-flake-summary.md\` was written but empty, so the dedicated artifact was skipped._"
+                  ;;
+                *)
+                  echo "**Status:** _\`playwright-flake-summary.md\` was not produced, so the dedicated artifact was skipped._"
+                  ;;
+              esac
               echo ""
               echo "#### How to (re)generate \`playwright-flake-summary.md\` locally"
               echo ""
@@ -488,7 +561,7 @@ jobs:
               echo "  --out=e2e/results/playwright-flake-summary.md"
               echo '```'
               echo ""
-              echo "The summary is only non-empty when at least one test failed on attempt 1 or was classified as flaky (failed then passed on retry1). A clean, all-green run intentionally produces no artifact — this notice is the expected outcome, not a build error."
+              echo "Note: the file itself is written on every successful run, including a clean one — it always contains at least the header and the counts table, and says explicitly when no flakes were found. It is the COUNTS (above), not file emptiness, that decide whether the dedicated artifact is worth downloading."
             elif [ -n "${FLAKE_SUMMARY_URL}" ]; then
               echo "**Status:** Download the standalone \`playwright-flake-summary.md\` here: [quicklog-flake-summary](${FLAKE_SUMMARY_URL})"
             else
@@ -826,6 +899,8 @@ jobs:
               echo ""
               echo "- \`e2e/results/quicklog-smoke-report.json\`"
               echo "- \`e2e/results/quicklog-smoke-report.txt\`"
+              echo "- \`e2e/results/playwright-report.json\` (Playwright's own JSON reporter — source of the flake summary above)"
+              echo "- \`e2e/results/playwright-flake-summary.md\` (present even on a clean run — see the flake summary section above)"
               echo "- \`playwright-report/\`"
               echo "- \`test-results/\`"
               echo ""

@@ -51,8 +51,11 @@ describe("Action Queue route — quick link contract", () => {
   it("Action Queue route is registered in App.tsx (canonical + legacy alias)", () => {
     expect(APP).toMatch(/path="\/actions"\s+element=\{<ActionQueue\s*\/>\}/);
     expect(APP).toMatch(/import\(\s*["']\.\/pages\/ActionQueue["']\s*\)/);
-    // Legacy /action-queue alias must still redirect to canonical /actions.
-    expect(APP).toMatch(/path="\/action-queue"\s+element=\{<Navigate\s+to="\/actions"/);
+    // Legacy /action-queue alias must still redirect to canonical /actions
+    // while preserving any incoming query and hash context.
+    expect(APP).toMatch(
+      /path="\/action-queue"\s+element=\{<RouteAliasRedirect\s+to="\/actions"\s*\/>\}/,
+    );
   });
 
   it("Action Queue route reads grow context from the URL (scoped grow hook)", () => {

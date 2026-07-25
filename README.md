@@ -344,6 +344,54 @@ against a fresh local Supabase on the runner:
 - [Scanner guardrail harness](docs/testing/scanner-guardrails.md) — scannerIt/installScannerGuardrail usage and slow-test telemetry contract
 - [Pi-ingest smoke runbook](docs/pi-ingest-smoke-runbook.md)
 
+## Paddle Craft catalog preflight
+
+Verifies that the Craft plans we advertise actually exist as **active** prices
+in the Paddle catalog, in both sandbox and live, before a change can ship.
+
+Why it matters: a Craft CTA the catalog cannot fulfil fails differently per
+environment. In sandbox it blocks at price resolution — the buyer watches
+checkout refuse to open. In live it risks taking a payment that
+`payments-webhook`'s `KNOWN_PRICE_IDS` filter then declines to convert into an
+entitlement: a charge with nothing granted.
+
+```bash
+npm run verify:paddle-craft-catalog
+```
+
+Sandbox only, for when you hold just the sandbox key:
+
+```bash
+npm run verify:paddle-craft-catalog:sandbox
+```
+
+**Required secrets** — read scope suffices; the script only issues GETs:
+
+| Variable | Used for |
+| --- | --- |
+| `PADDLE_SANDBOX_API_KEY` | verifying the sandbox catalog |
+| `PADDLE_LIVE_API_KEY` | verifying the live catalog |
+
+**Exit codes:**
+
+| Code | Meaning | Typical cause |
+| --- | --- | --- |
+| `0` | every required `external_id` found and active | — |
+| `1` | at least one `external_id` missing or inactive | the Paddle product/price was never created, or was archived in the dashboard |
+| `2` | misconfiguration — nothing was verified | the API key for a requested environment is unset, or a bad `--env` value |
+
+Exit `2` is deliberately **not** a pass. A missing key means the check did not
+run, which must never be read as "the catalog is fine" — those entries report
+as `skip`, never `pass`.
+
+The required ids derive from `src/lib/paidPlanAllowlist.ts`, so adding a plan
+there surfaces here automatically instead of needing a second hand-synced list.
+
+CI runs this on any PR touching the checkout/catalog seams, and nightly at
+08:17 UTC so an out-of-band archive in the Paddle dashboard surfaces within a
+day rather than waiting for the next Craft PR. On a PR, failures are summarised
+as a sticky comment listing the affected `external_id`s per environment.
+
 ## Money-migration applied-check
 
 `scripts/assert-required-money-migrations-applied.mjs` verifies that every

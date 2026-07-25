@@ -31,6 +31,9 @@ on:
 
 permissions:
   contents: read
+  # Needed only to post/refresh the sticky failure comment on a PR. The
+  # nightly and workflow_dispatch runs never reach that step.
+  pull-requests: write
 
 jobs:
   paddle-craft-catalog-preflight:
@@ -43,6 +46,7 @@ jobs:
         with:
           bun-version: 1.3.14
       - name: Verify Craft price catalog (sandbox + live)
+        id: preflight
         env:
           PADDLE_SANDBOX_API_KEY: ${{ secrets.PADDLE_SANDBOX_API_KEY }}
           PADDLE_LIVE_API_KEY: ${{ secrets.PADDLE_LIVE_API_KEY }}
@@ -59,4 +63,63 @@ jobs:
             cat "$RUNNER_TEMP/craft-preflight.log"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+          echo "rc=$RC" >> "$GITHUB_OUTPUT"
           exit $RC
+
+      # Summarise the outcome on the PR itself. Runs even when the check
+      # failed, so the comment appears exactly when it is most useful.
+      #
+      # PRIVACY: the comment is built ONLY from the parsed `external_id` +
+      # environment of non-passing lines. The raw log is deliberately NOT
+      # echoed here — a passing line's detail embeds the Paddle internal
+      # price id (`pri_...`), which has no business in PR chatter. The step
+      # summary above (run-scoped, not a comment) keeps the full log.
+      - name: Comment Craft catalog failures on the PR
+        if: always() && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          RC: ${{ steps.preflight.outputs.rc }}
+        run: |
+          set -euo pipefail
+          MARKER="<!-- paddle-craft-catalog-preflight -->"
+          LOG="$RUNNER_TEMP/craft-preflight.log"
+          [ -f "$LOG" ] || { echo "No preflight log; nothing to report."; exit 0; }
+
+          # `✗` = catalog miss. `•` = skipped because a key was unset, which
+          # is NOT a pass and must never read as one.
+          FAILS=$(grep -E '^✗ ' "$LOG" | sed -E 's/^✗ \[([^]]+)\] ([^ ]+) — .*/| `\2` | \1 | missing or inactive |/' || true)
+          SKIPS=$(grep -E '^• ' "$LOG" | sed -E 's/^• \[([^]]+)\] ([^ ]+) — .*/| `\2` | \1 | not verified — API key unset |/' || true)
+
+          if [ -z "$FAILS" ] && [ -z "$SKIPS" ]; then
+            STATUS="✅ **Craft catalog verified** — every required price exists and is active in both environments."
+            ROWS=""
+          elif [ -n "$SKIPS" ] && [ -z "$FAILS" ]; then
+            STATUS="⚠️ **Craft catalog NOT verified.** A required API key is unset, so nothing was checked for that environment. This is not a pass."
+            ROWS=$(printf '%s\n' "$SKIPS")
+          else
+            STATUS="❌ **Craft catalog incomplete.** Advertised Craft plans are missing from the Paddle catalog. Shipping this risks a live charge that \`payments-webhook\` cannot convert into an entitlement."
+            ROWS=$(printf '%s\n%s\n' "$FAILS" "$SKIPS")
+          fi
+
+          if [ -n "$ROWS" ]; then
+            TABLE=$(printf '| external_id | environment | state |\n| --- | --- | --- |\n%s\n' "$ROWS")
+          else
+            TABLE=""
+          fi
+
+          BODY=$(printf '%s\n### Paddle Craft catalog preflight\n\n%s\n\n%s\n\nFix: create the missing product/price in the Paddle dashboard with the matching `external_id`, or stop advertising the plan until it exists.\n\n- Exit code: `%s` (0 pass · 1 missing/inactive · 2 not verified)\n- Workflow run: %s\n' \
+            "$MARKER" "$STATUS" "$TABLE" "${RC:-unknown}" "$RUN_URL")
+
+          # Idempotent: patch the existing marker comment rather than stacking.
+          EXISTING=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
+            -q ".[] | select(.body | contains(\"$MARKER\")) | .id" | head -n1)
+          if [ -n "$EXISTING" ]; then
+            gh api --method PATCH "repos/$REPO/issues/comments/$EXISTING" -f body="$BODY" >/dev/null
+            echo "Updated Craft catalog comment $EXISTING."
+          else
+            gh pr comment "$PR" --repo "$REPO" --body "$BODY"
+            echo "Posted Craft catalog comment on PR #$PR."
+          fi

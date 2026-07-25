@@ -15,7 +15,7 @@
  * authoritative for numbering and Pro access.
  */
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useLocation, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { usePhenoHuntWorkspace, CANDIDATE_PAGE_SIZE } from "@/hooks/usePhenoHuntWorkspace";
 import { buildPhenoHuntCsv, phenoHuntCsvFilename } from "@/lib/phenoHuntCsvExport";
 import { LOUD_TRAIT_AXES } from "@/lib/phenoExpressionRules";
@@ -91,7 +91,6 @@ import type {
   AssignCandidateNumberFailure,
   AssignCandidateNumberResult,
 } from "@/lib/phenoCandidateNumberService";
-import { buildUpgradeHref } from "@/components/PhenoTrackerUpgradeGate";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { canWriteFeatureData } from "@/lib/featureEntitlements";
 
@@ -209,26 +208,24 @@ const CandidateNumberAssign = memo(function CandidateNumberAssign({
   plantId,
   candidateNumber,
   canAssign,
+  onRecheckPlan,
   onAssign,
 }: {
   plantId: string;
   candidateNumber: number | null;
   canAssign: boolean;
+  onRecheckPlan: () => void | Promise<unknown>;
   onAssign: (plantId: string, candidateNumber: number) => Promise<AssignCandidateNumberResult>;
 }) {
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  // Kept alongside the message so the entitlement denial can offer an upgrade
-  // route. Every other reason — including `network` — stays a plain message:
-  // a transport failure must never be dressed up as "you need to pay".
+  // Kept alongside the message so the entitlement denial can offer the right
+  // remedy. Every other reason — including `network` — stays a plain message:
+  // a transport failure must never be dressed up as an account problem.
   const [errReason, setErrReason] = useState<AssignCandidateNumberFailure | null>(null);
   const [assigned, setAssigned] = useState<number | null>(null);
-  const location = useLocation();
-  const upgradeHref = useMemo(
-    () => buildUpgradeHref(location.pathname, location.search),
-    [location.pathname, location.search],
-  );
+  const [rechecking, setRechecking] = useState(false);
 
   const current = assigned ?? candidateNumber;
   if (current != null) {
@@ -272,6 +269,23 @@ const CandidateNumberAssign = memo(function CandidateNumberAssign({
     setErrReason(null);
     setAssigned(res.candidateNumber);
     setValue("");
+  };
+
+  // An entitlement rejection here means the CLIENT believed the grower could
+  // write (canAssign gated this control) but the database disagreed — a stale
+  // or diverged plan read, not a known Free grower. The remedy is to re-check
+  // the plan, never to sell: /pricing does not inspect the current entitlement
+  // before opening checkout, so an upsell here could bill an already-paying
+  // grower a second time.
+  const recheckPlan = async () => {
+    setRechecking(true);
+    try {
+      await onRecheckPlan();
+      setErr(null);
+      setErrReason(null);
+    } finally {
+      setRechecking(false);
+    }
   };
 
   return (
@@ -320,13 +334,15 @@ const CandidateNumberAssign = memo(function CandidateNumberAssign({
           {errReason === "entitlement" ? (
             <>
               {" "}
-              <Link
-                to={upgradeHref}
-                data-testid={`workspace-assign-number-upgrade-${plantId}`}
-                className="font-medium underline underline-offset-2"
+              <button
+                type="button"
+                disabled={rechecking}
+                onClick={() => void recheckPlan()}
+                data-testid={`workspace-assign-number-recheck-${plantId}`}
+                className="font-medium underline underline-offset-2 disabled:opacity-50"
               >
-                Upgrade to Pro
-              </Link>
+                {rechecking ? "Re-checking…" : "Re-check my plan"}
+              </button>
             </>
           ) : null}
         </span>
@@ -586,6 +602,7 @@ interface EditorProps {
   selected: boolean;
   onToggleSelect: (plantId: string) => void;
   canAssign: boolean;
+  onRecheckPlan: () => void | Promise<unknown>;
   onAssignNumber: (
     plantId: string,
     candidateNumber: number,
@@ -672,6 +689,7 @@ const CandidateEditor = memo(function CandidateEditor({
   selected,
   onToggleSelect,
   canAssign,
+  onRecheckPlan,
   onAssignNumber,
   onSaveScore,
   onSaveRound,
@@ -804,6 +822,7 @@ const CandidateEditor = memo(function CandidateEditor({
           plantId={plantId}
           candidateNumber={candidate.candidateNumber ?? null}
           canAssign={canAssign}
+          onRecheckPlan={onRecheckPlan}
           onAssign={onAssignNumber}
         />
         <PhenoCandidateEvidenceCoverage
@@ -1081,7 +1100,7 @@ export default function PhenoHuntWorkspace() {
     plantIds: loadedCandidateIds,
     configuredGoals: ws.hunt?.evidenceGoals ?? [],
   });
-  const { entitlement } = useMyEntitlements();
+  const { entitlement, refetch: refetchEntitlement } = useMyEntitlements();
   // Owner-only + Pro. Pheno surfaces are owner-only via RLS, so the viewer owns
   // the hunt; the presentation gate is an active Pheno Tracker Pro plan. The
   // database trigger is authoritative regardless.
@@ -1659,6 +1678,7 @@ export default function PhenoHuntWorkspace() {
                     selected={selectedIds.includes(c.candidateId)}
                     onToggleSelect={onToggleSelect}
                     canAssign={canAssign}
+                    onRecheckPlan={refetchEntitlement}
                     onAssignNumber={ws.assignCandidateNumber}
                     onSaveScore={ws.saveScore}
                     onSaveRound={ws.saveRound}

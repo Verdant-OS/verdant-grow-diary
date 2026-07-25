@@ -43,8 +43,13 @@ let entitlementMock: { isActive: boolean; effectivePlanId: string; displayPlanId
   effectivePlanId: "pro_monthly",
   displayPlanId: "pro_monthly",
 };
+const refetchEntitlementMock = vi.fn().mockResolvedValue(undefined);
 vi.mock("@/hooks/useMyEntitlements", () => ({
-  useMyEntitlements: () => ({ entitlement: entitlementMock, loading: false, refetch: vi.fn() }),
+  useMyEntitlements: () => ({
+    entitlement: entitlementMock,
+    loading: false,
+    refetch: refetchEntitlementMock,
+  }),
 }));
 
 import PhenoHuntWorkspace from "@/pages/PhenoHuntWorkspace";
@@ -131,6 +136,7 @@ beforeEach(() => {
   hookMock.mockReset();
   assignMock.mockReset().mockResolvedValue({ ok: true, candidateNumber: 5 });
   loadNextPageMock.mockReset();
+  refetchEntitlementMock.mockClear();
   entitlementMock = {
     isActive: true,
     effectivePlanId: "pro_monthly",
@@ -202,7 +208,12 @@ describe("owner-only candidate-number assignment", () => {
     expect(err).toHaveAttribute("role", "alert");
   });
 
-  it("offers an upgrade route when the denial is an entitlement one", async () => {
+  it("offers a plan re-check — never an upsell — when the denial is an entitlement one", async () => {
+    // This control is gated by canAssign, so reaching an entitlement rejection
+    // means the client thought the grower COULD write and the database
+    // disagreed: a stale/diverged plan read, not a known Free grower. Selling
+    // to them is unsafe — /pricing does not inspect the current entitlement
+    // before opening checkout, so an upsell could bill them a second time.
     assignMock.mockResolvedValue({
       ok: false,
       reason: "entitlement",
@@ -216,17 +227,23 @@ describe("owner-only candidate-number assignment", () => {
     expect(await screen.findByTestId("workspace-assign-number-error-p1")).toHaveTextContent(
       /active Pheno Tracker Pro plan/i,
     );
-    const cta = screen.getByTestId("workspace-assign-number-upgrade-p1");
-    expect(cta.getAttribute("href") ?? "").toContain("/pricing");
-    // No self-serve trial exists in this product, so the CTA must never
-    // promise one.
-    expect(cta.textContent ?? "").not.toMatch(/trial/i);
+
+    const recheck = screen.getByTestId("workspace-assign-number-recheck-p1");
+    expect(recheck.textContent ?? "").toMatch(/re-check my plan/i);
+    // Must not route an already-entitled grower into a second checkout.
+    expect(recheck.getAttribute("href")).toBeNull();
+    const scope = screen.getByTestId("workspace-assign-number-p1");
+    expect(scope.querySelector('a[href*="/pricing"]')).toBeNull();
+    expect(scope.textContent ?? "").not.toMatch(/upgrade|trial/i);
+
+    fireEvent.click(recheck);
+    await waitFor(() => expect(refetchEntitlementMock).toHaveBeenCalled());
   });
 
-  it("never offers an upgrade route for a transport failure", async () => {
+  it("never offers a remedy affordance for a transport failure", async () => {
     // Regression guard: `network` is reached by any unclassified SQLSTATE, a
-    // thrown promise, or a 200 with an unusable row. Telling a grower with a
-    // dropped connection to buy Pro would be a lie — the CTA is entitlement-only.
+    // thrown promise, or a 200 with an unusable row. A dropped connection is
+    // not an account problem and must not be presented as one.
     assignMock.mockResolvedValue({
       ok: false,
       reason: "network",
@@ -240,7 +257,10 @@ describe("owner-only candidate-number assignment", () => {
     expect(await screen.findByTestId("workspace-assign-number-error-p1")).toHaveTextContent(
       /check your connection/i,
     );
-    expect(screen.queryByTestId("workspace-assign-number-upgrade-p1")).toBeNull();
+    expect(screen.queryByTestId("workspace-assign-number-recheck-p1")).toBeNull();
+    expect(screen.getByTestId("workspace-assign-number-p1").textContent ?? "").not.toMatch(
+      /upgrade|trial|plan/i,
+    );
   });
 
   it("hides the assignment control from a non-Pro (read-only) viewer", () => {

@@ -47,7 +47,7 @@ const FEATURE_BULLETS: ReadonlyArray<string> = [
   "Export your pheno report",
 ];
 
-export function buildUpgradeHref(pathname: string, search: string): string {
+function buildUpgradeHref(pathname: string, search: string): string {
   // Forward the full same-origin app path INCLUDING its query — a deep link
   // to /pheno-hunts/new?growId=... must keep its context through checkout or
   // the buyer lands on "Grow not found". The candidate goes through the

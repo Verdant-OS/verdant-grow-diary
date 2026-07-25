@@ -922,6 +922,105 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
 
+      # Compute artifact file sizes + SHA-256 checksums for the flake summary
+      # and Playwright traces so the Job Summary carries independent integrity
+      # metadata for the exact bytes uploaded. Never fails the job — pure
+      # enrichment. All values are derived from local files (same bytes
+      # actions/upload-artifact consumed), never from network calls.
+      - name: Artifact checksums (trace + flake summary)
+        id: artifact_checksums
+        if: always() && steps.e2e_config.outputs.should_run == 'true'
+        shell: bash
+        env:
+          FLAKE_SUMMARY_PRESENT: ${{ steps.check_flake_summary.outputs.present }}
+          FLAKE_SUMMARY_URL: ${{ steps.upload_flake_summary.outputs.artifact-url }}
+          TRACES_URL: ${{ steps.upload_playwright_traces.outputs.artifact-url }}
+        run: |
+          human_bytes() {
+            # POSIX-portable human-readable byte formatter (no `numfmt` dep).
+            awk -v b="$1" 'BEGIN {
+              split("B KiB MiB GiB TiB", u, " ");
+              i = 1;
+              while (b >= 1024 && i < 5) { b /= 1024; i++; }
+              if (i == 1) printf "%d %s", b, u[i];
+              else printf "%.2f %s", b, u[i];
+            }'
+          }
+
+          flake_file="e2e/results/playwright-flake-summary.md"
+          flake_line="_Not generated for this run — no failed or flaky tests to report._"
+          if [ "${FLAKE_SUMMARY_PRESENT}" = "true" ] && [ -r "${flake_file}" ]; then
+            flake_bytes=$(wc -c < "${flake_file}" | tr -d ' ')
+            flake_sha=$(sha256sum "${flake_file}" | awk '{print $1}')
+            flake_hr=$(human_bytes "${flake_bytes}")
+            flake_line="| \`playwright-flake-summary.md\` | ${flake_hr} (${flake_bytes} bytes) | \`${flake_sha}\` |"
+          fi
+
+          # Playwright traces artifact = every test-results/**/*.zip. Report
+          # per-file rows (bounded to 25 to stay well under the 1 MiB
+          # $GITHUB_STEP_SUMMARY cap) plus totals + a manifest checksum that
+          # covers every trace zip, so tampering with any single trace is
+          # detectable from the summary alone.
+          trace_rows=""
+          trace_total_bytes=0
+          trace_file_count=0
+          trace_manifest_sha=""
+          if compgen -G "test-results/**/*.zip" > /dev/null 2>&1 || \
+             find test-results -type f -name '*.zip' -print -quit 2>/dev/null | grep -q .; then
+            tmp_manifest="$(mktemp)"
+            # Deterministic ordering so the manifest checksum is reproducible.
+            while IFS= read -r -d '' f; do
+              bytes=$(wc -c < "$f" | tr -d ' ')
+              sha=$(sha256sum "$f" | awk '{print $1}')
+              trace_total_bytes=$((trace_total_bytes + bytes))
+              trace_file_count=$((trace_file_count + 1))
+              printf '%s  %s  %s\n' "$sha" "$bytes" "$f" >> "$tmp_manifest"
+            done < <(find test-results -type f -name '*.zip' -print0 | sort -z)
+            trace_manifest_sha=$(sha256sum "$tmp_manifest" | awk '{print $1}')
+            # Cap displayed rows so a run with hundreds of trace zips doesn't
+            # overflow the Job Summary size cap. Full manifest is still
+            # covered by trace_manifest_sha (computed over the full list).
+            trace_rows=$(head -n 25 "$tmp_manifest" | awk '{
+              sha=$1; bytes=$2; $1=""; $2=""; path=$0; sub(/^  /,"",path);
+              printf "| `%s` | %s bytes | `%s` |\n", path, bytes, sha;
+            }')
+            if [ "${trace_file_count}" -gt 25 ]; then
+              trace_rows="${trace_rows}"$'\n'"| _…and $((trace_file_count - 25)) more trace zip(s) — full list covered by the manifest SHA-256 below._ | | |"
+            fi
+            rm -f "$tmp_manifest"
+          fi
+
+          {
+            echo ""
+            echo "### 🔐 Artifact checksums (SHA-256)"
+            echo ""
+            echo "Independent integrity metadata for the exact bytes uploaded above. Recompute locally with \`sha256sum <file>\` after unzipping the artifact to verify."
+            echo ""
+            echo "**Flake summary (\`quicklog-flake-summary-${ARTIFACT_SUFFIX}\`)**"
+            echo ""
+            echo "| File | Size | SHA-256 |"
+            echo "|------|------|---------|"
+            echo "${flake_line}"
+            echo ""
+            echo "**Playwright traces (\`quicklog-playwright-traces-${ARTIFACT_SUFFIX}\`)**"
+            echo ""
+            if [ "${trace_file_count}" -gt 0 ]; then
+              trace_total_hr=$(human_bytes "${trace_total_bytes}")
+              echo "- **Files:** ${trace_file_count} \`trace.zip\`(s)"
+              echo "- **Total size:** ${trace_total_hr} (${trace_total_bytes} bytes)"
+              echo "- **Manifest SHA-256:** \`${trace_manifest_sha}\` — computed over a deterministic \`<sha>  <bytes>  <path>\` listing of every uploaded trace zip; any change to any single trace changes this value."
+              echo ""
+              echo "| File | Size | SHA-256 |"
+              echo "|------|------|---------|"
+              echo "${trace_rows}"
+            else
+              echo "_No \`test-results/**/*.zip\` files were produced for this run — nothing to checksum._"
+            fi
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
+
+
       # Enrichment only — never fails the job. Emits a trace-viewer link into
       # $GITHUB_STEP_SUMMARY when the flake summary upload succeeded, so the
       # trace artifact is one click away from the flake summary section above.

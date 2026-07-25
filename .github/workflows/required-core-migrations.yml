@@ -78,7 +78,7 @@ jobs:
         env:
           TARGET_ENV: sandbox
           MANIFEST_SCOPE: advisory
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL_SANDBOX }}
           REPORT_PATH: ${{ github.workspace }}/audit/core-sandbox/advisory-report.md
           AUDIT_PATH: ${{ github.workspace }}/audit/core-sandbox/advisory-audit.json
         run: node scripts/assert-required-core-migrations-applied.mjs

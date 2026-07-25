@@ -414,7 +414,8 @@ describe("required-core-migrations workflow trust boundary", () => {
     );
     expect(sandboxBlock).not.toContain("pull_request");
     expect(sandboxBlock).toContain("environment: verdant-sandbox");
-    expect(sandboxBlock).toContain("secrets.SUPABASE_DB_URL_SANDBOX");
+    expect(sandboxBlock.match(/secrets\.SUPABASE_DB_URL_SANDBOX/g)).toHaveLength(2);
+    expect(sandboxBlock).not.toMatch(/SUPABASE_DB_URL:\s*\$\{\{\s*secrets\.SUPABASE_DB_URL\s*\}\}/);
   });
 
   it("allows production remote access only by manual dispatch from the deploy branch", () => {

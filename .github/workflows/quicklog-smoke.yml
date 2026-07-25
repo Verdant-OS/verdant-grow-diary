@@ -1043,12 +1043,24 @@ jobs:
           name: quicklog-smoke-artifacts-${{ env.ARTIFACT_SUFFIX }}
           if-no-files-found: warn
           retention-days: 30
+          # NOTE: `path: |` below is a YAML literal block — every line in it is
+          # a literal path pattern, so comments cannot live inside it.
+          #
+          # test-results/ must stay in this bundle. Five places in this same
+          # workflow's Job Summary promise it is here: the bundle-contents
+          # table, the "use this bundle when you also want test-results/" note,
+          # the error-context.md archive-path rows, and (critically) the trace
+          # fallback telling operators traces "live under
+          # test-results/**/trace.zip inside the bundle" when the standalone
+          # traces artifact URL is unavailable. Dropping the path silently
+          # broke that fallback while leaving every instruction in place.
           path: |
             e2e/results/quicklog-smoke-report.json
             e2e/results/quicklog-smoke-report.txt
             e2e/results/playwright-report.json
             e2e/results/playwright-flake-summary.md
             playwright-report/
+            test-results/
 
       # After the smoke bundle is uploaded, emit direct links back to every
       # `test-results/**/error-context.md` file that the failure-debug section

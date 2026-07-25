@@ -566,6 +566,8 @@ jobs:
         shell: bash
         env:
           FLAKE_SUMMARY_URL: ${{ steps.upload_flake_summary.outputs.artifact-url }}
+          HTML_REPORT_URL: ${{ steps.upload_playwright_report.outputs.artifact-url }}
+
           FLAKE_SUMMARY_PRESENT: ${{ steps.check_flake_summary.outputs.present }}
           FLAKE_SUMMARY_REASON: ${{ steps.check_flake_summary.outputs.reason }}
           PW_COUNTS_AVAILABLE: ${{ steps.summarize_flakes.outputs.pw_counts_available }}

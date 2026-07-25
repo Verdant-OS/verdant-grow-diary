@@ -47,5 +47,5 @@ export function buildPaidPlanAllowlistSourceRegex(
   ids: readonly string[] = PAID_PLAN_IDS,
 ): RegExp {
   const entries = ids.map((id) => `["']${id}["']`).join(",\\s*");
-  return new RegExp(`PAID_PLAN_IDS[\\s\\S]{0,800}${entries},`);
+  return new RegExp(`PAID_PLAN_IDS\\s*=\\s*\\[[\\s\\S]{0,600}${entries},`);
 }

@@ -35,6 +35,19 @@ describe("appRouteManifest — structural invariants", () => {
     expect(APP_ROUTES.find((route) => route.path === "/logs")?.access).toBe("redirect");
   });
 
+  it("describes operator write capabilities without overstating read-only safety", () => {
+    const ggsIngest = APP_ROUTES.find(
+      (route) => route.path === "/operator/ggs-real-payload-ingest",
+    );
+    expect(ggsIngest?.description).toMatch(/commit/i);
+    expect(ggsIngest?.description).toMatch(/validated ingest RPC/i);
+    expect(ggsIngest?.description).toMatch(/read-only Sentinel verdict/i);
+
+    const supportInbox = APP_ROUTES.find((route) => route.path === "/operator/support-inbox");
+    expect(supportInbox?.description).toMatch(/original submissions are read-only/i);
+    expect(supportInbox?.description).toMatch(/review status and internal notes are editable/i);
+  });
+
   it("every entry has a non-empty path and a valid access value", () => {
     for (const entry of APP_ROUTES) {
       expect(typeof entry.path).toBe("string");

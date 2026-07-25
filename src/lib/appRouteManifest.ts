@@ -303,7 +303,8 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   {
     path: "/operator/ggs-real-payload-ingest",
     access: "operator",
-    description: "GGS Sentinel smoke runner verdict over real Spider Farmer GGS rows.",
+    description:
+      "Operator-gated GGS real-payload commit through the validated ingest RPC, plus a read-only Sentinel verdict.",
   },
   {
     path: "/operator/one-tent-live-proof",
@@ -345,7 +346,8 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   {
     path: "/operator/support-inbox",
     access: "operator",
-    description: "Operator support inbox (read-only).",
+    description:
+      "Operator support inbox; original submissions are read-only, while review status and internal notes are editable.",
   },
   {
     path: "/partners/csv-preview",

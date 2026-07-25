@@ -1,9 +1,11 @@
 /**
  * Operator GGS Real-Payload Ingest page.
  *
- * Read-only diagnostics. No Supabase writes, no rpc, no Edge function
- * invocations, no alerts/Action-Queue mutation, no AI calls, no device
- * control, no raw-payload rendering, no MQTT publishing.
+ * Operator-gated ingest plus read-only Sentinel diagnostics. The ingest panel
+ * can commit validated, attested rows only through `pi_ingest_commit_batch`;
+ * the Sentinel panel only reads existing rows. No direct sensor writes, no
+ * alerts/Action-Queue mutation, no AI calls, no device control, no raw-payload
+ * rendering, no MQTT publishing.
  */
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -70,7 +72,8 @@ export default function OperatorGgsRealPayloadIngest() {
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">GGS Real-Payload Ingest</h1>
         <p className="text-sm text-muted-foreground">
-          Operator Mode · Read-only Sentinel verdict over real Spider Farmer GGS rows.
+          Operator Mode · Commit validated, attested Spider Farmer GGS readings, then review the
+          read-only Sentinel verdict.
         </p>
       </header>
 

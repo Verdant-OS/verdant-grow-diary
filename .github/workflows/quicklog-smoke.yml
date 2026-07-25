@@ -815,6 +815,58 @@ jobs:
             playwright-report/
             test-results/
 
+      # Consolidated at-a-glance index of the three primary uploads for this
+      # run (smoke bundle, standalone flake summary, standalone Playwright
+      # HTML report) so a reviewer can grab any of them from one place
+      # without scrolling through the per-artifact sections that already
+      # exist above/below. Written after upload_smoke_bundle so every
+      # `artifact-url` output is populated. Enrichment only — never fails.
+      - name: List uploaded artifacts in Job Summary
+        if: always() && steps.e2e_config.outputs.should_run == 'true'
+        shell: bash
+        env:
+          SMOKE_BUNDLE_URL: ${{ steps.upload_smoke_bundle.outputs.artifact-url }}
+          FLAKE_SUMMARY_URL: ${{ steps.upload_flake_summary.outputs.artifact-url }}
+          FLAKE_SUMMARY_PRESENT: ${{ steps.check_flake_summary.outputs.present }}
+          HTML_REPORT_URL: ${{ steps.upload_playwright_report.outputs.artifact-url }}
+        run: |
+          # Renders one Markdown row per artifact with the exact uploaded
+          # name (including the run-scoped ARTIFACT_SUFFIX) and a Download
+          # column that becomes a clickable link only when the upload
+          # actually succeeded. Absent uploads (skipped by the flake gate,
+          # disabled via `upload_html_report=false`, failed upload) render
+          # as an italic "not uploaded" note in the same row so reviewers
+          # never wonder whether they missed a link.
+          fmt_link() {
+            local url="$1" label="$2" missing_note="$3"
+            if [ -n "${url}" ]; then
+              printf '[%s](%s)' "${label}" "${url}"
+            else
+              printf '_%s_' "${missing_note}"
+            fi
+          }
+          smoke_link=$(fmt_link "${SMOKE_BUNDLE_URL}" "Download" "not uploaded — check the run's Artifacts dropdown")
+          if [ "${FLAKE_SUMMARY_PRESENT}" = "true" ]; then
+            flake_link=$(fmt_link "${FLAKE_SUMMARY_URL}" "Download" "uploaded, URL unavailable — see Artifacts dropdown")
+          else
+            flake_link='_not uploaded — 0 failed + 0 flaky (see Flake summary section)_'
+          fi
+          html_link=$(fmt_link "${HTML_REPORT_URL}" "Download" "not uploaded — see HTML report section for reason")
+          {
+            echo ""
+            echo "### 📦 Uploaded artifacts (this run)"
+            echo ""
+            echo "One-stop index of every standalone artifact this workflow published. Each row shows the exact uploaded name (with the run-scoped suffix \`${ARTIFACT_SUFFIX}\`), what it contains, and a direct download link when available. Per-artifact sections above/below add gate breakdowns, inline previews, and fallback paths for the missing cases."
+            echo ""
+            echo "| Artifact name | Contents | Download |"
+            echo "| ------------- | -------- | -------- |"
+            echo "| \`quicklog-smoke-artifacts-${ARTIFACT_SUFFIX}\` | Full smoke bundle: \`quicklog-smoke-report.{json,txt}\`, \`playwright-report.json\`, \`playwright-flake-summary.md\`, \`playwright-report/\` (HTML), \`test-results/\` | ${smoke_link} |"
+            echo "| \`quicklog-flake-summary-${ARTIFACT_SUFFIX}\` | Single file: \`playwright-flake-summary.md\` (uploaded only when \`failed + flaky > 0\`) | ${flake_link} |"
+            echo "| \`quicklog-playwright-report-${ARTIFACT_SUFFIX}\` | Standalone \`playwright-report/\` (unzip and open \`index.html\`) | ${html_link} |"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
+
       # Follow-up to the pinned "🧭 Playwright HTML report" section at the
       # top of the Job Summary: the same `playwright-report/` tree is also
       # packaged inside the `quicklog-smoke-artifacts` bundle. Surface that

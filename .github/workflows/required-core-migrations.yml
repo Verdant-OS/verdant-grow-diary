@@ -167,24 +167,33 @@ jobs:
 
   # ADVISORY: schema behind paid / entitlement-gated features.
   #
-  # continue-on-error is deliberate. A missing Pro column breaks a paid surface
-  # for the growers who bought it — worth surfacing — but must never block an
-  # unrelated core release, or a core fix ends up waiting on an optional
-  # paid-feature migration. Same script, same verified behavior, different
-  # manifest and non-blocking.
+  # A missing Pro column breaks a paid surface for the growers who bought it —
+  # worth surfacing — but must never block an unrelated core release, or a core
+  # fix ends up waiting on an optional paid-feature migration. Same script and
+  # same verified behavior as the core job, different manifest.
+  #
+  # The job itself always ends GREEN; drift is reported as a ::warning::
+  # annotation plus a job summary. See the step-level note below for why this
+  # is not job-level continue-on-error.
   advisory-pro-sandbox:
     name: Advisory — Pro-feature schema in SANDBOX (non-blocking)
     needs: manifest-and-files
     if: ${{ (github.event_name == 'pull_request') || (github.event_name == 'workflow_dispatch' && inputs.target_env == 'sandbox') }}
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Prepare audit dir
         run: mkdir -p "${{ github.workspace }}/audit/pro-sandbox"
       - name: Install psql
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+      # continue-on-error on the STEP, not the job. Job-level continue-on-error
+      # still surfaces the check as FAILURE in the checks API, which makes an
+      # "advisory" result indistinguishable from a blocking one on the PR — the
+      # exact triage noise this job exists to avoid. Failing the step instead
+      # lets the job finish green while the next step re-reads the outcome.
       - name: Report Pro-feature schema drift (advisory)
+        id: pro_check
+        continue-on-error: true
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL_SANDBOX }}
           TARGET_ENV: sandbox
@@ -192,14 +201,28 @@ jobs:
           REPORT_PATH: ${{ github.workspace }}/audit/pro-sandbox/report.md
           AUDIT_PATH: ${{ github.workspace }}/audit/pro-sandbox/audit.json
         run: node scripts/assert-required-core-migrations-applied.mjs
-      - name: Publish advisory report to job summary
+      - name: Publish advisory result
         if: always()
         run: |
-          if [ -f "${{ github.workspace }}/audit/pro-sandbox/report.md" ]; then
-            echo "> **Advisory only** — Pro-feature schema. Does not block release." >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            cat "${{ github.workspace }}/audit/pro-sandbox/report.md" >> "$GITHUB_STEP_SUMMARY"
+          set -euo pipefail
+          if [ "${{ steps.pro_check.outcome }}" = "success" ]; then
+            echo "✓ Pro-feature schema present in sandbox."
+            echo "✓ Pro-feature schema present in sandbox." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
           fi
+          # Surfaced as a warning annotation, never an error: a missing Pro
+          # column breaks a paid surface for entitled growers (worth seeing)
+          # but must not gate an unrelated core release.
+          echo "::warning title=Pro-feature schema drift::Pro-gated schema is missing in sandbox. Advisory only — does not block release. See the job summary for details."
+          {
+            echo "> ⚠️ **Advisory only** — Pro-feature schema drift. Does **not** block release."
+            echo ""
+            if [ -f "${{ github.workspace }}/audit/pro-sandbox/report.md" ]; then
+              cat "${{ github.workspace }}/audit/pro-sandbox/report.md"
+            else
+              echo "The advisory check did not produce a report (see step logs)."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Upload advisory audit
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

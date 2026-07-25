@@ -140,9 +140,7 @@ describe("irrigation evidence RLS harness — no device-control / automation / f
     // those are SECURITY INVOKER and depend on auth.uid(); a service_role JWT
     // cannot honestly prove ACL possession by successful execution. ACL
     // possession is proved in pgTAP instead.
-    expect(src).not.toMatch(
-      /admin\s*\.rpc\(\s*['"]create_(watering|feeding)_event['"]/i,
-    );
+    expect(src).not.toMatch(/admin\s*\.rpc\(\s*['"]create_(watering|feeding)_event['"]/i);
   });
   it("uses a distinct feedingArgs helper that explicitly clears p_water", () => {
     // The RPC rejects a non-null p_water when p_event_type = 'feeding'
@@ -175,7 +173,9 @@ describe("irrigation evidence RLS harness — no device-control / automation / f
     // Every DML denial assertion must combine both helpers so a
     // missing-function error cannot satisfy an RPC/table-denial check.
     const dmlDenials = Array.from(
-      src.matchAll(/authenticated denied (?:INSERT|UPDATE|DELETE|create_[a-z_]+_event)[^\n]*\n\s*([^\n]+)/gi),
+      src.matchAll(
+        /authenticated denied (?:INSERT|UPDATE|DELETE|create_[a-z_]+_event)[^\n]*\n\s*([^\n]+)/gi,
+      ),
     ).map((m) => m[1]);
     expect(dmlDenials.length, "expected denial assertions to exist").toBeGreaterThan(0);
     for (const line of dmlDenials) {
@@ -202,7 +202,6 @@ describe("irrigation evidence RLS harness — no device-control / automation / f
     expect(src).toMatch(/feeding seed exists only in feeding_events/);
   });
 });
-
 
 describe("irrigation evidence RLS harness — disposable + self-cleaning", () => {
   it("only ever creates @verdant.test users", () => {
@@ -310,14 +309,19 @@ describe("irrigation evidence CI gate — authoritative and non-production", () 
   });
 
   it("runs the disposable RLS harness against a masked local Supabase stack", () => {
-    expect(workflowCode).toMatch(/supabase start/);
-    expect(workflowCode).toMatch(/supabase db reset --local/);
+    expect(workflowCode).toContain("Prepare immutable migration replay workspace");
+    expect(workflowCode).toContain("node scripts/prepare-local-supabase-replay.mjs");
+    expect(workflowCode).toMatch(/supabase start --workdir "\$SUPABASE_REPLAY_WORKDIR"/);
+    expect(workflowCode).toMatch(/supabase db reset --workdir "\$SUPABASE_REPLAY_WORKDIR" --local/);
+    expect(workflowCode).toMatch(/supabase status --workdir "\$SUPABASE_REPLAY_WORKDIR" -o env/);
     expect(workflowCode).toMatch(/::add-mask::\$\{ANON_KEY\}/);
     expect(workflowCode).toMatch(/::add-mask::\$\{SERVICE_ROLE_KEY\}/);
     expect(workflowCode).toMatch(/::add-mask::\$\{DB_URL\}/);
     expect(workflowCode).toMatch(/SUPABASE_DB_URL=\$\{DB_URL\}/);
     expect(workflowCode).toContain("bun run test:irrigation-evidence-rls:local-lane");
-    expect(workflowCode).toMatch(/if:\s*always\(\)[\s\S]{0,120}supabase stop --no-backup/);
+    expect(workflowCode).toMatch(
+      /if:\s*always\(\)[\s\S]{0,180}supabase stop --workdir "\$SUPABASE_REPLAY_WORKDIR" --no-backup/,
+    );
     expect(workflowCode).not.toMatch(/supabase\s+(link|db push)/);
   });
 
@@ -344,6 +348,9 @@ describe("irrigation evidence CI gate — authoritative and non-production", () 
   it("reruns for all database, irrigation UI, style, and browser-proof dependencies", () => {
     for (const path of [
       '"supabase/migrations/**"',
+      '"config/local-supabase-replay-compatibility.json"',
+      '"config/local-supabase-replay/**"',
+      '"scripts/prepare-local-supabase-replay.mjs"',
       '"src/components/irrigation/**"',
       '"src/components/ui/**"',
       '"src/lib/irrigation/**"',

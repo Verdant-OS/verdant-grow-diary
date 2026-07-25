@@ -8,6 +8,7 @@ import { spawnSync } from "node:child_process";
 const SCRIPT = resolve("scripts/prepare-local-supabase-replay.mjs");
 const REAL_MANIFEST = resolve("config/local-supabase-replay-compatibility.json");
 const SECURITY_DB_WORKFLOW = resolve(".github/workflows/security-db-local.yml");
+const IRRIGATION_EVIDENCE_WORKFLOW = resolve(".github/workflows/irrigation-evidence-gate.yml");
 const temporaryRoots: string[] = [];
 
 function sha256(value: string): string {
@@ -163,6 +164,25 @@ describe("local Supabase replay compatibility workspace", () => {
       'supabase db reset --workdir "$SUPABASE_REPLAY_WORKDIR" 2>&1 | tee supabase-db-reset.log',
       'run: supabase stop --workdir "$SUPABASE_REPLAY_WORKDIR" --no-backup || true',
     ]);
+  });
+
+  it("routes the irrigation runtime gate through the same disposable replay workdir", () => {
+    const workflow = readFileSync(IRRIGATION_EVIDENCE_WORKFLOW, "utf8");
+    const prepareIndex = workflow.indexOf("Prepare immutable migration replay workspace");
+    const startIndex = workflow.indexOf("Start disposable local Supabase");
+    const lifecycleCommands = workflow
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => /\bsupabase (start|status|db reset|stop)\b/.test(line));
+
+    expect(prepareIndex).toBeGreaterThan(-1);
+    expect(startIndex).toBeGreaterThan(prepareIndex);
+    expect(workflow).toContain("node scripts/prepare-local-supabase-replay.mjs");
+    expect(lifecycleCommands).toHaveLength(4);
+    for (const command of lifecycleCommands) {
+      expect(command).toContain('--workdir "$SUPABASE_REPLAY_WORKDIR"');
+    }
+    expect(workflow).not.toMatch(/\bsupabase\s+(link|db push)\b/);
   });
 
   it("verifies the real immutable compatibility manifest without writing", () => {

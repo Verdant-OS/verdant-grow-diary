@@ -124,7 +124,7 @@ describe("Quick Log Playwright CI surface", () => {
     expect(wf).not.toMatch(/echo\s+["']?\$\{\{\s*secrets\.E2E_TEST_(EMAIL|PASSWORD)\s*\}\}/);
   });
 
-  it("CI workflow uploads exactly the expected artifact paths and excludes storageState", () => {
+  it("CI workflow uploads the exact safe smoke bundle and excludes raw auth/DOM artifacts", () => {
     const wf = read(".github/workflows/quicklog-smoke.yml");
     const uploadMatch = wf.match(
       /-\s*name:\s*Upload smoke artifacts[\s\S]*?(?=\n {6}- name:|\n*$)/,
@@ -141,12 +141,15 @@ describe("Quick Log Playwright CI surface", () => {
       "e2e/results/playwright-report.json",
       "e2e/results/playwright-flake-summary.md",
       "playwright-report/",
-      "test-results/",
     ];
     expect(paths).toEqual(expected);
-    // Must never publish storageState as an artifact.
+    // Must never publish auth state or the raw Playwright test-results tree,
+    // which can contain error-context DOM and authenticated attachments.
     expect(pathBlock).not.toMatch(/e2e\/\.auth/);
     expect(pathBlock).not.toMatch(/user\.json/);
+    expect(pathBlock).not.toMatch(/test-results/);
+    expect(pathBlock).not.toMatch(/error-context\.md/);
+    expect(pathBlock).not.toMatch(/step-logs/);
   });
 
   it("CI workflow skips cleanly on PR without secrets and fails fast on dispatch", () => {
@@ -724,7 +727,7 @@ describe("Quick Log Playwright CI surface", () => {
     expect(block).toContain("REPORT_PARSE_STATUS");
   });
 
-  it("bundled smoke artifact upload remains unchanged (name + paths + retention)", () => {
+  it("bundled smoke artifact keeps the exact safe path set and retention", () => {
     const wf = read(".github/workflows/quicklog-smoke.yml");
     const uploadMatch = wf.match(
       /-\s*name:\s*Upload smoke artifacts[\s\S]*?(?=\n {6}- name:|\n*$)/,
@@ -743,8 +746,8 @@ describe("Quick Log Playwright CI surface", () => {
       "e2e/results/playwright-report.json",
       "e2e/results/playwright-flake-summary.md",
       "playwright-report/",
-      "test-results/",
     ]);
+    expect(paths).not.toContain("test-results/");
     const bundled = wf.match(/-\s*name:\s*Upload smoke artifacts[\s\S]*?(?=\n {6}- name:)/);
     expect(bundled).toBeTruthy();
     expect(bundled![0]).toMatch(/retention-days:\s*30/);

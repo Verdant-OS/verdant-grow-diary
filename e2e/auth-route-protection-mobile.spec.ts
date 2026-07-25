@@ -111,6 +111,7 @@ const PUBLIC_MOBILE_ROUTES: string[] = [
   "/upgrade",
   "/checkout/success",
   "/checkout/cancel",
+  "/unsubscribe",
   "/terms",
   "/privacy",
   "/refund",

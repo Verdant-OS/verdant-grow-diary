@@ -885,34 +885,12 @@ describe("Quick Log shared in-flight coordination", () => {
     expect(unit).toHaveTextContent("EC mS/cm");
   });
 
-  it("freezes the Reminder draft during the child-owned shared lock and restores it after failure", async () => {
-    const pending = deferredRpc();
-    harness.rpc.mockReturnValue(pending.promise);
+  it("does not expose an unsupported legacy Reminder draft from a crafted prefill", async () => {
     renderQuickLog({ plantId: "p1", growId: "g1", tentId: "t1", eventType: "reminder" });
-    const reminder = await waitFor(() => {
-      const control = mainForm().querySelector<HTMLInputElement>('input[type="datetime-local"]');
-      expect(control).not.toBeNull();
-      return control!;
-    });
-    fireEvent.change(reminder, { target: { value: "2026-07-20T09:30" } });
-    const childSave = await prepareChildNote();
-
-    act(() => {
-      childSave.click();
-      fireEvent.change(reminder, { target: { value: "2026-07-21T10:45" } });
-    });
-
-    await waitFor(() => expect(harness.rpc).toHaveBeenCalledTimes(1));
-    expectMainDraftSemanticallyLocked(true);
-    expect(reminder).toHaveValue("2026-07-20T09:30");
-
-    await act(async () => {
-      pending.resolve({ data: null, error: { message: "offline" } });
-      await pending.promise;
-    });
-
-    await screen.findByTestId("quick-log-dialog-all-activities-error");
-    await waitFor(() => expectMainDraftSemanticallyLocked(false));
-    expect(reminder).toHaveValue("2026-07-20T09:30");
+    await waitFor(() =>
+      expect(mainForm().querySelector('input[type="datetime-local"]')).toBeNull(),
+    );
+    expect(screen.getByRole("combobox", { name: "Event" })).not.toHaveTextContent("Reminder");
+    expect(harness.rpc).not.toHaveBeenCalled();
   });
 });

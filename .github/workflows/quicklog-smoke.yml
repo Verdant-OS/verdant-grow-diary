@@ -922,7 +922,44 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
 
-      - name: Upload Playwright media (screenshots/videos)
+      # Enrichment only — never fails the job. Emits a trace-viewer link into
+      # $GITHUB_STEP_SUMMARY when the flake summary upload succeeded, so the
+      # trace artifact is one click away from the flake summary section above.
+      - name: Link Playwright trace viewer in Job Summary
+        if: always() && steps.e2e_config.outputs.should_run == 'true'
+        shell: bash
+        env:
+          FLAKE_SUMMARY_PRESENT: ${{ steps.check_flake_summary.outputs.present }}
+          FLAKE_SUMMARY_URL: ${{ steps.upload_flake_summary.outputs.artifact-url }}
+          TRACES_URL: ${{ steps.upload_playwright_traces.outputs.artifact-url }}
+          SMOKE_BUNDLE_URL: ${{ steps.upload_smoke_bundle.outputs.artifact-url }}
+        run: |
+          if [ "${FLAKE_SUMMARY_PRESENT}" != "true" ] || [ -z "${FLAKE_SUMMARY_URL}" ]; then
+            # Only surface the trace viewer link alongside a successful flake
+            # summary upload — otherwise there's nothing to cross-reference and
+            # the smoke bundle section already covers the fallback path.
+            exit 0
+          fi
+          {
+            echo ""
+            echo "### 🎬 Playwright trace viewer"
+            echo ""
+            echo "The flake summary artifact was uploaded above. Open the trace for the exact failing/flaky attempt it references:"
+            echo ""
+            if [ -n "${TRACES_URL}" ]; then
+              echo "1. **Download the traces artifact:** [\`quicklog-playwright-traces-${ARTIFACT_SUFFIX}\`](${TRACES_URL}) — contains every \`test-results/**/trace.zip\` produced by this run (first attempt + retries)."
+            elif [ -n "${SMOKE_BUNDLE_URL}" ]; then
+              echo "1. **Download the smoke bundle:** [\`quicklog-smoke-artifacts-${ARTIFACT_SUFFIX}\`](${SMOKE_BUNDLE_URL}) — traces live under \`test-results/**/trace.zip\` inside the bundle. _(Standalone \`quicklog-playwright-traces\` artifact URL was unavailable in this Job Summary.)_"
+            else
+              echo "1. **Download the traces artifact:** open this run's **Artifacts** dropdown and grab \`quicklog-playwright-traces-${ARTIFACT_SUFFIX}\` (or \`quicklog-smoke-artifacts-${ARTIFACT_SUFFIX}\` for the same files under \`test-results/**/trace.zip\`)."
+            fi
+            echo "2. Unzip the artifact locally."
+            echo "3. Drag the \`trace.zip\` for the failing test onto [**trace.playwright.dev**](https://trace.playwright.dev/) — it opens the full interactive Playwright Trace Viewer (timeline, DOM snapshots, network, console) in the browser, no local install required."
+            echo ""
+            echo "_Retry traces are stored next to the first attempt under the same test folder, so you can compare attempt 1 vs retry 1 side-by-side._"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
         id: upload_playwright_media
         if: always() && steps.e2e_config.outputs.should_run == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

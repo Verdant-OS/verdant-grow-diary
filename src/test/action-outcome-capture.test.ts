@@ -26,6 +26,25 @@ const ACTION_DETAIL = readFileSync(resolve(ROOT, "src/pages/ActionDetail.tsx"), 
 const RULES = readFileSync(resolve(ROOT, "src/lib/actionOutcomeRules.ts"), "utf8");
 const BADGES = readFileSync(resolve(ROOT, "src/components/DiaryEntryBadges.tsx"), "utf8");
 
+function extractAsyncFunctionBefore(
+  source: string,
+  functionName: string,
+  nextFunctionName: string,
+): string {
+  const start = source.indexOf(`async function ${functionName}`);
+  const end = source.indexOf(`async function ${nextFunctionName}`, start);
+  if (start < 0 || end <= start) {
+    throw new Error(`Could not isolate ${functionName} before ${nextFunctionName}`);
+  }
+  return source.slice(start, end);
+}
+
+const RECORD_OUTCOME_BLOCK = extractAsyncFunctionBefore(
+  ACTION_DETAIL,
+  "recordOutcome",
+  "logEvent",
+);
+
 function baseAction(overrides: Partial<OutcomeActionInput> = {}): OutcomeActionInput {
   return {
     id: "action-1",
@@ -331,12 +350,8 @@ describe("ActionDetail — idempotency check", () => {
 describe("ActionDetail — no user_id in insert", () => {
   it("does not include user_id in outcome insert payload", () => {
     // The recordOutcome function builds from the draft which never has user_id as a field
-    const outcomeBlock = ACTION_DETAIL.slice(
-      ACTION_DETAIL.indexOf("async function recordOutcome"),
-      ACTION_DETAIL.indexOf("setOutcomeBusy(false);\n    setOutcomeDialogOpen(false);"),
-    );
     // No user_id in the insert call itself
-    expect(outcomeBlock).not.toMatch(/user_id\s*:/);
+    expect(RECORD_OUTCOME_BLOCK).not.toMatch(/user_id\s*:/);
   });
 });
 
@@ -346,11 +361,7 @@ describe("ActionDetail — no user_id in insert", () => {
 describe("ActionDetail — outcome does not mutate alerts", () => {
   it("outcome recording logic does not touch alerts table", () => {
     // The recordOutcome function only inserts into diary_entries
-    const outcomeBlock = ACTION_DETAIL.slice(
-      ACTION_DETAIL.indexOf("async function recordOutcome"),
-      ACTION_DETAIL.indexOf("setOutcomeBusy(false);\n    setOutcomeDialogOpen(false);"),
-    );
-    expect(outcomeBlock).not.toMatch(/\.from\(["']alerts["']\).*update/);
+    expect(RECORD_OUTCOME_BLOCK).not.toMatch(/\.from\(["']alerts["']\).*update/);
   });
 });
 
@@ -359,11 +370,7 @@ describe("ActionDetail — outcome does not mutate alerts", () => {
 // ---------------------------------------------------------------------------
 describe("ActionDetail — outcome does not mutate action_queue", () => {
   it("outcome recording logic does not update action_queue", () => {
-    const outcomeBlock = ACTION_DETAIL.slice(
-      ACTION_DETAIL.indexOf("async function recordOutcome"),
-      ACTION_DETAIL.indexOf("setOutcomeBusy(false);\n    setOutcomeDialogOpen(false);"),
-    );
-    expect(outcomeBlock).not.toMatch(/\.from\(["']action_queue["']\).*update/);
+    expect(RECORD_OUTCOME_BLOCK).not.toMatch(/\.from\(["']action_queue["']\).*update/);
   });
 });
 

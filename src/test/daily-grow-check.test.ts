@@ -141,6 +141,7 @@ describe("dailyGrowCheckRules — summary", () => {
     expect(get("handheld")).toBe("skipped");
     expect(get("alerts")).toBe("reviewed");
     expect(get("tasks")).toBe("not-reviewed");
+    expect(summary.find((row) => row.key === "tasks")?.label).toBe("Pending actions");
   });
   it("missing optional readings do not block completion", () => {
     expect(canCompleteDailyGrowCheck(INITIAL_DAILY_GROW_CHECK_STATE)).toBe(true);
@@ -154,7 +155,7 @@ describe("DailyCheck page — entry points and structure", () => {
     expect(PAGE).toMatch(/Step 3 · Add Manual Sensor Snapshot/);
     expect(PAGE).toMatch(/Step 4 · Quick Log/);
     expect(PAGE).toMatch(/Step 5 · Handheld Readings/);
-    expect(PAGE).toMatch(/Step 6 · Review Alerts & Pending Tasks/);
+    expect(PAGE).toMatch(/Step 6 · Review Alerts & Pending Actions/);
     expect(PAGE).toMatch(/Daily Grow Check/);
     expect(PAGE).toMatch(/Current Tent/);
     expect(PAGE).toMatch(/Current Plant/);

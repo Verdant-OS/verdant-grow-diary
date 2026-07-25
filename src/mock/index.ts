@@ -110,17 +110,6 @@ export interface Camera {
   lastFrameAt: string;
 }
 
-export interface Task {
-  id: string;
-  title: string;
-  type: "water" | "feed" | "training" | "defoliation" | "flush" | "inspect";
-  tentId?: string;
-  plantId?: string;
-  dueAt: string;
-  status: "today" | "upcoming" | "done";
-  recurring?: string;
-}
-
 export interface Alert {
   id: string;
   severity: "critical" | "warning" | "info";
@@ -203,19 +192,6 @@ export const cameras: Camera[] = [
   { id: "c2", tentId: "t2", name: "Tent B · Top", online: true, thumbnail: PHOTO("1518915334520-5cb1c1f8e123"), lastFrameAt: new Date(Date.now() - 90_000).toISOString() },
   { id: "c3", tentId: "t3", name: "Tent C · Side", online: false, thumbnail: PHOTO("1466692476868-aef1dfb1e735"), lastFrameAt: new Date(Date.now() - 6 * 3600_000).toISOString() },
   { id: "c4", tentId: "t4", name: "Tent D · Front", online: true, thumbnail: PHOTO("1507371341162-763b5e419408"), lastFrameAt: new Date(Date.now() - 120_000).toISOString() },
-];
-
-const today = new Date();
-const addDays = (d: number) => new Date(today.getTime() + d * 86400_000).toISOString();
-
-export const tasks: Task[] = [
-  { id: "k1", title: "Water Tent A", type: "water", tentId: "t1", dueAt: addDays(0), status: "today", recurring: "every 2 days" },
-  { id: "k2", title: "Feed Tent B (Bloom A+B)", type: "feed", tentId: "t2", dueAt: addDays(0), status: "today" },
-  { id: "k3", title: "Defoliate lower fans (Tent A)", type: "defoliation", tentId: "t1", dueAt: addDays(1), status: "upcoming" },
-  { id: "k4", title: "Flush Tent D", type: "flush", tentId: "t4", dueAt: addDays(2), status: "upcoming" },
-  { id: "k5", title: "Inspect trichomes (GG #1)", type: "inspect", tentId: "t1", plantId: "p1", dueAt: addDays(3), status: "upcoming" },
-  { id: "k6", title: "Water Tent C", type: "water", tentId: "t3", dueAt: addDays(-1), status: "done" },
-  { id: "k7", title: "LST Tent B plants", type: "training", tentId: "t2", dueAt: addDays(-2), status: "done" },
 ];
 
 export const alerts: Alert[] = [

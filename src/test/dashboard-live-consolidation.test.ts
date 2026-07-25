@@ -7,7 +7,7 @@
  *  - Dashboard renders an "Environment Snapshot" section.
  *  - Snapshot section is not labelled "Live" inside the Dashboard page header
  *    (we only call readings live when verified live/fresh, via SensorSourceBadge).
- *  - Dashboard preserves existing links to Sensors, Alerts, Tasks.
+ *  - Dashboard preserves Sensors, Alerts, and Action Queue while retiring Tasks.
  *  - Static safety: no service_role, no fake-live labels, no device-control
  *    strings, no automation/autopilot, no *_executed event naming.
  */
@@ -34,15 +34,16 @@ describe("Dashboard + Live Dashboard consolidation · navigation", () => {
 
   it("Legacy /grow-room route redirects to the main Dashboard", () => {
     expect(APP).toMatch(
-      /path=["']\/grow-room["']\s+element=\{<Navigate\s+to=["']\/["']\s+replace\s*\/>\}/,
+      /path=["']\/grow-room["']\s+element=\{<RouteAliasRedirect\s+to=["']\/["']\s*\/>\}/,
     );
     expect(APP).not.toMatch(/<GrowRoomMode\s*\/?>/);
   });
 
-  it("Existing Alerts / Tasks / Sensors nav links remain", () => {
+  it("keeps Alerts / Action Queue / Sensors and removes standalone Tasks navigation", () => {
     expect(SIDEBAR).toMatch(/\/alerts/);
-    expect(SIDEBAR).toMatch(/\/tasks/);
+    expect(SIDEBAR).toMatch(/\/actions/);
     expect(SIDEBAR).toMatch(/\/sensors/);
+    expect(SIDEBAR).not.toMatch(/\/tasks/);
   });
 });
 

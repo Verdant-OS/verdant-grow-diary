@@ -86,7 +86,6 @@ describe("MobileNav More sheet — Slice 4 grouping", () => {
       Daily: [
         ["Quick Log", "/daily-check"],
         ["Action Queue", "/actions"],
-        ["Tasks", "/tasks"],
       ],
       Insight: [
         ["Sensors", "/sensors"],

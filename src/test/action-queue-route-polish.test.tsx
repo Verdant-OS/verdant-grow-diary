@@ -287,7 +287,7 @@ describe("Action Queue polish — static safety + contract preservation", () => 
   it("preserves /actions route registration and legacy /action-queue redirect", () => {
     expect(APP).toMatch(/path="\/actions"\s+element=\{<ActionQueue\s*\/>\}/);
     expect(APP).toMatch(
-      /path="\/action-queue"\s+element=\{<Navigate\s+to="\/actions"\s+replace\s*\/>\}/,
+      /path="\/action-queue"\s+element=\{<RouteAliasRedirect\s+to="\/actions"\s*\/>\}/,
     );
   });
 });

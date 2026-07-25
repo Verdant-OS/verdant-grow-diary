@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 const ROOT = resolve(__dirname, "../..");
 const APP = readFileSync(resolve(ROOT, "src/App.tsx"), "utf8");
-const AUTH = readFileSync(resolve(ROOT, "src/store/auth.tsx"), "utf8");
+const AUTH = readFileSync(resolve(ROOT, "src/store/auth.tsx"), "utf8").replace(/\r\n?/g, "\n");
 
 describe("auth identity query-cache transition fence", () => {
   it("wires the root QueryClient clear into AuthProvider identity transitions", () => {

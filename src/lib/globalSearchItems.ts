@@ -31,7 +31,6 @@ export const GLOBAL_SEARCH_ITEMS: readonly GlobalSearchItem[] = [
   { label: "Timeline", to: "/timeline", group: "Daily" },
   { label: "Alerts", to: "/alerts", group: "Daily" },
   { label: "Action Queue", to: "/actions", group: "Daily" },
-  { label: "Tasks", to: "/tasks", group: "Daily" },
   // Insight
   { label: "Sensors", to: "/sensors", group: "Insight" },
   { label: "AI Doctor", to: "/doctor", group: "Insight", keywords: ["coach", "diagnosis"] },

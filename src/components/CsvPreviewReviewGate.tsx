@@ -26,6 +26,7 @@ import {
   buildSensorNormalizationPreviewViewModel,
   type SensorNormalizationPreviewViewModel,
 } from "@/lib/sensors/sensorNormalizationPreviewViewModel";
+import { toDateTimeLocalInputValue } from "@/lib/dateTimeLocalRules";
 
 /**
  * CsvPreviewReviewGate — presentational-only review gate + import plan summary
@@ -253,7 +254,7 @@ export function CsvPreviewReviewGate({
   }, [previewResult, tentId, plantId, effectiveNow, acceptedRowCount]);
 
   const [diaryDate, setDiaryDate] = useState<string>(() =>
-    effectiveNow.toISOString().slice(0, 16),
+    toDateTimeLocalInputValue(effectiveNow),
   );
 
   const checks = useMemo(

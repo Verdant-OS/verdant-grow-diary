@@ -49,7 +49,6 @@ import {
   selectAiDoctorSensorEvidenceClassification,
 } from "@/lib/aiDoctorCurrentSensorSnapshotRules";
 import { isUuid } from "@/lib/isUuid";
-import { buildPlantAiDoctorReviewPath } from "@/lib/aiDoctorEntryRules";
 import {
   buildPlantQuickLogPrefill,
   PLANT_QUICKLOG_PREFILL_EVENT,
@@ -248,8 +247,6 @@ export default function PlantDetailAiDoctorReadiness({
     });
   }, [stage, signals, sensorSnapshot]);
 
-  const doctorHref = buildPlantAiDoctorReviewPath({ plantId, tentId }) ?? "/doctor";
-
   const sensor = result.sensorEvidence;
   const nextAction = nextActionForStatus(sensor.status, tentId ?? null);
   const snapshotPrefill = useMemo(
@@ -336,19 +333,6 @@ export default function PlantDetailAiDoctorReadiness({
           >
             Try sensor read again
           </Button>
-          {plantId ? (
-            <Button
-              asChild
-              size="sm"
-              variant="outline"
-              className="h-7 gap-1"
-              data-testid="plant-detail-ai-doctor-readiness-history-only-cta"
-            >
-              <Link to={doctorHref}>
-                Ask Doctor with available history <ArrowRight className="h-3.5 w-3.5" />
-              </Link>
-            </Button>
-          ) : null}
         </div>
       ) : (
         <div className="space-y-2">
@@ -463,35 +447,6 @@ export default function PlantDetailAiDoctorReadiness({
                   </Button>
                 )}
               </div>
-            )}
-          </div>
-
-          <div className="pt-1">
-            {plantId ? (
-              <Button
-                asChild
-                size="sm"
-                variant="outline"
-                className="h-7 gap-1"
-                data-testid="plant-detail-ai-doctor-readiness-cta"
-              >
-                <Link to={doctorHref}>
-                  Ask Doctor <ArrowRight className="h-3.5 w-3.5" />
-                </Link>
-              </Button>
-            ) : (
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                disabled
-                aria-disabled="true"
-                className="h-7 gap-1 opacity-60 cursor-not-allowed"
-                data-testid="plant-detail-ai-doctor-readiness-cta-disabled"
-                title="Plant context is not loaded yet."
-              >
-                Ask Doctor <ArrowRight className="h-3.5 w-3.5" />
-              </Button>
             )}
           </div>
         </div>

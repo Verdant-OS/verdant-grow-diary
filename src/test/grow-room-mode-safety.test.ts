@@ -105,7 +105,7 @@ describe("Grow-Room Mode · route + nav wiring", () => {
   it("App redirects the legacy /grow-room route to the main Dashboard", () => {
     expect(app).toMatch(/path=["']\/grow-room["']/);
     expect(app).toMatch(
-      /path=["']\/grow-room["']\s+element=\{<Navigate\s+to=["']\/["']\s+replace\s*\/>\}/,
+      /path=["']\/grow-room["']\s+element=\{<RouteAliasRedirect\s+to=["']\/["']\s*\/>\}/,
     );
     expect(app).not.toMatch(/<GrowRoomMode\s*\/?>/);
   });

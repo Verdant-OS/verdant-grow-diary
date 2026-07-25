@@ -42,6 +42,13 @@ describe("route alias scope preservation", () => {
     );
   });
 
+  it("redirects /tasks while preserving grow scope, focus, and hash", async () => {
+    renderAlias("/tasks?growId=g1&focus=aq1#row", "/tasks", "/actions");
+    expect(await screen.findByTestId("route-alias-location")).toHaveTextContent(
+      "/actions?growId=g1&focus=aq1#row",
+    );
+  });
+
   it("keeps blank search and hash blank", () => {
     expect(buildRouteAliasTarget("/timeline", "", "")).toBe("/timeline");
   });
@@ -98,8 +105,11 @@ describe("stateful alias wiring", () => {
     );
   });
 
-  it("routes grow-room and action-queue through the query-preserving alias", () => {
+  it("routes grow-room, tasks, and action-queue through the query-preserving alias", () => {
     expect(APP).toMatch(/path="\/grow-room"\s+element=\{<RouteAliasRedirect\s+to="\/"\s*\/>\}/);
+    expect(APP).toMatch(
+      /path="\/tasks"\s+element=\{<RouteAliasRedirect\s+to="\/actions"\s*\/>\}/,
+    );
     expect(APP).toMatch(
       /path="\/action-queue"\s+element=\{<RouteAliasRedirect\s+to="\/actions"\s*\/>\}/,
     );

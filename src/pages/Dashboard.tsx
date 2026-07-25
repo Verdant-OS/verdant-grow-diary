@@ -12,7 +12,7 @@ import {
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
-import { AlertTriangle, Box, Sprout, ListChecks, Sparkles, ArrowRight } from "lucide-react";
+import { AlertTriangle, Box, Sprout, Sparkles, ArrowRight } from "lucide-react";
 import type { Stage, SensorReading } from "@/mock";
 import PageHeader from "@/components/PageHeader";
 import KpiCard from "@/components/KpiCard";
@@ -26,7 +26,7 @@ import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import DashboardDataSourceDisclosure from "@/components/DashboardDataSourceDisclosure";
 import GrowDataLoadError, { GrowDataLoadingState } from "@/components/GrowDataLoadError";
 // Mock side-panel hooks intentionally removed — the Dashboard renders
-// honest empty states for Tasks and AI Insights until backed by real data.
+// an honest empty state for AI Insights until backed by real data.
 // See docs/qa/v0-demo-loop-checklist.md and docs/safety/static-safety-scans.md.
 import { useGrowPlants, useGrowTents } from "@/hooks/useGrowData";
 import { useGrows } from "@/store/grows";
@@ -141,8 +141,6 @@ export default function Dashboard() {
   const plantsQuery = useGrowPlants(undefined, scopedGrowId);
   const { data: tents = [] } = tentsQuery;
   const { data: plants = [] } = plantsQuery;
-  // Tasks: no real-data hook yet — render an honest empty state below.
-  const tasks: { status: string }[] = [];
   const dashboardReadingsQuery = useSensorReadings();
   const { data: rawReadings = [] } = dashboardReadingsQuery;
   // Diagnostic packets may be stored with a canonical `live` source. Keep
@@ -256,7 +254,6 @@ export default function Dashboard() {
     stage: alertContextStage,
   });
 
-  const dueToday = tasks.filter((t) => t.status === "today").length;
   // Open alert count and recent alerts come from real persisted alerts (RLS).
   const openAlerts = persistedAlertsState.alerts.filter((a) => a.status === "open").length;
 
@@ -396,7 +393,7 @@ export default function Dashboard() {
 
       <GuidedActionChecklistPanel scopedGrowId={scopedGrowId ?? null} className="mb-6" />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
         <KpiCard label="Active tents" value={tents.length} icon={<Box className="h-3.5 w-3.5" />} />
         <KpiCard
           label="Plants"
@@ -410,13 +407,6 @@ export default function Dashboard() {
           value={openAlerts}
           icon={<AlertTriangle className="h-3.5 w-3.5" />}
           accent={openAlerts > 0 ? "destructive" : "success"}
-        />
-        <KpiCard
-          label="Due today"
-          value={dueToday}
-          hint={dueToday === 0 ? "No tasks yet" : undefined}
-          icon={<ListChecks className="h-3.5 w-3.5" />}
-          accent={dueToday > 0 ? "warning" : "success"}
         />
       </div>
 

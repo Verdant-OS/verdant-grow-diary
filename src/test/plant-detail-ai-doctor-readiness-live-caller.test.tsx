@@ -162,14 +162,13 @@ describe("PlantDetailAiDoctorReadiness — live caller × real intake classifica
     });
   });
 
-  it("keeps the plant-scoped Ask Doctor CTA on the existing review anchor", () => {
+  it("keeps readiness informational so the live-review surface owns the review action", () => {
     setBridge(null, null);
     renderCard();
 
-    expect(screen.getByTestId("plant-detail-ai-doctor-readiness-cta")).toHaveAttribute(
-      "href",
-      `/plants/plant-1?tentId=${TENT_ID}#plant-ai-doctor-review`,
-    );
+    expect(screen.queryByTestId("plant-detail-ai-doctor-readiness-cta")).toBeNull();
+    expect(screen.queryByTestId("plant-detail-ai-doctor-readiness-history-only-cta")).toBeNull();
+    expect(COMPONENT_SRC).not.toMatch(/buildPlantAiDoctorReviewPath/);
   });
 
   it.each(["stale", "no_data"] as const)(

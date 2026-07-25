@@ -5,7 +5,7 @@
  *   1. Assigned tent (or "No tent")
  *   2. Current environment freshness / source (live / manual / stale)
  *   3. Open alert count for the assigned tent
- *   4. Pending task count for the assigned tent
+ *   4. Pending action count for the assigned tent
  *
  * Pulls from the SAME read-only hooks the panels below already use, so this
  * never invents telemetry or counts. Missing data renders as "Unknown" — it
@@ -142,14 +142,14 @@ export default function PlantStatusStrip({ tentId, tentName, growId }: Props) {
         </div>
       </div>
 
-      {/* Pending tasks */}
+      {/* Pending actions */}
       <div
         className="rounded-lg border bg-card/40 p-2.5"
         data-testid="plant-status-tasks"
         data-count={actionCount ?? "unknown"}
       >
         <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
-          <ListTodo className="h-3 w-3" /> Pending Tasks
+          <ListTodo className="h-3 w-3" /> Pending actions
         </div>
         <div className="text-sm font-medium mt-0.5 flex items-center gap-2">
           {!hasTent ? (

@@ -11,7 +11,7 @@
  *   3. Add Manual Sensor Snapshot (existing ManualSensorReadingCard)
  *   4. Add Quick Log note/photo (existing QuickLog dialog)
  *   5. Add optional handheld readings (existing QuickLog hardware block)
- *   6. Review Tent Alerts and Pending Tasks (read-only)
+ *   6. Review Tent Alerts and Pending Actions (read-only)
  *
  * Manual readings remain source = "manual". Handheld pH/EC/PPFD readings
  * remain QuickLog note text only. CO2 is context-only.
@@ -1101,7 +1101,7 @@ export default function DailyCheck() {
 
           {renderedStep === "review" && (
             <StepCard
-              title="Step 6 · Review Alerts & Pending Tasks"
+              title="Step 6 · Review Alerts & Pending Actions"
               icon={<Bell className="h-4 w-4" />}
             >
               <p className="mb-2 min-w-0 break-words text-xs text-muted-foreground">

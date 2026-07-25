@@ -425,7 +425,7 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/signup", access: "redirect", description: "→ /auth" },
   { path: "/strains", access: "redirect", description: "→ /cultivars" },
   { path: "/strains/:slug", access: "redirect", description: "→ /cultivars/:slug" },
-  { path: "/tasks", access: "auth" },
+  { path: "/tasks", access: "redirect", description: "→ /actions" },
   { path: "/tents", access: "auth" },
   { path: "/tents/:id", access: "auth" },
   { path: "/terms", access: "public", description: "Terms of service." },

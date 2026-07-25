@@ -47,8 +47,9 @@ describe("Copy renames are applied", () => {
     expect(ALERTS_PANEL).not.toContain("Assigned Tent Alerts");
   });
 
-  it("Tent actions panel title is 'Pending Tasks'", () => {
-    expect(ACTIONS_PANEL).toContain("Pending Tasks");
+  it("Tent actions panel title is 'Pending actions'", () => {
+    expect(ACTIONS_PANEL).toContain("Pending actions");
+    expect(ACTIONS_PANEL).not.toContain("Pending Tasks");
     expect(ACTIONS_PANEL).not.toContain("Assigned Tent Action Queue");
   });
 
@@ -68,7 +69,7 @@ describe("Plant Detail status strip surfaces the four key signals", () => {
     expect(PLANT_DETAIL).toContain("PlantStatusStrip");
   });
 
-  it("strip exposes tent / environment / alerts / tasks chips", () => {
+  it("strip exposes tent / environment / alerts / actions chips", () => {
     expect(STRIP).toContain('data-testid="plant-status-strip"');
     expect(STRIP).toContain('data-testid="plant-status-tent"');
     expect(STRIP).toContain('data-testid="plant-status-environment"');

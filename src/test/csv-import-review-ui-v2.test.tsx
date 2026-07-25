@@ -51,7 +51,7 @@ describe("CSV Import Review UI v2", () => {
       fireEvent.change(screen.getByTestId("csv-gate-diary-date"), { target: { value: "2026-07-15T09:30" } });
       const after = screen.getByTestId("diary-field-occurred_at").textContent;
       expect(after).not.toBe(before);
-      expect(after).toMatch(/2026-07-15T09:30/);
+      expect(after).toBe(new Date(2026, 6, 15, 9, 30).toISOString());
     });
 
     it("existing-entry attach mode is disabled when no existing entries are provided", () => {

@@ -24,13 +24,16 @@
  * device-control changes are made by this file.
  */
 import { describe, it, expect } from "vitest";
+import { basename, resolve } from "node:path";
 
 import { normalizeIngestPayload } from "@/lib/sensorIngestNormalizationRules";
 import { buildEcoWittRoutedRows } from "@/lib/ecowittRoutedRowBuilder";
 import type { EcoWittRouterEligibleTent } from "@/lib/ecowittChannelTentRouter";
 import { normalizeEcowittLiveSoilPayload } from "@/lib/ecowittLiveSoilIngestRules";
 import { calculateAirVpdKpa } from "@/lib/vpdRules";
+import { listFilesCached, readFileCached } from "./helpers/cachedSrcTextScan";
 
+const ROOT = resolve(__dirname, "../..");
 const TENT = "11111111-1111-1111-1111-111111111111";
 const USER = "uuuuuuuu-uuuu-uuuu-uuuu-uuuuuuuuuuuu";
 const TS = "2026-06-19T12:00:00.000Z";
@@ -225,42 +228,36 @@ describe("documented non-deriving live ingest mappers", () => {
 // ---------------------------------------------------------------------------
 
 describe("calculateAirVpdKpa usage guard (ingest mappers only)", () => {
-  it("every ingest-mapper importer also emits the 'vpd_kpa' metric", async () => {
-    const fs = await import("node:fs/promises");
-    const path = await import("node:path");
-    const roots = ["src/lib", "supabase/functions/_shared"];
+  it("every ingest-mapper importer also emits the 'vpd_kpa' metric", () => {
+    const roots = [
+      resolve(ROOT, "src/lib"),
+      resolve(ROOT, "supabase/functions/_shared"),
+    ];
     // Display/presenter helpers may derive VPD for on-screen rendering
     // without emitting a persisted vpd_kpa metric. Those are legitimate
     // non-ingest uses and are skipped by this narrow guard.
     const NON_INGEST_FILENAME =
       /viewmodel|chart|status|display|presenter|target|advisor|drift|snapshotband/i;
     const NON_INGEST_EXACT_FILENAMES = new Set(["publicVpdCalculatorRules.ts"]);
-    const importers: string[] = [];
-
-    async function walk(dir: string): Promise<void> {
-      let entries: import("node:fs").Dirent[];
-      try {
-        entries = await fs.readdir(dir, { withFileTypes: true });
-      } catch {
-        return;
-      }
-      for (const e of entries) {
-        const p = path.join(dir, e.name);
-        if (e.isDirectory()) await walk(p);
-        else if (/\.(ts|tsx)$/.test(e.name) && !/\.test\./.test(e.name)) {
-          if (NON_INGEST_FILENAME.test(e.name) || NON_INGEST_EXACT_FILENAMES.has(e.name)) continue;
-          const src = await fs.readFile(p, "utf8");
-          if (/^vpdRules\.ts$/.test(e.name)) continue; // definition site
-          if (/\bcalculateAirVpdKpa\b/.test(src)) importers.push(p);
+    const importers = roots
+      .flatMap((root) => listFilesCached(root))
+      .filter((file) => {
+        const fileName = basename(file);
+        if (!/\.(ts|tsx)$/.test(fileName) || /\.test\./.test(fileName)) return false;
+        if (
+          NON_INGEST_FILENAME.test(fileName) ||
+          NON_INGEST_EXACT_FILENAMES.has(fileName) ||
+          fileName === "vpdRules.ts"
+        ) {
+          return false;
         }
-      }
-    }
-    for (const r of roots) await walk(r);
+        return /\bcalculateAirVpdKpa\b/.test(readFileCached(file));
+      });
 
     expect([...NON_INGEST_EXACT_FILENAMES]).toEqual(["publicVpdCalculatorRules.ts"]);
     expect(importers.length).toBeGreaterThan(0);
     for (const file of importers) {
-      const src = await fs.readFile(file, "utf8");
+      const src = readFileCached(file);
       expect(
         /\bvpd_kpa\b/.test(src),
         `${file} imports calculateAirVpdKpa but never references the "vpd_kpa" metric. ` +

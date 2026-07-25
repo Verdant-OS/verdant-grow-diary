@@ -35,7 +35,6 @@ const PlantDetail = lazy(() => import("./pages/PlantDetail"));
 const Sensors = lazy(() => import("./pages/Sensors"));
 const EcowittIngestAudit = lazy(() => import("./pages/EcowittIngestAudit"));
 const SensorsIngestNormalizer = lazy(() => import("./pages/SensorsIngestNormalizer"));
-const Tasks = lazy(() => import("./pages/Tasks"));
 // Cameras removed from current Verdant build (out of V0 scope).
 const Alerts = lazy(() => import("./pages/Alerts"));
 const AlertDetail = lazy(() => import("./pages/AlertDetail"));
@@ -351,7 +350,7 @@ const App = () => (
                     <Route path="/timeline" element={<Timeline />} />
                     {/* Legacy alias — canonical route is /timeline. */}
                     <Route path="/logs" element={<RouteAliasRedirect to="/timeline" />} />
-                    <Route path="/tasks" element={<Tasks />} />
+                    <Route path="/tasks" element={<RouteAliasRedirect to="/actions" />} />
                     {/* /cameras route removed — out of current V0 scope. */}
                     <Route path="/alerts" element={<Alerts />} />
                     <Route path="/alerts/:alertId" element={<AlertDetail />} />

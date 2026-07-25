@@ -2,7 +2,7 @@
 // See docs/auth-security.md.
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { relative, resolve } from "node:path";
 import { listFilesCached, readFileCached } from "./helpers/cachedSrcTextScan";
 
 const ROOT = resolve(__dirname, "../..");
@@ -14,6 +14,8 @@ const RLS_DOC = readFileSync(resolve(ROOT, "docs/qa-rls-checklist.md"), "utf8");
 const SRC_FILES = listFilesCached(SRC).filter((p) =>
   /\.(ts|tsx|js|jsx)$/.test(p),
 );
+const isSrcTestFile = (filePath: string) =>
+  relative(SRC, filePath).replace(/\\/g, "/").startsWith("test/");
 
 describe("Supabase client storage", () => {
   it("uses sessionStorage (not localStorage) for auth persistence", () => {
@@ -64,7 +66,7 @@ describe("Auth security docs", () => {
 describe("src/ static safety", () => {
   it("never imports the service role key into src/", () => {
     const offenders = SRC_FILES.filter((f) => {
-      if (/src\/test\//.test(f)) return false; // guard tests assert absence
+      if (isSrcTestFile(f)) return false; // guard tests assert absence
       const body = readFileCached(f);
       // Strip sanitizer-style references (regex literals + quoted string literals
       // naming the key, e.g. defensive redaction code). The real escalation
@@ -84,7 +86,7 @@ describe("src/ static safety", () => {
 
   it("introduces no NEXT_PUBLIC_* env vars in src/", () => {
     const offenders = SRC_FILES.filter((f) => {
-      if (/src\/test\//.test(f)) return false;
+      if (isSrcTestFile(f)) return false;
       return /NEXT_PUBLIC_/.test(readFileCached(f));
     });
     expect(offenders).toEqual([]);

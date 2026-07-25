@@ -35,11 +35,7 @@ import PlantDetailHarvestEvidenceReportMount from "@/components/PlantDetailHarve
 import { isHarvestWatchEligible } from "@/lib/harvestWatchEligibilityRules";
 import PlantDetailWhatsMissing from "@/components/PlantDetailWhatsMissing";
 import PlantDetailAiDoctorReadiness from "@/components/PlantDetailAiDoctorReadiness";
-import PlantDetailDoctorContextPreview from "@/components/PlantDetailDoctorContextPreview";
 import PlantDetailAiDoctorContextPanel from "@/components/PlantDetailAiDoctorContextPanel";
-import PlantDetailAiDoctorReadinessGate from "@/components/PlantDetailAiDoctorReadinessGate";
-import PlantDetailAiDoctorSafeReviewStart from "@/components/PlantDetailAiDoctorSafeReviewStart";
-import AiDoctorReviewResultPreview from "@/components/AiDoctorReviewResultPreview";
 import PlantDetailAiDoctorLiveReview from "@/components/PlantDetailAiDoctorLiveReview";
 import PlantDetailAiDoctorContextReadinessMount from "@/components/PlantDetailAiDoctorContextReadinessMount";
 import PlantProfileContextCard from "@/components/PlantProfileContextCard";
@@ -817,55 +813,39 @@ export default function PlantDetail() {
             stage={plant.stage ?? null}
             hasPlantPhoto={!!plant.photo}
           />
-          <PlantDetailAiDoctorReadiness
-            plantId={plant.id}
-            growId={plant.growId ?? null}
-            tentId={plant.tentId ?? null}
-            stage={plant.stage ?? null}
-            hasPlantPhoto={!!plant.photo}
-          />
-          <PlantDetailAiDoctorContextReadinessMount
-            plantId={plant.id}
-            growId={plant.growId ?? null}
-            tentId={plant.tentId ?? null}
-            plantName={plant.name}
-            strain={plant.strain}
-            stage={plant.stage ?? null}
-            medium={plant.medium ?? null}
-            potSize={plant.potSize ?? null}
-            plantType={plant.plantType ?? null}
-          />
-          <PlantDetailTimelineEvidenceReadinessLaunch
-            plantId={plant.id}
-            growId={plant.growId ?? null}
-            tentId={plant.tentId ?? null}
-            plantName={plant.name}
-            strain={plant.strain}
-            stage={plant.stage ?? null}
-            hasPlantPhoto={!!plant.photo}
-          />
-          <PlantDetailDoctorContextPreview
-            plantId={plant.id}
-            stage={plant.stage ?? null}
-            hasPlantPhoto={!!plant.photo}
-            growId={plant.growId ?? null}
-            tentId={plant.tentId ?? null}
-            plantName={plant.name}
-            tentName={tent?.name ?? null}
-          />
           <section
             id={PLANT_AI_DOCTOR_REVIEW_ANCHOR_ID}
             tabIndex={-1}
             aria-label="Plant AI Doctor review"
-            className="min-w-0 scroll-mt-16 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="min-w-0 scroll-mt-16 space-y-3 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <PlantDetailAiDoctorReadinessGate
+            <PlantDetailAiDoctorReadiness
               plantId={plant.id}
-              plant={plant}
-              hasSafeAiDoctorFlow
+              growId={plant.growId ?? null}
+              tentId={plant.tentId ?? null}
+              stage={plant.stage ?? null}
+              hasPlantPhoto={!!plant.photo}
             />
-            <PlantDetailAiDoctorSafeReviewStart plantId={plant.id} plant={plant} />
-            <AiDoctorReviewResultPreview testIdPrefix="plant-detail" />
+            <PlantDetailAiDoctorContextReadinessMount
+              plantId={plant.id}
+              growId={plant.growId ?? null}
+              tentId={plant.tentId ?? null}
+              plantName={plant.name}
+              strain={plant.strain}
+              stage={plant.stage ?? null}
+              medium={plant.medium ?? null}
+              potSize={plant.potSize ?? null}
+              plantType={plant.plantType ?? null}
+            />
+            <PlantDetailTimelineEvidenceReadinessLaunch
+              plantId={plant.id}
+              growId={plant.growId ?? null}
+              tentId={plant.tentId ?? null}
+              plantName={plant.name}
+              strain={plant.strain}
+              stage={plant.stage ?? null}
+              hasPlantPhoto={!!plant.photo}
+            />
             <PlantDetailAiDoctorLiveReview
               plantId={plant.id}
               plant={plant}

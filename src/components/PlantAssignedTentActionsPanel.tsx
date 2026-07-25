@@ -128,7 +128,7 @@ export default function PlantAssignedTentActionsPanel({ tentId, tentName, growId
     <Card data-testid="plant-assigned-tent-actions-panel" className="mt-4">
       <CardHeader className="flex min-w-0 flex-col items-stretch gap-2 space-y-0 sm:flex-row sm:items-center sm:justify-between">
         <CardTitle className="flex min-w-0 flex-wrap items-center gap-2 text-base">
-          <ListTodo className="h-4 w-4" /> Pending Tasks
+          <ListTodo className="h-4 w-4" /> Pending actions
           {tentName ? (
             <span className="text-xs font-normal text-muted-foreground">· {tentName}</span>
           ) : null}

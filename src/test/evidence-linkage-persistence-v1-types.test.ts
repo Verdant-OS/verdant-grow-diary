@@ -51,7 +51,7 @@ describe("Evidence Linkage Persistence v1 — schema + wiring", () => {
       const start = src.indexOf(anchor);
       expect(start).toBeGreaterThan(-1);
       const rest = src.slice(start + anchor.length);
-      const nextTable = rest.search(/\n {6}[a-z_]+: \{\n/);
+      const nextTable = rest.search(/\r?\n {6}[a-z_]+: \{\r?\n/);
       const end = nextTable >= 0 ? start + anchor.length + nextTable : src.length;
       return src.slice(start, end);
     }

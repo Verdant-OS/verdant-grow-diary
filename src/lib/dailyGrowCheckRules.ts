@@ -119,7 +119,7 @@ export function buildDailyGrowCheckSummary(
     },
     {
       key: "tasks",
-      label: "Pending tasks",
+      label: "Pending actions",
       outcome: state.tasksReviewed ? "reviewed" : "not-reviewed",
     },
   ];

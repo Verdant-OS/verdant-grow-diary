@@ -54,16 +54,37 @@ describe("Plant Detail information architecture", () => {
       "PlantDetailAiDoctorReadiness",
       "PlantDetailAiDoctorContextReadinessMount",
       "PlantDetailTimelineEvidenceReadinessLaunch",
-      "PlantDetailDoctorContextPreview",
-      "PlantDetailAiDoctorReadinessGate",
-      "PlantDetailAiDoctorSafeReviewStart",
-      "AiDoctorReviewResultPreview",
       "PlantDetailAiDoctorLiveReview",
       "PlantDetailAiDoctorContextPanel",
       "PlantAiDoctorSessionsPanel",
     ]) {
       expect(countComponent(ACTIVE_PAGE, component), component).toBe(1);
     }
+  });
+
+  it("mounts one real AI review action without legacy preview launchers", () => {
+    expect(countComponent(ACTIVE_PAGE, "PlantDetailAiDoctorLiveReview")).toBe(1);
+    for (const component of [
+      "PlantDetailDoctorContextPreview",
+      "PlantDetailAiDoctorReadinessGate",
+      "PlantDetailAiDoctorSafeReviewStart",
+      "AiDoctorReviewResultPreview",
+    ]) {
+      expect(countComponent(ACTIVE_PAGE, component), component).toBe(0);
+      expect(PAGE).not.toMatch(new RegExp(`import\\s+${component}\\s+from`));
+    }
+  });
+
+  it("keeps visible readiness content inside the Ask Doctor anchor when live review is blocked", () => {
+    const anchorStart = ACTIVE_PAGE.indexOf(`id={PLANT_AI_DOCTOR_REVIEW_ANCHOR_ID}`);
+    const anchorEnd = ACTIVE_PAGE.indexOf("</section>", anchorStart);
+    const anchorSource = ACTIVE_PAGE.slice(anchorStart, anchorEnd);
+
+    expect(anchorStart).toBeGreaterThan(-1);
+    expect(anchorEnd).toBeGreaterThan(anchorStart);
+    expect(countComponent(anchorSource, "PlantDetailAiDoctorReadiness")).toBe(1);
+    expect(countComponent(anchorSource, "PlantDetailAiDoctorContextReadinessMount")).toBe(1);
+    expect(countComponent(anchorSource, "PlantDetailAiDoctorLiveReview")).toBe(1);
   });
 
   it("keeps essentials ahead of disclosures and recap -> response -> harvest source order", () => {

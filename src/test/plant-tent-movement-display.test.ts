@@ -154,11 +154,12 @@ describe("plantTentMovementDisplayRules · findLatestPlantTentMovement", () => {
 });
 
 describe("PlantStatusStrip · grower-native labels", () => {
-  it("uses Current Tent / Current Environment / Tent Alerts / Pending Tasks", () => {
+  it("uses Current Tent / Current Environment / Tent Alerts / Pending actions", () => {
     expect(STRIP).toContain("Current Tent");
     expect(STRIP).toContain("Current Environment");
     expect(STRIP).toContain("Tent Alerts");
-    expect(STRIP).toContain("Pending Tasks");
+    expect(STRIP).toContain("Pending actions");
+    expect(STRIP).not.toContain("Pending Tasks");
     expect(STRIP).not.toMatch(/>\s*Tent\s*</);
     expect(STRIP).not.toContain("Open Alerts");
   });

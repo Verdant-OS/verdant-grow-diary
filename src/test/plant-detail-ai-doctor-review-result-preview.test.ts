@@ -1,31 +1,30 @@
 /**
- * PlantDetail: AI Doctor Review Result preview is mounted (static check).
+ * PlantDetail: only the real live-review flow owns result presentation.
  *
- * Avoids rendering the full PlantDetail page; asserts the source wires up
- * the safe read-only preview component with no result payload.
+ * Avoids rendering the full PlantDetail page; asserts the page no longer
+ * mounts an empty, preview-only result card ahead of the grower-initiated
+ * review. The live review still renders the validated result component.
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const SRC = readFileSync(
-  resolve(__dirname, "../../src/pages/PlantDetail.tsx"),
+const PAGE_SRC = readFileSync(resolve(__dirname, "../../src/pages/PlantDetail.tsx"), "utf8");
+const LIVE_REVIEW_SRC = readFileSync(
+  resolve(__dirname, "../../src/components/PlantDetailAiDoctorLiveReview.tsx"),
   "utf8",
 );
 
-describe("PlantDetail — AI Doctor Review Result preview", () => {
-  it("imports AiDoctorReviewResultPreview", () => {
-    expect(SRC).toMatch(
-      /from "@\/components\/AiDoctorReviewResultPreview"/,
-    );
+describe("PlantDetail — AI Doctor review result ownership", () => {
+  it("does not import or mount an empty result preview", () => {
+    expect(PAGE_SRC).not.toMatch(/from "@\/components\/AiDoctorReviewResultPreview"/);
+    expect(PAGE_SRC).not.toMatch(/<AiDoctorReviewResultPreview\b/);
   });
 
-  it("mounts the preview component without a result prop", () => {
-    expect(SRC).toMatch(/<AiDoctorReviewResultPreview\b[\s\S]*?\/>/);
-    const match = SRC.match(/<AiDoctorReviewResultPreview\b([\s\S]*?)\/>/);
-    expect(match).not.toBeNull();
-    if (match) {
-      expect(match[1]).not.toMatch(/result=/);
-    }
+  it("keeps result rendering inside the live review with a validated result prop", () => {
+    expect(LIVE_REVIEW_SRC).toMatch(/from "@\/components\/AiDoctorReviewResultPreview"/);
+    expect(LIVE_REVIEW_SRC).toMatch(
+      /<AiDoctorReviewResultPreview\s+result=\{review\.result\}\s+testIdPrefix="plant-detail-live"\s*\/>/,
+    );
   });
 });

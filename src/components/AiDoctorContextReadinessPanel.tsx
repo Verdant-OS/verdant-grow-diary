@@ -508,38 +508,6 @@ export default function AiDoctorContextReadinessPanel({
               </li>
             ))}
         </ul>
-
-        {/*
-          Disabled handoff control. Intentionally not wired to any write
-          path: the AI Doctor preview surface is read-only. A safe Action
-          Queue insert path exists for saved AI Doctor sessions, but the
-          readiness preview has neither a saved session nor a structured
-          suggested action. Re-wiring is deferred to a future slice with
-          an explicit grower-confirm modal.
-        */}
-        <div
-          className="flex flex-col gap-1 pt-1"
-          data-testid="ai-doctor-action-suggestion-preview-handoff"
-          data-handoff-enabled="false"
-        >
-          <button
-            type="button"
-            disabled
-            aria-disabled="true"
-            aria-describedby="ai-doctor-action-suggestion-preview-handoff-note"
-            data-testid="ai-doctor-action-suggestion-preview-handoff-button"
-            className="inline-flex w-fit cursor-not-allowed items-center rounded-md border border-border/60 bg-muted/30 px-2 py-1 text-xs text-muted-foreground opacity-60"
-          >
-            Add to Action Queue
-          </button>
-          <p
-            id="ai-doctor-action-suggestion-preview-handoff-note"
-            className="text-[11px] text-muted-foreground"
-            data-testid="ai-doctor-action-suggestion-preview-handoff-note"
-          >
-            Action Queue write path not enabled for AI Doctor previews.
-          </p>
-        </div>
       </section>
     </section>
   );

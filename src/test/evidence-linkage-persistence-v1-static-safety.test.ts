@@ -115,7 +115,7 @@ describe("Evidence Linkage Persistence v1 — static safety", () => {
     ]);
     for (const src of [alertDetail, aiHook]) {
       const assignments =
-        src.match(/originating_timeline_events:[\s\S]*?(?=,\n|\n\s*}|$)/g) ?? [];
+        src.match(/originating_timeline_events:[\s\S]*?(?=,\r?\n|\r?\n\s*}|$)/g) ?? [];
       for (const a of assignments) {
         const normalized = a.replace(/\s+/g, "");
         expect(

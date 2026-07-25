@@ -92,7 +92,6 @@ export const moreGroups: MoreGroup[] = [
     items: [
       { to: "/daily-check", label: "Quick Log", icon: ClipboardCheck },
       { to: "/actions", label: "Action Queue", icon: ListChecks },
-      { to: "/tasks", label: "Tasks", icon: ListChecks },
     ],
   },
   {

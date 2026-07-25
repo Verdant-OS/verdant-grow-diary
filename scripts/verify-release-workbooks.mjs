@@ -56,10 +56,12 @@ const STEPS = [
     label: "Workbook tests",
     cmd: "bunx",
     args: [
-      "vitest", "run",
+      "vitest",
+      "run",
       "src/test/assert-premium-workbook-access-docs.test.ts",
       "src/test/assert-release-traceability-mapping.test.ts",
       "src/test/generate-release-workbook-templates.test.ts",
+      "src/test/release-workbook-concurrent-read-isolation.test.ts",
       "src/test/release-workbook-formula-snapshots.test.ts",
       "src/test/release-workbook-manifest.test.ts",
       "--reporter=dot",
@@ -71,7 +73,9 @@ function pad(s, n) {
   s = String(s);
   return s.length >= n ? s : s + " ".repeat(n - s.length);
 }
-function fmtSeconds(ms) { return `${(ms / 1000).toFixed(2)}s`; }
+function fmtSeconds(ms) {
+  return `${(ms / 1000).toFixed(2)}s`;
+}
 function sha256OfFile(p) {
   return createHash("sha256").update(readFileSync(p)).digest("hex");
 }
@@ -101,12 +105,7 @@ export function formatFormulaMismatch({ workbook, sheet, cell, expected, actual 
 }
 
 export function formatBlockedToken({ file, pattern, line }) {
-  return [
-    "Blocked token:",
-    `File: ${file}`,
-    `Pattern: ${pattern}`,
-    `Line: ${line}`,
-  ].join("\n");
+  return ["Blocked token:", `File: ${file}`, `Pattern: ${pattern}`, `Line: ${line}`].join("\n");
 }
 
 export function formatPlaceholderMismatch({ file, expected, found }) {
@@ -314,7 +313,13 @@ if (invokedDirectly) {
     const r = spawnSync(step.cmd, step.args, { stdio: "inherit", env: process.env });
     const ms = Date.now() - t0;
     const ok = r.status === 0 && !r.error;
-    results.push({ ...step, status: ok ? "PASS" : "FAIL", ms, exit: r.status, err: r.error?.message });
+    results.push({
+      ...step,
+      status: ok ? "PASS" : "FAIL",
+      ms,
+      exit: r.status,
+      err: r.error?.message,
+    });
     if (!ok) firstFailure = { ...step, ms, exit: r.status, err: r.error?.message };
   }
 

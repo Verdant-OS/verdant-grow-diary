@@ -123,6 +123,29 @@ function phenoSqlGrantedPlans(): ReadonlySet<string> {
 }
 
 /**
+ * The webhook's price allow-list — the FIRST grant gate, chronologically.
+ *
+ * A price id missing from it makes `decide()` return `unknown_price_id`, so no
+ * `subscriptions` row is written at all and the buyer resolves as Free. The
+ * three entitlement gates are then unreachable: they would all agree the plan
+ * is entitled, about a subscription that does not exist. Paddle still receives
+ * a 200, so a real charge fails silently.
+ */
+function webhookGrantedPriceIds(): ReadonlySet<string> {
+  const source = readFileSync(
+    resolve(process.cwd(), "supabase", "functions", "payments-webhook", "eventProcessor.ts"),
+    "utf8",
+  );
+  const block = source.match(/KNOWN_PRICE_IDS[^=]*=\s*\[([\s\S]*?)\]/);
+  if (!block) throw new Error("Could not locate KNOWN_PRICE_IDS in eventProcessor.ts");
+  const found = new Set<string>();
+  for (const plan of KNOWN_PLAN_IDS) {
+    if (block[1].includes(`"${plan}"`) || block[1].includes(`'${plan}'`)) found.add(plan);
+  }
+  return found;
+}
+
+/**
  * The edge gate keeps its own copy of the allow-list and does not export it,
  * so it is read as text — the same static-scan technique this repo already
  * uses for migration SQL. Reading beats exporting here: it needs no
@@ -192,6 +215,24 @@ describe("sell-vs-grant parity", () => {
         granted.has(plan),
         `${plan} dominates Pro's capabilities but the edge PRO_PLAN_IDS omits it — ` +
           `a client+database fix that skips this gate still denies the feature server-side`,
+      ).toBe(true);
+    }
+  });
+
+  // The gate that runs FIRST. Without it the other three are unreachable —
+  // they would agree the plan is entitled, about a subscription row that was
+  // never written. This is the difference between "sold but degraded" and
+  // "charged and granted nothing", so it is asserted for every purchasable
+  // plan, not only the Pro-dominating ones.
+  it("persists a subscription for every purchasable plan at the webhook gate", () => {
+    const granted = webhookGrantedPriceIds();
+    const purchasable = KNOWN_PLAN_IDS.filter((plan) => plan !== "free");
+    for (const plan of purchasable) {
+      expect(
+        granted.has(plan),
+        `${plan} is a purchasable plan but KNOWN_PRICE_IDS omits it — a completed ` +
+          `payment is skipped as unknown_price_id, no subscriptions row is written, ` +
+          `and the buyer resolves as Free while Paddle still receives a 200`,
       ).toBe(true);
     }
   });

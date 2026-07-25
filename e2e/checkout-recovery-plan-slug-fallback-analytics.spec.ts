@@ -97,9 +97,10 @@ test.describe("checkoutRecoveryPlanSlug fallback funnel event (browser E2E)", ()
 
     const INVALID_PLAN = "totally_bogus_plan_slug_not_in_allowlist"; // length 42 -> "33+"
 
-    const result = await page.evaluate((plan) =>
-      window.__sanitizerModule!.sanitizeCheckoutRecoveryPlanSlug(plan),
-    , INVALID_PLAN);
+    const result = await page.evaluate(
+      (plan) => window.__sanitizerModule!.sanitizeCheckoutRecoveryPlanSlug(plan),
+      INVALID_PLAN,
+    );
     expect(result).toBe("unknown_plan");
 
     // Give the analytics dispatch a tick to flush through window events.

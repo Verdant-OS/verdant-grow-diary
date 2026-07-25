@@ -635,6 +635,12 @@ jobs:
                 echo "**Playwright HTML report for the same run:** _URL unavailable — check this run's Artifacts dropdown for \`quicklog-playwright-report-${ARTIFACT_SUFFIX}\` (unzip and open \`index.html\`). It is uploaded as a sibling artifact rather than inside the flake summary zip._"
               fi
               echo ""
+              if [ -n "${SMOKE_BUNDLE_URL}" ]; then
+                echo "**Playwright trace viewer:** [\`quicklog-smoke-artifacts-${ARTIFACT_SUFFIX}\`](${SMOKE_BUNDLE_URL}) — unzip and drag any \`e2e/results/**/trace.zip\` onto [trace.playwright.dev](https://trace.playwright.dev/) to open the interactive trace viewer for the failing/flaky attempt. Retry traces are stored alongside the first attempt under the same test folder."
+              else
+                echo "**Playwright trace viewer:** _URL unavailable — download \`quicklog-smoke-artifacts-${ARTIFACT_SUFFIX}\` from this run's Artifacts dropdown, then drag any \`e2e/results/**/trace.zip\` onto [trace.playwright.dev](https://trace.playwright.dev/) to open the interactive trace viewer._"
+              fi
+              echo ""
               echo "**Raw workflow logs for this upload:** [run #${GITHUB_RUN_NUMBER} attempt ${GITHUB_RUN_ATTEMPT}](${RUN_ATTEMPT_URL}) — expand the \`${GITHUB_JOB}\` job, then the \`Upload playwright-flake-summary.md as artifact\` step for the exact upload output, or the \`Summarize Playwright flakes\` step for how the file was generated. Full run page: [${GITHUB_WORKFLOW} #${GITHUB_RUN_NUMBER}](${RUN_URL})."
               echo ""
             elif [ "${FLAKE_SUMMARY_PRESENT}" = "true" ]; then

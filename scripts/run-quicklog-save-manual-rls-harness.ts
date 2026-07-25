@@ -13,7 +13,7 @@
  *
  * Run on dev/staging only — never against production.
  */
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createClient, type AuthUser, type SupabaseClient } from "@supabase/supabase-js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL!;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -59,7 +59,8 @@ async function recreateUser(email: string, password: string): Promise<string> {
     page: 1,
     perPage: 200,
   });
-  const prior = list?.users?.find((u) => u.email === email);
+  const users: AuthUser[] = list.users;
+  const prior = users.find((user) => user.email === email);
   if (prior) await admin.auth.admin.deleteUser(prior.id);
   const { data, error } = await admin.auth.admin.createUser({
     email,

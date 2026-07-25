@@ -7,8 +7,8 @@ name: Irrigation pgTAP + Harness Typecheck
 #      the hosted project ref knkwiiywfkbqznbxwqfh).
 #   2. Applies migrations + supabase/seed.sql (production GRANT parity).
 #   3. Executes the pgTAP feeding and watering suites via psql.
-#   4. Runs `tsgo --noEmit` on the runtime harness sources to catch harness
-#      drift before the disposable-stack lane can be scheduled.
+#   4. Runs a dedicated TypeScript project that explicitly includes every
+#      irrigation runtime harness named below.
 #
 # This lane is deliberately narrow: it does NOT execute the runtime harness
 # (that lives in security-db-local.yml / the manual disposable-stack lane).
@@ -97,6 +97,9 @@ jobs:
               - "scripts/run-quicklog-save-manual-rls-harness.ts"
               - "scripts/run-quicklog-rpc-rls-harnesses.ts"
               - "scripts/run-quicklog-typed-payloads-harness.ts"
+              - "tsconfig.irrigation-harness.json"
+              - "package.json"
+              - "bun.lock"
               # The workflow itself — any change here re-runs the full gate.
               - ".github/workflows/irrigation-pgtap-rls-gate.yml"
 
@@ -185,6 +188,9 @@ jobs:
                 "scripts/run-quicklog-save-manual-rls-harness.ts"
                 "scripts/run-quicklog-rpc-rls-harnesses.ts"
                 "scripts/run-quicklog-typed-payloads-harness.ts"
+                "tsconfig.irrigation-harness.json"
+                "package.json"
+                "bun.lock"
                 ".github/workflows/irrigation-pgtap-rls-gate.yml"
               )
               for f in "${ALLOWLIST[@]}"; do
@@ -201,7 +207,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   harness-typecheck:
-    name: harness typecheck (tsgo --noEmit)
+    name: irrigation harness typecheck (tsc --noEmit)
     needs: changes
     if: >-
       (needs.changes.outputs.irrigation == 'true' || github.event_name == 'workflow_dispatch')
@@ -226,16 +232,11 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Typecheck (full project — includes irrigation harnesses)
-        # tsgo is a stop-ship gate. Full-project noEmit catches any
-        # harness drift; scoping to specific files would miss shared
-        # type surface changes.
-        #
-        # `tsgo` is not an installable npm package on its own — it is the bin
-        # name shipped by @typescript/native-preview, which is not a repo
-        # devDependency. Bare `bunx tsgo` 404s against the registry; pin the
-        # real package explicitly so bunx installs the right thing on demand.
-        run: bunx --package=@typescript/native-preview tsgo --noEmit
+      - name: Typecheck irrigation harnesses
+        # The app project only includes src/. This dedicated project names
+        # every TypeScript harness in the irrigation allowlist so none can
+        # silently fall outside compiler coverage.
+        run: bun run typecheck:irrigation-harnesses
 
   pgtap-irrigation:
     name: pgTAP irrigation (feeding + watering)

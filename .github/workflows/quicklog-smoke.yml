@@ -587,12 +587,32 @@ jobs:
             # that the download link is live. The fuller status/gate
             # explanation still follows for the skipped/missing cases.
             if [ "${FLAKE_SUMMARY_PRESENT}" = "true" ] && [ -n "${FLAKE_SUMMARY_URL}" ]; then
-              echo "**Download:** [\`quicklog-flake-summary\`](${FLAKE_SUMMARY_URL}) — single-file artifact containing \`playwright-flake-summary.md\`."
+              echo "**Download:** [\`quicklog-flake-summary-${ARTIFACT_SUFFIX}\`](${FLAKE_SUMMARY_URL}) — single-file artifact containing \`playwright-flake-summary.md\`."
+              echo ""
+            elif [ "${FLAKE_SUMMARY_PRESENT}" = "true" ]; then
+              echo "**Download:** _Standalone artifact was uploaded, but its direct URL is unavailable in this Job Summary._"
+              echo ""
+              echo "Open this run's **Artifacts** dropdown (top-right of the run page) and download:"
+              echo ""
+              echo "- **Artifact name:** \`quicklog-flake-summary-${ARTIFACT_SUFFIX}\`"
+              echo "- **File inside the zip:** \`playwright-flake-summary.md\` (at the root of the archive)"
+              echo ""
+            else
+              echo "**Download:** _Standalone \`quicklog-flake-summary-${ARTIFACT_SUFFIX}\` artifact was **not uploaded** for this run (see the **Upload gate** breakdown below for the exact reason)._"
+              echo ""
+              echo "Fallback — the same file is archived inside the always-uploaded smoke bundle whenever it exists on disk:"
+              echo ""
+              echo "- **Bundle artifact name:** \`quicklog-smoke-artifacts-${ARTIFACT_SUFFIX}\` (Artifacts dropdown on this run's page)"
+              echo "- **Path inside the bundle zip:** \`e2e/results/playwright-flake-summary.md\`"
+              echo "- **Sibling source of truth (same folder):** \`e2e/results/playwright-report.json\` — regenerate the summary locally by passing this to \`scripts/summarize-playwright-flakes.mjs --report=\`."
+              echo ""
+              echo "If neither artifact contains the file, it was never produced — jump to **How to (re)generate \`playwright-flake-summary.md\` locally** below."
               echo ""
             fi
             echo "**Expected path (in this workspace):** \`e2e/results/playwright-flake-summary.md\`"
-            echo "**Uploaded artifact name:** \`quicklog-flake-summary\` (single file: \`playwright-flake-summary.md\`)"
-            echo "**Also archived inside:** \`quicklog-smoke-artifacts\` bundle, same relative path — alongside the source it was generated from, \`e2e/results/playwright-report.json\` (Playwright's own JSON reporter output; not uploaded as a standalone artifact)."
+            echo "**Uploaded artifact name (standalone):** \`quicklog-flake-summary-${ARTIFACT_SUFFIX}\` (single file: \`playwright-flake-summary.md\`)"
+            echo "**Also archived inside:** \`quicklog-smoke-artifacts-${ARTIFACT_SUFFIX}\` bundle at \`e2e/results/playwright-flake-summary.md\` — alongside the source it was generated from, \`e2e/results/playwright-report.json\` (Playwright's own JSON reporter output; not uploaded as a standalone artifact)."
+
             echo ""
             echo "#### Upload gate"
             echo ""

@@ -42,7 +42,7 @@ describe("Quick Log authenticated route target contract", () => {
       /report\.run\(12,\s*"Watering opens the structured Quick Log"[\s\S]*?(?=report\.run\(13,)/,
     );
     expect(step, "step 12 structured Watering handoff assertion missing").toBeTruthy();
-    expect(step![0]).toContain('getByTestId("quick-log-dialog-all-activities-watering")');
+    expect(step![0]).toMatch(/getByRole\("button",\s*\{\s*name:\s*\/\^watering\$\/i/);
     expect(step![0]).toContain('getByTestId("qlv2-watering-form")');
     expect(step![0]).toContain('getByLabel("Volume (ml)")');
     expect(step![0]).not.toContain('locator("#quick-log-event-type")');

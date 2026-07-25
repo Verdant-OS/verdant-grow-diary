@@ -303,7 +303,7 @@ test.describe("Quick Log smoke checklist", () => {
       let structuredWaterTargetId = "";
       await report.run(12, "Watering opens the structured Quick Log", async () => {
         structuredWaterTargetId = (await readTargetTuple(dialog)).plantId;
-        await dialog.getByTestId("quick-log-dialog-all-activities-watering").click();
+        await dialog.getByRole("button", { name: /^watering$/i, exact: true }).click();
 
         await expect(page.getByTestId("qlv2-watering-form")).toBeVisible();
         await expect(page.getByLabel("Volume (ml)")).toBeVisible();

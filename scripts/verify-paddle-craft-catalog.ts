@@ -46,6 +46,15 @@ const REQUIRED_PLAN_IDS = PAID_PLAN_IDS.filter(
   (id) => id === "craft_monthly" || id === "craft_annual",
 );
 
+/**
+ * Prefix used to recognise Craft-SKU plans in the Paddle catalog. Any
+ * active price whose external_id starts with this and is NOT in
+ * REQUIRED_PLAN_IDS represents a newly sellable plan that has drifted
+ * out of coverage — the coverage assertion below fails the build in
+ * that case so we never ship a Craft plan the preflight isn't guarding.
+ */
+const CRAFT_EXTERNAL_ID_PREFIX = "craft_";
+
 const PADDLE_API_BASE = {
   sandbox: "https://sandbox-api.paddle.com",
   live: "https://api.paddle.com",

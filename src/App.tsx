@@ -220,9 +220,9 @@ const App = () => (
                   {/* Deprecated auth entry points — redirect to canonical /auth to
                       prevent funnel leaks from old bookmarks, emails, ads, and
                       creator posts that still point to /login /signup /register. */}
-                  <Route path="/login" element={<Navigate to="/auth" replace />} />
-                  <Route path="/signup" element={<Navigate to="/auth" replace />} />
-                  <Route path="/register" element={<Navigate to="/auth" replace />} />
+                  <Route path="/login" element={<RouteAliasRedirect to="/auth" />} />
+                  <Route path="/signup" element={<RouteAliasRedirect to="/auth?mode=signup" />} />
+                  <Route path="/register" element={<RouteAliasRedirect to="/auth?mode=signup" />} />
 
                   <Route path="/features" element={<Navigate to="/welcome" replace />} />
 
@@ -340,7 +340,7 @@ const App = () => (
                     <Route path="/dashboard" element={<Dashboard />} />
                     {/* Legacy Live Dashboard route — consolidated into the
                         main Dashboard. Redirect preserves old bookmarks. */}
-                    <Route path="/grow-room" element={<Navigate to="/" replace />} />
+                    <Route path="/grow-room" element={<RouteAliasRedirect to="/" />} />
 
                     <Route path="/daily-check" element={<DailyCheck />} />
                     <Route path="/tents" element={<Tents />} />
@@ -365,13 +365,16 @@ const App = () => (
                     <Route path="/actions/:actionId" element={<ActionDetail />} />
                     {/* Legacy alias — canonical route is /actions. Keeps old
                         bookmarks, docs, and external links working. */}
-                    <Route path="/action-queue" element={<Navigate to="/actions" replace />} />
+                    <Route path="/action-queue" element={<RouteAliasRedirect to="/actions" />} />
                     <Route path="/grow-lineage" element={<GrowLineageRepair />} />
                     <Route path="/genetics" element={<GeneticsLibrary />} />
                     <Route path="/genetics/accessions/:id" element={<AccessionDetail />} />
                     <Route path="/genetics/batches/:id" element={<PropagationBatchDetail />} />
                     <Route path="/genetics/trace/:kind/:id" element={<TraceabilityView />} />
-                    <Route path="/genetics/health/:kind/:id" element={<ScreeningQuarantineHistory />} />
+                    <Route
+                      path="/genetics/health/:kind/:id"
+                      element={<ScreeningQuarantineHistory />}
+                    />
                     <Route path="/grows" element={<Grows />} />
                     <Route path="/grows/:growId" element={<GrowDetail />} />
                     <Route path="/grows/:growId/learning" element={<GrowLearning />} />

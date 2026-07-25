@@ -747,7 +747,7 @@ export function evaluateActionQueue(a: ActionQueueEvidence | null): LoopStepRow 
     evidence: ev,
     missing_info: [],
     safety_note: "Approval required. Grower decides. No device command.",
-    deep_link: `/action-queue/${a.id}`,
+    deep_link: `/actions/${a.id}`,
   };
 }
 

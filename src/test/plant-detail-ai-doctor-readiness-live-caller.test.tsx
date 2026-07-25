@@ -207,36 +207,42 @@ describe("PlantDetailAiDoctorReadiness — live caller × real intake classifica
       reasonCode: SensorSnapshotReasonCode;
       mode: string;
       nextActionLabel: string | null;
+      nextActionHref: string | null;
     }> = [
       {
         status: "usable",
         reasonCode: "fresh_accept",
         mode: "healthy",
         nextActionLabel: null,
+        nextActionHref: null,
       },
       {
         status: "stale",
         reasonCode: "stale_timestamp",
         mode: "cautionary",
         nextActionLabel: "Add fresh sensor snapshot",
+        nextActionHref: null,
       },
       {
         status: "invalid",
         reasonCode: "malformed_payload",
         mode: "unsafe",
         nextActionLabel: "Review sensor intake",
+        nextActionHref: `/sensors?tentId=${TENT_ID}&tentIntent=required`,
       },
       {
         status: "needs_review",
         reasonCode: "none_accepted",
         mode: "unsafe",
         nextActionLabel: "Review snapshot issue",
+        nextActionHref: `/sensors?tentId=${TENT_ID}&tentIntent=required`,
       },
       {
         status: "no_data",
         reasonCode: "none_received",
         mode: "missing",
         nextActionLabel: "Add sensor snapshot",
+        nextActionHref: null,
       },
     ];
 
@@ -263,6 +269,9 @@ describe("PlantDetailAiDoctorReadiness — live caller × real intake classifica
             `plant-detail-ai-doctor-sensor-evidence-next-action-${c.status}`,
           );
           expect(btn.textContent).toContain(c.nextActionLabel);
+          if (c.nextActionHref) {
+            expect(btn.closest("a")).toHaveAttribute("href", c.nextActionHref);
+          }
         } else {
           expect(
             screen.queryByTestId(`plant-detail-ai-doctor-sensor-evidence-next-action-${c.status}`),

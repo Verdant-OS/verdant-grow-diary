@@ -4,12 +4,20 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter, Navigate, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import RouteAliasRedirect from "@/components/RouteAliasRedirect";
 
 // Lightweight stand-in for the real Action Queue page to avoid pulling in its
 // data hooks. The redirect contract is what we're asserting.
 function ActionQueueStub() {
-  return <div data-testid="actions-page">Action Queue</div>;
+  const location = useLocation();
+  return (
+    <div data-testid="actions-page">
+      Action Queue
+      {location.search}
+      {location.hash}
+    </div>
+  );
 }
 
 function RedirectHarness({ initial }: { initial: string }) {
@@ -17,7 +25,7 @@ function RedirectHarness({ initial }: { initial: string }) {
     <MemoryRouter initialEntries={[initial]}>
       <Routes>
         <Route path="/actions" element={<ActionQueueStub />} />
-        <Route path="/action-queue" element={<Navigate to="/actions" replace />} />
+        <Route path="/action-queue" element={<RouteAliasRedirect to="/actions" />} />
         <Route path="*" element={<div data-testid="not-found">404</div>} />
       </Routes>
     </MemoryRouter>
@@ -25,9 +33,11 @@ function RedirectHarness({ initial }: { initial: string }) {
 }
 
 describe("QA-LOOP-02 /action-queue legacy redirect", () => {
-  it("redirects /action-queue to /actions", () => {
-    render(<RedirectHarness initial="/action-queue" />);
-    expect(screen.getByTestId("actions-page")).toBeInTheDocument();
+  it("redirects /action-queue to /actions with focus, alert, and hash intact", () => {
+    render(<RedirectHarness initial="/action-queue?focus=aq1&alert=al1#row" />);
+    expect(screen.getByTestId("actions-page")).toHaveTextContent(
+      "Action Queue?focus=aq1&alert=al1#row",
+    );
     expect(screen.queryByTestId("not-found")).not.toBeInTheDocument();
   });
 
@@ -36,10 +46,12 @@ describe("QA-LOOP-02 /action-queue legacy redirect", () => {
     expect(screen.getByTestId("actions-page")).toBeInTheDocument();
   });
 
-  it("confirms App.tsx wires the legacy alias to a Navigate redirect", async () => {
+  it("confirms App.tsx wires the legacy alias to the scope-preserving redirect", async () => {
     const fs = await import("node:fs");
     const src = fs.readFileSync("src/App.tsx", "utf8");
-    expect(src).toMatch(/path="\/action-queue"\s+element=\{<Navigate\s+to="\/actions"\s+replace/);
+    expect(src).toMatch(
+      /path="\/action-queue"\s+element=\{<RouteAliasRedirect\s+to="\/actions"\s*\/>\}/,
+    );
   });
 });
 

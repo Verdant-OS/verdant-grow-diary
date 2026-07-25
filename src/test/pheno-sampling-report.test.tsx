@@ -9,6 +9,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { useEffect } from "react";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import {
   PhenoSamplingProvider,
@@ -73,32 +74,16 @@ const FIXTURES: readonly PhenoSamplingSubmission[] = [
 
 function Seed({ rows }: { rows: readonly PhenoSamplingSubmission[] }) {
   const { recordSubmission } = usePhenoSampling();
-  // Push fixtures once on mount so downstream components render with data.
-  useSeed(rows, recordSubmission);
+  useEffect(() => {
+    for (const r of rows) {
+      const { id: _id, ...rest } = r;
+      recordSubmission(rest);
+    }
+  }, [recordSubmission, rows]);
   return null;
 }
 
-function useSeed(
-  rows: readonly PhenoSamplingSubmission[],
-  record: (
-    input: Omit<PhenoSamplingSubmission, "id" | "submittedAt"> & {
-      submittedAt?: string;
-    },
-  ) => PhenoSamplingSubmission,
-) {
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const seededRef = (Seed as unknown as { seeded?: boolean }).seeded;
-  if (!seededRef) {
-    (Seed as unknown as { seeded?: boolean }).seeded = true;
-    for (const r of rows) {
-      const { id: _id, ...rest } = r;
-      record(rest);
-    }
-  }
-}
-
 function renderWithProvider(candidates: readonly { candidateId: string }[]) {
-  (Seed as unknown as { seeded?: boolean }).seeded = false;
   return render(
     <PhenoSamplingProvider>
       <Seed rows={FIXTURES} />
@@ -173,6 +158,24 @@ describe("pheno sampling — pure report helpers", () => {
 });
 
 describe("PhenoSamplingWorkspaceTools", () => {
+  it("labels summaries, printable output, and entries as session-only before use", () => {
+    renderWithProvider([{ candidateId: "PH-1" }]);
+
+    const disclosure = screen.getByTestId("pheno-sampling-tools-session-disclosure");
+    expect(disclosure).toHaveTextContent(/session only/i);
+    expect(disclosure).toHaveTextContent(/not saved to your Verdant account/i);
+    expect(disclosure).toHaveTextContent(/leave or reload/i);
+    expect(
+      screen.getByRole("heading", { name: "Current session sampling summary" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Open printable session summary" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: /current session entries — PH-1/i }),
+    ).toBeInTheDocument();
+  });
+
   it("renders a rating summary with correct averages and counts", () => {
     renderWithProvider([{ candidateId: "PH-1" }, { candidateId: "PH-2" }]);
     const ph1Row = screen.getByTestId("pheno-summary-row-PH-1");
@@ -196,7 +199,15 @@ describe("PhenoSamplingWorkspaceTools", () => {
     // PH-2's tester should NOT appear in the PH-1 comparison.
     expect(within(compare).queryAllByText("T-01")).toHaveLength(1);
     // Required comparison fields are present.
-    for (const key of ["dryHit", "burnQuality", "ashColor", "oilRing", "effect", "flavor", "overall"]) {
+    for (const key of [
+      "dryHit",
+      "burnQuality",
+      "ashColor",
+      "oilRing",
+      "effect",
+      "flavor",
+      "overall",
+    ]) {
       expect(within(compare).getByTestId(`pheno-compare-row-${key}`)).toBeInTheDocument();
     }
   });

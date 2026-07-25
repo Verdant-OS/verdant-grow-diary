@@ -6,16 +6,20 @@ const ROOT = resolve(__dirname, "../..");
 const APP = readFileSync(resolve(ROOT, "src/App.tsx"), "utf8");
 
 describe("Deprecated auth route redirects", () => {
-  it("/login redirects to /auth", () => {
-    expect(APP).toMatch(/path="\/login"\s+element=\{<Navigate\s+to="\/auth"/);
+  it("/login redirects through the context-preserving alias", () => {
+    expect(APP).toMatch(/path="\/login"\s+element=\{<RouteAliasRedirect\s+to="\/auth"\s*\/>\}/);
   });
 
-  it("/signup redirects to /auth", () => {
-    expect(APP).toMatch(/path="\/signup"\s+element=\{<Navigate\s+to="\/auth"/);
+  it("/signup redirects to signup mode through the context-preserving alias", () => {
+    expect(APP).toMatch(
+      /path="\/signup"\s+element=\{<RouteAliasRedirect\s+to="\/auth\?mode=signup"\s*\/>\}/,
+    );
   });
 
-  it("/register redirects to /auth", () => {
-    expect(APP).toMatch(/path="\/register"\s+element=\{<Navigate\s+to="\/auth"/);
+  it("/register redirects to signup mode through the context-preserving alias", () => {
+    expect(APP).toMatch(
+      /path="\/register"\s+element=\{<RouteAliasRedirect\s+to="\/auth\?mode=signup"\s*\/>\}/,
+    );
   });
 
   it("/auth route still exists directly (regression guard)", () => {

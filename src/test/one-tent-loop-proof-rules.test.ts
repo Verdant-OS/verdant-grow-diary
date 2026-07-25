@@ -233,6 +233,7 @@ describe("evaluateActionQueue — approval-required and no device command", () =
       linked_alert_id: "a1",
     });
     expect(row.status).toBe("passed");
+    expect(row.deep_link).toBe("/actions/aq1");
     expect(row.evidence.join(" ").toLowerCase()).toMatch(/approval required/);
     expect(row.evidence.join(" ").toLowerCase()).toMatch(/no device command/);
   });

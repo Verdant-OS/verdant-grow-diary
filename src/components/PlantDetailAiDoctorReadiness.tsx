@@ -38,6 +38,7 @@ import {
   type Classification,
   type SnapshotStatus,
 } from "@/lib/sensorSnapshotStatusContract";
+import { buildSensorsTentRouteHref } from "@/lib/sensorRouteTentIntentRules";
 import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
 import { useSensorBridgeHealth } from "@/hooks/useSensorBridgeHealth";
 import { useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
@@ -172,14 +173,18 @@ interface RouteNextAction {
 
 type NextAction = SnapshotNextAction | RouteNextAction;
 
-function nextActionForStatus(status: SnapshotStatus | null): NextAction | null {
+function nextActionForStatus(
+  status: SnapshotStatus | null,
+  tentId: string | null,
+): NextAction | null {
+  const sensorReviewHref = buildSensorsTentRouteHref(tentId, { requireExactMatch: true });
   switch (status) {
     case "stale":
       return { kind: "snapshot", label: "Add fresh sensor snapshot" };
     case "invalid":
-      return { kind: "route", label: "Review sensor intake", to: "/pi-ingest-status" };
+      return { kind: "route", label: "Review sensor intake", to: sensorReviewHref };
     case "needs_review":
-      return { kind: "route", label: "Review snapshot issue", to: "/pi-ingest-status" };
+      return { kind: "route", label: "Review snapshot issue", to: sensorReviewHref };
     case "no_data":
       return { kind: "snapshot", label: "Add sensor snapshot" };
     case "usable":
@@ -246,7 +251,7 @@ export default function PlantDetailAiDoctorReadiness({
   const doctorHref = buildPlantAiDoctorReviewPath({ plantId, tentId }) ?? "/doctor";
 
   const sensor = result.sensorEvidence;
-  const nextAction = nextActionForStatus(sensor.status);
+  const nextAction = nextActionForStatus(sensor.status, tentId ?? null);
   const snapshotPrefill = useMemo(
     () =>
       buildPlantQuickLogPrefill({

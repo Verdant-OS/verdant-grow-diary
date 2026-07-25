@@ -20,9 +20,17 @@ export type PaddleEnv = "sandbox" | "live";
 // The known human-readable price IDs we accept. Anything else is a config
 // mistake (a product created outside create_product/create_price) and is
 // skipped rather than written with a raw pri_/pro_ id.
+//
+// This is the FIRST grant gate, not the last. A price id missing here is
+// skipped as `unknown_price_id`, so no subscriptions row is ever written and
+// the buyer resolves as Free regardless of what the client, edge, and SQL
+// entitlement gates allow — while Paddle still receives a 200, making the
+// failure silent. Any plan sold as a subscription must appear here.
 export const KNOWN_PRICE_IDS: ReadonlyArray<string> = [
   "pro_monthly",
   "pro_annual",
+  "craft_monthly",
+  "craft_annual",
   "founder_lifetime",
 ];
 

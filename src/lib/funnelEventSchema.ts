@@ -69,7 +69,7 @@ const SCHEMA_SET: Readonly<Record<FunnelEventName, ReadonlySet<FunnelParamKey>>>
       name,
       new Set(FUNNEL_EVENT_SCHEMA[name]),
     ]),
-  ) as Record<FunnelEventName, ReadonlySet<FunnelParamKey>>;
+  ) as unknown as Record<FunnelEventName, ReadonlySet<FunnelParamKey>>;
 
 // Observability counter for tests / diagnostics.
 let schemaViolationCount = 0;

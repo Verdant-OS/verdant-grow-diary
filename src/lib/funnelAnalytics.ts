@@ -45,6 +45,7 @@ export const FUNNEL_EVENTS = [
   "paywall_viewed",
   "paywall_cta_clicked",
   "checkout_started",
+  "checkout_catalog_unavailable",
   "subscription_activated",
   "checkout_return_completed",
 ] as const;
@@ -66,6 +67,12 @@ export const FUNNEL_PARAM_KEYS = [
   "event_type",
   /** csv_import_completed inserted-row count. */
   "rows",
+  /**
+   * Sanitized catalog-unavailable reason enum from get-paddle-price
+   * (e.g. "price_not_configured"). Server-defined tokens only — never
+   * echoed to the user-facing UI and never carries free text.
+   */
+  "reason",
 ] as const;
 
 type FunnelParamKey = (typeof FUNNEL_PARAM_KEYS)[number];

@@ -222,6 +222,19 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
           err instanceof PaddleCheckoutUnavailableError ||
           err instanceof PaddleCheckoutCatalogUnavailableError
         ) {
+          // Non-sensitive telemetry: emit the sanitized server reason on the
+          // funnel bus so we can diagnose missing Paddle env vars / catalog
+          // entries in analytics without ever surfacing the reason code in
+          // user-facing copy. The `blockedReason` string below is the
+          // calm human message; the reason enum is telemetry-only.
+          const reasonToken =
+            err instanceof PaddleCheckoutCatalogUnavailableError
+              ? err.reason
+              : "checkout_env_unavailable";
+          trackFunnelEvent("checkout_catalog_unavailable", {
+            plan: options.priceId,
+            reason: reasonToken,
+          });
           setBlockedReason(err.message);
         } else {
           setBlockedReason(CHECKOUT_RECOVERY_MESSAGE);

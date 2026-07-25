@@ -1,6 +1,6 @@
 {
   "generator": "scripts/sync-edge-shared.mjs",
-  "sourceCount": 83,
+  "sourceCount": 84,
   "sourceHashes": {
     "src/constants/aiDoctorContextReadiness.ts": "22767b47268f6fa199b89f81d9dbb7fb017ab1f9f860c8dfdfe6d44501ee8170",
     "src/constants/aiDoctorImportedHistory.ts": "f04d998dea22c9e8e7aaa6489a64cf4af44202435982039a1f216ccba9c317a0",
@@ -50,6 +50,7 @@
     "src/lib/manualSensorSnapshotRules.ts": "c71b8a44acc9f29b731935383e7bff95337daa52b882a1da24eea7ce9964b415",
     "src/lib/manualSensorSnapshotViewModel.ts": "858bbd44acd249bd39b4a318273e79cf95477f0049f12fb878ec3443e29ac4f2",
     "src/lib/paddleSubscriptionAccessRules.ts": "715f5b5f70ff94c06435f8ea0a2df9131346dcc5317e0e2f3004dfe431f15c4b",
+    "src/lib/paidPlanAllowlist.ts": "9a45aa19cf4292ce4a115095f343ba25e492e9f8476676b7edb53ef83b708f7a",
     "src/lib/photoEventNonDiagnosticLabelRules.ts": "2ecb0ffbb463f7c89ae1409fc7343f82fe2e72c1a61642e424460e0af95c5e4c",
     "src/lib/piIngestAuthRules.ts": "43ba763955b861128b5bf2469378957af8fddbc19f621f60586c8792e71b4fa0",
     "src/lib/piIngestBridgeAuthorizationRules.ts": "258fe3867eebed7b4e068515486877138e95eb9287686b4a5330f00a4444c008",

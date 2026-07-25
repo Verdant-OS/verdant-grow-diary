@@ -2,7 +2,7 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { gatewayFetch, type PaddleEnv } from "../_shared/paddle.ts";
 import { resolveServerBillingEnvironment } from "../_shared/unionEntitlementLookup.ts";
-import { PAID_PLAN_ALLOWLIST, PAID_PLAN_IDS } from "@/lib/paidPlanAllowlist";
+import { PAID_PLAN_ALLOWLIST, PAID_PLAN_IDS } from "../_shared/lib/lib/paidPlanAllowlist.ts";
 
 /**
  * Resolve a paid plan id to its public Paddle price ID. Read-only; no DB

@@ -83,7 +83,76 @@ export function parseVerifierLog(logText) {
       if (status === "fail") row.cause = classifyFailure(detail);
       rows.push(row);
       continue;
+}
+
+/**
+ * Convert the verifier's JSON report (see verify-paddle-craft-catalog.ts
+ * `finalize()`) into the same `parsed` shape parseVerifierLog produces.
+ * This is the preferred input path — it avoids re-parsing the human log
+ * entirely, so glyph encoding, log truncation, or stray banner lines
+ * can't drift the renderer's view of what the verifier saw.
+ *
+ * The report is treated as untrusted input: unknown status values,
+ * unknown cause kinds, missing summary fields, and non-string ids are
+ * all rejected so a malformed file can't smuggle unclassified failures
+ * past the remedy switch.
+ */
+export function parseVerifierReport(report) {
+  const parsed = { rows: [], summary: null, keyUnsetMentioned: false };
+  if (!report || typeof report !== "object") return parsed;
+  const rawRows = Array.isArray(report.rows) ? report.rows : [];
+  for (const raw of rawRows) {
+    if (!raw || typeof raw !== "object") continue;
+    const { env, externalId, status, cause } = raw;
+    if (env !== "sandbox" && env !== "live") continue;
+    if (typeof externalId !== "string" || externalId.length === 0) continue;
+    if (status !== "pass" && status !== "fail" && status !== "skip") continue;
+    const row = { env, externalId, status };
+    if (status === "fail") {
+      if (cause && typeof cause === "object" && typeof cause.kind === "string") {
+        const knownKinds = new Set([
+          "api_error",
+          "inactive",
+          "missing",
+          "coverage_gap",
+          "enumeration_error",
+        ]);
+        if (knownKinds.has(cause.kind)) {
+          const normalized = { kind: cause.kind };
+          if (cause.kind === "api_error" && Number.isFinite(cause.httpStatus)) {
+            normalized.httpStatus = Number(cause.httpStatus);
+          }
+          row.cause = normalized;
+        } else {
+          row.cause = { kind: "missing" };
+        }
+      } else {
+        row.cause = { kind: "missing" };
+      }
     }
+    parsed.rows.push(row);
+  }
+  const s = report.summary;
+  if (s && typeof s === "object") {
+    const pass = Number(s.pass);
+    const fail = Number(s.fail);
+    const skip = Number(s.skip);
+    if ([pass, fail, skip].every((n) => Number.isFinite(n))) {
+      parsed.summary = { pass, fail, skip };
+    }
+  }
+  parsed.keyUnsetMentioned = Boolean(report.keyUnset);
+  return parsed;
+}
+
+function safeReadReport(reportPath) {
+  if (!reportPath) return null;
+  try {
+    return JSON.parse(readFileSync(reportPath, "utf8"));
+  } catch {
+    return null;
+  }
+}
     const s = SUMMARY_RE.exec(rawLine);
     if (s) {
       summary = { pass: Number(s[1]), fail: Number(s[2]), skip: Number(s[3]) };

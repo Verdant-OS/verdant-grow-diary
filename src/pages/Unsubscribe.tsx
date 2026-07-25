@@ -28,7 +28,6 @@ export default function Unsubscribe() {
     title: "Unsubscribe | Verdant Grow Diary",
     description: "Confirm you want to stop receiving emails from Verdant Grow Diary.",
     path: "/unsubscribe",
-    robots: "noindex,nofollow",
   });
 
   useEffect(() => {

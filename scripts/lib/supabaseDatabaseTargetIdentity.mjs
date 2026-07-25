@@ -2,9 +2,9 @@
  * Pinned Supabase database identities for Verdant's remote schema gates.
  *
  * A secret name is not proof of where its connection string points. Every
- * remote database check must parse the URL and prove that the project ref
- * encoded by the supported Supabase connection form matches the selected
- * environment before psql is allowed to run.
+ * remote database check must parse the URL and either prove that its encoded
+ * project ref matches the selected environment or bind a generic shared-
+ * pooler username to that pinned ref before psql is allowed to run.
  */
 export const SUPABASE_DATABASE_TARGETS = Object.freeze({
   sandbox: Object.freeze({
@@ -81,7 +81,8 @@ function strongestRequestedSslMode(url) {
  * - Dedicated PgBouncer: db.<project-ref>.supabase.co:6543, user postgres
  * - Shared Supavisor session/transaction:
  *   aws-<n>-<region>.pooler.supabase.com:5432|6543,
- *   user postgres.<project-ref>
+ *   user postgres.<project-ref>, or generic user postgres that the gate later
+ *   rewrites to the selected pinned project before opening a connection
  *
  * The returned object contains no password or raw URL.
  */
@@ -153,10 +154,11 @@ export function parseSupabaseDatabaseUrl(databaseUrl) {
 
   if (SHARED_SUPAVISOR_HOST.test(hostname)) {
     const userMatch = SHARED_SUPAVISOR_USER.exec(username);
-    if (!userMatch) {
+    const requiresPinnedProjectBinding = username === "postgres";
+    if (!userMatch && !requiresPinnedProjectBinding) {
       identityError(
         "missing_supavisor_project_ref",
-        "Shared Supavisor URLs must encode the project ref in the username.",
+        "Shared Supavisor URLs must use postgres or postgres.<project-ref> as the username.",
       );
     }
     if (port !== "5432" && port !== "6543") {
@@ -167,10 +169,11 @@ export function parseSupabaseDatabaseUrl(databaseUrl) {
     }
 
     return Object.freeze({
-      projectRef: userMatch[1],
+      projectRef: userMatch?.[1] ?? null,
       connectionMode: port === "5432" ? "shared-supavisor-session" : "shared-supavisor-transaction",
       hostname,
       port: Number(port),
+      requiresPinnedProjectBinding,
     });
   }
 
@@ -186,10 +189,19 @@ export function parseSupabaseDatabaseUrl(databaseUrl) {
  * All source query options are removed; only the strongest validated TLS mode
  * survives as a separate, gate-owned child-process setting.
  */
-export function sanitizeSupabaseDatabaseUrlForPsql(databaseUrl) {
-  parseSupabaseDatabaseUrl(databaseUrl);
+export function sanitizeSupabaseDatabaseUrlForPsql(databaseUrl, targetEnv) {
+  const identity = assertSupabaseDatabaseTargetIdentity({
+    targetEnv,
+    databaseUrl,
+  });
   const url = new URL(databaseUrl);
   const sslMode = strongestRequestedSslMode(url);
+  if (identity.requiresPinnedProjectBinding) {
+    // A shared Supavisor host is multi-tenant; its username selects the
+    // project. Bind a generic Dashboard-style `postgres` username to the
+    // already-pinned target so the child process cannot route elsewhere.
+    url.username = `postgres.${identity.projectRef}`;
+  }
   url.search = "";
   return Object.freeze({
     databaseUrl: url.toString(),
@@ -211,20 +223,21 @@ export function databaseTargetForEnvironment(targetEnv) {
 }
 
 /**
- * Prove that a supported Supabase URL points at the project pinned for the
- * selected environment. Never returns the raw URL or credentials.
+ * Prove an encoded project ref or establish the project ref that a generic
+ * shared-pooler URL must be bound to for the selected environment. Never
+ * returns the raw URL or credentials.
  */
 export function assertSupabaseDatabaseTargetIdentity({ targetEnv, databaseUrl }) {
   const target = databaseTargetForEnvironment(targetEnv);
   const parsed = parseSupabaseDatabaseUrl(databaseUrl);
 
-  if (!PROJECT_REF.test(parsed.projectRef)) {
+  if (parsed.projectRef !== null && !PROJECT_REF.test(parsed.projectRef)) {
     identityError(
       "malformed_project_ref",
       "Database URL does not contain a valid Supabase project ref.",
     );
   }
-  if (parsed.projectRef !== target.projectRef) {
+  if (parsed.projectRef !== null && parsed.projectRef !== target.projectRef) {
     identityError(
       "project_ref_mismatch",
       `Database URL project ref does not match the pinned ${targetEnv} project.`,
@@ -238,5 +251,6 @@ export function assertSupabaseDatabaseTargetIdentity({ targetEnv, databaseUrl })
     connectionMode: parsed.connectionMode,
     hostname: parsed.hostname,
     port: parsed.port,
+    requiresPinnedProjectBinding: parsed.requiresPinnedProjectBinding === true,
   });
 }

@@ -1045,8 +1045,12 @@ jobs:
               echo "_No flake summary artifact was uploaded (no failed/flaky tests met the upload gate, or the upload was skipped/failed). Trace links below are shown unconditionally so you can still inspect any trace this run produced._"
             fi
             echo ""
-
+            RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            ATTEMPT_URL="${RUN_URL}/attempts/${GITHUB_RUN_ATTEMPT}"
+            JOB_URL="${RUN_URL}/job/${GITHUB_JOB}"
+            echo "**This workflow run:** [\`${GITHUB_WORKFLOW}\` #${GITHUB_RUN_NUMBER} (attempt ${GITHUB_RUN_ATTEMPT})](${ATTEMPT_URL}) · [run overview](${RUN_URL}) · [job \`${GITHUB_JOB}\`](${JOB_URL})"
             echo ""
+
             if [ -n "${TRACES_URL}" ]; then
               echo "1. **Download the traces artifact:** [\`quicklog-playwright-traces-${ARTIFACT_SUFFIX}\`](${TRACES_URL}) — contains every \`test-results/**/trace.zip\` produced by this run (first attempt + retries)."
             elif [ -n "${SMOKE_BUNDLE_URL}" ]; then

@@ -74,6 +74,10 @@ describe("Supabase database target identity", () => {
     [sharedUrl(SANDBOX_REF, 6543), "shared-supavisor-transaction"],
     [directUrl(SANDBOX_REF).replace("sslmode=require", "sslmode=verify-ca"), "direct"],
     [directUrl(SANDBOX_REF).replace("sslmode=require", "sslmode=verify-full"), "direct"],
+    [directUrl(SANDBOX_REF).replace("?sslmode=require", ""), "direct"],
+    [directUrl(SANDBOX_REF, 6543).replace("?sslmode=require", ""), "dedicated-pooler"],
+    [sharedUrl(SANDBOX_REF).replace("?sslmode=require", ""), "shared-supavisor-session"],
+    [sharedUrl(SANDBOX_REF, 6543).replace("?sslmode=require", ""), "shared-supavisor-transaction"],
   ])("accepts documented sandbox URL form %#", (url, expectedMode) => {
     expect(
       assertSupabaseDatabaseTargetIdentity({
@@ -173,10 +177,13 @@ describe("Supabase database target identity", () => {
     ).toThrow(/sslmode=require, verify-ca, or verify-full/i);
   });
 
-  it("rejects a connection URL that does not explicitly require TLS", () => {
-    expect(() =>
+  it("accepts a query-free Dashboard URL for the caller's enforced TLS default", () => {
+    expect(
       parseSupabaseDatabaseUrl(directUrl(SANDBOX_REF).replace("?sslmode=require", "")),
-    ).toThrow(/non-downgradable TLS/i);
+    ).toMatchObject({
+      projectRef: SANDBOX_REF,
+      connectionMode: "direct",
+    });
   });
 
   it("returns only non-secret identity metadata", () => {
@@ -319,6 +326,7 @@ describe("remote applied-schema runner safety", () => {
         DATABASE_URL: "postgres://must-not-survive",
         PGHOST: "attacker.invalid",
         PGPASSWORD: "ambient-secret",
+        PGSSLMODE: "disable",
         OTHER_PROTECTED_SECRET: "must-not-reach-psql",
         PATH: process.env.PATH,
       },
@@ -339,6 +347,7 @@ describe("remote applied-schema runner safety", () => {
     expect(calls[0].args.join(" ")).not.toContain(url);
     expect(calls[0].args.join(" ")).not.toContain("argv-secret-sentinel");
     expect(calls[0].env.PGDATABASE).toBe(url);
+    expect(calls[0].env.PGSSLMODE).toBe("require");
     expect(calls[0].env.PGHOST).toBeUndefined();
     expect(calls[0].env.PGPASSWORD).toBeUndefined();
     expect(calls[0].env.DATABASE_URL).toBeUndefined();

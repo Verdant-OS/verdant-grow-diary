@@ -45,10 +45,12 @@ function decodeUsername(encodedUsername) {
 
 function validateConnectionOptions(url) {
   if (!url.search) {
-    identityError(
-      "missing_sslmode",
-      "Database URL must require a non-downgradable TLS connection.",
-    );
+    // Supabase's documented Dashboard connection strings omit sslmode.
+    // The only caller that opens a connection supplies PGSSLMODE=require in
+    // its allowlisted child environment, so an omitted option still fails
+    // closed to TLS. Explicit URL options are validated below because they
+    // override libpq environment defaults.
+    return;
   }
 
   const keys = [...url.searchParams.keys()];

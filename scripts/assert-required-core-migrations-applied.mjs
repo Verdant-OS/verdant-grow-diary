@@ -101,6 +101,11 @@ export function buildPsqlEnvironment(sourceEnv, databaseUrl) {
     }
   }
   childEnv.PGDATABASE = databaseUrl;
+  // Dashboard-generated Supabase URLs commonly omit sslmode. Force a
+  // non-downgradable libpq default without trusting any ambient PGSSLMODE.
+  // Explicit verify-ca/verify-full URL options override this with a stronger
+  // mode; the identity parser rejects explicit downgrade-capable modes.
+  childEnv.PGSSLMODE = "require";
   return childEnv;
 }
 

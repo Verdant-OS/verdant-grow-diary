@@ -45,12 +45,13 @@
  *
  * Exit codes (a one-shot run's exit code is its PROOF, so it must never
  * report a write that did not land as success — see onceExitCode):
- *   0  the reading was accepted by ingest (HTTP 2xx), or the run was a
- *      dry-run where nothing was attempted and the preview IS the output.
- *   1  a live attempt was made and NOT accepted — rejected (4xx/5xx),
- *      network_error, or unknown_response. Note `--invalid` is expected
- *      to land here in live mode: that non-zero exit is the proof the
- *      impossible payload was correctly refused.
+ *   0  the response body explicitly confirmed accepted:true or inserted>0,
+ *      or the run was an explicitly requested dry-run where the preview IS
+ *      the output.
+ *   1  a live attempt was NOT accepted or did not prove a write landed —
+ *      rejected, network_error, or unknown_response. Note `--invalid` is
+ *      expected to land here in live mode: that non-zero exit is the proof
+ *      the impossible payload was correctly refused.
  *   2  configuration error — refused to start, nothing downstream ran.
  *
  * Env:
@@ -77,7 +78,10 @@ import {
   type EcowittMqttPayload,
   type EcowittIngestEvidence,
 } from "../../src/lib/ecowittMqttIngestRules";
-import { buildIngestAttemptReport } from "../../src/lib/ingestAttemptReportRules";
+import {
+  applyIngestWriteAcknowledgement,
+  buildIngestAttemptReport,
+} from "../../src/lib/ingestAttemptReportRules";
 import {
   HaStatestreamAssembler,
   deriveVpdIfPaired,
@@ -133,6 +137,24 @@ export function readEnv(env: NodeJS.ProcessEnv): RuntimeEnv {
     mqttUsername: env.ECOWITT_MQTT_USERNAME ?? null,
     mqttPassword: env.ECOWITT_MQTT_PASSWORD ?? null,
   };
+}
+
+export type OnceLiveConfigKey = "VERDANT_INGEST_URL" | "VERDANT_BRIDGE_TOKEN" | "VERDANT_TENT_ID";
+
+/**
+ * Return missing live-write settings without ever returning their values.
+ * Pure and stable so one-shot startup can fail before MQTT or HTTP.
+ */
+export function missingOnceLiveConfigKeys(env: {
+  url: string | null | undefined;
+  token: string | null | undefined;
+  tentId: string | null | undefined;
+}): OnceLiveConfigKey[] {
+  const missing: OnceLiveConfigKey[] = [];
+  if (!env.url?.trim()) missing.push("VERDANT_INGEST_URL");
+  if (!env.token?.trim()) missing.push("VERDANT_BRIDGE_TOKEN");
+  if (!env.tentId?.trim()) missing.push("VERDANT_TENT_ID");
+  return missing;
 }
 
 // ---------------------------------------------------------------------------
@@ -868,16 +890,19 @@ interface HandleResult {
  *
  * `posted` is deliberately NOT the signal: it is `resp !== null`, which is
  * true for a rejection too (we got *a* response, just not a good one).
- * `status` comes from buildIngestAttemptReport, which sets "accepted" only
- * for HTTP 2xx.
+ * `status` comes from the final, acknowledgement-checked report. HTTP 2xx
+ * alone is insufficient because ingest may return accepted:false or
+ * inserted:0.
  *
  *   accepted / dry_run                            -> 0
  *   rejected / network_error / unknown_response    -> 1
+ *   configuration_error                            -> 2
  *
  * Exit 2 is reserved for fail-closed startup config errors, so the three
  * cases stay distinguishable. Pure: no I/O, no process access.
  */
-export function onceExitCode(status: string): 0 | 1 {
+export function onceExitCode(status: string): 0 | 1 | 2 {
+  if (status === "configuration_error") return 2;
   return status === "accepted" || status === "dry_run" ? 0 : 1;
 }
 
@@ -922,7 +947,9 @@ async function handlePayload(
       token: env.token,
       tentId: env.tentId,
       plantId: env.plantId,
-      dryRun: true,
+      // Only an explicit --dry-run is a dry run. A locally rejected live
+      // payload remains a rejection; missing live config is a startup error.
+      dryRun: flags.dryRun,
       normalizerReasons: norm.reasons,
       metricKeys,
       evidence,
@@ -981,17 +1008,20 @@ async function handlePayload(
     networkError = e instanceof Error ? e.message : String(e);
   }
 
-  const report = buildIngestAttemptReport({
-    url: env.url,
-    token: env.token,
-    tentId: env.tentId,
-    plantId: env.plantId,
-    response: resp,
-    networkError,
-    normalizerReasons: norm.reasons,
-    metricKeys,
-    evidence,
-  });
+  const report = applyIngestWriteAcknowledgement(
+    buildIngestAttemptReport({
+      url: env.url,
+      token: env.token,
+      tentId: env.tentId,
+      plantId: env.plantId,
+      response: resp,
+      networkError,
+      normalizerReasons: norm.reasons,
+      metricKeys,
+      evidence,
+    }),
+    resp?.body,
+  );
   printReport(report);
   if (flags.writeReport) await writeRedactedReport(report);
 
@@ -1195,6 +1225,19 @@ async function main(): Promise<void> {
     });
     await runHaDryRunLoop(modeConfig, env, flags);
     return;
+  }
+
+  if (flags.once && !flags.dryRun) {
+    const missingLiveConfig = missingOnceLiveConfigKeys(env);
+    if (missingLiveConfig.length > 0) {
+      // Names only, never values: a bridge token must not leak into output.
+      console.error(
+        "[ecowitt-mqtt-runner] configuration error — live one-shot requires:",
+        missingLiveConfig.join(", "),
+      );
+      process.exit(onceExitCode("configuration_error"));
+      return;
+    }
   }
 
   // eslint-disable-next-line no-console

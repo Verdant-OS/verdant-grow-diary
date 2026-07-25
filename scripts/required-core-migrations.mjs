@@ -102,6 +102,17 @@ export const REQUIRED_CORE_SCHEMA = [
       "Quick Log. Without it the typed feeding write path fails outright.",
   },
   {
+    table: "feeding_events",
+    column: "line_id",
+    migration: "20260612212323_568c55c7-3cd0-46f6-aef7-301e61e61362.sql",
+    reason:
+      "quicklog_save_event's feeding_events INSERT names line_id unconditionally " +
+      "(COALESCE(v_feed->>'line_id','default')), and writeFeedingTypedEvent rejects with " +
+      "'line_id:missing' without one. Same migration as products — but a target that got " +
+      "products via a partial/manual apply and not line_id would pass a products-only " +
+      "check while every structured feed save still fails, so both columns are checked.",
+  },
+  {
     table: "plants",
     column: "candidate_number",
     migration: "20260712010343_pheno_candidate_number_foundation.sql",

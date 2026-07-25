@@ -12,12 +12,14 @@
 # nothing". Nothing in CI compared the schema the app requires against the
 # schema prod actually had, so it sat live for days.
 #
-# This asserts COLUMN EXISTENCE via information_schema — not migration
-# version rows in supabase_migrations.schema_migrations. Duplicate
-# migrations supplying the same column, and schema created outside the
-# Supabase CLI, both make a version check fail against a perfectly correct
-# database. Column existence is also the exact condition the app fails on,
-# so green here means "the app will work". See the header of
+# This asserts COLUMN EXISTENCE via pg_catalog — not migration version rows
+# in supabase_migrations.schema_migrations. Duplicate migrations supplying
+# the same column, and schema created outside the Supabase CLI, both make a
+# version check fail against a perfectly correct database. pg_catalog rather
+# than information_schema because the latter is filtered by the connecting
+# role's privileges, which produced a false "everything is missing" against a
+# correct database. Column existence is also the exact condition the app
+# fails on, so green here means "the app will work". See the header of
 # scripts/required-core-migrations.mjs for the full rationale.
 #
 # Deliberately does NOT use ./.github/actions/require-ci-secret: that
@@ -34,6 +36,16 @@ on:
       - "scripts/required-core-migrations.mjs"
       - "src/test/required-core-migrations.test.ts"
       - ".github/workflows/required-core-migrations.yml"
+
+  # Every push to the deploy branch re-checks LIVE. Publishing happens through
+  # Lovable's deploy_project, outside CI entirely, so there is no pre-deploy
+  # workflow to hook into — a push to this branch is the closest CI-observable
+  # point before a publish. Without this the LIVE check would only ever run on
+  # a manual dispatch, i.e. exactly when someone remembers, which is not a gate.
+  # (Note: the deploy branch is `verdant-grow-diary`, NOT `main`.)
+  push:
+    branches: [verdant-grow-diary]
+
   workflow_dispatch:
     inputs:
       target_env:
@@ -70,7 +82,9 @@ jobs:
   applied-sandbox:
     name: Assert core schema present in SANDBOX
     needs: manifest-and-files
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.target_env == 'sandbox' }}
+    # PRs and manual sandbox dispatches. Never on the deploy-branch push — that
+    # path checks LIVE below.
+    if: ${{ (github.event_name == 'pull_request') || (github.event_name == 'workflow_dispatch' && inputs.target_env == 'sandbox') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -132,12 +146,15 @@ jobs:
           path: audit/core-sandbox
           if-no-files-found: warn
 
-  # Live/pre-deploy variant. Manual dispatch only — this is the gate to run
-  # before publishing the deploy branch.
+  # Live/pre-deploy variant. Runs automatically on every deploy-branch push so
+  # a publish cannot proceed on an unverified LIVE schema, plus on explicit
+  # dispatch. Requires SUPABASE_DB_URL_LIVE; fails closed without it.
   applied-live:
     name: Assert core schema present in LIVE (pre-deploy gate)
     needs: manifest-and-files
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.target_env == 'live' }}
+    # Fires on every deploy-branch push (the real pre-publish moment) and on an
+    # explicit live dispatch. Never on PRs.
+    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/verdant-grow-diary') || (github.event_name == 'workflow_dispatch' && inputs.target_env == 'live') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4

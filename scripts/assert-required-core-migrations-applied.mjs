@@ -16,7 +16,7 @@
  *   nothing" — a P0 that sat live for days because nothing compared the
  *   schema the app requires against the schema prod actually had.
  *
- * This asserts COLUMN EXISTENCE via information_schema, not migration
+ * This asserts COLUMN EXISTENCE via pg_catalog, not migration
  * versions in `supabase_migrations.schema_migrations`. See the header of
  * scripts/required-core-migrations.mjs for why: duplicate migrations that
  * supply the same column, and schema created outside the Supabase CLI, both
@@ -37,8 +37,8 @@
  *
  * Requires `psql` on PATH. CI installs it via `postgresql-client`.
  *
- * Read-only: issues a single SELECT against information_schema. No writes,
- * no schema changes.
+ * Read-only: issues a single SELECT against pg_catalog, plus one further
+ * diagnostic SELECT on the failure path only. No writes, no schema changes.
  *
  * Exit codes (distinct per failure mode so CI can branch on the specific
  * cause instead of parsing log text):
@@ -245,9 +245,54 @@ if (!DB_URL && !HAS_PG_ENV) {
 // Every key is validated against /^[a-z_][a-z0-9_]*$/ above, so this
 // interpolation cannot carry a quote or comment sequence.
 const keyList = expected.map((e) => `'${e.key}'`).join(",");
+const tableList = [...new Set(expected.map((e) => e.table))]
+  .map((t) => `'${t}'`)
+  .join(",");
+
+// Deliberately pg_catalog, NOT information_schema.
+//
+// `information_schema.columns` only exposes columns the CURRENT ROLE holds
+// some privilege on. A connection whose role can reach information_schema but
+// holds no privileges on public tables therefore sees an EMPTY result and this
+// guard reports every column missing against a perfectly correct database —
+// indistinguishable, in the output, from a genuinely empty database. That is
+// the same cry-wolf failure that made the earlier version-row design
+// unusable, so it gets the same treatment: ask a question whose answer does
+// not depend on who is asking.
+//
+// pg_catalog is world-readable, so this reflects actual schema regardless of
+// the connecting role's grants. attnum > 0 skips system columns;
+// NOT attisdropped skips logically-dropped ones.
+//
+// RELKIND FILTER IS LOAD-BEARING, NOT TIDINESS. information_schema exposes
+// only table-like relations, but pg_attribute exposes EVERY relation kind —
+// and an index's pg_attribute rows are named after the columns it indexes.
+// Without this filter, `CREATE INDEX plants ON decoy (grow_id, plant_type)`
+// makes the guard report `plants.grow_id` and `plants.plant_type` present in
+// a database with no `plants` table at all: a false GREEN on a deploy gate,
+// the one direction nothing downstream catches. Kinds kept mirror
+// information_schema: r=table, p=partitioned, v=view, m=matview, f=foreign.
+const RELKINDS = "'r','p','v','m','f'";
+
 const sql =
-  "SELECT table_name || '.' || column_name FROM information_schema.columns " +
-  `WHERE table_schema = 'public' AND table_name || '.' || column_name IN (${keyList});`;
+  "SELECT c.relname || '.' || a.attname " +
+  "FROM pg_catalog.pg_attribute a " +
+  "JOIN pg_catalog.pg_class c ON c.oid = a.attrelid " +
+  "JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace " +
+  `WHERE n.nspname = 'public' AND c.relkind IN (${RELKINDS}) ` +
+  "AND a.attnum > 0 AND NOT a.attisdropped " +
+  `AND c.relname || '.' || a.attname IN (${keyList});`;
+
+// Runs only when something is missing. Distinguishes the three failure shapes
+// an all-missing result could otherwise conflate: the table is absent, the
+// table exists but the column is not on it, or nothing at all is visible.
+// Same relkind filter, so an index named after a table cannot report that
+// table as "present" here either.
+const diagnosticSql =
+  "SELECT c.relname FROM pg_catalog.pg_class c " +
+  "JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace " +
+  `WHERE n.nspname = 'public' AND c.relkind IN (${RELKINDS}) ` +
+  `AND c.relname IN (${tableList});`;
 
 const args = ["-X", "-A", "-t", "-v", "ON_ERROR_STOP=1", "-c", sql];
 if (DB_URL) args.unshift(DB_URL);
@@ -269,13 +314,13 @@ if (result.error) {
 }
 
 if (result.status !== 0) {
-  console.error(`✗ psql exited ${result.status} while querying information_schema.`);
+  console.error(`✗ psql exited ${result.status} while querying the system catalog.`);
   // stderr can embed the connection string on some failure modes; keep it out
   // of the PR-visible report and let the access-controlled workflow log carry it.
   if (result.stderr) console.error(result.stderr.trim());
   console.error("  Do NOT deploy — target schema state is unknown.");
   writeReport("Schema query failed", [
-    "`psql` returned a non-zero exit code while reading `information_schema.columns`.",
+    "`psql` returned a non-zero exit code while reading `pg_catalog`.",
     "The target database's schema state is unknown; treat as blocking.",
     "",
     "See the workflow log for the full `psql` error output (stderr is not mirrored here",
@@ -283,7 +328,7 @@ if (result.status !== 0) {
   ]);
   writeAudit("schema_query_failed", {
     expected,
-    note: `psql exited ${result.status} querying information_schema — schema state was never observed.`,
+    note: `psql exited ${result.status} querying pg_catalog — schema state was never observed.`,
   });
   process.exit(EXIT.SCHEMA_QUERY_FAILED);
 }
@@ -299,6 +344,30 @@ for (const e of expected) e.present = present.has(e.key);
 const missing = expected.filter((e) => !e.present);
 
 if (missing.length > 0) {
+  // Which of the required TABLES exist at all? Without this, "every column
+  // missing" is ambiguous between an empty/wrong database and real drift, and
+  // an operator cannot tell which from the output alone. Best-effort: a
+  // failure here must not mask the real verdict below.
+  const requiredTables = [...new Set(expected.map((e) => e.table))];
+  let tablesPresent = null;
+  const diag = spawnSync(
+    "psql",
+    DB_URL
+      ? [DB_URL, "-X", "-A", "-t", "-v", "ON_ERROR_STOP=1", "-c", diagnosticSql]
+      : ["-X", "-A", "-t", "-v", "ON_ERROR_STOP=1", "-c", diagnosticSql],
+    { encoding: "utf8", env: process.env },
+  );
+  if (!diag.error && diag.status === 0) {
+    tablesPresent = diag.stdout
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean);
+  }
+  const tablesAbsent =
+    tablesPresent === null
+      ? null
+      : requiredTables.filter((t) => !tablesPresent.includes(t));
+
   console.error(`✗ Core schema INCOMPLETE in target env (${TARGET_ENV}):`);
   console.error(
     `  ${missing.length} of ${expected.length} required column(s) missing from the database.`,
@@ -306,6 +375,27 @@ if (missing.length > 0) {
   console.error("  Each row: <table.column>  <migration that supplies it>");
   for (const m of missing) {
     console.error(`    ${m.key}  supabase/migrations/${m.migration}`);
+  }
+  if (tablesAbsent === null) {
+    console.error("\n  (table-presence diagnostic unavailable — psql call failed)");
+  } else if (tablesAbsent.length === requiredTables.length) {
+    console.error(
+      `\n  DIAGNOSTIC: none of the ${requiredTables.length} required tables ` +
+        `(${requiredTables.join(", ")}) exist in this database's public schema.\n` +
+        "  That is far more consistent with an empty, wrong, or freshly-provisioned\n" +
+        "  database than with migration drift. Confirm SUPABASE_DB_URL points at the\n" +
+        "  intended environment before applying any migration.",
+    );
+  } else if (tablesAbsent.length > 0) {
+    console.error(
+      `\n  DIAGNOSTIC: these required tables are absent entirely: ${tablesAbsent.join(", ")}.\n` +
+        `  Present: ${tablesPresent.join(", ") || "(none)"}.`,
+    );
+  } else {
+    console.error(
+      "\n  DIAGNOSTIC: every required table exists; only the column(s) above are\n" +
+        "  missing. This is ordinary migration drift — apply the listed migration(s).",
+    );
   }
   console.error(
     "\nDo NOT deploy. Core product flows will fail at runtime with PGRST204 /\n" +
@@ -329,10 +419,40 @@ if (missing.length > 0) {
     "`PGRST204` / `42703` — typically presenting to the grower as a button that",
     "silently does nothing.",
     "",
+    ...(tablesAbsent === null
+      ? ["_(table-presence diagnostic unavailable — the follow-up psql call failed.)_"]
+      : tablesAbsent.length === requiredTables.length
+        ? [
+            `⚠️ **None of the ${requiredTables.length} required tables ` +
+              `(${requiredTables.map((t) => `\`${t}\``).join(", ")}) exist in this ` +
+              "database's `public` schema at all.**",
+            "",
+            "That points at an empty, wrong, or freshly-provisioned database rather than",
+            "migration drift. **Check that `SUPABASE_DB_URL` targets the intended",
+            "environment before applying anything** — applying migrations to the wrong",
+            "database is worse than the drift this gate looks for.",
+          ]
+        : tablesAbsent.length > 0
+          ? [
+              `⚠️ These required tables are absent entirely: ${tablesAbsent
+                .map((t) => `\`${t}\``)
+                .join(", ")}.`,
+            ]
+          : [
+              "Every required table exists — only the column(s) above are missing, which",
+              "is ordinary migration drift.",
+            ]),
+    "",
     "**Next step:** apply the listed migration(s) via the Supabase CLI against this",
     "environment, then re-run this workflow. Do not deploy until the guard is green.",
   ]);
-  writeAudit("missing_columns", { expected });
+  writeAudit("missing_columns", {
+    expected,
+    note:
+      tablesAbsent === null
+        ? "Table-presence diagnostic unavailable."
+        : `Required tables absent: ${tablesAbsent.join(", ") || "(none)"}.`,
+  });
   process.exit(EXIT.MISSING_COLUMNS);
 }
 

@@ -1,7 +1,9 @@
 import { useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
+import { useTents } from "@/hooks/use-tents";
+import { getEligibleTentsForPlantMove } from "@/lib/plantTentRelationshipRules";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -27,11 +29,6 @@ import {
   formatPlantTentMovementNote,
 } from "@/lib/plantTentMovementRules";
 
-interface TentRow {
-  id: string;
-  name: string;
-}
-
 interface Props {
   plantId: string;
   growId?: string | null;
@@ -40,9 +37,14 @@ interface Props {
 }
 
 /**
- * Assigns or moves a plant to a tent within the same grow by updating
- * ONLY `plants.tent_id`. RLS enforces ownership. The client never sets
- * user_id / grow_id / strain / stage / notes.
+ * Assigns or moves a plant to a tent by updating ONLY `plants.tent_id`.
+ * RLS enforces ownership. The client never sets user_id / grow_id /
+ * strain / stage / notes.
+ *
+ * Tents are scoped to the plant's grow when the plant has one (mirrors
+ * getEligibleTentsForPlantMove / EditPlantDialog). Plants missing grow
+ * context (grow_id null) fall back to every tent the user owns instead
+ * of dead-ending — same fallback EditPlantDialog's Tent dropdown uses.
  *
  * Out of scope: diary entries, sensor readings, alerts, Action Queue,
  * automation, device control — no writes to those tables.
@@ -59,38 +61,24 @@ export default function AssignTentDialog({
   const [selected, setSelected] = useState<string>("");
   const [busy, setBusy] = useState(false);
 
-  const hasGrowContext = Boolean(growId);
   const isMove = Boolean(currentTentId);
 
-  const { data: rows = [], isLoading } = useQuery({
-    queryKey: ["plant-detail", "eligible-tents", plantId, growId ?? null],
-    enabled: open && hasGrowContext,
-    queryFn: async (): Promise<TentRow[]> => {
-      // Same-grow, non-archived tents. Cross-grow tents are excluded
-      // by the explicit grow_id filter.
-      const { data, error } = await supabase
-        .from("tents")
-        .select("id, name, grow_id, is_archived")
-        .eq("grow_id", growId as string)
-        .eq("is_archived", false)
-        .order("created_at", { ascending: true });
-      if (error) throw error;
-      return (data ?? []).map((t) => ({
-        id: t.id as string,
-        name: (t.name as string) ?? "Unnamed tent",
-      }));
-    },
-  });
+  const { data: allTents = [], isLoading } = useTents();
 
-  const { others, current } = useMemo(() => {
-    const o: TentRow[] = [];
-    const c: TentRow[] = [];
-    for (const t of rows) {
-      if (currentTentId && t.id === currentTentId) c.push(t);
-      else o.push(t);
-    }
-    return { others: o, current: c };
-  }, [rows, currentTentId]);
+  const { others, current } = useMemo(
+    () =>
+      getEligibleTentsForPlantMove(
+        allTents as Array<{
+          id: string;
+          name: string;
+          grow_id?: string | null;
+          is_archived?: boolean | null;
+        }>,
+        currentTentId ?? null,
+        growId ?? null,
+      ),
+    [allTents, currentTentId, growId],
+  );
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -188,21 +176,14 @@ export default function AssignTentDialog({
           </DialogTitle>
         </DialogHeader>
 
-        {!hasGrowContext ? (
-          <p
-            className="text-sm text-muted-foreground"
-            data-testid="assign-tent-no-grow"
-          >
-            Unable to load tents because this plant is missing grow context.
-          </p>
-        ) : isLoading ? (
+        {isLoading ? (
           <p className="text-sm text-muted-foreground">Loading…</p>
         ) : others.length === 0 && current.length === 0 ? (
           <p
             className="text-sm text-muted-foreground"
             data-testid="assign-tent-empty"
           >
-            No tents available in this grow.
+            No tents available{growId ? " in this grow" : ""}.
           </p>
         ) : (
           <form onSubmit={submit} className="grid gap-3">
@@ -215,7 +196,7 @@ export default function AssignTentDialog({
                 <SelectContent>
                   {others.length > 0 && (
                     <SelectGroup>
-                      <SelectLabel>Tents in this grow</SelectLabel>
+                      <SelectLabel>{growId ? "Tents in this grow" : "Tents"}</SelectLabel>
                       {others.map((t) => (
                         <SelectItem
                           key={t.id}

@@ -51,6 +51,32 @@ describe("featureEntitlements", () => {
     expect(canWriteFeatureData(e, FK)).toBe(true);
   });
 
+  it.each(["craft_monthly", "craft_annual"] as const)(
+    "active %s grants Pro-tier feature access (Craft is sold as 'everything in Pro')",
+    (planId) => {
+      const e = resolveEntitlements(row({ plan_id: planId }), NOW);
+      expect(canUseFeature(e, FK)).toBe(true);
+      expect(canReadExistingFeatureData(e, FK)).toBe(true);
+      expect(canWriteFeatureData(e, FK)).toBe(true);
+    },
+  );
+
+  it.each(["craft_monthly", "craft_annual"] as const)(
+    "canceled %s after paid-through end can read existing but cannot write",
+    (planId) => {
+      const e = resolveEntitlements(
+        row({
+          plan_id: planId,
+          status: "canceled",
+          current_period_end: "2026-07-31T23:59:59Z",
+        }),
+        NOW,
+      );
+      expect(canWriteFeatureData(e, FK)).toBe(false);
+      expect(canReadExistingFeatureData(e, FK)).toBe(true);
+    },
+  );
+
   it("active founder_lifetime can read and write", () => {
     const e = resolveEntitlements(
       row({ plan_id: "founder_lifetime", current_period_end: null }),

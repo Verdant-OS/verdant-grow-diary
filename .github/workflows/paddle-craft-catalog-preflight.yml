@@ -77,7 +77,12 @@ jobs:
           # its diagnostic to stderr and never produces a per-id line on
           # stdout. Redirecting only stdout would let "no rows parsed"
           # silently read as success downstream.
+          #
+          # --json-out is the canonical machine-readable output; the
+          # renderer reads it directly instead of re-parsing the log,
+          # which eliminates a class of glyph/log-drift bugs.
           bun run scripts/verify-paddle-craft-catalog.ts --env both \
+            --json-out "$RUNNER_TEMP/craft-preflight/report.json" \
             > "$RUNNER_TEMP/craft-preflight/log.txt" 2>&1
           RC=$?
           set -e
@@ -93,7 +98,11 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
+          # Prefer the JSON report; the renderer falls back to the log
+          # automatically if the file is missing (e.g. verifier crashed
+          # before finalize()).
           node scripts/render-paddle-craft-preflight-comment.mjs \
+            --report "$RUNNER_TEMP/craft-preflight/report.json" \
             --log "$RUNNER_TEMP/craft-preflight/log.txt" \
             --rc "$RC" \
             --event "$EVENT_NAME" \
@@ -101,6 +110,7 @@ jobs:
             --artifact "paddle-craft-preflight-log" \
             --out "$RUNNER_TEMP/craft-preflight/comment.md"
           node scripts/render-paddle-craft-preflight-comment.mjs \
+            --report "$RUNNER_TEMP/craft-preflight/report.json" \
             --log "$RUNNER_TEMP/craft-preflight/log.txt" \
             --rc "$RC" \
             --event "$EVENT_NAME" \

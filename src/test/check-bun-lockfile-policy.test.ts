@@ -1,129 +1,419 @@
 /**
- * Tests for scripts/check-bun-lockfile-policy.mjs — pure evaluator over
- * a virtual filesystem. No live process spawn, no network.
+ * Pure evaluator and Windows CLI contracts for the transitional lock policy.
+ * No network and no dependency installation.
  */
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import {
+  FORBIDDEN_LOCKFILES,
+  PACKAGE_LOCK_SECURITY_FLOORS,
+  evaluatePolicy,
   isExactSemver,
   resolvedVersionInBunLock,
-  evaluatePolicy,
 } from "../../scripts/check-bun-lockfile-policy.mjs";
+import {
+  npmCiDryRunInvocation,
+  runNpmLockSemanticCheck,
+} from "../../scripts/check-npm-lock-semantic.mjs";
 
-function makeFs(files: Record<string, string>) {
-  const set = new Set(Object.keys(files));
+const MCP = "@lovable.dev/mcp-js";
+const CWD = resolve("virtual-repo");
+const at = (name: string) => resolve(CWD, name);
+const lockGood = `"${MCP}": ["${MCP}@0.24.0", "https://example/tgz", {}, "sha512-abc"]`;
+
+function packageJson(spec = "0.24.0", overrides: Record<string, string> = {}) {
   return {
-    exists: (p: string) => set.has(p),
-    readFile: (p: string) => {
-      if (!(p in files)) throw new Error(`ENOENT: ${p}`);
-      return files[p];
+    name: "verdant",
+    version: "0.0.0",
+    dependencies: { [MCP]: spec },
+    devDependencies: {},
+    overrides,
+  };
+}
+
+function bunLock(manifest = packageJson()) {
+  return JSON.stringify({
+    lockfileVersion: 1,
+    workspaces: {
+      "": {
+        name: manifest.name,
+        dependencies: manifest.dependencies,
+        devDependencies: manifest.devDependencies,
+      },
+    },
+    overrides: manifest.overrides,
+    packages: {
+      [MCP]: [`${MCP}@0.24.0`, "", {}],
+    },
+  });
+}
+
+function packageLock(manifest = packageJson()) {
+  return {
+    name: manifest.name,
+    version: manifest.version,
+    lockfileVersion: 3,
+    requires: true,
+    packages: {
+      "": {
+        name: manifest.name,
+        version: manifest.version,
+        dependencies: manifest.dependencies,
+        devDependencies: manifest.devDependencies,
+      },
+      [`node_modules/${MCP}`]: { version: "0.24.0" },
+      ...Object.fromEntries(
+        Object.entries(PACKAGE_LOCK_SECURITY_FLOORS).map(([name, version]) => [
+          `node_modules/${name}`,
+          { version },
+        ]),
+      ),
+      "node_modules/minimatch": { version: "3.1.5" },
+      ...(manifest.overrides["fast-uri"]
+        ? { "node_modules/fast-uri": { version: manifest.overrides["fast-uri"] } }
+        : {}),
     },
   };
 }
 
-const MCP = "@lovable.dev/mcp-js";
-const CWD = "/repo";
-const pkg = (spec: string) => JSON.stringify({ name: "verdant", dependencies: { [MCP]: spec } });
-const lockGood = `"${MCP}": ["${MCP}@0.20.0", "https://example/tgz", {}, "sha512-abc"]`;
+function transition(overrides: Record<string, unknown> = {}) {
+  return {
+    schemaVersion: 1,
+    canonicalPackageManager: "bun",
+    canonicalLockfile: "bun.lock",
+    compatibilityLockfile: "package-lock.json",
+    owner: "Verdant dependency security",
+    reason: "npm remains in a reviewed local setup entrypoint.",
+    reviewBy: "2026-08-25",
+    consumerContracts: [{ path: "README.md", markers: ["npm install"] }],
+    ...overrides,
+  };
+}
+
+function policyFiles({
+  manifest = packageJson(),
+  bunLockText = bunLock(manifest),
+  npmLock = packageLock(manifest),
+  transitionConfig = transition(),
+  readme = "npm install",
+  extra = {},
+}: {
+  manifest?: ReturnType<typeof packageJson>;
+  bunLockText?: string;
+  npmLock?: ReturnType<typeof packageLock> | Record<string, unknown>;
+  transitionConfig?: ReturnType<typeof transition>;
+  readme?: string;
+  extra?: Record<string, string>;
+} = {}) {
+  return {
+    [at("package.json")]: JSON.stringify(manifest),
+    [at("bun.lock")]: bunLockText,
+    [at("package-lock.json")]: JSON.stringify(npmLock),
+    [at("config/dependency-lockfile-transition.json")]: JSON.stringify(transitionConfig),
+    [at("README.md")]: readme,
+    ...extra,
+  };
+}
+
+function makeFs(files: Record<string, string>) {
+  const paths = new Set(Object.keys(files));
+  return {
+    exists: (path: string) => paths.has(path),
+    readFile: (path: string) => {
+      if (!(path in files)) throw new Error(`ENOENT: ${path}`);
+      return files[path];
+    },
+    listFiles: () => [...paths],
+  };
+}
+
+function evaluate(files = policyFiles(), today = "2026-07-25") {
+  return evaluatePolicy({ cwd: CWD, ...makeFs(files), today });
+}
 
 describe("isExactSemver", () => {
-  it.each(["0.20.0", "1.2.3", "1.2.3-rc.1", "10.0.0-beta+build.4"])(
+  it.each(["0.24.0", "1.2.3", "1.2.3-rc.1", "10.0.0-beta+build.4"])(
     "accepts exact semver %s",
-    (s) => expect(isExactSemver(s)).toBe(true),
+    (value) => expect(isExactSemver(value)).toBe(true),
   );
 
   it.each([
-    "^0.20.0",
-    "~0.20.0",
-    "0.20.x",
+    "^0.24.0",
+    "~0.24.0",
+    "0.24.x",
     "*",
     "latest",
-    ">=0.20.0",
+    ">=0.24.0",
     "workspace:*",
     "file:./x",
     "git+https://x",
     "",
-  ])("rejects non-exact %s", (s) => expect(isExactSemver(s)).toBe(false));
+  ])("rejects non-exact %s", (value) => expect(isExactSemver(value)).toBe(false));
 });
 
 describe("resolvedVersionInBunLock", () => {
   it("finds the resolved version", () => {
-    expect(resolvedVersionInBunLock(lockGood, MCP)).toEqual(["0.20.0"]);
+    expect(resolvedVersionInBunLock(lockGood, MCP)).toEqual(["0.24.0"]);
   });
+
   it("returns null when the package is missing", () => {
     expect(resolvedVersionInBunLock('"other": ["other@1.0.0"]', MCP)).toBeNull();
   });
 });
 
 describe("evaluatePolicy", () => {
-  it("passes with bun.lock + exact pin + resolved version match", () => {
-    const fs = makeFs({
-      "/repo/bun.lock": lockGood,
-      "/repo/package.json": pkg("0.20.0"),
+  it("passes with Bun canonical and the synchronized reviewed npm compatibility lock", () => {
+    expect(evaluate()).toMatchObject({
+      ok: true,
+      errors: [],
+      transition: {
+        owner: "Verdant dependency security",
+        reviewBy: "2026-08-25",
+        consumers: ["README.md"],
+      },
     });
-    const r = evaluatePolicy({ cwd: CWD, ...fs });
-    expect(r.ok).toBe(true);
-    expect(r.errors).toEqual([]);
   });
 
-  it("fails when bun.lock is missing", () => {
-    const fs = makeFs({ "/repo/package.json": pkg("0.20.0") });
-    const r = evaluatePolicy({ cwd: CWD, ...fs });
-    expect(r.ok).toBe(false);
-    expect(r.errors.join(" ")).toMatch(/bun\.lock/);
+  it.each(["bun.lock", "package-lock.json"])("fails when required %s is missing", (name) => {
+    const files = policyFiles();
+    delete files[at(name)];
+    expect(evaluate(files).errors.join(" ")).toContain(`Required lockfile is missing: ${name}`);
   });
 
-  it("fails when bun.lockb exists", () => {
-    const fs = makeFs({
-      "/repo/bun.lock": lockGood,
-      "/repo/bun.lockb": "binary",
-      "/repo/package.json": pkg("0.20.0"),
-    });
-    const r = evaluatePolicy({ cwd: CWD, ...fs });
-    expect(r.ok).toBe(false);
-    expect(r.errors.join(" ")).toMatch(/bun\.lockb/);
+  it.each(FORBIDDEN_LOCKFILES)("fails when forbidden %s exists", (name) => {
+    const files = policyFiles({ extra: { [at(name)]: "x" } });
+    expect(evaluate(files).errors.join(" ")).toContain(`Forbidden lockfile present: ${name}`);
   });
 
-  it.each(["package-lock.json", "yarn.lock", "pnpm-lock.yaml"])("fails when %s exists", (name) => {
-    const fs = makeFs({
-      "/repo/bun.lock": lockGood,
-      [`/repo/${name}`]: "x",
-      "/repo/package.json": pkg("0.20.0"),
-    });
-    const r = evaluatePolicy({ cwd: CWD, ...fs });
-    expect(r.ok).toBe(false);
-    expect(r.errors.join(" ")).toContain(name);
-  });
-
-  it.each(["^0.20.0", "~0.20.0", "latest", "*"])(
+  it.each(["^0.24.0", "~0.24.0", "latest", "*"])(
     "fails when @lovable.dev/mcp-js uses %s",
     (spec) => {
-      const fs = makeFs({
-        "/repo/bun.lock": lockGood,
-        "/repo/package.json": pkg(spec),
-      });
-      const r = evaluatePolicy({ cwd: CWD, ...fs });
-      expect(r.ok).toBe(false);
-      expect(r.errors.join(" ")).toMatch(/pinned to an exact semver/);
+      const manifest = packageJson(spec);
+      const result = evaluate(
+        policyFiles({
+          manifest,
+          npmLock: packageLock(manifest),
+        }),
+      );
+      expect(result.errors.join(" ")).toMatch(/pinned to an exact semver/);
     },
   );
 
-  it("fails when bun.lock resolves a different version than package.json pins", () => {
-    const fs = makeFs({
-      "/repo/bun.lock": `"${MCP}": ["${MCP}@0.19.0"]`,
-      "/repo/package.json": pkg("0.20.0"),
-    });
-    const r = evaluatePolicy({ cwd: CWD, ...fs });
-    expect(r.ok).toBe(false);
-    expect(r.errors.join(" ")).toMatch(/resolves.*0\.19\.0/);
+  it("fails when either lock resolves a different MCP version", () => {
+    const bunFiles = policyFiles();
+    const staleBun = JSON.parse(bunFiles[at("bun.lock")]);
+    staleBun.packages[MCP][0] = `${MCP}@0.23.0`;
+    bunFiles[at("bun.lock")] = JSON.stringify(staleBun);
+    expect(evaluate(bunFiles).errors.join(" ")).toMatch(/bun\.lock resolves.*0\.23\.0/);
+
+    const npmFiles = policyFiles();
+    const stale = JSON.parse(npmFiles[at("package-lock.json")]);
+    stale.packages[`node_modules/${MCP}`].version = "0.23.0";
+    npmFiles[at("package-lock.json")] = JSON.stringify(stale);
+    expect(evaluate(npmFiles).errors.join(" ")).toMatch(/package-lock\.json resolves.*0\.23\.0/);
   });
 
-  it("fails when @lovable.dev/mcp-js is missing from package.json", () => {
-    const fs = makeFs({
-      "/repo/bun.lock": lockGood,
-      "/repo/package.json": JSON.stringify({ name: "x", dependencies: {} }),
-    });
-    const r = evaluatePolicy({ cwd: CWD, ...fs });
-    expect(r.ok).toBe(false);
-    expect(r.errors.join(" ")).toContain("not present");
+  it("fails when Bun root workspace metadata drifts from package.json", () => {
+    const files = policyFiles();
+    const stale = JSON.parse(files[at("bun.lock")]);
+    stale.workspaces[""].dependencies[MCP] = "^0.24.0";
+    files[at("bun.lock")] = JSON.stringify(stale);
+    expect(evaluate(files).errors.join(" ")).toContain(
+      "bun.lock root workspace dependencies is not synchronized",
+    );
   });
+
+  it("fails when package-lock root declarations drift from package.json", () => {
+    const files = policyFiles();
+    const stale = JSON.parse(files[at("package-lock.json")]);
+    stale.packages[""].dependencies[MCP] = "0.23.0";
+    files[at("package-lock.json")] = JSON.stringify(stale);
+    expect(evaluate(files).errors.join(" ")).toContain(
+      "package-lock.json root dependencies is not synchronized",
+    );
+  });
+
+  it("fails when an exact npm override is not resolved consistently", () => {
+    const manifest = packageJson("0.24.0", { "fast-uri": "3.1.4" });
+    const stale = packageLock(manifest);
+    stale.packages["node_modules/fast-uri"].version = "3.0.0";
+    expect(evaluate(policyFiles({ manifest, npmLock: stale })).errors.join(" ")).toContain(
+      "package-lock.json override for fast-uri@3.1.4 is not synchronized",
+    );
+  });
+
+  it.each([
+    ["postcss", "8.5.6"],
+    ["postcss", "8.5.18-rc.0"],
+    ["brace-expansion", "1.1.12"],
+  ])("fails when the npm graph regresses the %s security floor", (packageName, version) => {
+    const files = policyFiles();
+    const stale = JSON.parse(files[at("package-lock.json")]);
+    stale.packages[`node_modules/${packageName}`].version = version;
+    files[at("package-lock.json")] = JSON.stringify(stale);
+    expect(evaluate(files).errors.join(" ")).toContain(
+      `package-lock.json security floor for ${packageName}`,
+    );
+  });
+
+  it("fails after the owned transition review date", () => {
+    expect(evaluate(policyFiles(), "2026-08-26").errors.join(" ")).toContain(
+      "Lockfile transition review is overdue",
+    );
+  });
+
+  it("fails when a reviewed npm marker disappears", () => {
+    expect(evaluate(policyFiles({ readme: "bun install" })).errors.join(" ")).toContain(
+      'README.md is missing reviewed marker "npm install"',
+    );
+  });
+
+  it("fails when a declared consumer adds a command outside its exact allowlist", () => {
+    expect(
+      evaluate(
+        policyFiles({ readme: "npm install\nnpm install definitely-unreviewed@latest" }),
+      ).errors.join(" "),
+    ).toContain("contains unreviewed command");
+  });
+
+  it("fails when a new npm entrypoint is not declared", () => {
+    const files = policyFiles({
+      extra: {
+        [at("vercel.json")]: '{"installCommand":"npm install"}',
+      },
+    });
+    expect(evaluate(files).errors.join(" ")).toContain(
+      "Undeclared npm install/ci consumer found at vercel.json",
+    );
+  });
+
+  it.each([
+    ["scripts/bootstrap.ps1", "npm install --no-audit"],
+    ["scripts/bootstrap.cmd", "npm.cmd install --no-audit"],
+  ])("discovers %s as an undeclared executable root consumer", (path, command) => {
+    const files = policyFiles({ extra: { [at(path)]: command } });
+    expect(evaluate(files).errors.join(" ")).toContain(
+      `Undeclared npm install/ci consumer found at ${path}`,
+    );
+  });
+
+  it("rejects drive-absolute transition consumer paths", () => {
+    expect(() =>
+      evaluate(
+        policyFiles({
+          transitionConfig: transition({
+            consumerContracts: [
+              {
+                path: "C:/Windows/System32/drivers/etc/hosts",
+                markers: ["npm install"],
+              },
+            ],
+          }),
+        }),
+      ),
+    ).toThrow(/must stay inside the repo/);
+  });
+
+  it("does not classify a global npm CLI install as a root lock consumer", () => {
+    const files = policyFiles({
+      extra: {
+        [at(".github/workflows/lighthouse.yml")]: "run: npm install -g @lhci/cli@0.14.x",
+      },
+    });
+    expect(evaluate(files)).toMatchObject({ ok: true, errors: [] });
+  });
+
+  it("passes against the repository's current transitional state", () => {
+    const root = resolve(__dirname, "../..");
+    expect(evaluatePolicy({ cwd: root, today: "2026-07-25" })).toMatchObject({
+      ok: true,
+      errors: [],
+    });
+    for (const forbidden of FORBIDDEN_LOCKFILES) {
+      expect(existsSync(resolve(root, forbidden)), forbidden).toBe(false);
+    }
+  });
+
+  it("runs as a CLI on Windows with explicit transitional output", () => {
+    const root = mkdtempSync(join(tmpdir(), "verdant-lockfile-policy-"));
+    const script = resolve(__dirname, "../../scripts/check-bun-lockfile-policy.mjs");
+    try {
+      const manifest = packageJson();
+      mkdirSync(join(root, "config"), { recursive: true });
+      writeFileSync(join(root, "package.json"), JSON.stringify(manifest), "utf8");
+      writeFileSync(join(root, "bun.lock"), bunLock(manifest), "utf8");
+      writeFileSync(join(root, "package-lock.json"), JSON.stringify(packageLock(manifest)), "utf8");
+      writeFileSync(
+        join(root, "config/dependency-lockfile-transition.json"),
+        JSON.stringify(transition()),
+        "utf8",
+      );
+      writeFileSync(join(root, "README.md"), "npm install", "utf8");
+      expect(spawnSync("git", ["init"], { cwd: root, encoding: "utf8" }).status).toBe(0);
+      expect(spawnSync("git", ["add", "."], { cwd: root, encoding: "utf8" }).status).toBe(0);
+
+      const result = spawnSync(process.execPath, [script], {
+        cwd: root,
+        encoding: "utf8",
+      });
+
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain("bun.lock canonical");
+      expect(result.stdout).toContain("package-lock.json synchronized for 1 npm consumers");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("isolated npm semantic lock check", () => {
+  it("uses a cross-platform no-lifecycle dry-run invocation", () => {
+    expect(npmCiDryRunInvocation("win32", { ComSpec: "C:\\Windows\\System32\\cmd.exe" })).toEqual({
+      command: "C:\\Windows\\System32\\cmd.exe",
+      args: [
+        "/d",
+        "/s",
+        "/c",
+        "npm ci --dry-run --ignore-scripts --no-audit --no-fund --cache .npm-cache",
+      ],
+    });
+    expect(npmCiDryRunInvocation("linux", {})).toEqual({
+      command: "npm",
+      args: [
+        "ci",
+        "--dry-run",
+        "--ignore-scripts",
+        "--no-audit",
+        "--no-fund",
+        "--cache",
+        ".npm-cache",
+      ],
+    });
+  });
+
+  it("rejects a ranged dependency resolution drift in a disposable copy", () => {
+    const repositoryRoot = resolve(__dirname, "../..");
+    const fixtureRoot = mkdtempSync(join(tmpdir(), "verdant-npm-semantic-fixture-"));
+    try {
+      writeFileSync(
+        join(fixtureRoot, "package.json"),
+        readFileSync(join(repositoryRoot, "package.json"), "utf8"),
+        "utf8",
+      );
+      const staleLock = JSON.parse(readFileSync(join(repositoryRoot, "package-lock.json"), "utf8"));
+      staleLock.packages["node_modules/react"].version = "19.0.0";
+      writeFileSync(join(fixtureRoot, "package-lock.json"), JSON.stringify(staleLock), "utf8");
+
+      expect(runNpmLockSemanticCheck({ repoRoot: fixtureRoot })).toEqual({
+        ok: false,
+        error: expect.stringContaining("not semantically synchronized"),
+      });
+      expect(existsSync(join(fixtureRoot, "node_modules"))).toBe(false);
+    } finally {
+      rmSync(fixtureRoot, { recursive: true, force: true });
+    }
+  }, 30_000);
 });

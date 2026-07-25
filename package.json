@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:lan": "vite --host 0.0.0.0",
     "prebuild": "node scripts/verify-edge-shared-in-sync.mjs && node scripts/check-no-src-lib-imports.mjs && node scripts/stamp-version.mjs",
     "stamp-version": "node scripts/stamp-version.mjs",
     "build": "vite build",
@@ -37,6 +38,7 @@
     "e2e:one-tent:teardown": "node scripts/e2e/teardown-one-tent-golden-path.mjs",
     "e2e:one-tent:ui": "playwright test e2e/one-tent-loop-golden-path-ui.spec.ts --project=chromium-mocked",
     "check:lockfile": "node scripts/check-bun-lockfile-policy.mjs",
+    "check:npm-lock-semantic": "node scripts/check-npm-lock-semantic.mjs",
     "check:sitemap-robots": "node scripts/check-sitemap-robots-parity.mjs",
     "plant-photos:cleanup": "node scripts/admin/plant-photos-cleanup.mjs",
     "check:deps": "node scripts/check-dependency-security.mjs",
@@ -354,13 +356,13 @@
     "jsdom": "^20.0.3",
     "lint-staged": "^17.0.5",
     "lovable-tagger": "^1.1.13",
-    "postcss": "^8.5.6",
+    "postcss": "8.5.23",
     "prettier": "^3.8.3",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.38.0",
-    "vite": "^5.4.19",
-    "vitest": "^3.2.4",
+    "vite": "6.4.3",
+    "vitest": "^3.2.6",
     "vitest-axe": "^0.1.0"
   },
   "lint-staged": {
@@ -374,6 +376,9 @@
     ]
   },
   "overrides": {
+    "fast-uri": "3.1.4",
+    "form-data": "4.0.6",
+    "js-yaml": "4.3.0",
     "lodash": "4.18.1",
     "flatted": "3.4.2",
     "glob": "10.5.0"

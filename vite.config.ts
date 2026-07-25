@@ -10,11 +10,7 @@ import {
   STATIC_PUBLIC_SEO_DOCUMENTS,
   VERDANT_SITE_ORIGIN,
 } from "./src/lib/build/staticPublicSeoDocuments";
-import {
-  buildOgCardSvg,
-  ogImageSlugForPath,
-  OG_IMAGE_WIDTH,
-} from "./src/lib/build/ogImageCard";
+import { buildOgCardSvg, ogImageSlugForPath, OG_IMAGE_WIDTH } from "./src/lib/build/ogImageCard";
 import { Resvg } from "@resvg/resvg-js";
 
 const SITE_ORIGIN = "https://verdantgrowdiary.com";
@@ -108,7 +104,9 @@ function staticSocialRouteDocuments(): Plugin {
             const png = new Resvg(svg, {
               fitTo: { mode: "width", value: OG_IMAGE_WIDTH },
               font: { loadSystemFonts: true, defaultFontFamily: "sans-serif" },
-            }).render().asPng();
+            })
+              .render()
+              .asPng();
             this.emitFile({
               type: "asset",
               fileName: ogFileName,
@@ -133,7 +131,6 @@ function staticSocialRouteDocuments(): Plugin {
         });
       }
 
-
       // Homepage ("/") — served by index.html itself. Emit a per-route OG PNG
       // and rewrite the sitewide og:image + twitter:image + og:image:alt so
       // non-JS crawlers see the same per-route treatment as every other page.
@@ -149,7 +146,9 @@ function staticSocialRouteDocuments(): Plugin {
         const homePng = new Resvg(homeSvg, {
           fitTo: { mode: "width", value: OG_IMAGE_WIDTH },
           font: { loadSystemFonts: true, defaultFontFamily: "sans-serif" },
-        }).render().asPng();
+        })
+          .render()
+          .asPng();
         this.emitFile({ type: "asset", fileName: "og/home.png", source: homePng });
       } catch (error) {
         this.error(
@@ -206,11 +205,12 @@ function staticSocialRouteDocuments(): Plugin {
   };
 }
 
-
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
-    host: "::",
+    // Keep local development private by default. `bun run dev:lan` is the
+    // explicit opt-in when another device on the grower's LAN needs access.
+    host: "127.0.0.1",
     port: 8080,
     hmr: {
       overlay: false,

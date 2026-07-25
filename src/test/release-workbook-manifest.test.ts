@@ -1,12 +1,17 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { execSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   SEED_PRODUCTION_HEADERS,
   COMMERCIAL_REVIEW_HEADERS,
 } from "../../scripts/generate-release-workbook-templates.mjs";
+import {
+  createReleaseWorkbookTestWorkspace,
+  generateReleaseWorkbookTestArtifactsAsync,
+  removeReleaseWorkbookTestWorkspaceAsync,
+  type ReleaseWorkbookTestWorkspace,
+} from "./utils/releaseWorkbookTestArtifacts";
 
 const ART = join(process.cwd(), "docs", "artifacts");
 const MANIFEST = join(ART, "release-workbook-template-manifest.json");
@@ -35,9 +40,24 @@ const BLOCKED_STRINGS = [
   "PREMIMUM_WORKBOOK_COPY_URL",
 ];
 
-beforeAll(() => {
-  if (!existsSync(MANIFEST)) {
-    execSync("node scripts/generate-release-workbook-templates.mjs", { stdio: "inherit" });
+let isolatedWorkspace: ReleaseWorkbookTestWorkspace;
+
+beforeAll(async () => {
+  const missing = REQUIRED_FILES.filter((file) => !existsSync(join(ART, file)));
+  if (missing.length > 0) {
+    throw new Error(
+      `Release workbook artifacts must be generated before reader tests run. Missing: ${missing.join(
+        ", ",
+      )}`,
+    );
+  }
+  isolatedWorkspace = createReleaseWorkbookTestWorkspace();
+  await generateReleaseWorkbookTestArtifactsAsync(isolatedWorkspace);
+});
+
+afterAll(async () => {
+  if (isolatedWorkspace) {
+    await removeReleaseWorkbookTestWorkspaceAsync(isolatedWorkspace);
   }
 });
 
@@ -138,21 +158,28 @@ describe("release workbook manifest", () => {
     expect(text).not.toMatch(/(^|[\s"])premium\//);
   });
 
-  it("regenerating the artifacts is fully deterministic (XLSX hashes stable)", () => {
+  it("regenerating the artifacts is fully deterministic (XLSX hashes stable)", async () => {
     const before = REQUIRED_FILES.filter((f) => f.endsWith(".xlsx")).map((f) => ({
       f,
-      hash: sha256File(join(ART, f)),
+      hash: sha256File(join(isolatedWorkspace.artifactDir, f)),
     }));
-    execSync("node scripts/generate-release-workbook-templates.mjs", { stdio: "ignore" });
+    await generateReleaseWorkbookTestArtifactsAsync(isolatedWorkspace);
     for (const { f, hash } of before) {
-      expect(sha256File(join(ART, f)), `XLSX nondeterministic: ${f}`).toBe(hash);
+      expect(
+        sha256File(join(isolatedWorkspace.artifactDir, f)),
+        `XLSX nondeterministic: ${f}`,
+      ).toBe(hash);
     }
   });
 
-  it("regenerating with unchanged content leaves the manifest byte-identical (no timestamp/format churn)", () => {
-    const before = readFileSync(MANIFEST, "utf8");
-    execSync("node scripts/generate-release-workbook-templates.mjs", { stdio: "ignore" });
-    const after = readFileSync(MANIFEST, "utf8");
+  it("regenerating with unchanged content leaves the manifest byte-identical (no timestamp/format churn)", async () => {
+    const isolatedManifest = join(
+      isolatedWorkspace.artifactDir,
+      "release-workbook-template-manifest.json",
+    );
+    const before = readFileSync(isolatedManifest, "utf8");
+    await generateReleaseWorkbookTestArtifactsAsync(isolatedWorkspace);
+    const after = readFileSync(isolatedManifest, "utf8");
     expect(after, "manifest churned on a no-change regeneration").toBe(before);
   });
 

@@ -20,12 +20,11 @@
  *    FUNNEL_EVENTS and FUNNEL_PARAM_KEYS.
  */
 
-import {
-  FUNNEL_EVENTS,
-  FUNNEL_PARAM_KEYS,
-  type FunnelEventName,
-  type FunnelEventParams,
+import type {
+  FunnelEventName,
+  FunnelEventParams,
 } from "@/lib/funnelAnalytics";
+import { FUNNEL_PARAM_KEYS } from "@/lib/funnelAnalytics";
 import { PRICING_ANALYTICS_EVENT } from "@/lib/pricingAnalytics";
 
 type FunnelParamKey = (typeof FUNNEL_PARAM_KEYS)[number];

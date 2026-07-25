@@ -21,14 +21,7 @@ const PROJECT_REF = /^[a-z0-9]{20}$/;
 const DIRECT_OR_DEDICATED_HOST = /^db\.([a-z0-9]{20})\.supabase\.co$/;
 const SHARED_SUPAVISOR_HOST = /^aws-\d+-[a-z0-9]+(?:-[a-z0-9]+)*\.pooler\.supabase\.com$/;
 const SHARED_SUPAVISOR_USER = /^postgres\.([a-z0-9]{20})$/;
-const ALLOWED_SSL_MODES = new Set([
-  "disable",
-  "allow",
-  "prefer",
-  "require",
-  "verify-ca",
-  "verify-full",
-]);
+const ALLOWED_SSL_MODES = new Set(["require", "verify-ca", "verify-full"]);
 
 export class SupabaseDatabaseTargetIdentityError extends Error {
   constructor(code, message) {
@@ -51,7 +44,12 @@ function decodeUsername(encodedUsername) {
 }
 
 function validateConnectionOptions(url) {
-  if (!url.search) return;
+  if (!url.search) {
+    identityError(
+      "missing_sslmode",
+      "Database URL must require a non-downgradable TLS connection.",
+    );
+  }
 
   const keys = [...url.searchParams.keys()];
   if (
@@ -67,7 +65,10 @@ function validateConnectionOptions(url) {
 
   const sslmode = url.searchParams.get("sslmode");
   if (!ALLOWED_SSL_MODES.has(sslmode)) {
-    identityError("unsupported_sslmode", "Database URL contains an unsupported sslmode value.");
+    identityError(
+      "unsupported_sslmode",
+      "Database URL must use sslmode=require, verify-ca, or verify-full.",
+    );
   }
 }
 

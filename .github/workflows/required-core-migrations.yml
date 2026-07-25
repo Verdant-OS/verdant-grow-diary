@@ -55,7 +55,7 @@ jobs:
   verify-sandbox:
     name: Verify pinned Verdant sandbox schema
     needs: manifest-and-files
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'sandbox' }}
+    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/verdant-grow-diary') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'sandbox') }}
     runs-on: ubuntu-latest
     environment: verdant-sandbox
     steps:
@@ -67,7 +67,7 @@ jobs:
       - name: Verify blocking core schema
         env:
           TARGET_ENV: sandbox
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL_SANDBOX }}
           REPORT_PATH: ${{ github.workspace }}/audit/core-sandbox/core-report.md
           AUDIT_PATH: ${{ github.workspace }}/audit/core-sandbox/core-audit.json
         run: node scripts/assert-required-core-migrations-applied.mjs
@@ -101,12 +101,12 @@ jobs:
           path: audit/core-sandbox
           if-no-files-found: error
 
-  # Production is reachable only from the trusted deploy-branch push or an
-  # explicit manual dispatch, and uses a separate protected environment.
+  # Production is reachable only through an explicit manual dispatch from the
+  # trusted deploy branch and uses a separate protected environment.
   verify-production:
     name: Verify pinned Verdant production schema
     needs: manifest-and-files
-    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/verdant-grow-diary') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'production') }}
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'production' }}
     runs-on: ubuntu-latest
     environment: verdant-production
     steps:

@@ -20,6 +20,15 @@ const feedingColumn = (column, migration) => ({
     "INSERT. A missing column aborts the entire save with 42703.",
 });
 
+const quicklogAuditColumn = (column) => ({
+  table: "quicklog_audit_events",
+  column,
+  migration: QUICKLOG_AUDIT_MIGRATION,
+  reason:
+    `The current Quick Log RPC writes quicklog_audit_events.${column} while ` +
+    "recording save and validation outcomes. A partial audit table aborts the save path.",
+});
+
 export const REQUIRED_CORE_SCHEMA = Object.freeze([
   {
     table: "tents",
@@ -51,13 +60,7 @@ export const REQUIRED_CORE_SCHEMA = Object.freeze([
     "water_temp_c",
   ].map((column) => feedingColumn(column, FEEDING_EXTENSION_MIGRATION)),
 
-  {
-    table: "quicklog_audit_events",
-    column: "status",
-    migration: QUICKLOG_AUDIT_MIGRATION,
-    reason:
-      "Every Quick Log RPC outcome writes quicklog_audit_events.status; absence aborts audit and save paths.",
-  },
+  ...["user_id", "idempotency_key", "grow_event_id", "status", "reason"].map(quicklogAuditColumn),
   {
     table: "quicklog_idempotency",
     column: "request_hash",

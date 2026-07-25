@@ -35,11 +35,11 @@ afterEach(() => {
 });
 
 function directUrl(ref: string, port = 5432, password = PASSWORD) {
-  return `postgresql://postgres:${encodeURIComponent(password)}@db.${ref}.supabase.co:${port}/postgres`;
+  return `postgresql://postgres:${encodeURIComponent(password)}@db.${ref}.supabase.co:${port}/postgres?sslmode=require`;
 }
 
 function sharedUrl(ref: string, port = 5432, password = PASSWORD) {
-  return `postgres://postgres.${ref}:${encodeURIComponent(password)}@aws-0-us-east-1.pooler.supabase.com:${port}/postgres`;
+  return `postgres://postgres.${ref}:${encodeURIComponent(password)}@aws-0-us-east-1.pooler.supabase.com:${port}/postgres?sslmode=require`;
 }
 
 function captureLogger() {
@@ -72,7 +72,8 @@ describe("Supabase database target identity", () => {
     [directUrl(SANDBOX_REF, 6543), "dedicated-pooler"],
     [sharedUrl(SANDBOX_REF), "shared-supavisor-session"],
     [sharedUrl(SANDBOX_REF, 6543), "shared-supavisor-transaction"],
-    [`${directUrl(SANDBOX_REF)}?sslmode=require`, "direct"],
+    [directUrl(SANDBOX_REF).replace("sslmode=require", "sslmode=verify-ca"), "direct"],
+    [directUrl(SANDBOX_REF).replace("sslmode=require", "sslmode=verify-full"), "direct"],
   ])("accepts documented sandbox URL form %#", (url, expectedMode) => {
     expect(
       assertSupabaseDatabaseTargetIdentity({
@@ -115,39 +116,45 @@ describe("Supabase database target identity", () => {
     ["wrong shared project", sharedUrl(PRODUCTION_REF)],
     [
       "conflicting direct username ref",
-      `postgres://postgres.${PRODUCTION_REF}:${PASSWORD}@db.${SANDBOX_REF}.supabase.co:5432/postgres`,
+      `postgres://postgres.${PRODUCTION_REF}:${PASSWORD}@db.${SANDBOX_REF}.supabase.co:5432/postgres?sslmode=require`,
     ],
-    ["routing query override", `${directUrl(SANDBOX_REF)}?host=db.${PRODUCTION_REF}.supabase.co`],
-    ["duplicate sslmode", `${directUrl(SANDBOX_REF)}?sslmode=require&sslmode=disable`],
+    ["routing query override", `${directUrl(SANDBOX_REF)}&host=db.${PRODUCTION_REF}.supabase.co`],
+    ["duplicate sslmode", `${directUrl(SANDBOX_REF)}&sslmode=disable`],
     [
       "lookalike direct host",
-      `postgres://postgres:${PASSWORD}@db.${SANDBOX_REF}.supabase.co.attacker.invalid:5432/postgres`,
+      `postgres://postgres:${PASSWORD}@db.${SANDBOX_REF}.supabase.co.attacker.invalid:5432/postgres?sslmode=require`,
     ],
     [
       "lookalike pooler host",
-      `postgres://postgres.${SANDBOX_REF}:${PASSWORD}@aws-0-us-east-1.pooler.supabase.com.attacker.invalid:5432/postgres`,
+      `postgres://postgres.${SANDBOX_REF}:${PASSWORD}@aws-0-us-east-1.pooler.supabase.com.attacker.invalid:5432/postgres?sslmode=require`,
     ],
     [
       "unsupported pooler host",
-      `postgres://postgres.${SANDBOX_REF}:${PASSWORD}@attacker.pooler.supabase.com:5432/postgres`,
+      `postgres://postgres.${SANDBOX_REF}:${PASSWORD}@attacker.pooler.supabase.com:5432/postgres?sslmode=require`,
     ],
     [
       "missing shared project ref",
-      `postgres://postgres:${PASSWORD}@aws-0-us-east-1.pooler.supabase.com:5432/postgres`,
+      `postgres://postgres:${PASSWORD}@aws-0-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require`,
     ],
     [
       "wrong direct user",
-      `postgres://readonly:${PASSWORD}@db.${SANDBOX_REF}.supabase.co:5432/postgres`,
+      `postgres://readonly:${PASSWORD}@db.${SANDBOX_REF}.supabase.co:5432/postgres?sslmode=require`,
     ],
-    ["missing password", `postgres://postgres@db.${SANDBOX_REF}.supabase.co:5432/postgres`],
-    ["wrong database", `postgres://postgres:${PASSWORD}@db.${SANDBOX_REF}.supabase.co:5432/app`],
+    [
+      "missing password",
+      `postgres://postgres@db.${SANDBOX_REF}.supabase.co:5432/postgres?sslmode=require`,
+    ],
+    [
+      "wrong database",
+      `postgres://postgres:${PASSWORD}@db.${SANDBOX_REF}.supabase.co:5432/app?sslmode=require`,
+    ],
     [
       "unsupported port",
-      `postgres://postgres:${PASSWORD}@db.${SANDBOX_REF}.supabase.co:6432/postgres`,
+      `postgres://postgres:${PASSWORD}@db.${SANDBOX_REF}.supabase.co:6432/postgres?sslmode=require`,
     ],
     [
       "unsupported protocol",
-      `https://postgres:${PASSWORD}@db.${SANDBOX_REF}.supabase.co:5432/postgres`,
+      `https://postgres:${PASSWORD}@db.${SANDBOX_REF}.supabase.co:5432/postgres?sslmode=require`,
     ],
   ])("rejects %s before a database client can run", (_label, url) => {
     expect(() =>
@@ -156,6 +163,20 @@ describe("Supabase database target identity", () => {
         databaseUrl: url,
       }),
     ).toThrow();
+  });
+
+  it.each(["disable", "allow", "prefer"])("rejects downgrade-capable sslmode=%s", (sslmode) => {
+    expect(() =>
+      parseSupabaseDatabaseUrl(
+        directUrl(SANDBOX_REF).replace("sslmode=require", `sslmode=${sslmode}`),
+      ),
+    ).toThrow(/sslmode=require, verify-ca, or verify-full/i);
+  });
+
+  it("rejects a connection URL that does not explicitly require TLS", () => {
+    expect(() =>
+      parseSupabaseDatabaseUrl(directUrl(SANDBOX_REF).replace("?sslmode=require", "")),
+    ).toThrow(/non-downgradable TLS/i);
   });
 
   it("returns only non-secret identity metadata", () => {
@@ -181,11 +202,16 @@ describe("required core schema manifest", () => {
     expect(migrationFor("plants.plant_type")).toBe(repair);
   });
 
-  it("guards quicklog_audit_events.status", () => {
-    const entry = REQUIRED_CORE_SCHEMA.find(
-      (candidate) => schemaKey(candidate) === "quicklog_audit_events.status",
+  it("guards the complete Quick Log audit INSERT contract", () => {
+    const auditEntries = REQUIRED_CORE_SCHEMA.filter(
+      (candidate) => candidate.table === "quicklog_audit_events",
     );
-    expect(entry?.migration).toBe("20260610230856_e8544509-5a66-41bc-8beb-39c95d96dde5.sql");
+    expect(auditEntries.map((entry) => entry.column).sort()).toEqual(
+      ["user_id", "idempotency_key", "grow_event_id", "status", "reason"].sort(),
+    );
+    expect(new Set(auditEntries.map((entry) => entry.migration))).toEqual(
+      new Set(["20260610230856_e8544509-5a66-41bc-8beb-39c95d96dde5.sql"]),
+    );
   });
 
   it("guards the full feeding INSERT contract, not only ALTER-added columns", () => {
@@ -379,27 +405,30 @@ describe("required-core-migrations workflow trust boundary", () => {
     expect(manifestBlock).toContain("src/test/required-core-migrations-gate.test.ts");
   });
 
-  it("allows sandbox remote access only by manual dispatch in its protected environment", () => {
+  it("allows sandbox remote access only on the deploy branch or manual dispatch", () => {
+    expect(sandboxBlock).toContain(
+      "github.event_name == 'push' && github.ref == 'refs/heads/verdant-grow-diary'",
+    );
     expect(sandboxBlock).toContain(
       "github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'sandbox'",
     );
     expect(sandboxBlock).not.toContain("pull_request");
     expect(sandboxBlock).toContain("environment: verdant-sandbox");
-    expect(sandboxBlock).toContain("secrets.SUPABASE_DB_URL");
+    expect(sandboxBlock).toContain("secrets.SUPABASE_DB_URL_SANDBOX");
   });
 
-  it("allows production remote access only on the deploy branch or manual dispatch", () => {
+  it("allows production remote access only by manual dispatch from the deploy branch", () => {
     expect(productionBlock).toContain("github.ref == 'refs/heads/verdant-grow-diary'");
     expect(productionBlock).toContain(
       "github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'production'",
     );
+    expect(productionBlock).not.toContain("github.event_name == 'push'");
     expect(productionBlock).not.toContain("pull_request");
     expect(productionBlock).toContain("environment: verdant-production");
     expect(productionBlock).toContain("secrets.SUPABASE_DB_URL");
   });
 
-  it("never references the old label-only repository secrets", () => {
-    expect(workflow).not.toContain("SUPABASE_DB_URL_SANDBOX");
+  it("never references the retired live repository secret", () => {
     expect(workflow).not.toContain("SUPABASE_DB_URL_LIVE");
   });
 });

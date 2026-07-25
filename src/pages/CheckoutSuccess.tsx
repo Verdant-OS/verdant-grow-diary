@@ -119,45 +119,13 @@ export default function CheckoutSuccess() {
     });
   }, [checkoutReturnSurface, confirmed, entitlement.effectivePlanId, hasCheckoutContext]);
 
-  // Best-effort order-confirmation email. Fires once per confirmed visit,
-  // only after the server-side resolver reports an active paid plan and
-  // there's real checkout context on this device. Idempotency key is
-  // scoped to (user, plan) so repeat visits or re-mounts do not re-queue.
-  // Server-side send-transactional-email is the source of truth; failures
-  // here are logged and swallowed so the visible confirmation UI is never
-  // affected by email plumbing.
-  const orderEmailFiredRef = useRef(false);
-  useEffect(() => {
-    if (!confirmed || !hasCheckoutContext || orderEmailFiredRef.current) return;
-    orderEmailFiredRef.current = true;
-    void (async () => {
-      try {
-        const { supabase } = await import("@/integrations/supabase/client");
-        const { data: userData } = await supabase.auth.getUser();
-        const user = userData?.user;
-        if (!user?.email) return;
-        const firstName =
-          (user.user_metadata as Record<string, unknown> | undefined)?.first_name;
-        await supabase.functions.invoke("send-transactional-email", {
-          body: {
-            templateName: "order-confirmation",
-            recipientEmail: user.email,
-            idempotencyKey: `order-confirm:${user.id}:${entitlement.effectivePlanId}`,
-            templateData: {
-              firstName: typeof firstName === "string" ? firstName : undefined,
-              productName:
-                entitlement.effectivePlanId === "founder_lifetime"
-                  ? "Verdant Founder Lifetime"
-                  : "Verdant Pro",
-              dashboardUrl: `${window.location.origin}/dashboard`,
-            },
-          },
-        });
-      } catch (err) {
-        console.warn("order-confirmation email dispatch failed", err);
-      }
-    })();
-  }, [confirmed, entitlement.effectivePlanId, hasCheckoutContext]);
+  // Order-confirmation email is dispatched server-side from the
+  // payments-webhook after transaction.completed is durably processed.
+  // The client no longer invokes send-transactional-email — the webhook
+  // is the single source of truth so private-mode / closed-tab buyers
+  // still receive the receipt.
+
+
 
   // Bounded poll — stops when confirmed or after POLL_TIMEOUT_MS. Runs in
   // BOTH unconfirmed states: "confirming" shows it explicitly, while

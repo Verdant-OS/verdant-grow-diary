@@ -43,7 +43,7 @@ let entitlementMock: { isActive: boolean; effectivePlanId: string; displayPlanId
   effectivePlanId: "pro_monthly",
   displayPlanId: "pro_monthly",
 };
-const refetchEntitlementMock = vi.fn().mockResolvedValue(undefined);
+const refetchEntitlementMock = vi.fn().mockResolvedValue(false);
 vi.mock("@/hooks/useMyEntitlements", () => ({
   useMyEntitlements: () => ({
     entitlement: entitlementMock,
@@ -136,7 +136,7 @@ beforeEach(() => {
   hookMock.mockReset();
   assignMock.mockReset().mockResolvedValue({ ok: true, candidateNumber: 5 });
   loadNextPageMock.mockReset();
-  refetchEntitlementMock.mockClear();
+  refetchEntitlementMock.mockReset().mockResolvedValue(false);
   entitlementMock = {
     isActive: true,
     effectivePlanId: "pro_monthly",
@@ -238,6 +238,38 @@ describe("owner-only candidate-number assignment", () => {
 
     fireEvent.click(recheck);
     await waitFor(() => expect(refetchEntitlementMock).toHaveBeenCalled());
+  });
+
+  it("keeps the denial visible when the plan re-check itself fails", async () => {
+    // A failed lookup resolves the entitlement to Free for presentation, which
+    // flips canAssign off. Without care that silently swaps the control for
+    // "Unnumbered" and throws away an actionable server denial for a grower who
+    // is probably still paying. The failure must be reported, not swallowed.
+    assignMock.mockResolvedValue({
+      ok: false,
+      reason: "entitlement",
+      error: "Assigning a candidate number needs an active Pheno Tracker Pro plan.",
+    });
+    refetchEntitlementMock.mockImplementation(async () => {
+      entitlementMock = { isActive: false, effectivePlanId: "free", displayPlanId: "free" };
+      return true; // lookupFailed
+    });
+
+    renderWorkspace({ candidates: [candidate("p1")], totalCandidateCount: 1 });
+    fireEvent.change(screen.getByTestId("workspace-assign-number-input-p1"), {
+      target: { value: "5" },
+    });
+    fireEvent.click(screen.getByTestId("workspace-assign-number-save-p1"));
+    fireEvent.click(await screen.findByTestId("workspace-assign-number-recheck-p1"));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("workspace-assign-number-error-p1")).toHaveTextContent(
+        /couldn't verify your plan/i,
+      ),
+    );
+    // Still recoverable, and never silently downgraded to the read-only label.
+    expect(screen.getByTestId("workspace-assign-number-recheck-p1")).toBeInTheDocument();
+    expect(screen.queryByTestId("workspace-candidate-unnumbered-p1")).toBeNull();
   });
 
   it("never offers a remedy affordance for a transport failure", async () => {

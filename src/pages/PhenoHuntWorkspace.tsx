@@ -214,7 +214,8 @@ const CandidateNumberAssign = memo(function CandidateNumberAssign({
   plantId: string;
   candidateNumber: number | null;
   canAssign: boolean;
-  onRecheckPlan: () => void | Promise<unknown>;
+  /** Resolves to true when the plan lookup itself FAILED (not "you are Free"). */
+  onRecheckPlan: () => Promise<boolean>;
   onAssign: (plantId: string, candidateNumber: number) => Promise<AssignCandidateNumberResult>;
 }) {
   const [value, setValue] = useState("");
@@ -226,6 +227,52 @@ const CandidateNumberAssign = memo(function CandidateNumberAssign({
   const [errReason, setErrReason] = useState<AssignCandidateNumberFailure | null>(null);
   const [assigned, setAssigned] = useState<number | null>(null);
   const [rechecking, setRechecking] = useState(false);
+
+  // An entitlement rejection means the CLIENT believed the grower could write
+  // (canAssign gated this control) but the database disagreed — a stale or
+  // diverged plan read, not a known Free grower. The remedy is to re-check the
+  // plan, never to sell: /pricing does not inspect the current entitlement
+  // before opening checkout, so an upsell here could bill an already-paying
+  // grower a second time.
+  const recheckPlan = async () => {
+    setRechecking(true);
+    try {
+      const lookupFailed = await onRecheckPlan();
+      if (lookupFailed) {
+        // A failed lookup resolves the entitlement to Free for presentation,
+        // which would otherwise flip canAssign off and silently swap this
+        // control for "Unnumbered" — hiding an actionable server denial behind
+        // a verification problem. Keep the denial visible and say so honestly.
+        setErr("Couldn't verify your plan just now. Your plan hasn't changed — try again.");
+        return;
+      }
+      setErr(null);
+      setErrReason(null);
+    } finally {
+      setRechecking(false);
+    }
+  };
+
+  const denialWithRecheck = (
+    <>
+      <span
+        role="alert"
+        data-testid={`workspace-assign-number-error-${plantId}`}
+        className="font-medium text-red-600 dark:text-red-400"
+      >
+        {err}
+      </span>{" "}
+      <button
+        type="button"
+        disabled={rechecking}
+        onClick={() => void recheckPlan()}
+        data-testid={`workspace-assign-number-recheck-${plantId}`}
+        className="font-medium underline underline-offset-2 disabled:opacity-50"
+      >
+        {rechecking ? "Re-checking…" : "Re-check my plan"}
+      </button>
+    </>
+  );
 
   const current = assigned ?? candidateNumber;
   if (current != null) {
@@ -239,6 +286,19 @@ const CandidateNumberAssign = memo(function CandidateNumberAssign({
     );
   }
   if (!canAssign) {
+    // A live entitlement denial outranks the plain read-only label: losing it
+    // here is exactly how a failed re-check would silently swallow the server's
+    // answer for a grower who is probably still paying.
+    if (err && errReason === "entitlement") {
+      return (
+        <div
+          data-testid={`workspace-assign-number-${plantId}`}
+          className="flex flex-wrap items-center gap-2 text-xs"
+        >
+          {denialWithRecheck}
+        </div>
+      );
+    }
     return (
       <span
         data-testid={`workspace-candidate-unnumbered-${plantId}`}
@@ -269,23 +329,6 @@ const CandidateNumberAssign = memo(function CandidateNumberAssign({
     setErrReason(null);
     setAssigned(res.candidateNumber);
     setValue("");
-  };
-
-  // An entitlement rejection here means the CLIENT believed the grower could
-  // write (canAssign gated this control) but the database disagreed — a stale
-  // or diverged plan read, not a known Free grower. The remedy is to re-check
-  // the plan, never to sell: /pricing does not inspect the current entitlement
-  // before opening checkout, so an upsell here could bill an already-paying
-  // grower a second time.
-  const recheckPlan = async () => {
-    setRechecking(true);
-    try {
-      await onRecheckPlan();
-      setErr(null);
-      setErrReason(null);
-    } finally {
-      setRechecking(false);
-    }
   };
 
   return (
@@ -324,27 +367,15 @@ const CandidateNumberAssign = memo(function CandidateNumberAssign({
         {busy ? "Saving…" : "Assign number"}
       </button>
       <span className="text-muted-foreground">Becomes permanently fixed for this hunt.</span>
-      {err ? (
+      {err && errReason === "entitlement" ? (
+        denialWithRecheck
+      ) : err ? (
         <span
           role="alert"
           data-testid={`workspace-assign-number-error-${plantId}`}
           className="font-medium text-red-600 dark:text-red-400"
         >
           {err}
-          {errReason === "entitlement" ? (
-            <>
-              {" "}
-              <button
-                type="button"
-                disabled={rechecking}
-                onClick={() => void recheckPlan()}
-                data-testid={`workspace-assign-number-recheck-${plantId}`}
-                className="font-medium underline underline-offset-2 disabled:opacity-50"
-              >
-                {rechecking ? "Re-checking…" : "Re-check my plan"}
-              </button>
-            </>
-          ) : null}
         </span>
       ) : null}
     </div>
@@ -602,7 +633,8 @@ interface EditorProps {
   selected: boolean;
   onToggleSelect: (plantId: string) => void;
   canAssign: boolean;
-  onRecheckPlan: () => void | Promise<unknown>;
+  /** Resolves to true when the plan lookup itself FAILED (not "you are Free"). */
+  onRecheckPlan: () => Promise<boolean>;
   onAssignNumber: (
     plantId: string,
     candidateNumber: number,

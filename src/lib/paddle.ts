@@ -246,6 +246,14 @@ export async function getPaddlePriceId(priceId: string): Promise<string> {
     body: { priceId, environment: env },
   });
   if (error || !data?.paddleId) {
+    const reason = await extractCatalogReason(data, error);
+    if (reason) {
+      throw new PaddleCheckoutCatalogUnavailableError(
+        reason,
+        priceId,
+        getPaddleCheckoutCatalogMessage(reason),
+      );
+    }
     throw new Error(`Failed to resolve price: ${priceId}`);
   }
   return data.paddleId as string;

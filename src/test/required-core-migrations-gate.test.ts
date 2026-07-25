@@ -42,6 +42,10 @@ function sharedUrl(ref: string, port = 5432, password = PASSWORD) {
   return `postgres://postgres.${ref}:${encodeURIComponent(password)}@aws-0-us-east-1.pooler.supabase.com:${port}/postgres?sslmode=require`;
 }
 
+function genericSharedUrl(port = 5432, password = PASSWORD, encodedUsername = "postgres") {
+  return `postgres://${encodedUsername}:${encodeURIComponent(password)}@aws-0-us-east-1.pooler.supabase.com:${port}/postgres?sslmode=require`;
+}
+
 function captureLogger() {
   const lines: string[] = [];
   return {
@@ -72,6 +76,8 @@ describe("Supabase database target identity", () => {
     [directUrl(SANDBOX_REF, 6543), "dedicated-pooler"],
     [sharedUrl(SANDBOX_REF), "shared-supavisor-session"],
     [sharedUrl(SANDBOX_REF, 6543), "shared-supavisor-transaction"],
+    [genericSharedUrl(), "shared-supavisor-session"],
+    [genericSharedUrl(6543), "shared-supavisor-transaction"],
     [directUrl(SANDBOX_REF).replace("sslmode=require", "sslmode=verify-ca"), "direct"],
     [directUrl(SANDBOX_REF).replace("sslmode=require", "sslmode=verify-full"), "direct"],
     [directUrl(SANDBOX_REF).replace("?sslmode=require", ""), "direct"],
@@ -136,8 +142,8 @@ describe("Supabase database target identity", () => {
       `postgres://postgres.${SANDBOX_REF}:${PASSWORD}@attacker.pooler.supabase.com:5432/postgres?sslmode=require`,
     ],
     [
-      "missing shared project ref",
-      `postgres://postgres:${PASSWORD}@aws-0-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require`,
+      "unsupported shared username",
+      `postgres://readonly:${PASSWORD}@aws-0-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require`,
     ],
     [
       "wrong direct user",
@@ -194,6 +200,31 @@ describe("Supabase database target identity", () => {
       projectRef: SANDBOX_REF,
       connectionMode: "direct",
       hostname: `db.${SANDBOX_REF}.supabase.co`,
+    });
+  });
+
+  it("binds a generic shared-pooler username to the selected pinned target", () => {
+    expect(
+      assertSupabaseDatabaseTargetIdentity({
+        targetEnv: "sandbox",
+        databaseUrl: genericSharedUrl(),
+      }),
+    ).toMatchObject({
+      targetEnv: "sandbox",
+      projectRef: SANDBOX_REF,
+      connectionMode: "shared-supavisor-session",
+      requiresPinnedProjectBinding: true,
+    });
+    expect(
+      assertSupabaseDatabaseTargetIdentity({
+        targetEnv: "production",
+        databaseUrl: genericSharedUrl(6543),
+      }),
+    ).toMatchObject({
+      targetEnv: "production",
+      projectRef: PRODUCTION_REF,
+      connectionMode: "shared-supavisor-transaction",
+      requiresPinnedProjectBinding: true,
     });
   });
 
@@ -407,6 +438,61 @@ describe("remote applied-schema runner safety", () => {
     expect(childEnv?.PGDATABASE).toBe(canonicalUrl);
     expect(childEnv?.PGSSLMODE).toBe("verify-full");
   });
+
+  it.each([
+    {
+      targetEnv: "sandbox",
+      projectRef: SANDBOX_REF,
+      port: 5432,
+      encodedUsername: "postgres",
+    },
+    {
+      targetEnv: "production",
+      projectRef: PRODUCTION_REF,
+      port: 6543,
+      encodedUsername: "post%67res",
+    },
+  ])(
+    "binds a generic shared-pooler child URL to $targetEnv on port $port",
+    ({ targetEnv, projectRef, port, encodedUsername }) => {
+      const sentinel = "shared/secret?# sentinel";
+      const url =
+        `${genericSharedUrl(port, sentinel, encodedUsername)}` +
+        "&host=attacker.invalid&sslmode=verify-full";
+      let childEnv: Record<string, string | undefined> | undefined;
+      const { logger, lines } = captureLogger();
+
+      const status = runRequiredCoreMigrationsApplied({
+        env: {
+          TARGET_ENV: targetEnv,
+          SUPABASE_DB_URL: url,
+          PATH: process.env.PATH,
+        },
+        spawnImpl: (_command, args, options) => {
+          expect(args.join(" ")).not.toContain("shared/secret");
+          childEnv = { ...options.env };
+          return {
+            status: 0,
+            stdout: REQUIRED_CORE_SCHEMA.map(schemaKey).join("\n"),
+            stderr: "",
+          };
+        },
+        logger,
+      });
+
+      const expected = new URL(url);
+      expected.username = `postgres.${projectRef}`;
+      expected.search = "";
+
+      expect(status).toBe(EXIT.OK);
+      expect(childEnv?.PGDATABASE).toBe(expected.toString());
+      expect(new URL(childEnv?.PGDATABASE ?? "").password).toBe(encodeURIComponent(sentinel));
+      expect(childEnv?.PGDATABASE).not.toContain("?");
+      expect(childEnv?.PGDATABASE).not.toContain("attacker.invalid");
+      expect(childEnv?.PGSSLMODE).toBe("verify-full");
+      expect(lines.join("\n")).not.toContain("shared/secret");
+    },
+  );
 
   it("suppresses raw psql stderr and secret sentinels from logs and artifacts", () => {
     const sentinel = "RAW-PSQL-SECRET-SENTINEL";

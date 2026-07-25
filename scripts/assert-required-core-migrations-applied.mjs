@@ -75,7 +75,7 @@ function buildExpected(manifest) {
   return { expected, malformed };
 }
 
-export function buildPsqlEnvironment(sourceEnv, databaseUrl) {
+export function buildPsqlEnvironment(sourceEnv, databaseUrl, targetEnv) {
   // psql needs process-location/locale basics, not the runner's full secret
   // environment. An allowlist also keeps unrelated protected-environment
   // secrets out of the child.
@@ -101,7 +101,7 @@ export function buildPsqlEnvironment(sourceEnv, databaseUrl) {
       childEnv[key] = sourceEnv[key];
     }
   }
-  const connection = sanitizeSupabaseDatabaseUrlForPsql(databaseUrl);
+  const connection = sanitizeSupabaseDatabaseUrlForPsql(databaseUrl, targetEnv);
   childEnv.PGDATABASE = connection.databaseUrl;
   // Never trust ambient PGSSLMODE. Query-free Dashboard URLs default to
   // require, while an explicit verify-ca/verify-full request is preserved.
@@ -253,7 +253,7 @@ export function runRequiredCoreMigrationsApplied({
     `AND c.relname IN (${tableList});`;
 
   const psqlArgs = ["-X", "-A", "-t", "-v", "ON_ERROR_STOP=1", "-c", sql];
-  const childEnv = buildPsqlEnvironment(env, databaseUrl);
+  const childEnv = buildPsqlEnvironment(env, databaseUrl, targetEnv);
 
   let result;
   try {

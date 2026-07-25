@@ -287,10 +287,11 @@ export function renderComment({ verdict, parsed, runUrl, artifactHint }) {
 }
 
 function parseArgs(argv) {
-  const out = { log: null, rc: null, event: null, out: null, json: false };
+  const out = { log: null, report: null, rc: null, event: null, out: null, json: false };
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
     if (a === "--log") out.log = argv[++i];
+    else if (a === "--report") out.report = argv[++i];
     else if (a === "--rc") out.rc = Number(argv[++i]);
     else if (a === "--event") out.event = argv[++i];
     else if (a === "--out") out.out = argv[++i];
@@ -316,8 +317,26 @@ if (isMain()) {
     console.error("--rc <exit-code> is required");
     process.exit(64);
   }
-  const logText = safeReadLog(args.log) ?? "";
-  const parsed = parseVerifierLog(logText);
+  // Prefer the JSON report when present — it carries pre-classified rows
+  // and can't drift on log encoding. Fall back to log parsing only when
+  // the report is missing or unreadable, so this script stays compatible
+  // with older CI runs and local ad-hoc invocations.
+  let parsed;
+  let inputMode;
+  const report = safeReadReport(args.report);
+  if (report) {
+    parsed = parseVerifierReport(report);
+    inputMode = "report";
+  } else {
+    if (args.report) {
+      console.error(
+        `--report ${args.report} not readable — falling back to --log`,
+      );
+    }
+    const logText = safeReadLog(args.log) ?? "";
+    parsed = parseVerifierLog(logText);
+    inputMode = "log";
+  }
   const verdict = decideVerdict({ rc: args.rc, parsed, eventName: args.event ?? "" });
   const comment = renderComment({
     verdict,
@@ -328,7 +347,12 @@ if (isMain()) {
   if (args.out) writeFileSync(args.out, comment, "utf8");
   if (args.json) {
     process.stdout.write(
-      JSON.stringify({ verdict, summary: parsed.summary, rowCount: parsed.rows.length }) + "\n",
+      JSON.stringify({
+        verdict,
+        summary: parsed.summary,
+        rowCount: parsed.rows.length,
+        inputMode,
+      }) + "\n",
     );
   } else {
     process.stdout.write(comment);

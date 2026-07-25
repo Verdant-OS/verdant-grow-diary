@@ -7,9 +7,16 @@
 // (`pri_...` internal ids, API response bodies, header dumps) is dropped
 // on the floor so a passing or errored line can't leak into a PR comment.
 //
+// Preferred input path: `--report <path>` reads the verifier's JSON
+// report (see scripts/verify-paddle-craft-catalog.ts `finalize()`) which
+// carries the same fields already-classified. `--log <path>` remains the
+// fallback for older CI runs / local ad-hoc invocations that don't emit
+// the report file — behaviour is identical when the log is well-formed.
+//
 // Callable as a CLI:
 //   node scripts/render-paddle-craft-preflight-comment.mjs \
-//     --log path/to/log --rc <exit-code> --event <pull_request|schedule|...> \
+//     [--report path/to/report.json | --log path/to/log] \
+//     --rc <exit-code> --event <pull_request|schedule|...> \
 //     [--out path/to/comment.md] [--json]
 //
 // Exit code is always 0 — this script only renders. The caller decides
@@ -83,6 +90,76 @@ export function parseVerifierLog(logText) {
     }
   }
   return { rows, summary, keyUnsetMentioned };
+}
+
+/**
+ * Convert the verifier's JSON report (see verify-paddle-craft-catalog.ts
+ * `finalize()`) into the same `parsed` shape parseVerifierLog produces.
+ * This is the preferred input path — it avoids re-parsing the human log
+ * entirely, so glyph encoding, log truncation, or stray banner lines
+ * can't drift the renderer's view of what the verifier saw.
+ *
+ * The report is treated as untrusted input: unknown status values,
+ * unknown cause kinds, missing summary fields, and non-string ids are
+ * all rejected so a malformed file can't smuggle unclassified failures
+ * past the remedy switch.
+ */
+export function parseVerifierReport(report) {
+  const parsed = { rows: [], summary: null, keyUnsetMentioned: false };
+  if (!report || typeof report !== "object") return parsed;
+  const rawRows = Array.isArray(report.rows) ? report.rows : [];
+  const KNOWN_CAUSE_KINDS = new Set([
+    "api_error",
+    "inactive",
+    "missing",
+    "coverage_gap",
+    "enumeration_error",
+  ]);
+  for (const raw of rawRows) {
+    if (!raw || typeof raw !== "object") continue;
+    const { env, externalId, status, cause } = raw;
+    if (env !== "sandbox" && env !== "live") continue;
+    if (typeof externalId !== "string" || externalId.length === 0) continue;
+    if (status !== "pass" && status !== "fail" && status !== "skip") continue;
+    const row = { env, externalId, status };
+    if (status === "fail") {
+      if (
+        cause &&
+        typeof cause === "object" &&
+        typeof cause.kind === "string" &&
+        KNOWN_CAUSE_KINDS.has(cause.kind)
+      ) {
+        const normalized = { kind: cause.kind };
+        if (cause.kind === "api_error" && Number.isFinite(cause.httpStatus)) {
+          normalized.httpStatus = Number(cause.httpStatus);
+        }
+        row.cause = normalized;
+      } else {
+        row.cause = { kind: "missing" };
+      }
+    }
+    parsed.rows.push(row);
+  }
+  const s = report.summary;
+  if (s && typeof s === "object") {
+    const pass = Number(s.pass);
+    const fail = Number(s.fail);
+    const skip = Number(s.skip);
+    if ([pass, fail, skip].every((n) => Number.isFinite(n))) {
+      parsed.summary = { pass, fail, skip };
+    }
+  }
+  parsed.keyUnsetMentioned = Boolean(report.keyUnset);
+  return parsed;
+}
+
+function safeReadReport(reportPath) {
+  if (!reportPath) return null;
+  try {
+    return JSON.parse(readFileSync(reportPath, "utf8"));
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -210,10 +287,11 @@ export function renderComment({ verdict, parsed, runUrl, artifactHint }) {
 }
 
 function parseArgs(argv) {
-  const out = { log: null, rc: null, event: null, out: null, json: false };
+  const out = { log: null, report: null, rc: null, event: null, out: null, json: false };
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
     if (a === "--log") out.log = argv[++i];
+    else if (a === "--report") out.report = argv[++i];
     else if (a === "--rc") out.rc = Number(argv[++i]);
     else if (a === "--event") out.event = argv[++i];
     else if (a === "--out") out.out = argv[++i];
@@ -239,8 +317,26 @@ if (isMain()) {
     console.error("--rc <exit-code> is required");
     process.exit(64);
   }
-  const logText = safeReadLog(args.log) ?? "";
-  const parsed = parseVerifierLog(logText);
+  // Prefer the JSON report when present — it carries pre-classified rows
+  // and can't drift on log encoding. Fall back to log parsing only when
+  // the report is missing or unreadable, so this script stays compatible
+  // with older CI runs and local ad-hoc invocations.
+  let parsed;
+  let inputMode;
+  const report = safeReadReport(args.report);
+  if (report) {
+    parsed = parseVerifierReport(report);
+    inputMode = "report";
+  } else {
+    if (args.report) {
+      console.error(
+        `--report ${args.report} not readable — falling back to --log`,
+      );
+    }
+    const logText = safeReadLog(args.log) ?? "";
+    parsed = parseVerifierLog(logText);
+    inputMode = "log";
+  }
   const verdict = decideVerdict({ rc: args.rc, parsed, eventName: args.event ?? "" });
   const comment = renderComment({
     verdict,
@@ -251,7 +347,12 @@ if (isMain()) {
   if (args.out) writeFileSync(args.out, comment, "utf8");
   if (args.json) {
     process.stdout.write(
-      JSON.stringify({ verdict, summary: parsed.summary, rowCount: parsed.rows.length }) + "\n",
+      JSON.stringify({
+        verdict,
+        summary: parsed.summary,
+        rowCount: parsed.rows.length,
+        inputMode,
+      }) + "\n",
     );
   } else {
     process.stdout.write(comment);

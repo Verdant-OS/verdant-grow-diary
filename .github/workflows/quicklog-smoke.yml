@@ -459,16 +459,36 @@ jobs:
             echo ""
             echo "### 📎 Flake summary artifact"
             echo ""
+            echo "**Expected path (in this workspace):** \`e2e/results/playwright-flake-summary.md\`"
+            echo "**Uploaded artifact name:** \`quicklog-flake-summary\` (single file: \`playwright-flake-summary.md\`)"
+            echo "**Also archived inside:** \`quicklog-smoke-artifacts\` bundle, same relative path."
+            echo ""
             if [ "${FLAKE_SUMMARY_PRESENT}" != "true" ]; then
               if [ "${FLAKE_SUMMARY_REASON}" = "empty" ]; then
-                echo "_No failed or flaky tests in this run — \`playwright-flake-summary.md\` was empty, so the dedicated \`quicklog-flake-summary\` artifact was skipped._"
+                echo "**Status:** _No failed or flaky tests in this run — \`playwright-flake-summary.md\` was written but empty, so the dedicated \`quicklog-flake-summary\` artifact was skipped._"
               else
-                echo "_No failed or flaky tests in this run — \`playwright-flake-summary.md\` was not produced, so the dedicated \`quicklog-flake-summary\` artifact was skipped._"
+                echo "**Status:** _No failed or flaky tests in this run — \`playwright-flake-summary.md\` was not produced, so the dedicated \`quicklog-flake-summary\` artifact was skipped._"
               fi
+              echo ""
+              echo "#### How to (re)generate \`playwright-flake-summary.md\` locally"
+              echo ""
+              echo "The file is written by \`scripts/summarize-playwright-flakes.mjs\` from the Playwright JSON report at \`e2e/results/playwright-report.json\`. To reproduce this step locally after a Playwright run:"
+              echo ""
+              echo '```bash'
+              echo "# 1. Run the Quick Log smoke (produces e2e/results/playwright-report.json)"
+              echo "bun run e2e:quicklog-smoke"
+              echo ""
+              echo "# 2. Regenerate the flake summary markdown"
+              echo "node scripts/summarize-playwright-flakes.mjs \\"
+              echo "  --report=e2e/results/playwright-report.json \\"
+              echo "  --out=e2e/results/playwright-flake-summary.md"
+              echo '```'
+              echo ""
+              echo "The summary is only non-empty when at least one test failed on attempt 1 or was classified as flaky (failed then passed on retry1). A clean, all-green run intentionally produces no artifact — this notice is the expected outcome, not a build error."
             elif [ -n "${FLAKE_SUMMARY_URL}" ]; then
-              echo "Download the standalone \`playwright-flake-summary.md\` here: [quicklog-flake-summary](${FLAKE_SUMMARY_URL})"
+              echo "**Status:** Download the standalone \`playwright-flake-summary.md\` here: [quicklog-flake-summary](${FLAKE_SUMMARY_URL})"
             else
-              echo "_Flake summary artifact URL unavailable — check the run's Artifacts dropdown for \`quicklog-flake-summary\`._"
+              echo "**Status:** _Flake summary artifact URL unavailable — check the run's Artifacts dropdown for \`quicklog-flake-summary\`._"
             fi
             echo ""
           } >> "$GITHUB_STEP_SUMMARY"

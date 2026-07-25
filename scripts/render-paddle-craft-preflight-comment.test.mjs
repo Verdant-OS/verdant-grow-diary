@@ -16,6 +16,7 @@ import {
   classifyFailure,
   decideVerdict,
   parseVerifierLog,
+  parseVerifierReport,
   renderComment,
 } from "./render-paddle-craft-preflight-comment.mjs";
 

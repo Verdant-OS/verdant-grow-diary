@@ -59,7 +59,6 @@ vi.mock("@/hooks/usePhenoEvidencePackets", () => ({
   }),
 }));
 
-
 function candidate(id: string, overrides: Partial<PhenoCandidateInput> = {}): PhenoCandidateInput {
   return {
     candidateId: id,
@@ -201,6 +200,47 @@ describe("owner-only candidate-number assignment", () => {
     const err = await screen.findByTestId("workspace-assign-number-error-p1");
     expect(err).toHaveTextContent(/already used by another candidate/i);
     expect(err).toHaveAttribute("role", "alert");
+  });
+
+  it("offers an upgrade route when the denial is an entitlement one", async () => {
+    assignMock.mockResolvedValue({
+      ok: false,
+      reason: "entitlement",
+      error: "Assigning a candidate number needs an active Pheno Tracker Pro plan.",
+    });
+    renderWorkspace({ candidates: [candidate("p1")], totalCandidateCount: 1 });
+    fireEvent.change(screen.getByTestId("workspace-assign-number-input-p1"), {
+      target: { value: "5" },
+    });
+    fireEvent.click(screen.getByTestId("workspace-assign-number-save-p1"));
+    expect(await screen.findByTestId("workspace-assign-number-error-p1")).toHaveTextContent(
+      /active Pheno Tracker Pro plan/i,
+    );
+    const cta = screen.getByTestId("workspace-assign-number-upgrade-p1");
+    expect(cta.getAttribute("href") ?? "").toContain("/pricing");
+    // No self-serve trial exists in this product, so the CTA must never
+    // promise one.
+    expect(cta.textContent ?? "").not.toMatch(/trial/i);
+  });
+
+  it("never offers an upgrade route for a transport failure", async () => {
+    // Regression guard: `network` is reached by any unclassified SQLSTATE, a
+    // thrown promise, or a 200 with an unusable row. Telling a grower with a
+    // dropped connection to buy Pro would be a lie — the CTA is entitlement-only.
+    assignMock.mockResolvedValue({
+      ok: false,
+      reason: "network",
+      error: "Couldn't save the number. Check your connection and try again.",
+    });
+    renderWorkspace({ candidates: [candidate("p1")], totalCandidateCount: 1 });
+    fireEvent.change(screen.getByTestId("workspace-assign-number-input-p1"), {
+      target: { value: "5" },
+    });
+    fireEvent.click(screen.getByTestId("workspace-assign-number-save-p1"));
+    expect(await screen.findByTestId("workspace-assign-number-error-p1")).toHaveTextContent(
+      /check your connection/i,
+    );
+    expect(screen.queryByTestId("workspace-assign-number-upgrade-p1")).toBeNull();
   });
 
   it("hides the assignment control from a non-Pro (read-only) viewer", () => {

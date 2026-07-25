@@ -15,7 +15,7 @@
  * authoritative for numbering and Pro access.
  */
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { usePhenoHuntWorkspace, CANDIDATE_PAGE_SIZE } from "@/hooks/usePhenoHuntWorkspace";
 import { buildPhenoHuntCsv, phenoHuntCsvFilename } from "@/lib/phenoHuntCsvExport";
 import { LOUD_TRAIT_AXES } from "@/lib/phenoExpressionRules";
@@ -87,7 +87,11 @@ import {
   PHENO_COHORT_MIN,
   PHENO_COHORT_MAX,
 } from "@/lib/phenoComparisonCohort";
-import type { AssignCandidateNumberResult } from "@/lib/phenoCandidateNumberService";
+import type {
+  AssignCandidateNumberFailure,
+  AssignCandidateNumberResult,
+} from "@/lib/phenoCandidateNumberService";
+import { buildUpgradeHref } from "@/components/PhenoTrackerUpgradeGate";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { canWriteFeatureData } from "@/lib/featureEntitlements";
 
@@ -215,7 +219,16 @@ const CandidateNumberAssign = memo(function CandidateNumberAssign({
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // Kept alongside the message so the entitlement denial can offer an upgrade
+  // route. Every other reason — including `network` — stays a plain message:
+  // a transport failure must never be dressed up as "you need to pay".
+  const [errReason, setErrReason] = useState<AssignCandidateNumberFailure | null>(null);
   const [assigned, setAssigned] = useState<number | null>(null);
+  const location = useLocation();
+  const upgradeHref = useMemo(
+    () => buildUpgradeHref(location.pathname, location.search),
+    [location.pathname, location.search],
+  );
 
   const current = assigned ?? candidateNumber;
   if (current != null) {
@@ -243,16 +256,20 @@ const CandidateNumberAssign = memo(function CandidateNumberAssign({
     const n = Number(value.trim());
     if (!Number.isInteger(n) || n <= 0) {
       setErr("Enter a positive whole number.");
+      setErrReason("invalid");
       return;
     }
     setBusy(true);
     setErr(null);
+    setErrReason(null);
     const res = await onAssign(plantId, n);
     setBusy(false);
     if (res.ok === false) {
       setErr(res.error);
+      setErrReason(res.reason);
       return;
     }
+    setErrReason(null);
     setAssigned(res.candidateNumber);
     setValue("");
   };
@@ -272,6 +289,7 @@ const CandidateNumberAssign = memo(function CandidateNumberAssign({
           value={value}
           onChange={(e) => {
             setErr(null);
+            setErrReason(null);
             setValue(e.target.value);
           }}
           onKeyDown={(e) => {
@@ -299,6 +317,18 @@ const CandidateNumberAssign = memo(function CandidateNumberAssign({
           className="font-medium text-red-600 dark:text-red-400"
         >
           {err}
+          {errReason === "entitlement" ? (
+            <>
+              {" "}
+              <Link
+                to={upgradeHref}
+                data-testid={`workspace-assign-number-upgrade-${plantId}`}
+                className="font-medium underline underline-offset-2"
+              >
+                Upgrade to Pro
+              </Link>
+            </>
+          ) : null}
         </span>
       ) : null}
     </div>

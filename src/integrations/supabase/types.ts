@@ -3167,6 +3167,7 @@ export type Database = {
       plants: {
         Row: {
           candidate_label: string | null
+          candidate_number: number | null
           created_at: string
           grow_id: string | null
           health: string
@@ -3189,6 +3190,7 @@ export type Database = {
         }
         Insert: {
           candidate_label?: string | null
+          candidate_number?: number | null
           created_at?: string
           grow_id?: string | null
           health?: string
@@ -3211,6 +3213,7 @@ export type Database = {
         }
         Update: {
           candidate_label?: string | null
+          candidate_number?: number | null
           created_at?: string
           grow_id?: string | null
           health?: string

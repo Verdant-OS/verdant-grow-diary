@@ -3,12 +3,14 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 /**
- * Static safety scan for the GGS Sentinel page + panel.
+ * Static safety scan for the read-only GGS Sentinel evaluator and the
+ * composite operator route that also mounts the write-capable ingest panel.
  *
  * These tests guard the AGENTS.md "Hard Safety Rules" for this slice:
- *   - No writes, no rpc, no functions.invoke, no Action Queue mutation,
- *     no AI imports, no device control, no raw_payload rendering,
- *     no MQTT publishing, no ggs_live/ggs_csv test-data labels.
+ *   - Sentinel evaluation stays read-only.
+ *   - Ingest writes route only through the validated commit helper/RPC.
+ *   - No Action Queue mutation, AI imports, device control, raw_payload
+ *     rendering, MQTT publishing, or ggs_live/ggs_csv test-data labels.
  */
 const SENTINEL_PAGE_PATH = "src/pages/OperatorGgsRealPayloadIngest.tsx";
 const SENTINEL_PANEL_PATH = "src/components/GgsSentinelSmokeRunnerPanel.tsx";
@@ -141,6 +143,16 @@ describe("evaluator priority unchanged — explanatory note pinned verbatim", ()
 });
 
 describe("operator GGS real-payload ingest — static safety", () => {
+  it("does not describe the composite write-capable route as wholly read-only", () => {
+    expect(SENTINEL_PAGE).not.toMatch(/Read-only diagnostics/i);
+    expect(SENTINEL_PAGE).not.toMatch(/No Supabase writes, no rpc/i);
+  });
+
+  it("visible route copy discloses both attested commit capability and read-only Sentinel review", () => {
+    expect(REAL_PAYLOAD_PAGE).toContain("Commit validated, attested Spider Farmer GGS readings");
+    expect(REAL_PAYLOAD_PAGE).toContain("read-only Sentinel verdict");
+  });
+
   it("panel never renders raw_payload body fields", () => {
     expect(REAL_PAYLOAD_PANEL).not.toMatch(/raw_payload\.payload/);
     expect(REAL_PAYLOAD_PANEL).not.toMatch(/JSON\.stringify\(.*raw_payload/);

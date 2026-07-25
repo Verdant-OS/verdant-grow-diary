@@ -7,7 +7,7 @@ import { template as actionRequired } from './action-required.tsx'
 import { template as growUpdate } from './grow-update.tsx'
 
 export interface TemplateEntry {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // deno-lint-ignore no-explicit-any
   component: ComponentType<any>
   subject: string | ((data: Record<string, unknown>) => string)
   displayName?: string

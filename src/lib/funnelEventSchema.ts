@@ -147,6 +147,4 @@ export function enforceFunnelEventSchema(
   return out;
 }
 
-// Re-export for the wiring test that asserts schema/catalog parity.
-export { FUNNEL_EVENTS };
 export type { FunnelEventName, FunnelEventParams };

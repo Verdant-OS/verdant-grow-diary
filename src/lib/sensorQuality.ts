@@ -90,7 +90,6 @@ export function evaluateSensorQuality(
 
   if (vpd === null) {
     reasons.push("VPD is missing from the latest snapshot.");
-    suspiciousFields.push("vpd");
   } else if (vpd < 0 || vpd > 5) {
     reasons.push("VPD is outside a plausible range.");
     suspiciousFields.push("vpd");
@@ -99,9 +98,7 @@ export function evaluateSensorQuality(
   // Soil EC unit mismatch: expect mS/cm (typically 0–6). Values >= 50 strongly
   // suggest µS/cm or raw uncalibrated units (e.g. 1450 instead of 1.45).
   if (soil_ec !== null && soil_ec >= 50) {
-    reasons.push(
-      "Soil EC looks unit-mismatched (expected mS/cm, got a large value).",
-    );
+    reasons.push("Soil EC looks unit-mismatched (expected mS/cm, got a large value).");
     suspiciousFields.push("soil_ec");
   }
   if (soil_ec !== null && soil_ec < 0) {

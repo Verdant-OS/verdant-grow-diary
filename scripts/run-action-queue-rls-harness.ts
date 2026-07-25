@@ -77,11 +77,7 @@ async function insertAndReturnId(table: string, row: Record<string, unknown>): P
   return data.id as string;
 }
 
-function actionRow(ids: {
-  growId: string;
-  tentId: string | null;
-  plantId: string | null;
-}) {
+function actionRow(ids: { growId: string; tentId: string | null; plantId: string | null }) {
   return {
     grow_id: ids.growId,
     tent_id: ids.tentId,
@@ -95,13 +91,21 @@ function actionRow(ids: {
   };
 }
 
-async function expectInsertAllowed(client: SupabaseClient, name: string, row: Record<string, unknown>) {
+async function expectInsertAllowed(
+  client: SupabaseClient,
+  name: string,
+  row: Record<string, unknown>,
+) {
   const { data, error } = await client.from("action_queue").insert(row).select("id").single();
   check(name, !error && !!data?.id, error?.message);
   return data?.id as string | undefined;
 }
 
-async function expectInsertRejected(client: SupabaseClient, name: string, row: Record<string, unknown>) {
+async function expectInsertRejected(
+  client: SupabaseClient,
+  name: string,
+  row: Record<string, unknown>,
+) {
   const { error } = await client.from("action_queue").insert(row).select("id").single();
   check(name, !!error, "insert unexpectedly succeeded");
 }
@@ -113,7 +117,12 @@ async function expectUpdateRejected(
   patch: Record<string, unknown>,
   expected: Record<string, string | null>,
 ) {
-  const { error } = await client.from("action_queue").update(patch).eq("id", actionId).select("id").single();
+  const { error } = await client
+    .from("action_queue")
+    .update(patch)
+    .eq("id", actionId)
+    .select("id")
+    .single();
   const { data: readback, error: readbackError } = await admin
     .from("action_queue")
     .select("grow_id,tent_id,plant_id")
@@ -129,6 +138,16 @@ async function expectUpdateRejected(
   check(name, !!error && unchanged, error ? undefined : "update unexpectedly succeeded");
 }
 
+async function expectDecisionUpdateAllowed(client: SupabaseClient, name: string, actionId: string) {
+  const { data, error } = await client
+    .from("action_queue")
+    .update({ status: "simulated" })
+    .eq("id", actionId)
+    .select("id,status")
+    .single();
+  check(name, !error && data?.status === "simulated", error?.message);
+}
+
 async function cleanup(userId: string | null, ids: Record<string, string[]>) {
   if (ids.actions.length) await admin.from("action_queue").delete().in("id", ids.actions);
   if (ids.plants.length) await admin.from("plants").delete().in("id", ids.plants);
@@ -138,20 +157,43 @@ async function cleanup(userId: string | null, ids: Record<string, string[]>) {
 }
 
 async function main() {
-  const ids = { grows: [] as string[], tents: [] as string[], plants: [] as string[], actions: [] as string[] };
+  const ids = {
+    grows: [] as string[],
+    tents: [] as string[],
+    plants: [] as string[],
+    actions: [] as string[],
+  };
   let userId: string | null = null;
 
   try {
     userId = await createUser();
     const client = await signedInClient();
 
-    const growA = await insertAndReturnId("grows", { user_id: userId, name: `RLS grow A ${runId}` });
-    const growB = await insertAndReturnId("grows", { user_id: userId, name: `RLS grow B ${runId}` });
+    const growA = await insertAndReturnId("grows", {
+      user_id: userId,
+      name: `RLS grow A ${runId}`,
+    });
+    const growB = await insertAndReturnId("grows", {
+      user_id: userId,
+      name: `RLS grow B ${runId}`,
+    });
     ids.grows.push(growA, growB);
 
-    const tentA = await insertAndReturnId("tents", { user_id: userId, grow_id: growA, name: `RLS tent A ${runId}` });
-    const tentB = await insertAndReturnId("tents", { user_id: userId, grow_id: growB, name: `RLS tent B ${runId}` });
-    const tentA2 = await insertAndReturnId("tents", { user_id: userId, grow_id: growA, name: `RLS tent A2 ${runId}` });
+    const tentA = await insertAndReturnId("tents", {
+      user_id: userId,
+      grow_id: growA,
+      name: `RLS tent A ${runId}`,
+    });
+    const tentB = await insertAndReturnId("tents", {
+      user_id: userId,
+      grow_id: growB,
+      name: `RLS tent B ${runId}`,
+    });
+    const tentA2 = await insertAndReturnId("tents", {
+      user_id: userId,
+      grow_id: growA,
+      name: `RLS tent A2 ${runId}`,
+    });
     ids.tents.push(tentA, tentB, tentA2);
 
     const plantA = await insertAndReturnId("plants", {
@@ -200,9 +242,32 @@ async function main() {
     );
 
     const expected = { grow_id: growA, tent_id: tentA, plant_id: plantA };
-    await expectUpdateRejected(client, "authenticated user cannot update to cross-grow tent", validActionId, { tent_id: tentB }, expected);
-    await expectUpdateRejected(client, "authenticated user cannot update to cross-grow plant", validActionId, { plant_id: plantB }, expected);
-    await expectUpdateRejected(client, "authenticated user cannot update to mismatched plant/tent", validActionId, { plant_id: plantA2 }, expected);
+    await expectUpdateRejected(
+      client,
+      "authenticated user cannot update to cross-grow tent",
+      validActionId,
+      { tent_id: tentB },
+      expected,
+    );
+    await expectUpdateRejected(
+      client,
+      "authenticated user cannot update to cross-grow plant",
+      validActionId,
+      { plant_id: plantB },
+      expected,
+    );
+    await expectUpdateRejected(
+      client,
+      "authenticated user cannot update to mismatched plant/tent",
+      validActionId,
+      { plant_id: plantA2 },
+      expected,
+    );
+    await expectDecisionUpdateAllowed(
+      client,
+      "authenticated row owner can record an approval-required decision transition",
+      validActionId,
+    );
   } finally {
     await cleanup(userId, ids);
   }

@@ -729,13 +729,13 @@ export default function ActionQueue() {
     event_type: EventType,
     new_status: Status,
     note?: string,
-  ) {
+  ): Promise<boolean> {
     setBusyId(row.id);
     const { error } = await supabase.from("action_queue").update(next).eq("id", row.id);
     if (error) {
       setBusyId(null);
       toast.error(error.message);
-      return;
+      return false;
     }
     await logEvent(row, event_type, new_status, note);
     let traceKind: ActionQueueTraceKind | null = null;
@@ -751,6 +751,7 @@ export default function ActionQueue() {
     if (drawerRow && drawerRow.id === row.id) {
       await loadDrawerHistory(row);
     }
+    return true;
   }
 
   function openNoteDialog(row: ActionRow, kind: TransitionKind) {
@@ -768,14 +769,14 @@ export default function ActionQueue() {
     setNoteDialog(null);
     setNoteDraft("");
 
-    if (kind === "simulate") {
+    const patch = buildTransitionPatch(kind);
+    const success = await transition(row, patch, eventTypeFor(kind), nextStatusFor(kind), note);
+    if (success && kind === "simulate") {
       // Simulation NEVER sends device commands. Status + audit only.
       toast.message("Simulated (no device command sent)", {
         description: `${row.action_type} → ${formatActionTargetLabel(row.target_metric, row.target_device)}`,
       });
     }
-    const patch = buildTransitionPatch(kind);
-    await transition(row, patch, eventTypeFor(kind), nextStatusFor(kind), note);
   }
 
   function cancelNoteDialog() {

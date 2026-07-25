@@ -93,12 +93,10 @@ describe("buildDashboardSensorHealthSummary", () => {
   });
 
   it("returns watch when reasons exist but no suspicious fields", () => {
-    // VPD missing produces a reason + suspiciousFields.vpd → maps to invalid,
-    // so to exercise the pure "watch" branch we synthesize a stale + valid
-    // snapshot with no suspicious fields by relying on the stale-only path:
-    // here we just confirm watch tone classification is warn.
-    const vm = buildDashboardSensorHealthSummary(ok({ temp: 24, rh: 55, vpd: 1.1 }), NOW);
-    expect(vm.tone).toBe("ok");
+    const vm = buildDashboardSensorHealthSummary(ok({ temp: 24, rh: 55 }), NOW);
+    expect(vm.status).toBe("watch");
+    expect(vm.tone).toBe("warn");
+    expect(vm.suspiciousFields).toEqual([]);
   });
 
   it("preserves source truth: manual snapshot never reads as Live", () => {

@@ -171,6 +171,7 @@ export default function Pricing() {
     environment: checkoutEnvironment,
     unavailableMessage,
     blockedReason,
+    dismissBlocked,
   } = usePaddleCheckout();
   const checkoutRecoveryReason = blockedReason ?? unavailableMessage;
   const checkoutTrustCopy = buildCheckoutTrustCopy({

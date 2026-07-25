@@ -284,6 +284,21 @@ Deno.serve(async (req) => {
   }
 
   console.log("payments-webhook result:", result.reason);
+
+  // Best-effort order-confirmation email. Fires only for durably-processed
+  // transaction.completed events. Never blocks or fails the webhook.
+  if (
+    result.httpStatus === 200 &&
+    event.eventType === "transaction.completed" &&
+    !result.reason.startsWith("skipped") &&
+    !result.reason.startsWith("duplicate")
+  ) {
+    await maybeSendPurchaseConfirmation(event, {
+      supabaseUrl: Deno.env.get("SUPABASE_URL")!,
+      serviceRoleKey: Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    });
+  }
+
   return new Response(JSON.stringify({ status: result.reason }), {
     status: result.httpStatus,
     headers: { "Content-Type": "application/json" },

@@ -26,6 +26,17 @@ export const PUBLIC_QUICK_LOG_STARTER_PATH = "/quick-log";
 export const PUBLIC_QUICK_LOG_STARTER_SIGNUP_REDIRECT = "/onboarding";
 
 /**
+ * Where an ALREADY signed-in visitor is sent instead of the signup CTA. The
+ * dashboard is the right target because it renders the existing authenticated
+ * resume surface (PublicQuickLogHandoffCard), so the device-local draft is
+ * picked up there rather than needing a second consume path here.
+ *
+ * A plain internal path with no query: nothing this page holds is safe to put
+ * in a URL, and the resume surface reads storage itself.
+ */
+export const PUBLIC_QUICK_LOG_STARTER_SIGNED_IN_PATH = "/dashboard";
+
+/**
  * Build the signup CTA href:
  *   /auth?mode=signup&redirectTo=%2Fonboarding[&utm_...allow-listed inbound]
  *

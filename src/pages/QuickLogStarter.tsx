@@ -47,8 +47,10 @@ import {
 } from "@/lib/publicQuickLogStarterDraftStore";
 import {
   PUBLIC_QUICK_LOG_STARTER_PATH,
+  PUBLIC_QUICK_LOG_STARTER_SIGNED_IN_PATH,
   buildQuickLogStarterSignupHref,
 } from "@/lib/quickLogStarterLinks";
+import { useAuth } from "@/store/auth";
 import { PUBLIC_QUICK_LOG_STARTER_COPY as COPY } from "@/constants/publicQuickLogStarterCopy";
 
 const PAGE_URL = `${VERDANT_SITE_ORIGIN}${PUBLIC_QUICK_LOG_STARTER_PATH}`;
@@ -87,6 +89,32 @@ export default function QuickLogStarter() {
   const signupHref = useMemo(
     () => buildQuickLogStarterSignupHref(location.search),
     [location.search],
+  );
+
+  // This page is public and stays device-local for everyone, but a grower who
+  // is ALREADY signed in must not be told to create an account: it is false
+  // and it dead-ends them (the signup CTA leads to /auth then /onboarding,
+  // never back to their diary). Adapt the call to action rather than
+  // redirecting, so the page remains viewable — including by an operator
+  // checking what visitors see. Reading context only; no session is fetched
+  // here and this surface still writes nothing anywhere.
+  const { user } = useAuth();
+  const cta = useMemo(
+    () =>
+      user
+        ? {
+            href: PUBLIC_QUICK_LOG_STARTER_SIGNED_IN_PATH,
+            label: COPY.signedInCtaLabel,
+            line: COPY.signedInCtaLine,
+            testId: "starter-continue-cta",
+          }
+        : {
+            href: signupHref,
+            label: COPY.signupCtaLabel,
+            line: COPY.ctaLine,
+            testId: "starter-signup-cta",
+          },
+    [user, signupHref],
   );
 
   const draft = usePublicQuickLogStarterDraft();
@@ -375,8 +403,8 @@ export default function QuickLogStarter() {
             </dl>
             <p className="text-xs text-muted-foreground">{COPY.truthLine}</p>
             <div className="flex flex-wrap items-center gap-2 pt-1">
-              <Button asChild data-testid="starter-signup-cta">
-                <Link to={signupHref}>{COPY.signupCtaLabel}</Link>
+              <Button asChild data-testid={cta.testId}>
+                <Link to={cta.href}>{cta.label}</Link>
               </Button>
               <Button
                 type="button"
@@ -387,14 +415,14 @@ export default function QuickLogStarter() {
                 {COPY.clearDraftLabel}
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground">{COPY.ctaLine}</p>
+            <p className="text-xs text-muted-foreground">{cta.line}</p>
           </CardContent>
         </Card>
       ) : (
         <section aria-label="Keep your notes" className="space-y-2">
-          <p className="text-sm text-muted-foreground">{COPY.ctaLine}</p>
-          <Button asChild variant="outline" data-testid="starter-signup-cta">
-            <Link to={signupHref}>{COPY.signupCtaLabel}</Link>
+          <p className="text-sm text-muted-foreground">{cta.line}</p>
+          <Button asChild variant="outline" data-testid={cta.testId}>
+            <Link to={cta.href}>{cta.label}</Link>
           </Button>
         </section>
       )}

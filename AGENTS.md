@@ -148,6 +148,31 @@ Once a migration file is merged into a base branch, it is permanent history. Nev
 - Before touching any file under `supabase/migrations/`, confirm it is new in this change. If it already exists on the target base branch, treat it as read-only.
 - Editing history doesn't undo what already ran in production — it only breaks what a freshly provisioned environment (local dev, CI, disaster recovery) ends up with, silently and with no signal that anything is wrong.
 
+There is no exception. In particular, "this migration is broken and could never
+have succeeded anywhere, so editing it is harmless" is **not** a licence to edit
+it. That reasoning is seductive and wrong: it is unfalsifiable from inside a PR,
+and the rule exists precisely because the cost of being mistaken is invisible.
+The `Published migration integrity` CI gate enforces this by comparing SHA-256
+hashes against the base branch, and it will fail the PR.
+
+### When a published migration is genuinely broken
+
+A forward migration cannot always help — if the broken statement aborts the
+replay, nothing after it runs. Use the repo's sanctioned mechanism instead:
+
+- `config/local-supabase-replay-compatibility.json` declares, per file, either a
+  `compatibility_noops` entry (a later export duplicating an earlier change) or a
+  `compatibility_patches` entry (a minimal find/replace applied at replay time).
+- The replay preparer verifies each `source_sha256` and rewrites only a copy
+  inside a disposable workdir. The committed migration is never modified, so the
+  integrity gate stays green.
+- Every entry records a `reason`. Per that file's own notes: do not add one
+  merely to silence a reset failure — prove the relationship first.
+
+Check this config **before** proposing any migration correction. A defect you are
+about to "fix" may already be handled here, in which case the correct change is
+none at all.
+
 ---
 
 ## Sensor Truth Rules

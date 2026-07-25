@@ -13,7 +13,7 @@
  * grant `usable` because it cannot distinguish a test packet from a physical
  * sensor. The legacy timeline presence boolean is never promoted to usable.
  */
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import {
   Stethoscope,
   AlertCircle,
@@ -49,6 +49,10 @@ import {
 } from "@/lib/aiDoctorCurrentSensorSnapshotRules";
 import { isUuid } from "@/lib/isUuid";
 import { buildPlantAiDoctorReviewPath } from "@/lib/aiDoctorEntryRules";
+import {
+  buildPlantQuickLogPrefill,
+  PLANT_QUICKLOG_PREFILL_EVENT,
+} from "@/lib/plantQuickLogPrefillRules";
 import { buildPlantRecentActivity } from "@/lib/plantRecentActivityRules";
 import { classifyTimelineEntry } from "@/lib/timelineEntryClassification";
 import { Button } from "@/components/ui/button";
@@ -155,21 +159,29 @@ function modeIcon(mode: AiDoctorSensorEvidenceMode) {
   }
 }
 
-interface NextAction {
+interface SnapshotNextAction {
+  kind: "snapshot";
+  label: string;
+}
+
+interface RouteNextAction {
+  kind: "route";
   label: string;
   to: string;
 }
 
+type NextAction = SnapshotNextAction | RouteNextAction;
+
 function nextActionForStatus(status: SnapshotStatus | null): NextAction | null {
   switch (status) {
     case "stale":
-      return { label: "Add fresh sensor snapshot", to: "/sensors" };
+      return { kind: "snapshot", label: "Add fresh sensor snapshot" };
     case "invalid":
-      return { label: "Review sensor intake", to: "/pi-ingest-status" };
+      return { kind: "route", label: "Review sensor intake", to: "/pi-ingest-status" };
     case "needs_review":
-      return { label: "Review snapshot issue", to: "/pi-ingest-status" };
+      return { kind: "route", label: "Review snapshot issue", to: "/pi-ingest-status" };
     case "no_data":
-      return { label: "Add sensor snapshot", to: "/sensors" };
+      return { kind: "snapshot", label: "Add sensor snapshot" };
     case "usable":
     default:
       return null;
@@ -235,6 +247,22 @@ export default function PlantDetailAiDoctorReadiness({
 
   const sensor = result.sensorEvidence;
   const nextAction = nextActionForStatus(sensor.status);
+  const snapshotPrefill = useMemo(
+    () =>
+      buildPlantQuickLogPrefill({
+        plantId,
+        growId,
+        tentId,
+        eventType: "environment",
+      }),
+    [growId, plantId, tentId],
+  );
+  const openPlantSnapshot = useCallback(() => {
+    if (typeof window === "undefined" || !snapshotPrefill) return;
+    window.dispatchEvent(
+      new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, { detail: snapshotPrefill }),
+    );
+  }, [snapshotPrefill]);
 
   return (
     <section
@@ -401,18 +429,34 @@ export default function PlantDetailAiDoctorReadiness({
             </p>
             {nextAction && (
               <div className="pt-1">
-                <Button
-                  asChild
-                  size="sm"
-                  variant="outline"
-                  className="h-7 gap-1"
-                  data-testid={`plant-detail-ai-doctor-sensor-evidence-next-action-${sensor.status}`}
-                  data-next-action-status={sensor.status ?? "unknown"}
-                >
-                  <Link to={nextAction.to}>
+                {nextAction.kind === "snapshot" && snapshotPrefill ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-7 gap-1"
+                    onClick={openPlantSnapshot}
+                    data-testid={`plant-detail-ai-doctor-sensor-evidence-next-action-${sensor.status}`}
+                    data-next-action-status={sensor.status ?? "unknown"}
+                    data-handoff="plant-quick-log"
+                  >
                     {nextAction.label} <ArrowRight className="h-3.5 w-3.5" />
-                  </Link>
-                </Button>
+                  </Button>
+                ) : (
+                  <Button
+                    asChild
+                    size="sm"
+                    variant="outline"
+                    className="h-7 gap-1"
+                    data-testid={`plant-detail-ai-doctor-sensor-evidence-next-action-${sensor.status}`}
+                    data-next-action-status={sensor.status ?? "unknown"}
+                    data-handoff="sensor-page"
+                  >
+                    <Link to={nextAction.kind === "route" ? nextAction.to : "/sensors"}>
+                      {nextAction.label} <ArrowRight className="h-3.5 w-3.5" />
+                    </Link>
+                  </Button>
+                )}
               </div>
             )}
           </div>

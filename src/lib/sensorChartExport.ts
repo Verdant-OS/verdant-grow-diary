@@ -7,10 +7,21 @@
  */
 import type { SensorReading } from "@/mock";
 import { readObservedSensorMetric } from "@/lib/sensorReadingSelectionRules";
-import { format } from "date-fns";
 
 const CSV_HEADER =
-  "Timestamp,Temperature (°C),Humidity (%),VPD (kPa),CO₂ (ppm),Soil Moisture (%),PPFD (µmol/m²/s),Source,Status,Captured At";
+  "Timestamp (UTC),Temperature (°C),Humidity (%),VPD (kPa),CO₂ (ppm),Soil Moisture (%),PPFD (µmol/m²/s),Source,Status,Captured At (UTC)";
+
+function formatUtcTimestamp(value: string | null | undefined): string {
+  if (!value) return "";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  return date
+    .toISOString()
+    .replace("T", " ")
+    .replace(/\.\d{3}Z$/, "");
+}
 
 /**
  * Escape a field for CSV inclusion. Wraps in quotes and escapes inner
@@ -31,7 +42,7 @@ function csvEscape(value: string | number | null | undefined): string {
 export function buildSensorReadingsCsv(readings: ReadonlyArray<SensorReading>): string {
   const rows = readings.map((r) =>
     [
-      format(new Date(r.ts), "yyyy-MM-dd HH:mm:ss"),
+      formatUtcTimestamp(r.ts),
       readObservedSensorMetric(r, "temp"),
       readObservedSensorMetric(r, "rh"),
       readObservedSensorMetric(r, "vpd"),
@@ -40,7 +51,7 @@ export function buildSensorReadingsCsv(readings: ReadonlyArray<SensorReading>): 
       readObservedSensorMetric(r, "ppfd"),
       r.source,
       r.status,
-      r.capturedAt ? format(new Date(r.capturedAt), "yyyy-MM-dd HH:mm:ss") : "",
+      formatUtcTimestamp(r.capturedAt),
     ]
       .map(csvEscape)
       .join(","),

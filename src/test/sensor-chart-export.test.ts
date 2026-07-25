@@ -19,7 +19,7 @@ describe("buildSensorReadingsCsv", () => {
   it("returns header only for empty input", () => {
     const csv = buildSensorReadingsCsv([]);
     expect(csv).toBe(
-      "Timestamp,Temperature (°C),Humidity (%),VPD (kPa),CO₂ (ppm),Soil Moisture (%),PPFD (µmol/m²/s),Source,Status,Captured At",
+      "Timestamp (UTC),Temperature (°C),Humidity (%),VPD (kPa),CO₂ (ppm),Soil Moisture (%),PPFD (µmol/m²/s),Source,Status,Captured At (UTC)",
     );
   });
 
@@ -40,6 +40,19 @@ describe("buildSensorReadingsCsv", () => {
     expect(lines.length).toBe(3);
     expect(lines[1]).toMatch(/^2026-06-01 10:00:00,22/);
     expect(lines[2]).toMatch(/^2026-06-01 12:00:00,26/);
+  });
+
+  it("normalizes offset timestamps to UTC", () => {
+    const r: SensorReading = {
+      ...baseReading,
+      ts: "2026-06-01T12:00:00-05:00",
+      capturedAt: "2026-06-01T12:00:00-05:00",
+    };
+
+    const line = buildSensorReadingsCsv([r]).split("\n")[1];
+
+    expect(line).toMatch(/^2026-06-01 17:00:00,/);
+    expect(line).toMatch(/,2026-06-01 17:00:00$/);
   });
 
   it("escapes commas in fields", () => {
@@ -67,6 +80,19 @@ describe("buildSensorReadingsCsv", () => {
     const csv = buildSensorReadingsCsv([r]);
     const line = csv.split("\n")[1];
     expect(line).toMatch(/,$/); // ends with empty field
+  });
+
+  it("leaves invalid timestamps empty instead of crashing the export", () => {
+    const r: SensorReading = {
+      ...baseReading,
+      ts: "not-a-timestamp",
+      capturedAt: "also-not-a-timestamp",
+    };
+
+    const line = buildSensorReadingsCsv([r]).split("\n")[1];
+
+    expect(line).toMatch(/^,/);
+    expect(line).toMatch(/,$/);
   });
 
   it("rounds integers correctly (co2)", () => {
@@ -104,7 +130,7 @@ describe("downloadTextFile", () => {
     const revokeSpy = vi.fn();
 
     const realAnchor = document.createElement("a");
-    const clickSpy = vi.spyOn(realAnchor, "click");
+    const clickSpy = vi.spyOn(realAnchor, "click").mockImplementation(() => undefined);
     createElementSpy.mockImplementation((tag: string) => {
       if (tag === "a") return realAnchor;
       return document.createElement(tag);

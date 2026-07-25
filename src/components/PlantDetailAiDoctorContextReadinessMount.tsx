@@ -24,10 +24,7 @@ import {
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 import type { ManualSensorLog } from "@/lib/manualSensorChronologyDeltaRules";
 import type { PlantRowLike } from "@/lib/aiDoctorContextCompiler";
-import {
-  QUICK_LOG_V2_OPEN_EVENT,
-  buildQuickLogV2OpenIntent,
-} from "@/lib/quickLogV2OpenIntent";
+import { QUICK_LOG_V2_OPEN_EVENT, buildQuickLogV2OpenIntent } from "@/lib/quickLogV2OpenIntent";
 
 export interface PlantDetailAiDoctorContextReadinessMountProps {
   plantId: string;
@@ -53,13 +50,7 @@ export interface PlantDetailAiDoctorContextReadinessMountProps {
   potSize?: string | null;
 }
 
-function FallbackShell({
-  testId,
-  message,
-}: {
-  testId: string;
-  message: string;
-}) {
+function FallbackShell({ testId, message }: { testId: string; message: string }) {
   return (
     <section
       data-testid={testId}
@@ -143,9 +134,7 @@ export default function PlantDetailAiDoctorContextReadinessMount({
   const openManualSensorEntry = useCallback(
     (prefill: { plantId: string; growId: string; tentId: string }) => {
       if (typeof window === "undefined") return;
-      window.dispatchEvent(
-        new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, { detail: prefill }),
-      );
+      window.dispatchEvent(new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, { detail: prefill }));
     },
     [],
   );
@@ -156,6 +145,23 @@ export default function PlantDetailAiDoctorContextReadinessMount({
     if (!intent) return;
     window.dispatchEvent(new CustomEvent(QUICK_LOG_V2_OPEN_EVENT, { detail: intent }));
   }, [plantId, tentId]);
+
+  const openEnvironmentSnapshot = useCallback(() => {
+    if (typeof window === "undefined" || !growId || !tentId) return;
+    window.dispatchEvent(
+      new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, {
+        detail: {
+          plantId,
+          plantName: plantName ?? null,
+          growId,
+          tentId,
+          tentName: null,
+          eventType: "environment",
+          suggestSnapshot: true,
+        },
+      }),
+    );
+  }, [plantId, plantName, growId, tentId]);
 
   if (!plantId) {
     return (
@@ -196,24 +202,20 @@ export default function PlantDetailAiDoctorContextReadinessMount({
           })
       : undefined;
   const safeOpenStructuredWater = growId && tentId ? openStructuredWater : undefined;
+  const safeOpenEnvironmentSnapshot = growId && tentId ? openEnvironmentSnapshot : undefined;
 
   return (
-    <div
-      data-testid="plant-detail-ai-doctor-context-readiness-mount"
-      className="my-3 space-y-2"
-    >
+    <div data-testid="plant-detail-ai-doctor-context-readiness-mount" className="my-3 space-y-2">
       <AiDoctorContextReadinessPanel
         context={built.context}
         openAlertsCount={alerts.rows.length}
         quickActions={{
-          // Watering / Feeding route into the existing QuickLog prefill
-          // surface; the grower still confirms and saves. No writes here.
+          // Every action routes into an existing Quick Log surface; the
+          // grower still reviews and saves. Dispatching never writes.
+          onFastAddPhoto: safeOpenQuickLog,
           onAddWatering: safeOpenStructuredWater,
           onAddFeeding: safeOpenQuickLog,
-          // Fast Add Photo and Add Sensor Snapshot have no safe single-
-          // tap entry yet — leave undefined so the panel renders them
-          // disabled with clear "coming soon" copy rather than inventing
-          // a route.
+          onAddSensorSnapshot: safeOpenEnvironmentSnapshot,
         }}
       />
       <PlantSensorContextAuditPanel
@@ -225,4 +227,3 @@ export default function PlantDetailAiDoctorContextReadinessMount({
     </div>
   );
 }
-

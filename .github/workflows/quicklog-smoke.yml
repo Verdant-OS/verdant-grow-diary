@@ -414,6 +414,29 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
 
+      # Append a direct download link to the just-uploaded flake summary
+      # artifact into the GitHub Actions Job Summary. `artifact-url` is only
+      # populated by actions/upload-artifact@v4 AFTER the upload step runs,
+      # so this must live immediately after upload_flake_summary rather than
+      # inside the earlier summarizer step. Enrichment only — never fails.
+      - name: Link flake summary artifact in Job Summary
+        if: always() && steps.e2e_config.outputs.should_run == 'true'
+        shell: bash
+        env:
+          FLAKE_SUMMARY_URL: ${{ steps.upload_flake_summary.outputs.artifact-url }}
+        run: |
+          {
+            echo ""
+            echo "### 📎 Flake summary artifact"
+            echo ""
+            if [ -n "${FLAKE_SUMMARY_URL}" ]; then
+              echo "Download the standalone \`playwright-flake-summary.md\` here: [quicklog-flake-summary](${FLAKE_SUMMARY_URL})"
+            else
+              echo "_Flake summary artifact URL unavailable — check the run's Artifacts dropdown for \`quicklog-flake-summary\`._"
+            fi
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Upload smoke artifacts
         id: upload_smoke_bundle
         if: always() && steps.e2e_config.outputs.should_run == 'true'

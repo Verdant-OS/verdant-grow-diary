@@ -74,6 +74,12 @@ on:
         description: "PR number to comment on for a manual workflow_dispatch run. Required for pr_comment_disabled/pr_comment_mode/pr_comment_min_failed to have any effect on a dispatched run — a plain workflow_dispatch has no pull_request event context to infer this from. Leave blank for a run that isn't about PR-comment behavior."
         required: false
         default: ""
+      upload_html_report:
+        description: "Upload the generated Playwright HTML report (playwright-report/) as the 'quicklog-playwright-report' artifact so failures can be browsed offline even when the flake summary is missing. Default true."
+        required: false
+        default: "true"
+        type: choice
+        options: ["true", "false"]
 
   push:
     branches: [verdant-grow-diary]

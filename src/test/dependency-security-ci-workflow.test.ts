@@ -11,6 +11,35 @@ const workflow = readFileSync(
   "utf8",
 );
 
+function workflowRunCommands(source: string): string[] {
+  const lines = source.split(/\r?\n/);
+  const commands: string[] = [];
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const match = lines[index].match(/^(\s*)run:\s*(.*)$/);
+    if (!match) continue;
+
+    const [, indentation, scalar] = match;
+    if (!/^[>|][+-]?$/.test(scalar.trim())) {
+      commands.push(scalar.trim());
+      continue;
+    }
+
+    const continuation: string[] = [];
+    for (let next = index + 1; next < lines.length; next += 1) {
+      const nextLine = lines[next];
+      if (nextLine.trim() === "") continue;
+      const nextIndentation = nextLine.match(/^\s*/)?.[0].length ?? 0;
+      if (nextIndentation <= indentation.length) break;
+      continuation.push(nextLine.trim());
+      index = next;
+    }
+    commands.push(continuation.join(" "));
+  }
+
+  return commands;
+}
+
 describe("dependency-security CI workflow", () => {
   it("runs for pushes and pull requests targeting the real default branch", () => {
     expect(workflow).toMatch(/^\s{2}merge_group:\s*$/m);
@@ -55,7 +84,7 @@ describe("dependency-security CI workflow", () => {
     }
   });
 
-  it("keeps the policy, audit, and focused contracts fail-closed", () => {
+  it("keeps the focused security lane fail-closed and delegates repo-wide coverage", () => {
     const focusedEnd = workflow.indexOf("- name: Typecheck");
     const securitySteps = workflow.slice(
       workflow.indexOf("- name: Lockfile policy check"),
@@ -65,5 +94,24 @@ describe("dependency-security CI workflow", () => {
     expect(securitySteps).toContain("bun run check:deps");
     expect(securitySteps).toContain("bunx vitest run");
     expect(securitySteps).not.toMatch(/continue-on-error:\s*true/);
+
+    const vitestCommands = workflowRunCommands(workflow).filter((command) =>
+      command.startsWith("bunx vitest run"),
+    );
+
+    expect(vitestCommands).toHaveLength(1);
+    for (const testFile of [
+      "src/test/check-bun-lockfile-policy.test.ts",
+      "src/test/check-dependency-security.test.ts",
+      "src/test/dependency-security-ci-workflow.test.ts",
+      "src/test/dependency-security-phase-a-contract.test.ts",
+      "src/test/vite-dev-server-binding.test.ts",
+    ]) {
+      expect(vitestCommands[0]).toContain(testFile);
+    }
+
+    expect(workflow).not.toMatch(/- name:\s*Unit tests/);
+    expect(workflow).toContain("Repo-wide Vitest coverage is intentionally delegated");
+    expect(workflow).toContain("sharded `CI` and `Full Vitest Suite (PR gate)` workflows");
   });
 });

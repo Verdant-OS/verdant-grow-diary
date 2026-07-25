@@ -39,12 +39,35 @@ import {
   PUBLIC_QUICK_LOG_STARTER_LOG_TYPES,
   type PublicQuickLogStarterLogType,
 } from "@/lib/publicQuickLogStarterRules";
+import { FAST_ADD_ACTIONS, type FastAddActionId } from "@/lib/fastAddActionRules";
 
 /**
  * Query key carrying the chosen preset alongside `open=quick-log`. Shared by
  * the builder and the reader so the two can never drift.
  */
 export const QUICK_LOG_START_TYPE_PARAM = "type";
+
+/**
+ * Closed vocabulary for the AUTHENTICATED marker: every non-null
+ * `quickLogEventType` in FAST_ADD_ACTIONS. This is deliberately WIDER than
+ * the public starter's four types — `photo` and `training` are real Quick Log
+ * activities that the public starter simply has no equivalent for. Reusing
+ * the starter's narrower list here would silently drop those two presets and
+ * open a plain observation form, which is how a grower ends up with a
+ * mislabeled entry. Pinned against FAST_ADD_ACTIONS by test so the two
+ * cannot drift.
+ */
+export const QUICK_LOG_START_EVENT_TYPES = [
+  "observation",
+  "watering",
+  "feeding",
+  "training",
+  "photo",
+  "environment",
+  "harvest",
+] as const;
+
+export type QuickLogStartEventType = (typeof QUICK_LOG_START_EVENT_TYPES)[number];
 
 export type ContextFreeQuickLogDestination =
   /** Authenticated grower: open the real Quick Log via the dashboard intent. */
@@ -56,18 +79,46 @@ export interface ContextFreeQuickLogInput {
   /** True when an authenticated session owns this view. */
   isSignedIn: boolean;
   /**
-   * Optional starter log-type seed. Values come from the closed
-   * PUBLIC_QUICK_LOG_STARTER_LOG_TYPES vocabulary; null means "no seed"
-   * (the training preset has no starter equivalent).
+   * The preset's REAL Quick Log event type, used for the authenticated
+   * branch. Null only for presets that do not open Quick Log at all
+   * (Diagnosis navigates to the AI Doctor surface instead).
+   */
+  authedEventType: QuickLogStartEventType | null;
+  /**
+   * Public-starter-only seed for the anonymous branch. Values come from the
+   * closed PUBLIC_QUICK_LOG_STARTER_LOG_TYPES vocabulary; null means the
+   * starter has no equivalent for this preset (photo, training).
    */
   fallbackType: PublicQuickLogStarterLogType | null;
 }
 
-function isKnownType(value: unknown): value is PublicQuickLogStarterLogType {
+function isKnownStarterType(value: unknown): value is PublicQuickLogStarterLogType {
   return (
     typeof value === "string" &&
     (PUBLIC_QUICK_LOG_STARTER_LOG_TYPES as readonly string[]).includes(value)
   );
+}
+
+function isKnownEventType(value: unknown): value is QuickLogStartEventType {
+  return (
+    typeof value === "string" && (QUICK_LOG_START_EVENT_TYPES as readonly string[]).includes(value)
+  );
+}
+
+/**
+ * The preset's real Quick Log event type, read from the single source of
+ * truth (FAST_ADD_ACTIONS) rather than re-declared at the call site. Callers
+ * must not maintain their own preset -> event-type table: the public-starter
+ * `fallbackType` column is deliberately narrower and is NOT a substitute.
+ *
+ * Returns null for presets that do not open Quick Log at all (Diagnosis
+ * navigates to the AI Doctor surface).
+ */
+export function quickLogEventTypeForAction(
+  actionId: FastAddActionId,
+): QuickLogStartEventType | null {
+  const def = FAST_ADD_ACTIONS.find((a) => a.id === actionId);
+  return isKnownEventType(def?.quickLogEventType) ? def!.quickLogEventType : null;
 }
 
 /**
@@ -78,17 +129,21 @@ function isKnownType(value: unknown): value is PublicQuickLogStarterLogType {
 export function resolveContextFreeQuickLogDestination(
   input: ContextFreeQuickLogInput,
 ): ContextFreeQuickLogDestination {
-  const seed = isKnownType(input.fallbackType) ? input.fallbackType : null;
   if (input.isSignedIn) {
+    // Use the preset's REAL event type here, never the public-starter seed:
+    // photo/training have no starter equivalent and would otherwise arrive as
+    // null and silently open an observation form.
+    const authed = isKnownEventType(input.authedEventType) ? input.authedEventType : null;
     // QUICK_LOG_START_ROUTE already carries `?open=quick-log`, so the preset
     // is appended with `&`.
     return {
       kind: "authed-start",
-      to: seed
-        ? `${QUICK_LOG_START_ROUTE}&${QUICK_LOG_START_TYPE_PARAM}=${encodeURIComponent(seed)}`
+      to: authed
+        ? `${QUICK_LOG_START_ROUTE}&${QUICK_LOG_START_TYPE_PARAM}=${encodeURIComponent(authed)}`
         : QUICK_LOG_START_ROUTE,
     };
   }
+  const seed = isKnownStarterType(input.fallbackType) ? input.fallbackType : null;
   return {
     kind: "public-starter",
     to: seed
@@ -105,10 +160,10 @@ export function resolveContextFreeQuickLogDestination(
  */
 export function readQuickLogStartEventType(
   search: string | null | undefined,
-): PublicQuickLogStarterLogType | null {
+): QuickLogStartEventType | null {
   if (typeof search !== "string") return null;
   const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
   if (params.get("open") !== "quick-log") return null;
   const raw = params.get(QUICK_LOG_START_TYPE_PARAM);
-  return isKnownType(raw) ? raw : null;
+  return isKnownEventType(raw) ? raw : null;
 }

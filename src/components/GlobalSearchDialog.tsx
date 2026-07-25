@@ -32,7 +32,10 @@ import {
   resolveFastAddIntent,
   type FastAddActionId,
 } from "@/lib/fastAddActionRules";
-import { resolveContextFreeQuickLogDestination } from "@/lib/globalSearchQuickLogFallbackRules";
+import {
+  resolveContextFreeQuickLogDestination,
+  quickLogEventTypeForAction,
+} from "@/lib/globalSearchQuickLogFallbackRules";
 import { useAuth } from "@/store/auth";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -763,6 +766,12 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
                                 navigate(
                                   resolveContextFreeQuickLogDestination({
                                     isSignedIn: !!user,
+                                    // Signed-in growers get the preset's REAL
+                                    // event type from FAST_ADD_ACTIONS. The
+                                    // fallbackType column above is the narrower
+                                    // public-starter vocabulary (no photo, no
+                                    // training) and must not stand in for it.
+                                    authedEventType: quickLogEventTypeForAction(actionId),
                                     fallbackType,
                                   }).to,
                                 );

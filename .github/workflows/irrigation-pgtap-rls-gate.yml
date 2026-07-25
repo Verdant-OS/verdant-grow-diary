@@ -84,6 +84,9 @@ jobs:
               - "supabase/tests/create_feeding_event.sql"
               - "supabase/tests/create_watering_event.sql"
               - "supabase/seed.sql"
+              - "config/local-supabase-replay-compatibility.json"
+              - "config/local-supabase-replay/**"
+              - "scripts/prepare-local-supabase-replay.mjs"
               # Runtime harness sources typechecked by this gate. Explicit
               # allowlist — new irrigation harnesses MUST be added here or
               # the gate will silently skip on PRs that only touch them.
@@ -172,6 +175,9 @@ jobs:
                 "supabase/tests/create_feeding_event.sql"
                 "supabase/tests/create_watering_event.sql"
                 "supabase/seed.sql"
+                "config/local-supabase-replay-compatibility.json"
+                "config/local-supabase-replay"
+                "scripts/prepare-local-supabase-replay.mjs"
                 "scripts/run-irrigation-evidence-rls-harness.ts"
                 "scripts/run-irrigation-integrity-suite.mjs"
                 "scripts/run-create-feeding-event-rls-harness.ts"
@@ -277,17 +283,32 @@ jobs:
           # Pinned deliberately — "latest" rate-limits on shared runners.
           version: 2.109.1
 
+      - name: Prepare immutable migration replay workspace
+        run: |
+          set -eo pipefail
+          REPLAY_WORKDIR="${RUNNER_TEMP}/verdant-supabase-replay"
+          node scripts/prepare-local-supabase-replay.mjs \
+            --output="${REPLAY_WORKDIR}" \
+            --json \
+            | tee migration-replay-compatibility.json
+          echo "SUPABASE_REPLAY_WORKDIR=${REPLAY_WORKDIR}" >> "$GITHUB_ENV"
+
       - name: Start local Supabase (disposable, loopback only)
         id: supabase-start
         run: |
           set -eo pipefail
-          supabase start --workdir . 2>&1 | tee supabase-start.log
+          # Startup output contains ephemeral local credentials. Keep it out of
+          # the Actions log and artifacts; the next step masks DB_URL.
+          if ! supabase start --workdir "$SUPABASE_REPLAY_WORKDIR" >"${RUNNER_TEMP}/irrigation-pgtap-supabase-start.log" 2>&1; then
+            echo "::error::Disposable local Supabase failed to start"
+            exit 1
+          fi
 
       - name: Export local Supabase DB URL
         id: supabase-env
         run: |
           set -eo pipefail
-          DB_URL="$(supabase status -o json | jq -r '.DB_URL // .db_url // empty')"
+          DB_URL="$(supabase status --workdir "$SUPABASE_REPLAY_WORKDIR" -o json | jq -r '.DB_URL // .db_url // empty')"
           if [ -z "$DB_URL" ]; then
             echo "BLOCKED: local Supabase did not expose DB_URL." >&2
             exit 2
@@ -311,7 +332,7 @@ jobs:
         # truth and false-flag drift.
         run: |
           set -o pipefail
-          supabase db reset 2>&1 | tee supabase-db-reset.log
+          supabase db reset --workdir "$SUPABASE_REPLAY_WORKDIR" 2>&1 | tee supabase-db-reset.log
 
       - name: pgTAP — create_feeding_event
         id: pgtap-feeding
@@ -335,8 +356,9 @@ jobs:
         with:
           name: irrigation-pgtap-rls-gate-logs
           path: |
-            supabase-start.log
             supabase-db-reset.log
+            migration-replay-compatibility.json
+            ${{ runner.temp }}/verdant-supabase-replay/local-supabase-replay-report.json
             pgtap-feeding.log
             pgtap-watering.log
           if-no-files-found: ignore
@@ -371,4 +393,4 @@ jobs:
 
       - name: Stop local Supabase
         if: always()
-        run: supabase stop --no-backup || true
+        run: supabase stop --workdir "$SUPABASE_REPLAY_WORKDIR" --no-backup || true

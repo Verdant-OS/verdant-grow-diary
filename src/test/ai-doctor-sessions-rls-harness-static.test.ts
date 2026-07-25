@@ -46,7 +46,7 @@ describe("AI Doctor sessions runtime RLS harness contract", () => {
     expect(HARNESS).toContain("signedInClient(emailA, passwordA)");
     expect(HARNESS).toContain("signedInClient(emailB, passwordB)");
     expect(HARNESS).toContain("const anonymous = createClient(SUPABASE_URL, ANON_KEY");
-    expect(HARNESS).toContain("async function seedScopes(\n  owner: SupabaseClient,");
+    expect(HARNESS).toMatch(/async function seedScopes\(\s+owner: SupabaseClient,/);
     expect(HARNESS).toContain('seedScopes(ownerA, uidA, "A")');
     expect(HARNESS).toContain('seedScopes(ownerB, uidB, "B")');
     expect(HARNESS).toContain("const { data: grow, error: growError } = await owner");

@@ -9,6 +9,8 @@ const SCRIPT = resolve("scripts/prepare-local-supabase-replay.mjs");
 const REAL_MANIFEST = resolve("config/local-supabase-replay-compatibility.json");
 const SECURITY_DB_WORKFLOW = resolve(".github/workflows/security-db-local.yml");
 const IRRIGATION_EVIDENCE_WORKFLOW = resolve(".github/workflows/irrigation-evidence-gate.yml");
+const IRRIGATION_PGTAP_WORKFLOW = resolve(".github/workflows/irrigation-pgtap-rls-gate.yml");
+const LOCAL_SEED = resolve("supabase/seed.sql");
 const temporaryRoots: string[] = [];
 
 function sha256(value: string): string {
@@ -155,7 +157,9 @@ describe("local Supabase replay compatibility workspace", () => {
     const lifecycleCommands = workflow
       .split(/\r?\n/)
       .map((line) => line.trim())
-      .filter((line) => /\bsupabase (start|status|db reset|stop)\b/.test(line));
+      .filter(
+        (line) => !line.startsWith("#") && /\bsupabase (start|status|db reset|stop)\b/.test(line),
+      );
 
     expect(lifecycleCommands).toHaveLength(4);
     expect(lifecycleCommands).toEqual([
@@ -173,7 +177,9 @@ describe("local Supabase replay compatibility workspace", () => {
     const lifecycleCommands = workflow
       .split(/\r?\n/)
       .map((line) => line.trim())
-      .filter((line) => /\bsupabase (start|status|db reset|stop)\b/.test(line));
+      .filter(
+        (line) => !line.startsWith("#") && /\bsupabase (start|status|db reset|stop)\b/.test(line),
+      );
 
     expect(prepareIndex).toBeGreaterThan(-1);
     expect(startIndex).toBeGreaterThan(prepareIndex);
@@ -183,6 +189,42 @@ describe("local Supabase replay compatibility workspace", () => {
       expect(command).toContain('--workdir "$SUPABASE_REPLAY_WORKDIR"');
     }
     expect(workflow).not.toMatch(/\bsupabase\s+(link|db push)\b/);
+  });
+
+  it("routes irrigation pgTAP through replay without publishing startup credentials", () => {
+    const workflow = readFileSync(IRRIGATION_PGTAP_WORKFLOW, "utf8");
+    const prepareIndex = workflow.indexOf("Prepare immutable migration replay workspace");
+    const startIndex = workflow.indexOf("Start local Supabase (disposable, loopback only)");
+    const lifecycleCommands = workflow
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(
+        (line) => !line.startsWith("#") && /\bsupabase (start|status|db reset|stop)\b/.test(line),
+      );
+
+    expect(prepareIndex).toBeGreaterThan(-1);
+    expect(startIndex).toBeGreaterThan(prepareIndex);
+    expect(workflow).toContain("node scripts/prepare-local-supabase-replay.mjs");
+    expect(lifecycleCommands).toHaveLength(4);
+    for (const command of lifecycleCommands) {
+      expect(command).toContain('--workdir "$SUPABASE_REPLAY_WORKDIR"');
+    }
+    expect(workflow).toContain('>"${RUNNER_TEMP}/irrigation-pgtap-supabase-start.log" 2>&1');
+    const artifactBlock = workflow.slice(workflow.indexOf("name: irrigation-pgtap-rls-gate-logs"));
+    expect(artifactBlock).not.toContain("irrigation-pgtap-supabase-start.log");
+    expect(workflow).not.toMatch(/\bsupabase\s+(link|db push)\b/);
+  });
+
+  it("reapplies the irrigation browser-write deny boundary after blanket local grants", () => {
+    const seed = readFileSync(LOCAL_SEED, "utf8");
+
+    expect(seed).toContain("REVOKE INSERT, UPDATE, DELETE ON TABLE");
+    expect(seed).toContain("public.grow_events");
+    expect(seed).toContain("public.watering_events");
+    expect(seed).toContain("public.feeding_events");
+    expect(seed).toContain("FROM PUBLIC, anon, authenticated");
+    expect(seed).toContain("TO authenticated");
+    expect(seed).toContain("TO service_role");
   });
 
   it("verifies the real immutable compatibility manifest without writing", () => {

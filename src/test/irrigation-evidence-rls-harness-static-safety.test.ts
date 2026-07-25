@@ -104,7 +104,7 @@ describe("irrigation evidence RLS harness — service_role boundary", () => {
   });
 
   it("seeds grower-owned fixtures through each authenticated owner", () => {
-    expect(src).toContain("async function seedId(\n  client: SupabaseClient,");
+    expect(src).toMatch(/async function seedId\(\s+client: SupabaseClient,/);
     expect(src).not.toMatch(/admin\.from\(table\)\.insert/);
     expect(src).toContain('seedId(ownerC, "grows"');
     expect(src).toContain('seedId(ownerC, "tents"');

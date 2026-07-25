@@ -83,6 +83,13 @@ export function parseVerifierLog(logText) {
       if (status === "fail") row.cause = classifyFailure(detail);
       rows.push(row);
       continue;
+    }
+    const s = SUMMARY_RE.exec(rawLine);
+    if (s) {
+      summary = { pass: Number(s[1]), fail: Number(s[2]), skip: Number(s[3]) };
+    }
+  }
+  return { rows, summary, keyUnsetMentioned };
 }
 
 /**
@@ -101,6 +108,13 @@ export function parseVerifierReport(report) {
   const parsed = { rows: [], summary: null, keyUnsetMentioned: false };
   if (!report || typeof report !== "object") return parsed;
   const rawRows = Array.isArray(report.rows) ? report.rows : [];
+  const KNOWN_CAUSE_KINDS = new Set([
+    "api_error",
+    "inactive",
+    "missing",
+    "coverage_gap",
+    "enumeration_error",
+  ]);
   for (const raw of rawRows) {
     if (!raw || typeof raw !== "object") continue;
     const { env, externalId, status, cause } = raw;
@@ -109,23 +123,17 @@ export function parseVerifierReport(report) {
     if (status !== "pass" && status !== "fail" && status !== "skip") continue;
     const row = { env, externalId, status };
     if (status === "fail") {
-      if (cause && typeof cause === "object" && typeof cause.kind === "string") {
-        const knownKinds = new Set([
-          "api_error",
-          "inactive",
-          "missing",
-          "coverage_gap",
-          "enumeration_error",
-        ]);
-        if (knownKinds.has(cause.kind)) {
-          const normalized = { kind: cause.kind };
-          if (cause.kind === "api_error" && Number.isFinite(cause.httpStatus)) {
-            normalized.httpStatus = Number(cause.httpStatus);
-          }
-          row.cause = normalized;
-        } else {
-          row.cause = { kind: "missing" };
+      if (
+        cause &&
+        typeof cause === "object" &&
+        typeof cause.kind === "string" &&
+        KNOWN_CAUSE_KINDS.has(cause.kind)
+      ) {
+        const normalized = { kind: cause.kind };
+        if (cause.kind === "api_error" && Number.isFinite(cause.httpStatus)) {
+          normalized.httpStatus = Number(cause.httpStatus);
         }
+        row.cause = normalized;
       } else {
         row.cause = { kind: "missing" };
       }
@@ -152,13 +160,6 @@ function safeReadReport(reportPath) {
   } catch {
     return null;
   }
-}
-    const s = SUMMARY_RE.exec(rawLine);
-    if (s) {
-      summary = { pass: Number(s[1]), fail: Number(s[2]), skip: Number(s[3]) };
-    }
-  }
-  return { rows, summary, keyUnsetMentioned };
 }
 
 /**

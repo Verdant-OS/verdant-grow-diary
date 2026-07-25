@@ -88,6 +88,17 @@ function parseEnvFlag(argv: readonly string[]): PaddleEnv[] {
   process.exit(2);
 }
 
+function parseJsonOutFlag(argv: readonly string[]): string | null {
+  const idx = argv.findIndex((a) => a === "--json-out");
+  if (idx < 0) return null;
+  const value = argv[idx + 1];
+  if (!value || value.startsWith("--")) {
+    console.error("--json-out requires a file path argument.");
+    process.exit(2);
+  }
+  return value;
+}
+
 function apiKeyFor(env: PaddleEnv): string | null {
   const name = env === "sandbox" ? "PADDLE_SANDBOX_API_KEY" : "PADDLE_LIVE_API_KEY";
   const value = process.env[name];

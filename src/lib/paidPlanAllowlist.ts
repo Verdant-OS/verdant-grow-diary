@@ -46,6 +46,9 @@ export const PAID_PLAN_ALLOWLIST: ReadonlySet<string> = new Set(PAID_PLAN_IDS);
 export function buildPaidPlanAllowlistSourceRegex(
   ids: readonly string[] = PAID_PLAN_IDS,
 ): RegExp {
-  const entries = ids.map((id) => `["']${id}["']`).join(",\\s*");
-  return new RegExp(`PAID_PLAN_IDS\\s*=\\s*\\[[\\s\\S]{0,600}${entries},`);
+  // Separator tolerates whitespace AND intervening line comments (the credit-
+  // pack block between founder_lifetime and credit_pack_50).
+  const sep = ",[\\s\\S]{0,300}?";
+  const entries = ids.map((id) => `["']${id}["']`).join(sep);
+  return new RegExp(`PAID_PLAN_IDS\\s*=\\s*\\[[\\s\\S]{0,50}?${entries},`);
 }

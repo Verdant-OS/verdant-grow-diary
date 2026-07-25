@@ -68,7 +68,18 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
           echo "rc=$RC" >> "$GITHUB_OUTPUT"
-          exit $RC
+
+          # Whether the ONLY reason we could not verify is an absent API key.
+          # Recorded here, where the log is in hand, rather than re-derived
+          # later — and deliberately narrower than "rc == 2", which also
+          # covers a malformed --env invocation that must still fail.
+          if grep -qE '_API_KEY is not set' "$RUNNER_TEMP/craft-preflight.log"; then
+            echo "unconfigured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "unconfigured=false" >> "$GITHUB_OUTPUT"
+          fi
+          # Do NOT exit here. The enforcement step below decides, so a
+          # missing repo secret does not red every unrelated checkout PR.
 
       # Summarise the outcome on the PR itself. Runs even when the check
       # failed, so the comment appears exactly when it is most useful.
@@ -178,3 +189,46 @@ jobs:
             gh pr comment "$PR" --repo "$REPO" --body "$BODY"
             echo "Posted Craft catalog comment on PR #$PR."
           fi
+
+      # Enforcement is separated from execution so the gate can be honest
+      # about WHY it could not verify.
+      #
+      # A catalog that is genuinely wrong (exit 1) fails hard — that is the
+      # whole point of the gate. But an absent PADDLE_*_API_KEY repo secret is
+      # a repository configuration state, not a defect in the pull request,
+      # and failing every checkout-touching PR for it would train reviewers to
+      # ignore this check — which is exactly how two genuinely-red suites sat
+      # unnoticed on the deploy branch.
+      #
+      # The comment still says "NOT VERIFIED … This is not a pass", and this
+      # step still emits a ::warning::, so the unverified state stays visible
+      # rather than being silently downgraded to green. The moment the secrets
+      # exist, this branch stops being reachable and the gate blocks for real.
+      - name: Enforce catalog result
+        if: always()
+        env:
+          RC: ${{ steps.preflight.outputs.rc }}
+          UNCONFIGURED: ${{ steps.preflight.outputs.unconfigured }}
+        run: |
+          set -euo pipefail
+          case "${RC:-}" in
+            0)
+              echo "Craft catalog verified in every requested environment."
+              ;;
+            2)
+              if [ "${UNCONFIGURED:-}" = "true" ]; then
+                echo "::warning::Craft catalog NOT verified — PADDLE_SANDBOX_API_KEY / PADDLE_LIVE_API_KEY are not configured. This is not a pass; it is not blocking only because no PR can fix a missing repo secret. Configure the secrets before Craft goes on sale."
+                exit 0
+              fi
+              echo "::error::Craft catalog preflight was misconfigured (exit 2) for a reason other than a missing API key — see the log."
+              exit 1
+              ;;
+            "")
+              echo "::error::Craft catalog preflight did not run to completion; treat as unverified."
+              exit 1
+              ;;
+            *)
+              echo "::error::Craft catalog check failed (exit ${RC}). An advertised Craft price is missing, inactive, or unreadable."
+              exit 1
+              ;;
+          esac

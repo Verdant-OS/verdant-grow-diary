@@ -37,11 +37,7 @@ function findLatestRpcSql(): { path: string; sql: string } | null {
   for (const name of readdirSync(MIG_DIR)) {
     const p = join(MIG_DIR, name);
     const sql = readFileSync(p, "utf8");
-    if (
-      /CREATE\s+(OR\s+REPLACE\s+)?FUNCTION\s+public\.quicklog_save_event\b/i.test(
-        sql,
-      )
-    ) {
+    if (/CREATE\s+(OR\s+REPLACE\s+)?FUNCTION\s+public\.quicklog_save_event\b/i.test(sql)) {
       matches.push({ path: p, sql, name });
     }
   }
@@ -58,7 +54,37 @@ const sql = mig?.sql ?? "";
 const bodyMatch = sql.match(
   /CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+public\.quicklog_save_event[\s\S]*?\$function\$([\s\S]*?)\$function\$/i,
 );
-const body = bodyMatch?.[1] ?? "";
+const wrapperBody = bodyMatch?.[1] ?? "";
+
+function findDelegatedRpcBody(): string {
+  if (
+    !mig ||
+    !/RENAME\s+TO\s+quicklog_save_event_pre_logged_at/i.test(sql) ||
+    !/quicklog_save_event_pre_logged_at\s*\(/i.test(wrapperBody)
+  ) {
+    return "";
+  }
+
+  const earlier = readdirSync(MIG_DIR)
+    .filter((name) => name.localeCompare(mig.path.split(/[\\/]/).pop() ?? "") < 0)
+    .sort((a, b) => b.localeCompare(a));
+  for (const name of earlier) {
+    const priorSql = readFileSync(join(MIG_DIR, name), "utf8");
+    const match = priorSql.match(
+      /CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+public\.quicklog_save_event[\s\S]*?\$function\$([\s\S]*?)\$function\$/i,
+    );
+    if (match?.[1]) return match[1];
+  }
+  return "";
+}
+
+// The latest foundation keeps the public signature as a narrow timestamp
+// wrapper and renames the previously-proven implementation to a non-executable
+// delegate. Preserve all existing trust-boundary assertions against that
+// effective call chain; wrapper-specific invariants have their own focused
+// regression suite.
+const delegatedBody = findDelegatedRpcBody();
+const body = delegatedBody ? `${delegatedBody}\n${wrapperBody}` : wrapperBody;
 
 describe("quicklog_save_event — migration discoverable", () => {
   it("a migration defines public.quicklog_save_event", () => {
@@ -70,9 +96,7 @@ describe("quicklog_save_event — migration discoverable", () => {
 describe("quicklog_save_event — identity and authentication", () => {
   it("is SECURITY DEFINER with a pinned search_path", () => {
     expect(sql).toMatch(/SECURITY\s+DEFINER/i);
-    expect(sql).toMatch(
-      /SET\s+search_path\s+TO\s+'public'\s*,\s*'pg_temp'/i,
-    );
+    expect(sql).toMatch(/SET\s+search_path\s+TO\s+'public'\s*,\s*'pg_temp'/i);
   });
 
   it("derives uid from auth.uid(), never from a client param", () => {
@@ -83,9 +107,7 @@ describe("quicklog_save_event — identity and authentication", () => {
   });
 
   it("rejects unauthenticated callers with 'not_authenticated'", () => {
-    expect(body).toMatch(
-      /IF\s+uid\s+IS\s+NULL[\s\S]{0,200}'not_authenticated'/i,
-    );
+    expect(body).toMatch(/IF\s+uid\s+IS\s+NULL[\s\S]{0,200}'not_authenticated'/i);
   });
 });
 
@@ -127,13 +149,13 @@ describe("quicklog_save_event — ownership and cross-boundary attachment", () =
     );
     // The old defect (only rejecting when the plant already had a non-null tent)
     // must be gone: an untented plant + arbitrary tent no longer slips through.
-    expect(body).not.toMatch(/v_plant_tent\s+IS\s+NOT\s+NULL\s+AND\s+v_plant_tent\s*<>\s*p_tent_id/i);
+    expect(body).not.toMatch(
+      /v_plant_tent\s+IS\s+NOT\s+NULL\s+AND\s+v_plant_tent\s*<>\s*p_tent_id/i,
+    );
   });
 
   it("all ownership/scope checks occur before the first INSERT into grow_events", () => {
-    const firstEventInsert = body.search(
-      /INSERT\s+INTO\s+public\.grow_events\s*\(\s*user_id/i,
-    );
+    const firstEventInsert = body.search(/INSERT\s+INTO\s+public\.grow_events\s*\(\s*user_id/i);
     expect(firstEventInsert).toBeGreaterThan(-1);
     for (const code of [
       "grow_not_owned",
@@ -148,21 +170,15 @@ describe("quicklog_save_event — ownership and cross-boundary attachment", () =
   });
 
   it("parent grow_events insert binds user_id to uid, not a client value", () => {
-    expect(body).toMatch(
-      /INSERT\s+INTO\s+public\.grow_events[\s\S]{0,300}VALUES\s*\(\s*uid\s*,/i,
-    );
+    expect(body).toMatch(/INSERT\s+INTO\s+public\.grow_events[\s\S]{0,300}VALUES\s*\(\s*uid\s*,/i);
   });
 });
 
 describe("quicklog_save_event — event_type whitelist (trigger-aligned)", () => {
   it("rejects invalid event types before any insert with 'invalid_event_type'", () => {
-    expect(body).toMatch(
-      /p_event_type\s+NOT\s+IN[\s\S]{0,400}'invalid_event_type'/i,
-    );
+    expect(body).toMatch(/p_event_type\s+NOT\s+IN[\s\S]{0,400}'invalid_event_type'/i);
     const at = body.indexOf("'invalid_event_type'");
-    const firstEventInsert = body.search(
-      /INSERT\s+INTO\s+public\.grow_events\s*\(\s*user_id/i,
-    );
+    const firstEventInsert = body.search(/INSERT\s+INTO\s+public\.grow_events\s*\(\s*user_id/i);
     expect(at).toBeLessThan(firstEventInsert);
   });
 
@@ -173,14 +189,7 @@ describe("quicklog_save_event — event_type whitelist (trigger-aligned)", () =>
     const m = body.match(/p_event_type\s+NOT\s+IN\s*\(([^)]+)\)/i);
     expect(m).not.toBeNull();
     const list = (m?.[1] ?? "").toLowerCase();
-    for (const ok of [
-      "watering",
-      "feeding",
-      "training",
-      "observation",
-      "photo",
-      "environment",
-    ]) {
+    for (const ok of ["watering", "feeding", "training", "observation", "photo", "environment"]) {
       expect(list).toContain(`'${ok}'`);
     }
     expect(list).not.toContain("'note'");
@@ -218,9 +227,7 @@ describe("quicklog_save_event — sensor snapshot validation", () => {
   });
 
   it("snapshot validation runs before the grow_events insert", () => {
-    const firstEventInsert = body.search(
-      /INSERT\s+INTO\s+public\.grow_events\s*\(\s*user_id/i,
-    );
+    const firstEventInsert = body.search(/INSERT\s+INTO\s+public\.grow_events\s*\(\s*user_id/i);
     for (const code of [
       "invalid_sensor_metric",
       "invalid_sensor_source",
@@ -246,9 +253,7 @@ describe("quicklog_save_event — idempotency scope", () => {
     );
     // The replay branch must return BEFORE the grow_events insert.
     const replayAt = body.search(/'duplicate_reused'/);
-    const firstEventInsert = body.search(
-      /INSERT\s+INTO\s+public\.grow_events\s*\(\s*user_id/i,
-    );
+    const firstEventInsert = body.search(/INSERT\s+INTO\s+public\.grow_events\s*\(\s*user_id/i);
     expect(replayAt).toBeGreaterThan(-1);
     expect(replayAt).toBeLessThan(firstEventInsert);
   });
@@ -277,9 +282,7 @@ describe("quicklog_save_event — atomic write + companion diary", () => {
     );
     expect(block).not.toBeNull();
     expect(block?.[0] ?? "").toMatch(/INSERT\s+INTO\s+public\.diary_entries/i);
-    expect(block?.[0] ?? "").toMatch(
-      /INSERT\s+INTO\s+public\.quicklog_idempotency/i,
-    );
+    expect(block?.[0] ?? "").toMatch(/INSERT\s+INTO\s+public\.quicklog_idempotency/i);
   });
 
   it("on failure, audits 'save_failed' with SQLSTATE and returns safe JSON (no RAISE)", () => {
@@ -288,9 +291,10 @@ describe("quicklog_save_event — atomic write + companion diary", () => {
     // dumps) and (b) return a calm typed {ok:false, reason:'save_failed'}
     // envelope so no orphan rows are committed and callers receive a safe
     // response rather than a raw Postgres exception.
-    const block = body.match(
-      /BEGIN\s+INSERT\s+INTO\s+public\.grow_events[\s\S]*?EXCEPTION[\s\S]*?END\s*;/i,
-    )?.[0] ?? "";
+    const block =
+      body.match(
+        /BEGIN\s+INSERT\s+INTO\s+public\.grow_events[\s\S]*?EXCEPTION[\s\S]*?END\s*;/i,
+      )?.[0] ?? "";
     expect(block).toMatch(/'save_failed'\s*,\s*SQLSTATE\b/);
     expect(block).toMatch(
       /RETURN\s+jsonb_build_object\(\s*'ok'\s*,\s*false\s*,\s*'reason'\s*,\s*'save_failed'/i,
@@ -307,9 +311,10 @@ describe("quicklog_save_event — atomic write + companion diary", () => {
     // (user_id, idempotency_key) and return the same {ok:true, reused:true,
     // grow_event_id} envelope the explicit duplicate branch returns, so a
     // concurrent replay collapses cleanly with no duplicate companion rows.
-    const except = body.match(
-      /EXCEPTION[\s\S]*?WHEN\s+unique_violation\s+THEN([\s\S]*?)WHEN\s+OTHERS\s+THEN/i,
-    )?.[1] ?? "";
+    const except =
+      body.match(
+        /EXCEPTION[\s\S]*?WHEN\s+unique_violation\s+THEN([\s\S]*?)WHEN\s+OTHERS\s+THEN/i,
+      )?.[1] ?? "";
     expect(except.length).toBeGreaterThan(0);
     expect(except).toMatch(
       /FROM\s+public\.quicklog_idempotency[\s\S]{0,200}user_id\s*=\s*uid\s+AND\s+idempotency_key\s*=\s*p_idempotency_key/i,
@@ -327,9 +332,7 @@ describe("quicklog_save_event — audit emissions are safe", () => {
   });
 
   it("emits 'validation_failed' with a short reason code for rejected calls", () => {
-    expect(body).toMatch(
-      /quicklog_audit_events[\s\S]{0,200}'validation_failed'/i,
-    );
+    expect(body).toMatch(/quicklog_audit_events[\s\S]{0,200}'validation_failed'/i);
   });
 
   it("emits 'duplicate_reused' on idempotent replay", () => {
@@ -343,9 +346,7 @@ describe("quicklog_save_event — audit emissions are safe", () => {
   });
 
   it("audit reason codes are short safe tokens — no SQL, table names, or UUIDs", () => {
-    const reasons = Array.from(
-      body.matchAll(/'reason'\s*,\s*'([^']+)'/g),
-    ).map((m) => m[1]);
+    const reasons = Array.from(body.matchAll(/'reason'\s*,\s*'([^']+)'/g)).map((m) => m[1]);
     // Also collect any literal inserted into quicklog_audit_events.reason.
     const auditReasons = Array.from(
       body.matchAll(
@@ -358,9 +359,7 @@ describe("quicklog_save_event — audit emissions are safe", () => {
       expect(r).toMatch(/^[a-z][a-z0-9_]{2,40}$/);
       expect(r).not.toMatch(/select|insert|update|delete|from|where/i);
       expect(r).not.toMatch(/public\.|auth\.|jwt|bearer|token|secret/i);
-      expect(r).not.toMatch(
-        /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i,
-      );
+      expect(r).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
     }
   });
 
@@ -429,9 +428,7 @@ describe("quicklog_save_event — post-failure orphan invariants (static)", () =
     for (const code of REJECT_CODES) {
       const at = body.indexOf(`'${code}'`);
       expect(at, code).toBeGreaterThan(-1);
-      expect(at, `${code} must precede first companion INSERT`).toBeLessThan(
-        earliest,
-      );
+      expect(at, `${code} must precede first companion INSERT`).toBeLessThan(earliest);
     }
   });
 
@@ -447,9 +444,7 @@ describe("quicklog_save_event — post-failure orphan invariants (static)", () =
     // No companion insert exists outside the atomic block.
     const outside = body.replace(blk, "");
     expect(outside).not.toMatch(/INSERT\s+INTO\s+public\.diary_entries/i);
-    expect(outside).not.toMatch(
-      /INSERT\s+INTO\s+public\.quicklog_idempotency/i,
-    );
+    expect(outside).not.toMatch(/INSERT\s+INTO\s+public\.quicklog_idempotency/i);
   });
 
   it("each rejection branch RETURNs early (never falls through to insert)", () => {
@@ -464,15 +459,11 @@ describe("quicklog_save_event — post-failure orphan invariants (static)", () =
 describe("quicklog_save_event — duplicate replay isolation (static)", () => {
   it("duplicate branch returns reused=true BEFORE the first insert", () => {
     const replayAt = body.indexOf("'duplicate_reused'");
-    const firstInsert = body.search(
-      /INSERT\s+INTO\s+public\.grow_events\s*\(\s*user_id/i,
-    );
+    const firstInsert = body.search(/INSERT\s+INTO\s+public\.grow_events\s*\(\s*user_id/i);
     expect(replayAt).toBeGreaterThan(-1);
     expect(replayAt).toBeLessThan(firstInsert);
     const window = body.slice(replayAt, firstInsert);
-    expect(window).toMatch(
-      /RETURN\s+jsonb_build_object[\s\S]{0,300}'reused'\s*,\s*true/i,
-    );
+    expect(window).toMatch(/RETURN\s+jsonb_build_object[\s\S]{0,300}'reused'\s*,\s*true/i);
   });
 
   it("idempotency lookup AND insert are scoped by (user_id, idempotency_key)", () => {
@@ -496,8 +487,7 @@ describe("quicklog_save_event — sensor JSON value shape (static)", () => {
   });
 
   it("does not coerce sensor values with ::numeric / to_number / to_jsonb (no masking)", () => {
-    const region =
-      body.match(/v_metrics\s*:=[\s\S]*?END\s+LOOP/i)?.[0] ?? body;
+    const region = body.match(/v_metrics\s*:=[\s\S]*?END\s+LOOP/i)?.[0] ?? body;
     expect(region).not.toMatch(/::numeric|to_number\(|to_jsonb\(/i);
   });
 });

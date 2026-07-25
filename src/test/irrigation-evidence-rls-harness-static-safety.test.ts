@@ -263,9 +263,23 @@ describe("irrigation evidence RLS harness — proves the trust boundary matrix",
     expect(src).toMatch(/idempotency_key_conflict/);
     expect(src).toMatch(/pg_advisory_xact_lock/);
     expect(src).toMatch(/pg_catalog\.pg_locks/);
-    expect(src).toMatch(/granted_count/);
-    expect(src).toMatch(/waiting_count/);
-    expect(src).toMatch(/overlapped at the idempotency insert/i);
+    expect(src).toContain("waitForRaceContention(owner.id, parallelReplayKey)");
+    expect(src).toContain("waitForRaceContention(owner.id, parallelConflictKey)");
+    expect(src).toMatch(/hashtextextended\(\$1::text \|\| ':' \|\| \$2::text,\s*0\)/);
+    expect(src).toMatch(/\(classid::bigint << 32\) \| objid::bigint/);
+    expect(src).toMatch(/objsubid = 1/);
+    expect(src).toMatch(/objsubid = 2/);
+    for (const count of [
+      "barrier_granted_count",
+      "barrier_waiting_count",
+      "quicklog_granted_count",
+      "quicklog_waiting_count",
+    ]) {
+      expect(src).toContain(count);
+    }
+    expect(src).toContain("[userId, idempotencyKey]");
+    expect(src).toMatch(/barrierContended \|\| quicklogContended/);
+    expect(src).toMatch(/idempotency serialization\/contention/i);
   });
   it("checks atomicity across the full committed event set", () => {
     for (const table of [

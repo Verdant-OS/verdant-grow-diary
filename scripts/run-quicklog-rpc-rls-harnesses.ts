@@ -5,7 +5,7 @@
  * Behavior:
  *   - If SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY + SUPABASE_ANON_KEY
  *     (or SUPABASE_PUBLISHABLE_KEY / VITE_SUPABASE_ANON_KEY) are all set:
- *     run both runtime harnesses sequentially and fail on any non-zero exit.
+ *     run all runtime harnesses sequentially and fail on any non-zero exit.
  *   - If any env is missing: print a clear SKIP message and exit 0.
  *
  * Never prints secret values. Never targets production — harness scripts
@@ -24,19 +24,15 @@ const ANON_VARS = [
 const missing = REQUIRED.filter((k) => !process.env[k]);
 const hasAnon = ANON_VARS.some((k) => Boolean(process.env[k]));
 if (missing.length > 0 || !hasAnon) {
-  const lacking = [
-    ...missing,
-    ...(hasAnon ? [] : ["SUPABASE_ANON_KEY (or _PUBLISHABLE_KEY)"]),
-  ];
-  console.log(
-    `[quicklog-rpc] SKIP runtime harnesses — missing env: ${lacking.join(", ")}`,
-  );
+  const lacking = [...missing, ...(hasAnon ? [] : ["SUPABASE_ANON_KEY (or _PUBLISHABLE_KEY)"])];
+  console.log(`[quicklog-rpc] SKIP runtime harnesses — missing env: ${lacking.join(", ")}`);
   process.exit(0);
 }
 
 const HARNESSES = [
   "scripts/run-quicklog-save-event-rls-harness.ts",
   "scripts/run-quicklog-save-manual-rls-harness.ts",
+  "scripts/run-quicklog-dual-timestamp-rls-harness.ts",
 ];
 
 let failed = false;

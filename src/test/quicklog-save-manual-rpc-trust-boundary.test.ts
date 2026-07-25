@@ -27,11 +27,7 @@ function findLatestRpcSql(): { path: string; sql: string } | null {
   for (const name of readdirSync(MIG_DIR)) {
     const p = join(MIG_DIR, name);
     const sql = readFileSync(p, "utf8");
-    if (
-      /CREATE\s+(OR\s+REPLACE\s+)?FUNCTION\s+public\.quicklog_save_manual/i.test(
-        sql,
-      )
-    ) {
+    if (/CREATE\s+(OR\s+REPLACE\s+)?FUNCTION\s+public\.quicklog_save_manual/i.test(sql)) {
       matches.push({ path: p, sql, name });
     }
   }
@@ -45,7 +41,33 @@ const sql = mig?.sql ?? "";
 const bodyMatch = sql.match(
   /CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+public\.quicklog_save_manual[\s\S]*?AS\s+(\$function\$|\$\$)([\s\S]*?)\1/i,
 );
-const body = bodyMatch?.[2] ?? "";
+const wrapperBody = bodyMatch?.[2] ?? "";
+
+function findDelegatedRpcBody(): string {
+  if (
+    !mig ||
+    !/RENAME\s+TO\s+quicklog_save_manual_pre_logged_at/i.test(sql) ||
+    !/quicklog_save_manual_pre_logged_at\s*\(/i.test(wrapperBody)
+  ) {
+    return "";
+  }
+
+  const latestName = mig.path.split(/[\\/]/).pop() ?? "";
+  const earlier = readdirSync(MIG_DIR)
+    .filter((name) => name.localeCompare(latestName) < 0)
+    .sort((a, b) => b.localeCompare(a));
+  for (const name of earlier) {
+    const priorSql = readFileSync(join(MIG_DIR, name), "utf8");
+    const match = priorSql.match(
+      /CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+public\.quicklog_save_manual[\s\S]*?AS\s+(\$function\$|\$\$)([\s\S]*?)\1/i,
+    );
+    if (match?.[2]) return match[2];
+  }
+  return "";
+}
+
+const delegatedBody = findDelegatedRpcBody();
+const body = delegatedBody ? `${delegatedBody}\n${wrapperBody}` : wrapperBody;
 
 describe("quicklog_save_manual — migration discoverable", () => {
   it("migration defines the function", () => {
@@ -124,9 +146,7 @@ describe("quicklog_save_manual — sensor inputs are typed SQL params", () => {
   });
 
   it("environment branch only fires when at least one sensor value is non-NULL", () => {
-    expect(body).toMatch(
-      /v_has_sensors\s*:=\s*\(\s*p_temperature_c\s+IS\s+NOT\s+NULL/i,
-    );
+    expect(body).toMatch(/v_has_sensors\s*:=\s*\(\s*p_temperature_c\s+IS\s+NOT\s+NULL/i);
     expect(body).toMatch(/IF\s+v_has_sensors\s+THEN/i);
   });
 
@@ -183,19 +203,17 @@ describe("quicklog_save_manual — internal audit emissions", () => {
   it("emits 'save_started' before the first companion INSERT", () => {
     const startAt = body.search(/'save_started'/);
     expect(startAt).toBeGreaterThan(-1);
-    const firstInsert = body.search(
-      /INSERT\s+INTO\s+public\.grow_events\b/i,
-    );
+    const firstInsert = body.search(/INSERT\s+INTO\s+public\.grow_events\b/i);
     expect(startAt).toBeLessThan(firstInsert);
   });
 
   it("emits 'save_succeeded' after the companion write block", () => {
-    expect(body).toMatch(
-      /quicklog_audit_events[\s\S]{0,200}'save_succeeded'/i,
-    );
+    expect(body).toMatch(/quicklog_audit_events[\s\S]{0,200}'save_succeeded'/i);
     const succAt = body.lastIndexOf("'save_succeeded'");
     const lastInsertMatches = Array.from(
-      body.matchAll(/INSERT\s+INTO\s+public\.(grow_events|watering_events|environment_events|diary_entries)\b/gi),
+      body.matchAll(
+        /INSERT\s+INTO\s+public\.(grow_events|watering_events|environment_events|diary_entries)\b/gi,
+      ),
     );
     expect(lastInsertMatches.length).toBeGreaterThan(0);
     const lastInsert = lastInsertMatches[lastInsertMatches.length - 1].index!;
@@ -203,9 +221,7 @@ describe("quicklog_save_manual — internal audit emissions", () => {
   });
 
   it("emits 'save_failed' with SQLSTATE (not SQLERRM) inside one WHEN OTHERS block", () => {
-    const except = body.match(
-      /EXCEPTION\s+WHEN\s+OTHERS\s+THEN[\s\S]*?END\s*;/i,
-    )?.[0] ?? "";
+    const except = body.match(/EXCEPTION\s+WHEN\s+OTHERS\s+THEN[\s\S]*?END\s*;/i)?.[0] ?? "";
     expect(except).toMatch(/'save_failed'\s*,\s*SQLSTATE\b/);
     expect(except).not.toMatch(/\bSQLERRM\b/);
     expect(except).toMatch(

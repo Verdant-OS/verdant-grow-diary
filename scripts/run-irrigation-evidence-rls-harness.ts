@@ -335,21 +335,58 @@ async function removeRaceBarrier(): Promise<void> {
   await raceDb.unsafe(`DROP SCHEMA IF EXISTS ${RACE_BARRIER_SCHEMA} CASCADE`);
 }
 
-async function waitForRaceContention(): Promise<boolean> {
+async function waitForRaceContention(userId: string, idempotencyKey: string): Promise<boolean> {
   const deadline = Date.now() + 2_500;
   while (Date.now() < deadline) {
-    const rows = (await raceDb.unsafe(`
+    const rows = (await raceDb.unsafe(
+      `
       SELECT
-        count(*) FILTER (WHERE granted)::integer AS granted_count,
-        count(*) FILTER (WHERE NOT granted)::integer AS waiting_count
+        count(*) FILTER (
+          WHERE granted
+            AND classid = ${RACE_ADVISORY_CLASS_ID}::oid
+            AND objid = ${RACE_ADVISORY_OBJECT_ID}::oid
+            AND objsubid = 2
+        )::integer AS barrier_granted_count,
+        count(*) FILTER (
+          WHERE NOT granted
+            AND classid = ${RACE_ADVISORY_CLASS_ID}::oid
+            AND objid = ${RACE_ADVISORY_OBJECT_ID}::oid
+            AND objsubid = 2
+        )::integer AS barrier_waiting_count,
+        count(*) FILTER (
+          WHERE granted
+            AND objsubid = 1
+            AND ((classid::bigint << 32) | objid::bigint)
+              = pg_catalog.hashtextextended($1::text || ':' || $2::text, 0)
+        )::integer AS quicklog_granted_count,
+        count(*) FILTER (
+          WHERE NOT granted
+            AND objsubid = 1
+            AND ((classid::bigint << 32) | objid::bigint)
+              = pg_catalog.hashtextextended($1::text || ':' || $2::text, 0)
+        )::integer AS quicklog_waiting_count
       FROM pg_catalog.pg_locks
       WHERE locktype = 'advisory'
-        AND classid = ${RACE_ADVISORY_CLASS_ID}::oid
-        AND objid = ${RACE_ADVISORY_OBJECT_ID}::oid
-        AND objsubid = 2
-    `)) as unknown as Array<{ granted_count: number | string; waiting_count: number | string }>;
+        AND database = (
+          SELECT oid
+          FROM pg_catalog.pg_database
+          WHERE datname = pg_catalog.current_database()
+        )
+    `,
+      [userId, idempotencyKey],
+    )) as unknown as Array<{
+      barrier_granted_count: number | string;
+      barrier_waiting_count: number | string;
+      quicklog_granted_count: number | string;
+      quicklog_waiting_count: number | string;
+    }>;
     const row = rows[0];
-    if (Number(row?.granted_count ?? 0) >= 1 && Number(row?.waiting_count ?? 0) >= 1) {
+    const barrierContended =
+      Number(row?.barrier_granted_count ?? 0) >= 1 && Number(row?.barrier_waiting_count ?? 0) >= 1;
+    const quicklogContended =
+      Number(row?.quicklog_granted_count ?? 0) >= 1 &&
+      Number(row?.quicklog_waiting_count ?? 0) >= 1;
+    if (barrierContended || quicklogContended) {
       return true;
     }
     await new Promise((resolve) => setTimeout(resolve, 25));
@@ -578,15 +615,16 @@ async function main() {
   check("ownership-spoofing detail key rejected", reasonOf(spoof.env) === "invalid_typed_payload");
 
   // 12. Install a disposable database-only barrier. For race-prefixed keys,
-  // the first INSERT holds a transaction-scoped advisory lock while the second
-  // waits on the same lock. pg_locks must show both transactions before the
-  // response assertions are allowed to count as concurrent-race proof.
+  // the first request holds either the wrapper's per-user/key serialization
+  // lock or the INSERT barrier lock while the second waits on that exact lock.
+  // pg_locks must show both transactions before response assertions count as
+  // concurrent-race proof.
   await installRaceBarrier();
   const parallelReplayKey = raceKey();
   const parallelReplayArgs = baseArgs({ p_idempotency_key: parallelReplayKey });
   const parallelReplayAPromise = save(ownerC, parallelReplayArgs);
   const parallelReplayBPromise = save(ownerC, parallelReplayArgs);
-  const parallelReplayContention = await waitForRaceContention();
+  const parallelReplayContention = await waitForRaceContention(owner.id, parallelReplayKey);
   const [parallelReplayA, parallelReplayB] = await Promise.all([
     parallelReplayAPromise,
     parallelReplayBPromise,
@@ -597,7 +635,7 @@ async function main() {
     .map((result) => result.env?.reused)
     .sort((a, b) => Number(a) - Number(b));
   check(
-    "parallel identical requests overlapped at the idempotency insert",
+    "parallel identical requests prove Quick Log idempotency serialization/contention",
     parallelReplayContention,
   );
   check(
@@ -642,7 +680,7 @@ async function main() {
       p_water: { volume_ml: 1300, ph: 6.1, ec_ms_cm: 1.8 },
     }),
   );
-  const parallelConflictContention = await waitForRaceContention();
+  const parallelConflictContention = await waitForRaceContention(owner.id, parallelConflictKey);
   const [parallelConflictA, parallelConflictB] = await Promise.all([
     parallelConflictAPromise,
     parallelConflictBPromise,
@@ -655,7 +693,7 @@ async function main() {
     (result) => reasonOf(result.env) === "idempotency_key_conflict",
   );
   check(
-    "parallel different requests overlapped at the idempotency insert",
+    "parallel different requests prove Quick Log idempotency serialization/contention",
     parallelConflictContention,
   );
   check(

@@ -77,7 +77,7 @@ describe("AlertDetail — stale-action warning", () => {
   it("renders the stale-action warning with the required copy", () => {
     expect(ALERT_DETAIL).toMatch(/data-testid="stale-action-warning"/);
     expect(ALERT_DETAIL).toMatch(
-      /This alert is no longer open, but related actions are still\s+pending review\. Confirm the current grow conditions before\s+approving\./,
+      /This alert is no longer open, but related actions are still\s+pending review\. Confirm\s+the current grow conditions before\s+approving\./,
     );
   });
 

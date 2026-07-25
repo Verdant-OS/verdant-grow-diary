@@ -38,8 +38,10 @@ vi.mock("@/hooks/useQuickLogV2Save", () => ({
 }));
 
 const insertMock = vi.fn();
+const activityRpcMock = vi.fn();
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
+    rpc: (...args: unknown[]) => activityRpcMock(...args),
     from: () => ({
       insert: insertMock,
       update: () => ({ eq: vi.fn() }),
@@ -151,6 +153,11 @@ describe("Quick Log starter-handoff consume-once", () => {
     saveMock.mockReset();
     saveMock.mockResolvedValue({ ok: true });
     insertMock.mockReset();
+    activityRpcMock.mockReset();
+    activityRpcMock.mockResolvedValue({
+      data: { ok: true, grow_event_id: "feeding-event-1" },
+      error: null,
+    });
   });
 
   it("rendering the prefilled dialog performs ZERO writes and never clears the draft", () => {
@@ -176,6 +183,79 @@ describe("Quick Log starter-handoff consume-once", () => {
     fireEvent.click(saveButton());
     await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(storedDraftRaw()).toBeNull());
+  });
+
+  it("confirmed Feeding activity save clears the exact reviewed starter draft", async () => {
+    seedDraft(starterDraft({ logType: "feeding", note: "Light feeding" }));
+    renderWithClient(
+      <QuickLog
+        open
+        onOpenChange={vi.fn()}
+        prefill={handoffPrefill({
+          eventType: "feeding",
+          activityId: "feeding",
+          note: "Light feeding",
+        })}
+      />,
+    );
+    expect(screen.getByTestId("quick-log-dialog-all-activities-note")).toHaveValue("Light feeding");
+    expect(activityRpcMock).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId("quick-log-dialog-all-activities-save"));
+    await waitFor(() => expect(activityRpcMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(storedDraftRaw()).toBeNull());
+    expect(saveMock).not.toHaveBeenCalled();
+  });
+
+  it("failed Feeding activity save retains the starter draft", async () => {
+    activityRpcMock.mockResolvedValueOnce({
+      data: null,
+      error: { message: "network unavailable" },
+    });
+    seedDraft(starterDraft({ logType: "feeding", note: "Light feeding" }));
+    const before = storedDraftRaw();
+    renderWithClient(
+      <QuickLog
+        open
+        onOpenChange={vi.fn()}
+        prefill={handoffPrefill({
+          eventType: "feeding",
+          activityId: "feeding",
+          note: "Light feeding",
+        })}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("quick-log-dialog-all-activities-save"));
+    await waitFor(() => expect(activityRpcMock).toHaveBeenCalledTimes(1));
+    await screen.findByTestId("quick-log-dialog-all-activities-error");
+    expect(storedDraftRaw()).toBe(before);
+    expect(saveMock).not.toHaveBeenCalled();
+  });
+
+  it("Feeding save never clears a same-id draft edited after review", async () => {
+    seedDraft(
+      starterDraft({
+        logType: "feeding",
+        note: "Newer feeding note",
+        updatedAt: "2026-07-15T11:30:00.000Z",
+      }),
+    );
+    const before = storedDraftRaw();
+    renderWithClient(
+      <QuickLog
+        open
+        onOpenChange={vi.fn()}
+        prefill={handoffPrefill({
+          eventType: "feeding",
+          activityId: "feeding",
+          note: "Reviewed feeding note",
+          publicStarterDraftUpdatedAt: "2026-07-15T10:00:00.000Z",
+        })}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("quick-log-dialog-all-activities-save"));
+    await waitFor(() => expect(activityRpcMock).toHaveBeenCalledTimes(1));
+    await screen.findByTestId("quick-log-dialog-all-activities-saved");
+    expect(storedDraftRaw()).toBe(before);
   });
 
   it("a double-click cannot produce two entries", async () => {

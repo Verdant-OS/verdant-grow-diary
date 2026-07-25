@@ -53,8 +53,16 @@ describe("AppShell — Quick Log is the single grower-facing logging CTA", () =>
     expect(APP_SHELL_SRC).toContain("PLANT_QUICKLOG_PREFILL_EVENT");
     expect(APP_SHELL_SRC).toContain("<QuickLog");
     expect(QUICK_LOG_SRC).toContain("requestedActivityId={prefill?.activityId ?? null}");
+    expect(QUICK_LOG_SRC).toContain(
+      "requestedNote={prefill?.activityId ? (prefill.note ?? null) : null}",
+    );
     // The mobile FAB remains as the mobile Quick Log entry point.
     expect(APP_SHELL_SRC).toMatch(/aria-label="Open Quick Log"/);
+  });
+
+  it("remounts Quick Log after close so child activity drafts cannot leak into a new session", () => {
+    expect(APP_SHELL_SRC).toContain("key={legacyQuickLogSession}");
+    expect(APP_SHELL_SRC).toContain("setLegacyQuickLogSession((session) => session + 1)");
   });
 
   it("introduces no Supabase writes, alerts, or Action Queue behavior", () => {

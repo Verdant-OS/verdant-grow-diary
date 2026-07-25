@@ -10,9 +10,7 @@
  *  - Labels reuse the canonical Quick Log activity catalog + stage labels;
  *    no new vocabulary is minted here.
  */
-import {
-  QUICK_LOG_ACTIVITY_DEFINITIONS,
-} from "@/constants/quickLogActivityTypes";
+import { QUICK_LOG_ACTIVITY_DEFINITIONS } from "@/constants/quickLogActivityTypes";
 import {
   PUBLIC_QUICK_LOG_STARTER_TYPE_TO_ACTIVITY_ID,
   type PublicQuickLogStarterDraft,
@@ -31,8 +29,7 @@ export const PUBLIC_QUICK_LOG_HANDOFF_NOT_NOW_LABEL = "Not now" as const;
 export const PUBLIC_QUICK_LOG_HANDOFF_DISCARD_LABEL = "Discard draft" as const;
 export const PUBLIC_QUICK_LOG_HANDOFF_DISCARD_CONFIRM_QUESTION =
   "Discard this draft from this device? This cannot be undone." as const;
-export const PUBLIC_QUICK_LOG_HANDOFF_DISCARD_CONFIRM_LABEL =
-  "Yes, discard it" as const;
+export const PUBLIC_QUICK_LOG_HANDOFF_DISCARD_CONFIRM_LABEL = "Yes, discard it" as const;
 export const PUBLIC_QUICK_LOG_HANDOFF_DISCARD_CANCEL_LABEL = "Keep draft" as const;
 
 export const PUBLIC_QUICK_LOG_HANDOFF_SETUP_LABEL = "Set up your grow first" as const;
@@ -53,9 +50,7 @@ export interface PublicQuickLogHandoffSummaryRow {
 }
 
 /** Activity label from the canonical catalog (never minted here). */
-export function handoffLogTypeLabel(
-  logType: PublicQuickLogStarterDraft["logType"],
-): string {
+export function handoffLogTypeLabel(logType: PublicQuickLogStarterDraft["logType"]): string {
   const activityId = PUBLIC_QUICK_LOG_STARTER_TYPE_TO_ACTIVITY_ID[logType];
   return QUICK_LOG_ACTIVITY_DEFINITIONS[activityId]?.label ?? logType;
 }
@@ -108,20 +103,4 @@ export function buildHandoffMatchHint(match: HandoffPlantMatch): string {
     case "none":
       return PUBLIC_QUICK_LOG_HANDOFF_SETUP_HINT;
   }
-}
-
-/**
- * Extra honesty for feeding drafts: the unified Quick Log save does not
- * accept feeding yet, so the review form will show its own "Coming soon"
- * state and the grower picks a supported type themselves. Stated up front
- * so the review step never feels like a bait-and-switch.
- */
-export function buildHandoffTypeCaveat(
-  logType: PublicQuickLogStarterDraft["logType"],
-): string | null {
-  if (logType !== "feeding") return null;
-  return (
-    "Feeding logs are not saveable from Quick Log yet — when you review, " +
-    "pick a supported type (your note comes along unchanged)."
-  );
 }

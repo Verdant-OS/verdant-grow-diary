@@ -56,7 +56,6 @@ import {
   PUBLIC_QUICK_LOG_HANDOFF_PLANTS_UNAVAILABLE_HINT,
   buildHandoffMatchHint,
   buildHandoffSummaryRows,
-  buildHandoffTypeCaveat,
 } from "@/lib/publicQuickLogHandoffViewModel";
 
 // Same literal the onboarding checklist uses for its create_grow step
@@ -196,7 +195,6 @@ function HandoffCardInner({
       : inventoryState === "error"
         ? PUBLIC_QUICK_LOG_HANDOFF_PLANTS_UNAVAILABLE_HINT
         : PUBLIC_QUICK_LOG_HANDOFF_CHECKING_LABEL;
-  const typeCaveat = buildHandoffTypeCaveat(draft.logType);
   const needsSetup = inventoryState === "ready" && match?.kind === "none";
 
   const handleReviewAndSave = () => {
@@ -276,15 +274,6 @@ function HandoffCardInner({
       >
         {matchHint}
       </p>
-      {typeCaveat ? (
-        <p
-          className="text-xs text-muted-foreground"
-          data-testid="public-quick-log-handoff-type-caveat"
-        >
-          {typeCaveat}
-        </p>
-      ) : null}
-
       {confirmingDiscard ? (
         <div
           className="rounded-md border border-destructive/40 bg-destructive/10 p-3 space-y-2"

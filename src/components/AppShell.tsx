@@ -58,8 +58,9 @@ export default function AppShell({ children }: { children?: ReactNode }) {
   const nav = useNavigate();
   const [openLog, setOpenLog] = useState(false);
   const [openScopedLog, setOpenScopedLog] = useState(false);
-  const [structuredOpenIntent, setStructuredOpenIntent] =
-    useState<QuickLogV2OpenIntent | null>(null);
+  const [structuredOpenIntent, setStructuredOpenIntent] = useState<QuickLogV2OpenIntent | null>(
+    null,
+  );
   const [legacyQuickLogSession, setLegacyQuickLogSession] = useState(0);
   const [prefill, setPrefill] = useState<QuickLogPrefill | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -114,8 +115,7 @@ export default function AppShell({ children }: { children?: ReactNode }) {
       setOpenScopedLog(true);
     }
     window.addEventListener(QUICK_LOG_V2_OPEN_EVENT, onOpenV2 as EventListener);
-    return () =>
-      window.removeEventListener(QUICK_LOG_V2_OPEN_EVENT, onOpenV2 as EventListener);
+    return () => window.removeEventListener(QUICK_LOG_V2_OPEN_EVENT, onOpenV2 as EventListener);
   }, []);
 
   useEffect(() => {
@@ -311,7 +311,10 @@ export default function AppShell({ children }: { children?: ReactNode }) {
           open={openLog}
           onOpenChange={(o) => {
             setOpenLog(o);
-            if (!o) setPrefill(null);
+            if (!o) {
+              setPrefill(null);
+              setLegacyQuickLogSession((session) => session + 1);
+            }
           }}
           prefill={prefill}
           onCreated={() => window.dispatchEvent(new Event("verdant:entry-created"))}

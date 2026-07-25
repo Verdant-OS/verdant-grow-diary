@@ -75,6 +75,7 @@ import {
   clearPublicQuickLogStarterDraft,
   readPublicQuickLogStarterDraft,
 } from "@/lib/publicQuickLogStarterDraftStore";
+import { matchesReviewedPublicStarterDraftRevision } from "@/lib/publicQuickLogHandoffRules";
 import { useLatestTentSensorSnapshot } from "@/lib/sensor";
 import { buildQuickLogStripFromTentState } from "@/lib/quickLogSnapshotStripAdapter";
 import { useQuickLogV2Save } from "@/hooks/useQuickLogV2Save";
@@ -614,6 +615,17 @@ export default function QuickLog({
     setInFlightSaveContext(null);
   }, []);
   const isSaveInFlight = useCallback(() => saveInFlightRef.current, []);
+  const consumeReviewedPublicStarterDraft = useCallback(() => {
+    if (
+      matchesReviewedPublicStarterDraftRevision({
+        storedDraft: readPublicQuickLogStarterDraft(),
+        reviewedDraftId: prefill?.publicStarterDraftId,
+        reviewedUpdatedAt: prefill?.publicStarterDraftUpdatedAt,
+      })
+    ) {
+      clearPublicQuickLogStarterDraft();
+    }
+  }, [prefill?.publicStarterDraftId, prefill?.publicStarterDraftUpdatedAt]);
 
   // Slice A2: re-enable stage defaulting ONLY when the grower actively switches
   // from one already-selected plant to a different one — the new target's stage
@@ -1192,22 +1204,11 @@ export default function QuickLog({
         savedAt: new Date().toISOString(),
       });
       onCreated?.();
-      // Public starter handoff consume-once: the anonymous on-device draft
-      // is cleared ONLY here — after the RPC confirmed the write — and only
-      // when the stored draft is still the exact one the grower reviewed
-      // (id match guards against a newer draft written in another tab).
-      // Failures above return before this line, so a failed save always
-      // retains the draft.
-      if (prefill?.publicStarterDraftId) {
-        const storedStarterDraft = readPublicQuickLogStarterDraft();
-        if (
-          storedStarterDraft &&
-          storedStarterDraft.id === prefill.publicStarterDraftId &&
-          storedStarterDraft.updatedAt === prefill.publicStarterDraftUpdatedAt
-        ) {
-          clearPublicQuickLogStarterDraft();
-        }
-      }
+      // Public starter handoff consume-once: the shared helper clears the
+      // anonymous on-device draft only after either authenticated save path
+      // confirms a write, and only when storage still has the exact revision
+      // the grower reviewed. Failures return before this line and retain it.
+      consumeReviewedPublicStarterDraft();
       setTimeout(() => viewPlantBtnRef.current?.focus(), 0);
       applyQuickLogV2Refresh(queryClient, {
         targetType: "plant",
@@ -1345,6 +1346,8 @@ export default function QuickLog({
           heading="All activity types"
           testIdPrefix="quick-log-dialog-all-activities"
           requestedActivityId={prefill?.activityId ?? null}
+          requestedNote={prefill?.activityId ? (prefill.note ?? null) : null}
+          onSaveSuccess={consumeReviewedPublicStarterDraft}
           onSaveStart={beginAllActivitiesSave}
           onSaveEnd={endAllActivitiesSave}
           saveBlocked={saveLocked}

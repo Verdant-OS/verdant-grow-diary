@@ -95,12 +95,21 @@ export interface QuickLogAllActivitiesSectionProps {
    * it never writes or bypasses availability checks.
    */
   requestedActivityId?: QuickLogActivityId | null;
+  /** Optional handoff note seeded only when a requested editor is applied. */
+  requestedNote?: string | null;
+  /** Fires only after persistence confirms success. */
+  onSaveSuccess?: (result: QuickLogAllActivitiesSaveSuccess) => void;
 }
 
 export interface QuickLogAllActivitiesSaveTarget {
   readonly growId: string;
   readonly tentId: string | null;
   readonly plantId: string | null;
+}
+
+export interface QuickLogAllActivitiesSaveSuccess {
+  readonly activityId: QuickLogActivityId;
+  readonly target: QuickLogAllActivitiesSaveTarget;
 }
 
 /** Map a QuickLogActivityId to the "What was saved" DailyCheck source. */
@@ -160,6 +169,8 @@ export default function QuickLogAllActivitiesSection({
   onBeforeStructuredWaterOpen,
   externalPersistenceBlockReason = null,
   requestedActivityId = null,
+  requestedNote = null,
+  onSaveSuccess,
 }: QuickLogAllActivitiesSectionProps) {
   const currentTarget = useMemo(
     () => buildQuickLogTargetIdentity({ growId, tentId, plantId }),
@@ -216,29 +227,6 @@ export default function QuickLogAllActivitiesSection({
   );
 
   useEffect(() => {
-    if (!requestedActivity || !requestedActivityRequestKey) {
-      appliedRequestedActivityKeyRef.current = null;
-      return;
-    }
-    if (appliedRequestedActivityKeyRef.current === requestedActivityRequestKey) return;
-    appliedRequestedActivityKeyRef.current = requestedActivityRequestKey;
-
-    setErrorReason(null);
-    setErrorForActivity(null);
-    setStructuredWaterError(null);
-    if (requestedActivityAvailability?.disabled) {
-      setSelectedDraft(null);
-      return;
-    }
-    setSelectedDraft(bindQuickLogActivityDraft(requestedActivity, currentTarget));
-  }, [
-    currentTarget,
-    requestedActivity,
-    requestedActivityAvailability?.disabled,
-    requestedActivityRequestKey,
-  ]);
-
-  useEffect(() => {
     if (previousTargetKeyRef.current === currentTargetKey) return;
     previousTargetKeyRef.current = currentTargetKey;
 
@@ -257,6 +245,41 @@ export default function QuickLogAllActivitiesSection({
     setStructuredWaterError(null);
     setSaved([]);
   }, [currentTargetKey]);
+
+  // Ordered after the target reset: an async target resolution must reset
+  // old target-specific state first, then apply the requested editor and
+  // starter note to the newly verified target.
+  useEffect(() => {
+    if (!requestedActivity || !requestedActivityRequestKey) {
+      appliedRequestedActivityKeyRef.current = null;
+      return;
+    }
+    if (appliedRequestedActivityKeyRef.current === requestedActivityRequestKey) return;
+    appliedRequestedActivityKeyRef.current = requestedActivityRequestKey;
+
+    setErrorReason(null);
+    setErrorForActivity(null);
+    setStructuredWaterError(null);
+    setNote("");
+    setHarvestWet("");
+    setHarvestDry("");
+    setHarvestUnit("g");
+    setDetailValues({});
+    envCheckTempEntryUnitRef.current = null;
+    setPhotoFile(null);
+    if (requestedActivityAvailability?.disabled) {
+      setSelectedDraft(null);
+      return;
+    }
+    setSelectedDraft(bindQuickLogActivityDraft(requestedActivity, currentTarget));
+    setNote(requestedNote ?? "");
+  }, [
+    currentTarget,
+    requestedActivity,
+    requestedActivityAvailability?.disabled,
+    requestedActivityRequestKey,
+    requestedNote,
+  ]);
 
   const canPersistManualSensor = false; // Deferred to ManualSensorReadingCard.
 
@@ -589,6 +612,12 @@ export default function QuickLogAllActivitiesSection({
           ]);
         }
       }
+      try {
+        onSaveSuccess?.({ activityId: selected.id, target: capturedTarget });
+      } catch {
+        // Persistence already succeeded. A caller-owned local cleanup
+        // failure must not turn a confirmed write into a false save error.
+      }
       setNote("");
       setHarvestWet("");
       setHarvestDry("");
@@ -631,6 +660,7 @@ export default function QuickLogAllActivitiesSection({
     isMutationBlocked,
     externalPersistenceBlockReason,
     activeEnvCheckTempUnit,
+    onSaveSuccess,
   ]);
 
   const noContext = !growId;

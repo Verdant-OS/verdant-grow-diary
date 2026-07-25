@@ -119,10 +119,40 @@ beforeEach(() => {
 });
 
 describe("QuickLogAllActivitiesSection — shared taxonomy", () => {
-  it("selects a requested supported activity without saving it", async () => {
-    mountSection({ requestedActivityId: "feeding" });
+  it("selects a requested supported activity, seeds its note, and never saves automatically", async () => {
+    mountSection({
+      requestedActivityId: "feeding",
+      requestedNote: "Reviewed anonymous feeding note",
+    });
     const form = await screen.findByTestId("quick-log-all-activities-form");
     expect(form).toHaveAttribute("data-activity-id", "feeding");
+    expect(screen.getByTestId("quick-log-all-activities-note")).toHaveValue(
+      "Reviewed anonymous feeding note",
+    );
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+
+  it("reapplies a requested editor after its target resolves asynchronously", async () => {
+    const view = mountSection({
+      growId: null,
+      tentId: null,
+      plantId: null,
+      requestedActivityId: "feeding",
+      requestedNote: "Keep this note",
+    });
+    view.rerender(
+      <QuickLogAllActivitiesSection
+        growId={GROW}
+        tentId={TENT}
+        plantId={PLANT}
+        plantStage="flower"
+        requestedActivityId="feeding"
+        requestedNote="Keep this note"
+      />,
+    );
+    const form = await screen.findByTestId("quick-log-all-activities-form");
+    expect(form).toHaveAttribute("data-activity-id", "feeding");
+    expect(screen.getByTestId("quick-log-all-activities-note")).toHaveValue("Keep this note");
     expect(rpcMock).not.toHaveBeenCalled();
   });
 
@@ -155,6 +185,29 @@ describe("QuickLogAllActivitiesSection — shared taxonomy", () => {
 });
 
 describe("QuickLogAllActivitiesSection — save routing", () => {
+  it("notifies its caller exactly once after a confirmed Feeding save", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: { ok: true, grow_event_id: "e-feed" },
+      error: null,
+    });
+    const onSaveSuccess = vi.fn();
+    mountSection({
+      requestedActivityId: "feeding",
+      requestedNote: "light feeding",
+      onSaveSuccess,
+    });
+    await screen.findByTestId("quick-log-all-activities-form");
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
+    await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(onSaveSuccess).toHaveBeenCalledWith({
+        activityId: "feeding",
+        target: { growId: GROW, tentId: TENT, plantId: PLANT },
+      }),
+    );
+    expect(onSaveSuccess).toHaveBeenCalledTimes(1);
+  });
+
   it("Note → quicklog_save_manual with p_action=note; dispatches + saved breakdown", async () => {
     rpcMock.mockResolvedValueOnce({
       data: { ok: true, grow_event_id: "e-note" },
@@ -675,14 +728,16 @@ describe("QuickLogAllActivitiesSection — Harvest v1b", () => {
 });
 
 describe("QuickLogAllActivitiesSection — failure paths", () => {
-  it("failed RPC does NOT dispatch verdant:entry-created and shows no saved item", async () => {
+  it("failed RPC does NOT dispatch, notify success, or show a saved item", async () => {
     rpcMock.mockResolvedValueOnce({ data: null, error: { message: "boom" } });
     const l = listenForEntryCreated();
-    mountSection();
+    const onSaveSuccess = vi.fn();
+    mountSection({ onSaveSuccess });
     await saveWithNote("feeding", "x");
     await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(1));
     await screen.findByTestId("quick-log-all-activities-error");
     expect(l.events.length).toBe(0);
+    expect(onSaveSuccess).not.toHaveBeenCalled();
     expect(screen.queryByTestId("quick-log-all-activities-saved")).toBeNull();
     l.dispose();
   });

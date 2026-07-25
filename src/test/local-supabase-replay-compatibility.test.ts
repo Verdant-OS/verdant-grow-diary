@@ -100,6 +100,29 @@ function addInjectionFixture(fixture: ReturnType<typeof writeFixture>) {
   };
 }
 
+function addPatchFixture(fixture: ReturnType<typeof writeFixture>) {
+  const sourceName = "20260721150000_patch.sql";
+  const sourceSql = "SELECT 'before';\n";
+  const patchedSql = "SELECT 'after';\n";
+  writeFileSync(join(fixture.sourceRoot, "supabase", "migrations", sourceName), sourceSql);
+
+  const manifest = JSON.parse(readFileSync(fixture.manifestPath, "utf8")) as {
+    compatibility_patches?: Array<Record<string, unknown>>;
+  };
+  manifest.compatibility_patches = [
+    {
+      source_path: `supabase/migrations/${sourceName}`,
+      source_sha256: sha256(sourceSql),
+      patched_sha256: sha256(patchedSql),
+      replacements: [{ from: "'before'", to: "'after'" }],
+      reason: "Fixture repairs one exact statement only in disposable replay.",
+    },
+  ];
+  writeFileSync(fixture.manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+
+  return { sourceName, sourceSql, patchedSql };
+}
+
 function runScript(args: string[]) {
   return spawnSync("node", [SCRIPT, ...args], {
     cwd: process.cwd(),
@@ -149,12 +172,14 @@ describe("local Supabase replay compatibility workspace", () => {
     const report = JSON.parse(result.stdout.trim()) as {
       mode: string;
       compatibility_entry_count: number;
+      compatibility_patch_count: number;
       compatibility_injection_count: number;
       source_migrations_unchanged: boolean;
     };
     expect(report).toMatchObject({
       mode: "verify_only",
-      compatibility_entry_count: 17,
+      compatibility_entry_count: 18,
+      compatibility_patch_count: 2,
       compatibility_injection_count: 1,
       source_migrations_unchanged: true,
     });
@@ -193,6 +218,48 @@ describe("local Supabase replay compatibility workspace", () => {
         "utf8",
       ),
     ).toBe(fixture.duplicateSql);
+  });
+
+  it("patches exact fingerprinted text only in the disposable workspace", () => {
+    const fixture = writeFixture();
+    const patch = addPatchFixture(fixture);
+    const output = join(fixture.container, "replay");
+    const result = runScript([
+      `--source=${fixture.sourceRoot}`,
+      `--manifest=${fixture.manifestPath}`,
+      `--output=${output}`,
+      "--json",
+    ]);
+
+    expect(result.status).toBe(0);
+    expect(readFileSync(join(output, "supabase", "migrations", patch.sourceName), "utf8")).toBe(
+      patch.patchedSql,
+    );
+    expect(
+      readFileSync(join(fixture.sourceRoot, "supabase", "migrations", patch.sourceName), "utf8"),
+    ).toBe(patch.sourceSql);
+  });
+
+  it("fails closed when a patch replacement is not an exact single match", () => {
+    const fixture = writeFixture();
+    addPatchFixture(fixture);
+    const manifest = JSON.parse(readFileSync(fixture.manifestPath, "utf8")) as {
+      compatibility_patches: Array<{
+        replacements: Array<{ from: string }>;
+      }>;
+    };
+    manifest.compatibility_patches[0].replacements[0].from = "'missing'";
+    writeFileSync(fixture.manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+
+    const result = runScript([
+      `--source=${fixture.sourceRoot}`,
+      `--manifest=${fixture.manifestPath}`,
+      "--verify-only",
+    ]);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("[supabase-replay] patch_mismatch");
+    expect(result.stderr).toContain("found 0");
   });
 
   it("injects a fingerprinted precondition only into the disposable workspace", () => {

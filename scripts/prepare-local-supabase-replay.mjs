@@ -45,9 +45,13 @@ export class ReplayPreparationError extends Error {
   }
 }
 
+function sha256Text(value) {
+  return createHash("sha256").update(value, "utf8").digest("hex");
+}
+
 export function sha256File(path) {
   const normalized = readFileSync(path, "utf8").replaceAll("\r\n", "\n");
-  return createHash("sha256").update(normalized, "utf8").digest("hex");
+  return sha256Text(normalized);
 }
 
 function fail(code, message) {
@@ -179,7 +183,8 @@ export function loadAndVerifyManifest({
     manifest?.hash_normalization !== "utf8_lf" ||
     !Array.isArray(manifest.compatibility_noops) ||
     (manifest.compatibility_injections !== undefined &&
-      !Array.isArray(manifest.compatibility_injections))
+      !Array.isArray(manifest.compatibility_injections)) ||
+    (manifest.compatibility_patches !== undefined && !Array.isArray(manifest.compatibility_patches))
   ) {
     fail(
       "invalid_manifest",
@@ -242,6 +247,68 @@ export function loadAndVerifyManifest({
 
   entries.sort((a, b) => a.duplicate_path.localeCompare(b.duplicate_path));
 
+  const patchPaths = new Set();
+  const patches = (manifest.compatibility_patches ?? []).map((entry, index) => {
+    const prefix = `compatibility_patches[${index}]`;
+    const sourcePath = validateMigrationPath(root, entry?.source_path, `${prefix}.source_path`);
+    validateHash(entry?.source_sha256, `${prefix}.source_sha256`);
+    validateHash(entry?.patched_sha256, `${prefix}.patched_sha256`);
+    if (duplicatePaths.has(entry.source_path)) {
+      fail("invalid_manifest", `${prefix}.source_path is also configured as a no-op`);
+    }
+    if (patchPaths.has(entry.source_path)) {
+      fail("invalid_manifest", `${prefix}.source_path is repeated`);
+    }
+    patchPaths.add(entry.source_path);
+    if (!Array.isArray(entry?.replacements) || entry.replacements.length === 0) {
+      fail("invalid_manifest", `${prefix}.replacements must not be empty`);
+    }
+    if (typeof entry?.reason !== "string" || entry.reason.trim().length < 20) {
+      fail("invalid_manifest", `${prefix}.reason must explain the local replay repair`);
+    }
+
+    const sourceActual = sha256File(sourcePath);
+    if (sourceActual !== entry.source_sha256) {
+      fail("hash_mismatch", `${entry.source_path} SHA-256 changed; refusing compatibility replay`);
+    }
+
+    let patchedSql = readFileSync(sourcePath, "utf8").replaceAll("\r\n", "\n");
+    const replacements = entry.replacements.map((replacement, replacementIndex) => {
+      const replacementPrefix = `${prefix}.replacements[${replacementIndex}]`;
+      if (
+        typeof replacement?.from !== "string" ||
+        replacement.from.length === 0 ||
+        typeof replacement?.to !== "string" ||
+        replacement.to.length === 0 ||
+        replacement.from === replacement.to
+      ) {
+        fail("invalid_manifest", `${replacementPrefix} must contain distinct text`);
+      }
+      const occurrences = patchedSql.split(replacement.from).length - 1;
+      if (occurrences !== 1) {
+        fail(
+          "patch_mismatch",
+          `${entry.source_path} expected exactly one ${replacementPrefix}.from match; found ${occurrences}`,
+        );
+      }
+      patchedSql = patchedSql.replace(replacement.from, replacement.to);
+      return { from: replacement.from, to: replacement.to };
+    });
+
+    if (sha256Text(patchedSql) !== entry.patched_sha256) {
+      fail("patch_mismatch", `${entry.source_path} patched SHA-256 does not match the manifest`);
+    }
+
+    return {
+      source_path: entry.source_path,
+      source_sha256: sourceActual,
+      patched_sha256: entry.patched_sha256,
+      replacements,
+      reason: entry.reason.trim(),
+    };
+  });
+  patches.sort((a, b) => a.source_path.localeCompare(b.source_path));
+
   const outputPaths = new Set();
   const injections = (manifest.compatibility_injections ?? []).map((entry, index) => {
     const prefix = `compatibility_injections[${index}]`;
@@ -294,6 +361,7 @@ export function loadAndVerifyManifest({
     sourceRoot: root,
     manifestPath: resolve(manifestPath),
     entries,
+    patches,
     injections,
   };
 }
@@ -343,6 +411,14 @@ export function prepareReplayWorkspace({
       const duplicateOutput = resolve(output, entry.duplicate_path);
       writeFileSync(duplicateOutput, compatibilityNoop(entry), "utf8");
     }
+    for (const patch of verified.patches) {
+      const patchOutput = resolve(output, patch.source_path);
+      let patchedSql = readFileSync(patchOutput, "utf8").replaceAll("\r\n", "\n");
+      for (const replacement of patch.replacements) {
+        patchedSql = patchedSql.replace(replacement.from, replacement.to);
+      }
+      writeFileSync(patchOutput, patchedSql, "utf8");
+    }
     for (const injection of verified.injections) {
       const templateSource = resolve(verified.sourceRoot, injection.template_path);
       const injectionOutput = resolve(output, injection.output_path);
@@ -356,8 +432,10 @@ export function prepareReplayWorkspace({
     mode: verifyOnly ? "verify_only" : "prepared",
     source_migrations_unchanged: true,
     compatibility_entry_count: verified.entries.length,
+    compatibility_patch_count: verified.patches.length,
     compatibility_injection_count: verified.injections.length,
     entries: verified.entries,
+    patches: verified.patches,
     injections: verified.injections,
   };
 
@@ -391,7 +469,7 @@ function main() {
     if (args.json) console.log(JSON.stringify(report));
     else {
       console.log(
-        `[supabase-replay] ${report.mode}: ${report.compatibility_entry_count} fingerprinted no-op entr${report.compatibility_entry_count === 1 ? "y" : "ies"} and ${report.compatibility_injection_count} injection${report.compatibility_injection_count === 1 ? "" : "s"} verified`,
+        `[supabase-replay] ${report.mode}: ${report.compatibility_entry_count} no-op entr${report.compatibility_entry_count === 1 ? "y" : "ies"}, ${report.compatibility_patch_count} patch${report.compatibility_patch_count === 1 ? "" : "es"}, and ${report.compatibility_injection_count} injection${report.compatibility_injection_count === 1 ? "" : "s"} verified`,
       );
     }
   } catch (error) {

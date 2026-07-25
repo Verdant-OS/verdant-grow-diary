@@ -128,6 +128,43 @@
       "duplicate_path": "supabase/migrations/20260721194325_f96507e6-a612-4d26-a99d-2a261f2c0ad5.sql",
       "duplicate_sha256": "e11cc12b8e33c1235ddf1dc11739fd7ab0c627e46c3bc2016ff875a5ea095424",
       "reason": "Production records 20260721107000; the later Lovable export repeats referral code generation and pending-referral capture functions and triggers."
+    },
+    {
+      "canonical_path": "supabase/migrations/20260722100000_quicklog_save_manual_stage.sql",
+      "canonical_sha256": "bc6bad92bd66ab02758068fce1f283e07bc34556c2208ea835f69a1b63288f7e",
+      "duplicate_path": "supabase/migrations/20260722165149_922e7389-1a95-4bc4-8efb-12f3a98e33f7.sql",
+      "duplicate_sha256": "fc45b6dacbbc81acae220026f5bb151a0664d9c7f94c82276e081ddbda1a4e82",
+      "reason": "The later immutable Lovable export repeats the earlier staged Quick Log manual RPC and fails fresh replay because the 12-argument signature already exists."
+    }
+  ],
+  "compatibility_patches": [
+    {
+      "source_path": "supabase/migrations/20260722203000_strain_reference_library_v1.sql",
+      "source_sha256": "7bc7271972afba0f5c50d26c26ee5bd0cb4fb90c5f13dbca6fa37e0e08e09f41",
+      "patched_sha256": "ae1937e26e8c74e9c0cb40153c8ec8c7c0600abb874d5b17300baf84f13c7121",
+      "replacements": [
+        {
+          "from": "select cultivar_id, 'reported_thc_pct', thc_pct_min, thc_pct_max, null, null, '%',",
+          "to": "select cultivar_id, 'reported_thc_pct', thc_pct_min, thc_pct_max, null, null::jsonb, '%',"
+        },
+        {
+          "from": "select cultivar_id, 'chemotype', null, null, chemotype, null, null,",
+          "to": "select cultivar_id, 'chemotype', null, null, chemotype, null::jsonb, null,"
+        }
+      ],
+      "reason": "The immutable cultivar seed UNION leaves both value_jsonb branches unknown; explicit jsonb null casts preserve the intended rows and make fresh replay deterministic."
+    },
+    {
+      "source_path": "supabase/migrations/20260723000000_quicklog_manual_always_mirror_diary.sql",
+      "source_sha256": "313cdecb76b6fd945f0ce4d2f87670f574c6e9cf6b5a237de1796ce3dfff9678",
+      "patched_sha256": "2157e1ddd45da26b3d928cffa58297d9e2fcdfbe5037a9aaa29173e8550e796b",
+      "replacements": [
+        {
+          "from": "CREATE FUNCTION public.quicklog_save_manual(",
+          "to": "CREATE OR REPLACE FUNCTION public.quicklog_save_manual("
+        }
+      ],
+      "reason": "The immutable Quick Log mirror migration reuses the 12-argument signature; OR REPLACE preserves its body while avoiding replay-state function collisions."
     }
   ],
   "compatibility_injections": [

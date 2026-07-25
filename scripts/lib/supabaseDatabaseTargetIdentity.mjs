@@ -22,6 +22,11 @@ const DIRECT_OR_DEDICATED_HOST = /^db\.([a-z0-9]{20})\.supabase\.co$/;
 const SHARED_SUPAVISOR_HOST = /^aws-\d+-[a-z0-9]+(?:-[a-z0-9]+)*\.pooler\.supabase\.com$/;
 const SHARED_SUPAVISOR_USER = /^postgres\.([a-z0-9]{20})$/;
 const ALLOWED_SSL_MODES = new Set(["require", "verify-ca", "verify-full"]);
+const SSL_MODE_STRENGTH = Object.freeze({
+  require: 1,
+  "verify-ca": 2,
+  "verify-full": 3,
+});
 
 export class SupabaseDatabaseTargetIdentityError extends Error {
   constructor(code, message) {
@@ -44,34 +49,29 @@ function decodeUsername(encodedUsername) {
 }
 
 function validateConnectionOptions(url) {
-  if (!url.search) {
-    // Supabase's documented Dashboard connection strings omit sslmode.
-    // The only caller that opens a connection supplies PGSSLMODE=require in
-    // its allowlisted child environment, so an omitted option still fails
-    // closed to TLS. Explicit URL options are validated below because they
-    // override libpq environment defaults.
-    return;
+  // The gate never passes URL query options through to libpq. It strips the
+  // entire query and supplies a gate-owned TLS mode in the child environment,
+  // making routing, credential, and session overrides inert. Validate every
+  // requested sslmode first because silently converting an explicit downgrade
+  // request into TLS would hide a malformed protected secret.
+  for (const sslmode of url.searchParams.getAll("sslmode")) {
+    if (!ALLOWED_SSL_MODES.has(sslmode)) {
+      identityError(
+        "unsupported_sslmode",
+        "Database URL must use sslmode=require, verify-ca, or verify-full.",
+      );
+    }
   }
+}
 
-  const keys = [...url.searchParams.keys()];
-  if (
-    keys.length !== 1 ||
-    keys[0] !== "sslmode" ||
-    url.searchParams.getAll("sslmode").length !== 1
-  ) {
-    identityError(
-      "unsupported_connection_options",
-      "Database URL may only include one sslmode connection option.",
-    );
+function strongestRequestedSslMode(url) {
+  let selected = "require";
+  for (const sslmode of url.searchParams.getAll("sslmode")) {
+    if (SSL_MODE_STRENGTH[sslmode] > SSL_MODE_STRENGTH[selected]) {
+      selected = sslmode;
+    }
   }
-
-  const sslmode = url.searchParams.get("sslmode");
-  if (!ALLOWED_SSL_MODES.has(sslmode)) {
-    identityError(
-      "unsupported_sslmode",
-      "Database URL must use sslmode=require, verify-ca, or verify-full.",
-    );
-  }
+  return selected;
 }
 
 /**
@@ -178,6 +178,23 @@ export function parseSupabaseDatabaseUrl(databaseUrl) {
     "unsupported_supabase_host",
     "Database URL does not use a supported Supabase database host.",
   );
+}
+
+/**
+ * Build the only connection representation the remote gate may hand to
+ * libpq. The returned URL still contains credentials and must never be logged.
+ * All source query options are removed; only the strongest validated TLS mode
+ * survives as a separate, gate-owned child-process setting.
+ */
+export function sanitizeSupabaseDatabaseUrlForPsql(databaseUrl) {
+  parseSupabaseDatabaseUrl(databaseUrl);
+  const url = new URL(databaseUrl);
+  const sslMode = strongestRequestedSslMode(url);
+  url.search = "";
+  return Object.freeze({
+    databaseUrl: url.toString(),
+    sslMode,
+  });
 }
 
 export function databaseTargetForEnvironment(targetEnv) {

@@ -18,6 +18,7 @@ import { fileURLToPath } from "node:url";
 import {
   assertSupabaseDatabaseTargetIdentity,
   databaseTargetForEnvironment,
+  sanitizeSupabaseDatabaseUrlForPsql,
   SupabaseDatabaseTargetIdentityError,
 } from "./lib/supabaseDatabaseTargetIdentity.mjs";
 import { manifestForScope, schemaKey } from "./required-core-migrations.mjs";
@@ -100,12 +101,11 @@ export function buildPsqlEnvironment(sourceEnv, databaseUrl) {
       childEnv[key] = sourceEnv[key];
     }
   }
-  childEnv.PGDATABASE = databaseUrl;
-  // Dashboard-generated Supabase URLs commonly omit sslmode. Force a
-  // non-downgradable libpq default without trusting any ambient PGSSLMODE.
-  // Explicit verify-ca/verify-full URL options override this with a stronger
-  // mode; the identity parser rejects explicit downgrade-capable modes.
-  childEnv.PGSSLMODE = "require";
+  const connection = sanitizeSupabaseDatabaseUrlForPsql(databaseUrl);
+  childEnv.PGDATABASE = connection.databaseUrl;
+  // Never trust ambient PGSSLMODE. Query-free Dashboard URLs default to
+  // require, while an explicit verify-ca/verify-full request is preserved.
+  childEnv.PGSSLMODE = connection.sslMode;
   return childEnv;
 }
 

@@ -404,9 +404,34 @@ jobs:
       # reviewers can grab just the summary from the run's artifacts
       # dropdown without downloading the full smoke bundle. The same file
       # is also included in `quicklog-smoke-artifacts` below for archival.
+      # Pre-check: the flake summary markdown is only meaningful when there
+      # were failed or flaky tests. If summarize-playwright-flakes.mjs
+      # produced no file (nothing to report) or an empty file, we skip the
+      # dedicated upload and record a clear note in the Job Summary instead
+      # of shipping an empty artifact reviewers might mistake for evidence.
+      - name: Check flake summary presence
+        id: check_flake_summary
+        if: always() && steps.e2e_config.outputs.should_run == 'true'
+        shell: bash
+        run: |
+          file="e2e/results/playwright-flake-summary.md"
+          if [ -s "${file}" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+            echo "reason=" >> "$GITHUB_OUTPUT"
+            echo "OK: ${file} is present and non-empty."
+          elif [ -f "${file}" ]; then
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "reason=empty" >> "$GITHUB_OUTPUT"
+            echo "NOTE: ${file} exists but is empty — nothing to upload."
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "reason=missing" >> "$GITHUB_OUTPUT"
+            echo "NOTE: ${file} was not produced — nothing to upload."
+          fi
+
       - name: Upload flake summary markdown
         id: upload_flake_summary
-        if: always() && steps.e2e_config.outputs.should_run == 'true'
+        if: always() && steps.e2e_config.outputs.should_run == 'true' && steps.check_flake_summary.outputs.present == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: quicklog-flake-summary
@@ -418,18 +443,29 @@ jobs:
       # artifact into the GitHub Actions Job Summary. `artifact-url` is only
       # populated by actions/upload-artifact@v4 AFTER the upload step runs,
       # so this must live immediately after upload_flake_summary rather than
-      # inside the earlier summarizer step. Enrichment only — never fails.
+      # inside the earlier summarizer step. When the upload was skipped
+      # because there were no failed/flaky tests, record that explicitly
+      # instead so reviewers know why no artifact is attached. Enrichment
+      # only — never fails.
       - name: Link flake summary artifact in Job Summary
         if: always() && steps.e2e_config.outputs.should_run == 'true'
         shell: bash
         env:
           FLAKE_SUMMARY_URL: ${{ steps.upload_flake_summary.outputs.artifact-url }}
+          FLAKE_SUMMARY_PRESENT: ${{ steps.check_flake_summary.outputs.present }}
+          FLAKE_SUMMARY_REASON: ${{ steps.check_flake_summary.outputs.reason }}
         run: |
           {
             echo ""
             echo "### 📎 Flake summary artifact"
             echo ""
-            if [ -n "${FLAKE_SUMMARY_URL}" ]; then
+            if [ "${FLAKE_SUMMARY_PRESENT}" != "true" ]; then
+              if [ "${FLAKE_SUMMARY_REASON}" = "empty" ]; then
+                echo "_No failed or flaky tests in this run — \`playwright-flake-summary.md\` was empty, so the dedicated \`quicklog-flake-summary\` artifact was skipped._"
+              else
+                echo "_No failed or flaky tests in this run — \`playwright-flake-summary.md\` was not produced, so the dedicated \`quicklog-flake-summary\` artifact was skipped._"
+              fi
+            elif [ -n "${FLAKE_SUMMARY_URL}" ]; then
               echo "Download the standalone \`playwright-flake-summary.md\` here: [quicklog-flake-summary](${FLAKE_SUMMARY_URL})"
             else
               echo "_Flake summary artifact URL unavailable — check the run's Artifacts dropdown for \`quicklog-flake-summary\`._"

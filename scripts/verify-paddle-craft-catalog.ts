@@ -25,16 +25,34 @@
  *   2  — misconfiguration (missing API key for a requested env, bad flags)
  */
 
+import { writeFileSync } from "node:fs";
+
 import { PAID_PLAN_IDS } from "../src/lib/paidPlanAllowlist";
 
 type PaddleEnv = "sandbox" | "live";
 type CheckStatus = "pass" | "fail" | "skip";
+
+/**
+ * Machine-readable failure cause. Duplicated (deliberately, minimally)
+ * from scripts/render-paddle-craft-preflight-comment.mjs so the JSON
+ * report can carry the classification directly and the renderer never
+ * has to re-parse the human-readable `detail` string. The renderer's
+ * classifier stays in place as the fallback path when only text logs
+ * are available (older CI runs, local ad-hoc runs).
+ */
+type FailureCause =
+  | { kind: "api_error"; httpStatus: number }
+  | { kind: "inactive" }
+  | { kind: "missing" }
+  | { kind: "coverage_gap" }
+  | { kind: "enumeration_error" };
 
 interface CheckResult {
   env: PaddleEnv;
   externalId: string;
   status: CheckStatus;
   detail: string;
+  cause?: FailureCause;
 }
 
 // The subset of PAID_PLAN_IDS this preflight guards. Derived from the

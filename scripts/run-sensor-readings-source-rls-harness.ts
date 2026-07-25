@@ -124,8 +124,10 @@ async function main() {
     owner = ownerFixture;
     const otherFixture = await createUser("other");
     other = otherFixture;
+    const ownerClient = await signIn(ownerFixture.email, ownerFixture.password);
+    const otherClient = await signIn(otherFixture.email, otherFixture.password);
 
-    const { data: ownerTent, error: ownerTentError } = await admin
+    const { data: ownerTent, error: ownerTentError } = await ownerClient
       .from("tents")
       .insert({ user_id: ownerFixture.id, name: "Sensor source owner tent" })
       .select("id")
@@ -135,7 +137,7 @@ async function main() {
     }
     ownerTentId = ownerTent.id as string;
 
-    const { data: otherTent, error: otherTentError } = await admin
+    const { data: otherTent, error: otherTentError } = await otherClient
       .from("tents")
       .insert({ user_id: otherFixture.id, name: "Sensor source other tent" })
       .select("id")
@@ -144,8 +146,6 @@ async function main() {
       throw new Error(`fixture_other_tent_${otherTentError?.code ?? "failed"}`);
     }
     otherTentId = otherTent.id as string;
-
-    const ownerClient = await signIn(ownerFixture.email, ownerFixture.password);
 
     for (const [index, source] of ["manual", "csv"].entries()) {
       const row = reading(ownerFixture.id, ownerTentId, source, index * 1_000);

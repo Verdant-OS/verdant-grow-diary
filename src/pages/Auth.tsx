@@ -403,9 +403,11 @@ export default function Auth() {
       setSignUpSuccess(
         "Account created. Check your inbox and open the verification link to continue.",
       );
+      void sendWelcomeEmailBestEffort(email);
       return;
     }
     setSignUpSuccess("Welcome to Verdant. Your account is ready.");
+    void sendWelcomeEmailBestEffort(email);
     nav(postSignInTarget(), { replace: true });
   }
 

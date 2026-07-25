@@ -40,7 +40,14 @@ export interface SensorWebhookHandlerDeps {
 const ALLOWED_ORIGINS = new Set<string>([
   "https://verdantgrowdiary.com",
   "https://www.verdantgrowdiary.com",
+  // Published Lovable site — distinct domain from the editor preview below.
   "https://verdantgrowdiary-com.lovable.app",
+  // Lovable's live EDITOR preview iframe for this project (id-preview--
+  // <project-uuid>.lovable.app). Not the same host as the published site
+  // above — omitting it meant the editor's own preview could never
+  // exercise live sensor ingest, failing browser-side as a CORS-blocked
+  // "Failed to fetch" / status 0 with no distinguishing server-side signal.
+  "https://id-preview--66255e7b-892c-4be5-8686-ab1cfc3666db.lovable.app",
   "http://localhost:5173",
   "http://localhost:3000",
   "http://localhost:8080",

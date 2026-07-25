@@ -210,6 +210,8 @@ describe("local Supabase replay compatibility workspace", () => {
       expect(command).toContain('--workdir "$SUPABASE_REPLAY_WORKDIR"');
     }
     expect(workflow).toContain('>"${RUNNER_TEMP}/irrigation-pgtap-supabase-start.log" 2>&1');
+    expect(workflow).toContain("process.stdout.write(new URL(process.argv[1]).hostname)");
+    expect(workflow).not.toContain("awk -F'[@:/]'");
     const artifactBlock = workflow.slice(workflow.indexOf("name: irrigation-pgtap-rls-gate-logs"));
     expect(artifactBlock).not.toContain("irrigation-pgtap-supabase-start.log");
     expect(workflow).not.toMatch(/\bsupabase\s+(link|db push)\b/);

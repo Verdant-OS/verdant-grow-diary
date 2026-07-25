@@ -314,9 +314,9 @@ jobs:
             exit 2
           fi
           # Loopback guard — refuse anything that isn't localhost.
-          HOST="$(echo "$DB_URL" | awk -F'[@:/]' '{print $4}')"
+          HOST="$(node -e 'process.stdout.write(new URL(process.argv[1]).hostname)' "$DB_URL")"
           case "$HOST" in
-            localhost|127.0.0.1|::1) ;;
+            localhost|127.0.0.1|::1|\[::1\]) ;;
             *)
               echo "BLOCKED: refusing non-loopback DB host '$HOST'." >&2
               exit 2

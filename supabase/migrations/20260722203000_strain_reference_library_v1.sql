@@ -519,7 +519,14 @@ insert into public.cultivar_claims (
   cultivar_id, trait_key, value_min, value_max, value_text, value_jsonb,
   unit, context_jsonb, source_id, confidence, verified_at
 )
-select cultivar_id, 'reported_thc_pct', thc_pct_min, thc_pct_max, null, null, '%',
+-- value_jsonb is untyped null in this branch and the next, but the third
+-- branch below supplies a real jsonb value (to_jsonb(dominant_terpenes)) in
+-- that same position. Postgres resolves UNION column types pairwise,
+-- left-to-right: the first two untyped nulls default the column to text,
+-- then the third branch's jsonb collides (42804: UNION types text and
+-- jsonb cannot be matched). Casting the untyped nulls to ::jsonb up front
+-- keeps every branch agreeing on the column type from the start.
+select cultivar_id, 'reported_thc_pct', thc_pct_min, thc_pct_max, null, null::jsonb, '%',
   jsonb_build_object(
     'measurement_basis', 'source_reported_summary',
     'analytical_method', 'not_reported',
@@ -528,7 +535,7 @@ select cultivar_id, 'reported_thc_pct', thc_pct_min, thc_pct_max, null, null, '%
   ), source_id, 'medium', '2026-07-22T00:00:00Z'::timestamptz
 from claim_seed where thc_pct_min is not null or thc_pct_max is not null
 union all
-select cultivar_id, 'chemotype', null, null, chemotype, null, null,
+select cultivar_id, 'chemotype', null, null, chemotype, null::jsonb, null,
   jsonb_build_object(
     'classification_basis', 'Source-reviewed named-cultivar prior; not a batch-specific laboratory panel.',
     'variability_note', 'Chemotype is a stronger prior than market indica/sativa labelling but remains source- and sample-dependent.'

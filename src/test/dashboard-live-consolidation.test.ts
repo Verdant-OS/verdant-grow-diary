@@ -34,7 +34,7 @@ describe("Dashboard + Live Dashboard consolidation · navigation", () => {
 
   it("Legacy /grow-room route redirects to the main Dashboard", () => {
     expect(APP).toMatch(
-      /path=["']\/grow-room["']\s+element=\{<Navigate\s+to=["']\/["']\s+replace\s*\/>\}/,
+      /path=["']\/grow-room["']\s+element=\{<RouteAliasRedirect\s+to=["']\/["']\s*\/>\}/,
     );
     expect(APP).not.toMatch(/<GrowRoomMode\s*\/?>/);
   });

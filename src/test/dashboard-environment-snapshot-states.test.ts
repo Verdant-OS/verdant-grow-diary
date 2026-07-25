@@ -80,7 +80,7 @@ describe("Source label rules (used by Environment Snapshot via SensorSourceBadge
 describe("Legacy Live Dashboard route + copy cleanup", () => {
   it("App redirects /grow-room to /", () => {
     expect(APP).toMatch(
-      /path=["']\/grow-room["']\s+element=\{<Navigate\s+to=["']\/["']\s+replace\s*\/>\}/,
+      /path=["']\/grow-room["']\s+element=\{<RouteAliasRedirect\s+to=["']\/["']\s*\/>\}/,
     );
   });
 

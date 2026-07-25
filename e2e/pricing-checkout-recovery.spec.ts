@@ -65,6 +65,33 @@ async function seedFakeSession(page: Page) {
   );
 }
 
+// Capture every verdant:analytics CustomEvent on window so the test can
+// assert recovery emissions carry the sanitized plan slug and nothing else.
+async function captureAnalyticsEvents(page: Page) {
+  await page.addInitScript(() => {
+    (window as unknown as { __verdantAnalyticsEvents: unknown[] }).__verdantAnalyticsEvents = [];
+    window.addEventListener("verdant:analytics", (event) => {
+      const detail = (event as CustomEvent<{ name: string; props?: Record<string, unknown> }>)
+        .detail;
+      (window as unknown as { __verdantAnalyticsEvents: unknown[] }).__verdantAnalyticsEvents.push({
+        name: detail?.name,
+        props: detail?.props ?? null,
+      });
+    });
+  });
+}
+
+type CapturedAnalyticsEvent = { name: string; props: Record<string, unknown> | null };
+
+async function readAnalyticsEvents(page: Page): Promise<CapturedAnalyticsEvent[]> {
+  return page.evaluate(
+    () =>
+      (window as unknown as { __verdantAnalyticsEvents: CapturedAnalyticsEvent[] })
+        .__verdantAnalyticsEvents ?? [],
+  );
+}
+
+
 async function mockSupabaseAndPaddle(page: Page) {
   // Auth: identity checks succeed; everything else answers empty JSON.
   await page.route(/\/auth\/v1\//, async (route, request) => {

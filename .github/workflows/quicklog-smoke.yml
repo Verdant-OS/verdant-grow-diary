@@ -1498,6 +1498,100 @@ jobs:
             --out=e2e/results/per-test-artifacts.json \
             || echo "::warning::per-test artifact uploader exited non-zero (see logs) — this is enrichment only and does not affect the smoke result"
 
+      # Single at-a-glance "Artifacts uploaded" list covering every
+      # upload-artifact step in this workflow. Runs after ALL uploads so
+      # every `artifact-url` output is populated (v4 only exposes the URL
+      # after the upload completes). Enrichment only — never fails the job.
+      # Each row shows the exact run-scoped artifact name and a Download
+      # link, or an italic "not uploaded" note when the upload was skipped
+      # (gate) or failed to expose a URL.
+      - name: Artifacts uploaded — consolidated links in Job Summary
+        if: always() && steps.e2e_config.outputs.should_run == 'true'
+        shell: bash
+        env:
+          SMOKE_BUNDLE_URL: ${{ steps.upload_smoke_bundle.outputs.artifact-url }}
+          HTML_REPORT_URL: ${{ steps.upload_playwright_report.outputs.artifact-url }}
+          FLAKE_SUMMARY_URL: ${{ steps.upload_flake_summary.outputs.artifact-url }}
+          FLAKE_SUMMARY_PRESENT: ${{ steps.check_flake_summary.outputs.present }}
+          TRACES_URL: ${{ steps.upload_playwright_traces.outputs.artifact-url }}
+          MEDIA_URL: ${{ steps.upload_playwright_media.outputs.artifact-url }}
+          SMOKE_JSON_URL: ${{ steps.upload_smoke_report_json.outputs.artifact-url }}
+          SMOKE_TXT_URL: ${{ steps.upload_smoke_report_txt.outputs.artifact-url }}
+          FAILURE_DEBUG_URL: ${{ steps.upload_failure_debug_summary.outputs.artifact-url }}
+          FAILURE_DEBUG_PRESENT: ${{ steps.failure_debug_summary.outputs.present }}
+        run: |
+          set +e
+          RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+
+          fmt_row() {
+            # $1=display name, $2=artifact name, $3=url, $4=missing-note
+            local name="$1" artifact="$2" url="$3" missing="$4"
+            local link
+            if [ -n "${url}" ]; then
+              link="[Download](${url})"
+            else
+              link="_${missing}_"
+            fi
+            printf '| %s | `%s` | %s |\n' "${name}" "${artifact}" "${link}"
+          }
+
+          if [ "${FLAKE_SUMMARY_PRESENT}" = "true" ]; then
+            flake_missing="uploaded, URL unavailable — see Artifacts dropdown"
+          else
+            flake_missing="not uploaded — 0 failed + 0 flaky (upload gate)"
+          fi
+          if [ "${FAILURE_DEBUG_PRESENT}" = "true" ]; then
+            debug_missing="uploaded, URL unavailable — see Artifacts dropdown"
+          else
+            debug_missing="not uploaded — job did not fail"
+          fi
+
+          {
+            echo ""
+            echo "## 📦 Artifacts uploaded (this run)"
+            echo ""
+            echo "All artifact URLs are scoped to this workflow run (\`#${GITHUB_RUN_NUMBER}\` attempt \`${GITHUB_RUN_ATTEMPT}\`, suffix \`${ARTIFACT_SUFFIX}\`). Missing rows mean the upload was gated off or produced no files — see the corresponding section above for the reason. Full [Artifacts dropdown](${RUN_URL}) on the run page lists every upload directly."
+            echo ""
+            echo "| Artifact | Name | Link |"
+            echo "| --- | --- | --- |"
+            fmt_row "Smoke bundle (JSON+TXT reports, HTML report, test-results)" \
+              "quicklog-smoke-artifacts-${ARTIFACT_SUFFIX}" \
+              "${SMOKE_BUNDLE_URL}" \
+              "not uploaded — see smoke bundle section"
+            fmt_row "Playwright HTML report" \
+              "quicklog-playwright-report-${ARTIFACT_SUFFIX}" \
+              "${HTML_REPORT_URL}" \
+              "not uploaded — HTML report upload disabled or failed"
+            fmt_row "Playwright traces (\`trace.zip\` per failed/retried test)" \
+              "quicklog-playwright-traces-${ARTIFACT_SUFFIX}" \
+              "${TRACES_URL}" \
+              "not uploaded — no traces produced (all tests green on first attempt)"
+            fmt_row "Playwright media (screenshots + videos)" \
+              "quicklog-playwright-media-${ARTIFACT_SUFFIX}" \
+              "${MEDIA_URL}" \
+              "not uploaded — no media produced"
+            fmt_row "Flake summary (single markdown)" \
+              "quicklog-flake-summary-${ARTIFACT_SUFFIX}" \
+              "${FLAKE_SUMMARY_URL}" \
+              "${flake_missing}"
+            fmt_row "Smoke report — JSON" \
+              "quicklog-smoke-report-json-${ARTIFACT_SUFFIX}" \
+              "${SMOKE_JSON_URL}" \
+              "not uploaded — no JSON report produced"
+            fmt_row "Smoke report — text" \
+              "quicklog-smoke-report-txt-${ARTIFACT_SUFFIX}" \
+              "${SMOKE_TXT_URL}" \
+              "not uploaded — no text report produced"
+            fmt_row "Failure debug info (\`quicklog-failure-debug.md\`)" \
+              "quicklog-failure-debug-${ARTIFACT_SUFFIX}" \
+              "${FAILURE_DEBUG_URL}" \
+              "${debug_missing}"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 0
+
+
+
       - name: Build Playwright failure PR-comment body
         id: build_pr_comment
         if: always() && steps.e2e_config.outputs.should_run == 'true' && env.PR_COMMENT_CONTEXT_OK == 'true'

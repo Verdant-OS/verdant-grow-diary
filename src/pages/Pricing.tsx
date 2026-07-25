@@ -452,7 +452,11 @@ export default function Pricing() {
       </section>
 
       {/* Pricing tier cards */}
-      <section className="px-6 pb-10 max-w-6xl mx-auto grid gap-8 md:gap-6 md:grid-cols-2 xl:grid-cols-4">
+      <section
+        id="pricing-plans"
+        data-testid="pricing-plans-grid"
+        className="px-6 pb-10 max-w-6xl mx-auto grid gap-8 md:gap-6 md:grid-cols-2 xl:grid-cols-4 scroll-mt-24"
+      >
         {/* Free */}
         <PricingCard
           testId="pricing-card-free"

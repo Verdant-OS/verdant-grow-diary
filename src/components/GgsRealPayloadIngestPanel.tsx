@@ -5,8 +5,8 @@
  *   - Never renders `raw_payload.payload` (the verbatim vendor body).
  *   - Commit button stays disabled until: payload parses, context is set,
  *     planner accepts, and the operator checks the attestation box.
- *   - All writes go through the existing validated `pi_ingest_commit_batch`
- *     RPC via `commitGgsRealPayload`. No direct table writes.
+ *   - All writes go through the JWT-authenticated operator Edge boundary.
+ *     The browser never calls the private commit RPC directly.
  *   - No alerts, Action Queue, AI, or device control side effects.
  */
 import { useMemo, useState } from "react";
@@ -35,6 +35,7 @@ import {
   describeRefusal,
 } from "@/lib/ggsRealPayloadIngestViewModel";
 import { commitGgsRealPayload, type GgsRealPayloadCommitResult } from "@/lib/ggsRealPayloadCommit";
+import { commitGgsRealPayloadAndRefresh } from "@/lib/ggsRealPayloadCommitOrchestration";
 import type { BridgeTokenRow } from "@/lib/bridgeTokenRules";
 import { bridgeTokenStatus } from "@/lib/bridgeTokenRules";
 
@@ -47,11 +48,21 @@ const EXAMPLE_PAYLOAD = `{
   "tent_id": "<tent uuid>"
 }`;
 
-export default function GgsRealPayloadIngestPanel() {
+export interface GgsRealPayloadIngestPanelProps {
+  selectedTentId: string;
+  onSelectedTentIdChange: (tentId: string) => void;
+  onCommitSuccess?: () => Promise<unknown> | unknown;
+}
+
+export default function GgsRealPayloadIngestPanel({
+  selectedTentId,
+  onSelectedTentIdChange,
+  onCommitSuccess,
+}: GgsRealPayloadIngestPanelProps) {
   const { user } = useAuth();
   const { data: tents = [] } = useTents();
 
-  const [tentId, setTentId] = useState<string>("");
+  const tentId = selectedTentId;
   const [bridgeId, setBridgeId] = useState<string>("");
   const [deviceId, setDeviceId] = useState<string>("");
   const [payloadText, setPayloadText] = useState<string>("");
@@ -99,7 +110,16 @@ export default function GgsRealPayloadIngestPanel() {
     setCommitting(true);
     setResult(null);
     try {
-      const res = await commitGgsRealPayload(vm.commit);
+      const res = await commitGgsRealPayloadAndRefresh(
+        {
+          tentId,
+          bridgeId,
+          deviceId: deviceId.trim(),
+          payloadText,
+          attested,
+        },
+        { commit: commitGgsRealPayload, onCommitSuccess },
+      );
       setResult(res);
     } finally {
       setCommitting(false);
@@ -113,27 +133,41 @@ export default function GgsRealPayloadIngestPanel() {
         <AlertTitle>Real-device payloads only</AlertTitle>
         <AlertDescription className="space-y-1 text-sm">
           <p>Only paste values that came from the physical Spider Farmer GGS device.</p>
-          <p>Do not use invented or hand-crafted values with <code>source: "live"</code>.</p>
+          <p>
+            Do not use invented or hand-crafted values with <code>source: "live"</code>.
+          </p>
           <p>Fixture/demo data cannot clear Sentinel live sign-off.</p>
         </AlertDescription>
       </Alert>
 
       <Card>
         <CardHeader>
-          <CardTitle>Tent &amp; bridge context</CardTitle>
+          <CardTitle>Tent &amp; bridge-token context</CardTitle>
           <CardDescription>
-            Commit routes through the existing <code>pi_ingest_commit_batch</code> path; both the
-            tent and bridge token must already exist for the operator.
+            Commit routes through the operator-authenticated Edge boundary to the private{" "}
+            <code>pi_ingest_commit_batch</code> path. Your verified session, operator role, and tent
+            ownership authorize the write. The selected active same-owner/tent bridge-token record
+            supplies audit and idempotency context.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
             <Label>Tent</Label>
-            <Select value={tentId} onValueChange={(v) => { setTentId(v); setBridgeId(""); }}>
-              <SelectTrigger><SelectValue placeholder="Select tent" /></SelectTrigger>
+            <Select
+              value={tentId}
+              onValueChange={(v) => {
+                onSelectedTentIdChange(v);
+                setBridgeId("");
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select tent" />
+              </SelectTrigger>
               <SelectContent>
                 {tents.map((t) => (
-                  <SelectItem key={t.id} value={t.id}>{t.name ?? t.id}</SelectItem>
+                  <SelectItem key={t.id} value={t.id}>
+                    {t.name ?? t.id}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -147,7 +181,9 @@ export default function GgsRealPayloadIngestPanel() {
               </SelectTrigger>
               <SelectContent>
                 {activeTokens.length === 0 ? (
-                  <SelectItem value="__none" disabled>No active bridge tokens for this tent</SelectItem>
+                  <SelectItem value="__none" disabled>
+                    No active bridge tokens for this tent
+                  </SelectItem>
                 ) : (
                   activeTokens.map((t) => (
                     <SelectItem key={t.id} value={t.id}>
@@ -189,8 +225,8 @@ export default function GgsRealPayloadIngestPanel() {
             className="font-mono text-xs"
           />
           <div className="text-xs text-muted-foreground">
-            The verbatim payload body is stored in <code>raw_payload</code> for audit but is
-            never displayed in this panel or anywhere else in Verdant's UI.
+            The verbatim payload body is stored in <code>raw_payload</code> for audit but is never
+            displayed in this panel or anywhere else in Verdant's UI.
           </div>
         </CardContent>
       </Card>
@@ -216,7 +252,9 @@ export default function GgsRealPayloadIngestPanel() {
             disabled={committing || !vm || vm.status !== "ok" || !vm.canCommit}
           >
             {committing ? (
-              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Committing…</>
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Committing…
+              </>
             ) : (
               "Commit real GGS payload"
             )}
@@ -224,7 +262,11 @@ export default function GgsRealPayloadIngestPanel() {
 
           {result && (
             <Alert variant={result.ok ? "default" : "destructive"}>
-              {result.ok ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+              {result.ok ? (
+                <CheckCircle2 className="h-4 w-4" />
+              ) : (
+                <AlertTriangle className="h-4 w-4" />
+              )}
               <AlertTitle>{result.ok ? "Commit complete" : "Commit failed"}</AlertTitle>
               <AlertDescription className="text-sm">
                 {result.ok === true ? (
@@ -233,10 +275,7 @@ export default function GgsRealPayloadIngestPanel() {
                     <strong>{result.rejected}</strong>
                   </>
                 ) : (
-                  <>
-                    {result.reason}
-                    {result.details ? `: ${result.details}` : ""}
-                  </>
+                  <>{result.reason}</>
                 )}
               </AlertDescription>
             </Alert>
@@ -247,11 +286,7 @@ export default function GgsRealPayloadIngestPanel() {
   );
 }
 
-function PreviewCard({
-  vm,
-}: {
-  vm: ReturnType<typeof buildGgsRealPayloadIngestViewModel> | null;
-}) {
+function PreviewCard({ vm }: { vm: ReturnType<typeof buildGgsRealPayloadIngestViewModel> | null }) {
   return (
     <Card>
       <CardHeader>
@@ -282,14 +317,23 @@ function PreviewCard({
               <Badge variant="outline">age: {vm.preview.ageSeconds}s</Badge>
             </div>
             <div className="grid gap-1">
-              <div><span className="text-muted-foreground">captured_at:</span> {vm.preview.capturedAt}</div>
-              <div><span className="text-muted-foreground">sensor_id:</span> {vm.preview.sensorId ?? "—"}</div>
+              <div>
+                <span className="text-muted-foreground">captured_at:</span> {vm.preview.capturedAt}
+              </div>
+              <div>
+                <span className="text-muted-foreground">sensor_id:</span>{" "}
+                {vm.preview.sensorId ?? "—"}
+              </div>
             </div>
             <ul className="divide-y rounded-md border">
               {vm.preview.metrics.map((m) => (
                 <li key={m.metric} className="flex items-center justify-between px-3 py-2">
-                  <span>{m.label} <span className="text-muted-foreground">({m.metric})</span></span>
-                  <span className="font-mono">{m.value} {m.unit}</span>
+                  <span>
+                    {m.label} <span className="text-muted-foreground">({m.metric})</span>
+                  </span>
+                  <span className="font-mono">
+                    {m.value} {m.unit}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -299,15 +343,15 @@ function PreviewCard({
                 <AlertTitle>Normalizer warnings</AlertTitle>
                 <AlertDescription>
                   <ul className="list-disc pl-5">
-                    {vm.preview.warnings.map((w) => <li key={w}>{w}</li>)}
+                    {vm.preview.warnings.map((w) => (
+                      <li key={w}>{w}</li>
+                    ))}
                   </ul>
                 </AlertDescription>
               </Alert>
             )}
             {!vm.canCommit && (
-              <p className="text-sm text-amber-600">
-                Commit disabled: {vm.blockers.join(", ")}
-              </p>
+              <p className="text-sm text-amber-600">Commit disabled: {vm.blockers.join(", ")}</p>
             )}
           </div>
         )}

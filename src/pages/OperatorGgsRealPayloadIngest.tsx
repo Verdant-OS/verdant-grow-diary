@@ -1,11 +1,10 @@
 /**
  * Operator GGS Real-Payload Ingest page.
  *
- * Operator-gated ingest plus read-only Sentinel diagnostics. The ingest panel
- * can commit validated, attested rows only through `pi_ingest_commit_batch`;
- * the Sentinel panel only reads existing rows. No direct sensor writes, no
- * alerts/Action-Queue mutation, no AI calls, no device control, no raw-payload
- * rendering, no MQTT publishing.
+ * Operator-gated commit plus a read-only Sentinel verdict. The write crosses
+ * a JWT-authenticated Edge boundary; Sentinel remains read-only. No alerts,
+ * Action Queue mutation, AI calls, device control, raw-payload rendering, or
+ * MQTT publishing.
  */
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -19,12 +18,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import GgsRealPayloadIngestPanel from "@/components/GgsRealPayloadIngestPanel";
 import { GgsSentinelSmokeRunnerPanel } from "@/components/GgsSentinelSmokeRunnerPanel";
 import {
-  runGgsSentinelSmoke,
-  REQUIRED_METRIC_KEYS,
-  type SentinelSensorRow,
+  evaluateGgsSentinelReadiness,
+  type GgsSentinelInputRow,
 } from "@/lib/ggsSentinelSmokeRunner";
-import { buildGgsSentinelSmokeRunnerPanelViewModel } from "@/lib/ggsSentinelSmokeRunnerViewModel";
-import { SPIDER_FARMER_GGS_PROVIDER } from "@/lib/spiderFarmerGgsMappingRules";
+import { buildGgsSentinelEvaluationPanelViewModel } from "@/lib/ggsSentinelSmokeRunnerViewModel";
+import {
+  GGS_OPERATOR_SENTINEL_METRICS,
+  GGS_OPERATOR_SENTINEL_QUALITY,
+  GGS_OPERATOR_SENTINEL_SOURCE,
+  GGS_OPERATOR_SENTINEL_VENDOR_CONTAINS,
+} from "@/lib/ggsOperatorRealPayloadSentinelRules";
 
 const ROW_FETCH_LIMIT = 50;
 
@@ -39,30 +42,33 @@ export default function OperatorGgsRealPayloadIngest() {
 
   const ggsRowsQ = useQuery({
     queryKey: ["operator-ggs-real-payload", selectedTentId],
-    enabled: authAvailable && !!selectedTentId,
-    queryFn: async (): Promise<SentinelSensorRow[]> => {
+    enabled: authAvailable && role.status === "granted" && !!selectedTentId,
+    queryFn: async (): Promise<GgsSentinelInputRow[]> => {
       const { data, error } = await supabase
         .from("sensor_readings")
-        .select("metric,value,source,quality,captured_at")
+        .select("metric,value,source,quality,captured_at,raw_payload")
         .eq("tent_id", selectedTentId)
-        .eq("source", SPIDER_FARMER_GGS_PROVIDER)
-        .in("metric", [...REQUIRED_METRIC_KEYS])
+        .eq("source", GGS_OPERATOR_SENTINEL_SOURCE)
+        .eq("quality", GGS_OPERATOR_SENTINEL_QUALITY)
+        .contains("raw_payload", GGS_OPERATOR_SENTINEL_VENDOR_CONTAINS)
+        .in("metric", [...GGS_OPERATOR_SENTINEL_METRICS])
         .order("captured_at", { ascending: false })
         .limit(ROW_FETCH_LIMIT);
       if (error) throw error;
-      return (data ?? []) as SentinelSensorRow[];
+      return (data ?? []) as GgsSentinelInputRow[];
     },
   });
 
   const verdict = useMemo(
     () =>
-      runGgsSentinelSmoke({
+      evaluateGgsSentinelReadiness({
         rows: ggsRowsQ.data ?? [],
+        snapshot: null,
         now: new Date(),
       }),
     [ggsRowsQ.data],
   );
-  const panelVm = useMemo(() => buildGgsSentinelSmokeRunnerPanelViewModel(verdict), [verdict]);
+  const panelVm = useMemo(() => buildGgsSentinelEvaluationPanelViewModel(verdict), [verdict]);
 
   return (
     <div
@@ -72,8 +78,8 @@ export default function OperatorGgsRealPayloadIngest() {
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">GGS Real-Payload Ingest</h1>
         <p className="text-sm text-muted-foreground">
-          Operator Mode · Commit validated, attested Spider Farmer GGS readings, then review the
-          read-only Sentinel verdict.
+          Operator Mode · Commit validated, attested Spider Farmer GGS readings through the gated
+          Edge boundary, then review the read-only Sentinel verdict.
         </p>
       </header>
 
@@ -93,7 +99,7 @@ export default function OperatorGgsRealPayloadIngest() {
               <CardTitle>Operator access required</CardTitle>
             </div>
             <CardDescription>
-              This screen is restricted to operators with the <code>admin</code> role.
+              This screen is restricted to accounts with the <code>operator</code> role.
             </CardDescription>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
@@ -113,7 +119,11 @@ export default function OperatorGgsRealPayloadIngest() {
 
       {role.status === "granted" && (
         <>
-          <GgsRealPayloadIngestPanel />
+          <GgsRealPayloadIngestPanel
+            selectedTentId={selectedTentId}
+            onSelectedTentIdChange={setSelectedTentId}
+            onCommitSuccess={() => ggsRowsQ.refetch()}
+          />
           <GgsSentinelSmokeRunnerPanel viewModel={panelVm} />
         </>
       )}

@@ -13,6 +13,7 @@
  */
 
 import type {
+  GgsSentinelEvaluation,
   MetricFreshnessAssessment,
   MetricFreshnessState,
   SentinelSmokeRunnerVerdict,
@@ -47,12 +48,13 @@ export interface GgsSentinelSmokeRunnerPanelViewModel {
 export const FRESHNESS_EXPLANATORY_NOTE =
   "Freshness guidance does not change Sentinel result priority. It only explains why each metric is fresh, aging, stale, or missing.";
 
-const STATE_TO_LABEL: Readonly<Record<MetricFreshnessState, FreshnessRowViewModel["statusLabel"]>> = {
-  fresh: "Fresh",
-  fresh_but_aging: "Fresh but aging",
-  stale: "Stale",
-  missing: "Missing",
-};
+const STATE_TO_LABEL: Readonly<Record<MetricFreshnessState, FreshnessRowViewModel["statusLabel"]>> =
+  {
+    fresh: "Fresh",
+    fresh_but_aging: "Fresh but aging",
+    stale: "Stale",
+    missing: "Missing",
+  };
 
 const STATE_TO_TONE: Readonly<Record<MetricFreshnessState, FreshnessTone>> = {
   fresh: "primary",
@@ -61,17 +63,24 @@ const STATE_TO_TONE: Readonly<Record<MetricFreshnessState, FreshnessTone>> = {
   missing: "muted",
 };
 
-const VERDICT_PILL_LABELS: Readonly<Record<SentinelState, { label: string; tone: FreshnessTone }>> = {
-  PASS_LIVE_SENTINEL_READY: { label: "Live · Sentinel ready", tone: "primary" },
-  BLOCKED_NO_GGS_ROWS: { label: "Blocked · no GGS rows", tone: "destructive" },
-  BLOCKED_NO_SOIL_TEMP_C: { label: "Blocked · no soil temperature (C)", tone: "destructive" },
-  BLOCKED_NO_EC: { label: "Blocked · no soil EC", tone: "destructive" },
-  BLOCKED_VENDOR_PROVENANCE_MISSING: { label: "Blocked · vendor provenance missing", tone: "destructive" },
-  BLOCKED_SOURCE_NOT_CANONICAL: { label: "Blocked · source not canonical", tone: "destructive" },
-  BLOCKED_STALE_READING: { label: "Blocked · stale reading", tone: "destructive" },
-  BLOCKED_VALIDATION_ERROR: { label: "Blocked · validation error", tone: "destructive" },
-  BLOCKED_RAW_PAYLOAD_RENDER_RISK: { label: "Blocked · raw payload render risk", tone: "destructive" },
-};
+const VERDICT_PILL_LABELS: Readonly<Record<SentinelState, { label: string; tone: FreshnessTone }>> =
+  {
+    PASS_LIVE_SENTINEL_READY: { label: "Live · Sentinel ready", tone: "primary" },
+    BLOCKED_NO_GGS_ROWS: { label: "Blocked · no GGS rows", tone: "destructive" },
+    BLOCKED_NO_SOIL_TEMP_C: { label: "Blocked · no soil temperature (C)", tone: "destructive" },
+    BLOCKED_NO_EC: { label: "Blocked · no soil EC", tone: "destructive" },
+    BLOCKED_VENDOR_PROVENANCE_MISSING: {
+      label: "Blocked · vendor provenance missing",
+      tone: "destructive",
+    },
+    BLOCKED_SOURCE_NOT_CANONICAL: { label: "Blocked · source not canonical", tone: "destructive" },
+    BLOCKED_STALE_READING: { label: "Blocked · stale reading", tone: "destructive" },
+    BLOCKED_VALIDATION_ERROR: { label: "Blocked · validation error", tone: "destructive" },
+    BLOCKED_RAW_PAYLOAD_RENDER_RISK: {
+      label: "Blocked · raw payload render risk",
+      tone: "destructive",
+    },
+  };
 
 const MS_PER_SECOND = 1000;
 const MS_PER_MINUTE = 60 * MS_PER_SECOND;
@@ -118,5 +127,43 @@ export function buildGgsSentinelSmokeRunnerPanelViewModel(
     pill: { state: verdict.state, label: pillSpec.label, tone: pillSpec.tone },
     freshnessNote: FRESHNESS_EXPLANATORY_NOTE,
     rows: verdict.freshness.map(rowVm),
+  };
+}
+
+const EVALUATION_METRIC_LABELS: Readonly<Record<string, string>> = {
+  soil_moisture_pct: "Soil moisture (%)",
+  ec: "Soil EC",
+  soil_temp_c: "Soil temperature (C)",
+};
+
+/**
+ * Presenter adapter for the canonical three-metric evaluator used by the
+ * operator real-payload route.
+ */
+export function buildGgsSentinelEvaluationPanelViewModel(
+  evaluation: GgsSentinelEvaluation,
+): GgsSentinelSmokeRunnerPanelViewModel {
+  const pillSpec = VERDICT_PILL_LABELS[evaluation.state];
+  return {
+    pill: {
+      state: evaluation.state,
+      label: pillSpec.label,
+      tone: pillSpec.tone,
+    },
+    freshnessNote: FRESHNESS_EXPLANATORY_NOTE,
+    rows: evaluation.metricFreshness.map((freshness) => {
+      const state: MetricFreshnessState =
+        freshness.freshnessStatus === "aging" ? "fresh_but_aging" : freshness.freshnessStatus;
+      return {
+        metric: freshness.metric,
+        label: EVALUATION_METRIC_LABELS[freshness.metric] ?? freshness.metric,
+        state,
+        statusLabel: STATE_TO_LABEL[state],
+        tone: STATE_TO_TONE[state],
+        ageText: freshness.ageMs === null ? "No row found" : formatAgeText(freshness.ageMs, state),
+        capturedText: formatCapturedText(freshness.capturedAt),
+        nextAction: freshness.nextActionLabel,
+      };
+    }),
   };
 }

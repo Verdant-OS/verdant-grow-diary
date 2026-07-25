@@ -8,7 +8,8 @@ import { resolve } from "node:path";
  *
  * These tests guard the AGENTS.md "Hard Safety Rules" for this slice:
  *   - Sentinel evaluation stays read-only.
- *   - Ingest writes route only through the validated commit helper/RPC.
+ *   - Ingest writes cross the authenticated Edge boundary; the browser never
+ *     calls the private commit RPC directly.
  *   - No Action Queue mutation, AI imports, device control, raw_payload
  *     rendering, MQTT publishing, or ggs_live/ggs_csv test-data labels.
  */
@@ -80,8 +81,10 @@ describe("static safety — GGS Sentinel page", () => {
       expect(SENTINEL_PAGE).not.toContain(term);
     });
   }
-  it("page does not import raw_payload from anywhere", () => {
-    expect(SENTINEL_PAGE).not.toMatch(/raw_payload/);
+  it("page selects raw_payload only for safe vendor provenance and never renders it", () => {
+    expect(SENTINEL_PAGE).toContain("metric,value,source,quality,captured_at,raw_payload");
+    expect(SENTINEL_PAGE).not.toMatch(/\{[^}]*raw_payload[^}]*\}/);
+    expect(SENTINEL_PAGE).not.toMatch(/JSON\.stringify\([^)]*raw_payload/);
   });
   it("page does not publish or broadcast", () => {
     expect(SENTINEL_PAGE).not.toMatch(/\b(publish|broadcast|emit|dispatch)\s*\(/);
@@ -171,8 +174,10 @@ describe("operator GGS real-payload ingest — static safety", () => {
     }
   });
 
-  it("commit wrapper only calls pi_ingest_commit_batch, not direct sensor_readings inserts", () => {
-    expect(REAL_PAYLOAD_COMMIT).toMatch(/pi_ingest_commit_batch/);
+  it("commit wrapper invokes the operator Edge boundary, never the private RPC", () => {
+    expect(REAL_PAYLOAD_COMMIT).toMatch(/operator-ggs-real-payload-commit/);
+    expect(REAL_PAYLOAD_COMMIT).toMatch(/functions\.invoke/);
+    expect(REAL_PAYLOAD_COMMIT).not.toMatch(/\.rpc\(\s*["']pi_ingest_commit_batch["']/);
     expect(REAL_PAYLOAD_COMMIT).not.toMatch(/\.from\(\s*["']sensor_readings["']\s*\)/);
   });
 

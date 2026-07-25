@@ -44,6 +44,7 @@ export type GgsSentinelInputRow = {
   metric: string;
   value: number | null;
   source: string | null;
+  quality?: string | null;
   captured_at: string;
 } & Record<GgsSensorBodyKey, unknown>;
 
@@ -310,14 +311,26 @@ export function evaluateGgsSentinelReadiness(
   let sawForbiddenSource: string | null = null;
   let missingVendorFor: GgsSentinelMetric | null = null;
   let staleMetric: { metric: GgsSentinelMetric; age: number } | null = null;
+  let staleQualityFor: GgsSentinelMetric | null = null;
+  let untrustedQualityFor: GgsSentinelMetric | null = null;
+  let invalidRowFor: GgsSentinelMetric | null = null;
   const safeMetrics: GgsSentinelSafeMetricSummary[] = [];
 
   for (const metric of GGS_SENTINEL_METRICS) {
     const row = latestByMetric.get(metric);
     if (!row) continue;
     const src = (row.source ?? "").trim();
-    if (FORBIDDEN_NON_CANONICAL_SOURCES.has(src)) {
+    if (!CANONICAL_LIVE_SOURCES.has(src)) {
       sawForbiddenSource = src;
+    }
+    const quality = (row.quality ?? "").trim();
+    if (quality === "stale") {
+      staleQualityFor = metric;
+    } else if (quality !== "ok") {
+      untrustedQualityFor = metric;
+    }
+    if (!Number.isFinite(Date.parse(row.captured_at))) {
+      invalidRowFor = metric;
     }
     const vendor = readVendor(readSensorBody(row));
     if (vendor !== GGS_REAL_PAYLOAD_SOURCE_APP) {
@@ -350,6 +363,18 @@ export function evaluateGgsSentinelReadiness(
       "All GGS rows use canonical source",
       sawForbiddenSource ? "fail" : "pass",
       sawForbiddenSource ? `forbidden source: ${sawForbiddenSource}` : undefined,
+    ),
+  );
+  checks.push(
+    check(
+      "quality_trusted",
+      'All GGS rows use quality "ok"',
+      staleQualityFor || untrustedQualityFor ? "fail" : "pass",
+      staleQualityFor
+        ? `stale quality for ${staleQualityFor}`
+        : untrustedQualityFor
+          ? `missing/unsafe quality for ${untrustedQualityFor}`
+          : undefined,
     ),
   );
   checks.push(
@@ -393,6 +418,8 @@ export function evaluateGgsSentinelReadiness(
     state = "BLOCKED_SOURCE_NOT_CANONICAL";
   } else if (missingVendorFor) {
     state = "BLOCKED_VENDOR_PROVENANCE_MISSING";
+  } else if (invalidRowFor || untrustedQualityFor) {
+    state = "BLOCKED_VALIDATION_ERROR";
   } else if (!hasSoilTemp) {
     state = "BLOCKED_NO_SOIL_TEMP_C";
   } else if (!hasEc) {
@@ -400,7 +427,7 @@ export function evaluateGgsSentinelReadiness(
   } else if (!hasMoisture) {
     // Treat as BLOCKED_NO_GGS_ROWS-ish, but more specific: moisture missing.
     state = "BLOCKED_NO_GGS_ROWS";
-  } else if (staleMetric) {
+  } else if (staleMetric || staleQualityFor) {
     state = "BLOCKED_STALE_READING";
   } else {
     state = "PASS_LIVE_SENTINEL_READY";

@@ -80,23 +80,24 @@ describe("buildGgsRealPayloadCommitInput", () => {
   });
 
   it("refuses an explicit declared source of demo", () => {
-    const plan = buildGgsRealPayloadCommitInput(
-      { ...realLookingPayload(), source: "demo" },
-      CTX,
-    );
+    const plan = buildGgsRealPayloadCommitInput({ ...realLookingPayload(), source: "demo" }, CTX);
     expect(refusalReason(plan)).toBe("forbidden_declared_source");
   });
 
-  it.each(["ggs_live", "ggs_csv", "fixture", "test", "sample"])(
-    "refuses forbidden declared source %s",
-    (src) => {
-      const plan = buildGgsRealPayloadCommitInput(
-        { ...realLookingPayload(), source: src },
-        CTX,
-      );
-      expect(refusalReason(plan)).toBe("forbidden_declared_source");
-    },
-  );
+  it.each([
+    "ggs_live",
+    "ggs_csv",
+    "manual",
+    "csv",
+    "stale",
+    "invalid",
+    "fixture",
+    "test",
+    "sample",
+  ])("refuses forbidden declared source %s", (src) => {
+    const plan = buildGgsRealPayloadCommitInput({ ...realLookingPayload(), source: src }, CTX);
+    expect(refusalReason(plan)).toBe("forbidden_declared_source");
+  });
 
   it("refuses when timestamp is missing", () => {
     const p = realLookingPayload();
@@ -137,9 +138,7 @@ describe("buildGgsRealPayloadCommitInput", () => {
       },
       CTX,
     );
-    expect(["no_canonical_readings", "normalizer_refused"]).toContain(
-      refusalReason(allBad),
-    );
+    expect(["no_canonical_readings", "normalizer_refused"]).toContain(refusalReason(allBad));
     if (partial.ok) {
       expect(partial.rows.find((r) => r.metric === "soil_temp_c")).toBeUndefined();
       for (const row of partial.rows) expect(Number.isFinite(row.value)).toBe(true);
@@ -155,28 +154,20 @@ describe("buildGgsRealPayloadCommitInput", () => {
   });
 
   it("refuses out-of-bounds soil_temp_c", () => {
-    const plan = buildGgsRealPayloadCommitInput(
-      { ...realLookingPayload(), soil_temp_c: 999 },
-      CTX,
-    );
+    const plan = buildGgsRealPayloadCommitInput({ ...realLookingPayload(), soil_temp_c: 999 }, CTX);
     // Either upstream normalizer drops it, or our bounds check fires.
     if (plan.ok === true) {
       expect(plan.rows.find((r) => r.metric === "soil_temp_c")).toBeUndefined();
     } else {
       const failed = plan as Extract<GgsRealPayloadCommitInput, { ok: false }>;
-      expect([
-        "soil_temp_out_of_range",
-        "no_canonical_readings",
-        "normalizer_refused",
-      ]).toContain(failed.reason);
+      expect(["soil_temp_out_of_range", "no_canonical_readings", "normalizer_refused"]).toContain(
+        failed.reason,
+      );
     }
   });
 
   it("refuses suspected EC unit mismatch (µS/cm leaking through)", () => {
-    const plan = buildGgsRealPayloadCommitInput(
-      { ...realLookingPayload(), soil_ec: 1500 },
-      CTX,
-    );
+    const plan = buildGgsRealPayloadCommitInput({ ...realLookingPayload(), soil_ec: 1500 }, CTX);
     expect(refusalReason(plan)).toBe("soil_ec_unit_mismatch_suspected");
   });
 
@@ -205,10 +196,7 @@ describe("buildGgsRealPayloadCommitInput", () => {
   });
 
   it("does not import Supabase, fetch, AI, alerts, action_queue, or device control", () => {
-    const src = readFileSync(
-      resolve(__dirname, "../lib/ggsRealPayloadIngestRules.ts"),
-      "utf8",
-    );
+    const src = readFileSync(resolve(__dirname, "../lib/ggsRealPayloadIngestRules.ts"), "utf8");
     expect(src).not.toMatch(/from\s+["']@\/integrations\/supabase/);
     expect(src).not.toMatch(/@supabase\/supabase-js/);
     expect(src).not.toMatch(/\.from\(["']sensor_readings["']\)/);

@@ -132,3 +132,10 @@ project_id = "knkwiiywfkbqznbxwqfh"
   # before @lovable.dev/mcp-js performs issuer/JWKS validation.
   [functions.mcp]
     verify_jwt = false
+
+  # Operator GGS payload commit is a privileged user-initiated write. The
+  # gateway verifies the JWT and the handler re-verifies auth.getUser, the
+  # operator role, and tent ownership. An active same-owner/tent bridge-token
+  # record supplies audit and idempotency context only.
+  [functions.operator-ggs-real-payload-commit]
+    verify_jwt = true

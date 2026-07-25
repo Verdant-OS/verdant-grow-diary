@@ -302,6 +302,7 @@ jobs:
           exit "$status"
 
       - name: Summarize failing step + log tail in Job Summary
+        id: failure_debug_summary
         if: failure()
         shell: bash
         env:
@@ -312,8 +313,10 @@ jobs:
         run: |
           # Emits a compact failure section at the top of the Job Summary that
           # names the failing step (from the known set of tracked step IDs) and
-          # tails the most relevant log artifacts. Never echoes secret values.
-          # Tail sizes are capped so the summary stays inside the 1 MiB
+          # tails the most relevant log artifacts. Also writes the exact same
+          # markdown to e2e/results/quicklog-failure-debug.md so it can be
+          # uploaded as a standalone downloadable artifact. Never echoes secret
+          # values. Tail sizes are capped so the summary stays inside the 1 MiB
           # GITHUB_STEP_SUMMARY budget even on long failures.
           set +e
 
@@ -332,6 +335,10 @@ jobs:
           RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           ATTEMPT_URL="${RUN_URL}/attempts/${GITHUB_RUN_ATTEMPT}"
           JOB_URL="${RUN_URL}/job/${GITHUB_JOB}"
+
+          mkdir -p e2e/results
+          DEBUG_MD="e2e/results/quicklog-failure-debug.md"
+          : > "${DEBUG_MD}"
 
           {
             echo ""
@@ -403,10 +410,52 @@ jobs:
             echo ""
             echo "_Full step-by-step output: [job \`${GITHUB_JOB}\`](${JOB_URL}) · [run attempt ${GITHUB_RUN_ATTEMPT}](${ATTEMPT_URL})_"
             echo ""
-          } >> "$GITHUB_STEP_SUMMARY"
+          } | tee -a "${DEBUG_MD}" >> "$GITHUB_STEP_SUMMARY"
+
+          # Expose presence + size for the upload/link steps below.
+          if [ -s "${DEBUG_MD}" ]; then
+            debug_size="$(wc -c < "${DEBUG_MD}" 2>/dev/null | tr -d ' \r\n')"
+            echo "present=true" >> "$GITHUB_OUTPUT"
+            echo "path=${DEBUG_MD}" >> "$GITHUB_OUTPUT"
+            echo "size=${debug_size}" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
 
           # This step is diagnostic only — never mask the real failure.
           exit 0
+
+      - name: Upload quick failure debug info
+        id: upload_failure_debug_summary
+        if: failure() && steps.failure_debug_summary.outputs.present == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: quicklog-failure-debug-${{ env.ARTIFACT_SUFFIX }}
+          path: e2e/results/quicklog-failure-debug.md
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Link quick failure debug artifact in Job Summary
+        if: failure() && steps.failure_debug_summary.outputs.present == 'true'
+        shell: bash
+        env:
+          DEBUG_URL: ${{ steps.upload_failure_debug_summary.outputs.artifact-url }}
+          DEBUG_SIZE: ${{ steps.failure_debug_summary.outputs.size }}
+        run: |
+          RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          {
+            echo ""
+            echo "### 📥 Quick debug info — downloadable artifact"
+            echo ""
+            if [ -n "${DEBUG_URL}" ]; then
+              echo "> ✅ **Uploaded:** [\`quicklog-failure-debug-${ARTIFACT_SUFFIX}\`](${DEBUG_URL}) (${DEBUG_SIZE} bytes) — a single \`quicklog-failure-debug.md\` file containing the exact markdown shown in the failure section above, for archiving or sharing outside the GitHub UI."
+            else
+              echo "> ⚠️ **Upload completed but no artifact URL was exposed to this Job Summary.** Open this run's **Artifacts** dropdown at the top of [the run page](${RUN_URL}) and download \`quicklog-failure-debug-${ARTIFACT_SUFFIX}\` manually."
+            fi
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
+
 
 
 

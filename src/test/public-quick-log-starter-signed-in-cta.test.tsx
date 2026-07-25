@@ -23,6 +23,7 @@ import { resolve as resolvePath } from "node:path";
 import { render, screen, cleanup } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { stripSourceComments } from "./utils/stripSourceComments";
+import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
 import { PUBLIC_QUICK_LOG_STARTER_COPY as COPY } from "@/constants/publicQuickLogStarterCopy";
 import {
   PUBLIC_QUICK_LOG_STARTER_SIGNED_IN_PATH,
@@ -50,11 +51,9 @@ function renderStarter() {
 
 beforeEach(() => {
   cleanup();
-  try {
-    window.localStorage.clear();
-  } catch {
-    /* storage may be blocked; the page tolerates it */
-  }
+  // Repo guard: src/test/** must go through the helper, never touch
+  // localStorage directly (assert-test-localstorage-helper-usage).
+  clearLocalStorageForTest();
   mockUser.mockReturnValue(null);
 });
 

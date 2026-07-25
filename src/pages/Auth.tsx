@@ -33,6 +33,7 @@ import {
   RESEND_VERIFICATION_GENERIC_FAILURE,
 } from "@/lib/authErrorRules";
 import { resolveKnownRouteReturnTo } from "@/lib/authRedirectRules";
+import { sendWelcomeEmailBestEffort } from "@/lib/sendWelcomeEmail";
 import {
   buildSignupEmailRedirectUrl,
   buildSignupUserMetadata,
@@ -403,9 +404,11 @@ export default function Auth() {
       setSignUpSuccess(
         "Account created. Check your inbox and open the verification link to continue.",
       );
+      void sendWelcomeEmailBestEffort(email);
       return;
     }
     setSignUpSuccess("Welcome to Verdant. Your account is ready.");
+    void sendWelcomeEmailBestEffort(email);
     nav(postSignInTarget(), { replace: true });
   }
 

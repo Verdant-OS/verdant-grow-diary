@@ -1033,17 +1033,19 @@ jobs:
           TRACES_URL: ${{ steps.upload_playwright_traces.outputs.artifact-url }}
           SMOKE_BUNDLE_URL: ${{ steps.upload_smoke_bundle.outputs.artifact-url }}
         run: |
-          if [ "${FLAKE_SUMMARY_PRESENT}" != "true" ] || [ -z "${FLAKE_SUMMARY_URL}" ]; then
-            # Only surface the trace viewer link alongside a successful flake
-            # summary upload — otherwise there's nothing to cross-reference and
-            # the smoke bundle section already covers the fallback path.
-            exit 0
-          fi
           {
             echo ""
             echo "### 🎬 Playwright trace viewer"
             echo ""
-            echo "The flake summary artifact was uploaded above. Open the trace for the exact failing/flaky attempt it references:"
+            if [ "${FLAKE_SUMMARY_PRESENT}" = "true" ] && [ -n "${FLAKE_SUMMARY_URL}" ]; then
+              echo "The flake summary artifact was uploaded above. Open the trace for the exact failing/flaky attempt it references:"
+            elif [ "${FLAKE_SUMMARY_PRESENT}" = "true" ]; then
+              echo "_The flake summary was generated but its standalone artifact URL was unavailable in this Job Summary — trace links below still work._"
+            else
+              echo "_No flake summary artifact was uploaded (no failed/flaky tests met the upload gate, or the upload was skipped/failed). Trace links below are shown unconditionally so you can still inspect any trace this run produced._"
+            fi
+            echo ""
+
             echo ""
             if [ -n "${TRACES_URL}" ]; then
               echo "1. **Download the traces artifact:** [\`quicklog-playwright-traces-${ARTIFACT_SUFFIX}\`](${TRACES_URL}) — contains every \`test-results/**/trace.zip\` produced by this run (first attempt + retries)."

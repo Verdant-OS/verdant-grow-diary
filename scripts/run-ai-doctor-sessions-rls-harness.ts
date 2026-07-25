@@ -131,6 +131,14 @@ function errorCode(error: unknown): string {
   return isRecord(error) && typeof error.code === "string" ? error.code : "unexpected";
 }
 
+function errorDetail(error: unknown): string {
+  if (isRecord(error) && typeof error.code === "string") return error.code;
+  if (error instanceof Error && error.message) {
+    return error.message.replace(/[\r\n\t]+/g, " ").slice(0, 240);
+  }
+  return "unexpected";
+}
+
 function isDenied(error: { code?: string } | null): boolean {
   return error?.code === "42501";
 }
@@ -176,7 +184,11 @@ async function seedScopes(userId: string, label: string): Promise<ScopeFixtures>
 
   const { data: tent, error: tentError } = await admin
     .from("tents")
-    .insert({ user_id: userId, name: `RLS tent ${label}` })
+    .insert({
+      user_id: userId,
+      grow_id: grow.id,
+      name: `RLS tent ${label}`,
+    })
     .select("id")
     .single();
   if (tentError || !tent?.id) {
@@ -187,6 +199,7 @@ async function seedScopes(userId: string, label: string): Promise<ScopeFixtures>
     .from("plants")
     .insert({
       user_id: userId,
+      grow_id: grow.id,
       tent_id: tent.id,
       name: `RLS plant ${label}`,
     })
@@ -669,7 +682,6 @@ async function run(): Promise<void> {
 }
 
 run().catch((error: unknown) => {
-  const code = isRecord(error) && typeof error.code === "string" ? error.code : "unexpected";
-  console.error(`[ai-doctor-sessions] harness failed: ${code}`);
+  console.error(`[ai-doctor-sessions] harness failed: ${errorDetail(error)}`);
   process.exit(1);
 });

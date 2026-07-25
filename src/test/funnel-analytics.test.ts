@@ -42,13 +42,34 @@ describe("event name contract", () => {
       "paywall_viewed",
       "paywall_cta_clicked",
       "checkout_started",
+      // Catalog / recovery funnel. A buyer who reached checkout and could not
+      // complete it is a distinct, revenue-relevant drop-off from one who
+      // never started, so these sit immediately after checkout_started and
+      // the sequence still reads as the buyer's actual path.
+      "checkout_catalog_unavailable",
+      "checkout_recovery_dismissed",
+      "checkout_recovery_choose_another_plan",
+      "checkout_recovery_retry",
       "subscription_activated",
       "checkout_return_completed",
     ]);
   });
 
   it("pins the param-key allowlist", () => {
-    expect([...FUNNEL_PARAM_KEYS]).toEqual(["surface", "plan", "method", "event_type", "rows"]);
+    // `reason` carries a bounded enum token only (e.g. price_not_configured,
+    // checkout_env_unavailable) — never the grower-facing message, never free
+    // text. It exists to diagnose catalog/env gaps in analytics. The
+    // structural sanitizer asserted below still applies to it: whitespace-
+    // bearing and over-long values are dropped even on an allowed key, so a
+    // later caller cannot smuggle prose through it.
+    expect([...FUNNEL_PARAM_KEYS]).toEqual([
+      "surface",
+      "plan",
+      "method",
+      "event_type",
+      "rows",
+      "reason",
+    ]);
   });
 });
 

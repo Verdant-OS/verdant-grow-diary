@@ -521,7 +521,15 @@ export default function ActionQueue() {
       )
       .order("created_at", { ascending: false })
       .limit(100);
-    const { data, error } = effectiveGrowId ? await q.eq("grow_id", effectiveGrowId) : await q;
+    // A focus deep-link is an explicit request for one RLS-visible action.
+    // Resolve it by id before applying the ambient active-grow scope so links
+    // from AI Doctor sessions still work when the source grow is archived or
+    // differs from the grow currently selected in the shell.
+    const { data, error } = focusedActionId
+      ? await q.eq("id", focusedActionId)
+      : effectiveGrowId
+        ? await q.eq("grow_id", effectiveGrowId)
+        : await q;
     if (error) {
       toast.error(error.message);
     } else {
@@ -548,7 +556,7 @@ export default function ActionQueue() {
     setLoading(false);
     setIsRefreshing(false);
     hasLoadedOnceRef.current = true;
-  }, [user, effectiveGrowId]);
+  }, [user, effectiveGrowId, focusedActionId]);
 
   // Reset the initial-load gate when grow scope changes so the user gets
   // the full skeleton (not just a subtle refresh) on a scope switch.

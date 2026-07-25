@@ -21,7 +21,6 @@ function LocationProbe() {
   return <div data-testid="loc-search">{sp.toString()}</div>;
 }
 
-
 // --- Fixtures ---------------------------------------------------------------
 
 const ROWS = [
@@ -70,6 +69,7 @@ const ROWS = [
 ];
 
 const insertSpy = vi.fn();
+const actionQueueEqSpy = vi.fn();
 
 vi.mock("@/integrations/supabase/client", () => {
   const makeActionQueueChain = () => {
@@ -78,7 +78,10 @@ vi.mock("@/integrations/supabase/client", () => {
       select: () => chain,
       order: () => chain,
       limit: () => chain,
-      eq: () => Promise.resolve(result),
+      eq: (column: string, value: string) => {
+        actionQueueEqSpy(column, value);
+        return Promise.resolve(result);
+      },
       in: () => chain,
       then: (resolve: (r: typeof result) => unknown) => resolve(result),
     };
@@ -151,11 +154,11 @@ function renderAt(url: string) {
   );
 }
 
-
 let scrollIntoViewSpy: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   insertSpy.mockClear();
+  actionQueueEqSpy.mockClear();
   scrollIntoViewSpy = vi.fn();
   // jsdom does not implement scrollIntoView — install per test run.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -163,6 +166,17 @@ beforeEach(() => {
 });
 
 describe("ActionQueue — ?focus deep-link", () => {
+  it("loads the focused row by id instead of filtering it out behind the active grow", async () => {
+    renderAt("/actions?focus=aq-2");
+
+    await waitFor(() =>
+      expect(screen.getAllByTestId("action-queue-row").length).toBeGreaterThan(0),
+    );
+
+    expect(actionQueueEqSpy).toHaveBeenCalledWith("id", "aq-2");
+    expect(actionQueueEqSpy).not.toHaveBeenCalledWith("grow_id", "g1");
+  });
+
   it("highlights the matching row with data-focused + accessible label", async () => {
     renderAt("/actions?focus=aq-1");
     await waitFor(() =>
@@ -198,9 +212,7 @@ describe("ActionQueue — ?focus deep-link", () => {
 
   it("renders normally with no focus param", async () => {
     renderAt("/actions");
-    await waitFor(() =>
-      expect(screen.getAllByTestId("action-queue-row").length).toBe(2),
-    );
+    await waitFor(() => expect(screen.getAllByTestId("action-queue-row").length).toBe(2));
     const focused = document.querySelectorAll('[data-focused="true"]');
     expect(focused.length).toBe(0);
     expect(scrollIntoViewSpy).not.toHaveBeenCalled();
@@ -208,9 +220,7 @@ describe("ActionQueue — ?focus deep-link", () => {
 
   it("unknown focus id renders normally and does not crash", async () => {
     renderAt("/actions?focus=does-not-exist");
-    await waitFor(() =>
-      expect(screen.getAllByTestId("action-queue-row").length).toBe(2),
-    );
+    await waitFor(() => expect(screen.getAllByTestId("action-queue-row").length).toBe(2));
     const focused = document.querySelectorAll('[data-focused="true"]');
     expect(focused.length).toBe(0);
     expect(scrollIntoViewSpy).not.toHaveBeenCalled();
@@ -237,12 +247,8 @@ describe("ActionQueue — ?focus deep-link", () => {
 describe("ActionQueue — focus chip + Clear focus", () => {
   it("renders 'Focused action' chip when ?focus=<id> is present", async () => {
     renderAt("/actions?focus=aq-1");
-    await waitFor(() =>
-      expect(screen.getByTestId("action-queue-focus-chip")).toBeTruthy(),
-    );
-    expect(screen.getByTestId("action-queue-focus-chip").textContent).toContain(
-      "Focused action",
-    );
+    await waitFor(() => expect(screen.getByTestId("action-queue-focus-chip")).toBeTruthy());
+    expect(screen.getByTestId("action-queue-focus-chip").textContent).toContain("Focused action");
     expect(screen.getByTestId("action-queue-focus-chip").textContent).toContain(
       "Showing linked Action Queue item.",
     );
@@ -250,26 +256,20 @@ describe("ActionQueue — focus chip + Clear focus", () => {
 
   it("does NOT render the chip when no focus param is present", async () => {
     renderAt("/actions");
-    await waitFor(() =>
-      expect(screen.getAllByTestId("action-queue-row").length).toBe(2),
-    );
+    await waitFor(() => expect(screen.getAllByTestId("action-queue-row").length).toBe(2));
     expect(screen.queryByTestId("action-queue-focus-chip")).toBeNull();
   });
 
   it("Clear focus removes the focus param and the row highlight", async () => {
     renderAt("/actions?focus=aq-1");
-    await waitFor(() =>
-      expect(screen.getByTestId("action-queue-focus-chip")).toBeTruthy(),
+    await waitFor(() => expect(screen.getByTestId("action-queue-focus-chip")).toBeTruthy());
+    expect(document.querySelector('[data-action-id="aq-1"]')?.getAttribute("data-focused")).toBe(
+      "true",
     );
-    expect(
-      document.querySelector('[data-action-id="aq-1"]')?.getAttribute("data-focused"),
-    ).toBe("true");
 
     fireEvent.click(screen.getByTestId("action-queue-clear-focus"));
 
-    await waitFor(() =>
-      expect(screen.queryByTestId("action-queue-focus-chip")).toBeNull(),
-    );
+    await waitFor(() => expect(screen.queryByTestId("action-queue-focus-chip")).toBeNull());
     expect(
       document.querySelector('[data-action-id="aq-1"]')?.getAttribute("data-focused"),
     ).toBeNull();
@@ -280,66 +280,45 @@ describe("ActionQueue — focus chip + Clear focus", () => {
 
   it("Clear focus preserves other query params (filters, growId, page)", async () => {
     renderAt("/actions?focus=aq-1&growId=g1&page=2&view=card");
-    await waitFor(() =>
-      expect(screen.getByTestId("action-queue-clear-focus")).toBeTruthy(),
-    );
+    await waitFor(() => expect(screen.getByTestId("action-queue-clear-focus")).toBeTruthy());
 
     fireEvent.click(screen.getByTestId("action-queue-clear-focus"));
 
-    await waitFor(() =>
-      expect(screen.queryByTestId("action-queue-focus-chip")).toBeNull(),
-    );
+    await waitFor(() => expect(screen.queryByTestId("action-queue-focus-chip")).toBeNull());
     const url = screen.getByTestId("loc-search").textContent ?? "";
     expect(url).not.toContain("focus=");
     expect(url).toContain("growId=g1");
     expect(url).toContain("page=2");
     expect(url).toContain("view=card");
-
   });
 
   it("Clear focus works safely for an unknown focus id", async () => {
     renderAt("/actions?focus=does-not-exist");
-    await waitFor(() =>
-      expect(screen.getByTestId("action-queue-focus-chip")).toBeTruthy(),
-    );
-    expect(() =>
-      fireEvent.click(screen.getByTestId("action-queue-clear-focus")),
-    ).not.toThrow();
-    await waitFor(() =>
-      expect(screen.queryByTestId("action-queue-focus-chip")).toBeNull(),
-    );
+    await waitFor(() => expect(screen.getByTestId("action-queue-focus-chip")).toBeTruthy());
+    expect(() => fireEvent.click(screen.getByTestId("action-queue-clear-focus"))).not.toThrow();
+    await waitFor(() => expect(screen.queryByTestId("action-queue-focus-chip")).toBeNull());
   });
 
   it("chip never leaks an AI Doctor session token", async () => {
     renderAt("/actions?focus=aq-1");
-    await waitFor(() =>
-      expect(screen.getByTestId("action-queue-focus-chip")).toBeTruthy(),
+    await waitFor(() => expect(screen.getByTestId("action-queue-focus-chip")).toBeTruthy());
+    expect(screen.getByTestId("action-queue-focus-chip").textContent ?? "").not.toContain(
+      "session:",
     );
-    expect(
-      screen.getByTestId("action-queue-focus-chip").textContent ?? "",
-    ).not.toContain("session:");
   });
 
   it("Clear focus does not trigger any DB writes", async () => {
     renderAt("/actions?focus=aq-1");
-    await waitFor(() =>
-      expect(screen.getByTestId("action-queue-clear-focus")).toBeTruthy(),
-    );
+    await waitFor(() => expect(screen.getByTestId("action-queue-clear-focus")).toBeTruthy());
     insertSpy.mockClear();
     fireEvent.click(screen.getByTestId("action-queue-clear-focus"));
-    await waitFor(() =>
-      expect(screen.queryByTestId("action-queue-focus-chip")).toBeNull(),
-    );
+    await waitFor(() => expect(screen.queryByTestId("action-queue-focus-chip")).toBeNull());
     expect(insertSpy).not.toHaveBeenCalled();
   });
 });
 
-
 // --- Static safety scan ------------------------------------------------------
-const PAGE = readFileSync(
-  resolve(__dirname, "../..", "src/pages/ActionQueue.tsx"),
-  "utf8",
-);
+const PAGE = readFileSync(resolve(__dirname, "../..", "src/pages/ActionQueue.tsx"), "utf8");
 
 describe("ActionQueue focus deep-link — safety scan", () => {
   it("introduces no functions.invoke / service_role / device-control verbs", () => {

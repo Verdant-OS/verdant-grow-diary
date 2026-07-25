@@ -97,19 +97,24 @@ describe("Supabase database target identity", () => {
     });
   });
 
-  it("accepts the pinned production project and never aliases it to sandbox", () => {
+  it("pins production and rebinds shared credentials instead of trusting their username", () => {
     expect(
       assertSupabaseDatabaseTargetIdentity({
         targetEnv: "production",
         databaseUrl: sharedUrl(PRODUCTION_REF, 6543),
       }).projectRef,
     ).toBe(PRODUCTION_REF);
-    expect(() =>
+    expect(
       assertSupabaseDatabaseTargetIdentity({
         targetEnv: "sandbox",
         databaseUrl: sharedUrl(PRODUCTION_REF, 6543),
       }),
-    ).toThrow(/pinned sandbox project/i);
+    ).toMatchObject({
+      targetEnv: "sandbox",
+      projectRef: SANDBOX_REF,
+      connectionMode: "shared-supavisor-transaction",
+      requiresPinnedProjectBinding: true,
+    });
   });
 
   it.each(["", "live", "prod", "Production", "sandbox ", "SANDBOX"])(
@@ -123,7 +128,6 @@ describe("Supabase database target identity", () => {
 
   it.each([
     ["wrong direct project", directUrl(PRODUCTION_REF)],
-    ["wrong shared project", sharedUrl(PRODUCTION_REF)],
     [
       "conflicting direct username ref",
       `postgres://postgres.${PRODUCTION_REF}:${PASSWORD}@db.${SANDBOX_REF}.supabase.co:5432/postgres?sslmode=require`,
@@ -142,8 +146,8 @@ describe("Supabase database target identity", () => {
       `postgres://postgres.${SANDBOX_REF}:${PASSWORD}@attacker.pooler.supabase.com:5432/postgres?sslmode=require`,
     ],
     [
-      "unsupported shared username",
-      `postgres://readonly:${PASSWORD}@aws-0-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require`,
+      "malformed shared username encoding",
+      `postgres://post%ZZgres:${PASSWORD}@aws-0-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require`,
     ],
     [
       "wrong direct user",
@@ -203,11 +207,17 @@ describe("Supabase database target identity", () => {
     });
   });
 
-  it("binds a generic shared-pooler username to the selected pinned target", () => {
+  it.each([
+    ["documented username", `postgres.${PRODUCTION_REF}`],
+    ["generic username", "postgres"],
+    ["encoded generic username", "post%67res"],
+    ["custom role", "readonly"],
+    ["placeholder suffix", "postgres.%5BPROJECT_REF%5D"],
+  ])("binds a %s shared-pooler credential to the selected pinned target", (_label, username) => {
     expect(
       assertSupabaseDatabaseTargetIdentity({
         targetEnv: "sandbox",
-        databaseUrl: genericSharedUrl(),
+        databaseUrl: genericSharedUrl(5432, PASSWORD, username),
       }),
     ).toMatchObject({
       targetEnv: "sandbox",
@@ -215,6 +225,9 @@ describe("Supabase database target identity", () => {
       connectionMode: "shared-supavisor-session",
       requiresPinnedProjectBinding: true,
     });
+  });
+
+  it("binds a shared-pooler credential to the pinned production target", () => {
     expect(
       assertSupabaseDatabaseTargetIdentity({
         targetEnv: "production",
@@ -441,19 +454,42 @@ describe("remote applied-schema runner safety", () => {
 
   it.each([
     {
+      label: "generic sandbox username",
       targetEnv: "sandbox",
       projectRef: SANDBOX_REF,
       port: 5432,
       encodedUsername: "postgres",
     },
     {
+      label: "encoded generic production username",
       targetEnv: "production",
       projectRef: PRODUCTION_REF,
       port: 6543,
       encodedUsername: "post%67res",
     },
+    {
+      label: "wrong-project username rebound to sandbox",
+      targetEnv: "sandbox",
+      projectRef: SANDBOX_REF,
+      port: 5432,
+      encodedUsername: `postgres.${PRODUCTION_REF}`,
+    },
+    {
+      label: "custom role rebound to sandbox",
+      targetEnv: "sandbox",
+      projectRef: SANDBOX_REF,
+      port: 6543,
+      encodedUsername: "readonly",
+    },
+    {
+      label: "placeholder suffix rebound to production",
+      targetEnv: "production",
+      projectRef: PRODUCTION_REF,
+      port: 5432,
+      encodedUsername: "postgres.%5BPROJECT_REF%5D",
+    },
   ])(
-    "binds a generic shared-pooler child URL to $targetEnv on port $port",
+    "binds $label to $targetEnv on port $port",
     ({ targetEnv, projectRef, port, encodedUsername }) => {
       const sentinel = "shared/secret?# sentinel";
       const url =

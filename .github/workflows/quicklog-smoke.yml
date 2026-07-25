@@ -107,6 +107,12 @@ jobs:
       pull-requests: write
 
     env:
+      # Run-specific suffix appended to every upload-artifact `name:` so
+      # multiple runs (re-runs, retries, dispatch-after-push) don't clash in
+      # the Actions UI. Combines run_id (unique per workflow run) with
+      # run_attempt (bumps on re-run) and a short commit SHA for at-a-glance
+      # traceability from the Artifacts dropdown.
+      ARTIFACT_SUFFIX: run-${{ github.run_id }}-attempt-${{ github.run_attempt }}-sha-${{ github.sha }}
       E2E_BASE_URL: ${{ vars.E2E_BASE_URL }}
       E2E_GROW_1_PLANT_URL: ${{ vars.E2E_GROW_1_PLANT_URL }}
       E2E_GROW_1_SECOND_PLANT_NAME: ${{ vars.E2E_GROW_1_SECOND_PLANT_NAME }}

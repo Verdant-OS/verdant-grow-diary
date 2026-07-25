@@ -377,15 +377,24 @@ npm run verify:paddle-craft-catalog:sandbox
 | Code | Meaning | Typical cause |
 | --- | --- | --- |
 | `0` | every required `external_id` found and active | — |
-| `1` | at least one `external_id` missing or inactive | the Paddle product/price was never created, or was archived in the dashboard |
+| `1` | at least one `external_id` could not be confirmed active | **either** the price was never created / was archived in the dashboard, **or** Paddle refused the read (401, 429, 5xx). These need opposite fixes, so read the per-line detail before touching the catalog |
 | `2` | misconfiguration — nothing was verified | the API key for a requested environment is unset, or a bad `--env` value |
 
 Exit `2` is deliberately **not** a pass. A missing key means the check did not
 run, which must never be read as "the catalog is fine" — those entries report
 as `skip`, never `pass`.
 
-The required ids derive from `src/lib/paidPlanAllowlist.ts`, so adding a plan
-there surfaces here automatically instead of needing a second hand-synced list.
+Note that exit `1` does **not** by itself mean the catalog is wrong. A `✗` line
+whose detail begins `Paddle API <status>` is a credential or availability
+problem; creating a price in response to that would be chasing the wrong
+failure. The PR comment labels the two cases distinctly.
+
+⚠️ **Adding a plan to `src/lib/paidPlanAllowlist.ts` does NOT automatically
+extend this check.** The script derives from that list but then filters to the
+Craft ids specifically (`REQUIRED_PLAN_IDS` in
+`scripts/verify-paddle-craft-catalog.ts`), so a newly added plan is silently
+**not** covered and this preflight will still pass. Widen that filter in the
+same change that introduces a new sellable plan.
 
 CI runs this on any PR touching the checkout/catalog seams, and nightly at
 08:17 UTC so an out-of-band archive in the Paddle dashboard surfaces within a

@@ -90,7 +90,14 @@ jobs:
           set -euo pipefail
           MARKER="<!-- paddle-craft-catalog-preflight -->"
           LOG="$RUNNER_TEMP/craft-preflight.log"
-          [ -f "$LOG" ] || { echo "No preflight log; nothing to report."; exit 0; }
+          # No log means the run died before the verifier ever executed (a
+          # checkout or Bun-setup failure). Returning early here would leave a
+          # previous run's green marker comment standing, so the PR would keep
+          # advertising "verified" for a run that verified nothing. Fall
+          # through with an empty log: RC is empty too, so the case below
+          # renders the treat-as-unverified state and PATCHes the existing
+          # comment rather than abandoning it.
+          [ -f "$LOG" ] || { echo "No preflight log — reporting as unverified."; : > "$LOG"; }
 
           # Classify each non-passing line by its DETAIL, not just its glyph.
           # A `✗` can mean the catalog genuinely lacks the price, OR that the

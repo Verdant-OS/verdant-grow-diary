@@ -316,7 +316,9 @@ test.describe("Quick Log smoke checklist", () => {
       await report.run(13, "Blank structured watering save is blocked", async () => {
         await expect(page.getByTestId("qlv2-missing-volume-help")).toBeVisible();
         await page.getByTestId("qlv2-save").click();
-        await expect(page.getByTestId("qlv2-error")).toContainText(/volume/i);
+        await expect(page.getByTestId("qlv2-error")).toContainText(
+          /(?:total\s+)?water.*before saving|volume/i,
+        );
         await expect(page.getByTestId("qlv2-post-save")).toHaveCount(0);
         return "required-volume guard visible; post-save absent";
       });

@@ -35,8 +35,11 @@ const SOURCE = readFileSync(SOURCE_PATH, "utf8");
 function extractEmitterBody(source: string): string {
   const start = source.indexOf("function logCatalogUnavailable");
   expect(start, "logCatalogUnavailable emitter not found").toBeGreaterThan(-1);
-  // Walk braces from the first `{` after the signature to the matching close.
-  const bodyStart = source.indexOf("{", start);
+  // The signature contains a parameter-type object literal, so we can't
+  // just walk from the first `{`. Anchor on the `): void {` opener.
+  const bodyOpener = source.indexOf("): void {", start);
+  expect(bodyOpener, "emitter body opener not found").toBeGreaterThan(-1);
+  const bodyStart = source.indexOf("{", bodyOpener);
   let depth = 0;
   for (let i = bodyStart; i < source.length; i++) {
     const ch = source[i];

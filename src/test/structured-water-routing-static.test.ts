@@ -24,9 +24,10 @@ describe("structured Water routing static fences", () => {
   });
 
   it("hides ordinary legacy Water selection and guards ordinary watering before save", () => {
-    expect(read("src/components/EventTypeSelector.tsx")).toContain(
-      't.value !== "watering"',
-    );
+    const selector = read("src/components/EventTypeSelector.tsx");
+    expect(selector).toContain('t.value !== "watering"');
+    expect(selector).toContain("isSupportedLegacyEventType(t.value)");
+    expect(selector).not.toContain("Coming soon");
     const source = read("src/components/QuickLog.tsx");
     expect(source).toContain("isVerifiedPublicStarterWateringHandoff");
     expect(source).toContain("ORDINARY_LEGACY_WATERING_BLOCKED_COPY");

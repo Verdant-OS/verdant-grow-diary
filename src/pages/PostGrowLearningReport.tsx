@@ -6,7 +6,7 @@
  * no device control, and no schema changes.
  */
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Leaf, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -30,7 +30,7 @@ import {
 import { usePostGrowLearningReportData } from "@/hooks/usePostGrowLearningReportData";
 import { usePlantMemoryEpisodes } from "@/hooks/usePlantMemoryEpisodes";
 import { buildPostGrowLearningLoopSummary } from "@/lib/postGrowLearningLoopSummaryRules";
-import { growDetailPath } from "@/lib/routes";
+import { actionDetailPath, growDetailPath } from "@/lib/routes";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { checkPremiumExportEntitlement } from "@/hooks/usePremiumExportServerGate";
 import PaywallCta from "@/components/PaywallCta";
@@ -45,6 +45,7 @@ function resultMessage(result: unknown, fallback: string): string {
 
 export default function PostGrowLearningReport() {
   const { growId } = useParams<{ growId: string }>();
+  const navigate = useNavigate();
   const { status, report, error, saveLesson, applyLessonToNextGrow } =
     usePostGrowLearningReportData(growId);
   const { state: episodesState } = usePlantMemoryEpisodes({
@@ -110,8 +111,21 @@ export default function PostGrowLearningReport() {
     setBusy(true);
     const result = await applyLessonToNextGrow(lesson);
     setBusy(false);
-    if (result.ok) toast.success("Added to Action Queue for review");
-    else toast.error(resultMessage(result, "Lesson could not be added to the Action Queue."));
+    if (result.ok) {
+      const actionId = result.actionId;
+      if (actionId) {
+        toast.success("Added to Action Queue for review", {
+          action: {
+            label: "Review",
+            onClick: () => navigate(actionDetailPath(actionId)),
+          },
+        });
+      } else {
+        toast.success("Added to Action Queue for review");
+      }
+    } else {
+      toast.error(resultMessage(result, "Lesson could not be added to the Action Queue."));
+    }
   }
 
   const serverDecided = gateStatus !== "loading";

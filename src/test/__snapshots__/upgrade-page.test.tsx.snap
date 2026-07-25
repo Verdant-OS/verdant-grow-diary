@@ -24,7 +24,7 @@ exports[`Upgrade page — success panel feature order snapshots > locks feature 
   },
   {
     "key": "feat-8",
-    "text": "Advanced grow reports (planned)",
+    "text": "Date-range diary & post-grow reports",
   },
   {
     "key": "feat-13",
@@ -57,7 +57,7 @@ exports[`Upgrade page — success panel feature order snapshots > locks feature 
   },
   {
     "key": "feat-8",
-    "text": "Advanced grow reports (planned)",
+    "text": "Date-range diary & post-grow reports",
   },
 ]
 `;
@@ -86,7 +86,7 @@ exports[`Upgrade page — success panel feature order snapshots > locks feature 
   },
   {
     "key": "feat-8",
-    "text": "Advanced grow reports (planned)",
+    "text": "Date-range diary & post-grow reports",
   },
 ]
 `;

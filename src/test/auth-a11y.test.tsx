@@ -46,9 +46,7 @@ const updateUserMock = vi.fn(
     }),
 );
 
-const getSessionMock = vi
-  .fn()
-  .mockResolvedValue({ data: { session: { user: { id: "u-1" } } } });
+const getSessionMock = vi.fn().mockResolvedValue({ data: { session: { user: { id: "u-1" } } } });
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
@@ -224,9 +222,7 @@ describe("Auth — friendly non-enumerating errors", () => {
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent(/couldn['’]t sign you in/i);
     expect(alert).not.toHaveTextContent(/no account|user does not exist|email not registered/i);
-    await waitFor(() =>
-      expect(document.activeElement).toBe(screen.getByLabelText(/^email$/i)),
-    );
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText(/^email$/i)));
   });
 
   it("forgot-password network failure shows generic retry copy", async () => {
@@ -251,9 +247,7 @@ describe("Auth — friendly non-enumerating errors", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: /send reset link/i }));
     resetForEmailResolve?.();
-    expect(
-      await screen.findByText(/if an account exists for that email/i),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/if an account exists for that email/i)).toBeInTheDocument();
   });
 });
 
@@ -261,9 +255,16 @@ describe("ResetPassword — requirements helper, loading, errors", () => {
   it("renders local-only requirements helper without server-certainty claims", async () => {
     renderReset();
     await waitFor(() => expect(screen.getByLabelText(/^new password$/i)).toBeInTheDocument());
+    expect(screen.getByRole("main")).toBeInTheDocument();
     expect(screen.getByText(/checked locally before submit/i)).toBeInTheDocument();
     // None of these claims should appear.
-    for (const phrase of [/strong password/i, /secure/i, /server approved/i, /guaranteed/i, /breached/i]) {
+    for (const phrase of [
+      /strong password/i,
+      /secure/i,
+      /server approved/i,
+      /guaranteed/i,
+      /breached/i,
+    ]) {
       expect(screen.queryByText(phrase)).toBeNull();
     }
     // All four requirement rows present.

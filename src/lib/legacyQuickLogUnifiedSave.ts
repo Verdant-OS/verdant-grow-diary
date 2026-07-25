@@ -10,9 +10,8 @@
  *     - `observation` form event → RPC `note` action
  *     - `note` form event → RPC `note` action
  * - All other event types (photo, feeding, training, reminder, etc.)
- *   are rejected with `unsupported_event_type` and surfaced as
- *   "Coming soon" in UI. We do not extend the RPC or validator in this
- *   slice.
+ *   are rejected with `unsupported_event_type`. The ordinary selector
+ *   filters them out because they belong in the structured Quick Log path.
  * - Sensor snapshot values are NOT persisted via this adapter. The
  *   strip remains pre-save trust UI only.
  * - Plant selection is required because the RPC needs a tent or plant
@@ -47,7 +46,7 @@ export function isSupportedLegacyEventType(value: string): value is SupportedLeg
 }
 
 export const UNSUPPORTED_EVENT_TYPE_COPY =
-  "Coming soon in the new Quick Log path. Use Water or Observation for now.";
+  "This activity uses its dedicated Quick Log form. Choose Observation or Environment check here.";
 
 export const ORDINARY_LEGACY_WATERING_BLOCKED_COPY =
   "Watering now uses the structured Water form. Choose Watering under All activity types to continue.";

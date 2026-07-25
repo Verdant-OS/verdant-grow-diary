@@ -32,22 +32,16 @@ export interface PlantProfileContextViewModel {
   readonly strain: PlantProfileContextField;
   readonly medium: PlantProfileContextField;
   readonly potSize: PlantProfileContextField;
-  readonly mediumAction: { readonly label: string; readonly disabled: true };
-  readonly potSizeAction: { readonly label: string; readonly disabled: true };
 }
 
 export const PLANT_PROFILE_CONTEXT_COPY = Object.freeze({
   title: "Plant profile context",
-  description:
-    "AI Doctor uses plant profile details to make safer, more useful checks.",
-  rationale:
-    "AI Doctor uses profile context to avoid guessing from photos or logs alone.",
+  description: "AI Doctor uses plant profile details to make safer, more useful checks.",
+  rationale: "AI Doctor uses profile context to avoid guessing from photos or logs alone.",
   unknownStage: "Stage is unknown.",
   unknownStrain: "Strain is not set.",
-  unknownMedium: "Medium is not available on this plant profile yet.",
-  unknownPotSize: "Pot size is not available on this plant profile yet.",
-  addMedium: "Add medium — coming soon",
-  addPotSize: "Add pot size — coming soon",
+  unknownMedium: "Medium has not been added yet.",
+  unknownPotSize: "Pot size has not been added yet.",
 });
 
 function clean(value: string | null | undefined): string | null {
@@ -78,25 +72,17 @@ export function buildPlantProfileContextViewModel(
     strain: {
       known: strain !== null,
       value: strain,
-      label: strain
-        ? `Strain: ${strain}`
-        : PLANT_PROFILE_CONTEXT_COPY.unknownStrain,
+      label: strain ? `Strain: ${strain}` : PLANT_PROFILE_CONTEXT_COPY.unknownStrain,
     },
     medium: {
       known: medium !== null,
       value: medium,
-      label: medium
-        ? `Medium: ${medium}`
-        : PLANT_PROFILE_CONTEXT_COPY.unknownMedium,
+      label: medium ? `Medium: ${medium}` : PLANT_PROFILE_CONTEXT_COPY.unknownMedium,
     },
     potSize: {
       known: potSize !== null,
       value: potSize,
-      label: potSize
-        ? `Pot size: ${potSize}`
-        : PLANT_PROFILE_CONTEXT_COPY.unknownPotSize,
+      label: potSize ? `Pot size: ${potSize}` : PLANT_PROFILE_CONTEXT_COPY.unknownPotSize,
     },
-    mediumAction: { label: PLANT_PROFILE_CONTEXT_COPY.addMedium, disabled: true },
-    potSizeAction: { label: PLANT_PROFILE_CONTEXT_COPY.addPotSize, disabled: true },
   };
 }

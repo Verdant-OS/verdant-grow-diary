@@ -507,7 +507,7 @@ export default function Auth() {
   }
 
   return (
-    <div className="min-h-dvh flex flex-col items-center justify-center px-6 py-10">
+    <main className="min-h-dvh flex flex-col items-center justify-center px-6 py-10">
       <div className="w-full max-w-sm">
         <div className="mb-4">
           <Link
@@ -941,6 +941,6 @@ export default function Auth() {
           .
         </p>
       </div>
-    </div>
+    </main>
   );
 }

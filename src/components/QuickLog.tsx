@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { newQuickLogSaveKey } from "@/lib/quickLogIdempotencyKey";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -1316,12 +1322,12 @@ export default function QuickLog({
             <Sparkles className="h-4 w-4 text-primary" />
             Quick Log
           </DialogTitle>
-          <p
+          <DialogDescription
             data-testid="quick-log-subtitle"
             className="text-[12px] text-muted-foreground leading-snug"
           >
             One target. One truth label. One save.
-          </p>
+          </DialogDescription>
         </DialogHeader>
 
         {/* Shared v1a activity surface — consumes canonical

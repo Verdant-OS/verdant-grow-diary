@@ -90,6 +90,8 @@ describe("PhenoHuntShowcase — missing hunt is never demo", () => {
     harness.kp = kpState();
     renderShowcase();
 
+    expect(screen.getByRole("main")).toBe(screen.getByTestId("pheno-hunt-showcase-page"));
+    expect(screen.getByRole("heading", { level: 1, name: "Pheno Hunt" })).toBeInTheDocument();
     const banner = screen.getByTestId("pheno-hunt-showcase-source");
     expect(banner.textContent).toMatch(/not found or has no candidates/i);
     expect(banner.textContent).not.toMatch(/demo|sample data/i);
@@ -135,6 +137,8 @@ describe("PhenoHuntShowcase — missing hunt is never demo", () => {
     harness.kp = kpState({ status: "idle" });
     renderShowcase();
 
+    expect(screen.getByRole("main")).toBe(screen.getByTestId("pheno-hunt-showcase-page"));
+    expect(screen.getByRole("heading", { level: 1, name: "Pheno Hunt" })).toBeInTheDocument();
     const banner = screen.getByTestId("pheno-hunt-showcase-source");
     expect(banner.textContent).toMatch(/loading your hunt/i);
     expect(banner.textContent).not.toMatch(/not found/i);

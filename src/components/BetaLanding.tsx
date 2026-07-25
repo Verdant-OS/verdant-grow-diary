@@ -3,14 +3,16 @@
  *
  * Data-free. No Supabase, no AI, no Action Queue, no analytics.
  * Only side effect: reads window.location.search (via prop) to forward
- * safe UTM params on the external CTA. No writes anywhere.
+ * safe UTM params on configured external CTAs. When those URLs are not
+ * configured, the CTAs use Verdant's working Contact and Feedback routes.
+ * No writes happen on this page.
  *
  * A11y notes:
  *  - Exactly one <h1> (the hero); every section has its own <h2>.
  *  - Primary CTA is a shadcn Button (`asChild`) wrapping the <a>, so we get
  *    a single semantic element (not <a><button>), keyboard-focusable, with
  *    an sr-only "(opens in new tab)" hint for external targets.
- *  - Disabled fallback CTA is a real `disabled` <button>, not a link stub.
+ *  - Internal fallback CTAs remain keyboard-accessible links.
  *  - Secondary CTA is an in-page <a href="#watch-demo"> — no focus-trap
  *    modal to manage.
  *  - Card list items use semantic <ul>/<li>; the "•" bullet is
@@ -97,7 +99,7 @@ export function getCreatorBetaFormUrl(): string | null {
 /**
  * Post-demo feedback form URL. Same safety contract as the intake URL:
  * only absolute http(s) targets are honored; anything else is treated as
- * unset and renders a disabled placeholder (never a broken/unsafe link).
+ * unset and falls back to Verdant's public feedback form.
  */
 export function getBetaFeedbackFormUrl(): string | null {
   const raw = (import.meta.env.VITE_BETA_FEEDBACK_FORM_URL ?? "") as string;
@@ -118,10 +120,10 @@ export default function BetaLanding({ variant, copy, currentSearch }: BetaLandin
   const rawUrl = getCreatorBetaFormUrl();
   const search = currentSearch ?? (typeof window !== "undefined" ? window.location.search : "");
   const formUrl = rawUrl ? preserveUtmOnUrl(rawUrl, search) : null;
-  const primaryLabel = formUrl ? "Request beta access" : "Beta form coming soon";
+  const primaryLabel = "Request beta access";
   const rawFeedbackUrl = getBetaFeedbackFormUrl();
   const feedbackUrl = rawFeedbackUrl ? preserveUtmOnUrl(rawFeedbackUrl, search) : null;
-  const feedbackLabel = feedbackUrl ? "Share post-demo feedback" : "Feedback form coming soon";
+  const feedbackLabel = "Share post-demo feedback";
   const testIdRoot = `${variant}-beta`;
 
   return (
@@ -149,9 +151,7 @@ export default function BetaLanding({ variant, copy, currentSearch }: BetaLandin
         className="px-6 pt-10 pb-10 max-w-4xl mx-auto text-center"
         aria-labelledby="beta-hero-heading"
       >
-        <p className="text-xs uppercase tracking-widest text-primary font-medium">
-          {copy.kicker}
-        </p>
+        <p className="text-xs uppercase tracking-widest text-primary font-medium">{copy.kicker}</p>
         <h1
           id="beta-hero-heading"
           className="mt-3 font-display text-4xl md:text-5xl font-bold tracking-tight"
@@ -192,14 +192,10 @@ export default function BetaLanding({ variant, copy, currentSearch }: BetaLandin
               </a>
             </Button>
           ) : (
-            <Button
-              size="lg"
-              disabled
-              aria-disabled="true"
-              className="min-h-11"
-              data-testid={`${testIdRoot}-cta-primary-disabled`}
-            >
-              {primaryLabel}
+            <Button asChild size="lg" className="min-h-11">
+              <Link to="/contact" data-testid={`${testIdRoot}-cta-primary`}>
+                {primaryLabel}
+              </Link>
             </Button>
           )}
           <Button asChild size="lg" variant="outline" className="min-h-11">
@@ -214,8 +210,8 @@ export default function BetaLanding({ variant, copy, currentSearch }: BetaLandin
         </div>
 
         <p className="mt-4 text-xs text-muted-foreground max-w-xl mx-auto">
-          Controlled beta. Access is granted after a short walkthrough so we can
-          keep the loop honest and the feedback grounded in real grows.
+          Controlled beta. Access is granted after a short walkthrough so we can keep the loop
+          honest and the feedback grounded in real grows.
         </p>
       </section>
 
@@ -254,16 +250,18 @@ export default function BetaLanding({ variant, copy, currentSearch }: BetaLandin
       >
         <Card>
           <CardHeader>
-            <h2 id="watch-demo-heading" className="text-xl font-semibold leading-none tracking-tight">
+            <h2
+              id="watch-demo-heading"
+              className="text-xl font-semibold leading-none tracking-tight"
+            >
               Watch demo walkthrough
             </h2>
           </CardHeader>
           <CardContent className="space-y-4 text-sm">
             <p className="text-muted-foreground">
-              The walkthrough is a short guided tour of a real grow — no
-              staged data, no auto-suggestions posing as decisions. It shows
-              how Verdant records evidence and how the grower stays in
-              control of every action.
+              The walkthrough is a short guided tour of a real grow — no staged data, no
+              auto-suggestions posing as decisions. It shows how Verdant records evidence and how
+              the grower stays in control of every action.
             </p>
             <ol
               className="space-y-2 text-muted-foreground list-decimal pl-5"
@@ -274,8 +272,8 @@ export default function BetaLanding({ variant, copy, currentSearch }: BetaLandin
               ))}
             </ol>
             <p className="text-xs text-muted-foreground">
-              After the walkthrough, testers share feedback through the
-              intake form linked above. Everything stays grower-approved.
+              After the walkthrough, testers share feedback through the intake form linked above.
+              Everything stays grower-approved.
             </p>
           </CardContent>
         </Card>
@@ -298,10 +296,11 @@ export default function BetaLanding({ variant, copy, currentSearch }: BetaLandin
           </CardHeader>
           <CardContent className="space-y-4 text-sm">
             <p className="text-muted-foreground">
-              After the walkthrough, share what was clear, what was confusing,
-              and what evidence surfaces you would rely on in a real grow.
-              Feedback is submitted through an external form — Verdant does
-              not store, track, or auto-analyze responses here.
+              After the walkthrough, share what was clear, what was confusing, and what evidence
+              surfaces you would rely on in a real grow.
+              {feedbackUrl
+                ? " Feedback is submitted through the configured external form; Verdant does not store or auto-analyze responses here."
+                : " Feedback is submitted through Verdant's public feedback form and is never auto-analyzed."}
             </p>
             <ul
               className="space-y-1.5 text-sm text-muted-foreground"
@@ -314,7 +313,9 @@ export default function BetaLanding({ variant, copy, currentSearch }: BetaLandin
                 "What would you want to see before recommending Verdant to another grower or breeder?",
               ].map((prompt) => (
                 <li key={prompt} className="flex gap-2">
-                  <span aria-hidden="true" className="text-primary">•</span>
+                  <span aria-hidden="true" className="text-primary">
+                    •
+                  </span>
                   <span>{prompt}</span>
                 </li>
               ))}
@@ -339,20 +340,19 @@ export default function BetaLanding({ variant, copy, currentSearch }: BetaLandin
                 </Button>
               ) : (
                 <Button
+                  asChild
                   size="lg"
                   variant="secondary"
-                  disabled
-                  aria-disabled="true"
                   className="min-h-11 max-w-full h-auto whitespace-normal text-center leading-tight"
-                  data-testid={`${testIdRoot}-feedback-cta-disabled`}
                 >
-                  {feedbackLabel}
+                  <Link to="/feedback" data-testid={`${testIdRoot}-feedback-cta`}>
+                    {feedbackLabel}
+                  </Link>
                 </Button>
               )}
             </div>
             <p className="text-xs text-muted-foreground">
-              No account required. No analytics. The breeder or grower always
-              decides what to share.
+              No account required. No analytics. The breeder or grower always decides what to share.
             </p>
           </CardContent>
         </Card>
@@ -360,8 +360,8 @@ export default function BetaLanding({ variant, copy, currentSearch }: BetaLandin
 
       <footer className="px-6 py-10 max-w-4xl mx-auto text-center text-xs text-muted-foreground">
         <p>
-          Verdant is plant memory, sensor truth, cautious AI, and
-          grower-approved action. The breeder or grower always decides.
+          Verdant is plant memory, sensor truth, cautious AI, and grower-approved action. The
+          breeder or grower always decides.
         </p>
       </footer>
     </main>

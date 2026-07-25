@@ -25,10 +25,15 @@ function renderPage() {
 describe("ContextualPhenoComparisonDemo page", () => {
   it("renders the page shell with demo labeling", () => {
     renderPage();
-    expect(screen.getByTestId("contextual-pheno-comparison-demo-page")).toBeTruthy();
+    expect(screen.getByRole("main")).toBe(
+      screen.getByTestId("contextual-pheno-comparison-demo-page"),
+    );
     expect(
-      screen.getByTestId("contextual-pheno-comparison-demo-banner").textContent,
-    ).toMatch(/demo/i);
+      screen.getByRole("heading", { level: 1, name: "Contextual Pheno Comparison (Demo)" }),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("contextual-pheno-comparison-demo-banner").textContent).toMatch(
+      /demo/i,
+    );
   });
 
   it("renders all 3 fixture plant cards in deterministic order", () => {
@@ -41,17 +46,15 @@ describe("ContextualPhenoComparisonDemo page", () => {
 
   it("renders the comparison caveat", () => {
     renderPage();
-    expect(
-      screen.getByTestId("contextual-pheno-comparison-caveat").textContent,
-    ).toMatch(/does not pick a phenotype/i);
+    expect(screen.getByTestId("contextual-pheno-comparison-caveat").textContent).toMatch(
+      /does not pick a phenotype/i,
+    );
   });
 
   it("does not call fetch on render", () => {
-    const fetchSpy = vi.spyOn(globalThis, "fetch" as never).mockImplementation(
-      () => {
-        throw new Error("fetch must not be called");
-      },
-    );
+    const fetchSpy = vi.spyOn(globalThis, "fetch" as never).mockImplementation(() => {
+      throw new Error("fetch must not be called");
+    });
     renderPage();
     expect(fetchSpy).not.toHaveBeenCalled();
   });

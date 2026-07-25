@@ -126,8 +126,18 @@ const SUPPORTED_VARIANTS: SupportedVariant[] = [
   // but the EventTypeSelector does not expose a "note" option — growers
   // pick "observation" in the UI. We exercise "observation" + "watering"
   // here; the legacy unified save tests cover the "note" RPC mapping.
-  { eventType: "observation", verb: "observation", requiresNote: true, requiresWateringVolume: false },
-  { eventType: "environment", verb: "environment check", requiresNote: true, requiresWateringVolume: false },
+  {
+    eventType: "observation",
+    verb: "observation",
+    requiresNote: true,
+    requiresWateringVolume: false,
+  },
+  {
+    eventType: "environment",
+    verb: "environment check",
+    requiresNote: true,
+    requiresWateringVolume: false,
+  },
 ];
 
 interface UnsupportedVariant {
@@ -137,10 +147,10 @@ interface UnsupportedVariant {
 }
 
 const UNSUPPORTED_VARIANTS: UnsupportedVariant[] = [
-  { eventType: "feeding",     note: "Routed to dedicated feeding form / coming soon in unified path." },
-  { eventType: "training",    note: "Coming soon in unified save path." },
-  { eventType: "diagnosis",   note: "AI Doctor flow, not Quick Log save path." },
-  { eventType: "harvest",     note: "Coming soon in unified save path." },
+  { eventType: "feeding", note: "Routed to the dedicated structured feeding form." },
+  { eventType: "training", note: "Routed to the dedicated structured training form." },
+  { eventType: "diagnosis", note: "AI Doctor flow, not Quick Log save path." },
+  { eventType: "harvest", note: "Coming soon in unified save path." },
 ];
 
 /** Shared toast-format helper — single source of truth, no duplicated strings. */
@@ -229,7 +239,7 @@ describe("Quick Log success toast — Saved {verb} for {plant}", () => {
 // Unsupported variants — must NOT route through the Saved-toast path
 // ---------------------------------------------------------------------------
 
-describe("Quick Log unsupported variants — surface 'coming soon' instead of Saved toast", () => {
+describe("Quick Log unsupported variants — fail closed instead of emitting a Saved toast", () => {
   for (const variant of UNSUPPORTED_VARIANTS) {
     it(`eventType=${variant.eventType} does not emit a Saved-for toast (${variant.note})`, async () => {
       renderWithClient(

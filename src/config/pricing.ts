@@ -53,7 +53,7 @@ const PRO_UNLOCKED_FEATURES = [
   "Exports & data ownership",
   "Full grow history",
   "Priority support",
-  "Advanced grow reports (planned)",
+  "Date-range diary & post-grow reports",
 ];
 
 const CRAFT_UNLOCKED_FEATURES = [
@@ -279,7 +279,7 @@ export const PLAN_COMPARISON: PlanComparisonRow[] = [
     },
   },
   {
-    label: "Advanced grow reports (planned)",
+    label: "Date-range diary & post-grow reports",
     values: {
       free: false,
       pro_monthly: true,
@@ -304,11 +304,11 @@ export const PLAN_COMPARISON: PlanComparisonRow[] = [
     label: "Availability",
     values: {
       free: "Available",
-      pro_monthly: "Checkout finalizing",
-      pro_annual: "Checkout finalizing",
-      craft_monthly: "Checkout finalizing",
-      craft_annual: "Checkout finalizing",
-      founder_lifetime: "Checkout finalizing",
+      pro_monthly: "Available",
+      pro_annual: "Available",
+      craft_monthly: "Available",
+      craft_annual: "Available",
+      founder_lifetime: "Available",
     },
   },
 ];

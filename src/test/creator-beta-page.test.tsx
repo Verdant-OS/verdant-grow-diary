@@ -77,14 +77,14 @@ describe("CreatorBeta · content + a11y", () => {
     const { container } = await renderPage();
     const text = container.textContent ?? "";
     for (const pattern of FORBIDDEN_CLAIMS) {
-      const lines = text.split(/\n|\.|•/).map((l) => l.trim()).filter(Boolean);
+      const lines = text
+        .split(/\n|\.|•/)
+        .map((l) => l.trim())
+        .filter(Boolean);
       for (const line of lines) {
         if (pattern.test(line)) {
           const negated = /does not|never|no\b/i.test(line);
-          expect(
-            negated,
-            `Forbidden claim "${pattern}" in unqualified line: "${line}"`,
-          ).toBe(true);
+          expect(negated, `Forbidden claim "${pattern}" in unqualified line: "${line}"`).toBe(true);
         }
       }
     }
@@ -95,10 +95,7 @@ describe("CreatorBeta · content + a11y", () => {
     const cta = screen.getByTestId("creator-beta-cta-secondary");
     expect(cta).toHaveAttribute("href", "#watch-demo");
     expect(cta).toHaveAccessibleName(/demo walkthrough/i);
-    expect(screen.getByTestId("creator-beta-walkthrough")).toHaveAttribute(
-      "id",
-      "watch-demo",
-    );
+    expect(screen.getByTestId("creator-beta-walkthrough")).toHaveAttribute("id", "watch-demo");
     expect(
       screen.getByTestId("creator-beta-walkthrough-steps").querySelectorAll("li"),
     ).toHaveLength(4);
@@ -111,35 +108,32 @@ describe("CreatorBeta · CTA behavior", () => {
     await renderPage();
     const cta = screen.getByTestId("creator-beta-cta-primary");
     expect(cta.tagName).toBe("A");
-    expect(cta).toHaveAttribute("href", expect.stringMatching(/^https:\/\/forms\.example\.com\/verdant-beta/));
+    expect(cta).toHaveAttribute(
+      "href",
+      expect.stringMatching(/^https:\/\/forms\.example\.com\/verdant-beta/),
+    );
     expect(cta).toHaveAttribute("target", "_blank");
     expect(cta).toHaveAttribute("rel", expect.stringMatching(/noopener/));
     expect(cta).toHaveAttribute("rel", expect.stringMatching(/noreferrer/));
     // Accessible name includes the "opens in a new tab" sr-only hint.
     expect(cta).toHaveAccessibleName(/request beta access.*new tab/i);
-    expect(
-      screen.queryByTestId("creator-beta-cta-primary-disabled"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("creator-beta-cta-primary-disabled")).not.toBeInTheDocument();
   });
 
-  it("primary CTA falls back to a real disabled <button> when URL is missing", async () => {
+  it("primary CTA falls back to Verdant's working contact form when URL is missing", async () => {
     vi.stubEnv("VITE_CREATOR_BETA_FORM_URL", "");
     await renderPage();
-    const disabled = screen.getByTestId("creator-beta-cta-primary-disabled");
-    expect(disabled.tagName).toBe("BUTTON");
-    expect(disabled).toBeDisabled();
-    expect(disabled).toHaveAttribute("aria-disabled", "true");
-    expect(disabled).toHaveTextContent(/beta form coming soon/i);
-    // Must not be a link stub.
-    expect(disabled).not.toHaveAttribute("href");
-    expect(screen.queryByTestId("creator-beta-cta-primary")).not.toBeInTheDocument();
+    const cta = screen.getByTestId("creator-beta-cta-primary");
+    expect(cta.tagName).toBe("A");
+    expect(cta).toHaveAttribute("href", "/contact");
+    expect(cta).not.toHaveAttribute("target");
+    expect(cta).toHaveAccessibleName(/request beta access/i);
   });
 
-  it("rejects non-http(s) URLs and falls back to the disabled placeholder", async () => {
+  it("rejects non-http(s) URLs and falls back to the contact form", async () => {
     vi.stubEnv("VITE_CREATOR_BETA_FORM_URL", "javascript:alert(1)");
     await renderPage();
-    expect(screen.getByTestId("creator-beta-cta-primary-disabled")).toBeInTheDocument();
-    expect(screen.queryByTestId("creator-beta-cta-primary")).not.toBeInTheDocument();
+    expect(screen.getByTestId("creator-beta-cta-primary")).toHaveAttribute("href", "/contact");
   });
 
   it("focusable CTAs can receive focus (keyboard-safe)", async () => {

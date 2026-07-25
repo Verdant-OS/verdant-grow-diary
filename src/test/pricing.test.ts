@@ -16,6 +16,7 @@ const read = (p: string) => readFileSync(resolve(root, p), "utf8");
 const APP = readSrc("App.tsx");
 const PAGE = readSrc("pages/Pricing.tsx");
 const CONSTANTS = readSrc("constants/pricing.ts");
+const UPGRADE_CONFIG = readSrc("config/pricing.ts");
 
 const LANDING = readSrc("pages/Landing.tsx");
 const ANALYTICS = readSrc("lib/pricingAnalytics.ts");
@@ -141,6 +142,24 @@ describe("AI credit packs (top-up surface)", () => {
     expect(PAGE).toMatch(/openCheckout\(\{ priceId: sku \}\)/);
     expect(PAGE).toMatch(/pricing_cta_credit_pack_clicked/);
     expect(ANALYTICS).toMatch(/pricing_cta_credit_pack_clicked/);
+  });
+
+  it("describes the live credit packs as available rather than planned", () => {
+    expect(CONSTANTS).toContain("One-time AI credit packs available");
+    expect(CONSTANTS).not.toMatch(/credit packs planned/i);
+  });
+});
+
+describe("Live paid-feature copy", () => {
+  it("describes date-range and post-grow reports as available paid features", () => {
+    expect(UPGRADE_CONFIG).toContain("Date-range diary & post-grow reports");
+    expect(PAGE).toContain("post-grow learning reports");
+    expect(UPGRADE_CONFIG).not.toMatch(/advanced grow reports \(planned\)/i);
+    expect(PAGE).not.toMatch(/early access to advanced grow reports/i);
+  });
+
+  it("does not describe configured checkout as still finalizing", () => {
+    expect(UPGRADE_CONFIG).not.toMatch(/checkout finalizing/i);
   });
 });
 

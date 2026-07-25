@@ -21,7 +21,6 @@ import { usePageSeo } from "@/hooks/usePageSeo";
 
 type Status = "checking" | "ready" | "link_problem" | "saving" | "done";
 
-
 export default function ResetPassword() {
   usePageSeo({
     title: "Reset password — Verdant Grow Diary",
@@ -46,8 +45,7 @@ export default function ResetPassword() {
 
   // Inline confirm mismatch — only show once user has typed in both fields
   // and they differ. Local-only check; no server certainty implied.
-  const confirmMismatch =
-    password.length > 0 && confirm.length > 0 && password !== confirm;
+  const confirmMismatch = password.length > 0 && confirm.length > 0 && password !== confirm;
 
   const [diagnosis, setDiagnosis] = useState<ResetLinkDiagnosis | null>(null);
 
@@ -67,7 +65,6 @@ export default function ResetPassword() {
       cancelled = true;
     };
   }, []);
-
 
   useEffect(() => {
     headingRef.current?.focus();
@@ -109,7 +106,7 @@ export default function ResetPassword() {
   const submitDisabled = status === "saving" || !reqStatus.allMet;
 
   return (
-    <div className="min-h-dvh flex flex-col items-center justify-center px-6 py-10">
+    <main className="min-h-dvh flex flex-col items-center justify-center px-6 py-10">
       <div className="w-full max-w-sm">
         <div className="flex items-center gap-3 mb-6">
           <BrandLogo size="lg" />
@@ -139,17 +136,13 @@ export default function ResetPassword() {
               data-testid={`reset-link-${diagnosis?.status ?? "missing"}`}
             >
               <div className="flex items-start gap-2">
-                <AlertTriangle
-                  className="h-5 w-5 text-destructive shrink-0 mt-0.5"
-                  aria-hidden
-                />
+                <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" aria-hidden />
                 <div className="grid gap-1">
                   <p className="text-sm font-medium">
                     {diagnosis?.title ?? "This reset link is not valid"}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    {diagnosis?.message ??
-                      "Request a new reset email from the sign-in page."}
+                    {diagnosis?.message ?? "Request a new reset email from the sign-in page."}
                   </p>
                 </div>
               </div>
@@ -167,7 +160,6 @@ export default function ResetPassword() {
                 </Link>
               </div>
             </div>
-
           ) : status === "done" ? (
             <div className="grid gap-3" role="status" aria-live="polite">
               <p className="text-sm">Password updated. Redirecting to sign in…</p>
@@ -236,16 +228,12 @@ export default function ResetPassword() {
                 ) : null}
               </div>
 
-
               <div
                 id="password-requirements"
                 aria-live="polite"
                 className="rounded-md border border-border bg-muted/30 p-3"
               >
-                <p
-                  id="password-requirements-note"
-                  className="text-xs text-muted-foreground mb-2"
-                >
+                <p id="password-requirements-note" className="text-xs text-muted-foreground mb-2">
                   {PASSWORD_REQUIREMENTS_HELPER_COPY}
                 </p>
                 <ul className="grid gap-1 text-xs">
@@ -309,6 +297,6 @@ export default function ResetPassword() {
           )}
         </div>
       </div>
-    </div>
+    </main>
   );
 }

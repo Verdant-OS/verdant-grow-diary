@@ -158,7 +158,10 @@ export default function PhenoHuntShowcase() {
   // for a particular hunt. (After all hooks, so the hook order stays stable.)
   if (source === "not_found") {
     return (
-      <div data-testid="pheno-hunt-showcase-page" className="container mx-auto max-w-5xl px-4 py-6">
+      <main
+        data-testid="pheno-hunt-showcase-page"
+        className="container mx-auto max-w-5xl px-4 py-6"
+      >
         <PageHeader
           title="Pheno Hunt"
           description="A read-only walk of your hunt: triage, compare, decide, and trace lineage — you make every call."
@@ -177,12 +180,12 @@ export default function PhenoHuntShowcase() {
             Back to your pheno hunts
           </Link>
         </p>
-      </div>
+      </main>
     );
   }
 
   return (
-    <div data-testid="pheno-hunt-showcase-page" className="container mx-auto max-w-5xl px-4 py-6">
+    <main data-testid="pheno-hunt-showcase-page" className="container mx-auto max-w-5xl px-4 py-6">
       <PageHeader
         title="Pheno Hunt"
         description="A read-only walk of your hunt: triage, compare, decide, and trace lineage — you make every call."
@@ -207,7 +210,10 @@ export default function PhenoHuntShowcase() {
       {pack.length > 0 && (
         <section aria-label="The pack" className="mb-8">
           <SectionHead title="The pack" />
-          <p className="mb-2.5 text-xs text-muted-foreground" data-testid="pheno-showcase-disclaimer">
+          <p
+            className="mb-2.5 text-xs text-muted-foreground"
+            data-testid="pheno-showcase-disclaimer"
+          >
             Scores sort the pack to compare — they don&rsquo;t decide. The keeper call is yours,
             earned at the cure.
           </p>
@@ -259,6 +265,6 @@ export default function PhenoHuntShowcase() {
         <SectionHead title="Keepers & family tree" />
         <PhenoFamilyTree pedigree={pedigree} cloneRowsByKeeperId={cloneRowsByKeeperId} />
       </section>
-    </div>
+    </main>
   );
 }

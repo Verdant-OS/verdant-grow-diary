@@ -65,17 +65,13 @@ function StepCard({ step }: { step: DemoProofWalkthroughStep }) {
       </p>
       <p className="text-xs">
         <span className="font-medium">Expected evidence: </span>
-        <span
-          data-testid={`demo-proof-walkthrough-step-${step.id}-evidence`}
-        >
+        <span data-testid={`demo-proof-walkthrough-step-${step.id}-evidence`}>
           {step.expectedEvidence}
         </span>
       </p>
       <p className="text-[11px] text-muted-foreground">
         <span className="font-medium">Safety: </span>
-        <span data-testid={`demo-proof-walkthrough-step-${step.id}-safety`}>
-          {step.safetyNote}
-        </span>
+        <span data-testid={`demo-proof-walkthrough-step-${step.id}-safety`}>{step.safetyNote}</span>
       </p>
       {step.reviewOnlyNote ? (
         <p
@@ -102,10 +98,7 @@ export default function DemoProofWalkthrough(): JSX.Element {
   const vm = buildDemoProofWalkthroughViewModel();
 
   return (
-    <div
-      className="space-y-4"
-      data-testid="demo-proof-walkthrough-page"
-    >
+    <main className="space-y-4" data-testid="demo-proof-walkthrough-page">
       <PageHeader
         title={vm.title}
         description={vm.subtitle}
@@ -119,8 +112,8 @@ export default function DemoProofWalkthrough(): JSX.Element {
       >
         <p className="font-semibold">Read-only demo walkthrough.</p>
         <p>
-          Links open existing proof surfaces; this page does not submit logs,
-          call AI, create alerts, approve actions, or control devices.
+          Links open existing proof surfaces; this page does not submit logs, call AI, create
+          alerts, approve actions, or control devices.
         </p>
         <p>
           Operator Mode requires a server-verified operator role; <code>?operator=1</code> only
@@ -133,7 +126,6 @@ export default function DemoProofWalkthrough(): JSX.Element {
       >
         Scope: {vm.proofWindowLabel}.
       </p>
-
 
       <section
         aria-label="Safety summary"
@@ -183,6 +175,6 @@ export default function DemoProofWalkthrough(): JSX.Element {
           ))}
         </ul>
       </section>
-    </div>
+    </main>
   );
 }

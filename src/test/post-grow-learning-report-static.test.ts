@@ -57,6 +57,14 @@ describe("Post-Grow Learning Report sections", () => {
   });
 });
 
+describe("Post-Grow Learning Report Action Queue handoff", () => {
+  it("offers a Review action for a newly created approval-required lesson", () => {
+    expect(PAGE).toContain("actionDetailPath");
+    expect(PAGE).toContain('label: "Review"');
+    expect(PAGE).toMatch(/onClick:\s*\(\)\s*=>\s*navigate\(actionDetailPath\(actionId\)\)/);
+  });
+});
+
 describe("Post-Grow Learning Report safety", () => {
   it("does not add schema, RLS, Edge, RPC, AI, or device-control surfaces", () => {
     const all = [APP, PAGE, CARDS, HOOK, RULES, GROW_DETAIL].join("\n");

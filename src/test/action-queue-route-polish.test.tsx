@@ -104,8 +104,7 @@ vi.mock("@/integrations/supabase/client", () => {
           onFulfilled: (r: { data: unknown; error: unknown }) => unknown,
           onRejected?: (e: unknown) => unknown,
         ) => resolveActionQuery().then(onFulfilled, onRejected),
-        catch: (onRejected: (e: unknown) => unknown) =>
-          resolveActionQuery().catch(onRejected),
+        catch: (onRejected: (e: unknown) => unknown) => resolveActionQuery().catch(onRejected),
       };
       return result;
     };
@@ -184,9 +183,7 @@ describe("Action Queue route — empty state", () => {
   it("renders 'No actions need review right now.' with approval-focused helper copy", async () => {
     actionRowsMock = [];
     renderPage();
-    await waitFor(() =>
-      expect(screen.queryByTestId("action-queue-loading-skeleton")).toBeNull(),
-    );
+    await waitFor(() => expect(screen.queryByTestId("action-queue-loading-skeleton")).toBeNull());
     const empty = screen.getByTestId("action-queue-empty-pending");
     expect(empty.textContent).toMatch(/No actions need review right now\./);
     expect(empty.textContent).toMatch(/AI Doctor or alert suggestions/i);
@@ -200,11 +197,23 @@ describe("Action Queue route — missing-context fallback", () => {
     mockIsValidScopedGrow = false;
     renderPage("/actions?growId=does-not-exist");
     const fallback = await screen.findByTestId("action-queue-missing-context");
-    expect(fallback.textContent).toMatch(
-      /Select a grow or tent to review pending actions\./,
-    );
+    expect(fallback.textContent).toMatch(/Select a grow or tent to review pending actions\./);
     expect(fallback.textContent).toMatch(/Grower approval is always required/i);
     expect(screen.queryByTestId("action-queue-loading-skeleton")).toBeNull();
+  });
+
+  it("renders matching RLS-scoped rows for an archived grow absent from the picker", async () => {
+    mockUrlGrowId = "grow-archived";
+    mockIsValidScopedGrow = false;
+    actionRowsMock = [{ ...PENDING_ROW, grow_id: "grow-archived" }];
+
+    renderPage("/actions?growId=grow-archived");
+
+    await waitFor(() => expect(screen.queryByTestId("action-queue-loading-skeleton")).toBeNull());
+    expect(screen.queryByTestId("action-queue-missing-context")).toBeNull();
+    expect(document.querySelector('[data-action-id="row-1"]')).toBeTruthy();
+    expect(screen.getByRole("button", { name: /approve/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /reject/i })).toBeInTheDocument();
   });
 });
 
@@ -212,12 +221,8 @@ describe("Action Queue route — row accessibility", () => {
   it("renders an h3 title + sr-only description, with aria-labelledby on the row", async () => {
     actionRowsMock = [PENDING_ROW];
     renderPage();
-    await waitFor(() =>
-      expect(screen.queryByTestId("action-queue-loading-skeleton")).toBeNull(),
-    );
-    const li = document.querySelector(
-      `[data-action-id="${PENDING_ROW.id}"]`,
-    ) as HTMLElement;
+    await waitFor(() => expect(screen.queryByTestId("action-queue-loading-skeleton")).toBeNull());
+    const li = document.querySelector(`[data-action-id="${PENDING_ROW.id}"]`) as HTMLElement;
     expect(li).toBeTruthy();
     // Existing focused-state contract preserved: non-focused row has no aria-label.
     expect(li.getAttribute("aria-label")).toBeNull();
@@ -245,10 +250,7 @@ describe("Action Queue route — row accessibility", () => {
 // ---------------------------------------------------------------------------
 const ROOT = resolve(__dirname, "../..");
 const PAGE = readFileSync(resolve(ROOT, "src/pages/ActionQueue.tsx"), "utf8");
-const VIEW = readFileSync(
-  resolve(ROOT, "src/lib/actionQueueRowView.ts"),
-  "utf8",
-);
+const VIEW = readFileSync(resolve(ROOT, "src/lib/actionQueueRowView.ts"), "utf8");
 const APP = readFileSync(resolve(ROOT, "src/App.tsx"), "utf8");
 
 describe("Action Queue polish — static safety + contract preservation", () => {
@@ -262,9 +264,7 @@ describe("Action Queue polish — static safety + contract preservation", () => 
     expect(blob).not.toContain("supabase");
     expect(blob).not.toContain("functions.invoke");
     expect(blob).not.toContain("service_role");
-    expect(blob).not.toMatch(
-      /\.insert\(|\.update\(|\.delete\(|\.upsert\(|\.rpc\(/,
-    );
+    expect(blob).not.toMatch(/\.insert\(|\.update\(|\.delete\(|\.upsert\(|\.rpc\(/);
   });
 
   it("page preserves approval-focused framing copy", () => {
@@ -276,9 +276,7 @@ describe("Action Queue polish — static safety + contract preservation", () => 
     expect(PAGE).not.toMatch(/\bautopilot\b/i);
     expect(PAGE).not.toMatch(/\bauto[\s-]?execute\b/i);
     expect(PAGE).not.toMatch(/\bauto[\s-]?run\b/i);
-    expect(PAGE).not.toMatch(
-      /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|\brelay\b|\bactuator\b/i,
-    );
+    expect(PAGE).not.toMatch(/mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|\brelay\b|\bactuator\b/i);
     expect(PAGE).not.toMatch(/calendar_events/);
     expect(PAGE).not.toMatch(/resend|sendgrid|mailgun|postmark|twilio/i);
     expect(PAGE).not.toMatch(

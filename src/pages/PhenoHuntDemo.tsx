@@ -238,7 +238,7 @@ export default function PhenoHuntDemo() {
   );
 
   return (
-    <div data-testid="pheno-hunt-demo-page" className="container mx-auto max-w-5xl px-4 py-6">
+    <main data-testid="pheno-hunt-demo-page" className="container mx-auto max-w-5xl px-4 py-6">
       <PageHeader
         title="Pheno Hunt (Demo)"
         description="Read-only walkthrough of a full hunt using labeled demo data. No live data, no AI, no save, no share."
@@ -330,6 +330,6 @@ export default function PhenoHuntDemo() {
         </div>
         <PhenoFamilyTree pedigree={pedigree} cloneRowsByKeeperId={cloneRowsByKeeperId} />
       </section>
-    </div>
+    </main>
   );
 }

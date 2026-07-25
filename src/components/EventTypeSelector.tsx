@@ -2,13 +2,13 @@
  * Presenter-only event type selector.
  *
  * Extracted from QuickLog so the event-type dropdown can be reused
- * without re-implementing the supported/coming-soon affordance.
+ * without exposing activities that this legacy save path cannot persist.
  *
  * STRICT SCOPE:
  * - UI only. No state, no business logic, no validation.
- * - Values, labels, icons, and "Coming soon" disabled state come from
- *   src/lib/diary.ts EVENT_TYPES and isSupportedLegacyEventType — the
- *   same canonical sources the rest of QuickLog uses.
+ * - Values, labels, and icons come from src/lib/diary.ts EVENT_TYPES.
+ * - isSupportedLegacyEventType filters out activities that belong in the
+ *   structured Quick Log path, so this selector never offers a dead choice.
  * - Does NOT touch the save path, RPC payload, or any sensor surface.
  */
 import { Label } from "@/components/ui/label";
@@ -56,22 +56,18 @@ export function EventTypeSelector({
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          {EVENT_TYPES.filter((t) => t.value !== "watering" || allowLegacyWatering).map((t) => {
-            const supported = isSupportedLegacyEventType(t.value);
-            return (
-              <SelectItem key={t.value} value={t.value} disabled={!supported}>
-                <span className="inline-flex items-center gap-2">
-                  <t.icon className="h-3.5 w-3.5" />
-                  {t.label}
-                  {!supported && (
-                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                      Coming soon
-                    </span>
-                  )}
-                </span>
-              </SelectItem>
-            );
-          })}
+          {EVENT_TYPES.filter(
+            (t) =>
+              (t.value !== "watering" || allowLegacyWatering) &&
+              isSupportedLegacyEventType(t.value),
+          ).map((t) => (
+            <SelectItem key={t.value} value={t.value}>
+              <span className="inline-flex items-center gap-2">
+                <t.icon className="h-3.5 w-3.5" />
+                {t.label}
+              </span>
+            </SelectItem>
+          ))}
         </SelectContent>
       </Select>
     </div>

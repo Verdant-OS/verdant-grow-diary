@@ -8,7 +8,8 @@
  *
  * Supported actions (watering / observation / note) route through
  * useQuickLogV2Save → quicklog_save_manual. Unsupported actions
- * (including photo) are surfaced as "Coming soon".
+ * (including photo) stay off the ordinary selector and fail closed
+ * if supplied through a crafted prefill.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, within, waitFor } from "@testing-library/react";
@@ -239,9 +240,7 @@ describe("QuickLog supported save · routes through quicklog_save_manual RPC", (
       );
       expect(saveMock).not.toHaveBeenCalled();
       expect(insertMock).not.toHaveBeenCalled();
-      expect(window.localStorage.getItem(PUBLIC_QUICK_LOG_STARTER_DRAFT_KEY)).toBe(
-        storedRaw,
-      );
+      expect(window.localStorage.getItem(PUBLIC_QUICK_LOG_STARTER_DRAFT_KEY)).toBe(storedRaw);
     },
   );
 
@@ -513,9 +512,7 @@ describe("QuickLog supported save · routes through quicklog_save_manual RPC", (
 
     await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
     await waitFor(() =>
-      expect(toastError).toHaveBeenCalledWith(
-        expect.stringMatching(/save_failed/),
-      ),
+      expect(toastError).toHaveBeenCalledWith(expect.stringMatching(/save_failed/)),
     );
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
     expect(onCreated).not.toHaveBeenCalled();

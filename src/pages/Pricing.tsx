@@ -253,7 +253,7 @@ export default function Pricing() {
       ],
       [
         "What do I actually get with Pro?",
-        "Multi-tent support, advanced exports including date-range diary reports, sensor snapshot history, longer grow history, advanced timeline filtering, priority support, and early access to advanced grow reports.",
+        "Multi-tent support, advanced exports including date-range diary reports, sensor snapshot history, longer grow history, advanced timeline filtering, priority support, and post-grow learning reports.",
       ],
       [
         "How does the Founder Lifetime Offer work?",
@@ -904,8 +904,7 @@ export default function Pricing() {
             <AccordionContent className="text-muted-foreground">
               Multi-tent support, advanced exports including date-range diary reports, sensor
               snapshot history, longer grow history, advanced timeline filtering, priority support,
-              and early access to advanced grow reports. Pro features ship over time, only as they
-              stabilize.
+              and post-grow learning reports. Pro features ship over time, only as they stabilize.
             </AccordionContent>
           </AccordionItem>
 

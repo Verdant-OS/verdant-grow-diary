@@ -30,7 +30,7 @@ describe("legacyQuickLogUnifiedSave", () => {
     const r = buildLegacyQuickLogUnifiedPayload({ ...baseInput, eventType: "photo" });
     const err = assertFail(r);
     expect(err.reason).toBe("unsupported_event_type");
-    expect(err.message).toMatch(/coming soon/i);
+    expect(err.message).toMatch(/dedicated quick log form/i);
   });
 
   it("rejects when no plant is selected", () => {
@@ -264,7 +264,10 @@ describe("isVerifiedPublicStarterWateringHandoff — fail-closed watering fence"
 
   it("rejects an ordinary (non public-starter) watering source", () => {
     expect(
-      isVerifiedPublicStarterWateringHandoff({ ...validPrefill, source: "manual" }, validStoredDraft),
+      isVerifiedPublicStarterWateringHandoff(
+        { ...validPrefill, source: "manual" },
+        validStoredDraft,
+      ),
     ).toBe(false);
     expect(
       isVerifiedPublicStarterWateringHandoff(
@@ -315,13 +318,19 @@ describe("isVerifiedPublicStarterWateringHandoff — fail-closed watering fence"
       isVerifiedPublicStarterWateringHandoff(validPrefill, { ...validStoredDraft, v: 2 }),
     ).toBe(false);
     expect(
-      isVerifiedPublicStarterWateringHandoff(validPrefill, { ...validStoredDraft, logType: "note" }),
+      isVerifiedPublicStarterWateringHandoff(validPrefill, {
+        ...validStoredDraft,
+        logType: "note",
+      }),
     ).toBe(false);
   });
 
   it("rejects a non-positive, non-finite, or mismatched watering volume", () => {
     expect(
-      isVerifiedPublicStarterWateringHandoff(validPrefill, { ...validStoredDraft, wateringVolumeMl: 0 }),
+      isVerifiedPublicStarterWateringHandoff(validPrefill, {
+        ...validStoredDraft,
+        wateringVolumeMl: 0,
+      }),
     ).toBe(false);
     expect(
       isVerifiedPublicStarterWateringHandoff(validPrefill, {

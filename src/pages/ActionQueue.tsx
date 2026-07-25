@@ -97,6 +97,7 @@ import {
   stripBackPointerTokens,
 } from "@/lib/actionQueueProvenanceRules";
 import { buildActionQueueGrowContextHint } from "@/lib/actionQueueGrowContextHintRules";
+import { shouldBlockActionQueueScopedGrow } from "@/lib/actionQueueScopedGrowAccessRules";
 import {
   parseAlertContextParam,
   filterActionsByAlertContext,
@@ -375,12 +376,18 @@ export default function ActionQueue() {
   const { urlGrowId, scopedGrowName, isValidScopedGrow, backHref } = useScopedGrow();
 
   const effectiveGrowId = urlGrowId ?? activeGrowId;
-  // URL provided a grow id, but it does not resolve to a grow the viewer
-  // owns. Showing every action would be misleading — render a calm prompt.
-  const hasInvalidScope = !!urlGrowId && !isValidScopedGrow;
   const [rows, setRows] = useState<ActionRow[]>([]);
   const [events, setEvents] = useState<Record<string, EventRow[]>>({});
   const [loading, setLoading] = useState(true);
+  // Archived grows are intentionally absent from the active grow picker.
+  // Keep unknown scopes blocked unless the exact RLS-scoped query returned
+  // only rows for the requested grow.
+  const hasInvalidScope = shouldBlockActionQueueScopedGrow({
+    urlGrowId,
+    isValidScopedGrow,
+    loading,
+    rows,
+  });
   const [isRefreshing, setIsRefreshing] = useState(false);
   const hasLoadedOnceRef = useRef(false);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);

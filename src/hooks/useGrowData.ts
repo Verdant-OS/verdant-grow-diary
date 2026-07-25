@@ -87,10 +87,29 @@ export function combineGrowDataMeta(metas: readonly GrowDataSourceMeta[]): GrowD
       sourceReason: "mixed:real-and-demo",
     };
   }
-  // Any combination involving unavailable is treated as unavailable-degraded.
+  // Real data present, and the only other source(s) here are "unavailable"
+  // (no mock at all) — e.g. a freshly created plant with no tent assigned
+  // yet, where plantMeta is real Supabase data and tentMeta simply never
+  // queried anything. This is NOT demo data. Falling through to "mixed"
+  // here (as this branch used to, contradicting its own comment above) fed
+  // straight into PlantDetailDataSourceDisclosure treating any "mixed"
+  // record source as "Demo" — mislabeling a brand new, genuinely real plant
+  // as "Demo / sample data ... not a real reading" on its own detail page.
+  // Confirmed live: a plant created via the real Create Plant flow, with no
+  // tent yet, showed the Demo badge despite every field on the page
+  // correctly reading "No tent assigned" / "NO READING" — i.e. an honest
+  // empty state, not fabricated demo content.
+  if (hasReal) {
+    return {
+      isDemoData: false,
+      dataSource: "supabase",
+      sourceReason: "partial-real",
+    };
+  }
+  // No real data anywhere — genuinely unavailable-degraded.
   return {
     isDemoData: metas.some((m) => m.isDemoData),
-    dataSource: hasReal ? "mixed" : "unavailable",
+    dataSource: "unavailable",
     sourceReason: "partial",
   };
 }

@@ -87,6 +87,7 @@ import {
   nextStatusFor,
   normalizeNote,
 } from "@/lib/actionQueueTransitions";
+import { safeActionQueueFailureCopy } from "@/lib/actionQueueFailureCopy";
 import {
   ACTION_QUEUE_SOURCE_VALUES,
   getActionQueueSourceLabel,
@@ -538,7 +539,7 @@ export default function ActionQueue() {
         ? await q.eq("grow_id", effectiveGrowId)
         : await q;
     if (error) {
-      toast.error(error.message);
+      toast.error(safeActionQueueFailureCopy("load", error));
     } else {
       setLastUpdatedAt(Date.now());
     }
@@ -642,7 +643,7 @@ export default function ActionQueue() {
     });
     if (error) {
       toast.warning("Status updated, but audit log failed", {
-        description: error.message,
+        description: safeActionQueueFailureCopy("audit", error),
       });
       return false;
     }
@@ -741,7 +742,7 @@ export default function ActionQueue() {
     const { error } = await supabase.from("action_queue").update(next).eq("id", row.id);
     if (error) {
       setBusyId(null);
-      toast.error(error.message);
+      toast.error(safeActionQueueFailureCopy("transition", error));
       return false;
     }
     await logEvent(row, event_type, new_status, note);

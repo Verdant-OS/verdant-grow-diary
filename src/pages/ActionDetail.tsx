@@ -50,6 +50,7 @@ import {
   nextStatusFor,
   normalizeNote,
 } from "@/lib/actionQueueTransitions";
+import { safeActionQueueFailureCopy } from "@/lib/actionQueueFailureCopy";
 import {
   actionsPath,
   aiDoctorSessionDetailPath,
@@ -397,7 +398,9 @@ export default function ActionDetail() {
       details: draft.details as unknown as Json,
     });
     if (error) {
-      toast.error("Failed to record outcome", { description: error.message });
+      toast.error("Failed to record outcome", {
+        description: safeActionQueueFailureCopy("outcome", error),
+      });
     } else {
       setExistingOutcome({ status: outcomeStatus });
       toast.success("Outcome recorded");
@@ -424,7 +427,9 @@ export default function ActionDetail() {
       note: note ?? null,
     });
     if (error) {
-      toast.warning("Status updated, but audit log failed", { description: error.message });
+      toast.warning("Status updated, but audit log failed", {
+        description: safeActionQueueFailureCopy("audit", error),
+      });
       return false;
     }
     return true;
@@ -441,7 +446,7 @@ export default function ActionDetail() {
     const { error } = await supabase.from("action_queue").update(next).eq("id", current.id);
     if (error) {
       setBusy(false);
-      toast.error(error.message);
+      toast.error(safeActionQueueFailureCopy("transition", error));
       return false;
     }
     await logEvent(current, event_type, new_status, note);
@@ -498,7 +503,7 @@ export default function ActionDetail() {
     });
     if (insErr) {
       toast.warning("Action completed, but follow-up note could not be created.", {
-        description: insErr.message,
+        description: safeActionQueueFailureCopy("followup", insErr),
       });
     }
   }

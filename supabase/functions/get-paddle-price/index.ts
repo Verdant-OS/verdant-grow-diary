@@ -116,20 +116,29 @@ Deno.serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
   if (req.method !== "POST") {
+    logCatalogUnavailable({ plan: "", reason: "method_not_allowed", stage: "method" });
     return json(405, { error: "method_not_allowed" });
   }
 
+  let requested = "";
+  let environment: PaddleEnv | undefined;
   try {
     // 1. Verified signed-in user. The anon key + caller Authorization header
     //    means auth.getUser() re-validates the JWT against the auth server;
     //    no service_role anywhere in this function.
     const authHeader = req.headers.get("Authorization") ?? "";
     if (!authHeader.startsWith("Bearer ")) {
+      logCatalogUnavailable({ plan: "", reason: "auth_required", stage: "auth" });
       return json(401, { error: "auth_required" });
     }
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
     if (!supabaseUrl || !supabaseAnonKey) {
+      logCatalogUnavailable({
+        plan: "",
+        reason: "price_resolution_unavailable",
+        stage: "auth",
+      });
       return json(500, { error: "price_resolution_unavailable" });
     }
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
@@ -138,6 +147,7 @@ Deno.serve(async (req) => {
     });
     const { data: userData, error: userError } = await supabase.auth.getUser();
     if (userError || !userData?.user) {
+      logCatalogUnavailable({ plan: "", reason: "auth_required", stage: "auth" });
       return json(401, { error: "auth_required" });
     }
 
@@ -145,8 +155,11 @@ Deno.serve(async (req) => {
     //    so the existing checkout client works unchanged, but only the three
     //    paid plan ids pass; everything else fails closed.
     const body = await req.json().catch(() => ({}));
-    const requested = typeof body?.priceId === "string" ? body.priceId.trim() : "";
+    requested = typeof body?.priceId === "string" ? body.priceId.trim() : "";
     if (!PAID_PLAN_ALLOWLIST.has(requested)) {
+      // Log ONLY that the request missed the allowlist; do not echo the
+      // rejected input value (could be attacker-controlled or PII-shaped).
+      logCatalogUnavailable({ plan: "(rejected)", reason: "unknown_plan", stage: "allowlist" });
       return json(400, { error: "unknown_plan" });
     }
 
@@ -163,32 +176,40 @@ Deno.serve(async (req) => {
         "founder_lifetime_slots_remaining",
       );
       if (capError) {
+        logCatalogUnavailable({
+          plan: requested,
+          reason: "price_resolution_unavailable",
+          stage: "founder_cap",
+        });
         // Fail closed: if availability cannot be proven, no founder checkout.
         return json(503, { error: "price_resolution_unavailable" });
       }
       if (typeof remaining !== "number" || remaining <= 0) {
+        logCatalogUnavailable({
+          plan: requested,
+          reason: "plan_sold_out",
+          stage: "founder_cap",
+        });
         return json(409, { error: "plan_sold_out" });
       }
     }
 
     // 3. Server-controlled environment. Any client-supplied environment
     //    field is ignored — the server decides sandbox vs live.
-    //
-    // H1 (audit fix): the previous 409 launch-gate on live env has
-    // been removed now that the Lovable webhook path (payments-webhook +
-    // allocate_lovable_founder_lifetime) handles both environments and
-    // enforces the founder cap atomically. Live checkout requires the
-    // PADDLE_LIVE_API_KEY / PAYMENTS_LIVE_WEBHOOK_SECRET / live
-    // PADDLE_PRICE_* env vars to be configured; when they aren't, the
-    // gatewayFetch below will fail and the sanitized 502 preserves the
-    // fail-closed behavior without a hardcoded environment refusal.
-    const environment: PaddleEnv = resolveServerBillingEnvironment();
+    environment = resolveServerBillingEnvironment();
 
     const response = await gatewayFetch(
       environment,
       `/prices?external_id=${encodeURIComponent(requested)}`,
     );
     if (!response.ok) {
+      logCatalogUnavailable({
+        plan: requested,
+        reason: "price_resolution_unavailable",
+        environment,
+        envVarConfigured: (SERVER_PRICE_CONFIG[requested] ?? "").length > 0,
+        stage: "gateway",
+      });
       // Upstream/gateway problems (including an environment with no
       // configured credentials) fail closed without leaking detail.
       return json(502, { error: "price_resolution_unavailable" });
@@ -197,6 +218,13 @@ Deno.serve(async (req) => {
     const paddleId = data?.data?.[0]?.id;
 
     if (typeof paddleId !== "string" || paddleId.length === 0) {
+      logCatalogUnavailable({
+        plan: requested,
+        reason: "price_not_configured",
+        environment,
+        envVarConfigured: (SERVER_PRICE_CONFIG[requested] ?? "").length > 0,
+        stage: "gateway_body",
+      });
       return json(404, { error: "price_not_configured" });
     }
 
@@ -206,11 +234,24 @@ Deno.serve(async (req) => {
     // unknown_price_id and leave the buyer without an entitlement.
     const configuredId = SERVER_PRICE_CONFIG[requested] ?? "";
     if (configuredId.length === 0 || paddleId !== configuredId) {
+      logCatalogUnavailable({
+        plan: requested,
+        reason: "price_resolution_unavailable",
+        environment,
+        envVarConfigured: configuredId.length > 0,
+        stage: "config_drift",
+      });
       return json(502, { error: "price_resolution_unavailable" });
     }
 
     return json(200, { paddleId });
   } catch (_err) {
+    logCatalogUnavailable({
+      plan: requested || "(none)",
+      reason: "internal_error",
+      environment,
+      stage: "exception",
+    });
     // Never surface upstream error text, stack, or configuration detail.
     return json(500, { error: "price_resolution_unavailable" });
   }

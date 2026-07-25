@@ -579,6 +579,17 @@ jobs:
             echo ""
             echo "### 📎 Flake summary artifact"
             echo ""
+            # Direct top-of-section link when the dedicated upload actually
+            # succeeded. Reviewers should not have to scroll through the
+            # upload-gate breakdown below to grab the file. `artifact-url`
+            # is populated by actions/upload-artifact@v4 only on a real
+            # successful upload, so its presence here is a strong signal
+            # that the download link is live. The fuller status/gate
+            # explanation still follows for the skipped/missing cases.
+            if [ "${FLAKE_SUMMARY_PRESENT}" = "true" ] && [ -n "${FLAKE_SUMMARY_URL}" ]; then
+              echo "**Download:** [\`quicklog-flake-summary\`](${FLAKE_SUMMARY_URL}) — single-file artifact containing \`playwright-flake-summary.md\`."
+              echo ""
+            fi
             echo "**Expected path (in this workspace):** \`e2e/results/playwright-flake-summary.md\`"
             echo "**Uploaded artifact name:** \`quicklog-flake-summary\` (single file: \`playwright-flake-summary.md\`)"
             echo "**Also archived inside:** \`quicklog-smoke-artifacts\` bundle, same relative path — alongside the source it was generated from, \`e2e/results/playwright-report.json\` (Playwright's own JSON reporter output; not uploaded as a standalone artifact)."

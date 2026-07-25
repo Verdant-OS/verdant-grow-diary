@@ -171,6 +171,7 @@ export default function Pricing() {
     environment: checkoutEnvironment,
     unavailableMessage,
     blockedReason,
+    dismissBlocked,
   } = usePaddleCheckout();
   const checkoutRecoveryReason = blockedReason ?? unavailableMessage;
   const checkoutTrustCopy = buildCheckoutTrustCopy({
@@ -452,7 +453,11 @@ export default function Pricing() {
       </section>
 
       {/* Pricing tier cards */}
-      <section className="px-6 pb-10 max-w-6xl mx-auto grid gap-8 md:gap-6 md:grid-cols-2 xl:grid-cols-4">
+      <section
+        id="pricing-plans"
+        data-testid="pricing-plans-grid"
+        className="px-6 pb-10 max-w-6xl mx-auto grid gap-8 md:gap-6 md:grid-cols-2 xl:grid-cols-4 scroll-mt-24"
+      >
         {/* Free */}
         <PricingCard
           testId="pricing-card-free"
@@ -628,6 +633,33 @@ export default function Pricing() {
               Checkout isn't ready here yet. Get one launch email.
             </h2>
             <p className="mt-3 text-sm text-muted-foreground">{checkoutRecoveryReason}</p>
+            {blockedReason && (
+              <div className="mt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  data-testid="pricing-checkout-choose-another-plan"
+                  onClick={() => {
+                    trackPricingEvent("pricing_checkout_blocked", {
+                      plan: lastCheckoutPlanRef.current,
+                      source: "choose_another_plan",
+                      reason: "recovery_dismissed",
+                    });
+                    dismissBlocked();
+                    setRecoveryRequested(false);
+                    const grid =
+                      typeof document !== "undefined"
+                        ? document.getElementById("pricing-plans")
+                        : null;
+                    grid?.scrollIntoView({ behavior: "smooth", block: "start" });
+                    (grid as HTMLElement | null)?.focus?.();
+                  }}
+                >
+                  Choose another plan
+                </Button>
+              </div>
+            )}
             <div className="mt-5">
               <SubscriberInterestForm planId={interestPlan} leadSource={paidInterestLeadSource} />
             </div>

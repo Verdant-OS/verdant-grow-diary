@@ -177,6 +177,25 @@ export function classifyIngestWriteAcknowledgement(
   }
 
   const acknowledgement = parsed as Record<string, unknown>;
+  const hasAccepted = Object.prototype.hasOwnProperty.call(acknowledgement, "accepted");
+  const hasInserted = Object.prototype.hasOwnProperty.call(acknowledgement, "inserted");
+
+  // Validate every acknowledgement field that is present before considering
+  // either positive signal. A valid sibling must never mask a malformed one.
+  if (
+    (hasAccepted && typeof acknowledgement.accepted !== "boolean") ||
+    (hasInserted &&
+      (typeof acknowledgement.inserted !== "number" ||
+        !Number.isInteger(acknowledgement.inserted) ||
+        acknowledgement.inserted < 0))
+  ) {
+    return {
+      kind: "unknown_response",
+      classification: "unknown",
+      reasons: ["malformed_response"],
+    };
+  }
+
   const explicitlyRejected = acknowledgement.accepted === false;
   const insertedZero = acknowledgement.inserted === 0;
 

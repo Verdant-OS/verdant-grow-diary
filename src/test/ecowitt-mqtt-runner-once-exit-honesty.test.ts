@@ -24,8 +24,9 @@
  * config fails before MQTT/HTTP; no stub-ingest subprocess is needed.
  */
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
-import { resolve as resolvePath } from "node:path";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve as resolvePath } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { classifyIngestWriteAcknowledgement } from "@/lib/ingestAttemptReportRules";
 import {
@@ -108,6 +109,7 @@ describe("live one-shot response acknowledgement", () => {
   it.each([
     { body: { accepted: true }, label: "accepted:true" },
     { body: { ok: true, inserted: 2 }, label: "inserted>0" },
+    { body: { accepted: true, inserted: 1 }, label: "matching positive fields" },
   ])("exits 0 only when the body proves a write landed ($label)", async ({ body }) => {
     const result = await attempt(body);
     expect(result.status).toBe("accepted");
@@ -122,6 +124,7 @@ describe("live one-shot response acknowledgement", () => {
     },
     { body: { ok: true, inserted: 0, skipped_duplicate: 1 }, label: "inserted:0" },
     { body: { accepted: true, inserted: 0 }, label: "conflicting acknowledgement" },
+    { body: { accepted: false, inserted: 1 }, label: "explicit negative with positive count" },
   ])("does not exit 0 for a 200 response with $label", async ({ body }) => {
     const result = await attempt(body);
     expect(result.status).toBe("rejected");
@@ -134,6 +137,22 @@ describe("live one-shot response acknowledgement", () => {
     {
       body: { accepted: "true", inserted: "1" },
       label: "wrong acknowledgement types",
+    },
+    {
+      body: { accepted: true, inserted: -1 },
+      label: "accepted:true with negative inserted",
+    },
+    {
+      body: { accepted: true, inserted: 1.5 },
+      label: "accepted:true with non-integer inserted",
+    },
+    {
+      body: { accepted: true, inserted: "0" },
+      label: "accepted:true with string inserted",
+    },
+    {
+      body: { accepted: "true", inserted: 1 },
+      label: "string accepted with positive inserted",
     },
   ])("fails closed for an ambiguous 200 response ($label)", async ({ body }) => {
     const result = await attempt(body);
@@ -192,25 +211,47 @@ describe("one-shot intent and live configuration", () => {
     expect(missingOnceLiveConfigKeys(LIVE_ENV)).toEqual([]);
   });
 
-  it("exits 2 before MQTT/HTTP when a live one-shot is missing configuration", () => {
-    const run = spawnSync("bun", ["run", SCRIPT, "--sample", "--once"], {
-      encoding: "utf8",
-      timeout: 30_000,
-      env: {
-        PATH: process.env.PATH ?? "",
-        HOME: process.env.HOME ?? "",
-        UPSTREAM_MODE: "ecowitt_raw",
-      },
-    });
-    const combined = `${run.stdout ?? ""}\n${run.stderr ?? ""}`;
-    expect(run.status).toBe(2);
-    expect(combined).toMatch(/configuration error/i);
-    expect(combined).toContain("VERDANT_INGEST_URL");
-    expect(combined).toContain("VERDANT_BRIDGE_TOKEN");
-    expect(combined).toContain("VERDANT_TENT_ID");
-    expect(combined).not.toMatch(/dry.run/i);
-    expect(combined).not.toMatch(/subscribed|econnrefused|fetch failed/i);
-  });
+  it.each([".env", ".env.local"])(
+    "exits 2 before MQTT/HTTP without loading live configuration from %s",
+    (envFile) => {
+      const childCwd = mkdtempSync(join(tmpdir(), "verdant-ecowitt-once-"));
+      const scriptPath = resolvePath(process.cwd(), SCRIPT);
+      try {
+        writeFileSync(
+          join(childCwd, envFile),
+          [
+            "VERDANT_INGEST_URL=http://127.0.0.1:9/functions/v1/sensor-ingest-webhook",
+            "VERDANT_BRIDGE_TOKEN=vbt_env_file_must_not_load",
+            "VERDANT_TENT_ID=00000000-0000-4000-8000-000000000000",
+          ].join("\n"),
+          "utf8",
+        );
+
+        const run = spawnSync("bun", ["--no-env-file", "run", scriptPath, "--sample", "--once"], {
+          cwd: childCwd,
+          encoding: "utf8",
+          timeout: 30_000,
+          env: {
+            PATH: process.env.PATH ?? "",
+            HOME: process.env.HOME ?? "",
+            UPSTREAM_MODE: "ecowitt_raw",
+          },
+        });
+        const combined = `${run.stdout ?? ""}\n${run.stderr ?? ""}`;
+        expect(run.error).toBeUndefined();
+        expect(run.status).toBe(2);
+        expect(combined).toMatch(/configuration error/i);
+        expect(combined).toContain("VERDANT_INGEST_URL");
+        expect(combined).toContain("VERDANT_BRIDGE_TOKEN");
+        expect(combined).toContain("VERDANT_TENT_ID");
+        expect(combined).not.toContain("vbt_env_file_must_not_load");
+        expect(combined).not.toMatch(/dry.run/i);
+        expect(combined).not.toMatch(/subscribed|econnrefused|fetch failed/i);
+      } finally {
+        rmSync(childCwd, { recursive: true, force: true });
+      }
+    },
+  );
 });
 
 describe("runner wiring — every --once exit goes through onceExitCode", () => {

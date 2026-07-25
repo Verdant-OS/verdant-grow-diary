@@ -538,6 +538,16 @@ Deno.serve(async (req) => {
       clearTimeout(timer);
     }
 
+    if (upstream.status === 402) {
+      console.log("ai-doctor-review status=upstream_credit_exhausted");
+      try {
+        await upstream.text();
+      } catch {
+        /* ignore */
+      }
+      return failureAfterRefund(spendId, "upstream_402", "upstream_credit_exhausted");
+    }
+
     if (!upstream.ok) {
       console.log(`ai-doctor-review status=http_${upstream.status}`);
       try {

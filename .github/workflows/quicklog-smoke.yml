@@ -598,6 +598,37 @@ jobs:
             if [ "${FLAKE_SUMMARY_PRESENT}" = "true" ] && [ -n "${FLAKE_SUMMARY_URL}" ]; then
               echo "**Download:** [\`quicklog-flake-summary-${ARTIFACT_SUFFIX}\`](${FLAKE_SUMMARY_URL}) — single-file artifact containing \`playwright-flake-summary.md\`."
               echo ""
+              # One-click access to the exact file the artifact contains.
+              # GitHub Actions has no public deep-link into a zip artifact,
+              # so the closest "one click" is the artifact URL labeled with
+              # the archive-relative path, plus the file contents inlined
+              # below so reviewers do not have to download + unzip just to
+              # read it. Skipped when the file is unreadable so the summary
+              # never breaks. Truncated to keep the Job Summary well under
+              # GitHub's 1 MiB $GITHUB_STEP_SUMMARY cap even if a future
+              # summarizer produces a very large report.
+              echo "**Open the exact file (\`playwright-flake-summary.md\` at the root of the zip):** [\`quicklog-flake-summary-${ARTIFACT_SUFFIX}/playwright-flake-summary.md\`](${FLAKE_SUMMARY_URL}) — one-click download; the zip contains only this single file, so no unzipping is required to locate it."
+              echo ""
+              flake_summary_file="e2e/results/playwright-flake-summary.md"
+              if [ -r "${flake_summary_file}" ]; then
+                flake_summary_bytes=$(wc -c < "${flake_summary_file}" | tr -d ' ')
+                echo "<details><summary>📄 Inline preview of <code>playwright-flake-summary.md</code> (${flake_summary_bytes} bytes) — click to expand</summary>"
+                echo ""
+                echo "> Rendered from the exact file that was uploaded as \`quicklog-flake-summary-${ARTIFACT_SUFFIX}/playwright-flake-summary.md\` in this run. Contents are truncated to the first 64 KiB to stay under the Job Summary size cap; download the artifact for the full file."
+                echo ""
+                echo '```markdown'
+                head -c 65536 "${flake_summary_file}"
+                if [ "${flake_summary_bytes}" -gt 65536 ]; then
+                  echo ""
+                  echo "... [truncated in Job Summary — see artifact for full contents] ..."
+                fi
+                echo ""
+                echo '```'
+                echo ""
+                echo "</details>"
+                echo ""
+              fi
+
               if [ -n "${HTML_REPORT_URL}" ]; then
                 echo "**Playwright HTML report for the same run:** [\`quicklog-playwright-report-${ARTIFACT_SUFFIX}\`](${HTML_REPORT_URL}) — unzip and open \`index.html\` to browse the exact test tree the flake summary counts came from. _Uploaded as a sibling artifact rather than inside the flake summary zip (which holds only \`playwright-flake-summary.md\`)._"
               else

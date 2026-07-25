@@ -5,6 +5,7 @@ import {
   resolvePaddleCheckout,
   getCheckoutUnavailableMessage,
   PaddleCheckoutUnavailableError,
+  PaddleCheckoutCatalogUnavailableError,
 } from "@/lib/paddle";
 import { useAuth } from "@/store/auth";
 import { useLocation, useNavigate } from "react-router-dom";

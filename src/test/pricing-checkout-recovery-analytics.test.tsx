@@ -83,6 +83,11 @@ beforeEach(() => {
   trackFunnelEventMock.mockReset();
   openCheckoutMock.mockReset();
   dismissBlockedMock.mockReset();
+  // jsdom doesn't implement scrollIntoView; the recovery panel calls it.
+  if (!("scrollIntoView" in HTMLElement.prototype)) {
+    // @ts-expect-error — test-only polyfill
+    HTMLElement.prototype.scrollIntoView = () => {};
+  }
 });
 
 describe("Pricing recovery analytics", () => {

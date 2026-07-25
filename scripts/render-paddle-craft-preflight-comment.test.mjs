@@ -162,3 +162,143 @@ test("comment always includes the sticky marker", () => {
   });
   assert.ok(md.startsWith(COMMENT_MARKER));
 });
+
+// ---------------------------------------------------------------------
+// JSON report path (preferred input) — locks in that the renderer reads
+// pre-classified rows from the verifier's machine-readable report and
+// never has to re-parse log text.
+// ---------------------------------------------------------------------
+
+const REPORT_ALL_PASS = {
+  schemaVersion: 1,
+  envs: ["sandbox", "live"],
+  requiredIds: ["craft_monthly", "craft_annual"],
+  rows: [
+    { env: "sandbox", externalId: "craft_monthly", status: "pass" },
+    { env: "sandbox", externalId: "craft_annual", status: "pass" },
+    { env: "live", externalId: "craft_monthly", status: "pass" },
+    { env: "live", externalId: "craft_annual", status: "pass" },
+  ],
+  summary: { pass: 4, fail: 0, skip: 0 },
+  exitCode: 0,
+  keyUnset: false,
+};
+
+const REPORT_COVERAGE_GAP = {
+  schemaVersion: 1,
+  envs: ["live"],
+  requiredIds: ["craft_monthly", "craft_annual"],
+  rows: [
+    { env: "live", externalId: "craft_monthly", status: "pass" },
+    { env: "live", externalId: "craft_annual", status: "pass" },
+    {
+      env: "live",
+      externalId: "craft_quarterly",
+      status: "fail",
+      cause: { kind: "coverage_gap" },
+    },
+  ],
+  summary: { pass: 2, fail: 1, skip: 0 },
+  exitCode: 1,
+  keyUnset: false,
+};
+
+const REPORT_KEY_UNSET = {
+  schemaVersion: 1,
+  envs: ["sandbox", "live"],
+  requiredIds: ["craft_monthly", "craft_annual"],
+  rows: [
+    { env: "sandbox", externalId: "craft_monthly", status: "skip" },
+    { env: "sandbox", externalId: "craft_annual", status: "skip" },
+  ],
+  summary: { pass: 0, fail: 0, skip: 2 },
+  exitCode: 2,
+  keyUnset: true,
+};
+
+test("parseVerifierReport → verified verdict, no glyph parsing required", () => {
+  const parsed = parseVerifierReport(REPORT_ALL_PASS);
+  assert.equal(parsed.rows.length, 4);
+  assert.deepEqual(parsed.summary, { pass: 4, fail: 0, skip: 0 });
+  assert.equal(parsed.keyUnsetMentioned, false);
+  const verdict = decideVerdict({ rc: 0, parsed, eventName: "pull_request" });
+  assert.equal(verdict.level, "pass");
+});
+
+test("parseVerifierReport preserves coverage_gap classification", () => {
+  const parsed = parseVerifierReport(REPORT_COVERAGE_GAP);
+  const gapRow = parsed.rows.find((r) => r.externalId === "craft_quarterly");
+  assert.ok(gapRow, "coverage_gap row must round-trip through the report parser");
+  assert.equal(gapRow.status, "fail");
+  assert.equal(gapRow.cause?.kind, "coverage_gap");
+});
+
+test("parseVerifierReport preserves api_error httpStatus for renderer remedy", () => {
+  const parsed = parseVerifierReport({
+    schemaVersion: 1,
+    envs: ["live"],
+    requiredIds: ["craft_monthly"],
+    rows: [
+      {
+        env: "live",
+        externalId: "craft_monthly",
+        status: "fail",
+        cause: { kind: "api_error", httpStatus: 429 },
+      },
+    ],
+    summary: { pass: 0, fail: 1, skip: 0 },
+    exitCode: 1,
+    keyUnset: false,
+  });
+  assert.equal(parsed.rows[0].cause.kind, "api_error");
+  assert.equal(parsed.rows[0].cause.httpStatus, 429);
+  const md = renderComment({
+    verdict: decideVerdict({ rc: 1, parsed, eventName: "pull_request" }),
+    parsed,
+  });
+  assert.match(md, /HTTP 429/);
+});
+
+test("parseVerifierReport surfaces keyUnset → warn branch on PR event", () => {
+  const parsed = parseVerifierReport(REPORT_KEY_UNSET);
+  assert.equal(parsed.keyUnsetMentioned, true);
+  const verdict = decideVerdict({ rc: 2, parsed, eventName: "pull_request" });
+  assert.equal(verdict.level, "warn");
+});
+
+test("parseVerifierReport rejects malformed rows without contaminating output", () => {
+  const parsed = parseVerifierReport({
+    schemaVersion: 1,
+    envs: ["sandbox"],
+    requiredIds: ["craft_monthly"],
+    rows: [
+      { env: "mars", externalId: "craft_monthly", status: "pass" }, // bad env
+      { env: "sandbox", externalId: 123, status: "pass" }, // bad id type
+      { env: "sandbox", externalId: "craft_monthly", status: "explode" }, // bad status
+      { env: "sandbox", externalId: "craft_monthly", status: "pass" }, // good
+      {
+        env: "sandbox",
+        externalId: "craft_annual",
+        status: "fail",
+        cause: { kind: "cosmic_ray" }, // unknown cause kind
+      },
+    ],
+    summary: { pass: 1, fail: 1, skip: 0 },
+    exitCode: 1,
+    keyUnset: false,
+  });
+  assert.equal(parsed.rows.length, 2, "only well-formed rows survive");
+  const failRow = parsed.rows.find((r) => r.status === "fail");
+  assert.equal(
+    failRow?.cause?.kind,
+    "missing",
+    "unknown cause kinds collapse to the safe default remedy",
+  );
+});
+
+test("parseVerifierReport returns empty parsed for non-object input", () => {
+  assert.deepEqual(parseVerifierReport(null).rows, []);
+  assert.deepEqual(parseVerifierReport("not json").rows, []);
+  assert.equal(parseVerifierReport({}).summary, null);
+});
+

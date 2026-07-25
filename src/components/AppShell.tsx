@@ -20,6 +20,7 @@ import VerificationPendingBanner from "./VerificationPendingBanner";
 import { SubscriptionPastDueBanner } from "./SubscriptionPastDueBanner";
 import GlobalSearchDialog from "./GlobalSearchDialog";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
+import { readQuickLogStartEventType } from "@/lib/globalSearchQuickLogFallbackRules";
 import { isEmailVerificationPending } from "@/lib/emailVerificationRules";
 import { resolveMobileQuickLogTarget } from "@/lib/quickLogRouteTargetRules";
 import { consumeQuickLogStartIntent } from "@/lib/startScreenPreferences";
@@ -58,8 +59,9 @@ export default function AppShell({ children }: { children?: ReactNode }) {
   const nav = useNavigate();
   const [openLog, setOpenLog] = useState(false);
   const [openScopedLog, setOpenScopedLog] = useState(false);
-  const [structuredOpenIntent, setStructuredOpenIntent] =
-    useState<QuickLogV2OpenIntent | null>(null);
+  const [structuredOpenIntent, setStructuredOpenIntent] = useState<QuickLogV2OpenIntent | null>(
+    null,
+  );
   const [legacyQuickLogSession, setLegacyQuickLogSession] = useState(0);
   const [prefill, setPrefill] = useState<QuickLogPrefill | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -114,8 +116,7 @@ export default function AppShell({ children }: { children?: ReactNode }) {
       setOpenScopedLog(true);
     }
     window.addEventListener(QUICK_LOG_V2_OPEN_EVENT, onOpenV2 as EventListener);
-    return () =>
-      window.removeEventListener(QUICK_LOG_V2_OPEN_EVENT, onOpenV2 as EventListener);
+    return () => window.removeEventListener(QUICK_LOG_V2_OPEN_EVENT, onOpenV2 as EventListener);
   }, []);
 
   useEffect(() => {
@@ -132,9 +133,14 @@ export default function AppShell({ children }: { children?: ReactNode }) {
   // query intent. Consume it only after AppShell is mounted, open the existing
   // Quick Log dialog, then remove the marker so refresh/back does not reopen it.
   useEffect(() => {
+    // Read the preset BEFORE consuming: consumeQuickLogStartIntent strips the
+    // companion type marker along with the intent itself.
+    const startEventType = readQuickLogStartEventType(location.search);
     const nextSearch = consumeQuickLogStartIntent(location.search);
     if (nextSearch === null) return;
-    setPrefill(null);
+    // Seed only the activity. No plant is invented — the grower still selects
+    // one, exactly as a context-free launcher has always required.
+    setPrefill(startEventType ? { eventType: startEventType } : null);
     setOpenLog(true);
     nav(
       {

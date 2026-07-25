@@ -74,6 +74,9 @@ describe("createPhenoHunt setup persistence", () => {
       if (call.table === "pheno_hunts" && call.op === "insert") {
         return { data: { id: "h1" }, error: null };
       }
+      if (call.table === "plants" && call.op === "update") {
+        return { data: { id: "p1" }, error: null };
+      }
       return { data: null, error: null };
     });
     await createPhenoHunt(
@@ -96,6 +99,9 @@ describe("createPhenoHunt setup persistence", () => {
     const { client, calls } = makeFakeClient((call) => {
       if (call.table === "pheno_hunts" && call.op === "insert") {
         return { data: { id: "h1" }, error: null };
+      }
+      if (call.table === "plants" && call.op === "update") {
+        return { data: { id: "p1" }, error: null };
       }
       return { data: null, error: null };
     });

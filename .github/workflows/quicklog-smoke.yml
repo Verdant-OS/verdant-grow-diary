@@ -301,6 +301,115 @@ jobs:
 
           exit "$status"
 
+      - name: Summarize failing step + log tail in Job Summary
+        if: failure()
+        shell: bash
+        env:
+          BOOTSTRAP_FIXTURE_OUTCOME: ${{ steps.bootstrap_fixture.outcome }}
+          VERIFY_FIXTURE_OUTCOME: ${{ steps.verify_fixture.outcome }}
+          QUICKLOG_SMOKE_OUTCOME: ${{ steps.quicklog_smoke.outcome }}
+          E2E_SHOULD_RUN: ${{ steps.e2e_config.outputs.should_run }}
+        run: |
+          # Emits a compact failure section at the top of the Job Summary that
+          # names the failing step (from the known set of tracked step IDs) and
+          # tails the most relevant log artifacts. Never echoes secret values.
+          # Tail sizes are capped so the summary stays inside the 1 MiB
+          # GITHUB_STEP_SUMMARY budget even on long failures.
+          set +e
+
+          declare -a FAILED_STEPS=()
+          add_failed() {
+            local label="$1"
+            local outcome="$2"
+            if [ "${outcome}" = "failure" ]; then
+              FAILED_STEPS+=("${label} (outcome: ${outcome})")
+            fi
+          }
+          add_failed "Bootstrap E2E fixture (\`bootstrap_fixture\`)" "${BOOTSTRAP_FIXTURE_OUTCOME}"
+          add_failed "Verify E2E fixture (\`verify_fixture\`)" "${VERIFY_FIXTURE_OUTCOME}"
+          add_failed "Run Quick Log Playwright smoke (\`quicklog_smoke\`)" "${QUICKLOG_SMOKE_OUTCOME}"
+
+          RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          ATTEMPT_URL="${RUN_URL}/attempts/${GITHUB_RUN_ATTEMPT}"
+          JOB_URL="${RUN_URL}/job/${GITHUB_JOB}"
+
+          {
+            echo ""
+            echo "## ❌ Job failed — quick debug info"
+            echo ""
+            echo "**Workflow:** \`${GITHUB_WORKFLOW}\` · **Run:** [#${GITHUB_RUN_NUMBER} attempt ${GITHUB_RUN_ATTEMPT}](${ATTEMPT_URL}) · **Job:** [\`${GITHUB_JOB}\`](${JOB_URL})"
+            echo ""
+            echo "### Failing step"
+            echo ""
+            if [ "${#FAILED_STEPS[@]}" -eq 0 ]; then
+              echo "_None of the tracked step IDs (\`bootstrap_fixture\`, \`verify_fixture\`, \`quicklog_smoke\`) reported \`outcome: failure\` at the point this summary ran. The failure is likely in an earlier setup step (checkout, dependency install, secret verification) or a later post-smoke step. Open the [job logs](${JOB_URL}) and look for the first red ✗ step._"
+            else
+              for entry in "${FAILED_STEPS[@]}"; do
+                echo "- ${entry}"
+              done
+            fi
+            echo ""
+
+            tail_file() {
+              local path="$1"
+              local label="$2"
+              local lines="${3:-80}"
+              if [ ! -f "${path}" ]; then
+                return 1
+              fi
+              local size
+              size="$(wc -c < "${path}" 2>/dev/null | tr -d ' \r\n')"
+              if [ -z "${size}" ] || [ "${size}" = "0" ]; then
+                return 1
+              fi
+              echo ""
+              echo "### 📄 ${label}"
+              echo ""
+              echo "\`${path}\` (${size} bytes) — last ${lines} lines:"
+              echo ""
+              echo '```text'
+              # Cap tail at 8 KiB to keep the Job Summary well under the 1 MiB budget.
+              tail -n "${lines}" "${path}" 2>/dev/null | head -c 8192
+              echo ""
+              echo '```'
+              return 0
+            }
+
+            emitted_log=0
+            if tail_file "e2e/results/quicklog-smoke-report.txt" "Quick Log smoke report (text)" 120; then
+              emitted_log=1
+            fi
+
+            # Playwright writes an error-context.md next to each failing test's
+            # trace under test-results/<test-folder>/. Surface up to 3 of them
+            # so the summary stays bounded.
+            if [ -d "test-results" ]; then
+              # shellcheck disable=SC2044
+              mapfile -t error_contexts < <(find test-results -maxdepth 4 -type f -name 'error-context.md' 2>/dev/null | sort | head -n 3)
+              for ctx in "${error_contexts[@]}"; do
+                if tail_file "${ctx}" "Playwright error context — \`$(dirname "${ctx}" | sed 's|^test-results/||')\`" 60; then
+                  emitted_log=1
+                fi
+              done
+            fi
+
+            if [ "${emitted_log}" -eq 0 ]; then
+              echo ""
+              echo "### 📄 No log tail available"
+              echo ""
+              echo "_Neither \`e2e/results/quicklog-smoke-report.txt\` nor any \`test-results/**/error-context.md\` was present at failure time. The failure happened before Playwright wrote its reports — see the [full job logs](${JOB_URL}) for the earlier step's output._"
+            fi
+
+            echo ""
+            echo "_Full step-by-step output: [job \`${GITHUB_JOB}\`](${JOB_URL}) · [run attempt ${GITHUB_RUN_ATTEMPT}](${ATTEMPT_URL})_"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # This step is diagnostic only — never mask the real failure.
+          exit 0
+
+
+
       - name: Capture Quick Log smoke metadata
         id: smoke_meta
         if: always() && steps.e2e_config.outputs.should_run == 'true'

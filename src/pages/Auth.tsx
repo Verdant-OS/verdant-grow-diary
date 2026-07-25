@@ -33,6 +33,7 @@ import {
   RESEND_VERIFICATION_GENERIC_FAILURE,
 } from "@/lib/authErrorRules";
 import { resolveKnownRouteReturnTo } from "@/lib/authRedirectRules";
+import { sendWelcomeEmailBestEffort } from "@/lib/sendWelcomeEmail";
 import {
   buildSignupEmailRedirectUrl,
   buildSignupUserMetadata,

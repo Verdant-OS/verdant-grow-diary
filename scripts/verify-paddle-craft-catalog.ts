@@ -126,6 +126,48 @@ async function lookupPriceExternalId(
   return { env, externalId, status: "pass", detail: `active price ${active.id}` };
 }
 
+async function discoverActiveCraftExternalIds(
+  env: PaddleEnv,
+  apiKey: string,
+): Promise<{ ok: true; ids: string[] } | { ok: false; detail: string }> {
+  // Enumerate active prices and filter by the Craft external_id prefix.
+  // We page defensively — Paddle caps per_page at 200 and returns a cursor
+  // in `meta.pagination.next` when more rows exist.
+  const collected: string[] = [];
+  let url: string | null =
+    `${PADDLE_API_BASE[env]}/prices?status=active&per_page=200`;
+  let guard = 0;
+  while (url && guard < 20) {
+    guard += 1;
+    const res: Response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      return { ok: false, detail: `Paddle API ${res.status}: ${body.slice(0, 200)}` };
+    }
+    const payload = (await res.json()) as {
+      data?: Array<{ external_id?: string | null; status?: string }>;
+      meta?: { pagination?: { next?: string | null; has_more?: boolean } };
+    };
+    for (const row of payload.data ?? []) {
+      const ext = row.external_id;
+      if (typeof ext === "string" && ext.startsWith(CRAFT_EXTERNAL_ID_PREFIX)) {
+        collected.push(ext);
+      }
+    }
+    const next = payload.meta?.pagination?.next ?? null;
+    const hasMore = payload.meta?.pagination?.has_more ?? false;
+    url = hasMore && next ? next : null;
+  }
+  // Dedupe — a single external_id can have multiple active price rows across
+  // currencies; we only care about the identifier surface.
+  return { ok: true, ids: Array.from(new Set(collected)).sort() };
+}
+
 async function main(): Promise<void> {
   const envs = parseEnvFlag(process.argv.slice(2));
   const results: CheckResult[] = [];
@@ -134,6 +176,8 @@ async function main(): Promise<void> {
   console.log(`# Environments: ${envs.join(", ")}`);
   console.log(`# Required external_ids: ${REQUIRED_PLAN_IDS.join(", ")}`);
   console.log("");
+
+  const requiredSet = new Set<string>(REQUIRED_PLAN_IDS);
 
   for (const env of envs) {
     const key = apiKeyFor(env);
@@ -160,6 +204,49 @@ async function main(): Promise<void> {
       results.push(r);
       const glyph = r.status === "pass" ? "✓" : r.status === "skip" ? "•" : "✗";
       console.log(`${glyph} [${env}] ${id} — ${r.detail}`);
+    }
+
+    // Coverage assertion: enumerate active Craft-prefixed external_ids in
+    // the catalog and fail loud if any are not in REQUIRED_PLAN_IDS. This
+    // catches a newly-created Craft plan (e.g. `craft_quarterly`) that a
+    // human added in the Paddle dashboard but that no preflight or code
+    // path knows about — the exact drift shape that let Craft ship
+    // uncovered the first time.
+    const discovery = await discoverActiveCraftExternalIds(env, key);
+    if (!discovery.ok) {
+      results.push({
+        env,
+        externalId: `${CRAFT_EXTERNAL_ID_PREFIX}* (coverage)`,
+        status: "fail",
+        detail: `catalog enumeration failed: ${discovery.detail}`,
+      });
+      console.log(
+        `✗ [${env}] ${CRAFT_EXTERNAL_ID_PREFIX}* (coverage) — catalog enumeration failed: ${discovery.detail}`,
+      );
+      continue;
+    }
+    const uncovered = discovery.ids.filter((id) => !requiredSet.has(id));
+    if (uncovered.length === 0) {
+      const detail =
+        discovery.ids.length === 0
+          ? `no active ${CRAFT_EXTERNAL_ID_PREFIX}* prices in catalog`
+          : `all ${discovery.ids.length} active ${CRAFT_EXTERNAL_ID_PREFIX}* price(s) covered`;
+      results.push({
+        env,
+        externalId: `${CRAFT_EXTERNAL_ID_PREFIX}* (coverage)`,
+        status: "pass",
+        detail,
+      });
+      console.log(`✓ [${env}] ${CRAFT_EXTERNAL_ID_PREFIX}* (coverage) — ${detail}`);
+    } else {
+      for (const id of uncovered) {
+        const detail =
+          `active in catalog but not in REQUIRED_PLAN_IDS — ` +
+          `add to src/lib/paidPlanAllowlist.ts PAID_PLAN_IDS and to REQUIRED_PLAN_IDS ` +
+          `in scripts/verify-paddle-craft-catalog.ts`;
+        results.push({ env, externalId: id, status: "fail", detail });
+        console.log(`✗ [${env}] ${id} — ${detail}`);
+      }
     }
   }
 

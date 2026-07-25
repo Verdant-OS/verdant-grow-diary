@@ -52,10 +52,14 @@ jobs:
           PADDLE_LIVE_API_KEY: ${{ secrets.PADDLE_LIVE_API_KEY }}
         run: |
           set +e
+          # Capture BOTH streams. The "API key not set" path writes its
+          # ::error:: to stderr and exits before printing any per-id line, so
+          # a stdout-only capture loses every trace of why nothing ran.
           bun run scripts/verify-paddle-craft-catalog.ts --env both \
-            | tee "$RUNNER_TEMP/craft-preflight.log"
-          RC=${PIPESTATUS[0]}
+            > "$RUNNER_TEMP/craft-preflight.log" 2>&1
+          RC=$?
           set -e
+          cat "$RUNNER_TEMP/craft-preflight.log"
           {
             echo "### Paddle Craft catalog preflight"
             echo ""
@@ -88,30 +92,74 @@ jobs:
           LOG="$RUNNER_TEMP/craft-preflight.log"
           [ -f "$LOG" ] || { echo "No preflight log; nothing to report."; exit 0; }
 
-          # `✗` = catalog miss. `•` = skipped because a key was unset, which
-          # is NOT a pass and must never read as one.
-          FAILS=$(grep -E '^✗ ' "$LOG" | sed -E 's/^✗ \[([^]]+)\] ([^ ]+) — .*/| `\2` | \1 | missing or inactive |/' || true)
-          SKIPS=$(grep -E '^• ' "$LOG" | sed -E 's/^• \[([^]]+)\] ([^ ]+) — .*/| `\2` | \1 | not verified — API key unset |/' || true)
+          # Classify each non-passing line by its DETAIL, not just its glyph.
+          # A `✗` can mean the catalog genuinely lacks the price, OR that the
+          # Paddle API refused us (auth / rate limit / 5xx). Collapsing those
+          # into "missing or inactive" sends an operator to create a price
+          # when the real fix is a credential or waiting out an outage.
+          # Only the HTTP status is surfaced — never the response body, which
+          # can echo request context.
+          ROWS=$(awk -F' — ' '
+            /^✗ / {
+              hdr = $1; sub(/^✗ +/, "", hdr)
+              env = hdr; sub(/^\[/, "", env); sub(/\].*$/, "", env)
+              id  = hdr; sub(/^\[[^]]*\] */, "", id)
+              d = $2
+              if (d ~ /^Paddle API /) {
+                code = d; sub(/^Paddle API /, "", code); sub(/:.*$/, "", code)
+                state = "API error (HTTP " code ") — check credentials / Paddle status"
+              } else if (d ~ /none are active/) {
+                state = "present but not active (archived?)"
+              } else {
+                state = "missing from catalog"
+              }
+              printf "| `%s` | %s | %s |\n", id, env, state
+            }
+            /^• / {
+              hdr = $1; sub(/^• +/, "", hdr)
+              env = hdr; sub(/^\[/, "", env); sub(/\].*$/, "", env)
+              id  = hdr; sub(/^\[[^]]*\] */, "", id)
+              printf "| `%s` | %s | not verified — API key unset |\n", id, env
+            }
+          ' "$LOG" || true)
 
-          if [ -z "$FAILS" ] && [ -z "$SKIPS" ]; then
-            STATUS="✅ **Craft catalog verified** — every required price exists and is active in both environments."
-            ROWS=""
-          elif [ -n "$SKIPS" ] && [ -z "$FAILS" ]; then
-            STATUS="⚠️ **Craft catalog NOT verified.** A required API key is unset, so nothing was checked for that environment. This is not a pass."
-            ROWS=$(printf '%s\n' "$SKIPS")
-          else
-            STATUS="❌ **Craft catalog incomplete.** Advertised Craft plans are missing from the Paddle catalog. Shipping this risks a live charge that \`payments-webhook\` cannot convert into an entitlement."
-            ROWS=$(printf '%s\n%s\n' "$FAILS" "$SKIPS")
-          fi
+          # The EXIT CODE is authoritative, never the presence of parsed rows.
+          # The key-unset path exits 2 having printed no per-id line at all, so
+          # "no rows" previously rendered as a green "verified" on a failed
+          # run — the exact false-green this gate exists to prevent.
+          case "${RC:-}" in
+            0)
+              STATUS="✅ **Craft catalog verified** — every required price exists and is active in both environments."
+              ;;
+            1)
+              STATUS="❌ **Craft catalog incomplete.** At least one advertised Craft price is missing, inactive, or could not be read. Shipping this risks a live charge that \`payments-webhook\` cannot convert into an entitlement."
+              ;;
+            2)
+              STATUS="⚠️ **Craft catalog NOT verified.** A required API key is unset (or the invocation was malformed), so the catalog was never checked. **This is not a pass.**"
+              ;;
+            *)
+              STATUS="⚠️ **Craft catalog preflight did not complete** (exit \`${RC:-unknown}\`). Treat as unverified."
+              ;;
+          esac
 
           if [ -n "$ROWS" ]; then
             TABLE=$(printf '| external_id | environment | state |\n| --- | --- | --- |\n%s\n' "$ROWS")
+          elif [ "${RC:-}" != "0" ]; then
+            TABLE="_No per-price detail was produced — the run stopped before reaching the catalog. See the workflow run for the reason._"
           else
             TABLE=""
           fi
 
-          BODY=$(printf '%s\n### Paddle Craft catalog preflight\n\n%s\n\n%s\n\nFix: create the missing product/price in the Paddle dashboard with the matching `external_id`, or stop advertising the plan until it exists.\n\n- Exit code: `%s` (0 pass · 1 missing/inactive · 2 not verified)\n- Workflow run: %s\n' \
-            "$MARKER" "$STATUS" "$TABLE" "${RC:-unknown}" "$RUN_URL")
+          # Remedies differ per outcome; a single blanket "create the price"
+          # line was wrong for both the credential and the not-run cases.
+          case "${RC:-}" in
+            0) FIX="" ;;
+            2) FIX="Fix: set the missing \`PADDLE_SANDBOX_API_KEY\` / \`PADDLE_LIVE_API_KEY\` repo secret, then re-run." ;;
+            *) FIX="Fix: for a missing/inactive entry, create or re-activate the price in the Paddle dashboard with the matching \`external_id\`, or stop advertising the plan until it exists. For an API error, check the credential and Paddle status before assuming the catalog is at fault." ;;
+          esac
+
+          BODY=$(printf '%s\n### Paddle Craft catalog preflight\n\n%s\n\n%s\n\n%s\n\n- Exit code: `%s` (0 pass · 1 missing/inactive/unreadable · 2 not verified)\n- Workflow run: %s\n' \
+            "$MARKER" "$STATUS" "$TABLE" "$FIX" "${RC:-unknown}" "$RUN_URL")
 
           # Idempotent: patch the existing marker comment rather than stacking.
           EXISTING=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \

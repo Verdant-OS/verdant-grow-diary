@@ -331,12 +331,19 @@ test.describe("Quick Log smoke checklist", () => {
         await expect(page.getByTestId("qlv2-watering-form")).toHaveCount(0);
 
         await openQuickLogDialog(page);
-        const reopenedTargetId = await dialog
-          .getByTestId("quick-log-target-card")
-          .getAttribute("data-target-plant-id");
-        expect(reopenedTargetId).toBe(structuredWaterTargetId);
+        const plantSelect = dialog.getByTestId("quick-log-plant-select");
+        await plantSelect.click();
+        const exactPlantName = page.getByText(TARGET_NAME, { exact: true });
+        const targetOption = page.getByRole("option").filter({ has: exactPlantName });
+        await expect(targetOption).toHaveCount(1);
+        await targetOption.click();
+        await expect
+          .poll(() =>
+            dialog.getByTestId("quick-log-target-card").getAttribute("data-target-plant-id"),
+          )
+          .toBe(structuredWaterTargetId);
         await dialog.getByTestId("quicklog-note").fill("Smoke checklist observation");
-        return "structured sheet closed; observation prepared for the same plant";
+        return "structured sheet closed; target reselected and observation prepared";
       });
 
       await report.run(15, "Save uses displayed target", async () => {

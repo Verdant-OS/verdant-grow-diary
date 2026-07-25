@@ -521,13 +521,20 @@ jobs:
             echo "#### Upload gate"
             echo ""
             if [ "${PW_COUNTS_AVAILABLE}" = "true" ]; then
+              noteworthy=$(( ${PW_FAILED:-0} + ${PW_FLAKY:-0} ))
               echo "| total | passed | failed | flaky | skipped |"
               echo "| ----- | ------ | ------ | ----- | ------- |"
               echo "| ${PW_TOTAL:-?} | ${PW_PASSED:-?} | ${PW_FAILED:-?} | ${PW_FLAKY:-?} | ${PW_SKIPPED:-?} |"
               echo ""
-              echo "**Gate rule:** upload the dedicated artifact only when \`failed + flaky > 0\`. This run: \`${PW_FAILED:-0} + ${PW_FLAKY:-0} = $(( ${PW_FAILED:-0} + ${PW_FLAKY:-0} ))\`."
+              echo "**Gate rule:** upload the dedicated artifact only when \`failed + flaky > 0\`. This run: \`${PW_FAILED:-0} failed + ${PW_FLAKY:-0} flaky = ${noteworthy}\`."
+              echo ""
+              if [ "${noteworthy}" -gt 0 ]; then
+                echo "**Generated from failed/flaky tests?** ✅ Yes — \`playwright-flake-summary.md\` reflects **${PW_FAILED:-0} failed** and **${PW_FLAKY:-0} flaky** test(s). Gate result: **upload** (${noteworthy} > 0)."
+              else
+                echo "**Generated from failed/flaky tests?** ❌ No — \`playwright-flake-summary.md\` was written from a clean run (**0 failed, 0 flaky**). Gate result: **skip upload** (${noteworthy} = 0)."
+              fi
             else
-              echo "_Counts unavailable this run — the gate fell back to file-presence, which uploads unless the report was genuinely missing (see below)._"
+              echo "_Counts unavailable this run — the gate fell back to file-presence, which uploads unless the report was genuinely missing (see below). Cannot determine whether the summary was generated from failed/flaky tests._"
             fi
             echo ""
             if [ "${FLAKE_SUMMARY_PRESENT}" != "true" ]; then

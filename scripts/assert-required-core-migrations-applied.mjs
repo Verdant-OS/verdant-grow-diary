@@ -60,10 +60,7 @@
 import { spawnSync } from "node:child_process";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
-import {
-  REQUIRED_CORE_SCHEMA,
-  schemaKey,
-} from "./required-core-migrations.mjs";
+import { manifestForScope, schemaKey } from "./required-core-migrations.mjs";
 
 const EXIT = Object.freeze({
   OK: 0,
@@ -157,9 +154,22 @@ function writeReport(kind, bodyLines) {
 // flagged rather than dropped. An audit artifact that silently omits the
 // broken entry would report a 4-requirement manifest when 5 were declared,
 // hiding the very entry that blocked the deploy from machine consumers.
+// "core" (blocking) or "pro" (advisory). Selecting the manifest here rather
+// than duplicating the script means the advisory path inherits every property
+// the core path was verified for: privilege independence, the relkind filter,
+// credential-free artifacts, and fail-closed exit codes.
+let MANIFEST;
+try {
+  MANIFEST = manifestForScope(process.env.MANIFEST_SCOPE);
+} catch (err) {
+  console.error(`✗ ${err instanceof Error ? err.message : String(err)}`);
+  console.error("  Set MANIFEST_SCOPE to 'core' or 'pro' (or leave unset for core).");
+  process.exit(EXIT.MALFORMED_MANIFEST);
+}
+
 const expected = [];
 const malformed = [];
-for (const entry of REQUIRED_CORE_SCHEMA) {
+for (const entry of MANIFEST) {
   try {
     expected.push({
       key: schemaKey(entry),
@@ -410,7 +420,7 @@ if (missing.length > 0) {
     ...missing.map(
       (m) =>
         `| \`${m.key}\` | \`supabase/migrations/${m.migration}\` | ${
-          REQUIRED_CORE_SCHEMA.find((e) => e.table === m.table && e.column === m.column)
+          MANIFEST.find((e) => e.table === m.table && e.column === m.column)
             ?.reason ?? ""
         } |`,
     ),

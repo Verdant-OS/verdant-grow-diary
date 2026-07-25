@@ -114,15 +114,6 @@ export const REQUIRED_CORE_SCHEMA = [
   },
   {
     table: "plants",
-    column: "candidate_number",
-    migration: "20260712010343_pheno_candidate_number_foundation.sql",
-    reason:
-      "phenoHuntCandidatesService selects and orders by it, so the Pheno Hunt workspace " +
-      "fails with 'Could not load hunt candidates', and phenoCandidateNumberService's " +
-      "UPDATE fails. Confirmed missing in prod 2026-07-23.",
-  },
-  {
-    table: "plants",
     column: "plant_type",
     migration: "20260722010000_plant_type_column.sql",
     reason:
@@ -136,13 +127,54 @@ export const REQUIRED_CORE_SCHEMA = [
 ];
 
 /**
- * Migration files that must exist on disk. Derived from the schema manifest
- * so the two can never drift: every entry names the migration that supplies
- * it, and that file is asserted present by
- * scripts/assert-required-core-migrations.mjs.
+ * Schema behind PAID / entitlement-gated features. Same shape as
+ * REQUIRED_CORE_SCHEMA, checked by the same script, but reported ADVISORY-only
+ * and never allowed to block a release.
+ *
+ * The distinction is the whole point of the core manifest's criterion #1. A
+ * missing Pro column breaks a paid surface for the growers who bought it —
+ * real, and worth surfacing — but it must not gate an unrelated core release,
+ * because then a core fix waits on an optional paid-feature migration.
+ *
+ * `plants.candidate_number` lives here and NOT in the core manifest: every
+ * Pheno route in App.tsx is wrapped in `PhenoTrackerUpgradeGate`, and the
+ * migration itself states "Pheno candidate numbering is a Pro feature",
+ * enforcing `public.has_pheno_tracker_entitlement`. It was briefly listed as
+ * core by mistake — it had been carried over from notes rather than put
+ * through the same verification as the other entries.
+ */
+export const ADVISORY_PRO_SCHEMA = [
+  {
+    table: "plants",
+    column: "candidate_number",
+    migration: "20260712010343_pheno_candidate_number_foundation.sql",
+    reason:
+      "phenoHuntCandidatesService selects and orders by it, so the Pheno Hunt workspace " +
+      "fails with 'Could not load hunt candidates' and phenoCandidateNumberService's " +
+      "UPDATE fails — for entitled Pro growers only. Confirmed missing in prod 2026-07-23.",
+  },
+];
+
+/**
+ * Manifest selected by the MANIFEST_SCOPE env var: "core" (default, blocking)
+ * or "pro" (advisory). Keeping one script for both means the pro path inherits
+ * every property the core path was verified for — privilege independence, the
+ * relkind filter, credential-free artifacts, fail-closed exits.
+ */
+export function manifestForScope(scope) {
+  if (scope === "pro") return ADVISORY_PRO_SCHEMA;
+  if (!scope || scope === "core") return REQUIRED_CORE_SCHEMA;
+  throw new Error(`Unknown MANIFEST_SCOPE: ${JSON.stringify(scope)} (expected "core" or "pro")`);
+}
+
+/**
+ * Migration files that must exist on disk. Derived from BOTH manifests so the
+ * file-presence check can never drift from what the DB checks reference.
  */
 export const REQUIRED_CORE_MIGRATIONS = [
-  ...new Set(REQUIRED_CORE_SCHEMA.map((e) => e.migration)),
+  ...new Set(
+    [...REQUIRED_CORE_SCHEMA, ...ADVISORY_PRO_SCHEMA].map((e) => e.migration),
+  ),
 ];
 
 /** Postgres identifier shape. Anything else is a manifest bug, not DB drift. */

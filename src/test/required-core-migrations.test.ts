@@ -24,7 +24,9 @@ import { resolve, join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   REQUIRED_CORE_SCHEMA,
+  ADVISORY_PRO_SCHEMA,
   REQUIRED_CORE_MIGRATIONS,
+  manifestForScope,
   schemaKey,
   coreMigrationVersion,
 } from "../../scripts/required-core-migrations.mjs";
@@ -113,6 +115,65 @@ describe("REQUIRED_CORE_SCHEMA manifest", () => {
   });
 });
 
+describe("core vs advisory separation", () => {
+  it("keeps plants.candidate_number OUT of the blocking core manifest", () => {
+    // Every Pheno route is wrapped in PhenoTrackerUpgradeGate and the migration
+    // itself enforces has_pheno_tracker_entitlement, so this column is Pro-gated.
+    // Listing it as core would block an unrelated release on an optional
+    // paid-feature migration — the exact false-positive the criteria forbid.
+    const coreKeys = REQUIRED_CORE_SCHEMA.map(schemaKey);
+    expect(coreKeys).not.toContain("plants.candidate_number");
+  });
+
+  it("still tracks plants.candidate_number as advisory rather than dropping it", () => {
+    // It IS genuinely missing from prod and does break the Pheno workspace for
+    // entitled growers — demoting it must not mean losing the detection.
+    const proKeys = ADVISORY_PRO_SCHEMA.map(schemaKey);
+    expect(proKeys).toContain("plants.candidate_number");
+  });
+
+  it("shares no entries between the core and advisory manifests", () => {
+    const coreKeys = new Set(REQUIRED_CORE_SCHEMA.map(schemaKey));
+    const overlap = ADVISORY_PRO_SCHEMA.map(schemaKey).filter((k) => coreKeys.has(k));
+    expect(overlap).toEqual([]);
+  });
+
+  it("holds advisory entries to the same shape contract as core entries", () => {
+    for (const entry of ADVISORY_PRO_SCHEMA) {
+      expect(schemaKey(entry)).toBe(`${entry.table}.${entry.column}`);
+      expect(entry.migration).toBeTruthy();
+      expect(entry.reason?.trim()).toBeTruthy();
+      expect(existsSync(join(MIGRATIONS_DIR, entry.migration))).toBe(true);
+    }
+  });
+});
+
+describe("manifestForScope()", () => {
+  it("defaults to the blocking core manifest when scope is unset or empty", () => {
+    // An empty env var and an unset one are indistinguishable in shell and
+    // GitHub Actions semantics, so both must land on the SAFE default — the
+    // blocking core manifest. Defaulting the other way (or throwing) would
+    // turn a trivial config slip into either a skipped check or a broken gate.
+    expect(manifestForScope(undefined)).toBe(REQUIRED_CORE_SCHEMA);
+    expect(manifestForScope("")).toBe(REQUIRED_CORE_SCHEMA);
+    expect(manifestForScope("core")).toBe(REQUIRED_CORE_SCHEMA);
+  });
+
+  it("returns the advisory manifest for 'pro'", () => {
+    expect(manifestForScope("pro")).toBe(ADVISORY_PRO_SCHEMA);
+  });
+
+  it("throws on an unknown scope rather than silently checking nothing", () => {
+    // A typo'd scope must not degrade into an empty manifest — that would be a
+    // gate reporting success having verified zero columns. Note 'Core' is
+    // rejected too: scope matching is exact, never case-folded.
+    expect(() => manifestForScope("prod")).toThrow();
+    expect(() => manifestForScope("Core")).toThrow();
+    expect(() => manifestForScope("PRO")).toThrow();
+    expect(() => manifestForScope("sandbox")).toThrow();
+  });
+});
+
 describe("REQUIRED_CORE_MIGRATIONS (derived)", () => {
   it("is de-duplicated even though several columns share one migration", () => {
     expect(new Set(REQUIRED_CORE_MIGRATIONS).size).toBe(
@@ -121,7 +182,9 @@ describe("REQUIRED_CORE_MIGRATIONS (derived)", () => {
   });
 
   it("covers exactly the migrations named by the schema manifest", () => {
-    const fromSchema = new Set(REQUIRED_CORE_SCHEMA.map((e) => e.migration));
+    const fromSchema = new Set(
+      [...REQUIRED_CORE_SCHEMA, ...ADVISORY_PRO_SCHEMA].map((e) => e.migration),
+    );
     expect(new Set(REQUIRED_CORE_MIGRATIONS)).toEqual(fromSchema);
   });
 

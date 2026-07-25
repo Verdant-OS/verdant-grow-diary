@@ -73,15 +73,16 @@ Deno.serve(async (req) => {
     legacyServiceRoleKey: Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? null,
   });
 
-  if (!supabaseUrl || !secretConfiguration.adminKey) {
-    console.error("Missing required environment variables");
-    return jsonResponse({ error: "Server configuration error" }, 500);
-  }
-
   // This endpoint owns a service-role queue write and must never delegate
   // recipient/template authority to an ordinary user JWT. Hosted opaque
   // secrets arrive on `apikey`; the legacy service-role JWT remains accepted
   // on Authorization during migration.
+  //
+  // Authorization is resolved BEFORE the configuration check so an
+  // unauthenticated caller can never distinguish "misconfigured server" from
+  // "wrong credential" — both are a flat 401. With no accepted keys the
+  // comparison matches nothing, so this stays fail-closed rather than
+  // becoming an open relay when the environment is incomplete.
   const authorization = authorizeTransactionalEmailCaller(
     req.headers.get("Authorization"),
     req.headers.get("apikey"),
@@ -89,6 +90,11 @@ Deno.serve(async (req) => {
   );
   if (!authorization.ok) {
     return jsonResponse({ error: "Unauthorized" }, 401);
+  }
+
+  if (!supabaseUrl || !secretConfiguration.adminKey) {
+    console.error("Missing required environment variables");
+    return jsonResponse({ error: "Server configuration error" }, 500);
   }
 
   if (exceedsTransactionalEmailBodyLimit(req.headers.get("content-length"))) {

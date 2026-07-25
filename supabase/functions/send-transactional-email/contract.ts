@@ -47,6 +47,37 @@ function normalizeSecret(value: unknown): string | null {
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
+/**
+ * Positively identify a client-side key so it can never become a send
+ * credential. This enforces the "never reads publishable keys" contract at the
+ * resolver instead of trusting whoever populated the secret map — dropping a
+ * publishable/anon key into SUPABASE_SECRET_KEYS would otherwise reopen the
+ * exact open-relay hole this function exists to close.
+ *
+ * Deliberately conservative: only keys we can POSITIVELY prove are client-side
+ * are rejected. Anything unrecognised is kept, so an unfamiliar-but-valid
+ * credential format can never silently break transactional email (including
+ * the payments-webhook purchase receipt).
+ */
+function isClientSideKey(value: string): boolean {
+  // Hosted opaque publishable keys are prefix-identifiable.
+  if (value.startsWith("sb_publishable_")) return true;
+
+  // Legacy JWTs carry their role in the payload. Reject anon explicitly;
+  // service_role (and anything undecodable) is left alone.
+  const segments = value.split(".");
+  if (segments.length !== 3) return false;
+  try {
+    const payload = segments[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = payload.padEnd(payload.length + ((4 - (payload.length % 4)) % 4), "=");
+    const decoded: unknown = JSON.parse(atob(padded));
+    const role = (decoded as { role?: unknown } | null)?.role;
+    return role === "anon";
+  } catch {
+    return false;
+  }
+}
+
 function readNamedSecrets(rawValue: string | null): {
   defaultKey: string | null;
   keys: string[];
@@ -85,7 +116,7 @@ export function resolveTransactionalEmailSecrets(input: {
   const legacy = normalizeSecret(input.legacyServiceRoleKey);
   const acceptedKeys = Array.from(
     new Set([...named.keys, single, legacy].filter((value): value is string => value !== null)),
-  );
+  ).filter((value) => !isClientSideKey(value));
 
   return {
     acceptedKeys,

@@ -69,17 +69,27 @@ describe("useGoogleAnalyticsPageViews — gtag behavior", () => {
     }
   });
 
-  it("calls gtag config with the measurement ID when gtag is present", () => {
+  // index.html bootstraps the tag with `send_page_view: false`, and settings
+  // passed to `config` persist for that measurement id — so a repeat `config`
+  // call is not a reliable way to emit a view. Regression guard for a change
+  // that would have taken the whole property dark with a green suite.
+  it("sends an explicit page_view event, not a repeat config call", () => {
     const wrapper = ({ children }: { children: React.ReactNode }) =>
       React.createElement(MemoryRouter, { initialEntries: ["/dashboard"] }, children);
 
     renderHook(() => useGoogleAnalyticsPageViews(), { wrapper });
 
-    expect(gtagMock).toHaveBeenCalledWith("config", GOOGLE_ANALYTICS_MEASUREMENT_ID, {
+    expect(gtagMock).toHaveBeenCalledWith("event", "page_view", {
+      send_to: GOOGLE_ANALYTICS_MEASUREMENT_ID,
       page_path: "/dashboard",
       page_location: `${window.location.origin}/dashboard`,
       page_title: "Test Title",
     });
+    expect(gtagMock).not.toHaveBeenCalledWith(
+      "config",
+      GOOGLE_ANALYTICS_MEASUREMENT_ID,
+      expect.anything(),
+    );
   });
 
   it("sanitizes UUIDs before sending to gtag", () => {
@@ -89,7 +99,8 @@ describe("useGoogleAnalyticsPageViews — gtag behavior", () => {
 
     renderHook(() => useGoogleAnalyticsPageViews(), { wrapper });
 
-    expect(gtagMock).toHaveBeenCalledWith("config", GOOGLE_ANALYTICS_MEASUREMENT_ID, {
+    expect(gtagMock).toHaveBeenCalledWith("event", "page_view", {
+      send_to: GOOGLE_ANALYTICS_MEASUREMENT_ID,
       page_path: "/plants/:id",
       page_location: `${window.location.origin}/plants/:id`,
       page_title: "Test Title",
@@ -110,7 +121,8 @@ describe("useGoogleAnalyticsPageViews — gtag behavior", () => {
 
     renderHook(() => useGoogleAnalyticsPageViews(), { wrapper });
 
-    expect(gtagMock).toHaveBeenCalledWith("config", GOOGLE_ANALYTICS_MEASUREMENT_ID, {
+    expect(gtagMock).toHaveBeenCalledWith("event", "page_view", {
+      send_to: GOOGLE_ANALYTICS_MEASUREMENT_ID,
       page_path: "/auth",
       page_location: `${window.location.origin}/auth`,
       page_title: "Test Title",

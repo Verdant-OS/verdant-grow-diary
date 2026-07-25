@@ -41,6 +41,50 @@ describe("transactional email trust boundary", () => {
     });
   });
 
+  it("never accepts a publishable or anon key as a send credential", () => {
+    // A client-side key landing in the secret map would reopen the open-relay
+    // hole this endpoint exists to close, so the resolver drops it rather than
+    // trusting whoever populated the map.
+    const anonJwt = `header.${Buffer.from(JSON.stringify({ role: "anon" })).toString("base64url")}.sig`;
+    const serviceJwt = `header.${Buffer.from(JSON.stringify({ role: "service_role" })).toString("base64url")}.sig`;
+
+    const resolved = resolveTransactionalEmailSecrets({
+      namedSecretKeysJson: JSON.stringify({
+        default: "sb_secret_default",
+        leaked: "sb_publishable_oops",
+        alsoLeaked: anonJwt,
+      }),
+      singleSecretKey: null,
+      legacyServiceRoleKey: serviceJwt,
+    });
+
+    expect(resolved.acceptedKeys).not.toContain("sb_publishable_oops");
+    expect(resolved.acceptedKeys).not.toContain(anonJwt);
+    // The legitimate credentials survive — this must not break receipts.
+    expect(resolved.acceptedKeys).toContain("sb_secret_default");
+    expect(resolved.acceptedKeys).toContain(serviceJwt);
+
+    // And an unrecognised format is kept, never silently dropped.
+    expect(
+      resolveTransactionalEmailSecrets({
+        namedSecretKeysJson: null,
+        singleSecretKey: "some-unfamiliar-but-valid-secret",
+        legacyServiceRoleKey: null,
+      }).acceptedKeys,
+    ).toEqual(["some-unfamiliar-but-valid-secret"]);
+  });
+
+  it("answers 401 before disclosing server configuration state", () => {
+    // An unauthenticated caller must not be able to distinguish "misconfigured"
+    // from "wrong credential"; the auth gate runs first.
+    const source = read("supabase/functions/send-transactional-email/index.ts");
+    const authorizationIndex = source.indexOf("authorizeTransactionalEmailCaller(");
+    const configErrorIndex = source.indexOf("Server configuration error");
+
+    expect(authorizationIndex).toBeGreaterThan(0);
+    expect(configErrorIndex).toBeGreaterThan(authorizationIndex);
+  });
+
   it("keeps the queue endpoint server-only before parsing caller-controlled fields", () => {
     const source = read("supabase/functions/send-transactional-email/index.ts");
     const authorizationIndex = source.indexOf("authorizeTransactionalEmailCaller(");

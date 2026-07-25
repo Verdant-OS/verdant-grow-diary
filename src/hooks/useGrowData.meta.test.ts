@@ -169,8 +169,16 @@ describe("combineGrowDataMeta", () => {
   // record source as "Demo", so a plain "no tent yet" state was mislabeled
   // as simulated data.
   it("REGRESSION: real + unavailable (no mock) stays real, never mixed/demo", () => {
-    const real = { isDemoData: false, dataSource: "supabase" as const, sourceReason: "supabase:rows" };
-    const unavailable = { isDemoData: false, dataSource: "unavailable" as const, sourceReason: "no-data" };
+    const real = {
+      isDemoData: false,
+      dataSource: "supabase" as const,
+      sourceReason: "supabase:rows",
+    };
+    const unavailable = {
+      isDemoData: false,
+      dataSource: "unavailable" as const,
+      sourceReason: "no-data",
+    };
 
     const combined = combineGrowDataMeta([real, unavailable]);
     expect(combined.dataSource).toBe("supabase");
@@ -191,6 +199,79 @@ describe("combineGrowDataMeta", () => {
     ]);
     expect(out.dataSource).toBe("mixed");
     expect(out.isDemoData).toBe(true);
+  });
+
+  it("preserves nested mixed live/manual provenance when combined with Supabase", () => {
+    const live = {
+      isDemoData: false,
+      dataSource: "supabase" as const,
+      sourceReason: "supabase:rows",
+    };
+    const liveAndManual = {
+      isDemoData: false,
+      dataSource: "mixed" as const,
+      sourceReason: "mixed:live-and-manual",
+    };
+
+    expect(combineGrowDataMeta([live, liveAndManual])).toEqual({
+      isDemoData: false,
+      dataSource: "mixed",
+      sourceReason: "mixed:preserved",
+    });
+  });
+
+  it("never erases explicit demo truth when unavailable and Supabase metas combine", () => {
+    const live = {
+      isDemoData: false,
+      dataSource: "supabase" as const,
+      sourceReason: "supabase:rows",
+    };
+    const demoMarkedUnavailable = {
+      isDemoData: true,
+      dataSource: "unavailable" as const,
+      sourceReason: "demo:unavailable",
+    };
+
+    expect(combineGrowDataMeta([live, demoMarkedUnavailable])).toEqual({
+      isDemoData: true,
+      dataSource: "mixed",
+      sourceReason: "mixed:real-and-demo",
+    });
+  });
+
+  it("keeps pure Supabase metadata real and non-demo", () => {
+    const live = {
+      isDemoData: false,
+      dataSource: "supabase" as const,
+      sourceReason: "supabase:rows",
+    };
+
+    expect(combineGrowDataMeta([live, { ...live }])).toEqual(live);
+  });
+
+  it("is order-invariant for nested mixed and explicit demo provenance", () => {
+    const live = {
+      isDemoData: false,
+      dataSource: "supabase" as const,
+      sourceReason: "supabase:rows",
+    };
+    const liveAndManual = {
+      isDemoData: false,
+      dataSource: "mixed" as const,
+      sourceReason: "mixed:live-and-manual",
+    };
+    const demoMarkedUnavailable = {
+      isDemoData: true,
+      dataSource: "unavailable" as const,
+      sourceReason: "demo:unavailable",
+    };
+
+    expect(combineGrowDataMeta([live, liveAndManual])).toEqual(
+      combineGrowDataMeta([liveAndManual, live]),
+    );
+    expect(combineGrowDataMeta([live, demoMarkedUnavailable])).toEqual(
+      combineGrowDataMeta([demoMarkedUnavailable, live]),
+    );
   });
 
   it("reports unavailable when nothing real or mock is present", () => {

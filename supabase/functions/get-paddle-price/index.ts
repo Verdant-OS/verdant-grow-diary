@@ -64,6 +64,53 @@ function json(status: number, body: Record<string, unknown>): Response {
   });
 }
 
+/**
+ * Structured, non-sensitive diagnostic log for catalog-unavailable branches.
+ * Emits ONLY: plan id (allowlist enum), sanitized reason code, resolved
+ * server environment, and whether the corresponding PADDLE_PRICE_* env var
+ * is configured for that plan. Never logs: user id, JWT, gateway response
+ * body, Paddle IDs, request headers, or any key material. Written to stderr
+ * as a single JSON line so it is greppable in edge function logs without
+ * being surfaced in any user-facing response.
+ */
+function logCatalogUnavailable(fields: {
+  plan: string;
+  reason:
+    | "unknown_plan"
+    | "price_not_configured"
+    | "price_resolution_unavailable"
+    | "plan_sold_out"
+    | "auth_required"
+    | "method_not_allowed"
+    | "internal_error";
+  environment?: "sandbox" | "live";
+  envVarConfigured?: boolean;
+  stage:
+    | "auth"
+    | "method"
+    | "allowlist"
+    | "founder_cap"
+    | "gateway"
+    | "gateway_body"
+    | "config_drift"
+    | "exception";
+}): void {
+  try {
+    console.warn(
+      JSON.stringify({
+        event: "get_paddle_price_catalog_unavailable",
+        plan: fields.plan || "(none)",
+        reason: fields.reason,
+        environment: fields.environment ?? "(unresolved)",
+        env_var_configured: fields.envVarConfigured ?? null,
+        stage: fields.stage,
+      }),
+    );
+  } catch {
+    // Telemetry must never break the resolver.
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });

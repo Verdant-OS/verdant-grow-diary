@@ -69,8 +69,7 @@ export default function PostGrowLearningReport() {
     loading: entitlementLoading,
     lookupFailed: clientLookupFailed,
   } = useMyEntitlements();
-  const clientIsPremium =
-    !clientLookupFailed && canUseCapability(entitlement, "advancedExports");
+  const clientIsPremium = !clientLookupFailed && canUseCapability(entitlement, "advancedExports");
   const [gateStatus, setGateStatus] = useState<"loading" | "allowed" | "denied" | "error">(
     "loading",
   );
@@ -138,8 +137,8 @@ export default function PostGrowLearningReport() {
           className="text-sm text-muted-foreground mb-4"
           data-testid="post-grow-report-gate-message"
         >
-          The report entitlement check did not complete. Nothing was generated. Try the check
-          again in a moment.
+          The report entitlement check did not complete. Nothing was generated. Try the check again
+          in a moment.
         </p>
         <Button
           type="button"

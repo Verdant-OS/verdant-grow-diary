@@ -251,33 +251,17 @@ jobs:
       - name: Bootstrap disposable E2E fixture
         id: bootstrap_fixture
         if: steps.e2e_config.outputs.should_run == 'true' && vars.E2E_ALLOW_FIXTURE_BOOTSTRAP == 'true'
-        shell: bash
-        run: |
-          # Tee combined stdout/stderr to a per-step log so the failure-debug
-          # summary can surface the last N lines under the failing step name.
-          # `set -o pipefail` ensures the real exit code propagates through tee.
-          set -o pipefail
-          mkdir -p e2e/results/step-logs
-          bun run e2e:bootstrap-fixture 2>&1 | tee e2e/results/step-logs/bootstrap_fixture.log
+        run: bun run e2e:bootstrap-fixture
 
       - name: Verify disposable E2E fixture
         id: verify_fixture
         if: steps.e2e_config.outputs.should_run == 'true'
-        shell: bash
-        run: |
-          set -o pipefail
-          mkdir -p e2e/results/step-logs
-          bun run e2e:verify-fixture 2>&1 | tee e2e/results/step-logs/verify_fixture.log
+        run: bun run e2e:verify-fixture
 
       - name: Run Quick Log Playwright smoke
         id: quicklog_smoke
         if: steps.e2e_config.outputs.should_run == 'true' && steps.verify_fixture.outcome == 'success'
-        shell: bash
-        run: |
-          set -o pipefail
-          mkdir -p e2e/results/step-logs
-          bun run e2e:quicklog-smoke 2>&1 | tee e2e/results/step-logs/quicklog_smoke.log
-
+        run: bun run e2e:quicklog-smoke
 
       - name: Verify Quick Log smoke artifacts
         if: always() && steps.e2e_config.outputs.should_run == 'true'
@@ -317,222 +301,40 @@ jobs:
 
           exit "$status"
 
-      - name: Summarize failing step + log tail in Job Summary
-        id: failure_debug_summary
+      - name: Summarize failed step metadata in Job Summary
         if: failure()
         shell: bash
         env:
           BOOTSTRAP_FIXTURE_OUTCOME: ${{ steps.bootstrap_fixture.outcome }}
           VERIFY_FIXTURE_OUTCOME: ${{ steps.verify_fixture.outcome }}
           QUICKLOG_SMOKE_OUTCOME: ${{ steps.quicklog_smoke.outcome }}
-          E2E_SHOULD_RUN: ${{ steps.e2e_config.outputs.should_run }}
         run: |
-          # Emits a compact failure section at the top of the Job Summary that
-          # names the failing step (from the known set of tracked step IDs) and
-          # tails the most relevant log artifacts. Also writes the exact same
-          # markdown to e2e/results/quicklog-failure-debug.md so it can be
-          # uploaded as a standalone downloadable artifact. Never echoes secret
-          # values. Tail sizes are capped so the summary stays inside the 1 MiB
-          # GITHUB_STEP_SUMMARY budget even on long failures.
-          set +e
-
-          # Each tracked step tees its combined stdout/stderr to
-          # e2e/results/step-logs/<step_id>.log. When a step fails, we surface
-          # the last 50 lines of its log immediately under the step name so the
-          # first thing a reader sees in the Job Summary is the actual output
-          # that produced the failure.
-          declare -a FAILED_STEPS=()
-          declare -a FAILED_LOGS=()
-          add_failed() {
-            local label="$1"
-            local outcome="$2"
-            local log_path="$3"
-            if [ "${outcome}" = "failure" ]; then
-              FAILED_STEPS+=("${label} (outcome: ${outcome})")
-              FAILED_LOGS+=("${log_path}")
-            fi
-          }
-          add_failed "Bootstrap E2E fixture (\`bootstrap_fixture\`)" "${BOOTSTRAP_FIXTURE_OUTCOME}" "e2e/results/step-logs/bootstrap_fixture.log"
-          add_failed "Verify E2E fixture (\`verify_fixture\`)" "${VERIFY_FIXTURE_OUTCOME}" "e2e/results/step-logs/verify_fixture.log"
-          add_failed "Run Quick Log Playwright smoke (\`quicklog_smoke\`)" "${QUICKLOG_SMOKE_OUTCOME}" "e2e/results/step-logs/quicklog_smoke.log"
-
           RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           ATTEMPT_URL="${RUN_URL}/attempts/${GITHUB_RUN_ATTEMPT}"
-          JOB_URL="${RUN_URL}/job/${GITHUB_JOB}"
-
-          mkdir -p e2e/results
-          DEBUG_MD="e2e/results/quicklog-failure-debug.md"
-          : > "${DEBUG_MD}"
-
-          # Emit the last N lines of a per-step log inline under the step name.
-          # Cap at 12 KiB after the tail to keep the summary well under 1 MiB.
-          emit_step_log_tail() {
-            local log_path="$1"
-            local lines="${2:-50}"
-            if [ ! -f "${log_path}" ]; then
-              echo "  - _No captured log at \`${log_path}\` — the step failed before producing any output (or was skipped)._"
-              return
-            fi
-            local size
-            size="$(wc -c < "${log_path}" 2>/dev/null | tr -d ' \r\n')"
-            if [ -z "${size}" ] || [ "${size}" = "0" ]; then
-              echo "  - _Captured log at \`${log_path}\` is empty (0 bytes)._"
-              return
-            fi
-            echo ""
-            echo "  <details open><summary>Last ${lines} lines of <code>${log_path}</code> (${size} bytes total)</summary>"
-            echo ""
-            echo '  ```text'
-            tail -n "${lines}" "${log_path}" 2>/dev/null | head -c 12288 | sed 's/^/  /'
-            echo ""
-            echo '  ```'
-            echo ""
-            echo "  </details>"
-          }
-
-          {
-            echo ""
-            echo "## ❌ Job failed — quick debug info"
-            echo ""
-            echo "**Workflow:** \`${GITHUB_WORKFLOW}\` · **Run:** [#${GITHUB_RUN_NUMBER} attempt ${GITHUB_RUN_ATTEMPT}](${ATTEMPT_URL}) · **Job:** [\`${GITHUB_JOB}\`](${JOB_URL})"
-            echo ""
-            echo "### Failing step"
-            echo ""
-            if [ "${#FAILED_STEPS[@]}" -eq 0 ]; then
-              echo "_None of the tracked step IDs (\`bootstrap_fixture\`, \`verify_fixture\`, \`quicklog_smoke\`) reported \`outcome: failure\` at the point this summary ran. The failure is likely in an earlier setup step (checkout, dependency install, secret verification) or a later post-smoke step. Open the [job logs](${JOB_URL}) and look for the first red ✗ step._"
-            else
-              for i in "${!FAILED_STEPS[@]}"; do
-                echo "- ${FAILED_STEPS[$i]}"
-                emit_step_log_tail "${FAILED_LOGS[$i]}" 50
-              done
-            fi
-            echo ""
-
-
-            tail_file() {
-              local path="$1"
-              local label="$2"
-              local lines="${3:-80}"
-              if [ ! -f "${path}" ]; then
-                return 1
-              fi
-              local size
-              size="$(wc -c < "${path}" 2>/dev/null | tr -d ' \r\n')"
-              if [ -z "${size}" ] || [ "${size}" = "0" ]; then
-                return 1
-              fi
-              echo ""
-              echo "### 📄 ${label}"
-              echo ""
-              echo "\`${path}\` (${size} bytes) — last ${lines} lines:"
-              echo ""
-              echo '```text'
-              # Cap tail at 8 KiB to keep the Job Summary well under the 1 MiB budget.
-              tail -n "${lines}" "${path}" 2>/dev/null | head -c 8192
-              echo ""
-              echo '```'
-              return 0
-            }
-
-            emitted_log=0
-            if tail_file "e2e/results/quicklog-smoke-report.txt" "Quick Log smoke report (text)" 120; then
-              emitted_log=1
-            fi
-
-            # Playwright writes an error-context.md next to each failing test's
-            # trace under test-results/<test-folder>/. Surface up to 3 of them
-            # so the summary stays bounded. Each excerpt gets a stable HTML
-            # anchor (ectx-1, ectx-2, ...) so the follow-up step (which runs
-            # after the smoke bundle is uploaded and therefore knows the
-            # artifact URL) can link both back to the inline excerpt on this
-            # same page AND out to the downloadable bundle at the exact
-            # archive-relative path.
-            #
-            # We also persist the archive-relative paths to
-            # e2e/results/error-context-paths.txt so the follow-up step can
-            # rebuild the same list without re-globbing (test-results/ may be
-            # mutated by later steps).
-            ECTX_INDEX="e2e/results/error-context-paths.txt"
-            : > "${ECTX_INDEX}"
-            if [ -d "test-results" ]; then
-              # shellcheck disable=SC2044
-              mapfile -t error_contexts < <(find test-results -maxdepth 4 -type f -name 'error-context.md' 2>/dev/null | sort | head -n 3)
-              ectx_n=0
-              for ctx in "${error_contexts[@]}"; do
-                ectx_n=$((ectx_n + 1))
-                anchor="ectx-${ectx_n}"
-                rel_dir="$(dirname "${ctx}" | sed 's|^test-results/||')"
-                # Persist "<anchor>\t<repo-relative path>" for the follow-up step.
-                printf '%s\t%s\n' "${anchor}" "${ctx}" >> "${ECTX_INDEX}"
-                # Emit the anchor immediately before the heading so
-                # `#ectx-N` links land on this excerpt.
-                echo ""
-                echo "<a id=\"${anchor}\"></a>"
-                if tail_file "${ctx}" "Playwright error context ${ectx_n} — \`${rel_dir}\`" 60; then
-                  emitted_log=1
-                fi
-              done
-            fi
-
-
-            if [ "${emitted_log}" -eq 0 ]; then
-              echo ""
-              echo "### 📄 No log tail available"
-              echo ""
-              echo "_Neither \`e2e/results/quicklog-smoke-report.txt\` nor any \`test-results/**/error-context.md\` was present at failure time. The failure happened before Playwright wrote its reports — see the [full job logs](${JOB_URL}) for the earlier step's output._"
-            fi
-
-            echo ""
-            echo "_Full step-by-step output: [job \`${GITHUB_JOB}\`](${JOB_URL}) · [run attempt ${GITHUB_RUN_ATTEMPT}](${ATTEMPT_URL})_"
-            echo ""
-          } | tee -a "${DEBUG_MD}" >> "$GITHUB_STEP_SUMMARY"
-
-          # Expose presence + size for the upload/link steps below.
-          if [ -s "${DEBUG_MD}" ]; then
-            debug_size="$(wc -c < "${DEBUG_MD}" 2>/dev/null | tr -d ' \r\n')"
-            echo "present=true" >> "$GITHUB_OUTPUT"
-            echo "path=${DEBUG_MD}" >> "$GITHUB_OUTPUT"
-            echo "size=${debug_size}" >> "$GITHUB_OUTPUT"
-          else
-            echo "present=false" >> "$GITHUB_OUTPUT"
+          failed_step="untracked setup or post-smoke step"
+          failed_outcome="failure"
+          if [ "${BOOTSTRAP_FIXTURE_OUTCOME}" = "failure" ]; then
+            failed_step="Bootstrap disposable E2E fixture"
+            failed_outcome="${BOOTSTRAP_FIXTURE_OUTCOME}"
+          elif [ "${VERIFY_FIXTURE_OUTCOME}" = "failure" ]; then
+            failed_step="Verify disposable E2E fixture"
+            failed_outcome="${VERIFY_FIXTURE_OUTCOME}"
+          elif [ "${QUICKLOG_SMOKE_OUTCOME}" = "failure" ]; then
+            failed_step="Run Quick Log Playwright smoke"
+            failed_outcome="${QUICKLOG_SMOKE_OUTCOME}"
           fi
-
-          # This step is diagnostic only — never mask the real failure.
-          exit 0
-
-      - name: Upload quick failure debug info
-        id: upload_failure_debug_summary
-        if: failure() && steps.failure_debug_summary.outputs.present == 'true'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: quicklog-failure-debug-${{ env.ARTIFACT_SUFFIX }}
-          path: e2e/results/quicklog-failure-debug.md
-          if-no-files-found: warn
-          retention-days: 30
-
-      - name: Link quick failure debug artifact in Job Summary
-        if: failure() && steps.failure_debug_summary.outputs.present == 'true'
-        shell: bash
-        env:
-          DEBUG_URL: ${{ steps.upload_failure_debug_summary.outputs.artifact-url }}
-          DEBUG_SIZE: ${{ steps.failure_debug_summary.outputs.size }}
-        run: |
-          RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           {
             echo ""
-            echo "### 📥 Quick debug info — downloadable artifact"
+            echo "## ❌ Quick Log smoke failed"
             echo ""
-            if [ -n "${DEBUG_URL}" ]; then
-              echo "> ✅ **Uploaded:** [\`quicklog-failure-debug-${ARTIFACT_SUFFIX}\`](${DEBUG_URL}) (${DEBUG_SIZE} bytes) — a single \`quicklog-failure-debug.md\` file containing the exact markdown shown in the failure section above, for archiving or sharing outside the GitHub UI."
-            else
-              echo "> ⚠️ **Upload completed but no artifact URL was exposed to this Job Summary.** Open this run's **Artifacts** dropdown at the top of [the run page](${RUN_URL}) and download \`quicklog-failure-debug-${ARTIFACT_SUFFIX}\` manually."
-            fi
+            echo "- Workflow: \`${GITHUB_WORKFLOW}\`"
+            echo "- Run: [#${GITHUB_RUN_NUMBER} attempt ${GITHUB_RUN_ATTEMPT}](${ATTEMPT_URL})"
+            echo "- Failed step: \`${failed_step}\`"
+            echo "- Outcome: \`${failed_outcome}\`"
+            echo ""
+            echo "Open the [run-attempt logs](${ATTEMPT_URL}) for the masked command output. Raw logs, smoke-report contents, and Playwright DOM context are not copied into this summary or retained in a diagnostic artifact."
             echo ""
           } >> "$GITHUB_STEP_SUMMARY"
-
-
-
-
 
       - name: Capture Quick Log smoke metadata
         id: smoke_meta
@@ -1050,58 +852,6 @@ jobs:
             e2e/results/playwright-flake-summary.md
             playwright-report/
 
-      # After the smoke bundle is uploaded, emit direct links back to every
-      # `test-results/**/error-context.md` file that the failure-debug section
-      # excerpted inline. GitHub artifact URLs point at the whole zip, so each
-      # row provides: (1) the exact archive-relative path to unzip, (2) a
-      # "Download bundle" link scoped to the smoke bundle artifact, and
-      # (3) a "Jump to inline excerpt" link that uses the stable `#ectx-N`
-      # anchor emitted earlier in the same Job Summary. This makes clicking a
-      # referenced error-context land on either the exact inline tail or the
-      # exact file inside the downloadable bundle. Runs only when the failure
-      # section actually recorded any error-context files.
-      - name: Link error-context files in Job Summary
-        if: failure() && steps.failure_debug_summary.outputs.present == 'true'
-        shell: bash
-        env:
-          SMOKE_BUNDLE_URL: ${{ steps.upload_smoke_bundle.outputs.artifact-url }}
-          ARTIFACT_SUFFIX: ${{ env.ARTIFACT_SUFFIX }}
-        run: |
-          set +e
-          INDEX="e2e/results/error-context-paths.txt"
-          if [ ! -s "${INDEX}" ]; then
-            # Nothing to link — either no error-context.md files were present
-            # at failure time, or the failure-debug step didn't run. Stay
-            # silent rather than adding an empty section.
-            exit 0
-          fi
-          {
-            echo ""
-            echo "### 🔗 Error-context files — direct links"
-            echo ""
-            echo "Each row corresponds to a \`test-results/**/error-context.md\` excerpt shown inline in the **❌ Job failed — quick debug info** section above. Clicking **Jump to excerpt** scrolls to the tail on this page; **Download bundle** downloads the smoke bundle zip containing the file at the exact archive-relative path shown."
-            echo ""
-            echo "| # | Archive path (inside \`quicklog-smoke-artifacts-${ARTIFACT_SUFFIX}.zip\`) | Jump to excerpt | Download bundle |"
-            echo "| - | --- | --- | --- |"
-            while IFS=$'\t' read -r anchor rel_path; do
-              [ -z "${anchor}" ] && continue
-              n="${anchor#ectx-}"
-              if [ -n "${SMOKE_BUNDLE_URL}" ]; then
-                dl="[Download](${SMOKE_BUNDLE_URL})"
-              else
-                dl="_bundle URL unavailable — see Artifacts dropdown_"
-              fi
-              printf '| %s | `%s` | [Jump to excerpt](#%s) | %s |\n' \
-                "${n}" "${rel_path}" "${anchor}" "${dl}"
-            done < "${INDEX}"
-            echo ""
-            echo "> After downloading the bundle, extract it and open the archive path shown above. Example: \`unzip quicklog-smoke-artifacts-${ARTIFACT_SUFFIX}.zip\` then open the file at the listed path in any Markdown viewer."
-            echo ""
-          } >> "$GITHUB_STEP_SUMMARY"
-          exit 0
-
-
-
       # Consolidated at-a-glance index of the three primary uploads for this
       # run (smoke bundle, standalone flake summary, standalone Playwright
       # HTML report) so a reviewer can grab any of them from one place
@@ -1147,18 +897,17 @@ jobs:
             echo ""
             echo "| Artifact name | Contents | Download |"
             echo "| ------------- | -------- | -------- |"
-            echo "| \`quicklog-smoke-artifacts-${ARTIFACT_SUFFIX}\` | Full smoke bundle: \`quicklog-smoke-report.{json,txt}\`, \`playwright-report.json\`, \`playwright-flake-summary.md\`, \`playwright-report/\` (HTML), \`test-results/\` | ${smoke_link} |"
+            echo "| \`quicklog-smoke-artifacts-${ARTIFACT_SUFFIX}\` | Smoke bundle: \`quicklog-smoke-report.{json,txt}\`, \`playwright-report.json\`, \`playwright-flake-summary.md\`, \`playwright-report/\` (HTML) | ${smoke_link} |"
             echo "| \`quicklog-flake-summary-${ARTIFACT_SUFFIX}\` | Single file: \`playwright-flake-summary.md\` (uploaded only when \`failed + flaky > 0\`) | ${flake_link} |"
             echo "| \`quicklog-playwright-report-${ARTIFACT_SUFFIX}\` | Standalone \`playwright-report/\` (unzip and open \`index.html\`) | ${html_link} |"
             echo ""
           } >> "$GITHUB_STEP_SUMMARY"
 
-
       # Follow-up to the pinned "🧭 Playwright HTML report" section at the
       # top of the Job Summary: the same `playwright-report/` tree is also
       # packaged inside the `quicklog-smoke-artifacts` bundle. Surface that
       # copy's artifact URL too so reviewers who already downloaded the
-      # bundle for other files (JSON report, TXT report, test-results/)
+      # bundle for other files (JSON report, TXT report, flake summary)
       # don't need to grab the standalone HTML report artifact separately.
       # `upload-artifact@v4`'s `artifact-url` output is only populated after
       # the upload step runs, so this must live immediately after
@@ -1180,29 +929,48 @@ jobs:
               echo ""
               echo "- [\`quicklog-smoke-artifacts\`](${SMOKE_BUNDLE_URL}) — unzip and open \`playwright-report/index.html\`"
               echo ""
-              echo "_Prefer the pinned [\`quicklog-playwright-report\`](#user-content-playwright-html-report) artifact at the top of this summary if you only need the HTML report; use this bundle when you also want the JSON/TXT reports, the flake summary markdown, or \`test-results/\`._"
+              echo "_Prefer the pinned [\`quicklog-playwright-report\`](#user-content-playwright-html-report) artifact at the top of this summary if you only need the HTML report; use this bundle when you also want the JSON/TXT reports or the flake summary markdown._"
             else
               echo "**Status:** _Smoke bundle artifact URL unavailable — check the run's Artifacts dropdown for \`quicklog-smoke-artifacts\` and open \`playwright-report/index.html\` inside it._"
             fi
             echo ""
           } >> "$GITHUB_STEP_SUMMARY"
 
-# Moved: Upload Playwright HTML report + Link in Job Summary now run
-# earlier (right before "Summarize Playwright flakes") so the HTML report
-# link is the FIRST section written to $GITHUB_STEP_SUMMARY and is
-# immediately visible at the top of the run's summary. $GITHUB_STEP_SUMMARY
-# is append-only, so ordering is controlled purely by step execution order.
-# Downstream steps that reference steps.upload_playwright_report.outputs.artifact-url
-# still resolve because those steps run after the moved position.
+      # Moved: Upload Playwright HTML report + Link in Job Summary now run
+      # earlier (right before "Summarize Playwright flakes") so the HTML report
+      # link is the FIRST section written to $GITHUB_STEP_SUMMARY and is
+      # immediately visible at the top of the run's summary. $GITHUB_STEP_SUMMARY
+      # is append-only, so ordering is controlled purely by step execution order.
+      # Downstream steps that reference steps.upload_playwright_report.outputs.artifact-url
+      # still resolve because those steps run after the moved position.
+
+      - name: Detect Playwright trace files
+        id: trace_files
+        if: always() && steps.e2e_config.outputs.should_run == 'true'
+        shell: bash
+        run: |
+          count=0
+          if [ -d "test-results" ]; then
+            count="$(find test-results -type f -name 'trace.zip' -print 2>/dev/null | wc -l | tr -d ' ')"
+          fi
+          echo "count=${count}" >> "$GITHUB_OUTPUT"
+          if [ "${count}" -gt 0 ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Upload Playwright traces
         id: upload_playwright_traces
-        if: always() && steps.e2e_config.outputs.should_run == 'true'
+        if: >-
+          always()
+          && steps.e2e_config.outputs.should_run == 'true'
+          && steps.trace_files.outputs.present == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: quicklog-playwright-traces-${{ env.ARTIFACT_SUFFIX }}
           path: |
-            test-results/**/*.zip
+            test-results/**/trace.zip
           retention-days: 30
           if-no-files-found: warn
 
@@ -1240,7 +1008,7 @@ jobs:
             flake_line="| \`playwright-flake-summary.md\` | ${flake_hr} (${flake_bytes} bytes) | \`${flake_sha}\` |"
           fi
 
-          # Playwright traces artifact = every test-results/**/*.zip. Report
+          # Playwright traces artifact = every test-results/**/trace.zip. Report
           # per-file rows (bounded to 25 to stay well under the 1 MiB
           # $GITHUB_STEP_SUMMARY cap) plus totals + a manifest checksum that
           # covers every trace zip, so tampering with any single trace is
@@ -1249,8 +1017,8 @@ jobs:
           trace_total_bytes=0
           trace_file_count=0
           trace_manifest_sha=""
-          if compgen -G "test-results/**/*.zip" > /dev/null 2>&1 || \
-             find test-results -type f -name '*.zip' -print -quit 2>/dev/null | grep -q .; then
+          if compgen -G "test-results/**/trace.zip" > /dev/null 2>&1 || \
+             find test-results -type f -name 'trace.zip' -print -quit 2>/dev/null | grep -q .; then
             tmp_manifest="$(mktemp)"
             # Deterministic ordering so the manifest checksum is reproducible.
             while IFS= read -r -d '' f; do
@@ -1259,7 +1027,7 @@ jobs:
               trace_total_bytes=$((trace_total_bytes + bytes))
               trace_file_count=$((trace_file_count + 1))
               printf '%s  %s  %s\n' "$sha" "$bytes" "$f" >> "$tmp_manifest"
-            done < <(find test-results -type f -name '*.zip' -print0 | sort -z)
+            done < <(find test-results -type f -name 'trace.zip' -print0 | sort -z)
             trace_manifest_sha=$(sha256sum "$tmp_manifest" | awk '{print $1}')
             # Cap displayed rows so a run with hundreds of trace zips doesn't
             # overflow the Job Summary size cap. Full manifest is still
@@ -1298,96 +1066,46 @@ jobs:
               echo "|------|------|---------|"
               echo "${trace_rows}"
             else
-              echo "_No \`test-results/**/*.zip\` files were produced for this run — nothing to checksum._"
+              echo "_No \`test-results/**/trace.zip\` files were produced for this run — nothing to checksum._"
             fi
             echo ""
           } >> "$GITHUB_STEP_SUMMARY"
 
-
-
-      # Enrichment only — never fails the job. Emits a trace-viewer link into
-      # $GITHUB_STEP_SUMMARY when the flake summary upload succeeded, so the
-      # trace artifact is one click away from the flake summary section above.
+      # Real-auth runs force trace off in playwright.config.ts. Viewer/download
+      # guidance is emitted only when trace files were proven to exist and the
+      # upload action returned an actual artifact URL.
       - name: Link Playwright trace viewer in Job Summary
         if: always() && steps.e2e_config.outputs.should_run == 'true'
         shell: bash
         env:
-          FLAKE_SUMMARY_PRESENT: ${{ steps.check_flake_summary.outputs.present }}
-          FLAKE_SUMMARY_URL: ${{ steps.upload_flake_summary.outputs.artifact-url }}
+          TRACE_FILES_PRESENT: ${{ steps.trace_files.outputs.present }}
+          TRACE_FILE_COUNT: ${{ steps.trace_files.outputs.count }}
           TRACES_URL: ${{ steps.upload_playwright_traces.outputs.artifact-url }}
-          SMOKE_BUNDLE_URL: ${{ steps.upload_smoke_bundle.outputs.artifact-url }}
         run: |
+          RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          ATTEMPT_URL="${RUN_URL}/attempts/${GITHUB_RUN_ATTEMPT}"
           {
             echo ""
-            echo "### 🎬 Playwright trace viewer"
+            echo "### 🎬 Playwright trace status"
             echo ""
-            if [ "${FLAKE_SUMMARY_PRESENT}" = "true" ] && [ -n "${FLAKE_SUMMARY_URL}" ]; then
-              echo "The flake summary artifact was uploaded above. Open the trace for the exact failing/flaky attempt it references:"
-            elif [ "${FLAKE_SUMMARY_PRESENT}" = "true" ]; then
-              echo "_The flake summary was generated but its standalone artifact URL was unavailable in this Job Summary — trace links below still work._"
+            echo "Run: [#${GITHUB_RUN_NUMBER} attempt ${GITHUB_RUN_ATTEMPT}](${ATTEMPT_URL})"
+            echo ""
+            if [ "${TRACE_FILES_PRESENT}" = "true" ] && [ -n "${TRACES_URL}" ]; then
+              echo "Trace files detected: \`${TRACE_FILE_COUNT}\`. [Download \`quicklog-playwright-traces-${ARTIFACT_SUFFIX}\`](${TRACES_URL})."
+              echo ""
+              echo "The upload wildcard strips the \`test-results/\` prefix. After extracting, locate traces from the artifact root:"
+              echo ""
+              echo '  ```bash'
+              echo "  find quicklog-playwright-traces-${ARTIFACT_SUFFIX} -type f -name 'trace.zip'"
+              echo '  ```'
+              echo ""
+              echo "Retry traces use sibling directories such as \`<test>-retry1/trace.zip\`. Open a located trace with \`bunx playwright show-trace <path-to-trace.zip>\`."
+            elif [ "${TRACE_FILES_PRESENT}" = "true" ]; then
+              echo "Trace files were detected, but no trace artifact URL is available. Viewer/download instructions are withheld until an upload is proven."
             else
-              echo "_No flake summary artifact was uploaded (no failed/flaky tests met the upload gate, or the upload was skipped/failed). Trace links below are shown unconditionally so you can still inspect any trace this run produced._"
+              echo "Trace intentionally disabled/unavailable for this authenticated smoke run."
             fi
             echo ""
-            RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-            ATTEMPT_URL="${RUN_URL}/attempts/${GITHUB_RUN_ATTEMPT}"
-            JOB_URL="${RUN_URL}/job/${GITHUB_JOB}"
-            echo "**This workflow run:** [\`${GITHUB_WORKFLOW}\` #${GITHUB_RUN_NUMBER} (attempt ${GITHUB_RUN_ATTEMPT})](${ATTEMPT_URL}) · [run overview](${RUN_URL}) · [job \`${GITHUB_JOB}\`](${JOB_URL})"
-            echo ""
-
-            if [ -n "${TRACES_URL}" ]; then
-              echo "> ✅ **Trace artifact uploaded:** [\`quicklog-playwright-traces-${ARTIFACT_SUFFIX}\`](${TRACES_URL}) — direct download link ready."
-              echo ""
-              echo "1. **Download the traces artifact:** [\`quicklog-playwright-traces-${ARTIFACT_SUFFIX}\`](${TRACES_URL}) — contains every \`test-results/**/trace.zip\` produced by this run (first attempt + retries)."
-            elif [ -n "${SMOKE_BUNDLE_URL}" ]; then
-              echo "> ⚠️ **Standalone trace artifact unavailable** — the \`quicklog-playwright-traces-${ARTIFACT_SUFFIX}\` upload was skipped or its URL was not exposed to this Job Summary. Use the smoke bundle below as the fallback (it contains the same \`test-results/**/trace.zip\` files)."
-              echo ""
-              echo "**Fallback download:** [\`quicklog-smoke-artifacts-${ARTIFACT_SUFFIX}\`](${SMOKE_BUNDLE_URL})"
-              echo ""
-              echo "1. **Download the smoke bundle:** [\`quicklog-smoke-artifacts-${ARTIFACT_SUFFIX}\`](${SMOKE_BUNDLE_URL}) — traces live under \`test-results/**/trace.zip\` inside the bundle."
-            else
-              echo "> ❌ **No trace artifact download link available in this Job Summary.** Both the standalone \`quicklog-playwright-traces-${ARTIFACT_SUFFIX}\` and the \`quicklog-smoke-artifacts-${ARTIFACT_SUFFIX}\` bundle uploads were skipped or failed to expose a URL. This usually means the Playwright step produced no \`test-results/**/trace.zip\` files (all tests passed on the first attempt with no retries), or the upload step failed — check the **Upload Playwright traces** and **Upload smoke bundle** steps in [this job's logs](${JOB_URL})."
-              echo ""
-              echo "**Manual download path:** open this run's **Artifacts** dropdown at the top of [the run page](${RUN_URL}) and look for \`quicklog-playwright-traces-${ARTIFACT_SUFFIX}\` (or \`quicklog-smoke-artifacts-${ARTIFACT_SUFFIX}\` for the same files under \`test-results/**/trace.zip\`). If neither artifact is listed there, no traces were produced by this run."
-              echo ""
-              echo "1. **Download the traces artifact:** open this run's **Artifacts** dropdown and grab \`quicklog-playwright-traces-${ARTIFACT_SUFFIX}\` (or \`quicklog-smoke-artifacts-${ARTIFACT_SUFFIX}\`)."
-            fi
-
-            echo "2. **Unzip the artifact locally** — copy-paste one of these commands from the folder where the zip landed:"
-            echo ""
-            echo "   \`\`\`bash"
-            echo "   # macOS / Linux"
-            echo "   unzip -o quicklog-playwright-traces-${ARTIFACT_SUFFIX}.zip -d quicklog-playwright-traces-${ARTIFACT_SUFFIX}"
-            echo "   \`\`\`"
-            echo ""
-            echo "   \`\`\`powershell"
-            echo "   # Windows PowerShell"
-            echo "   Expand-Archive -Force -Path .\\quicklog-playwright-traces-${ARTIFACT_SUFFIX}.zip -DestinationPath .\\quicklog-playwright-traces-${ARTIFACT_SUFFIX}"
-            echo "   \`\`\`"
-            echo ""
-            echo "3. **Locate the trace(s)** — every failing/flaky test has its own \`trace.zip\` under \`test-results/<test-folder>/\`:"
-            echo ""
-            echo "   \`\`\`bash"
-            echo "   # macOS / Linux"
-            echo "   find quicklog-playwright-traces-${ARTIFACT_SUFFIX}/test-results -name 'trace.zip'"
-            echo "   \`\`\`"
-            echo ""
-            echo "   \`\`\`powershell"
-            echo "   # Windows PowerShell"
-            echo "   Get-ChildItem -Recurse -Path .\\quicklog-playwright-traces-${ARTIFACT_SUFFIX}\\test-results -Filter trace.zip"
-            echo "   \`\`\`"
-            echo ""
-            echo "4. **Open [trace.playwright.dev](https://trace.playwright.dev/)** in your browser — it runs 100% client-side, no upload/sign-in, and your trace bytes never leave your machine."
-            echo "5. **Drag the \`trace.zip\` file directly onto the page** (or click **Select file...** in the top-left and pick it). The interactive Trace Viewer opens with the timeline, DOM snapshots, actions, network, and console for that exact test run."
-            echo ""
-            echo "> **Prefer the CLI?** If you have Playwright installed locally, you can open a trace without the web viewer:"
-            echo "> \`\`\`bash"
-            echo "> bunx playwright show-trace quicklog-playwright-traces-${ARTIFACT_SUFFIX}/test-results/<test-folder>/trace.zip"
-            echo "> \`\`\`"
-            echo ""
-            echo "_Retry traces are stored next to the first attempt under the same \`test-results/<test-folder>/\` directory (\`trace.zip\` = attempt 1, \`retry1/trace.zip\` = retry 1), so you can open both in trace.playwright.dev tabs and compare side-by-side._"
-            echo ""
-
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload Playwright media (screenshots/videos)
@@ -1465,7 +1183,7 @@ jobs:
               echo "- \`quicklog-smoke-report-json\` — artifact URL unavailable, see Artifacts dropdown"
             fi
             if [ -n "${BUNDLE_URL}" ]; then
-              echo "- [\`quicklog-smoke-artifacts\`](${BUNDLE_URL}) — bundles the full \`playwright-report.json\`, \`playwright-report/\`, and \`test-results/\`"
+              echo "- [\`quicklog-smoke-artifacts\`](${BUNDLE_URL}) — bundles \`playwright-report.json\`, \`playwright-report/\`, and the smoke/flake summaries"
             else
               echo "- \`quicklog-smoke-artifacts\` — artifact URL unavailable, see Artifacts dropdown"
             fi
@@ -1497,100 +1215,6 @@ jobs:
             --report=e2e/results/playwright-report.json \
             --out=e2e/results/per-test-artifacts.json \
             || echo "::warning::per-test artifact uploader exited non-zero (see logs) — this is enrichment only and does not affect the smoke result"
-
-      # Single at-a-glance "Artifacts uploaded" list covering every
-      # upload-artifact step in this workflow. Runs after ALL uploads so
-      # every `artifact-url` output is populated (v4 only exposes the URL
-      # after the upload completes). Enrichment only — never fails the job.
-      # Each row shows the exact run-scoped artifact name and a Download
-      # link, or an italic "not uploaded" note when the upload was skipped
-      # (gate) or failed to expose a URL.
-      - name: Artifacts uploaded — consolidated links in Job Summary
-        if: always() && steps.e2e_config.outputs.should_run == 'true'
-        shell: bash
-        env:
-          SMOKE_BUNDLE_URL: ${{ steps.upload_smoke_bundle.outputs.artifact-url }}
-          HTML_REPORT_URL: ${{ steps.upload_playwright_report.outputs.artifact-url }}
-          FLAKE_SUMMARY_URL: ${{ steps.upload_flake_summary.outputs.artifact-url }}
-          FLAKE_SUMMARY_PRESENT: ${{ steps.check_flake_summary.outputs.present }}
-          TRACES_URL: ${{ steps.upload_playwright_traces.outputs.artifact-url }}
-          MEDIA_URL: ${{ steps.upload_playwright_media.outputs.artifact-url }}
-          SMOKE_JSON_URL: ${{ steps.upload_smoke_report_json.outputs.artifact-url }}
-          SMOKE_TXT_URL: ${{ steps.upload_smoke_report_txt.outputs.artifact-url }}
-          FAILURE_DEBUG_URL: ${{ steps.upload_failure_debug_summary.outputs.artifact-url }}
-          FAILURE_DEBUG_PRESENT: ${{ steps.failure_debug_summary.outputs.present }}
-        run: |
-          set +e
-          RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-
-          fmt_row() {
-            # $1=display name, $2=artifact name, $3=url, $4=missing-note
-            local name="$1" artifact="$2" url="$3" missing="$4"
-            local link
-            if [ -n "${url}" ]; then
-              link="[Download](${url})"
-            else
-              link="_${missing}_"
-            fi
-            printf '| %s | `%s` | %s |\n' "${name}" "${artifact}" "${link}"
-          }
-
-          if [ "${FLAKE_SUMMARY_PRESENT}" = "true" ]; then
-            flake_missing="uploaded, URL unavailable — see Artifacts dropdown"
-          else
-            flake_missing="not uploaded — 0 failed + 0 flaky (upload gate)"
-          fi
-          if [ "${FAILURE_DEBUG_PRESENT}" = "true" ]; then
-            debug_missing="uploaded, URL unavailable — see Artifacts dropdown"
-          else
-            debug_missing="not uploaded — job did not fail"
-          fi
-
-          {
-            echo ""
-            echo "## 📦 Artifacts uploaded (this run)"
-            echo ""
-            echo "All artifact URLs are scoped to this workflow run (\`#${GITHUB_RUN_NUMBER}\` attempt \`${GITHUB_RUN_ATTEMPT}\`, suffix \`${ARTIFACT_SUFFIX}\`). Missing rows mean the upload was gated off or produced no files — see the corresponding section above for the reason. Full [Artifacts dropdown](${RUN_URL}) on the run page lists every upload directly."
-            echo ""
-            echo "| Artifact | Name | Link |"
-            echo "| --- | --- | --- |"
-            fmt_row "Smoke bundle (JSON+TXT reports, HTML report, test-results)" \
-              "quicklog-smoke-artifacts-${ARTIFACT_SUFFIX}" \
-              "${SMOKE_BUNDLE_URL}" \
-              "not uploaded — see smoke bundle section"
-            fmt_row "Playwright HTML report" \
-              "quicklog-playwright-report-${ARTIFACT_SUFFIX}" \
-              "${HTML_REPORT_URL}" \
-              "not uploaded — HTML report upload disabled or failed"
-            fmt_row "Playwright traces (\`trace.zip\` per failed/retried test)" \
-              "quicklog-playwright-traces-${ARTIFACT_SUFFIX}" \
-              "${TRACES_URL}" \
-              "not uploaded — no traces produced (all tests green on first attempt)"
-            fmt_row "Playwright media (screenshots + videos)" \
-              "quicklog-playwright-media-${ARTIFACT_SUFFIX}" \
-              "${MEDIA_URL}" \
-              "not uploaded — no media produced"
-            fmt_row "Flake summary (single markdown)" \
-              "quicklog-flake-summary-${ARTIFACT_SUFFIX}" \
-              "${FLAKE_SUMMARY_URL}" \
-              "${flake_missing}"
-            fmt_row "Smoke report — JSON" \
-              "quicklog-smoke-report-json-${ARTIFACT_SUFFIX}" \
-              "${SMOKE_JSON_URL}" \
-              "not uploaded — no JSON report produced"
-            fmt_row "Smoke report — text" \
-              "quicklog-smoke-report-txt-${ARTIFACT_SUFFIX}" \
-              "${SMOKE_TXT_URL}" \
-              "not uploaded — no text report produced"
-            fmt_row "Failure debug info (\`quicklog-failure-debug.md\`)" \
-              "quicklog-failure-debug-${ARTIFACT_SUFFIX}" \
-              "${FAILURE_DEBUG_URL}" \
-              "${debug_missing}"
-            echo ""
-          } >> "$GITHUB_STEP_SUMMARY"
-          exit 0
-
-
 
       - name: Build Playwright failure PR-comment body
         id: build_pr_comment
@@ -1694,6 +1318,8 @@ jobs:
           SMOKE_STEP_CONCLUSION: ${{ steps.quicklog_smoke.conclusion }}
           PLAYWRIGHT_REPORT_ARTIFACT_URL: ${{ steps.upload_playwright_report.outputs.artifact-url }}
           PLAYWRIGHT_TRACES_ARTIFACT_URL: ${{ steps.upload_playwright_traces.outputs.artifact-url }}
+          TRACE_FILES_PRESENT: ${{ steps.trace_files.outputs.present }}
+          TRACE_FILE_COUNT: ${{ steps.trace_files.outputs.count }}
           PLAYWRIGHT_MEDIA_ARTIFACT_URL: ${{ steps.upload_playwright_media.outputs.artifact-url }}
           SMOKE_REPORT_JSON_ARTIFACT_URL: ${{ steps.upload_smoke_report_json.outputs.artifact-url }}
           SMOKE_REPORT_TXT_ARTIFACT_URL: ${{ steps.upload_smoke_report_txt.outputs.artifact-url }}
@@ -1706,7 +1332,6 @@ jobs:
           # Never echo secret values. Only references to secret NAMES are written.
           fallback="${ARTIFACTS_URL}"
           pw_report_url="${PLAYWRIGHT_REPORT_ARTIFACT_URL:-$fallback}"
-          pw_traces_url="${PLAYWRIGHT_TRACES_ARTIFACT_URL:-$fallback}"
           pw_media_url="${PLAYWRIGHT_MEDIA_ARTIFACT_URL:-$fallback}"
           smoke_json_url="${SMOKE_REPORT_JSON_ARTIFACT_URL:-$fallback}"
           smoke_txt_url="${SMOKE_REPORT_TXT_ARTIFACT_URL:-$fallback}"
@@ -1744,7 +1369,11 @@ jobs:
             echo "- [Workflow run](${RUN_URL})"
             echo "- [Artifacts](${ARTIFACTS_URL})"
             echo "- [Playwright HTML report](${pw_report_url})"
-            echo "- [Playwright traces](${pw_traces_url})"
+            if [ "${TRACE_FILES_PRESENT}" = "true" ] && [ -n "${PLAYWRIGHT_TRACES_ARTIFACT_URL}" ]; then
+              echo "- [Playwright traces (${TRACE_FILE_COUNT})](${PLAYWRIGHT_TRACES_ARTIFACT_URL})"
+            else
+              echo "- Playwright traces: intentionally disabled/unavailable for this authenticated run"
+            fi
             echo "- [Playwright media (screenshots/videos)](${pw_media_url})"
             echo "- [Smoke report JSON](${smoke_json_url})"
             echo "- [Smoke report TXT](${smoke_txt_url})"
@@ -1773,7 +1402,7 @@ jobs:
               echo "- Playwright: \`${PLAYWRIGHT_VERSION:-unavailable}\`"
               echo "- Playwright retries per test: \`${PLAYWRIGHT_RETRIES:-1}\` (override via workflow_dispatch \`playwright_retries\` input)"
               echo ""
-              echo "  Retry artifacts: a flake produces per-attempt trace zips, videos, and screenshots under \`test-results/<test>-retry1/\`. Compare the original attempt and \`retry1\` to distinguish a regression (fails both) from a flake (passes on retry)."
+              echo "  Retry artifacts use sibling directories such as \`test-results/<test>-retry1/\`. Authenticated tracing is intentionally off; screenshots/videos may still be retained by Playwright."
               echo ""
               echo "### Smoke counts"
               echo ""
@@ -1793,7 +1422,7 @@ jobs:
               echo "- Report parse status: \`${REPORT_PARSE_STATUS:-unknown}\`"
               echo ""
               if [ "${SMOKE_STEP_OUTCOME}" = "failure" ] || [ "${SMOKE_STEP_CONCLUSION}" = "failure" ]; then
-                echo "Smoke command failed: the Playwright smoke step did not complete successfully. Inspect \`quicklog-smoke-report.txt\`, Playwright trace, screenshots, and videos."
+                echo "Smoke command failed: the Playwright smoke step did not complete successfully. Inspect the masked run logs and the available report/media artifacts."
               fi
               case "${REPORT_PARSE_STATUS}" in
                 parsed)
@@ -1818,7 +1447,11 @@ jobs:
               echo ""
               echo "- Bundled artifact: \`quicklog-smoke-artifacts\` (retention: 30 days)"
               echo "- Playwright HTML report artifact: \`quicklog-playwright-report\` (retention: 30 days)"
-              echo "- Playwright traces artifact: \`quicklog-playwright-traces\` (retention: 30 days)"
+              if [ "${TRACE_FILES_PRESENT}" = "true" ] && [ -n "${PLAYWRIGHT_TRACES_ARTIFACT_URL}" ]; then
+                echo "- Playwright traces artifact: \`quicklog-playwright-traces\` (${TRACE_FILE_COUNT} file(s), retention: 30 days)"
+              else
+                echo "- Playwright traces artifact: not uploaded — trace intentionally disabled/unavailable"
+              fi
               echo "- Playwright media artifact: \`quicklog-playwright-media\` (retention: 30 days)"
               echo "- Smoke report JSON artifact: \`quicklog-smoke-report-json\` (retention: 30 days)"
               echo "- Smoke report TXT artifact: \`quicklog-smoke-report-txt\` (retention: 30 days)"
@@ -1831,11 +1464,10 @@ jobs:
               echo "- \`e2e/results/playwright-report.json\` (Playwright's own JSON reporter — source of the flake summary above)"
               echo "- \`e2e/results/playwright-flake-summary.md\` (present even on a clean run — see the flake summary section above)"
               echo "- \`playwright-report/\`"
-              echo "- \`test-results/\`"
               echo ""
               echo "### Troubleshooting"
               echo ""
-              echo "Open \`quicklog-smoke-report.txt\` first (then the JSON sibling) and find the first \`✗\` line. Then inspect the matching Playwright trace, screenshots, and video under \`playwright-report/\` and \`test-results/\`."
+              echo "Open \`quicklog-smoke-report.txt\` first (then the JSON sibling) and find the first \`✗\` line. Use the masked run logs and any uploaded screenshots/videos for additional context."
 
             else
               echo "- Smoke executed: no (skipped)"

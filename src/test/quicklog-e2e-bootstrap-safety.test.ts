@@ -174,10 +174,11 @@ describe("Workflow: bootstrap step + media expansion + summary", () => {
     expect(m![0]).toMatch(/path:\s*playwright-report\//);
   });
 
-  it("traces artifact keeps test-results/**/*.zip", () => {
+  it("traces artifact uploads trace.zip files only", () => {
     const m = wf.match(/name:\s*quicklog-playwright-traces[\s\S]*?(?=\n {6}- name:)/);
     expect(m).toBeTruthy();
-    expect(m![0]).toMatch(/test-results\/\*\*\/\*\.zip/);
+    expect(m![0]).toMatch(/test-results\/\*\*\/trace\.zip/);
+    expect(m![0]).not.toMatch(/test-results\/\*\*\/\*\.zip/);
   });
 
   it("all dedicated upload artifact steps use v4 + retention 30 + warn", () => {

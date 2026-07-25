@@ -122,7 +122,6 @@ describe("Supabase database target identity", () => {
       "conflicting direct username ref",
       `postgres://postgres.${PRODUCTION_REF}:${PASSWORD}@db.${SANDBOX_REF}.supabase.co:5432/postgres?sslmode=require`,
     ],
-    ["routing query override", `${directUrl(SANDBOX_REF)}&host=db.${PRODUCTION_REF}.supabase.co`],
     ["duplicate sslmode", `${directUrl(SANDBOX_REF)}&sslmode=disable`],
     [
       "lookalike direct host",
@@ -183,6 +182,18 @@ describe("Supabase database target identity", () => {
     ).toMatchObject({
       projectRef: SANDBOX_REF,
       connectionMode: "direct",
+    });
+  });
+
+  it("derives identity only from the URL authority when query overrides are present", () => {
+    expect(
+      parseSupabaseDatabaseUrl(
+        `${directUrl(SANDBOX_REF)}&host=db.${PRODUCTION_REF}.supabase.co&user=readonly&dbname=app`,
+      ),
+    ).toMatchObject({
+      projectRef: SANDBOX_REF,
+      connectionMode: "direct",
+      hostname: `db.${SANDBOX_REF}.supabase.co`,
     });
   });
 
@@ -309,8 +320,14 @@ describe("remote applied-schema runner safety", () => {
     expect(psqlCalls).toBe(0);
   });
 
-  it("passes the URL through child env, strips ambient routing env, and queries only tables", () => {
-    const url = directUrl(SANDBOX_REF, 5432, "argv-secret-sentinel");
+  it("canonicalizes the child URL, strips routing options and ambient env, and queries only tables", () => {
+    const canonicalUrl = directUrl(SANDBOX_REF, 5432, "argv-secret-sentinel").replace(
+      "?sslmode=require",
+      "",
+    );
+    const url =
+      `${canonicalUrl}?sslmode=require&connect_timeout=10` +
+      `&host=db.${PRODUCTION_REF}.supabase.co&user=readonly&dbname=app`;
     const calls: Array<{
       command: string;
       args: string[];
@@ -346,8 +363,10 @@ describe("remote applied-schema runner safety", () => {
     expect(calls[0].command).toBe("psql");
     expect(calls[0].args.join(" ")).not.toContain(url);
     expect(calls[0].args.join(" ")).not.toContain("argv-secret-sentinel");
-    expect(calls[0].env.PGDATABASE).toBe(url);
+    expect(calls[0].env.PGDATABASE).toBe(canonicalUrl);
     expect(calls[0].env.PGSSLMODE).toBe("require");
+    expect(calls[0].env.PGDATABASE).not.toContain("?");
+    expect(calls[0].env.PGDATABASE).not.toContain(PRODUCTION_REF);
     expect(calls[0].env.PGHOST).toBeUndefined();
     expect(calls[0].env.PGPASSWORD).toBeUndefined();
     expect(calls[0].env.DATABASE_URL).toBeUndefined();
@@ -357,6 +376,36 @@ describe("remote applied-schema runner safety", () => {
     expect(sql).not.toMatch(/c\.relkind IN \([^)]*['"]v['"]/);
     expect(sql).not.toMatch(/c\.relkind IN \([^)]*['"]m['"]/);
     expect(sql).not.toMatch(/c\.relkind IN \([^)]*['"]f['"]/);
+  });
+
+  it("preserves the strongest validated TLS mode while stripping every URL option", () => {
+    const canonicalUrl = directUrl(SANDBOX_REF).replace("?sslmode=require", "");
+    const url =
+      `${canonicalUrl}?sslmode=require&sslmode=verify-full` +
+      "&sslmode=verify-ca&application_name=verdant-gate";
+    let childEnv: Record<string, string | undefined> | undefined;
+    const { logger } = captureLogger();
+
+    const status = runRequiredCoreMigrationsApplied({
+      env: {
+        TARGET_ENV: "sandbox",
+        SUPABASE_DB_URL: url,
+        PATH: process.env.PATH,
+      },
+      spawnImpl: (_command, _args, options) => {
+        childEnv = { ...options.env };
+        return {
+          status: 0,
+          stdout: REQUIRED_CORE_SCHEMA.map(schemaKey).join("\n"),
+          stderr: "",
+        };
+      },
+      logger,
+    });
+
+    expect(status).toBe(EXIT.OK);
+    expect(childEnv?.PGDATABASE).toBe(canonicalUrl);
+    expect(childEnv?.PGSSLMODE).toBe("verify-full");
   });
 
   it("suppresses raw psql stderr and secret sentinels from logs and artifacts", () => {

@@ -131,7 +131,17 @@ export function sanitizeFunnelParams(
 
 export function trackFunnelEvent(name: FunnelEventName, params?: FunnelEventParams): void {
   if (typeof window === "undefined") return;
-  const safe = sanitizeFunnelParams(params);
+  const globallySafe = sanitizeFunnelParams(params);
+  // Per-event schema pass. Imported lazily to break the cycle (schema
+  // module imports FUNNEL_EVENTS/FUNNEL_PARAM_KEYS from here).
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { enforceFunnelEventSchema } = require("@/lib/funnelEventSchema") as {
+    enforceFunnelEventSchema: (
+      n: FunnelEventName,
+      p: Record<string, string | number | boolean>,
+    ) => Record<string, string | number | boolean>;
+  };
+  const safe = enforceFunnelEventSchema(name, globallySafe);
   try {
     const g = (window as { gtag?: (...args: unknown[]) => void }).gtag;
     if (typeof g === "function") g("event", name, safe);

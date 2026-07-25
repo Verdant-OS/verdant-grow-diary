@@ -69,18 +69,6 @@ function extractEmittedKeys(emitterBody: string): string[] {
   }
   expect(endIdx, "unterminated JSON.stringify literal").toBeGreaterThan(-1);
   const literal = emitterBody.slice(startIdx, endIdx + 1);
-    const ch = emitterBody[i];
-    if (ch === "{") depth++;
-    else if (ch === "}") {
-      depth--;
-      if (depth === 0) {
-        endIdx = i;
-        break;
-      }
-    }
-  }
-  expect(endIdx, "unterminated JSON.stringify literal").toBeGreaterThan(-1);
-  const literal = emitterBody.slice(startIdx + marker.length - 1, endIdx + 1);
   // Match top-level `key:` occurrences. Keys are bare identifiers here.
   const keys: string[] = [];
   const keyRegex = /(^|[\s,{])([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g;

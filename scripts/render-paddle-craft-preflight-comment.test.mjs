@@ -50,6 +50,8 @@ SUMMARY: pass=0 fail=2 skip=0
 `;
 
 const KEY_UNSET_ONLY = `::error::PADDLE_SANDBOX_API_KEY is not set — cannot verify sandbox.
+• [sandbox] craft_monthly — PADDLE_SANDBOX_API_KEY not set
+• [sandbox] craft_annual — PADDLE_SANDBOX_API_KEY not set
 
 SUMMARY: pass=0 fail=0 skip=2
 `;

@@ -2,43 +2,42 @@
  * sellable-tier chain — every purchasable id must be handled, exactly once,
  * at every layer between "we take the money" and "we grant the thing".
  *
- * Motivated by Craft, which was marketed and priced while being broken at FOUR
+ * Motivated by Craft, which was marketed and priced while broken at FOUR
  * independent layers: the checkout price allow-list, the server price config,
  * the webhook's subscription-persistence allow-list, and three entitlement
  * gates. Each was found separately, days apart, and fixing one made the next
  * one's absence *less* visible rather than more — a plan that reaches checkout
- * but is skipped by the webhook is charged-and-granted-nothing, which is worse
- * than being unbuyable.
+ * but is skipped by the webhook is charged-and-granted-nothing, which is
+ * silent, rather than merely unbuyable, which is loud.
  *
- * `src/lib/paidPlanAllowlist.ts` declares itself the single source of truth and
- * says every consumer MUST derive from it. Two consumers now do. The webhook's
- * `KNOWN_PRICE_IDS` is still hand-maintained, so this test is what stands
- * between that list and silent divergence.
+ * `src/lib/paidPlanAllowlist.ts` is the single source of truth. The plan-vs-pack
+ * split now lives THERE, and `payments-webhook`'s `KNOWN_PRICE_IDS` derives
+ * from it instead of keeping a hand-maintained copy, so the primary invariant
+ * is checked against real exported values rather than scraped text.
  *
- * Read as text rather than imported: these are Deno edge modules with `npm:`
- * specifiers that vitest cannot resolve. The same static-scan technique the
- * repo already uses for migration SQL.
+ * Two things are still scanned as text, deliberately: `SERVER_PRICE_CONFIG`
+ * lives in a Deno edge module with `npm:` specifiers vitest cannot resolve,
+ * and the derivation check exists precisely to catch the derivation being
+ * replaced by a literal list again.
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { PAID_PLAN_IDS } from "@/lib/paidPlanAllowlist";
+import { CREDIT_PACK_IDS, PAID_PLAN_IDS, SUBSCRIPTION_PLAN_IDS } from "@/lib/paidPlanAllowlist";
 
 function edgeSource(...segments: string[]): string {
   return readFileSync(resolve(process.cwd(), "supabase", "functions", ...segments), "utf8");
 }
 
+const WEBHOOK = edgeSource("payments-webhook", "eventProcessor.ts");
+const PRICE_FN = edgeSource("get-paddle-price", "index.ts");
+
 /**
- * Ids inside a bracketed/braced literal, matched against the known universe.
- *
- * Handles both shapes these files actually use: quoted array members
- * (`"pro_monthly",`) and BARE object keys (`pro_monthly: Deno.env.get(...)`).
- * Missing the bare-key form silently yielded empty sets, which would have made
- * the assertions vacuously true — caught only by the non-triviality guard below.
- *
- * The trailing `\s*:` on the bare-key form also prevents prefix collisions:
- * `credit_pack_50` cannot match inside `credit_pack_500`, because the next
- * character there is `0`, not a colon.
+ * Ids inside a braced literal. Handles bare object keys (`credit_pack_50: 50`)
+ * as well as quoted members — missing the bare-key form silently yields an
+ * empty set, which would make assertions vacuously true. The trailing `\s*:`
+ * also prevents prefix collisions: `credit_pack_50` cannot match inside
+ * `credit_pack_500`.
  */
 function idsInBlock(block: string): Set<string> {
   const found = new Set<string>();
@@ -56,18 +55,6 @@ function extract(source: string, pattern: RegExp, label: string): Set<string> {
   return idsInBlock(match[1]);
 }
 
-const WEBHOOK = edgeSource("payments-webhook", "eventProcessor.ts");
-const PRICE_FN = edgeSource("get-paddle-price", "index.ts");
-
-/** Subscription plans: a match here writes a `subscriptions` row. */
-const knownPriceIds = extract(WEBHOOK, /KNOWN_PRICE_IDS[^=]*=\s*\[([\s\S]*?)\]/, "KNOWN_PRICE_IDS");
-/** One-time SKUs: a match here grants credits and must NEVER grant a plan. */
-const creditPackIds = extract(
-  WEBHOOK,
-  /CREDIT_PACK_CREDITS[^=]*=\s*\{([\s\S]*?)\}/,
-  "CREDIT_PACK_CREDITS",
-);
-/** Server-side price resolution: checkout cannot open without an entry. */
 const serverPriceConfigIds = extract(
   PRICE_FN,
   /SERVER_PRICE_CONFIG[^=]*=\s*\{([\s\S]*?)\n\};/,
@@ -77,9 +64,46 @@ const serverPriceConfigIds = extract(
 const sorted = (s: Iterable<string>) => [...s].sort();
 
 describe("sellable-tier chain", () => {
+  it("classifies every purchasable id as exactly one of plan or pack", () => {
+    // Exhaustive: an id in NEITHER is skipped by the webhook as
+    // `unknown_price_id` — payment succeeds, nothing is written, Paddle still
+    // receives a 200. That is the charged-and-granted-nothing path.
+    const handled = new Set([...SUBSCRIPTION_PLAN_IDS, ...CREDIT_PACK_IDS]);
+    expect(sorted(handled)).toEqual(sorted(PAID_PLAN_IDS));
+
+    // Disjoint: an id in BOTH means a $9 credit pack also writes a
+    // subscriptions row and grants plan access.
+    for (const packId of CREDIT_PACK_IDS) {
+      expect(
+        (SUBSCRIPTION_PLAN_IDS as ReadonlyArray<string>).includes(packId),
+        `${packId} is a one-time pack but is also classified as a subscription plan`,
+      ).toBe(false);
+    }
+  });
+
+  it("keeps the webhook's KNOWN_PRICE_IDS derived, not hand-maintained", () => {
+    // The regression guard for this whole class, and — since
+    // sell-vs-grant-parity now imports SUBSCRIPTION_PLAN_IDS rather than
+    // scraping this module — the ONLY check on the edge seam itself.
+    //
+    // The assignment must be the WHOLE statement, terminated. A substring
+    // match would accept `= SUBSCRIPTION_PLAN_IDS.filter(id => id !==
+    // "craft_annual")`, which reintroduces exactly the silent omission this
+    // PR exists to kill while leaving both assertions green.
+    expect(
+      /KNOWN_PRICE_IDS\s*:\s*ReadonlyArray<string>\s*=\s*SUBSCRIPTION_PLAN_IDS\s*;/.test(WEBHOOK),
+      "KNOWN_PRICE_IDS must be assigned SUBSCRIPTION_PLAN_IDS whole and unmodified — " +
+        "a literal list, or any narrowing of the derived list, reintroduces the " +
+        "hand-maintained copy that silently omitted Craft",
+    ).toBe(true);
+
+    // And it must not have quietly regained a literal array alongside it.
+    expect(/KNOWN_PRICE_IDS[^=]*=\s*\[/.test(WEBHOOK)).toBe(false);
+  });
+
   it("resolves a server price for every purchasable id", () => {
-    // Without an entry here `get-paddle-price` returns unknown_plan/price_not_
-    // configured and checkout never opens — the plan is advertised but unbuyable.
+    // Without an entry, get-paddle-price returns unknown_plan /
+    // price_not_configured and checkout never opens — advertised but unbuyable.
     for (const id of PAID_PLAN_IDS) {
       expect(
         serverPriceConfigIds.has(id),
@@ -88,43 +112,23 @@ describe("sellable-tier chain", () => {
     }
   });
 
-  it("handles every purchasable id at the webhook, exactly once", () => {
-    // The union must be exhaustive: an id in NEITHER list is skipped as
-    // `unknown_price_id`, so the payment succeeds, nothing is written, and
-    // Paddle still receives a 200. That is the charged-and-granted-nothing
-    // path, and it is silent.
-    const handled = new Set([...knownPriceIds, ...creditPackIds]);
-    expect(sorted(handled)).toEqual(sorted(PAID_PLAN_IDS));
-  });
-
-  it("never lets a one-time pack resolve to a subscription plan", () => {
-    // A $9 credit purchase granting Pro would be a revenue and trust failure.
-    // Both edge modules call this out in prose; this asserts it.
-    for (const packId of creditPackIds) {
-      expect(
-        knownPriceIds.has(packId),
-        `${packId} is a one-time credit pack but also appears in KNOWN_PRICE_IDS — ` +
-          `a pack purchase would write a subscriptions row and grant plan access`,
-      ).toBe(false);
-    }
-  });
-
-  it("never lets a subscription plan be mistaken for a credit pack", () => {
-    for (const planId of knownPriceIds) {
-      expect(
-        creditPackIds.has(planId),
-        `${planId} is a subscription plan but also appears in CREDIT_PACK_CREDITS — ` +
-          `a subscription payment would be converted into a one-off credit grant`,
-      ).toBe(false);
-    }
+  it("guards a pack declared in the allowlist but never classified", () => {
+    // The source module throws at import time if a `credit_pack*` id is added
+    // to PAID_PLAN_IDS without being declared in CREDIT_PACK_IDS, because the
+    // derivation would otherwise classify it as a subscription plan — the
+    // dangerous direction. Assert the guard exists rather than re-implementing
+    // its logic here.
+    const source = readFileSync(resolve(process.cwd(), "src", "lib", "paidPlanAllowlist.ts"), "utf8");
+    expect(source).toMatch(/startsWith\("credit_pack"\)/);
+    expect(source).toMatch(/throw new Error/);
   });
 
   it("keeps the derived sets non-trivial", () => {
-    // Guards against a regex that silently matches nothing, which would make
+    // Guards against a matcher that silently finds nothing, which would make
     // every assertion above vacuously true while the drift it targets is live.
     expect(PAID_PLAN_IDS.length).toBeGreaterThan(2);
-    expect(knownPriceIds.size).toBeGreaterThan(1);
-    expect(creditPackIds.size).toBeGreaterThan(0);
+    expect(SUBSCRIPTION_PLAN_IDS.length).toBeGreaterThan(1);
+    expect(CREDIT_PACK_IDS.length).toBeGreaterThan(0);
     expect(serverPriceConfigIds.size).toBe(PAID_PLAN_IDS.length);
   });
 });

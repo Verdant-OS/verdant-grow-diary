@@ -2648,6 +2648,19 @@ cause (missing / inactive / API error) and picks the remedy accordingly.
 > still reports green. Widen `REQUIRED_PLAN_IDS` in the same change that
 > introduces the new plan.
 
+**If the new id is a one-time credit pack, also add it to
+`CREDIT_PACK_IDS`** in the same file. `PAID_PLAN_IDS` is the full
+purchasable universe; `SUBSCRIPTION_PLAN_IDS` is derived from it by
+removing the packs, and `payments-webhook`'s `KNOWN_PRICE_IDS` is that
+derived list. A pack left out of `CREDIT_PACK_IDS` would therefore be
+treated as a subscription, and a $9 purchase would write a
+`subscriptions` row and grant plan access. `paidPlanAllowlist.ts`
+throws at import time on any `credit_pack*` id that is missing there,
+so this fails loudly at edge cold start rather than at the till — but
+adding both together avoids the red. Giving the pack a credit amount in
+`CREDIT_PACK_CREDITS` is enforced separately by the typechecker
+(`Record<CreditPackId, number>`).
+
 ### Workflow security model
 
 The workflow runs in two jobs so PR-controlled code never executes with

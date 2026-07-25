@@ -25,6 +25,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { KNOWN_PLAN_IDS, PLAN_CATALOG } from "@/lib/entitlements/planCatalog";
+import { SUBSCRIPTION_PLAN_IDS } from "@/lib/paidPlanAllowlist";
 import {
   FEATURE_KEYS,
   canReadExistingFeatureData,
@@ -132,17 +133,16 @@ function phenoSqlGrantedPlans(): ReadonlySet<string> {
  * a 200, so a real charge fails silently.
  */
 function webhookGrantedPriceIds(): ReadonlySet<string> {
-  const source = readFileSync(
-    resolve(process.cwd(), "supabase", "functions", "payments-webhook", "eventProcessor.ts"),
-    "utf8",
-  );
-  const block = source.match(/KNOWN_PRICE_IDS[^=]*=\s*\[([\s\S]*?)\]/);
-  if (!block) throw new Error("Could not locate KNOWN_PRICE_IDS in eventProcessor.ts");
-  const found = new Set<string>();
-  for (const plan of KNOWN_PLAN_IDS) {
-    if (block[1].includes(`"${plan}"`) || block[1].includes(`'${plan}'`)) found.add(plan);
-  }
-  return found;
+  // Reads the shared source of truth instead of scraping the edge module.
+  // KNOWN_PRICE_IDS is now DERIVED from SUBSCRIPTION_PLAN_IDS — it used to be
+  // a hand-maintained literal, which is exactly how Craft went missing — so
+  // scanning for an array literal would find nothing and fail spuriously.
+  //
+  // The assertion stays meaningful rather than tautological: it still
+  // cross-checks two independent modules — the entitlements plan catalog
+  // (KNOWN_PLAN_IDS, "what can we grant capabilities for") against the paid
+  // plan allow-list ("what do we accept money for"). Those must agree.
+  return new Set<string>(SUBSCRIPTION_PLAN_IDS);
 }
 
 /**

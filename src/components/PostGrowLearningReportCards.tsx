@@ -509,8 +509,11 @@ export function ExportSummaryButtons({
   learningSummary?: PostGrowLearningLoopSummary;
 }) {
   return (
-    <div className="flex flex-col items-end gap-1" data-testid="post-grow-export-actions">
-      <div className="flex flex-wrap gap-2">
+    <div
+      className="flex w-full min-w-0 flex-col items-stretch gap-1 xl:w-auto xl:items-end"
+      data-testid="post-grow-export-actions"
+    >
+      <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap xl:w-auto">
         <Button
           variant="default"
           size="sm"
@@ -557,7 +560,10 @@ export function ExportSummaryButtons({
           <Download className="h-4 w-4 mr-1" /> Summary text
         </Button>
       </div>
-      <p className="text-[11px] text-muted-foreground" data-testid="post-grow-export-helper">
+      <p
+        className="w-full text-[11px] text-muted-foreground xl:max-w-md xl:text-right"
+        data-testid="post-grow-export-helper"
+      >
         {PRINT_HELPER_COPY}
       </p>
     </div>

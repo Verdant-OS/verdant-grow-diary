@@ -46,6 +46,14 @@ describe("Post-Grow Learning Report sections", () => {
     expect(PAGE).toContain("grid grid-cols-1");
     expect(CARDS).toContain("grid grid-cols-1 sm:grid-cols-3");
     expect(CARDS).toContain("grid grid-cols-2 sm:grid-cols-3");
+    expect(PAGE).toContain(
+      "flex min-w-0 flex-col gap-4 xl:flex-row xl:items-start xl:justify-between",
+    );
+    expect(PAGE).toContain('className="mb-0 min-w-0 flex-1"');
+    expect(PAGE).not.toContain("sm:flex-row sm:items-start sm:justify-between");
+    expect(CARDS).toContain(
+      "flex w-full min-w-0 flex-col items-stretch gap-1 xl:w-auto xl:items-end",
+    );
   });
 });
 

@@ -232,11 +232,12 @@ export default function PostGrowLearningReport() {
       </Button>
 
       <div className="glass rounded-3xl p-4 sm:p-6 mb-4 border-primary/20">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <PageHeader
             title="Post-Grow Learning Report"
             description="Plant memory, sensor truth, and lessons for the next run."
             icon={<Leaf className="h-5 w-5" />}
+            className="mb-0 min-w-0 flex-1"
           />
           <ExportSummaryButtons vm={report} learningSummary={learningSummary} />
         </div>

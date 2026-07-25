@@ -74,6 +74,12 @@ on:
         description: "PR number to comment on for a manual workflow_dispatch run. Required for pr_comment_disabled/pr_comment_mode/pr_comment_min_failed to have any effect on a dispatched run — a plain workflow_dispatch has no pull_request event context to infer this from. Leave blank for a run that isn't about PR-comment behavior."
         required: false
         default: ""
+      upload_html_report:
+        description: "Upload the generated Playwright HTML report (playwright-report/) as the 'quicklog-playwright-report' artifact so failures can be browsed offline even when the flake summary is missing. Default true."
+        required: false
+        default: "true"
+        type: choice
+        options: ["true", "false"]
 
   push:
     branches: [verdant-grow-diary]
@@ -605,13 +611,56 @@ jobs:
 
       - name: Upload Playwright HTML report
         id: upload_playwright_report
-        if: always() && steps.e2e_config.outputs.should_run == 'true'
+        # Always uploaded on push/pull_request; on workflow_dispatch, honors the
+        # upload_html_report input (default true). Kept independent of the flake
+        # summary so failures can still be browsed offline via the standalone
+        # HTML report even when playwright-flake-summary.md is missing.
+        if: >-
+          always()
+          && steps.e2e_config.outputs.should_run == 'true'
+          && (github.event_name != 'workflow_dispatch' || inputs.upload_html_report != 'false')
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: quicklog-playwright-report
           path: playwright-report/
           retention-days: 30
           if-no-files-found: warn
+
+      - name: Link Playwright HTML report in Job Summary
+        if: always() && steps.e2e_config.outputs.should_run == 'true'
+        shell: bash
+        env:
+          HTML_REPORT_URL: ${{ steps.upload_playwright_report.outputs.artifact-url }}
+          UPLOAD_HTML_REPORT_INPUT: ${{ github.event_name == 'workflow_dispatch' && inputs.upload_html_report || 'true' }}
+          FLAKE_SUMMARY_PRESENT: ${{ env.FLAKE_SUMMARY_PRESENT }}
+        run: |
+          # Traceability + fallback: surface the HTML report artifact URL in the
+          # Job Summary so reviewers can browse failures even when the flake
+          # summary is missing (clean run, dispatch-suppressed comment, etc.).
+          # Enrichment only — never fails the job.
+          {
+            echo ""
+            echo "### 🧭 Playwright HTML report"
+            echo ""
+            if [ ! -d "playwright-report" ]; then
+              echo "**Status:** ❌ \`playwright-report/\` directory not produced — Playwright likely did not run to completion. See earlier steps."
+            elif [ "${UPLOAD_HTML_REPORT_INPUT}" = "false" ]; then
+              echo "**Status:** ⏭️ Upload skipped for this run (\`upload_html_report=false\` on workflow_dispatch)."
+              echo ""
+              echo "Re-dispatch with \`upload_html_report=true\` (default) to publish the \`quicklog-playwright-report\` artifact."
+            elif [ -n "${HTML_REPORT_URL}" ]; then
+              echo "Browse failures offline via the standalone HTML report:"
+              echo ""
+              echo "- [\`quicklog-playwright-report\`](${HTML_REPORT_URL}) — unzip and open \`index.html\`"
+              echo ""
+              if [ "${FLAKE_SUMMARY_PRESENT}" != "true" ]; then
+                echo "_The flake summary artifact is not present for this run, so this HTML report is the primary way to inspect individual test failures._"
+              fi
+            else
+              echo "**Status:** _HTML report artifact URL unavailable — check the run's Artifacts dropdown for \`quicklog-playwright-report\`._"
+            fi
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload Playwright traces
         id: upload_playwright_traces

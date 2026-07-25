@@ -526,22 +526,86 @@ jobs:
             echo ""
             echo "#### Upload gate"
             echo ""
+            # Compute every input the real gate in `Check flake summary presence`
+            # branched on, then render each one so reviewers can reproduce the
+            # decision without reading the workflow YAML.
+            file="e2e/results/playwright-flake-summary.md"
+            if [ -f "${file}" ]; then
+              file_exists="true"
+              file_size=$(wc -c < "${file}" | tr -d ' ')
+            else
+              file_exists="false"
+              file_size="0"
+            fi
+            if [ "${file_exists}" = "true" ] && [ "${file_size}" -gt 0 ]; then
+              file_nonempty="true"
+            else
+              file_nonempty="false"
+            fi
+            noteworthy=$(( ${PW_FAILED:-0} + ${PW_FLAKY:-0} ))
+            failed_threshold=0
+            flaky_threshold=0
+            case "${FLAKE_SUMMARY_PRESENT}" in
+              true)  gate_result="upload" ;;
+              *)     gate_result="skip" ;;
+            esac
+            case "${FLAKE_SUMMARY_REASON}" in
+              "")      reason_display="(none — uploaded)" ;;
+              clean)   reason_display="clean — 0 failed + 0 flaky" ;;
+              empty)   reason_display="empty — file existed but had zero bytes" ;;
+              missing) reason_display="missing — summarizer did not produce the file" ;;
+              *)       reason_display="${FLAKE_SUMMARY_REASON}" ;;
+            esac
+            echo "**Thresholds (hardcoded in \`Check flake summary presence\`):**"
+            echo ""
+            echo "| threshold | value | meaning |"
+            echo "| --------- | ----- | ------- |"
+            echo "| \`failed\` | \`> ${failed_threshold}\` | any hard failure contributes to \`noteworthy\` |"
+            echo "| \`flaky\` | \`> ${flaky_threshold}\` | any retry-recovered test contributes to \`noteworthy\` |"
+            echo "| \`noteworthy = failed + flaky\` | \`> 0\` | primary gate — upload only when at least one test was failed or flaky |"
+            echo ""
+            echo "**Computed inputs for this run:**"
+            echo ""
+            echo "| input | value | source |"
+            echo "| ----- | ----- | ------ |"
+            echo "| \`pw_counts_available\` | \`${PW_COUNTS_AVAILABLE:-false}\` | \`summarize_flakes\` step output |"
+            echo "| \`pw_failed\` | \`${PW_FAILED:-?}\` | \`summarize_flakes\` step output |"
+            echo "| \`pw_flaky\` | \`${PW_FLAKY:-?}\` | \`summarize_flakes\` step output |"
+            echo "| \`pw_passed\` | \`${PW_PASSED:-?}\` | \`summarize_flakes\` step output |"
+            echo "| \`pw_skipped\` | \`${PW_SKIPPED:-?}\` | \`summarize_flakes\` step output |"
+            echo "| \`pw_total\` | \`${PW_TOTAL:-?}\` | \`summarize_flakes\` step output |"
+            echo "| \`noteworthy\` (\`failed + flaky\`) | \`${noteworthy}\` | computed here |"
+            echo "| \`playwright-flake-summary.md\` exists | \`${file_exists}\` | filesystem check |"
+            echo "| \`playwright-flake-summary.md\` size (bytes) | \`${file_size}\` | filesystem check |"
+            echo "| \`playwright-flake-summary.md\` non-empty | \`${file_nonempty}\` | filesystem check |"
+            echo ""
             if [ "${PW_COUNTS_AVAILABLE}" = "true" ]; then
-              noteworthy=$(( ${PW_FAILED:-0} + ${PW_FLAKY:-0} ))
               echo "| total | passed | failed | flaky | skipped |"
               echo "| ----- | ------ | ------ | ----- | ------- |"
               echo "| ${PW_TOTAL:-?} | ${PW_PASSED:-?} | ${PW_FAILED:-?} | ${PW_FLAKY:-?} | ${PW_SKIPPED:-?} |"
               echo ""
-              echo "**Gate rule:** upload the dedicated artifact only when \`failed + flaky > 0\`. This run: \`${PW_FAILED:-0} failed + ${PW_FLAKY:-0} flaky = ${noteworthy}\`."
+              echo "**Gate rule (primary):** upload only when \`failed + flaky > 0\` AND the file exists."
+              echo "**Gate rule (fallback, when counts unavailable):** upload when the file exists and is non-empty."
               echo ""
-              if [ "${noteworthy}" -gt 0 ]; then
+              echo "**Applied branch:** counts available (\`pw_counts_available=true\`) → primary rule."
+              echo "**Evaluation:** \`${PW_FAILED:-0} failed + ${PW_FLAKY:-0} flaky = ${noteworthy}\` and \`file_exists=${file_exists}\` → **${gate_result}**."
+              echo ""
+              if [ "${noteworthy}" -gt 0 ] && [ "${file_exists}" = "true" ]; then
                 echo "**Generated from failed/flaky tests?** ✅ Yes — \`playwright-flake-summary.md\` reflects **${PW_FAILED:-0} failed** and **${PW_FLAKY:-0} flaky** test(s). Gate result: **upload** (${noteworthy} > 0)."
               else
-                echo "**Generated from failed/flaky tests?** ❌ No — \`playwright-flake-summary.md\` was written from a clean run (**0 failed, 0 flaky**). Gate result: **skip upload** (${noteworthy} = 0)."
+                echo "**Generated from failed/flaky tests?** ❌ No — clean run (**0 failed, 0 flaky**) or missing file. Gate result: **skip upload**."
               fi
             else
-              echo "_Counts unavailable this run — the gate fell back to file-presence, which uploads unless the report was genuinely missing (see below). Cannot determine whether the summary was generated from failed/flaky tests._"
+              echo "**Gate rule (primary):** upload only when \`failed + flaky > 0\`."
+              echo "**Gate rule (fallback, applied here):** counts unavailable → upload if the file exists and is non-empty (fail-open — withholding possible evidence is worse than an occasional unnecessary artifact)."
+              echo ""
+              echo "**Applied branch:** counts unavailable (\`pw_counts_available!=true\`) → fallback rule."
+              echo "**Evaluation:** \`file_exists=${file_exists}\`, \`file_nonempty=${file_nonempty}\` → **${gate_result}**."
+              echo ""
+              echo "_Cannot determine whether the summary was generated from failed/flaky tests — counts weren't parsed._"
             fi
+            echo ""
+            echo "**Gate decision:** \`${gate_result}\` — reason: \`${reason_display}\`."
             echo ""
             if [ "${FLAKE_SUMMARY_PRESENT}" != "true" ]; then
               case "${FLAKE_SUMMARY_REASON}" in

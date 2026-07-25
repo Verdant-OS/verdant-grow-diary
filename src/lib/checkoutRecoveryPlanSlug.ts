@@ -29,6 +29,8 @@
  */
 
 import { PAID_PLAN_ALLOWLIST, type PaidPlanId } from "@/lib/paidPlanAllowlist";
+import { trackFunnelEvent } from "@/lib/funnelAnalytics";
+
 
 /** Stable fallback token — enum-like, no whitespace, funnel-sanitizer safe. */
 export const CHECKOUT_RECOVERY_UNKNOWN_PLAN_SLUG = "unknown_plan" as const;
@@ -72,9 +74,9 @@ function classify(value: unknown): UnknownPlanSlugFallbackTelemetry {
 }
 
 function emitFallbackWarning(telemetry: UnknownPlanSlugFallbackTelemetry): void {
-  // Throttle: warn at most once per (reason,bucket) tuple per session so a
-  // stuck caller can't flood the console. The counter still increments on
-  // every call.
+  // Throttle console.warn: at most once per (reason,bucket) tuple per session
+  // so a stuck caller can't flood devtools. The counter and the aggregated
+  // analytics event still fire on every call.
   const key = `${telemetry.reason}:${telemetry.lengthBucket}`;
   if (warnedReasons.has(key)) return;
   warnedReasons.add(key);
@@ -95,6 +97,25 @@ function emitFallbackWarning(telemetry: UnknownPlanSlugFallbackTelemetry): void 
 }
 
 /**
+ * Fire-and-forget analytics emission for every fallback (not throttled).
+ * Uses the shared funnel channel so subscribers can aggregate `reason` and
+ * `length_bucket` distributions without touching devtools. Carries only the
+ * two non-sensitive fields the console.warn line does — no raw value, no
+ * plan slug, no user identifiers.
+ */
+function emitFallbackAnalytics(telemetry: UnknownPlanSlugFallbackTelemetry): void {
+  try {
+    trackFunnelEvent("checkout_recovery_plan_slug_fallback", {
+      reason: telemetry.reason,
+      length_bucket: telemetry.lengthBucket,
+    });
+  } catch {
+    /* analytics must never break the recovery flow */
+  }
+}
+
+
+/**
  * Returns the input iff it is an exact member of the shared paid-plan
  * allowlist. Everything else — undefined, null, wrong type, unknown slug,
  * label ("Pro Monthly"), URL, Paddle price id ("pri_..."), free text —
@@ -108,8 +129,10 @@ export function sanitizeCheckoutRecoveryPlanSlug(value: unknown): CheckoutRecove
   const telemetry = classify(value);
   unknownFallbackCount += 1;
   emitFallbackWarning(telemetry);
+  emitFallbackAnalytics(telemetry);
   return CHECKOUT_RECOVERY_UNKNOWN_PLAN_SLUG;
 }
+
 
 /** Total number of fallbacks observed since the last reset. */
 export function getUnknownPlanSlugFallbackCount(): number {

@@ -162,6 +162,71 @@ describe("phenoEvidenceCaptureRules", () => {
     ]);
   });
 
+  it("counts a stored receipt whose details.plant_id the save RPC stripped", () => {
+    // quicklog_save_manual scrubs plant_id (and user/grow/tent ids) out of the
+    // client-supplied details blob, so every persisted receipt lacks one. The
+    // row's own plant_id column is authoritative. Regression: requiring
+    // details.plant_id rejected every real receipt and pinned coverage at 0.
+    const stored = {
+      ...buildPhenoEvidenceReceiptDetails({
+        huntId: HUNT_ID,
+        plantId: PLANT_ID,
+        evidenceGoal: "structure",
+        stage: "flower",
+      }),
+    } as Record<string, unknown>;
+    delete stored.plant_id;
+
+    expect(
+      parsePhenoEvidenceReceiptRow(row({ details: stored }), {
+        huntId: HUNT_ID,
+        plantId: PLANT_ID,
+      })?.plantId,
+    ).toBe(PLANT_ID);
+
+    const coverage = buildPhenoEvidenceCoverage({
+      configuredGoals: ["structure", "aroma"],
+      diaryRows: [row({ details: stored })],
+      huntId: HUNT_ID,
+      plantId: PLANT_ID,
+    });
+    expect(coverage.completedCount).toBe(1);
+  });
+
+  it("still rejects a scrubbed receipt whose row belongs to another candidate", () => {
+    const stored = {
+      ...buildPhenoEvidenceReceiptDetails({
+        huntId: HUNT_ID,
+        plantId: PLANT_ID,
+        evidenceGoal: "structure",
+      }),
+    } as Record<string, unknown>;
+    delete stored.plant_id;
+    expect(
+      parsePhenoEvidenceReceiptRow(row({ details: stored, plant_id: "another-plant" }), {
+        huntId: HUNT_ID,
+        plantId: PLANT_ID,
+      }),
+    ).toBeNull();
+  });
+
+  it("rejects a legacy receipt whose details.plant_id contradicts its row", () => {
+    const forged = {
+      ...buildPhenoEvidenceReceiptDetails({
+        huntId: HUNT_ID,
+        plantId: PLANT_ID,
+        evidenceGoal: "structure",
+      }),
+      plant_id: "another-plant",
+    };
+    expect(
+      parsePhenoEvidenceReceiptRow(row({ details: forged }), {
+        huntId: HUNT_ID,
+        plantId: PLANT_ID,
+      }),
+    ).toBeNull();
+  });
+
   it("does not count valid receipts for goals that are not configured for the hunt", () => {
     const coverage = buildPhenoEvidenceCoverage({
       configuredGoals: ["aroma"],

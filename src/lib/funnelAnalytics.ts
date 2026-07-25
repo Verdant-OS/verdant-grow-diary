@@ -49,9 +49,11 @@ export const FUNNEL_EVENTS = [
   "checkout_recovery_dismissed",
   "checkout_recovery_choose_another_plan",
   "checkout_recovery_retry",
+  "checkout_recovery_plan_slug_fallback",
   "subscription_activated",
   "checkout_return_completed",
 ] as const;
+
 
 export type FunnelEventName = (typeof FUNNEL_EVENTS)[number];
 
@@ -73,10 +75,20 @@ export const FUNNEL_PARAM_KEYS = [
   /**
    * Sanitized catalog-unavailable reason enum from get-paddle-price
    * (e.g. "price_not_configured"). Server-defined tokens only — never
-   * echoed to the user-facing UI and never carries free text.
+   * echoed to the user-facing UI and never carries free text. Also used
+   * by `checkout_recovery_plan_slug_fallback` to classify why the shared
+   * sanitizer collapsed a plan value to "unknown_plan"
+   * (missing / wrong_type / empty_string / not_in_allowlist).
    */
   "reason",
+  /**
+   * Coarse, non-identifying length bucket ("0" / "1-8" / "9-32" / "33+")
+   * emitted alongside `reason` by `checkout_recovery_plan_slug_fallback`.
+   * Never carries or approximates the raw rejected value.
+   */
+  "length_bucket",
 ] as const;
+
 
 type FunnelParamKey = (typeof FUNNEL_PARAM_KEYS)[number];
 

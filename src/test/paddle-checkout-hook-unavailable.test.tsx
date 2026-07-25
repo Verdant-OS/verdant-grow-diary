@@ -48,8 +48,19 @@ vi.mock("@/lib/paddle", async () => {
       this.name = "PaddleCheckoutUnavailableError";
     }
   }
+  class PaddleCheckoutCatalogUnavailableError extends Error {
+    constructor(
+      readonly reason: string,
+      readonly planId: string,
+      message: string,
+    ) {
+      super(message);
+      this.name = "PaddleCheckoutCatalogUnavailableError";
+    }
+  }
   return {
     PaddleCheckoutUnavailableError,
+    PaddleCheckoutCatalogUnavailableError,
     resolvePaddleCheckout: () => paddleState.env,
     getCheckoutUnavailableMessage: () => paddleState.message,
     initializePaddle: vi.fn(async () => {

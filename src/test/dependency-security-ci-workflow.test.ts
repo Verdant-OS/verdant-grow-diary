@@ -113,5 +113,15 @@ describe("dependency-security CI workflow", () => {
     expect(workflow).not.toMatch(/- name:\s*Unit tests/);
     expect(workflow).toContain("Repo-wide Vitest coverage is intentionally delegated");
     expect(workflow).toContain("sharded `CI` and `Full Vitest Suite (PR gate)` workflows");
+
+    const playwrightCommands = workflowRunCommands(workflow).filter((command) =>
+      command.startsWith("bunx playwright test"),
+    );
+    expect(playwrightCommands).toEqual([
+      "bunx playwright test e2e/auth-loading.spec.ts e2e/auth-route-protection.spec.ts e2e/legal-seo-metadata.spec.ts --project=chromium-mocked",
+    ]);
+    expect(playwrightCommands).not.toContain("bunx playwright test --project=chromium-mocked");
+    expect(workflow).toContain("Repo-wide browser coverage");
+    expect(workflow).toContain("existing dedicated E2E workflows");
   });
 });

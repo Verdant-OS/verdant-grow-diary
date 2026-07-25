@@ -75,10 +75,8 @@ jobs:
       # sharded `CI` and `Full Vitest Suite (PR gate)` workflows. This job owns
       # only the focused dependency-security contract tests above.
 
-      # Playwright smoke suite (chromium project against the built app).
-      # `--project` is a no-op when the project name doesn't exist in
-      # playwright.config.ts; adjust the project name to match the repo's
-      # smoke project as needed.
+      # Pinned mocked browser compatibility only. Repo-wide browser coverage
+      # remains owned by the existing dedicated E2E workflows.
       - name: Cache Playwright browsers
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
@@ -91,5 +89,10 @@ jobs:
         run: bunx playwright install --with-deps chromium
 
       - name: Playwright smoke suite
-        run: bunx playwright test --project=chromium-mocked
+        run: >-
+          bunx playwright test
+          e2e/auth-loading.spec.ts
+          e2e/auth-route-protection.spec.ts
+          e2e/legal-seo-metadata.spec.ts
+          --project=chromium-mocked
         continue-on-error: false

@@ -29,6 +29,18 @@ on:
     # surfaces within 24h instead of waiting for the next Craft PR.
     - cron: "17 8 * * *"
 
+concurrency:
+  # One preflight per PR. Without this, two overlapping `synchronize` runs
+  # race on the sticky comment: the older run can finish last and PATCH its
+  # result over the newer one, leaving a stale — possibly green — verdict
+  # attached to a commit that failed. Mirrors deployment-preview.yml.
+  #
+  # The `|| github.ref` fallback keeps the nightly and workflow_dispatch runs
+  # in their own group, so a PR run can never cancel the scheduled sweep that
+  # exists to catch an out-of-band archive in the Paddle dashboard.
+  group: paddle-craft-catalog-preflight-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   # Needed only to post/refresh the sticky failure comment on a PR. The
@@ -89,8 +101,13 @@ jobs:
       # echoed here — a passing line's detail embeds the Paddle internal
       # price id (`pri_...`), which has no business in PR chatter. The step
       # summary above (run-scoped, not a comment) keeps the full log.
+      # `!cancelled()` rather than `always()`: cancel-in-progress narrows the
+      # race but does not close it, because `always()` also fires on a
+      # CANCELLED run — so a superseded run could still PATCH its stale
+      # verdict on the way out. This runs on success and on failure, never on
+      # cancellation.
       - name: Comment Craft catalog failures on the PR
-        if: always() && github.event_name == 'pull_request'
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
@@ -205,7 +222,9 @@ jobs:
       # rather than being silently downgraded to green. The moment the secrets
       # exist, this branch stops being reachable and the gate blocks for real.
       - name: Enforce catalog result
-        if: always()
+        # Same reasoning as the comment step: a superseded, cancelled run must
+        # not report a verdict at all.
+        if: ${{ !cancelled() }}
         env:
           RC: ${{ steps.preflight.outputs.rc }}
           UNCONFIGURED: ${{ steps.preflight.outputs.unconfigured }}

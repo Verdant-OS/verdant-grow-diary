@@ -251,17 +251,33 @@ jobs:
       - name: Bootstrap disposable E2E fixture
         id: bootstrap_fixture
         if: steps.e2e_config.outputs.should_run == 'true' && vars.E2E_ALLOW_FIXTURE_BOOTSTRAP == 'true'
-        run: bun run e2e:bootstrap-fixture
+        shell: bash
+        run: |
+          # Tee combined stdout/stderr to a per-step log so the failure-debug
+          # summary can surface the last N lines under the failing step name.
+          # `set -o pipefail` ensures the real exit code propagates through tee.
+          set -o pipefail
+          mkdir -p e2e/results/step-logs
+          bun run e2e:bootstrap-fixture 2>&1 | tee e2e/results/step-logs/bootstrap_fixture.log
 
       - name: Verify disposable E2E fixture
         id: verify_fixture
         if: steps.e2e_config.outputs.should_run == 'true'
-        run: bun run e2e:verify-fixture
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p e2e/results/step-logs
+          bun run e2e:verify-fixture 2>&1 | tee e2e/results/step-logs/verify_fixture.log
 
       - name: Run Quick Log Playwright smoke
         id: quicklog_smoke
         if: steps.e2e_config.outputs.should_run == 'true' && steps.verify_fixture.outcome == 'success'
-        run: bun run e2e:quicklog-smoke
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p e2e/results/step-logs
+          bun run e2e:quicklog-smoke 2>&1 | tee e2e/results/step-logs/quicklog_smoke.log
+
 
       - name: Verify Quick Log smoke artifacts
         if: always() && steps.e2e_config.outputs.should_run == 'true'

@@ -1049,7 +1049,58 @@ jobs:
             e2e/results/playwright-report.json
             e2e/results/playwright-flake-summary.md
             playwright-report/
-            test-results/
+
+      # After the smoke bundle is uploaded, emit direct links back to every
+      # `test-results/**/error-context.md` file that the failure-debug section
+      # excerpted inline. GitHub artifact URLs point at the whole zip, so each
+      # row provides: (1) the exact archive-relative path to unzip, (2) a
+      # "Download bundle" link scoped to the smoke bundle artifact, and
+      # (3) a "Jump to inline excerpt" link that uses the stable `#ectx-N`
+      # anchor emitted earlier in the same Job Summary. This makes clicking a
+      # referenced error-context land on either the exact inline tail or the
+      # exact file inside the downloadable bundle. Runs only when the failure
+      # section actually recorded any error-context files.
+      - name: Link error-context files in Job Summary
+        if: failure() && steps.failure_debug_summary.outputs.present == 'true'
+        shell: bash
+        env:
+          SMOKE_BUNDLE_URL: ${{ steps.upload_smoke_bundle.outputs.artifact-url }}
+          ARTIFACT_SUFFIX: ${{ env.ARTIFACT_SUFFIX }}
+        run: |
+          set +e
+          INDEX="e2e/results/error-context-paths.txt"
+          if [ ! -s "${INDEX}" ]; then
+            # Nothing to link — either no error-context.md files were present
+            # at failure time, or the failure-debug step didn't run. Stay
+            # silent rather than adding an empty section.
+            exit 0
+          fi
+          {
+            echo ""
+            echo "### 🔗 Error-context files — direct links"
+            echo ""
+            echo "Each row corresponds to a \`test-results/**/error-context.md\` excerpt shown inline in the **❌ Job failed — quick debug info** section above. Clicking **Jump to excerpt** scrolls to the tail on this page; **Download bundle** downloads the smoke bundle zip containing the file at the exact archive-relative path shown."
+            echo ""
+            echo "| # | Archive path (inside \`quicklog-smoke-artifacts-${ARTIFACT_SUFFIX}.zip\`) | Jump to excerpt | Download bundle |"
+            echo "| - | --- | --- | --- |"
+            while IFS=$'\t' read -r anchor rel_path; do
+              [ -z "${anchor}" ] && continue
+              n="${anchor#ectx-}"
+              if [ -n "${SMOKE_BUNDLE_URL}" ]; then
+                dl="[Download](${SMOKE_BUNDLE_URL})"
+              else
+                dl="_bundle URL unavailable — see Artifacts dropdown_"
+              fi
+              printf '| %s | `%s` | [Jump to excerpt](#%s) | %s |\n' \
+                "${n}" "${rel_path}" "${anchor}" "${dl}"
+            done < "${INDEX}"
+            echo ""
+            echo "> After downloading the bundle, extract it and open the archive path shown above. Example: \`unzip quicklog-smoke-artifacts-${ARTIFACT_SUFFIX}.zip\` then open the file at the listed path in any Markdown viewer."
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 0
+
+
 
       # Consolidated at-a-glance index of the three primary uploads for this
       # run (smoke bundle, standalone flake summary, standalone Playwright

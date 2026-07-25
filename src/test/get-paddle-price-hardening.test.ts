@@ -18,10 +18,10 @@ const CONFIG = readFileSync(resolve(process.cwd(), "supabase/config.toml"), "utf
 const stripped = SRC.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
 
 describe("get-paddle-price — paid plan allowlist", () => {
-  it("accepts exactly pro_monthly, pro_annual, founder_lifetime", () => {
+  it("accepts exactly pro_monthly, pro_annual, craft_monthly, craft_annual, founder_lifetime", () => {
     // Quote-agnostic: prettier normalizes edge functions to double quotes.
     expect(SRC).toMatch(
-      /PAID_PLAN_ALLOWLIST[\s\S]{0,120}["']pro_monthly["'],\s*["']pro_annual["'],\s*["']founder_lifetime["'],/,
+      /PAID_PLAN_ALLOWLIST[\s\S]{0,200}["']pro_monthly["'],\s*["']pro_annual["'],\s*["']craft_monthly["'],\s*["']craft_annual["'],\s*["']founder_lifetime["'],/,
     );
     expect(SRC).toMatch(/PAID_PLAN_ALLOWLIST\.has\(requested\)/);
     // Fail-closed branch for anything outside the allowlist.

@@ -5,6 +5,7 @@ import {
   resolvePaddleCheckout,
   getCheckoutUnavailableMessage,
   PaddleCheckoutUnavailableError,
+  PaddleCheckoutCatalogUnavailableError,
 } from "@/lib/paddle";
 import { useAuth } from "@/store/auth";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -217,7 +218,10 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
         // The dedicated fail-closed error surfaces as an inline calm state,
         // never a destructive toast. Everything else keeps the existing
         // destructive toast so real Paddle/network failures stay visible.
-        if (err instanceof PaddleCheckoutUnavailableError) {
+        if (
+          err instanceof PaddleCheckoutUnavailableError ||
+          err instanceof PaddleCheckoutCatalogUnavailableError
+        ) {
           setBlockedReason(err.message);
         } else {
           setBlockedReason(CHECKOUT_RECOVERY_MESSAGE);

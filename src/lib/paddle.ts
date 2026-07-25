@@ -101,6 +101,89 @@ export class PaddleCheckoutUnavailableError extends Error {
   }
 }
 
+/**
+ * Raised when the server-side price resolver refuses to hand back a
+ * Paddle price id for a known-good reason: the plan isn't in the
+ * allowlist, the catalog entry doesn't exist yet, the corresponding
+ * `PADDLE_PRICE_*` env var is unset, or the gateway itself failed. Handled
+ * by the checkout hook as a calm inline blocked state — no destructive
+ * toast, no lost intent, no crash.
+ *
+ * `reason` mirrors the sanitized error code from get-paddle-price
+ * (`unknown_plan` | `price_not_configured` | `price_resolution_unavailable`
+ * | `plan_sold_out`). Callers should treat unknown reasons as a generic
+ * "unavailable" state.
+ */
+export type PaddleCheckoutCatalogReason =
+  | "unknown_plan"
+  | "price_not_configured"
+  | "price_resolution_unavailable"
+  | "plan_sold_out";
+
+export class PaddleCheckoutCatalogUnavailableError extends Error {
+  readonly reason: PaddleCheckoutCatalogReason;
+  readonly planId: string;
+  constructor(reason: PaddleCheckoutCatalogReason, planId: string, message: string) {
+    super(message);
+    this.name = "PaddleCheckoutCatalogUnavailableError";
+    this.reason = reason;
+    this.planId = planId;
+  }
+}
+
+const CATALOG_REASONS: ReadonlySet<PaddleCheckoutCatalogReason> = new Set([
+  "unknown_plan",
+  "price_not_configured",
+  "price_resolution_unavailable",
+  "plan_sold_out",
+]);
+
+export function getPaddleCheckoutCatalogMessage(
+  reason: PaddleCheckoutCatalogReason,
+): string {
+  switch (reason) {
+    case "unknown_plan":
+      return "This plan isn't available for checkout yet. Please pick another plan or check back soon.";
+    case "price_not_configured":
+      return "This plan isn't set up for checkout yet. Please pick another plan or check back soon.";
+    case "plan_sold_out":
+      return "This plan is sold out.";
+    case "price_resolution_unavailable":
+    default:
+      return "Checkout is temporarily unavailable for this plan. Please try again in a moment or pick another plan.";
+  }
+}
+
+/** Best-effort extraction of the sanitized `{ error: "..." }` code returned
+ *  by get-paddle-price, whether it surfaces via the invoke `data` (2xx-ish)
+ *  or the `error.context` Response (non-2xx). Returns null if the body
+ *  isn't a recognized catalog reason. */
+async function extractCatalogReason(
+  data: unknown,
+  error: unknown,
+): Promise<PaddleCheckoutCatalogReason | null> {
+  const fromData =
+    data && typeof data === "object" && typeof (data as { error?: unknown }).error === "string"
+      ? ((data as { error: string }).error)
+      : null;
+  if (fromData && CATALOG_REASONS.has(fromData as PaddleCheckoutCatalogReason)) {
+    return fromData as PaddleCheckoutCatalogReason;
+  }
+  const ctx = (error as { context?: unknown } | null)?.context;
+  if (ctx && typeof (ctx as Response).json === "function") {
+    try {
+      const body = await (ctx as Response).clone().json();
+      const code = body && typeof body.error === "string" ? body.error : null;
+      if (code && CATALOG_REASONS.has(code as PaddleCheckoutCatalogReason)) {
+        return code as PaddleCheckoutCatalogReason;
+      }
+    } catch {
+      // fall through — not a JSON body
+    }
+  }
+  return null;
+}
+
 export async function initializePaddle(): Promise<void> {
   if (paddleInitialized) return;
   if (paddleInitPromise) return paddleInitPromise;
@@ -163,6 +246,14 @@ export async function getPaddlePriceId(priceId: string): Promise<string> {
     body: { priceId, environment: env },
   });
   if (error || !data?.paddleId) {
+    const reason = await extractCatalogReason(data, error);
+    if (reason) {
+      throw new PaddleCheckoutCatalogUnavailableError(
+        reason,
+        priceId,
+        getPaddleCheckoutCatalogMessage(reason),
+      );
+    }
     throw new Error(`Failed to resolve price: ${priceId}`);
   }
   return data.paddleId as string;

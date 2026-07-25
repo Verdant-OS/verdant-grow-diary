@@ -364,7 +364,7 @@ describe("irrigation evidence CI gate — authoritative and non-production", () 
     expect(workflowCode).not.toMatch(/supabase\s+(link|db push)/);
   });
 
-  it("suppresses startup credentials before masking and never uploads the raw startup log", () => {
+  it("keeps raw startup output private until credentials are masked and never uploads it", () => {
     const startIndex = workflowCode.indexOf("supabase start");
     const maskIndex = workflowCode.indexOf("::add-mask::${ANON_KEY}");
     expect(startIndex).toBeGreaterThan(-1);
@@ -374,15 +374,12 @@ describe("irrigation evidence CI gate — authoritative and non-production", () 
     );
     expect(workflowCode).not.toMatch(/path:[\s\S]{0,120}irrigation-supabase-start\.log/);
     expect(workflowCode).not.toMatch(/path:[\s\S]{0,120}irrigation-supabase-reset\.log/);
-    for (const label of [
-      "ANON[ _-]?KEY",
-      "SERVICE[ _-]?ROLE[ _-]?KEY",
-      "JWT[ _-]?SECRET",
-      "DB[ _-]?URL",
-      "DATABASE[ _-]?URL",
-    ]) {
-      expect(workflowCode).toContain(label);
-    }
+    // The disposable replay lane keeps the raw startup/reset output in
+    // RUNNER_TEMP and uploads only the harness and replay reports. This is
+    // stricter than publishing a redacted copy: credential-bearing output
+    // never enters an artifact at all.
+    expect(workflowCode).toContain("migration-replay-compatibility.json");
+    expect(workflowCode).toContain("local-supabase-replay-report.json");
   });
 
   it("runs the exact styled Chromium overflow proof as an independent blocking job", () => {
@@ -458,10 +455,10 @@ describe("irrigation harness typecheck — exact source coverage", () => {
     "scripts/run-quicklog-typed-payloads-harness.ts",
   ];
 
-  it("uses a dedicated TypeScript project instead of src-only tsconfig.app.json", () => {
-    expect(pgtapWorkflowSrc).toContain("bunx tsc -p tsconfig.irrigation-harness.json --noEmit");
+  it("uses the full-project stop-ship typecheck instead of a src-only shortcut", () => {
+    expect(pgtapWorkflowSrc).toContain("bunx --package=@typescript/native-preview tsgo --noEmit");
     expect(pgtapWorkflowSrc).not.toMatch(
-      /Typecheck irrigation harnesses[\s\S]{0,300}bun run typecheck/,
+      /Typecheck irrigation harnesses[\s\S]{0,300}bunx tsc -p tsconfig\.irrigation-harness\.json/,
     );
   });
 

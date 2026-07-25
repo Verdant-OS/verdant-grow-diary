@@ -50,15 +50,25 @@ function extractEmitterBody(source: string): string {
 }
 
 function extractEmittedKeys(emitterBody: string): string[] {
-  const marker = "JSON.stringify({";
-  const startIdx = emitterBody.indexOf(marker);
-  expect(startIdx, "JSON.stringify object literal not found").toBeGreaterThan(
-    -1,
-  );
+  const openMatch = /JSON\.stringify\s*\(\s*\{/.exec(emitterBody);
+  expect(openMatch, "JSON.stringify object literal not found").not.toBeNull();
+  const startIdx = openMatch!.index + openMatch![0].length - 1; // index of the '{'
   // Walk braces to find matching close.
   let depth = 0;
   let endIdx = -1;
-  for (let i = startIdx + marker.length - 1; i < emitterBody.length; i++) {
+  for (let i = startIdx; i < emitterBody.length; i++) {
+    const ch = emitterBody[i];
+    if (ch === "{") depth++;
+    else if (ch === "}") {
+      depth--;
+      if (depth === 0) {
+        endIdx = i;
+        break;
+      }
+    }
+  }
+  expect(endIdx, "unterminated JSON.stringify literal").toBeGreaterThan(-1);
+  const literal = emitterBody.slice(startIdx, endIdx + 1);
     const ch = emitterBody[i];
     if (ch === "{") depth++;
     else if (ch === "}") {

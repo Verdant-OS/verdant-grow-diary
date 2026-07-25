@@ -300,70 +300,41 @@ test.describe("Quick Log smoke checklist", () => {
         return "attach section focused";
       });
 
-      await report.run(12, "Select Watering event type", async () => {
-        // The activity-type chips are presentational; `eventType` (which
-        // drives the required-watering-ml validation) is owned by the Event
-        // select (EventTypeSelector, id=quick-log-event-type). Clicking only
-        // the chip leaves eventType on the default, so the blank-ml save
-        // would bounce off the note gate instead of the watering gate.
-        const eventSelect = dialog.locator("#quick-log-event-type");
-        await eventSelect.click();
-        await page.getByRole("option", { name: /^watering$/i }).click();
-        await expect(eventSelect).toContainText(/watering/i);
-        return "watering selected";
+      let structuredWaterTargetId = "";
+      await report.run(12, "Watering opens the structured Quick Log", async () => {
+        structuredWaterTargetId = (await readTargetTuple(dialog)).plantId;
+        await dialog.getByTestId("quick-log-dialog-all-activities-watering").click();
+
+        await expect(page.getByTestId("qlv2-watering-form")).toBeVisible();
+        await expect(page.getByLabel("Volume (ml)")).toBeVisible();
+        await expect(page.getByLabel("Choose plant or tent for this Quick Log")).toContainText(
+          TARGET_NAME,
+        );
+        return "structured Water form opened for the selected plant";
       });
 
-      // Watering save validation is driven ADAPTIVELY so this checklist
-      // matches the live deployed app today and the branch contract once it
-      // ships. The live app requires a note before saving a watering entry
-      // (it surfaces "Add a quick note"); the branch adds an undeployed
-      // required Watering (ml) field on top. We attempt a blank save, confirm
-      // it is BLOCKED, then satisfy whatever the running build requires.
-      await report.run(13, "Blank watering save is blocked by validation", async () => {
-        await dialog.getByTestId("quick-log-save").click();
-        // A validation error must keep the dialog in edit mode — no post-save.
-        await expect(dialog.getByTestId("quick-log-post-save")).toHaveCount(0);
-        // Some visible error must explain the block (note-required on live,
-        // or the watering-ml error on the deployed-branch build).
-        const wateringErr = dialog.getByTestId("quicklog-watering-error");
-        const saveErr = dialog.getByTestId("quick-log-save-error");
-        const shown =
-          (await wateringErr.count()) > 0
-            ? await wateringErr.isVisible()
-            : (await saveErr.count()) > 0 && (await saveErr.isVisible());
-        if (shown) return "blocked with a visible validation error";
-        // Real browsers can block the submit BEFORE the app handler runs:
-        // the native `required` constraint shows a "Please fill out this
-        // field" bubble that lives outside the DOM, so neither app error
-        // element renders (CI screenshot evidence on #193). Accept that
-        // mechanism via ValidityState.
-        for (const testId of ["quicklog-watering-ml", "quicklog-note"]) {
-          const field = dialog.getByTestId(testId);
-          if ((await field.count()) === 0) continue;
-          const valueMissing = await field.evaluate(
-            (el) => (el as HTMLInputElement | HTMLTextAreaElement).validity?.valueMissing ?? false,
-          );
-          if (valueMissing) return `blocked by native required validation (${testId})`;
-        }
-        throw new Error("Blank save produced no visible validation error");
+      await report.run(13, "Blank structured watering save is blocked", async () => {
+        await expect(page.getByTestId("qlv2-missing-volume-help")).toBeVisible();
+        await page.getByTestId("qlv2-save").click();
+        await expect(page.getByTestId("qlv2-error")).toContainText(/volume/i);
+        await expect(page.getByTestId("qlv2-post-save")).toHaveCount(0);
+        return "required-volume guard visible; post-save absent";
       });
 
-      await report.run(14, "Satisfy required fields (note; watering ml when present)", async () => {
-        await dialog.getByTestId("quicklog-note").fill("Smoke watering log");
-        // The Watering (ml) field lives inside the collapsed "Add more
-        // details" section on builds that enforce it. Expand and fill when
-        // present; skip cleanly on the live build that needs only a note.
-        let ml = dialog.getByTestId("quicklog-watering-ml");
-        if ((await ml.count()) === 0) {
-          const moreToggle = dialog.getByRole("switch", { name: /add more details/i });
-          if ((await moreToggle.count()) > 0) await moreToggle.click();
-          ml = dialog.getByTestId("quicklog-watering-ml");
-        }
-        if ((await ml.count()) > 0) {
-          await ml.fill("250");
-          return "note + watering ml (250) filled";
-        }
-        return "note filled (no watering ml field on this build)";
+      await report.run(14, "Return to Quick Log and prepare an observation", async () => {
+        await page
+          .getByRole("button", { name: /^close$/i, exact: true })
+          .last()
+          .click();
+        await expect(page.getByTestId("qlv2-watering-form")).toHaveCount(0);
+
+        await openQuickLogDialog(page);
+        const reopenedTargetId = await dialog
+          .getByTestId("quick-log-target-card")
+          .getAttribute("data-target-plant-id");
+        expect(reopenedTargetId).toBe(structuredWaterTargetId);
+        await dialog.getByTestId("quicklog-note").fill("Smoke checklist observation");
+        return "structured sheet closed; observation prepared for the same plant";
       });
 
       await report.run(15, "Save uses displayed target", async () => {

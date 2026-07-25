@@ -6,6 +6,14 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { normalizeTargetsRow } from "@/hooks/useGrowTargets";
+import {
+  FIELDS,
+  celsiusToDisplayUnit,
+  displayUnitToCelsius,
+  rowValueToFormValue,
+  rowToForm,
+  temperatureUnitSymbol,
+} from "@/components/GrowTargetsEditor";
 
 const ROOT = resolve(__dirname, "../..");
 const DASHBOARD = readFileSync(resolve(ROOT, "src/pages/Dashboard.tsx"), "utf8");
@@ -149,6 +157,160 @@ describe("GrowTargetsEditor contract", () => {
   });
   it("does not write to action_queue", () => {
     expect(EDITOR).not.toMatch(/action_queue/);
+  });
+});
+
+describe("GrowTargetsEditor temperature unit preference", () => {
+  // Regression: this dialog previously hardcoded "°C" as both the label and
+  // the implicit unit of every number typed in, regardless of the app-wide
+  // temperature preference (default: Fahrenheit — see
+  // DEFAULT_TEMPERATURE_UNIT in temperatureUnitPreference.ts). A grower on
+  // the Fahrenheit default had no indication they needed to type a Celsius
+  // number, and the value was stored as if it were already Celsius.
+
+  it("marks exactly temp and soil_temp as temperature fields", () => {
+    const tempKeys = FIELDS.filter((f) => f.isTemperature).map((f) => f.key);
+    expect(tempKeys.sort()).toEqual(["soil_temp", "temp"]);
+  });
+
+  it("does not mark non-temperature fields as temperature fields", () => {
+    for (const key of ["rh", "vpd", "soil_wc", "soil_ec", "ppfd"] as const) {
+      const field = FIELDS.find((f) => f.key === key)!;
+      expect(field.isTemperature).toBeFalsy();
+    }
+  });
+
+  describe("temperatureUnitSymbol", () => {
+    it("returns °F for fahrenheit and °C for celsius", () => {
+      expect(temperatureUnitSymbol("fahrenheit")).toBe("°F");
+      expect(temperatureUnitSymbol("celsius")).toBe("°C");
+    });
+  });
+
+  describe("celsiusToDisplayUnit / displayUnitToCelsius", () => {
+    it("is a no-op in celsius", () => {
+      expect(celsiusToDisplayUnit(21, "celsius")).toBe(21);
+      expect(displayUnitToCelsius(21, "celsius")).toBe(21);
+    });
+
+    it("converts a known celsius value to fahrenheit correctly", () => {
+      // 20°C is exactly 68°F — a clean value with no rounding ambiguity.
+      expect(celsiusToDisplayUnit(20, "fahrenheit")).toBe(68);
+      expect(displayUnitToCelsius(68, "fahrenheit")).toBe(20);
+    });
+
+    it("converts 0°C and negative celsius correctly", () => {
+      expect(celsiusToDisplayUnit(0, "fahrenheit")).toBe(32);
+      expect(celsiusToDisplayUnit(-10, "fahrenheit")).toBe(14);
+    });
+
+    it("round-trips within floating-point noise for arbitrary values", () => {
+      // The exact bug class this guards against: reopening the dialog and
+      // saving without touching a field must not silently drift the stored
+      // Celsius value on every save.
+      for (const celsius of [18.5, 21.3, 26.75, -5.2, 30]) {
+        const displayed = celsiusToDisplayUnit(celsius, "fahrenheit");
+        const roundTripped = displayUnitToCelsius(displayed, "fahrenheit");
+        expect(Math.abs(roundTripped - celsius)).toBeLessThan(0.02);
+      }
+    });
+
+    it("rounds to at most 2 decimal places", () => {
+      const displayed = celsiusToDisplayUnit(21.333333, "fahrenheit");
+      const decimals = (String(displayed).split(".")[1] ?? "").length;
+      expect(decimals).toBeLessThanOrEqual(2);
+    });
+  });
+
+  describe("rowValueToFormValue", () => {
+    const tempField = FIELDS.find((f) => f.key === "temp")!;
+    const rhField = FIELDS.find((f) => f.key === "rh")!;
+
+    it("returns empty string for null/undefined", () => {
+      expect(rowValueToFormValue(null, tempField, "fahrenheit")).toBe("");
+      expect(rowValueToFormValue(undefined, tempField, "fahrenheit")).toBe("");
+    });
+
+    it("returns empty string for non-finite values", () => {
+      expect(rowValueToFormValue("not-a-number", tempField, "fahrenheit")).toBe("");
+    });
+
+    it("converts a temperature field's stored Celsius value to the display unit", () => {
+      expect(rowValueToFormValue(20, tempField, "fahrenheit")).toBe("68");
+      expect(rowValueToFormValue(20, tempField, "celsius")).toBe("20");
+    });
+
+    it("never converts a non-temperature field, even when the preference is fahrenheit", () => {
+      expect(rowValueToFormValue(65, rhField, "fahrenheit")).toBe("65");
+    });
+  });
+
+  describe("rowToForm", () => {
+    it("converts every temperature column, leaves every other column untouched", () => {
+      const row = {
+        temp_min: 20,
+        temp_max: 28,
+        rh_min: 40,
+        rh_max: 65,
+        soil_temp_min: 18,
+        soil_temp_max: 26,
+        ppfd_min: 300,
+        ppfd_max: 900,
+      };
+      const form = rowToForm(row, "fahrenheit");
+      expect(form.temp_min).toBe("68");
+      expect(form.temp_max).toBe("82.4");
+      expect(form.soil_temp_min).toBe("64.4");
+      expect(form.soil_temp_max).toBe("78.8");
+      // Untouched: same values, whatever the preference.
+      expect(form.rh_min).toBe("40");
+      expect(form.rh_max).toBe("65");
+      expect(form.ppfd_min).toBe("300");
+      expect(form.ppfd_max).toBe("900");
+    });
+
+    it("in celsius mode, temperature columns pass through unchanged", () => {
+      const row = { temp_min: 20, temp_max: 28 };
+      const form = rowToForm(row, "celsius");
+      expect(form.temp_min).toBe("20");
+      expect(form.temp_max).toBe("28");
+    });
+
+    it("returns the empty form for a null row", () => {
+      const form = rowToForm(null, "fahrenheit");
+      expect(form.temp_min).toBe("");
+      expect(form.temp_max).toBe("");
+    });
+  });
+
+  describe("wiring", () => {
+    it("reads the live temperature unit preference", () => {
+      expect(EDITOR).toMatch(/useTemperatureUnitPreference/);
+      expect(EDITOR).toMatch(
+        /from ["']@\/hooks\/useTemperatureUnitPreference["']/,
+      );
+    });
+
+    it("no longer hardcodes °C as the label for every field", () => {
+      // The exact regression string: a field's unit rendered unconditionally
+      // from a static FieldDef.unit, with no isTemperature branch.
+      expect(EDITOR).not.toMatch(/\{f\.label\}\s*\(\{f\.unit\}\)/);
+      expect(EDITOR).toMatch(/temperatureUnitSymbol/);
+    });
+
+    it("converts the display unit back to Celsius before the upsert", () => {
+      const convertIdx = EDITOR.indexOf("displayUnitToCelsius");
+      const upsertIdx = EDITOR.indexOf(".upsert(");
+      expect(convertIdx).toBeGreaterThan(-1);
+      expect(upsertIdx).toBeGreaterThan(-1);
+      expect(convertIdx).toBeLessThan(upsertIdx);
+    });
+
+    it("does not introduce an ai-coach call, external-control strings, or service_role", () => {
+      expect(AI_COACH_CALL.test(EDITOR)).toBe(false);
+      expect(EXTERNAL_CONTROL.test(EDITOR)).toBe(false);
+      expect(SERVICE_ROLE.test(EDITOR)).toBe(false);
+    });
   });
 });
 

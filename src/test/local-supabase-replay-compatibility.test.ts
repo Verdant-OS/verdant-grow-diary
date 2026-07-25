@@ -116,7 +116,7 @@ describe("local Supabase replay compatibility workspace", () => {
     };
     expect(report).toMatchObject({
       mode: "verify_only",
-      compatibility_entry_count: 3,
+      compatibility_entry_count: 17,
       source_migrations_unchanged: true,
     });
   });

@@ -3,9 +3,11 @@
   "hash_normalization": "utf8_lf",
   "_notes": [
     "Fresh local Supabase resets must preserve the immutable migration files in the repository.",
-    "The connected production project's recorded history contains each canonical migration below and does not contain the later Lovable duplicate.",
+    "Every entry pairs an earlier descriptive migration with a later immutable Lovable export that repeats the same schema change during a fresh replay.",
+    "Hosted migration history was checked read-only; where it records the canonical version, the later duplicate remains absent.",
+    "The repository's prior local-replay repair identified the same collision set before the immutable export files were restored.",
     "The replay preparer verifies every SHA-256 before replacing only the duplicate copy inside a disposable workdir.",
-    "Do not add an entry merely to silence a reset failure. Prove the hosted migration-history relationship first."
+    "Do not add an entry merely to silence a reset failure. Prove the canonical/duplicate relationship first."
   ],
   "compatibility_noops": [
     {
@@ -14,6 +16,90 @@
       "duplicate_path": "supabase/migrations/20260721182752_4fc51714-bc29-4044-9b91-180c065e997f.sql",
       "duplicate_sha256": "0a99565b7967e34ea141dacd083d3df0e205fc3629318f6a149517776c602465",
       "reason": "Production records 20260721103000; the later unrecorded file repeats the AI credit grant ledger and fails fresh replay with SQLSTATE 42P07."
+    },
+    {
+      "canonical_path": "supabase/migrations/20260719035000_add_ai_doctor_sessions_user_delete_cascade.sql",
+      "canonical_sha256": "da9e9be6580a573dd90426a48654b2883203a3d8b697ba3e1ad0aa25e2a963a8",
+      "duplicate_path": "supabase/migrations/20260721190300_6e424afe-215e-474e-8e41-d62406450973.sql",
+      "duplicate_sha256": "bdb6776a3837f9d2e2438dcae3184394b30a20eddfae0230da6ede8cfb0a6f04",
+      "reason": "The later Lovable export repeats the earlier AI Doctor account-deletion foreign key and fails fresh replay because the named constraint already exists."
+    },
+    {
+      "canonical_path": "supabase/migrations/20260719043000_ai_credit_result_cache.sql",
+      "canonical_sha256": "71777a5c754685f7c52cb6d41cafb5647cce8ee08d8f5e0f71468e799f0a0482",
+      "duplicate_path": "supabase/migrations/20260721190434_d4c06065-8426-4d69-aac6-f1135e381aee.sql",
+      "duplicate_sha256": "a97bc11f07510d4be6e72cd4439f7cb3bed643ada7d21179f2ca08c859928c17",
+      "reason": "Production records 20260719043000; the later export repeats its AI credit result sidecar, constraints, and replay RPC definitions."
+    },
+    {
+      "canonical_path": "supabase/migrations/20260719075033_vpd_calibration_provenance.sql",
+      "canonical_sha256": "3451e69e2482636f61f02c8e6a964bbeda278e22dd0f9fba5bb8c696fd338f06",
+      "duplicate_path": "supabase/migrations/20260721190634_e16d1c98-27e3-4246-882c-d6ebc0c4491b.sql",
+      "duplicate_sha256": "77969aa234b4b9c698180767106d0f92c583573129f35630b0ccfdb2ec3cd526",
+      "reason": "The later Lovable export repeats the earlier VPD calibration and measurement provenance tables, grants, policies, and helper RPCs."
+    },
+    {
+      "canonical_path": "supabase/migrations/20260719180000_ai_doctor_review_evidence_receipts.sql",
+      "canonical_sha256": "f67c8874830fbf8c781ace474ae727a754085f75152548f960d0bd5a0626d5e9",
+      "duplicate_path": "supabase/migrations/20260721190735_ad890fa2-a669-48bb-92fc-89376b84370f.sql",
+      "duplicate_sha256": "6b8ab161dc5069dd35b0d4ee4793a50556ba8b29507c1c20f0f245eb1e9c905b",
+      "reason": "Production records 20260719180000; the later export repeats the AI Doctor evidence receipt table, access rules, and recorder RPC."
+    },
+    {
+      "canonical_path": "supabase/migrations/20260720093000_ai_credit_grow_scope_integrity.sql",
+      "canonical_sha256": "e375910bac9b5cf6a8bcb53ca3a9f4853e02a259e696a5a4a971cfcdc9c1aebd",
+      "duplicate_path": "supabase/migrations/20260721192508_2ee8c89c-be17-4c29-8d73-684db0db4649.sql",
+      "duplicate_sha256": "293376806c9703437960e07f636b4356fd58b2f10db332cf58e468ac1c182dc7",
+      "reason": "Production records 20260720093000; the later export repeats grow-scope AI credit constraints and the hardened spend and refund RPCs."
+    },
+    {
+      "canonical_path": "supabase/migrations/20260720120000_phenoid_addon_layer_foundation.sql",
+      "canonical_sha256": "26dcff03fdd04ffaf5db8edda513f3ae77a1546de9de12c414ea1f75150901e5",
+      "duplicate_path": "supabase/migrations/20260721192852_78e5de95-fef1-456d-a0d1-e026e4e1115b.sql",
+      "duplicate_sha256": "8c1a3e0c53b976233db19df7b7bb6a3d61e0cfda1d4cdc474877afa8b835a4eb",
+      "reason": "The later Lovable export repeats the earlier PhenoID candidate extras, fights, idempotency, policies, and helper functions."
+    },
+    {
+      "canonical_path": "supabase/migrations/20260720130000_pheno_ingest_rpc.sql",
+      "canonical_sha256": "11bb58572d7f5e3af47fd0ce5df98ed02a4c192f4cf7da6f04564e3b14b3ae37",
+      "duplicate_path": "supabase/migrations/20260721193009_804e0421-0e2e-470f-a9b6-adf4bc312ae1.sql",
+      "duplicate_sha256": "8c7f0c2c1df9aa128fce731dd55cd91e62742e2d1607ae4d8f6de40a5b4d12ab",
+      "reason": "The later Lovable export repeats the earlier PhenoID ingestion RPC, idempotency records, grants, and row-level security rules."
+    },
+    {
+      "canonical_path": "supabase/migrations/20260720141000_genetics_traceability_accessions.sql",
+      "canonical_sha256": "7d6aa66073dfea319f5036cb95ee37113df1bec13d7dc97380eb775fbdfa3d81",
+      "duplicate_path": "supabase/migrations/20260721193128_17950647-c02c-4adb-a83e-cd186cfca7a8.sql",
+      "duplicate_sha256": "2c77babfbc11ac7f97fb502e3ca1cdc7fbcdeff489140276c2c8ce067e2389c4",
+      "reason": "The later Lovable export repeats the earlier genetics accession and mutation-idempotency tables, policies, and mutation helper."
+    },
+    {
+      "canonical_path": "supabase/migrations/20260720142000_genetics_traceability_batches.sql",
+      "canonical_sha256": "10e1df98f859c4bf8f9a209001dffb1dafb64dd8df49fd6467b8fee6dd34911d",
+      "duplicate_path": "supabase/migrations/20260721193247_f6b46fe2-299b-4f0b-91cf-80768cf5c11c.sql",
+      "duplicate_sha256": "81a68f690187d2574ef25047dfbc4852f6fe399daccb099955743d5161c9d246",
+      "reason": "The later Lovable export repeats the earlier propagation batch and status-event schema, access rules, and batch mutation functions."
+    },
+    {
+      "canonical_path": "supabase/migrations/20260720143000_genetics_traceability_assignments.sql",
+      "canonical_sha256": "70e6ef2550cb6e39c9678c7ea01f4b34c36a9bb3b7fdd5c9edadfb4066e8d144",
+      "duplicate_path": "supabase/migrations/20260721193431_99226d9d-eff2-4bf1-bda4-7f86584e2162.sql",
+      "duplicate_sha256": "b78bad016ba64439ff6b1e3fd73e32a764e6bbe00b3b76c5945b4ec9bbbe7c28",
+      "reason": "The later Lovable export repeats the earlier plant-origin assignment schema, event history, policies, and assignment resolver functions."
+    },
+    {
+      "canonical_path": "supabase/migrations/20260720144000_genetics_traceability_screening.sql",
+      "canonical_sha256": "c4c4838ff8ded1745c5c537dd4d2eb6635c28d6302fc9db209851defa5507529",
+      "duplicate_path": "supabase/migrations/20260721193523_380202e1-6b43-48b8-8831-ab5b99bd4a51.sql",
+      "duplicate_sha256": "0c8306a7306c409704fc0f042d09b31e7e8ef01aac6437b987e64a25c043da92",
+      "reason": "The later Lovable export repeats the earlier genetics screening-result schema, ownership policies, grants, and recording function."
+    },
+    {
+      "canonical_path": "supabase/migrations/20260720145000_genetics_traceability_quarantine.sql",
+      "canonical_sha256": "bae3116391b60f0f175b516393647559091cbf73d3b4b2fd896d7895e3764c8f",
+      "duplicate_path": "supabase/migrations/20260721193641_c9189cd4-85d1-4c1f-808e-bb1e5779ca70.sql",
+      "duplicate_sha256": "7f0dd10a27b7b4346033feda7650316d16c66ba7881d2ef78102ff31a7f29017",
+      "reason": "The later Lovable export repeats the earlier quarantine episode and transition-event schema, policies, grants, and mutation functions."
     },
     {
       "canonical_path": "supabase/migrations/20260721104000_ai_credit_spend_pack_overflow.sql",
@@ -28,6 +114,20 @@
       "duplicate_path": "supabase/migrations/20260721194154_9cf7d1a8-174a-44fd-ad49-8ca1fe2e41fb.sql",
       "duplicate_sha256": "0af58a839f0e4859c9bde9902f2d5a5e5cb41d54ce87c3ed7599ed726b211f01",
       "reason": "Production records 20260721105000; the later unrecorded Lovable migration repeats the non-Paddle grant schema and grant_lovable_credits function."
+    },
+    {
+      "canonical_path": "supabase/migrations/20260721106000_referrals_conversion.sql",
+      "canonical_sha256": "61e3bdc69e7f17bc6591cdbecd4a4edc9305b2ffb4fb9231ee1b99527204d539",
+      "duplicate_path": "supabase/migrations/20260721194239_18592b2d-3ca9-4608-bbf5-c2262e422c70.sql",
+      "duplicate_sha256": "675cea7fe4bcb5fdd25e0911a7966b0e08e224318c62291c8e642e1952b4e91c",
+      "reason": "Production records 20260721106000; the later Lovable export repeats referral conversion tables, constraints, indexes, policies, and grants."
+    },
+    {
+      "canonical_path": "supabase/migrations/20260721107000_referral_code_and_pending_capture.sql",
+      "canonical_sha256": "f367cddbb15ac3eec8b4b15f48ef7220475f94c8e17054bbcbf34d12b1563821",
+      "duplicate_path": "supabase/migrations/20260721194325_f96507e6-a612-4d26-a99d-2a261f2c0ad5.sql",
+      "duplicate_sha256": "e11cc12b8e33c1235ddf1dc11739fd7ab0c627e46c3bc2016ff875a5ea095424",
+      "reason": "Production records 20260721107000; the later Lovable export repeats referral code generation and pending-referral capture functions and triggers."
     }
   ]
 }

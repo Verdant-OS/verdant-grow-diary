@@ -3,8 +3,8 @@
  *
  * The script has top-level side effects (reads argv/env, spawns psql, calls
  * process.exit), so we exercise it as a child process rather than importing
- * it. `psql` is stubbed via a tiny shell script on a per-test PATH so we can
- * script stdout/exit for the DB query deterministically and offline.
+ * it. `psql` is intercepted by a per-test Node preload so we can script
+ * stdout/exit for the DB query deterministically, offline, and cross-platform.
  *
  * Documented exit codes (see README):
  *   0 = OK / no drift
@@ -15,45 +15,33 @@
  * touches the DB or psql.
  */
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, chmodSync, rmSync, readFileSync, existsSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import {
+  installPsqlSpawnStub,
+  type InstalledPsqlSpawnStub,
+  type PsqlSpawnStubResult,
+} from "./helpers/psqlSpawnStub";
 import {
   REQUIRED_MONEY_MIGRATIONS,
   migrationVersion,
 } from "../../scripts/required-money-migrations.mjs";
 
-const SCRIPT = resolve(
-  __dirname,
-  "..",
-  "..",
-  "scripts",
-  "diff-money-migration-prefixes.mjs",
-);
+const SCRIPT = resolve(__dirname, "..", "..", "scripts", "diff-money-migration-prefixes.mjs");
+const SANDBOX_REF = "bzatgtgjvuojpoxcknaa";
+const PRODUCTION_REF = "knkwiiywfkbqznbxwqfh";
 
-interface StubPsql {
-  stdout?: string;
-  stderr?: string;
-  exit?: number;
+function sharedUrl(ref: string, password = "money-test-secret", port = 5432): string {
+  return `postgresql://postgres.${ref}:${encodeURIComponent(password)}@aws-0-us-east-1.pooler.supabase.com:${port}/postgres?sslmode=require`;
 }
 
 let shimDir: string;
+let psqlStub: InstalledPsqlSpawnStub | undefined;
 
-/** Write a shell shim named `psql` that echoes fixed output and exits with a fixed code. */
-function installPsqlShim(stub: StubPsql): void {
-  const stdoutPath = join(shimDir, "psql.stdout");
-  const stderrPath = join(shimDir, "psql.stderr");
-  writeFileSync(stdoutPath, stub.stdout ?? "");
-  writeFileSync(stderrPath, stub.stderr ?? "");
-  const body =
-    `#!/usr/bin/env bash\n` +
-    `cat ${JSON.stringify(stdoutPath)}\n` +
-    `cat ${JSON.stringify(stderrPath)} 1>&2\n` +
-    `exit ${stub.exit ?? 0}\n`;
-  const path = join(shimDir, "psql");
-  writeFileSync(path, body, { encoding: "utf8" });
-  chmodSync(path, 0o755);
+function installPsqlShim(stub: PsqlSpawnStubResult): void {
+  psqlStub = installPsqlSpawnStub(shimDir, stub);
 }
 
 interface RunOptions {
@@ -64,15 +52,18 @@ interface RunOptions {
 }
 
 function runScript(opts: RunOptions = {}) {
-  // Keep the real system PATH so `bash` (used by the shim) resolves, but
-  // prepend shimDir so our `psql` wins over any real one. When omitShim is
-  // true, we drop shimDir entirely — the real `psql` may or may not exist,
-  // so tests that rely on "psql not invocable" use a bogus PATH.
-  const basePath = opts.omitShim ? "/nonexistent-empty-path" : `${shimDir}:/usr/bin:/bin`;
+  const basePath = opts.omitShim ? join(shimDir, "missing-commands") : (process.env.PATH ?? "");
   const env: Record<string, string> = {
     PATH: basePath,
     HOME: process.env.HOME ?? "/root",
   };
+  for (const key of ["COMSPEC", "PATHEXT", "SystemRoot", "WINDIR"]) {
+    const value = process.env[key];
+    if (value) env[key] = value;
+  }
+  if (!opts.omitShim && psqlStub) {
+    env.NODE_OPTIONS = psqlStub.nodeOptions;
+  }
   for (const [k, v] of Object.entries(opts.env ?? {})) {
     if (v === undefined) delete env[k];
     else env[k] = v;
@@ -87,6 +78,7 @@ function runScript(opts: RunOptions = {}) {
 
 beforeEach(() => {
   shimDir = mkdtempSync(join(tmpdir(), "diff-money-shim-"));
+  psqlStub = undefined;
 });
 
 afterEach(() => {
@@ -153,7 +145,7 @@ describe("diff-money-migration-prefixes.mjs — DB diff mode (exit 0)", () => {
     installPsqlShim({ stdout: `${allApplied}\n`, exit: 0 });
     const r = runScript({
       args: ["--json"],
-      env: { SUPABASE_DB_URL: "postgres://stub", TARGET_ENV: "live" },
+      env: { SUPABASE_DB_URL: sharedUrl(PRODUCTION_REF), TARGET_ENV: "live" },
     });
     expect(r.status).toBe(0);
     const parsed = JSON.parse(r.stdout);
@@ -163,31 +155,52 @@ describe("diff-money-migration-prefixes.mjs — DB diff mode (exit 0)", () => {
     expect(parsed.missing).toEqual([]);
     expect(parsed.rows.every((row: { applied: boolean }) => row.applied)).toBe(true);
   });
+
+  it("passes the DB URL through PGDATABASE, never psql argv or inherited custom env", () => {
+    const allApplied = REQUIRED_MONEY_MIGRATIONS.map(migrationVersion).join("\n");
+    const dbUrl = "postgresql://money_user:argv-canary-secret@db.example/verdant";
+    installPsqlShim({ stdout: `${allApplied}\n`, exit: 0 });
+
+    const r = runScript({
+      env: {
+        DATABASE_URL: "postgresql://ambient-database-url.invalid/decoy",
+        PGHOST: "ambient-host.invalid",
+        PGHOSTADDR: "203.0.113.11",
+        PGPASSFILE: "/tmp/ambient-pgpass",
+        PGPASSWORD: "ambient-password-canary",
+        PGSERVICE: "ambient-service",
+        SUPABASE_ACCESS_TOKEN: "ambient-supabase-token-canary",
+        SUPABASE_DB_URL: dbUrl,
+        SUPABASE_DB_URL_SANDBOX: "postgresql://ambient-sandbox.invalid/decoy",
+      },
+    });
+
+    expect(r.status).toBe(0);
+    const invocation = psqlStub?.readInvocation();
+    expect(invocation).toBeDefined();
+    expect(invocation?.args.join(" ")).not.toContain(dbUrl);
+    expect(invocation?.args.join(" ")).not.toContain("argv-canary-secret");
+    expect(invocation?.env).toEqual({ PGDATABASE: dbUrl });
+  });
 });
 
 describe("diff-money-migration-prefixes.mjs — DB diff mode (exit 1, drift)", () => {
   it("exits 1 and reports MISSING rows when a required prefix is absent", () => {
     // Omit the last required prefix from the psql output → drift.
-    const partial = REQUIRED_MONEY_MIGRATIONS.slice(0, -1)
-      .map(migrationVersion)
-      .join("\n");
+    const partial = REQUIRED_MONEY_MIGRATIONS.slice(0, -1).map(migrationVersion).join("\n");
     installPsqlShim({ stdout: `${partial}\n`, exit: 0 });
     const r = runScript({ env: { SUPABASE_DB_URL: "postgres://stub" } });
     expect(r.status).toBe(1);
     expect(r.stdout).toContain("MISSING");
     expect(r.stdout).toContain("Do NOT deploy");
-    const missingFile =
-      REQUIRED_MONEY_MIGRATIONS[REQUIRED_MONEY_MIGRATIONS.length - 1];
+    const missingFile = REQUIRED_MONEY_MIGRATIONS[REQUIRED_MONEY_MIGRATIONS.length - 1];
     expect(r.stdout).toContain(missingFile);
   });
 
   it("--json drift path reports missing entries and non-zero missing_count", () => {
-    const missingFile =
-      REQUIRED_MONEY_MIGRATIONS[REQUIRED_MONEY_MIGRATIONS.length - 1];
+    const missingFile = REQUIRED_MONEY_MIGRATIONS[REQUIRED_MONEY_MIGRATIONS.length - 1];
     const missingVersion = migrationVersion(missingFile);
-    const partial = REQUIRED_MONEY_MIGRATIONS.slice(0, -1)
-      .map(migrationVersion)
-      .join("\n");
+    const partial = REQUIRED_MONEY_MIGRATIONS.slice(0, -1).map(migrationVersion).join("\n");
     installPsqlShim({ stdout: `${partial}\n`, exit: 0 });
     const r = runScript({
       args: ["--json"],
@@ -196,17 +209,12 @@ describe("diff-money-migration-prefixes.mjs — DB diff mode (exit 1, drift)", (
     expect(r.status).toBe(1);
     const parsed = JSON.parse(r.stdout);
     expect(parsed.missing_count).toBe(1);
-    expect(parsed.missing).toEqual([
-      { file: missingFile, version: missingVersion },
-    ]);
+    expect(parsed.missing).toEqual([{ file: missingFile, version: missingVersion }]);
     expect(parsed.applied_count).toBe(REQUIRED_MONEY_MIGRATIONS.length - 1);
   });
 
   it("tolerates blank lines and whitespace in psql output", () => {
-    const noisy =
-      "\n  " +
-      REQUIRED_MONEY_MIGRATIONS.map(migrationVersion).join("\n  ") +
-      "\n\n";
+    const noisy = "\n  " + REQUIRED_MONEY_MIGRATIONS.map(migrationVersion).join("\n  ") + "\n\n";
     installPsqlShim({ stdout: noisy, exit: 0 });
     const r = runScript({ env: { SUPABASE_DB_URL: "postgres://stub" } });
     expect(r.status).toBe(0);
@@ -231,23 +239,52 @@ describe("diff-money-migration-prefixes.mjs — DB diff mode (exit 2, tooling)",
   });
 
   it("exits 2 when psql exits non-zero (tracker query failed)", () => {
+    const rawDiagnostic =
+      "psql: connection failed for postgresql://money_user:raw-stderr-secret@db.example/verdant\n";
     installPsqlShim({
       stdout: "",
-      stderr: "ERROR: relation supabase_migrations.schema_migrations does not exist\n",
+      stderr: rawDiagnostic,
       exit: 1,
     });
     const r = runScript({ env: { SUPABASE_DB_URL: "postgres://stub" } });
     expect(r.status).toBe(2);
     expect(r.stderr).toContain("psql exited 1");
-    expect(r.stderr).toContain("schema_migrations does not exist");
+    expect(r.stderr).toContain("Raw psql diagnostics were withheld");
+    expect(r.stderr).not.toContain(rawDiagnostic.trim());
+    expect(r.stderr).not.toContain("raw-stderr-secret");
+    expect(r.stderr).not.toContain("postgresql://");
   });
 
   it("accepts PGHOST as a substitute for SUPABASE_DB_URL", () => {
     const allApplied = REQUIRED_MONEY_MIGRATIONS.map(migrationVersion).join("\n");
     installPsqlShim({ stdout: `${allApplied}\n`, exit: 0 });
-    const r = runScript({ env: { PGHOST: "stub-host" } });
+    const r = runScript({
+      env: { PGHOST: "stub-host", PGPASSFILE: "/tmp/intentional-pgpass" },
+    });
     // Should NOT exit 2 for missing DB — should reach psql (the shim) and OK.
     expect(r.status).toBe(0);
+    const invocation = psqlStub?.readInvocation();
+    expect(invocation?.env.PGHOST).toBe("stub-host");
+    expect(invocation?.env.PGPASSFILE).toBe("/tmp/intentional-pgpass");
+    expect(invocation?.env.PGDATABASE).toBeUndefined();
+  });
+
+  it("rejects PGHOST-only input for a protected target before psql", () => {
+    installPsqlShim({ stdout: "must-not-run" });
+    const r = runScript({
+      env: {
+        PGHOST: "attacker.invalid",
+        PGPASSWORD: "ambient-secret",
+        TARGET_ENV: "live",
+      },
+    });
+
+    expect(r.status).toBe(2);
+    expect(r.stderr).toContain("missing_protected_database_url");
+    expect(r.stderr).toContain("psql was not invoked");
+    expect(r.stderr).not.toContain("ambient-secret");
+    expect(r.stderr).not.toContain("attacker.invalid");
+    expect(existsSync(psqlStub?.invocationPath ?? "")).toBe(false);
   });
 });
 
@@ -260,7 +297,7 @@ describe("diff-money-migration-prefixes.mjs — --sarif output", () => {
     installPsqlShim({ stdout: `${allApplied}\n`, exit: 0 });
     const r = runScript({
       args: ["--sarif"],
-      env: { SUPABASE_DB_URL: "postgres://stub", TARGET_ENV: "live" },
+      env: { SUPABASE_DB_URL: sharedUrl(PRODUCTION_REF), TARGET_ENV: "live" },
     });
     expect(r.status).toBe(0);
     const sarif = JSON.parse(r.stdout);
@@ -284,16 +321,13 @@ describe("diff-money-migration-prefixes.mjs — --sarif output", () => {
   });
 
   it("emits one drift result per missing prefix and exits 1", () => {
-    const missingFile =
-      REQUIRED_MONEY_MIGRATIONS[REQUIRED_MONEY_MIGRATIONS.length - 1];
+    const missingFile = REQUIRED_MONEY_MIGRATIONS[REQUIRED_MONEY_MIGRATIONS.length - 1];
     const missingVersion = migrationVersion(missingFile);
-    const partial = REQUIRED_MONEY_MIGRATIONS.slice(0, -1)
-      .map(migrationVersion)
-      .join("\n");
+    const partial = REQUIRED_MONEY_MIGRATIONS.slice(0, -1).map(migrationVersion).join("\n");
     installPsqlShim({ stdout: `${partial}\n`, exit: 0 });
     const r = runScript({
       args: ["--sarif"],
-      env: { SUPABASE_DB_URL: "postgres://stub", TARGET_ENV: "sandbox" },
+      env: { SUPABASE_DB_URL: sharedUrl(SANDBOX_REF), TARGET_ENV: "sandbox" },
     });
     expect(r.status).toBe(1);
     const sarif = JSON.parse(r.stdout);
@@ -316,9 +350,7 @@ describe("diff-money-migration-prefixes.mjs — --sarif output", () => {
   });
 
   it("writes SARIF to --sarif-out=PATH (creating parent dirs) and keeps text diff on stdout", () => {
-    const partial = REQUIRED_MONEY_MIGRATIONS.slice(0, -1)
-      .map(migrationVersion)
-      .join("\n");
+    const partial = REQUIRED_MONEY_MIGRATIONS.slice(0, -1).map(migrationVersion).join("\n");
     installPsqlShim({ stdout: `${partial}\n`, exit: 0 });
     const outFile = join(shimDir, "nested", "reports", "diff.sarif");
     const r = runScript({
@@ -371,16 +403,13 @@ describe("diff-money-migration-prefixes.mjs — --sarif output", () => {
 
 describe("diff-money-migration-prefixes.mjs — --github-annotations", () => {
   it("emits ::error:: workflow commands on stderr for each missing prefix", () => {
-    const missingFile =
-      REQUIRED_MONEY_MIGRATIONS[REQUIRED_MONEY_MIGRATIONS.length - 1];
+    const missingFile = REQUIRED_MONEY_MIGRATIONS[REQUIRED_MONEY_MIGRATIONS.length - 1];
     const missingVersion = migrationVersion(missingFile);
-    const partial = REQUIRED_MONEY_MIGRATIONS.slice(0, -1)
-      .map(migrationVersion)
-      .join("\n");
+    const partial = REQUIRED_MONEY_MIGRATIONS.slice(0, -1).map(migrationVersion).join("\n");
     installPsqlShim({ stdout: `${partial}\n`, exit: 0 });
     const r = runScript({
       args: ["--github-annotations"],
-      env: { SUPABASE_DB_URL: "postgres://stub", TARGET_ENV: "live" },
+      env: { SUPABASE_DB_URL: sharedUrl(PRODUCTION_REF), TARGET_ENV: "live" },
     });
     expect(r.status).toBe(1);
     expect(r.stderr).toContain(
@@ -409,4 +438,3 @@ describe("diff-money-migration-prefixes.mjs — --github-annotations", () => {
     expect(r.stderr).not.toContain("::error");
   });
 });
-

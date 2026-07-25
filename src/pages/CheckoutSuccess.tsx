@@ -119,6 +119,14 @@ export default function CheckoutSuccess() {
     });
   }, [checkoutReturnSurface, confirmed, entitlement.effectivePlanId, hasCheckoutContext]);
 
+  // Order-confirmation email is dispatched server-side from the
+  // payments-webhook after transaction.completed is durably processed.
+  // The client no longer invokes send-transactional-email — the webhook
+  // is the single source of truth so private-mode / closed-tab buyers
+  // still receive the receipt.
+
+
+
   // Bounded poll — stops when confirmed or after POLL_TIMEOUT_MS. Runs in
   // BOTH unconfirmed states: "confirming" shows it explicitly, while
   // "no_context" polls quietly — a real buyer whose sessionStorage is

@@ -118,6 +118,7 @@ const Privacy = lazy(() => import("./pages/PrivacyPolicy"));
 const Refund = lazy(() => import("./pages/RefundPolicy"));
 const Feedback = lazy(() => import("./pages/support/Feedback"));
 const Contact = lazy(() => import("./pages/support/Contact"));
+const Unsubscribe = lazy(() => import("./pages/Unsubscribe"));
 const OperatorSupportInbox = lazy(() => import("./pages/OperatorSupportInbox"));
 const OperatorCreditsAudit = lazy(() => import("./pages/OperatorCreditsAudit"));
 
@@ -215,6 +216,7 @@ const App = () => (
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
                   <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
+                  <Route path="/unsubscribe" element={<Unsubscribe />} />
                   {/* Deprecated auth entry points — redirect to canonical /auth to
                       prevent funnel leaks from old bookmarks, emails, ads, and
                       creator posts that still point to /login /signup /register. */}

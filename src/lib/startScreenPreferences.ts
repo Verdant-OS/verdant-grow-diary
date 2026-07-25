@@ -54,12 +54,20 @@ export function routeForStartScreen(choice: StartScreenChoice): string {
 /**
  * Consume Verdant's one-shot Quick Log start intent while preserving unrelated
  * query parameters. Returns null when no valid intent is present.
+ *
+ * The intent's companion `type` marker (the preset a grower picked before
+ * being routed here — see globalSearchQuickLogFallbackRules) is consumed too,
+ * so it cannot linger in the URL and re-seed the activity on refresh/back.
+ * Callers that need the value must read it BEFORE consuming, via
+ * readQuickLogStartEventType. Only stripped alongside a valid intent: a bare
+ * `?type=` with no `open=quick-log` belongs to someone else and is untouched.
  */
 export function consumeQuickLogStartIntent(search: string): string | null {
   if (typeof search !== "string") return null;
   const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
   if (params.get("open") !== "quick-log") return null;
   params.delete("open");
+  params.delete("type");
   const remaining = params.toString();
   return remaining ? `?${remaining}` : "";
 }

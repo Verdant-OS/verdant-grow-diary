@@ -64,3 +64,18 @@ project_id = "knkwiiywfkbqznbxwqfh"
   # UUID owner identifiers only — no email/name/profile fields.
   [functions.operator-credits-audit]
     verify_jwt = true
+  # Transactional email surface. send-transactional-email is called from
+  # signed-in app flows (post-signup welcome) and from other server
+  # functions using service_role; verify_jwt on keeps unauthenticated
+  # callers out. The preview, unsubscribe, and suppression handlers are
+  # invoked without a Supabase JWT (Go API / email clients) — they each
+  # verify their own caller (LOVABLE_API_KEY, unsubscribe token, or
+  # HMAC signature) inside the handler.
+  [functions.send-transactional-email]
+    verify_jwt = true
+  [functions.preview-transactional-email]
+    verify_jwt = false
+  [functions.handle-email-unsubscribe]
+    verify_jwt = false
+  [functions.handle-email-suppression]
+    verify_jwt = false

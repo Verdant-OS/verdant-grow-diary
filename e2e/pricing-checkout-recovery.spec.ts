@@ -162,6 +162,7 @@ async function openBlockedRecovery(page: Page) {
 test.describe("Pricing checkout recovery (blocked state)", () => {
   test.beforeEach(async ({ page }) => {
     await seedFakeSession(page);
+    await captureAnalyticsEvents(page);
     await mockSupabaseAndPaddle(page);
   });
 

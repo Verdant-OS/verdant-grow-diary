@@ -63,6 +63,43 @@ function writeFixture() {
   };
 }
 
+function addInjectionFixture(fixture: ReturnType<typeof writeFixture>) {
+  const templatePath = join(
+    fixture.sourceRoot,
+    "config",
+    "local-supabase-replay",
+    "fixture-baseline.sql",
+  );
+  const templateSql = "GRANT SELECT ON TABLE public.fixture TO authenticated;\n";
+  mkdirSync(join(fixture.sourceRoot, "config", "local-supabase-replay"), {
+    recursive: true,
+  });
+  writeFileSync(templatePath, templateSql);
+
+  const requiredName = "20260721190000_required.sql";
+  writeFileSync(join(fixture.sourceRoot, "supabase", "migrations", requiredName), "SELECT 1;\n");
+
+  const manifest = JSON.parse(readFileSync(fixture.manifestPath, "utf8")) as {
+    compatibility_injections?: Array<Record<string, string>>;
+  };
+  manifest.compatibility_injections = [
+    {
+      template_path: "config/local-supabase-replay/fixture-baseline.sql",
+      template_sha256: sha256(templateSql),
+      output_path: "supabase/migrations/20260721189999_local_replay_fixture_baseline.sql",
+      required_before_path: `supabase/migrations/${requiredName}`,
+      reason: "Fixture establishes a required local replay privilege baseline.",
+    },
+  ];
+  writeFileSync(fixture.manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+
+  return {
+    templatePath,
+    templateSql,
+    outputName: "20260721189999_local_replay_fixture_baseline.sql",
+  };
+}
+
 function runScript(args: string[]) {
   return spawnSync("node", [SCRIPT, ...args], {
     cwd: process.cwd(),
@@ -112,11 +149,13 @@ describe("local Supabase replay compatibility workspace", () => {
     const report = JSON.parse(result.stdout.trim()) as {
       mode: string;
       compatibility_entry_count: number;
+      compatibility_injection_count: number;
       source_migrations_unchanged: boolean;
     };
     expect(report).toMatchObject({
       mode: "verify_only",
       compatibility_entry_count: 17,
+      compatibility_injection_count: 1,
       source_migrations_unchanged: true,
     });
   });
@@ -154,6 +193,42 @@ describe("local Supabase replay compatibility workspace", () => {
         "utf8",
       ),
     ).toBe(fixture.duplicateSql);
+  });
+
+  it("injects a fingerprinted precondition only into the disposable workspace", () => {
+    const fixture = writeFixture();
+    const injection = addInjectionFixture(fixture);
+    const output = join(fixture.container, "replay");
+    const result = runScript([
+      `--source=${fixture.sourceRoot}`,
+      `--manifest=${fixture.manifestPath}`,
+      `--output=${output}`,
+      "--json",
+    ]);
+
+    expect(result.status).toBe(0);
+    expect(readFileSync(join(output, "supabase", "migrations", injection.outputName), "utf8")).toBe(
+      injection.templateSql,
+    );
+    expect(
+      existsSync(join(fixture.sourceRoot, "supabase", "migrations", injection.outputName)),
+    ).toBe(false);
+  });
+
+  it("fails closed when a compatibility injection fingerprint changes", () => {
+    const fixture = writeFixture();
+    const injection = addInjectionFixture(fixture);
+    writeFileSync(injection.templatePath, `${injection.templateSql}SELECT 2;\n`);
+
+    const result = runScript([
+      `--source=${fixture.sourceRoot}`,
+      `--manifest=${fixture.manifestPath}`,
+      "--verify-only",
+    ]);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("[supabase-replay] hash_mismatch");
+    expect(result.stderr).toContain("config/local-supabase-replay/fixture-baseline.sql");
   });
 
   it("produces a deterministic report with no timestamps or output paths", () => {

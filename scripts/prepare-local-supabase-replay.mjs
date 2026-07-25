@@ -6,7 +6,9 @@
  * A small, fingerprinted manifest identifies later Lovable migrations that
  * repeat canonical migrations already recorded by production. Every source
  * byte is verified before the duplicate is replaced with a no-op only inside
- * the disposable output directory. Unknown drift fails closed.
+ * the disposable output directory. Fingerprinted local-only preconditions may
+ * also be injected before an immutable migration that expects hosted legacy
+ * defaults. Unknown drift fails closed.
  *
  * This script never connects to Supabase and never writes inside the source
  * repository. The caller must provide a new output directory outside it.
@@ -32,6 +34,7 @@ const DEFAULT_MANIFEST_PATH = resolve(
   "local-supabase-replay-compatibility.json",
 );
 const MIGRATION_PREFIX = "supabase/migrations/";
+const TEMPLATE_PREFIX = "config/local-supabase-replay/";
 const REPORT_NAME = "local-supabase-replay-report.json";
 
 export class ReplayPreparationError extends Error {
@@ -112,6 +115,35 @@ function validateMigrationPath(sourceRoot, value, label) {
   return resolved;
 }
 
+function validateTemplatePath(sourceRoot, value, label) {
+  if (typeof value !== "string" || !value.startsWith(TEMPLATE_PREFIX)) {
+    fail("invalid_manifest", `${label} must start with ${TEMPLATE_PREFIX}`);
+  }
+  const resolved = resolve(sourceRoot, value);
+  const templatesRoot = resolve(sourceRoot, "config", "local-supabase-replay");
+  if (!isInside(templatesRoot, resolved)) {
+    fail("invalid_manifest", `${label} escapes ${TEMPLATE_PREFIX}`);
+  }
+  assertExistingFile(resolved, label);
+  return resolved;
+}
+
+function validateMigrationOutputPath(sourceRoot, value, label) {
+  if (typeof value !== "string" || !value.startsWith(MIGRATION_PREFIX)) {
+    fail("invalid_manifest", `${label} must start with ${MIGRATION_PREFIX}`);
+  }
+  const resolved = resolve(sourceRoot, value);
+  const migrationsRoot = resolve(sourceRoot, "supabase", "migrations");
+  if (!isInside(migrationsRoot, resolved)) {
+    fail("invalid_manifest", `${label} escapes supabase/migrations`);
+  }
+  migrationVersion(resolved);
+  if (existsSync(resolved)) {
+    fail("invalid_manifest", `${label} already exists in the immutable source migrations`);
+  }
+  return resolved;
+}
+
 function migrationVersion(path) {
   const filename = path.replaceAll("\\", "/").split("/").at(-1) ?? "";
   const match = filename.match(/^(\d{14})_.+\.sql$/);
@@ -145,11 +177,13 @@ export function loadAndVerifyManifest({
   if (
     manifest?.version !== 1 ||
     manifest?.hash_normalization !== "utf8_lf" ||
-    !Array.isArray(manifest.compatibility_noops)
+    !Array.isArray(manifest.compatibility_noops) ||
+    (manifest.compatibility_injections !== undefined &&
+      !Array.isArray(manifest.compatibility_injections))
   ) {
     fail(
       "invalid_manifest",
-      "Compatibility manifest must be version 1, use utf8_lf hashes, and include compatibility_noops",
+      "Compatibility manifest must be version 1, use utf8_lf hashes, and include valid compatibility arrays",
     );
   }
   if (manifest.compatibility_noops.length === 0) {
@@ -207,7 +241,61 @@ export function loadAndVerifyManifest({
   });
 
   entries.sort((a, b) => a.duplicate_path.localeCompare(b.duplicate_path));
-  return { sourceRoot: root, manifestPath: resolve(manifestPath), entries };
+
+  const outputPaths = new Set();
+  const injections = (manifest.compatibility_injections ?? []).map((entry, index) => {
+    const prefix = `compatibility_injections[${index}]`;
+    const templatePath = validateTemplatePath(
+      root,
+      entry?.template_path,
+      `${prefix}.template_path`,
+    );
+    validateHash(entry?.template_sha256, `${prefix}.template_sha256`);
+    const templateActual = sha256File(templatePath);
+    if (templateActual !== entry.template_sha256) {
+      fail(
+        "hash_mismatch",
+        `${entry.template_path} SHA-256 changed; refusing compatibility replay`,
+      );
+    }
+
+    const outputPath = validateMigrationOutputPath(
+      root,
+      entry?.output_path,
+      `${prefix}.output_path`,
+    );
+    const requiredBeforePath = validateMigrationPath(
+      root,
+      entry?.required_before_path,
+      `${prefix}.required_before_path`,
+    );
+    if (migrationVersion(outputPath) >= migrationVersion(requiredBeforePath)) {
+      fail("invalid_manifest", `${prefix}.output_path must precede required_before_path`);
+    }
+    if (outputPaths.has(entry.output_path)) {
+      fail("invalid_manifest", `${prefix}.output_path is repeated`);
+    }
+    outputPaths.add(entry.output_path);
+    if (typeof entry?.reason !== "string" || entry.reason.trim().length < 20) {
+      fail("invalid_manifest", `${prefix}.reason must explain the local replay precondition`);
+    }
+
+    return {
+      template_path: entry.template_path,
+      template_sha256: templateActual,
+      output_path: entry.output_path,
+      required_before_path: entry.required_before_path,
+      reason: entry.reason.trim(),
+    };
+  });
+
+  injections.sort((a, b) => a.output_path.localeCompare(b.output_path));
+  return {
+    sourceRoot: root,
+    manifestPath: resolve(manifestPath),
+    entries,
+    injections,
+  };
 }
 
 function compatibilityNoop(entry) {
@@ -255,6 +343,12 @@ export function prepareReplayWorkspace({
       const duplicateOutput = resolve(output, entry.duplicate_path);
       writeFileSync(duplicateOutput, compatibilityNoop(entry), "utf8");
     }
+    for (const injection of verified.injections) {
+      const templateSource = resolve(verified.sourceRoot, injection.template_path);
+      const injectionOutput = resolve(output, injection.output_path);
+      const normalizedSql = readFileSync(templateSource, "utf8").replaceAll("\r\n", "\n");
+      writeFileSync(injectionOutput, normalizedSql, "utf8");
+    }
   }
 
   const report = {
@@ -262,7 +356,9 @@ export function prepareReplayWorkspace({
     mode: verifyOnly ? "verify_only" : "prepared",
     source_migrations_unchanged: true,
     compatibility_entry_count: verified.entries.length,
+    compatibility_injection_count: verified.injections.length,
     entries: verified.entries,
+    injections: verified.injections,
   };
 
   if (!verifyOnly) {
@@ -295,7 +391,7 @@ function main() {
     if (args.json) console.log(JSON.stringify(report));
     else {
       console.log(
-        `[supabase-replay] ${report.mode}: ${report.compatibility_entry_count} fingerprinted compatibility entr${report.compatibility_entry_count === 1 ? "y" : "ies"} verified`,
+        `[supabase-replay] ${report.mode}: ${report.compatibility_entry_count} fingerprinted no-op entr${report.compatibility_entry_count === 1 ? "y" : "ies"} and ${report.compatibility_injection_count} injection${report.compatibility_injection_count === 1 ? "" : "s"} verified`,
       );
     }
   } catch (error) {

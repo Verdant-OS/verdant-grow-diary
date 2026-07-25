@@ -43,14 +43,20 @@ describe("buildSensorReadingsCsv", () => {
   });
 
   it("escapes commas in fields", () => {
-    const r: SensorReading = { ...baseReading, source: "live, manual" as unknown as SensorReading["source"] };
+    const r: SensorReading = {
+      ...baseReading,
+      source: "live, manual" as unknown as SensorReading["source"],
+    };
     const csv = buildSensorReadingsCsv([r]);
     const line = csv.split("\n")[1];
     expect(line).toContain('"live, manual"');
   });
 
   it("escapes double quotes in fields", () => {
-    const r: SensorReading = { ...baseReading, status: "needs_\"review" as unknown as SensorReading["status"] };
+    const r: SensorReading = {
+      ...baseReading,
+      status: 'needs_"review' as unknown as SensorReading["status"],
+    };
     const csv = buildSensorReadingsCsv([r]);
     const line = csv.split("\n")[1];
     expect(line).toContain('"needs_""review"');
@@ -68,6 +74,25 @@ describe("buildSensorReadingsCsv", () => {
     const csv = buildSensorReadingsCsv([r]);
     const line = csv.split("\n")[1];
     expect(line).toContain(",850,");
+  });
+
+  it("keeps compatibility zeroes empty when the source did not observe those metrics", () => {
+    const r: SensorReading = {
+      ...baseReading,
+      temp: 25.56,
+      rh: 56,
+      vpd: 0,
+      co2: 907,
+      soil: 55,
+      ppfd: 800,
+      observedMetrics: ["temp", "rh", "co2", "soil", "ppfd"],
+      source: "manual",
+      status: "usable",
+    };
+
+    const cells = buildSensorReadingsCsv([r]).split("\n")[1].split(",");
+
+    expect(cells.slice(1, 9)).toEqual(["25.56", "56", "", "907", "55", "800", "manual", "usable"]);
   });
 });
 

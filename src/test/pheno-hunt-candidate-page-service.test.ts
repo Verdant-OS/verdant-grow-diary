@@ -15,11 +15,13 @@ interface Recorded {
 const recorded: Recorded[] = [];
 // Per-table canned results, keyed by table name (last write wins per test).
 const results: Record<string, { data: unknown; error: unknown; count?: number }> = {};
+const resultQueues: Record<string, Array<{ data: unknown; error: unknown; count?: number }>> = {};
 
 function makeBuilder(table: string) {
   const rec: Recorded = { table, calls: [] };
   recorded.push(rec);
-  const result = () => results[table] ?? { data: [], error: null, count: 0 };
+  const result = () =>
+    resultQueues[table]?.shift() ?? results[table] ?? { data: [], error: null, count: 0 };
   const builder: Record<string, unknown> = {};
   for (const m of ["select", "eq", "in", "or", "ilike", "not", "order", "range", "limit"]) {
     builder[m] = (...args: unknown[]) => {
@@ -43,7 +45,10 @@ vi.mock("@/lib/phenoSexObservationService", () => ({
   listLatestSexObservationsForHunt: (...a: unknown[]) => listLatestSex(...a),
 }));
 
-import { loadPhenoHuntCandidatePage } from "@/lib/phenoHuntCandidatesService";
+import {
+  loadPhenoHuntCandidatePage,
+  loadPhenoHuntCandidates,
+} from "@/lib/phenoHuntCandidatesService";
 
 function plantsResult(rows: unknown[], count: number) {
   results["plants"] = { data: rows, error: null, count };
@@ -58,6 +63,7 @@ function firstOrder(table: string): Array<[string, ...unknown[]]> {
 beforeEach(() => {
   recorded.length = 0;
   for (const k of Object.keys(results)) delete results[k];
+  for (const k of Object.keys(resultQueues)) delete resultQueues[k];
   listLatestSex.mockReset().mockResolvedValue({});
 });
 
@@ -162,6 +168,122 @@ describe("loadPhenoHuntCandidatePage — bounds & ordering", () => {
   it("returns an error for a missing hunt id", async () => {
     const res = await loadPhenoHuntCandidatePage({ huntId: "   ", page: 0, pageSize: 30 });
     expect(res.ok).toBe(false);
+  });
+
+  it("retries without candidate_number only when that column is absent", async () => {
+    resultQueues["plants"] = [
+      {
+        data: null,
+        error: {
+          code: "PGRST204",
+          message: "Could not find the 'candidate_number' column of 'plants' in the schema cache",
+        },
+      },
+      {
+        data: [
+          {
+            id: "p1",
+            name: "Legacy candidate",
+            candidate_label: "Legacy",
+            strain: null,
+            stage: null,
+            plant_type: null,
+            grow_id: null,
+            tent_id: null,
+            photo_url: null,
+            is_archived: false,
+          },
+        ],
+        error: null,
+        count: 1,
+      },
+    ];
+
+    const res = await loadPhenoHuntCandidatePage({ huntId: "h1", page: 0, pageSize: 30 });
+
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.total).toBe(1);
+    expect(res.candidates[0].candidateNumber).toBeNull();
+
+    const plantQueries = recorded.filter((entry) => entry.table === "plants");
+    expect(plantQueries).toHaveLength(2);
+    expect(String(plantQueries[0].calls.find((call) => call[0] === "select")?.[1])).toContain(
+      "candidate_number",
+    );
+    expect(String(plantQueries[1].calls.find((call) => call[0] === "select")?.[1])).not.toContain(
+      "candidate_number",
+    );
+    expect(
+      plantQueries[1].calls.filter((call) => call[0] === "order").map((call) => call[1]),
+    ).toEqual(["candidate_label", "name", "id"]);
+  });
+
+  it.each([
+    ["permission error", { code: "42501", message: "permission denied for table plants" }],
+    [
+      "different missing column",
+      {
+        code: "PGRST204",
+        message: "Could not find the 'plant_type' column of 'plants' in the schema cache",
+      },
+    ],
+  ])("does not retry candidate reads for an unrelated %s", async (_label, error) => {
+    results["plants"] = { data: null, error };
+
+    const res = await loadPhenoHuntCandidatePage({ huntId: "h1", page: 0, pageSize: 30 });
+
+    expect(res).toEqual({ ok: false, error: "Could not load hunt candidates." });
+    expect(recorded.filter((entry) => entry.table === "plants")).toHaveLength(1);
+  });
+});
+
+describe("loadPhenoHuntCandidates — deploy-window compatibility", () => {
+  it("keeps comparison surfaces available when candidate_number is not deployed yet", async () => {
+    results["pheno_hunts"] = {
+      data: {
+        id: "h1",
+        name: "Legacy Hunt",
+        grow_id: null,
+        tent_id: null,
+      },
+      error: null,
+    };
+    resultQueues["plants"] = [
+      {
+        data: null,
+        error: {
+          code: "42703",
+          message: "column plants.candidate_number does not exist",
+        },
+      },
+      {
+        data: [
+          {
+            id: "p1",
+            name: "Legacy candidate",
+            candidate_label: "Legacy",
+            strain: null,
+            stage: null,
+            plant_type: null,
+            grow_id: null,
+            tent_id: null,
+            photo_url: null,
+            is_archived: false,
+          },
+        ],
+        error: null,
+      },
+    ];
+
+    const res = await loadPhenoHuntCandidates("h1");
+
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.hunt.name).toBe("Legacy Hunt");
+    expect(res.candidates).toHaveLength(1);
+    expect(res.candidates[0].candidateNumber).toBeNull();
+    expect(recorded.filter((entry) => entry.table === "plants")).toHaveLength(2);
   });
 });
 

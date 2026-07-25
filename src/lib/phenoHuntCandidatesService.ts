@@ -50,6 +50,27 @@ export interface PhenoHuntListItem {
   candidateCount: number;
 }
 
+const PHENO_CANDIDATE_PLANT_COLUMNS =
+  "id, name, candidate_label, candidate_number, strain, stage, plant_type, grow_id, tent_id, photo_url, is_archived";
+const LEGACY_PHENO_CANDIDATE_PLANT_COLUMNS =
+  "id, name, candidate_label, strain, stage, plant_type, grow_id, tent_id, photo_url, is_archived";
+
+/**
+ * Only tolerate the known deploy-window failure where candidate_number has
+ * not reached PostgREST yet. Permission, RLS, network, and unrelated schema
+ * failures must remain visible instead of being hidden behind a retry.
+ */
+function isCandidateNumberColumnUnavailable(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const record = error as Record<string, unknown>;
+  const code = typeof record.code === "string" ? record.code.toUpperCase() : "";
+  if (code !== "PGRST204" && code !== "42703") return false;
+  const detail = [record.message, record.details, record.hint]
+    .filter((value): value is string => typeof value === "string")
+    .join(" ");
+  return /\bcandidate_number\b/i.test(detail);
+}
+
 interface PhenoHuntListRow {
   readonly id: string;
   readonly name: string | null;
@@ -115,17 +136,27 @@ export async function loadPhenoHuntCandidates(
   // Read plants through the narrow typed pheno boundary (phenoDb) so
   // candidate_number — which the generated types.ts still lacks — is typed
   // without an `any` or a hand-edit of generated types. SELECT only.
-  const { data: plantRows, error: plantsError } = await phenoDb
+  const primaryPlantRead = await phenoDb
     .from("plants")
-    .select(
-      "id, name, candidate_label, candidate_number, strain, stage, plant_type, grow_id, tent_id, photo_url, is_archived",
-    )
+    .select(PHENO_CANDIDATE_PLANT_COLUMNS)
     .eq("pheno_hunt_id", id)
     .eq("is_archived", false);
 
+  let plantRows = primaryPlantRead.data as unknown as PhenoHuntCandidatePlantRow[] | null;
+  let plantsError: unknown = primaryPlantRead.error;
+  if (isCandidateNumberColumnUnavailable(plantsError)) {
+    const legacyPlantRead = await phenoDb
+      .from("plants")
+      .select(LEGACY_PHENO_CANDIDATE_PLANT_COLUMNS)
+      .eq("pheno_hunt_id", id)
+      .eq("is_archived", false);
+    plantRows = legacyPlantRead.data as unknown as PhenoHuntCandidatePlantRow[] | null;
+    plantsError = legacyPlantRead.error;
+  }
+
   if (plantsError) return { ok: false, error: "Could not load hunt candidates." };
 
-  const plants = (plantRows ?? []) as PhenoHuntCandidatePlantRow[];
+  const plants = (plantRows ?? []) as unknown as PhenoHuntCandidatePlantRow[];
   const plantIds = plants
     .map((p) => p.id)
     .filter((v): v is string => typeof v === "string" && v.length > 0);
@@ -414,57 +445,77 @@ export async function loadPhenoHuntCandidatePage(
   const to = from + pageSize - 1;
   const filters = input.filters ?? {};
 
-  let query = phenoDb
-    .from("plants")
-    .select(
-      "id, name, candidate_label, candidate_number, strain, stage, plant_type, grow_id, tent_id, photo_url, is_archived",
-      { count: "exact" },
-    )
-    .eq("pheno_hunt_id", id)
-    .eq("is_archived", false);
-
   const text = typeof filters.text === "string" ? sanitizeSearchText(filters.text) : "";
-  if (text) {
-    const parts = [`candidate_label.ilike.*${text}*`, `name.ilike.*${text}*`];
-    const asNumber = Number(text);
-    if (Number.isInteger(asNumber) && asNumber > 0) parts.push(`candidate_number.eq.${asNumber}`);
-    query = query.or(parts.join(","));
-  }
   const strain = typeof filters.strain === "string" ? sanitizeSearchText(filters.strain) : "";
-  if (strain) query = query.ilike("strain", `%${strain}%`);
   const stage = typeof filters.stage === "string" ? filters.stage.trim() : "";
-  if (stage) query = query.eq("stage", stage);
 
   // Keeper-decision filter — honest at scale via candidate-id intersection.
+  let includedDecisionIds: string[] | null = null;
+  let excludedDecisionIds: string[] | null = null;
   if (filters.decision) {
     if (filters.decision === "undecided") {
       const decidedIds = await plantIdsWithDecision(id, DECIDED_DECISIONS);
-      if (decidedIds.length > 0) query = query.not("id", "in", `(${decidedIds.join(",")})`);
+      if (decidedIds.length > 0) excludedDecisionIds = decidedIds;
     } else {
-      const ids = await plantIdsWithDecision(id, [filters.decision]);
-      query = query.in("id", ids);
+      includedDecisionIds = await plantIdsWithDecision(id, [filters.decision]);
     }
   }
+
   // Sex filter — via the bounded latest-per-plant view.
+  let sexIds: string[] | null = null;
   if (filters.sex) {
     const latest = await listLatestSexObservationsForHunt(id);
-    const ids = Object.values(latest)
+    sexIds = Object.values(latest)
       .filter((r) => r.sex === filters.sex)
       .map((r) => r.plantId);
-    query = query.in("id", ids);
   }
 
-  query = query
-    .order("candidate_number", { ascending: true, nullsFirst: false })
-    .order("candidate_label", { ascending: true, nullsFirst: false })
-    .order("name", { ascending: true })
-    .order("id", { ascending: true })
-    .range(from, to);
+  const runCandidateQuery = async (includeCandidateNumber: boolean) => {
+    let query = phenoDb
+      .from("plants")
+      .select(
+        includeCandidateNumber
+          ? PHENO_CANDIDATE_PLANT_COLUMNS
+          : LEGACY_PHENO_CANDIDATE_PLANT_COLUMNS,
+        { count: "exact" },
+      )
+      .eq("pheno_hunt_id", id)
+      .eq("is_archived", false);
 
-  const { data: plantRows, error: plantsError, count } = await query;
+    if (text) {
+      const parts = [`candidate_label.ilike.*${text}*`, `name.ilike.*${text}*`];
+      const asNumber = Number(text);
+      if (includeCandidateNumber && Number.isInteger(asNumber) && asNumber > 0) {
+        parts.push(`candidate_number.eq.${asNumber}`);
+      }
+      query = query.or(parts.join(","));
+    }
+    if (strain) query = query.ilike("strain", `%${strain}%`);
+    if (stage) query = query.eq("stage", stage);
+    if (excludedDecisionIds) {
+      query = query.not("id", "in", `(${excludedDecisionIds.join(",")})`);
+    }
+    if (includedDecisionIds) query = query.in("id", includedDecisionIds);
+    if (sexIds) query = query.in("id", sexIds);
+
+    if (includeCandidateNumber) {
+      query = query.order("candidate_number", { ascending: true, nullsFirst: false });
+    }
+    return query
+      .order("candidate_label", { ascending: true, nullsFirst: false })
+      .order("name", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, to);
+  };
+
+  let candidateRead = await runCandidateQuery(true);
+  if (isCandidateNumberColumnUnavailable(candidateRead.error)) {
+    candidateRead = await runCandidateQuery(false);
+  }
+  const { data: plantRows, error: plantsError, count } = candidateRead;
   if (plantsError) return { ok: false, error: "Could not load hunt candidates." };
 
-  const plants = (plantRows ?? []) as PhenoHuntCandidatePlantRow[];
+  const plants = (plantRows ?? []) as unknown as PhenoHuntCandidatePlantRow[];
   const plantIds = plants
     .map((p) => p.id)
     .filter((v): v is string => typeof v === "string" && v.length > 0);

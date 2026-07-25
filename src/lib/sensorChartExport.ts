@@ -6,6 +6,7 @@
  * No I/O, no React. Deterministic.
  */
 import type { SensorReading } from "@/mock";
+import { readObservedSensorMetric } from "@/lib/sensorReadingSelectionRules";
 import { format } from "date-fns";
 
 const CSV_HEADER =
@@ -23,13 +24,6 @@ function csvEscape(value: string | number | null | undefined): string {
   return s;
 }
 
-/** Render a PPFD cell — empty for missing / non-finite, value otherwise. */
-function ppfdCell(value: number | null | undefined): string {
-  if (value === null || value === undefined) return "";
-  if (typeof value !== "number" || !Number.isFinite(value)) return "";
-  return String(value);
-}
-
 /**
  * Build CSV text from sensor readings. Output is RFC 4180-ish and
  * deterministic so tests can assert exact rows.
@@ -38,12 +32,12 @@ export function buildSensorReadingsCsv(readings: ReadonlyArray<SensorReading>): 
   const rows = readings.map((r) =>
     [
       format(new Date(r.ts), "yyyy-MM-dd HH:mm:ss"),
-      r.temp,
-      r.rh,
-      r.vpd,
-      r.co2,
-      r.soil,
-      ppfdCell(r.ppfd),
+      readObservedSensorMetric(r, "temp"),
+      readObservedSensorMetric(r, "rh"),
+      readObservedSensorMetric(r, "vpd"),
+      readObservedSensorMetric(r, "co2"),
+      readObservedSensorMetric(r, "soil"),
+      readObservedSensorMetric(r, "ppfd"),
       r.source,
       r.status,
       r.capturedAt ? format(new Date(r.capturedAt), "yyyy-MM-dd HH:mm:ss") : "",

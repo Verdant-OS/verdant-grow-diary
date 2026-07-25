@@ -437,6 +437,12 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     description: "Public manual-input, stage-aware air VPD calculator.",
   },
   {
+    path: "/unsubscribe",
+    access: "public",
+    description:
+      "One-click email unsubscribe landing. Public by necessity: authenticates by the ?token= from the email link, never a session, so a recipient who is signed out (or was never a user) can still opt out.",
+  },
+  {
     path: "/upgrade",
     access: "redirect",
     description: "→ /pricing with allowlisted plan, acquisition, and return intent.",

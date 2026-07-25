@@ -99,8 +99,8 @@ describe("Pricing recovery analytics", () => {
     renderPricing();
     trackPricingEventMock.mockClear();
 
-    // Any paid CTA — pick the annual Pro card CTA, which routes to pro_annual.
-    const proCta = screen.getByTestId("pricing-cta-pro_annual");
+    // Default billing is annual, so this CTA routes to `pro_annual`.
+    const proCta = screen.getByTestId("pricing-cta-pro-annual");
     fireEvent.click(proCta);
 
     const blockedCalls = trackPricingEventMock.mock.calls.filter(
@@ -118,8 +118,8 @@ describe("Pricing recovery analytics", () => {
   it("retry button fires pricing + funnel recovery_retry with the last-clicked plan, then reopens checkout", () => {
     renderPricing();
 
-    // Set lastCheckoutPlanRef via a CTA click first.
-    fireEvent.click(screen.getByTestId("pricing-cta-pro_monthly"));
+    // Set lastCheckoutPlanRef via a CTA click first (default billing = annual).
+    fireEvent.click(screen.getByTestId("pricing-cta-pro-annual"));
     trackPricingEventMock.mockClear();
     trackFunnelEventMock.mockClear();
 
@@ -127,19 +127,19 @@ describe("Pricing recovery analytics", () => {
 
     expect(trackPricingEventMock).toHaveBeenCalledWith(
       "pricing_checkout_recovery_retry",
-      { plan: "pro_monthly", source: "recovery_panel" },
+      { plan: "pro_annual", source: "recovery_panel" },
     );
     expect(trackFunnelEventMock).toHaveBeenCalledWith(
       "checkout_recovery_retry",
-      { plan: "pro_monthly" },
+      { plan: "pro_annual" },
     );
     expect(dismissBlockedMock).toHaveBeenCalledTimes(1);
-    expect(openCheckoutMock).toHaveBeenCalledWith({ priceId: "pro_monthly" });
+    expect(openCheckoutMock).toHaveBeenCalledWith({ priceId: "pro_annual" });
   });
 
   it("choose-another-plan button fires pricing + funnel recovery_choose_another_plan", () => {
     renderPricing();
-    fireEvent.click(screen.getByTestId("pricing-cta-pro_annual"));
+    fireEvent.click(screen.getByTestId("pricing-cta-craft-annual"));
     trackPricingEventMock.mockClear();
     trackFunnelEventMock.mockClear();
 
@@ -147,11 +147,11 @@ describe("Pricing recovery analytics", () => {
 
     expect(trackPricingEventMock).toHaveBeenCalledWith(
       "pricing_checkout_recovery_choose_another_plan",
-      { plan: "pro_annual", source: "recovery_panel" },
+      { plan: "craft_annual", source: "recovery_panel" },
     );
     expect(trackFunnelEventMock).toHaveBeenCalledWith(
       "checkout_recovery_choose_another_plan",
-      { plan: "pro_annual" },
+      { plan: "craft_annual" },
     );
     expect(dismissBlockedMock).toHaveBeenCalledTimes(1);
     expect(openCheckoutMock).not.toHaveBeenCalled();
@@ -159,7 +159,7 @@ describe("Pricing recovery analytics", () => {
 
   it("dismiss button fires pricing + funnel recovery_dismissed", () => {
     renderPricing();
-    fireEvent.click(screen.getByTestId("pricing-cta-founder_lifetime"));
+    fireEvent.click(screen.getByTestId("pricing-cta-founder-lifetime"));
     trackPricingEventMock.mockClear();
     trackFunnelEventMock.mockClear();
 

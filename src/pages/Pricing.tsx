@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/accordion";
 import { trackPricingEvent, type PricingAnalyticsName } from "@/lib/pricingAnalytics";
 import { trackFunnelEvent } from "@/lib/funnelAnalytics";
+import { sanitizeCheckoutRecoveryPlanSlug } from "@/lib/checkoutRecoveryPlanSlug";
 import { VERDANT_PRICING_FAQ_ADDITIONS } from "@/constants/verdantSeoCopy";
 import { usePaddleCheckout } from "@/hooks/usePaddleCheckout";
 import type { SubscriberInterestPlanId } from "@/lib/subscriberInterestRules";

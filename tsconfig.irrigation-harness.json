@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "types": ["bun", "node"],
+    "noEmit": true
+  },
+  "include": [
+    "scripts/run-irrigation-evidence-rls-harness.ts",
+    "scripts/run-create-feeding-event-rls-harness.ts",
+    "scripts/run-quicklog-save-event-rls-harness.ts",
+    "scripts/run-quicklog-save-manual-rls-harness.ts",
+    "scripts/run-quicklog-rpc-rls-harnesses.ts",
+    "scripts/run-quicklog-typed-payloads-harness.ts"
+  ]
+}

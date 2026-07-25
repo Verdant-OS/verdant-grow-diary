@@ -12,6 +12,10 @@ const harness = readFileSync(HARNESS_PATH, "utf8");
 const packageJson = JSON.parse(readFileSync(PACKAGE_PATH, "utf8")) as {
   scripts?: Record<string, string>;
 };
+const seedReadingSet = harness.slice(
+  harness.indexOf("async function seedReadingSet"),
+  harness.indexOf("\nfunction calibrationRow"),
+);
 
 describe("VPD calibration provenance runtime RLS harness contract", () => {
   it("is exposed as an explicit local security lane", () => {
@@ -127,5 +131,16 @@ describe("VPD calibration provenance runtime RLS harness contract", () => {
     expect(harness).toMatch(
       /seedTent\(\s*cascadeUserClient,\s*cascadeUser\.id,\s*"auth user delete cascade"/,
     );
+  });
+
+  it("uses caller-known UUIDs instead of relying on an insert representation", () => {
+    expect(seedReadingSet).toMatch(/const airId = crypto\.randomUUID\(\)/);
+    expect(seedReadingSet).toMatch(/const humidityId = crypto\.randomUUID\(\)/);
+    expect(seedReadingSet).toMatch(/const vpdId = crypto\.randomUUID\(\)/);
+    expect(seedReadingSet).toContain("id: airId");
+    expect(seedReadingSet).toContain("id: humidityId");
+    expect(seedReadingSet).toContain("id: vpdId");
+    expect(seedReadingSet).not.toContain('.select("id,metric")');
+    expect(seedReadingSet).toContain("return { airId, humidityId, vpdId, observedAt }");
   });
 });

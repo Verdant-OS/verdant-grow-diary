@@ -290,6 +290,7 @@ export default function PhenoHuntNew() {
               id="ph-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              onFocus={(e) => e.target.select()}
               placeholder="e.g. Summer Pheno Hunt"
               data-testid="ph-name-input"
             />

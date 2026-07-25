@@ -21,6 +21,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { verifyWebhook, getPaddleClient, type PaddleEnv } from "../_shared/paddle.ts";
 import { handleVerifiedEvent, type Deps, type EventLikeWithId } from "./orchestrator.ts";
 import { insertPaddleEventLog } from "./eventLogInsert.ts";
+import { maybeSendPurchaseConfirmation } from "./sendPurchaseConfirmation.ts";
 
 let _supabase: ReturnType<typeof createClient> | null = null;
 function getSupabase() {

@@ -201,7 +201,9 @@ async function discoverActiveCraftExternalIds(
 }
 
 async function main(): Promise<void> {
-  const envs = parseEnvFlag(process.argv.slice(2));
+  const argv = process.argv.slice(2);
+  const envs = parseEnvFlag(argv);
+  const jsonOut = parseJsonOutFlag(argv);
   const results: CheckResult[] = [];
 
   console.log(`# Paddle Craft catalog preflight`);
@@ -226,7 +228,7 @@ async function main(): Promise<void> {
       }
       // Missing API key for a requested env is a misconfiguration, not a
       // catalog failure — surface as exit 2.
-      printSummaryAndExit(results, 2);
+      finalize(results, envs, jsonOut, 2);
       return;
     }
     for (const id of REQUIRED_PLAN_IDS) {
@@ -251,6 +253,7 @@ async function main(): Promise<void> {
         externalId: `${CRAFT_EXTERNAL_ID_PREFIX}* (coverage)`,
         status: "fail",
         detail: `catalog enumeration failed: ${discovery.detail}`,
+        cause: { kind: "enumeration_error" },
       });
       console.log(
         `✗ [${env}] ${CRAFT_EXTERNAL_ID_PREFIX}* (coverage) — catalog enumeration failed: ${discovery.detail}`,
@@ -276,22 +279,94 @@ async function main(): Promise<void> {
           `active in catalog but not in REQUIRED_PLAN_IDS — ` +
           `add to src/lib/paidPlanAllowlist.ts PAID_PLAN_IDS and to REQUIRED_PLAN_IDS ` +
           `in scripts/verify-paddle-craft-catalog.ts`;
-        results.push({ env, externalId: id, status: "fail", detail });
+        results.push({
+          env,
+          externalId: id,
+          status: "fail",
+          detail,
+          cause: { kind: "coverage_gap" },
+        });
         console.log(`✗ [${env}] ${id} — ${detail}`);
       }
     }
   }
 
   const failed = results.filter((r) => r.status === "fail").length;
-  printSummaryAndExit(results, failed > 0 ? 1 : 0);
+  finalize(results, envs, jsonOut, failed > 0 ? 1 : 0);
 }
 
-function printSummaryAndExit(results: readonly CheckResult[], code: number): void {
+/**
+ * Summary counts, JSON report emission, and exit — kept in one place so
+ * every termination path (misconfig, catalog failure, all-green) writes
+ * the same structured report shape.
+ *
+ * The JSON report is the canonical machine-readable output: the CI
+ * renderer reads it directly instead of re-parsing the human log, which
+ * eliminates a whole class of glyph-encoding / line-drift bugs and
+ * removes the temptation to widen the log parser to carry data.
+ *
+ * Report shape (stable — the renderer's `--report` path pins it):
+ *   {
+ *     schemaVersion: 1,
+ *     envs: PaddleEnv[],
+ *     requiredIds: string[],
+ *     rows: [{ env, externalId, status, cause? }, ...],  // no `detail`
+ *     summary: { pass, fail, skip },
+ *     exitCode: number,
+ *     keyUnset: boolean,
+ *     generatedAt: ISO-8601 string
+ *   }
+ *
+ * `detail` is intentionally excluded — it can embed up to 200 chars of
+ * Paddle response body on the API-error path, which we do NOT want in
+ * PR comments. The classified `cause` carries everything the renderer
+ * needs to pick a remedy.
+ */
+function finalize(
+  results: readonly CheckResult[],
+  envs: readonly PaddleEnv[],
+  jsonOut: string | null,
+  code: number,
+): void {
   const pass = results.filter((r) => r.status === "pass").length;
   const fail = results.filter((r) => r.status === "fail").length;
   const skip = results.filter((r) => r.status === "skip").length;
   console.log("");
   console.log(`SUMMARY: pass=${pass} fail=${fail} skip=${skip}`);
+
+  if (jsonOut) {
+    const report = {
+      schemaVersion: 1 as const,
+      envs: [...envs],
+      requiredIds: [...REQUIRED_PLAN_IDS],
+      rows: results.map((r) => {
+        const row: {
+          env: PaddleEnv;
+          externalId: string;
+          status: CheckStatus;
+          cause?: FailureCause;
+        } = { env: r.env, externalId: r.externalId, status: r.status };
+        if (r.cause) row.cause = r.cause;
+        return row;
+      }),
+      summary: { pass, fail, skip },
+      exitCode: code,
+      keyUnset: results.some(
+        (r) => r.status === "skip" && /_API_KEY not set$/.test(r.detail),
+      ),
+      generatedAt: new Date().toISOString(),
+    };
+    try {
+      writeFileSync(jsonOut, JSON.stringify(report, null, 2) + "\n", "utf8");
+    } catch (err) {
+      // A write failure must not mask the real verifier verdict — log
+      // and continue to exit with the intended code.
+      console.error(
+        `::warning::failed to write JSON report to ${jsonOut}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
   process.exit(code);
 }
 

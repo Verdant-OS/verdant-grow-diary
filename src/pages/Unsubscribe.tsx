@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -6,21 +6,12 @@ import BrandLogo from "@/components/BrandLogo";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import { Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 
-type Status =
-  | "validating"
-  | "ready"
-  | "already"
-  | "invalid"
-  | "confirming"
-  | "success"
-  | "error";
-
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
+type Status = "validating" | "ready" | "already" | "invalid" | "confirming" | "success" | "error";
 
 export default function Unsubscribe() {
   const [searchParams] = useSearchParams();
-  const token = searchParams.get("token");
+  const tokenRef = useRef(searchParams.get("token"));
+  const token = tokenRef.current;
   const [status, setStatus] = useState<Status>("validating");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -28,36 +19,51 @@ export default function Unsubscribe() {
     title: "Unsubscribe | Verdant Grow Diary",
     description: "Confirm you want to stop receiving emails from Verdant Grow Diary.",
     path: "/unsubscribe",
+    noindex: true,
   });
 
   useEffect(() => {
     let cancelled = false;
+
+    // Keep the one-time token out of browser history, copied URLs, and later
+    // same-page navigation as soon as React owns the route.
+    if (token && typeof window !== "undefined") {
+      try {
+        window.history.replaceState(
+          window.history.state,
+          "",
+          `${window.location.pathname}${window.location.hash}`,
+        );
+      } catch {
+        // URL cleanup is defense-in-depth and must not block the request.
+      }
+    }
+
     async function validate() {
       if (!token) {
         setStatus("invalid");
         return;
       }
       try {
-        const response = await fetch(
-          `${SUPABASE_URL}/functions/v1/handle-email-unsubscribe?token=${encodeURIComponent(token)}`,
-          { headers: { apikey: SUPABASE_ANON_KEY } },
-        );
-        const body = (await response.json().catch(() => ({}))) as {
+        const { data, error } = await supabase.functions.invoke("handle-email-unsubscribe", {
+          body: { token, action: "validate" },
+        });
+        if (error) throw error;
+        const body = (data ?? {}) as {
           valid?: boolean;
           reason?: string;
-          error?: string;
         };
         if (cancelled) return;
-        if (response.ok && body.valid) {
+        if (body.valid) {
           setStatus("ready");
         } else if (body.reason === "already_unsubscribed") {
           setStatus("already");
         } else {
           setStatus("invalid");
         }
-      } catch (err) {
+      } catch {
         if (cancelled) return;
-        setErrorMessage(err instanceof Error ? err.message : String(err));
+        setErrorMessage("We couldn't verify this link. Please try again.");
         setStatus("error");
       }
     }
@@ -73,7 +79,7 @@ export default function Unsubscribe() {
     setErrorMessage(null);
     try {
       const { data, error } = await supabase.functions.invoke("handle-email-unsubscribe", {
-        body: { token },
+        body: { token, action: "unsubscribe" },
       });
       if (error) throw error;
       const payload = (data ?? {}) as { success?: boolean; reason?: string };
@@ -85,9 +91,9 @@ export default function Unsubscribe() {
         setStatus("error");
         setErrorMessage("We couldn't process the unsubscribe. Please try again.");
       }
-    } catch (err) {
+    } catch {
       setStatus("error");
-      setErrorMessage(err instanceof Error ? err.message : String(err));
+      setErrorMessage("We couldn't process the unsubscribe. Please try again.");
     }
   }
 
@@ -109,9 +115,9 @@ export default function Unsubscribe() {
             {status === "ready" && (
               <>
                 <p>
-                  Click confirm to stop receiving emails from Verdant Grow Diary at
-                  this address. This only affects marketing and grow-update emails —
-                  we&rsquo;ll still send critical account emails like password resets.
+                  Click confirm to stop receiving emails from Verdant Grow Diary at this address.
+                  This only affects marketing and grow-update emails — we&rsquo;ll still send
+                  critical account emails like password resets.
                 </p>
                 <Button className="mt-5 w-full" onClick={confirmUnsubscribe}>
                   Confirm unsubscribe
@@ -139,20 +145,22 @@ export default function Unsubscribe() {
             {status === "invalid" && (
               <p className="flex items-center gap-2">
                 <AlertCircle className="h-5 w-5 text-destructive" aria-hidden />
-                This unsubscribe link is invalid or expired. Reply to the last
-                email you received and I&rsquo;ll take care of it.
+                This unsubscribe link is invalid or expired. Reply to the last email you received
+                and I&rsquo;ll take care of it.
               </p>
             )}
             {status === "error" && (
               <p className="flex items-center gap-2">
                 <AlertCircle className="h-5 w-5 text-destructive" aria-hidden />
-                Something went wrong{errorMessage ? `: ${errorMessage}` : "."} Please
-                try again in a moment.
+                Something went wrong{errorMessage ? `: ${errorMessage}` : "."} Please try again in a
+                moment.
               </p>
             )}
           </div>
           <div className="mt-6 text-xs text-muted-foreground">
-            <Link to="/" className="underline">Return to Verdant</Link>
+            <Link to="/" className="underline" referrerPolicy="no-referrer">
+              Return to Verdant
+            </Link>
           </div>
         </div>
       </div>

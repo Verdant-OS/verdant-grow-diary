@@ -25,13 +25,7 @@
     <!-- Preload the landing hero logo (LCP candidate on /welcome) so the
          browser starts fetching it during HTML parse instead of waiting
          for React to mount and discover the <img>. -->
-    <link
-      rel="preload"
-      as="image"
-      href="/brand/verdant-logo.png"
-      fetchpriority="high"
-    />
-
+    <link rel="preload" as="image" href="/brand/verdant-logo.png" fetchpriority="high" />
 
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-B3QRSZEM9S"></script>
@@ -42,7 +36,10 @@
       }
       gtag("js", new Date());
 
-      gtag("config", "G-B3QRSZEM9S");
+      // React sends an explicit pathname-only page_location. Disable GA's
+      // automatic initial view so query tokens and hashes never become the
+      // browser-location fallback before the router mounts.
+      gtag("config", "G-B3QRSZEM9S", { send_page_view: false });
     </script>
 
     <!-- Primary SEO -->
@@ -72,7 +69,7 @@
       rel="preload"
       as="style"
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap"
-      onload="this.rel='stylesheet'"
+      onload="this.rel = 'stylesheet'"
     />
     <noscript>
       <link

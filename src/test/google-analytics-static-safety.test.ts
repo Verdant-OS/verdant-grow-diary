@@ -67,8 +67,10 @@ describe("Google Analytics static safety — no PII in path logic", () => {
 
   it("never forwards React Router search params or relies on GA's raw-location fallback", () => {
     const hook = readFile("src/hooks/useGoogleAnalyticsPageViews.ts");
+    const indexHtml = readFile("index.html");
     expect(hook).not.toContain("location.search");
     expect(hook).toContain("page_location:");
     expect(hook).toContain("buildSafeAnalyticsPageLocation");
+    expect(indexHtml).toMatch(/send_page_view:\s*false/);
   });
 });

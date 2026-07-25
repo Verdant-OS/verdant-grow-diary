@@ -89,12 +89,12 @@ vi.mock("@/integrations/supabase/client", () => {
   };
 });
 
-vi.mock("@/store/auth", () => ({
-  useAuth: (() => {
-    const user = { id: "u1", email: "u@example.com" };
-    return () => ({ user });
-  })(),
-}));
+vi.mock("@/store/auth", () => {
+  const user = { id: "u1", email: "u@example.com" };
+  return {
+    useAuth: () => ({ user }),
+  };
+});
 vi.mock("@/store/grows", () => ({
   useGrows: () => ({
     grows: [{ id: "g1", name: "G1" }],
@@ -105,14 +105,6 @@ vi.mock("@/store/grows", () => ({
 vi.mock("sonner", () => ({
   toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn(), message: vi.fn() },
 }));
-
-// ActionDetail resolves its row through async effects that can exceed
-// testing-library's 1s findBy default AND vitest's 5s per-test timeout on
-// loaded shared CI runners (observed repeatedly across full-suite batches;
-// passes locally in seconds). Raise the per-test budget for this file and
-// give the async-load awaits a generous findBy timeout beneath it.
-vi.setConfig({ testTimeout: 60_000 });
-const FIND_TIMEOUT = { timeout: 30_000 };
 
 beforeEach(() => {
   detailRow = AI_DOCTOR_ROW;
@@ -131,16 +123,10 @@ function renderDetail(actionId = "aq-ai-1") {
 describe("ActionDetail header — View saved AI Doctor session link", () => {
   it("renders the link beside the 'Linked from AI Doctor' chip for AI Doctor rows with a session id", async () => {
     renderDetail();
-    const chip = await screen.findByTestId(
-      "action-detail-ai-doctor-session-header-link",
-      undefined,
-      FIND_TIMEOUT,
-    );
+    const chip = await screen.findByTestId("action-detail-ai-doctor-session-header-link");
     expect(chip.textContent ?? "").toMatch(/linked from ai doctor/i);
     const link = (await screen.findByTestId(
       "action-detail-ai-doctor-saved-session-link",
-      undefined,
-      FIND_TIMEOUT,
     )) as HTMLAnchorElement;
     expect(link.textContent).toBe("View saved AI Doctor session");
     expect(link.getAttribute("href")).toBe(aiDoctorSessionDetailPath("sess-abc"));
@@ -149,34 +135,26 @@ describe("ActionDetail header — View saved AI Doctor session link", () => {
   it("does not render the link when the AI Doctor row lacks a parseable session id", async () => {
     detailRow = AI_DOCTOR_ROW_NO_SESSION;
     renderDetail("aq-ai-2");
-    await screen.findByText("Raise the light by 10 cm", undefined, FIND_TIMEOUT);
+    await screen.findByText("Raise the light by 10 cm");
     expect(screen.queryByTestId("action-detail-ai-doctor-saved-session-link")).toBeNull();
   });
 
   it("does not render the link on non-AI-Doctor actions", async () => {
     detailRow = COACH_ROW;
     renderDetail("aq-coach-1");
-    await screen.findByText("Lower humidity to 55%", undefined, FIND_TIMEOUT);
+    await screen.findByText("Lower humidity to 55%");
     expect(screen.queryByTestId("action-detail-ai-doctor-saved-session-link")).toBeNull();
   });
 
   it("preserves the existing 'Suggestion origin' panel", async () => {
     renderDetail();
-    const panel = await screen.findByTestId(
-      "action-detail-ai-doctor-provenance",
-      undefined,
-      FIND_TIMEOUT,
-    );
+    const panel = await screen.findByTestId("action-detail-ai-doctor-provenance");
     expect(panel.textContent ?? "").toContain("Suggestion origin");
   });
 
   it("does not leak raw [session:<id>] tokens or target_device", async () => {
     renderDetail();
-    const link = await screen.findByTestId(
-      "action-detail-ai-doctor-saved-session-link",
-      undefined,
-      FIND_TIMEOUT,
-    );
+    const link = await screen.findByTestId("action-detail-ai-doctor-saved-session-link");
     const text = (link.textContent ?? "").toLowerCase();
     expect(text).not.toContain("[session:");
     expect(text).not.toContain("secret-device-name");
@@ -185,11 +163,7 @@ describe("ActionDetail header — View saved AI Doctor session link", () => {
 
   it("link copy does not imply automation, execution, or status transition", async () => {
     renderDetail();
-    const link = await screen.findByTestId(
-      "action-detail-ai-doctor-saved-session-link",
-      undefined,
-      FIND_TIMEOUT,
-    );
+    const link = await screen.findByTestId("action-detail-ai-doctor-saved-session-link");
     const lower = (link.textContent ?? "").toLowerCase();
     for (const tok of [
       "auto-execute",

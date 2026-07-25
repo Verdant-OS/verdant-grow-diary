@@ -97,8 +97,8 @@ async function signIn(email: string, password: string): Promise<SupabaseClient> 
   return client;
 }
 
-async function seedTent(userId: string, label: string): Promise<string> {
-  const { data, error } = await admin
+async function seedTent(client: SupabaseClient, userId: string, label: string): Promise<string> {
+  const { data, error } = await client
     .from("tents")
     .insert({ user_id: userId, name: `VPD provenance ${label}` })
     .select("id")
@@ -131,6 +131,9 @@ async function seedReadingSet(args: {
   legacyTsOnly?: boolean;
 }): Promise<ReadingSet> {
   const observedAt = new Date(Date.now() - args.minutesAgo * 60_000).toISOString();
+  const airId = crypto.randomUUID();
+  const humidityId = crypto.randomUUID();
+  const vpdId = crypto.randomUUID();
   const base = {
     user_id: args.userId,
     tent_id: args.tentId,
@@ -140,41 +143,35 @@ async function seedReadingSet(args: {
     ts: observedAt,
     raw_payload: { harness: args.label },
   };
-  const { data, error } = await admin
-    .from("sensor_readings")
-    .insert([
-      {
-        ...base,
-        metric: "temperature_c",
-        value: args.airValue ?? 25,
-        device_id: args.airDeviceId === undefined ? "vpd-probe-1" : args.airDeviceId,
-        source: args.airSource ?? "manual",
-      },
-      {
-        ...base,
-        metric: "humidity_pct",
-        value: args.humidityValue ?? 60,
-        device_id: args.humidityDeviceId === undefined ? "vpd-probe-1" : args.humidityDeviceId,
-        source: args.humiditySource ?? "manual",
-      },
-      {
-        ...base,
-        metric: "vpd_kpa",
-        value: args.vpdValue ?? 0.73,
-        device_id: args.vpdDeviceId === undefined ? "vpd-probe-1" : args.vpdDeviceId,
-        source: args.vpdSource ?? "manual",
-      },
-    ])
-    .select("id,metric");
-  if (error || data?.length !== 3) {
-    throw new Error(`fixture_readings_${error?.code ?? "failed"}`);
+  const { error } = await admin.from("sensor_readings").insert([
+    {
+      ...base,
+      id: airId,
+      metric: "temperature_c",
+      value: args.airValue ?? 25,
+      device_id: args.airDeviceId === undefined ? "vpd-probe-1" : args.airDeviceId,
+      source: args.airSource ?? "manual",
+    },
+    {
+      ...base,
+      id: humidityId,
+      metric: "humidity_pct",
+      value: args.humidityValue ?? 60,
+      device_id: args.humidityDeviceId === undefined ? "vpd-probe-1" : args.humidityDeviceId,
+      source: args.humiditySource ?? "manual",
+    },
+    {
+      ...base,
+      id: vpdId,
+      metric: "vpd_kpa",
+      value: args.vpdValue ?? 0.73,
+      device_id: args.vpdDeviceId === undefined ? "vpd-probe-1" : args.vpdDeviceId,
+      source: args.vpdSource ?? "manual",
+    },
+  ]);
+  if (error) {
+    throw new Error(`fixture_readings_${error.code}`);
   }
-  const idFor = (metric: string) =>
-    data.find((row) => row.metric === metric)?.id as string | undefined;
-  const airId = idFor("temperature_c");
-  const humidityId = idFor("humidity_pct");
-  const vpdId = idFor("vpd_kpa");
-  if (!airId || !humidityId || !vpdId) throw new Error("fixture_reading_ids_missing");
   return { airId, humidityId, vpdId, observedAt };
 }
 
@@ -300,12 +297,12 @@ async function main(): Promise<void> {
   try {
     owner = await createUser("owner");
     other = await createUser("other");
-    const ownerTentId = await seedTent(owner.id, "owner tent");
-    const otherTentId = await seedTent(other.id, "other tent");
-    tentIds.push(ownerTentId, otherTentId);
-
     const ownerClient = await signIn(owner.email, owner.password);
     const otherClient = await signIn(other.email, other.password);
+    const ownerTentId = await seedTent(ownerClient, owner.id, "owner tent");
+    const otherTentId = await seedTent(otherClient, other.id, "other tent");
+    tentIds.push(ownerTentId, otherTentId);
+
     const verifiedAt = new Date(Date.now() - 30 * 24 * 60 * 60_000).toISOString();
 
     const { data: calibration, error: calibrationError } = await ownerClient
@@ -888,7 +885,7 @@ async function main(): Promise<void> {
       provenanceDeleteError?.code ?? provenanceDeleteReadbackError?.code,
     );
 
-    const cascadeTentId = await seedTent(owner.id, "tent delete cascade");
+    const cascadeTentId = await seedTent(ownerClient, owner.id, "tent delete cascade");
     tentIds.push(cascadeTentId);
     const { data: cascadeTentCalibration, error: cascadeTentCalibrationError } = await ownerClient
       .from("vpd_calibration_records")
@@ -953,7 +950,11 @@ async function main(): Promise<void> {
 
     cascadeUser = await createUser("auth-delete-cascade");
     const cascadeUserClient = await signIn(cascadeUser.email, cascadeUser.password);
-    const cascadeUserTentId = await seedTent(cascadeUser.id, "auth user delete cascade");
+    const cascadeUserTentId = await seedTent(
+      cascadeUserClient,
+      cascadeUser.id,
+      "auth user delete cascade",
+    );
     tentIds.push(cascadeUserTentId);
     const { data: cascadeUserCalibration, error: cascadeUserCalibrationError } =
       await cascadeUserClient

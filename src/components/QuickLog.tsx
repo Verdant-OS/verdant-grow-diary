@@ -129,6 +129,7 @@ import {
   buildEcCompensationPreview,
   EC_COMPENSATION_PREVIEW_DISCLAIMER,
 } from "@/lib/ecCompensationPreviewViewModel";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import { buildEnvironmentCheckSensorContext } from "@/lib/environmentCheckSensorContextRules";
 import { buildSensorNormalizationPreviewViewModel } from "@/lib/sensors/sensorNormalizationPreviewViewModel";
 import { SensorNormalizationPreviewPanel } from "@/components/SensorNormalizationPreviewPanel";
@@ -355,7 +356,31 @@ export default function QuickLog({
   const [envHumidityPct, setEnvHumidityPct] = useState<string>("");
   const [envVpdKpa, setEnvVpdKpa] = useState<string>("");
   const [envWaterTempValue, setEnvWaterTempValue] = useState<string>("");
-  const [envWaterTempUnit, setEnvWaterTempUnit] = useState<EnvironmentCheckWaterTempUnit>("F");
+  // The legacy Environment Check water-temp field is already unit-aware via
+  // an explicit °F/°C selector (conversion happens once inside
+  // environmentCheckQuickLogRules). Seed and reset that selector from the
+  // grower's temperature unit preference instead of hardcoding °F.
+  const temperatureUnitPreference = useTemperatureUnitPreference();
+  const defaultEnvWaterTempUnit: EnvironmentCheckWaterTempUnit =
+    temperatureUnitPreference === "celsius" ? "C" : "F";
+  const [envWaterTempUnit, setEnvWaterTempUnit] =
+    useState<EnvironmentCheckWaterTempUnit>(defaultEnvWaterTempUnit);
+  // Room temperature has no independent unit selector of its own — it
+  // always follows the grower's global display preference directly.
+  const envRoomTempUnit: EnvironmentCheckWaterTempUnit =
+    temperatureUnitPreference === "celsius" ? "C" : "F";
+  // Pins the unit an OPEN, non-empty room-temp draft was typed under, captured
+  // at the first keystroke from empty. `temperatureUnitPreference` above is
+  // live-reactive (cross-tab `storage` + same-tab TEMPERATURE_UNIT_CHANGE_EVENT),
+  // so without this pin a preference flip while the grower has an unsaved digit
+  // in the field would silently reinterpret that digit under the NEW unit at
+  // save time (e.g. a typed "25" meaning 25°C persisted as 25°F instead).
+  // Un-pinned (null) whenever the draft is empty, so an empty field's label/
+  // placeholder still reflects the live preference.
+  const [pinnedEnvRoomTempUnit, setPinnedEnvRoomTempUnit] =
+    useState<EnvironmentCheckWaterTempUnit | null>(null);
+  const effectiveEnvRoomTempUnit: EnvironmentCheckWaterTempUnit =
+    pinnedEnvRoomTempUnit ?? envRoomTempUnit;
   const [envEcMscm, setEnvEcMscm] = useState<string>("");
   const [harvestPhotoAngle, setHarvestPhotoAngle] = useState<HarvestPhotoAngle | "">("");
   const [harvestPhotoLighting, setHarvestPhotoLighting] = useState<HarvestPhotoLighting | "">("");
@@ -624,8 +649,12 @@ export default function QuickLog({
         snapshot: sensorState.snapshot,
         hasTent: !!sensorTentId,
         attached: snapshot,
+        // Read-only reference value (Pattern B) — this memo only drives the
+        // .status auto-attach effects below, but must still stay unit-aware
+        // like every other consumer of this adapter.
+        temperatureUnit: temperatureUnitPreference,
       }),
-    [sensorState.status, sensorState.snapshot, sensorTentId, snapshot],
+    [sensorState.status, sensorState.snapshot, sensorTentId, snapshot, temperatureUnitPreference],
   );
 
   useEffect(() => {
@@ -764,10 +793,11 @@ export default function QuickLog({
     setEarlyNotes("");
     setEarlyManuallyOpen(false);
     setEnvRoomTempF("");
+    setPinnedEnvRoomTempUnit(null);
     setEnvHumidityPct("");
     setEnvVpdKpa("");
     setEnvWaterTempValue("");
-    setEnvWaterTempUnit("F");
+    setEnvWaterTempUnit(defaultEnvWaterTempUnit);
     setEnvEcMscm("");
     setHarvestPhotoAngle("");
     setHarvestPhotoLighting("");
@@ -802,10 +832,11 @@ export default function QuickLog({
     }
     if (plan.clearEnvironment) {
       setEnvRoomTempF("");
+      setPinnedEnvRoomTempUnit(null);
       setEnvHumidityPct("");
       setEnvVpdKpa("");
       setEnvWaterTempValue("");
-      setEnvWaterTempUnit("F");
+      setEnvWaterTempUnit(defaultEnvWaterTempUnit);
       setEnvEcMscm("");
     }
     if (plan.clearMaturity) {
@@ -862,10 +893,11 @@ export default function QuickLog({
     setEarlyVigor(null);
     setEarlyNotes("");
     setEnvRoomTempF("");
+    setPinnedEnvRoomTempUnit(null);
     setEnvHumidityPct("");
     setEnvVpdKpa("");
     setEnvWaterTempValue("");
-    setEnvWaterTempUnit("F");
+    setEnvWaterTempUnit(defaultEnvWaterTempUnit);
     setEnvEcMscm("");
     setHarvestPhotoAngle("");
     setHarvestPhotoLighting("");
@@ -1007,6 +1039,7 @@ export default function QuickLog({
       if (saveEventType === "environment") {
         const bandCheck = validateEnvironmentCheckSensorBand({
           roomTempF: envRoomTempF,
+          roomTempUnit: effectiveEnvRoomTempUnit,
           humidityPct: envHumidityPct,
           vpdKpa: envVpdKpa,
         });
@@ -1022,6 +1055,7 @@ export default function QuickLog({
         saveEventType === "environment"
           ? buildEnvironmentCheckDetails({
               roomTempF: envRoomTempF,
+              roomTempUnit: effectiveEnvRoomTempUnit,
               humidityPct: envHumidityPct,
               vpdKpa: envVpdKpa,
               waterTempValue: envWaterTempValue,
@@ -2144,6 +2178,7 @@ export default function QuickLog({
               (() => {
                 const hasMeasurement = hasAnyEnvironmentCheckMeasurement({
                   roomTempF: envRoomTempF,
+                  roomTempUnit: effectiveEnvRoomTempUnit,
                   humidityPct: envHumidityPct,
                   vpdKpa: envVpdKpa,
                   waterTempValue: envWaterTempValue,
@@ -2186,7 +2221,7 @@ export default function QuickLog({
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <Label className="text-xs" htmlFor="quick-log-env-room-temp-f">
-                          Room temperature (°F)
+                          Room temperature ({effectiveEnvRoomTempUnit === "C" ? "°C" : "°F"})
                         </Label>
                         <Input
                           id="quick-log-env-room-temp-f"
@@ -2195,9 +2230,21 @@ export default function QuickLog({
                           value={envRoomTempF}
                           onChange={(e) => {
                             if (restoreLockedDraftValue(e.currentTarget, envRoomTempF)) return;
-                            setEnvRoomTempF(e.target.value);
+                            const nextValue = e.target.value;
+                            // Pin the unit this draft is interpreted under at the
+                            // FIRST keystroke from empty, so a live preference
+                            // change later (cross-tab or same-tab) can never
+                            // silently reinterpret digits the grower already
+                            // typed. Un-pin when the field is cleared back to
+                            // empty so a fresh draft reflects the live unit.
+                            if (nextValue.trim().length > 0 && envRoomTempF.trim().length === 0) {
+                              setPinnedEnvRoomTempUnit(envRoomTempUnit);
+                            } else if (nextValue.trim().length === 0) {
+                              setPinnedEnvRoomTempUnit(null);
+                            }
+                            setEnvRoomTempF(nextValue);
                           }}
-                          placeholder="76"
+                          placeholder={effectiveEnvRoomTempUnit === "C" ? "24" : "76"}
                           autoComplete="off"
                         />
                       </div>
@@ -2336,7 +2383,8 @@ export default function QuickLog({
                       (() => {
                         const normPreviewVm = buildSensorNormalizationPreviewViewModel({
                           payload: {
-                            temperature_f: envRoomTempF || undefined,
+                            [effectiveEnvRoomTempUnit === "C" ? "temperature_c" : "temperature_f"]:
+                              envRoomTempF || undefined,
                             humidity_pct: envHumidityPct || undefined,
                             vpd_kpa: envVpdKpa || undefined,
                             soil_ec_ms_cm: envEcMscm || undefined,

@@ -57,12 +57,31 @@ BEGIN
   END IF;
 END $$;
 
--- Preserve the irrigation event ACL established by
--- 20260724055000_irrigation_event_acl_parity.sql after the local-only blanket
--- grants above. Hosted projects receive this posture from the migration itself.
-REVOKE INSERT, UPDATE, DELETE
-  ON TABLE public.grow_events, public.watering_events, public.feeding_events
-  FROM PUBLIC, anon, authenticated;
-GRANT SELECT
-  ON TABLE public.grow_events, public.watering_events, public.feeding_events
-  TO authenticated;
+-- Irrigation event history is browser-read-only. The canonical write path is
+-- quicklog_save_event / quicklog_save_manual; direct client DML was revoked by
+-- the production migration. Reapply that deny boundary after the blanket local
+-- parity grant so runtime and pgTAP lanes test production-equivalent ACLs.
+DO $$
+BEGIN
+  IF to_regclass('public.grow_events') IS NOT NULL
+     AND to_regclass('public.watering_events') IS NOT NULL
+     AND to_regclass('public.feeding_events') IS NOT NULL THEN
+    REVOKE INSERT, UPDATE, DELETE ON TABLE
+      public.grow_events,
+      public.watering_events,
+      public.feeding_events
+    FROM PUBLIC, anon, authenticated;
+
+    GRANT SELECT ON TABLE
+      public.grow_events,
+      public.watering_events,
+      public.feeding_events
+    TO authenticated;
+
+    GRANT ALL ON TABLE
+      public.grow_events,
+      public.watering_events,
+      public.feeding_events
+    TO service_role;
+  END IF;
+END $$;

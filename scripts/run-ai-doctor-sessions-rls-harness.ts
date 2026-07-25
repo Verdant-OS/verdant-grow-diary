@@ -131,6 +131,14 @@ function errorCode(error: unknown): string {
   return isRecord(error) && typeof error.code === "string" ? error.code : "unexpected";
 }
 
+function errorDetail(error: unknown): string {
+  if (isRecord(error) && typeof error.code === "string") return error.code;
+  if (error instanceof Error && error.message) {
+    return error.message.replace(/[\r\n\t]+/g, " ").slice(0, 240);
+  }
+  return "unexpected";
+}
+
 function isDenied(error: { code?: string } | null): boolean {
   return error?.code === "42501";
 }
@@ -164,8 +172,12 @@ interface ScopeFixtures {
   plantId: string;
 }
 
-async function seedScopes(userId: string, label: string): Promise<ScopeFixtures> {
-  const { data: grow, error: growError } = await admin
+async function seedScopes(
+  owner: SupabaseClient,
+  userId: string,
+  label: string,
+): Promise<ScopeFixtures> {
+  const { data: grow, error: growError } = await owner
     .from("grows")
     .insert({ user_id: userId, name: `RLS grow ${label}` })
     .select("id")
@@ -174,19 +186,24 @@ async function seedScopes(userId: string, label: string): Promise<ScopeFixtures>
     throw new Error(`seed_grow_failed:${growError?.code ?? "unknown"}`);
   }
 
-  const { data: tent, error: tentError } = await admin
+  const { data: tent, error: tentError } = await owner
     .from("tents")
-    .insert({ user_id: userId, name: `RLS tent ${label}` })
+    .insert({
+      user_id: userId,
+      grow_id: grow.id,
+      name: `RLS tent ${label}`,
+    })
     .select("id")
     .single();
   if (tentError || !tent?.id) {
     throw new Error(`seed_tent_failed:${tentError?.code ?? "unknown"}`);
   }
 
-  const { data: plant, error: plantError } = await admin
+  const { data: plant, error: plantError } = await owner
     .from("plants")
     .insert({
       user_id: userId,
+      grow_id: grow.id,
       tent_id: tent.id,
       name: `RLS plant ${label}`,
     })
@@ -278,8 +295,8 @@ async function run(): Promise<void> {
     const anonymous = createClient(SUPABASE_URL, ANON_KEY, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
-    const scopeA = await seedScopes(uidA, "A");
-    const scopeB = await seedScopes(uidB, "B");
+    const scopeA = await seedScopes(ownerA, uidA, "A");
+    const scopeB = await seedScopes(ownerB, uidB, "B");
 
     const sessionAId = crypto.randomUUID();
     const sessionADefaultId = crypto.randomUUID();
@@ -669,7 +686,6 @@ async function run(): Promise<void> {
 }
 
 run().catch((error: unknown) => {
-  const code = isRecord(error) && typeof error.code === "string" ? error.code : "unexpected";
-  console.error(`[ai-doctor-sessions] harness failed: ${code}`);
+  console.error(`[ai-doctor-sessions] harness failed: ${errorDetail(error)}`);
   process.exit(1);
 });

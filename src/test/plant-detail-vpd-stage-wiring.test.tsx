@@ -15,6 +15,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 
 import PlantTentEnvironmentPanel from "@/components/PlantTentEnvironmentPanel";
+import {
+  saveTemperatureUnitPreference,
+  clearTemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 
 // Mock the readings hook so we can control the slice deterministically.
 vi.mock("@/hooks/usePlantTentLatestReadings", () => ({
@@ -93,6 +97,31 @@ describe("Plant Detail — stage-aware VPD copy", () => {
     expect(screen.queryByTestId("plant-tent-environment-vpd-stage-hint")).toBeNull();
     // Stale marker on the captured-source strip still rendered.
     expect(screen.getByTestId("plant-tent-environment-stale")).toBeInTheDocument();
+  });
+});
+
+describe("Plant Detail — Current Environment honors the temperature-unit preference (not fixed °F)", () => {
+  it("defaults to °F when no preference is saved (24°C reading → 75.2°F)", () => {
+    clearTemperatureUnitPreference();
+    renderPanel("veg");
+    const temp = screen.getByTestId("plant-tent-environment-metric-temp");
+    expect(temp.textContent).toContain("75.2");
+    expect(temp.textContent).toContain("°F");
+    expect(temp.textContent).not.toContain("°C");
+    // Recent Sensor Readings history row shares the same live preference.
+    const recentRow = screen.getByTestId("plant-tent-environment-recent-row");
+    expect(recentRow.textContent).toContain("75.2°F");
+  });
+
+  it("switches to °C, unconverted, when the grower's preference is celsius", () => {
+    saveTemperatureUnitPreference("celsius");
+    renderPanel("veg");
+    const temp = screen.getByTestId("plant-tent-environment-metric-temp");
+    expect(temp.textContent).toContain("24.0");
+    expect(temp.textContent).toContain("°C");
+    expect(temp.textContent).not.toContain("°F");
+    const recentRow = screen.getByTestId("plant-tent-environment-recent-row");
+    expect(recentRow.textContent).toContain("24.0°C");
   });
 });
 

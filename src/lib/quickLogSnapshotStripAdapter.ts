@@ -24,6 +24,10 @@ import {
   classifySnapshotTrustBadge,
   type SnapshotTrustBadgeView,
 } from "@/lib/sensorSnapshotTrustBadgeRules";
+import {
+  formatTemperatureDisplay,
+  type TemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 
 export type QuickLogSnapshotStripStatus =
   | "usable"
@@ -164,9 +168,19 @@ function formatAge(capturedMs: number, nowMs: number): string {
 
 function buildMetrics(
   snapshot: SensorSnapshot,
+  temperatureUnit: TemperatureUnitPreference,
 ): ReadonlyArray<{ label: string; value: string }> {
   const out: { label: string; value: string }[] = [];
-  if (snapshot.temp !== null) out.push({ label: "Temp", value: `${snapshot.temp.toFixed(1)}°C` });
+  if (snapshot.temp !== null) {
+    out.push({
+      label: "Temp",
+      value: formatTemperatureDisplay(snapshot.temp, {
+        valueUnit: "C",
+        unit: temperatureUnit,
+        digits: 1,
+      }),
+    });
+  }
   if (snapshot.rh !== null) out.push({ label: "RH", value: `${snapshot.rh.toFixed(0)}%` });
   if (snapshot.vpd !== null) out.push({ label: "VPD", value: `${snapshot.vpd.toFixed(2)} kPa` });
   return out;
@@ -198,6 +212,15 @@ export interface BuildQuickLogStripArgs {
    */
   attached?: boolean;
   now?: Date;
+  /**
+   * Active temperature display unit. REQUIRED — this adapter is pure
+   * (no I/O, never reads the live preference itself), so a caller that
+   * omits this can only ever get a silently-wrong-unit reading. This is
+   * exactly the bug class Codex flagged repeatedly across Quick Log:
+   * making the field compulsory means tsc catches a forgotten unit at
+   * every call site instead of it shipping as a hardcoded °C.
+   */
+  temperatureUnit: TemperatureUnitPreference;
 }
 
 export function buildQuickLogSnapshotStrip(
@@ -209,6 +232,7 @@ export function buildQuickLogSnapshotStrip(
     hasTent = true,
     attached = true,
     now = new Date(),
+    temperatureUnit,
   } = args;
 
   // No tent selected or loader still in flight or empty snapshot ⇒ no_data.
@@ -285,7 +309,7 @@ export function buildQuickLogSnapshotStrip(
     capturedAt: snapshot.ts,
     capturedAtLabel: formatCapturedAtAbsolute(snapshot.ts),
     ageLabel,
-    metrics: buildMetrics(snapshot),
+    metrics: buildMetrics(snapshot, temperatureUnit),
     action: finalAction,
     classification,
     providerLabel: deriveProviderLabel(src),
@@ -324,6 +348,15 @@ export interface BuildQuickLogStripFromTentStateArgs {
   hasTent: boolean;
   attached?: boolean;
   now?: Date;
+  /**
+   * Active temperature display unit. REQUIRED — this adapter is pure
+   * (no I/O, never reads the live preference itself), so a caller that
+   * omits this can only ever get a silently-wrong-unit reading. This is
+   * exactly the bug class Codex flagged repeatedly across Quick Log:
+   * making the field compulsory means tsc catches a forgotten unit at
+   * every call site instead of it shipping as a hardcoded °C.
+   */
+  temperatureUnit: TemperatureUnitPreference;
 }
 
 function narrowStrict(s: StrictSnapshotStatus): QuickLogSnapshotStripStatus {
@@ -361,17 +394,21 @@ function synthClassification(
   };
 }
 
-function fToC(f: number): number {
-  return ((f - 32) * 5) / 9;
-}
-
 function buildStrictMetrics(
   snap: StrictSensorSnapshot,
+  temperatureUnit: TemperatureUnitPreference,
 ): ReadonlyArray<{ label: string; value: string }> {
   const out: { label: string; value: string }[] = [];
   const tempF = snap.metrics.temp_f;
   if (typeof tempF === "number" && Number.isFinite(tempF)) {
-    out.push({ label: "Temp", value: `${fToC(tempF).toFixed(1)}°C` });
+    out.push({
+      label: "Temp",
+      value: formatTemperatureDisplay(tempF, {
+        valueUnit: "F",
+        unit: temperatureUnit,
+        digits: 1,
+      }),
+    });
   }
   const rh = snap.metrics.humidity_pct;
   if (typeof rh === "number" && Number.isFinite(rh)) {
@@ -387,7 +424,14 @@ function buildStrictMetrics(
 export function buildQuickLogStripFromTentState(
   args: BuildQuickLogStripFromTentStateArgs,
 ): QuickLogSnapshotStripViewModel {
-  const { status: loaderStatus, snapshot, hasTent, attached = true, now = new Date() } = args;
+  const {
+    status: loaderStatus,
+    snapshot,
+    hasTent,
+    attached = true,
+    now = new Date(),
+    temperatureUnit,
+  } = args;
 
   // Treat idle/loading/empty/error/no-tent as no_data (UI parity with the
   // legacy dashboard-shape adapter). The strict resolver never invents
@@ -445,7 +489,7 @@ export function buildQuickLogStripFromTentState(
     capturedAt: snapshot.captured_at,
     capturedAtLabel: formatCapturedAtAbsolute(snapshot.captured_at),
     ageLabel,
-    metrics: buildStrictMetrics(snapshot),
+    metrics: buildStrictMetrics(snapshot, temperatureUnit),
     action,
     classification: synthClassification(status, snapshot.badge_label),
     providerLabel: deriveProviderLabel(snapshot.source),

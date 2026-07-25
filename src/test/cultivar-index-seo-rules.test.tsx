@@ -15,9 +15,7 @@ afterEach(cleanup);
 
 function renderCultivars(entry: string) {
   const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: { retry: false },
-    },
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
 
   return render(
@@ -66,34 +64,30 @@ describe("cultivarIndexSeoRules", () => {
 });
 
 describe("CultivarsIndex crawl-safety wiring", () => {
-  it(
-    "keeps the original accessible hub UI and indexable metadata for /cultivars",
-    () => {
-      renderCultivars("/cultivars");
+  it("keeps the original accessible hub UI and indexable metadata for /cultivars", () => {
+    renderCultivars("/cultivars");
 
-      expect(screen.getByRole("search", { name: "Filter cultivar guides" })).toBeInTheDocument();
-      expect(screen.getByTestId("cultivars-index-result-count")).toHaveAttribute(
-        "aria-live",
-        "polite",
-      );
-      expect(screen.getByRole("link", { name: "grow-stage care guide" })).toHaveAttribute(
-        "href",
-        "/guides/grow-stage-care-guide",
-      );
-      expect(screen.getByRole("link", { name: "Pheno comparison" })).toHaveAttribute(
-        "href",
-        "/pheno-comparison",
-      );
+    expect(screen.getByRole("search", { name: "Filter cultivar guides" })).toBeInTheDocument();
+    expect(screen.getByTestId("cultivars-index-result-count")).toHaveAttribute(
+      "aria-live",
+      "polite",
+    );
+    expect(screen.getByRole("link", { name: "grow-stage care guide" })).toHaveAttribute(
+      "href",
+      "/guides/grow-stage-care-guide",
+    );
+    expect(screen.getByRole("link", { name: "Pheno comparison" })).toHaveAttribute(
+      "href",
+      "/pheno-comparison",
+    );
 
-      expect(headContent('meta[name="robots"]')).toBe("index, follow");
-      expect(document.head.querySelector('link[rel="canonical"]')).toHaveAttribute(
-        "href",
-        `${ORIGIN}/cultivars`,
-      );
-      expect(headContent('meta[property="og:url"]')).toBe(`${ORIGIN}/cultivars`);
-    },
-    15_000,
-  );
+    expect(headContent('meta[name="robots"]')).toBe("index, follow");
+    expect(document.head.querySelector('link[rel="canonical"]')).toHaveAttribute(
+      "href",
+      `${ORIGIN}/cultivars`,
+    );
+    expect(headContent('meta[property="og:url"]')).toBe(`${ORIGIN}/cultivars`);
+  });
 
   it("sets noindex while canonical and og:url remain the clean hub for query variants", () => {
     renderCultivars("/cultivars?q=oreoz&difficulty=Advanced");

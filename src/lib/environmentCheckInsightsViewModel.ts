@@ -17,6 +17,11 @@ import {
   buildEnvironmentCheckTimelineList,
   type EnvironmentCheckTimelineRawEntry,
 } from "./environmentCheckTimelineViewModel";
+import {
+  celsiusToFahrenheit,
+  loadTemperatureUnitPreference,
+  type TemperatureUnitPreference,
+} from "./temperatureUnitPreference";
 
 export const ENVIRONMENT_CHECK_INSIGHTS_TITLE =
   "Environment Check insights" as const;
@@ -233,10 +238,14 @@ function summarizeMetric(
 function formatLatestValue(
   key: EnvironmentCheckInsightsMetricKey,
   value: number,
+  tempUnit: TemperatureUnitPreference,
 ): string {
   switch (key) {
     case "temp":
-      return `${value.toFixed(1)}°C`;
+      // Samples are canonical Celsius; convert at string-build time only.
+      return tempUnit === "fahrenheit"
+        ? `${celsiusToFahrenheit(value).toFixed(1)}°F`
+        : `${value.toFixed(1)}°C`;
     case "humidity":
       return `${value.toFixed(0)}%`;
     case "vpd":
@@ -244,6 +253,28 @@ function formatLatestValue(
     case "co2":
       return `${Math.round(value)} ppm`;
   }
+}
+
+/**
+ * Convert a temperature metric stat from canonical Celsius to the display
+ * unit. Range checks / trend / outOfRange were already computed against the
+ * canonical °C targets — only the numbers and unit shown to the grower
+ * change. Non-temp stats pass through untouched.
+ */
+function statForDisplay(
+  stat: EnvironmentCheckInsightsMetricStat,
+  tempUnit: TemperatureUnitPreference,
+): EnvironmentCheckInsightsMetricStat {
+  if (stat.key !== "temp" || tempUnit !== "fahrenheit") return stat;
+  const round2 = (n: number) => Math.round(celsiusToFahrenheit(n) * 100) / 100;
+  return {
+    ...stat,
+    unit: "°F",
+    min: round2(stat.min),
+    max: round2(stat.max),
+    avg: round2(stat.avg),
+    latest: round2(stat.latest),
+  };
 }
 
 function buildSummary(
@@ -265,6 +296,10 @@ function buildSummary(
 /**
  * Build the Environment Check insights view-model from raw diary entries.
  * Pure & deterministic. Returns a stable shape even for empty input.
+ *
+ * `options.tempUnit` controls only the DISPLAY of temperature values
+ * (latest chip + stat numbers/unit). Range checks and trends always run
+ * against the canonical °C samples/targets; conversion happens after.
  */
 export function buildEnvironmentCheckInsightsViewModel(
   rawEntries:
@@ -275,13 +310,17 @@ export function buildEnvironmentCheckInsightsViewModel(
     targets?: EnvironmentCheckInsightsTargets;
     /** When true, generic-targets warning is suppressed (caller passed plant targets). */
     plantSpecificTargets?: boolean;
+    /** Display unit for temperature values. Defaults to the saved preference. */
+    tempUnit?: TemperatureUnitPreference;
   },
 ): EnvironmentCheckInsightsViewModel {
   const targets =
     options?.targets ?? ENVIRONMENT_CHECK_INSIGHTS_DEFAULT_TARGETS;
   const usingGenericTargets = !options?.plantSpecificTargets;
+  // Resolved once here (never inside loops); tests/callers may inject.
+  const tempUnit = options?.tempUnit ?? loadTemperatureUnitPreference();
 
-  const vmList = buildEnvironmentCheckTimelineList(rawEntries);
+  const vmList = buildEnvironmentCheckTimelineList(rawEntries, tempUnit);
   const list = Array.isArray(rawEntries) ? rawEntries : [];
 
   // Build numeric samples keyed by entryId so we can preserve the ordered
@@ -332,7 +371,7 @@ export function buildEnvironmentCheckInsightsViewModel(
 
   const metrics: EnvironmentCheckInsightsMetricStat[] = [];
   const t = summarizeMetric("temp", "Temp", targets.temp_c.unit, tempSamples, targets.temp_c);
-  if (t) metrics.push(t);
+  if (t) metrics.push(statForDisplay(t, tempUnit));
   const r = summarizeMetric(
     "humidity",
     "RH",
@@ -357,13 +396,13 @@ export function buildEnvironmentCheckInsightsViewModel(
           const values: EnvironmentCheckInsightsLatest["values"] = [];
           if (s) {
             if (s.temp_c != null)
-              values.push({ key: "temp", label: "Temp", value: formatLatestValue("temp", s.temp_c) });
+              values.push({ key: "temp", label: "Temp", value: formatLatestValue("temp", s.temp_c, tempUnit) });
             if (s.humidity_pct != null)
-              values.push({ key: "humidity", label: "RH", value: formatLatestValue("humidity", s.humidity_pct) });
+              values.push({ key: "humidity", label: "RH", value: formatLatestValue("humidity", s.humidity_pct, tempUnit) });
             if (s.vpd_kpa != null)
-              values.push({ key: "vpd", label: "VPD", value: formatLatestValue("vpd", s.vpd_kpa) });
+              values.push({ key: "vpd", label: "VPD", value: formatLatestValue("vpd", s.vpd_kpa, tempUnit) });
             if (s.co2_ppm != null)
-              values.push({ key: "co2", label: "CO₂", value: formatLatestValue("co2", s.co2_ppm) });
+              values.push({ key: "co2", label: "CO₂", value: formatLatestValue("co2", s.co2_ppm, tempUnit) });
           }
           return { occurredAt: newest.occurredAt, values };
         })()

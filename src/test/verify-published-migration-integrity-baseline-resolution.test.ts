@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { resolveBaseline } from "../../scripts/verify-published-migration-integrity.mjs";
 
-
 /**
  * Pins the precedence order documented in the script header:
  *   1. --baseline flag  2. VERDANT_MIGRATION_BASELINE_REF

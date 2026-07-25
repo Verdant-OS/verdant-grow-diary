@@ -94,15 +94,17 @@ vi.mock("@/integrations/supabase/client", () => {
   };
   return {
     supabase: {
-      from: (table: string) =>
-        table === "action_queue" ? makeActionQueueChain() : makeGeneric(),
+      from: (table: string) => (table === "action_queue" ? makeActionQueueChain() : makeGeneric()),
     },
   };
 });
 
-vi.mock("@/store/auth", () => ({
-  useAuth: () => ({ user: { id: "u1", email: "u@example.com" } }),
-}));
+vi.mock("@/store/auth", () => {
+  const user = { id: "u1", email: "u@example.com" };
+  return {
+    useAuth: () => ({ user }),
+  };
+});
 vi.mock("@/store/grows", () => ({
   useGrows: () => ({
     grows: [{ id: "g1", name: "G1" }],
@@ -113,14 +115,6 @@ vi.mock("@/store/grows", () => ({
 vi.mock("sonner", () => ({
   toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn(), message: vi.fn() },
 }));
-
-// ActionDetail resolves its row through async effects that can exceed
-// testing-library's 1s findBy default AND vitest's 5s per-test timeout on
-// loaded shared CI runners (observed repeatedly across full-suite batches;
-// passes locally in <2s). Raise the per-test budget for this file and give
-// the async-load awaits a generous findBy timeout beneath it.
-vi.setConfig({ testTimeout: 60_000 });
-const FIND_TIMEOUT = { timeout: 30_000 };
 
 beforeEach(() => {
   detailRow = ALERT_DERIVED_ROW;
@@ -139,12 +133,10 @@ function renderDetail(actionId = "aq-1") {
 describe("ActionDetail header — Linked alert link", () => {
   it("renders chip + link for an alert-derived action with a safe alert id", async () => {
     renderDetail();
-    const header = await screen.findByTestId("action-detail-linked-alert-header", undefined, FIND_TIMEOUT);
+    const header = await screen.findByTestId("action-detail-linked-alert-header");
     expect(header.textContent ?? "").toMatch(/linked alert/i);
     const link = (await screen.findByTestId(
       "action-detail-linked-alert-link",
-      undefined,
-      FIND_TIMEOUT,
     )) as HTMLAnchorElement;
     expect(link.textContent).toBe("View linked alert");
     expect(link.getAttribute("href")).toBe(alertDetailPath("alert-abc"));
@@ -155,14 +147,10 @@ describe("ActionDetail header — Linked alert link", () => {
     renderDetail("aq-2");
     const aiLink = (await screen.findByTestId(
       "action-detail-ai-doctor-saved-session-link",
-      undefined,
-      FIND_TIMEOUT,
     )) as HTMLAnchorElement;
     expect(aiLink.getAttribute("href")).toBe(aiDoctorSessionDetailPath("sess-xyz"));
     const alertLink = (await screen.findByTestId(
       "action-detail-linked-alert-link",
-      undefined,
-      FIND_TIMEOUT,
     )) as HTMLAnchorElement;
     expect(alertLink.getAttribute("href")).toBe(alertDetailPath("alert-abc"));
   });
@@ -170,7 +158,7 @@ describe("ActionDetail header — Linked alert link", () => {
   it("does not render Linked alert when no alert id is parseable", async () => {
     detailRow = NO_ALERT_ROW;
     renderDetail("aq-3");
-    await screen.findByText("Drop EC slightly", undefined, FIND_TIMEOUT);
+    await screen.findByText("Drop EC slightly");
     expect(screen.queryByTestId("action-detail-linked-alert-link")).toBeNull();
     expect(screen.queryByTestId("action-detail-linked-alert-header")).toBeNull();
   });
@@ -178,17 +166,15 @@ describe("ActionDetail header — Linked alert link", () => {
   it("renders nothing on actions without any alert or AI Doctor token", async () => {
     detailRow = NON_ALERT_NON_AI_ROW;
     renderDetail("aq-4");
-    await screen.findByText("Manual note", undefined, FIND_TIMEOUT);
+    await screen.findByText("Manual note");
     expect(screen.queryByTestId("action-detail-linked-alert-link")).toBeNull();
-    expect(
-      screen.queryByTestId("action-detail-ai-doctor-saved-session-link"),
-    ).toBeNull();
+    expect(screen.queryByTestId("action-detail-ai-doctor-saved-session-link")).toBeNull();
   });
 
   it("does not leak raw [alert:<id>], [session:<id>] tokens, or target_device", async () => {
     detailRow = AI_DOCTOR_ROW_WITH_ALERT;
     const { container } = renderDetail("aq-2");
-    await screen.findByTestId("action-detail-linked-alert-link", undefined, FIND_TIMEOUT);
+    await screen.findByTestId("action-detail-linked-alert-link");
     const text = container.textContent ?? "";
     expect(text).not.toContain("[alert:");
     expect(text).not.toContain("[session:");
@@ -198,7 +184,7 @@ describe("ActionDetail header — Linked alert link", () => {
 
   it("link copy does not imply automation, execution, or status transition", async () => {
     renderDetail();
-    const link = await screen.findByTestId("action-detail-linked-alert-link", undefined, FIND_TIMEOUT);
+    const link = await screen.findByTestId("action-detail-linked-alert-link");
     const lower = (link.textContent ?? "").toLowerCase();
     for (const tok of [
       "auto-execute",
@@ -222,28 +208,21 @@ describe("ActionDetail header — Linked alert link", () => {
   it("preserves the existing AI Doctor 'Suggestion origin' panel when applicable", async () => {
     detailRow = AI_DOCTOR_ROW_WITH_ALERT;
     renderDetail("aq-2");
-    const panel = await screen.findByTestId("action-detail-ai-doctor-provenance", undefined, FIND_TIMEOUT);
+    const panel = await screen.findByTestId("action-detail-ai-doctor-provenance");
     expect(panel.textContent ?? "").toContain("Suggestion origin");
   });
 });
 
 // --- Static safety scans ----------------------------------------------------
-const DETAIL_SRC = readFileSync(
-  resolve(__dirname, "../..", "src/pages/ActionDetail.tsx"),
-  "utf8",
-);
+const DETAIL_SRC = readFileSync(resolve(__dirname, "../..", "src/pages/ActionDetail.tsx"), "utf8");
 
 describe("ActionDetail Linked alert — static safety", () => {
   it("introduces no new write paths into action_queue or alerts", () => {
     const lower = DETAIL_SRC.toLowerCase();
     expect(lower).not.toContain("functions.invoke");
     expect(lower).not.toContain("service_role");
-    expect(lower).not.toMatch(
-      /from\(["']action_queue["'][\s\S]{0,200}?\.upsert\(/,
-    );
-    expect(lower).not.toMatch(
-      /from\(["']action_queue["'][\s\S]{0,200}?\.delete\(/,
-    );
+    expect(lower).not.toMatch(/from\(["']action_queue["'][\s\S]{0,200}?\.upsert\(/);
+    expect(lower).not.toMatch(/from\(["']action_queue["'][\s\S]{0,200}?\.delete\(/);
     expect(lower).not.toMatch(
       /from\(["']alerts["'][\s\S]{0,200}?\.(insert|update|delete|upsert)\(/,
     );

@@ -19,6 +19,11 @@ import {
   Clock,
 } from "lucide-react";
 import type { TimelineEvidenceDetailViewModel } from "@/lib/timelineEvidenceDetailViewModel";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
+import {
+  celsiusToFahrenheit,
+  type TemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 import TimelineSensorSourceBadge from "@/components/TimelineSensorSourceBadge";
 import { classifyTimelineSensorSource } from "@/lib/timelineSensorSourceBadgeRules";
 import SensorSourceLegendTooltip from "@/components/SensorSourceLegendTooltip";
@@ -29,8 +34,19 @@ interface Props {
   onClose: () => void;
 }
 
+/**
+ * Display-only sensor temperature. `tempC` is canonical Celsius from the
+ * persisted snapshot; conversion happens exactly once, here. The celsius
+ * preference renders the legacy string unchanged.
+ */
+function fmtChipTemp(tempC: number, unit: TemperatureUnitPreference): string {
+  if (unit === "celsius") return `${tempC}°C`;
+  return `${celsiusToFahrenheit(tempC).toFixed(1)}°F`;
+}
+
 export default function TimelineEvidenceDetailDrawer({ viewModel, open, onClose }: Props) {
   const closeRef = useRef<HTMLButtonElement | null>(null);
+  const temperatureUnit = useTemperatureUnitPreference();
 
   useEffect(() => {
     if (!open) return;
@@ -242,7 +258,9 @@ export default function TimelineEvidenceDetailDrawer({ viewModel, open, onClose 
                   <TimelineSensorSourceBadge badge={sourceBadge} className="mr-1" />
                 </div>
                 <div className="flex flex-wrap gap-1.5">
-                  {vm.sensor.tempC != null && <Chip>{vm.sensor.tempC}°C</Chip>}
+                  {vm.sensor.tempC != null && (
+                    <Chip>{fmtChipTemp(vm.sensor.tempC, temperatureUnit)}</Chip>
+                  )}
                   {vm.sensor.rhPercent != null && <Chip>{vm.sensor.rhPercent}% RH</Chip>}
                   {vm.sensor.vpdKpa != null && <Chip>VPD {vm.sensor.vpdKpa}</Chip>}
                   {vm.sensor.co2Ppm != null && <Chip>CO₂ {vm.sensor.co2Ppm}</Chip>}

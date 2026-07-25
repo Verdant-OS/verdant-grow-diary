@@ -35,6 +35,12 @@
  */
 
 import type { QuickLogActivityId } from "@/constants/quickLogActivityTypes";
+import {
+  celsiusToFahrenheit,
+  fahrenheitToCelsius,
+  getTemperatureUnitSymbol,
+  type TemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 
 /** Reserved identity keys the write seam rejects — never emit these. */
 export const QUICK_LOG_DETAIL_RESERVED_KEYS: readonly string[] = Object.freeze([
@@ -82,6 +88,18 @@ export interface QuickLogDetailFieldSpec {
    * (e.g. details.environment_check.temp_c) instead of inventing flat keys.
    */
   readonly envelope?: string;
+  /**
+   * Marks a `number` field whose CANONICAL stored basis is Celsius (this
+   * spec's `min`/`max`/`unit`/`placeholder` are authored in °C). When set,
+   * `getQuickLogActivityDetailFields` can return a Fahrenheit-adjusted copy
+   * for display/validation (label, bounds, placeholder) while the grower's
+   * entry is converted back to canonical °C exactly once at save time — the
+   * same pin-then-convert contract used by QuickLogWateringForm's water
+   * temperature field. Never set on non-temperature fields.
+   */
+  readonly temperatureCelsius?: boolean;
+  /** Placeholder shown when the display unit is Fahrenheit (see above). */
+  readonly placeholderF?: string;
 }
 
 /**
@@ -255,7 +273,9 @@ export const QUICK_LOG_ACTIVITY_DETAIL_FIELDS: Partial<
       max: 60,
       unit: "°C",
       placeholder: "e.g. 24",
+      placeholderF: "e.g. 75",
       envelope: "environment_check",
+      temperatureCelsius: true,
     },
     {
       key: "humidity_pct",
@@ -270,10 +290,47 @@ export const QUICK_LOG_ACTIVITY_DETAIL_FIELDS: Partial<
   ],
 });
 
+/**
+ * Round-trip a Celsius plausibility bound to a whole-number Fahrenheit
+ * bound for display/validation. -10°C/60°C are exact (14°F/140°F); the
+ * rounding guards any future non-exact bound.
+ */
+function toFahrenheitBound(celsius: number): number {
+  return Math.round(celsiusToFahrenheit(celsius));
+}
+
+/**
+ * Adjust a `temperatureCelsius` spec's label-facing fields (unit, bounds,
+ * placeholder) to Fahrenheit. The spec's `key`/`envelope` (storage identity)
+ * never change — only what the grower sees and what bounds gate the save.
+ */
+function toFahrenheitDisplaySpec(spec: QuickLogDetailFieldSpec): QuickLogDetailFieldSpec {
+  return {
+    ...spec,
+    unit: "°F",
+    min: typeof spec.min === "number" ? toFahrenheitBound(spec.min) : spec.min,
+    max: typeof spec.max === "number" ? toFahrenheitBound(spec.max) : spec.max,
+    placeholder: spec.placeholderF ?? spec.placeholder,
+  };
+}
+
+/**
+ * Detail field specs for an activity. `tempUnit` (default "celsius", the
+ * canonical basis) selects the DISPLAY unit for any `temperatureCelsius`
+ * field — Fahrenheit-adjusts its label unit, plausibility bounds, and
+ * placeholder so a live-Fahrenheit grower sees and is validated against °F,
+ * while the stored key/envelope stay the canonical Celsius contract. Callers
+ * that persist or validate a grower's typed entry MUST pass the same unit
+ * that was active when the entry was made (pinned), not necessarily the
+ * current live preference — mirrors the watering/feeding temperature fields.
+ */
 export function getQuickLogActivityDetailFields(
   activityId: QuickLogActivityId,
+  tempUnit: TemperatureUnitPreference = "celsius",
 ): readonly QuickLogDetailFieldSpec[] {
-  return QUICK_LOG_ACTIVITY_DETAIL_FIELDS[activityId] ?? [];
+  const specs = QUICK_LOG_ACTIVITY_DETAIL_FIELDS[activityId] ?? [];
+  if (tempUnit === "celsius") return specs;
+  return specs.map((spec) => (spec.temperatureCelsius ? toFahrenheitDisplaySpec(spec) : spec));
 }
 
 /**
@@ -348,12 +405,21 @@ export function validateQuickLogDetailNumberInput(
  * fields are nested (as numbers) under their canonical parent key. Fixed
  * details for the activity are always merged in. Returns null when nothing
  * remains so callers omit p_details entirely rather than storing {}.
+ *
+ * `tempUnit` (default "celsius") is the unit the grower's raw entry is IN —
+ * pass the unit pinned at the moment the draft was typed (falling back to
+ * the live preference when no draft is in progress), the same contract as
+ * QuickLogWateringForm's water temperature field. A `temperatureCelsius`
+ * field's bounds are checked in that same unit (matching what the UI
+ * validated against), then the value is converted back to canonical °C
+ * exactly once before it is stored under its canonical key.
  */
 export function sanitizeQuickLogActivityDetails(
   activityId: QuickLogActivityId,
   rawValues: Readonly<Record<string, unknown>> | null | undefined,
+  tempUnit: TemperatureUnitPreference = "celsius",
 ): Record<string, unknown> | null {
-  const specs = getQuickLogActivityDetailFields(activityId);
+  const specs = getQuickLogActivityDetailFields(activityId, tempUnit);
   const fixed = QUICK_LOG_ACTIVITY_FIXED_DETAILS[activityId] ?? null;
   if (specs.length === 0 && !fixed) return null;
 
@@ -382,8 +448,15 @@ export function sanitizeQuickLogActivityDetails(
       if (typeof spec.max === "number" && n > spec.max) continue;
       if (spec.envelope) {
         // Canonical nested envelope, numeric — e.g. environment_check.temp_c.
+        // A temperature field's bounds above were already checked in the
+        // grower's entry unit (spec is display-adjusted); convert back to
+        // canonical °C exactly once, here, before persistence.
+        const canonical =
+          spec.temperatureCelsius && tempUnit === "fahrenheit"
+            ? Math.round(fahrenheitToCelsius(n) * 100) / 100
+            : n;
         const parent = (out[spec.envelope] ?? {}) as Record<string, unknown>;
-        parent[spec.key] = n;
+        parent[spec.key] = canonical;
         out[spec.envelope] = parent;
       } else {
         // Flat number fields keep the grower's exact entry as a string
@@ -417,10 +490,18 @@ export interface QuickLogDetailDisplayLine {
  * when the value is blank/invalid/out-of-band. Shared by both describers so
  * select-label mapping, number bounds, and unit suffixing stay in one place.
  * Number fields accept stored numbers (canonical envelopes) or numeric strings.
+ *
+ * `tempUnit` (default "celsius") is the DISPLAY unit for a `temperatureCelsius`
+ * field. Bounds are always evaluated against `spec` as given — the stored
+ * value's canonical (°C) plausibility floor — never the display unit; only
+ * the shown number/symbol are converted. This is a read-only history render
+ * (Pattern B): it always reflects the CURRENT live preference, not whatever
+ * unit was active when the value was originally logged.
  */
 function formatDetailLine(
   spec: QuickLogDetailFieldSpec,
   raw: unknown,
+  tempUnit: TemperatureUnitPreference = "celsius",
 ): QuickLogDetailDisplayLine | null {
   if (spec.kind === "number") {
     let n: number;
@@ -434,8 +515,15 @@ function formatDetailLine(
     if (!Number.isFinite(n)) return null;
     if (typeof spec.min === "number" && n < spec.min) return null;
     if (typeof spec.max === "number" && n > spec.max) return null;
-    const shown = String(n).slice(0, QUICK_LOG_DETAIL_TEXT_MAX);
-    return { key: spec.key, label: spec.label, value: spec.unit ? `${shown} ${spec.unit}` : shown };
+    const displayValue =
+      spec.temperatureCelsius && tempUnit === "fahrenheit" ? celsiusToFahrenheit(n) : n;
+    const displayUnit = spec.temperatureCelsius ? getTemperatureUnitSymbol(tempUnit) : spec.unit;
+    const shown = String(Math.round(displayValue * 10) / 10).slice(0, QUICK_LOG_DETAIL_TEXT_MAX);
+    return {
+      key: spec.key,
+      label: spec.label,
+      value: displayUnit ? `${shown} ${displayUnit}` : shown,
+    };
   }
 
   if (typeof raw !== "string") return null;
@@ -468,7 +556,11 @@ function readSpecValue(spec: QuickLogDetailFieldSpec, record: Record<string, unk
 export function describeQuickLogActivityDetails(
   activityId: QuickLogActivityId,
   details: unknown,
+  tempUnit: TemperatureUnitPreference = "celsius",
 ): readonly QuickLogDetailDisplayLine[] {
+  // Base (canonical Celsius) specs — bounds must check the STORED value's
+  // own basis, never a display-adjusted one. `tempUnit` only changes what
+  // formatDetailLine shows, not what it validates against.
   const specs = getQuickLogActivityDetailFields(activityId);
   if (specs.length === 0) return [];
   if (!details || typeof details !== "object") return [];
@@ -476,7 +568,7 @@ export function describeQuickLogActivityDetails(
 
   const lines: QuickLogDetailDisplayLine[] = [];
   for (const spec of specs) {
-    const line = formatDetailLine(spec, readSpecValue(spec, record));
+    const line = formatDetailLine(spec, readSpecValue(spec, record), tempUnit);
     if (line) lines.push(line);
   }
   return lines;
@@ -494,6 +586,7 @@ export function describeQuickLogActivityDetails(
  */
 export function describeQuickLogDetailsFromExtras(
   details: unknown,
+  tempUnit: TemperatureUnitPreference = "celsius",
 ): readonly QuickLogDetailDisplayLine[] {
   if (!details || typeof details !== "object") return [];
   const record = details as Record<string, unknown>;
@@ -506,7 +599,7 @@ export function describeQuickLogDetailsFromExtras(
       const dedupeKey = spec.envelope ? `${spec.envelope}.${spec.key}` : spec.key;
       if (seen.has(dedupeKey)) continue;
       seen.add(dedupeKey);
-      const line = formatDetailLine(spec, readSpecValue(spec, record));
+      const line = formatDetailLine(spec, readSpecValue(spec, record), tempUnit);
       if (line) lines.push(line);
     }
   }

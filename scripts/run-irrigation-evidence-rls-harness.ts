@@ -398,8 +398,12 @@ async function signIn(email: string, password: string): Promise<SupabaseClient> 
   if (error) throw new Error(`sign_in_failed:${error.message ?? "unknown"}`);
   return c;
 }
-async function seedId(table: string, row: Record<string, unknown>): Promise<string> {
-  const { data, error } = await admin.from(table).insert(row).select("id").single();
+async function seedId(
+  client: SupabaseClient,
+  table: string,
+  row: Record<string, unknown>,
+): Promise<string> {
+  const { data, error } = await client.from(table).insert(row).select("id").single();
   if (error || !data?.id) throw new Error(`seed_${table}_failed:${error?.message ?? "unknown"}`);
   return data.id as string;
 }
@@ -422,25 +426,43 @@ async function main() {
   const anonC = createClient(SUPABASE_URL, ANON_KEY, { auth: { persistSession: false } });
 
   // Owner scope: grow, tent, plant-in-tent, untented plant, other tent.
-  const oGrow = await seedId("grows", { user_id: owner.id, name: `irr grow ${runId}` });
-  const oTent = await seedId("tents", { user_id: owner.id, grow_id: oGrow, name: "T1" });
-  const oTent2 = await seedId("tents", { user_id: owner.id, grow_id: oGrow, name: "T2" });
-  const oPlantInTent = await seedId("plants", {
+  const oGrow = await seedId(ownerC, "grows", {
+    user_id: owner.id,
+    name: `irr grow ${runId}`,
+  });
+  const oTent = await seedId(ownerC, "tents", {
+    user_id: owner.id,
+    grow_id: oGrow,
+    name: "T1",
+  });
+  const oTent2 = await seedId(ownerC, "tents", {
+    user_id: owner.id,
+    grow_id: oGrow,
+    name: "T2",
+  });
+  const oPlantInTent = await seedId(ownerC, "plants", {
     user_id: owner.id,
     grow_id: oGrow,
     tent_id: oTent,
     name: "P-tented",
   });
-  const oPlantUntented = await seedId("plants", {
+  const oPlantUntented = await seedId(ownerC, "plants", {
     user_id: owner.id,
     grow_id: oGrow,
     tent_id: null,
     name: "P-untented",
   });
   // Stranger scope.
-  const sGrow = await seedId("grows", { user_id: stranger.id, name: `irr strange grow ${runId}` });
-  const sTent = await seedId("tents", { user_id: stranger.id, grow_id: sGrow, name: "ST1" });
-  const sPlant = await seedId("plants", {
+  const sGrow = await seedId(strangerC, "grows", {
+    user_id: stranger.id,
+    name: `irr strange grow ${runId}`,
+  });
+  const sTent = await seedId(strangerC, "tents", {
+    user_id: stranger.id,
+    grow_id: sGrow,
+    name: "ST1",
+  });
+  const sPlant = await seedId(strangerC, "plants", {
     user_id: stranger.id,
     grow_id: sGrow,
     tent_id: sTent,

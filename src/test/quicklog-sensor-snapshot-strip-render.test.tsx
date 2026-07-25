@@ -13,7 +13,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, act } from "@testing-library/react";
 import QuickLogSensorSnapshotStrip from "@/components/QuickLogSensorSnapshotStrip";
 import {
   EMPTY_SENSOR_SNAPSHOT,
@@ -21,6 +21,10 @@ import {
   type SensorSnapshotStatus,
 } from "@/lib/latestSensorSnapshotRules";
 import type { LatestTentSensorSnapshotState, LatestTentSensorSnapshotStatus } from "@/lib/sensor";
+import {
+  clearTemperatureUnitPreference,
+  saveTemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 
 const NOW = new Date("2026-06-02T12:00:00Z");
 const FIVE_MIN_AGO = "2026-06-02T11:55:00Z";
@@ -80,6 +84,11 @@ describe("QuickLogSensorSnapshotStrip render (tent-scoped realtime hook)", () =>
     vi.useFakeTimers({ shouldAdvanceTime: false });
     vi.setSystemTime(NOW);
     mockUseLatestTentSensorSnapshot.mockReset();
+    // The strip's Temp metric now reads the live temperatureUnit preference
+    // (Codex round-6 fix — see the "Temp metric is live-reactive" describe
+    // block below). Clear it before every test so this file never becomes
+    // order-dependent on whatever an earlier test file left in localStorage.
+    clearTemperatureUnitPreference();
   });
 
   afterEach(() => {
@@ -87,6 +96,11 @@ describe("QuickLogSensorSnapshotStrip render (tent-scoped realtime hook)", () =>
   });
 
   it("usable — fresh_live snapshot renders Usable pill and metric chips", () => {
+    // Pin the preference to celsius for this test so the exact-value
+    // assertion below documents the F→C conversion path independent of
+    // the app-wide default. Live-reactivity to the ACTIVE preference is
+    // covered separately below.
+    saveTemperatureUnitPreference("celsius");
     mockUseLatestTentSensorSnapshot.mockReturnValue(stateReady(fullSnapshot()));
     render(<QuickLogSensorSnapshotStrip tentId="t1" />);
 
@@ -241,5 +255,57 @@ describe("QuickLogSensorSnapshotStrip render (tent-scoped realtime hook)", () =>
     expect(src).not.toMatch(/@\/hooks\/useLatestSensorSnapshot/);
     expect(src).toMatch(/useLatestTentSensorSnapshot/);
     expect(src).toMatch(/from\s+["']@\/lib\/sensor["']/);
+  });
+});
+
+describe("QuickLogSensorSnapshotStrip — Temp metric is live-reactive to the temperature unit preference", () => {
+  // Codex round-6 finding: the strip's Temp metric was built by
+  // `buildQuickLogStripFromTentState` without threading the grower's
+  // temperatureUnit preference through at all, so it always rendered the
+  // tent snapshot's temperature hardcoded as °C — even when Fahrenheit was
+  // the active (and app-wide default) preference, mismatching every other
+  // Temp field in the same Quick Log dialog. This is a read-only reference
+  // display (Pattern B), not a grower-typed draft, so it must always
+  // reflect the CURRENT live preference, recomputed at render time.
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: false });
+    vi.setSystemTime(NOW);
+    mockUseLatestTentSensorSnapshot.mockReset();
+    clearTemperatureUnitPreference();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("renders the tent snapshot's Temp in Fahrenheit by default, not hardcoded °C", () => {
+    // Default preference is fahrenheit (this branch's app-wide default).
+    mockUseLatestTentSensorSnapshot.mockReturnValue(stateReady(fullSnapshot()));
+    render(<QuickLogSensorSnapshotStrip tentId="t1" />);
+
+    expect(screen.getByTestId("quicklog-sensor-snapshot-metric-temp")).toHaveTextContent(
+      "Temp 75.7°F",
+    );
+    expect(screen.queryByText("Temp 24.3°C")).not.toBeInTheDocument();
+  });
+
+  it("flips the rendered Temp metric to °C live when the preference changes, without remounting", () => {
+    mockUseLatestTentSensorSnapshot.mockReturnValue(stateReady(fullSnapshot()));
+    render(<QuickLogSensorSnapshotStrip tentId="t1" />);
+
+    expect(screen.getByTestId("quicklog-sensor-snapshot-metric-temp")).toHaveTextContent(
+      "Temp 75.7°F",
+    );
+
+    // Preference flips to celsius (e.g. from another tab), dispatching
+    // TEMPERATURE_UNIT_CHANGE_EVENT — picked up by the reactive hook with
+    // no remount and no prop change.
+    act(() => {
+      saveTemperatureUnitPreference("celsius");
+    });
+
+    expect(screen.getByTestId("quicklog-sensor-snapshot-metric-temp")).toHaveTextContent(
+      "Temp 24.3°C",
+    );
   });
 });

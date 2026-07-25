@@ -10,6 +10,7 @@ import {
   DIARY_CALENDAR_FILTER_STORAGE_KEY,
   readPersistedDiaryCalendarFilter,
 } from "@/lib/diaryCalendarFilterPersistence";
+import { saveTemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 
 const ENV_FULL = {
   id: "e1",
@@ -92,7 +93,8 @@ describe("DiaryCalendarSection — persisted filter", () => {
 });
 
 describe("DiaryCalendarSection — Environment Check tap-for-details", () => {
-  it("renders Environment Check collapsed by default (compact line, no expanded grid)", () => {
+  it("renders Environment Check collapsed by default (compact line, no expanded grid, celsius preference)", () => {
+    saveTemperatureUnitPreference("celsius");
     render(<DiaryCalendarSection rawEntries={[ENV_FULL]} />);
     expect(screen.getByTestId("diary-calendar-env-compact")).toHaveTextContent(
       /24\.6°C/,
@@ -104,7 +106,16 @@ describe("DiaryCalendarSection — Environment Check tap-for-details", () => {
     ).toHaveTextContent(/not live sensor telemetry/i);
   });
 
-  it("Show details expands Environment Check with full temp/RH/VPD/CO2 + note + disclaimer", () => {
+  it("renders Environment Check compact temp converted to Fahrenheit by default", () => {
+    render(<DiaryCalendarSection rawEntries={[ENV_FULL]} />);
+    // 24.6°C → 76.28°F, displayed to 1 decimal.
+    expect(screen.getByTestId("diary-calendar-env-compact")).toHaveTextContent(
+      /76\.3°F/,
+    );
+  });
+
+  it("Show details expands Environment Check with full temp/RH/VPD/CO2 + note + disclaimer (celsius preference)", () => {
+    saveTemperatureUnitPreference("celsius");
     render(<DiaryCalendarSection rawEntries={[ENV_FULL]} />);
     fireEvent.click(screen.getByTestId("diary-calendar-env-toggle"));
     const expanded = screen.getByTestId("diary-calendar-env-expanded");

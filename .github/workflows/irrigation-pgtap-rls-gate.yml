@@ -76,19 +76,17 @@ jobs:
               - "supabase/migrations/20260707220000_quicklog_save_event_atomic_idempotency_v2.sql"
               - "supabase/migrations/20260709160000_quicklog_save_manual_idempotency.sql"
               - "supabase/migrations/20260720160000_quicklog_save_event_irrigation_boundary_hardening.sql"
-              # Fresh-replay bridge carries the pre-import event ACL baseline.
-              - "supabase/migrations/20260721180000_fresh_replay_duplicate_import_bridge.sql"
-              - "supabase/migrations/20260722160000_fresh_replay_quicklog_stage_import_bridge.sql"
               # Irrigation event-table DML revoke migration (UUID-named).
               - "supabase/migrations/20260722062644_8cdef271-abf0-4d82-9eca-970a91b6c547.sql"
-              - "supabase/migrations/20260724055000_irrigation_event_acl_parity.sql"
-              - "supabase/migrations/20260724070000_search_normalizer_service_role_execute.sql"
               # Contract-migrations lane.
               - "supabase/contract-migrations/quicklog_save_manual_revoke_anon_execute.sql"
               # pgTAP suites + prod-parity seed.
               - "supabase/tests/create_feeding_event.sql"
               - "supabase/tests/create_watering_event.sql"
               - "supabase/seed.sql"
+              - "config/local-supabase-replay-compatibility.json"
+              - "config/local-supabase-replay/**"
+              - "scripts/prepare-local-supabase-replay.mjs"
               # Runtime harness sources typechecked by this gate. Explicit
               # allowlist — new irrigation harnesses MUST be added here or
               # the gate will silently skip on PRs that only touch them.
@@ -99,7 +97,6 @@ jobs:
               - "scripts/run-quicklog-save-manual-rls-harness.ts"
               - "scripts/run-quicklog-rpc-rls-harnesses.ts"
               - "scripts/run-quicklog-typed-payloads-harness.ts"
-              - "tsconfig.irrigation-harness.json"
               # The workflow itself — any change here re-runs the full gate.
               - ".github/workflows/irrigation-pgtap-rls-gate.yml"
 
@@ -173,15 +170,14 @@ jobs:
                 "supabase/migrations/20260707220000_quicklog_save_event_atomic_idempotency_v2.sql"
                 "supabase/migrations/20260709160000_quicklog_save_manual_idempotency.sql"
                 "supabase/migrations/20260720160000_quicklog_save_event_irrigation_boundary_hardening.sql"
-                "supabase/migrations/20260721180000_fresh_replay_duplicate_import_bridge.sql"
-                "supabase/migrations/20260722160000_fresh_replay_quicklog_stage_import_bridge.sql"
                 "supabase/migrations/20260722062644_8cdef271-abf0-4d82-9eca-970a91b6c547.sql"
-                "supabase/migrations/20260724055000_irrigation_event_acl_parity.sql"
-                "supabase/migrations/20260724070000_search_normalizer_service_role_execute.sql"
                 "supabase/contract-migrations/quicklog_save_manual_revoke_anon_execute.sql"
                 "supabase/tests/create_feeding_event.sql"
                 "supabase/tests/create_watering_event.sql"
                 "supabase/seed.sql"
+                "config/local-supabase-replay-compatibility.json"
+                "config/local-supabase-replay"
+                "scripts/prepare-local-supabase-replay.mjs"
                 "scripts/run-irrigation-evidence-rls-harness.ts"
                 "scripts/run-irrigation-integrity-suite.mjs"
                 "scripts/run-create-feeding-event-rls-harness.ts"
@@ -189,7 +185,6 @@ jobs:
                 "scripts/run-quicklog-save-manual-rls-harness.ts"
                 "scripts/run-quicklog-rpc-rls-harnesses.ts"
                 "scripts/run-quicklog-typed-payloads-harness.ts"
-                "tsconfig.irrigation-harness.json"
                 ".github/workflows/irrigation-pgtap-rls-gate.yml"
               )
               for f in "${ALLOWLIST[@]}"; do
@@ -231,10 +226,16 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Typecheck irrigation harnesses
-        # This dedicated config includes every run-*-rls-harness.ts source
-        # named in this workflow. tsconfig.app.json only includes src/.
-        run: bunx tsc -p tsconfig.irrigation-harness.json --noEmit
+      - name: Typecheck (full project — includes irrigation harnesses)
+        # tsgo is a stop-ship gate. Full-project noEmit catches any
+        # harness drift; scoping to specific files would miss shared
+        # type surface changes.
+        #
+        # `tsgo` is not an installable npm package on its own — it is the bin
+        # name shipped by @typescript/native-preview, which is not a repo
+        # devDependency. Bare `bunx tsgo` 404s against the registry; pin the
+        # real package explicitly so bunx installs the right thing on demand.
+        run: bunx --package=@typescript/native-preview tsgo --noEmit
 
   pgtap-irrigation:
     name: pgTAP irrigation (feeding + watering)
@@ -282,39 +283,45 @@ jobs:
           # Pinned deliberately — "latest" rate-limits on shared runners.
           version: 2.109.1
 
+      - name: Prepare immutable migration replay workspace
+        run: |
+          set -eo pipefail
+          REPLAY_WORKDIR="${RUNNER_TEMP}/verdant-supabase-replay"
+          node scripts/prepare-local-supabase-replay.mjs \
+            --output="${REPLAY_WORKDIR}" \
+            --json \
+            | tee migration-replay-compatibility.json
+          echo "SUPABASE_REPLAY_WORKDIR=${REPLAY_WORKDIR}" >> "$GITHUB_ENV"
+
       - name: Start local Supabase (disposable, loopback only)
         id: supabase-start
         run: |
           set -eo pipefail
-          supabase start --workdir . 2>&1 | tee supabase-start.log
+          # Startup output contains ephemeral local credentials. Keep it out of
+          # the Actions log and artifacts; the next step masks DB_URL.
+          if ! supabase start --workdir "$SUPABASE_REPLAY_WORKDIR" >"${RUNNER_TEMP}/irrigation-pgtap-supabase-start.log" 2>&1; then
+            echo "::error::Disposable local Supabase failed to start"
+            exit 1
+          fi
 
       - name: Export local Supabase DB URL
         id: supabase-env
         run: |
-          set -euo pipefail
-          STATUS_ENV="$(supabase status -o env || true)"
-          eval "$STATUS_ENV"
-          DB_URL="${DB_URL:-${POSTGRES_URL:-}}"
-          if [ -z "$DB_URL" ] && command -v jq >/dev/null 2>&1; then
-            DB_URL="$(supabase status -o json | jq -r '.DB_URL // .db_url // .POSTGRES_URL // .postgres_url // empty')"
-          fi
-          if [ -z "$DB_URL" ]; then
-            DB_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
-          fi
+          set -eo pipefail
+          DB_URL="$(supabase status --workdir "$SUPABASE_REPLAY_WORKDIR" -o json | jq -r '.DB_URL // .db_url // empty')"
           if [ -z "$DB_URL" ]; then
             echo "BLOCKED: local Supabase did not expose DB_URL." >&2
             exit 2
           fi
           # Loopback guard — refuse anything that isn't localhost.
-          HOST="$(python3 -c 'import sys; from urllib.parse import urlparse; print(urlparse(sys.argv[1]).hostname or "")' "$DB_URL")"
+          HOST="$(node -e 'process.stdout.write(new URL(process.argv[1]).hostname)' "$DB_URL")"
           case "$HOST" in
-            localhost|127.0.0.1|::1) ;;
+            localhost|127.0.0.1|::1|\[::1\]) ;;
             *)
               echo "BLOCKED: refusing non-loopback DB host '$HOST'." >&2
               exit 2
               ;;
           esac
-          psql "$DB_URL" -v ON_ERROR_STOP=1 -At -c "select 1" >/dev/null
           echo "::add-mask::$DB_URL"
           echo "SUPABASE_DB_URL=$DB_URL" >> "$GITHUB_ENV"
 
@@ -325,7 +332,7 @@ jobs:
         # truth and false-flag drift.
         run: |
           set -o pipefail
-          supabase db reset 2>&1 | tee supabase-db-reset.log
+          supabase db reset --workdir "$SUPABASE_REPLAY_WORKDIR" 2>&1 | tee supabase-db-reset.log
 
       - name: pgTAP — create_feeding_event
         id: pgtap-feeding
@@ -349,8 +356,9 @@ jobs:
         with:
           name: irrigation-pgtap-rls-gate-logs
           path: |
-            supabase-start.log
             supabase-db-reset.log
+            migration-replay-compatibility.json
+            ${{ runner.temp }}/verdant-supabase-replay/local-supabase-replay-report.json
             pgtap-feeding.log
             pgtap-watering.log
           if-no-files-found: ignore
@@ -385,4 +393,4 @@ jobs:
 
       - name: Stop local Supabase
         if: always()
-        run: supabase stop --no-backup || true
+        run: supabase stop --workdir "$SUPABASE_REPLAY_WORKDIR" --no-backup || true

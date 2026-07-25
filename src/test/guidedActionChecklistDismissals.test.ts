@@ -8,7 +8,7 @@ import {
 import {
   clearLocalStorageForTest,
   setLocalStorageItemForTest,
-} from "./helpers/localStorageTestHelper";
+} from "@/test/helpers/localStorageTestHelper";
 
 describe("guidedActionChecklistDismissals", () => {
   beforeEach(() => {

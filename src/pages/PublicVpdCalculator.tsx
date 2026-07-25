@@ -706,7 +706,12 @@ export default function PublicVpdCalculator() {
               selected above.
             </p>
             <div className="mt-5">
-              <BlueprintTeaser vm={buildBlueprintTeaserViewModel({ stage })} />
+              <BlueprintTeaser
+                vm={buildBlueprintTeaserViewModel(
+                  { stage },
+                  temperatureUnit === "C" ? "celsius" : "fahrenheit",
+                )}
+              />
             </div>
             <div className="mt-5 flex flex-wrap gap-3">
               <Button asChild>

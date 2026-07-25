@@ -33,6 +33,13 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { GeneticsBadge } from "@/components/GeneticsBadge";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
+import {
+  celsiusToFahrenheit,
+  fahrenheitToCelsius,
+  getTemperatureUnitSymbol,
+  type TemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 
 export type HyperLogAction =
   | "water"
@@ -93,9 +100,12 @@ const ACTION_TILES: Array<{
   { id: "environment", label: "Env Check", icon: Gauge },
 ];
 
-// Hardcoded demo values — NOT live telemetry.
+// Hardcoded demo values — NOT live telemetry. Temp is stored canonically in
+// °C and formatted per the active temperatureUnit preference at render time
+// (see demoSnapshotTempDisplay) so it never mismatches the unit-aware Temp
+// input/preview shown lower in this same modal.
+const DEMO_SNAPSHOT_TEMP_C = 24.6;
 const DEMO_SNAPSHOT = {
-  temp: "24.6°C",
   rh: "58%",
   vpd: "1.12 kPa",
 };
@@ -103,6 +113,24 @@ const DEMO_SNAPSHOT = {
 const WATER_UNITS = ["ml", "L", "cups"] as const;
 
 const VERDANT_GREEN = "#00C853";
+
+const PLAIN_TEMP_INPUT = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/;
+
+/**
+ * Convert the grower-typed environment temperature (entered in the active
+ * preference unit) into a canonical-°C string EXACTLY ONCE at the commit
+ * handoff — the dispatched draft stores canonical °C, which is what
+ * hyperLogDraftRules renders as "Temp X°C". Blank stays blank and
+ * non-numeric text passes through unchanged.
+ */
+function typedTempToCelsiusInput(raw: string, unit: TemperatureUnitPreference): string {
+  if (unit !== "fahrenheit") return raw;
+  const trimmed = raw.trim();
+  if (trimmed === "" || !PLAIN_TEMP_INPUT.test(trimmed)) return raw;
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed)) return raw;
+  return String(Math.round(fahrenheitToCelsius(parsed) * 100) / 100);
+}
 
 const EMPTY_FORM: HyperLogDemoFormState = {
   waterAmount: "",
@@ -134,6 +162,19 @@ export function HyperLogModal({
   const [form, setForm] = useState<HyperLogDemoFormState>(EMPTY_FORM);
   const [photos, setPhotos] = useState<Array<{ id: string; url: string; name: string }>>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const temperatureUnit = useTemperatureUnitPreference();
+  const temperatureUnitSymbol = getTemperatureUnitSymbol(temperatureUnit);
+  const demoSnapshotTempDisplay =
+    temperatureUnit === "celsius"
+      ? `${DEMO_SNAPSHOT_TEMP_C.toFixed(1)}°C`
+      : `${celsiusToFahrenheit(DEMO_SNAPSHOT_TEMP_C).toFixed(1)}°F`;
+  // Pattern-A draft-input race guard: pins the ACTIVE temperatureUnit at the
+  // moment the raw envTemp draft transitions from empty to non-empty, so a
+  // live preference flip (e.g. from another tab) between typing and Commit
+  // can never silently reinterpret already-typed digits under the new unit.
+  // Cleared back to null whenever the draft returns to empty or the modal
+  // resets.
+  const envTempEntryUnitRef = useRef<TemperatureUnitPreference | null>(null);
 
   // Sync initialAction when modal re-opens with a preselect.
   useEffect(() => {
@@ -156,9 +197,22 @@ export function HyperLogModal({
 
   const updateField = useCallback(
     <K extends keyof HyperLogDemoFormState>(key: K, value: HyperLogDemoFormState[K]) => {
+      if (key === "envTemp") {
+        const nextRaw = String(value);
+        setForm((prev) => {
+          const prevRaw = prev.envTemp;
+          if (prevRaw.trim() === "" && nextRaw.trim() !== "") {
+            envTempEntryUnitRef.current = temperatureUnit;
+          } else if (nextRaw.trim() === "") {
+            envTempEntryUnitRef.current = null;
+          }
+          return { ...prev, [key]: value };
+        });
+        return;
+      }
       setForm((prev) => ({ ...prev, [key]: value }));
     },
-    [],
+    [temperatureUnit],
   );
 
   const handleFiles = useCallback((files: FileList | null) => {
@@ -203,12 +257,19 @@ export function HyperLogModal({
       return [];
     });
     setForm(EMPTY_FORM);
+    envTempEntryUnitRef.current = null;
     setSelected(null);
   }, []);
 
   const handleCommit = () => {
     if (!selected) return;
-    onCommit?.(selected, form, { photoCount: photos.length });
+    // Unit seam: envTemp was typed in the preference unit; the committed
+    // draft stores canonical °C. Converted exactly once, right here.
+    const committedForm: HyperLogDemoFormState = {
+      ...form,
+      envTemp: typedTempToCelsiusInput(form.envTemp, envTempEntryUnitRef.current ?? temperatureUnit),
+    };
+    onCommit?.(selected, committedForm, { photoCount: photos.length });
     onOpenChange(false);
     resetAll();
   };
@@ -218,9 +279,17 @@ export function HyperLogModal({
     onOpenChange(next);
   };
 
+  // Pin read for the live preview line: labels the raw draft with whatever
+  // unit is currently pinned (or the live preference if nothing is pinned
+  // yet), so the preview never relabels itself mid-edit due to an
+  // unrelated preference flip in another tab.
+  const envTempPreviewUnitSymbol = getTemperatureUnitSymbol(
+    envTempEntryUnitRef.current ?? temperatureUnit,
+  );
+
   const timelinePreview = useMemo(
-    () => buildTimelinePreview(selected, form, photos.length),
-    [selected, form, photos.length],
+    () => buildTimelinePreview(selected, form, photos.length, envTempPreviewUnitSymbol),
+    [selected, form, photos.length, envTempPreviewUnitSymbol],
   );
 
   return (
@@ -399,7 +468,7 @@ export function HyperLogModal({
                 <div className="space-y-2.5" data-testid="hyperlog-env-fields">
                   <FieldRow>
                     <DemoInput
-                      placeholder="Temp (°C)"
+                      placeholder={`Temp (${temperatureUnitSymbol})`}
                       value={form.envTemp}
                       onChange={(v) => updateField("envTemp", v)}
                       aria-label="Environment temperature"
@@ -459,7 +528,7 @@ export function HyperLogModal({
                 </span>
               </div>
               <div className="grid grid-cols-3 gap-3">
-                <SnapshotCell icon={Thermometer} label="Temp" value={DEMO_SNAPSHOT.temp} />
+                <SnapshotCell icon={Thermometer} label="Temp" value={demoSnapshotTempDisplay} />
                 <SnapshotCell icon={Droplet} label="RH" value={DEMO_SNAPSHOT.rh} />
                 <SnapshotCell icon={Gauge} label="VPD" value={DEMO_SNAPSHOT.vpd} />
               </div>
@@ -626,6 +695,7 @@ function buildTimelinePreview(
   action: HyperLogAction | null,
   form: HyperLogDemoFormState,
   photoCount: number,
+  temperatureUnitSymbol: string,
 ): { headline: string; summary: string; meta: string | null } {
   const photoMeta = photoCount > 0 ? `${photoCount} photo${photoCount === 1 ? "" : "s"} attached` : null;
   if (!action) {
@@ -653,7 +723,10 @@ function buildTimelinePreview(
   }
   if (action === "environment") {
     const parts: string[] = [];
-    if (form.envTemp.trim()) parts.push(`Temp ${form.envTemp.trim()}°C`);
+    // Live preview shows the raw typed value (not yet converted — that
+    // happens once in handleCommit), so the symbol must match what the
+    // grower is actually typing right now.
+    if (form.envTemp.trim()) parts.push(`Temp ${form.envTemp.trim()}${temperatureUnitSymbol}`);
     if (form.envHumidity.trim()) parts.push(`RH ${form.envHumidity.trim()}%`);
     if (form.envVpd.trim()) parts.push(`VPD ${form.envVpd.trim()} kPa`);
     if (form.envCo2.trim()) parts.push(`CO₂ ${form.envCo2.trim()} ppm`);

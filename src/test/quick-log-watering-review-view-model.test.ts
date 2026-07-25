@@ -73,6 +73,15 @@ describe("buildWateringReview — evidence preview", () => {
     ]);
   });
 
+  it("labels water temperature in the active display unit (fahrenheit)", () => {
+    const review = buildWateringReview(withForm({ waterTempC: "70.7" }), "fahrenheit");
+
+    expect(review.measurements).toContainEqual({
+      label: "Water temperature (°F)",
+      value: "70.7",
+    });
+  });
+
   it("shows manual observations as labels, not inferred sensor facts", () => {
     const review = buildWateringReview(
       withForm({

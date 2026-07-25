@@ -3,6 +3,10 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import QuickLogV2Sheet from "@/components/QuickLogV2Sheet";
+import {
+  clearTemperatureUnitPreference,
+  saveTemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 
 const rpcMock = vi.fn();
 const wateringWriterMock = vi.fn();
@@ -124,6 +128,7 @@ function clickSave() {
 }
 
 beforeEach(() => {
+  clearTemperatureUnitPreference();
   rpcMock.mockReset();
   wateringWriterMock.mockReset();
   storageUpload.mockReset();
@@ -204,6 +209,10 @@ describe("QuickLogV2Sheet — structured watering", () => {
   });
 
   it("maps root-zone measurements, EC/PPM, manual observations, note, and manual air evidence", async () => {
+    // This test types raw values expecting celsius passthrough into the
+    // saved payload — pin the display unit explicitly rather than ride
+    // whatever the global default happens to be.
+    saveTemperatureUnitPreference("celsius");
     renderSheet();
     clickWater();
     enterVolume("750");
@@ -610,5 +619,94 @@ describe("QuickLogV2Sheet — structured watering", () => {
     clickWater();
     expect((screen.getByLabelText("Volume (ml)") as HTMLInputElement).value).toBe("");
     expect((screen.getByLabelText("Input EC") as HTMLInputElement).value).toBe("");
+  });
+
+  it("pins the manual sensor snapshot Temp draft to its entry unit through a live preference flip (Water save path)", async () => {
+    saveTemperatureUnitPreference("celsius");
+    renderSheet();
+    clickWater();
+    enterVolume("500");
+    fireEvent.change(screen.getByLabelText("Temp (°C)"), { target: { value: "25" } });
+
+    act(() => {
+      saveTemperatureUnitPreference("fahrenheit");
+    });
+
+    clickSave();
+    await waitFor(() => expect(wateringWriterMock).toHaveBeenCalledTimes(1));
+    const payload = wateringWriterMock.mock.calls[0][0];
+    expect(payload.sensor_snapshot.metrics.temperature_c).toBe(25);
+  });
+
+  it("pins the manual sensor snapshot Temp draft to its entry unit through a live preference flip (Note save path)", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: { ok: true, grow_event_id: "note-event-temp-pin", environment_event_id: null },
+      error: null,
+    });
+    saveTemperatureUnitPreference("celsius");
+    renderSheet(); // defaults to action "note"
+    fireEvent.change(screen.getByLabelText("Temp (°C)"), { target: { value: "25" } });
+
+    act(() => {
+      saveTemperatureUnitPreference("fahrenheit");
+    });
+
+    clickSave();
+    await waitFor(() => expect(rpcMock).toHaveBeenCalled());
+    const [, payload] = rpcMock.mock.calls[0] as [string, { p_temperature_c: number | null }];
+    expect(payload.p_temperature_c).toBe(25);
+  });
+
+  it("keeps the manual sensor snapshot Temp label showing the pinned entry unit, not the live one, through a mid-draft preference flip", async () => {
+    // Codex round-6 finding: the save payload was already correctly pinned
+    // (see the two tests above), but the visible label still read the live
+    // unit — a grower who typed 25 meaning 25°C would see the field relabel
+    // itself to "(°F)" after a cross-tab flip even though 25°C is what gets
+    // saved.
+    saveTemperatureUnitPreference("celsius");
+    renderSheet(); // defaults to action "note"
+    fireEvent.change(screen.getByLabelText("Temp (°C)"), { target: { value: "25" } });
+
+    act(() => {
+      saveTemperatureUnitPreference("fahrenheit");
+    });
+
+    expect(screen.getByLabelText("Temp (°C)")).toBeTruthy();
+    expect(screen.queryByLabelText("Temp (°F)")).toBeNull();
+  });
+
+  it("pins the Water temperature draft to its entry unit through a live preference flip", async () => {
+    saveTemperatureUnitPreference("celsius");
+    renderSheet();
+    clickWater();
+    enterVolume("500");
+    fireEvent.change(screen.getByLabelText("Water temperature (°C)"), { target: { value: "18" } });
+
+    act(() => {
+      saveTemperatureUnitPreference("fahrenheit");
+    });
+
+    clickSave();
+    await waitFor(() => expect(wateringWriterMock).toHaveBeenCalledTimes(1));
+    const payload = wateringWriterMock.mock.calls[0][0];
+    expect(payload.water_temp_c).toBe(18);
+  });
+
+  it("keeps the Water temperature label showing the pinned entry unit, not the live one, through a mid-draft preference flip", async () => {
+    // Codex round-5 finding: the save payload was already correctly pinned
+    // (see the test above), but the visible label still read the live unit —
+    // a grower who typed 18 meaning 18°C would see the field relabel itself
+    // to "(°F)" after a cross-tab flip even though 18°C is what gets saved.
+    saveTemperatureUnitPreference("celsius");
+    renderSheet();
+    clickWater();
+    fireEvent.change(screen.getByLabelText("Water temperature (°C)"), { target: { value: "18" } });
+
+    act(() => {
+      saveTemperatureUnitPreference("fahrenheit");
+    });
+
+    expect(screen.getByLabelText("Water temperature (°C)")).toBeTruthy();
+    expect(screen.queryByLabelText("Water temperature (°F)")).toBeNull();
   });
 });

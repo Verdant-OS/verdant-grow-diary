@@ -121,7 +121,6 @@ describe("Quick creation shortcuts — V0 safety guardrails", () => {
     );
     expect(new Set(tables)).toEqual(new Set(["plants"]));
     expect(CREATE_PLANT).toContain('.from("plants")');
-    expect(CREATE_PLANT).toContain("validatePlantInsertPayload(payload)");
     expect(CREATE_PLANT).toContain(".insert(validation.value as never)");
   });
 

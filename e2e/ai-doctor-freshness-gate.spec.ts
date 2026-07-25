@@ -78,6 +78,7 @@ const PLANT_ROW = {
   stage: "flower",
   started_at: "2026-07-01T00:00:00.000Z",
   health: "healthy",
+  plant_type: "unknown",
   photo_url: "/placeholder.svg",
   last_note: null,
   is_archived: false,

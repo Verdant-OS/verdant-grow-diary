@@ -115,6 +115,17 @@ describe("irrigation evidence RLS harness — service_role boundary", () => {
     const stripped = noComments.replace(/SUPABASE_SERVICE_ROLE_KEY/g, "");
     expect(stripped).not.toMatch(/service[_-]?role/i);
   });
+
+  it("seeds grower-owned fixtures through each authenticated owner", () => {
+    expect(src).toMatch(/async function seedId\(\s+client: SupabaseClient,/);
+    expect(src).not.toMatch(/admin\.from\(table\)\.insert/);
+    expect(src).toContain('seedId(ownerC, "grows"');
+    expect(src).toContain('seedId(ownerC, "tents"');
+    expect(src).toContain('seedId(ownerC, "plants"');
+    expect(src).toContain('seedId(strangerC, "grows"');
+    expect(src).toContain('seedId(strangerC, "tents"');
+    expect(src).toContain('seedId(strangerC, "plants"');
+  });
 });
 
 describe("irrigation evidence pgTAP — every legacy RPC overload is pinned", () => {
@@ -337,14 +348,19 @@ describe("irrigation evidence CI gate — authoritative and non-production", () 
   });
 
   it("runs the disposable RLS harness against a masked local Supabase stack", () => {
-    expect(workflowCode).toMatch(/supabase start/);
-    expect(workflowCode).toMatch(/supabase db reset --local/);
+    expect(workflowCode).toContain("Prepare immutable migration replay workspace");
+    expect(workflowCode).toContain("node scripts/prepare-local-supabase-replay.mjs");
+    expect(workflowCode).toMatch(/supabase start --workdir "\$SUPABASE_REPLAY_WORKDIR"/);
+    expect(workflowCode).toMatch(/supabase db reset --workdir "\$SUPABASE_REPLAY_WORKDIR" --local/);
+    expect(workflowCode).toMatch(/supabase status --workdir "\$SUPABASE_REPLAY_WORKDIR" -o env/);
     expect(workflowCode).toMatch(/::add-mask::\$\{ANON_KEY\}/);
     expect(workflowCode).toMatch(/::add-mask::\$\{SERVICE_ROLE_KEY\}/);
     expect(workflowCode).toMatch(/::add-mask::\$\{DB_URL\}/);
     expect(workflowCode).toMatch(/SUPABASE_DB_URL=\$\{DB_URL\}/);
     expect(workflowCode).toContain("bun run test:irrigation-evidence-rls:local-lane");
-    expect(workflowCode).toMatch(/if:\s*always\(\)[\s\S]{0,120}supabase stop --no-backup/);
+    expect(workflowCode).toMatch(
+      /if:\s*always\(\)[\s\S]{0,180}supabase stop --workdir "\$SUPABASE_REPLAY_WORKDIR" --no-backup/,
+    );
     expect(workflowCode).not.toMatch(/supabase\s+(link|db push)/);
   });
 
@@ -380,6 +396,9 @@ describe("irrigation evidence CI gate — authoritative and non-production", () 
   it("reruns for all database, irrigation UI, style, and browser-proof dependencies", () => {
     for (const path of [
       '"supabase/migrations/**"',
+      '"config/local-supabase-replay-compatibility.json"',
+      '"config/local-supabase-replay/**"',
+      '"scripts/prepare-local-supabase-replay.mjs"',
       '"src/components/irrigation/**"',
       '"src/components/ui/**"',
       '"src/lib/irrigation/**"',

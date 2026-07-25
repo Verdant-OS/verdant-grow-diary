@@ -6,9 +6,7 @@ import CultivarsIndex from "@/pages/CultivarsIndex";
 
 function renderIndex(entry = "/cultivars") {
   const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: { retry: false },
-    },
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
 
   return render(
@@ -25,7 +23,9 @@ afterEach(cleanup);
 describe("Strain Reference Library V1 index", () => {
   it("shows the sample-data boundary and all ten profiles", () => {
     renderIndex();
-    expect(screen.getByRole("heading", { name: /source-backed cultivar profiles/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: /source-backed cultivar profiles/i }),
+    ).toBeInTheDocument();
     expect(screen.getByTestId("cultivar-sample-banner")).toHaveTextContent(
       /sample reference data/i,
     );

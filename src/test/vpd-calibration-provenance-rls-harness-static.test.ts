@@ -12,6 +12,10 @@ const harness = readFileSync(HARNESS_PATH, "utf8");
 const packageJson = JSON.parse(readFileSync(PACKAGE_PATH, "utf8")) as {
   scripts?: Record<string, string>;
 };
+const seedReadingSet = harness.slice(
+  harness.indexOf("async function seedReadingSet"),
+  harness.indexOf("\nfunction calibrationRow"),
+);
 
 describe("VPD calibration provenance runtime RLS harness contract", () => {
   it("is exposed as an explicit local security lane", () => {
@@ -108,5 +112,35 @@ describe("VPD calibration provenance runtime RLS harness contract", () => {
   it("uses the service role only for fixtures, authoritative readback, and cleanup", () => {
     expect(harness).toMatch(/service role is used only for fixture setup, readback, and teardown/i);
     expect(harness).not.toMatch(/serviceRole[^\n]*expectInsertAllowed/i);
+  });
+
+  it("requires an explicit client for every tent fixture", () => {
+    expect(harness).toMatch(
+      /async function seedTent\(\s*client:\s*SupabaseClient,\s*userId:\s*string,\s*label:\s*string/,
+    );
+    expect(harness).toMatch(/const \{ data, error \} = await client\s*[\r\n]+\s*\.from\("tents"\)/);
+    expect(harness).not.toMatch(
+      /const \{ data, error \} = await admin\s*[\r\n]+\s*\.from\("tents"\)\s*[\r\n]+\s*\.insert/,
+    );
+  });
+
+  it("seeds owner, cross-user, and cascade tents through their signed-in owners", () => {
+    expect(harness).toContain('await seedTent(ownerClient, owner.id, "owner tent")');
+    expect(harness).toContain('await seedTent(otherClient, other.id, "other tent")');
+    expect(harness).toContain('await seedTent(ownerClient, owner.id, "tent delete cascade")');
+    expect(harness).toMatch(
+      /seedTent\(\s*cascadeUserClient,\s*cascadeUser\.id,\s*"auth user delete cascade"/,
+    );
+  });
+
+  it("uses caller-known UUIDs instead of relying on an insert representation", () => {
+    expect(seedReadingSet).toMatch(/const airId = crypto\.randomUUID\(\)/);
+    expect(seedReadingSet).toMatch(/const humidityId = crypto\.randomUUID\(\)/);
+    expect(seedReadingSet).toMatch(/const vpdId = crypto\.randomUUID\(\)/);
+    expect(seedReadingSet).toContain("id: airId");
+    expect(seedReadingSet).toContain("id: humidityId");
+    expect(seedReadingSet).toContain("id: vpdId");
+    expect(seedReadingSet).not.toContain('.select("id,metric")');
+    expect(seedReadingSet).toContain("return { airId, humidityId, vpdId, observedAt }");
   });
 });

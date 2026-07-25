@@ -46,8 +46,23 @@ describe("AI Doctor sessions runtime RLS harness contract", () => {
     expect(HARNESS).toContain("signedInClient(emailA, passwordA)");
     expect(HARNESS).toContain("signedInClient(emailB, passwordB)");
     expect(HARNESS).toContain("const anonymous = createClient(SUPABASE_URL, ANON_KEY");
-    expect(HARNESS).toContain('seedScopes(uidA, "A")');
-    expect(HARNESS).toContain('seedScopes(uidB, "B")');
+    expect(HARNESS).toMatch(/async function seedScopes\(\s+owner: SupabaseClient,/);
+    expect(HARNESS).toContain('seedScopes(ownerA, uidA, "A")');
+    expect(HARNESS).toContain('seedScopes(ownerB, uidB, "B")');
+    expect(HARNESS).toContain("const { data: grow, error: growError } = await owner");
+    expect(HARNESS).toContain("const { data: tent, error: tentError } = await owner");
+    expect(HARNESS).toContain("const { data: plant, error: plantError } = await owner");
+    expect(HARNESS).toContain("grow_id: grow.id");
+    expect(HARNESS).toContain("tent_id: tent.id");
+  });
+
+  it("preserves actionable setup errors without logging secrets", () => {
+    expect(HARNESS).toContain("function errorDetail(error: unknown)");
+    expect(HARNESS).toContain("error instanceof Error && error.message");
+    expect(HARNESS).toContain('replace(/[\\r\\n\\t]+/g, " ").slice(0, 240)');
+    expect(HARNESS).toContain("harness failed: ${errorDetail(error)}");
+    expect(HARNESS).not.toContain("SERVICE_KEY}");
+    expect(HARNESS).not.toContain("ANON_KEY}");
   });
 
   it("proves owner access, cross-user isolation, and every scoped insert fence", () => {

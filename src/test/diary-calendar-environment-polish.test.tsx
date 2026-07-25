@@ -2,7 +2,7 @@
  * Diary Calendar — Environment Check polish: filter isolation,
  * compact value rendering, safe fallback when all values are missing.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import DiaryCalendarSection from "@/components/DiaryCalendarSection";
 import {
@@ -10,6 +10,14 @@ import {
   computeDiaryCalendarFilterCounts,
   ENVIRONMENT_CHECK_NO_VALUES_COPY,
 } from "@/lib/diaryCalendarViewModel";
+import {
+  clearTemperatureUnitPreference,
+  saveTemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
+
+beforeEach(() => {
+  clearTemperatureUnitPreference();
+});
 
 const MIXED = [
   { id: "w", entry_at: "2026-06-10T08:00:00Z", event_type: "watering" },
@@ -75,7 +83,8 @@ describe("Diary Calendar — Environment Check polish", () => {
     expect(counts.all).toBe(5);
   });
 
-  it("renders compact temp/humidity/VPD/CO2 values with units", () => {
+  it("renders compact temp/humidity/VPD/CO2 values with units (celsius preference)", () => {
+    saveTemperatureUnitPreference("celsius");
     render(<DiaryCalendarSection rawEntries={[MIXED[3]]} />);
     expect(screen.getByText(/24\.6°C/)).toBeInTheDocument();
     expect(screen.getByText(/58%/)).toBeInTheDocument();
@@ -83,7 +92,17 @@ describe("Diary Calendar — Environment Check polish", () => {
     expect(screen.getByText(/720 ppm/)).toBeInTheDocument();
   });
 
+  it("renders compact temp value converted to Fahrenheit by default", () => {
+    render(<DiaryCalendarSection rawEntries={[MIXED[3]]} />);
+    // 24.6°C → 76.28°F, displayed to 1 decimal.
+    expect(screen.getByText(/76\.3°F/)).toBeInTheDocument();
+    expect(screen.getByText(/58%/)).toBeInTheDocument();
+    expect(screen.getByText(/1\.12 kPa/)).toBeInTheDocument();
+    expect(screen.getByText(/720 ppm/)).toBeInTheDocument();
+  });
+
   it("omits missing/malformed fields cleanly (only present values render)", () => {
+    saveTemperatureUnitPreference("celsius");
     const partial = {
       id: "ep",
       entry_at: "2026-06-10T11:00:00Z",

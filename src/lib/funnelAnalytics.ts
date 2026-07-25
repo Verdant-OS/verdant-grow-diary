@@ -27,6 +27,7 @@
  */
 
 import { PRICING_ANALYTICS_EVENT } from "@/lib/pricingAnalytics";
+import { enforceFunnelEventSchema } from "@/lib/funnelEventSchema";
 
 export const FUNNEL_EVENTS = [
   "signup",

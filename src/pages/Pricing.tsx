@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/accordion";
 import { trackPricingEvent, type PricingAnalyticsName } from "@/lib/pricingAnalytics";
 import { trackFunnelEvent } from "@/lib/funnelAnalytics";
+import { sanitizeCheckoutRecoveryPlanSlug } from "@/lib/checkoutRecoveryPlanSlug";
 import { VERDANT_PRICING_FAQ_ADDITIONS } from "@/constants/verdantSeoCopy";
 import { usePaddleCheckout } from "@/hooks/usePaddleCheckout";
 import type { SubscriberInterestPlanId } from "@/lib/subscriberInterestRules";
@@ -642,14 +643,15 @@ export default function Pricing() {
                   data-testid="pricing-checkout-retry"
                   disabled={checkoutLoading}
                   onClick={() => {
-                    const plan = lastCheckoutPlanRef.current;
+                    const rawPlan = lastCheckoutPlanRef.current;
+                    const plan = sanitizeCheckoutRecoveryPlanSlug(rawPlan);
                     trackPricingEvent("pricing_checkout_recovery_retry", {
                       plan,
                       source: "recovery_panel",
                     });
                     trackFunnelEvent("checkout_recovery_retry", { plan });
                     dismissBlocked();
-                    void openCheckout({ priceId: plan });
+                    void openCheckout({ priceId: rawPlan });
                   }}
                 >
                   Try again
@@ -660,7 +662,7 @@ export default function Pricing() {
                   size="sm"
                   data-testid="pricing-checkout-choose-another-plan"
                   onClick={() => {
-                    const plan = lastCheckoutPlanRef.current;
+                    const plan = sanitizeCheckoutRecoveryPlanSlug(lastCheckoutPlanRef.current);
                     trackPricingEvent("pricing_checkout_recovery_choose_another_plan", {
                       plan,
                       source: "recovery_panel",
@@ -684,7 +686,7 @@ export default function Pricing() {
                   size="sm"
                   data-testid="pricing-checkout-dismiss"
                   onClick={() => {
-                    const plan = lastCheckoutPlanRef.current;
+                    const plan = sanitizeCheckoutRecoveryPlanSlug(lastCheckoutPlanRef.current);
                     trackPricingEvent("pricing_checkout_recovery_dismissed", {
                       plan,
                       source: "recovery_panel",

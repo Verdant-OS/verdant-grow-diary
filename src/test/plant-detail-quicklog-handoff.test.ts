@@ -49,6 +49,23 @@ describe("buildPlantQuickLogPrefill (pure)", () => {
     });
   });
 
+  it("can explicitly preselect the environment activity for a plant sensor handoff", () => {
+    const r = buildPlantQuickLogPrefill({
+      plantId: "p1",
+      growId: "g1",
+      tentId: "t1",
+      eventType: "environment",
+    });
+
+    expect(r).toMatchObject({
+      plantId: "p1",
+      growId: "g1",
+      tentId: "t1",
+      eventType: "environment",
+      suggestSnapshot: true,
+    });
+  });
+
   it("does not copy any sensor values into the prefill", () => {
     const r = buildPlantQuickLogPrefill({
       plantId: "p1",

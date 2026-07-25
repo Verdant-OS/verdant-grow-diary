@@ -84,6 +84,14 @@ describe("ai-doctor-review edge — credit_denied envelope unchanged", () => {
   it("returns the server-resolved plan identity with successful credit context", () => {
     expect(src).toContain("plan_id: spendObj.plan_id");
   });
+
+  it("refunds an upstream provider 402 and returns the service-degraded envelope", () => {
+    expect(src).toMatch(
+      /upstream\.status\s*===\s*402[\s\S]{0,300}failureAfterRefund\(\s*spendId,\s*"upstream_402",\s*"upstream_credit_exhausted"\s*\)/,
+    );
+    expect(src.indexOf("upstream.status === 402")).toBeLessThan(src.indexOf("if (!upstream.ok)"));
+    expect(src).toContain("ai-doctor-review status=upstream_credit_exhausted");
+  });
 });
 
 describe("shared adapter — adaptCreditedAiResponse", () => {

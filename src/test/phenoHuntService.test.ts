@@ -11,6 +11,7 @@ import {
 function makeClient(opts: {
   huntInsertError?: { message: string } | null;
   plantUpdateErrorAt?: number; // index of plant that fails
+  plantUpdateMissingAt?: number; // index whose RLS update affects zero rows
   huntId?: string;
 }) {
   const huntInsert = vi.fn();
@@ -44,11 +45,19 @@ function makeClient(opts: {
       if (table === "plants") {
         return {
           update: (values: unknown) => ({
-            eq: async (_col: string, val: string) => {
+            eq: (_col: string, val: string) => {
               const at = plantIdx++;
               plantUpdates.push({ id: val, values });
               const fail = opts.plantUpdateErrorAt === at;
-              return { error: fail ? { message: "rls" } : null };
+              const missing = opts.plantUpdateMissingAt === at;
+              return {
+                select: () => ({
+                  maybeSingle: async () => ({
+                    data: fail || missing ? null : { id: val },
+                    error: fail ? { message: "rls" } : null,
+                  }),
+                }),
+              };
             },
             // Rollback untag path: .update({...}).in("id", [ids])
             in: async (_col: string, ids: string[]) => {
@@ -182,6 +191,18 @@ describe("phenoHuntService", () => {
       expect(huntDelete).toHaveBeenCalledWith({ col: "id", val: "h1" });
     });
 
+    it("rolls back when RLS silently updates zero candidate rows", async () => {
+      const { client, huntDelete } = makeClient({
+        huntId: "h1",
+        plantUpdateMissingAt: 0,
+      });
+
+      await expect(
+        createPhenoHunt({ growId: "g1", name: "Hunt", plantIds: ["p1"] }, client),
+      ).rejects.toThrow(/Could not tag candidate plant/);
+      expect(huntDelete).toHaveBeenCalledWith({ col: "id", val: "h1" });
+    });
+
     it("rejects empty name / grow / plant list", async () => {
       const { client } = makeClient({});
       await expect(
@@ -201,6 +222,7 @@ function makeDeleteClient(opts: {
   linkedIds?: string[];
   selectError?: { message: string } | null;
   untagError?: { message: string } | null;
+  untagReturnedIds?: string[];
   deleteError?: { message: string } | null;
 }) {
   const calls: { op: string; values?: unknown }[] = [];
@@ -218,9 +240,16 @@ function makeDeleteClient(opts: {
             },
           }),
           update: (values: unknown) => ({
-            eq: async (_c: string, _v: string) => {
+            eq: (_c: string, _v: string) => {
               calls.push({ op: "plants.update", values });
-              return { error: opts.untagError ?? null };
+              return {
+                select: async () => ({
+                  data: opts.untagError
+                    ? null
+                    : (opts.untagReturnedIds ?? opts.linkedIds ?? []).map((id) => ({ id })),
+                  error: opts.untagError ?? null,
+                }),
+              };
             },
           }),
           delete: () => ({
@@ -275,6 +304,16 @@ describe("deletePhenoHunt", () => {
       untagError: { message: "rls" },
     });
     await expect(deletePhenoHunt({ huntId: "h1" }, client)).rejects.toThrow(/untag/);
+    expect(calls.map((c) => c.op)).not.toContain("pheno_hunts.delete");
+  });
+
+  it("does not delete the hunt when candidate untagging affects zero rows", async () => {
+    const { client, calls } = makeDeleteClient({
+      linkedIds: ["p1"],
+      untagReturnedIds: [],
+    });
+
+    await expect(deletePhenoHunt({ huntId: "h1" }, client)).rejects.toThrow(/untag/i);
     expect(calls.map((c) => c.op)).not.toContain("pheno_hunts.delete");
   });
 

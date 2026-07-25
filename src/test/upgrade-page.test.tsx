@@ -268,6 +268,8 @@ describe("Upgrade page", () => {
     expect(allAnswers).toMatch(/runs your grow for you/);
     expect(allAnswers).toMatch(/grower-approved/);
     expect(allAnswers).toMatch(/paddle/);
+    expect(allAnswers).toMatch(/current plan and price/);
+    expect(allAnswers).not.toMatch(/provisional|placeholder|being finalized/);
     expect(allAnswers).toMatch(/founder/);
     expect(allAnswers).toMatch(/cancel|stop when your billing/);
   });

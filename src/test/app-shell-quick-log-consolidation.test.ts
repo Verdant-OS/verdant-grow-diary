@@ -23,13 +23,17 @@ const FAST_ADD_BTN_SRC = readFileSync(
   "utf8",
 );
 
+const QUICK_LOG_SRC = readFileSync(
+  resolve(__dirname, "../..", "src/components/QuickLog.tsx"),
+  "utf8",
+);
+
 describe("AppShell — Quick Log is the single grower-facing logging CTA", () => {
   it("renders exactly one consolidated Quick Log entry point in the header", () => {
     // The standalone duplicate "Quick log" Button must be gone.
     expect(APP_SHELL_SRC).not.toMatch(/>\s*Quick log\s*</);
     // GlobalFastAddButton is the single header CTA (mobile FAB is separate).
-    const headerCtaMatches =
-      APP_SHELL_SRC.match(/<GlobalFastAddButton\b/g) ?? [];
+    const headerCtaMatches = APP_SHELL_SRC.match(/<GlobalFastAddButton\b/g) ?? [];
     expect(headerCtaMatches.length).toBe(1);
   });
 
@@ -48,8 +52,17 @@ describe("AppShell — Quick Log is the single grower-facing logging CTA", () =>
     // that AppShell already listens for to open the QuickLog component.
     expect(APP_SHELL_SRC).toContain("PLANT_QUICKLOG_PREFILL_EVENT");
     expect(APP_SHELL_SRC).toContain("<QuickLog");
+    expect(QUICK_LOG_SRC).toContain("requestedActivityId={prefill?.activityId ?? null}");
+    expect(QUICK_LOG_SRC).toContain(
+      "requestedNote={prefill?.activityId ? (prefill.note ?? null) : null}",
+    );
     // The mobile FAB remains as the mobile Quick Log entry point.
     expect(APP_SHELL_SRC).toMatch(/aria-label="Open Quick Log"/);
+  });
+
+  it("remounts Quick Log after close so child activity drafts cannot leak into a new session", () => {
+    expect(APP_SHELL_SRC).toContain("key={legacyQuickLogSession}");
+    expect(APP_SHELL_SRC).toContain("setLegacyQuickLogSession((session) => session + 1)");
   });
 
   it("introduces no Supabase writes, alerts, or Action Queue behavior", () => {

@@ -516,11 +516,11 @@ export default function ActionDetail() {
     setDialog(null);
     setNoteDraft("");
 
-    if (kind === "simulate") {
-      toast.message("Simulated (no device command sent)");
-    }
     const patch = buildTransitionPatch(kind);
     const success = await transition(row, patch, eventTypeFor(kind), nextStatusFor(kind), note);
+    if (success && kind === "simulate") {
+      toast.message("Simulated (no device command sent)");
+    }
     if (success && isBreedingFollowUpAction(row.action_type)) {
       const now = new Date().toISOString();
       if (kind === "approve") {

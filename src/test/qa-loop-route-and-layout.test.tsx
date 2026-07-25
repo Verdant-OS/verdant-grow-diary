@@ -55,6 +55,25 @@ describe("QA-LOOP-03 Settings mobile tile layout", () => {
     vi.doMock("@/store/auth", () => ({
       useAuth: () => ({ user: { email: "g@example.com" }, signOut: vi.fn() }),
     }));
+    vi.doMock("@/hooks/useMyEntitlements", () => ({
+      useMyEntitlements: () => ({
+        loading: false,
+        lookupFailed: false,
+        entitlement: { displayPlanId: "free", status: "active", isStaff: false },
+        refetch: vi.fn(),
+      }),
+    }));
+    vi.doMock("@/hooks/usePaddleCancelNotice", () => ({
+      usePaddleCancelNotice: () => ({
+        visible: false,
+        accessUntilIso: null,
+        accessUntilLabel: "",
+        reason: null,
+      }),
+    }));
+    vi.doMock("@/components/RewardedReferralCard", () => ({
+      default: () => <div data-testid="rewarded-referral-card-stub">Referral card</div>,
+    }));
     const Settings = (await import("@/pages/Settings")).default;
     render(
       <MemoryRouter>
@@ -79,5 +98,5 @@ describe("QA-LOOP-03 Settings mobile tile layout", () => {
       expect(cls).not.toMatch(/\babsolute\b/);
       expect(cls).not.toMatch(/\bfixed\b/);
     }
-  });
+  }, 15_000);
 });

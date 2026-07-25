@@ -21,10 +21,7 @@
  *     timestamp UI; no timestamp defaults come from Fast Add here).
  */
 import { describe, it, expect } from "vitest";
-import {
-  resolveFastAddIntent,
-  type FastAddSelectionContext,
-} from "../lib/fastAddActionRules";
+import { resolveFastAddIntent, type FastAddSelectionContext } from "../lib/fastAddActionRules";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "../lib/plantQuickLogPrefillRules";
 import { QUICK_LOG_V2_OPEN_EVENT } from "../lib/quickLogV2OpenIntent";
 
@@ -66,6 +63,7 @@ describe("Fast Add — Note (diary_note) prefill", () => {
       if (intent.kind !== "open-quicklog") return;
       expect(intent.eventName).toBe(PLANT_QUICKLOG_PREFILL_EVENT);
       expect(intent.prefill.eventType).toBe("observation");
+      expect(intent.prefill.activityId).toBe("note");
       expect(intent.prefill.plantId).toBe(ctx.plantId);
       expect(intent.prefill.tentId).toBe(ctx.tentId);
       expect(intent.prefill.growId).toBe(ctx.growId);
@@ -86,6 +84,7 @@ describe("Fast Add — Feeding prefill", () => {
       if (intent.kind !== "open-quicklog") return;
       expect(intent.eventName).toBe(PLANT_QUICKLOG_PREFILL_EVENT);
       expect(intent.prefill.eventType).toBe("feeding");
+      expect(intent.prefill.activityId).toBe("feeding");
       expect(intent.prefill.plantId).toBe(ctx.plantId);
       expect(intent.prefill.tentId).toBe(ctx.tentId);
       expect(intent.prefill.growId).toBe(ctx.growId);
@@ -126,13 +125,9 @@ describe("Fast Add — Watering prefill (Quick Log v2 handoff)", () => {
 
 describe("Fast Add — Note and Feeding require plant or tent context", () => {
   it("diary_note without context returns needs-context", () => {
-    expect(resolveFastAddIntent("diary_note", null, { now }).kind).toBe(
-      "needs-context",
-    );
+    expect(resolveFastAddIntent("diary_note", null, { now }).kind).toBe("needs-context");
   });
   it("feeding without context returns needs-context", () => {
-    expect(resolveFastAddIntent("feeding", null, { now }).kind).toBe(
-      "needs-context",
-    );
+    expect(resolveFastAddIntent("feeding", null, { now }).kind).toBe("needs-context");
   });
 });

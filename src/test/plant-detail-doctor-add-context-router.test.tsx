@@ -66,10 +66,7 @@ import { sensorsPath } from "@/lib/routes";
 import PlantDetailDoctorLaunchDialog from "@/components/PlantDetailDoctorLaunchDialog";
 
 const ROOT = resolve(__dirname, "../..");
-const HELPER = readFileSync(
-  resolve(ROOT, "src/lib/plantDetailDoctorAddContextRouter.ts"),
-  "utf8",
-);
+const HELPER = readFileSync(resolve(ROOT, "src/lib/plantDetailDoctorAddContextRouter.ts"), "utf8");
 
 const FORBIDDEN = [
   /service_role/,
@@ -120,6 +117,26 @@ describe("buildPlantDetailDoctorAddContextRoute", () => {
     expect(d.gaps).toEqual(["note"]);
   });
 
+  it.each([
+    ["grow", { growId: null }],
+    ["tent", { tentId: null }],
+  ])(
+    "preserves the requested plant instead of dispatching a generic QuickLog when %s context is missing",
+    (_missing, override) => {
+      const d = buildPlantDetailDoctorAddContextRoute(
+        input({
+          hasRecentSensorSnapshot: true,
+          hasRecentPhoto: true,
+          ...override,
+        }),
+      );
+
+      expect(d.kind).toBe("quicklog_note");
+      expect(d.quickLogEvent).toBeUndefined();
+      expect(d.to).toBe("/daily-check?plantId=p1&from=plant-detail&method=note");
+    },
+  );
+
   it("chooses sensor route when sensor is missing and notes exist", () => {
     const d = buildPlantDetailDoctorAddContextRoute(
       input({ hasTimelineOrNote: true, hasRecentPhoto: true }),
@@ -155,14 +172,26 @@ describe("buildPlantDetailDoctorAddContextRoute", () => {
     });
   });
 
+  it("preserves the requested plant when photo capture lacks complete QuickLog context", () => {
+    const d = buildPlantDetailDoctorAddContextRoute(
+      input({
+        growId: null,
+        hasTimelineOrNote: true,
+        hasRecentSensorSnapshot: true,
+      }),
+    );
+
+    expect(d.kind).toBe("quicklog_photo");
+    expect(d.quickLogEvent).toBeUndefined();
+    expect(d.to).toBe("/daily-check?plantId=p1&from=plant-detail&method=note");
+  });
+
   it("uses deterministic priority note > sensor > photo when multiple gaps exist", () => {
     const allMissing = buildPlantDetailDoctorAddContextRoute(input());
     expect(allMissing.kind).toBe("quicklog_note");
     expect(allMissing.gaps).toEqual(["note", "sensor", "photo"]);
 
-    const noteSatisfied = buildPlantDetailDoctorAddContextRoute(
-      input({ hasTimelineOrNote: true }),
-    );
+    const noteSatisfied = buildPlantDetailDoctorAddContextRoute(input({ hasTimelineOrNote: true }));
     expect(noteSatisfied.kind).toBe("sensor_route");
     expect(noteSatisfied.gaps).toEqual(["sensor", "photo"]);
   });
@@ -247,17 +276,15 @@ describe("<PlantDetailDoctorLaunchDialog /> Add Context First wiring", () => {
 
   it("renders the visible Add context helper copy", () => {
     open();
-    expect(
-      screen.getByTestId("plant-detail-doctor-launch-add-context-helper").textContent,
-    ).toBe(ADD_CONTEXT_HELPER_COPY);
+    expect(screen.getByTestId("plant-detail-doctor-launch-add-context-helper").textContent).toBe(
+      ADD_CONTEXT_HELPER_COPY,
+    );
   });
 
   it("Continue to AI Doctor remains available regardless of context gaps", () => {
     open();
     const cont = screen.getByTestId("plant-detail-doctor-launch-continue");
-    expect(cont.getAttribute("href")).toBe(
-      "/plants/p1?tentId=t1#plant-ai-doctor-review",
-    );
+    expect(cont.getAttribute("href")).toBe("/plants/p1?tentId=t1#plant-ai-doctor-review");
   });
 
   it("does not render Add context button when no gaps exist (Ask Doctor still works)", () => {

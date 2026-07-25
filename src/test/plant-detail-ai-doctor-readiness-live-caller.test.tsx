@@ -10,7 +10,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
@@ -84,6 +84,7 @@ function renderCard() {
       <MemoryRouter>
         <PlantDetailAiDoctorReadiness
           plantId="plant-1"
+          growId="grow-1"
           tentId={TENT_ID}
           stage="veg"
           hasPlantPhoto
@@ -170,6 +171,35 @@ describe("PlantDetailAiDoctorReadiness — live caller × real intake classifica
       `/plants/plant-1?tentId=${TENT_ID}#plant-ai-doctor-review`,
     );
   });
+
+  it.each(["stale", "no_data"] as const)(
+    "status=%s opens plant-targeted Quick Log with an environment snapshot selected",
+    (status) => {
+      setBridge(status, status === "stale" ? "stale_timestamp" : "none_received");
+      const dispatchSpy = vi.spyOn(window, "dispatchEvent");
+      renderCard();
+
+      const action = screen.getByTestId(
+        `plant-detail-ai-doctor-sensor-evidence-next-action-${status}`,
+      );
+      expect(action).toHaveAttribute("data-handoff", "plant-quick-log");
+      fireEvent.click(action);
+
+      const event = dispatchSpy.mock.calls
+        .map(([candidate]) => candidate)
+        .find((candidate) => candidate.type === "verdant:open-quicklog") as CustomEvent;
+      expect(event.detail).toEqual({
+        plantId: "plant-1",
+        plantName: null,
+        growId: "grow-1",
+        tentId: TENT_ID,
+        tentName: null,
+        eventType: "environment",
+        suggestSnapshot: true,
+      });
+      dispatchSpy.mockRestore();
+    },
+  );
 
   describe("UI panel reflects real intake classification", () => {
     const cases: Array<{

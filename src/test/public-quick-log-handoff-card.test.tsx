@@ -207,6 +207,7 @@ describe("<PublicQuickLogHandoffCard />", () => {
       growId: "g1",
       tentId: "t1",
       eventType: "observation",
+      activityId: null,
       note: "First true leaves look healthy.",
       wateringVolumeMl: null,
       suggestSnapshot: false,
@@ -292,11 +293,21 @@ describe("<PublicQuickLogHandoffCard />", () => {
     expect(events[0].detail.suppressPlantDefault).toBe(true);
   });
 
-  it("feeding drafts state the 'Coming soon' caveat up front", () => {
+  it("feeding drafts hand off to the canonical Feeding editor without stale caveat copy", () => {
     seedDraft(draft({ logType: "feeding", note: "Fed 2ml/L grow nutes" }));
+    const events: CustomEvent[] = [];
+    const listener = (e: Event) => events.push(e as CustomEvent);
+    window.addEventListener(PLANT_QUICKLOG_PREFILL_EVENT, listener);
     renderCard();
-    expect(screen.getByTestId("public-quick-log-handoff-type-caveat").textContent).toMatch(
-      /not saveable from Quick Log yet/i,
+    fireEvent.click(screen.getByTestId("public-quick-log-handoff-review-save"));
+    window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, listener);
+    expect(events).toHaveLength(1);
+    expect(events[0].detail.eventType).toBe("feeding");
+    expect(events[0].detail.activityId).toBe("feeding");
+    expect(events[0].detail.note).toBe("Fed 2ml/L grow nutes");
+    expect(screen.queryByTestId("public-quick-log-handoff-type-caveat")).toBeNull();
+    expect(screen.getByTestId("public-quick-log-handoff-card")).not.toHaveTextContent(
+      /coming soon|not saveable/i,
     );
   });
 

@@ -115,9 +115,7 @@ function toCandidate(
   // (getEffectivePlantGrowId convention).
   let growId = asNonEmptyString(plant.grow_id) ?? asNonEmptyString(plant.growId);
   if (!growId && tentId) {
-    const tent = tents.find(
-      (t) => (asNonEmptyString(t.id) ?? "") === tentId,
-    );
+    const tent = tents.find((t) => (asNonEmptyString(t.id) ?? "") === tentId);
     if (tent) {
       growId = asNonEmptyString(tent.grow_id) ?? asNonEmptyString(tent.growId);
     }
@@ -172,9 +170,7 @@ export function matchHandoffPlant(
 
   const wanted = normalizeHandoffNickname(plantNickname);
   const nicknameMatches =
-    wanted.length > 0
-      ? eligible.filter((p) => normalizeHandoffNickname(p.name) === wanted)
-      : [];
+    wanted.length > 0 ? eligible.filter((p) => normalizeHandoffNickname(p.name) === wanted) : [];
   if (nicknameMatches.length === 1) {
     return { kind: "nickname", plant: nicknameMatches[0], eligibleCount };
   }
@@ -199,6 +195,12 @@ export interface PublicQuickLogHandoffPrefill {
   growId: string | null;
   tentId: string | null;
   eventType: string;
+  /**
+   * Feeding now has a canonical authenticated activity editor. Other
+   * starter types stay on the legacy review form so watering volume and
+   * observation behavior keep their proven contracts.
+   */
+  activityId: "feeding" | null;
   note: string | null;
   wateringVolumeMl: number | null;
   suggestSnapshot: false;
@@ -224,18 +226,18 @@ export interface PublicQuickLogHandoffPrefill {
  * Map the draft onto the EXISTING Quick Log prefill contract.
  *
  * Mapping is 1:1 with no invention:
- *  - logType passes through as the truthful eventType. "feeding" is not
- *    yet saveable by the unified Quick Log save; the existing form shows
- *    its own "Coming soon" honesty and the grower re-types it themselves.
+ *  - logType passes through as the truthful eventType. Feeding also
+ *    selects the canonical authenticated activity editor; selection is
+ *    review-only and never writes automatically.
  *  - note passes through when non-empty; the form seeds it only-if-empty.
  *  - wateringVolumeMl passes through for watering drafts only.
  *  - stage is deliberately NOT mapped: the form derives stage from the
  *    selected plant/grow, and an anonymous draft must never mutate an
  *    existing plant's stage. The card still displays the drafted stage.
  *  - plant identity comes from `match`, never from the nickname text.
- *  - publicStarterDraftId is the ONLY starter-specific field: an opaque id
- *    (no grower content) letting the save path clear the draft after a
- *    CONFIRMED successful write.
+ *  - publicStarterDraftId/publicStarterDraftUpdatedAt are opaque local
+ *    revision markers (no grower content) letting either authenticated
+ *    save path clear the draft after a CONFIRMED successful write.
  */
 export function mapDraftToQuickLogPrefill(args: {
   draft: PublicQuickLogStarterDraft;
@@ -248,13 +250,32 @@ export function mapDraftToQuickLogPrefill(args: {
     growId: suggested ? suggested.growId : null,
     tentId: suggested ? suggested.tentId : null,
     eventType: args.draft.logType,
+    activityId: args.draft.logType === "feeding" ? "feeding" : null,
     note: args.draft.note.length > 0 ? args.draft.note : null,
-    wateringVolumeMl:
-      args.draft.logType === "watering" ? args.draft.wateringVolumeMl : null,
+    wateringVolumeMl: args.draft.logType === "watering" ? args.draft.wateringVolumeMl : null,
     suggestSnapshot: false,
     source: "public-starter",
     publicStarterDraftId: args.draft.id,
     publicStarterDraftUpdatedAt: args.draft.updatedAt,
     suppressPlantDefault: suggested === null,
   };
+}
+
+/**
+ * Consume-once guard shared by both authenticated Quick Log save paths.
+ * Draft ids survive edits, so equality requires the exact reviewed
+ * revision as well as the id.
+ */
+export function matchesReviewedPublicStarterDraftRevision(args: {
+  storedDraft: PublicQuickLogStarterDraft | null;
+  reviewedDraftId: string | null | undefined;
+  reviewedUpdatedAt: string | null | undefined;
+}): boolean {
+  return Boolean(
+    args.storedDraft &&
+    args.reviewedDraftId &&
+    args.reviewedUpdatedAt &&
+    args.storedDraft.id === args.reviewedDraftId &&
+    args.storedDraft.updatedAt === args.reviewedUpdatedAt,
+  );
 }

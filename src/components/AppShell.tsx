@@ -317,7 +317,10 @@ export default function AppShell({ children }: { children?: ReactNode }) {
           open={openLog}
           onOpenChange={(o) => {
             setOpenLog(o);
-            if (!o) setPrefill(null);
+            if (!o) {
+              setPrefill(null);
+              setLegacyQuickLogSession((session) => session + 1);
+            }
           }}
           prefill={prefill}
           onCreated={() => window.dispatchEvent(new Event("verdant:entry-created"))}

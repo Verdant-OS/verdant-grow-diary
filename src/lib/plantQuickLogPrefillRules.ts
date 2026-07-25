@@ -11,22 +11,30 @@
  * manually.
  */
 
-export interface PlantQuickLogPrefillInput {
+export type PlantQuickLogPrefillEventType = "observation" | "environment";
+
+export interface PlantQuickLogPrefillInput<
+  TEventType extends PlantQuickLogPrefillEventType = "observation",
+> {
   plantId: string | null | undefined;
   plantName?: string | null;
   growId: string | null | undefined;
   tentId: string | null | undefined;
   tentName?: string | null;
+  /** Activity to preselect. Defaults to a neutral observation. */
+  eventType?: TEventType;
 }
 
-export interface PlantQuickLogPrefill {
+export interface PlantQuickLogPrefill<
+  TEventType extends PlantQuickLogPrefillEventType = "observation",
+> {
   plantId: string;
   plantName: string | null;
   growId: string;
   tentId: string;
   tentName: string | null;
   /** QuickLog event type to preselect. */
-  eventType: "observation";
+  eventType: TEventType;
   /** Suggest enabling the sensor snapshot toggle since a tent is assigned. */
   suggestSnapshot: true;
   /** Optional draft note text to prefill into the QuickLog note field. */
@@ -35,9 +43,11 @@ export interface PlantQuickLogPrefill {
 
 export const PLANT_QUICKLOG_PREFILL_EVENT = "verdant:open-quicklog" as const;
 
-export function buildPlantQuickLogPrefill(
-  input: PlantQuickLogPrefillInput | null | undefined,
-): PlantQuickLogPrefill | null {
+export function buildPlantQuickLogPrefill<
+  TEventType extends PlantQuickLogPrefillEventType = "observation",
+>(
+  input: PlantQuickLogPrefillInput<TEventType> | null | undefined,
+): PlantQuickLogPrefill<TEventType> | null {
   if (!input) return null;
   const { plantId, growId, tentId } = input;
   if (!plantId || !growId || !tentId) return null;
@@ -47,7 +57,7 @@ export function buildPlantQuickLogPrefill(
     growId,
     tentId,
     tentName: input.tentName ?? null,
-    eventType: "observation",
+    eventType: (input.eventType ?? "observation") as TEventType,
     suggestSnapshot: true,
   };
 }

@@ -19,10 +19,7 @@
  *                   it and clobber that source of truth)
  */
 import { describe, it, expect } from "vitest";
-import {
-  resolveFastAddIntent,
-  type FastAddSelectionContext,
-} from "../lib/fastAddActionRules";
+import { resolveFastAddIntent, type FastAddSelectionContext } from "../lib/fastAddActionRules";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "../lib/plantQuickLogPrefillRules";
 
 const FIXED = new Date("2026-07-24T09:00:00.000Z");
@@ -52,6 +49,7 @@ describe("Fast Add — Environment Check prefill seeds occurred_at + captured_at
       if (intent.kind !== "open-quicklog") return;
       expect(intent.eventName).toBe(PLANT_QUICKLOG_PREFILL_EVENT);
       expect(intent.prefill.eventType).toBe("environment");
+      expect(intent.prefill.activityId).toBe("environment_check");
       expect(intent.prefill.occurred_at).toBe(FIXED.toISOString());
       expect(intent.prefill.captured_at).toBe(FIXED.toISOString());
     },
@@ -82,6 +80,7 @@ describe("Fast Add — Photo prefill seeds occurred_at only", () => {
       if (intent.kind !== "open-quicklog") return;
       expect(intent.eventName).toBe(PLANT_QUICKLOG_PREFILL_EVENT);
       expect(intent.prefill.eventType).toBe("photo");
+      expect(intent.prefill.activityId).toBe("photo");
       expect(intent.prefill.occurred_at).toBe(FIXED.toISOString());
       // captured_at must be undefined so the photo upload flow can stamp it
       // from EXIF or the upload moment without a Fast Add default winning.

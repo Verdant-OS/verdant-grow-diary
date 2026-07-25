@@ -506,7 +506,6 @@ function DeleteAccountTile() {
 
 export default function Settings() {
   const { user, signOut } = useAuth();
-  const integrations = ["Spider Farmer", "AC Infinity", "Vivosun", "Raspberry Pi 5"];
   return (
     <div>
       <PageHeader
@@ -543,21 +542,22 @@ export default function Settings() {
 
         <TemperatureUnitTile />
 
-        <Tile name="Notifications" state="coming_soon">
-          <p className="text-sm text-muted-foreground">Critical alerts only · Email + in-app</p>
+        <Tile name="Notifications" state="available">
+          <p className="text-sm text-muted-foreground mb-3">
+            Review in-app alerts, severity, and status.
+          </p>
+          <Button asChild size="sm" data-testid="settings-alerts-link">
+            <Link to="/alerts">Open alerts</Link>
+          </Button>
         </Tile>
 
-        <Tile name="Integrations" state="disabled">
-          <div className="flex flex-wrap gap-2">
-            {integrations.map((i) => (
-              <span
-                key={i}
-                className="text-xs px-2.5 py-1 rounded-full border border-border/50 bg-secondary/50"
-              >
-                {i}
-              </span>
-            ))}
-          </div>
+        <Tile name="Sensor integrations" state="available">
+          <p className="text-sm text-muted-foreground mb-3">
+            Import CSV history and manage clearly source-labeled sensor readings.
+          </p>
+          <Button asChild size="sm" data-testid="settings-sensor-integrations-link">
+            <Link to="/sensors">Open sensor data</Link>
+          </Button>
         </Tile>
 
         <Tile name="Agent integrations" state="available">

@@ -72,13 +72,7 @@ describe("manual sensor save payload — smoke guard", () => {
     }
     const metricNames = payloads.map((p) => p.metric).sort();
     expect(metricNames).toEqual(
-      [
-        "co2_ppm",
-        "humidity_pct",
-        "soil_moisture_pct",
-        "temperature_c",
-        "vpd_kpa",
-      ].sort(),
+      ["co2_ppm", "humidity_pct", "soil_moisture_pct", "temperature_c", "vpd_kpa"].sort(),
     );
   });
 });
@@ -89,18 +83,26 @@ describe("manual sensor save payload — smoke guard", () => {
 function manualSnapshot(values: {
   temp: number;
   rh: number;
-  vpd: number;
+  vpd: number | null;
   co2: number;
   soil: number;
 }) {
   const ts = new Date().toISOString();
-  return snapshotFromReadings([
+  const readings = [
     { ts, metric: "temperature_c", value: values.temp, source: "manual" },
     { ts, metric: "humidity_pct", value: values.rh, source: "manual" },
-    { ts, metric: "vpd_kpa", value: values.vpd, source: "manual" },
     { ts, metric: "co2_ppm", value: values.co2, source: "manual" },
     { ts, metric: "soil_moisture_pct", value: values.soil, source: "manual" },
-  ]);
+  ];
+  if (values.vpd !== null) {
+    readings.push({
+      ts,
+      metric: "vpd_kpa",
+      value: values.vpd,
+      source: "manual",
+    });
+  }
+  return snapshotFromReadings(readings);
 }
 
 const TARGETS = {
@@ -141,6 +143,31 @@ describe("manual reading IN RANGE — smoke guard", () => {
     });
     expect(persistable).toEqual([]);
   });
+
+  it("does not persist a VPD alert when air VPD is preview-only and was not saved", () => {
+    const snap = manualSnapshot({
+      temp: 22.22,
+      rh: 70,
+      vpd: null,
+      co2: 450,
+      soil: 35,
+    });
+    expect(snap).not.toBeNull();
+    expect(snap!.source).toBe("manual");
+    expect(snap!.vpd).toBeNull();
+
+    const quality = evaluateSensorQuality(snap);
+    expect(quality.quality).toBe("watch");
+    expect(quality.reasons).toContain("VPD is missing from the latest snapshot.");
+    expect(quality.suspiciousFields).not.toContain("vpd");
+
+    const targets = compareSnapshotToTargets(snap, TARGETS);
+    const persistable = selectPersistableAlerts(
+      buildEnvironmentAlerts({ snapshot: snap, quality, targets }),
+      { snapshot: snap, quality: quality.quality },
+    );
+    expect(persistable).toEqual([]);
+  });
 });
 
 // --------------------------------------------------------------------------
@@ -161,9 +188,7 @@ describe("manual reading OUT OF RANGE — smoke guard", () => {
     const targets = compareSnapshotToTargets(snap, TARGETS);
     expect(targets.status).toBe("out_of_range");
 
-    expect(
-      isSnapshotPersistable({ snapshot: snap, quality: quality.quality }),
-    ).toBe(true);
+    expect(isSnapshotPersistable({ snapshot: snap, quality: quality.quality })).toBe(true);
 
     const alerts = buildEnvironmentAlerts({
       snapshot: snap,
@@ -245,14 +270,10 @@ describe("manual save → latest environment refresh", () => {
     const insertSpy = vi.fn().mockResolvedValue(undefined);
     vi.doMock("@/lib/growRepo", () => ({ insertSensorReading: insertSpy }));
 
-    const { QueryClient, QueryClientProvider } = await import(
-      "@tanstack/react-query"
-    );
+    const { QueryClient, QueryClientProvider } = await import("@tanstack/react-query");
     const React = (await import("react")).default;
     const { renderHook, waitFor } = await import("@testing-library/react");
-    const { useInsertSensorReading } = await import(
-      "@/hooks/useInsertSensorReading"
-    );
+    const { useInsertSensorReading } = await import("@/hooks/useInsertSensorReading");
 
     const client = new QueryClient({
       defaultOptions: {
@@ -314,8 +335,7 @@ describe("source label persistence — smoke guard", () => {
 // 6. Static safety scan — manual save path stays inside its lane
 // --------------------------------------------------------------------------
 const ROOT = resolve(__dirname, "../..");
-const read = (p: string) =>
-  stripSourceComments(readFileSync(resolve(ROOT, p), "utf8"));
+const read = (p: string) => stripSourceComments(readFileSync(resolve(ROOT, p), "utf8"));
 
 const MANUAL_SAVE_FILES = [
   "src/components/ManualSensorReadingCard.tsx",

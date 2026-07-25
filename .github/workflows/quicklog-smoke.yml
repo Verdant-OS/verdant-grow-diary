@@ -661,6 +661,57 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
 
+      - name: Link Playwright JSON report source in Job Summary
+        if: always() && steps.e2e_config.outputs.should_run == 'true'
+        shell: bash
+        env:
+          BUNDLE_URL: ${{ steps.upload_smoke_bundle.outputs.artifact-url }}
+          SMOKE_JSON_URL: ${{ steps.upload_smoke_report_json.outputs.artifact-url }}
+          HTML_REPORT_URL: ${{ steps.upload_playwright_report.outputs.artifact-url }}
+        run: |
+          # Traceability: point reviewers at the exact Playwright JSON report
+          # directory that fed scripts/summarize-playwright-flakes.mjs, so
+          # playwright-flake-summary.md can always be traced back to its
+          # source. Enrichment only — never fails the job.
+          REPORT_PATH="e2e/results/playwright-report.json"
+          {
+            echo ""
+            echo "### 📄 Playwright JSON report source"
+            echo ""
+            echo "\`playwright-flake-summary.md\` is generated from the Playwright JSON report at:"
+            echo ""
+            echo "- **Local path:** \`${REPORT_PATH}\`"
+            echo "- **Local HTML report dir:** \`playwright-report/\`"
+            echo ""
+            if [ -f "${REPORT_PATH}" ]; then
+              SIZE_BYTES=$(wc -c < "${REPORT_PATH}" | tr -d ' ')
+              echo "- **Report file present in this run:** ✅ (\`${SIZE_BYTES}\` bytes)"
+            else
+              echo "- **Report file present in this run:** ❌ not generated (Playwright likely did not run — see earlier steps)"
+            fi
+            echo ""
+            echo "**Downloads (this run):**"
+            echo ""
+            if [ -n "${SMOKE_JSON_URL}" ]; then
+              echo "- [\`quicklog-smoke-report-json\`](${SMOKE_JSON_URL}) — bundles \`e2e/results/quicklog-smoke-report.json\`"
+            else
+              echo "- \`quicklog-smoke-report-json\` — artifact URL unavailable, see Artifacts dropdown"
+            fi
+            if [ -n "${BUNDLE_URL}" ]; then
+              echo "- [\`quicklog-smoke-artifacts\`](${BUNDLE_URL}) — bundles the full \`playwright-report.json\`, \`playwright-report/\`, and \`test-results/\`"
+            else
+              echo "- \`quicklog-smoke-artifacts\` — artifact URL unavailable, see Artifacts dropdown"
+            fi
+            if [ -n "${HTML_REPORT_URL}" ]; then
+              echo "- [\`quicklog-playwright-report\`](${HTML_REPORT_URL}) — standalone HTML report directory"
+            else
+              echo "- \`quicklog-playwright-report\` — artifact URL unavailable, see Artifacts dropdown"
+            fi
+            echo ""
+            echo "_Download any of the above, then re-run \`node scripts/summarize-playwright-flakes.mjs --report=<path-to-playwright-report.json>\` locally to reproduce \`playwright-flake-summary.md\` byte-for-byte._"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Upload per-test failure artifacts
         id: upload_per_test_artifacts
         if: always() && steps.e2e_config.outputs.should_run == 'true' && env.PR_COMMENT_CONTEXT_OK == 'true' && env.PR_COMMENT_DISABLED != 'true'

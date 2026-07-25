@@ -495,7 +495,7 @@ jobs:
         if: always() && steps.e2e_config.outputs.should_run == 'true' && steps.check_flake_summary.outputs.present == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: quicklog-flake-summary
+          name: quicklog-flake-summary-${{ env.ARTIFACT_SUFFIX }}
           path: e2e/results/playwright-flake-summary.md
           retention-days: 30
           if-no-files-found: warn
@@ -668,7 +668,7 @@ jobs:
         if: always() && steps.e2e_config.outputs.should_run == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: quicklog-smoke-artifacts
+          name: quicklog-smoke-artifacts-${{ env.ARTIFACT_SUFFIX }}
           if-no-files-found: warn
           retention-days: 30
           path: |
@@ -691,7 +691,7 @@ jobs:
           && (github.event_name != 'workflow_dispatch' || inputs.upload_html_report != 'false')
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: quicklog-playwright-report
+          name: quicklog-playwright-report-${{ env.ARTIFACT_SUFFIX }}
           path: playwright-report/
           retention-days: 30
           if-no-files-found: warn
@@ -737,7 +737,7 @@ jobs:
         if: always() && steps.e2e_config.outputs.should_run == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: quicklog-playwright-traces
+          name: quicklog-playwright-traces-${{ env.ARTIFACT_SUFFIX }}
           path: |
             test-results/**/*.zip
           retention-days: 30
@@ -748,7 +748,7 @@ jobs:
         if: always() && steps.e2e_config.outputs.should_run == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: quicklog-playwright-media
+          name: quicklog-playwright-media-${{ env.ARTIFACT_SUFFIX }}
           path: |
             test-results/**/*.png
             test-results/**/*.jpg
@@ -765,7 +765,7 @@ jobs:
         if: always() && steps.e2e_config.outputs.should_run == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: quicklog-smoke-report-json
+          name: quicklog-smoke-report-json-${{ env.ARTIFACT_SUFFIX }}
           path: e2e/results/quicklog-smoke-report.json
           retention-days: 30
           if-no-files-found: warn
@@ -775,7 +775,7 @@ jobs:
         if: always() && steps.e2e_config.outputs.should_run == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: quicklog-smoke-report-txt
+          name: quicklog-smoke-report-txt-${{ env.ARTIFACT_SUFFIX }}
           path: e2e/results/quicklog-smoke-report.txt
           retention-days: 30
           if-no-files-found: warn

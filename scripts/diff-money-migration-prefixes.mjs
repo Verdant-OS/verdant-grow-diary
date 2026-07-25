@@ -31,9 +31,10 @@ import { spawnSync } from "node:child_process";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import {
-  REQUIRED_MONEY_MIGRATIONS,
-  migrationVersion,
-} from "./required-money-migrations.mjs";
+  coreTargetEnvironmentForMoney,
+  sanitizeMoneyDatabaseUrlForPsql,
+} from "./lib/moneyDatabaseTargetIdentity.mjs";
+import { REQUIRED_MONEY_MIGRATIONS, migrationVersion } from "./required-money-migrations.mjs";
 
 const rawArgs = process.argv.slice(2);
 const flags = new Set(rawArgs.filter((a) => !a.includes("=")));
@@ -90,8 +91,7 @@ function buildSarif(state) {
           "credit / referral / entitlement regressions.",
       },
       defaultConfiguration: { level: "error" },
-      helpUri:
-        "https://github.com/verdant/verdant-grow-diary#money-migration-applied-check",
+      helpUri: "https://github.com/verdant/verdant-grow-diary#money-migration-applied-check",
     },
     {
       id: "money-migration-malformed",
@@ -235,11 +235,8 @@ function emitSarif(sarif) {
 function emitGithubAnnotations(state) {
   for (const m of state.missing) {
     const file = `${MIGRATION_DIR}/${m.file}`;
-    const msg =
-      `Required money migration not applied in ${TARGET_ENV}: prefix ${m.version}`;
-    process.stderr.write(
-      `::error file=${file},line=1,title=Money migration drift::${msg}\n`,
-    );
+    const msg = `Required money migration not applied in ${TARGET_ENV}: prefix ${m.version}`;
+    process.stderr.write(`::error file=${file},line=1,title=Money migration drift::${msg}\n`);
   }
   for (const m of state.malformed) {
     process.stderr.write(
@@ -272,8 +269,7 @@ function finish(code, state) {
 if (expectedOnly) {
   if (asJson) {
     process.stdout.write(
-      JSON.stringify({ target_env: TARGET_ENV, expected, malformed }, null, 2) +
-        "\n",
+      JSON.stringify({ target_env: TARGET_ENV, expected, malformed }, null, 2) + "\n",
     );
   } else if (!asSarif) {
     console.log(`Expected required-money-migration prefixes (${expected.length}):`);
@@ -293,6 +289,22 @@ if (malformed.length > 0) {
   finish(2, { malformed });
 }
 
+let coreTargetEnv;
+try {
+  coreTargetEnv = coreTargetEnvironmentForMoney(TARGET_ENV);
+} catch {
+  const msg =
+    "Database target identity rejected (invalid_target_environment); psql was not invoked";
+  console.error(`✗ ${msg}`);
+  finish(2, { toolingError: msg });
+}
+if (coreTargetEnv !== null && !DB_URL) {
+  const msg =
+    "Database target identity rejected (missing_protected_database_url); psql was not invoked";
+  console.error(`✗ ${msg}`);
+  finish(2, { toolingError: msg });
+}
+
 if (!DB_URL && !HAS_PG_ENV) {
   const msg =
     "No database connection configured. Set SUPABASE_DB_URL, DATABASE_URL, " +
@@ -306,9 +318,42 @@ const sql =
   `SELECT version FROM supabase_migrations.schema_migrations ` +
   `WHERE version IN (${versionList}) ORDER BY version;`;
 const psqlArgs = ["-X", "-A", "-t", "-v", "ON_ERROR_STOP=1", "-c", sql];
-if (DB_URL) psqlArgs.unshift(DB_URL);
+const psqlEnv = { ...process.env };
+if (DB_URL) {
+  let sanitized;
+  try {
+    sanitized = sanitizeMoneyDatabaseUrlForPsql(DB_URL, TARGET_ENV);
+  } catch (error) {
+    const reason =
+      error && typeof error === "object" && typeof error.code === "string"
+        ? error.code
+        : "invalid_target_environment";
+    const msg = `Database target identity rejected (${reason}); psql was not invoked`;
+    console.error(`✗ ${msg}`);
+    finish(2, { toolingError: msg });
+  }
 
-const result = spawnSync("psql", psqlArgs, { encoding: "utf8", env: process.env });
+  // Keep credentials out of the process argument list. libpq accepts a
+  // connection URI through PGDATABASE, so psql receives the same connection
+  // without exposing it through process listings or command traces. URL mode
+  // is authoritative: scrub every ambient libpq/Supabase connection input so
+  // a runner-level PGHOSTADDR, PGPASSFILE, service, or URL alias cannot alter
+  // which database is queried.
+  for (const key of Object.keys(psqlEnv)) {
+    const normalizedKey = key.toUpperCase();
+    if (
+      normalizedKey.startsWith("PG") ||
+      normalizedKey === "DATABASE_URL" ||
+      normalizedKey.startsWith("SUPABASE_")
+    ) {
+      delete psqlEnv[key];
+    }
+  }
+  psqlEnv.PGDATABASE = sanitized.databaseUrl;
+  if (sanitized.sslMode) psqlEnv.PGSSLMODE = sanitized.sslMode;
+}
+
+const result = spawnSync("psql", psqlArgs, { encoding: "utf8", env: psqlEnv });
 if (result.error) {
   const msg = `psql not invocable: ${result.error.message}`;
   console.error(`✗ ${msg}`);
@@ -317,12 +362,15 @@ if (result.error) {
 if (result.status !== 0) {
   const msg = `psql exited ${result.status} querying supabase_migrations.schema_migrations`;
   console.error(`✗ ${msg}`);
-  if (result.stderr) console.error(result.stderr.trim());
+  console.error("Raw psql diagnostics were withheld because they may contain connection details.");
   finish(2, { toolingError: msg });
 }
 
 const applied = new Set(
-  result.stdout.split("\n").map((l) => l.trim()).filter(Boolean),
+  result.stdout
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean),
 );
 const rows = expected.map((e) => ({ ...e, applied: applied.has(e.version) }));
 const missing = rows.filter((r) => !r.applied);

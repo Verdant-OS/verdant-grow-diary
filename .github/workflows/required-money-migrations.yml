@@ -7,23 +7,34 @@ on:
       - "scripts/assert-required-money-migrations.mjs"
       - "scripts/assert-required-money-migrations-applied.mjs"
       - "scripts/assert-no-unreviewed-money-migrations.mjs"
+      - "scripts/diff-money-migration-prefixes.mjs"
+      - "scripts/lib/moneyDatabaseTargetIdentity.mjs"
+      - "scripts/lib/supabaseDatabaseTargetIdentity.mjs"
       - "scripts/required-money-migrations.mjs"
-      - "scripts/collect-money-edge-function-logs.mjs"
+      - "src/test/assert-required-money-migrations-applied-security.test.ts"
+      - "src/test/diff-money-migration-prefixes.test.ts"
+      - "src/test/helpers/psqlSpawnStub.ts"
+      - "src/test/money-database-target-identity.test.ts"
+      - "src/test/required-money-migrations-workflow-trust-boundary.test.ts"
       - "src/test/required-money-migrations-version.test.ts"
+      - ".github/workflows/prefix-diff-sarif.yml"
       - ".github/workflows/required-money-migrations.yml"
 
   push:
-    branches: [main]
+    branches: [verdant-grow-diary]
   workflow_dispatch:
     inputs:
       target_env:
-        description: "Target env label for logs (live | sandbox)"
+        description: "Protected target environment"
         required: true
         default: "sandbox"
+        type: choice
+        options:
+          - sandbox
+          - live
 
 permissions:
   contents: read
-  pull-requests: write
 
 jobs:
   unit-tests-migration-version:
@@ -42,7 +53,12 @@ jobs:
         id: vitest_run
         run: |
           set -o pipefail
-          bunx vitest run src/test/required-money-migrations-version.test.ts \
+          bunx vitest run \
+            src/test/assert-required-money-migrations-applied-security.test.ts \
+            src/test/diff-money-migration-prefixes.test.ts \
+            src/test/money-database-target-identity.test.ts \
+            src/test/required-money-migrations-workflow-trust-boundary.test.ts \
+            src/test/required-money-migrations-version.test.ts \
             --reporter=verbose \
             2>&1 | tee "${{ github.workspace }}/audit/vitest/required-money-migrations.log"
       - name: Dump extractor expected prefixes
@@ -71,16 +87,25 @@ jobs:
       - name: Assert no unreviewed money-adjacent migrations
         run: node scripts/assert-no-unreviewed-money-migrations.mjs
 
-
   assert-money-migrations-applied-sandbox:
     name: Assert money migrations applied in SANDBOX
     needs: assert-required-money-migrations
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.target_env == 'sandbox' }}
+    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/verdant-grow-diary') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'sandbox') }}
+    environment: verdant-sandbox
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ""
+      PGDATABASE: ""
+      PGHOST: ""
+      PGPASSWORD: ""
+      PGPORT: ""
+      PGSERVICE: ""
+      PGSERVICEFILE: ""
+      PGUSER: ""
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Prepare audit dir
-        run: mkdir -p "${{ github.workspace }}/audit/sandbox/logs"
+        run: mkdir -p "${{ github.workspace }}/audit/sandbox"
       - name: Preflight — SUPABASE_DB_URL_SANDBOX configured
         uses: ./.github/actions/require-ci-secret
         with:
@@ -90,20 +115,14 @@ jobs:
           report-path: ${{ github.workspace }}/audit/sandbox/report.md
           log-prefix: money-migration-preflight
           fix-steps-json: >-
-            ["1. Open **Settings → Secrets and variables → Actions** in this repository.",
-             "2. Add a repository secret named `SUPABASE_DB_URL_SANDBOX` whose value is the pooled Postgres connection string for the SANDBOX database (the same URL used by `supabase db push`).",
+            ["1. Open **Settings → Environments → verdant-sandbox** in this repository.",
+             "2. Add an environment secret named `SUPABASE_DB_URL_SANDBOX` whose value is the pooled Postgres connection string for the SANDBOX database (the same URL used by `supabase db push`).",
              "3. Re-run this workflow. The gate will run `node scripts/assert-required-money-migrations-applied.mjs` against SANDBOX and confirm every money-critical migration is applied."]
           reason-lines-json: >-
             ["Why this is a hard failure: without the DB URL the deploy gate cannot",
              "confirm that money-critical migrations (credit spends, referrals, entitlements)",
              "are actually applied. Merging without this check risks silently shipping",
              "a schema drift into production."]
-      - name: Post PR comment when sandbox DB URL secret is missing
-        if: failure() && github.event_name == 'pull_request' && hashFiles('audit/sandbox/report.md') != ''
-        uses: marocchino/sticky-pull-request-comment@773744901bac0e8cbb5a0dc842800d45e9b2b405 # v2
-        with:
-          header: money-migration-guard-sandbox
-          path: audit/sandbox/report.md
       - name: Install psql client
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
       - name: Fast-fail prefix diff (sandbox)
@@ -130,46 +149,12 @@ jobs:
           REPORT_PATH: ${{ github.workspace }}/audit/sandbox/report.md
           AUDIT_PATH: ${{ github.workspace }}/audit/sandbox/applied-audit.json
           DIFF_PATH: ${{ github.workspace }}/audit/sandbox/prefix-diff.txt
-        # Missing-secret handling lives in the "Preflight — SUPABASE_DB_URL_SANDBOX
-        # configured" step above (scripts/assert-money-migration-db-secret.mjs),
-        # which is the single source of truth for that failure mode.
+        # Missing-secret handling lives in the local require-ci-secret
+        # preflight above, which is the single source of truth for that failure.
         run: node scripts/assert-required-money-migrations-applied.mjs
-      - name: Collect edge-function log excerpts (sandbox)
-        if: always()
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF_SANDBOX }}
-          TARGET_ENV: sandbox
-          LOGS_DIR: ${{ github.workspace }}/audit/sandbox/logs
-        run: node scripts/collect-money-edge-function-logs.mjs || true
       - name: Append report to workflow summary
         if: always() && hashFiles('audit/sandbox/report.md') != ''
         run: cat audit/sandbox/report.md >> "$GITHUB_STEP_SUMMARY"
-      - name: Post PR comment with missing migrations
-        if: failure() && github.event_name == 'pull_request' && hashFiles('audit/sandbox/report.md') != ''
-        uses: marocchino/sticky-pull-request-comment@773744901bac0e8cbb5a0dc842800d45e9b2b405 # v2
-        with:
-          header: money-migration-guard-sandbox
-          path: audit/sandbox/report.md
-      - name: Summarize prefix-diff JSON for PR
-        if: always() && github.event_name == 'pull_request' && hashFiles('audit/sandbox/prefix-diff-cli.json') != ''
-        run: |
-          node scripts/summarize-prefix-diff-json.mjs \
-            --in="${{ github.workspace }}/audit/sandbox/prefix-diff-cli.json" \
-            --out="${{ github.workspace }}/audit/sandbox/prefix-diff-summary.md" \
-            --header="Money-migration prefix drift"
-      - name: Post PR comment with prefix-diff summary
-        if: always() && github.event_name == 'pull_request' && hashFiles('audit/sandbox/prefix-diff-summary.md') != ''
-        uses: marocchino/sticky-pull-request-comment@773744901bac0e8cbb5a0dc842800d45e9b2b405 # v2
-        with:
-          header: money-migration-prefix-diff-sandbox
-          path: audit/sandbox/prefix-diff-summary.md
-      - name: Clear stale sandbox PR comment on success
-        if: success() && github.event_name == 'pull_request'
-        uses: marocchino/sticky-pull-request-comment@773744901bac0e8cbb5a0dc842800d45e9b2b405 # v2
-        with:
-          header: money-migration-guard-sandbox
-          delete: true
       - name: Upload sandbox audit bundle
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -181,13 +166,23 @@ jobs:
   assert-money-migrations-applied-live:
     name: Assert money migrations applied in LIVE (pre-deploy gate)
     needs: assert-required-money-migrations
-    # Only run against live on main pushes or an explicit dispatch — never on PRs.
-    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.target_env == 'live') }}
+    # Production verification is always a protected, manual run from the trusted base branch.
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'live' }}
+    environment: verdant-production
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ""
+      PGDATABASE: ""
+      PGHOST: ""
+      PGPASSWORD: ""
+      PGPORT: ""
+      PGSERVICE: ""
+      PGSERVICEFILE: ""
+      PGUSER: ""
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Prepare audit dir
-        run: mkdir -p "${{ github.workspace }}/audit/live/logs"
+        run: mkdir -p "${{ github.workspace }}/audit/live"
       - name: Preflight — SUPABASE_DB_URL_LIVE configured
         uses: ./.github/actions/require-ci-secret
         with:
@@ -197,8 +192,8 @@ jobs:
           report-path: ${{ github.workspace }}/audit/live/report.md
           log-prefix: money-migration-preflight
           fix-steps-json: >-
-            ["1. Open **Settings → Secrets and variables → Actions** in this repository.",
-             "2. Add a repository secret named `SUPABASE_DB_URL_LIVE` whose value is the pooled Postgres connection string for the LIVE database (the same URL used by `supabase db push`).",
+            ["1. Open **Settings → Environments → verdant-production** in this repository.",
+             "2. Add an environment secret named `SUPABASE_DB_URL_LIVE` whose value is the pooled Postgres connection string for the LIVE database (the same URL used by `supabase db push`).",
              "3. Re-run this workflow. The gate will run `node scripts/assert-required-money-migrations-applied.mjs` against LIVE and confirm every money-critical migration is applied."]
           reason-lines-json: >-
             ["Why this is a hard failure: without the DB URL the deploy gate cannot",
@@ -231,18 +226,9 @@ jobs:
           REPORT_PATH: ${{ github.workspace }}/audit/live/report.md
           AUDIT_PATH: ${{ github.workspace }}/audit/live/applied-audit.json
           DIFF_PATH: ${{ github.workspace }}/audit/live/prefix-diff.txt
-        # Missing-secret handling lives in the "Preflight — SUPABASE_DB_URL_LIVE
-        # configured" step above (scripts/assert-money-migration-db-secret.mjs),
-        # which is the single source of truth for that failure mode.
+        # Missing-secret handling lives in the local require-ci-secret
+        # preflight above, which is the single source of truth for that failure.
         run: node scripts/assert-required-money-migrations-applied.mjs
-      - name: Collect edge-function log excerpts (live)
-        if: always()
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF_LIVE }}
-          TARGET_ENV: live
-          LOGS_DIR: ${{ github.workspace }}/audit/live/logs
-        run: node scripts/collect-money-edge-function-logs.mjs || true
       - name: Append report to workflow summary
         if: always() && hashFiles('audit/live/report.md') != ''
         run: cat audit/live/report.md >> "$GITHUB_STEP_SUMMARY"

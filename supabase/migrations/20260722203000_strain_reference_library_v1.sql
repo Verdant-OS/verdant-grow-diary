@@ -519,7 +519,7 @@ insert into public.cultivar_claims (
   cultivar_id, trait_key, value_min, value_max, value_text, value_jsonb,
   unit, context_jsonb, source_id, confidence, verified_at
 )
-select cultivar_id, 'reported_thc_pct', thc_pct_min, thc_pct_max, null, null::jsonb, '%',
+select cultivar_id, 'reported_thc_pct', thc_pct_min, thc_pct_max, null, null, '%',
   jsonb_build_object(
     'measurement_basis', 'source_reported_summary',
     'analytical_method', 'not_reported',
@@ -528,7 +528,7 @@ select cultivar_id, 'reported_thc_pct', thc_pct_min, thc_pct_max, null, null::js
   ), source_id, 'medium', '2026-07-22T00:00:00Z'::timestamptz
 from claim_seed where thc_pct_min is not null or thc_pct_max is not null
 union all
-select cultivar_id, 'chemotype', null, null, chemotype, null::jsonb, null,
+select cultivar_id, 'chemotype', null, null, chemotype, null, null,
   jsonb_build_object(
     'classification_basis', 'Source-reviewed named-cultivar prior; not a batch-specific laboratory panel.',
     'variability_note', 'Chemotype is a stronger prior than market indica/sativa labelling but remains source- and sample-dependent.'

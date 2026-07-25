@@ -37,6 +37,18 @@ describe("Quick Log authenticated route target contract", () => {
     expect(step![0]).toContain('getByTestId("quick-log-save").click()');
   });
 
+  it("keeps Watering on the structured Quick Log v2 handoff instead of the legacy Event select", () => {
+    const step = SMOKE.match(
+      /report\.run\(12,\s*"Watering opens the structured Quick Log"[\s\S]*?(?=report\.run\(13,)/,
+    );
+    expect(step, "step 12 structured Watering handoff assertion missing").toBeTruthy();
+    expect(step![0]).toMatch(/getByRole\("button",\s*\{\s*name:\s*\/\^watering\$\/i/);
+    expect(step![0]).toContain('getByTestId("qlv2-watering-form")');
+    expect(step![0]).toContain('getByLabel("Volume (ml)")');
+    expect(step![0]).not.toContain('locator("#quick-log-event-type")');
+    expect(step![0]).not.toMatch(/getByRole\("option",\s*\{\s*name:\s*\/\^watering/);
+  });
+
   it("never serializes intercepted request data into the smoke reports", () => {
     expect(SMOKE).not.toMatch(
       /report\.(?:run|skip)\([^\n]*(?:postData|requestBody|requestPayload|rawPayload)/,

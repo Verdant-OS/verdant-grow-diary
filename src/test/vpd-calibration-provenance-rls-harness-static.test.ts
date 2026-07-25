@@ -109,4 +109,23 @@ describe("VPD calibration provenance runtime RLS harness contract", () => {
     expect(harness).toMatch(/service role is used only for fixture setup, readback, and teardown/i);
     expect(harness).not.toMatch(/serviceRole[^\n]*expectInsertAllowed/i);
   });
+
+  it("requires an explicit client for every tent fixture", () => {
+    expect(harness).toMatch(
+      /async function seedTent\(\s*client:\s*SupabaseClient,\s*userId:\s*string,\s*label:\s*string/,
+    );
+    expect(harness).toMatch(/const \{ data, error \} = await client\s*[\r\n]+\s*\.from\("tents"\)/);
+    expect(harness).not.toMatch(
+      /const \{ data, error \} = await admin\s*[\r\n]+\s*\.from\("tents"\)\s*[\r\n]+\s*\.insert/,
+    );
+  });
+
+  it("seeds owner, cross-user, and cascade tents through their signed-in owners", () => {
+    expect(harness).toContain('await seedTent(ownerClient, owner.id, "owner tent")');
+    expect(harness).toContain('await seedTent(otherClient, other.id, "other tent")');
+    expect(harness).toContain('await seedTent(ownerClient, owner.id, "tent delete cascade")');
+    expect(harness).toMatch(
+      /seedTent\(\s*cascadeUserClient,\s*cascadeUser\.id,\s*"auth user delete cascade"/,
+    );
+  });
 });

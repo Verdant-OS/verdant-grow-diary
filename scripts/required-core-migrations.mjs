@@ -93,24 +93,49 @@ export const REQUIRED_CORE_SCHEMA = [
       "buildGrowScopedPlantsOrFilter emits a literal 'grow_id.eq.<uuid>' PostgREST filter, " +
       "so the grow-scoped Plants page hard-fails. Same migration as tents.grow_id.",
   },
-  {
+  // --- feeding_events: the COMPLETE set added by 20260612212323 ---------
+  //
+  // quicklog_save_event's feeding INSERT names all of these unconditionally,
+  // even when a value is null. Postgres resolves the whole column list before
+  // it looks at values, so ANY one of them being absent fails the entire
+  // INSERT with 42703 — every structured Feed save, not a degraded subset.
+  //
+  // Guarding a partial set would be worse than useless: it makes "green" mean
+  // "some of the columns this write path needs are present", which reads as a
+  // guarantee it does not provide. If a write path is worth guarding, guard
+  // its whole column list.
+  //
+  // event_id / user_id / volume_ml / ph are also in that INSERT but come from
+  // the base CREATE TABLE (20260518152526), not an ALTER — you do not get a
+  // half-created table from a partial apply, so they are not drift-prone in
+  // the way these eight are.
+  ...[
+    "line_id",
+    "products",
+    "ec_in",
+    "ec_out",
+    "runoff_ml",
+    "runoff_ph",
+    "runoff_ec",
+    "water_temp_c",
+  ].map((column) => ({
     table: "feeding_events",
-    column: "products",
+    column,
     migration: "20260612212323_568c55c7-3cd0-46f6-aef7-301e61e61362.sql",
     reason:
-      "Typed feeding writes send the products JSONB on every structured Feed save from " +
-      "Quick Log. Without it the typed feeding write path fails outright.",
-  },
+      `Named unconditionally in quicklog_save_event's feeding_events INSERT column list. ` +
+      "Absent → 42703 → every structured Feed save from Quick Log fails. Added by ALTER " +
+      "TABLE, so a partial or manual schema application can leave it behind.",
+  })),
   {
-    table: "feeding_events",
-    column: "line_id",
-    migration: "20260612212323_568c55c7-3cd0-46f6-aef7-301e61e61362.sql",
+    table: "quicklog_idempotency",
+    column: "request_hash",
+    migration: "20260720160000_quicklog_save_event_irrigation_boundary_hardening.sql",
     reason:
-      "quicklog_save_event's feeding_events INSERT names line_id unconditionally " +
-      "(COALESCE(v_feed->>'line_id','default')), and writeFeedingTypedEvent rejects with " +
-      "'line_id:missing' without one. Same migration as products — but a target that got " +
-      "products via a partial/manual apply and not line_id would pass a products-only " +
-      "check while every structured feed save still fails, so both columns are checked.",
+      "quicklog_save_event SELECTs request_hash on every valid call (its replay/conflict " +
+      "check) and UPDATEs it after every save. Absent → 42703 → every event-backed Quick " +
+      "Log save aborts, and the idempotency guard that prevents duplicate commits is the " +
+      "thing that breaks. Added by ALTER TABLE, so drift-prone.",
   },
   {
     table: "plants",

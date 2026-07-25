@@ -566,6 +566,8 @@ jobs:
         shell: bash
         env:
           FLAKE_SUMMARY_URL: ${{ steps.upload_flake_summary.outputs.artifact-url }}
+          HTML_REPORT_URL: ${{ steps.upload_playwright_report.outputs.artifact-url }}
+
           FLAKE_SUMMARY_PRESENT: ${{ steps.check_flake_summary.outputs.present }}
           FLAKE_SUMMARY_REASON: ${{ steps.check_flake_summary.outputs.reason }}
           PW_COUNTS_AVAILABLE: ${{ steps.summarize_flakes.outputs.pw_counts_available }}
@@ -596,9 +598,16 @@ jobs:
             if [ "${FLAKE_SUMMARY_PRESENT}" = "true" ] && [ -n "${FLAKE_SUMMARY_URL}" ]; then
               echo "**Download:** [\`quicklog-flake-summary-${ARTIFACT_SUFFIX}\`](${FLAKE_SUMMARY_URL}) — single-file artifact containing \`playwright-flake-summary.md\`."
               echo ""
+              if [ -n "${HTML_REPORT_URL}" ]; then
+                echo "**Playwright HTML report for the same run:** [\`quicklog-playwright-report-${ARTIFACT_SUFFIX}\`](${HTML_REPORT_URL}) — unzip and open \`index.html\` to browse the exact test tree the flake summary counts came from. _Uploaded as a sibling artifact rather than inside the flake summary zip (which holds only \`playwright-flake-summary.md\`)._"
+              else
+                echo "**Playwright HTML report for the same run:** _URL unavailable — check this run's Artifacts dropdown for \`quicklog-playwright-report-${ARTIFACT_SUFFIX}\` (unzip and open \`index.html\`). It is uploaded as a sibling artifact rather than inside the flake summary zip._"
+              fi
+              echo ""
               echo "**Raw workflow logs for this upload:** [run #${GITHUB_RUN_NUMBER} attempt ${GITHUB_RUN_ATTEMPT}](${RUN_ATTEMPT_URL}) — expand the \`${GITHUB_JOB}\` job, then the \`Upload playwright-flake-summary.md as artifact\` step for the exact upload output, or the \`Summarize Playwright flakes\` step for how the file was generated. Full run page: [${GITHUB_WORKFLOW} #${GITHUB_RUN_NUMBER}](${RUN_URL})."
               echo ""
             elif [ "${FLAKE_SUMMARY_PRESENT}" = "true" ]; then
+
               echo "**Download:** _Standalone artifact was uploaded, but its direct URL is unavailable in this Job Summary._"
               echo ""
               echo "Open this run's **Artifacts** dropdown (top-right of the run page) and download:"

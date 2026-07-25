@@ -120,6 +120,7 @@ async function lookupPriceExternalId(
       externalId,
       status: "fail",
       detail: `Paddle API ${res.status}: ${body.slice(0, 200)}`,
+      cause: { kind: "api_error", httpStatus: res.status },
     };
   }
   const payload = (await res.json()) as { data?: Array<{ id: string; status: string }> };
@@ -130,6 +131,7 @@ async function lookupPriceExternalId(
       externalId,
       status: "fail",
       detail: "no price entity found (checked active + archived)",
+      cause: { kind: "missing" },
     };
   }
   const active = rows.find((r) => r.status === "active");
@@ -139,6 +141,7 @@ async function lookupPriceExternalId(
       externalId,
       status: "fail",
       detail: `found ${rows.length} entry/entries but none are active (status: ${rows.map((r) => r.status).join(",")})`,
+      cause: { kind: "inactive" },
     };
   }
   return { env, externalId, status: "pass", detail: `active price ${active.id}` };

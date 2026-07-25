@@ -2,14 +2,17 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { gatewayFetch, type PaddleEnv } from "../_shared/paddle.ts";
 import { resolveServerBillingEnvironment } from "../_shared/unionEntitlementLookup.ts";
+import { PAID_PLAN_ALLOWLIST, PAID_PLAN_IDS } from "../_shared/lib/lib/paidPlanAllowlist.ts";
 
 /**
  * Resolve a paid plan id to its public Paddle price ID. Read-only; no DB
  * writes.
  *
  * Hardened contract (paid-launch gate):
- *  - Only the paid plan allowlist is accepted: pro_monthly, pro_annual,
- *    founder_lifetime. Anything else fails closed with a sanitized error.
+ *  - Only the paid plan allowlist is accepted (see PAID_PLAN_IDS —
+ *    single source of truth in src/lib/paidPlanAllowlist.ts, mirrored to
+ *    supabase/functions/_shared/lib/). Anything else fails closed with a
+ *    sanitized error.
  *  - Requires a verified signed-in user (auth.getUser on the caller's JWT).
  *    Anonymous price scraping through our gateway credentials is not a
  *    supported surface.
@@ -24,34 +27,15 @@ import { resolveServerBillingEnvironment } from "../_shared/unionEntitlementLook
  */
 
 /**
- * The only plans a price may be resolved for. Keep in lockstep with the
- * client planCatalog and the reconciliation RPC's plan checks.
- *
- * Every entry here MUST also appear as a key in SERVER_PRICE_CONFIG below,
- * and the corresponding PADDLE_PRICE_* env var must be populated before this
- * function is deployed to a live environment.
- */
-const PAID_PLAN_ALLOWLIST: ReadonlySet<string> = new Set([
-  "pro_monthly",
-  "pro_annual",
-  "craft_monthly",
-  "craft_annual",
-  "founder_lifetime",
-  // One-time AI credit packs. These are purchasable price ids (SKU-recognition
-  // seam) — NOT plans: they never enter planCatalog / KNOWN_PRICE_TO_PLAN, so a
-  // credit purchase can never resolve to a Pro entitlement.
-  "credit_pack_50",
-  "credit_pack_150",
-]);
-
-/**
  * Server-configured Paddle price IDs — the same source the webhook uses for
  * plan classification (paddle-webhook/index.ts PADDLE_PRICE_CONFIG). Populated
  * at cold-start from env so the map is built once per instance. An empty
  * string means the var is not configured; the gateway result is then rejected
  * rather than returned unvalidated.
  *
- * Keep keys in lockstep with PAID_PLAN_ALLOWLIST above.
+ * Keys MUST cover every entry in PAID_PLAN_IDS — a cold-start drift guard
+ * below throws if a plan id is added to the shared allowlist without a
+ * corresponding env-var wiring here.
  */
 const SERVER_PRICE_CONFIG: Readonly<Record<string, string>> = {
   pro_monthly: Deno.env.get("PADDLE_PRICE_PRO_MONTHLY") ?? "",
@@ -62,6 +46,16 @@ const SERVER_PRICE_CONFIG: Readonly<Record<string, string>> = {
   credit_pack_50: Deno.env.get("PADDLE_PRICE_CREDIT_PACK_50") ?? "",
   credit_pack_150: Deno.env.get("PADDLE_PRICE_CREDIT_PACK_150") ?? "",
 };
+
+// Cold-start drift guard: fail loudly if PAID_PLAN_IDS gains an entry that
+// SERVER_PRICE_CONFIG doesn't wire an env var for. Silent absence here would
+// otherwise fail-closed only after a checkout attempt.
+for (const id of PAID_PLAN_IDS) {
+  if (!(id in SERVER_PRICE_CONFIG)) {
+    throw new Error(`SERVER_PRICE_CONFIG missing env wiring for plan id: ${id}`);
+  }
+}
+
 
 function json(status: number, body: Record<string, unknown>): Response {
   return new Response(JSON.stringify(body), {

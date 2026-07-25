@@ -13,6 +13,7 @@
  */
 
 import { supabase } from "@/integrations/supabase/client";
+import { classifyPaddlePriceFailure } from "@/lib/paddlePriceAvailabilityRules";
 import {
   resolvePaddleCheckoutEnvironment,
   classifyPaddleToken,
@@ -23,15 +24,12 @@ import {
 } from "@/lib/paddleEnvironment";
 import { handlePaddleCheckoutEvent } from "@/lib/checkoutOverlaySession";
 
-const clientToken = import.meta.env.VITE_PAYMENTS_CLIENT_TOKEN as
-  | string
-  | undefined;
+const clientToken = import.meta.env.VITE_PAYMENTS_CLIENT_TOKEN as string | undefined;
 
 // Global `(window as any).Paddle` typing is already declared by src/pages/Upgrade.tsx
 // (loose PaddleGlobal shape). We access it via `(window as any).Paddle` here
 // to avoid conflicting declarations while calling methods not modeled there
 // (e.g. `Checkout.open({ customer, customData, settings })`).
-
 
 function currentHostname(): string | null {
   if (typeof window === "undefined") return null;
@@ -58,7 +56,6 @@ export function getPaddleEnvironment(): "sandbox" | "live" {
   return classifyPaddleToken(clientToken) === "live" ? "live" : "sandbox";
 }
 
-
 /**
  * Slice A — deterministic checkout gate. Returns `'sandbox' | 'live' |
  * 'unavailable'`. Callers MUST refuse to open checkout when the result is
@@ -81,15 +78,11 @@ export function getCheckoutUnavailableMessage(): string | null {
   if (env !== "unavailable") return null;
   // Distinguish only the loopback+live case, which has a specific
   // remediation. Every other unavailable case gets generic copy.
-  if (
-    classifyPaddleToken(clientToken) === "live" &&
-    isLoopbackHostname(currentHostname())
-  ) {
+  if (classifyPaddleToken(clientToken) === "live" && isLoopbackHostname(currentHostname())) {
     return CHECKOUT_UNAVAILABLE_LOCALHOST_MESSAGE;
   }
   return CHECKOUT_UNAVAILABLE_GENERIC_MESSAGE;
 }
-
 
 let paddleInitialized = false;
 let paddleInitPromise: Promise<void> | null = null;
@@ -115,9 +108,7 @@ export async function initializePaddle(): Promise<void> {
   }
 
   paddleInitPromise = new Promise<void>((resolve, reject) => {
-    const existing = document.querySelector<HTMLScriptElement>(
-      'script[data-paddle-loader="true"]',
-    );
+    const existing = document.querySelector<HTMLScriptElement>('script[data-paddle-loader="true"]');
     const onLoad = () => {
       try {
         const paddleJsEnv = env === "sandbox" ? "sandbox" : "production";
@@ -163,8 +154,17 @@ export async function getPaddlePriceId(priceId: string): Promise<string> {
     body: { priceId, environment: env },
   });
   if (error || !data?.paddleId) {
+    // A plan whose price is unconfigured, missing from the catalog, or sold
+    // out is not a fault the grower can retry away — it is that plan being
+    // unbuyable right now. Route it to the same calm inline state as other
+    // fail-closed checkout conditions rather than a destructive toast that
+    // also leaks the internal plan id. Anything unrecognised still throws
+    // loudly, so a real transport failure stays visible.
+    const failure = classifyPaddlePriceFailure({ invokeError: error, data });
+    if (failure.kind === "unavailable") {
+      throw new PaddleCheckoutUnavailableError(failure.message);
+    }
     throw new Error(`Failed to resolve price: ${priceId}`);
   }
   return data.paddleId as string;
 }
-

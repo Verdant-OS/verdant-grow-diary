@@ -163,7 +163,29 @@ export default function Pricing() {
   const [interestPlan, setInterestPlan] = useState<SubscriberInterestPlanId>(
     preselect.plan ?? (preselect.billing === "monthly" ? "pro_monthly" : "pro_annual"),
   );
-  const lastCheckoutPlanRef = useRef<SubscriberInterestPlanId>(interestPlan);
+  // The SKU of the most recent checkout attempt, which may be a credit pack.
+  // Typed as string rather than SubscriberInterestPlanId (= Exclude<PlanId,
+  // "free">) because packs are deliberately not plans, yet "Try again" must
+  // retry whatever the grower actually clicked. This replaces a
+  // SubscriberInterestPlanId-typed ref that pack clicks could not write —
+  // which is exactly how a failed pack retry became a subscription checkout.
+  // The launch-list form keeps reading `interestPlan` state, so a pack id can
+  // never reach SubscriberInterestForm, which collects interest in *plans*.
+  // Starts null on purpose: "no attempt has been made yet" must be
+  // distinguishable from "pro_annual was attempted". Seeding it with
+  // interestPlan would attribute an unattributed failure to whichever plan
+  // happens to be preselected.
+  const lastCheckoutSkuRef = useRef<string | null>(null);
+  // Which SKU the current blockedReason belongs to. A runtime checkout failure
+  // is specific to the SKU that failed and must not make the others inert.
+  const [blockedSku, setBlockedSku] = useState<string | null>(null);
+  // Mirror of interestPlan for the blocked-analytics effect below. Read via a
+  // ref rather than added to that effect's dep array: the effect must fire on
+  // blockedReason alone, and listing interestPlan would re-emit
+  // pricing_checkout_blocked every time the billing toggle changes the
+  // preselected plan.
+  const interestPlanRef = useRef<SubscriberInterestPlanId>(interestPlan);
+  interestPlanRef.current = interestPlan;
   const [recoveryRequested, setRecoveryRequested] = useState(false);
   const recoveryRef = useRef<HTMLElement>(null);
   const {
@@ -175,6 +197,35 @@ export default function Pricing() {
     dismissBlocked,
   } = usePaddleCheckout();
   const checkoutRecoveryReason = blockedReason ?? unavailableMessage;
+
+  /**
+   * Is THIS sku blocked?
+   *
+   * The two blocked states are not the same shape and must not be collapsed:
+   *
+   * - `unavailableMessage` means Paddle is not configured for this environment
+   *   at all. Nothing is purchasable, so it is correctly global.
+   * - `blockedReason` means one checkout attempt failed at the catalog seam.
+   *   That is specific to the SKU that failed.
+   *
+   * Collapsing them made a single failed credit-pack click — the SKU most
+   * likely to be unconfigured — relabel Pro and Craft as "Join the launch
+   * list" and make them inert, even though those prices resolve fine. It was
+   * also sticky: the early return below skips openCheckout, which is the only
+   * thing that clears blockedReason (usePaddleCheckout.ts:162), so the whole
+   * page stayed dead for the session unless the grower found the recovery
+   * panel's Dismiss button.
+   */
+  function isSkuBlocked(sku: string): boolean {
+    if (unavailableMessage) return true;
+    if (!blockedReason) return false;
+    // Unattributed failure — blocked, but we don't know which SKU it belongs
+    // to. Fail CLOSED and treat it as page-wide, matching the previous
+    // behaviour exactly. Narrowing only ever applies where the attribution is
+    // real, so this cannot turn a genuine block into a live button.
+    if (blockedSku === null) return true;
+    return blockedSku === sku;
+  }
   const checkoutTrustCopy = buildCheckoutTrustCopy({
     environment: checkoutEnvironment,
     blocked: Boolean(checkoutRecoveryReason),
@@ -187,11 +238,11 @@ export default function Pricing() {
     eventName: PricingAnalyticsName,
     source: string,
   ) {
-    lastCheckoutPlanRef.current = planId;
+    lastCheckoutSkuRef.current = planId;
     setInterestPlan(planId);
     setRecoveryRequested(true);
     trackPricingEvent(eventName, { source });
-    if (checkoutRecoveryReason) {
+    if (isSkuBlocked(planId)) {
       trackPricingEvent("pricing_checkout_blocked", {
         plan: planId,
         source,
@@ -206,8 +257,17 @@ export default function Pricing() {
   // plan-intent state and opens checkout for the pack SKU directly. Same
   // canonical checkout hook — this stays inside Pricing.tsx (checkout ownership).
   function handleBuyPack(sku: string) {
+    // Record the SKU and arm the recovery panel, exactly as handlePaidIntent
+    // does. Both were missing here. Without the first, "Try again" retried
+    // lastCheckoutPlanRef — which a pack click never writes — so it still held
+    // `interestPlan`, default pro_annual: a grower who clicked "Buy 50 credits"
+    // ($9) and pressed Try again was opened into a $99/yr subscription
+    // checkout. Without the second, the recovery panel rendered but was never
+    // scrolled to or focused, appearing far above the pack section in view.
+    lastCheckoutSkuRef.current = sku;
+    setRecoveryRequested(true);
     trackPricingEvent("pricing_cta_credit_pack_clicked", { source: "credit_pack", plan: sku });
-    if (checkoutRecoveryReason) {
+    if (isSkuBlocked(sku)) {
       trackPricingEvent("pricing_checkout_blocked", {
         plan: sku,
         source: "credit_pack",
@@ -230,9 +290,18 @@ export default function Pricing() {
   }, []);
 
   useEffect(() => {
-    if (!blockedReason) return;
+    if (!blockedReason) {
+      // openCheckout clears blockedReason on a fresh attempt; drop the SKU
+      // binding with it so a stale one can never keep a button labelled
+      // unavailable after the failure it described is gone.
+      setBlockedSku(null);
+      return;
+    }
+    // Bind the failure to the SKU that caused it. This runs after the attempt,
+    // so the ref still holds that attempt's SKU.
+    setBlockedSku(lastCheckoutSkuRef.current);
     trackPricingEvent("pricing_checkout_blocked", {
-      plan: lastCheckoutPlanRef.current,
+      plan: lastCheckoutSkuRef.current ?? interestPlanRef.current,
       reason: "runtime_failure",
     });
   }, [blockedReason]);
@@ -516,7 +585,7 @@ export default function Pricing() {
                 );
               }}
             >
-              {checkoutRecoveryReason ? (
+              {isSkuBlocked(billing === "annual" ? "pro_annual" : "pro_monthly") ? (
                 "Join the Pro launch list"
               ) : (
                 <>
@@ -561,7 +630,7 @@ export default function Pricing() {
                 );
               }}
             >
-              {checkoutRecoveryReason ? (
+              {isSkuBlocked(billing === "annual" ? "craft_annual" : "craft_monthly") ? (
                 "Join the Craft launch list"
               ) : (
                 <>
@@ -609,7 +678,7 @@ export default function Pricing() {
             >
               {founderSoldOut
                 ? "Founder Lifetime sold out"
-                : checkoutRecoveryReason
+                : isSkuBlocked("founder_lifetime")
                   ? "Join the Founder launch list"
                   : `Claim Founder Lifetime — $${PRICING.founder.price}`}
             </Button>
@@ -643,15 +712,20 @@ export default function Pricing() {
                   data-testid="pricing-checkout-retry"
                   disabled={checkoutLoading}
                   onClick={() => {
-                    const rawPlan = lastCheckoutPlanRef.current;
-                    const plan = sanitizeCheckoutRecoveryPlanSlug(rawPlan);
+                    // Retry the SKU that actually failed. This read used to be
+                    // lastCheckoutPlanRef, which credit-pack clicks never
+                    // wrote, so a failed "Buy 50 credits" ($9) retried its
+                    // initial value — interestPlan, default pro_annual — and
+                    // opened a $99/yr subscription checkout instead.
+                    const rawSku = lastCheckoutSkuRef.current ?? interestPlan;
+                    const plan = sanitizeCheckoutRecoveryPlanSlug(rawSku);
                     trackPricingEvent("pricing_checkout_recovery_retry", {
                       plan,
                       source: "recovery_panel",
                     });
                     trackFunnelEvent("checkout_recovery_retry", { plan });
                     dismissBlocked();
-                    void openCheckout({ priceId: rawPlan });
+                    void openCheckout({ priceId: rawSku });
                   }}
                 >
                   Try again
@@ -662,7 +736,7 @@ export default function Pricing() {
                   size="sm"
                   data-testid="pricing-checkout-choose-another-plan"
                   onClick={() => {
-                    const plan = sanitizeCheckoutRecoveryPlanSlug(lastCheckoutPlanRef.current);
+                    const plan = sanitizeCheckoutRecoveryPlanSlug(lastCheckoutSkuRef.current ?? interestPlan);
                     trackPricingEvent("pricing_checkout_recovery_choose_another_plan", {
                       plan,
                       source: "recovery_panel",
@@ -686,7 +760,7 @@ export default function Pricing() {
                   size="sm"
                   data-testid="pricing-checkout-dismiss"
                   onClick={() => {
-                    const plan = sanitizeCheckoutRecoveryPlanSlug(lastCheckoutPlanRef.current);
+                    const plan = sanitizeCheckoutRecoveryPlanSlug(lastCheckoutSkuRef.current ?? interestPlan);
                     trackPricingEvent("pricing_checkout_recovery_dismissed", {
                       plan,
                       source: "recovery_panel",
@@ -757,7 +831,7 @@ export default function Pricing() {
                 data-testid={`pricing-cta-${pack.sku}`}
                 onClick={() => handleBuyPack(pack.sku)}
               >
-                {checkoutRecoveryReason
+                {isSkuBlocked(pack.sku)
                   ? "Checkout unavailable"
                   : `Buy ${pack.credits} credits — $${pack.priceUsd}`}
               </Button>

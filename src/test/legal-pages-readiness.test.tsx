@@ -57,7 +57,9 @@ function renderAt(path: string) {
 describe("/terms disclosures", () => {
   it("loads and names the seller Matthew Tyler Cheek", () => {
     renderAt("/terms");
-    expect(screen.getByRole("heading", { name: /terms of service/i, level: 1 })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: /terms of service/i, level: 1 }),
+    ).toBeInTheDocument();
     expect(screen.getAllByText(/Matthew Tyler Cheek/).length).toBeGreaterThan(0);
   });
 
@@ -175,11 +177,19 @@ describe("redirect aliases", () => {
     });
   }
 
-  it("App.tsx wires all four aliases as Navigate redirects", () => {
-    expect(APP_SRC).toMatch(/path="\/terms-of-service" element=\{<Navigate to="\/terms" replace/);
-    expect(APP_SRC).toMatch(/path="\/privacy-policy" element=\{<Navigate to="\/privacy" replace/);
-    expect(APP_SRC).toMatch(/path="\/refunds" element=\{<Navigate to="\/refund" replace/);
-    expect(APP_SRC).toMatch(/path="\/refund-policy" element=\{<Navigate to="\/refund" replace/);
+  it("App.tsx wires all four aliases through location-preserving redirects", () => {
+    for (const [alias, canonical] of [
+      ["/terms-of-service", "/terms"],
+      ["/privacy-policy", "/privacy"],
+      ["/refunds", "/refund"],
+      ["/refund-policy", "/refund"],
+    ] as const) {
+      expect(APP_SRC).toMatch(
+        new RegExp(
+          `path="${alias}"\\s+element=\\{<RouteAliasRedirect\\s+to="${canonical}"\\s*/>\\}`,
+        ),
+      );
+    }
   });
 
   it("App.tsx mounts /terms /privacy /refund as public routes", () => {
@@ -250,7 +260,9 @@ describe("forbidden claims + secret scan", () => {
       const hits = [...f.matchAll(/sell(s|ing)? cannabis/gi)];
       for (const m of hits) {
         const before = f.slice(Math.max(0, m.index! - 60), m.index!);
-        expect(/not|never/i.test(before), `non-negated sales claim: …${before}[${m[0]}]`).toBe(true);
+        expect(/not|never/i.test(before), `non-negated sales claim: …${before}[${m[0]}]`).toBe(
+          true,
+        );
       }
     }
   });

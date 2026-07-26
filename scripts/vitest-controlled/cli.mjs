@@ -29,7 +29,13 @@ import {
   CONFIG_FINGERPRINT_SCHEMA_VERSION,
 } from "./fingerprint.mjs";
 import { REPORTER_SCHEMA_VERSION } from "./reporter.mjs";
-import { summarizeRun, renderMarkdown, aggregateShards, readProgress } from "./summarizer.mjs";
+import {
+  summarizeRun,
+  renderMarkdown,
+  aggregateShards,
+  readProgress,
+  isTerminalFileStatus,
+} from "./summarizer.mjs";
 
 // Run-record schema history:
 //   v1..v2 — legacy pre-workspace-fingerprint runs.
@@ -264,6 +270,7 @@ export async function runBatch({
   runDir,
   runRecord,
   batchIndex,
+  attempt = 0,
   batchFiles,
   batchDeadlineMs,
   vitestBin = "bunx",
@@ -290,6 +297,7 @@ export async function runBatch({
     VERDANT_CTRL_SHARD_INDEX: String(runRecord.shardIndex),
     VERDANT_CTRL_SHARD_TOTAL: String(runRecord.shardTotal),
     VERDANT_CTRL_BATCH_INDEX: String(batchIndex),
+    VERDANT_CTRL_ATTEMPT: String(attempt),
     VERDANT_CTRL_REPO_ROOT: repoRoot,
   };
   const logStream = fs.openSync(rawLog, "a");
@@ -303,7 +311,14 @@ export async function runBatch({
     });
   } catch (err) {
     fs.closeSync(logStream);
-    return { batchIndex, exitCode: null, signal: null, timedOut: false, error: String(err) };
+    return {
+      batchIndex,
+      attempt,
+      exitCode: null,
+      signal: null,
+      timedOut: false,
+      error: String(err),
+    };
   }
   let timedOut = false;
   const timer = batchDeadlineMs
@@ -329,12 +344,45 @@ export async function runBatch({
   } catch {}
   return {
     batchIndex,
+    attempt,
     exitCode: result.code,
     signal: result.signal ?? null,
     timedOut,
     durationMs: Date.now() - startedAt,
     rawLog,
   };
+}
+
+function appendProgressEvent(progressFile, event) {
+  const fd = fs.openSync(progressFile, "a");
+  try {
+    fs.writeSync(fd, `${JSON.stringify(event)}\n`);
+    fs.fsyncSync(fd);
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+function markBatchAttemptStarted({ runDir, runRecord, batchIndex, attempt, files }) {
+  const progressFile = path.join(runDir, "progress.jsonl");
+  const startedAt = new Date().toISOString();
+  for (const file of files) {
+    appendProgressEvent(progressFile, {
+      event: "file",
+      schema: REPORTER_SCHEMA_VERSION,
+      runId: runRecord.runId,
+      shardIndex: runRecord.shardIndex,
+      shardTotal: runRecord.shardTotal,
+      batchIndex,
+      attempt,
+      file,
+      status: "incomplete",
+      counts: { passed: 0, failed: 0, skipped: 0, todo: 0 },
+      failedTests: [],
+      firstError: null,
+      startedAt,
+    });
+  }
 }
 
 /** Public: run a fresh shard (subcommand `run`). */
@@ -376,6 +424,7 @@ export async function commandRun(opts, deps = {}) {
     spawnImpl,
     filesFilter: null,
     resumeMode: "fresh",
+    attempt: 0,
   });
 }
 
@@ -481,10 +530,38 @@ export async function commandResume(opts, deps = {}) {
     });
   }
   const batches = splitIntoBatches(shardFiles, runRecord.batchSize);
+  const priorSummary = summarizeRun(runDir);
+  if (priorSummary.corruptArtifacts?.length) {
+    throw Object.assign(
+      new Error(
+        `Refusing to resume: run metadata contains ${priorSummary.corruptArtifacts.length} corrupt artifact(s)`,
+      ),
+      { code: EXIT.CONFIG_ERROR },
+    );
+  }
+  const priorFailedBatchIndexes = new Set(priorSummary.failedBatchIndexes ?? []);
+  for (const batchIndex of priorFailedBatchIndexes) {
+    if (batchIndex < 0 || batchIndex >= batches.length) {
+      throw Object.assign(
+        new Error(`Refusing to resume: failed batch index ${batchIndex} is outside the run plan`),
+        { code: EXIT.CONFIG_ERROR },
+      );
+    }
+  }
+  const requiresFullRevalidation =
+    !priorSummary.finalMetadataValid ||
+    ((priorSummary.exitCode !== 0 || priorSummary.batchProcessFailed) &&
+      priorFailedBatchIndexes.size === 0);
+  const failedBatchFiles = new Set(
+    requiresFullRevalidation
+      ? shardFiles
+      : [...priorFailedBatchIndexes].flatMap((batchIndex) => batches[batchIndex]),
+  );
   const {
     files: doneMap,
     conflicts,
     corruptLines,
+    maxAttempt,
   } = readProgress(path.join(runDir, "progress.jsonl"));
   if (conflicts.length || corruptLines.length) {
     throw Object.assign(
@@ -494,7 +571,8 @@ export async function commandResume(opts, deps = {}) {
       { code: EXIT.CONFIG_ERROR },
     );
   }
-  const incompleteFilter = (file) => !doneMap.has(file);
+  const incompleteFilter = (file) =>
+    failedBatchFiles.has(file) || !isTerminalFileStatus(doneMap.get(file)?.status);
   return executeBatches(
     { runId: runRecord.runId, runDir, runRecord, shardFiles, batches },
     {
@@ -504,6 +582,7 @@ export async function commandResume(opts, deps = {}) {
       spawnImpl,
       filesFilter: incompleteFilter,
       resumeMode: "resume",
+      attempt: maxAttempt + 1,
     },
   );
 }
@@ -594,14 +673,19 @@ export async function commandRerunFailed(opts, deps = {}) {
     spawnImpl,
     filesFilter: null,
     resumeMode: "rerun-failed",
+    attempt: 0,
   });
 }
 
 async function executeBatches(
   state,
-  { repoRoot, batchDeadlineMs, vitestBin, spawnImpl, filesFilter, resumeMode },
+  { repoRoot, batchDeadlineMs, vitestBin, spawnImpl, filesFilter, resumeMode, attempt = 0 },
 ) {
   const { runDir, runRecord, batches } = state;
+  // A resumed artifact may still carry an old marker. Clear it before any
+  // work so a crash or failed retry cannot leave a stale clean-completion
+  // claim behind.
+  fs.rmSync(path.join(runDir, "completed"), { force: true });
   let interrupted = false;
   const onSig = () => {
     interrupted = true;
@@ -613,11 +697,22 @@ async function executeBatches(
     if (interrupted) break;
     const files = filesFilter ? batches[i].filter(filesFilter) : batches[i];
     if (!files.length) continue;
+    // Establish the current attempt for every selected file before the
+    // child starts. If the reporter omits a callback, the file remains
+    // incomplete instead of inheriting an older terminal result.
+    markBatchAttemptStarted({
+      runDir,
+      runRecord,
+      batchIndex: i,
+      attempt,
+      files,
+    });
     const result = await runBatch({
       repoRoot,
       runDir,
       runRecord,
       batchIndex: i,
+      attempt,
       batchFiles: files,
       batchDeadlineMs,
       vitestBin,
@@ -640,23 +735,37 @@ async function executeBatches(
     pre.corruptLines.length > 0 ||
     pre.duplicateManifestFiles.length > 0 ||
     (pre.extraneousFiles && pre.extraneousFiles.length > 0);
+  const batchProcessFailed = batchResults.some(
+    (result) =>
+      result.exitCode !== 0 || result.timedOut || result.signal != null || Boolean(result.error),
+  );
   const cleanCompletion =
-    !interrupted && pre.totals.failedFiles === 0 && pre.totals.incompleteFiles === 0 && !invalid;
+    !interrupted &&
+    !batchProcessFailed &&
+    pre.totals.failedFiles === 0 &&
+    pre.totals.incompleteFiles === 0 &&
+    !invalid;
   const exit = interrupted
     ? EXIT.INTERRUPTED
     : invalid
       ? EXIT.CONFIG_ERROR
-      : pre.totals.failedFiles > 0 || pre.totals.incompleteFiles > 0
+      : batchProcessFailed || pre.totals.failedFiles > 0 || pre.totals.incompleteFiles > 0
         ? EXIT.TEST_FAILURES
         : EXIT.GREEN;
-  if (cleanCompletion) {
-    fs.writeFileSync(path.join(runDir, "completed"), new Date().toISOString());
-  }
   fs.writeFileSync(path.join(runDir, "exit-code"), String(exit));
   fs.writeFileSync(
     path.join(runDir, "run-meta"),
-    JSON.stringify({ resumeMode, batchResults, interrupted, exit }, null, 2),
+    JSON.stringify(
+      { resumeMode, attempt, batchResults, batchProcessFailed, interrupted, exit },
+      null,
+      2,
+    ),
   );
+  // The completion marker is the final durable claim. Never expose it
+  // before both exit-code and run-meta have been persisted.
+  if (cleanCompletion) {
+    fs.writeFileSync(path.join(runDir, "completed"), new Date().toISOString());
+  }
   // Regenerate summary now that the marker (if any) exists so status is authoritative.
   const summary = writeSummaryArtifacts(runDir);
   return { runDir, exit, summary, interrupted, batchResults };

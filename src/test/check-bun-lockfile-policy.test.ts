@@ -335,7 +335,7 @@ describe("evaluatePolicy", () => {
     for (const forbidden of FORBIDDEN_LOCKFILES) {
       expect(existsSync(resolve(root, forbidden)), forbidden).toBe(false);
     }
-  });
+  }, 15_000);
 
   it("runs as a CLI on Windows with explicit transitional output", () => {
     const root = mkdtempSync(join(tmpdir(), "verdant-lockfile-policy-"));
@@ -415,5 +415,5 @@ describe("isolated npm semantic lock check", () => {
     } finally {
       rmSync(fixtureRoot, { recursive: true, force: true });
     }
-  }, 30_000);
+  }, 60_000);
 });

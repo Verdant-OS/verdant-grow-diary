@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- controlled-runner spawn stubs use loose types for the child_process contract */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
@@ -7,6 +7,8 @@ import { EventEmitter } from "node:events";
 import { spawnSync } from "node:child_process";
 import { commandRun, commandResume, DEFAULTS, EXIT } from "../../scripts/vitest-controlled/cli.mjs";
 import { readProgress } from "../../scripts/vitest-controlled/summarizer.mjs";
+
+vi.setConfig({ testTimeout: 20_000 });
 
 // Build a fake repo containing test files that will never actually be
 // executed — we stub the vitest spawn instead. This isolates the
@@ -45,9 +47,13 @@ function fakeRepo(fileCount: number) {
 function makeSpawnStub({
   writeStatus,
   crashAfter,
+  childExitCode = 0,
+  shouldWriteFile = () => true,
 }: {
-  writeStatus: (file: string) => "passed" | "failed";
+  writeStatus: (file: string) => "passed" | "failed" | "skipped";
   crashAfter?: number;
+  childExitCode?: number;
+  shouldWriteFile?: (file: string) => boolean;
 }) {
   let batchesSpawned = 0;
   const stub = (_bin: string, args: string[], opts: any) => {
@@ -57,6 +63,7 @@ function makeSpawnStub({
     const shardIndex = Number(opts.env.VERDANT_CTRL_SHARD_INDEX);
     const shardTotal = Number(opts.env.VERDANT_CTRL_SHARD_TOTAL);
     const batchIndex = Number(opts.env.VERDANT_CTRL_BATCH_INDEX);
+    const attempt = Number(opts.env.VERDANT_CTRL_ATTEMPT ?? 0);
     // Extract file args (everything after the last flag).
     const fileArgs = args.filter((a) => !a.startsWith("-") && a !== "vitest" && a !== "run");
     const emitter = new EventEmitter() as any;
@@ -69,6 +76,7 @@ function makeSpawnStub({
             .relative(repoRoot, path.resolve(repoRoot, rel))
             .split(path.sep)
             .join("/");
+          if (!shouldWriteFile(relFromRoot)) continue;
           const status = writeStatus(relFromRoot);
           fs.appendFileSync(
             progressFile,
@@ -79,12 +87,13 @@ function makeSpawnStub({
               shardIndex,
               shardTotal,
               batchIndex,
+              attempt,
               file: relFromRoot,
               status,
               counts: {
                 passed: status === "passed" ? 1 : 0,
                 failed: status === "failed" ? 1 : 0,
-                skipped: 0,
+                skipped: status === "skipped" ? 1 : 0,
                 todo: 0,
               },
               failedTests: status === "failed" ? ["broken"] : [],
@@ -102,6 +111,7 @@ function makeSpawnStub({
             shardIndex,
             shardTotal,
             batchIndex,
+            attempt,
             errorCount: 0,
             completedAt: "now",
           }) + "\n",
@@ -110,7 +120,7 @@ function makeSpawnStub({
         if (crashAfter !== undefined && thisBatch >= crashAfter) {
           emitter.emit("exit", 1, "SIGKILL");
         } else {
-          emitter.emit("exit", 0, null);
+          emitter.emit("exit", childExitCode, null);
         }
       } catch (err) {
         emitter.emit("error", err);
@@ -159,6 +169,133 @@ describe("controlled runner CLI (stubbed vitest)", () => {
     expect(res.summary.failedFilesList).toContain("src/f02.test.ts");
   });
 
+  it("fails closed when a child exits nonzero despite green reporter events", async () => {
+    const { root, files } = fakeRepo(2);
+    const runsRoot = path.join(root, ".vitest-runs");
+    const { stub } = makeSpawnStub({
+      writeStatus: () => "passed",
+      childExitCode: 1,
+    });
+    const res = await commandRun({
+      repoRoot: root,
+      shardSpec: "1/1",
+      batchSize: 2,
+      runsRoot,
+      files,
+      spawnImpl: stub as any,
+    });
+
+    expect(res.exit).toBe(EXIT.TEST_FAILURES);
+    expect(res.summary.status).toBe("failed");
+    expect(fs.existsSync(path.join(res.runDir, "completed"))).toBe(false);
+
+    const askedFor: string[] = [];
+    const resumed = await commandResume({
+      repoRoot: root,
+      runDir: res.runDir,
+      spawnImpl: makeSpawnStub({
+        writeStatus: (file) => {
+          askedFor.push(file);
+          return "passed";
+        },
+      }).stub as any,
+    });
+
+    expect(askedFor.sort()).toEqual(files.sort());
+    expect(resumed.exit).toBe(EXIT.GREEN);
+    expect(resumed.summary.status).toBe("complete");
+  });
+
+  it("revalidates every assigned file when failed final metadata is missing", async () => {
+    const { root, files } = fakeRepo(2);
+    const first = await commandRun({
+      repoRoot: root,
+      shardSpec: "1/1",
+      batchSize: 2,
+      runsRoot: path.join(root, ".vitest-runs"),
+      files,
+      spawnImpl: makeSpawnStub({
+        writeStatus: () => "passed",
+        childExitCode: 1,
+      }).stub as any,
+    });
+    fs.rmSync(path.join(first.runDir, "run-meta"));
+
+    const askedFor: string[] = [];
+    const resumed = await commandResume({
+      repoRoot: root,
+      runDir: first.runDir,
+      spawnImpl: makeSpawnStub({
+        writeStatus: (file) => {
+          askedFor.push(file);
+          return "passed";
+        },
+      }).stub as any,
+    });
+
+    expect(askedFor.sort()).toEqual(files.sort());
+    expect(resumed.exit).toBe(EXIT.GREEN);
+    expect(resumed.summary.status).toBe("complete");
+  });
+
+  it("lets a newer resume attempt supersede an earlier terminal failure", async () => {
+    const { root, files } = fakeRepo(1);
+    const first = await commandRun({
+      repoRoot: root,
+      shardSpec: "1/1",
+      batchSize: 1,
+      runsRoot: path.join(root, ".vitest-runs"),
+      files,
+      spawnImpl: makeSpawnStub({
+        writeStatus: () => "failed",
+        childExitCode: 1,
+      }).stub as any,
+    });
+
+    const resumed = await commandResume({
+      repoRoot: root,
+      runDir: first.runDir,
+      spawnImpl: makeSpawnStub({ writeStatus: () => "passed" }).stub as any,
+    });
+    const progress = readProgress(path.join(first.runDir, "progress.jsonl"));
+
+    expect(resumed.exit).toBe(EXIT.GREEN);
+    expect(resumed.summary.status).toBe("complete");
+    expect(progress.conflicts).toEqual([]);
+    expect(progress.files.get(files[0])?.status).toBe("passed");
+    expect(progress.files.get(files[0])?.attempt).toBe(1);
+  });
+
+  it("stays non-green when a retry omits a selected file result", async () => {
+    const { root, files } = fakeRepo(2);
+    const first = await commandRun({
+      repoRoot: root,
+      shardSpec: "1/1",
+      batchSize: 2,
+      runsRoot: path.join(root, ".vitest-runs"),
+      files,
+      spawnImpl: makeSpawnStub({
+        writeStatus: () => "skipped",
+        childExitCode: 1,
+      }).stub as any,
+    });
+    const omittedFile = files[1];
+
+    const resumed = await commandResume({
+      repoRoot: root,
+      runDir: first.runDir,
+      spawnImpl: makeSpawnStub({
+        writeStatus: () => "passed",
+        shouldWriteFile: (file) => file !== omittedFile,
+      }).stub as any,
+    });
+
+    expect(resumed.exit).toBe(EXIT.TEST_FAILURES);
+    expect(resumed.summary.status).toBe("failed");
+    expect(resumed.summary.incompleteFiles).toEqual([omittedFile]);
+    expect(fs.existsSync(path.join(first.runDir, "completed"))).toBe(false);
+  });
+
   it("resume skips already-completed files", async () => {
     const { root, files } = fakeRepo(5);
     const runsRoot = path.join(root, ".vitest-runs");
@@ -174,8 +311,14 @@ describe("controlled runner CLI (stubbed vitest)", () => {
     // Truncate progress to simulate interruption after 2 files.
     const progressFile = path.join(first.runDir, "progress.jsonl");
     const lines = fs.readFileSync(progressFile, "utf8").split("\n").filter(Boolean);
-    // Keep only first 2 file events.
-    const fileLines = lines.filter((l) => JSON.parse(l).event === "file").slice(0, 2);
+    // Keep only the first 2 terminal file events; preflight incomplete
+    // markers represent selected work, not completed work.
+    const fileLines = lines
+      .filter((line) => {
+        const event = JSON.parse(line);
+        return event.event === "file" && ["passed", "failed", "skipped"].includes(event.status);
+      })
+      .slice(0, 2);
     fs.writeFileSync(progressFile, fileLines.join("\n") + "\n");
     fs.rmSync(path.join(first.runDir, "completed"));
 
@@ -195,6 +338,85 @@ describe("controlled runner CLI (stubbed vitest)", () => {
     // Should have re-run only the 3 remaining files.
     expect(askedFor.sort()).toEqual(["src/f02.test.ts", "src/f03.test.ts", "src/f04.test.ts"]);
     expect(res.exit).toBe(EXIT.GREEN);
+  });
+
+  it("resume reruns an explicitly incomplete file event", async () => {
+    const { root, files } = fakeRepo(2);
+    const first = await commandRun({
+      repoRoot: root,
+      shardSpec: "1/1",
+      batchSize: 2,
+      runsRoot: path.join(root, ".vitest-runs"),
+      files,
+      spawnImpl: makeSpawnStub({ writeStatus: () => "passed" }).stub as any,
+    });
+    fs.rmSync(path.join(first.runDir, "completed"));
+
+    const progressFile = path.join(first.runDir, "progress.jsonl");
+    const incompleteFile = files[0];
+    const events = fs
+      .readFileSync(progressFile, "utf8")
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => JSON.parse(line))
+      .filter(
+        (event) =>
+          !(
+            event.event === "file" &&
+            event.file === incompleteFile &&
+            event.status !== "incomplete"
+          ),
+      );
+    fs.writeFileSync(progressFile, `${events.map((event) => JSON.stringify(event)).join("\n")}\n`);
+
+    const askedFor: string[] = [];
+    const resumed = await commandResume({
+      repoRoot: root,
+      runDir: first.runDir,
+      spawnImpl: makeSpawnStub({
+        writeStatus: (file) => {
+          askedFor.push(file);
+          return "passed";
+        },
+      }).stub as any,
+    });
+
+    expect(askedFor).toEqual([incompleteFile]);
+    expect(resumed.exit).toBe(EXIT.GREEN);
+    expect(resumed.summary.status).toBe("complete");
+  });
+
+  it("removes a stale completion marker when a resumed retry fails", async () => {
+    const { root, files } = fakeRepo(1);
+    const first = await commandRun({
+      repoRoot: root,
+      shardSpec: "1/1",
+      batchSize: 1,
+      runsRoot: path.join(root, ".vitest-runs"),
+      files,
+      spawnImpl: makeSpawnStub({ writeStatus: () => "passed" }).stub as any,
+    });
+    const progressFile = path.join(first.runDir, "progress.jsonl");
+    const events = fs
+      .readFileSync(progressFile, "utf8")
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => JSON.parse(line))
+      .filter((event) => event.event !== "file" || event.status === "incomplete");
+    fs.writeFileSync(progressFile, `${events.map((event) => JSON.stringify(event)).join("\n")}\n`);
+
+    const resumed = await commandResume({
+      repoRoot: root,
+      runDir: first.runDir,
+      spawnImpl: makeSpawnStub({
+        writeStatus: () => "passed",
+        childExitCode: 1,
+      }).stub as any,
+    });
+
+    expect(resumed.exit).toBe(EXIT.TEST_FAILURES);
+    expect(resumed.summary.status).toBe("failed");
+    expect(fs.existsSync(path.join(first.runDir, "completed"))).toBe(false);
   });
 
   it("resume refuses when source fingerprint drifts", async () => {

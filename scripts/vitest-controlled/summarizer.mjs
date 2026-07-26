@@ -12,17 +12,22 @@ import { computeAssignmentFingerprint, computeShardFingerprint } from "./fingerp
 
 export const SUMMARY_SCHEMA_VERSION = 2;
 
+export function isTerminalFileStatus(status) {
+  return status === "passed" || status === "failed" || status === "skipped";
+}
+
 /** Read progress.jsonl and reduce to a per-file map + batch events. */
 export function readProgress(progressFile) {
   const files = new Map();
   const batches = [];
   const conflicts = [];
   const corruptLines = [];
+  let maxAttempt = -1;
   let raw;
   try {
     raw = fs.readFileSync(progressFile, "utf8");
   } catch (err) {
-    if (err.code === "ENOENT") return { files, batches, conflicts, corruptLines };
+    if (err.code === "ENOENT") return { files, batches, conflicts, corruptLines, maxAttempt };
     throw err;
   }
   const lines = raw.split("\n");
@@ -37,24 +42,42 @@ export function readProgress(progressFile) {
       continue;
     }
     if (ev.event === "file") {
+      const attempt = Number.isSafeInteger(ev.attempt) && ev.attempt >= 0 ? ev.attempt : 0;
+      maxAttempt = Math.max(maxAttempt, attempt);
       const prev = files.get(ev.file);
       if (!prev) {
         files.set(ev.file, ev);
+      } else if (attempt > (Number.isSafeInteger(prev.attempt) ? prev.attempt : 0)) {
+        // Progress is append-only across resume attempts. A newer attempt
+        // deliberately supersedes the prior terminal result for this file.
+        files.set(ev.file, ev);
+      } else if (attempt < (Number.isSafeInteger(prev.attempt) ? prev.attempt : 0)) {
+        continue;
+      } else if (!isTerminalFileStatus(prev.status) && isTerminalFileStatus(ev.status)) {
+        // A resumed terminal result supersedes an explicitly provisional
+        // event. The inverse is ignored so late provisional callbacks can
+        // never erase an authoritative result.
+        files.set(ev.file, ev);
+      } else if (isTerminalFileStatus(prev.status) && !isTerminalFileStatus(ev.status)) {
+        continue;
       } else if (
         prev.status === ev.status &&
         prev.counts?.passed === ev.counts?.passed &&
         prev.counts?.failed === ev.counts?.failed &&
-        prev.counts?.skipped === ev.counts?.skipped
+        prev.counts?.skipped === ev.counts?.skipped &&
+        prev.counts?.todo === ev.counts?.todo
       ) {
         // identical duplicate — ignore
       } else {
         conflicts.push({ file: ev.file, previous: prev, next: ev });
       }
     } else if (ev.event === "batch-end") {
+      const attempt = Number.isSafeInteger(ev.attempt) && ev.attempt >= 0 ? ev.attempt : 0;
+      maxAttempt = Math.max(maxAttempt, attempt);
       batches.push(ev);
     }
   }
-  return { files, batches, conflicts, corruptLines };
+  return { files, batches, conflicts, corruptLines, maxAttempt };
 }
 
 function loadJson(p) {
@@ -66,10 +89,28 @@ function loadJson(p) {
   }
 }
 
+function loadOptionalJson(p) {
+  try {
+    return { value: JSON.parse(fs.readFileSync(p, "utf8")), error: null };
+  } catch (err) {
+    if (err.code === "ENOENT") return { value: null, error: null };
+    return {
+      value: null,
+      error: {
+        file: path.basename(p),
+        reason: err instanceof SyntaxError ? "invalid_json" : "unreadable",
+      },
+    };
+  }
+}
+
 export function summarizeRun(runDir, { authoritativeManifest, expectedFiles } = {}) {
   const runJson = loadJson(path.join(runDir, "run.json"));
   const manifestJson = loadJson(path.join(runDir, "manifest.json"));
   const shardFilesJson = loadJson(path.join(runDir, "shard-files.json"));
+  const runMetaArtifact = loadOptionalJson(path.join(runDir, "run-meta"));
+  const runMeta = runMetaArtifact.value;
+  const corruptArtifacts = runMetaArtifact.error ? [runMetaArtifact.error] : [];
   const manifest = authoritativeManifest ?? manifestJson;
   const progressFile = path.join(runDir, "progress.jsonl");
   const { files, batches, conflicts, corruptLines } = readProgress(progressFile);
@@ -81,12 +122,66 @@ export function summarizeRun(runDir, { authoritativeManifest, expectedFiles } = 
       return null;
     }
   })();
-
   const expected =
     expectedFiles ??
     (Array.isArray(shardFilesJson) ? shardFilesJson : null) ??
     manifest?.files ??
     [...files.keys()].sort();
+  const failedBatchResults = Array.isArray(runMeta?.batchResults)
+    ? runMeta.batchResults.filter(
+        (result) =>
+          result?.exitCode !== 0 ||
+          result?.timedOut ||
+          result?.signal != null ||
+          Boolean(result?.error),
+      )
+    : [];
+  const plannedBatchCount =
+    Number.isInteger(runJson?.batchSize) && runJson.batchSize > 0
+      ? Math.ceil(expected.length / runJson.batchSize)
+      : null;
+  const failedBatchIndexIsValid = (index) =>
+    Number.isInteger(index) &&
+    index >= 0 &&
+    (plannedBatchCount == null || index < plannedBatchCount);
+  const failedBatchIndexes = failedBatchResults
+    .map((result) => result.batchIndex)
+    .filter(failedBatchIndexIsValid);
+  const failedBatchIndexesValid = failedBatchIndexes.length === failedBatchResults.length;
+  if (!failedBatchIndexesValid) {
+    corruptArtifacts.push({
+      file: "run-meta",
+      reason: "invalid_failed_batch_index",
+    });
+  }
+  const derivedBatchProcessFailed = failedBatchResults.length > 0;
+  const batchProcessFailed = runMeta?.batchProcessFailed === true || derivedBatchProcessFailed;
+  const batchFailureMetadataConsistent =
+    runMeta?.batchProcessFailed == null ||
+    (typeof runMeta.batchProcessFailed === "boolean" &&
+      runMeta.batchProcessFailed === derivedBatchProcessFailed);
+  const finalMetadataValid = Boolean(
+    Number.isInteger(exitCode) &&
+    runMeta &&
+    Number.isInteger(runMeta.exit) &&
+    runMeta.exit === exitCode &&
+    Array.isArray(runMeta.batchResults) &&
+    typeof runMeta.interrupted === "boolean" &&
+    batchFailureMetadataConsistent &&
+    failedBatchIndexesValid &&
+    (runMeta.exit !== 0 || (!runMeta.interrupted && !batchProcessFailed)),
+  );
+  if (
+    completedMarker &&
+    !finalMetadataValid &&
+    !corruptArtifacts.some((artifact) => artifact.file === "final-metadata")
+  ) {
+    corruptArtifacts.push({
+      file: "final-metadata",
+      reason: "missing_or_inconsistent",
+    });
+  }
+
   const expectedSet = new Set(expected);
   const extraneous = [...files.keys()].filter((f) => !expectedSet.has(f));
   const perFile = expected.map((rel) => {
@@ -140,8 +235,22 @@ export function summarizeRun(runDir, { authoritativeManifest, expectedFiles } = 
   })();
 
   let status;
-  if (conflicts.length || corruptLines.length || duplicatesInManifest.length || extraneous.length) {
+  if (
+    conflicts.length ||
+    corruptLines.length ||
+    corruptArtifacts.length ||
+    duplicatesInManifest.length ||
+    extraneous.length
+  ) {
     status = "invalid";
+  } else if (runMeta?.interrupted || exitCode === 130) {
+    status = "interrupted";
+  } else if (
+    (exitCode != null && exitCode !== 0) ||
+    batchProcessFailed ||
+    failedBatchIndexes.length > 0
+  ) {
+    status = "failed";
   } else if (!completedMarker) {
     status = "interrupted";
   } else if (totals.failedFiles > 0 || totals.incompleteFiles > 0) {
@@ -174,6 +283,10 @@ export function summarizeRun(runDir, { authoritativeManifest, expectedFiles } = 
       : null,
     status,
     exitCode,
+    runMetaPresent: runMeta != null,
+    finalMetadataValid,
+    batchProcessFailed,
+    failedBatchIndexes,
     completed: completedMarker,
     shardFileCount: expected.length,
     // The assigned-file list is persisted so aggregate validation can
@@ -187,6 +300,7 @@ export function summarizeRun(runDir, { authoritativeManifest, expectedFiles } = 
     extraneousFiles: extraneous,
     conflicts,
     corruptLines,
+    corruptArtifacts,
     duplicateManifestFiles: duplicatesInManifest,
     batchCount: batches.length,
     rawLogPath: fs.existsSync(path.join(runDir, "raw", "batch-000.log"))
@@ -398,6 +512,13 @@ export function aggregateShards(shardSummaries, { manifest } = {}) {
   const failedFiles = [];
   const incompleteFiles = [];
   for (const s of shardSummaries) {
+    if (s.batchProcessFailed || s.failedBatchIndexes?.length) {
+      addReason("test_failure", {
+        source: "batch_process",
+        shardIndex: s.shardIndex,
+        failedBatchIndexes: s.failedBatchIndexes ?? [],
+      });
+    }
     for (const r of s.perFile) {
       if (seen.has(r.file)) {
         duplicates.push({ file: r.file, shards: [seen.get(r.file), s.shardIndex] });
@@ -427,7 +548,7 @@ export function aggregateShards(shardSummaries, { manifest } = {}) {
       }
     }
     if (s.status === "invalid") {
-      if (s.conflicts?.length || s.corruptLines?.length) {
+      if (s.conflicts?.length || s.corruptLines?.length || s.corruptArtifacts?.length) {
         addReason("corrupt_artifact", { shardIndex: s.shardIndex });
       }
       if (s.extraneousFiles?.length) {

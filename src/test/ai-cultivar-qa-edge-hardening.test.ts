@@ -20,7 +20,10 @@ describe("ai-cultivar-qa Edge hardening", () => {
     expect(GROUNDING).toMatch(/SERVER_CULTIVAR_QA_CONTEXTS/);
 
     for (const slug of VERDANT_CULTIVAR_SLUGS) {
-      expect(GROUNDING).toContain(JSON.stringify(slug));
+      const escapedSlug = slug.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      expect(GROUNDING).toMatch(
+        new RegExp(`(?:^|[,{])\\s*(?:["']${escapedSlug}["']|${escapedSlug})\\s*:`, "m"),
+      );
     }
   });
 

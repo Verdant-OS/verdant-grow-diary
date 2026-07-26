@@ -943,7 +943,7 @@ export default function Pricing() {
           >
             {founderSoldOut
               ? "Founder Lifetime sold out"
-              : checkoutRecoveryReason
+              : isSkuBlocked("founder_lifetime")
                 ? "Join the Founder launch list"
                 : "Claim Founder Lifetime"}
           </Button>
@@ -1184,11 +1184,14 @@ export default function Pricing() {
           <Button
             size="lg"
             disabled={checkoutLoading}
+            data-testid="pricing-cta-pro-footer"
             onClick={() => {
               handlePaidIntent("pro_monthly", "pricing_cta_pro_monthly_clicked", "footer");
             }}
           >
-            {checkoutRecoveryReason ? "Join the Pro launch list" : "Upgrade to Pro"}
+            {/* Must match the SKU this button actually opens (pro_monthly —
+                the footer CTA does not follow the billing toggle). */}
+            {isSkuBlocked("pro_monthly") ? "Join the Pro launch list" : "Upgrade to Pro"}
           </Button>
         </div>
       </section>

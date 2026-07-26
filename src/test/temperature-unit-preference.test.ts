@@ -11,10 +11,15 @@
  *  - Only temperature is converted — caller decides; no other metric
  *    paths touched here.
  */
-import { describe, it, expect, beforeEach } from "vitest";
-import { clearLocalStorageForTest, setLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  clearLocalStorageForTest,
+  ensureLocalStorageForTest,
+  setLocalStorageItemForTest,
+} from "./helpers/localStorageTestHelper";
 import {
   DEFAULT_TEMPERATURE_UNIT,
+  TEMPERATURE_UNIT_CHANGE_EVENT,
   TEMPERATURE_UNIT_OPTIONS,
   celsiusToFahrenheit,
   fahrenheitToCelsius,
@@ -33,6 +38,10 @@ beforeEach(() => {
   }
 });
 
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 describe("temperatureUnitPreference — defaults and persistence", () => {
   it("defaults to fahrenheit", () => {
     expect(DEFAULT_TEMPERATURE_UNIT).toBe("fahrenheit");
@@ -40,7 +49,7 @@ describe("temperatureUnitPreference — defaults and persistence", () => {
   });
 
   it("persists and reloads the user's celsius choice", () => {
-    saveTemperatureUnitPreference("celsius");
+    expect(saveTemperatureUnitPreference("celsius")).toBe(true);
     expect(loadTemperatureUnitPreference()).toBe("celsius");
   });
 
@@ -51,8 +60,39 @@ describe("temperatureUnitPreference — defaults and persistence", () => {
 
   it("clear restores the default", () => {
     saveTemperatureUnitPreference("celsius");
-    clearTemperatureUnitPreference();
+    expect(clearTemperatureUnitPreference()).toBe(true);
     expect(loadTemperatureUnitPreference()).toBe("fahrenheit");
+  });
+
+  it("reports a failed write and does not dispatch a change event", () => {
+    const storage = ensureLocalStorageForTest();
+    const storagePrototype = Object.getPrototypeOf(storage) as Storage;
+    vi.spyOn(storagePrototype, "setItem").mockImplementation(() => {
+      throw new Error("storage blocked");
+    });
+    const dispatch = vi.spyOn(window, "dispatchEvent");
+
+    expect(saveTemperatureUnitPreference("celsius")).toBe(false);
+    expect(loadTemperatureUnitPreference()).toBe("fahrenheit");
+    expect(dispatch).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: TEMPERATURE_UNIT_CHANGE_EVENT }),
+    );
+  });
+
+  it("reports a failed reset, preserves the preference, and does not dispatch", () => {
+    expect(saveTemperatureUnitPreference("celsius")).toBe(true);
+    const storage = ensureLocalStorageForTest();
+    const storagePrototype = Object.getPrototypeOf(storage) as Storage;
+    vi.spyOn(storagePrototype, "removeItem").mockImplementation(() => {
+      throw new Error("storage blocked");
+    });
+    const dispatch = vi.spyOn(window, "dispatchEvent");
+
+    expect(clearTemperatureUnitPreference()).toBe(false);
+    expect(loadTemperatureUnitPreference()).toBe("celsius");
+    expect(dispatch).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: TEMPERATURE_UNIT_CHANGE_EVENT }),
+    );
   });
 
   it("resolveTemperatureUnitPreference normalizes unknown values", () => {
@@ -63,10 +103,7 @@ describe("temperatureUnitPreference — defaults and persistence", () => {
   });
 
   it("exposes the expected option set with fahrenheit recommended", () => {
-    expect(TEMPERATURE_UNIT_OPTIONS.map((o) => o.key)).toEqual([
-      "fahrenheit",
-      "celsius",
-    ]);
+    expect(TEMPERATURE_UNIT_OPTIONS.map((o) => o.key)).toEqual(["fahrenheit", "celsius"]);
     expect(TEMPERATURE_UNIT_OPTIONS[0].recommended).toBe(true);
   });
 });
@@ -89,9 +126,7 @@ describe("formatTemperatureDisplay — rendering and rounding", () => {
 
   it("honors an explicit celsius display unit override", () => {
     expect(formatTemperatureDisplay(20, { unit: "celsius" })).toBe("20°C");
-    expect(formatTemperatureDisplay(20.46, { unit: "celsius", digits: 1 })).toBe(
-      "20.5°C",
-    );
+    expect(formatTemperatureDisplay(20.46, { unit: "celsius", digits: 1 })).toBe("20.5°C");
   });
 
   it("supports persisted preference: switching to celsius affects display only", () => {
@@ -105,20 +140,16 @@ describe("formatTemperatureDisplay — rendering and rounding", () => {
     // Value is already °F; preference is fahrenheit → no conversion.
     expect(formatTemperatureDisplay(75, { valueUnit: "F" })).toBe("75°F");
     // Value is already °F; preference is celsius → convert ONCE.
-    expect(
-      formatTemperatureDisplay(75, { valueUnit: "F", unit: "celsius", digits: 1 }),
-    ).toBe("23.9°C");
+    expect(formatTemperatureDisplay(75, { valueUnit: "F", unit: "celsius", digits: 1 })).toBe(
+      "23.9°C",
+    );
     // Value is canonical °C; preference is fahrenheit → convert ONCE.
     // 24°C → 75.2°F; not 167°F.
-    expect(formatTemperatureDisplay(24, { unit: "fahrenheit", digits: 1 })).toBe(
-      "75.2°F",
-    );
+    expect(formatTemperatureDisplay(24, { unit: "fahrenheit", digits: 1 })).toBe("75.2°F");
   });
 
   it("returns 'Unknown unit' for ambiguous sources (never guesses)", () => {
-    expect(formatTemperatureDisplay(25, { valueUnit: "unknown" })).toBe(
-      "Unknown unit",
-    );
+    expect(formatTemperatureDisplay(25, { valueUnit: "unknown" })).toBe("Unknown unit");
   });
 
   it("returns 'Unknown' for null / undefined / NaN / Infinity (no NaN°F leaks)", () => {
@@ -130,9 +161,7 @@ describe("formatTemperatureDisplay — rendering and rounding", () => {
   });
 
   it("supports custom unavailable copy", () => {
-    expect(
-      formatTemperatureDisplay(null, { unavailableLabel: "—" }),
-    ).toBe("—");
+    expect(formatTemperatureDisplay(null, { unavailableLabel: "—" })).toBe("—");
   });
 
   it("rounds .4 / .5 / .6 boundaries consistently at 0 digits", () => {

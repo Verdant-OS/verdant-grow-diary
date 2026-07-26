@@ -98,6 +98,7 @@ const PLANT = {
   stage: "flower",
   started_at: "2026-07-01T00:00:00.000Z",
   health: "healthy",
+  plant_type: "unknown",
   photo_url: null,
   last_note: null,
   is_archived: false,
@@ -1077,15 +1078,12 @@ async function expectSelectorCardinality(
 }
 
 async function assertRouteFitsViewport(page: Page, route: BrowserRoute) {
-  await page.goto(route.path, { waitUntil: "domcontentloaded" });
-  await expect(page.getByRole("heading", { level: 1, name: route.heading })).toBeVisible();
-
+  await page.goto(route.path, { waitUntil: "commit" });
   const mainSelector = route.mainSelector ?? "main#main-content";
-  await expect(page.locator(mainSelector)).toHaveCount(1);
-  if (mainSelector === "main#main-content") {
-    await expect(page.locator("main main")).toHaveCount(0);
-  }
-
+  // Wait for the route-specific fixture signal before shared chrome or
+  // headings. Grow Detail and Timeline intentionally share the same grow
+  // heading, so heading-first readiness can observe stale DOM from the prior
+  // route while the next navigation is still settling.
   const readyCount = await expectSelectorCardinality(
     page,
     route.readySelector,
@@ -1097,6 +1095,12 @@ async function assertRouteFitsViewport(page: Page, route: BrowserRoute) {
       readyCount,
       `${route.path} fixture must render its expected ready-selector collection`,
     ).toBe(route.fixtureExpectedReadyCount);
+  }
+
+  await expect(page.getByRole("heading", { level: 1, name: route.heading })).toBeVisible();
+  await expect(page.locator(mainSelector)).toHaveCount(1);
+  if (mainSelector === "main#main-content") {
+    await expect(page.locator("main main")).toHaveCount(0);
   }
   await waitForStableLayout(page, mainSelector, route.path);
 

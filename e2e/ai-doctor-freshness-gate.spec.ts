@@ -1,5 +1,5 @@
 // Playwright boundary proof for the AI Doctor 48h snapshot-freshness gate
-// on Plant Detail's "Ask Doctor" launch dialog.
+// on Plant Detail's canonical context + cautious live-review surfaces.
 //
 // SAFETY:
 // - One route boundary intercepts every Supabase /auth/v1/** and /rest/v1/**
@@ -10,19 +10,18 @@
 //   authenticated surface never relies on bundled mock/demo fallback data.
 //
 // GATE SEMANTICS UNDER TEST (the load-bearing part):
-// - FRESH  (snapshot <= 48h old + recent activity) → no stale explanation,
-//   Continue is an enabled link.
+// - FRESH  (snapshot <= 48h old + recent activity) → fresh evidence is
+//   present and the explicit review action is enabled.
 // - STALE  (snapshot > 48h old but within the 7d window, activity present)
-//   → readiness "partial": the stale explanation renders AND Continue
-//   STAYS ENABLED. The 48h cutoff downgrades confidence; it does not by
-//   itself block the flow.
-// - BLOCKED (no activity, no snapshot) → readiness "insufficient": the
-//   Continue link is replaced by a disabled button + blocked explanation.
+//   → fresh evidence is absent but the review action STAYS ENABLED. The 48h
+//   cutoff downgrades confidence; it does not by itself block the flow.
+// - BLOCKED (no activity, no snapshot) → readiness "insufficient" and the
+//   paid/costly live-review action is not rendered.
 //
 // TIME CONTROL: repo convention — fixture timestamps are computed relative
 // to Date.now() at test time with ≥30min margins on both sides of the 48h
-// boundary, and boundary exactness is asserted through the dialog's
-// data-cutoff-at / data-snapshot-at ISO attributes (locale-independent).
+// boundary. Exact inclusive boundary arithmetic remains pinned by the pure
+// ai-doctor-snapshot-freshness-boundary unit contract.
 import { test, expect, type Page } from "@playwright/test";
 
 const MOCKED_PROJECT = "chromium-mocked";
@@ -45,8 +44,6 @@ const FAKE_USER = {
 const GROW_ID = "11111111-1111-4111-8111-111111111111";
 const TENT_ID = "22222222-2222-4222-8222-222222222222";
 const PLANT_ID = "33333333-3333-4333-8333-333333333333";
-const PLANT_REVIEW_HREF = `/plants/${PLANT_ID}?tentId=${TENT_ID}#plant-ai-doctor-review`;
-
 const GROW_ROW = {
   id: GROW_ID,
   name: "Freshness Proof Grow",
@@ -97,6 +94,7 @@ const CURRENT_AGREEMENT_ROWS = [
 
 const HOUR_MS = 3_600_000;
 const FRESH_WINDOW_MS = 48 * HOUR_MS;
+const ROUTE_READY_TIMEOUT_MS = 90_000;
 
 // Requests this presentation-only surface must never make.
 const FORBIDDEN_REQUEST_RE = /(openai|anthropic|api\.groq|\/functions\/v1\/)/i;
@@ -351,21 +349,32 @@ function expectIsolatedReadOnlyTraffic(traffic: TrafficAudit) {
   expect(traffic.pageErrors, "uncaught page errors").toEqual([]);
 }
 
-async function openDoctorLaunchDialog(page: Page) {
-  await page.goto(`/plants/${PLANT_ID}`, { waitUntil: "domcontentloaded" });
+async function openCanonicalAiReview(page: Page) {
+  // Vite may still be transforming the lazy Plant Detail chunk on the first
+  // cold navigation in a serialized mocked run. `commit` proves the local
+  // document responded; the route-specific disclosure below is the actual
+  // readiness contract. This avoids coupling correctness to DOMContentLoaded
+  // while still failing on a real root-boundary/app error.
+  await page.goto(`/plants/${PLANT_ID}`, { waitUntil: "commit" });
   const aiDisclosureTrigger = page.getByTestId("plant-detail-disclosure-ai-trigger");
+  const rootError = page.getByRole("heading", {
+    level: 1,
+    name: "This page ran into an unexpected error",
+  });
+  await expect(
+    aiDisclosureTrigger.or(rootError),
+    "Plant Detail must reach its AI disclosure or expose the root error boundary",
+  ).toBeVisible({ timeout: ROUTE_READY_TIMEOUT_MS });
+  await expect(rootError, "Plant Detail must not render the root error boundary").toHaveCount(0);
   await expect(aiDisclosureTrigger).toBeVisible();
   if ((await aiDisclosureTrigger.getAttribute("aria-expanded")) !== "true") {
     await aiDisclosureTrigger.click();
   }
   await expect(page.getByTestId("plant-detail-disclosure-ai-content")).toBeVisible();
 
-  const trigger = page.getByTestId("plant-detail-doctor-launch-trigger");
-  await expect(trigger).toBeVisible();
   await expect(page.getByText("No real plants yet")).toHaveCount(0);
   await expect(page.getByTestId("agreement-reconsent-gate")).toHaveCount(0);
-  await trigger.click();
-  await expect(page.getByTestId("plant-detail-doctor-launch-dialog")).toBeVisible();
+  await expect(page.getByTestId("plant-ai-doctor-context-panel")).toBeVisible();
 }
 
 async function installFreshnessHarness(page: Page, diaryRows: readonly DiaryFixtureRow[]) {
@@ -377,98 +386,66 @@ async function installFreshnessHarness(page: Page, diaryRows: readonly DiaryFixt
 
 test.describe("AI Doctor snapshot freshness gate (mocked, 48h boundary)", () => {
   test.beforeEach(() => {
+    // The first mocked Plant Detail visit can include cold Vite transforms.
+    // Route readiness remains bounded above and every app/page error still
+    // fails the scenario; this only gives the lazy chunk time to become ready.
+    test.setTimeout(135_000);
     test.skip(
       test.info().project.name !== MOCKED_PROJECT,
       `freshness boundary proof runs once, under the ${MOCKED_PROJECT} project`,
     );
   });
 
-  test("FRESH: snapshot 47h30m old → no stale explanation, Continue enabled", async ({ page }) => {
+  test("FRESH: snapshot 47h30m old → fresh evidence and review action", async ({ page }) => {
     const traffic = await installFreshnessHarness(
       page,
       buildDiaryFixture(Date.now(), FRESH_WINDOW_MS - 30 * 60_000),
     );
-    await openDoctorLaunchDialog(page);
+    await openCanonicalAiReview(page);
 
-    await expect(
-      page.getByTestId("plant-detail-doctor-launch-snapshot-stale-explanation"),
-    ).toHaveCount(0);
-    await expect(page.getByTestId("plant-detail-doctor-launch-continue-blocked")).toHaveCount(0);
+    const context = page.getByTestId("plant-ai-doctor-context-panel");
+    await expect(context.locator('[data-code="recent-manual-sensor-snapshot"]')).toBeVisible();
+    await expect(context.locator('[data-code="fresh-manual-sensor-snapshot"]')).toBeVisible();
 
-    const cont = page.getByTestId("plant-detail-doctor-launch-continue");
-    await expect(cont).toBeVisible();
-    await expect(cont).toHaveAttribute("href", PLANT_REVIEW_HREF);
-    await expect(
-      page.getByTestId("plant-detail-doctor-launch-log-readiness-to-diary"),
-    ).toHaveAttribute("data-snapshot-freshness", "fresh");
+    const review = page.getByTestId("plant-ai-doctor-live-review");
+    await expect(review).toBeVisible();
+    await expect(review).toHaveAttribute("data-readiness", "partial");
+    await expect(page.getByTestId("plant-ai-doctor-live-review-start")).toBeEnabled();
 
     expectIsolatedReadOnlyTraffic(traffic);
   });
 
-  test("STALE: snapshot 48h30m old → stale explanation renders, Continue STAYS enabled", async ({
+  test("STALE: snapshot 48h30m old → fresh evidence absent, review STAYS enabled", async ({
     page,
   }) => {
     const fixtureNowMs = Date.now();
-    const snapshotIso = new Date(fixtureNowMs - (FRESH_WINDOW_MS + 30 * 60_000)).toISOString();
     const traffic = await installFreshnessHarness(
       page,
       buildDiaryFixture(fixtureNowMs, FRESH_WINDOW_MS + 30 * 60_000),
     );
-    await openDoctorLaunchDialog(page);
+    await openCanonicalAiReview(page);
 
-    const staleBox = page.getByTestId("plant-detail-doctor-launch-snapshot-stale-explanation");
-    await expect(staleBox).toBeVisible();
-    await expect(staleBox).toHaveAttribute("role", "status");
-    await expect(staleBox).toHaveAttribute("data-snapshot-at", snapshotIso);
-    await expect(
-      page.getByTestId("plant-detail-doctor-launch-snapshot-stale-sentence"),
-    ).toContainText(/48h freshness cutoff/);
+    const context = page.getByTestId("plant-ai-doctor-context-panel");
+    await expect(context.locator('[data-code="recent-manual-sensor-snapshot"]')).toBeVisible();
+    await expect(context.locator('[data-code="fresh-manual-sensor-snapshot"]')).toHaveCount(0);
 
-    // Boundary arithmetic, drift-proof: the cutoff the dialog computed is
-    // (render-time now - 48h). It must sit AFTER the seeded snapshot (the
-    // definition of stale) and within a few minutes of our fixture-time
-    // cutoff (render happens seconds after fixture build).
-    const cutoffAt = await staleBox.getAttribute("data-cutoff-at");
-    expect(cutoffAt).not.toBeNull();
-    const cutoffMs = Date.parse(cutoffAt as string);
-    expect(Number.isFinite(cutoffMs)).toBe(true);
-    expect(cutoffMs).toBeGreaterThan(Date.parse(snapshotIso));
-    expect(Math.abs(cutoffMs - (fixtureNowMs - FRESH_WINDOW_MS))).toBeLessThan(5 * 60_000);
-
-    // THE gate semantics: stale-but-recent snapshot + activity → partial →
-    // Continue remains an enabled link; no blocked button, no blocked box.
-    await expect(page.getByTestId("plant-detail-doctor-launch-continue-blocked")).toHaveCount(0);
-    await expect(page.getByTestId("plant-detail-doctor-launch-blocked-explanation")).toHaveCount(0);
-    const cont = page.getByTestId("plant-detail-doctor-launch-continue");
-    await expect(cont).toBeVisible();
-    await expect(cont).toHaveAttribute("href", PLANT_REVIEW_HREF);
-    await expect(
-      page.getByTestId("plant-detail-doctor-launch-log-readiness-to-diary"),
-    ).toHaveAttribute("data-snapshot-freshness", "stale");
+    // Stale-but-recent snapshot + activity remains partial, so the grower
+    // can still start a cautious review.
+    await expect(context).toHaveAttribute("data-readiness", "partial");
+    await expect(page.getByTestId("plant-ai-doctor-live-review-start")).toBeEnabled();
 
     expectIsolatedReadOnlyTraffic(traffic);
   });
 
-  test("BLOCKED: no activity and no snapshot → disabled Continue + blocked explanation", async ({
-    page,
-  }) => {
+  test("BLOCKED: no activity and no snapshot → no live-review action", async ({ page }) => {
     const traffic = await installFreshnessHarness(page, []);
-    await openDoctorLaunchDialog(page);
+    await openCanonicalAiReview(page);
 
-    await expect(page.getByTestId("plant-detail-doctor-launch-continue")).toHaveCount(0);
-    const blocked = page.getByTestId("plant-detail-doctor-launch-continue-blocked");
-    await expect(blocked).toBeVisible();
-    await expect(blocked).toBeDisabled();
-    await expect(blocked).toHaveAttribute("aria-disabled", "true");
-
-    const explanation = page.getByTestId("plant-detail-doctor-launch-blocked-explanation");
-    await expect(explanation).toBeVisible();
-    await expect(explanation).toHaveAttribute("role", "status");
-    const codes = await page
-      .getByTestId("plant-detail-doctor-launch-blocked-list")
-      .locator("li")
-      .evaluateAll((lis) => lis.map((li) => li.getAttribute("data-blocking-code")));
-    expect(codes).toEqual(["recent-timeline-activity", "recent-manual-sensor-snapshot"]);
+    const context = page.getByTestId("plant-ai-doctor-context-panel");
+    await expect(context).toHaveAttribute("data-readiness", "insufficient");
+    await expect(context.locator('[data-code="recent-timeline-activity"]')).toBeVisible();
+    await expect(context.locator('[data-code="recent-manual-sensor-snapshot"]')).toBeVisible();
+    await expect(page.getByTestId("plant-ai-doctor-live-review")).toHaveCount(0);
 
     expectIsolatedReadOnlyTraffic(traffic);
   });

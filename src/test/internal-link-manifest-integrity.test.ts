@@ -13,6 +13,8 @@ import { readdirSync, readFileSync } from "node:fs";
 import { extname, join, relative, resolve } from "node:path";
 
 import { APP_ROUTES } from "@/lib/appRouteManifest";
+import { GLOBAL_SEARCH_ITEMS } from "@/lib/globalSearchItems";
+import { LABS_NAVIGATION_DESTINATIONS } from "@/lib/growerNavigationRules";
 
 const REPO_ROOT = resolve(__dirname, "../..");
 const SOURCE_ROOTS = [
@@ -48,6 +50,12 @@ const STATIC_ASSET_EXTENSIONS = new Set([
 interface LiteralInternalLink {
   source: string;
   line: number;
+  target: string;
+}
+
+interface DataDrivenInternalLink {
+  source: string;
+  label: string;
   target: string;
 }
 
@@ -107,18 +115,55 @@ function extractLiteralInternalLinks(): LiteralInternalLink[] {
   return links;
 }
 
-describe("literal internal links", () => {
-  it(
-    "all resolve to mounted application routes",
-    () => {
-      const links = extractLiteralInternalLinks();
-      const broken = links
-        .filter((link) => !resolvesToMountedRoute(link.target))
-        .map((link) => `${link.source}:${link.line} -> ${link.target}`);
+function getDataDrivenInternalLinks(): DataDrivenInternalLink[] {
+  return [
+    ...GLOBAL_SEARCH_ITEMS.map((item) => ({
+      source: "GLOBAL_SEARCH_ITEMS",
+      label: item.label,
+      target: item.to,
+    })),
+    ...LABS_NAVIGATION_DESTINATIONS.map((item) => ({
+      source: "LABS_NAVIGATION_DESTINATIONS",
+      label: item.label,
+      target: item.to,
+    })),
+  ];
+}
 
-      expect(broken, `Broken literal internal links:\n${broken.join("\n")}`).toEqual([]);
-      expect(links.length).toBeGreaterThan(50);
-    },
-    15_000,
-  );
+describe("literal internal links", () => {
+  it("all resolve to mounted application routes", () => {
+    const links = extractLiteralInternalLinks();
+    const broken = links
+      .filter((link) => !resolvesToMountedRoute(link.target))
+      .map((link) => `${link.source}:${link.line} -> ${link.target}`);
+
+    expect(broken, `Broken literal internal links:\n${broken.join("\n")}`).toEqual([]);
+    expect(links.length).toBeGreaterThan(50);
+  }, 15_000);
+});
+
+describe("data-driven internal links", () => {
+  it("all Global Search and grower-navigation destinations resolve to mounted routes", () => {
+    const links = getDataDrivenInternalLinks();
+    const broken = links
+      .filter((link) => !resolvesToMountedRoute(link.target))
+      .map((link) => `${link.source} '${link.label}' -> ${link.target}`);
+
+    expect(broken, `Broken data-driven internal links:\n${broken.join("\n")}`).toEqual([]);
+    expect(links).toHaveLength(GLOBAL_SEARCH_ITEMS.length + LABS_NAVIGATION_DESTINATIONS.length);
+  });
+
+  it("resolves concrete destinations against parameterized manifest patterns", () => {
+    const parameterizedRoutes = APP_ROUTES.filter((entry) => entry.path.includes(":"));
+
+    for (const route of parameterizedRoutes) {
+      const concreteDestination = route.path.replace(/:[^/]+/g, "route-integrity-id");
+      expect(
+        resolvesToMountedRoute(concreteDestination),
+        `${concreteDestination} must resolve against ${route.path}`,
+      ).toBe(true);
+    }
+
+    expect(parameterizedRoutes.length).toBeGreaterThan(0);
+  });
 });

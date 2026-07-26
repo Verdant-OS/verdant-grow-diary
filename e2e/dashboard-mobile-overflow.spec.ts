@@ -42,6 +42,7 @@ const FAKE_PLANT = {
   stage: "veg",
   started_at: "2020-01-01T00:00:00.000Z",
   health: "healthy",
+  plant_type: "unknown",
   photo_url: null,
   last_note: null,
   is_archived: false,
@@ -194,7 +195,9 @@ test.describe("Dashboard mobile overflow closure", () => {
 
   test("stacks Daily Grow Check rows inside a 320px viewport", async ({ page }) => {
     await openDashboard(page, { width: 320, height: 568 });
-    await expect(page.getByTestId("dashboard-daily-grow-check-panel-row-actions").first()).toBeVisible();
+    await expect(
+      page.getByTestId("dashboard-daily-grow-check-panel-row-actions").first(),
+    ).toBeVisible();
 
     expectNoOverflow(await readOverflowMetrics(page));
   });

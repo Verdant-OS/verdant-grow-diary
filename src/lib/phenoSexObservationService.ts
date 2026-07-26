@@ -13,6 +13,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { phenoDb } from "@/integrations/supabase/phenoTables";
 import { normalizeSexObservation, type PhenoSexObservation } from "@/lib/phenoSexObservationModel";
+import { PhenoEvidenceReadError } from "@/lib/phenoEvidenceReadError";
 
 export interface SexObservationRow {
   readonly plantId: string;
@@ -93,7 +94,7 @@ export async function listLatestSexObservationsForHunt(
       // derivation correct within the cap, and the explicit bound stops an
       // unbounded full-history read of an append-only table.
       .limit(2000);
-    if (legacy.error || !legacy.data) return {};
+    if (legacy.error || !legacy.data) throw new PhenoEvidenceReadError("sex_observations");
     data = legacy.data;
   }
   const map: Record<string, SexObservationRow> = {};

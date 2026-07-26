@@ -46,6 +46,11 @@ const FORBIDDEN_REASON_TOKENS = [
   "environment_unavailable",
 ];
 
+const CURRENT_AGREEMENT_ROWS = [
+  { agreement_type: "terms", version: "2026-07-13" },
+  { agreement_type: "privacy", version: "2026-07-13" },
+];
+
 async function seedFakeSession(page: Page) {
   await page.addInitScript(
     ({ key, user }) => {
@@ -91,6 +96,9 @@ async function readAnalyticsEvents(page: Page): Promise<CapturedAnalyticsEvent[]
   );
 }
 
+async function countAnalyticsEvents(page: Page, name: string): Promise<number> {
+  return (await readAnalyticsEvents(page)).filter((event) => event.name === name).length;
+}
 
 async function mockSupabaseAndPaddle(page: Page) {
   // Auth: identity checks succeed; everything else answers empty JSON.
@@ -106,10 +114,15 @@ async function mockSupabaseAndPaddle(page: Page) {
     await route.fulfill({ status: 200, contentType: "application/json", body: "{}" });
   });
 
-  // REST + RPC: nothing this spec exercises writes; return empty arrays.
-  await page.route(/\/rest\/v1\//, (route) =>
-    route.fulfill({ status: 200, contentType: "application/json", body: "[]" }),
-  );
+  // REST + RPC: nothing this spec exercises writes. Keep the fake account
+  // already consented so the legal gate does not obscure checkout recovery.
+  await page.route(/\/rest\/v1\//, (route, request) => {
+    const pathname = new URL(request.url()).pathname;
+    const body = pathname.endsWith("/rest/v1/user_agreement_acceptances")
+      ? JSON.stringify(CURRENT_AGREEMENT_ROWS)
+      : "[]";
+    return route.fulfill({ status: 200, contentType: "application/json", body });
+  });
 
   // get-paddle-price: force the catalog-unavailable branch so the recovery
   // panel is reached even if the local build ships with a payments token
@@ -149,14 +162,20 @@ async function mockSupabaseAndPaddle(page: Page) {
   await page.route(/google-analytics\.com|googletagmanager\.com/, (route) => route.abort());
 }
 
-async function openBlockedRecovery(page: Page) {
-  await page.goto("/pricing");
+async function triggerBlockedRecovery(page: Page) {
   const proMonthly = page.getByTestId("pricing-cta-pro-monthly");
   await expect(proMonthly).toBeVisible();
   await proMonthly.click();
   const recovery = page.getByTestId("pricing-checkout-recovery");
   await expect(recovery).toBeVisible();
   return recovery;
+}
+
+async function openBlockedRecovery(page: Page) {
+  // Pin the plan exercised by this contract. Pricing intentionally defaults
+  // to annual, while this smoke proves the monthly recovery analytics slug.
+  await page.goto("/pricing?plan=pro_monthly");
+  return triggerBlockedRecovery(page);
 }
 
 test.describe("Pricing checkout recovery (blocked state)", () => {
@@ -290,19 +309,46 @@ test.describe("Pricing checkout recovery (blocked state)", () => {
     await openBlockedRecovery(page);
 
     // --- Retry -----------------------------------------------------------
+    const blockedEventsBeforeRetry = await countAnalyticsEvents(page, "pricing_checkout_blocked");
     await page.getByTestId("pricing-checkout-retry").click();
-    await expect(page.getByTestId("pricing-checkout-retry")).toBeVisible();
+    await expect
+      .poll(() => countAnalyticsEvents(page, "pricing_checkout_recovery_retry"))
+      .toBeGreaterThan(0);
+    await expect
+      .poll(() => countAnalyticsEvents(page, "checkout_recovery_retry"))
+      .toBeGreaterThan(0);
+    // Retry dismisses the old panel and starts a new checkout attempt. Wait
+    // for that attempt to reach a fresh blocked state before exercising the
+    // next recovery action.
+    await expect
+      .poll(() => countAnalyticsEvents(page, "pricing_checkout_blocked"))
+      .toBeGreaterThan(blockedEventsBeforeRetry);
+    await expect(page.getByTestId("pricing-checkout-retry")).toBeEnabled();
 
     // --- Choose another plan --------------------------------------------
     await page.getByTestId("pricing-checkout-choose-another-plan").click();
     await expect(page.getByTestId("pricing-checkout-recovery")).toHaveCount(0);
+    await expect
+      .poll(() => countAnalyticsEvents(page, "pricing_checkout_recovery_choose_another_plan"))
+      .toBeGreaterThan(0);
+    await expect
+      .poll(() => countAnalyticsEvents(page, "checkout_recovery_choose_another_plan"))
+      .toBeGreaterThan(0);
 
-    // Re-open the blocked state so Dismiss has a panel to close.
-    await openBlockedRecovery(page);
+    // Re-open in the SAME document so the init-script analytics collector
+    // retains Retry and Choose-another events. Calling openBlockedRecovery
+    // again would navigate and reset the collector before the final read.
+    await triggerBlockedRecovery(page);
 
     // --- Dismiss --------------------------------------------------------
     await page.getByTestId("pricing-checkout-dismiss").click();
     await expect(page.getByTestId("pricing-checkout-recovery")).toHaveCount(0);
+    await expect
+      .poll(() => countAnalyticsEvents(page, "pricing_checkout_recovery_dismissed"))
+      .toBeGreaterThan(0);
+    await expect
+      .poll(() => countAnalyticsEvents(page, "checkout_recovery_dismissed"))
+      .toBeGreaterThan(0);
 
     const events = await readAnalyticsEvents(page);
 
@@ -329,17 +375,14 @@ test.describe("Pricing checkout recovery (blocked state)", () => {
         // that originated from a real CTA.
         expect(match.props, `"${name}" must carry props`).not.toBeNull();
         const props = match.props ?? {};
-        expect(props.plan, `"${name}" must include sanitized plan slug`).toBe(
-          EXPECTED_PLAN_SLUG,
-        );
+        expect(props.plan, `"${name}" must include sanitized plan slug`).toBe(EXPECTED_PLAN_SLUG);
 
         // Contract: no unknown keys. Every property has to belong to the
         // sanctioned pricing/funnel key allowlist.
         for (const key of Object.keys(props)) {
-          expect(
-            ALLOWED_PROP_KEYS.has(key),
-            `"${name}" carried disallowed prop key "${key}"`,
-          ).toBe(true);
+          expect(ALLOWED_PROP_KEYS.has(key), `"${name}" carried disallowed prop key "${key}"`).toBe(
+            true,
+          );
         }
 
         // Contract: no internal reason tokens or internal metadata anywhere
@@ -361,4 +404,3 @@ test.describe("Pricing checkout recovery (blocked state)", () => {
     }
   });
 });
-

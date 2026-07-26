@@ -220,7 +220,7 @@ const App = () => (
                   <Route path="/signup" element={<RouteAliasRedirect to="/auth?mode=signup" />} />
                   <Route path="/register" element={<RouteAliasRedirect to="/auth?mode=signup" />} />
 
-                  <Route path="/features" element={<Navigate to="/welcome" replace />} />
+                  <Route path="/features" element={<RouteAliasRedirect to="/welcome" />} />
 
                   {/* Session-aware apex: signed-out visitors receive the public
                       landing directly; signed-in growers retain Dashboard in
@@ -229,7 +229,7 @@ const App = () => (
                   <Route path="/welcome" element={<Landing />} />
                   {/* /demo route removed — Verdant tracks real grow data only.
                       Old bookmarks redirect to the landing page. */}
-                  <Route path="/demo" element={<Navigate to="/welcome" replace />} />
+                  <Route path="/demo" element={<RouteAliasRedirect to="/welcome" />} />
                   <Route path="/hardware-integrations" element={<HardwareIntegrations />} />
                   {/* Public, browser-local CSV proof. Both routes stay outside
                       AppShell and perform no private reads or writes. */}
@@ -346,7 +346,7 @@ const App = () => (
                     <Route path="/doctor" element={<AiDoctorStart />} />
                     {/* Legacy alias — canonical route is /doctor. Growers
                         sometimes type /ai-doctor; redirect rather than 404. */}
-                    <Route path="/ai-doctor" element={<Navigate to="/doctor" replace />} />
+                    <Route path="/ai-doctor" element={<RouteAliasRedirect to="/doctor" />} />
                     <Route path="/doctor/sessions" element={<AiDoctorSessionsIndex />} />
                     <Route path="/doctor/sessions/:sessionId" element={<AiDoctorSessionDetail />} />
                     <Route path="/actions" element={<ActionQueue />} />

@@ -35,6 +35,30 @@ function renderAlias(from: string, path: string, to: string) {
 afterEach(() => cleanup());
 
 describe("route alias scope preservation", () => {
+  it.each([
+    {
+      from: "/features?ref=pricing#plans",
+      path: "/features",
+      to: "/welcome",
+      expected: "/welcome?ref=pricing#plans",
+    },
+    {
+      from: "/demo?ref=partner#proof",
+      path: "/demo",
+      to: "/welcome",
+      expected: "/welcome?ref=partner#proof",
+    },
+    {
+      from: "/ai-doctor?growId=g1&plantId=p1#review",
+      path: "/ai-doctor",
+      to: "/doctor",
+      expected: "/doctor?growId=g1&plantId=p1#review",
+    },
+  ])("redirects $path while preserving query and hash", async ({ from, path, to, expected }) => {
+    renderAlias(from, path, to);
+    expect(await screen.findByTestId("route-alias-location")).toHaveTextContent(expected);
+  });
+
   it("redirects /logs while preserving grow scope and hash", async () => {
     renderAlias("/logs?growId=g1#entry", "/logs", "/timeline");
     expect(await screen.findByTestId("route-alias-location")).toHaveTextContent(
@@ -95,6 +119,21 @@ describe("route alias scope preservation", () => {
 });
 
 describe("stateful alias wiring", () => {
+  it.each([
+    { path: "/features", to: "/welcome" },
+    { path: "/demo", to: "/welcome" },
+    { path: "/ai-doctor", to: "/doctor" },
+  ])("routes $path through the query-preserving alias", ({ path, to }) => {
+    const escapedPath = path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const escapedTarget = to.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+    expect(APP).toMatch(
+      new RegExp(
+        `path="${escapedPath}"\\s+element=\\{<RouteAliasRedirect\\s+to="${escapedTarget}"\\s*\\/>\\}`,
+      ),
+    );
+  });
+
   it("routes login, signup, and register through the shared context-preserving alias", () => {
     expect(APP).toMatch(/path="\/login"\s+element=\{<RouteAliasRedirect\s+to="\/auth"\s*\/>\}/);
     expect(APP).toMatch(
@@ -107,9 +146,7 @@ describe("stateful alias wiring", () => {
 
   it("routes grow-room, tasks, and action-queue through the query-preserving alias", () => {
     expect(APP).toMatch(/path="\/grow-room"\s+element=\{<RouteAliasRedirect\s+to="\/"\s*\/>\}/);
-    expect(APP).toMatch(
-      /path="\/tasks"\s+element=\{<RouteAliasRedirect\s+to="\/actions"\s*\/>\}/,
-    );
+    expect(APP).toMatch(/path="\/tasks"\s+element=\{<RouteAliasRedirect\s+to="\/actions"\s*\/>\}/);
     expect(APP).toMatch(
       /path="\/action-queue"\s+element=\{<RouteAliasRedirect\s+to="\/actions"\s*\/>\}/,
     );

@@ -1153,6 +1153,10 @@ export default function PhenoHuntWorkspace() {
   const [objectiveSaving, setObjectiveSaving] = useState(false);
   const effectiveBreedingObjective: BreedingObjectiveTarget[] =
     breedingObjectiveLocal ?? ws.hunt?.breedingObjective ?? [];
+  const selectedRoundLoadState =
+    round === "overall"
+      ? null
+      : (ws.roundLoadStates?.[round] ?? { status: "idle" as const, error: null });
 
   const { setFilter } = ws;
 
@@ -1691,6 +1695,42 @@ export default function PhenoHuntWorkspace() {
               >
                 No loaded candidates match these filters.
               </p>
+            ) : round !== "overall" && selectedRoundLoadState?.status !== "ready" ? (
+              <div
+                data-testid={
+                  selectedRoundLoadState?.status === "error"
+                    ? "workspace-round-error"
+                    : "workspace-round-loading"
+                }
+                className="space-y-3 rounded-lg border border-border bg-card p-4"
+              >
+                <p
+                  role={selectedRoundLoadState?.status === "error" ? "alert" : "status"}
+                  className="text-sm text-muted-foreground"
+                >
+                  {selectedRoundLoadState?.status === "error"
+                    ? (selectedRoundLoadState.error ?? "Could not load this scoring round.")
+                    : `Loading ${PHENO_SCORE_ROUND_LABELS[round]} scores…`}
+                </p>
+                {selectedRoundLoadState?.status === "error" ? (
+                  <button
+                    type="button"
+                    data-testid="workspace-round-retry"
+                    onClick={() => void ws.loadRound(round)}
+                    className="rounded border border-border px-3 py-1.5 text-sm font-medium"
+                  >
+                    Retry round
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  data-testid="workspace-round-save-disabled"
+                  disabled
+                  className="rounded-md border border-border bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground opacity-50"
+                >
+                  Save unavailable
+                </button>
+              </div>
             ) : (
               <div className="grid gap-4 md:grid-cols-2">
                 {visibleCandidates.map((c) => (
@@ -1736,19 +1776,38 @@ export default function PhenoHuntWorkspace() {
               </div>
             )}
 
-            {ws.hasMore && (
-              <div className="flex justify-center">
-                <button
-                  type="button"
-                  data-testid="workspace-show-more"
-                  disabled={ws.loadingMore}
-                  onClick={ws.loadNextPage}
-                  className="rounded border border-border bg-secondary px-3 py-1.5 text-sm font-medium disabled:opacity-50"
-                >
-                  {ws.loadingMore ? "Loading…" : `Load up to ${CANDIDATE_PAGE_SIZE} more`}
-                </button>
-              </div>
-            )}
+            {ws.hasMore &&
+              (ws.loadMoreError ? (
+                <div className="flex flex-col items-center gap-2">
+                  <p
+                    data-testid="workspace-load-more-error"
+                    role="alert"
+                    className="text-sm text-muted-foreground"
+                  >
+                    {ws.loadMoreError}
+                  </p>
+                  <button
+                    type="button"
+                    data-testid="workspace-load-more-retry"
+                    onClick={ws.loadNextPage}
+                    className="rounded border border-border bg-secondary px-3 py-1.5 text-sm font-medium"
+                  >
+                    Retry loading candidates
+                  </button>
+                </div>
+              ) : (
+                <div className="flex justify-center">
+                  <button
+                    type="button"
+                    data-testid="workspace-show-more"
+                    disabled={ws.loadingMore}
+                    onClick={ws.loadNextPage}
+                    className="rounded border border-border bg-secondary px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+                  >
+                    {ws.loadingMore ? "Loading…" : `Load up to ${CANDIDATE_PAGE_SIZE} more`}
+                  </button>
+                </div>
+              ))}
           </>
         )}
 

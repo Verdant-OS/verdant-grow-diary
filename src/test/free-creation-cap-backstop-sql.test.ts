@@ -76,7 +76,7 @@ describe("server-authoritative Free grow/tent creation caps", () => {
     );
   });
 
-  it("derives paid authority from both server-owned billing lanes, never profiles.tier", () => {
+  it("derives paid authority from both server-owned billing lanes, never the profile XP column", () => {
     expect(NORMALIZED_SQL).toContain("from public.billing_subscriptions");
     expect(NORMALIZED_SQL).toContain("from public.subscriptions");
     expect(NORMALIZED_SQL).toContain("s.environment = 'live'");

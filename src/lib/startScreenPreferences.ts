@@ -114,24 +114,34 @@ export function getStartScreenChoiceOrDefault(userId: string): StartScreenChoice
   return getStartScreenChoice(userId) ?? DEFAULT_START_SCREEN;
 }
 
-export function setStartScreenChoice(userId: string, choice: StartScreenChoice): void {
+/**
+ * Persist a start-screen choice and confirm it can be read back.
+ *
+ * Returns false when storage is unavailable, the inputs are invalid, or the
+ * browser rejects/does not retain the write. Callers can then avoid claiming
+ * that a preference was saved when it was not.
+ */
+export function setStartScreenChoice(userId: string, choice: StartScreenChoice): boolean {
   const key = storageKey(userId);
   const s = safeStorage();
-  if (!key || !s || !isValid(choice)) return;
+  if (!key || !s || !isValid(choice)) return false;
   try {
     s.setItem(key, choice);
+    return s.getItem(key) === choice;
   } catch {
-    /* fail open */
+    return false;
   }
 }
 
-export function clearStartScreenChoice(userId: string): void {
+/** Remove a saved choice and confirm the key is absent. */
+export function clearStartScreenChoice(userId: string): boolean {
   const key = storageKey(userId);
   const s = safeStorage();
-  if (!key || !s) return;
+  if (!key || !s) return false;
   try {
     s.removeItem(key);
+    return s.getItem(key) === null;
   } catch {
-    /* ignore */
+    return false;
   }
 }

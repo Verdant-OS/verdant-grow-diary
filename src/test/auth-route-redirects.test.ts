@@ -26,8 +26,10 @@ describe("Deprecated auth route redirects", () => {
     expect(APP).toMatch(/path="\/auth"\s+element=\{<Auth\s*\/>\}/);
   });
 
-  it("/features redirects to /welcome", () => {
-    expect(APP).toMatch(/path="\/features"\s+element=\{<Navigate\s+to="\/welcome"/);
+  it("/features redirects to /welcome through the context-preserving alias", () => {
+    expect(APP).toMatch(
+      /path="\/features"\s+element=\{<RouteAliasRedirect\s+to="\/welcome"\s*\/>\}/,
+    );
   });
 });
 

@@ -10,15 +10,12 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { APP_ROUTES } from "@/lib/appRouteManifest";
 
-const APP_TSX = readFileSync(
-  resolve(__dirname, "../../src/App.tsx"),
-  "utf8",
-);
+const APP_TSX = readFileSync(resolve(__dirname, "../../src/App.tsx"), "utf8");
 
 describe("/ai-doctor redirect alias", () => {
-  it("App.tsx mounts /ai-doctor as a <Navigate> to /doctor", () => {
+  it("App.tsx mounts /ai-doctor through the context-preserving alias", () => {
     expect(APP_TSX).toMatch(
-      /path="\/ai-doctor"[\s\S]{0,120}<Navigate\s+to="\/doctor"\s+replace/,
+      /path="\/ai-doctor"\s+element=\{<RouteAliasRedirect\s+to="\/doctor"\s*\/>\}/,
     );
   });
 

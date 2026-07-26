@@ -49,7 +49,6 @@ vi.mock("@/hooks/usePhenoEvidencePackets", () => ({
   }),
 }));
 
-
 const HUNT_ID = "hunt-1";
 
 function candidate(id: string): PhenoCandidateInput {
@@ -98,6 +97,7 @@ function mountAt(input: ScenarioInput) {
     // these scenarios exercise.
     totalCandidateCount: (input.candidates ?? []).length,
     loadingMore: false,
+    loadMoreError: null,
     hasMore: false,
     loadNextPage: vi.fn(),
     filters: {},
@@ -107,6 +107,7 @@ function mountAt(input: ScenarioInput) {
     scoresByPlant: input.scoresByPlant ?? {},
     decisionsByPlant: input.decisionsByPlant ?? {},
     roundsByKey: {},
+    roundLoadStates: {},
     decisionHistoryByPlant: {},
     sexByPlant: {},
     reversedPlantIds: new Set<string>(),

@@ -111,17 +111,20 @@ interface CopyButtonProps {
 function CopyButton({ label, command, testId }: CopyButtonProps) {
   const [copied, setCopied] = useState(false);
   const onClick = useCallback(async () => {
+    const clipboard = typeof navigator !== "undefined" ? navigator.clipboard : undefined;
+    if (typeof clipboard?.writeText !== "function") {
+      toast.error("Could not copy command. Select the command and copy it manually.");
+      return;
+    }
+
     try {
-      const clipboard = typeof navigator !== "undefined" ? navigator.clipboard : undefined;
-      if (clipboard?.writeText) {
-        await clipboard.writeText(command);
-      }
+      await clipboard.writeText(command);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      toast.success("Command copied to clipboard");
+      window.setTimeout(() => setCopied(false), 2000);
     } catch {
-      // Clipboard unavailable; still flash confirmation so operator sees feedback.
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setCopied(false);
+      toast.error("Could not copy command. Select the command and copy it manually.");
     }
   }, [command]);
   return (
@@ -302,12 +305,16 @@ export function EcowittIngestValidationPanel({
     const text = serializeEvidenceForClipboard(evidenceSnapshot);
     try {
       const clipboard = typeof navigator !== "undefined" ? navigator.clipboard : undefined;
-      if (clipboard?.writeText) await clipboard.writeText(text);
+      if (typeof clipboard?.writeText !== "function") {
+        toast.error("Could not copy redacted evidence. Download the validation JSON instead.");
+        return;
+      }
+      await clipboard.writeText(text);
+      setCopyOpen(false);
+      toast.success("Redacted evidence copied");
     } catch {
-      /* clipboard unavailable */
+      toast.error("Could not copy redacted evidence. Download the validation JSON instead.");
     }
-    setCopyOpen(false);
-    toast.success("Redacted evidence copied");
   }, [evidenceSnapshot]);
 
   return (

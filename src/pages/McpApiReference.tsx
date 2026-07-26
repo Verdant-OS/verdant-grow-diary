@@ -11,6 +11,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Check, Copy } from "lucide-react";
+import { toast } from "sonner";
 import BrandLogo from "@/components/BrandLogo";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import McpToolExplorer from "@/components/mcp/McpToolExplorer";
@@ -20,12 +21,20 @@ const ENDPOINT = "https://knkwiiywfkbqznbxwqfh.supabase.co/functions/v1/mcp";
 function Code({ children, copyLabel }: { children: string; copyLabel?: string }) {
   const [copied, setCopied] = useState(false);
   const onCopy = async () => {
+    const clipboard = typeof navigator !== "undefined" ? navigator.clipboard : undefined;
+    if (typeof clipboard?.writeText !== "function") {
+      toast.error("Could not copy to clipboard. Select the code and copy it manually.");
+      return;
+    }
+
     try {
-      await navigator.clipboard.writeText(children);
+      await clipboard.writeText(children);
       setCopied(true);
+      toast.success("Copied to clipboard");
       window.setTimeout(() => setCopied(false), 1600);
     } catch {
-      // Clipboard unavailable (e.g. insecure context) — silently no-op.
+      setCopied(false);
+      toast.error("Could not copy to clipboard. Select the code and copy it manually.");
     }
   };
   return (
@@ -40,13 +49,16 @@ function Code({ children, copyLabel }: { children: string; copyLabel?: string })
         data-testid="mcp-api-copy-button"
         className="absolute top-2 right-2 inline-flex items-center gap-1 rounded-md border border-border bg-background/80 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-background focus:outline-none focus:ring-2 focus:ring-ring"
       >
-        {copied ? <Check className="h-3.5 w-3.5" aria-hidden /> : <Copy className="h-3.5 w-3.5" aria-hidden />}
+        {copied ? (
+          <Check className="h-3.5 w-3.5" aria-hidden />
+        ) : (
+          <Copy className="h-3.5 w-3.5" aria-hidden />
+        )}
         <span>{copied ? "Copied" : "Copy"}</span>
       </button>
     </div>
   );
 }
-
 
 function Section({
   id,
@@ -80,7 +92,10 @@ export default function McpApiReference() {
           <BrandLogo size="md" showText />
         </Link>
         <nav className="flex items-center gap-4 text-sm">
-          <Link to="/settings/agent-integrations" className="text-muted-foreground hover:text-foreground">
+          <Link
+            to="/settings/agent-integrations"
+            className="text-muted-foreground hover:text-foreground"
+          >
             Agent integrations
           </Link>
           <Link to="/guides" className="text-muted-foreground hover:text-foreground">
@@ -94,16 +109,15 @@ export default function McpApiReference() {
           <p className="text-xs uppercase tracking-wide text-muted-foreground">API reference</p>
           <h1 className="text-4xl font-bold tracking-tight">Verdant Grow OS MCP</h1>
           <p className="text-muted-foreground text-lg">
-            A read-only Model Context Protocol server that lets an OAuth-signed-in
-            grower's assistant read their own grows, diary entries, and latest
-            sensor snapshot. No writes. No AI. No device control.
+            A read-only Model Context Protocol server that lets an OAuth-signed-in grower's
+            assistant read their own grows, diary entries, and latest sensor snapshot. No writes. No
+            AI. No device control.
           </p>
         </div>
 
         <Section id="explorer" title="Interactive tool explorer">
           <p className="text-sm text-muted-foreground">
-            Call each tool live as your signed-in account. Connect this browser
-            once from{" "}
+            Call each tool live as your signed-in account. Connect this browser once from{" "}
             <Link to="/settings/agent-integrations" className="underline">
               Settings → Agent integrations
             </Link>{" "}
@@ -114,79 +128,81 @@ export default function McpApiReference() {
 
         <Section id="endpoint" title="Endpoint & auth">
           <p className="text-sm text-muted-foreground">
-            Streamable HTTP transport (MCP spec 2025-06-18). Callers authenticate
-            with an OAuth 2.1 bearer token issued by this app's authorization
-            server — end users complete a consent screen at{" "}
-            <code>/.lovable/oauth/consent</code>. Session JWTs pasted from other
-            flows are rejected.
+            Streamable HTTP transport (MCP spec 2025-06-18). Callers authenticate with an OAuth 2.1
+            bearer token issued by this app's authorization server — end users complete a consent
+            screen at <code>/.lovable/oauth/consent</code>. Session JWTs pasted from other flows are
+            rejected.
           </p>
           <Code>{`POST ${ENDPOINT}
 Authorization: Bearer <oauth_access_token>
 Content-Type: application/json`}</Code>
           <ul className="text-sm text-muted-foreground list-disc pl-6 space-y-1">
-            <li>Issuer: <code>https://knkwiiywfkbqznbxwqfh.supabase.co/auth/v1</code></li>
-            <li>Accepted audience: <code>authenticated</code></li>
-            <li>Dynamic client registration is enabled — Claude, ChatGPT, Cursor, and Codex can self-register.</li>
+            <li>
+              Issuer: <code>https://knkwiiywfkbqznbxwqfh.supabase.co/auth/v1</code>
+            </li>
+            <li>
+              Accepted audience: <code>authenticated</code>
+            </li>
+            <li>
+              Dynamic client registration is enabled — Claude, ChatGPT, Cursor, and Codex can
+              self-register.
+            </li>
           </ul>
         </Section>
 
         <Section id="safety" title="Safety invariants">
           <p className="text-sm text-muted-foreground">
-            These properties hold for every tool below and are enforced in the
-            server, not by convention:
+            These properties hold for every tool below and are enforced in the server, not by
+            convention:
           </p>
           <ul className="text-sm list-disc pl-6 space-y-2">
             <li>
-              <strong>Read-only.</strong> Every tool is annotated{" "}
-              <code>readOnlyHint: true</code>, <code>idempotentHint: true</code>,{" "}
-              <code>openWorldHint: false</code>. There is no write, no AI call,
-              and no device command surface.
+              <strong>Read-only.</strong> Every tool is annotated <code>readOnlyHint: true</code>,{" "}
+              <code>idempotentHint: true</code>, <code>openWorldHint: false</code>. There is no
+              write, no AI call, and no device command surface.
             </li>
             <li>
-              <strong>Own data only.</strong> All database reads go through the
-              caller's OAuth token, so Supabase RLS runs as that user. The
-              service-role key is never referenced in tool code.
+              <strong>Own data only.</strong> All database reads go through the caller's OAuth
+              token, so Supabase RLS runs as that user. The service-role key is never referenced in
+              tool code.
             </li>
             <li>
               <strong>Ownership guard on nested reads.</strong>{" "}
-              <code>list_recent_diary_entries</code> verifies the grow is
-              visible to the caller before returning entries, so an
-              operator-role account cannot use this server to read another
-              grower's diary through the wider <code>diary_entries</code>{" "}
-              policy.
+              <code>list_recent_diary_entries</code> verifies the grow is visible to the caller
+              before returning entries, so an operator-role account cannot use this server to read
+              another grower's diary through the wider <code>diary_entries</code> policy.
             </li>
             <li>
-              <strong>Sensor truth preserved.</strong>{" "}
-              <code>source</code> and <code>quality</code> labels are returned
-              verbatim. A reading is only current live telemetry when{" "}
-              <code>current_live: true</code> (quality <code>ok</code> + source{" "}
-              <code>live</code> + freshness <code>fresh</code>). Manual, csv,
-              demo, sim, stale, and invalid rows keep their labels and are
-              never re-labeled as live.
+              <strong>Sensor truth preserved.</strong> <code>source</code> and <code>quality</code>{" "}
+              labels are returned verbatim. A reading is only current live telemetry when{" "}
+              <code>current_live: true</code> (quality <code>ok</code> + source <code>live</code> +
+              freshness <code>fresh</code>). Manual, csv, demo, sim, stale, and invalid rows keep
+              their labels and are never re-labeled as live.
             </li>
             <li>
-              <strong>No raw provenance leakage.</strong>{" "}
-              <code>raw_payload</code> is selected long enough to exclude
-              diagnostic Windows testbench rows, then stripped before the
-              response is assembled.
+              <strong>No raw provenance leakage.</strong> <code>raw_payload</code> is selected long
+              enough to exclude diagnostic Windows testbench rows, then stripped before the response
+              is assembled.
             </li>
             <li>
-              <strong>Deterministic snapshots.</strong> The latest-per-metric
-              selection breaks ties by <code>ts DESC</code>,{" "}
-              <code>created_at DESC</code>, then <code>id DESC</code>, so
+              <strong>Deterministic snapshots.</strong> The latest-per-metric selection breaks ties
+              by <code>ts DESC</code>, <code>created_at DESC</code>, then <code>id DESC</code>, so
               identical inputs never flip the snapshot between calls.
             </li>
           </ul>
         </Section>
 
         <Section id="list_grows" title="list_grows">
-          <p className="text-sm text-muted-foreground">
-            List the signed-in grower's own grows.
-          </p>
+          <p className="text-sm text-muted-foreground">List the signed-in grower's own grows.</p>
           <h3 className="text-sm font-semibold">Parameters</h3>
           <ul className="text-sm list-disc pl-6 space-y-1">
-            <li><code>includeArchived</code> — boolean, optional. Include archived grows. Defaults to <code>false</code>.</li>
-            <li><code>limit</code> — integer 1–100, optional. Defaults to <code>25</code>.</li>
+            <li>
+              <code>includeArchived</code> — boolean, optional. Include archived grows. Defaults to{" "}
+              <code>false</code>.
+            </li>
+            <li>
+              <code>limit</code> — integer 1–100, optional. Defaults to <code>25</code>.
+            </li>
           </ul>
           <h3 className="text-sm font-semibold">Request</h3>
           <Code>{`{
@@ -221,8 +237,12 @@ Content-Type: application/json`}</Code>
           </p>
           <h3 className="text-sm font-semibold">Parameters</h3>
           <ul className="text-sm list-disc pl-6 space-y-1">
-            <li><code>growId</code> — uuid, required. Must belong to the caller.</li>
-            <li><code>limit</code> — integer 1–50, optional. Defaults to <code>10</code>.</li>
+            <li>
+              <code>growId</code> — uuid, required. Must belong to the caller.
+            </li>
+            <li>
+              <code>limit</code> — integer 1–50, optional. Defaults to <code>10</code>.
+            </li>
           </ul>
           <h3 className="text-sm font-semibold">Request</h3>
           <Code>{`{
@@ -253,22 +273,23 @@ Content-Type: application/json`}</Code>
   ]
 }`}</Code>
           <p className="text-xs text-muted-foreground">
-            Presenter-safe fields only. Raw payloads, private image URLs, and
-            internal detail JSON are never returned.
+            Presenter-safe fields only. Raw payloads, private image URLs, and internal detail JSON
+            are never returned.
           </p>
         </Section>
 
         <Section id="get_latest_sensor_snapshot" title="get_latest_sensor_snapshot">
           <p className="text-sm text-muted-foreground">
-            Latest reading per metric for one of the caller's own tents.
-            Metrics: <code>temperature_c</code>, <code>humidity_pct</code>,{" "}
-            <code>vpd_kpa</code>, <code>co2_ppm</code>,{" "}
-            <code>soil_moisture_pct</code>, <code>soil_temp_c</code>,{" "}
+            Latest reading per metric for one of the caller's own tents. Metrics:{" "}
+            <code>temperature_c</code>, <code>humidity_pct</code>, <code>vpd_kpa</code>,{" "}
+            <code>co2_ppm</code>, <code>soil_moisture_pct</code>, <code>soil_temp_c</code>,{" "}
             <code>ph</code>, <code>ec</code>, <code>ppfd</code>.
           </p>
           <h3 className="text-sm font-semibold">Parameters</h3>
           <ul className="text-sm list-disc pl-6 space-y-1">
-            <li><code>tentId</code> — uuid, required. Must belong to the caller.</li>
+            <li>
+              <code>tentId</code> — uuid, required. Must belong to the caller.
+            </li>
           </ul>
           <h3 className="text-sm font-semibold">Request</h3>
           <Code>{`{
@@ -311,10 +332,9 @@ Content-Type: application/json`}</Code>
   }
 }`}</Code>
           <p className="text-xs text-muted-foreground">
-            Only readings with <code>current_live: true</code> should be
-            treated as current live telemetry. Every other combination —
-            including <code>source: "manual"</code> at fresh quality — keeps
-            its label and must not be presented as live.
+            Only readings with <code>current_live: true</code> should be treated as current live
+            telemetry. Every other combination — including <code>source: "manual"</code> at fresh
+            quality — keeps its label and must not be presented as live.
           </p>
           <p className="text-xs text-muted-foreground">
             When a tent has no non-diagnostic readings, the response is{" "}
@@ -324,25 +344,21 @@ Content-Type: application/json`}</Code>
 
         <Section id="errors" title="Errors">
           <p className="text-sm text-muted-foreground">
-            The server distinguishes two error surfaces. <strong>Transport-level</strong>{" "}
-            failures (missing or invalid OAuth token) come back as a JSON-RPC{" "}
-            <code>error</code> object with an HTTP <code>401</code>.{" "}
-            <strong>Tool-level</strong> failures (bad parameters, unknown grow,
-            unknown tent) come back as a normal <code>tools/call</code>{" "}
-            <code>result</code> with <code>isError: true</code> and a
-            human-readable text message — the JSON-RPC envelope itself is a
-            success.
+            The server distinguishes two error surfaces. <strong>Transport-level</strong> failures
+            (missing or invalid OAuth token) come back as a JSON-RPC <code>error</code> object with
+            an HTTP <code>401</code>. <strong>Tool-level</strong> failures (bad parameters, unknown
+            grow, unknown tent) come back as a normal <code>tools/call</code> <code>result</code>{" "}
+            with <code>isError: true</code> and a human-readable text message — the JSON-RPC
+            envelope itself is a success.
           </p>
 
           <h3 className="text-sm font-semibold" id="error-unauthorized">
             401 Unauthorized
           </h3>
           <p className="text-sm text-muted-foreground">
-            The bearer token is missing, expired, revoked, or was not issued by
-            this app's OAuth server (for example, a copied Supabase session
-            JWT). The response includes a{" "}
-            <code>WWW-Authenticate</code> header pointing at the OAuth
-            protected-resource metadata.
+            The bearer token is missing, expired, revoked, or was not issued by this app's OAuth
+            server (for example, a copied Supabase session JWT). The response includes a{" "}
+            <code>WWW-Authenticate</code> header pointing at the OAuth protected-resource metadata.
           </p>
           <Code copyLabel="Copy unauthorized response">{`HTTP/1.1 401 Unauthorized
 WWW-Authenticate: Bearer resource_metadata="https://knkwiiywfkbqznbxwqfh.supabase.co/functions/v1/mcp/.well-known/oauth-protected-resource"
@@ -357,27 +373,23 @@ Content-Type: application/json
   }
 }`}</Code>
           <p className="text-sm text-muted-foreground">
-            <strong>How to recover:</strong> do not retry with the same token.
-            Run the OAuth 2.1 authorization-code + PKCE flow again against the
-            issuer above, or — in this browser — click{" "}
-            <em>Disconnect</em> then <em>Connect this browser</em> from{" "}
+            <strong>How to recover:</strong> do not retry with the same token. Run the OAuth 2.1
+            authorization-code + PKCE flow again against the issuer above, or — in this browser —
+            click <em>Disconnect</em> then <em>Connect this browser</em> from{" "}
             <Link to="/settings/agent-integrations" className="underline">
               Settings → Agent integrations
             </Link>
-            . Never paste an app session token as a workaround; the server
-            requires an <code>oauth_client</code> claim and will keep rejecting
-            it.
+            . Never paste an app session token as a workaround; the server requires an{" "}
+            <code>oauth_client</code> claim and will keep rejecting it.
           </p>
 
           <h3 className="text-sm font-semibold" id="error-invalid-params">
             Invalid parameters
           </h3>
           <p className="text-sm text-muted-foreground">
-            The bearer token was accepted, but the tool's Zod input schema
-            rejected the arguments — for example a missing{" "}
-            <code>growId</code>, a malformed UUID, or a <code>limit</code> out
-            of range. The JSON-RPC call succeeds; the tool result carries the
-            failure.
+            The bearer token was accepted, but the tool's Zod input schema rejected the arguments —
+            for example a missing <code>growId</code>, a malformed UUID, or a <code>limit</code> out
+            of range. The JSON-RPC call succeeds; the tool result carries the failure.
           </p>
           <Code copyLabel="Copy invalid-parameters response">{`{
   "jsonrpc": "2.0",
@@ -393,21 +405,19 @@ Content-Type: application/json
   }
 }`}</Code>
           <p className="text-sm text-muted-foreground">
-            <strong>How to recover:</strong> read the field list in the message,
-            correct the arguments against the parameter tables above, and retry
-            the same JSON-RPC call. Do not fall back to a wider tool or invent
-            an id — an unknown <code>growId</code>/<code>tentId</code> that
-            parses as a UUID surfaces as the ownership errors below, not this
-            one.
+            <strong>How to recover:</strong> read the field list in the message, correct the
+            arguments against the parameter tables above, and retry the same JSON-RPC call. Do not
+            fall back to a wider tool or invent an id — an unknown <code>growId</code>/
+            <code>tentId</code> that parses as a UUID surfaces as the ownership errors below, not
+            this one.
           </p>
 
           <h3 className="text-sm font-semibold" id="error-not-found">
             Not found for the signed-in grower
           </h3>
           <p className="text-sm text-muted-foreground">
-            The id parses correctly but is either unknown or belongs to another
-            grower. RLS returns the same "not found" either way so ownership is
-            never leaked through the error.
+            The id parses correctly but is either unknown or belongs to another grower. RLS returns
+            the same "not found" either way so ownership is never leaked through the error.
           </p>
           <Code copyLabel="Copy not-found response">{`{
   "jsonrpc": "2.0",
@@ -420,13 +430,11 @@ Content-Type: application/json
   }
 }`}</Code>
           <p className="text-sm text-muted-foreground">
-            <strong>How to recover:</strong> call <code>list_grows</code> (or,
-            for tents, look them up inside a known grow in the app) to
-            re-discover a valid id owned by the current user, then retry.
-            Retrying the same id will keep returning this error.
+            <strong>How to recover:</strong> call <code>list_grows</code> (or, for tents, look them
+            up inside a known grow in the app) to re-discover a valid id owned by the current user,
+            then retry. Retrying the same id will keep returning this error.
           </p>
         </Section>
-
 
         <Section id="connect" title="Connect a client">
           <p className="text-sm text-muted-foreground">
@@ -434,9 +442,8 @@ Content-Type: application/json
             <Link to="/settings/agent-integrations" className="underline">
               Settings → Agent integrations
             </Link>
-            . Third-party clients (Claude, ChatGPT, Cursor, Codex) point at the
-            endpoint above and complete the OAuth consent flow — no manual
-            token pasting.
+            . Third-party clients (Claude, ChatGPT, Cursor, Codex) point at the endpoint above and
+            complete the OAuth consent flow — no manual token pasting.
           </p>
         </Section>
       </article>

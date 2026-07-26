@@ -11,6 +11,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { phenoDb } from "@/integrations/supabase/phenoTables";
 import { normalizeKeeperDecision, type PhenoKeeperDecision } from "@/lib/phenoKeeperDecisionModel";
+import { PhenoEvidenceReadError } from "@/lib/phenoEvidenceReadError";
 
 export interface KeeperDecisionRow {
   readonly plantId: string;
@@ -65,7 +66,7 @@ export async function listKeeperDecisionsForHunt(
   // Page-scoped read: fetch only the visible candidates' decisions at scale.
   if (plantIds && plantIds.length > 0) query = query.in("plant_id", plantIds as string[]);
   const { data, error } = await query;
-  if (error || !data) return {};
+  if (error || !data) throw new PhenoEvidenceReadError("keeper_decisions");
   const map: Record<string, KeeperDecisionRow> = {};
   for (const row of data) {
     if (!row.plant_id) continue;

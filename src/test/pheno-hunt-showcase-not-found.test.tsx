@@ -47,6 +47,7 @@ function wsState(over: Record<string, unknown> = {}) {
     scoresByPlant: {},
     smokeByPlant: {},
     roundsByKey: {},
+    roundLoadStates: {},
     loadRound: vi.fn(),
     ...over,
   };

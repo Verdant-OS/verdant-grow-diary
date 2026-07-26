@@ -9,8 +9,10 @@ import {
   resolveTrace,
   listScreeningForSubject,
   listQuarantineForSubject,
+  unwrapGeneticsReadResult,
   type ScreeningDto,
   type QuarantineEpisodeDto,
+  type GeneticsReadError,
 } from "@/lib/genetics/traceabilityApi";
 import { buildTraceView, type TraceView } from "@/lib/genetics/traceabilityViewModel";
 
@@ -55,11 +57,12 @@ export function screeningQueryKey(ownerId: string | null, subjectType: string, s
 
 export function useSubjectScreening(subjectType: string | null, subjectId: string | null) {
   const ownerId = useAuth().user?.id ?? null;
-  return useQuery<ScreeningDto[]>({
+  return useQuery<ScreeningDto[], GeneticsReadError>({
     queryKey: screeningQueryKey(ownerId, subjectType ?? "", subjectId ?? ""),
     enabled: !!ownerId && !!subjectType && !!subjectId,
     retry: false,
-    queryFn: () => listScreeningForSubject(subjectType!, subjectId!),
+    queryFn: async () =>
+      unwrapGeneticsReadResult(await listScreeningForSubject(subjectType!, subjectId!)),
   });
 }
 
@@ -69,10 +72,11 @@ export function quarantineQueryKey(ownerId: string | null, subjectType: string, 
 
 export function useSubjectQuarantine(subjectType: string | null, subjectId: string | null) {
   const ownerId = useAuth().user?.id ?? null;
-  return useQuery<QuarantineEpisodeDto[]>({
+  return useQuery<QuarantineEpisodeDto[], GeneticsReadError>({
     queryKey: quarantineQueryKey(ownerId, subjectType ?? "", subjectId ?? ""),
     enabled: !!ownerId && !!subjectType && !!subjectId,
     retry: false,
-    queryFn: () => listQuarantineForSubject(subjectType!, subjectId!),
+    queryFn: async () =>
+      unwrapGeneticsReadResult(await listQuarantineForSubject(subjectType!, subjectId!)),
   });
 }

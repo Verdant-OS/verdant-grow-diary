@@ -162,7 +162,6 @@ export default function TentPlantRosterPanel({
         )}
       </div>
 
-
       {viewModel.state === "unknown-relationship" && (
         <p
           className="text-sm text-muted-foreground py-3"
@@ -175,10 +174,7 @@ export default function TentPlantRosterPanel({
 
       {viewModel.state === "empty" && (
         <div className="py-3">
-          <p
-            className="text-sm text-muted-foreground"
-            data-testid="tent-plant-roster-empty"
-          >
+          <p className="text-sm text-muted-foreground" data-testid="tent-plant-roster-empty">
             {viewModel.emptyCopy}
           </p>
           {viewModel.emptyArchivedHintCopy && (
@@ -244,9 +240,7 @@ export default function TentPlantRosterPanel({
                 )}
                 <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
                   {latest && (
-                    <span
-                      data-testid={`tent-plant-roster-row-${row.id}-latest-log`}
-                    >
+                    <span data-testid={`tent-plant-roster-row-${row.id}-latest-log`}>
                       Latest log: {latest}
                     </span>
                   )}
@@ -340,18 +334,14 @@ function TentPlantRosterRowActions({
   }, []);
 
   function focusMenuItem(index: number) {
-    const items = menuRef.current?.querySelectorAll<HTMLElement>(
-      '[role="menuitem"]',
-    );
+    const items = menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]');
     if (!items || items.length === 0) return;
     const safeIndex = ((index % items.length) + items.length) % items.length;
     items[safeIndex]?.focus();
   }
 
   function currentItemIndex(): number {
-    const items = menuRef.current?.querySelectorAll<HTMLElement>(
-      '[role="menuitem"]',
-    );
+    const items = menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]');
     if (!items) return -1;
     const active = document.activeElement as HTMLElement | null;
     if (!active) return -1;
@@ -412,10 +402,33 @@ function TentPlantRosterRowActions({
       >
         {entries.map((entry) => {
           const baseClass =
-            "block w-full text-left rounded-sm px-2 py-1 text-xs hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
-          const aria = entry.disabled && entry.disabledReason
-            ? `${entry.label} (unavailable: ${entry.disabledReason})`
-            : entry.label;
+            "block w-full text-left rounded-sm px-2 py-1 text-xs hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent disabled:hover:text-inherit";
+          const unavailable =
+            entry.disabled === true || (entry.event !== "open-quicklog" && !entry.href);
+          const aria =
+            unavailable && entry.disabledReason
+              ? `${entry.label} (unavailable: ${entry.disabledReason})`
+              : unavailable
+                ? `${entry.label} (unavailable)`
+                : entry.label;
+          if (unavailable) {
+            return (
+              <li key={entry.kind} role="none">
+                <button
+                  type="button"
+                  role="menuitem"
+                  className={baseClass}
+                  aria-label={aria}
+                  aria-disabled="true"
+                  disabled
+                  data-testid={entry.testId}
+                  data-anchor-blocked={entry.anchorBlocked ? "true" : undefined}
+                >
+                  {entry.label}
+                </button>
+              </li>
+            );
+          }
           if (entry.event === "open-quicklog") {
             return (
               <li key={entry.kind} role="none">
@@ -437,10 +450,9 @@ function TentPlantRosterRowActions({
             <li key={entry.kind} role="none">
               <a
                 role="menuitem"
-                href={entry.href ?? "#"}
+                href={entry.href!}
                 className={baseClass}
                 aria-label={aria}
-                aria-disabled={entry.disabled || undefined}
                 data-testid={entry.testId}
                 data-anchor-blocked={entry.anchorBlocked ? "true" : undefined}
                 onClick={(e) => onActivate(entry, e, rowName)}

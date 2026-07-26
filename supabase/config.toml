@@ -85,3 +85,35 @@ project_id = "knkwiiywfkbqznbxwqfh"
     verify_jwt = false
   [functions.handle-email-suppression]
     verify_jwt = false
+
+  # Explicit auth topology for every remaining committed function. These
+  # user-scoped handlers require a Supabase JWT at the gateway and also verify
+  # the caller inside the handler before reading entitlements or writing data.
+  [functions.ai-coach]
+    verify_jwt = true
+  [functions.ai-cultivar-qa]
+    verify_jwt = true
+  [functions.create-breeding-suggestions]
+    verify_jwt = true
+  [functions.environment-summary-report-entitlement]
+    verify_jwt = true
+  [functions.live-sensor-entitlement]
+    verify_jwt = true
+  [functions.mint-bridge-token]
+    verify_jwt = true
+  [functions.premium-export-entitlement]
+    verify_jwt = true
+  [functions.revoke-bridge-token]
+    verify_jwt = true
+  [functions.save-founder-prefs]
+    verify_jwt = true
+
+  # The validation-only EcoWitt endpoint authenticates an opaque bridge token
+  # inside the handler, not a Supabase JWT.
+  [functions.ecowitt-real-ingest]
+    verify_jwt = false
+
+  # The generated MCP server must receive OAuth metadata and bearer requests
+  # before @lovable.dev/mcp-js performs issuer/JWKS validation.
+  [functions.mcp]
+    verify_jwt = false

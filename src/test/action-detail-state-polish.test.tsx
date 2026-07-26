@@ -32,18 +32,9 @@ function block(label: string, regex: RegExp): string {
   return m[0];
 }
 
-const LOADING_BLOCK = block(
-  "loading-state",
-  /if \(loading\) \{[\s\S]*?\n {2}\}/,
-);
-const ERROR_BLOCK = block(
-  "error-state",
-  /if \(loadError\) \{[\s\S]*?\n {2}\}/,
-);
-const NOTFOUND_BLOCK = block(
-  "not-found-state",
-  /if \(notFound \|\| !row\) \{[\s\S]*?\n {2}\}/,
-);
+const LOADING_BLOCK = block("loading-state", /if \(loading\) \{[\s\S]*?\n {2}\}/);
+const ERROR_BLOCK = block("error-state", /if \(loadError\) \{[\s\S]*?\n {2}\}/);
+const NOTFOUND_BLOCK = block("not-found-state", /if \(notFound \|\| !row\) \{[\s\S]*?\n {2}\}/);
 
 describe("ActionDetail — loading state", () => {
   it("renders visible 'Loading action…' copy", () => {
@@ -149,14 +140,16 @@ describe("ActionDetail — state UI safety", () => {
     expect(all).not.toMatch(/autopilot|auto[- ]?execute|auto[- ]?run|executed automatically/i);
   });
 
-  it("page module contains no service_role and no client user_id insert", () => {
+  it("page module contains no service_role and sends no identity to the transition RPC", () => {
     expect(SRC).not.toMatch(/service_role/i);
-    // Audit insert must not pass user_id from the client.
     const m = SRC.match(
-      /\.from\(\s*["']action_queue_events["']\s*\)\s*\.insert\(\s*\{([\s\S]*?)\}\s*\)/,
+      /const\s+rpcArgs\s*=\s*buildActionQueueTransitionRpcArgs\(\s*\{([\s\S]*?)\}\s*\)/,
     );
     expect(m).not.toBeNull();
-    expect(m![1]).not.toMatch(/\buser_id\s*:/);
+    expect(m![1]).not.toMatch(/\buser_id\b|\bgrow_id\b|\bevent_type\b|\bnew_status\b/);
+    expect(SRC).toMatch(
+      /supabase\.rpc\(\s*["']action_queue_transition["']\s*,\s*rpcArgs\s*,?\s*\)/,
+    );
   });
 
   it("page module does not invoke edge functions or AI gateway", () => {

@@ -2,17 +2,15 @@
  * Client hook for the Pro "Ask about this cultivar" Q&A.
  *
  * Calls the ai-cultivar-qa edge function, which re-checks the caller's paid
- * entitlement server-side and answers strictly from the supplied public
- * cultivar context (see cultivarQaGrounding). This hook never fabricates an
- * answer and surfaces a failure rather than presenting an empty state as fact.
+ * entitlement server-side and selects canonical context from the published
+ * cultivar slug. The public context is still sent temporarily so the client
+ * remains compatible with the previously deployed function; the hardened
+ * function ignores it and never treats it as model grounding.
  */
 import { useCallback, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { VerdantCultivarProfile } from "@/constants/verdantCultivars";
-import {
-  buildCultivarQaContext,
-  validateCultivarQuestion,
-} from "@/lib/cultivarQaGrounding";
+import { buildCultivarQaContext, validateCultivarQuestion } from "@/lib/cultivarQaGrounding";
 
 export type CultivarQaStatus = "idle" | "loading" | "answered" | "error";
 
@@ -35,42 +33,41 @@ export function useCultivarQa(): UseCultivarQaReturn {
 
   const reset = useCallback(() => setState(IDLE), []);
 
-  const ask = useCallback(
-    async (cultivar: VerdantCultivarProfile, question: string) => {
-      const validation = validateCultivarQuestion(question);
-      if (!validation.ok) {
-        setState({ status: "error", answer: null, reason: validation.reason ?? "invalid" });
+  const ask = useCallback(async (cultivar: VerdantCultivarProfile, question: string) => {
+    const validation = validateCultivarQuestion(question);
+    if (!validation.ok) {
+      setState({ status: "error", answer: null, reason: validation.reason ?? "invalid" });
+      return;
+    }
+    setState({ status: "loading", answer: null, reason: null });
+    try {
+      const { data, error } = await supabase.functions.invoke("ai-cultivar-qa", {
+        body: {
+          cultivarSlug: cultivar.slug,
+          question: question.trim(),
+          // Backward-compatible during the Edge rollout. The hardened
+          // function deliberately ignores this client-owned field.
+          context: buildCultivarQaContext(cultivar),
+        },
+      });
+      if (error) {
+        setState({ status: "error", answer: null, reason: "request_failed" });
         return;
       }
-      setState({ status: "loading", answer: null, reason: null });
-      try {
-        const { data, error } = await supabase.functions.invoke("ai-cultivar-qa", {
-          body: {
-            cultivarSlug: cultivar.slug,
-            question: question.trim(),
-            context: buildCultivarQaContext(cultivar),
-          },
+      const payload = data as { ok?: boolean; answer?: string; reason?: string } | null;
+      if (!payload?.ok || typeof payload.answer !== "string" || !payload.answer.trim()) {
+        setState({
+          status: "error",
+          answer: null,
+          reason: payload?.reason ?? "no_answer",
         });
-        if (error) {
-          setState({ status: "error", answer: null, reason: "request_failed" });
-          return;
-        }
-        const payload = data as { ok?: boolean; answer?: string; reason?: string } | null;
-        if (!payload?.ok || typeof payload.answer !== "string" || !payload.answer.trim()) {
-          setState({
-            status: "error",
-            answer: null,
-            reason: payload?.reason ?? "no_answer",
-          });
-          return;
-        }
-        setState({ status: "answered", answer: payload.answer.trim(), reason: null });
-      } catch {
-        setState({ status: "error", answer: null, reason: "request_failed" });
+        return;
       }
-    },
-    [],
-  );
+      setState({ status: "answered", answer: payload.answer.trim(), reason: null });
+    } catch {
+      setState({ status: "error", answer: null, reason: "request_failed" });
+    }
+  }, []);
 
   return { ...state, ask, reset };
 }

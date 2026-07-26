@@ -13,24 +13,29 @@ describe("Action Queue complete/cancel transitions", () => {
     expect(src).toMatch(/isTerminalStatus\(row\.status\)/);
   });
 
-  it("complete branch builds patch with status completed + completed_at via shared helper", () => {
-    expect(src).toMatch(/buildTransitionPatch\(kind\)/);
+  it("complete branch delegates status and completed_at derivation to the transactional RPC", () => {
+    expect(src).toMatch(/transition:\s*kind/);
+    expect(src).toMatch(/expectedStatus:\s*row\.status/);
     expect(src).toMatch(/from "@\/lib\/actionQueueTransitions"/);
   });
 
-  it("cancel transition uses shared eventTypeFor/nextStatusFor", () => {
-    expect(src).toMatch(/eventTypeFor\(kind\)/);
-    expect(src).toMatch(/nextStatusFor\(kind\)/);
+  it("cancel transition accepts only a validated canonical RPC result", () => {
+    expect(src).toMatch(/parseActionQueueTransitionRpcResult\(data,\s*rpcArgs\)/);
+    expect(src).toMatch(/result\.ok !== true/);
   });
 
   it("Mark Complete is gated via shared canComplete", () => {
-    expect(src).toMatch(/import \{[\s\S]*?canComplete[\s\S]*?\} from "@\/lib\/actionQueueTransitions"/);
+    expect(src).toMatch(
+      /import \{[\s\S]*?canComplete[\s\S]*?\} from "@\/lib\/actionQueueTransitions"/,
+    );
     expect(src).toMatch(/canComplete\(row\.status\) && \(/);
     expect(src).toMatch(/Mark Complete/);
   });
 
   it("Cancel is gated via shared canCancel", () => {
-    expect(src).toMatch(/import \{[\s\S]*?canCancel[\s\S]*?\} from "@\/lib\/actionQueueTransitions"/);
+    expect(src).toMatch(
+      /import \{[\s\S]*?canCancel[\s\S]*?\} from "@\/lib\/actionQueueTransitions"/,
+    );
     expect(src).toMatch(/canCancel\(row\.status\) && \(/);
   });
 
@@ -46,7 +51,9 @@ describe("Action Queue complete/cancel transitions", () => {
     expect(src).toMatch(/cancel: \{\s*title: "Cancel Action"/);
   });
 
-  it("inserts audit events via existing logEvent path (no service_role)", () => {
+  it("records status and audit through the canonical RPC (no privileged key)", () => {
+    expect(src).toMatch(/supabase\.rpc\(\s*"action_queue_transition"/);
+    expect(src).not.toMatch(/\.from\(\s*"action_queue_events"\s*\)\s*\.insert\(/);
     expect(src).not.toMatch(/service_role/i);
   });
 

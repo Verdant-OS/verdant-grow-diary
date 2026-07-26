@@ -14,14 +14,8 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const PAGE = readFileSync(
-  resolve(__dirname, "../..", "src/pages/ActionQueue.tsx"),
-  "utf8",
-);
-const GROW = readFileSync(
-  resolve(__dirname, "../..", "src/pages/GrowDetail.tsx"),
-  "utf8",
-);
+const PAGE = readFileSync(resolve(__dirname, "../..", "src/pages/ActionQueue.tsx"), "utf8");
+const GROW = readFileSync(resolve(__dirname, "../..", "src/pages/GrowDetail.tsx"), "utf8");
 
 describe("ActionQueue — URL growId filter", () => {
   it("reads growId via shared useScopedGrow hook", () => {
@@ -45,9 +39,10 @@ describe("ActionQueue — URL growId filter", () => {
     expect(PAGE).toMatch(/aria-label=\s*["']Sort order["']/);
   });
 
-  it("preserves transition/audit flow (no schema changes)", () => {
-    expect(PAGE).toMatch(/from\(\s*["']action_queue_events["']\s*\)\s*\.insert/);
-    expect(PAGE).toMatch(/buildTransitionPatch/);
+  it("preserves transition/audit flow through the atomic RPC", () => {
+    expect(PAGE).toMatch(/supabase\.rpc\(\s*["']action_queue_transition["']/);
+    expect(PAGE).toMatch(/buildActionQueueTransitionRpcArgs/);
+    expect(PAGE).not.toMatch(/from\(\s*["']action_queue_events["']\s*\)\s*\.insert/);
   });
 
   it("introduces no device-control, ai-coach, or service_role surface", () => {

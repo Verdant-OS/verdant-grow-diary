@@ -10,6 +10,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { APP_ROUTES } from "@/lib/appRouteManifest";
 import { buildDemoProofWalkthroughViewModel } from "@/lib/demoProofWalkthroughViewModel";
 
 function loadAppRoutePaths(): Set<string> {
@@ -63,6 +64,20 @@ describe("Demo Proof Walkthrough — route snapshot", () => {
     expect(op).toBeTruthy();
     expect(op!.href).toBe("/sensors?operator=1");
     expect(appPaths.has("/sensors")).toBe(true);
+  });
+
+  it("labels every operator or internal manifest destination as operator_only", () => {
+    const protectedSteps = vm.steps.filter((step) => {
+      const base = stripQuery(step.href);
+      const manifestEntry = APP_ROUTES.find((route) => route.path === base);
+      return manifestEntry?.access === "operator" || manifestEntry?.access === "internal";
+    });
+
+    expect(protectedSteps.length).toBeGreaterThan(0);
+    for (const step of protectedSteps) {
+      expect(step.statusKind, `${step.href} must not be labeled ready`).toBe("operator_only");
+      expect(step.safetyNote).toMatch(/server-verified operator role/i);
+    }
   });
 
   it("never links to /grows", () => {

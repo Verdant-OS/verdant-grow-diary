@@ -324,8 +324,9 @@ export default function Landing({ canonicalPath = "/welcome" }: LandingProps) {
           Start with your real grow
         </h2>
         <p className="mt-3 text-muted-foreground">
-          Create a free account to begin logging your tents, plants, and sensor readings. Verdant
-          tracks real grow data — there is no synthetic preview mode.
+          Create a free account to begin logging your tents, plants, and sensor readings. Your
+          signed-in diary starts with your own saved grow data; Verdant does not fill it with sample
+          rows.
         </p>
         <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
           {user ? (

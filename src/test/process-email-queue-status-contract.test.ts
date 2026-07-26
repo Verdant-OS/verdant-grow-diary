@@ -78,7 +78,7 @@ describe("process-email-queue send-log status contract", () => {
       /const\s*\{\s*error:\s*rateLimitLogError\s*\}\s*=\s*await\s+supabase\s*\.from\(\s*["']email_send_log["']\s*\)\s*\.insert\(/,
     );
     expect(rateLimitAuditBlock).toMatch(
-      /if\s*\(rateLimitLogError\)\s*\{\s*console\.error\(\s*["']Failed to record email rate-limit audit["']\s*,\s*\{\s*queue\s*,\s*msg_id:\s*msg\.msg_id\s*,\s*error_code:\s*rateLimitLogError\.code\s*\?\?\s*["']unknown["']\s*,?\s*\}\s*\)\s*\}/,
+      /if\s*\(rateLimitLogError\)\s*\{\s*console\.error\(\s*["']Failed to record email rate-limit audit["']\s*,\s*\{\s*queue\s*,\s*msg_id:\s*msg\.msg_id\s*,\s*error_code:\s*rateLimitLogError\.code\s*\?\?\s*["']unknown["']\s*,?\s*\}\s*\)\s*;?\s*\}/,
     );
   });
 });

@@ -138,20 +138,32 @@ test.describe("Auth redirect safety (mocked)", () => {
     page,
     baseURL,
   }) => {
-    const SB_PROJECT_REF = "FAKE-PROJECT-REF-PLACEHOLDER-NOT-REAL";
+    const SB_PROJECT_REF = "knkwiiywfkbqznbxwqfh";
     const SB_SESSION_KEY = `sb-${SB_PROJECT_REF}-auth-token`;
     await page.addInitScript(
       ({ key }) => {
+        const encodeSegment = (value: object) =>
+          btoa(JSON.stringify(value)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+        const expiresAt = Math.floor(Date.now() / 1000) + 3600;
         const fakeSession = {
-          access_token: "FAKE-ACCESS-TOKEN-NOT-REAL",
+          access_token: [
+            encodeSegment({ alg: "HS256", typ: "JWT" }),
+            encodeSegment({
+              aud: "authenticated",
+              exp: expiresAt,
+              role: "authenticated",
+              sub: "test-user",
+            }),
+            "FAKE-SIGNATURE-NOT-REAL",
+          ].join("."),
           refresh_token: "FAKE-REFRESH-TOKEN-NOT-REAL",
           expires_in: 3600,
-          expires_at: Math.floor(Date.now() / 1000) + 3600,
+          expires_at: expiresAt,
           token_type: "bearer",
           user: { id: "test-user", aud: "authenticated", email: "x@example.invalid" },
         };
         try {
-          sessionStorage.setItem(key, JSON.stringify({ currentSession: fakeSession }));
+          sessionStorage.setItem(key, JSON.stringify(fakeSession));
         } catch {
           /* ignore */
         }
@@ -168,11 +180,7 @@ test.describe("Auth redirect safety (mocked)", () => {
     );
     await page.goto("/reset-password?redirectTo=https://evil.example");
     const newPwd = page.getByLabel(/^new password$/i);
-    const ready = await newPwd
-      .waitFor({ timeout: 5000 })
-      .then(() => true)
-      .catch(() => false);
-    test.skip(!ready, "Reset form did not render with synthetic session.");
+    await expect(newPwd).toBeVisible();
     await newPwd.fill("verdantnoop1");
     await page.getByLabel(/^confirm new password$/i).fill("verdantnoop1");
     await page.getByRole("button", { name: /^update password$/i }).click();

@@ -45,8 +45,8 @@ import {
   canReject,
   canComplete,
   canCancel,
-  buildTransitionPatch,
-  eventTypeFor,
+  buildActionQueueTransitionRpcArgs,
+  parseActionQueueTransitionRpcResult,
   nextStatusFor,
   normalizeNote,
 } from "@/lib/actionQueueTransitions";
@@ -411,52 +411,37 @@ export default function ActionDetail() {
     setOutcomeNote("");
   }
 
-  // SECURITY: audit-only insert. No device commands. user_id omitted (DB default auth.uid()).
-  async function logEvent(
-    current: ActionRow,
-    event_type: EventType,
-    new_status: Status,
-    note?: string,
-  ): Promise<boolean> {
-    const { error } = await supabase.from("action_queue_events").insert({
-      action_queue_id: current.id,
-      grow_id: current.grow_id,
-      event_type,
-      previous_status: current.status,
-      new_status,
-      note: note ?? null,
-    });
-    if (error) {
-      toast.warning("Status updated, but audit log failed", {
-        description: safeActionQueueFailureCopy("audit", error),
-      });
-      return false;
-    }
-    return true;
-  }
-
   async function transition(
     current: ActionRow,
-    next: Partial<ActionRow>,
-    event_type: EventType,
-    new_status: Status,
+    kind: TransitionKind,
     note?: string,
   ): Promise<boolean> {
     setBusy(true);
-    const { error } = await supabase.from("action_queue").update(next).eq("id", current.id);
-    if (error) {
+    const rpcArgs = buildActionQueueTransitionRpcArgs({
+      actionQueueId: current.id,
+      transition: kind,
+      expectedStatus: current.status,
+      note,
+    });
+    const { data, error } = await supabase.rpc("action_queue_transition", rpcArgs);
+    const result = parseActionQueueTransitionRpcResult(data, rpcArgs);
+    if (error || !result || result.ok !== true) {
+      const shouldReload =
+        result?.ok === false &&
+        (result.reason === "status_conflict" || result.reason === "action_not_found");
+      if (shouldReload) await load();
       setBusy(false);
-      toast.error(safeActionQueueFailureCopy("transition", error));
+      toast.error(safeActionQueueFailureCopy("transition", error ?? result));
       return false;
     }
-    await logEvent(current, event_type, new_status, note);
+
     // Follow-up diary entry: ONLY when this transition completes the action.
     // Non-blocking — if it fails we keep the completed status + audit row.
-    if (new_status === "completed") {
+    if (result.new_status === "completed") {
       await maybeCreateFollowupDiaryEntry({
         ...current,
-        ...next,
         status: "completed",
+        completed_at: result.transitioned_at,
       });
     }
     setBusy(false);
@@ -521,8 +506,7 @@ export default function ActionDetail() {
     setDialog(null);
     setNoteDraft("");
 
-    const patch = buildTransitionPatch(kind);
-    const success = await transition(row, patch, eventTypeFor(kind), nextStatusFor(kind), note);
+    const success = await transition(row, kind, note);
     if (success && kind === "simulate") {
       toast.message("Simulated (no device command sent)");
     }

@@ -51,11 +51,7 @@ const COACH_ROW_NO_ALERT = {
   reason: "Stress observed.",
 };
 
-let listRows: unknown[] = [
-  ALERT_DERIVED_ROW,
-  AI_DOCTOR_ROW_WITH_ALERT,
-  COACH_ROW_NO_ALERT,
-];
+let listRows: unknown[] = [ALERT_DERIVED_ROW, AI_DOCTOR_ROW_WITH_ALERT, COACH_ROW_NO_ALERT];
 const insertSpy = vi.fn();
 
 vi.mock("@/integrations/supabase/client", () => {
@@ -146,9 +142,7 @@ function renderList(url = "/actions") {
 }
 
 async function waitForRows() {
-  await waitFor(() =>
-    expect(screen.getAllByTestId("action-queue-row").length).toBeGreaterThan(0),
-  );
+  await waitFor(() => expect(screen.getAllByTestId("action-queue-row").length).toBeGreaterThan(0));
 }
 
 describe("Action Queue row — Linked alert affordance", () => {
@@ -156,9 +150,7 @@ describe("Action Queue row — Linked alert affordance", () => {
     renderList();
     await waitForRows();
     const row = document.querySelector('[data-action-id="aq-alert-1"]') as HTMLElement;
-    const chip = row.querySelector(
-      '[data-testid="action-queue-row-linked-alert"]',
-    ) as HTMLElement;
+    const chip = row.querySelector('[data-testid="action-queue-row-linked-alert"]') as HTMLElement;
     expect(chip).toBeTruthy();
     expect(chip.textContent ?? "").toMatch(/linked alert/i);
   });
@@ -192,12 +184,8 @@ describe("Action Queue row — Linked alert affordance", () => {
     renderList();
     await waitForRows();
     const row = document.querySelector('[data-action-id="aq-coach-1"]') as HTMLElement;
-    expect(
-      row.querySelector('[data-testid="action-queue-row-linked-alert"]'),
-    ).toBeNull();
-    expect(
-      row.querySelector('[data-testid="action-queue-row-linked-alert-anchor"]'),
-    ).toBeNull();
+    expect(row.querySelector('[data-testid="action-queue-row-linked-alert"]')).toBeNull();
+    expect(row.querySelector('[data-testid="action-queue-row-linked-alert-anchor"]')).toBeNull();
   });
 
   it("does not leak raw [alert:<id>], [session:<id>] tokens, or target_device on any row", async () => {
@@ -213,9 +201,7 @@ describe("Action Queue row — Linked alert affordance", () => {
   it("link copy does not imply automation, execution, or status transition", async () => {
     renderList();
     await waitForRows();
-    const anchor = (await screen.findAllByTestId(
-      "action-queue-row-linked-alert-anchor",
-    ))[0];
+    const anchor = (await screen.findAllByTestId("action-queue-row-linked-alert-anchor"))[0];
     const lower = (anchor.textContent ?? "").toLowerCase();
     for (const tok of [
       "auto-execute",
@@ -249,26 +235,22 @@ describe("Action Queue row — Linked alert affordance", () => {
 });
 
 // --- Static safety scans ----------------------------------------------------
-const QUEUE_SRC = readFileSync(
-  resolve(__dirname, "../..", "src/pages/ActionQueue.tsx"),
-  "utf8",
-);
+const QUEUE_SRC = readFileSync(resolve(__dirname, "../..", "src/pages/ActionQueue.tsx"), "utf8");
 
 describe("Action Queue Linked alert — static safety", () => {
   it("introduces no new write paths into action_queue or alerts", () => {
     const lower = QUEUE_SRC.toLowerCase();
     expect(lower).not.toContain("functions.invoke");
     expect(lower).not.toContain("service_role");
-    expect(lower).not.toMatch(
-      /from\(["']action_queue["'][\s\S]{0,200}?\.upsert\(/,
-    );
-    expect(lower).not.toMatch(
-      /from\(["']action_queue["'][\s\S]{0,200}?\.delete\(/,
-    );
+    expect(lower).not.toMatch(/from\(["']action_queue["'][\s\S]{0,200}?\.upsert\(/);
+    expect(lower).not.toMatch(/from\(["']action_queue["'][\s\S]{0,200}?\.delete\(/);
     expect(lower).not.toMatch(
       /from\(["']alerts["'][\s\S]{0,200}?\.(insert|update|delete|upsert)\(/,
     );
-    expect(lower).not.toMatch(/\.rpc\(/);
+    const rpcNames = [...lower.matchAll(/supabase\.rpc\(\s*["']([^"']+)["']/g)].map(
+      (match) => match[1],
+    );
+    expect(rpcNames).toEqual(["action_queue_transition"]);
   });
 
   it("uses the shared route helper and pure extractor", () => {

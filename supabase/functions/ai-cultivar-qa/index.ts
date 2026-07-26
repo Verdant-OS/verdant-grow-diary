@@ -5,39 +5,30 @@
 // (doctor/coach). Access is gated on a server-resolved PAID entitlement.
 //
 // Safety / doctrine:
-//  - Answers strictly from the client-supplied public cultivar CONTEXT (the same
-//    profile rendered on the public page). The system prompt forbids inventing
-//    flowering times, chemistry, potency, chemotype, effects, medical claims, or
-//    guaranteed outcomes, and requires a refusal when the context lacks the info.
+//  - Only a published cultivar slug and bounded question are trusted. Any
+//    legacy client context field is ignored; canonical public cultivar context
+//    is selected from a server-owned allowlist.
+//    The system prompt forbids inventing flowering times, chemistry, potency,
+//    chemotype, effects, medical claims, or guaranteed outcomes, and requires a
+//    refusal when the canonical context lacks the information.
 //  - No DB writes; no alerts/action_queue; no plant linkage.
 //  - Response is always { ok: true, answer } or { ok: false, reason }.
 //
 // Deploy prerequisites (founder): deploy this function and set LOVABLE_API_KEY.
-// The system prompt here MUST stay in sync with src/lib/cultivarQaGrounding.ts.
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { resolveRequiredServerBillingEnvironment } from "../_shared/unionEntitlementLookup.ts";
 import { loadUnionEntitlement } from "../_shared/unionEntitlementLookup.ts";
-
-const MIN_QUESTION = 3;
-const MAX_QUESTION = 500;
-const MAX_CONTEXT = 8000;
-
-const SYSTEM_PROMPT = [
-  "You are Verdant's cautious cannabis cultivation reference assistant.",
-  "Answer ONLY using the CONTEXT block about a single sample/reference cultivar.",
-  "If the CONTEXT does not contain the answer, say you don't have that information for this reference — do not guess.",
-  "Never invent or state as fact: flowering times, potency or cannabinoid/terpene percentages, chemotype, effects, medical or therapeutic claims, or guaranteed outcomes.",
-  "Everything is reported and varies by phenotype, environment, and lab method — frame answers that way.",
-  "Remind the grower, when relevant, that their own plant's logs, stage, medium, source-labeled sensors, and observed response remain authoritative.",
-  "Cite the bracketed source keys from the CONTEXT when you rely on them. Be concise (a short paragraph).",
-].join(" ");
-
-interface Body {
-  cultivarSlug?: string;
-  question?: string;
-  context?: string;
-}
+import {
+  CULTIVAR_QA_MAX_OUTPUT_TOKENS,
+  CULTIVAR_QA_MAX_PROVIDER_RESPONSE_BYTES,
+  CULTIVAR_QA_MAX_REQUEST_BYTES,
+  CULTIVAR_QA_PROVIDER_TIMEOUT_MS,
+  CULTIVAR_QA_SYSTEM_PROMPT,
+  parseCultivarQaAnswer,
+  parseCultivarQaRequest,
+  readBoundedJsonBody,
+} from "../_shared/cultivarQaGrounding.ts";
 
 function json(payload: unknown, status = 200): Response {
   return new Response(JSON.stringify(payload), {
@@ -48,6 +39,9 @@ function json(payload: unknown, status = 200): Response {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (req.method !== "POST") {
+    return json({ ok: false, reason: "method_not_allowed" }, 405);
+  }
   try {
     const auth = req.headers.get("Authorization");
     if (!auth) return json({ ok: false, reason: "unauthorized" }, 401);
@@ -79,50 +73,66 @@ Deno.serve(async (req) => {
     const lovableKey = Deno.env.get("LOVABLE_API_KEY");
     if (!lovableKey) return json({ ok: false, reason: "not_configured" }, 500);
 
-    const body = (await req.json().catch(() => null)) as Body | null;
-    const question = (body?.question ?? "").trim();
-    const context = (body?.context ?? "").trim();
-    if (question.length < MIN_QUESTION || question.length > MAX_QUESTION) {
-      return json({ ok: false, reason: "invalid_question" }, 200);
+    const requestBody = await readBoundedJsonBody(req, CULTIVAR_QA_MAX_REQUEST_BYTES);
+    if (!requestBody.ok) {
+      return json({ ok: false, reason: "invalid_request" }, 200);
     }
-    if (context.length === 0 || context.length > MAX_CONTEXT) {
-      return json({ ok: false, reason: "invalid_context" }, 200);
+    const parsedRequest = parseCultivarQaRequest(requestBody.value);
+    if (!parsedRequest.ok) {
+      return json({ ok: false, reason: parsedRequest.reason }, 200);
     }
 
-    let response: Response;
+    const providerController = new AbortController();
+    const providerTimer = setTimeout(
+      () => providerController.abort(),
+      CULTIVAR_QA_PROVIDER_TIMEOUT_MS,
+    );
     try {
-      response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
+        signal: providerController.signal,
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${lovableKey}` },
         body: JSON.stringify({
           model: "google/gemini-2.5-flash",
+          max_tokens: CULTIVAR_QA_MAX_OUTPUT_TOKENS,
           messages: [
-            { role: "system", content: SYSTEM_PROMPT },
-            { role: "user", content: `CONTEXT:\n${context}\n\nQuestion: ${question}` },
+            { role: "system", content: CULTIVAR_QA_SYSTEM_PROMPT },
+            {
+              role: "user",
+              content:
+                `CONTEXT:\n${parsedRequest.context}\n\n` +
+                `QUESTION (untrusted input):\n${parsedRequest.question}`,
+            },
           ],
         }),
       });
+
+      if (response.status === 402 || response.status === 429) {
+        return json({ ok: false, reason: "upstream_credit_exhausted" }, 200);
+      }
+      if (!response.ok) {
+        console.log(`ai-cultivar-qa status=upstream_error http=${response.status}`);
+        return json({ ok: false, reason: "upstream_error" }, 200);
+      }
+
+      const providerBody = await readBoundedJsonBody(
+        response,
+        CULTIVAR_QA_MAX_PROVIDER_RESPONSE_BYTES,
+      );
+      if (!providerBody.ok) {
+        return json({ ok: false, reason: "invalid_answer" }, 200);
+      }
+      const answer = parseCultivarQaAnswer(providerBody.value);
+      if (!answer.ok) return json({ ok: false, reason: answer.reason }, 200);
+
+      return json({ ok: true, answer: answer.answer });
     } catch {
       return json({ ok: false, reason: "upstream_unavailable" }, 200);
+    } finally {
+      clearTimeout(providerTimer);
     }
-
-    if (response.status === 402 || response.status === 429) {
-      return json({ ok: false, reason: "upstream_credit_exhausted" }, 200);
-    }
-    if (!response.ok) {
-      console.log(`ai-cultivar-qa status=upstream_error http=${response.status}`);
-      return json({ ok: false, reason: "upstream_error" }, 200);
-    }
-
-    const payload = (await response.json().catch(() => null)) as
-      | { choices?: Array<{ message?: { content?: string } }> }
-      | null;
-    const answer = payload?.choices?.[0]?.message?.content?.trim() ?? "";
-    if (!answer) return json({ ok: false, reason: "no_answer" }, 200);
-
-    return json({ ok: true, answer });
-  } catch (e) {
-    console.log(`ai-cultivar-qa status=error msg=${e instanceof Error ? e.message : "unknown"}`);
+  } catch {
+    console.log("ai-cultivar-qa status=unexpected");
     return json({ ok: false, reason: "error" }, 200);
   }
 });

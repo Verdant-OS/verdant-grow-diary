@@ -9,7 +9,9 @@ const DETAIL = readFileSync(resolve(ROOT, "src/pages/ActionDetail.tsx"), "utf8")
 describe("Action Queue detail view", () => {
   it("registers the /actions/:actionId route in App.tsx", () => {
     expect(APP).toMatch(/path="\/actions\/:actionId"\s+element=\{<ActionDetail\s*\/>\}/);
-    expect(APP).toMatch(/ActionDetail\s*=\s*lazy\(\(\)\s*=>\s*import\("\.\/pages\/ActionDetail"\)\)/);
+    expect(APP).toMatch(
+      /ActionDetail\s*=\s*lazy\(\(\)\s*=>\s*import\("\.\/pages\/ActionDetail"\)\)/,
+    );
   });
 
   it("uses the useParams actionId from the URL", () => {
@@ -65,12 +67,16 @@ describe("Action Queue detail view", () => {
     );
   });
 
-  it("audit insert omits user_id (DB default auth.uid() wins)", () => {
+  it("uses the atomic transition RPC without caller-supplied identity", () => {
     const m = DETAIL.match(
-      /\.from\(\s*["']action_queue_events["']\s*\)\s*\.insert\(\{([\s\S]*?)\}\)/,
+      /const\s+rpcArgs\s*=\s*buildActionQueueTransitionRpcArgs\(\s*\{([\s\S]*?)\}\s*\)/,
     );
     expect(m).toBeTruthy();
-    expect(m![1]).not.toMatch(/user_id/);
+    expect(m![1]).not.toMatch(/\buser_id\b|\bgrow_id\b|\bevent_type\b|\bnew_status\b/);
+    expect(DETAIL).toMatch(
+      /supabase\.rpc\(\s*["']action_queue_transition["']\s*,\s*rpcArgs\s*,?\s*\)/,
+    );
+    expect(DETAIL).not.toMatch(/\.from\(\s*["']action_queue_events["']\s*\)\s*\.insert\(/);
   });
 
   it("introduces no device-control surface or service_role", () => {

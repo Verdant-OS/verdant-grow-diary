@@ -5,8 +5,8 @@
  *  - Native window.prompt is no longer used.
  *  - shadcn Dialog + Textarea power the note capture.
  *  - Cancel writes no audit event (no transition() in cancel handler).
- *  - Confirm forwards a trimmed note (or undefined if blank) into transition()
- *    and ultimately into action_queue_events.note.
+ *  - Confirm forwards a trimmed note (or undefined if blank) into the
+ *    transactional transition RPC.
  *  - Approve / Reject / Simulate each open the dialog.
  *  - History still renders the note.
  *  - action_queue_events remains immutable (no UPDATE policy added).
@@ -61,9 +61,15 @@ describe("ActionQueue — note Dialog UX", () => {
 
 describe("ActionQueue — dialog wiring", () => {
   it("Approve / Reject / Simulate each open the dialog", () => {
-    expect(PAGE).toMatch(/function\s+approve[\s\S]{0,80}openNoteDialog\(\s*row\s*,\s*["']approve["']\s*\)/);
-    expect(PAGE).toMatch(/function\s+reject[\s\S]{0,80}openNoteDialog\(\s*row\s*,\s*["']reject["']\s*\)/);
-    expect(PAGE).toMatch(/function\s+simulate[\s\S]{0,80}openNoteDialog\(\s*row\s*,\s*["']simulate["']\s*\)/);
+    expect(PAGE).toMatch(
+      /function\s+approve[\s\S]{0,80}openNoteDialog\(\s*row\s*,\s*["']approve["']\s*\)/,
+    );
+    expect(PAGE).toMatch(
+      /function\s+reject[\s\S]{0,80}openNoteDialog\(\s*row\s*,\s*["']reject["']\s*\)/,
+    );
+    expect(PAGE).toMatch(
+      /function\s+simulate[\s\S]{0,80}openNoteDialog\(\s*row\s*,\s*["']simulate["']\s*\)/,
+    );
   });
 
   it("Cancel makes no status change and writes no audit event", () => {
@@ -79,16 +85,13 @@ describe("ActionQueue — dialog wiring", () => {
   });
 
   it("Confirm path drives transition() for each kind via shared helpers", () => {
-    expect(PAGE).toMatch(/buildTransitionPatch\(kind\)/);
-    expect(PAGE).toMatch(/transition\(row,\s*patch,\s*eventTypeFor\(kind\),\s*nextStatusFor\(kind\),\s*note\)/);
+    expect(PAGE).toMatch(/transition\(row,\s*kind,\s*note\)/);
+    expect(PAGE).toMatch(/buildActionQueueTransitionRpcArgs\(\s*\{/);
   });
 
-
-
-  it("note is written into action_queue_events.note", () => {
-    expect(PAGE).toMatch(
-      /\.from\(\s*["']action_queue_events["']\s*\)\s*\.insert\(\s*\{[\s\S]*?note:\s*note\s*\?\?\s*null[\s\S]*?\}/,
-    );
+  it("note is passed to the transactional RPC input", () => {
+    expect(PAGE).toMatch(/buildActionQueueTransitionRpcArgs\(\s*\{[\s\S]*?note,[\s\S]*?\}\s*\)/);
+    expect(PAGE).not.toMatch(/\.from\(\s*["']action_queue_events["']\s*\)\s*\.insert\(/);
   });
 
   it("history view still renders the note", () => {
@@ -101,7 +104,6 @@ describe("ActionQueue — safety", () => {
     expect(MIG).not.toMatch(
       /CREATE\s+POLICY[^;]*?ON\s+public\.action_queue_events[^;]*?FOR\s+UPDATE/i,
     );
-
   });
 
   it("no device-control surface introduced", () => {

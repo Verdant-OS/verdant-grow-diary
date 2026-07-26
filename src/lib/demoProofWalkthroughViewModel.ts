@@ -189,8 +189,8 @@ const STEPS: readonly DemoProofWalkthroughStep[] = Object.freeze([
       "Checklist of six steps, sensor-proof section (live/audit), and copy/print markdown free of UUIDs, ISO-second timestamps, and private identifiers.",
     href: "/demo/one-tent-live-proof",
     safetyNote:
-      "Report copy is sanitized; missing or blocked proof renders as 'Needs operator confirmation', never as healthy.",
-    statusKind: "ready",
+      "A server-verified operator role is required. Report copy is sanitized; missing or blocked proof renders as 'Needs operator confirmation', never as healthy.",
+    statusKind: "operator_only",
   },
 ]);
 

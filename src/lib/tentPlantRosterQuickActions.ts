@@ -26,10 +26,7 @@ import {
 
 export { PLANT_QUICKLOG_PREFILL_EVENT };
 
-export type TentPlantRosterQuickActionKind =
-  | "view_diary"
-  | "add_quicklog"
-  | "view_photos";
+export type TentPlantRosterQuickActionKind = "view_diary" | "add_quicklog" | "view_photos";
 
 export interface TentPlantRosterQuickActionContext {
   tentId: string | null | undefined;
@@ -43,8 +40,7 @@ export interface TentPlantRosterQuickActionPlantInput {
 }
 
 export interface TentPlantRosterQuickActionsInput
-  extends TentPlantRosterQuickActionPlantInput,
-    TentPlantRosterQuickActionContext {
+  extends TentPlantRosterQuickActionPlantInput, TentPlantRosterQuickActionContext {
   /**
    * Override for the photos anchor availability. Defaults to true now that
    * Plant Detail renders a dedicated `plant-photos` anchor. Tests/storybook
@@ -60,8 +56,8 @@ export const TENT_PLANT_ROSTER_PHOTOS_FALLBACK_HINT_COPY =
 export interface TentPlantRosterQuickActionEntry {
   kind: TentPlantRosterQuickActionKind;
   label: string;
-  /** Defined when the entry navigates to an existing route. */
-  href?: string;
+  /** A real route for navigation entries; null for event-only or disabled entries. */
+  href: string | null;
   /** Defined when the entry dispatches a global event instead of navigating. */
   event?: "open-quicklog";
   /** Forwarded as CustomEvent `detail` for `event` entries. */
@@ -82,9 +78,7 @@ export interface TentPlantRosterQuickActionEntry {
 const DIARY_ANCHOR_AVAILABLE = true;
 const PHOTOS_ANCHOR_AVAILABLE_DEFAULT = true;
 
-function buildPrefill(
-  input: TentPlantRosterQuickActionsInput,
-): PlantQuickLogPrefill | null {
+function buildPrefill(input: TentPlantRosterQuickActionsInput): PlantQuickLogPrefill | null {
   const { plantId, tentId, growId } = input;
   if (!plantId || !tentId || !growId) return null;
   return {
@@ -103,9 +97,7 @@ export function tentPlantRosterQuickActionsTriggerLabel(
   plantName: string | null | undefined,
 ): string {
   const name =
-    typeof plantName === "string" && plantName.trim().length > 0
-      ? plantName.trim()
-      : "this plant";
+    typeof plantName === "string" && plantName.trim().length > 0 ? plantName.trim() : "this plant";
   return `Open actions for ${name}`;
 }
 
@@ -113,24 +105,22 @@ export function buildTentPlantRosterQuickActions(
   input: TentPlantRosterQuickActionsInput,
 ): TentPlantRosterQuickActionEntry[] {
   const plantId =
-    typeof input.plantId === "string" && input.plantId.length > 0
-      ? input.plantId
-      : null;
+    typeof input.plantId === "string" && input.plantId.length > 0 ? input.plantId : null;
 
   const photosAnchorAvailable =
     input.photosAnchorAvailable === false ? false : PHOTOS_ANCHOR_AVAILABLE_DEFAULT;
 
-  const plantDetailHref = plantId ? plantDetailPath(plantId) : "#";
-  const diaryHref = plantId
+  const plantDetailHref = plantId ? plantDetailPath(plantId) : null;
+  const diaryHref = plantDetailHref
     ? DIARY_ANCHOR_AVAILABLE
       ? `${plantDetailHref}#${PLANT_RELATIVE_TIMELINE_ANCHOR_ID}`
       : plantDetailHref
-    : "#";
-  const photosHref = plantId
+    : null;
+  const photosHref = plantDetailHref
     ? photosAnchorAvailable
       ? `${plantDetailHref}#${PLANT_PHOTOS_ANCHOR_ID}`
       : plantDetailHref
-    : "#";
+    : null;
 
   const prefill = buildPrefill(input);
 
@@ -151,13 +141,12 @@ export function buildTentPlantRosterQuickActions(
     {
       kind: "add_quicklog",
       label: "Add Quick Log",
+      href: null,
       event: "open-quicklog",
       eventPayload: prefill,
       testId: `${testIdBase}-add-quicklog`,
       disabled: !prefill,
-      disabledReason: prefill
-        ? undefined
-        : "Plant, tent, or grow context is not loaded yet.",
+      disabledReason: prefill ? undefined : "Plant, tent, or grow context is not loaded yet.",
     },
     {
       kind: "view_photos",
@@ -177,7 +166,5 @@ export function dispatchTentPlantRosterQuickLog(
 ): void {
   if (typeof window === "undefined") return;
   if (!payload) return;
-  window.dispatchEvent(
-    new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, { detail: payload }),
-  );
+  window.dispatchEvent(new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, { detail: payload }));
 }

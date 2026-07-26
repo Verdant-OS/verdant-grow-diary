@@ -20,10 +20,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import {
-  buildActionButtonAriaLabel,
-  buildStatusBadgeAriaLabel,
-} from "@/lib/actionQueueRowView";
+import { buildActionButtonAriaLabel, buildStatusBadgeAriaLabel } from "@/lib/actionQueueRowView";
 import { stripSourceComments } from "@/test/utils/stripSourceComments";
 
 const QUEUE = stripSourceComments(
@@ -32,15 +29,9 @@ const QUEUE = stripSourceComments(
 const DETAIL = stripSourceComments(
   readFileSync(resolve(__dirname, "../..", "src/pages/ActionDetail.tsx"), "utf8"),
 );
-const BUTTON = readFileSync(
-  resolve(__dirname, "../..", "src/components/ui/button.tsx"),
-  "utf8",
-);
+const BUTTON = readFileSync(resolve(__dirname, "../..", "src/components/ui/button.tsx"), "utf8");
 
-const FORBIDDEN_IN_LABELS = [
-  "[alert:",
-  "[session:",
-];
+const FORBIDDEN_IN_LABELS = ["[alert:", "[session:"];
 
 // Patterns that must never appear in any accessible name produced by
 // the helper, regardless of input.
@@ -63,21 +54,13 @@ function buttonOpeningTag(source: string, testId: string): string | undefined {
 
 describe("buildActionButtonAriaLabel — pure helper", () => {
   it("composes a descriptive label per transition kind", () => {
-    expect(buildActionButtonAriaLabel("approve", SAMPLE_ROW)).toBe(
-      "Approve action: Raise Light",
-    );
-    expect(buildActionButtonAriaLabel("reject", SAMPLE_ROW)).toBe(
-      "Reject action: Raise Light",
-    );
-    expect(buildActionButtonAriaLabel("simulate", SAMPLE_ROW)).toBe(
-      "Simulate action: Raise Light",
-    );
+    expect(buildActionButtonAriaLabel("approve", SAMPLE_ROW)).toBe("Approve action: Raise Light");
+    expect(buildActionButtonAriaLabel("reject", SAMPLE_ROW)).toBe("Reject action: Raise Light");
+    expect(buildActionButtonAriaLabel("simulate", SAMPLE_ROW)).toBe("Simulate action: Raise Light");
     expect(buildActionButtonAriaLabel("complete", SAMPLE_ROW)).toBe(
       "Mark action complete: Raise Light",
     );
-    expect(buildActionButtonAriaLabel("cancel", SAMPLE_ROW)).toBe(
-      "Cancel action: Raise Light",
-    );
+    expect(buildActionButtonAriaLabel("cancel", SAMPLE_ROW)).toBe("Cancel action: Raise Light");
   });
 
   it("falls back to 'Suggested action' when action_type is missing", () => {
@@ -96,12 +79,12 @@ describe("buildActionButtonAriaLabel — pure helper", () => {
       }),
     ).toBe("Approve action: Raise Light. Saving — please wait");
     // Empty/whitespace reasons are ignored.
-    expect(
-      buildActionButtonAriaLabel("approve", SAMPLE_ROW, { disabledReason: "   " }),
-    ).toBe("Approve action: Raise Light");
-    expect(
-      buildActionButtonAriaLabel("approve", SAMPLE_ROW, { disabledReason: null }),
-    ).toBe("Approve action: Raise Light");
+    expect(buildActionButtonAriaLabel("approve", SAMPLE_ROW, { disabledReason: "   " })).toBe(
+      "Approve action: Raise Light",
+    );
+    expect(buildActionButtonAriaLabel("approve", SAMPLE_ROW, { disabledReason: null })).toBe(
+      "Approve action: Raise Light",
+    );
   });
 
   it("never leaks ids, back-pointer tokens, or raw reason text into the label", () => {
@@ -122,9 +105,7 @@ describe("buildActionButtonAriaLabel — pure helper", () => {
 
 describe("buildStatusBadgeAriaLabel — pure helper", () => {
   it("describes the current status for assistive tech", () => {
-    expect(buildStatusBadgeAriaLabel("pending_approval")).toBe(
-      "Current status: Pending review",
-    );
+    expect(buildStatusBadgeAriaLabel("pending_approval")).toBe("Current status: Pending review");
     expect(buildStatusBadgeAriaLabel("approved")).toBe("Current status: Approved");
     expect(buildStatusBadgeAriaLabel("simulated")).toBe("Current status: Simulated");
     expect(buildStatusBadgeAriaLabel("rejected")).toBe("Current status: Rejected");
@@ -142,9 +123,7 @@ describe("ActionQueue — status-control aria wiring", () => {
 
   it("wires aria-label on every status-change button via the helper", () => {
     for (const kind of ["approve", "simulate", "reject", "complete", "cancel"] as const) {
-      const re = new RegExp(
-        `aria-label=\\{buildActionButtonAriaLabel\\(\\s*["']${kind}["']`,
-      );
+      const re = new RegExp(`aria-label=\\{buildActionButtonAriaLabel\\(\\s*["']${kind}["']`);
       expect(QUEUE).toMatch(re);
     }
   });
@@ -167,9 +146,7 @@ describe("ActionDetail — status-control aria wiring", () => {
 
   it("wires aria-label on every status-change button via the helper", () => {
     for (const kind of ["approve", "simulate", "reject", "complete", "cancel"] as const) {
-      const re = new RegExp(
-        `aria-label=\\{buildActionButtonAriaLabel\\(\\s*["']${kind}["']`,
-      );
+      const re = new RegExp(`aria-label=\\{buildActionButtonAriaLabel\\(\\s*["']${kind}["']`);
       expect(DETAIL).toMatch(re);
     }
   });
@@ -227,11 +204,14 @@ describe("static safety — no automation/device-command copy introduced", () =>
   it("ActionDetail.tsx executable code is clean", () => {
     for (const re of FORBIDDEN) expect(DETAIL).not.toMatch(re);
   });
-  it("client never inserts user_id on the audit row", () => {
+  it("client never supplies identity to the transition RPC", () => {
     const m = QUEUE.match(
-      /\.from\(\s*["']action_queue_events["']\s*\)\s*\.insert\(\s*\{([\s\S]*?)\}\s*\)/,
+      /const\s+rpcArgs\s*=\s*buildActionQueueTransitionRpcArgs\(\s*\{([\s\S]*?)\}\s*\)/,
     );
     expect(m).not.toBeNull();
-    expect(m![1]).not.toMatch(/\buser_id\s*:/);
+    expect(m![1]).not.toMatch(/\buser_id\b|\bgrow_id\b|\bevent_type\b|\bnew_status\b/);
+    expect(QUEUE).toMatch(
+      /supabase\.rpc\(\s*["']action_queue_transition["']\s*,\s*rpcArgs\s*,?\s*\)/,
+    );
   });
 });

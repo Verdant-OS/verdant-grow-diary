@@ -13,9 +13,8 @@
  * to avoid layout shift on slow networks. Dark mode is intentionally
  * not inverted — the mark reads well on dark surfaces as-is.
  *
- * TODO(favicon): the detailed circular mark does not render well at
- * 16×16. When time allows, produce a simplified single-glyph favicon
- * derived from this asset and wire it into index.html / manifest.
+ * The detailed circular mark is not reused at 16×16; index.html points to
+ * the purpose-built leaf-and-pen SVG favicon in public/favicon.svg.
  */
 
 const LOGO_SRC = "/brand/verdant-logo.png";

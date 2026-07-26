@@ -453,13 +453,18 @@ export default function AiDoctorSessionsIndex() {
   const [savingView, setSavingView] = useState(false);
   const [pendingLabel, setPendingLabel] = useState("");
   const [saveError, setSaveError] = useState<SaveViewError | null>(null);
+  const [savedViewsPersistenceError, setSavedViewsPersistenceError] = useState(false);
 
-  useEffect(() => {
-    writeSavedViews(savedViews);
-  }, [savedViews]);
+  const persistUserSavedViews = (nextViews: SavedView[]): boolean => {
+    const persisted = writeSavedViews(nextViews);
+    setSavedViewsPersistenceError(!persisted);
+    if (!persisted) return false;
+    setSavedViews(nextViews);
+    return true;
+  };
 
   // Display list merges built-in (system) views in front of user views.
-  // Built-in views are never persisted — see write effect below.
+  // Built-in views are never passed to the explicit persistence helper above.
   const displaySavedViews = useMemo(() => mergeBuiltInSavedViews(savedViews), [savedViews]);
 
   // Auto-select the matching built-in view when current filters/page match it,
@@ -492,7 +497,8 @@ export default function AiDoctorSessionsIndex() {
       existing: [...BUILTIN_SAVED_VIEWS, ...savedViews],
     });
     if (result.ok && result.view) {
-      setSavedViews([...savedViews, result.view]);
+      const nextViews = [...savedViews, result.view];
+      if (!persistUserSavedViews(nextViews)) return;
       setSavingView(false);
       setPendingLabel("");
       setSaveError(null);
@@ -519,7 +525,11 @@ export default function AiDoctorSessionsIndex() {
       setPendingDeleteId(null);
       return;
     }
-    setSavedViews((prev) => removeSavedView(prev, pendingDeleteId));
+    const nextViews = removeSavedView(savedViews, pendingDeleteId);
+    if (!persistUserSavedViews(nextViews)) {
+      setPendingDeleteId(null);
+      return;
+    }
     if (selectedSavedViewId === pendingDeleteId) setSelectedSavedViewId("");
     setPendingDeleteId(null);
   };
@@ -563,7 +573,11 @@ export default function AiDoctorSessionsIndex() {
       setImportSummary(null);
       return;
     }
-    setSavedViews(result.views ?? []);
+    const nextViews = result.views ?? [];
+    if (!persistUserSavedViews(nextViews)) {
+      setImportSummary(null);
+      return;
+    }
     setImportSummary({
       added: result.added?.length ?? 0,
       skipped: result.skipped?.length ?? 0,
@@ -991,6 +1005,22 @@ export default function AiDoctorSessionsIndex() {
                             : "Saved view limit reached."}
                   </span>
                 ) : null}
+                {savedViewsPersistenceError ? (
+                  <span
+                    className="w-full text-xs text-destructive"
+                    role="alert"
+                    data-testid="ai-doctor-sessions-saved-views-persistence-error"
+                  >
+                    Couldn't save saved views to browser storage. Check site permissions and try
+                    again.
+                  </span>
+                ) : null}
+                <p
+                  className="w-full text-[11px] text-muted-foreground"
+                  data-testid="ai-doctor-sessions-saved-views-storage-disclosure"
+                >
+                  Custom saved views stay on this device and are not synced to your account.
+                </p>
               </div>
 
               <div

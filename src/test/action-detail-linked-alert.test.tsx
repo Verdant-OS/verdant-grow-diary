@@ -226,7 +226,10 @@ describe("ActionDetail Linked alert — static safety", () => {
     expect(lower).not.toMatch(
       /from\(["']alerts["'][\s\S]{0,200}?\.(insert|update|delete|upsert)\(/,
     );
-    expect(lower).not.toMatch(/\.rpc\(/);
+    const rpcNames = [...lower.matchAll(/supabase\.rpc\(\s*["']([^"']+)["']/g)].map(
+      (match) => match[1],
+    );
+    expect(rpcNames).toEqual(["action_queue_transition"]);
   });
 
   it("uses the shared route helper and pure extractor", () => {

@@ -346,7 +346,10 @@ describe("ActionQueue focus deep-link — safety scan", () => {
     // chain specifically.
     expect(PAGE).not.toMatch(/\.upsert\(/);
     expect(PAGE).not.toMatch(/from\(["'][^"']+["']\)[\s\S]{0,200}?\.delete\(/);
-    expect(PAGE).not.toMatch(/\.rpc\(/);
+    const rpcNames = [...PAGE.matchAll(/supabase\.rpc\(\s*["']([^"']+)["']/g)].map(
+      (match) => match[1],
+    );
+    expect(rpcNames).toEqual(["action_queue_transition"]);
   });
 
   it("scrubs session back-pointer tokens before rendering reason", () => {

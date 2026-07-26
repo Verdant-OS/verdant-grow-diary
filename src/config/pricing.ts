@@ -52,7 +52,6 @@ const PRO_UNLOCKED_FEATURES = [
   "Multi-tent tracking",
   "Exports & data ownership",
   "Full grow history",
-  "Priority support",
   "Date-range diary & post-grow reports",
 ];
 
@@ -268,17 +267,6 @@ export const PLAN_COMPARISON: PlanComparisonRow[] = [
     },
   },
   {
-    label: "Priority support",
-    values: {
-      free: false,
-      pro_monthly: true,
-      pro_annual: true,
-      craft_monthly: true,
-      craft_annual: true,
-      founder_lifetime: true,
-    },
-  },
-  {
     label: "Date-range diary & post-grow reports",
     values: {
       free: false,
@@ -458,7 +446,7 @@ export const UPGRADE_FAQ: UpgradeFaqItem[] = [
   },
   {
     q: "What happens if I cancel Pro?",
-    a: "You keep your account and your grow history stays intact on the Free tier. Pro-only features (advanced exports, date-range reports, priority support) simply stop when your billing access ends.",
+    a: "You keep your account and your grow history stays intact on the Free tier. Pro-only features such as advanced exports and date-range reports simply stop when your billing access ends.",
   },
   {
     q: "Does Verdant control my equipment?",

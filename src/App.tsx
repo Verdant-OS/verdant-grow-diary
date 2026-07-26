@@ -1,6 +1,6 @@
 import { lazy, Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Navigate, Route, Routes, useParams } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -16,6 +16,7 @@ import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
 import { AgreementReconsentGate } from "@/components/AgreementReconsentGate";
 import RootEntry from "@/components/RootEntry";
 import RouteAliasRedirect from "@/components/RouteAliasRedirect";
+import { buildLegacyStrainSlugAliasTarget } from "@/lib/routeAliasRules";
 
 // Route pages and the authenticated AppShell are code-split so the public
 // marketing / auth entry paths (/welcome, /pricing, /hardware-integrations,
@@ -188,9 +189,13 @@ function PageLoader() {
 }
 
 function LegacyStrainSlugRedirect() {
-  // Preserves the slug when redirecting /strains/:slug → /cultivars/:slug.
+  // Preserve the decoded slug as one encoded path segment plus the incoming
+  // query/hash when redirecting /strains/:slug → /cultivars/:slug.
   const { slug } = useParams<{ slug: string }>();
-  return <Navigate to={`/cultivars/${slug ?? ""}`} replace />;
+  const location = useLocation();
+  return (
+    <Navigate to={buildLegacyStrainSlugAliasTarget(slug, location.search, location.hash)} replace />
+  );
 }
 
 const App = () => (

@@ -63,7 +63,7 @@ const DEFAULT_UNLOCK_BULLETS: ReadonlyArray<string> = [
   "Unlimited grows and full grow history",
   "More AI Doctor credits each month",
   "Read-only sensor integrations where available",
-  "Full Action Queue with approval-required steps",
+  "Multi-tent grow memory",
   "Advanced timeline filtering and sensor snapshot history",
   "Exports and backups of your grow data",
 ];
@@ -93,10 +93,7 @@ export function paywallCtaFindBannedWords(text: string): string[] {
   return [...hits].sort();
 }
 
-function describePlanSentence(
-  requiredPlan: string,
-  currentPlan: string | undefined,
-): string {
+function describePlanSentence(requiredPlan: string, currentPlan: string | undefined): string {
   if (currentPlan && currentPlan.trim() && currentPlan !== requiredPlan) {
     return `You are on ${currentPlan}. ${requiredPlan} unlocks more of Verdant's grow memory and operator tools.`;
   }
@@ -108,17 +105,12 @@ function describePlanSentence(
  * same input it always returns the same output. No I/O, no React, no
  * payment-provider calls.
  */
-export function buildPaywallCtaViewModel(
-  input: PaywallCtaInput = {},
-): PaywallCtaViewModel {
-  const requiredPlanLabel =
-    input.requiredPlanLabel?.trim() || DEFAULT_REQUIRED_PLAN_LABEL;
+export function buildPaywallCtaViewModel(input: PaywallCtaInput = {}): PaywallCtaViewModel {
+  const requiredPlanLabel = input.requiredPlanLabel?.trim() || DEFAULT_REQUIRED_PLAN_LABEL;
   const currentPlanLabel = input.currentPlanLabel?.trim() || undefined;
   const featureTitle = input.featureTitle?.trim();
 
-  const title = featureTitle
-    ? `${featureTitle} is part of ${requiredPlanLabel}`
-    : DEFAULT_TITLE;
+  const title = featureTitle ? `${featureTitle} is part of ${requiredPlanLabel}` : DEFAULT_TITLE;
 
   const bullets =
     input.unlockBullets && input.unlockBullets.length > 0
@@ -133,8 +125,7 @@ export function buildPaywallCtaViewModel(
     currentPlanLabel,
     description,
     unlockBullets: bullets,
-    primaryCtaLabel:
-      input.primaryCtaLabel?.trim() || DEFAULT_PRIMARY_CTA_LABEL,
+    primaryCtaLabel: input.primaryCtaLabel?.trim() || DEFAULT_PRIMARY_CTA_LABEL,
     primaryCtaHref: input.pricingHref?.trim() || DEFAULT_PRICING_HREF,
     secondaryCopy: input.secondaryCopy?.trim() || undefined,
   };

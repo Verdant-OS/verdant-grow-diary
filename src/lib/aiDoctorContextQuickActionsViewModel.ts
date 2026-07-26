@@ -11,6 +11,7 @@
  */
 import { sensorsPath, plantDetailPath } from "@/lib/routes";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
+import type { QuickLogActivityId } from "@/constants/quickLogActivityTypes";
 
 export type AiDoctorContextQuickActionKind =
   | "update_plant_profile"
@@ -18,7 +19,6 @@ export type AiDoctorContextQuickActionKind =
   | "add_manual_sensor_snapshot"
   | "capture_new_snapshot"
   | "add_plant_photo";
-
 
 export interface AiDoctorContextQuickActionLinkTarget {
   kind: "link";
@@ -41,11 +41,10 @@ export interface AiDoctorContextQuickLogEventPayload {
   growId: string | null;
   tentId: string | null;
   tentName: string | null;
-  eventType: "observation" | "environment";
+  eventType: "observation" | "environment" | "photo";
+  activityId: QuickLogActivityId;
   suggestSnapshot: boolean;
 }
-
-
 
 export interface AiDoctorContextQuickAction {
   kind: AiDoctorContextQuickActionKind;
@@ -111,10 +110,10 @@ const ACTION_ORDER: AiDoctorContextQuickActionKind[] = [
   "add_plant_photo",
 ];
 
-
 function quickLogPayload(
   args: BuildAiDoctorContextQuickActionsArgs,
-  eventType: "observation" | "environment" = "observation",
+  eventType: AiDoctorContextQuickLogEventPayload["eventType"],
+  activityId: QuickLogActivityId,
 ): AiDoctorContextQuickLogEventPayload | null {
   if (!args.plantId) return null;
   return {
@@ -124,10 +123,10 @@ function quickLogPayload(
     tentId: args.tentId ?? null,
     tentName: args.tentName ?? null,
     eventType,
+    activityId,
     suggestSnapshot: true,
   };
 }
-
 
 function buildAction(
   kind: AiDoctorContextQuickActionKind,
@@ -144,15 +143,12 @@ function buildAction(
         satisfies,
         target: { kind: "link", href },
         disabled: !args.plantId,
-        disabledReason: args.plantId
-          ? undefined
-          : "Plant context is not loaded yet.",
+        disabledReason: args.plantId ? undefined : "Plant context is not loaded yet.",
         testId,
       };
     }
-    case "add_recent_log":
-    case "add_plant_photo": {
-      const payload = quickLogPayload(args);
+    case "add_recent_log": {
+      const payload = quickLogPayload(args, "observation", "note");
       return {
         kind,
         label: QUICK_ACTION_LABELS[kind],
@@ -163,9 +159,23 @@ function buildAction(
           payload,
         },
         disabled: !args.plantId,
-        disabledReason: args.plantId
-          ? undefined
-          : "Plant context is not loaded yet.",
+        disabledReason: args.plantId ? undefined : "Plant context is not loaded yet.",
+        testId,
+      };
+    }
+    case "add_plant_photo": {
+      const payload = quickLogPayload(args, "photo", "photo");
+      return {
+        kind,
+        label: QUICK_ACTION_LABELS[kind],
+        satisfies,
+        target: {
+          kind: "event",
+          eventName: PLANT_QUICKLOG_PREFILL_EVENT,
+          payload,
+        },
+        disabled: !args.plantId,
+        disabledReason: args.plantId ? undefined : "Plant context is not loaded yet.",
         testId,
       };
     }
@@ -180,7 +190,7 @@ function buildAction(
       };
     }
     case "capture_new_snapshot": {
-      const payload = quickLogPayload(args, "environment");
+      const payload = quickLogPayload(args, "environment", "environment_check");
       return {
         kind,
         label: QUICK_ACTION_LABELS[kind],
@@ -191,15 +201,12 @@ function buildAction(
           payload,
         },
         disabled: !args.plantId,
-        disabledReason: args.plantId
-          ? undefined
-          : "Plant context is not loaded yet.",
+        disabledReason: args.plantId ? undefined : "Plant context is not loaded yet.",
         testId,
       };
     }
   }
 }
-
 
 /**
  * Build the deterministic list of quick actions that address the given
@@ -221,13 +228,8 @@ export function buildAiDoctorContextQuickActions(
   // missing), independent of the 7-day missing-context code. Tagged
   // with a synthetic satisfies code so downstream tests/analytics can
   // distinguish it from the 7-day surface.
-  if (
-    args.snapshotFreshnessState === "stale" ||
-    args.snapshotFreshnessState === "missing"
-  ) {
-    bucket.set("capture_new_snapshot", [
-      `snapshot-freshness-${args.snapshotFreshnessState}`,
-    ]);
+  if (args.snapshotFreshnessState === "stale" || args.snapshotFreshnessState === "missing") {
+    bucket.set("capture_new_snapshot", [`snapshot-freshness-${args.snapshotFreshnessState}`]);
   }
   const out: AiDoctorContextQuickAction[] = [];
   for (const kind of ACTION_ORDER) {
@@ -237,7 +239,6 @@ export function buildAiDoctorContextQuickActions(
   }
   return out;
 }
-
 
 /** Calm, non-actionable copy when no warning context exists. */
 export const AI_DOCTOR_NO_WARNING_CONTEXT_COPY = "No warning context found.";

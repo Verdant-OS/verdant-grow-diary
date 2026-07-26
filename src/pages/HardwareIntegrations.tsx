@@ -122,7 +122,7 @@ export default function HardwareIntegrations() {
         </Card>
         <Card title="What Verdant adds">
           A diary-first workflow, plant and tent tracking, environment alerts with an immutable
-          audit trail, an AI Coach that is cautious and suggest-only, and an approval-required
+          audit trail, an AI Doctor that is cautious and suggest-only, and an approval-required
           Action Queue where every meaningful change needs a human in the loop.
         </Card>
         <Card title="Safe integration philosophy">

@@ -31,6 +31,7 @@ import {
 } from "@/lib/phenoContendersViewModel";
 import { buildPhenoPedigree } from "@/lib/phenoPedigreeViewModel";
 import { buildCureTimeline } from "@/lib/phenoCureTimelineViewModel";
+import { phenoHuntWorkspacePath } from "@/lib/routes";
 
 const VERDICT_TONE: Record<ContenderVerdict, string> = {
   keep: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
@@ -253,8 +254,8 @@ export default function PhenoHuntShowcase() {
         )}
       >
         {isDemo
-          ? `Demo — ${meta.name}. Sample data; open one of your own hunts to see it live.`
-          : `Live — ${meta.name}${meta.packSize ? ` · ${meta.packSize} candidates` : ""}.`}
+          ? `Demo — ${meta.name}. Sample data; open one of your saved hunts to see account data.`
+          : `Saved hunt — ${meta.name}${meta.packSize ? ` · ${meta.packSize} candidates` : ""}.`}
       </p>
 
       {pack.length > 0 && (
@@ -296,6 +297,8 @@ export default function PhenoHuntShowcase() {
             pool={data.contenders}
             defaultAId={(pack[0] ?? data.contenders[0]).id}
             defaultBId={(pack[1] ?? data.contenders[1]).id}
+            decisionMode={isDemo ? "local-demo" : "read-only"}
+            workspaceHref={!isDemo && id ? phenoHuntWorkspacePath(id) : undefined}
           />
         </section>
       )}

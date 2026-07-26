@@ -1,7 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import { Link, MemoryRouter, Route, Routes } from "react-router-dom";
 import type { ResolvedEntitlement } from "@/lib/entitlements";
 import { PLAN_CATALOG } from "@/lib/entitlements";
 import Pricing from "@/pages/Pricing";
@@ -18,6 +18,13 @@ const mocks = vi.hoisted(() => ({
     entitlement: null as ResolvedEntitlement | null,
   },
 }));
+
+const scrollIntoView = vi.fn();
+const originalScrollIntoViewDescriptor = Object.getOwnPropertyDescriptor(
+  HTMLElement.prototype,
+  "scrollIntoView",
+);
+const originalMatchMedia = window.matchMedia;
 
 vi.mock("@/store/auth", () => ({
   useAuth: () => ({
@@ -76,7 +83,28 @@ function renderPricing() {
   );
 }
 
+function renderPricingFromSource() {
+  return render(
+    <MemoryRouter initialEntries={["/source"]}>
+      <Routes>
+        <Route
+          path="/source"
+          element={<Link to="/pricing#buy-credits">Buy AI Doctor credits</Link>}
+        />
+        <Route path="/pricing" element={<Pricing />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
+
 beforeEach(() => {
+  scrollIntoView.mockReset();
+  Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+    configurable: true,
+    writable: true,
+    value: scrollIntoView,
+  });
+  window.matchMedia = originalMatchMedia;
   mocks.openCheckout.mockReset();
   mocks.auth.user = { id: "user-1", email: "grower@example.test" };
   mocks.auth.loading = false;
@@ -85,7 +113,59 @@ beforeEach(() => {
   mocks.entitlements.entitlement = entitlementFor("free", "free");
 });
 
+afterEach(() => {
+  if (originalScrollIntoViewDescriptor) {
+    Object.defineProperty(
+      HTMLElement.prototype,
+      "scrollIntoView",
+      originalScrollIntoViewDescriptor,
+    );
+  } else {
+    Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView");
+  }
+  window.matchMedia = originalMatchMedia;
+});
+
 describe("Pricing credit-pack entitlement gate", () => {
+  it("scrolls and focuses the real credit-pack target after cross-route SPA navigation", async () => {
+    const user = userEvent.setup();
+    renderPricingFromSource();
+
+    await user.click(screen.getByRole("link", { name: "Buy AI Doctor credits" }));
+
+    const target = await screen.findByTestId("pricing-credit-packs");
+    await waitFor(() => expect(target).toHaveFocus());
+    expect(target).toHaveAttribute("id", "buy-credits");
+    expect(target).toHaveAttribute("tabindex", "-1");
+    expect(scrollIntoView).toHaveBeenCalledWith({
+      behavior: "smooth",
+      block: "start",
+    });
+  });
+
+  it("uses an instant anchor handoff when reduced motion is preferred", async () => {
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: query === "(prefers-reduced-motion: reduce)",
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
+    const user = userEvent.setup();
+    renderPricingFromSource();
+
+    await user.click(screen.getByRole("link", { name: "Buy AI Doctor credits" }));
+
+    await waitFor(() => expect(screen.getByTestId("pricing-credit-packs")).toHaveFocus());
+    expect(scrollIntoView).toHaveBeenCalledWith({
+      behavior: "auto",
+      block: "start",
+    });
+  });
+
   it("shows honest paid-plan guidance and never opens pack checkout for Free", async () => {
     const user = userEvent.setup();
     renderPricing();

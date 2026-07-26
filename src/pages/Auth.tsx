@@ -139,9 +139,9 @@ export default function Auth() {
     } else {
       clearPendingOAuthReferral();
     }
-    // Google returns to the configured public origin. The helper preserves
-    // only Verdant's fixed CSV onboarding target for the post-OAuth root
-    // handoff; all other destinations are intentionally not persisted.
+    // Google returns to the configured public origin. Preserve one
+    // manifest-validated, non-transitional destination for the post-OAuth
+    // root handoff.
     if (explicitRedirect) {
       savePendingOAuthPostAuthRedirect(explicitRedirect);
     } else {
@@ -151,8 +151,7 @@ export default function Auth() {
     setGoogleError(null);
     try {
       // redirect_uri MUST be a same-origin public URL, not a protected route.
-      // The fixed CSV onboarding intent is applied after Supabase reports a
-      // session; other return paths keep their existing non-OAuth behavior.
+      // The one-shot destination is applied after Supabase reports a session.
       const result = await lovable.auth.signInWithOAuth("google", {
         redirect_uri: window.location.origin,
       });

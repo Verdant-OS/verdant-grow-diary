@@ -19,11 +19,12 @@
  * hand a raw query value to `navigate()` or `<Link to>`.
  */
 
+import { resolveKnownRouteReturnTo } from "@/lib/authRedirectRules";
 import { PLANT_AI_DOCTOR_REVIEW_ANCHOR_ID } from "@/lib/plantDetailQuickActions";
 
 /**
  * Allowlist of gated Pheno Tracker routes we specifically want to preserve
- * post-checkout. Any other same-origin app path also passes the generic
+ * post-checkout. Any other manifest-known app path also passes the generic
  * safety checks, so this list documents intent rather than restricting it.
  */
 export const PHENO_TRACKER_RETURN_TO_ALLOWLIST: ReadonlyArray<RegExp> = [
@@ -34,6 +35,14 @@ export const PHENO_TRACKER_RETURN_TO_ALLOWLIST: ReadonlyArray<RegExp> = [
 ];
 
 const FORBIDDEN_SCHEME = /^[a-z][a-z0-9+.-]*:/i;
+const BLOCKED_CHECKOUT_RETURN_PATHS = new Set([
+  "/auth",
+  "/checkout/cancel",
+  "/checkout/success",
+  "/login",
+  "/reset-password",
+  "/signup",
+]);
 
 export function sanitizeCheckoutReturnTo(value: string | null | undefined): string | null {
   if (typeof value !== "string") return null;
@@ -70,7 +79,12 @@ export function sanitizeCheckoutReturnTo(value: string | null | undefined): stri
     const base = "http://checkout-return-to.local";
     const parsed = new URL(value, base);
     if (parsed.origin !== base) return null;
-    return value;
+    const canonicalPathname =
+      parsed.pathname.length > 1 && parsed.pathname.endsWith("/")
+        ? parsed.pathname.slice(0, -1)
+        : parsed.pathname;
+    if (BLOCKED_CHECKOUT_RETURN_PATHS.has(canonicalPathname)) return null;
+    return resolveKnownRouteReturnTo(value);
   } catch {
     return null;
   }

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { resolvePricingPlanPreselect } from "@/lib/pricingPlanPreselect";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import {
@@ -14,7 +14,7 @@ import {
   FileText,
   Printer,
   FileSpreadsheet,
-  HandCoins,
+  Filter,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import BrandLogo from "@/components/BrandLogo";
@@ -54,6 +54,7 @@ import { useFounderSlotsRemaining } from "@/hooks/useFounderSlotsRemaining";
 import { useAuth } from "@/store/auth";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { creditPackBlockedCopy, resolveCreditPackPurchaseGate } from "@/lib/creditPackEligibility";
+import { isReducedMotionPreferred } from "@/lib/useTimelineHighlightAutoScroll";
 
 type BillingPeriod = "monthly" | "annual";
 
@@ -135,7 +136,6 @@ const COMPARISON_ROWS: Row[] = [
   },
   { label: "Sensor snapshot history", free: false, pro: true, craft: true, founder: true },
   { label: "Better timeline filtering", free: false, pro: true, craft: true, founder: true },
-  { label: "Priority support", free: false, pro: true, craft: true, founder: true },
   {
     label: "Future Pro features as they stabilize",
     free: false,
@@ -153,6 +153,7 @@ const COMPARISON_ROWS: Row[] = [
 ];
 
 export default function Pricing() {
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const { user, loading: authLoading } = useAuth();
   const {
@@ -203,6 +204,8 @@ export default function Pricing() {
   interestPlanRef.current = interestPlan;
   const [recoveryRequested, setRecoveryRequested] = useState(false);
   const recoveryRef = useRef<HTMLElement>(null);
+  const creditPacksRef = useRef<HTMLElement>(null);
+  const handledCreditPacksHashRef = useRef<string | null>(null);
   const {
     openCheckout,
     loading: checkoutLoading,
@@ -322,6 +325,41 @@ export default function Pricing() {
   }, []);
 
   useEffect(() => {
+    if (location.hash !== "#buy-credits") {
+      handledCreditPacksHashRef.current = null;
+      return;
+    }
+    if (handledCreditPacksHashRef.current === location.hash) return;
+    const target = creditPacksRef.current;
+    if (!target) return;
+
+    handledCreditPacksHashRef.current = location.hash;
+    if (typeof target.scrollIntoView === "function") {
+      try {
+        target.scrollIntoView({
+          behavior: isReducedMotionPreferred() ? "auto" : "smooth",
+          block: "start",
+        });
+      } catch {
+        try {
+          target.scrollIntoView();
+        } catch {
+          // Presentation-only fallback; focus still identifies the destination.
+        }
+      }
+    }
+    try {
+      target.focus({ preventScroll: true });
+    } catch {
+      try {
+        target.focus();
+      } catch {
+        // A failed focus must not turn an in-page navigation aid into an error.
+      }
+    }
+  }, [location.hash]);
+
+  useEffect(() => {
     if (!blockedReason) {
       // openCheckout clears blockedReason on a fresh attempt; drop the SKU
       // binding with it so a stale one can never keep a button labelled
@@ -356,7 +394,7 @@ export default function Pricing() {
       ],
       [
         "What do I actually get with Pro?",
-        "Multi-tent support, advanced exports including date-range diary reports, sensor snapshot history, longer grow history, advanced timeline filtering, priority support, and post-grow learning reports.",
+        "Multi-tent support, advanced exports including date-range diary reports, sensor snapshot history, longer grow history, advanced timeline filtering, and post-grow learning reports.",
       ],
       [
         "Do I need specific hardware?",
@@ -831,11 +869,17 @@ export default function Pricing() {
       {/* Top up AI Doctor credits — one-time packs (the canonical checkout
           surface for the out-of-credits buy-CTA elsewhere in the app). */}
       <section
+        ref={creditPacksRef}
         id="buy-credits"
+        aria-labelledby="pricing-credit-packs-heading"
+        tabIndex={-1}
         data-testid="pricing-credit-packs"
         className="px-6 pb-12 max-w-4xl mx-auto scroll-mt-24"
       >
-        <h2 className="font-display text-2xl md:text-3xl font-semibold text-center">
+        <h2
+          id="pricing-credit-packs-heading"
+          className="font-display text-2xl md:text-3xl font-semibold text-center"
+        >
           Top up AI Doctor credits
         </h2>
         <p className="mt-3 text-sm text-muted-foreground text-center max-w-2xl mx-auto">
@@ -929,9 +973,9 @@ export default function Pricing() {
             body="CSV imports stay labeled as CSV. Manual, demo, stale, and invalid readings stay clearly labeled so Verdant does not pretend weak data is live data."
           />
           <ProofCallout
-            icon={<HandCoins className="h-5 w-5" />}
-            title="Approval-required actions"
-            body="Verdant can suggest next steps, but the grower decides. No blind automation. No device commands. The Action Queue stays grower-approved by design."
+            icon={<Filter className="h-5 w-5" />}
+            title="Advanced timeline filtering"
+            body="Focus a grow history by date range and jump to the next missing action without changing or hiding the underlying diary evidence."
           />
         </div>
       </section>
@@ -1104,8 +1148,8 @@ export default function Pricing() {
             <AccordionTrigger>What do I actually get with Pro?</AccordionTrigger>
             <AccordionContent className="text-muted-foreground">
               Multi-tent support, advanced exports including date-range diary reports, sensor
-              snapshot history, longer grow history, advanced timeline filtering, priority support,
-              and post-grow learning reports. Pro features ship over time, only as they stabilize.
+              snapshot history, longer grow history, advanced timeline filtering, and post-grow
+              learning reports. Pro features ship over time, only as they stabilize.
             </AccordionContent>
           </AccordionItem>
 

@@ -73,6 +73,12 @@ import {
   type PiIngestCommitBatchInput,
   type PiIngestCommitBatchResult,
 } from "./commitBatch.ts";
+import {
+  requireLiveSensorEntitlement,
+  type LiveSensorEntitlementDecision,
+} from "../_shared/liveSensorEntitlementGate.ts";
+import { resolveServerBillingEnvironment } from "../_shared/unionEntitlementLookup.ts";
+import type { LovableBillingEnvironment } from "../_shared/lib/lib/entitlements/lovablePaddleAdapter.ts";
 
 export const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -118,6 +124,17 @@ export interface PiIngestHandlerDeps {
     client: PiIngestCommitBatchClient,
     input: PiIngestCommitBatchInput,
   ) => Promise<PiIngestCommitBatchResult>;
+  /** Test-only seam around the authoritative server-side paid-feature check.
+   * Production re-resolves the HMAC credential owner's liveSensors capability
+   * on every request; the bridge credential alone never grants paid access. */
+  checkLiveSensorEntitlement?: (
+    client: unknown,
+    userId: string,
+    expectedBillingEnvironment: LovableBillingEnvironment,
+    now: Date,
+  ) => Promise<LiveSensorEntitlementDecision>;
+  /** Test-only server billing environment override. Never read from request input. */
+  expectedBillingEnvironment?: LovableBillingEnvironment;
 }
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -294,6 +311,31 @@ export async function handlePiIngestReadingsRequest(
     return jsonResponse(401, buildUnauthorizedResponseBody());
   }
 
+  // HMAC proves bridge identity and the owner lookup proves scope, but neither
+  // grants a paid capability. Re-resolve the server-derived owner on every
+  // request so Free, canceled, downgraded, or unverifiable accounts cannot
+  // continue ingesting through a previously issued credential. This check
+  // intentionally precedes idempotency reads, normalization, and all writes.
+  let liveSensorAccess: LiveSensorEntitlementDecision;
+  try {
+    const checkLiveSensorEntitlement =
+      deps.checkLiveSensorEntitlement ?? requireLiveSensorEntitlement;
+    liveSensorAccess = await checkLiveSensorEntitlement(
+      client,
+      tentOwner.tentOwnerUserId,
+      deps.expectedBillingEnvironment ?? resolveServerBillingEnvironment(),
+      new Date(deps.now ?? Date.now()),
+    );
+  } catch {
+    return jsonResponse(503, buildInternalFailureResponseBody());
+  }
+  if (!liveSensorAccess.ok) {
+    if (liveSensorAccess.reason === "entitlement_lookup_failed") {
+      return jsonResponse(503, buildInternalFailureResponseBody());
+    }
+    return jsonResponse(403, { error: "upgrade_required" });
+  }
+
   // Authorization passed — validate full request envelope (pure rules).
   // Validation does not normalize/insert; on failure return 400 with a
   // generic body that never echoes raw body, signature, ids, or secrets.
@@ -314,9 +356,10 @@ export async function handlePiIngestReadingsRequest(
     return jsonResponse(400, buildInvalidRequestResponseBody());
   }
 
-  // Derive per-reading idempotency keys (pure). Catches duplicate
-  // readings in a single batch before any DB lookup is added.
-  const keyResult = deriveBatchIdempotencyKeys(
+  // Derive keys from the validated client readings first (pure) so an
+  // intra-batch duplicate is rejected before any DB lookup. These keys
+  // are validation-only: normalization may add server-derived rows.
+  const submittedKeyResult = deriveBatchIdempotencyKeys(
     row.bridge_id,
     validation.envelope.readings.map((r) => ({
       tentId: validation.envelope.tent_id,
@@ -325,8 +368,25 @@ export async function handlePiIngestReadingsRequest(
       capturedAt: validation.envelope.captured_at,
     })),
   );
-  if (!keyResult.ok) {
+  if (!submittedKeyResult.ok) {
     return jsonResponse(400, buildInvalidRequestResponseBody());
+  }
+
+  // Derive the commit keys from the normalized row set. Normalization can
+  // add a deterministic VPD reading when temperature + humidity are both
+  // present, so this guarantees one idempotency key for every committed
+  // row without trusting a client-supplied key or raw payload.
+  const commitKeyResult = deriveBatchIdempotencyKeys(
+    row.bridge_id,
+    normalized.rows.map((normalizedRow) => ({
+      tentId: normalizedRow.tent_id,
+      deviceId: normalizedRow.device_id,
+      metric: normalizedRow.metric,
+      capturedAt: normalizedRow.captured_at,
+    })),
+  );
+  if (!commitKeyResult.ok) {
+    return jsonResponse(503, buildInternalFailureResponseBody());
   }
 
   // Look up which derived idempotency keys already exist for this
@@ -337,7 +397,7 @@ export async function handlePiIngestReadingsRequest(
   try {
     const lookup = await lookupFn(client as unknown as PiIngestIdempotencyLookupClient, {
       bridgeId: row.bridge_id,
-      candidateKeys: keyResult.keys,
+      candidateKeys: commitKeyResult.keys,
     });
     if (!lookup.ok) {
       return jsonResponse(503, buildInternalFailureResponseBody());
@@ -360,7 +420,7 @@ export async function handlePiIngestReadingsRequest(
         bridgeId: row.bridge_id,
         tentId: validation.envelope.tent_id,
         readingDrafts: normalized.rows,
-        idempotencyKeys: keyResult.keys,
+        idempotencyKeys: commitKeyResult.keys,
       },
       existingKeys,
     });

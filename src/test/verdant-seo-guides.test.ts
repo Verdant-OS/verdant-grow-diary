@@ -174,6 +174,21 @@ describe("Verdant SEO guide pages (20)", () => {
     }
   });
 
+  it("makes Action Queue handoff explicitly grower-initiated", () => {
+    const publicContent = JSON.stringify({
+      faq: VERDANT_GROWER_GUIDE_FAQ,
+      guides: VERDANT_SEO_GUIDES,
+    });
+
+    expect(publicContent).toMatch(/only when the grower chooses to add it/i);
+    expect(publicContent).not.toMatch(
+      /drop(?:s|ped)? (?:it|them|actions?) into (?:an |the )?Action Queue/i,
+    );
+    expect(publicContent).not.toMatch(
+      /(?:recommended action stays in|equipment change is grower-approved through|stays with the grower through) (?:an |the )?(?:approval-required )?Action Queue/i,
+    );
+  });
+
   it("no guide content markets Verdant as ERP / seed-to-sale / compliance", () => {
     const surface = [GUIDES_INDEX, GUIDE_PAGE, CONTENT_TS].join("\n").toLowerCase();
     for (const forbidden of [

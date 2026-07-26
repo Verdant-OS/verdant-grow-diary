@@ -1,7 +1,6 @@
 /**
  * OAuthPostAuthRedirect — consumes a one-shot, manifest-validated OAuth
- * CSV-onboarding destination after the provider returns to the public app
- * origin.
+ * destination after the provider returns to the public app origin.
  *
  * It never reads URL values as authority, never writes data, and only runs at
  * the apex after a verified client session exists.

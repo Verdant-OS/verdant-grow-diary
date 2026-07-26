@@ -61,6 +61,11 @@ describe("Hardware Integrations page copy", () => {
     expect(PAGE).toMatch(/AI-assisted/i);
   });
 
+  it("names the routed AI Doctor surface rather than the orphaned Coach page", () => {
+    expect(PAGE).toMatch(/AI Doctor/);
+    expect(PAGE).not.toMatch(/AI Coach/);
+  });
+
   it("includes required sections", () => {
     expect(PAGE).toMatch(/Why hardware integrations matter/);
     expect(PAGE).toMatch(/Ideal integration data/);

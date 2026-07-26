@@ -142,6 +142,24 @@ describe("public One-Tent tour", () => {
     );
   });
 
+  it("preserves a validated protected return target after the product tour", () => {
+    const returnTo = "/plants/plant-123?tentId=tent-1#plant-ai-doctor-review";
+    render(
+      <MemoryRouter>
+        <PublicOneTentTour
+          hasAccount={false}
+          acquisitionSource="landing_page"
+          redirectTo={returnTo}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId("public-one-tent-tour-signup-cta")).toHaveAttribute(
+      "href",
+      `/auth?mode=signup&redirectTo=${encodeURIComponent(returnTo)}&utm_source=landing_page&utm_medium=owned&utm_campaign=paid_launch`,
+    );
+  });
+
   it("sends signed-in growers back to their dashboard", () => {
     renderTour(true);
     expect(screen.getByTestId("public-one-tent-tour-dashboard-cta")).toHaveAttribute("href", "/");

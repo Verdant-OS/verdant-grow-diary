@@ -1,10 +1,11 @@
 /**
- * Static + behavior safety guards for the HyperLog → Quick Log handoff.
+ * Static + behavior safety guards for the retired production HyperLog entry
+ * point and the still-isolated prototype helpers.
  *
  * Asserts:
  *  - hyperLogDraftRules has no Supabase / write / AI / Action Queue imports
- *  - HyperLog no longer exposes Water; the ordinary Watering action remains
- *    available through its structured Quick Log v2 handoff
+ *  - HyperLog is not reachable from the production Quick Log menu; the ordinary
+ *    Watering action remains available through its structured Quick Log v2 handoff
  *  - HyperLogModal still labels demo data clearly (DEMO SNAPSHOT / DEMO ONLY)
  */
 import { describe, it, expect } from "vitest";
@@ -34,9 +35,9 @@ const FORBIDDEN = [
   "@/integrations/supabase",
   "supabase-js",
   ".rpc(",
-  ".from(\"diary_entries\"",
+  '.from("diary_entries"',
   ".from('diary_entries'",
-  ".from(\"sensor_readings\"",
+  '.from("sensor_readings"',
   "ai-doctor",
   "ActionQueue",
   "action-queue",
@@ -60,16 +61,15 @@ describe("HyperLog draft → Quick Log handoff — static safety", () => {
     expect(MODAL).not.toMatch(/\bLIVE\s+SNAPSHOT\b/);
   });
 
-  it("GlobalFastAddButton uses the existing PLANT_QUICKLOG_PREFILL_EVENT name", () => {
-    expect(FAST_ADD).toContain("HYPERLOG_QUICKLOG_EVENT_NAME");
-    expect(FAST_ADD).toContain("buildHyperLogQuickLogPrefill");
+  it("GlobalFastAddButton does not bundle the HyperLog prototype", () => {
+    expect(FAST_ADD).not.toMatch(/HyperLog|hyperLog|HYPERLOG/);
     expect(FAST_ADD).not.toMatch(/\.from\(\s*["']diary_entries["']/);
     expect(FAST_ADD).not.toMatch(/supabase\.rpc/);
   });
 });
 
-describe("GlobalFastAddButton HyperLog handoff", () => {
-  it("removes the HyperLog Water affordance while preserving structured Watering", () => {
+describe("GlobalFastAddButton production boundary", () => {
+  it("removes every HyperLog affordance while preserving structured Watering", () => {
     render(
       <MemoryRouter initialEntries={["/plants/p-99"]}>
         <GlobalFastAddButton />
@@ -77,7 +77,8 @@ describe("GlobalFastAddButton HyperLog handoff", () => {
     );
 
     fireEvent.click(screen.getByTestId("global-fast-add-trigger"));
-    expect(screen.queryByTestId("global-fast-add-hyperlog-water")).toBeNull();
+    expect(screen.queryByTestId("global-fast-add-hyperlog-section")).toBeNull();
+    expect(screen.queryByText(/hyperlog/i)).toBeNull();
     expect(screen.getByTestId("global-fast-add-action-watering")).toBeInTheDocument();
   });
 });

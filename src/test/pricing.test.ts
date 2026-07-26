@@ -185,15 +185,20 @@ describe("Free vs Pro vs Founder Lifetime comparison", () => {
     }
   });
 
-  it("Pro tier includes backup, exports, priority support", () => {
+  it("Pro tier lists implemented paid capabilities without universal or unimplemented claims", () => {
     for (const item of [
       "Export / backups",
-      "Priority support",
       "Sensor snapshot history",
       "Advanced timeline filtering",
     ]) {
       expect(CONSTANTS).toContain(item);
     }
+    expect(CONSTANTS).not.toContain("Full Action Queue");
+    expect(CONSTANTS).not.toContain("Priority support");
+    expect(PAGE).not.toContain('title="Approval-required actions"');
+    expect(PAGE).not.toContain("priority support");
+    expect(UPGRADE_CONFIG).not.toContain("Priority support");
+    expect(UPGRADE_CONFIG).not.toContain("priority support");
   });
 
   it("comparison table renders all four columns (Free / Pro / Craft / Founder Lifetime)", () => {

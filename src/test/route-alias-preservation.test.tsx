@@ -4,7 +4,7 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import RouteAliasRedirect from "@/components/RouteAliasRedirect";
-import { buildRouteAliasTarget } from "@/lib/routeAliasRules";
+import { buildLegacyStrainSlugAliasTarget, buildRouteAliasTarget } from "@/lib/routeAliasRules";
 
 const ROOT = resolve(__dirname, "../..");
 const APP = readFileSync(resolve(ROOT, "src/App.tsx"), "utf8");
@@ -83,6 +83,25 @@ describe("route alias scope preservation", () => {
     ).toBe("/timeline?growId=a%2Fb+room%26cycle%3D1#entry%2Fraw%20anchor");
   });
 
+  it("encodes a decoded legacy strain slug as one segment and preserves query/hash", () => {
+    expect(
+      buildLegacyStrainSlugAliasTarget(
+        "blue/dream & haze",
+        "?ref=legacy%2Fguide",
+        "#feeding%20notes",
+      ),
+    ).toBe("/cultivars/blue%2Fdream%20%26%20haze?ref=legacy%2Fguide#feeding%20notes");
+  });
+
+  it("fails malformed or path-traversal strain slugs to the cultivar index", () => {
+    expect(buildLegacyStrainSlugAliasTarget("..", "?ref=legacy", "#top")).toBe(
+      "/cultivars?ref=legacy#top",
+    );
+    expect(buildLegacyStrainSlugAliasTarget("\ud800", "?ref=legacy", "#top")).toBe(
+      "/cultivars?ref=legacy#top",
+    );
+  });
+
   it("merges a canonical destination query before incoming signup context", () => {
     expect(
       buildRouteAliasTarget(
@@ -149,6 +168,12 @@ describe("stateful alias wiring", () => {
     expect(APP).toMatch(/path="\/tasks"\s+element=\{<RouteAliasRedirect\s+to="\/actions"\s*\/>\}/);
     expect(APP).toMatch(
       /path="\/action-queue"\s+element=\{<RouteAliasRedirect\s+to="\/actions"\s*\/>\}/,
+    );
+  });
+
+  it("routes a dynamic legacy strain slug through the encoded preserving helper", () => {
+    expect(APP).toMatch(
+      /buildLegacyStrainSlugAliasTarget\(\s*slug,\s*location\.search,\s*location\.hash,?\s*\)/,
     );
   });
 });

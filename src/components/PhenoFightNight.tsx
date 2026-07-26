@@ -11,6 +11,7 @@
  * never picks for them. Presentational + local UI state only: no I/O, no writes.
  */
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import PhenoComparabilityBanner from "@/components/PhenoComparabilityBanner";
@@ -23,6 +24,12 @@ export interface PhenoFightNightProps {
   readonly pool: readonly ContenderInput[];
   readonly defaultAId?: string | number;
   readonly defaultBId?: string | number;
+  /**
+   * Demo surfaces may keep the local comparison call. Account-backed showcase
+   * surfaces are read-only and route decisions to the writable hunt workspace.
+   */
+  readonly decisionMode?: "local-demo" | "read-only";
+  readonly workspaceHref?: string;
   readonly className?: string;
 }
 
@@ -184,6 +191,8 @@ export default function PhenoFightNight({
   pool,
   defaultAId,
   defaultBId,
+  decisionMode = "local-demo",
+  workspaceHref,
   className,
 }: PhenoFightNightProps) {
   const [initialA, initialB] = firstTwoIds(pool, defaultAId, defaultBId);
@@ -291,32 +300,51 @@ export default function PhenoFightNight({
         </div>
       )}
 
-      {/* The call — the grower's, not the app's */}
-      <div
-        data-testid="pheno-fight-call"
-        className="mt-3 flex flex-wrap items-center justify-center gap-2"
-      >
-        <span className="text-[11px] font-medium text-muted-foreground">The call:</span>
-        {callButton(
-          "a",
-          `${a.name} wins`,
-          "border-emerald-500/50 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
-        )}
-        {callButton("tie", "Too close", "border-border bg-secondary text-foreground")}
-        {callButton(
-          "b",
-          `${b.name} wins`,
-          "border-fuchsia-500/50 bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-300",
-        )}
-      </div>
+      {decisionMode === "read-only" ? (
+        <div
+          data-testid="pheno-fight-read-only"
+          className="mt-3 flex flex-wrap items-center justify-center gap-2 rounded-md border border-border/60 bg-secondary/30 px-3 py-2 text-[11px] text-muted-foreground"
+        >
+          <span>Read-only showcase — decisions are not saved here.</span>
+          {workspaceHref ? (
+            <Link
+              to={workspaceHref}
+              className="font-medium text-foreground underline underline-offset-2"
+            >
+              Open hunt workspace to record a decision
+            </Link>
+          ) : null}
+        </div>
+      ) : (
+        /* The call — the grower's, not the app's. Demo-only local state. */
+        <div
+          data-testid="pheno-fight-call"
+          className="mt-3 flex flex-wrap items-center justify-center gap-2"
+        >
+          <span className="text-[11px] font-medium text-muted-foreground">The call:</span>
+          {callButton(
+            "a",
+            `${a.name} wins`,
+            "border-emerald-500/50 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+          )}
+          {callButton("tie", "Too close", "border-border bg-secondary text-foreground")}
+          {callButton(
+            "b",
+            `${b.name} wins`,
+            "border-fuchsia-500/50 bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-300",
+          )}
+        </div>
+      )}
 
       <p
         data-testid="pheno-fight-caveat"
         className="mt-3 rounded-md border-l-2 border-fuchsia-500/50 bg-secondary/30 px-3 py-2 text-[11px] text-muted-foreground"
       >
-        Fight night stages the comparison — the tally and Loud scores inform, they don't decide. You
-        make the call at the cure. (Demo — your pick isn't saved; a live hunt records your decision,
-        it never picks for you.)
+        Fight night stages the comparison — the tally and Loud scores inform, they don&apos;t
+        decide. You make the call at the cure.
+        {decisionMode === "local-demo"
+          ? " Demo — your pick isn't saved."
+          : " Record your decision in the hunt workspace; Verdant never picks for you."}
       </p>
     </section>
   );

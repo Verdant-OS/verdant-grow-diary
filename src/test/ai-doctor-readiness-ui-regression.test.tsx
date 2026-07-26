@@ -424,7 +424,7 @@ describe("AI Doctor Readiness UI — quick-action safety (mount)", () => {
     expect(sessionStorageSetSpy).not.toHaveBeenCalled();
   });
 
-  it("Add Feeding dispatches the same navigation-only event payload shape", () => {
+  it("Add Feeding opens the feeding editor with the exact plant target", () => {
     recentActivityState = { data: [], isLoading: false };
     manualLogsState = { data: [], isLoading: false };
 
@@ -455,10 +455,12 @@ describe("AI Doctor Readiness UI — quick-action safety (mount)", () => {
 
     expect(events).toHaveLength(1);
     expect(events[0].type).toBe("verdant:open-quicklog");
-    expect(events[0].detail).toEqual({
+    expect(events[0].detail).toMatchObject({
       plantId: "p2",
       growId: "g2",
       tentId: "t2",
+      eventType: "feeding",
+      activityId: "feeding",
     });
   });
 
@@ -490,10 +492,12 @@ describe("AI Doctor Readiness UI — quick-action safety (mount)", () => {
     }
 
     expect(events).toHaveLength(1);
-    expect(events[0].detail).toEqual({
+    expect(events[0].detail).toMatchObject({
       plantId: "p-photo",
       growId: "g-photo",
       tentId: "t-photo",
+      eventType: "photo",
+      activityId: "photo",
     });
     expect(fetchSpy).not.toHaveBeenCalled();
   });

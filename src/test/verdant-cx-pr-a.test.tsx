@@ -53,26 +53,23 @@ function renderGuide(slug: string) {
 }
 
 describe("PR A · guide bottom CTA to public demo", () => {
-  it.each(VERDANT_SEO_GUIDES.map((g) => g.slug))(
-    "renders the demo CTA on /guides/%s",
-    (slug) => {
-      const { getByTestId } = renderGuide(slug);
-      const cta = getByTestId("guide-demo-cta");
-      expect(cta.textContent).toMatch(/See a real One-Tent Loop before signing up/i);
-      expect(cta.textContent).toMatch(/Quick Log/);
-      expect(cta.textContent).toMatch(/grower-approved action queue/i);
-      const link = getByTestId("guide-demo-cta-link") as HTMLAnchorElement;
-      // Public route only. Never a protected app route.
-      expect(link.getAttribute("href")).toBe("/welcome");
-      for (const protectedPath of ["/dashboard", "/diary", "/plants", "/tents", "/actions"]) {
-        expect(link.getAttribute("href")).not.toContain(protectedPath);
-      }
-      const lower = cta.textContent!.toLowerCase();
-      for (const phrase of FORBIDDEN) {
-        expect(lower.includes(phrase), `CTA copy contains "${phrase}"`).toBe(false);
-      }
-    },
-  );
+  it.each(VERDANT_SEO_GUIDES.map((g) => g.slug))("renders the demo CTA on /guides/%s", (slug) => {
+    const { getByTestId } = renderGuide(slug);
+    const cta = getByTestId("guide-demo-cta");
+    expect(cta.textContent).toMatch(/See a real One-Tent Loop before signing up/i);
+    expect(cta.textContent).toMatch(/Quick Log/);
+    expect(cta.textContent).toMatch(/grower-approved action queue/i);
+    const link = getByTestId("guide-demo-cta-link") as HTMLAnchorElement;
+    // Public route only. Never a protected app route.
+    expect(link.getAttribute("href")).toBe("/welcome");
+    for (const protectedPath of ["/dashboard", "/diary", "/plants", "/tents", "/actions"]) {
+      expect(link.getAttribute("href")).not.toContain(protectedPath);
+    }
+    const lower = cta.textContent!.toLowerCase();
+    for (const phrase of FORBIDDEN) {
+      expect(lower.includes(phrase), `CTA copy contains "${phrase}"`).toBe(false);
+    }
+  });
 });
 
 describe("PR A · sensor source legend on hardware integrations", () => {
@@ -145,6 +142,7 @@ describe("PR A · /how-ai-doctor-works public page", () => {
     const block = getByTestId("grower-approved-decisions");
     expect(block.textContent).toMatch(/grower decides/i);
     expect(block.textContent).toMatch(/approval-required/i);
+    expect(block.textContent).toMatch(/only when the grower chooses to add it/i);
     expect(block.textContent!.toLowerCase()).toContain("does not control");
     expect(block.textContent!.toLowerCase()).toContain("cannot touch equipment");
   });
@@ -168,20 +166,12 @@ describe("PR A · /how-ai-doctor-works public page", () => {
   });
 
   it("route is listed in sitemap.xml", () => {
-    const sitemap = readFileSync(
-      resolve(__dirname, "../../public/sitemap.xml"),
-      "utf8",
-    );
-    expect(sitemap).toContain(
-      `<loc>https://verdantgrowdiary.com${HOW_AI_DOCTOR_WORKS_PATH}</loc>`,
-    );
+    const sitemap = readFileSync(resolve(__dirname, "../../public/sitemap.xml"), "utf8");
+    expect(sitemap).toContain(`<loc>https://verdantgrowdiary.com${HOW_AI_DOCTOR_WORKS_PATH}</loc>`);
   });
 
   it("robots.txt does not disallow /how-ai-doctor-works", () => {
-    const robots = readFileSync(
-      resolve(__dirname, "../../public/robots.txt"),
-      "utf8",
-    );
+    const robots = readFileSync(resolve(__dirname, "../../public/robots.txt"), "utf8");
     const disallows = robots
       .split(/\r?\n/)
       .map((l) => l.replace(/#.*$/, "").trim())

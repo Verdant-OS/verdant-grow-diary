@@ -1,8 +1,8 @@
 /**
- * End-to-end-ish user-flow tests for each supported HyperLog tile.
+ * Isolated prototype-flow tests for each supported HyperLog tile.
  *
- * Mounts GlobalFastAddButton + a stub Quick Log listener and verifies
- * that clicking each HyperLog tile + Commit fires the existing
+ * Mounts HyperLogModal directly (the prototype is intentionally absent from
+ * GlobalFastAddButton) and verifies that Commit fires the existing
  * `verdant:open-quicklog` event with the correct prefill shape.
  *
  * Hard assertions:
@@ -17,7 +17,15 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import GlobalFastAddButton from "@/components/GlobalFastAddButton";
+import HyperLogModal, {
+  type HyperLogAction,
+  type HyperLogDemoFormState,
+} from "@/components/HyperLogModal";
 import type { QuickLogPrefill } from "@/components/QuickLog";
+import {
+  buildHyperLogQuickLogPrefill,
+  HYPERLOG_QUICKLOG_EVENT_NAME,
+} from "@/lib/hyperLogDraftRules";
 import {
   clearTemperatureUnitPreference,
   saveTemperatureUnitPreference,
@@ -47,28 +55,55 @@ afterEach(() => {
   window.removeEventListener("verdant:open-quicklog", handler as EventListener);
 });
 
-function openTileAndCommit(tile: string) {
+function renderPrototype(tile: HyperLogAction) {
   render(
-    <MemoryRouter initialEntries={["/plants/p-77"]}>
-      <GlobalFastAddButton />
-    </MemoryRouter>,
+    <HyperLogModal
+      open
+      onOpenChange={() => undefined}
+      initialAction={tile}
+      onCommit={(
+        action: HyperLogAction,
+        form: HyperLogDemoFormState,
+        extras?: { photoCount: number },
+      ) => {
+        const detail = buildHyperLogQuickLogPrefill({
+          action,
+          form,
+          photoCount: extras?.photoCount ?? 0,
+          context: {
+            plantId: "p-77",
+            plantName: "Plant 77",
+            growId: "g-77",
+            tentId: "t-77",
+            tentName: "Tent 77",
+          },
+        });
+        if (detail) {
+          window.dispatchEvent(new CustomEvent(HYPERLOG_QUICKLOG_EVENT_NAME, { detail }));
+        }
+      }}
+    />,
   );
-  fireEvent.click(screen.getByTestId("global-fast-add-trigger"));
-  fireEvent.click(screen.getByTestId(`global-fast-add-hyperlog-${tile}`));
+}
+
+function openTileAndCommit(tile: HyperLogAction) {
+  renderPrototype(tile);
   act(() => {
     fireEvent.click(screen.getByTestId("hyperlog-commit"));
   });
 }
 
-describe("HyperLog tile → Quick Log handoff e2e", () => {
-  it("does not expose a HyperLog water tile", () => {
+describe("retired production boundary + isolated HyperLog prototype mapping", () => {
+  it("does not expose any HyperLog tile in the production Quick Log menu", () => {
     render(
       <MemoryRouter initialEntries={["/plants/p-77"]}>
         <GlobalFastAddButton />
       </MemoryRouter>,
     );
     fireEvent.click(screen.getByTestId("global-fast-add-trigger"));
-    expect(screen.queryByTestId("global-fast-add-hyperlog-water")).toBeNull();
+    expect(screen.queryByTestId("global-fast-add-hyperlog-section")).toBeNull();
+    expect(screen.queryByText(/hyperlog/i)).toBeNull();
+    expect(screen.getByTestId("global-fast-add-action-watering")).toBeInTheDocument();
   });
 
   it("feed tile maps to eventType=feeding", () => {
@@ -106,7 +141,9 @@ describe("HyperLog tile → Quick Log handoff e2e", () => {
     expect(json).not.toMatch(/blob:/);
     expect(json).not.toMatch(/File\(/);
     // photoCount is the only photo info that may travel — never URLs/files.
-    expect(typeof captured[0].detail.photoCount === "number" || captured[0].detail.photoCount == null).toBe(true);
+    expect(
+      typeof captured[0].detail.photoCount === "number" || captured[0].detail.photoCount == null,
+    ).toBe(true);
   });
 
   it("does not call any new persistence function from HyperLogModal/GlobalFastAdd commit", () => {
@@ -123,13 +160,7 @@ describe("HyperLog tile → Quick Log handoff e2e", () => {
 describe("HyperLog environment temp draft — entry-unit pin race", () => {
   it("keeps the ORIGINAL entry unit's interpretation when the live preference flips before commit", () => {
     // Default preference is fahrenheit (this branch's app-wide default).
-    render(
-      <MemoryRouter initialEntries={["/plants/p-77"]}>
-        <GlobalFastAddButton />
-      </MemoryRouter>,
-    );
-    fireEvent.click(screen.getByTestId("global-fast-add-trigger"));
-    fireEvent.click(screen.getByTestId("global-fast-add-hyperlog-environment"));
+    renderPrototype("environment");
 
     // Grower types "77" meaning 77°F while the live preference is fahrenheit.
     fireEvent.change(screen.getByLabelText("Environment temperature"), {
@@ -160,13 +191,7 @@ describe("HyperLog demo Sensor Snapshot — unit-aware display", () => {
     // Codex round-5 finding: the demo Sensor Snapshot always showed the
     // hardcoded "24.6°C" regardless of the active preference, mixing units on
     // screen with the unit-aware Temp input/preview right below it.
-    render(
-      <MemoryRouter initialEntries={["/plants/p-77"]}>
-        <GlobalFastAddButton />
-      </MemoryRouter>,
-    );
-    fireEvent.click(screen.getByTestId("global-fast-add-trigger"));
-    fireEvent.click(screen.getByTestId("global-fast-add-hyperlog-environment"));
+    renderPrototype("environment");
 
     // Default preference is fahrenheit (this branch's app-wide default): the
     // canonical 24.6°C demo value must render converted, not raw.
@@ -176,13 +201,7 @@ describe("HyperLog demo Sensor Snapshot — unit-aware display", () => {
 
   it("shows the demo snapshot temperature in °C when the preference is celsius", () => {
     saveTemperatureUnitPreference("celsius");
-    render(
-      <MemoryRouter initialEntries={["/plants/p-77"]}>
-        <GlobalFastAddButton />
-      </MemoryRouter>,
-    );
-    fireEvent.click(screen.getByTestId("global-fast-add-trigger"));
-    fireEvent.click(screen.getByTestId("global-fast-add-hyperlog-environment"));
+    renderPrototype("environment");
 
     expect(screen.getByText("24.6°C")).toBeTruthy();
     expect(screen.queryByText("76.3°F")).toBeNull();

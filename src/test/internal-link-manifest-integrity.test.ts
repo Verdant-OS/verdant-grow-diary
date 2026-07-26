@@ -1,7 +1,7 @@
 /**
  * Literal internal-link integrity.
  *
- * Scans rendered page/component source for static `to="/..."`,
+ * Scans all production TypeScript source for static `to="/..."`,
  * `href="/..."`, object `to`/`href` fields, and `navigate("/...")` calls.
  * Every discovered app path must resolve to a mounted APP_ROUTES entry.
  *
@@ -17,15 +17,22 @@ import { GLOBAL_SEARCH_ITEMS } from "@/lib/globalSearchItems";
 import { LABS_NAVIGATION_DESTINATIONS } from "@/lib/growerNavigationRules";
 
 const REPO_ROOT = resolve(__dirname, "../..");
-const SOURCE_ROOTS = [
-  resolve(REPO_ROOT, "src/pages"),
-  resolve(REPO_ROOT, "src/components"),
-] as const;
+const SOURCE_ROOT = resolve(REPO_ROOT, "src");
+const EXCLUDED_SOURCE_DIRECTORIES = new Set(["test", "__tests__"]);
 
 const LINK_PATTERNS = [
   /\b(?:to|href)\s*=\s*["'](\/[^"'{}]*)["']/g,
   /\b(?:to|href)\s*:\s*["'](\/[^"'{}]*)["']/g,
   /\bnavigate\(\s*["'](\/[^"'{}]*)["']/g,
+] as const;
+
+const DEAD_LINK_PATTERNS = [
+  /\b(?:to|href)\s*=\s*["']\s*["']/g,
+  /\b(?:to|href)\s*:\s*["']\s*["']/g,
+  /\b(?:to|href)\s*=\s*["']#["']/g,
+  /\b(?:to|href)\s*:\s*["']#["']/g,
+  /\b(?:to|href)\s*=\s*["']javascript:/gi,
+  /\b(?:to|href)\s*:\s*["']javascript:/gi,
 ] as const;
 
 const STATIC_ASSET_EXTENSIONS = new Set([
@@ -59,13 +66,19 @@ interface DataDrivenInternalLink {
   target: string;
 }
 
-function walkTsxFiles(root: string): string[] {
+function walkProductionSourceFiles(root: string): string[] {
   const out: string[] = [];
   for (const entry of readdirSync(root, { withFileTypes: true })) {
     const full = join(root, entry.name);
     if (entry.isDirectory()) {
-      out.push(...walkTsxFiles(full));
-    } else if (entry.isFile() && entry.name.endsWith(".tsx")) {
+      if (!EXCLUDED_SOURCE_DIRECTORIES.has(entry.name)) {
+        out.push(...walkProductionSourceFiles(full));
+      }
+    } else if (
+      entry.isFile() &&
+      /\.(?:ts|tsx)$/.test(entry.name) &&
+      !/\.(?:test|spec)\.(?:ts|tsx)$/.test(entry.name)
+    ) {
       out.push(full);
     }
   }
@@ -96,7 +109,7 @@ function resolvesToMountedRoute(target: string): boolean {
 
 function extractLiteralInternalLinks(): LiteralInternalLink[] {
   const links: LiteralInternalLink[] = [];
-  for (const file of SOURCE_ROOTS.flatMap(walkTsxFiles)) {
+  for (const file of walkProductionSourceFiles(SOURCE_ROOT)) {
     const source = readFileSync(file, "utf8");
     for (const pattern of LINK_PATTERNS) {
       pattern.lastIndex = 0;
@@ -108,6 +121,25 @@ function extractLiteralInternalLinks(): LiteralInternalLink[] {
           source: relative(REPO_ROOT, file).replace(/\\/g, "/"),
           line,
           target,
+        });
+      }
+    }
+  }
+  return links;
+}
+
+function extractDeadLinks(): LiteralInternalLink[] {
+  const links: LiteralInternalLink[] = [];
+  for (const file of walkProductionSourceFiles(SOURCE_ROOT)) {
+    const source = readFileSync(file, "utf8");
+    for (const pattern of DEAD_LINK_PATTERNS) {
+      pattern.lastIndex = 0;
+      for (const match of source.matchAll(pattern)) {
+        const line = source.slice(0, match.index ?? 0).split("\n").length;
+        links.push({
+          source: relative(REPO_ROOT, file).replace(/\\/g, "/"),
+          line,
+          target: match[0],
         });
       }
     }
@@ -138,7 +170,13 @@ describe("literal internal links", () => {
       .map((link) => `${link.source}:${link.line} -> ${link.target}`);
 
     expect(broken, `Broken literal internal links:\n${broken.join("\n")}`).toEqual([]);
-    expect(links.length).toBeGreaterThan(50);
+    expect(links.length).toBeGreaterThan(150);
+  }, 15_000);
+
+  it("contains no static empty, hash-only, or javascript links", () => {
+    const dead = extractDeadLinks().map((link) => `${link.source}:${link.line} -> ${link.target}`);
+
+    expect(dead, `Dead static links:\n${dead.join("\n")}`).toEqual([]);
   }, 15_000);
 });
 

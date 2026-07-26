@@ -66,6 +66,14 @@ jobs:
       - name: Prepare artifact dir
         run: mkdir -p "$RUNNER_TEMP/craft-preflight"
 
+      # The renderer decides whether this gate blocks a PR, so its own tests
+      # have to run somewhere. `test:paddle-craft-preflight-renderer` was
+      # defined in package.json but no workflow ever invoked it — the verdict
+      # logic was shipping unguarded. Runs before the verifier so a renderer
+      # regression fails fast and without needing Paddle credentials.
+      - name: Renderer unit tests
+        run: bun run test:paddle-craft-preflight-renderer
+
       - name: Run verifier
         id: run
         env:
@@ -116,10 +124,33 @@ jobs:
             --event "$EVENT_NAME" \
             --json > "$RUNNER_TEMP/craft-preflight/verdict.json"
           cat "$RUNNER_TEMP/craft-preflight/verdict.json"
-          LEVEL=$(node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(process.env.VJ,"utf8")).verdict.level)' \
-            VJ="$RUNNER_TEMP/craft-preflight/verdict.json" 2>/dev/null || echo unknown)
-          SHOULD_FAIL=$(node -e 'process.stdout.write(String(JSON.parse(require("fs").readFileSync(process.env.VJ,"utf8")).verdict.shouldFail))' \
-            VJ="$RUNNER_TEMP/craft-preflight/verdict.json" 2>/dev/null || echo true)
+
+          # `VAR=value cmd` exports VAR only when the assignment PRECEDES the
+          # command. Written *after* `node -e '...'` it is an ordinary argv
+          # entry, so process.env.VJ was undefined, readFileSync(undefined)
+          # threw, `2>/dev/null` swallowed the error, and BOTH reads fell
+          # through to their `|| echo` fallbacks — pinning should_fail=true
+          # regardless of the real verdict. The gate rendered "Not blocking
+          # this PR" into the sticky comment and then blocked the PR anyway,
+          # on every PR, for as long as the Paddle keys stay unset.
+          if ! VERDICT=$(VJ="$RUNNER_TEMP/craft-preflight/verdict.json" node -e '
+              const v = JSON.parse(require("fs").readFileSync(process.env.VJ, "utf8")).verdict;
+              if (typeof v.level !== "string" || typeof v.shouldFail !== "boolean") {
+                throw new Error("verdict.json carries no usable level/shouldFail");
+              }
+              process.stdout.write(v.level + " " + v.shouldFail);
+            '); then
+            # Still fail closed on an unreadable verdict — but say so out
+            # loud. Failing closed *silently* is precisely what let the bug
+            # above survive: the symptom was indistinguishable from a real
+            # catalog failure.
+            echo "::error::Could not read a verdict from verdict.json — failing closed."
+            LEVEL=unreadable
+            SHOULD_FAIL=true
+          else
+            LEVEL="${VERDICT%% *}"
+            SHOULD_FAIL="${VERDICT##* }"
+          fi
           echo "verdict_level=$LEVEL" >> "$GITHUB_OUTPUT"
           echo "should_fail=$SHOULD_FAIL" >> "$GITHUB_OUTPUT"
 

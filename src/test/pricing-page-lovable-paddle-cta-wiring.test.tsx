@@ -45,9 +45,15 @@ vi.mock("@/lib/pricingAnalytics", () => ({
   trackPricingEvent: vi.fn(),
 }));
 
-function renderPricing() {
+// Founder Lifetime left the public pricing grid; it now renders only on an
+// explicit `?plan=founder_lifetime` deep link. The Founder assertions below
+// still exercise the real card and its real checkout call — they just arrive
+// the way a grower holding an existing Founder link does.
+function renderPricing({ founderDeepLink = false } = {}) {
   return render(
-    <MemoryRouter>
+    <MemoryRouter
+      initialEntries={[founderDeepLink ? "/pricing?plan=founder_lifetime" : "/pricing"]}
+    >
       <Pricing />
     </MemoryRouter>,
   );
@@ -58,16 +64,20 @@ describe("Pricing page — built-in Paddle wiring", () => {
     openCheckoutMock.mockReset();
   });
 
-  it("renders Free, Pro Monthly, Pro Annual, and Founder Lifetime with correct prices", () => {
+  it("renders Free and Pro with correct prices, and no Founder card by default", () => {
     renderPricing();
 
     // Pro card defaults to annual toggle: $99 / year
     expect(screen.getByTestId("pricing-card-free")).toBeInTheDocument();
     expect(screen.getByTestId("pricing-card-pro")).toBeInTheDocument();
-    expect(screen.getByTestId("pricing-card-founder")).toBeInTheDocument();
+    expect(screen.queryByTestId("pricing-card-founder")).toBeNull();
 
     const proCard = screen.getByTestId("pricing-card-pro");
     expect(proCard.textContent).toMatch(/\$99/);
+  });
+
+  it("still prices Founder Lifetime at $129 on an explicit deep link", () => {
+    renderPricing({ founderDeepLink: true });
     const founderCard = screen.getByTestId("pricing-card-founder");
     expect(founderCard.textContent).toMatch(/\$129/);
   });
@@ -111,7 +121,7 @@ describe("Pricing page — built-in Paddle wiring", () => {
 
   it("Founder Lifetime CTA opens checkout with priceId=founder_lifetime", async () => {
     const user = userEvent.setup();
-    renderPricing();
+    renderPricing({ founderDeepLink: true });
     await user.click(screen.getByTestId("pricing-cta-founder-lifetime"));
     expect(openCheckoutMock).toHaveBeenCalledWith({ priceId: "founder_lifetime" });
   });
@@ -126,7 +136,7 @@ describe("Pricing page — built-in Paddle wiring", () => {
   });
 
   it("Founder copy uses manual-close language, not fake countdown", () => {
-    renderPricing();
+    renderPricing({ founderDeepLink: true });
     const founderCard = screen.getByTestId("pricing-card-founder");
     expect(founderCard.textContent).toMatch(/may close manually/i);
     // No timer / countdown UI

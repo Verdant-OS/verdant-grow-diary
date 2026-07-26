@@ -230,6 +230,19 @@ export default function Pricing() {
     environment: checkoutEnvironment,
     blocked: Boolean(checkoutRecoveryReason),
   });
+  /**
+   * Founder Lifetime is no longer part of the public pricing grid. It stays
+   * reachable ONLY through an explicit `?plan=founder_lifetime` deep link, so
+   * URLs already in circulation (marketing email, the legacy
+   * `/billing/founder-lifetime` redirect) still complete instead of landing on
+   * a page where the offer has silently vanished.
+   *
+   * Presentation-only. `founder_lifetime` remains in planCatalog,
+   * PAID_PLAN_IDS / SUBSCRIPTION_PLAN_IDS, ai_credit_allowance and every
+   * entitlement gate — existing holders keep exactly what they bought, and the
+   * sell-vs-grant parity guards stay satisfied.
+   */
+  const showFounderOffer = preselect.plan === "founder_lifetime";
   const founderSlots = useFounderSlotsRemaining();
   const founderSoldOut = founderSlots.status === "ready" && founderSlots.soldOut;
 
@@ -278,9 +291,9 @@ export default function Pricing() {
     void openCheckout({ priceId: sku });
   }
   usePageSeo({
-    title: "Pricing — Free, Pro & Founder Lifetime | Verdant Grow Diary",
+    title: "Pricing — Free, Pro & Craft | Verdant Grow Diary",
     description:
-      "Free grow diary forever. Pro adds multi-tent support, sensor history and advanced exports. Founder Lifetime is a one-time plan for early supporters.",
+      "Free grow diary forever. Pro adds multi-tent support, sensor history and advanced exports. Craft adds the live Pro Blueprint that scores every reading against your per-stage SOP.",
     path: "/pricing",
   });
 
@@ -325,10 +338,6 @@ export default function Pricing() {
       [
         "What do I actually get with Pro?",
         "Multi-tent support, advanced exports including date-range diary reports, sensor snapshot history, longer grow history, advanced timeline filtering, priority support, and post-grow learning reports.",
-      ],
-      [
-        "How does the Founder Lifetime Offer work?",
-        `$${FOUNDER_LIFETIME_PRICE_USD} once. You get full Pro access for the life of the product. This is a limited early-supporter offer, limited to the first ${FOUNDER_LIFETIME_LIMIT} buyers.`,
       ],
       [
         "Do I need specific hardware?",
@@ -383,20 +392,6 @@ export default function Pricing() {
               category: "Annual subscription",
             },
           ],
-        },
-        {
-          "@type": "Product",
-          name: "Verdant Founder Lifetime",
-          description: `One-time purchase for lifetime Pro access. Limited to the first ${FOUNDER_LIFETIME_LIMIT} early supporters.`,
-          brand: { "@type": "Brand", name: "Verdant Grow Diary" },
-          offers: {
-            "@type": "Offer",
-            price: String(FOUNDER_LIFETIME_PRICE_USD),
-            priceCurrency: "USD",
-            url: "https://verdantgrowdiary.com/pricing",
-            availability: "https://schema.org/LimitedAvailability",
-            category: "One-time",
-          },
         },
       ],
     };
@@ -642,7 +637,16 @@ export default function Pricing() {
           }
         />
 
-        {/* Founder Lifetime Offer */}
+        {/* Founder Lifetime — retired from the public pricing grid.
+            Rendered ONLY when a grower arrives on an explicit
+            `?plan=founder_lifetime` deep link (including via the legacy
+            `/billing/founder-lifetime` redirect), so links already sent out
+            still complete rather than dead-ending on a page with no Founder
+            offer anywhere. Browsing to /pricing normally shows Free / Pro /
+            Craft only. Nothing about the ENTITLEMENT changes: founder_lifetime
+            stays in planCatalog, PAID_PLAN_IDS and every gate, so existing
+            holders keep exactly what they bought. */}
+        {showFounderOffer && (
         <PricingCard
           testId="pricing-card-founder"
           name={PRICING.founder.name}
@@ -684,6 +688,7 @@ export default function Pricing() {
             </Button>
           }
         />
+        )}
       </section>
 
       {checkoutRecoveryReason && (
@@ -892,7 +897,9 @@ export default function Pricing() {
         </div>
       </section>
 
-      {/* Founder Lifetime highlight band */}
+      {/* Founder Lifetime highlight band — retired from the public page along
+          with the grid card; shown only on an explicit deep link. */}
+      {showFounderOffer && (
       <section className="px-6 py-10 max-w-5xl mx-auto">
         <div className="rounded-2xl border border-primary/40 bg-primary/5 p-6 md:p-8 flex flex-col md:flex-row gap-6 md:items-center">
           <div className="h-12 w-12 rounded-xl bg-primary/15 text-primary flex items-center justify-center shrink-0">
@@ -942,11 +949,14 @@ export default function Pricing() {
           </Button>
         </div>
       </section>
+      )}
 
       {/* Comparison table */}
       <section className="px-6 py-12 max-w-5xl mx-auto">
         <h2 className="font-display text-2xl md:text-3xl font-semibold text-center">
-          Compare Free, Pro, Craft, and Founder Lifetime
+          {showFounderOffer
+            ? "Compare Free, Pro, Craft, and Founder Lifetime"
+            : "Compare Free, Pro and Craft"}
         </h2>
         <p className="mt-3 text-sm text-muted-foreground text-center max-w-2xl mx-auto">
           Free is genuinely useful for starting a grow diary. Pro adds deeper history, advanced
@@ -963,7 +973,11 @@ export default function Pricing() {
                 <th className="text-center font-medium px-4 py-3">Free</th>
                 <th className="text-center font-medium px-4 py-3 text-primary">Pro</th>
                 <th className="text-center font-medium px-4 py-3 text-primary">Craft</th>
-                <th className="text-center font-medium px-4 py-3 text-primary">Founder Lifetime</th>
+                {showFounderOffer && (
+                  <th className="text-center font-medium px-4 py-3 text-primary">
+                    Founder Lifetime
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -979,16 +993,18 @@ export default function Pricing() {
                   <td className="px-4 py-3 text-center">
                     <CellValue value={row.craft} accent />
                   </td>
-                  <td className="px-4 py-3 text-center">
-                    <CellValue value={row.founder} accent />
-                  </td>
+                  {showFounderOffer && (
+                    <td className="px-4 py-3 text-center">
+                      <CellValue value={row.founder} accent />
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
         <p className="mt-3 text-xs text-muted-foreground text-center sm:hidden">
-          Swipe to compare all four plans →
+          {showFounderOffer ? "Swipe to compare all four plans →" : "Swipe to compare all plans →"}
         </p>
       </section>
 

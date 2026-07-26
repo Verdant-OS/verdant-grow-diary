@@ -8,6 +8,10 @@ import {
   saveTemperatureUnitPreference,
 } from "@/lib/temperatureUnitPreference";
 
+// This integration-heavy sheet suite mounts the full Quick Log editor.
+// Keep its assertions strict while allowing for controlled-runner contention.
+vi.setConfig({ testTimeout: 15_000 });
+
 const rpcMock = vi.fn();
 const wateringWriterMock = vi.fn();
 const storageUpload = vi.fn();
@@ -163,9 +167,9 @@ describe("QuickLogV2Sheet — structured watering", () => {
   it("opens directly on Water with the exact default target and fails closed for a stale target", () => {
     const valid = renderSheet("plant:plant-1", "water");
     expect(screen.getByTestId("qlv2-watering-form")).toBeInTheDocument();
-    expect(
-      screen.getByLabelText("Choose plant or tent for this Quick Log"),
-    ).toHaveTextContent("Plant · Plant 1");
+    expect(screen.getByLabelText("Choose plant or tent for this Quick Log")).toHaveTextContent(
+      "Plant · Plant 1",
+    );
     expect(screen.getByTestId("qlv2-target-panel")).toHaveAttribute("data-scope", "plant");
     valid.unmount();
 

@@ -101,13 +101,21 @@ function taskChildren(t) {
   return [];
 }
 
+function normalizeTestState(state, mode) {
+  if (state === "pass" || state === "passed") return "pass";
+  if (state === "fail" || state === "failed") return "fail";
+  if (state === "todo" || (state === "skipped" && mode === "todo")) return "todo";
+  if (state === "skip" || state === "skipped") return "skip";
+  return state ?? "unknown";
+}
+
 /** Recursively collect leaf tests (mode="test") with their state. */
 function collectTests(task, acc = []) {
   const type = task?.type;
   if (type === "test" || type === "custom") {
     acc.push({
       name: (task.suite?.name ? `${task.suite.name} > ` : "") + (task.name || "<unnamed>"),
-      state: task.result?.state ?? task.mode ?? "unknown",
+      state: normalizeTestState(task.result?.state ?? task.mode, task.mode),
       duration: task.result?.duration ?? null,
       error: task.result?.errors?.[0]?.message ?? null,
     });
@@ -116,10 +124,50 @@ function collectTests(task, acc = []) {
   return acc;
 }
 
+/**
+ * Read Vitest 3.2.7's method-based TestModule/TestCollection API.
+ * Returns null for legacy task trees so their existing recursive adapter
+ * remains authoritative.
+ */
+function collectModernTests(task) {
+  if (typeof task?.children?.allTests !== "function") return null;
+  return [...task.children.allTests()].map((test) => {
+    const result = test.result();
+    const diagnostic = typeof test.diagnostic === "function" ? test.diagnostic() : null;
+    return {
+      name: test.fullName || test.name || "<unnamed>",
+      state: normalizeTestState(result?.state, test.options?.mode),
+      duration: diagnostic?.duration ?? null,
+      error: result?.errors?.[0]?.message ?? null,
+    };
+  });
+}
+
+function fileResultState(task) {
+  const state = typeof task?.state === "function" ? task.state() : task?.result?.state;
+  return normalizeTestState(state);
+}
+
+function fileDuration(task) {
+  if (typeof task?.diagnostic === "function") {
+    return task.diagnostic()?.duration ?? null;
+  }
+  return task?.result?.duration ?? null;
+}
+
 function fileStateFromTests(tests, fileResultState) {
-  if (fileResultState === "fail" || tests.some((t) => t.state === "fail")) return "failed";
-  if (tests.length === 0) return fileResultState === "pass" ? "passed" : "skipped";
+  if (fileResultState === "fail" || tests.some((t) => t.state === "fail")) {
+    return "failed";
+  }
+  if (tests.length === 0) {
+    if (fileResultState === "pass") return "passed";
+    if (fileResultState === "skip") return "skipped";
+    return "incomplete";
+  }
   if (tests.every((t) => t.state === "skip" || t.state === "todo")) return "skipped";
+  if (tests.some((t) => !["pass", "skip", "todo"].includes(t.state))) {
+    return "incomplete";
+  }
   return "passed";
 }
 
@@ -141,10 +189,10 @@ export default class VerdantControlledReporter {
     this.shardIndex = Number(options.shardIndex ?? process.env.VERDANT_CTRL_SHARD_INDEX ?? 1);
     this.shardTotal = Number(options.shardTotal ?? process.env.VERDANT_CTRL_SHARD_TOTAL ?? 1);
     this.batchIndex = Number(options.batchIndex ?? process.env.VERDANT_CTRL_BATCH_INDEX ?? 0);
+    this.attempt = Number(options.attempt ?? process.env.VERDANT_CTRL_ATTEMPT ?? 0);
     this.repoRoot = options.repoRoot ?? process.env.VERDANT_CTRL_REPO_ROOT ?? process.cwd();
     this._flushed = new Set();
-    this.debugEnabled =
-      options.debug ?? truthyEnv(process.env.VERDANT_CTRL_REPORTER_DEBUG ?? "");
+    this.debugEnabled = options.debug ?? truthyEnv(process.env.VERDANT_CTRL_REPORTER_DEBUG ?? "");
     this.debugFile =
       options.debugFile ??
       process.env.VERDANT_CTRL_REPORTER_DEBUG_FILE ??
@@ -194,6 +242,7 @@ export default class VerdantControlledReporter {
       shardIndex: this.shardIndex,
       shardTotal: this.shardTotal,
       batchIndex: this.batchIndex,
+      attempt: this.attempt,
       callback,
       callbackKeys: sortedKeys(task),
       fieldTypes: describeTypes(task),
@@ -216,13 +265,20 @@ export default class VerdantControlledReporter {
       this._emitDebug(callback, fileTask, selectedField, rel, "deduped");
       return;
     }
-    this._flushed.add(rel);
-    const tests = collectTests(fileTask);
+    const tests = collectModernTests(fileTask) ?? collectTests(fileTask);
     const passed = tests.filter((t) => t.state === "pass").length;
     const failed = tests.filter((t) => t.state === "fail").length;
     const skipped = tests.filter((t) => t.state === "skip").length;
     const todo = tests.filter((t) => t.state === "todo").length;
-    const status = fileStateFromTests(tests, fileTask.result?.state);
+    const status = fileStateFromTests(tests, fileResultState(fileTask));
+    if (status === "incomplete") {
+      // Module-end may arrive before Vitest has finalized method-based
+      // results. Do not persist or dedupe a provisional event; onFinished
+      // gets another chance to emit the terminal file result.
+      this._emitDebug(callback, fileTask, selectedField, rel, "deferred-incomplete");
+      return;
+    }
+    this._flushed.add(rel);
     const failedNames = tests.filter((t) => t.state === "fail").map((t) => t.name);
     this._append({
       event: "file",
@@ -231,10 +287,11 @@ export default class VerdantControlledReporter {
       shardIndex: this.shardIndex,
       shardTotal: this.shardTotal,
       batchIndex: this.batchIndex,
+      attempt: this.attempt,
       file: rel,
       status,
       counts: { passed, failed, skipped, todo },
-      duration: fileTask.result?.duration ?? null,
+      duration: fileDuration(fileTask),
       failedTests: failedNames,
       firstError: failedNames.length
         ? (tests.find((t) => t.state === "fail")?.error ?? null)
@@ -280,6 +337,7 @@ export default class VerdantControlledReporter {
         shardIndex: this.shardIndex,
         shardTotal: this.shardTotal,
         batchIndex: this.batchIndex,
+        attempt: this.attempt,
         errorCount: (errors || []).length,
         completedAt: nowIso(),
       });

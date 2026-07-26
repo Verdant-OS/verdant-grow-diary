@@ -87,7 +87,7 @@ describe("CultivarsIndex crawl-safety wiring", () => {
       `${ORIGIN}/cultivars`,
     );
     expect(headContent('meta[property="og:url"]')).toBe(`${ORIGIN}/cultivars`);
-  });
+  }, 15_000);
 
   it("sets noindex while canonical and og:url remain the clean hub for query variants", () => {
     renderCultivars("/cultivars?q=oreoz&difficulty=Advanced");

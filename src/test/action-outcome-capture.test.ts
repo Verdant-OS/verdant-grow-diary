@@ -42,7 +42,7 @@ function extractAsyncFunctionBefore(
 const RECORD_OUTCOME_BLOCK = extractAsyncFunctionBefore(
   ACTION_DETAIL,
   "recordOutcome",
-  "logEvent",
+  "transition",
 );
 
 function baseAction(overrides: Partial<OutcomeActionInput> = {}): OutcomeActionInput {

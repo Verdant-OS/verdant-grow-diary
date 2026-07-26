@@ -55,14 +55,35 @@ interface CheckResult {
   cause?: FailureCause;
 }
 
-// The subset of PAID_PLAN_IDS this preflight guards. Derived from the
-// single-source allowlist so a plan added there is immediately visible
-// here, but we deliberately only require the plans currently sold under
-// the Craft SKU — credit packs have their own catalog surface and
-// founder_lifetime/pro_* are covered by other preflights.
-const REQUIRED_PLAN_IDS = PAID_PLAN_IDS.filter(
-  (id) => id === "craft_monthly" || id === "craft_annual",
-);
+// External-id prefixes this preflight guards. Craft plans and the one-time
+// AI credit packs both ship through this gate; founder_lifetime and pro_* are
+// covered by other preflights.
+//
+// Prefix-driven rather than an id list on purpose: a new craft_ or
+// credit_pack_ SKU added to PAID_PLAN_IDS is required here automatically,
+// instead of relying on someone remembering to widen a second list. That
+// second list is exactly the shape of the copy that let Craft go missing from
+// the webhook allowlist in the first place.
+const GUARDED_EXTERNAL_ID_PREFIXES = ["craft_", "credit_pack_"] as const;
+
+function isGuardedExternalId(id: string): boolean {
+  return GUARDED_EXTERNAL_ID_PREFIXES.some((prefix) => id.startsWith(prefix));
+}
+
+// The subset of PAID_PLAN_IDS this preflight guards, derived from the
+// single-source allowlist.
+const REQUIRED_PLAN_IDS = PAID_PLAN_IDS.filter(isGuardedExternalId);
+
+// Fail loudly rather than silently guarding nothing if the prefixes ever stop
+// matching the allowlist (a rename, say). A preflight that checks zero ids
+// reports green forever.
+if (REQUIRED_PLAN_IDS.length === 0) {
+  console.error(
+    "verify-paddle-craft-catalog: GUARDED_EXTERNAL_ID_PREFIXES matched no id in " +
+      "PAID_PLAN_IDS — this preflight would verify nothing and pass.",
+  );
+  process.exit(2);
+}
 
 /**
  * Prefix used to recognise Craft-SKU plans in the Paddle catalog. Any
@@ -71,7 +92,7 @@ const REQUIRED_PLAN_IDS = PAID_PLAN_IDS.filter(
  * out of coverage — the coverage assertion below fails the build in
  * that case so we never ship a Craft plan the preflight isn't guarding.
  */
-const CRAFT_EXTERNAL_ID_PREFIX = "craft_";
+const GUARDED_LABEL = GUARDED_EXTERNAL_ID_PREFIXES.map((p) => `${p}*`).join(" / ");
 
 const PADDLE_API_BASE = {
   sandbox: "https://sandbox-api.paddle.com",
@@ -187,7 +208,7 @@ async function discoverActiveCraftExternalIds(
     };
     for (const row of payload.data ?? []) {
       const ext = row.external_id;
-      if (typeof ext === "string" && ext.startsWith(CRAFT_EXTERNAL_ID_PREFIX)) {
+      if (typeof ext === "string" && isGuardedExternalId(ext)) {
         collected.push(ext);
       }
     }
@@ -250,13 +271,13 @@ async function main(): Promise<void> {
     if (!discovery.ok) {
       results.push({
         env,
-        externalId: `${CRAFT_EXTERNAL_ID_PREFIX}* (coverage)`,
+        externalId: `${GUARDED_LABEL} (coverage)`,
         status: "fail",
         detail: `catalog enumeration failed: ${discovery.detail}`,
         cause: { kind: "enumeration_error" },
       });
       console.log(
-        `✗ [${env}] ${CRAFT_EXTERNAL_ID_PREFIX}* (coverage) — catalog enumeration failed: ${discovery.detail}`,
+        `✗ [${env}] ${GUARDED_LABEL} (coverage) — catalog enumeration failed: ${discovery.detail}`,
       );
       continue;
     }
@@ -264,15 +285,15 @@ async function main(): Promise<void> {
     if (uncovered.length === 0) {
       const detail =
         discovery.ids.length === 0
-          ? `no active ${CRAFT_EXTERNAL_ID_PREFIX}* prices in catalog`
-          : `all ${discovery.ids.length} active ${CRAFT_EXTERNAL_ID_PREFIX}* price(s) covered`;
+          ? `no active ${GUARDED_LABEL} prices in catalog`
+          : `all ${discovery.ids.length} active ${GUARDED_LABEL} price(s) covered`;
       results.push({
         env,
-        externalId: `${CRAFT_EXTERNAL_ID_PREFIX}* (coverage)`,
+        externalId: `${GUARDED_LABEL} (coverage)`,
         status: "pass",
         detail,
       });
-      console.log(`✓ [${env}] ${CRAFT_EXTERNAL_ID_PREFIX}* (coverage) — ${detail}`);
+      console.log(`✓ [${env}] ${GUARDED_LABEL} (coverage) — ${detail}`);
     } else {
       for (const id of uncovered) {
         const detail =

@@ -118,7 +118,8 @@ export type PaddleCheckoutCatalogReason =
   | "unknown_plan"
   | "price_not_configured"
   | "price_resolution_unavailable"
-  | "plan_sold_out";
+  | "plan_sold_out"
+  | "pack_requires_monthly_plan";
 
 export class PaddleCheckoutCatalogUnavailableError extends Error {
   readonly reason: PaddleCheckoutCatalogReason;
@@ -136,6 +137,7 @@ const CATALOG_REASONS: ReadonlySet<PaddleCheckoutCatalogReason> = new Set([
   "price_not_configured",
   "price_resolution_unavailable",
   "plan_sold_out",
+  "pack_requires_monthly_plan",
 ]);
 
 export function getPaddleCheckoutCatalogMessage(
@@ -148,6 +150,11 @@ export function getPaddleCheckoutCatalogMessage(
       return "This plan isn't set up for checkout yet. Please pick another plan or check back soon.";
     case "plan_sold_out":
       return "This plan is sold out.";
+    case "pack_requires_monthly_plan":
+      // Not a fault the buyer can retry away — an honest explanation of what a
+      // pack is for. Free grows are scoped per-grow, so a pack would have no
+      // monthly allowance to top up and the credits would be unspendable.
+      return "Credit packs top up the monthly AI allowance that comes with a paid plan. Your current plan includes AI Doctor checks per grow instead, so a pack would have nothing to add to yet.";
     case "price_resolution_unavailable":
     default:
       return "Checkout is temporarily unavailable for this plan. Please try again in a moment or pick another plan.";

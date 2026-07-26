@@ -1,8 +1,16 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { gatewayFetch, type PaddleEnv } from "../_shared/paddle.ts";
-import { resolveServerBillingEnvironment } from "../_shared/unionEntitlementLookup.ts";
-import { PAID_PLAN_ALLOWLIST, PAID_PLAN_IDS } from "../_shared/lib/lib/paidPlanAllowlist.ts";
+import {
+  loadUnionEntitlement,
+  resolveServerBillingEnvironment,
+} from "../_shared/unionEntitlementLookup.ts";
+import {
+  CREDIT_PACK_IDS,
+  PAID_PLAN_ALLOWLIST,
+  PAID_PLAN_IDS,
+} from "../_shared/lib/lib/paidPlanAllowlist.ts";
+import { creditPackIsSpendable } from "../_shared/lib/lib/creditPackEligibility.ts";
 
 /**
  * Resolve a paid plan id to its public Paddle price ID. Read-only; no DB
@@ -161,6 +169,41 @@ Deno.serve(async (req) => {
       // rejected input value (could be attacker-controlled or PII-shaped).
       logCatalogUnavailable({ plan: "(rejected)", reason: "unknown_plan", stage: "allowlist" });
       return json(400, { error: "unknown_plan" });
+    }
+
+    // 2a-bis. A credit pack tops up the MONTHLY AI bucket. `ai_credit_spend`
+    //     only consults pack balance under `IF v_scope = 'per_month'`, and free
+    //     grows are scoped per_grow — so a pack bought on a free plan lands in
+    //     ai_credit_grants and NO spend path ever reads it. That is money taken
+    //     for credits we can never deliver.
+    //
+    //     Enforced HERE, before a price is returned, for the same reason as the
+    //     founder cap below: it is the last point where refusing costs the
+    //     buyer nothing. A client-side gate alone is bypassable by calling this
+    //     function directly, so the server is the authority; the predicate is
+    //     shared with the client rather than duplicated.
+    if ((CREDIT_PACK_IDS as readonly string[]).includes(requested)) {
+      let packSpendable = false;
+      try {
+        const { entitlement } = await loadUnionEntitlement(
+          supabase,
+          resolveServerBillingEnvironment(),
+          new Date(),
+        );
+        packSpendable = creditPackIsSpendable(entitlement);
+      } catch {
+        // Fail CLOSED: if we cannot confirm the buyer can spend the pack, we
+        // must not sell it. An unusable purchase is worse than a retry.
+        packSpendable = false;
+      }
+      if (!packSpendable) {
+        logCatalogUnavailable({
+          plan: requested,
+          reason: "pack_requires_monthly_plan",
+          stage: "entitlement",
+        });
+        return json(403, { error: "pack_requires_monthly_plan" });
+      }
     }
 
     // 2b. Founder Lifetime is a capped one-time plan (75 slots). Block a

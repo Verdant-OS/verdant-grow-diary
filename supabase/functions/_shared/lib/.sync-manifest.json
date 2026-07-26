@@ -1,6 +1,6 @@
 {
   "generator": "scripts/sync-edge-shared.mjs",
-  "sourceCount": 84,
+  "sourceCount": 85,
   "sourceHashes": {
     "src/constants/aiDoctorContextReadiness.ts": "22767b47268f6fa199b89f81d9dbb7fb017ab1f9f860c8dfdfe6d44501ee8170",
     "src/constants/aiDoctorImportedHistory.ts": "f04d998dea22c9e8e7aaa6489a64cf4af44202435982039a1f216ccba9c317a0",
@@ -32,6 +32,7 @@
     "src/lib/cost/costDomains.ts": "7eee4a661bbcc4ccc64c466a00ebe0df35cdc26d4487718ae795a1283b343474",
     "src/lib/cost/index.ts": "092f062d4b8d4bae292d1dc6d62007ac47df5723fc04227230969e0e714e9d00",
     "src/lib/cost/promptTokenEstimator.ts": "b01a591e28439060fe679678a15e93169a25fc73ead028998d5d96558fd08bc0",
+    "src/lib/creditPackEligibility.ts": "40f7ddc275d800458d524e333f2e8a0d9c490ae07c3154d28ee228a7300d3ee5",
     "src/lib/diaryEntryRules.ts": "407ba0f17e72c084c365f33feaf77d1eef29c9b75793c3bbff5430bc82c6a6d2",
     "src/lib/earlyStageAiDoctorContextRules.ts": "020c2dc6b329937148ea6ebf2358daeb40886b7c16481c9f7d89c1f512592ecd",
     "src/lib/earlyStageQuickLogRules.ts": "762a17b8e0186d87070ee4ba76cf18dabf7f59405019a1319c97704b76de8d3e",

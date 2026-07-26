@@ -25,8 +25,63 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { CREDIT_PACK_IDS, PAID_PLAN_IDS, SUBSCRIPTION_PLAN_IDS } from "@/lib/paidPlanAllowlist";
 
+/**
+ * Remove JS comments so a commented-out entry cannot satisfy a substring
+ * match. Without this, `// credit_pack_150: Deno.env.get(…)` still contains
+ * the literal `credit_pack_150:` and every assertion below stays green while
+ * that SKU no longer resolves a price — a billing scan handing back false
+ * assurance, which is worse than no scan.
+ *
+ * Quote-aware on purpose: a `//` inside a string (a URL, say) is not a
+ * comment, and a naive line-wise strip would silently truncate real code and
+ * shrink the very sets these assertions measure.
+ */
+export function stripComments(source: string): string {
+  let out = "";
+  let quote: string | null = null;
+  let i = 0;
+  while (i < source.length) {
+    const ch = source[i];
+    const next = source[i + 1];
+    if (quote) {
+      if (ch === "\\") {
+        out += ch + (next ?? "");
+        i += 2;
+        continue;
+      }
+      if (ch === quote) quote = null;
+      out += ch;
+      i += 1;
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === "`") {
+      quote = ch;
+      out += ch;
+      i += 1;
+      continue;
+    }
+    if (ch === "/" && next === "/") {
+      while (i < source.length && source[i] !== "\n") i += 1;
+      continue;
+    }
+    if (ch === "/" && next === "*") {
+      i += 2;
+      while (i < source.length && !(source[i] === "*" && source[i + 1] === "/")) i += 1;
+      i += 2;
+      continue;
+    }
+    out += ch;
+    i += 1;
+  }
+  return out;
+}
+
+function sourceOf(...segments: string[]): string {
+  return stripComments(readFileSync(resolve(process.cwd(), ...segments), "utf8"));
+}
+
 function edgeSource(...segments: string[]): string {
-  return readFileSync(resolve(process.cwd(), "supabase", "functions", ...segments), "utf8");
+  return sourceOf("supabase", "functions", ...segments);
 }
 
 const WEBHOOK = edgeSource("payments-webhook", "eventProcessor.ts");
@@ -118,9 +173,29 @@ describe("sellable-tier chain", () => {
     // derivation would otherwise classify it as a subscription plan — the
     // dangerous direction. Assert the guard exists rather than re-implementing
     // its logic here.
-    const source = readFileSync(resolve(process.cwd(), "src", "lib", "paidPlanAllowlist.ts"), "utf8");
+    // Comment-stripped, so commenting the guard out fails this rather than
+    // leaving it green on the strength of the disabled text.
+    const source = sourceOf("src", "lib", "paidPlanAllowlist.ts");
     expect(source).toMatch(/startsWith\("credit_pack"\)/);
     expect(source).toMatch(/throw new Error/);
+  });
+
+  it("strips comments without eating real code", () => {
+    // The stripper itself is load-bearing: if it silently no-opped, the
+    // commented-out-entry hole would reopen; if it over-stripped, every set
+    // above would shrink and the assertions would fail for the wrong reason.
+    // Both directions are asserted rather than assumed.
+    expect(stripComments(`{ a: 1, // b: 2\n c: 3 }`)).not.toContain("b:");
+    expect(stripComments(`{ a: 1, /* b: 2 */ c: 3 }`)).not.toContain("b:");
+    expect(stripComments(`{ a: 1, c: 3 }`)).toContain("c: 3");
+    // A `//` inside a string is not a comment.
+    expect(stripComments(`const u = "https://x.test/p"; const k = 1;`)).toContain("const k = 1;");
+    // And it must actually be doing something to the real file.
+    const raw = readFileSync(
+      resolve(process.cwd(), "supabase", "functions", "get-paddle-price", "index.ts"),
+      "utf8",
+    );
+    expect(PRICE_FN.length).toBeLessThan(raw.length);
   });
 
   it("keeps the derived sets non-trivial", () => {

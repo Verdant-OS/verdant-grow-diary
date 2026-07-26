@@ -20,7 +20,7 @@ import {
 
 
 const FIXTURE_META = {
-  title: "Pricing — Free, Pro & Founder Lifetime | Verdant Grow Diary",
+  title: "Pricing — Free, Pro & Craft | Verdant Grow Diary",
   description: "Free grow diary forever. Pro adds multi-tent support.",
   url: "https://verdantgrowdiary.com/pricing",
   image: "https://verdantgrowdiary.com/og/pricing.png",
@@ -183,7 +183,7 @@ describe("static route head fidelity helpers", () => {
     expect(md).toContain("`/gone`");
     expect(md).toContain("### `/pricing`");
     expect(md).toContain("Wrong title");
-    expect(md).toContain("Pricing — Free, Pro & Founder Lifetime");
+    expect(md).toContain("Pricing — Free, Pro & Craft");
     // Clean route must not appear as a drifted section.
     expect(md).not.toContain("### `/clean`");
   });

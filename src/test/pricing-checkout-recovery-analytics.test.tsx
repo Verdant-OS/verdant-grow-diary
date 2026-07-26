@@ -164,7 +164,7 @@ describe("Pricing recovery analytics", () => {
 
   it("dismiss button fires pricing + funnel recovery_dismissed", () => {
     renderPricing();
-    fireEvent.click(screen.getByTestId("pricing-cta-founder-lifetime"));
+    fireEvent.click(screen.getByTestId("pricing-cta-craft-annual"));
     trackPricingEventMock.mockClear();
     trackFunnelEventMock.mockClear();
 
@@ -172,11 +172,11 @@ describe("Pricing recovery analytics", () => {
 
     expect(trackPricingEventMock).toHaveBeenCalledWith(
       "pricing_checkout_recovery_dismissed",
-      { plan: "founder_lifetime", source: "recovery_panel" },
+      { plan: "craft_annual", source: "recovery_panel" },
     );
     expect(trackFunnelEventMock).toHaveBeenCalledWith(
       "checkout_recovery_dismissed",
-      { plan: "founder_lifetime" },
+      { plan: "craft_annual" },
     );
     expect(dismissBlockedMock).toHaveBeenCalledTimes(1);
     expect(openCheckoutMock).not.toHaveBeenCalled();

@@ -312,10 +312,17 @@ async function main(): Promise<void> {
  *     requiredIds: string[],
  *     rows: [{ env, externalId, status, cause? }, ...],  // no `detail`
  *     summary: { pass, fail, skip },
+ *     missingByEnv: { sandbox?: [...], live?: [...] },   // non-pass rows
  *     exitCode: number,
  *     keyUnset: boolean,
  *     generatedAt: ISO-8601 string
  *   }
+ *
+ * `missingByEnv` is a remediation aid: it groups every non-pass row
+ * (fail + skip) by env so an operator can see at a glance which ids
+ * need attention in which environment without re-scanning `rows`. Rows
+ * carry the same `status` + `cause` shape as the top-level `rows` array
+ * so downstream tooling can pick a remedy directly.
  *
  * `detail` is intentionally excluded — it can embed up to 200 chars of
  * Paddle response body on the API-error path, which we do NOT want in
@@ -335,21 +342,30 @@ function finalize(
   console.log(`SUMMARY: pass=${pass} fail=${fail} skip=${skip}`);
 
   if (jsonOut) {
+    const rows = results.map((r) => {
+      const row: {
+        env: PaddleEnv;
+        externalId: string;
+        status: CheckStatus;
+        cause?: FailureCause;
+      } = { env: r.env, externalId: r.externalId, status: r.status };
+      if (r.cause) row.cause = r.cause;
+      return row;
+    });
+    const missingByEnv: Partial<Record<PaddleEnv, typeof rows>> = {};
+    for (const env of envs) {
+      const forEnv = rows
+        .filter((r) => r.env === env && r.status !== "pass")
+        .sort((a, b) => a.externalId.localeCompare(b.externalId));
+      if (forEnv.length > 0) missingByEnv[env] = forEnv;
+    }
     const report = {
       schemaVersion: 1 as const,
       envs: [...envs],
       requiredIds: [...REQUIRED_PLAN_IDS],
-      rows: results.map((r) => {
-        const row: {
-          env: PaddleEnv;
-          externalId: string;
-          status: CheckStatus;
-          cause?: FailureCause;
-        } = { env: r.env, externalId: r.externalId, status: r.status };
-        if (r.cause) row.cause = r.cause;
-        return row;
-      }),
+      rows,
       summary: { pass, fail, skip },
+      missingByEnv,
       exitCode: code,
       keyUnset: results.some(
         (r) => r.status === "skip" && /_API_KEY not set$/.test(r.detail),

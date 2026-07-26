@@ -130,7 +130,11 @@ describe("Action Queue safety — current posture (suggest-only by construction)
     // RPC allow-list: ai-coach may only call approved credit-metering RPCs.
     // Anything else (device control, automation, action_queue writers,
     // role/billing mutators) is forbidden.
-    const APPROVED_RPCS = new Set(["ai_credit_spend", "ai_credit_refund"]);
+    const APPROVED_RPCS = new Set([
+      "ai_credit_spend",
+      "ai_credit_refund",
+      "ai_credit_attach_result",
+    ]);
     const rpcCalls = [...AI_COACH_CODE.matchAll(/\.rpc\s*\(\s*["'`]([a-zA-Z0-9_]+)["'`]/g)].map(
       (m) => m[1],
     );
@@ -172,7 +176,7 @@ describe("Action Queue safety — current posture (suggest-only by construction)
     for (const m of matches) {
       const idx = m.index ?? 0;
       const window = AI_COACH_CODE.slice(Math.max(0, idx - 200), idx + 400);
-      expect(m[1]).toMatch(/^ai_credit_(spend|refund)$/);
+      expect(m[1]).toMatch(/^ai_credit_(spend|refund|attach_result)$/);
       expect(window, `ai-coach RPC ${m[1]} must not touch action_queue`).not.toMatch(
         /action_queue/i,
       );

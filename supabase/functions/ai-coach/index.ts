@@ -8,6 +8,11 @@ import { buildAiSensorSnapshotContext } from "../_shared/lib/lib/aiSensorSnapsho
 import { pickLatestSensorSnapshotEvidenceByCapturedAt } from "../_shared/lib/lib/aiCoachLatestSensorSnapshot.ts";
 import { resolveRequiredServerBillingEnvironment } from "../_shared/unionEntitlementLookup.ts";
 import { isMissingAiCreditRpcOverload } from "../_shared/aiCreditRpcCompatibility.ts";
+import {
+  classifyAiDoctorCreditSpend,
+  isConfirmedAiDoctorCreditRefund,
+  parseAiDoctorResultAttachment,
+} from "../_shared/aiDoctorCreditReplayRules.ts";
 
 type Mode = "diagnose" | "next_steps";
 interface Body {
@@ -15,7 +20,7 @@ interface Body {
   growId?: string;
   photoUrl?: string;
   question?: string;
-  idempotencyKey?: string;
+  idempotencyKey: string;
 }
 
 interface DiaryRow {
@@ -33,6 +38,10 @@ const QUICK_LOG_SENSOR_PROVENANCE_LOOKBACK_MS = 4 * 60 * 60 * 1000;
 const QUICK_LOG_SENSOR_PROVENANCE_ROW_LIMIT = 200;
 const QUICK_LOG_SENSOR_PROVENANCE_COLUMNS =
   "id,metric,value,quality,source,captured_at,ts,created_at,raw_payload";
+const PROVIDER_TIMEOUT_MS = 25_000;
+const RESULT_PERSISTENCE_TIMEOUT_MS = 3_000;
+const MAX_QUESTION_LENGTH = 2_000;
+const MAX_PHOTO_URL_LENGTH = 8_192;
 
 function asObject(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -56,6 +65,85 @@ function capturedAtMs(snapshot: unknown): number | null {
   if (typeof raw !== "string" || raw.trim() === "") return null;
   const ms = Date.parse(raw);
   return Number.isFinite(ms) ? ms : null;
+}
+
+function isBoundedText(value: unknown, maxLength = 2_000): value is string {
+  return typeof value === "string" && value.trim().length > 0 && value.length <= maxLength;
+}
+
+function isBoundedTextList(value: unknown): value is string[] {
+  return (
+    Array.isArray(value) &&
+    value.length <= 20 &&
+    value.every((item) => typeof item === "string" && item.length <= 1_000)
+  );
+}
+
+type ValidatedCoachResult =
+  | { ok: true; result: Record<string, unknown> }
+  | { ok: false; reason: string };
+
+/**
+ * Fail-closed parser for fresh and replayed AI Coach results. The provider is
+ * untrusted; only the documented analysis shape crosses the Edge boundary.
+ * Structured diagnosis remains an opaque object for the canonical client
+ * diagnosis sanitizer, but arrays/primitives are rejected here.
+ */
+function validateAiCoachResult(value: unknown): ValidatedCoachResult {
+  const root = asObject(value);
+  const analysis = asObject(root?.analysis);
+  if (!root || !analysis) return { ok: false, reason: "shape" };
+
+  const likelyIssue = analysis.likely_issue;
+  if (
+    !isBoundedText(analysis.summary, 4_000) ||
+    (likelyIssue !== null && !isBoundedText(likelyIssue, 1_000)) ||
+    !["low", "medium", "high"].includes(String(analysis.confidence)) ||
+    !["low", "medium", "high", "unknown"].includes(String(analysis.risk_level)) ||
+    !isBoundedTextList(analysis.evidence) ||
+    !isBoundedTextList(analysis.possible_causes) ||
+    !isBoundedTextList(analysis.recommended_actions) ||
+    !isBoundedTextList(analysis.do_not_do) ||
+    !isBoundedText(analysis.follow_up_24h) ||
+    !isBoundedText(analysis.follow_up_3_day)
+  ) {
+    return { ok: false, reason: "analysis" };
+  }
+
+  const diagnosis = root.diagnosis;
+  if (diagnosis !== null && diagnosis !== undefined && !asObject(diagnosis)) {
+    return { ok: false, reason: "diagnosis" };
+  }
+
+  return {
+    ok: true,
+    result: {
+      analysis: {
+        summary: analysis.summary,
+        likely_issue: likelyIssue,
+        confidence: analysis.confidence,
+        risk_level: analysis.risk_level,
+        evidence: analysis.evidence,
+        possible_causes: analysis.possible_causes,
+        recommended_actions: analysis.recommended_actions,
+        do_not_do: analysis.do_not_do,
+        follow_up_24h: analysis.follow_up_24h,
+        follow_up_3_day: analysis.follow_up_3_day,
+      },
+      diagnosis: diagnosis ?? null,
+      sparse: root.sparse === true,
+      empty: root.empty === true,
+    },
+  };
+}
+
+function readCoachMessageContent(value: unknown): string | null {
+  const payload = asObject(value);
+  const choices = payload?.choices;
+  if (!Array.isArray(choices) || choices.length === 0) return null;
+  const message = asObject(asObject(choices[0])?.message);
+  const content = message?.content;
+  return typeof content === "string" && content.trim().length > 0 ? content : null;
 }
 
 // S2: server-pinned tier/feature. Escalation is deferred.
@@ -85,8 +173,77 @@ function isUuid(s: unknown): s is string {
   );
 }
 
+function parseAiCoachBody(value: unknown, supabaseUrl: string): Body | null {
+  const raw = asObject(value);
+  if (!raw || (raw.mode !== "diagnose" && raw.mode !== "next_steps")) return null;
+  if (!isUuid(raw.idempotencyKey)) return null;
+
+  let growId: string | undefined;
+  if (raw.growId !== undefined && raw.growId !== null) {
+    if (!isUuid(raw.growId)) return null;
+    growId = raw.growId.toLowerCase();
+  }
+
+  let question: string | undefined;
+  if (raw.question !== undefined && raw.question !== null) {
+    if (typeof raw.question !== "string" || raw.question.length > MAX_QUESTION_LENGTH) return null;
+    question = raw.question.trim() || undefined;
+  }
+
+  let photoUrl: string | undefined;
+  if (raw.photoUrl !== undefined && raw.photoUrl !== null) {
+    if (
+      typeof raw.photoUrl !== "string" ||
+      raw.photoUrl.length === 0 ||
+      raw.photoUrl.length > MAX_PHOTO_URL_LENGTH
+    ) {
+      return null;
+    }
+    const allowedPhotoPrefix = `${supabaseUrl.replace(/\/$/, "")}/storage/v1/object/sign/`;
+    if (!raw.photoUrl.startsWith(allowedPhotoPrefix)) return null;
+    photoUrl = raw.photoUrl;
+  }
+
+  return {
+    mode: raw.mode,
+    growId,
+    photoUrl,
+    question,
+    idempotencyKey: raw.idempotencyKey,
+  };
+}
+
+function calmFailure(reason: string, extra?: Record<string, unknown>): Response {
+  return json({ ok: false, reason, ...(extra ?? {}) }, 200);
+}
+
+function safeOk(result: unknown, credit?: Record<string, unknown>): Response {
+  return json({ ok: true, result, ...(credit ? { credit } : {}) }, 200);
+}
+
+async function settleResultPersistence<T>(operation: PromiseLike<T>): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      Promise.resolve(operation),
+      new Promise<never>((_resolve, reject) => {
+        timeoutId = setTimeout(
+          () => reject(new Error("result_persistence_timeout")),
+          RESULT_PERSISTENCE_TIMEOUT_MS,
+        );
+      }),
+    ]);
+  } finally {
+    if (timeoutId !== undefined) clearTimeout(timeoutId);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  // After the spend RPC starts, an unexpected error is ambiguous: the ledger
+  // may have committed. A same-key replay must resolve it instead of charging
+  // a second credit.
+  let creditSpendMayExist = false;
   try {
     const auth = req.headers.get("Authorization");
     if (!auth) return json({ error: "unauthorized" }, 401);
@@ -105,24 +262,28 @@ Deno.serve(async (req) => {
     if (!serviceRoleKey || !creditSupabaseUrl || !billingEnvironmentResolution.ok) {
       return json({ error: "AI not configured" }, 500);
     }
+    let requestBody: unknown;
+    try {
+      requestBody = await req.json();
+    } catch {
+      return calmFailure("shape");
+    }
+    const body = parseAiCoachBody(requestBody, creditSupabaseUrl);
+    if (!body) return calmFailure("shape");
+
+    const lovableKey = Deno.env.get("LOVABLE_API_KEY");
+    if (!lovableKey) return json({ error: "AI not configured" }, 500);
+
     const creditSupabase = createClient(creditSupabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
     const billingEnvironment = billingEnvironmentResolution.environment;
 
-    const body = (await req.json()) as Body;
-    const lovableKey = Deno.env.get("LOVABLE_API_KEY");
-    if (!lovableKey) return json({ error: "AI not configured" }, 500);
-
     // ---- S2: ai_credit_spend (atomic check-and-spend) -----------------------
-    const growId = isUuid(body.growId) ? body.growId : null;
-    const idempotencyKey =
-      typeof body.idempotencyKey === "string" &&
-      body.idempotencyKey.length >= 8 &&
-      body.idempotencyKey.length <= 200
-        ? body.idempotencyKey
-        : crypto.randomUUID();
+    const growId = body.growId ?? null;
+    const idempotencyKey = body.idempotencyKey;
 
+    creditSpendMayExist = true;
     let spendResponse = await creditSupabase.rpc("ai_credit_spend", {
       p_user_id: userId,
       p_billing_environment: billingEnvironment,
@@ -144,44 +305,24 @@ Deno.serve(async (req) => {
     const { data: spend, error: spendErr } = spendResponse;
     if (spendErr || !spend || typeof spend !== "object") {
       console.log("ai-coach status=credit_rpc_error");
-      return json({ error: "credit_rpc" }, 500);
+      return calmFailure("credit_rpc");
     }
     const spendObj = spend as Record<string, unknown>;
-    if (spendObj.ok !== true && spendObj.status !== "denied") {
-      // A refunded or context-conflicting idempotency replay is terminal, but
-      // it is not a quota denial. Keep it out of the paywall path.
-      console.log(
-        `ai-coach status=credit_invalid http=200 reason=${String(spendObj.reason ?? "")}`,
-      );
-      return json({ ok: false, reason: "invalid" }, 200);
-    }
-    if (spendObj.ok !== true) {
-      console.log(`ai-coach status=credit_denied http=200 reason=${String(spendObj.reason ?? "")}`);
-      return json({ ok: false, reason: "credit_denied", credit: spendObj }, 200);
-    }
-    if (spendObj.feature !== FEATURE || spendObj.model_tier !== MODEL_TIER) {
-      console.log("ai-coach status=credit_scope_mismatch");
-      return json({ ok: false, reason: "invalid" }, 200);
-    }
-    if (spendObj.status === "replayed") {
-      console.log("ai-coach status=replay_result_unavailable");
-      return json({ ok: false, reason: "invalid" }, 200);
-    }
-    if (spendObj.status !== "spent") {
-      console.log("ai-coach status=credit_status_invalid");
-      return json({ error: "credit_rpc" }, 500);
-    }
-    const spendId = typeof spendObj.spend_id === "string" ? spendObj.spend_id : null;
-    const refundKey = "refund:" + (spendId ?? idempotencyKey);
-    const refund = async (reason: string) => {
-      if (!spendId) return;
+
+    type RefundOutcome = "confirmed" | "unconfirmed";
+
+    const refund = async (spendId: string | null, reason: string): Promise<RefundOutcome> => {
+      if (!spendId) return "unconfirmed";
+      const refundKey = `refund:${spendId}`;
       try {
-        let refundResponse = await creditSupabase.rpc("ai_credit_refund", {
-          p_expected_user_id: userId,
-          p_spend_id: spendId,
-          p_idempotency_key: refundKey,
-          p_reason: reason,
-        });
+        let refundResponse = await settleResultPersistence(
+          creditSupabase.rpc("ai_credit_refund", {
+            p_expected_user_id: userId,
+            p_spend_id: spendId,
+            p_idempotency_key: refundKey,
+            p_reason: reason,
+          }),
+        );
         if (
           isMissingAiCreditRpcOverload(
             refundResponse.error,
@@ -189,24 +330,89 @@ Deno.serve(async (req) => {
             "p_expected_user_id",
           )
         ) {
-          refundResponse = await supabase.rpc("ai_credit_refund", {
-            p_spend_id: spendId,
-            p_idempotency_key: refundKey,
-            p_reason: reason,
-          });
+          refundResponse = await settleResultPersistence(
+            supabase.rpc("ai_credit_refund", {
+              p_spend_id: spendId,
+              p_idempotency_key: refundKey,
+              p_reason: reason,
+            }),
+          );
         }
-        if (
-          refundResponse.error ||
-          !refundResponse.data ||
-          typeof refundResponse.data !== "object" ||
-          (refundResponse.data as Record<string, unknown>).ok !== true
-        ) {
-          console.log("ai-coach status=refund_failed");
+        if (!refundResponse.error && isConfirmedAiDoctorCreditRefund(refundResponse.data)) {
+          console.log("ai-coach refund=confirmed");
+          return "confirmed";
         }
       } catch {
-        console.log("ai-coach status=refund_failed");
+        // A transport timeout is ambiguous; the caller must retain the same
+        // request key until a replay resolves the ledger state.
       }
+      console.log("ai-coach refund=unconfirmed");
+      return "unconfirmed";
     };
+
+    async function failureAfterRefund(
+      spendId: string | null,
+      refundReason: string,
+      terminalReason: string,
+    ): Promise<Response> {
+      const outcome = await refund(spendId, refundReason);
+      return calmFailure(outcome === "confirmed" ? terminalReason : "result_pending");
+    }
+
+    const spendDecision = classifyAiDoctorCreditSpend(spendObj, Date.now());
+    if (spendDecision.kind === "refunded") {
+      console.log("ai-coach status=result_recording_failed");
+      return calmFailure("result_recording_failed");
+    }
+    if (spendDecision.kind === "denied") {
+      console.log(`ai-coach status=credit_denied http=200 reason=${String(spendObj.reason ?? "")}`);
+      return calmFailure("credit_denied", { credit: spendObj });
+    }
+    if (spendDecision.kind === "conflict") {
+      console.log("ai-coach status=idempotency_conflict");
+      return calmFailure("invalid");
+    }
+    if (spendDecision.kind === "invalid") {
+      console.log("ai-coach status=credit_status_invalid");
+      return calmFailure("credit_rpc");
+    }
+
+    if (
+      spendObj.feature !== FEATURE ||
+      spendObj.model_tier !== MODEL_TIER ||
+      spendObj.grow_id !== growId
+    ) {
+      console.log("ai-coach status=credit_scope_mismatch");
+      return calmFailure("credit_rpc");
+    }
+
+    if (spendDecision.kind === "pending") {
+      console.log("ai-coach status=result_pending");
+      return calmFailure("result_pending");
+    }
+    if (spendDecision.kind === "stale") {
+      console.log("ai-coach status=stale_resultless_replay");
+      return failureAfterRefund(
+        spendDecision.spendId,
+        "stale_resultless_replay",
+        "result_recording_failed",
+      );
+    }
+    if (spendDecision.kind === "cached") {
+      const cached = validateAiCoachResult(spendDecision.result);
+      if (cached.ok) {
+        console.log("ai-coach status=ok_replayed");
+        return safeOk(cached.result, { replayed: true });
+      }
+      console.log("ai-coach status=cached_result_invalid");
+      return failureAfterRefund(
+        spendDecision.spendId,
+        "cached_result_invalid",
+        "result_recording_failed",
+      );
+    }
+
+    const spendId = spendDecision.spendId;
 
     // --- gather real context ---
     let grow: Record<string, unknown> | null = null;
@@ -293,8 +499,9 @@ Deno.serve(async (req) => {
 
     if (empty && !body.photoUrl) {
       // No model call → refund the just-spent credit so empty preflights are free.
-      await refund("empty_no_model_call");
-      return json({ analysis: EMPTY_ANALYSIS, sparse: true, empty: true });
+      const refundOutcome = await refund(spendId, "empty_no_model_call");
+      if (refundOutcome !== "confirmed") return calmFailure("result_pending");
+      return safeOk({ analysis: EMPTY_ANALYSIS, diagnosis: null, sparse: true, empty: true });
     }
 
     // --- build structured context block ---
@@ -400,27 +607,19 @@ Rules for diagnosis (structured view, approval-first):
 `;
 
     const userContent: Array<Record<string, unknown>> = [];
-    // Only forward a photoUrl when it is a Supabase Storage signed URL on
-    // this project. Prevents arbitrary external image submission that would
-    // burn AI credits on attacker-controlled URLs.
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const allowedPhotoPrefix = supabaseUrl
-      ? `${supabaseUrl.replace(/\/$/, "")}/storage/v1/object/sign/`
-      : "";
-    const safePhotoUrl =
-      typeof body.photoUrl === "string" &&
-      allowedPhotoPrefix &&
-      body.photoUrl.startsWith(allowedPhotoPrefix)
-        ? body.photoUrl
-        : null;
-    if (safePhotoUrl) userContent.push({ type: "image_url", image_url: { url: safePhotoUrl } });
+    // parseAiCoachBody already constrained photoUrl to this project's signed
+    // Storage path before any credit spend.
+    if (body.photoUrl) userContent.push({ type: "image_url", image_url: { url: body.photoUrl } });
     const text = (body.question ? `QUESTION: ${body.question}\n\n` : "") + context;
     userContent.push({ type: "text", text });
 
+    const providerController = new AbortController();
+    const providerTimer = setTimeout(() => providerController.abort(), PROVIDER_TIMEOUT_MS);
     let r: Response;
     try {
       r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
+        signal: providerController.signal,
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${lovableKey}` },
         body: JSON.stringify({
           model: "google/gemini-2.5-flash",
@@ -432,62 +631,99 @@ Rules for diagnosis (structured view, approval-first):
         }),
       });
     } catch {
-      await refund("upstream_network");
-      return json({ error: "AI network error" }, 500);
+      return failureAfterRefund(spendId, "upstream_network", "timeout");
+    } finally {
+      clearTimeout(providerTimer);
     }
 
     if (r.status === 429) {
-      await refund("upstream_429");
-      return json({ error: "Rate limit hit, try again soon." }, 429);
+      return failureAfterRefund(spendId, "upstream_429", "http");
     }
     if (r.status === 402) {
-      await refund("upstream_402");
       console.log("ai-coach status=upstream_credit_exhausted http=200");
-      return json({ ok: false, reason: "upstream_credit_exhausted" }, 200);
+      return failureAfterRefund(spendId, "upstream_402", "upstream_credit_exhausted");
     }
     if (!r.ok) {
-      await refund(`upstream_${r.status}`);
-      return json({ error: `AI error ${r.status}` }, 500);
+      return failureAfterRefund(spendId, `upstream_${r.status}`, "http");
     }
-    const data = await r.json();
-    const raw = data.choices?.[0]?.message?.content ?? "{}";
-    let parsed: Record<string, unknown> = {};
+
+    let data: unknown;
     try {
-      parsed = JSON.parse(raw);
+      data = await r.json();
     } catch {
-      parsed = {};
+      return failureAfterRefund(spendId, "upstream_parse", "parse");
+    }
+
+    const raw = readCoachMessageContent(data);
+    if (!raw) return failureAfterRefund(spendId, "upstream_empty", "empty");
+
+    let parsed: Record<string, unknown>;
+    try {
+      const candidate = JSON.parse(raw);
+      const object = asObject(candidate);
+      if (!object) return failureAfterRefund(spendId, "upstream_parse", "parse");
+      parsed = object;
+    } catch {
+      return failureAfterRefund(spendId, "upstream_parse", "parse");
     }
 
     // Backward-compatible: the legacy free-text shape lived at the top level.
     // The new prompt nests it under `analysis`. Fall back to top-level if the
     // model returned the legacy shape.
     const analysis =
-      parsed.analysis && typeof parsed.analysis === "object"
-        ? (parsed.analysis as Record<string, unknown>)
-        : parsed.summary || parsed.recommended_actions
-          ? parsed
-          : { ...EMPTY_ANALYSIS, summary: "AI returned unparseable output.", confidence: "low" };
+      asObject(parsed.analysis) ?? (parsed.summary || parsed.recommended_actions ? parsed : null);
 
-    // Structured diagnosis is sanitized client-side (canonical rules live in
-    // src/lib/aiDoctorDiagnosisRules.ts). Pass through raw and let the client
-    // run validateAndSanitizeDiagnosis — this function never runs actions.
-    const diagnosis =
-      parsed.diagnosis && typeof parsed.diagnosis === "object" ? parsed.diagnosis : null;
-
-    return json({
+    // Structured diagnosis is still sanitized by the canonical client
+    // validateAndSanitizeDiagnosis rules before rendering or persistence.
+    // This boundary accepts only an object or null so arrays/primitives never
+    // become a replayable result.
+    const diagnosis = asObject(parsed.diagnosis);
+    const validated = validateAiCoachResult({
       analysis,
       diagnosis,
       sparse,
       empty: false,
-      credit: {
-        remaining: spendObj.remaining,
-        scope: spendObj.scope,
-        scope_limit: spendObj.scope_limit,
-      },
     });
-  } catch (e) {
-    console.error("ai-coach unhandled_error", e);
-    return json({ error: "server_error" }, 500);
+    if (validated.ok === false) {
+      return failureAfterRefund(spendId, "invalid_model_result", "invalid");
+    }
+
+    let finalization: ReturnType<typeof parseAiDoctorResultAttachment> = "ambiguous";
+    try {
+      const attachmentResponse = await settleResultPersistence(
+        creditSupabase.rpc("ai_credit_attach_result", {
+          p_expected_user_id: userId,
+          p_spend_id: spendId,
+          p_expected_feature: FEATURE,
+          p_result: validated.result,
+        }),
+      );
+      if (!attachmentResponse.error) {
+        finalization = parseAiDoctorResultAttachment(attachmentResponse.data);
+      }
+    } catch {
+      // Timeout/transport ambiguity preserves the spend and logical request
+      // key. A same-key replay can recover an attachment that committed.
+    }
+
+    if (finalization === "ambiguous") {
+      console.log("ai-coach status=result_pending");
+      return calmFailure("result_pending");
+    }
+    if (finalization === "rejected") {
+      console.log("ai-coach status=result_recording_rejected");
+      return failureAfterRefund(spendId, "result_recording_rejected", "result_recording_failed");
+    }
+
+    console.log(finalization === "recorded" ? "ai-coach status=ok" : "ai-coach status=ok_replayed");
+    return safeOk(validated.result, {
+      remaining: spendObj.remaining,
+      scope: spendObj.scope,
+      scope_limit: spendObj.scope_limit,
+    });
+  } catch {
+    console.log("ai-coach status=unexpected");
+    return calmFailure(creditSpendMayExist ? "result_pending" : "http");
   }
 });
 

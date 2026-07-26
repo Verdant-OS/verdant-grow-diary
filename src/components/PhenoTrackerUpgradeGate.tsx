@@ -17,10 +17,9 @@ import { canUseFeature, canReadExistingFeatureData } from "@/lib/featureEntitlem
  *   - Everyone else (Free, unauthenticated, unknown): renders the calm
  *     upgrade card with an Upgrade CTA and an optional "View Pheno Demo" link.
  *
- * The Upgrade CTA carries a `returnTo` search param pointing at the current
- * gated pathname. The billing/success flow does not yet consume it — see
- * follow-up note in `docs/security-regression-tests.md` or the Upgrade page
- * TODO. This is safe: unknown params are ignored today.
+ * The Upgrade CTA carries a sanitized `returnTo` search param for the current
+ * gated path and query. The checkout success flow consumes it after confirmed
+ * entitlement activation, so a buyer returns to the exact gated context.
  *
  * SAFETY: UI gating only. Write paths must ALSO check
  * `canWriteFeatureData(entitlement, "pheno_tracker")` before firing any

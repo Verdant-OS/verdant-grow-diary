@@ -43,16 +43,20 @@ describe("ai-coach edge function — security shape", () => {
     expect(CODE).toContain('"p_expected_user_id"');
   });
 
-  it("rejects scope mismatches and resultless replays before the provider call", () => {
+  it("rejects scope mismatches and resolves every replay before the provider call", () => {
+    const decisionIndex = CODE.indexOf("const spendDecision = classifyAiDoctorCreditSpend");
     const scopeIndex = CODE.indexOf("spendObj.feature !== FEATURE");
-    const replayIndex = CODE.indexOf('spendObj.status === "replayed"');
     const providerIndex = CODE.indexOf('fetch("https://ai.gateway.lovable.dev');
+    expect(decisionIndex).toBeGreaterThan(-1);
     expect(scopeIndex).toBeGreaterThan(-1);
-    expect(replayIndex).toBeGreaterThan(scopeIndex);
-    expect(providerIndex).toBeGreaterThan(replayIndex);
-    expect(CODE.slice(replayIndex, providerIndex)).toContain(
-      'return json({ ok: false, reason: "invalid" }, 200)',
-    );
+    expect(scopeIndex).toBeGreaterThan(decisionIndex);
+    expect(providerIndex).toBeGreaterThan(scopeIndex);
+    const replayBlock = CODE.slice(decisionIndex, providerIndex);
+    expect(replayBlock).toContain('spendDecision.kind === "pending"');
+    expect(replayBlock).toContain('spendDecision.kind === "stale"');
+    expect(replayBlock).toContain('spendDecision.kind === "cached"');
+    expect(replayBlock).toContain("validateAiCoachResult(spendDecision.result)");
+    expect(replayBlock).toContain("return safeOk(cached.result");
   });
 
   it("forwards the caller Authorization header into the Supabase client", () => {
@@ -133,7 +137,7 @@ describe("ai-coach edge function — security shape", () => {
     expect(CODE).toMatch(/const\s+empty\s*=\s*!grow\s*\|\|\s*entries\.length\s*===\s*0/);
     // The empty branch returns EMPTY_ANALYSIS BEFORE the fetch() to the AI gateway.
     const emptyIdx = CODE.search(
-      /if\s*\(\s*empty[\s\S]*?return\s+json\(\s*\{\s*analysis:\s*EMPTY_ANALYSIS/,
+      /if\s*\(\s*empty[\s\S]*?return\s+safeOk\(\s*\{\s*analysis:\s*EMPTY_ANALYSIS/,
     );
     const fetchIdx = CODE.search(/fetch\(\s*["']https:\/\/ai\.gateway\.lovable\.dev/);
     expect(emptyIdx).toBeGreaterThan(-1);

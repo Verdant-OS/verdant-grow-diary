@@ -255,7 +255,7 @@ const App = () => (
                   {/* Legacy "strain" URL aliases capture search intent for
                       "Oreoz strain" / "Do-Si-Dos" etc. and route to the
                       canonical /cultivars surface (vocab: cultivar, not strain). */}
-                  <Route path="/strains" element={<Navigate to="/cultivars" replace />} />
+                  <Route path="/strains" element={<RouteAliasRedirect to="/cultivars" />} />
                   <Route path="/strains/:slug" element={<LegacyStrainSlugRedirect />} />
                   <Route path="/glossary" element={<Glossary />} />
                   <Route path="/how-ai-doctor-works" element={<HowAiDoctorWorks />} />
@@ -272,10 +272,10 @@ const App = () => (
                   <Route path="/refund" element={<Refund />} />
                   <Route path="/feedback" element={<Feedback />} />
                   <Route path="/contact" element={<Contact />} />
-                  <Route path="/refunds" element={<Navigate to="/refund" replace />} />
-                  <Route path="/refund-policy" element={<Navigate to="/refund" replace />} />
-                  <Route path="/terms-of-service" element={<Navigate to="/terms" replace />} />
-                  <Route path="/privacy-policy" element={<Navigate to="/privacy" replace />} />
+                  <Route path="/refunds" element={<RouteAliasRedirect to="/refund" />} />
+                  <Route path="/refund-policy" element={<RouteAliasRedirect to="/refund" />} />
+                  <Route path="/terms-of-service" element={<RouteAliasRedirect to="/terms" />} />
+                  <Route path="/privacy-policy" element={<RouteAliasRedirect to="/privacy" />} />
 
                   {/* Internal read-only walkthrough presenter. Mounted OUTSIDE
                       AppShell so the no-write E2E guard can render it without a

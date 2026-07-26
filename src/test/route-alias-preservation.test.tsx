@@ -54,6 +54,36 @@ describe("route alias scope preservation", () => {
       to: "/doctor",
       expected: "/doctor?growId=g1&plantId=p1#review",
     },
+    {
+      from: "/strains?ref=legacy#directory",
+      path: "/strains",
+      to: "/cultivars",
+      expected: "/cultivars?ref=legacy#directory",
+    },
+    {
+      from: "/refunds?source=footer#eligibility",
+      path: "/refunds",
+      to: "/refund",
+      expected: "/refund?source=footer#eligibility",
+    },
+    {
+      from: "/refund-policy?source=footer#eligibility",
+      path: "/refund-policy",
+      to: "/refund",
+      expected: "/refund?source=footer#eligibility",
+    },
+    {
+      from: "/terms-of-service?source=footer#rights",
+      path: "/terms-of-service",
+      to: "/terms",
+      expected: "/terms?source=footer#rights",
+    },
+    {
+      from: "/privacy-policy?source=footer#choices",
+      path: "/privacy-policy",
+      to: "/privacy",
+      expected: "/privacy?source=footer#choices",
+    },
   ])("redirects $path while preserving query and hash", async ({ from, path, to, expected }) => {
     renderAlias(from, path, to);
     expect(await screen.findByTestId("route-alias-location")).toHaveTextContent(expected);
@@ -142,6 +172,11 @@ describe("stateful alias wiring", () => {
     { path: "/features", to: "/welcome" },
     { path: "/demo", to: "/welcome" },
     { path: "/ai-doctor", to: "/doctor" },
+    { path: "/strains", to: "/cultivars" },
+    { path: "/refunds", to: "/refund" },
+    { path: "/refund-policy", to: "/refund" },
+    { path: "/terms-of-service", to: "/terms" },
+    { path: "/privacy-policy", to: "/privacy" },
   ])("routes $path through the query-preserving alias", ({ path, to }) => {
     const escapedPath = path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const escapedTarget = to.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

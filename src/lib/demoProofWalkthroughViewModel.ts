@@ -17,11 +17,7 @@
  * from the Dashboard / Command Center.
  */
 
-export type DemoProofWalkthroughStatus =
-  | "ready"
-  | "operator_only"
-  | "limited"
-  | "unavailable";
+export type DemoProofWalkthroughStatus = "ready" | "operator_only" | "limited" | "unavailable";
 
 export interface DemoProofWalkthroughStep {
   readonly id: string;
@@ -51,8 +47,7 @@ export interface DemoProofWalkthroughViewModel {
   readonly whatThisDoesNotProve: readonly string[];
 }
 
-export const DEMO_PROOF_WALKTHROUGH_ROUTE =
-  "/internal/demo-proof-walkthrough";
+export const DEMO_PROOF_WALKTHROUGH_ROUTE = "/internal/demo-proof-walkthrough";
 
 export const PROOF_WINDOW_LABEL = "current proof window (last 24 hours)";
 
@@ -107,8 +102,7 @@ const STEPS: readonly DemoProofWalkthroughStep[] = Object.freeze([
     expectedEvidence:
       "Quick Log captures diary entry, optional photo, and sensor snapshot with source = manual or live; never relabels stale or invalid as live.",
     href: "/daily-check",
-    safetyNote:
-      "Snapshot provenance (source, captured_at) is preserved as-is. No fake live data.",
+    safetyNote: "Snapshot provenance (source, captured_at) is preserved as-is. No fake live data.",
     statusKind: "ready",
     reviewOnlyNote: "Review only—do not submit during demo.",
   },
@@ -119,7 +113,7 @@ const STEPS: readonly DemoProofWalkthroughStep[] = Object.freeze([
     purpose: "Review what changed and what followed.",
     expectedEvidence:
       "Timeline shows category sections, evidence-quality indicators, readability summary, and print summary.",
-    href: "/logs",
+    href: "/timeline",
     safetyNote: "Read-only view of recorded events.",
     statusKind: "ready",
   },
@@ -127,13 +121,11 @@ const STEPS: readonly DemoProofWalkthroughStep[] = Object.freeze([
     id: "sensor-data",
     order: 6,
     label: "Sensor Data",
-    purpose:
-      "Confirm the latest sensor snapshot with explicit source label.",
+    purpose: "Confirm the latest sensor snapshot with explicit source label.",
     expectedEvidence:
       "Latest snapshot shown with allowed source label (live | manual | csv | demo | stale | invalid) and captured_at.",
     href: "/sensors",
-    safetyNote:
-      "Stale or invalid telemetry is never displayed as healthy.",
+    safetyNote: "Stale or invalid telemetry is never displayed as healthy.",
     statusKind: "ready",
   },
   {
@@ -153,8 +145,7 @@ const STEPS: readonly DemoProofWalkthroughStep[] = Object.freeze([
     id: "ai-doctor-readiness",
     order: 8,
     label: "AI Grow Doctor readiness",
-    purpose:
-      "Review available and missing context before any AI interpretation.",
+    purpose: "Review available and missing context before any AI interpretation.",
     expectedEvidence:
       "AI Doctor entry surface lists available context (stage, recent log, snapshot) and explicitly names missing context. No certain diagnoses from weak evidence.",
     href: "/doctor",
@@ -167,30 +158,26 @@ const STEPS: readonly DemoProofWalkthroughStep[] = Object.freeze([
     id: "alerts",
     order: 9,
     label: "Alerts",
-    purpose:
-      "Confirm alerts reflect real target breaches against labeled telemetry.",
+    purpose: "Confirm alerts reflect real target breaches against labeled telemetry.",
     expectedEvidence:
       "Open alerts show source-labeled evidence; stale or invalid telemetry never triggers a 'healthy' state.",
     href: "/alerts",
     safetyNote: "Alerts do not auto-create Action Queue items.",
     statusKind: "ready",
-    reviewOnlyNote:
-      "Review only—do not create or change alerts during demo.",
+    reviewOnlyNote: "Review only—do not create or change alerts during demo.",
   },
   {
     id: "action-queue",
     order: 10,
     label: "Approval-required Action Queue",
-    purpose:
-      "Actions remain pending approval; Verdant does not execute device control.",
+    purpose: "Actions remain pending approval; Verdant does not execute device control.",
     expectedEvidence:
       "Action Queue items default to pending / approval-required; completion creates a follow-up diary entry visible on the timeline.",
     href: "/actions",
     safetyNote:
       "No automatic execution, no device-control payloads, no auto-creation from alerts or AI.",
     statusKind: "ready",
-    reviewOnlyNote:
-      "Review only—do not approve actions during demo.",
+    reviewOnlyNote: "Review only—do not approve actions during demo.",
   },
   {
     id: "one-tent-live-proof",
@@ -227,8 +214,7 @@ const WHAT_THIS_DOES_NOT_PROVE: readonly string[] = Object.freeze([
 export function buildDemoProofWalkthroughViewModel(): DemoProofWalkthroughViewModel {
   return Object.freeze({
     title: "Verdant One-Tent Loop Proof Walkthrough",
-    subtitle:
-      "Read-only walkthrough of the V0 One-Tent Loop RC1 proof path.",
+    subtitle: "Read-only walkthrough of the V0 One-Tent Loop RC1 proof path.",
     proofWindowLabel: PROOF_WINDOW_LABEL,
     safetySummary: SAFETY_SUMMARY,
     steps: STEPS,

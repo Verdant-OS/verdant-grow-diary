@@ -12,11 +12,14 @@
 const withGrowId = (base: string, growId?: string | null): string =>
   growId ? `${base}?growId=${encodeURIComponent(growId)}` : base;
 
-export const growDetailPath = (growId: string): string =>
-  `/grows/${encodeURIComponent(growId)}`;
+export const growDetailPath = (growId: string): string => `/grows/${encodeURIComponent(growId)}`;
 
-export const logsPath = (growId?: string | null): string => withGrowId("/logs", growId);
 export const timelinePath = (growId?: string | null): string => withGrowId("/timeline", growId);
+/**
+ * @deprecated Use `timelinePath`. Kept source-compatible for older callers,
+ * but always emits the canonical Timeline URL so live links avoid a redirect.
+ */
+export const logsPath = (growId?: string | null): string => timelinePath(growId);
 export const plantsPath = (growId?: string | null): string => withGrowId("/plants", growId);
 export const tentsPath = (growId?: string | null): string => withGrowId("/tents", growId);
 export const actionsPath = (growId?: string | null): string => withGrowId("/actions", growId);
@@ -33,6 +36,13 @@ export const phenoHuntsPath = (): string => "/pheno-hunts";
 export const phenoHuntWorkspacePath = (huntId: string): string =>
   `/pheno-hunts/${encodeURIComponent(huntId)}/workspace`;
 
+/** Grow-scoped breeding event entry, optionally narrowed to one tent. */
+export const breedingLogNewPath = (growId: string, tentId?: string | null): string => {
+  const params = new URLSearchParams({ growId });
+  if (tentId) params.set("tentId", tentId);
+  return `/breeding/log/new?${params.toString()}`;
+};
+
 export const actionDetailPath = (actionId: string): string =>
   `/actions/${encodeURIComponent(actionId)}`;
 
@@ -45,8 +55,7 @@ export const growDetailOutcomesPath = (growId: string): string =>
   `${growDetailPath(growId)}#outcomes`;
 
 /** Grow-level Learning Review page (One-Tent Learning Loop V1). */
-export const growLearningPath = (growId: string): string =>
-  `${growDetailPath(growId)}/learning`;
+export const growLearningPath = (growId: string): string => `${growDetailPath(growId)}/learning`;
 
 /**
  * Action Queue scoped to a single alert's linked actions via the URL-driven
@@ -55,7 +64,6 @@ export const growLearningPath = (growId: string): string =>
  */
 export const actionQueueAlertContextPath = (alertId: string): string =>
   `/actions?alert=${encodeURIComponent(alertId)}`;
-
 
 export const alertDetailPath = (alertId: string): string =>
   `/alerts/${encodeURIComponent(alertId)}`;
@@ -92,8 +100,7 @@ export const plantDetailPath = (
   return qs ? `${base}?${qs}` : base;
 };
 
-export const tentDetailPath = (tentId: string): string =>
-  `/tents/${encodeURIComponent(tentId)}`;
+export const tentDetailPath = (tentId: string): string => `/tents/${encodeURIComponent(tentId)}`;
 
 export const aiDoctorSessionDetailPath = (sessionId: string): string =>
   `/doctor/sessions/${encodeURIComponent(sessionId)}`;

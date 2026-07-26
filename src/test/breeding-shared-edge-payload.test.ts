@@ -1,7 +1,7 @@
 /**
  * Guards the EDGE-side breeding action_queue payload builder
  * (supabase/functions/_shared/genetics/breedingActionQueue.ts) — the copy the
- * create-breeding-suggestions Edge Function actually uses for the /breeding/new
+ * create-breeding-suggestions Edge Function actually uses for the /breeding/log/new
  * flow. It MUST stay in sync with the browser copy: set `target_metric` (to
  * satisfy action_queue_target_present_chk), never send a top-level `due_at` (no
  * such column exists on action_queue), and store grower-facing readable copy in

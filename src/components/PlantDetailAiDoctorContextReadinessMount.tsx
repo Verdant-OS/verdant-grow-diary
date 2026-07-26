@@ -201,6 +201,7 @@ export default function PlantDetailAiDoctorContextReadinessMount({
             tentId,
           })
       : undefined;
+  const safeOpenManualSensorEntry = growId && tentId ? openManualSensorEntry : undefined;
   const safeOpenStructuredWater = growId && tentId ? openStructuredWater : undefined;
   const safeOpenEnvironmentSnapshot = growId && tentId ? openEnvironmentSnapshot : undefined;
 
@@ -221,7 +222,7 @@ export default function PlantDetailAiDoctorContextReadinessMount({
       <PlantSensorContextAuditPanel
         logs={auditLogs}
         identity={auditIdentity}
-        onOpenManualSensorEntry={openManualSensorEntry}
+        onOpenManualSensorEntry={safeOpenManualSensorEntry}
       />
       <AiDoctorCheckInPreviewPanel context={built.context} />
     </div>

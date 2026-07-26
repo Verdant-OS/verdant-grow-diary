@@ -9,10 +9,7 @@
  * Pure. No I/O. No Supabase. No automation.
  */
 import { describe, it, expect } from "vitest";
-import {
-  buildReportsHubSummary,
-  type ReportsHubInput,
-} from "@/lib/reportsHubViewModel";
+import { buildReportsHubSummary, type ReportsHubInput } from "@/lib/reportsHubViewModel";
 import { APP_ROUTES } from "@/lib/appRouteManifest";
 
 const GROW_ID = "grow-route-id-test";
@@ -55,10 +52,7 @@ const INPUT: ReportsHubInput = {
 function toRoutePattern(href: string): string {
   const noHash = href.split("#")[0];
   const noQuery = noHash.split("?")[0];
-  return noQuery.replace(GROW_ID, ":growId").replace(
-    new RegExp(`/${GROW_ID}(?=/|$)`),
-    "/:growId",
-  );
+  return noQuery.replace(GROW_ID, ":growId").replace(new RegExp(`/${GROW_ID}(?=/|$)`), "/:growId");
 }
 
 describe("Reports hub card identifiers + routes", () => {
@@ -93,7 +87,7 @@ describe("Reports hub card identifiers + routes", () => {
           "id": "sensor_context",
         },
         {
-          "href": "/logs?growId=grow-route-id-test",
+          "href": "/timeline?growId=grow-route-id-test",
           "hrefLabel": "Open timeline",
           "id": "timeline_activity",
         },

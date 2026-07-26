@@ -15,6 +15,7 @@
  */
 
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "./plantQuickLogPrefillRules";
+import { buildPlantAiDoctorReviewPath } from "./aiDoctorEntryRules";
 import {
   QUICK_LOG_V2_OPEN_EVENT,
   buildQuickLogV2OpenIntent,
@@ -178,9 +179,11 @@ export function resolveFastAddIntent(
   }
 
   if (def.id === "diagnosis") {
-    const to = context.plantId
-      ? `/plants/${encodeURIComponent(context.plantId)}#ai-doctor`
-      : "/doctor";
+    const to =
+      buildPlantAiDoctorReviewPath({
+        plantId: context.plantId,
+        tentId: context.tentId,
+      }) ?? "/doctor";
     return { kind: "navigate", to };
   }
 

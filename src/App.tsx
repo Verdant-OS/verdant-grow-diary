@@ -133,13 +133,10 @@ const AiDoctorConfidenceAudit = lazy(() => import("./pages/AiDoctorConfidenceAud
 const EcowittLiveBringup = lazy(() => import("./pages/EcowittLiveBringup"));
 const EnvironmentSummaryReportPage = lazy(() => import("./pages/EnvironmentSummaryReportPage"));
 const OperatorOneTentLoopSmokeTest = lazy(() => import("./pages/OperatorOneTentLoopSmokeTest"));
-const OperatorGgsRealPayloadIngest = lazy(() => import("./pages/OperatorGgsRealPayloadIngest"));
 const OperatorPostGrowReflectionDryRun = lazy(
   () => import("./pages/OperatorPostGrowReflectionDryRun"),
 );
 const OperatorDemoPreview = lazy(() => import("./pages/OperatorDemoPreview"));
-const CustomerModeGuide = lazy(() => import("./pages/CustomerModeGuide"));
-const CustomerModeCannabisCareFaq = lazy(() => import("./pages/CustomerModeCannabisCareFaq"));
 const OperatorAiDoctorPhase1Page = lazy(() =>
   import("./pages/OperatorAiDoctorPhase1").then((m) => ({
     default: m.OperatorAiDoctorPhase1Page,
@@ -274,14 +271,6 @@ const App = () => (
                   <Route path="/refund-policy" element={<Navigate to="/refund" replace />} />
                   <Route path="/terms-of-service" element={<Navigate to="/terms" replace />} />
                   <Route path="/privacy-policy" element={<Navigate to="/privacy" replace />} />
-
-                  {/* Public Customer Mode shell. Mounted OUTSIDE AppShell so
-                      no operator chrome (header, Quick Log) renders. */}
-                  <Route path="/customer/:shareId" element={<CustomerModeGuide />} />
-                  <Route
-                    path="/customer/:shareId/cannabis-care"
-                    element={<CustomerModeCannabisCareFaq />}
-                  />
 
                   {/* Internal read-only walkthrough presenter. Mounted OUTSIDE
                       AppShell so the no-write E2E guard can render it without a
@@ -422,6 +411,7 @@ const App = () => (
                     />
                     <Route path="/breeding" element={<BreedingProgramsIndex />} />
                     <Route path="/breeding/new" element={<BreedingProgramNew />} />
+                    <Route path="/breeding/log/new" element={<BreedingLogNew />} />
                     <Route path="/breeding/:programId" element={<BreedingProgramDetail />} />
                     <Route path="/reports" element={<Reports />} />
                     <Route path="/reports/diary-range" element={<DiaryRangeReportPage />} />
@@ -494,10 +484,6 @@ const App = () => (
                       <Route
                         path="/operator/post-grow-reflection-dry-run"
                         element={<OperatorPostGrowReflectionDryRun />}
-                      />
-                      <Route
-                        path="/operator/ggs-real-payload-ingest"
-                        element={<OperatorGgsRealPayloadIngest />}
                       />
                       <Route path="/operator/demo-preview" element={<OperatorDemoPreview />} />
                       <Route path="/operator/support-inbox" element={<OperatorSupportInbox />} />

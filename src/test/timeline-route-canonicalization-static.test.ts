@@ -5,8 +5,8 @@
  * and sidebar nav from regressing back to the legacy /logs route.
  *
  * The /logs route still exists in App.tsx as a redirect alias to /timeline,
- * and the logsPath helper still exists in src/lib/routes.ts for backward
- * compatibility — both are explicitly allowed here.
+ * and the logsPath helper still exists in src/lib/routes.ts for source
+ * compatibility, but the helper itself emits canonical /timeline URLs.
  *
  * Read-only. No React render, no fetch, no Supabase, no schema work.
  */

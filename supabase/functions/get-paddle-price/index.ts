@@ -1,8 +1,16 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { gatewayFetch, type PaddleEnv } from "../_shared/paddle.ts";
-import { resolveServerBillingEnvironment } from "../_shared/unionEntitlementLookup.ts";
-import { PAID_PLAN_ALLOWLIST, PAID_PLAN_IDS } from "../_shared/lib/lib/paidPlanAllowlist.ts";
+import {
+  loadUnionEntitlementForUser,
+  resolveServerBillingEnvironment,
+} from "../_shared/unionEntitlementLookup.ts";
+import {
+  CREDIT_PACK_IDS,
+  PAID_PLAN_ALLOWLIST,
+  PAID_PLAN_IDS,
+} from "../_shared/lib/lib/paidPlanAllowlist.ts";
+import { creditPackIsSpendable } from "../_shared/lib/lib/creditPackEligibility.ts";
 
 /**
  * Resolve a paid plan id to its public Paddle price ID. Read-only; no DB
@@ -56,7 +64,6 @@ for (const id of PAID_PLAN_IDS) {
   }
 }
 
-
 function json(status: number, body: Record<string, unknown>): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -80,6 +87,7 @@ function logCatalogUnavailable(fields: {
     | "price_not_configured"
     | "price_resolution_unavailable"
     | "plan_sold_out"
+    | "pack_requires_monthly_plan"
     | "auth_required"
     | "method_not_allowed"
     | "internal_error";
@@ -89,6 +97,7 @@ function logCatalogUnavailable(fields: {
     | "auth"
     | "method"
     | "allowlist"
+    | "entitlement"
     | "founder_cap"
     | "gateway"
     | "gateway_body"
@@ -161,6 +170,37 @@ Deno.serve(async (req) => {
       // rejected input value (could be attacker-controlled or PII-shaped).
       logCatalogUnavailable({ plan: "(rejected)", reason: "unknown_plan", stage: "allowlist" });
       return json(400, { error: "unknown_plan" });
+    }
+
+    // 2a. A credit pack tops up the monthly AI bucket. Free grows spend from
+    //     a per-grow allowance, so pack grants are not consulted by the
+    //     authoritative spend function and would be unusable.
+    //
+    //     Enforce this before returning a price. The client uses the same pure
+    //     predicate for presentation, but this verified caller-JWT/RLS lookup
+    //     is authoritative and cannot be bypassed by invoking the function.
+    if ((CREDIT_PACK_IDS as readonly string[]).includes(requested)) {
+      let packSpendable = false;
+      try {
+        const { entitlement, lookupFailed } = await loadUnionEntitlementForUser(
+          supabase,
+          userData.user.id,
+          resolveServerBillingEnvironment(),
+          new Date(),
+        );
+        packSpendable = !lookupFailed && creditPackIsSpendable(entitlement);
+      } catch {
+        // Fail closed: an unreadable entitlement must never become a sale.
+        packSpendable = false;
+      }
+      if (!packSpendable) {
+        logCatalogUnavailable({
+          plan: requested,
+          reason: "pack_requires_monthly_plan",
+          stage: "entitlement",
+        });
+        return json(403, { error: "pack_requires_monthly_plan" });
+      }
     }
 
     // 2b. Founder Lifetime is a capped one-time plan (75 slots). Block a

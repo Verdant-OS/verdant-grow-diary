@@ -36,7 +36,7 @@ describe("Demo Proof Walkthrough — route snapshot", () => {
       "/tents",
       "/plants",
       "/daily-check",
-      "/logs",
+      "/timeline",
       "/sensors",
       "/doctor",
       "/alerts",

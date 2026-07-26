@@ -133,6 +133,19 @@ describe("VPD calibration provenance runtime RLS harness contract", () => {
     );
   });
 
+  it("releases the Free active-tent slot before creating the owner cascade fixture", () => {
+    const releaseIndex = harness.indexOf("free_tent_slot_release_");
+    const cascadeIndex = harness.indexOf(
+      'await seedTent(ownerClient, owner.id, "tent delete cascade")',
+    );
+
+    expect(releaseIndex).toBeGreaterThan(harness.indexOf("const ownerTentId"));
+    expect(cascadeIndex).toBeGreaterThan(releaseIndex);
+    expect(harness.slice(releaseIndex - 500, cascadeIndex)).toMatch(
+      /\.from\("tents"\)[\s\S]*\.update\(\{ is_archived: true \}\)[\s\S]*\.eq\("id", ownerTentId\)/,
+    );
+  });
+
   it("uses caller-known UUIDs instead of relying on an insert representation", () => {
     expect(seedReadingSet).toMatch(/const airId = crypto\.randomUUID\(\)/);
     expect(seedReadingSet).toMatch(/const humidityId = crypto\.randomUUID\(\)/);

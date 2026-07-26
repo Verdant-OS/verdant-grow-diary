@@ -101,7 +101,12 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/breeder-beta", access: "public", description: "Breeder beta landing page." },
   { path: "/breeding", access: "auth", description: "Breeding programs index." },
   { path: "/breeding/:programId", access: "auth", description: "Breeding program detail." },
-  { path: "/breeding/new", access: "auth", description: "New breeding event entry." },
+  {
+    path: "/breeding/log/new",
+    access: "auth",
+    description: "Log a grow-scoped breeding event.",
+  },
+  { path: "/breeding/new", access: "auth", description: "Create a new breeding program." },
   { path: "/checkout/cancel", access: "public", description: "Checkout cancellation return." },
   { path: "/checkout/success", access: "public", description: "Checkout success return." },
   { path: "/contact", access: "public", description: "Public support contact page." },
@@ -111,16 +116,6 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     path: "/cultivars/:slug",
     access: "public",
     description: "Public per-cultivar guide page (evergreen best-practice content).",
-  },
-  {
-    path: "/customer/:shareId",
-    access: "public",
-    description: "Customer Mode QR guide shell (read-only, no private grow data).",
-  },
-  {
-    path: "/customer/:shareId/cannabis-care",
-    access: "public",
-    description: "Customer Mode cannabis plant care FAQ page (read-only).",
   },
   { path: "/daily-check", access: "auth" },
   {
@@ -299,12 +294,6 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     path: "/operator/ecowitt-tent-preview",
     access: "operator",
     description: "EcoWitt per-tent preview (read-only).",
-  },
-  {
-    path: "/operator/ggs-real-payload-ingest",
-    access: "operator",
-    description:
-      "Operator-gated GGS real-payload commit through the validated ingest RPC, plus a read-only Sentinel verdict.",
   },
   {
     path: "/operator/one-tent-live-proof",

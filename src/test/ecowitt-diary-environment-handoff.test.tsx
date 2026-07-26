@@ -9,23 +9,24 @@ import {
   type EcowittIngestValidationInput,
 } from "@/lib/ecowittIngestValidationViewModel";
 import {
+  buildAlreadyLoggedEventInfo,
   buildDiaryEnvironmentCheckDraft,
   DIARY_ENVIRONMENT_CHECK_TITLE,
+  environmentCheckTimelineHref,
 } from "@/lib/ecowittDiaryEnvironmentCheckRules";
 import {
   buildLatestEvidenceSnapshot,
   serializeEvidenceForClipboard,
   ECOWITT_EVIDENCE_LABEL,
 } from "@/lib/ecowittValidationEvidenceRules";
-import {
-  buildEcowittValidationExport,
-  serializeExport,
-} from "@/lib/ecowittValidationExportRules";
+import { buildEcowittValidationExport, serializeExport } from "@/lib/ecowittValidationExportRules";
 
 const NOW = new Date("2026-06-07T12:00:00Z");
 const TENT = "11111111-2222-3333-4444-555555555555";
 
-function acceptedInput(extra?: Partial<EcowittIngestValidationInput>): EcowittIngestValidationInput {
+function acceptedInput(
+  extra?: Partial<EcowittIngestValidationInput>,
+): EcowittIngestValidationInput {
   return {
     tentId: TENT,
     now: NOW,
@@ -69,6 +70,21 @@ function acceptedInput(extra?: Partial<EcowittIngestValidationInput>): EcowittIn
 }
 
 describe("ecowitt diary environment check rules", () => {
+  it("links only to a real Timeline entry anchor when the saved event id is known", () => {
+    expect(environmentCheckTimelineHref("2026-06-07T11:58:00Z", "grow-123", "grow-event-456")).toBe(
+      "/timeline?growId=grow-123#timeline-entry-grow-event-456",
+    );
+    expect(environmentCheckTimelineHref("2026-06-07T11:58:00Z", "grow-123")).toBe(
+      "/timeline?growId=grow-123",
+    );
+    expect(
+      buildAlreadyLoggedEventInfo("2026-06-07T11:58:00Z", "grow-123", "grow-event-456"),
+    ).toMatchObject({
+      capturedAt: "2026-06-07T11:58:00Z",
+      href: "/timeline?growId=grow-123#timeline-entry-grow-event-456",
+    });
+  });
+
   it("builds an eligible draft from accepted EcoWitt evidence", () => {
     const vm = buildEcowittIngestValidationViewModel(acceptedInput());
     const draft = buildDiaryEnvironmentCheckDraft({
@@ -203,25 +219,19 @@ describe("EcowittIngestValidationPanel — diary handoff", () => {
     expect(screen.queryByTestId("log-environment-check-button")).toBeNull();
 
     rerender(
-      <EcowittIngestValidationPanel
-        input={acceptedInput()}
-        onLogEnvironmentCheck={onLog}
-      />,
+      <EcowittIngestValidationPanel input={acceptedInput()} onLogEnvironmentCheck={onLog} />,
     );
     const btn = screen.getByTestId("log-environment-check-button");
     expect(btn.getAttribute("data-eligible")).toBe("true");
     expect(btn.getAttribute("data-already-logged")).toBe("false");
   });
 
-  it("clicking Log Environment Check invokes handler with draft built from latest evidence", () => {
+  it("clicking Log Environment Check invokes handler with draft built from latest evidence", async () => {
     const onLog = vi.fn();
-    render(
-      <EcowittIngestValidationPanel
-        input={acceptedInput()}
-        onLogEnvironmentCheck={onLog}
-      />,
-    );
-    fireEvent.click(screen.getByTestId("log-environment-check-button"));
+    render(<EcowittIngestValidationPanel input={acceptedInput()} onLogEnvironmentCheck={onLog} />);
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("log-environment-check-button"));
+    });
     expect(onLog).toHaveBeenCalledTimes(1);
     const draft = onLog.mock.calls[0][0];
     expect(draft.eligible).toBe(true);
@@ -229,15 +239,14 @@ describe("EcowittIngestValidationPanel — diary handoff", () => {
     expect(draft.rpcPayload.p_target_id).toBe(TENT);
   });
 
-  it("clicking twice with alreadyLogged shows Already logged state and does not call handler again", () => {
+  it("clicking twice with alreadyLogged shows Already logged state and does not call handler again", async () => {
     const onLog = vi.fn();
     const { rerender } = render(
-      <EcowittIngestValidationPanel
-        input={acceptedInput()}
-        onLogEnvironmentCheck={onLog}
-      />,
+      <EcowittIngestValidationPanel input={acceptedInput()} onLogEnvironmentCheck={onLog} />,
     );
-    fireEvent.click(screen.getByTestId("log-environment-check-button"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("log-environment-check-button"));
+    });
     expect(onLog).toHaveBeenCalledTimes(1);
 
     rerender(
@@ -354,22 +363,16 @@ describe("EcowittIngestValidationPanel — copy + export", () => {
   });
 
   it("Export validation opens preview modal and confirms JSON download (no fetch)", async () => {
-    const fetchSpy = vi
-      .spyOn(globalThis, "fetch" as never)
-      .mockImplementation(() => {
-        throw new Error("export must not perform network calls");
-      });
+    const fetchSpy = vi.spyOn(globalThis, "fetch" as never).mockImplementation(() => {
+      throw new Error("export must not perform network calls");
+    });
     render(<EcowittIngestValidationPanel input={acceptedInput()} />);
     await act(async () => {
       fireEvent.click(screen.getByTestId("export-validation-button"));
     });
     const dialog = screen.getByTestId("export-preview-dialog");
-    expect(dialog.textContent).toContain(
-      "Local EcoWitt validation — last 10 attempts",
-    );
-    expect(screen.getByTestId("export-preview-attempt-count").textContent).toBe(
-      "1",
-    );
+    expect(dialog.textContent).toContain("Local EcoWitt validation — last 10 attempts");
+    expect(screen.getByTestId("export-preview-attempt-count").textContent).toBe("1");
     // Confirm JSON
     await act(async () => {
       fireEvent.click(screen.getByTestId("export-download-json-button"));
@@ -414,12 +417,10 @@ describe("EcowittIngestValidationPanel — copy + export", () => {
 
 describe("CSV serializer", () => {
   it("emits one row per (attempt × metric), capped to last 10 attempts, with redacted output", async () => {
-    const { buildEcowittValidationExport, serializeExportCsv } = await import(
-      "@/lib/ecowittValidationExportRules"
-    );
-    const { buildEcowittIngestValidationViewModel } = await import(
-      "@/lib/ecowittIngestValidationViewModel"
-    );
+    const { buildEcowittValidationExport, serializeExportCsv } =
+      await import("@/lib/ecowittValidationExportRules");
+    const { buildEcowittIngestValidationViewModel } =
+      await import("@/lib/ecowittIngestValidationViewModel");
     const rows = Array.from({ length: 25 }, (_, i) => ({
       id: `r${i}`,
       source: "ecowitt",
@@ -476,41 +477,54 @@ describe("Diary Environment Check link / View affordance", () => {
           loggedCapturedAts: ["2026-06-07T11:58:00Z"],
         })}
         growId="grow-123"
+        loggedEventIdsByCapturedAt={{
+          "2026-06-07T11:58:00Z": "grow-event-456",
+        }}
       />,
     );
-    const link = screen.getByTestId(
-      "view-environment-check-link",
-    ) as HTMLAnchorElement;
+    const link = screen.getByTestId("view-environment-check-link") as HTMLAnchorElement;
     expect(link).toBeInTheDocument();
     expect(link.getAttribute("href")).toMatch(/^\/timeline/);
     expect(link.getAttribute("href")).toContain("growId=grow-123");
-    expect(link.getAttribute("href")).toContain(
-      "ecowitt-environment-check-2026-06-07T11",
+    expect(link.getAttribute("href")).toBe(
+      "/timeline?growId=grow-123#timeline-entry-grow-event-456",
     );
     expect(screen.getByTestId("logged-event-title").textContent).toContain(
       "EcoWitt Environment Check",
     );
-    expect(
-      screen.getByTestId("logged-event-captured-at").textContent,
-    ).toContain("2026-06-07T11:58:00Z");
+    expect(screen.getByTestId("logged-event-captured-at").textContent).toContain(
+      "2026-06-07T11:58:00Z",
+    );
   });
 
-  it("renders View link after a fresh Log click even if grow_events query hasn't refetched", () => {
-    const onLog = vi.fn();
-    render(
-      <EcowittIngestValidationPanel
-        input={acceptedInput()}
-        onLogEnvironmentCheck={onLog}
-      />,
-    );
+  it("renders an exact View link after a successful fresh Log even before refetch", async () => {
+    const onLog = vi.fn().mockResolvedValue({
+      ok: true,
+      growEventId: "grow-event-789",
+    });
+    render(<EcowittIngestValidationPanel input={acceptedInput()} onLogEnvironmentCheck={onLog} />);
     expect(screen.queryByTestId("view-environment-check-link")).toBeNull();
-    fireEvent.click(screen.getByTestId("log-environment-check-button"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("log-environment-check-button"));
+    });
     expect(onLog).toHaveBeenCalledTimes(1);
     const link = screen.getByTestId("view-environment-check-link");
-    expect(link.getAttribute("href")).toContain("ecowitt-environment-check-");
+    expect(link.getAttribute("href")).toBe("/timeline#timeline-entry-grow-event-789");
     expect(screen.getByTestId("logged-event-title").textContent).toContain(
       "EcoWitt Environment Check",
     );
+  });
+
+  it("does not render a success handoff when the diary save fails", async () => {
+    const onLog = vi.fn().mockResolvedValue({ ok: false });
+    render(<EcowittIngestValidationPanel input={acceptedInput()} onLogEnvironmentCheck={onLog} />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("log-environment-check-button"));
+    });
+
+    expect(onLog).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId("view-environment-check-link")).toBeNull();
   });
 
   it("does not expose raw UUID-style internal IDs in user-facing copy", () => {
@@ -526,7 +540,6 @@ describe("Diary Environment Check link / View affordance", () => {
     expect(container.textContent).not.toContain("internal-row-id-12345");
   });
 });
-
 
 describe("export rules — last 10 attempts + redaction", () => {
   function manyRows(n: number) {
@@ -648,9 +661,7 @@ describe("safety: panel + helpers do not introduce writes / device control", () 
     "utf8",
   );
 
-  const allSources = [panelSrc, evidenceSrc, exportSrc, diarySrc, vmSrc].join(
-    "\n",
-  );
+  const allSources = [panelSrc, evidenceSrc, exportSrc, diarySrc, vmSrc].join("\n");
 
   it("does not insert/update/delete sensor_readings", () => {
     expect(allSources).not.toMatch(/from\(["']sensor_readings["']\)/);
@@ -666,8 +677,6 @@ describe("safety: panel + helpers do not introduce writes / device control", () 
   });
 
   it("does not include device-control strings", () => {
-    expect(allSources).not.toMatch(
-      /(\bdevice[_-]?control\b|\bdevice[_-]?command\b|\bactuator\b)/i,
-    );
+    expect(allSources).not.toMatch(/(\bdevice[_-]?control\b|\bdevice[_-]?command\b|\bactuator\b)/i);
   });
 });

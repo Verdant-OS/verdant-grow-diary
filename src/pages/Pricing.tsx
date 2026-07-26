@@ -51,6 +51,9 @@ import {
 import { buildAttributedSignupPath } from "@/lib/signupAcquisitionRules";
 import { buildCheckoutTrustCopy } from "@/lib/checkoutTrustCopyRules";
 import { useFounderSlotsRemaining } from "@/hooks/useFounderSlotsRemaining";
+import { useAuth } from "@/store/auth";
+import { useMyEntitlements } from "@/hooks/useMyEntitlements";
+import { creditPackBlockedCopy, resolveCreditPackPurchaseGate } from "@/lib/creditPackEligibility";
 
 type BillingPeriod = "monthly" | "annual";
 
@@ -151,6 +154,18 @@ const COMPARISON_ROWS: Row[] = [
 
 export default function Pricing() {
   const [searchParams] = useSearchParams();
+  const { user, loading: authLoading } = useAuth();
+  const {
+    entitlement,
+    loading: entitlementLoading,
+    lookupFailed: entitlementLookupFailed,
+  } = useMyEntitlements();
+  const creditPackGate = resolveCreditPackPurchaseGate({
+    entitlement,
+    entitlementVerified: !entitlementLookupFailed,
+    loading: authLoading || entitlementLoading,
+    signedIn: user != null,
+  });
   // Canonical `?plan=` preselect (see resolvePricingPlanPreselect).
   // Legacy `/billing/:plan` redirects here with this exact contract.
   // NEVER auto-opens Paddle — the grower must click a Pricing CTA.
@@ -270,6 +285,10 @@ export default function Pricing() {
   // plan-intent state and opens checkout for the pack SKU directly. Same
   // canonical checkout hook — this stays inside Pricing.tsx (checkout ownership).
   function handleBuyPack(sku: string) {
+    // Presentation is not the authority (get-paddle-price repeats this gate),
+    // but never start a checkout the current verified entitlement cannot use.
+    if (creditPackGate.kind !== "allowed") return;
+
     // Record the SKU and arm the recovery panel, exactly as handlePaidIntent
     // does. Both were missing here. Without the first, "Try again" retried
     // lastCheckoutPlanRef — which a pack click never writes — so it still held
@@ -647,47 +666,47 @@ export default function Pricing() {
             stays in planCatalog, PAID_PLAN_IDS and every gate, so existing
             holders keep exactly what they bought. */}
         {showFounderOffer && (
-        <PricingCard
-          testId="pricing-card-founder"
-          name={PRICING.founder.name}
-          subtitle={PRICING.founder.subtitle}
-          price={`$${PRICING.founder.price}`}
-          cadence={` ${PRICING.founder.cadence}`}
-          description={PRICING.founder.description}
-          features={PRICING.founder.features}
-          badge={
-            founderSlots.status === "ready" && founderSlots.claimed !== null
-              ? `${founderSlots.claimed} of ${founderSlots.total} claimed`
-              : PRICING.founder.badge
-          }
-          footnote={
-            founderSoldOut
-              ? "Founder Lifetime is currently sold out. Additional slots may open if a purchase is refunded."
-              : `Founder Lifetime is limited; availability may close manually when the first ${PRICING.founder.limit} are claimed.`
-          }
-          cta={
-            <Button
-              size="lg"
-              className="w-full h-auto min-h-11 whitespace-normal"
-              disabled={checkoutLoading || founderSoldOut}
-              data-testid="pricing-cta-founder-lifetime"
-              data-founder-remaining={founderSlots.remaining ?? ""}
-              onClick={() => {
-                handlePaidIntent(
-                  "founder_lifetime",
-                  "pricing_cta_founder_lifetime_clicked",
-                  "plan_card",
-                );
-              }}
-            >
-              {founderSoldOut
-                ? "Founder Lifetime sold out"
-                : isSkuBlocked("founder_lifetime")
-                  ? "Join the Founder launch list"
-                  : `Claim Founder Lifetime — $${PRICING.founder.price}`}
-            </Button>
-          }
-        />
+          <PricingCard
+            testId="pricing-card-founder"
+            name={PRICING.founder.name}
+            subtitle={PRICING.founder.subtitle}
+            price={`$${PRICING.founder.price}`}
+            cadence={` ${PRICING.founder.cadence}`}
+            description={PRICING.founder.description}
+            features={PRICING.founder.features}
+            badge={
+              founderSlots.status === "ready" && founderSlots.claimed !== null
+                ? `${founderSlots.claimed} of ${founderSlots.total} claimed`
+                : PRICING.founder.badge
+            }
+            footnote={
+              founderSoldOut
+                ? "Founder Lifetime is currently sold out. Additional slots may open if a purchase is refunded."
+                : `Founder Lifetime is limited; availability may close manually when the first ${PRICING.founder.limit} are claimed.`
+            }
+            cta={
+              <Button
+                size="lg"
+                className="w-full h-auto min-h-11 whitespace-normal"
+                disabled={checkoutLoading || founderSoldOut}
+                data-testid="pricing-cta-founder-lifetime"
+                data-founder-remaining={founderSlots.remaining ?? ""}
+                onClick={() => {
+                  handlePaidIntent(
+                    "founder_lifetime",
+                    "pricing_cta_founder_lifetime_clicked",
+                    "plan_card",
+                  );
+                }}
+              >
+                {founderSoldOut
+                  ? "Founder Lifetime sold out"
+                  : isSkuBlocked("founder_lifetime")
+                    ? "Join the Founder launch list"
+                    : `Claim Founder Lifetime — $${PRICING.founder.price}`}
+              </Button>
+            }
+          />
         )}
       </section>
 
@@ -741,7 +760,9 @@ export default function Pricing() {
                   size="sm"
                   data-testid="pricing-checkout-choose-another-plan"
                   onClick={() => {
-                    const plan = sanitizeCheckoutRecoveryPlanSlug(lastCheckoutSkuRef.current ?? interestPlan);
+                    const plan = sanitizeCheckoutRecoveryPlanSlug(
+                      lastCheckoutSkuRef.current ?? interestPlan,
+                    );
                     trackPricingEvent("pricing_checkout_recovery_choose_another_plan", {
                       plan,
                       source: "recovery_panel",
@@ -765,7 +786,9 @@ export default function Pricing() {
                   size="sm"
                   data-testid="pricing-checkout-dismiss"
                   onClick={() => {
-                    const plan = sanitizeCheckoutRecoveryPlanSlug(lastCheckoutSkuRef.current ?? interestPlan);
+                    const plan = sanitizeCheckoutRecoveryPlanSlug(
+                      lastCheckoutSkuRef.current ?? interestPlan,
+                    );
                     trackPricingEvent("pricing_checkout_recovery_dismissed", {
                       plan,
                       source: "recovery_panel",
@@ -819,6 +842,18 @@ export default function Pricing() {
           Out of monthly credits? Buy a one-time pack. Packs never expire and are spent only after
           your included monthly allowance.
         </p>
+        <p
+          data-testid="pricing-credit-pack-gate"
+          data-gate-kind={creditPackGate.kind}
+          className="mt-3 text-sm text-muted-foreground text-center max-w-2xl mx-auto"
+          role={creditPackGate.kind === "blocked" ? "status" : undefined}
+        >
+          {creditPackGate.kind === "pending"
+            ? "Checking your plan before showing top-up options…"
+            : creditPackGate.kind === "blocked"
+              ? creditPackBlockedCopy(creditPackGate.reason)
+              : "Available for your current paid plan."}
+        </p>
         <div className="mt-8 grid gap-6 sm:grid-cols-2">
           {CREDIT_PACKS.map((pack) => (
             <div
@@ -832,13 +867,17 @@ export default function Pricing() {
               <Button
                 size="lg"
                 className="mt-5 w-full h-auto min-h-11 whitespace-normal"
-                disabled={checkoutLoading}
+                disabled={checkoutLoading || creditPackGate.kind !== "allowed"}
                 data-testid={`pricing-cta-${pack.sku}`}
                 onClick={() => handleBuyPack(pack.sku)}
               >
-                {isSkuBlocked(pack.sku)
-                  ? "Checkout unavailable"
-                  : `Buy ${pack.credits} credits — $${pack.priceUsd}`}
+                {creditPackGate.kind === "pending"
+                  ? "Checking plan…"
+                  : creditPackGate.kind === "blocked"
+                    ? "Credit packs unavailable"
+                    : isSkuBlocked(pack.sku)
+                      ? "Checkout unavailable"
+                      : `Buy ${pack.credits} credits — $${pack.priceUsd}`}
               </Button>
             </div>
           ))}
@@ -900,55 +939,55 @@ export default function Pricing() {
       {/* Founder Lifetime highlight band — retired from the public page along
           with the grid card; shown only on an explicit deep link. */}
       {showFounderOffer && (
-      <section className="px-6 py-10 max-w-5xl mx-auto">
-        <div className="rounded-2xl border border-primary/40 bg-primary/5 p-6 md:p-8 flex flex-col md:flex-row gap-6 md:items-center">
-          <div className="h-12 w-12 rounded-xl bg-primary/15 text-primary flex items-center justify-center shrink-0">
-            <Sparkles className="h-6 w-6" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="font-display text-xl md:text-2xl font-semibold">
-              Founder Lifetime Offer — ${FOUNDER_LIFETIME_PRICE_USD} once, full Pro forever
-            </h2>
-            <p className="mt-2 text-sm md:text-base text-muted-foreground">
-              Verdant is founder-built. This is a limited early-supporter offer for the first{" "}
-              {FOUNDER_LIFETIME_LIMIT} growers who back the product early. Pay once, get full Pro
-              access for the life of the product, and help shape what ships next. No hype, no
-              countdown gimmicks — when the first {FOUNDER_LIFETIME_LIMIT} are claimed, the offer
-              ends.
-            </p>
-            <Link
-              to="/founder"
-              className="mt-3 inline-flex text-sm font-medium text-primary underline underline-offset-4"
-              onClick={() =>
-                trackPricingEvent("pricing_founder_details_clicked", {
-                  source: "highlight_band",
-                })
-              }
+        <section className="px-6 py-10 max-w-5xl mx-auto">
+          <div className="rounded-2xl border border-primary/40 bg-primary/5 p-6 md:p-8 flex flex-col md:flex-row gap-6 md:items-center">
+            <div className="h-12 w-12 rounded-xl bg-primary/15 text-primary flex items-center justify-center shrink-0">
+              <Sparkles className="h-6 w-6" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h2 className="font-display text-xl md:text-2xl font-semibold">
+                Founder Lifetime Offer — ${FOUNDER_LIFETIME_PRICE_USD} once, full Pro forever
+              </h2>
+              <p className="mt-2 text-sm md:text-base text-muted-foreground">
+                Verdant is founder-built. This is a limited early-supporter offer for the first{" "}
+                {FOUNDER_LIFETIME_LIMIT} growers who back the product early. Pay once, get full Pro
+                access for the life of the product, and help shape what ships next. No hype, no
+                countdown gimmicks — when the first {FOUNDER_LIFETIME_LIMIT} are claimed, the offer
+                ends.
+              </p>
+              <Link
+                to="/founder"
+                className="mt-3 inline-flex text-sm font-medium text-primary underline underline-offset-4"
+                onClick={() =>
+                  trackPricingEvent("pricing_founder_details_clicked", {
+                    source: "highlight_band",
+                  })
+                }
+              >
+                See exactly what Founder includes
+              </Link>
+            </div>
+            <Button
+              size="lg"
+              className="shrink-0"
+              disabled={checkoutLoading || founderSoldOut}
+              data-testid="pricing-cta-founder-highlight"
+              onClick={() => {
+                handlePaidIntent(
+                  "founder_lifetime",
+                  "pricing_cta_founder_lifetime_clicked",
+                  "highlight_band",
+                );
+              }}
             >
-              See exactly what Founder includes
-            </Link>
+              {founderSoldOut
+                ? "Founder Lifetime sold out"
+                : isSkuBlocked("founder_lifetime")
+                  ? "Join the Founder launch list"
+                  : "Claim Founder Lifetime"}
+            </Button>
           </div>
-          <Button
-            size="lg"
-            className="shrink-0"
-            disabled={checkoutLoading || founderSoldOut}
-            data-testid="pricing-cta-founder-highlight"
-            onClick={() => {
-              handlePaidIntent(
-                "founder_lifetime",
-                "pricing_cta_founder_lifetime_clicked",
-                "highlight_band",
-              );
-            }}
-          >
-            {founderSoldOut
-              ? "Founder Lifetime sold out"
-              : isSkuBlocked("founder_lifetime")
-                ? "Join the Founder launch list"
-                : "Claim Founder Lifetime"}
-          </Button>
-        </div>
-      </section>
+        </section>
       )}
 
       {/* Comparison table */}

@@ -3,7 +3,7 @@
 // Behavior:
 //   OPTIONS                           → 200 (CORS preflight)
 //   non-POST                          → 405 method_not_allowed
-//   POST without service-role config  → 503 secret_resolver_not_implemented
+//   POST without service-role config  → 503 legacy secret_resolver_not_implemented code
 //   POST missing/invalid auth headers → 401 unauthorized
 //   POST invalid body / missing tent  → 400 invalid_request
 //   POST lookup/resolver internal err → 503 internal_failure
@@ -51,10 +51,7 @@ import {
   type PiIngestBridgeCredentialLookupClient,
 } from "./bridgeCredentialLookup.ts";
 import { toResolveBridgeSecretInput } from "./bridgeCredentialRow.ts";
-import {
-  type PiIngestSecretKeyProvider,
-  resolveBridgeSecret,
-} from "./secretResolver.ts";
+import { type PiIngestSecretKeyProvider, resolveBridgeSecret } from "./secretResolver.ts";
 import { loadTentOwnerUserId } from "./tentOwnerLookup.ts";
 import { evaluateBridgeAuthorization } from "../_shared/lib/lib/piIngestBridgeAuthorizationRules.ts";
 import type { BridgeCredentialMetadata } from "../_shared/lib/lib/piIngestBridgeCredentialMetadataResolver.ts";
@@ -138,9 +135,7 @@ function readEnv(name: string): string | null {
 /** Lazily construct the server-only Supabase client. The elevated
  *  key is read here and nowhere else in the project. Returns null
  *  when env config is missing or supabase-js cannot be imported. */
-async function buildDefaultLookupClient(): Promise<
-  PiIngestBridgeCredentialLookupClient | null
-> {
+async function buildDefaultLookupClient(): Promise<PiIngestBridgeCredentialLookupClient | null> {
   const url = readEnv("SUPABASE_URL");
   const serviceKey = readEnv("SUPABASE_SERVICE_ROLE_KEY");
   if (!url || !serviceKey) return null;
@@ -337,14 +332,13 @@ export async function handlePiIngestReadingsRequest(
   // Look up which derived idempotency keys already exist for this
   // bridge. SELECT-only — no inserts of any kind. On any lookup error,
   // fail closed with a generic internal_failure (no key/DB leak).
-  const lookupFn =
-    deps.loadExistingIdempotencyKeys ?? loadExistingPiIngestIdempotencyKeys;
+  const lookupFn = deps.loadExistingIdempotencyKeys ?? loadExistingPiIngestIdempotencyKeys;
   let existingKeys: ReadonlySet<string>;
   try {
-    const lookup = await lookupFn(
-      client as unknown as PiIngestIdempotencyLookupClient,
-      { bridgeId: row.bridge_id, candidateKeys: keyResult.keys },
-    );
+    const lookup = await lookupFn(client as unknown as PiIngestIdempotencyLookupClient, {
+      bridgeId: row.bridge_id,
+      candidateKeys: keyResult.keys,
+    });
     if (!lookup.ok) {
       return jsonResponse(503, buildInternalFailureResponseBody());
     }
@@ -417,15 +411,12 @@ export async function handlePiIngestReadingsRequest(
   const commitFn = deps.commitPiIngestBatch ?? commitPiIngestBatch;
   let commitResult: PiIngestCommitBatchResult;
   try {
-    commitResult = await commitFn(
-      client as unknown as PiIngestCommitBatchClient,
-      {
-        userId: tentOwner.tentOwnerUserId,
-        bridgeId: row.bridge_id,
-        tentId: validation.envelope.tent_id,
-        rows: commitRows,
-      },
-    );
+    commitResult = await commitFn(client as unknown as PiIngestCommitBatchClient, {
+      userId: tentOwner.tentOwnerUserId,
+      bridgeId: row.bridge_id,
+      tentId: validation.envelope.tent_id,
+      rows: commitRows,
+    });
   } catch {
     return jsonResponse(503, buildInternalFailureResponseBody());
   }
@@ -442,11 +433,7 @@ export async function handlePiIngestReadingsRequest(
 }
 
 // @ts-ignore Deno runtime entrypoint — only start the server when run directly.
-if (
-  typeof Deno !== "undefined" &&
-  typeof Deno.serve === "function" &&
-  import.meta.main
-) {
+if (typeof Deno !== "undefined" && typeof Deno.serve === "function" && import.meta.main) {
   // @ts-ignore
   Deno.serve(handlePiIngestReadingsRequest);
 }

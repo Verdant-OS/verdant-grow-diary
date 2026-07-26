@@ -33,7 +33,7 @@ describe("Dashboard Environment Snapshot · empty / stale / invalid states", () 
 
   it("empty state has Import sensor data link to Sensors page anchor", () => {
     expect(DASH).toContain('data-testid="dashboard-environment-snapshot-import-sensor-data"');
-    expect(DASH).toMatch(/to="\/sensors#import-sensor-data"/);
+    expect(DASH).toMatch(/to="\/sensors#csv-import"/);
     expect(DASH).toMatch(/Import sensor data/);
   });
 

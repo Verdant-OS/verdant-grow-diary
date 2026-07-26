@@ -1,24 +1,29 @@
 /**
  * AUD-004 regression — the Sensor Webhook settings card MUST NOT render a
- * live session JWT inside the visible cURL example. Reveal-with-token is
- * only possible behind an explicit user click (gated by window.confirm),
- * and even then we never paint the live token into the on-screen <pre>.
+ * live session JWT inside either the visible or copied cURL example.
+ * sensor-ingest-webhook accepts only a tent-scoped vbt_ bridge token, so the
+ * setup card must not read the browser session or offer a JWT copy path.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 
 const LIVE_JWT = "eyJhbGciOiJIUzI1NiJ9.live-session-token-do-not-leak.sig";
 
+const { getSession, onAuthStateChange } = vi.hoisted(() => ({
+  getSession: vi.fn().mockResolvedValue({
+    data: { session: { access_token: "eyJhbGciOiJIUzI1NiJ9.live-session-token-do-not-leak.sig" } },
+  }),
+  onAuthStateChange: vi.fn().mockReturnValue({
+    data: { subscription: { unsubscribe: vi.fn() } },
+  }),
+}));
+
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     auth: {
-      getSession: vi.fn().mockResolvedValue({
-        data: { session: { access_token: "eyJhbGciOiJIUzI1NiJ9.live-session-token-do-not-leak.sig" } },
-      }),
-      onAuthStateChange: vi.fn().mockReturnValue({
-        data: { subscription: { unsubscribe: vi.fn() } },
-      }),
+      getSession,
+      onAuthStateChange,
     },
   },
 }));
@@ -37,22 +42,23 @@ import TentSensorWebhookSettingsCard from "@/components/TentSensorWebhookSetting
 describe("AUD-004 — TentSensorWebhookSettingsCard does not expose live JWT", () => {
   beforeEach(() => {
     cleanup();
+    vi.clearAllMocks();
     import.meta.env.VITE_SUPABASE_URL = "https://abc.supabase.co";
   });
 
-  it("renders a safe placeholder in the visible cURL block even when signed in", async () => {
+  it("renders the required bridge-token placeholder without reading the browser session", async () => {
     render(<TentSensorWebhookSettingsCard tentId="tent-uuid-1" />);
-    // Wait a tick for the async getSession resolution.
-    await new Promise((r) => setTimeout(r, 0));
 
     const curl = await screen.findByTestId("tent-sensor-webhook-curl");
-    expect(curl.textContent ?? "").toContain("<YOUR_SESSION_TOKEN>");
+    expect(curl.textContent ?? "").toContain("<VBT_BRIDGE_TOKEN>");
+    expect(curl.textContent ?? "").not.toContain("<YOUR_SESSION_TOKEN>");
     expect(curl.textContent ?? "").not.toContain(LIVE_JWT);
+    expect(getSession).not.toHaveBeenCalled();
+    expect(onAuthStateChange).not.toHaveBeenCalled();
   });
 
   it("still renders a usable cURL example (endpoint + tent_id + source)", async () => {
     render(<TentSensorWebhookSettingsCard tentId="tent-uuid-1" />);
-    await new Promise((r) => setTimeout(r, 0));
 
     const curl = await screen.findByTestId("tent-sensor-webhook-curl");
     const text = curl.textContent ?? "";
@@ -60,31 +66,40 @@ describe("AUD-004 — TentSensorWebhookSettingsCard does not expose live JWT", (
     expect(text).toContain("/functions/v1/sensor-ingest-webhook");
     expect(text).toContain("tent-uuid-1");
     expect(text).toContain("webhook_generic");
-    expect(text).toContain("Authorization: Bearer <YOUR_SESSION_TOKEN>");
+    expect(text).toContain("Authorization: Bearer <VBT_BRIDGE_TOKEN>");
   });
 
-  it("shows bridge-token guidance for long-running clients", async () => {
+  it("shows bridge-token guidance and states that app-session JWTs are rejected", async () => {
     render(<TentSensorWebhookSettingsCard tentId="tent-uuid-1" />);
-    await new Promise((r) => setTimeout(r, 0));
-    expect(screen.getByText(/bridge token/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/bridge token/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/app-session JWTs are not accepted/i)).toBeInTheDocument();
   });
 
   it("gives the icon-only endpoint copy control an accessible name", async () => {
     render(<TentSensorWebhookSettingsCard tentId="tent-uuid-1" />);
-    await new Promise((r) => setTimeout(r, 0));
 
     expect(screen.getByRole("button", { name: "Copy sensor webhook URL" })).toBeInTheDocument();
   });
 
-  it("exposes the reveal-with-token action only as an explicit, gated control", async () => {
+  it("has no session-token copy control and copies only the bridge-token placeholder", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+
     render(<TentSensorWebhookSettingsCard tentId="tent-uuid-1" />);
-    await new Promise((r) => setTimeout(r, 0));
-    const btn = screen.getByTestId("tent-sensor-webhook-copy-curl-with-token");
-    expect(btn).toBeInTheDocument();
-    // The visible label warns the user it is one-time, do-not-share.
-    expect(btn.textContent ?? "").toMatch(/do not share/i);
-    // The default "Copy example" copies the placeholder snippet only.
+    expect(
+      screen.queryByTestId("tent-sensor-webhook-copy-curl-with-token"),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/copy with my session token/i)).not.toBeInTheDocument();
+
     const safeCopy = screen.getByTestId("tent-sensor-webhook-copy-curl");
-    expect(safeCopy.textContent ?? "").toMatch(/copy example/i);
+    fireEvent.click(safeCopy);
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    const copied = String(writeText.mock.calls[0][0]);
+    expect(copied).toContain("Bearer <VBT_BRIDGE_TOKEN>");
+    expect(copied).not.toContain(LIVE_JWT);
+    expect(copied).not.toContain("YOUR_SESSION_TOKEN");
   });
 });

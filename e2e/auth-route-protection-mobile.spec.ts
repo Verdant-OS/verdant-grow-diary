@@ -37,7 +37,6 @@ const PROTECTED_MOBILE_ROUTES: string[] = [
   "/operator/ecowitt-bridge-debug",
   "/operator/ecowitt-live-bringup",
   "/operator/ecowitt-tent-preview",
-  "/operator/ggs-real-payload-ingest",
   "/demo/one-tent-live-proof",
   "/operator/one-tent-live-proof",
   "/operator/one-tent-loop-smoke-test",
@@ -90,8 +89,6 @@ const PUBLIC_MOBILE_ROUTES: string[] = [
   "/how-ai-doctor-works",
   "/partners/csv-preview",
   "/sensors/csv-preview",
-  "/customer/:shareId",
-  "/customer/:shareId/cannabis-care",
   // Read-only Pheno Comparison preview: public, fixture-only, mounted outside
   // AuthProvider/GrowsProvider/AppShell — must render signed-out on mobile with
   // zero private-table fetches.

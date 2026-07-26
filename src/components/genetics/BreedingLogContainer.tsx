@@ -23,6 +23,7 @@ export function BreedingLogContainer({ activeGrowId, plants, onCreated, onCancel
     plantId: string;
     subType: BreedingEventType;
     details: any;
+    requestActionQueueSuggestions: boolean;
   }) => {
     setBusy(true);
     try {
@@ -32,15 +33,18 @@ export function BreedingLogContainer({ activeGrowId, plants, onCreated, onCancel
       const selectedPlant = plants.find((p) => p.id === data.plantId);
       const details = (data.details ?? {}) as Record<string, string>;
 
-      const { data: rpcData, error: rpcError } = await (supabase.rpc as any)("breeding_log_save_event", {
-        p_grow_id: activeGrowId,
-        p_plant_id: data.plantId,
-        p_event_type: data.subType,
-        p_tent_id: selectedPlant?.tent_id ?? null,
-        p_method: typeof details.method === "string" ? details.method : null,
-        p_intensity: typeof details.intensity === "string" ? details.intensity : null,
-        p_details: details,
-      });
+      const { data: rpcData, error: rpcError } = await (supabase.rpc as any)(
+        "breeding_log_save_event",
+        {
+          p_grow_id: activeGrowId,
+          p_plant_id: data.plantId,
+          p_event_type: data.subType,
+          p_tent_id: selectedPlant?.tent_id ?? null,
+          p_method: typeof details.method === "string" ? details.method : null,
+          p_intensity: typeof details.intensity === "string" ? details.intensity : null,
+          p_details: details,
+        },
+      );
 
       if (rpcError) {
         throw new Error(`Failed to save event: ${rpcError.message}`);
@@ -55,37 +59,39 @@ export function BreedingLogContainer({ activeGrowId, plants, onCreated, onCancel
       }
       const eventId = result.grow_event_id;
 
-      // 2. Invoke Edge Function for Action Queue Suggestions
-      // Provenance Rule: "Action Queue insertion failure must not roll back or block the original Quick Log event save."
-      try {
-        const { data: fnData, error: fnError } = await supabase.functions.invoke(
-          "create-breeding-suggestions",
-          {
-            body: { event_id: eventId },
-          },
-        );
-        if (fnError) {
-          console.error("[BreedingLogContainer] Edge function error:", fnError);
-        } else {
-          const actionIds =
-            (fnData as { actionIds?: Array<{ id: string; plantId: string | null }> } | null)
-              ?.actionIds ?? [];
-          const now = new Date().toISOString();
-          for (const row of actionIds) {
-            emitBreedingAuditEvent({
-              eventType: "breeding_suggestion_created",
-              actionId: row.id,
-              plantId: row.plantId ?? data.plantId,
-              source: "breeding_v0",
-              status: "pending_approval",
-              actorId: user?.id ?? null,
-              requiresApproval: true,
-              timestamp: now,
-            });
+      // 2. Suggestions are a separate, explicit grower choice. The event still
+      // saves when suggestions are not requested or when their insert fails.
+      if (data.requestActionQueueSuggestions) {
+        try {
+          const { data: fnData, error: fnError } = await supabase.functions.invoke(
+            "create-breeding-suggestions",
+            {
+              body: { event_id: eventId },
+            },
+          );
+          if (fnError) {
+            console.error("[BreedingLogContainer] Edge function error:", fnError);
+          } else {
+            const actionIds =
+              (fnData as { actionIds?: Array<{ id: string; plantId: string | null }> } | null)
+                ?.actionIds ?? [];
+            const now = new Date().toISOString();
+            for (const row of actionIds) {
+              emitBreedingAuditEvent({
+                eventType: "breeding_suggestion_created",
+                actionId: row.id,
+                plantId: row.plantId ?? data.plantId,
+                source: "breeding_v0",
+                status: "pending_approval",
+                actorId: user?.id ?? null,
+                requiresApproval: true,
+                timestamp: now,
+              });
+            }
           }
+        } catch (err) {
+          console.error("[BreedingLogContainer] Failed to invoke suggestions:", err);
         }
-      } catch (err) {
-        console.error("[BreedingLogContainer] Failed to invoke suggestions:", err);
       }
 
       // Refresh data
@@ -106,7 +112,7 @@ export function BreedingLogContainer({ activeGrowId, plants, onCreated, onCancel
       <div className="rounded-lg border border-pink-500/30 bg-pink-500/5 p-4">
         <h3 className="text-sm font-medium text-pink-400 mb-2">Breeding Event</h3>
         <p className="text-xs text-muted-foreground mb-4">
-          Log genetic events. AI will suggest next steps in your Action Queue.
+          Log genetic events. Follow-up suggestions are optional and always require your review.
         </p>
         <BreedingEventForm
           plants={plants}

@@ -175,6 +175,10 @@ import CopyTraceLinkButton from "@/components/CopyTraceLinkButton";
 import { useTimelineHighlightAutoScroll } from "@/lib/useTimelineHighlightAutoScroll";
 import { useTimelineHashAnchorHandoff } from "@/hooks/useTimelineHashAnchorHandoff";
 import {
+  buildLinkedGrowEventTimelineAnchorId,
+  buildTimelineEntryAnchorId,
+} from "@/lib/timelineEntryAnchorRules";
+import {
   buildTimelinePageReadKey,
   buildTimelinePageReadView,
   hasTimelineRequiredReadError,
@@ -400,9 +404,7 @@ export default function Timeline() {
     refetch: refetchEntitlement,
   } = useMyEntitlements();
   const advancedTimelineUnlocked =
-    !entitlementLoading &&
-    !lookupFailed &&
-    canUseFeature(entitlement, "advanced_timeline_filters");
+    !entitlementLoading && !lookupFailed && canUseFeature(entitlement, "advanced_timeline_filters");
   const [startDateFilter, setStartDateFilter] = useState<string>(() => {
     const v = searchParams.get(TIMELINE_START_DATE_PARAM);
     return isTimelineDateFilterValue(v) ? v : "";
@@ -1758,10 +1760,13 @@ export default function Timeline() {
               <ul className="space-y-3">
                 {group.items.map((e) => {
                   const isHighlighted = diaryEntryMatchesHighlight(e, highlight);
+                  const primaryAnchorId =
+                    buildTimelineEntryAnchorId(e.id) ?? `timeline-entry-${e.id}`;
+                  const linkedGrowEventAnchorId = buildLinkedGrowEventTimelineAnchorId(e.details);
                   return (
                     <li
                       key={e.id}
-                      id={`timeline-entry-${e.id}`}
+                      id={primaryAnchorId}
                       data-testid={isHighlighted ? TIMELINE_HIGHLIGHT_TESTID : "timeline-entry"}
                       data-highlight={isHighlighted ? "action-queue-trace" : undefined}
                       aria-label={isHighlighted ? TIMELINE_HIGHLIGHT_ARIA_LABEL : undefined}
@@ -1772,6 +1777,13 @@ export default function Timeline() {
                           "ring-2 ring-primary ring-offset-2 ring-offset-background focus:outline-none focus-visible:ring-2 focus-visible:ring-primary",
                       )}
                     >
+                      {linkedGrowEventAnchorId && linkedGrowEventAnchorId !== primaryAnchorId ? (
+                        <span
+                          id={linkedGrowEventAnchorId}
+                          data-timeline-entry-alias-for={primaryAnchorId}
+                          hidden
+                        />
+                      ) : null}
                       {e.photo_url ? (
                         (() => {
                           const idx = findTimelinePhotoIndexById(lightboxItems, e.id);

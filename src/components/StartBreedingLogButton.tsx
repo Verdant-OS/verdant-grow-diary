@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { FlaskConical } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { breedingLogNewPath } from "@/lib/routes";
 import { useAuth } from "@/store/auth";
 
 interface Props {
@@ -10,16 +11,14 @@ interface Props {
 }
 
 /**
- * Deep-link to /breeding/new pre-scoped to the current grow (and tent when
+ * Deep-link to /breeding/log/new pre-scoped to the current grow (and tent when
  * present). Only rendered for authenticated users. Mirrors StartPhenoHuntButton.
  */
 export default function StartBreedingLogButton({ growId, tentId, className }: Props) {
   const { user } = useAuth();
   if (!user || !growId) return null;
 
-  const params = new URLSearchParams({ growId });
-  if (tentId) params.set("tentId", tentId);
-  const href = `/breeding/new?${params.toString()}`;
+  const href = breedingLogNewPath(growId, tentId);
 
   return (
     <Button

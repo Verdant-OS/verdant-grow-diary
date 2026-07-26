@@ -2,11 +2,35 @@
 // Requires a Supabase session JWT. Returns the plaintext token ONCE.
 // Stored at rest as sha-256 hash + short non-secret prefix.
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { requireLiveSensorEntitlement } from "../_shared/liveSensorEntitlementGate.ts";
+import { resolveServerBillingEnvironment } from "../_shared/unionEntitlementLookup.ts";
+import type { LovableBillingEnvironment } from "../_shared/lib/lib/entitlements/lovablePaddleAdapter.ts";
+
+export interface MintBridgeTokenClient {
+  auth: {
+    getClaims(token: string): PromiseLike<{
+      data?: { claims?: { sub?: string | null } | null } | null;
+      error?: unknown;
+    }>;
+  };
+  // Supabase's generated Edge schema resolves untyped tables to `never`.
+  // Keep this handler seam limited to the runtime query-builder method.
+  // deno-lint-ignore no-explicit-any
+  from(table: string): any;
+}
+
+export interface MintBridgeTokenHandlerDeps {
+  /** Test-only seam. Production creates a caller-JWT Supabase client. */
+  supabase?: MintBridgeTokenClient;
+  /** One request clock shared by entitlement resolution and token expiry. */
+  now?: () => Date;
+  /** Test-only server environment override; never read from request input. */
+  expectedBillingEnvironment?: LovableBillingEnvironment;
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
@@ -21,59 +45,77 @@ const MIN_TTL_HOURS = 1;
 const MAX_TTL_DAYS = 365;
 
 function b64url(bytes: Uint8Array): string {
-  let s = btoa(String.fromCharCode(...bytes));
+  const s = btoa(String.fromCharCode(...bytes));
   return s.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
 async function sha256Hex(input: string): Promise<string> {
-  const buf = await crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(input),
-  );
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
   return Array.from(new Uint8Array(buf))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
 }
 
-Deno.serve(async (req) => {
+export async function handleRequest(
+  req: Request,
+  deps: MintBridgeTokenHandlerDeps = {},
+): Promise<Response> {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
 
   const authHeader = req.headers.get("Authorization");
   if (!authHeader?.startsWith("Bearer ")) return json({ error: "unauthorized" }, 401);
 
-  const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-  const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY)
-    return json({ error: "server_misconfigured" }, 503);
+  let supabase = deps.supabase;
+  if (!supabase) {
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return json({ error: "server_misconfigured" }, 503);
 
-  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    global: { headers: { Authorization: authHeader } },
-  });
+    supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: authHeader } },
+    }) as unknown as MintBridgeTokenClient;
+  }
 
   const token = authHeader.replace("Bearer ", "");
   const { data: claimsData, error: claimsErr } = await supabase.auth.getClaims(token);
   if (claimsErr || !claimsData?.claims?.sub) return json({ error: "unauthorized" }, 401);
   const userId = claimsData.claims.sub as string;
+  const requestNow = deps.now?.() ?? new Date();
+
+  // Server-authoritative capability gate. The user id comes only from the
+  // verified JWT claims; plan/capabilities in request JSON are never read.
+  const liveSensorAccess = await requireLiveSensorEntitlement(
+    supabase,
+    userId,
+    deps.expectedBillingEnvironment ?? resolveServerBillingEnvironment(),
+    requestNow,
+  );
+  if (!liveSensorAccess.ok) {
+    const status = liveSensorAccess.reason === "entitlement_lookup_failed" ? 503 : 403;
+    return json({ error: liveSensorAccess.reason }, status);
+  }
 
   let body: { tent_id?: string; name?: string; ttl_days?: number };
-  try { body = await req.json(); } catch { return json({ error: "invalid_json" }, 400); }
+  try {
+    body = await req.json();
+  } catch {
+    return json({ error: "invalid_json" }, 400);
+  }
 
   const tentId = String(body.tent_id || "");
   const name = (body.name || "bridge").toString().slice(0, 60);
-  const ttlDays = Math.max(
-    MIN_TTL_HOURS / 24,
-    Math.min(MAX_TTL_DAYS, Number(body.ttl_days ?? 30)),
-  );
-  if (!/^[0-9a-f-]{36}$/i.test(tentId))
-    return json({ error: "invalid_tent_id" }, 400);
+  const ttlDays = Math.max(MIN_TTL_HOURS / 24, Math.min(MAX_TTL_DAYS, Number(body.ttl_days ?? 30)));
+  if (!/^[0-9a-f-]{36}$/i.test(tentId)) return json({ error: "invalid_tent_id" }, 400);
 
   // Verify tent ownership (defense-in-depth; INSERT policy also enforces).
   const { data: tentRow, error: tentErr } = await supabase
-    .from("tents").select("id, user_id").eq("id", tentId).maybeSingle();
+    .from("tents")
+    .select("id, user_id")
+    .eq("id", tentId)
+    .maybeSingle();
   if (tentErr) return json({ error: "tent_lookup_failed" }, 503);
-  if (!tentRow || tentRow.user_id !== userId)
-    return json({ error: "forbidden_tent" }, 403);
+  if (!tentRow || tentRow.user_id !== userId) return json({ error: "forbidden_tent" }, 403);
 
   // Generate 32 random bytes -> base64url -> vbt_ prefix.
   const rand = new Uint8Array(32);
@@ -81,7 +123,7 @@ Deno.serve(async (req) => {
   const plaintext = TOKEN_PREFIX + b64url(rand);
   const tokenHash = await sha256Hex(plaintext);
   const tokenPrefix = plaintext.slice(0, 12); // vbt_ + 8 chars, non-secret
-  const expiresAt = new Date(Date.now() + ttlDays * 86400_000).toISOString();
+  const expiresAt = new Date(requestNow.getTime() + ttlDays * 86400_000).toISOString();
 
   const { data: inserted, error: insErr } = await supabase
     .from("bridge_tokens")
@@ -95,7 +137,14 @@ Deno.serve(async (req) => {
     })
     .select("id, name, token_prefix, expires_at, created_at")
     .single();
-  if (insErr) { console.error("mint-bridge-token insert_failed", insErr); return json({ error: "insert_failed" }, 400); }
+  if (insErr) {
+    console.error("mint-bridge-token insert_failed", insErr);
+    return json({ error: "insert_failed" }, 400);
+  }
 
   return json({ ok: true, token: plaintext, record: inserted }, 200);
-});
+}
+
+if (import.meta.main) {
+  Deno.serve((req) => handleRequest(req));
+}

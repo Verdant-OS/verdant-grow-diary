@@ -1032,13 +1032,6 @@ export function findGuideBySlug(slug: string | undefined): SeoGuidePage | null {
 
 export const VERDANT_SITE_ORIGIN = "https://verdantgrowdiary.com";
 
-/**
- * Canonical public entry-point for the Customer Mode guide shell. The
- * :shareId segment is opaque and rendered as placeholder copy in this
- * shell, so a stable "guide" slug is a safe internal link target.
- */
-export const VERDANT_CUSTOMER_GUIDE_PATH = "/customer/guide";
-
 export const VERDANT_GUIDES_BREADCRUMB_ITEMS: ReadonlyArray<{
   name: string;
   url: string;

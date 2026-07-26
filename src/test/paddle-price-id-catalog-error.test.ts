@@ -88,6 +88,26 @@ describe("getPaddlePriceId — catalog-unavailable mapping", () => {
     });
   });
 
+  it("maps an unspendable pack refusal to calm paid-plan guidance", async () => {
+    invokeMock.mockResolvedValueOnce({
+      data: null,
+      error: {
+        context: new Response(JSON.stringify({ error: "pack_requires_monthly_plan" }), {
+          status: 403,
+          headers: { "Content-Type": "application/json" },
+        }),
+      },
+    });
+
+    const err = await getPaddlePriceId("credit_pack_50").catch((error) => error);
+    expect(err).toBeInstanceOf(PaddleCheckoutCatalogUnavailableError);
+    expect(err).toMatchObject({
+      reason: "pack_requires_monthly_plan",
+      planId: "credit_pack_50",
+    });
+    expect((err as Error).message).toMatch(/monthly AI allowance/i);
+  });
+
   it("falls back to the generic error when the body is unrecognized", async () => {
     invokeMock.mockResolvedValueOnce({
       data: null,
@@ -118,6 +138,7 @@ describe("getPaddlePriceId — catalog-unavailable mapping", () => {
       "price_not_configured",
       "price_resolution_unavailable",
       "plan_sold_out",
+      "pack_requires_monthly_plan",
     ] as const) {
       const msg = getPaddleCheckoutCatalogMessage(reason);
       expect(msg).not.toMatch(/PADDLE_PRICE_/);

@@ -241,9 +241,9 @@ function TemperatureUnitTile() {
  *
  * Reads the caller's entitlement via useMyEntitlements (RLS-protected select-own).
  * Features are read from PRICING_TIERS (single source of truth).
- * Manage/Cancel buttons are placeholders — they never call Paddle, never call
- * the billing API, and never write account status. They open an informational
- * dialog only.
+ * Recurring paid plans open a fresh, server-minted Paddle customer-portal
+ * session. The browser never receives provider credentials and never writes
+ * billing status directly.
  */
 function SubscriptionTile() {
   const { loading, lookupFailed, entitlement, refetch } = useMyEntitlements();

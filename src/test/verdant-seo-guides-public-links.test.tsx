@@ -8,8 +8,8 @@
  *    manifest explicitly marks `public` (or a real public/ static asset).
  *  - No internal link points at a missing route or a protected surface.
  *  - Clicking guide-family links keeps the user on public guide content.
- *  - Public guide presenters do not promote the backend-placeholder
- *    Customer Guide share path.
+ *  - Public guide presenters do not promote the retired, unbacked Customer
+ *    Mode share paths.
  *  - Rendered copy + head metadata carry no device-control/autopilot
  *    promises and no compliance-tool (Metrc/seed-to-sale) positioning.
  *
@@ -22,7 +22,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import GuidesIndex from "@/pages/GuidesIndex";
 import GuidePage from "@/pages/GuidePage";
-import { VERDANT_CUSTOMER_GUIDE_PATH, VERDANT_GUIDE_SLUGS } from "@/constants/verdantSeoContent";
+import { VERDANT_GUIDE_SLUGS } from "@/constants/verdantSeoContent";
 import { APP_ROUTES } from "@/lib/appRouteManifest";
 
 const REPO = resolve(__dirname, "../..");
@@ -219,19 +219,20 @@ describe("/guides click-through stays on public content", () => {
   });
 
   for (const path of ALL_GUIDE_PATHS) {
-    it(`${path}: does not render a Customer Guide placeholder CTA`, () => {
+    it(`${path}: does not render a retired Customer Mode CTA`, () => {
       const { container } = renderGuides(path);
-      expect(
-        container.querySelector<HTMLAnchorElement>(`a[href="${VERDANT_CUSTOMER_GUIDE_PATH}"]`),
-      ).toBeNull();
+      const customerLinks = [...container.querySelectorAll<HTMLAnchorElement>("a[href]")].filter(
+        (link) => pathnameOf(link.getAttribute("href") ?? "").startsWith("/customer/"),
+      );
+      expect(customerLinks).toEqual([]);
       expect(container.textContent).not.toMatch(/start with the customer guide/i);
     });
   }
 
-  it("preserves the Customer Guide backend route without promoting it", () => {
+  it("preserves real public routes without restoring Customer Mode", () => {
     expect(manifestEntryFor("/welcome")?.access).toBe("public");
-    expect(manifestEntryFor(VERDANT_CUSTOMER_GUIDE_PATH)?.access).toBe("public");
     expect(manifestEntryFor("/pricing")?.access).toBe("public");
+    expect(APP_ROUTES.some((route) => route.path.startsWith("/customer/"))).toBe(false);
   });
 });
 

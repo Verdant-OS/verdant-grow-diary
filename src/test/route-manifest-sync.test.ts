@@ -83,7 +83,7 @@ describe("Public SEO route surface", () => {
   /**
    * Regression fence: every route mounted in App.tsx that looks like a
    * public SEO surface (grower guides, pricing, welcome, hardware
-   * integrations, customer share pages) MUST appear in the manifest and
+   * integrations) MUST appear in the manifest and
    * MUST be marked `public`. This catches the class of drift where a new
    * SEO page is added to App.tsx but the manifest is not updated.
    */
@@ -97,7 +97,6 @@ describe("Public SEO route surface", () => {
     /^\/sensors\/csv-preview$/,
     /^\/how-ai-doctor-works$/,
     /^\/tools(\/.*)?$/,
-    /^\/customer\/.+$/,
     /^\/quick-log$/,
   ];
 

@@ -155,7 +155,7 @@ describe("Quick Log preset menu — event wiring", () => {
     renderQuickLog({ plantId: "p1", tentId: null, growId: "g1" }, { onNavigate, onDispatchEvent });
     fireEvent.click(screen.getByTestId("global-fast-add-trigger"));
     fireEvent.click(screen.getByTestId("global-fast-add-action-diagnosis"));
-    expect(onNavigate).toHaveBeenCalledWith("/plants/p1#ai-doctor");
+    expect(onNavigate).toHaveBeenCalledWith("/plants/p1#plant-ai-doctor-review");
     expect(onDispatchEvent).not.toHaveBeenCalled();
   });
 });

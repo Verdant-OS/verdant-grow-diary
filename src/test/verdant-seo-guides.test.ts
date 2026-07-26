@@ -10,7 +10,6 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
-  VERDANT_CUSTOMER_GUIDE_PATH,
   VERDANT_CUSTOMER_MODE_GROWER_FAQ,
   VERDANT_GROWER_GUIDE_FAQ,
   VERDANT_GUIDES_BREADCRUMB_ITEMS,
@@ -263,15 +262,15 @@ describe("Landing and Pricing OG/Twitter metadata", () => {
   });
 });
 
-describe("Customer Guide route remains available without a misleading public CTA", () => {
-  it("Customer Guide path resolves to the real /customer/:shareId route", () => {
-    expect(VERDANT_CUSTOMER_GUIDE_PATH.startsWith("/customer/")).toBe(true);
-    expect(APP_TSX).toMatch(/path="\/customer\/:shareId"/);
+describe("retired Customer Mode routes stay absent from the public guide funnel", () => {
+  it("does not mount an unbacked Customer Mode share route", () => {
+    expect(APP_TSX).not.toMatch(/path="\/customer\/:shareId"/);
+    expect(CONTENT_TS).not.toContain('"/customer/guide"');
   });
 
-  it("GuidePage and GuidesIndex neither import nor reference the placeholder path", () => {
-    expect(GUIDE_PAGE).not.toContain("VERDANT_CUSTOMER_GUIDE_PATH");
-    expect(GUIDES_INDEX).not.toContain("VERDANT_CUSTOMER_GUIDE_PATH");
+  it("GuidePage and GuidesIndex neither import nor promote Customer Mode", () => {
+    expect(GUIDE_PAGE).not.toMatch(/\/customer\//);
+    expect(GUIDES_INDEX).not.toMatch(/\/customer\//);
     expect(GUIDE_PAGE).not.toMatch(/Start with the Customer Guide/i);
     expect(GUIDES_INDEX).not.toMatch(/start with the Customer Guide/i);
   });

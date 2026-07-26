@@ -28,12 +28,51 @@ const mocks = vi.hoisted(() => ({
   openCheckout: vi.fn(),
   dismissBlocked: vi.fn(),
   track: vi.fn(),
+  paidEntitlement: {
+    effectivePlanId: "pro_monthly",
+    displayPlanId: "pro_monthly",
+    status: "active",
+    isActive: true,
+    capabilities: {
+      maxActiveGrows: null,
+      aiCreditsPerGrow: null,
+      aiMonthlyCredits: 100,
+      liveSensors: true,
+      advancedExports: true,
+      multiTent: true,
+      sensorHistoryDays: null,
+      prioritySupport: true,
+      blueprint: false,
+    },
+    degraded: false,
+    degradedReason: null,
+    isStaff: false,
+    source: "lovable_paddle_subscription",
+  },
   checkout: {
     environment: "live" as "live" | "sandbox" | "unavailable",
     unavailable: false,
     unavailableMessage: null as string | null,
     blockedReason: null as string | null,
   },
+}));
+
+vi.mock("@/store/auth", () => ({
+  useAuth: () => ({
+    user: { id: "paid-grower" },
+    session: null,
+    loading: false,
+    signOut: vi.fn(),
+  }),
+}));
+
+vi.mock("@/hooks/useMyEntitlements", () => ({
+  useMyEntitlements: () => ({
+    loading: false,
+    lookupFailed: false,
+    entitlement: mocks.paidEntitlement,
+    refetch: vi.fn(async () => false),
+  }),
 }));
 
 vi.mock("@/hooks/usePaddleCheckout", () => ({

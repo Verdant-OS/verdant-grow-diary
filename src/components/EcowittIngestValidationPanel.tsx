@@ -38,6 +38,11 @@ import {
   type DiaryEnvironmentCheckDraft,
 } from "@/lib/ecowittDiaryEnvironmentCheckRules";
 
+export interface EnvironmentCheckLogResult {
+  ok: boolean;
+  growEventId?: string | null;
+}
+
 interface Props {
   input: EcowittIngestValidationInput;
   /** Existing audit refetch from useEcowittAuditRows; never triggers writes. */
@@ -48,10 +53,14 @@ interface Props {
    * the latest accepted validation evidence. Caller wires this to the
    * existing diary/grow_events insert helper (e.g. quicklog_save_manual).
    */
-  onLogEnvironmentCheck?: (draft: DiaryEnvironmentCheckDraft) => void;
+  onLogEnvironmentCheck?: (
+    draft: DiaryEnvironmentCheckDraft,
+  ) => EnvironmentCheckLogResult | Promise<EnvironmentCheckLogResult>;
   isLogging?: boolean;
   /** Optional grow scope used to build the timeline link href. */
   growId?: string | null;
+  /** Saved grow-event identity keyed by the validation captured_at value. */
+  loggedEventIdsByCapturedAt?: Readonly<Record<string, string>>;
 }
 
 function statusVariant(
@@ -103,8 +112,7 @@ function CopyButton({ label, command, testId }: CopyButtonProps) {
   const [copied, setCopied] = useState(false);
   const onClick = useCallback(async () => {
     try {
-      const clipboard =
-        typeof navigator !== "undefined" ? navigator.clipboard : undefined;
+      const clipboard = typeof navigator !== "undefined" ? navigator.clipboard : undefined;
       if (clipboard?.writeText) {
         await clipboard.writeText(command);
       }
@@ -138,6 +146,7 @@ export function EcowittIngestValidationPanel({
   onLogEnvironmentCheck,
   isLogging,
   growId,
+  loggedEventIdsByCapturedAt,
 }: Props) {
   const vm = buildEcowittIngestValidationViewModel(input);
   const now = input.now ?? new Date();
@@ -166,30 +175,50 @@ export function EcowittIngestValidationPanel({
     ],
   );
 
-  // Track captured_at of the most recent locally-initiated log click so we
-  // can surface a success block with the View link even before the
-  // grow_events query roundtrips.
-  const [justLoggedCapturedAt, setJustLoggedCapturedAt] = useState<
-    string | null
-  >(null);
+  // Keep the confirmed grow-event identity in memory so the post-save handoff
+  // can target Timeline before the grow_events refetch completes.
+  const [justLogged, setJustLogged] = useState<{
+    capturedAt: string;
+    growEventId: string | null;
+  } | null>(null);
+  const [logPending, setLogPending] = useState(false);
 
-  const handleLog = useCallback(() => {
+  const handleLog = useCallback(async () => {
     if (!onLogEnvironmentCheck) return;
     if (!diaryDraft.eligible) return;
     if (vm.alreadyLogged) return;
-    setJustLoggedCapturedAt(vm.latestCapturedAt);
-    onLogEnvironmentCheck(diaryDraft);
-  }, [onLogEnvironmentCheck, diaryDraft, vm.alreadyLogged, vm.latestCapturedAt]);
+    if (!vm.latestCapturedAt || logPending) return;
+    setLogPending(true);
+    try {
+      const result = await onLogEnvironmentCheck(diaryDraft);
+      if (result?.ok) {
+        setJustLogged({
+          capturedAt: vm.latestCapturedAt,
+          growEventId: result.growEventId ?? null,
+        });
+      }
+    } finally {
+      setLogPending(false);
+    }
+  }, [onLogEnvironmentCheck, diaryDraft, vm.alreadyLogged, vm.latestCapturedAt, logPending]);
 
-  const loggedInfo = useMemo(
-    () =>
-      vm.alreadyLogged
-        ? buildAlreadyLoggedEventInfo(vm.latestCapturedAt, growId ?? null)
-        : justLoggedCapturedAt
-          ? buildAlreadyLoggedEventInfo(justLoggedCapturedAt, growId ?? null)
-          : null,
-    [vm.alreadyLogged, vm.latestCapturedAt, justLoggedCapturedAt, growId],
-  );
+  const loggedInfo = useMemo(() => {
+    if (vm.alreadyLogged && vm.latestCapturedAt) {
+      return buildAlreadyLoggedEventInfo(
+        vm.latestCapturedAt,
+        growId ?? null,
+        loggedEventIdsByCapturedAt?.[vm.latestCapturedAt] ?? null,
+      );
+    }
+    if (justLogged?.capturedAt === vm.latestCapturedAt) {
+      return buildAlreadyLoggedEventInfo(
+        justLogged.capturedAt,
+        growId ?? null,
+        justLogged.growEventId,
+      );
+    }
+    return null;
+  }, [vm.alreadyLogged, vm.latestCapturedAt, justLogged, growId, loggedEventIdsByCapturedAt]);
 
   // Modal state.
   const [exportOpen, setExportOpen] = useState(false);
@@ -226,10 +255,7 @@ export function EcowittIngestValidationPanel({
     [vm.tentScopedLabel, vm.sourceLabel, vm.thresholds, vm.exportAttempts, now],
   );
 
-  const exportPreview = useMemo(
-    () => buildExportPreview(exportPayload),
-    [exportPayload],
-  );
+  const exportPreview = useMemo(() => buildExportPreview(exportPayload), [exportPayload]);
 
   const evidencePreview = useMemo(
     () => (evidenceSnapshot ? buildEvidencePreview(evidenceSnapshot) : null),
@@ -275,8 +301,7 @@ export function EcowittIngestValidationPanel({
     }
     const text = serializeEvidenceForClipboard(evidenceSnapshot);
     try {
-      const clipboard =
-        typeof navigator !== "undefined" ? navigator.clipboard : undefined;
+      const clipboard = typeof navigator !== "undefined" ? navigator.clipboard : undefined;
       if (clipboard?.writeText) await clipboard.writeText(text);
     } catch {
       /* clipboard unavailable */
@@ -285,17 +310,14 @@ export function EcowittIngestValidationPanel({
     toast.success("Redacted evidence copied");
   }, [evidenceSnapshot]);
 
-
   return (
     <Card data-testid="ecowitt-ingest-validation-panel">
       <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 pb-2">
         <div className="space-y-1">
-          <CardTitle className="text-base">
-            EcoWitt ingest validation
-          </CardTitle>
+          <CardTitle className="text-base">EcoWitt ingest validation</CardTitle>
           <p className="text-xs text-muted-foreground">
-            Read-only local validation evidence for this tent (test data, not
-            live sensor telemetry).
+            Read-only local validation evidence for this tent (test data, not live sensor
+            telemetry).
           </p>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
@@ -309,10 +331,7 @@ export function EcowittIngestValidationPanel({
               {vm.invalidTestBadge.label}
             </Badge>
           )}
-          <Badge
-            variant={statusVariant(vm.status)}
-            data-testid="validation-status-badge"
-          >
+          <Badge variant={statusVariant(vm.status)} data-testid="validation-status-badge">
             {vm.statusLabel}
           </Badge>
         </div>
@@ -333,10 +352,7 @@ export function EcowittIngestValidationPanel({
           </ul>
         ) : null}
 
-        <div
-          data-testid="validation-action-bar"
-          className="flex flex-wrap items-center gap-2"
-        >
+        <div data-testid="validation-action-bar" className="flex flex-wrap items-center gap-2">
           <CopyButton
             label="Copy accepted test command"
             command={buildEcowittAuditDevSenderCommand(
@@ -374,9 +390,7 @@ export function EcowittIngestValidationPanel({
               size="sm"
               variant="outline"
               onClick={handleLog}
-              disabled={
-                !diaryDraft.eligible || vm.alreadyLogged || !!isLogging
-              }
+              disabled={!diaryDraft.eligible || vm.alreadyLogged || !!isLogging || logPending}
               data-testid="log-environment-check-button"
               data-eligible={diaryDraft.eligible ? "true" : "false"}
               data-already-logged={vm.alreadyLogged ? "true" : "false"}
@@ -385,7 +399,7 @@ export function EcowittIngestValidationPanel({
             >
               {vm.alreadyLogged
                 ? "Already logged"
-                : isLogging
+                : isLogging || logPending
                   ? "Logging…"
                   : "Log Environment Check"}
             </Button>
@@ -427,19 +441,11 @@ export function EcowittIngestValidationPanel({
             <p className="font-medium" data-testid="logged-event-title">
               {loggedInfo.title}
             </p>
-            <p
-              className="text-muted-foreground"
-              data-testid="logged-event-captured-at"
-            >
+            <p className="text-muted-foreground" data-testid="logged-event-captured-at">
               Captured at: {loggedInfo.capturedAt}
             </p>
-            <p
-              className="text-muted-foreground"
-              data-testid="logged-event-status"
-            >
-              {vm.alreadyLogged
-                ? "Already logged to diary"
-                : "Logged to diary"}
+            <p className="text-muted-foreground" data-testid="logged-event-status">
+              {vm.alreadyLogged ? "Already logged to diary" : "Logged to diary"}
             </p>
             <a
               href={loggedInfo.href}
@@ -450,9 +456,6 @@ export function EcowittIngestValidationPanel({
             </a>
           </div>
         ) : null}
-
-
-
 
         {vm.hasEvidence ? (
           <dl className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-xs text-muted-foreground">
@@ -473,10 +476,7 @@ export function EcowittIngestValidationPanel({
         ) : null}
 
         {vm.hasEvidence ? (
-          <div
-            data-testid="validation-metric-chips"
-            className="flex flex-wrap gap-1"
-          >
+          <div data-testid="validation-metric-chips" className="flex flex-wrap gap-1">
             {vm.metricChips.map((chip) => (
               <Badge
                 key={chip.key}
@@ -613,9 +613,7 @@ export function EcowittIngestValidationPanel({
             {vm.cliHints.map((hint) => (
               <li key={hint.command}>
                 <span className="text-muted-foreground">{hint.label}:</span>{" "}
-                <code className="rounded bg-muted px-1 py-0.5">
-                  {hint.command}
-                </code>
+                <code className="rounded bg-muted px-1 py-0.5">{hint.command}</code>
               </li>
             ))}
           </ul>
@@ -639,9 +637,7 @@ export function EcowittIngestValidationPanel({
             <dt className="font-medium">Source</dt>
             <dd>{exportPreview.source_label}</dd>
             <dt className="font-medium">Attempts</dt>
-            <dd data-testid="export-preview-attempt-count">
-              {exportPreview.attempt_count}
-            </dd>
+            <dd data-testid="export-preview-attempt-count">{exportPreview.attempt_count}</dd>
             <dt className="font-medium">Latest captured</dt>
             <dd>{exportPreview.latest_captured_at ?? "—"}</dd>
             <dt className="font-medium">Earliest captured</dt>
@@ -711,9 +707,8 @@ export function EcowittIngestValidationPanel({
               <dd>{evidencePreview.captured_at ?? "—"}</dd>
               <dt className="font-medium">Metrics</dt>
               <dd data-testid="copy-preview-metrics">
-                {evidencePreview.metric_summary
-                  .map((m) => `${m.label}:${m.status}`)
-                  .join(", ") || "—"}
+                {evidencePreview.metric_summary.map((m) => `${m.label}:${m.status}`).join(", ") ||
+                  "—"}
               </dd>
             </dl>
           ) : null}

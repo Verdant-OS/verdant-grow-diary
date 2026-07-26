@@ -67,7 +67,7 @@ describe("fastAddActionRules", () => {
     });
     expect(intent.kind).toBe("navigate");
     if (intent.kind === "navigate") {
-      expect(intent.to).toMatch(/^\/plants\/p1#ai-doctor$/);
+      expect(intent.to).toBe("/plants/p1#plant-ai-doctor-review");
     }
   });
 
@@ -137,7 +137,7 @@ describe("GlobalFastAddButton", () => {
     renderAt("/plants/p1", { onNavigate, onDispatchEvent });
     fireEvent.click(screen.getByTestId("global-fast-add-trigger"));
     fireEvent.click(screen.getByTestId("global-fast-add-action-diagnosis"));
-    expect(onNavigate).toHaveBeenCalledWith("/plants/p1#ai-doctor");
+    expect(onNavigate).toHaveBeenCalledWith("/plants/p1#plant-ai-doctor-review");
     expect(onDispatchEvent).not.toHaveBeenCalled();
   });
 });

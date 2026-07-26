@@ -214,9 +214,7 @@ export default function Dashboard() {
   // details.manual_sensor_snapshot rows + manual environment grow_events).
   // Additive only — the sensor_readings path above is never weakened.
   const quickLogManualSnapshotCount =
-    activationEvidence.status === "ok"
-      ? (activationEvidence.summary.manualSnapshotCount ?? 0)
-      : 0;
+    activationEvidence.status === "ok" ? (activationEvidence.summary.manualSnapshotCount ?? 0) : 0;
   const onboardingVm = buildOnboardingChecklistViewModel({
     growCount: grows.length,
     tentCount: tents.length,
@@ -538,7 +536,7 @@ export default function Dashboard() {
                       </Button>
                       <Button asChild size="sm" variant="outline">
                         <Link
-                          to="/sensors#import-sensor-data"
+                          to="/sensors#csv-import"
                           data-testid="dashboard-environment-snapshot-import-sensor-data"
                           aria-label="Import sensor data"
                         >

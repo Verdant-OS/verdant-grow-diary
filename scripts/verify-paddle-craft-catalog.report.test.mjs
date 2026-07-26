@@ -22,20 +22,20 @@ function runVerifier(env, extraEnv = {}) {
   return { res, report };
 }
 
-test("report.missingByEnv groups non-pass rows by env (key unset → skip)", () => {
+test("report.missingByEnv groups guarded Craft and credit-pack rows by env", () => {
   const { res, report } = runVerifier("sandbox");
   assert.equal(res.status, 2, "missing key → exit 2");
   assert.ok(report.missingByEnv, "missingByEnv is present");
   assert.ok(Array.isArray(report.missingByEnv.sandbox), "sandbox array present");
-  assert.equal(report.missingByEnv.sandbox.length, 2);
+  assert.equal(report.missingByEnv.sandbox.length, 4);
   for (const row of report.missingByEnv.sandbox) {
     assert.equal(row.env, "sandbox");
     assert.equal(row.status, "skip");
-    assert.ok(row.externalId.startsWith("craft_"));
+    assert.match(row.externalId, /^(?:craft_|credit_pack_)/);
   }
-  // Sorted by externalId ascending — deterministic for downstream tooling.
+  // Exact guarded catalog, sorted by externalId for deterministic downstream tooling.
   const ids = report.missingByEnv.sandbox.map((r) => r.externalId);
-  assert.deepEqual(ids, [...ids].sort());
+  assert.deepEqual(ids, ["craft_annual", "craft_monthly", "credit_pack_150", "credit_pack_50"]);
   // No live entry when live wasn't requested.
   assert.equal(report.missingByEnv.live, undefined);
 });

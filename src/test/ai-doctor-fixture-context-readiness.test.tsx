@@ -20,16 +20,15 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { readFileSync } from "node:fs";
+import { relative, resolve } from "node:path";
 import AiDoctorContextReadinessPanel from "@/components/AiDoctorContextReadinessPanel";
-import {
-  compileAiDoctorContextFromRows,
-  type AiDoctorContext,
-} from "@/lib/aiDoctorEngine";
+import { compileAiDoctorContextFromRows, type AiDoctorContext } from "@/lib/aiDoctorEngine";
 import {
   compileDoctorContextFromDiaryFixture,
   type DiaryFixture,
   __testing as fixtureTesting,
 } from "@/lib/aiDoctorFixtureContextRules";
+import { listFilesCached, readFileCached } from "./helpers/cachedSrcTextScan";
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
@@ -74,12 +73,12 @@ function tentRowsFromFixture(f: DiaryFixture & { source_app?: string }) {
   const rows: Array<Record<string, unknown>> = [];
   let i = 0;
   for (const [tent, t] of Object.entries(f.tents ?? {})) {
-    const captured = new Date(NOW.getTime() - (++i) * HOUR).toISOString();
-    const avg = ((t as { averages?: { temperature_f?: number; rh_pct?: number } }).averages) ?? {};
+    const captured = new Date(NOW.getTime() - ++i * HOUR).toISOString();
+    const avg = (t as { averages?: { temperature_f?: number; rh_pct?: number } }).averages ?? {};
     if (typeof avg.temperature_f === "number") {
       rows.push({
         metric: "temperature_c",
-        value: Math.round(((avg.temperature_f - 32) * 5) / 9 * 10) / 10,
+        value: Math.round((((avg.temperature_f - 32) * 5) / 9) * 10) / 10,
         captured_at: captured,
         source: "csv",
         tent,
@@ -127,43 +126,32 @@ describe("AiDoctorContextReadinessPanel — diary fixture golden context", () =>
     render(<AiDoctorContextReadinessPanel context={buildContext()} />);
 
     // Provenance visible: CSV / imported source badge present, never live.
-    const csvBadge = screen.getByTestId(
-      "ai-doctor-context-readiness-panel-source-csv",
-    );
+    const csvBadge = screen.getByTestId("ai-doctor-context-readiness-panel-source-csv");
     expect(csvBadge.textContent).toContain("CSV / imported");
     expect(csvBadge.getAttribute("data-trustworthy")).toBe("false");
-    expect(
-      screen.queryByTestId("ai-doctor-context-readiness-panel-source-live"),
-    ).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-context-readiness-panel-source-live")).toBeNull();
 
     // Imported history disclosure (the not-live / manual-review-required panel).
-    const disclosure = screen.getByTestId(
-      "ai-doctor-imported-history-disclosure",
-    );
+    const disclosure = screen.getByTestId("ai-doctor-imported-history-disclosure");
     expect(disclosure).toBeTruthy();
-    expect(
-      screen.getByTestId("ai-doctor-imported-history-source-label").textContent,
-    ).toContain("CSV history");
+    expect(screen.getByTestId("ai-doctor-imported-history-source-label").textContent).toContain(
+      "CSV history",
+    );
 
     // Missing-live warning is shown because the fixture has no live readings.
-    const warn = screen.getByTestId(
-      "ai-doctor-imported-history-missing-live-warning",
-    );
+    const warn = screen.getByTestId("ai-doctor-imported-history-missing-live-warning");
     expect(warn.textContent?.toLowerCase()).toContain("missing");
   });
 
   it("preview output is labeled 'Preview only — not saved.'", () => {
     render(<AiDoctorContextReadinessPanel context={buildContext()} />);
-    expect(
-      screen.getByTestId("ai-doctor-context-readiness-panel-preview-notice")
-        .textContent,
-    ).toBe("Preview only — not saved.");
+    expect(screen.getByTestId("ai-doctor-context-readiness-panel-preview-notice").textContent).toBe(
+      "Preview only — not saved.",
+    );
   });
 
   it("does not leak raw payload, vendor secrets, or private/internal fields", () => {
-    const { container } = render(
-      <AiDoctorContextReadinessPanel context={buildContext()} />,
-    );
+    const { container } = render(<AiDoctorContextReadinessPanel context={buildContext()} />);
     const text = container.textContent ?? "";
     for (const secret of Object.values(SECRET_BAITS)) {
       expect(text).not.toContain(secret);
@@ -177,9 +165,7 @@ describe("AiDoctorContextReadinessPanel — diary fixture golden context", () =>
   });
 
   it("renders no device-command-shaped strings", () => {
-    const { container } = render(
-      <AiDoctorContextReadinessPanel context={buildContext()} />,
-    );
+    const { container } = render(<AiDoctorContextReadinessPanel context={buildContext()} />);
     const text = container.textContent ?? "";
     for (const pattern of fixtureTesting.DEVICE_COMMAND_PATTERNS) {
       expect(
@@ -190,9 +176,7 @@ describe("AiDoctorContextReadinessPanel — diary fixture golden context", () =>
   });
 
   it("does not describe invalid/unknown soil-probe state as healthy", () => {
-    const { container } = render(
-      <AiDoctorContextReadinessPanel context={buildContext()} />,
-    );
+    const { container } = render(<AiDoctorContextReadinessPanel context={buildContext()} />);
     const text = (container.textContent ?? "").toLowerCase();
     // The fixture's soil_probes.status is "partial_invalid_or_unknown". The
     // readiness panel must never claim soil is healthy / nominal / good.
@@ -201,9 +185,7 @@ describe("AiDoctorContextReadinessPanel — diary fixture golden context", () =>
   });
 
   it("approval-required suggestions in the fixture are not rendered as approved/executed actions", () => {
-    const { container } = render(
-      <AiDoctorContextReadinessPanel context={buildContext()} />,
-    );
+    const { container } = render(<AiDoctorContextReadinessPanel context={buildContext()} />);
     const text = (container.textContent ?? "").toLowerCase();
 
     // Sanity: fixture's suggestions are all approval_required + non-device.
@@ -224,9 +206,7 @@ describe("AiDoctorContextReadinessPanel — diary fixture golden context", () =>
     const compiled = compileDoctorContextFromDiaryFixture(fixture);
     expect(compiled.provenance.is_live).toBe(false);
     expect(compiled.provenance.source).toBe("csv");
-    expect(compiled.provenance.source_warning.toLowerCase()).toContain(
-      "not live telemetry",
-    );
+    expect(compiled.provenance.source_warning.toLowerCase()).toContain("not live telemetry");
     for (const s of compiled.suggested_actions_context_only) {
       expect(s.approval_required).toBe(true);
       expect(s.device_control).toBe(false);
@@ -243,16 +223,17 @@ describe("AiDoctorContextReadinessPanel — diary fixture golden context", () =>
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it("static guard: fixture is not imported by runtime app code", async () => {
-    const { execSync } = await import("node:child_process");
-    const out = execSync(
-      "rg -l --no-messages \"fixtures/diary/2026-06-13-multi-tent-baseline\" src || true",
-      { encoding: "utf8" },
-    );
-    const offenders = out
-      .split("\n")
-      .map((l) => l.trim().split("\\").join("/"))
-      .filter((l) => l && !l.startsWith("src/test/"));
+  it("static guard: fixture is not imported by runtime app code", () => {
+    const sourceRoot = resolve(__dirname, "..");
+    const fixtureReference = "fixtures/diary/2026-06-13-multi-tent-baseline";
+    const offenders = listFilesCached(sourceRoot)
+      .filter((file) => {
+        const sourceRelativePath = relative(sourceRoot, file).replace(/\\/g, "/");
+        return !sourceRelativePath.startsWith("test/");
+      })
+      .filter((file) => readFileCached(file).includes(fixtureReference))
+      .map((file) => relative(process.cwd(), file).replace(/\\/g, "/"))
+      .sort();
     expect(offenders).toEqual([]);
-  });
+  }, 15_000);
 });

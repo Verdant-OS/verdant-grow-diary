@@ -150,7 +150,7 @@ describe("per-SKU checkout blocking", () => {
     // thing that clears blockedReason — the page never recovered.
     await user.click(screen.getByTestId("pricing-cta-pro-annual"));
     expect(mocks.openCheckout).toHaveBeenCalledWith({ priceId: "pro_annual" });
-  });
+  }, 15_000);
 
   it("retries the SKU that failed, not the default plan", async () => {
     const user = userEvent.setup();

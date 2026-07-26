@@ -52,14 +52,22 @@ function normalizedRelative(root, absolutePath) {
 }
 
 function listPolicyFiles(root) {
-  const result = spawnSync("git", ["-C", root, "ls-files", "-z"], {
-    encoding: "utf8",
-    timeout: 30_000,
-    maxBuffer: 8 * 1024 * 1024,
-  });
-  if (result.error || result.status !== 0) {
+  // NPM_INSTALL_PATTERN cannot match a file that does not contain "npm".
+  // Ask Git for that lossless tracked-file candidate set first instead of
+  // synchronously reading every tracked text file in the repository.
+  const result = spawnSync(
+    "git",
+    ["-C", root, "grep", "-l", "-z", "-i", "-F", "-e", "npm", "--", "."],
+    {
+      encoding: "utf8",
+      timeout: 30_000,
+      maxBuffer: 8 * 1024 * 1024,
+    },
+  );
+  // `git grep` uses exit 1 for a valid search with no matches.
+  if (result.error || (result.status !== 0 && result.status !== 1)) {
     throw new Error(
-      `git ls-files failed: ${result.error?.message ?? `exit ${result.status ?? "unknown"}`}`,
+      `git grep failed: ${result.error?.message ?? `exit ${result.status ?? "unknown"}`}`,
     );
   }
   // These policy implementation/fixture files necessarily contain npm command
@@ -92,7 +100,7 @@ function listPolicyFiles(root) {
     ".xlsx",
     ".zip",
   ]);
-  return result.stdout
+  return (result.stdout ?? "")
     .split("\0")
     .filter(Boolean)
     .map((path) => path.replaceAll("\\", "/"))

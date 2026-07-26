@@ -12,6 +12,11 @@
  * the workspace layering rule (business logic outside JSX / edge glue).
  */
 
+import {
+  SUBSCRIPTION_PLAN_IDS,
+  type CreditPackId,
+} from "../_shared/lib/lib/paidPlanAllowlist.ts";
+
 // Local copy of PaddleEnv so this pure module never pulls the Deno-only
 // shared util into the frontend typecheck graph (unit tests import it
 // from src/test/**). The canonical export lives in ../_shared/paddle.ts.
@@ -20,11 +25,18 @@ export type PaddleEnv = "sandbox" | "live";
 // The known human-readable price IDs we accept. Anything else is a config
 // mistake (a product created outside create_product/create_price) and is
 // skipped rather than written with a raw pri_/pro_ id.
-export const KNOWN_PRICE_IDS: ReadonlyArray<string> = [
-  "pro_monthly",
-  "pro_annual",
-  "founder_lifetime",
-];
+//
+// This is the FIRST grant gate, not the last. A price id missing here is
+// skipped as `unknown_price_id`, so no subscriptions row is ever written and
+// the buyer resolves as Free regardless of what the client, edge, and SQL
+// entitlement gates allow — while Paddle still receives a 200, making the
+// failure silent.
+//
+// DERIVED from the single source of truth rather than hand-maintained. This
+// list previously omitted Craft, which is exactly the charged-and-granted-
+// nothing path above; deriving makes that class structurally impossible
+// instead of relying on someone remembering to update a second copy.
+export const KNOWN_PRICE_IDS: ReadonlyArray<string> = SUBSCRIPTION_PLAN_IDS;
 
 /**
  * One-time AI credit-pack SKUs → the number of credits each grants.
@@ -34,7 +46,10 @@ export const KNOWN_PRICE_IDS: ReadonlyArray<string> = [
  * $9 credit purchase must never grant Pro access — packs are recognized ONLY
  * here, in the one-time transaction path, and resolve to a credit grant.
  */
-export const CREDIT_PACK_CREDITS: Readonly<Record<string, number>> = {
+// Typed by CreditPackId rather than `string`, so declaring a pack in the
+// shared allowlist without giving it a credit value here is a COMPILE error
+// instead of an `undefined` lookup that silently skips the grant at runtime.
+export const CREDIT_PACK_CREDITS: Readonly<Record<CreditPackId, number>> = {
   credit_pack_50: 50,
   credit_pack_150: 150,
 };

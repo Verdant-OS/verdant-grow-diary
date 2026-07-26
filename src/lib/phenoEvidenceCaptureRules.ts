@@ -185,11 +185,20 @@ export function parsePhenoEvidenceReceiptRow(
   }
 
   const huntId = boundedId(details.hunt_id);
-  const plantId = boundedId(details.plant_id);
   const evidenceGoal = asGoalId(details.evidence_goal);
-  if (!huntId || !plantId || !evidenceGoal) return null;
-  if (huntId !== expected.huntId || plantId !== expected.plantId) return null;
-  if (row.plant_id !== expected.plantId) return null;
+  if (!huntId || !evidenceGoal) return null;
+  if (huntId !== expected.huntId) return null;
+
+  // The candidate comes from the row's own plant_id column, never from
+  // details: quicklog_save_manual strips plant_id (and user/grow/tent ids)
+  // out of the client-supplied details blob as an ownership-spoofing guard,
+  // so a stored receipt never carries one. The column is the authoritative,
+  // RLS-scoped value anyway. A legacy row that still has details.plant_id
+  // must agree with it.
+  const plantId = boundedId(row.plant_id);
+  if (!plantId || plantId !== expected.plantId) return null;
+  const legacyDetailsPlantId = boundedId(details.plant_id);
+  if (legacyDetailsPlantId !== null && legacyDetailsPlantId !== plantId) return null;
 
   return {
     diaryEntryId: row.id,

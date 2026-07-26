@@ -19,6 +19,7 @@ import {
   type AiDoctorEntitlementView,
 } from "@/lib/aiDoctorEntitlementRules";
 import { sanitizeCheckoutReturnTo } from "@/lib/checkoutReturnTo";
+import { SUBSCRIPTION_PLAN_IDS } from "@/lib/paidPlanAllowlist";
 import type { ResolvedEntitlement } from "@/lib/entitlements/types";
 
 export type AiCreditDenialScope = "per_grow" | "per_month" | string;
@@ -49,13 +50,14 @@ export interface AiCreditLimitNoticeViewModel {
   paywallVm?: PaywallCtaViewModel;
 }
 
-const PAID_PLAN_IDS = new Set([
-  "pro_monthly",
-  "pro_annual",
-  "craft_monthly",
-  "craft_annual",
-  "founder_lifetime",
-]);
+/**
+ * Recurring/lifetime plans, derived from the single-source allowlist rather
+ * than copied. This list used to be a local literal; a tier added to
+ * PAID_PLAN_IDS but missed here would show a paying subscriber the "unknown"
+ * copy instead of "wait". Credit packs are excluded on purpose — a pack id in
+ * `credit.plan_id` is not a plan and must not resolve to "wait".
+ */
+const PAID_PLAN_IDS: ReadonlySet<string> = new Set(SUBSCRIPTION_PLAN_IDS);
 
 interface SurfaceCopy {
   featureTitle: string;

@@ -23,6 +23,13 @@ export const REQUIRED_MONEY_MIGRATIONS = [
   "20260721105000_ai_credit_grants_non_paddle_grants.sql",
   "20260721106000_referrals_conversion.sql",
   "20260721107000_referral_code_and_pending_capture.sql",
+  // Craft entitlement parity. REQUIRED rather than merely KNOWN, because its
+  // absence does silently regress money behaviour: a paying Craft subscriber
+  // is denied the Pheno Tracker feature the pricing page sells them. Listing
+  // it here also makes the deploy verify it was APPLIED and not merely
+  // merged — the gap that previously left plants.candidate_number undeployed
+  // while the code depending on it shipped.
+  "20260725220000_craft_pheno_tracker_entitlement.sql",
 ];
 
 /**

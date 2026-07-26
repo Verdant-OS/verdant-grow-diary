@@ -92,14 +92,17 @@ describe("AiCreditLimitNotice presenter", () => {
     expect(buyLink).toHaveAttribute("href", "/pricing#buy-credits");
   });
 
-  it("wait branch (founder_lifetime) renders a top-up link but NO upgrade/paywall CTA", () => {
-    renderWithRouter(<AiCreditLimitNotice credit={denial("founder_lifetime")} />);
-    expect(screen.queryByTestId("ai-credit-limit-notice-paywall-link")).toBeNull();
-    expect(screen.getByTestId("ai-credit-limit-notice-buy-credits")).toHaveAttribute(
-      "href",
-      "/pricing#buy-credits",
-    );
-  });
+  it.each(["founder_lifetime", "craft_monthly", "craft_annual"])(
+    "wait branch (%s) renders a top-up link but NO upgrade/paywall CTA",
+    (planId) => {
+      renderWithRouter(<AiCreditLimitNotice credit={denial(planId)} />);
+      expect(screen.queryByTestId("ai-credit-limit-notice-paywall-link")).toBeNull();
+      expect(screen.getByTestId("ai-credit-limit-notice-buy-credits")).toHaveAttribute(
+        "href",
+        "/pricing#buy-credits",
+      );
+    },
+  );
 
   it("upsell (free) branch does NOT render the buy-credits top-up link", () => {
     // Free growers get the upgrade path, not a pack top-up.
@@ -121,7 +124,7 @@ describe("AiCreditLimitNotice presenter", () => {
     expect(screen.queryByRole("link")).toBeNull();
   });
 
-  it.each(["pro_monthly", "founder_lifetime", null])(
+  it.each(["pro_monthly", "pro_annual", "craft_monthly", "craft_annual", "founder_lifetime", null])(
     "never invokes an upsell callback for a %s denial without a CTA",
     (planId) => {
       const onUpsellCtaClick = vi.fn();
@@ -137,7 +140,15 @@ describe("AiCreditLimitNotice presenter", () => {
   );
 
   it("rendered DOM text contains no banned words", () => {
-    for (const plan of ["free", "pro_monthly", "founder_lifetime", null]) {
+    for (const plan of [
+      "free",
+      "pro_monthly",
+      "pro_annual",
+      "craft_monthly",
+      "craft_annual",
+      "founder_lifetime",
+      null,
+    ]) {
       const { unmount } = renderWithRouter(
         <AiCreditLimitNotice credit={denial(plan as string | null)} />,
       );

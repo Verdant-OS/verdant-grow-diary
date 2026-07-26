@@ -45,6 +45,7 @@ const plantRow = {
   pheno_hunt_id: null,
   plant_type: "unknown",
   candidate_label: null,
+  candidate_number: 0,
   created_at: "2026-02-10T00:00:00Z",
   updated_at: "2026-05-01T00:00:00Z",
 } as const;

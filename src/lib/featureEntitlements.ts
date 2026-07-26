@@ -35,6 +35,8 @@ export type FeatureKey = "pheno_tracker" | "advanced_timeline_filters";
 const PRO_PLAN_IDS: ReadonlyArray<PlanId> = [
   "pro_monthly",
   "pro_annual",
+  "craft_monthly",
+  "craft_annual",
   "founder_lifetime",
 ];
 

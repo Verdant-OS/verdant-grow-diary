@@ -19,7 +19,16 @@ function trackPageView(path: string, title: string) {
   if (typeof window === "undefined") return;
   if (typeof window.gtag !== "function") return;
   const safePath = sanitizePagePath(path);
-  window.gtag("config", GOOGLE_ANALYTICS_MEASUREMENT_ID, {
+  // Send an explicit page_view EVENT, not a repeat `config` call. index.html
+  // bootstraps this measurement id with `send_page_view: false` so the initial
+  // automatic hit can never fire with an unsanitized URL. Settings passed to
+  // `config` persist for that id, so a later `config` call is not a reliable
+  // way to emit a view — under that reading every page view is silently
+  // dropped and the property goes dark. `event`/`page_view` is GA4's
+  // documented SPA pattern: exactly one view per route change, correct
+  // regardless of how `config` merging is interpreted.
+  window.gtag("event", "page_view", {
+    send_to: GOOGLE_ANALYTICS_MEASUREMENT_ID,
     page_path: safePath,
     page_location: buildSafeAnalyticsPageLocation(window.location.origin, safePath),
     page_title: title,

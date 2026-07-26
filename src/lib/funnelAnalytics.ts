@@ -27,6 +27,7 @@
  */
 
 import { PRICING_ANALYTICS_EVENT } from "@/lib/pricingAnalytics";
+import { enforceFunnelEventSchema } from "@/lib/funnelEventSchema";
 
 export const FUNNEL_EVENTS = [
   "signup",
@@ -45,9 +46,15 @@ export const FUNNEL_EVENTS = [
   "paywall_viewed",
   "paywall_cta_clicked",
   "checkout_started",
+  "checkout_catalog_unavailable",
+  "checkout_recovery_dismissed",
+  "checkout_recovery_choose_another_plan",
+  "checkout_recovery_retry",
+  "checkout_recovery_plan_slug_fallback",
   "subscription_activated",
   "checkout_return_completed",
 ] as const;
+
 
 export type FunnelEventName = (typeof FUNNEL_EVENTS)[number];
 
@@ -66,7 +73,23 @@ export const FUNNEL_PARAM_KEYS = [
   "event_type",
   /** csv_import_completed inserted-row count. */
   "rows",
+  /**
+   * Sanitized catalog-unavailable reason enum from get-paddle-price
+   * (e.g. "price_not_configured"). Server-defined tokens only — never
+   * echoed to the user-facing UI and never carries free text. Also used
+   * by `checkout_recovery_plan_slug_fallback` to classify why the shared
+   * sanitizer collapsed a plan value to "unknown_plan"
+   * (missing / wrong_type / empty_string / not_in_allowlist).
+   */
+  "reason",
+  /**
+   * Coarse, non-identifying length bucket ("0" / "1-8" / "9-32" / "33+")
+   * emitted alongside `reason` by `checkout_recovery_plan_slug_fallback`.
+   * Never carries or approximates the raw rejected value.
+   */
+  "length_bucket",
 ] as const;
+
 
 type FunnelParamKey = (typeof FUNNEL_PARAM_KEYS)[number];
 
@@ -109,7 +132,8 @@ export function sanitizeFunnelParams(
 
 export function trackFunnelEvent(name: FunnelEventName, params?: FunnelEventParams): void {
   if (typeof window === "undefined") return;
-  const safe = sanitizeFunnelParams(params);
+  const globallySafe = sanitizeFunnelParams(params);
+  const safe = enforceFunnelEventSchema(name, globallySafe);
   try {
     const g = (window as { gtag?: (...args: unknown[]) => void }).gtag;
     if (typeof g === "function") g("event", name, safe);

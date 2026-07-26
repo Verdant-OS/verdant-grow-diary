@@ -28,8 +28,10 @@ vi.mock("@/hooks/use-toast", () => ({ toast: vi.fn() }));
 
 vi.mock("@/lib/paddle", () => {
   class PaddleCheckoutUnavailableError extends Error {}
+  class PaddleCheckoutCatalogUnavailableError extends Error {}
   return {
     PaddleCheckoutUnavailableError,
+    PaddleCheckoutCatalogUnavailableError,
     resolvePaddleCheckout: () => "sandbox",
     getCheckoutUnavailableMessage: () => null,
     initializePaddle: vi.fn(async () => {}),

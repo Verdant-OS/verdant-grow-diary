@@ -13,9 +13,11 @@ describe("Google Analytics tag presence in index.html", () => {
     expect(INDEX_HTML).toContain("https://www.googletagmanager.com/gtag/js?id=G-B3QRSZEM9S");
   });
 
-  it("contains the inline gtag config with the measurement ID", () => {
+  it("disables the raw-location initial page view", () => {
     // Formatting-agnostic: prettier reflows quotes/whitespace in index.html.
-    expect(INDEX_HTML).toMatch(/gtag\(\s*["']config["']\s*,\s*["']G-B3QRSZEM9S["']\s*\)/);
+    expect(INDEX_HTML).toMatch(
+      /gtag\(\s*["']config["']\s*,\s*["']G-B3QRSZEM9S["']\s*,\s*\{\s*send_page_view:\s*false\s*\}\s*\)/,
+    );
   });
 
   it("contains the dataLayer bootstrap", () => {

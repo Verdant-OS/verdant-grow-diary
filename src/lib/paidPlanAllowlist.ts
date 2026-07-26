@@ -34,6 +34,49 @@ export type PaidPlanId = (typeof PAID_PLAN_IDS)[number];
 export const PAID_PLAN_ALLOWLIST: ReadonlySet<string> = new Set(PAID_PLAN_IDS);
 
 /**
+ * One-time SKUs. A purchase here grants CREDITS and must never write a
+ * subscriptions row — a $9 pack resolving to plan access would be a revenue
+ * and trust failure.
+ *
+ * Declared as the exception rather than deriving plans from it, because
+ * PAID_PLAN_IDS above must stay a literal array: the hardening tests pin its
+ * exact source text and order via buildPaidPlanAllowlistSourceRegex.
+ */
+export const CREDIT_PACK_IDS = ["credit_pack_50", "credit_pack_150"] as const;
+
+export type CreditPackId = (typeof CREDIT_PACK_IDS)[number];
+
+const CREDIT_PACK_ID_SET: ReadonlySet<string> = new Set(CREDIT_PACK_IDS);
+
+// Fail at import time — including edge-function cold start and every test run
+// — if a new pack is added to PAID_PLAN_IDS but not declared here. Without
+// this, SUBSCRIPTION_PLAN_IDS below would silently classify it as a plan, and
+// a credit purchase would grant a subscription. That is the dangerous
+// direction of this split, so it is guarded rather than merely documented.
+for (const id of PAID_PLAN_IDS) {
+  if (id.startsWith("credit_pack") && !CREDIT_PACK_ID_SET.has(id)) {
+    throw new Error(
+      `paidPlanAllowlist: "${id}" looks like a one-time credit pack but is missing from ` +
+        `CREDIT_PACK_IDS. Add it there, or it will be treated as a subscription plan and ` +
+        `a pack purchase would grant plan access.`,
+    );
+  }
+}
+
+/**
+ * Recurring/lifetime plans — every purchasable id that is NOT a one-time pack.
+ *
+ * DERIVED, deliberately. `payments-webhook`'s KNOWN_PRICE_IDS was the last
+ * hand-maintained copy of this list, and its omission of Craft meant a
+ * completed payment wrote no subscriptions row at all while Paddle still
+ * received a 200 — charged, granted nothing, silent. Deriving makes that
+ * class structurally impossible rather than merely asserted.
+ */
+export const SUBSCRIPTION_PLAN_IDS: ReadonlyArray<PaidPlanId> = PAID_PLAN_IDS.filter(
+  (id) => !CREDIT_PACK_ID_SET.has(id),
+);
+
+/**
  * Build the source-order regex the hardening tests pin against
  * `supabase/functions/get-paddle-price/index.ts`. Kept as a builder rather
  * than a constant so the test file can pass just the plan ids it wants to

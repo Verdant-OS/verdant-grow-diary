@@ -219,6 +219,18 @@ function remedyForFailRow(row) {
   if (cause.kind === "inactive") {
     return "Price exists but is not active — un-archive or re-create as active.";
   }
+  if (cause.kind === "coverage_gap") {
+    // The inverse of "missing": the price EXISTS and is active, but the app
+    // does not know it is sellable. Telling an operator to create a price they
+    // are looking at sends them the wrong way entirely.
+    return (
+      "Active in Paddle but not sellable by the app — add this external_id to " +
+      "`PAID_PLAN_IDS` in src/lib/paidPlanAllowlist.ts (and to `CREDIT_PACK_IDS` if it is a pack)."
+    );
+  }
+  if (cause.kind === "enumeration_error") {
+    return "Could not enumerate the catalog — check credentials / Paddle status, then re-run.";
+  }
   return "Missing from catalog — create the price via `create_price` with this external_id.";
 }
 

@@ -302,3 +302,29 @@ test("parseVerifierReport returns empty parsed for non-object input", () => {
   assert.equal(parseVerifierReport({}).summary, null);
 });
 
+
+test("coverage_gap remedy tells operators to widen the allowlist, not create a price", () => {
+  // The price EXISTS and is active; the app just doesn't know it is sellable.
+  // Falling through to "Missing from catalog — create the price" sends an
+  // operator to create a duplicate of the price they are looking at.
+  const comment = renderComment({
+    verdict: { level: "fail", kind: "catalog_or_crash", shouldFail: true },
+    parsed: {
+      rows: [
+        {
+          env: "live",
+          externalId: "credit_pack_500",
+          status: "fail",
+          detail: "active in catalog but not in REQUIRED_PLAN_IDS",
+          cause: { kind: "coverage_gap" },
+        },
+      ],
+      summary: { pass: 0, fail: 1, skip: 0 },
+      keyUnsetMentioned: false,
+    },
+    runUrl: "https://example.test/run",
+    artifactHint: "log",
+  });
+  assert.match(comment, /add this external_id to/i);
+  assert.doesNotMatch(comment, /create the price via/i);
+});

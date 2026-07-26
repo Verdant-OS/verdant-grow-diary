@@ -132,6 +132,7 @@
     "verify:paddle-craft-catalog": "bun run scripts/verify-paddle-craft-catalog.ts --env both",
     "verify:paddle-craft-catalog:sandbox": "bun run scripts/verify-paddle-craft-catalog.ts --env sandbox",
     "test:paddle-craft-preflight-renderer": "node --test scripts/render-paddle-craft-preflight-comment.test.mjs",
+    "test:paddle-craft-preflight-report": "node --test scripts/verify-paddle-craft-catalog.report.test.mjs",
     "docs:assert-premium-workbook-access": "node scripts/assert-premium-workbook-access-docs.mjs",
     "docs:assert-release-traceability": "node scripts/assert-release-traceability-mapping.mjs",
     "docs:generate-release-workbook-templates": "node scripts/generate-release-workbook-templates.mjs",

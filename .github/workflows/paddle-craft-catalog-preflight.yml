@@ -72,7 +72,9 @@ jobs:
       # logic was shipping unguarded. Runs before the verifier so a renderer
       # regression fails fast and without needing Paddle credentials.
       - name: Renderer unit tests
-        run: bun run test:paddle-craft-preflight-renderer
+        run: |
+          bun run test:paddle-craft-preflight-renderer
+          bun run test:paddle-craft-preflight-report
 
       - name: Run verifier
         id: run

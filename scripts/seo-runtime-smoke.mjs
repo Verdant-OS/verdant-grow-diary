@@ -15,7 +15,7 @@ const ROUTES = [
   },
   {
     path: "/pricing",
-    expectTitle: /Pricing — Free, Pro & Founder Lifetime/,
+    expectTitle: /Pricing — Free, Pro & Craft/,
     canonical: `${ORIGIN}/pricing`,
   },
   {

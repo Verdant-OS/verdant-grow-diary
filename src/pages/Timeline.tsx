@@ -29,8 +29,10 @@ import ActionResponseMemoryCard from "@/components/ActionResponseMemoryCard";
 import { Button } from "@/components/ui/button";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import {
+  SENSOR_PLANT_PARAM,
   SENSOR_SOURCES_PARAM,
   encodeSensorSourcesParam,
+  parseTimelinePlantIdParam,
   parseSensorSourcesParam,
   sensorSourcesEqual,
 } from "@/lib/sensorSourceUrlRules";
@@ -295,6 +297,7 @@ export default function Timeline() {
   const ownerId = user;
 
   const { pathname, hash } = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   // Shared URL `?growId=` resolution. urlGrowId is preserved as the source of truth
   // for filter precedence; scopedGrowName/backHref come from the same hook.
   const {
@@ -345,19 +348,18 @@ export default function Timeline() {
   const [eventFilter, setEventFilter] = useState<EventFilter>("all");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [plantFilter, setPlantFilter] = useState("");
+  const plantFilter = parseTimelinePlantIdParam(searchParams.get(SENSOR_PLANT_PARAM)) ?? "";
   const [tentFilter, setTentFilter] = useState("");
-  // Seed plant/tent filters from URL on mount so deep links from Quick
-  // Log → /timeline?growId=&plantId=&tentId= land on the right scope.
-  // One-shot seed; later user edits remain authoritative.
-  const [didSeedScopeFilters, setDidSeedScopeFilters] = useState(false);
+  // Tent remains a one-shot continuity seed. Plant scope is canonical URL
+  // state and is mirrored below so source-summary links, filter edits, and
+  // clear actions stay in sync.
+  const [didSeedTentFilter, setDidSeedTentFilter] = useState(false);
   const [eventTypeFilter, setEventTypeFilter] = useState("");
   const [lightboxPhotoId, setLightboxPhotoId] = useState<string | null>(null);
   const [detailEntryId, setDetailEntryId] = useState<string | null>(null);
   // Source filter state is mirrored to/from the `?sensorSources=` URL
   // query param so the Sensors page summary widget can link directly into
   // a pre-filtered Timeline without introducing app-wide global state.
-  const [searchParams, setSearchParams] = useSearchParams();
   // Read-only diary-trace highlight from ?highlight=action-queue:<id>:<kind>.
   // Pure parse; never alters sorting or fetches.
   const highlight = useMemo(
@@ -375,6 +377,18 @@ export default function Timeline() {
   const [sensorSourceFilter, setSensorSourceFilter] = useState<TimelineSensorSourceKind[]>(() =>
     parseSensorSourcesParam(searchParams.get(SENSOR_SOURCES_PARAM)),
   );
+
+  // Plant scope has one canonical source: the URL. Filter edits replace
+  // only `plantId`, preserving source/date/grow and unrelated params.
+  // The opaque id is applied only to owner/grow-scoped rows, and an
+  // unknown id fails closed instead of selecting a different plant.
+  function setPlantFilter(value: string) {
+    const next = new URLSearchParams(searchParams);
+    const encoded = parseTimelinePlantIdParam(value);
+    if (encoded) next.set(SENSOR_PLANT_PARAM, encoded);
+    else next.delete(SENSOR_PLANT_PARAM);
+    setSearchParams(next, { replace: true });
+  }
 
   // Pull URL → state when the param changes externally (e.g. via Link).
   useEffect(() => {
@@ -450,15 +464,13 @@ export default function Timeline() {
   const activeReadKeyRef = useRef(activeReadKey);
   activeReadKeyRef.current = activeReadKey;
 
-  // One-shot seed of plant/tent filters from URL params written by the
-  // Quick Log → Timeline continuity link. Never overwrites later edits.
+  // One-shot seed of tent filter from URL params written by the Quick
+  // Log → Timeline continuity link. Plant is canonical URL state above.
   useEffect(() => {
-    if (didSeedScopeFilters) return;
-    const seededPlant = searchParams.get("plantId");
+    if (didSeedTentFilter) return;
     const seededTent = searchParams.get("tentId");
-    if (seededPlant && !plantFilter) setPlantFilter(seededPlant);
     if (seededTent && !tentFilter) setTentFilter(seededTent);
-    if (seededPlant || seededTent) setDidSeedScopeFilters(true);
+    if (seededTent) setDidSeedTentFilter(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 

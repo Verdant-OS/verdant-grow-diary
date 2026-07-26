@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const harness = vi.hoisted(() => ({
@@ -232,7 +232,27 @@ function renderTimeline(route = "/timeline") {
   return render(
     <MemoryRouter initialEntries={[route]}>
       <Timeline />
+      <LocationProbe />
     </MemoryRouter>,
+  );
+}
+
+function LocationProbe() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  return (
+    <>
+      <output data-testid="timeline-location-search">{location.search}</output>
+      <button
+        type="button"
+        data-testid="timeline-external-plant-navigation"
+        onClick={() =>
+          navigate("/timeline?sensorSources=csv&plantId=plant-a&from=2026-07-01&to=2026-07-31")
+        }
+      >
+        Navigate to Plant A
+      </button>
+    </>
   );
 }
 
@@ -411,6 +431,117 @@ describe("Timeline mounted read-state boundary", () => {
       "1 stage-tagged log",
     );
     expect(screen.getByTestId("timeline-one-tent-loop-next-step-card")).toBeInTheDocument();
+  });
+
+  it("applies and canonicalizes plantId with source/date params without cross-plant bleed", async () => {
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries") {
+        return {
+          data: [
+            {
+              ...diaryEntry("plant-a-csv", "Plant A CSV reading"),
+              plant_id: "plant-a",
+              details: {
+                event_type: "sensor_snapshot",
+                plant_name: "Plant A",
+                sensor_snapshot: { source: "csv" },
+              },
+            },
+            {
+              ...diaryEntry("plant-b-csv", "Plant B CSV reading"),
+              plant_id: "plant-b",
+              details: {
+                event_type: "sensor_snapshot",
+                plant_name: "Plant B",
+                sensor_snapshot: { source: "csv" },
+              },
+            },
+          ],
+          error: null,
+          count: 2,
+        };
+      }
+      return defaultResult(spec);
+    });
+
+    renderTimeline("/timeline?sensorSources=csv&plantId=plant-a&from=2026-07-01&to=2026-07-31");
+
+    expect(await screen.findByText("Plant A CSV reading")).toBeInTheDocument();
+    expect(screen.queryByText("Plant B CSV reading")).not.toBeInTheDocument();
+    expect(screen.getByTestId("timeline-results-count")).toHaveTextContent(
+      "Detailed diary: showing 1 of 2 entries",
+    );
+
+    fireEvent.change(screen.getByTestId("timeline-plant-filter"), {
+      target: { value: "plant-b" },
+    });
+
+    expect(await screen.findByText("Plant B CSV reading")).toBeInTheDocument();
+    expect(screen.queryByText("Plant A CSV reading")).not.toBeInTheDocument();
+    await waitFor(() => {
+      const params = new URLSearchParams(
+        screen.getByTestId("timeline-location-search").textContent ?? "",
+      );
+      expect(params.get("plantId")).toBe("plant-b");
+      expect(params.get("sensorSources")).toBe("csv");
+      expect(params.get("from")).toBe("2026-07-01");
+      expect(params.get("to")).toBe("2026-07-31");
+    });
+
+    fireEvent.click(screen.getByTestId("timeline-external-plant-navigation"));
+    expect(await screen.findByText("Plant A CSV reading")).toBeInTheDocument();
+    expect(screen.queryByText("Plant B CSV reading")).not.toBeInTheDocument();
+    await waitFor(() => {
+      const params = new URLSearchParams(
+        screen.getByTestId("timeline-location-search").textContent ?? "",
+      );
+      expect(params.get("plantId")).toBe("plant-a");
+      expect(params.get("sensorSources")).toBe("csv");
+      expect(params.get("from")).toBe("2026-07-01");
+      expect(params.get("to")).toBe("2026-07-31");
+    });
+  });
+
+  it("fails closed for an unknown plantId and treats a missing plantId as unscoped", async () => {
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries") {
+        return {
+          data: [
+            {
+              ...diaryEntry("plant-a-csv", "Plant A CSV reading"),
+              plant_id: "plant-a",
+              details: {
+                event_type: "sensor_snapshot",
+                plant_name: "Plant A",
+                sensor_snapshot: { source: "csv" },
+              },
+            },
+            {
+              ...diaryEntry("plant-b-csv", "Plant B CSV reading"),
+              plant_id: "plant-b",
+              details: {
+                event_type: "sensor_snapshot",
+                plant_name: "Plant B",
+                sensor_snapshot: { source: "csv" },
+              },
+            },
+          ],
+          error: null,
+          count: 2,
+        };
+      }
+      return defaultResult(spec);
+    });
+
+    const view = renderTimeline("/timeline?sensorSources=csv&plantId=unknown-plant");
+    expect(await screen.findByText("No matches")).toBeInTheDocument();
+    expect(screen.queryByText("Plant A CSV reading")).not.toBeInTheDocument();
+    expect(screen.queryByText("Plant B CSV reading")).not.toBeInTheDocument();
+
+    view.unmount();
+    renderTimeline("/timeline?sensorSources=csv");
+    expect(await screen.findByText("Plant A CSV reading")).toBeInTheDocument();
+    expect(screen.getByText("Plant B CSV reading")).toBeInTheDocument();
   });
 
   it("unlocks the Sensors continuation for V2 grow-event-only evidence", async () => {

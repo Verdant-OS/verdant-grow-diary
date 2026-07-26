@@ -93,6 +93,7 @@ function baseState(overrides: Partial<UsePhenoHuntWorkspaceState>): UsePhenoHunt
     loadMoreError: null,
     hasMore: false,
     loadNextPage: loadNextPageMock,
+    reload: vi.fn(),
     filters: {},
     setFilter: vi.fn(),
     resetFilters: vi.fn(),

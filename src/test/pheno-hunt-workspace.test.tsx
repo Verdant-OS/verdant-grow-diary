@@ -49,6 +49,7 @@ function renderAt(state: Partial<UsePhenoHuntWorkspaceState>) {
     loadMoreError: null,
     hasMore: false,
     loadNextPage: state.loadNextPage ?? vi.fn(),
+    reload: state.reload ?? vi.fn(),
     filters: {},
     setFilter: state.setFilter ?? vi.fn(),
     resetFilters: state.resetFilters ?? vi.fn(),

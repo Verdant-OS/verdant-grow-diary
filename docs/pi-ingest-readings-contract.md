@@ -1,15 +1,20 @@
-# pi-ingest-readings — Edge Function Contract (DOCS ONLY)
+# pi-ingest-readings — Edge Function Contract
 
-**Status:** Contract + static guardrail tests only. **No implementation yet.**
-This document defines the future Supabase Edge Function named
-`pi-ingest-readings`. The function does **not** exist in this commit and
-must not be created in this task.
+**Repository status:** Implemented and covered by static, unit, and deployed-smoke
+test harnesses. The handler lives at
+`supabase/functions/pi-ingest-readings/index.ts`; its server-only credential
+lookup, AES-GCM secret resolver, HMAC verification, ownership checks,
+idempotency lookup, and atomic commit helpers live beside it. Database support
+is defined by the versioned `pi_ingest_*` migrations.
 
-This is a **docs/tests only** scope. No Edge Function code, no service_role
-usage, no schema changes, no UI changes, no Home Assistant / MQTT / Pi
-bridge implementation, no automation, no device control, no alert
-persistence changes, no Action Queue changes, no AI Doctor changes, and
-no PPFD / soil EC / reservoir expansion are introduced here.
+**Deployment status:** Repository presence does not prove that a particular
+Supabase project is running this revision. Confirm migration history, function
+revision, required secret names, and the deployed smoke test before calling the
+endpoint production-ready.
+
+The implementation remains ingestion-only: no automation, device control,
+direct alert persistence, Action Queue writes, AI Doctor writes, or unsupported
+PPFD / soil EC / reservoir expansion belongs in this endpoint.
 
 ---
 
@@ -64,8 +69,8 @@ No new source enum values are introduced.
   "source": "pi_bridge",
   "readings": [
     { "metric": "temperature_c", "value": 24.2, "unit": "c" },
-    { "metric": "humidity_pct",  "value": 58,   "unit": "%" },
-    { "metric": "vpd_kpa",       "value": 1.18, "unit": "kpa" }
+    { "metric": "humidity_pct", "value": 58, "unit": "%" },
+    { "metric": "vpd_kpa", "value": 1.18, "unit": "kpa" }
   ],
   "raw": {}
 }
@@ -146,7 +151,7 @@ until the V0 safety contract is expanded with separate schema work):
 
 ## 7. Auth / security expectations
 
-Future implementation requirements (do not implement in this task):
+Implementation requirements:
 
 - **No unauthenticated writes.** The endpoint must verify the caller
   before any write.
@@ -154,14 +159,16 @@ Future implementation requirements (do not implement in this task):
   ship to the browser bundle.
 - **No public anonymous insert endpoint.** Anonymous callers receive
   401 and zero rows are inserted.
-- Future auth should use a **signed bridge token or HMAC** scheme.
-- `service_role` may **only** be used **inside the Edge Function**
-  **after** the bridge token has been verified. It is never exposed to
-  the client and never used before verification.
+- Auth uses a **timestamped HMAC signature** tied to a server-resolved bridge
+  credential.
+- `service_role` may **only** be used **inside the Edge Function**. Before
+  HMAC verification it is limited to the minimum encrypted-credential lookup
+  needed to verify the signature. Ownership/idempotency reads and every write
+  occur only after verification. The key is never exposed to the client.
 - Failed auth returns **401 and inserts zero rows**.
 - Invalid payload returns **400 and inserts zero rows**.
-- Rate limiting and device-level abuse guards MUST be considered
-  before production rollout.
+- Rate limiting and device-level abuse guards remain required production
+  rollout checks.
 
 ---
 
@@ -200,7 +207,9 @@ Any of the following blocks shipping the endpoint:
 
 - Endpoint writes without verified auth.
 - Endpoint accepts a client-provided `user_id`.
-- Endpoint uses `service_role` before verifying the bridge token.
+- Endpoint performs a `service_role` write before HMAC verification, or uses
+  it pre-verification for anything beyond the minimum encrypted-credential
+  lookup.
 - Endpoint writes to anything except `sensor_readings`.
 - Endpoint creates alerts or `action_queue` rows directly.
 - Endpoint accepts unsupported metrics.
@@ -211,16 +220,18 @@ Any of the following blocks shipping the endpoint:
 
 ---
 
-## 11. Future implementation checklist
+## 11. Implementation and rollout checklist
 
-Tracked for future build prompts. Do not implement here.
-
-- [ ] Implement the Edge Function `pi-ingest-readings`.
-- [ ] Add HMAC / token verification.
-- [ ] Add a device / bridge registration model.
-- [ ] Add an idempotency strategy (e.g. `(device_id, captured_at, metric)`).
-- [ ] Add a rate-limit strategy.
-- [ ] Add RLS / ownership tests.
+- [x] Implement the Edge Function `pi-ingest-readings`.
+- [x] Add timestamped HMAC verification.
+- [x] Add the encrypted bridge credential model.
+- [x] Add atomic idempotency storage and commit behavior.
+- [ ] Verify the rate-limit and device-abuse strategy in the target deployment.
+- [x] Add static, unit, ownership, and RLS-oriented guardrail tests.
+- [ ] Verify all required migrations and function revisions in the target
+      Supabase project.
+- [ ] Run the deployed smoke harness against a disposable bridge credential and
+      tent.
 - [ ] Add a local Pi client example.
 - [ ] Add Home Assistant / MQTT adapters later (separate scope).
 
@@ -229,8 +240,8 @@ Tracked for future build prompts. Do not implement here.
 ## 12. Bridge secret resolution strategy (audit finding)
 
 This section captures the result of the bridge credential secret-model
-audit. It governs how the future resolver and Edge Function must handle
-bridge HMAC secrets.
+audit. It governs how the resolver and Edge Function handle bridge HMAC
+secrets.
 
 ### 12.1 Finding
 
@@ -244,7 +255,7 @@ Therefore:
 
 - **`secret_hash` alone cannot verify a standard HMAC signature.** A
   one-way hash of the secret is not usable as the HMAC key without
-  redefining the protocol so that the hash *is* the shared secret —
+  redefining the protocol so that the hash _is_ the shared secret —
   which would make the stored hash functionally equivalent to plaintext
   secret material.
 - **A resolver must not map `secret_hash` to `BridgeCredential.secret`.**
@@ -267,12 +278,12 @@ Therefore:
 6. A resolver must not pass `secret_hash` as `secret` on
    `BridgeCredential` unless the column is explicitly redefined as
    sensitive secret material (renamed and documented as such).
-7. The Edge Function implementation is **blocked** until the secret
-   resolution strategy is finalized and implemented.
+7. The Edge Function must fail closed unless the encrypted-secret resolution
+   strategy is configured and succeeds.
 
 ### 12.3 Strategy options
 
-**Option A — Encrypted shared secret (recommended).**
+**Option A — Encrypted shared secret (implemented).**
 Store `secret_ciphertext` in the database, encrypted with a
 server-only environment key held by the Edge Function runtime. The
 Edge Function decrypts at verification time and uses the plaintext
@@ -293,6 +304,6 @@ option.
 ### 12.4 Preferred direction
 
 - Do **not** use `secret_hash` as `BridgeCredential.secret`.
-- The future resolver must not map `secret_hash` to raw `secret`.
-- The future endpoint must only verify HMAC after resolving usable
+- The resolver must not map `secret_hash` to raw `secret`.
+- The endpoint must only verify HMAC after resolving usable
   secret material through a server-only mechanism (Option A or B).

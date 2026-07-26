@@ -49,10 +49,10 @@ describe("CreatorBeta · content + a11y", () => {
     expect(h1s[0]).toHaveTextContent(/show the evidence behind the grow/i);
   });
 
-  it("renders section H2s including Watch demo walkthrough", async () => {
+  it("renders section H2s including the written demo walkthrough", async () => {
     await renderPage();
     expect(
-      screen.getByRole("heading", { level: 2, name: /watch demo walkthrough/i }),
+      screen.getByRole("heading", { level: 2, name: /read demo walkthrough/i }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("heading", { level: 2, name: /what verdant does not do/i }),
@@ -94,11 +94,15 @@ describe("CreatorBeta · content + a11y", () => {
     await renderPage();
     const cta = screen.getByTestId("creator-beta-cta-secondary");
     expect(cta).toHaveAttribute("href", "#watch-demo");
-    expect(cta).toHaveAccessibleName(/demo walkthrough/i);
+    expect(cta).toHaveAccessibleName(/written demo walkthrough/i);
     expect(screen.getByTestId("creator-beta-walkthrough")).toHaveAttribute("id", "watch-demo");
     expect(
       screen.getByTestId("creator-beta-walkthrough-steps").querySelectorAll("li"),
     ).toHaveLength(4);
+    expect(screen.getByTestId("creator-beta-walkthrough")).toHaveTextContent(
+      /not a video or a live grow/i,
+    );
+    expect(screen.queryByText(/watch demo walkthrough/i)).not.toBeInTheDocument();
   });
 });
 

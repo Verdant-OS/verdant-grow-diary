@@ -80,10 +80,14 @@ describe("BreederBeta · content + a11y", () => {
   it("walkthrough section is present and anchored", async () => {
     await renderPage();
     expect(
-      screen.getByRole("heading", { level: 2, name: /watch demo walkthrough/i }),
+      screen.getByRole("heading", { level: 2, name: /read demo walkthrough/i }),
     ).toBeInTheDocument();
     expect(screen.getByTestId("breeder-beta-walkthrough")).toHaveAttribute("id", "watch-demo");
     expect(screen.getByTestId("breeder-beta-cta-secondary")).toHaveAttribute("href", "#watch-demo");
+    expect(screen.getByTestId("breeder-beta-walkthrough")).toHaveTextContent(
+      /not a video or a live grow/i,
+    );
+    expect(screen.queryByText(/watch demo walkthrough/i)).not.toBeInTheDocument();
   });
 
   it("primary CTA falls back to Verdant's working contact form when URL is missing", async () => {

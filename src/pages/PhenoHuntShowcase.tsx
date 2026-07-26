@@ -1,10 +1,10 @@
 /**
  * PhenoHuntShowcase — LIVE, read-only walk of the grower's OWN hunt through the
  * same surfaces as the /internal demo: pack → contenders → fight → cure → family
- * tree. Reads via RLS-scoped SELECT (usePhenoHuntView); no session / no hunt id /
- * still loading falls back to the labeled demo, so the page is never blank and
- * never fabricates. A specific hunt id that resolves to nothing renders the
- * explicit not-found notice instead — demo sections never impersonate it.
+ * tree. Reads via RLS-scoped SELECT (usePhenoHuntView); no session / no hunt id
+ * uses the labeled demo. A requested live hunt renders no fixture rows while
+ * loading, exposes retry when reads are unavailable, and shows not-found only
+ * after successful empty reads.
  *
  * Read-only: no writes, no AI, no automation. Mounted outside AppShell (like the
  * per-hunt comparison) so the read surface renders without operator chrome.
@@ -13,6 +13,7 @@ import { useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
 import PageHeader from "@/components/PageHeader";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import PhenoComparabilityBanner from "@/components/PhenoComparabilityBanner";
 import { normalizePlantType, plantTypeBadgeLabel } from "@/lib/plantTypeRules";
@@ -133,7 +134,7 @@ function LivePackCard({ c, ranked }: { c: ContenderInput; ranked: boolean }) {
 
 export default function PhenoHuntShowcase() {
   const { id } = useParams<{ id: string }>();
-  const { status, source, meta, data, cloneRowsByKeeperId } = usePhenoHuntView(id);
+  const { status, source, meta, data, cloneRowsByKeeperId, retry } = usePhenoHuntView(id);
 
   const board = useMemo(() => buildContenders(data.contenders), [data.contenders]);
   const pedigree = useMemo(
@@ -152,6 +153,57 @@ export default function PhenoHuntShowcase() {
     : [];
 
   const isDemo = source === "demo";
+
+  if (status === "loading") {
+    return (
+      <main
+        data-testid="pheno-hunt-showcase-page"
+        className="container mx-auto max-w-5xl px-4 py-6"
+      >
+        <PageHeader
+          title="Pheno Hunt"
+          description="A read-only walk of your hunt: triage, compare, decide, and trace lineage — you make every call."
+        />
+        <p
+          data-testid="pheno-hunt-showcase-source"
+          role="status"
+          className="mb-5 rounded-md border border-border/60 bg-secondary/40 px-3 py-2 text-xs text-muted-foreground"
+        >
+          Loading your hunt…
+        </p>
+      </main>
+    );
+  }
+
+  if (status === "unavailable") {
+    return (
+      <main
+        data-testid="pheno-hunt-showcase-page"
+        className="container mx-auto max-w-5xl px-4 py-6"
+      >
+        <PageHeader
+          title="Pheno Hunt"
+          description="A read-only walk of your hunt: triage, compare, decide, and trace lineage — you make every call."
+        />
+        <div
+          data-testid="pheno-hunt-showcase-source"
+          role="alert"
+          className="mb-5 space-y-3 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-3 text-sm text-amber-700 dark:text-amber-300"
+        >
+          <p>This hunt is temporarily unavailable. Try loading it again.</p>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={retry}
+            data-testid="pheno-hunt-showcase-retry"
+          >
+            Try again
+          </Button>
+        </div>
+      </main>
+    );
+  }
 
   // A signed-in grower pointed at a specific hunt that resolved to nothing:
   // say so plainly and render NO sections — sample data must never stand in
@@ -200,11 +252,9 @@ export default function PhenoHuntShowcase() {
             : "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
         )}
       >
-        {status === "loading"
-          ? "Loading your hunt…"
-          : isDemo
-            ? `Demo — ${meta.name}. Sample data; open one of your own hunts to see it live.`
-            : `Live — ${meta.name}${meta.packSize ? ` · ${meta.packSize} candidates` : ""}.`}
+        {isDemo
+          ? `Demo — ${meta.name}. Sample data; open one of your own hunts to see it live.`
+          : `Live — ${meta.name}${meta.packSize ? ` · ${meta.packSize} candidates` : ""}.`}
       </p>
 
       {pack.length > 0 && (

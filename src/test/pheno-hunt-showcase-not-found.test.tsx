@@ -2,28 +2,33 @@
  * pheno-hunt-showcase-not-found.test — the live showcase must never dress a
  * missing hunt in demo data.
  *
- * Three states, three behaviors:
+ * Five states, five behaviors:
  *  - signed-in + hunt id + workspace settled with zero candidates → explicit
  *    not-found notice (source "not_found"), NO demo sections beneath;
+ *  - signed-in + hunt id + either read failed → retryable unavailable notice,
+ *    never not-found and never demo;
  *  - signed-in + hunt id + reads still in flight → loading, never a premature
- *    not-found (and never a premature "Demo" verdict);
+ *    not-found verdict or demo fixture rows;
+ *  - requested hunt + auth still resolving → the same empty loading shell,
+ *    never a public-demo flash before the session hydrates;
  *  - signed out → the labeled demo, unchanged.
  *
  * usePhenoHuntWorkspace / usePhenoKeepers / auth are mocked the same way the
  * other showcase-adjacent suites mock their read hooks — no Supabase.
  */
 import { afterEach, describe, it, expect, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 const harness = vi.hoisted(() => ({
   user: null as { id: string } | null,
+  authLoading: false,
   ws: {} as Record<string, unknown>,
   kp: {} as Record<string, unknown>,
 }));
 
 vi.mock("@/store/auth", () => ({
-  useAuth: () => ({ user: harness.user, session: null, loading: false }),
+  useAuth: () => ({ user: harness.user, session: null, loading: harness.authLoading }),
 }));
 
 vi.mock("@/hooks/usePhenoHuntWorkspace", () => ({
@@ -49,6 +54,7 @@ function wsState(over: Record<string, unknown> = {}) {
     roundsByKey: {},
     roundLoadStates: {},
     loadRound: vi.fn(),
+    reload: vi.fn(),
     ...over,
   };
 }
@@ -63,6 +69,7 @@ function kpState(over: Record<string, unknown> = {}) {
     reversals: [],
     clonesByKeeper: {},
     crosses: [],
+    reload: vi.fn(),
     ...over,
   };
 }
@@ -80,6 +87,7 @@ function renderShowcase() {
 afterEach(() => {
   cleanup();
   harness.user = null;
+  harness.authLoading = false;
   harness.ws = {};
   harness.kp = {};
 });
@@ -108,20 +116,29 @@ describe("PhenoHuntShowcase — missing hunt is never demo", () => {
     expect(screen.queryByTestId("pheno-family-tree")).not.toBeInTheDocument();
   });
 
-  it("signed-in + hunt id + workspace error (e.g. no pheno_hunts row) → not-found, not demo", () => {
+  it("signed-in + hunt id + read failure → unavailable with retry, not not-found or demo", () => {
     harness.user = { id: "grower-1" };
-    harness.ws = wsState({ status: "error" });
-    harness.kp = kpState({ status: "error" });
+    const reloadWorkspace = vi.fn();
+    const reloadKeepers = vi.fn();
+    harness.ws = wsState({ status: "error", reload: reloadWorkspace });
+    harness.kp = kpState({ reload: reloadKeepers });
     renderShowcase();
 
-    expect(screen.getByTestId("pheno-hunt-showcase-source").textContent).toMatch(
-      /not found or has no candidates/i,
+    expect(screen.getByTestId("pheno-hunt-showcase-source")).toHaveTextContent(
+      /temporarily unavailable/i,
     );
+    expect(screen.queryByTestId("pheno-hunt-showcase-not-found-link")).not.toBeInTheDocument();
     expect(screen.queryByTestId("pheno-hunt-showcase-pack")).not.toBeInTheDocument();
     expect(screen.queryByTestId("pheno-fight")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("pheno-contenders")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("pheno-family-tree")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("pheno-hunt-showcase-retry"));
+    expect(reloadWorkspace).toHaveBeenCalledTimes(1);
+    expect(reloadKeepers).toHaveBeenCalledTimes(1);
   });
 
-  it("signed-in + hunt id + reads in flight → loading, no premature not-found", () => {
+  it("signed-in + hunt id + reads in flight → loading with no demo fixture leak", () => {
     harness.user = { id: "grower-1" };
     harness.ws = wsState({ status: "loading" });
     harness.kp = kpState({ status: "loading" });
@@ -130,6 +147,10 @@ describe("PhenoHuntShowcase — missing hunt is never demo", () => {
     const banner = screen.getByTestId("pheno-hunt-showcase-source");
     expect(banner.textContent).toMatch(/loading your hunt/i);
     expect(banner.textContent).not.toMatch(/not found/i);
+    expect(screen.queryByTestId("pheno-hunt-showcase-pack")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("pheno-fight")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("pheno-contenders")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("pheno-family-tree")).not.toBeInTheDocument();
   });
 
   it("signed-in + hunt id + pre-effect mount (both hooks idle) still counts as loading", () => {
@@ -143,6 +164,21 @@ describe("PhenoHuntShowcase — missing hunt is never demo", () => {
     const banner = screen.getByTestId("pheno-hunt-showcase-source");
     expect(banner.textContent).toMatch(/loading your hunt/i);
     expect(banner.textContent).not.toMatch(/not found/i);
+  });
+
+  it("hunt id + auth still resolving → loading with no public demo flash", () => {
+    harness.authLoading = true;
+    harness.ws = wsState({ status: "idle" });
+    harness.kp = kpState({ status: "idle" });
+    renderShowcase();
+
+    expect(screen.getByTestId("pheno-hunt-showcase-source")).toHaveTextContent(
+      /loading your hunt/i,
+    );
+    expect(screen.queryByTestId("pheno-hunt-showcase-pack")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("pheno-fight")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("pheno-contenders")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("pheno-family-tree")).not.toBeInTheDocument();
   });
 
   it("signed out → the labeled demo, unchanged", () => {

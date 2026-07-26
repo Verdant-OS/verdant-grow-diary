@@ -68,16 +68,21 @@ describe("buildPlantSensorSourceReadings", () => {
 
 describe("PlantSensorSourceBreakdownCard", () => {
   it("renders counts per canonical source using diary rows", () => {
-    render(
-      withProviders(
-        <PlantSensorSourceBreakdownCard plantId="p1" rows={ROWS_PLANT_A} />,
-      ),
-    );
+    render(withProviders(<PlantSensorSourceBreakdownCard plantId="p1" rows={ROWS_PLANT_A} />));
     expect(screen.getByTestId("plant-sensor-source-breakdown")).toBeInTheDocument();
     expect(screen.getByTestId("sensor-source-summary-count-live")).toHaveTextContent("1");
     expect(screen.getByTestId("sensor-source-summary-count-csv")).toHaveTextContent("1");
     expect(screen.getByTestId("sensor-source-summary-count-manual")).toHaveTextContent("1");
     expect(screen.getByTestId("sensor-source-summary-count-invalid")).toHaveTextContent("1");
+  });
+
+  it("threads the real plant id through each source Timeline link", () => {
+    render(
+      withProviders(<PlantSensorSourceBreakdownCard plantId="plant a/1" rows={ROWS_PLANT_A} />),
+    );
+
+    const href = screen.getByTestId("sensor-source-summary-link-live").getAttribute("href");
+    expect(href).toBe("/timeline?sensorSources=live&plantId=plant+a%2F1");
   });
 
   it("does not count rows the caller did not supply (plant isolation)", () => {
@@ -106,19 +111,15 @@ describe("PlantSensorSourceBreakdownCard", () => {
       withProviders(
         <PlantSensorSourceBreakdownCard
           plantId="p1"
-          rows={[
-            { entry_at: "2026-06-10T12:00:00Z", details: { event_type: "note" } },
-          ]}
+          rows={[{ entry_at: "2026-06-10T12:00:00Z", details: { event_type: "note" } }]}
         />,
       ),
     );
-    expect(
-      screen.getByTestId("plant-sensor-source-breakdown-empty"),
-    ).toHaveTextContent(/no sensor readings found for this plant/i);
+    expect(screen.getByTestId("plant-sensor-source-breakdown-empty")).toHaveTextContent(
+      /no sensor readings found for this plant/i,
+    );
     // The legend is still rendered so growers can learn what each source means.
-    expect(
-      screen.getByTestId("plant-sensor-source-breakdown-legend"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("plant-sensor-source-breakdown-legend")).toBeInTheDocument();
   });
 
   it("classifies unknown source as invalid (never live)", () => {
@@ -140,9 +141,7 @@ describe("PlantSensorSourceBreakdownCard", () => {
   });
 
   it("returns null when no plantId is provided", () => {
-    const { container } = render(
-      withProviders(<PlantSensorSourceBreakdownCard plantId={null} />),
-    );
+    const { container } = render(withProviders(<PlantSensorSourceBreakdownCard plantId={null} />));
     expect(container.querySelector('[data-testid="plant-sensor-source-breakdown"]')).toBeNull();
   });
 });

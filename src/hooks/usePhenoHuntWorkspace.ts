@@ -100,6 +100,8 @@ export interface UsePhenoHuntWorkspaceState {
   hasMore: boolean;
   /** Load the next bounded page (append). No-op while one is in flight. */
   loadNextPage: () => void;
+  /** Retry the initial bounded hunt read without changing hunt or filters. */
+  reload: () => void;
   /** Active server-side filters. */
   filters: PhenoWorkspaceFilters;
   /** Patch the filters; resets pagination to page 0 with stale-response guard. */
@@ -220,6 +222,7 @@ export function usePhenoHuntWorkspace(
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
   const [filters, setFiltersState] = useState<PhenoWorkspaceFilters>({});
+  const [reloadTick, setReloadTick] = useState(0);
   const [comparisonSummary, setComparisonSummary] = useState<PhenoHuntComparisonSummary | null>(
     null,
   );
@@ -343,7 +346,9 @@ export function usePhenoHuntWorkspace(
     return () => {
       cancelled = true;
     };
-  }, [id, filters]);
+  }, [id, filters, reloadTick]);
+
+  const reload = useCallback(() => setReloadTick((tick) => tick + 1), []);
 
   const hasMore =
     status === "ok" && totalCandidateCount != null && candidates.length < totalCandidateCount;
@@ -694,6 +699,7 @@ export function usePhenoHuntWorkspace(
     loadMoreError,
     hasMore,
     loadNextPage,
+    reload,
     filters,
     setFilter,
     resetFilters,

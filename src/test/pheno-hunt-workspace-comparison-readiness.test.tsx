@@ -100,6 +100,7 @@ function mountAt(input: ScenarioInput) {
     loadMoreError: null,
     hasMore: false,
     loadNextPage: vi.fn(),
+    reload: vi.fn(),
     filters: {},
     setFilter: vi.fn(),
     resetFilters: vi.fn(),

@@ -2641,12 +2641,22 @@ cause (missing / inactive / API error) and picks the remedy accordingly.
 
 ### Extending the allowlist
 
-> ⚠️ Adding a plan to `src/lib/paidPlanAllowlist.ts` does **not** extend
-> this check. `REQUIRED_PLAN_IDS` in
-> `scripts/verify-paddle-craft-catalog.ts` filters to the Craft ids, so
-> a newly sellable plan would be silently uncovered while the preflight
-> still reports green. Widen `REQUIRED_PLAN_IDS` in the same change that
-> introduces the new plan.
+`REQUIRED_PLAN_IDS` in `scripts/verify-paddle-craft-catalog.ts` is derived
+from `PAID_PLAN_IDS` by external-id **prefix**
+(`GUARDED_EXTERNAL_ID_PREFIXES`, currently `craft_` and `credit_pack_`), so
+a new `craft_*` or `credit_pack_*` SKU added to the allowlist is required by
+this preflight automatically — there is no second list to remember.
+
+> ⚠️ A new plan on a **different** prefix (say `studio_monthly`) is still
+> silently uncovered: it matches no guarded prefix, so the preflight would
+> neither require it nor flag it as a coverage gap, and would keep
+> reporting green while that plan's Paddle price went unverified. Add the
+> prefix to `GUARDED_EXTERNAL_ID_PREFIXES` in the same change that
+> introduces the plan.
+
+The script exits `2` if the prefixes ever match nothing in `PAID_PLAN_IDS`
+— a preflight that verifies zero ids reports green forever, which is worse
+than not having one.
 
 **If the new id is a one-time credit pack, also add it to
 `CREDIT_PACK_IDS`** in the same file. `PAID_PLAN_IDS` is the full

@@ -8,7 +8,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, act, cleanup } from "@testing-library/react";
 import { useState } from "react";
-import { usePlantProfilePhotoPreview, type PlantProfilePhotoDecodeProbe } from "@/hooks/usePlantProfilePhotoPreview";
+import {
+  usePlantProfilePhotoPreview,
+  type PlantProfilePhotoDecodeProbe,
+} from "@/hooks/usePlantProfilePhotoPreview";
 import PlantProfilePhotoPreview from "@/components/PlantProfilePhotoPreview";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -62,7 +65,11 @@ interface HarnessProps {
   onReplace?: () => void;
   onRemove?: () => void;
 }
-function Harness(props: HarnessProps & { register?: (setFile: (f: File | null, m: string | null) => void) => void }) {
+function Harness(
+  props: HarnessProps & {
+    register?: (setFile: (f: File | null, m: string | null) => void) => void;
+  },
+) {
   const [file, setFile] = useState<File | null>(props.initialFile);
   const [mime, setMime] = useState<string | null>(props.initialMime);
   props.register?.((f, m) => {
@@ -110,13 +117,7 @@ describe("usePlantProfilePhotoPreview — supported formats", () => {
     ["image/webp", "photo.webp"],
   ])("renders a normal object-URL preview for %s", async (mime, name) => {
     const file = fakeFile(name, mime);
-    render(
-      <Harness
-        initialFile={file}
-        initialMime={mime}
-        probe={immediateProbe(true)}
-      />,
-    );
+    render(<Harness initialFile={file} initialMime={mime} probe={immediateProbe(true)} />);
     expect(screen.getByTestId("preview-status").textContent).toBe("image");
     // Object URL was created and not revoked yet.
     expect(created.length).toBe(1);
@@ -153,14 +154,10 @@ describe("usePlantProfilePhotoPreview — HEIC/HEIF decode probing", () => {
     expect(screen.getByTestId("preview-status").textContent).toBe("fallback");
     const card = screen.getByRole("status");
     expect(card).toHaveAttribute("aria-live", "polite");
-    expect(card.getAttribute("data-preview-reason")).toBe(
-      "browser_decode_unsupported",
-    );
+    expect(card.getAttribute("data-preview-reason")).toBe("browser_decode_unsupported");
     expect(screen.getByText("Photo selected")).toBeInTheDocument();
     expect(screen.getByText("HEIC")).toBeInTheDocument();
-    expect(
-      screen.getByText(/original photo is ready to upload/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/original photo is ready to upload/i)).toBeInTheDocument();
     // Object URL created for the probe was revoked when we fell back.
     expect(revoked.length).toBeGreaterThan(0);
   });
@@ -178,8 +175,7 @@ describe("usePlantProfilePhotoPreview — HEIC/HEIF decode probing", () => {
   });
 
   it("probe rejection surfaces a generic preview_error fallback", async () => {
-    const failing: PlantProfilePhotoDecodeProbe = () =>
-      Promise.reject(new Error("boom"));
+    const failing: PlantProfilePhotoDecodeProbe = () => Promise.reject(new Error("boom"));
     render(
       <Harness
         initialFile={fakeFile("shot.heic", "image/heic")}
@@ -190,9 +186,7 @@ describe("usePlantProfilePhotoPreview — HEIC/HEIF decode probing", () => {
     await act(async () => {});
     const card = screen.getByRole("status");
     expect(card.getAttribute("data-preview-reason")).toBe("preview_error");
-    expect(
-      screen.getByText(/still ready to upload/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/still ready to upload/i)).toBeInTheDocument();
   });
 });
 
@@ -309,7 +303,9 @@ describe("EditPlantDialog integration — save contract + safety", () => {
 
   it("no upload happens before Save (upload is inside the submit handler only)", () => {
     // Guard: onFileChosen only sets local state — no upload call.
-    const onChosen = EDIT.match(/function onFileChosen[\s\S]*?\n\s*\}\n/);
+    const onChosen = EDIT.match(
+      /function onFileChosen\b[\s\S]*?(?=\r?\n\s*async function submit\b)/,
+    );
     expect(onChosen).toBeTruthy();
     expect(onChosen?.[0]).not.toMatch(/uploadPlantProfilePhoto/);
   });

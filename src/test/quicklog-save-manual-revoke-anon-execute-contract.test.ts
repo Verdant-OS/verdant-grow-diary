@@ -23,12 +23,14 @@ import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 
 const ROOT = resolve(__dirname, "../..");
-const CONTRACT_PATH =
-  "supabase/contract-migrations/quicklog_save_manual_revoke_anon_execute.sql";
+const CONTRACT_PATH = "supabase/contract-migrations/quicklog_save_manual_revoke_anon_execute.sql";
 const abs = resolve(ROOT, CONTRACT_PATH);
 const raw = existsSync(abs) ? readFileSync(abs, "utf8") : "";
 // Strip SQL line comments so pins target executable statements only.
-const executable = raw.replace(/^\s*--.*$/gm, "").trim();
+const executable = raw
+  .replace(/\r\n?/g, "\n")
+  .replace(/^\s*--.*$/gm, "")
+  .trim();
 
 const OVERLOAD_ARGS =
   "text, uuid, text, numeric, text, numeric, numeric, numeric,\n  timestamptz, jsonb, text";
@@ -93,12 +95,16 @@ describe("quicklog_save_manual revoke-anon-execute contract migration", () => {
     // quicklog_save_manual in the public schema, so a stray overload cannot
     // silently retain anon EXECUTE.
     expect(executable).toMatch(/DO\s*\$\$/i);
-    expect(executable).toMatch(/FROM\s+pg_proc\s+p[\s\S]*?p\.proname\s*=\s*'quicklog_save_manual'/i);
+    expect(executable).toMatch(
+      /FROM\s+pg_proc\s+p[\s\S]*?p\.proname\s*=\s*'quicklog_save_manual'/i,
+    );
     expect(executable).toMatch(/FOR\s+bad\s+IN[\s\S]*?LOOP/i);
   });
 
   it("postcondition asserts every overload: anon=false, authenticated=true, service_role=true", () => {
-    expect(executable).toMatch(/has_function_privilege\(\s*'anon'\s*,\s*p\.oid\s*,\s*'EXECUTE'\s*\)/i);
+    expect(executable).toMatch(
+      /has_function_privilege\(\s*'anon'\s*,\s*p\.oid\s*,\s*'EXECUTE'\s*\)/i,
+    );
     expect(executable).toMatch(
       /has_function_privilege\(\s*'authenticated'\s*,\s*p\.oid\s*,\s*'EXECUTE'\s*\)/i,
     );
@@ -131,11 +137,9 @@ describe("quicklog_save_manual revoke-anon-execute contract migration", () => {
       .filter((s) => s.length > 0);
     for (const stmt of stmts) {
       if (!/^(REVOKE|GRANT|ALTER|CREATE|DROP)\b/i.test(stmt)) continue;
-      expect(
-        stmt,
-        `unexpected DDL/DCL touches something other than quicklog_save_manual`,
-      ).toMatch(/quicklog_save_manual/i);
+      expect(stmt, `unexpected DDL/DCL touches something other than quicklog_save_manual`).toMatch(
+        /quicklog_save_manual/i,
+      );
     }
   });
-
 });

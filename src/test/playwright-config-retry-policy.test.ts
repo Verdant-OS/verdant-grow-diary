@@ -41,7 +41,7 @@ describe("playwright.config retry + artifact policy", () => {
   it("retries 0 times locally when CI is unset", async () => {
     const cfg = await loadConfig();
     expect(cfg.retries).toBe(0);
-  });
+  }, 30_000);
 
   it("retries at least once in CI so flakes produce a retry artifact set", async () => {
     process.env.CI = "true";

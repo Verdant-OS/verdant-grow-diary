@@ -114,26 +114,37 @@ describe("public VPD calculator page", () => {
     expect(screen.getByTestId("public-vpd-confidence")).toHaveTextContent("unverified");
   });
 
-  it("unlocks target status after the full VPD evidence checklist", async () => {
-    const user = userEvent.setup();
+  it("unlocks target status after the full VPD evidence checklist", () => {
     renderPage();
 
-    await user.type(screen.getByLabelText("Air temperature"), "77");
-    await user.type(screen.getByLabelText("Relative humidity (current room reading)"), "60");
-    await user.type(screen.getByLabelText("Measured leaf temperature"), "77");
-    await user.selectOptions(screen.getByLabelText("Temperature/RH sensor placement"), "canopy");
-    await user.type(screen.getByLabelText("Temperature reference"), "Traceable reference");
-    await user.type(screen.getByLabelText("Temperature verified date"), "2026-06-01");
-    await user.type(screen.getByLabelText("Calibration RH reference (optional)"), "75");
-    await user.type(screen.getByLabelText("Humidity verified date"), "2026-06-01");
-    await user.click(
+    fireEvent.change(screen.getByLabelText("Air temperature"), { target: { value: "77" } });
+    fireEvent.change(screen.getByLabelText("Relative humidity (current room reading)"), {
+      target: { value: "60" },
+    });
+    fireEvent.change(screen.getByLabelText("Measured leaf temperature"), {
+      target: { value: "77" },
+    });
+    fireEvent.change(screen.getByLabelText("Temperature/RH sensor placement"), {
+      target: { value: "canopy" },
+    });
+    fireEvent.change(screen.getByLabelText("Temperature reference"), {
+      target: { value: "Traceable reference" },
+    });
+    fireEvent.change(screen.getByLabelText("Temperature verified date"), {
+      target: { value: "2026-06-01" },
+    });
+    fireEvent.change(screen.getByLabelText("Calibration RH reference (optional)"), {
+      target: { value: "75" },
+    });
+    fireEvent.change(screen.getByLabelText("Humidity verified date"), {
+      target: { value: "2026-06-01" },
+    });
+    fireEvent.click(
       screen.getByLabelText(/Temperature was checked against that reference at normal room/i),
     );
-    await user.click(
-      screen.getByLabelText(/Leaf temperature was measured now in the same canopy/i),
-    );
-    await user.selectOptions(screen.getByLabelText("Plant stage"), "flower");
-    await user.click(screen.getByRole("button", { name: /Calculate VPD/ }));
+    fireEvent.click(screen.getByLabelText(/Leaf temperature was measured now in the same canopy/i));
+    fireEvent.change(screen.getByLabelText("Plant stage"), { target: { value: "flower" } });
+    fireEvent.click(screen.getByRole("button", { name: /Calculate VPD/ }));
 
     expect(screen.getByTestId("public-vpd-confidence")).toHaveTextContent("verified");
     expect(screen.getByTestId("public-vpd-classification")).toHaveTextContent(
@@ -185,24 +196,25 @@ describe("public VPD calculator page", () => {
     expect(mocks.track).toHaveBeenCalledWith("vpd_calculator_reset");
   });
 
-  it("converts both temperature fields exactly and does not drift over repeated toggles", async () => {
-    const user = userEvent.setup();
+  it("converts both temperature fields exactly and does not drift over repeated toggles", () => {
     renderPage();
 
-    await user.type(screen.getByLabelText("Air temperature"), "78");
-    await user.type(screen.getByLabelText("Measured leaf temperature"), "73.4");
+    fireEvent.change(screen.getByLabelText("Air temperature"), { target: { value: "78" } });
+    fireEvent.change(screen.getByLabelText("Measured leaf temperature"), {
+      target: { value: "73.4" },
+    });
     const unit = screen.getByLabelText("Temperature unit");
 
-    await user.selectOptions(unit, "C");
+    fireEvent.change(unit, { target: { value: "C" } });
     expect(screen.getByLabelText("Air temperature")).toHaveValue(25.6);
     expect(screen.getByLabelText("Measured leaf temperature")).toHaveValue(23);
 
-    await user.selectOptions(unit, "F");
+    fireEvent.change(unit, { target: { value: "F" } });
     expect(screen.getByLabelText("Air temperature")).toHaveValue(78);
     expect(screen.getByLabelText("Measured leaf temperature")).toHaveValue(73.4);
 
     for (let index = 0; index < 20; index += 1) {
-      await user.selectOptions(unit, index % 2 === 0 ? "C" : "F");
+      fireEvent.change(unit, { target: { value: index % 2 === 0 ? "C" : "F" } });
     }
     expect(unit).toHaveValue("F");
     expect(screen.getByLabelText("Air temperature")).toHaveValue(78);

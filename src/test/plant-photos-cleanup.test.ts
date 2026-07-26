@@ -6,7 +6,6 @@
  * spied fake that MUST NOT be called for any blocked condition.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import * as childProcess from "node:child_process";
 import {
   parseCleanupArgs,
   isDestructiveMode,
@@ -39,6 +38,7 @@ import {
   existsSync,
   statSync,
   mkdirSync,
+  readdirSync,
   readFileSync as _readFile,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -542,6 +542,17 @@ describe("planCleanup + executeCleanup — fail-closed behavior", () => {
 // -------- CLI + repo-shape static safety --------
 
 const ROOT = resolve(__dirname, "../..");
+
+function listSourceTypeScriptFiles(directory: string): string[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) {
+      return entry.name === "test" ? [] : listSourceTypeScriptFiles(path);
+    }
+    return entry.isFile() && /\.(?:ts|tsx)$/.test(entry.name) ? [path] : [];
+  });
+}
+
 const CLI = readFileSync(resolve(ROOT, "scripts/admin/plant-photos-cleanup.mjs"), "utf8");
 const LIB = readFileSync(resolve(ROOT, "scripts/admin/plant-photos-cleanup-lib.mjs"), "utf8");
 const PKG = JSON.parse(readFileSync(resolve(ROOT, "package.json"), "utf8")) as {
@@ -562,12 +573,10 @@ describe("cleanup tool — no UI, no scheduler, npm script wiring", () => {
     expect(LIB).not.toMatch(/\bsetInterval\s*\(|\bsetTimeout\s*\(|node-cron|cronjob\.schedule/);
   });
   it("no UI surface — script is not imported by any src/ non-test file", () => {
-    const { execSync } = childProcess;
-    const out = execSync(
-      "grep -rEl \"plant-photos-cleanup\" src --include='*.ts' --include='*.tsx' | grep -v '/test/' || true",
-      { cwd: ROOT, encoding: "utf8" },
+    const matchingFiles = listSourceTypeScriptFiles(resolve(ROOT, "src")).filter((path) =>
+      readFileSync(path, "utf8").includes("plant-photos-cleanup"),
     );
-    expect(out.trim()).toBe("");
+    expect(matchingFiles).toEqual([]);
   });
   it("CLI defaults to dry-run and requires SUPABASE_URL + service-role key", () => {
     expect(CLI).toContain("SUPABASE_URL");

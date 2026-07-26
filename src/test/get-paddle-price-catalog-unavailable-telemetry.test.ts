@@ -124,6 +124,10 @@ describe("get-paddle-price — telemetry fires on every fail-closed branch", () 
       "auth_required",
       "method_not_allowed",
       "internal_error",
+      // Refusal to sell a credit pack to a plan whose scope is per_grow —
+      // ai_credit_spend would never read the balance, so the purchase would be
+      // unspendable. Sanitized: names the RULE, never the caller or their plan.
+      "pack_requires_monthly_plan",
     ]);
     const reasons = CALL_SITES.flatMap((body) =>
       [...body.matchAll(/reason:\s*["']([^"']+)["']/g)].map((m) => m[1]),

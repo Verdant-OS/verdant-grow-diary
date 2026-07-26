@@ -38,7 +38,7 @@ describe("Action Queue owner decision guard", () => {
 
   it("reconciles an open drawer after reload and uses exact transition guards", () => {
     expect(ACTION_QUEUE).toMatch(
-      /setDrawerRow\(\(current\)\s*=>\s*current\s*\?\s*list\.find\(\(row\)\s*=>\s*row\.id\s*===\s*current\.id\)\s*\?\?\s*null\s*:\s*null\s*\)/,
+      /setDrawerRow\(\(current\)\s*=>\s*current\s*\?\s*\(?\s*list\.find\(\(row\)\s*=>\s*row\.id\s*===\s*current\.id\)\s*\?\?\s*null\s*\)?\s*:\s*null/,
     );
     expect(ACTION_QUEUE).toMatch(
       /canApprove=\{!!drawerRow\s*&&\s*canApproveAction\(drawerRow\.status\)\}/,

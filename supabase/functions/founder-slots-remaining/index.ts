@@ -109,6 +109,96 @@ function loadDeps(): Promise<Deps> {
 
 log({ event: "boot", severity: "info" });
 
+// ---------------------------------------------------------------------------
+// In-process counters + timers. These live for the lifetime of one edge
+// worker instance (they reset on cold boot / restart), which is fine —
+// Lovable Cloud spawns many short-lived instances, so we intentionally
+// emit both:
+//   - `request_metric` (per request, carries outcome + duration_ms) —
+//     the source of truth for latency histograms / rate calculations in
+//     the log aggregator.
+//   - `metric_snapshot` (throttled, carries the counter table) — a
+//     lightweight sanity check that lets you eyeball per-instance
+//     totals without joining every `request_metric` row.
+// Neither replaces the existing per-outcome logs; they add trendable
+// numeric surfaces on top of them.
+// ---------------------------------------------------------------------------
+
+type Outcome =
+  | "success"
+  | "rpc_error"
+  | "rpc_invalid_payload"
+  | "env_missing"
+  | "startup_dependencies_unavailable"
+  | "handler_unhandled_error"
+  | "method_not_allowed";
+
+const counters: Record<string, number> = {
+  requests_total: 0,
+  success: 0,
+  rpc_error: 0,
+  rpc_invalid_payload: 0,
+  env_missing: 0,
+  startup_dependencies_unavailable: 0,
+  startup_import_failed: 0,
+  handler_unhandled_error: 0,
+  method_not_allowed: 0,
+};
+
+// Running latency accumulator (ms) for a cheap mean + max per snapshot
+// window. `_since_snapshot` fields reset every time we emit a snapshot
+// so the values reflect the window, not the instance lifetime.
+let durationSumMsSinceSnapshot = 0;
+let durationMaxMsSinceSnapshot = 0;
+let requestsSinceSnapshot = 0;
+
+const SNAPSHOT_INTERVAL_MS = 30_000;
+let lastSnapshotAt = 0;
+
+function recordRequestMetric(
+  outcome: Outcome,
+  durationMs: number,
+  requestId: string,
+): void {
+  counters.requests_total += 1;
+  counters[outcome] = (counters[outcome] ?? 0) + 1;
+  requestsSinceSnapshot += 1;
+  durationSumMsSinceSnapshot += durationMs;
+  if (durationMs > durationMaxMsSinceSnapshot) {
+    durationMaxMsSinceSnapshot = durationMs;
+  }
+  log({
+    event: "request_metric",
+    severity: "info",
+    request_id: requestId,
+    outcome,
+    duration_ms: Math.round(durationMs * 100) / 100,
+  });
+  maybeEmitSnapshot();
+}
+
+function maybeEmitSnapshot(): void {
+  const now = Date.now();
+  if (now - lastSnapshotAt < SNAPSHOT_INTERVAL_MS) return;
+  lastSnapshotAt = now;
+  const mean = requestsSinceSnapshot === 0
+    ? 0
+    : Math.round((durationSumMsSinceSnapshot / requestsSinceSnapshot) * 100) / 100;
+  log({
+    event: "metric_snapshot",
+    severity: "info",
+    window_ms: SNAPSHOT_INTERVAL_MS,
+    requests_in_window: requestsSinceSnapshot,
+    duration_ms_mean_in_window: mean,
+    duration_ms_max_in_window: Math.round(durationMaxMsSinceSnapshot * 100) / 100,
+    counters: { ...counters },
+  });
+  requestsSinceSnapshot = 0;
+  durationSumMsSinceSnapshot = 0;
+  durationMaxMsSinceSnapshot = 0;
+}
+
+
 // RFC 4122 v4 UUID regex — used to sanitize any client-supplied
 // `x-request-id` header so log/response IDs stay compact and predictable
 // and can't be used to smuggle arbitrary content into log lines.

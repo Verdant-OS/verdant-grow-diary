@@ -438,19 +438,31 @@ export async function handleVerifiedEvent(
       // production that can only happen via a deps-wiring regression, and it
       // would hit EVERY pack purchase while looking completely healthy.
       //
-      // Marked skipped with a named reason instead: the money path never
-      // reports success for work it did not do. Paddle stops retrying (the
-      // retry cannot fix missing wiring) and the audit log names the cause.
-      const mark = await deps.markEvent(paddleEventId, {
-        processing_status: "skipped",
+      // Codex (P1): my first fix marked this `skipped` — but `skipped` is a
+      // TERMINAL status in the duplicate-event branch above
+      // (`prior === "skipped"` short-circuits to `duplicate_skipped`, 200, no
+      // reprocessing). So once this fired, redeploying the fixed dependency
+      // could never recover the purchase: neither a Paddle retry (we already
+      // said 200, so none comes) nor a manual replay of the same event
+      // (permanently short-circuited) would ever re-attempt the grant.
+      // Charged, nothing granted, no path back — a worse trap than the
+      // original silent success, because it looks properly handled.
+      //
+      // `failed` is NOT in that terminal set, so it falls through to
+      // "reprocess". Marking `failed` + 500 here — mirroring the RPC-failure
+      // branch just above — gives this BOTH normal Paddle retry semantics
+      // (grant_lovable_credit_pack is idempotent, so a retry is safe) AND
+      // future-replay recoverability through the existing reprocess path,
+      // rather than inventing a separate reconciliation mechanism for a
+      // failure mode the retry machinery already knows how to handle.
+      const err = "credit_pack_grant_unwired";
+      await deps.markEvent(paddleEventId, {
+        processing_status: "failed",
         processed_ok: false,
-        skip_reason: "credit_pack_grant_unwired",
-        last_error: null,
+        skip_reason: null,
+        last_error: redactError(err),
       });
-      if ("error" in mark) {
-        return { httpStatus: 500, reason: `mark_skipped_failed:${redactError(mark.error)}` };
-      }
-      return { httpStatus: 200, reason: "skipped:credit_pack_grant_unwired" };
+      return { httpStatus: 500, reason: `write_failed:${redactError(err)}` };
     }
   } else if (decision.kind === "upsert_subscription") {
     writeRes = await deps.upsertSubscription(decision.row);

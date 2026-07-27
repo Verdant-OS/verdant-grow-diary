@@ -663,16 +663,25 @@ describe("handleVerifiedEvent — AI credit-pack grant", () => {
     expect(boom.reason).not.toContain("unspendable");
   });
 
-  it("grant dep not wired: still 200, but NEVER reports a grant it did not make", async () => {
+  it("grant dep not wired: NEVER reports a grant it did not make, and stays retryable", async () => {
     // This previously asserted `processed:grant_credit_pack` — i.e. the money
     // path reporting a successful grant that never happened. In production an
     // unwired dep can only come from a deps regression, and it would hit EVERY
     // pack purchase while the audit log looked completely healthy: charged,
     // nothing granted, nothing to alert on.
     //
-    // The 200 is kept deliberately — a retry cannot fix missing wiring, so
-    // Paddle should stop — but the outcome is now recorded as skipped with a
-    // named cause instead of success.
+    // Codex (P1) then caught the fix itself being wrong: my first version
+    // marked this `skipped` + 200. `skipped` is TERMINAL in the duplicate-event
+    // branch (see "duplicate previously failed" vs the skipped/processed
+    // cases above) — so once recorded, redeploying the corrected dependency
+    // could never recover the purchase. No Paddle retry comes (we said 200),
+    // and a manual replay of the same event permanently short-circuits to
+    // `duplicate_skipped`. Charged, nothing granted, no way back.
+    //
+    // `failed` + 500 instead: a normal Paddle retry (the grant RPC is
+    // idempotent), AND `failed` is NOT terminal in the duplicate branch, so a
+    // later replay after the fix ships reprocesses and actually grants —
+    // proven by the next test.
     const f = makeFixture();
     const res = await handleVerifiedEvent(
       f.deps,
@@ -681,14 +690,37 @@ describe("handleVerifiedEvent — AI credit-pack grant", () => {
       NOW,
       {},
     );
-    expect(res.httpStatus).toBe(200);
-    expect(res.reason).toBe("skipped:credit_pack_grant_unwired");
+    expect(res.httpStatus).toBe(500);
+    expect(res.reason).toContain("credit_pack_grant_unwired");
     expect(res.reason).not.toContain("processed");
-    // And the audit row must name the cause, not sit blank.
     expect(f.markCalls.at(-1)?.patch).toMatchObject({
-      processing_status: "skipped",
+      processing_status: "failed",
       processed_ok: false,
-      skip_reason: "credit_pack_grant_unwired",
     });
+  });
+
+  it("a purchase stuck by unwired deps actually grants once the fix ships and Paddle replays", async () => {
+    // The recovery path Codex asked for, proven rather than asserted: seed the
+    // SAME event id as already `failed` (as the previous test would have left
+    // it), then redeliver it with the dependency now wired. This must NOT
+    // short-circuit as a duplicate — it must reprocess and grant.
+    const f = makeFixture({
+      seedExisting: [["evt_pack_recovered", { processing_status: "failed" }]],
+    });
+    const grant = vi.fn(async () => ({ ok: true }) as Awaited<ReturnType<PackDep>>);
+    (f.deps as Deps).allocateCreditPack = grant;
+
+    const res = await handleVerifiedEvent(
+      f.deps,
+      packTxEvent("credit_pack_50", "evt_pack_recovered"),
+      "sandbox",
+      NOW,
+      {},
+    );
+
+    expect(res.httpStatus).toBe(200);
+    expect(res.reason).toBe("processed:grant_credit_pack");
+    expect(grant).toHaveBeenCalledTimes(1);
+    expect(f.markCalls.at(-1)?.patch.processing_status).toBe("processed");
   });
 });

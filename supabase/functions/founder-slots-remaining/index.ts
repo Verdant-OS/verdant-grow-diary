@@ -405,6 +405,9 @@ function maybeEmitSnapshot(): void {
     counters: countersSnapshot,
     deploy_version: releaseProvenance.deploy_version,
     supabase_env: releaseProvenance.supabase_env,
+    // Per-window key: `lastSnapshotAt` is the deterministic window boundary
+    // for this snapshot, so a retried waitUntil re-fires with the same key.
+    idempotency_key: `${FN}:snap:${lastSnapshotAt}`,
   });
   requestsSinceSnapshot = 0;
   durationSumMsSinceSnapshot = 0;

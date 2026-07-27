@@ -747,7 +747,7 @@ export default function ActionQueue() {
       // the grower gets a persistent, accurate banner instead of a looping
       // generic toast.
       if (isMissingActionQueueTransitionRpcError(error)) {
-        setRpcUnavailable(true);
+        setRpcAvailability("unavailable");
         console.warn(
           JSON.stringify({
             event: "action_queue_transition_rpc_unavailable",

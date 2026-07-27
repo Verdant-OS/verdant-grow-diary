@@ -255,6 +255,17 @@ interface MetricEventRow {
   counters?: Record<string, number> | null;
   deploy_version: string;
   supabase_env: string;
+  /**
+   * Deterministic per-logical-event dedup key. Repeated inserts with the
+   * same key are collapsed to a single row by the partial unique index
+   * `edge_function_metric_events_idempotency_key_uidx`, so EdgeRuntime
+   * retries (or manual re-fires from `waitUntil`) can never double-count.
+   * Format:
+   *   - request_metric:  `${fn}:req:${request_id}`
+   *   - metric_snapshot: `${fn}:snap:${window_start_ms}`
+   * Kept ≤ 200 chars to satisfy the length CHECK.
+   */
+  idempotency_key: string;
 }
 
 type MetricPersistor = (row: MetricEventRow) => Promise<void>;
@@ -264,15 +275,19 @@ async function persistMetricEventDefault(row: MetricEventRow): Promise<void> {
   const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!url || !key) return; // silently skip — env_missing already logged elsewhere
   try {
+    // PostgREST upsert keyed on the partial-unique idempotency_key column.
+    // `resolution=merge-duplicates` + `on_conflict=idempotency_key` turns a
+    // repeated write into a no-op UPDATE (same values), so the row count
+    // stays 1 no matter how many times the runtime retries this waitUntil.
     const res = await fetch(
-      `${url}/rest/v1/edge_function_metric_events`,
+      `${url}/rest/v1/edge_function_metric_events?on_conflict=idempotency_key`,
       {
         method: "POST",
         headers: {
           apikey: key,
           Authorization: `Bearer ${key}`,
           "Content-Type": "application/json",
-          Prefer: "return=minimal",
+          Prefer: "return=minimal,resolution=merge-duplicates",
         },
         body: JSON.stringify(row),
       },
@@ -283,6 +298,7 @@ async function persistMetricEventDefault(row: MetricEventRow): Promise<void> {
         severity: "warn",
         status: res.status,
         event_type: row.event_type,
+        idempotency_key: row.idempotency_key,
       });
     }
   } catch (err) {
@@ -290,6 +306,7 @@ async function persistMetricEventDefault(row: MetricEventRow): Promise<void> {
       event: "metric_persist_failed",
       severity: "warn",
       event_type: row.event_type,
+      idempotency_key: row.idempotency_key,
       error_message: err instanceof Error ? err.message : String(err),
     });
   }
@@ -350,6 +367,9 @@ function recordRequestMetric(
     duration_ms: roundedDuration,
     deploy_version: releaseProvenance.deploy_version,
     supabase_env: releaseProvenance.supabase_env,
+    // Per-request key: retries of the same logical invocation (identified by
+    // request_id) collapse to a single row via the partial unique index.
+    idempotency_key: `${FN}:req:${requestId}`,
   });
   maybeEmitSnapshot();
 }
@@ -385,6 +405,9 @@ function maybeEmitSnapshot(): void {
     counters: countersSnapshot,
     deploy_version: releaseProvenance.deploy_version,
     supabase_env: releaseProvenance.supabase_env,
+    // Per-window key: `lastSnapshotAt` is the deterministic window boundary
+    // for this snapshot, so a retried waitUntil re-fires with the same key.
+    idempotency_key: `${FN}:snap:${lastSnapshotAt}`,
   });
   requestsSinceSnapshot = 0;
   durationSumMsSinceSnapshot = 0;

@@ -389,8 +389,25 @@ export async function handleVerifiedEvent(
       }
       writeRes = { ok: true };
     } else {
-      // Dep not wired (pure subscription-path unit tests) → no-op success.
-      writeRes = { ok: true };
+      // Dep NOT wired. Previously this returned a silent no-op success, which
+      // marked a paid credit-pack purchase "processed" with no grant written
+      // and no error raised — charged, nothing recorded, invisible. In
+      // production that can only happen via a deps-wiring regression, and it
+      // would hit EVERY pack purchase while looking completely healthy.
+      //
+      // Marked skipped with a named reason instead: the money path never
+      // reports success for work it did not do. Paddle stops retrying (the
+      // retry cannot fix missing wiring) and the audit log names the cause.
+      const mark = await deps.markEvent(paddleEventId, {
+        processing_status: "skipped",
+        processed_ok: false,
+        skip_reason: "credit_pack_grant_unwired",
+        last_error: null,
+      });
+      if ("error" in mark) {
+        return { httpStatus: 500, reason: `mark_skipped_failed:${redactError(mark.error)}` };
+      }
+      return { httpStatus: 200, reason: "skipped:credit_pack_grant_unwired" };
     }
   } else if (decision.kind === "upsert_subscription") {
     writeRes = await deps.upsertSubscription(decision.row);

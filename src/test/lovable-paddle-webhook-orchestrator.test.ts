@@ -593,7 +593,16 @@ describe("handleVerifiedEvent — AI credit-pack grant", () => {
     expect(grant).toHaveBeenCalledTimes(1);
   });
 
-  it("grant dep not wired (pure subscription-path fixture): no-op success, still 200", async () => {
+  it("grant dep not wired: still 200, but NEVER reports a grant it did not make", async () => {
+    // This previously asserted `processed:grant_credit_pack` — i.e. the money
+    // path reporting a successful grant that never happened. In production an
+    // unwired dep can only come from a deps regression, and it would hit EVERY
+    // pack purchase while the audit log looked completely healthy: charged,
+    // nothing granted, nothing to alert on.
+    //
+    // The 200 is kept deliberately — a retry cannot fix missing wiring, so
+    // Paddle should stop — but the outcome is now recorded as skipped with a
+    // named cause instead of success.
     const f = makeFixture();
     const res = await handleVerifiedEvent(
       f.deps,
@@ -603,6 +612,13 @@ describe("handleVerifiedEvent — AI credit-pack grant", () => {
       {},
     );
     expect(res.httpStatus).toBe(200);
-    expect(res.reason).toBe("processed:grant_credit_pack");
+    expect(res.reason).toBe("skipped:credit_pack_grant_unwired");
+    expect(res.reason).not.toContain("processed");
+    // And the audit row must name the cause, not sit blank.
+    expect(f.markCalls.at(-1)?.patch).toMatchObject({
+      processing_status: "skipped",
+      processed_ok: false,
+      skip_reason: "credit_pack_grant_unwired",
+    });
   });
 });

@@ -34,16 +34,44 @@ const FN = "edge-metrics-alert-check";
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-request-id, x-alert-cron-secret",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Expose-Headers": "x-request-id",
 };
 
-function json(status: number, body: unknown): Response {
-  return new Response(JSON.stringify(body), {
+const REQUEST_ID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function resolveRequestId(req: Request): string {
+  const raw = req.headers.get("x-request-id")?.trim();
+  if (raw && REQUEST_ID_RE.test(raw)) return raw.toLowerCase();
+  return crypto.randomUUID();
+}
+
+function json(
+  status: number,
+  body: Record<string, unknown>,
+  requestId: string,
+): Response {
+  return new Response(JSON.stringify({ ...body, request_id: requestId }), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: {
+      ...corsHeaders,
+      "Content-Type": "application/json",
+      "x-request-id": requestId,
+    },
   });
 }
+
+function fail(
+  status: number,
+  errorCode: string,
+  message: string,
+  requestId: string,
+): Response {
+  return json(status, { error: message, error_code: errorCode }, requestId);
+}
+
 
 function log(severity: "info" | "warn" | "error", event: string, extra: Record<string, unknown> = {}): void {
   const line = JSON.stringify({ fn: FN, ts: new Date().toISOString(), severity, event, ...extra });
@@ -162,34 +190,48 @@ async function postWebhook(breaches: Breach[], t: Thresholds): Promise<{ posted:
   }
 }
 
-async function requireOperator(authHeader: string): Promise<{ ok: true } | { ok: false; res: Response }> {
+async function requireOperator(
+  authHeader: string,
+  requestId: string,
+): Promise<{ ok: true } | { ok: false; res: Response }> {
   const url = Deno.env.get("SUPABASE_URL");
   const anon = Deno.env.get("SUPABASE_ANON_KEY");
-  if (!url || !anon) return { ok: false, res: json(503, { error: "env_missing" }) };
+  if (!url || !anon) {
+    return { ok: false, res: fail(503, "env_missing", "Service unavailable", requestId) };
+  }
   const supa = createClient(url, anon, { global: { headers: { Authorization: authHeader } } });
   const token = authHeader.slice("Bearer ".length);
   const { data: claims, error } = await supa.auth.getClaims(token);
-  if (error || !claims?.claims?.sub) return { ok: false, res: json(401, { error: "unauthorized" }) };
+  if (error || !claims?.claims?.sub) {
+    return { ok: false, res: fail(401, "invalid_jwt", "Unauthorized", requestId) };
+  }
   const { data: isOp, error: rErr } = await supa.rpc("has_role", {
     _user_id: claims.claims.sub,
     _role: "operator",
   });
-  if (rErr) return { ok: false, res: json(500, { error: "role_check_failed" }) };
-  if (!isOp) return { ok: false, res: json(403, { error: "forbidden" }) };
+  if (rErr) {
+    return { ok: false, res: fail(503, "role_check_failed", "Service unavailable", requestId) };
+  }
+  if (!isOp) {
+    return { ok: false, res: fail(403, "operator_role_required", "Forbidden", requestId) };
+  }
   return { ok: true };
 }
 
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  const requestId = resolveRequestId(req);
+
   if (req.method !== "GET" && req.method !== "POST") {
-    return json(405, { error: "method_not_allowed" });
+    return fail(405, "method_not_allowed", "Method not allowed", requestId);
   }
 
   const url = Deno.env.get("SUPABASE_URL");
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!url || !serviceKey) {
-    log("error", "env_missing");
-    return json(503, { error: "env_missing" });
+    log("error", "env_missing", { request_id: requestId });
+    return fail(503, "env_missing", "Service unavailable", requestId);
   }
 
   // Manual invocations must present an operator JWT. Scheduled pg_cron
@@ -197,12 +239,16 @@ Deno.serve(async (req) => {
   // lets pg_net trigger the check without carrying a user session.
   const cronSecret = Deno.env.get("ALERT_CRON_SECRET");
   const providedCronSecret = req.headers.get("x-alert-cron-secret");
-  const isCron = cronSecret && providedCronSecret && providedCronSecret === cronSecret;
+  const isCron = Boolean(
+    cronSecret && providedCronSecret && providedCronSecret === cronSecret,
+  );
 
   if (!isCron) {
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) return json(401, { error: "unauthorized" });
-    const gate = await requireOperator(authHeader);
+    if (!authHeader?.startsWith("Bearer ")) {
+      return fail(401, "missing_bearer_token", "Unauthorized", requestId);
+    }
+    const gate = await requireOperator(authHeader, requestId);
     if (!gate.ok) return gate.res;
   }
 
@@ -218,8 +264,8 @@ Deno.serve(async (req) => {
     .limit(10000);
 
   if (error) {
-    log("error", "query_failed", { code: error.code });
-    return json(500, { error: "query_failed" });
+    log("error", "query_failed", { request_id: requestId, code: error.code });
+    return fail(503, "query_failed", "Service unavailable", requestId);
   }
 
   const rows = (data ?? []) as EventRow[];
@@ -228,23 +274,33 @@ Deno.serve(async (req) => {
   if (breaches.length > 0) {
     webhook = await postWebhook(breaches, thresholds);
     log("warn", "alert_fired", {
+      request_id: requestId,
       breach_count: breaches.length,
       webhook_posted: webhook.posted,
       webhook_status: webhook.status,
     });
   } else {
-    log("info", "alert_check_clean", { window_minutes: thresholds.windowMinutes, sampled: rows.length });
+    log("info", "alert_check_clean", {
+      request_id: requestId,
+      window_minutes: thresholds.windowMinutes,
+      sampled: rows.length,
+    });
   }
 
-  return json(200, {
-    ok: true,
-    window_minutes: thresholds.windowMinutes,
-    sampled_events: rows.length,
-    thresholds,
-    breaches,
-    webhook,
-    invoked_via: isCron ? "cron" : "operator",
-  });
+  return json(
+    200,
+    {
+      ok: true,
+      window_minutes: thresholds.windowMinutes,
+      sampled_events: rows.length,
+      thresholds,
+      breaches,
+      webhook,
+      invoked_via: isCron ? "cron" : "operator",
+    },
+    requestId,
+  );
 });
+
 
 export const __internals = { evaluate, loadThresholds };

@@ -9,6 +9,11 @@
  *    SECURITY DEFINER `public.has_role` RPC using the caller's JWT).
  *  - Reads only aggregate counters/window stats — no PII, no user rows.
  *
+ * ERROR CONTRACT:
+ *  Every non-2xx response uses the shape
+ *    { "error": string, "error_code": string, "request_id": string }
+ *  and echoes `x-request-id` so callers can correlate with server logs.
+ *
  * QUERY:
  *  - Optional `fn=<edge_fn_name>` filter (default: no filter, returns the
  *    globally-latest snapshot across every edge function that persists).
@@ -21,38 +26,81 @@ const FN = "edge-metrics-latest";
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-request-id",
   "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Expose-Headers": "x-request-id",
 };
 
-function json(status: number, body: unknown, extra: Record<string, string> = {}): Response {
-  return new Response(JSON.stringify(body), {
+const REQUEST_ID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function resolveRequestId(req: Request): string {
+  const raw = req.headers.get("x-request-id")?.trim();
+  if (raw && REQUEST_ID_RE.test(raw)) return raw.toLowerCase();
+  return crypto.randomUUID();
+}
+
+function json(
+  status: number,
+  body: Record<string, unknown>,
+  requestId: string,
+): Response {
+  return new Response(JSON.stringify({ ...body, request_id: requestId }), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json", ...extra },
+    headers: {
+      ...corsHeaders,
+      "Content-Type": "application/json",
+      "x-request-id": requestId,
+    },
   });
 }
 
-function log(severity: "info" | "warn" | "error", event: string, extra: Record<string, unknown> = {}): void {
-  const line = JSON.stringify({ fn: FN, ts: new Date().toISOString(), severity, event, ...extra });
+function fail(
+  status: number,
+  errorCode: string,
+  message: string,
+  requestId: string,
+): Response {
+  return json(status, { error: message, error_code: errorCode }, requestId);
+}
+
+function log(
+  severity: "info" | "warn" | "error",
+  event: string,
+  extra: Record<string, unknown> = {},
+): void {
+  const line = JSON.stringify({
+    fn: FN,
+    ts: new Date().toISOString(),
+    severity,
+    event,
+    ...extra,
+  });
   if (severity === "error") console.error(line);
   else if (severity === "warn") console.warn(line);
   else console.log(line);
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  if (req.method !== "GET") return json(405, { error: "method_not_allowed" });
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+  const requestId = resolveRequestId(req);
+
+  if (req.method !== "GET") {
+    return fail(405, "method_not_allowed", "Method not allowed", requestId);
+  }
 
   const authHeader = req.headers.get("Authorization");
   if (!authHeader?.startsWith("Bearer ")) {
-    return json(401, { error: "unauthorized" });
+    return fail(401, "missing_bearer_token", "Unauthorized", requestId);
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
   if (!supabaseUrl || !anonKey) {
-    log("error", "env_missing");
-    return json(503, { error: "service_unavailable", error_code: "env_missing" });
+    log("error", "env_missing", { request_id: requestId });
+    return fail(503, "env_missing", "Service unavailable", requestId);
   }
 
   const token = authHeader.slice("Bearer ".length);
@@ -62,7 +110,7 @@ Deno.serve(async (req) => {
 
   const { data: claims, error: claimsError } = await supabase.auth.getClaims(token);
   if (claimsError || !claims?.claims?.sub) {
-    return json(401, { error: "unauthorized" });
+    return fail(401, "invalid_jwt", "Unauthorized", requestId);
   }
   const userId = claims.claims.sub as string;
 
@@ -71,11 +119,11 @@ Deno.serve(async (req) => {
     _role: "operator",
   });
   if (roleError) {
-    log("error", "role_check_failed", { code: roleError.code });
-    return json(500, { error: "role_check_failed" });
+    log("error", "role_check_failed", { request_id: requestId, code: roleError.code });
+    return fail(503, "role_check_failed", "Service unavailable", requestId);
   }
   if (!isOperator) {
-    return json(403, { error: "forbidden" });
+    return fail(403, "operator_role_required", "Forbidden", requestId);
   }
 
   const url = new URL(req.url);
@@ -93,12 +141,13 @@ Deno.serve(async (req) => {
 
   const { data, error } = await query.maybeSingle();
   if (error) {
-    log("error", "query_failed", { code: error.code });
-    return json(500, { error: "query_failed" });
-  }
-  if (!data) {
-    return json(200, { snapshot: null, filter: { fn: fnFilter } });
+    log("error", "query_failed", { request_id: requestId, code: error.code });
+    return fail(503, "query_failed", "Service unavailable", requestId);
   }
 
-  return json(200, { snapshot: data, filter: { fn: fnFilter } });
+  return json(
+    200,
+    { snapshot: data ?? null, filter: { fn: fnFilter } },
+    requestId,
+  );
 });

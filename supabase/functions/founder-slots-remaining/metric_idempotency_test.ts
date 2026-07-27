@@ -50,7 +50,7 @@ Deno.test(
     primeEnv();
     const rows: Record<string, unknown>[] = [];
     __setMetricPersistorForTesting(async (row) => {
-      rows.push(row as Record<string, unknown>);
+      rows.push(row as unknown as Record<string, unknown>);
     });
     try {
       const requestId = "11111111-1111-4111-8111-111111111111";
@@ -84,7 +84,7 @@ Deno.test(
     primeEnv();
     const rows: Record<string, unknown>[] = [];
     __setMetricPersistorForTesting(async (row) => {
-      rows.push(row as Record<string, unknown>);
+      rows.push(row as unknown as Record<string, unknown>);
     });
     try {
       const requestId = "22222222-2222-4222-8222-222222222222";
@@ -126,7 +126,7 @@ Deno.test(
     primeEnv();
     const rows: Record<string, unknown>[] = [];
     __setMetricPersistorForTesting(async (row) => {
-      rows.push(row as Record<string, unknown>);
+      rows.push(row as unknown as Record<string, unknown>);
     });
     try {
       const a = "33333333-3333-4333-8333-333333333333";
@@ -176,7 +176,7 @@ Deno.test(
     primeEnv();
     const rows: Record<string, unknown>[] = [];
     __setMetricPersistorForTesting(async (row) => {
-      rows.push(row as Record<string, unknown>);
+      rows.push(row as unknown as Record<string, unknown>);
     });
     try {
       for (let i = 0; i < 5; i += 1) {

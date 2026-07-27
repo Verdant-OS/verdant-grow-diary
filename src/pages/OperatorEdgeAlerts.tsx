@@ -197,6 +197,7 @@ export default function OperatorEdgeAlerts() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
   const [dispatchPage, setDispatchPage] = useState(0);
+  const [attemptsPage, setAttemptsPage] = useState(0);
 
   const liveQuery = useQuery({
     queryKey: ["operator", "edge-alerts", "live"],

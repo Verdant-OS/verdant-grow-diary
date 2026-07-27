@@ -247,7 +247,12 @@ describe("Action Queue Linked alert — static safety", () => {
     expect(lower).not.toMatch(
       /from\(["']alerts["'][\s\S]{0,200}?\.(insert|update|delete|upsert)\(/,
     );
-    const rpcNames = [...lower.matchAll(/supabase\.rpc\(\s*["']([^"']+)["']/g)].map(
+    // Tolerates the runtime-availability cast used to invoke the RPC before
+    // its generated typing lands (see actionQueueRpcAvailability):
+    //   (supabase.rpc as unknown as (...) => ...)("action_queue_transition", ...)
+    // as well as a direct supabase.rpc("action_queue_transition", ...). Same
+    // pattern as action-detail.test.ts.
+    const rpcNames = [...lower.matchAll(/supabase\.rpc\b[\s\S]{0,200}?["']([^"']+)["']/g)].map(
       (match) => match[1],
     );
     expect(rpcNames).toEqual(["action_queue_transition"]);

@@ -291,7 +291,12 @@ describe("ActionQueue alert context chip — safety scan", () => {
   it("does not add upsert / table-delete / non-transition RPCs on the supabase client", () => {
     expect(PAGE).not.toMatch(/\.upsert\(/);
     expect(PAGE).not.toMatch(/from\(["'][^"']+["']\)[\s\S]{0,200}?\.delete\(/);
-    const rpcNames = [...PAGE.matchAll(/supabase\.rpc\(\s*["']([^"']+)["']/g)].map(
+    // Tolerates the runtime-availability cast used to invoke the RPC before
+    // its generated typing lands (see actionQueueRpcAvailability):
+    //   (supabase.rpc as unknown as (...) => ...)("action_queue_transition", ...)
+    // as well as a direct supabase.rpc("action_queue_transition", ...). Same
+    // pattern as action-detail.test.ts.
+    const rpcNames = [...PAGE.matchAll(/supabase\.rpc\b[\s\S]{0,200}?["']([^"']+)["']/g)].map(
       (match) => match[1],
     );
     expect(rpcNames).toEqual(["action_queue_transition"]);

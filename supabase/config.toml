@@ -69,6 +69,14 @@ project_id = "knkwiiywfkbqznbxwqfh"
   # UUID owner identifiers only — no email/name/profile fields.
   [functions.operator-credits-audit]
     verify_jwt = true
+  # edge-metrics-alert-check and edge-metrics-latest are operator-only edge
+  # function metric/alert surfaces. Require a platform-verified JWT AND
+  # re-check public.has_role(uid,'operator') inside via the caller-scoped
+  # has_role RPC before returning anything.
+  [functions.edge-metrics-alert-check]
+    verify_jwt = true
+  [functions.edge-metrics-latest]
+    verify_jwt = true
   # Transactional email queue writes are server-only. The handler compares
   # `apikey` against SUPABASE_SECRET_KEYS (with local/legacy fallbacks) before
   # parsing any caller-controlled recipient/template fields. Gateway

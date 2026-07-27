@@ -147,8 +147,13 @@ describe("ActionDetail — state UI safety", () => {
     );
     expect(m).not.toBeNull();
     expect(m![1]).not.toMatch(/\buser_id\b|\bgrow_id\b|\bevent_type\b|\bnew_status\b/);
+    // Tolerates the runtime-availability cast used to invoke the RPC before
+    // its generated typing lands (see actionQueueRpcAvailability):
+    //   (supabase.rpc as unknown as (...) => ...)("action_queue_transition", ...)
+    // as well as a direct supabase.rpc("action_queue_transition", ...). Same
+    // pattern as action-detail.test.ts.
     expect(SRC).toMatch(
-      /supabase\.rpc\(\s*["']action_queue_transition["']\s*,\s*rpcArgs\s*,?\s*\)/,
+      /supabase\.rpc\b[\s\S]{0,200}?["']action_queue_transition["']\s*,\s*rpcArgs\s*,?\s*\)/,
     );
   });
 

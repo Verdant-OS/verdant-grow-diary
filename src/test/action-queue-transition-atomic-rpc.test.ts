@@ -152,8 +152,13 @@ describe.each([
 ])("%s transition wiring", (_label, source) => {
   it("uses the canonical transition RPC and validates its result", () => {
     expect(source).toMatch(/const\s+rpcArgs\s*=\s*buildActionQueueTransitionRpcArgs\(/);
+    // Tolerates the runtime-availability cast used to invoke the RPC before
+    // its generated typing lands (see actionQueueRpcAvailability):
+    //   (supabase.rpc as unknown as (...) => ...)("action_queue_transition", ...)
+    // as well as a direct supabase.rpc("action_queue_transition", ...). Same
+    // pattern as action-detail.test.ts.
     expect(source).toMatch(
-      /supabase\.rpc\(\s*["']action_queue_transition["']\s*,\s*rpcArgs\s*,?\s*\)/,
+      /supabase\.rpc\b[\s\S]{0,200}?["']action_queue_transition["']\s*,\s*rpcArgs\s*,?\s*\)/,
     );
     expect(source).toMatch(/parseActionQueueTransitionRpcResult\(data,\s*rpcArgs\)/);
   });

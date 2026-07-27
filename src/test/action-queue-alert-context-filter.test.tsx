@@ -416,7 +416,12 @@ describe("alert-context filter — safety scan", () => {
 
   it("page has no creation/deletion paths or non-transition RPCs added", () => {
     expect(PAGE).not.toMatch(/\.upsert\(/);
-    const rpcNames = [...PAGE.matchAll(/supabase\.rpc\(\s*["']([^"']+)["']/g)].map(
+    // Tolerates the runtime-availability cast used to invoke the RPC before
+    // its generated typing lands (see actionQueueRpcAvailability):
+    //   (supabase.rpc as unknown as (...) => ...)("action_queue_transition", ...)
+    // as well as a direct supabase.rpc("action_queue_transition", ...). Same
+    // pattern as action-detail.test.ts.
+    const rpcNames = [...PAGE.matchAll(/supabase\.rpc\b[\s\S]{0,200}?["']([^"']+)["']/g)].map(
       (match) => match[1],
     );
     expect(rpcNames).toEqual(["action_queue_transition"]);

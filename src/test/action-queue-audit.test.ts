@@ -96,8 +96,13 @@ describe("action_queue_events — schema & RLS", () => {
 
 describe("ActionQueue page — audit wiring", () => {
   it("uses the transactional transition-and-audit RPC", () => {
+    // Tolerates the runtime-availability cast used to invoke the RPC before
+    // its generated typing lands (see actionQueueRpcAvailability):
+    //   (supabase.rpc as unknown as (...) => ...)("action_queue_transition", ...)
+    // as well as a direct supabase.rpc("action_queue_transition", ...). Same
+    // pattern as action-detail.test.ts.
     expect(PAGE).toMatch(
-      /supabase\.rpc\(\s*["']action_queue_transition["']\s*,\s*rpcArgs\s*,?\s*\)/,
+      /supabase\.rpc\b[\s\S]{0,200}?["']action_queue_transition["']\s*,\s*rpcArgs\s*,?\s*\)/,
     );
     expect(PAGE).toMatch(/parseActionQueueTransitionRpcResult\(data,\s*rpcArgs\)/);
   });

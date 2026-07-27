@@ -1075,7 +1075,12 @@ export default function ActionQueue() {
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={load}
+                onClick={() => {
+                  // Manual refresh re-probes RPC state: show the interim
+                  // placeholder until the next transition proves availability.
+                  setRpcAvailability("unknown");
+                  void load();
+                }}
                 disabled={loading || isRefreshing}
                 aria-label="Refresh Action Queue"
                 data-testid="action-queue-refresh-button"

@@ -584,7 +584,13 @@ Deno.serve(async (req) => {
   }
 
   let webhook: Awaited<ReturnType<typeof postWebhook>> = { posted: false, attempts: [] };
-  if (toFire.length > 0) {
+  if (isDryRun) {
+    log("info", "dry_run_evaluated", {
+      request_id: requestId,
+      fired_count: toFire.length,
+      suppressed_count: suppressed.length,
+    });
+  } else if (toFire.length > 0) {
     webhook = await postWebhook(toFire, thresholds, log, requestId);
     log("warn", "alert_fired", {
       request_id: requestId,
@@ -643,6 +649,8 @@ Deno.serve(async (req) => {
     200,
     {
       ok: true,
+      dry_run: isDryRun,
+      simulated: simulatedBreach,
       window_minutes: thresholds.windowMinutes,
       sampled_events: rows.length,
       thresholds,
@@ -650,7 +658,7 @@ Deno.serve(async (req) => {
       fired: toFire,
       suppressed,
       webhook,
-      invoked_via: isCron ? "cron" : "operator",
+      invoked_via: isCron ? "cron" : isDryRun ? "operator_dry_run" : "operator",
     },
     requestId,
   );

@@ -327,9 +327,16 @@ describe("Timeline integration (source pin)", () => {
     expect(TIMELINE_SRC).toContain(
       "const isReadinessCheckEvent = isAiDoctorReadinessCheckEvent(e);",
     );
-    // Mirrors the learning-loop pin in timeline-learning-loop-entries.test.ts,
-    // which requires the literal `isLearningLoopEvent ? []` to survive.
-    expect(TIMELINE_SRC).toMatch(/isReadinessCheckEvent\s*\?\s*\[\]/);
+    // Detail presentation (structured lines + raw-chip fallback) is
+    // centralized in timelineDiaryEntryDetailPresentationRules.ts; the
+    // module itself is unit-tested (suppress: true → empty presentation) in
+    // timelineDiaryEntryDetailPresentationRules.test.ts. This pin only
+    // guards the WIRING: isReadinessCheckEvent must still reach that
+    // module's suppress option, mirroring the learning-loop pin in
+    // timeline-learning-loop-entries.test.ts.
+    expect(TIMELINE_SRC).toMatch(
+      /suppress:\s*isLearningLoopEvent\s*\|\|\s*isReadinessCheckEvent/,
+    );
   });
 });
 

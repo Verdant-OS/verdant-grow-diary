@@ -90,11 +90,7 @@ import { cn } from "@/lib/utils";
 import { getEventType } from "@/lib/diary";
 import { buildGrowDiaryTimeline } from "@/lib/growDiaryTimelineRules";
 import { MEASUREMENT_DETAIL_KEYS } from "@/lib/timelineEntryClassification";
-import {
-  describeQuickLogDetailsFromExtras,
-  QUICK_LOG_DETAIL_FIELD_KEYS,
-  type QuickLogDetailDisplayLine,
-} from "@/lib/quickLogActivityDetailFields";
+import { presentTimelineDiaryEntryDetails } from "@/lib/timelineDiaryEntryDetailPresentationRules";
 import { classifyVpdAgainstStage } from "@/lib/vpdStageTargetRules";
 import {
   mapGrowEventsToRecentRawEntries,
@@ -1887,33 +1883,17 @@ export default function Timeline() {
                           // render as raw chips — the dedicated badge
                           // below presents them instead.
                           const isReadinessCheckEvent = isAiDoctorReadinessCheckEvent(e);
-                          const HIDDEN = [
-                            "event_type",
-                            "plant_id",
-                            "plant_name",
-                            "tent_id",
-                            "sensor",
-                            "sensor_snapshot",
-                            "remind_at",
-                          ];
-                          // Structured Quick Log detail renders as labeled
-                          // chips (below) instead of raw machine codes.
-                          const detailLines: readonly QuickLogDetailDisplayLine[] =
-                            isLearningLoopEvent || isReadinessCheckEvent
-                              ? []
-                              : describeQuickLogDetailsFromExtras(e.details, temperatureUnit);
-                          // Exclude the FULL structured-key set (not just
-                          // rendered lines): a present-but-invalid structured
-                          // value yields no labeled line and must still never
-                          // fall through as a raw chip.
-                          const extra = isLearningLoopEvent
-                            ? []
-                            : isReadinessCheckEvent
-                              ? []
-                              : Object.entries(e.details || {}).filter(
-                                  ([k]) =>
-                                    !HIDDEN.includes(k) && !QUICK_LOG_DETAIL_FIELD_KEYS.has(k),
-                                );
+                          // What's safe to present from this entry's details
+                          // blob (structured lines vs. last-resort raw chips
+                          // vs. fully suppressed) is centralized in one
+                          // tested module so a future diary writer's new
+                          // internal field can't silently leak here again —
+                          // see timelineDiaryEntryDetailPresentationRules.ts.
+                          const { detailLines, extra } = presentTimelineDiaryEntryDetails(
+                            e.details,
+                            temperatureUnit,
+                            { suppress: isLearningLoopEvent || isReadinessCheckEvent },
+                          );
                           const loopActionId =
                             isLearningLoopEvent && typeof e.details?.action_queue_id === "string"
                               ? (e.details.action_queue_id as string)

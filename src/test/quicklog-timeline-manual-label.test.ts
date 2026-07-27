@@ -34,6 +34,10 @@ const TIMELINE_RULES = readFileSync(
   resolve(ROOT, "src/lib/relativeTimelineProjectionRules.ts"),
   "utf8",
 );
+const TIMELINE_DETAIL_PRESENTATION_RULES = readFileSync(
+  resolve(ROOT, "src/lib/timelineDiaryEntryDetailPresentationRules.ts"),
+  "utf8",
+);
 
 describe("Grow Timeline · sensor_snapshot wiring", () => {
   it("reads the canonical `sensor_snapshot` key QuickLog writes", () => {
@@ -41,8 +45,13 @@ describe("Grow Timeline · sensor_snapshot wiring", () => {
   });
 
   it("hides both `sensor` and `sensor_snapshot` from the misc extras strip", () => {
-    expect(TIMELINE_PAGE).toMatch(
-      /HIDDEN\s*=\s*\[[^\]]*"sensor"[^\]]*"sensor_snapshot"[^\]]*\]/,
+    // Detail presentation (structured lines + raw-chip fallback, including
+    // the HIDDEN_DIARY_DETAIL_KEYS denylist) is centralized in
+    // timelineDiaryEntryDetailPresentationRules.ts — see
+    // timelineDiaryEntryDetailPresentationRules.test.ts for the unit-level
+    // guarantee that every hidden key never reaches the raw fallback.
+    expect(TIMELINE_DETAIL_PRESENTATION_RULES).toMatch(
+      /HIDDEN_DIARY_DETAIL_KEYS[\s\S]*?=[\s\S]*?new Set\(\[[^\]]*"sensor"[^\]]*"sensor_snapshot"[^\]]*\]/,
     );
   });
 

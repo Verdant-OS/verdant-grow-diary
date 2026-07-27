@@ -92,6 +92,9 @@ import { safeActionQueueFailureCopy } from "@/lib/actionQueueFailureCopy";
 import {
   isMissingActionQueueTransitionRpcError,
   ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY,
+  ACTION_QUEUE_TRANSITION_RPC_CHECKING_COPY,
+  ACTION_QUEUE_TRANSITION_RPC_AVAILABLE_COPY,
+  type ActionQueueRpcAvailability,
 } from "@/lib/actionQueueRpcAvailability";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle } from "lucide-react";

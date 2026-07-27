@@ -47,6 +47,7 @@ import EnvironmentCheckSnapshotLinkButton from "@/components/EnvironmentCheckSna
 import AiDoctorCheckInTimelineBadge from "@/components/AiDoctorCheckInTimelineBadge";
 import AiDoctorReadinessTimelineBadge from "@/components/AiDoctorReadinessTimelineBadge";
 import { isAiDoctorReadinessCheckEvent } from "@/lib/aiDoctorReadinessTimelineBadge";
+import { PHENO_EVIDENCE_RECEIPT_KIND } from "@/lib/phenoEvidenceCaptureRules";
 import {
   buildEnvironmentCheckDiaryViewModel,
   isEnvironmentCheckKind,
@@ -1887,6 +1888,18 @@ export default function Timeline() {
                           // render as raw chips — the dedicated badge
                           // below presents them instead.
                           const isReadinessCheckEvent = isAiDoctorReadinessCheckEvent(e);
+                          // Pheno evidence receipts (details.kind ===
+                          // "pheno_evidence_receipt", see
+                          // phenoEvidenceCaptureRules.ts) carry the same kind
+                          // of machine bookkeeping — a hunt join id, the
+                          // evidence goal, an equipment-command flag, and
+                          // other internal receipt fields — that must never
+                          // render as raw chips either. The note text is
+                          // already shown above; there is no dedicated badge
+                          // for these on the general timeline.
+                          const isPhenoEvidenceReceiptEvent =
+                            (e.details as Record<string, unknown> | undefined)?.kind ===
+                            PHENO_EVIDENCE_RECEIPT_KIND;
                           const HIDDEN = [
                             "event_type",
                             "plant_id",
@@ -1895,25 +1908,48 @@ export default function Timeline() {
                             "sensor",
                             "sensor_snapshot",
                             "remind_at",
+                            // Quick Log v2 companion-row plumbing (see
+                            // quickLogDiaryCompanionRules.ts): a schema
+                            // version marker and a grow_events join id —
+                            // pure internal bookkeeping, never grower-facing,
+                            // and never null so the value-based filter below
+                            // cannot catch them on its own.
+                            "quick_log_version",
+                            "linked_grow_event_id",
+                            // Redundant with the dedicated photo render above
+                            // (which reads the row-level photo_url); the
+                            // details-blob echo has no separate grower value.
+                            "photo_url",
                           ];
                           // Structured Quick Log detail renders as labeled
                           // chips (below) instead of raw machine codes.
                           const detailLines: readonly QuickLogDetailDisplayLine[] =
-                            isLearningLoopEvent || isReadinessCheckEvent
+                            isLearningLoopEvent || isReadinessCheckEvent || isPhenoEvidenceReceiptEvent
                               ? []
                               : describeQuickLogDetailsFromExtras(e.details, temperatureUnit);
                           // Exclude the FULL structured-key set (not just
                           // rendered lines): a present-but-invalid structured
                           // value yields no labeled line and must still never
-                          // fall through as a raw chip.
+                          // fall through as a raw chip. Also drop any
+                          // null-valued key outright — the RPC write seam
+                          // echoes several always-present-but-often-null
+                          // fields (e.g. feeding/watering on a non-feeding/
+                          // watering entry) onto every row; a null value is
+                          // "not provided" and must never render as
+                          // "feeding: null", matching this codebase's own
+                          // absence-stays-unknown doctrine.
                           const extra = isLearningLoopEvent
                             ? []
                             : isReadinessCheckEvent
                               ? []
-                              : Object.entries(e.details || {}).filter(
-                                  ([k]) =>
-                                    !HIDDEN.includes(k) && !QUICK_LOG_DETAIL_FIELD_KEYS.has(k),
-                                );
+                              : isPhenoEvidenceReceiptEvent
+                                ? []
+                                : Object.entries(e.details || {}).filter(
+                                    ([k, v]) =>
+                                      v != null &&
+                                      !HIDDEN.includes(k) &&
+                                      !QUICK_LOG_DETAIL_FIELD_KEYS.has(k),
+                                  );
                           const loopActionId =
                             isLearningLoopEvent && typeof e.details?.action_queue_id === "string"
                               ? (e.details.action_queue_id as string)

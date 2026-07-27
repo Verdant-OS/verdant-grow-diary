@@ -1104,6 +1104,69 @@ export type Database = {
         }
         Relationships: []
       }
+      edge_metrics_webhook_attempts: {
+        Row: {
+          attempt: number
+          attempted_at: string
+          created_at: string
+          delay_before_ms: number
+          dispatch_id: string
+          duration_ms: number
+          error: string | null
+          fn: string
+          id: string
+          metric: string
+          ok: boolean
+          outcome: string
+          request_id: string | null
+          requests_in_window: number | null
+          status_code: number | null
+          threshold: number | null
+          transient: boolean
+          value: number | null
+        }
+        Insert: {
+          attempt: number
+          attempted_at?: string
+          created_at?: string
+          delay_before_ms?: number
+          dispatch_id: string
+          duration_ms?: number
+          error?: string | null
+          fn: string
+          id?: string
+          metric: string
+          ok?: boolean
+          outcome: string
+          request_id?: string | null
+          requests_in_window?: number | null
+          status_code?: number | null
+          threshold?: number | null
+          transient?: boolean
+          value?: number | null
+        }
+        Update: {
+          attempt?: number
+          attempted_at?: string
+          created_at?: string
+          delay_before_ms?: number
+          dispatch_id?: string
+          duration_ms?: number
+          error?: string | null
+          fn?: string
+          id?: string
+          metric?: string
+          ok?: boolean
+          outcome?: string
+          request_id?: string | null
+          requests_in_window?: number | null
+          status_code?: number | null
+          threshold?: number | null
+          transient?: boolean
+          value?: number | null
+        }
+        Relationships: []
+      }
       email_send_log: {
         Row: {
           created_at: string

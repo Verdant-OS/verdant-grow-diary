@@ -601,6 +601,47 @@ Deno.serve(async (req) => {
       webhook_attempts: webhook.attempts.length,
       webhook_gave_up_transient: webhook.gave_up_transient ?? false,
     });
+    // Persist per-attempt history so operators can inspect scheduled /
+    // delivered / exhausted delivery attempts per breach in the UI.
+    if (webhook.attempts.length > 0) {
+      const dispatchId = crypto.randomUUID();
+      const lastIdx = webhook.attempts.length - 1;
+      const attemptRows = toFire.flatMap((b) =>
+        webhook.attempts.map((a, idx) => {
+          let outcome: "delivered" | "transient_failure" | "permanent_failure" | "exhausted";
+          if (a.ok) outcome = "delivered";
+          else if (!a.transient) outcome = "permanent_failure";
+          else if (idx === lastIdx && webhook.gave_up_transient) outcome = "exhausted";
+          else outcome = "transient_failure";
+          return {
+            dispatch_id: dispatchId,
+            fn: b.fn,
+            metric: b.metric,
+            attempt: a.attempt,
+            outcome,
+            status_code: a.status ?? null,
+            ok: a.ok,
+            transient: a.transient,
+            error: a.error ?? null,
+            delay_before_ms: a.delay_before_ms,
+            duration_ms: a.duration_ms,
+            value: b.value,
+            threshold: b.threshold,
+            requests_in_window: b.requests_in_window,
+            request_id: requestId,
+          };
+        }),
+      );
+      const { error: attemptsErr } = await supa
+        .from("edge_metrics_webhook_attempts")
+        .insert(attemptRows);
+      if (attemptsErr) {
+        log("warn", "webhook_attempts_insert_failed", {
+          request_id: requestId,
+          code: attemptsErr.code,
+        });
+      }
+    }
     // Only record cooldown for breaches whose webhook actually delivered.
     // If delivery failed transiently and we exhausted retries, leave the
     // dispatch row untouched so the next cron pass can retry immediately

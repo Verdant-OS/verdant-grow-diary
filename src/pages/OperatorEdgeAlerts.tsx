@@ -106,6 +106,28 @@ interface DispatchRow {
   updated_at: string;
 }
 
+type AttemptOutcome = "delivered" | "transient_failure" | "permanent_failure" | "exhausted";
+
+interface WebhookAttemptRow {
+  id: string;
+  dispatch_id: string;
+  fn: string;
+  metric: string;
+  attempt: number;
+  outcome: AttemptOutcome;
+  status_code: number | null;
+  ok: boolean;
+  transient: boolean;
+  error: string | null;
+  delay_before_ms: number;
+  duration_ms: number;
+  value: number | null;
+  threshold: number | null;
+  requests_in_window: number | null;
+  request_id: string | null;
+  attempted_at: string;
+}
+
 type MetricFilter = "all" | MetricKey;
 type StatusFilter = "all" | "active" | "expired";
 type TimeFilter = "all" | "1h" | "24h" | "7d" | "30d";
@@ -175,6 +197,7 @@ export default function OperatorEdgeAlerts() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
   const [dispatchPage, setDispatchPage] = useState(0);
+  const [attemptsPage, setAttemptsPage] = useState(0);
 
   const liveQuery = useQuery({
     queryKey: ["operator", "edge-alerts", "live"],
@@ -205,6 +228,23 @@ export default function OperatorEdgeAlerts() {
         .limit(1000);
       if (error) throw error;
       return (data ?? []) as DispatchRow[];
+    },
+  });
+
+  const attemptsQuery = useQuery({
+    queryKey: ["operator", "edge-alerts", "attempts"],
+    enabled: isOperator === true,
+    refetchInterval: 60_000,
+    queryFn: async (): Promise<WebhookAttemptRow[]> => {
+      const { data, error } = await supabase
+        .from("edge_metrics_webhook_attempts")
+        .select(
+          "id, dispatch_id, fn, metric, attempt, outcome, status_code, ok, transient, error, delay_before_ms, duration_ms, value, threshold, requests_in_window, request_id, attempted_at",
+        )
+        .order("attempted_at", { ascending: false })
+        .limit(500);
+      if (error) throw error;
+      return (data ?? []) as WebhookAttemptRow[];
     },
   });
 
@@ -278,6 +318,29 @@ export default function OperatorEdgeAlerts() {
     dispatchPage * PAGE_SIZE + PAGE_SIZE,
   );
 
+  const filteredAttempts = useMemo(() => {
+    return (attemptsQuery.data ?? []).filter((r) => {
+      if (!matchesCommonFilters(r.fn, r.metric)) return false;
+      if (timeCutoff !== null) {
+        const t = Date.parse(r.attempted_at);
+        if (!Number.isFinite(t) || t < timeCutoff) return false;
+      }
+      return true;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [attemptsQuery.data, searchNeedle, metricFilter, timeCutoff]);
+
+  const attemptsPageCount = Math.max(1, Math.ceil(filteredAttempts.length / PAGE_SIZE));
+
+  useEffect(() => {
+    if (attemptsPage >= attemptsPageCount) setAttemptsPage(0);
+  }, [attemptsPageCount, attemptsPage]);
+
+  const pagedAttempts = filteredAttempts.slice(
+    attemptsPage * PAGE_SIZE,
+    attemptsPage * PAGE_SIZE + PAGE_SIZE,
+  );
+
   const activeCooldownCount = dispatchesWithExpiry.filter((r) => r.cooldown_active).length;
 
   const filtersActive =
@@ -292,12 +355,14 @@ export default function OperatorEdgeAlerts() {
     setStatusFilter("all");
     setTimeFilter("all");
     setDispatchPage(0);
+    setAttemptsPage(0);
   };
 
   const refresh = () => {
     setNow(Date.now());
     liveQuery.refetch();
     dispatchesQuery.refetch();
+    attemptsQuery.refetch();
   };
 
   if (roleLoading) {
@@ -679,6 +744,126 @@ export default function OperatorEdgeAlerts() {
                     size="sm"
                     onClick={() => setDispatchPage((p) => Math.min(pageCount - 1, p + 1))}
                     disabled={dispatchPage >= pageCount - 1}
+                  >
+                    Next
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Webhook attempts</CardTitle>
+          <CardDescription>
+            Per-attempt delivery history from <code>edge_metrics_webhook_attempts</code>. Each
+            breach fire produces one row per attempt (delivered, transient retry, permanent
+            failure, or exhausted after retries).
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {attemptsQuery.isLoading ? (
+            <p className="text-sm text-muted-foreground">Loading attempt history…</p>
+          ) : attemptsQuery.error ? (
+            <p className="text-sm text-destructive">
+              {(attemptsQuery.error as Error).message}
+            </p>
+          ) : filteredAttempts.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              {(attemptsQuery.data ?? []).length === 0
+                ? "No webhook attempts recorded yet."
+                : "No attempts match the current filters."}
+            </p>
+          ) : (
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>When</TableHead>
+                    <TableHead>Function</TableHead>
+                    <TableHead>Metric</TableHead>
+                    <TableHead className="text-right">Attempt</TableHead>
+                    <TableHead>Outcome</TableHead>
+                    <TableHead className="text-right">Status</TableHead>
+                    <TableHead className="text-right">Delay</TableHead>
+                    <TableHead className="text-right">Duration</TableHead>
+                    <TableHead>Error</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pagedAttempts.map((r) => {
+                    const variant: "default" | "destructive" | "secondary" | "outline" =
+                      r.outcome === "delivered"
+                        ? "default"
+                        : r.outcome === "exhausted" || r.outcome === "permanent_failure"
+                        ? "destructive"
+                        : "secondary";
+                    return (
+                      <TableRow key={r.id}>
+                        <TableCell
+                          className="text-xs text-muted-foreground whitespace-nowrap"
+                          title={`${formatAbsolute(r.attempted_at)}${
+                            r.request_id ? ` · req ${r.request_id}` : ""
+                          }`}
+                        >
+                          {formatRelative(r.attempted_at, now)}
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">{r.fn}</TableCell>
+                        <TableCell className="text-xs">{metricLabel(r.metric)}</TableCell>
+                        <TableCell className="text-right tabular-nums">{r.attempt}</TableCell>
+                        <TableCell>
+                          <Badge variant={variant}>{r.outcome.replace(/_/g, " ")}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {r.status_code ?? "—"}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums text-muted-foreground">
+                          {r.delay_before_ms}ms
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums text-muted-foreground">
+                          {r.duration_ms}ms
+                        </TableCell>
+                        <TableCell
+                          className="text-xs text-muted-foreground max-w-[16rem] truncate"
+                          title={r.error ?? ""}
+                        >
+                          {r.error ?? "—"}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+
+              <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
+                <span>
+                  Showing {attemptsPage * PAGE_SIZE + 1}–
+                  {Math.min(filteredAttempts.length, (attemptsPage + 1) * PAGE_SIZE)} of{" "}
+                  {filteredAttempts.length}
+                </span>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setAttemptsPage((p) => Math.max(0, p - 1))}
+                    disabled={attemptsPage === 0}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    Prev
+                  </Button>
+                  <span className="tabular-nums">
+                    Page {attemptsPage + 1} / {attemptsPageCount}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setAttemptsPage((p) => Math.min(attemptsPageCount - 1, p + 1))
+                    }
+                    disabled={attemptsPage >= attemptsPageCount - 1}
                   >
                     Next
                     <ChevronRight className="h-4 w-4" />

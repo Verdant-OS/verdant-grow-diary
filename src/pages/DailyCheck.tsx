@@ -1264,8 +1264,14 @@ export default function DailyCheck() {
         </>
       ) : null}
 
-      {/* Step indices for tests/debug only — non-visual */}
-      <span className="sr-only" data-testid="daily-grow-check-step-list">
+      {/* Step indices for tests/debug only — non-visual AND never announced
+          to real screen readers. `sr-only` alone still puts this raw,
+          comma-joined internal step-slug list (e.g. "select,environment,
+          manual,quicklog,handheld,review,done") in front of every real
+          screen-reader user on this page; aria-hidden removes it from the
+          accessibility tree while keeping it queryable by test tooling via
+          data-testid. */}
+      <span className="sr-only" aria-hidden="true" data-testid="daily-grow-check-step-list">
         {DAILY_GROW_CHECK_STEPS.join(",")}
       </span>
     </div>

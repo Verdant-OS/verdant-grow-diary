@@ -106,6 +106,28 @@ interface DispatchRow {
   updated_at: string;
 }
 
+type AttemptOutcome = "delivered" | "transient_failure" | "permanent_failure" | "exhausted";
+
+interface WebhookAttemptRow {
+  id: string;
+  dispatch_id: string;
+  fn: string;
+  metric: string;
+  attempt: number;
+  outcome: AttemptOutcome;
+  status_code: number | null;
+  ok: boolean;
+  transient: boolean;
+  error: string | null;
+  delay_before_ms: number;
+  duration_ms: number;
+  value: number | null;
+  threshold: number | null;
+  requests_in_window: number | null;
+  request_id: string | null;
+  attempted_at: string;
+}
+
 type MetricFilter = "all" | MetricKey;
 type StatusFilter = "all" | "active" | "expired";
 type TimeFilter = "all" | "1h" | "24h" | "7d" | "30d";

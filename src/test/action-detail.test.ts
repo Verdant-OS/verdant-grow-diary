@@ -83,7 +83,6 @@ describe("Action Queue detail view", () => {
     expect(DETAIL).not.toMatch(/\.from\(\s*["']action_queue_events["']\s*\)\s*\.insert\(/);
   });
 
-
   it("introduces no device-control surface or service_role", () => {
     expect(DETAIL).not.toMatch(/mqtt|home.?assistant|pi_bridge|webhook|relay|actuator/i);
     expect(DETAIL).not.toMatch(/service_role/i);

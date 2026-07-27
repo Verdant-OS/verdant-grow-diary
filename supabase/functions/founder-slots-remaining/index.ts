@@ -49,8 +49,7 @@ function log(fields: LogFields): void {
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 };
 
@@ -69,8 +68,8 @@ function json(status: number, body: object, headers: Record<string, string> = {}
 // (bad npm subpath, network hiccup, ESM parse error) is captured as an
 // alertable `startup_import_failed` event instead of a silent module-load
 // crash that the platform surfaces to callers as a bare HTTP 500.
-type CreateClientFn = typeof import("npm:@supabase/supabase-js@2")["createClient"];
-type BuildPayloadFn = typeof import("./contract.ts")["buildFounderSlotsPayload"];
+type CreateClientFn = (typeof import("npm:@supabase/supabase-js@2"))["createClient"];
+type BuildPayloadFn = (typeof import("./contract.ts"))["buildFounderSlotsPayload"];
 
 interface Deps {
   createClient: CreateClientFn;
@@ -86,22 +85,22 @@ let depsLoaderOverride: (() => Promise<Deps>) | null = null;
  * actually break the real dynamic imports. Pass `null` to restore the
  * default behavior.
  */
-export function __setDepsLoaderForTesting(
-  loader: (() => Promise<Deps>) | null,
-): void {
+export function __setDepsLoaderForTesting(loader: (() => Promise<Deps>) | null): void {
   depsLoaderOverride = loader;
   depsPromise = null;
 }
 
 function loadDeps(): Promise<Deps> {
   if (depsPromise) return depsPromise;
-  const loader = depsLoaderOverride ?? (async () => {
-    const [{ createClient }, { buildFounderSlotsPayload }] = await Promise.all([
-      import("npm:@supabase/supabase-js@2"),
-      import("./contract.ts"),
-    ]);
-    return { createClient, buildFounderSlotsPayload };
-  });
+  const loader =
+    depsLoaderOverride ??
+    (async () => {
+      const [{ createClient }, { buildFounderSlotsPayload }] = await Promise.all([
+        import("npm:@supabase/supabase-js@2"),
+        import("./contract.ts"),
+      ]);
+      return { createClient, buildFounderSlotsPayload };
+    });
   depsPromise = (async () => {
     try {
       const deps = await loader();
@@ -125,7 +124,6 @@ function loadDeps(): Promise<Deps> {
   })();
   return depsPromise;
 }
-
 
 log({ event: "boot", severity: "info" });
 
@@ -222,9 +220,7 @@ let releaseProvenance: ReleaseProvenance = resolveReleaseProvenance();
  * `request_metric` and `metric_snapshot` lines. Pass `null` to
  * re-resolve from the current env.
  */
-export function __setReleaseProvenanceForTesting(
-  next: ReleaseProvenance | null,
-): void {
+export function __setReleaseProvenanceForTesting(next: ReleaseProvenance | null): void {
   releaseProvenance = next ?? resolveReleaseProvenance();
 }
 
@@ -319,9 +315,7 @@ let metricPersistor: MetricPersistor = persistMetricEventDefault;
  * on the rows without hitting the network. Pass `null` to restore the
  * real PostgREST-based sink.
  */
-export function __setMetricPersistorForTesting(
-  next: MetricPersistor | null,
-): void {
+export function __setMetricPersistorForTesting(next: MetricPersistor | null): void {
   metricPersistor = next ?? persistMetricEventDefault;
 }
 
@@ -337,11 +331,7 @@ function schedulePersist(row: MetricEventRow): void {
   // else: fire-and-forget; classic Deno tests await it via the test hook.
 }
 
-function recordRequestMetric(
-  outcome: Outcome,
-  durationMs: number,
-  requestId: string,
-): void {
+function recordRequestMetric(outcome: Outcome, durationMs: number, requestId: string): void {
   counters.requests_total += 1;
   counters[outcome] = (counters[outcome] ?? 0) + 1;
   requestsSinceSnapshot += 1;
@@ -374,14 +364,14 @@ function recordRequestMetric(
   maybeEmitSnapshot();
 }
 
-
 function maybeEmitSnapshot(): void {
   const now = Date.now();
   if (now - lastSnapshotAt < SNAPSHOT_INTERVAL_MS) return;
   lastSnapshotAt = now;
-  const mean = requestsSinceSnapshot === 0
-    ? 0
-    : Math.round((durationSumMsSinceSnapshot / requestsSinceSnapshot) * 100) / 100;
+  const mean =
+    requestsSinceSnapshot === 0
+      ? 0
+      : Math.round((durationSumMsSinceSnapshot / requestsSinceSnapshot) * 100) / 100;
   const maxRounded = Math.round(durationMaxMsSinceSnapshot * 100) / 100;
   const countersSnapshot = { ...counters };
   log({
@@ -414,14 +404,10 @@ function maybeEmitSnapshot(): void {
   durationMaxMsSinceSnapshot = 0;
 }
 
-
-
-
 // RFC 4122 v4 UUID regex — used to sanitize any client-supplied
 // `x-request-id` header so log/response IDs stay compact and predictable
 // and can't be used to smuggle arbitrary content into log lines.
-const REQUEST_ID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const REQUEST_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function resolveRequestId(req: Request): string {
   const incoming = req.headers.get("x-request-id");
@@ -444,7 +430,7 @@ export async function handleFounderSlotsRequest(req: Request): Promise<Response>
   // Track outcome so the `finally` block can stamp exactly one
   // `request_metric` per handler invocation.
   let outcome: Outcome = "success";
-  const done = <T,>(resp: T, o: Outcome): T => {
+  const done = <T>(resp: T, o: Outcome): T => {
     outcome = o;
     return resp;
   };
@@ -476,7 +462,6 @@ export async function handleFounderSlotsRequest(req: Request): Promise<Response>
       code,
     );
 
-
   try {
     if (req.method !== "GET" && req.method !== "POST") {
       return done(
@@ -492,7 +477,6 @@ export async function handleFounderSlotsRequest(req: Request): Promise<Response>
         "method_not_allowed",
       );
     }
-
 
     let deps: Deps;
     try {
@@ -576,4 +560,3 @@ export async function handleFounderSlotsRequest(req: Request): Promise<Response>
 if (Deno.env.get("FOUNDER_SLOTS_SKIP_SERVE") !== "1") {
   Deno.serve(handleFounderSlotsRequest);
 }
-

@@ -27,11 +27,22 @@ test("report.missingByEnv groups guarded Craft and credit-pack rows by env", () 
   assert.equal(res.status, 2, "missing key → exit 2");
   assert.ok(report.missingByEnv, "missingByEnv is present");
   assert.ok(Array.isArray(report.missingByEnv.sandbox), "sandbox array present");
-  assert.equal(report.missingByEnv.sandbox.length, 4);
+  // Derived, not hardcoded: the preflight guards every PAID_PLAN_ID matching a
+  // guarded prefix, so widening GUARDED_EXTERNAL_ID_PREFIXES (Craft + credit
+  // packs today) must not require editing this contract test. Pinning "2" and
+  // "craft_" made this fail with 4 !== 2 the moment packs were guarded.
+  assert.ok(
+    report.missingByEnv.sandbox.length >= 2,
+    "expected at least the two Craft plans to be reported",
+  );
+  assert.equal(report.missingByEnv.sandbox.length, report.requiredIds.length);
   for (const row of report.missingByEnv.sandbox) {
     assert.equal(row.env, "sandbox");
     assert.equal(row.status, "skip");
-    assert.match(row.externalId, /^(?:craft_|credit_pack_)/);
+    assert.ok(
+      report.requiredIds.includes(row.externalId),
+      `${row.externalId} reported but not in requiredIds`,
+    );
   }
   // Exact guarded catalog, sorted by externalId for deterministic downstream tooling.
   const ids = report.missingByEnv.sandbox.map((r) => r.externalId);

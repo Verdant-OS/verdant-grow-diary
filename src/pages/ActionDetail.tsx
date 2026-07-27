@@ -431,7 +431,12 @@ export default function ActionDetail() {
       expectedStatus: current.status,
       note,
     });
-    const { data, error } = await (supabase.rpc as unknown as (fn: string, args: unknown) => Promise<{ data: unknown; error: unknown }>)("action_queue_transition", rpcArgs);
+    const { data, error } = await (
+      supabase.rpc as unknown as (
+        fn: string,
+        args: unknown,
+      ) => Promise<{ data: unknown; error: unknown }>
+    )("action_queue_transition", rpcArgs);
     const result = parseActionQueueTransitionRpcResult(data, rpcArgs);
     if (error || !result || result.ok !== true) {
       if (isMissingActionQueueTransitionRpcError(error)) {
@@ -658,7 +663,6 @@ export default function ActionDetail() {
           </AlertDescription>
         </Alert>
       )}
-
 
       <header className="relative mb-6 overflow-hidden rounded-3xl border border-border/60 bg-card/70 p-5 shadow-card backdrop-blur-xl">
         <div

@@ -38,13 +38,7 @@ const MISSING_RPC_MESSAGE_PATTERNS: readonly RegExp[] = [
 
 const RPC_NAME_PATTERN = /action_queue_transition/i;
 
-const NESTED_ERROR_KEYS: readonly string[] = [
-  "error",
-  "cause",
-  "originalError",
-  "context",
-  "data",
-];
+const NESTED_ERROR_KEYS: readonly string[] = ["error", "cause", "originalError", "context", "data"];
 
 function readString(source: Record<string, unknown>, key: string): string | null {
   const value = source[key];
@@ -81,11 +75,7 @@ export function isMissingActionQueueTransitionRpcError(
   if (code && KNOWN_MISSING_RPC_CODES.has(code)) {
     // 42P01 alone isn't specific — require the RPC name to appear somewhere.
     if (code !== "42P01") return true;
-    const blob = [
-      readString(row, "message"),
-      readString(row, "details"),
-      readString(row, "hint"),
-    ]
+    const blob = [readString(row, "message"), readString(row, "details"), readString(row, "hint")]
       .filter((s): s is string => s !== null)
       .join(" ");
     if (RPC_NAME_PATTERN.test(blob)) return true;
@@ -120,7 +110,6 @@ export function isMissingActionQueueTransitionRpcError(
 
   return false;
 }
-
 
 /**
  * Grower-safe copy for the missing-RPC state. Deliberately avoids echoing

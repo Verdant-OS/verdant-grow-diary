@@ -24,14 +24,14 @@ the coarse `error` field, which is retained only for back-compat).
 { "error": "slots_unavailable", "error_code": "rpc_error", "request_id": "6b1c9d2e-…" }
 ```
 
-| `error_code`                        | HTTP | Meaning                                                                  | Retry  |
-| ----------------------------------- | ---- | ------------------------------------------------------------------------ | ------ |
-| `method_not_allowed`                | 405  | Method other than GET/POST/OPTIONS.                                      | none   |
-| `startup_dependencies_unavailable`  | 503  | Cold-start import failure (Supabase client or contract module).          | manual |
-| `env_missing`                       | 503  | `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` not configured.             | manual |
-| `rpc_error`                         | 503  | `public.founder_lifetime_slots_remaining()` returned a database error.   | auto   |
-| `rpc_invalid_payload`               | 503  | RPC value was not an integer in `[0, 100]`.                              | auto   |
-| `handler_unhandled_error`           | 503  | Unexpected exception escaped the handler.                                | auto   |
+| `error_code`                       | HTTP | Meaning                                                                | Retry  |
+| ---------------------------------- | ---- | ---------------------------------------------------------------------- | ------ |
+| `method_not_allowed`               | 405  | Method other than GET/POST/OPTIONS.                                    | none   |
+| `startup_dependencies_unavailable` | 503  | Cold-start import failure (Supabase client or contract module).        | manual |
+| `env_missing`                      | 503  | `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` not configured.           | manual |
+| `rpc_error`                        | 503  | `public.founder_lifetime_slots_remaining()` returned a database error. | auto   |
+| `rpc_invalid_payload`              | 503  | RPC value was not an integer in `[0, 100]`.                            | auto   |
+| `handler_unhandled_error`          | 503  | Unexpected exception escaped the handler.                              | auto   |
 
 All 503s are safe to treat as "fall back to the static Founder cap copy on
 `/pricing`." No failure response ever leaks server-side detail; `error_code` is

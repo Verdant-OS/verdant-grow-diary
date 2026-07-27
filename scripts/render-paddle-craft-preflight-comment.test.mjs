@@ -71,7 +71,10 @@ test("classifyFailure separates causes", () => {
     classifyFailure("found 1 entry/entries but none are active (status: archived)").kind,
     "inactive",
   );
-  assert.equal(classifyFailure("no price entity found (checked active + archived)").kind, "missing");
+  assert.equal(
+    classifyFailure("no price entity found (checked active + archived)").kind,
+    "missing",
+  );
 });
 
 test("all-pass log → verified verdict, no reason-code leak", () => {
@@ -302,6 +305,94 @@ test("parseVerifierReport returns empty parsed for non-object input", () => {
   assert.equal(parseVerifierReport({}).summary, null);
 });
 
+test("coverage_gap remedy tells operators to widen the allowlist, not create a price", () => {
+  // The price EXISTS and is active; the app just doesn't know it is sellable.
+  // Falling through to "Missing from catalog — create the price" sends an
+  // operator to create a duplicate of the price they are looking at.
+  const comment = renderComment({
+    verdict: { level: "fail", kind: "catalog_or_crash", shouldFail: true },
+    parsed: {
+      rows: [
+        {
+          env: "live",
+          externalId: "credit_pack_500",
+          status: "fail",
+          detail: "active in catalog but not in REQUIRED_PLAN_IDS",
+          cause: { kind: "coverage_gap" },
+        },
+      ],
+      summary: { pass: 0, fail: 1, skip: 0 },
+      keyUnsetMentioned: false,
+    },
+    runUrl: "https://example.test/run",
+    artifactHint: "log",
+  });
+  assert.match(comment, /add this external_id to/i);
+  assert.doesNotMatch(comment, /create the price via/i);
+});
+
+// --- log-fallback parity with the JSON path -------------------------------
+// The renderer has TWO input paths. Fixing a cause only on the --report path
+// leaves --log handing out the old, wrong remedy.
+
+test("log fallback classifies a coverage gap, not a missing price", () => {
+  const parsed = parseVerifierLog(
+    [
+      "# Paddle Craft catalog preflight",
+      "✗ [live] credit_pack_500 — active in catalog but not in REQUIRED_PLAN_IDS — add to src/lib/paidPlanAllowlist.ts",
+      "",
+      "SUMMARY: pass=0 fail=1 skip=0",
+    ].join("\n"),
+  );
+  assert.equal(parsed.rows.length, 1);
+  assert.equal(parsed.rows[0].cause.kind, "coverage_gap");
+
+  const comment = renderComment({
+    verdict: { level: "fail", kind: "catalog_or_crash", shouldFail: true },
+    parsed,
+    runUrl: "https://example.test/run",
+    artifactHint: "log",
+  });
+  assert.match(comment, /add this external_id to/i);
+  assert.doesNotMatch(comment, /create the price via/i);
+});
+
+test("log fallback keeps the coverage row instead of dropping it", () => {
+  // The synthetic id contains spaces. Under the old `\S+` id group this line
+  // matched nothing and the failure rendered as no row at all.
+  const parsed = parseVerifierLog(
+    [
+      "✗ [live] craft_* / credit_pack_* (coverage) — catalog enumeration failed: Paddle API 500",
+      "",
+      "SUMMARY: pass=0 fail=1 skip=0",
+    ].join("\n"),
+  );
+  assert.equal(parsed.rows.length, 1, "row must not vanish");
+  assert.equal(parsed.rows[0].externalId, "craft_* / credit_pack_* (coverage)");
+  assert.equal(parsed.rows[0].cause.kind, "enumeration_error");
+
+  const comment = renderComment({
+    verdict: { level: "fail", kind: "catalog_or_crash", shouldFail: true },
+    parsed,
+    runUrl: "https://example.test/run",
+    artifactHint: "log",
+  });
+  assert.match(comment, /could not enumerate the catalog/i);
+});
+
+test("log fallback still reads an ordinary id and a genuinely missing price", () => {
+  // Non-triviality: the widened id group must not have broken normal rows or
+  // collapsed every cause into the new branches.
+  const parsed = parseVerifierLog(
+    [
+      "✗ [live] craft_annual — no price entity found (checked active + archived)",
+      "",
+      "SUMMARY: pass=0 fail=1 skip=0",
+    ].join("\n"),
+  );
+  assert.equal(parsed.rows[0].externalId, "craft_annual");
+  assert.equal(parsed.rows[0].cause.kind, "missing");
+});
 // ---------------------------------------------------------------------
 // Per-environment "Missing by environment" section — surfaces status +
 // cause for every non-pass row grouped by env so the PR comment / step
@@ -416,8 +507,13 @@ test("renderComment classifies coverage_gap and enumeration_error in per-env tab
   });
   assert.match(md, /coverage_gap/);
   assert.match(md, /enumeration_error/);
-  assert.match(md, /not in REQUIRED_PLAN_IDS/);
-  assert.match(md, /Paddle enumeration failed/);
+  // Asserts the KIND of remedy, not its exact prose. This previously pinned
+  // two literal sentences; the coverage_gap wording has since been widened to
+  // send operators through the full sellable-tier chain (an allowlist entry
+  // alone leaves the SKU unsellable). Pinning prose would make that a test
+  // failure instead of an improvement — what matters is that a coverage gap is
+  // told to widen the allowlist, never to create a price that already exists.
+  assert.match(md, /PAID_PLAN_IDS/);
+  assert.doesNotMatch(md, /create the price via/i);
+  assert.match(md, /enumerate the catalog|Paddle enumeration failed/i);
 });
-
-

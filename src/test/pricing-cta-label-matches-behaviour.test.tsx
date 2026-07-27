@@ -80,6 +80,7 @@ vi.mock("@/hooks/usePaddleCheckout", () => ({
 vi.mock("@/hooks/usePageSeo", () => ({ usePageSeo: () => {} }));
 vi.mock("@/lib/pricingAnalytics", () => ({ trackPricingEvent: vi.fn() }));
 
+import { CREDIT_PACKS } from "@/constants/pricing";
 import Pricing from "@/pages/Pricing";
 
 /** Every CTA that can open a paid checkout, and the SKU it opens. */
@@ -89,7 +90,11 @@ const PAID_CTAS: ReadonlyArray<{ testId: string; sku: string }> = [
   { testId: "pricing-cta-founder-lifetime", sku: "founder_lifetime" },
   { testId: "pricing-cta-founder-highlight", sku: "founder_lifetime" },
   { testId: "pricing-cta-pro-footer", sku: "pro_monthly" },
-  { testId: "pricing-cta-credit_pack_50", sku: "credit_pack_50" },
+  // Derived from the same constant the page maps over, so adding a third pack
+  // cannot silently escape this guard. Listing only credit_pack_50 by hand is
+  // exactly how credit_pack_150 went unchecked in the first version of this
+  // supposedly exhaustive table.
+  ...CREDIT_PACKS.map((pack) => ({ testId: `pricing-cta-${pack.sku}`, sku: pack.sku })),
 ];
 
 /** Copy that tells a grower "this will NOT take your money right now." */

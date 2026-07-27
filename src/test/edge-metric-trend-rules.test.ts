@@ -138,8 +138,20 @@ describe("distinct helpers", () => {
 
   it("distinctOutcomes collects across buckets", () => {
     const buckets = [
-      { bucketStartMs: 1, total: 1, byOutcome: { success: 1 }, latencyMeanMs: null, latencyMaxMs: null },
-      { bucketStartMs: 2, total: 1, byOutcome: { rpc_error: 1 }, latencyMeanMs: null, latencyMaxMs: null },
+      {
+        bucketStartMs: 1,
+        total: 1,
+        byOutcome: { success: 1 },
+        latencyMeanMs: null,
+        latencyMaxMs: null,
+      },
+      {
+        bucketStartMs: 2,
+        total: 1,
+        byOutcome: { rpc_error: 1 },
+        latencyMeanMs: null,
+        latencyMaxMs: null,
+      },
     ];
     expect(distinctOutcomes(buckets)).toEqual(["rpc_error", "success"]);
   });

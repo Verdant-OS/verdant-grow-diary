@@ -145,6 +145,29 @@ export interface Deps {
     environment: PaddleEnv;
   }): Promise<CreditPackAllocationResult>;
   /**
+   * Settlement-time spendability probe for a credit-pack buyer.
+   *
+   * get-paddle-price gates packs at price-resolution time, but the money is
+   * taken later: a buyer who was entitled when they clicked can lapse before
+   * the transaction settles. `ai_credit_spend` only reads pack balance when
+   * the scope is per_month, so those credits sit dormant.
+   *
+   * Deliberately does NOT gate the grant. Withholding credits someone paid
+   * for is worse than granting dormant ones — packs never expire, so they
+   * activate the moment the buyer has a plan again. This exists to make the
+   * mismatch VISIBLE rather than to police it.
+   *
+   * `known: false` means we could not read the entitlement; that must never
+   * be reported as a mismatch, only as unknown.
+   *
+   * Optional, so every existing fixture and the subscription paths are
+   * unaffected when it is absent.
+   */
+  probeCreditPackSpendable?(input: {
+    user_id: string;
+    environment: PaddleEnv;
+  }): Promise<{ known: boolean; spendable: boolean }>;
+  /**
    * Double-bill fix: after a Founder Lifetime grant, cancel the buyer's
    * OTHER active recurring provider subscriptions (effective at the next
    * billing period — they keep what they already paid for). Without this,
@@ -280,6 +303,11 @@ export async function handleVerifiedEvent(
 
   // 3) Write.
   let writeRes: IoResult;
+  // Set when a credit pack was granted to someone who cannot currently spend
+  // it (they lapsed between price resolution and settlement). Surfaced in the
+  // return reason so it is greppable in logs, rather than abusing an audit
+  // column meant for failures — the grant itself succeeded.
+  let packSettledUnspendable = false;
   // Set when the post-grant provider cancellation fails; recorded on the
   // processed mark's last_error for operator reconciliation. Never blocks
   // the grant or the 200.
@@ -388,9 +416,53 @@ export async function handleVerifiedEvent(
         return { httpStatus: 500, reason: `write_failed:${redactError(err)}` };
       }
       writeRes = { ok: true };
+      // Grant already succeeded above. This only annotates the outcome.
+      if (deps.probeCreditPackSpendable) {
+        try {
+          const probe = await deps.probeCreditPackSpendable({
+            user_id: decision.userId,
+            environment: decision.env,
+          });
+          if (probe.known && !probe.spendable) {
+            packSettledUnspendable = true;
+          }
+        } catch {
+          // A probe failure must never affect a completed grant, and must
+          // never be reported as a mismatch — we simply do not know.
+        }
+      }
     } else {
-      // Dep not wired (pure subscription-path unit tests) → no-op success.
-      writeRes = { ok: true };
+      // Dep NOT wired. Previously this returned a silent no-op success, which
+      // marked a paid credit-pack purchase "processed" with no grant written
+      // and no error raised — charged, nothing recorded, invisible. In
+      // production that can only happen via a deps-wiring regression, and it
+      // would hit EVERY pack purchase while looking completely healthy.
+      //
+      // Codex (P1): my first fix marked this `skipped` — but `skipped` is a
+      // TERMINAL status in the duplicate-event branch above
+      // (`prior === "skipped"` short-circuits to `duplicate_skipped`, 200, no
+      // reprocessing). So once this fired, redeploying the fixed dependency
+      // could never recover the purchase: neither a Paddle retry (we already
+      // said 200, so none comes) nor a manual replay of the same event
+      // (permanently short-circuited) would ever re-attempt the grant.
+      // Charged, nothing granted, no path back — a worse trap than the
+      // original silent success, because it looks properly handled.
+      //
+      // `failed` is NOT in that terminal set, so it falls through to
+      // "reprocess". Marking `failed` + 500 here — mirroring the RPC-failure
+      // branch just above — gives this BOTH normal Paddle retry semantics
+      // (grant_lovable_credit_pack is idempotent, so a retry is safe) AND
+      // future-replay recoverability through the existing reprocess path,
+      // rather than inventing a separate reconciliation mechanism for a
+      // failure mode the retry machinery already knows how to handle.
+      const err = "credit_pack_grant_unwired";
+      await deps.markEvent(paddleEventId, {
+        processing_status: "failed",
+        processed_ok: false,
+        skip_reason: null,
+        last_error: redactError(err),
+      });
+      return { httpStatus: 500, reason: `write_failed:${redactError(err)}` };
     }
   } else if (decision.kind === "upsert_subscription") {
     writeRes = await deps.upsertSubscription(decision.row);
@@ -425,16 +497,49 @@ export async function handleVerifiedEvent(
     return { httpStatus: 500, reason: `write_failed:${redactError(err)}` };
   }
 
-  // 4) Mark processed. A failed post-grant provider cancellation rides on
-  // last_error (processed_ok stays true — the grant itself succeeded) so
-  // the operator audit surface can reconcile the double-bill risk.
+  // 4) Mark processed. Two anomalies can ride alongside a successful grant —
+  // a failed post-grant provider cancellation (double-bill risk) and a
+  // credit pack settling for a buyer who cannot yet spend it — and BOTH must
+  // reach the durable last_error column, not just this response's `reason`.
+  //
+  // Codex (P2): my first version put unspendable_at_settlement ONLY in the
+  // return reason. That string lives in the function's transient response —
+  // logs expire, and any future delivery of this SAME event short-circuits to
+  // `duplicate_processed` at the top of this function without ever
+  // recomputing it. So the marker this branch exists to make "findable" was
+  // findable exactly once, in a log line, and never again. Querying
+  // lovable_paddle_events — the actual audit surface an operator would use
+  // months later — could not see it at all.
+  //
+  // They are mutually exclusive by decision kind today (a provider-cancel
+  // failure only follows a founder_lifetime/record_lifetime grant; the pack
+  // probe only follows grant_credit_pack) but composed as a list rather than
+  // an if/else so that stays true by construction, not by assumption, if a
+  // future decision kind ever produces both.
+  // Two string lists on purpose, not one: `reason` (the terse response) and
+  // last_error (the persisted, detailed audit trail) have different existing
+  // shapes for provider_cancel_failed — the response omits the underlying
+  // error text, last_error carries it. Reusing one joined string for both
+  // would either leak error detail into the response or drop it from the
+  // audit row; this preserves each pre-existing shape and adds
+  // unspendable_at_settlement — a plain flag, no detail to omit — to both.
+  const anomalyFlags: string[] = [];
+  const anomalyDetails: string[] = [];
+  if (providerCancelError) {
+    anomalyFlags.push("provider_cancel_failed");
+    anomalyDetails.push(`provider_cancel_failed:${providerCancelError}`);
+  }
+  if (packSettledUnspendable) {
+    anomalyFlags.push("unspendable_at_settlement");
+    anomalyDetails.push("unspendable_at_settlement");
+  }
+  const lastError = anomalyDetails.length > 0 ? redactError(anomalyDetails.join(";")) : null;
+
   const mark = await deps.markEvent(paddleEventId, {
     processing_status: "processed",
     processed_ok: true,
     skip_reason: null,
-    last_error: providerCancelError
-      ? redactError(`provider_cancel_failed:${providerCancelError}`)
-      : null,
+    last_error: lastError,
   });
   if ("error" in mark) {
     // Subscription upsert is idempotent (unique paddle_subscription_id), so
@@ -444,8 +549,9 @@ export async function handleVerifiedEvent(
 
   return {
     httpStatus: 200,
-    reason: providerCancelError
-      ? `processed:${decision.kind};provider_cancel_failed`
-      : `processed:${decision.kind}`,
+    reason:
+      anomalyFlags.length > 0
+        ? `processed:${decision.kind};${anomalyFlags.join(";")}`
+        : `processed:${decision.kind}`,
   };
 }

@@ -32,7 +32,13 @@ export const COMMENT_MARKER = "<!-- paddle-craft-catalog-preflight -->";
 //   ✗ [live] craft_annual — no price entity found (checked active + archived)
 //   • [live] craft_monthly — PADDLE_LIVE_API_KEY not set
 // Plus one SUMMARY line: SUMMARY: pass=<n> fail=<n> skip=<n>
-const LINE_RE = /^([✓✗•])\s+\[(sandbox|live)\]\s+(\S+)\s+—\s+(.+?)\s*$/u;
+// The id group is non-greedy `.+?` rather than `\S+` on purpose: the coverage
+// and enumeration rows carry a SYNTHETIC id containing spaces
+// ("craft_* / credit_pack_* (coverage)"). With `\S+` those lines matched
+// nothing and silently disappeared from the log-fallback comment — a failure
+// row that renders as no row at all. ` — ` is the field separator and never
+// appears inside an id, so non-greedy stops in the right place.
+const LINE_RE = /^([✓✗•])\s+\[(sandbox|live)\]\s+(.+?)\s+—\s+(.+?)\s*$/u;
 const SUMMARY_RE = /^SUMMARY:\s+pass=(\d+)\s+fail=(\d+)\s+skip=(\d+)\s*$/;
 const KEY_UNSET_RE = /_API_KEY is not set/;
 
@@ -48,6 +54,16 @@ export function classifyFailure(detail) {
   }
   if (/none are active/i.test(detail)) {
     return { kind: "inactive" };
+  }
+  // Kept in step with the JSON path's causes. Without these the fallback
+  // classifies a coverage gap as `missing` and tells an operator to create a
+  // price that already exists and is active — the exact inversion the JSON
+  // remedy was fixed for.
+  if (/not in REQUIRED_PLAN_IDS/i.test(detail)) {
+    return { kind: "coverage_gap" };
+  }
+  if (/catalog enumeration failed/i.test(detail)) {
+    return { kind: "enumeration_error" };
   }
   return { kind: "missing" };
 }
@@ -153,7 +169,6 @@ export function parseVerifierReport(report) {
   return parsed;
 }
 
-
 function safeReadReport(reportPath) {
   if (!reportPath) return null;
   try {
@@ -221,10 +236,25 @@ function remedyForFailRow(row) {
     return "Price exists but is not active — un-archive or re-create as active.";
   }
   if (cause.kind === "coverage_gap") {
-    return "Active in Paddle but not in REQUIRED_PLAN_IDS — add to `paidPlanAllowlist.ts` or archive.";
+    // The inverse of "missing": the price EXISTS and is active, but the app
+    // does not know it is sellable. Telling an operator to create a price they
+    // are looking at sends them the wrong way entirely.
+    // Pointing only at the allowlists would turn THIS gate green while the SKU
+    // still could not be sold or fulfilled: checkout needs a SERVER_PRICE_CONFIG
+    // entry + env var, a pack needs a CREDIT_PACK_CREDITS amount, and the UI
+    // needs a definition in constants/pricing.ts. The full chain is already
+    // asserted by src/test/sellable-tier-chain.test.ts, so send operators there
+    // rather than enumerating a checklist that can drift from it.
+    return (
+      "Active in Paddle but not sellable by the app — add this external_id to " +
+      "`PAID_PLAN_IDS` in src/lib/paidPlanAllowlist.ts, then run " +
+      "`bunx vitest run src/test/sellable-tier-chain.test.ts`, which fails until " +
+      "the whole chain is wired (CREDIT_PACK_IDS + CREDIT_PACK_CREDITS for a pack, " +
+      "SERVER_PRICE_CONFIG + PADDLE_PRICE_* env for checkout, and the UI definition)."
+    );
   }
   if (cause.kind === "enumeration_error") {
-    return "Paddle enumeration failed — cannot assert coverage. Re-run once Paddle is reachable.";
+    return "Could not enumerate the catalog — check credentials / Paddle status, then re-run.";
   }
   return "Missing from catalog — create the price via `create_price` with this external_id.";
 }
@@ -352,7 +382,6 @@ export function renderComment({ verdict, parsed, runUrl, artifactHint }) {
   return lines.join("\n");
 }
 
-
 function parseArgs(argv) {
   const out = { log: null, report: null, rc: null, event: null, out: null, json: false };
   for (let i = 0; i < argv.length; i += 1) {
@@ -396,9 +425,7 @@ if (isMain()) {
     inputMode = "report";
   } else {
     if (args.report) {
-      console.error(
-        `--report ${args.report} not readable — falling back to --log`,
-      );
+      console.error(`--report ${args.report} not readable — falling back to --log`);
     }
     const logText = safeReadLog(args.log) ?? "";
     parsed = parseVerifierLog(logText);

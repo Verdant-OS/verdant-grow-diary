@@ -31,8 +31,7 @@ const corsHeaders: Record<string, string> = {
   "Access-Control-Expose-Headers": "x-request-id",
 };
 
-const REQUEST_ID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const REQUEST_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function resolveRequestId(req: Request): string {
   const raw = req.headers.get("x-request-id")?.trim();
@@ -40,11 +39,7 @@ function resolveRequestId(req: Request): string {
   return crypto.randomUUID();
 }
 
-function json(
-  status: number,
-  body: Record<string, unknown>,
-  requestId: string,
-): Response {
+function json(status: number, body: Record<string, unknown>, requestId: string): Response {
   return new Response(JSON.stringify({ ...body, request_id: requestId }), {
     status,
     headers: {
@@ -55,12 +50,7 @@ function json(
   });
 }
 
-function fail(
-  status: number,
-  errorCode: string,
-  message: string,
-  requestId: string,
-): Response {
+function fail(status: number, errorCode: string, message: string, requestId: string): Response {
   return json(status, { error: message, error_code: errorCode }, requestId);
 }
 
@@ -145,9 +135,5 @@ Deno.serve(async (req) => {
     return fail(503, "query_failed", "Service unavailable", requestId);
   }
 
-  return json(
-    200,
-    { snapshot: data ?? null, filter: { fn: fnFilter } },
-    requestId,
-  );
+  return json(200, { snapshot: data ?? null, filter: { fn: fnFilter } }, requestId);
 });

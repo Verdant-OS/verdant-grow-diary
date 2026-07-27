@@ -4,10 +4,7 @@
   "title": "founder-slots-remaining response",
   "description": "Response body contract for the public `founder-slots-remaining` edge function. Success (HTTP 200) returns the remaining/total slot counts; every failure (405 or 503) returns a stable error envelope with a machine-readable `error_code`. Every response — success or failure — includes a `request_id` UUID that is also echoed in the `x-request-id` response header.",
   "type": "object",
-  "oneOf": [
-    { "$ref": "#/$defs/successResponse" },
-    { "$ref": "#/$defs/errorResponse" }
-  ],
+  "oneOf": [{ "$ref": "#/$defs/successResponse" }, { "$ref": "#/$defs/errorResponse" }],
   "$defs": {
     "requestId": {
       "type": "string",

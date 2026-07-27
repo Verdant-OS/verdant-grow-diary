@@ -47,8 +47,7 @@ const corsHeaders: Record<string, string> = {
   "Access-Control-Expose-Headers": "x-request-id",
 };
 
-const REQUEST_ID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const REQUEST_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function resolveRequestId(req: Request): string {
   const raw = req.headers.get("x-request-id")?.trim();
@@ -56,11 +55,7 @@ function resolveRequestId(req: Request): string {
   return crypto.randomUUID();
 }
 
-function json(
-  status: number,
-  body: Record<string, unknown>,
-  requestId: string,
-): Response {
+function json(status: number, body: Record<string, unknown>, requestId: string): Response {
   return new Response(JSON.stringify({ ...body, request_id: requestId }), {
     status,
     headers: {
@@ -71,17 +66,15 @@ function json(
   });
 }
 
-function fail(
-  status: number,
-  errorCode: string,
-  message: string,
-  requestId: string,
-): Response {
+function fail(status: number, errorCode: string, message: string, requestId: string): Response {
   return json(status, { error: message, error_code: errorCode }, requestId);
 }
 
-
-function log(severity: "info" | "warn" | "error", event: string, extra: Record<string, unknown> = {}): void {
+function log(
+  severity: "info" | "warn" | "error",
+  event: string,
+  extra: Record<string, unknown> = {},
+): void {
   const line = JSON.stringify({ fn: FN, ts: new Date().toISOString(), severity, event, ...extra });
   if (severity === "error") console.error(line);
   else if (severity === "warn") console.warn(line);
@@ -228,8 +221,6 @@ function partitionByCooldown(
   return { toFire, suppressed };
 }
 
-
-
 interface WebhookAttempt {
   attempt: number;
   status?: number;
@@ -268,7 +259,11 @@ async function sleep(ms: number): Promise<void> {
 async function postWebhook(
   breaches: Breach[],
   t: Thresholds,
-  logger: (severity: "info" | "warn" | "error", event: string, extra?: Record<string, unknown>) => void = log,
+  logger: (
+    severity: "info" | "warn" | "error",
+    event: string,
+    extra?: Record<string, unknown>,
+  ) => void = log,
   requestId?: string,
 ): Promise<WebhookResult> {
   const url = Deno.env.get("ALERT_WEBHOOK_URL");
@@ -277,8 +272,9 @@ async function postWebhook(
   const maxAttempts = Math.max(1, numEnv("ALERT_WEBHOOK_MAX_ATTEMPTS", 4));
   const baseDelay = numEnv("ALERT_WEBHOOK_BASE_DELAY_MS", 500);
   const maxDelay = numEnv("ALERT_WEBHOOK_MAX_DELAY_MS", 8000);
-  const lines = breaches.map((b) =>
-    `• *${b.fn}* — ${b.metric}: ${b.value} (threshold ${b.threshold}, requests ${b.requests_in_window})`,
+  const lines = breaches.map(
+    (b) =>
+      `• *${b.fn}* — ${b.metric}: ${b.value} (threshold ${b.threshold}, requests ${b.requests_in_window})`,
   );
   const text = `:rotating_light: Verdant edge alert — ${breaches.length} breach(es) in last ${t.windowMinutes}m\n${lines.join("\n")}`;
   const body = JSON.stringify({ text, breaches, window_minutes: t.windowMinutes });
@@ -312,7 +308,14 @@ async function postWebhook(
       const duration = Date.now() - startedAt;
       const ok = res.status >= 200 && res.status < 300;
       const transient = !ok && isTransientStatus(res.status);
-      attempts.push({ attempt, status: res.status, ok, transient, delay_before_ms: delayBefore, duration_ms: duration });
+      attempts.push({
+        attempt,
+        status: res.status,
+        ok,
+        transient,
+        delay_before_ms: delayBefore,
+        duration_ms: duration,
+      });
       lastStatus = res.status;
       lastError = undefined;
       if (ok) {
@@ -344,7 +347,14 @@ async function postWebhook(
       const duration = Date.now() - startedAt;
       const msg = err instanceof Error ? err.message : String(err);
       // Network/timeout/abort errors are treated as transient.
-      attempts.push({ attempt, ok: false, transient: true, error: msg, delay_before_ms: delayBefore, duration_ms: duration });
+      attempts.push({
+        attempt,
+        ok: false,
+        transient: true,
+        error: msg,
+        delay_before_ms: delayBefore,
+        duration_ms: duration,
+      });
       lastError = msg;
       lastStatus = undefined;
       logger("warn", "webhook_transient_failure", {
@@ -402,7 +412,6 @@ async function requireOperator(
   return { ok: true };
 }
 
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   const requestId = resolveRequestId(req);
@@ -423,9 +432,7 @@ Deno.serve(async (req) => {
   // lets pg_net trigger the check without carrying a user session.
   const cronSecret = Deno.env.get("ALERT_CRON_SECRET");
   const providedCronSecret = req.headers.get("x-alert-cron-secret");
-  const isCron = Boolean(
-    cronSecret && providedCronSecret && providedCronSecret === cronSecret,
-  );
+  const isCron = Boolean(cronSecret && providedCronSecret && providedCronSecret === cronSecret);
 
   if (!isCron) {
     const authHeader = req.headers.get("Authorization");
@@ -476,12 +483,7 @@ Deno.serve(async (req) => {
       const filtered = (dispatchRows ?? []).filter((r) =>
         pairs.includes(`${r.fn}|${r.metric}`),
       ) as DispatchRow[];
-      const parts = partitionByCooldown(
-        breaches,
-        filtered,
-        new Date(),
-        thresholds.cooldownMinutes,
-      );
+      const parts = partitionByCooldown(breaches, filtered, new Date(), thresholds.cooldownMinutes);
       toFire = parts.toFire;
       suppressed = parts.suppressed;
     }
@@ -559,6 +561,5 @@ Deno.serve(async (req) => {
     requestId,
   );
 });
-
 
 export const __internals = { evaluate, loadThresholds, partitionByCooldown, postWebhook, log };

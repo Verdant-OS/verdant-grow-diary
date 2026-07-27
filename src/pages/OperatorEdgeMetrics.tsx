@@ -84,8 +84,7 @@ async function fetchRows(rangeKey: RangeKey): Promise<EdgeMetricEventRow[]> {
 }
 
 function tickFormatter(bucket: "hour" | "day") {
-  return (value: number) =>
-    format(new Date(value), bucket === "hour" ? "HH:mm" : "MMM d");
+  return (value: number) => format(new Date(value), bucket === "hour" ? "HH:mm" : "MMM d");
 }
 
 function tooltipLabelFormatter(bucket: "hour" | "day") {
@@ -372,8 +371,8 @@ export default function OperatorEdgeMetrics() {
             <CardHeader>
               <CardTitle>Per-request latency</CardTitle>
               <CardDescription>
-                Mean and max <code>duration_ms</code> per bucket, from{" "}
-                <code>request_metric</code> rows.
+                Mean and max <code>duration_ms</code> per bucket, from <code>request_metric</code>{" "}
+                rows.
               </CardDescription>
             </CardHeader>
             <CardContent className="h-64">
@@ -393,10 +392,7 @@ export default function OperatorEdgeMetrics() {
                       tickFormatter={tickFormatter(range.bucket)}
                       stroke="hsl(var(--muted-foreground))"
                     />
-                    <YAxis
-                      stroke="hsl(var(--muted-foreground))"
-                      tickFormatter={(v) => `${v}ms`}
-                    />
+                    <YAxis stroke="hsl(var(--muted-foreground))" tickFormatter={(v) => `${v}ms`} />
                     <Tooltip
                       labelFormatter={tooltipLabelFormatter(range.bucket)}
                       formatter={(v: unknown) => `${Number(v).toFixed(2)} ms`}

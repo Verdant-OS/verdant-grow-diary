@@ -39,16 +39,34 @@ describe("isMissingActionQueueTransitionRpcError", () => {
 
   it("detects additional PostgREST/SQL variants for renamed or removed functions", () => {
     const variants: unknown[] = [
-      { code: "PGRST203", message: "Could not choose the best candidate function between: public.action_queue_transition(uuid,text), public.action_queue_transition_v2(uuid,text,jsonb)" },
-      { message: "Searched for a function named public.action_queue_transition, but no matches were found in the schema cache." },
+      {
+        code: "PGRST203",
+        message:
+          "Could not choose the best candidate function between: public.action_queue_transition(uuid,text), public.action_queue_transition_v2(uuid,text,jsonb)",
+      },
+      {
+        message:
+          "Searched for a function named public.action_queue_transition, but no matches were found in the schema cache.",
+      },
       { message: "procedure public.action_queue_transition(uuid, text) does not exist" },
       { message: "Unknown function action_queue_transition" },
       // 404 with body payload from a raw fetch wrapper
-      { status: 404, body: "Could not find the function public.action_queue_transition in the schema cache" },
+      {
+        status: 404,
+        body: "Could not find the function public.action_queue_transition in the schema cache",
+      },
       { statusCode: 404, message: "function public.action_queue_transition does not exist" },
       // nested wrapper shapes (fetch/Supabase clients often wrap the real error)
-      { name: "FunctionsHttpError", cause: { code: "PGRST202", message: "Could not find the function" } },
-      { error: { code: "42883", message: "function public.action_queue_transition(uuid,text) does not exist" } },
+      {
+        name: "FunctionsHttpError",
+        cause: { code: "PGRST202", message: "Could not find the function" },
+      },
+      {
+        error: {
+          code: "42883",
+          message: "function public.action_queue_transition(uuid,text) does not exist",
+        },
+      },
       { context: { data: { message: "no function matches the given name and argument types" } } },
       // 42P01 gated by RPC-name presence in details
       { code: "42P01", message: "relation missing", details: "action_queue_transition" },
@@ -104,7 +122,6 @@ describe("isMissingActionQueueTransitionRpcError", () => {
     }
   });
 });
-
 
 describe("safeActionQueueFailureCopy rpc_missing reason", () => {
   it("returns friendly copy without echoing backend text", () => {

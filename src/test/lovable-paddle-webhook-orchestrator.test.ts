@@ -593,7 +593,109 @@ describe("handleVerifiedEvent — AI credit-pack grant", () => {
     expect(grant).toHaveBeenCalledTimes(1);
   });
 
-  it("grant dep not wired (pure subscription-path fixture): no-op success, still 200", async () => {
+  it("grants a pack the buyer cannot yet spend, and PERSISTS the flag to the audit row", async () => {
+    // Founder decision: never withhold credits someone paid for. The money is
+    // taken before this runs, and packs do not expire — so a buyer who lapsed
+    // between price resolution and settlement gets the credits, which activate
+    // when they have a plan again. The flag makes that dormant balance
+    // findable instead of silent.
+    //
+    // Codex (P2): my first version put the marker ONLY in the response
+    // `reason` — a transient string that logs expire and that a future
+    // duplicate delivery of the same event never recomputes (it short-circuits
+    // to `duplicate_processed` before this code runs again). So the marker was
+    // findable exactly once, in a log line, never in the durable
+    // lovable_paddle_events row an operator would actually query months later.
+    // It now also lands in the persisted last_error column.
+    const f = makeFixture();
+    const grant = vi.fn(async () => ({ ok: true }) as Awaited<ReturnType<PackDep>>);
+    (f.deps as Deps).allocateCreditPack = grant;
+    (f.deps as Deps).probeCreditPackSpendable = vi.fn(async () => ({
+      known: true,
+      spendable: false,
+    }));
+
+    const res = await handleVerifiedEvent(
+      f.deps,
+      packTxEvent("credit_pack_50", "evt_pack_unspendable"),
+      "sandbox",
+      NOW,
+      {},
+    );
+
+    expect(res.httpStatus).toBe(200);
+    // Granted — the assertion that matters most.
+    expect(grant).toHaveBeenCalledTimes(1);
+    expect(res.reason).toContain("processed:grant_credit_pack");
+    expect(res.reason).toContain("unspendable_at_settlement");
+    // The durable row, not just the transient response — this is the part
+    // Codex's finding was actually about.
+    expect(f.markCalls.at(-1)?.patch).toMatchObject({
+      processing_status: "processed",
+      processed_ok: true,
+      last_error: expect.stringContaining("unspendable_at_settlement"),
+    });
+  });
+
+  it("does not flag a spendable buyer, and never lets a probe failure touch the grant", async () => {
+    // Non-triviality + blast-radius guard: the probe is annotation only. A
+    // spendable buyer must be unmarked, and a throwing probe must not turn a
+    // completed grant into a failure or a false mismatch.
+    const f = makeFixture();
+    const grant = vi.fn(async () => ({ ok: true }) as Awaited<ReturnType<PackDep>>);
+    (f.deps as Deps).allocateCreditPack = grant;
+    (f.deps as Deps).probeCreditPackSpendable = vi.fn(async () => ({
+      known: true,
+      spendable: true,
+    }));
+    const ok = await handleVerifiedEvent(
+      f.deps,
+      packTxEvent("credit_pack_50", "evt_pack_ok"),
+      "sandbox",
+      NOW,
+      {},
+    );
+    expect(ok.reason).toBe("processed:grant_credit_pack");
+    expect(ok.reason).not.toContain("unspendable");
+
+    const f2 = makeFixture();
+    const grant2 = vi.fn(async () => ({ ok: true }) as Awaited<ReturnType<PackDep>>);
+    (f2.deps as Deps).allocateCreditPack = grant2;
+    (f2.deps as Deps).probeCreditPackSpendable = vi.fn(async () => {
+      throw new Error("entitlement read exploded");
+    });
+    const boom = await handleVerifiedEvent(
+      f2.deps,
+      packTxEvent("credit_pack_50", "evt_pack_probe_boom"),
+      "sandbox",
+      NOW,
+      {},
+    );
+    expect(boom.httpStatus).toBe(200);
+    expect(grant2).toHaveBeenCalledTimes(1);
+    // Unknown is NOT a mismatch.
+    expect(boom.reason).not.toContain("unspendable");
+  });
+
+  it("grant dep not wired: NEVER reports a grant it did not make, and stays retryable", async () => {
+    // This previously asserted `processed:grant_credit_pack` — i.e. the money
+    // path reporting a successful grant that never happened. In production an
+    // unwired dep can only come from a deps regression, and it would hit EVERY
+    // pack purchase while the audit log looked completely healthy: charged,
+    // nothing granted, nothing to alert on.
+    //
+    // Codex (P1) then caught the fix itself being wrong: my first version
+    // marked this `skipped` + 200. `skipped` is TERMINAL in the duplicate-event
+    // branch (see "duplicate previously failed" vs the skipped/processed
+    // cases above) — so once recorded, redeploying the corrected dependency
+    // could never recover the purchase. No Paddle retry comes (we said 200),
+    // and a manual replay of the same event permanently short-circuits to
+    // `duplicate_skipped`. Charged, nothing granted, no way back.
+    //
+    // `failed` + 500 instead: a normal Paddle retry (the grant RPC is
+    // idempotent), AND `failed` is NOT terminal in the duplicate branch, so a
+    // later replay after the fix ships reprocesses and actually grants —
+    // proven by the next test.
     const f = makeFixture();
     const res = await handleVerifiedEvent(
       f.deps,
@@ -602,7 +704,37 @@ describe("handleVerifiedEvent — AI credit-pack grant", () => {
       NOW,
       {},
     );
+    expect(res.httpStatus).toBe(500);
+    expect(res.reason).toContain("credit_pack_grant_unwired");
+    expect(res.reason).not.toContain("processed");
+    expect(f.markCalls.at(-1)?.patch).toMatchObject({
+      processing_status: "failed",
+      processed_ok: false,
+    });
+  });
+
+  it("a purchase stuck by unwired deps actually grants once the fix ships and Paddle replays", async () => {
+    // The recovery path Codex asked for, proven rather than asserted: seed the
+    // SAME event id as already `failed` (as the previous test would have left
+    // it), then redeliver it with the dependency now wired. This must NOT
+    // short-circuit as a duplicate — it must reprocess and grant.
+    const f = makeFixture({
+      seedExisting: [["evt_pack_recovered", { processing_status: "failed" }]],
+    });
+    const grant = vi.fn(async () => ({ ok: true }) as Awaited<ReturnType<PackDep>>);
+    (f.deps as Deps).allocateCreditPack = grant;
+
+    const res = await handleVerifiedEvent(
+      f.deps,
+      packTxEvent("credit_pack_50", "evt_pack_recovered"),
+      "sandbox",
+      NOW,
+      {},
+    );
+
     expect(res.httpStatus).toBe(200);
     expect(res.reason).toBe("processed:grant_credit_pack");
+    expect(grant).toHaveBeenCalledTimes(1);
+    expect(f.markCalls.at(-1)?.patch.processing_status).toBe("processed");
   });
 });

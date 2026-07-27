@@ -23,7 +23,9 @@ Deno.test("request_metric is mirrored to the analytics sink with provenance", as
   Deno.env.delete("SUPABASE_SERVICE_ROLE_KEY");
   __setDepsLoaderForTesting(() =>
     Promise.resolve({
-      createClient: (() => { throw new Error("unused"); }) as never,
+      createClient: (() => {
+        throw new Error("unused");
+      }) as never,
       buildFounderSlotsPayload: (() => null) as never,
     }),
   );
@@ -41,7 +43,9 @@ Deno.test("request_metric is mirrored to the analytics sink with provenance", as
 
     const requestMetric = rows.find(
       (r): r is Record<string, unknown> =>
-        typeof r === "object" && r !== null && (r as Record<string, unknown>).event_type === "request_metric",
+        typeof r === "object" &&
+        r !== null &&
+        (r as Record<string, unknown>).event_type === "request_metric",
     );
     assert(requestMetric, "expected a request_metric row to be persisted");
     assertEquals(requestMetric.fn, "founder-slots-remaining");
@@ -53,7 +57,8 @@ Deno.test("request_metric is mirrored to the analytics sink with provenance", as
       "duration_ms must be present and numeric",
     );
     assert(
-      typeof requestMetric.request_id === "string" && (requestMetric.request_id as string).length > 0,
+      typeof requestMetric.request_id === "string" &&
+        (requestMetric.request_id as string).length > 0,
       "request_id must be present",
     );
   } finally {
@@ -72,7 +77,9 @@ Deno.test("persistor failures never break the request path", async () => {
   Deno.env.delete("SUPABASE_SERVICE_ROLE_KEY");
   __setDepsLoaderForTesting(() =>
     Promise.resolve({
-      createClient: (() => { throw new Error("unused"); }) as never,
+      createClient: (() => {
+        throw new Error("unused");
+      }) as never,
       buildFounderSlotsPayload: (() => null) as never,
     }),
   );

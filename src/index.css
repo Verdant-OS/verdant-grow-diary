@@ -14,7 +14,7 @@
     --popover: 150 18% 8%;
     --popover-foreground: 90 25% 92%;
 
-    --primary: 95 60% 55%;            /* lime accent */
+    --primary: 95 60% 55%; /* lime accent */
     --primary-foreground: 150 25% 8%;
 
     --secondary: 150 20% 14%;
@@ -23,7 +23,7 @@
     --muted: 150 12% 14%;
     --muted-foreground: 145 10% 60%;
 
-    --accent: 145 50% 35%;            /* deep green */
+    --accent: 145 50% 35%; /* deep green */
     --accent-foreground: 90 30% 95%;
 
     --destructive: 0 70% 55%;
@@ -53,8 +53,9 @@
     --gradient-verdant: linear-gradient(135deg, hsl(140 55% 18%), hsl(150 30% 8%));
     --gradient-leaf: linear-gradient(135deg, hsl(130 60% 40%), hsl(95 70% 55%));
     --gradient-glass: linear-gradient(160deg, hsl(150 25% 14% / 0.85), hsl(150 20% 8% / 0.6));
-    --gradient-hero: radial-gradient(circle at 20% 0%, hsl(95 60% 30% / 0.35), transparent 50%),
-                     radial-gradient(circle at 90% 100%, hsl(140 50% 25% / 0.4), transparent 60%);
+    --gradient-hero:
+      radial-gradient(circle at 20% 0%, hsl(95 60% 30% / 0.35), transparent 50%),
+      radial-gradient(circle at 90% 100%, hsl(140 50% 25% / 0.4), transparent 60%);
 
     --shadow-glow: 0 0 40px hsl(95 70% 50% / 0.25);
     --shadow-card: 0 8px 24px -8px hsl(150 50% 4% / 0.6);
@@ -90,19 +91,35 @@
 }
 
 @layer base {
-  * { @apply border-border; }
-  html, body, #root { @apply min-h-screen; }
+  * {
+    @apply border-border;
+  }
+  html,
+  body,
+  #root {
+    @apply min-h-screen;
+  }
   html {
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
   }
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-family:
+      "Inter",
+      system-ui,
+      -apple-system,
+      sans-serif;
     background-image: var(--gradient-hero);
     background-attachment: fixed;
   }
-  h1, h2, h3, h4 { font-family: 'Space Grotesk', 'Inter', sans-serif; letter-spacing: -0.02em; }
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: "Space Grotesk", "Inter", sans-serif;
+    letter-spacing: -0.02em;
+  }
 
   @media (max-width: 640px) {
     body {
@@ -130,20 +147,38 @@
     border: 1px solid hsl(var(--border));
     box-shadow: var(--shadow-card);
   }
-  .glow-accent { box-shadow: var(--shadow-glow); }
-  .gradient-leaf { background: var(--gradient-leaf); }
-  .gradient-verdant { background: var(--gradient-verdant); }
-  .text-leaf { color: hsl(var(--leaf-glow)); }
+  .glow-accent {
+    box-shadow: var(--shadow-glow);
+  }
+  .gradient-leaf {
+    background: var(--gradient-leaf);
+  }
+  .gradient-verdant {
+    background: var(--gradient-verdant);
+  }
+  .text-leaf {
+    color: hsl(var(--leaf-glow));
+  }
   .label-chip {
     @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider;
   }
-  .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
-  .scrollbar-thin::-webkit-scrollbar-thumb { background: hsl(var(--muted)); border-radius: 999px; }
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted));
+    border-radius: 999px;
+  }
 }
 
 @layer utilities {
-  .animate-fade-in { animation: fadeIn 0.4s var(--transition-smooth) both; }
-  .animate-slide-up { animation: slideUp 0.5s var(--transition-smooth) both; }
+  .animate-fade-in {
+    animation: fadeIn 0.4s var(--transition-smooth) both;
+  }
+  .animate-slide-up {
+    animation: slideUp 0.5s var(--transition-smooth) both;
+  }
 
   @media (max-width: 640px) {
     .text-\[10px\],
@@ -158,18 +193,42 @@
     }
   }
 
-  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-  @keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
 }
 
 /* Print rules for Environment Summary Report (and any printable section). */
 @media screen {
-  .print-only { display: none !important; }
+  .print-only {
+    display: none !important;
+  }
 }
 @media print {
-  .print-hidden { display: none !important; }
-  .print-only { display: block !important; }
-  body * { visibility: hidden; }
+  .print-hidden {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+  body * {
+    visibility: hidden;
+  }
   [data-print-section="environment-summary-report"],
   [data-print-section="environment-summary-report"] *,
   [data-print-section="harvest-evidence-report"],
@@ -177,7 +236,9 @@
   [data-print-section="diary-range-report"],
   [data-print-section="diary-range-report"] *,
   [data-print-section="ai-doctor-report"],
-  [data-print-section="ai-doctor-report"] * { visibility: visible; }
+  [data-print-section="ai-doctor-report"] * {
+    visibility: visible;
+  }
   [data-print-section="environment-summary-report"],
   [data-print-section="harvest-evidence-report"],
   [data-print-section="diary-range-report"],
@@ -196,14 +257,24 @@
     margin: 12mm;
     @bottom-right {
       content: "Page " counter(page) " of " counter(pages);
-      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+      font-family:
+        ui-sans-serif,
+        system-ui,
+        -apple-system,
+        "Segoe UI",
+        Roboto,
         sans-serif;
       font-size: 10px;
       color: #555;
     }
     @bottom-left {
       content: "Verdant — Environment Summary";
-      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+      font-family:
+        ui-sans-serif,
+        system-ui,
+        -apple-system,
+        "Segoe UI",
+        Roboto,
         sans-serif;
       font-size: 10px;
       color: #888;

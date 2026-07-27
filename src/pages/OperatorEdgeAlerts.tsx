@@ -22,13 +22,7 @@ import { AlertTriangle, Bell, BellOff, CheckCircle2, Clock, RefreshCw } from "lu
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -182,8 +176,7 @@ export default function OperatorEdgeAlerts() {
         cooldownMinutes !== null && Number.isFinite(lastMs)
           ? new Date(lastMs + cooldownMinutes * 60_000).toISOString()
           : null;
-      const active =
-        expiresAt !== null ? Date.parse(expiresAt) > now : false;
+      const active = expiresAt !== null ? Date.parse(expiresAt) > now : false;
       return { ...r, expires_at: expiresAt, cooldown_active: active };
     });
   }, [dispatchesQuery.data, cooldownMinutes, now]);
@@ -210,9 +203,7 @@ export default function OperatorEdgeAlerts() {
         <Card>
           <CardHeader>
             <CardTitle>Restricted</CardTitle>
-            <CardDescription>
-              This page is only available to operators.
-            </CardDescription>
+            <CardDescription>This page is only available to operators.</CardDescription>
           </CardHeader>
         </Card>
       </div>
@@ -229,8 +220,8 @@ export default function OperatorEdgeAlerts() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Edge alerts</h1>
           <p className="text-sm text-muted-foreground">
-            Live breach state from <code>edge-metrics-alert-check</code> and
-            cooldown history from <code>edge_metrics_alert_dispatches</code>.
+            Live breach state from <code>edge-metrics-alert-check</code> and cooldown history from{" "}
+            <code>edge_metrics_alert_dispatches</code>.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -261,8 +252,7 @@ export default function OperatorEdgeAlerts() {
             <CardTitle className="text-3xl">{suppressed.length}</CardTitle>
           </CardHeader>
           <CardContent className="text-xs text-muted-foreground">
-            Breaches skipped because they fired within the last{" "}
-            {cooldownMinutes ?? "?"} min.
+            Breaches skipped because they fired within the last {cooldownMinutes ?? "?"} min.
           </CardContent>
         </Card>
         <Card>
@@ -284,9 +274,7 @@ export default function OperatorEdgeAlerts() {
             <CardTitle className="flex items-center gap-2 text-destructive">
               <AlertTriangle className="h-4 w-4" /> Live check failed
             </CardTitle>
-            <CardDescription>
-              {(liveQuery.error as Error).message}
-            </CardDescription>
+            <CardDescription>{(liveQuery.error as Error).message}</CardDescription>
           </CardHeader>
         </Card>
       ) : null}
@@ -307,8 +295,8 @@ export default function OperatorEdgeAlerts() {
             </h2>
             {fired.length === 0 ? (
               <p className="text-sm text-muted-foreground flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-emerald-500" /> No breaches
-                fired in this window.
+                <CheckCircle2 className="h-4 w-4 text-emerald-500" /> No breaches fired in this
+                window.
               </p>
             ) : (
               <Table>
@@ -375,10 +363,7 @@ export default function OperatorEdgeAlerts() {
                       >
                         {formatRelative(b.last_fired_at, now)}
                       </TableCell>
-                      <TableCell
-                        className="text-xs"
-                        title={formatAbsolute(b.next_eligible_at)}
-                      >
+                      <TableCell className="text-xs" title={formatAbsolute(b.next_eligible_at)}>
                         {formatRelative(b.next_eligible_at, now)}
                       </TableCell>
                     </TableRow>
@@ -394,21 +379,17 @@ export default function OperatorEdgeAlerts() {
         <CardHeader>
           <CardTitle>Cooldown state</CardTitle>
           <CardDescription>
-            All persisted dispatch rows. Cooldown expiry = last_fired_at +{" "}
-            {cooldownMinutes ?? "?"} min (from the alert function config).
+            All persisted dispatch rows. Cooldown expiry = last_fired_at + {cooldownMinutes ?? "?"}{" "}
+            min (from the alert function config).
           </CardDescription>
         </CardHeader>
         <CardContent>
           {dispatchesQuery.isLoading ? (
             <p className="text-sm text-muted-foreground">Loading dispatch history…</p>
           ) : dispatchesQuery.error ? (
-            <p className="text-sm text-destructive">
-              {(dispatchesQuery.error as Error).message}
-            </p>
+            <p className="text-sm text-destructive">{(dispatchesQuery.error as Error).message}</p>
           ) : dispatchesWithExpiry.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No dispatches recorded yet.
-            </p>
+            <p className="text-sm text-muted-foreground">No dispatches recorded yet.</p>
           ) : (
             <Table>
               <TableHeader>

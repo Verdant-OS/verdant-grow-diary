@@ -60,7 +60,6 @@ describe("Action Queue complete/cancel transitions", () => {
     expect(src).not.toMatch(/service_role/i);
   });
 
-
   it("introduces no device-control surface", () => {
     expect(src).not.toMatch(/mqtt|home.?assistant|pi_bridge|webhook|relay|actuator/i);
   });

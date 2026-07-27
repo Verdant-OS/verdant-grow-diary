@@ -110,14 +110,10 @@ const UNKNOWN_COPY: CopyEntry = {
   requiresReauth: false,
 };
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function isEdgeErrorCode(value: unknown): value is EdgeErrorCode {
-  return (
-    typeof value === "string" &&
-    (EDGE_ERROR_CODES as readonly string[]).includes(value)
-  );
+  return typeof value === "string" && (EDGE_ERROR_CODES as readonly string[]).includes(value);
 }
 
 function coerceRequestId(value: unknown): string | null {

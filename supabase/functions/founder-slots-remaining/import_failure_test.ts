@@ -14,10 +14,7 @@
 Deno.env.set("FOUNDER_SLOTS_SKIP_SERVE", "1");
 
 import { assert, assertEquals, assertMatch } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import {
-  __setDepsLoaderForTesting,
-  handleFounderSlotsRequest,
-} from "./index.ts";
+import { __setDepsLoaderForTesting, handleFounderSlotsRequest } from "./index.ts";
 
 interface CapturedLog {
   level: "log" | "warn" | "error";
@@ -32,16 +29,18 @@ function captureLogs(): { logs: CapturedLog[]; restore: () => void } {
     warn: console.warn,
     error: console.error,
   };
-  const wrap = (level: CapturedLog["level"]) => (...args: unknown[]) => {
-    const line = args.map((a) => (typeof a === "string" ? a : JSON.stringify(a))).join(" ");
-    let parsed: Record<string, unknown> = {};
-    try {
-      parsed = JSON.parse(line);
-    } catch {
-      // non-JSON boot logs — ignore
-    }
-    logs.push({ level, line, parsed });
-  };
+  const wrap =
+    (level: CapturedLog["level"]) =>
+    (...args: unknown[]) => {
+      const line = args.map((a) => (typeof a === "string" ? a : JSON.stringify(a))).join(" ");
+      let parsed: Record<string, unknown> = {};
+      try {
+        parsed = JSON.parse(line);
+      } catch {
+        // non-JSON boot logs — ignore
+      }
+      logs.push({ level, line, parsed });
+    };
   console.log = wrap("log");
   console.warn = wrap("warn");
   console.error = wrap("error");
@@ -60,9 +59,7 @@ function findEvent(logs: CapturedLog[], event: string): CapturedLog | undefined 
 }
 
 Deno.test("startup_import_failed → 503 slots_unavailable with structured event", async () => {
-  const importError = new TypeError(
-    "Module not found \"npm:@supabase/supabase-js@2\".",
-  );
+  const importError = new TypeError('Module not found "npm:@supabase/supabase-js@2".');
   __setDepsLoaderForTesting(() => Promise.reject(importError));
 
   const { logs, restore } = captureLogs();
@@ -74,10 +71,7 @@ Deno.test("startup_import_failed → 503 slots_unavailable with structured event
     assertEquals(res.status, 503);
     const requestId = res.headers.get("x-request-id");
     assert(requestId, "response must carry x-request-id header");
-    assertMatch(
-      requestId!,
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
-    );
+    assertMatch(requestId!, /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
 
     const body = await res.json();
     assertEquals(body.error, "slots_unavailable");
@@ -91,10 +85,7 @@ Deno.test("startup_import_failed → 503 slots_unavailable with structured event
     assertEquals(startup!.level, "error");
 
     const requestScoped = findEvent(logs, "startup_dependencies_unavailable");
-    assert(
-      requestScoped,
-      "expected request-scoped startup_dependencies_unavailable event",
-    );
+    assert(requestScoped, "expected request-scoped startup_dependencies_unavailable event");
     assertEquals(requestScoped!.parsed.request_id, requestId);
     assertEquals(requestScoped!.parsed.severity, "critical");
 
@@ -151,10 +142,7 @@ Deno.test("import failure is transient — subsequent call retries loader", asyn
     assertEquals(calls, 2, "loader must be invoked again after a failure");
 
     const envMissing = findEvent(logs, "env_missing");
-    assert(
-      envMissing,
-      "second call should reach env_missing branch (proving loader retried)",
-    );
+    assert(envMissing, "second call should reach env_missing branch (proving loader retried)");
   } finally {
     restore();
     __setDepsLoaderForTesting(null);

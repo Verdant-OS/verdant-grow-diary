@@ -60,9 +60,7 @@ Deno.test(
           headers: { "x-request-id": requestId },
         }),
       );
-      const requestMetric = rows.find(
-        (r) => r.event_type === "request_metric",
-      );
+      const requestMetric = rows.find((r) => r.event_type === "request_metric");
       assert(requestMetric, "expected a request_metric row");
       assertEquals(
         requestMetric.idempotency_key,
@@ -101,70 +99,53 @@ Deno.test(
       // the write server-side.
       await req();
       await req();
-      const requestMetrics = rows.filter(
-        (r) => r.event_type === "request_metric",
-      );
+      const requestMetrics = rows.filter((r) => r.event_type === "request_metric");
       assertEquals(requestMetrics.length, 2, "writer fires per invocation");
       assertEquals(
         requestMetrics[0].idempotency_key,
         requestMetrics[1].idempotency_key,
         "retries must reuse the same idempotency_key so the server-side unique index dedups them",
       );
-      assertEquals(
-        requestMetrics[0].idempotency_key,
-        `${FN}:req:${requestId}`,
-      );
+      assertEquals(requestMetrics[0].idempotency_key, `${FN}:req:${requestId}`);
     } finally {
       reset();
     }
   },
 );
 
-Deno.test(
-  "distinct request_ids produce distinct idempotency_keys",
-  async () => {
-    primeEnv();
-    const rows: Record<string, unknown>[] = [];
-    __setMetricPersistorForTesting(async (row) => {
-      rows.push(row as unknown as Record<string, unknown>);
-    });
-    try {
-      const a = "33333333-3333-4333-8333-333333333333";
-      const b = "44444444-4444-4444-8444-444444444444";
-      await handleFounderSlotsRequest(
-        new Request("http://localhost/founder-slots-remaining", {
-          method: "GET",
-          headers: { "x-request-id": a },
-        }),
-      );
-      await handleFounderSlotsRequest(
-        new Request("http://localhost/founder-slots-remaining", {
-          method: "GET",
-          headers: { "x-request-id": b },
-        }),
-      );
-      const requestMetrics = rows.filter(
-        (r) => r.event_type === "request_metric",
-      );
-      assertEquals(requestMetrics.length, 2);
-      assertEquals(
-        requestMetrics[0].idempotency_key,
-        `${FN}:req:${a}`,
-      );
-      assertEquals(
-        requestMetrics[1].idempotency_key,
-        `${FN}:req:${b}`,
-      );
-      assert(
-        requestMetrics[0].idempotency_key !==
-          requestMetrics[1].idempotency_key,
-        "distinct requests must not share a dedup key",
-      );
-    } finally {
-      reset();
-    }
-  },
-);
+Deno.test("distinct request_ids produce distinct idempotency_keys", async () => {
+  primeEnv();
+  const rows: Record<string, unknown>[] = [];
+  __setMetricPersistorForTesting(async (row) => {
+    rows.push(row as unknown as Record<string, unknown>);
+  });
+  try {
+    const a = "33333333-3333-4333-8333-333333333333";
+    const b = "44444444-4444-4444-8444-444444444444";
+    await handleFounderSlotsRequest(
+      new Request("http://localhost/founder-slots-remaining", {
+        method: "GET",
+        headers: { "x-request-id": a },
+      }),
+    );
+    await handleFounderSlotsRequest(
+      new Request("http://localhost/founder-slots-remaining", {
+        method: "GET",
+        headers: { "x-request-id": b },
+      }),
+    );
+    const requestMetrics = rows.filter((r) => r.event_type === "request_metric");
+    assertEquals(requestMetrics.length, 2);
+    assertEquals(requestMetrics[0].idempotency_key, `${FN}:req:${a}`);
+    assertEquals(requestMetrics[1].idempotency_key, `${FN}:req:${b}`);
+    assert(
+      requestMetrics[0].idempotency_key !== requestMetrics[1].idempotency_key,
+      "distinct requests must not share a dedup key",
+    );
+  } finally {
+    reset();
+  }
+});
 
 Deno.test(
   "metric_snapshot rows use a `${fn}:snap:${window_start_ms}` key so retries dedup per window",

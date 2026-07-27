@@ -26,8 +26,7 @@ import {
 // network) does not leak fetch handles across Deno tests.
 __setMetricPersistorForTesting(async () => {});
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const SUPPLIED_ID = "6b1c9d2e-1111-4a22-8bbb-abcdef012345";
 
 function silenceLogs(): () => void {
@@ -45,11 +44,7 @@ function silenceLogs(): () => void {
 type Scenario = {
   name: string;
   expectedStatus: 405 | 503;
-  expectedErrorCode:
-    | "env_missing"
-    | "rpc_error"
-    | "rpc_invalid_payload"
-    | "method_not_allowed";
+  expectedErrorCode: "env_missing" | "rpc_error" | "rpc_invalid_payload" | "method_not_allowed";
   buildRequest: (headers?: HeadersInit) => Request;
   prepare: () => void;
 };
@@ -59,8 +54,7 @@ const scenarios: Scenario[] = [
     name: "env_missing (503)",
     expectedStatus: 503,
     expectedErrorCode: "env_missing",
-    buildRequest: (headers) =>
-      new Request("http://localhost/", { method: "GET", headers }),
+    buildRequest: (headers) => new Request("http://localhost/", { method: "GET", headers }),
     prepare: () => {
       Deno.env.delete("SUPABASE_URL");
       Deno.env.delete("SUPABASE_SERVICE_ROLE_KEY");
@@ -70,7 +64,7 @@ const scenarios: Scenario[] = [
             throw new Error("must not be called when env is missing");
           }) as never,
           buildFounderSlotsPayload: (() => null) as never,
-        })
+        }),
       );
     },
   },
@@ -78,8 +72,7 @@ const scenarios: Scenario[] = [
     name: "rpc_error (503)",
     expectedStatus: 503,
     expectedErrorCode: "rpc_error",
-    buildRequest: (headers) =>
-      new Request("http://localhost/", { method: "GET", headers }),
+    buildRequest: (headers) => new Request("http://localhost/", { method: "GET", headers }),
     prepare: () => {
       Deno.env.set("SUPABASE_URL", "http://localhost");
       Deno.env.set("SUPABASE_SERVICE_ROLE_KEY", "test-service-role");
@@ -93,7 +86,7 @@ const scenarios: Scenario[] = [
               }),
           })) as never,
           buildFounderSlotsPayload: (() => null) as never,
-        })
+        }),
       );
     },
   },
@@ -101,19 +94,17 @@ const scenarios: Scenario[] = [
     name: "rpc_invalid_payload (503)",
     expectedStatus: 503,
     expectedErrorCode: "rpc_invalid_payload",
-    buildRequest: (headers) =>
-      new Request("http://localhost/", { method: "GET", headers }),
+    buildRequest: (headers) => new Request("http://localhost/", { method: "GET", headers }),
     prepare: () => {
       Deno.env.set("SUPABASE_URL", "http://localhost");
       Deno.env.set("SUPABASE_SERVICE_ROLE_KEY", "test-service-role");
       __setDepsLoaderForTesting(() =>
         Promise.resolve({
           createClient: ((_url: string, _key: string) => ({
-            rpc: (_name: string) =>
-              Promise.resolve({ data: "not-a-number", error: null }),
+            rpc: (_name: string) => Promise.resolve({ data: "not-a-number", error: null }),
           })) as never,
           buildFounderSlotsPayload: ((_data: unknown) => null) as never,
-        })
+        }),
       );
     },
   },
@@ -121,43 +112,39 @@ const scenarios: Scenario[] = [
     name: "method_not_allowed (405)",
     expectedStatus: 405,
     expectedErrorCode: "method_not_allowed",
-    buildRequest: (headers) =>
-      new Request("http://localhost/", { method: "DELETE", headers }),
+    buildRequest: (headers) => new Request("http://localhost/", { method: "DELETE", headers }),
     // No deps needed — method is rejected before loadDeps runs.
     prepare: () => __setDepsLoaderForTesting(null),
   },
 ];
 
 for (const scenario of scenarios) {
-  Deno.test(
-    `x-request-id echo — client-supplied UUID preserved on ${scenario.name}`,
-    async () => {
-      scenario.prepare();
-      const restore = silenceLogs();
-      try {
-        const res = await handleFounderSlotsRequest(
-          scenario.buildRequest({ "x-request-id": SUPPLIED_ID }),
-        );
-        assertEquals(res.status, scenario.expectedStatus);
-        const headerId = res.headers.get("x-request-id");
-        assertEquals(
-          headerId,
-          SUPPLIED_ID,
-          "client-supplied x-request-id must be echoed on the response header",
-        );
-        const body = (await res.json()) as Record<string, unknown>;
-        assertEquals(body.error_code, scenario.expectedErrorCode);
-        assertEquals(
-          body.request_id,
-          SUPPLIED_ID,
-          "body request_id must equal the client-supplied x-request-id",
-        );
-      } finally {
-        restore();
-        __setDepsLoaderForTesting(null);
-      }
-    },
-  );
+  Deno.test(`x-request-id echo — client-supplied UUID preserved on ${scenario.name}`, async () => {
+    scenario.prepare();
+    const restore = silenceLogs();
+    try {
+      const res = await handleFounderSlotsRequest(
+        scenario.buildRequest({ "x-request-id": SUPPLIED_ID }),
+      );
+      assertEquals(res.status, scenario.expectedStatus);
+      const headerId = res.headers.get("x-request-id");
+      assertEquals(
+        headerId,
+        SUPPLIED_ID,
+        "client-supplied x-request-id must be echoed on the response header",
+      );
+      const body = (await res.json()) as Record<string, unknown>;
+      assertEquals(body.error_code, scenario.expectedErrorCode);
+      assertEquals(
+        body.request_id,
+        SUPPLIED_ID,
+        "body request_id must equal the client-supplied x-request-id",
+      );
+    } finally {
+      restore();
+      __setDepsLoaderForTesting(null);
+    }
+  });
 
   Deno.test(
     `x-request-id echo — server mints a UUID when none supplied on ${scenario.name}`,

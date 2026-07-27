@@ -16,9 +16,7 @@ export interface ActionQueueRpcStatusPillProps {
   availability: ActionQueueRpcAvailability;
 }
 
-export function ActionQueueRpcStatusPill({
-  availability,
-}: ActionQueueRpcStatusPillProps) {
+export function ActionQueueRpcStatusPill({ availability }: ActionQueueRpcStatusPillProps) {
   const pillClass =
     availability === "unavailable"
       ? "border-destructive/40 bg-destructive/10 text-destructive"

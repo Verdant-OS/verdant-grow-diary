@@ -23,14 +23,16 @@ interface CapturedLog {
 function captureLogs(): { logs: CapturedLog[]; restore: () => void } {
   const logs: CapturedLog[] = [];
   const originals = { log: console.log, warn: console.warn, error: console.error };
-  const wrap = () => (...args: unknown[]) => {
-    const line = args.map((a) => (typeof a === "string" ? a : JSON.stringify(a))).join(" ");
-    try {
-      logs.push({ parsed: JSON.parse(line) });
-    } catch {
-      // ignore non-JSON boot noise
-    }
-  };
+  const wrap =
+    () =>
+    (...args: unknown[]) => {
+      const line = args.map((a) => (typeof a === "string" ? a : JSON.stringify(a))).join(" ");
+      try {
+        logs.push({ parsed: JSON.parse(line) });
+      } catch {
+        // ignore non-JSON boot noise
+      }
+    };
   console.log = wrap();
   console.warn = wrap();
   console.error = wrap();

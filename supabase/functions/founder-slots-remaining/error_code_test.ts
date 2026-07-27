@@ -14,10 +14,7 @@
 Deno.env.set("FOUNDER_SLOTS_SKIP_SERVE", "1");
 
 import { assert, assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import {
-  __setDepsLoaderForTesting,
-  handleFounderSlotsRequest,
-} from "./index.ts";
+import { __setDepsLoaderForTesting, handleFounderSlotsRequest } from "./index.ts";
 
 function silenceLogs(): () => void {
   const originals = { log: console.log, warn: console.warn, error: console.error };
@@ -44,7 +41,7 @@ Deno.test("env_missing → 503 with error_code=env_missing", async () => {
         throw new Error("must not be called when env is missing");
       }) as never,
       buildFounderSlotsPayload: (() => null) as never,
-    })
+    }),
   );
   const restore = silenceLogs();
   try {
@@ -83,7 +80,7 @@ Deno.test("rpc_error → 503 with error_code=rpc_error and no PG details leaked"
           }),
       })) as never,
       buildFounderSlotsPayload: (() => null) as never,
-    })
+    }),
   );
   const restore = silenceLogs();
   try {
@@ -124,7 +121,7 @@ Deno.test("rpc_invalid_payload → 503 with error_code=rpc_invalid_payload", asy
       })) as never,
       // Return null to signal the payload builder rejected the RPC value.
       buildFounderSlotsPayload: ((_data: unknown) => null) as never,
-    })
+    }),
   );
   const restore = silenceLogs();
   try {

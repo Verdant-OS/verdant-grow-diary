@@ -428,8 +428,7 @@ export default function ActionQueue() {
   // placeholder instead of a stale/assumed green. Flips to "available" only
   // when a transition actually succeeds, and to "unavailable" when a
   // transition fails with a missing-RPC signal (persistent banner + red pill).
-  const [rpcAvailability, setRpcAvailability] =
-    useState<ActionQueueRpcAvailability>("unknown");
+  const [rpcAvailability, setRpcAvailability] = useState<ActionQueueRpcAvailability>("unknown");
   const rpcUnavailable = rpcAvailability === "unavailable";
 
   // Load existing approve/reject diary trace rows for the open drawer
@@ -739,7 +738,12 @@ export default function ActionQueue() {
       expectedStatus: row.status,
       note,
     });
-    const { data, error } = await (supabase.rpc as unknown as (fn: string, args: unknown) => Promise<{ data: unknown; error: unknown }>)("action_queue_transition", rpcArgs);
+    const { data, error } = await (
+      supabase.rpc as unknown as (
+        fn: string,
+        args: unknown,
+      ) => Promise<{ data: unknown; error: unknown }>
+    )("action_queue_transition", rpcArgs);
     const result = parseActionQueueTransitionRpcResult(data, rpcArgs);
     if (error || !result || result.ok !== true) {
       // Distinguish "backend RPC missing" from a normal transient failure so
@@ -1051,7 +1055,6 @@ export default function ActionQueue() {
               </Button>
             </div>
           }
-
         />
         {lastUpdatedAt !== null && (
           <p

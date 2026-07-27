@@ -155,11 +155,15 @@ async function seedFor(client: SupabaseClient, uid: string, label: string): Prom
 }
 
 async function seedExtraGrow(client: SupabaseClient, uid: string): Promise<string> {
+  // This second grow exists only to prove cross-grow mirror correlation.
+  // Keep it archived so the authenticated fixture follows the real Free
+  // one-active-grow boundary instead of granting itself a paid bypass.
   const { data, error } = await client
     .from("grows")
     .insert({
       user_id: uid,
       name: `dual-time-extra-grow-${STAMP}`,
+      is_archived: true,
     })
     .select("id")
     .single();

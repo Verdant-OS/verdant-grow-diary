@@ -137,6 +137,13 @@ describe("sensor-history read-cap runtime harness contract", () => {
     );
     expect(HARNESS).toContain("const ids = createdUserIds");
   });
+
+  it("compares PostgREST timestamps by instant instead of wire-format spelling", () => {
+    expect(HARNESS).toMatch(/function isSameInstant\(actual: unknown, expected: string\): boolean/);
+    expect(HARNESS).toContain("Date.parse(actual)");
+    expect(HARNESS).toContain("Date.parse(expected)");
+    expect(HARNESS).not.toMatch(/row\.captured_at\s*===\s*(?:RECENT_AT|OLD_AT)/);
+  });
 });
 
 describe("sensor-history server read-boundary audit", () => {
